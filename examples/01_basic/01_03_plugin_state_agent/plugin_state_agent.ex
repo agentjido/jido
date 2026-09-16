@@ -8,14 +8,18 @@ defmodule Jido.Examples.PluginStateAgent do
   """
 
   defmodule CountTurns do
-    use Jido.Plugin
+    use Jido.Plugin, agent: __MODULE__.Agent
+  end
+
+  defmodule CountTurns.Agent do
+    use Jido.Agent.Plugin
 
     @impl true
     def state_spec(_opts),
       do: {:turns, Zoi.integer() |> Zoi.min(0) |> Zoi.max(1) |> Zoi.default(0)}
 
     @impl true
-    def update_state(turns, _directives, _opts), do: {:ok, turns + 1}
+    def reduce(reduction, _opts), do: {:ok, reduction.plugin_state + 1}
   end
 
   use Jido.Agent, name: "basic_sdk_plugin_state"

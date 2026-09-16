@@ -85,22 +85,29 @@ end
 defmodule JidoTest.AgentRuntimeFixtures.BootPlugin do
   @moduledoc false
 
-  use Jido.Plugin
+  use Jido.Plugin, agent: __MODULE__.Agent, agent_server: __MODULE__.Server
+end
 
-  alias JidoTest.AgentRuntimeFixtures.BootPluginWorker
+defmodule JidoTest.AgentRuntimeFixtures.BootPlugin.Agent do
+  use Jido.Agent.Plugin
 
-  @impl Jido.Plugin
+  @impl true
   def state_spec(_opts) do
     {:boot, Zoi.object(%{calls: Zoi.integer() |> Zoi.default(0)}) |> Zoi.default(%{calls: 0})}
   end
 
-  @impl Jido.Plugin
-  def update_state(state, _directives, _opts) do
-    {:ok, Map.update!(state, :calls, &(&1 + 1))}
+  @impl true
+  def reduce(reduction, _opts) do
+    {:ok, Map.update!(reduction.plugin_state, :calls, &(&1 + 1))}
   end
+end
+
+defmodule JidoTest.AgentRuntimeFixtures.BootPlugin.Server do
+  use Jido.AgentServer.Plugin
+  alias JidoTest.AgentRuntimeFixtures.BootPluginWorker
 
   def child_spec(init) do
-    Supervisor.child_spec({BootPluginWorker, init}, id: __MODULE__)
+    Supervisor.child_spec({BootPluginWorker, init}, id: JidoTest.AgentRuntimeFixtures.BootPlugin)
   end
 end
 

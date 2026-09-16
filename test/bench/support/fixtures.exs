@@ -21,19 +21,27 @@ end
 
 defmodule JidoCoreBench.PreparePlugin do
   @moduledoc false
-  use Jido.Plugin
+  use Jido.Plugin, agent: __MODULE__.Agent
+end
+
+defmodule JidoCoreBench.PreparePlugin.Agent do
+  use Jido.Agent.Plugin
   @impl true
   def state_spec(_opts), do: :none
 end
 
 defmodule JidoCoreBench.AdmitPlugin do
   @moduledoc false
-  use Jido.Plugin
+  use Jido.Plugin, agent_server: __MODULE__.Server
+end
+
+defmodule JidoCoreBench.AdmitPlugin.Server do
+  use Jido.AgentServer.Plugin
 
   @impl true
-  def admit(_runtime, command, _opts) do
-    JidoCoreBench.Fixtures.barrier(command.context)
-    {:ok, command}
+  def admit(_runtime, admission, _opts) do
+    JidoCoreBench.Fixtures.barrier(admission.caller_context)
+    {:ok, nil}
   end
 end
 

@@ -13,19 +13,21 @@ defmodule Jido.Plugin.ContractTest do
   end
 
   defmodule RaisingMarkerPlugin do
-    @behaviour Jido.Plugin
-
     def __jido_plugin__, do: raise("invalid marker")
   end
 
   defmodule AdmissionPlugin do
-    use Jido.Plugin
+    use Jido.Plugin, agent_server: __MODULE__.Server
+  end
+
+  defmodule AdmissionPlugin.Server do
+    use Jido.AgentServer.Plugin
 
     @impl true
-    def admit(_runtime, command, opts) do
+    def admit(_runtime, _admission, opts) do
       case Keyword.fetch!(opts, :mode) do
-        :invalid -> {:ok, :not_a_command}
-        :replace -> {:ok, %{command | agent: %{command.agent | id: "replacement"}}}
+        :invalid -> :not_a_result
+        :accept -> {:ok, :runtime_input}
         :reject -> {:error, :denied}
       end
     end
@@ -55,7 +57,11 @@ defmodule Jido.Plugin.ContractTest do
   end
 
   defmodule OwnedStatePlugin do
-    use Jido.Plugin
+    use Jido.Plugin, agent: __MODULE__.Agent
+  end
+
+  defmodule OwnedStatePlugin.Agent do
+    use Jido.Agent.Plugin
 
     @impl true
     def state_spec(_opts) do
@@ -68,7 +74,11 @@ defmodule Jido.Plugin.ContractTest do
   end
 
   defmodule NilOwnedStatePlugin do
-    use Jido.Plugin
+    use Jido.Plugin, agent: __MODULE__.Agent
+  end
+
+  defmodule NilOwnedStatePlugin.Agent do
+    use Jido.Agent.Plugin
 
     @impl true
     def state_spec(_opts) do
@@ -96,6 +106,7 @@ defmodule Jido.Plugin.ContractTest do
 
   defmodule OwnedDirective do
     defstruct value: nil
+    def validate(%__MODULE__{}), do: {:ok, %Jido.Agent.Directive.Stop{}}
   end
 
   defmodule ReturnOwnedDirective do
@@ -108,30 +119,35 @@ defmodule Jido.Plugin.ContractTest do
   end
 
   defmodule ReplaceDirectiveTypePlugin do
-    use Jido.Plugin
+    use Jido.Plugin, agent: __MODULE__.Agent, agent_server: __MODULE__.Server
+  end
+
+  defmodule ReplaceDirectiveTypePlugin.Agent do
+    use Jido.Agent.Plugin
 
     @impl true
     def directives(_opts), do: [OwnedDirective]
+  end
 
-    @impl true
-    def validate_directive(%OwnedDirective{}, _opts) do
-      {:ok, %Jido.Agent.Directive.Stop{}}
-    end
+  defmodule ReplaceDirectiveTypePlugin.Server do
+    use Jido.AgentServer.Plugin
 
     @impl true
     def dispatch(_runtime, _directive, _context, _opts), do: :ok
 
     def child_spec(_init) do
-      Supervisor.child_spec({Elixir.Agent, fn -> nil end}, id: __MODULE__)
+      Supervisor.child_spec({Elixir.Agent, fn -> nil end}, id: ReplaceDirectiveTypePlugin)
     end
   end
 
   defmodule ReducedDirective do
     defstruct []
+    def validate(%__MODULE__{} = directive), do: {:ok, directive}
   end
 
   defmodule ForeignDirective do
     defstruct []
+    def validate(%__MODULE__{} = directive), do: {:ok, directive}
   end
 
   defmodule ReturnMixedDirectives do
@@ -144,7 +160,11 @@ defmodule Jido.Plugin.ContractTest do
   end
 
   defmodule DirectiveReducerPlugin do
-    use Jido.Plugin
+    use Jido.Plugin, agent: __MODULE__.Agent
+  end
+
+  defmodule DirectiveReducerPlugin.Agent do
+    use Jido.Agent.Plugin
 
     @impl true
     def state_spec(_opts) do
@@ -152,36 +172,42 @@ defmodule Jido.Plugin.ContractTest do
     end
 
     @impl true
-    def update_state(state, directives, _opts) do
-      {:ok, %{state | seen: Enum.map(directives, & &1.__struct__)}}
+    def reduce(reduction, _opts) do
+      owned = Enum.filter(reduction.directives, &match?(%ReducedDirective{}, &1))
+      {:ok, %{reduction.plugin_state | seen: Enum.map(owned, & &1.__struct__)}}
     end
 
     @impl true
     def directives(_opts), do: [ReducedDirective]
-
-    @impl true
-    def validate_directive(%ReducedDirective{} = directive, _opts), do: {:ok, directive}
   end
 
   defmodule ForeignDirectivePlugin do
-    use Jido.Plugin
+    use Jido.Plugin, agent: __MODULE__.Agent, agent_server: __MODULE__.Server
+  end
+
+  defmodule ForeignDirectivePlugin.Agent do
+    use Jido.Agent.Plugin
 
     @impl true
     def directives(_opts), do: [ForeignDirective]
+  end
 
-    @impl true
-    def validate_directive(%ForeignDirective{} = directive, _opts), do: {:ok, directive}
+  defmodule ForeignDirectivePlugin.Server do
+    use Jido.AgentServer.Plugin
 
     @impl true
     def dispatch(_runtime, _directive, _context, _opts), do: :ok
 
     def child_spec(_init) do
-      Supervisor.child_spec({Elixir.Agent, fn -> nil end}, id: __MODULE__)
+      Supervisor.child_spec({Elixir.Agent, fn -> nil end}, id: ForeignDirectivePlugin)
     end
   end
 
   defmodule NormalizedDirective do
     defstruct [:value]
+
+    def validate(%__MODULE__{} = directive),
+      do: {:ok, %{directive | value: String.trim(directive.value)}}
   end
 
   defmodule ReturnNormalizedDirective do
@@ -194,7 +220,11 @@ defmodule Jido.Plugin.ContractTest do
   end
 
   defmodule NormalizingDirectivePlugin do
-    use Jido.Plugin
+    use Jido.Plugin, agent: __MODULE__.Agent
+  end
+
+  defmodule NormalizingDirectivePlugin.Agent do
+    use Jido.Agent.Plugin
 
     @impl true
     def state_spec(_opts) do
@@ -203,74 +233,88 @@ defmodule Jido.Plugin.ContractTest do
     end
 
     @impl true
-    def update_state(state, [%NormalizedDirective{value: value}], _opts) do
-      {:ok, %{state | value: value}}
+    def reduce(reduction, _opts) do
+      case Enum.find(reduction.directives, &match?(%NormalizedDirective{}, &1)) do
+        %NormalizedDirective{value: value} -> {:ok, %{reduction.plugin_state | value: value}}
+        nil -> {:ok, reduction.plugin_state}
+      end
     end
 
     @impl true
     def directives(_opts), do: [NormalizedDirective]
-
-    @impl true
-    def validate_directive(%NormalizedDirective{} = directive, _opts) do
-      {:ok, %{directive | value: String.trim(directive.value)}}
-    end
   end
 
   defmodule UnhandledDirective do
     defstruct []
+    def validate(%__MODULE__{} = directive), do: {:ok, directive}
+  end
+
+  defmodule MissingValidationDirective do
+    defstruct []
   end
 
   defmodule MissingValidationPlugin do
-    use Jido.Plugin
+    use Jido.Plugin, agent: __MODULE__.Agent
+  end
+
+  defmodule MissingValidationPlugin.Agent do
+    use Jido.Agent.Plugin
 
     @impl true
     def state_spec(_opts),
       do: {:missing_validation, Zoi.integer() |> Zoi.default(0)}
 
     @impl true
-    def update_state(state, _directives, _opts), do: {:ok, state}
+    def reduce(reduction, _opts), do: {:ok, reduction.plugin_state}
 
     @impl true
-    def directives(_opts), do: [UnhandledDirective]
+    def directives(_opts), do: [MissingValidationDirective]
   end
 
   defmodule UnhandledDirectivePlugin do
-    use Jido.Plugin
+    use Jido.Plugin, agent: __MODULE__.Agent
+  end
+
+  defmodule UnhandledDirectivePlugin.Agent do
+    use Jido.Agent.Plugin
 
     @impl true
     def directives(_opts), do: [UnhandledDirective]
-
-    @impl true
-    def validate_directive(%UnhandledDirective{} = directive, _opts), do: {:ok, directive}
   end
 
   defmodule DispatchWithoutRuntimePlugin do
-    use Jido.Plugin
+    use Jido.Plugin, agent: __MODULE__.Agent, agent_server: __MODULE__.Server
+  end
+
+  defmodule DispatchWithoutRuntimePlugin.Agent do
+    use Jido.Agent.Plugin
 
     @impl true
     def directives(_opts), do: [UnhandledDirective]
+  end
 
-    @impl true
-    def validate_directive(%UnhandledDirective{} = directive, _opts), do: {:ok, directive}
+  defmodule DispatchWithoutRuntimePlugin.Server do
+    use Jido.AgentServer.Plugin
 
     @impl true
     def dispatch(_runtime, _directive, _context, _opts), do: :ok
   end
 
   defmodule BuiltInDirectivePlugin do
-    use Jido.Plugin
+    use Jido.Plugin, agent: __MODULE__.Agent
+  end
+
+  defmodule BuiltInDirectivePlugin.Agent do
+    use Jido.Agent.Plugin
 
     @impl true
     def state_spec(_opts), do: {:invalid_owner, Zoi.integer() |> Zoi.default(0)}
 
     @impl true
-    def update_state(state, _directives, _opts), do: {:ok, state}
+    def reduce(reduction, _opts), do: {:ok, reduction.plugin_state}
 
     @impl true
     def directives(_opts), do: [Jido.Agent.Directive.Stop]
-
-    @impl true
-    def validate_directive(directive, _opts), do: {:ok, directive}
   end
 
   defmodule InvalidStateAgent do
@@ -339,14 +383,14 @@ defmodule Jido.Plugin.ContractTest do
     assert {:error, %Jido.Error.ValidationError{message: message}} =
              Jido.Plugin.normalize_all([CallbackOnlyPlugin])
 
-    assert message == "Agent Plugin must use Jido.Plugin"
+    assert message == "Plugin must use an owner-facet Jido.Plugin manifest"
   end
 
   test "requires validation for each declared Directive type" do
     assert {:error, %Jido.Error.ValidationError{message: message}} =
              Jido.Plugin.normalize_all([MissingValidationPlugin])
 
-    assert message == "Agent Plugin with Directives must define validate_directive/2"
+    assert message == "Agent Plugin Directive must define validate/1"
   end
 
   test "requires each Plugin Directive to reduce state or dispatch runtime work" do
@@ -372,7 +416,7 @@ defmodule Jido.Plugin.ContractTest do
     assert {:error, %Jido.Error.ValidationError{message: message}} =
              Jido.Plugin.normalize_all([MarkerOnlyPlugin])
 
-    assert message == "Agent Plugin must use Jido.Plugin"
+    assert message == "Plugin must use an owner-facet Jido.Plugin manifest"
   end
 
   test "contains a Plugin marker fault" do
@@ -394,7 +438,7 @@ defmodule Jido.Plugin.ContractTest do
     end
   end
 
-  test "admission keeps its error contract for invalid commands and Agent replacement" do
+  test "admission accepts only a runtime input result or an explicit error" do
     agent =
       Jido.Agent.new!(
         name: "plugin_admission_contract",
@@ -410,26 +454,18 @@ defmodule Jido.Plugin.ContractTest do
     assert {:error, %Jido.Error.ExecutionError{} = invalid} =
              Jido.Plugin.admit(command, invalid_specs, %{})
 
-    assert invalid.message == "Agent Plugin admit/3 returned an invalid result"
+    assert invalid.message == "Agent Server Plugin admit/3 returned an invalid result"
 
     assert invalid.details == %{
              code: :plugin_invalid_callback_result,
              plugin: AdmissionPlugin,
-             result: {:ok, :not_a_command}
+             facet: AdmissionPlugin.Server,
+             result: :not_a_result
            }
 
-    assert {:ok, replace_specs} = Jido.Plugin.normalize_all([{AdmissionPlugin, mode: :replace}])
-
-    assert {:error, %Jido.Error.ExecutionError{} = replacement} =
-             Jido.Plugin.admit(command, replace_specs, %{})
-
-    assert replacement.message == "Agent Plugin cannot replace the Agent"
-
-    assert replacement.details == %{
-             code: :plugin_invalid_callback_result,
-             plugin: AdmissionPlugin,
-             callback: :admit
-           }
+    assert {:ok, accept_specs} = Jido.Plugin.normalize_all([{AdmissionPlugin, mode: :accept}])
+    assert {:ok, accepted} = Jido.Plugin.admit(command, accept_specs, %{})
+    assert accepted.plugin_inputs[AdmissionPlugin].runtime == :runtime_input
 
     assert {:ok, reject_specs} = Jido.Plugin.normalize_all([{AdmissionPlugin, mode: :reject}])
     assert {:error, :denied} = Jido.Plugin.admit(command, reject_specs, %{})
@@ -462,10 +498,10 @@ defmodule Jido.Plugin.ContractTest do
     agent = ReplaceDirectiveTypeAgent.new!()
     signal = Signal.new!("directive.replace", %{}, source: "/test")
 
-    assert {:error, %Jido.Error.ExecutionError{message: message}} =
+    assert {:error, %Jido.Error.ValidationError{message: message}} =
              ReplaceDirectiveTypeAgent.cmd(agent, signal)
 
-    assert message == "Agent Plugin validate_directive/2 changed Directive type"
+    assert message == "Agent Directive validation changed its type"
   end
 
   test "gives a Plugin state reducer only its owned Directives" do

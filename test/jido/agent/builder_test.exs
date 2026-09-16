@@ -102,6 +102,6 @@ defmodule Jido.Agent.BuilderTest do
 
     builder = Builder.new(name: "valid") |> Builder.plugin(String)
     assert {:error, error} = Builder.build(builder)
-    assert error.message == "Agent Plugin must use Jido.Plugin"
+    assert error.message == "Plugin must use an owner-facet Jido.Plugin manifest"
   end
 end

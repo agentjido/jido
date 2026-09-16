@@ -10,26 +10,30 @@ defmodule Jido.Plugin.StateRuntimeTest do
     defstruct Zoi.Struct.struct_fields(@schema)
 
     def schema, do: @schema
+    def validate(%__MODULE__{} = directive), do: Zoi.parse(@schema, directive)
   end
 
   defmodule Credits do
-    use Jido.Plugin
+    use Jido.Plugin, agent: __MODULE__.Agent
+  end
 
-    @impl Jido.Plugin
+  defmodule Credits.Agent do
+    use Jido.Agent.Plugin
+
+    @impl true
     def state_spec(_opts), do: {:credits, Zoi.integer() |> Zoi.min(0) |> Zoi.default(3)}
 
-    @impl Jido.Plugin
+    @impl true
     def directives(_opts), do: [Spend]
 
-    @impl Jido.Plugin
-    def validate_directive(%Spend{} = directive, _opts),
-      do: Zoi.parse(Spend.schema(), directive)
-
-    @impl Jido.Plugin
-    def update_state(credits, directives, _opts),
+    @impl true
+    def reduce(reduction, _opts),
       do:
         {:ok,
-         Enum.reduce(directives, credits, fn %Spend{amount: amount}, left -> left - amount end)}
+         Enum.reduce(reduction.directives, reduction.plugin_state, fn
+           %Spend{amount: amount}, left -> left - amount
+           _directive, left -> left
+         end)}
   end
 
   defmodule SpendCredits do

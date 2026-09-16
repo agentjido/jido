@@ -9,6 +9,7 @@ defmodule Jido.Examples.Factory.Async.Request do
   @enforce_keys Zoi.Struct.enforce_keys(@schema)
   defstruct Zoi.Struct.struct_fields(@schema)
   def schema, do: @schema
+  def validate(%__MODULE__{} = value), do: Zoi.parse(@schema, value)
 end
 
 defmodule Jido.Examples.Factory.Async.Cancel do
@@ -17,6 +18,7 @@ defmodule Jido.Examples.Factory.Async.Cancel do
   @enforce_keys Zoi.Struct.enforce_keys(@schema)
   defstruct Zoi.Struct.struct_fields(@schema)
   def schema, do: @schema
+  def validate(%__MODULE__{} = value), do: Zoi.parse(@schema, value)
 end
 
 defmodule Jido.Examples.Factory.Async.Forget do
@@ -25,20 +27,12 @@ defmodule Jido.Examples.Factory.Async.Forget do
   @enforce_keys Zoi.Struct.enforce_keys(@schema)
   defstruct Zoi.Struct.struct_fields(@schema)
   def schema, do: @schema
+  def validate(%__MODULE__{} = value), do: Zoi.parse(@schema, value)
 end
 
 defmodule Jido.Examples.Factory.Async do
   @moduledoc "Starts linked tasks after commit and returns results through Signals. No replay is implied."
-  use Jido.Plugin
-  alias __MODULE__.{Cancel, Forget, Request, Runtime}
-
-  def directives(_), do: [Request, Cancel, Forget]
-  def validate_directive(%{__struct__: module} = value, _), do: Zoi.parse(module.schema(), value)
-  def child_spec(init), do: Supervisor.child_spec({Runtime, init}, id: __MODULE__)
-  def await_ready(runtime, _), do: GenServer.call(runtime, :ready)
-
-  def dispatch(runtime, directive, context, _),
-    do: GenServer.call(runtime, {:dispatch, directive, context.turn_context})
+  use Jido.Plugin, agent: __MODULE__.Agent, agent_server: __MODULE__.Server
 
   @doc false
   def result_schema do
@@ -49,6 +43,29 @@ defmodule Jido.Examples.Factory.Async do
       error: Zoi.string()
     })
   end
+end
+
+defmodule Jido.Examples.Factory.Async.Agent do
+  use Jido.Agent.Plugin
+  alias Jido.Examples.Factory.Async.{Cancel, Forget, Request}
+
+  @impl true
+  def directives(_), do: [Request, Cancel, Forget]
+end
+
+defmodule Jido.Examples.Factory.Async.Server do
+  use Jido.AgentServer.Plugin
+  alias Jido.Examples.Factory.Async.Runtime
+
+  def child_spec(init),
+    do: Supervisor.child_spec({Runtime, init}, id: Jido.Examples.Factory.Async)
+
+  @impl true
+  def await_ready(runtime, _), do: GenServer.call(runtime, :ready)
+
+  @impl true
+  def dispatch(runtime, directive, context, _),
+    do: GenServer.call(runtime, {:dispatch, directive, context.turn_context})
 end
 
 defmodule Jido.Examples.Factory.Async.Runtime do

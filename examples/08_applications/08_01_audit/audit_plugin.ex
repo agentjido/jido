@@ -15,32 +15,35 @@ defmodule Jido.Examples.Applications.Audit.Record do
   defstruct Zoi.Struct.struct_fields(@schema)
 
   def schema, do: @schema
+  def validate(%__MODULE__{} = directive), do: Zoi.parse(@schema, Map.from_struct(directive))
 end
 
 defmodule Jido.Examples.Applications.Audit.Plugin do
   @moduledoc "Owns committed audit state and reconciles its runtime projection."
-  use Jido.Plugin
+  use Jido.Plugin, agent: __MODULE__.Agent, agent_server: __MODULE__.Server
+  alias Jido.Examples.Applications.Audit.Record
 
-  alias Jido.Plugin.{DirectiveContext, Init}
-  alias Jido.Examples.Applications.Audit.{Record, Runtime}
+  def record(event, outcome), do: %Record{event: event, outcome: outcome}
+end
+
+defmodule Jido.Examples.Applications.Audit.Plugin.Agent do
+  use Jido.Agent.Plugin
+  alias Jido.Examples.Applications.Audit.Record
 
   @state_schema Zoi.object(%{events: Zoi.list(Zoi.any()) |> Zoi.default([])})
                 |> Zoi.default(%{events: []})
 
-  def record(event, outcome), do: %Record{event: event, outcome: outcome}
-
-  @impl Jido.Plugin
+  @impl true
   def state_spec(_opts), do: {:audit, @state_schema}
 
-  @impl Jido.Plugin
+  @impl true
   def directives(_opts), do: [Record]
 
-  @impl Jido.Plugin
-  def validate_directive(%Record{} = directive, _opts),
-    do: Zoi.parse(Record.schema(), Map.from_struct(directive))
+  @impl true
+  def reduce(reduction, _opts) do
+    state = reduction.plugin_state
+    directives = Enum.filter(reduction.directives, &match?(%Record{}, &1))
 
-  @impl Jido.Plugin
-  def update_state(state, directives, _opts) do
     events =
       Enum.reduce(directives, state.events, fn %Record{} = record, events ->
         events ++ [%{event: record.event, outcome: record.outcome}]
@@ -48,15 +51,22 @@ defmodule Jido.Examples.Applications.Audit.Plugin do
 
     {:ok, %{state | events: events}}
   end
+end
 
-  @impl Jido.Plugin
+defmodule Jido.Examples.Applications.Audit.Plugin.Server do
+  use Jido.AgentServer.Plugin
+  alias Jido.Plugin.{DirectiveContext, Init}
+  alias Jido.Examples.Applications.Audit.Runtime
+
+  @impl true
   def dispatch(runtime, _directive, %DirectiveContext{} = context, _opts),
     do: GenServer.call(runtime, {:reconcile, context.plugin_state.events})
 
-  @impl Jido.Plugin
+  @impl true
   def await_ready(runtime, _opts), do: GenServer.call(runtime, :await_ready)
 
-  def child_spec(%Init{} = init), do: Supervisor.child_spec({Runtime, init}, id: __MODULE__)
+  def child_spec(%Init{} = init),
+    do: Supervisor.child_spec({Runtime, init}, id: Jido.Examples.Applications.Audit.Plugin)
 end
 
 defmodule Jido.Examples.Applications.Audit.Runtime do

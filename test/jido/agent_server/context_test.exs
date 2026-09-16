@@ -5,34 +5,45 @@ defmodule Jido.AgentServer.ContextTest do
   alias Jido.Signal
 
   defmodule ContextPlugin do
-    use Jido.Plugin
+    use Jido.Plugin, agent: __MODULE__.Agent, agent_server: __MODULE__.Server
+  end
+
+  defmodule ContextPlugin.Agent do
+    use Jido.Agent.Plugin
 
     @impl true
-    def admit(_runtime, command, _opts) do
-      if gate = Map.get(command.context, :gate) do
-        send(command.context.observer, {:admission_blocked, gate, self()})
+    def state_spec(_opts), do: {:context_plugin, Zoi.integer() |> Zoi.default(0)}
+
+    @impl true
+    def reduce(reduction, _opts), do: {:ok, reduction.plugin_state + 1}
+  end
+
+  defmodule ContextPlugin.Server do
+    use Jido.AgentServer.Plugin
+
+    @impl true
+    def admit(_runtime, admission, _opts) do
+      if gate = Map.get(admission.caller_context, :gate) do
+        send(admission.caller_context.observer, {:admission_blocked, gate, self()})
 
         receive do
           {:release, ^gate} -> :ok
         end
       end
 
-      if delay = Map.get(command.context, :prepare_delay), do: Process.sleep(delay)
+      if delay = Map.get(admission.caller_context, :prepare_delay), do: Process.sleep(delay)
 
-      if Map.get(command.context, :prepare_error) do
+      if Map.get(admission.caller_context, :prepare_error) do
         {:error, :prepared_too_late}
       else
-        send(command.context.observer, {:context_admitted, command.context, command.signal})
+        send(
+          admission.caller_context.observer,
+          {:context_admitted, admission.caller_context, admission.signal}
+        )
 
-        {:ok, Jido.Agent.Command.put_plugin_input(command, __MODULE__, %{admitted: true})}
+        {:ok, %{admitted: true}}
       end
     end
-
-    @impl true
-    def state_spec(_opts), do: {:context_plugin, Zoi.integer() |> Zoi.default(0)}
-
-    @impl true
-    def update_state(state, _directives, _opts), do: {:ok, state + 1}
 
     @impl true
     def prepare_dispatch(_runtime, signal, context, _opts) do
@@ -41,7 +52,7 @@ defmodule Jido.AgentServer.ContextTest do
     end
 
     def child_spec(init),
-      do: Supervisor.child_spec({Elixir.Agent, fn -> init end}, id: __MODULE__)
+      do: Supervisor.child_spec({Elixir.Agent, fn -> init end}, id: ContextPlugin)
   end
 
   defmodule Emit do

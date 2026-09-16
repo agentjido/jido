@@ -80,8 +80,8 @@ The split Plugin modules follow code ownership, not process placement:
 | `Jido.Persistence.Plugin` | Converts its owned value | No | No adapter access | No |
 | `Jido.Topology.Plugin` | No live state | No | No | No; static contribution only |
 
-This model keeps the old `Jido.Plugin` mixed-callback form as a compatibility
-adapter. It does not put all owner logic back in that module.
+This model uses only owner-facet package manifests. Package modules do not
+define lifecycle callbacks. Bundled Plugins use the same owner boundaries.
 
 ## Canonical implementation
 

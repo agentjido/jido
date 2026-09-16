@@ -55,14 +55,21 @@ defmodule Jido.AgentServer.FailureContractTest do
   end
 
   defmodule HeldReadyPlugin do
-    use Jido.Plugin
+    use Jido.Plugin, agent_server: __MODULE__.Server
+  end
+
+  defmodule HeldReadyPlugin.Server do
+    use Jido.AgentServer.Plugin
 
     def child_spec(_init) do
-      Supervisor.child_spec({Elixir.Agent, fn -> nil end}, id: __MODULE__)
+      Supervisor.child_spec({Elixir.Agent, fn -> nil end}, id: HeldReadyPlugin)
     end
 
     def await_ready(_runtime, opts) do
-      send(Keyword.fetch!(opts, :observer), {:readiness_waiting, self()})
+      observer =
+        :persistent_term.get({HeldReadyPlugin, :observer, Keyword.fetch!(opts, :observer_key)})
+
+      send(observer, {:readiness_waiting, self()})
 
       receive do
         :release_readiness -> :ok
@@ -263,7 +270,11 @@ defmodule Jido.AgentServer.FailureContractTest do
   end
 
   test "stale Plugin lifecycle messages cannot replace the current child", %{jido: jido} do
-    definition = %{Agent.definition() | plugins: [{HeldReadyPlugin, [observer: self()]}]}
+    definition = %{
+      Agent.definition()
+      | plugins: [{HeldReadyPlugin, [observer_key: register_observer()]}]
+    }
+
     server = start_supervised!({Server, agent: definition, jido: jido, register: false})
     assert_receive {:readiness_waiting, readiness}, 1_000
     send(readiness, :release_readiness)
@@ -288,7 +299,11 @@ defmodule Jido.AgentServer.FailureContractTest do
   test "readiness timeout leaves a queued Signal available after readiness completes", %{
     jido: jido
   } do
-    definition = %{Agent.definition() | plugins: [{HeldReadyPlugin, [observer: self()]}]}
+    definition = %{
+      Agent.definition()
+      | plugins: [{HeldReadyPlugin, [observer_key: register_observer()]}]
+    }
+
     server = start_supervised!({Server, agent: definition, jido: jido, register: false})
     assert_receive {:readiness_waiting, readiness}, 1_000
     assert {:error, :timeout} = Server.await_ready(server, 0)
@@ -304,7 +319,10 @@ defmodule Jido.AgentServer.FailureContractTest do
   end
 
   test "loss of the readiness worker stops initialization", %{jido: jido} do
-    definition = %{Agent.definition() | plugins: [{HeldReadyPlugin, [observer: self()]}]}
+    definition = %{
+      Agent.definition()
+      | plugins: [{HeldReadyPlugin, [observer_key: register_observer()]}]
+    }
 
     server =
       start_supervised!(
@@ -477,5 +495,12 @@ defmodule Jido.AgentServer.FailureContractTest do
     control = start_supervised!({Elixir.Agent, fn -> :ok end})
     table = :"server_failure_storage_#{System.unique_integer([:positive])}"
     {{ControlledStorage, table: table, control: control}, control}
+  end
+
+  defp register_observer do
+    key = unique_id("held-ready-observer")
+    :persistent_term.put({HeldReadyPlugin, :observer, key}, self())
+    on_exit(fn -> :persistent_term.erase({HeldReadyPlugin, :observer, key}) end)
+    key
   end
 end

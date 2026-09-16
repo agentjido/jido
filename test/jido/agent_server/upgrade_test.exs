@@ -39,7 +39,11 @@ defmodule JidoTest.AgentServer.UpgradeTest do
   end
 
   defmodule DifferentPlugin do
-    use Jido.Plugin
+    use Jido.Plugin, agent: __MODULE__.Agent
+  end
+
+  defmodule DifferentPlugin.Agent do
+    use Jido.Agent.Plugin
 
     def state_spec(_opts), do: {:extra, Zoi.integer() |> Zoi.default(0)}
   end

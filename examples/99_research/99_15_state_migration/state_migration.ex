@@ -20,11 +20,16 @@ defmodule Jido.Examples.StateMigration.UpgradeAudit do
   @enforce_keys Zoi.Struct.enforce_keys(@schema)
   defstruct Zoi.Struct.struct_fields(@schema)
   def schema, do: @schema
+  def validate(%__MODULE__{} = directive), do: Zoi.parse(@schema, directive)
 end
 
 defmodule Jido.Examples.StateMigration.Audit do
   @moduledoc "Owns audit state whose static schema accepts both formats."
-  use Jido.Plugin
+  use Jido.Plugin, agent: __MODULE__.Agent, agent_server: __MODULE__.Server
+end
+
+defmodule Jido.Examples.StateMigration.Audit.Agent do
+  use Jido.Agent.Plugin
   alias Jido.Examples.StateMigration.UpgradeAudit
 
   def state_spec(_) do
@@ -41,9 +46,11 @@ defmodule Jido.Examples.StateMigration.Audit do
   end
 
   def directives(_), do: [UpgradeAudit]
-  def validate_directive(directive, _), do: Zoi.parse(UpgradeAudit.schema(), directive)
 
-  def update_state(state, directives, _) do
+  def reduce(reduction, _) do
+    state = reduction.plugin_state
+    directives = Enum.filter(reduction.directives, &match?(%UpgradeAudit{}, &1))
+
     {:ok,
      Enum.reduce(directives, state, fn
        %UpgradeAudit{upgrade_id: id}, %{format: 1, events: events} ->
@@ -53,7 +60,12 @@ defmodule Jido.Examples.StateMigration.Audit do
          current
      end)}
   end
+end
 
+defmodule Jido.Examples.StateMigration.Audit.Server do
+  use Jido.AgentServer.Plugin
+
+  @impl true
   def dispatch(_, _, _, _), do: :ok
 end
 

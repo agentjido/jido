@@ -1,13 +1,18 @@
 defmodule Jido.Examples.FencedInventory.Gate do
   @moduledoc "Checks external ownership through the public live admission callback."
-  use Jido.Plugin
+  use Jido.Plugin, agent_server: __MODULE__.Server
+end
+
+defmodule Jido.Examples.FencedInventory.Gate.Server do
+  use Jido.AgentServer.Plugin
 
   alias Jido.Examples.FencedInventory.{Authority, Client}
 
-  def admit(nil, command, _opts) do
-    with {:ok, config} <- Client.config(command.agent.id),
+  @impl true
+  def admit(nil, admission, _opts) do
+    with {:ok, config} <- Client.config(admission.agent_id),
          :ok <- Authority.check(config.authority, config.token) do
-      {:ok, Jido.Agent.Command.put_plugin_input(command, __MODULE__, config)}
+      {:ok, config}
     else
       error ->
         {:error,

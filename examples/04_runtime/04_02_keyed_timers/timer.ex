@@ -1,10 +1,9 @@
 defmodule Jido.Examples.BurstBuncher.Timer do
   @moduledoc "A keyed timer capability used only by the Burst Buncher example."
 
-  use Jido.Plugin
+  use Jido.Plugin, agent: __MODULE__.Agent, agent_server: __MODULE__.Server
 
-  alias Jido.Examples.BurstBuncher.Timer.{Cancel, Replace, Runtime}
-  alias Jido.Plugin.{DirectiveContext, Init}
+  alias Jido.Examples.BurstBuncher.Timer.{Cancel, Replace}
   alias Jido.Signal
 
   @doc "Creates or replaces one keyed timer."
@@ -16,27 +15,29 @@ defmodule Jido.Examples.BurstBuncher.Timer do
   @doc "Cancels one keyed timer when it exists."
   @spec cancel(term()) :: Cancel.t()
   def cancel(timer_id), do: struct!(Cancel, timer_id: timer_id)
+end
 
-  @impl Jido.Plugin
+defmodule Jido.Examples.BurstBuncher.Timer.Agent do
+  use Jido.Agent.Plugin
+  alias Jido.Examples.BurstBuncher.Timer.{Cancel, Replace}
+
+  @impl true
   def directives(_opts), do: [Replace, Cancel]
+end
 
-  @impl Jido.Plugin
-  def validate_directive(%{__struct__: Replace} = directive, _opts) do
-    Zoi.parse(Replace.schema(), Map.from_struct(directive))
-  end
+defmodule Jido.Examples.BurstBuncher.Timer.Server do
+  use Jido.AgentServer.Plugin
+  alias Jido.Examples.BurstBuncher.Timer.Runtime
+  alias Jido.Plugin.{DirectiveContext, Init}
 
-  def validate_directive(%{__struct__: Cancel} = directive, _opts) do
-    Zoi.parse(Cancel.schema(), Map.from_struct(directive))
-  end
-
-  @impl Jido.Plugin
+  @impl true
   def dispatch(runtime, directive, %DirectiveContext{}, opts) do
     GenServer.call(runtime, {:directive, directive}, Keyword.get(opts, :timeout, 5_000))
   catch
     :exit, reason -> {:error, {:buncher_timer_unavailable, reason}}
   end
 
-  @impl Jido.Plugin
+  @impl true
   def await_ready(runtime, opts) do
     GenServer.call(runtime, :await_ready, Keyword.get(opts, :timeout, 5_000))
   catch
@@ -45,7 +46,7 @@ defmodule Jido.Examples.BurstBuncher.Timer do
 
   @doc false
   def child_spec(%Init{} = init) do
-    Supervisor.child_spec({Runtime, init}, id: __MODULE__)
+    Supervisor.child_spec({Runtime, init}, id: Jido.Examples.BurstBuncher.Timer)
   end
 end
 
@@ -68,6 +69,8 @@ defmodule Jido.Examples.BurstBuncher.Timer.Replace do
 
   @doc false
   def schema, do: @schema
+
+  def validate(%__MODULE__{} = directive), do: Zoi.parse(@schema, Map.from_struct(directive))
 end
 
 defmodule Jido.Examples.BurstBuncher.Timer.Cancel do
@@ -81,6 +84,8 @@ defmodule Jido.Examples.BurstBuncher.Timer.Cancel do
 
   @doc false
   def schema, do: @schema
+
+  def validate(%__MODULE__{} = directive), do: Zoi.parse(@schema, Map.from_struct(directive))
 end
 
 defmodule Jido.Examples.BurstBuncher.Timer.Runtime do

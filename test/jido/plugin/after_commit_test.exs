@@ -15,7 +15,7 @@ defmodule Jido.Plugin.AfterCommitTest do
 
   defmodule Legacy do
     @moduledoc false
-    use Jido.Plugin
+    def __jido_plugin__, do: :agent
     def after_commit(_runtime, _commit, _opts), do: :ok
   end
 
@@ -74,11 +74,16 @@ defmodule Jido.Plugin.AfterCommitTest do
     assert spec.agent_server.options == [sink: :sink]
   end
 
-  for package <- [Legacy, Manifest, AgentPackage, PersistencePackage, TopologyPackage] do
+  for package <- [Manifest, AgentPackage, PersistencePackage, TopologyPackage] do
     @package package
     test "#{inspect(package)} cannot take Server commit authority" do
       assert {:error, %Jido.Error.ValidationError{details: %{callback: {:after_commit, 3}}}} =
                Plugin.normalize_all([{@package, key: :owned}])
     end
+  end
+
+  test "bare Plugin markers cannot take Server commit authority" do
+    assert {:error, %{message: "Plugin must use an owner-facet Jido.Plugin manifest"}} =
+             Plugin.normalize_all([Legacy])
   end
 end

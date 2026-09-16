@@ -73,7 +73,7 @@ defmodule Jido.Plugin.DispatchTest do
     invalid_signal = %{signal("dispatch.output") | source: "not a URI reference"}
     directive = Dispatch.send(invalid_signal, {:pid, target: self()})
 
-    assert {:error, errors} = Dispatch.validate_directive(directive, [])
+    assert {:error, errors} = Dispatch.Send.validate(directive)
     assert Enum.any?(errors, &(&1.path == [:signal, :source]))
   end
 

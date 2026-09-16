@@ -31,7 +31,7 @@ for adapter <- [:ets, :file, :ecto] do
         bus = start_bus(c, store)
         module = if @boundary == :normal, do: NormalJourneyAgent, else: DurableJourneyAgent
         server = start_agent(c, module: module)
-        assert :ok = Client.await_ready(client(server), [])
+        assert :ok = Client.Server.await_ready(client(server), [])
         trace = Trace.new_root()
 
         signal =
@@ -92,7 +92,7 @@ for adapter <- [:ets, :file, :ecto] do
                   )
               end
 
-            assert :ok = Client.await_ready(client(replacement), [])
+            assert :ok = Client.Server.await_ready(client(replacement), [])
             Observability.await_turn(c.observer, replacement, 3)
             assert Server.snapshot(replacement).agent == snapshot.agent
             assert {:ok, ^saved, 3} = load(c, saved.id, module)

@@ -16,4 +16,8 @@ defmodule Jido.Plugin.Scheduler.Schedule do
 
   @doc false
   def schema, do: @schema
+
+  @doc "Validates one delayed Signal request."
+  def validate(%__MODULE__{} = directive),
+    do: Zoi.parse(@schema, Map.from_struct(directive))
 end

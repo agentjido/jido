@@ -83,9 +83,6 @@ defmodule Jido.Agent.Plugin.Pipeline do
       Jido.Agent.Directive.validate(directive)
     else
       case Plugin.directive_owner(specs, directive) do
-        %Spec{legacy?: true} = spec ->
-          Plugin.validate_legacy_directive(spec, directive)
-
         %Spec{} ->
           Jido.Agent.Directive.validate(directive)
 
@@ -133,30 +130,6 @@ defmodule Jido.Agent.Plugin.Pipeline do
        do: {:ok, state}
 
   defp reduce_one(
-         %Spec{legacy?: true} = spec,
-         state,
-         _agent,
-         _signal,
-         _inputs,
-         directives
-       ) do
-    if function_exported?(spec.module, :update_state, 3) do
-      owned_directives = owned_directives(directives, spec)
-
-      PluginError.safe_apply(
-        spec.package,
-        spec.module,
-        :update_state,
-        [Map.get(state, spec.state_key), owned_directives, spec.options],
-        "Agent Plugin update_state/3 failed"
-      )
-      |> validate_reduction(spec, state, :update_state)
-    else
-      {:ok, state}
-    end
-  end
-
-  defp reduce_one(
          %Spec{} = spec,
          state,
          agent,
@@ -186,13 +159,13 @@ defmodule Jido.Agent.Plugin.Pipeline do
         [reduction, spec.options],
         "Agent Plugin reduction failed"
       )
-      |> validate_reduction(spec, state, :reduce)
+      |> validate_reduction(spec, state)
     else
       {:ok, state}
     end
   end
 
-  defp validate_reduction({:ok, value}, spec, state, _callback) do
+  defp validate_reduction({:ok, value}, spec, state) do
     case Zoi.parse(spec.state_schema, value) do
       {:ok, value} ->
         with :ok <- portable(value, spec) do
@@ -209,22 +182,15 @@ defmodule Jido.Agent.Plugin.Pipeline do
     end
   end
 
-  defp validate_reduction({:error, _reason} = error, _spec, _state, _callback), do: error
+  defp validate_reduction({:error, _reason} = error, _spec, _state), do: error
 
-  defp validate_reduction(result, spec, _state, callback) do
+  defp validate_reduction(result, spec, _state) do
     PluginError.invalid_callback(
-      "Agent Plugin #{callback_label(callback)} returned an invalid result",
+      "Agent Plugin reduce/2 returned an invalid result",
       spec.package,
       spec.module,
       %{result: result}
     )
-  end
-
-  defp callback_label(:reduce), do: "reduce/2"
-  defp callback_label(:update_state), do: "update_state/3"
-
-  defp owned_directives(directives, spec) do
-    Enum.filter(directives, &(&1.__struct__ in spec.directive_modules))
   end
 
   defp portable(value, spec) do

@@ -13,15 +13,15 @@ defmodule Jido.Plugin.Normalizer do
     prepare: 2,
     state_spec: 1,
     reduce: 2,
-    update_state: 3,
     directives: 1,
+    update_state: 3,
     validate_directive: 2
   ]
-  @legacy_agent_callbacks Keyword.delete(@agent_callbacks, :reduce)
   @agent_capabilities Keyword.drop(@agent_callbacks, [:update_state, :validate_directive])
 
   # Authority checks keep first-error order. Capability checks only test presence.
   @server_callbacks [
+    validate_options: 1,
     admit: 3,
     prepare_dispatch: 4,
     dispatch: 4,
@@ -29,26 +29,14 @@ defmodule Jido.Plugin.Normalizer do
     child_spec: 1,
     after_commit: 3
   ]
+  @server_capabilities Keyword.delete(@server_callbacks, :validate_options)
   @persistence_callbacks [dump: 3, load: 3]
   @topology_callbacks [contribute: 2]
 
-  # Legacy package callback order is part of first-error reporting.
-  @legacy_callbacks [
-    validate_options: 1,
-    prepare: 2,
-    child_spec: 1,
-    admit: 3,
-    prepare_dispatch: 4,
-    state_spec: 1,
-    update_state: 3,
-    directives: 1,
-    validate_directive: 2,
-    dispatch: 4,
-    await_ready: 2
-  ]
-
-  @package_callbacks [reduce: 2, after_commit: 3] ++
-                       @persistence_callbacks ++ @topology_callbacks ++ @legacy_callbacks
+  @package_callbacks @agent_callbacks ++
+                       @server_callbacks ++
+                       @persistence_callbacks ++
+                       @topology_callbacks
 
   @doc false
   @spec normalize_all([Jido.Plugin.declaration()] | [Spec.t()]) ::
@@ -79,7 +67,11 @@ defmodule Jido.Plugin.Normalizer do
 
     cond do
       declarations == [] ->
-        {:ok, Enum.map(values, &upgrade_spec/1)}
+        if Enum.all?(values, &match?(%Spec{manifest: %Manifest{}}, &1)) do
+          {:ok, values}
+        else
+          PluginError.validation("Plugin specs require an owner-facet manifest", %{specs: values})
+        end
 
       specs != [] ->
         PluginError.validation(
@@ -106,52 +98,6 @@ defmodule Jido.Plugin.Normalizer do
     end
   end
 
-  defp upgrade_spec(%Spec{manifest: %Manifest{}} = spec), do: spec
-
-  defp upgrade_spec(%Spec{} = spec) do
-    agent =
-      if has_any?(spec.module, @legacy_agent_callbacks) or not is_nil(spec.state_key) or
-           spec.directive_modules != [] do
-        %AgentSpec{
-          package: spec.module,
-          module: spec.module,
-          options: spec.options,
-          state_key: spec.state_key,
-          state_schema: spec.state_schema,
-          directive_modules: spec.directive_modules,
-          legacy?: true
-        }
-      end
-
-    server =
-      if has_any?(spec.module, @server_callbacks) or spec.dispatch? or spec.runtime? do
-        %ServerSpec{
-          package: spec.module,
-          module: spec.module,
-          options: spec.options,
-          dispatch?: spec.dispatch? or function_exported?(spec.module, :dispatch, 4),
-          runtime?: spec.runtime?,
-          legacy?: true
-        }
-      end
-
-    manifest = %Manifest{
-      module: spec.module,
-      agent: facet_module(agent),
-      agent_server: facet_module(server)
-    }
-
-    %{
-      spec
-      | manifest: manifest,
-        agent: agent,
-        agent_server: server,
-        legacy?: true,
-        dispatch?: not is_nil(server) and server.dispatch?,
-        runtime?: not is_nil(server) and server.runtime?
-    }
-  end
-
   defp normalize(module) when is_atom(module), do: build_spec(module, [])
 
   defp normalize({module, options}) when is_atom(module) and is_list(options) do
@@ -172,27 +118,9 @@ defmodule Jido.Plugin.Normalizer do
     with :ok <- ensure_loaded(module),
          {:ok, marker} <- read_package_marker(module) do
       case marker do
-        :agent -> build_legacy_spec(module, options)
         %Manifest{} = manifest -> build_manifest_spec(module, options, manifest)
         _marker -> invalid_package(module)
       end
-    end
-  end
-
-  defp build_legacy_spec(module, options) do
-    with :ok <- validate_legacy_contract(module),
-         :ok <- legacy_has_capability(module),
-         {:ok, options} <- read_legacy_options(module, options),
-         {:ok, agent} <- build_legacy_agent_spec(module, options),
-         {:ok, server} <- build_legacy_server_spec(module, options),
-         :ok <- validate_pair(module, agent, server, nil, nil) do
-      manifest = %Manifest{
-        module: module,
-        agent: facet_module(agent),
-        agent_server: facet_module(server)
-      }
-
-      {:ok, aggregate(module, options, manifest, agent, server, nil, nil, true)}
     end
   end
 
@@ -205,17 +133,7 @@ defmodule Jido.Plugin.Normalizer do
          {:ok, persistence} <- build_persistence_spec(manifest, options),
          {:ok, topology} <- build_topology_spec(manifest, options),
          :ok <- validate_pair(module, agent, server, persistence, topology) do
-      {:ok,
-       aggregate(
-         module,
-         options,
-         manifest,
-         agent,
-         server,
-         persistence,
-         topology,
-         false
-       )}
+      {:ok, aggregate(module, options, manifest, agent, server, persistence, topology)}
     else
       false ->
         PluginError.validation("Plugin manifest package module does not match", %{
@@ -228,30 +146,6 @@ defmodule Jido.Plugin.Normalizer do
     end
   end
 
-  defp build_legacy_agent_spec(module, options) do
-    if has_any?(module, @legacy_agent_callbacks) do
-      build_agent_values(module, module, options, true)
-    else
-      {:ok, nil}
-    end
-  end
-
-  defp build_legacy_server_spec(module, options) do
-    if has_any?(module, @server_callbacks) do
-      {:ok,
-       %ServerSpec{
-         package: module,
-         module: module,
-         options: options,
-         dispatch?: function_exported?(module, :dispatch, 4),
-         runtime?: function_exported?(module, :child_spec, 1),
-         legacy?: true
-       }}
-    else
-      {:ok, nil}
-    end
-  end
-
   defp build_agent_spec(%Manifest{agent: nil}, _options), do: {:ok, nil}
 
   defp build_agent_spec(%Manifest{} = manifest, options) do
@@ -260,14 +154,14 @@ defmodule Jido.Plugin.Normalizer do
 
     with :ok <- validate_facet(facet, Jido.Agent.Plugin, :agent),
          :ok <- facet_has_capability(facet, :agent),
-         do: build_agent_values(manifest.module, facet, facet_options, false)
+         do: build_agent_values(manifest.module, facet, facet_options)
   end
 
-  defp build_agent_values(package, facet, options, legacy?) do
+  defp build_agent_values(package, facet, options) do
     with {:ok, {state_key, state_schema}} <- read_state_spec(package, facet, options),
          {:ok, directive_modules} <- read_directives(package, facet, options),
          :ok <-
-           validate_agent_contract(package, facet, state_key, directive_modules, legacy?) do
+           validate_agent_contract(package, facet, state_key, directive_modules) do
       {:ok,
        %AgentSpec{
          package: package,
@@ -275,8 +169,7 @@ defmodule Jido.Plugin.Normalizer do
          options: options,
          state_key: state_key,
          state_schema: state_schema,
-         directive_modules: directive_modules,
-         legacy?: legacy?
+         directive_modules: directive_modules
        }}
     end
   end
@@ -288,15 +181,15 @@ defmodule Jido.Plugin.Normalizer do
     facet_options = Manifest.options_for(manifest, :agent_server, options)
 
     with :ok <- validate_facet(facet, Jido.AgentServer.Plugin, :agent_server),
-         :ok <- facet_has_capability(facet, :agent_server) do
+         :ok <- facet_has_capability(facet, :agent_server),
+         :ok <- validate_server_options(manifest.module, facet, facet_options) do
       {:ok,
        %ServerSpec{
          package: manifest.module,
          module: facet,
          options: facet_options,
          dispatch?: function_exported?(facet, :dispatch, 4),
-         runtime?: function_exported?(facet, :child_spec, 1),
-         legacy?: false
+         runtime?: function_exported?(facet, :child_spec, 1)
        }}
     end
   end
@@ -362,12 +255,10 @@ defmodule Jido.Plugin.Normalizer do
 
       not is_nil(server) and server.dispatch? and
           (is_nil(agent) or agent.directive_modules == []) ->
-        message =
-          if server.legacy?,
-            do: "Agent Plugin dispatch/4 requires declared Directives",
-            else: "Agent Server Plugin dispatch requires Agent-owned Directives"
-
-        PluginError.validation(message, %{plugin: package, facet: server.module})
+        PluginError.validation("Agent Server Plugin dispatch requires Agent-owned Directives", %{
+          plugin: package,
+          facet: server.module
+        })
 
       not is_nil(agent) and agent.directive_modules != [] and
         not reducer?(agent) and
@@ -399,26 +290,11 @@ defmodule Jido.Plugin.Normalizer do
     end
   end
 
-  defp validate_legacy_contract(module) do
-    behaviours = behaviours(module)
-
-    cond do
-      Jido.Plugin not in behaviours ->
-        invalid_package(module)
-
-      function_exported?(module, :after_commit, 3) ->
-        PluginError.validation("after_commit/3 requires an Agent Server Plugin facet", %{
-          plugin: module,
-          callback: {:after_commit, 3}
-        })
-
-      true ->
-        :ok
-    end
-  end
-
   defp invalid_package(module),
-    do: PluginError.validation("Agent Plugin must use Jido.Plugin", %{plugin: module})
+    do:
+      PluginError.validation("Plugin must use an owner-facet Jido.Plugin manifest", %{
+        plugin: module
+      })
 
   defp callback_free_package(module) do
     case Enum.find(@package_callbacks, fn {function, arity} ->
@@ -498,7 +374,35 @@ defmodule Jido.Plugin.Normalizer do
     do: require_capability(module, :agent, @agent_capabilities)
 
   defp facet_has_capability(module, :agent_server),
-    do: require_capability(module, :agent_server, @server_callbacks)
+    do: require_capability(module, :agent_server, @server_capabilities)
+
+  defp validate_server_options(package, facet, options) do
+    if function_exported?(facet, :validate_options, 1) do
+      case PluginError.safe_apply(
+             package,
+             facet,
+             :validate_options,
+             [options],
+             "Agent Server Plugin option validation failed"
+           ) do
+        :ok ->
+          :ok
+
+        {:error, _reason} = error ->
+          error
+
+        result ->
+          PluginError.invalid_callback(
+            "Agent Server Plugin validate_options/1 returned an invalid result",
+            package,
+            facet,
+            %{result: result}
+          )
+      end
+    else
+      :ok
+    end
+  end
 
   defp require_capability(module, owner, callbacks) do
     if has_any?(module, callbacks) do
@@ -508,60 +412,6 @@ defmodule Jido.Plugin.Normalizer do
         facet: module,
         owner: owner
       })
-    end
-  end
-
-  defp read_legacy_options(module, options) do
-    if function_exported?(module, :validate_options, 1) do
-      PluginError.safe_apply(
-        module,
-        module,
-        :validate_options,
-        [options],
-        "Agent Plugin validate_options/1 failed"
-      )
-      |> validate_options_result(module, options)
-    else
-      {:ok, options}
-    end
-  end
-
-  defp validate_options_result(:ok, _module, options), do: {:ok, options}
-
-  defp validate_options_result({:ok, validated}, module, _options)
-       when is_list(validated) do
-    if Keyword.keyword?(validated),
-      do: {:ok, validated},
-      else:
-        PluginError.validation("Agent Plugin validate_options/1 returned invalid options", %{
-          plugin: module,
-          options: validated
-        })
-  end
-
-  defp validate_options_result({:error, _reason} = error, _module, _options), do: error
-
-  defp validate_options_result({:ok, validated}, module, _options) do
-    PluginError.validation("Agent Plugin validate_options/1 returned invalid options", %{
-      plugin: module,
-      options: validated
-    })
-  end
-
-  defp validate_options_result(result, module, _options) do
-    PluginError.invalid_callback(
-      "Agent Plugin validate_options/1 returned an invalid result",
-      module,
-      module,
-      %{result: result}
-    )
-  end
-
-  defp legacy_has_capability(module) do
-    if has_any?(module, Keyword.delete(@legacy_callbacks, :validate_options)) do
-      :ok
-    else
-      PluginError.validation("Agent Plugin defines no capability", %{plugin: module})
     end
   end
 
@@ -715,29 +565,7 @@ defmodule Jido.Plugin.Normalizer do
     Enum.find_value(values, fn value -> if predicate.(value), do: {:invalid, value} end)
   end
 
-  defp validate_agent_contract(package, facet, state_key, directives, true) do
-    validates? = function_exported?(facet, :validate_directive, 2)
-    updates? = function_exported?(facet, :update_state, 3)
-
-    cond do
-      directives != [] and not validates? ->
-        PluginError.validation("Agent Plugin with Directives must define validate_directive/2", %{
-          plugin: package,
-          facet: facet
-        })
-
-      updates? and is_nil(state_key) ->
-        PluginError.validation("Agent Plugin update_state/3 requires state_spec/1", %{
-          plugin: package,
-          facet: facet
-        })
-
-      true ->
-        :ok
-    end
-  end
-
-  defp validate_agent_contract(package, facet, state_key, directives, false) do
+  defp validate_agent_contract(package, facet, state_key, directives) do
     reducer? = function_exported?(facet, :reduce, 2)
     invalid_directive = Enum.find(directives, &(not Directive.validator?(&1)))
 
@@ -773,9 +601,6 @@ defmodule Jido.Plugin.Normalizer do
     end
   end
 
-  defp reducer?(%AgentSpec{legacy?: true, module: module}),
-    do: function_exported?(module, :update_state, 3)
-
   defp reducer?(%AgentSpec{module: module}), do: function_exported?(module, :reduce, 2)
 
   defp unique_packages(specs) do
@@ -808,7 +633,7 @@ defmodule Jido.Plugin.Normalizer do
     end
   end
 
-  defp aggregate(module, options, manifest, agent, server, persistence, topology, legacy?) do
+  defp aggregate(module, options, manifest, agent, server, persistence, topology) do
     %Spec{
       module: module,
       options: options,
@@ -817,7 +642,6 @@ defmodule Jido.Plugin.Normalizer do
       agent_server: server,
       persistence: persistence,
       topology: topology,
-      legacy?: legacy?,
       state_key: field(agent, :state_key),
       state_schema: field(agent, :state_schema),
       directive_modules: field(agent, :directive_modules, []),
@@ -830,9 +654,6 @@ defmodule Jido.Plugin.Normalizer do
   defp field(value, field), do: Map.fetch!(value, field)
   defp field(nil, _field, default), do: default
   defp field(value, field, _default), do: Map.fetch!(value, field)
-
-  defp facet_module(nil), do: nil
-  defp facet_module(spec), do: spec.module
 
   defp behaviours(module) do
     module.module_info(:attributes)

@@ -15,47 +15,70 @@ defmodule Jido.Plugin.RuntimeTest do
   end
 
   defmodule RuntimePlugin do
-    use Jido.Plugin
+    use Jido.Plugin, agent: __MODULE__.Agent, agent_server: __MODULE__.Server
+  end
 
-    @impl Plugin
+  defmodule RuntimePlugin.Agent do
+    use Jido.Agent.Plugin
+
+    @impl true
     def state_spec(_opts) do
       {:runtime,
        Zoi.object(%{calls: Zoi.integer() |> Zoi.default(0)}) |> Zoi.default(%{calls: 0})}
     end
 
-    @impl Plugin
-    def update_state(state, _directives, _opts) do
-      {:ok, %{state | calls: state.calls + 1}}
+    @impl true
+    def reduce(reduction, _opts) do
+      {:ok, %{reduction.plugin_state | calls: reduction.plugin_state.calls + 1}}
     end
+  end
+
+  defmodule RuntimePlugin.Server do
+    use Jido.AgentServer.Plugin
 
     def child_spec(init) do
       Supervisor.child_spec(
         {Jido.Plugin.RuntimeTest.RuntimeTree, init},
-        id: __MODULE__
+        id: RuntimePlugin
       )
     end
   end
 
   defmodule ProcessPlugin do
+    use Jido.Plugin, agent_server: __MODULE__.Server
+
+    def start_link(init), do: GenServer.start_link(__MODULE__.Process, init)
+  end
+
+  defmodule ProcessPlugin.Server do
+    use Jido.AgentServer.Plugin
+    def child_spec(init), do: %{id: ProcessPlugin, start: {ProcessPlugin, :start_link, [init]}}
+  end
+
+  defmodule ProcessPlugin.Process do
     use GenServer
-
-    use Jido.Plugin
-
-    def start_link(init), do: GenServer.start_link(__MODULE__, init)
 
     @impl GenServer
     def init(init) do
-      send(Keyword.fetch!(init.options, :test), {:process_plugin_started, self(), init})
+      send(
+        Jido.Plugin.RuntimeTest.observer(init.options),
+        {:process_plugin_started, self(), init}
+      )
+
       {:ok, init}
     end
   end
 
   defmodule TemporaryRuntimePlugin do
-    use Jido.Plugin
+    use Jido.Plugin, agent_server: __MODULE__.Server
+  end
+
+  defmodule TemporaryRuntimePlugin.Server do
+    use Jido.AgentServer.Plugin
 
     def child_spec(init) do
       %{
-        id: __MODULE__,
+        id: TemporaryRuntimePlugin,
         start: {Jido.Plugin.RuntimeTest.ProcessPlugin, :start_link, [init]},
         restart: :temporary,
         type: :worker
@@ -64,22 +87,36 @@ defmodule Jido.Plugin.RuntimeTest do
   end
 
   defmodule InvalidRuntimePlugin do
-    use Jido.Plugin
+    use Jido.Plugin, agent_server: __MODULE__.Server
+  end
 
-    def child_spec(_init), do: %{id: __MODULE__}
+  defmodule InvalidRuntimePlugin.Server do
+    use Jido.AgentServer.Plugin
+
+    def child_spec(_init), do: %{id: InvalidRuntimePlugin}
   end
 
   defmodule RaisingRuntimePlugin do
-    use Jido.Plugin
+    use Jido.Plugin, agent_server: __MODULE__.Server
+  end
+
+  defmodule RaisingRuntimePlugin.Server do
+    use Jido.AgentServer.Plugin
 
     def child_spec(_init), do: raise("invalid runtime configuration")
   end
 
   defmodule ConfigurableRuntimePlugin do
-    use Jido.Plugin
+    use Jido.Plugin, agent_server: __MODULE__.Server
+  end
+
+  defmodule ConfigurableRuntimePlugin.Server do
+    use Jido.AgentServer.Plugin
 
     def child_spec(%Plugin.Init{options: opts}) do
-      Keyword.fetch!(opts, :child_spec)
+      :persistent_term.get(
+        {ConfigurableRuntimePlugin, :child_spec, Keyword.fetch!(opts, :spec_key)}
+      )
     end
   end
 
@@ -147,7 +184,7 @@ defmodule Jido.Plugin.RuntimeTest do
 
     @impl GenServer
     def init(init) do
-      send(Keyword.fetch!(init.options, :test), {:runtime_started, self(), init})
+      send(Jido.Plugin.RuntimeTest.observer(init.options), {:runtime_started, self(), init})
       {:ok, init}
     end
 
@@ -168,6 +205,11 @@ defmodule Jido.Plugin.RuntimeTest do
   end
 
   setup do
+    observer_key = System.unique_integer([:positive])
+    :persistent_term.put({__MODULE__, :observer, observer_key}, self())
+    Process.put({__MODULE__, :observer_key}, observer_key)
+    on_exit(fn -> :persistent_term.erase({__MODULE__, :observer, observer_key}) end)
+
     agent = RuntimeAgent.new!()
     agent_host = start_supervised!({AgentHost, {agent, self()}})
 
@@ -182,6 +224,9 @@ defmodule Jido.Plugin.RuntimeTest do
     %{agent: agent, agent_host: agent_host, init: init}
   end
 
+  def observer(opts),
+    do: :persistent_term.get({__MODULE__, :observer, Keyword.fetch!(opts, :test)})
+
   test "public Plugin runtime structs expose Zoi schemas" do
     assert %Zoi.Types.Struct{module: Plugin.Init} = Plugin.Init.schema()
 
@@ -190,7 +235,7 @@ defmodule Jido.Plugin.RuntimeTest do
   end
 
   test "uses the standard child_spec/1 interface", %{agent_host: agent_host, init: init} do
-    opts = [test: self(), label: :clock]
+    opts = [test: Process.get({__MODULE__, :observer_key}), label: :clock]
 
     assert {:ok, [spec]} = Plugin.child_specs(init, [{RuntimePlugin, opts}])
     assert spec.id == RuntimePlugin
@@ -213,8 +258,11 @@ defmodule Jido.Plugin.RuntimeTest do
     refute match?(%Agent{}, init.agent_server)
   end
 
-  test "a Plugin can also be the supervised OTP process", %{agent_host: agent_host, init: init} do
-    opts = [test: self()]
+  test "a Plugin package can own a separate supervised OTP process", %{
+    agent_host: agent_host,
+    init: init
+  } do
+    opts = [test: Process.get({__MODULE__, :observer_key})]
 
     assert {:ok, [spec]} = Plugin.child_specs(init, [{ProcessPlugin, opts}])
     assert spec.id == ProcessPlugin
@@ -239,14 +287,14 @@ defmodule Jido.Plugin.RuntimeTest do
     assert {:error, %Jido.Error.ValidationError{message: message}} =
              Plugin.child_specs(init, [TemporaryRuntimePlugin])
 
-    assert message == "Agent Plugin runtime root must use :permanent restart"
+    assert message == "Agent Server Plugin runtime root must use :permanent restart"
   end
 
   test "a runtime child sends a Signal through the Agent command path", %{
     agent_host: agent_host,
     init: init
   } do
-    opts = [test: self()]
+    opts = [test: Process.get({__MODULE__, :observer_key})]
     {:ok, specs} = Plugin.child_specs(init, [{RuntimePlugin, opts}])
     _runtime_root = start_supervised!({RuntimeRoot, specs})
 
@@ -263,7 +311,7 @@ defmodule Jido.Plugin.RuntimeTest do
   test "a runtime worker restart does not replace Agent state", %{
     init: init
   } do
-    opts = [test: self()]
+    opts = [test: Process.get({__MODULE__, :observer_key})]
     {:ok, specs} = Plugin.child_specs(init, [{RuntimePlugin, opts}])
     _runtime_root = start_supervised!({RuntimeRoot, specs})
 
@@ -295,9 +343,9 @@ defmodule Jido.Plugin.RuntimeTest do
 
   test "rejects a repeated Plugin module", %{init: init} do
     declarations = [
-      {RuntimePlugin, test: self(), label: :first},
+      {RuntimePlugin, test: Process.get({__MODULE__, :observer_key}), label: :first},
       ProcessPlugin,
-      {RuntimePlugin, test: self(), label: :second}
+      {RuntimePlugin, test: Process.get({__MODULE__, :observer_key}), label: :second}
     ]
 
     assert {:error, %Jido.Error.ValidationError{message: message}} =
@@ -326,12 +374,19 @@ defmodule Jido.Plugin.RuntimeTest do
     ]
 
     for child_spec <- invalid_specs do
+      spec_key = System.unique_integer([:positive])
+      :persistent_term.put({ConfigurableRuntimePlugin, :child_spec, spec_key}, child_spec)
+
       assert {:error, %Jido.Error.ValidationError{} = error} =
                Plugin.child_specs(init, [
-                 {ConfigurableRuntimePlugin, child_spec: child_spec}
+                 {ConfigurableRuntimePlugin, spec_key: spec_key}
                ])
 
-      assert error.message == "Agent Plugin child_spec/1 returned an invalid child specification"
+      :persistent_term.erase({ConfigurableRuntimePlugin, :child_spec, spec_key})
+
+      assert error.message ==
+               "Agent Server Plugin child_spec/1 returned an invalid child specification"
+
       assert error.details.plugin == ConfigurableRuntimePlugin
       assert Map.has_key?(error.details, :reason)
     end

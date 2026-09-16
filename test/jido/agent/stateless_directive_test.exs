@@ -9,17 +9,22 @@ defmodule Jido.Agent.StatelessDirectiveTest do
     @enforce_keys Zoi.Struct.enforce_keys(@schema)
     defstruct Zoi.Struct.struct_fields(@schema)
     def schema, do: @schema
+    def validate(%__MODULE__{} = effect), do: Zoi.parse(@schema, Map.from_struct(effect))
   end
 
   defmodule Effects do
-    use Jido.Plugin
+    use Jido.Plugin, agent: __MODULE__.Agent, agent_server: __MODULE__.Server
+  end
+
+  defmodule Effects.Agent do
+    use Jido.Agent.Plugin
 
     @impl true
     def directives(_opts), do: [Effect]
+  end
 
-    @impl true
-    def validate_directive(effect, _opts),
-      do: Zoi.parse(Effect.schema(), Map.from_struct(effect))
+  defmodule Effects.Server do
+    use Jido.AgentServer.Plugin
 
     @impl true
     def dispatch(nil, %Effect{kind: kind}, context, _opts) do

@@ -16,4 +16,12 @@ defmodule Jido.Plugin.Dispatch.Send do
 
   @doc false
   def schema, do: @schema
+
+  @doc "Validates one delivery request and its dispatch target."
+  def validate(%__MODULE__{} = directive) do
+    with {:ok, directive} <- Zoi.parse(@schema, Map.from_struct(directive)),
+         {:ok, target} <- Jido.Signal.Dispatch.validate_opts(directive.target) do
+      {:ok, %{directive | target: target}}
+    end
+  end
 end

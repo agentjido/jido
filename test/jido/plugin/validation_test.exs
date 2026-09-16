@@ -6,18 +6,30 @@ defmodule Jido.Plugin.ValidationTest do
 
   defmodule Effect do
     defstruct [:value]
+    def validate(%__MODULE__{} = directive), do: {:ok, directive}
   end
 
   defmodule Empty do
-    use Jido.Plugin
+    use Jido.Plugin, agent: __MODULE__.Agent
+  end
+
+  defmodule Empty.Agent do
+    use Jido.Agent.Plugin
   end
 
   defmodule Configurable do
-    use Jido.Plugin
+    use Jido.Plugin, agent: __MODULE__.Agent, agent_server: __MODULE__.Server
+  end
+
+  defmodule Configurable.Agent do
+    use Jido.Agent.Plugin
     def state_spec(opts), do: Keyword.get(opts, :state, {:owned, Zoi.integer()})
     def directives(opts), do: Keyword.get(opts, :directives, [Effect])
-    def validate_directive(effect, opts), do: Keyword.get(opts, :validation_result, {:ok, effect})
-    def update_state(_current, _directives, opts), do: Keyword.fetch!(opts, :result)
+    def reduce(_reduction, opts), do: Keyword.fetch!(opts, :result)
+  end
+
+  defmodule Configurable.Server do
+    use Jido.AgentServer.Plugin
     def dispatch(_, _, _, _), do: :ok
 
     def prepare_dispatch(_, signal, _, opts),
@@ -25,17 +37,29 @@ defmodule Jido.Plugin.ValidationTest do
   end
 
   defmodule NoState do
-    use Jido.Plugin
-    def update_state(state, _, _), do: {:ok, state}
+    use Jido.Plugin, agent: __MODULE__.Agent
+  end
+
+  defmodule NoState.Agent do
+    use Jido.Agent.Plugin
+    def reduce(reduction, _), do: {:ok, reduction.plugin_state}
   end
 
   defmodule ThrowingChild do
-    use Jido.Plugin
+    use Jido.Plugin, agent_server: __MODULE__.Server
+  end
+
+  defmodule ThrowingChild.Server do
+    use Jido.AgentServer.Plugin
     def child_spec(_), do: throw(:bad_child_spec)
   end
 
   defmodule OptionValidator do
-    use Jido.Plugin
+    use Jido.Plugin, agent: __MODULE__.Agent, agent_server: __MODULE__.Server
+  end
+
+  defmodule OptionValidator.Server do
+    use Jido.AgentServer.Plugin
 
     def validate_options(opts) do
       send(self(), {:callback, :validate_options, opts})
@@ -47,6 +71,12 @@ defmodule Jido.Plugin.ValidationTest do
         result -> result
       end
     end
+
+    def admit(_runtime, _admission, _opts), do: {:ok, nil}
+  end
+
+  defmodule OptionValidator.Agent do
+    use Jido.Agent.Plugin
 
     def state_spec(opts) do
       send(self(), {:callback, :state_spec, opts})
@@ -60,7 +90,11 @@ defmodule Jido.Plugin.ValidationTest do
   end
 
   defmodule FailingDirectives do
-    use Jido.Plugin
+    use Jido.Plugin, agent: __MODULE__.Agent
+  end
+
+  defmodule FailingDirectives.Agent do
+    use Jido.Agent.Plugin
 
     def directives(opts) do
       case Keyword.fetch!(opts, :failure) do
@@ -73,7 +107,11 @@ defmodule Jido.Plugin.ValidationTest do
   end
 
   defmodule FailingStateSpec do
-    use Jido.Plugin
+    use Jido.Plugin, agent: __MODULE__.Agent
+  end
+
+  defmodule FailingStateSpec.Agent do
+    use Jido.Agent.Plugin
 
     def state_spec(opts) do
       case Keyword.fetch!(opts, :failure) do
@@ -130,12 +168,12 @@ defmodule Jido.Plugin.ValidationTest do
           {JidoTest.MissingPlugin, "could not be loaded"},
           {{Configurable, state: :invalid}, "state_spec/1 returned an invalid value"},
           {{Configurable, state: {:owned, Zoi.any() |> Zoi.refine(fn _ -> :ok end)}},
-           "state schema must contain static data"},
+           "options must be static data"},
           {{Configurable, directives: :invalid}, "directives/1 must return a list"},
           {{Configurable, directives: [42]}, "Directive modules must be atoms"},
           {{Configurable, directives: [Effect, Effect]}, "Directive modules must be unique"},
-          {{Configurable, directives: []}, "dispatch/4 requires declared Directives"},
-          {NoState, "update_state/3 requires state_spec/1"}
+          {{Configurable, directives: []}, "dispatch requires Agent-owned Directives"},
+          {NoState, "reduce/2 requires state_spec/1"}
         ] do
       assert {:error, error} = Plugin.normalize_all([declaration])
       assert error.message =~ fragment
@@ -170,13 +208,13 @@ defmodule Jido.Plugin.ValidationTest do
   end
 
   test "normalizes options and declaration callbacks once for reusable specs" do
-    original_opts = [validation_result: {:ok, [validated: true]}]
+    original_opts = [validation_result: :ok]
 
     assert {:ok, [spec]} = Plugin.normalize_all([{OptionValidator, original_opts}])
-    assert spec.options == [validated: true]
+    assert spec.options == original_opts
     assert_received {:callback, :validate_options, ^original_opts}
-    assert_received {:callback, :state_spec, [validated: true]}
-    assert_received {:callback, :directives, [validated: true]}
+    assert_received {:callback, :state_spec, ^original_opts}
+    assert_received {:callback, :directives, ^original_opts}
     refute_received {:callback, _, _}
 
     assert {:ok, [^spec]} = Plugin.normalize_all([spec])
@@ -185,20 +223,20 @@ defmodule Jido.Plugin.ValidationTest do
     init = %Init{agent_server: self(), agent_id: "agent", module: OptionValidator}
 
     assert {:ok, _schema} = Plugin.compose_schema(Zoi.object(%{}), [spec])
-    assert {:ok, [{OptionValidator, [validated: true]}]} = Plugin.canonical_declarations([spec])
+    assert {:ok, [{OptionValidator, ^original_opts}]} = Plugin.canonical_declarations([spec])
     assert {:ok, []} = Plugin.child_specs(init, [spec])
     refute_received {:callback, _, _}
   end
 
   test "Plugin Codec encodes a declaration after one normalization" do
-    original_opts = [validation_result: {:ok, [validated: true]}]
+    original_opts = [validation_result: :ok]
 
     assert {:ok, document, _registry} = Plugin.Codec.encode({OptionValidator, original_opts})
     assert document["type"] == "jido.plugin"
 
     assert_received {:callback, :validate_options, ^original_opts}
-    assert_received {:callback, :state_spec, [validated: true]}
-    assert_received {:callback, :directives, [validated: true]}
+    assert_received {:callback, :state_spec, ^original_opts}
+    assert_received {:callback, :directives, ^original_opts}
     refute_received {:callback, _, _}
   end
 
@@ -221,13 +259,13 @@ defmodule Jido.Plugin.ValidationTest do
   end
 
   test "rejects mixed declarations and normalized specs before callbacks run" do
-    original_opts = [validation_result: {:ok, [validated: true]}]
+    original_opts = [validation_result: :ok]
     declaration = {OptionValidator, original_opts}
 
     assert {:ok, [spec]} = Plugin.normalize_all([declaration])
     assert_received {:callback, :validate_options, ^original_opts}
-    assert_received {:callback, :state_spec, [validated: true]}
-    assert_received {:callback, :directives, [validated: true]}
+    assert_received {:callback, :state_spec, ^original_opts}
+    assert_received {:callback, :directives, ^original_opts}
     refute_received {:callback, _, _}
 
     assert {:error, first_error} = Plugin.normalize_all([declaration, spec])
@@ -255,7 +293,7 @@ defmodule Jido.Plugin.ValidationTest do
     assert {:error, error} =
              Plugin.normalize_all([{OptionValidator, validation_result: :invalid}])
 
-    assert error.message == "Agent Plugin validate_options/1 returned an invalid result"
+    assert error.message == "Agent Server Plugin validate_options/1 returned an invalid result"
     assert error.details.plugin == OptionValidator
 
     for invalid_options <- [[:not_keyword], :not_a_list] do
@@ -264,9 +302,9 @@ defmodule Jido.Plugin.ValidationTest do
                  {OptionValidator, validation_result: {:ok, invalid_options}}
                ])
 
-      assert error.message == "Agent Plugin validate_options/1 returned invalid options"
+      assert error.message == "Agent Server Plugin validate_options/1 returned an invalid result"
       assert error.details.plugin == OptionValidator
-      assert error.details.options == invalid_options
+      assert error.details.result == {:ok, invalid_options}
     end
 
     assert {:error, :invalid_plugin_options} =
@@ -280,7 +318,7 @@ defmodule Jido.Plugin.ValidationTest do
       assert {:error, %Jido.Error.ExecutionError{} = error} =
                Plugin.normalize_all([{OptionValidator, validation_result: failure}])
 
-      assert error.message == "Agent Plugin validate_options/1 failed"
+      assert error.message == "Agent Server Plugin option validation failed"
       assert error.details.plugin == OptionValidator
 
       if kind == :error do
@@ -347,7 +385,7 @@ defmodule Jido.Plugin.ValidationTest do
 
     for {result, message} <- [
           {{:ok, "invalid"}, "Plugin-owned Agent state field is invalid"},
-          {:invalid, "Agent Plugin update_state/3 returned an invalid result"}
+          {:invalid, "Agent Plugin reduce/2 returned an invalid result"}
         ] do
       {:ok, specs} = Plugin.normalize_all([{Configurable, result: result}])
 
@@ -385,9 +423,7 @@ defmodule Jido.Plugin.ValidationTest do
                Jido.Agent.Plugin.specs(specs)
              )
 
-    {:ok, [spec]} = Plugin.normalize_all([{Configurable, validation_result: :invalid}])
-    assert {:error, error} = Plugin.validate_directive(spec, %Effect{})
-    assert error.message == "Agent Plugin validate_directive/2 returned an invalid result"
+    assert {:ok, %Effect{}} = Jido.Agent.Directive.validate(%Effect{})
   end
 
   test "outbound preparation rejects invalid results and preserves explicit errors" do
@@ -408,7 +444,10 @@ defmodule Jido.Plugin.ValidationTest do
       assert {:error, error} = Plugin.prepare_dispatch(outbound, specs, %{}, context, %{owned: 1})
 
       if result == :invalid,
-        do: assert(error.message == "Agent Plugin prepare_dispatch/4 returned an invalid result"),
+        do:
+          assert(
+            error.message == "Agent Server Plugin prepare_dispatch/4 returned an invalid result"
+          ),
         else: assert(error == :blocked)
     end
   end
@@ -433,7 +472,7 @@ defmodule Jido.Plugin.ValidationTest do
     assert {:error, %Jido.Error.ExecutionError{} = error} =
              Plugin.prepare_dispatch(outbound, specs, %{}, context, %{owned: 1})
 
-    assert error.message == "Agent Plugin prepare_dispatch/4 returned an invalid Signal"
+    assert error.message == "Agent Server Plugin prepare_dispatch/4 returned an invalid Signal"
     assert error.details.plugin == Configurable
     assert [_error | _rest] = error.details.errors
   end
@@ -445,7 +484,7 @@ defmodule Jido.Plugin.ValidationTest do
     init = %Init{agent_server: pid, agent_id: "agent", module: ThrowingChild}
     assert {:error, {:agent_server_unavailable, _}} = Plugin.state(init)
     assert {:error, error} = Plugin.child_specs(init, [ThrowingChild])
-    assert error.message == "Agent Plugin child_spec/1 failed"
+    assert error.message == "Agent Server Plugin child_spec/1 failed"
     assert error.details.kind == :throw
     assert error.details.reason == :bad_child_spec
   end

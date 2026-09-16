@@ -114,41 +114,6 @@ defmodule Jido.Agent.Plugin do
 
   def directive_owner(_specs, _directive), do: nil
 
-  @doc false
-  @spec validate_legacy_directive(Spec.t(), struct()) :: {:ok, struct()} | {:error, term()}
-  def validate_legacy_directive(%Spec{} = spec, %{__struct__: directive_module} = directive) do
-    PluginError.safe_apply(
-      spec.package,
-      spec.module,
-      :validate_directive,
-      [directive, spec.options],
-      "Agent Plugin Directive validation failed"
-    )
-    |> case do
-      {:ok, %{__struct__: ^directive_module} = validated} ->
-        {:ok, validated}
-
-      {:ok, %{__struct__: validated_module}} ->
-        PluginError.invalid_callback(
-          "Agent Plugin validate_directive/2 changed Directive type",
-          spec.package,
-          spec.module,
-          %{expected: directive_module, actual: validated_module}
-        )
-
-      {:error, _reason} = error ->
-        error
-
-      result ->
-        PluginError.invalid_callback(
-          "Agent Plugin validate_directive/2 returned an invalid result",
-          spec.package,
-          spec.module,
-          %{result: result}
-        )
-    end
-  end
-
   defp prepare_one(agent, signal, %Spec{} = spec) do
     if function_exported?(spec.module, :prepare, 2) do
       preparation = %Preparation{

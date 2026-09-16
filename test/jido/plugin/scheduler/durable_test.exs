@@ -94,23 +94,23 @@ defmodule Jido.Plugin.Scheduler.DurableTest do
     cancel = Scheduler.cancel("job-1")
 
     assert {:ok, %{cron: %{}}} =
-             Scheduler.update_state(pending.state.scheduler, [acknowledge, cancel], [])
+             Scheduler.Agent.apply_directives(pending.state.scheduler, [acknowledge, cancel])
 
     assert {:error, :unknown_schedule_occurrence} =
-             Scheduler.update_state(pending.state.scheduler, [cancel, acknowledge], [])
+             Scheduler.Agent.apply_directives(pending.state.scheduler, [cancel, acknowledge])
   end
 
   test "repeated definitions preserve progress and changed definitions need a new generation" do
     {armed, cron} = armed()
     assert {:ok, pending, [_]} = enqueue(armed, @first)
     state = pending.state.scheduler
-    assert {:ok, ^state} = Scheduler.update_state(state, [cron], [])
+    assert {:ok, ^state} = Scheduler.Agent.apply_directives(state, [cron])
 
     assert {:error, :schedule_generation_conflict} =
-             Scheduler.update_state(state, [%{cron | cron: "*/2 * * * * *"}], [])
+             Scheduler.Agent.apply_directives(state, [%{cron | cron: "*/2 * * * * *"}])
 
     assert {:error, :schedule_generation_conflict} =
-             Scheduler.update_state(state, [%{cron | generation: 0}], [])
+             Scheduler.Agent.apply_directives(state, [%{cron | generation: 0}])
   end
 
   test "altered tick data, malformed pending state, and unknown acknowledgement are rejected" do
@@ -121,10 +121,9 @@ defmodule Jido.Plugin.Scheduler.DurableTest do
     assert_stale(Example.cmd(pending, %{tick | data: %{job_id: "other"}}))
 
     assert {:error, :unknown_schedule_occurrence} =
-             Scheduler.update_state(
+             Scheduler.Agent.apply_directives(
                pending.state.scheduler,
-               [Scheduler.acknowledge("unknown")],
-               []
+               [Scheduler.acknowledge("unknown")]
              )
 
     {:ok, bad_tick} = Signal.put_context(tick, "jidoschedulegen", 2)
@@ -136,9 +135,8 @@ defmodule Jido.Plugin.Scheduler.DurableTest do
     signal = Signal.new!("test.tick", %{}, source: "/test")
 
     assert {:error, :durable_schedule_requires_generation} =
-             Scheduler.validate_directive(
-               Scheduler.cron("job-1", "* * * * *", signal, delivery: :durable),
-               []
+             Jido.Agent.Directive.validate(
+               Scheduler.cron("job-1", "* * * * *", signal, delivery: :durable)
              )
   end
 
@@ -153,7 +151,7 @@ defmodule Jido.Plugin.Scheduler.DurableTest do
     signal = Signal.new!("test.tick", %{}, source: "/test")
 
     assert {:error, {:invalid_job_id, :non_durable_term}} =
-             Scheduler.validate_directive(Scheduler.cancel(make_ref()), [])
+             Jido.Agent.Directive.validate(Scheduler.cancel(make_ref()))
 
     invalid_queue = %Scheduler.Queue{
       job_id: "job-1",
@@ -162,12 +160,11 @@ defmodule Jido.Plugin.Scheduler.DurableTest do
       scope: {TestJido, "agent-1", nil}
     }
 
-    assert {:error, _reason} = Scheduler.validate_directive(invalid_queue, [])
+    assert {:error, _reason} = Jido.Agent.Directive.validate(invalid_queue)
 
     assert {:error, _reason} =
-             Scheduler.validate_directive(
-               Scheduler.cron("job-1", "not a cron", signal, generation: 1),
-               []
+             Jido.Agent.Directive.validate(
+               Scheduler.cron("job-1", "not a cron", signal, generation: 1)
              )
   end
 
@@ -191,15 +188,15 @@ defmodule Jido.Plugin.Scheduler.DurableTest do
       turn_context: %{}
     }
 
-    assert :ok = Scheduler.dispatch(self(), queue, context, [])
+    assert :ok = Scheduler.Server.dispatch(self(), queue, context, [])
     refute_receive {:"$gen_cast", :pending_changed}
 
     current = %{cron: %{"job-1" => %{delivery: :durable, generation: 2}}}
-    assert :ok = Scheduler.dispatch(self(), queue, %{context | plugin_state: current}, [])
+    assert :ok = Scheduler.Server.dispatch(self(), queue, %{context | plugin_state: current}, [])
     refute_receive {:"$gen_cast", :pending_changed}
 
     assert :ok =
-             Scheduler.dispatch(
+             Scheduler.Server.dispatch(
                self(),
                %{queue | generation: 2},
                %{context | plugin_state: current},
@@ -222,7 +219,7 @@ defmodule Jido.Plugin.Scheduler.DurableTest do
     end
 
     assert {:scheduler, _schema} =
-             Scheduler.state_spec(
+             Scheduler.Agent.state_spec(
                delivery_interval: 4_294_967_295,
                delivery_timeout: 2_147_483_597,
                retry_delay_ms: 4_294_967_295
@@ -238,7 +235,8 @@ defmodule Jido.Plugin.Scheduler.DurableTest do
                )
     end
 
-    assert {:scheduler, _schema} = Scheduler.state_spec(time_scale: SchedEx.IdentityTimeScale)
+    assert {:scheduler, _schema} =
+             Scheduler.Agent.state_spec(time_scale: SchedEx.IdentityTimeScale)
   end
 
   defp armed do

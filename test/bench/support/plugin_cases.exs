@@ -1,6 +1,10 @@
 defmodule JidoCoreBench.SchemaPlugin do
   @moduledoc false
-  use Jido.Plugin
+  use Jido.Plugin, agent: __MODULE__.Agent
+end
+
+defmodule JidoCoreBench.SchemaPlugin.Agent do
+  use Jido.Agent.Plugin
 
   def state_spec(opts) do
     {:owned,
@@ -53,7 +57,7 @@ defmodule JidoCoreBench.PluginCases do
               )
             )
 
-            F.equal!(Enum.map(result.plugin_specs, & &1.module), [JidoCoreBench.SchemaPlugin])
+            F.equal!(Enum.map(result.plugin_specs, & &1.package), [JidoCoreBench.SchemaPlugin])
         end
       end)
     end

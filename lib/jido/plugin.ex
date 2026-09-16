@@ -37,29 +37,14 @@ defmodule Jido.Plugin do
   Directive. Startup and replacement use `Jido.Plugin.Init`; notifications
   are bounded, best effort, and not replayed.
 
-  `use Jido.Plugin` with no manifest options is the mixed-callback compatibility
-  form. Its old Directive validation, state update, and Command admission
-  callbacks remain for source compatibility. New Plugins must use an
-  owner-facet manifest.
+  Every Plugin must use an owner-facet manifest. Package modules do not define
+  lifecycle callbacks.
   """
 
-  alias Jido.Agent.Command
-  alias Jido.Agent.Plugin.Preparation
-  alias Jido.Plugin.{DirectiveContext, Init, Manifest, SignalContext, Spec}
+  alias Jido.Plugin.{Init, Manifest, Spec}
 
   @type declaration :: module() | {module(), keyword()}
-  @type state_spec :: :none | {atom(), Zoi.schema()}
-
-  @doc "Defines a Plugin package or the supported mixed compatibility behavior."
-  defmacro __using__([]) do
-    quote location: :keep do
-      @behaviour Jido.Plugin
-
-      @doc false
-      def __jido_plugin__, do: :agent
-    end
-  end
-
+  @doc "Defines a Plugin package with one or more owner facets."
   defmacro __using__(opts) when is_list(opts) do
     allowed = [:agent, :agent_server, :persistence, :topology, :vsn, :option_keys]
     unknown = Keyword.keys(opts) -- allowed
@@ -99,43 +84,6 @@ defmodule Jido.Plugin do
     end
   end
 
-  @callback validate_options(opts :: keyword()) ::
-              :ok | {:ok, keyword()} | {:error, term()}
-  @callback prepare(preparation :: Preparation.t(), opts :: keyword()) ::
-              {:ok, term()} | {:error, term()}
-  @callback admit(runtime_ref :: term() | nil, command :: Command.t(), opts :: keyword()) ::
-              {:ok, Command.t()} | {:error, term()}
-  @callback prepare_dispatch(
-              runtime_ref :: term() | nil,
-              signal :: Jido.Signal.t(),
-              context :: SignalContext.t(),
-              opts :: keyword()
-            ) :: {:ok, Jido.Signal.t()} | {:error, term()}
-  @callback state_spec(opts :: keyword()) :: state_spec()
-  @callback update_state(plugin_state :: term(), directives :: [struct()], opts :: keyword()) ::
-              {:ok, plugin_state :: term()} | {:error, term()}
-  @callback directives(opts :: keyword()) :: [module()] | {:error, term()}
-  @callback validate_directive(directive :: struct(), opts :: keyword()) ::
-              {:ok, struct()} | {:error, term()}
-  @callback dispatch(
-              runtime_ref :: term() | nil,
-              directive :: struct(),
-              context :: DirectiveContext.t(),
-              opts :: keyword()
-            ) :: :ok | {:error, term()}
-  @callback await_ready(runtime_ref :: term(), opts :: keyword()) :: :ok | {:error, term()}
-
-  @optional_callbacks validate_options: 1,
-                      prepare: 2,
-                      admit: 3,
-                      prepare_dispatch: 4,
-                      state_spec: 1,
-                      update_state: 3,
-                      directives: 1,
-                      validate_directive: 2,
-                      dispatch: 4,
-                      await_ready: 2
-
   @doc "Normalizes one declaration and returns its static manifest."
   @spec manifest(declaration()) :: {:ok, Manifest.t()} | {:error, term()}
   def manifest(declaration) do
@@ -172,11 +120,6 @@ defmodule Jido.Plugin do
   end
 
   def directive_owner(_specs, _directive), do: nil
-
-  @doc false
-  def validate_directive(%Jido.Plugin.Spec{agent: agent_spec}, directive) do
-    Jido.Agent.Plugin.validate_legacy_directive(agent_spec, directive)
-  end
 
   @doc false
   defdelegate admits?(specs), to: Jido.AgentServer.Plugin

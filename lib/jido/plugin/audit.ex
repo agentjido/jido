@@ -11,16 +11,10 @@ defmodule Jido.Plugin.Audit do
       plugins: [{Jido.Plugin.Audit, max_entries: 1_000}]
   """
 
-  use Jido.Plugin
+  use Jido.Plugin, agent: Jido.Plugin.Audit.Agent
 
   alias Jido.Plugin.Audit.Record
   alias Jido.Signal.ID
-
-  @default_max_entries 1_000
-  @state_schema Zoi.object(%{
-                  records: Zoi.list(Zoi.struct(Record)) |> Zoi.default([])
-                })
-                |> Zoi.default(%{records: []})
 
   @doc "Creates one domain audit Directive."
   @spec record(term(), atom(), keyword()) :: Record.t()
@@ -32,73 +26,5 @@ defmodule Jido.Plugin.Audit do
       outcome: outcome,
       metadata: Keyword.get(opts, :metadata, %{})
     }
-  end
-
-  @impl Jido.Plugin
-  def state_spec(opts) do
-    _max_entries = max_entries!(opts)
-    {:audit, @state_schema}
-  end
-
-  @impl Jido.Plugin
-  def directives(_opts), do: [Record]
-
-  @impl Jido.Plugin
-  def validate_directive(%Record{} = record, _opts) do
-    with {:ok, record} <- Zoi.parse(Record.schema(), Map.from_struct(record)),
-         true <- ID.valid?(record.id),
-         :ok <- Jido.Action.validate_static_data(record) do
-      {:ok, record}
-    else
-      false ->
-        invalid("Audit record id must be a UUID7", %{id: record.id})
-
-      {:error, reason} when is_binary(reason) ->
-        invalid("Audit record must contain portable data", %{reason: reason})
-
-      {:error, _reason} = error ->
-        error
-    end
-  end
-
-  @impl Jido.Plugin
-  def update_state(state, [], opts) do
-    max_entries = max_entries!(opts)
-    count = length(state.records)
-
-    if count <= max_entries do
-      {:ok, state}
-    else
-      {:ok, %{state | records: Enum.drop(state.records, count - max_entries)}}
-    end
-  end
-
-  def update_state(state, records, opts) do
-    max_entries = max_entries!(opts)
-    incoming_count = length(records)
-
-    records =
-      if incoming_count >= max_entries do
-        Enum.take(records, -max_entries)
-      else
-        Enum.take(state.records, -(max_entries - incoming_count)) ++ records
-      end
-
-    {:ok, %{state | records: records}}
-  end
-
-  defp max_entries!(opts) do
-    case Keyword.get(opts, :max_entries, @default_max_entries) do
-      value when is_integer(value) and value > 0 ->
-        value
-
-      value ->
-        raise ArgumentError,
-              "Audit max_entries must be a positive integer, got: #{inspect(value)}"
-    end
-  end
-
-  defp invalid(message, details) do
-    {:error, Jido.Error.validation_error(message, kind: :config, details: details)}
   end
 end

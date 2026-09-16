@@ -6,15 +6,13 @@ defmodule Jido.AgentServer.Plugin.Spec do
             module: nil,
             options: [],
             dispatch?: false,
-            runtime?: false,
-            legacy?: false
+            runtime?: false
 
   @type t :: %__MODULE__{
           package: module(),
           module: module(),
           options: keyword(),
           dispatch?: boolean(),
-          runtime?: boolean(),
-          legacy?: boolean()
+          runtime?: boolean()
         }
 end

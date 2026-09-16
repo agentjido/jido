@@ -64,10 +64,15 @@ field. Jido validates that value with the owned schema and portable-value rule.
 
 ## Agent Server Facet
 
-The Agent Server facet can implement `admit/3`, `prepare_dispatch/4`,
+The Agent Server facet can implement `validate_options/1`, `admit/3`, `prepare_dispatch/4`,
 `after_commit/3`, `dispatch/4`, and `await_ready/2`. It can also implement the
 standard OTP `child_spec/1` callback for one runtime root. The returned specification must
 use `restart: :permanent`.
+
+`validate_options/1` runs when Jido normalizes a declaration. It returns
+`:ok` or `{:error, reason}`. It checks static options before Jido starts a
+runtime. The option callback does not give a Server facet a runtime capability
+by itself. Use it with a live callback or `child_spec/1`.
 
 Admission runs in declaration order after pure preparation and before Turn
 evaluation. `admit/3` receives a read-only

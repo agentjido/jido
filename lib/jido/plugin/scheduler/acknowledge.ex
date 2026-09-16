@@ -6,4 +6,8 @@ defmodule Jido.Plugin.Scheduler.Acknowledge do
   defstruct Zoi.Struct.struct_fields(@schema)
   @doc false
   def schema, do: @schema
+
+  @doc "Validates one occurrence acknowledgement."
+  def validate(%__MODULE__{} = directive),
+    do: Zoi.parse(@schema, Map.from_struct(directive))
 end

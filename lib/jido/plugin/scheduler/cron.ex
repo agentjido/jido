@@ -28,4 +28,25 @@ defmodule Jido.Plugin.Scheduler.Cron do
 
   @doc false
   def schema, do: @schema
+
+  @doc "Validates one recurring schedule request."
+  def validate(%__MODULE__{} = directive) do
+    with {:ok, directive} <- Zoi.parse(@schema, Map.from_struct(directive)),
+         :ok <- Jido.Plugin.Scheduler.validate_durable_id(directive.job_id),
+         {:ok, timezone} <-
+           Jido.Plugin.Scheduler.validate_cron_spec(
+             directive.cron,
+             directive.signal,
+             directive.timezone
+           ),
+         :ok <- Jido.Plugin.Scheduler.validate_occurrence(directive.signal, directive.generation),
+         :ok <- validate_delivery(directive) do
+      {:ok, %{directive | timezone: timezone}}
+    end
+  end
+
+  defp validate_delivery(%__MODULE__{delivery: :durable, generation: nil}),
+    do: {:error, :durable_schedule_requires_generation}
+
+  defp validate_delivery(_directive), do: :ok
 end

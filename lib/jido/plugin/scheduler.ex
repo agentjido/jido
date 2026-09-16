@@ -60,10 +60,11 @@ defmodule Jido.Plugin.Scheduler do
   state is not saved in the Agent checkpoint.
   """
 
-  use Jido.Plugin
+  use Jido.Plugin,
+    agent: Jido.Plugin.Scheduler.Agent,
+    agent_server: Jido.Plugin.Scheduler.Server
 
   alias Crontab.CronExpression.Parser
-  alias Jido.Plugin.{DirectiveContext, Init}
   alias Jido.PortableTerm
 
   alias Jido.Plugin.Scheduler.{
@@ -72,40 +73,12 @@ defmodule Jido.Plugin.Scheduler do
     Cron,
     Durable,
     Occurrence,
-    Queue,
-    Runtime,
     Schedule
   }
 
   alias Jido.Signal
 
-  @state_key :scheduler
   @default_timezone "Etc/UTC"
-  @timer_max 4_294_967_295
-  @delivery_timeout_max div(@timer_max - 100, 2)
-  @cron_spec_schema Zoi.object(%{
-                      cron_expression: Zoi.string(),
-                      message: Zoi.struct(Jido.Signal),
-                      timezone: Zoi.string(),
-                      generation:
-                        Zoi.integer() |> Zoi.min(0) |> Zoi.max(2_147_483_647) |> Zoi.optional(),
-                      delivery: Zoi.literal(:durable) |> Zoi.optional(),
-                      pending: Zoi.struct(Signal) |> Zoi.nullable() |> Zoi.optional(),
-                      last_scheduled_at:
-                        Zoi.string()
-                        |> Zoi.refine({Occurrence, :validate_utc, []})
-                        |> Zoi.nullable()
-                        |> Zoi.optional()
-                    })
-
-  @state_schema Zoi.object(%{
-                  cron:
-                    Zoi.map(Zoi.any(), @cron_spec_schema,
-                      description: "Durable recurring schedule definitions"
-                    )
-                    |> Zoi.refine({__MODULE__, :validate_cron_state, []})
-                })
-                |> Zoi.default(%{cron: %{}})
 
   @doc "Creates one delayed Signal Directive."
   @spec schedule(non_neg_integer(), Signal.t()) :: Schedule.t()
@@ -140,16 +113,6 @@ defmodule Jido.Plugin.Scheduler do
   @spec cancel(term()) :: Cancel.t()
   def cancel(job_id), do: %Cancel{job_id: job_id}
 
-  @impl Jido.Plugin
-  def state_spec(opts) do
-    validate_timer_option!(opts, :delivery_interval, 100, @timer_max)
-    validate_timer_option!(opts, :delivery_timeout, 5_000, @delivery_timeout_max)
-    validate_timer_option!(opts, :retry_delay_ms, 1_000, @timer_max)
-    validate_time_scale_option!(opts)
-
-    {@state_key, @state_schema}
-  end
-
   @doc false
   def validate_cron_state(cron, _opts) do
     Enum.reduce_while(cron, :ok, fn {job_id, spec}, :ok ->
@@ -165,111 +128,6 @@ defmodule Jido.Plugin.Scheduler do
           {:halt, {:error, "invalid cron state for #{inspect(job_id)}: #{inspect(reason)}"}}
       end
     end)
-  end
-
-  @impl Jido.Plugin
-  def update_state(state, directives, _opts) do
-    Enum.reduce_while(directives, {:ok, state}, fn
-      %Cron{} = directive, {:ok, state} ->
-        spec =
-          build_cron_spec(
-            directive.cron,
-            directive.signal,
-            directive.timezone,
-            directive.generation,
-            directive.delivery
-          )
-
-        case Durable.replace(Map.get(state.cron, directive.job_id), spec) do
-          {:ok, spec} -> {:cont, {:ok, put_in(state, [:cron, directive.job_id], spec)}}
-          error -> {:halt, error}
-        end
-
-      %Cancel{job_id: job_id}, {:ok, state} ->
-        {:cont, {:ok, update_in(state, [:cron], &Map.delete(&1, job_id))}}
-
-      %module{} = directive, {:ok, state} when module in [Queue, Acknowledge] ->
-        case Durable.update(state, directive) do
-          {:ok, state} -> {:cont, {:ok, state}}
-          error -> {:halt, error}
-        end
-
-      _directive, {:ok, state} ->
-        {:cont, {:ok, state}}
-    end)
-  end
-
-  @impl Jido.Plugin
-  def directives(_opts), do: [Schedule, Cron, Cancel, Queue, Acknowledge]
-
-  @impl Jido.Plugin
-  def validate_directive(%Schedule{} = directive, _opts),
-    do: Zoi.parse(Schedule.schema(), Map.from_struct(directive))
-
-  def validate_directive(%Cron{} = directive, _opts) do
-    with {:ok, directive} <- Zoi.parse(Cron.schema(), Map.from_struct(directive)),
-         :ok <- validate_durable_id(directive.job_id),
-         {:ok, timezone} <-
-           validate_cron_spec(directive.cron, directive.signal, directive.timezone),
-         :ok <- validate_occurrence(directive.signal, directive.generation),
-         :ok <- validate_delivery(directive) do
-      {:ok, %{directive | timezone: timezone}}
-    end
-  end
-
-  def validate_directive(%Cancel{} = directive, _opts) do
-    with {:ok, directive} <- Zoi.parse(Cancel.schema(), Map.from_struct(directive)),
-         :ok <- validate_durable_id(directive.job_id) do
-      {:ok, directive}
-    end
-  end
-
-  def validate_directive(%Queue{} = directive, _opts) do
-    with {:ok, directive} <- Zoi.parse(Queue.schema(), Map.from_struct(directive)),
-         :ok <- validate_durable_id(directive.job_id),
-         :ok <- validate_occurrence_scope(directive.scope) do
-      {:ok, directive}
-    end
-  end
-
-  def validate_directive(%Acknowledge{} = directive, _opts),
-    do: Zoi.parse(Acknowledge.schema(), Map.from_struct(directive))
-
-  def validate_directive(directive, _opts) do
-    {:error,
-     Jido.Error.validation_error("Unknown Scheduler Plugin Directive",
-       details: %{directive: directive}
-     )}
-  end
-
-  @impl Jido.Plugin
-  def dispatch(runtime, %Queue{} = directive, %DirectiveContext{} = context, _opts) do
-    if Durable.current_queue?(context.plugin_state, directive) do
-      GenServer.cast(runtime, :pending_changed)
-    else
-      :ok
-    end
-  end
-
-  def dispatch(runtime, %Acknowledge{}, _context, _opts),
-    do: GenServer.cast(runtime, :pending_changed)
-
-  def dispatch(runtime, directive, %DirectiveContext{} = context, opts) do
-    GenServer.call(runtime, {:directive, directive, context}, Keyword.get(opts, :timeout, 5_000))
-  catch
-    :exit, reason -> {:error, {:scheduler_runtime_unavailable, reason}}
-  end
-
-  @impl Jido.Plugin
-  def await_ready(runtime, opts) do
-    GenServer.call(runtime, :await_ready, Keyword.get(opts, :timeout, 5_000))
-  catch
-    :exit, reason -> {:error, {:scheduler_runtime_unavailable, reason}}
-  end
-
-  @doc false
-  def child_spec(%Init{} = init) do
-    Supervisor.child_spec({Runtime, init}, id: __MODULE__)
   end
 
   @doc false
@@ -306,15 +164,12 @@ defmodule Jido.Plugin.Scheduler do
     if PortableTerm.valid?(scope), do: :ok, else: {:error, :non_durable_occurrence_scope}
   end
 
-  defp validate_occurrence(_signal, nil), do: :ok
-  defp validate_occurrence(signal, _generation), do: Occurrence.validate_template(signal)
+  @doc false
+  def validate_occurrence(_signal, nil), do: :ok
+  def validate_occurrence(signal, _generation), do: Occurrence.validate_template(signal)
 
-  defp validate_delivery(%Cron{delivery: :durable, generation: nil}),
-    do: {:error, :durable_schedule_requires_generation}
-
-  defp validate_delivery(_directive), do: :ok
-
-  defp validate_cron_spec(cron_expression, message, timezone) do
+  @doc false
+  def validate_cron_spec(cron_expression, message, timezone) do
     with :ok <- validate_cron_expression_type(cron_expression),
          {:ok, timezone} <- validate_timezone_option(timezone),
          :ok <- validate_durable_message(message),
@@ -360,33 +215,10 @@ defmodule Jido.Plugin.Scheduler do
       else: {:error, {:invalid_message, :non_durable_term}}
   end
 
-  defp validate_durable_id(id) do
+  @doc false
+  def validate_durable_id(id) do
     if PortableTerm.valid?(id),
       do: :ok,
       else: {:error, {:invalid_job_id, :non_durable_term}}
-  end
-
-  defp validate_timer_option!(opts, name, default, maximum) do
-    value = Keyword.get(opts, name, default)
-
-    unless is_integer(value) and value in 1..maximum do
-      raise ArgumentError,
-            "Scheduler #{name} must be an integer from 1 to #{maximum}"
-    end
-  end
-
-  defp validate_time_scale_option!(opts) do
-    time_scale = Keyword.get(opts, :time_scale, SchedEx.IdentityTimeScale)
-
-    valid? =
-      is_atom(time_scale) and not is_nil(time_scale) and Code.ensure_loaded?(time_scale) and
-        Enum.all?(SchedEx.TimeScale.behaviour_info(:callbacks), fn {callback, arity} ->
-          function_exported?(time_scale, callback, arity)
-        end)
-
-    unless valid? do
-      raise ArgumentError,
-            "Scheduler time_scale must be a loaded module with now/1 and speedup/0 callbacks"
-    end
   end
 end

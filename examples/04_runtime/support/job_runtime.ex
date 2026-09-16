@@ -40,6 +40,7 @@ defmodule Jido.Examples.Runtime.JobRuntime.Submit do
   defstruct Zoi.Struct.struct_fields(@schema)
 
   def schema, do: @schema
+  def validate(%__MODULE__{} = directive), do: Zoi.parse(@schema, directive)
 end
 
 defmodule Jido.Examples.Runtime.JobRuntime.Cancel do
@@ -50,23 +51,33 @@ defmodule Jido.Examples.Runtime.JobRuntime.Cancel do
   defstruct Zoi.Struct.struct_fields(@schema)
 
   def schema, do: @schema
+  def validate(%__MODULE__{} = directive), do: Zoi.parse(@schema, directive)
 end
 
 defmodule Jido.Examples.Runtime.JobRuntime do
   @moduledoc "A Plugin that owns linked job tasks and returns terminal Signals."
 
-  use Jido.Plugin
+  use Jido.Plugin, agent: __MODULE__.Agent, agent_server: __MODULE__.PluginServer
 
-  alias Jido.Examples.Runtime.JobRuntime.{Cancel, Server, Submit}
+  @doc "Builds the terminal Signal sent by the managed runtime."
+  def settle_signal!(data) do
+    Jido.Signal.new!("examples.runtime.jobs.settle", data,
+      source: "/examples/runtime/job_runtime"
+    )
+  end
+end
+
+defmodule Jido.Examples.Runtime.JobRuntime.Agent do
+  use Jido.Agent.Plugin
+  alias Jido.Examples.Runtime.JobRuntime.{Cancel, Submit}
 
   @impl true
   def directives(_opts), do: [Submit, Cancel]
+end
 
-  @impl true
-  def validate_directive(%{__struct__: module} = directive, _opts),
-    do: Zoi.parse(module.schema(), directive)
-
-  def child_spec(init), do: Supervisor.child_spec({Server, init}, id: __MODULE__)
+defmodule Jido.Examples.Runtime.JobRuntime.PluginServer do
+  use Jido.AgentServer.Plugin
+  alias Jido.Examples.Runtime.JobRuntime.Server
 
   @impl true
   def await_ready(runtime, _opts), do: GenServer.call(runtime, :ready)
@@ -75,12 +86,8 @@ defmodule Jido.Examples.Runtime.JobRuntime do
   def dispatch(runtime, directive, context, _opts),
     do: GenServer.call(runtime, {:dispatch, directive, context.turn_context})
 
-  @doc "Builds the terminal Signal sent by the managed runtime."
-  def settle_signal!(data) do
-    Jido.Signal.new!("examples.runtime.jobs.settle", data,
-      source: "/examples/runtime/job_runtime"
-    )
-  end
+  def child_spec(init),
+    do: Supervisor.child_spec({Server, init}, id: Jido.Examples.Runtime.JobRuntime)
 end
 
 defmodule Jido.Examples.Runtime.JobRuntime.Server do

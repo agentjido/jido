@@ -2,8 +2,9 @@
 
 ## Status
 
-Narrow prepared input and the post-execution Agent Plugin pipeline are
-implemented on branch `v3-spike`. The complete package cleanup is not complete.
+The current source uses owner-facet manifests for bundled Plugins, examples,
+and test fixtures. The mixed package callback path and `legacy?` specs are
+removed.
 
 ## Current evidence
 
@@ -16,21 +17,21 @@ implemented on branch `v3-spike`. The complete package cleanup is not complete.
 | `test/jido/plugin/preparation_test.exs` | Full-state reads, pure input, reduction, direct and live parity, rejection, and portability pass. |
 | `test/jido/plugin/contract_test.exs` | Owned-state protection, Directive validation, and reducer isolation pass. |
 | `test/jido/plugin/ordering_test.exs` | State reducers run in declaration order and stop at the first error. |
-| Core test suite | 1,017 tests passed with example, benchmark, peer, flaky, and skipped tags excluded. |
+| Core test suite | The package suite checks owner facets, examples, and runtime boundaries. |
 
 ## Gap register
 
 | Gap | Owner | State |
 | --- | --- | --- |
-| Mixed `use Jido.Plugin` package callbacks remain in the normalizer. | Plugin declaration | Open |
-| Built-in Plugins still use the mixed package form. | Plugin packages | Open |
+| Mixed package callback normalization | Plugin declaration | Removed |
+| Bundled Plugin migration | Plugin packages | Complete |
 | Identity and Secure Signal use package inputs without Signal replacement. | Examples | Fixed |
 
 ## Ordered follow-up
 
-1. Move each built-in Plugin to explicit owner facets.
-2. Remove mixed package normalization and `legacy?` fields.
-3. Run core, example, benchmark, peer, docs, and Dialyzer checks.
+1. Keep each new package callback-free with explicit owner facets.
+2. Keep custom Directive validation on its Directive module.
+3. Run core, example, benchmark, system, docs, and quality checks after each change.
 
 ## Acceptance matrix
 

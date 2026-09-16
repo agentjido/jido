@@ -611,7 +611,7 @@ defmodule Jido.Topology.Controller.Runtime do
   defp ready_bus_inputs(pid, _spec, context) do
     case Map.get(Server.children(pid), {:plugin, BusInputs}) do
       %{pid: runtime} when is_pid(runtime) ->
-        BusInputs.await_ready(runtime, timeout: context.task_timeout)
+        BusInputs.Server.await_ready(runtime, timeout: context.task_timeout)
 
       _missing ->
         {:error, :subscription_unavailable}

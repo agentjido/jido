@@ -10,7 +10,11 @@ defmodule Jido.Plugin.OrderingTest do
   end
 
   defmodule FirstStatePlugin do
-    use Jido.Plugin
+    use Jido.Plugin, agent: __MODULE__.Agent
+  end
+
+  defmodule FirstStatePlugin.Agent do
+    use Jido.Agent.Plugin
 
     @impl true
     def state_spec(opts) do
@@ -19,16 +23,20 @@ defmodule Jido.Plugin.OrderingTest do
     end
 
     @impl true
-    def update_state(state, _directives, opts) do
+    def reduce(reduction, opts) do
       case Keyword.get(opts, :result, :ok) do
-        :ok -> {:ok, state + 1}
+        :ok -> {:ok, reduction.plugin_state + 1}
         error -> {:error, error}
       end
     end
   end
 
   defmodule SecondStatePlugin do
-    use Jido.Plugin
+    use Jido.Plugin, agent: __MODULE__.Agent
+  end
+
+  defmodule SecondStatePlugin.Agent do
+    use Jido.Agent.Plugin
 
     @impl true
     def state_spec(opts) do
@@ -37,9 +45,9 @@ defmodule Jido.Plugin.OrderingTest do
     end
 
     @impl true
-    def update_state(state, _directives, opts) do
+    def reduce(reduction, opts) do
       case Keyword.get(opts, :result, :ok) do
-        :ok -> {:ok, state + 1}
+        :ok -> {:ok, reduction.plugin_state + 1}
         error -> {:error, error}
       end
     end
@@ -47,55 +55,73 @@ defmodule Jido.Plugin.OrderingTest do
 
   defmodule SharedDirective do
     defstruct []
+    def validate(%__MODULE__{} = directive), do: {:ok, directive}
   end
 
   defmodule FirstDirectivePlugin do
-    use Jido.Plugin
+    use Jido.Plugin, agent: __MODULE__.Agent, agent_server: __MODULE__.Server
+  end
+
+  defmodule FirstDirectivePlugin.Agent do
+    use Jido.Agent.Plugin
 
     @impl true
     def directives(_opts), do: [SharedDirective]
+  end
 
-    @impl true
-    def validate_directive(%SharedDirective{} = directive, _opts), do: {:ok, directive}
+  defmodule FirstDirectivePlugin.Server do
+    use Jido.AgentServer.Plugin
 
     @impl true
     def dispatch(_runtime, _directive, _context, _opts), do: :ok
   end
 
   defmodule SecondDirectivePlugin do
-    use Jido.Plugin
+    use Jido.Plugin, agent: __MODULE__.Agent, agent_server: __MODULE__.Server
+  end
+
+  defmodule SecondDirectivePlugin.Agent do
+    use Jido.Agent.Plugin
 
     @impl true
     def directives(_opts), do: [SharedDirective]
+  end
 
-    @impl true
-    def validate_directive(%SharedDirective{} = directive, _opts), do: {:ok, directive}
+  defmodule SecondDirectivePlugin.Server do
+    use Jido.AgentServer.Plugin
 
     @impl true
     def dispatch(_runtime, _directive, _context, _opts), do: :ok
   end
 
   defmodule FirstAdmissionPlugin do
-    use Jido.Plugin
+    use Jido.Plugin, agent_server: __MODULE__.Server
+  end
+
+  defmodule FirstAdmissionPlugin.Server do
+    use Jido.AgentServer.Plugin
 
     @impl true
-    def admit(runtime, command, opts) do
-      send(opts[:observer], {:admitted, :first, runtime})
-
-      {:ok, Command.put_plugin_input(command, __MODULE__, :first)}
+    def admit(runtime, _admission, _opts) do
+      send(self(), {:admitted, :first, runtime})
+      {:ok, :first}
     end
   end
 
   defmodule SecondAdmissionPlugin do
-    use Jido.Plugin
+    use Jido.Plugin, agent_server: __MODULE__.Server
+  end
+
+  defmodule SecondAdmissionPlugin.Server do
+    use Jido.AgentServer.Plugin
 
     @impl true
-    def admit(runtime, command, opts) do
-      send(opts[:observer], {:admitted, :second, runtime})
+    def admit(runtime, _admission, opts) do
+      send(self(), {:admitted, :second, runtime})
 
       case Keyword.get(opts, :result, :ok) do
         :ok ->
-          {:ok, Command.put_plugin_input(command, __MODULE__, :second)}
+          {:ok, :second}
 
         error ->
           {:error, error}
@@ -104,12 +130,16 @@ defmodule Jido.Plugin.OrderingTest do
   end
 
   defmodule ThirdAdmissionPlugin do
-    use Jido.Plugin
+    use Jido.Plugin, agent_server: __MODULE__.Server
+  end
+
+  defmodule ThirdAdmissionPlugin.Server do
+    use Jido.AgentServer.Plugin
 
     @impl true
-    def admit(runtime, command, opts) do
-      send(opts[:observer], {:admitted, :third, runtime})
-      {:ok, command}
+    def admit(runtime, _admission, _opts) do
+      send(self(), {:admitted, :third, runtime})
+      {:ok, nil}
     end
   end
 
@@ -142,17 +172,22 @@ defmodule Jido.Plugin.OrderingTest do
   end
 
   defmodule FirstOutboundPlugin do
-    use Jido.Plugin
+    use Jido.Plugin, agent: __MODULE__.Agent, agent_server: __MODULE__.Server
+  end
+
+  defmodule FirstOutboundPlugin.Agent do
+    use Jido.Agent.Plugin
 
     @impl true
     def state_spec(_opts), do: {:first, Zoi.atom() |> Zoi.default(:first_state)}
+  end
+
+  defmodule FirstOutboundPlugin.Server do
+    use Jido.AgentServer.Plugin
 
     @impl true
-    def update_state(state, _directives, _opts), do: {:ok, state}
-
-    @impl true
-    def prepare_dispatch(runtime, signal, context, opts) do
-      send(opts[:observer], {:outbound, :first, runtime, context.plugin_state})
+    def prepare_dispatch(runtime, signal, context, _opts) do
+      send(self(), {:outbound, :first, runtime, context.plugin_state})
       {:ok, append_trace(signal, :first)}
     end
 
@@ -162,17 +197,22 @@ defmodule Jido.Plugin.OrderingTest do
   end
 
   defmodule SecondOutboundPlugin do
-    use Jido.Plugin
+    use Jido.Plugin, agent: __MODULE__.Agent, agent_server: __MODULE__.Server
+  end
+
+  defmodule SecondOutboundPlugin.Agent do
+    use Jido.Agent.Plugin
 
     @impl true
     def state_spec(_opts), do: {:second, Zoi.atom() |> Zoi.default(:second_state)}
+  end
+
+  defmodule SecondOutboundPlugin.Server do
+    use Jido.AgentServer.Plugin
 
     @impl true
-    def update_state(state, _directives, _opts), do: {:ok, state}
-
-    @impl true
-    def prepare_dispatch(runtime, signal, context, opts) do
-      send(opts[:observer], {:outbound, :second, runtime, context.plugin_state})
+    def prepare_dispatch(runtime, signal, context, _opts) do
+      send(self(), {:outbound, :second, runtime, context.plugin_state})
       {:ok, append_trace(signal, :second)}
     end
 
@@ -182,21 +222,29 @@ defmodule Jido.Plugin.OrderingTest do
   end
 
   defmodule InvalidOutboundPlugin do
-    use Jido.Plugin
+    use Jido.Plugin, agent_server: __MODULE__.Server
+  end
+
+  defmodule InvalidOutboundPlugin.Server do
+    use Jido.AgentServer.Plugin
 
     @impl true
-    def prepare_dispatch(_runtime, signal, _context, opts) do
-      send(opts[:observer], {:outbound, :invalid})
+    def prepare_dispatch(_runtime, signal, _context, _opts) do
+      send(self(), {:outbound, :invalid})
       {:ok, %{signal | source: "not a URI reference"}}
     end
   end
 
   defmodule MustNotRunOutboundPlugin do
-    use Jido.Plugin
+    use Jido.Plugin, agent_server: __MODULE__.Server
+  end
+
+  defmodule MustNotRunOutboundPlugin.Server do
+    use Jido.AgentServer.Plugin
 
     @impl true
-    def prepare_dispatch(_runtime, signal, _context, opts) do
-      send(opts[:observer], {:outbound, :must_not_run})
+    def prepare_dispatch(_runtime, signal, _context, _opts) do
+      send(self(), {:outbound, :must_not_run})
       {:ok, signal}
     end
   end
@@ -219,13 +267,11 @@ defmodule Jido.Plugin.OrderingTest do
   end
 
   test "admission runs in declaration order and stops at the first error" do
-    observer = self()
-
     assert {:ok, specs} =
              Plugin.normalize_all([
-               {FirstAdmissionPlugin, observer: observer},
-               {SecondAdmissionPlugin, observer: observer},
-               {ThirdAdmissionPlugin, observer: observer}
+               FirstAdmissionPlugin,
+               SecondAdmissionPlugin,
+               ThirdAdmissionPlugin
              ])
 
     command = command()
@@ -239,7 +285,8 @@ defmodule Jido.Plugin.OrderingTest do
 
     assert admitted.plugin_inputs == %{
              FirstAdmissionPlugin => %Jido.Plugin.Input{runtime: :first},
-             SecondAdmissionPlugin => %Jido.Plugin.Input{runtime: :second}
+             SecondAdmissionPlugin => %Jido.Plugin.Input{runtime: :second},
+             ThirdAdmissionPlugin => %Jido.Plugin.Input{runtime: nil}
            }
 
     assert_received {:admitted, :first, :first_runtime}
@@ -248,9 +295,9 @@ defmodule Jido.Plugin.OrderingTest do
 
     assert {:ok, failing_specs} =
              Plugin.normalize_all([
-               {FirstAdmissionPlugin, observer: observer},
-               {SecondAdmissionPlugin, observer: observer, result: :denied},
-               {ThirdAdmissionPlugin, observer: observer}
+               FirstAdmissionPlugin,
+               {SecondAdmissionPlugin, result: :denied},
+               ThirdAdmissionPlugin
              ])
 
     assert Plugin.admit(command, failing_specs, %{}) == {:error, :denied}
@@ -260,12 +307,10 @@ defmodule Jido.Plugin.OrderingTest do
   end
 
   test "outbound preparation runs in reverse order with each owned state slice" do
-    observer = self()
-
     assert {:ok, specs} =
              Plugin.normalize_all([
-               {FirstOutboundPlugin, observer: observer},
-               {SecondOutboundPlugin, observer: observer}
+               FirstOutboundPlugin,
+               SecondOutboundPlugin
              ])
 
     source = signal("plugin.order")
@@ -299,12 +344,10 @@ defmodule Jido.Plugin.OrderingTest do
   end
 
   test "validates each outbound transform before it runs the next Plugin" do
-    observer = self()
-
     assert {:ok, specs} =
              Plugin.normalize_all([
-               {MustNotRunOutboundPlugin, observer: observer},
-               {InvalidOutboundPlugin, observer: observer}
+               MustNotRunOutboundPlugin,
+               InvalidOutboundPlugin
              ])
 
     source = signal("plugin.order")

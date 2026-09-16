@@ -15,4 +15,13 @@ defmodule Jido.Plugin.Scheduler.Queue do
   @enforce_keys Zoi.Struct.enforce_keys(@schema)
   defstruct Zoi.Struct.struct_fields(@schema)
   def schema, do: @schema
+
+  @doc "Validates one durable occurrence queue request."
+  def validate(%__MODULE__{} = directive) do
+    with {:ok, directive} <- Zoi.parse(@schema, Map.from_struct(directive)),
+         :ok <- Jido.Plugin.Scheduler.validate_durable_id(directive.job_id),
+         :ok <- Jido.Plugin.Scheduler.validate_occurrence_scope(directive.scope) do
+      {:ok, directive}
+    end
+  end
 end

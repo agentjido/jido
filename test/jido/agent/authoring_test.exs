@@ -26,17 +26,26 @@ defmodule JidoTest.Agent.AuthoringTest do
   end
 
   defmodule CountTurns do
-    use Jido.Plugin
+    use Jido.Plugin, agent: __MODULE__.Agent
+  end
+
+  defmodule CountTurns.Agent do
+    use Jido.Agent.Plugin
 
     def state_spec(opts),
       do: {:turns, Zoi.integer() |> Zoi.default(Keyword.get(opts, :initial, 0))}
 
-    def update_state(turns, _directives, _opts), do: {:ok, turns + 1}
+    def reduce(reduction, _opts), do: {:ok, reduction.plugin_state + 1}
   end
 
   defmodule PassThrough do
-    use Jido.Plugin
+    use Jido.Plugin, agent: __MODULE__.Agent
+  end
+
+  defmodule PassThrough.Agent do
+    use Jido.Agent.Plugin
     def state_spec(_opts), do: :none
+    def prepare(_preparation, _opts), do: {:ok, nil}
   end
 
   defmodule PreparedCounter do

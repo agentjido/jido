@@ -53,6 +53,11 @@ defmodule JidoTest.AgentServerRuntimeFixtures do
 
   defmodule CountedDirective do
     defstruct [:test]
+
+    def validate(%__MODULE__{test: test} = directive) do
+      send(test, :directive_validated)
+      {:ok, directive}
+    end
   end
 
   defmodule ReturnCountedDirective do
@@ -65,16 +70,18 @@ defmodule JidoTest.AgentServerRuntimeFixtures do
   end
 
   defmodule CountedDirectivePlugin do
-    use Jido.Plugin
+    use Jido.Plugin, agent: __MODULE__.Agent, agent_server: __MODULE__.Server
+  end
+
+  defmodule CountedDirectivePlugin.Agent do
+    use Jido.Agent.Plugin
 
     @impl true
     def directives(_opts), do: [CountedDirective]
+  end
 
-    @impl true
-    def validate_directive(%CountedDirective{test: test} = directive, _opts) do
-      send(test, :directive_validated)
-      {:ok, directive}
-    end
+  defmodule CountedDirectivePlugin.Server do
+    use Jido.AgentServer.Plugin
 
     @impl true
     def dispatch(_runtime, %CountedDirective{test: test}, context, _opts) do
@@ -83,7 +90,7 @@ defmodule JidoTest.AgentServerRuntimeFixtures do
     end
 
     def child_spec(_init) do
-      Supervisor.child_spec({Elixir.Agent, fn -> nil end}, id: __MODULE__)
+      Supervisor.child_spec({Elixir.Agent, fn -> nil end}, id: CountedDirectivePlugin)
     end
   end
 
@@ -96,6 +103,7 @@ defmodule JidoTest.AgentServerRuntimeFixtures do
 
   defmodule SlowDirective do
     defstruct [:test, :gate, :server]
+    def validate(%__MODULE__{} = directive), do: {:ok, directive}
   end
 
   defmodule ReturnSlowDirective do
@@ -114,13 +122,18 @@ defmodule JidoTest.AgentServerRuntimeFixtures do
   end
 
   defmodule SlowDirectivePlugin do
-    use Jido.Plugin
+    use Jido.Plugin, agent: __MODULE__.Agent, agent_server: __MODULE__.Server
+  end
+
+  defmodule SlowDirectivePlugin.Agent do
+    use Jido.Agent.Plugin
 
     @impl true
     def directives(_opts), do: [SlowDirective]
+  end
 
-    @impl true
-    def validate_directive(%SlowDirective{} = directive, _opts), do: {:ok, directive}
+  defmodule SlowDirectivePlugin.Server do
+    use Jido.AgentServer.Plugin
 
     @impl true
     def dispatch(_runtime, %SlowDirective{test: test, gate: gate}, _context, _opts)
@@ -140,7 +153,7 @@ defmodule JidoTest.AgentServerRuntimeFixtures do
     end
 
     def child_spec(_init) do
-      Supervisor.child_spec({Elixir.Agent, fn -> nil end}, id: __MODULE__)
+      Supervisor.child_spec({Elixir.Agent, fn -> nil end}, id: SlowDirectivePlugin)
     end
   end
 
@@ -174,13 +187,17 @@ defmodule JidoTest.AgentServerRuntimeFixtures do
   end
 
   defmodule ReadinessPlugin do
-    use Jido.Plugin
+    use Jido.Plugin, agent_server: __MODULE__.Server
+  end
+
+  defmodule ReadinessPlugin.Server do
+    use Jido.AgentServer.Plugin
 
     @impl true
     def await_ready(runtime, _opts), do: GenServer.call(runtime, :await_ready)
 
     def child_spec(init) do
-      Supervisor.child_spec({ReadinessRuntime, init}, id: __MODULE__)
+      Supervisor.child_spec({ReadinessRuntime, init}, id: ReadinessPlugin)
     end
   end
 
@@ -229,10 +246,14 @@ defmodule JidoTest.AgentServerRuntimeFixtures do
   end
 
   defmodule GenerationPlugin do
-    use Jido.Plugin
+    use Jido.Plugin, agent_server: __MODULE__.Server
+  end
+
+  defmodule GenerationPlugin.Server do
+    use Jido.AgentServer.Plugin
 
     def child_spec(init) do
-      Supervisor.child_spec({GenerationRuntime, init}, id: __MODULE__)
+      Supervisor.child_spec({GenerationRuntime, init}, id: GenerationPlugin)
     end
   end
 
@@ -244,6 +265,7 @@ defmodule JidoTest.AgentServerRuntimeFixtures do
 
   defmodule FreshRuntimeDirective do
     defstruct [:value]
+    def validate(%__MODULE__{} = directive), do: {:ok, directive}
   end
 
   defmodule ReturnFreshRuntimeDirective do
@@ -256,46 +278,20 @@ defmodule JidoTest.AgentServerRuntimeFixtures do
   end
 
   defmodule FreshRuntimePlugin do
+    use Jido.Plugin, agent: __MODULE__.Agent, agent_server: __MODULE__.Server
+
+    def start_link(init), do: GenServer.start_link(__MODULE__.Process, init)
+  end
+
+  defmodule FreshRuntimePlugin.Process do
     use GenServer
-    use Jido.Plugin
-
-    @impl Jido.Plugin
-    def state_spec(_opts) do
-      {:fresh_runtime,
-       Zoi.object(%{value: Zoi.integer() |> Zoi.default(0)}) |> Zoi.default(%{value: 0})}
-    end
-
-    @impl Jido.Plugin
-    def update_state(state, [%FreshRuntimeDirective{value: value}], _opts) do
-      {:ok, %{state | value: value}}
-    end
-
-    @impl Jido.Plugin
-    def directives(_opts), do: [FreshRuntimeDirective]
-
-    @impl Jido.Plugin
-    def validate_directive(%FreshRuntimeDirective{} = directive, _opts),
-      do: {:ok, directive}
-
-    @impl Jido.Plugin
-    def dispatch(_runtime, _directive, _context, _opts), do: :ok
-
-    @impl Jido.Plugin
-    def await_ready(runtime, _opts) do
-      if :persistent_term.get({__MODULE__, :pause_restart}, false),
-        do: notify({:fresh_readiness_waiting, self(), runtime})
-
-      GenServer.call(runtime, :await_ready)
-    end
-
-    def start_link(init), do: GenServer.start_link(__MODULE__, init)
 
     @impl GenServer
     def init(init), do: {:ok, %{init: init, plugin_state: nil}, {:continue, :load_state}}
 
     @impl GenServer
     def handle_continue(:load_state, state) do
-      if :persistent_term.get({__MODULE__, :pause_restart}, false) do
+      if :persistent_term.get({FreshRuntimePlugin, :pause_restart}, false) do
         notify({:fresh_load_waiting, self()})
 
         receive do
@@ -318,6 +314,47 @@ defmodule JidoTest.AgentServerRuntimeFixtures do
       if test = Process.whereis(:jido_agent_fresh_runtime_test), do: send(test, message)
       :ok
     end
+  end
+
+  defmodule FreshRuntimePlugin.Agent do
+    use Jido.Agent.Plugin
+
+    @impl true
+    def state_spec(_opts) do
+      {:fresh_runtime,
+       Zoi.object(%{value: Zoi.integer() |> Zoi.default(0)}) |> Zoi.default(%{value: 0})}
+    end
+
+    @impl true
+    def directives(_opts), do: [FreshRuntimeDirective]
+
+    @impl true
+    def reduce(reduction, _opts) do
+      case Enum.find(reduction.directives, &match?(%FreshRuntimeDirective{}, &1)) do
+        %FreshRuntimeDirective{value: value} -> {:ok, %{reduction.plugin_state | value: value}}
+        nil -> {:ok, reduction.plugin_state}
+      end
+    end
+  end
+
+  defmodule FreshRuntimePlugin.Server do
+    use Jido.AgentServer.Plugin
+
+    @impl true
+    def dispatch(_runtime, _directive, _context, _opts), do: :ok
+
+    @impl true
+    def await_ready(runtime, _opts) do
+      if :persistent_term.get({FreshRuntimePlugin, :pause_restart}, false) do
+        if test = Process.whereis(:jido_agent_fresh_runtime_test),
+          do: send(test, {:fresh_readiness_waiting, self(), runtime})
+      end
+
+      GenServer.call(runtime, :await_ready)
+    end
+
+    def child_spec(init),
+      do: %{id: FreshRuntimePlugin, start: {FreshRuntimePlugin, :start_link, [init]}}
   end
 
   defmodule FreshRuntimeAgent do

@@ -13,4 +13,12 @@ defmodule Jido.Plugin.Scheduler.Cancel do
 
   @doc false
   def schema, do: @schema
+
+  @doc "Validates one recurring schedule cancellation."
+  def validate(%__MODULE__{} = directive) do
+    with {:ok, directive} <- Zoi.parse(@schema, Map.from_struct(directive)),
+         :ok <- Jido.Plugin.Scheduler.validate_durable_id(directive.job_id) do
+      {:ok, directive}
+    end
+  end
 end

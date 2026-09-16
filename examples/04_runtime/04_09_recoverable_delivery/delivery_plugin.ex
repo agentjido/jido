@@ -11,6 +11,7 @@ defmodule Jido.Examples.RecoverableDelivery.Deliver do
   defstruct Zoi.Struct.struct_fields(@schema)
 
   def schema, do: @schema
+  def validate(%__MODULE__{} = directive), do: Zoi.parse(@schema, directive)
 end
 
 defmodule Jido.Examples.RecoverableDelivery.Confirm do
@@ -26,14 +27,19 @@ defmodule Jido.Examples.RecoverableDelivery.Confirm do
   defstruct Zoi.Struct.struct_fields(@schema)
 
   def schema, do: @schema
+  def validate(%__MODULE__{} = directive), do: Zoi.parse(@schema, directive)
 end
 
 defmodule Jido.Examples.RecoverableDelivery.Output do
   @moduledoc "A delivery Plugin with pending and completed work in Agent state."
 
-  use Jido.Plugin
+  use Jido.Plugin, agent: __MODULE__.Agent, agent_server: __MODULE__.Server
+end
 
-  alias Jido.Examples.RecoverableDelivery.{Confirm, Deliver, Worker}
+defmodule Jido.Examples.RecoverableDelivery.Output.Agent do
+  use Jido.Agent.Plugin
+
+  alias Jido.Examples.RecoverableDelivery.{Confirm, Deliver}
 
   @impl true
   def state_spec(_opts) do
@@ -48,10 +54,12 @@ defmodule Jido.Examples.RecoverableDelivery.Output do
   def directives(_opts), do: [Deliver, Confirm]
 
   @impl true
-  def validate_directive(%module{} = directive, _opts), do: Zoi.parse(module.schema(), directive)
+  def reduce(reduction, _opts) do
+    state = reduction.plugin_state
 
-  @impl true
-  def update_state(state, directives, _opts) do
+    directives =
+      Enum.filter(reduction.directives, &(match?(%Deliver{}, &1) or match?(%Confirm{}, &1)))
+
     Enum.reduce_while(directives, {:ok, state}, fn directive, {:ok, current} ->
       case apply_intent(current, directive) do
         {:ok, next} -> {:cont, {:ok, next}}
@@ -59,12 +67,6 @@ defmodule Jido.Examples.RecoverableDelivery.Output do
       end
     end)
   end
-
-  @impl true
-  def dispatch(runtime, %Deliver{}, _context, _opts), do: GenServer.cast(runtime, :wake)
-  def dispatch(_runtime, %Confirm{}, _context, _opts), do: :ok
-
-  def child_spec(init), do: Supervisor.child_spec({Worker, init}, id: __MODULE__)
 
   defp apply_intent(state, %Deliver{effect_id: id, value: value}) do
     case Map.fetch(Map.merge(state.pending, state.completed), id) do
@@ -91,4 +93,16 @@ defmodule Jido.Examples.RecoverableDelivery.Output do
         {:error, :unknown_delivery_confirmation}
     end
   end
+end
+
+defmodule Jido.Examples.RecoverableDelivery.Output.Server do
+  use Jido.AgentServer.Plugin
+  alias Jido.Examples.RecoverableDelivery.{Confirm, Deliver, Worker}
+
+  @impl true
+  def dispatch(runtime, %Deliver{}, _context, _opts), do: GenServer.cast(runtime, :wake)
+  def dispatch(_runtime, %Confirm{}, _context, _opts), do: :ok
+
+  def child_spec(init),
+    do: Supervisor.child_spec({Worker, init}, id: Jido.Examples.RecoverableDelivery.Output)
 end

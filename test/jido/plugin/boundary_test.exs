@@ -7,10 +7,14 @@ defmodule Jido.Plugin.BoundaryTest do
   alias Jido.Topology.Plugin.Contribution
 
   defmodule OwnedState do
-    use Jido.Plugin
+    use Jido.Plugin, agent: __MODULE__.Agent
+  end
+
+  defmodule OwnedState.Agent do
+    use Jido.Agent.Plugin
 
     def state_spec(_opts), do: {:owned, Zoi.integer() |> Zoi.default(3)}
-    def update_state(value, _directives, _opts), do: {:ok, value}
+    def reduce(reduction, _opts), do: {:ok, reduction.plugin_state}
   end
 
   defmodule EmptyAgentFacet do
@@ -77,8 +81,8 @@ defmodule Jido.Plugin.BoundaryTest do
     use Jido.Plugin, topology: TopologyFacet
   end
 
-  test "stored legacy specs retain their state contract when upgraded to facets" do
-    {_key, schema} = OwnedState.state_spec([])
+  test "stored specs without a manifest are rejected" do
+    {_key, schema} = OwnedState.Agent.state_spec([])
 
     stored = %Spec{
       module: OwnedState,
@@ -87,20 +91,11 @@ defmodule Jido.Plugin.BoundaryTest do
       state_schema: schema
     }
 
-    assert {:ok, [upgraded]} = Plugin.normalize_all([stored])
-    assert upgraded.legacy?
-    assert upgraded.agent.legacy?
-    assert upgraded.agent.package == OwnedState
-    assert upgraded.agent.module == OwnedState
-    assert upgraded.agent.options == stored.options
-    assert upgraded.agent.state_key == :owned
-    assert upgraded.agent.state_schema == schema
-    assert upgraded.agent.directive_modules == []
-    assert upgraded.agent_server == nil
-    assert {:ok, [^upgraded]} = Plugin.normalize_all([upgraded])
-    assert {:ok, [{OwnedState, [label: "stored"]}]} = Plugin.canonical_declarations([stored])
-    assert {:ok, composed} = Plugin.compose_schema(Zoi.object(%{}), [stored])
-    assert {:ok, %{owned: 3}} = Zoi.parse(composed, %{})
+    assert {:error, %{message: "Plugin specs require an owner-facet manifest"}} =
+             Plugin.normalize_all([stored])
+
+    assert {:ok, [spec]} = Plugin.normalize_all([OwnedState])
+    assert {:ok, [^spec]} = Plugin.normalize_all([spec])
   end
 
   test "manifest accessors retain owner order and restrict mapped options" do

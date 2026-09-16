@@ -6,15 +6,19 @@ defmodule Jido.Topology.Controller.CompositionRuntimeTest do
   alias Jido.Topology.{Builder, Controller, Ref}
 
   defmodule BlockReady do
-    use Jido.Plugin
+    use Jido.Plugin, agent_server: __MODULE__.Server
+  end
+
+  defmodule BlockReady.Server do
+    use Jido.AgentServer.Plugin
 
     def child_spec(_init) do
-      %{id: __MODULE__, start: {Elixir.Agent, :start_link, [fn -> :ready end]}}
+      %{id: BlockReady, start: {Elixir.Agent, :start_link, [fn -> :ready end]}}
     end
 
     @impl true
     def await_ready(_runtime, _opts) do
-      observer = :persistent_term.get({__MODULE__, :observer})
+      observer = :persistent_term.get({BlockReady, :observer})
       test = if is_map(observer), do: observer.test, else: observer
 
       if is_map(observer) do

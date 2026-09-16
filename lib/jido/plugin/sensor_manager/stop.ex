@@ -13,4 +13,12 @@ defmodule Jido.Plugin.SensorManager.Stop do
 
   @doc false
   def schema, do: @schema
+
+  @doc "Validates one desired sensor removal."
+  def validate(%__MODULE__{} = directive) do
+    with {:ok, directive} <- Zoi.parse(@schema, Map.from_struct(directive)),
+         :ok <- Jido.Plugin.SensorManager.validate_tag(directive.tag) do
+      {:ok, directive}
+    end
+  end
 end

@@ -8,6 +8,7 @@ defmodule Jido.Examples.Factory.FlowFactory.Run do
   @enforce_keys Zoi.Struct.enforce_keys(@schema)
   defstruct Zoi.Struct.struct_fields(@schema)
   def schema, do: @schema
+  def validate(%__MODULE__{} = value), do: Zoi.parse(@schema, value)
 end
 
 defmodule Jido.Examples.Factory.FlowFactory.Cancel do
@@ -15,18 +16,35 @@ defmodule Jido.Examples.Factory.FlowFactory.Cancel do
   @schema Zoi.struct(__MODULE__, %{})
   defstruct []
   def schema, do: @schema
+  def validate(%__MODULE__{} = value), do: Zoi.parse(@schema, value)
 end
 
 defmodule Jido.Examples.Factory.FlowFactory.Runner do
   @moduledoc "A Plugin owns the asynchronous Exec handle outside portable Agent state."
-  use Jido.Plugin
+  use Jido.Plugin, agent: __MODULE__.Agent, agent_server: __MODULE__.Server
+end
+
+defmodule Jido.Examples.Factory.FlowFactory.Runner.Agent do
+  use Jido.Agent.Plugin
   alias Jido.Examples.Factory.FlowFactory.{Cancel, Run}
 
+  @impl true
   def directives(_), do: [Run, Cancel]
-  def validate_directive(%{__struct__: module} = value, _), do: Zoi.parse(module.schema(), value)
-  def child_spec(init), do: Supervisor.child_spec({__MODULE__.Runtime, init}, id: __MODULE__)
+end
+
+defmodule Jido.Examples.Factory.FlowFactory.Runner.Server do
+  use Jido.AgentServer.Plugin
+
+  def child_spec(init),
+    do:
+      Supervisor.child_spec({Jido.Examples.Factory.FlowFactory.Runner.Runtime, init},
+        id: Jido.Examples.Factory.FlowFactory.Runner
+      )
+
+  @impl true
   def await_ready(pid, _), do: GenServer.call(pid, :ready)
 
+  @impl true
   def dispatch(pid, directive, context, _),
     do: GenServer.call(pid, {directive, context.turn_context})
 end

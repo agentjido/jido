@@ -61,7 +61,7 @@ defmodule JidoTest.System.Scenarios.Overload do
         replacement = start_supervised!({Bus, name: :system_bus, jido: c.jido}, id: :system_bus)
         assert replacement != bus
         client = Server.children(server)[{:plugin, Client}].pid
-        assert :ok = Client.await_ready(client, [])
+        assert :ok = Client.Server.await_ready(client, [])
 
         Process.exit(worker, :kill)
         assert_receive {:DOWN, ^worker_monitor, :process, ^worker, :killed}, 10_000

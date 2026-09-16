@@ -11,6 +11,7 @@ defmodule Jido.Examples.Applications.Subscription.Subscribe do
   @enforce_keys Zoi.Struct.enforce_keys(@schema)
   defstruct Zoi.Struct.struct_fields(@schema)
   def schema, do: @schema
+  def validate(%__MODULE__{} = directive), do: Zoi.parse(@schema, Map.from_struct(directive))
 end
 
 defmodule Jido.Examples.Applications.Subscription.Unsubscribe do
@@ -21,36 +22,38 @@ defmodule Jido.Examples.Applications.Subscription.Unsubscribe do
   @enforce_keys Zoi.Struct.enforce_keys(@schema)
   defstruct Zoi.Struct.struct_fields(@schema)
   def schema, do: @schema
+  def validate(%__MODULE__{} = directive), do: Zoi.parse(@schema, Map.from_struct(directive))
 end
 
 defmodule Jido.Examples.Applications.Subscription.Plugin do
   @moduledoc "Owns desired subscription state and reconciles a runtime projection."
-  use Jido.Plugin
+  use Jido.Plugin, agent: __MODULE__.Agent, agent_server: __MODULE__.Server
+  alias Jido.Examples.Applications.Subscription.{Subscribe, Unsubscribe}
 
-  alias Jido.Plugin.{DirectiveContext, Init}
-  alias Jido.Examples.Applications.Subscription.{Runtime, Subscribe, Unsubscribe}
+  def subscribe(topic, config \\ %{}), do: %Subscribe{topic: topic, config: config}
+  def unsubscribe(topic), do: %Unsubscribe{topic: topic}
+end
+
+defmodule Jido.Examples.Applications.Subscription.Plugin.Agent do
+  use Jido.Agent.Plugin
+  alias Jido.Examples.Applications.Subscription.{Subscribe, Unsubscribe}
 
   @state_schema Zoi.object(%{desired: Zoi.map() |> Zoi.default(%{})})
                 |> Zoi.default(%{desired: %{}})
 
-  def subscribe(topic, config \\ %{}), do: %Subscribe{topic: topic, config: config}
-  def unsubscribe(topic), do: %Unsubscribe{topic: topic}
-
-  @impl Jido.Plugin
+  @impl true
   def state_spec(_opts), do: {:subscriptions, @state_schema}
 
-  @impl Jido.Plugin
+  @impl true
   def directives(_opts), do: [Subscribe, Unsubscribe]
 
-  @impl Jido.Plugin
-  def validate_directive(%Subscribe{} = directive, _opts),
-    do: Zoi.parse(Subscribe.schema(), Map.from_struct(directive))
+  @impl true
+  def reduce(reduction, _opts) do
+    state = reduction.plugin_state
 
-  def validate_directive(%Unsubscribe{} = directive, _opts),
-    do: Zoi.parse(Unsubscribe.schema(), Map.from_struct(directive))
+    directives =
+      Enum.filter(reduction.directives, &(match?(%Subscribe{}, &1) or match?(%Unsubscribe{}, &1)))
 
-  @impl Jido.Plugin
-  def update_state(state, directives, _opts) do
     next =
       Enum.reduce(directives, state, fn
         %Subscribe{topic: topic, config: config}, current ->
@@ -62,15 +65,22 @@ defmodule Jido.Examples.Applications.Subscription.Plugin do
 
     {:ok, next}
   end
+end
 
-  @impl Jido.Plugin
+defmodule Jido.Examples.Applications.Subscription.Plugin.Server do
+  use Jido.AgentServer.Plugin
+  alias Jido.Plugin.{DirectiveContext, Init}
+  alias Jido.Examples.Applications.Subscription.Runtime
+
+  @impl true
   def dispatch(runtime, _directive, %DirectiveContext{} = context, _opts),
     do: GenServer.call(runtime, {:reconcile, context.plugin_state.desired})
 
-  @impl Jido.Plugin
+  @impl true
   def await_ready(runtime, _opts), do: GenServer.call(runtime, :await_ready)
 
-  def child_spec(%Init{} = init), do: Supervisor.child_spec({Runtime, init}, id: __MODULE__)
+  def child_spec(%Init{} = init),
+    do: Supervisor.child_spec({Runtime, init}, id: Jido.Examples.Applications.Subscription.Plugin)
 end
 
 defmodule Jido.Examples.Applications.Subscription.Runtime do

@@ -6,20 +6,27 @@ defmodule JidoTest.TelemetryAgent.Deliver do
   defstruct Zoi.Struct.struct_fields(@schema)
 
   def schema, do: @schema
+  def validate(%__MODULE__{} = directive), do: Zoi.parse(@schema, directive)
 end
 
 defmodule JidoTest.TelemetryAgent.Output do
   @moduledoc false
 
-  use Jido.Plugin
+  use Jido.Plugin, agent: __MODULE__.Agent, agent_server: __MODULE__.Server
+end
+
+defmodule JidoTest.TelemetryAgent.Output.Agent do
+  use Jido.Agent.Plugin
 
   alias JidoTest.TelemetryAgent.Deliver
 
   @impl true
   def directives(_opts), do: [Deliver]
+end
 
-  @impl true
-  def validate_directive(directive, _opts), do: Zoi.parse(Deliver.schema(), directive)
+defmodule JidoTest.TelemetryAgent.Output.Server do
+  use Jido.AgentServer.Plugin
+  alias JidoTest.TelemetryAgent.Deliver
 
   @impl true
   def dispatch(nil, %Deliver{value: value}, context, _opts) do

@@ -1,12 +1,17 @@
 # Contract probes for Rounds 25 and 30. These do not measure time.
+# The second probe checks the current post-Action schema transform behavior.
 defmodule JidoCoreEffects.Owned do
-  use Jido.Plugin
+  use Jido.Plugin, agent: __MODULE__.Agent
+end
+
+defmodule JidoCoreEffects.Owned.Agent do
+  use Jido.Agent.Plugin
 
   def state_spec(_opts),
     do: {:owned, Zoi.integer() |> Zoi.transform({__MODULE__, :increment, []})}
 
   def increment(value, _opts), do: value + 1
-  def update_state(value, _directives, _opts), do: {:ok, value}
+  def reduce(reduction, _opts), do: {:ok, reduction.plugin_state}
 end
 
 defmodule JidoCoreEffects.Reset do
@@ -20,7 +25,20 @@ defmodule JidoCoreEffects.Reset do
 end
 
 {:ok, specs} = Jido.Plugin.normalize_all([JidoCoreEffects.Owned])
-{:ok, %{owned: 2}, []} = Jido.Plugin.update_state({:ok, %{owned: 1}, []}, specs)
+probe_agent =
+  Jido.Agent.new!(name: "core_effects_owned", plugins: [JidoCoreEffects.Owned])
+  |> Map.put(:id, "core-effects-owned")
+  |> Map.put(:state, %{owned: 1})
+
+probe_signal = Jido.Signal.new!("probe.owned", %{}, source: "/probe")
+{:ok, %{owned: 2}, []} =
+  Jido.Agent.Plugin.Pipeline.run(
+    {:ok, %{owned: 1}, []},
+    probe_agent,
+    probe_signal,
+    %{},
+    Jido.Agent.Plugin.specs(specs)
+  )
 IO.puts("Round 25: unchanged reducer output still transforms owned state from 1 to 2")
 
 {:ok, supervisor} = Jido.start_link(name: JidoCoreEffects)
@@ -39,11 +57,13 @@ try do
   instance = %{definition | id: "core-effects", state: %{count: 1}}
   signal = Jido.Signal.new!("probe.reset", %{}, source: "/probe")
 
-  {:error, %Jido.Error.ValidationError{message: "Agent state does not match its schema"}} =
+  {:ok, next_agent, []} =
     Jido.Agent.cmd(instance, signal,
       task_supervisor: JidoCoreEffects.TaskSupervisor,
       context: %{probe_owner: self()}
     )
+
+  %{count: "1"} = next_agent.state
 
   receive do
     :action_ran -> :ok
@@ -51,7 +71,7 @@ try do
     1_000 -> raise "Action did not run"
   end
 
-  IO.puts("Round 30: the command runs its Action, then rejects the second state parse")
+  IO.puts("Round 30: the command runs its Action, then applies the state transform")
 after
   Supervisor.stop(supervisor)
 end

@@ -9,23 +9,35 @@ defmodule Jido.AgentServer.StartupTest do
   end
 
   defmodule IgnoredRuntimePlugin do
-    use Jido.Plugin
-
-    def child_spec(init), do: %{id: __MODULE__, start: {__MODULE__, :start_link, [init]}}
+    use Jido.Plugin, agent_server: __MODULE__.Server
     def start_link(_init), do: :ignore
   end
 
+  defmodule IgnoredRuntimePlugin.Server do
+    use Jido.AgentServer.Plugin
+
+    def child_spec(init),
+      do: %{id: IgnoredRuntimePlugin, start: {IgnoredRuntimePlugin, :start_link, [init]}}
+  end
+
   defmodule HeldIgnoredRuntimePlugin do
-    use Jido.Plugin
-    def child_spec(init), do: %{id: __MODULE__, start: {__MODULE__, :start_link, [init]}}
+    use Jido.Plugin, agent_server: __MODULE__.Server
 
     def start_link(init) do
-      send(init.options[:observer], {:plugin_starting, init.agent_server, self()})
+      observer = :persistent_term.get({__MODULE__, :observer, init.options[:observer_key]})
+      send(observer, {:plugin_starting, init.agent_server, self()})
 
       receive do
         :return_ignore -> :ignore
       end
     end
+  end
+
+  defmodule HeldIgnoredRuntimePlugin.Server do
+    use Jido.AgentServer.Plugin
+
+    def child_spec(init),
+      do: %{id: HeldIgnoredRuntimePlugin, start: {HeldIgnoredRuntimePlugin, :start_link, [init]}}
   end
 
   defmodule HeldConstructor do
@@ -35,9 +47,11 @@ defmodule Jido.AgentServer.StartupTest do
 
       receive do
         :construct_agent ->
+          :persistent_term.put({HeldIgnoredRuntimePlugin, :observer, opts[:id]}, observer)
+
           definition = %{
             Agent.definition()
-            | plugins: [{HeldIgnoredRuntimePlugin, [observer: observer]}]
+            | plugins: [{HeldIgnoredRuntimePlugin, [observer_key: opts[:id]]}]
           }
 
           Jido.Agent.instantiate(definition, id: opts[:id])
@@ -50,6 +64,7 @@ defmodule Jido.AgentServer.StartupTest do
          %{jido: jido} do
       observer = self()
       id = unique_id("delayed-startup-caller")
+      on_exit(fn -> :persistent_term.erase({HeldIgnoredRuntimePlugin, :observer, id}) end)
 
       caller =
         Task.async(fn ->

@@ -43,6 +43,7 @@ defmodule Jido.AgentServer.Plugin do
               opts :: keyword()
             ) :: :ok | {:error, term()}
   @callback await_ready(runtime_ref :: term(), opts :: keyword()) :: :ok | {:error, term()}
+  @callback validate_options(opts :: keyword()) :: :ok | {:error, term()}
 
   @doc """
   Receives each successful Turn commit before returned Directives run.
@@ -69,6 +70,7 @@ defmodule Jido.AgentServer.Plugin do
                       prepare_dispatch: 4,
                       dispatch: 4,
                       await_ready: 2,
+                      validate_options: 1,
                       after_commit: 3
 
   @doc false
@@ -223,19 +225,11 @@ defmodule Jido.AgentServer.Plugin do
         spec.module,
         :dispatch,
         [runtime_ref, directive, context, spec.options],
-        label(
-          spec,
-          "Agent Plugin Directive dispatch failed",
-          "Agent Server Plugin Directive dispatch failed"
-        )
+        "Agent Server Plugin Directive dispatch failed"
       )
       |> validate_status_result(
         spec,
-        label(
-          spec,
-          "Agent Plugin dispatch/4 returned an invalid result",
-          "Agent Server Plugin dispatch/4 returned an invalid result"
-        )
+        "Agent Server Plugin dispatch/4 returned an invalid result"
       )
     end
   end
@@ -258,19 +252,11 @@ defmodule Jido.AgentServer.Plugin do
         spec.module,
         :await_ready,
         [runtime_ref, spec.options],
-        label(
-          spec,
-          "Agent Plugin readiness check failed",
-          "Agent Server Plugin readiness check failed"
-        )
+        "Agent Server Plugin readiness check failed"
       )
       |> validate_status_result(
         spec,
-        label(
-          spec,
-          "Agent Plugin await_ready/2 returned an invalid result",
-          "Agent Server Plugin await_ready/2 returned an invalid result"
-        )
+        "Agent Server Plugin await_ready/2 returned an invalid result"
       )
     else
       :ok
@@ -279,26 +265,6 @@ defmodule Jido.AgentServer.Plugin do
 
   defp admit_one(command, %{agent_server: nil}, _runtime_ref, _state_version),
     do: {:ok, command}
-
-  defp admit_one(
-         command,
-         %{agent_server: %Spec{legacy?: true} = spec},
-         runtime_ref,
-         _state_version
-       ) do
-    if function_exported?(spec.module, :admit, 3) do
-      PluginError.safe_apply(
-        spec.package,
-        spec.module,
-        :admit,
-        [runtime_ref, command, spec.options],
-        label(spec, "Agent Plugin admission failed", "Agent Server Plugin admission failed")
-      )
-      |> validate_legacy_admission_result(command, spec)
-    else
-      {:ok, command}
-    end
-  end
 
   defp admit_one(
          command,
@@ -343,11 +309,7 @@ defmodule Jido.AgentServer.Plugin do
         spec.module,
         :prepare_dispatch,
         [runtime_ref, signal, context, spec.options],
-        label(
-          spec,
-          "Agent Plugin outbound Signal preparation failed",
-          "Agent Server Plugin outbound Signal preparation failed"
-        )
+        "Agent Server Plugin outbound Signal preparation failed"
       )
       |> case do
         {:ok, %Jido.Signal{} = prepared} ->
@@ -358,11 +320,7 @@ defmodule Jido.AgentServer.Plugin do
 
         result ->
           PluginError.invalid_callback(
-            label(
-              spec,
-              "Agent Plugin prepare_dispatch/4 returned an invalid result",
-              "Agent Server Plugin prepare_dispatch/4 returned an invalid result"
-            ),
+            "Agent Server Plugin prepare_dispatch/4 returned an invalid result",
             spec.package,
             spec.module,
             %{result: result}
@@ -388,93 +346,6 @@ defmodule Jido.AgentServer.Plugin do
     )
   end
 
-  defp validate_legacy_admission_result({:ok, %Command{} = command}, original, spec) do
-    with {:ok, command} <- Command.validate(command),
-         :ok <- unchanged_admission_field(command.agent, original.agent, :agent, spec),
-         :ok <- unchanged_admission_field(command.signal, original.signal, :signal, spec),
-         :ok <- unchanged_admission_field(command.context, original.context, :context, spec),
-         :ok <- unchanged_prepared_input(command.plugin_inputs, original.plugin_inputs, spec),
-         :ok <- unchanged_foreign_inputs(command.plugin_inputs, original.plugin_inputs, spec) do
-      {:ok, command}
-    end
-  end
-
-  defp validate_legacy_admission_result({:error, _reason} = error, _original, _spec), do: error
-
-  defp validate_legacy_admission_result(result, _original, spec) do
-    PluginError.invalid_callback(
-      label(
-        spec,
-        "Agent Plugin admit/3 returned an invalid result",
-        "Agent Server Plugin admit/3 returned an invalid result"
-      ),
-      spec.package,
-      spec.module,
-      %{result: result}
-    )
-  end
-
-  defp unchanged_admission_field(value, value, _field, _spec), do: :ok
-
-  defp unchanged_admission_field(_value, _original, field, spec) do
-    {legacy, current} = admission_field_error(field)
-
-    PluginError.invalid_callback(
-      label(spec, legacy, current),
-      spec.package,
-      spec.module,
-      %{callback: :admit}
-    )
-  end
-
-  defp admission_field_error(:agent),
-    do: {"Agent Plugin cannot replace the Agent", "Agent Server Plugin cannot replace the Agent"}
-
-  defp admission_field_error(:signal),
-    do: {"Agent Plugin cannot change the Signal", "Agent Server Plugin cannot change the Signal"}
-
-  defp admission_field_error(:context),
-    do:
-      {"Agent Plugin cannot change the caller context",
-       "Agent Server Plugin cannot change the caller context"}
-
-  defp unchanged_foreign_inputs(inputs, original, spec) do
-    if Map.delete(inputs, spec.package) === Map.delete(original, spec.package) do
-      :ok
-    else
-      PluginError.invalid_callback(
-        label(
-          spec,
-          "Agent Plugin cannot change another Plugin's input",
-          "Agent Server Plugin cannot change another Plugin's input"
-        ),
-        spec.package,
-        spec.module,
-        %{callback: :admit, field: :plugin_inputs}
-      )
-    end
-  end
-
-  defp unchanged_prepared_input(inputs, original, spec) do
-    input = Map.get(inputs, spec.package, %Input{})
-    original_input = Map.get(original, spec.package, %Input{})
-
-    if input.prepared === original_input.prepared do
-      :ok
-    else
-      PluginError.invalid_callback(
-        label(
-          spec,
-          "Agent Plugin cannot change pure prepared input",
-          "Agent Server Plugin cannot change pure prepared input"
-        ),
-        spec.package,
-        spec.module,
-        %{callback: :admit, field: :prepared}
-      )
-    end
-  end
-
   defp validate_signal(signal, spec) do
     case Zoi.parse(Jido.Signal.schema(), signal) do
       {:ok, validated} ->
@@ -482,11 +353,7 @@ defmodule Jido.AgentServer.Plugin do
 
       {:error, errors} ->
         PluginError.invalid_callback(
-          label(
-            spec,
-            "Agent Plugin prepare_dispatch/4 returned an invalid Signal",
-            "Agent Server Plugin prepare_dispatch/4 returned an invalid Signal"
-          ),
+          "Agent Server Plugin prepare_dispatch/4 returned an invalid Signal",
           spec.package,
           spec.module,
           %{errors: errors}
@@ -504,11 +371,7 @@ defmodule Jido.AgentServer.Plugin do
   rescue
     error ->
       PluginError.validation(
-        label(
-          spec,
-          "Agent Plugin child_spec/1 raised",
-          "Agent Server Plugin child_spec/1 raised"
-        ),
+        "Agent Server Plugin child_spec/1 raised",
         %{
           plugin: spec.package,
           facet: spec.module,
@@ -518,11 +381,7 @@ defmodule Jido.AgentServer.Plugin do
   catch
     kind, reason ->
       PluginError.validation(
-        label(
-          spec,
-          "Agent Plugin child_spec/1 failed",
-          "Agent Server Plugin child_spec/1 failed"
-        ),
+        "Agent Server Plugin child_spec/1 failed",
         %{
           plugin: spec.package,
           facet: spec.module,
@@ -541,11 +400,7 @@ defmodule Jido.AgentServer.Plugin do
 
         restart ->
           PluginError.validation(
-            label(
-              spec,
-              "Agent Plugin runtime root must use :permanent restart",
-              "Agent Server Plugin runtime root must use :permanent restart"
-            ),
+            "Agent Server Plugin runtime root must use :permanent restart",
             %{
               plugin: spec.package,
               facet: spec.module,
@@ -582,11 +437,7 @@ defmodule Jido.AgentServer.Plugin do
 
   defp invalid_child_spec(child_spec, spec, reason) do
     PluginError.validation(
-      label(
-        spec,
-        "Agent Plugin child_spec/1 returned an invalid child specification",
-        "Agent Server Plugin child_spec/1 returned an invalid child specification"
-      ),
+      "Agent Server Plugin child_spec/1 returned an invalid child specification",
       %{plugin: spec.package, facet: spec.module, child_spec: child_spec, reason: reason}
     )
   end
@@ -611,9 +462,6 @@ defmodule Jido.AgentServer.Plugin do
 
   defp server_options(%{agent_server: %Spec{options: options}}), do: options
   defp server_options(_plugin_spec), do: []
-
-  defp label(%Spec{legacy?: true}, legacy, _current), do: legacy
-  defp label(%Spec{}, _legacy, current), do: current
 
   defp owned_state(_agent_state, %{agent: %{state_key: nil}}), do: nil
   defp owned_state(agent_state, %{agent: %{state_key: key}}), do: Map.get(agent_state, key)

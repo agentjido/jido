@@ -260,7 +260,7 @@ defmodule Jido.Plugin.SensorManagerTest do
           {SensorManager.start(:source, TestSensor, %{pid: self()}),
            "Sensor config must contain portable data"}
         ] do
-      assert {:error, error} = SensorManager.validate_directive(directive, [])
+      assert {:error, error} = Jido.Agent.Directive.validate(directive)
       assert error.message == message
     end
   end
@@ -269,12 +269,14 @@ defmodule Jido.Plugin.SensorManagerTest do
     pid = spawn(fn -> :ok end)
     ref = Process.monitor(pid)
     assert_receive {:DOWN, ^ref, :process, ^pid, _}
-    assert {:error, {:sensor_manager_runtime_unavailable, _}} = SensorManager.await_ready(pid, [])
+
+    assert {:error, {:sensor_manager_runtime_unavailable, _}} =
+             SensorManager.Server.await_ready(pid, [])
 
     context =
       struct(Jido.Plugin.DirectiveContext, plugin_state: %{desired: %{}}, state_version: 1)
 
     assert {:error, {:sensor_manager_runtime_unavailable, _}} =
-             SensorManager.dispatch(pid, SensorManager.stop(:source), context, [])
+             SensorManager.Server.dispatch(pid, SensorManager.stop(:source), context, [])
   end
 end

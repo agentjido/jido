@@ -101,9 +101,11 @@ defmodule Jido.Plugin.Scheduler.OccurrenceTest do
     signal = tick()
 
     assert {:ok, directive} =
-             Scheduler.validate_directive(Scheduler.cron(:plain, "* * * * *", signal), [])
+             Jido.Agent.Directive.validate(Scheduler.cron(:plain, "* * * * *", signal))
 
-    assert {:ok, %{cron: %{plain: spec}}} = Scheduler.update_state(%{cron: %{}}, [directive], [])
+    assert {:ok, %{cron: %{plain: spec}}} =
+             Scheduler.Agent.apply_directives(%{cron: %{}}, [directive])
+
     assert spec == %{cron_expression: "* * * * *", message: signal, timezone: "Etc/UTC"}
     assert :ok = Scheduler.validate_cron_state(%{plain: spec}, [])
   end
@@ -113,15 +115,14 @@ defmodule Jido.Plugin.Scheduler.OccurrenceTest do
     assert Scheduler.schedule(10, signal) == %Scheduler.Schedule{delay_ms: 10, signal: signal}
     invalid = Scheduler.schedule(-1, :not_a_signal)
     assert invalid == %Scheduler.Schedule{delay_ms: -1, signal: :not_a_signal}
-    assert {:error, _} = Scheduler.validate_directive(invalid, [])
+    assert {:error, _} = Jido.Agent.Directive.validate(invalid)
   end
 
   test "timezone defaults are shared by validation and stored definitions" do
     for timezone <- [nil, "", "Etc/UTC"] do
       assert {:ok, directive} =
-               Scheduler.validate_directive(
-                 Scheduler.cron(:plain, "* * * * *", tick(), timezone: timezone),
-                 []
+               Jido.Agent.Directive.validate(
+                 Scheduler.cron(:plain, "* * * * *", tick(), timezone: timezone)
                )
 
       assert directive.timezone == "Etc/UTC"
@@ -147,17 +148,15 @@ defmodule Jido.Plugin.Scheduler.OccurrenceTest do
     end
 
     assert {:error, syntax_error} =
-             Scheduler.validate_directive(
-               Scheduler.cron(:job, "bad cron", tick(), timezone: "Not/AZone"),
-               []
+             Jido.Agent.Directive.validate(
+               Scheduler.cron(:job, "bad cron", tick(), timezone: "Not/AZone")
              )
 
     assert {:invalid_cron, _} = syntax_error
 
     assert {:error, {:invalid_timezone, _}} =
-             Scheduler.validate_directive(
-               Scheduler.cron(:job, "* * * * *", tick(), timezone: "Not/AZone"),
-               []
+             Jido.Agent.Directive.validate(
+               Scheduler.cron(:job, "* * * * *", tick(), timezone: "Not/AZone")
              )
   end
 
@@ -165,9 +164,8 @@ defmodule Jido.Plugin.Scheduler.OccurrenceTest do
     {:ok, tagged} = Occurrence.attach(tick(), @scope, "job-1", 1, @instant)
 
     assert {:error, :reserved_occurrence_metadata} =
-             Scheduler.validate_directive(
-               Scheduler.cron("job-1", "* * * * *", tagged, generation: 1),
-               []
+             Jido.Agent.Directive.validate(
+               Scheduler.cron("job-1", "* * * * *", tagged, generation: 1)
              )
 
     spec = Scheduler.build_cron_spec("* * * * *", tagged, nil, 1)
@@ -180,18 +178,14 @@ defmodule Jido.Plugin.Scheduler.OccurrenceTest do
 
     for value <- [self(), make_ref(), port, fn -> :ok end, [1 | :improper_tail]] do
       assert {:error, {:invalid_job_id, :non_durable_term}} =
-               Scheduler.validate_directive(
-                 Scheduler.cron({:job, %{nested: value}}, "* * * * *", tick()),
-                 []
+               Jido.Agent.Directive.validate(
+                 Scheduler.cron({:job, %{nested: value}}, "* * * * *", tick())
                )
 
       invalid_message = %{tick() | data: %{nested: {:value, [value]}}}
 
       assert {:error, {:invalid_message, :non_durable_term}} =
-               Scheduler.validate_directive(
-                 Scheduler.cron(:job, "* * * * *", invalid_message),
-                 []
-               )
+               Jido.Agent.Directive.validate(Scheduler.cron(:job, "* * * * *", invalid_message))
 
       assert {:error, :non_durable_occurrence_scope} =
                Scheduler.validate_occurrence_scope({ExampleJido, "agent-1", [value]})

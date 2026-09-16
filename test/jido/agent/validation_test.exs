@@ -5,7 +5,11 @@ defmodule Jido.Agent.ValidationTest do
   alias Jido.Error.ValidationError
 
   defmodule CallbackPlugin do
-    use Jido.Plugin
+    use Jido.Plugin, agent: __MODULE__.Agent
+  end
+
+  defmodule CallbackPlugin.Agent do
+    use Jido.Agent.Plugin
 
     @impl true
     def state_spec(opts) do
@@ -21,7 +25,11 @@ defmodule Jido.Agent.ValidationTest do
   end
 
   defmodule StatePlugin do
-    use Jido.Plugin
+    use Jido.Plugin, agent: __MODULE__.Agent
+  end
+
+  defmodule StatePlugin.Agent do
+    use Jido.Agent.Plugin
 
     @impl true
     def state_spec(_opts), do: {:owned, Zoi.integer()}

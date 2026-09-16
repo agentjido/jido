@@ -106,9 +106,13 @@ defmodule JidoTest.Agent.AuthoringExtensionTest do
   end
 
   defmodule Turns do
-    use Jido.Plugin
+    use Jido.Plugin, agent: __MODULE__.Agent
+  end
+
+  defmodule Turns.Agent do
+    use Jido.Agent.Plugin
     def state_spec(_), do: {:turns, Zoi.integer() |> Zoi.default(0)}
-    def update_state(n, _, _), do: {:ok, n + 1}
+    def reduce(reduction, _), do: {:ok, reduction.plugin_state + 1}
   end
 
   test "foreign entities lower with ordinary Plugins, routes and generated helpers" do

@@ -7,10 +7,13 @@ defmodule Jido.AgentServer.PluginLifecycleTest do
   @moduletag capture_log: true
 
   defmodule Runtime do
-    use GenServer
-    use Jido.Plugin
+    use Jido.Plugin, agent_server: __MODULE__.Server
 
-    def start_link(init), do: GenServer.start_link(__MODULE__, init)
+    def start_link(init), do: GenServer.start_link(__MODULE__.Process, init)
+  end
+
+  defmodule Runtime.Process do
+    use GenServer
 
     def init(init) do
       case Keyword.get(init.options, :start_error) do
@@ -18,12 +21,23 @@ defmodule Jido.AgentServer.PluginLifecycleTest do
         reason -> {:stop, reason}
       end
     end
+  end
 
+  defmodule Runtime.Server do
+    use Jido.AgentServer.Plugin
+
+    def child_spec(init), do: %{id: Runtime, start: {Runtime, :start_link, [init]}}
+
+    @impl true
     def await_ready(pid, opts) do
       result =
         case Keyword.get(opts, :gate) do
-          nil -> :ok
-          gate -> Elixir.Agent.get_and_update(gate, fn [result | rest] -> {result, rest} end)
+          nil ->
+            :ok
+
+          gate_key ->
+            gate = :persistent_term.get({Runtime, :gate, gate_key})
+            Elixir.Agent.get_and_update(gate, fn [result | rest] -> {result, rest} end)
         end
 
       case result do
@@ -50,16 +64,25 @@ defmodule Jido.AgentServer.PluginLifecycleTest do
   end
 
   defmodule ObservedRuntime do
-    use GenServer
-    use Jido.Plugin
+    use Jido.Plugin, agent_server: __MODULE__.Server
 
-    def child_spec(init), do: %{id: __MODULE__, start: {__MODULE__, :start_link, [init]}}
-    def start_link(init), do: GenServer.start_link(__MODULE__, init)
+    def start_link(init), do: GenServer.start_link(__MODULE__.Process, init)
+  end
+
+  defmodule ObservedRuntime.Process do
+    use GenServer
 
     def init(init) do
       send(Keyword.fetch!(init.options, :observer), {:observed_runtime_started, self()})
       {:ok, init}
     end
+  end
+
+  defmodule ObservedRuntime.Server do
+    use Jido.AgentServer.Plugin
+
+    def child_spec(init),
+      do: %{id: ObservedRuntime, start: {ObservedRuntime, :start_link, [init]}}
   end
 
   defmodule RejectingCreateAdapter do
@@ -133,7 +156,7 @@ defmodule Jido.AgentServer.PluginLifecycleTest do
   test "initial Plugin readiness has a finite timeout and cleans up", %{jido: jido} do
     observer = self()
     gate = start_supervised!({Elixir.Agent, fn -> [{:wait, observer}] end})
-    definition = %{Agent.definition() | plugins: [{Runtime, gate: gate}]}
+    definition = %{Agent.definition() | plugins: [{Runtime, gate: register_gate(gate)}]}
 
     starter =
       Task.async(fn ->
@@ -156,7 +179,7 @@ defmodule Jido.AgentServer.PluginLifecycleTest do
   test "abrupt owner death stops initial Plugin readiness and its runtime", %{jido: jido} do
     observer = self()
     gate = start_supervised!({Elixir.Agent, fn -> [{:wait, observer}] end})
-    definition = %{Agent.definition() | plugins: [{Runtime, gate: gate}]}
+    definition = %{Agent.definition() | plugins: [{Runtime, gate: register_gate(gate)}]}
 
     starter =
       Task.async(fn ->
@@ -252,7 +275,7 @@ defmodule Jido.AgentServer.PluginLifecycleTest do
 
   test "failed readiness after a runtime restart stops the owner", %{jido: jido} do
     gate = start_supervised!({Elixir.Agent, fn -> [:ok, {:error, :not_ready}] end})
-    definition = %{Agent.definition() | plugins: [{Runtime, gate: gate}]}
+    definition = %{Agent.definition() | plugins: [{Runtime, gate: register_gate(gate)}]}
     {:ok, server} = Jido.start_agent(jido, definition, restart: :temporary)
     runtime = Server.children(server)[{:plugin, Runtime}].pid
     ref = Process.monitor(server)
@@ -312,7 +335,7 @@ defmodule Jido.AgentServer.PluginLifecycleTest do
   defp paused_restart(jido, opts \\ []) do
     observer = self()
     gate = start_supervised!({Elixir.Agent, fn -> [:ok, {:wait, observer}] end})
-    definition = %{Agent.definition() | plugins: [{Runtime, gate: gate}]}
+    definition = %{Agent.definition() | plugins: [{Runtime, gate: register_gate(gate)}]}
 
     {:ok, server} =
       Jido.start_agent(jido, definition,
@@ -326,5 +349,12 @@ defmodule Jido.AgentServer.PluginLifecycleTest do
     assert_receive {:readiness_waiting, waiter, runtime}, 2_000
     assert Jido.AgentServer.PluginChild.child_pid(child.lifecycle_pid) == :restarting
     {server, child.lifecycle_pid, waiter, runtime}
+  end
+
+  defp register_gate(gate) do
+    key = unique_id("readiness-gate")
+    :persistent_term.put({Runtime, :gate, key}, gate)
+    on_exit(fn -> :persistent_term.erase({Runtime, :gate, key}) end)
+    key
   end
 end

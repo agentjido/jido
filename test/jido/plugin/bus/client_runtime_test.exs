@@ -17,7 +17,7 @@ defmodule Jido.Plugin.Bus.ClientRuntimeTest do
     }
 
     client = start_supervised!({Runtime, init})
-    assert :ok = Client.await_ready(client, [])
+    assert :ok = Client.Server.await_ready(client, [])
     monitor = Process.monitor(bus)
     stop_supervised!(:ready_bus)
     assert_receive {:DOWN, ^monitor, :process, ^bus, _}
@@ -25,7 +25,7 @@ defmodule Jido.Plugin.Bus.ClientRuntimeTest do
     stale_token = :sys.get_state(client).reconnect_token
     replacement = start_supervised!({Bus, name: :ready_bus, jido: jido}, id: :ready_bus)
 
-    assert :ok = Client.await_ready(client, [])
+    assert :ok = Client.Server.await_ready(client, [])
     state = :sys.get_state(client)
     assert state.bus == replacement
     assert is_binary(state.subscription_id)

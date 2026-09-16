@@ -6,15 +6,7 @@ defmodule Jido.AgentServer.PluginBoundaryTest do
   alias Jido.Plugin.Init
 
   defmodule Runtime do
-    use GenServer
-    use Jido.Plugin
-
-    def child_spec(init) do
-      if Keyword.get(init.options, :invalid_spec),
-        do: raise(ArgumentError, "invalid runtime spec")
-
-      %{id: __MODULE__, start: {__MODULE__, :start_link, [init]}}
-    end
+    use Jido.Plugin, agent_server: __MODULE__.Server
 
     def start_link(init) do
       case Keyword.get(init.options, :start, :ok) do
@@ -25,19 +17,38 @@ defmodule Jido.AgentServer.PluginBoundaryTest do
           {:error, :runtime_unavailable}
 
         :info ->
-          {:ok, pid} = GenServer.start_link(__MODULE__, init)
+          {:ok, pid} = GenServer.start_link(__MODULE__.Process, init)
           {:ok, pid, :started}
 
         :ok ->
-          GenServer.start_link(__MODULE__, init)
+          GenServer.start_link(__MODULE__.Process, init)
       end
     end
+  end
 
+  defmodule Runtime.Process do
+    use GenServer
+    @impl true
     def init(init), do: {:ok, init}
   end
 
+  defmodule Runtime.Server do
+    use Jido.AgentServer.Plugin
+
+    def child_spec(init) do
+      if Keyword.get(init.options, :invalid_spec),
+        do: raise(ArgumentError, "invalid runtime spec")
+
+      %{id: Runtime, start: {Runtime, :start_link, [init]}}
+    end
+  end
+
   defmodule StateOnly do
-    use Jido.Plugin
+    use Jido.Plugin, agent: __MODULE__.Agent
+  end
+
+  defmodule StateOnly.Agent do
+    use Jido.Agent.Plugin
     def state_spec(_opts), do: {:owned, Zoi.integer() |> Zoi.default(0)}
   end
 
@@ -92,7 +103,7 @@ defmodule Jido.AgentServer.PluginBoundaryTest do
   test "a replacement runtime can return additional startup information" do
     {wrapper, runtime, init, _spec} = start_wrapper()
     token = request_restart(wrapper, runtime)
-    replacement = Runtime.child_spec(%{init | options: [start: :info]})
+    replacement = Runtime.Server.child_spec(%{init | options: [start: :info]})
     send(wrapper, {:plugin_runtime_bootstrap, token, {:ok, replacement}})
 
     assert_receive {:plugin_runtime_ready, ^wrapper, Runtime, next_runtime}, 1_000
@@ -106,7 +117,7 @@ defmodule Jido.AgentServer.PluginBoundaryTest do
     {wrapper, runtime, init, _spec} = start_wrapper()
     wrapper_ref = Process.monitor(wrapper)
     token = request_restart(wrapper, runtime)
-    replacement = Runtime.child_spec(%{init | options: [start: :ignore]})
+    replacement = Runtime.Server.child_spec(%{init | options: [start: :ignore]})
     send(wrapper, {:plugin_runtime_bootstrap, token, {:ok, replacement}})
 
     assert_receive {:DOWN, ^wrapper_ref, :process, ^wrapper,
@@ -118,7 +129,7 @@ defmodule Jido.AgentServer.PluginBoundaryTest do
     {wrapper, runtime, init, _spec} = start_wrapper()
     wrapper_ref = Process.monitor(wrapper)
     token = request_restart(wrapper, runtime)
-    replacement = Runtime.child_spec(%{init | options: [start: :error]})
+    replacement = Runtime.Server.child_spec(%{init | options: [start: :error]})
     send(wrapper, {:plugin_runtime_bootstrap, token, {:ok, replacement}})
 
     assert_receive {:DOWN, ^wrapper_ref, :process, ^wrapper,
@@ -205,7 +216,7 @@ defmodule Jido.AgentServer.PluginBoundaryTest do
   defp start_wrapper(extra \\ []) do
     {:ok, [spec]} = Jido.Plugin.normalize_all([Runtime])
     init = %Init{agent_server: self(), agent_id: unique_id("plugin-wrapper"), module: Runtime}
-    child_spec = Runtime.child_spec(init)
+    child_spec = Runtime.Server.child_spec(init)
     args = [self(), spec, child_spec] ++ extra
     wrapper = start_supervised!(Supervisor.child_spec({PluginChild, args}, restart: :temporary))
     {wrapper, PluginChild.child_pid(wrapper), init, spec}

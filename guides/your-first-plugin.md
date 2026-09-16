@@ -1,6 +1,7 @@
 # Write a Plugin
 
-Start with a callback-free package that uses `Jido.Plugin`. Add only the owner
+Start with a callback-free package that uses `Jido.Plugin`. Bare
+`use Jido.Plugin` is not a valid package declaration. Add only the owner
 facets that the capability needs.
 
 Use `Jido.Agent.Plugin` for owned state and owned Directives. Use

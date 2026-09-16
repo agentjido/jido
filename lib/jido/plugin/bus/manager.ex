@@ -18,17 +18,5 @@ defmodule Jido.Plugin.Bus.Manager do
   `Jido.Plugin.Bus.Client` so the Bus exists before the Client starts.
   """
 
-  use Jido.Plugin
-
-  alias Jido.Plugin.Init
-  alias Jido.Signal.Bus
-
-  @doc false
-  def child_spec(%Init{} = init) do
-    init.options
-    |> Keyword.put_new(:name, init.agent_id)
-    |> Keyword.put_new(:jido, init.jido)
-    |> Bus.child_spec()
-    |> Map.put(:id, __MODULE__)
-  end
+  use Jido.Plugin, agent_server: Jido.Plugin.Bus.Manager.Server
 end

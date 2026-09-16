@@ -19,4 +19,26 @@ defmodule Jido.Plugin.Audit.Record do
 
   @doc false
   def schema, do: @schema
+
+  @doc "Validates one portable audit record."
+  def validate(%__MODULE__{} = record) do
+    with {:ok, record} <- Zoi.parse(@schema, Map.from_struct(record)),
+         true <- Jido.Signal.ID.valid?(record.id),
+         :ok <- Jido.Action.validate_static_data(record) do
+      {:ok, record}
+    else
+      false ->
+        invalid("Audit record id must be a UUID7", %{id: record.id})
+
+      {:error, reason} when is_binary(reason) ->
+        invalid("Audit record must contain portable data", %{reason: reason})
+
+      {:error, _reason} = error ->
+        error
+    end
+  end
+
+  defp invalid(message, details) do
+    {:error, Jido.Error.validation_error(message, kind: :config, details: details)}
+  end
 end

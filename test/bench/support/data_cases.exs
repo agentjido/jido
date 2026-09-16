@@ -44,7 +44,7 @@ defmodule JidoCoreBench.DataCases do
       F.checked(
         "audit/update/#{n}/#{count}",
         fn _ -> %{records: existing} end,
-        &Jido.Plugin.Audit.update_state(&1, incoming, max_entries: 1_000),
+        &Jido.Plugin.Audit.Agent.apply_records(&1, incoming, max_entries: 1_000),
         fn {:ok, state} -> F.equal!(state.records, expected) end
       )
     end

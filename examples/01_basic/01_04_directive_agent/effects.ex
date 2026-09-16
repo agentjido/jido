@@ -15,37 +15,44 @@ defmodule Jido.Examples.DirectiveAgent.Record do
   defstruct Zoi.Struct.struct_fields(@schema)
 
   def schema, do: @schema
+
+  def validate(%__MODULE__{} = directive) do
+    case Zoi.parse(@schema, Map.from_struct(directive)) do
+      {:ok, validated} -> {:ok, validated}
+      {:error, errors} -> {:error, Jido.Error.validation_error("invalid record", details: errors)}
+    end
+  end
 end
 
 defmodule Jido.Examples.DirectiveAgent.Effects do
   @moduledoc "A real Plugin runtime that records post-commit dispatch observations."
 
-  use Jido.Plugin
-
-  alias Jido.Examples.DirectiveAgent.{Record, EffectRuntime}
-
-  @impl true
-  def directives(_opts), do: [Record]
-
-  @impl true
-  def validate_directive(%Record{} = directive, _opts) do
-    case Zoi.parse(Record.schema(), Map.from_struct(directive)) do
-      {:ok, validated} -> {:ok, validated}
-      {:error, errors} -> {:error, Jido.Error.validation_error("invalid record", details: errors)}
-    end
-  end
-
-  @impl true
-  def dispatch(runtime, directive, context, _opts) do
-    GenServer.call(runtime, {:record, directive, context})
-  end
-
-  def child_spec(init), do: Supervisor.child_spec({EffectRuntime, init}, id: __MODULE__)
+  use Jido.Plugin, agent: __MODULE__.Agent, agent_server: __MODULE__.Server
 
   def records(server) do
     %{pid: runtime} = Jido.AgentServer.children(server)[{:plugin, __MODULE__}]
     GenServer.call(runtime, :records)
   end
+end
+
+defmodule Jido.Examples.DirectiveAgent.Effects.Agent do
+  use Jido.Agent.Plugin
+  alias Jido.Examples.DirectiveAgent.Record
+
+  @impl true
+  def directives(_opts), do: [Record]
+end
+
+defmodule Jido.Examples.DirectiveAgent.Effects.Server do
+  use Jido.AgentServer.Plugin
+  alias Jido.Examples.DirectiveAgent.EffectRuntime
+
+  @impl true
+  def dispatch(runtime, directive, context, _opts),
+    do: GenServer.call(runtime, {:record, directive, context})
+
+  def child_spec(init),
+    do: Supervisor.child_spec({EffectRuntime, init}, id: Jido.Examples.DirectiveAgent.Effects)
 end
 
 defmodule Jido.Examples.DirectiveAgent.EffectRuntime do

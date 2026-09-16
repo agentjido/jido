@@ -19,10 +19,14 @@ defmodule JidoTest.Authoring.Agents.Fixtures.AddFlow do
 end
 
 defmodule JidoTest.Authoring.Agents.Fixtures.CountTurns do
-  use Jido.Plugin
+  use Jido.Plugin, agent: __MODULE__.Agent
+end
+
+defmodule JidoTest.Authoring.Agents.Fixtures.CountTurns.Agent do
+  use Jido.Agent.Plugin
 
   def state_spec(opts),
     do: {:turns, Zoi.integer() |> Zoi.default(Keyword.fetch!(opts, :initial))}
 
-  def update_state(turns, _directives, _opts), do: {:ok, turns + 1}
+  def reduce(reduction, _opts), do: {:ok, reduction.plugin_state + 1}
 end

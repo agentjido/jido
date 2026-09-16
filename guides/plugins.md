@@ -1,6 +1,6 @@
 # Plugins
 
-Declare Plugin packages in the Agent definition. A new package uses
+Declare Plugin packages in the Agent definition. Every package uses
 `Jido.Plugin` only as a manifest:
 
 ```elixir
@@ -24,6 +24,12 @@ bounded authority:
   storage or commit authority.
 - `Jido.Topology.Plugin` contributes static canonical Topology entries without
   live-control authority.
+
+The bundled Plugins use this same contract. `Audit` has an Agent facet.
+`Heartbeat`, `Bus.Client`, and `Bus.Manager` have Server facets. `Dispatch`,
+`Scheduler`, and `SensorManager` have both Agent and Server facets. A package
+module keeps public constructor helpers, but it does not define lifecycle
+callbacks. Put Directive validation on each Directive module.
 
 The Action cannot change protected Plugin keys. After execution, each Agent
 facet can read the prior complete state, the current candidate state, its pure
