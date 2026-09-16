@@ -79,6 +79,8 @@ defmodule Jido.AgentServer.State do
                 Zoi.any(description: "Active Plugin commit notification task") |> Zoi.optional(),
               directive_task:
                 Zoi.any(description: "Active Plugin Directive task") |> Zoi.optional(),
+              cancel_task:
+                Zoi.any(description: "Active Exec cancellation task") |> Zoi.optional(),
               error_policy_tasks:
                 Zoi.map(description: "Bounded asynchronous error Signal deliveries")
                 |> Zoi.default(%{})

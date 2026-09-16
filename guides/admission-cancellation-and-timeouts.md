@@ -37,6 +37,14 @@ Cancellation can stop admission or executable work before commit. It does not:
 - reverse a Directive that already reached an external system; or
 - make an uncertain external result safe to retry.
 
+Custom Exec cancellation runs in an owned task. While it waits, status reports
+`:cancelling`, and stop can end the Server. A second cancellation request
+returns `{:error, :cancelling}`. Built-in `Jido.Exec` cancellation stays on
+its required owner process and has at most two 500 millisecond stop waits.
+A successful cancellation ends the Turn. A failed or timed-out cancellation
+is indeterminate and stops the Server. Exec completion that arrives during
+custom cancellation cannot replace its first result.
+
 ## Distinguish Timeouts
 
 | Timeout | Scope |
@@ -44,7 +52,7 @@ Cancellation can stop admission or executable work before commit. It does not:
 | `AgentServer.call/3` timeout | Caller wait and admission deadline |
 | `turn_timeout` | Active Plugin admission and candidate evaluation before commit |
 | Jido Action execution timeout | One executable chain |
-| `directive_timeout` | One commit notification or one Directive dispatch |
+| `directive_timeout` | One commit notification, Directive dispatch, custom error policy, or custom Exec cancellation task |
 | `idle_timeout` | Idle actor lifetime |
 | topology startup timeout | One activation and readiness pass |
 | persistence adapter timeout | Application adapter behavior |
@@ -60,6 +68,10 @@ cancellation when that is the required policy.
 Server error policy can log, stop, stop after a count, emit an external Signal,
 or call an application function with the error and Outcome. Policy runs after
 Jido knows the failure stage. It cannot change the prior commit result.
+An application policy function runs in an owned task. Status, stop, and later
+Signals can run while it waits. Its stop result can arrive after a later Turn.
+The task uses `directive_timeout`, or 5,000 milliseconds when that setting is
+`:infinity`. A timed-out or failed policy task stops the Server.
 
 See [Errors And Runtime Guarantees](errors-and-runtime-guarantees.md) and
 [Agent Server Lifecycle](agent-server-lifecycle.md).

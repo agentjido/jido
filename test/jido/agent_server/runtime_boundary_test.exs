@@ -404,6 +404,112 @@ defmodule Jido.AgentServer.RuntimeBoundaryTest do
     assert Process.alive?(server)
   end
 
+  test "status and stop respond while custom Exec cancellation waits", %{jido: jido} do
+    {:ok, server} =
+      Jido.start_agent(jido, Agent,
+        exec_module: BoundaryExec,
+        exec_opts: [observer: self(), mode: :cancel_hang],
+        directive_timeout: 2_000,
+        restart: :temporary
+      )
+
+    caller =
+      Task.async(fn ->
+        try do
+          Server.call(server, signal("boundary.emit", %{count: 1}))
+        catch
+          :exit, reason -> {:exit, reason}
+        end
+      end)
+
+    assert_receive {:boundary_exec_started, _adapter, _worker}, 2_000
+
+    canceller =
+      Task.async(fn ->
+        try do
+          Server.cancel(server)
+        catch
+          :exit, reason -> {:exit, reason}
+        end
+      end)
+
+    assert_receive {:exec_callback_started, :cancel, :cancel_hang, cancel_owner}, 2_000
+    assert Server.status(server).phase == :cancelling
+    assert Process.alive?(cancel_owner)
+
+    monitor = Process.monitor(server)
+    assert :ok = Server.stop(server, :shutdown, 500)
+    assert_receive {:DOWN, ^monitor, :process, ^server, :shutdown}, 1_000
+    assert {:exit, _reason} = Task.await(canceller, 1_000)
+    assert {:exit, _reason} = Task.await(caller, 1_000)
+  end
+
+  test "a waiting custom policy can query its Server while later Signals and stop run", %{
+    jido: jido
+  } do
+    test = self()
+    gate = make_ref()
+    {:ok, holder} = Elixir.Agent.start_link(fn -> nil end)
+    on_exit(fn -> if Process.alive?(holder), do: Elixir.Agent.stop(holder) end)
+
+    policy = fn _error, _outcome ->
+      server = Elixir.Agent.get(holder, & &1)
+      send(test, {:policy_started, self()})
+      send(test, {:policy_own_status, Server.status(server).phase})
+
+      receive do
+        {:release_policy, ^gate} -> :continue
+      end
+    end
+
+    {:ok, server} =
+      Jido.start_agent(jido, Agent,
+        error_policy: policy,
+        directive_timeout: 2_000,
+        restart: :temporary
+      )
+
+    :ok = Elixir.Agent.update(holder, fn _ -> server end)
+    assert {:error, _reason} = Server.call(server, signal("boundary.fail"))
+    assert_receive {:policy_started, policy_owner}, 1_000
+    assert_receive {:policy_own_status, :idle}, 1_000
+    assert Server.status(server).phase == :idle
+    assert {:ok, _agent} = Server.call(server, signal("boundary.emit", %{count: 1}))
+    assert Process.alive?(policy_owner)
+
+    monitor = Process.monitor(server)
+    assert :ok = Server.stop(server, :shutdown, 500)
+    assert_receive {:DOWN, ^monitor, :process, ^server, :shutdown}, 1_000
+  end
+
+  test "a custom policy timeout stops its owned task and Server", %{jido: jido} do
+    test = self()
+
+    policy = fn _error, _outcome ->
+      send(test, {:policy_blocked, self()})
+
+      receive do
+        :never -> :continue
+      end
+    end
+
+    {:ok, server} =
+      Jido.start_agent(jido, Agent,
+        error_policy: policy,
+        directive_timeout: 50,
+        restart: :temporary
+      )
+
+    monitor = Process.monitor(server)
+    assert {:error, _reason} = Server.call(server, signal("boundary.fail"))
+    assert_receive {:policy_blocked, policy_owner}, 1_000
+
+    assert_receive {:DOWN, ^monitor, :process, ^server, {:shutdown, {:error_policy_timeout, 50}}},
+                   1_000
+
+    eventually(fn -> not Process.alive?(policy_owner) end)
+  end
+
   test "error Signal policy reports failure without causing a feedback loop", %{jido: jido} do
     {:ok, server} =
       Jido.start_agent(jido, Agent, error_policy: {:emit_signal, {:pid, target: self()}})
