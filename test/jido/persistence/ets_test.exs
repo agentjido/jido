@@ -137,6 +137,8 @@ defmodule JidoTest.Persistence.ETSTest do
       ETS.get("key", table: table)
     end
 
+    monitor = Process.monitor(pid)
     send(pid, :stop)
+    assert_receive {:DOWN, ^monitor, :process, ^pid, :normal}, 1_000
   end
 end
