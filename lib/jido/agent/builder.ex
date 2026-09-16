@@ -116,7 +116,7 @@ defmodule Jido.Agent.Builder do
 
   def plugin(builder, module, config) do
     with {:ok, config} <- Authoring.options(config),
-         {:ok, [plugin]} <- Jido.Plugin.canonical_declarations([{module, config}]) do
+         {:ok, [plugin]} <- Jido.Plugin.Normalizer.canonical_declarations([{module, config}]) do
       append(builder, :plugins, plugin)
     else
       {:error, error} -> %{builder | error: error}
@@ -183,7 +183,7 @@ defmodule Jido.Agent.Builder do
 
   defp valid_field(:plugins, value) do
     with {:ok, values} <- Authoring.traverse(value, &{:ok, &1}),
-         {:ok, _} <- Jido.Plugin.canonical_declarations(values),
+         {:ok, _} <- Jido.Plugin.Normalizer.canonical_declarations(values),
          do: :ok
   end
 

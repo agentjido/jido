@@ -30,7 +30,6 @@ defmodule Jido.AgentServer.State do
               error_count:
                 Zoi.integer(description: "Consecutive runtime error count") |> Zoi.default(0),
               parent: Zoi.any(description: "Current logical parent") |> Zoi.optional(),
-              orphaned_from: Zoi.any(description: "Former logical parent") |> Zoi.optional(),
               children:
                 Zoi.map(description: "Tracked Agent and Plugin children") |> Zoi.default(%{}),
               child_spawn_requests:
@@ -40,7 +39,6 @@ defmodule Jido.AgentServer.State do
                 |> Zoi.default(%{}),
               on_parent_death: Zoi.atom(description: "Parent death policy") |> Zoi.default(:stop),
               pool: Zoi.atom(description: "Owning Agent InstanceManager") |> Zoi.optional(),
-              pool_key: Zoi.any(description: "Agent InstanceManager key") |> Zoi.optional(),
               idle_timeout:
                 Zoi.any(description: "Idle timeout in milliseconds") |> Zoi.default(:infinity),
               persistence:

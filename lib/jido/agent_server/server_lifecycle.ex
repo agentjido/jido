@@ -6,7 +6,6 @@ defmodule Jido.AgentServer.ServerLifecycle do
   alias Jido.AgentServer.PostCommit
   alias Jido.AgentServer.TaskSupport
   alias Jido.Agent
-  alias Jido.Plugin
   alias Jido.AgentServer.ActiveTurn
   alias Jido.AgentServer.ChildLifecycle
   alias Jido.AgentServer.ExecutionAdapter
@@ -20,8 +19,6 @@ defmodule Jido.AgentServer.ServerLifecycle do
   alias Jido.Telemetry.Agent, as: AgentTelemetry
   alias Jido.Tracing.Context, as: TraceContext
 
-  def init(%Options{} = opts), do: init({opts, nil})
-
   def init({%Options{} = opts, startup_reply}) do
     Process.flag(:trap_exit, true)
 
@@ -30,7 +27,7 @@ defmodule Jido.AgentServer.ServerLifecycle do
          {:ok, restored_agent, restored_version, initial_persistence} <-
            Storage.restore_initial_agent(opts),
          {:ok, agent} <- Agent.validate_instance(restored_agent),
-         {:ok, plugin_specs} <- Plugin.normalize_all(agent.plugins),
+         {:ok, plugin_specs} <- Jido.Plugin.Normalizer.normalize_all(agent.plugins),
          {:ok, exec_module} <- Options.validate_exec_module(opts.exec_module),
          {:ok, exec_opts} <- Options.validate_keyword(opts.exec_opts, :exec_opts),
          {:ok, max_postponed_signals} <-
@@ -60,7 +57,6 @@ defmodule Jido.AgentServer.ServerLifecycle do
         parent: parent,
         on_parent_death: opts.on_parent_death,
         pool: opts.pool,
-        pool_key: opts.pool_key,
         idle_timeout: opts.idle_timeout,
         persistence: opts.persistence,
         initial_persistence: initial_persistence,

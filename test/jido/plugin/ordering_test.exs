@@ -2,7 +2,6 @@ defmodule Jido.Plugin.OrderingTest do
   use JidoTest.Case, async: true
 
   alias Jido.Agent.Command
-  alias Jido.Plugin
   alias Jido.Plugin.SignalContext
 
   defmodule Agent do
@@ -251,7 +250,7 @@ defmodule Jido.Plugin.OrderingTest do
 
   test "normalization rejects duplicate state keys and Directive owners" do
     assert {:error, state_error} =
-             Plugin.normalize_all([
+             Jido.Plugin.Normalizer.normalize_all([
                {FirstStatePlugin, key: :shared},
                {SecondStatePlugin, key: :shared}
              ])
@@ -260,7 +259,7 @@ defmodule Jido.Plugin.OrderingTest do
     assert state_error.details.state_key == :shared
 
     assert {:error, directive_error} =
-             Plugin.normalize_all([FirstDirectivePlugin, SecondDirectivePlugin])
+             Jido.Plugin.Normalizer.normalize_all([FirstDirectivePlugin, SecondDirectivePlugin])
 
     assert directive_error.message == "Agent Plugin Directive ownership must be unique"
     assert directive_error.details.directive == SharedDirective
@@ -268,7 +267,7 @@ defmodule Jido.Plugin.OrderingTest do
 
   test "admission runs in declaration order and stops at the first error" do
     assert {:ok, specs} =
-             Plugin.normalize_all([
+             Jido.Plugin.Normalizer.normalize_all([
                FirstAdmissionPlugin,
                SecondAdmissionPlugin,
                ThirdAdmissionPlugin
@@ -277,7 +276,7 @@ defmodule Jido.Plugin.OrderingTest do
     command = command()
 
     assert {:ok, admitted} =
-             Plugin.admit(command, specs, %{
+             Jido.AgentServer.Plugin.Callbacks.admit(command, specs, %{
                FirstAdmissionPlugin => :first_runtime,
                SecondAdmissionPlugin => :second_runtime,
                ThirdAdmissionPlugin => :third_runtime
@@ -294,13 +293,15 @@ defmodule Jido.Plugin.OrderingTest do
     assert_received {:admitted, :third, :third_runtime}
 
     assert {:ok, failing_specs} =
-             Plugin.normalize_all([
+             Jido.Plugin.Normalizer.normalize_all([
                FirstAdmissionPlugin,
                {SecondAdmissionPlugin, result: :denied},
                ThirdAdmissionPlugin
              ])
 
-    assert Plugin.admit(command, failing_specs, %{}) == {:error, :denied}
+    assert Jido.AgentServer.Plugin.Callbacks.admit(command, failing_specs, %{}) ==
+             {:error, :denied}
+
     assert_received {:admitted, :first, nil}
     assert_received {:admitted, :second, nil}
     refute_received {:admitted, :third, nil}
@@ -308,7 +309,7 @@ defmodule Jido.Plugin.OrderingTest do
 
   test "outbound preparation runs in reverse order with each owned state slice" do
     assert {:ok, specs} =
-             Plugin.normalize_all([
+             Jido.Plugin.Normalizer.normalize_all([
                FirstOutboundPlugin,
                SecondOutboundPlugin
              ])
@@ -330,7 +331,7 @@ defmodule Jido.Plugin.OrderingTest do
       )
 
     assert {:ok, prepared} =
-             Plugin.prepare_dispatch(
+             Jido.AgentServer.Plugin.Callbacks.prepare_dispatch(
                source,
                specs,
                %{FirstOutboundPlugin => :first_runtime, SecondOutboundPlugin => :second_runtime},
@@ -345,7 +346,7 @@ defmodule Jido.Plugin.OrderingTest do
 
   test "validates each outbound transform before it runs the next Plugin" do
     assert {:ok, specs} =
-             Plugin.normalize_all([
+             Jido.Plugin.Normalizer.normalize_all([
                MustNotRunOutboundPlugin,
                InvalidOutboundPlugin
              ])
@@ -366,7 +367,9 @@ defmodule Jido.Plugin.OrderingTest do
         partition: nil
       )
 
-    assert {:error, error} = Plugin.prepare_dispatch(source, specs, %{}, context, %{})
+    assert {:error, error} =
+             Jido.AgentServer.Plugin.Callbacks.prepare_dispatch(source, specs, %{}, context, %{})
+
     assert error.details.plugin == InvalidOutboundPlugin
     assert_received {:outbound, :invalid}
     refute_received {:outbound, :must_not_run}
@@ -374,7 +377,7 @@ defmodule Jido.Plugin.OrderingTest do
 
   test "a later reducer failure does not return partially updated Plugin state" do
     assert {:ok, specs} =
-             Plugin.normalize_all([
+             Jido.Plugin.Normalizer.normalize_all([
                FirstStatePlugin,
                {SecondStatePlugin, result: :second_failed}
              ])
@@ -393,7 +396,7 @@ defmodule Jido.Plugin.OrderingTest do
 
   test "explicit reducers form an ordered state middleware chain" do
     declarations = [FirstReducerPackage, SecondReducerPackage]
-    assert {:ok, specs} = Plugin.normalize_all(declarations)
+    assert {:ok, specs} = Jido.Plugin.Normalizer.normalize_all(declarations)
 
     agent =
       Jido.Agent.new!(name: "ordered_reducer_agent", plugins: declarations)

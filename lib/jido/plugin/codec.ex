@@ -13,7 +13,7 @@ defmodule Jido.Plugin.Codec do
   @spec encode(Jido.Plugin.declaration()) ::
           {:ok, document(), Registry.t()} | {:error, term()}
   def encode(plugin) do
-    with {:ok, [plugin]} <- Jido.Plugin.canonical_declarations([plugin]),
+    with {:ok, [plugin]} <- Jido.Plugin.Normalizer.canonical_declarations([plugin]),
          {:ok, registry} <- derive_registry(plugin),
          {:ok, document} <- encode_normalized(plugin, registry),
          do: {:ok, document, registry}
@@ -23,7 +23,7 @@ defmodule Jido.Plugin.Codec do
   @spec encode(Jido.Plugin.declaration(), Registry.t() | map()) ::
           {:ok, document()} | {:error, term()}
   def encode(plugin, registry) do
-    with {:ok, [{module, options}]} <- Jido.Plugin.canonical_declarations([plugin]),
+    with {:ok, [{module, options}]} <- Jido.Plugin.Normalizer.canonical_declarations([plugin]),
          {:ok, registry} <- Registry.new(registry),
          do: encode_normalized({module, options}, registry)
   end
@@ -51,7 +51,7 @@ defmodule Jido.Plugin.Codec do
          {:ok, registry} <- Registry.new(registry),
          {:ok, module} <- Registry.resolve(registry, document["module"], :plugin),
          {:ok, options} <- Data.decode(document["options"], registry),
-         {:ok, [plugin]} <- Jido.Plugin.canonical_declarations([{module, options}]) do
+         {:ok, [plugin]} <- Jido.Plugin.Normalizer.canonical_declarations([{module, options}]) do
       {:ok, plugin}
     end
   end

@@ -7,13 +7,12 @@ defmodule Jido.AgentServer.Upgrade do
   alias Jido.Agent
   alias Jido.AgentServer.State
   alias Jido.Error
-  alias Jido.Plugin
 
   def prepare(%State{} = data, target_module, migration) do
     with :ok <- definition_upgrade_supported?(data, target_module),
          {:ok, state} <- invoke_state_migration(migration, data.agent),
          {:ok, target} <- Agent.instantiate(target_module, id: data.agent.id, state: state),
-         {:ok, plugin_specs} <- Plugin.normalize_all(target.plugins),
+         {:ok, plugin_specs} <- Jido.Plugin.Normalizer.normalize_all(target.plugins),
          :ok <- unchanged_plugin_contract(data.plugin_specs, plugin_specs) do
       {:ok, target, plugin_specs}
     end

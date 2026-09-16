@@ -1,8 +1,7 @@
 defmodule Jido.Plugin.AfterCommitTest do
   use ExUnit.Case, async: true
 
-  alias Jido.AgentServer.Plugin, as: ServerPlugin
-  alias Jido.Plugin
+  alias Jido.AgentServer.Plugin.Callbacks
   alias JidoTest.CommitProjection.{AgentFacet, NotificationFacet, Stateless}
 
   defmodule Mapped do
@@ -62,14 +61,16 @@ defmodule Jido.Plugin.AfterCommitTest do
   end
 
   test "a commit-only Server facet needs no runtime or Agent facet" do
-    assert {:ok, [spec]} = Plugin.normalize_all([{Stateless, sink: :sink}])
+    assert {:ok, [spec]} = Jido.Plugin.Normalizer.normalize_all([{Stateless, sink: :sink}])
     refute spec.runtime?
     assert spec.agent_server.module == NotificationFacet
-    assert ServerPlugin.commit_modules([spec]) == [Stateless]
+    assert Callbacks.commit_modules([spec]) == [Stateless]
   end
 
   test "commit options stay within the selected owner facet" do
-    assert {:ok, [spec]} = Plugin.normalize_all([{Mapped, key: :projection, sink: :sink}])
+    assert {:ok, [spec]} =
+             Jido.Plugin.Normalizer.normalize_all([{Mapped, key: :projection, sink: :sink}])
+
     assert spec.agent.options == [key: :projection]
     assert spec.agent_server.options == [sink: :sink]
   end
@@ -78,12 +79,12 @@ defmodule Jido.Plugin.AfterCommitTest do
     @package package
     test "#{inspect(package)} cannot take Server commit authority" do
       assert {:error, %Jido.Error.ValidationError{details: %{callback: {:after_commit, 3}}}} =
-               Plugin.normalize_all([{@package, key: :owned}])
+               Jido.Plugin.Normalizer.normalize_all([{@package, key: :owned}])
     end
   end
 
   test "bare Plugin markers cannot take Server commit authority" do
     assert {:error, %{message: "Plugin must use an owner-facet Jido.Plugin manifest"}} =
-             Plugin.normalize_all([Legacy])
+             Jido.Plugin.Normalizer.normalize_all([Legacy])
   end
 end

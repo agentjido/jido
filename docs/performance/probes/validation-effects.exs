@@ -24,7 +24,7 @@ defmodule JidoCoreEffects.Reset do
   end
 end
 
-{:ok, specs} = Jido.Plugin.normalize_all([JidoCoreEffects.Owned])
+{:ok, specs} = Jido.Plugin.Normalizer.normalize_all([JidoCoreEffects.Owned])
 probe_agent =
   Jido.Agent.new!(name: "core_effects_owned", plugins: [JidoCoreEffects.Owned])
   |> Map.put(:id, "core-effects-owned")

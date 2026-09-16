@@ -3,32 +3,15 @@ defmodule Jido.AgentServer.PluginChild do
 
   use GenServer
 
-  alias Jido.AgentServer.Plugin
+  alias Jido.AgentServer.Plugin.Callbacks
   alias Jido.AgentServer.TaskSupport
 
   @restart_poll_ms 10
   @restart_poll_attempts 500
 
   @doc false
-  def start_link([owner, plugin_spec, child_spec]),
-    do: start_link(owner, plugin_spec, child_spec)
-
-  def start_link([owner, plugin_spec, child_spec, name]),
-    do: start_link(owner, plugin_spec, child_spec, name)
-
   def start_link([owner, plugin_spec, child_spec, name, readiness_timeout]),
     do: start_link(owner, plugin_spec, child_spec, name, readiness_timeout)
-
-  def start_link(owner, plugin_spec, child_spec) when is_pid(owner) do
-    GenServer.start_link(__MODULE__, {owner, plugin_spec, child_spec})
-  end
-
-  def start_link(owner, plugin_spec, child_spec, nil) when is_pid(owner),
-    do: start_link(owner, plugin_spec, child_spec)
-
-  def start_link(owner, plugin_spec, child_spec, name) when is_pid(owner) do
-    GenServer.start_link(__MODULE__, {owner, plugin_spec, child_spec}, name: name)
-  end
 
   def start_link(owner, plugin_spec, child_spec, name, readiness_timeout)
       when is_pid(owner) and is_integer(readiness_timeout) and readiness_timeout > 0 do
@@ -43,10 +26,6 @@ defmodule Jido.AgentServer.PluginChild do
   def child_pid(server), do: GenServer.call(server, :child_pid)
 
   @impl true
-  def init({owner, plugin_spec, child_spec}) do
-    init({owner, plugin_spec, child_spec, 5_000})
-  end
-
   def init({owner, plugin_spec, child_spec, readiness_timeout}) do
     Process.flag(:trap_exit, true)
     Process.link(owner)
@@ -219,7 +198,7 @@ defmodule Jido.AgentServer.PluginChild do
   defp start_readiness(state, child_pid, reason) do
     # Readiness can read Agent state. Keep child lookup responsive while
     # that work runs, or an Agent lookup can block the read it needs.
-    task = Task.async(fn -> Plugin.await_ready(state.plugin_spec, child_pid) end)
+    task = Task.async(fn -> Callbacks.await_ready(state.plugin_spec, child_pid) end)
 
     timer =
       TaskSupport.start_task_timer(state.readiness_timeout, :plugin_readiness_timeout, task.ref)

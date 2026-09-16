@@ -15,8 +15,6 @@ defmodule Jido.AgentServer.DirectiveRuntime do
     StopChild
   }
 
-  alias Jido.AgentServer, as: Server
-
   alias Jido.AgentServer.{
     ChildInfo,
     ChildOperations,
@@ -34,30 +32,6 @@ defmodule Jido.AgentServer.DirectiveRuntime do
 
   @doc false
   @spec handle(term(), DirectiveContext.t(), State.t()) :: result()
-  def handle(%Emit{} = directive, context, state), do: emit(directive, context, state)
-
-  def handle(
-        %EmitToParent{signal: signal},
-        context,
-        %State{parent: %ParentRef{} = parent} = state
-      ) do
-    Server.cast(parent.pid, DispatchPreparation.propagate(signal, context.signal))
-    {:ok, state}
-  end
-
-  def handle(%EmitToParent{}, _context, state), do: {:error, :no_parent, state}
-
-  def handle(%EmitToChild{tag: tag, signal: signal}, context, state) do
-    case agent_child(state, tag) do
-      {:ok, child} ->
-        Server.cast(child.pid, DispatchPreparation.propagate(signal, context.signal))
-        {:ok, state}
-
-      {:error, reason} ->
-        {:error, reason, state}
-    end
-  end
-
   def handle(%Error{error: error, context: error_context}, _context, state) do
     {:error, {:reported_error, error_context, error}, state}
   end
@@ -141,7 +115,7 @@ defmodule Jido.AgentServer.DirectiveRuntime do
   def dispatch_prepared(%Emit{signal: signal, dispatch: dispatch}, state, agent_server) do
     case dispatch || state.default_dispatch do
       nil ->
-        Server.cast(agent_server, signal)
+        Jido.AgentServer.cast(agent_server, signal)
 
       target ->
         dispatch_signal(signal, target, state.jido)
@@ -150,14 +124,14 @@ defmodule Jido.AgentServer.DirectiveRuntime do
 
   def dispatch_prepared(%EmitToParent{signal: signal}, %State{parent: parent}, _agent_server) do
     case parent do
-      %ParentRef{} -> Server.cast(parent.pid, signal)
+      %ParentRef{} -> Jido.AgentServer.cast(parent.pid, signal)
       nil -> {:error, :no_parent}
     end
   end
 
   def dispatch_prepared(%EmitToChild{tag: tag, signal: signal}, state, _agent_server) do
     case agent_child(state, tag) do
-      {:ok, child} -> Server.cast(child.pid, signal)
+      {:ok, child} -> Jido.AgentServer.cast(child.pid, signal)
       {:error, reason} -> {:error, reason}
     end
   end
@@ -168,29 +142,6 @@ defmodule Jido.AgentServer.DirectiveRuntime do
       nil -> {:error, {:child_not_found, tag}}
       _child -> {:error, {:not_an_agent_child, tag}}
     end
-  end
-
-  defp emit(%Emit{signal: signal, dispatch: dispatch}, context, state) do
-    dispatch = dispatch || state.default_dispatch
-
-    if is_nil(dispatch) do
-      signal = DispatchPreparation.propagate(signal, context.signal)
-      Server.cast(self(), signal)
-      {:ok, state}
-    else
-      case dispatch_emit(%Emit{signal: signal, dispatch: dispatch}, context, state) do
-        :ok -> {:ok, state}
-        {:error, reason} -> {:error, reason, state}
-      end
-    end
-  end
-
-  @doc false
-  @spec dispatch_emit(Emit.t(), DirectiveContext.t(), State.t()) :: :ok | {:error, term()}
-  def dispatch_emit(%Emit{signal: signal, dispatch: dispatch}, context, state) do
-    signal = DispatchPreparation.propagate(signal, context.signal)
-    dispatch = dispatch || state.default_dispatch
-    dispatch_signal(signal, dispatch, state.jido)
   end
 
   @doc false

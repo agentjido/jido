@@ -12,8 +12,7 @@ defmodule Jido.AgentServer.Plugin do
   state and state version.
   """
 
-  alias Jido.Agent.Command
-  alias Jido.AgentServer.Plugin.{Admission, Callbacks, Commit}
+  alias Jido.AgentServer.Plugin.{Admission, Commit}
   alias Jido.Plugin.{DirectiveContext, Init, SignalContext}
 
   @doc "Defines an Agent Server-owned Plugin facet."
@@ -71,58 +70,6 @@ defmodule Jido.AgentServer.Plugin do
                       validate_options: 1,
                       after_commit: 3
 
-  @doc false
-  @spec commit_modules([Jido.Plugin.Spec.t()]) :: [module()]
-  def commit_modules(specs), do: Callbacks.commit_modules(specs)
-
-  @doc false
-  @spec after_commit(Jido.Plugin.Spec.t(), term(), Commit.t()) :: :ok | {:error, term()}
-  def after_commit(spec, runtime_ref, commit),
-    do: Callbacks.after_commit(spec, runtime_ref, commit)
-
-  @doc false
-  @spec admits?([Jido.Plugin.Spec.t()]) :: boolean()
-  def admits?(specs), do: Callbacks.admits?(specs)
-
-  @doc false
-  @spec admission_modules([Jido.Plugin.Spec.t()]) :: [module()]
-  def admission_modules(specs), do: Callbacks.admission_modules(specs)
-
-  @doc false
-  @spec dispatch_modules([Jido.Plugin.Spec.t()]) :: [module()]
-  def dispatch_modules(specs), do: Callbacks.dispatch_modules(specs)
-
-  @doc false
-  @spec admit(Command.t(), [Jido.Plugin.Spec.t()], %{optional(module()) => term() | nil}) ::
-          {:ok, Command.t()} | {:error, term()}
-  def admit(command, specs, runtime_refs), do: Callbacks.admit(command, specs, runtime_refs)
-
-  @doc false
-  @spec admit(
-          Command.t(),
-          [Jido.Plugin.Spec.t()],
-          %{optional(module()) => term() | nil},
-          non_neg_integer()
-        ) :: {:ok, Command.t()} | {:error, term()}
-  def admit(command, specs, runtime_refs, state_version),
-    do: Callbacks.admit(command, specs, runtime_refs, state_version)
-
-  @doc false
-  @spec prepare_dispatch(
-          Jido.Signal.t(),
-          [Jido.Plugin.Spec.t()],
-          %{optional(module()) => term() | nil},
-          SignalContext.t(),
-          map()
-        ) :: {:ok, Jido.Signal.t()} | {:error, term()}
-  def prepare_dispatch(signal, specs, runtime_refs, context, agent_state),
-    do: Callbacks.prepare_dispatch(signal, specs, runtime_refs, context, agent_state)
-
-  @doc false
-  @spec child_specs(Init.t(), [Jido.Plugin.declaration()] | [Jido.Plugin.Spec.t()]) ::
-          {:ok, [Supervisor.child_spec()]} | {:error, term()}
-  def child_specs(init, declarations), do: Callbacks.child_specs(init, declarations)
-
   @doc "Gets one Plugin-owned field from the current complete Agent state."
   @spec state(Init.t(), timeout()) :: {:ok, term()} | {:error, term()}
   def state(%Init{agent_server: agent_server, module: package}, timeout \\ 5_000) do
@@ -130,14 +77,4 @@ defmodule Jido.AgentServer.Plugin do
   catch
     :exit, reason -> {:error, {:agent_server_unavailable, reason}}
   end
-
-  @doc false
-  @spec dispatch(Jido.Plugin.Spec.t(), term(), struct(), DirectiveContext.t()) ::
-          :ok | {:error, term()}
-  def dispatch(plugin_spec, runtime_ref, directive, context),
-    do: Callbacks.dispatch(plugin_spec, runtime_ref, directive, context)
-
-  @doc false
-  @spec await_ready(Jido.Plugin.Spec.t(), term()) :: :ok | {:error, term()}
-  def await_ready(plugin_spec, runtime_ref), do: Callbacks.await_ready(plugin_spec, runtime_ref)
 end

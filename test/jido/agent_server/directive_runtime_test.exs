@@ -15,7 +15,7 @@ defmodule Jido.AgentServer.DirectiveRuntimeTest do
     %{runtime: state, context: context, server: server}
   end
 
-  test "direct Signal handlers preserve causation and use the selected relative target", %{
+  test "prepared Signal handlers preserve causation and use the selected relative target", %{
     runtime: state,
     context: context
   } do
@@ -29,7 +29,8 @@ defmodule Jido.AgentServer.DirectiveRuntimeTest do
           Directive.emit_to_parent(outbound),
           Directive.emit_to_child(:child, outbound)
         ] do
-      assert {:ok, ^state} = DirectiveRuntime.handle(directive, context, state)
+      assert {:ok, prepared, _target} = DirectiveRuntime.prepare_signal(directive, context, state)
+      assert :ok = DirectiveRuntime.dispatch_prepared(prepared, state, self())
       assert_receive {:"$gen_cast", {:signal, _ref, delivered}}
       assert delivered.id == outbound.id
       assert Trace.get(delivered).trace_id == trace.trace_id
@@ -49,7 +50,6 @@ defmodule Jido.AgentServer.DirectiveRuntimeTest do
           {Directive.emit_to_child(:child, outbound), state, {:child_not_found, :child}},
           {Directive.emit_to_child(:child, outbound), plugin_state, {:not_an_agent_child, :child}}
         ] do
-      assert {:error, ^reason, ^runtime} = DirectiveRuntime.handle(directive, context, runtime)
       assert {:error, ^reason} = DirectiveRuntime.prepare_signal(directive, context, runtime)
       assert {:error, ^reason} = DirectiveRuntime.dispatch_prepared(directive, runtime, self())
     end
@@ -57,7 +57,10 @@ defmodule Jido.AgentServer.DirectiveRuntimeTest do
     refute_received {:"$gen_cast", _}
   end
 
-  test "prepared relative delivery uses the current parent and child", %{runtime: state} do
+  test "prepared relative delivery uses the current parent and child", %{
+    runtime: state,
+    context: context
+  } do
     outbound = signal("runtime.outbound")
     parent = ParentRef.new!(pid: self(), id: "parent", tag: :parent)
     state = %{state | parent: parent, children: %{child: child(self())}}
@@ -66,8 +69,10 @@ defmodule Jido.AgentServer.DirectiveRuntimeTest do
           Directive.emit_to_parent(outbound),
           Directive.emit_to_child(:child, outbound)
         ] do
-      assert :ok = DirectiveRuntime.dispatch_prepared(directive, state, self())
-      assert_receive {:"$gen_cast", {:signal, _ref, ^outbound}}
+      assert {:ok, prepared, _target} = DirectiveRuntime.prepare_signal(directive, context, state)
+      assert :ok = DirectiveRuntime.dispatch_prepared(prepared, state, self())
+      assert_receive {:"$gen_cast", {:signal, _ref, delivered}}
+      assert delivered.id == outbound.id
     end
   end
 
@@ -82,13 +87,19 @@ defmodule Jido.AgentServer.DirectiveRuntimeTest do
     runtime = %{state | children: %{child: child(target)}}
     outbound = signal("runtime.unreceived")
 
-    assert {:ok, ^runtime} =
-             DirectiveRuntime.handle(Directive.emit_to_child(:child, outbound), context, runtime)
+    assert {:ok, prepared, _target} =
+             DirectiveRuntime.prepare_signal(
+               Directive.emit_to_child(:child, outbound),
+               context,
+               runtime
+             )
+
+    assert :ok = DirectiveRuntime.dispatch_prepared(prepared, runtime, self())
 
     refute_received {:"$gen_cast", _}
   end
 
-  test "external dispatch reports errors, exceptions and throws without changing state", %{
+  test "external dispatch reports errors, exceptions and throws", %{
     runtime: state,
     context: context
   } do
@@ -99,21 +110,20 @@ defmodule Jido.AgentServer.DirectiveRuntimeTest do
           {fn _ -> throw(:delivery_failed) end, {:throw, :delivery_failed}}
         ] do
       directive = Directive.emit_to_pid(outbound, self(), message_format: formatter)
+      assert {:ok, prepared, _target} = DirectiveRuntime.prepare_signal(directive, context, state)
 
       assert {:error, {:emit_dispatch_failed, ^reason}} =
-               DirectiveRuntime.dispatch_prepared(directive, state, self())
-
-      assert {:error, {:emit_dispatch_failed, ^reason}, ^state} =
-               DirectiveRuntime.handle(directive, context, state)
+               DirectiveRuntime.dispatch_prepared(prepared, state, self())
     end
 
     invalid = Directive.emit(outbound, :invalid)
 
-    assert {:error, {:emit_dispatch_failed, _}, ^state} =
-             DirectiveRuntime.handle(invalid, context, state)
+    assert {:error, %Jido.Error.ValidationError{}} =
+             DirectiveRuntime.prepare_directives([invalid], state)
 
     valid = Directive.emit_to_pid(outbound, self())
-    assert {:ok, ^state} = DirectiveRuntime.handle(valid, context, state)
+    assert {:ok, prepared, _target} = DirectiveRuntime.prepare_signal(valid, context, state)
+    assert :ok = DirectiveRuntime.dispatch_prepared(prepared, state, self())
     assert_receive {:signal, delivered}
     assert delivered.id == outbound.id
   end

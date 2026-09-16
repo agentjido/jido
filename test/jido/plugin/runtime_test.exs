@@ -237,7 +237,9 @@ defmodule Jido.Plugin.RuntimeTest do
   test "uses the standard child_spec/1 interface", %{agent_host: agent_host, init: init} do
     opts = [test: Process.get({__MODULE__, :observer_key}), label: :clock]
 
-    assert {:ok, [spec]} = Plugin.child_specs(init, [{RuntimePlugin, opts}])
+    assert {:ok, [spec]} =
+             Jido.AgentServer.Plugin.Callbacks.child_specs(init, [{RuntimePlugin, opts}])
+
     assert spec.id == RuntimePlugin
     assert spec.type == :supervisor
 
@@ -264,7 +266,9 @@ defmodule Jido.Plugin.RuntimeTest do
   } do
     opts = [test: Process.get({__MODULE__, :observer_key})]
 
-    assert {:ok, [spec]} = Plugin.child_specs(init, [{ProcessPlugin, opts}])
+    assert {:ok, [spec]} =
+             Jido.AgentServer.Plugin.Callbacks.child_specs(init, [{ProcessPlugin, opts}])
+
     assert spec.id == ProcessPlugin
     assert Map.get(spec, :type, :worker) == :worker
 
@@ -285,7 +289,7 @@ defmodule Jido.Plugin.RuntimeTest do
 
   test "requires a permanent Plugin runtime root", %{init: init} do
     assert {:error, %Jido.Error.ValidationError{message: message}} =
-             Plugin.child_specs(init, [TemporaryRuntimePlugin])
+             Jido.AgentServer.Plugin.Callbacks.child_specs(init, [TemporaryRuntimePlugin])
 
     assert message == "Agent Server Plugin runtime root must use :permanent restart"
   end
@@ -295,7 +299,7 @@ defmodule Jido.Plugin.RuntimeTest do
     init: init
   } do
     opts = [test: Process.get({__MODULE__, :observer_key})]
-    {:ok, specs} = Plugin.child_specs(init, [{RuntimePlugin, opts}])
+    {:ok, specs} = Jido.AgentServer.Plugin.Callbacks.child_specs(init, [{RuntimePlugin, opts}])
     _runtime_root = start_supervised!({RuntimeRoot, specs})
 
     assert_receive {:runtime_started, worker, _init}
@@ -312,7 +316,7 @@ defmodule Jido.Plugin.RuntimeTest do
     init: init
   } do
     opts = [test: Process.get({__MODULE__, :observer_key})]
-    {:ok, specs} = Plugin.child_specs(init, [{RuntimePlugin, opts}])
+    {:ok, specs} = Jido.AgentServer.Plugin.Callbacks.child_specs(init, [{RuntimePlugin, opts}])
     _runtime_root = start_supervised!({RuntimeRoot, specs})
 
     assert_receive {:runtime_started, worker, _init}
@@ -349,14 +353,14 @@ defmodule Jido.Plugin.RuntimeTest do
     ]
 
     assert {:error, %Jido.Error.ValidationError{message: message}} =
-             Plugin.child_specs(init, declarations)
+             Jido.AgentServer.Plugin.Callbacks.child_specs(init, declarations)
 
     assert message == "Agent Plugin modules must be unique"
   end
 
   test "rejects an invalid runtime child specification", %{init: init} do
     assert {:error, %Jido.Error.ValidationError{}} =
-             Plugin.child_specs(init, [InvalidRuntimePlugin])
+             Jido.AgentServer.Plugin.Callbacks.child_specs(init, [InvalidRuntimePlugin])
   end
 
   test "validates all OTP child specification fields before startup", %{init: init} do
@@ -378,7 +382,7 @@ defmodule Jido.Plugin.RuntimeTest do
       :persistent_term.put({ConfigurableRuntimePlugin, :child_spec, spec_key}, child_spec)
 
       assert {:error, %Jido.Error.ValidationError{} = error} =
-               Plugin.child_specs(init, [
+               Jido.AgentServer.Plugin.Callbacks.child_specs(init, [
                  {ConfigurableRuntimePlugin, spec_key: spec_key}
                ])
 
@@ -394,6 +398,6 @@ defmodule Jido.Plugin.RuntimeTest do
 
   test "contains a failure from child_spec/1", %{init: init} do
     assert {:error, %Jido.Error.ValidationError{}} =
-             Plugin.child_specs(init, [RaisingRuntimePlugin])
+             Jido.AgentServer.Plugin.Callbacks.child_specs(init, [RaisingRuntimePlugin])
   end
 end

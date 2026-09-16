@@ -41,7 +41,7 @@ defmodule Jido.Plugin do
   lifecycle callbacks.
   """
 
-  alias Jido.Plugin.{Init, Manifest, Spec}
+  alias Jido.Plugin.{Init, Manifest, Normalizer}
 
   @type declaration :: module() | {module(), keyword()}
   @doc "Defines a Plugin package with one or more owner facets."
@@ -87,26 +87,8 @@ defmodule Jido.Plugin do
   @doc "Normalizes one declaration and returns its static manifest."
   @spec manifest(declaration()) :: {:ok, Manifest.t()} | {:error, term()}
   def manifest(declaration) do
-    with {:ok, [spec]} <- normalize_all([declaration]), do: {:ok, spec.manifest}
+    with {:ok, [spec]} <- Normalizer.normalize_all([declaration]), do: {:ok, spec.manifest}
   end
-
-  @doc false
-  @spec normalize_all([declaration()] | [Spec.t()]) :: {:ok, [Spec.t()]} | {:error, term()}
-  defdelegate normalize_all(declarations), to: Jido.Plugin.Normalizer
-
-  @doc false
-  @spec canonical_declarations([declaration()] | [Spec.t()]) ::
-          {:ok, [{module(), keyword()}]} | {:error, term()}
-  defdelegate canonical_declarations(declarations), to: Jido.Plugin.Normalizer
-
-  @doc false
-  defdelegate compose_schema(schema, declarations), to: Jido.Agent.Plugin
-
-  @doc false
-  defdelegate prepares?(specs), to: Jido.Agent.Plugin
-
-  @doc false
-  defdelegate prepare(agent, signal, specs), to: Jido.Agent.Plugin
 
   @doc false
   def directive_owner(specs, %{__struct__: directive_module}) when is_list(specs) do
@@ -121,37 +103,7 @@ defmodule Jido.Plugin do
 
   def directive_owner(_specs, _directive), do: nil
 
-  @doc false
-  defdelegate admits?(specs), to: Jido.AgentServer.Plugin
-
-  @doc false
-  defdelegate admission_modules(specs), to: Jido.AgentServer.Plugin
-
-  @doc false
-  defdelegate dispatch_modules(specs), to: Jido.AgentServer.Plugin
-
-  @doc false
-  defdelegate admit(command, specs, runtime_refs), to: Jido.AgentServer.Plugin
-
-  @doc false
-  defdelegate admit(command, specs, runtime_refs, state_version), to: Jido.AgentServer.Plugin
-
-  @doc false
-  defdelegate prepare_dispatch(signal, specs, runtime_refs, context, agent_state),
-    to: Jido.AgentServer.Plugin
-
-  @doc false
-  @spec child_specs(Init.t(), [declaration()] | [Spec.t()]) ::
-          {:ok, [Supervisor.child_spec()]} | {:error, term()}
-  defdelegate child_specs(init, declarations), to: Jido.AgentServer.Plugin
-
   @doc "Gets the current state owned by one Plugin runtime."
   @spec state(Init.t(), timeout()) :: {:ok, term()} | {:error, term()}
   def state(init, timeout \\ 5_000), do: Jido.AgentServer.Plugin.state(init, timeout)
-
-  @doc false
-  defdelegate dispatch(spec, runtime_ref, directive, context), to: Jido.AgentServer.Plugin
-
-  @doc false
-  defdelegate await_ready(spec, runtime_ref), to: Jido.AgentServer.Plugin
 end

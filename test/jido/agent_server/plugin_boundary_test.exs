@@ -57,14 +57,13 @@ defmodule Jido.AgentServer.PluginBoundaryTest do
     :ok
   end
 
-  for registration <- [:unnamed, nil, :registry] do
+  for registration <- [:unnamed, :registry] do
     test "wrapper starts and stops its runtime with #{registration} registration", %{jido: jido} do
       name = {:via, Registry, {Jido.registry_name(jido), {:plugin_boundary, self()}}}
 
       extra =
         case unquote(registration) do
           :unnamed -> []
-          nil -> [nil]
           :registry -> [name]
         end
 
@@ -214,10 +213,10 @@ defmodule Jido.AgentServer.PluginBoundaryTest do
   end
 
   defp start_wrapper(extra \\ []) do
-    {:ok, [spec]} = Jido.Plugin.normalize_all([Runtime])
+    {:ok, [spec]} = Jido.Plugin.Normalizer.normalize_all([Runtime])
     init = %Init{agent_server: self(), agent_id: unique_id("plugin-wrapper"), module: Runtime}
     child_spec = Runtime.Server.child_spec(init)
-    args = [self(), spec, child_spec] ++ extra
+    args = [self(), spec, child_spec, List.first(extra), 5_000]
     wrapper = start_supervised!(Supervisor.child_spec({PluginChild, args}, restart: :temporary))
     {wrapper, PluginChild.child_pid(wrapper), init, spec}
   end

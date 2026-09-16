@@ -3,7 +3,6 @@ defmodule Jido.Plugin.FacetsTest do
 
   alias Jido.Agent
   alias Jido.Persistence.Plugin, as: PersistencePlugin
-  alias Jido.Plugin
   alias Jido.Plugin.DirectiveContext
   alias Jido.Signal
   alias Jido.Topology.Plugin, as: TopologyPlugin
@@ -317,7 +316,7 @@ defmodule Jido.Plugin.FacetsTest do
 
   test "one manifest normalizes to four owner-specific Specs" do
     options = options()
-    assert {:ok, [spec]} = Plugin.normalize_all([{Package, options}])
+    assert {:ok, [spec]} = Jido.Plugin.Normalizer.normalize_all([{Package, options}])
 
     assert spec.manifest.module == Package
     assert spec.manifest.vsn == 3
@@ -358,29 +357,33 @@ defmodule Jido.Plugin.FacetsTest do
     assert {:error, _issues} = Jido.Agent.Directive.validate(%SchemaEffect{count: "2"})
 
     assert {:error, validation_error} =
-             Plugin.normalize_all([PackageWithPluginDirectiveValidation])
+             Jido.Plugin.Normalizer.normalize_all([PackageWithPluginDirectiveValidation])
 
     assert validation_error.message ==
              "Agent Plugin Directive validation belongs to the Directive module"
 
-    assert {:error, reducer_error} = Plugin.normalize_all([PackageWithLegacyStateUpdate])
+    assert {:error, reducer_error} =
+             Jido.Plugin.Normalizer.normalize_all([PackageWithLegacyStateUpdate])
+
     assert reducer_error.message == "Agent Plugin state middleware must define reduce/2"
 
-    assert {:error, directive_error} = Plugin.normalize_all([PackageWithUnvalidatedDirective])
+    assert {:error, directive_error} =
+             Jido.Plugin.Normalizer.normalize_all([PackageWithUnvalidatedDirective])
+
     assert directive_error.message == "Agent Plugin Directive must define validate/1"
   end
 
   test "Agent Server admission adds runtime input without replacing pure input or command data" do
     agent = agent()
     signal = Signal.new!("facet.run", %{}, source: "/test")
-    assert {:ok, [spec]} = Plugin.normalize_all([{Package, options()}])
+    assert {:ok, [spec]} = Jido.Plugin.Normalizer.normalize_all([{Package, options()}])
     assert {:ok, command} = Jido.Agent.Command.new(agent, signal, %{request: "one"})
 
     prepared = %Jido.Plugin.Input{prepared: %{tenant: "alpha"}}
     command = %{command | plugin_inputs: %{Package => prepared}}
 
     assert {:ok, admitted} =
-             Jido.AgentServer.Plugin.admit(command, [spec], %{Package => :runtime}, 12)
+             Jido.AgentServer.Plugin.Callbacks.admit(command, [spec], %{Package => :runtime}, 12)
 
     assert admitted.agent === command.agent
     assert admitted.signal === command.signal
@@ -401,10 +404,10 @@ defmodule Jido.Plugin.FacetsTest do
   end
 
   test "Server, Persistence, and Topology facets use only their owner values" do
-    assert {:ok, [spec]} = Plugin.normalize_all([{Package, options()}])
+    assert {:ok, [spec]} = Jido.Plugin.Normalizer.normalize_all([{Package, options()}])
 
     assert :ok =
-             Jido.AgentServer.Plugin.dispatch(
+             Jido.AgentServer.Plugin.Callbacks.dispatch(
                spec,
                nil,
                %Effect{label: "validated:facet"},
@@ -428,17 +431,17 @@ defmodule Jido.Plugin.FacetsTest do
 
   test "normalization rejects wrong owners and unpaired Persistence" do
     assert {:error, %Jido.Error.ValidationError{message: owner_message}} =
-             Plugin.normalize_all([WrongOwnerPackage])
+             Jido.Plugin.Normalizer.normalize_all([WrongOwnerPackage])
 
     assert owner_message == "Plugin facet must use its owner behavior"
 
     assert {:error, %Jido.Error.ValidationError{message: persistence_message}} =
-             Plugin.normalize_all([InvalidPersistencePackage])
+             Jido.Plugin.Normalizer.normalize_all([InvalidPersistencePackage])
 
     assert persistence_message == "Persistence Plugin facet requires a stateful Agent facet"
 
     assert {:error, %Jido.Error.ValidationError{message: mapping_message}} =
-             Plugin.normalize_all([MisassignedOptionsPackage])
+             Jido.Plugin.Normalizer.normalize_all([MisassignedOptionsPackage])
 
     assert mapping_message == "Plugin option mapping names an unselected facet"
   end
@@ -452,7 +455,9 @@ defmodule Jido.Plugin.FacetsTest do
           {PackageWithOwnedDumpCallback, {:dump, 3}},
           {PackageWithOwnedLoadCallback, {:load, 3}}
         ] do
-      assert {:error, %Jido.Error.ValidationError{} = error} = Plugin.normalize_all([package])
+      assert {:error, %Jido.Error.ValidationError{} = error} =
+               Jido.Plugin.Normalizer.normalize_all([package])
+
       assert error.details.callback == callback
     end
   end
@@ -463,12 +468,12 @@ defmodule Jido.Plugin.FacetsTest do
           {PackageWithMultipleOwnedCallbacks, {:reduce, 2}}
         ] do
       assert {:error, %Jido.Error.ValidationError{details: %{callback: ^callback}}} =
-               Plugin.normalize_all([package])
+               Jido.Plugin.Normalizer.normalize_all([package])
     end
   end
 
   test "Persistence rejects foreign contexts, non-portable output, and invalid loaded state" do
-    assert {:ok, [spec]} = Plugin.normalize_all([NonPortablePersistencePackage])
+    assert {:ok, [spec]} = Jido.Plugin.Normalizer.normalize_all([NonPortablePersistencePackage])
     dump_context = PersistencePlugin.context(spec, :dump, 1, :test)
     load_context = PersistencePlugin.context(spec, :load, 1, :test)
 
@@ -483,7 +488,9 @@ defmodule Jido.Plugin.FacetsTest do
 
     assert context_message == "Persistence Plugin context does not match its owner"
 
-    assert {:ok, [invalid_load_spec]} = Plugin.normalize_all([InvalidLoadPersistencePackage])
+    assert {:ok, [invalid_load_spec]} =
+             Jido.Plugin.Normalizer.normalize_all([InvalidLoadPersistencePackage])
+
     invalid_load_context = PersistencePlugin.context(invalid_load_spec, :load, 1, :test)
 
     assert {:error, %Jido.Error.ExecutionError{message: state_message}} =
@@ -493,7 +500,7 @@ defmodule Jido.Plugin.FacetsTest do
   end
 
   test "Topology validates context ownership and each canonical entry" do
-    assert {:ok, [spec]} = Plugin.normalize_all([InvalidTopologyPackage])
+    assert {:ok, [spec]} = Jido.Plugin.Normalizer.normalize_all([InvalidTopologyPackage])
     context = TopologyPlugin.context(spec, "worker", FacetAgent)
 
     assert {:error, %Jido.Error.ValidationError{}} = TopologyPlugin.contribute(spec, context)

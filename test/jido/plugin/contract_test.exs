@@ -381,47 +381,47 @@ defmodule Jido.Plugin.ContractTest do
 
   test "requires the use Jido.Plugin authoring boundary" do
     assert {:error, %Jido.Error.ValidationError{message: message}} =
-             Jido.Plugin.normalize_all([CallbackOnlyPlugin])
+             Jido.Plugin.Normalizer.normalize_all([CallbackOnlyPlugin])
 
     assert message == "Plugin must use an owner-facet Jido.Plugin manifest"
   end
 
   test "requires validation for each declared Directive type" do
     assert {:error, %Jido.Error.ValidationError{message: message}} =
-             Jido.Plugin.normalize_all([MissingValidationPlugin])
+             Jido.Plugin.Normalizer.normalize_all([MissingValidationPlugin])
 
     assert message == "Agent Plugin Directive must define validate/1"
   end
 
   test "requires each Plugin Directive to reduce state or dispatch runtime work" do
     assert {:error, %Jido.Error.ValidationError{message: message}} =
-             Jido.Plugin.normalize_all([UnhandledDirectivePlugin])
+             Jido.Plugin.Normalizer.normalize_all([UnhandledDirectivePlugin])
 
     assert message == "Agent Plugin Directives must reduce state or dispatch runtime work"
   end
 
   test "allows typed Directive dispatch without a Plugin process" do
     assert {:ok, [%Jido.Plugin.Spec{dispatch?: true, runtime?: false}]} =
-             Jido.Plugin.normalize_all([DispatchWithoutRuntimePlugin])
+             Jido.Plugin.Normalizer.normalize_all([DispatchWithoutRuntimePlugin])
   end
 
   test "does not let a Plugin claim a built-in Directive" do
     assert {:error, %Jido.Error.ValidationError{message: message}} =
-             Jido.Plugin.normalize_all([BuiltInDirectivePlugin])
+             Jido.Plugin.Normalizer.normalize_all([BuiltInDirectivePlugin])
 
     assert message == "Agent Plugin cannot own a built-in Directive"
   end
 
   test "does not accept a marker without the Jido.Plugin behavior" do
     assert {:error, %Jido.Error.ValidationError{message: message}} =
-             Jido.Plugin.normalize_all([MarkerOnlyPlugin])
+             Jido.Plugin.Normalizer.normalize_all([MarkerOnlyPlugin])
 
     assert message == "Plugin must use an owner-facet Jido.Plugin manifest"
   end
 
   test "contains a Plugin marker fault" do
     assert {:error, %Jido.Error.ExecutionError{message: message}} =
-             Jido.Plugin.normalize_all([RaisingMarkerPlugin])
+             Jido.Plugin.Normalizer.normalize_all([RaisingMarkerPlugin])
 
     assert message == "Agent Plugin marker failed"
   end
@@ -449,10 +449,11 @@ defmodule Jido.Plugin.ContractTest do
     signal = Signal.new!("trace.run", %{trace: []}, source: "/test")
     assert {:ok, command} = Jido.Agent.Command.new(agent, signal)
 
-    assert {:ok, invalid_specs} = Jido.Plugin.normalize_all([{AdmissionPlugin, mode: :invalid}])
+    assert {:ok, invalid_specs} =
+             Jido.Plugin.Normalizer.normalize_all([{AdmissionPlugin, mode: :invalid}])
 
     assert {:error, %Jido.Error.ExecutionError{} = invalid} =
-             Jido.Plugin.admit(command, invalid_specs, %{})
+             Jido.AgentServer.Plugin.Callbacks.admit(command, invalid_specs, %{})
 
     assert invalid.message == "Agent Server Plugin admit/3 returned an invalid result"
 
@@ -463,12 +464,16 @@ defmodule Jido.Plugin.ContractTest do
              result: :not_a_result
            }
 
-    assert {:ok, accept_specs} = Jido.Plugin.normalize_all([{AdmissionPlugin, mode: :accept}])
-    assert {:ok, accepted} = Jido.Plugin.admit(command, accept_specs, %{})
+    assert {:ok, accept_specs} =
+             Jido.Plugin.Normalizer.normalize_all([{AdmissionPlugin, mode: :accept}])
+
+    assert {:ok, accepted} = Jido.AgentServer.Plugin.Callbacks.admit(command, accept_specs, %{})
     assert accepted.plugin_inputs[AdmissionPlugin].runtime == :runtime_input
 
-    assert {:ok, reject_specs} = Jido.Plugin.normalize_all([{AdmissionPlugin, mode: :reject}])
-    assert {:error, :denied} = Jido.Plugin.admit(command, reject_specs, %{})
+    assert {:ok, reject_specs} =
+             Jido.Plugin.Normalizer.normalize_all([{AdmissionPlugin, mode: :reject}])
+
+    assert {:error, :denied} = Jido.AgentServer.Plugin.Callbacks.admit(command, reject_specs, %{})
   end
 
   test "validates the complete Action state" do
@@ -559,7 +564,7 @@ defmodule Jido.Plugin.ContractTest do
   end
 
   test "uses strict equality for numeric changes in nested Plugin-owned state" do
-    assert {:ok, specs} = Jido.Plugin.normalize_all([OwnedStatePlugin])
+    assert {:ok, specs} = Jido.Plugin.Normalizer.normalize_all([OwnedStatePlugin])
     original = %{owned: %{count: 1, nested: %{value: 2}}}
     agent = %{OwnedStateAgent.new!() | state: original}
     signal = Signal.new!("owned.pipeline", %{}, source: "/test")

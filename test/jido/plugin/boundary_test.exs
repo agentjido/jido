@@ -1,7 +1,6 @@
 defmodule Jido.Plugin.BoundaryTest do
   use ExUnit.Case, async: true
 
-  alias Jido.Plugin
   alias Jido.Plugin.{Manifest, Spec}
   alias Jido.Topology.Plugin, as: TopologyPlugin
   alias Jido.Topology.Plugin.Contribution
@@ -92,10 +91,10 @@ defmodule Jido.Plugin.BoundaryTest do
     }
 
     assert {:error, %{message: "Plugin specs require an owner-facet manifest"}} =
-             Plugin.normalize_all([stored])
+             Jido.Plugin.Normalizer.normalize_all([stored])
 
-    assert {:ok, [spec]} = Plugin.normalize_all([OwnedState])
-    assert {:ok, [^spec]} = Plugin.normalize_all([spec])
+    assert {:ok, [spec]} = Jido.Plugin.Normalizer.normalize_all([OwnedState])
+    assert {:ok, [^spec]} = Jido.Plugin.Normalizer.normalize_all([spec])
   end
 
   test "manifest accessors retain owner order and restrict mapped options" do
@@ -164,7 +163,7 @@ defmodule Jido.Plugin.BoundaryTest do
 
   test "normalization reports mismatched package identity and missing facet capabilities" do
     assert {:error, %{details: %{plugin: MismatchedPackage, manifest: OwnedState}}} =
-             Plugin.normalize_all([MismatchedPackage])
+             Jido.Plugin.Normalizer.normalize_all([MismatchedPackage])
 
     for {package, facet, owner} <- [
           {EmptyAgentPackage, EmptyAgentFacet, :agent},
@@ -174,14 +173,14 @@ defmodule Jido.Plugin.BoundaryTest do
               %{
                 message: "Plugin facet defines no capability",
                 details: %{facet: ^facet, owner: ^owner}
-              }} = Plugin.normalize_all([package])
+              }} = Jido.Plugin.Normalizer.normalize_all([package])
     end
 
     assert {:error, %{message: "Agent Plugin reduce/2 requires state_spec/1"}} =
-             Plugin.normalize_all([StatelessReducerPackage])
+             Jido.Plugin.Normalizer.normalize_all([StatelessReducerPackage])
 
     assert {:error, %{details: %{facet: EmptyAgentFacet, owner: :persistence}}} =
-             Plugin.normalize_all([WrongPersistencePackage])
+             Jido.Plugin.Normalizer.normalize_all([WrongPersistencePackage])
   end
 
   test "facet metadata exceptions are contained at the normalization boundary" do
@@ -189,7 +188,7 @@ defmodule Jido.Plugin.BoundaryTest do
             %Jido.Error.ValidationError{
               message: "Plugin facet metadata failed",
               details: %{facet: RaisingMetadata, owner: :agent, error: %ArgumentError{}}
-            }} = Plugin.normalize_all([RaisingMetadataPackage])
+            }} = Jido.Plugin.Normalizer.normalize_all([RaisingMetadataPackage])
 
     assert {:error,
             %Jido.Error.ValidationError{
@@ -200,7 +199,7 @@ defmodule Jido.Plugin.BoundaryTest do
                 kind: :throw,
                 reason: :facet_metadata_unavailable
               }
-            }} = Plugin.normalize_all([ThrowingMetadataPackage])
+            }} = Jido.Plugin.Normalizer.normalize_all([ThrowingMetadataPackage])
   end
 
   test "Topology returns explicit errors and contains callback exceptions" do
@@ -235,7 +234,7 @@ defmodule Jido.Plugin.BoundaryTest do
   end
 
   test "Topology contribution contexts enforce static identity fields" do
-    {:ok, [spec]} = Plugin.normalize_all([TopologyPackage])
+    {:ok, [spec]} = Jido.Plugin.Normalizer.normalize_all([TopologyPackage])
     context = TopologyPlugin.context(spec, "agent/worker", __MODULE__)
     assert {:ok, ^context} = Jido.Topology.Plugin.Context.validate(context)
     assert {:ok, ^context} = Zoi.parse(Jido.Topology.Plugin.Context.schema(), context)
@@ -250,7 +249,7 @@ defmodule Jido.Plugin.BoundaryTest do
   end
 
   defp topology_result(result) do
-    {:ok, [spec]} = Plugin.normalize_all([{TopologyPackage, result: result}])
+    {:ok, [spec]} = Jido.Plugin.Normalizer.normalize_all([{TopologyPackage, result: result}])
     context = TopologyPlugin.context(spec, "worker", __MODULE__)
     TopologyPlugin.contribute(spec, context)
   end

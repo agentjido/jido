@@ -7,7 +7,7 @@ defmodule Jido.AgentServer.PostCommit do
   require Logger
   alias Jido.Agent.Directive
   alias Jido.Plugin
-  alias Jido.AgentServer.Plugin, as: ServerPlugin
+  alias Jido.AgentServer.Plugin.Callbacks
   alias Jido.AgentServer.Plugin.Commit
   alias Jido.Plugin.DirectiveContext, as: PluginDirectiveContext
   alias Jido.Plugin.SignalContext, as: PluginSignalContext
@@ -145,7 +145,7 @@ defmodule Jido.AgentServer.PostCommit do
          span,
          %State{active: %ActiveTurn{} = active} = data
        ) do
-    modules = ServerPlugin.dispatch_modules(data.plugin_specs)
+    modules = Callbacks.dispatch_modules(data.plugin_specs)
 
     with {:ok, prepared_directive, target} <-
            DirectiveRuntime.prepare_signal(directive, context, data),
@@ -168,7 +168,7 @@ defmodule Jido.AgentServer.PostCommit do
       start_directive_task(
         fn ->
           with {:ok, signal} <-
-                 ServerPlugin.prepare_dispatch(
+                 Callbacks.prepare_dispatch(
                    prepared_directive.signal,
                    data.plugin_specs,
                    runtime_refs,
@@ -300,7 +300,7 @@ defmodule Jido.AgentServer.PostCommit do
     start_directive_task(
       fn ->
         with {:ok, runtime_ref} <- PluginLifecycle.plugin_runtime_ref(data, plugin) do
-          ServerPlugin.dispatch(plugin, runtime_ref, directive, plugin_context)
+          Callbacks.dispatch(plugin, runtime_ref, directive, plugin_context)
         end
       end,
       rest,
@@ -359,7 +359,7 @@ defmodule Jido.AgentServer.PostCommit do
         data.jido,
         fn ->
           with {:ok, runtime_ref} <- PluginLifecycle.plugin_runtime_ref(data, plugin) do
-            ServerPlugin.after_commit(plugin, runtime_ref, commit)
+            Callbacks.after_commit(plugin, runtime_ref, commit)
           end
         end,
         commit_notification_timeout(data),

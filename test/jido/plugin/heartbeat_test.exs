@@ -2,7 +2,6 @@ defmodule Jido.Plugin.HeartbeatTest do
   use JidoTest.Case, async: false
 
   alias Jido.AgentServer, as: Server
-  alias Jido.Plugin
   alias Jido.Plugin.{Heartbeat, Init}
 
   defmodule RecordHeartbeat do
@@ -88,7 +87,7 @@ defmodule Jido.Plugin.HeartbeatTest do
           {[source: "not a URI reference"], {:invalid_heartbeat_source, "not a URI reference"}}
         ] do
       assert {:error, %Jido.Error.ValidationError{} = error} =
-               Plugin.normalize_all([{Heartbeat, opts}])
+               Jido.Plugin.Normalizer.normalize_all([{Heartbeat, opts}])
 
       assert error.message == "Heartbeat Plugin options are invalid"
       assert error.details.reason == reason

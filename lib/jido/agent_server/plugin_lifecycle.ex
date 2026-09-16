@@ -1,7 +1,7 @@
 defmodule Jido.AgentServer.PluginLifecycle do
   @moduledoc false
 
-  alias Jido.AgentServer.Plugin
+  alias Jido.AgentServer.Plugin.Callbacks
   alias Jido.Plugin.Init
   alias Jido.AgentServer.{ChildInfo, PluginChild, Shutdown, State}
 
@@ -20,7 +20,7 @@ defmodule Jido.AgentServer.PluginLifecycle do
         {:error, {:plugin_spec_not_found, plugin}}
 
       plugin_spec ->
-        with {:ok, [child_spec]} <- Plugin.child_specs(init(state, plugin_spec), [plugin_spec]) do
+        with {:ok, [child_spec]} <- Callbacks.child_specs(init(state, plugin_spec), [plugin_spec]) do
           {:ok, child_spec}
         else
           {:ok, []} -> {:error, {:plugin_runtime_not_declared, plugin}}
@@ -34,7 +34,7 @@ defmodule Jido.AgentServer.PluginLifecycle do
     Enum.reduce_while(state.plugin_specs, :ok, fn spec, :ok ->
       if spec.runtime? do
         with {:ok, runtime_ref} <- runtime_ref(state, spec.module),
-             :ok <- Plugin.await_ready(spec, runtime_ref) do
+             :ok <- Callbacks.await_ready(spec, runtime_ref) do
           {:cont, :ok}
         else
           {:error, reason} -> {:halt, {:error, reason}}
@@ -117,7 +117,7 @@ defmodule Jido.AgentServer.PluginLifecycle do
   defp child_specs(state) do
     state.plugin_specs
     |> Enum.reduce_while({:ok, []}, fn plugin_spec, {:ok, child_specs} ->
-      case Plugin.child_specs(init(state, plugin_spec), [plugin_spec]) do
+      case Callbacks.child_specs(init(state, plugin_spec), [plugin_spec]) do
         {:ok, specs} -> {:cont, {:ok, Enum.reverse(specs, child_specs)}}
         {:error, reason} -> {:halt, {:error, reason}}
       end
@@ -144,39 +144,25 @@ defmodule Jido.AgentServer.PluginLifecycle do
   defp owned_state(_agent_state, %{state_key: nil}), do: nil
   defp owned_state(agent_state, %{state_key: key}), do: Map.get(agent_state, key)
 
-  defp start_child(state, %{id: plugin} = child_spec) when is_atom(plugin) do
+  defp start_child(state, %{id: plugin} = child_spec) do
     spec = Supervisor.child_spec(child_spec, [])
     plugin_spec = Enum.find(state.plugin_specs, &(&1.module == plugin))
 
-    if plugin_spec do
-      wrapper_spec =
-        Supervisor.child_spec(
-          {PluginChild,
-           [self(), plugin_spec, spec, wrapper_name(state, plugin), state.readiness_timeout]},
-          id: {:agent_plugin_child, state.agent.id, plugin},
-          restart: :temporary
-        )
+    wrapper_spec =
+      Supervisor.child_spec(
+        {PluginChild,
+         [self(), plugin_spec, spec, wrapper_name(state, plugin), state.readiness_timeout]},
+        id: {:agent_plugin_child, state.agent.id, plugin},
+        restart: :temporary
+      )
 
-      case start_wrapper(state, wrapper_spec) do
-        {:ok, lifecycle_pid} ->
-          track_plugin_child(state, plugin, spec, lifecycle_pid)
+    case start_wrapper(state, wrapper_spec) do
+      {:ok, lifecycle_pid} ->
+        track_plugin_child(state, plugin, spec, lifecycle_pid)
 
-        {:ok, lifecycle_pid, _info} ->
-          track_plugin_child(state, plugin, spec, lifecycle_pid)
-
-        :ignore ->
-          {:ok, state}
-
-        {:error, reason} ->
-          {:error, {:plugin_child_start_failed, plugin, reason}, state}
-      end
-    else
-      {:error, {:plugin_spec_not_found, plugin}, state}
+      {:error, reason} ->
+        {:error, {:plugin_child_start_failed, plugin, reason}, state}
     end
-  end
-
-  defp start_child(state, child_spec) do
-    {:error, {:invalid_plugin_child_spec_id, child_spec}, state}
   end
 
   defp start_wrapper(%State{jido: jido}, wrapper_spec)

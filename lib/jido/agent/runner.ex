@@ -275,7 +275,7 @@ defmodule Jido.Agent.Runner do
   end
 
   defp plugin_specs(declarations, :normalize) do
-    with {:ok, specs} <- Jido.Plugin.normalize_all(declarations),
+    with {:ok, specs} <- Jido.Plugin.Normalizer.normalize_all(declarations),
          do: {:ok, Jido.Agent.Plugin.specs(specs)}
   end
 

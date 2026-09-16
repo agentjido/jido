@@ -16,7 +16,7 @@ defmodule Jido.Topology.Plugin do
   """
 
   alias Jido.Agent.Authoring
-  alias Jido.Plugin, as: PluginPackage
+  alias Jido.Plugin.Normalizer, as: PluginNormalizer
   alias Jido.Plugin.Error, as: PluginError
   alias Jido.Topology.Plugin.{Context, Contribution, Spec}
   alias Jido.Topology.Validation
@@ -100,7 +100,7 @@ defmodule Jido.Topology.Plugin do
 
   defp declaration_contributions(declaration) do
     with {:ok, agent} <- Validation.agent_definition(declaration.module),
-         {:ok, specs} <- PluginPackage.normalize_all(agent.plugins) do
+         {:ok, specs} <- PluginNormalizer.normalize_all(agent.plugins) do
       specs
       |> Enum.reject(&is_nil(&1.topology))
       |> Authoring.traverse(fn spec ->

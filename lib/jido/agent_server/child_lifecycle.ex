@@ -31,7 +31,7 @@ defmodule Jido.AgentServer.ChildLifecycle do
 
       true ->
         monitored = %{parent | ref: Process.monitor(pid)}
-        next_data = %{data | parent: monitored, orphaned_from: nil}
+        next_data = %{data | parent: monitored}
 
         case Relationship.put_own(next_data) do
           :ok ->
@@ -240,7 +240,7 @@ defmodule Jido.AgentServer.ChildLifecycle do
   end
 
   def handle_parent_down(reason, %State{parent: %ParentRef{} = parent} = data) do
-    next_data = %{data | parent: nil, orphaned_from: parent}
+    next_data = %{data | parent: nil}
     _ = Relationship.delete_own(next_data)
 
     case data.on_parent_death do

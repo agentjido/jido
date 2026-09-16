@@ -7,7 +7,6 @@ defmodule Jido.Persistence.Checkpoint do
   alias Jido.Agent.Plugin.Spec, as: AgentSpec
   alias Jido.Persistence.Plugin, as: PersistencePlugin
   alias Jido.Persistence.Plugin.Spec, as: PersistenceSpec
-  alias Jido.Plugin
 
   @custom_checkpoint_kind :agent_custom
 
@@ -28,7 +27,7 @@ defmodule Jido.Persistence.Checkpoint do
       {:ok, checkpoint}
     else
       with {:ok, declarations} <- plugin_declarations(agent_module, checkpoint),
-           {:ok, specs} <- Plugin.normalize_all(declarations),
+           {:ok, specs} <- Jido.Plugin.Normalizer.normalize_all(declarations),
            {:ok, state} <-
              load_owned_state(Map.get(checkpoint, :state), specs, record_format, reason) do
         {:ok, Map.put(checkpoint, :state, state)}
@@ -40,7 +39,7 @@ defmodule Jido.Persistence.Checkpoint do
     if custom_checkpoint?(checkpoint) do
       {:ok, checkpoint}
     else
-      with {:ok, specs} <- Plugin.normalize_all(agent.plugins),
+      with {:ok, specs} <- Jido.Plugin.Normalizer.normalize_all(agent.plugins),
            {:ok, state} <- dump_owned_state(agent.state, specs, record_format, reason) do
         {:ok, Map.put(checkpoint, :state, state)}
       end

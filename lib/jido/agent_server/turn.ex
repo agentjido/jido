@@ -9,7 +9,7 @@ defmodule Jido.AgentServer.Turn do
   alias Jido.Agent
   alias Jido.Agent.Plugin, as: AgentPlugin
   alias Jido.Agent.Runner
-  alias Jido.AgentServer.Plugin, as: ServerPlugin
+  alias Jido.AgentServer.Plugin.Callbacks
   alias Jido.AgentServer.ActiveTurn
   alias Jido.AgentServer.DirectiveRuntime
   alias Jido.AgentServer.ExecutionAdapter
@@ -163,7 +163,7 @@ defmodule Jido.AgentServer.Turn do
       with {:ok, command} <- initial_command(signal, context, data) do
         data = %{data | active: %{data.active | source_signal: command.signal}}
 
-        if AgentPlugin.prepares?(data.plugin_specs) or ServerPlugin.admits?(data.plugin_specs) do
+        if AgentPlugin.prepares?(data.plugin_specs) or Callbacks.admits?(data.plugin_specs) do
           start_admission_task(command, data)
         else
           begin_turn_execution(command, data)
@@ -203,7 +203,7 @@ defmodule Jido.AgentServer.Turn do
     plugin_specs = data.plugin_specs
 
     with {:ok, runtime_refs} <-
-           PluginLifecycle.plugin_runtime_refs(data, ServerPlugin.admission_modules(plugin_specs)) do
+           PluginLifecycle.plugin_runtime_refs(data, Callbacks.admission_modules(plugin_specs)) do
       pending =
         TaskSupport.start_traced(
           data.jido,
@@ -212,7 +212,7 @@ defmodule Jido.AgentServer.Turn do
                    AgentPlugin.prepare(command.agent, command.signal, plugin_specs),
                  command = %{command | plugin_inputs: plugin_inputs},
                  {:ok, command} <-
-                   ServerPlugin.admit(
+                   Callbacks.admit(
                      command,
                      plugin_specs,
                      runtime_refs,
@@ -424,7 +424,7 @@ defmodule Jido.AgentServer.Turn do
 
     AgentTelemetry.committed(next_data, version, directive_count)
 
-    notifications = ServerPlugin.commit_modules(data.plugin_specs)
+    notifications = Callbacks.commit_modules(data.plugin_specs)
 
     post_commit_actions =
       case notifications do

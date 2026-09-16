@@ -17,7 +17,6 @@ defmodule Jido.AgentServer.ChildOperations do
   }
 
   alias Jido.AgentServer.Signal.ChildStarted
-  alias Jido.AgentServer.Signal.Runtime, as: RuntimeSignal
 
   @reserved_child_opts [:agent, :id, :jido, :parent, :partition, :name, :register]
 
@@ -350,7 +349,7 @@ defmodule Jido.AgentServer.ChildOperations do
   end
 
   defp directive_context(%State{} = data) do
-    signal = RuntimeSignal.new!(%{}, source: "/agent/#{data.agent.id}")
+    signal = Jido.Signal.new!("jido.agent.runtime", %{}, source: "/agent/#{data.agent.id}")
 
     %DirectiveContext{
       agent_id: data.agent.id,

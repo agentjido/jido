@@ -5,7 +5,6 @@ defmodule Jido.Agent.TurnEvaluationTest do
   alias Jido.Agent
   alias Jido.Agent.Command
   alias Jido.Agent.Turn
-  alias Jido.Plugin
   alias Jido.Signal
   alias JidoTest.AgentFixtures.Add
 
@@ -158,7 +157,7 @@ defmodule Jido.Agent.TurnEvaluationTest do
   test "the private evaluator reports its closed preparation and finalization stages" do
     source = Signal.new!("missing.route", %{}, source: "/test")
     agent = Agent.new!(name: "missing_route") |> Agent.instantiate!()
-    {:ok, specs} = Plugin.normalize_all(agent.plugins)
+    {:ok, specs} = Jido.Plugin.Normalizer.normalize_all(agent.plugins)
     {:ok, command} = Command.new(agent, source)
 
     assert {:error, :route, %Jido.Error.RoutingError{}} =
@@ -171,7 +170,7 @@ defmodule Jido.Agent.TurnEvaluationTest do
 
     selected = Signal.new!("source.route", %{observer: self()}, source: "/test")
     selected_agent = CustomRouteAgent.new!(id: "stages")
-    {:ok, selected_specs} = Plugin.normalize_all(selected_agent.plugins)
+    {:ok, selected_specs} = Jido.Plugin.Normalizer.normalize_all(selected_agent.plugins)
     {:ok, selected_command} = Command.new(selected_agent, selected)
 
     assert {:ok, prepared} =
