@@ -43,7 +43,7 @@ failure does not undo that commit.
 
 ### Event catalog
 
-All ten families below are implemented.
+All eleven families below are implemented.
 The current event names are checked in
 [telemetry_test.exs](../../../test/jido/telemetry_test.exs); Topology update
 and placement boundaries are checked in
@@ -61,6 +61,7 @@ and [controller_boundary_test.exs](../../../test/jido/topology/controller_bounda
 | Admission rejection | `[:jido, :agent, :admission, :rejected]` | Point | A call or cast did not enter a Turn |
 | Agent persistence | `[:jido, :persistence, :operation, event]` | Span | One public Agent persistence operation |
 | Local Topology | `[:jido, :topology, :operation, event]` | Span | One static local Controller operation |
+| Topology ownership settlement | `[:jido, :topology, :ownership, :settled]` | Point | One Owner cleanup result after Controller loss |
 | Scheduler delivery | `[:jido, :scheduler, :delivery]` | Point | One bounded durable-delivery outcome |
 
 For a span, `event` is `:start`, `:stop`, or `:exception`. A returned failure
@@ -147,6 +148,7 @@ converts them at its boundary. Counts and revisions are integers.
 | Admission rejection | `system_time`, `queue_depth` | `queue_limit`, `wait_duration` |
 | Persistence | `duration` | `expected_revision`, `revision_before`, `revision_after` |
 | Local Topology | `duration` | `component_count`, `ready_count`, `failed_count`, `epoch` |
+| Topology ownership settlement | `component_count`, `ready_count`, `failed_count` | None |
 | Scheduler delivery | `count` | None |
 
 The `turn.settled` duration measures from Turn start to settlement. It is not
@@ -157,7 +159,7 @@ the live-result duration from the Turn span.
 The default metric set has count and duration metrics for both `:stop` and
 `:exception` events for lifecycle, Turn result, commit, Plugin notification, Directive,
 persistence, and local Topology. It also has settlement count and duration,
-admission rejection count, and Scheduler delivery count. Default metric tags
+admission rejection count, Topology ownership settlement count, and Scheduler delivery count. Default metric tags
 can use only the fixed vocabularies `operation`, `status`, `stage`,
 `admission_reason`, `persistence_reason`, `topology_operation`,
 `scheduler_outcome`, and `component_kind`. A reporter can select a smaller set.
@@ -428,7 +430,7 @@ shall emit one bounded `[:jido, :scheduler, :delivery]` point event.
 
 | ID | Decision | Recommended answer | Effect if changed |
 | --- | --- | --- | --- |
-| `OBS-DEC-001` | Event catalog | Use the ten families in this file. | Names, tests, metrics, logs, and host mapping change together. |
+| `OBS-DEC-001` | Event catalog | Use the eleven families in this file. | Names, tests, metrics, logs, and host mapping change together. |
 | `OBS-DEC-002` | Agent Ref projection | Use `agent_namespace`, `agent_partition`, and `agent_id`. | Identity fields have one stable meaning. |
 | `OBS-DEC-003` | Lifecycle operations | Use `hibernate` and `thaw`; keep create and delete under persistence. | Lifecycle and persistence facts stay separate. |
 | `OBS-DEC-004` | Public statuses and stages | Use the bounded tables and keep private stages hidden. | Dashboards do not depend on evaluator details. |

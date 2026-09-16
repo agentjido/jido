@@ -73,6 +73,7 @@ Span families use `:start` and one terminal event. A returned failure uses
 | Admission rejection | `[:jido, :agent, :admission, :rejected]` | Agent and Signal identity, `admission_reason` | `queue_depth`, `queue_limit` |
 | Persistence | `[:jido, :persistence, :operation, event]` | Agent identity, `operation`, `adapter_module`, `persistence_reason` | `duration`, revisions |
 | Local Topology | `[:jido, :topology, :operation, event]` | `topology_id`, `topology_operation`, `status` | `duration`, component counts |
+| Topology ownership settlement | `[:jido, :topology, :ownership, :settled]` | `topology_id`, `topology_operation: :cleanup`, `status` | `component_count`, `ready_count`, `failed_count` |
 | Scheduler delivery | `[:jido, :scheduler, :delivery]` | `scheduler_outcome`, `status` | `count` |
 
 Fields can be absent when they do not apply. Every event contains
@@ -177,8 +178,9 @@ events from these span families:
 - persistence
 - local Topology
 
-It also contains settlement count and duration, admission rejection count, and
-Scheduler delivery count. Duration summaries convert the Erlang native unit to
+It also contains Turn settlement count and duration, admission rejection count,
+Topology ownership settlement count tagged by status, and Scheduler delivery
+count. Duration summaries convert the Erlang native unit to
 milliseconds.
 
 Default metric tags use only `operation`, `status`, `stage`,

@@ -6,7 +6,7 @@ defmodule Jido.Telemetry do
   metrics, semantic logs, and optional OpenTelemetry spans. The catalog covers
   Agent lifecycle, Turn result, commit, Plugin commit notification, Directive
   work, Turn settlement, admission rejection, persistence, local Topology
-  operations, and Scheduler delivery.
+  operations, Topology ownership settlement, and Scheduler delivery.
 
   A successful Turn span ends when its commit becomes live. Plugin
   notifications and Directive work can continue after this point. The separate
@@ -68,8 +68,8 @@ defmodule Jido.Telemetry do
   Returns metric definitions for the Jido semantic event catalog.
 
   The result contains count and duration metrics for normal and exception span
-  endings. It also contains Turn settlement, admission rejection, and
-  Scheduler delivery metrics. Default tags use only bounded result and
+  endings. It also contains Turn settlement, admission rejection, Topology
+  ownership settlement, and Scheduler delivery metrics. Default tags use only bounded result and
   operation values. They do not use Agent, Signal, Turn, trace, module, or
   error IDs.
 
@@ -96,6 +96,10 @@ defmodule Jido.Telemetry do
         Telemetry.Metrics.counter("jido.scheduler.delivery.count",
           event_name: [:jido, :scheduler, :delivery],
           tags: [:scheduler_outcome]
+        ),
+        Telemetry.Metrics.counter("jido.topology.ownership.settled.count",
+          event_name: [:jido, :topology, :ownership, :settled],
+          tags: [:status]
         )
       ]
   end
@@ -169,7 +173,8 @@ defmodule Jido.Telemetry do
       [
         [:jido, :agent, :turn, :settled],
         [:jido, :agent, :admission, :rejected],
-        [:jido, :scheduler, :delivery]
+        [:jido, :scheduler, :delivery],
+        [:jido, :topology, :ownership, :settled]
       ]
   end
 

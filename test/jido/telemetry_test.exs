@@ -34,7 +34,7 @@ defmodule JidoTest.TelemetryTest do
     metrics = Telemetry.metrics()
     names = Enum.map(metrics, & &1.name)
 
-    assert length(names) == 32
+    assert length(names) == 33
 
     for prefix <- [
           [:jido, :agent, :lifecycle],
@@ -53,6 +53,13 @@ defmodule JidoTest.TelemetryTest do
     assert [:jido, :agent, :turn, :settled, :count] in names
     assert [:jido, :agent, :admission, :rejected, :count] in names
     assert [:jido, :scheduler, :delivery, :count] in names
+    assert [:jido, :topology, :ownership, :settled, :count] in names
+
+    ownership_metric =
+      Enum.find(metrics, &(&1.name == [:jido, :topology, :ownership, :settled, :count]))
+
+    assert ownership_metric.event_name == [:jido, :topology, :ownership, :settled]
+    assert ownership_metric.tags == [:status]
 
     allowed =
       ~w(operation status stage admission_reason persistence_reason topology_operation scheduler_outcome component_kind)a
@@ -90,6 +97,22 @@ defmodule JidoTest.TelemetryTest do
       end)
 
     assert log =~ "status=conflict"
+  end
+
+  test "ownership cleanup failure is a semantic error log" do
+    Application.put_env(:jido, :telemetry, semantic_log_mode: :errors)
+
+    log =
+      capture_log(fn ->
+        Jido.Telemetry.Semantic.point(
+          [:jido, :topology, :ownership, :settled],
+          %{topology_id: "topology-1", topology_operation: :cleanup, status: :error},
+          %{component_count: 3, failed_count: 1}
+        )
+      end)
+
+    assert log =~ "event=topology.ownership.settled"
+    assert log =~ "status=error"
   end
 
   test "per-instance debug mode takes priority over global semantic logging" do

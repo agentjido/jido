@@ -98,6 +98,13 @@ defmodule JidoTest.System.TopologyCleanup do
 
     assert metadata.status == :ok
     assert measurements.failed_count == 0
+
+    assert Enum.any?(Jido.Telemetry.metrics(), fn metric ->
+             metric.name == [:jido, :topology, :ownership, :settled, :count] and
+               metric.event_name == [:jido, :topology, :ownership, :settled] and
+               metric.tags == [:status]
+           end)
+
     assert Process.alive?(unrelated)
     survivors = Enum.filter(owned, &Process.alive?/1)
     for pid <- survivors, do: stop_agent(c, pid)
