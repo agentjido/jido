@@ -53,6 +53,13 @@ The facet cannot read the adapter, record key, complete Agent state, process,
 or commit result. Dump output must be portable. Load output must also match the
 paired Agent-facet state schema.
 
+Each callback must return `{:ok, value}` or `{:error, reason}`. A raised
+callback, an invalid return, a non-portable value, or an invalid loaded state
+returns an error to the Persistence caller. A dump failure prevents the record
+write. A load failure prevents Agent restore. Keep every Plugin-owned field in
+the checkpoint; a missing field is an error. Authors should handle the error
+and fix the callback or record instead of assuming a partial Agent exists.
+
 Direct and behavior-only definitions use the version-2 checkpoint format with
 an embedded definition. This includes an explicitly unversioned direct
 definition that uses a generated module as its behavior but owns changed static

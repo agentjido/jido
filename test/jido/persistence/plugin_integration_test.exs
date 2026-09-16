@@ -16,14 +16,36 @@ defmodule JidoTest.Persistence.PluginIntegrationTest do
 
     def dump(value, context, opts) do
       notify(opts, {:dump, value, context})
-      {:ok, Keyword.fetch!(opts, :prefix) <> Integer.to_string(value)}
+
+      case Process.get({__MODULE__, :dump_fault}) do
+        :raise -> raise "dump callback failed"
+        :wrong_return -> :invalid
+        :non_portable -> {:ok, self()}
+        _ -> {:ok, Keyword.fetch!(opts, :prefix) <> Integer.to_string(value)}
+      end
     end
 
     def load(value, context, opts) do
       notify(opts, {:load, value, context})
-      prefix = Keyword.fetch!(opts, :prefix)
-      {number, ""} = value |> String.replace_prefix(prefix, "") |> Integer.parse()
-      {:ok, number}
+
+      case Process.get({__MODULE__, :load_fault}) do
+        :raise ->
+          raise "load callback failed"
+
+        :wrong_return ->
+          :invalid
+
+        :non_portable ->
+          {:ok, self()}
+
+        :invalid_state ->
+          {:ok, "not an integer"}
+
+        _ ->
+          prefix = Keyword.fetch!(opts, :prefix)
+          {number, ""} = value |> String.replace_prefix(prefix, "") |> Integer.parse()
+          {:ok, number}
+      end
     end
 
     defp notify(opts, message) do
@@ -111,5 +133,63 @@ defmodule JidoTest.Persistence.PluginIntegrationTest do
 
     assert payload == %{id: agent.id, complete: %{value: 7, owned: 9}}
     assert {:ok, ^agent} = Persistence.load_agent(c.persistence, CustomCheckpointAgent, agent.id)
+  end
+
+  test "dump callback faults and invalid values cannot write a record", c do
+    for {fault, code} <- [
+          raise: :plugin_callback_failed,
+          wrong_return: :plugin_invalid_callback_result,
+          non_portable: :non_portable_term
+        ] do
+      agent = owned_agent("dump-#{fault}")
+      key = Persistence.agent_key(nil, Agent, agent.id)
+      {ETS, opts} = c.persistence
+      Process.put({PersistenceFacet, :dump_fault}, fault)
+
+      assert {:error, error} = Persistence.save_agent(c.persistence, agent)
+      assert Jido.Error.code(error) == code
+
+      assert {:error, :not_found} = ETS.get(key, opts)
+    end
+
+    Process.delete({PersistenceFacet, :dump_fault})
+  end
+
+  test "load callback faults and invalid values cannot restore an Agent", c do
+    for {fault, code} <- [
+          raise: :plugin_callback_failed,
+          wrong_return: :plugin_invalid_callback_result,
+          non_portable: :non_portable_term,
+          invalid_state: :plugin_invalid_callback_result
+        ] do
+      agent = owned_agent("load-#{fault}")
+      assert :ok = Persistence.save_agent(c.persistence, agent)
+      Process.put({PersistenceFacet, :load_fault}, fault)
+
+      assert {:error, error} = Persistence.load_agent(c.persistence, Agent, agent.id)
+      assert Jido.Error.code(error) == code
+
+      Process.delete({PersistenceFacet, :load_fault})
+      assert {:ok, ^agent} = Persistence.load_agent(c.persistence, Agent, agent.id)
+    end
+  end
+
+  test "a missing Plugin-owned field cannot write a record", c do
+    agent = owned_agent("missing-owned")
+    incomplete = %{agent | state: Map.delete(agent.state, :owned)}
+    key = Persistence.agent_key(nil, Agent, agent.id)
+    {ETS, opts} = c.persistence
+
+    assert {:error, _reason} = Persistence.save_agent(c.persistence, incomplete)
+    assert {:error, :not_found} = ETS.get(key, opts)
+  end
+
+  defp owned_agent(id) do
+    Agent.new!(
+      name: "persistence_plugin_faults",
+      schema: Zoi.object(%{visible: Zoi.integer() |> Zoi.default(1)}),
+      plugins: [{Package, prefix: "sealed:"}]
+    )
+    |> Agent.instantiate!(id: id, state: %{visible: 8, owned: 12})
   end
 end
