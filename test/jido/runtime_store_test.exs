@@ -67,7 +67,7 @@ defmodule JidoTest.RuntimeStoreTest do
     assert :ok = Supervisor.terminate_child(jido, Jido.runtime_store_name(jido))
 
     timeout_calls = [
-      {fn -> RuntimeStore.fetch(jido, :hive, :key) end, :error},
+      {fn -> RuntimeStore.fetch(jido, :hive, :key) end, {:error, :timeout}},
       {fn -> RuntimeStore.get(jido, :hive, :key, :default) end, :default},
       {fn -> RuntimeStore.put(jido, :hive, :key, :value) end, {:error, :timeout}},
       {fn -> RuntimeStore.delete(jido, :hive, :key) end, {:error, :timeout}},
@@ -88,7 +88,7 @@ defmodule JidoTest.RuntimeStoreTest do
 
   defp calls(jido) do
     [
-      {fn -> RuntimeStore.fetch(jido, :hive, :key) end, :error},
+      {fn -> RuntimeStore.fetch(jido, :hive, :key) end, {:error, :not_running}},
       {fn -> RuntimeStore.get(jido, :hive, :key, :default) end, :default},
       {fn -> RuntimeStore.put(jido, :hive, :key, :value) end, {:error, :not_running}},
       {fn -> RuntimeStore.delete(jido, :hive, :key) end, {:error, :not_running}},

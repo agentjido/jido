@@ -53,14 +53,15 @@ defmodule Jido.RuntimeStore do
   def get(instance, hive, key, default \\ nil) when is_atom(instance) do
     case fetch(instance, hive, key) do
       {:ok, value} -> value
-      :error -> default
+      _unavailable_or_missing -> default
     end
   end
 
   @doc false
-  @spec fetch(atom(), hive(), key()) :: {:ok, value()} | :error
+  @spec fetch(atom(), hive(), key()) ::
+          {:ok, value()} | :error | {:error, :not_running | :timeout}
   def fetch(instance, hive, key) when is_atom(instance) do
-    call(instance, {:fetch, hive, key}, :error)
+    call(instance, {:fetch, hive, key}, {:error, :not_running}, {:error, :timeout})
   end
 
   @doc false

@@ -303,6 +303,9 @@ defmodule Jido.AgentServer.ChildLifecycleTest do
     runtime_store = Jido.runtime_store_name(jido)
 
     assert :ok = Supervisor.terminate_child(jido_pid, runtime_store)
+    worker = spawn(fn -> reject_relationship_writes(runtime_store) end)
+    true = Process.register(worker, runtime_store)
+    on_exit(fn -> Process.exit(worker, :kill) end)
 
     source = signal("runtime.directive")
 
@@ -318,7 +321,41 @@ defmodule Jido.AgentServer.ChildLifecycleTest do
              Jido.AgentServer.DirectiveRuntime.handle(directive, context, state)
 
     eventually(fn -> Jido.whereis_agent(jido, child_id) == nil end)
+    monitor = Process.monitor(worker)
+    Process.exit(worker, :kill)
+    assert_receive {:DOWN, ^monitor, :process, ^worker, :killed}, 1_000
     assert {:ok, _pid} = Supervisor.restart_child(jido_pid, runtime_store)
+  end
+
+  defp reject_relationship_writes(table) do
+    receive do
+      {:"$gen_call", from, request} ->
+        reply =
+          case request do
+            {:fetch, hive, key} ->
+              case :ets.lookup(table, {hive, key}) do
+                [{{^hive, ^key}, value}] -> {:ok, value}
+                [] -> :error
+              end
+
+            {:put, :agent_relationships, _key, _value} ->
+              {:error, :not_running}
+
+            {:put, hive, key, value} ->
+              true = :ets.insert(table, {{hive, key}, value})
+              :ok
+
+            {:delete, hive, key} ->
+              true = :ets.delete(table, {hive, key})
+              :ok
+
+            {:list, _hive} ->
+              []
+          end
+
+        GenServer.reply(from, reply)
+        reject_relationship_writes(table)
+    end
   end
 
   test "child factories must preserve requested identity before tracking", %{jido: jido} do

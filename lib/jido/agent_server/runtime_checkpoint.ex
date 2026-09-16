@@ -8,13 +8,14 @@ defmodule Jido.AgentServer.RuntimeCheckpoint do
   @hive :agent_runtime_checkpoints
 
   @doc false
-  @spec restore(Options.t()) :: {Agent.t(), non_neg_integer()}
+  @spec restore(Options.t()) ::
+          {:ok, Agent.t(), non_neg_integer()} | {:error, term()}
   def restore(%Options{agent: %Agent{} = initial} = options) do
     case fetch(options.jido, key(initial.id, options.partition)) do
       {:ok, %{agent: %Agent{} = agent, state_version: version}}
       when agent.id == initial.id and agent.module == initial.module and
              is_integer(version) and version >= 0 ->
-        {agent, version}
+        {:ok, agent, version}
 
       {:ok,
        %{
@@ -24,10 +25,19 @@ defmodule Jido.AgentServer.RuntimeCheckpoint do
        }}
       when agent.id == initial.id and source_module == initial.module and
              is_integer(version) and version >= 0 ->
-        {agent, version}
+        {:ok, agent, version}
 
-      _other ->
-        {initial, options.state_version}
+      :error ->
+        {:ok, initial, options.state_version}
+
+      {:error, :not_running} ->
+        {:error, :runtime_checkpoint_unavailable}
+
+      {:error, :timeout} ->
+        {:error, :runtime_checkpoint_unavailable}
+
+      {:ok, _invalid} ->
+        {:error, :invalid_runtime_checkpoint}
     end
   end
 

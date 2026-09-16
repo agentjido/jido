@@ -3375,8 +3375,9 @@ defmodule Jido.AgentServer do
   end
 
   defp restore_initial_agent(%Options{persistence: nil} = opts) do
-    {agent, version} = RuntimeCheckpoint.restore(opts)
-    {:ok, agent, version, :none}
+    with {:ok, agent, version} <- RuntimeCheckpoint.restore(opts) do
+      {:ok, agent, version, :none}
+    end
   end
 
   defp restore_initial_agent(%Options{} = opts) do

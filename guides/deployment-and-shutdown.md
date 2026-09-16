@@ -42,6 +42,11 @@ An abnormal `AgentServer` restart can use the instance runtime checkpoint while
 the Jido instance stays alive. Durable persistence is necessary when an Agent
 must survive an instance or node restart.
 
+If the local runtime store is unavailable during a restart, the Agent does not
+activate from its initial state. Restore the store worker, then start the Agent
+again. The local checkpoint is ephemeral: loss of the instance or its ETS table
+still requires durable persistence to recover committed state.
+
 Plugin runtime processes restart from Plugin specifications. Signal bus
 subscribers and application connections must also have a restart or
 reconciliation rule. Do not put a PID or connection in durable Agent state.
