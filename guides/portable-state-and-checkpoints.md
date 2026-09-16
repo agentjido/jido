@@ -81,6 +81,16 @@ Do not put these values in the persistent complete Agent state:
 - bitstrings that are not byte-aligned
 - runtime handles that are valid only on one node
 
+The portable-term check accepts atoms, but that does not make every atom safe
+across BEAM nodes. Persistence decodes a stored record with
+`binary_to_term(bytes, [:safe])`. A fresh BEAM rejects an atom name that it has
+not already loaded. The two-BEAM
+[checkpoint test](../test/jido/persistence/cross_beam_atom_test.exs) saves a
+new atom on one node and gets `:invalid_persistence_record` on the other; the
+same value as a string loads. Use stable strings for data that can introduce
+new names, or preload a fixed atom set on every loading node. Do not depend on
+unrestricted atom portability.
+
 Use stable identifiers and portable configuration. Rebuild runtime resources
 in a Plugin runtime or in application supervision after restore.
 
