@@ -18,9 +18,9 @@ can reject them before their deadline.
 ## Run Plugin Admission
 
 Plugins with `admit/3` can use their optional runtime to accept or reject a
-command. Admission has the Plugin Directive timeout. It runs after pure
-preparation and before Turn evaluation. It can inspect its own pure prepared
-input but cannot replace it.
+command. Admission uses the active `turn_timeout` pre-commit deadline. It runs
+after pure preparation and before Turn evaluation. It can inspect its own pure
+prepared input but cannot replace it.
 
 A Plugin cannot make a synchronous reentrant call to the same Agent from its
 admission task. Jido rejects this case to avoid a deadlock.
@@ -42,8 +42,9 @@ Cancellation can stop admission or executable work before commit. It does not:
 | Timeout | Scope |
 | --- | --- |
 | `AgentServer.call/3` timeout | Caller wait and admission deadline |
+| `turn_timeout` | Active Plugin admission and candidate evaluation before commit |
 | Jido Action execution timeout | One executable chain |
-| `directive_timeout` | Plugin admission, one commit notification, or one Directive dispatch |
+| `directive_timeout` | One commit notification or one Directive dispatch |
 | `idle_timeout` | Idle actor lifetime |
 | topology startup timeout | One activation and readiness pass |
 | persistence adapter timeout | Application adapter behavior |

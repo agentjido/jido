@@ -20,8 +20,8 @@ a Turn, covers Plugin admission and candidate evaluation, and stops when commit
 starts. Its default is 5 seconds. A timeout cancels owned work, preserves the
 last committed snapshot, and rejects late results.
 
-`directive_timeout` limits Plugin admission, each commit notification, and each
-Directive dispatch. Its default is 5 seconds. Commit notifications keep a
+`directive_timeout` limits each commit notification and each Directive
+dispatch. Its default is 5 seconds. Commit notifications keep a
 5-second limit when this option is `:infinity`. A caller timeout is a different
 boundary: the caller can stop waiting while accepted actor work continues.
 
