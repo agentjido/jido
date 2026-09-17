@@ -126,6 +126,19 @@ defmodule JidoTest.AgentServer.UpgradeTest do
     assert Server.snapshot(server).state_version == 1
   end
 
+  test "a definition upgrade keeps instance ownership metadata", c do
+    metadata = %{"jido.topology" => %{"id" => "test-topology"}, "owner" => "demo"}
+
+    {:ok, source} = Jido.Agent.instantiate(SourceAgent, id: unique_id("owned-definition"))
+    {:ok, server} = Jido.start_agent(c.jido, %{source | metadata: metadata})
+
+    assert {:ok, target} =
+             Server.upgrade(server, TargetAgent, fn _source -> {:ok, %{value: "saved"}} end)
+
+    assert target.metadata == metadata
+    assert Server.agent(server).metadata == metadata
+  end
+
   test "an invalid target or changed Plugin contract preserves the old snapshot", c do
     {:ok, server} = Jido.start_agent(c.jido, SourceAgent, id: unique_id("invalid"))
     before = Server.snapshot(server)

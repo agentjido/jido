@@ -12,6 +12,8 @@ defmodule Jido.AgentServer.Upgrade do
     with :ok <- definition_upgrade_supported?(data, target_module),
          {:ok, state} <- invoke_state_migration(migration, data.agent),
          {:ok, target} <- Agent.instantiate(target_module, id: data.agent.id, state: state),
+         {:ok, target} <-
+           Agent.validate(%{target | metadata: Map.merge(target.metadata, data.agent.metadata)}),
          {:ok, plugin_specs} <- Jido.Plugin.Normalizer.normalize_all(target.plugins),
          :ok <- unchanged_plugin_contract(data.plugin_specs, plugin_specs) do
       {:ok, target, plugin_specs}
