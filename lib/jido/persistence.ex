@@ -228,7 +228,7 @@ defmodule Jido.Persistence do
              {:ok, identity} <-
                Identity.resolve({adapter, adapter_opts}, instance, agent_module, agent_id, opts),
              {:ok, value, _condition} <- Store.read({adapter, adapter_opts}, identity.key),
-             {:ok, record} <- Record.decode(value),
+             {:ok, record} <- decode_record(value, agent_module),
              :ok <-
                Record.validate_for_identity(
                  record,
@@ -353,7 +353,7 @@ defmodule Jido.Persistence do
         {:error, :conflict}
 
       {:ok, value, condition} ->
-        with {:ok, current} <- Record.decode(value),
+        with {:ok, current} <- decode_record(value, record.agent_module),
              :ok <- Record.validate_against_record(current, record, identity),
              :ok <- Record.require_active_for_write(current),
              :ok <- check_revision(current, record, expected_revision) do
@@ -377,7 +377,7 @@ defmodule Jido.Persistence do
        ) do
     case Store.read({adapter, opts}, identity.key) do
       {:ok, value, condition} ->
-        with {:ok, current_record} <- Record.decode(value),
+        with {:ok, current_record} <- decode_record(value, current_agent.module),
              :ok <-
                Record.validate_ref(
                  current_record,
@@ -484,7 +484,7 @@ defmodule Jido.Persistence do
         end
 
       {:ok, expected_value, condition} ->
-        with {:ok, current} <- Record.decode(expected_value),
+        with {:ok, current} <- decode_record(expected_value, agent_module),
              :ok <-
                Record.validate_for_identity(
                  current,
@@ -522,6 +522,12 @@ defmodule Jido.Persistence do
       {:error, _reason} = error ->
         error
     end
+  end
+
+  defp decode_record(value, agent_module) do
+    # Only the caller-supplied module can provide atoms before safe decoding.
+    _ = Code.ensure_loaded?(agent_module)
+    Record.decode(value)
   end
 
   defp read_for_delete(config, key) do

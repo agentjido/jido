@@ -87,9 +87,12 @@ across BEAM nodes. Persistence decodes a stored record with
 not already loaded. The two-BEAM
 [checkpoint test](../test/jido/persistence/cross_beam_atom_test.exs) saves a
 new atom on one node and gets `:invalid_persistence_record` on the other; the
-same value as a string loads. Use stable strings for data that can introduce
-new names, or preload a fixed atom set on every loading node. Do not depend on
-unrestricted atom portability.
+same value as a string loads. Jido loads the caller-supplied Agent module
+before it decodes a record. The application must load other trusted modules
+that define fixed atoms in saved state. Jido does not select modules from
+stored bytes. Use stable strings for data that can introduce new names. A
+custom Agent checkpoint or Plugin Persistence facet can convert that data at
+its state boundary. Do not depend on unrestricted atom portability.
 
 Use stable identifiers and portable configuration. Rebuild runtime resources
 in a Plugin runtime or in application supervision after restore.
