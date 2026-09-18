@@ -59,6 +59,17 @@ defmodule Jido.AgentServer.PendingJobRecoveryTest do
       kill(target)
       assert_receive {:DOWN, ^task_ref, :process, ^task, _reason}, 1_000
       server = if @loss == :agent, do: start_agent(c, :required), else: server
+
+      if @loss == :plugin do
+        eventually(
+          fn ->
+            replacement = Server.children(server)[{:plugin, Jobs}].pid
+            is_pid(replacement) and replacement != target and Process.alive?(replacement)
+          end,
+          timeout: 5_000
+        )
+      end
+
       assert Server.agent(server).state.status == :running
       assert Server.agent(server).state.approved?
       second_task = hold_attempt(server, :retry_job, "attempt-2")

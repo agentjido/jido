@@ -175,6 +175,12 @@ defmodule Jido.Topology.ControllerBoundaryTest do
 
     eventually(fn -> is_pid(runtime(controller)) and runtime(controller) != before end)
     eventually(fn -> not Process.alive?(old) end)
+
+    eventually(
+      fn -> match?({:ok, ^instance, 2, ^placements, nil}, TargetStore.load(jido, instance)) end,
+      timeout: 5_000
+    )
+
     assert {:ok, ^instance, 2, ^placements, nil} = TargetStore.load(jido, instance)
     assert Controller.agent_node(controller, :worker) == @offline
   end
