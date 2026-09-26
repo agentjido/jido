@@ -60,20 +60,30 @@ defmodule Jido.Agent.SchemaTest do
   defmodule PlainAgent do
     @moduledoc false
 
-    use Jido.Agent,
-      name: "schema_contract_plain",
-      schema: Bounds.schema(),
-      routes: [{"counter.add", JidoTest.AgentFixtures.Add}]
+    use Jido.Agent, name: "schema_contract_plain"
+
+    agent do
+      schema Bounds.schema()
+    end
+
+    routes do
+      route "counter.add", JidoTest.AgentFixtures.Add
+    end
   end
 
   defmodule PluginAgent do
     @moduledoc false
 
-    use Jido.Agent,
-      name: "schema_contract_plugin",
-      schema: Bounds.schema(),
-      plugins: [OwnedState],
-      routes: [{"counter.add", JidoTest.AgentFixtures.Add}]
+    use Jido.Agent, name: "schema_contract_plugin"
+
+    agent do
+      schema Bounds.schema()
+      plugin OwnedState
+    end
+
+    routes do
+      route "counter.add", JidoTest.AgentFixtures.Add
+    end
   end
 
   test "composition preserves required Plugin fields and the root rule" do

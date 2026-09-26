@@ -65,9 +65,12 @@ end
 defmodule JidoTest.Authoring.Topology.Fixtures.FaultWorker do
   alias JidoTest.Authoring.Topology.Fixtures
 
-  use Jido.Agent,
-    name: "authoring_fault_worker",
-    plugins: [Fixtures.InboxPackage, Fixtures.FaultPackage]
+  use Jido.Agent, name: "authoring_fault_worker"
+
+  agent do
+    plugin Fixtures.InboxPackage
+    plugin Fixtures.FaultPackage
+  end
 end
 
 # Each source definition is valid. Only planning invokes the faulty facet.

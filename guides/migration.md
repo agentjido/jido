@@ -112,6 +112,11 @@ end
 agent = MyApp.Counter.new(id: "counter-1")
 ```
 
+V3 module options contain only `name`, `description`, `vsn`, and `extensions`.
+Move schema, metadata, and Plugin declarations into `agent do`. Move route
+entries into `routes do`. Direct `Jido.Agent.new/1` definitions still accept
+maps and keyword lists.
+
 ### What you need to change
 
 Use a static data schema. Module `new/1` now returns a tagged result. Use

@@ -26,7 +26,11 @@ defmodule JidoTest.PersistenceTest do
   end
 
   defmodule CheckpointAgent do
-    use Jido.Agent, name: "checkpoint_contract", schema: Zoi.object(%{reply: Zoi.any()})
+    use Jido.Agent, name: "checkpoint_contract"
+
+    agent do
+      schema Zoi.object(%{reply: Zoi.any()})
+    end
 
     @impl true
     def checkpoint(agent, _context), do: agent.state.reply

@@ -14,9 +14,14 @@ defmodule JidoTest.AgentServer.ExecutionContextTest do
   end
 
   defmodule Reader do
-    use Jido.Agent,
-      name: "execution_context_reader",
-      routes: [{"context.read", ReadContext}]
+    use Jido.Agent, name: "execution_context_reader"
+
+    agent do
+    end
+
+    routes do
+      route "context.read", ReadContext
+    end
   end
 
   test "a live Turn overrides caller jido and partition while a direct command keeps them", %{

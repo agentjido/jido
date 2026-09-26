@@ -38,21 +38,22 @@ defmodule JidoTest.ScheduledOccurrenceFixtures.FastRuntimeAgent do
 
   alias JidoTest.AgentRuntimeFixtures.{Record, ReturnDirective, Tick}
 
-  use Jido.Agent,
-    name: "fast_runtime_agent",
-    schema:
-      Zoi.object(%{
-        events: Zoi.list(Zoi.any()) |> Zoi.default([]),
-        ticks: Zoi.integer() |> Zoi.default(0)
-      }),
-    routes: [
-      {"runtime.directive", ReturnDirective},
-      {"runtime.record", Record},
-      {"cron.tick", Tick}
-    ],
-    plugins: [
-      {Jido.Plugin.Scheduler, time_scale: JidoTest.ScheduledOccurrenceFixtures.Clock}
-    ]
+  use Jido.Agent, name: "fast_runtime_agent"
+
+  agent do
+    schema Zoi.object(%{
+             events: Zoi.list(Zoi.any()) |> Zoi.default([]),
+             ticks: Zoi.integer() |> Zoi.default(0)
+           })
+
+    plugin Jido.Plugin.Scheduler, config: [time_scale: JidoTest.ScheduledOccurrenceFixtures.Clock]
+  end
+
+  routes do
+    route "runtime.directive", ReturnDirective
+    route "runtime.record", Record
+    route "cron.tick", Tick
+  end
 end
 
 defmodule JidoTest.ScheduledOccurrenceFixtures.TimedAgent do

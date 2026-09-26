@@ -6,18 +6,20 @@ defmodule Jido.AgentServer.FailureContractTest do
   alias JidoTest.AgentFixtures
 
   defmodule Agent do
-    use Jido.Agent,
-      name: "server_failure_contract",
-      schema:
-        Zoi.object(%{
-          count: Zoi.integer() |> Zoi.default(0),
-          history: Zoi.list(Zoi.string()) |> Zoi.default([])
-        }),
-      routes: [
-        {"counter.add", AgentFixtures.Add},
-        {"counter.block", AgentFixtures.BlockingAdd},
-        {"counter.fail", AgentFixtures.Fail}
-      ]
+    use Jido.Agent, name: "server_failure_contract"
+
+    agent do
+      schema Zoi.object(%{
+               count: Zoi.integer() |> Zoi.default(0),
+               history: Zoi.list(Zoi.string()) |> Zoi.default([])
+             })
+    end
+
+    routes do
+      route "counter.add", AgentFixtures.Add
+      route "counter.block", AgentFixtures.BlockingAdd
+      route "counter.fail", AgentFixtures.Fail
+    end
   end
 
   defmodule ControlledStorage do

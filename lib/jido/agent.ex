@@ -59,7 +59,7 @@ defmodule Jido.Agent do
   Flow when one Signal must run several operations. Route defaults must be
   plain maps, including defaults supplied in a target tuple.
 
-  An Agent module can use keyword configuration or declarative blocks:
+  An Agent module declares schema, metadata, Plugins, and routes in DSL blocks:
 
       defmodule MyApp.Counter do
         use Jido.Agent, name: "counter"
@@ -87,7 +87,9 @@ defmodule Jido.Agent do
 
   Exposed routes must be exact and have no match predicate. Routes without
   `as:` keep normal wildcard and predicate support and generate no helpers.
-  A field cannot appear in both keyword and block configuration.
+  `use Jido.Agent` accepts only `:name`, `:description`, `:vsn`, and
+  `:extensions`. Module definitions are validated at compilation. Direct
+  `new/1` construction still accepts a map or keyword list of definition fields.
 
   Read name, description, routes, Plugins, and metadata from `definition/0`.
   Modules expose `domain_schema/0` for the authored schema and

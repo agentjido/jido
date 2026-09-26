@@ -14,10 +14,15 @@ defmodule JidoTest.AgentServer.RuntimeCheckpointTest do
   end
 
   defmodule Counter do
-    use Jido.Agent,
-      name: "runtime_checkpoint_counter",
-      schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}),
-      routes: [{"checkpoint.increment", Increment}]
+    use Jido.Agent, name: "runtime_checkpoint_counter"
+
+    agent do
+      schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+    end
+
+    routes do
+      route "checkpoint.increment", Increment
+    end
   end
 
   test "a committed Agent cannot restart from initial state while its store is unavailable", %{

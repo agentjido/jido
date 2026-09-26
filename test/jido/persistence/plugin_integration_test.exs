@@ -62,11 +62,12 @@ defmodule JidoTest.Persistence.PluginIntegrationTest do
   end
 
   defmodule CustomCheckpointAgent do
-    use Jido.Agent,
-      name: "persistence_custom_checkpoint",
-      vsn: 2,
-      schema: Zoi.object(%{value: Zoi.integer() |> Zoi.default(0)}),
-      plugins: [{Package, prefix: "sealed:"}]
+    use Jido.Agent, name: "persistence_custom_checkpoint", vsn: 2
+
+    agent do
+      schema Zoi.object(%{value: Zoi.integer() |> Zoi.default(0)})
+      plugin Package, config: [prefix: "sealed:"]
+    end
 
     @impl Jido.Agent
     def checkpoint(agent, _context), do: {:ok, %{id: agent.id, complete: agent.state}}

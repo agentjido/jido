@@ -9,17 +9,19 @@ defmodule Jido.Agent.VersioningTest do
   end
 
   defmodule VersionedAgent do
-    use Jido.Agent,
-      name: "versioned_agent",
-      vsn: 3,
-      schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+    use Jido.Agent, name: "versioned_agent", vsn: 3
+
+    agent do
+      schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+    end
   end
 
   defmodule CustomCheckpointAgent do
-    use Jido.Agent,
-      name: "custom_checkpoint_version_agent",
-      vsn: 4,
-      schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+    use Jido.Agent, name: "custom_checkpoint_version_agent", vsn: 4
+
+    agent do
+      schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+    end
 
     @impl Jido.Agent
     def checkpoint(agent, _context), do: {:ok, %{id: agent.id, state: agent.state}}

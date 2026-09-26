@@ -22,36 +22,33 @@ defmodule Jido.AgentTest do
   defmodule AuthoredAgent do
     @moduledoc false
 
-    use Jido.Agent,
-      name: "authored_agent",
-      description: "Exercises the generated Agent API",
-      schema:
-        Zoi.object(%{
-          count: Zoi.integer() |> Zoi.default(0),
-          history: Zoi.list(Zoi.string()) |> Zoi.default([])
-        }),
-      routes: [{"counter.add", JidoTest.AgentFixtures.Add}],
-      metadata: %{category: "test", tags: ["agent", "immutable"], vsn: "1.0.0"}
-  end
+    use Jido.Agent, name: "authored_agent", description: "Exercises the generated Agent API"
 
-  defmodule InvalidRouteAgent do
-    @moduledoc false
+    agent do
+      schema Zoi.object(%{
+               count: Zoi.integer() |> Zoi.default(0),
+               history: Zoi.list(Zoi.string()) |> Zoi.default([])
+             })
 
-    use Jido.Agent,
-      name: "invalid_route_agent",
-      routes: [{"invalid.route", String}]
+      metadata %{category: "test", tags: ["agent", "immutable"], vsn: "1.0.0"}
+    end
+
+    routes do
+      route "counter.add", JidoTest.AgentFixtures.Add
+    end
   end
 
   defmodule CustomRoutingAgent do
     @moduledoc false
 
-    use Jido.Agent,
-      name: "custom_routing_agent",
-      schema:
-        Zoi.object(%{
-          count: Zoi.integer() |> Zoi.default(0),
-          history: Zoi.list(Zoi.string()) |> Zoi.default([])
-        })
+    use Jido.Agent, name: "custom_routing_agent"
+
+    agent do
+      schema Zoi.object(%{
+               count: Zoi.integer() |> Zoi.default(0),
+               history: Zoi.list(Zoi.string()) |> Zoi.default([])
+             })
+    end
 
     @impl Jido.Agent
     def handle_signal(%Jido.Signal{type: "custom.add", data: data}, _agent) do
@@ -97,13 +94,14 @@ defmodule Jido.AgentTest do
   defmodule CallbackPersistenceAgent do
     @moduledoc false
 
-    use Jido.Agent,
-      name: "callback_persistence_agent",
-      schema:
-        Zoi.object(%{
-          count: Zoi.integer() |> Zoi.default(0),
-          history: Zoi.list(Zoi.string()) |> Zoi.default([])
-        })
+    use Jido.Agent, name: "callback_persistence_agent"
+
+    agent do
+      schema Zoi.object(%{
+               count: Zoi.integer() |> Zoi.default(0),
+               history: Zoi.list(Zoi.string()) |> Zoi.default([])
+             })
+    end
 
     @impl Jido.Agent
     def checkpoint(agent, context) do
@@ -434,11 +432,6 @@ defmodule Jido.AgentTest do
       assert {:error,
               %Jido.Error.ValidationError{message: "Agent schema must contain static data"}} =
                Agent.new(name: "lazy_schema_agent", schema: lazy_schema)
-    end
-
-    test "validates module-authored route targets before instantiation" do
-      assert {:error, %Jido.Error.ValidationError{message: "Invalid Agent route executable"}} =
-               InvalidRouteAgent.new()
     end
   end
 

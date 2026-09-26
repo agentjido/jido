@@ -5,6 +5,16 @@ An Agent definition has `id: nil` and `state: nil`. Call `MyAgent.definition()` 
 `Jido.Agent.instantiate/2` to create an instance. The bang forms raise on error.
 Instance options contain only `:id` and `:state`.
 
+Use `use Jido.Agent` for `name`, `description`, `vsn`, and `extensions` only.
+Declare schema, metadata, and Plugins in `agent do`, and routes in `routes do`.
+Jido validates each module definition at compilation. For generated data,
+`Jido.Agent.new/1` accepts the complete definition as a map or keyword list.
+
+Read definition fields through `MyAgent.definition()`. Use `domain_schema/0`
+for the authored schema or `complete_schema/0` for the schema with Plugin state.
+Each route accepts one executable. Use a Flow for a sequence of Actions.
+Route defaults must be plain maps in both tuple and explicit option forms.
+
 Declare a static data schema. The complete state includes Plugin-owned
 keys. Unknown keys and invalid values fail validation. `Jido.Agent.set/2`
 merges domain attributes and validates the complete result. An Action returns

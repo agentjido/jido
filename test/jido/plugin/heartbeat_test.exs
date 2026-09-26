@@ -14,14 +14,18 @@ defmodule Jido.Plugin.HeartbeatTest do
   end
 
   defmodule HeartbeatAgent do
-    use Jido.Agent,
-      name: "plugin_heartbeat_agent",
-      schema: Zoi.object(%{heartbeats: Zoi.list(Zoi.any()) |> Zoi.default([])}),
-      routes: [{"plugin.heartbeat", RecordHeartbeat}],
-      plugins: [
-        {Heartbeat,
-         interval: 10, signal_type: "plugin.heartbeat", signal_data: %{source: :plugin}}
-      ]
+    use Jido.Agent, name: "plugin_heartbeat_agent"
+
+    agent do
+      schema Zoi.object(%{heartbeats: Zoi.list(Zoi.any()) |> Zoi.default([])})
+
+      plugin Heartbeat,
+        config: [interval: 10, signal_type: "plugin.heartbeat", signal_data: %{source: :plugin}]
+    end
+
+    routes do
+      route "plugin.heartbeat", RecordHeartbeat
+    end
   end
 
   test "a runtime-only Plugin can feed Signals into its Agent", %{jido: jido} do

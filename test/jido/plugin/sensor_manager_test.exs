@@ -75,14 +75,18 @@ defmodule Jido.Plugin.SensorManagerTest do
   end
 
   defmodule Agent do
-    use Jido.Agent,
-      name: "sensor_manager_agent",
-      schema: Zoi.object(%{readings: Zoi.list(Zoi.integer()) |> Zoi.default([])}),
-      routes: [
-        {"sensor.manage", ManageAction},
-        {"sensor.reading", ReadingAction}
-      ],
-      plugins: [{SensorManager, retry_delay_ms: 10}]
+    use Jido.Agent, name: "sensor_manager_agent"
+
+    agent do
+      schema Zoi.object(%{readings: Zoi.list(Zoi.integer()) |> Zoi.default([])})
+
+      plugin SensorManager, config: [retry_delay_ms: 10]
+    end
+
+    routes do
+      route "sensor.manage", ManageAction
+      route "sensor.reading", ReadingAction
+    end
   end
 
   test "reconciles desired sensors and restarts a failed sensor", %{jido: jido} do

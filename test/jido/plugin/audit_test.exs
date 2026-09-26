@@ -15,11 +15,17 @@ defmodule Jido.Plugin.AuditTest do
   end
 
   defmodule Agent do
-    use Jido.Agent,
-      name: "audit_plugin_agent",
-      schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}),
-      routes: [{"audit.record", RecordAction}],
-      plugins: [{Audit, max_entries: 2}]
+    use Jido.Agent, name: "audit_plugin_agent"
+
+    agent do
+      schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+
+      plugin Audit, config: [max_entries: 2]
+    end
+
+    routes do
+      route "audit.record", RecordAction
+    end
   end
 
   defmodule NonPortableAction do
@@ -33,11 +39,17 @@ defmodule Jido.Plugin.AuditTest do
   end
 
   defmodule NonPortableAgent do
-    use Jido.Agent,
-      name: "audit_plugin_non_portable_agent",
-      schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}),
-      routes: [{"audit.bad", NonPortableAction}],
-      plugins: [Audit]
+    use Jido.Agent, name: "audit_plugin_non_portable_agent"
+
+    agent do
+      schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+
+      plugin Audit
+    end
+
+    routes do
+      route "audit.bad", NonPortableAction
+    end
   end
 
   test "record preserves supplied fields, including an explicit nil ID" do

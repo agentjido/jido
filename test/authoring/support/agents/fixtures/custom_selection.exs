@@ -1,7 +1,9 @@
 defmodule JidoTest.Authoring.Agents.Fixtures.CustomSelection do
-  use Jido.Agent,
-    name: "authoring_custom_selection",
-    schema: Zoi.object(%{text: Zoi.string() |> Zoi.default("")})
+  use Jido.Agent, name: "authoring_custom_selection"
+
+  agent do
+    schema Zoi.object(%{text: Zoi.string() |> Zoi.default("")})
+  end
 
   @impl Jido.Agent
   def handle_signal(%Jido.Signal{type: "custom.write", data: %{text: text}}, _agent),

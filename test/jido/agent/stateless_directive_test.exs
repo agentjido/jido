@@ -69,11 +69,18 @@ defmodule Jido.Agent.StatelessDirectiveTest do
   end
 
   defmodule Agent do
-    use Jido.Agent,
-      name: "stateless_directive_agent",
-      schema: Zoi.object(%{value: Zoi.integer() |> Zoi.default(0)}),
-      routes: [{"effect.submit", Submit}, {"effect.result", Result}],
-      plugins: [Effects]
+    use Jido.Agent, name: "stateless_directive_agent"
+
+    agent do
+      schema Zoi.object(%{value: Zoi.integer() |> Zoi.default(0)})
+
+      plugin Effects
+    end
+
+    routes do
+      route "effect.submit", Submit
+      route "effect.result", Result
+    end
   end
 
   test "a handler without a Plugin process sends its result through another Turn", %{jido: jido} do

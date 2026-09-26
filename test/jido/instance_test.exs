@@ -11,9 +11,11 @@ defmodule JidoTest.InstanceTest do
   end
 
   defmodule RedisTestAgent do
-    use Jido.Agent,
-      name: "redis_test_agent",
-      schema: Zoi.object(%{counter: Zoi.integer() |> Zoi.default(0)})
+    use Jido.Agent, name: "redis_test_agent"
+
+    agent do
+      schema Zoi.object(%{counter: Zoi.integer() |> Zoi.default(0)})
+    end
   end
 
   defmodule RedisMock do

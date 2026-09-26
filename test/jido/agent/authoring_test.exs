@@ -162,18 +162,20 @@ defmodule JidoTest.Agent.AuthoringTest do
     end
   end
 
-  defmodule KeywordCounter do
-    use Jido.Agent,
-      name: "authoring_counter",
-      description: "All authoring forms",
-      vsn: 7,
-      schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}),
-      metadata: %{owner: :test, nested: {:tag, <<255>>}},
-      plugins: [{CountTurns, [initial: 0]}, {PassThrough, [label: :second]}],
-      routes: [
-        {"authoring.add", Add, defaults: %{amount: 1, flag: false}, priority: 10},
-        {"authoring.flow", Flow, defaults: %{amount: 2}, priority: -5}
-      ]
+  defmodule UnexposedCounter do
+    use Jido.Agent, name: "authoring_counter", description: "All authoring forms", vsn: 7
+
+    agent do
+      schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+      metadata %{owner: :test, nested: {:tag, <<255>>}}
+      plugin CountTurns, config: [initial: 0]
+      plugin PassThrough, config: [label: :second]
+    end
+
+    routes do
+      route "authoring.add", Add, defaults: %{amount: 1, flag: false}, priority: 10
+      route "authoring.flow", Flow, defaults: %{amount: 2}, priority: -5
+    end
   end
 
   defmodule InlineCounter do
@@ -204,16 +206,16 @@ defmodule JidoTest.Agent.AuthoringTest do
     defp add(count, amount, multiplier), do: count + amount * multiplier
   end
 
-  test "block and keyword declarations retain their own module identity" do
+  test "exposed and unexposed routes retain their own module identity" do
     block = Counter.definition()
-    keyword = KeywordCounter.definition()
+    unexposed = UnexposedCounter.definition()
 
     assert block.module == Counter
-    assert keyword.module == KeywordCounter
-    assert %{keyword | module: Counter} === block
+    assert unexposed.module == UnexposedCounter
+    assert %{unexposed | module: Counter} === block
     assert function_exported?(Counter, :add_signal, 1)
-    refute function_exported?(KeywordCounter, :add_signal, 1)
-    refute function_exported?(KeywordCounter, :add_signal, 2)
+    refute function_exported?(UnexposedCounter, :add_signal, 1)
+    refute function_exported?(UnexposedCounter, :add_signal, 2)
   end
 
   test "block metadata accepts mixed keys and rejects structs with a DSL error" do
@@ -653,8 +655,8 @@ defmodule JidoTest.Agent.AuthoringTest do
     assert error.line == 11
   end
 
-  test "compile diagnostics reject mixed fields, missing source and manual collisions" do
-    assert_raise CompileError, ~r/both keyword and block/, fn ->
+  test "compile diagnostics reject definition options, missing source and manual collisions" do
+    assert_raise CompileError, ~r/Unknown authoring fields/, fn ->
       compile_agent("route \"test.add\", Add", ", routes: []")
     end
 
@@ -674,6 +676,32 @@ defmodule JidoTest.Agent.AuthoringTest do
 
       assert error.file == "agent_dsl_fixture.ex"
       assert error.line == 10
+    end
+  end
+
+  test "module options accept only identity and extension settings" do
+    for option <- ["schema: Zoi.object(%{})", "metadata: %{}", "plugins: []", "routes: []"] do
+      for block <- ["", "agent do\nend"] do
+        error =
+          assert_raise CompileError, fn ->
+            compile_isolated("""
+            defmodule JidoTest.RemovedAgentOptions#{System.unique_integer([:positive])} do
+              use Jido.Agent, name: "removed_options", #{option}
+              #{block}
+            end
+            """)
+          end
+
+        assert error.description =~ "Unknown authoring fields"
+      end
+    end
+  end
+
+  test "invalid executable targets fail module verification" do
+    for target <- ["String", "[Add]", "[Add, Add]"] do
+      assert_raise CompileError, ~r/Invalid Agent route executable/, fn ->
+        compile_agent("route \"test.add\", #{target}")
+      end
     end
   end
 

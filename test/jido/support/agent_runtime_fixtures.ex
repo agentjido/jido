@@ -116,22 +116,25 @@ defmodule JidoTest.AgentRuntimeFixtures.RuntimeAgent do
 
   alias JidoTest.AgentRuntimeFixtures.{Record, ReturnDirective, Tick}
 
-  use Jido.Agent,
-    name: "runtime_agent",
-    schema:
-      Zoi.object(%{
-        events: Zoi.list(Zoi.any()) |> Zoi.default([]),
-        ticks: Zoi.integer() |> Zoi.default(0)
-      }),
-    routes: [
-      {"runtime.directive", ReturnDirective},
-      {"runtime.record", Record},
-      {"cron.tick", Tick},
-      {"jido.agent.child.started", Record},
-      {"jido.agent.child.exit", Record},
-      {"jido.agent.orphaned", Record}
-    ],
-    plugins: [Jido.Plugin.Scheduler]
+  use Jido.Agent, name: "runtime_agent"
+
+  agent do
+    schema Zoi.object(%{
+             events: Zoi.list(Zoi.any()) |> Zoi.default([]),
+             ticks: Zoi.integer() |> Zoi.default(0)
+           })
+
+    plugin Jido.Plugin.Scheduler
+  end
+
+  routes do
+    route "runtime.directive", ReturnDirective
+    route "runtime.record", Record
+    route "cron.tick", Tick
+    route "jido.agent.child.started", Record
+    route "jido.agent.child.exit", Record
+    route "jido.agent.orphaned", Record
+  end
 end
 
 defmodule JidoTest.AgentRuntimeFixtures.ChildAgent do
@@ -139,14 +142,17 @@ defmodule JidoTest.AgentRuntimeFixtures.ChildAgent do
 
   alias JidoTest.AgentRuntimeFixtures.{Record, RecordOrphan, ReplyToParent}
 
-  use Jido.Agent,
-    name: "runtime_child_agent",
-    schema: Zoi.object(%{events: Zoi.list(Zoi.any()) |> Zoi.default([])}),
-    routes: [
-      {"child.record", Record},
-      {"child.reply", ReplyToParent},
-      {"jido.agent.orphaned", RecordOrphan}
-    ]
+  use Jido.Agent, name: "runtime_child_agent"
+
+  agent do
+    schema Zoi.object(%{events: Zoi.list(Zoi.any()) |> Zoi.default([])})
+  end
+
+  routes do
+    route "child.record", Record
+    route "child.reply", ReplyToParent
+    route "jido.agent.orphaned", RecordOrphan
+  end
 end
 
 defmodule JidoTest.AgentRuntimeFixtures.PluginRuntimeAgent do
@@ -154,12 +160,15 @@ defmodule JidoTest.AgentRuntimeFixtures.PluginRuntimeAgent do
 
   alias JidoTest.AgentRuntimeFixtures.{BootPlugin, Record}
 
-  use Jido.Agent,
-    name: "plugin_runtime_agent",
-    schema:
-      Zoi.object(%{
-        events: Zoi.list(Zoi.any()) |> Zoi.default([])
-      }),
-    routes: [{"runtime.plugin.boot", Record}],
-    plugins: [BootPlugin]
+  use Jido.Agent, name: "plugin_runtime_agent"
+
+  agent do
+    schema Zoi.object(%{events: Zoi.list(Zoi.any()) |> Zoi.default([])})
+
+    plugin BootPlugin
+  end
+
+  routes do
+    route "runtime.plugin.boot", Record
+  end
 end

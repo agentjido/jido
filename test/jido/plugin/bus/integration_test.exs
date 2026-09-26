@@ -44,61 +44,83 @@ defmodule Jido.Plugin.Bus.IntegrationTest do
   end
 
   defmodule Agent do
-    use Jido.Agent,
-      name: "bus_plugin_agent",
-      schema: Zoi.object(%{values: Zoi.list(Zoi.integer()) |> Zoi.default([])}),
-      routes: [{"bus.input", RecordAction}],
-      plugins: [{Client, bus: :plugin_bus, path: "bus.**"}]
+    use Jido.Agent, name: "bus_plugin_agent"
+
+    agent do
+      schema Zoi.object(%{values: Zoi.list(Zoi.integer()) |> Zoi.default([])})
+
+      plugin Client, config: [bus: :plugin_bus, path: "bus.**"]
+    end
+
+    routes do
+      route "bus.input", RecordAction
+    end
   end
 
   defmodule DurableAgent do
-    use Jido.Agent,
-      name: "durable_bus_plugin_agent",
-      schema: Zoi.object(%{values: Zoi.list(Zoi.integer()) |> Zoi.default([])}),
-      routes: [
-        {"bus.input", RecordAction},
-        {"bus.retry", RetryAction}
-      ],
-      plugins: [
-        {Client,
-         bus: :plugin_bus,
-         path: "bus.**",
-         durable: "durable-bus-agent",
-         start_from: :origin,
-         retry_delay_ms: 10}
-      ]
+    use Jido.Agent, name: "durable_bus_plugin_agent"
+
+    agent do
+      schema Zoi.object(%{values: Zoi.list(Zoi.integer()) |> Zoi.default([])})
+
+      plugin Client,
+        config: [
+          bus: :plugin_bus,
+          path: "bus.**",
+          durable: "durable-bus-agent",
+          start_from: :origin,
+          retry_delay_ms: 10
+        ]
+    end
+
+    routes do
+      route "bus.input", RecordAction
+      route "bus.retry", RetryAction
+    end
   end
 
   defmodule DurableBlockingAgent do
-    use Jido.Agent,
-      name: "durable_blocking_bus_plugin_agent",
-      schema: Zoi.object(%{values: Zoi.list(Zoi.integer()) |> Zoi.default([])}),
-      routes: [{"bus.block", BlockingRecordAction}],
-      plugins: [
-        {Client,
-         bus: :plugin_bus,
-         path: "bus.**",
-         durable: "durable-bus-barrier",
-         start_from: :origin,
-         retry_delay_ms: 10}
-      ]
+    use Jido.Agent, name: "durable_blocking_bus_plugin_agent"
+
+    agent do
+      schema Zoi.object(%{values: Zoi.list(Zoi.integer()) |> Zoi.default([])})
+
+      plugin Client,
+        config: [
+          bus: :plugin_bus,
+          path: "bus.**",
+          durable: "durable-bus-barrier",
+          start_from: :origin,
+          retry_delay_ms: 10
+        ]
+    end
+
+    routes do
+      route "bus.block", BlockingRecordAction
+    end
   end
 
   defmodule ManagerAgent do
-    use Jido.Agent,
-      name: "bus_manager_agent",
-      plugins: [Manager]
+    use Jido.Agent, name: "bus_manager_agent"
+
+    agent do
+      plugin Manager
+    end
   end
 
   defmodule OwnedBusAgent do
-    use Jido.Agent,
-      name: "owned_bus_agent",
-      schema: Zoi.object(%{values: Zoi.list(Zoi.integer()) |> Zoi.default([])}),
-      routes: [{"bus.input", RecordAction}],
-      plugins: [
-        {Manager, name: :owned_plugin_bus},
-        {Client, bus: :owned_plugin_bus, path: "bus.**", retry_delay_ms: 10}
-      ]
+    use Jido.Agent, name: "owned_bus_agent"
+
+    agent do
+      schema Zoi.object(%{values: Zoi.list(Zoi.integer()) |> Zoi.default([])})
+
+      plugin Manager, config: [name: :owned_plugin_bus]
+      plugin Client, config: [bus: :owned_plugin_bus, path: "bus.**", retry_delay_ms: 10]
+    end
+
+    routes do
+      route "bus.input", RecordAction
+    end
   end
 
   test "casts normal Bus input into the Agent", %{jido: jido} do

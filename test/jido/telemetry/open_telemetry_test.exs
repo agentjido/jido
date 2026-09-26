@@ -26,11 +26,17 @@ defmodule JidoTest.Telemetry.OpenTelemetryTest do
   end
 
   defmodule NotifyAgent do
-    use Jido.Agent,
-      name: "traced_notification_agent",
-      schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}),
-      routes: [{"trace.add", Add}],
-      plugins: [NotifyPlugin]
+    use Jido.Agent, name: "traced_notification_agent"
+
+    agent do
+      schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+
+      plugin NotifyPlugin
+    end
+
+    routes do
+      route "trace.add", Add
+    end
   end
 
   setup do

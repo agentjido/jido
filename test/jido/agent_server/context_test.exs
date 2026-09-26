@@ -69,11 +69,17 @@ defmodule Jido.AgentServer.ContextTest do
   end
 
   defmodule Agent do
-    use Jido.Agent,
-      name: "server_context_agent",
-      schema: Zoi.object(%{value: Zoi.integer() |> Zoi.default(0)}),
-      routes: [{"context.input", Emit}],
-      plugins: [ContextPlugin]
+    use Jido.Agent, name: "server_context_agent"
+
+    agent do
+      schema Zoi.object(%{value: Zoi.integer() |> Zoi.default(0)})
+
+      plugin ContextPlugin
+    end
+
+    routes do
+      route "context.input", Emit
+    end
   end
 
   for failure <- [:exit, :timeout] do

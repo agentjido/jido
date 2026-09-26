@@ -14,7 +14,7 @@ defmodule JidoTest.Authoring.Agents.BoundariesTest do
 
   for {file, message} <- [
         {"missing_source", "signal_source is required for as:"},
-        {"duplicate_schema", "Fields declared in both keyword and block form"},
+        {"duplicate_schema", "Unknown authoring fields"},
         {"helper_collision", "Generated function conflicts with replace_signal/1"},
         {"plugin_conflict", "Plugin-owned Agent state key conflicts with the domain schema"}
       ] do
@@ -54,7 +54,7 @@ defmodule JidoTest.Authoring.Agents.BoundariesTest do
     end
   end
 
-  test "keyword authoring does not generate undeclared helpers" do
+  test "routes without as do not generate helpers" do
     Corpus.load!(:counter_keyword)
     module = Corpus.spec(:counter_keyword).attrs.module
     refute function_exported?(module, :add_signal, 1)

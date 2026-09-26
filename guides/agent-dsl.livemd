@@ -56,8 +56,10 @@ defmodule AgentDSL.Profile do
 end
 ```
 
-Each field has one source. Jido rejects a field that appears in both the
-`use Jido.Agent` options and its DSL block.
+Use `use Jido.Agent` only for `name`, `description`, `vsn`, and `extensions`.
+Declare schema, metadata, and Plugins in `agent do`; declare routes in
+`routes do`. Jido validates module definitions at compilation.
+Direct `Jido.Agent.new/1` definitions still accept maps and keyword lists.
 
 The DSL is declarative. It describes the Agent and generates its definition and
 interfaces. It does not start an Agent Server.

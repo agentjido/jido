@@ -11,14 +11,14 @@ defmodule Jido.Agent.TurnEvaluationTest do
   defmodule CustomRouteAgent do
     @moduledoc false
 
-    use Jido.Agent,
-      name: "turn_evaluation_custom_route",
-      schema:
-        Zoi.object(%{
-          count: Zoi.integer() |> Zoi.default(0),
-          history: Zoi.list(Zoi.string()) |> Zoi.default([])
-        }),
-      plugins: []
+    use Jido.Agent, name: "turn_evaluation_custom_route"
+
+    agent do
+      schema Zoi.object(%{
+               count: Zoi.integer() |> Zoi.default(0),
+               history: Zoi.list(Zoi.string()) |> Zoi.default([])
+             })
+    end
 
     @impl true
     def handle_signal(%Signal{} = signal, _agent) do
@@ -28,13 +28,14 @@ defmodule Jido.Agent.TurnEvaluationTest do
   end
 
   defmodule InvalidSourceAgent do
-    use Jido.Agent,
-      name: "turn_evaluation_invalid_source",
-      schema:
-        Zoi.object(%{
-          count: Zoi.integer() |> Zoi.default(0),
-          history: Zoi.list(Zoi.string()) |> Zoi.default([])
-        })
+    use Jido.Agent, name: "turn_evaluation_invalid_source"
+
+    agent do
+      schema Zoi.object(%{
+               count: Zoi.integer() |> Zoi.default(0),
+               history: Zoi.list(Zoi.string()) |> Zoi.default([])
+             })
+    end
 
     @impl true
     def handle_signal(%Signal{data: %{invalid_source: value}}, _agent) do

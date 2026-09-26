@@ -1,11 +1,12 @@
 defmodule JidoTest.Authoring.Topology.Fixtures.Worker do
-  use Jido.Agent,
-    name: "authoring_worker",
-    schema:
-      Zoi.object(%{
-        label: Zoi.string() |> Zoi.default("worker"),
-        value: Zoi.integer() |> Zoi.default(0)
-      })
+  use Jido.Agent, name: "authoring_worker"
+
+  agent do
+    schema Zoi.object(%{
+             label: Zoi.string() |> Zoi.default("worker"),
+             value: Zoi.integer() |> Zoi.default(0)
+           })
+  end
 end
 
 defmodule JidoTest.Authoring.Topology.Fixtures.SetValue do
@@ -33,10 +34,12 @@ defmodule JidoTest.Authoring.Topology.Fixtures.InboxPackage do
 end
 
 defmodule JidoTest.Authoring.Topology.Fixtures.PluginWorker do
-  use Jido.Agent,
-    name: "authoring_plugin_worker",
-    schema: Zoi.object(%{value: Zoi.integer() |> Zoi.default(0)}),
-    plugins: [JidoTest.Authoring.Topology.Fixtures.InboxPackage]
+  use Jido.Agent, name: "authoring_plugin_worker"
+
+  agent do
+    schema Zoi.object(%{value: Zoi.integer() |> Zoi.default(0)})
+    plugin JidoTest.Authoring.Topology.Fixtures.InboxPackage
+  end
 end
 
 defmodule JidoTest.Authoring.Topology.Fixtures.Role do

@@ -28,12 +28,15 @@ defmodule JidoTest.AgentServerRuntimeFixtures do
   end
 
   defmodule OwnedExecutionAgent do
-    use Jido.Agent,
-      name: "agent_owned_execution_agent",
-      routes: [
-        {"owned.action", OwnedExecutionAction},
-        {"owned.flow", OwnedExecutionFlow}
-      ]
+    use Jido.Agent, name: "agent_owned_execution_agent"
+
+    agent do
+    end
+
+    routes do
+      route "owned.action", OwnedExecutionAction
+      route "owned.flow", OwnedExecutionFlow
+    end
   end
 
   defmodule CountedDirective do
@@ -80,10 +83,15 @@ defmodule JidoTest.AgentServerRuntimeFixtures do
   end
 
   defmodule CountedDirectiveAgent do
-    use Jido.Agent,
-      name: "counted_directive_agent",
-      routes: [{"directive.count", ReturnCountedDirective}],
-      plugins: [CountedDirectivePlugin]
+    use Jido.Agent, name: "counted_directive_agent"
+
+    agent do
+      plugin CountedDirectivePlugin
+    end
+
+    routes do
+      route "directive.count", ReturnCountedDirective
+    end
   end
 
   defmodule SlowDirective do
@@ -143,10 +151,15 @@ defmodule JidoTest.AgentServerRuntimeFixtures do
   end
 
   defmodule SlowDirectiveAgent do
-    use Jido.Agent,
-      name: "slow_directive_agent",
-      routes: [{"directive.slow", ReturnSlowDirective}],
-      plugins: [SlowDirectivePlugin]
+    use Jido.Agent, name: "slow_directive_agent"
+
+    agent do
+      plugin SlowDirectivePlugin
+    end
+
+    routes do
+      route "directive.slow", ReturnSlowDirective
+    end
   end
 
   defmodule ReadinessRuntime do
@@ -187,9 +200,11 @@ defmodule JidoTest.AgentServerRuntimeFixtures do
   end
 
   defmodule ReadinessAgent do
-    use Jido.Agent,
-      name: "readiness_agent",
-      plugins: [ReadinessPlugin]
+    use Jido.Agent, name: "readiness_agent"
+
+    agent do
+      plugin ReadinessPlugin
+    end
   end
 
   defmodule GenerationRuntime do
@@ -243,9 +258,11 @@ defmodule JidoTest.AgentServerRuntimeFixtures do
   end
 
   defmodule GenerationAgent do
-    use Jido.Agent,
-      name: "generation_agent",
-      plugins: [GenerationPlugin]
+    use Jido.Agent, name: "generation_agent"
+
+    agent do
+      plugin GenerationPlugin
+    end
   end
 
   defmodule FreshRuntimeDirective do
@@ -343,9 +360,14 @@ defmodule JidoTest.AgentServerRuntimeFixtures do
   end
 
   defmodule FreshRuntimeAgent do
-    use Jido.Agent,
-      name: "fresh_runtime_agent",
-      routes: [{"runtime.fresh", ReturnFreshRuntimeDirective}],
-      plugins: [FreshRuntimePlugin]
+    use Jido.Agent, name: "fresh_runtime_agent"
+
+    agent do
+      plugin FreshRuntimePlugin
+    end
+
+    routes do
+      route "runtime.fresh", ReturnFreshRuntimeDirective
+    end
   end
 end

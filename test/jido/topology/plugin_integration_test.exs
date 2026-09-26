@@ -38,16 +38,21 @@ defmodule Jido.Topology.PluginIntegrationTest do
 
   defmodule Worker do
     @moduledoc false
-    use Jido.Agent,
-      name: "topology_plugin_worker",
-      plugins: [{BusPackage, prefix: "inbox_"}, {AuditPackage, prefix: "audit_"}]
+    use Jido.Agent, name: "topology_plugin_worker"
+
+    agent do
+      plugin BusPackage, config: [prefix: "inbox_"]
+      plugin AuditPackage, config: [prefix: "audit_"]
+    end
   end
 
   defmodule ConflictingWorker do
     @moduledoc false
-    use Jido.Agent,
-      name: "conflicting_topology_plugin_worker",
-      plugins: [{BusPackage, prefix: "unused_", fixed_bus: "events"}]
+    use Jido.Agent, name: "conflicting_topology_plugin_worker"
+
+    agent do
+      plugin BusPackage, config: [prefix: "unused_", fixed_bus: "events"]
+    end
   end
 
   defmodule OwnershipFacet do
@@ -78,9 +83,11 @@ defmodule Jido.Topology.PluginIntegrationTest do
 
   defmodule Parent do
     @moduledoc false
-    use Jido.Agent,
-      name: "topology_plugin_parent",
-      plugins: [{OwnershipPackage, child: "child"}]
+    use Jido.Agent, name: "topology_plugin_parent"
+
+    agent do
+      plugin OwnershipPackage, config: [child: "child"]
+    end
   end
 
   test "instantiation adds ordered Agent and group contributions without changing the definition" do

@@ -11,10 +11,15 @@ defmodule JidoTest.Agent.ReplacementTest do
   end
 
   defmodule Configured do
-    use Jido.Agent,
-      name: "agent_replacement_configured",
-      schema: Zoi.object(%{config: Zoi.map() |> Zoi.default(%{})}),
-      routes: [{"config.reset", Reset}]
+    use Jido.Agent, name: "agent_replacement_configured"
+
+    agent do
+      schema Zoi.object(%{config: Zoi.map() |> Zoi.default(%{})})
+    end
+
+    routes do
+      route "config.reset", Reset
+    end
   end
 
   test "set deep-merges while a complete Action candidate replaces a domain field", %{jido: jido} do

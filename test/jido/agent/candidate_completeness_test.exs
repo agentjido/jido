@@ -17,18 +17,20 @@ defmodule JidoTest.Agent.CandidateCompletenessTest do
   end
 
   defmodule Counter do
-    use Jido.Agent,
-      name: "candidate_completeness_counter",
-      schema:
-        Zoi.object(%{
-          count: Zoi.integer() |> Zoi.default(0),
-          history: Zoi.list(Zoi.string()) |> Zoi.default([]),
-          note: Zoi.string() |> Zoi.optional()
-        }),
-      routes: [
-        {"candidate.partial", Partial},
-        {"candidate.clear", ClearOptional}
-      ]
+    use Jido.Agent, name: "candidate_completeness_counter"
+
+    agent do
+      schema Zoi.object(%{
+               count: Zoi.integer() |> Zoi.default(0),
+               history: Zoi.list(Zoi.string()) |> Zoi.default([]),
+               note: Zoi.string() |> Zoi.optional()
+             })
+    end
+
+    routes do
+      route "candidate.partial", Partial
+      route "candidate.clear", ClearOptional
+    end
   end
 
   test "direct and live Turns reject a candidate that omits a defaulted field", %{jido: jido} do

@@ -32,23 +32,10 @@ defmodule Jido.Agent.DSL.Compiler do
       |> Extension.get_entities([:agent])
       |> Enum.split_with(&match?(%Jido.Agent.DSL.Plugin{}, &1))
 
-    fields = block_fields(dsl, routes, plugins, env)
-    overlap = Map.keys(fields) |> Enum.filter(&Map.has_key?(config, &1))
-
-    if overlap != [],
-      do: fail!(env, "Fields declared in both keyword and block form: #{inspect(overlap)}")
-
     config =
-      Map.merge(
-        %{
-          description: nil,
-          schema: Zoi.object(%{}),
-          metadata: %{},
-          routes: [],
-          plugins: []
-        },
-        Map.merge(config, fields)
-      )
+      config
+      |> Map.put_new(:description, nil)
+      |> Map.merge(block_fields(dsl, routes, plugins, env))
 
     config = unwrap!(Jido.Agent.Extension.lower(extensions, config, entities), env)
     config = Map.put_new(config, :vsn, 1)
@@ -61,7 +48,6 @@ defmodule Jido.Agent.DSL.Compiler do
       do: validate_lowered_routes!(routes, Map.get(config, :routes, []), env)
 
     generated = generate(routes, source, env)
-    block? = fields != %{} or source != nil or extensions != []
 
     quote do
       @doc false
@@ -69,9 +55,7 @@ defmodule Jido.Agent.DSL.Compiler do
 
       unquote_splicing(generated)
 
-      if unquote(block?) do
-        @after_verify {Jido.Agent.DSL.Compiler, :verify}
-      end
+      @after_verify {Jido.Agent.DSL.Compiler, :verify}
     end
   end
 
@@ -83,6 +67,7 @@ defmodule Jido.Agent.DSL.Compiler do
     if Module.get_attribute(env.module, :jido_agent_combined_extensions) do
       Map.take(config, [:name, :description, :extensions, :vsn])
     else
+      unwrap!(Authoring.keys(config, [:name, :description, :vsn, :extensions]), env)
       config
     end
   end
@@ -111,30 +96,15 @@ defmodule Jido.Agent.DSL.Compiler do
   end
 
   defp block_fields(dsl, routes, plugins, env) do
-    fields =
-      Enum.reduce([:schema, :metadata], %{}, fn key, acc ->
-        case Extension.fetch_opt(dsl, [:agent], key) do
-          {:ok, value} -> Map.put(acc, key, value)
-          :error -> acc
-        end
-      end)
-
-    fields =
-      if routes == [],
-        do: fields,
-        else: Map.put(fields, :routes, Enum.map(routes, &lower_route(&1, env)))
-
-    if plugins == [] do
-      fields
-    else
-      declarations =
+    %{
+      schema: Extension.get_opt(dsl, [:agent], :schema, Zoi.object(%{})),
+      metadata: Extension.get_opt(dsl, [:agent], :metadata, %{}),
+      routes: Enum.map(routes, &lower_route(&1, env)),
+      plugins:
         Enum.map(plugins, fn plugin ->
-          options = unwrap!(Authoring.options(plugin.config), env)
-          {plugin.module, options}
+          {plugin.module, unwrap!(Authoring.options(plugin.config), env)}
         end)
-
-      Map.put(fields, :plugins, declarations)
-    end
+    }
   end
 
   defp lower_route(route, env) do
@@ -189,6 +159,7 @@ defmodule Jido.Agent.DSL.Compiler do
 
   defp extension?(_module, _callback), do: false
 
+  defp unwrap!(:ok, _env), do: :ok
   defp unwrap!({:ok, value}, _env), do: value
   defp unwrap!({:error, error}, env), do: fail!(env, Exception.message(error))
 

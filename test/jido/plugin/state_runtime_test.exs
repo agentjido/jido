@@ -46,10 +46,15 @@ defmodule Jido.Plugin.StateRuntimeTest do
   end
 
   defmodule DataAgent do
-    use Jido.Agent,
-      name: "plugin_data_agent",
-      routes: [{"plugin.credits.spend", SpendCredits}],
-      plugins: [Credits]
+    use Jido.Agent, name: "plugin_data_agent"
+
+    agent do
+      plugin Credits
+    end
+
+    routes do
+      route "plugin.credits.spend", SpendCredits
+    end
   end
 
   test "state-only Plugins compose optional state into the Agent" do

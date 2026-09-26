@@ -121,14 +121,17 @@ defmodule Jido.Plugin.RuntimeTest do
   end
 
   defmodule RuntimeAgent do
-    use Agent,
-      name: "runtime_plugin_agent",
-      schema:
-        Zoi.object(%{
-          count: Zoi.integer() |> Zoi.default(0)
-        }),
-      routes: [{"counter.add", AddAction}],
-      plugins: [RuntimePlugin]
+    use Jido.Agent, name: "runtime_plugin_agent"
+
+    agent do
+      schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+
+      plugin RuntimePlugin
+    end
+
+    routes do
+      route "counter.add", AddAction
+    end
   end
 
   defmodule AgentHost do

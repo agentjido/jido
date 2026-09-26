@@ -16,10 +16,15 @@ end
 
 defmodule JidoTest.System.ControlledAgent do
   @moduledoc false
-  use Jido.Agent,
-    name: "system_controlled_agent",
-    schema: Zoi.object(%{value: Zoi.integer() |> Zoi.default(0)}),
-    routes: [{"system.work", JidoTest.System.ControlledWork}]
+  use Jido.Agent, name: "system_controlled_agent"
+
+  agent do
+    schema Zoi.object(%{value: Zoi.integer() |> Zoi.default(0)})
+  end
+
+  routes do
+    route "system.work", JidoTest.System.ControlledWork
+  end
 
   def signal(value, opts \\ []) do
     Jido.Signal.new!("system.work", Map.put(Map.new(opts), :value, value), source: "/system")

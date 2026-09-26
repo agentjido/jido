@@ -1,8 +1,10 @@
 defmodule Jido.Examples.Topology.InboxWorker do
   @moduledoc "An Agent whose Plugin declaration contributes its input Bus."
-  use Jido.Agent,
-    name: "topology_inbox_worker",
-    plugins: [{Jido.Examples.Topology.InboxPlugin, bus: "inbox"}]
+  use Jido.Agent, name: "topology_inbox_worker"
+
+  agent do
+    plugin Jido.Examples.Topology.InboxPlugin, config: [bus: "inbox"]
+  end
 
   agent do
     schema Zoi.object(%{total: Zoi.integer() |> Zoi.default(0)})
@@ -23,9 +25,11 @@ end
 
 defmodule Jido.Examples.Topology.InvalidInboxWorker do
   @moduledoc "An Agent whose Plugin contributes an invalid Bus resource key."
-  use Jido.Agent,
-    name: "topology_invalid_inbox_worker",
-    plugins: [{Jido.Examples.Topology.InboxPlugin, bus: nil}]
+  use Jido.Agent, name: "topology_invalid_inbox_worker"
+
+  agent do
+    plugin Jido.Examples.Topology.InboxPlugin, config: [bus: nil]
+  end
 
   agent do
     schema Zoi.object(%{})

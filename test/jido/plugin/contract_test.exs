@@ -318,65 +318,100 @@ defmodule Jido.Plugin.ContractTest do
   end
 
   defmodule InvalidStateAgent do
-    use Jido.Agent,
-      name: "invalid_state_agent",
-      schema: Zoi.object(%{trace: Zoi.list(Zoi.string()) |> Zoi.default([])}),
-      routes: [{"invalid.run", InvalidStateAction}]
+    use Jido.Agent, name: "invalid_state_agent"
+
+    agent do
+      schema Zoi.object(%{trace: Zoi.list(Zoi.string()) |> Zoi.default([])})
+    end
+
+    routes do
+      route "invalid.run", InvalidStateAction
+    end
   end
 
   defmodule DirectiveAgent do
-    use Jido.Agent,
-      name: "directive_agent",
-      routes: [{"directive.stop", ReturnStop}]
+    use Jido.Agent, name: "directive_agent"
+
+    agent do
+    end
+
+    routes do
+      route "directive.stop", ReturnStop
+    end
   end
 
   defmodule FailingAgent do
-    use Jido.Agent,
-      name: "failing_agent",
-      routes: [{"failure.run", FailingAction}]
+    use Jido.Agent, name: "failing_agent"
+
+    agent do
+    end
+
+    routes do
+      route "failure.run", FailingAction
+    end
   end
 
   defmodule OwnedStateAgent do
-    use Jido.Agent,
-      name: "owned_state_agent",
-      schema: Zoi.object(%{trace: Zoi.list(Zoi.string()) |> Zoi.default([])}),
-      routes: [{"owned.overwrite", OverwriteOwnedState}],
-      plugins: [OwnedStatePlugin]
+    use Jido.Agent, name: "owned_state_agent"
+
+    agent do
+      schema Zoi.object(%{trace: Zoi.list(Zoi.string()) |> Zoi.default([])})
+
+      plugin OwnedStatePlugin
+    end
+
+    routes do
+      route "owned.overwrite", OverwriteOwnedState
+    end
   end
 
   defmodule NilOwnedStateAgent do
-    use Jido.Agent,
-      name: "nil_owned_state_agent",
-      routes: [{"owned.delete_nil", DeleteNilOwnedState}],
-      plugins: [NilOwnedStatePlugin]
-  end
+    use Jido.Agent, name: "nil_owned_state_agent"
 
-  defmodule ConflictingStateAgent do
-    use Jido.Agent,
-      name: "conflicting_state_agent",
-      schema: Zoi.object(%{owned: Zoi.map()}),
-      plugins: [OwnedStatePlugin]
+    agent do
+      plugin NilOwnedStatePlugin
+    end
+
+    routes do
+      route "owned.delete_nil", DeleteNilOwnedState
+    end
   end
 
   defmodule ReplaceDirectiveTypeAgent do
-    use Jido.Agent,
-      name: "replace_directive_type_agent",
-      routes: [{"directive.replace", ReturnOwnedDirective}],
-      plugins: [ReplaceDirectiveTypePlugin]
+    use Jido.Agent, name: "replace_directive_type_agent"
+
+    agent do
+      plugin ReplaceDirectiveTypePlugin
+    end
+
+    routes do
+      route "directive.replace", ReturnOwnedDirective
+    end
   end
 
   defmodule DirectiveReducerAgent do
-    use Jido.Agent,
-      name: "directive_reducer_agent",
-      routes: [{"directive.reduce", ReturnMixedDirectives}],
-      plugins: [DirectiveReducerPlugin, ForeignDirectivePlugin]
+    use Jido.Agent, name: "directive_reducer_agent"
+
+    agent do
+      plugin DirectiveReducerPlugin
+      plugin ForeignDirectivePlugin
+    end
+
+    routes do
+      route "directive.reduce", ReturnMixedDirectives
+    end
   end
 
   defmodule NormalizingDirectiveAgent do
-    use Jido.Agent,
-      name: "normalizing_directive_agent",
-      routes: [{"directive.normalize", ReturnNormalizedDirective}],
-      plugins: [NormalizingDirectivePlugin]
+    use Jido.Agent, name: "normalizing_directive_agent"
+
+    agent do
+      plugin NormalizingDirectivePlugin
+    end
+
+    routes do
+      route "directive.normalize", ReturnNormalizedDirective
+    end
   end
 
   test "requires the use Jido.Plugin authoring boundary" do
@@ -603,6 +638,11 @@ defmodule Jido.Plugin.ContractTest do
     assert {:error, %Jido.Error.ValidationError{}} =
              OwnedStateAgent.new(state: %{owned: %{count: 0}, trace: [], extra: true})
 
-    assert_raise Jido.Error.ValidationError, fn -> ConflictingStateAgent.new!() end
+    assert {:error, %Jido.Error.ValidationError{}} =
+             Jido.Agent.new(
+               name: "conflicting_state_agent",
+               schema: Zoi.object(%{owned: Zoi.map()}),
+               plugins: [OwnedStatePlugin]
+             )
   end
 end

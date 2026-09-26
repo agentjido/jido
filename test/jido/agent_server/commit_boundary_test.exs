@@ -69,14 +69,18 @@ defmodule Jido.AgentServer.CommitBoundaryTest do
 
   defmodule Agent do
     @moduledoc false
-    use Jido.Agent,
-      name: "commit_boundary_agent",
-      schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}),
-      routes: [
-        {"commit.effects", CommitEffects},
-        {"commit.external_invalid", WriteThenReturnInvalidState}
-      ],
-      plugins: [Package]
+    use Jido.Agent, name: "commit_boundary_agent"
+
+    agent do
+      schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+
+      plugin Package
+    end
+
+    routes do
+      route "commit.effects", CommitEffects
+      route "commit.external_invalid", WriteThenReturnInvalidState
+    end
   end
 
   test "three Directives run in returned order after one complete commit", %{jido: jido} do

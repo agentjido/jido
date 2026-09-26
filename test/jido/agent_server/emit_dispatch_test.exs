@@ -40,14 +40,17 @@ defmodule Jido.AgentServer.EmitDispatchTest do
   end
 
   defmodule Agent do
-    use Jido.Agent,
-      name: "emit_dispatch_agent",
-      schema: Zoi.object(%{sends: Zoi.integer() |> Zoi.default(0)}),
-      routes: [
-        {"dispatch.bus", BusAction},
-        {"dispatch.send", SendAction},
-        {"dispatch.invalid", InvalidAction}
-      ]
+    use Jido.Agent, name: "emit_dispatch_agent"
+
+    agent do
+      schema Zoi.object(%{sends: Zoi.integer() |> Zoi.default(0)})
+    end
+
+    routes do
+      route "dispatch.bus", BusAction
+      route "dispatch.send", SendAction
+      route "dispatch.invalid", InvalidAction
+    end
   end
 
   test "reports the real post-commit dispatch result", %{jido: jido} do

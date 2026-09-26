@@ -76,15 +76,18 @@ end
 defmodule JidoTest.AgentFixtures.CounterAgent do
   @moduledoc false
 
-  use Jido.Agent,
-    name: "counter_agent",
-    description: "A module-authored Agent",
-    schema:
-      Zoi.object(%{
-        count: Zoi.integer() |> Zoi.default(0),
-        history: Zoi.list(Zoi.string()) |> Zoi.default([])
-      }),
-    routes: [{"counter.add", JidoTest.AgentFixtures.Add}]
+  use Jido.Agent, name: "counter_agent", description: "A module-authored Agent"
+
+  agent do
+    schema Zoi.object(%{
+             count: Zoi.integer() |> Zoi.default(0),
+             history: Zoi.list(Zoi.string()) |> Zoi.default([])
+           })
+  end
+
+  routes do
+    route "counter.add", JidoTest.AgentFixtures.Add
+  end
 end
 
 defmodule JidoTest.AgentFixtures.BlockingAdd do

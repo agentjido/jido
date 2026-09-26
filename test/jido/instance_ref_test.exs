@@ -19,17 +19,27 @@ defmodule JidoTest.InstanceRefTest do
   end
 
   defmodule Counter do
-    use Jido.Agent,
-      name: "instance_ref_counter",
-      schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}),
-      routes: [{"counter.add", Add}]
+    use Jido.Agent, name: "instance_ref_counter"
+
+    agent do
+      schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+    end
+
+    routes do
+      route "counter.add", Add
+    end
   end
 
   defmodule RenamedCounter do
-    use Jido.Agent,
-      name: "instance_ref_renamed_counter",
-      schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}),
-      routes: [{"counter.add", Add}]
+    use Jido.Agent, name: "instance_ref_renamed_counter"
+
+    agent do
+      schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+    end
+
+    routes do
+      route "counter.add", Add
+    end
   end
 
   defmodule BadConfigInstance do

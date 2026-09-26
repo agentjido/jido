@@ -339,12 +339,10 @@ defmodule JidoTest.Agent.AuthoringExtensionTest do
         compile_isolated(
           quote do
             defmodule unquote(module) do
-              use Jido.Agent,
-                name: "rewritten_route",
-                metadata: %{rewrite: unquote(rewrite)},
-                extensions: [RewriteRoutes]
+              use Jido.Agent, name: "rewritten_route", extensions: [RewriteRoutes]
 
               agent do
+                metadata %{rewrite: unquote(rewrite)}
               end
 
               routes do

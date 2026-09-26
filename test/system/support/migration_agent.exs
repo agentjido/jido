@@ -21,9 +21,14 @@ end
 
 defmodule JidoTest.System.MigrationAgent do
   @moduledoc false
-  use Jido.Agent,
-    name: "system_migration_agent",
-    schema: Zoi.object(%{value: Zoi.integer() |> Zoi.default(0)}),
-    plugins: [JidoTest.System.MigrationAgent.Plugin],
-    routes: [{"system.work", JidoTest.System.ControlledWork}]
+  use Jido.Agent, name: "system_migration_agent"
+
+  agent do
+    schema Zoi.object(%{value: Zoi.integer() |> Zoi.default(0)})
+    plugin JidoTest.System.MigrationAgent.Plugin
+  end
+
+  routes do
+    route "system.work", JidoTest.System.ControlledWork
+  end
 end
