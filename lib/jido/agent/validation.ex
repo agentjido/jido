@@ -198,8 +198,8 @@ defmodule Jido.Agent.Validation do
     with {:ok, overrides} <- normalize_attrs(overrides, :instance),
          :ok <- validate_instance_overrides(overrides),
          {:ok, id} <- instance_id(Map.get(overrides, :id)),
-         {:ok, state} <- initial_state(schema, Map.get(overrides, :state, %{})) do
-      validate_instance_data(%{definition | id: id, state: state}, schema)
+         {:ok, state} <- State.initialize(Map.get(overrides, :state, %{}), schema) do
+      {:ok, %{definition | id: id, state: state}}
     end
   end
 
@@ -207,17 +207,6 @@ defmodule Jido.Agent.Validation do
     with {:ok, id} <- validate_id(agent.id),
          {:ok, state} <- State.validate(agent.state, schema),
          do: {:ok, %{agent | id: id, state: state}}
-  end
-
-  defp initial_state(schema, state) when is_map(state) and not is_struct(state) do
-    schema
-    |> State.defaults_from_schema()
-    |> State.merge(state)
-    |> State.validate(schema)
-  end
-
-  defp initial_state(_schema, state) do
-    invalid("Agent instance state must be a map", %{state: state})
   end
 
   defp known_keys(attrs) do

@@ -12,13 +12,31 @@ defmodule Jido.Agent.State do
   @doc false
   def defaults_from_schema(%Zoi.Types.Map{fields: fields}) do
     Enum.reduce(fields, %{}, fn
-      {key, %Zoi.Types.Default{} = field_schema}, defaults ->
-        {:ok, value} = Zoi.parse(field_schema, nil)
+      {key, %Zoi.Types.Default{value: value}}, defaults ->
         Map.put(defaults, key, value)
 
       {_key, _field_schema}, defaults ->
         defaults
     end)
+  end
+
+  @doc false
+  def initialize(state, schema) when is_map(state) and not is_struct(state) do
+    initial = schema |> defaults_from_schema() |> merge(state)
+
+    with {:ok, normalized} <- validate(initial, schema) do
+      # Zoi can insert defaults without validating their inner schemas.
+      # Check newly inserted or coerced values, but do not parse unchanged state twice.
+      if normalized === initial, do: {:ok, normalized}, else: validate(normalized, schema)
+    end
+  end
+
+  def initialize(state, _schema) do
+    {:error,
+     Error.validation_error("Agent instance state must be a map",
+       kind: :config,
+       details: %{state: state}
+     )}
   end
 
   @spec validate_schema(term()) :: :ok | {:error, Error.ValidationError.t()}
@@ -65,11 +83,11 @@ defmodule Jido.Agent.State do
   def validate_candidate(state, %Zoi.Types.Map{} = schema)
       when is_map(state) and not is_struct(state) do
     missing_keys =
-      schema
-      |> defaults_from_schema()
-      |> Map.keys()
-      |> Enum.reject(&Map.has_key?(state, &1))
-      |> Enum.sort()
+      for {key, %Zoi.Types.Default{}} <- schema.fields,
+          not Map.has_key?(state, key),
+          do: key
+
+    missing_keys = Enum.sort(missing_keys)
 
     if missing_keys == [] do
       validate(state, schema)
