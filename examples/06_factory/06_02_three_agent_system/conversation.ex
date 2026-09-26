@@ -34,7 +34,7 @@ defmodule Jido.Examples.Factory.Conversation do
         Jido.Examples.Factory.Conversation.begin_request(input, context.agent_state)
       end
 
-      define :ask, args: [:request_id, :text]
+      define :ask
     end
 
     route "examples.factory.async.result" do

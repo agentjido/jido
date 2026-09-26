@@ -37,7 +37,12 @@ defmodule Jido.AgentServer.PendingJobVMRecoveryTest do
 
       assert {:ok, _} = peer_call(c.peer_a, Server, :call, [parent, command])
       child = peer_eventually(fn -> peer_call(c.peer_a, Server, :children, [parent])[:worker] end)
-      assert {:ok, _} = peer_call(c.peer_a, Agent, :request_job, [child.pid, "job-1", 4])
+
+      {:ok, route_signal_1} = Agent.request_job_signal(%{job_id: "job-1", value: 4})
+
+      assert {:ok, _} =
+               peer_call(c.peer_a, Jido.AgentServer, :call, [child.pid, route_signal_1])
+
       observer = peer_call(c.peer_a, Fixtures, :observer, [])
 
       assert {:ok, running} =
@@ -85,8 +90,10 @@ defmodule Jido.AgentServer.PendingJobVMRecoveryTest do
                state_version: revision
              }
 
+      {:ok, route_signal_2} = Agent.retry_job_signal(%{job_id: "job-1", attempt_id: "attempt-2"})
+
       assert {:ok, _} =
-               peer_call(target_peer, Agent, :retry_job, [restored, "job-1", "attempt-2"])
+               peer_call(target_peer, Jido.AgentServer, :call, [restored, route_signal_2])
 
       peer_eventually(fn ->
         peer_call(target_peer, Server, :agent, [restored]).state.status == :completed
@@ -96,10 +103,8 @@ defmodule Jido.AgentServer.PendingJobVMRecoveryTest do
       assert snapshot.agent.state.result == "8"
       assert snapshot.state_version == revision + 2
 
-      stale =
-        Agent.settle_attempt_signal!(
-          input: %{job_id: "attempt-1", status: :completed, result: "wrong"}
-        )
+      {:ok, stale} =
+        Agent.settle_attempt_signal(%{job_id: "attempt-1", status: :completed, result: "wrong"})
 
       assert {:error, _} = peer_call(target_peer, Server, :call, [restored, stale])
       assert peer_call(target_peer, Server, :snapshot, [restored]) == snapshot

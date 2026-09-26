@@ -25,7 +25,7 @@ defmodule JidoTest.Authoring.Agents.Fixtures.BlockCounter do
     route "counter.add", JidoTest.Authoring.Agents.Fixtures.Add do
       defaults %{amount: 1}
       priority 10
-      define :add, args: [{:optional, :amount}]
+      define :add
     end
 
     route "counter.*", JidoTest.Authoring.Agents.Fixtures.Add do

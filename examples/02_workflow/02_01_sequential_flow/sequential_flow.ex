@@ -13,7 +13,7 @@ defmodule Jido.Examples.SequentialFlow do
     signal_source "/workflow"
 
     route "workflow.sequential", Jido.Examples.SequentialFlow.Pipeline do
-      define :double_value, args: [:value, {:optional, :failure}]
+      define :double_value
     end
   end
 end

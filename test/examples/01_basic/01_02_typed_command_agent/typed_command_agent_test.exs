@@ -6,10 +6,14 @@ defmodule JidoTest.Examples.Basic.TypedCommandAgentTest do
   alias Jido.Examples.TypedCommandAgent, as: Agent
 
   test "route defaults and typed command input agree in direct and live execution", %{jido: jido} do
+    {:ok, command_signal_1} = Agent.patch_profile_signal(%{})
+    {:ok, command_signal_2} = Agent.patch_profile_signal(%{patch: %{name: " New "}})
+    {:ok, command_signal_3} = Agent.patch_profile_signal(%{patch: %{push: false}})
+
     cases = [
-      {Agent.patch_profile_signal!(), %{name: "Route default", email: true, push: true}},
-      {Agent.patch_profile_signal!(%{name: " New "}), %{name: "New", email: true, push: false}},
-      {Agent.patch_profile_signal!(%{push: false}), %{name: "Initial", email: true, push: false}}
+      {command_signal_1, %{name: "Route default", email: true, push: true}},
+      {command_signal_2, %{name: "New", email: true, push: false}},
+      {command_signal_3, %{name: "Initial", email: true, push: false}}
     ]
 
     for {command, expected_profile} <- cases do
@@ -37,7 +41,8 @@ defmodule JidoTest.Examples.Basic.TypedCommandAgentTest do
     before = Server.snapshot(server)
 
     for patch <- [%{push: "yes"}, %{unknown: true}, nil] do
-      command = Agent.patch_profile_signal!(patch)
+      {:ok, command} =
+        Agent.patch_profile_signal(%{patch: patch})
 
       assert {:error, %Jido.Action.Error.InvalidInputError{}} =
                Agent.cmd(before.agent, command)
@@ -46,7 +51,11 @@ defmodule JidoTest.Examples.Basic.TypedCommandAgentTest do
       assert Server.snapshot(server) == before
     end
 
-    assert {:ok, recovered} = Agent.patch_profile(server, %{name: "Valid"})
+    {:ok, route_signal_1} = Agent.patch_profile_signal(%{patch: %{name: "Valid"}})
+
+    assert {:ok, recovered} =
+             Jido.AgentServer.call(server, route_signal_1, [])
+
     assert recovered.state.profile.name == "Valid"
     assert Server.snapshot(server) == %{agent: recovered, state_version: 1}
   end
@@ -55,12 +64,18 @@ defmodule JidoTest.Examples.Basic.TypedCommandAgentTest do
     server = start_agent!(jido, Agent, error_policy: observe_errors())
     before = Server.snapshot(server)
 
+    {:ok, route_signal_2} = Agent.set_count_signal(%{count: 6})
+
     assert {:error, %ValidationError{message: "Agent state does not match its schema"}} =
-             Agent.set_count(server, 6)
+             Jido.AgentServer.call(server, route_signal_2, [])
 
     assert Server.snapshot(server) == before
 
-    assert {:ok, recovered} = Agent.set_count(server, 5)
+    {:ok, route_signal_3} = Agent.set_count_signal(%{count: 5})
+
+    assert {:ok, recovered} =
+             Jido.AgentServer.call(server, route_signal_3, [])
+
     assert recovered.state.count == 5
     assert Server.snapshot(server) == %{agent: recovered, state_version: 1}
   end

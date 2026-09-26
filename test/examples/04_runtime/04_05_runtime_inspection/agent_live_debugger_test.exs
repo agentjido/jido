@@ -36,7 +36,11 @@ defmodule JidoTest.Examples.Runtime.AgentLiveDebuggerTest do
 
   test "a snapshot uses public inspection and removes secrets", %{jido: jido} do
     agent = start_agent!(jido, AgentLiveDebugger, initial_state: %{secret_token: "secret"})
-    assert {:ok, _} = AgentLiveDebugger.record_result(agent, input: %{result: "done"})
+
+    {:ok, route_signal_1} = AgentLiveDebugger.record_result_signal(%{result: "done"})
+
+    assert {:ok, _} =
+             Jido.AgentServer.call(agent, route_signal_1, [])
 
     snapshot = AgentLiveDebugger.snapshot(agent)
     assert snapshot.agent_module == AgentLiveDebugger
@@ -54,7 +58,7 @@ defmodule JidoTest.Examples.Runtime.AgentLiveDebuggerTest do
       receive do
         :release -> :ok
       after
-        5_000 -> raise "inspection barrier was not released"
+        5000 -> raise "inspection barrier was not released"
       end
     end
 
@@ -62,13 +66,11 @@ defmodule JidoTest.Examples.Runtime.AgentLiveDebuggerTest do
 
     task =
       Task.async(fn ->
-        InspectionFixture.record_result(agent,
-          input: %{result: "later"},
-          context: %{inspection_barrier: barrier}
-        )
+        {:ok, route_signal_2} = InspectionFixture.record_result_signal(%{result: "later"})
+        Jido.AgentServer.call(agent, route_signal_2, context: %{inspection_barrier: barrier})
       end)
 
-    assert_receive {:inspection_waiting, worker}, 1_000
+    assert_receive {:inspection_waiting, worker}, 1000
     snapshot = AgentLiveDebugger.snapshot(agent)
     assert snapshot.state == %{status: "idle", result: ""}
     assert snapshot.state_version == 0

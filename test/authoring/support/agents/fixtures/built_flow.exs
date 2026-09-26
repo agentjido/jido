@@ -20,7 +20,7 @@ defmodule JidoTest.Authoring.Agents.Fixtures.BuiltFlow do
     signal_source "/authoring/built_flow"
 
     route "total.set", @flow do
-      define :set, args: [:value]
+      define :set
     end
   end
 end

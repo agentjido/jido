@@ -1,7 +1,6 @@
 # Route Interfaces
 
-This Livebook defines one exact route and uses the Signal and live-call helpers
-that Jido generates for it.
+This Livebook defines one exact route and uses its generated map-based Signal constructor.
 
 ## Install Jido
 
@@ -29,14 +28,14 @@ defmodule RouteInterfaces.Order do
   use Jido.Agent, name: "route_interfaces_order"
 
   agent do
-    schema Zoi.object(%{status: Zoi.enum([:open, :closed]) |> Zoi.default(:open)})
+    schema(Zoi.object(%{status: Zoi.enum([:open, :closed]) |> Zoi.default(:open)}))
   end
 
   routes do
-    signal_source "/guides/route-interfaces"
+    signal_source("/guides/route-interfaces")
 
     route "order.status.set", RouteInterfaces.SetStatus do
-      define :set_status, args: [:status]
+      define(:set_status)
     end
   end
 end
@@ -48,7 +47,7 @@ keeps one helper tied to one executable target.
 ## Construct A Signal
 
 ```elixir
-{:ok, signal} = RouteInterfaces.Order.set_status_signal(:closed)
+{:ok, signal} = RouteInterfaces.Order.set_status_signal(%{status: :closed})
 
 %{
   type: signal.type,
@@ -57,25 +56,23 @@ keeps one helper tied to one executable target.
 }
 ```
 
-The bang form, `set_status_signal!/1`, returns the Signal or raises a validation
-error.
+The constructor returns `{:ok, signal}` or `{:error, reason}`. It does not execute
+the command.
 
 ## Add Envelope And Input Data
 
 ```elixir
 {:ok, signal} =
-  RouteInterfaces.Order.set_status_signal(
-    :closed,
-    input: %{request_id: "req-1"},
-    signal: [subject: "order-7"]
+  RouteInterfaces.Order.set_status_signal(%{status: :closed, request_id: "req-1"},
+    subject: "order-7"
   )
 
 {signal.data.request_id, signal.subject}
 ```
 
-Do not provide the same input key both positionally and through `input:`.
+Input is one plain map. Envelope options cannot replace the Signal type or data.
 
-## Use The Live Helper
+## Call The Server
 
 ```elixir
 {:ok, _jido} = Jido.start()
@@ -87,17 +84,14 @@ Do not provide the same input key both positionally and through `input:`.
   )
 
 {:ok, committed} =
-  RouteInterfaces.Order.set_status(
-    order,
-    :closed,
-    context: %{actor: "reviewer"},
-    timeout: 5_000
-  )
+  with {:ok, signal} <- RouteInterfaces.Order.set_status_signal(%{status: :closed}) do
+    Jido.AgentServer.call(order, signal, context: %{actor: "reviewer"}, timeout: 5000)
+  end
 
 committed.state.status
 ```
 
-The live helper constructs the same Signal and calls `Jido.AgentServer.call/3`.
+Pass runtime context and the wait timeout to `Jido.AgentServer.call/3`.
 
 ## Stop The Example
 

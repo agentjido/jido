@@ -69,5 +69,8 @@ defmodule JidoTest.Examples.Basic.DirectiveAgentTest do
     assert Server.snapshot(server) == %{agent: committed, state_version: 1}
   end
 
-  defp change(count, batch), do: Agent.set_count_signal!(count, batch)
+  defp change(count, batch) do
+    {:ok, command_signal_1} = Agent.set_count_signal(%{count: count, batch: batch})
+    command_signal_1
+  end
 end

@@ -7,7 +7,13 @@ defmodule JidoTest.Examples.MultiAgent.CorrelatedRequestsTest do
 
   test "child work and its correlated result use separate parent commits", %{jido: jido} do
     parent = start_agent!(jido, CorrelatedRequests)
-    assert {:ok, pending} = CorrelatedRequests.request(parent, "request-1", 7)
+
+    {:ok, route_signal_1} =
+      CorrelatedRequests.request_signal(%{request_id: "request-1", value: 7})
+
+    assert {:ok, pending} =
+             Jido.AgentServer.call(parent, route_signal_1, [])
+
     assert pending.state.status == :waiting
     pending_version = Server.snapshot(parent).state_version
     assert pending_version == 1
@@ -21,10 +27,13 @@ defmodule JidoTest.Examples.MultiAgent.CorrelatedRequestsTest do
   test "wrong correlation and duplicate request IDs preserve the candidate" do
     agent = CorrelatedRequests.new!()
 
+    {:ok, command_signal_1} =
+      CorrelatedRequests.request_signal(%{request_id: "request-1", value: 7})
+
     assert {:ok, pending, [_spawn, _send]} =
              CorrelatedRequests.cmd(
                agent,
-               CorrelatedRequests.request_signal!("request-1", 7)
+               command_signal_1
              )
 
     for overrides <- [%{request_id: "old"}, %{tag: "wrong"}, %{job_id: "wrong"}] do
@@ -42,26 +51,34 @@ defmodule JidoTest.Examples.MultiAgent.CorrelatedRequestsTest do
       assert {:error, _} = CorrelatedRequests.cmd(pending, signal)
     end
 
+    {:ok, command_signal_2} =
+      CorrelatedRequests.request_signal(%{request_id: "request-1", value: 8})
+
     assert {:error, _} =
              CorrelatedRequests.cmd(
                pending,
-               CorrelatedRequests.request_signal!("request-1", 8)
+               command_signal_2
              )
   end
 
   test "cancellation returns explicit child-stop intent" do
     agent = CorrelatedRequests.new!()
 
+    {:ok, command_signal_3} =
+      CorrelatedRequests.request_signal(%{request_id: "request-1", value: 7})
+
     assert {:ok, pending, _directives} =
              CorrelatedRequests.cmd(
                agent,
-               CorrelatedRequests.request_signal!("request-1", 7)
+               command_signal_3
              )
+
+    {:ok, command_signal_4} = CorrelatedRequests.cancel_signal(%{request_id: "request-1"})
 
     assert {:ok, cancelled, [%Jido.Agent.Directive.StopChild{tag: "request-1"}]} =
              CorrelatedRequests.cmd(
                pending,
-               CorrelatedRequests.cancel_signal!("request-1")
+               command_signal_4
              )
 
     assert cancelled.state.status == :cancelled

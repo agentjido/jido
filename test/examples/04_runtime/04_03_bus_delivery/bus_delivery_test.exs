@@ -39,7 +39,7 @@ defmodule JidoTest.Examples.Runtime.BusDeliveryFixture do
         end
       end
 
-      define :record, args: [:value]
+      define :record
     end
   end
 end
@@ -56,18 +56,18 @@ defmodule JidoTest.Examples.Runtime.BusDeliveryTest do
     bus = start_supervised!({Bus, name: :example_commands, jido: jido})
     {:ok, agent} = Jido.start_agent(jido, observed(BusDeliveryFixture, :on_delivery))
 
-    assert {:ok, [_, _]} =
-             Bus.publish(bus, [
-               BusDeliveryFixture.record_signal!(1),
-               BusDeliveryFixture.record_signal!(2)
-             ])
+    {:ok, command_signal_1} = BusDeliveryFixture.record_signal(%{value: 1})
+    {:ok, command_signal_2} = BusDeliveryFixture.record_signal(%{value: 2})
 
-    assert_receive {:feature_work, first, %{value: 1}}, 1_000
+    assert {:ok, [_, _]} =
+             Bus.publish(bus, [command_signal_1, command_signal_2])
+
+    assert_receive {:feature_work, first, %{value: 1}}, 1000
     assert state(agent).values == []
     assert Server.snapshot(agent).state_version == 0
     refute_received {:feature_work, _, %{value: 2}}
     send(first, :release)
-    assert_receive {:feature_work, second, %{value: 2}}, 1_000
+    assert_receive {:feature_work, second, %{value: 2}}, 1000
     assert state(agent).values == [1]
     send(second, :release)
     eventually(fn -> state(agent).values == [1, 2] end)
@@ -80,19 +80,19 @@ defmodule JidoTest.Examples.Runtime.BusDeliveryTest do
     {:ok, agent} =
       Jido.start_agent(jido, observed(BusDeliveryFixture, :on_delivery), error_policy: :log_only)
 
-    assert {:ok, [_, _]} =
-             Bus.publish(bus, [
-               BusDeliveryFixture.record_signal!(3),
-               BusDeliveryFixture.record_signal!(4)
-             ])
+    {:ok, command_signal_3} = BusDeliveryFixture.record_signal(%{value: 3})
+    {:ok, command_signal_4} = BusDeliveryFixture.record_signal(%{value: 4})
 
-    assert_receive {:feature_work, first, %{value: 3}}, 1_000
+    assert {:ok, [_, _]} =
+             Bus.publish(bus, [command_signal_3, command_signal_4])
+
+    assert_receive {:feature_work, first, %{value: 3}}, 1000
     send(first, :fail)
-    assert_receive {:feature_work, retry, %{value: 3}}, 1_000
+    assert_receive {:feature_work, retry, %{value: 3}}, 1000
     assert state(agent).values == []
     assert Server.snapshot(agent).state_version == 0
     send(retry, :release)
-    assert_receive {:feature_work, next, %{value: 4}}, 1_000
+    assert_receive {:feature_work, next, %{value: 4}}, 1000
     send(next, :release)
     eventually(fn -> state(agent).values == [3, 4] end)
   end
@@ -102,14 +102,19 @@ defmodule JidoTest.Examples.Runtime.BusDeliveryTest do
   } do
     bus = start_supervised!({Bus, name: :example_commands, jido: jido})
     agent = start_agent!(jido, BusDelivery)
-    event = BusDelivery.record_signal!(7)
+    {:ok, event} = BusDelivery.record_signal(%{value: 7})
     assert {:ok, [_]} = Bus.publish(bus, [event])
-    eventually(fn -> state(agent).values == [7] end)
+    eventually(fn -> state(agent).values == ~c"\a" end)
     old = Server.children(agent)[{:plugin, Client}].pid
     Process.exit(old, :kill)
     eventually(fn -> Server.children(agent)[{:plugin, Client}].pid != old end)
-    assert {:ok, [_, _]} = Bus.publish(bus, [event, BusDelivery.record_signal!(9)])
-    eventually(fn -> state(agent).values == [7, 9] end)
+
+    {:ok, command_signal_5} = BusDelivery.record_signal(%{value: 9})
+
+    assert {:ok, [_, _]} =
+             Bus.publish(bus, [event, command_signal_5])
+
+    eventually(fn -> state(agent).values == ~c"\a\t" end)
     assert length(state(agent).seen) == 2
     # Duplicate acknowledgement is a successful unchanged-state Turn.
     assert Server.snapshot(agent).state_version >= 3
@@ -119,17 +124,16 @@ defmodule JidoTest.Examples.Runtime.BusDeliveryTest do
     bus = start_supervised!({Bus, name: :example_commands, jido: jido})
     agent = start_agent!(jido, BusDelivery)
 
+    {:ok, command_signal_6} = BusDelivery.record_signal(%{value: 5})
+
     assert {:ok, [_, _]} =
-             Bus.publish(bus, [
-               signal("unrelated.record", %{value: 100}),
-               BusDelivery.record_signal!(5)
-             ])
+             Bus.publish(bus, [signal("unrelated.record", %{value: 100}), command_signal_6])
 
     eventually(fn -> state(agent).values == [5] end)
     assert Server.snapshot(agent).state_version == 1
     runtime = Server.children(agent)[{:plugin, Client}].pid
     ref = Process.monitor(runtime)
     assert :ok = Jido.stop_agent(jido, agent)
-    assert_receive {:DOWN, ^ref, :process, ^runtime, _}, 1_000
+    assert_receive {:DOWN, ^ref, :process, ^runtime, _}, 1000
   end
 end

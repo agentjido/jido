@@ -37,7 +37,7 @@ defmodule Jido.Examples.DirectiveAgent do
          [%Record{label: "first"}, second, %Record{label: "third"}]}
       end
 
-      define :set_count, args: [:count, :batch]
+      define :set_count
     end
   end
 end

@@ -114,12 +114,12 @@ defmodule PluginRuntime.Agent do
   use Jido.Agent, name: "plugin_runtime_agent"
 
   agent do
-    schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
-    plugin PluginRuntime.Effects
+    schema(Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}))
+    plugin(PluginRuntime.Effects)
   end
 
   routes do
-    signal_source "/guides/plugin-runtime"
+    signal_source("/guides/plugin-runtime")
 
     route "runtime.record" do
       action %{label: label},
@@ -130,7 +130,7 @@ defmodule PluginRuntime.Agent do
         {:ok, %{context.agent_state | count: context.agent_state.count + 1}, [directive]}
       end
 
-      define :record, args: [:label]
+      define(:record)
     end
   end
 end
@@ -150,6 +150,7 @@ end
 :ok = Jido.AgentServer.await_ready(agent)
 
 settled_handler = {PluginRuntime.Effects, make_ref()}
+
 :ok =
   :telemetry.attach(
     settled_handler,
@@ -158,7 +159,10 @@ settled_handler = {PluginRuntime.Effects, make_ref()}
     self()
   )
 
-{:ok, committed} = PluginRuntime.Agent.record(agent, "first")
+{:ok, committed} =
+  with {:ok, signal} <- PluginRuntime.Agent.record_signal(%{label: "first"}) do
+    Jido.AgentServer.call(agent, signal, [])
+  end
 
 try do
   receive do

@@ -13,7 +13,15 @@ defmodule JidoTest.System.FileStorageTest do
 
   setup c do
     server = start_agent(c)
-    assert {:ok, _} = Server.call(server, Probe.record_and_deliver_signal!("saved", 7))
+
+    {:ok, command_signal_1} = Probe.record_and_deliver_signal(%{effect_id: "saved", value: 7})
+
+    assert {:ok, _} =
+             Server.call(
+               server,
+               command_signal_1
+             )
+
     completed(c, server, %{"saved" => 7})
     snapshot = Server.snapshot(server)
     {adapter, opts} = c.store
@@ -57,11 +65,13 @@ defmodule JidoTest.System.FileStorageTest do
   end
 
   test "a real temporary-file write failure stops the Agent and preserves its checkpoint", c do
-    File.chmod!(c.directory, 0o500)
+    File.chmod!(c.directory, 320)
 
     try do
       monitors = monitor_agent_tree(c, c.server)
-      signal = Probe.record_and_deliver_signal!("must-not-run", 99)
+
+      {:ok, signal} =
+        Probe.record_and_deliver_signal(%{effect_id: "must-not-run", value: 99})
 
       # File returns the OS error without a write-outcome classification.
       # Persistence treats that uncertainty as indeterminate and fences the Agent.
@@ -76,7 +86,7 @@ defmodule JidoTest.System.FileStorageTest do
       Observability.assert_turn(c.observer, signal, :error, false)
       Observability.assert_persistence(c.observer, :indeterminate)
     after
-      File.chmod!(c.directory, 0o700)
+      File.chmod!(c.directory, 448)
     end
 
     assert_restores(c)

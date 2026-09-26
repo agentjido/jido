@@ -18,7 +18,7 @@ defmodule Jido.Examples.Topology.InboxWorker do
         {:ok, %{context.agent_state | total: context.agent_state.total + value}}
       end
 
-      define :work, args: [:value]
+      define :work
     end
   end
 end

@@ -38,14 +38,22 @@ defmodule Jido.Examples.CorrelatedRequests do
                 seen: state.seen ++ [request_id]
             }
 
+            {:ok, command_signal_1} =
+              Jido.Examples.Worker.calculate_signal(%{
+                request_id: request_id,
+                job_id: request_id,
+                tag: request_id,
+                value: value
+              })
+
             directives = [
               Jido.Agent.Directive.spawn_child(Jido.Examples.Worker, request_id,
                 restart: :temporary,
-                opts: %{error_policy: :stop_on_error, exec_opts: [timeout: 1_000]}
+                opts: %{error_policy: :stop_on_error, exec_opts: [timeout: 1000]}
               ),
               Jido.Agent.Directive.emit_to_child(
                 request_id,
-                Jido.Examples.Worker.calculate_signal!(request_id, request_id, request_id, value)
+                command_signal_1
               )
             ]
 
@@ -53,7 +61,7 @@ defmodule Jido.Examples.CorrelatedRequests do
         end
       end
 
-      define :request, args: [:request_id, :value]
+      define :request
     end
 
     route "examples.multi_agent.requests.cancel" do
@@ -69,7 +77,7 @@ defmodule Jido.Examples.CorrelatedRequests do
         end
       end
 
-      define :cancel, args: [:request_id]
+      define :cancel
     end
 
     route "examples.multi_agent.worker.result" do

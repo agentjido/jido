@@ -90,7 +90,11 @@ defmodule Jido.Topology.ControllerTest do
     right = Controller.whereis_agent(controller, :right)
     assert Server.agent(left).state.label == "left"
     assert Server.agent(right).state.label == "right"
-    assert {:ok, _} = Cell.work(left, 3)
+
+    {:ok, route_signal_1} = Cell.work_signal(%{value: 3})
+
+    assert {:ok, _} =
+             Jido.AgentServer.call(left, route_signal_1, [])
 
     assert {:error, {:already_started, ^controller}} =
              Controller.start_link(jido: jido, topology: Independent.new!(id: "independent"))
@@ -282,7 +286,11 @@ defmodule Jido.Topology.ControllerTest do
     controller = start_supervised!({Controller, jido: jido, topology: instance})
     assert :ok = Controller.await_ready(controller)
     bus = Controller.whereis_bus(controller, :work)
-    assert {:ok, [_]} = Bus.publish(bus, [Cell.work_signal!(7)])
+
+    {:ok, command_signal_1} = Cell.work_signal(%{value: 7})
+
+    assert {:ok, [_]} =
+             Bus.publish(bus, [command_signal_1])
 
     for index <- 1..4 do
       worker = Controller.whereis_agent(controller, :workers, index)
@@ -305,12 +313,14 @@ defmodule Jido.Topology.ControllerTest do
     controller = start_supervised!({Controller, jido: jido, topology: instance})
     assert :ok = Controller.await_ready(controller)
 
-    for key <- [:a, :b],
-        do:
-          assert(
-            {:ok, [_]} =
-              Bus.publish(Controller.whereis_bus(controller, key), [Cell.work_signal!(2)])
-          )
+    for key <- [:a, :b] do
+      {:ok, command_signal_2} = Cell.work_signal(%{value: 2})
+
+      assert(
+        {:ok, [_]} =
+          Bus.publish(Controller.whereis_bus(controller, key), [command_signal_2])
+      )
+    end
 
     agent = Controller.whereis_agent(controller, :cell)
     eventually(fn -> Server.agent(agent).state.total == 4 end)
@@ -462,16 +472,27 @@ defmodule Jido.Topology.ControllerTest do
       |> Builder.build!(id: id, input: %{worker_count: 2})
 
     controller = start_supervised!({Controller, jido: PersistentJido, topology: instance})
-    assert :ok = Controller.await_ready(controller, 5_000)
-    assert {:ok, _} = Cell.work(Controller.whereis_agent(controller, :workers, 1), 12)
+    assert :ok = Controller.await_ready(controller, 5000)
+
+    {:ok, route_signal_2} = Cell.work_signal(%{value: 12})
+
+    assert {:ok, _} =
+             Jido.AgentServer.call(
+               Controller.whereis_agent(controller, :workers, 1),
+               route_signal_2,
+               []
+             )
+
     stop_supervised!({Controller, id})
     controller = start_supervised!({Controller, jido: PersistentJido, topology: instance})
-    assert :ok = Controller.await_ready(controller, 5_000)
+    assert :ok = Controller.await_ready(controller, 5000)
     worker = Controller.whereis_agent(controller, :workers, 1)
     assert Server.agent(worker).state.total == 12
 
+    {:ok, command_signal_3} = Cell.work_signal(%{value: 5})
+
     assert {:ok, [_]} =
-             Bus.publish(Controller.whereis_bus(controller, :work), [Cell.work_signal!(5)])
+             Bus.publish(Controller.whereis_bus(controller, :work), [command_signal_3])
 
     eventually(fn -> Server.agent(worker).state.total == 17 end)
     Process.exit(worker, :kill)
@@ -481,10 +502,10 @@ defmodule Jido.Topology.ControllerTest do
         current = Controller.whereis_agent(controller, :workers, 1)
         is_pid(current) and current != worker and Server.agent(current).state.total == 17
       end,
-      timeout: 5_000
+      timeout: 5000
     )
 
-    assert :ok = Controller.await_ready(controller, 5_000)
+    assert :ok = Controller.await_ready(controller, 5000)
   end
 
   test "repairs a Bus and its subscriptions after a Bus failure", %{jido: jido} do
@@ -503,11 +524,13 @@ defmodule Jido.Topology.ControllerTest do
         current = Controller.whereis_bus(controller, :work)
         is_pid(current) and current != bus and Controller.status(controller).status == :ready
       end,
-      timeout: 5_000
+      timeout: 5000
     )
 
+    {:ok, command_signal_4} = Cell.work_signal(%{value: 5})
+
     assert {:ok, [_]} =
-             Bus.publish(Controller.whereis_bus(controller, :work), [Cell.work_signal!(5)])
+             Bus.publish(Controller.whereis_bus(controller, :work), [command_signal_4])
 
     eventually(fn ->
       Server.agent(Controller.whereis_agent(controller, :workers, 1)).state.total == 5
@@ -519,7 +542,11 @@ defmodule Jido.Topology.ControllerTest do
     controller = start_supervised!({Controller, jido: jido, topology: instance})
     assert :ok = Controller.await_ready(controller)
     left = Controller.whereis_agent(controller, :left)
-    assert {:ok, _} = Cell.work(left, 9)
+
+    {:ok, route_signal_3} = Cell.work_signal(%{value: 9})
+
+    assert {:ok, _} =
+             Jido.AgentServer.call(left, route_signal_3, [])
 
     {_, runtime, _, _} =
       Enum.find(

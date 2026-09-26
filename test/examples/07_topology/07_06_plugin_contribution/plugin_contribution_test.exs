@@ -26,7 +26,12 @@ defmodule Jido.Examples.Topology.PluginContributionTest do
     bus = Controller.whereis_bus(controller, :inbox)
     assert is_pid(worker)
     assert is_pid(bus)
-    assert {:ok, [_record]} = Bus.publish(bus, [InboxWorker.work_signal!(5)])
+
+    {:ok, command_signal_1} = InboxWorker.work_signal(%{value: 5})
+
+    assert {:ok, [_record]} =
+             Bus.publish(bus, [command_signal_1])
+
     eventually(fn -> AgentServer.agent(worker).state.total == 5 end)
   end
 

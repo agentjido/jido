@@ -57,7 +57,7 @@ defmodule JidoTest.TelemetryAgent do
         {:ok, %{context.agent_state | value: value}}
       end
 
-      define :record, args: [:value]
+      define :record
     end
 
     route "test.telemetry.fail" do
@@ -76,7 +76,7 @@ defmodule JidoTest.TelemetryAgent do
         {:ok, %{context.agent_state | value: value}}
       end
 
-      define :hold, args: [:value]
+      define :hold
     end
 
     route "test.telemetry.missing_child" do
@@ -88,7 +88,7 @@ defmodule JidoTest.TelemetryAgent do
         {:ok, %{context.agent_state | value: value}, [directive]}
       end
 
-      define :send_to_missing_child, args: [:value]
+      define :send_to_missing_child
     end
 
     route "test.telemetry.deliver" do
@@ -99,7 +99,7 @@ defmodule JidoTest.TelemetryAgent do
         {:ok, %{context.agent_state | value: value}, [effect]}
       end
 
-      define :record_and_deliver, args: [:value]
+      define :record_and_deliver
     end
   end
 end

@@ -175,7 +175,12 @@ defmodule JidoTest.Examples.Factory.FlowFactoryTest do
     assert_eventually(length(FlowFactory.status(mission).events) == 2)
     before = FlowFactory.status(mission)
     assert {:error, _} = Server.call(mission, finished("different-mission", %{}))
-    assert {:error, _} = Mission.start(mission, "Another goal")
+
+    {:ok, route_signal_1} = Mission.start_signal(%{goal: "Another goal"})
+
+    assert {:error, _} =
+             Jido.AgentServer.call(mission, route_signal_1, [])
+
     assert FlowFactory.status(mission) == before
     assert {:ok, _} = FlowFactory.cancel(mission)
     assert_calls_stopped(monitor_calls(roots))
@@ -262,6 +267,7 @@ defmodule JidoTest.Examples.Factory.FlowFactoryTest do
   end
 
   defp release(workers, role), do: send(elem(workers[role], 0), :release)
+
   defp release_all(workers), do: Enum.each(workers, fn {role, _} -> release(workers, role) end)
 
   defp monitor_calls(workers),
@@ -309,6 +315,8 @@ defmodule JidoTest.Examples.Factory.FlowFactoryTest do
     do: Enum.all?(value, fn {key, item} -> portable?(key) and portable?(item) end)
 
   defp portable?(value) when is_list(value), do: Enum.all?(value, &portable?/1)
+
   defp portable?(value) when is_tuple(value), do: value |> Tuple.to_list() |> portable?()
+
   defp portable?(_), do: true
 end

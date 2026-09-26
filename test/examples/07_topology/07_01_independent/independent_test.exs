@@ -13,7 +13,12 @@ defmodule Jido.Examples.Topology.IndependentTest do
     assert :ok = Controller.await_ready(controller)
     left = Controller.whereis_agent(controller, :left)
     right = Controller.whereis_agent(controller, :right)
-    assert {:ok, _} = Cell.work(left, 4)
+
+    {:ok, route_signal_1} = Cell.work_signal(%{value: 4})
+
+    assert {:ok, _} =
+             Jido.AgentServer.call(left, route_signal_1, [])
+
     assert Jido.AgentServer.agent(left).state.total == 4
     assert Jido.AgentServer.agent(right).state.total == 0
   end
@@ -28,7 +33,12 @@ defmodule Jido.Examples.Topology.IndependentTest do
     assert :ok = Controller.await_ready(controller)
     left = Controller.whereis_agent(controller, :left)
     right = Controller.whereis_agent(controller, :right)
-    assert {:ok, _} = Cell.work(right, 7)
+
+    {:ok, route_signal_2} = Cell.work_signal(%{value: 7})
+
+    assert {:ok, _} =
+             Jido.AgentServer.call(right, route_signal_2, [])
+
     assert :ok = Jido.stop_agent(jido, left)
     assert %{status: :degraded, repair: :manual} = Controller.status(controller)
 
@@ -40,6 +50,10 @@ defmodule Jido.Examples.Topology.IndependentTest do
     assert is_pid(replacement) and replacement != left
     assert Controller.whereis_agent(controller, :right) == right
     assert Jido.AgentServer.agent(right).state.total == 7
-    assert {:ok, _} = Cell.work(replacement, 3)
+
+    {:ok, route_signal_3} = Cell.work_signal(%{value: 3})
+
+    assert {:ok, _} =
+             Jido.AgentServer.call(replacement, route_signal_3, [])
   end
 end

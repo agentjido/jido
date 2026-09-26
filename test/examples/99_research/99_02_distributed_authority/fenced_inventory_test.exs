@@ -19,14 +19,28 @@ defmodule JidoTest.Examples.FencedInventoryTest do
   test "replacement on a second node fences the old activation before Action work", c do
     token1 = peer_call(c.peer_a, Authority, :claim, [c.authority])
     assert {:ok, old} = start(c.peer_a, c, token1)
-    assert {:ok, _} = peer_call(c.peer_a, Example, :record, [old, 1])
+
+    {:ok, route_signal_1} = Example.record_signal(%{value: 1})
+
+    assert {:ok, _} =
+             peer_call(c.peer_a, Jido.AgentServer, :call, [old, route_signal_1])
+
     token2 = peer_call(c.peer_b, Authority, :claim, [c.authority])
     assert token2 > token1
     assert {:ok, replacement} = start(c.peer_b, c, token2)
     assert node(old) != node(replacement)
     assert peer_call(c.peer_b, Server, :snapshot, [replacement]).agent.state.value == 1
-    assert {:error, _} = peer_call(c.peer_a, Example, :record, [old, 99])
-    assert {:ok, _} = peer_call(c.peer_b, Example, :record, [replacement, 2])
+
+    {:ok, route_signal_2} = Example.record_signal(%{value: 99})
+
+    assert {:error, _} =
+             peer_call(c.peer_a, Jido.AgentServer, :call, [old, route_signal_2])
+
+    {:ok, route_signal_3} = Example.record_signal(%{value: 2})
+
+    assert {:ok, _} =
+             peer_call(c.peer_b, Jido.AgentServer, :call, [replacement, route_signal_3])
+
     assert peer_call(c.peer_a, Authority, :effects, [c.authority]) == [{token1, 1}, {token2, 2}]
     assert peer_call(c.peer_b, Server, :snapshot, [replacement]).agent.state.value == 2
   end
@@ -54,28 +68,58 @@ defmodule JidoTest.Examples.FencedInventoryTest do
   test "authority loss rejects work without executing the Action", c do
     token = peer_call(c.peer_a, Authority, :claim, [c.authority])
     assert {:ok, owner} = start(c.peer_b, c, token)
-    assert {:ok, _} = peer_call(c.peer_b, Example, :record, [owner, 1])
+
+    {:ok, route_signal_4} = Example.record_signal(%{value: 1})
+
+    assert {:ok, _} =
+             peer_call(c.peer_b, Jido.AgentServer, :call, [owner, route_signal_4])
+
     assert :ok = peer_call(c.peer_a, GenServer, :stop, [c.authority])
-    assert {:error, _} = peer_call(c.peer_b, Example, :record, [owner, 2])
+
+    {:ok, route_signal_5} = Example.record_signal(%{value: 2})
+
+    assert {:error, _} =
+             peer_call(c.peer_b, Jido.AgentServer, :call, [owner, route_signal_5])
+
     assert peer_call(c.peer_b, Server, :snapshot, [owner]).agent.state.value == 1
   end
 
   test "a disconnected old owner stays fenced after reconnection", c do
     token1 = peer_call(c.peer_a, Authority, :claim, [c.authority])
     assert {:ok, old} = start(c.peer_b, c, token1)
-    assert {:ok, _} = peer_call(c.peer_b, Example, :record, [old, 1])
+
+    {:ok, route_signal_6} = Example.record_signal(%{value: 1})
+
+    assert {:ok, _} =
+             peer_call(c.peer_b, Jido.AgentServer, :call, [old, route_signal_6])
+
     cookie = peer_call(c.peer_b, Node, :get_cookie, [])
     # Block automatic reconnection. The standard IO peer channel stays available.
     assert true = peer_call(c.peer_b, Node, :set_cookie, [c.node_a, :fenced_probe_disconnected])
     assert true = peer_call(c.peer_b, Node, :disconnect, [c.node_a])
     assert c.node_a not in peer_call(c.peer_b, Node, :list, [])
-    assert {:error, _} = peer_call(c.peer_b, Example, :record, [old, 90])
+
+    {:ok, route_signal_7} = Example.record_signal(%{value: 90})
+
+    assert {:error, _} =
+             peer_call(c.peer_b, Jido.AgentServer, :call, [old, route_signal_7])
+
     token2 = peer_call(c.peer_a, Authority, :claim, [c.authority])
     assert {:ok, replacement} = start(c.peer_a, c, token2)
-    assert {:ok, _} = peer_call(c.peer_a, Example, :record, [replacement, 2])
+
+    {:ok, route_signal_8} = Example.record_signal(%{value: 2})
+
+    assert {:ok, _} =
+             peer_call(c.peer_a, Jido.AgentServer, :call, [replacement, route_signal_8])
+
     assert true = peer_call(c.peer_b, Node, :set_cookie, [c.node_a, cookie])
     assert true = peer_call(c.peer_b, Node, :connect, [c.node_a])
-    assert {:error, _} = peer_call(c.peer_b, Example, :record, [old, 91])
+
+    {:ok, route_signal_9} = Example.record_signal(%{value: 91})
+
+    assert {:error, _} =
+             peer_call(c.peer_b, Jido.AgentServer, :call, [old, route_signal_9])
+
     assert peer_call(c.peer_a, Authority, :effects, [c.authority]) == [{token1, 1}, {token2, 2}]
   end
 

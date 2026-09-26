@@ -35,7 +35,7 @@ defmodule Jido.Examples.IndeterminateWriteProbe do
         {:ok, next, directives}
       end
 
-      define :increment, args: [:request_id, :amount]
+      define :increment
     end
   end
 end

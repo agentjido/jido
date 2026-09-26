@@ -56,12 +56,12 @@ defmodule SensorGuide.Agent do
   use Jido.Agent, name: "sensor_guide_agent"
 
   agent do
-    schema Zoi.object(%{inputs: Zoi.integer() |> Zoi.default(0)})
-    plugin Jido.Plugin.SensorManager
+    schema(Zoi.object(%{inputs: Zoi.integer() |> Zoi.default(0)}))
+    plugin(Jido.Plugin.SensorManager)
   end
 
   routes do
-    signal_source "/guides/sensor"
+    signal_source("/guides/sensor")
 
     route "sensor.start" do
       action %{observer: observer},
@@ -78,7 +78,7 @@ defmodule SensorGuide.Agent do
         {:ok, context.agent_state, [directive]}
       end
 
-      define :start_probe, args: [:observer]
+      define(:start_probe)
     end
 
     route "sensor.stop" do
@@ -86,7 +86,7 @@ defmodule SensorGuide.Agent do
         {:ok, context.agent_state, [Jido.Plugin.SensorManager.stop(:probe)]}
       end
 
-      define :stop_probe
+      define(:stop_probe)
     end
 
     route "sensor.ready" do
@@ -114,7 +114,10 @@ end
     id: "sensor-agent"
   )
 
-{:ok, _committed} = SensorGuide.Agent.start_probe(agent, :sensor_guide_observer)
+{:ok, _committed} =
+  with {:ok, signal} <- SensorGuide.Agent.start_probe_signal(%{observer: :sensor_guide_observer}) do
+    Jido.AgentServer.call(agent, signal, [])
+  end
 
 receive do
   {:sensor_guide_input, count} -> count
@@ -122,12 +125,17 @@ after
   5_000 -> raise "Sensor input did not arrive"
 end
 
-{:ok, _committed} = SensorGuide.Agent.stop_probe(agent)
+{:ok, _committed} =
+  with {:ok, signal} <- SensorGuide.Agent.stop_probe_signal(%{}) do
+    Jido.AgentServer.call(agent, signal, [])
+  end
 
 :idle =
   Enum.reduce_while(1..100, :directing, fn _, _phase ->
     case Jido.AgentServer.status(agent).phase do
-      :idle -> {:halt, :idle}
+      :idle ->
+        {:halt, :idle}
+
       phase ->
         Process.sleep(10)
         {:cont, phase}

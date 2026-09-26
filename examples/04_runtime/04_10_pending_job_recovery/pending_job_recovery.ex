@@ -55,7 +55,7 @@ defmodule Jido.Examples.PendingJobRecovery do
         end
       end
 
-      define :request_job, args: [:job_id, :value]
+      define :request_job
     end
 
     route "examples.runtime.pending_jobs.approve" do
@@ -77,7 +77,7 @@ defmodule Jido.Examples.PendingJobRecovery do
         end
       end
 
-      define :approve_job, args: [:job_id, :attempt_id]
+      define :approve_job
     end
 
     route "examples.runtime.pending_jobs.retry" do
@@ -102,7 +102,7 @@ defmodule Jido.Examples.PendingJobRecovery do
         end
       end
 
-      define :retry_job, args: [:job_id, :attempt_id]
+      define :retry_job
     end
 
     route "examples.runtime.pending_jobs.cancel" do
@@ -124,7 +124,7 @@ defmodule Jido.Examples.PendingJobRecovery do
         end
       end
 
-      define :cancel_job, args: [:job_id]
+      define :cancel_job
     end
 
     route "examples.runtime.jobs.settle" do

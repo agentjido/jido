@@ -15,7 +15,7 @@ defmodule Jido.Examples.Plugins.CommitProjection.Agent do
         {:ok, %{context.agent_state | count: context.agent_state.count + amount}}
       end
 
-      define :add, args: [:amount]
+      define :add
     end
   end
 end

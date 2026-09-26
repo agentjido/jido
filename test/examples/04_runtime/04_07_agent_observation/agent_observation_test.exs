@@ -15,8 +15,10 @@ defmodule JidoTest.Examples.Runtime.AgentObservationTest do
 
     try do
       assert {:ok, server} = Jido.start_agent(jido, Example, id: id)
-      success = Example.record_signal!(7)
-      delivery = Example.send_to_missing_child_signal!(11)
+      {:ok, success} = Example.record_signal(%{value: 7})
+
+      {:ok, delivery} =
+        Example.send_to_missing_child_signal(%{value: 11})
 
       assert {:ok, _} = Server.call(server, success)
       assert {:ok, _} = Server.call(server, delivery)
@@ -30,7 +32,9 @@ defmodule JidoTest.Examples.Runtime.AgentObservationTest do
               &(&1.event == [:jido, :agent, :turn, :settled])
             )
 
-          if length(events) == 2, do: events
+          if length(events) == 2 do
+            events
+          end
         end)
 
       assert [recorded] =

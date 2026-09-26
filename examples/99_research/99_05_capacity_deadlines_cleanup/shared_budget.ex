@@ -126,7 +126,9 @@ defmodule Jido.Examples.SharedBudget do
         task =
           Task.Supervisor.async_nolink(state.tasks, fn ->
             try do
-              case apply(worker, :work, [server, job.id, job.value, [context: work_context]]) do
+              {:ok, signal} = worker.work_signal(%{job: job.id, value: job.value})
+
+              case Jido.AgentServer.call(server, signal, context: work_context) do
                 {:ok, agent} -> {:ok, agent.state.value}
                 error -> error
               end

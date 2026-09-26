@@ -54,13 +54,15 @@ defmodule Jido.Examples.Factory.IEx do
         )
 
       if session.mode == :conversation do
-        result =
-          LiveConversation.chat(pid, request_id, text,
-            context: context,
-            timeout: 60_000
-          )
+        {:ok, route_signal_1} =
+          LiveConversation.chat_signal(%{request_id: request_id, text: text})
 
-        if context.stream, do: Observer.finish(session.observer, request_id, result)
+        result =
+          Jido.AgentServer.call(pid, route_signal_1, context: context, timeout: 60000)
+
+        if context.stream do
+          Observer.finish(session.observer, request_id, result)
+        end
 
         case result do
           {:ok, _agent} when context.stream -> :ok
@@ -68,7 +70,9 @@ defmodule Jido.Examples.Factory.IEx do
           {:error, reason} -> {:error, reason}
         end
       else
-        case Conversation.ask(pid, request_id, text, context: context) do
+        {:ok, route_signal_2} = Conversation.ask_signal(%{request_id: request_id, text: text})
+
+        case Jido.AgentServer.call(pid, route_signal_2, context: context) do
           {:ok, _} -> :ok
           error -> error
         end
@@ -100,6 +104,7 @@ defmodule Jido.Examples.Factory.IEx do
   end
 
   defp handle_line(_session, "/back"), do: :ok
+
   defp handle_line(session, "/quit"), do: stop(session)
 
   defp handle_line(session, line) do
@@ -135,10 +140,12 @@ defmodule Jido.Examples.Factory.IEx do
 
   @doc "Returns current factory jobs."
   def status(%{mode: :conversation}), do: {:error, :no_factory}
+
   def status(session), do: control(session, :status, "")
 
   @doc "Reads one factory job and its queue position."
   def job(%{mode: :conversation}, _id), do: {:error, :no_factory}
+
   def job(session, id), do: Tools.inspect_factory(session.jido, session.factory_id, :job, id)
 
   @doc "Sends a command without a model request."
@@ -206,9 +213,11 @@ defmodule Jido.Examples.Factory.IEx do
 
   defp start_owner(jido, mode, id) do
     with {:ok, pid} <- Jido.start_agent(jido, Owner, id: id) do
-      case Owner.boot(pid, mode) do
+      {:ok, route_signal_3} = Owner.boot_signal(%{mode: mode})
+
+      case Jido.AgentServer.call(pid, route_signal_3, []) do
         {:ok, _} ->
-          with :ok <- await_agent(jido, "#{id}/factory", 5_000),
+          with :ok <- await_agent(jido, "#{id}/factory", 5000),
                {:ok, _} <- Tools.command(jido, "#{id}/factory", :status, "startup", "", "") do
             {:ok, pid}
           else

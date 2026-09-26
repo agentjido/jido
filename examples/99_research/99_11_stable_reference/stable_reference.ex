@@ -16,7 +16,7 @@ defmodule Jido.Examples.StableReference.Conversation do
         {:ok, %{context.agent_state | messages: context.agent_state.messages ++ [text]}}
       end
 
-      define :append, args: [:text]
+      define :append
     end
   end
 end

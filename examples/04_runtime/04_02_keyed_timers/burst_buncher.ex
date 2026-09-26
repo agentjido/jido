@@ -84,7 +84,7 @@ defmodule Jido.Examples.BurstBuncher do
         end
       end
 
-      define :add_item, args: [:item_id, :item]
+      define :add_item
     end
 
     route "examples.runtime.burst_buncher.flush" do
@@ -118,7 +118,7 @@ defmodule Jido.Examples.BurstBuncher do
         end
       end
 
-      define :flush, args: [:generation]
+      define :flush
     end
   end
 
@@ -127,7 +127,10 @@ defmodule Jido.Examples.BurstBuncher do
   @doc "Builds one timer flush Signal for a known generation."
   @spec timer_flush_signal!(non_neg_integer()) :: Signal.t()
   def timer_flush_signal!(generation) when is_integer(generation) and generation >= 0 do
-    flush_signal!(generation, signal: [source: "/examples/runtime/burst_buncher/timer"])
+    {:ok, signal} =
+      flush_signal(%{generation: generation}, source: "/examples/runtime/burst_buncher/timer")
+
+    signal
   end
 
   @doc false

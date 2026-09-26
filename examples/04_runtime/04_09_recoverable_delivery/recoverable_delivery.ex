@@ -27,7 +27,7 @@ defmodule Jido.Examples.RecoverableDelivery do
         {:ok, %{context.agent_state | value: value}, [directive]}
       end
 
-      define :record_and_deliver, args: [:effect_id, :value]
+      define :record_and_deliver
     end
 
     route "examples.runtime.delivery.confirm" do
@@ -38,7 +38,7 @@ defmodule Jido.Examples.RecoverableDelivery do
         {:ok, context.agent_state, [confirmation]}
       end
 
-      define :confirm_delivery, args: [:effect_id, :value]
+      define :confirm_delivery
     end
   end
 end

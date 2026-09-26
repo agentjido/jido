@@ -59,7 +59,7 @@ defmodule JidoTest.Agent.AuthoringTest do
       signal_source "/prepared"
 
       route "prepared.add", Add do
-        define :add, args: [:amount]
+        define :add
       end
     end
   end
@@ -129,25 +129,13 @@ defmodule JidoTest.Agent.AuthoringTest do
       signal_source "/named"
 
       route "named.inputs", NamedInputs do
-        define :compose,
-          args: [
-            :server,
-            :opts,
-            :_,
-            :_private,
-            :"user-id",
-            {:optional, :amount},
-            {:optional, :amount_or_opts}
-          ]
+        define :compose
       end
     end
   end
 
   defmodule Counter do
-    use Jido.Agent,
-      name: "authoring_counter",
-      description: "All authoring forms",
-      vsn: 7
+    use Jido.Agent, name: "authoring_counter", description: "All authoring forms", vsn: 7
 
     agent do
       schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
@@ -161,15 +149,15 @@ defmodule JidoTest.Agent.AuthoringTest do
 
       route "authoring.add", Add do
         defaults %{amount: 1, flag: false}
-        priority 10
-        define :add, args: [{:optional, :amount}]
-        define :add_exact, args: [:amount]
+        priority(10)
+        define :add
+        define :add_exact
       end
 
       route "authoring.flow", Flow do
         defaults %{amount: 2}
-        priority -5
-        define :flow_add, args: [:amount]
+        priority(-5)
+        define :flow_add
       end
     end
   end
@@ -221,7 +209,7 @@ defmodule JidoTest.Agent.AuthoringTest do
            %{context.agent_state | count: add(context.agent_state.count, amount, multiplier)}}
         end
 
-        define :add_inline, args: [:amount, {:optional, :multiplier}]
+        define :add_inline
       end
     end
 
@@ -235,7 +223,7 @@ defmodule JidoTest.Agent.AuthoringTest do
     assert block.module == Counter
     assert keyword.module == KeywordCounter
     assert %{keyword | module: Counter} === block
-    assert function_exported?(Counter, :add_signal, 0)
+    assert function_exported?(Counter, :add_signal, 1)
     refute function_exported?(KeywordCounter, :add_signal, 0)
   end
 
@@ -273,7 +261,9 @@ defmodule JidoTest.Agent.AuthoringTest do
     assert target.__jido_executable__().kind == :action
     assert target.name() == "inline_authoring_add"
 
-    signal = InlineCounter.add_inline_signal!(3, 2)
+    {:ok, signal} =
+      InlineCounter.add_inline_signal(%{amount: 3, multiplier: 2})
+
     assert {:ok, candidate, []} = InlineCounter.cmd(InlineCounter.new!(), signal)
     assert candidate.state.count == 6
   end
@@ -312,114 +302,69 @@ defmodule JidoTest.Agent.AuthoringTest do
     assert {:ok, %{state: %{result: :other}}, []} = module.cmd(module.new!(), other)
   end
 
-  test "generated constructors preserve omission, explicit values and new Signal IDs" do
-    assert {:ok, %{data: %{}} = first} = Counter.add_signal()
-    assert {:ok, %{data: %{amount: 0}} = second} = Counter.add_signal(0)
+  test "generated constructors preserve omitted and explicit input and fresh Signal IDs" do
+    assert {:ok, %{data: %{}} = first} = Counter.add_signal(%{})
+    assert {:ok, %{data: %{amount: 0}} = second} = Counter.add_signal(%{amount: 0})
     refute first.id == second.id
-    assert Counter.add_signal!(nil).data == %{amount: nil}
-    assert Counter.add_signal!(input: %{flag: false}).data == %{flag: false}
-    assert Counter.add_signal!(2, signal: [source: "/custom", id: "stable"]).id == "stable"
-    assert Counter.add_signal!(2, signal: [source: "/custom"]).source == "/custom"
+    assert {:ok, %{data: %{flag: false}}} = Counter.add_signal(%{flag: false})
+
+    assert {:ok, %{id: "stable", source: "/custom"}} =
+             Counter.add_signal(%{amount: 2}, source: "/custom", id: "stable")
+
     assert {:ok, next, []} = Counter.cmd(Counter.new!(), first)
     assert next.state.count == 1
 
-    assert {:error, %Jido.Action.Error.InvalidInputError{}} =
-             Counter.cmd(Counter.new!(), Counter.add_signal!(nil))
+    assert {:ok, signal} = Counter.add_signal(%{amount: nil})
+    assert signal.data == %{amount: nil}
+    assert {:error, %Jido.Action.Error.InvalidInputError{}} = Counter.cmd(Counter.new!(), signal)
   end
 
-  test "generated documentation exposes named arguments, optional forms and execution contracts" do
+  test "generated documentation and specs describe one map-based constructor" do
     module = Jido.Examples.MinimalAgent
-    assert {_, ["increment(server)"], _, _} = function_docs(module, :increment, 1)
-
-    assert {_, ["increment(server, amount_or_opts)"], _, _} =
-             function_docs(module, :increment, 2)
-
-    assert {_, ["increment(server, amount, opts)"], %{"en" => call_help}, _} =
-             function_docs(module, :increment, 3)
-
-    assert call_help =~ "{:ok, committed_agent}"
-    assert call_help =~ "does not cancel a Turn"
-    assert call_help =~ "`:context`"
-    assert call_help =~ "without coercion or executable validation"
-
-    assert {_, ["increment_signal()"], _, _} = function_docs(module, :increment_signal, 0)
-
-    assert {_, ["increment_signal(amount_or_opts)"], %{"en" => optional_help}, _} =
-             function_docs(module, :increment_signal, 1)
-
-    assert optional_help =~ "either its positional input value or a keyword options list"
-    assert optional_help =~ "Omitted optional inputs remain absent"
-
-    assert {_, ["increment_signal(amount, opts)"], %{"en" => signal_help}, _} =
-             function_docs(module, :increment_signal, 2)
-
-    assert signal_help =~ "{:ok, signal}"
-    assert signal_help =~ "accepted only by the live call helper"
-
-    assert {_, ["increment_signal!(amount, opts)"], %{"en" => bang_help}, _} =
-             function_docs(module, :increment_signal!, 2)
-
-    assert bang_help =~ "Returns the Signal or raises"
-
-    assert {_, ["set_count(server, count, opts)"], _, _} =
-             function_docs(Jido.Examples.TypedCommandAgent, :set_count, 3)
-  end
-
-  test "generated specs keep raw input broad and describe the actual return values" do
-    module = Jido.Examples.MinimalAgent
+    assert {_, [signature], %{"en" => help}, _} = function_docs(module, :increment_signal, 2)
+    assert signature =~ "increment_signal(input, envelope_opts"
+    assert help =~ "plain input map"
+    assert help =~ "does not execute a command"
+    assert help =~ "Jido.AgentServer.call/3"
 
     assert function_spec(module, :increment_signal, 2) ==
              normalized_spec(
-               "increment_signal(term(), keyword()) :: {:ok, Jido.Signal.t()} | {:error, term()}"
+               "increment_signal(map(), keyword()) :: {:ok, Jido.Signal.t()} | {:error, term()}"
              )
 
-    assert function_spec(module, :increment_signal!, 2) ==
-             normalized_spec("increment_signal!(term(), keyword()) :: Jido.Signal.t()")
-
-    assert function_spec(module, :increment, 3) ==
-             normalized_spec(
-               "increment(Jido.AgentServer.server(), term(), keyword()) :: {:ok, Jido.Agent.instance()} | {:error, term()}"
-             )
+    assert function_exported?(module, :increment_signal, 1)
+    refute function_exported?(module, :increment_signal, 0)
+    refute function_exported?(module, :increment_signal!, 1)
+    refute function_exported?(module, :increment, 2)
   end
 
-  test "named arguments preserve payloads when fields overlap helper names or need escaping" do
-    assert {:ok, signal} = NamedAgent.compose_signal(1, 2, 3, 4, 5, 6, 7, signal: [id: "named"])
-
-    assert signal.data == %{
-             server: 1,
-             opts: 2,
-             _: 3,
-             _private: 4,
-             "user-id": 5,
-             amount: 6,
-             amount_or_opts: 7
-           }
-
-    assert NamedAgent.compose_signal!(1, 2, 3, 4, 5, input: %{amount: 6}).data == %{
-             server: 1,
-             opts: 2,
-             _: 3,
-             _private: 4,
-             "user-id": 5,
-             amount: 6
-           }
+  test "map inputs retain keys that overlap helper option names" do
+    input = %{server: 1, opts: 2, _: 3, _private: 4, "user-id": 5, amount: 6, amount_or_opts: 7}
+    assert {:ok, signal} = NamedAgent.compose_signal(input, id: "named")
+    assert signal.data == input
+    assert signal.id == "named"
   end
 
-  test "interface packaging and envelope options reject ambiguity" do
-    for arguments <- [
-          [1, [input: %{amount: 2}]],
-          [1, [input: []]],
-          [1, [timeout: 10]],
-          [1, [signal: [type: "different"]]],
-          [1, [signal: [data: %{}]]],
-          [1, [unknown: true]],
-          [1, [input: %{}, input: %{}]]
-        ] do
-      assert {:error, _} = apply(Counter, :add_signal, arguments)
+  test "constructors reject non-map input and invalid envelope options" do
+    for input <- [nil, [], [amount: 1], 1, ~D[2026-09-03]] do
+      assert {:error, %Jido.Error.ValidationError{}} = Counter.add_signal(input)
     end
 
-    assert_raise Jido.Error.ValidationError, fn -> Counter.add_signal!(1, input: %{amount: 2}) end
-    assert {:error, _} = Counter.add_signal(1, signal: [source: "bad source"])
+    for options <- [
+          [input: %{}],
+          [signal: []],
+          [timeout: 10],
+          [context: %{}],
+          [type: "different"],
+          [data: %{}],
+          [unknown: true],
+          [source: "/one", source: "/two"],
+          [source: "bad source"],
+          :invalid
+        ] do
+      assert {:error, _} = Counter.add_signal(%{}, options)
+    end
+
     assert {:error, _} = Agent.instantiate(:missing_agent_module, [])
     assert {:error, _} = Agent.instantiate(%{}, [])
   end
@@ -636,27 +581,24 @@ defmodule JidoTest.Agent.AuthoringTest do
     assert [%{target: {Add, %{amount: 2}}}] = built.routes
   end
 
-  test "optional list inputs cannot be mistaken for interface options" do
-    for field <- [:items, :nullable_items, :options, :empty, :anything] do
-      assert_raise CompileError, ~r/must use input options/, fn ->
-        compile_agent("""
-        route "test.list", ListInputs do
-          define :list, args: [{:optional, #{inspect(field)}}]
-        end
-        """)
-      end
+  test "map inputs support optional list and keyword fields without ambiguity" do
+    compiled =
+      compile_agent("route \"test.list\", ListInputs do\n  define :list\nend\n")
+
+    {module, _} =
+      Enum.find(compiled, fn {module, _} -> function_exported?(module, :list_signal, 1) end)
+
+    for field <- [:items, :nullable_items, :options, :empty, :anything], value <- [[], [1]] do
+      input = %{field => value}
+      assert {:ok, signal} = module.list_signal(input)
+      assert signal.data == input
     end
   end
 
   test "compile diagnostics reject invalid interface declarations" do
     cases = [
-      {"route \"test.*\", Add do\n define :add, args: [:amount]\nend", "exact route"},
-      {"route \"test.add\", Add do\n define :add, args: [:missing]\nend", "Unknown executable"},
-      {"route \"test.add\", Add do\n define :add, args: [:amount, :amount]\nend",
-       "Duplicate interface argument"},
-      {"route \"test.add\", Add do\n define :add, args: [{:optional, :amount}, :flag]\nend",
-       "optional arguments last"},
-      {"route \"test.add\", Add do\n define :new\nend", "Generated function conflicts"},
+      {"route \"test.*\", Add do\n define :add\nend", "exact route"},
+      {"route \"test.add\", Add do\n match fn _ -> true end\n define :add\nend", "exact route"},
       {"route \"test.add\", Add do\n define :add\n define :add\nend", "Duplicate interface name"},
       {"route \"test.add\", Add do\n define :add\nend\nroute \"test.add\", Add",
        "exactly one route"}
@@ -664,6 +606,10 @@ defmodule JidoTest.Agent.AuthoringTest do
 
     for {routes, message} <- cases do
       assert_raise CompileError, ~r/#{message}/, fn -> compile_agent(routes) end
+    end
+
+    assert_raise Spark.Error.DslError, ~r/args/, fn ->
+      compile_agent("route \"test.add\", Add do\n define :add, args: [:amount]\nend")
     end
   end
 
@@ -719,7 +665,7 @@ defmodule JidoTest.Agent.AuthoringTest do
       compile_agent(
         "route \"test.add\", Add do\n define :add\nend",
         "",
-        "def add_signal(), do: :manual"
+        "def add_signal(_input), do: :manual"
       )
     end
   end
@@ -768,7 +714,7 @@ defmodule JidoTest.Agent.AuthoringTest do
           routes do
             signal_source "/reloaded"
             route "reloaded.add", #{inspect(module)}.Add do
-              define :add, args: [#{inspect(field)}]
+              define :add
             end
           end
         end
@@ -782,7 +728,8 @@ defmodule JidoTest.Agent.AuthoringTest do
         end
         """)
 
-        assert {:ok, candidate, []} = module.cmd(module.new!(), module.add_signal!(3))
+        assert {:ok, signal} = module.add_signal(%{field => 3})
+        assert {:ok, candidate, []} = module.cmd(module.new!(), signal)
         assert candidate.state.count == 3
       end
     end)
@@ -862,40 +809,82 @@ defmodule JidoTest.Agent.AuthoringRuntimeTest do
     agent = Counter.new!()
     {:ok, server} = Jido.start_agent(jido, agent)
 
-    assert {:ok, expected, []} = Counter.cmd(agent, Counter.add_signal!(3))
-    assert {:ok, ^expected} = Counter.add(server, 3)
+    {:ok, command_signal_1} = Counter.add_signal(%{amount: 3})
+
+    assert {:ok, expected, []} =
+             Counter.cmd(
+               agent,
+               command_signal_1
+             )
+
+    {:ok, route_signal_1} = Counter.add_signal(%{amount: 3})
+
+    assert {:ok, ^expected} =
+             Jido.AgentServer.call(server, route_signal_1, [])
+
     assert expected.state == %{count: 3, turns: 1}
 
-    assert {:ok, flow_candidate, []} = Counter.cmd(expected, Counter.flow_add_signal!(2))
-    assert {:ok, ^flow_candidate} = Counter.flow_add(server, 2)
+    {:ok, command_signal_2} = Counter.flow_add_signal(%{amount: 2})
+
+    assert {:ok, flow_candidate, []} =
+             Counter.cmd(
+               expected,
+               command_signal_2
+             )
+
+    {:ok, route_signal_2} = Counter.flow_add_signal(%{amount: 2})
+
+    assert {:ok, ^flow_candidate} =
+             Jido.AgentServer.call(server, route_signal_2, [])
+
     assert flow_candidate.state == %{count: 5, turns: 2}
     assert Server.snapshot(server).state_version == 2
   end
 
   test "generated inline helpers apply route defaults", %{jido: jido} do
     {:ok, server} = Jido.start_agent(jido, InlineCounter)
-    assert {:ok, committed} = InlineCounter.add_inline(server, 4)
+
+    {:ok, route_signal_3} = InlineCounter.add_inline_signal(%{amount: 4})
+
+    assert {:ok, committed} =
+             Jido.AgentServer.call(server, route_signal_3, [])
+
     assert committed.state == %{count: 4}
   end
 
   test "a live helper forwards runtime validation without a commit", %{jido: jido} do
     {:ok, server} = Jido.start_agent(jido, Counter)
     before = Server.snapshot(server)
-    assert {:error, %Jido.Error.ValidationError{}} = Counter.add(server, 2, timeout: :invalid)
+
+    {:ok, route_signal_4} = Counter.add_signal(%{amount: 2})
+
+    assert {:error, %Jido.Error.ValidationError{}} =
+             Jido.AgentServer.call(server, route_signal_4, timeout: :invalid)
+
     assert Server.snapshot(server) == before
-    assert {:ok, committed} = Counter.add(server, 0, context: %{})
+
+    {:ok, route_signal_5} = Counter.add_signal(%{amount: 0})
+
+    assert {:ok, committed} =
+             Jido.AgentServer.call(server, route_signal_5, context: %{})
+
     assert committed.state.count == 0
   end
 
   test "helpers leave executable validation to execution", %{jido: jido} do
     agent = PreparedCounter.new!()
-    assert {:ok, signal} = PreparedCounter.add_signal(2)
+    assert {:ok, signal} = PreparedCounter.add_signal(%{amount: 2})
     assert signal.data == %{amount: 2}
     assert {:ok, candidate, []} = PreparedCounter.cmd(agent, signal)
     assert candidate.state.count == 2
 
     {:ok, server} = Jido.start_agent(jido, agent)
-    assert {:ok, ^candidate} = PreparedCounter.add(server, 2)
+
+    {:ok, route_signal_6} = PreparedCounter.add_signal(%{amount: 2})
+
+    assert {:ok, ^candidate} =
+             Jido.AgentServer.call(server, route_signal_6, [])
+
     assert Server.snapshot(server).state_version == 1
   end
 end

@@ -8,9 +8,13 @@ defmodule JidoTest.Examples.Workflow.ConditionalRoutesTest do
     client = start_supervised!({Service, %{primary: {:ok, %{answer: "primary"}}}})
     server = start_agent!(jido, Example)
 
-    assert {:ok, agent} = Example.fetch(server, context: %{service: {Service, client}})
+    {:ok, route_signal_1} = Example.fetch_signal(%{})
+
+    assert {:ok, agent} =
+             Jido.AgentServer.call(server, route_signal_1, context: %{service: {Service, client}})
+
     assert agent.state == %{route: :primary, result: %{answer: "primary"}}
-    assert Service.calls(client) == [{:primary, %{}}]
+    assert Service.calls(client) == [primary: %{}]
     assert Server.snapshot(server) == %{agent: agent, state_version: 1}
   end
 
@@ -22,15 +26,28 @@ defmodule JidoTest.Examples.Workflow.ConditionalRoutesTest do
         {Service, %{primary: {:error, :unavailable}, fallback: {:ok, %{answer: "cache"}}}}
       )
 
-    assert {:ok, fallback} = Example.fetch(server, context: %{service: {Service, unavailable}})
+    {:ok, route_signal_2} = Example.fetch_signal(%{})
+
+    assert {:ok, fallback} =
+             Jido.AgentServer.call(server, route_signal_2,
+               context: %{service: {Service, unavailable}}
+             )
+
     assert fallback.state == %{route: :fallback, result: %{answer: "cache"}}
-    assert Service.calls(unavailable) == [{:primary, %{}}, {:fallback, %{}}]
+    assert Service.calls(unavailable) == [primary: %{}, fallback: %{}]
     before = Server.snapshot(server)
 
     forbidden = start_supervised!({Service, %{primary: {:error, :forbidden}}}, id: :forbidden)
-    assert {:error, error} = Example.fetch(server, context: %{service: {Service, forbidden}})
+
+    {:ok, route_signal_3} = Example.fetch_signal(%{})
+
+    assert {:error, error} =
+             Jido.AgentServer.call(server, route_signal_3,
+               context: %{service: {Service, forbidden}}
+             )
+
     assert Enum.any?(errors(error), &(&1.message == "primary rejected"))
-    assert Service.calls(forbidden) == [{:primary, %{}}]
+    assert Service.calls(forbidden) == [primary: %{}]
     assert Server.snapshot(server) == before
   end
 end

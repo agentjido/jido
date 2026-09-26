@@ -83,8 +83,13 @@ defmodule Jido.Plugin.Scheduler.OccurrenceRecoveryTest do
 
   test "an uncommitted occurrence is retried after Agent loss and clock advance", c do
     server = start_agent(c)
-    assert {:ok, _} = Example.arm_schedule(server, "job-1", "* * * * * *")
-    assert_receive {:occurrence_write_held, ^server, :before, lost}, 1_000
+
+    {:ok, route_signal_1} = Example.arm_schedule_signal(%{job_id: "job-1", cron: "* * * * * *"})
+
+    assert {:ok, _} =
+             Jido.AgentServer.call(server, route_signal_1, [])
+
+    assert_receive {:occurrence_write_held, ^server, :before, lost}, 1000
     assert lost.occurrence.scheduled_at == "2030-01-01T00:00:01.000000Z"
 
     saved = load_agent(c)
@@ -106,8 +111,13 @@ defmodule Jido.Plugin.Scheduler.OccurrenceRecoveryTest do
     {adapter, opts} = c.persistence
     c = %{c | persistence: {adapter, Keyword.put(opts, :stage, :after)}}
     server = start_agent(c)
-    assert {:ok, _} = Example.arm_schedule(server, "job-1", "* * * * * *")
-    assert_receive {:occurrence_write_held, ^server, :after, completed}, 1_000
+
+    {:ok, route_signal_2} = Example.arm_schedule_signal(%{job_id: "job-1", cron: "* * * * * *"})
+
+    assert {:ok, _} =
+             Jido.AgentServer.call(server, route_signal_2, [])
+
+    assert_receive {:occurrence_write_held, ^server, :after, completed}, 1000
     assert [^completed] = load_agent(c).state.ticks
     assert load_agent(c).state.scheduler.cron["job-1"].pending == nil
     kill(server)
@@ -123,12 +133,17 @@ defmodule Jido.Plugin.Scheduler.OccurrenceRecoveryTest do
   test "Scheduler loss during delivery does not lose or repeat the business commit", c do
     server = start_agent(c)
     scheduler = Server.children(server)[{:plugin, Scheduler}].pid
-    assert {:ok, _} = Example.arm_schedule(server, "job-1", "* * * * * *")
-    assert_receive {:occurrence_write_held, ^server, :before, tick}, 1_000
+
+    {:ok, route_signal_3} = Example.arm_schedule_signal(%{job_id: "job-1", cron: "* * * * * *"})
+
+    assert {:ok, _} =
+             Jido.AgentServer.call(server, route_signal_3, [])
+
+    assert_receive {:occurrence_write_held, ^server, :before, tick}, 1000
     delivery = :sys.get_state(scheduler).delivery_task.pid
     monitor = Process.monitor(delivery)
     kill(scheduler)
-    assert_receive {:DOWN, ^monitor, :process, ^delivery, _}, 1_000
+    assert_receive {:DOWN, ^monitor, :process, ^delivery, _}, 1000
     Elixir.Agent.update(c.barrier, fn _ -> false end)
     send(server, :release)
     await_occurrence(server, tick.occurrence.id)
@@ -148,12 +163,17 @@ defmodule Jido.Plugin.Scheduler.OccurrenceRecoveryTest do
       Elixir.Agent.update(c.barrier, fn _ -> @stage end)
       server = start_agent(c)
       monitor = Process.monitor(server)
-      assert {:ok, _} = Example.arm_schedule(server, "job-1", "* * * * * *")
-      assert_receive {:occurrence_write_rejected, @stage}, 1_000
+
+      {:ok, route_signal_4} = Example.arm_schedule_signal(%{job_id: "job-1", cron: "* * * * * *"})
+
+      assert {:ok, _} =
+               Jido.AgentServer.call(server, route_signal_4, [])
+
+      assert_receive {:occurrence_write_rejected, @stage}, 1000
 
       assert_receive {:DOWN, ^monitor, :process, ^server,
                       {:shutdown, {:persistence_failed, {:rejected, :test_storage_unavailable}}}},
-                     1_000
+                     1000
 
       saved = load_agent(c)
       assert saved.state.ticks == []
@@ -174,13 +194,17 @@ defmodule Jido.Plugin.Scheduler.OccurrenceRecoveryTest do
     Elixir.Agent.update(c.barrier, fn _ -> :result end)
     server = start_agent(c)
     monitor = Process.monitor(server)
-    assert {:ok, _} = Example.arm_schedule(server, "job-1", "* * * * * *")
 
-    assert_receive {:occurrence_write_rejected, :result}, 1_000
+    {:ok, route_signal_5} = Example.arm_schedule_signal(%{job_id: "job-1", cron: "* * * * * *"})
+
+    assert {:ok, _} =
+             Jido.AgentServer.call(server, route_signal_5, [])
+
+    assert_receive {:occurrence_write_rejected, :result}, 1000
 
     assert_receive {:DOWN, ^monitor, :process, ^server,
                     {:shutdown, {:persistence_failed, {:rejected, :test_storage_unavailable}}}},
-                   1_000
+                   1000
 
     pending = load_agent(c).state.scheduler.cron["job-1"].pending
     assert load_agent(c).state.scheduler.cron["job-1"].pending == pending
@@ -200,18 +224,28 @@ defmodule Jido.Plugin.Scheduler.OccurrenceRecoveryTest do
     Elixir.Agent.update(c.barrier, fn _ -> :result end)
     server = start_agent(c)
     monitor = Process.monitor(server)
-    assert {:ok, _} = Example.arm_schedule(server, "job-1", "* * * * * *")
-    assert_receive {:occurrence_write_rejected, :result}, 1_000
+
+    {:ok, route_signal_6} = Example.arm_schedule_signal(%{job_id: "job-1", cron: "* * * * * *"})
+
+    assert {:ok, _} =
+             Jido.AgentServer.call(server, route_signal_6, [])
+
+    assert_receive {:occurrence_write_rejected, :result}, 1000
 
     assert_receive {:DOWN, ^monitor, :process, ^server,
                     {:shutdown, {:persistence_failed, {:rejected, :test_storage_unavailable}}}},
-                   1_000
+                   1000
 
     saved = load_agent(c)
     tick = saved.state.scheduler.cron["job-1"].pending
 
+    {:ok, command_signal_1} = Example.cancel_schedule_signal(%{job_id: "job-1"})
+
     assert {:ok, cancelled, [_directive]} =
-             Jido.Agent.cmd(saved, Example.cancel_schedule_signal!("job-1"))
+             Jido.Agent.cmd(
+               saved,
+               command_signal_1
+             )
 
     assert cancelled.state.scheduler.cron == %{}
 
@@ -227,7 +261,12 @@ defmodule Jido.Plugin.Scheduler.OccurrenceRecoveryTest do
     restored = start_agent(c, restore: :required)
     assert Server.agent(restored) == cancelled
     assert {:error, _} = Server.call(restored, tick)
-    assert {:ok, _} = Example.arm_schedule(restored, "job-1", "* * * * * *")
+
+    {:ok, route_signal_7} = Example.arm_schedule_signal(%{job_id: "job-1", cron: "* * * * * *"})
+
+    assert {:ok, _} =
+             Jido.AgentServer.call(restored, route_signal_7, [])
+
     await_tick_count(restored, 1)
     assert [%{occurrence: %{generation: 2}}] = Server.agent(restored).state.ticks
   end

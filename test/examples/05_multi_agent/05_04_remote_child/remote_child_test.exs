@@ -11,15 +11,21 @@ defmodule JidoTest.Examples.MultiAgent.RemoteChildTest do
     assert {:ok, parent} =
              peer_call(c.peer_a, Jido, :start_agent, [c.jido, RemoteParent, [id: "remote-parent"]])
 
-    assert {:ok, _} = peer_call(c.peer_a, RemoteParent, :request_child, [parent, c.node_b])
+    {:ok, route_signal_1} = RemoteParent.request_child_signal(%{target_node: c.node_b})
 
-    child = peer_call(c.peer_a, Server, :children, [parent], 5_000)[:worker]
+    assert {:ok, _} =
+             peer_call(c.peer_a, Jido.AgentServer, :call, [parent, route_signal_1])
+
+    child = peer_call(c.peer_a, Server, :children, [parent], 5000)[:worker]
 
     assert node(child.pid) == c.node_b
     assert peer_call(c.peer_b, Process, :alive?, [child.pid])
 
+    {:ok, route_signal_2} =
+      RemoteParent.request_result_signal(%{value: 21, request_id: "request-1"})
+
     assert {:ok, _} =
-             peer_call(c.peer_a, RemoteParent, :request_result, [parent, 21, "request-1"])
+             peer_call(c.peer_a, Jido.AgentServer, :call, [parent, route_signal_2])
 
     result =
       peer_eventually(
@@ -29,7 +35,7 @@ defmodule JidoTest.Examples.MultiAgent.RemoteChildTest do
             _not_ready -> nil
           end
         end,
-        timeout: 3_000
+        timeout: 3000
       )
 
     assert result == %{executed_on: c.node_b, request_id: "request-1", value: 21}
@@ -37,7 +43,7 @@ defmodule JidoTest.Examples.MultiAgent.RemoteChildTest do
 
     peer_eventually(
       fn -> not peer_call(c.peer_b, Process, :alive?, [child.pid]) end,
-      timeout: 2_000
+      timeout: 2000
     )
   end
 

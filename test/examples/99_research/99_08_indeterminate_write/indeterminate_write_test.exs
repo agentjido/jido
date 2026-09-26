@@ -24,8 +24,10 @@ defmodule JidoTest.Examples.IndeterminateWriteTest do
                restore: false
              )
 
+    {:ok, route_signal_1} = Probe.increment_signal(%{request_id: "first", amount: 1})
+
     assert {:error, {:persistence_failed, :indeterminate}} =
-             Probe.increment(server, "first", 1, context: context)
+             Jido.AgentServer.call(server, route_signal_1, context: context)
 
     assert {:ok, %{state: %{count: 1}}, 1} =
              Persistence.load_agent_with_revision(store, Probe, id, instance: jido)
@@ -35,7 +37,8 @@ defmodule JidoTest.Examples.IndeterminateWriteTest do
   end
 
   defp next_command(server, context) do
-    Probe.increment(server, "second", 10, context: context)
+    {:ok, route_signal_2} = Probe.increment_signal(%{request_id: "second", amount: 10})
+    Jido.AgentServer.call(server, route_signal_2, context: context)
   catch
     :exit, reason -> {:error, reason}
   end

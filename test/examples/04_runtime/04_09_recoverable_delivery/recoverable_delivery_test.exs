@@ -20,13 +20,17 @@ defmodule JidoTest.Examples.Runtime.RecoverableDeliveryTest do
     assert :ok = Sink.available(c.jido, false)
     server = start_example(c, id, false)
 
-    assert {:ok, committed} = Example.record_and_deliver(server, "effect-1", 7)
+    {:ok, route_signal_1} = Example.record_and_deliver_signal(%{effect_id: "effect-1", value: 7})
+
+    assert {:ok, committed} =
+             Jido.AgentServer.call(server, route_signal_1, [])
+
     assert committed.state.delivery.pending == %{"effect-1" => 7}
     assert Sink.records(c.jido) == %{}
 
     server_ref = Process.monitor(server)
     Process.exit(server, :kill)
-    assert_receive {:DOWN, ^server_ref, :process, ^server, :killed}, 1_000
+    assert_receive {:DOWN, ^server_ref, :process, ^server, :killed}, 1000
     eventually(fn -> Jido.whereis_agent(c.jido, id) == nil end)
 
     assert :ok = Sink.available(c.jido, true)

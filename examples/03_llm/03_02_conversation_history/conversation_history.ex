@@ -41,7 +41,7 @@ defmodule Jido.Examples.ConversationHistory do
         end
       end
 
-      define :append_message, args: [:message_id, :text]
+      define :append_message
     end
   end
 end

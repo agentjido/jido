@@ -11,7 +11,11 @@ defmodule JidoTest.Examples.Runtime.ScheduledCounterTest do
   test "a scheduling Directive starts a later Signal and second Turn", %{jido: jido} do
     counter = start_agent!(jido, ScheduledCounter)
 
-    assert {:ok, scheduled} = ScheduledCounter.schedule_once(counter, 10)
+    {:ok, route_signal_1} = ScheduledCounter.schedule_once_signal(%{delay_ms: 10})
+
+    assert {:ok, scheduled} =
+             Jido.AgentServer.call(counter, route_signal_1, [])
+
     assert scheduled.state.schedule_requests == 1
     assert scheduled.state.count == 0
 
@@ -26,13 +30,25 @@ defmodule JidoTest.Examples.Runtime.ScheduledCounterTest do
   test "CRON Directives add and remove Scheduler runtime state", %{jido: jido} do
     counter = start_agent!(jido, ScheduledCounter)
 
-    assert {:ok, enabled} = ScheduledCounter.enable_cron(counter, :heartbeat, "0 0 0 1 1 * 2099")
+    {:ok, route_signal_2} =
+      ScheduledCounter.enable_cron_signal(%{
+        job_id: :heartbeat,
+        expression: "0 0 0 1 1 * 2099"
+      })
+
+    assert {:ok, enabled} =
+             Jido.AgentServer.call(counter, route_signal_2, [])
+
     assert enabled.state.cron_enabled
 
     assert {:ok, scheduler_state} = Server.plugin_state(counter, Scheduler)
     assert Map.has_key?(scheduler_state.cron, :heartbeat)
 
-    assert {:ok, disabled} = ScheduledCounter.disable_cron(counter, :heartbeat)
+    {:ok, route_signal_3} = ScheduledCounter.disable_cron_signal(%{job_id: :heartbeat})
+
+    assert {:ok, disabled} =
+             Jido.AgentServer.call(counter, route_signal_3, [])
+
     refute disabled.state.cron_enabled
 
     assert {:ok, scheduler_state} = Server.plugin_state(counter, Scheduler)
@@ -42,8 +58,21 @@ defmodule JidoTest.Examples.Runtime.ScheduledCounterTest do
   test "invalid timer and CRON requests leave Agent and Plugin state unchanged", %{jido: jido} do
     counter = start_agent!(jido, ScheduledCounter, error_policy: :log_only)
     before = Server.snapshot(counter)
-    assert {:error, _} = ScheduledCounter.schedule_once(counter, -1)
-    assert {:error, _} = ScheduledCounter.enable_cron(counter, :invalid, "invalid cron")
+
+    {:ok, route_signal_4} = ScheduledCounter.schedule_once_signal(%{delay_ms: -1})
+
+    assert {:error, _} =
+             Jido.AgentServer.call(counter, route_signal_4, [])
+
+    {:ok, route_signal_5} =
+      ScheduledCounter.enable_cron_signal(%{
+        job_id: :invalid,
+        expression: "invalid cron"
+      })
+
+    assert {:error, _} =
+             Jido.AgentServer.call(counter, route_signal_5, [])
+
     assert Server.snapshot(counter) == before
   end
 end

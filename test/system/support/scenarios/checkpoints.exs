@@ -14,21 +14,37 @@ defmodule JidoTest.System.Scenarios.Checkpoints do
           id = Server.agent(server).id
           children = monitor_agent_tree(c, server)
           FaultAdapter.arm(c.control, {1, {@stage, self()}})
-          signal = Probe.record_and_deliver_signal!("effect", 7)
+
+          {:ok, signal} =
+            Probe.record_and_deliver_signal(%{effect_id: "effect", value: 7})
 
           caller =
             Task.async(fn ->
               try do
-                Server.call(server, signal, timeout: 60_000)
+                Server.call(server, signal, timeout: 60000)
               catch
                 :exit, reason -> {:exit, reason}
               end
             end)
 
-          assert_receive {:checkpoint_barrier, @stage, ^server}, 10_000
-          revision = if @stage == :before_write, do: 0, else: 1
+          assert_receive {:checkpoint_barrier, @stage, ^server}, 10000
+
+          revision =
+            if @stage == :before_write do
+              0
+            else
+              1
+            end
+
           assert {:ok, stored, ^revision} = load(c, id)
-          assert stored.state.value == if(revision == 0, do: 0, else: 7)
+
+          assert stored.state.value ==
+                   (if(revision == 0) do
+                      0
+                    else
+                      7
+                    end)
+
           assert Sink.records(c.jido) == %{}
 
           # The Server is blocked in its persistence callback; do not call it to
@@ -36,18 +52,32 @@ defmodule JidoTest.System.Scenarios.Checkpoints do
           monitor = Process.monitor(server)
           Observability.killed(c.observer, server)
           Process.exit(server, :kill)
-          assert_receive {:DOWN, ^monitor, :process, ^server, :killed}, 10_000
+          assert_receive {:DOWN, ^monitor, :process, ^server, :killed}, 10000
           await_down(children)
           assert_empty_agent_pool(c)
-          assert {:exit, _} = Task.await(caller, 10_000)
+          assert {:exit, _} = Task.await(caller, 10000)
           assert Jido.whereis_agent(c.jido, id) == nil
           assert {:ok, ^stored, ^revision} = load(c, id)
 
           restored = start_agent(c, id: id, restore: :required)
-          records = if revision == 0, do: %{}, else: %{"effect" => 7}
+
+          records =
+            if revision == 0 do
+              %{}
+            else
+              %{"effect" => 7}
+            end
+
           completed(c, restored, records)
           assert Sink.records(c.jido) == records
-          assert Server.snapshot(restored).state_version == if(revision == 0, do: 0, else: 2)
+
+          assert Server.snapshot(restored).state_version ==
+                   (if(revision == 0) do
+                      0
+                    else
+                      2
+                    end)
+
           stop_agent(c, restored)
         end
       end
@@ -56,13 +86,16 @@ defmodule JidoTest.System.Scenarios.Checkpoints do
         server = start_agent(c)
         id = Server.agent(server).id
         monitor = Process.monitor(server)
-        signal = Probe.record_and_deliver_signal!("effect", 7)
+
+        {:ok, signal} =
+          Probe.record_and_deliver_signal(%{effect_id: "effect", value: 7})
+
         FaultAdapter.arm(c.control, {1, :lost_reply})
 
         assert {:error, {:persistence_failed, {:indeterminate, :system_lost_reply}}} =
                  Server.call(server, signal)
 
-        assert_receive {:DOWN, ^monitor, :process, ^server, _}, 10_000
+        assert_receive {:DOWN, ^monitor, :process, ^server, _}, 10000
         assert Sink.records(c.jido) == %{}
 
         assert {:ok, %{state: %{value: 7, delivery: %{pending: %{"effect" => 7}}}}, 1} =

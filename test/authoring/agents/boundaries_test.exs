@@ -15,7 +15,6 @@ defmodule JidoTest.Authoring.Agents.BoundariesTest do
   for {file, message} <- [
         {"missing_source", "signal_source is required for define"},
         {"duplicate_schema", "Fields declared in both keyword and block form"},
-        {"optional_list", "must use input options"},
         {"helper_collision", "Generated function conflicts with replace_signal/1"},
         {"plugin_conflict", "Plugin-owned Agent state key conflicts with the domain schema"}
       ] do
@@ -29,19 +28,28 @@ defmodule JidoTest.Authoring.Agents.BoundariesTest do
     end
   end
 
+  test "removed positional declarations report their source location" do
+    error =
+      assert_raise Spark.Error.DslError, fn ->
+        Corpus.compile_file("invalid/optional_list.exs")
+      end
+
+    assert Exception.message(error) =~ "args"
+  end
+
   for variant <- [:counter_block, :inline, :flow_plugin] do
     @variant variant
-    test "#{variant}: optional generated helper keeps omissions and fresh IDs" do
+    test "#{variant}: generated helper keeps omissions and fresh IDs" do
       Corpus.load!(@variant)
       spec = Corpus.spec(@variant)
       module = spec.attrs.module
-      assert {:ok, first} = module.add_signal()
-      assert {:ok, second} = module.add_signal()
+      assert {:ok, first} = module.add_signal(%{})
+      assert {:ok, second} = module.add_signal(%{})
       assert first.data == %{}
       assert first.source == spec.source
       assert first.type == elem(hd(spec.steps), 0)
       assert first.id != second.id
-      assert {:ok, explicit} = module.add_signal(3)
+      assert {:ok, explicit} = module.add_signal(%{amount: 3})
       assert explicit.data == %{amount: 3}
     end
   end
@@ -88,13 +96,13 @@ defmodule JidoTest.Authoring.Agents.BoundariesTest do
     end
   end
 
-  test "required list helper accepts empty lists and does not confuse them with options" do
+  test "map inputs preserve empty and nonempty lists" do
     Corpus.load!(:list_inputs)
     spec = Corpus.spec(:list_inputs)
     module = spec.attrs.module
 
     for items <- [[], ["a", "b"]] do
-      assert {:ok, signal} = module.replace_signal(items)
+      assert {:ok, signal} = module.replace_signal(%{items: items})
       assert signal.type == "items.replace"
       assert signal.source == spec.source
       assert signal.data === %{items: items}
@@ -105,7 +113,7 @@ defmodule JidoTest.Authoring.Agents.BoundariesTest do
   test "lowered and built Flow targets support their named generated interfaces" do
     Corpus.load!(:extension_route)
     extension = Corpus.spec(:extension_route).attrs.module
-    assert {:ok, text_signal} = extension.write_signal("after lowering")
+    assert {:ok, text_signal} = extension.write_signal(%{text: "after lowering"})
     assert text_signal.data == %{text: "after lowering"}
 
     assert {:ok, %{state: %{text: "after lowering"}}, []} =
@@ -113,7 +121,7 @@ defmodule JidoTest.Authoring.Agents.BoundariesTest do
 
     Corpus.load!(:built_flow)
     built = Corpus.spec(:built_flow).attrs.module
-    assert {:ok, value_signal} = built.set_signal(9)
+    assert {:ok, value_signal} = built.set_signal(%{value: 9})
     assert value_signal.data == %{value: 9}
     assert {:ok, %{state: %{total: 9}}, []} = Agent.cmd(built.new!(), value_signal)
   end

@@ -274,12 +274,16 @@ defmodule JidoTest.Examples.Factory.WorkshopTest do
         end
       end)
 
-    assert {:ok, _} =
-             Conversation.ask(system.conversation, "inspect", "Inspect the factory",
-               context: context
-             )
+    {:ok, route_signal_1} =
+      Conversation.ask_signal(%{
+        request_id: "inspect",
+        text: "Inspect the factory"
+      })
 
-    assert_receive {:inspection_result, body}, 5_000
+    assert {:ok, _} =
+             Jido.AgentServer.call(system.conversation, route_signal_1, context: context)
+
+    assert_receive {:inspection_result, body}, 5000
     assert body =~ "max_concurrent_jobs"
     assert body =~ "interval_ms"
     assert body =~ "1000"
@@ -290,17 +294,22 @@ defmodule JidoTest.Examples.Factory.WorkshopTest do
     jido: jido
   } do
     system = HTTP.system!(jido, :workshop)
-    assert {:ok, agent} = Workshop.boot(system.factory)
+
+    {:ok, route_signal_2} = Workshop.boot_signal(%{})
+
+    assert {:ok, agent} =
+             Jido.AgentServer.call(system.factory, route_signal_2, [])
+
     assert map_size(agent.state.scheduler.cron) == 1
     runtime = Server.children(system.factory)[{:plugin, Jido.Plugin.Scheduler}].pid
     ref = Process.monitor(runtime)
     assert {:ok, _} = Tools.command(jido, system.factory_id, :submit, "job", "", "Goal")
-    assert_eventually(HTTP.state(system.factory).active_job_id == "job", timeout: 2_000)
+    assert_eventually(HTTP.state(system.factory).active_job_id == "job", timeout: 2000)
     worker_id = HTTP.state(system.factory).jobs["job"].worker_id
     worker = eventually(fn -> Jido.whereis_agent(jido, worker_id) end)
     worker_ref = Process.monitor(worker)
     assert :ok = Jido.stop_agent(jido, system.owner)
-    assert_receive {:DOWN, ^ref, :process, _, _}, 2_000
-    assert_receive {:DOWN, ^worker_ref, :process, _, _}, 2_000
+    assert_receive {:DOWN, ^ref, :process, _, _}, 2000
+    assert_receive {:DOWN, ^worker_ref, :process, _, _}, 2000
   end
 end

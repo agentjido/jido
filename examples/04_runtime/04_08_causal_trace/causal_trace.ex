@@ -35,11 +35,18 @@ defmodule Jido.Examples.CausalTrace do
         if context.agent_state.request_id == "" do
           directives =
             Enum.flat_map([:left, :right], fn slot ->
+              {:ok, command_signal_1} =
+                Worker.compute_signal(%{
+                  request_id: input.request_id,
+                  slot: slot,
+                  value: input.value
+                })
+
               [
                 Directive.spawn_child(Worker, slot, node: input[:node], restart: :temporary),
                 Directive.emit_to_child(
                   slot,
-                  Worker.compute_signal!(input.request_id, slot, input.value)
+                  command_signal_1
                 )
               ]
             end)
@@ -50,7 +57,7 @@ defmodule Jido.Examples.CausalTrace do
         end
       end
 
-      define :start_work, args: [:request_id, :value]
+      define :start_work
     end
 
     route "examples.runtime.causal_trace.result" do

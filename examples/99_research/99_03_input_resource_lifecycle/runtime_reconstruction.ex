@@ -17,7 +17,7 @@ defmodule Jido.Examples.RuntimeReconstruction do
         {:ok, context.agent_state, [%__MODULE__.SetFeed{feed: name}]}
       end
 
-      define :select, args: [:name]
+      define :select
     end
 
     route "examples.research.runtime_reconstruction.feed.input" do

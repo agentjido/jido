@@ -188,10 +188,16 @@ defmodule JidoTest.Examples.LLM.ReActAgentTest do
   defp ask(server, prompt, model, tools, opts \\ []) do
     max_steps = Keyword.get(opts, :max_steps, 8)
 
-    ReActAgent.ask(server, prompt,
-      input: %{max_steps: max_steps, steps_remaining: max_steps},
+    {:ok, route_signal_1} =
+      ReActAgent.ask_signal(%{
+        prompt: prompt,
+        max_steps: max_steps,
+        steps_remaining: max_steps
+      })
+
+    Jido.AgentServer.call(server, route_signal_1,
       context: %{model: model, tools: tools},
-      timeout: Keyword.get(opts, :timeout, 5_000)
+      timeout: Keyword.get(opts, :timeout, 5000)
     )
   end
 end

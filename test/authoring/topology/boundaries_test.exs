@@ -117,14 +117,14 @@ defmodule JidoTest.Authoring.Topology.BoundariesTest do
     owner = module.owner()
     assert owner === module.definition()
     assert owner.metadata === %{"kind" => "owner"}
-    assert topology.metadata === %{"kind" => "topology", :role_count => 1}
+    assert topology.metadata === %{"kind" => "topology", role_count: 1}
     assert {:ok, agent} = module.new_agent(id: "owner", state: %{value: 7})
     assert %Agent{id: "owner", state: %{value: 7}, module: ^module} = agent
     assert {:ok, instance} = module.new(id: "topology")
     assert %Topology.Instance{id: "topology", definition: ^topology} = instance
     assert Map.keys(instance.plan.agents) == ["agent/worker"]
 
-    signal = module.set_signal!(9)
+    {:ok, signal} = module.set_signal(%{value: 9})
     assert signal.type == "owner.set"
     assert signal.source == "/authoring/owner"
     assert {:ok, %{state: %{value: 9}}, []} = Agent.cmd(agent, signal)

@@ -39,7 +39,7 @@ defmodule Jido.Examples.PluginStateAgent do
         {:ok, %{context.agent_state | count: context.agent_state.count + amount}}
       end
 
-      define :increment, args: [:amount]
+      define :increment
     end
 
     route "basic.plugin_state.overwrite" do

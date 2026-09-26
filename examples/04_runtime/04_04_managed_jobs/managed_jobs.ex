@@ -50,7 +50,7 @@ defmodule Jido.Examples.ManagedJobs do
         end
       end
 
-      define :start_job, args: [:job_id, :value]
+      define :start_job
     end
 
     route "examples.runtime.jobs.cancel" do
@@ -66,7 +66,7 @@ defmodule Jido.Examples.ManagedJobs do
         end
       end
 
-      define :cancel_job, args: [:job_id]
+      define :cancel_job
     end
 
     route "examples.runtime.jobs.settle" do

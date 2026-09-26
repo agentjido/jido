@@ -10,12 +10,16 @@ defmodule JidoTest.Examples.LLM.ToolCallTest do
       )
 
   test "a typed tool result retains its call ID in the final model input", %{jido: jido} do
-    model = service([{:ok, selected()}, {:ok, %{answer: "answer"}}])
-    tools = service([{:ok, "evidence"}])
+    model = service(ok: selected(), ok: %{answer: "answer"})
+    tools = service(ok: "evidence")
     server = start_agent!(jido, Example)
 
+    {:ok, command_signal_1} = Example.ask_signal(%{prompt: "question"})
+
     assert {:ok, agent} =
-             Server.call(server, Example.ask_signal!("question"),
+             Server.call(
+               server,
+               command_signal_1,
                context: %{model: client(model), tools: client(tools)}
              )
 
@@ -23,11 +27,11 @@ defmodule JidoTest.Examples.LLM.ToolCallTest do
     assert agent.state == %{answer: "answer", tool_results: results}
 
     assert calls(model) == [
-             {:select, %{prompt: "question"}},
-             {:finish, %{prompt: "question", results: results}}
+             select: %{prompt: "question"},
+             finish: %{prompt: "question", results: results}
            ]
 
-    assert calls(tools) == [{:search, %{query: "OTP", operation: :read}}]
+    assert calls(tools) == [search: %{query: "OTP", operation: :read}]
     assert Server.snapshot(server).state_version == 1
   end
 
@@ -40,10 +44,14 @@ defmodule JidoTest.Examples.LLM.ToolCallTest do
           selected(%{arguments: %{query: [], operation: :read}}),
           selected(%{arguments: %{query: "OTP", operation: :delete}})
         ] do
-      model = service([{:ok, call}])
+      model = service(ok: call)
+
+      {:ok, command_signal_2} = Example.ask_signal(%{prompt: "bad"})
 
       assert {:error, _} =
-               Server.call(server, Example.ask_signal!("bad"),
+               Server.call(
+                 server,
+                 command_signal_2,
                  context: %{model: client(model), tools: client(tools)}
                )
 
@@ -74,20 +82,46 @@ defmodule JidoTest.Examples.LLM.ToolCallTest do
     server = start_agent!(jido, Example)
 
     model =
-      service([
-        {:ok, selected()},
-        {:ok, %{answer: "seed"}},
-        {:ok, selected()},
-        {:ok, selected()},
-        {:ok, %{answer: []}}
-      ])
+      service(
+        ok: selected(),
+        ok: %{answer: "seed"},
+        ok: selected(),
+        ok: selected(),
+        ok: %{answer: []}
+      )
 
-    tools = service([{:ok, "seed"}, {:error, :unavailable}, {:ok, "effect remains"}])
+    tools = service(ok: "seed", error: :unavailable, ok: "effect remains")
     ctx = %{model: client(model), tools: client(tools)}
-    assert {:ok, _} = Server.call(server, Example.ask_signal!("seed"), context: ctx)
+
+    {:ok, command_signal_3} = Example.ask_signal(%{prompt: "seed"})
+
+    assert {:ok, _} =
+             Server.call(
+               server,
+               command_signal_3,
+               context: ctx
+             )
+
     before = Server.snapshot(server)
-    assert {:error, _} = Server.call(server, Example.ask_signal!("tool error"), context: ctx)
-    assert {:error, _} = Server.call(server, Example.ask_signal!("answer error"), context: ctx)
+
+    {:ok, command_signal_4} = Example.ask_signal(%{prompt: "tool error"})
+
+    assert {:error, _} =
+             Server.call(
+               server,
+               command_signal_4,
+               context: ctx
+             )
+
+    {:ok, command_signal_5} = Example.ask_signal(%{prompt: "answer error"})
+
+    assert {:error, _} =
+             Server.call(
+               server,
+               command_signal_5,
+               context: ctx
+             )
+
     assert Server.snapshot(server) == before
     assert length(calls(tools)) == 3
 

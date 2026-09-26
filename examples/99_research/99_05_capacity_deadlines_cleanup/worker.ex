@@ -19,7 +19,7 @@ defmodule Jido.Examples.SharedBudget.Worker do
         {:ok, %{job: job, value: value * 2}}
       end
 
-      define :work, args: [:job, :value]
+      define :work
     end
   end
 end

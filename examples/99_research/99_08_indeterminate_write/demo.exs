@@ -12,7 +12,13 @@ store = {Store, store: process, write_result: :indeterminate}
 
 try do
   {:ok, agent} = Jido.start_agent(jido, Probe, id: "write-probe", persistence: store)
-  IO.inspect(Probe.increment(agent, "first", 1), label: "First reply")
+
+  {:ok, route_signal_1} = Probe.increment_signal(%{request_id: "first", amount: 1})
+
+  IO.inspect(
+    Jido.AgentServer.call(agent, route_signal_1, []),
+    label: "First reply"
+  )
 
   {:ok, stored, revision} =
     Jido.Persistence.load_agent_with_revision(store, Probe, "write-probe", instance: jido)
@@ -21,7 +27,13 @@ try do
 
   try do
     IO.inspect(Server.snapshot(agent).agent.state, label: "Live state")
-    IO.inspect(Probe.increment(agent, "second", 10), label: "Second reply")
+
+    {:ok, route_signal_2} = Probe.increment_signal(%{request_id: "second", amount: 10})
+
+    IO.inspect(
+      Jido.AgentServer.call(agent, route_signal_2, []),
+      label: "Second reply"
+    )
   catch
     :exit, _ -> IO.puts("The Agent stopped accepting work.")
   end

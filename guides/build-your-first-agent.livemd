@@ -24,14 +24,16 @@ defmodule FirstAgent.Counter do
     description: "Counts typed increment Signals"
 
   agent do
-    schema Zoi.object(%{
-             count: Zoi.integer() |> Zoi.min(0) |> Zoi.default(0),
-             last_amount: Zoi.integer() |> Zoi.default(0)
-           })
+    schema(
+      Zoi.object(%{
+        count: Zoi.integer() |> Zoi.min(0) |> Zoi.default(0),
+        last_amount: Zoi.integer() |> Zoi.default(0)
+      })
+    )
   end
 
   routes do
-    signal_source "/guides/first-agent"
+    signal_source("/guides/first-agent")
 
     route "counter.increment" do
       action %{amount: amount},
@@ -48,8 +50,8 @@ defmodule FirstAgent.Counter do
          }}
       end
 
-      defaults %{amount: 1}
-      define :increment, args: [{:optional, :amount}]
+      defaults(%{amount: 1})
+      define(:increment)
     end
   end
 end
@@ -90,10 +92,10 @@ agent = FirstAgent.Counter.new!(id: "counter-1")
 Omit the optional argument to use the route default.
 
 ```elixir
-{:ok, default_signal} = FirstAgent.Counter.increment_signal()
+{:ok, default_signal} = FirstAgent.Counter.increment_signal(%{})
 {:ok, after_default, []} = FirstAgent.Counter.cmd(agent, default_signal)
 
-{:ok, explicit_signal} = FirstAgent.Counter.increment_signal(4)
+{:ok, explicit_signal} = FirstAgent.Counter.increment_signal(%{amount: 4})
 {:ok, after_explicit, []} = FirstAgent.Counter.cmd(after_default, explicit_signal)
 
 after_explicit.state
@@ -104,7 +106,7 @@ The final state is `%{count: 5, last_amount: 4}`.
 ## Reject Invalid Input
 
 ```elixir
-{:ok, invalid_signal} = FirstAgent.Counter.increment_signal(-1)
+{:ok, invalid_signal} = FirstAgent.Counter.increment_signal(%{amount: -1})
 {:error, error} = FirstAgent.Counter.cmd(after_explicit, invalid_signal)
 
 {error.__struct__, after_explicit.state.count}

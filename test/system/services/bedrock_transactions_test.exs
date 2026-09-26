@@ -16,7 +16,13 @@ defmodule JidoTest.System.Services.BedrockTransactions do
     repo = Keyword.fetch!(opts, :repo)
     owner = self()
     server = start_agent(c)
-    assert {:ok, _} = Probe.record_and_deliver(server, "before-abort", 7)
+
+    {:ok, route_signal_1} =
+      Probe.record_and_deliver_signal(%{effect_id: "before-abort", value: 7})
+
+    assert {:ok, _} =
+             Jido.AgentServer.call(server, route_signal_1, [])
+
     completed(c, server, %{"before-abort" => 7})
     snapshot = Server.snapshot(server)
     key = "system/transaction-conflict"
@@ -28,21 +34,25 @@ defmodule JidoTest.System.Services.BedrockTransactions do
             fn ->
               nil = repo.get(key)
               send(owner, {:transaction_read, self()})
-              receive do: (:release -> :ok)
+
+              receive do
+                :release -> :ok
+              end
+
               repo.put(key, "stale")
             end,
             retry_limit: 0,
-            timeout_in_ms: 10_000
+            timeout_in_ms: 10000
           )
         rescue
           error -> {:error, Exception.message(error)}
         end
       end)
 
-    assert_receive {:transaction_read, writer}, 10_000
+    assert_receive {:transaction_read, writer}, 10000
     assert :ok = repo.transact(fn -> repo.put(key, "winner") end, retry_limit: 0)
     send(writer, :release)
-    assert {:error, reason} = Task.await(held, 10_000)
+    assert {:error, reason} = Task.await(held, 10000)
     assert reason =~ ":aborted"
     assert "winner" == repo.transact(fn -> repo.get(key) end)
     assert {:ok, saved, 2} = load(c, snapshot.agent.id)
@@ -83,16 +93,19 @@ defmodule JidoTest.System.Services.BedrockTransactions do
 
     monitors = monitor_agent_tree(c, server)
 
+    {:ok, command_signal_1} =
+      Probe.record_and_deliver_signal(%{effect_id: "lost-commit-reply", value: 19})
+
     request =
       Server.send_request(
         server,
-        Probe.record_and_deliver_signal!("lost-commit-reply", 19),
+        command_signal_1,
         :infinity
       )
 
-    assert_receive {:commit_reply_held, ^sequencer, version}, 10_000
+    assert_receive {:commit_reply_held, ^sequencer, version}, 10000
     assert is_binary(version)
-    assert {:reply, {:error, _}} = Server.receive_response(request, 10_000)
+    assert {:reply, {:error, _}} = Server.receive_response(request, 10000)
     await_down(monitors)
     assert_empty_agent_pool(c)
     :telemetry.detach(handler)

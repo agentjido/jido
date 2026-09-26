@@ -10,18 +10,27 @@ defmodule Jido.AgentServer.DistributedAuthorityTest do
   test "a replacement restores on another node and fences an older revision", c do
     persistence = persistence(c)
     assert {:ok, old} = start(c.peer_a, c, persistence)
-    assert {:ok, %{state: %{value: 1}}} = peer_call(c.peer_a, Agent, :record, [old, 1])
+
+    {:ok, route_signal_1} = Agent.record_signal(%{value: 1})
+
+    assert {:ok, %{state: %{value: 1}}} =
+             peer_call(c.peer_a, Jido.AgentServer, :call, [old, route_signal_1])
+
     assert {:ok, replacement} = start(c.peer_b, c, persistence)
     assert node(replacement) == c.node_b
 
     assert %{state_version: 1, agent: %{state: %{value: 1}}} =
              peer_call(c.peer_b, Server, :snapshot, [replacement])
 
+    {:ok, route_signal_2} = Agent.record_signal(%{value: 2})
+
     assert {:ok, %{state: %{value: 2}}} =
-             peer_call(c.peer_b, Agent, :record, [replacement, 2])
+             peer_call(c.peer_b, Jido.AgentServer, :call, [replacement, route_signal_2])
+
+    {:ok, route_signal_3} = Agent.record_signal(%{value: 3})
 
     assert {:error, {:persistence_failed, :conflict}} =
-             peer_call(c.peer_a, Agent, :record, [old, 3])
+             peer_call(c.peer_a, Jido.AgentServer, :call, [old, route_signal_3])
 
     peer_eventually(fn -> not peer_call(c.peer_a, Process, :alive?, [old]) end)
 

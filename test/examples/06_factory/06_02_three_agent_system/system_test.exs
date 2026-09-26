@@ -25,16 +25,16 @@ defmodule JidoTest.Examples.Factory.SystemTest do
         end
       end)
 
+    {:ok, route_signal_1} = Conversation.ask_signal(%{request_id: "chat-1", text: "Start work"})
+
     assert {:ok, agent} =
-             Conversation.ask(system.conversation, "chat-1", "Start work", context: context)
+             Jido.AgentServer.call(system.conversation, route_signal_1, context: context)
 
     assert agent.state.status == :thinking
-    assert_receive {:tool_result, worker, body}, 5_000
+    assert_receive {:tool_result, worker, body}, 5000
     assert Jason.encode!(body) =~ "chat-1"
 
-    assert_eventually(HTTP.state(system.factory).jobs["chat-1"].status == :running,
-      timeout: 2_000
-    )
+    assert_eventually(HTTP.state(system.factory).jobs["chat-1"].status == :running, timeout: 2000)
 
     assert_eventually(
       Enum.any?(HTTP.state(system.conversation).events, &(&1.status == "running"))
@@ -96,11 +96,23 @@ defmodule JidoTest.Examples.Factory.SystemTest do
         end
       end)
 
-    assert {:ok, _} = Conversation.ask(system.conversation, "chat", "Hello", context: context)
-    assert_receive {:waiting, worker}, 5_000
-    refs = for pid <- [system.conversation, system.factory, worker], do: Process.monitor(pid)
+    {:ok, route_signal_2} = Conversation.ask_signal(%{request_id: "chat", text: "Hello"})
+
+    assert {:ok, _} =
+             Jido.AgentServer.call(system.conversation, route_signal_2, context: context)
+
+    assert_receive {:waiting, worker}, 5000
+
+    refs =
+      for pid <- [system.conversation, system.factory, worker] do
+        Process.monitor(pid)
+      end
+
     assert :ok = Jido.stop_agent(jido, system.owner)
-    for ref <- refs, do: assert_receive({:DOWN, ^ref, :process, _, _}, 2_000)
+
+    for ref <- refs do
+      assert_receive({:DOWN, ^ref, :process, _, _}, 2000)
+    end
   end
 
   test "timer work completes without another user command", %{jido: jido} do
@@ -238,7 +250,11 @@ defmodule JidoTest.Examples.Factory.SystemTest do
          }}
       end)
 
-    assert {:ok, _} = Conversation.ask(system.conversation, "chat", "Hello", context: context)
+    {:ok, route_signal_3} = Conversation.ask_signal(%{request_id: "chat", text: "Hello"})
+
+    assert {:ok, _} =
+             Jido.AgentServer.call(system.conversation, route_signal_3, context: context)
+
     assert_eventually(HTTP.state(system.conversation).status == :idle)
     error = HTTP.state(system.conversation).error
     assert error =~ "HTTP 401"

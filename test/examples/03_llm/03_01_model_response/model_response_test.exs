@@ -3,23 +3,28 @@ defmodule JidoTest.Examples.LLM.ModelResponseTest do
   alias Jido.Examples.ModelResponse, as: Example
 
   test "exact input and selected output cross direct and live boundaries", %{jido: jido} do
-    model = service([{:ok, %{answer: "one", private: self()}}, {:ok, %{answer: "one"}}])
+    model = service(ok: %{answer: "one", private: self()}, ok: %{answer: "one"})
 
     persistence =
       {Jido.Persistence.ETS, table: :"llm_response_#{System.unique_integer([:positive])}"}
 
     server = start_agent!(jido, Example, persistence: persistence, restore: false)
     before = Server.snapshot(server)
-    assert {:ok, signal} = Example.generate_signal("hello")
+    assert {:ok, signal} = Example.generate_signal(%{prompt: "hello"})
     assert signal.data == %{prompt: "hello"}
 
     assert {:ok, candidate, []} =
              Example.cmd(before.agent, signal, context: %{model: client(model)})
 
     assert Server.snapshot(server) == before
-    assert {:ok, ^candidate} = Example.generate(server, "hello", context: %{model: client(model)})
+
+    {:ok, route_signal_1} = Example.generate_signal(%{prompt: "hello"})
+
+    assert {:ok, ^candidate} =
+             Jido.AgentServer.call(server, route_signal_1, context: %{model: client(model)})
+
     assert candidate.state == %{answer: "one"}
-    assert calls(model) == [{:complete, %{prompt: "hello"}}, {:complete, %{prompt: "hello"}}]
+    assert calls(model) == [complete: %{prompt: "hello"}, complete: %{prompt: "hello"}]
 
     assert {:ok, ^candidate, 1} =
              Jido.Persistence.load_agent_with_revision(persistence, Example, candidate.id,
@@ -28,14 +33,41 @@ defmodule JidoTest.Examples.LLM.ModelResponseTest do
   end
 
   test "bad input makes no call and bad output preserves a prior commit", %{jido: jido} do
-    model = service([{:ok, %{answer: "seed"}}, {:ok, %{answer: []}}])
+    model = service(ok: %{answer: "seed"}, ok: %{answer: []})
     server = start_agent!(jido, Example)
     ctx = %{model: client(model)}
-    assert {:error, _} = Server.call(server, Example.generate_signal!(""), context: ctx)
+
+    {:ok, command_signal_1} = Example.generate_signal(%{prompt: ""})
+
+    assert {:error, _} =
+             Server.call(
+               server,
+               command_signal_1,
+               context: ctx
+             )
+
     assert calls(model) == []
-    assert {:ok, _} = Server.call(server, Example.generate_signal!("seed"), context: ctx)
+
+    {:ok, command_signal_2} = Example.generate_signal(%{prompt: "seed"})
+
+    assert {:ok, _} =
+             Server.call(
+               server,
+               command_signal_2,
+               context: ctx
+             )
+
     before = Server.snapshot(server)
-    assert {:error, _} = Server.call(server, Example.generate_signal!("bad"), context: ctx)
+
+    {:ok, command_signal_3} = Example.generate_signal(%{prompt: "bad"})
+
+    assert {:error, _} =
+             Server.call(
+               server,
+               command_signal_3,
+               context: ctx
+             )
+
     assert Server.snapshot(server) == before
     assert length(calls(model)) == 2
   end
@@ -44,14 +76,41 @@ defmodule JidoTest.Examples.LLM.ModelResponseTest do
     jido: jido
   } do
     server = start_agent!(jido, Example)
-    primary = service([{:error, :overloaded}, {:error, :unauthorized}, {:error, :timeout}])
-    backup = service([{:ok, %{answer: "backup"}}, {:ok, %{answer: nil}}])
+    primary = service(error: :overloaded, error: :unauthorized, error: :timeout)
+    backup = service(ok: %{answer: "backup"}, ok: %{answer: nil})
     ctx = %{model: client(primary), backup: client(backup)}
-    assert {:ok, _} = Server.call(server, Example.generate_signal!("hello"), context: ctx)
+
+    {:ok, command_signal_4} = Example.generate_signal(%{prompt: "hello"})
+
+    assert {:ok, _} =
+             Server.call(
+               server,
+               command_signal_4,
+               context: ctx
+             )
+
     before = Server.snapshot(server)
-    assert {:error, _} = Server.call(server, Example.generate_signal!("auth"), context: ctx)
-    assert calls(backup) == [{:complete, %{prompt: "hello"}}]
-    assert {:error, _} = Server.call(server, Example.generate_signal!("bad backup"), context: ctx)
+
+    {:ok, command_signal_5} = Example.generate_signal(%{prompt: "auth"})
+
+    assert {:error, _} =
+             Server.call(
+               server,
+               command_signal_5,
+               context: ctx
+             )
+
+    assert calls(backup) == [complete: %{prompt: "hello"}]
+
+    {:ok, command_signal_6} = Example.generate_signal(%{prompt: "bad backup"})
+
+    assert {:error, _} =
+             Server.call(
+               server,
+               command_signal_6,
+               context: ctx
+             )
+
     assert Server.snapshot(server) == before
     assert Enum.map(calls(primary), &elem(&1, 1).prompt) == ["hello", "auth", "bad backup"]
     assert Enum.map(calls(backup), &elem(&1, 1).prompt) == ["hello", "bad backup"]
@@ -63,8 +122,12 @@ defmodule JidoTest.Examples.LLM.ModelResponseTest do
     model =
       service([{:ok, %{answer: "seed"}}, blocked(self(), :deadline, {:ok, %{answer: "late"}})])
 
+    {:ok, command_signal_7} = Example.generate_signal(%{prompt: "seed"})
+
     assert {:ok, _} =
-             Server.call(server, Example.generate_signal!("seed"),
+             Server.call(
+               server,
+               command_signal_7,
                context: %{model: client(model)}
              )
 
@@ -72,13 +135,19 @@ defmodule JidoTest.Examples.LLM.ModelResponseTest do
 
     task =
       Task.async(fn ->
-        Server.call(server, Example.generate_signal!("wait"), context: %{model: client(model)})
+        {:ok, command_signal_8} = Example.generate_signal(%{prompt: "wait"})
+
+        Server.call(
+          server,
+          command_signal_8,
+          context: %{model: client(model)}
+        )
       end)
 
-    assert_receive {:provider_waiting, :deadline, worker, :complete, %{prompt: "wait"}}, 1_000
+    assert_receive {:provider_waiting, :deadline, worker, :complete, %{prompt: "wait"}}, 1000
     ref = Process.monitor(worker)
     assert {:error, _} = Task.await(task)
-    assert_receive {:DOWN, ^ref, :process, ^worker, _}, 1_000
+    assert_receive {:DOWN, ^ref, :process, ^worker, _}, 1000
     assert Server.snapshot(server) == before
   end
 end

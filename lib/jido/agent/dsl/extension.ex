@@ -1,6 +1,6 @@
 defmodule Jido.Agent.DSL.Interface do
   @moduledoc false
-  defstruct [:name, :__spark_metadata__, args: []]
+  defstruct [:name, :__spark_metadata__]
 end
 
 defmodule Jido.Agent.DSL.Route do
@@ -20,7 +20,7 @@ defmodule Jido.Agent.DSL.Extension do
     name: :define,
     target: Jido.Agent.DSL.Interface,
     args: [:name],
-    schema: [name: [type: :atom, required: true], args: [type: :any, default: []]]
+    schema: [name: [type: :atom, required: true]]
   }
   @route %Spark.Dsl.Entity{
     name: :__route__,

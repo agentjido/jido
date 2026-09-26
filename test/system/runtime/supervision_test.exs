@@ -22,11 +22,20 @@ defmodule JidoTest.System.SupervisionTest do
 
     on_exit(fn -> :logger.set_primary_config(:filters, filters) end)
     server = start_agent(c)
-    assert {:ok, _} = Probe.record_and_deliver(server, "saved", 7)
+
+    {:ok, route_signal_1} = Probe.record_and_deliver_signal(%{effect_id: "saved", value: 7})
+
+    assert {:ok, _} =
+             Jido.AgentServer.call(server, route_signal_1, [])
+
     completed(c, server, %{"saved" => 7})
     assert GenServer.call(c.sink, :records) == %{"saved" => 7}
     id = Jido.AgentServer.agent(server).id
-    children = for {_, pid, _, _} <- Supervisor.which_children(c.jido_pid), is_pid(pid), do: pid
+
+    children =
+      for {_, pid, _, _} <- Supervisor.which_children(c.jido_pid), is_pid(pid) do
+        pid
+      end
 
     monitors =
       monitor_agent_tree(c, server) ++
@@ -42,11 +51,13 @@ defmodule JidoTest.System.SupervisionTest do
 
     try do
       Process.exit(c.jido_pid, :kill)
-      assert_receive {:DOWN, ^prior_monitor, :process, _, :killed}, 10_000
+      assert_receive {:DOWN, ^prior_monitor, :process, _, :killed}, 10000
       assert Process.alive?(c.world)
       assert Process.alive?(held)
     after
-      if Process.alive?(held), do: :erlang.resume_process(held)
+      if Process.alive?(held) do
+        :erlang.resume_process(held)
+      end
     end
 
     await_down(monitors)

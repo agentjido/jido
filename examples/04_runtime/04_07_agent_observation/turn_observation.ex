@@ -25,7 +25,7 @@ defmodule Jido.Examples.TurnObservation do
         {:ok, %{context.agent_state | value: value}}
       end
 
-      define :record, args: [:value]
+      define :record
     end
 
     route "examples.runtime.observation.missing_child" do
@@ -41,7 +41,7 @@ defmodule Jido.Examples.TurnObservation do
         {:ok, %{context.agent_state | value: value}, [directive]}
       end
 
-      define :send_to_missing_child, args: [:value]
+      define :send_to_missing_child
     end
   end
 end

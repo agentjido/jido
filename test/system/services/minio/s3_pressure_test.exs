@@ -14,7 +14,10 @@ defmodule JidoTest.System.Services.S3Pressure do
   test "many real S3 writers have one winner at each revision", c do
     server = start_agent(c)
     id = Server.agent(server).id
-    signal = Probe.record_and_deliver_signal!("seed", 7)
+
+    {:ok, signal} =
+      Probe.record_and_deliver_signal(%{effect_id: "seed", value: 7})
+
     assert {:ok, _agent} = Server.call(server, signal)
     completed(c, server, %{"seed" => 7})
     stop_agent(c, server)
@@ -28,7 +31,7 @@ defmodule JidoTest.System.Services.S3Pressure do
         {adapter.compare_and_swap(probe_key, :not_found, bytes, adapter_opts), bytes}
       end)
 
-    assert [{:ok, created_bytes}] = Enum.filter(creates, &match?({:ok, _}, &1))
+    assert [ok: created_bytes] = Enum.filter(creates, &match?({:ok, _}, &1))
     assert Enum.count(creates, &match?({{:error, :conflict}, _}, &1)) == 47
     assert {:ok, ^created_bytes, _token} = adapter.get(probe_key, adapter_opts)
 
@@ -41,7 +44,7 @@ defmodule JidoTest.System.Services.S3Pressure do
           {adapter.compare_and_swap(probe_key, {:token, token}, bytes, adapter_opts), bytes}
         end)
 
-      assert [{:ok, updated_bytes}] = Enum.filter(updates, &match?({:ok, _}, &1))
+      assert [ok: updated_bytes] = Enum.filter(updates, &match?({:ok, _}, &1))
       assert Enum.count(updates, &match?({{:error, :conflict}, _}, &1)) == 23
       assert {:ok, ^updated_bytes, _token} = adapter.get(probe_key, adapter_opts)
     end
@@ -53,7 +56,7 @@ defmodule JidoTest.System.Services.S3Pressure do
 
       writes =
         race(24, fn value ->
-          candidate = %{current | state: %{current.state | value: round * 1_000 + value}}
+          candidate = %{current | state: %{current.state | value: round * 1000 + value}}
 
           {Persistence.save_agent(c.store, candidate,
              instance: c.jido,
@@ -63,7 +66,7 @@ defmodule JidoTest.System.Services.S3Pressure do
            ), candidate}
         end)
 
-      assert [{:ok, winner}] = Enum.filter(writes, &match?({:ok, _}, &1))
+      assert [ok: winner] = Enum.filter(writes, &match?({:ok, _}, &1))
       assert Enum.count(writes, &match?({{:error, :conflict}, _}, &1)) == 23
       assert {:ok, ^winner, next_revision} = load(c, id)
       assert next_revision == revision + 1
@@ -84,7 +87,10 @@ defmodule JidoTest.System.Services.S3Pressure do
   test "an accepted MinIO write with a lost reply is not retried", c do
     server = start_agent(c)
     id = Server.agent(server).id
-    signal = Probe.record_and_deliver_signal!("lost-seed", 7)
+
+    {:ok, signal} =
+      Probe.record_and_deliver_signal(%{effect_id: "lost-seed", value: 7})
+
     assert {:ok, _agent} = Server.call(server, signal)
     completed(c, server, %{"lost-seed" => 7})
     stop_agent(c, server)
@@ -93,7 +99,12 @@ defmodule JidoTest.System.Services.S3Pressure do
     {adapter, adapter_opts} = c.store
     request = Keyword.fetch!(adapter_opts, :request_fn)
     {:ok, calls} = Elixir.Agent.start_link(fn -> 0 end)
-    on_exit(fn -> if Process.alive?(calls), do: Elixir.Agent.stop(calls) end)
+
+    on_exit(fn ->
+      if Process.alive?(calls) do
+        Elixir.Agent.stop(calls)
+      end
+    end)
 
     lost_reply = fn operation ->
       case operation.method do

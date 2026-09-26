@@ -14,7 +14,7 @@ defmodule Jido.Examples.OutputRepair do
     signal_source "/examples/llm/output_repair"
 
     route "examples.llm.output_repair.answer", Jido.Examples.OutputRepair.Pipeline do
-      define :answer, args: [:prompt]
+      define :answer
     end
   end
 end

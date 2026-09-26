@@ -12,7 +12,14 @@ defmodule JidoTest.Telemetry.AgentLifecycleTest do
     probe = EventProbe.attach(agent.id)
 
     try do
-      assert {:ok, candidate, []} = Agent.cmd(agent, Agent.record_signal!(7))
+      {:ok, command_signal_1} = Agent.record_signal(%{value: 7})
+
+      assert {:ok, candidate, []} =
+               Agent.cmd(
+                 agent,
+                 command_signal_1
+               )
+
       assert candidate.state.value == 7
       assert agent.state.value == 0
       assert EventProbe.events(probe) == []
@@ -35,7 +42,12 @@ defmodule JidoTest.Telemetry.AgentLifecycleTest do
 
     try do
       {:ok, server} = Jido.start_agent(jido, Agent, id: id)
-      assert {:ok, agent} = Agent.record(server, 7)
+
+      {:ok, route_signal_1} = Agent.record_signal(%{value: 7})
+
+      assert {:ok, agent} =
+               Jido.AgentServer.call(server, route_signal_1, [])
+
       assert_receive :observer_failed
       assert agent.state.value == 7
       assert Server.snapshot(server).state_version == 1
@@ -53,11 +65,16 @@ defmodule JidoTest.Telemetry.AgentLifecycleTest do
       # Debug history is a diagnostic oracle only. It is never the collector's
       # event source, and it cannot satisfy the telemetry acceptance assertion.
       {:ok, server} = Jido.start_agent(jido, Agent, id: id, debug: true)
-      success = Agent.record_signal!(7)
-      validation = Agent.record_signal!("invalid integer")
-      execution = Agent.fail_execution_signal!()
-      cancellation = Agent.hold_signal!(99)
-      delivery = Agent.send_to_missing_child_signal!(11)
+      {:ok, success} = Agent.record_signal(%{value: 7})
+
+      {:ok, validation} =
+        Agent.record_signal(%{value: "invalid integer"})
+
+      {:ok, execution} = Agent.fail_execution_signal(%{})
+      {:ok, cancellation} = Agent.hold_signal(%{value: 99})
+
+      {:ok, delivery} =
+        Agent.send_to_missing_child_signal(%{value: 11})
 
       assert {:ok, _} = Server.call(server, success)
       assert {:error, _} = Server.call(server, validation)
@@ -69,7 +86,11 @@ defmodule JidoTest.Telemetry.AgentLifecycleTest do
       assert Server.agent(server).state.value == 11
 
       {:ok, history} = Server.recent_events(server)
-      outcomes = for %{metadata: %{outcome: outcome}} <- history, do: outcome
+
+      outcomes =
+        for %{metadata: %{outcome: outcome}} <- history do
+          outcome
+        end
 
       expected = [
         {success.id, :succeeded, true, 0, 1},
@@ -103,10 +124,11 @@ defmodule JidoTest.Telemetry.AgentLifecycleTest do
         assert event.metadata.status == public_status(outcome.status)
 
         assert event.metadata.stage ==
-                 if(outcome.stage in [:prepare, :execute, :finalize],
-                   do: :evaluate,
-                   else: outcome.stage
-                 )
+                 (if(outcome.stage in [:prepare, :execute, :finalize]) do
+                    :evaluate
+                  else
+                    outcome.stage
+                  end)
 
         assert is_binary(event.metadata.trace_id)
         assert is_binary(event.metadata.activation_id)
@@ -186,9 +208,12 @@ defmodule JidoTest.Telemetry.AgentLifecycleTest do
 
     try do
       {:ok, server} = Jido.start_agent(jido, Agent, id: id)
-      signal = Agent.record_and_deliver_signal!(8)
+
+      {:ok, signal} =
+        Agent.record_and_deliver_signal(%{value: 8})
+
       assert {:ok, agent} = Server.call(server, signal, context: %{deliver: deliver})
-      assert_receive {:delivery_started, worker, 8}, 1_000
+      assert_receive {:delivery_started, worker, 8}, 1000
       assert agent.state.value == 8
       assert Server.snapshot(server).state_version == 1
       assert Server.status(server).phase == :directing
@@ -245,7 +270,7 @@ defmodule JidoTest.Telemetry.AgentLifecycleTest do
 
     try do
       {:ok, server} = Jido.start_agent(jido, Agent, id: id, partition: %{private: self()})
-      command = Agent.fail_execution_signal!()
+      {:ok, command} = Agent.fail_execution_signal(%{})
       trace = Jido.Tracing.Trace.new_root()
       {:ok, command} = Jido.Tracing.Trace.put(command, trace)
 
@@ -292,10 +317,15 @@ defmodule JidoTest.Telemetry.AgentLifecycleTest do
 
     try do
       {:ok, server} = Jido.start_agent(jido, Agent, id: id, directive_timeout: 100)
-      assert {:ok, _} = Agent.record_and_deliver(server, 8, context: %{deliver: deliver})
-      assert_receive {:delivery_started, worker}, 1_000
+
+      {:ok, route_signal_2} = Agent.record_and_deliver_signal(%{value: 8})
+
+      assert {:ok, _} =
+               Jido.AgentServer.call(server, route_signal_2, context: %{deliver: deliver})
+
+      assert_receive {:delivery_started, worker}, 1000
       monitor = Process.monitor(worker)
-      assert_receive {:DOWN, ^monitor, :process, ^worker, _}, 1_000
+      assert_receive {:DOWN, ^monitor, :process, ^worker, _}, 1000
       eventually(fn -> Server.status(server).phase == :idle end)
       events = semantic_events(probe)
       [terminal] = Enum.filter(events, &(&1.event == [:jido, :agent, :turn, :settled]))
@@ -328,17 +358,18 @@ defmodule JidoTest.Telemetry.AgentLifecycleTest do
       caller =
         Task.async(fn ->
           try do
-            Agent.hold(server, 9, context: %{barrier: barrier})
+            {:ok, route_signal_3} = Agent.hold_signal(%{value: 9})
+            Jido.AgentServer.call(server, route_signal_3, context: %{barrier: barrier})
           catch
             :exit, reason -> {:caller_exit, reason}
           end
         end)
 
-      assert_receive {:held_execution, worker}, 1_000
+      assert_receive {:held_execution, worker}, 1000
       monitor = Process.monitor(worker)
       assert :ok = Jido.stop_agent(jido, server)
       assert {:caller_exit, _} = Task.await(caller)
-      assert_receive {:DOWN, ^monitor, :process, ^worker, _}, 1_000
+      assert_receive {:DOWN, ^monitor, :process, ^worker, _}, 1000
       events = semantic_events(probe)
       [terminal] = Enum.filter(events, &(&1.event == [:jido, :agent, :turn, :settled]))
       assert terminal.metadata.status == :indeterminate
@@ -366,13 +397,29 @@ defmodule JidoTest.Telemetry.AgentLifecycleTest do
       {:ok, server} =
         Jido.start_agent(jido, Agent, id: id, max_postponed_signals: 0)
 
-      held = Task.async(fn -> Agent.hold(server, 1, context: %{barrier: barrier}) end)
-      assert_receive {:held_execution, worker}, 1_000
+      held =
+        Task.async(fn ->
+          {:ok, route_signal_4} = Agent.hold_signal(%{value: 1})
+          Jido.AgentServer.call(server, route_signal_4, context: %{barrier: barrier})
+        end)
+
+      assert_receive {:held_execution, worker}, 1000
+
+      {:ok, command_signal_2} = Agent.record_signal(%{value: 2})
 
       assert {:error, {:overloaded, %{limit: 0, postponed: 0}}} =
-               Server.call(server, Agent.record_signal!(2))
+               Server.call(
+                 server,
+                 command_signal_2
+               )
 
-      assert :ok = Server.cast(server, Agent.record_signal!(3))
+      {:ok, command_signal_3} = Agent.record_signal(%{value: 3})
+
+      assert :ok =
+               Server.cast(
+                 server,
+                 command_signal_3
+               )
 
       eventually(fn ->
         probe
@@ -418,13 +465,25 @@ defmodule JidoTest.Telemetry.AgentLifecycleTest do
 
     try do
       {:ok, server} = Jido.start_agent(jido, Agent, id: id)
-      held = Task.async(fn -> Agent.hold(server, 1, context: %{barrier: barrier}) end)
-      assert_receive {:held_execution, worker}, 1_000
+
+      held =
+        Task.async(fn ->
+          {:ok, route_signal_5} = Agent.hold_signal(%{value: 1})
+          Jido.AgentServer.call(server, route_signal_5, context: %{barrier: barrier})
+        end)
+
+      assert_receive {:held_execution, worker}, 1000
 
       caller =
         Task.async(fn ->
           try do
-            Server.call(server, Agent.record_signal!(2), 20)
+            {:ok, command_signal_4} = Agent.record_signal(%{value: 2})
+
+            Server.call(
+              server,
+              command_signal_4,
+              20
+            )
           catch
             :exit, _reason -> :caller_timed_out
           end
@@ -511,11 +570,16 @@ defmodule JidoTest.Telemetry.AgentLifecycleTest do
 
     try do
       {:ok, server} = Jido.start_agent(jido, Agent, id: id)
-      assert {:ok, _} = Agent.record_and_deliver(server, 8, context: %{deliver: deliver})
-      assert_receive {:delivery_started, worker}, 1_000
+
+      {:ok, route_signal_6} = Agent.record_and_deliver_signal(%{value: 8})
+
+      assert {:ok, _} =
+               Jido.AgentServer.call(server, route_signal_6, context: %{deliver: deliver})
+
+      assert_receive {:delivery_started, worker}, 1000
       monitor = Process.monitor(worker)
       Process.exit(worker, :kill)
-      assert_receive {:DOWN, ^monitor, :process, ^worker, :killed}, 1_000
+      assert_receive {:DOWN, ^monitor, :process, ^worker, :killed}, 1000
       eventually(fn -> Server.status(server).phase == :idle end)
       events = semantic_events(probe)
       [fault] = Enum.filter(events, &(&1.event == [:jido, :agent, :directive, :exception]))
@@ -544,7 +608,9 @@ defmodule JidoTest.Telemetry.AgentLifecycleTest do
   end
 
   defp public_status(:succeeded), do: :ok
+
   defp public_status(:failed), do: :error
+
   defp public_status(status), do: status
 
   defp cancel_held_turn(server, signal) do

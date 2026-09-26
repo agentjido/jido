@@ -95,7 +95,7 @@ defmodule JidoTest.Topology.AuthoringHostTest do
             signal_source "/topology-owner"
 
             route "owner.add", Add do
-              define :add, args: [:amount]
+              define :add
             end
           end
 
@@ -139,7 +139,8 @@ defmodule JidoTest.Topology.AuthoringHostTest do
 
     assert {:ok, server} = Jido.start_agent(jido, module, id: "live-owner")
     assert AgentServer.agent(server).module == module
-    assert {:ok, %{state: %{count: 3}}} = module.add(server, 3)
+    assert {:ok, signal} = module.add_signal(%{amount: 3})
+    assert {:ok, %{state: %{count: 3}}} = Jido.AgentServer.call(server, signal)
   end
 
   test "the topology block is independent from the optional control Agent block" do

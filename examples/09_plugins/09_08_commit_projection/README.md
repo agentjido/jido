@@ -20,7 +20,8 @@ its owned committed state after any successful Turn.
 
 Read [the Agent and Plugin source](commit_projection.ex) first, then
 [the test](../../../test/examples/09_plugins/09_08_commit_projection/commit_projection_test.exs).
-Use `Agent.add(server, amount)` to change the count.
+Build the command with `Agent.add_signal(%{amount: amount})`. Pass the Signal to
+`Jido.AgentServer.call/3` to change the count.
 
 ```sh
 mix test test/examples/09_plugins/09_08_commit_projection --include example --seed 0

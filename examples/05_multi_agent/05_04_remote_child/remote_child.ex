@@ -22,18 +22,23 @@ defmodule Jido.Examples.RemoteParent do
         {:ok, context.agent_state, [directive]}
       end
 
-      define :request_child, args: [:target_node]
+      define :request_child
     end
 
     route "examples.multi_agent.remote_child.request_result" do
       action input,
         schema: Zoi.object(%{value: Zoi.integer(), request_id: Zoi.string()}),
         context: context do
-        signal = Jido.Examples.RemoteCounter.calculate_signal!(input.value, input.request_id)
+        {:ok, signal} =
+          Jido.Examples.RemoteCounter.calculate_signal(%{
+            value: input.value,
+            request_id: input.request_id
+          })
+
         {:ok, context.agent_state, [Jido.Agent.Directive.emit_to_child(:worker, signal)]}
       end
 
-      define :request_result, args: [:value, :request_id]
+      define :request_result
     end
 
     route "examples.multi_agent.remote_child.result" do

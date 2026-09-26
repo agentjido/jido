@@ -5,7 +5,12 @@ defmodule JidoTest.Examples.MultiAgent.AgentHierarchyTest do
 
   defp tree(jido) do
     root = start_agent!(jido, AgentHierarchy)
-    assert {:ok, _} = AgentHierarchy.grow(root, 2)
+
+    {:ok, route_signal_1} = AgentHierarchy.grow_signal(%{depth: 2})
+
+    assert {:ok, _} =
+             Jido.AgentServer.call(root, route_signal_1, [])
+
     eventually(fn -> length(descendants(root)) == 6 end)
     {root, descendants(root)}
   end
@@ -60,12 +65,23 @@ defmodule JidoTest.Examples.MultiAgent.AgentHierarchyTest do
     root = start_agent!(jido, AgentHierarchy, error_policy: :log_only)
 
     for depth <- [-1, 5] do
-      assert {:error, _} = AgentHierarchy.grow(root, depth)
+      {:ok, route_signal_2} = AgentHierarchy.grow_signal(%{depth: depth})
+
+      assert {:error, _} =
+               Jido.AgentServer.call(root, route_signal_2, [])
+
       assert Server.snapshot(root).state_version == 0
       assert Server.children(root) == %{}
     end
 
-    assert {:ok, _} = AgentHierarchy.grow(root, 0)
-    assert {:error, _} = AgentHierarchy.grow(root, 0)
+    {:ok, route_signal_3} = AgentHierarchy.grow_signal(%{depth: 0})
+
+    assert {:ok, _} =
+             Jido.AgentServer.call(root, route_signal_3, [])
+
+    {:ok, route_signal_4} = AgentHierarchy.grow_signal(%{depth: 0})
+
+    assert {:error, _} =
+             Jido.AgentServer.call(root, route_signal_4, [])
   end
 end

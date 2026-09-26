@@ -126,15 +126,22 @@ defmodule JidoTest.Examples.Factory.BatchTest do
         end
       end)
 
-    assert {:ok, _} =
-             Conversation.ask(system.conversation, "corrected", "add 3 jobs to the factory",
-               context: context
-             )
+    {:ok, route_signal_1} =
+      Conversation.ask_signal(%{
+        request_id: "corrected",
+        text: "add 3 jobs to the factory"
+      })
 
-    assert_receive {:input_error, error}, 5_000
+    assert {:ok, _} =
+             Jido.AgentServer.call(system.conversation, route_signal_1, context: context)
+
+    assert_receive {:input_error, error}, 5000
     assert error =~ "Invalid submit_work arguments"
-    assert_receive {:receipt, receipt}, 5_000
-    for index <- 1..3, do: assert(receipt =~ "corrected/#{index}")
+    assert_receive {:receipt, receipt}, 5000
+
+    for index <- 1..3 do
+      assert(receipt =~ "corrected/#{index}")
+    end
 
     assert_eventually(
       HTTP.state(system.conversation).answer == "Queued three demonstration jobs."

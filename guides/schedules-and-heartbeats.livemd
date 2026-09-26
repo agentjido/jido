@@ -18,12 +18,12 @@ defmodule ScheduleGuide.Agent do
   use Jido.Agent, name: "schedule_guide_agent"
 
   agent do
-    schema Zoi.object(%{ticks: Zoi.integer() |> Zoi.default(0)})
-    plugin Jido.Plugin.Scheduler
+    schema(Zoi.object(%{ticks: Zoi.integer() |> Zoi.default(0)}))
+    plugin(Jido.Plugin.Scheduler)
   end
 
   routes do
-    signal_source "/guides/schedule"
+    signal_source("/guides/schedule")
 
     route "schedule.once" do
       action %{delay_ms: delay_ms, observer: observer},
@@ -41,7 +41,7 @@ defmodule ScheduleGuide.Agent do
         {:ok, context.agent_state, [directive]}
       end
 
-      define :schedule_once, args: [:delay_ms, :observer]
+      define(:schedule_once)
     end
 
     route "schedule.tick" do
@@ -69,7 +69,11 @@ end
     id: "scheduled-agent"
   )
 
-{:ok, _committed} = ScheduleGuide.Agent.schedule_once(agent, 25, self())
+{:ok, _committed} =
+  with {:ok, signal} <-
+         ScheduleGuide.Agent.schedule_once_signal(%{delay_ms: 25, observer: self()}) do
+    Jido.AgentServer.call(agent, signal, [])
+  end
 
 receive do
   {:schedule_guide_tick, count} -> count
@@ -90,14 +94,15 @@ defmodule ScheduleGuide.HeartbeatAgent do
   use Jido.Agent, name: "schedule_guide_heartbeat"
 
   agent do
-    schema Zoi.object(%{})
+    schema(Zoi.object(%{}))
 
-    plugin Jido.Plugin.Heartbeat,
+    plugin(Jido.Plugin.Heartbeat,
       config: [
         interval: 1_000,
         signal_type: "system.heartbeat",
         signal_data: %{}
       ]
+    )
   end
 end
 ```

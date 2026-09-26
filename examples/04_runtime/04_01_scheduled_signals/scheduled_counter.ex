@@ -41,7 +41,7 @@ defmodule Jido.Examples.ScheduledCounter do
          [Jido.Plugin.Scheduler.schedule(delay_ms, tick)]}
       end
 
-      define :schedule_once, args: [:delay_ms]
+      define :schedule_once
     end
 
     route "examples.runtime.scheduled_counter.enable_cron" do
@@ -59,7 +59,7 @@ defmodule Jido.Examples.ScheduledCounter do
         {:ok, %{context.agent_state | cron_enabled: true}, [directive]}
       end
 
-      define :enable_cron, args: [:job_id, {:optional, :expression}]
+      define :enable_cron
     end
 
     route "examples.runtime.scheduled_counter.disable_cron" do
@@ -70,7 +70,7 @@ defmodule Jido.Examples.ScheduledCounter do
         {:ok, %{context.agent_state | cron_enabled: false}, [directive]}
       end
 
-      define :disable_cron, args: [:job_id]
+      define :disable_cron
     end
 
     route "examples.runtime.scheduled_counter.tick" do

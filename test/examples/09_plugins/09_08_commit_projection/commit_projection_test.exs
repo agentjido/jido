@@ -11,7 +11,12 @@ defmodule JidoTest.Examples.Plugins.CommitProjectionTest do
     {:ok, server} = Jido.start_agent(jido, Agent, id: unique_id())
     assert %{pid: runtime} = Map.fetch!(Server.children(server), {:plugin, Package})
     assert Runtime.view(runtime) == {0, 0}
-    assert {:ok, committed} = Agent.add(server, 3)
+
+    {:ok, route_signal_1} = Agent.add_signal(%{amount: 3})
+
+    assert {:ok, committed} =
+             Jido.AgentServer.call(server, route_signal_1, [])
+
     assert committed.state == candidate.state
     eventually(fn -> Server.status(server).phase == :idle end)
     assert Runtime.view(runtime) == {3, 1}

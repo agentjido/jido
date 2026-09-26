@@ -18,7 +18,12 @@ probe = EventProbe.attach_all()
 
 try do
   {:ok, server} = Jido.start_agent(instance, Agent, id: "observed", partition: "west")
-  {:ok, _agent} = Agent.record(server, 7)
+
+  {:ok, route_signal_1} = Agent.record_signal(%{value: 7})
+
+  {:ok, _agent} =
+    Jido.AgentServer.call(server, route_signal_1, [])
+
   :ok = Jido.hibernate(instance, server, partition: "west")
   {:ok, thawed} = Jido.thaw(instance, Agent, "observed", partition: "west")
   :ok = Jido.stop_agent(instance, thawed)
@@ -39,13 +44,14 @@ try do
   facts =
     for event <- events,
         Enum.take(event.event, 2) != [:jido, :agent_server],
-        List.last(event.event) in [:stop, :settled, :rejected],
-        do: %{
-          event: event.event,
-          operation: event.metadata[:operation] || event.metadata[:topology_operation],
-          status: event.metadata[:status],
-          schema_version: event.metadata.schema_version
-        }
+        List.last(event.event) in [:stop, :settled, :rejected] do
+      %{
+        event: event.event,
+        operation: event.metadata[:operation] || event.metadata[:topology_operation],
+        status: event.metadata[:status],
+        schema_version: event.metadata.schema_version
+      }
+    end
 
   true = Enum.any?(facts, &(&1.event == [:jido, :agent, :turn, :settled]))
   true = Enum.any?(facts, &(&1.event == [:jido, :persistence, :operation, :stop]))

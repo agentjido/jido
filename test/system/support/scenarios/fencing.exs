@@ -16,7 +16,11 @@ defmodule JidoTest.System.Scenarios.Fencing do
           for value <- 1..8 do
             Task.async(fn ->
               send(parent, {:writer_ready, self()})
-              receive do: (:write -> :ok)
+
+              receive do
+                :write -> :ok
+              end
+
               candidate = %{initial | state: %{initial.state | value: value}}
 
               {Jido.Persistence.save_agent(c.store, candidate,
@@ -28,16 +32,25 @@ defmodule JidoTest.System.Scenarios.Fencing do
             end)
           end
 
-        for _ <- tasks, do: assert_receive({:writer_ready, _}, 10_000)
-        for task <- tasks, do: send(task.pid, :write)
-        results = Enum.map(tasks, &Task.await(&1, 30_000))
-        assert [{:ok, winner}] = Enum.filter(results, &match?({:ok, _}, &1))
+        for _ <- tasks do
+          assert_receive({:writer_ready, _}, 10000)
+        end
+
+        for task <- tasks do
+          send(task.pid, :write)
+        end
+
+        results = Enum.map(tasks, &Task.await(&1, 30000))
+        assert [ok: winner] = Enum.filter(results, &match?({:ok, _}, &1))
         assert Enum.count(results, &match?({{:error, :conflict}, _}, &1)) == 7
         assert {:ok, ^winner, 1} = load(c, initial.id)
         monitor = Process.monitor(server)
-        signal = Probe.record_and_deliver_signal!("stale", 99)
+
+        {:ok, signal} =
+          Probe.record_and_deliver_signal(%{effect_id: "stale", value: 99})
+
         assert {:error, {:persistence_failed, :conflict}} = Server.call(server, signal)
-        assert_receive {:DOWN, ^monitor, :process, ^server, _}, 10_000
+        assert_receive {:DOWN, ^monitor, :process, ^server, _}, 10000
         Observability.assert_turn(c.observer, signal, :error, false)
         Observability.assert_persistence(c.observer, :conflict)
         assert Sink.records(c.jido) == %{}
@@ -57,9 +70,12 @@ defmodule JidoTest.System.Scenarios.Fencing do
                  )
 
         monitor = Process.monitor(server)
-        signal = Probe.record_and_deliver_signal!("deleted", 99)
+
+        {:ok, signal} =
+          Probe.record_and_deliver_signal(%{effect_id: "deleted", value: 99})
+
         assert {:error, {:persistence_failed, :conflict}} = Server.call(server, signal)
-        assert_receive {:DOWN, ^monitor, :process, ^server, _}, 10_000
+        assert_receive {:DOWN, ^monitor, :process, ^server, _}, 10000
         assert {:error, :deleted} = load(c, id)
 
         assert {:error, :deleted} =

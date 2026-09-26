@@ -24,7 +24,7 @@ defmodule Jido.Examples.MinimalAgent do
       end
 
       defaults %{amount: 1}
-      define :increment, args: [{:optional, :amount}]
+      define :increment
     end
   end
 end

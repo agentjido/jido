@@ -24,7 +24,7 @@ defmodule JidoTest.Examples.SharedBudgetWorker do
         end
       end
 
-      define :work, args: [:job, :value]
+      define :work
     end
   end
 end

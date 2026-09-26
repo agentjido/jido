@@ -20,24 +20,30 @@ defmodule JidoTest.System.Scenarios.Topology do
         director = Controller.whereis_agent(controller, :director)
 
         leaders =
-          for team <- [:east, :west],
-              do: Controller.whereis_agent(controller, Ref.ref(team, :leader))
+          for team <- [:east, :west] do
+            Controller.whereis_agent(controller, Ref.ref(team, :leader))
+          end
 
         workers =
-          for team <- [:east, :west],
-              do: Controller.whereis_agent(controller, Ref.ref(team, :workers), 1)
+          for team <- [:east, :west] do
+            Controller.whereis_agent(controller, Ref.ref(team, :workers), 1)
+          end
 
         owned = [director | leaders ++ workers]
         assert Enum.all?(owned, &is_pid/1)
         assert Enum.all?(leaders, fn leader -> leader in child_pids(director) end)
 
-        for {leader, worker} <- Enum.zip(leaders, workers),
-            do: assert(worker in child_pids(leader))
+        for {leader, worker} <- Enum.zip(leaders, workers) do
+          assert(worker in child_pids(leader))
+        end
 
         bus = Controller.whereis_bus(controller, :events)
-        first = Cell.work_signal!(7)
+        {:ok, first} = Cell.work_signal(%{value: 7})
         assert {:ok, [_]} = Bus.publish(bus, [first])
-        for worker <- workers, do: Observability.await_turn(c.observer, worker, 1)
+
+        for worker <- workers do
+          Observability.await_turn(c.observer, worker, 1)
+        end
 
         # Exact local placement must preserve the stable component identity.
         assert :ok =
@@ -51,12 +57,12 @@ defmodule JidoTest.System.Scenarios.Topology do
 
         monitor = Process.monitor(bus)
         Process.exit(bus, :kill)
-        assert_receive {:DOWN, ^monitor, :process, ^bus, :killed}, 10_000
+        assert_receive {:DOWN, ^monitor, :process, ^bus, :killed}, 10000
         assert :ok = Controller.reconcile(controller)
         assert :ok = Controller.await_ready(controller)
         replacement = Controller.whereis_bus(controller, :events)
         assert is_pid(replacement) and replacement != bus
-        second = Cell.work_signal!(5)
+        {:ok, second} = Cell.work_signal(%{value: 5})
         assert {:ok, [_]} = Bus.publish(replacement, [second])
 
         for worker <- workers do
@@ -82,16 +88,30 @@ defmodule JidoTest.System.Scenarios.Topology do
         original = members(controller, 2)
         old_bus = Controller.whereis_bus(controller, :work)
         runtime = runtime(controller)
-        monitors = for pid <- [runtime, old_bus], do: {pid, Process.monitor(pid)}
+
+        monitors =
+          for pid <- [runtime, old_bus] do
+            {pid, Process.monitor(pid)}
+          end
+
         Observability.killed(c.observer, runtime)
         Process.exit(runtime, :kill)
-        for {pid, ref} <- monitors, do: assert_receive({:DOWN, ^ref, :process, ^pid, _}, 10_000)
+
+        for {pid, ref} <- monitors do
+          assert_receive({:DOWN, ^ref, :process, ^pid, _}, 10000)
+        end
+
         await_new_runtime(c, controller, runtime)
         assert members(controller, 2) == original
         bus = Controller.whereis_bus(controller, :work)
         assert bus != old_bus
         trace = Trace.new_root()
-        {:ok, signal} = Trace.put(Cell.work_signal!(7), trace)
+
+        {:ok, command_signal_1} = Cell.work_signal(%{value: 7})
+
+        {:ok, signal} =
+          Trace.put(command_signal_1, trace)
+
         assert {:ok, [_]} = Bus.publish(bus, [signal])
 
         ids =
@@ -108,12 +128,16 @@ defmodule JidoTest.System.Scenarios.Topology do
 
         Observability.assert_topology(c.observer, :activate, 3)
         stop_controller(c, initial.id, original ++ [bus])
-        for id <- ids, do: Observability.assert_turn(c.observer, signal, :ok, true, id)
+
+        for id <- ids do
+          Observability.assert_turn(c.observer, signal, :ok, true, id)
+        end
 
         events =
           for {_, [:jido, :agent, :turn, :stop], _, meta} <- Observability.events(c.observer),
-              meta[:source_signal_id] == signal.id,
-              do: meta
+              meta[:source_signal_id] == signal.id do
+            meta
+          end
 
         assert length(events) == 2
         assert Enum.all?(events, &(&1.trace_id == trace.trace_id))
@@ -132,8 +156,14 @@ defmodule JidoTest.System.Scenarios.Topology do
 
         original = members(controller, 3)
 
-        for {pid, value} <- Enum.with_index(original, 1),
-            do: assert({:ok, _} = Cell.work(pid, value))
+        for {pid, value} <- Enum.with_index(original, 1) do
+          {:ok, route_signal_1} = Cell.work_signal(%{value: value})
+
+          assert(
+            {:ok, _} =
+              Jido.AgentServer.call(pid, route_signal_1, [])
+          )
+        end
 
         saved = Enum.map(original, &Server.snapshot/1)
         Observability.assert_topology(c.observer, :update, 3)
@@ -141,7 +171,7 @@ defmodule JidoTest.System.Scenarios.Topology do
         monitor = Process.monitor(old_runtime)
         Observability.killed(c.observer, old_runtime)
         Process.exit(old_runtime, :kill)
-        assert_receive {:DOWN, ^monitor, :process, ^old_runtime, :killed}, 10_000
+        assert_receive {:DOWN, ^monitor, :process, ^old_runtime, :killed}, 10000
         await_new_runtime(c, controller, old_runtime)
         status = Controller.status(controller)
         assert status.target_revision == 2
@@ -151,7 +181,10 @@ defmodule JidoTest.System.Scenarios.Topology do
         # Collect cleanup evidence before asserting the failed membership contract.
         :ok = Supervisor.terminate_child(c.world, {Controller, initial.id})
         orphans = Enum.filter(original, &Process.alive?/1)
-        for pid <- orphans, do: stop_agent(c, pid)
+
+        for pid <- orphans do
+          stop_agent(c, pid)
+        end
 
         assert {status.agents, found, still_live, orphans} == {3, original, saved, []},
                "SYSTEM-TOPOLOGY-01: Runtime restart lost the accepted target or its owned members. " <>
@@ -167,16 +200,28 @@ defmodule JidoTest.System.Scenarios.Topology do
         assert :ok = Controller.update(controller, target)
         assert :ok = Controller.await_ready(controller)
         added = Controller.whereis_agent(controller, :workers, 2)
-        assert {:ok, committed} = Cell.work(added, 17)
+
+        {:ok, route_signal_2} = Cell.work_signal(%{value: 17})
+
+        assert {:ok, committed} =
+                 Jido.AgentServer.call(added, route_signal_2, [])
+
         before = Server.snapshot(added)
         assert {:ok, saved, 1} = load_cell(c, committed.id)
         assert saved.state == committed.state
 
         services =
-          for {_, pid, _, _} <- Supervisor.which_children(c.jido_pid), is_pid(pid), do: pid
+          for {_, pid, _, _} <- Supervisor.which_children(c.jido_pid), is_pid(pid) do
+            pid
+          end
 
         old = [c.jido_pid | services ++ members(controller, 2)]
-        monitors = for pid <- old, do: {pid, Process.monitor(pid)}
+
+        monitors =
+          for pid <- old do
+            {pid, Process.monitor(pid)}
+          end
+
         controller_monitor = Process.monitor(controller)
         old_runtime = runtime(controller)
 
@@ -187,12 +232,15 @@ defmodule JidoTest.System.Scenarios.Topology do
 
         try do
           Process.exit(c.jido_pid, :kill)
-          for {pid, ref} <- monitors, do: assert_receive({:DOWN, ^ref, :process, ^pid, _}, 10_000)
+
+          for {pid, ref} <- monitors do
+            assert_receive({:DOWN, ^ref, :process, ^pid, _}, 10000)
+          end
         after
           :sys.resume(c.world)
         end
 
-        assert_receive {:DOWN, ^controller_monitor, :process, ^controller, _}, 10_000
+        assert_receive {:DOWN, ^controller_monitor, :process, ^controller, _}, 10000
 
         await_runtime_start(c, old_runtime)
 

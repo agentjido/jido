@@ -34,19 +34,22 @@ defmodule JidoTest.Examples.Factory.StreamingTest do
         send(test_pid, {id, event})
       end)
 
-    {:ok, agent} = Jido.start_agent(jido, LiveConversation, exec_opts: [timeout: 15_000])
+    {:ok, agent} = Jido.start_agent(jido, LiveConversation, exec_opts: [timeout: 15000])
     before = Server.agent(agent)
 
     task =
       Task.async(fn ->
-        LiveConversation.chat(agent, "stream", "Hello", context: context, timeout: 20_000)
+        {:ok, route_signal_1} =
+          LiveConversation.chat_signal(%{request_id: "stream", text: "Hello"})
+
+        Jido.AgentServer.call(agent, route_signal_1, context: context, timeout: 20000)
       end)
 
-    assert_receive {:first_chunk, fixture_task}, 5_000
-    assert_receive {"stream", {:delta, "Hello"}}, 5_000
+    assert_receive {:first_chunk, fixture_task}, 5000
+    assert_receive {"stream", {:delta, "Hello"}}, 5000
     assert Server.agent(agent) == before
     send(fixture_task, :finish)
-    assert {:ok, result} = Task.await(task, 10_000)
+    assert {:ok, result} = Task.await(task, 10000)
     assert result.state.answer == "Hello world"
     assert Enum.count(result.state.messages, &(&1.role == :assistant)) == 1
   end
@@ -84,25 +87,28 @@ defmodule JidoTest.Examples.Factory.StreamingTest do
 
     context = FactorySSE.context(fixture)
 
-    assert {:ok, _} =
-             Conversation.ask(system.conversation, "stream-job", "Start work", context: context)
+    {:ok, route_signal_2} =
+      Conversation.ask_signal(%{request_id: "stream-job", text: "Start work"})
 
-    assert_receive {:partial_tool, fixture_task}, 5_000
+    assert {:ok, _} =
+             Jido.AgentServer.call(system.conversation, route_signal_2, context: context)
+
+    assert_receive {:partial_tool, fixture_task}, 5000
     assert FactoryHTTP.state(system.factory).jobs == %{}
     send(fixture_task, :finish_tool)
-    assert_receive {:tool_result, fixture_task, body}, 5_000
+    assert_receive {:tool_result, fixture_task, body}, 5000
     assert Jason.encode!(body) =~ "stream-job"
     assert map_size(FactoryHTTP.state(system.factory).jobs) == 1
     assert FactoryHTTP.state(system.factory).jobs["stream-job"].goal == "Streamed goal"
 
     assert_eventually(
       Enum.any?(FactoryHTTP.state(system.conversation).events, &(&1.status == "running")),
-      timeout: 2_000
+      timeout: 2000
     )
 
     assert FactoryHTTP.state(system.conversation).status == :thinking
     send(fixture_task, :finish)
-    assert_eventually(FactoryHTTP.state(system.conversation).answer == "Accepted", timeout: 2_000)
+    assert_eventually(FactoryHTTP.state(system.conversation).answer == "Accepted", timeout: 2000)
     assert {:ok, _} = Tools.command(jido, system.factory_id, :cancel, "cancel", "stream-job", "")
   end
 
@@ -170,16 +176,26 @@ defmodule JidoTest.Examples.Factory.StreamingTest do
          end}
       )
 
+    {:ok, route_signal_3} =
+      Conversation.ask_signal(%{
+        request_id: "three",
+        text: "add 3 jobs to the factory"
+      })
+
     assert {:ok, _} =
-             Conversation.ask(system.conversation, "three", "add 3 jobs to the factory",
+             Jido.AgentServer.call(system.conversation, route_signal_3,
                context: FactorySSE.context(fixture)
              )
 
-    assert_receive {:partial_batch, fixture_task}, 5_000
+    assert_receive {:partial_batch, fixture_task}, 5000
     assert FactoryHTTP.state(system.factory).jobs == %{}
     send(fixture_task, :finish_batch)
-    assert_receive {:batch_receipt, receipt}, 5_000
-    for index <- 1..3, do: assert(receipt =~ "three/#{index}")
+    assert_receive {:batch_receipt, receipt}, 5000
+
+    for index <- 1..3 do
+      assert(receipt =~ "three/#{index}")
+    end
+
     assert map_size(FactoryHTTP.state(system.factory).jobs) == 3
     assert_eventually(FactoryHTTP.state(system.conversation).answer == "Queued three demo jobs.")
   end
@@ -210,10 +226,10 @@ defmodule JidoTest.Examples.Factory.StreamingTest do
     {:ok, agent} = Jido.start_agent(jido, LiveConversation)
     before = Server.agent(agent)
 
+    {:ok, route_signal_4} = LiveConversation.chat_signal(%{request_id: "partial", text: "Hello"})
+
     assert {:error, _} =
-             LiveConversation.chat(agent, "partial", "Hello",
-               context: FactorySSE.context(fixture)
-             )
+             Jido.AgentServer.call(agent, route_signal_4, context: FactorySSE.context(fixture))
 
     assert Server.agent(agent) == before
   end
@@ -229,18 +245,20 @@ defmodule JidoTest.Examples.Factory.StreamingTest do
            FactorySSE.start_text(socket)
            FactorySSE.text(socket, "Waiting")
            send(test_pid, :connected)
-           send(test_pid, {:connection_ended, :gen_tcp.recv(socket, 0, 5_000)})
+           send(test_pid, {:connection_ended, :gen_tcp.recv(socket, 0, 5000)})
          end}
       )
 
+    {:ok, route_signal_5} = Conversation.ask_signal(%{request_id: "close", text: "Hello"})
+
     assert {:ok, _} =
-             Conversation.ask(system.conversation, "close", "Hello",
+             Jido.AgentServer.call(system.conversation, route_signal_5,
                context: FactorySSE.context(fixture)
              )
 
-    assert_receive :connected, 5_000
+    assert_receive :connected, 5000
     assert :ok = Jido.stop_agent(jido, system.owner)
-    assert_receive {:connection_ended, {:error, :closed}}, 5_000
+    assert_receive {:connection_ended, {:error, :closed}}, 5000
   end
 
   test "the terminal marks a partial stream as failed and preserves history", %{jido: jido} do

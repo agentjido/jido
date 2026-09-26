@@ -36,7 +36,7 @@ defmodule Jido.Examples.Applications.FixedGroup.ControllerAgent do
         ControllerState.start(input, context.agent_state)
       end
 
-      define :start, args: [:group_id, :worker_count]
+      define :start
     end
 
     route "jido.agent.child.started" do
@@ -63,7 +63,7 @@ defmodule Jido.Examples.Applications.FixedGroup.ControllerAgent do
         ControllerState.submit(input, context.agent_state)
       end
 
-      define :submit, args: [:tasks]
+      define :submit
     end
 
     route "examples.applications.fixed_group.work.applied" do

@@ -24,7 +24,7 @@ defmodule Jido.Examples.DistributedAuthorityProbe do
         {:ok, %{context.agent_state | value: value}}
       end
 
-      define :record, args: [:value]
+      define :record
     end
   end
 end

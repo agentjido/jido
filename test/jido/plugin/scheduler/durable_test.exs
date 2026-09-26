@@ -55,8 +55,13 @@ defmodule Jido.Plugin.Scheduler.DurableTest do
     assert {:ok, pending, [_]} = enqueue(armed, @first)
     tick = pending.state.scheduler.cron["job-1"].pending
 
+    {:ok, command_signal_1} = Example.arm_schedule_signal(%{job_id: "job-1", cron: "* * * * * *"})
+
     assert {:ok, replacement, [_]} =
-             Example.cmd(pending, Example.arm_schedule_signal!("job-1", "* * * * * *"))
+             Example.cmd(
+               pending,
+               command_signal_1
+             )
 
     assert replacement.state.generation == 2
     assert replacement.state.scheduler.cron["job-1"].pending == nil
@@ -72,13 +77,26 @@ defmodule Jido.Plugin.Scheduler.DurableTest do
     {armed, _cron} = armed()
     assert {:ok, pending, [_]} = enqueue(armed, @first)
     tick = pending.state.scheduler.cron["job-1"].pending
-    assert {:ok, cancelled, [_]} = Example.cmd(pending, Example.cancel_schedule_signal!("job-1"))
+
+    {:ok, command_signal_2} = Example.cancel_schedule_signal(%{job_id: "job-1"})
+
+    assert {:ok, cancelled, [_]} =
+             Example.cmd(
+               pending,
+               command_signal_2
+             )
+
     assert cancelled.state.scheduler.cron == %{}
     assert_stale(Example.cmd(cancelled, tick))
     assert {:ok, ^cancelled, [_]} = enqueue(cancelled, @first)
 
+    {:ok, command_signal_3} = Example.arm_schedule_signal(%{job_id: "job-1", cron: "* * * * * *"})
+
     assert {:ok, recreated, [_]} =
-             Example.cmd(cancelled, Example.arm_schedule_signal!("job-1", "* * * * * *"))
+             Example.cmd(
+               cancelled,
+               command_signal_3
+             )
 
     assert recreated.state.generation == 2
     assert {:ok, ^recreated, [_]} = enqueue(recreated, @first)
@@ -240,10 +258,12 @@ defmodule Jido.Plugin.Scheduler.DurableTest do
   end
 
   defp armed do
+    {:ok, command_signal_4} = Example.arm_schedule_signal(%{job_id: "job-1", cron: "* * * * * *"})
+
     assert {:ok, armed, [cron]} =
              Example.cmd(
                Example.new!(id: "agent-1"),
-               Example.arm_schedule_signal!("job-1", "* * * * * *")
+               command_signal_4
              )
 
     {armed, cron}

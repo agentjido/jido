@@ -18,11 +18,11 @@ defmodule ObserveGuide.Counter do
   use Jido.Agent, name: "observe_guide_counter"
 
   agent do
-    schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+    schema(Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}))
   end
 
   routes do
-    signal_source "/guides/observe"
+    signal_source("/guides/observe")
 
     route "counter.add" do
       action %{amount: amount},
@@ -32,7 +32,7 @@ defmodule ObserveGuide.Counter do
         {:ok, %{context.agent_state | count: context.agent_state.count + amount}}
       end
 
-      define :add, args: [:amount]
+      define(:add)
     end
   end
 end
@@ -78,7 +78,11 @@ handler_id = "observe-guide-#{System.unique_integer([:positive])}"
     id: "observed-counter"
   )
 
-{:ok, committed} = ObserveGuide.Counter.add(counter, 2)
+{:ok, committed} =
+  with {:ok, signal} <- ObserveGuide.Counter.add_signal(%{amount: 2}) do
+    Jido.AgentServer.call(counter, signal, [])
+  end
+
 committed.state
 ```
 

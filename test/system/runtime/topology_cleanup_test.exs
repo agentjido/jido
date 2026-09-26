@@ -48,11 +48,20 @@ defmodule JidoTest.System.TopologyCleanup do
     assert %{agents: 3, active: 0, pending: 0, errors: errors} = Controller.status(controller)
     assert errors["bus/events"] == :bus_identity_in_use
     assert Controller.whereis_bus(controller, :events) == nil
-    owned = for member <- 1..3, do: Controller.whereis_agent(controller, :workers, member)
+
+    owned =
+      for member <- 1..3 do
+        Controller.whereis_agent(controller, :workers, member)
+      end
+
     assert Enum.all?(owned, &is_pid/1)
 
     for {pid, value} <- Enum.with_index(owned, 1) do
-      assert {:ok, _} = Cell.work(pid, value)
+      {:ok, route_signal_1} = Cell.work_signal(%{value: value})
+
+      assert {:ok, _} =
+               Jido.AgentServer.call(pid, route_signal_1, [])
+
       snapshot = Server.snapshot(pid)
       assert {:ok, saved, 1} = load(c, snapshot.agent.id, Cell)
       assert saved == snapshot.agent
@@ -73,19 +82,24 @@ defmodule JidoTest.System.TopologyCleanup do
     stop =
       Task.async(fn ->
         try do
-          Supervisor.stop(controller, :normal, 10_000)
+          Supervisor.stop(controller, :normal, 10000)
         catch
           :exit, reason -> {:exit, reason}
         end
       end)
 
-    assert_receive {:cleanup_held, runtime}, 10_000
-    monitors = for pid <- [controller, runtime], do: {pid, Process.monitor(pid)}
+    assert_receive {:cleanup_held, runtime}, 10000
+
+    monitors =
+      for pid <- [controller, runtime] do
+        {pid, Process.monitor(pid)}
+      end
+
     Observability.killed(c.observer, runtime)
     Process.exit(runtime, :kill)
     Process.exit(controller, :kill)
     await_down(monitors)
-    Task.await(stop, 10_000)
+    Task.await(stop, 10000)
 
     {_, [:jido, :topology, :ownership, :settled], measurements, metadata} =
       Observability.await(c.observer, fn
@@ -107,7 +121,11 @@ defmodule JidoTest.System.TopologyCleanup do
 
     assert Process.alive?(unrelated)
     survivors = Enum.filter(owned, &Process.alive?/1)
-    for pid <- survivors, do: stop_agent(c, pid)
+
+    for pid <- survivors do
+      stop_agent(c, pid)
+    end
+
     assert_empty_agent_pool(c)
     assert JidoTest.RecoverableDeliverySink.attempts(c.jido) == []
 

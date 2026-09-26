@@ -14,7 +14,7 @@ defmodule Jido.Examples.EffectfulSteps do
 
     route "workflow.effects", Jido.Examples.EffectfulSteps.Pipeline do
       defaults %{allowed: true, expected_revision: "r1"}
-      define :fetch_record, args: [:key, {:optional, :allowed}, {:optional, :expected_revision}]
+      define :fetch_record
     end
   end
 end

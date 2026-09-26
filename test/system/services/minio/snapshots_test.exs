@@ -20,7 +20,12 @@ defmodule JidoTest.System.Services.MinIOSnapshots do
     Logger.configure(level: :info)
     on_exit(fn -> Logger.configure(level: level) end)
     server = start_agent(c)
-    assert {:ok, _} = Probe.record_and_deliver(server, "snapshot", 17)
+
+    {:ok, route_signal_1} = Probe.record_and_deliver_signal(%{effect_id: "snapshot", value: 17})
+
+    assert {:ok, _} =
+             Jido.AgentServer.call(server, route_signal_1, [])
+
     completed(c, server, %{"snapshot" => 17})
     snapshot = Server.snapshot(server)
     stop_agent(c, server)
@@ -34,8 +39,9 @@ defmodule JidoTest.System.Services.MinIOSnapshots do
 
     materializers =
       for {_, {:materializer, {name, local_node}}} <- directory,
-          local_node == node(),
-          do: Process.whereis(name)
+          local_node == node() do
+        Process.whereis(name)
+      end
 
     assert materializers != [] and Enum.all?(materializers, &is_pid/1)
 
@@ -88,7 +94,7 @@ defmodule JidoTest.System.Services.MinIOSnapshots do
 
               %{ready | index_manager: %{ready.index_manager | window_lag_time_μs: original_lag}}
             end,
-            30_000
+            30000
           )
 
         state.path
@@ -114,7 +120,8 @@ defmodule JidoTest.System.Services.MinIOSnapshots do
       end
 
     assert recovery == :ok,
-           "SYSTEM-BEDROCK-05: cluster rebuild did not restore a ready transaction system: #{inspect(recovery)}. Native upload results: #{inspect(native)}. Recent logs:\n#{Observability.format_logs(c.observer)}"
+           "SYSTEM-BEDROCK-05: cluster rebuild did not restore a ready transaction system: #{inspect(recovery)}. Native upload results: #{inspect(native)}. Recent logs:
+#{Observability.format_logs(c.observer)}"
 
     assert {:ok, ^saved, 2} = load(c, saved.id)
     restored = start_agent(c, id: saved.id, restore: :required)

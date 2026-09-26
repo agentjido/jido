@@ -12,7 +12,12 @@ defmodule JidoTest.System.Services.BedrockFaults do
 
   setup c do
     server = start_agent(c)
-    assert {:ok, _} = Probe.record_and_deliver(server, "saved", 7)
+
+    {:ok, route_signal_1} = Probe.record_and_deliver_signal(%{effect_id: "saved", value: 7})
+
+    assert {:ok, _} =
+             Jido.AgentServer.call(server, route_signal_1, [])
+
     completed(c, server, %{"saved" => 7})
     snapshot = Server.snapshot(server)
     stop_agent(c, server)

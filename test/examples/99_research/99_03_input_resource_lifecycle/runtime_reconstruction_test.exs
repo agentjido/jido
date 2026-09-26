@@ -19,12 +19,17 @@ defmodule JidoTest.Examples.RuntimeReconstructionTest do
 
     old_resource = Runtime.inspect_runtime(c.runtime).resource
     resource_ref = Process.monitor(old_resource)
-    assert {:ok, _} = Example.select(c.server, "B")
-    assert_receive {:DOWN, ^resource_ref, :process, ^old_resource, _}, 1_000
+
+    {:ok, route_signal_1} = Example.select_signal(%{name: "B"})
+
+    assert {:ok, _} =
+             Jido.AgentServer.call(c.server, route_signal_1, [])
+
+    assert_receive {:DOWN, ^resource_ref, :process, ^old_resource, _}, 1000
     current_resource = Runtime.inspect_runtime(c.runtime).resource
     current_ref = Process.monitor(current_resource)
     Process.exit(c.runtime, :kill)
-    assert_receive {:DOWN, ^current_ref, :process, ^current_resource, _}, 1_000
+    assert_receive {:DOWN, ^current_ref, :process, ^current_resource, _}, 1000
 
     replacement =
       eventually(fn -> plugin_runtime(c.server) != c.runtime && plugin_runtime(c.server) end)
@@ -37,11 +42,15 @@ defmodule JidoTest.Examples.RuntimeReconstructionTest do
     resource = Runtime.inspect_runtime(replacement).resource
     ref = Process.monitor(resource)
     assert :ok = Jido.AgentServer.stop(c.server)
-    assert_receive {:DOWN, ^ref, :process, ^resource, _}, 1_000
+    assert_receive {:DOWN, ^ref, :process, ^resource, _}, 1000
   end
 
   test "replacement Init supplies committed owned state and its version", c do
-    assert {:ok, _} = Example.select(c.server, "B")
+    {:ok, route_signal_2} = Example.select_signal(%{name: "B"})
+
+    assert {:ok, _} =
+             Jido.AgentServer.call(c.server, route_signal_2, [])
+
     version = Jido.AgentServer.snapshot(c.server).state_version
     Process.exit(c.runtime, :kill)
 

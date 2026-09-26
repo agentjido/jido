@@ -148,10 +148,9 @@ offers = [
 ]
 
 {:ok, searched} =
-  Example.search_flights(server,
-    input: %{constraints: constraints},
-    context: %{search: {FixtureSearch, {:ok, offers}}}
-  )
+  with {:ok, signal} <- Example.search_flights_signal(%{constraints: constraints}) do
+    Jido.AgentServer.call(server, signal, context: %{search: {FixtureSearch, {:ok, offers}}})
+  end
 
 %{
   status: searched.state.booking_status,
@@ -171,12 +170,14 @@ from an older search result.
 
 ```elixir
 {:ok, selected} =
-  Example.select_fare(
-    server,
-    "fare-1",
-    searched.state.search_revision,
-    "passenger-ref"
-  )
+  with {:ok, signal} <-
+         Example.select_fare_signal(%{
+           option_id: "fare-1",
+           search_revision: searched.state.search_revision,
+           passenger_ref: "passenger-ref"
+         }) do
+    Jido.AgentServer.call(server, signal, [])
+  end
 
 %{
   status: selected.state.booking_status,
@@ -196,7 +197,7 @@ provider. This is useful when you test the pure command boundary.
 
 ```elixir
 booking_context = %{booking_adapter: {FakeBookingAPI, booking_api}}
-{:ok, approval_signal} = Example.approve_booking_signal()
+{:ok, approval_signal} = Example.approve_booking_signal(%{})
 
 {:ok, candidate, [directive]} =
   Example.cmd(selected, approval_signal, context: booking_context)
@@ -222,7 +223,9 @@ correlated result Signal back to the Agent Server.
 
 ```elixir
 {:ok, submitting} =
-  Example.approve_booking(server, context: booking_context)
+  with {:ok, signal} <- Example.approve_booking_signal(%{}) do
+    Jido.AgentServer.call(server, signal, context: booking_context)
+  end
 
 terminal_agent =
   Enum.reduce_while(1..100, nil, fn _attempt, _last_agent ->
@@ -263,7 +266,9 @@ fails before it creates another provider request.
 
 ```elixir
 {:error, duplicate_error} =
-  Example.approve_booking(server, context: booking_context)
+  with {:ok, signal} <- Example.approve_booking_signal(%{}) do
+    Jido.AgentServer.call(server, signal, context: booking_context)
+  end
 
 %{
   error: Jido.Flow.Error.to_map(duplicate_error),

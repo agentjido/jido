@@ -42,7 +42,7 @@ defmodule Jido.Examples.BusDelivery do
         end
       end
 
-      define :record, args: [:value]
+      define :record
     end
   end
 end

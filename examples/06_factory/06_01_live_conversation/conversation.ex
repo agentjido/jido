@@ -48,7 +48,7 @@ defmodule Jido.Examples.Factory.LiveConversation do
         end
       end
 
-      define :chat, args: [:request_id, :text]
+      define :chat
     end
   end
 end

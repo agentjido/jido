@@ -71,9 +71,6 @@ defmodule Jido.Agent.DSL.Compiler do
       @doc false
       def __agent_config__, do: unquote(Macro.escape(config))
 
-      @doc false
-      def __agent_interfaces__, do: unquote(Macro.escape(interfaces))
-
       unquote_splicing(generated)
 
       if unquote(block?) do
@@ -116,10 +113,8 @@ defmodule Jido.Agent.DSL.Compiler do
   end
 
   def verify(module) do
-    interfaces = module.__agent_interfaces__()
     env = %{file: to_string(module.module_info(:compile)[:source]), line: 1}
     unwrap!(Jido.Agent.__definition_from_module__(module, module.__agent_config__()), env)
-    Enum.each(interfaces, &verify_fields!(&1, env))
     :ok
   end
 
@@ -184,16 +179,9 @@ defmodule Jido.Agent.DSL.Compiler do
           {:error, reason} -> fail!(env, "Invalid signal_source: #{reason}")
         end
 
-        {fields, required} = arguments!(interface.args, env)
-
-        {target, _defaults} = Authoring.split_target(route.target)
-
         %{
           name: interface.name,
-          fields: fields,
-          required: required,
           path: route.path,
-          target: target,
           source: source,
           line: env.line
         }
@@ -201,117 +189,25 @@ defmodule Jido.Agent.DSL.Compiler do
     end)
   end
 
-  defp arguments!(args, env) when is_list(args) do
-    {fields, required, _optional?} =
-      Enum.reduce(args, {[], 0, false}, fn
-        {:optional, field}, {fields, required, _} when is_atom(field) ->
-          {[field | fields], required, true}
-
-        field, {fields, required, false} when is_atom(field) ->
-          {[field | fields], required + 1, false}
-
-        _, _ ->
-          fail!(env, "args must contain unique field names with optional arguments last")
-      end)
-
-    if length(fields) != length(Enum.uniq(fields)), do: fail!(env, "Duplicate interface argument")
-    {Enum.reverse(fields), required}
-  end
-
-  defp arguments!(_args, env), do: fail!(env, "args must be a list")
-
   defp generate(interfaces, env) do
     names = Enum.map(interfaces, & &1.name)
     if length(names) != length(Enum.uniq(names)), do: fail!(env, "Duplicate interface name")
 
-    {_seen, code} =
-      Enum.reduce(interfaces, {MapSet.new(), []}, fn interface, acc ->
-        Enum.reduce([:call, :signal, :signal!], acc, fn mode, {seen, code} ->
-          name = function_name(interface.name, mode)
-          offset = if mode == :call, do: 1, else: 0
+    Enum.map(interfaces, fn interface ->
+      name = String.to_atom("#{interface.name}_signal")
 
-          Enum.reduce(
-            (interface.required + offset)..(length(interface.fields) + offset + 1),
-            {seen, code},
-            fn arity, {seen, code} ->
-              key = {name, arity}
-
-              if MapSet.member?(seen, key) or Module.defines?(env.module, key),
-                do:
-                  fail!(
-                    %{env | line: interface.line},
-                    "Generated function conflicts with #{name}/#{arity}"
-                  )
-
-              {MapSet.put(seen, key),
-               [Jido.Agent.DSL.Generator.function(interface, name, mode, arity) | code]}
-            end
-          )
-        end)
-      end)
-
-    Enum.reverse(code)
-  end
-
-  defp function_name(name, :call), do: name
-  defp function_name(name, :signal), do: String.to_atom("#{name}_signal")
-  defp function_name(name, :signal!), do: String.to_atom("#{name}_signal!")
-
-  defp verify_fields!(interface, env) do
-    env = %{env | line: interface.line}
-
-    schema =
-      case interface.target do
-        %Jido.Flow{schema: schema} ->
-          schema
-
-        module when is_atom(module) ->
-          if function_exported?(module, :schema, 0),
-            do: module.schema(),
-            else: fail!(env, "Interface target must expose its executable input schema")
-
-        _ ->
-          fail!(env, "Interface target must be an Action or Flow")
+      for arity <- [1, 2] do
+        if Module.defines?(env.module, {name, arity}),
+          do:
+            fail!(
+              %{env | line: interface.line},
+              "Generated function conflicts with #{name}/#{arity}"
+            )
       end
 
-    fields =
-      case schema do
-        %Zoi.Types.Map{fields: fields} ->
-          fields
-
-        [] ->
-          []
-
-        _ ->
-          if interface.fields == [],
-            do: [],
-            else: fail!(env, "Positional args require a field-based Zoi input schema")
-      end
-
-    Enum.each(interface.fields, fn key ->
-      if not Keyword.has_key?(fields, key),
-        do: fail!(env, "Unknown executable input field #{inspect(key)}")
-    end)
-
-    interface.fields
-    |> Enum.drop(interface.required)
-    |> Enum.each(fn key ->
-      if list_input?(Keyword.fetch!(fields, key)),
-        do: fail!(env, "Optional keyword/list input #{inspect(key)} must use input options")
+      Jido.Agent.DSL.Generator.function(interface)
     end)
   end
-
-  defp list_input?(%Zoi.Types.Literal{value: value}), do: is_list(value)
-
-  defp list_input?(%{__struct__: module} = schema) do
-    module in [Zoi.Types.Any, Zoi.Types.Array, Zoi.Types.Keyword] or
-      Enum.any?(Map.take(schema, [:inner, :schema, :schemas, :from]), fn
-        {_, values} when is_list(values) -> Enum.any?(values, &list_input?/1)
-        {_, inner} -> list_input?(inner)
-      end)
-  end
-
-  defp list_input?(_schema), do: false
 
   defp extension?(module, callback) when is_atom(module) and not is_nil(module),
     do: Code.ensure_loaded?(module) and function_exported?(module, callback, 2)

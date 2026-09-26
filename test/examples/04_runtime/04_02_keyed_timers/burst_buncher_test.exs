@@ -8,12 +8,20 @@ defmodule JidoTest.Examples.Runtime.BurstBuncherTest do
   alias Jido.Examples.BurstBuncher
 
   test "maximum size flushes one ordered batch after commit", %{jido: jido} do
-    buncher = start_buncher(jido, max_size: 2, flush_delay_ms: 1_000)
+    buncher = start_buncher(jido, max_size: 2, flush_delay_ms: 1000)
 
-    assert {:ok, first} = BurstBuncher.add_item(buncher, "item-1", %{value: 1})
+    {:ok, route_signal_1} = BurstBuncher.add_item_signal(%{item_id: "item-1", item: %{value: 1}})
+
+    assert {:ok, first} =
+             Jido.AgentServer.call(buncher, route_signal_1, [])
+
     assert first.state.buffer == [%{id: "item-1", value: %{value: 1}}]
 
-    assert {:ok, second} = BurstBuncher.add_item(buncher, "item-2", %{value: 2})
+    {:ok, route_signal_2} = BurstBuncher.add_item_signal(%{item_id: "item-2", item: %{value: 2}})
+
+    assert {:ok, second} =
+             Jido.AgentServer.call(buncher, route_signal_2, [])
+
     assert second.state.buffer == []
     assert second.state.last_flush_reason == :size
 
@@ -35,12 +43,20 @@ defmodule JidoTest.Examples.Runtime.BurstBuncherTest do
   end
 
   test "stale timer generations cannot drain a newer batch", %{jido: jido} do
-    buncher = start_buncher(jido, max_size: 3, flush_delay_ms: 1_000)
+    buncher = start_buncher(jido, max_size: 3, flush_delay_ms: 1000)
 
-    assert {:ok, first} = BurstBuncher.add_item(buncher, "item-1", :first)
+    {:ok, route_signal_3} = BurstBuncher.add_item_signal(%{item_id: "item-1", item: :first})
+
+    assert {:ok, first} =
+             Jido.AgentServer.call(buncher, route_signal_3, [])
+
     assert first.state.timer_generation == 1
 
-    assert {:ok, second} = BurstBuncher.add_item(buncher, "item-2", :second)
+    {:ok, route_signal_4} = BurstBuncher.add_item_signal(%{item_id: "item-2", item: :second})
+
+    assert {:ok, second} =
+             Jido.AgentServer.call(buncher, route_signal_4, [])
+
     assert second.state.timer_generation == 2
 
     assert {:ok, unchanged} = Server.call(buncher, BurstBuncher.timer_flush_signal!(1))
@@ -58,14 +74,19 @@ defmodule JidoTest.Examples.Runtime.BurstBuncherTest do
   end
 
   test "a duplicate item ID does not enter the batch twice", %{jido: jido} do
-    buncher = start_buncher(jido, max_size: 2, flush_delay_ms: 1_000)
-    duplicate = BurstBuncher.add_item_signal!("item-1", :first)
+    buncher = start_buncher(jido, max_size: 2, flush_delay_ms: 1000)
+
+    {:ok, duplicate} =
+      BurstBuncher.add_item_signal(%{item_id: "item-1", item: :first})
 
     assert {:ok, _agent} = Server.call(buncher, duplicate)
     assert {:ok, unchanged} = Server.call(buncher, duplicate)
     assert Enum.map(unchanged.state.buffer, & &1.id) == ["item-1"]
 
-    assert {:ok, _agent} = BurstBuncher.add_item(buncher, "item-2", :second)
+    {:ok, route_signal_5} = BurstBuncher.add_item_signal(%{item_id: "item-2", item: :second})
+
+    assert {:ok, _agent} =
+             Jido.AgentServer.call(buncher, route_signal_5, [])
 
     assert_receive {:signal,
                     %Jido.Signal{
@@ -86,14 +107,18 @@ defmodule JidoTest.Examples.Runtime.BurstBuncherTest do
 
   test "the timer flushes a partial batch without another command", %{jido: jido} do
     buncher = start_buncher(jido, max_size: 3, flush_delay_ms: 10)
-    assert {:ok, _} = BurstBuncher.add_item(buncher, "item", :value)
+
+    {:ok, route_signal_6} = BurstBuncher.add_item_signal(%{item_id: "item", item: :value})
+
+    assert {:ok, _} =
+             Jido.AgentServer.call(buncher, route_signal_6, [])
 
     assert_receive {:signal,
                     %Jido.Signal{
                       type: "examples.runtime.burst_buncher.batch",
                       data: %{reason: :timeout, items: [%{id: "item"}]}
                     }},
-                   1_000
+                   1000
 
     assert Server.agent(buncher).state.buffer == []
   end

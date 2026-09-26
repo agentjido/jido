@@ -22,13 +22,19 @@ defmodule JidoTest.Examples.Basic.MinimalAgentTest do
 
       assert {:ok, ^candidate} = Server.call(server, command)
       assert Server.snapshot(server) == %{agent: candidate, state_version: 1}
-
       # The domain helper uses the same Server options and result contract.
+      {:ok, route_signal_1} = MinimalAgent.increment_signal(%{amount: 1})
+
       assert {:error, %Jido.Error.ValidationError{}} =
-               MinimalAgent.increment(server, 1, timeout: :invalid)
+               Jido.AgentServer.call(server, route_signal_1, timeout: :invalid)
 
       assert Server.snapshot(server) == %{agent: candidate, state_version: 1}
-      assert {:ok, ^candidate} = MinimalAgent.increment(server, 0, context: %{})
+
+      {:ok, route_signal_2} = MinimalAgent.increment_signal(%{amount: 0})
+
+      assert {:ok, ^candidate} =
+               Jido.AgentServer.call(server, route_signal_2, context: %{})
+
       assert Server.snapshot(server) == %{agent: candidate, state_version: 2}
     end
   end
@@ -38,7 +44,8 @@ defmodule JidoTest.Examples.Basic.MinimalAgentTest do
     before = Server.snapshot(server)
 
     for amount <- ["3", nil, 1.5] do
-      command = MinimalAgent.increment_signal!(amount)
+      {:ok, command} =
+        MinimalAgent.increment_signal(%{amount: amount})
 
       assert {:error, %Jido.Action.Error.InvalidInputError{}} =
                MinimalAgent.cmd(before.agent, command)
@@ -49,7 +56,11 @@ defmodule JidoTest.Examples.Basic.MinimalAgentTest do
       assert Server.snapshot(server) == before
     end
 
-    assert {:ok, recovered} = MinimalAgent.increment(server, 2)
+    {:ok, route_signal_3} = MinimalAgent.increment_signal(%{amount: 2})
+
+    assert {:ok, recovered} =
+             Jido.AgentServer.call(server, route_signal_3, [])
+
     assert recovered.state == %{count: 2}
     assert Server.snapshot(server) == %{agent: recovered, state_version: 1}
   end
@@ -59,7 +70,14 @@ defmodule JidoTest.Examples.Basic.MinimalAgentTest do
     second = start_agent!(jido, MinimalAgent)
     untouched = Server.snapshot(second)
 
-    assert {:ok, changed} = Server.call(first, MinimalAgent.increment_signal!(7))
+    {:ok, command_signal_1} = MinimalAgent.increment_signal(%{amount: 7})
+
+    assert {:ok, changed} =
+             Server.call(
+               first,
+               command_signal_1
+             )
+
     assert changed.state == %{count: 7}
     assert Server.snapshot(first) == %{agent: changed, state_version: 1}
     assert Server.snapshot(second) == untouched

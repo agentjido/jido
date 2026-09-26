@@ -254,6 +254,8 @@ defmodule Jido.Examples.Factory.Workshop.State do
     next = %{state | active_job_id: id, queue: rest, jobs: Map.put(state.jobs, id, job)}
     {next, event} = Protocol.event(next, job, "Started demonstration job")
 
+    {:ok, command_signal_1} = WorkItem.start_signal(%{})
+
     directives = [
       event,
       Jido.Agent.Directive.spawn_child(WorkItem, tag,
@@ -268,7 +270,10 @@ defmodule Jido.Examples.Factory.Workshop.State do
           }
         }
       ),
-      Jido.Agent.Directive.emit_to_child(tag, WorkItem.start_signal!())
+      Jido.Agent.Directive.emit_to_child(
+        tag,
+        command_signal_1
+      )
     ]
 
     {:ok, next, directives}

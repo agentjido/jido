@@ -10,8 +10,17 @@ probe = EventProbe.attach("observed")
 
 try do
   {:ok, server} = Jido.start_agent(ObservationProbe, Agent, id: "observed")
-  {:ok, _agent} = Agent.record(server, 7)
-  {:ok, _agent} = Agent.send_to_missing_child(server, 11)
+
+  {:ok, route_signal_1} = Agent.record_signal(%{value: 7})
+
+  {:ok, _agent} =
+    Jido.AgentServer.call(server, route_signal_1, [])
+
+  {:ok, route_signal_2} = Agent.send_to_missing_child_signal(%{value: 11})
+
+  {:ok, _agent} =
+    Jido.AgentServer.call(server, route_signal_2, [])
+
   %{phase: :idle, state_version: 2} = Server.status(server)
   :ok = Jido.stop_agent(ObservationProbe, server)
 

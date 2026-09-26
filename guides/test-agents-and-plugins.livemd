@@ -16,11 +16,11 @@ defmodule TestGuide.Counter do
   use Jido.Agent, name: "test_guide_counter"
 
   agent do
-    schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+    schema(Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}))
   end
 
   routes do
-    signal_source "/guides/test"
+    signal_source("/guides/test")
 
     route "counter.add" do
       action %{amount: amount},
@@ -30,7 +30,7 @@ defmodule TestGuide.Counter do
         {:ok, %{context.agent_state | count: context.agent_state.count + amount}}
       end
 
-      define :add, args: [:amount]
+      define(:add)
     end
   end
 end
@@ -43,7 +43,7 @@ Directives, and unchanged input value.
 
 ```elixir
 agent = TestGuide.Counter.new!(id: "direct-test")
-{:ok, signal} = TestGuide.Counter.add_signal(3)
+{:ok, signal} = TestGuide.Counter.add_signal(%{amount: 3})
 
 {:ok, candidate, []} = TestGuide.Counter.cmd(agent, signal)
 0 = agent.state.count
@@ -53,7 +53,8 @@ agent = TestGuide.Counter.new!(id: "direct-test")
 Invalid input must fail before it can produce a candidate.
 
 ```elixir
-{:ok, invalid_signal} = TestGuide.Counter.add_signal("three")
+{:ok, invalid_signal} = TestGuide.Counter.add_signal(%{amount: "three"})
+
 {:error, %Jido.Action.Error.InvalidInputError{}} =
   TestGuide.Counter.cmd(agent, invalid_signal)
 ```
@@ -69,7 +70,12 @@ jido = :"test_guide_#{System.unique_integer([:positive])}"
 {:ok, server} = Jido.start_agent(jido, TestGuide.Counter, id: "live-test")
 
 before = Jido.AgentServer.snapshot(server)
-{:ok, committed} = TestGuide.Counter.add(server, 4)
+
+{:ok, committed} =
+  with {:ok, signal} <- TestGuide.Counter.add_signal(%{amount: 4}) do
+    Jido.AgentServer.call(server, signal, [])
+  end
+
 after_commit = Jido.AgentServer.snapshot(server)
 
 0 = before.state_version

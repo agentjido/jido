@@ -53,7 +53,7 @@ defmodule Jido.Examples.TypedCommandAgent do
       end
 
       defaults %{patch: %{name: "Route default", push: true}}
-      define :patch_profile, args: [{:optional, :patch}]
+      define :patch_profile
     end
 
     route "basic.typed_command.set_count" do
@@ -64,7 +64,7 @@ defmodule Jido.Examples.TypedCommandAgent do
         {:ok, %{context.agent_state | count: count}}
       end
 
-      define :set_count, args: [:count]
+      define :set_count
     end
   end
 end

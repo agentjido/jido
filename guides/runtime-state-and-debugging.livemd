@@ -25,11 +25,11 @@ defmodule DebugGuide.Counter do
   use Jido.Agent, name: "debug_guide_counter"
 
   agent do
-    schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+    schema(Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}))
   end
 
   routes do
-    signal_source "/guides/debug"
+    signal_source("/guides/debug")
 
     route "counter.add" do
       action %{amount: amount},
@@ -39,7 +39,7 @@ defmodule DebugGuide.Counter do
         {:ok, %{context.agent_state | count: context.agent_state.count + amount}}
       end
 
-      define :add, args: [:amount]
+      define(:add)
     end
   end
 end
@@ -61,7 +61,11 @@ be a positive integer. Its default is 500.
 ## Run a Turn
 
 ```elixir
-{:ok, committed} = DebugGuide.Counter.add(counter, 2)
+{:ok, committed} =
+  with {:ok, signal} <- DebugGuide.Counter.add_signal(%{amount: 2}) do
+    Jido.AgentServer.call(counter, signal, [])
+  end
+
 committed.state
 ```
 
@@ -153,7 +157,12 @@ You can enable the buffer after the Agent starts:
 {:error, :debug_not_enabled} = Jido.AgentServer.recent_events(counter)
 
 :ok = Jido.AgentServer.set_debug(counter, true)
-{:ok, _committed} = DebugGuide.Counter.add(counter, 3)
+
+{:ok, _committed} =
+  with {:ok, signal} <- DebugGuide.Counter.add_signal(%{amount: 3}) do
+    Jido.AgentServer.call(counter, signal, [])
+  end
+
 {:ok, new_events} = Jido.AgentServer.recent_events(counter)
 ```
 

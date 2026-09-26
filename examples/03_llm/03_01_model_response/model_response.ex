@@ -35,7 +35,7 @@ defmodule Jido.Examples.ModelResponse do
         end
       end
 
-      define :generate, args: [:prompt]
+      define :generate
     end
   end
 end

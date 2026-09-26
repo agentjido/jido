@@ -22,8 +22,13 @@ defmodule Jido.Plugin.Scheduler.OccurrenceRuntimeTest do
   test "the candidate stores recurring schedule intent and its generation" do
     agent = Agent.new!()
 
+    {:ok, command_signal_1} = Agent.arm_schedule_signal(%{job_id: "job-1", cron: "* * * * * *"})
+
     assert {:ok, candidate, [_cron]} =
-             Agent.cmd(agent, Agent.arm_schedule_signal!("job-1", "* * * * * *"))
+             Agent.cmd(
+               agent,
+               command_signal_1
+             )
 
     assert agent.state.scheduler.cron == %{}
     assert candidate.state.generation == 1
@@ -38,7 +43,11 @@ defmodule Jido.Plugin.Scheduler.OccurrenceRuntimeTest do
   test "runtime ticks carry a logical occurrence ID independent of Signal delivery", %{jido: jido} do
     c = %{jido: jido, agent_id: unique_id(), persistence: nil}
     server = start_agent(c)
-    assert {:ok, _} = Agent.arm_schedule(server, "job-1", "* * * * * *")
+
+    {:ok, route_signal_1} = Agent.arm_schedule_signal(%{job_id: "job-1", cron: "* * * * * *"})
+
+    assert {:ok, _} =
+             Jido.AgentServer.call(server, route_signal_1, [])
 
     [first | _] = await_ticks(server, 1)
     Clock.set(~U[2030-01-01 00:00:01.100000Z])
@@ -62,13 +71,21 @@ defmodule Jido.Plugin.Scheduler.OccurrenceRuntimeTest do
 
   test "repeated clock slots keep identity while generation replacement changes it", c do
     server = start_agent(c)
-    assert {:ok, _} = Agent.arm_schedule(server, "job-1", "* * * * * *")
+
+    {:ok, route_signal_2} = Agent.arm_schedule_signal(%{job_id: "job-1", cron: "* * * * * *"})
+
+    assert {:ok, _} =
+             Jido.AgentServer.call(server, route_signal_2, [])
+
     [first, second | _] = await_ticks(server, 2)
     assert first.signal_id != second.signal_id
     assert first.occurrence == second.occurrence
     assert first.occurrence.scheduled_at == "2030-01-01T00:00:01.000000Z"
 
-    assert {:ok, _} = Agent.arm_schedule(server, "job-1", "* * * * * *")
+    {:ok, route_signal_3} = Agent.arm_schedule_signal(%{job_id: "job-1", cron: "* * * * * *"})
+
+    assert {:ok, _} =
+             Jido.AgentServer.call(server, route_signal_3, [])
 
     replacement =
       eventually(fn ->
@@ -81,7 +98,12 @@ defmodule Jido.Plugin.Scheduler.OccurrenceRuntimeTest do
 
   test "Scheduler restart retains the occurrence coordinates", c do
     server = start_agent(c)
-    assert {:ok, _} = Agent.arm_schedule(server, "job-1", "* * * * * *")
+
+    {:ok, route_signal_4} = Agent.arm_schedule_signal(%{job_id: "job-1", cron: "* * * * * *"})
+
+    assert {:ok, _} =
+             Jido.AgentServer.call(server, route_signal_4, [])
+
     [first | _] = await_ticks(server, 1)
     scheduler = Server.children(server)[{:plugin, Scheduler}].pid
     kill(scheduler)
@@ -95,7 +117,12 @@ defmodule Jido.Plugin.Scheduler.OccurrenceRuntimeTest do
 
   test "Agent restore retains identity and the next scheduled instant changes it", c do
     server = start_agent(c)
-    assert {:ok, _} = Agent.arm_schedule(server, "job-1", "* * * * * *")
+
+    {:ok, route_signal_5} = Agent.arm_schedule_signal(%{job_id: "job-1", cron: "* * * * * *"})
+
+    assert {:ok, _} =
+             Jido.AgentServer.call(server, route_signal_5, [])
+
     [first | _] = await_ticks(server, 1)
     kill(server)
 

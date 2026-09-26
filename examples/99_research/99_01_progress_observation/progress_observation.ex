@@ -21,7 +21,7 @@ defmodule Jido.Examples.ProgressObservation do
         {:ok, %{context.agent_state | waiting: reason, status: :waiting}}
       end
 
-      define :wait_for, args: [:reason]
+      define :wait_for
     end
 
     route "examples.research.progress_observation.work" do

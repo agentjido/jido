@@ -32,7 +32,7 @@ defmodule Jido.Examples.ChildLifecycle do
         end
       end
 
-      define :start_worker, args: [:tag, {:optional, :restart}]
+      define :start_worker
     end
 
     route "examples.multi_agent.children.stop" do
@@ -47,7 +47,7 @@ defmodule Jido.Examples.ChildLifecycle do
         {:ok, candidate, [Jido.Agent.Directive.stop_child(tag)]}
       end
 
-      define :stop_worker, args: [:tag]
+      define :stop_worker
     end
 
     route "jido.agent.child.*", Jido.Examples.Support.KeepState

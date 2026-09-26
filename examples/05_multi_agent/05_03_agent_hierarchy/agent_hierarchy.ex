@@ -27,13 +27,16 @@ defmodule Jido.Examples.AgentHierarchy do
               []
             else
               Enum.flat_map(["left", "right"], fn tag ->
+                {:ok, command_signal_1} =
+                  Jido.Examples.AgentHierarchy.grow_signal(%{depth: depth - 1})
+
                 [
                   Jido.Agent.Directive.spawn_child(Jido.Examples.AgentHierarchy, tag,
                     restart: :temporary
                   ),
                   Jido.Agent.Directive.emit_to_child(
                     tag,
-                    Jido.Examples.AgentHierarchy.grow_signal!(depth - 1)
+                    command_signal_1
                   )
                 ]
               end)
@@ -43,7 +46,7 @@ defmodule Jido.Examples.AgentHierarchy do
         end
       end
 
-      define :grow, args: [:depth]
+      define :grow
     end
 
     route "jido.agent.child.started", Jido.Examples.Support.KeepState

@@ -90,7 +90,7 @@ defmodule JidoTest.ScheduledOccurrenceFixtures.TimedAgent do
         {:ok, %{context.agent_state | generation: generation}, [directive]}
       end
 
-      define :arm_schedule, args: [:job_id, :cron]
+      define :arm_schedule
     end
 
     route "test.schedule.tick" do

@@ -77,8 +77,15 @@ defmodule JidoTest.System.PeerRuntime do
         Keyword.merge([id: id, restart: :temporary], opts)
       )
 
-  def create_worker(parent, node),
-    do: LifecycleParent.create_worker(parent, node, ControlledAgent)
+  def create_worker(parent, node) do
+    {:ok, route_signal_1} =
+      LifecycleParent.create_worker_signal(%{
+        target_node: node,
+        worker_module: ControlledAgent
+      })
+
+    Jido.AgentServer.call(parent, route_signal_1, [])
+  end
 
   def activate_startup_parent(id, timeout),
     do:
@@ -95,11 +102,15 @@ defmodule JidoTest.System.PeerRuntime do
   end
 
   def startup_error(id), do: Jido.RuntimeStore.get(@instance, :remote_test_errors, id)
+
   def whereis(id), do: Jido.whereis_agent(@instance, id)
 
   def child(parent), do: Server.children(parent)[:worker]
+
   def observations(parent), do: Server.agent(parent).state.observations
+
   def stop(server), do: Jido.stop_agent(@instance, server)
+
   def stop_child(parent), do: Server.stop_child(parent, :worker)
 
   def pool_size,
@@ -116,17 +127,24 @@ defmodule JidoTest.System.PeerRuntime do
   end
 
   def work(server, value), do: Server.call(server, ControlledAgent.signal(value))
+
   def snapshot(server), do: Server.snapshot(server)
+
   def status(server), do: Server.status(server)
+
   def events, do: GenServer.call(__MODULE__, :events)
+
   def watch(remote), do: GenServer.call(__MODULE__, {:watch, remote})
+
   def await_down(remote), do: GenServer.call(__MODULE__, {:await_down, remote}, 10_000)
 
   def await_event(id, event, count),
     do: GenServer.call(__MODULE__, {:await_event, id, event, count}, 15_000)
 
   def watch_pid(pid), do: GenServer.call(__MODULE__, {:watch_pid, pid})
+
   def await_pid_down(pid), do: GenServer.call(__MODULE__, {:await_pid_down, pid}, 10_000)
+
   def await_work_result(id), do: GenServer.call(__MODULE__, {:await_work_result, id}, 10_000)
 
   def hold(server) do

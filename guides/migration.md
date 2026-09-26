@@ -122,7 +122,7 @@ defmodule MyApp.Counter do
   use Jido.Agent, name: "counter"
 
   agent do
-    schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+    schema(Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}))
   end
 end
 
@@ -178,23 +178,25 @@ defmodule MyApp.Counter do
   use Jido.Agent, name: "counter"
 
   agent do
-    schema Zoi.object(%{
-      count: Zoi.integer() |> Zoi.default(0),
-      label: Zoi.string() |> Zoi.default("main")
-    })
+    schema(
+      Zoi.object(%{
+        count: Zoi.integer() |> Zoi.default(0),
+        label: Zoi.string() |> Zoi.default("main")
+      })
+    )
   end
 
   routes do
-    signal_source "/counter"
+    signal_source("/counter")
 
     route "counter.increment", MyApp.Increment do
-      define :increment, args: [:amount]
+      define(:increment)
     end
   end
 end
 
 {:ok, agent} = MyApp.Counter.new(id: "counter-1")
-{:ok, signal} = MyApp.Counter.increment_signal(2)
+{:ok, signal} = MyApp.Counter.increment_signal(%{amount: 2})
 {:ok, candidate, []} = MyApp.Counter.cmd(agent, signal)
 # candidate.state == %{count: 2, label: "main"}
 # agent.state remains %{count: 0, label: "main"}
@@ -231,7 +233,12 @@ Use the live API when the application needs a committed result:
 ```elixir
 {:ok, _instance} = Jido.start()
 {:ok, server} = Jido.start_agent(MyApp.Counter, id: "counter-1")
-{:ok, committed} = MyApp.Counter.increment(server, 2)
+
+{:ok, committed} =
+  with {:ok, signal} <- MyApp.Counter.increment_signal(%{amount: 2}) do
+    Jido.AgentServer.call(server, signal, [])
+  end
+
 # committed.state.count == 2
 :ok = Jido.stop_agent(server)
 ```

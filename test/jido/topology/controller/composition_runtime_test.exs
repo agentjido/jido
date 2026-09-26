@@ -70,21 +70,29 @@ defmodule Jido.Topology.Controller.CompositionRuntimeTest do
       |> Builder.build!(id: "responsive")
 
     controller = start_supervised!({Controller, jido: jido, topology: instance})
-    assert_receive {:readiness_blocked, gate}, 1_000
+    assert_receive {:readiness_blocked, gate}, 1000
     assert %{status: :starting, active: active} = Controller.status(controller, 100)
     assert active <= 2
     eventually(fn -> is_pid(Controller.whereis_agent(controller, :z_fast)) end)
-    assert {:ok, _} = Cell.work(Controller.whereis_agent(controller, :z_fast), 3)
+
+    {:ok, route_signal_1} = Cell.work_signal(%{value: 3})
+
+    assert {:ok, _} =
+             Jido.AgentServer.call(
+               Controller.whereis_agent(controller, :z_fast),
+               route_signal_1,
+               []
+             )
 
     eventually(
       fn ->
         Controller.status(controller, 100).errors["agent/a_slow"] == :startup_task_timeout
       end,
-      timeout: 2_000
+      timeout: 2000
     )
 
     send(gate, :release)
-    assert :ok = Controller.await_ready(controller, 2_000)
+    assert :ok = Controller.await_ready(controller, 2000)
     assert Server.agent(Controller.whereis_agent(controller, :z_fast)).state.total == 3
   end
 
@@ -212,7 +220,11 @@ defmodule Jido.Topology.Controller.CompositionRuntimeTest do
     east = Controller.whereis_agent(controller, Ref.ref(:east, :leader))
     :ok = Jido.stop_agent(jido, east)
     assert Process.alive?(bus)
-    assert {:ok, _} = Cell.work(west, 7)
+
+    {:ok, route_signal_2} = Cell.work_signal(%{value: 7})
+
+    assert {:ok, _} =
+             Jido.AgentServer.call(west, route_signal_2, [])
 
     eventually(
       fn ->
@@ -221,7 +233,7 @@ defmodule Jido.Topology.Controller.CompositionRuntimeTest do
         is_pid(replacement) and replacement != east and
           map_size(Server.children(replacement)) == 2
       end,
-      timeout: 5_000
+      timeout: 5000
     )
 
     assert Controller.whereis_bus(controller, :events) == bus
@@ -235,19 +247,27 @@ defmodule Jido.Topology.Controller.CompositionRuntimeTest do
     controller = start_supervised!({Controller, jido: PersistentJido, topology: instance})
     assert :ok = Controller.await_ready(controller)
 
+    {:ok, route_signal_3} = Cell.work_signal(%{value: 10})
+
     assert {:ok, _} =
-             Cell.work(Controller.whereis_agent(controller, Ref.ref(:east, :workers), 1), 10)
+             Jido.AgentServer.call(
+               Controller.whereis_agent(controller, Ref.ref(:east, :workers), 1),
+               route_signal_3,
+               []
+             )
 
     stop_supervised!({Controller, instance.id})
     controller = start_supervised!({Controller, jido: PersistentJido, topology: instance})
-    assert :ok = Controller.await_ready(controller, 5_000)
+    assert :ok = Controller.await_ready(controller, 5000)
     east = Controller.whereis_agent(controller, Ref.ref(:east, :workers), 1)
     west = Controller.whereis_agent(controller, Ref.ref(:west, :workers), 1)
     assert Server.agent(east).state.total == 10
     assert Server.agent(west).state.total == 0
 
+    {:ok, command_signal_1} = Cell.work_signal(%{value: 2})
+
     assert {:ok, [_]} =
-             Bus.publish(Controller.whereis_bus(controller, :events), [Cell.work_signal!(2)])
+             Bus.publish(Controller.whereis_bus(controller, :events), [command_signal_1])
 
     eventually(fn ->
       Server.agent(east).state.total == 12 and Server.agent(west).state.total == 2

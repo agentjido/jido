@@ -14,23 +14,26 @@ defmodule JidoTest.Tracing.RemoteCausalTraceTest do
     assert {:ok, parent} =
              peer_call(c.peer_a, Jido, :start_agent, [c.jido, Agent, [id: "parent"]])
 
+    {:ok, route_signal_1} =
+      Agent.start_work_signal(%{
+        request_id: "private-remote-input",
+        value: 7,
+        node: c.node_b
+      })
+
     assert {:ok, _} =
-             peer_call(c.peer_a, Agent, :start_work, [
-               parent,
-               "private-remote-input",
-               7,
-               [input: %{node: c.node_b}]
-             ])
+             peer_call(c.peer_a, Jido.AgentServer, :call, [parent, route_signal_1])
 
     peer_eventually(
       fn ->
         peer_call(c.peer_a, Server, :agent, [parent]).state.results == %{left: 14, right: 14}
       end,
-      timeout: 3_000
+      timeout: 3000
     )
 
-    for {_tag, child} <- peer_call(c.peer_a, Server, :children, [parent]),
-        do: assert(node(child.pid) == c.node_b)
+    for {_tag, child} <- peer_call(c.peer_a, Server, :children, [parent]) do
+      assert(node(child.pid) == c.node_b)
+    end
 
     events = await_turns(c, probes, 7)
     [cause] = turns(events, "examples.runtime.causal_trace.begin")
@@ -49,12 +52,16 @@ defmodule JidoTest.Tracing.RemoteCausalTraceTest do
       assert event.causation_id == cause.signal_id
     end
 
-    for event <- started ++ activations, do: assert(event.cause_turn_id == cause.turn_id)
+    for event <- started ++ activations do
+      assert(event.cause_turn_id == cause.turn_id)
+    end
 
     assert Enum.sort(Enum.map(results, & &1.parent_span_id)) ==
              Enum.sort(Enum.map(work, & &1.span_id))
 
-    for event <- results, do: assert(event.trace_id == cause.trace_id)
+    for event <- results do
+      assert(event.trace_id == cause.trace_id)
+    end
 
     for key <- [:signal_id, :turn_id, :span_id] do
       assert length(
@@ -62,8 +69,9 @@ defmodule JidoTest.Tracing.RemoteCausalTraceTest do
              ) == 7
     end
 
-    for event <- started,
-        do: assert(event.child_activation_id in Enum.map(activations, & &1.activation_id))
+    for event <- started do
+      assert(event.child_activation_id in Enum.map(activations, & &1.activation_id))
+    end
 
     refute inspect(events) =~ "private-remote-input"
     refute inspect(events) =~ "private-causal-agent-state"

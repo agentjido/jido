@@ -12,7 +12,11 @@ defmodule Jido.AgentServer.RemoteAPITest do
       peer_call(c.peer_b, Jido, :start_agent, [c.jido, RemoteCounter, [id: "younger"]])
 
     for {caller, owner, pid} <- [{c.peer_b, c.peer_a, older}, {c.peer_a, c.peer_b, younger}] do
-      assert {:ok, %{state: %{value: 1}}} = peer_call(caller, RemoteCounter, :record, [pid, 1])
+      {:ok, route_signal_1} = RemoteCounter.record_signal(%{value: 1})
+
+      assert {:ok, %{state: %{value: 1}}} =
+               peer_call(caller, Jido.AgentServer, :call, [pid, route_signal_1])
+
       assert peer_call(caller, Server, :alive?, [pid])
 
       for kind <- [:call, :request] do

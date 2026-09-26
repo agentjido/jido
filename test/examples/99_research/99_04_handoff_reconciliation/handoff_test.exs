@@ -17,13 +17,36 @@ defmodule JidoTest.Examples.HandoffTest do
     assert {:ok, _} = Example.command(c.server, "transfer", %{owner: "billing"})
     eventually(fn -> state(billing).generation == 1 end)
     assert state(c.server).owner == "general"
-    assert {:ok, _} = Example.Worker.acknowledge(billing)
+
+    {:ok, route_signal_1} = Example.Worker.acknowledge_signal(%{})
+
+    assert {:ok, _} =
+             Jido.AgentServer.call(billing, route_signal_1, [])
+
     eventually(fn -> state(c.server).owner == "billing" end)
-    assert {:ok, _} = Example.Worker.acknowledge(billing)
-    assert {:ok, _} = Example.Worker.complete(old, "late general answer")
-    assert {:ok, _} = Example.Worker.complete(billing, "billing answer")
+
+    {:ok, route_signal_2} = Example.Worker.acknowledge_signal(%{})
+
+    assert {:ok, _} =
+             Jido.AgentServer.call(billing, route_signal_2, [])
+
+    {:ok, route_signal_3} = Example.Worker.complete_signal(%{result: "late general answer"})
+
+    assert {:ok, _} =
+             Jido.AgentServer.call(old, route_signal_3, [])
+
+    {:ok, route_signal_4} = Example.Worker.complete_signal(%{result: "billing answer"})
+
+    assert {:ok, _} =
+             Jido.AgentServer.call(billing, route_signal_4, [])
+
     eventually(fn -> state(c.server).result == "billing answer" end)
-    assert {:ok, _} = Example.Worker.complete(billing, "duplicate replacement")
+
+    {:ok, route_signal_5} = Example.Worker.complete_signal(%{result: "duplicate replacement"})
+
+    assert {:ok, _} =
+             Jido.AgentServer.call(billing, route_signal_5, [])
+
     # Synchronous replay also establishes a barrier after the worker's duplicate.
     assert {:ok, agent} =
              Example.command(c.server, "result", %{
@@ -42,7 +65,12 @@ defmodule JidoTest.Examples.HandoffTest do
     assert {:ok, agent} = Example.command(c.server, "abort")
     assert agent.state.pending == nil
     assert agent.state.owner == "general"
-    assert {:ok, _} = Example.Worker.complete(child(c.server, "general"), "handled locally")
+
+    {:ok, route_signal_6} = Example.Worker.complete_signal(%{result: "handled locally"})
+
+    assert {:ok, _} =
+             Jido.AgentServer.call(child(c.server, "general"), route_signal_6, [])
+
     eventually(fn -> state(c.server).result == "handled locally" end)
   end
 
@@ -52,7 +80,7 @@ defmodule JidoTest.Examples.HandoffTest do
     eventually(fn -> state(billing).generation == 1 end)
     ref = Process.monitor(billing)
     Process.exit(billing, :kill)
-    assert_receive {:DOWN, ^ref, :process, ^billing, _}, 1_000
+    assert_receive {:DOWN, ^ref, :process, ^billing, _}, 1000
 
     eventually(fn ->
       state(c.server).pending == nil and "billing" not in state(c.server).alive
@@ -73,9 +101,19 @@ defmodule JidoTest.Examples.HandoffTest do
              })
 
     assert agent.state.owner == "general"
-    assert {:ok, _} = Example.Worker.acknowledge(replacement)
+
+    {:ok, route_signal_7} = Example.Worker.acknowledge_signal(%{})
+
+    assert {:ok, _} =
+             Jido.AgentServer.call(replacement, route_signal_7, [])
+
     eventually(fn -> state(c.server).generation == 2 end)
-    assert {:ok, _} = Example.Worker.complete(replacement, "recovered")
+
+    {:ok, route_signal_8} = Example.Worker.complete_signal(%{result: "recovered"})
+
+    assert {:ok, _} =
+             Jido.AgentServer.call(replacement, route_signal_8, [])
+
     eventually(fn -> state(c.server).result == "recovered" end)
 
     children =
@@ -85,10 +123,12 @@ defmodule JidoTest.Examples.HandoffTest do
 
     assert :ok = Server.stop(c.server)
 
-    for {pid, monitor} <- children,
-        do: assert_receive({:DOWN, ^monitor, :process, ^pid, _}, 1_000)
+    for {pid, monitor} <- children do
+      assert_receive({:DOWN, ^monitor, :process, ^pid, _}, 1000)
+    end
   end
 
   defp state(server), do: Server.snapshot(server).agent.state
+
   defp child(server, tag), do: Server.children(server)[tag].pid
 end

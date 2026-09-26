@@ -23,7 +23,12 @@ defmodule JidoTest.System.Services.S3MinIO do
        c do
     server = start_agent(c)
     id = Server.agent(server).id
-    assert {:ok, _agent} = Probe.record_and_deliver(server, "maintenance", 1)
+
+    {:ok, route_signal_1} = Probe.record_and_deliver_signal(%{effect_id: "maintenance", value: 1})
+
+    assert {:ok, _agent} =
+             Jido.AgentServer.call(server, route_signal_1, [])
+
     stop_agent(c, server)
 
     opts = [instance: c.jido, namespace: c.namespace]

@@ -13,7 +13,7 @@ defmodule Jido.Examples.ExecutableContinuation do
     signal_source "/workflow"
 
     route "workflow.continuation", Jido.Examples.ExecutableContinuation.Pipeline do
-      define :add_repeatedly, args: [:value, :remaining]
+      define :add_repeatedly
     end
   end
 end

@@ -26,8 +26,10 @@ defmodule Jido.AgentServer.DistributedChildTest do
 
     # RPC only invokes the public command on A. The command itself must cross
     # the distribution connection from A to the Agent Server on B.
+    {:ok, route_signal_1} = RemoteCounter.record_signal(%{value: 7})
+
     assert {:ok, %{state: %{value: 7}}} =
-             peer_call(peer_a, RemoteCounter, :record, [remote, 7])
+             peer_call(peer_a, Jido.AgentServer, :call, [remote, route_signal_1])
 
     assert %{state_version: 1, agent: %{state: %{value: 7}}} =
              peer_call(peer_b, Server, :snapshot, [remote])
@@ -46,7 +48,11 @@ defmodule Jido.AgentServer.DistributedChildTest do
              peer_call(peer_a, Jido, :start_agent, [jido, RemoteParent, [id: "parent"]])
 
     assert node(parent) == node_a
-    assert {:ok, _agent} = peer_call(peer_a, RemoteParent, :request_child, [parent, node_b])
+
+    {:ok, route_signal_2} = RemoteParent.request_child_signal(%{target_node: node_b})
+
+    assert {:ok, _agent} =
+             peer_call(peer_a, Jido.AgentServer, :call, [parent, route_signal_2])
 
     child = peer_eventually(fn -> peer_call(peer_a, Server, :children, [parent])[:worker] end)
 
@@ -59,7 +65,11 @@ defmodule Jido.AgentServer.DistributedChildTest do
 
     assert Enum.any?(supervised(context.peer_b, jido), fn {_, pid, _, _} -> pid == child.pid end)
 
-    assert {:ok, _} = peer_call(peer_a, RemoteParent, :request_result, [parent, 9, "request-1"])
+    {:ok, route_signal_3} =
+      RemoteParent.request_result_signal(%{value: 9, request_id: "request-1"})
+
+    assert {:ok, _} =
+             peer_call(peer_a, Jido.AgentServer, :call, [parent, route_signal_3])
 
     peer_eventually(fn ->
       peer_call(peer_a, Server, :agent, [parent]).state.result ==
@@ -92,7 +102,12 @@ defmodule Jido.AgentServer.DistributedChildTest do
     directive = Directive.spawn_child(RemoteCounter, :worker, node: c.node_b, restart: :permanent)
     dispatch(c, parent, directive)
     first = child(c, parent)
-    assert {:ok, _} = peer_call(c.peer_a, RemoteCounter, :record, [first.pid, 11])
+
+    {:ok, route_signal_4} = RemoteCounter.record_signal(%{value: 11})
+
+    assert {:ok, _} =
+             peer_call(c.peer_a, Jido.AgentServer, :call, [first.pid, route_signal_4])
+
     peer_call(c.peer_b, Process, :exit, [first.pid, :kill])
 
     next =
@@ -103,7 +118,7 @@ defmodule Jido.AgentServer.DistributedChildTest do
             _ -> nil
           end
         end,
-        timeout: 2_000
+        timeout: 2000
       )
 
     assert node(next.pid) == c.node_b

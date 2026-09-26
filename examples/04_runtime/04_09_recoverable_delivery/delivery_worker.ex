@@ -59,7 +59,8 @@ defmodule Jido.Examples.RecoverableDelivery.Worker do
 
   defp deliver_and_confirm(init, sink, id, value) do
     with :ok <- sink.deliver(init.jido, %Deliver{effect_id: id, value: value}) do
-      Agent.confirm_delivery(init.agent_server, id, value)
+      {:ok, route_signal_1} = Agent.confirm_delivery_signal(%{effect_id: id, value: value})
+      Jido.AgentServer.call(init.agent_server, route_signal_1, [])
     end
   catch
     :exit, reason -> {:error, {:delivery_unavailable, reason}}

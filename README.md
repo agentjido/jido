@@ -56,11 +56,11 @@ defmodule MyApp.Counter do
   use Jido.Agent, name: "counter"
 
   agent do
-    schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+    schema(Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}))
   end
 
   routes do
-    signal_source "/example"
+    signal_source("/example")
 
     route "counter.increment" do
       action %{amount: amount},
@@ -70,8 +70,8 @@ defmodule MyApp.Counter do
         {:ok, %{context.agent_state | count: context.agent_state.count + amount}}
       end
 
-      defaults %{amount: 1}
-      define :increment, args: [{:optional, :amount}]
+      defaults(%{amount: 1})
+      define(:increment)
     end
   end
 end
@@ -87,7 +87,7 @@ signal =
 
 {:ok, candidate, []} = MyApp.Counter.cmd(agent, signal)
 candidate.state.count
-#=> 2
+# => 2
 ```
 
 `cmd/2` is the main entry point for an Agent value. It routes one Signal and
@@ -103,7 +103,7 @@ serialized message handling, persistence, or runtime effects:
 
 {:ok, committed_agent} = Jido.AgentServer.call(counter, signal)
 committed_agent.state.count
-#=> 2
+# => 2
 ```
 
 The default instance is also implicit for Agent lookup, listing, counts, stop,
@@ -114,12 +114,16 @@ The route `define` declaration creates helpers for the same contract. Use the
 Signal helper with `cmd/2`, or use the command helper with a live actor:
 
 ```elixir
-{:ok, increment_signal} = MyApp.Counter.increment_signal(3)
+{:ok, increment_signal} = MyApp.Counter.increment_signal(%{amount: 3})
 {:ok, candidate, []} = MyApp.Counter.cmd(agent, increment_signal)
 
-{:ok, committed_agent} = MyApp.Counter.increment(counter, 3)
+{:ok, committed_agent} =
+  with {:ok, signal} <- MyApp.Counter.increment_signal(%{amount: 3}) do
+    Jido.AgentServer.call(counter, signal, [])
+  end
+
 committed_agent.state.count
-#=> 5
+# => 5
 ```
 
 ## Agent Plugins

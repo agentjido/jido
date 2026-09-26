@@ -26,7 +26,7 @@ defmodule Jido.Examples.FencedInventory do
         end
       end
 
-      define :record, args: [:value]
+      define :record
     end
   end
 end

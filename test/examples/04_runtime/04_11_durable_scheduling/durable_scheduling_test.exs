@@ -15,7 +15,11 @@ defmodule JidoTest.Examples.Runtime.DurableSchedulingTest do
   test "an acknowledged occurrence stays complete after restore and scheduling continues", c do
     id = unique_id("example-durable-schedule")
     server = start_example(c, id, false)
-    assert {:ok, _} = Example.arm_schedule(server, "job-1", "* * * * * *")
+
+    {:ok, route_signal_1} = Example.arm_schedule_signal(%{job_id: "job-1", cron: "* * * * * *"})
+
+    assert {:ok, _} =
+             Jido.AgentServer.call(server, route_signal_1, [])
 
     [first | _] = await_ticks(server, 1)
     assert first.data == %{job_id: "job-1", generation: 1}
@@ -24,7 +28,7 @@ defmodule JidoTest.Examples.Runtime.DurableSchedulingTest do
 
     ref = Process.monitor(server)
     Process.exit(server, :kill)
-    assert_receive {:DOWN, ^ref, :process, ^server, :killed}, 1_000
+    assert_receive {:DOWN, ^ref, :process, ^server, :killed}, 1000
     eventually(fn -> Jido.whereis_agent(c.jido, id) == nil end)
 
     restored = start_example(c, id, :required)
@@ -38,9 +42,12 @@ defmodule JidoTest.Examples.Runtime.DurableSchedulingTest do
       eventually(
         fn ->
           ticks = Server.agent(restored).state.ticks
-          if Enum.any?(ticks, &(&1.occurrence.id != first.occurrence.id)), do: ticks
+
+          if Enum.any?(ticks, &(&1.occurrence.id != first.occurrence.id)) do
+            ticks
+          end
         end,
-        timeout: 4_000
+        timeout: 4000
       )
 
     assert Enum.count(ticks, &(&1.occurrence.id == first.occurrence.id)) == 1

@@ -133,7 +133,7 @@ defmodule JidoTest.Agent.AuthoringExtensionTest do
             signal_source "/extension"
 
             route "add", %Ref{target: Add} do
-              define :add, args: [:amount]
+              define :add
             end
 
             route "ordinary", Add
@@ -149,7 +149,7 @@ defmodule JidoTest.Agent.AuthoringExtensionTest do
     assert [{Turns, []}] = definition.plugins
     assert Enum.count(definition.routes, &(&1.target == Add)) == 3
     assert Enum.any?(definition.routes, &(&1.target == {Add, %{amount: 1}}))
-    signal = module.add_signal!(3)
+    {:ok, signal} = module.add_signal(%{amount: 3})
     assert {:ok, %{state: %{count: 3, turns: 1}}, []} = Agent.cmd(module.new!(), signal)
     assert {:ok, document, registry} = Jido.Agent.Codec.encode(definition)
     assert {:ok, ^definition} = Jido.Agent.Codec.decode(document, registry)

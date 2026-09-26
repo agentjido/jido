@@ -122,7 +122,7 @@ identity and state.
 | `new/1` | `new/1`, `new!/1` | The non-raising form now returns a tagged result. |
 | `cmd/2..3` with an Action, Instruction, or list | `cmd/2..3` with one Signal | One Signal selects one executable. Put an Action sequence in one Flow. |
 | `set/2`, `validate/1..2` | `Jido.Agent.set/2`, `validate/1`, `validate_definition/1`, or `validate_instance/1` | These functions are no longer generated on each Agent module. |
-| No route interface helpers | Generated `name_signal`, `name_signal!`, and live `name` helpers from `define` | Treat `cmd/2` as the common boundary. Helpers package one route's input. |
+| No route interface helpers | Generated `name_signal(input_map, envelope_opts)` from `define` | Treat `cmd/2` as the common boundary. Helpers package one route's input. |
 
 ### Other Agent modules
 
@@ -550,3 +550,11 @@ declaration. The Dispatch Plugin and Send Directive are removed. Emit uses
 reverse-order `prepare_dispatch` hooks, Server `directive_timeout`, and native
 Emit errors. The former Plugin timeout option no longer applies. Delivery
 remains post-commit and best effort. A timeout does not undo external work.
+
+## Map-Based Route Constructors
+
+Remove `args:` from `define`. Pass all command input in one map to
+`name_signal/1,2`. Pass Signal envelope options directly as the second argument.
+The constructor returns `{:ok, signal}` or `{:error, reason}`. Generated live
+helpers and `name_signal!` are removed. Call `Jido.AgentServer.call/3` with the
+constructed Signal and pass runtime `context` and `timeout` there.

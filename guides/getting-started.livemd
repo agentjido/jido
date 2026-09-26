@@ -42,22 +42,22 @@ is outside the Agent state commit.
 
 The declaration describes the Agent data schema and the routes from Signals to
 executable work. It does not start a process. The nested `define` adds Signal
-and live-call helpers.
+constructors.
 
 ```elixir
 defmodule GettingStarted.Counter do
   use Jido.Agent, name: "getting_started_counter"
 
   agent do
-    schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+    schema(Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}))
   end
 
   routes do
-    signal_source "/guides/getting-started"
+    signal_source("/guides/getting-started")
 
     route "counter.add", GettingStarted.Add do
-      defaults %{amount: 1}
-      define :add, args: [{:optional, :amount}]
+      defaults(%{amount: 1})
+      define(:add)
     end
   end
 end
@@ -74,7 +74,7 @@ process or commit live state.
 
 ```elixir
 agent = GettingStarted.Counter.new!(id: "direct-counter")
-{:ok, signal} = GettingStarted.Counter.add_signal(3)
+{:ok, signal} = GettingStarted.Counter.add_signal(%{amount: 3})
 {:ok, candidate, []} = GettingStarted.Counter.cmd(agent, signal)
 
 {agent.state.count, candidate.state.count}
@@ -96,7 +96,11 @@ at a time and commits each valid candidate.
     id: "live-counter"
   )
 
-{:ok, committed} = GettingStarted.Counter.add(counter, 3)
+{:ok, committed} =
+  with {:ok, signal} <- GettingStarted.Counter.add_signal(%{amount: 3}) do
+    Jido.AgentServer.call(counter, signal, [])
+  end
+
 snapshot = Jido.AgentServer.snapshot(counter)
 
 {committed.state.count, snapshot.state_version}

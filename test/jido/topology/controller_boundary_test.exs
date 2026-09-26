@@ -57,7 +57,11 @@ defmodule Jido.Topology.ControllerBoundaryTest do
     assert Controller.whereis(jido, instance.id) == controller
     worker = Controller.whereis_agent(controller, :worker)
     member = Controller.whereis_agent(controller, :members, 1)
-    assert {:ok, committed} = Cell.work(worker, 7)
+
+    {:ok, route_signal_1} = Cell.work_signal(%{value: 7})
+
+    assert {:ok, committed} =
+             Jido.AgentServer.call(worker, route_signal_1, [])
 
     assert :ok = Controller.place_agent(controller, :worker, node())
 
@@ -144,7 +148,11 @@ defmodule Jido.Topology.ControllerBoundaryTest do
     controller = start_supervised!({Controller, jido: jido, topology: instance, repair: :manual})
     assert :ok = Controller.await_ready(controller)
     old = Controller.whereis_agent(controller, :worker)
-    assert {:ok, committed} = Cell.work(old, 7)
+
+    {:ok, route_signal_2} = Cell.work_signal(%{value: 7})
+
+    assert {:ok, committed} =
+             Jido.AgentServer.call(old, route_signal_2, [])
 
     assert {:ok, 1} = TargetStore.accept(jido, 0, instance, %{})
     assert {:error, :conflict} = Controller.place_agent(controller, :worker, @offline)
@@ -160,7 +168,12 @@ defmodule Jido.Topology.ControllerBoundaryTest do
     controller = start_supervised!({Controller, jido: jido, topology: instance, repair: :manual})
     assert :ok = Controller.await_ready(controller)
     old = Controller.whereis_agent(controller, :worker)
-    assert {:ok, committed} = Cell.work(old, 3)
+
+    {:ok, route_signal_3} = Cell.work_signal(%{value: 3})
+
+    assert {:ok, committed} =
+             Jido.AgentServer.call(old, route_signal_3, [])
+
     assert Server.agent(old) == committed
     key = "agent/worker"
     move = %{key: key, from: node(), to: @offline}
@@ -171,14 +184,14 @@ defmodule Jido.Topology.ControllerBoundaryTest do
     before = runtime(controller)
     monitor = Process.monitor(before)
     Process.exit(before, :kill)
-    assert_receive {:DOWN, ^monitor, :process, ^before, :killed}, 1_000
+    assert_receive {:DOWN, ^monitor, :process, ^before, :killed}, 1000
 
     eventually(fn -> is_pid(runtime(controller)) and runtime(controller) != before end)
     eventually(fn -> not Process.alive?(old) end)
 
     eventually(
       fn -> match?({:ok, ^instance, 2, ^placements, nil}, TargetStore.load(jido, instance)) end,
-      timeout: 5_000
+      timeout: 5000
     )
 
     assert {:ok, ^instance, 2, ^placements, nil} = TargetStore.load(jido, instance)
@@ -197,11 +210,16 @@ defmodule Jido.Topology.ControllerBoundaryTest do
     controller = start_supervised!({Controller, jido: jido, topology: instance, repair: :manual})
     assert :ok = Controller.await_ready(controller)
     worker = Controller.whereis_agent(controller, :worker)
-    assert {:ok, committed} = Cell.work(worker, 3)
+
+    {:ok, route_signal_4} = Cell.work_signal(%{value: 3})
+
+    assert {:ok, committed} =
+             Jido.AgentServer.call(worker, route_signal_4, [])
+
     before = runtime(controller)
     monitor = Process.monitor(before)
     Process.exit(before, :kill)
-    assert_receive {:DOWN, ^monitor, :process, ^before, :killed}, 1_000
+    assert_receive {:DOWN, ^monitor, :process, ^before, :killed}, 1000
 
     eventually(fn -> is_pid(runtime(controller)) and runtime(controller) != before end)
     assert :ok = Controller.await_ready(controller)

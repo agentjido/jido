@@ -34,7 +34,7 @@ defmodule Jido.Examples.Factory.FlowFactory.Mission do
         Jido.Examples.Factory.FlowFactory.Mission.State.start(input, context)
       end
 
-      define :start, args: [:goal]
+      define :start
     end
 
     route "examples.factory.flow.progress" do
@@ -216,10 +216,13 @@ defmodule Jido.Examples.Factory.FlowFactory do
   def start(jido, goal, opts \\ []) do
     with {:ok, pid} <-
            Jido.start_agent(jido, Mission, id: Keyword.get(opts, :id, Jido.Signal.ID.generate!())) do
-      case Mission.start(pid, goal,
-             input: %{security: Keyword.get(opts, :security, true)},
-             context: Keyword.get(opts, :context, %{})
-           ) do
+      {:ok, route_signal_1} =
+        Mission.start_signal(%{
+          goal: goal,
+          security: Keyword.get(opts, :security, true)
+        })
+
+      case Jido.AgentServer.call(pid, route_signal_1, context: Keyword.get(opts, :context, %{})) do
         {:ok, _} ->
           {:ok, pid}
 
@@ -231,5 +234,9 @@ defmodule Jido.Examples.Factory.FlowFactory do
   end
 
   def status(pid), do: Jido.AgentServer.snapshot(pid).agent.state
-  def cancel(pid), do: Mission.cancel(pid)
+
+  def cancel(pid) do
+    {:ok, route_signal_2} = Mission.cancel_signal(%{})
+    Jido.AgentServer.call(pid, route_signal_2, [])
+  end
 end

@@ -36,7 +36,11 @@ defmodule JidoTest.Persistence.IndeterminateWriteTest do
 
   test "a confirmed write commits state and permits post-commit output", c do
     {:ok, pid} = start_agent(c, :ok)
-    assert {:ok, agent} = Probe.increment(pid, "first", 1, context: c.turn_context)
+
+    {:ok, route_signal_1} = Probe.increment_signal(%{request_id: "first", amount: 1})
+
+    assert {:ok, agent} =
+             Jido.AgentServer.call(pid, route_signal_1, context: c.turn_context)
 
     assert_receive {:signal,
                     %{
@@ -53,8 +57,10 @@ defmodule JidoTest.Persistence.IndeterminateWriteTest do
   test "an uncertain reply can follow a stored write without dispatching its Directive", c do
     {:ok, pid} = start_agent(c, :indeterminate)
 
+    {:ok, route_signal_2} = Probe.increment_signal(%{request_id: "first", amount: 1})
+
     assert {:error, {:persistence_failed, :indeterminate}} =
-             Probe.increment(pid, "first", 1, context: c.turn_context)
+             Jido.AgentServer.call(pid, route_signal_2, context: c.turn_context)
 
     assert_stored_first(c)
     refute_received {:signal, %{type: "examples.research.indeterminate_write.applied"}}
@@ -63,8 +69,10 @@ defmodule JidoTest.Persistence.IndeterminateWriteTest do
   test "an indeterminate write prevents evaluation of the next Action on stale state", c do
     {:ok, pid} = start_agent(c, :indeterminate)
 
+    {:ok, route_signal_3} = Probe.increment_signal(%{request_id: "first", amount: 1})
+
     assert {:error, {:persistence_failed, :indeterminate}} =
-             Probe.increment(pid, "first", 1, context: c.turn_context)
+             Jido.AgentServer.call(pid, route_signal_3, context: c.turn_context)
 
     assert_stored_first(c)
 
@@ -86,8 +94,10 @@ defmodule JidoTest.Persistence.IndeterminateWriteTest do
                restore: false
              )
 
+    {:ok, route_signal_4} = Probe.increment_signal(%{request_id: "first", amount: 1})
+
     assert {:error, {:persistence_failed, {:indeterminate, %Jido.Error.ExecutionError{}}}} =
-             Probe.increment(pid, "first", 1, context: c.turn_context)
+             Jido.AgentServer.call(pid, route_signal_4, context: c.turn_context)
 
     assert_stored_first(c)
     result = try_next_command(pid, c.turn_context)
@@ -111,7 +121,8 @@ defmodule JidoTest.Persistence.IndeterminateWriteTest do
   end
 
   defp try_next_command(pid, context) do
-    Probe.increment(pid, "second", 10, context: context)
+    {:ok, route_signal_5} = Probe.increment_signal(%{request_id: "second", amount: 10})
+    Jido.AgentServer.call(pid, route_signal_5, context: context)
   catch
     :exit, reason -> {:exit, reason}
   end

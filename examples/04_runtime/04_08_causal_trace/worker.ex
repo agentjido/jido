@@ -21,16 +21,18 @@ defmodule Jido.Examples.CausalTrace.Worker do
         context: context do
         value = input.value * 2
 
-        result =
-          Jido.Examples.CausalTrace.collect_result_signal!(
-            input: %{request_id: input.request_id, slot: input.slot, value: value}
-          )
+        {:ok, result} =
+          Jido.Examples.CausalTrace.collect_result_signal(%{
+            request_id: input.request_id,
+            slot: input.slot,
+            value: value
+          })
 
         {:ok, %{context.agent_state | value: value},
          [Jido.Agent.Directive.emit_to_parent(result)]}
       end
 
-      define :compute, args: [:request_id, :slot, :value]
+      define :compute
     end
   end
 end

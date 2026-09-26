@@ -28,7 +28,7 @@ defmodule Jido.Examples.RemoteLifecycle do
         {:ok, context.agent_state, [directive]}
       end
 
-      define :create_worker, args: [:target_node]
+      define :create_worker
     end
 
     route "jido.agent.child.exit" do

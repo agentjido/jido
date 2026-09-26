@@ -15,8 +15,13 @@ defmodule JidoTest.Tracing.CausalTraceTest do
     probe = EventProbe.attach(agent.id)
 
     try do
+      {:ok, command_signal_1} = Agent.start_work_signal(%{request_id: "request-1", value: 7})
+
       assert {:ok, candidate, directives} =
-               Agent.cmd(agent, Agent.start_work_signal!("request-1", 7))
+               Agent.cmd(
+                 agent,
+                 command_signal_1
+               )
 
       assert candidate.state.request_id == "request-1"
       assert agent.state.request_id == ""
@@ -24,8 +29,9 @@ defmodule JidoTest.Tracing.CausalTraceTest do
       assert [%SpawnChild{tag: :left}, %EmitToChild{}, %SpawnChild{tag: :right}, %EmitToChild{}] =
                directives
 
-      for %EmitToChild{signal: signal} <- directives,
-          do: assert(Jido.Tracing.Trace.get(signal) == nil)
+      for %EmitToChild{signal: signal} <- directives do
+        assert(Jido.Tracing.Trace.get(signal) == nil)
+      end
 
       assert EventProbe.events(probe) == []
     after
@@ -251,14 +257,35 @@ defmodule JidoTest.Tracing.CausalTraceTest do
       child = Server.children(server).left
       # The caller supplies the trace for its own retry. Agents do not invent it.
       original = Trace.new_root()
-      failed = Agent.Worker.compute_signal!("private-causal-request-data", :left, "bad value")
+
+      {:ok, failed} =
+        Agent.Worker.compute_signal(%{
+          request_id: "private-causal-request-data",
+          slot: :left,
+          value: "bad value"
+        })
+
       {:ok, failed} = Trace.put(failed, original)
       assert {:error, _} = Server.call(child.pid, failed)
-      retry = Agent.Worker.compute_signal!("private-causal-request-data", :left, 9)
+
+      {:ok, retry} =
+        Agent.Worker.compute_signal(%{
+          request_id: "private-causal-request-data",
+          slot: :left,
+          value: 9
+        })
+
       {:ok, retry} = Trace.put(retry, Trace.child_of(original, failed.id))
       assert {:ok, _} = Server.call(child.pid, retry)
       assert Server.agent(child.pid).state.value == 18
-      independent = Agent.Worker.compute_signal!("private-causal-request-data", :left, 10)
+
+      {:ok, independent} =
+        Agent.Worker.compute_signal(%{
+          request_id: "private-causal-request-data",
+          slot: :left,
+          value: 10
+        })
+
       assert {:ok, _} = Server.call(child.pid, independent)
 
       events =
@@ -269,8 +296,9 @@ defmodule JidoTest.Tracing.CausalTraceTest do
           if Enum.any?(
                turns(events, "examples.runtime.causal_trace.compute"),
                &(&1.signal_id == independent.id)
-             ),
-             do: events
+             ) do
+            events
+          end
         end)
 
       observed =
@@ -299,7 +327,16 @@ defmodule JidoTest.Tracing.CausalTraceTest do
 
     try do
       assert {:ok, server} = Jido.start_agent(c.jido, Agent, id: id)
-      assert {:ok, _} = Agent.start_work(server, "private-causal-request-data", 7)
+
+      {:ok, route_signal_1} =
+        Agent.start_work_signal(%{
+          request_id: "private-causal-request-data",
+          value: 7
+        })
+
+      assert {:ok, _} =
+               Jido.AgentServer.call(server, route_signal_1, [])
+
       eventually(fn -> Server.agent(server).state.results == %{left: 14, right: 14} end)
 
       events =
@@ -307,7 +344,9 @@ defmodule JidoTest.Tracing.CausalTraceTest do
           events =
             Enum.filter(EventProbe.events(probe), &(Enum.take(&1.event, 2) == [:jido, :agent]))
 
-          if Enum.count(events, &(&1.event == [:jido, :agent, :turn, :settled])) == 7, do: events
+          if Enum.count(events, &(&1.event == [:jido, :agent, :turn, :settled])) == 7 do
+            events
+          end
         end)
 
       assert Map.keys(Server.children(server)) |> Enum.sort() == [:left, :right]

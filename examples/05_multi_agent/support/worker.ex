@@ -31,7 +31,7 @@ defmodule Jido.Examples.Worker do
          [Jido.Agent.Directive.emit_to_parent(reply)]}
       end
 
-      define :calculate, args: [:request_id, :job_id, :tag, :value]
+      define :calculate
     end
   end
 end

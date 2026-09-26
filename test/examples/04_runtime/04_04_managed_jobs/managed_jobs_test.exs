@@ -8,11 +8,15 @@ defmodule JidoTest.Examples.Runtime.ManagedJobsTest do
   defp start_job(jido) do
     agent = start_agent!(jido, ManagedJobs, error_policy: :log_only)
 
+    {:ok, route_signal_1} = ManagedJobs.start_job_signal(%{job_id: "job", value: 3})
+
     assert {:ok, pending} =
-             ManagedJobs.start_job(agent, "job", 3, context: JidoTest.JobRunner.context(self()))
+             Jido.AgentServer.call(agent, route_signal_1,
+               context: JidoTest.JobRunner.context(self())
+             )
 
     assert pending.state.status == :running
-    assert_receive {:job_work, worker, 3}, 1_000
+    assert_receive {:job_work, worker, 3}, 1000
     {agent, worker}
   end
 
@@ -22,10 +26,12 @@ defmodule JidoTest.Examples.Runtime.ManagedJobsTest do
     agent = start_agent!(jido, ManagedJobs)
     before = Server.snapshot(agent)
 
+    {:ok, command_signal_1} = ManagedJobs.start_job_signal(%{job_id: "job", value: 3})
+
     assert {:ok, candidate, [intent]} =
              ManagedJobs.cmd(
                before.agent,
-               ManagedJobs.start_job_signal!("job", 3),
+               command_signal_1,
                context: JidoTest.JobRunner.context(self())
              )
 
@@ -34,10 +40,14 @@ defmodule JidoTest.Examples.Runtime.ManagedJobsTest do
     assert Server.snapshot(agent) == before
     refute_received {:job_work, _, _}
 
-    assert {:ok, _} =
-             ManagedJobs.start_job(agent, "job", 3, context: JidoTest.JobRunner.context(self()))
+    {:ok, route_signal_2} = ManagedJobs.start_job_signal(%{job_id: "job", value: 3})
 
-    assert_receive {:job_work, worker, 3}, 1_000
+    assert {:ok, _} =
+             Jido.AgentServer.call(agent, route_signal_2,
+               context: JidoTest.JobRunner.context(self())
+             )
+
+    assert_receive {:job_work, worker, 3}, 1000
     assert state(agent).status == :running
     assert Server.snapshot(agent).state_version == 1
     send(worker, {:finish, {:ok, "artifact:6"}})
@@ -50,14 +60,24 @@ defmodule JidoTest.Examples.Runtime.ManagedJobsTest do
   test "cancellation stops work and rejects its later result", %{jido: jido} do
     {agent, worker} = start_job(jido)
     ref = Process.monitor(worker)
-    assert {:ok, _} = ManagedJobs.cancel_job(agent, "job")
-    assert_receive {:DOWN, ^ref, :process, ^worker, _}, 1_000
+
+    {:ok, route_signal_3} = ManagedJobs.cancel_job_signal(%{job_id: "job"})
+
+    assert {:ok, _} =
+             Jido.AgentServer.call(agent, route_signal_3, [])
+
+    assert_receive {:DOWN, ^ref, :process, ^worker, _}, 1000
     before = Server.snapshot(agent)
 
+    {:ok, route_signal_4} =
+      ManagedJobs.settle_signal(%{
+        job_id: "job",
+        status: :completed,
+        result: "late"
+      })
+
     assert {:error, _} =
-             ManagedJobs.settle(agent,
-               input: %{job_id: "job", status: :completed, result: "late"}
-             )
+             Jido.AgentServer.call(agent, route_signal_4, [])
 
     assert Server.snapshot(agent) == before
     assert state(agent).status == :cancelled
@@ -68,7 +88,7 @@ defmodule JidoTest.Examples.Runtime.ManagedJobsTest do
     ref = Process.monitor(worker)
     old = Server.children(agent)[{:plugin, Jobs}].pid
     Process.exit(old, :kill)
-    assert_receive {:DOWN, ^ref, :process, ^worker, _}, 1_000
+    assert_receive {:DOWN, ^ref, :process, ^worker, _}, 1000
 
     runtime =
       eventually(fn ->
@@ -80,8 +100,17 @@ defmodule JidoTest.Examples.Runtime.ManagedJobsTest do
 
     assert JobServer.jobs(runtime) == []
     assert state(agent).status == :running
-    assert {:ok, _} = ManagedJobs.cancel_job(agent, "job")
-    assert {:ok, _} = ManagedJobs.start_job(agent, "retry-with-new-id", 5)
+
+    {:ok, route_signal_5} = ManagedJobs.cancel_job_signal(%{job_id: "job"})
+
+    assert {:ok, _} =
+             Jido.AgentServer.call(agent, route_signal_5, [])
+
+    {:ok, route_signal_6} = ManagedJobs.start_job_signal(%{job_id: "retry-with-new-id", value: 5})
+
+    assert {:ok, _} =
+             Jido.AgentServer.call(agent, route_signal_6, [])
+
     eventually(fn -> state(agent).status == :completed end)
     assert state(agent).result == "10"
   end

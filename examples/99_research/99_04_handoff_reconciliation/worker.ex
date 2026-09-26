@@ -52,7 +52,7 @@ defmodule Jido.Examples.Handoff.Worker do
          [Directive.emit_to_parent(Handoff.signal("examples.research.handoff.result", data))]}
       end
 
-      define :complete, args: [:result]
+      define :complete
     end
   end
 end

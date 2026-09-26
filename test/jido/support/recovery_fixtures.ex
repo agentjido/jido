@@ -3,7 +3,9 @@ defmodule JidoTest.RecoveryFixtures do
   alias Jido.Examples.PendingJobRecovery, as: Agent
 
   def approve_held(server, observer) do
-    Agent.approve_job(server, "job-1", "attempt-1",
+    {:ok, route_signal_1} = Agent.approve_job_signal(%{job_id: "job-1", attempt_id: "attempt-1"})
+
+    Jido.AgentServer.call(server, route_signal_1,
       context: %{job_runner: {__MODULE__.Runner, observer}}
     )
   end

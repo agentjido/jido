@@ -14,7 +14,7 @@ defmodule Jido.Examples.ParallelTools do
     signal_source "/examples/llm/parallel_tools"
 
     route "examples.llm.parallel_tools.plan", Jido.Examples.ParallelTools.Pipeline do
-      define :plan, args: [:prompt]
+      define :plan
     end
   end
 end

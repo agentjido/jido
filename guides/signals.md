@@ -16,7 +16,7 @@ those two keys and leaves them absent when the caller does not supply them.
 
 The `routes` block can set `signal_source` and declare nested `define` entries
 for generated Signal and command functions. Exact routes can expose interfaces;
-wildcards and match predicates cannot expose positional helpers.
+wildcards and match predicates cannot expose generated helpers.
 
 A caller timeout does not undo active work. Remote admission uses the caller's
 clock through a bounded query. Failed remote liveness checks during a partition

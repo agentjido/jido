@@ -19,7 +19,12 @@ defmodule Jido.Examples.RecoverableDelivery.Probe do
     try do
       :ok = Sink.available(jido, false)
       {:ok, server} = Jido.start_agent(jido, Agent, opts ++ [restore: false])
-      {:ok, committed} = Agent.record_and_deliver(server, "effect-1", 7)
+
+      {:ok, route_signal_1} = Agent.record_and_deliver_signal(%{effect_id: "effect-1", value: 7})
+
+      {:ok, committed} =
+        Jido.AgentServer.call(server, route_signal_1, [])
+
       IO.inspect(committed.state, label: "Committed intent while the sink is unavailable")
       agent_ref = Process.monitor(server)
       Process.exit(server, :kill)

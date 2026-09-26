@@ -119,13 +119,19 @@ defmodule Jido.Examples.Factory.WorkshopProbe do
   defp ask(session, id, text) do
     IO.puts("probe> #{text}")
     pid = Jido.whereis_agent(session.jido, session.conversation_id)
-    {:ok, _} = Conversation.ask(pid, id, text, context: session.context)
+
+    {:ok, route_signal_1} = Conversation.ask_signal(%{request_id: id, text: text})
+
+    {:ok, _} =
+      Jido.AgentServer.call(pid, route_signal_1, context: session.context)
+
     await(fn -> Server.agent(pid).state.status == :idle end, 120_000)
     state = Server.agent(pid).state
     ensure(state.error == "", state.error)
   end
 
   defp ensure(true, _message), do: :ok
+
   defp ensure(false, message), do: raise(message)
 
   defp await(check, timeout \\ 5_000),

@@ -14,7 +14,7 @@ defmodule Jido.Examples.ToolCall do
     signal_source "/examples/llm/tool_call"
 
     route "examples.llm.tool_call.ask", Jido.Examples.ToolCall.Pipeline do
-      define :ask, args: [:prompt]
+      define :ask
     end
   end
 end

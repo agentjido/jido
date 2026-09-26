@@ -16,19 +16,37 @@ defmodule JidoTest.Examples.Factory.LiveConversationTest do
       end)
 
     agent = LiveConversation.new!()
-    signal = LiveConversation.chat_signal!("pure", "First")
+
+    {:ok, signal} =
+      LiveConversation.chat_signal(%{request_id: "pure", text: "First"})
+
     assert {:ok, candidate, []} = LiveConversation.cmd(agent, signal, context: context)
     assert candidate.state.answer == "Hello"
     assert agent.state.answer == ""
-    assert_receive {:request, %{"messages" => [%{"role" => "user"}]}}, 2_000
+    assert_receive {:request, %{"messages" => [%{"role" => "user"}]}}, 2000
 
     {:ok, server} = Jido.start_agent(jido, LiveConversation)
-    assert {:ok, _} = LiveConversation.chat(server, "one", "First", context: context)
+
+    {:ok, route_signal_1} = LiveConversation.chat_signal(%{request_id: "one", text: "First"})
+
+    assert {:ok, _} =
+             Jido.AgentServer.call(server, route_signal_1, context: context)
+
     assert_receive {:request, _}
-    assert {:ok, agent} = LiveConversation.chat(server, "two", "Second", context: context)
+
+    {:ok, route_signal_2} = LiveConversation.chat_signal(%{request_id: "two", text: "Second"})
+
+    assert {:ok, agent} =
+             Jido.AgentServer.call(server, route_signal_2, context: context)
+
     assert_receive {:request, body}
     assert Enum.map(body["messages"], & &1["role"]) == ["user", "assistant", "user"]
-    assert {:error, _} = LiveConversation.chat(server, "two", "Repeat", context: context)
+
+    {:ok, route_signal_3} = LiveConversation.chat_signal(%{request_id: "two", text: "Repeat"})
+
+    assert {:error, _} =
+             Jido.AgentServer.call(server, route_signal_3, context: context)
+
     refute_received {:request, _}
     refute inspect(agent.state) =~ "fixture-key"
     assert Server.agent(server) == agent
@@ -53,8 +71,11 @@ defmodule JidoTest.Examples.Factory.LiveConversationTest do
 
     log =
       ExUnit.CaptureLog.capture_log(fn ->
+        {:ok, route_signal_4} =
+          LiveConversation.chat_signal(%{request_id: "failure", text: "Hello"})
+
         assert {:error, error} =
-                 LiveConversation.chat(server, "failure", "Hello", context: context)
+                 Jido.AgentServer.call(server, route_signal_4, context: context)
 
         assert error.details.status == 401
         assert error.details.reason == :model_request_failed

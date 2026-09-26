@@ -16,7 +16,9 @@ defmodule Jido.AgentServer.ChildPlacementTest do
 
   test "pure Agent evaluation returns remote intent without starting a process" do
     {:ok, agent} = RemoteParent.new()
-    signal = RemoteParent.request_child_signal!(:worker@host)
+
+    {:ok, signal} =
+      RemoteParent.request_child_signal(%{target_node: :worker@host})
 
     assert {:ok, candidate, [%Directive.SpawnChild{node: :worker@host, tag: :worker}]} =
              RemoteParent.cmd(agent, signal)

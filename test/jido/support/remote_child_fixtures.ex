@@ -64,7 +64,7 @@ defmodule JidoTest.RemoteChildFixtures.LifecycleParent do
         {:ok, context.agent_state, [directive]}
       end
 
-      define :create_worker, args: [:target_node, :worker_module]
+      define :create_worker
     end
 
     route "jido.agent.child.exit" do

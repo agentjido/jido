@@ -55,13 +55,20 @@ defmodule JidoTest.FactoryHTTP do
     alias Jido.Examples.Factory.System, as: Owner
     id = JidoTest.Case.unique_id("factory")
     {:ok, owner} = Jido.start_agent(jido, Owner, id: id)
-    {:ok, _} = Owner.boot(owner, mode, input: Map.new(opts))
+
+    {:ok, route_signal_1} = Owner.boot_signal(Map.merge(Map.new(opts), %{mode: mode}))
+
+    {:ok, _} =
+      Jido.AgentServer.call(owner, route_signal_1, [])
 
     {factory, conversation} =
       JidoTest.Eventually.eventually(fn ->
         factory = Jido.whereis_agent(jido, "#{id}/factory")
         conversation = Jido.whereis_agent(jido, "#{id}/conversation")
-        if is_pid(factory) and is_pid(conversation), do: {factory, conversation}
+
+        if is_pid(factory) and is_pid(conversation) do
+          {factory, conversation}
+        end
       end)
 
     if mode == :departments do

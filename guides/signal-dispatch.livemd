@@ -17,11 +17,11 @@ defmodule DispatchGuide.Sender do
   use Jido.Agent, name: "dispatch_guide_sender"
 
   agent do
-    schema Zoi.object(%{sent: Zoi.integer() |> Zoi.default(0)})
+    schema(Zoi.object(%{sent: Zoi.integer() |> Zoi.default(0)}))
   end
 
   routes do
-    signal_source "/guides/dispatch"
+    signal_source("/guides/dispatch")
 
     route "dispatch.send" do
       action %{recipient: recipient, text: text},
@@ -44,7 +44,7 @@ defmodule DispatchGuide.Sender do
         {:ok, %{context.agent_state | sent: context.agent_state.sent + 1}, [directive]}
       end
 
-      define :send_text, args: [:recipient, :text]
+      define(:send_text)
     end
   end
 end
@@ -61,7 +61,10 @@ end
     id: "dispatch-sender"
   )
 
-{:ok, committed} = DispatchGuide.Sender.send_text(sender, self(), "ready")
+{:ok, committed} =
+  with {:ok, signal} <- DispatchGuide.Sender.send_text_signal(%{recipient: self(), text: "ready"}) do
+    Jido.AgentServer.call(sender, signal, [])
+  end
 
 received =
   receive do

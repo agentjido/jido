@@ -12,7 +12,7 @@ defmodule JidoTest.Authoring.Topology.Fixtures.Combined do
     signal_source "/authoring/owner"
 
     route "owner.set", JidoTest.Authoring.Topology.Fixtures.SetValue do
-      define :set, args: [:value]
+      define :set
     end
   end
 

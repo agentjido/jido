@@ -36,20 +36,22 @@ defmodule AgentDSL.Profile do
     description: "Owns one display profile"
 
   agent do
-    schema Zoi.object(%{
-             name: Zoi.string() |> Zoi.default("Anonymous"),
-             revision: Zoi.integer() |> Zoi.min(0) |> Zoi.default(0)
-           })
+    schema(
+      Zoi.object(%{
+        name: Zoi.string() |> Zoi.default("Anonymous"),
+        revision: Zoi.integer() |> Zoi.min(0) |> Zoi.default(0)
+      })
+    )
 
-    metadata %{domain: "profiles"}
+    metadata(%{domain: "profiles"})
   end
 
   routes do
-    signal_source "/guides/agent-dsl"
+    signal_source("/guides/agent-dsl")
 
     route "profile.rename", AgentDSL.Rename do
-      defaults %{name: "Anonymous"}
-      define :rename, args: [{:optional, :name}]
+      defaults(%{name: "Anonymous"})
+      define(:rename)
     end
   end
 end
@@ -79,7 +81,7 @@ definition = AgentDSL.Profile.definition()
 
 ```elixir
 agent = AgentDSL.Profile.new!(id: "profile-1")
-{:ok, signal} = AgentDSL.Profile.rename_signal(" Ada ")
+{:ok, signal} = AgentDSL.Profile.rename_signal(%{name: " Ada "})
 {:ok, candidate, []} = AgentDSL.Profile.cmd(agent, signal)
 
 candidate.state.name
@@ -90,7 +92,7 @@ The result is `"Ada"`.
 ## Use A Route Default
 
 ```elixir
-{:ok, signal} = AgentDSL.Profile.rename_signal()
+{:ok, signal} = AgentDSL.Profile.rename_signal(%{})
 {:ok, candidate, []} = AgentDSL.Profile.cmd(agent, signal)
 
 candidate.state.name

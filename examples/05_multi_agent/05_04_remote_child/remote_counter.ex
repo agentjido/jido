@@ -16,7 +16,7 @@ defmodule Jido.Examples.RemoteCounter do
         {:ok, %{context.agent_state | value: value}}
       end
 
-      define :record, args: [:value]
+      define :record
     end
 
     route "examples.multi_agent.remote_child.calculate" do
@@ -34,7 +34,7 @@ defmodule Jido.Examples.RemoteCounter do
          [Jido.Agent.Directive.emit_to_parent(reply)]}
       end
 
-      define :calculate, args: [:value, :request_id]
+      define :calculate
     end
   end
 end

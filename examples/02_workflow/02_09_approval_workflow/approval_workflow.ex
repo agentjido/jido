@@ -51,7 +51,7 @@ defmodule Jido.Examples.ApprovalWorkflow do
     end
 
     route "examples.flight.select", Jido.Examples.ApprovalWorkflow.SelectFare do
-      define :select_fare, args: [:option_id, :search_revision, :passenger_ref]
+      define :select_fare
     end
 
     route "examples.flight.approve", Jido.Examples.ApprovalWorkflow.ApproveBooking do

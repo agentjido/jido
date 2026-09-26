@@ -10,8 +10,15 @@ defmodule JidoTest.Examples.Applications.SubscriptionTest do
     {:ok, agent_server} = Jido.start_agent(jido, Agent, id: id)
     runtime = plugin_runtime(agent_server)
 
+    {:ok, route_signal_1} =
+      Agent.change_signal(%{
+        operation: :subscribe,
+        topic: "orders",
+        config: %{status: "new"}
+      })
+
     assert {:ok, committed} =
-             Agent.change(agent_server, :subscribe, "orders", input: %{config: %{status: "new"}})
+             Jido.AgentServer.call(agent_server, route_signal_1, [])
 
     desired = %{"orders" => %{status: "new"}}
     assert committed.state.subscriptions.desired == desired
@@ -22,7 +29,10 @@ defmodule JidoTest.Examples.Applications.SubscriptionTest do
     restarted =
       eventually(fn ->
         next = plugin_runtime(agent_server)
-        if next != runtime, do: next
+
+        if next != runtime do
+          next
+        end
       end)
 
     eventually(fn -> Runtime.external(restarted) == desired end)

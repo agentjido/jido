@@ -19,7 +19,17 @@ defmodule Jido.Examples.Topology.PlacementPolicyTest do
     assert :ok = Controller.await_ready(controller)
     worker = Controller.whereis_agent(controller, :workers, 1)
 
-    assert {:ok, _agent} = PlacementPolicy.place(control, topology_id, :workers, 1, node())
+    {:ok, route_signal_1} =
+      PlacementPolicy.place_signal(%{
+        topology_id: topology_id,
+        target: :workers,
+        member: 1,
+        node: node()
+      })
+
+    assert {:ok, _agent} =
+             Jido.AgentServer.call(control, route_signal_1, [])
+
     assert Controller.agent_node(controller, :workers, 1) == node()
     assert Controller.whereis_agent(controller, :workers, 1) == worker
     eventually(fn -> AgentServer.agent(control).state.lifecycle_events > 0 end)

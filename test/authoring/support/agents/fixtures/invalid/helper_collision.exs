@@ -9,7 +9,7 @@ defmodule JidoTest.Authoring.Agents.Fixtures.Invalid.HelperCollision do
     signal_source "/invalid"
 
     route "items.replace", JidoTest.Authoring.Agents.Fixtures.ReplaceItems do
-      define :replace, args: [:items]
+      define :replace
     end
   end
 end

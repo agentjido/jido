@@ -17,7 +17,7 @@ defmodule JidoTest.Authoring.Agents.Fixtures.InlineCounter do
         {:ok, %{context.agent_state | count: context.agent_state.count + amount * 2}}
       end
 
-      define :add, args: [{:optional, :amount}]
+      define :add
     end
   end
 end

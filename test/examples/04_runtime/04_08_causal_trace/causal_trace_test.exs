@@ -13,7 +13,12 @@ defmodule JidoTest.Examples.Runtime.CausalTraceTest do
 
     try do
       assert {:ok, server} = Jido.start_agent(jido, Example, id: id)
-      assert {:ok, _} = Example.start_work(server, "request-1", 7)
+
+      {:ok, route_signal_1} = Example.start_work_signal(%{request_id: "request-1", value: 7})
+
+      assert {:ok, _} =
+               Jido.AgentServer.call(server, route_signal_1, [])
+
       eventually(fn -> Server.agent(server).state.results == %{left: 14, right: 14} end)
 
       turns =
@@ -22,10 +27,13 @@ defmodule JidoTest.Examples.Runtime.CausalTraceTest do
             for %{
                   event: [:jido, :agent, :turn, :settled],
                   metadata: metadata
-                } <- EventProbe.events(probe),
-                do: metadata
+                } <- EventProbe.events(probe) do
+              metadata
+            end
 
-          if length(turns) == 7, do: turns
+          if length(turns) == 7 do
+            turns
+          end
         end)
 
       [parent] = Enum.filter(turns, &(&1.signal_type == "examples.runtime.causal_trace.begin"))

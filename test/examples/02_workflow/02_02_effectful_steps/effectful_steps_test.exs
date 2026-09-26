@@ -15,7 +15,7 @@ defmodule JidoTest.Examples.Workflow.EffectfulStepsTest do
     persistence = {Jido.Persistence.ETS, table: :"workflow_#{System.unique_integer([:positive])}"}
     server = start_agent!(jido, Example, persistence: persistence, restore: false)
     before = Server.snapshot(server)
-    command = Example.fetch_record_signal!("one")
+    {:ok, command} = Example.fetch_record_signal(%{key: "one"})
     context = %{service: {Service, client}, private_request: make_ref()}
 
     assert {:ok, candidate, []} = Example.cmd(before.agent, command, context: context)
@@ -30,7 +30,7 @@ defmodule JidoTest.Examples.Workflow.EffectfulStepsTest do
 
     monitor = Process.monitor(server)
     assert :ok = Server.hibernate(server)
-    assert_receive {:DOWN, ^monitor, :process, ^server, {:shutdown, :hibernate}}, 1_000
+    assert_receive {:DOWN, ^monitor, :process, ^server, {:shutdown, :hibernate}}, 1000
     assert {:ok, restored} = Jido.thaw(jido, Example, candidate.id, persistence: persistence)
     assert Server.snapshot(restored) == %{agent: candidate, state_version: 1}
   end
@@ -39,20 +39,35 @@ defmodule JidoTest.Examples.Workflow.EffectfulStepsTest do
     client = service()
     server = start_agent!(jido, Example)
     context = %{service: {Service, client}}
-    assert {:ok, _} = Example.fetch_record(server, "seed", context: context)
+
+    {:ok, route_signal_1} = Example.fetch_record_signal(%{key: "seed"})
+
+    assert {:ok, _} =
+             Jido.AgentServer.call(server, route_signal_1, context: context)
+
     before = Server.snapshot(server)
 
-    assert {:error, denied} = Example.fetch_record(server, "denied", false, context: context)
-    assert Enum.any?(errors(denied), &(&1.message == "request denied"))
-    assert Service.calls(client) == [{:read, %{key: "seed"}}]
+    {:ok, route_signal_2} = Example.fetch_record_signal(%{key: "denied", allowed: false})
 
-    assert {:error, stale} = Example.fetch_record(server, "stale", true, "r0", context: context)
+    assert {:error, denied} =
+             Jido.AgentServer.call(server, route_signal_2, context: context)
+
+    assert Enum.any?(errors(denied), &(&1.message == "request denied"))
+    assert Service.calls(client) == [read: %{key: "seed"}]
+
+    {:ok, route_signal_3} =
+      Example.fetch_record_signal(%{
+        key: "stale",
+        allowed: true,
+        expected_revision: "r0"
+      })
+
+    assert {:error, stale} =
+             Jido.AgentServer.call(server, route_signal_3, context: context)
+
     assert Enum.any?(errors(stale), &(&1.message == "source revision is stale"))
 
-    assert Service.calls(client) == [
-             {:read, %{key: "seed"}},
-             {:read, %{key: "stale"}}
-           ]
+    assert Service.calls(client) == [read: %{key: "seed"}, read: %{key: "stale"}]
 
     assert Server.snapshot(server) == before
   end
@@ -67,20 +82,32 @@ defmodule JidoTest.Examples.Workflow.EffectfulStepsTest do
 
     server = start_agent!(jido, Example)
 
+    {:ok, route_signal_4} = Example.fetch_record_signal(%{key: "one"})
+
     assert {:ok, committed} =
-             Example.fetch_record(server, "one", context: %{service: {Service, first}})
+             Jido.AgentServer.call(server, route_signal_4, context: %{service: {Service, first}})
 
-    assert {:ok, ^committed} = Example.fetch_record(server, "one")
-    assert Service.calls(first) == [{:read, %{key: "one"}}]
+    {:ok, route_signal_5} = Example.fetch_record_signal(%{key: "one"})
 
-    assert {:error, error} = Example.fetch_record(server, "two")
+    assert {:ok, ^committed} =
+             Jido.AgentServer.call(server, route_signal_5, [])
+
+    assert Service.calls(first) == [read: %{key: "one"}]
+
+    {:ok, route_signal_6} = Example.fetch_record_signal(%{key: "two"})
+
+    assert {:error, error} =
+             Jido.AgentServer.call(server, route_signal_6, [])
+
     assert Enum.any?(errors(error), &(&1.message == "service context required"))
 
+    {:ok, route_signal_7} = Example.fetch_record_signal(%{key: "two"})
+
     assert {:ok, next} =
-             Example.fetch_record(server, "two", context: %{service: {Service, second}})
+             Jido.AgentServer.call(server, route_signal_7, context: %{service: {Service, second}})
 
     assert next.state.result.answer == "second"
-    assert Service.calls(second) == [{:read, %{key: "two"}}]
+    assert Service.calls(second) == [read: %{key: "two"}]
     assert Server.snapshot(server).state_version == 3
   end
 end

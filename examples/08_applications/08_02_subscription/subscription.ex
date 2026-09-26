@@ -31,7 +31,7 @@ defmodule Jido.Examples.Applications.Subscription.Agent do
         {:ok, next_state, [directive]}
       end
 
-      define :change, args: [:operation, :topic]
+      define :change
     end
   end
 end

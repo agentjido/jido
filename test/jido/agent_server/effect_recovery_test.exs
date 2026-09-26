@@ -43,8 +43,13 @@ defmodule Jido.AgentServer.EffectRecoveryTest do
   test "pure evaluation adds business state and Plugin intent to one candidate" do
     agent = Agent.new!()
 
+    {:ok, command_signal_1} = Agent.record_and_deliver_signal(%{effect_id: "effect-1", value: 7})
+
     assert {:ok, candidate, [%Deliver{effect_id: "effect-1", value: 7}]} =
-             Agent.cmd(agent, Agent.record_and_deliver_signal!("effect-1", 7))
+             Agent.cmd(
+               agent,
+               command_signal_1
+             )
 
     assert agent.state.value == 0
     assert agent.state.delivery == %{pending: %{}, completed: %{}}
@@ -54,28 +59,68 @@ defmodule Jido.AgentServer.EffectRecoveryTest do
 
   test "confirmation validates the saved ID and value before completing work" do
     agent = Agent.new!()
-    {:ok, pending, _} = Agent.cmd(agent, Agent.record_and_deliver_signal!("effect-1", 7))
+
+    {:ok, command_signal_2} = Agent.record_and_deliver_signal(%{effect_id: "effect-1", value: 7})
+
+    {:ok, pending, _} =
+      Agent.cmd(
+        agent,
+        command_signal_2
+      )
 
     for {id, value} <- [{"unknown", 7}, {"effect-1", 99}] do
-      assert {:error, _} = Agent.cmd(pending, Agent.confirm_delivery_signal!(id, value))
+      {:ok, command_signal_3} = Agent.confirm_delivery_signal(%{effect_id: id, value: value})
+
+      assert {:error, _} =
+               Agent.cmd(
+                 pending,
+                 command_signal_3
+               )
     end
 
-    assert {:ok, completed, _} = Agent.cmd(pending, Agent.confirm_delivery_signal!("effect-1", 7))
+    {:ok, command_signal_4} = Agent.confirm_delivery_signal(%{effect_id: "effect-1", value: 7})
+
+    assert {:ok, completed, _} =
+             Agent.cmd(
+               pending,
+               command_signal_4
+             )
+
     assert completed.state.delivery == %{pending: %{}, completed: %{"effect-1" => 7}}
 
+    {:ok, command_signal_5} = Agent.confirm_delivery_signal(%{effect_id: "effect-1", value: 7})
+
     assert {:ok, ^completed, _} =
-             Agent.cmd(completed, Agent.confirm_delivery_signal!("effect-1", 7))
+             Agent.cmd(
+               completed,
+               command_signal_5
+             )
   end
 
   test "completed IDs prevent duplicate delivery and conflicting state changes", context do
     server = start_agent(context)
-    assert {:ok, _} = Agent.record_and_deliver(server, "effect-1", 7)
-    assert_receive {:effect_attempt, "effect-1", _worker}, 1_000
+
+    {:ok, route_signal_1} = Agent.record_and_deliver_signal(%{effect_id: "effect-1", value: 7})
+
+    assert {:ok, _} =
+             Jido.AgentServer.call(server, route_signal_1, [])
+
+    assert_receive {:effect_attempt, "effect-1", _worker}, 1000
     await_completed(server, %{"effect-1" => 7})
     assert Server.snapshot(server).state_version == 2
-    assert {:ok, _} = Agent.record_and_deliver(server, "effect-1", 7)
+
+    {:ok, route_signal_2} = Agent.record_and_deliver_signal(%{effect_id: "effect-1", value: 7})
+
+    assert {:ok, _} =
+             Jido.AgentServer.call(server, route_signal_2, [])
+
     before_conflict = Server.snapshot(server)
-    assert {:error, _} = Agent.record_and_deliver(server, "effect-1", 99)
+
+    {:ok, route_signal_3} = Agent.record_and_deliver_signal(%{effect_id: "effect-1", value: 99})
+
+    assert {:error, _} =
+             Jido.AgentServer.call(server, route_signal_3, [])
+
     assert Server.snapshot(server) == before_conflict
     refute_received {:effect_attempt, "effect-1", _worker}
     assert Sink.records(context.jido) == %{"effect-1" => 7}
@@ -92,9 +137,21 @@ defmodule Jido.AgentServer.EffectRecoveryTest do
       :ok = Sink.hold(context.jido, @stage)
       id = unique_id()
       server = start_agent(context, id: id)
-      assert {:ok, committed} = Agent.record_and_deliver(server, "effect-1", 7)
-      assert_receive {:effect_attempt, "effect-1", task}, 1_000
-      expected = if @stage == :after_write, do: %{"effect-1" => 7}, else: %{}
+
+      {:ok, route_signal_4} = Agent.record_and_deliver_signal(%{effect_id: "effect-1", value: 7})
+
+      assert {:ok, committed} =
+               Jido.AgentServer.call(server, route_signal_4, [])
+
+      assert_receive {:effect_attempt, "effect-1", task}, 1000
+
+      expected =
+        if @stage == :after_write do
+          %{"effect-1" => 7}
+        else
+          %{}
+        end
+
       eventually(fn -> Sink.records(context.jido) == expected end)
       assert Server.snapshot(server) == %{agent: committed, state_version: 1}
       assert {:ok, ^committed, 1} = load(context, id)
@@ -102,7 +159,7 @@ defmodule Jido.AgentServer.EffectRecoveryTest do
       kill_agent(context, server, task, id)
       :ok = Sink.hold(context.jido, :none)
       restored = start_agent(context, id: id, restore: :required)
-      assert_receive {:effect_attempt, "effect-1", _new_task}, 1_000
+      assert_receive {:effect_attempt, "effect-1", _new_task}, 1000
       await_completed(restored, %{"effect-1" => 7})
       assert Sink.records(context.jido) == %{"effect-1" => 7}
       assert %{agent: acknowledged, state_version: 2} = Server.snapshot(restored)
@@ -114,13 +171,18 @@ defmodule Jido.AgentServer.EffectRecoveryTest do
   test "completed work remains complete after another Agent activation", context do
     id = unique_id()
     server = start_agent(context, id: id)
-    assert {:ok, _} = Agent.record_and_deliver(server, "effect-1", 7)
-    assert_receive {:effect_attempt, "effect-1", _task}, 1_000
+
+    {:ok, route_signal_5} = Agent.record_and_deliver_signal(%{effect_id: "effect-1", value: 7})
+
+    assert {:ok, _} =
+             Jido.AgentServer.call(server, route_signal_5, [])
+
+    assert_receive {:effect_attempt, "effect-1", _task}, 1000
     await_completed(server, %{"effect-1" => 7})
     committed = Server.snapshot(server)
     stop_monitor = Process.monitor(server)
     :ok = Jido.stop_agent(context.jido, server)
-    assert_receive {:DOWN, ^stop_monitor, :process, ^server, _reason}, 1_000
+    assert_receive {:DOWN, ^stop_monitor, :process, ^server, _reason}, 1000
     restored = start_agent(context, id: id, restore: :required)
     assert Server.snapshot(restored) == committed
     refute_received {:effect_attempt, "effect-1", _task}
@@ -129,16 +191,21 @@ defmodule Jido.AgentServer.EffectRecoveryTest do
   test "Plugin loss restarts delivery without replacing the Agent", context do
     :ok = Sink.hold(context.jido, :before_write)
     server = start_agent(context)
-    assert {:ok, _} = Agent.record_and_deliver(server, "effect-1", 7)
-    assert_receive {:effect_attempt, "effect-1", task}, 1_000
+
+    {:ok, route_signal_6} = Agent.record_and_deliver_signal(%{effect_id: "effect-1", value: 7})
+
+    assert {:ok, _} =
+             Jido.AgentServer.call(server, route_signal_6, [])
+
+    assert_receive {:effect_attempt, "effect-1", task}, 1000
     worker = Server.children(server)[{:plugin, Output}].pid
     worker_monitor = Process.monitor(worker)
     task_monitor = Process.monitor(task)
     :ok = Sink.hold(context.jido, :none)
     Process.exit(worker, :kill)
-    assert_receive {:DOWN, ^worker_monitor, :process, ^worker, :killed}, 1_000
-    assert_receive {:DOWN, ^task_monitor, :process, ^task, _reason}, 1_000
-    assert_receive {:effect_attempt, "effect-1", replay_task}, 1_000
+    assert_receive {:DOWN, ^worker_monitor, :process, ^worker, :killed}, 1000
+    assert_receive {:DOWN, ^task_monitor, :process, ^task, _reason}, 1000
+    assert_receive {:effect_attempt, "effect-1", replay_task}, 1000
     assert replay_task != task
     await_completed(server, %{"effect-1" => 7})
     assert Process.alive?(server)
@@ -148,9 +215,19 @@ defmodule Jido.AgentServer.EffectRecoveryTest do
   test "a blocked delivery permits new Turns and preserves older pending work", context do
     :ok = Sink.hold(context.jido, :before_write)
     server = start_agent(context)
-    assert {:ok, _} = Agent.record_and_deliver(server, "effect-1", 7)
-    assert_receive {:effect_attempt, "effect-1", task}, 1_000
-    assert {:ok, latest} = Agent.record_and_deliver(server, "effect-2", 9)
+
+    {:ok, route_signal_7} = Agent.record_and_deliver_signal(%{effect_id: "effect-1", value: 7})
+
+    assert {:ok, _} =
+             Jido.AgentServer.call(server, route_signal_7, [])
+
+    assert_receive {:effect_attempt, "effect-1", task}, 1000
+
+    {:ok, route_signal_8} = Agent.record_and_deliver_signal(%{effect_id: "effect-2", value: 9})
+
+    assert {:ok, latest} =
+             Jido.AgentServer.call(server, route_signal_8, [])
+
     assert latest.state.value == 9
     assert latest.state.delivery.pending == %{"effect-1" => 7, "effect-2" => 9}
     assert Server.snapshot(server).state_version == 2
@@ -164,9 +241,14 @@ defmodule Jido.AgentServer.EffectRecoveryTest do
   test "an unavailable sink is retried from saved intent", context do
     :ok = Sink.available(context.jido, false)
     server = start_agent(context)
-    assert {:ok, _} = Agent.record_and_deliver(server, "effect-1", 7)
-    assert_receive {:effect_attempt, "effect-1", first_task}, 1_000
-    assert_receive {:effect_attempt, "effect-1", retry_task}, 1_000
+
+    {:ok, route_signal_9} = Agent.record_and_deliver_signal(%{effect_id: "effect-1", value: 7})
+
+    assert {:ok, _} =
+             Jido.AgentServer.call(server, route_signal_9, [])
+
+    assert_receive {:effect_attempt, "effect-1", first_task}, 1000
+    assert_receive {:effect_attempt, "effect-1", retry_task}, 1000
     assert first_task != retry_task
     assert Server.agent(server).state.delivery.pending == %{"effect-1" => 7}
     assert Server.snapshot(server).state_version == 1
@@ -181,12 +263,14 @@ defmodule Jido.AgentServer.EffectRecoveryTest do
     :ok = Elixir.Agent.update(fault, fn _ -> true end)
     before_write = Server.snapshot(server)
 
+    {:ok, route_signal_10} = Agent.record_and_deliver_signal(%{effect_id: "effect-1", value: 7})
+
     assert {:error, {:persistence_failed, {:rejected, :test_storage_unavailable}}} =
-             Agent.record_and_deliver(server, "effect-1", 7)
+             Jido.AgentServer.call(server, route_signal_10, [])
 
     assert_receive {:DOWN, ^monitor, :process, ^server,
                     {:shutdown, {:persistence_failed, {:rejected, :test_storage_unavailable}}}},
-                   1_000
+                   1000
 
     refute_received {:effect_attempt, "effect-1", _task}
     assert Sink.records(context.jido) == %{}
@@ -198,8 +282,13 @@ defmodule Jido.AgentServer.EffectRecoveryTest do
     {context, fault} = faulty_storage(context)
     :ok = Sink.hold(context.jido, :after_write)
     server = start_agent(context)
-    assert {:ok, committed} = Agent.record_and_deliver(server, "effect-1", 7)
-    assert_receive {:effect_attempt, "effect-1", task}, 1_000
+
+    {:ok, route_signal_11} = Agent.record_and_deliver_signal(%{effect_id: "effect-1", value: 7})
+
+    assert {:ok, committed} =
+             Jido.AgentServer.call(server, route_signal_11, [])
+
+    assert_receive {:effect_attempt, "effect-1", task}, 1000
     eventually(fn -> Sink.records(context.jido) == %{"effect-1" => 7} end)
     monitor = Process.monitor(server)
     :ok = Elixir.Agent.update(fault, fn _ -> true end)
@@ -208,7 +297,7 @@ defmodule Jido.AgentServer.EffectRecoveryTest do
 
     assert_receive {:DOWN, ^monitor, :process, ^server,
                     {:shutdown, {:persistence_failed, {:rejected, :test_storage_unavailable}}}},
-                   1_000
+                   1000
 
     assert {:ok, ^committed, 1} = load(context, committed.id)
     :ok = Elixir.Agent.update(fault, fn _ -> false end)

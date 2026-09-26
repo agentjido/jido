@@ -32,7 +32,7 @@ defmodule Jido.Examples.Topology.PlacementPolicy do
         {:ok, context.agent_state, [directive]}
       end
 
-      define :place, args: [:topology_id, :target, :member, :node]
+      define :place
     end
 
     route "jido.topology.lifecycle.**" do

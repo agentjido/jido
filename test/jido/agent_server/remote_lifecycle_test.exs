@@ -36,34 +36,37 @@ defmodule Jido.AgentServer.RemoteLifecycleTest do
     assert [%{observation: :unreachable, reason: :noconnection}] = observations(c, parent)
 
     peer_eventually(fn -> not peer_call(c.peer_b, Process, :alive?, [child.pid]) end,
-      timeout: 2_000
+      timeout: 2000
     )
 
-    peer_eventually(fn -> not peer_call(c.peer_b, Process, :alive?, [task]) end, timeout: 2_000)
+    peer_eventually(fn -> not peer_call(c.peer_b, Process, :alive?, [task]) end, timeout: 2000)
     assert peer_call(c.peer_a, Process, :alive?, [parent])
     assert peer_call(c.peer_a, Node, :list, []) == []
     assert peer_call(c.peer_b, Node, :list, []) == []
     assert peer_call(c.peer_a, Node, :connect, [c.node_b])
     assert peer_call(c.peer_b, Jido, :whereis_agent, [c.jido, child.id]) == nil
     assert peer_call(c.peer_a, Server, :children, [parent]) == %{}
-
     # The previous active request is closed on B. The first retry resolves
     # that receipt; the following request can use a new generation.
+    {:ok, route_signal_1} =
+      Parent.create_worker_signal(%{
+        target_node: c.node_b,
+        worker_module: Fixtures.Child
+      })
+
     assert {:ok, _} =
-             peer_call(c.peer_a, Parent, :create_worker, [
-               parent,
-               c.node_b,
-               Fixtures.Child
-             ])
+             peer_call(c.peer_a, Jido.AgentServer, :call, [parent, route_signal_1])
 
     peer_eventually(fn -> peer_call(c.peer_a, Server, :status, [parent]).phase == :idle end)
 
+    {:ok, route_signal_2} =
+      Parent.create_worker_signal(%{
+        target_node: c.node_b,
+        worker_module: Fixtures.Child
+      })
+
     assert {:ok, _} =
-             peer_call(c.peer_a, Parent, :create_worker, [
-               parent,
-               c.node_b,
-               Fixtures.Child
-             ])
+             peer_call(c.peer_a, Jido.AgentServer, :call, [parent, route_signal_2])
 
     replacement =
       peer_eventually(fn -> peer_call(c.peer_a, Server, :children, [parent])[:worker] end)
@@ -103,12 +106,14 @@ defmodule Jido.AgentServer.RemoteLifecycleTest do
     assert {:ok, parent} =
              peer_call(c.peer_a, Jido, :start_agent, [c.jido, Parent, [id: "lifecycle-parent"]])
 
+    {:ok, route_signal_3} =
+      Parent.create_worker_signal(%{
+        target_node: c.node_b,
+        worker_module: Keyword.get(opts, :worker_module, Jido.Examples.RemoteCounter)
+      })
+
     assert {:ok, _} =
-             peer_call(c.peer_a, Parent, :create_worker, [
-               parent,
-               c.node_b,
-               Keyword.get(opts, :worker_module, Jido.Examples.RemoteCounter)
-             ])
+             peer_call(c.peer_a, Jido.AgentServer, :call, [parent, route_signal_3])
 
     child = peer_eventually(fn -> peer_call(c.peer_a, Server, :children, [parent])[:worker] end)
     {parent, child}

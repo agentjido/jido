@@ -21,11 +21,16 @@ defmodule JidoTest.System.Services.RedisFaults do
 
   test "SIGKILL and AOF restart retain completed effects and the checkpoint revision", c do
     server = start_agent(c)
-    assert {:ok, _} = Probe.record_and_deliver(server, "saved", 7)
+
+    {:ok, route_signal_1} = Probe.record_and_deliver_signal(%{effect_id: "saved", value: 7})
+
+    assert {:ok, _} =
+             Jido.AgentServer.call(server, route_signal_1, [])
+
     completed(c, server, %{"saved" => 7})
     snapshot = Server.snapshot(server)
     kill_agent(c, server)
-    {socket, replacement_os_pid} = GenServer.call(c.redis, :crash_restart, 10_000)
+    {socket, replacement_os_pid} = GenServer.call(c.redis, :crash_restart, 10000)
     assert socket == c.socket
     assert replacement_os_pid != c.os_pid
     assert {:ok, "PONG"} = RedisServer.command(socket, ["PING"])
@@ -43,11 +48,18 @@ defmodule JidoTest.System.Services.RedisFaults do
     control = start_supervised!({Agent, fn -> false end}, id: :network_fault)
 
     command = fn parts ->
-      drop? = if hd(parts) == "EVAL", do: Agent.get_and_update(control, &{&1, false}), else: false
+      drop? =
+        if hd(parts) == "EVAL" do
+          Agent.get_and_update(control, &{&1, false})
+        else
+          false
+        end
 
-      if drop?,
-        do: RedisServer.command_without_reply(c.socket, parts),
-        else: RedisServer.command(c.socket, parts)
+      if drop? do
+        RedisServer.command_without_reply(c.socket, parts)
+      else
+        RedisServer.command(c.socket, parts)
+      end
     end
 
     store = {Jido.Persistence.Redis, command_fn: command, prefix: "system"}
@@ -55,7 +67,9 @@ defmodule JidoTest.System.Services.RedisFaults do
     id = Server.agent(server).id
     monitors = monitor_agent_tree(c, server)
     Agent.update(control, fn _ -> true end)
-    signal = Probe.record_and_deliver_signal!("uncertain", 7)
+
+    {:ok, signal} =
+      Probe.record_and_deliver_signal(%{effect_id: "uncertain", value: 7})
 
     assert {:error, {:persistence_failed, {:indeterminate, :closed}}} =
              Server.call(server, signal)

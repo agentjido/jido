@@ -18,11 +18,11 @@ defmodule RequestGuide.Counter do
   use Jido.Agent, name: "request_guide_counter"
 
   agent do
-    schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+    schema(Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}))
   end
 
   routes do
-    signal_source "/guides/requests"
+    signal_source("/guides/requests")
 
     route "counter.add" do
       action %{amount: amount},
@@ -32,7 +32,7 @@ defmodule RequestGuide.Counter do
         {:ok, %{context.agent_state | count: context.agent_state.count + amount}}
       end
 
-      define :add, args: [:amount]
+      define(:add)
     end
   end
 end
@@ -53,7 +53,7 @@ end
 ## Call And Wait
 
 ```elixir
-{:ok, signal} = RequestGuide.Counter.add_signal(2)
+{:ok, signal} = RequestGuide.Counter.add_signal(%{amount: 2})
 
 {:ok, committed} =
   Jido.AgentServer.call(
@@ -72,11 +72,11 @@ deadline. If the caller stops waiting after work starts, the Turn can continue.
 ## Cast Without A Reply
 
 ```elixir
-{:ok, cast_signal} = RequestGuide.Counter.add_signal(3)
+{:ok, cast_signal} = RequestGuide.Counter.add_signal(%{amount: 3})
 :ok = Jido.AgentServer.cast(counter, cast_signal)
 
 # A later call from the same process arrives after the cast.
-{:ok, barrier_signal} = RequestGuide.Counter.add_signal(0)
+{:ok, barrier_signal} = RequestGuide.Counter.add_signal(%{amount: 0})
 {:ok, after_cast} = Jido.AgentServer.call(counter, barrier_signal)
 
 after_cast.state.count
@@ -87,7 +87,7 @@ A cast is best effort under overload. It does not confirm admission or commit.
 ## Send Now And Receive Later
 
 ```elixir
-{:ok, request_signal} = RequestGuide.Counter.add_signal(4)
+{:ok, request_signal} = RequestGuide.Counter.add_signal(%{amount: 4})
 request_id = Jido.AgentServer.send_request(counter, request_signal)
 
 response = Jido.AgentServer.receive_response(request_id, 5_000)

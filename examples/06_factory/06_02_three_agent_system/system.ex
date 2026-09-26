@@ -28,7 +28,7 @@ defmodule Jido.Examples.Factory.System do
         Jido.Examples.Factory.System.boot_state(input, context)
       end
 
-      define :boot, args: [{:optional, :mode}]
+      define :boot
     end
 
     route "examples.factory.event" do
@@ -55,17 +55,28 @@ defmodule Jido.Examples.Factory.System do
     do: Protocol.invalid("System is already started")
 
   def boot_state(input, %{agent_state: state, agent_id: id}) do
-    factory = if input.mode == :departments, do: Orchestrator, else: Workshop
+    factory =
+      if input.mode == :departments do
+        Orchestrator
+      else
+        Workshop
+      end
 
     factory_opts =
-      if input.mode == :workshop,
-        do: %{initial_state: %{step_delay_ms: input.step_delay_ms}},
-        else: %{}
+      if input.mode == :workshop do
+        %{initial_state: %{step_delay_ms: input.step_delay_ms}}
+      else
+        %{}
+      end
 
     boot =
-      if input.mode == :departments,
-        do: Orchestrator.boot_signal!(),
-        else: Workshop.boot_signal!()
+      if input.mode == :departments do
+        {:ok, command_signal_1} = Orchestrator.boot_signal(%{})
+        command_signal_1
+      else
+        {:ok, command_signal_2} = Workshop.boot_signal(%{})
+        command_signal_2
+      end
 
     directives = [
       Directive.spawn_child(Conversation, "conversation",

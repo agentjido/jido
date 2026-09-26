@@ -50,7 +50,7 @@ defmodule Jido.Examples.Applications.ElasticGroup.ControllerAgent do
         ControllerState.start(input, context.agent_state)
       end
 
-      define :start, args: [:group_id, :min_workers, :max_workers]
+      define :start
     end
 
     route "jido.agent.child.started" do
@@ -87,7 +87,7 @@ defmodule Jido.Examples.Applications.ElasticGroup.ControllerAgent do
         ControllerState.enqueue(input, context.agent_state)
       end
 
-      define :enqueue, args: [:tasks]
+      define :enqueue
     end
 
     route "examples.applications.elastic_group.work.completed" do

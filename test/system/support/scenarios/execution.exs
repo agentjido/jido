@@ -73,12 +73,20 @@ defmodule JidoTest.System.Scenarios.Execution do
         test "#{@commit_request} at checkpoint #{@commit_stage} cannot reverse a commit", c do
           server = start_agent(c)
           id = Server.agent(server).id
-          signal = Probe.record_and_deliver_signal!("committed", 7)
+
+          {:ok, signal} =
+            Probe.record_and_deliver_signal(%{effect_id: "committed", value: 7})
+
           FaultAdapter.arm(c.control, {1, {@commit_stage, self()}})
 
           # A caller timeout is real protocol behavior, not a sleep used to
           # guess completion. Hold the checkpoint until that caller has exited.
-          timeout = if @commit_request == :caller_timeout, do: 100, else: 10_000
+          timeout =
+            if @commit_request == :caller_timeout do
+              100
+            else
+              10000
+            end
 
           caller =
             Task.async(fn ->
@@ -89,7 +97,7 @@ defmodule JidoTest.System.Scenarios.Execution do
               end
             end)
 
-          assert_receive {:checkpoint_barrier, @commit_stage, ^server}, 10_000
+          assert_receive {:checkpoint_barrier, @commit_stage, ^server}, 10000
 
           {_, _, _, started} =
             Observability.await(c.observer, fn
@@ -106,15 +114,15 @@ defmodule JidoTest.System.Scenarios.Execution do
               # test. The release below comes from the same sender.
               :gen_statem.send_request(server, {:cancel, started.turn_id})
             else
-              assert {:caller_exit, {:timeout, _}} = Task.await(caller, 10_000)
+              assert {:caller_exit, {:timeout, _}} = Task.await(caller, 10000)
               nil
             end
 
           send(server, :release_checkpoint)
 
           if cancel do
-            assert {:reply, {:error, :stale_turn}} = Server.receive_response(cancel, 10_000)
-            assert {:ok, _} = Task.await(caller, 10_000)
+            assert {:reply, {:error, :stale_turn}} = Server.receive_response(cancel, 10000)
+            assert {:ok, _} = Task.await(caller, 10000)
           end
 
           completed(c, server, %{"committed" => 7})

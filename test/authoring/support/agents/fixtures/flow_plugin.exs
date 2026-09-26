@@ -12,7 +12,7 @@ defmodule JidoTest.Authoring.Agents.Fixtures.FlowCounter do
 
     route "flow.add", JidoTest.Authoring.Agents.Fixtures.AddFlow do
       defaults %{amount: 2}
-      define :add, args: [{:optional, :amount}]
+      define :add
     end
   end
 end

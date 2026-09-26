@@ -69,18 +69,18 @@ defmodule Jido.Agent do
 
           route "counter.add", MyApp.Add do
             defaults %{amount: 1}
-            define :add, args: [{:optional, :amount}]
+            define :add
           end
         end
       end
 
-  A nested `define` generates `add_signal`, `add_signal!`, and a live `add`
-  helper. For example, `Counter.add_signal(2)` returns `{:ok, signal}`, and
-  `Counter.add(server, 2, timeout: 5000)` calls `Jido.AgentServer.call/3`.
-  Omitted optional arguments remain absent so route defaults apply normally.
-  Extra payload fields use `input: %{...}`; Signal envelope options use
-  `signal: [...]`. Only live helpers accept `context` and `timeout` options.
-  Helpers package input; Plugins and executables validate it during execution.
+  A nested `define` generates `add_signal(input, envelope_opts \\ [])`.
+  For example, `Counter.add_signal(%{amount: 2}, source: "/caller")` returns
+  `{:ok, signal}`. Input must be a plain map. Omitted fields remain absent so
+  route defaults apply during execution. Envelope options cannot replace the
+  Signal type or data. Plugins and executables validate input during execution.
+  Use `Jido.AgentServer.call(server, signal, context: %{}, timeout: 5000)`
+  for a live Agent, or `cmd/3` for direct execution.
 
   Exposed routes must be exact and have no match predicate. Routes without
   `define` keep normal wildcard and predicate support and generate no helpers.

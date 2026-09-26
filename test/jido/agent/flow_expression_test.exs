@@ -31,7 +31,7 @@ defmodule Jido.Agent.FlowExpressionTest do
 
       route "counter.add", Add do
         defaults %{amount: 2}
-        define :add, args: [{:optional, :amount}]
+        define :add
       end
     end
   end
@@ -63,11 +63,30 @@ defmodule Jido.Agent.FlowExpressionTest do
       assert {:ok, document, registry} = Codec.encode(definition)
       assert {:ok, ^definition} = Codec.decode(JSON.decode!(JSON.encode!(document)), registry)
       instance = Agent.instantiate!(definition, state: %{count: 10})
-      assert {:ok, %{state: %{count: 12}}, []} = Agent.cmd(instance, Counter.add_signal!())
-      assert {:ok, %{state: %{count: 15}}, []} = Agent.cmd(instance, Counter.add_signal!(9))
+
+      {:ok, command_signal_1} = Counter.add_signal(%{})
+
+      assert {:ok, %{state: %{count: 12}}, []} =
+               Agent.cmd(
+                 instance,
+                 command_signal_1
+               )
+
+      {:ok, command_signal_2} = Counter.add_signal(%{amount: 9})
+
+      assert {:ok, %{state: %{count: 15}}, []} =
+               Agent.cmd(
+                 instance,
+                 command_signal_2
+               )
 
       {:ok, server} = Jido.start_agent(jido, instance)
-      assert {:ok, %{state: %{count: 15}}} = Counter.add(server, 9)
+
+      {:ok, route_signal_1} = Counter.add_signal(%{amount: 9})
+
+      assert {:ok, %{state: %{count: 15}}} =
+               Jido.AgentServer.call(server, route_signal_1, [])
+
       assert Jido.AgentServer.snapshot(server).state_version == 1
     end
   end
@@ -83,12 +102,22 @@ defmodule Jido.Agent.FlowExpressionTest do
       )
 
     instance = Agent.instantiate!(definition, state: %{count: 10})
-    assert {:error, error} = Agent.cmd(instance, Counter.add_signal!())
+
+    {:ok, command_signal_3} = Counter.add_signal(%{})
+
+    assert {:error, error} =
+             Agent.cmd(instance, command_signal_3)
+
     assert is_exception(error)
 
     {:ok, server} = Jido.start_agent(jido, instance)
     before = Jido.AgentServer.snapshot(server)
-    assert {:error, _error} = Counter.add(server)
+
+    {:ok, route_signal_2} = Counter.add_signal(%{})
+
+    assert {:error, _error} =
+             Jido.AgentServer.call(server, route_signal_2, [])
+
     assert Jido.AgentServer.snapshot(server) == before
   end
 end
