@@ -2,7 +2,7 @@ defmodule Jido.Agent.Runner do
   @moduledoc false
 
   alias Jido.Agent
-  alias Jido.Agent.{Authoring, Command, Plugin, Turn, Validation}
+  alias Jido.Agent.{Authoring, Callback, Command, Plugin, Turn, Validation}
   alias Jido.Agent.Plugin.Pipeline, as: PluginPipeline
   alias Jido.Error
   alias Jido.Signal
@@ -185,7 +185,7 @@ defmodule Jido.Agent.Runner do
   defp select(%Agent{module: module} = agent, signal) do
     result =
       if module != Agent and function_exported?(module, :handle_signal, 2),
-        do: invoke_agent_callback(module, :handle_signal, [signal, agent]),
+        do: Callback.invoke(module, :handle_signal, [signal, agent]),
         else: default_selection(agent, signal)
 
     result
@@ -280,27 +280,6 @@ defmodule Jido.Agent.Runner do
         result: result
       }
     )
-  end
-
-  defp invoke_agent_callback(module, callback, args) do
-    apply(module, callback, args)
-  rescue
-    error -> agent_callback_error(module, callback, :error, error)
-  catch
-    kind, reason -> agent_callback_error(module, callback, kind, reason)
-  end
-
-  defp agent_callback_error(module, callback, kind, reason) do
-    {:error,
-     Error.execution_error("Agent callback failed",
-       details: %{
-         code: :agent_callback_failed,
-         module: module,
-         callback: callback,
-         kind: kind,
-         reason: reason
-       }
-     )}
   end
 
   defp at(_stage, {:ok, _value} = result), do: result

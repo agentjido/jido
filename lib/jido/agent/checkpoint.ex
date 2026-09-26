@@ -2,6 +2,7 @@ defmodule Jido.Agent.Checkpoint do
   @moduledoc false
 
   alias Jido.Agent
+  alias Jido.Agent.Callback
   alias Jido.Error
   alias Jido.PortableTerm
 
@@ -230,20 +231,11 @@ defmodule Jido.Agent.Checkpoint do
   end
 
   defp invoke(module, callback, args) do
-    case safe_apply(module, callback, args) do
-      {:ok, {:ok, value}} -> {:ok, value}
-      {:ok, {:error, reason}} -> {:error, reason}
-      {:ok, result} -> invalid_callback(callback, result)
-      {:error, kind, reason} -> callback_failed(module, callback, kind, reason)
+    case Callback.invoke(module, callback, args) do
+      {:ok, _value} = result -> result
+      {:error, _reason} = error -> error
+      result -> invalid_callback(callback, result)
     end
-  end
-
-  defp safe_apply(module, callback, args) do
-    {:ok, apply(module, callback, args)}
-  rescue
-    error -> {:error, :error, error}
-  catch
-    kind, reason -> {:error, kind, reason}
   end
 
   defp checkpoint_payload(value) when is_map(value) and not is_struct(value), do: :ok
@@ -294,19 +286,6 @@ defmodule Jido.Agent.Checkpoint do
         "Agent callback returned an invalid result",
         %{code: :agent_invalid_callback_result, callback: callback, result: result}
       )
-
-  defp callback_failed(module, callback, kind, reason) do
-    {:error,
-     Error.execution_error("Agent callback failed",
-       details: %{
-         code: :agent_callback_failed,
-         module: module,
-         callback: callback,
-         kind: kind,
-         reason: reason
-       }
-     )}
-  end
 
   defp invalid(message, details),
     do: {:error, Error.validation_error(message, details: details)}
