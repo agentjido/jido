@@ -114,14 +114,6 @@ defmodule Jido.Agent.Turn do
   end
 
   @doc false
-  @spec selected(term(), term(), Jido.Signal.t()) :: {:ok, t()} | {:error, Exception.t()}
-  def selected(executable, input, %Jido.Signal{} = source_signal) do
-    turn = %__MODULE__{executable: executable, input: input, source_signal: source_signal}
-
-    with :ok <- validate_plan(turn), do: {:ok, turn}
-  end
-
-  @doc false
   @spec validate_selected(t()) :: {:ok, t()} | {:error, Exception.t()}
   def validate_selected(%__MODULE__{source_signal: %Jido.Signal{}} = turn) do
     with :ok <- validate_plan(turn), do: {:ok, turn}

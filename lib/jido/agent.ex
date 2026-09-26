@@ -160,6 +160,14 @@ defmodule Jido.Agent do
   @type t :: definition() | instance()
   @type handle_result :: {:ok, Turn.t()} | {:error, term()}
 
+  @doc """
+  Selects one Action or Flow and its input from the received Signal and current Agent.
+
+  Return `{:ok, turn}` or `{:error, reason}`. The runner binds the original
+  Signal and validates the Turn before execution. A callback cannot replace
+  the source Signal. It can call `Jido.Agent.handle_signal/2` to use the Agent's
+  declared routes. An error does not cause an automatic route fallback.
+  """
   @callback handle_signal(signal :: Signal.t(), agent :: instance()) :: handle_result()
   @callback checkpoint(agent :: instance(), context :: map()) :: {:ok, map()} | {:error, term()}
   @callback restore(checkpoint :: map(), context :: map()) ::
@@ -344,7 +352,13 @@ defmodule Jido.Agent do
   def cmd(%__MODULE__{}, %Signal{}, opts),
     do: invalid("Agent.cmd/3 options must be a keyword list", %{opts: opts})
 
-  @doc false
+  @doc """
+  Selects a Turn using the Agent's declared routes.
+
+  Use this function as an explicit fallback from a custom `c:handle_signal/2`
+  callback. It applies route defaults and returns a validated Turn bound to the
+  original Signal. It does not invoke the custom callback or execute the Turn.
+  """
   @spec handle_signal(Signal.t(), instance()) :: handle_result()
   def handle_signal(%Signal{} = signal, %__MODULE__{} = agent),
     do: Runner.prepare_default_turn(signal, agent)

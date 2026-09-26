@@ -2,7 +2,7 @@ defmodule Jido.Agent.Runner do
   @moduledoc false
 
   alias Jido.Agent
-  alias Jido.Agent.{Command, Plugin, Turn, Validation}
+  alias Jido.Agent.{Authoring, Command, Plugin, Turn, Validation}
   alias Jido.Agent.Plugin.Pipeline, as: PluginPipeline
   alias Jido.Error
   alias Jido.Signal
@@ -69,8 +69,7 @@ defmodule Jido.Agent.Runner do
       )
       when is_list(exec_opts) and is_list(plugin_specs) do
     with :ok <- at(:input, Command.validate_caller_context(command.context)),
-         {:ok, selection} <- at(:route, select(command.agent, source_signal)),
-         {:ok, turn} <- at(:input, materialize(selection, source_signal, command.signal)) do
+         {:ok, turn} <- at(:route, select(command.agent, source_signal)) do
       {:ok,
        prepared(
          command.agent,
@@ -92,12 +91,10 @@ defmodule Jido.Agent.Runner do
   @doc false
   @spec prepare_default_turn(Signal.t(), Agent.instance()) :: Agent.handle_result()
   def prepare_default_turn(%Signal{} = signal, %Agent{} = agent) do
-    with {:ok, selection} <- default_selection(agent, signal),
-         {:ok, turn} <- materialize(selection, signal, signal) do
-      {:ok, turn}
-    else
-      {:error, error} -> {:error, normalize_routing_error(error, signal)}
-    end
+    agent
+    |> default_selection(signal)
+    |> finish_selection(signal, agent.module)
+    |> normalize_result_routing_error(signal)
   end
 
   defp prepare_direct(agent, signal, opts) do
@@ -110,8 +107,7 @@ defmodule Jido.Agent.Runner do
          {:ok, signal} <- at(:input, Command.normalize_signal(signal)),
          plugin_specs = Plugin.specs(specs),
          {:ok, plugin_inputs} <- at(:prepare, Plugin.prepare(agent, signal, plugin_specs)),
-         {:ok, selection} <- at(:route, select(agent, signal)),
-         {:ok, turn} <- at(:input, materialize(selection, signal, signal)) do
+         {:ok, turn} <- at(:route, select(agent, signal)) do
       {:ok,
        prepared(
          agent,
@@ -180,41 +176,32 @@ defmodule Jido.Agent.Runner do
   defp select(%Agent{module: module} = agent, signal) do
     result =
       if module != Agent and function_exported?(module, :handle_signal, 2),
-        do: custom_selection(agent, signal),
+        do: invoke_agent_callback(module, :handle_signal, [signal, agent]),
         else: default_selection(agent, signal)
 
-    normalize_result_routing_error(result, signal)
+    result
+    |> finish_selection(signal, module)
+    |> normalize_result_routing_error(signal)
   end
 
   defp default_selection(agent, signal) do
     with {:ok, router} <- Router.new(agent.routes),
          {:ok, target} <- route_first(router, signal),
-         {:ok, executable, defaults} <- select_target(target) do
-      {:ok, {:route, executable, defaults}}
+         {executable, defaults} = Authoring.split_target(target),
+         {:ok, input} <- merge_route_input(defaults || %{}, signal) do
+      {:ok, %Turn{executable: executable, input: input}}
     end
   end
 
-  defp custom_selection(agent, signal) do
-    case invoke_agent_callback(agent.module, :handle_signal, [signal, agent]) do
-      {:ok, %Turn{} = turn} ->
-        with {:ok, turn} <- Turn.bind_source(turn, signal),
-             {:ok, turn} <- Turn.validate_selected(turn),
-             do: {:ok, {:fixed, turn}}
-
-      {:error, reason} ->
-        {:error, reason}
-
-      result ->
-        {:error, invalid_callback_result(result, agent.module)}
-    end
+  defp finish_selection({:ok, %Turn{} = turn}, signal, _module) do
+    with {:ok, turn} <- Turn.bind_source(turn, signal),
+         do: Turn.validate_selected(turn)
   end
 
-  defp materialize({:fixed, turn}, _source_signal, _effective_signal), do: {:ok, turn}
+  defp finish_selection({:error, _reason} = error, _signal, _module), do: error
 
-  defp materialize({:route, executable, defaults}, source_signal, effective_signal) do
-    with {:ok, input} <- merge_route_input(defaults, effective_signal),
-         do: Turn.selected(executable, input, source_signal)
-  end
+  defp finish_selection(result, _signal, module),
+    do: {:error, invalid_callback_result(result, module)}
 
   defp normalize_exec_result({:ok, output}), do: normalize_exec_result({:ok, output, []})
 
@@ -253,11 +240,6 @@ defmodule Jido.Agent.Runner do
     do: {:error, normalize_routing_error(error, signal)}
 
   defp normalize_result_routing_error(result, _signal), do: result
-
-  defp select_target({executable, defaults}) when is_map(defaults),
-    do: {:ok, executable, defaults}
-
-  defp select_target(executable), do: {:ok, executable, %{}}
 
   defp merge_route_input(defaults, %Signal{data: data})
        when is_map(defaults) and is_map(data),

@@ -84,6 +84,32 @@ command uses the first matching target in Router order. No match returns
 Router priority and specificity put an exact route before matching wildcard
 routes. Test all overlapping patterns.
 
+## Select A Turn In A Callback
+
+Implement `handle_signal/2` when selection needs current Agent state, custom
+input conversion, or an explicit error. Return `{:ok, %Jido.Agent.Turn{}}` or
+`{:error, reason}`. Declared routes and custom callbacks use the same Turn
+validation and execution path.
+
+Call `Jido.Agent.handle_signal/2` to use declared routes for the remaining cases:
+
+```elixir
+@impl Jido.Agent
+def handle_signal(%Jido.Signal{type: "message.raw", data: text}, _agent)
+    when is_binary(text) do
+  Jido.Agent.Turn.new(MyApp.HandleMessage, %{text: text})
+end
+
+def handle_signal(signal, agent) do
+  Jido.Agent.handle_signal(signal, agent)
+end
+```
+
+The callback receives the original Signal. It can convert Signal data into
+executable input, but it cannot replace the Turn's source Signal. Selecting an
+executable does not consume a continuation. An error ends preparation; it does
+not cause an automatic fallback to declared routes.
+
 ## Generate Interfaces
 
 An exact DSL route can set `as: :add`. Jido then creates `add_signal/1,2`,
