@@ -72,6 +72,11 @@ defmodule Jido.AgentServer.Options do
             coerce: true
           )
 
+  @option_fields (Enum.map(Zoi.Struct.struct_fields(@schema), fn
+                    {key, _default} -> key
+                    key -> key
+                  end) -- [:plugin_specs]) ++ [:id, :initial_state, :restart]
+
   @type t :: unquote(Zoi.type_spec(@schema))
   @enforce_keys Zoi.Struct.enforce_keys(@schema)
   defstruct Zoi.Struct.struct_fields(@schema)
@@ -106,7 +111,13 @@ defmodule Jido.AgentServer.Options do
              :exec_module,
              "does not support custom Exec modules; use Jido.Exec"
            ),
-         {:ok, agent, plugin_specs, _schema} <- build_agent(attrs),
+         :ok <-
+           reject_option(
+             attrs,
+             :cron_specs,
+             "does not support cron_specs; use Jido.Plugin.Scheduler"
+           ),
+         :ok <- known_options(attrs),
          {:ok, parent} <- build_parent(Map.get(attrs, :parent)),
          :ok <- validate_registration(attrs),
          :ok <- validate_parent_policy(Map.get(attrs, :on_parent_death, :stop)),
@@ -132,12 +143,18 @@ defmodule Jido.AgentServer.Options do
              :readiness_timeout
            ),
          :ok <- validate_lifecycle(attrs),
-         :ok <-
-           reject_option(
-             attrs,
-             :cron_specs,
-             "does not support cron_specs; use Jido.Plugin.Scheduler"
-           ) do
+         {:ok, _exec_opts} <- validate_keyword(Map.get(attrs, :exec_opts, []), :exec_opts),
+         {:ok, _postponed_limit} <-
+           validate_limit(
+             Map.get(attrs, :max_postponed_signals, @default_max_postponed_signals),
+             :max_postponed_signals
+           ),
+         {:ok, _directive_limit} <-
+           validate_limit(
+             Map.get(attrs, :max_directives_per_turn, :infinity),
+             :max_directives_per_turn
+           ),
+         {:ok, agent, plugin_specs, _schema} <- build_agent(attrs) do
       jido = Map.get(attrs, :jido)
       register = Map.get(attrs, :register, not is_nil(jido))
 
@@ -159,6 +176,13 @@ defmodule Jido.AgentServer.Options do
   end
 
   def new(_value), do: invalid("options must be a map or keyword list")
+
+  defp known_options(attrs) do
+    case Map.keys(attrs) -- @option_fields do
+      [] -> :ok
+      keys -> invalid("contains unknown options", %{keys: keys})
+    end
+  end
 
   defp reject_option(attrs, field, message) do
     if Map.has_key?(attrs, field), do: invalid(message), else: :ok
@@ -432,10 +456,10 @@ defmodule Jido.AgentServer.Options do
     {:error, Error.validation_error("#{field} must be a keyword list", field: field)}
   end
 
-  def validate_limit(:infinity, _field), do: {:ok, :infinity}
-  def validate_limit(value, _field) when is_integer(value) and value >= 0, do: {:ok, value}
+  defp validate_limit(:infinity, _field), do: {:ok, :infinity}
+  defp validate_limit(value, _field) when is_integer(value) and value >= 0, do: {:ok, value}
 
-  def validate_limit(value, field) do
+  defp validate_limit(value, field) do
     {:error,
      Error.validation_error("#{field} must be :infinity or a non-negative integer",
        field: field,

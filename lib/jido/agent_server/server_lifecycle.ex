@@ -24,12 +24,7 @@ defmodule Jido.AgentServer.ServerLifecycle do
          :ok <- mark_registry_status(opts, :starting),
          {:ok, restored_agent, restored_version, initial_persistence} <-
            Storage.restore_initial_agent(opts),
-         {:ok, agent, plugin_specs} <- startup_agent(restored_agent, opts),
-         {:ok, _exec_opts} <- Options.validate_keyword(opts.exec_opts, :exec_opts),
-         {:ok, _max_postponed_signals} <-
-           Options.validate_limit(opts.max_postponed_signals, :max_postponed_signals),
-         {:ok, _max_directives_per_turn} <-
-           Options.validate_limit(opts.max_directives_per_turn, :max_directives_per_turn) do
+         {:ok, agent, plugin_specs} <- startup_agent(restored_agent, opts) do
       parent = opts |> ChildLifecycle.restore_parent(agent) |> ChildLifecycle.monitor_parent()
 
       data = %State{

@@ -24,6 +24,23 @@ defmodule Jido.AgentServer.OptionsTest do
     def new(_opts), do: :invalid
   end
 
+  test "invalid options are rejected before calling the Agent constructor" do
+    for option <- [
+          [turn_timout: 17],
+          [plugin_specs: []],
+          [exec_opts: :invalid],
+          [max_postponed_signals: -1],
+          [max_directives_per_turn: -1],
+          [turn_timeout: 0]
+        ] do
+      assert {:error, %Jido.Error.ValidationError{}} =
+               Options.new([agent: FailingConstructor] ++ option)
+    end
+
+    assert {:error, %Jido.Error.ValidationError{details: %{keys: [:turn_timout]}}} =
+             Options.new(agent: RemoteCounter, turn_timout: 17)
+  end
+
   test "constructors keep their result and report malformed results" do
     assert {:ok, opts} = Options.new(agent: ZeroArityConstructor)
     assert opts.agent.id == "zero-arity"
