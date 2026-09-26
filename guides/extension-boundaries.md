@@ -23,7 +23,7 @@ only when the extension needs the authority that the contract supplies.
 | Request runtime work after an Agent commit | `Jido.Agent.Directive` | The runtime handles a typed Directive after commit. A Directive is not a durable delivery guarantee. |
 | Observe Agent behavior | A semantic Telemetry handler or the optional OpenTelemetry API mapping | Observation has no authority to change evaluation, commit, or runtime results. |
 
-Builders and codecs are public authoring tools. Use them for trusted systems
+Data constructors and Codecs are public authoring tools. Use them for trusted systems
 that create Agent or Topology definitions. Child `node:` options and
 `Jido.Topology.Controller.place_agent/4` accept an exact known Erlang node.
 They do not discover nodes, select capacity, rebalance a system, or grant

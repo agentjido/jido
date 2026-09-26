@@ -7,17 +7,23 @@ defmodule JidoTest.System.TopologyCleanup do
   alias Jido.AgentServer, as: Server
   alias Jido.Examples.Topology.Cell
   alias Jido.Signal.Bus
-  alias Jido.Topology.{Builder, Controller}
+  alias Jido.Topology.Controller
   alias JidoTest.System.Observability
 
   @tag :research
   test "a partial accepted update accounts for members when its control tree dies during cleanup",
        c do
     build = fn count ->
-      Builder.new(name: "partial_cleanup")
-      |> Builder.group(:workers, Cell, count: count)
-      |> Builder.bus(:events)
-      |> Builder.build!(id: c.namespace)
+      Jido.Topology.unwrap!(
+        with {:ok, definition} <-
+               Jido.Topology.new(%{
+                 name: "partial_cleanup",
+                 groups: [%{key: :workers, module: Cell, count: count}],
+                 resources: [%{key: :events, kind: :bus}]
+               }) do
+          Jido.Topology.instantiate(definition, id: c.namespace)
+        end
+      )
     end
 
     initial = build.(1)

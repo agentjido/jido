@@ -4,7 +4,7 @@ defmodule JidoTest.Authoring.Topology.MetadataTest do
   use ExUnit.Case, async: false
   @moduletag :authoring
   alias Jido.Topology
-  alias Jido.Topology.{Builder, Codec}
+  alias Jido.Topology.Codec
   alias JidoTest.Authoring.Compiler
   alias JidoTest.Authoring.Topology.Fixtures
   @fixtures Path.expand("../support/topology/fixtures", __DIR__)
@@ -23,10 +23,7 @@ defmodule JidoTest.Authoring.Topology.MetadataTest do
 
       for definition <- [
             module.topology(),
-            Topology.new!(Map.to_list(attrs)),
-            Builder.build!(Builder.new(attrs)),
-            Builder.new(name: "metadata_maps") |> Builder.metadata(metadata) |> Builder.build!(),
-            Builder.build!(Builder.new(module))
+            Topology.new!(Map.to_list(attrs))
           ] do
         assert definition === expected
         assert {:ok, document, registry} = Codec.encode(definition)
@@ -50,9 +47,7 @@ defmodule JidoTest.Authoring.Topology.MetadataTest do
 
       for result <- [
             Topology.new(attrs),
-            Topology.new(Map.to_list(attrs)),
-            attrs |> Builder.new() |> Builder.build(),
-            Builder.new(name: "invalid_metadata") |> Builder.metadata(metadata) |> Builder.build()
+            Topology.new(Map.to_list(attrs))
           ] do
         assert {:error, %Jido.Error.ValidationError{}} = result
       end

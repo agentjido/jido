@@ -1,25 +1,24 @@
-# Topology Builders, Codecs, and Composition
+# Topology Data, Codecs, and Composition
 
-The Topology DSL, Builder, and Codec use one canonical constructor. Choose the
-authoring form that makes the system definition clear.
+The Topology DSL, data constructors, and Codec share validation. Choose the
+form that makes the system definition clear.
 
-## Use The Builder
+## Declare Data
 
 ```elixir
-builder =
-  Jido.Topology.Builder.new(name: "built_system")
-  |> Jido.Topology.Builder.agent(:leader, MyApp.Cell,
-    initial_state: %{label: "leader"},
-    node: node()
+{:ok, definition} =
+  Jido.Topology.new(
+    name: "built_system",
+    agents: [%{key: :leader, module: MyApp.Cell, initial_state: %{label: "leader"}, node: node()}],
+    groups: [%{key: :workers, module: MyApp.Cell, count: 3}],
+    relationships: [%{parent: :leader, child: :workers}]
   )
-  |> Jido.Topology.Builder.group(:workers, MyApp.Cell, count: 3)
-  |> Jido.Topology.Builder.owns(:leader, :workers)
 
-{:ok, definition} = Jido.Topology.Builder.build(builder)
-{:ok, instance} = Jido.Topology.Builder.build(builder, id: "built-1", input: %{})
+{:ok, instance} = Jido.Topology.instantiate(definition, id: "built-1", input: %{})
 ```
 
-The Builder keeps its first error. Check the final result.
+Build each collection in its required order. Check the constructor result
+before you plan an instance. Use `module.topology()` to read a module definition.
 
 The `node:` option is an exact Erlang node. It can also be a topology input or
 member reference. The default is the Controller node.

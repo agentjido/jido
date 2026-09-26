@@ -16,7 +16,6 @@ defmodule Jido.Topology.EntryMetadata do
   ]
 
   def fields(kind) when is_atom(kind), do: @entries |> Keyword.fetch!(kind) |> elem(1)
-  def collection(kind) when is_atom(kind), do: @entries |> Keyword.fetch!(kind) |> elem(0)
 
   def collections do
     for {kind, {collection, _fields}} <- @entries, not is_nil(collection), do: {kind, collection}

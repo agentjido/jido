@@ -11,7 +11,7 @@ through explicit imports, bindings, and exports.
 ## Read the code
 
 Read [the root Topology](composed_system.ex), [the reusable team](worker_team.ex),
-[the Builder and Codec forms](formats.ex), and the
+[the data and Codec forms](formats.ex), and the
 [JSON fixture](fixtures/composed_system.json).
 
 ## Run it
@@ -38,7 +38,7 @@ per-component pause are not supported.
 
 - [Root Topology](composed_system.ex)
 - [Reusable team](worker_team.ex)
-- [Builder and Codec](formats.ex)
+- [Data and Codec](formats.ex)
 - [JSON fixture](fixtures/composed_system.json)
 - [Tests](../../../test/examples/07_topology/07_05_composed_system/composed_system_test.exs)
 - [Cell Agent](../support/cell.ex)

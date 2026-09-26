@@ -13,7 +13,7 @@ defmodule Jido.Topology.Extension do
   Consume only entity structs that the extension owns, and keep the relative
   order of all remaining entities. Do not depend on order between different
   Spark sections. All entities must be consumed. Common Topology validation
-  still applies, and activation uses the same controller as Builder and direct
+  still applies, and activation uses the same controller as direct
   definitions.
 
   The callback receives entity structs, not the raw Spark DSL state. Put each

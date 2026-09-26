@@ -2,7 +2,7 @@ defmodule JidoTest.Agent.AuthoringExtensionTest do
   use ExUnit.Case, async: false
 
   alias Jido.Agent
-  alias Jido.Agent.{Builder, Codec, Extension}
+  alias Jido.Agent.{Codec, Extension}
 
   defmodule Label do
     defstruct [:key, :value, :__spark_metadata__]
@@ -269,7 +269,7 @@ defmodule JidoTest.Agent.AuthoringExtensionTest do
     assert {:ok, %{}} = Extension.lower([], %{}, [])
   end
 
-  test "public data lowering feeds direct, Builder and Codec authoring" do
+  test "public data lowering feeds direct, data and Codec authoring" do
     source = %{
       name: "data_extended_agent",
       vsn: 9,
@@ -283,7 +283,6 @@ defmodule JidoTest.Agent.AuthoringExtensionTest do
     assert lowered.metadata == %{source: :data, owner: "app"}
 
     direct = Agent.new!(lowered)
-    assert Builder.build!(Builder.new(lowered)) === direct
     assert {:ok, document, registry} = Codec.encode(direct)
     assert {:ok, ^direct} = Codec.decode(JSON.decode!(JSON.encode!(document)), registry)
     refute Map.has_key?(document, "extensions")

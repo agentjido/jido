@@ -63,7 +63,7 @@ entities = [struct!(MyApp.Label, key: :owner, value: "app")]
 ```
 
 `Extension.lower/3` returns lowered data, not a validated Agent. The caller
-must pass it to `Jido.Agent.new/1`, Builder, or another normal validator.
+must pass it to `Jido.Agent.new/1` or another normal validator.
 
 ## Consume Only Owned Entities
 
@@ -82,7 +82,7 @@ The lowering callback runs while Jido builds the Agent definition. It must not:
 - read changing runtime state; or
 - hide executable code in opaque data.
 
-Lowering should produce the same semantic Agent data that the Builder or Codec
+Lowering should produce the same semantic Agent data that the constructor or Codec
 can represent. New syntax must not create a second runtime contract.
 
 ## Preserve Core Boundaries
@@ -125,10 +125,10 @@ meanings. Preserve the relative order of entities that belong to later
 extensions. Do not depend on order between separate Spark sections.
 
 The final configuration passes the same validation, composition, planning, and
-controller paths as Builder and Codec definitions. An extension can describe a
+controller paths as data and Codec definitions. An extension can describe a
 refined topology, but it cannot add a second activation runtime or put dynamic
 runtime data in a static definition.
 
-See [Agent DSL](agent-dsl.livemd), [Builders And Codecs](builders-and-codecs.md),
+See [Agent DSL](agent-dsl.livemd), [Data Definitions And Codecs](data-definitions-and-codecs.md),
 [Topology Definitions](topology-definitions.md), and
 [Extension Boundaries](extension-boundaries.md).

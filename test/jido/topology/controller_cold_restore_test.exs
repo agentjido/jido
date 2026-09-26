@@ -3,7 +3,7 @@ defmodule JidoTest.Topology.ControllerColdRestoreTest do
   alias Jido.Agent.Ref
   alias Jido.Persistence
   alias Jido.Persistence.ETS
-  alias Jido.Topology.{Builder, Controller}
+  alias Jido.Topology.Controller
   alias JidoTest.TopologyRestoreProbe
 
   test "loads an Agent definition before safe checkpoint decoding on a cold remote host", c do
@@ -12,9 +12,15 @@ defmodule JidoTest.Topology.ControllerColdRestoreTest do
     store = {ETS, table: :cold_topology_restore}
 
     instance =
-      Builder.new(name: "cold_restore")
-      |> Builder.agent(:worker, TopologyRestoreProbe, node: c.node_b)
-      |> Builder.build!(id: "cold")
+      Jido.Topology.unwrap!(
+        with {:ok, definition} <-
+               Jido.Topology.new(%{
+                 name: "cold_restore",
+                 agents: [%{key: :worker, module: TopologyRestoreProbe, node: c.node_b}]
+               }) do
+          Jido.Topology.instantiate(definition, id: "cold")
+        end
+      )
 
     id = hd(Map.values(instance.plan.agents)).id
     ref = Ref.new!(namespace: namespace, id: id)

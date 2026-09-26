@@ -1,26 +1,36 @@
 defmodule Jido.Examples.Topology.ComposedFormats do
-  @moduledoc "Builder and JSON forms of the composed system, with stable Registry IDs."
+  @moduledoc "data and JSON forms of the composed system, with stable Registry IDs."
   alias Jido.Codec.Registry
   alias Jido.Examples.Topology.{Cell, ComposedSystem, WorkerTeam}
-  alias Jido.Topology.{Builder, Codec, Ref, Reference}
+  alias Jido.Topology.{Codec, Ref, Reference}
 
-  @doc "Builds the same composition as the Spark module."
-  def builder do
-    Builder.new(name: "composed_system")
-    |> Builder.schema(ComposedSystem.topology().schema)
-    |> Builder.agent(:director, Cell)
-    |> Builder.bus(:events)
-    |> Builder.include(:east, WorkerTeam,
-      inputs: %{worker_count: Reference.input(:east_workers), label: "east"},
-      bindings: %{events: :events}
-    )
-    |> Builder.include(:west, WorkerTeam,
-      inputs: %{worker_count: Reference.input(:west_workers), label: "west"},
-      bindings: %{events: :events}
-    )
-    |> Builder.owns(:director, Ref.ref(:east, :leader))
-    |> Builder.owns(:director, Ref.ref(:west, :leader))
-    |> Builder.startup(concurrency: 4, task_timeout: 5_000)
+  @doc "Returns data for the same composition as the Spark module."
+  def data do
+    %{
+      startup: [concurrency: 4, task_timeout: 5000],
+      schema: ComposedSystem.topology().schema,
+      name: "composed_system",
+      agents: [%{key: :director, module: Cell}],
+      resources: [%{key: :events, kind: :bus}],
+      includes: [
+        %{
+          key: :east,
+          topology: WorkerTeam,
+          inputs: %{worker_count: Reference.input(:east_workers), label: "east"},
+          bindings: %{events: :events}
+        },
+        %{
+          key: :west,
+          topology: WorkerTeam,
+          inputs: %{worker_count: Reference.input(:west_workers), label: "west"},
+          bindings: %{events: :events}
+        }
+      ],
+      relationships: [
+        %{parent: :director, child: Ref.ref(:east, :leader)},
+        %{parent: :director, child: Ref.ref(:west, :leader)}
+      ]
+    }
   end
 
   @doc "Returns stable code and schema names used in the JSON document."

@@ -2,7 +2,7 @@ defmodule Jido.Topology.Controller.TargetStoreTest do
   use ExUnit.Case, async: true
 
   alias Jido.Examples.Topology.Cell
-  alias Jido.Topology.Builder
+
   alias Jido.Topology.Controller.TargetStore
 
   defmodule IndeterminateAdapter do
@@ -117,8 +117,14 @@ defmodule Jido.Topology.Controller.TargetStoreTest do
   end
 
   defp topology(id, count) do
-    Builder.new(name: "target_store")
-    |> Builder.group(:workers, Cell, count: count)
-    |> Builder.build!(id: id)
+    Jido.Topology.unwrap!(
+      with {:ok, definition} <-
+             Jido.Topology.new(%{
+               name: "target_store",
+               groups: [%{key: :workers, module: Cell, count: count}]
+             }) do
+        Jido.Topology.instantiate(definition, id: id)
+      end
+    )
   end
 end

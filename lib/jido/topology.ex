@@ -2,7 +2,7 @@ defmodule Jido.Topology do
   @moduledoc """
   A declarative definition of Agents, groups, resources, and logical ownership.
 
-  Module declarations, `Jido.Topology.Builder`, and `Jido.Topology.Codec` use
+  Module declarations, data definitions, and `Jido.Topology.Codec` use
   the same constructor. Declaration and planning start no processes. Instance
   input is validated separately from Agent state. See the topology examples in
   `examples/07_topology` for startup, control Signals, placement, and JSON

@@ -132,7 +132,7 @@ agent = MyApp.Counter.new!(id: "counter-1")
 
 A definition is now a neutral `%Jido.Agent{}` with `id: nil` and `state: nil`.
 An instance has a nonempty binary ID and validated state. Separate these steps
-when using generic construction or the Builder:
+when using generic construction:
 
 ```elixir
 definition = MyApp.Counter.definition()

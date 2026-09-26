@@ -1,7 +1,7 @@
 # Agent authoring corpus
 
 This suite checks the same Agent contract across authored modules, direct
-attributes, Builder calls, and saved JSON. It has 15 distinct cases with 16
+attributes and saved JSON. It has 15 distinct cases with 16
 module variants. It is not a complete feature matrix.
 
 Run it with:
@@ -24,7 +24,7 @@ the `:authoring` tag. There is no authoring CI job.
 | Required profile | Keyword module | Required initial state, defaults, unknown state fields |
 | False, zero, and nil | Block module | Explicit values replace route defaults; nullable input |
 | Nested profile | Block module | Nested validation and preservation of other fields |
-| List inputs | Block module | Required list helper, empty list, item validation |
+| List inputs | Block module | Map input, empty list, item validation |
 | Bounded value | Keyword module | Lower and upper bounds, failed candidate, recovery |
 | Static metadata | Block module | Date Registry reference, tuple, binary, integer versus float |
 | Predicate routes | Block module | External predicate, fallback, missing route and recovery |
@@ -34,11 +34,10 @@ the `:authoring` tag. There is no authoring CI job.
 | Extension route | Extension plus block module | Target lowering and the generated interface |
 | Custom selection | Keyword module with callback | Behavior module identity survives conversion; recovery |
 | Metadata boundaries | Three block modules | Atom, string, and mixed keys; cross-form equality and JSON round trips |
-| Invalid declarations | Eight source files | Missing source, duplicate schema, optional list, helper collision, Plugin state conflict, invalid metadata |
+| Invalid declarations | Eight source files | Missing source, duplicate schema, removed positional arguments, helper collision, Plugin state conflict, invalid metadata |
 
-The 16 valid module variants use six data paths: module definition, direct
-map, direct keyword list, incremental Builder, module-seeded Builder, and saved
-JSON. Each case/form pair has separate pure and live ExUnit tests. Shared tests
+The 16 valid module variants use four data paths: module definition, direct
+map, direct keyword list, and saved JSON. Each case/form pair has separate pure and live ExUnit tests. Shared tests
 check neutral definitions, instantiation, explicit state overrides, JSON
 stability, and direct versus live Turns. Specific interface tests stay explicit.
 Failure steps check the error type and unchanged live snapshot. Later valid
@@ -99,7 +98,7 @@ DSL helper declarations.
 ## Metadata regression
 
 The suite found that block metadata rejected string keys accepted by the direct
-constructor, Builder, and Codec. The block DSL now uses the core metadata
+constructor and Codec. The block DSL now uses the core metadata
 validator. Three focused source fixtures check atom, string, and mixed keys
 across these forms. Mixed metadata retains both `:case` and `"case"` after JSON
 conversion. Structs and non-map values remain invalid. Invalid block metadata

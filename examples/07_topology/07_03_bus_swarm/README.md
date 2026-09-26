@@ -5,12 +5,12 @@ stored Topology definition.
 
 ## What you will learn
 
-- How DSL, Builder, and trusted JSON Codec forms define the same Topology.
+- How DSL, data, and trusted JSON Codec forms define the same Topology.
 - How one Bus subscription expands across a large Agent group.
 
 ## Read the code
 
-Read [the DSL Topology](swarm.ex), [the Builder and Codec forms](formats.ex),
+Read [the DSL Topology](swarm.ex), [the data and Codec forms](formats.ex),
 the [JSON fixture](fixtures/swarm.json), then the shared [Cell Agent](../support/cell.ex).
 
 ## Run it
@@ -34,7 +34,7 @@ The scale result is local and in memory. It is not a multi-host throughput claim
 ## Files
 
 - [DSL](swarm.ex)
-- [Builder and Codec](formats.ex)
+- [Data and Codec](formats.ex)
 - [JSON fixture](fixtures/swarm.json)
 - [Tests](../../../test/examples/07_topology/07_03_bus_swarm/bus_swarm_test.exs)
 - [Cell Agent](../support/cell.ex)

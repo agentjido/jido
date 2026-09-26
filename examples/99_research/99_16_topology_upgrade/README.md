@@ -12,7 +12,7 @@ and state.
 
 ## Read the code
 
-Read [the builder, plan comparison, and two worker definitions](topology_upgrade.ex).
+Read [the data definition, plan comparison, and two worker definitions](topology_upgrade.ex).
 
 ## Run it
 

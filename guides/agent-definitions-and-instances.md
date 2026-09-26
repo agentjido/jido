@@ -20,7 +20,7 @@ definition = MyApp.Counter.definition()
 true = Jido.Agent.definition?(definition)
 ```
 
-You can also use `Jido.Agent.new/1`, `Jido.Agent.Builder`, or
+You can also use `Jido.Agent.new/1` or
 `Jido.Agent.Codec`. All authoring forms use the same construction validation.
 
 Keep the data schema static. Put changing values in instance state or command

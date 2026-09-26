@@ -2,28 +2,15 @@ defmodule JidoTest.MalformedPublicInputsTest do
   use JidoTest.Case, async: true
 
   alias Jido.Agent
-  alias Jido.Agent.{Builder, Extension, Turn}
+  alias Jido.Agent.{Extension, Turn}
   alias Jido.Error.ValidationError
   alias Jido.Persistence
   alias Jido.Signal
   alias JidoTest.AgentFixtures.Add
 
-  defmodule BrokenDefinition do
-    def __agent_config__, do: []
-    def definition, do: raise("invalid generated definition")
-  end
-
-  test "a broken module definition returns a Builder error with its cause" do
-    assert {:error, %ValidationError{details: details}} =
-             BrokenDefinition |> Builder.new() |> Builder.build()
-
-    assert details.module == BrokenDefinition
-    assert %RuntimeError{message: "invalid generated definition"} = details.reason
-  end
-
   test "extension lowering rejects improper lists and non-map config" do
     for {extensions, config, entities} <- [
-          {[BrokenDefinition | :invalid], %{}, []},
+          {[String | :invalid], %{}, []},
           {[], %{}, [1 | :invalid]},
           {[], nil, []},
           {[], %URI{}, []}

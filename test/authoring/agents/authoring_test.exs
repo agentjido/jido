@@ -4,7 +4,7 @@ defmodule JidoTest.Authoring.Agents.AuthoringTest do
   use ExUnit.Case, async: false
   @moduletag :authoring
   alias Jido.Agent
-  alias Jido.Agent.{Builder, Codec}
+  alias Jido.Agent.Codec
   alias JidoTest.Authoring.Agents.Corpus
 
   setup %{variant: variant} do
@@ -68,7 +68,7 @@ defmodule JidoTest.Authoring.Agents.AuthoringTest do
       for instance <- [
             module.new!(opts),
             Agent.instantiate!(module, opts),
-            Builder.build!(Corpus.builder(spec), opts),
+            Agent.instantiate!(Agent.new!(spec.attrs), opts),
             decoded
           ] do
         assert instance.state === spec.override_state

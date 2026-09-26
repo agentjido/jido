@@ -2,7 +2,7 @@ defmodule JidoTest.Agent.AuthoringTest do
   use ExUnit.Case, async: false
 
   alias Jido.Agent
-  alias Jido.Agent.{Builder, Codec}
+  alias Jido.Agent.Codec
   alias Jido.Codec.Registry
 
   def stringify_count(value, _opts), do: Integer.to_string(value)
@@ -176,16 +176,6 @@ defmodule JidoTest.Agent.AuthoringTest do
       ]
   end
 
-  defmodule CanonicalSource do
-    def __agent_config__, do: %{module: __MODULE__, name: "private_source", vsn: 1}
-
-    def definition do
-      Agent.new!(module: __MODULE__, name: "public_source", vsn: 12, metadata: %{source: :agent})
-    end
-
-    def handle_signal(_signal, agent), do: {:ok, agent, []}
-  end
-
   defmodule InlineCounter do
     use Jido.Agent, name: "inline_authoring_counter"
 
@@ -225,11 +215,6 @@ defmodule JidoTest.Agent.AuthoringTest do
     assert %{keyword | module: Counter} === block
     assert function_exported?(Counter, :add_signal, 1)
     refute function_exported?(KeywordCounter, :add_signal, 0)
-  end
-
-  test "Builder module input copies public definition data" do
-    assert CanonicalSource.__agent_config__().name == "private_source"
-    assert Builder.build!(Builder.new(CanonicalSource)) === CanonicalSource.definition()
   end
 
   test "block metadata accepts mixed keys and rejects structs with a DSL error" do
@@ -373,11 +358,9 @@ defmodule JidoTest.Agent.AuthoringTest do
     definition = RawCounter.definition()
     assert {:ok, document, registry} = Codec.encode(definition)
     assert {:ok, ^definition} = Codec.decode(JSON.decode!(JSON.encode!(document)), registry)
-    assert {:ok, rebuilt} = Builder.build(Builder.new(RawCounter))
-    assert rebuilt == definition
     refute function_exported?(RawCounter, :raw_signal, 1)
 
-    agent = Agent.instantiate!(rebuilt, id: "raw")
+    agent = Agent.instantiate!(definition, id: "raw")
 
     for type <- ["raw.add", "event.add"] do
       signal = Jido.Signal.new!(type, %{amount: 2}, source: "/test")
@@ -388,20 +371,6 @@ defmodule JidoTest.Agent.AuthoringTest do
     signal = Jido.Signal.new!("raw.add", %{amount: -1}, source: "/test")
     assert {:error, %Jido.Error.RoutingError{}} = Agent.cmd(agent, signal)
     assert {:error, _} = Registry.new(%{"runtime" => {:value, %{~D[2026-09-03] | day: self()}}})
-  end
-
-  test "Builder keeps its first error and never creates a half instance" do
-    failed = Builder.new(name: "valid") |> Builder.route("invalid..path", Add)
-    assert {:error, error} = Builder.build(failed)
-
-    assert {:error, ^error} =
-             failed |> Builder.plugin(:missing_plugin) |> Builder.name("other") |> Builder.build()
-
-    assert {:error, _} = Builder.build(Builder.new(state: %{count: 1}))
-    assert {:error, _} = Builder.build(Builder.new([:invalid]))
-    assert {:error, _} = Builder.build(Builder.new(:missing_agent_module))
-    assert {:error, _} = Builder.build(Builder.new(Counter), name: "override")
-    assert_raise Jido.Error.ValidationError, fn -> Builder.build!(Builder.new(unknown: true)) end
   end
 
   test "Plugin Codec uses the same record and Registry as Agent Codec" do
@@ -549,34 +518,17 @@ defmodule JidoTest.Agent.AuthoringTest do
              )
 
     assert {:error, _} = Agent.new(name: "old", routes: [{"old.add", Add, params: %{amount: 2}}])
-
-    assert {:error, _} =
-             Builder.new(name: "old")
-             |> Builder.route("old.add", Add, params: %{amount: 2})
-             |> Builder.build()
-
-    options = [label: "ordered", initial: 0]
-    expected = Agent.new!(name: "ordered", plugins: [{CountTurns, options}])
-
-    assert Builder.new(name: "ordered")
-           |> Builder.plugin(CountTurns, options)
-           |> Builder.build!() == expected
   end
 
-  test "malformed route collections return errors in direct and Builder forms" do
+  test "malformed route collections return errors in direct forms" do
     route = {"direct.add", Add}
 
     for routes <- [[route | :invalid], [[route]], [[route, route]], [[]]] do
       assert {:error, _} = Agent.new(name: "invalid", routes: routes)
-      assert {:error, _} = Builder.build(Builder.new(name: "invalid", routes: routes))
     end
 
-    assert {:error, _} = Builder.build(Builder.new(name: "invalid", plugins: [CountTurns | 1]))
-
     assert {:ok, built} =
-             Builder.new(name: "tuple")
-             |> Builder.route("tuple.add", {Add, %{amount: 2}})
-             |> Builder.build()
+             Agent.new(name: "tuple", routes: [{"tuple.add", {Add, %{amount: 2}}}])
 
     assert [%{target: {Add, %{amount: 2}}}] = built.routes
   end

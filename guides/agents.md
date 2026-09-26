@@ -50,5 +50,5 @@ an extension can lower a reference to an Action or Flow before helper validation
 Duplicate extensions, unclaimed entities and invalid callback results fail.
 
 Keep this work static. Do not start a process, run an Action, or contact a
-service from a lowerer. Reuse the same semantic lowerer for data and Builder
+service from a lowerer. Reuse the same semantic lowerer for data
 frontends. Extensions do not change the Agent runtime or Plugin-owned field rules.

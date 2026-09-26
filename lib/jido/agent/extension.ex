@@ -9,7 +9,7 @@ defmodule Jido.Agent.Extension do
 
   Return updated configuration and any entities owned by another extension.
   All entities must be consumed. Common Agent validation still applies, and
-  execution uses the same runtime as Builder and direct definitions.
+  execution uses the same runtime as direct definitions.
 
   Lowering must be static: do not start processes, run Actions or contact external
   services. Keep semantic lowering usable from data-based authoring. Extensions
@@ -65,7 +65,7 @@ defmodule Jido.Agent.Extension do
 
   The function calls each extension in declaration order. It returns only the
   lowered core configuration after every entity and route target is claimed.
-  Pass the returned map to `Jido.Agent.new/1`, `Jido.Agent.Builder.new/1`, or
+  Pass the returned map to `Jido.Agent.new/1` or
   another static authoring boundary. This function starts no process and runs
   no Action or Flow.
   """

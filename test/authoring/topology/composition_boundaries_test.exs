@@ -6,7 +6,7 @@ defmodule JidoTest.Authoring.Topology.CompositionBoundariesTest do
 
   alias Jido.Error.ValidationError
   alias Jido.Topology
-  alias Jido.Topology.{Builder, Codec, Plan, Ref}
+  alias Jido.Topology.{Codec, Plan, Ref}
   alias JidoTest.Authoring.Topology.Corpus
 
   setup %{variant: variant} do
@@ -39,13 +39,25 @@ defmodule JidoTest.Authoring.Topology.CompositionBoundariesTest do
   end
 
   @tag variant: :repeated
-  test "ownership cycles across sibling exports fail in Builders and stored JSON", %{spec: spec} do
+  test "ownership cycles across sibling exports fail in data and stored JSON", %{spec: spec} do
     left = Ref.ref("team/a", :public_worker)
     right = Ref.ref("team%2Fa", :public_worker)
-    base = Corpus.builder(spec)
+    base = spec.attrs
 
     assert {:error, %ValidationError{message: message}} =
-             base |> Builder.owns(left, right) |> Builder.owns(right, left) |> Builder.build()
+             Jido.Topology.new(
+               Map.update(
+                 Map.update(
+                   base,
+                   :relationships,
+                   [%{parent: left, child: right}],
+                   &(&1 ++ [%{parent: left, child: right}])
+                 ),
+                 :relationships,
+                 [%{parent: right, child: left}],
+                 &(&1 ++ [%{parent: right, child: left}])
+               )
+             )
 
     assert message =~ "contains a cycle"
 
@@ -60,7 +72,12 @@ defmodule JidoTest.Authoring.Topology.CompositionBoundariesTest do
       ])
 
     assert {:error, %ValidationError{message: ^message}} = Codec.decode(document, spec.registry)
-    assert {:ok, valid} = Builder.build(base, id: "corpus")
+
+    assert {:ok, valid} =
+             (with {:ok, definition} <- Jido.Topology.new(base) do
+                Jido.Topology.instantiate(definition, id: "corpus")
+              end)
+
     assert valid.plan === hd(spec.scenarios).plan
   end
 
@@ -158,7 +175,9 @@ defmodule JidoTest.Authoring.Topology.CompositionBoundariesTest do
 
       for result <- [
             Topology.instantiate(invalid, id: "corpus"),
-            Builder.build(Builder.new(invalid), id: "corpus"),
+            with {:ok, definition} <- Jido.Topology.new(invalid) do
+              Jido.Topology.instantiate(definition, id: "corpus")
+            end,
             Codec.decode(document, spec.registry, id: "corpus")
           ] do
         assert {:error,

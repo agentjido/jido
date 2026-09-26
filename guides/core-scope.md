@@ -9,7 +9,7 @@ guide and the public module documentation when you build an extension.
 | Area | Supported contract |
 | --- | --- |
 | Agent values | Immutable definitions and instances, validated state, Actions, Flows, and Directives. Direct commands return a candidate; a live Server commits it. |
-| Authoring | Declarative modules, map and keyword declarations, Builder, and trusted Codecs share core validation. These forms remain supported. |
+| Authoring | Declarative modules, map and keyword declarations, and trusted Codecs share core validation. These forms remain supported. |
 | Live execution | Public PID-based `Jido.AgentServer` operations. `Jido` instance helpers start, find, stop, hibernate, and thaw Agents. An explicit upgrade operation waits for idle; validated definition migration preserves identity and Plugin declarations. |
 | Plugins | One callback-free package manifest can select Agent, Agent Server, Persistence, and Topology owner facets. Each facet has bounded authority. |
 | Persistence | Binary get and exact-byte CAS, versioned active and tombstone records, revision-zero creation, legacy active reads, and Agent-owned checkpoints. |
@@ -35,8 +35,9 @@ An Agent can set the delay between attempts to deliver saved pending work:
 
 ```elixir
 agent do
-  plugin Jido.Plugin.Scheduler,
+  plugin(Jido.Plugin.Scheduler,
     config: [delivery_interval: 250]
+  )
 end
 ```
 
@@ -65,11 +66,12 @@ Applications can control when a local controller repeats its repair pass:
 ```elixir
 alias Jido.Topology.Controller
 
-{:ok, controller} = Controller.start_link(
-  jido: MyApp.Jido,
-  topology: instance,
-  repair: :manual
-)
+{:ok, controller} =
+  Controller.start_link(
+    jido: MyApp.Jido,
+    topology: instance,
+    repair: :manual
+  )
 
 :ok = Controller.await_ready(controller)
 

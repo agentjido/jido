@@ -1,14 +1,16 @@
 defmodule Jido.Examples.TopologyUpgrade do
   @moduledoc "Builds and compares desired local worker sets through public Topology values."
 
-  alias Jido.Topology.Builder
-
   def build(id, count, worker_module \\ __MODULE__.WorkerV1) do
-    Builder.new(name: "research_upgrade_topology")
-    |> Builder.agent(:observer, __MODULE__.WorkerV1)
-    |> Builder.group(:workers, worker_module, count: count)
-    |> Builder.startup(retry_interval: 10)
-    |> Builder.build(id: id)
+    with {:ok, definition} <-
+           Jido.Topology.new(%{
+             startup: [retry_interval: 10],
+             name: "research_upgrade_topology",
+             agents: [%{key: :observer, module: __MODULE__.WorkerV1}],
+             groups: [%{key: :workers, module: worker_module, count: count}]
+           }) do
+      Jido.Topology.instantiate(definition, id: id)
+    end
   end
 
   @doc "Compares two validated Agent plans with the same topology identity."

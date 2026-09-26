@@ -13,7 +13,7 @@ defmodule Jido.Topology.AuthoringTest do
 
   alias Jido.Examples.Topology.{Accounts, Cell, Formats, Swarm}
   alias Jido.Topology
-  alias Jido.Topology.{Builder, Codec, Plan, Ref, Reference}
+  alias Jido.Topology.{Codec, Plan, Ref, Reference}
 
   test "a large group plan keeps resource order and ownership" do
     assert {:ok, instance} = Swarm.new(id: "demo", input: %{worker_count: 1_000})
@@ -29,30 +29,41 @@ defmodule Jido.Topology.AuthoringTest do
     assert {:ok, ^definition} = Codec.decode(JSON.decode!(JSON.encode!(document)), registry)
   end
 
-  test "exact node placement survives Builder, Codec, and plan construction" do
+  test "exact node placement survives data, Codec, and plan construction" do
     target_node = :"worker@127.0.0.1"
 
-    builder =
-      Builder.new(name: "placed")
-      |> Builder.agent(:worker, Cell, node: target_node)
+    attrs =
+      %{name: "placed", agents: [%{key: :worker, module: Cell, node: target_node}]}
 
-    assert {:ok, definition} = Builder.build(builder)
+    assert {:ok, definition} = Jido.Topology.new(attrs)
     assert hd(definition.agents).node == target_node
     assert {:ok, document, registry} = Codec.encode(definition)
     assert {:ok, ^definition} = Codec.decode(JSON.decode!(JSON.encode!(document)), registry)
-    assert {:ok, instance} = Builder.build(builder, id: "placed")
+
+    assert {:ok, instance} =
+             (with {:ok, definition} <- Jido.Topology.new(attrs) do
+                Jido.Topology.instantiate(definition, id: "placed")
+              end)
+
     assert instance.plan.agents["agent/worker"].node == target_node
   end
 
   test "a remote Agent cannot subscribe to a local resource" do
-    builder =
-      Builder.new(name: "remote-resource")
-      |> Builder.agent(:worker, Cell, node: :"worker@127.0.0.1")
-      |> Builder.bus(:events)
-      |> Builder.subscribe(:worker, to: :events, path: "examples.topology.cell.work")
+    attrs =
+      %{
+        name: "remote-resource",
+        agents: [%{key: :worker, module: Cell, node: :"worker@127.0.0.1"}],
+        resources: [%{key: :events, kind: :bus}],
+        connections: [%{agent: :worker, to: :events, path: "examples.topology.cell.work"}]
+      }
 
-    assert {:ok, _definition} = Builder.build(builder)
-    assert {:error, error} = Builder.build(builder, id: "remote-resource")
+    assert {:ok, _definition} = Jido.Topology.new(attrs)
+
+    assert {:error, error} =
+             (with {:ok, definition} <- Jido.Topology.new(attrs) do
+                Jido.Topology.instantiate(definition, id: "remote-resource")
+              end)
+
     assert error.message == "A remote topology Agent cannot subscribe to a local Bus"
   end
 
@@ -109,12 +120,18 @@ defmodule Jido.Topology.AuthoringTest do
   end
 
   test "zero members produce an empty group and satisfy a dependency" do
-    builder =
-      Builder.new(name: "empty")
-      |> Builder.group(:workers, Cell, count: 0)
-      |> Builder.agent(:observer, Cell, depends_on: [:workers])
+    attrs =
+      %{
+        name: "empty",
+        groups: [%{key: :workers, module: Cell, count: 0}],
+        agents: [%{key: :observer, module: Cell, depends_on: [:workers]}]
+      }
 
-    assert {:ok, instance} = Builder.build(builder, id: "empty")
+    assert {:ok, instance} =
+             (with {:ok, definition} <- Jido.Topology.new(attrs) do
+                Jido.Topology.instantiate(definition, id: "empty")
+              end)
+
     assert map_size(instance.plan.agents) == 1
     assert instance.plan.layers == [["agent/observer"]]
   end
@@ -138,85 +155,134 @@ defmodule Jido.Topology.AuthoringTest do
   end
 
   test "duplicate names, missing references, and cycles fail" do
-    base = Builder.new(name: "invalid") |> Builder.agent(:one, Cell) |> Builder.agent(:two, Cell)
-    assert {:error, _} = base |> Builder.agent("one", Cell) |> Builder.build()
-    assert {:error, _} = base |> Builder.owns(:missing, :one) |> Builder.build()
+    base = %{name: "invalid", agents: [%{key: :one, module: Cell}, %{key: :two, module: Cell}]}
 
     assert {:error, _} =
-             base |> Builder.owns(:one, :two) |> Builder.owns(:two, :one) |> Builder.build()
+             Jido.Topology.new(
+               Map.update(
+                 base,
+                 :agents,
+                 [%{key: "one", module: Cell}],
+                 &(&1 ++ [%{key: "one", module: Cell}])
+               )
+             )
 
     assert {:error, _} =
-             base |> Builder.subscribe(:one, to: :missing, path: "**") |> Builder.build()
+             Jido.Topology.new(
+               Map.update(
+                 base,
+                 :relationships,
+                 [%{parent: :missing, child: :one}],
+                 &(&1 ++ [%{parent: :missing, child: :one}])
+               )
+             )
 
     assert {:error, _} =
-             Builder.new(name: "cycle")
-             |> Builder.agent(:one, Cell, depends_on: [:two])
-             |> Builder.agent(:two, Cell, depends_on: [:one])
-             |> Builder.build()
+             Jido.Topology.new(
+               Map.update(
+                 Map.update(
+                   base,
+                   :relationships,
+                   [%{parent: :one, child: :two}],
+                   &(&1 ++ [%{parent: :one, child: :two}])
+                 ),
+                 :relationships,
+                 [%{parent: :two, child: :one}],
+                 &(&1 ++ [%{parent: :two, child: :one}])
+               )
+             )
+
+    assert {:error, _} =
+             Jido.Topology.new(
+               Map.update(
+                 base,
+                 :connections,
+                 [%{agent: :one, to: :missing, path: "**"}],
+                 &(&1 ++ [%{agent: :one, to: :missing, path: "**"}])
+               )
+             )
+
+    assert {:error, _} =
+             Jido.Topology.new(%{
+               name: "cycle",
+               agents: [
+                 %{key: :one, module: Cell, depends_on: [:two]},
+                 %{key: :two, module: Cell, depends_on: [:one]}
+               ]
+             })
   end
 
   test "a child has one singleton owner" do
     base =
-      Builder.new(name: "owners")
-      |> Builder.agent(:one, Cell)
-      |> Builder.agent(:two, Cell)
-      |> Builder.group(:workers, Cell)
+      %{
+        name: "owners",
+        agents: [%{key: :one, module: Cell}, %{key: :two, module: Cell}],
+        groups: [%{key: :workers, module: Cell}]
+      }
 
     assert {:error, _} =
-             base
-             |> Builder.owns(:one, :workers)
-             |> Builder.owns(:two, :workers)
-             |> Builder.build()
+             Jido.Topology.new(
+               Map.update(
+                 Map.update(
+                   base,
+                   :relationships,
+                   [%{parent: :one, child: :workers}],
+                   &(&1 ++ [%{parent: :one, child: :workers}])
+                 ),
+                 :relationships,
+                 [%{parent: :two, child: :workers}],
+                 &(&1 ++ [%{parent: :two, child: :workers}])
+               )
+             )
 
-    assert {:error, _} = base |> Builder.owns(:workers, :one) |> Builder.build()
+    assert {:error, _} =
+             Jido.Topology.new(
+               Map.update(
+                 base,
+                 :relationships,
+                 [%{parent: :workers, child: :one}],
+                 &(&1 ++ [%{parent: :workers, child: :one}])
+               )
+             )
   end
 
-  test "Builder preserves its first error and rejects unknown options" do
-    builder = Builder.new(name: "bad") |> Builder.agent(:a, Cell, surprise: true)
-    assert {:error, first} = Builder.build(builder)
-
-    assert {:error, ^first} =
-             builder |> Builder.bus(:bus) |> Builder.startup(concurrency: 0) |> Builder.build()
-
+  test "data constructors reject unknown fields and invalid field values" do
     assert {:error, _} = Topology.new(name: "bad", unknown: true)
 
     assert {:error, _} =
-             Builder.new(name: "bad") |> Builder.agent(:a, Cell, key: :b) |> Builder.build()
+             Topology.new(name: "bad", agents: [%{key: :a, module: Cell, surprise: true}])
+
+    assert {:error, _} = Topology.new(name: "fields", metadata: self())
+    assert {:error, _} = Topology.new(name: "schema", schema: Zoi.integer())
   end
 
-  test "Builder preserves declaration order at scale" do
-    builder =
-      Enum.reduce(1..1_000, Builder.new(name: "ordered"), fn index, builder ->
-        Builder.agent(builder, "agent-#{index}", Cell)
-      end)
-
-    assert {:ok, definition} = Builder.build(builder)
+  test "data constructors preserve declaration order at scale" do
+    agents = for index <- 1..1_000, do: %{key: "agent-#{index}", module: Cell}
+    assert {:ok, definition} = Topology.new(name: "ordered", agents: agents)
     assert Enum.map(definition.agents, & &1.key) == Enum.map(1..1_000, &"agent-#{&1}")
   end
 
-  test "Builder field errors remain sticky and invalid modules return errors" do
-    builder = Builder.new(name: "fields") |> Builder.metadata(self())
-    assert {:error, error} = Builder.build(builder)
-    assert {:error, ^error} = builder |> Builder.metadata(%{}) |> Builder.build()
-    assert {:error, _} = Builder.new(String) |> Builder.build()
+  test "Agent initial state is validated during pure planning" do
+    attrs =
+      %{name: "state", agents: [%{key: :a, module: Cell, initial_state: %{total: "bad"}}]}
+
+    assert {:ok, _} = Jido.Topology.new(attrs)
 
     assert {:error, _} =
-             Builder.new(name: "schema") |> Builder.schema(Zoi.integer()) |> Builder.build()
-  end
-
-  test "Agent initial state is validated during pure planning" do
-    builder =
-      Builder.new(name: "state") |> Builder.agent(:a, Cell, initial_state: %{total: "bad"})
-
-    assert {:ok, _} = Builder.build(builder)
-    assert {:error, _} = Builder.build(builder, id: "state")
+             (with {:ok, definition} <- Jido.Topology.new(attrs) do
+                Jido.Topology.instantiate(definition, id: "state")
+              end)
   end
 
   test "missing input and member references return structured errors" do
-    builder =
-      Builder.new(name: "refs") |> Builder.group(:g, Cell, count: Reference.input(:missing))
+    attrs =
+      %{name: "refs", groups: [%{key: :g, module: Cell, count: Reference.input(:missing)}]}
 
-    assert {:error, error} = Builder.build(builder, id: "missing")
+    assert {:error, error} =
+             (with {:ok, definition} <- Jido.Topology.new(attrs) do
+                Jido.Topology.instantiate(definition, id: "missing")
+              end)
+
     assert Exception.message(error) =~ "Missing topology reference"
   end
 

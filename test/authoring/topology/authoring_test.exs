@@ -4,7 +4,7 @@ defmodule JidoTest.Authoring.Topology.AuthoringTest do
   use ExUnit.Case, async: false
   @moduletag :authoring
   alias Jido.Topology
-  alias Jido.Topology.{Builder, Codec, Plan}
+  alias Jido.Topology.{Codec, Plan}
   alias JidoTest.Authoring.Topology.Corpus
 
   setup %{variant: variant} do
@@ -66,13 +66,13 @@ defmodule JidoTest.Authoring.Topology.AuthoringTest do
 
   for variant <- Corpus.variants() do
     @tag variant: variant
-    test "#{variant}: module, Builder, and Codec instance constructors", %{spec: spec} do
+    test "#{variant}: module, data, and Codec instance constructors", %{spec: spec} do
       for scenario <- spec.scenarios do
         opts = [id: "corpus", input: scenario.input]
         assert {:ok, from_module} = spec.module.new(opts)
-        assert {:ok, from_builder} = Builder.build(Corpus.builder(spec), opts)
+        assert {:ok, from_data} = Topology.instantiate(Topology.new!(spec.attrs), opts)
         assert {:ok, from_codec} = Codec.decode(spec.document, spec.registry, opts)
-        assert from_module === from_builder
+        assert from_module === from_data
         assert from_codec === from_module
         assert from_module.plan === scenario.plan
       end

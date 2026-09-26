@@ -4,7 +4,7 @@ defmodule JidoTest.Authoring.Agents.MetadataTest do
   use ExUnit.Case, async: false
   @moduletag :authoring
   alias Jido.Agent
-  alias Jido.Agent.{Builder, Codec}
+  alias Jido.Agent.Codec
   alias JidoTest.Authoring.Compiler
   alias JidoTest.Authoring.Agents.Fixtures
   @fixtures Path.expand("../support/agents/fixtures", __DIR__)
@@ -24,14 +24,7 @@ defmodule JidoTest.Authoring.Agents.MetadataTest do
 
       for definition <- [
             module.definition(),
-            Agent.new!(Map.to_list(attrs)),
-            Builder.build!(Builder.new(attrs)),
-            attrs
-            |> Map.delete(:metadata)
-            |> Builder.new()
-            |> Builder.metadata(metadata)
-            |> Builder.build!(),
-            Builder.build!(Builder.new(module))
+            Agent.new!(Map.to_list(attrs))
           ] do
         assert definition === expected
         assert {:ok, document, registry} = Codec.encode(definition)
@@ -46,9 +39,7 @@ defmodule JidoTest.Authoring.Agents.MetadataTest do
 
       for result <- [
             Agent.new(attrs),
-            Agent.new(Map.to_list(attrs)),
-            attrs |> Builder.new() |> Builder.build(),
-            Builder.new(name: "invalid_metadata") |> Builder.metadata(metadata) |> Builder.build()
+            Agent.new(Map.to_list(attrs))
           ] do
         assert {:error, %Jido.Error.ValidationError{}} = result
       end

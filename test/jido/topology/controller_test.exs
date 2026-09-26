@@ -4,7 +4,7 @@ defmodule Jido.Topology.ControllerTest do
   alias Jido.AgentServer, as: Server
   alias Jido.Examples.Topology.{Cell, Hierarchy, Independent, Swarm}
   alias Jido.Signal.Bus
-  alias Jido.Topology.{Builder, Controller}
+  alias Jido.Topology.Controller
   alias Jido.Topology.BusInputs
 
   defmodule LifecycleControl do
@@ -106,11 +106,17 @@ defmodule Jido.Topology.ControllerTest do
 
   test "public readiness follows a blocked Bus client reconnect", %{jido: jido} do
     instance =
-      Builder.new(name: "live_bus_readiness")
-      |> Builder.bus(:events)
-      |> Builder.agent(:cell, Cell)
-      |> Builder.subscribe(:cell, to: :events, path: "examples.topology.cell.work")
-      |> Builder.build!(id: unique_id("live-bus"))
+      Jido.Topology.unwrap!(
+        with {:ok, definition} <-
+               Jido.Topology.new(%{
+                 name: "live_bus_readiness",
+                 resources: [%{key: :events, kind: :bus}],
+                 agents: [%{key: :cell, module: Cell}],
+                 connections: [%{agent: :cell, to: :events, path: "examples.topology.cell.work"}]
+               }) do
+          Jido.Topology.instantiate(definition, id: unique_id("live-bus"))
+        end
+      )
 
     controller =
       start_supervised!({Controller, jido: jido, topology: instance, repair: :manual})
@@ -152,11 +158,16 @@ defmodule Jido.Topology.ControllerTest do
 
   test "public readiness follows a lost live parent binding", %{jido: jido} do
     instance =
-      Builder.new(name: "live_parent_readiness")
-      |> Builder.agent(:parent, Cell)
-      |> Builder.agent(:child, Cell)
-      |> Builder.owns(:parent, :child)
-      |> Builder.build!(id: unique_id("live-parent"))
+      Jido.Topology.unwrap!(
+        with {:ok, definition} <-
+               Jido.Topology.new(%{
+                 name: "live_parent_readiness",
+                 agents: [%{key: :parent, module: Cell}, %{key: :child, module: Cell}],
+                 relationships: [%{parent: :parent, child: :child}]
+               }) do
+          Jido.Topology.instantiate(definition, id: unique_id("live-parent"))
+        end
+      )
 
     controller =
       start_supervised!({Controller, jido: jido, topology: instance, repair: :manual})
@@ -259,10 +270,18 @@ defmodule Jido.Topology.ControllerTest do
 
   test "normalizes group member lookup and rejects unsupported values", %{jido: jido} do
     instance =
-      Builder.new(name: "member-lookup")
-      |> Builder.group(:counted, Cell, count: 1)
-      |> Builder.group(:keyed, Cell, members: [%{id: :alpha}], key_by: :id)
-      |> Builder.build!(id: "member-lookup")
+      Jido.Topology.unwrap!(
+        with {:ok, definition} <-
+               Jido.Topology.new(%{
+                 name: "member-lookup",
+                 groups: [
+                   %{key: :counted, module: Cell, count: 1},
+                   %{key: :keyed, module: Cell, members: [%{id: :alpha}], key_by: :id}
+                 ]
+               }) do
+          Jido.Topology.instantiate(definition, id: "member-lookup")
+        end
+      )
 
     controller = start_supervised!({Controller, jido: jido, topology: instance})
     assert :ok = Controller.await_ready(controller)
@@ -302,13 +321,20 @@ defmodule Jido.Topology.ControllerTest do
 
   test "supports more than one Bus subscription on an Agent", %{jido: jido} do
     instance =
-      Builder.new(name: "multiple")
-      |> Builder.agent(:cell, Cell)
-      |> Builder.bus(:a)
-      |> Builder.bus(:b)
-      |> Builder.subscribe(:cell, to: :a, path: "examples.topology.cell.work")
-      |> Builder.subscribe(:cell, to: :b, path: "examples.topology.cell.work")
-      |> Builder.build!(id: "multiple")
+      Jido.Topology.unwrap!(
+        with {:ok, definition} <-
+               Jido.Topology.new(%{
+                 name: "multiple",
+                 agents: [%{key: :cell, module: Cell}],
+                 resources: [%{key: :a, kind: :bus}, %{key: :b, kind: :bus}],
+                 connections: [
+                   %{agent: :cell, to: :a, path: "examples.topology.cell.work"},
+                   %{agent: :cell, to: :b, path: "examples.topology.cell.work"}
+                 ]
+               }) do
+          Jido.Topology.instantiate(definition, id: "multiple")
+        end
+      )
 
     controller = start_supervised!({Controller, jido: jido, topology: instance})
     assert :ok = Controller.await_ready(controller)
@@ -328,9 +354,12 @@ defmodule Jido.Topology.ControllerTest do
 
   test "repairs an agent after a normal stop", %{jido: jido} do
     instance =
-      Builder.new(Independent)
-      |> Builder.startup(retry_interval: 10)
-      |> Builder.build!(id: "repair")
+      Jido.Topology.unwrap!(
+        with {:ok, definition} <-
+               Jido.Topology.new(Map.put(Independent.topology(), :startup, retry_interval: 10)) do
+          Jido.Topology.instantiate(definition, id: "repair")
+        end
+      )
 
     controller = start_supervised!({Controller, jido: jido, topology: instance})
     assert :ok = Controller.await_ready(controller)
@@ -348,9 +377,12 @@ defmodule Jido.Topology.ControllerTest do
 
   test "repairs parent bindings after parent failure", %{jido: jido} do
     instance =
-      Builder.new(Hierarchy)
-      |> Builder.startup(retry_interval: 10)
-      |> Builder.build!(id: "repair-tree")
+      Jido.Topology.unwrap!(
+        with {:ok, definition} <-
+               Jido.Topology.new(Map.put(Hierarchy.topology(), :startup, retry_interval: 10)) do
+          Jido.Topology.instantiate(definition, id: "repair-tree")
+        end
+      )
 
     controller = start_supervised!({Controller, jido: jido, topology: instance})
     assert :ok = Controller.await_ready(controller)
@@ -385,9 +417,12 @@ defmodule Jido.Topology.ControllerTest do
     existing = start_supervised!({Bus, name: "bus-conflict/bus/work", jido: jido})
 
     instance =
-      Builder.new(name: "bus-conflict")
-      |> Builder.bus(:work)
-      |> Builder.build!(id: "bus-conflict")
+      Jido.Topology.unwrap!(
+        with {:ok, definition} <-
+               Jido.Topology.new(%{name: "bus-conflict", resources: [%{key: :work, kind: :bus}]}) do
+          Jido.Topology.instantiate(definition, id: "bus-conflict")
+        end
+      )
 
     controller = start_supervised!({Controller, jido: jido, topology: instance})
 
@@ -402,9 +437,15 @@ defmodule Jido.Topology.ControllerTest do
 
   test "looks up a ready Bus without scanning the resource supervisor", %{jido: jido} do
     instance =
-      Builder.new(name: "cached-bus-lookup")
-      |> Builder.bus(:work)
-      |> Builder.build!(id: "cached-bus-lookup")
+      Jido.Topology.unwrap!(
+        with {:ok, definition} <-
+               Jido.Topology.new(%{
+                 name: "cached-bus-lookup",
+                 resources: [%{key: :work, kind: :bus}]
+               }) do
+          Jido.Topology.instantiate(definition, id: "cached-bus-lookup")
+        end
+      )
 
     controller =
       start_supervised!({Controller, jido: jido, topology: instance, repair: :manual})
@@ -428,9 +469,12 @@ defmodule Jido.Topology.ControllerTest do
     {:ok, existing} = Jido.start_agent(jido, Cell, id: "waiting/agent/left")
 
     instance =
-      Builder.new(Independent)
-      |> Builder.startup(retry_interval: 10)
-      |> Builder.build!(id: "waiting")
+      Jido.Topology.unwrap!(
+        with {:ok, definition} <-
+               Jido.Topology.new(Map.put(Independent.topology(), :startup, retry_interval: 10)) do
+          Jido.Topology.instantiate(definition, id: "waiting")
+        end
+      )
 
     controller = start_supervised!({Controller, jido: jido, topology: instance})
     eventually(fn -> Controller.status(controller).status == :degraded end)
@@ -467,9 +511,12 @@ defmodule Jido.Topology.ControllerTest do
     id = unique_id("persistent-topology")
 
     instance =
-      Builder.new(Swarm)
-      |> Builder.startup(retry_interval: 10)
-      |> Builder.build!(id: id, input: %{worker_count: 2})
+      Jido.Topology.unwrap!(
+        with {:ok, definition} <-
+               Jido.Topology.new(Map.put(Swarm.topology(), :startup, retry_interval: 10)) do
+          Jido.Topology.instantiate(definition, id: id, input: %{worker_count: 2})
+        end
+      )
 
     controller = start_supervised!({Controller, jido: PersistentJido, topology: instance})
     assert :ok = Controller.await_ready(controller, 5000)
@@ -510,9 +557,12 @@ defmodule Jido.Topology.ControllerTest do
 
   test "repairs a Bus and its subscriptions after a Bus failure", %{jido: jido} do
     instance =
-      Builder.new(Swarm)
-      |> Builder.startup(retry_interval: 10)
-      |> Builder.build!(id: "bus-repair", input: %{worker_count: 2})
+      Jido.Topology.unwrap!(
+        with {:ok, definition} <-
+               Jido.Topology.new(Map.put(Swarm.topology(), :startup, retry_interval: 10)) do
+          Jido.Topology.instantiate(definition, id: "bus-repair", input: %{worker_count: 2})
+        end
+      )
 
     controller = start_supervised!({Controller, jido: jido, topology: instance})
     assert :ok = Controller.await_ready(controller)

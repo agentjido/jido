@@ -151,7 +151,6 @@ identity and state.
 
 | V3 module | Purpose | Migration use |
 | --- | --- | --- |
-| `Jido.Agent.Builder` | Builds definitions and instances in ordered programmatic steps. | Use it when the definition comes from application data rather than one module. |
 | `Jido.Agent.Codec` | Encodes and decodes versioned authoring documents. | Use it for trusted Agent definition transport, not for Agent checkpoints. |
 | `Jido.Codec.Registry` | Maps stable trusted IDs to modules, schemas, values, and executables for all authoring Codecs. | Use explicit allowlists where V2 used Discovery or dynamic module names. |
 | `Jido.Agent.Command` | Carries the Agent, Signal, caller context, and isolated Plugin inputs through live admission. | Agent Server owns this envelope. Plugin `admit/3` receives a bounded `Jido.AgentServer.Plugin.Admission` value. Direct `cmd/3` does not create a Command. |
@@ -372,7 +371,6 @@ definition while it runs.
 | V3 module | Purpose |
 | --- | --- |
 | `Jido.Topology` | Declares Agents, groups, Buses, ownership, connections, imports, exports, and startup policy. |
-| `Jido.Topology.Builder` | Builds the same declaration through programmatic steps. |
 | `Jido.Topology.Codec` | Encodes and decodes trusted topology authoring documents. |
 | `Jido.Topology.Instance` | Holds validated topology input and one plan. |
 | `Jido.Topology.Plan` | Holds stable IDs, exact nodes, dependency layers, and expanded resources. |
@@ -558,3 +556,13 @@ Remove `args:` from `define`. Pass all command input in one map to
 The constructor returns `{:ok, signal}` or `{:error, reason}`. Generated live
 helpers and `name_signal!` are removed. Call `Jido.AgentServer.call/3` with the
 constructed Signal and pass runtime `context` and `timeout` there.
+
+## Data Constructors Replace Builders
+
+`Jido.Agent.Builder` and `Jido.Topology.Builder` are removed. Prepare one map
+or keyword list, with routes and other collections in their required order.
+Pass it to `Jido.Agent.new/1` or `Jido.Topology.new/1`. Then use `instantiate/2`
+with instance options. Check each result. There is no Builder value that saves
+an earlier error. Read module definitions with `module.definition()` for Agents
+or `module.topology()` for Topologies. JSON formats and document versions are
+unchanged. The Flow Builder belongs to Jido Action and is unchanged.

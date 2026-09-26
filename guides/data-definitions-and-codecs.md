@@ -1,46 +1,38 @@
-# Builders and Codecs
+# Data Definitions and Codecs
 
-Use `Jido.Agent.Builder` for an ordered programmatic declaration. Use
-`Jido.Agent.Codec` for a versioned JSON-compatible declaration. Both produce
-the same canonical Agent definition as the module DSL. They declare data; they
-do not run an actor.
+Use `Jido.Agent.new/1` for a map or keyword declaration. Use `Jido.Agent.Codec`
+for a versioned JSON-compatible declaration. These forms produce the same
+canonical Agent definition as the module DSL. They do not start a process.
 
-## Declare In Ordered Steps
+## Declare Data
 
 ```elixir
-builder =
-  Jido.Agent.Builder.new(name: "built_counter")
-  |> Jido.Agent.Builder.schema(
-    Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
-  )
-  |> Jido.Agent.Builder.route(
-    "counter.add",
-    MyApp.Add,
-    defaults: %{amount: 1}
+{:ok, definition} =
+  Jido.Agent.new(
+    name: "built_counter",
+    schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}),
+    routes: [{"counter.add", MyApp.Add, defaults: %{amount: 1}}]
   )
 
-{:ok, definition} = Jido.Agent.Builder.build(builder)
-{:ok, instance} = Jido.Agent.Builder.build(builder, id: "built-1")
+{:ok, instance} = Jido.Agent.instantiate(definition, id: "built-1")
 ```
 
-The Builder preserves its first error. Always check `build/1` or `build/2`.
-Like `Jido.Flow.Builder`, it stores each added route after validation and
-checks the complete definition at build time. Appending a route does not
-revalidate earlier route targets. Build checks all current target contracts.
-Plugin declarations keep their ordered callback and ownership checks.
+Build route and Plugin lists in the required order. The constructor validates
+all fields and executable targets. Plugin order controls callbacks and state
+ownership. Check the constructor result before you construct an instance.
 
-Builder options and DSL options reject duplicate keyword keys. Direct Agent
-constructors, instance overrides, `Jido.Agent.set/2`, and caller context keep the last
-value for a repeated key. Supply each key once when moving between authoring
-forms. Caller context also accepts `nil` as an empty map.
+Direct Agent constructors, instance overrides, `Jido.Agent.set/2`, and caller
+context keep the last value for a repeated keyword key. DSL options reject
+duplicate keys. Supply each key once when moving between authoring forms.
+Caller context also accepts `nil` as an empty map.
 
 ## Module Roles
 
 An Agent behavior module can implement `handle_signal/2` for custom selection.
 When this callback is absent, Jido uses the Agent routes. A module created with
 `use Jido.Agent` also supplies static configuration through `__agent_config__/0`.
-`Agent.instantiate(module, options)` and `Builder.new(module)` require this authoring
-configuration.
+`Agent.instantiate(module, options)` requires this authoring configuration.
+Use `module.definition()` to read a module definition.
 
 Agent Server startup and `SpawnChild` also accept constructor modules with
 `new/0` or `new/1`. Such a constructor can return an Agent whose behavior module
@@ -83,5 +75,5 @@ identifiers instead of using generated temporary identifiers.
 The codecs limit depth, node counts, collection size, and string size. Apply a
 smaller limit at an untrusted ingestion boundary when your application needs it.
 
-See [Topology Builders, Codecs, And Composition](topology-builders-codecs-and-composition.md)
+See [Topology Data, Codecs, And Composition](topology-data-codecs-and-composition.md)
 and [Portable State And Checkpoints](portable-state-and-checkpoints.md).

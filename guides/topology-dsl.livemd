@@ -18,7 +18,7 @@ defmodule TopologyGuide.Cell do
   use Jido.Agent, name: "topology_guide_cell"
 
   agent do
-    schema Zoi.object(%{label: Zoi.string() |> Zoi.default("cell")})
+    schema(Zoi.object(%{label: Zoi.string() |> Zoi.default("cell")}))
   end
 
   routes do
@@ -40,24 +40,24 @@ defmodule TopologyGuide.System do
   topology do
     agents do
       agent :leader, TopologyGuide.Cell do
-        initial_state %{label: "leader"}
+        initial_state(%{label: "leader"})
       end
 
       agent :worker, TopologyGuide.Cell do
-        initial_state %{label: "worker"}
+        initial_state(%{label: "worker"})
       end
     end
 
     relationships do
       owns :leader, :worker do
-        on_parent_exit :stop
+        on_parent_exit(:stop)
       end
     end
 
     startup do
-      concurrency 2
-      max_agents 10
-      task_timeout 5_000
+      concurrency(2)
+      max_agents(10)
+      task_timeout(5_000)
     end
   end
 end
@@ -114,4 +114,4 @@ worker = Jido.Topology.Controller.whereis_agent(controller, :worker)
 
 A normal controller shutdown stops its topology Agents.
 
-Continue with [Topology Builders, Codecs, And Composition](topology-builders-codecs-and-composition.md).
+Continue with [Topology Data, Codecs, And Composition](topology-data-codecs-and-composition.md).

@@ -30,11 +30,6 @@ defmodule Jido.Agent.Authoring do
   def split_target({target, defaults}) when is_map(defaults), do: {target, defaults}
   def split_target(target), do: {target, nil}
 
-  def validate_target(target) do
-    {executable, _defaults} = split_target(target)
-    Jido.Executable.validate(executable)
-  end
-
   def options(value) do
     with {:ok, attrs} <- attrs(value),
          do: {:ok, if(is_list(value), do: value, else: Enum.sort(attrs))}

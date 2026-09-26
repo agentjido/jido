@@ -2,7 +2,7 @@ defmodule Jido.Agent.VersioningTest do
   use ExUnit.Case, async: true
 
   alias Jido.Agent
-  alias Jido.Agent.{Builder, Codec}
+  alias Jido.Agent.Codec
 
   defmodule DefaultVersionAgent do
     use Jido.Agent, name: "default_version_agent"
@@ -60,13 +60,12 @@ defmodule Jido.Agent.VersioningTest do
     end
   end
 
-  test "definition, map, Builder, and Codec preserve the version" do
+  test "definition, map, data, and Codec preserve the version" do
     agent = VersionedAgent.new!(id: "versioned", state: %{count: 2})
     assert Agent.definition(agent).vsn == 3
     assert Map.fetch!(agent, :vsn) == 3
 
-    assert Builder.new(name: "built", vsn: 8) |> Builder.build!() |> Map.fetch!(:vsn) == 8
-    assert Builder.new(VersionedAgent) |> Builder.build!() == VersionedAgent.definition()
+    assert Jido.Agent.new!(%{name: "built", vsn: 8}) |> Map.fetch!(:vsn) == 8
 
     assert {:ok, document, registry} = Codec.encode(VersionedAgent.definition())
     assert document["version"] == 2

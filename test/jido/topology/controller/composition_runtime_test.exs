@@ -3,7 +3,7 @@ defmodule Jido.Topology.Controller.CompositionRuntimeTest do
   alias Jido.AgentServer, as: Server
   alias Jido.Examples.Topology.{Cell, ComposedSystem}
   alias Jido.Signal.Bus
-  alias Jido.Topology.{Builder, Controller, Ref}
+  alias Jido.Topology.{Controller, Ref}
 
   defmodule BlockReady do
     use Jido.Plugin, agent_server: __MODULE__.Server
@@ -63,11 +63,16 @@ defmodule Jido.Topology.Controller.CompositionRuntimeTest do
     on_exit(fn -> :persistent_term.erase({BlockReady, :observer}) end)
 
     instance =
-      Builder.new(name: "responsive")
-      |> Builder.agent(:a_slow, SlowCell)
-      |> Builder.agent(:z_fast, Cell)
-      |> Builder.startup(concurrency: 2, task_timeout: 200, retry_interval: 10)
-      |> Builder.build!(id: "responsive")
+      Jido.Topology.unwrap!(
+        with {:ok, definition} <-
+               Jido.Topology.new(%{
+                 startup: [concurrency: 2, task_timeout: 200, retry_interval: 10],
+                 name: "responsive",
+                 agents: [%{key: :a_slow, module: SlowCell}, %{key: :z_fast, module: Cell}]
+               }) do
+          Jido.Topology.instantiate(definition, id: "responsive")
+        end
+      )
 
     controller = start_supervised!({Controller, jido: jido, topology: instance})
     assert_receive {:readiness_blocked, gate}, 1000
@@ -100,15 +105,23 @@ defmodule Jido.Topology.Controller.CompositionRuntimeTest do
     counter = start_supervised!({Elixir.Agent, fn -> %{active: 0, max: 0} end})
     :persistent_term.put({BlockReady, :observer}, %{test: self(), counter: counter})
     on_exit(fn -> :persistent_term.erase({BlockReady, :observer}) end)
-    child = Builder.new(name: "gated") |> Builder.agent(:cell, SlowCell) |> Builder.build!()
+    child = Jido.Topology.new!(%{name: "gated", agents: [%{key: :cell, module: SlowCell}]})
 
     instance =
-      Builder.new(name: "bounded")
-      |> Builder.include(:a, child)
-      |> Builder.include(:b, child)
-      |> Builder.include(:c, child)
-      |> Builder.startup(concurrency: 1, task_timeout: 2_000)
-      |> Builder.build!(id: "bounded")
+      Jido.Topology.unwrap!(
+        with {:ok, definition} <-
+               Jido.Topology.new(%{
+                 startup: [concurrency: 1, task_timeout: 2000],
+                 name: "bounded",
+                 includes: [
+                   %{key: :a, topology: child},
+                   %{key: :b, topology: child},
+                   %{key: :c, topology: child}
+                 ]
+               }) do
+          Jido.Topology.instantiate(definition, id: "bounded")
+        end
+      )
 
     controller = start_supervised!({Controller, jido: jido, topology: instance})
     assert_receive {:readiness_blocked, first}, 1_000
@@ -129,11 +142,16 @@ defmodule Jido.Topology.Controller.CompositionRuntimeTest do
     on_exit(fn -> :persistent_term.erase({BlockReady, :observer}) end)
 
     instance =
-      Builder.new(name: "requested-repair")
-      |> Builder.agent(:first, SlowCell)
-      |> Builder.agent(:second, SlowCell)
-      |> Builder.startup(concurrency: 1, task_timeout: 2_000)
-      |> Builder.build!(id: "requested-repair")
+      Jido.Topology.unwrap!(
+        with {:ok, definition} <-
+               Jido.Topology.new(%{
+                 startup: [concurrency: 1, task_timeout: 2000],
+                 name: "requested-repair",
+                 agents: [%{key: :first, module: SlowCell}, %{key: :second, module: SlowCell}]
+               }) do
+          Jido.Topology.instantiate(definition, id: "requested-repair")
+        end
+      )
 
     controller = start_supervised!({Controller, jido: jido, topology: instance, repair: :manual})
     assert_receive {:readiness_blocked, first}, 1_000
@@ -161,12 +179,17 @@ defmodule Jido.Topology.Controller.CompositionRuntimeTest do
     on_exit(fn -> :persistent_term.erase({BlockReady, :observer}) end)
 
     instance =
-      Builder.new(name: "parent-snapshot")
-      |> Builder.agent(:parent, Cell)
-      |> Builder.agent(:child, SlowCell)
-      |> Builder.owns(:parent, :child)
-      |> Builder.startup(task_timeout: 5_000, retry_interval: 60_000)
-      |> Builder.build!(id: "parent-snapshot")
+      Jido.Topology.unwrap!(
+        with {:ok, definition} <-
+               Jido.Topology.new(%{
+                 startup: [task_timeout: 5000, retry_interval: 60000],
+                 name: "parent-snapshot",
+                 agents: [%{key: :parent, module: Cell}, %{key: :child, module: SlowCell}],
+                 relationships: [%{parent: :parent, child: :child}]
+               }) do
+          Jido.Topology.instantiate(definition, id: "parent-snapshot")
+        end
+      )
 
     controller = start_supervised!({Controller, jido: jido, topology: instance})
     assert_receive {:readiness_blocked, gate}, 1_000
@@ -187,12 +210,17 @@ defmodule Jido.Topology.Controller.CompositionRuntimeTest do
     {:ok, unrelated} = Jido.start_agent(jido, Cell, id: "blocked-parent/agent/parent")
 
     instance =
-      Builder.new(name: "blocked-parent")
-      |> Builder.agent(:parent, Cell)
-      |> Builder.agent(:child, Cell)
-      |> Builder.owns(:parent, :child)
-      |> Builder.startup(retry_interval: 60_000)
-      |> Builder.build!(id: "blocked-parent")
+      Jido.Topology.unwrap!(
+        with {:ok, definition} <-
+               Jido.Topology.new(%{
+                 startup: [retry_interval: 60000],
+                 name: "blocked-parent",
+                 agents: [%{key: :parent, module: Cell}, %{key: :child, module: Cell}],
+                 relationships: [%{parent: :parent, child: :child}]
+               }) do
+          Jido.Topology.instantiate(definition, id: "blocked-parent")
+        end
+      )
 
     controller = start_supervised!({Controller, jido: jido, topology: instance})
 
@@ -209,9 +237,14 @@ defmodule Jido.Topology.Controller.CompositionRuntimeTest do
 
   test "a team failure leaves the shared Bus and the other team running", %{jido: jido} do
     instance =
-      Builder.new(ComposedSystem)
-      |> Builder.startup(retry_interval: 10, concurrency: 4)
-      |> Builder.build!(id: "team-repair")
+      Jido.Topology.unwrap!(
+        with {:ok, definition} <-
+               Jido.Topology.new(
+                 Map.put(ComposedSystem.topology(), :startup, retry_interval: 10, concurrency: 4)
+               ) do
+          Jido.Topology.instantiate(definition, id: "team-repair")
+        end
+      )
 
     controller = start_supervised!({Controller, jido: jido, topology: instance})
     assert :ok = Controller.await_ready(controller)

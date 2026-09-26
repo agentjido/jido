@@ -1,40 +1,24 @@
 defmodule JidoCoreBench.AuthoringCases do
   @moduledoc false
-  alias Jido.Agent.{Builder, Codec}
+  alias Jido.Agent.Codec
   alias Jido.Agent.Codec.Deriver
   alias JidoCoreBench.Fixtures, as: F
 
-  def workloads(sizes), do: builder_cases(sizes) ++ registry_cases()
+  def workloads(sizes) do
+    definitions =
+      for size <- sizes do
+        F.checked(
+          "authoring/definition/#{size}",
+          fn _ -> F.definition(size) end,
+          fn definition ->
+            definition |> Map.from_struct() |> Map.drop([:id, :state]) |> Jido.Agent.new()
+          end,
+          fn {:ok, definition} -> F.equal!(length(definition.routes), size) end
+        )
+        |> Map.put(:verify, fn definition, result -> F.equal!(result, {:ok, definition}) end)
+      end
 
-  defp builder_cases(sizes) do
-    for size <- sizes, mode <- [:bulk, :incremental, :mixed] do
-      F.checked(
-        "authoring/builder/#{size}/#{mode}",
-        fn _ -> F.definition(size) end,
-        fn definition ->
-          attrs = definition |> Map.from_struct() |> Map.drop([:id, :state, :routes])
-          routes = definition.routes
-
-          {initial, appended} =
-            case mode do
-              :bulk -> {routes, []}
-              :incremental -> {[], routes}
-              :mixed -> Enum.split(routes, div(size, 2))
-            end
-
-          Enum.reduce(appended, Builder.new(Map.put(attrs, :routes, initial)), fn route,
-                                                                                  builder ->
-            Builder.route(builder, route.path, route.target,
-              priority: route.priority,
-              match: route.match
-            )
-          end)
-          |> Builder.build()
-        end,
-        fn {:ok, definition} -> F.equal!(length(definition.routes), size) end
-      )
-      |> Map.put(:verify, fn definition, result -> F.equal!(result, {:ok, definition}) end)
-    end
+    definitions ++ registry_cases()
   end
 
   defp registry_cases do

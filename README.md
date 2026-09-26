@@ -44,10 +44,10 @@ One `%Jido.Agent{}` has two valid forms. A definition has `id: nil` and
 that has only an id or only state is invalid.
 
 Agent modules provide declarative `agent` and `routes` blocks, with explicit
-nested `define` declarations for command and Signal helpers. Direct map and
-keyword construction, module construction, the runtime Builder, and the
-JSON-compatible Codec use the same Agent validation. See the
-`Jido.Agent`, `Jido.Agent.Builder`, and `Jido.Agent.Codec` API documentation.
+nested `define` declarations for Signal constructors. Direct map and keyword
+construction, module construction, and the JSON-compatible Codec use the same
+Agent validation. See the
+`Jido.Agent` and `Jido.Agent.Codec` API documentation.
 
 ## Example
 

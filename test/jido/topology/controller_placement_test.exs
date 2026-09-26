@@ -2,15 +2,21 @@ defmodule JidoTest.Topology.ControllerPlacementTest do
   use JidoTest.PeerCase, async: false
 
   alias Jido.Examples.Topology.Cell
-  alias Jido.Topology.{Builder, Controller}
+  alias Jido.Topology.Controller
 
   test "starts and moves an Agent on exact connected nodes", c do
     id = "placed-#{System.unique_integer([:positive])}"
 
     instance =
-      Builder.new(name: "placed_topology")
-      |> Builder.agent(:worker, Cell, node: c.node_b)
-      |> Builder.build!(id: id)
+      Jido.Topology.unwrap!(
+        with {:ok, definition} <-
+               Jido.Topology.new(%{
+                 name: "placed_topology",
+                 agents: [%{key: :worker, module: Cell, node: c.node_b}]
+               }) do
+          Jido.Topology.instantiate(definition, id: id)
+        end
+      )
 
     assert {:ok, controller} =
              peer_call(c.peer_a, Supervisor, :start_child, [

@@ -32,7 +32,7 @@ defmodule Jido.MixProject do
        {"guides/state-schemas.livemd", "State Schemas"},
        {"guides/route-interfaces.livemd", "Route Interfaces"},
        {"guides/plugin-state.md", "Plugin-Owned State"},
-       {"guides/builders-and-codecs.md", "Builders And Codecs"},
+       {"guides/data-definitions-and-codecs.md", "Data Definitions And Codecs"},
        {"guides/authoring-extensions.md", "Authoring Extensions"}
      ]},
     {"Run Actors",
@@ -62,8 +62,8 @@ defmodule Jido.MixProject do
         "Ownership, Orphans, And Remote Children"},
        {"guides/topology-definitions.md", "Topology Definitions"},
        {"guides/topology-dsl.livemd", "Topology DSL"},
-       {"guides/topology-builders-codecs-and-composition.md",
-        "Topology Builders, Codecs, And Composition"},
+       {"guides/topology-data-codecs-and-composition.md",
+        "Topology Data, Codecs, And Composition"},
        {"guides/activate-and-repair-a-topology.livemd", "Activate And Repair A Topology"}
      ]},
     {"Persist And Recover",
@@ -206,7 +206,6 @@ defmodule Jido.MixProject do
           Jido.Agent.Turn.Outcome
         ],
         "Agent Authoring": [
-          Jido.Agent.Builder,
           Jido.Agent.Extension
         ],
         "Authoring Codecs": [
@@ -264,7 +263,6 @@ defmodule Jido.MixProject do
         ],
         Topology: [
           Jido.Topology,
-          Jido.Topology.Builder,
           Jido.Topology.Controller,
           Jido.Topology.Extension,
           Jido.Topology.Instance,

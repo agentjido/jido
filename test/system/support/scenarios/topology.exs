@@ -5,7 +5,7 @@ defmodule JidoTest.System.Scenarios.Topology do
       alias Jido.AgentServer, as: Server
       alias Jido.Examples.Topology.Cell
       alias Jido.Signal.Bus
-      alias Jido.Topology.{Builder, Controller}
+      alias Jido.Topology.Controller
       alias Jido.Topology.Controller.Runtime
       alias Jido.Tracing.Trace
       alias JidoTest.System.Observability
@@ -278,21 +278,31 @@ defmodule JidoTest.System.Scenarios.Topology do
       end
 
       defp topology(id, count, bus? \\ false) do
-        builder =
-          Builder.new(name: "system_topology") |> Builder.group(:workers, Cell, count: count)
+        attrs =
+          %{name: "system_topology", groups: [%{key: :workers, module: Cell, count: count}]}
 
-        builder =
+        attrs =
           if bus?,
             do:
-              builder
-              |> Builder.bus(:work)
-              |> Builder.subscribe(:workers,
-                to: :work,
-                path: "examples.topology.cell.work"
+              Map.update(
+                Map.update(
+                  attrs,
+                  :resources,
+                  [%{key: :work, kind: :bus}],
+                  &(&1 ++ [%{key: :work, kind: :bus}])
+                ),
+                :connections,
+                [%{agent: :workers, to: :work, path: "examples.topology.cell.work"}],
+                &(&1 ++ [%{agent: :workers, to: :work, path: "examples.topology.cell.work"}])
               ),
-            else: builder
+            else: attrs
 
-        builder |> Builder.startup(retry_interval: 10) |> Builder.build!(id: id)
+        Jido.Topology.unwrap!(
+          with {:ok, definition} <-
+                 Jido.Topology.new(Map.put(attrs, :startup, retry_interval: 10)) do
+            Jido.Topology.instantiate(definition, id: id)
+          end
+        )
       end
 
       defp start_controller(c, topology) do

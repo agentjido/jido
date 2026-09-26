@@ -4,7 +4,7 @@ Code.require_file("../compiler.exs", __DIR__)
 defmodule JidoTest.Authoring.Agents.Corpus do
   @moduledoc false
   alias Jido.Agent
-  alias Jido.Agent.{Builder, Codec}
+  alias Jido.Agent.Codec
   alias Jido.Codec.Registry
   alias JidoTest.Authoring.Compiler
   alias JidoTest.Authoring.Agents.{Cases, Fixtures}
@@ -29,7 +29,7 @@ defmodule JidoTest.Authoring.Agents.Corpus do
   ]
 
   def variants, do: Keyword.keys(@variants)
-  def forms, do: [:module, :map, :keyword, :builder, :module_builder, :json]
+  def forms, do: [:module, :map, :keyword, :json]
   def fixture(relative), do: Path.join(@fixtures, relative)
 
   # Only selected tests load source. require_file/1 shares successful loads;
@@ -83,24 +83,9 @@ defmodule JidoTest.Authoring.Agents.Corpus do
     })
   end
 
-  def builder(%{attrs: attrs}) do
-    builder = Builder.new(Map.drop(attrs, [:routes, :plugins]))
-
-    builder =
-      Enum.reduce(attrs.plugins, builder, fn {module, opts}, acc ->
-        Builder.plugin(acc, module, opts)
-      end)
-
-    Enum.reduce(attrs.routes, builder, fn {path, target, opts}, acc ->
-      Builder.route(acc, path, target, opts)
-    end)
-  end
-
   def definition(spec, :module), do: spec.attrs.module.definition()
   def definition(spec, :map), do: Agent.new!(spec.attrs)
   def definition(spec, :keyword), do: Agent.new!(Map.to_list(spec.attrs))
-  def definition(spec, :builder), do: Builder.build!(builder(spec))
-  def definition(spec, :module_builder), do: Builder.build!(Builder.new(spec.attrs.module))
 
   def definition(spec, :json) do
     {:ok, definition} = Codec.decode(spec.document, spec.registry)

@@ -1,7 +1,7 @@
 # Authoring verification
 
 This suite checks Agent and Topology definitions through source compilation,
-extraction, direct data, Builders, saved JSON, and instance construction.
+extraction, direct data, saved JSON, and instance construction.
 It has 26 saved cases: 15 Agent cases and 11 Topology cases.
 Keyword and block variants give 28 source variants in total. Additional fault
 fixtures check Plugin failures and invalid source without adding saved cases.
@@ -78,8 +78,8 @@ Each domain keeps its test modules in the same namespace. Invalid source uses
 fixture loading and authoring-form construction. These modules stay separate
 because Agent state and execution differ from Topology inputs and plans.
 
-Both sets have six authoring forms: module, direct map, direct keyword list,
-incremental Builder, module-seeded Builder, and saved JSON. Expected declarations,
+Both sets have four authoring forms: module, direct map, direct keyword list,
+and saved JSON. Expected declarations,
 state, and plans are independent test data. Tests never rewrite JSON documents.
 Additional boundary tests check invalid source, metadata, and malformed documents.
 

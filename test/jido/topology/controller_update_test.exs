@@ -2,7 +2,7 @@ defmodule JidoTest.Topology.ControllerUpdateTest do
   use JidoTest.Case, async: true
 
   alias Jido.AgentServer, as: Server
-  alias Jido.Topology.Builder
+
   alias Jido.Topology.Controller
 
   defmodule Worker do
@@ -75,10 +75,14 @@ defmodule JidoTest.Topology.ControllerUpdateTest do
   end
 
   defp topology(id, count, module \\ Worker) do
-    Builder.new(name: "controller_update_topology")
-    |> Builder.group(:workers, module, count: count)
-    |> Builder.startup(retry_interval: 10)
-    |> Builder.build(id: id)
+    with {:ok, definition} <-
+           Jido.Topology.new(%{
+             startup: [retry_interval: 10],
+             name: "controller_update_topology",
+             groups: [%{key: :workers, module: module, count: count}]
+           }) do
+      Jido.Topology.instantiate(definition, id: id)
+    end
   end
 
   defp workers(controller, count),

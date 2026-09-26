@@ -2,7 +2,7 @@ defmodule Jido.Agent.AuthoringContractTest do
   use ExUnit.Case, async: true
 
   alias Jido.Agent
-  alias Jido.Agent.{Builder, Command, Directive}
+  alias Jido.Agent.{Command, Directive}
   alias JidoTest.AgentFixtures.Add
   alias Jido.Agent.Codec.Deriver
   alias Jido.Codec.Registry
@@ -14,9 +14,6 @@ defmodule Jido.Agent.AuthoringContractTest do
   test "input normalization preserves each public boundary's duplicate policy" do
     assert {:ok, %{name: "last"} = definition} = Agent.new(name: "first", name: "last")
     assert {:ok, %{id: "last"}} = Agent.instantiate(definition, id: "first", id: "last")
-
-    assert {:error, %{message: "Expected unique keyword options"}} =
-             Builder.new(name: "first", name: "last") |> Builder.build()
 
     assert {:ok, %{key: 2}} = Command.normalize_context(key: 1, key: 2)
     assert {:ok, %{}} = Command.normalize_context(nil)
@@ -38,17 +35,10 @@ defmodule Jido.Agent.AuthoringContractTest do
 
       assert {:ok, %{routes: [%{target: ^target}]}} =
                Agent.new(name: "routes", routes: [{"counter.add", target}])
-
-      assert {:ok, %{routes: [%{target: ^target}]}} =
-               Builder.new(name: "routes")
-               |> Builder.route("counter.add", target)
-               |> Builder.build()
     end
 
     assert {:error, %{message: "Route defaults must be a plain map"}} =
-             Builder.new(name: "routes")
-             |> Builder.route("counter.add", Add, defaults: %URI{port: 1})
-             |> Builder.build()
+             Agent.new(name: "routes", routes: [{"counter.add", Add, defaults: %URI{port: 1}}])
 
     assert {:ok, %{routes: [%{target: Add}]}} =
              Agent.new(name: "routes", routes: [{"counter.add", Add}])
@@ -63,9 +53,6 @@ defmodule Jido.Agent.AuthoringContractTest do
 
     assert :ok = Directive.validate_agent_target(Factory)
     assert {:error, %{message: "Expected an Agent module"}} = Agent.instantiate(Factory, [])
-
-    assert {:error, %{message: "Expected an Agent module"}} =
-             Builder.new(Factory) |> Builder.build()
 
     assert {:error, %{message: "Agent module must implement the Jido.Agent behavior"}} =
              Agent.new(name: "behavior", module: Factory)

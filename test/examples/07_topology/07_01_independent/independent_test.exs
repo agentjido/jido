@@ -2,7 +2,7 @@ defmodule Jido.Examples.Topology.IndependentTest do
   use JidoTest.Case, async: true
   @moduletag :example
   alias Jido.Examples.Topology.{Cell, Independent}
-  alias Jido.Topology.{Builder, Controller}
+  alias Jido.Topology.Controller
 
   test "starts independent Agents in the application child specification", %{jido: jido} do
     controller =
@@ -25,9 +25,12 @@ defmodule Jido.Examples.Topology.IndependentTest do
 
   test "an external policy requests repair without replacing unchanged Agents", %{jido: jido} do
     instance =
-      Builder.new(Independent)
-      |> Builder.startup(retry_interval: 10)
-      |> Builder.build!(id: "manual-example")
+      Jido.Topology.unwrap!(
+        with {:ok, definition} <-
+               Jido.Topology.new(Map.put(Independent.topology(), :startup, retry_interval: 10)) do
+          Jido.Topology.instantiate(definition, id: "manual-example")
+        end
+      )
 
     controller = start_supervised!({Controller, jido: jido, topology: instance, repair: :manual})
     assert :ok = Controller.await_ready(controller)

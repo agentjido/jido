@@ -1,6 +1,6 @@
 # Topology authoring corpus
 
-Eleven saved cases use 12 source variants and six authoring forms. The minimal case
+Eleven saved cases use 12 source variants and four authoring forms. The minimal case
 has both keyword and block variants. See the [suite guide](../README.md) for
 commands and shared rules.
 
@@ -28,15 +28,14 @@ ownership, subscriptions, dependency layers, lookups, and component counts.
 Invalid inputs must return structured errors. Later valid inputs must still
 produce the same plan.
 
-`boundaries_test.exs` checks invalid source, graph errors, empty plans, Builder
-reuse, reserved Bus options, startup values, ownership policies, remote Bus
+`boundaries_test.exs` checks invalid source, graph errors and empty plans, reserved Bus options, startup values, ownership policies, remote Bus
 subscriptions, and combined Agent/Topology behavior.
 
 `composition_boundaries_test.exs` checks sibling ownership cycles, exact import
 bindings, private endpoints, export kinds, nested input error paths, inclusion
 order, and child limits after JSON transport.
 
-`plugin_boundaries_test.exs` checks 13 failure modes across all six forms:
+`plugin_boundaries_test.exs` checks 13 failure modes across all four forms:
 raise, throw, exit, invalid callback result, invalid contribution shape, wrong
 package identity, invalid entry, reserved Bus config, duplicate resource,
 missing endpoint, ownership cycle, duplicate ownership, and explicit rejection.

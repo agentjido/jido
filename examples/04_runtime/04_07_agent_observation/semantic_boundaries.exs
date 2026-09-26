@@ -4,7 +4,7 @@
 alias Jido.Examples.Topology.Cell
 alias Jido.Examples.TurnObservation, as: Agent
 alias Jido.Examples.Runtime.EventProbe
-alias Jido.Topology.{Builder, Controller}
+alias Jido.Topology.Controller
 
 instance = SemanticBoundaryProbe
 namespace = "examples/semantic-boundary"
@@ -28,10 +28,13 @@ try do
   {:ok, thawed} = Jido.thaw(instance, Agent, "observed", partition: "west")
   :ok = Jido.stop_agent(instance, thawed)
 
-  topology =
-    Builder.new(name: "observed-topology")
-    |> Builder.agent(:cell, Cell)
-    |> Builder.build!(id: "observed-topology")
+  {:ok, definition} =
+    Jido.Topology.new(
+      name: "observed-topology",
+      agents: [%{key: :cell, module: Cell}]
+    )
+
+  {:ok, topology} = Jido.Topology.instantiate(definition, id: "observed-topology")
 
   {:ok, controller} = Controller.start_link(jido: instance, topology: topology, repair: :manual)
   :ok = Controller.await_ready(controller)

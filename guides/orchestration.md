@@ -1,7 +1,7 @@
 # Compose Agent systems
 
 Use Flows for one executable graph. Use owned children for separate live Agents.
-Use `Jido.Topology` to author and start a static system through DSL, Builder, or
+Use `Jido.Topology` to author and start a static system through DSL, data, or
 Codec. The forms share validation and planning. Composition supports imports,
 exports, bindings, keyed identities, and supervised activation.
 

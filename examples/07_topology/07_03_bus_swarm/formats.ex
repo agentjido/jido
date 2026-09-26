@@ -1,20 +1,22 @@
 defmodule Jido.Examples.Topology.Formats do
-  @moduledoc "Builder and JSON forms of the Swarm DSL, using stable application Registry IDs."
+  @moduledoc "data and JSON forms of the Swarm DSL, using stable application Registry IDs."
   alias Jido.Codec.Registry
   alias Jido.Examples.Topology.{Cell, Swarm}
-  alias Jido.Topology.{Builder, Codec, Reference}
+  alias Jido.Topology.{Codec, Reference}
 
-  @doc "Builds the same definition as Swarm.topology/0."
-  def builder do
-    Builder.new(name: "bus_swarm")
-    |> Builder.schema(Swarm.topology().schema)
-    |> Builder.metadata(%{purpose: "Bus fan-out"})
-    |> Builder.agent(:coordinator, Cell)
-    |> Builder.group(:workers, Cell, count: Reference.input(:worker_count))
-    |> Builder.bus(:work)
-    |> Builder.owns(:coordinator, :workers)
-    |> Builder.subscribe(:workers, to: :work, path: "examples.topology.cell.work")
-    |> Builder.startup(concurrency: 32)
+  @doc "Returns data for the same definition as Swarm.topology/0."
+  def data do
+    %{
+      startup: [concurrency: 32],
+      metadata: %{purpose: "Bus fan-out"},
+      schema: Swarm.topology().schema,
+      name: "bus_swarm",
+      agents: [%{key: :coordinator, module: Cell}],
+      groups: [%{key: :workers, module: Cell, count: Reference.input(:worker_count)}],
+      resources: [%{key: :work, kind: :bus}],
+      relationships: [%{parent: :coordinator, child: :workers}],
+      connections: [%{agent: :workers, to: :work, path: "examples.topology.cell.work"}]
+    }
   end
 
   @doc "Returns the stable Registry required by the example JSON document."

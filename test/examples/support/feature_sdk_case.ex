@@ -14,10 +14,14 @@ defmodule JidoTest.FeatureSDKCase do
     owner_key = System.unique_integer([:positive, :monotonic])
     :yes = :global.register_name({JidoTest.FeatureObserver, owner_key}, self())
 
-    module
-    |> Jido.Agent.Builder.new()
-    |> Jido.Agent.Builder.plugin(JidoTest.FeatureObserver, owner_key: owner_key, key: key)
-    |> Jido.Agent.Builder.build!()
+    Jido.Agent.new!(
+      Map.update(
+        module.definition() |> Map.from_struct() |> Map.drop([:id, :state]),
+        :plugins,
+        [{JidoTest.FeatureObserver, [owner_key: owner_key, key: key]}],
+        &(&1 ++ [{JidoTest.FeatureObserver, [owner_key: owner_key, key: key]}])
+      )
+    )
   end
 
   def state(server), do: Jido.AgentServer.snapshot(server).agent.state

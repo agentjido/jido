@@ -2,7 +2,7 @@ defmodule Jido.Agent.FlowExpressionTest do
   use JidoTest.Case, async: true
 
   alias Jido.Agent
-  alias Jido.Agent.{Builder, Codec}
+  alias Jido.Agent.Codec
   alias Jido.Flow.Ref
 
   defmodule Amount do
@@ -55,10 +55,11 @@ defmodule Jido.Agent.FlowExpressionTest do
 
     for target <- [Add, flow] do
       definition =
-        Builder.new(name: "expression_counter")
-        |> Builder.schema(Counter.schema())
-        |> Builder.route("counter.add", target, defaults: %{amount: 2})
-        |> Builder.build!()
+        Jido.Agent.new!(%{
+          schema: Counter.schema(),
+          name: "expression_counter",
+          routes: [{"counter.add", target, defaults: %{amount: 2}}]
+        })
 
       assert {:ok, document, registry} = Codec.encode(definition)
       assert {:ok, ^definition} = Codec.decode(JSON.decode!(JSON.encode!(document)), registry)

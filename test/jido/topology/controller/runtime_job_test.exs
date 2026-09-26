@@ -2,7 +2,7 @@ defmodule Jido.Topology.Controller.RuntimeJobTest do
   use JidoTest.Case, async: true
 
   alias Jido.Examples.Topology.Cell
-  alias Jido.Topology.Builder
+
   alias Jido.Topology.Controller.Runtime
 
   test "timeout retains capacity until DOWN and blocks dependents", %{jido: jido} do
@@ -113,12 +113,17 @@ defmodule Jido.Topology.Controller.RuntimeJobTest do
     on_exit(fn -> Process.cancel_timer(timer) end)
 
     instance =
-      Builder.new(name: "job-events")
-      |> Builder.agent(:parent, Cell)
-      |> Builder.agent(:child, Cell)
-      |> Builder.owns(:parent, :child)
-      |> Builder.startup(concurrency: 1, retry_interval: 60_000)
-      |> Builder.build!(id: "job-events")
+      Jido.Topology.unwrap!(
+        with {:ok, definition} <-
+               Jido.Topology.new(%{
+                 startup: [concurrency: 1, retry_interval: 60000],
+                 name: "job-events",
+                 agents: [%{key: :parent, module: Cell}, %{key: :child, module: Cell}],
+                 relationships: [%{parent: :parent, child: :child}]
+               }) do
+          Jido.Topology.instantiate(definition, id: "job-events")
+        end
+      )
 
     state = %{
       jido: jido,

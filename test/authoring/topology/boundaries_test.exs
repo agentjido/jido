@@ -5,7 +5,7 @@ defmodule JidoTest.Authoring.Topology.BoundariesTest do
   @moduletag :authoring
   alias Jido.Agent
   alias Jido.Topology
-  alias Jido.Topology.{Builder, Codec, Plan, Ref}
+  alias Jido.Topology.{Codec, Plan, Ref}
   alias JidoTest.Authoring.Compiler
   alias JidoTest.Authoring.Topology.{Cases, Corpus, Fixtures}
 
@@ -46,7 +46,7 @@ defmodule JidoTest.Authoring.Topology.BoundariesTest do
     end
   end
 
-  test "invalid graphs and bindings fail in direct and Builder forms" do
+  test "invalid graphs and bindings fail in map and keyword forms" do
     worker = %{key: :worker, module: Fixtures.Worker}
 
     cases = [
@@ -87,8 +87,7 @@ defmodule JidoTest.Authoring.Topology.BoundariesTest do
 
       for result <- [
             Topology.new(attrs),
-            Topology.new(Map.to_list(attrs)),
-            Builder.build(Builder.new(attrs))
+            Topology.new(Map.to_list(attrs))
           ] do
         assert {:error, %Jido.Error.ValidationError{}} = result
       end
@@ -207,49 +206,6 @@ defmodule JidoTest.Authoring.Topology.BoundariesTest do
     end
   end
 
-  test "Builder reuse preserves the original and the first failure" do
-    Corpus.load!(:minimal)
-    base = Corpus.builder(Corpus.spec(:minimal))
-    original = Builder.build!(base)
-    branch = Builder.agent(base, :second, Fixtures.Worker)
-    assert Enum.map(Builder.build!(branch).agents, & &1.key) == ["worker", "second"]
-    assert Builder.build!(base) === original
-    failed = Builder.name(base, "")
-    assert {:error, error} = Builder.build(failed)
-    assert {:error, ^error} = failed |> Builder.name("valid") |> Builder.build()
-  end
-
-  for field <- [:concurrency, :max_agents, :retry_interval, :task_timeout] do
-    @tag field: field
-    test "#{field} rejects zero, negative, and non-integer values across data and JSON", %{
-      field: field
-    } do
-      Corpus.load!(:configured)
-      spec = Corpus.spec(:configured)
-
-      for value <- [0, -1, 1.5, "1", false] do
-        attrs = put_in(spec.attrs, [:startup, field], value)
-        document = put_in(spec.document, ["startup", Atom.to_string(field)], value)
-
-        for result <- [
-              Topology.new(attrs),
-              Topology.new(Map.to_list(attrs)),
-              Builder.build(Builder.new(attrs)),
-              Codec.decode(document, spec.registry)
-            ] do
-          assert {:error,
-                  %Jido.Error.ValidationError{
-                    message: "Expected a positive integer",
-                    details: %{field: ^field}
-                  }} = result
-        end
-      end
-
-      assert {:ok, valid} = Codec.decode(spec.document, spec.registry, id: "corpus")
-      assert valid.plan === hd(spec.scenarios).plan
-    end
-  end
-
   test "reserved Bus identity options and unknown ownership policies cannot enter definitions" do
     Corpus.load!(:configured)
     spec = Corpus.spec(:configured)
@@ -261,8 +217,6 @@ defmodule JidoTest.Authoring.Topology.BoundariesTest do
               %Jido.Error.ValidationError{
                 message: "Topology owns Bus name, Registry, and Jido scope"
               }} = Topology.new(attrs)
-
-      assert {:error, %Jido.Error.ValidationError{}} = Builder.build(Builder.new(attrs))
     end
 
     attrs = put_in(spec.attrs, [:relationships, Access.at(0), :on_parent_exit], :restart)
@@ -284,16 +238,20 @@ defmodule JidoTest.Authoring.Topology.BoundariesTest do
     for form <- Corpus.forms() do
       original = Corpus.definition(spec, form)
 
-      builder =
-        Builder.new(original) |> Builder.subscribe(:remote, to: :events, path: "authoring.work")
+      attrs =
+        Map.update(
+          original,
+          :connections,
+          [%{agent: :remote, to: :events, path: "authoring.work"}],
+          &(&1 ++ [%{agent: :remote, to: :events, path: "authoring.work"}])
+        )
 
-      assert {:ok, definition} = Builder.build(builder)
+      assert {:ok, definition} = Jido.Topology.new(attrs)
       assert {:ok, document} = Codec.encode(definition, spec.registry)
       assert {:ok, ^definition} = Codec.decode(document, spec.registry)
 
       for result <- [
             Topology.instantiate(definition, id: "corpus"),
-            Builder.build(builder, id: "corpus"),
             Codec.decode(document, spec.registry, id: "corpus")
           ] do
         assert {:error,

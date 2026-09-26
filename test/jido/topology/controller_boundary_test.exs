@@ -3,7 +3,7 @@ defmodule Jido.Topology.ControllerBoundaryTest do
 
   alias Jido.AgentServer, as: Server
   alias Jido.Examples.Topology.Cell
-  alias Jido.Topology.{Builder, Controller}
+  alias Jido.Topology.Controller
   alias Jido.Topology.Controller.TargetStore
 
   @offline :"topology-unavailable@127.0.0.1"
@@ -45,10 +45,16 @@ defmodule Jido.Topology.ControllerBoundaryTest do
     jido: jido
   } do
     instance =
-      Builder.new(name: "local-placement")
-      |> Builder.agent(:worker, Cell)
-      |> Builder.group(:members, Cell, count: 1)
-      |> Builder.build!(id: "local-placement")
+      Jido.Topology.unwrap!(
+        with {:ok, definition} <-
+               Jido.Topology.new(%{
+                 name: "local-placement",
+                 agents: [%{key: :worker, module: Cell}],
+                 groups: [%{key: :members, module: Cell, count: 1}]
+               }) do
+          Jido.Topology.instantiate(definition, id: "local-placement")
+        end
+      )
 
     assert Controller.whereis(:not_a_running_jido, instance.id) == nil
     assert Controller.whereis(jido, instance.id) == nil
@@ -233,11 +239,19 @@ defmodule Jido.Topology.ControllerBoundaryTest do
     jido: jido
   } do
     instance =
-      Builder.new(name: "placement-ownership")
-      |> Builder.agent(:worker, Cell)
-      |> Builder.bus(:events)
-      |> Builder.subscribe(:worker, to: :events, path: "examples.topology.cell.work")
-      |> Builder.build!(id: "placement-ownership")
+      Jido.Topology.unwrap!(
+        with {:ok, definition} <-
+               Jido.Topology.new(%{
+                 name: "placement-ownership",
+                 agents: [%{key: :worker, module: Cell}],
+                 resources: [%{key: :events, kind: :bus}],
+                 connections: [
+                   %{agent: :worker, to: :events, path: "examples.topology.cell.work"}
+                 ]
+               }) do
+          Jido.Topology.instantiate(definition, id: "placement-ownership")
+        end
+      )
 
     controller = start_supervised!({Controller, jido: jido, topology: instance, repair: :manual})
     assert :ok = Controller.await_ready(controller)
@@ -272,9 +286,19 @@ defmodule Jido.Topology.ControllerBoundaryTest do
              Controller.update(controller, topology("different"))
 
     target =
-      Builder.new(instance.definition |> Map.from_struct())
-      |> Builder.bus(:added)
-      |> Builder.build!(id: instance.id)
+      Jido.Topology.unwrap!(
+        with {:ok, definition} <-
+               Jido.Topology.new(
+                 Map.update(
+                   instance.definition |> Map.from_struct(),
+                   :resources,
+                   [%{key: :added, kind: :bus}],
+                   &(&1 ++ [%{key: :added, kind: :bus}])
+                 )
+               ) do
+          Jido.Topology.instantiate(definition, id: instance.id)
+        end
+      )
 
     assert {:error, %{message: "Topology update cannot change resources"}} =
              Controller.update(controller, target)
@@ -354,9 +378,15 @@ defmodule Jido.Topology.ControllerBoundaryTest do
   end
 
   defp topology(id, opts \\ []) do
-    Builder.new(name: "controller_boundaries")
-    |> Builder.agent(:worker, Cell, opts)
-    |> Builder.build!(id: id)
+    Jido.Topology.unwrap!(
+      with {:ok, definition} <-
+             Jido.Topology.new(%{
+               name: "controller_boundaries",
+               agents: [Map.merge(%{key: :worker, module: Cell}, Map.new(opts))]
+             }) do
+        Jido.Topology.instantiate(definition, id: id)
+      end
+    )
   end
 
   defp runtime(controller) do

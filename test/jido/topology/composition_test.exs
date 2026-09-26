@@ -2,7 +2,7 @@ defmodule Jido.Topology.CompositionTest do
   use ExUnit.Case, async: true
   alias Jido.Examples.Topology.{Cell, ComposedFormats, ComposedSystem, WorkerTeam}
   alias Jido.Topology
-  alias Jido.Topology.{Builder, Codec, Plan, Ref, Reference}
+  alias Jido.Topology.{Codec, Plan, Ref, Reference}
 
   defmodule RecursiveSource do
     def __topology_config__ do
@@ -10,9 +10,9 @@ defmodule Jido.Topology.CompositionTest do
     end
   end
 
-  test "DSL, Builder, and stored JSON retain the same composition and plan" do
+  test "DSL, data, and stored JSON retain the same composition and plan" do
     definition = ComposedSystem.topology()
-    assert {:ok, ^definition} = Builder.build(ComposedFormats.builder())
+    assert {:ok, ^definition} = Jido.Topology.new(ComposedFormats.data())
     assert {:ok, json} = ComposedFormats.json()
     document = JSON.decode!(json)
     assert document["version"] == 2
@@ -25,7 +25,12 @@ defmodule Jido.Topology.CompositionTest do
     assert {:ok, ^definition} = ComposedFormats.from_file()
     assert {:ok, instance} = ComposedSystem.new(id: "composed")
     assert {:ok, ^instance} = Codec.decode(document, ComposedFormats.registry(), id: "composed")
-    assert {:ok, ^instance} = Builder.build(ComposedFormats.builder(), id: "composed")
+
+    assert {:ok, ^instance} =
+             (with {:ok, definition} <- Jido.Topology.new(ComposedFormats.data()) do
+                Jido.Topology.instantiate(definition, id: "composed")
+              end)
+
     assert map_size(instance.plan.agents) == 8
     assert map_size(instance.plan.resources) == 1
     assert instance.definition.startup.concurrency == 4
@@ -62,7 +67,7 @@ defmodule Jido.Topology.CompositionTest do
 
   test "direct Plan construction still checks the declaration graph" do
     definition =
-      Builder.new(name: "cycle") |> Builder.group(:workers, Cell, count: 0) |> Builder.build!()
+      Jido.Topology.new!(%{name: "cycle", groups: [%{key: :workers, module: Cell, count: 0}]})
 
     [group] = definition.groups
     invalid = %{definition | groups: [%{group | depends_on: ["workers"]}]}
@@ -90,22 +95,32 @@ defmodule Jido.Topology.CompositionTest do
 
   test "nested topologies can re-export public endpoints" do
     region =
-      Builder.new(name: "region")
-      |> Builder.schema(Zoi.object(%{count: Zoi.integer() |> Zoi.default(2)}))
-      |> Builder.import_bus(:events)
-      |> Builder.include(:team, WorkerTeam,
-        inputs: %{worker_count: Reference.input(:count)},
-        bindings: %{events: :events}
-      )
-      |> Builder.export(:agent, :leader, from: Ref.ref(:team, :leader))
-      |> Builder.export(:group, :workers, from: Ref.ref(:team, :workers))
-      |> Builder.build!()
+      Jido.Topology.new!(%{
+        schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(2)}),
+        name: "region",
+        imports: [%{key: :events, kind: :bus}],
+        includes: [
+          %{
+            key: :team,
+            topology: WorkerTeam,
+            inputs: %{worker_count: Reference.input(:count)},
+            bindings: %{events: :events}
+          }
+        ],
+        exports: [
+          %{kind: :agent, key: :leader, from: Ref.ref(:team, :leader)},
+          %{kind: :group, key: :workers, from: Ref.ref(:team, :workers)}
+        ]
+      })
 
     root =
-      Builder.new(name: "root")
-      |> Builder.bus(:bus)
-      |> Builder.include(:region, region, inputs: %{count: 3}, bindings: %{events: :bus})
-      |> Builder.build!()
+      Jido.Topology.new!(%{
+        name: "root",
+        resources: [%{key: :bus, kind: :bus}],
+        includes: [
+          %{key: :region, topology: region, inputs: %{count: 3}, bindings: %{events: :bus}}
+        ]
+      })
 
     {:ok, document, registry} = Codec.encode(root)
     assert {:ok, ^root} = Codec.decode(JSON.decode!(JSON.encode!(document)), registry)
@@ -121,18 +136,37 @@ defmodule Jido.Topology.CompositionTest do
   end
 
   test "private names and wrong endpoint kinds are rejected" do
-    base = ComposedFormats.builder()
+    base = ComposedFormats.data()
 
     assert {:error, _} =
-             base |> Builder.owns(:director, Ref.ref(:east, :coordinator)) |> Builder.build()
+             Jido.Topology.new(
+               Map.update(
+                 base,
+                 :relationships,
+                 [%{parent: :director, child: Ref.ref(:east, :coordinator)}],
+                 &(&1 ++ [%{parent: :director, child: Ref.ref(:east, :coordinator)}])
+               )
+             )
 
     assert {:error, _} =
-             base |> Builder.owns(Ref.ref(:east, :workers), :director) |> Builder.build()
+             Jido.Topology.new(
+               Map.update(
+                 base,
+                 :relationships,
+                 [%{parent: Ref.ref(:east, :workers), child: :director}],
+                 &(&1 ++ [%{parent: Ref.ref(:east, :workers), child: :director}])
+               )
+             )
 
     assert {:error, _} =
-             base
-             |> Builder.subscribe(:director, to: Ref.ref(:east, :leader), path: "**")
-             |> Builder.build()
+             Jido.Topology.new(
+               Map.update(
+                 base,
+                 :connections,
+                 [%{agent: :director, to: Ref.ref(:east, :leader), path: "**"}],
+                 &(&1 ++ [%{agent: :director, to: Ref.ref(:east, :leader), path: "**"}])
+               )
+             )
 
     plan = ComposedSystem.new!(id: "private").plan
     assert Plan.resolve(plan, Ref.ref(:east, :coordinator), :agent) == nil
@@ -142,122 +176,232 @@ defmodule Jido.Topology.CompositionTest do
   end
 
   test "imports require exact bindings and correct resource kinds" do
-    base = Builder.new(name: "imports") |> Builder.bus(:bus) |> Builder.agent(:cell, Cell)
-    assert {:error, _} = base |> Builder.include(:team, WorkerTeam) |> Builder.build()
+    base = %{
+      name: "imports",
+      resources: [%{key: :bus, kind: :bus}],
+      agents: [%{key: :cell, module: Cell}]
+    }
 
     assert {:error, _} =
-             base
-             |> Builder.include(:team, WorkerTeam, bindings: %{events: :bus, extra: :bus})
-             |> Builder.build()
-
-    assert {:error, _} =
-             base
-             |> Builder.include(:team, WorkerTeam, bindings: %{events: :cell})
-             |> Builder.build()
-
-    assert {:error, _} =
-             base
-             |> Builder.include(:team, WorkerTeam,
-               bindings: [%{key: :events, to: :bus}, %{key: "events", to: :bus}]
+             Jido.Topology.new(
+               Map.update(
+                 base,
+                 :includes,
+                 [%{key: :team, topology: WorkerTeam}],
+                 &(&1 ++ [%{key: :team, topology: WorkerTeam}])
+               )
              )
-             |> Builder.build()
+
+    assert {:error, _} =
+             Jido.Topology.new(
+               Map.update(
+                 base,
+                 :includes,
+                 [%{key: :team, topology: WorkerTeam, bindings: %{events: :bus, extra: :bus}}],
+                 &(&1 ++
+                     [%{key: :team, topology: WorkerTeam, bindings: %{events: :bus, extra: :bus}}])
+               )
+             )
+
+    assert {:error, _} =
+             Jido.Topology.new(
+               Map.update(
+                 base,
+                 :includes,
+                 [%{key: :team, topology: WorkerTeam, bindings: %{events: :cell}}],
+                 &(&1 ++ [%{key: :team, topology: WorkerTeam, bindings: %{events: :cell}}])
+               )
+             )
+
+    assert {:error, _} =
+             Jido.Topology.new(
+               Map.update(
+                 base,
+                 :includes,
+                 [
+                   %{
+                     key: :team,
+                     topology: WorkerTeam,
+                     bindings: [%{key: :events, to: :bus}, %{key: "events", to: :bus}]
+                   }
+                 ],
+                 &(&1 ++
+                     [
+                       %{
+                         key: :team,
+                         topology: WorkerTeam,
+                         bindings: [%{key: :events, to: :bus}, %{key: "events", to: :bus}]
+                       }
+                     ])
+               )
+             )
 
     assert {:error, _} = WorkerTeam.new(id: "unbound")
   end
 
   test "export aliases are unique and must refer to an existing endpoint" do
-    base = Builder.new(name: "exports") |> Builder.agent(:cell, Cell)
+    base = %{name: "exports", agents: [%{key: :cell, module: Cell}]}
 
     assert {:error, _} =
-             base |> Builder.export(:agent, :public, from: :missing) |> Builder.build()
-
-    assert {:error, _} = base |> Builder.export(:bus, :public, from: :cell) |> Builder.build()
+             Jido.Topology.new(
+               Map.update(
+                 base,
+                 :exports,
+                 [%{kind: :agent, key: :public, from: :missing}],
+                 &(&1 ++ [%{kind: :agent, key: :public, from: :missing}])
+               )
+             )
 
     assert {:error, _} =
-             base
-             |> Builder.export(:agent, :public, from: :cell)
-             |> Builder.export(:agent, :public, from: :cell)
-             |> Builder.build()
+             Jido.Topology.new(
+               Map.update(
+                 base,
+                 :exports,
+                 [%{kind: :bus, key: :public, from: :cell}],
+                 &(&1 ++ [%{kind: :bus, key: :public, from: :cell}])
+               )
+             )
+
+    assert {:error, _} =
+             Jido.Topology.new(
+               Map.update(
+                 Map.update(
+                   base,
+                   :exports,
+                   [%{kind: :agent, key: :public, from: :cell}],
+                   &(&1 ++ [%{kind: :agent, key: :public, from: :cell}])
+                 ),
+                 :exports,
+                 [%{kind: :agent, key: :public, from: :cell}],
+                 &(&1 ++ [%{kind: :agent, key: :public, from: :cell}])
+               )
+             )
   end
 
   test "cycles and duplicate ownership are checked across inclusion boundaries" do
     base =
-      Builder.new(name: "cycles")
-      |> Builder.bus(:bus)
-      |> Builder.include(:east, WorkerTeam, bindings: %{events: :bus})
-      |> Builder.include(:west, WorkerTeam, bindings: %{events: :bus})
+      %{
+        name: "cycles",
+        resources: [%{key: :bus, kind: :bus}],
+        includes: [
+          %{key: :east, topology: WorkerTeam, bindings: %{events: :bus}},
+          %{key: :west, topology: WorkerTeam, bindings: %{events: :bus}}
+        ]
+      }
 
     assert {:error, error} =
-             base
-             |> Builder.owns(Ref.ref(:east, :leader), Ref.ref(:west, :leader))
-             |> Builder.owns(Ref.ref(:west, :leader), Ref.ref(:east, :leader))
-             |> Builder.build()
+             Jido.Topology.new(
+               Map.update(
+                 Map.update(
+                   base,
+                   :relationships,
+                   [%{parent: Ref.ref(:east, :leader), child: Ref.ref(:west, :leader)}],
+                   &(&1 ++ [%{parent: Ref.ref(:east, :leader), child: Ref.ref(:west, :leader)}])
+                 ),
+                 :relationships,
+                 [%{parent: Ref.ref(:west, :leader), child: Ref.ref(:east, :leader)}],
+                 &(&1 ++ [%{parent: Ref.ref(:west, :leader), child: Ref.ref(:east, :leader)}])
+               )
+             )
 
     assert Exception.message(error) =~ "cycle"
 
     assert {:error, _} =
-             base
-             |> Builder.owns(Ref.ref(:west, :leader), Ref.ref(:east, :workers))
-             |> Builder.build()
+             Jido.Topology.new(
+               Map.update(
+                 base,
+                 :relationships,
+                 [%{parent: Ref.ref(:west, :leader), child: Ref.ref(:east, :workers)}],
+                 &(&1 ++ [%{parent: Ref.ref(:west, :leader), child: Ref.ref(:east, :workers)}])
+               )
+             )
   end
 
   test "import and export cycles fail without starting processes" do
     unit =
-      Builder.new(name: "unit")
-      |> Builder.import_bus(:bus)
-      |> Builder.export(:bus, :bus, from: :bus)
-      |> Builder.build!()
+      Jido.Topology.new!(%{
+        name: "unit",
+        imports: [%{key: :bus, kind: :bus}],
+        exports: [%{kind: :bus, key: :bus, from: :bus}]
+      })
 
     assert {:error, error} =
-             Builder.new(name: "loop")
-             |> Builder.include(:a, unit, bindings: %{bus: Ref.ref(:b, :bus)})
-             |> Builder.include(:b, unit, bindings: %{bus: Ref.ref(:a, :bus)})
-             |> Builder.build()
+             Jido.Topology.new(%{
+               name: "loop",
+               includes: [
+                 %{key: :a, topology: unit, bindings: %{bus: Ref.ref(:b, :bus)}},
+                 %{key: :b, topology: unit, bindings: %{bus: Ref.ref(:a, :bus)}}
+               ]
+             })
 
     assert Exception.message(error) =~ "cycle"
   end
 
   test "root and child Agent limits apply to the full expanded subtree" do
     assert {:error, _} =
-             ComposedFormats.builder()
-             |> Builder.startup(max_agents: 7)
-             |> Builder.build(id: "limit")
+             (with {:ok, definition} <-
+                     Jido.Topology.new(Map.put(ComposedFormats.data(), :startup, max_agents: 7)) do
+                Jido.Topology.instantiate(definition, id: "limit")
+              end)
 
-    child = Builder.new(WorkerTeam) |> Builder.startup(max_agents: 2) |> Builder.build!()
+    child = Jido.Topology.new!(Map.put(WorkerTeam.topology(), :startup, max_agents: 2))
 
     assert {:error, _} =
-             Builder.new(name: "limit")
-             |> Builder.bus(:bus)
-             |> Builder.include(:team, child,
-               inputs: %{worker_count: 2},
-               bindings: %{events: :bus}
-             )
-             |> Builder.build(id: "child-limit")
+             (with {:ok, definition} <-
+                     Jido.Topology.new(%{
+                       name: "limit",
+                       resources: [%{key: :bus, kind: :bus}],
+                       includes: [
+                         %{
+                           key: :team,
+                           topology: child,
+                           inputs: %{worker_count: 2},
+                           bindings: %{events: :bus}
+                         }
+                       ]
+                     }) do
+                Jido.Topology.instantiate(definition, id: "child-limit")
+              end)
   end
 
   test "Agent limits fail before member and Agent state transformations" do
     assert {:error, member_error} =
-             Builder.new(name: "member-limit")
-             |> Builder.group(:workers, Cell,
-               members: [%{}, %{id: "valid"}],
-               key_by: :id
-             )
-             |> Builder.startup(max_agents: 1)
-             |> Builder.build(id: "member-limit")
+             (with {:ok, definition} <-
+                     Jido.Topology.new(%{
+                       startup: [max_agents: 1],
+                       name: "member-limit",
+                       groups: [
+                         %{
+                           key: :workers,
+                           module: Cell,
+                           members: [%{}, %{id: "valid"}],
+                           key_by: :id
+                         }
+                       ]
+                     }) do
+                Jido.Topology.instantiate(definition, id: "member-limit")
+              end)
 
     assert Exception.message(member_error) =~ "max_agents"
 
     child =
-      Builder.new(name: "invalid-child")
-      |> Builder.agent(:invalid, Cell, initial_state: %{total: "invalid"})
-      |> Builder.agent(:valid, Cell)
-      |> Builder.startup(max_agents: 1)
-      |> Builder.build!()
+      Jido.Topology.new!(%{
+        startup: [max_agents: 1],
+        name: "invalid-child",
+        agents: [
+          %{key: :invalid, module: Cell, initial_state: %{total: "invalid"}},
+          %{key: :valid, module: Cell}
+        ]
+      })
 
     assert {:error, child_error} =
-             Builder.new(name: "parent")
-             |> Builder.include(:child, child)
-             |> Builder.build(id: "child-limit-order")
+             (with {:ok, definition} <-
+                     Jido.Topology.new(%{
+                       name: "parent",
+                       includes: [%{key: :child, topology: child}]
+                     }) do
+                Jido.Topology.instantiate(definition, id: "child-limit-order")
+              end)
 
     assert Exception.message(child_error) =~ "max_agents"
   end
@@ -269,25 +413,42 @@ defmodule Jido.Topology.CompositionTest do
     assert Exception.message(error) =~ "input"
 
     assert {:error, error} =
-             Builder.new(name: "bad-child")
-             |> Builder.bus(:bus)
-             |> Builder.include(:team, WorkerTeam,
-               inputs: %{worker_count: -1},
-               bindings: %{events: :bus}
-             )
-             |> Builder.build(id: "bad")
+             (with {:ok, definition} <-
+                     Jido.Topology.new(%{
+                       name: "bad-child",
+                       resources: [%{key: :bus, kind: :bus}],
+                       includes: [
+                         %{
+                           key: :team,
+                           topology: WorkerTeam,
+                           inputs: %{worker_count: -1},
+                           bindings: %{events: :bus}
+                         }
+                       ]
+                     }) do
+                Jido.Topology.instantiate(definition, id: "bad")
+              end)
 
     assert Exception.message(error) =~ "included topology input"
   end
 
   test "structured addresses preserve separators and inclusion order does not change the plan" do
-    base = Builder.new(name: "names") |> Builder.bus(:bus)
+    base = %{name: "names", resources: [%{key: :bus, kind: :bus}]}
 
     definition =
-      base
-      |> Builder.include("east/west", WorkerTeam, bindings: %{events: :bus})
-      |> Builder.include("east", WorkerTeam, bindings: %{events: :bus})
-      |> Builder.build!()
+      Jido.Topology.new!(
+        Map.update(
+          Map.update(
+            base,
+            :includes,
+            [%{key: "east/west", topology: WorkerTeam, bindings: %{events: :bus}}],
+            &(&1 ++ [%{key: "east/west", topology: WorkerTeam, bindings: %{events: :bus}}])
+          ),
+          :includes,
+          [%{key: "east", topology: WorkerTeam, bindings: %{events: :bus}}],
+          &(&1 ++ [%{key: "east", topology: WorkerTeam, bindings: %{events: :bus}}])
+        )
+      )
 
     reversed = %{definition | includes: Enum.reverse(definition.includes)}
     {:ok, first} = Topology.instantiate(definition, id: "names")
@@ -301,9 +462,12 @@ defmodule Jido.Topology.CompositionTest do
     composed = ComposedSystem.new!(id: "root")
 
     leaf =
-      Builder.new(name: "leaf")
-      |> Builder.agent(:coordinator, Cell)
-      |> Builder.build!(id: "root/component/east")
+      Jido.Topology.unwrap!(
+        with {:ok, definition} <-
+               Jido.Topology.new(%{name: "leaf", agents: [%{key: :coordinator, module: Cell}]}) do
+          Jido.Topology.instantiate(definition, id: "root/component/east")
+        end
+      )
 
     assert composed.plan.agents["component/east/agent/coordinator"].id !=
              leaf.plan.agents["agent/coordinator"].id
@@ -313,9 +477,10 @@ defmodule Jido.Topology.CompositionTest do
 
   test "recursive modules and excessive nesting return structured errors" do
     assert {:error, error} =
-             Builder.new(name: "root")
-             |> Builder.include(:loop, RecursiveSource)
-             |> Builder.build()
+             Jido.Topology.new(%{
+               name: "root",
+               includes: [%{key: :loop, topology: RecursiveSource}]
+             })
 
     assert Exception.message(error) =~ "Recursive"
 
@@ -329,14 +494,14 @@ defmodule Jido.Topology.CompositionTest do
   end
 
   test "composition accepts 1000 scopes and rejects scope 1001" do
-    leaf = Builder.new(name: "leaf") |> Builder.build!()
+    leaf = Jido.Topology.new!(%{name: "leaf"})
 
-    builder =
-      Enum.reduce(1..999, Builder.new(name: "scope-limit"), fn index, builder ->
-        Builder.include(builder, "scope-#{index}", leaf)
-      end)
+    attrs = %{
+      name: "scope-limit",
+      includes: for(index <- 1..999, do: %{key: "scope-#{index}", topology: leaf})
+    }
 
-    assert {:ok, topology} = Builder.build(builder)
+    assert {:ok, topology} = Jido.Topology.new(attrs)
 
     assert Enum.map(topology.includes, & &1.key) ==
              Enum.map(1..999, &"scope-#{&1}")
@@ -345,9 +510,14 @@ defmodule Jido.Topology.CompositionTest do
             %Jido.Error.ValidationError{
               message: "Topology exceeds 1000 component scopes"
             }} =
-             builder
-             |> Builder.include("scope-1000", leaf)
-             |> Builder.build()
+             Jido.Topology.new(
+               Map.update(
+                 attrs,
+                 :includes,
+                 [%{key: "scope-1000", topology: leaf}],
+                 &(&1 ++ [%{key: "scope-1000", topology: leaf}])
+               )
+             )
   end
 
   test "Codec rejects changes to nested topology and export reference records" do

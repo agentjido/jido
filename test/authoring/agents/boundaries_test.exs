@@ -4,7 +4,7 @@ defmodule JidoTest.Authoring.Agents.BoundariesTest do
   use ExUnit.Case, async: false
   @moduletag :authoring
   alias Jido.Agent
-  alias Jido.Agent.{Builder, Codec}
+  alias Jido.Agent.Codec
   alias JidoTest.Authoring.Agents.Corpus
 
   setup do
@@ -58,18 +58,6 @@ defmodule JidoTest.Authoring.Agents.BoundariesTest do
     Corpus.load!(:counter_keyword)
     module = Corpus.spec(:counter_keyword).attrs.module
     refute function_exported?(module, :add_signal, 0)
-  end
-
-  test "Builder branches are independent and retain their first error" do
-    Corpus.load!(:counter_block)
-    base = :counter_block |> Corpus.spec() |> Corpus.builder()
-    original = Builder.build!(base)
-    branch = Builder.name(base, "branched") |> Builder.build!()
-    assert branch === %{original | name: "branched"}
-    assert Builder.build!(base) === original
-    invalid = Builder.name(base, 42)
-    assert {:error, error} = Builder.build(invalid)
-    assert {:error, ^error} = invalid |> Builder.name("fixed") |> Builder.build()
   end
 
   test "required state cannot be omitted and unknown state fields are rejected" do
