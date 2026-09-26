@@ -156,22 +156,36 @@ defmodule Jido.AgentServer.PostCommit do
       }
 
       agent_server = self()
+      plugin_specs = data.plugin_specs
+      default_dispatch = data.config.default_dispatch
+      jido = data.jido
+
+      plugin_states =
+        for %{agent: %{state_key: key}} <- plugin_specs,
+            not is_nil(key),
+            into: %{},
+            do: {key, Map.get(data.agent.state, key)}
 
       start_directive_task(
         fn ->
           with {:ok, signal} <-
                  Callbacks.prepare_dispatch(
                    prepared_directive.signal,
-                   data.plugin_specs,
+                   plugin_specs,
                    runtime_refs,
                    plugin_context,
-                   data.agent.state
+                   plugin_states
                  ) do
             prepared_directive = Map.put(prepared_directive, :signal, signal)
 
             case prepared_directive do
               %Directive.Emit{} ->
-                DirectiveRuntime.dispatch_prepared(prepared_directive, data, agent_server)
+                DirectiveRuntime.dispatch_emit(
+                  prepared_directive,
+                  default_dispatch,
+                  jido,
+                  agent_server
+                )
 
               _relative ->
                 {:dispatch_relative_signal, prepared_directive}
@@ -289,9 +303,11 @@ defmodule Jido.AgentServer.PostCommit do
 
     # A restarting Plugin can need Agent state to become ready. Resolve its
     # reference in the bounded task so the Agent can answer that state query.
+    runtime_source = PluginLifecycle.runtime_source(data, plugin.module)
+
     start_directive_task(
       fn ->
-        with {:ok, runtime_ref} <- PluginLifecycle.plugin_runtime_ref(data, plugin) do
+        with {:ok, runtime_ref} <- PluginLifecycle.plugin_runtime_ref(runtime_source, plugin) do
           Callbacks.dispatch(plugin, runtime_ref, directive, plugin_context)
         end
       end,
@@ -346,11 +362,13 @@ defmodule Jido.AgentServer.PostCommit do
   end
 
   defp launch_commit_notification(plugin, commit, pending, data) do
+    runtime_source = PluginLifecycle.runtime_source(data, plugin.module)
+
     task =
       TaskSupport.start_traced(
         data.jido,
         fn ->
-          with {:ok, runtime_ref} <- PluginLifecycle.plugin_runtime_ref(data, plugin) do
+          with {:ok, runtime_ref} <- PluginLifecycle.plugin_runtime_ref(runtime_source, plugin) do
             Callbacks.after_commit(plugin, runtime_ref, commit)
           end
         end,

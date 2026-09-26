@@ -101,6 +101,7 @@ defmodule Jido.AgentServer.Turn do
 
   defp start_admission_task(command, %State{} = data) do
     plugin_specs = data.plugin_specs
+    state_version = data.state_version
 
     with {:ok, runtime_refs} <-
            PluginLifecycle.plugin_runtime_refs(data, Callbacks.admission_modules(plugin_specs)) do
@@ -116,7 +117,7 @@ defmodule Jido.AgentServer.Turn do
                      command,
                      plugin_specs,
                      runtime_refs,
-                     data.state_version
+                     state_version
                    ) do
               {:ok, command}
             end

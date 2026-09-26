@@ -212,11 +212,12 @@ defmodule Jido.AgentServer.ServerLifecycle do
   defp start_plugin_readiness(%State{} = data) do
     owner = self()
     token = make_ref()
+    inputs = PluginLifecycle.readiness_inputs(data)
 
     {pid, ref} =
       :erlang.spawn_opt(
         fn ->
-          send(owner, {:plugin_readiness, token, PluginLifecycle.await_all(data)})
+          send(owner, {:plugin_readiness, token, PluginLifecycle.await_all(inputs)})
         end,
         [:link, :monitor]
       )

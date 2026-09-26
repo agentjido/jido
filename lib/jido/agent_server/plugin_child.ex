@@ -198,7 +198,8 @@ defmodule Jido.AgentServer.PluginChild do
   defp start_readiness(state, child_pid, reason) do
     # Readiness can read Agent state. Keep child lookup responsive while
     # that work runs, or an Agent lookup can block the read it needs.
-    task = Task.async(fn -> Callbacks.await_ready(state.plugin_spec, child_pid) end)
+    plugin_spec = state.plugin_spec
+    task = Task.async(fn -> Callbacks.await_ready(plugin_spec, child_pid) end)
 
     timer =
       TaskSupport.start_task_timer(state.readiness_timeout, :plugin_readiness_timeout, task.ref)

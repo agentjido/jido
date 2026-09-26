@@ -30,17 +30,20 @@ defmodule Jido.AgentServer.PluginLifecycle do
   end
 
   @doc false
-  def await_all(%State{} = state) do
-    Enum.reduce_while(state.plugin_specs, :ok, fn spec, :ok ->
-      if match?(%{agent_server: %{runtime?: true}}, spec) do
-        with {:ok, runtime_ref} <- runtime_ref(state, spec.module),
-             :ok <- Callbacks.await_ready(spec, runtime_ref) do
-          {:cont, :ok}
-        else
-          {:error, reason} -> {:halt, {:error, reason}}
-        end
-      else
+  def readiness_inputs(%State{} = state) do
+    for %{agent_server: %{runtime?: true}} = spec <- state.plugin_specs,
+        do: {spec, runtime_source(state, spec.module)}
+  end
+
+  def await_all(%State{} = state), do: state |> readiness_inputs() |> await_all()
+
+  def await_all(inputs) when is_list(inputs) do
+    Enum.reduce_while(inputs, :ok, fn {spec, source}, :ok ->
+      with {:ok, runtime_ref} <- plugin_runtime_ref(source, spec),
+           :ok <- Callbacks.await_ready(spec, runtime_ref) do
         {:cont, :ok}
+      else
+        {:error, reason} -> {:halt, {:error, reason}}
       end
     end)
   end
@@ -77,23 +80,28 @@ defmodule Jido.AgentServer.PluginLifecycle do
   defp restarting(plugin), do: {:error, {:plugin_runtime_restarting, plugin}}
 
   @doc false
-  def runtime_ref(%State{} = state, plugin) when is_atom(plugin) do
+  def runtime_source(%State{} = state, plugin) do
     case State.child(state, {:plugin, plugin}) do
-      %ChildInfo{lifecycle_pid: lifecycle_pid} when is_pid(lifecycle_pid) ->
-        case PluginChild.child_pid(lifecycle_pid) do
-          pid when is_pid(pid) -> {:ok, pid}
-          value -> {:error, {:plugin_runtime_unavailable, plugin, value}}
-        end
+      %ChildInfo{lifecycle_pid: pid} when is_pid(pid) -> {:lifecycle, pid}
+      %ChildInfo{pid: pid} when is_pid(pid) -> {:runtime, pid}
+      nil -> nil
+    end
+  end
 
-      %ChildInfo{pid: pid} when is_pid(pid) ->
-        {:ok, pid}
+  def runtime_ref(%State{} = state, plugin),
+    do: resolve_runtime_ref(runtime_source(state, plugin), plugin)
 
-      nil ->
-        {:error, {:plugin_runtime_not_found, plugin}}
+  defp resolve_runtime_ref({:lifecycle, lifecycle_pid}, plugin) do
+    case PluginChild.child_pid(lifecycle_pid) do
+      pid when is_pid(pid) -> {:ok, pid}
+      value -> {:error, {:plugin_runtime_unavailable, plugin, value}}
     end
   catch
     :exit, reason -> {:error, {:plugin_runtime_unavailable, plugin, reason}}
   end
+
+  defp resolve_runtime_ref({:runtime, pid}, _plugin), do: {:ok, pid}
+  defp resolve_runtime_ref(nil, plugin), do: {:error, {:plugin_runtime_not_found, plugin}}
 
   @doc false
   def stop_all(%State{} = state, reason) do
@@ -310,16 +318,19 @@ defmodule Jido.AgentServer.PluginLifecycle do
     Enum.reduce_while(modules, {:ok, %{}}, fn module, {:ok, refs} ->
       spec = Enum.find(data.plugin_specs, &(&1.module == module))
 
-      case plugin_runtime_ref(data, spec) do
+      case plugin_runtime_ref(runtime_source(data, module), spec) do
         {:ok, runtime_ref} -> {:cont, {:ok, Map.put(refs, module, runtime_ref)}}
         {:error, reason} -> {:halt, {:error, reason}}
       end
     end)
   end
 
-  def plugin_runtime_ref(data, %Jido.Plugin.Spec{agent_server: %{runtime?: true}, module: module}) do
-    runtime_ref(data, module)
+  def plugin_runtime_ref(source, %Jido.Plugin.Spec{
+        agent_server: %{runtime?: true},
+        module: module
+      }) do
+    resolve_runtime_ref(source, module)
   end
 
-  def plugin_runtime_ref(_data, %Jido.Plugin.Spec{}), do: {:ok, nil}
+  def plugin_runtime_ref(_source, %Jido.Plugin.Spec{}), do: {:ok, nil}
 end

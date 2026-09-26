@@ -112,14 +112,8 @@ defmodule Jido.AgentServer.DirectiveRuntime do
 
   @doc false
   @spec dispatch_prepared(struct(), State.t(), pid()) :: :ok | {:error, term()}
-  def dispatch_prepared(%Emit{signal: signal, dispatch: dispatch}, state, agent_server) do
-    case dispatch || state.config.default_dispatch do
-      nil ->
-        Jido.AgentServer.cast(agent_server, signal)
-
-      target ->
-        dispatch_signal(signal, target, state.jido)
-    end
+  def dispatch_prepared(%Emit{} = directive, state, agent_server) do
+    dispatch_emit(directive, state.config.default_dispatch, state.jido, agent_server)
   end
 
   def dispatch_prepared(%EmitToParent{signal: signal}, %State{parent: parent}, _agent_server) do
@@ -133,6 +127,18 @@ defmodule Jido.AgentServer.DirectiveRuntime do
     case agent_child(state, tag) do
       {:ok, child} -> Jido.AgentServer.cast(child.pid, signal)
       {:error, reason} -> {:error, reason}
+    end
+  end
+
+  def dispatch_emit(
+        %Emit{signal: signal, dispatch: dispatch},
+        default_dispatch,
+        jido,
+        agent_server
+      ) do
+    case dispatch || default_dispatch do
+      nil -> Jido.AgentServer.cast(agent_server, signal)
+      target -> dispatch_signal(signal, target, jido)
     end
   end
 
