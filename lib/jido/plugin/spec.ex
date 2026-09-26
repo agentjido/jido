@@ -8,12 +8,7 @@ defmodule Jido.Plugin.Spec do
             agent: nil,
             agent_server: nil,
             persistence: nil,
-            topology: nil,
-            state_key: nil,
-            state_schema: nil,
-            directive_modules: [],
-            dispatch?: false,
-            runtime?: false
+            topology: nil
 
   @type t :: %__MODULE__{
           module: module(),
@@ -22,11 +17,6 @@ defmodule Jido.Plugin.Spec do
           agent: Jido.Agent.Plugin.Spec.t() | nil,
           agent_server: Jido.AgentServer.Plugin.Spec.t() | nil,
           persistence: Jido.Persistence.Plugin.Spec.t() | nil,
-          topology: Jido.Topology.Plugin.Spec.t() | nil,
-          state_key: atom() | nil,
-          state_schema: Zoi.schema() | nil,
-          directive_modules: [module()],
-          dispatch?: boolean(),
-          runtime?: boolean()
+          topology: Jido.Topology.Plugin.Spec.t() | nil
         }
 end

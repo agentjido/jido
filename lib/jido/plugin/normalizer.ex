@@ -639,19 +639,9 @@ defmodule Jido.Plugin.Normalizer do
       agent: agent,
       agent_server: server,
       persistence: persistence,
-      topology: topology,
-      state_key: field(agent, :state_key),
-      state_schema: field(agent, :state_schema),
-      directive_modules: field(agent, :directive_modules, []),
-      dispatch?: not is_nil(server) and server.dispatch?,
-      runtime?: not is_nil(server) and server.runtime?
+      topology: topology
     }
   end
-
-  defp field(nil, _field), do: nil
-  defp field(value, field), do: Map.fetch!(value, field)
-  defp field(nil, _field, default), do: default
-  defp field(value, field, _default), do: Map.fetch!(value, field)
 
   defp behaviours(module) do
     module.module_info(:attributes)

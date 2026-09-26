@@ -547,7 +547,7 @@ defmodule Jido.AgentServer do
     reply =
       case Enum.find(data.plugin_specs, &(&1.module == plugin)) do
         nil -> {:error, {:plugin_not_declared, plugin}}
-        spec -> {:ok, PluginLifecycle.plugin_state_value(data.agent.state, spec.state_key)}
+        spec -> {:ok, PluginLifecycle.plugin_state_value(data.agent.state, spec)}
       end
 
     {:keep_state_and_data, [{:reply, from, reply}]}

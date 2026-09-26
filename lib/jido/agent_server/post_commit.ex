@@ -259,7 +259,7 @@ defmodule Jido.AgentServer.PostCommit do
 
   defp start_plugin_directive(directive, rest, context, span, %State{} = data) do
     case Plugin.directive_owner(data.plugin_specs, directive) do
-      %Jido.Plugin.Spec{dispatch?: false} ->
+      %Jido.Plugin.Spec{agent_server: server} when is_nil(server) or not server.dispatch? ->
         complete_directive({:ok, data}, rest, context, span)
 
       %Jido.Plugin.Spec{} = plugin ->
@@ -289,7 +289,7 @@ defmodule Jido.AgentServer.PostCommit do
       source_signal: context.source_signal,
       effective_signal: context.signal,
       state_version: data.state_version,
-      plugin_state: PluginLifecycle.plugin_state_value(data.agent.state, plugin.state_key),
+      plugin_state: PluginLifecycle.plugin_state_value(data.agent.state, plugin),
       turn_context: context.turn_context,
       jido: data.jido,
       partition: data.partition
@@ -330,7 +330,7 @@ defmodule Jido.AgentServer.PostCommit do
       turn_id: data.active.turn_id,
       agent_id: data.agent.id,
       agent_module: data.agent.module,
-      plugin_state: PluginLifecycle.plugin_state_value(data.agent.state, plugin.state_key),
+      plugin_state: PluginLifecycle.plugin_state_value(data.agent.state, plugin),
       state_version: data.state_version,
       jido: data.jido,
       partition: data.partition

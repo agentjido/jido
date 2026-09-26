@@ -81,14 +81,7 @@ defmodule Jido.Plugin.BoundaryTest do
   end
 
   test "stored specs without a manifest are rejected" do
-    {_key, schema} = OwnedState.Agent.state_spec([])
-
-    stored = %Spec{
-      module: OwnedState,
-      options: [label: "stored"],
-      state_key: :owned,
-      state_schema: schema
-    }
+    stored = %Spec{module: OwnedState, options: [label: "stored"]}
 
     assert {:error, %{message: "Plugin specs require an owner-facet manifest"}} =
              Jido.Plugin.Normalizer.normalize_all([stored])

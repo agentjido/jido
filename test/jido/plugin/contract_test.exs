@@ -401,7 +401,7 @@ defmodule Jido.Plugin.ContractTest do
   end
 
   test "allows typed Directive dispatch without a Plugin process" do
-    assert {:ok, [%Jido.Plugin.Spec{dispatch?: true, runtime?: false}]} =
+    assert {:ok, [%Jido.Plugin.Spec{agent_server: %{dispatch?: true, runtime?: false}}]} =
              Jido.Plugin.Normalizer.normalize_all([DispatchWithoutRuntimePlugin])
   end
 

@@ -32,7 +32,7 @@ defmodule Jido.AgentServer.PluginLifecycle do
   @doc false
   def await_all(%State{} = state) do
     Enum.reduce_while(state.plugin_specs, :ok, fn spec, :ok ->
-      if spec.runtime? do
+      if match?(%{agent_server: %{runtime?: true}}, spec) do
         with {:ok, runtime_ref} <- runtime_ref(state, spec.module),
              :ok <- Callbacks.await_ready(spec, runtime_ref) do
           {:cont, :ok}
@@ -50,15 +50,15 @@ defmodule Jido.AgentServer.PluginLifecycle do
     Enum.find_value(state.plugin_specs, :ready, &plugin_readiness(state, &1))
   end
 
-  defp plugin_readiness(_state, %{runtime?: false}), do: false
-
-  defp plugin_readiness(state, %{runtime?: true, module: plugin}) do
+  defp plugin_readiness(state, %{agent_server: %{runtime?: true}, module: plugin}) do
     case runtime_ref(state, plugin) do
       {:ok, pid} -> runtime_readiness(pid, plugin)
       {:error, {:plugin_runtime_unavailable, ^plugin, _state}} -> restarting(plugin)
       {:error, reason} -> {:error, reason}
     end
   end
+
+  defp plugin_readiness(_state, _spec), do: false
 
   defp runtime_readiness(pid, plugin) when is_pid(pid) and node(pid) == node() do
     if Process.alive?(pid), do: false, else: restarting(plugin)
@@ -133,16 +133,13 @@ defmodule Jido.AgentServer.PluginLifecycle do
       agent_server: self(),
       agent_id: state.agent.id,
       module: nil,
-      plugin_state: owned_state(state.agent.state, plugin_spec),
+      plugin_state: plugin_state_value(state.agent.state, plugin_spec),
       state_version: state.state_version,
       jido: state.jido,
       partition: state.partition,
       options: []
     }
   end
-
-  defp owned_state(_agent_state, %{state_key: nil}), do: nil
-  defp owned_state(agent_state, %{state_key: key}), do: Map.get(agent_state, key)
 
   defp start_child(state, %{id: plugin} = child_spec) do
     spec = Supervisor.child_spec(child_spec, [])
@@ -304,8 +301,10 @@ defmodule Jido.AgentServer.PluginLifecycle do
     end
   end
 
-  def plugin_state_value(_state, nil), do: nil
-  def plugin_state_value(state, key), do: Map.get(state, key)
+  def plugin_state_value(state, %{agent: %{state_key: key}}) when not is_nil(key),
+    do: Map.get(state, key)
+
+  def plugin_state_value(_state, _spec), do: nil
 
   def plugin_runtime_refs(%State{} = data, modules) do
     Enum.reduce_while(modules, {:ok, %{}}, fn module, {:ok, refs} ->
@@ -318,9 +317,9 @@ defmodule Jido.AgentServer.PluginLifecycle do
     end)
   end
 
-  def plugin_runtime_ref(_data, %Jido.Plugin.Spec{runtime?: false}), do: {:ok, nil}
-
-  def plugin_runtime_ref(data, %Jido.Plugin.Spec{module: module}) do
+  def plugin_runtime_ref(data, %Jido.Plugin.Spec{agent_server: %{runtime?: true}, module: module}) do
     runtime_ref(data, module)
   end
+
+  def plugin_runtime_ref(_data, %Jido.Plugin.Spec{}), do: {:ok, nil}
 end

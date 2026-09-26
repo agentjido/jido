@@ -62,7 +62,7 @@ defmodule Jido.Plugin.AfterCommitTest do
 
   test "a commit-only Server facet needs no runtime or Agent facet" do
     assert {:ok, [spec]} = Jido.Plugin.Normalizer.normalize_all([{Stateless, sink: :sink}])
-    refute spec.runtime?
+    refute spec.agent_server.runtime?
     assert spec.agent_server.module == NotificationFacet
     assert Callbacks.commit_modules([spec]) == [Stateless]
   end
