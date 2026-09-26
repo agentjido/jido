@@ -308,7 +308,7 @@ defmodule Jido.Agent.Validation do
     Enum.reduce_while(routes, :ok, fn route, :ok ->
       {target, _defaults} = Authoring.split_target(route.target)
 
-      case validate_target(target) do
+      case Jido.Executable.validate(target) do
         :ok ->
           {:cont, :ok}
 
@@ -317,19 +317,6 @@ defmodule Jido.Agent.Validation do
       end
     end)
   end
-
-  defp validate_target([]), do: Jido.Executable.validate([])
-
-  defp validate_target(targets) when is_list(targets) do
-    Enum.reduce_while(targets, :ok, fn target, :ok ->
-      case Jido.Executable.validate(target) do
-        :ok -> {:cont, :ok}
-        {:error, _reason} = error -> {:halt, error}
-      end
-    end)
-  end
-
-  defp validate_target(target), do: Jido.Executable.validate(target)
 
   defp normalize_attrs(attrs, source) do
     case Authoring.to_attrs(attrs) do

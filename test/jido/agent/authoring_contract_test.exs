@@ -29,6 +29,13 @@ defmodule Jido.Agent.AuthoringContractTest do
     end
   end
 
+  test "each route accepts one executable and rejects target lists" do
+    for target <- [[], [Add], [Add, Add], {[Add], %{by: 1}}] do
+      assert {:error, %{message: "Invalid Agent route executable"}} =
+               Agent.new(name: "routes", routes: [{"counter.add", target}])
+    end
+  end
+
   test "route splitting preserves tuples, plain targets, and explicit defaults validation" do
     for defaults <- [%{}, %{by: 2}, %URI{port: 1}] do
       target = {Add, defaults}

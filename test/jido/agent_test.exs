@@ -586,12 +586,12 @@ defmodule Jido.AgentTest do
   end
 
   describe "Signal and command lifecycle" do
-    test "the default handler validates a matching single route and keeps router target rules" do
+    test "the default handler validates a matching single route" do
       agent = agent_with_route("counter.add", Add)
       signal = Signal.new!("counter.add", %{by: 1, label: "one"}, source: "/test")
       [route] = agent.routes
 
-      for target <- [Add, [Add], {Add, %{by: 9, label: "default"}}] do
+      for target <- [Add, {Add, %{by: 9, label: "default"}}] do
         assert {:ok, %Turn{executable: Add, input: input}} =
                  Agent.handle_signal(signal, %{agent | routes: [%{route | target: target}]})
 
@@ -609,9 +609,6 @@ defmodule Jido.AgentTest do
 
       assert {:error, %Jido.Error.RoutingError{details: %{cause: _}}} =
                Agent.handle_signal(%{signal | type: invalid.path}, %{agent | routes: [invalid]})
-
-      assert {:ok, %Turn{executable: Add}} =
-               Agent.handle_signal(signal, %{agent | routes: [%{route | target: [Add, Add]}]})
 
       assert {:error, %Jido.Error.RoutingError{}} =
                Agent.handle_signal(signal, %{agent | routes: [%{route | target: []}]})

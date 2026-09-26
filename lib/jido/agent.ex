@@ -55,6 +55,9 @@ defmodule Jido.Agent do
 
   ## Declarative authoring
 
+  Each route selects one Action or Flow. Target lists are not accepted. Use a
+  Flow when one Signal must run several operations.
+
   An Agent module can use keyword configuration or declarative blocks:
 
       defmodule MyApp.Counter do
