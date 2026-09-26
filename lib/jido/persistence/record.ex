@@ -123,13 +123,8 @@ defmodule Jido.Persistence.Record do
   @doc false
   @spec validate(term(), atom() | nil, module(), String.t(), term()) :: :ok | {:error, term()}
   def validate(record, instance, agent_module, agent_id, partition) when is_map(record) do
-    with :ok <- validate_format_and_kind(record),
-         :ok <- validate_exact_shape(record),
-         :ok <- validate_identity(record, :instance, instance, agent_module, agent_id, partition),
-         :ok <- validate_revision(record),
-         :ok <- validate_kind_fields(record),
-         :ok <- validate_portable(record) do
-      :ok
+    with :ok <- validate_format_and_kind(record) do
+      validate_contents(record, :instance, instance, agent_module, agent_id, partition)
     end
   end
 
@@ -142,14 +137,8 @@ defmodule Jido.Persistence.Record do
   def validate_ref(record, namespace, agent_module, agent_id, partition)
       when is_map(record) do
     with :ok <- validate_format_and_kind(record),
-         true <- Map.get(record, :format) == @ref_format_version,
-         :ok <- validate_exact_shape(record),
-         :ok <-
-           validate_identity(record, :namespace, namespace, agent_module, agent_id, partition),
-         :ok <- validate_revision(record),
-         :ok <- validate_kind_fields(record),
-         :ok <- validate_portable(record) do
-      :ok
+         true <- Map.get(record, :format) == @ref_format_version do
+      validate_contents(record, :namespace, namespace, agent_module, agent_id, partition)
     else
       false -> invalid(:format)
       {:error, _reason} = error -> error
@@ -275,6 +264,15 @@ defmodule Jido.Persistence.Record do
       :active -> :ok
       :tombstone -> {:error, :conflict}
       :unknown -> {:error, {:invalid_persistence_record, :kind}}
+    end
+  end
+
+  defp validate_contents(record, scope_field, scope, agent_module, agent_id, partition) do
+    with :ok <- validate_exact_shape(record),
+         :ok <- validate_identity(record, scope_field, scope, agent_module, agent_id, partition),
+         :ok <- validate_revision(record),
+         :ok <- validate_kind_fields(record) do
+      validate_portable(record)
     end
   end
 
