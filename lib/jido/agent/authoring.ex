@@ -25,8 +25,6 @@ defmodule Jido.Agent.Authoring do
 
   def to_attrs(_value, _duplicates), do: :error
 
-  # A tuple is a target with defaults only when its second element is a map.
-  # Keep this distinct from the stricter explicit :defaults option below.
   def split_target({target, defaults}) when is_map(defaults), do: {target, defaults}
   def split_target(target), do: {target, nil}
 
@@ -71,7 +69,7 @@ defmodule Jido.Agent.Authoring do
 
   defp normalize_one_route(spec) do
     case Router.normalize(spec) do
-      {:ok, [route]} -> {:ok, route}
+      {:ok, [route]} -> with :ok <- defaults(route.target), do: {:ok, route}
       {:ok, _routes} -> error("Expected one route specification")
       {:error, _error} = error -> error
     end
@@ -104,6 +102,8 @@ defmodule Jido.Agent.Authoring do
     do: %{env | line: :erl_anno.line(anno)}
 
   def location(env, _entity), do: env
+
+  defp defaults({_target, value}) when is_map(value), do: defaults(%{defaults: value})
 
   defp defaults(%{defaults: value}) when not is_map(value) or is_struct(value),
     do: error("Route defaults must be a plain map")

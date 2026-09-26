@@ -56,7 +56,8 @@ defmodule Jido.Agent do
   ## Declarative authoring
 
   Each route selects one Action or Flow. Target lists are not accepted. Use a
-  Flow when one Signal must run several operations.
+  Flow when one Signal must run several operations. Route defaults must be
+  plain maps, including defaults supplied in a target tuple.
 
   An Agent module can use keyword configuration or declarative blocks:
 

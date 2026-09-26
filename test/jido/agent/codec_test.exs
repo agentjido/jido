@@ -27,7 +27,7 @@ defmodule Jido.Agent.CodecTest do
   end
 
   test "Codec round trips every accepted route defaults form" do
-    for target <- [Add, {Add, %{}}, {Add, %{by: 2}}, {Add, %URI{port: 1}}] do
+    for target <- [Add, {Add, %{}}, {Add, %{by: 2}}] do
       definition =
         Agent.new!(name: "defaults", routes: [{"counter.add", target, priority: 7}])
 
@@ -37,12 +37,18 @@ defmodule Jido.Agent.CodecTest do
     end
   end
 
-  test "Codec still rejects non-map route defaults" do
-    definition = Agent.new!(name: "defaults", routes: [{"counter.add", Add}])
+  test "Codec rejects defaults that are not plain maps" do
+    definition =
+      Agent.new!(
+        name: "defaults",
+        metadata: %{uri: %URI{port: 1}},
+        routes: [{"counter.add", Add}]
+      )
+
     {:ok, document, registry} = Codec.encode(definition)
     [route] = document["routes"]
 
-    for defaults <- [false, 1, 1.0, "invalid", [], {1, 2}] do
+    for defaults <- [false, 1, 1.0, "invalid", [], {1, 2}, %URI{port: 1}] do
       assert {:ok, encoded} = Data.encode(defaults, registry)
       invalid = %{document | "routes" => [%{route | "defaults" => encoded}]}
 

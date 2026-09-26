@@ -36,8 +36,8 @@ defmodule Jido.Agent.AuthoringContractTest do
     end
   end
 
-  test "route splitting preserves tuples, plain targets, and explicit defaults validation" do
-    for defaults <- [%{}, %{by: 2}, %URI{port: 1}] do
+  test "route defaults must be plain maps in every authoring form" do
+    for defaults <- [%{}, %{by: 2}] do
       target = {Add, defaults}
 
       assert {:ok, %{routes: [%{target: ^target}]}} =
@@ -46,6 +46,15 @@ defmodule Jido.Agent.AuthoringContractTest do
 
     assert {:error, %{message: "Route defaults must be a plain map"}} =
              Agent.new(name: "routes", routes: [{"counter.add", Add, defaults: %URI{port: 1}}])
+
+    for route <- [
+          {"counter.add", {Add, %URI{port: 1}}},
+          %{path: "counter.add", target: {Add, %URI{port: 1}}},
+          %Jido.Signal.Router.Route{path: "counter.add", target: {Add, %URI{port: 1}}}
+        ] do
+      assert {:error, %{message: "Route defaults must be a plain map"}} =
+               Agent.new(name: "routes", routes: [route])
+    end
 
     assert {:ok, %{routes: [%{target: Add}]}} =
              Agent.new(name: "routes", routes: [{"counter.add", Add}])

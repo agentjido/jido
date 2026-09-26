@@ -153,19 +153,11 @@ defmodule Jido.Agent.Codec do
          {:ok, kind} <- kind(data["kind"]),
          {:ok, target} <- Registry.resolve(registry, data["target"], kind),
          {:ok, defaults} <- Data.decode(data["defaults"], registry),
-         {:ok, match} <- resolve_match(data["match"], registry),
-         {:ok, target} <- decode_target(target, defaults) do
-      Authoring.route(data["path"], target, match: match, priority: data["priority"])
+         {:ok, match} <- resolve_match(data["match"], registry) do
+      opts = if is_nil(defaults), do: [], else: [defaults: defaults]
+      Authoring.route(data["path"], target, opts ++ [match: match, priority: data["priority"]])
     end
   end
-
-  # Preserve tuple defaults, including structs, without relaxing the explicit
-  # :defaults authoring option.
-  defp decode_target(target, nil), do: {:ok, target}
-  defp decode_target(target, defaults) when is_map(defaults), do: {:ok, {target, defaults}}
-
-  defp decode_target(_target, _defaults),
-    do: Authoring.error("Route defaults must be a plain map")
 
   defp match_id(nil, _registry), do: {:ok, nil}
   defp match_id(match, registry), do: Registry.identifier(registry, :route_match, match)
