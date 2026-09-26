@@ -1,54 +1,53 @@
-defmodule Jido.Plugin.DispatchTest do
+defmodule Jido.AgentServer.EmitDispatchTest do
   use JidoTest.Case, async: true
 
   alias Jido.AgentServer, as: Server
   alias Jido.Agent.Turn.Outcome
-  alias Jido.Plugin.Dispatch
+  alias Jido.Agent.Directive
   alias Jido.Signal
   alias Jido.Signal.Bus
 
   defmodule SendAction do
-    use Jido.Action, name: "dispatch_plugin_send"
+    use Jido.Action, name: "emit_dispatch_send"
 
     @impl Jido.Action
     def run(%{target: target, value: value}, context) do
-      output = Signal.new!("dispatch.output", %{value: value}, source: "/plugin/dispatch")
+      output = Signal.new!("dispatch.output", %{value: value}, source: "/directive/emit")
       state = %{context.agent_state | sends: context.agent_state.sends + 1}
-      {:ok, state, [Dispatch.send(output, {:pid, target: target})]}
+      {:ok, state, [Directive.emit(output, {:pid, target: target})]}
     end
   end
 
   defmodule InvalidAction do
-    use Jido.Action, name: "dispatch_plugin_invalid"
+    use Jido.Action, name: "emit_dispatch_invalid"
 
     @impl Jido.Action
     def run(_params, context) do
-      output = Signal.new!("dispatch.output", %{}, source: "/plugin/dispatch")
-      {:ok, %{context.agent_state | sends: 1}, [Dispatch.send(output, {:pid, []})]}
+      output = Signal.new!("dispatch.output", %{}, source: "/directive/emit")
+      {:ok, %{context.agent_state | sends: 1}, [Directive.emit(output, {:pid, []})]}
     end
   end
 
   defmodule BusAction do
-    use Jido.Action, name: "dispatch_plugin_bus"
+    use Jido.Action, name: "emit_dispatch_bus"
 
     @impl Jido.Action
     def run(_params, context) do
-      output = Signal.new!("dispatch.bus.output", %{}, source: "/plugin/dispatch")
+      output = Signal.new!("dispatch.bus.output", %{}, source: "/directive/emit")
       state = %{context.agent_state | sends: context.agent_state.sends + 1}
-      {:ok, state, [Dispatch.send(output, {:bus, target: :dispatch_plugin_bus})]}
+      {:ok, state, [Directive.emit(output, {:bus, target: :emit_dispatch_bus})]}
     end
   end
 
   defmodule Agent do
     use Jido.Agent,
-      name: "dispatch_plugin_agent",
+      name: "emit_dispatch_agent",
       schema: Zoi.object(%{sends: Zoi.integer() |> Zoi.default(0)}),
       routes: [
         {"dispatch.bus", BusAction},
         {"dispatch.send", SendAction},
         {"dispatch.invalid", InvalidAction}
-      ],
-      plugins: [Dispatch]
+      ]
   end
 
   test "reports the real post-commit dispatch result", %{jido: jido} do
@@ -69,16 +68,16 @@ defmodule Jido.Plugin.DispatchTest do
     assert Server.agent(pid).state.sends == 0
   end
 
-  test "rejects a Send Directive with an invalid complete Signal" do
+  test "rejects an Emit Directive with an invalid complete Signal" do
     invalid_signal = %{signal("dispatch.output") | source: "not a URI reference"}
-    directive = Dispatch.send(invalid_signal, {:pid, target: self()})
+    directive = Directive.emit(invalid_signal, {:pid, target: self()})
 
-    assert {:error, errors} = Dispatch.Send.validate(directive)
-    assert Enum.any?(errors, &(&1.path == [:signal, :source]))
+    assert {:error, errors} = Directive.validate(directive)
+    assert Enum.any?(errors, &(&1.path == [:source]))
   end
 
   test "inherits the Agent Jido scope for a Bus target", %{jido: jido} do
-    bus = start_supervised!({Bus, name: :dispatch_plugin_bus, jido: jido})
+    bus = start_supervised!({Bus, name: :emit_dispatch_bus, jido: jido})
     assert {:ok, _subscription} = Bus.subscribe(bus, "dispatch.bus.output")
     {:ok, pid} = Jido.start_agent(jido, Agent, id: unique_id("dispatch-bus"))
 

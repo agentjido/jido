@@ -330,8 +330,6 @@ needs them.
 | `Jido.Plugin.Codec` | Encodes Plugin declarations through the shared trusted Codec Registry. |
 | `Jido.Plugin.Audit` | Commits selected domain audit records in Plugin-owned state. |
 | `Jido.Plugin.Audit.Record` | Holds one portable audit record. |
-| `Jido.Plugin.Dispatch` | Owns explicit post-commit Signal delivery. |
-| `Jido.Plugin.Dispatch.Send` | Describes one Plugin-owned Signal delivery request. |
 | `Jido.Plugin.Bus` | Owns a Signal Bus subscription for one Agent. |
 | `Jido.Plugin.Bus.Client` | Gives the Agent Plugin a Bus client runtime. |
 | `Jido.Plugin.Bus.Manager` | Owns shared Bus processes under the Jido instance. |
@@ -543,3 +541,12 @@ The next migration examples should follow this order:
 For each example, show the V2 code, the V3 code, the changed guarantee, and one
 test that proves the application still has the required behavior. Do not call a
 migration complete because the new code compiles.
+
+## Consolidated Signal Delivery
+
+Replace `Jido.Plugin.Dispatch.send(signal, target)` with
+`Jido.Agent.Directive.emit(signal, target)` and remove the Dispatch Plugin
+declaration. The Dispatch Plugin and Send Directive are removed. Emit uses
+reverse-order `prepare_dispatch` hooks, Server `directive_timeout`, and native
+Emit errors. The former Plugin timeout option no longer applies. Delivery
+remains post-commit and best effort. A timeout does not undo external work.

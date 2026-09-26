@@ -247,8 +247,6 @@ defmodule Jido.MixProject do
           Jido.Plugin.Bus,
           Jido.Plugin.Bus.Client,
           Jido.Plugin.Bus.Manager,
-          Jido.Plugin.Dispatch,
-          Jido.Plugin.Dispatch.Send,
           Jido.Plugin.Heartbeat,
           Jido.Plugin.Heartbeat.Signal.Tick,
           Jido.Plugin.Scheduler,

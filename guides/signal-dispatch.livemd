@@ -18,7 +18,6 @@ defmodule DispatchGuide.Sender do
 
   agent do
     schema Zoi.object(%{sent: Zoi.integer() |> Zoi.default(0)})
-    plugin Jido.Plugin.Dispatch
   end
 
   routes do
@@ -37,7 +36,7 @@ defmodule DispatchGuide.Sender do
           )
 
         directive =
-          Jido.Plugin.Dispatch.send(
+          Jido.Agent.Directive.emit(
             outbound,
             {:pid, target: recipient}
           )
@@ -74,12 +73,13 @@ received =
 {committed.state.sent, received.type, received.data}
 ```
 
-The Agent state commits before the Plugin calls the Jido Signal PID adapter.
-The Plugin also propagates trace causation from the input Signal.
+The Agent state commits before the runtime calls the Jido Signal PID adapter.
+Emit propagates trace causation and runs Plugin `prepare_dispatch` hooks in
+reverse declaration order. `directive_timeout` bounds delivery. No Dispatch
+Plugin or additional runtime process is required.
 
 A dispatch timeout is indeterminate. The adapter can finish after the timeout.
-Use receiver idempotency when retry is possible. This Plugin is not a durable
-outbox.
+Use receiver idempotency when retry is possible. Emit is not a durable outbox.
 
 ## Stop The Example
 
