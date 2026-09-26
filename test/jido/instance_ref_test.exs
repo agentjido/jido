@@ -5,7 +5,6 @@ defmodule JidoTest.InstanceRefTest do
 
   alias Jido.Agent.Ref
   alias Jido.Error
-  alias Jido.Persistence
   alias Jido.Signal
 
   defmodule Add do
@@ -392,66 +391,6 @@ defmodule JidoTest.InstanceRefTest do
         ] do
       assert {:error, :not_found} = operation.(ref)
     end
-  end
-
-  test "namespaced storage detects dual-key collisions and still reads one legacy key" do
-    namespace = unique_namespace("collision")
-    legacy_instance = unique_instance("legacy")
-    ref_instance = unique_instance("ref")
-    store = persistence("collision")
-    agent = Counter.new!(id: "counter")
-    ref = Ref.new!(namespace: namespace, partition: nil, id: agent.id)
-
-    assert :ok = Persistence.save_agent(store, agent, instance: legacy_instance)
-
-    assert {:ok, ^agent} =
-             Persistence.load_agent(store, Counter, agent.id,
-               instance: legacy_instance,
-               namespace: namespace
-             )
-
-    updated = %{agent | state: %{count: 1}}
-
-    assert :ok =
-             Persistence.save_agent(store, updated,
-               instance: legacy_instance,
-               namespace: namespace,
-               revision: 1,
-               expected_revision: 0
-             )
-
-    legacy_key = Persistence.agent_key(legacy_instance, Counter, agent.id)
-    ref_key = Persistence.agent_key(ref)
-    adapter_opts = elem(store, 1)
-
-    assert {:error, :not_found} = Jido.Persistence.ETS.get(ref_key, adapter_opts)
-    assert {:ok, legacy_bytes} = Jido.Persistence.ETS.get(legacy_key, adapter_opts)
-    assert {:ok, %{format: 2, kind: :active}} = Jido.Persistence.Record.decode(legacy_bytes)
-
-    assert :ok =
-             Persistence.save_agent(store, agent,
-               instance: ref_instance,
-               namespace: namespace
-             )
-
-    assert {:ok, ref_bytes} = Jido.Persistence.ETS.get(ref_key, adapter_opts)
-
-    assert {:ok,
-            %{
-              format: 3,
-              kind: :active,
-              namespace: ^namespace,
-              agent_module: Counter
-            }} = Jido.Persistence.Record.decode(ref_bytes)
-
-    assert {:error, {:persistence_identity_collision, keys}} =
-             Persistence.load_agent(store, Counter, agent.id,
-               instance: legacy_instance,
-               namespace: namespace
-             )
-
-    assert keys.legacy_key == legacy_key
-    assert keys.ref_key == ref_key
   end
 
   defp signal(by) do

@@ -7,7 +7,7 @@ defmodule JidoTest.InstanceTest do
   alias Jido.Persistence.Redis
 
   defmodule TestInstance do
-    use Jido, otp_app: :jido_test_instance
+    use Jido, otp_app: :jido_test_instance, namespace: "instance-test"
   end
 
   defmodule RedisTestAgent do
@@ -65,6 +65,7 @@ defmodule JidoTest.InstanceTest do
     defmodule #{inspect(module)} do
       use Jido,
         otp_app: :jido_test_instance,
+        namespace: #{inspect(prefix)},
         persistence: {Jido.Persistence.Redis, [
           command_fn: fn command -> JidoTest.InstanceTest.RedisMock.command(command) end,
           prefix: #{inspect(prefix)}
@@ -223,7 +224,7 @@ defmodule JidoTest.InstanceTest do
     assert {:ok, pid} = module.start_agent(agent, restore: false)
 
     assert {:ok, partitioned_pid} =
-             module.start_agent(partitioned, partition: :blue, restore: false)
+             module.start_agent(partitioned, partition: "blue", restore: false)
 
     assert :ok = module.hibernate(pid)
     assert :ok = module.hibernate(partitioned_pid)
@@ -231,7 +232,7 @@ defmodule JidoTest.InstanceTest do
     assert {:ok, restored_pid} = module.thaw(RedisTestAgent, agent.id)
 
     assert {:ok, restored_partitioned_pid} =
-             module.thaw(RedisTestAgent, agent.id, partition: :blue)
+             module.thaw(RedisTestAgent, agent.id, partition: "blue")
 
     assert Server.agent(restored_pid).state.counter == 10
     assert Server.agent(restored_partitioned_pid).state.counter == 20

@@ -1,5 +1,6 @@
 defmodule JidoTest.Telemetry.EventProbeTest do
-  use ExUnit.Case, async: true
+  # This probe receives global events, including events from other tests.
+  use ExUnit.Case, async: false
 
   alias Jido.Examples.Runtime.EventProbe
 

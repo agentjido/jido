@@ -118,21 +118,12 @@ defmodule Jido.Persistence.Checkpoint do
   @doc false
   def restore_agent(record, agent_module, agent_id, instance) do
     with :ok <- validate_definition_revision(record, agent_module),
-         {:ok, checkpoint} <- restore_checkpoint(record, agent_module),
+         {:ok, checkpoint} <-
+           load(agent_module, Record.checkpoint(record), Record.format(record), :restore),
          {:ok, agent} <-
            Agent.restore(agent_module, checkpoint, restore_context(record, instance)),
          :ok <- validate_restored_identity(agent, agent_module, agent_id) do
       {:ok, agent}
-    end
-  end
-
-  defp restore_checkpoint(record, agent_module) do
-    checkpoint = Record.checkpoint(record)
-
-    if Record.format(record) in [Record.format_version(), Record.ref_format_version()] do
-      load(agent_module, checkpoint, Record.format(record), :restore)
-    else
-      {:ok, checkpoint}
     end
   end
 

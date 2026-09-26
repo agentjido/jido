@@ -24,9 +24,9 @@ Supervisor.start_link(children, strategy: :one_for_one)
 ```
 
 The `:otp_app` value tells the generated module where to read its runtime
-configuration. The optional `:namespace` value enables stable Agent Ref
-operations. It must be a nonempty binary and must be unique among live local
-instances on one Erlang node. The optional `:persistence` value defines the
+configuration. The `:namespace` value enables stable Agent Ref operations
+and is required for persistent Agents. It must be a nonempty binary and must
+be unique among live local instances on one Erlang node. The optional `:persistence` value defines the
 default adapter for actors in this instance.
 
 For shared Bedrock persistence, use a host repo created with `Bedrock.Repo`:
@@ -71,7 +71,7 @@ Pass actor options to `start_agent/2`.
 {:ok, server} =
   MyApp.Jido.start_agent(MyAgent,
     id: "agent-42",
-    partition: :north,
+    partition: "north",
     max_postponed_signals: 200,
     turn_timeout: 10_000,
     max_directives_per_turn: 20,
@@ -100,7 +100,7 @@ Important actor defaults are:
 
 Use `:partition` when the same Agent ID must exist in separate registry
 namespaces. Use the same partition for lookup, stop, persistence, hibernate, and
-thaw operations.
+thaw operations. Durable Agents require `nil` or a nonempty string partition.
 
 The supported error policies are `:log_only`, `:stop_on_error`,
 `{:max_errors, count}`, `{:emit_signal, dispatch}`, or a function with arity two.

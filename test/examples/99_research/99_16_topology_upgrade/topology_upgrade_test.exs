@@ -6,7 +6,10 @@ defmodule JidoTest.Examples.TopologyUpgradeTest do
   alias Jido.AgentServer, as: Server
 
   defmodule PersistentJido do
-    use Jido, otp_app: :jido, persistence: {Jido.Persistence.ETS, table: __MODULE__}
+    use Jido,
+      otp_app: :jido,
+      namespace: "topology-upgrade",
+      persistence: {Jido.Persistence.ETS, table: __MODULE__}
   end
 
   test "pure plans identify additions, removals, changed definitions, and retained Agents" do

@@ -127,7 +127,10 @@ defmodule JidoTest.PeerCase do
 
     # A temporary RPC caller cannot own the long-lived Jido instance.
     {:ok, _instance} =
-      peer_call(peer, Supervisor, :start_child, [Jido.Supervisor, {Jido, name: jido}])
+      peer_call(peer, Supervisor, :start_child, [
+        Jido.Supervisor,
+        {Jido, name: jido, namespace: "jido/peer/#{jido}"}
+      ])
 
     :ok
   end

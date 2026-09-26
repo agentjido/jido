@@ -61,7 +61,8 @@ the same API with their own keys, codecs, and lifecycle rules.
 
 ## Agent checkpoints
 
-Configure `persistence: {Adapter, options}` on the Jido instance. Jido does not
+Configure a stable `namespace: "my-app/agents"` and
+`persistence: {Adapter, options}` on the Jido instance. Jido does not
 start the adapter's process. Implement binary `get/2` and atomic exact-byte
 `compare_and_swap/4` from `Jido.Persistence.Adapter`. A new persistent
 activation writes revision zero before its start call succeeds. A live success
@@ -98,13 +99,11 @@ behavior explicitly. The adapter does not turn a Mnesia table into a lease or
 prove that it is shared or durable. See the
 [Mnesia table options](https://www.erlang.org/doc/apps/mnesia/mnesia.html#create_table-2).
 
-Compatible unnamed and namespaced Ref storage keys both start with
-`jido:agent:v1:`. Their encoded identities differ. Compatible keys use outer
-format 2; Ref keys use outer format 3. The reader also accepts Jido V3 outer
-format-1 active records. A namespaced operation reads a lone compatible key
-but rejects a compatible and Ref-key collision. It does not rewrite across
-keys. Old V2 and Actor records require an explicit offline application
-conversion.
+Agent storage keys start with `jido:agent:v1:` and encode the exact
+`{namespace, partition, id}` Ref tuple. All Agent records use outer format 3.
+The reader validates the stored Agent module, but the module is not part of
+the key. Older formats and instance-based keys require an
+[offline migration](compare-and-swap-hibernate-and-thaw.md#move-records-from-an-earlier-v3-beta).
 
 ## Check identity and portable state on load
 

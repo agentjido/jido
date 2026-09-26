@@ -5,6 +5,7 @@ defmodule JidoTest.System.Scenarios.Restoration do
     quote do
       alias Jido.AgentServer, as: Server
       alias Jido.Persistence
+      alias JidoTest.RecoverableDeliveryAgent, as: DeliveryAgent
       alias JidoTest.RecoverableDeliverySink, as: Sink
       alias JidoTest.System.{ControlledAgent, FaultAdapter, MigrationAgent, Observability}
 
@@ -45,15 +46,15 @@ defmodule JidoTest.System.Scenarios.Restoration do
         end
       end
 
-      test "deletion after a restore read prevents stale activation", c do
-        server = start_agent(c, module: ControlledAgent)
-        assert {:ok, saved} = Server.call(server, ControlledAgent.signal(7))
+      test "deletion after a restore read fences its next commit and effects", c do
+        server = start_agent(c)
+        saved = Server.agent(server)
         stop_agent(c, server)
         FaultAdapter.arm(c.control, {:read, {:after_read, self()}})
 
         activation =
           Task.async(fn ->
-            Jido.start_agent(c.jido, ControlledAgent,
+            Jido.start_agent(c.jido, DeliveryAgent,
               id: saved.id,
               persistence: c.persistence,
               restart: :temporary,
@@ -64,16 +65,36 @@ defmodule JidoTest.System.Scenarios.Restoration do
         assert_receive {:record_read, reader, {:ok, _}}, 10_000
 
         assert :ok =
-                 Persistence.delete_agent(c.store, ControlledAgent, saved.id,
+                 Persistence.delete_agent(c.store, DeliveryAgent, saved.id,
                    instance: c.jido,
                    namespace: c.namespace
                  )
 
         send(reader, :release_read)
-        assert {:error, :deleted} = Task.await(activation, 10_000)
+        # This is the snapshot read, not the removed identity-discovery probe.
+        # A read does not reserve the record against a later deletion.
+        assert {:ok, restored} = Task.await(activation, 10_000)
+        assert Server.snapshot(restored) == %{agent: saved, state_version: 0}
+        monitors = monitor_agent_tree(c, restored)
+
+        {:ok, signal} =
+          DeliveryAgent.record_and_deliver_signal(%{effect_id: "deleted-restore", value: 99})
+
+        assert {:error, {:persistence_failed, :conflict}} = Server.call(restored, signal)
+        await_down(monitors)
+        Observability.assert_turn(c.observer, signal, :error, false)
+        Observability.assert_persistence(c.observer, :conflict)
+
+        assert {:error, :deleted} =
+                 Jido.start_agent(c.jido, DeliveryAgent,
+                   id: saved.id,
+                   persistence: c.persistence,
+                   restore: :required
+                 )
+
         assert Jido.whereis_agent(c.jido, saved.id) == nil
         assert_empty_agent_pool(c)
-        assert {:error, :deleted} = load(c, saved.id, ControlledAgent)
+        assert {:error, :deleted} = load(c, saved.id, DeliveryAgent)
         Observability.assert_persistence(c.observer, :not_found)
         assert Sink.attempts(c.jido) == []
       end

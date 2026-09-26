@@ -54,8 +54,8 @@ defmodule Jido.Examples.PersistenceProbeStore do
     do: Elixir.Agent.update(Keyword.fetch!(opts, :store), &Map.delete(&1, key))
 
   @doc "Changes a stored record to exercise validation at the load boundary."
-  def rewrite_record({__MODULE__, opts}, module, id, update) do
-    key = Jido.Persistence.agent_key(nil, module, id)
+  def rewrite_record({__MODULE__, opts}, id, update) do
+    key = Jido.Persistence.agent_key(Jido.Agent.Ref.new!(namespace: "persistence-probe", id: id))
 
     with {:ok, bytes} <- get(key, opts) do
       record = :erlang.binary_to_term(bytes, [:safe])

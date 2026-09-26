@@ -114,7 +114,7 @@ defmodule Jido.InstanceHelpersTest do
   end
 
   test "hibernate and thaw use the default instance when no instance is given" do
-    assert {:ok, _jido} = Jido.start()
+    assert {:ok, _jido} = Jido.start(namespace: "default-persistence-test")
 
     table = :"default_lifecycle_#{System.unique_integer([:positive])}"
     persistence = {Jido.Persistence.ETS, table: table}

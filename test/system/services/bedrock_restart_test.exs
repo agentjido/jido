@@ -41,13 +41,18 @@ defmodule JidoTest.System.Services.BedrockRestart do
 
     agent = Counter.new!(id: "counter")
 
-    assert :ok = Persistence.save_agent(store, agent, revision: 0)
+    assert :ok = Persistence.save_agent(store, agent, namespace: "persistence-test", revision: 0)
     assert :ok = BedrockIntegration.restart!()
-    assert {:ok, restored} = Persistence.load_agent(store, Counter, agent.id)
+
+    assert {:ok, restored} =
+             Persistence.load_agent(store, Counter, agent.id, namespace: "persistence-test")
+
     assert restored == agent
 
-    assert :ok = Persistence.delete_agent(store, Counter, agent.id)
-    assert {:error, :deleted} = Persistence.load_agent(store, Counter, agent.id)
+    assert :ok = Persistence.delete_agent(store, Counter, agent.id, namespace: "persistence-test")
+
+    assert {:error, :deleted} =
+             Persistence.load_agent(store, Counter, agent.id, namespace: "persistence-test")
 
     assert {:error, :outer_rollback} =
              TestRepo.transact(fn ->

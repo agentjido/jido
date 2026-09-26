@@ -48,14 +48,14 @@ defmodule JidoTest.Persistence.RecordLifecycleTest do
     assert initial == RuntimeAgent.new!(id: id)
 
     {ETS, opts} = persistence
-    key = Persistence.agent_key(jido, RuntimeAgent, id)
+    key = Persistence.agent_key(Jido.Agent.Ref.new!(namespace: Jido.namespace(jido), id: id))
     assert {:ok, bytes} = ETS.get(key, opts)
     record = :erlang.binary_to_term(bytes, [:safe])
 
     assert record == %{
-             format: 2,
+             format: 3,
              kind: :active,
-             instance: jido,
+             namespace: Jido.namespace(jido),
              agent_module: RuntimeAgent,
              agent_vsn: RuntimeAgent.vsn(),
              agent_id: id,
@@ -131,13 +131,16 @@ defmodule JidoTest.Persistence.RecordLifecycleTest do
              Persistence.load_agent(persistence, RuntimeAgent, active.id, instance: jido)
 
     {ETS, opts} = persistence
-    key = Persistence.agent_key(jido, RuntimeAgent, active.id)
+
+    key =
+      Persistence.agent_key(Jido.Agent.Ref.new!(namespace: Jido.namespace(jido), id: active.id))
+
     assert {:ok, bytes} = ETS.get(key, opts)
 
     assert :erlang.binary_to_term(bytes, [:safe]) == %{
-             format: 2,
+             format: 3,
              kind: :tombstone,
-             instance: jido,
+             namespace: Jido.namespace(jido),
              agent_module: RuntimeAgent,
              agent_id: active.id,
              partition: nil,
@@ -153,10 +156,13 @@ defmodule JidoTest.Persistence.RecordLifecycleTest do
 
     missing_id = unique_id("missing-delete")
     assert :ok = Persistence.delete_agent(persistence, RuntimeAgent, missing_id, instance: jido)
-    missing_key = Persistence.agent_key(jido, RuntimeAgent, missing_id)
+
+    missing_key =
+      Persistence.agent_key(Jido.Agent.Ref.new!(namespace: Jido.namespace(jido), id: missing_id))
+
     assert {:ok, missing_bytes} = ETS.get(missing_key, opts)
 
-    assert %{format: 2, kind: :tombstone, revision: 0} =
+    assert %{format: 3, kind: :tombstone, revision: 0} =
              :erlang.binary_to_term(missing_bytes, [:safe])
   end
 
@@ -191,34 +197,52 @@ defmodule JidoTest.Persistence.RecordLifecycleTest do
              )
   end
 
-  test "legacy format one remains readable" do
-    {ETS, opts} = persistence = persistence(:legacy)
-    agent = RuntimeAgent.new!(id: unique_id("legacy"), state: %{events: [:legacy]})
+  test "old record formats fail without changing stored bytes" do
+    {ETS, opts} = persistence = persistence(:old_formats)
+    agent = RuntimeAgent.new!(id: unique_id("old-formats"))
     assert {:ok, checkpoint} = Agent.checkpoint(agent)
+    key = Persistence.agent_key(Jido.Agent.Ref.new!(namespace: "persistence-test", id: agent.id))
 
-    record = %{
-      format: 1,
-      kind: :agent,
-      instance: nil,
-      agent_module: RuntimeAgent,
-      agent_id: agent.id,
-      partition: nil,
-      revision: 7,
-      checkpoint: checkpoint
-    }
+    for format <- [1, 2] do
+      record = %{
+        format: format,
+        kind: if(format == 1, do: :agent, else: :active),
+        instance: nil,
+        agent_module: RuntimeAgent,
+        agent_id: agent.id,
+        partition: nil,
+        revision: 7,
+        checkpoint: checkpoint
+      }
 
-    key = Persistence.agent_key(nil, RuntimeAgent, agent.id)
-    assert :ok = ETS.put(key, :erlang.term_to_binary(record), opts)
+      bytes = :erlang.term_to_binary(record)
+      assert :ok = ETS.put(key, bytes, opts)
 
-    assert {:ok, ^agent, 7} =
-             Persistence.load_agent_with_revision(persistence, RuntimeAgent, agent.id)
+      assert {:error, {:invalid_persistence_record, :format}} =
+               Persistence.load_agent(persistence, RuntimeAgent, agent.id,
+                 namespace: "persistence-test"
+               )
+
+      assert {:error, {:invalid_persistence_record, :format}} =
+               Persistence.save_agent(persistence, agent,
+                 namespace: "persistence-test",
+                 revision: 8
+               )
+
+      assert {:error, {:invalid_persistence_record, :format}} =
+               Persistence.delete_agent(persistence, RuntimeAgent, agent.id,
+                 namespace: "persistence-test"
+               )
+
+      assert {:ok, ^bytes} = ETS.get(key, opts)
+    end
   end
 
   test "outer definition and record changes fail closed without a replacement write" do
     {ETS, opts} = persistence = persistence(:fail_closed)
     agent = RuntimeAgent.new!(id: unique_id("fail-closed"))
-    key = Persistence.agent_key(nil, RuntimeAgent, agent.id)
-    assert :ok = Persistence.save_agent(persistence, agent)
+    key = Persistence.agent_key(Jido.Agent.Ref.new!(namespace: "persistence-test", id: agent.id))
+    assert :ok = Persistence.save_agent(persistence, agent, namespace: "persistence-test")
     assert {:ok, original} = ETS.get(key, opts)
     record = :erlang.binary_to_term(original, [:safe])
 
@@ -226,7 +250,9 @@ defmodule JidoTest.Persistence.RecordLifecycleTest do
     assert :ok = ETS.put(key, :erlang.term_to_binary(different_definition), opts)
 
     assert {:error, %Jido.Error.ValidationError{details: %{code: :definition_mismatch}}} =
-             Persistence.load_agent(persistence, RuntimeAgent, agent.id)
+             Persistence.load_agent(persistence, RuntimeAgent, agent.id,
+               namespace: "persistence-test"
+             )
 
     for changed <- [
           %{record | format: 99},
@@ -235,8 +261,18 @@ defmodule JidoTest.Persistence.RecordLifecycleTest do
         ] do
       bytes = :erlang.term_to_binary(changed)
       assert :ok = ETS.put(key, bytes, opts)
-      assert {:error, _reason} = Persistence.load_agent(persistence, RuntimeAgent, agent.id)
-      assert {:error, _reason} = Persistence.save_agent(persistence, agent, revision: 1)
+
+      assert {:error, _reason} =
+               Persistence.load_agent(persistence, RuntimeAgent, agent.id,
+                 namespace: "persistence-test"
+               )
+
+      assert {:error, _reason} =
+               Persistence.save_agent(persistence, agent,
+                 namespace: "persistence-test",
+                 revision: 1
+               )
+
       assert {:ok, ^bytes} = ETS.get(key, opts)
     end
   end

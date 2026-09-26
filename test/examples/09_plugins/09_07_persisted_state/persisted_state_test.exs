@@ -7,16 +7,26 @@ defmodule JidoTest.Examples.Plugins.PersistedStateTest do
   alias Jido.Persistence
   alias Jido.Persistence.ETS
 
-  test "a Persistence facet stores only its paired Plugin state in a different form" do
+  test "a Persistence facet stores only its paired Plugin state in a different form", %{
+    jido: jido
+  } do
     persistence = persistence()
     agent = ExampleAgent.new!(id: unique_id("persisted-plugin"), state: %{visible: 3, owned: 7})
-    clean_record_on_exit(persistence, agent, nil)
+    clean_record_on_exit(persistence, agent, jido)
 
-    assert :ok = Persistence.save_agent(persistence, agent, revision: 2)
-    assert %{checkpoint: %{state: %{visible: 3, owned: "owned:7"}}} = record(persistence, agent)
+    assert :ok =
+             Persistence.save_agent(persistence, agent,
+               instance: jido,
+               revision: 2
+             )
+
+    assert %{checkpoint: %{state: %{visible: 3, owned: "owned:7"}}} =
+             record(persistence, agent, jido)
 
     assert {:ok, ^agent, 2} =
-             Persistence.load_agent_with_revision(persistence, ExampleAgent, agent.id)
+             Persistence.load_agent_with_revision(persistence, ExampleAgent, agent.id,
+               instance: jido
+             )
   end
 
   test "a malformed or missing owned value cannot restore an Agent", %{jido: jido} do
@@ -70,7 +80,7 @@ defmodule JidoTest.Examples.Plugins.PersistedStateTest do
     {ETS, table: __MODULE__}
   end
 
-  defp record({ETS, opts}, agent, instance \\ nil) do
+  defp record({ETS, opts}, agent, instance) do
     assert {:ok, bytes} = ETS.get(record_key(agent, instance), opts)
     :erlang.binary_to_term(bytes, [:safe])
   end
@@ -84,5 +94,9 @@ defmodule JidoTest.Examples.Plugins.PersistedStateTest do
     on_exit(fn -> ETS.delete(key, opts) end)
   end
 
-  defp record_key(agent, instance), do: Persistence.agent_key(instance, ExampleAgent, agent.id)
+  defp record_key(agent, instance),
+    do:
+      Persistence.agent_key(
+        Jido.Agent.Ref.new!(namespace: Jido.namespace(instance), id: agent.id)
+      )
 end

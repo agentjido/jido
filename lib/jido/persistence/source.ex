@@ -36,7 +36,16 @@ defmodule Jido.Persistence.Source do
   end
 
   def validate_operation_options(opts) do
-    if Keyword.keyword?(opts), do: :ok, else: {:error, {:invalid_persistence_options, opts}}
+    cond do
+      not Keyword.keyword?(opts) ->
+        {:error, {:invalid_persistence_options, opts}}
+
+      Keyword.has_key?(opts, :write_authority) ->
+        {:error, {:unsupported_persistence_option, :write_authority}}
+
+      true ->
+        :ok
+    end
   end
 
   defp resolve_instance_config(jido) when is_atom(jido) and not is_nil(jido) do

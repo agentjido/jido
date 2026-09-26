@@ -131,7 +131,13 @@ defmodule Jido.RuntimeTopologyTest do
     jido = :"#{base_jido}_generation"
     table = :"#{base_jido}_persistence"
     persistence = {Jido.Persistence.ETS, table: table}
-    jido_pid = start_supervised!({Jido, name: jido, persistence: persistence}, id: jido)
+
+    jido_pid =
+      start_supervised!(
+        {Jido, name: jido, namespace: "runtime-topology/#{jido}", persistence: persistence},
+        id: jido
+      )
+
     id = unique_id("durable-topology")
 
     {:ok, server} =
@@ -153,7 +159,12 @@ defmodule Jido.RuntimeTopologyTest do
 
     assert :ets.whereis(Jido.runtime_store_name(jido)) == :undefined
 
-    replacement = start_supervised!({Jido, name: jido, persistence: persistence}, id: jido)
+    replacement =
+      start_supervised!(
+        {Jido, name: jido, namespace: "runtime-topology/#{jido}", persistence: persistence},
+        id: jido
+      )
+
     refute replacement == jido_pid
     assert Jido.list_agents(jido) == []
     assert RuntimeStore.fetch(jido, :topology_test, :generation) == :error

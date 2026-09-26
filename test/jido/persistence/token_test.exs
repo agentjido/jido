@@ -97,7 +97,7 @@ defmodule JidoTest.Persistence.TokenTest do
   end
 
   test "a changed token rejects the old candidate even when bytes match", c do
-    assert :ok = Persistence.save_agent(c.store, c.agent)
+    assert :ok = Persistence.save_agent(c.store, c.agent, namespace: "persistence-test")
     assert_receive {:cas, key, :not_found}
     assert {:ok, bytes, first_token} = get(c.store, key)
 
@@ -105,7 +105,9 @@ defmodule JidoTest.Persistence.TokenTest do
     hook = fn ^key -> adapter.put(key, bytes, options) end
     racing = {adapter, Keyword.put(options, :before_cas, hook)}
 
-    assert {:error, :conflict} = Persistence.save_agent(racing, c.agent, revision: 1)
+    assert {:error, :conflict} =
+             Persistence.save_agent(racing, c.agent, namespace: "persistence-test", revision: 1)
+
     assert_receive {:cas, ^key, {:token, ^first_token}}
     assert {:ok, ^bytes, new_token} = get(c.store, key)
     assert new_token != first_token
@@ -125,7 +127,7 @@ defmodule JidoTest.Persistence.TokenTest do
       source = {adapter, Keyword.put(options, :read_override, reply)}
 
       assert {:error, %Jido.Error.ExecutionError{details: details}} =
-               Persistence.save_agent(source, c.agent)
+               Persistence.save_agent(source, c.agent, namespace: "persistence-test")
 
       assert details.code == :persistence_invalid_callback_result
       assert details.result == :invalid_token_read
@@ -133,12 +135,15 @@ defmodule JidoTest.Persistence.TokenTest do
     end
 
     source = {adapter, Keyword.put(options, :read_override, {:error, :offline})}
-    assert {:error, :offline} = Persistence.save_agent(source, c.agent)
+
+    assert {:error, :offline} =
+             Persistence.save_agent(source, c.agent, namespace: "persistence-test")
+
     refute_received {:cas, _key, _condition}
   end
 
   test "a token stays out of restore output and semantic telemetry", c do
-    assert :ok = Persistence.save_agent(c.store, c.agent)
+    assert :ok = Persistence.save_agent(c.store, c.agent, namespace: "persistence-test")
     assert_receive {:cas, key, :not_found}
     assert {:ok, _bytes, token} = get(c.store, key)
 
@@ -161,7 +166,9 @@ defmodule JidoTest.Persistence.TokenTest do
     on_exit(fn -> :telemetry.detach(handler) end)
 
     assert {:ok, restored, 0} =
-             Persistence.load_agent_with_revision(c.store, CounterAgent, c.agent.id)
+             Persistence.load_agent_with_revision(c.store, CounterAgent, c.agent.id,
+               namespace: "persistence-test"
+             )
 
     assert restored == c.agent
     assert_receive {:telemetry, measurements, metadata}

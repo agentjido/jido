@@ -10,12 +10,12 @@ defmodule Jido.Agent.SerializationContractTest do
     opts = [store: start_supervised!(Store)]
     store = {Store, opts}
     agent = Probe.new!(id: unique_id())
-    assert :ok = Persistence.save_agent(store, agent)
-    key = Persistence.agent_key(nil, Probe, agent.id)
+    assert :ok = Persistence.save_agent(store, agent, namespace: "persistence-test")
+    key = Persistence.agent_key(Jido.Agent.Ref.new!(namespace: "persistence-test", id: agent.id))
     assert "jido:agent:v1:" <> _identity = key
     assert {:ok, bytes} = Store.get(key, opts)
     record = :erlang.binary_to_term(bytes, [:safe])
-    assert record.format == 2
+    assert record.format == 3
     assert record.kind == :active
     assert record.agent_vsn == Probe.vsn()
     assert record.agent_id == agent.id
@@ -30,11 +30,14 @@ defmodule Jido.Agent.SerializationContractTest do
     old_key = String.replace_prefix(key, "jido:agent:v1:", "jido:actor:v1:")
     assert :ok = Store.delete(key, opts)
     assert :ok = Store.put(old_key, old_bytes, opts)
-    assert {:error, :not_found} = Persistence.load_agent(store, Probe, agent.id)
+
+    assert {:error, :not_found} =
+             Persistence.load_agent(store, Probe, agent.id, namespace: "persistence-test")
+
     assert :ok = Store.put(key, old_bytes, opts)
 
     assert {:error, {:invalid_persistence_record, :kind}} =
-             Persistence.load_agent(store, Probe, agent.id)
+             Persistence.load_agent(store, Probe, agent.id, namespace: "persistence-test")
   end
 
   test "Agent authoring JSON declares its type and rejects the old type" do

@@ -31,13 +31,13 @@ end
 {:ok, east} =
   Jido.start_agent(AddressGuide.Worker,
     id: "worker-1",
-    partition: :east
+    partition: "east"
   )
 
 {:ok, west} =
   Jido.start_agent(AddressGuide.Worker,
     id: "worker-1",
-    partition: :west
+    partition: "west"
   )
 
 {east, west}
@@ -51,15 +51,15 @@ runs more than one Jido supervisor.
 ## Look Up And List
 
 ```elixir
-^east = Jido.whereis_agent("worker-1", partition: :east)
-^west = Jido.whereis_agent("worker-1", partition: :west)
+^east = Jido.whereis_agent("worker-1", partition: "east")
+^west = Jido.whereis_agent("worker-1", partition: "west")
 
 %{
-  east: Jido.list_agents(partition: :east),
-  west: Jido.list_agents(partition: :west),
+  east: Jido.list_agents(partition: "east"),
+  west: Jido.list_agents(partition: "west"),
   counts: %{
-    east: Jido.agent_count(partition: :east),
-    west: Jido.agent_count(partition: :west)
+    east: Jido.agent_count(partition: "east"),
+    west: Jido.agent_count(partition: "west")
   }
 }
 ```

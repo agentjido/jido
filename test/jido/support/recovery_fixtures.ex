@@ -47,7 +47,7 @@ end
 
 defmodule JidoTest.RecoveryInstance do
   @moduledoc false
-  use Jido, otp_app: :jido, persistence: JidoTest.RecoveryStore
+  use Jido, otp_app: :jido, namespace: "recovery-test", persistence: JidoTest.RecoveryStore
 
   def start_for_test(path) do
     Application.put_env(:jido, JidoTest.RecoveryStore, path: path)

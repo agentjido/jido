@@ -503,7 +503,10 @@ defmodule Jido.Topology.ControllerTest do
   end
 
   defmodule PersistentJido do
-    use Jido, otp_app: :jido, persistence: {Jido.Persistence.ETS, table: __MODULE__}
+    use Jido,
+      otp_app: :jido,
+      namespace: "controller-test",
+      persistence: {Jido.Persistence.ETS, table: __MODULE__}
   end
 
   test "restores committed state and Bus subscriptions after controller shutdown" do

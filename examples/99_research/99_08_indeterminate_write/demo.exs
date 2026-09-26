@@ -7,7 +7,7 @@ alias Jido.Examples.PersistenceProbeStore, as: Store
 
 {:ok, process} = Store.start_link([])
 jido = Jido.Examples.IndeterminateWriteDemo
-{:ok, instance} = Jido.start_link(name: jido)
+{:ok, instance} = Jido.start_link(name: jido, namespace: "indeterminate-write-demo")
 store = {Store, store: process, write_result: :indeterminate}
 
 try do

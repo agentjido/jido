@@ -392,10 +392,10 @@ V2 Storage checkpoints, Plugin pointers, and Thread append stores do not have
 an automatic V3 reader. Renaming an envelope is not a conversion.
 
 V3 uses `Jido.Persistence` and a binary adapter with atomic compare-and-swap.
-Compatible unnamed and namespaced keys both start with `jido:agent:v1:`.
-Compatible keys encode instance, module, partition, and ID and use outer
-format 2. Namespaced keys encode `{namespace, partition, id}` and use outer
-format 3. The reader also accepts Jido V3 outer format-1 active records.
+Agent keys start with `jido:agent:v1:`, encode the exact
+`{namespace, partition, id}` Ref tuple, and use outer record format 3. Older
+V3 beta instance-based keys and outer formats 1 and 2 also require an
+[offline migration](compare-and-swap-hibernate-and-thaw.md#move-records-from-an-earlier-v3-beta).
 Restore validates identity, definition revision, complete state, and recursive
 portability.
 
@@ -406,13 +406,9 @@ portability.
    complete Agent state, history, and pending work.
 3. Convert each domain field and Plugin-owned field to the new schemas. Decide how
    to reconcile external work that might already have completed.
-4. Construct and validate a V3 instance. If you add a namespace, stop old
-   writers and call `Jido.Persistence.establish_write_authority/4` for each
-   logical Agent. Pass its result as `:write_authority` to every persistence
-   caller until all callers use Ref identity. This rejects compatible and
-   stable key collisions and routes both V3 caller modes to one record. Save
-   through the V3 persistence API and adapter. Keep V2 backups separate from
-   V3 records.
+4. Construct and validate a V3 instance with a stable namespace. Save through
+   the V3 persistence API to a separate empty target store. Preserve saved
+   revisions and deletion markers. Keep V2 backups separate from V3 records.
 5. Restore the saved record in a fresh V3 process. Verify identity, state,
    pending work IDs, retry counts, and Plugin reconstruction before activation.
 6. Rehearse rollback before the first namespaced write. Older code cannot read

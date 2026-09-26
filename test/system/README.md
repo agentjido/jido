@@ -239,6 +239,9 @@ persistence prefix.
 - Rejected completion storage leaves intent available for recovery.
 - Eight competing writers have exactly one CAS winner. A stale live Agent is
   fenced before it emits an effect. A tombstone also fences delayed writes.
+  Deletion after the snapshot read can still allow activation from that snapshot;
+  its next commit fails and cannot dispatch post-commit effects. A fresh restore
+  reads the tombstone and returns `:deleted`.
 - A replaced Bus is subscribed before Topology reports ready. A traced Signal
   reaches every member, commits one Turn per member, and retains trace identity.
 - Killed Agent tasks, Plugin workers, and runtime-pool wrappers terminate.

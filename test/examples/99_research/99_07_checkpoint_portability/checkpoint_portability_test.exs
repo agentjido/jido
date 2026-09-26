@@ -18,6 +18,6 @@ defmodule JidoTest.Examples.CheckpointPortabilityTest do
                 code: :non_portable_term,
                 path: [:record, :checkpoint, :state, :payload, :job, :worker]
               }
-            }} = Persistence.load_agent(store, Probe, id)
+            }} = Persistence.load_agent(store, Probe, id, namespace: "persistence-probe")
   end
 end

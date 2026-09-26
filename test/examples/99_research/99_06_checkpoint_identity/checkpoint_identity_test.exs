@@ -14,6 +14,6 @@ defmodule JidoTest.Examples.CheckpointIdentityTest do
     assert :ok = Probe.store_mismatched_checkpoint(store, requested_id, "different-agent")
 
     assert {:error, {:invalid_persistence_record, :checkpoint_identity}} =
-             Persistence.load_agent(store, Probe, requested_id)
+             Persistence.load_agent(store, Probe, requested_id, namespace: "persistence-probe")
   end
 end

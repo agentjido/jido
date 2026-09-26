@@ -92,23 +92,31 @@ defmodule JidoTest.Persistence.PluginIntegrationTest do
       )
       |> Agent.instantiate!(id: "owned-state", state: %{visible: 8, owned: 12})
 
-    assert :ok = Persistence.save_agent(c.persistence, agent, revision: 3, reason: :test)
+    assert :ok =
+             Persistence.save_agent(c.persistence, agent,
+               namespace: "persistence-test",
+               revision: 3,
+               reason: :test
+             )
+
     assert_receive {:dump, 12, dump_context}
     assert dump_context.plugin == Package
     assert dump_context.plugin_vsn == 4
-    assert dump_context.record_format == 2
+    assert dump_context.record_format == 3
     assert dump_context.direction == :dump
     assert dump_context.reason == :test
 
     {ETS, opts} = c.persistence
-    key = Persistence.agent_key(nil, Agent, agent.id)
+    key = Persistence.agent_key(Jido.Agent.Ref.new!(namespace: "persistence-test", id: agent.id))
     assert {:ok, bytes} = ETS.get(key, opts)
     record = :erlang.binary_to_term(bytes, [:safe])
     assert record.checkpoint.state.visible == 8
     assert record.checkpoint.state.owned == "sealed:12"
     refute Map.has_key?(record.checkpoint.state, :adapter)
 
-    assert {:ok, restored} = Persistence.load_agent(c.persistence, Agent, agent.id)
+    assert {:ok, restored} =
+             Persistence.load_agent(c.persistence, Agent, agent.id, namespace: "persistence-test")
+
     assert_receive {:load, "sealed:12", load_context}
     assert load_context.direction == :load
     assert load_context.reason == :restore
@@ -122,17 +130,25 @@ defmodule JidoTest.Persistence.PluginIntegrationTest do
         state: %{value: 7, owned: 9}
       )
 
-    assert :ok = Persistence.save_agent(c.persistence, agent, revision: 2)
+    assert :ok =
+             Persistence.save_agent(c.persistence, agent,
+               namespace: "persistence-test",
+               revision: 2
+             )
 
     {ETS, opts} = c.persistence
-    key = Persistence.agent_key(nil, CustomCheckpointAgent, agent.id)
+    key = Persistence.agent_key(Jido.Agent.Ref.new!(namespace: "persistence-test", id: agent.id))
     assert {:ok, bytes} = ETS.get(key, opts)
 
     assert %{checkpoint: %{kind: :agent_custom, payload: payload}} =
              :erlang.binary_to_term(bytes, [:safe])
 
     assert payload == %{id: agent.id, complete: %{value: 7, owned: 9}}
-    assert {:ok, ^agent} = Persistence.load_agent(c.persistence, CustomCheckpointAgent, agent.id)
+
+    assert {:ok, ^agent} =
+             Persistence.load_agent(c.persistence, CustomCheckpointAgent, agent.id,
+               namespace: "persistence-test"
+             )
   end
 
   test "dump callback faults and invalid values cannot write a record", c do
@@ -142,11 +158,16 @@ defmodule JidoTest.Persistence.PluginIntegrationTest do
           non_portable: :non_portable_term
         ] do
       agent = owned_agent("dump-#{fault}")
-      key = Persistence.agent_key(nil, Agent, agent.id)
+
+      key =
+        Persistence.agent_key(Jido.Agent.Ref.new!(namespace: "persistence-test", id: agent.id))
+
       {ETS, opts} = c.persistence
       Process.put({PersistenceFacet, :dump_fault}, fault)
 
-      assert {:error, error} = Persistence.save_agent(c.persistence, agent)
+      assert {:error, error} =
+               Persistence.save_agent(c.persistence, agent, namespace: "persistence-test")
+
       assert Jido.Error.code(error) == code
 
       assert {:error, :not_found} = ETS.get(key, opts)
@@ -163,24 +184,34 @@ defmodule JidoTest.Persistence.PluginIntegrationTest do
           invalid_state: :plugin_invalid_callback_result
         ] do
       agent = owned_agent("load-#{fault}")
-      assert :ok = Persistence.save_agent(c.persistence, agent)
+      assert :ok = Persistence.save_agent(c.persistence, agent, namespace: "persistence-test")
       Process.put({PersistenceFacet, :load_fault}, fault)
 
-      assert {:error, error} = Persistence.load_agent(c.persistence, Agent, agent.id)
+      assert {:error, error} =
+               Persistence.load_agent(c.persistence, Agent, agent.id,
+                 namespace: "persistence-test"
+               )
+
       assert Jido.Error.code(error) == code
 
       Process.delete({PersistenceFacet, :load_fault})
-      assert {:ok, ^agent} = Persistence.load_agent(c.persistence, Agent, agent.id)
+
+      assert {:ok, ^agent} =
+               Persistence.load_agent(c.persistence, Agent, agent.id,
+                 namespace: "persistence-test"
+               )
     end
   end
 
   test "a missing Plugin-owned field cannot write a record", c do
     agent = owned_agent("missing-owned")
     incomplete = %{agent | state: Map.delete(agent.state, :owned)}
-    key = Persistence.agent_key(nil, Agent, agent.id)
+    key = Persistence.agent_key(Jido.Agent.Ref.new!(namespace: "persistence-test", id: agent.id))
     {ETS, opts} = c.persistence
 
-    assert {:error, _reason} = Persistence.save_agent(c.persistence, incomplete)
+    assert {:error, _reason} =
+             Persistence.save_agent(c.persistence, incomplete, namespace: "persistence-test")
+
     assert {:error, :not_found} = ETS.get(key, opts)
   end
 

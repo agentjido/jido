@@ -54,7 +54,7 @@ store = {Jido.Persistence.ETS, table: :persistence_guide}
     store,
     agent,
     revision: 1,
-    instance: PersistenceGuide.Jido
+    namespace: "persistence-guide"
   )
 ```
 
@@ -68,7 +68,7 @@ comparison. `put/3` and `delete/2` are optional maintenance operations.
 
 ## Load and logically delete
 
-The same instance and partition values identify the record on every operation.
+The same namespace, partition, and Agent ID identify the record on every operation.
 
 ```elixir
 {:ok, restored} =
@@ -76,7 +76,7 @@ The same instance and partition values identify the record on every operation.
     store,
     PersistenceGuide.Counter,
     "guide-counter",
-    instance: PersistenceGuide.Jido
+    namespace: "persistence-guide"
   )
 
 restored.state
@@ -88,7 +88,7 @@ restored.state
     store,
     PersistenceGuide.Counter,
     "guide-counter",
-    instance: PersistenceGuide.Jido
+    namespace: "persistence-guide"
   )
 
 {:error, :deleted} =
@@ -96,7 +96,7 @@ restored.state
     store,
     PersistenceGuide.Counter,
     "guide-counter",
-    instance: PersistenceGuide.Jido
+    namespace: "persistence-guide"
   )
 ```
 
@@ -129,6 +129,7 @@ An Agent start option can override or disable that configuration.
 defmodule PersistenceGuide.AppJido do
   use Jido,
     otp_app: :my_app,
+    namespace: "my-app/agents",
     persistence: {Jido.Persistence.ETS, table: :my_app_agents}
 end
 ```
@@ -233,6 +234,7 @@ Configure the repository on the Jido instance:
 defmodule MyApp.Jido do
   use Jido,
     otp_app: :my_app,
+    namespace: "my-app/agents",
     persistence: {Jido.Persistence.Ecto, repo: MyApp.Repo}
 end
 ```
@@ -303,6 +305,7 @@ Select the repo in the Jido instance:
 defmodule MyApp.Jido do
   use Jido,
     otp_app: :my_app,
+    namespace: "my-app/agents",
     persistence:
       {Jido.Persistence.Bedrock,
        repo: MyApp.BedrockRepo,

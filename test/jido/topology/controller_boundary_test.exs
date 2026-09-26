@@ -149,7 +149,14 @@ defmodule Jido.Topology.ControllerBoundaryTest do
     suffix = System.unique_integer([:positive])
     jido = :"placement_reject_#{suffix}"
     table = :"placement_reject_table_#{suffix}"
-    start_supervised!({Jido, name: jido, persistence: {Jido.Persistence.ETS, table: table}})
+
+    start_supervised!(
+      {Jido,
+       name: jido,
+       namespace: "controller-boundary/#{jido}",
+       persistence: {Jido.Persistence.ETS, table: table}}
+    )
+
     instance = topology("placement-reject-#{suffix}")
     controller = start_supervised!({Controller, jido: jido, topology: instance, repair: :manual})
     assert :ok = Controller.await_ready(controller)

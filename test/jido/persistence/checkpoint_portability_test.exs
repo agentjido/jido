@@ -18,8 +18,13 @@ defmodule JidoTest.Persistence.CheckpointPortabilityTest do
         state: %{payload: %{job: %{id: "job-1", attempts: [1, 2], result: {:ok, "done"}}}}
       )
 
-    assert :ok = Persistence.save_agent(c.store, agent, revision: 3)
-    assert {:ok, ^agent, 3} = Persistence.load_agent_with_revision(c.store, Probe, c.id)
+    assert :ok =
+             Persistence.save_agent(c.store, agent, namespace: "persistence-probe", revision: 3)
+
+    assert {:ok, ^agent, 3} =
+             Persistence.load_agent_with_revision(c.store, Probe, c.id,
+               namespace: "persistence-probe"
+             )
   end
 
   test "Agent acceptance rejects a process handle before persistence", c do
@@ -31,7 +36,7 @@ defmodule JidoTest.Persistence.CheckpointPortabilityTest do
               }
             }} = Probe.new(id: c.id, state: %{payload: %{job: %{worker: self()}}})
 
-    key = Persistence.agent_key(nil, Probe, c.id)
+    key = Persistence.agent_key(Jido.Agent.Ref.new!(namespace: "persistence-probe", id: c.id))
     assert {:error, :not_found} = Store.get(key, elem(c.store, 1))
   end
 
@@ -44,7 +49,7 @@ defmodule JidoTest.Persistence.CheckpointPortabilityTest do
               }
             }} = Probe.new(id: c.id, state: %{payload: %{job: %{values: [1 | self()]}}})
 
-    key = Persistence.agent_key(nil, Probe, c.id)
+    key = Persistence.agent_key(Jido.Agent.Ref.new!(namespace: "persistence-probe", id: c.id))
     assert {:error, :not_found} = Store.get(key, elem(c.store, 1))
   end
 
@@ -57,7 +62,7 @@ defmodule JidoTest.Persistence.CheckpointPortabilityTest do
                 code: :non_portable_term,
                 path: [:record, :checkpoint, :state, :payload, :job, :worker]
               }
-            }} = Persistence.load_agent(c.store, Probe, c.id)
+            }} = Persistence.load_agent(c.store, Probe, c.id, namespace: "persistence-probe")
   end
 
   test "load rejects every prohibited term class supplied by storage", c do
@@ -83,7 +88,7 @@ defmodule JidoTest.Persistence.CheckpointPortabilityTest do
                   code: :non_portable_term,
                   path: path
                 }
-              }} = Persistence.load_agent(c.store, Probe, id)
+              }} = Persistence.load_agent(c.store, Probe, id, namespace: "persistence-probe")
 
       assert Enum.take(path, 6) == [:record, :checkpoint, :state, :payload, :job, :runtime]
       assert length(path) <= 20

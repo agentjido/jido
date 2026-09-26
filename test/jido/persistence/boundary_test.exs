@@ -44,14 +44,12 @@ defmodule Jido.Persistence.BoundaryTest do
     %{agent: agent, store: store}
   end
 
-  test "compatible and Ref keys share one prefix but keep distinct identities", c do
-    compatible_key = Persistence.agent_key(nil, Basic, c.agent.id)
-    ref = Agent.Ref.new!(namespace: "record-boundary", id: c.agent.id)
-    ref_key = Persistence.agent_key(ref)
+  test "the key contains only the exact Ref tuple", c do
+    ref = Agent.Ref.new!(namespace: "record-boundary", partition: "blue", id: c.agent.id)
+    assert "jido:agent:v1:" <> encoded = Persistence.agent_key(ref)
 
-    assert "jido:agent:v1:" <> _identity = compatible_key
-    assert "jido:agent:v1:" <> _identity = ref_key
-    refute compatible_key == ref_key
+    assert {ref.namespace, ref.partition, ref.id} ==
+             encoded |> Base.url_decode64!(padding: false) |> :erlang.binary_to_term([:safe])
   end
 
   test "stored envelopes reject invalid fields without changing their bytes", c do
@@ -83,72 +81,53 @@ defmodule Jido.Persistence.BoundaryTest do
 
     assert Record.decode(nil) == {:error, :invalid_persistence_record}
 
-    assert Record.validate(nil, nil, Basic, c.agent.id, nil) ==
-             {:error, {:invalid_persistence_record, :shape}}
+    assert Record.validate(nil, ref, Basic) == {:error, {:invalid_persistence_record, :shape}}
 
-    assert Record.validate_ref(nil, namespace, Basic, c.agent.id, nil) ==
-             {:error, {:invalid_persistence_record, :shape}}
-
-    assert Record.validate_ref(%{record | format: 2}, namespace, Basic, c.agent.id, nil) ==
+    assert Record.validate(%{record | format: 2}, ref, Basic) ==
              {:error, {:invalid_persistence_record, :format}}
 
     assert Record.kind(%{format: 99}) == :unknown
-
-    assert Record.validate(%{format: 1, kind: :unknown}, nil, Basic, c.agent.id, nil) ==
-             {:error, {:invalid_persistence_record, :kind}}
-  end
-
-  test "legacy records cannot cross instance boundaries", c do
-    assert {:ok, checkpoint} = Agent.checkpoint(c.agent)
-    assert {:ok, record} = Record.build_active(c.agent, :first, nil, 0, checkpoint)
-
-    assert Record.validate(record, :second, Basic, c.agent.id, nil) ==
-             {:error, {:invalid_persistence_record, :instance}}
   end
 
   test "identity validation preserves scope-first error order and exact key sets", c do
     {:ok, checkpoint} = Agent.checkpoint(c.agent)
 
-    for {scope, value, build, validate} <- [
-          {:instance, :first, &Record.build_active/5, &Record.validate/5},
-          {:namespace, "first", &Record.build_ref_active/5, &Record.validate_ref/5}
-        ] do
-      {:ok, active} = build.(c.agent, value, "blue", 0, checkpoint)
-      tombstone = active |> Map.drop([:agent_vsn, :checkpoint]) |> Map.put(:kind, :tombstone)
+    ref = Agent.Ref.new!(namespace: "first", partition: "blue", id: c.agent.id)
+    {:ok, active} = Record.build_active(c.agent, ref, 0, checkpoint)
+    tombstone = active |> Map.drop([:agent_vsn, :checkpoint]) |> Map.put(:kind, :tombstone)
 
-      changes = [
-        {scope, "other"},
-        {:agent_module, String},
-        {:agent_id, "other"},
-        {:partition, "other"}
-      ]
+    changes = [
+      {:namespace, "other"},
+      {:agent_module, String},
+      {:agent_id, "other"},
+      {:partition, "other"}
+    ]
 
-      for record <- [active, tombstone] do
-        assert :ok = validate.(record, value, Basic, c.agent.id, "blue")
+    for record <- [active, tombstone] do
+      assert :ok = Record.validate(record, ref, Basic)
 
-        for {{field, _value}, index} <- Enum.with_index(changes) do
-          changed = Map.merge(record, Map.new(Enum.drop(changes, index)))
+      for {{field, _value}, index} <- Enum.with_index(changes) do
+        changed = Map.merge(record, Map.new(Enum.drop(changes, index)))
 
-          assert {:error, {:invalid_persistence_record, ^field}} =
-                   validate.(changed, value, Basic, c.agent.id, "blue")
-        end
-
-        for key <- Map.keys(record) do
-          field = if key in [:format, :kind], do: key, else: :shape
-
-          assert {:error, {:invalid_persistence_record, ^field}} =
-                   validate.(Map.delete(record, key), value, Basic, c.agent.id, "blue")
-
-          # Equal size alone does not prove an exact key set.
-          changed = record |> Map.delete(key) |> Map.put(:extra, true)
-
-          assert {:error, {:invalid_persistence_record, ^field}} =
-                   validate.(changed, value, Basic, c.agent.id, "blue")
-        end
-
-        assert {:error, {:invalid_persistence_record, :shape}} =
-                 validate.(Map.put(record, :extra, true), value, Basic, c.agent.id, "blue")
+        assert {:error, {:invalid_persistence_record, ^field}} =
+                 Record.validate(changed, ref, Basic)
       end
+
+      for key <- Map.keys(record) do
+        field = if key in [:format, :kind], do: key, else: :shape
+
+        assert {:error, {:invalid_persistence_record, ^field}} =
+                 Record.validate(Map.delete(record, key), ref, Basic)
+
+        # Equal size alone does not prove an exact key set.
+        changed = record |> Map.delete(key) |> Map.put(:extra, true)
+
+        assert {:error, {:invalid_persistence_record, ^field}} =
+                 Record.validate(changed, ref, Basic)
+      end
+
+      assert {:error, {:invalid_persistence_record, :shape}} =
+               Record.validate(Map.put(record, :extra, true), ref, Basic)
     end
   end
 
@@ -157,70 +136,58 @@ defmodule Jido.Persistence.BoundaryTest do
     {ETS, adapter_opts} = c.store
     store = {RecordingAdapter, Keyword.put(adapter_opts, :observer, self())}
 
-    for namespace <- [nil, "record-sequence"] do
-      opts = [instance: :record_instance, partition: "blue", namespace: namespace]
-      legacy_key = Persistence.agent_key(:record_instance, Basic, c.agent.id, "blue")
+    namespace = "record-sequence"
+    opts = [instance: :record_instance, partition: "blue", namespace: namespace]
+    ref = Agent.Ref.new!(namespace: namespace, partition: "blue", id: c.agent.id)
+    key = Persistence.agent_key(ref)
 
-      {key, probes, scope, value} =
-        if namespace do
-          ref = Agent.Ref.new!(namespace: namespace, partition: "blue", id: c.agent.id)
-          key = Persistence.agent_key(ref)
-          {key, [{:get, key}, {:get, legacy_key}], :namespace, namespace}
-        else
-          {legacy_key, [], :instance, :record_instance}
-        end
+    record =
+      %{
+        format: 3,
+        namespace: namespace,
+        kind: :active,
+        agent_module: Basic,
+        agent_vsn: c.agent.vsn,
+        agent_id: c.agent.id,
+        partition: "blue",
+        revision: 0,
+        checkpoint: checkpoint
+      }
 
-      record =
-        %{
-          format: if(namespace, do: 3, else: 2),
-          kind: :active,
-          agent_module: Basic,
-          agent_vsn: c.agent.vsn,
-          agent_id: c.agent.id,
-          partition: "blue",
-          revision: 0,
-          checkpoint: checkpoint
-        }
-        |> Map.put(scope, value)
+    created = :erlang.term_to_binary(record)
+    updated = :erlang.term_to_binary(%{record | revision: 1})
 
-      created = :erlang.term_to_binary(record)
-      updated = :erlang.term_to_binary(%{record | revision: 1})
+    tombstone =
+      record
+      |> Map.drop([:agent_vsn, :checkpoint])
+      |> Map.merge(%{kind: :tombstone, revision: 1})
 
-      tombstone =
-        record
-        |> Map.drop([:agent_vsn, :checkpoint])
-        |> Map.merge(%{kind: :tombstone, revision: 1})
+    deleted = :erlang.term_to_binary(tombstone)
+    prefix = [:validate_options]
 
-      deleted = :erlang.term_to_binary(tombstone)
-      prefix = [:validate_options] ++ probes
+    # Initial revision validation precedes storage access.
+    assert {:error, {:invalid_initial_revision, 1}} =
+             Persistence.create_agent(store, c.agent, Keyword.put(opts, :revision, 1))
 
-      # Initial revision validation still precedes either identity read.
-      assert {:error, {:invalid_initial_revision, 1}} =
-               Persistence.create_agent(store, c.agent, Keyword.put(opts, :revision, 1))
+    assert adapter_calls() == [:validate_options]
 
-      assert adapter_calls() == [:validate_options]
+    assert :ok = Persistence.create_agent(store, c.agent, opts)
+    assert adapter_calls() == prefix ++ [{:cas, key, :not_found, created}]
 
-      assert :ok = Persistence.create_agent(store, c.agent, opts)
-      assert adapter_calls() == prefix ++ [{:cas, key, :not_found, created}]
+    assert :ok =
+             Persistence.save_agent(store, c.agent, opts ++ [revision: 1, expected_revision: 0])
 
-      assert :ok =
-               Persistence.save_agent(store, c.agent, opts ++ [revision: 1, expected_revision: 0])
+    assert adapter_calls() == prefix ++ [{:get, key}, {:cas, key, created, updated}]
 
-      assert adapter_calls() == prefix ++ [{:get, key}, {:cas, key, created, updated}]
+    assert {:ok, restored, 1} =
+             Persistence.load_agent_with_revision(store, Basic, c.agent.id, opts)
 
-      assert {:ok, restored, 1} =
-               Persistence.load_agent_with_revision(store, Basic, c.agent.id, opts)
+    assert restored == c.agent
+    assert adapter_calls() == prefix ++ [{:get, key}]
 
-      assert restored == c.agent
-      assert adapter_calls() == prefix ++ [{:get, key}]
-
-      assert :ok = Persistence.delete_agent(store, Basic, c.agent.id, opts)
-      assert adapter_calls() == prefix ++ [{:get, key}, {:cas, key, updated, deleted}]
-      assert {:ok, ^deleted} = ETS.get(key, adapter_opts)
-
-      # Do not leave a compatible record for the next iteration.
-      assert :ok = ETS.delete(key, adapter_opts)
-    end
+    assert :ok = Persistence.delete_agent(store, Basic, c.agent.id, opts)
+    assert adapter_calls() == prefix ++ [{:get, key}, {:cas, key, updated, deleted}]
+    assert {:ok, ^deleted} = ETS.get(key, adapter_opts)
   end
 
   test "replacement requires a stable identity and an existing Ref record", c do
@@ -228,11 +195,6 @@ defmodule Jido.Persistence.BoundaryTest do
 
     assert {:error, :stable_namespace_required} =
              Persistence.replace_agent(c.store, c.agent, target)
-
-    assert :ok = Persistence.save_agent(c.store, c.agent)
-
-    assert {:error, :stable_namespace_required} =
-             Persistence.replace_agent(c.store, c.agent, target, namespace: "legacy")
 
     assert {:error, :agent_identity_mismatch} =
              Persistence.replace_agent(c.store, c.agent, %{target | id: "other"})
@@ -246,40 +208,40 @@ defmodule Jido.Persistence.BoundaryTest do
              Persistence.create_agent(c.store, c.agent, revision: 1)
   end
 
-  test "failed storage reads cannot become writes or successful identity resolution", c do
-    namespace = "read-fault"
-    ref = Agent.Ref.new!(namespace: namespace, id: c.agent.id)
-    ref_key = Persistence.agent_key(ref)
-    legacy_key = Persistence.agent_key(nil, Basic, c.agent.id)
+  test "missing namespaces and removed write gates fail before storage access", c do
+    store = {ReadAdapter, read: fn _ -> flunk("unexpected storage read") end}
 
-    for failed_key <- [ref_key, legacy_key] do
-      store =
-        {ReadAdapter,
-         read: fn key ->
-           if key == failed_key, do: {:error, :offline}, else: {:error, :not_found}
-         end}
+    for call <- [
+          &Persistence.save_agent(store, c.agent, &1),
+          &Persistence.create_agent(store, c.agent, &1),
+          &Persistence.replace_agent(store, c.agent, c.agent, &1),
+          &Persistence.load_agent(store, Basic, c.agent.id, &1),
+          &Persistence.delete_agent(store, Basic, c.agent.id, &1)
+        ] do
+      assert {:error, :stable_namespace_required} = call.([])
+      assert {:error, :stable_namespace_required} = call.(namespace: nil)
 
-      assert {:error, :offline} =
-               Persistence.load_agent(store, Basic, c.agent.id, namespace: namespace)
+      for invalid <- ["", :namespace, 42] do
+        assert {:error, %Jido.Error.ValidationError{}} = call.(namespace: invalid)
+      end
+
+      for invalid <- [:blue, 1, ""] do
+        assert {:error, %Jido.Error.ValidationError{}} =
+                 call.(namespace: "valid", partition: invalid)
+      end
+
+      assert {:error, {:unsupported_persistence_option, :write_authority}} =
+               call.(namespace: "valid", write_authority: nil)
     end
+  end
 
+  test "failed storage reads cannot become writes", c do
     failing = {ReadAdapter, read: fn _ -> {:error, :offline} end}
-    assert {:error, :offline} = Persistence.save_agent(failing, c.agent)
-
-    Process.put(:replacement_reads, 0)
-
-    intermittent =
-      {ReadAdapter,
-       read: fn _ ->
-         count = Process.get(:replacement_reads) + 1
-         Process.put(:replacement_reads, count)
-         if count < 3, do: {:error, :not_found}, else: {:error, :offline}
-       end}
-
-    assert {:error, :offline} =
-             Persistence.replace_agent(intermittent, c.agent, c.agent, namespace: namespace)
-
-    assert Process.get(:replacement_reads) == 3
+    opts = [namespace: "read-fault"]
+    assert {:error, :offline} = Persistence.load_agent(failing, Basic, c.agent.id, opts)
+    assert {:error, :offline} = Persistence.save_agent(failing, c.agent, opts)
+    assert {:error, :offline} = Persistence.replace_agent(failing, c.agent, c.agent, opts)
+    assert {:error, :offline} = Persistence.delete_agent(failing, Basic, c.agent.id, opts)
   end
 
   test "checkpoint public boundaries reject non-map input and context", c do

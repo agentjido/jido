@@ -140,12 +140,14 @@ Signal mailbox. See the `Jido.Plugin` API docs.
 
 ## Persistence
 
-Persistence is optional. Configure one binary adapter on the Jido instance:
+Persistence is optional. Configure a stable namespace and one binary adapter
+on the Jido instance:
 
 ```elixir
 defmodule MyApp.Jido do
   use Jido,
     otp_app: :my_app,
+    namespace: "my-app/agents",
     persistence: {Jido.Persistence.Ecto, repo: MyApp.Repo}
 end
 ```

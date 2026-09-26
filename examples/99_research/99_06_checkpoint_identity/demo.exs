@@ -10,7 +10,9 @@ store = {Store, store: process}
 try do
   :ok = Probe.store_mismatched_checkpoint(store, "requested-agent", "different-agent")
 
-  case Jido.Persistence.load_agent(store, Probe, "requested-agent") do
+  case Jido.Persistence.load_agent(store, Probe, "requested-agent",
+         namespace: "persistence-probe"
+       ) do
     {:ok, agent} ->
       IO.inspect(%{requested_id: "requested-agent", restored_id: agent.id}, label: "GAP")
 

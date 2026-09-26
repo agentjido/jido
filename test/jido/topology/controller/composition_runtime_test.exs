@@ -53,7 +53,10 @@ defmodule Jido.Topology.Controller.CompositionRuntimeTest do
   end
 
   defmodule PersistentJido do
-    use Jido, otp_app: :jido, persistence: {Jido.Persistence.ETS, table: __MODULE__}
+    use Jido,
+      otp_app: :jido,
+      namespace: "composition-runtime-test",
+      persistence: {Jido.Persistence.ETS, table: __MODULE__}
   end
 
   test "status stays responsive and independent members start while readiness is blocked", %{

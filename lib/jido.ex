@@ -92,7 +92,8 @@ defmodule Jido do
   ## Options
 
     - `:otp_app` - Required. Your application name (e.g., `:my_app`).
-    - `:namespace` - Optional nonempty binary for stable Agent Ref operations.
+    - `:namespace` - Nonempty binary for stable Agent Ref operations.
+      Required for persistent Agents.
       One exact namespace can be bound to one live local instance per node.
     - `:persistence` - Optional `Jido.Persistence.Adapter` module or
       `{module, options}` tuple. The default is no durable persistence.
@@ -541,7 +542,8 @@ defmodule Jido do
 
   ## Options
     - `:name` - Required. The name of this Jido instance (e.g., `MyApp.Jido`)
-    - `:namespace` - Optional nonempty stable namespace for Ref-first functions
+    - `:namespace` - Nonempty stable namespace for Ref-first functions.
+      Required for persistent Agents.
     - `:max_tasks` - Task Supervisor child limit; defaults to `1_000`
     - `:persistence` - Optional default persistence adapter
 

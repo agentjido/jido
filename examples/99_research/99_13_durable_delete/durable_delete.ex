@@ -7,6 +7,10 @@ defmodule Jido.Examples.DurableDelete do
   end
 
   def delayed_write(store, order) do
-    Jido.Persistence.save_agent(store, order, revision: 1, expected_revision: 0)
+    Jido.Persistence.save_agent(store, order,
+      namespace: "durable-delete-example",
+      revision: 1,
+      expected_revision: 0
+    )
   end
 end

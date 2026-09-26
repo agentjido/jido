@@ -131,11 +131,16 @@ defmodule JidoTest.System.Scenarios.Execution do
           assert stored == snapshot.agent
           Observability.assert_turn(c.observer, signal, :ok, true)
           kill_agent(c, server)
+          # Delivery is at least once. Check retries by effect ID, then prove
+          # that restoring completed state starts no new attempt.
+          attempts = Sink.attempts(c.jido)
+          assert attempts != []
+          assert Enum.all?(attempts, &(&1.effect_id == "committed"))
           restored = start_agent(c, id: id, restore: :required)
           assert Server.snapshot(restored) == snapshot
           stop_agent(c, restored)
           assert Sink.records(c.jido) == %{"committed" => 7}
-          assert length(Sink.attempts(c.jido)) == 1
+          assert Sink.attempts(c.jido) == attempts
         end
       end
     end

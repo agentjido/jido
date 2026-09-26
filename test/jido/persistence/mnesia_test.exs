@@ -37,10 +37,18 @@ defmodule JidoTest.Persistence.MnesiaTest do
     source = {Mnesia, opts}
     agent = RuntimeAgent.new!(id: "mnesia-checkpoint")
 
-    assert :ok = Persistence.save_agent(source, agent)
-    assert {:ok, ^agent} = Persistence.load_agent(source, RuntimeAgent, agent.id)
-    assert :ok = Persistence.delete_agent(source, RuntimeAgent, agent.id)
-    assert {:error, :deleted} = Persistence.load_agent(source, RuntimeAgent, agent.id)
+    assert :ok = Persistence.save_agent(source, agent, namespace: "persistence-test")
+
+    assert {:ok, ^agent} =
+             Persistence.load_agent(source, RuntimeAgent, agent.id, namespace: "persistence-test")
+
+    assert :ok =
+             Persistence.delete_agent(source, RuntimeAgent, agent.id,
+               namespace: "persistence-test"
+             )
+
+    assert {:error, :deleted} =
+             Persistence.load_agent(source, RuntimeAgent, agent.id, namespace: "persistence-test")
   end
 
   test "requires an existing non-local set table with two attributes", %{table: table} do

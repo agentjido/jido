@@ -109,20 +109,28 @@ defmodule JidoTest.Persistence.EctoTest do
 
     assert :ok =
              Persistence.save_agent(store, agent,
+               namespace: "ecto-test",
                instance: __MODULE__,
                revision: 4
              )
 
     assert {:ok, ^agent, 4} =
              Persistence.load_agent_with_revision(store, RuntimeAgent, agent.id,
+               namespace: "ecto-test",
                instance: __MODULE__
              )
 
     assert :ok =
-             Persistence.delete_agent(store, RuntimeAgent, agent.id, instance: __MODULE__)
+             Persistence.delete_agent(store, RuntimeAgent, agent.id,
+               namespace: "ecto-test",
+               instance: __MODULE__
+             )
 
     assert {:error, :deleted} =
-             Persistence.load_agent(store, RuntimeAgent, agent.id, instance: __MODULE__)
+             Persistence.load_agent(store, RuntimeAgent, agent.id,
+               namespace: "ecto-test",
+               instance: __MODULE__
+             )
   end
 
   test "validates the repo, schema, and repository options", %{opts: opts} do

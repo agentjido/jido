@@ -2,103 +2,50 @@ defmodule Jido.Persistence.Record do
   @moduledoc false
 
   alias Jido.Agent
+  alias Jido.Agent.Ref
   alias Jido.Error
   alias Jido.PortableTerm
 
-  @legacy_format_version 1
-  @format_version 2
-  @ref_format_version 3
+  @format_version 3
+  @common_keys [:format, :kind, :namespace, :agent_module, :agent_id, :partition, :revision]
+  @active_keys @common_keys ++ [:agent_vsn, :checkpoint]
 
-  @common_keys [:format, :kind, :agent_module, :agent_id, :partition, :revision]
-  @active_keys @common_keys ++ [:instance, :agent_vsn, :checkpoint]
-  @tombstone_keys @common_keys ++ [:instance]
-  @ref_active_keys @common_keys ++ [:namespace, :agent_vsn, :checkpoint]
-  @ref_tombstone_keys @common_keys ++ [:namespace]
-
-  @doc false
-  @spec format_version() :: pos_integer()
   def format_version, do: @format_version
 
   @doc false
-  @spec ref_format_version() :: pos_integer()
-  def ref_format_version, do: @ref_format_version
-
-  @doc false
-  @spec build_active(Agent.t(), atom() | nil, term(), non_neg_integer(), map()) ::
+  @spec build_active(Agent.t(), Ref.t(), non_neg_integer(), map()) ::
           {:ok, map()} | {:error, term()}
-  def build_active(%Agent{} = agent, instance, partition, revision, checkpoint) do
+  def build_active(%Agent{} = agent, %Ref{} = ref, revision, checkpoint) do
     record = %{
       format: @format_version,
       kind: :active,
-      instance: instance,
+      namespace: ref.namespace,
       agent_module: agent.module,
       agent_vsn: agent.vsn,
       agent_id: agent.id,
-      partition: partition,
+      partition: ref.partition,
       revision: revision,
       checkpoint: checkpoint
     }
 
-    with :ok <- validate(record, instance, agent.module, agent.id, partition), do: {:ok, record}
-  end
-
-  @doc false
-  @spec build_tombstone(atom() | nil, module(), String.t(), term(), non_neg_integer()) ::
-          {:ok, map()} | {:error, term()}
-  def build_tombstone(instance, agent_module, agent_id, partition, revision) do
-    record = %{
-      format: @format_version,
-      kind: :tombstone,
-      instance: instance,
-      agent_module: agent_module,
-      agent_id: agent_id,
-      partition: partition,
-      revision: revision
-    }
-
-    with :ok <- validate(record, instance, agent_module, agent_id, partition), do: {:ok, record}
-  end
-
-  @doc false
-  @spec build_ref_active(Agent.t(), String.t(), String.t() | nil, non_neg_integer(), map()) ::
-          {:ok, map()} | {:error, term()}
-  def build_ref_active(%Agent{} = agent, namespace, partition, revision, checkpoint) do
-    record = %{
-      format: @ref_format_version,
-      kind: :active,
-      namespace: namespace,
-      agent_module: agent.module,
-      agent_vsn: agent.vsn,
-      agent_id: agent.id,
-      partition: partition,
-      revision: revision,
-      checkpoint: checkpoint
-    }
-
-    with :ok <- validate_ref(record, namespace, agent.module, agent.id, partition),
+    with :ok <- validate(record, ref, agent.module),
          do: {:ok, record}
   end
 
   @doc false
-  @spec build_ref_tombstone(
-          String.t(),
-          module(),
-          String.t(),
-          String.t() | nil,
-          non_neg_integer()
-        ) :: {:ok, map()} | {:error, term()}
-  def build_ref_tombstone(namespace, agent_module, agent_id, partition, revision) do
+  @spec build_tombstone(Ref.t(), module(), non_neg_integer()) :: {:ok, map()} | {:error, term()}
+  def build_tombstone(%Ref{} = ref, agent_module, revision) do
     record = %{
-      format: @ref_format_version,
+      format: @format_version,
       kind: :tombstone,
-      namespace: namespace,
+      namespace: ref.namespace,
       agent_module: agent_module,
-      agent_id: agent_id,
-      partition: partition,
+      agent_id: ref.id,
+      partition: ref.partition,
       revision: revision
     }
 
-    with :ok <- validate_ref(record, namespace, agent_module, agent_id, partition),
+    with :ok <- validate(record, ref, agent_module),
          do: {:ok, record}
   end
 
@@ -121,40 +68,22 @@ defmodule Jido.Persistence.Record do
   def decode(_value), do: {:error, :invalid_persistence_record}
 
   @doc false
-  @spec validate(term(), atom() | nil, module(), String.t(), term()) :: :ok | {:error, term()}
-  def validate(record, instance, agent_module, agent_id, partition) when is_map(record) do
-    with :ok <- validate_format_and_kind(record) do
-      validate_contents(record, :instance, instance, agent_module, agent_id, partition)
-    end
-  end
-
-  def validate(_record, _instance, _agent_module, _agent_id, _partition),
-    do: invalid(:shape)
-
-  @doc false
-  @spec validate_ref(term(), String.t(), module(), String.t(), String.t() | nil) ::
-          :ok | {:error, term()}
-  def validate_ref(record, namespace, agent_module, agent_id, partition)
-      when is_map(record) do
+  @spec validate(term(), Ref.t(), module()) :: :ok | {:error, term()}
+  def validate(record, %Ref{} = ref, agent_module) when is_map(record) do
     with :ok <- validate_format_and_kind(record),
-         true <- Map.get(record, :format) == @ref_format_version do
-      validate_contents(record, :namespace, namespace, agent_module, agent_id, partition)
-    else
-      false -> invalid(:format)
-      {:error, _reason} = error -> error
+         :ok <- validate_exact_shape(record),
+         :ok <- validate_identity(record, ref, agent_module),
+         :ok <- validate_revision(record),
+         :ok <- validate_kind_fields(record) do
+      validate_portable(record)
     end
   end
 
-  def validate_ref(_record, _namespace, _agent_module, _agent_id, _partition),
-    do: invalid(:shape)
+  def validate(_record, _ref, _agent_module), do: invalid(:shape)
 
   @doc false
   @spec kind(map()) :: :active | :tombstone | :unknown
-  def kind(%{format: @legacy_format_version, kind: :agent}), do: :active
-  def kind(%{format: @format_version, kind: :active}), do: :active
-  def kind(%{format: @format_version, kind: :tombstone}), do: :tombstone
-  def kind(%{format: @ref_format_version, kind: :active}), do: :active
-  def kind(%{format: @ref_format_version, kind: :tombstone}), do: :tombstone
+  def kind(%{format: @format_version, kind: kind}) when kind in [:active, :tombstone], do: kind
   def kind(_record), do: :unknown
 
   @doc false
@@ -171,85 +100,7 @@ defmodule Jido.Persistence.Record do
 
   @doc false
   @spec agent_vsn(map()) :: term()
-  def agent_vsn(%{format: format, kind: :active} = record)
-      when format in [@format_version, @ref_format_version],
-      do: Map.get(record, :agent_vsn)
-
-  def agent_vsn(_record), do: nil
-
-  def format_for_identity(%{mode: :legacy}), do: format_version()
-  def format_for_identity(%{mode: :ref}), do: ref_format_version()
-
-  def build_active_for_identity(agent, instance, partition, revision, checkpoint, %{mode: :legacy}) do
-    build_active(agent, instance, partition, revision, checkpoint)
-  end
-
-  def build_active_for_identity(agent, _instance, partition, revision, checkpoint, %{
-        mode: :ref,
-        namespace: namespace
-      }) do
-    build_ref_active(agent, namespace, partition, revision, checkpoint)
-  end
-
-  def build_tombstone_for_identity(
-        instance,
-        agent_module,
-        agent_id,
-        partition,
-        revision,
-        %{mode: :legacy}
-      ) do
-    build_tombstone(instance, agent_module, agent_id, partition, revision)
-  end
-
-  def build_tombstone_for_identity(
-        _instance,
-        agent_module,
-        agent_id,
-        partition,
-        revision,
-        %{mode: :ref, namespace: namespace}
-      ) do
-    build_ref_tombstone(namespace, agent_module, agent_id, partition, revision)
-  end
-
-  def validate_for_identity(record, %{mode: :legacy}, instance, agent_module, agent_id, partition) do
-    validate(record, instance, agent_module, agent_id, partition)
-  end
-
-  def validate_for_identity(
-        record,
-        %{mode: :ref, namespace: namespace},
-        _instance,
-        agent_module,
-        agent_id,
-        partition
-      ) do
-    validate_ref(record, namespace, agent_module, agent_id, partition)
-  end
-
-  def validate_against_record(current, record, %{mode: :legacy}) do
-    validate(
-      current,
-      record.instance,
-      record.agent_module,
-      record.agent_id,
-      record.partition
-    )
-  end
-
-  def validate_against_record(current, record, %{
-        mode: :ref,
-        namespace: namespace
-      }) do
-    validate_ref(
-      current,
-      namespace,
-      record.agent_module,
-      record.agent_id,
-      record.partition
-    )
-  end
+  def agent_vsn(record), do: Map.get(record, :agent_vsn)
 
   def require_active(record) do
     case kind(record) do
@@ -267,42 +118,16 @@ defmodule Jido.Persistence.Record do
     end
   end
 
-  defp validate_contents(record, scope_field, scope, agent_module, agent_id, partition) do
-    with :ok <- validate_exact_shape(record),
-         :ok <- validate_identity(record, scope_field, scope, agent_module, agent_id, partition),
-         :ok <- validate_revision(record),
-         :ok <- validate_kind_fields(record) do
-      validate_portable(record)
-    end
-  end
-
   defp validate_format_and_kind(record) do
     case {Map.get(record, :format), Map.get(record, :kind)} do
-      {@legacy_format_version, :agent} -> :ok
-      {@format_version, :active} -> :ok
-      {@format_version, :tombstone} -> :ok
-      {@ref_format_version, :active} -> :ok
-      {@ref_format_version, :tombstone} -> :ok
-      {@legacy_format_version, _kind} -> invalid(:kind)
+      {@format_version, kind} when kind in [:active, :tombstone] -> :ok
       {@format_version, _kind} -> invalid(:kind)
-      {@ref_format_version, _kind} -> invalid(:kind)
       {_format, _kind} -> invalid(:format)
     end
   end
 
-  defp validate_exact_shape(%{format: @legacy_format_version}), do: :ok
-
-  defp validate_exact_shape(%{format: @ref_format_version, kind: :active} = record),
-    do: exact_keys(record, @ref_active_keys)
-
-  defp validate_exact_shape(%{format: @ref_format_version, kind: :tombstone} = record),
-    do: exact_keys(record, @ref_tombstone_keys)
-
-  defp validate_exact_shape(%{format: @format_version, kind: :active} = record),
-    do: exact_keys(record, @active_keys)
-
-  defp validate_exact_shape(%{format: @format_version, kind: :tombstone} = record),
-    do: exact_keys(record, @tombstone_keys)
+  defp validate_exact_shape(%{kind: :active} = record), do: exact_keys(record, @active_keys)
+  defp validate_exact_shape(%{kind: :tombstone} = record), do: exact_keys(record, @common_keys)
 
   defp exact_keys(record, keys) do
     if map_size(record) == length(keys) and Enum.all?(keys, &Map.has_key?(record, &1)),
@@ -310,12 +135,12 @@ defmodule Jido.Persistence.Record do
       else: invalid(:shape)
   end
 
-  defp validate_identity(record, scope_field, scope, agent_module, agent_id, partition) do
+  defp validate_identity(record, ref, agent_module) do
     cond do
-      Map.get(record, scope_field) != scope -> invalid(scope_field)
+      Map.get(record, :namespace) != ref.namespace -> invalid(:namespace)
       Map.get(record, :agent_module) != agent_module -> invalid(:agent_module)
-      Map.get(record, :agent_id) != agent_id -> invalid(:agent_id)
-      Map.get(record, :partition) != partition -> invalid(:partition)
+      Map.get(record, :agent_id) != ref.id -> invalid(:agent_id)
+      Map.get(record, :partition) != ref.partition -> invalid(:partition)
       true -> :ok
     end
   end
@@ -333,12 +158,9 @@ defmodule Jido.Persistence.Record do
     end
   end
 
-  defp validate_active(%{format: format} = record)
-       when format in [@format_version, @ref_format_version] do
+  defp validate_active(record) do
     with :ok <- validate_checkpoint(record), do: validate_agent_vsn(record)
   end
-
-  defp validate_active(record), do: validate_checkpoint(record)
 
   defp validate_checkpoint(record) do
     checkpoint = Map.get(record, :checkpoint)

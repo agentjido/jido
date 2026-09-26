@@ -10,7 +10,7 @@ store = {Store, store: process}
 try do
   :ok = Probe.store_payload(store, "portable-agent", %{job: %{worker: self()}})
 
-  case Jido.Persistence.load_agent(store, Probe, "portable-agent") do
+  case Jido.Persistence.load_agent(store, Probe, "portable-agent", namespace: "persistence-probe") do
     {:ok, agent} ->
       IO.inspect(%{accepted_process_handle: is_pid(agent.state.payload.job.worker)}, label: "GAP")
 

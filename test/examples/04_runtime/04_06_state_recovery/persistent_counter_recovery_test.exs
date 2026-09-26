@@ -81,7 +81,7 @@ defmodule JidoTest.Examples.Runtime.PersistentCounterRecoveryTest do
   test "a corrupt record prevents restore", %{jido: jido} do
     {ETS, opts} = persistence = persistence(:corrupt)
     id = unique_id("corrupt-counter")
-    key = Persistence.agent_key(jido, PersistentCounterRecovery, id)
+    key = Persistence.agent_key(Jido.Agent.Ref.new!(namespace: Jido.namespace(jido), id: id))
 
     assert :ok = ETS.put(key, <<0, 1, 2>>, opts)
 

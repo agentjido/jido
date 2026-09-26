@@ -24,6 +24,8 @@ defmodule JidoTest.Case do
   - `:jido` - The name of the Jido instance (atom)
   - `:jido_pid` - The PID of the Jido supervisor
 
+  Each instance has a unique namespace for persistence.
+
   ## Helper Functions
 
   The module also provides helper functions:
@@ -94,7 +96,7 @@ defmodule JidoTest.Case do
     test_id = System.unique_integer([:positive])
     jido_name = :"jido_test_#{test_id}"
 
-    jido_pid = start_supervised!({Jido, name: jido_name})
+    jido_pid = start_supervised!({Jido, name: jido_name, namespace: "jido/test/#{test_id}"})
 
     {:ok, Map.merge(context, %{jido: jido_name, jido_pid: jido_pid})}
   end
