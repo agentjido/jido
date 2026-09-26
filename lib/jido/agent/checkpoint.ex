@@ -93,34 +93,36 @@ defmodule Jido.Agent.Checkpoint do
           {:ok, Agent.instance()} | {:error, term()}
   def default_restore(module, checkpoint, _context)
       when is_atom(module) and is_map(checkpoint) and not is_struct(checkpoint) do
-    with :ok <- portable(checkpoint, :checkpoint) do
-      cond do
-        exact_keys?(checkpoint, @default_keys) -> restore_generated(module, checkpoint)
-        exact_keys?(checkpoint, @embedded_keys) -> restore_embedded(module, checkpoint)
-        true -> invalid_checkpoint(checkpoint)
-      end
+    with :ok <- portable(checkpoint, :checkpoint),
+         {:ok, format} <- default_format(checkpoint),
+         :ok <- default_header(module, checkpoint, format),
+         {:ok, definition} <- restore_definition(module, checkpoint, format) do
+      Agent.instantiate(definition, id: checkpoint.id, state: checkpoint.state)
     end
   end
 
   def default_restore(module, checkpoint, _context),
     do: invalid_checkpoint(%{module: module, checkpoint: checkpoint})
 
-  defp restore_generated(module, checkpoint) do
-    with :ok <- default_header(module, checkpoint, :generated),
-         {:ok, definition} <- current_definition(module),
-         :ok <- same_vsn(checkpoint.vsn, definition.vsn),
-         {:ok, agent} <- Agent.instantiate(definition, id: checkpoint.id, state: checkpoint.state) do
-      {:ok, agent}
+  defp default_format(checkpoint) do
+    cond do
+      exact_keys?(checkpoint, @default_keys) -> {:ok, :generated}
+      exact_keys?(checkpoint, @embedded_keys) -> {:ok, :embedded}
+      true -> invalid_checkpoint(checkpoint)
     end
   end
 
-  defp restore_embedded(module, checkpoint) do
-    with :ok <- default_header(module, checkpoint, :embedded),
-         {:ok, definition} <- Agent.validate_definition(checkpoint.definition),
-         :ok <- embedded_header(module, checkpoint, definition),
-         {:ok, agent} <-
-           Agent.instantiate(definition, id: checkpoint.id, state: checkpoint.state) do
-      {:ok, agent}
+  defp restore_definition(module, checkpoint, :generated) do
+    with {:ok, definition} <- current_definition(module),
+         :ok <- same_vsn(checkpoint.vsn, definition.vsn) do
+      {:ok, definition}
+    end
+  end
+
+  defp restore_definition(module, checkpoint, :embedded) do
+    with {:ok, definition} <- Agent.validate_definition(checkpoint.definition),
+         :ok <- embedded_header(module, checkpoint, definition) do
+      {:ok, definition}
     end
   end
 
@@ -141,14 +143,8 @@ defmodule Jido.Agent.Checkpoint do
   end
 
   defp default_header(module, checkpoint, format) do
-    valid_vsn? =
-      case format do
-        :generated -> is_integer(checkpoint.vsn) and checkpoint.vsn > 0
-        :embedded -> is_nil(checkpoint.vsn) or (is_integer(checkpoint.vsn) and checkpoint.vsn > 0)
-      end
-
-    if checkpoint.version == @version and checkpoint.kind == :agent and
-         checkpoint.agent_module == module and valid_vsn? and
+    if valid_header?(module, checkpoint, :agent) and
+         (format == :embedded or not is_nil(checkpoint.vsn)) and
          is_binary(checkpoint.id) and byte_size(checkpoint.id) > 0 and
          is_map(checkpoint.state) and not is_struct(checkpoint.state) do
       :ok
@@ -164,18 +160,19 @@ defmodule Jido.Agent.Checkpoint do
   end
 
   defp custom_header(module, checkpoint) do
-    valid_vsn? = is_nil(checkpoint.vsn) or (is_integer(checkpoint.vsn) and checkpoint.vsn > 0)
-
-    with true <- checkpoint.version == @version,
-         true <- checkpoint.kind == :agent_custom,
-         true <- checkpoint.agent_module == module,
-         true <- valid_vsn?,
+    with true <- valid_header?(module, checkpoint, :agent_custom),
          :ok <- current_vsn(module, checkpoint.vsn) do
       :ok
     else
       false -> invalid_checkpoint(checkpoint)
       {:error, _reason} = error -> error
     end
+  end
+
+  defp valid_header?(module, checkpoint, kind) do
+    checkpoint.version == @version and checkpoint.kind == kind and
+      checkpoint.agent_module == module and
+      (is_nil(checkpoint.vsn) or (is_integer(checkpoint.vsn) and checkpoint.vsn > 0))
   end
 
   defp checkpoint_definition(agent, definition) do
@@ -278,7 +275,8 @@ defmodule Jido.Agent.Checkpoint do
       module != Agent and function_exported?(module, :definition, 0) and
         function_exported?(module, :vsn, 0)
 
-  defp exact_keys?(map, keys), do: Enum.sort(Map.keys(map)) == Enum.sort(keys)
+  defp exact_keys?(map, keys),
+    do: map_size(map) == length(keys) and Enum.all?(keys, &Map.has_key?(map, &1))
 
   defp invalid_checkpoint(checkpoint),
     do: invalid("Invalid Agent checkpoint", %{code: :invalid_checkpoint, checkpoint: checkpoint})
