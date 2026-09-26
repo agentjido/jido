@@ -64,7 +64,7 @@ defmodule Jido.Plugin.AfterCommitTest do
     assert {:ok, [spec]} = Jido.Plugin.Normalizer.normalize_all([{Stateless, sink: :sink}])
     refute spec.agent_server.runtime?
     assert spec.agent_server.module == NotificationFacet
-    assert Callbacks.commit_modules([spec]) == [Stateless]
+    assert Callbacks.commit_specs([spec]) == [spec]
   end
 
   test "commit options stay within the selected owner facet" do

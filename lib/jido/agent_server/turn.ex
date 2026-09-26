@@ -63,8 +63,10 @@ defmodule Jido.AgentServer.Turn do
       with {:ok, command} <- initial_command(signal, context, data) do
         data = %{data | active: %{data.active | source_signal: command.signal}}
 
-        if AgentPlugin.prepares?(data.plugin_specs) or Callbacks.admits?(data.plugin_specs) do
-          start_admission_task(command, data)
+        admission_specs = Callbacks.admission_specs(data.plugin_specs)
+
+        if AgentPlugin.prepares?(data.plugin_specs) or admission_specs != [] do
+          start_admission_task(command, admission_specs, data)
         else
           begin_turn_execution(command, data)
         end
@@ -99,12 +101,12 @@ defmodule Jido.AgentServer.Turn do
     Jido.Agent.Command.new_trusted_agent(data.agent, signal, context)
   end
 
-  defp start_admission_task(command, %State{} = data) do
+  defp start_admission_task(command, admission_specs, %State{} = data) do
     plugin_specs = data.plugin_specs
     state_version = data.state_version
 
     with {:ok, runtime_refs} <-
-           PluginLifecycle.plugin_runtime_refs(data, Callbacks.admission_modules(plugin_specs)) do
+           PluginLifecycle.plugin_runtime_refs(data, admission_specs) do
       pending =
         TaskSupport.start_traced(
           data.jido,
@@ -115,7 +117,7 @@ defmodule Jido.AgentServer.Turn do
                  {:ok, command} <-
                    Callbacks.admit(
                      command,
-                     plugin_specs,
+                     admission_specs,
                      runtime_refs,
                      state_version
                    ) do
@@ -308,12 +310,12 @@ defmodule Jido.AgentServer.Turn do
 
     AgentTelemetry.committed(next_data, version, directive_count)
 
-    notifications = Callbacks.commit_modules(data.plugin_specs)
+    notifications = Callbacks.commit_specs(data.plugin_specs)
 
     post_commit_actions =
       case notifications do
         [] -> PostCommit.directive_actions(directives, agent.id, active)
-        modules -> [{:next_event, :internal, {:after_commit, modules, directives}}]
+        specs -> [{:next_event, :internal, {:after_commit, specs, directives}}]
       end
 
     actions = TurnCompletion.reply_action(active.caller, {:ok, agent}) ++ post_commit_actions

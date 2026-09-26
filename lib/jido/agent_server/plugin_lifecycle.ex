@@ -20,10 +20,9 @@ defmodule Jido.AgentServer.PluginLifecycle do
         {:error, {:plugin_spec_not_found, plugin}}
 
       plugin_spec ->
-        with {:ok, [child_spec]} <- Callbacks.child_specs(init(state, plugin_spec), [plugin_spec]) do
-          {:ok, child_spec}
-        else
-          {:ok, []} -> {:error, {:plugin_runtime_not_declared, plugin}}
+        case Callbacks.child_spec(init(state, plugin_spec), plugin_spec) do
+          {:ok, child_spec} -> {:ok, child_spec}
+          :none -> {:error, {:plugin_runtime_not_declared, plugin}}
           {:error, reason} -> {:error, {:plugin_child_spec_failed, plugin, reason}}
         end
     end
@@ -125,8 +124,9 @@ defmodule Jido.AgentServer.PluginLifecycle do
   defp child_specs(state) do
     state.plugin_specs
     |> Enum.reduce_while({:ok, []}, fn plugin_spec, {:ok, child_specs} ->
-      case Callbacks.child_specs(init(state, plugin_spec), [plugin_spec]) do
-        {:ok, specs} -> {:cont, {:ok, Enum.reverse(specs, child_specs)}}
+      case Callbacks.child_spec(init(state, plugin_spec), plugin_spec) do
+        :none -> {:cont, {:ok, child_specs}}
+        {:ok, spec} -> {:cont, {:ok, [{plugin_spec, spec} | child_specs]}}
         {:error, reason} -> {:halt, {:error, reason}}
       end
     end)
@@ -149,10 +149,7 @@ defmodule Jido.AgentServer.PluginLifecycle do
     }
   end
 
-  defp start_child(state, %{id: plugin} = child_spec) do
-    spec = Supervisor.child_spec(child_spec, [])
-    plugin_spec = Enum.find(state.plugin_specs, &(&1.module == plugin))
-
+  defp start_child(state, {plugin_spec, %{id: plugin} = spec}) do
     wrapper_spec =
       Supervisor.child_spec(
         {PluginChild,
@@ -314,12 +311,10 @@ defmodule Jido.AgentServer.PluginLifecycle do
 
   def plugin_state_value(_state, _spec), do: nil
 
-  def plugin_runtime_refs(%State{} = data, modules) do
-    Enum.reduce_while(modules, {:ok, %{}}, fn module, {:ok, refs} ->
-      spec = Enum.find(data.plugin_specs, &(&1.module == module))
-
-      case plugin_runtime_ref(runtime_source(data, module), spec) do
-        {:ok, runtime_ref} -> {:cont, {:ok, Map.put(refs, module, runtime_ref)}}
+  def plugin_runtime_refs(%State{} = data, specs) do
+    Enum.reduce_while(specs, {:ok, %{}}, fn spec, {:ok, refs} ->
+      case plugin_runtime_ref(runtime_source(data, spec.module), spec) do
+        {:ok, runtime_ref} -> {:cont, {:ok, Map.put(refs, spec.module, runtime_ref)}}
         {:error, reason} -> {:halt, {:error, reason}}
       end
     end)

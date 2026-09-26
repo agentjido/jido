@@ -137,11 +137,11 @@ defmodule Jido.AgentServer.PostCommit do
          span,
          %State{active: %ActiveTurn{} = active} = data
        ) do
-    modules = Callbacks.dispatch_modules(data.plugin_specs)
+    plugin_specs = Callbacks.dispatch_specs(data.plugin_specs)
 
     with {:ok, prepared_directive, target} <-
            DirectiveRuntime.prepare_signal(directive, context, data),
-         {:ok, runtime_refs} <- PluginLifecycle.plugin_runtime_refs(data, modules) do
+         {:ok, runtime_refs} <- PluginLifecycle.plugin_runtime_refs(data, plugin_specs) do
       plugin_context = %PluginSignalContext{
         turn_id: active.turn_id,
         agent_id: data.agent.id,
@@ -156,7 +156,6 @@ defmodule Jido.AgentServer.PostCommit do
       }
 
       agent_server = self()
-      plugin_specs = data.plugin_specs
       default_dispatch = data.config.default_dispatch
       jido = data.jido
 
@@ -330,8 +329,8 @@ defmodule Jido.AgentServer.PostCommit do
     kind, reason -> complete_directive({:error, {kind, reason}, data}, rest, context, span)
   end
 
-  defp start_commit_notification(module, rest, directives, data) do
-    plugin = Enum.find(data.plugin_specs, &(&1.module == module))
+  defp start_commit_notification(plugin, rest, directives, data) do
+    module = plugin.module
 
     commit = %Commit{
       plugin: module,
