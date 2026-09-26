@@ -42,25 +42,18 @@ defmodule Jido.Examples.ApprovalWorkflow do
   routes do
     signal_source "/examples/flight_booking"
 
-    route "examples.flight.request", Jido.Examples.ApprovalWorkflow.SearchFlow do
-      define :search_flights
-    end
+    route "examples.flight.request", Jido.Examples.ApprovalWorkflow.SearchFlow,
+      as: :search_flights
 
-    route "examples.flight.preferences_updated", Jido.Examples.ApprovalWorkflow.SearchFlow do
-      define :update_preferences
-    end
+    route "examples.flight.preferences_updated", Jido.Examples.ApprovalWorkflow.SearchFlow,
+      as: :update_preferences
 
-    route "examples.flight.select", Jido.Examples.ApprovalWorkflow.SelectFare do
-      define :select_fare
-    end
+    route "examples.flight.select", Jido.Examples.ApprovalWorkflow.SelectFare, as: :select_fare
 
-    route "examples.flight.approve", Jido.Examples.ApprovalWorkflow.ApproveBooking do
-      define :approve_booking
-    end
+    route "examples.flight.approve", Jido.Examples.ApprovalWorkflow.ApproveBooking,
+      as: :approve_booking
 
-    route "examples.flight.cancel", Jido.Examples.ApprovalWorkflow.Cancel do
-      define :cancel
-    end
+    route "examples.flight.cancel", Jido.Examples.ApprovalWorkflow.Cancel, as: :cancel
 
     route "examples.flight.booking_succeeded", Jido.Examples.ApprovalWorkflow.BookingSucceeded
     route "examples.flight.booking_failed", Jido.Examples.ApprovalWorkflow.BookingFailed

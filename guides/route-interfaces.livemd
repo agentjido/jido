@@ -34,15 +34,15 @@ defmodule RouteInterfaces.Order do
   routes do
     signal_source("/guides/route-interfaces")
 
-    route "order.status.set", RouteInterfaces.SetStatus do
-      define(:set_status)
-    end
+    route "order.status.set", RouteInterfaces.SetStatus, as: :set_status
   end
 end
 ```
 
-A generated interface requires an exact route with no match predicate. This
-keeps one helper tied to one executable target.
+Use `as: :set_status` to generate `set_status_signal/1,2`. Each route can name
+one helper. Omit `as:` to generate no helper. A generated interface requires
+an exact route with no match predicate. The `routes` block must set
+`signal_source`. Helper names must be atoms and unique in the module.
 
 ## Construct A Signal
 

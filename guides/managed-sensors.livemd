@@ -63,7 +63,7 @@ defmodule SensorGuide.Agent do
   routes do
     signal_source("/guides/sensor")
 
-    route "sensor.start" do
+    route "sensor.start", as: :start_probe do
       action %{observer: observer},
         name: "sensor_guide_start",
         schema: Zoi.object(%{observer: Zoi.atom()}),
@@ -77,16 +77,12 @@ defmodule SensorGuide.Agent do
 
         {:ok, context.agent_state, [directive]}
       end
-
-      define(:start_probe)
     end
 
-    route "sensor.stop" do
+    route "sensor.stop", as: :stop_probe do
       action _input, name: "sensor_guide_stop", context: context do
         {:ok, context.agent_state, [Jido.Plugin.SensorManager.stop(:probe)]}
       end
-
-      define(:stop_probe)
     end
 
     route "sensor.ready" do

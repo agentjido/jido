@@ -49,9 +49,8 @@ defmodule AgentDSL.Profile do
   routes do
     signal_source("/guides/agent-dsl")
 
-    route "profile.rename", AgentDSL.Rename do
+    route "profile.rename", AgentDSL.Rename, as: :rename do
       defaults(%{name: "Anonymous"})
-      define(:rename)
     end
   end
 end

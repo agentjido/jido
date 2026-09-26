@@ -11,14 +11,12 @@ defmodule Jido.Examples.Topology.InboxWorker do
   routes do
     signal_source "/examples/topology/plugin_contribution"
 
-    route "examples.topology.plugin_contribution.work" do
+    route "examples.topology.plugin_contribution.work", as: :work do
       action %{value: value},
         schema: Zoi.object(%{value: Zoi.integer()}),
         context: context do
         {:ok, %{context.agent_state | total: context.agent_state.total + value}}
       end
-
-      define :work
     end
   end
 end

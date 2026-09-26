@@ -5,8 +5,6 @@ defmodule JidoTest.Authoring.Agents.Fixtures.Invalid.MissingSource do
   end
 
   routes do
-    route "counter.add", JidoTest.Authoring.Agents.Fixtures.Add do
-      define :add
-    end
+    route "counter.add", JidoTest.Authoring.Agents.Fixtures.Add, as: :add
   end
 end

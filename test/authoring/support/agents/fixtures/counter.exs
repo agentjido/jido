@@ -22,10 +22,9 @@ defmodule JidoTest.Authoring.Agents.Fixtures.BlockCounter do
   routes do
     signal_source "/authoring/counter"
 
-    route "counter.add", JidoTest.Authoring.Agents.Fixtures.Add do
+    route "counter.add", JidoTest.Authoring.Agents.Fixtures.Add, as: :add do
       defaults %{amount: 1}
       priority 10
-      define :add
     end
 
     route "counter.*", JidoTest.Authoring.Agents.Fixtures.Add do

@@ -9,17 +9,15 @@ defmodule Jido.Examples.RemoteCounter do
   routes do
     signal_source "/examples/multi_agent/remote_child/counter"
 
-    route "examples.multi_agent.remote_child.record" do
+    route "examples.multi_agent.remote_child.record", as: :record do
       action %{value: value},
         schema: Zoi.object(%{value: Zoi.integer()}),
         context: context do
         {:ok, %{context.agent_state | value: value}}
       end
-
-      define :record
     end
 
-    route "examples.multi_agent.remote_child.calculate" do
+    route "examples.multi_agent.remote_child.calculate", as: :calculate do
       action input,
         schema: Zoi.object(%{value: Zoi.integer(), request_id: Zoi.string()}),
         context: context do
@@ -33,8 +31,6 @@ defmodule Jido.Examples.RemoteCounter do
         {:ok, %{context.agent_state | value: input.value},
          [Jido.Agent.Directive.emit_to_parent(reply)]}
       end
-
-      define :calculate
     end
   end
 end

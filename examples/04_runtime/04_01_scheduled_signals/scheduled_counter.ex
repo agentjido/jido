@@ -26,7 +26,7 @@ defmodule Jido.Examples.ScheduledCounter do
   routes do
     signal_source "/examples/runtime/scheduled_counter"
 
-    route "examples.runtime.scheduled_counter.schedule_once" do
+    route "examples.runtime.scheduled_counter.schedule_once", as: :schedule_once do
       action %{delay_ms: delay_ms},
         schema: Zoi.object(%{delay_ms: Zoi.integer() |> Zoi.min(0)}),
         context: context do
@@ -40,11 +40,9 @@ defmodule Jido.Examples.ScheduledCounter do
         {:ok, %{state | schedule_requests: state.schedule_requests + 1},
          [Jido.Plugin.Scheduler.schedule(delay_ms, tick)]}
       end
-
-      define :schedule_once
     end
 
-    route "examples.runtime.scheduled_counter.enable_cron" do
+    route "examples.runtime.scheduled_counter.enable_cron", as: :enable_cron do
       defaults %{expression: "* * * * * * *"}
 
       action %{job_id: job_id, expression: expression},
@@ -58,19 +56,15 @@ defmodule Jido.Examples.ScheduledCounter do
         directive = Jido.Plugin.Scheduler.cron(job_id, expression, tick)
         {:ok, %{context.agent_state | cron_enabled: true}, [directive]}
       end
-
-      define :enable_cron
     end
 
-    route "examples.runtime.scheduled_counter.disable_cron" do
+    route "examples.runtime.scheduled_counter.disable_cron", as: :disable_cron do
       action %{job_id: job_id},
         schema: Zoi.object(%{job_id: Zoi.any()}),
         context: context do
         directive = Jido.Plugin.Scheduler.cancel(job_id)
         {:ok, %{context.agent_state | cron_enabled: false}, [directive]}
       end
-
-      define :disable_cron
     end
 
     route "examples.runtime.scheduled_counter.tick" do

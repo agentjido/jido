@@ -104,26 +104,22 @@ defmodule JidoTest.RecoverableDeliveryAgent do
   routes do
     signal_source "/test/recoverable_delivery"
 
-    route "examples.runtime.delivery.record" do
+    route "examples.runtime.delivery.record", as: :record_and_deliver do
       action %{effect_id: effect_id, value: value},
         schema: Zoi.object(%{effect_id: Zoi.string() |> Zoi.min(1), value: Zoi.integer()}),
         context: context do
         directive = struct!(Deliver, effect_id: effect_id, value: value)
         {:ok, %{context.agent_state | value: value}, [directive]}
       end
-
-      define :record_and_deliver
     end
 
-    route "examples.runtime.delivery.confirm" do
+    route "examples.runtime.delivery.confirm", as: :confirm_delivery do
       action %{effect_id: effect_id, value: value},
         schema: Zoi.object(%{effect_id: Zoi.string() |> Zoi.min(1), value: Zoi.integer()}),
         context: context do
         confirmation = struct!(Confirm, effect_id: effect_id, value: value)
         {:ok, context.agent_state, [confirmation]}
       end
-
-      define :confirm_delivery
     end
   end
 end

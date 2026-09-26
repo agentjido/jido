@@ -17,12 +17,10 @@ defmodule Jido.Examples.Factory.Orchestrator do
   routes do
     signal_source "/examples/factory/department_factory"
 
-    route "examples.factory.department_factory.boot" do
+    route "examples.factory.department_factory.boot", as: :boot do
       action _input, context: context do
         Jido.Examples.Factory.Orchestrator.State.start_departments(context.agent_state)
       end
-
-      define :boot
     end
 
     route "examples.factory.command" do

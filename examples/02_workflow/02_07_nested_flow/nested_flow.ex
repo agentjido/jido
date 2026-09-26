@@ -9,9 +9,7 @@ defmodule Jido.Examples.NestedFlow do
   routes do
     signal_source "/workflow"
 
-    route "workflow.nested", Jido.Examples.NestedFlow.Pipeline do
-      define :draft_and_review
-    end
+    route "workflow.nested", Jido.Examples.NestedFlow.Pipeline, as: :draft_and_review
   end
 end
 

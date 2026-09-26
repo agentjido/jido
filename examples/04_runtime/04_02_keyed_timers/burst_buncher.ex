@@ -28,7 +28,7 @@ defmodule Jido.Examples.BurstBuncher do
   routes do
     signal_source "/examples/runtime/burst_buncher"
 
-    route "examples.runtime.burst_buncher.add" do
+    route "examples.runtime.burst_buncher.add", as: :add_item do
       action input,
         schema:
           Zoi.object(%{
@@ -83,11 +83,9 @@ defmodule Jido.Examples.BurstBuncher do
           end
         end
       end
-
-      define :add_item
     end
 
-    route "examples.runtime.burst_buncher.flush" do
+    route "examples.runtime.burst_buncher.flush", as: :flush do
       action %{generation: generation},
         schema: Zoi.object(%{generation: Zoi.integer() |> Zoi.min(0)}),
         context: context do
@@ -117,8 +115,6 @@ defmodule Jido.Examples.BurstBuncher do
           {:ok, state}
         end
       end
-
-      define :flush
     end
   end
 

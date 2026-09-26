@@ -14,7 +14,7 @@ defmodule Jido.Examples.IndeterminateWriteProbe do
   routes do
     signal_source "/examples/research/indeterminate_write"
 
-    route "examples.research.indeterminate_write.increment" do
+    route "examples.research.indeterminate_write.increment", as: :increment do
       action input,
         schema: Zoi.object(%{request_id: Zoi.string() |> Zoi.min(1), amount: Zoi.integer()}),
         context: context do
@@ -34,8 +34,6 @@ defmodule Jido.Examples.IndeterminateWriteProbe do
 
         {:ok, next, directives}
       end
-
-      define :increment
     end
   end
 end

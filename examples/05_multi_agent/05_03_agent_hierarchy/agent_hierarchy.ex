@@ -13,7 +13,7 @@ defmodule Jido.Examples.AgentHierarchy do
   routes do
     signal_source "/examples/multi_agent/agent_hierarchy"
 
-    route "examples.multi_agent.agent_hierarchy.grow" do
+    route "examples.multi_agent.agent_hierarchy.grow", as: :grow do
       action %{depth: depth},
         schema: Zoi.object(%{depth: Zoi.integer() |> Zoi.min(0) |> Zoi.max(4)}),
         context: context do
@@ -45,8 +45,6 @@ defmodule Jido.Examples.AgentHierarchy do
           {:ok, %{state | expanded: true, depth: depth}, directives}
         end
       end
-
-      define :grow
     end
 
     route "jido.agent.child.started", Jido.Examples.Support.KeepState

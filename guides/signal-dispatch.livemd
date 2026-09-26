@@ -23,7 +23,7 @@ defmodule DispatchGuide.Sender do
   routes do
     signal_source("/guides/dispatch")
 
-    route "dispatch.send" do
+    route "dispatch.send", as: :send_text do
       action %{recipient: recipient, text: text},
         name: "dispatch_guide_send",
         schema: Zoi.object(%{recipient: Zoi.pid(), text: Zoi.string()}),
@@ -43,8 +43,6 @@ defmodule DispatchGuide.Sender do
 
         {:ok, %{context.agent_state | sent: context.agent_state.sent + 1}, [directive]}
       end
-
-      define(:send_text)
     end
   end
 end

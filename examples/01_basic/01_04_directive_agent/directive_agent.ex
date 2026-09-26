@@ -18,7 +18,7 @@ defmodule Jido.Examples.DirectiveAgent do
   routes do
     signal_source "/examples/basic/directive_agent"
 
-    route "basic.directive.set_count" do
+    route "basic.directive.set_count", as: :set_count do
       action %{count: count, batch: batch},
         schema:
           Zoi.object(%{
@@ -36,8 +36,6 @@ defmodule Jido.Examples.DirectiveAgent do
         {:ok, %{context.agent_state | count: count},
          [%Record{label: "first"}, second, %Record{label: "third"}]}
       end
-
-      define :set_count
     end
   end
 end

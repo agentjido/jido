@@ -27,7 +27,7 @@ defmodule Jido.Examples.ManagedJobs do
   routes do
     signal_source "/examples/runtime/managed_jobs"
 
-    route "examples.runtime.jobs.start" do
+    route "examples.runtime.jobs.start", as: :start_job do
       action input,
         schema: Zoi.object(%{job_id: Zoi.string() |> Zoi.min(1), value: Zoi.integer()}),
         context: context do
@@ -49,11 +49,9 @@ defmodule Jido.Examples.ManagedJobs do
           end
         end
       end
-
-      define :start_job
     end
 
-    route "examples.runtime.jobs.cancel" do
+    route "examples.runtime.jobs.cancel", as: :cancel_job do
       action %{job_id: job_id},
         schema: Zoi.object(%{job_id: Zoi.string()}),
         context: context do
@@ -65,11 +63,9 @@ defmodule Jido.Examples.ManagedJobs do
           {:error, Jido.Action.Error.validation_error("job is not running")}
         end
       end
-
-      define :cancel_job
     end
 
-    route "examples.runtime.jobs.settle" do
+    route "examples.runtime.jobs.settle", as: :settle do
       action input,
         schema:
           Zoi.object(%{
@@ -86,8 +82,6 @@ defmodule Jido.Examples.ManagedJobs do
           {:error, Jido.Action.Error.validation_error("job result is stale")}
         end
       end
-
-      define :settle
     end
   end
 end

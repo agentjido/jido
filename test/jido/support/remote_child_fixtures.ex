@@ -51,7 +51,7 @@ defmodule JidoTest.RemoteChildFixtures.LifecycleParent do
   routes do
     signal_source "/test/remote/lifecycle"
 
-    route "test.remote.create_worker" do
+    route "test.remote.create_worker", as: :create_worker do
       action input,
         schema: Zoi.object(%{target_node: Zoi.atom(), worker_module: Zoi.module()}),
         context: context do
@@ -63,8 +63,6 @@ defmodule JidoTest.RemoteChildFixtures.LifecycleParent do
 
         {:ok, context.agent_state, [directive]}
       end
-
-      define :create_worker
     end
 
     route "jido.agent.child.exit" do

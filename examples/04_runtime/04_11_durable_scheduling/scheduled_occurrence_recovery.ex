@@ -22,13 +22,9 @@ defmodule Jido.Examples.ScheduledOccurrenceRecovery do
   routes do
     signal_source "/examples/runtime/durable_schedule"
 
-    route "examples.runtime.schedule.arm", __MODULE__.Arm do
-      define :arm_schedule
-    end
+    route "examples.runtime.schedule.arm", __MODULE__.Arm, as: :arm_schedule
 
-    route "examples.runtime.schedule.cancel", __MODULE__.Cancel do
-      define :cancel_schedule
-    end
+    route "examples.runtime.schedule.cancel", __MODULE__.Cancel, as: :cancel_schedule
 
     route "jido.scheduler.enqueue", Jido.Plugin.Scheduler.Enqueue
     route "examples.runtime.schedule.tick", __MODULE__.Capture

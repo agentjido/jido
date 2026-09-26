@@ -35,7 +35,7 @@ defmodule ChildGuide.Parent do
   routes do
     signal_source("/guides/children")
 
-    route "child.start" do
+    route "child.start", as: :start_worker do
       action _input, name: "child_guide_start", context: context do
         directive =
           Jido.Agent.Directive.spawn_child(
@@ -47,16 +47,12 @@ defmodule ChildGuide.Parent do
 
         {:ok, %{context.agent_state | desired: true}, [directive]}
       end
-
-      define(:start_worker)
     end
 
-    route "child.stop" do
+    route "child.stop", as: :stop_worker do
       action _input, name: "child_guide_stop", context: context do
         {:ok, %{context.agent_state | desired: false}, [Jido.Agent.Directive.stop_child(:worker)]}
       end
-
-      define(:stop_worker)
     end
 
     route "jido.agent.child.*" do

@@ -15,7 +15,7 @@ defmodule Jido.Examples.RemoteLifecycle do
   routes do
     signal_source "/examples/multi_agent/remote_lifecycle"
 
-    route "examples.multi_agent.remote_lifecycle.create_worker" do
+    route "examples.multi_agent.remote_lifecycle.create_worker", as: :create_worker do
       action %{target_node: target_node},
         schema: Zoi.object(%{target_node: Zoi.atom()}),
         context: context do
@@ -27,8 +27,6 @@ defmodule Jido.Examples.RemoteLifecycle do
 
         {:ok, context.agent_state, [directive]}
       end
-
-      define :create_worker
     end
 
     route "jido.agent.child.exit" do

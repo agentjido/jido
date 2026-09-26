@@ -10,7 +10,7 @@ defmodule Jido.Examples.Worker do
   routes do
     signal_source "/examples/multi_agent/worker"
 
-    route "examples.multi_agent.worker.calculate" do
+    route "examples.multi_agent.worker.calculate", as: :calculate do
       action input,
         schema:
           Zoi.object(%{
@@ -30,8 +30,6 @@ defmodule Jido.Examples.Worker do
         {:ok, %{completed: context.agent_state.completed ++ [result]},
          [Jido.Agent.Directive.emit_to_parent(reply)]}
       end
-
-      define :calculate
     end
   end
 end

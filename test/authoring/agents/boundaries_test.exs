@@ -13,7 +13,7 @@ defmodule JidoTest.Authoring.Agents.BoundariesTest do
   end
 
   for {file, message} <- [
-        {"missing_source", "signal_source is required for define"},
+        {"missing_source", "signal_source is required for as:"},
         {"duplicate_schema", "Fields declared in both keyword and block form"},
         {"helper_collision", "Generated function conflicts with replace_signal/1"},
         {"plugin_conflict", "Plugin-owned Agent state key conflicts with the domain schema"}
@@ -28,13 +28,13 @@ defmodule JidoTest.Authoring.Agents.BoundariesTest do
     end
   end
 
-  test "removed positional declarations report their source location" do
+  test "removed define declarations fail compilation" do
     error =
-      assert_raise Spark.Error.DslError, fn ->
-        Corpus.compile_file("invalid/optional_list.exs")
+      assert_raise CompileError, fn ->
+        Corpus.compile_file("invalid/removed_define.exs")
       end
 
-    assert Exception.message(error) =~ "args"
+    assert error.file == Corpus.fixture("invalid/removed_define.exs")
   end
 
   for variant <- [:counter_block, :inline, :flow_plugin] do
@@ -57,7 +57,8 @@ defmodule JidoTest.Authoring.Agents.BoundariesTest do
   test "keyword authoring does not generate undeclared helpers" do
     Corpus.load!(:counter_keyword)
     module = Corpus.spec(:counter_keyword).attrs.module
-    refute function_exported?(module, :add_signal, 0)
+    refute function_exported?(module, :add_signal, 1)
+    refute function_exported?(module, :add_signal, 2)
   end
 
   test "required state cannot be omitted and unknown state fields are rejected" do

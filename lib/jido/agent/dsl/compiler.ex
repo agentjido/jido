@@ -57,14 +57,10 @@ defmodule Jido.Agent.DSL.Compiler do
       fail!(env, "Agent vsn must be a positive integer")
     end
 
-    routes =
-      if extensions == [],
-        do: routes,
-        else: lowered_interfaces(routes, Map.get(config, :routes, []), env)
+    if extensions != [],
+      do: validate_lowered_routes!(routes, Map.get(config, :routes, []), env)
 
-    interfaces = interfaces(routes, source, env)
-
-    generated = generate(interfaces, env)
+    generated = generate(routes, source, env)
     block? = fields != %{} or source != nil or extensions != []
 
     quote do
@@ -91,25 +87,21 @@ defmodule Jido.Agent.DSL.Compiler do
     end
   end
 
-  defp lowered_interfaces(routes, lowered, env) do
+  defp validate_lowered_routes!(routes, lowered, env) do
     lowered = unwrap!(Authoring.routes(lowered), env)
 
-    Enum.map(routes, fn route ->
-      if route.interfaces == [] do
-        route
-      else
-        case Enum.filter(lowered, &(&1.path == route.path)) do
-          [final] when is_nil(final.match) ->
-            %{route | target: final.target}
+    for route <- routes, not is_nil(route.as) do
+      case Enum.filter(lowered, &(&1.path == route.path)) do
+        [final] when is_nil(final.match) ->
+          :ok
 
-          _ ->
-            fail!(
-              Authoring.location(env, route),
-              "An exposed Signal type must retain exactly one route without a match predicate after lowering"
-            )
-        end
+        _ ->
+          fail!(
+            Authoring.location(env, route),
+            "An exposed Signal type must retain exactly one route without a match predicate after lowering"
+          )
       end
-    end)
+    end
   end
 
   def verify(module) do
@@ -151,11 +143,13 @@ defmodule Jido.Agent.DSL.Compiler do
     unwrap!(Authoring.route(route.path, route.target, opts), Authoring.location(env, route))
   end
 
-  defp interfaces(routes, source, env) do
+  defp generate(routes, source, env) do
     route_counts = Enum.frequencies_by(routes, & &1.path)
+    exposed = Enum.reject(routes, &is_nil(&1.as))
+    names = Enum.frequencies_by(exposed, & &1.as)
 
     source_result =
-      if Enum.any?(routes, &(&1.interfaces != [])) do
+      if exposed != [] do
         if is_binary(source),
           do: Jido.Signal.validate_uri_reference(source, []),
           else: :missing
@@ -163,49 +157,30 @@ defmodule Jido.Agent.DSL.Compiler do
         :ok
       end
 
-    Enum.flat_map(routes, fn route ->
-      Enum.map(route.interfaces, fn interface ->
-        env = Authoring.location(env, interface)
+    Enum.map(exposed, fn route ->
+      env = Authoring.location(env, route)
 
-        if String.contains?(route.path, "*") or route.match != nil,
-          do: fail!(env, "define requires an exact route without a match predicate")
+      if String.contains?(route.path, "*") or route.match != nil,
+        do: fail!(env, "as: requires an exact route without a match predicate")
 
-        if Map.fetch!(route_counts, route.path) > 1,
-          do: fail!(env, "An exposed Signal type must have exactly one route")
+      if Map.fetch!(route_counts, route.path) > 1,
+        do: fail!(env, "An exposed Signal type must have exactly one route")
 
-        case source_result do
-          :ok -> :ok
-          :missing -> fail!(env, "signal_source is required for define")
-          {:error, reason} -> fail!(env, "Invalid signal_source: #{reason}")
-        end
+      case source_result do
+        :ok -> :ok
+        :missing -> fail!(env, "signal_source is required for as:")
+        {:error, reason} -> fail!(env, "Invalid signal_source: #{reason}")
+      end
 
-        %{
-          name: interface.name,
-          path: route.path,
-          source: source,
-          line: env.line
-        }
-      end)
-    end)
-  end
-
-  defp generate(interfaces, env) do
-    names = Enum.map(interfaces, & &1.name)
-    if length(names) != length(Enum.uniq(names)), do: fail!(env, "Duplicate interface name")
-
-    Enum.map(interfaces, fn interface ->
-      name = String.to_atom("#{interface.name}_signal")
+      if Map.fetch!(names, route.as) > 1, do: fail!(env, "Duplicate interface name")
+      name = String.to_atom("#{route.as}_signal")
 
       for arity <- [1, 2] do
         if Module.defines?(env.module, {name, arity}),
-          do:
-            fail!(
-              %{env | line: interface.line},
-              "Generated function conflicts with #{name}/#{arity}"
-            )
+          do: fail!(env, "Generated function conflicts with #{name}/#{arity}")
       end
 
-      Jido.Agent.DSL.Generator.function(interface)
+      Jido.Agent.DSL.Generator.function(name, route.path, source)
     end)
   end
 

@@ -34,7 +34,7 @@ the `:authoring` tag. There is no authoring CI job.
 | Extension route | Extension plus block module | Target lowering and the generated interface |
 | Custom selection | Keyword module with callback | Behavior module identity survives conversion; recovery |
 | Metadata boundaries | Three block modules | Atom, string, and mixed keys; cross-form equality and JSON round trips |
-| Invalid declarations | Eight source files | Missing source, duplicate schema, removed positional arguments, helper collision, Plugin state conflict, invalid metadata |
+| Invalid declarations | Eight source files | Missing source, duplicate schema, removed `define` declaration, helper collision, Plugin state conflict, invalid metadata |
 
 The 16 valid module variants use four data paths: module definition, direct
 map, direct keyword list, and saved JSON. Each case/form pair has separate pure and live ExUnit tests. Shared tests

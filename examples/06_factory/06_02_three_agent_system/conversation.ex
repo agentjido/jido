@@ -23,7 +23,7 @@ defmodule Jido.Examples.Factory.Conversation do
   routes do
     signal_source "/examples/factory/conversation"
 
-    route "examples.factory.conversation.ask" do
+    route "examples.factory.conversation.ask", as: :ask do
       action input,
         schema:
           Zoi.object(%{
@@ -33,8 +33,6 @@ defmodule Jido.Examples.Factory.Conversation do
         context: context do
         Jido.Examples.Factory.Conversation.begin_request(input, context.agent_state)
       end
-
-      define :ask
     end
 
     route "examples.factory.async.result" do

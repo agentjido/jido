@@ -22,7 +22,7 @@ defmodule JidoTest.Examples.Runtime.BusDeliveryFixture do
   routes do
     signal_source "/test/bus_delivery"
 
-    route "examples.runtime.bus_delivery.record" do
+    route "examples.runtime.bus_delivery.record", as: :record do
       action %{value: value}, schema: Zoi.object(%{value: Zoi.integer()}), context: context do
         context.plugin_inputs[JidoTest.FeatureObserver].runtime.on_delivery.(%{value: value})
         state = context.agent_state
@@ -38,8 +38,6 @@ defmodule JidoTest.Examples.Runtime.BusDeliveryFixture do
            }}
         end
       end
-
-      define :record
     end
   end
 end

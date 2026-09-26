@@ -29,9 +29,8 @@ defmodule Jido.Agent.FlowExpressionTest do
     routes do
       signal_source "/expression"
 
-      route "counter.add", Add do
+      route "counter.add", Add, as: :add do
         defaults %{amount: 2}
-        define :add
       end
     end
   end

@@ -13,7 +13,7 @@ defmodule Jido.Examples.Topology.Cell do
   routes do
     signal_source "/examples/topology/cell"
 
-    route "examples.topology.cell.work" do
+    route "examples.topology.cell.work", as: :work do
       action %{value: value},
         schema: Zoi.object(%{value: Zoi.integer()}),
         context: context do
@@ -24,8 +24,6 @@ defmodule Jido.Examples.Topology.Cell do
              total: context.agent_state.total + value
          }}
       end
-
-      define :work
     end
 
     route "jido.agent.**", Jido.Examples.Support.KeepState

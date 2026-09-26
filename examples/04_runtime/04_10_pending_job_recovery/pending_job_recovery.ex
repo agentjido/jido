@@ -32,7 +32,7 @@ defmodule Jido.Examples.PendingJobRecovery do
   routes do
     signal_source "/examples/runtime/pending_jobs"
 
-    route "examples.runtime.pending_jobs.request" do
+    route "examples.runtime.pending_jobs.request", as: :request_job do
       action input,
         schema: Zoi.object(%{job_id: Zoi.string() |> Zoi.min(1), value: Zoi.integer()}),
         context: context do
@@ -54,11 +54,9 @@ defmodule Jido.Examples.PendingJobRecovery do
           {:error, Jido.Action.Error.validation_error("job is active or already used")}
         end
       end
-
-      define :request_job
     end
 
-    route "examples.runtime.pending_jobs.approve" do
+    route "examples.runtime.pending_jobs.approve", as: :approve_job do
       action input,
         schema:
           Zoi.object(%{
@@ -76,11 +74,9 @@ defmodule Jido.Examples.PendingJobRecovery do
           {:error, Jido.Action.Error.validation_error("job is not awaiting approval")}
         end
       end
-
-      define :approve_job
     end
 
-    route "examples.runtime.pending_jobs.retry" do
+    route "examples.runtime.pending_jobs.retry", as: :retry_job do
       action input,
         schema:
           Zoi.object(%{
@@ -101,11 +97,9 @@ defmodule Jido.Examples.PendingJobRecovery do
           {:error, Jido.Action.Error.validation_error("job is not approved for retry")}
         end
       end
-
-      define :retry_job
     end
 
-    route "examples.runtime.pending_jobs.cancel" do
+    route "examples.runtime.pending_jobs.cancel", as: :cancel_job do
       action %{job_id: job_id},
         schema: Zoi.object(%{job_id: Zoi.string()}),
         context: context do
@@ -123,11 +117,9 @@ defmodule Jido.Examples.PendingJobRecovery do
           {:error, Jido.Action.Error.validation_error("job cannot be cancelled")}
         end
       end
-
-      define :cancel_job
     end
 
-    route "examples.runtime.jobs.settle" do
+    route "examples.runtime.jobs.settle", as: :settle_attempt do
       action input,
         schema:
           Zoi.object(%{
@@ -144,8 +136,6 @@ defmodule Jido.Examples.PendingJobRecovery do
           {:error, Jido.Action.Error.validation_error("attempt result is stale")}
         end
       end
-
-      define :settle_attempt
     end
   end
 

@@ -16,7 +16,7 @@ defmodule Jido.Examples.CorrelatedRequests do
   routes do
     signal_source "/examples/multi_agent/correlated_requests"
 
-    route "examples.multi_agent.requests.start" do
+    route "examples.multi_agent.requests.start", as: :request do
       action %{request_id: request_id, value: value},
         schema: Zoi.object(%{request_id: Zoi.string() |> Zoi.min(1), value: Zoi.integer()}),
         context: context do
@@ -60,11 +60,9 @@ defmodule Jido.Examples.CorrelatedRequests do
             {:ok, candidate, directives}
         end
       end
-
-      define :request
     end
 
-    route "examples.multi_agent.requests.cancel" do
+    route "examples.multi_agent.requests.cancel", as: :cancel do
       action %{request_id: request_id},
         schema: Zoi.object(%{request_id: Zoi.string()}),
         context: context do
@@ -76,8 +74,6 @@ defmodule Jido.Examples.CorrelatedRequests do
           {:error, Jido.Action.Error.validation_error("request is not waiting")}
         end
       end
-
-      define :cancel
     end
 
     route "examples.multi_agent.worker.result" do

@@ -10,7 +10,7 @@ defmodule Jido.Examples.ChildLifecycle do
   routes do
     signal_source "/examples/multi_agent/child_lifecycle"
 
-    route "examples.multi_agent.children.start" do
+    route "examples.multi_agent.children.start", as: :start_worker do
       action input,
         schema:
           Zoi.object(%{
@@ -31,11 +31,9 @@ defmodule Jido.Examples.ChildLifecycle do
           {:ok, candidate, [directive]}
         end
       end
-
-      define :start_worker
     end
 
-    route "examples.multi_agent.children.stop" do
+    route "examples.multi_agent.children.stop", as: :stop_worker do
       action %{tag: tag},
         schema: Zoi.object(%{tag: Zoi.string() |> Zoi.min(1)}),
         context: context do
@@ -46,8 +44,6 @@ defmodule Jido.Examples.ChildLifecycle do
 
         {:ok, candidate, [Jido.Agent.Directive.stop_child(tag)]}
       end
-
-      define :stop_worker
     end
 
     route "jido.agent.child.*", Jido.Examples.Support.KeepState

@@ -12,9 +12,8 @@ defmodule Jido.Examples.EffectfulSteps do
   routes do
     signal_source "/workflow"
 
-    route "workflow.effects", Jido.Examples.EffectfulSteps.Pipeline do
+    route "workflow.effects", Jido.Examples.EffectfulSteps.Pipeline, as: :fetch_record do
       defaults %{allowed: true, expected_revision: "r1"}
-      define :fetch_record
     end
   end
 end

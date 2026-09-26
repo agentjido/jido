@@ -18,17 +18,15 @@ defmodule Jido.Examples.TurnObservation do
   routes do
     signal_source "/examples/runtime/observation"
 
-    route "examples.runtime.observation.record" do
+    route "examples.runtime.observation.record", as: :record do
       action %{value: value},
         schema: Zoi.object(%{value: Zoi.integer()}),
         context: context do
         {:ok, %{context.agent_state | value: value}}
       end
-
-      define :record
     end
 
-    route "examples.runtime.observation.missing_child" do
+    route "examples.runtime.observation.missing_child", as: :send_to_missing_child do
       action %{value: value},
         schema: Zoi.object(%{value: Zoi.integer()}),
         context: context do
@@ -40,8 +38,6 @@ defmodule Jido.Examples.TurnObservation do
         directive = Jido.Agent.Directive.emit_to_child(:missing, signal)
         {:ok, %{context.agent_state | value: value}, [directive]}
       end
-
-      define :send_to_missing_child
     end
   end
 end

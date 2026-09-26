@@ -10,7 +10,7 @@ defmodule Jido.Examples.Applications.Subscription.Agent do
   routes do
     signal_source "/examples/applications/subscription"
 
-    route "examples.applications.subscription.change" do
+    route "examples.applications.subscription.change", as: :change do
       action input,
         schema:
           Zoi.object(%{
@@ -30,8 +30,6 @@ defmodule Jido.Examples.Applications.Subscription.Agent do
 
         {:ok, next_state, [directive]}
       end
-
-      define :change
     end
   end
 end

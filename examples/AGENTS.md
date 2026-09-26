@@ -67,7 +67,7 @@ Follow these rules:
    is a first-class extension point, or is the subject of the example.
 9. Use Builder, JSON, or direct definition forms only when the example teaches
    those forms.
-10. Use `define` for the main commands that a reader will call.
+10. Use the route option `as:` for the main commands that a reader will call.
 11. Use static Zoi schemas at Agent, Action, and Flow boundaries.
 12. Use Action or Signal input for requested work. Use execution context for
     runtime services and execution metadata. Use Agent state for durable domain
@@ -133,7 +133,7 @@ required public contract does not yet exist.
   name for modules.
 - Scope Signal types to the section, example, and command.
 - Scope Signal sources to the example.
-- Use exact routes for commands exposed with `define`.
+- Use exact routes for commands exposed with `as:`.
 - Keep names stable after an example becomes part of the published learning
   path.
 

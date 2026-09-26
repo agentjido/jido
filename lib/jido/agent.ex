@@ -67,14 +67,13 @@ defmodule Jido.Agent do
         routes do
           signal_source "/counter"
 
-          route "counter.add", MyApp.Add do
+          route "counter.add", MyApp.Add, as: :add do
             defaults %{amount: 1}
-            define :add
           end
         end
       end
 
-  A nested `define` generates `add_signal(input, envelope_opts \\ [])`.
+  The route setting `as: :add` generates `add_signal(input, envelope_opts \\ [])`.
   For example, `Counter.add_signal(%{amount: 2}, source: "/caller")` returns
   `{:ok, signal}`. Input must be a plain map. Omitted fields remain absent so
   route defaults apply during execution. Envelope options cannot replace the
@@ -83,7 +82,7 @@ defmodule Jido.Agent do
   for a live Agent, or `cmd/3` for direct execution.
 
   Exposed routes must be exact and have no match predicate. Routes without
-  `define` keep normal wildcard and predicate support and generate no helpers.
+  `as:` keep normal wildcard and predicate support and generate no helpers.
   A field cannot appear in both keyword and block configuration.
 
   `Jido.Agent.new/1` and `Jido.Agent.Codec` provide data and JSON

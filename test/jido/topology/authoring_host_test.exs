@@ -94,9 +94,7 @@ defmodule JidoTest.Topology.AuthoringHostTest do
           routes do
             signal_source "/topology-owner"
 
-            route "owner.add", Add do
-              define :add
-            end
+            route "owner.add", Add, as: :add
           end
 
           topology do

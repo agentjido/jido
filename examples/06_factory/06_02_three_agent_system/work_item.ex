@@ -18,7 +18,7 @@ defmodule Jido.Examples.Factory.WorkItem do
   routes do
     signal_source "/examples/factory/work_item"
 
-    route "examples.factory.work_item.start" do
+    route "examples.factory.work_item.start", as: :start do
       action _input, schema: Zoi.object(%{}), context: context do
         state = context.agent_state
 
@@ -28,8 +28,6 @@ defmodule Jido.Examples.Factory.WorkItem do
           {:ok, %{state | started: true}, [Jido.Examples.Factory.WorkItem.tick(state)]}
         end
       end
-
-      define :start
     end
 
     route "examples.factory.work_item.tick" do

@@ -8,8 +8,6 @@ defmodule JidoTest.Authoring.Agents.Fixtures.ListInputs do
   routes do
     signal_source "/authoring/list_inputs"
 
-    route "items.replace", JidoTest.Authoring.Agents.Fixtures.ReplaceItems do
-      define :replace
-    end
+    route "items.replace", JidoTest.Authoring.Agents.Fixtures.ReplaceItems, as: :replace
   end
 end

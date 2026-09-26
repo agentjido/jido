@@ -4,7 +4,7 @@ defmodule Jido.Agent.DSL.Macros do
   alias Jido.Action.Inline
 
   @entity :"Elixir.Jido.Agent.DSL.Extension.Routes.Route"
-  @route_options [:defaults, :priority, :match, :do]
+  @route_options [:as, :defaults, :priority, :match, :do]
   defmacro route(path, target_or_options) do
     if Keyword.keyword?(target_or_options) do
       build(path, nil, target_or_options, __CALLER__)
@@ -19,6 +19,10 @@ defmodule Jido.Agent.DSL.Macros do
     else
       build(path, target_or_options, options, __CALLER__)
     end
+  end
+
+  defmacro route(path, target, options, block) do
+    build(path, target, options ++ block, __CALLER__)
   end
 
   @doc false
@@ -48,17 +52,17 @@ defmodule Jido.Agent.DSL.Macros do
   end
 
   defp build_inline(path, {metadata, args}, route_options, route_block, caller) do
-    caller = %{caller | line: Keyword.get(metadata, :line, caller.line)}
-    parsed = parse_inline!(args, caller)
+    action_caller = %{caller | line: Keyword.get(metadata, :line, caller.line)}
+    parsed = parse_inline!(args, action_caller)
     route_path = Macro.unique_var(:route_path, __MODULE__)
 
     identity =
       quote do: [host: Jido.Agent, route: unquote(route_path), role: :action]
 
     compiled =
-      Inline.compile!(identity, parsed, caller,
+      Inline.compile!(identity, parsed, action_caller,
         default_name: quote(do: unquote(__MODULE__).default_name(unquote(route_path))),
-        remove_imports: [{__MODULE__, [route: 2, route: 3]}]
+        remove_imports: [{__MODULE__, [route: 2, route: 3, route: 4]}]
       )
 
     declaration =
@@ -138,7 +142,7 @@ defmodule Jido.Agent.DSL.Macros do
   defp call_entity(path, target, route_options, block, caller) do
     options = if is_nil(block), do: route_options, else: Keyword.put(route_options, :do, block)
 
-    quote generated: true, line: caller.line, file: caller.file do
+    quote generated: true, line: caller.line do
       require unquote(@entity)
       unquote(@entity).__route__(unquote(path), unquote(target), unquote(options))
     end

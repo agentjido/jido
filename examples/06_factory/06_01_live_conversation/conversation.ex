@@ -20,7 +20,7 @@ defmodule Jido.Examples.Factory.LiveConversation do
   routes do
     signal_source "/examples/factory/chat"
 
-    route "examples.factory.live_conversation.chat" do
+    route "examples.factory.live_conversation.chat", as: :chat do
       action input,
         schema:
           Zoi.object(%{
@@ -47,8 +47,6 @@ defmodule Jido.Examples.Factory.LiveConversation do
           end
         end
       end
-
-      define :chat
     end
   end
 end

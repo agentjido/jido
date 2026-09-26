@@ -20,7 +20,7 @@ defmodule Jido.Examples.CausalTrace do
   routes do
     signal_source "/examples/runtime/causal_trace"
 
-    route "examples.runtime.causal_trace.begin" do
+    route "examples.runtime.causal_trace.begin", as: :start_work do
       action input,
         schema:
           Zoi.object(%{
@@ -56,11 +56,9 @@ defmodule Jido.Examples.CausalTrace do
           {:error, :request_already_started}
         end
       end
-
-      define :start_work
     end
 
-    route "examples.runtime.causal_trace.result" do
+    route "examples.runtime.causal_trace.result", as: :collect_result do
       action input,
         schema:
           Zoi.object(%{
@@ -79,8 +77,6 @@ defmodule Jido.Examples.CausalTrace do
           {:error, :unrelated_result}
         end
       end
-
-      define :collect_result
     end
 
     route "jido.agent.child.*", Jido.Examples.Support.KeepState

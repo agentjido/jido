@@ -41,7 +41,7 @@ is outside the Agent state commit.
 ## Declare One Agent
 
 The declaration describes the Agent data schema and the routes from Signals to
-executable work. It does not start a process. The nested `define` adds Signal
+executable work. It does not start a process. The route option `as:` adds Signal
 constructors.
 
 ```elixir
@@ -55,9 +55,8 @@ defmodule GettingStarted.Counter do
   routes do
     signal_source("/guides/getting-started")
 
-    route "counter.add", GettingStarted.Add do
+    route "counter.add", GettingStarted.Add, as: :add do
       defaults(%{amount: 1})
-      define(:add)
     end
   end
 end

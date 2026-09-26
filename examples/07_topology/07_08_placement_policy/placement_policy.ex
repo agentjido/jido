@@ -12,7 +12,7 @@ defmodule Jido.Examples.Topology.PlacementPolicy do
   routes do
     signal_source "/examples/topology/placement-policy"
 
-    route "examples.topology.placement.request" do
+    route "examples.topology.placement.request", as: :place do
       action input,
         schema:
           Zoi.object(%{
@@ -31,8 +31,6 @@ defmodule Jido.Examples.Topology.PlacementPolicy do
 
         {:ok, context.agent_state, [directive]}
       end
-
-      define :place
     end
 
     route "jido.topology.lifecycle.**" do

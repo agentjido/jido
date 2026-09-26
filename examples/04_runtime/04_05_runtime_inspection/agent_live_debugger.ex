@@ -16,12 +16,10 @@ defmodule Jido.Examples.AgentLiveDebugger do
   routes do
     signal_source "/examples/runtime/inspection"
 
-    route "examples.runtime.inspection.record" do
+    route "examples.runtime.inspection.record", as: :record_result do
       action %{result: result}, context: context do
         {:ok, %{context.agent_state | status: "complete", result: result}}
       end
-
-      define :record_result
     end
   end
 

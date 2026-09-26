@@ -12,7 +12,7 @@ defmodule JidoTest.Examples.SharedBudgetWorker do
   routes do
     signal_source "/test/examples/shared_budget"
 
-    route "examples.research.shared_budget.work" do
+    route "examples.research.shared_budget.work", as: :work do
       action %{job: job, value: value},
         schema: Zoi.object(%{job: Zoi.string(), value: Zoi.integer()}),
         context: context do
@@ -23,8 +23,6 @@ defmodule JidoTest.Examples.SharedBudgetWorker do
           :fail -> {:error, Jido.Action.Error.execution_error("controlled review failure")}
         end
       end
-
-      define :work
     end
   end
 end

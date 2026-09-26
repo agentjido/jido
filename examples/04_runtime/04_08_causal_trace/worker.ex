@@ -10,7 +10,7 @@ defmodule Jido.Examples.CausalTrace.Worker do
   routes do
     signal_source "/examples/runtime/causal_trace"
 
-    route "examples.runtime.causal_trace.compute" do
+    route "examples.runtime.causal_trace.compute", as: :compute do
       action input,
         schema:
           Zoi.object(%{
@@ -31,8 +31,6 @@ defmodule Jido.Examples.CausalTrace.Worker do
         {:ok, %{context.agent_state | value: value},
          [Jido.Agent.Directive.emit_to_parent(result)]}
       end
-
-      define :compute
     end
   end
 end

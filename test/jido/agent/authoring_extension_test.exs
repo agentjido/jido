@@ -100,6 +100,21 @@ defmodule JidoTest.Agent.AuthoringExtensionTest do
     def lower_agent(config, entities), do: {:ok, %{config | routes: :invalid}, entities}
   end
 
+  defmodule RewriteRoutes do
+    use Spark.Dsl.Extension
+
+    def lower_agent(config, entities) do
+      routes =
+        case config.metadata.rewrite do
+          :remove -> []
+          :duplicate -> config.routes ++ config.routes
+          :predicate -> Enum.map(config.routes, &Map.put(&1, :match, fn _ -> true end))
+        end
+
+      {:ok, %{config | routes: routes}, entities}
+    end
+  end
+
   defmodule Add do
     use Jido.Action, name: "extension_add", schema: Zoi.object(%{amount: Zoi.integer()})
     def run(%{amount: n}, %{agent_state: state}), do: {:ok, %{state | count: state.count + n}}
@@ -132,9 +147,7 @@ defmodule JidoTest.Agent.AuthoringExtensionTest do
           routes do
             signal_source "/extension"
 
-            route "add", %Ref{target: Add} do
-              define :add
-            end
+            route "add", %Ref{target: Add}, as: :add
 
             route "ordinary", Add
             route "extension_target", ref: Add
@@ -315,6 +328,33 @@ defmodule JidoTest.Agent.AuthoringExtensionTest do
           end
         end
       )
+    end
+  end
+
+  test "as requires one exact route without a predicate after extension lowering" do
+    for rewrite <- [:remove, :duplicate, :predicate] do
+      module = Module.concat(__MODULE__, "Rewritten#{System.unique_integer([:positive])}")
+
+      assert_raise CompileError, ~r/retain exactly one route without a match predicate/, fn ->
+        compile_isolated(
+          quote do
+            defmodule unquote(module) do
+              use Jido.Agent,
+                name: "rewritten_route",
+                metadata: %{rewrite: unquote(rewrite)},
+                extensions: [RewriteRoutes]
+
+              agent do
+              end
+
+              routes do
+                signal_source "/rewritten"
+                route "add", Add, as: :add
+              end
+            end
+          end
+        )
+      end
     end
   end
 

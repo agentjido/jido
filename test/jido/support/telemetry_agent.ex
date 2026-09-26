@@ -52,34 +52,28 @@ defmodule JidoTest.TelemetryAgent do
   routes do
     signal_source "/test/telemetry"
 
-    route "test.telemetry.record" do
+    route "test.telemetry.record", as: :record do
       action %{value: value}, schema: Zoi.object(%{value: Zoi.integer()}), context: context do
         {:ok, %{context.agent_state | value: value}}
       end
-
-      define :record
     end
 
-    route "test.telemetry.fail" do
+    route "test.telemetry.fail", as: :fail_execution do
       action _input, schema: Zoi.object(%{}), context: context do
         {:error, Map.get(context, :failure, :requested_execution_failure)}
       end
-
-      define :fail_execution
     end
 
-    route "test.telemetry.hold" do
+    route "test.telemetry.hold", as: :hold do
       action %{value: value},
         schema: Zoi.object(%{value: Zoi.integer()}),
         context: context do
         context.barrier.()
         {:ok, %{context.agent_state | value: value}}
       end
-
-      define :hold
     end
 
-    route "test.telemetry.missing_child" do
+    route "test.telemetry.missing_child", as: :send_to_missing_child do
       action %{value: value},
         schema: Zoi.object(%{value: Zoi.integer()}),
         context: context do
@@ -87,19 +81,15 @@ defmodule JidoTest.TelemetryAgent do
         directive = Jido.Agent.Directive.emit_to_child(:missing, signal)
         {:ok, %{context.agent_state | value: value}, [directive]}
       end
-
-      define :send_to_missing_child
     end
 
-    route "test.telemetry.deliver" do
+    route "test.telemetry.deliver", as: :record_and_deliver do
       action %{value: value},
         schema: Zoi.object(%{value: Zoi.integer()}),
         context: context do
         effect = %JidoTest.TelemetryAgent.Deliver{value: value}
         {:ok, %{context.agent_state | value: value}, [effect]}
       end
-
-      define :record_and_deliver
     end
   end
 end

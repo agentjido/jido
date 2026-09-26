@@ -5,6 +5,13 @@ defmodule JidoTest.Agent.AuthoringTest do
   alias Jido.Agent.Codec
   alias Jido.Codec.Registry
 
+  setup do
+    # Spark records source locations only when debug information is enabled.
+    previous = Code.compiler_options(debug_info: true)
+    on_exit(fn -> Code.compiler_options(previous) end)
+    :ok
+  end
+
   def stringify_count(value, _opts), do: Integer.to_string(value)
 
   defmodule Add do
@@ -58,9 +65,7 @@ defmodule JidoTest.Agent.AuthoringTest do
     routes do
       signal_source "/prepared"
 
-      route "prepared.add", Add do
-        define :add
-      end
+      route "prepared.add", Add, as: :add
     end
   end
 
@@ -128,9 +133,7 @@ defmodule JidoTest.Agent.AuthoringTest do
     routes do
       signal_source "/named"
 
-      route "named.inputs", NamedInputs do
-        define :compose
-      end
+      route "named.inputs", NamedInputs, as: :compose
     end
   end
 
@@ -147,17 +150,14 @@ defmodule JidoTest.Agent.AuthoringTest do
     routes do
       signal_source "/authoring"
 
-      route "authoring.add", Add do
+      route "authoring.add", Add, as: :add do
         defaults %{amount: 1, flag: false}
         priority(10)
-        define :add
-        define :add_exact
       end
 
-      route "authoring.flow", Flow do
+      route "authoring.flow", Flow, as: :flow_add do
         defaults %{amount: 2}
         priority(-5)
-        define :flow_add
       end
     end
   end
@@ -186,7 +186,7 @@ defmodule JidoTest.Agent.AuthoringTest do
     routes do
       signal_source "/inline-authoring"
 
-      route "inline.add", defaults: %{multiplier: 1} do
+      route "inline.add", defaults: %{multiplier: 1}, as: :add_inline do
         action %{amount: amount, multiplier: multiplier},
           name: "inline_authoring_add",
           schema:
@@ -198,8 +198,6 @@ defmodule JidoTest.Agent.AuthoringTest do
           {:ok,
            %{context.agent_state | count: add(context.agent_state.count, amount, multiplier)}}
         end
-
-        define :add_inline
       end
     end
 
@@ -214,7 +212,8 @@ defmodule JidoTest.Agent.AuthoringTest do
     assert keyword.module == KeywordCounter
     assert %{keyword | module: Counter} === block
     assert function_exported?(Counter, :add_signal, 1)
-    refute function_exported?(KeywordCounter, :add_signal, 0)
+    refute function_exported?(KeywordCounter, :add_signal, 1)
+    refute function_exported?(KeywordCounter, :add_signal, 2)
   end
 
   test "block metadata accepts mixed keys and rejects structs with a DSL error" do
@@ -535,7 +534,7 @@ defmodule JidoTest.Agent.AuthoringTest do
 
   test "map inputs support optional list and keyword fields without ambiguity" do
     compiled =
-      compile_agent("route \"test.list\", ListInputs do\n  define :list\nend\n")
+      compile_agent("route \"test.list\", ListInputs, as: :list")
 
     {module, _} =
       Enum.find(compiled, fn {module, _} -> function_exported?(module, :list_signal, 1) end)
@@ -549,25 +548,71 @@ defmodule JidoTest.Agent.AuthoringTest do
 
   test "compile diagnostics reject invalid interface declarations" do
     cases = [
-      {"route \"test.*\", Add do\n define :add\nend", "exact route"},
-      {"route \"test.add\", Add do\n match fn _ -> true end\n define :add\nend", "exact route"},
-      {"route \"test.add\", Add do\n define :add\n define :add\nend", "Duplicate interface name"},
-      {"route \"test.add\", Add do\n define :add\nend\nroute \"test.add\", Add",
-       "exactly one route"}
+      {"route \"test.*\", Add, as: :add", "exact route"},
+      {"route \"test.add\", Add, as: :add, match: fn _ -> true end", "exact route"},
+      {"route \"test.add\", Add, as: :add\nroute \"test.other\", Add, as: :add",
+       "Duplicate interface name"},
+      {"route \"test.add\", Add, as: :add\nroute \"test.add\", Add", "exactly one route"}
     ]
 
     for {routes, message} <- cases do
-      assert_raise CompileError, ~r/#{message}/, fn -> compile_agent(routes) end
+      error = assert_raise CompileError, ~r/#{message}/, fn -> compile_agent(routes) end
+      assert error.file == "agent_dsl_fixture.ex"
+      assert error.line == 10
     end
 
-    assert_raise Spark.Error.DslError, ~r/args/, fn ->
-      compile_agent("route \"test.add\", Add do\n define :add, args: [:amount]\nend")
+    assert_raise CompileError, ~r/duplicate route option/, fn ->
+      compile_agent("route \"test.add\", Add, as: :add, as: :other")
     end
+
+    for name <- ["\"add\"", "42", "[:add]"] do
+      assert_raise Spark.Error.DslError, ~r/as/, fn ->
+        compile_agent("route \"test.add\", Add, as: #{name}")
+      end
+    end
+  end
+
+  test "an inline route without as needs no source and generates no helper" do
+    compiled =
+      compile_agent(
+        """
+        route "test.add" do
+          action params do
+            {:ok, params}
+          end
+        end
+        """,
+        "",
+        "",
+        false
+      )
+
+    {module, _} = Enum.find(compiled, fn {module, _} -> function_exported?(module, :new!, 0) end)
+    refute function_exported?(module, :add_signal, 1)
+    refute function_exported?(module, :add_signal, 2)
+    signal = Jido.Signal.new!("test.add", %{}, source: "/caller")
+    assert {:ok, %{state: %{}}, []} = module.cmd(module.new!(), signal)
+  end
+
+  test "inline helper errors point to the route header" do
+    error =
+      assert_raise CompileError, ~r/exact route/, fn ->
+        compile_agent("""
+        route "test.*", as: :add do
+          action params do
+            {:ok, params}
+          end
+        end
+        """)
+      end
+
+    assert error.file == "agent_dsl_fixture.ex"
+    assert error.line == 10
   end
 
   test "inline route diagnostics reject missing, mixed, duplicate, and bound declarations" do
     assert_raise CompileError, ~r/requires a target module or one inline Action/, fn ->
-      compile_agent("route \"test.add\" do\n define :add\nend")
+      compile_agent("route \"test.add\", as: :add")
     end
 
     assert_raise CompileError, ~r/cannot combine a target module with an inline Action/, fn ->
@@ -593,15 +638,19 @@ defmodule JidoTest.Agent.AuthoringTest do
       """)
     end
 
-    assert_raise CompileError, ~r/inline Action callback requires/, fn ->
-      compile_agent("""
-      route "test.add" do
-        action value <- 1 do
-          {:ok, %{count: value}}
+    error =
+      assert_raise CompileError, ~r/inline Action callback requires/, fn ->
+        compile_agent("""
+        route "test.add" do
+          action value <- 1 do
+            {:ok, %{count: value}}
+          end
         end
+        """)
       end
-      """)
-    end
+
+    assert error.file == "agent_dsl_fixture.ex"
+    assert error.line == 11
   end
 
   test "compile diagnostics reject mixed fields, missing source and manual collisions" do
@@ -610,15 +659,21 @@ defmodule JidoTest.Agent.AuthoringTest do
     end
 
     assert_raise CompileError, ~r/signal_source is required/, fn ->
-      compile_agent("route \"test.add\", Add do\n define :add\nend", "", "", false)
+      compile_agent("route \"test.add\", Add, as: :add", "", "", false)
     end
 
-    assert_raise CompileError, ~r/Generated function conflicts/, fn ->
-      compile_agent(
-        "route \"test.add\", Add do\n define :add\nend",
-        "",
-        "def add_signal(_input), do: :manual"
-      )
+    for args <- ["_input", "_input, _options"] do
+      error =
+        assert_raise CompileError, ~r/Generated function conflicts/, fn ->
+          compile_agent(
+            "route \"test.add\", Add, as: :add",
+            "",
+            "def add_signal(#{args}), do: :manual"
+          )
+        end
+
+      assert error.file == "agent_dsl_fixture.ex"
+      assert error.line == 10
     end
   end
 
@@ -665,9 +720,7 @@ defmodule JidoTest.Agent.AuthoringTest do
 
           routes do
             signal_source "/reloaded"
-            route "reloaded.add", #{inspect(module)}.Add do
-              define :add
-            end
+            route "reloaded.add", #{inspect(module)}.Add, as: :add
           end
         end
 

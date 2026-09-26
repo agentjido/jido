@@ -9,14 +9,12 @@ defmodule Jido.Examples.StableReference.Conversation do
   routes do
     signal_source "/examples/research/stable_reference"
 
-    route "examples.research.stable_reference.conversation.append" do
+    route "examples.research.stable_reference.conversation.append", as: :append do
       action %{text: text},
         schema: Zoi.object(%{text: Zoi.string()}),
         context: context do
         {:ok, %{context.agent_state | messages: context.agent_state.messages ++ [text]}}
       end
-
-      define :append
     end
   end
 end

@@ -9,13 +9,9 @@ defmodule Jido.Examples.OrderedBatch do
   routes do
     signal_source "/workflow"
 
-    route "workflow.batch.collect", Jido.Examples.OrderedBatch.Collected do
-      define :collect_results
-    end
+    route "workflow.batch.collect", Jido.Examples.OrderedBatch.Collected, as: :collect_results
 
-    route "workflow.batch.strict", Jido.Examples.OrderedBatch.Strict do
-      define :convert_all
-    end
+    route "workflow.batch.strict", Jido.Examples.OrderedBatch.Strict, as: :convert_all
   end
 end
 

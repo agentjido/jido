@@ -13,7 +13,7 @@ defmodule Jido.Examples.ConversationHistory do
   routes do
     signal_source "/examples/llm/conversation_history"
 
-    route "examples.llm.conversation_history.append" do
+    route "examples.llm.conversation_history.append", as: :append_message do
       action input,
         schema:
           Zoi.object(%{
@@ -40,8 +40,6 @@ defmodule Jido.Examples.ConversationHistory do
           end
         end
       end
-
-      define :append_message
     end
   end
 end

@@ -35,7 +35,7 @@ defmodule FirstAgent.Counter do
   routes do
     signal_source("/guides/first-agent")
 
-    route "counter.increment" do
+    route "counter.increment", as: :increment do
       action %{amount: amount},
         name: "first_agent_increment",
         schema: Zoi.object(%{amount: Zoi.integer() |> Zoi.min(0)}),
@@ -51,7 +51,6 @@ defmodule FirstAgent.Counter do
       end
 
       defaults(%{amount: 1})
-      define(:increment)
     end
   end
 end

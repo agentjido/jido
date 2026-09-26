@@ -16,7 +16,7 @@ defmodule Jido.Examples.MinimalAgent do
   routes do
     signal_source "/examples/basic/minimal_agent"
 
-    route "basic.minimal.increment" do
+    route "basic.minimal.increment", as: :increment do
       action %{amount: amount},
         schema: Zoi.object(%{amount: Zoi.integer()}),
         context: context do
@@ -24,7 +24,6 @@ defmodule Jido.Examples.MinimalAgent do
       end
 
       defaults %{amount: 1}
-      define :increment
     end
   end
 end

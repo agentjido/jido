@@ -1,12 +1,10 @@
 defmodule Jido.Agent.DSL.Generator do
   @moduledoc false
 
-  def function(interface) do
-    name = String.to_atom("#{interface.name}_signal")
-
+  def function(name, path, source) do
     quote do
       @doc """
-      Builds a `#{unquote(interface.path)}` Signal from a plain input map.
+      Builds a `#{unquote(path)}` Signal from a plain input map.
 
       Returns `{:ok, signal}` or `{:error, reason}`. Envelope options include
       `:source`, `:id`, and `:subject`. Unknown or duplicate options are errors.
@@ -20,7 +18,12 @@ defmodule Jido.Agent.DSL.Generator do
       """
       @spec unquote(name)(map(), keyword()) :: {:ok, Jido.Signal.t()} | {:error, term()}
       def unquote(name)(input, envelope_opts \\ []),
-        do: Jido.Agent.Interface.signal(unquote(Macro.escape(interface)), input, envelope_opts)
+        do:
+          Jido.Agent.Interface.signal(
+            %{path: unquote(path), source: unquote(source)},
+            input,
+            envelope_opts
+          )
     end
   end
 end

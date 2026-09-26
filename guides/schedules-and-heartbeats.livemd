@@ -25,7 +25,7 @@ defmodule ScheduleGuide.Agent do
   routes do
     signal_source("/guides/schedule")
 
-    route "schedule.once" do
+    route "schedule.once", as: :schedule_once do
       action %{delay_ms: delay_ms, observer: observer},
         name: "schedule_guide_once",
         schema: Zoi.object(%{delay_ms: Zoi.integer() |> Zoi.min(0), observer: Zoi.pid()}),
@@ -40,8 +40,6 @@ defmodule ScheduleGuide.Agent do
         directive = Jido.Plugin.Scheduler.schedule(delay_ms, tick)
         {:ok, context.agent_state, [directive]}
       end
-
-      define(:schedule_once)
     end
 
     route "schedule.tick" do

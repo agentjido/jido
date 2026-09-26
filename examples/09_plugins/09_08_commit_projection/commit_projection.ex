@@ -10,12 +10,10 @@ defmodule Jido.Examples.Plugins.CommitProjection.Agent do
   routes do
     signal_source "/examples/plugins/commit_projection"
 
-    route "examples.plugins.commit_projection.add" do
+    route "examples.plugins.commit_projection.add", as: :add do
       action %{amount: amount}, schema: Zoi.object(%{amount: Zoi.integer()}), context: context do
         {:ok, %{context.agent_state | count: context.agent_state.count + amount}}
       end
-
-      define :add
     end
   end
 end

@@ -9,9 +9,7 @@ defmodule Jido.Examples.ParallelJoin do
   routes do
     signal_source "/workflow"
 
-    route "workflow.parallel", Jido.Examples.ParallelJoin.Pipeline do
-      define :fetch_pair
-    end
+    route "workflow.parallel", Jido.Examples.ParallelJoin.Pipeline, as: :fetch_pair
   end
 end
 

@@ -9,15 +9,13 @@ defmodule JidoTest.Authoring.Agents.Fixtures.InlineCounter do
   routes do
     signal_source "/authoring/inline"
 
-    route "inline.add", defaults: %{amount: 1} do
+    route "inline.add", defaults: %{amount: 1}, as: :add do
       action %{amount: amount},
         name: "authoring_inline_add",
         schema: Zoi.object(%{amount: Zoi.integer()}),
         context: context do
         {:ok, %{context.agent_state | count: context.agent_state.count + amount * 2}}
       end
-
-      define :add
     end
   end
 end

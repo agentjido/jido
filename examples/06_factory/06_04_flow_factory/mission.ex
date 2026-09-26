@@ -23,7 +23,7 @@ defmodule Jido.Examples.Factory.FlowFactory.Mission do
   routes do
     signal_source "/examples/factory/flow"
 
-    route "examples.factory.flow.start" do
+    route "examples.factory.flow.start", as: :start do
       action input,
         schema:
           Zoi.object(%{
@@ -33,8 +33,6 @@ defmodule Jido.Examples.Factory.FlowFactory.Mission do
         context: context do
         Jido.Examples.Factory.FlowFactory.Mission.State.start(input, context)
       end
-
-      define :start
     end
 
     route "examples.factory.flow.progress" do
@@ -67,12 +65,10 @@ defmodule Jido.Examples.Factory.FlowFactory.Mission do
       end
     end
 
-    route "examples.factory.flow.cancel" do
+    route "examples.factory.flow.cancel", as: :cancel do
       action _input, context: context do
         Jido.Examples.Factory.FlowFactory.Mission.State.cancel(context.agent_state)
       end
-
-      define :cancel
     end
 
     route "jido.agent.child.exit" do

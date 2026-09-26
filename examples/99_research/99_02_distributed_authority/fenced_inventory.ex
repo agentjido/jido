@@ -10,7 +10,7 @@ defmodule Jido.Examples.FencedInventory do
   routes do
     signal_source "/examples/research/fenced_inventory"
 
-    route "examples.research.fenced_inventory.record" do
+    route "examples.research.fenced_inventory.record", as: :record do
       action %{value: value},
         schema: Zoi.object(%{value: Zoi.integer()}),
         context: context do
@@ -25,8 +25,6 @@ defmodule Jido.Examples.FencedInventory do
           {:ok, %{context.agent_state | value: value}}
         end
       end
-
-      define :record
     end
   end
 end

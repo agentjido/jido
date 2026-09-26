@@ -25,7 +25,7 @@ defmodule Jido.Examples.Applications.FixedGroup.ControllerAgent do
   routes do
     signal_source "/examples/applications/fixed_group/controller"
 
-    route "examples.applications.fixed_group.start" do
+    route "examples.applications.fixed_group.start", as: :start do
       action input,
         schema:
           Zoi.object(%{
@@ -35,8 +35,6 @@ defmodule Jido.Examples.Applications.FixedGroup.ControllerAgent do
         context: context do
         ControllerState.start(input, context.agent_state)
       end
-
-      define :start
     end
 
     route "jido.agent.child.started" do
@@ -47,7 +45,7 @@ defmodule Jido.Examples.Applications.FixedGroup.ControllerAgent do
       end
     end
 
-    route "examples.applications.fixed_group.work.submit" do
+    route "examples.applications.fixed_group.work.submit", as: :submit do
       action input,
         schema:
           Zoi.object(%{
@@ -62,8 +60,6 @@ defmodule Jido.Examples.Applications.FixedGroup.ControllerAgent do
         context: context do
         ControllerState.submit(input, context.agent_state)
       end
-
-      define :submit
     end
 
     route "examples.applications.fixed_group.work.applied" do

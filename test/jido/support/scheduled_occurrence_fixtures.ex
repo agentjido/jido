@@ -71,7 +71,7 @@ defmodule JidoTest.ScheduledOccurrenceFixtures.TimedAgent do
   routes do
     signal_source "/test/scheduled_occurrences"
 
-    route "test.schedule.arm" do
+    route "test.schedule.arm", as: :arm_schedule do
       action input,
         schema: Zoi.object(%{job_id: Zoi.string() |> Zoi.min(1), cron: Zoi.string()}),
         context: context do
@@ -89,8 +89,6 @@ defmodule JidoTest.ScheduledOccurrenceFixtures.TimedAgent do
 
         {:ok, %{context.agent_state | generation: generation}, [directive]}
       end
-
-      define :arm_schedule
     end
 
     route "test.schedule.tick" do

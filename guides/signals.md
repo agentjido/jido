@@ -14,9 +14,9 @@ and `:partition` from its own state, even when the caller supplies other
 values. Direct `Agent.cmd/3` has no Server state; it passes caller values for
 those two keys and leaves them absent when the caller does not supply them.
 
-The `routes` block can set `signal_source` and declare nested `define` entries
-for generated Signal and command functions. Exact routes can expose interfaces;
-wildcards and match predicates cannot expose generated helpers.
+The `routes` block can set `signal_source`. Add `as: :name` to an exact route
+to generate `name_signal/1,2`. Omit `as:` to generate no helper. Wildcard routes
+and routes with match predicates cannot expose generated helpers.
 
 A caller timeout does not undo active work. Remote admission uses the caller's
 clock through a bounded query. Failed remote liveness checks during a partition

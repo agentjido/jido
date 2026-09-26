@@ -38,7 +38,7 @@ defmodule Jido.Examples.Applications.ElasticGroup.ControllerAgent do
   routes do
     signal_source "/examples/applications/elastic_group/controller"
 
-    route "examples.applications.elastic_group.start" do
+    route "examples.applications.elastic_group.start", as: :start do
       action input,
         schema:
           Zoi.object(%{
@@ -49,8 +49,6 @@ defmodule Jido.Examples.Applications.ElasticGroup.ControllerAgent do
         context: context do
         ControllerState.start(input, context.agent_state)
       end
-
-      define :start
     end
 
     route "jido.agent.child.started" do
@@ -69,7 +67,7 @@ defmodule Jido.Examples.Applications.ElasticGroup.ControllerAgent do
       end
     end
 
-    route "examples.applications.elastic_group.tasks.enqueue" do
+    route "examples.applications.elastic_group.tasks.enqueue", as: :enqueue do
       action input,
         schema:
           Zoi.object(%{
@@ -86,8 +84,6 @@ defmodule Jido.Examples.Applications.ElasticGroup.ControllerAgent do
         context: context do
         ControllerState.enqueue(input, context.agent_state)
       end
-
-      define :enqueue
     end
 
     route "examples.applications.elastic_group.work.completed" do
@@ -106,12 +102,10 @@ defmodule Jido.Examples.Applications.ElasticGroup.ControllerAgent do
       end
     end
 
-    route "examples.applications.elastic_group.scale.observe" do
+    route "examples.applications.elastic_group.scale.observe", as: :observe_scale do
       action _input, context: context do
         ControllerState.observe_scale(context.agent_state)
       end
-
-      define :observe_scale
     end
 
     route "examples.applications.elastic_group.control.worker.drained" do

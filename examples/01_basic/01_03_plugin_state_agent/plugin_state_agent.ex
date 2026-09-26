@@ -32,24 +32,20 @@ defmodule Jido.Examples.PluginStateAgent do
   routes do
     signal_source "/examples/basic/plugin_state_agent"
 
-    route "basic.plugin_state.increment" do
+    route "basic.plugin_state.increment", as: :increment do
       action %{amount: amount},
         schema: Zoi.object(%{amount: Zoi.integer()}),
         context: context do
         {:ok, %{context.agent_state | count: context.agent_state.count + amount}}
       end
-
-      define :increment
     end
 
-    route "basic.plugin_state.overwrite" do
+    route "basic.plugin_state.overwrite", as: :overwrite_plugin_state do
       action _input,
         schema: Zoi.object(%{}),
         context: context do
         {:ok, %{context.agent_state | turns: context.agent_state.turns + 1}}
       end
-
-      define :overwrite_plugin_state
     end
   end
 end

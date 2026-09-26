@@ -13,9 +13,7 @@ defmodule Jido.Examples.OutputRepair do
   routes do
     signal_source "/examples/llm/output_repair"
 
-    route "examples.llm.output_repair.answer", Jido.Examples.OutputRepair.Pipeline do
-      define :answer
-    end
+    route "examples.llm.output_repair.answer", Jido.Examples.OutputRepair.Pipeline, as: :answer
   end
 end
 

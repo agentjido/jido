@@ -33,7 +33,7 @@ defmodule JidoTest.Authoring.Agents.AuthoringTest do
       assert {:ok, generated, registry} = Codec.encode(definition)
       assert {:ok, ^definition} = Codec.decode(JSON.decode!(JSON.encode!(generated)), registry)
 
-      for field <- ~w(id state interfaces signal_source inline_action) do
+      for field <- ~w(id state as interfaces signal_source inline_action) do
         refute Map.has_key?(document, field)
       end
 

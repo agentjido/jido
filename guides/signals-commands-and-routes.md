@@ -86,8 +86,9 @@ routes. Test all overlapping patterns.
 
 ## Generate Interfaces
 
-An exact DSL route can declare `define`. Jido then creates constructors such as
-`add_signal/1,2`, which accepts an input map and optional envelope options. A generated interface cannot
+An exact DSL route can set `as: :add`. Jido then creates `add_signal/1,2`,
+which accepts an input map and optional envelope options. Each route can name
+one helper. Omit `as:` to generate no helper. A generated interface cannot
 use a wildcard route or a route match predicate.
 
 See [Route Interfaces](route-interfaces.livemd) and

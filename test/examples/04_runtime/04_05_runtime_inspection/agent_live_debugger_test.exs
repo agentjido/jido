@@ -14,13 +14,11 @@ defmodule JidoTest.Examples.Runtime.InspectionFixture do
   routes do
     signal_source "/test/runtime_inspection"
 
-    route "test.runtime.inspect" do
+    route "test.runtime.inspect", as: :record_result do
       action %{result: result}, context: context do
         context.inspection_barrier.()
         {:ok, %{context.agent_state | status: "complete", result: result}}
       end
-
-      define :record_result
     end
   end
 end

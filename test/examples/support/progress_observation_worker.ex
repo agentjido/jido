@@ -14,7 +14,7 @@ defmodule JidoTest.Examples.ProgressObservationWorker do
   routes do
     signal_source "/test/examples/progress_observation"
 
-    route "test.examples.progress_observation.work" do
+    route "test.examples.progress_observation.work", as: :work do
       action _input, schema: Zoi.object(%{}), context: context do
         for step <- 1..10 do
           Jido.Examples.ProgressObservation.Buffer.publish(context.progress_table, %{
@@ -30,8 +30,6 @@ defmodule JidoTest.Examples.ProgressObservationWorker do
             {:ok, %{context.agent_state | status: :completed, result: "report"}}
         end
       end
-
-      define :work
     end
   end
 end

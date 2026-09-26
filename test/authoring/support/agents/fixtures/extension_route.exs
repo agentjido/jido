@@ -10,8 +10,6 @@ defmodule JidoTest.Authoring.Agents.Fixtures.ExtensionRoute do
   routes do
     signal_source "/authoring/extension_route"
 
-    route "text.write", via: JidoTest.Authoring.Agents.Fixtures.SetText do
-      define :write
-    end
+    route "text.write", via: JidoTest.Authoring.Agents.Fixtures.SetText, as: :write
   end
 end

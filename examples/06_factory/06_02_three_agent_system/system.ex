@@ -17,7 +17,7 @@ defmodule Jido.Examples.Factory.System do
   routes do
     signal_source "/examples/factory/system"
 
-    route "examples.factory.system.boot" do
+    route "examples.factory.system.boot", as: :boot do
       action input,
         schema:
           Zoi.object(%{
@@ -27,8 +27,6 @@ defmodule Jido.Examples.Factory.System do
         context: context do
         Jido.Examples.Factory.System.boot_state(input, context)
       end
-
-      define :boot
     end
 
     route "examples.factory.event" do

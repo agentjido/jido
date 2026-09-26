@@ -10,14 +10,12 @@ defmodule Jido.Examples.RuntimeReconstruction do
   routes do
     signal_source "/examples/research/runtime_reconstruction"
 
-    route "examples.research.runtime_reconstruction.feed.select" do
+    route "examples.research.runtime_reconstruction.feed.select", as: :select do
       action %{name: name},
         schema: Zoi.object(%{name: Zoi.string() |> Zoi.min(1)}),
         context: context do
         {:ok, context.agent_state, [%__MODULE__.SetFeed{feed: name}]}
       end
-
-      define :select
     end
 
     route "examples.research.runtime_reconstruction.feed.input" do

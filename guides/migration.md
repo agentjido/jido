@@ -189,9 +189,7 @@ defmodule MyApp.Counter do
   routes do
     signal_source("/counter")
 
-    route "counter.increment", MyApp.Increment do
-      define(:increment)
-    end
+    route "counter.increment", MyApp.Increment, as: :increment
   end
 end
 

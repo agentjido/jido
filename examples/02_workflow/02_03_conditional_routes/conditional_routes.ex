@@ -12,9 +12,7 @@ defmodule Jido.Examples.ConditionalRoutes do
   routes do
     signal_source "/workflow"
 
-    route "workflow.routes", Jido.Examples.ConditionalRoutes.Pipeline do
-      define :fetch
-    end
+    route "workflow.routes", Jido.Examples.ConditionalRoutes.Pipeline, as: :fetch
   end
 end
 

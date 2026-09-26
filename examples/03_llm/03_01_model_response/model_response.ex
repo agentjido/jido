@@ -10,7 +10,7 @@ defmodule Jido.Examples.ModelResponse do
   routes do
     signal_source "/examples/llm/model_response"
 
-    route "examples.llm.model_response.generate" do
+    route "examples.llm.model_response.generate", as: :generate do
       action input,
         schema: Jido.Examples.LLM.Adapter.prompt_schema(),
         context: context do
@@ -34,8 +34,6 @@ defmodule Jido.Examples.ModelResponse do
           {:ok, %{answer: result.answer}}
         end
       end
-
-      define :generate
     end
   end
 end

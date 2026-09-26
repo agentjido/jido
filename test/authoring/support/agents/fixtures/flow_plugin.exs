@@ -10,9 +10,8 @@ defmodule JidoTest.Authoring.Agents.Fixtures.FlowCounter do
   routes do
     signal_source "/authoring/flow"
 
-    route "flow.add", JidoTest.Authoring.Agents.Fixtures.AddFlow do
+    route "flow.add", JidoTest.Authoring.Agents.Fixtures.AddFlow, as: :add do
       defaults %{amount: 2}
-      define :add
     end
   end
 end

@@ -22,15 +22,13 @@ defmodule TestGuide.Counter do
   routes do
     signal_source("/guides/test")
 
-    route "counter.add" do
+    route "counter.add", as: :add do
       action %{amount: amount},
         name: "test_guide_add",
         schema: Zoi.object(%{amount: Zoi.integer()}),
         context: context do
         {:ok, %{context.agent_state | count: context.agent_state.count + amount}}
       end
-
-      define(:add)
     end
   end
 end

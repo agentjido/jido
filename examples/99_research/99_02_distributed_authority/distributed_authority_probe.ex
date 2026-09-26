@@ -17,14 +17,12 @@ defmodule Jido.Examples.DistributedAuthorityProbe do
   routes do
     signal_source "/examples/research/distributed_authority"
 
-    route "examples.research.distributed_authority.record" do
+    route "examples.research.distributed_authority.record", as: :record do
       action %{value: value},
         schema: Zoi.object(%{value: Zoi.integer()}),
         context: context do
         {:ok, %{context.agent_state | value: value}}
       end
-
-      define :record
     end
   end
 end

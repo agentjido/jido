@@ -20,7 +20,7 @@ defmodule Jido.Examples.Factory.Workshop do
   routes do
     signal_source "/examples/factory/workshop"
 
-    route "examples.factory.workshop.boot" do
+    route "examples.factory.workshop.boot", as: :boot do
       action _input, schema: Zoi.object(%{}), context: context do
         if Map.has_key?(context.agent_state.scheduler.cron, "factory_poll") do
           {:ok, context.agent_state}
@@ -34,8 +34,6 @@ defmodule Jido.Examples.Factory.Workshop do
           {:ok, context.agent_state, [directive]}
         end
       end
-
-      define :boot
     end
 
     route "examples.factory.command" do

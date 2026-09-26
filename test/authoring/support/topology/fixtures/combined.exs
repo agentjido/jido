@@ -11,9 +11,7 @@ defmodule JidoTest.Authoring.Topology.Fixtures.Combined do
   routes do
     signal_source "/authoring/owner"
 
-    route "owner.set", JidoTest.Authoring.Topology.Fixtures.SetValue do
-      define :set
-    end
+    route "owner.set", JidoTest.Authoring.Topology.Fixtures.SetValue, as: :set
   end
 
   topology do

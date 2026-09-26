@@ -43,8 +43,8 @@ One `%Jido.Agent{}` has two valid forms. A definition has `id: nil` and
 `state: nil`. An instance has a non-empty `id` and validated state. A value
 that has only an id or only state is invalid.
 
-Agent modules provide declarative `agent` and `routes` blocks, with explicit
-nested `define` declarations for Signal constructors. Direct map and keyword
+Agent modules provide declarative `agent` and `routes` blocks, with an optional
+`as:` route setting for a Signal constructor. Direct map and keyword
 construction, module construction, and the JSON-compatible Codec use the same
 Agent validation. See the
 `Jido.Agent` and `Jido.Agent.Codec` API documentation.
@@ -62,7 +62,7 @@ defmodule MyApp.Counter do
   routes do
     signal_source("/example")
 
-    route "counter.increment" do
+    route "counter.increment", as: :increment do
       action %{amount: amount},
         name: "increment",
         schema: Zoi.object(%{amount: Zoi.integer()}),
@@ -71,7 +71,6 @@ defmodule MyApp.Counter do
       end
 
       defaults(%{amount: 1})
-      define(:increment)
     end
   end
 end
@@ -110,8 +109,9 @@ The default instance is also implicit for Agent lookup, listing, counts, stop,
 hibernate, and thaw. Pass an instance as the first argument only when the
 application runs more than one Jido supervisor.
 
-The route `define` declaration creates helpers for the same contract. Use the
-Signal helper with `cmd/2`, or use the command helper with a live actor:
+The route setting `as: :increment` creates `increment_signal/1,2`. Each route
+can name one helper. Omit `as:` to generate no helper. Use the Signal with
+`cmd/2` or `Jido.AgentServer.call/3`:
 
 ```elixir
 {:ok, increment_signal} = MyApp.Counter.increment_signal(%{amount: 3})

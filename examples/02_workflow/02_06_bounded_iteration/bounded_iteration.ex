@@ -9,9 +9,7 @@ defmodule Jido.Examples.BoundedIteration do
   routes do
     signal_source "/workflow"
 
-    route "workflow.iteration", Jido.Examples.BoundedIteration.Pipeline do
-      define :repair
-    end
+    route "workflow.iteration", Jido.Examples.BoundedIteration.Pipeline, as: :repair
   end
 end
 

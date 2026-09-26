@@ -36,7 +36,7 @@ defmodule Jido.Examples.TypedCommandAgent do
   routes do
     signal_source "/examples/basic/typed_command_agent"
 
-    route "basic.typed_command.patch_profile" do
+    route "basic.typed_command.patch_profile", as: :patch_profile do
       action %{patch: patch},
         schema:
           Zoi.object(%{
@@ -53,18 +53,15 @@ defmodule Jido.Examples.TypedCommandAgent do
       end
 
       defaults %{patch: %{name: "Route default", push: true}}
-      define :patch_profile
     end
 
-    route "basic.typed_command.set_count" do
+    route "basic.typed_command.set_count", as: :set_count do
       action %{count: count},
         schema: Zoi.object(%{count: Zoi.integer()}),
         context: context do
         # Complete Agent validation owns this bound check.
         {:ok, %{context.agent_state | count: count}}
       end
-
-      define :set_count
     end
   end
 end

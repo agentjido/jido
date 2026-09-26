@@ -29,7 +29,7 @@ defmodule Jido.Examples.Handoff.Worker do
       end
     end
 
-    route "examples.research.handoff.worker.ack" do
+    route "examples.research.handoff.worker.ack", as: :acknowledge do
       action _input, schema: Zoi.object(%{}), context: context do
         {:ok, context.agent_state,
          [
@@ -38,11 +38,9 @@ defmodule Jido.Examples.Handoff.Worker do
            )
          ]}
       end
-
-      define :acknowledge
     end
 
-    route "examples.research.handoff.worker.complete" do
+    route "examples.research.handoff.worker.complete", as: :complete do
       action %{result: result},
         schema: Zoi.object(%{result: Zoi.string()}),
         context: context do
@@ -51,8 +49,6 @@ defmodule Jido.Examples.Handoff.Worker do
         {:ok, context.agent_state,
          [Directive.emit_to_parent(Handoff.signal("examples.research.handoff.result", data))]}
       end
-
-      define :complete
     end
   end
 end
