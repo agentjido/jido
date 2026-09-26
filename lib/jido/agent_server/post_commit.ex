@@ -22,38 +22,36 @@ defmodule Jido.AgentServer.PostCommit do
   alias Jido.Telemetry.Agent, as: AgentTelemetry
   alias Jido.Tracing.Context, as: TraceContext
 
-  def commit_result(result, %State{commit_task: pending} = data) do
-    TaskSupport.release_task_result(pending)
-    complete_commit_notification(result, pending, %{data | commit_task: nil})
+  def settle(field, event, %State{} = data) when field in [:commit_task, :directive_task] do
+    pending = Map.fetch!(data, field)
+    TaskSupport.settle(pending, event)
+    complete_task(field, event, pending, Map.put(data, field, nil))
   end
 
-  def commit_down(reason, %State{commit_task: pending} = data) do
-    TaskSupport.cancel_task_timer(pending.timer)
+  defp complete_task(:commit_task, {:result, result}, pending, data) do
+    complete_commit_notification(result, pending, data)
+  end
 
+  defp complete_task(:commit_task, {:down, reason}, pending, data) do
     error =
       Error.execution_error("Agent Plugin commit notification task exited",
         details: %{code: :plugin_callback_task_failed, callback: :after_commit, reason: reason}
       )
 
-    complete_commit_notification({:error, error}, pending, %{data | commit_task: nil}, :exit)
+    complete_commit_notification({:error, error}, pending, data, :exit)
   end
 
-  def commit_timeout(%State{commit_task: pending} = data) do
-    TaskSupport.shutdown_task(pending.task)
-
+  defp complete_task(:commit_task, :timeout, pending, data) do
     error =
       Error.timeout_error("Agent Plugin commit notification timed out",
         timeout: commit_notification_timeout(data),
         details: %{code: :plugin_callback_timeout, callback: :after_commit}
       )
 
-    complete_commit_notification({:error, error}, pending, %{data | commit_task: nil})
+    complete_commit_notification({:error, error}, pending, data)
   end
 
-  def directive_result(result, %State{directive_task: pending} = data) do
-    TaskSupport.release_task_result(pending)
-    data = %{data | directive_task: nil}
-
+  defp complete_task(:directive_task, {:result, result}, pending, data) do
     directive_result =
       case result do
         :ok ->
@@ -75,10 +73,7 @@ defmodule Jido.AgentServer.PostCommit do
     complete_directive(directive_result, pending.rest, pending.context, pending.span)
   end
 
-  def directive_down(reason, %State{directive_task: pending} = data) do
-    TaskSupport.cancel_task_timer(pending.timer)
-    data = %{data | directive_task: nil}
-
+  defp complete_task(:directive_task, {:down, reason}, pending, data) do
     error =
       Error.execution_error("Agent Plugin Directive task exited",
         details: %{code: :plugin_callback_task_failed, callback: :dispatch, reason: reason}
@@ -87,10 +82,7 @@ defmodule Jido.AgentServer.PostCommit do
     complete_directive({:error, error, data}, pending.rest, pending.context, pending.span, :exit)
   end
 
-  def directive_timeout(%State{directive_task: pending} = data) do
-    TaskSupport.shutdown_task(pending.task)
-    data = %{data | directive_task: nil}
-
+  defp complete_task(:directive_task, :timeout, pending, data) do
     error =
       Error.timeout_error("Agent Directive timed out",
         timeout: data.directive_timeout,

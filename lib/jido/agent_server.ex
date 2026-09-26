@@ -735,8 +735,8 @@ defmodule Jido.AgentServer do
   defp route_info({ref, result} = message, phase, data) when is_reference(ref) do
     case task_owner(data, phase, ref) do
       :admission -> Turn.admission_result(result, data)
-      :commit -> PostCommit.commit_result(result, data)
-      :directive -> PostCommit.directive_result(result, data)
+      :commit -> PostCommit.settle(:commit_task, {:result, result}, data)
+      :directive -> PostCommit.settle(:directive_task, {:result, result}, data)
       :error_policy -> FailurePolicy.task_result(ref, result, data)
       nil -> fallback_info(message, phase, data)
     end
@@ -753,8 +753,8 @@ defmodule Jido.AgentServer do
       task = task_owner(data, phase, ref) ->
         case task do
           :admission -> Turn.admission_down(reason, data)
-          :commit -> PostCommit.commit_down(reason, data)
-          :directive -> PostCommit.directive_down(reason, data)
+          :commit -> PostCommit.settle(:commit_task, {:down, reason}, data)
+          :directive -> PostCommit.settle(:directive_task, {:down, reason}, data)
           :error_policy -> FailurePolicy.task_down(ref, reason, data)
         end
 
@@ -779,14 +779,14 @@ defmodule Jido.AgentServer do
   defp route_timeout(message, timer, {:after_commit_timeout, ref}, :directing, data) do
     if task_owner(data, :directing, ref) == :commit and
          TaskSupport.task_timer?(data.commit_task, ref, timer),
-       do: PostCommit.commit_timeout(data),
+       do: PostCommit.settle(:commit_task, :timeout, data),
        else: fallback_info(message, :directing, data)
   end
 
   defp route_timeout(message, timer, {:directive_timeout, ref}, :directing, data) do
     if task_owner(data, :directing, ref) == :directive and
          TaskSupport.task_timer?(data.directive_task, ref, timer),
-       do: PostCommit.directive_timeout(data),
+       do: PostCommit.settle(:directive_task, :timeout, data),
        else: fallback_info(message, :directing, data)
   end
 

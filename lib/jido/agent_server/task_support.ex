@@ -20,6 +20,10 @@ defmodule Jido.AgentServer.TaskSupport do
     %{task: task, timer: start_task_timer(timeout, tag, task.ref)}
   end
 
+  def settle(pending, {:result, _result}), do: release_task_result(pending)
+  def settle(pending, {:down, _reason}), do: cancel_task_timer(pending.timer)
+  def settle(pending, :timeout), do: shutdown_task(pending.task)
+
   def release_task_result(%{task: %Task{ref: ref}, timer: timer}) do
     Process.demonitor(ref, [:flush])
     cancel_task_timer(timer)
