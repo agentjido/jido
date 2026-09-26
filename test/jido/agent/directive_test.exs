@@ -113,4 +113,43 @@ defmodule Jido.Agent.DirectiveTest do
       assert {:ok, ^directive} = Directive.validate(directive)
     end
   end
+
+  test "child helpers reject option typos and ambiguous or malformed containers" do
+    for opts <- [
+          [restat: :permanent],
+          [restart: :permanent, restart: :temporary],
+          [opts: [id: "first", id: "second"]],
+          [meta: [role: :first, role: :second]],
+          [opts: %URI{}],
+          [meta: :invalid],
+          [{"restart", :permanent}],
+          [:invalid],
+          %{restart: :permanent}
+        ] do
+      assert_raise ArgumentError, fn ->
+        Directive.spawn_child(JidoTest.AgentFixtures.CounterAgent, :child, opts)
+      end
+    end
+  end
+
+  test "child helpers retain supported options with maps or keyword lists" do
+    for {opts, meta} <- [
+          {%{id: "child"}, %{role: :worker}},
+          {[id: "child"], [role: :worker]}
+        ] do
+      directive =
+        Directive.spawn_child(JidoTest.AgentFixtures.CounterAgent, :child,
+          node: node(),
+          opts: opts,
+          meta: meta,
+          restart: :temporary
+        )
+
+      assert directive.opts == %{id: "child"}
+      assert directive.meta == %{role: :worker}
+      assert directive.node == node()
+      assert directive.restart == :temporary
+      assert {:ok, ^directive} = Directive.validate(directive)
+    end
+  end
 end

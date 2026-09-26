@@ -254,17 +254,34 @@ defmodule Jido.Agent.Directive do
   @spec spawn_process(Supervisor.child_spec()) :: SpawnProcess.t()
   def spawn_process(child_spec), do: %SpawnProcess{child_spec: child_spec}
 
-  @doc "Creates a SpawnChild Directive. Pass `node: target_node` for remote placement."
+  @doc """
+  Creates a SpawnChild Directive. Pass `node: target_node` for remote placement.
+
+  Accepts the unique keyword options `:node`, `:opts`, `:meta`, and `:restart`.
+  `:opts` and `:meta` accept plain maps or unique keyword lists. Invalid option
+  containers, duplicate keys, and unknown options raise `ArgumentError`.
+  Directive validation checks field values before a Turn commits.
+  """
   @spec spawn_child(module() | Jido.Agent.t(), term(), keyword()) :: SpawnChild.t()
   def spawn_child(agent, tag, opts \\ []) do
+    unless Keyword.keyword?(opts), do: raise(ArgumentError, "expected keyword options")
+    opts = Keyword.validate!(opts, [:node, :opts, :meta, :restart])
+
     %SpawnChild{
       agent: agent,
       tag: tag,
       node: Keyword.get(opts, :node),
-      opts: opts |> Keyword.get(:opts, %{}) |> Map.new(),
-      meta: opts |> Keyword.get(:meta, %{}) |> Map.new(),
+      opts: option_map!(opts, :opts),
+      meta: option_map!(opts, :meta),
       restart: Keyword.get(opts, :restart, :transient)
     }
+  end
+
+  defp option_map!(opts, key) do
+    case Jido.Agent.Authoring.to_attrs(Keyword.get(opts, key, %{}), :reject) do
+      {:ok, value} -> value
+      :error -> raise ArgumentError, "#{key} must be a plain map or unique keyword list"
+    end
   end
 
   @doc "Creates an AdoptChild Directive."
