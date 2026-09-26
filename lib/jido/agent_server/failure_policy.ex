@@ -147,10 +147,6 @@ defmodule Jido.AgentServer.FailurePolicy do
     %{data | error_policy_tasks: Map.put(data.error_policy_tasks, task.ref, pending)}
   end
 
-  def drop_task(%State{} = data, ref) do
-    %{data | error_policy_tasks: Map.delete(data.error_policy_tasks, ref)}
-  end
-
   def record_dispatch_failure(%State{} = data, reason) do
     error = Inspection.public_error(reason)
 
@@ -162,12 +158,14 @@ defmodule Jido.AgentServer.FailurePolicy do
     Inspection.record_event(data, :error_signal_delivery_failed, %{error: error})
   end
 
-  def task_result(ref, result, %State{} = data) do
-    pending = Map.fetch!(data.error_policy_tasks, ref)
-    TaskSupport.release_task_result(pending)
-    data = drop_task(data, ref)
+  def settle(ref, event, %State{} = data) do
+    {pending, tasks} = Map.pop!(data.error_policy_tasks, ref)
+    TaskSupport.settle(pending, event)
+    complete_task(event, Map.get(pending, :kind, :dispatch), %{data | error_policy_tasks: tasks})
+  end
 
-    case Map.get(pending, :kind, :dispatch) do
+  defp complete_task({:result, result}, kind, data) do
+    case kind do
       :custom ->
         settle_custom(result, data)
 
@@ -190,12 +188,8 @@ defmodule Jido.AgentServer.FailurePolicy do
     end
   end
 
-  def task_down(ref, reason, %State{} = data) do
-    pending = Map.fetch!(data.error_policy_tasks, ref)
-    TaskSupport.cancel_task_timer(pending.timer)
-    data = drop_task(data, ref)
-
-    case Map.get(pending, :kind, :dispatch) do
+  defp complete_task({:down, reason}, kind, data) do
+    case kind do
       :custom ->
         {:stop, Shutdown.normalize_reason({:error_policy_task_failed, reason}), data}
 
@@ -209,12 +203,8 @@ defmodule Jido.AgentServer.FailurePolicy do
     end
   end
 
-  def task_timeout(task_ref, %State{} = data) do
-    pending = Map.fetch!(data.error_policy_tasks, task_ref)
-    TaskSupport.shutdown_task(pending.task)
-    data = drop_task(data, task_ref)
-
-    case Map.get(pending, :kind, :dispatch) do
+  defp complete_task(:timeout, kind, data) do
+    case kind do
       :custom ->
         {:stop, Shutdown.normalize_reason({:error_policy_timeout, dispatch_timeout(data)}), data}
 

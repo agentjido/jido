@@ -737,7 +737,7 @@ defmodule Jido.AgentServer do
       :admission -> Turn.admission_result(result, data)
       :commit -> PostCommit.settle(:commit_task, {:result, result}, data)
       :directive -> PostCommit.settle(:directive_task, {:result, result}, data)
-      :error_policy -> FailurePolicy.task_result(ref, result, data)
+      :error_policy -> FailurePolicy.settle(ref, {:result, result}, data)
       nil -> fallback_info(message, phase, data)
     end
   end
@@ -755,7 +755,7 @@ defmodule Jido.AgentServer do
           :admission -> Turn.admission_down(reason, data)
           :commit -> PostCommit.settle(:commit_task, {:down, reason}, data)
           :directive -> PostCommit.settle(:directive_task, {:down, reason}, data)
-          :error_policy -> FailurePolicy.task_down(ref, reason, data)
+          :error_policy -> FailurePolicy.settle(ref, {:down, reason}, data)
         end
 
       true ->
@@ -793,7 +793,7 @@ defmodule Jido.AgentServer do
   defp route_timeout(message, timer, {:error_policy_dispatch_timeout, ref}, phase, data) do
     if task_owner(data, phase, ref) == :error_policy and
          TaskSupport.task_timer?(Map.get(data.error_policy_tasks, ref), ref, timer),
-       do: FailurePolicy.task_timeout(ref, data),
+       do: FailurePolicy.settle(ref, :timeout, data),
        else: fallback_info(message, phase, data)
   end
 
