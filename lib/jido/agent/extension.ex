@@ -32,13 +32,25 @@ defmodule Jido.Agent.Extension do
   @doc false
   @spec route_target_extension([module()], atom()) :: {:ok, module()} | {:error, term()}
   def route_target_extension(extensions, option) when is_list(extensions) and is_atom(option) do
-    Enum.reduce_while(extensions, {:ok, []}, fn extension, {:ok, claims} ->
+    with {:ok, claims} <- route_target_claims(extensions), do: route_target_claim(claims, option)
+  end
+
+  def route_target_extension(_extensions, option), do: invalid_route_option(option)
+
+  defp route_target_claims(extensions) do
+    Enum.reduce_while(extensions, {:ok, %{}}, fn extension, {:ok, claims} ->
       if is_atom(extension) and Code.ensure_loaded?(extension) and
            function_exported?(extension, :route_target_options, 0) do
         options = extension.route_target_options()
 
         if is_list(options) and options == Enum.uniq(options) and Enum.all?(options, &is_atom/1) do
-          claims = if option in options, do: [extension | claims], else: claims
+          claims =
+            Enum.reduce(
+              options,
+              claims,
+              &Map.update(&2, &1, [extension], fn owners -> [extension | owners] end)
+            )
+
           {:cont, {:ok, claims}}
         else
           {:halt,
@@ -54,11 +66,7 @@ defmodule Jido.Agent.Extension do
         {:cont, {:ok, claims}}
       end
     end)
-    |> route_target_claim(option)
   end
-
-  def route_target_extension(_extensions, option),
-    do: Authoring.error("Invalid Agent extension route target option", %{option: option})
 
   @doc """
   Lowers static extension data to ordinary Agent authoring data.
@@ -129,57 +137,85 @@ defmodule Jido.Agent.Extension do
   defp finish({:error, _} = error), do: error
 
   defp claim_route_targets(extensions, %{routes: routes} = config) when is_list(routes) do
-    Enum.reduce_while(routes, {:ok, []}, fn route, {:ok, claimed} ->
-      case claim_route_target(extensions, route) do
-        {:ok, route} -> {:cont, {:ok, [route | claimed]}}
-        {:error, _} = error -> {:halt, error}
-      end
-    end)
-    |> case do
-      {:ok, routes} -> {:ok, %{config | routes: Enum.reverse(routes)}}
-      error -> error
+    case Enum.find_value(routes, &route_target/1) do
+      nil ->
+        {:ok, config}
+
+      %{option: option} when is_atom(option) ->
+        with {:ok, claims} <- route_target_claims(extensions),
+             {:ok, routes} <- claim_routes(claims, routes) do
+          {:ok, %{config | routes: routes}}
+        end
+
+      %{option: option} ->
+        invalid_route_option(option)
     end
   end
 
   defp claim_route_targets(_extensions, config), do: {:ok, config}
 
+  defp route_target(%{target: {%Jido.Agent.Extension.RouteTarget{} = target, _defaults}}),
+    do: target
+
+  defp route_target(%{target: %Jido.Agent.Extension.RouteTarget{} = target}), do: target
+  defp route_target(_route), do: nil
+
+  defp claim_routes(claims, routes) do
+    Enum.reduce_while(routes, {:ok, []}, fn route, {:ok, claimed} ->
+      case claim_route_target(claims, route) do
+        {:ok, route} -> {:cont, {:ok, [route | claimed]}}
+        {:error, _} = error -> {:halt, error}
+      end
+    end)
+    |> case do
+      {:ok, routes} -> {:ok, Enum.reverse(routes)}
+      error -> error
+    end
+  end
+
   defp claim_route_target(
-         extensions,
+         claims,
          %{target: {%Jido.Agent.Extension.RouteTarget{} = target, defaults}} = route
        ) do
-    with {:ok, target} <- claim_route_target_value(extensions, target),
+    with {:ok, target} <- claim_route_target_value(claims, target),
          do: {:ok, %{route | target: {target, defaults}}}
   end
 
   defp claim_route_target(
-         extensions,
+         claims,
          %{target: %Jido.Agent.Extension.RouteTarget{} = target} = route
        ) do
-    with {:ok, target} <- claim_route_target_value(extensions, target),
+    with {:ok, target} <- claim_route_target_value(claims, target),
          do: {:ok, %{route | target: target}}
   end
 
-  defp claim_route_target(_extensions, route), do: {:ok, route}
+  defp claim_route_target(_claims, route), do: {:ok, route}
 
-  defp claim_route_target_value(extensions, target) do
-    with {:ok, extension} <- route_target_extension(extensions, target.option),
+  defp claim_route_target_value(claims, target) do
+    with {:ok, extension} <- route_target_claim(claims, target.option),
          do: {:ok, %{target | extension: extension}}
   end
 
-  defp route_target_claim({:ok, [extension]}, _option), do: {:ok, extension}
+  defp route_target_claim(claims, option) when is_atom(option) do
+    case Map.get(claims, option, []) do
+      [extension] ->
+        {:ok, extension}
 
-  defp route_target_claim({:ok, []}, option),
-    do:
-      Authoring.error("Unknown Agent extension route target option #{inspect(option)}", %{
-        option: option
-      })
+      [] ->
+        Authoring.error("Unknown Agent extension route target option #{inspect(option)}", %{
+          option: option
+        })
 
-  defp route_target_claim({:ok, extensions}, option),
-    do:
-      Authoring.error("Conflicting Agent extension route target option #{inspect(option)}", %{
-        option: option,
-        extensions: Enum.reverse(extensions)
-      })
+      extensions ->
+        Authoring.error("Conflicting Agent extension route target option #{inspect(option)}", %{
+          option: option,
+          extensions: Enum.reverse(extensions)
+        })
+    end
+  end
 
-  defp route_target_claim({:error, _} = error, _option), do: error
+  defp route_target_claim(_claims, option), do: invalid_route_option(option)
+
+  defp invalid_route_option(option),
+    do: Authoring.error("Invalid Agent extension route target option", %{option: option})
 end

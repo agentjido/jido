@@ -73,6 +73,15 @@ defmodule JidoTest.Agent.AuthoringExtensionTest do
     def route_target_options, do: [:ref, :ref]
   end
 
+  defmodule ObservedTargets do
+    def route_target_options do
+      send(self(), :read_route_targets)
+      [:observed, :ref]
+    end
+
+    def lower_agent(config, entities), do: {:ok, config, entities}
+  end
+
   defmodule BadConfig do
     use Spark.Dsl.Extension
     def lower_agent(config, entities), do: {:ok, Map.put(config, :surprise, true), entities}
@@ -235,6 +244,65 @@ defmodule JidoTest.Agent.AuthoringExtensionTest do
                      )
                    end
     end
+  end
+
+  test "lowering reads target declarations once and keeps route order and defaults" do
+    target = %Extension.RouteTarget{option: :observed, value: Add}
+
+    routes = [
+      %{path: "ordinary", target: Add},
+      %{path: "first", target: target},
+      %{path: "second", target: {target, %{amount: 2}}}
+    ]
+
+    # Both extensions claim :ref, but an unused claim is not a conflict.
+    assert {:ok, lowered} =
+             Extension.lower([ObservedTargets, Labels], %{routes: routes, metadata: %{}}, [])
+
+    claimed = %{target | extension: ObservedTargets}
+
+    assert lowered.routes == [
+             %{path: "ordinary", target: Add},
+             %{path: "first", target: claimed},
+             %{path: "second", target: {claimed, %{amount: 2}}}
+           ]
+
+    assert_received :read_route_targets
+    refute_received :read_route_targets
+
+    ordinary = %{routes: [%{path: "ordinary", target: Add}]}
+    assert {:ok, ^ordinary} = Extension.lower([ObservedTargets], ordinary, [])
+    refute_received :read_route_targets
+  end
+
+  test "lowering keeps the first target error and conflict owner order" do
+    target = %Extension.RouteTarget{option: :ref, value: Add}
+    config = %{routes: [%{target: target}]}
+
+    assert {:error, error} = Extension.lower([Labels, ConflictingRouteTarget], config, [])
+    assert error.details.extensions == [Labels, ConflictingRouteTarget]
+
+    for option <- [:unknown, "invalid"] do
+      first = %{target: %{target | option: option}}
+
+      assert {:error, error} =
+               Extension.lower(
+                 [Labels, ConflictingRouteTarget],
+                 %{routes: [first | config.routes]},
+                 []
+               )
+
+      assert error.details.option == option
+    end
+
+    assert {:error, error} =
+             Extension.lower(
+               [InvalidRouteTargetOptions],
+               %{routes: [%{target: %{target | option: "invalid"}}]},
+               []
+             )
+
+    assert Exception.message(error) == "Invalid Agent extension route target option"
   end
 
   test "unclaimed declarations fail at compilation" do
