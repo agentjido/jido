@@ -96,13 +96,18 @@ defmodule Jido.Agent.Validation do
 
   @doc false
   @spec validate_instance(term()) :: {:ok, Agent.t()} | {:error, Exception.t()}
-  def validate_instance(%Agent{} = agent) do
-    with {:ok, agent, _plugin_specs, schema} <- validate_common(agent) do
-      validate_instance_data(agent, schema)
-    end
+  def validate_instance(agent) do
+    with {:ok, agent, _specs} <- validate_instance_with_plugins(agent), do: {:ok, agent}
   end
 
-  def validate_instance(value),
+  @doc false
+  def validate_instance_with_plugins(%Agent{} = agent) do
+    with {:ok, agent, specs, schema} <- validate_common(agent),
+         {:ok, agent} <- validate_instance_data(agent, schema),
+         do: {:ok, agent, specs}
+  end
+
+  def validate_instance_with_plugins(value),
     do: invalid("Expected a Jido.Agent instance", %{value: value})
 
   @doc false

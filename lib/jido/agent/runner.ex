@@ -2,7 +2,7 @@ defmodule Jido.Agent.Runner do
   @moduledoc false
 
   alias Jido.Agent
-  alias Jido.Agent.{Command, Plugin, Turn}
+  alias Jido.Agent.{Command, Plugin, Turn, Validation}
   alias Jido.Agent.Plugin.Pipeline, as: PluginPipeline
   alias Jido.Error
   alias Jido.Signal
@@ -55,9 +55,7 @@ defmodule Jido.Agent.Runner do
   @spec prepare(Agent.instance(), Signal.t(), keyword()) ::
           {:ok, Prepared.t()} | {:error, term()}
   def prepare(%Agent{} = agent, %Signal{} = signal, opts) when is_list(opts) do
-    agent
-    |> prepare_direct(signal, opts, :normalize)
-    |> unstage()
+    prepare_direct(agent, signal, opts) |> unstage()
   end
 
   @doc false
@@ -72,7 +70,6 @@ defmodule Jido.Agent.Runner do
       when is_list(exec_opts) and is_list(plugin_specs) do
     with :ok <- at(:input, Command.validate_caller_context(command.context)),
          {:ok, selection} <- at(:route, select(command.agent, source_signal)),
-         {:ok, plugin_specs} <- at(:prepare, plugin_specs(plugin_specs, :prepared)),
          {:ok, turn} <- at(:input, materialize(selection, source_signal, command.signal)) do
       {:ok,
        prepared(
@@ -82,7 +79,7 @@ defmodule Jido.Agent.Runner do
          command.context,
          exec_opts,
          command.plugin_inputs,
-         plugin_specs
+         Plugin.specs(plugin_specs)
        )}
     end
   end
@@ -103,15 +100,15 @@ defmodule Jido.Agent.Runner do
     end
   end
 
-  defp prepare_direct(agent, signal, opts, plugin_source) do
+  defp prepare_direct(agent, signal, opts) do
     {caller_context, exec_opts} = Keyword.pop(opts, :context, %{})
 
     with {:ok, caller_context} <- at(:input, Command.normalize_context(caller_context)),
          :ok <- at(:input, Command.validate_caller_context(caller_context)),
-         {:ok, agent} <-
-           at(:input, normalize_result_routing_error(Agent.validate_instance(agent), signal)),
+         validation = Validation.validate_instance_with_plugins(agent),
+         {:ok, agent, specs} <- at(:input, normalize_result_routing_error(validation, signal)),
          {:ok, signal} <- at(:input, Command.normalize_signal(signal)),
-         {:ok, plugin_specs} <- at(:prepare, plugin_specs(agent.plugins, plugin_source)),
+         plugin_specs = Plugin.specs(specs),
          {:ok, plugin_inputs} <- at(:prepare, Plugin.prepare(agent, signal, plugin_specs)),
          {:ok, selection} <- at(:route, select(agent, signal)),
          {:ok, turn} <- at(:input, materialize(selection, signal, signal)) do
@@ -273,13 +270,6 @@ defmodule Jido.Agent.Runner do
        details: %{signal_id: signal.id, data: signal.data}
      )}
   end
-
-  defp plugin_specs(declarations, :normalize) do
-    with {:ok, specs} <- Jido.Plugin.Normalizer.normalize_all(declarations),
-         do: {:ok, Jido.Agent.Plugin.specs(specs)}
-  end
-
-  defp plugin_specs(specs, :prepared), do: {:ok, Jido.Agent.Plugin.specs(specs)}
 
   defp invalid_state_output(output) do
     {:error,

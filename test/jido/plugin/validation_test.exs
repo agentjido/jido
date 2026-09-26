@@ -233,6 +233,19 @@ defmodule Jido.Plugin.ValidationTest do
     refute_received {:callback, _, _}
   end
 
+  test "direct preparation validates Plugin declarations once" do
+    agent = Jido.Agent.new!(name: "prepared") |> Jido.Agent.instantiate!()
+    opts = [validation_result: :ok]
+    agent = %{agent | plugins: [{OptionValidator, opts}]}
+    signal = Jido.Signal.new!("unrouted", %{}, source: "/test")
+
+    assert {:error, %Jido.Error.RoutingError{}} = Jido.Agent.Runner.prepare(agent, signal, [])
+    assert_received {:callback, :validate_options, ^opts}
+    assert_received {:callback, :state_spec, ^opts}
+    assert_received {:callback, :directives, ^opts}
+    refute_received {:callback, _, _}
+  end
+
   test "Plugin Codec encodes a declaration after one normalization" do
     original_opts = [validation_result: :ok]
 
