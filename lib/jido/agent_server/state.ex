@@ -1,9 +1,12 @@
 defmodule Jido.AgentServer.State do
   @moduledoc false
 
+  alias Jido.AgentServer.Options
+
   @schema Zoi.struct(
             __MODULE__,
             %{
+              config: Options.runtime_schema(),
               agent: Zoi.any(description: "Live immutable Agent value"),
               plugin_specs: Zoi.list(Zoi.any(), description: "Validated Agent Plugin specs"),
               jido: Zoi.any(description: "Owning Jido instance") |> Zoi.optional(),
@@ -15,17 +18,7 @@ defmodule Jido.AgentServer.State do
               registered?:
                 Zoi.boolean(description: "Whether the Agent is Registry named")
                 |> Zoi.default(false),
-              exec_opts: Zoi.any(description: "Executable runtime options"),
-              max_postponed_signals: Zoi.any(description: "Postponed Signal admission limit"),
               postponed_tokens: Zoi.any(description: "Bounded postponed Signal token set"),
-              turn_timeout: Zoi.any(description: "Pre-commit Turn timeout"),
-              max_directives_per_turn: Zoi.any(description: "Directive batch limit"),
-              directive_timeout: Zoi.any(description: "Plugin and external Directive timeout"),
-              readiness_timeout: Zoi.integer(description: "Plugin runtime readiness timeout"),
-              default_dispatch:
-                Zoi.any(description: "Default outbound Signal dispatch") |> Zoi.optional(),
-              error_policy:
-                Zoi.any(description: "Agent Server error policy") |> Zoi.default(:log_only),
               error_count:
                 Zoi.integer(description: "Consecutive runtime error count") |> Zoi.default(0),
               parent: Zoi.any(description: "Current logical parent") |> Zoi.optional(),
@@ -36,12 +29,6 @@ defmodule Jido.AgentServer.State do
                   description: "Remote child creation identities, including unresolved starts"
                 )
                 |> Zoi.default(%{}),
-              on_parent_death: Zoi.atom(description: "Parent death policy") |> Zoi.default(:stop),
-              pool: Zoi.atom(description: "Owning Agent InstanceManager") |> Zoi.optional(),
-              idle_timeout:
-                Zoi.any(description: "Idle timeout in milliseconds") |> Zoi.default(:infinity),
-              persistence:
-                Zoi.any(description: "Optional Agent persistence adapter") |> Zoi.optional(),
               initial_persistence:
                 Zoi.enum([:none, :create, :restored, :ready],
                   description: "Initial durable-record state"
@@ -51,14 +38,10 @@ defmodule Jido.AgentServer.State do
                 Zoi.map(description: "Attached owner PIDs and monitor references")
                 |> Zoi.default(%{}),
               idle_timer: Zoi.any(description: "Current idle timer") |> Zoi.optional(),
-              spawn_fun:
-                Zoi.any(description: "Optional process spawn function") |> Zoi.optional(),
               debug:
                 Zoi.boolean(description: "Enable the Agent event buffer") |> Zoi.default(false),
               debug_events:
                 Zoi.list(Zoi.any(), description: "Recent Agent runtime events") |> Zoi.default([]),
-              debug_max_events:
-                Zoi.integer(description: "Maximum recent runtime events") |> Zoi.default(500),
               state_version: Zoi.integer(description: "Agent commit revision"),
               checkpoint_origin_module:
                 Zoi.atom(description: "Definition module used to start this Agent")

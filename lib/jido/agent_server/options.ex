@@ -20,9 +20,35 @@ defmodule Jido.AgentServer.Options do
     readiness_timeout + @startup_completion_timeout
   end
 
+  @runtime_fields %{
+    exec_opts: Zoi.any(description: "Executable runtime options") |> Zoi.default([]),
+    max_postponed_signals:
+      Zoi.any(description: "Postponed Signal admission limit")
+      |> Zoi.default(@default_max_postponed_signals),
+    turn_timeout:
+      Zoi.any(description: "Pre-commit Turn timeout")
+      |> Zoi.default(@default_turn_timeout),
+    max_directives_per_turn:
+      Zoi.any(description: "Directive count limit") |> Zoi.default(:infinity),
+    directive_timeout:
+      Zoi.any(description: "Plugin and external Directive timeout")
+      |> Zoi.default(@default_directive_timeout),
+    readiness_timeout:
+      Zoi.integer(description: "Plugin runtime readiness timeout")
+      |> Zoi.default(@default_readiness_timeout),
+    default_dispatch: Zoi.any(description: "Default outbound Signal dispatch") |> Zoi.optional(),
+    error_policy: Zoi.any(description: "Agent Server error policy") |> Zoi.default(:log_only),
+    on_parent_death: Zoi.atom(description: "Parent death policy") |> Zoi.default(:stop),
+    pool: Zoi.atom(description: "Owning Agent InstanceManager") |> Zoi.optional(),
+    idle_timeout: Zoi.any(description: "Idle timeout in milliseconds") |> Zoi.default(:infinity),
+    persistence: Zoi.any(description: "Optional Agent persistence adapter") |> Zoi.optional(),
+    spawn_fun: Zoi.any(description: "Optional process spawn function") |> Zoi.optional(),
+    debug_max_events: Zoi.integer(description: "Maximum event count") |> Zoi.default(500)
+  }
+
   @schema Zoi.struct(
             __MODULE__,
-            %{
+            Map.merge(@runtime_fields, %{
               agent: Zoi.any(description: "Validated Agent value"),
               name: Zoi.any(description: "Optional OTP process name") |> Zoi.optional(),
               jido: Zoi.any(description: "Optional Jido instance") |> Zoi.optional(),
@@ -30,45 +56,16 @@ defmodule Jido.AgentServer.Options do
               registry: Zoi.any(description: "Optional Registry") |> Zoi.optional(),
               register:
                 Zoi.boolean(description: "Register this Agent by id") |> Zoi.default(false),
-              exec_opts: Zoi.any(description: "Executable runtime options") |> Zoi.default([]),
-              max_postponed_signals:
-                Zoi.any(description: "Postponed Signal admission limit")
-                |> Zoi.default(@default_max_postponed_signals),
-              turn_timeout:
-                Zoi.any(description: "Pre-commit Turn timeout")
-                |> Zoi.default(@default_turn_timeout),
-              max_directives_per_turn:
-                Zoi.any(description: "Directive count limit") |> Zoi.default(:infinity),
-              directive_timeout:
-                Zoi.any(description: "Plugin and external Directive timeout")
-                |> Zoi.default(@default_directive_timeout),
-              readiness_timeout:
-                Zoi.integer(description: "Plugin runtime readiness timeout")
-                |> Zoi.default(@default_readiness_timeout),
-              default_dispatch:
-                Zoi.any(description: "Default outbound Signal dispatch") |> Zoi.optional(),
-              error_policy:
-                Zoi.any(description: "Agent Server error policy") |> Zoi.default(:log_only),
               parent: Zoi.any(description: "Optional logical parent") |> Zoi.optional(),
-              on_parent_death: Zoi.atom(description: "Parent death policy") |> Zoi.default(:stop),
-              spawn_fun:
-                Zoi.any(description: "Optional process spawn function") |> Zoi.optional(),
-              pool: Zoi.atom(description: "Owning Agent InstanceManager") |> Zoi.optional(),
               pool_key: Zoi.any(description: "Agent InstanceManager key") |> Zoi.optional(),
-              idle_timeout:
-                Zoi.any(description: "Idle timeout in milliseconds") |> Zoi.default(:infinity),
-              persistence:
-                Zoi.any(description: "Optional Agent persistence adapter") |> Zoi.optional(),
               restore:
                 Zoi.any(description: "Persisted Agent restore policy") |> Zoi.default(:if_found),
               state_version:
                 Zoi.integer(description: "Initial Agent commit revision")
                 |> Zoi.default(0),
               debug:
-                Zoi.boolean(description: "Enable the Agent event buffer") |> Zoi.default(false),
-              debug_max_events:
-                Zoi.integer(description: "Maximum event count") |> Zoi.default(500)
-            },
+                Zoi.boolean(description: "Enable the Agent event buffer") |> Zoi.default(false)
+            }),
             coerce: true
           )
 
@@ -78,6 +75,12 @@ defmodule Jido.AgentServer.Options do
 
   @doc false
   def schema, do: @schema
+
+  @doc false
+  def runtime_schema, do: Zoi.object(@runtime_fields)
+
+  @doc false
+  def runtime_config(%__MODULE__{} = opts), do: Map.take(opts, Map.keys(@runtime_fields))
 
   @doc false
   def new(opts) when is_list(opts) do

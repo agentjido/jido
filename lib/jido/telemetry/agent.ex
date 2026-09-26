@@ -58,7 +58,7 @@ defmodule Jido.Telemetry.Agent do
 
     measurements = %{
       queue_depth: MapSet.size(data.postponed_tokens),
-      queue_limit: data.max_postponed_signals
+      queue_limit: data.config.max_postponed_signals
     }
 
     Semantic.point([:jido, :agent, :admission, :rejected], metadata, measurements)

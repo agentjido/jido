@@ -136,11 +136,14 @@ defmodule Jido.AgentServer.DirectiveRuntimeTest do
     directive = Directive.spawn_process(spec)
 
     for result <- [{:ok, self()}, {:ok, self(), :info}, :ignore] do
-      runtime = %{state | spawn_fun: fn ^spec -> result end}
+      runtime = %{state | config: %{state.config | spawn_fun: fn ^spec -> result end}}
       assert {:ok, ^runtime} = DirectiveRuntime.handle(directive, context, runtime)
     end
 
-    runtime = %{state | spawn_fun: fn ^spec -> {:error, :unavailable} end}
+    runtime = %{
+      state
+      | config: %{state.config | spawn_fun: fn ^spec -> {:error, :unavailable} end}
+    }
 
     assert {:error, {:spawn_process_failed, :unavailable}, ^runtime} =
              DirectiveRuntime.handle(directive, context, runtime)
@@ -167,7 +170,7 @@ defmodule Jido.AgentServer.DirectiveRuntimeTest do
           {fn _spec -> :unexpected end, {:invalid_start_result, :unexpected}},
           {fn _spec -> {:ok, :not_a_pid} end, {:invalid_start_result, {:ok, :not_a_pid}}}
         ] do
-      runtime = %{state | spawn_fun: spawn_fun}
+      runtime = %{state | config: %{state.config | spawn_fun: spawn_fun}}
 
       assert {:error, {:spawn_process_failed, ^reason}, ^runtime} =
                DirectiveRuntime.handle(directive, context, runtime)

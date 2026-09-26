@@ -25,14 +25,15 @@ defmodule Jido.AgentServer.ServerLifecycle do
          {:ok, restored_agent, restored_version, initial_persistence} <-
            Storage.restore_initial_agent(opts),
          {:ok, agent, plugin_specs} <- Validation.validate_instance_with_plugins(restored_agent),
-         {:ok, exec_opts} <- Options.validate_keyword(opts.exec_opts, :exec_opts),
-         {:ok, max_postponed_signals} <-
+         {:ok, _exec_opts} <- Options.validate_keyword(opts.exec_opts, :exec_opts),
+         {:ok, _max_postponed_signals} <-
            Options.validate_limit(opts.max_postponed_signals, :max_postponed_signals),
-         {:ok, max_directives_per_turn} <-
+         {:ok, _max_directives_per_turn} <-
            Options.validate_limit(opts.max_directives_per_turn, :max_directives_per_turn) do
       parent = opts |> ChildLifecycle.restore_parent(agent) |> ChildLifecycle.monitor_parent()
 
       data = %State{
+        config: Options.runtime_config(opts),
         agent: agent,
         plugin_specs: plugin_specs,
         jido: opts.jido,
@@ -40,24 +41,10 @@ defmodule Jido.AgentServer.ServerLifecycle do
         partition: opts.partition,
         registry: opts.registry,
         registered?: opts.register,
-        exec_opts: exec_opts,
-        max_postponed_signals: max_postponed_signals,
         postponed_tokens: MapSet.new(),
-        turn_timeout: opts.turn_timeout,
-        max_directives_per_turn: max_directives_per_turn,
-        directive_timeout: opts.directive_timeout,
-        readiness_timeout: opts.readiness_timeout,
-        default_dispatch: opts.default_dispatch,
-        error_policy: opts.error_policy,
         parent: parent,
-        on_parent_death: opts.on_parent_death,
-        pool: opts.pool,
-        idle_timeout: opts.idle_timeout,
-        persistence: opts.persistence,
         initial_persistence: initial_persistence,
-        spawn_fun: opts.spawn_fun,
         debug: opts.debug,
-        debug_max_events: opts.debug_max_events,
         state_version: restored_version,
         checkpoint_origin_module: opts.agent.module,
         activation_id: Signal.ID.generate!(),
@@ -149,7 +136,7 @@ defmodule Jido.AgentServer.ServerLifecycle do
 
       error =
         Error.timeout_error("Agent Plugin readiness timed out",
-          timeout: data.readiness_timeout,
+          timeout: data.config.readiness_timeout,
           details: %{code: :plugin_callback_timeout, callback: :await_ready}
         )
 
@@ -233,7 +220,12 @@ defmodule Jido.AgentServer.ServerLifecycle do
         [:link, :monitor]
       )
 
-    timer = TaskSupport.start_task_timer(data.readiness_timeout, :plugin_readiness_timeout, token)
+    timer =
+      TaskSupport.start_task_timer(
+        data.config.readiness_timeout,
+        :plugin_readiness_timeout,
+        token
+      )
 
     %{data | plugin_bootstrap: %{pid: pid, ref: ref, token: token, timer: timer}}
   end

@@ -18,7 +18,7 @@ defmodule Jido.AgentServer.Inspection do
       state_version: data.state_version,
       admission: %{
         postponed: MapSet.size(data.postponed_tokens),
-        limit: data.max_postponed_signals,
+        limit: data.config.max_postponed_signals,
         message_queue_len: message_queue_len
       },
       runtime: %{
@@ -28,9 +28,9 @@ defmodule Jido.AgentServer.Inspection do
         pending_child_spawns: pending_child_spawns(data),
         error_count: data.error_count,
         lifecycle: %{
-          pool: data.pool,
+          pool: data.config.pool,
           attached: map_size(data.attachments),
-          idle_timeout: data.idle_timeout,
+          idle_timeout: data.config.idle_timeout,
           idle_timer?: not is_nil(data.idle_timer)
         }
       },
@@ -82,7 +82,7 @@ defmodule Jido.AgentServer.Inspection do
 
   def record_event(%State{} = data, event, metadata) do
     entry = %{event: event, at: System.system_time(:millisecond), metadata: metadata}
-    events = Enum.take([entry | data.debug_events], data.debug_max_events)
+    events = Enum.take([entry | data.debug_events], data.config.debug_max_events)
     %{data | debug_events: events}
   end
 
@@ -120,7 +120,7 @@ defmodule Jido.AgentServer.Inspection do
 
   def recent_events(%State{} = data, opts) do
     if data.debug do
-      limit = opts |> Keyword.get(:limit, data.debug_max_events) |> normalize_event_limit()
+      limit = opts |> Keyword.get(:limit, data.config.debug_max_events) |> normalize_event_limit()
       {:ok, Enum.take(data.debug_events, limit)}
     else
       {:error, :debug_not_enabled}

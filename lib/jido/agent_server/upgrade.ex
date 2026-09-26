@@ -40,7 +40,7 @@ defmodule Jido.AgentServer.Upgrade do
        )}
   end
 
-  defp definition_upgrade_supported?(%State{persistence: nil}, _target_module), do: :ok
+  defp definition_upgrade_supported?(%State{config: %{persistence: nil}}, _target_module), do: :ok
 
   defp definition_upgrade_supported?(%State{agent: %{module: module}}, module), do: :ok
 

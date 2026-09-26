@@ -73,7 +73,7 @@ defmodule Jido.AgentServer.Idle do
 
   def maybe_start_idle_timer(%State{} = data, phase) when phase != :idle, do: data
 
-  def maybe_start_idle_timer(%State{idle_timeout: :infinity} = data, :idle), do: data
+  def maybe_start_idle_timer(%State{config: %{idle_timeout: :infinity}} = data, :idle), do: data
 
   def maybe_start_idle_timer(%State{idle_timer: timer} = data, :idle)
       when not is_nil(timer),
@@ -81,7 +81,7 @@ defmodule Jido.AgentServer.Idle do
 
   def maybe_start_idle_timer(%State{} = data, :idle) do
     if map_size(data.attachments) == 0 do
-      timer = :erlang.start_timer(data.idle_timeout, self(), :agent_idle_timeout)
+      timer = :erlang.start_timer(data.config.idle_timeout, self(), :agent_idle_timeout)
       %{data | idle_timer: timer}
     else
       data

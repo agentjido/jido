@@ -155,7 +155,7 @@ defmodule Jido.AgentServer.ChildOperations do
       state.jido,
       opts,
       directive.restart,
-      state.directive_timeout
+      state.config.directive_timeout
     )
   end
 
@@ -173,7 +173,14 @@ defmodule Jido.AgentServer.ChildOperations do
           {:ok, pid, info}
 
         {:error, reason} ->
-          _ = ChildPlacement.stop(state.jido, pid, :identity_mismatch, state.directive_timeout)
+          _ =
+            ChildPlacement.stop(
+              state.jido,
+              pid,
+              :identity_mismatch,
+              state.config.directive_timeout
+            )
+
           {:error, reason}
       end
     end
@@ -308,7 +315,7 @@ defmodule Jido.AgentServer.ChildOperations do
 
   defp stop_agent_process(pid, reason, %State{jido: jido} = state)
        when is_atom(jido) and not is_nil(jido) do
-    ChildPlacement.stop(jido, pid, reason, state.directive_timeout)
+    ChildPlacement.stop(jido, pid, reason, state.config.directive_timeout)
   end
 
   defp stop_agent_process(pid, reason, _state) do

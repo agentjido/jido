@@ -47,7 +47,7 @@ defmodule Jido.AgentServer.Turn do
   def start_turn(%Signal{} = signal, from, context, %State{} = data) do
     data = Idle.cancel_idle_timer(data)
     trace = TraceContext.begin_turn(signal)
-    active = ActiveTurn.new(signal, from, data.state_version, data.turn_timeout)
+    active = ActiveTurn.new(signal, from, data.state_version, data.config.turn_timeout)
     data = %{data | active: active}
     metadata = data |> AgentTelemetry.turn_metadata() |> Map.merge(trace)
 
@@ -180,7 +180,7 @@ defmodule Jido.AgentServer.Turn do
 
   defp start_exec(%Jido.Agent.Command{} = command, %State{} = data) do
     exec_opts =
-      Keyword.put(data.exec_opts, :task_supervisor, Jido.task_supervisor_name(data.jido))
+      Keyword.put(data.config.exec_opts, :task_supervisor, Jido.task_supervisor_name(data.jido))
 
     with {:ok, prepared} <-
            Runner.prepare_for_server(

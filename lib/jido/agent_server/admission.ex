@@ -132,15 +132,15 @@ defmodule Jido.AgentServer.Admission do
     %{data | postponed_tokens: MapSet.delete(data.postponed_tokens, token)}
   end
 
-  defp admission_full?(%State{max_postponed_signals: :infinity}), do: false
+  defp admission_full?(%State{config: %{max_postponed_signals: :infinity}}), do: false
 
   defp admission_full?(%State{} = data) do
-    MapSet.size(data.postponed_tokens) >= data.max_postponed_signals
+    MapSet.size(data.postponed_tokens) >= data.config.max_postponed_signals
   end
 
   defp overload_error(%State{} = data) do
     {:overloaded,
-     %{limit: data.max_postponed_signals, postponed: MapSet.size(data.postponed_tokens)}}
+     %{limit: data.config.max_postponed_signals, postponed: MapSet.size(data.postponed_tokens)}}
   end
 
   defp reentrant_turn_call?({caller, _tag}, %ActiveTurn{exec_handle: %{pid: root}})

@@ -84,7 +84,7 @@ defmodule Jido.AgentServer.DirectiveRuntime do
   @spec prepare_signal(term(), DirectiveContext.t(), State.t()) ::
           {:ok, struct(), term()} | {:error, term()}
   def prepare_signal(%Emit{signal: signal, dispatch: dispatch} = directive, context, state) do
-    target = dispatch || state.default_dispatch || {:agent, state.agent.id}
+    target = dispatch || state.config.default_dispatch || {:agent, state.agent.id}
     {:ok, %{directive | signal: DispatchPreparation.propagate(signal, context.signal)}, target}
   end
 
@@ -113,7 +113,7 @@ defmodule Jido.AgentServer.DirectiveRuntime do
   @doc false
   @spec dispatch_prepared(struct(), State.t(), pid()) :: :ok | {:error, term()}
   def dispatch_prepared(%Emit{signal: signal, dispatch: dispatch}, state, agent_server) do
-    case dispatch || state.default_dispatch do
+    case dispatch || state.config.default_dispatch do
       nil ->
         Jido.AgentServer.cast(agent_server, signal)
 
@@ -163,8 +163,8 @@ defmodule Jido.AgentServer.DirectiveRuntime do
     try do
       result =
         cond do
-          is_function(state.spawn_fun, 1) ->
-            state.spawn_fun.(child_spec)
+          is_function(state.config.spawn_fun, 1) ->
+            state.config.spawn_fun.(child_spec)
 
           is_atom(state.jido) ->
             DynamicSupervisor.start_child(Jido.agent_supervisor_name(state.jido), child_spec)
@@ -209,7 +209,7 @@ defmodule Jido.AgentServer.DirectiveRuntime do
   end
 
   def prepare_directives(directives, %State{} = data) do
-    with :ok <- ensure_directive_limit(directives, data.max_directives_per_turn),
+    with :ok <- ensure_directive_limit(directives, data.config.max_directives_per_turn),
          :ok <- ensure_terminal_directive_last(directives),
          {:ok, directives} <- validate_signal_dispatches(directives) do
       {:ok, directives}

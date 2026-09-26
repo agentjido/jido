@@ -177,7 +177,7 @@ defmodule Jido.AgentServer.ChildLifecycle do
                 data.jido,
                 pid,
                 :relationship_persist_failed,
-                data.directive_timeout
+                data.config.directive_timeout
               )
 
             data
@@ -205,7 +205,7 @@ defmodule Jido.AgentServer.ChildLifecycle do
         {:keep_state, track_online_child(data, pid, info)}
 
       {:error, _reason, :stop} ->
-        _ = ChildPlacement.stop(data.jido, pid, :identity_mismatch, data.directive_timeout)
+        _ = ChildPlacement.stop(data.jido, pid, :identity_mismatch, data.config.directive_timeout)
         :keep_state_and_data
 
       {:error, _reason} ->
@@ -243,7 +243,7 @@ defmodule Jido.AgentServer.ChildLifecycle do
     next_data = %{data | parent: nil}
     _ = Relationship.delete_own(next_data)
 
-    case data.on_parent_death do
+    case data.config.on_parent_death do
       :stop ->
         case next_data.active do
           %ActiveTurn{exec_handle: handle} = active when not is_nil(handle) ->

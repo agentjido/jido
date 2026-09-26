@@ -13,15 +13,15 @@ defmodule Jido.AgentServer.FailurePolicy do
 
   @max_error_policy_tasks 32
 
-  def decide(%Outcome{}, %State{error_policy: :log_only} = data),
+  def decide(%Outcome{}, %State{config: %{error_policy: :log_only}} = data),
     do: {:continue, data}
 
-  def decide(%Outcome{} = outcome, %State{error_policy: :stop_on_error} = data),
+  def decide(%Outcome{} = outcome, %State{config: %{error_policy: :stop_on_error}} = data),
     do: {:stop, {:agent_error, outcome.error}, data}
 
   def decide(
         %Outcome{} = outcome,
-        %State{error_policy: {:max_errors, max}} = data
+        %State{config: %{error_policy: {:max_errors, max}}} = data
       ) do
     if data.error_count >= max,
       do: {:stop, {:max_agent_errors, outcome.error}, data},
@@ -30,7 +30,7 @@ defmodule Jido.AgentServer.FailurePolicy do
 
   def decide(
         %Outcome{} = outcome,
-        %State{error_policy: {:emit_signal, dispatch}} = data
+        %State{config: %{error_policy: {:emit_signal, dispatch}}} = data
       ) do
     source_signal = outcome.effective_signal || outcome.source_signal
 
@@ -73,7 +73,7 @@ defmodule Jido.AgentServer.FailurePolicy do
     end
   end
 
-  def decide(%Outcome{} = outcome, %State{error_policy: policy} = data)
+  def decide(%Outcome{} = outcome, %State{config: %{error_policy: policy}} = data)
       when is_function(policy, 2) do
     start_custom_error_policy(policy, outcome, data)
   end
@@ -130,7 +130,7 @@ defmodule Jido.AgentServer.FailurePolicy do
     kind, reason -> record_dispatch_failure(data, {kind, reason})
   end
 
-  def dispatch_timeout(%State{directive_timeout: timeout}),
+  def dispatch_timeout(%State{config: %{directive_timeout: timeout}}),
     do: TaskSupport.finite_timeout(timeout)
 
   defp start_policy_task(data, kind, fun) do

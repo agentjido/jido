@@ -148,7 +148,7 @@ defmodule Jido.AgentServer.PluginLifecycle do
     wrapper_spec =
       Supervisor.child_spec(
         {PluginChild,
-         [self(), plugin_spec, spec, wrapper_name(state, plugin), state.readiness_timeout]},
+         [self(), plugin_spec, spec, wrapper_name(state, plugin), state.config.readiness_timeout]},
         id: {:agent_plugin_child, state.agent.id, plugin},
         restart: :temporary
       )

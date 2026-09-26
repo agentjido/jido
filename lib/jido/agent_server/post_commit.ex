@@ -85,7 +85,7 @@ defmodule Jido.AgentServer.PostCommit do
   defp complete_task(:directive_task, :timeout, pending, data) do
     error =
       Error.timeout_error("Agent Directive timed out",
-        timeout: data.directive_timeout,
+        timeout: data.config.directive_timeout,
         details: %{
           code: :plugin_callback_timeout,
           callback: :dispatch,
@@ -304,7 +304,7 @@ defmodule Jido.AgentServer.PostCommit do
 
   defp start_directive_task(fun, rest, context, span, data) do
     pending =
-      TaskSupport.start_traced(data.jido, fun, data.directive_timeout, :directive_timeout)
+      TaskSupport.start_traced(data.jido, fun, data.config.directive_timeout, :directive_timeout)
       |> Map.merge(%{rest: rest, context: context, span: span})
 
     {:keep_state, %{data | directive_task: pending}}
@@ -410,7 +410,7 @@ defmodule Jido.AgentServer.PostCommit do
     )
   end
 
-  defp commit_notification_timeout(%State{directive_timeout: timeout}),
+  defp commit_notification_timeout(%State{config: %{directive_timeout: timeout}}),
     do: TaskSupport.finite_timeout(timeout)
 
   defp continue_directives([], _context, %State{active: %ActiveTurn{}} = data) do

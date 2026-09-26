@@ -57,7 +57,7 @@ defmodule Jido.AgentServer.Storage do
       reason: :activate
     ]
 
-    case Jido.Persistence.create_agent(data.persistence, data.agent, opts) do
+    case Jido.Persistence.create_agent(data.config.persistence, data.agent, opts) do
       :ok -> {:ok, %{data | initial_persistence: :ready}}
       {:error, _reason} = error -> error
     end
@@ -69,7 +69,7 @@ defmodule Jido.AgentServer.Storage do
   def persist_initial_agent(%State{} = data),
     do: {:ok, %{data | initial_persistence: :ready}}
 
-  def persist_commit(%State{persistence: nil} = data, agent, version) do
+  def persist_commit(%State{config: %{persistence: nil}} = data, agent, version) do
     RuntimeCheckpoint.put(data, agent, version)
   end
 
@@ -77,7 +77,7 @@ defmodule Jido.AgentServer.Storage do
     persist_agent(data, agent, version, :commit)
   end
 
-  def persist_definition_upgrade(%State{persistence: nil} = data, target, version) do
+  def persist_definition_upgrade(%State{config: %{persistence: nil}} = data, target, version) do
     RuntimeCheckpoint.put(data, target, version)
   end
 
@@ -88,23 +88,29 @@ defmodule Jido.AgentServer.Storage do
 
   def persist_definition_upgrade(%State{} = data, target, version) do
     opts = persistence_write_opts(data, version, :definition_upgrade)
-    Jido.Persistence.replace_agent(data.persistence, data.agent, target, opts)
+    Jido.Persistence.replace_agent(data.config.persistence, data.agent, target, opts)
   end
 
   def persist_agent(data, agent, version, reason, extra_opts \\ [])
 
-  def persist_agent(%State{persistence: nil}, %Agent{}, _version, _reason, _extra_opts),
-    do: {:error, :persistence_not_configured}
+  def persist_agent(
+        %State{config: %{persistence: nil}},
+        %Agent{},
+        _version,
+        _reason,
+        _extra_opts
+      ),
+      do: {:error, :persistence_not_configured}
 
   def persist_agent(%State{} = data, %Agent{} = agent, version, reason, extra_opts) do
     opts = persistence_write_opts(data, version, reason, extra_opts)
-    Jido.Persistence.save_agent(data.persistence, agent, opts)
+    Jido.Persistence.save_agent(data.config.persistence, agent, opts)
   end
 
   def persist_on_stop({:shutdown, :hibernate}, %State{}), do: :ok
   def persist_on_stop({:shutdown, {:persistence_failed, _reason}}, %State{}), do: :ok
 
-  def persist_on_stop(reason, %State{persistence: persistence} = data)
+  def persist_on_stop(reason, %State{config: %{persistence: persistence}} = data)
       when not is_nil(persistence) do
     if Shutdown.clean?(reason) do
       case persist_agent(data, data.agent, data.state_version, :stop) do
@@ -114,7 +120,7 @@ defmodule Jido.AgentServer.Storage do
         {:error, error} ->
           Logger.error("Agent persistence failed during shutdown",
             agent_id: data.agent.id,
-            pool: data.pool,
+            pool: data.config.pool,
             reason: inspect(error)
           )
       end
