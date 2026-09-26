@@ -29,13 +29,14 @@ defmodule Jido.Agent do
   complete state proposal.
 
   Default Signal routing accepts an executable target or `{executable, defaults}`.
-  The defaults map is combined with the Signal data using
-  `Map.merge(defaults, signal.data)`. Signal values take precedence. The merge
-  is shallow: a supplied nested map replaces the corresponding default map.
-  An empty Signal data map uses all defaults; non-map data returns a validation
-  error. The executable validates the combined input before execution. Invalid
-  supplied values do not fall back to defaults. The Signal in execution context
-  keeps its original data.
+  Signal data can be a map, keyword list, or `nil`. Keyword lists become maps;
+  the last value for a duplicate key wins. `nil` becomes an empty map. The
+  defaults map is combined with this input using `Map.merge(defaults, input)`.
+  Signal values take precedence. The merge is shallow: a supplied nested map
+  replaces the corresponding default map. Empty input uses all defaults.
+  Other data returns a validation error. The executable validates the combined
+  input before execution. Invalid supplied values do not fall back to defaults.
+  The Signal in execution context keeps its original data.
 
       routes: [{"counter.add", {MyApp.Add, %{amount: 1}}}]
 
@@ -163,8 +164,9 @@ defmodule Jido.Agent do
   @doc """
   Selects one Action or Flow and its input from the received Signal and current Agent.
 
-  Return `{:ok, turn}` or `{:error, reason}`. The runner binds the original
-  Signal and validates the Turn before execution. A callback cannot replace
+  Return `{:ok, turn}` or `{:error, reason}`. Turn input can be a map, keyword
+  list, or `nil`. The runner binds the original Signal, validates the Turn, and
+  normalizes its input to a map before execution. A callback cannot replace
   the source Signal. It can call `Jido.Agent.handle_signal/2` to use the Agent's
   declared routes. An error does not cause an automatic route fallback.
   """
@@ -356,8 +358,9 @@ defmodule Jido.Agent do
   Selects a Turn using the Agent's declared routes.
 
   Use this function as an explicit fallback from a custom `c:handle_signal/2`
-  callback. It applies route defaults and returns a validated Turn bound to the
-  original Signal. It does not invoke the custom callback or execute the Turn.
+  callback. It normalizes Signal data, applies route defaults, and returns a
+  validated Turn with map input, bound to the original Signal. It does not
+  invoke the custom callback or execute the Turn.
   """
   @spec handle_signal(Signal.t(), instance()) :: handle_result()
   def handle_signal(%Signal{} = signal, %__MODULE__{} = agent),

@@ -241,16 +241,18 @@ defmodule Jido.Agent.Runner do
 
   defp normalize_result_routing_error(result, _signal), do: result
 
-  defp merge_route_input(defaults, %Signal{data: data})
-       when is_map(defaults) and is_map(data),
-       do: {:ok, Map.merge(defaults, data)}
+  defp merge_route_input(defaults, %Signal{} = signal) do
+    case Turn.normalize_input(signal.data) do
+      {:ok, input} ->
+        {:ok, Map.merge(defaults, input)}
 
-  defp merge_route_input(_defaults, %Signal{} = signal) do
-    {:error,
-     Error.validation_error("Agent Signal data must be a map",
-       field: :data,
-       details: %{signal_id: signal.id, data: signal.data}
-     )}
+      {:error, _error} ->
+        {:error,
+         Error.validation_error("Agent Signal data must be a map, keyword list, or nil",
+           field: :data,
+           details: %{signal_id: signal.id, data: signal.data}
+         )}
+    end
   end
 
   defp invalid_state_output(output) do

@@ -29,6 +29,15 @@ defmodule Jido.Agent.SelectionTest do
     end
   end
 
+  defmodule ValidatedRecord do
+    use Jido.Action,
+      name: "selection_validated_record",
+      schema: Zoi.object(%{value: Zoi.integer()})
+
+    @impl true
+    def run(input, context), do: Record.run(input, context)
+  end
+
   defmodule RoutedAgent do
     use Jido.Agent, name: "selection_routed"
 
@@ -55,7 +64,7 @@ defmodule Jido.Agent.SelectionTest do
     routes do
       route "selection.action", Record, defaults: %{value: 7, settings: %{first: 1, second: 2}}
       route "selection.flow", RecordFlow, defaults: %{value: 7, settings: %{first: 1, second: 2}}
-      route "selection.result", Record
+      route "selection.result", Record, defaults: %{route_default: true}
     end
 
     @impl true
@@ -85,11 +94,26 @@ defmodule Jido.Agent.SelectionTest do
   test "declared routes and explicit callback fallback prepare and execute the same Turn", %{
     jido: jido
   } do
-    for module <- [RoutedAgent, CustomAgent],
-        {type, target} <- [{"selection.action", Record}, {"selection.flow", RecordFlow}] do
-      agent = module.new!()
-      source = signal(type, %{value: 3, settings: %{second: 9}})
-      input = %{value: 3, settings: %{second: 9}}
+    defaults = %{value: 7, settings: %{first: 1, second: 2}}
+
+    cases = [
+      {%{}, defaults},
+      {nil, defaults},
+      {[], defaults},
+      {[value: 3], %{defaults | value: 3}},
+      {[value: 1, value: 3], %{defaults | value: 3}},
+      {%{value: nil}, %{defaults | value: nil}},
+      {%{value: false}, %{defaults | value: false}},
+      {%{value: 0}, %{defaults | value: 0}},
+      {%{value: 3, settings: %{second: 9}}, %{value: 3, settings: %{second: 9}}},
+      {%{"value" => 3}, Map.put(defaults, "value", 3)}
+    ]
+
+    for definition <- definitions(),
+        {type, target} <- [{"selection.action", Record}, {"selection.flow", RecordFlow}],
+        {data, input} <- cases do
+      agent = Agent.instantiate!(definition)
+      source = signal(type, data)
 
       assert {:ok, turn} = Agent.handle_signal(source, agent)
       assert turn == %Turn{executable: target, input: input, source_signal: source}
@@ -105,7 +129,110 @@ defmodule Jido.Agent.SelectionTest do
       assert_receive {:executed, ^input, execution_signal}
       assert execution_signal.data == source.data
       assert live.state == direct.state
+      assert :ok = Jido.stop_agent(jido, server)
     end
+  end
+
+  test "custom Turn inputs use the same normalization without applying route defaults", %{
+    jido: jido
+  } do
+    for target <- [Record, RecordFlow],
+        {input, expected} <- [
+          {nil, %{}},
+          {[], %{}},
+          {%{value: false}, %{value: false}},
+          {[value: 1, value: 3], %{value: 3}}
+        ] do
+      agent = CustomAgent.new!()
+      turn = Turn.new!(target, input)
+      assert turn.input == input
+      source = signal("selection.result", %{result: {:ok, turn}})
+
+      assert {:ok, prepared} = Runner.prepare(agent, source, [])
+      assert prepared.turn.input == expected
+      assert prepared.turn.source_signal == source
+      assert {:ok, direct, []} = Agent.cmd(agent, source)
+      assert direct.state == %{input: expected, calls: 1}
+
+      assert {:ok, server} = Jido.start_agent(jido, agent)
+      assert {:ok, live} = Server.call(server, source)
+      assert live.state == direct.state
+    end
+  end
+
+  test "map input retains its struct fields when a custom callback selects it" do
+    input = URI.parse("https://example.test/path")
+    turn = Turn.new!(Record, input)
+    source = signal("selection.result", %{result: {:ok, turn}})
+
+    assert {:ok, prepared} = Runner.prepare(CustomAgent.new!(), source, [])
+    assert prepared.turn.input === input
+  end
+
+  test "routes without defaults accept empty input in direct and live calls", %{jido: jido} do
+    for target <- [Record, RecordFlow], data <- [nil, []] do
+      definition =
+        Agent.new!(
+          name: "selection_no_defaults",
+          schema: RoutedAgent.domain_schema(),
+          routes: [{"selection.empty", target}]
+        )
+
+      agent = Agent.instantiate!(definition)
+      source = signal("selection.empty", data)
+      assert {:ok, server} = Jido.start_agent(jido, agent)
+      assert {:ok, direct, []} = Agent.cmd(agent, source)
+      assert {:ok, live} = Server.call(server, source)
+      assert direct.state == %{input: %{}, calls: 1}
+      assert live.state == direct.state
+    end
+  end
+
+  test "invalid route data returns its Signal context before executable work", %{jido: jido} do
+    for definition <- definitions() do
+      agent = Agent.instantiate!(definition)
+      assert {:ok, server} = Jido.start_agent(jido, agent)
+
+      for data <- ["hello", 3, [1, 2], [{"value", 3}], [{:value, 3} | :invalid]] do
+        source = signal("selection.action", data)
+
+        for result <- [
+              Agent.handle_signal(source, agent),
+              Agent.cmd(agent, source, context: %{observer: self()}),
+              Server.call(server, source, context: %{observer: self()})
+            ] do
+          assert {:error,
+                  %Jido.Error.ValidationError{
+                    subject: :data,
+                    details: %{signal_id: id, data: ^data}
+                  }} = result
+
+          assert id == source.id
+        end
+
+        assert Server.agent(server).state == agent.state
+        refute_received {:executed, _, _}
+      end
+    end
+  end
+
+  test "invalid supplied values fail executable validation instead of using defaults", %{
+    jido: jido
+  } do
+    agent =
+      Agent.new!(
+        name: "selection_invalid_value",
+        schema: RoutedAgent.domain_schema(),
+        routes: [{"selection.validated", {ValidatedRecord, %{value: 7}}}]
+      )
+      |> Agent.instantiate!()
+
+    source = signal("selection.validated", value: "invalid")
+    assert {:ok, server} = Jido.start_agent(jido, agent)
+    assert {:error, _error} = Agent.cmd(agent, source, context: %{observer: self()})
+    assert {:error, _error} = Server.call(server, source, context: %{observer: self()})
+    assert Server.agent(server).state == agent.state
+    refute_received {:executed, _, _}
   end
 
   test "custom selection can convert raw Signal data before input validation", %{jido: jido} do
@@ -211,5 +338,17 @@ defmodule Jido.Agent.SelectionTest do
       assert prepared.signal == execution_signal
       assert prepared.context.signal == execution_signal
     end
+  end
+
+  defp definitions do
+    [
+      RoutedAgent.definition(),
+      CustomAgent.definition(),
+      Agent.new!(
+        name: "selection_data",
+        schema: RoutedAgent.domain_schema(),
+        routes: RoutedAgent.definition().routes
+      )
+    ]
   end
 end

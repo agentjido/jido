@@ -72,8 +72,10 @@ Signal data replaces matching default keys. The merge is shallow. A supplied
 nested map replaces the complete nested default map. Invalid supplied values do
 not fall back to defaults.
 
-Default routing requires map-shaped Signal data. The Signal in execution
-context keeps its original data.
+Default routing accepts maps, keyword lists, and `nil`. A keyword list becomes
+a map; the last value for a duplicate key wins. `nil`, `[]`, and `%{}` use all
+route defaults. Other data returns a validation error. The Signal in execution
+context keeps its original data. Route defaults must be a plain map.
 
 ## Use The First Target
 
@@ -90,6 +92,11 @@ Implement `handle_signal/2` when selection needs current Agent state, custom
 input conversion, or an explicit error. Return `{:ok, %Jido.Agent.Turn{}}` or
 `{:error, reason}`. Declared routes and custom callbacks use the same Turn
 validation and execution path.
+
+Turn input accepts the same maps, keyword lists, and `nil` as default routing.
+The runner normalizes this input to a map before execution. Constructors keep
+the input value supplied by the callback. A custom callback can convert other
+Signal data, such as a string or a non-keyword list, into valid Turn input.
 
 Call `Jido.Agent.handle_signal/2` to use declared routes for the remaining cases:
 

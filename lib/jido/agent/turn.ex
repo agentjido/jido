@@ -10,6 +10,10 @@ defmodule Jido.Agent.Turn do
   `nil` only while an application callback constructs a Turn. The evaluator
   binds and validates the source Signal before executable work starts.
 
+  `input` accepts a map, keyword list, or `nil`. Constructors preserve the
+  supplied value. Before execution, the runner converts keyword lists to maps
+  and `nil` to an empty map. The last value for a duplicate keyword key wins.
+
   The Server keeps runtime progress in a private active-turn record and creates
   one `Jido.Agent.Turn.Outcome` at the terminal runtime boundary.
   """
@@ -98,7 +102,7 @@ defmodule Jido.Agent.Turn do
   @doc "Validates one Agent Turn."
   @spec validate(term()) :: {:ok, t()} | {:error, Exception.t()}
   def validate(%__MODULE__{} = turn) do
-    with :ok <- validate_plan(turn),
+    with {:ok, _input} <- validate_plan(turn),
          :ok <- validate_source_signal(turn.source_signal) do
       {:ok, turn}
     end
@@ -116,7 +120,7 @@ defmodule Jido.Agent.Turn do
   @doc false
   @spec validate_selected(t()) :: {:ok, t()} | {:error, Exception.t()}
   def validate_selected(%__MODULE__{source_signal: %Jido.Signal{}} = turn) do
-    with :ok <- validate_plan(turn), do: {:ok, turn}
+    with {:ok, input} <- validate_plan(turn), do: {:ok, %{turn | input: input}}
   end
 
   def validate_selected(value) do
@@ -128,25 +132,25 @@ defmodule Jido.Agent.Turn do
      )}
   end
 
+  @doc false
+  @spec normalize_input(term()) :: {:ok, map()} | {:error, Exception.t()}
+  def normalize_input(nil), do: {:ok, %{}}
+  def normalize_input(value) when is_map(value), do: {:ok, value}
+
+  def normalize_input(value) when is_list(value) do
+    if Keyword.keyword?(value), do: {:ok, Map.new(value)}, else: invalid_input(value)
+  end
+
+  def normalize_input(value), do: invalid_input(value)
+
   defp validate_plan(%__MODULE__{} = turn) do
-    with :ok <- Jido.Executable.validate(turn.executable),
-         :ok <- validate_data(turn.input, :input),
-         do: :ok
+    with :ok <- Jido.Executable.validate(turn.executable), do: normalize_input(turn.input)
   end
 
-  defp validate_data(value, _field) when is_map(value) or is_nil(value),
-    do: :ok
-
-  defp validate_data(value, field) when is_list(value) do
-    if Keyword.keyword?(value), do: :ok, else: invalid_data(value, field)
-  end
-
-  defp validate_data(value, field), do: invalid_data(value, field)
-
-  defp invalid_data(value, field) do
+  defp invalid_input(value) do
     {:error,
-     Error.validation_error("Agent Turn #{field} must be a map, keyword list, or nil",
-       field: field,
+     Error.validation_error("Agent Turn input must be a map, keyword list, or nil",
+       field: :input,
        details: %{value: value}
      )}
   end
