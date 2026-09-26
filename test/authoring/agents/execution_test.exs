@@ -12,6 +12,30 @@ defmodule JidoTest.Authoring.Agents.ExecutionTest do
     {:ok, spec: Corpus.spec(variant)}
   end
 
+  for variant <- Corpus.variants() do
+    @tag variant: variant
+    test "#{variant}: module and neutral definitions start as the same Agent", %{
+      spec: spec,
+      jido: jido
+    } do
+      definition = Agent.new!(spec.attrs)
+      sources = [spec.attrs.module | Enum.map(Corpus.forms(), &Corpus.definition(spec, &1))]
+
+      for source <- sources do
+        id = unique_id("definition-startup")
+        expected = Agent.instantiate!(definition, id: id, state: spec.override)
+        assert expected.state === spec.override_state
+
+        assert {:ok, server} =
+                 Jido.start_agent(jido, source, id: id, initial_state: spec.override)
+
+        assert Server.agent(server) === expected
+        assert Agent.definition(Server.agent(server)) === definition
+        assert Server.snapshot(server).state_version == 0
+      end
+    end
+  end
+
   for variant <- Corpus.variants(), form <- Corpus.forms() do
     @tag variant: variant, form: form
     test "#{variant}/#{form}: direct and live state sequence", %{

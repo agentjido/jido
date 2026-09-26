@@ -107,6 +107,13 @@ raises a DSL error, not a protocol error.
 These boundary fixtures supplement the 16 full corpus variants; they do not add
 live execution cases or saved JSON documents.
 
+## Server startup
+
+Each corpus variant also starts the Server directly from its module and all
+four neutral definition forms. These checks compare the complete live Agent
+with direct instantiation, including explicit state overrides and Plugin state.
+They verify that startup retains the definition and starts at commit version zero.
+
 ## Deferred work
 
 State defaults currently treat explicit nil as missing. A focused test records
