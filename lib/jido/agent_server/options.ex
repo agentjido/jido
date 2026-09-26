@@ -2,6 +2,7 @@ defmodule Jido.AgentServer.Options do
   @moduledoc false
 
   alias Jido.Agent
+  alias Jido.Agent.Validation
   alias Jido.Error
   alias Jido.AgentServer.ParentRef
 
@@ -50,6 +51,8 @@ defmodule Jido.AgentServer.Options do
             __MODULE__,
             Map.merge(@runtime_fields, %{
               agent: Zoi.any(description: "Validated Agent value"),
+              plugin_specs:
+                Zoi.any(description: "Validated startup Plugin specs") |> Zoi.optional(),
               name: Zoi.any(description: "Optional OTP process name") |> Zoi.optional(),
               jido: Zoi.any(description: "Optional Jido instance") |> Zoi.optional(),
               partition: Zoi.any(description: "Logical Agent partition") |> Zoi.optional(),
@@ -103,7 +106,7 @@ defmodule Jido.AgentServer.Options do
              :exec_module,
              "does not support custom Exec modules; use Jido.Exec"
            ),
-         {:ok, agent} <- build_agent(attrs),
+         {:ok, agent, plugin_specs, _schema} <- build_agent(attrs),
          {:ok, parent} <- build_parent(Map.get(attrs, :parent)),
          :ok <- validate_registration(attrs),
          :ok <- validate_parent_policy(Map.get(attrs, :on_parent_death, :stop)),
@@ -143,6 +146,7 @@ defmodule Jido.AgentServer.Options do
         |> Map.take(Map.keys(%__MODULE__{agent: nil}) -- [:__struct__])
         |> Map.merge(%{
           agent: agent,
+          plugin_specs: plugin_specs,
           registry: Map.get(attrs, :registry, registry(jido)),
           register: register,
           default_dispatch: default_dispatch,
@@ -165,20 +169,18 @@ defmodule Jido.AgentServer.Options do
     id = Map.get(attrs, :id)
     initial_state = Map.get(attrs, :initial_state)
 
-    with {:ok, agent} <- instantiate_agent(agent, id, initial_state) do
-      Agent.validate_instance(agent)
-    end
+    instantiate_agent(agent, id, initial_state)
   end
 
   defp instantiate_agent(%Agent{id: nil, state: nil} = definition, id, initial_state) do
-    Agent.instantiate(definition, instance_overrides(id, initial_state))
+    Validation.instantiate_with_plugins(definition, instance_overrides(id, initial_state))
   end
 
   defp instantiate_agent(%Agent{id: id, state: state} = agent, requested_id, initial_state)
        when is_binary(id) and is_map(state) and not is_struct(state) do
-    with {:ok, agent} <- Agent.validate_instance(agent) do
+    with {:ok, agent, specs, schema} <- Validation.validate_instance_with_plugins(agent) do
       if is_nil(requested_id) and is_nil(initial_state) do
-        {:ok, agent}
+        {:ok, agent, specs, schema}
       else
         invalid("cannot override an Agent instance with Server options", %{
           agent_id: agent.id,
@@ -195,24 +197,20 @@ defmodule Jido.AgentServer.Options do
     overrides = instance_overrides(id, initial_state)
 
     with {:module, ^module} <- Code.ensure_loaded(module) do
-      result =
-        cond do
-          function_exported?(module, :__agent_config__, 0) ->
-            Agent.instantiate(module, overrides)
+      if function_exported?(module, :__agent_config__, 0) do
+        Validation.new_from_module_with_plugins(module, module.__agent_config__(), overrides)
+      else
+        result =
+          cond do
+            function_exported?(module, :new, 1) -> module.new(overrides)
+            function_exported?(module, :new, 0) -> module.new()
+            true -> invalid("Agent module must implement new/0 or new/1", %{module: module})
+          end
 
-          function_exported?(module, :new, 1) ->
-            module.new(overrides)
-
-          function_exported?(module, :new, 0) ->
-            module.new()
-
-          true ->
-            invalid("Agent module must implement new/0 or new/1", %{module: module})
+        with {:ok, agent} <- normalize_agent_result(result, module),
+             :ok <- validate_requested_id(agent, id, module) do
+          Validation.validate_instance_with_plugins(agent)
         end
-
-      with {:ok, agent} <- normalize_agent_result(result, module),
-           :ok <- validate_requested_id(agent, id, module) do
-        {:ok, agent}
       end
     else
       {:error, reason} ->

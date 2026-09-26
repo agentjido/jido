@@ -48,15 +48,20 @@ defmodule Jido.Agent.Validation do
   @doc false
   @spec instantiate(Agent.t(), map() | keyword()) ::
           {:ok, Agent.t()} | {:error, Exception.t()}
-  def instantiate(%Agent{} = definition, overrides) do
-    with {:ok, definition, _plugin_specs, schema} <-
+  def instantiate(definition, overrides) do
+    with {:ok, agent, _specs, _schema} <- instantiate_with_plugins(definition, overrides),
+         do: {:ok, agent}
+  end
+
+  def instantiate_with_plugins(%Agent{} = definition, overrides) do
+    with {:ok, definition, plugin_specs, schema} <-
            validate_definition_with_plugins(definition),
          {:ok, agent} <- instantiate_validated(definition, schema, overrides) do
-      {:ok, agent}
+      {:ok, agent, plugin_specs, schema}
     end
   end
 
-  def instantiate(value, _overrides),
+  def instantiate_with_plugins(value, _overrides),
     do: invalid("Expected a neutral Jido.Agent definition", %{value: value})
 
   @doc false
@@ -126,13 +131,19 @@ defmodule Jido.Agent.Validation do
   @spec new_from_module(module(), map() | keyword(), map() | keyword()) ::
           {:ok, Agent.t()} | {:error, Exception.t()}
   def new_from_module(module, definition, overrides) when is_atom(module) do
+    with {:ok, agent, _specs, _schema} <-
+           new_from_module_with_plugins(module, definition, overrides),
+         do: {:ok, agent}
+  end
+
+  def new_from_module_with_plugins(module, definition, overrides) when is_atom(module) do
     with {:ok, attrs} <- normalize_attrs(definition, :definition),
          attrs = attrs |> Map.put(:module, module) |> Map.put_new(:vsn, 1),
          :ok <- known_keys(attrs),
          :ok <- reject_instance_data(attrs),
-         {:ok, definition, _plugin_specs, schema} <- build_definition_with_plugins(attrs),
+         {:ok, definition, plugin_specs, schema} <- build_definition_with_plugins(attrs),
          {:ok, agent} <- instantiate_validated(definition, schema, overrides) do
-      {:ok, agent}
+      {:ok, agent, plugin_specs, schema}
     end
   end
 

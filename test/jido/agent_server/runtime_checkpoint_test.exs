@@ -94,4 +94,20 @@ defmodule JidoTest.AgentServer.RuntimeCheckpointTest do
     assert Server.agent(recovered).state == %{count: 9}
     assert Server.snapshot(recovered).state_version == 3
   end
+
+  test "restored state is validated even when the startup definition is unchanged", %{jido: jido} do
+    id = unique_id("checkpoint-invalid-state")
+    {:ok, agent} = Counter.new(id: id)
+
+    assert :ok =
+             RuntimeStore.put(jido, :agent_runtime_checkpoints, Jido.partition_key(id, nil), %{
+               agent: %{agent | state: %{count: "invalid"}},
+               state_version: 1
+             })
+
+    assert {:error, %Jido.Error.ValidationError{}} =
+             Jido.start_agent(jido, agent, restart: :temporary)
+
+    assert Jido.whereis_agent(jido, id) == nil
+  end
 end
