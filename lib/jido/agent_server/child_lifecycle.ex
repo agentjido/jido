@@ -22,14 +22,10 @@ defmodule Jido.AgentServer.ChildLifecycle do
   def attach_parent(%State{parent: %ParentRef{}}, _parent), do: {:error, :already_has_parent}
 
   def attach_parent(%State{} = data, %ParentRef{pid: pid} = parent) do
-    cond do
-      pid == self() ->
-        {:error, :cannot_adopt_self}
-
-      not is_pid(pid) or not Process.alive?(pid) ->
-        {:error, :parent_not_alive}
-
-      true ->
+    if pid == self() do
+      {:error, :cannot_adopt_self}
+    else
+      with :ok <- Jido.AgentServer.Liveness.check(pid, :parent_not_alive) do
         monitored = %{parent | ref: Process.monitor(pid)}
         next_data = %{data | parent: monitored}
 
@@ -41,6 +37,7 @@ defmodule Jido.AgentServer.ChildLifecycle do
             Process.demonitor(monitored.ref, [:flush])
             {:error, {:relationship_persist_failed, reason}}
         end
+      end
     end
   end
 

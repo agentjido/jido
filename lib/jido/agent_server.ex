@@ -357,12 +357,8 @@ defmodule Jido.AgentServer do
   be confirmed; it does not prove process exit during a network failure.
   """
   @spec alive?(server()) :: boolean()
-  def alive?(server) when is_pid(server) and node(server) == node(), do: Process.alive?(server)
-
   def alive?(server) when is_pid(server) do
-    :erpc.call(node(server), Process, :alive?, [server], 1_000)
-  catch
-    _kind, _reason -> false
+    Jido.AgentServer.Liveness.check(server, :not_alive) == :ok
   end
 
   def alive?(server) do

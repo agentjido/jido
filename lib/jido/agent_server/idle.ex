@@ -34,25 +34,15 @@ defmodule Jido.AgentServer.Idle do
     :keep_state_and_data
   end
 
+  defp attach_owner(_data, owner_pid) when owner_pid == self(),
+    do: {:error, :cannot_attach_self}
+
   defp attach_owner(%State{} = data, owner_pid) do
-    cond do
-      owner_pid == self() ->
-        {:error, :cannot_attach_self}
+    with :ok <- Jido.AgentServer.Liveness.check(owner_pid, :owner_not_alive) do
+      attachments =
+        Map.put_new_lazy(data.attachments, owner_pid, fn -> Process.monitor(owner_pid) end)
 
-      not Process.alive?(owner_pid) ->
-        {:error, :owner_not_alive}
-
-      Map.has_key?(data.attachments, owner_pid) ->
-        {:ok, cancel_idle_timer(data)}
-
-      true ->
-        ref = Process.monitor(owner_pid)
-
-        {:ok,
-         %{
-           cancel_idle_timer(data)
-           | attachments: Map.put(data.attachments, owner_pid, ref)
-         }}
+      {:ok, %{cancel_idle_timer(data) | attachments: attachments}}
     end
   end
 

@@ -324,7 +324,7 @@ defmodule Jido.AgentServer.ChildOperations do
   end
 
   defp resolve_child(pid, _state) when is_pid(pid) do
-    if Process.alive?(pid), do: {:ok, pid}, else: {:error, :child_not_alive}
+    with :ok <- Jido.AgentServer.Liveness.check(pid, :child_not_alive), do: {:ok, pid}
   end
 
   defp resolve_child(id, %State{jido: jido, partition: partition})
