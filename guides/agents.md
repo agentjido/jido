@@ -17,7 +17,7 @@ Route defaults must be plain maps in both tuple and explicit option forms.
 
 Declare a static data schema. The complete state includes Plugin-owned
 keys. Unknown keys and invalid values fail validation. `Jido.Agent.set/2`
-merges domain attributes and validates the complete result. An Action returns
+replaces supplied domain fields and validates the complete result. An Action returns
 a complete candidate state from `context.agent_state`. A final candidate must
 include each schema field that has a default. If it omits one, Jido rejects the
 Turn before commit rather than replacing old data with the default. To remove
@@ -25,9 +25,17 @@ an optional field that has no default, omit it from the complete candidate.
 For a defaulted field, return an explicit schema-accepted empty value to clear
 it.
 
-`set/2` deep-merges nested maps. For example, `config: %{}` does not clear an
-existing `config.a`. To replace that domain field in a Turn, return the full
-candidate with the explicit new map:
+`set/2` retains fields that you do not supply. A supplied nested map replaces
+the previous map, so `Jido.Agent.set(agent, config: %{})` clears `config` when
+its schema accepts an empty map. To retain some nested values, merge them
+explicitly:
+
+```elixir
+config = Map.merge(agent.state.config, %{enabled: true})
+{:ok, updated} = Jido.Agent.set(agent, config: config)
+```
+
+In a Turn, return the complete candidate with the new map:
 
 ```elixir
 def run(_params, context) do

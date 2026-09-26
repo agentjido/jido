@@ -328,7 +328,17 @@ defmodule Jido.Agent do
     end
   end
 
-  @doc "Merges domain attributes and validates the complete next Agent state."
+  @doc """
+  Replaces supplied top-level domain fields and validates the complete next state.
+
+  Fields not supplied retain their values. A supplied nested map replaces the
+  previous map. To retain nested values, merge them before calling this function:
+
+      config = Map.merge(agent.state.config, %{enabled: true})
+      Jido.Agent.set(agent, config: config)
+
+  Plugin-owned fields cannot be set with this function.
+  """
   @spec set(instance(), map() | keyword()) :: {:ok, instance()} | {:error, Exception.t()}
   def set(%__MODULE__{} = agent, attrs) do
     with {:ok, attrs} <- normalize_domain_attrs(attrs),
@@ -336,7 +346,7 @@ defmodule Jido.Agent do
       if not is_map(agent.state) or is_struct(agent.state) do
         invalid("Agent.set/2 requires an instance", %{id: agent.id, state: agent.state})
       else
-        transition(agent, State.merge(agent.state, attrs))
+        transition(agent, Map.merge(agent.state, attrs))
       end
     end
   end

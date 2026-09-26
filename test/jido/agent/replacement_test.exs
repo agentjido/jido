@@ -22,15 +22,16 @@ defmodule JidoTest.Agent.ReplacementTest do
     end
   end
 
-  test "set deep-merges while a complete Action candidate replaces a domain field", %{jido: jido} do
+  test "set and complete Action candidates replace a domain field", %{jido: jido} do
     initial = Configured.new!(id: unique_id("config-reset"), state: %{config: %{a: 1}})
 
-    assert {:ok, merged} = Jido.Agent.set(initial, config: %{})
-    assert merged.state.config == %{a: 1}
+    assert {:ok, updated} = Jido.Agent.set(initial, config: %{})
+    assert updated.state.config == %{}
 
     signal = Signal.new!("config.reset", %{}, source: "/test")
     assert {:ok, direct, []} = Configured.cmd(initial, signal)
     assert direct.state.config == %{}
+    assert updated.state == direct.state
     assert initial.state.config == %{a: 1}
 
     assert {:ok, server} = Jido.start_agent(jido, initial)

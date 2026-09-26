@@ -100,7 +100,7 @@ identity and state.
 | No definition function | `MyAgent.definition/0`, `definition/1`, `definition?/1` | These functions expose the declared, neutral Agent. |
 | No explicit instance boundary | `instantiate/2`, `instantiate!/2`, `instance?/1` | Instance creation adds identity and validated complete state. |
 | `cmd(agent, action_or_instruction, opts)` returns `{agent, directives}` | `cmd(agent, signal, opts)` returns `{:ok, candidate, directives}` or `{:error, reason}` | Build a Signal and route it to one Action or Flow. |
-| `set/2` deep-merges state without full validation | `set/2` merges domain fields and validates the complete next state | Plugin-owned keys are protected. |
+| `set/2` deep-merges state without full validation | `set/2` replaces supplied top-level domain fields and validates the complete next state | Merge nested values explicitly when needed. Plugin-owned keys are protected. |
 | `validate(agent, opts)` | `validate/1`, `validate_definition/1`, `validate_instance/1` | Remove the V2 `:strict` option and select the required value boundary. |
 | `schema/0` accepts NimbleOptions or Zoi | `domain_schema/0` and `complete_schema/0` use static Zoi data schemas | `complete_schema/0` includes Plugin-owned fields in the Agent state map. |
 | Ad hoc Agent map conversion | No general Agent map helper | Use `Jido.Agent.Codec` for a portable definition document and the checkpoint boundary for identity and live state. Read public struct fields directly for local inspection. |

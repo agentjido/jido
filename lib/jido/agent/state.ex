@@ -6,10 +6,6 @@ defmodule Jido.Agent.State do
   alias Jido.Util.DeepMerge
 
   @doc false
-  def merge(current_state, attrs) when is_list(attrs), do: merge(current_state, Map.new(attrs))
-  def merge(current_state, attrs) when is_map(attrs), do: DeepMerge.merge(current_state, attrs)
-
-  @doc false
   def defaults_from_schema(%Zoi.Types.Map{fields: fields}) do
     Enum.reduce(fields, %{}, fn
       {key, %Zoi.Types.Default{value: value}}, defaults ->
@@ -22,7 +18,7 @@ defmodule Jido.Agent.State do
 
   @doc false
   def initialize(state, schema) when is_map(state) and not is_struct(state) do
-    initial = schema |> defaults_from_schema() |> merge(state)
+    initial = schema |> defaults_from_schema() |> DeepMerge.merge(state)
 
     with {:ok, normalized} <- validate(initial, schema) do
       # Zoi can insert defaults without validating their inner schemas.

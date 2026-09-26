@@ -553,10 +553,11 @@ defmodule Jido.AgentTest do
                Agent.transition(agent, %{count: 0, history: [], extra: true})
     end
 
-    test "deep merges domain state and keeps the source Agent immutable" do
+    test "set replaces supplied fields and keeps other state and the source Agent" do
       nested_schema =
         Zoi.object(%{
-          config: Zoi.map() |> Zoi.default(%{a: 1, b: 2})
+          config: Zoi.map() |> Zoi.default(%{a: 1, b: 2}),
+          count: Zoi.integer() |> Zoi.default(7)
         })
 
       agent =
@@ -564,8 +565,12 @@ defmodule Jido.AgentTest do
         |> Agent.instantiate!()
 
       assert {:ok, updated} = Agent.set(agent, config: %{b: 3, c: 4})
-      assert updated.state.config == %{a: 1, b: 3, c: 4}
-      assert agent.state.config == %{a: 1, b: 2}
+      assert updated.state == %{config: %{b: 3, c: 4}, count: 7}
+      assert agent.state == %{config: %{a: 1, b: 2}, count: 7}
+
+      config = Map.merge(agent.state.config, %{b: 3, c: 4})
+      assert {:ok, merged} = Agent.set(agent, %{config: config})
+      assert merged.state == %{config: %{a: 1, b: 3, c: 4}, count: 7}
     end
 
     test "returns a validation error for malformed set attributes" do
