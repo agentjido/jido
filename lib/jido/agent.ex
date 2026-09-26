@@ -306,8 +306,8 @@ defmodule Jido.Agent do
   @doc false
   @spec transition(instance(), term()) :: {:ok, instance()} | {:error, Exception.t()}
   def transition(%__MODULE__{} = agent, next_state) do
-    with {:ok, agent} <- validate_instance(agent) do
-      transition_validated(agent, next_state)
+    with {:ok, agent, _specs, schema} <- Validation.validate_instance_with_plugins(agent) do
+      transition_validated(agent, next_state, schema)
     end
   end
 
@@ -316,7 +316,14 @@ defmodule Jido.Agent do
           {:ok, instance()} | {:error, Exception.t()}
   def transition_validated(%__MODULE__{} = agent, next_state) do
     with {:ok, schema} <- complete_schema(agent),
-         {:ok, state} <- State.validate_candidate(next_state, schema) do
+         do: transition_validated(agent, next_state, schema)
+  end
+
+  @doc false
+  @spec transition_validated(instance(), term(), Zoi.schema()) ::
+          {:ok, instance()} | {:error, Exception.t()}
+  def transition_validated(%__MODULE__{} = agent, next_state, schema) do
+    with {:ok, state} <- State.validate_candidate(next_state, schema) do
       {:ok, %{agent | state: state}}
     end
   end

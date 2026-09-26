@@ -15,6 +15,7 @@ defmodule Jido.Agent.Runner do
 
     @enforce_keys [
       :agent,
+      :schema,
       :signal,
       :turn,
       :context,
@@ -26,6 +27,7 @@ defmodule Jido.Agent.Runner do
 
     @type t :: %__MODULE__{
             agent: Jido.Agent.instance(),
+            schema: Zoi.schema(),
             signal: Jido.Signal.t(),
             turn: Jido.Agent.Turn.t(),
             context: map(),
@@ -69,10 +71,12 @@ defmodule Jido.Agent.Runner do
       )
       when is_list(exec_opts) and is_list(plugin_specs) do
     with :ok <- at(:input, Command.validate_caller_context(command.context)),
-         {:ok, turn} <- at(:route, select(command.agent, source_signal)) do
+         {:ok, turn} <- at(:route, select(command.agent, source_signal)),
+         {:ok, schema} <- at(:input, Plugin.compose_schema(command.agent.schema, plugin_specs)) do
       {:ok,
        prepared(
          command.agent,
+         schema,
          command.signal,
          turn,
          command.context,
@@ -103,7 +107,8 @@ defmodule Jido.Agent.Runner do
     with {:ok, caller_context} <- at(:input, Command.normalize_context(caller_context)),
          :ok <- at(:input, Command.validate_caller_context(caller_context)),
          validation = Validation.validate_instance_with_plugins(agent),
-         {:ok, agent, specs} <- at(:input, normalize_result_routing_error(validation, signal)),
+         {:ok, agent, specs, schema} <-
+           at(:input, normalize_result_routing_error(validation, signal)),
          {:ok, signal} <- at(:input, Command.normalize_signal(signal)),
          plugin_specs = Plugin.specs(specs),
          {:ok, plugin_inputs} <- at(:prepare, Plugin.prepare(agent, signal, plugin_specs)),
@@ -111,6 +116,7 @@ defmodule Jido.Agent.Runner do
       {:ok,
        prepared(
          agent,
+         schema,
          signal,
          turn,
          caller_context,
@@ -123,6 +129,7 @@ defmodule Jido.Agent.Runner do
 
   defp prepared(
          agent,
+         schema,
          signal,
          turn,
          caller_context,
@@ -140,6 +147,7 @@ defmodule Jido.Agent.Runner do
 
     %Prepared{
       agent: agent,
+      schema: schema,
       signal: signal,
       turn: turn,
       context: context,
@@ -168,7 +176,8 @@ defmodule Jido.Agent.Runner do
                prepared.plugin_specs
              )
            ),
-         {:ok, agent} <- at(:validate, Agent.transition_validated(prepared.agent, output)) do
+         {:ok, agent} <-
+           at(:validate, Agent.transition_validated(prepared.agent, output, prepared.schema)) do
       {:ok, agent, directives}
     end
   end
@@ -296,6 +305,7 @@ defmodule Jido.Agent.Runner do
 
   defp at(_stage, {:ok, _value} = result), do: result
   defp at(_stage, {:ok, _first, _second} = result), do: result
+  defp at(_stage, {:ok, _first, _second, _third} = result), do: result
   defp at(_stage, :ok), do: :ok
   defp at(stage, {:error, reason}), do: {:error, stage, reason}
 

@@ -52,9 +52,10 @@ defmodule Jido.Agent.Plugin do
          agent_specs = specs(specs),
          :ok <- state_key_conflicts(fields, agent_specs) do
       plugin_fields =
-        agent_specs
-        |> Enum.reject(&is_nil(&1.state_key))
-        |> Map.new(fn %Spec{state_key: key, state_schema: schema} -> {key, schema} end)
+        for %Spec{state_key: key, state_schema: schema} <- agent_specs,
+            not is_nil(key),
+            into: %{},
+            do: {key, schema}
 
       extended = Zoi.extend(domain_schema, plugin_fields)
       {:ok, %{domain_schema | fields: extended.fields}}

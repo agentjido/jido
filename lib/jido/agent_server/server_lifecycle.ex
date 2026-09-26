@@ -24,7 +24,8 @@ defmodule Jido.AgentServer.ServerLifecycle do
          :ok <- mark_registry_status(opts, :starting),
          {:ok, restored_agent, restored_version, initial_persistence} <-
            Storage.restore_initial_agent(opts),
-         {:ok, agent, plugin_specs} <- Validation.validate_instance_with_plugins(restored_agent),
+         {:ok, agent, plugin_specs, _schema} <-
+           Validation.validate_instance_with_plugins(restored_agent),
          {:ok, _exec_opts} <- Options.validate_keyword(opts.exec_opts, :exec_opts),
          {:ok, _max_postponed_signals} <-
            Options.validate_limit(opts.max_postponed_signals, :max_postponed_signals),

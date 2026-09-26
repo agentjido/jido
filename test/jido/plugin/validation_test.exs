@@ -246,6 +246,35 @@ defmodule Jido.Plugin.ValidationTest do
     refute_received {:callback, _, _}
   end
 
+  test "a complete direct Turn reads Plugin declarations once" do
+    agent =
+      Jido.Agent.new!(
+        name: "prepared_turn",
+        routes: [{"observe", JidoTest.AgentFixtures.ObserveExecutionBoundary}]
+      )
+      |> Jido.Agent.instantiate!()
+
+    opts = [validation_result: :ok]
+    agent = %{agent | plugins: [{OptionValidator, opts}]}
+    signal = Jido.Signal.new!("observe", %{test_pid: self()}, source: "/test")
+
+    assert {:ok, ^agent, []} = Jido.Agent.cmd(agent, signal)
+    assert_received {:callback, :validate_options, ^opts}
+    assert_received {:callback, :state_spec, ^opts}
+    assert_received {:callback, :directives, ^opts}
+    refute_received {:callback, _, _}
+
+    assert {:ok, specs} = Jido.Plugin.Normalizer.normalize_all(agent.plugins)
+    assert_received {:callback, :validate_options, ^opts}
+    assert_received {:callback, :state_spec, ^opts}
+    assert_received {:callback, :directives, ^opts}
+    command = %Jido.Agent.Command{agent: agent, signal: signal}
+
+    assert {:ok, prepared} = Jido.Agent.Runner.prepare_for_server(command, signal, [], specs)
+    assert {:ok, ^agent, []} = Jido.Agent.Runner.finish_for_server(prepared, {:ok, agent.state})
+    refute_received {:callback, _, _}
+  end
+
   test "Plugin Codec encodes a declaration after one normalization" do
     original_opts = [validation_result: :ok]
 
