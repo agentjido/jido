@@ -4,7 +4,7 @@ defmodule Jido.AgentServer.ServerLifecycle do
   alias Jido.AgentServer.Idle
   alias Jido.AgentServer.PostCommit
   alias Jido.AgentServer.TaskSupport
-  alias Jido.Agent
+  alias Jido.Agent.Validation
   alias Jido.AgentServer.ActiveTurn
   alias Jido.AgentServer.ChildLifecycle
   alias Jido.AgentServer.Options
@@ -24,8 +24,7 @@ defmodule Jido.AgentServer.ServerLifecycle do
          :ok <- mark_registry_status(opts, :starting),
          {:ok, restored_agent, restored_version, initial_persistence} <-
            Storage.restore_initial_agent(opts),
-         {:ok, agent} <- Agent.validate_instance(restored_agent),
-         {:ok, plugin_specs} <- Jido.Plugin.Normalizer.normalize_all(agent.plugins),
+         {:ok, agent, plugin_specs} <- Validation.validate_instance_with_plugins(restored_agent),
          {:ok, exec_opts} <- Options.validate_keyword(opts.exec_opts, :exec_opts),
          {:ok, max_postponed_signals} <-
            Options.validate_limit(opts.max_postponed_signals, :max_postponed_signals),
