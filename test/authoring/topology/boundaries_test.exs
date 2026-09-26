@@ -178,6 +178,35 @@ defmodule JidoTest.Authoring.Topology.BoundariesTest do
     end
   end
 
+  test "entry, startup, include, and binding records reject unknown fields in data and JSON" do
+    Corpus.load!(:nested)
+    spec = Corpus.spec(:nested)
+    attrs = spec.attrs |> Topology.new!() |> Map.from_struct()
+
+    for path <- [
+          [:agents, Access.at(0)],
+          [:startup],
+          [:includes, Access.at(0)],
+          [:includes, Access.at(0), :bindings, Access.at(0)]
+        ] do
+      invalid = update_in(attrs, path, &Map.put(&1, :unexpected, true))
+      assert {:error, %Jido.Error.ValidationError{} = error} = Topology.new(invalid)
+      assert error.message == "Unknown authoring fields"
+      assert error.details.keys == [:unexpected]
+
+      json_path =
+        Enum.map(path, fn key -> if is_atom(key), do: Atom.to_string(key), else: key end)
+
+      document = update_in(spec.document, json_path, &Map.put(&1, "unexpected", true))
+
+      assert {:error, %Jido.Error.ValidationError{} = error} =
+               Codec.decode(document, spec.registry)
+
+      assert error.message == "Unknown authoring fields"
+      assert error.details.keys == ["unexpected"]
+    end
+  end
+
   test "Builder reuse preserves the original and the first failure" do
     Corpus.load!(:minimal)
     base = Corpus.builder(Corpus.spec(:minimal))

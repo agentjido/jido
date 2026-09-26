@@ -19,18 +19,10 @@ defmodule Jido.Topology.Codec do
   alias Jido.Agent.Authoring
   alias Jido.Codec.{Data, Registry}
   alias Jido.Topology
+  alias Jido.Topology.EntryMetadata
   alias Jido.Topology.Codec.{Deriver, Value}
 
-  @collections [
-    :agents,
-    :groups,
-    :resources,
-    :relationships,
-    :connections,
-    :includes,
-    :imports,
-    :exports
-  ]
+  @collections EntryMetadata.collections()
   @fields ~w(type version name schema metadata agents groups resources relationships connections startup includes imports exports)
   @value_fields [
     :initial_state,
@@ -76,10 +68,13 @@ defmodule Jido.Topology.Codec do
     with {:ok, schema} <- Registry.identifier(registry, :schema, definition.schema),
          {:ok, metadata} <- Value.encode(definition.metadata, registry),
          {:ok, collections} <-
-           Authoring.traverse(@collections, fn kind ->
+           Authoring.traverse(@collections, fn {_kind, collection} ->
              with {:ok, entries} <-
-                    Authoring.traverse(Map.fetch!(definition, kind), &encode_entry(&1, registry)),
-                  do: {:ok, {Atom.to_string(kind), entries}}
+                    Authoring.traverse(
+                      Map.fetch!(definition, collection),
+                      &encode_entry(&1, registry)
+                    ),
+                  do: {:ok, {Atom.to_string(collection), entries}}
            end),
          {:ok, startup} <- encode_entry(definition.startup, registry) do
       document =
@@ -111,15 +106,16 @@ defmodule Jido.Topology.Codec do
          {:ok, schema} <- Registry.resolve(registry, document["schema"], :schema),
          {:ok, metadata} <- Value.decode(document["metadata"], registry),
          {:ok, collections} <-
-           Authoring.traverse(@collections, fn kind ->
+           Authoring.traverse(@collections, fn {kind, collection} ->
              with {:ok, entries} <-
                     Authoring.traverse(
-                      Map.get(document, Atom.to_string(kind), []),
-                      &decode_entry(&1, fields(kind), registry)
+                      Map.get(document, Atom.to_string(collection), []),
+                      &decode_entry(&1, EntryMetadata.fields(kind), registry)
                     ),
-                  do: {:ok, {kind, entries}}
+                  do: {:ok, {collection, entries}}
            end),
-         {:ok, startup} <- decode_entry(document["startup"], fields(:startup), registry) do
+         {:ok, startup} <-
+           decode_entry(document["startup"], EntryMetadata.fields(:startup), registry) do
       {:ok,
        Map.merge(Map.new(collections), %{
          name: document["name"],
@@ -161,16 +157,6 @@ defmodule Jido.Topology.Codec do
 
   defp decode_entry(_, _, _), do: Authoring.error("Expected a topology record")
 
-  defp fields(:agents), do: [:key, :module, :initial_state, :depends_on, :node]
-  defp fields(:groups), do: fields(:agents) ++ [:count, :members, :key_by]
-  defp fields(:resources), do: [:key, :kind, :config]
-  defp fields(:relationships), do: [:parent, :child, :on_parent_exit]
-  defp fields(:connections), do: [:agent, :to, :path]
-  defp fields(:startup), do: [:concurrency, :max_agents, :retry_interval, :task_timeout]
-  defp fields(:includes), do: [:key, :topology, :inputs, :bindings]
-  defp fields(:imports), do: [:key, :kind]
-  defp fields(:exports), do: [:key, :kind, :from]
-
   defp document_header(%{"type" => "jido.topology", "version" => 2} = document),
     do: Data.object(document, @fields)
 
@@ -196,7 +182,7 @@ defmodule Jido.Topology.Codec do
   defp decode_field(:topology, value, registry), do: decode_document(value, registry)
 
   defp decode_field(:bindings, values, registry),
-    do: Authoring.traverse(values, &decode_entry(&1, [:key, :to], registry))
+    do: Authoring.traverse(values, &decode_entry(&1, EntryMetadata.fields(:binding), registry))
 
   defp decode_field(:kind, "agent", _), do: {:ok, :agent}
   defp decode_field(:kind, "group", _), do: {:ok, :group}

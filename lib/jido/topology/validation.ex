@@ -1,7 +1,7 @@
 defmodule Jido.Topology.Validation do
   @moduledoc false
   alias Jido.Agent.Authoring
-  alias Jido.Topology.{Ref, Reference, Resource}
+  alias Jido.Topology.{EntryMetadata, Ref, Reference, Resource}
 
   @fields [
     :name,
@@ -82,7 +82,7 @@ defmodule Jido.Topology.Validation do
 
   def entry(kind, attrs) do
     with {:ok, attrs} <- Authoring.attrs(attrs),
-         :ok <- Authoring.keys(attrs, fields(kind)),
+         :ok <- Authoring.keys(attrs, EntryMetadata.fields(kind)),
          {:ok, value} <- normalize(kind, attrs),
          :ok <- static_entry(kind, value),
          do: {:ok, value}
@@ -90,17 +90,6 @@ defmodule Jido.Topology.Validation do
 
   defp static_entry(:include, _value), do: :ok
   defp static_entry(_kind, value), do: static(value)
-
-  defp fields(:agent), do: [:key, :module, :initial_state, :depends_on, :node]
-  defp fields(:group), do: fields(:agent) ++ [:count, :members, :key_by]
-  defp fields(:resource), do: [:key, :kind, :config]
-  defp fields(:owns), do: [:parent, :child, :on_parent_exit]
-  defp fields(:subscribe), do: [:agent, :to, :path]
-  defp fields(:startup), do: [:concurrency, :max_agents, :retry_interval, :task_timeout]
-  defp fields(:import), do: [:key, :kind]
-  defp fields(:export), do: [:key, :kind, :from]
-  defp fields(:include), do: [:key, :topology, :inputs, :bindings]
-  defp fields(:binding), do: [:key, :to]
 
   defp normalize(kind, attrs) when kind in [:agent, :group] do
     with {:ok, name} <- key(attrs[:key]),
@@ -187,7 +176,7 @@ defmodule Jido.Topology.Validation do
 
   defp include(attrs, ancestors, depth) do
     with {:ok, attrs} <- Authoring.attrs(attrs),
-         :ok <- Authoring.keys(attrs, fields(:include)),
+         :ok <- Authoring.keys(attrs, EntryMetadata.fields(:include)),
          {:ok, key} <- key(attrs[:key]),
          {:ok, source, ancestors} <- included_source(attrs[:topology], ancestors),
          {:ok, definition} <- definition(source, ancestors, depth + 1),

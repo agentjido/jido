@@ -7,7 +7,9 @@ defmodule Jido.Topology.Builder do
   """
   alias Jido.Agent.Authoring
   alias Jido.Topology
-  alias Jido.Topology.Validation
+  alias Jido.Topology.{EntryMetadata, Validation}
+
+  @collections Enum.map(EntryMetadata.collections(), &elem(&1, 1))
 
   @schema Zoi.struct(__MODULE__, %{
             config: Zoi.map(),
@@ -110,7 +112,7 @@ defmodule Jido.Topology.Builder do
     with {:ok, opts} <- Authoring.attrs(opts),
          :ok <- Authoring.keys(opts, Map.keys(opts) -- Map.keys(base)),
          {:ok, entry} <- Validation.entry(kind, Map.merge(base, opts)) do
-      field = collection(kind)
+      field = EntryMetadata.collection(kind)
 
       %{
         builder
@@ -134,16 +136,7 @@ defmodule Jido.Topology.Builder do
   defp put(%{error: error} = builder, _, _) when not is_nil(error), do: builder
 
   defp put(builder, key, value)
-       when key in [
-              :agents,
-              :groups,
-              :resources,
-              :relationships,
-              :connections,
-              :includes,
-              :imports,
-              :exports
-            ] and is_list(value),
+       when key in @collections and is_list(value),
        do: %{
          builder
          | reversed_collections: Map.put(builder.reversed_collections, key, Enum.reverse(value))
@@ -155,13 +148,4 @@ defmodule Jido.Topology.Builder do
       {:error, error} -> %{builder | error: error}
     end
   end
-
-  defp collection(:agent), do: :agents
-  defp collection(:group), do: :groups
-  defp collection(:resource), do: :resources
-  defp collection(:owns), do: :relationships
-  defp collection(:subscribe), do: :connections
-  defp collection(:include), do: :includes
-  defp collection(:import), do: :imports
-  defp collection(:export), do: :exports
 end
