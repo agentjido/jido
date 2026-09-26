@@ -26,6 +26,14 @@ defmodule Jido.Topology.Plan do
          do: expand_plan(definition, id, input, composed)
   end
 
+  @doc false
+  def extension_changes(current, target) do
+    changed = for {key, spec} <- current.agents, Map.get(target.agents, key) != spec, do: key
+
+    {current.resources != target.resources, Map.keys(current.agents) -- Map.keys(target.agents),
+     changed}
+  end
+
   # The caller must supply the composition from this definition's validation.
   @doc false
   def build_composed(definition, id, input, composed) do

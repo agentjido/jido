@@ -5,7 +5,7 @@ defmodule Jido.Topology.Controller.TargetStore do
   alias Jido.Persistence.Store
   alias Jido.PortableTerm
   alias Jido.Topology
-  alias Jido.Topology.Instance
+  alias Jido.Topology.{Instance, Plan}
 
   @format 1
   @hive :topology_targets
@@ -199,11 +199,7 @@ defmodule Jido.Topology.Controller.TargetStore do
   end
 
   defp validate_target(initial, %Instance{} = target, revision, placements, pending_move) do
-    unchanged? =
-      initial.plan.resources == target.plan.resources and
-        Enum.all?(initial.plan.agents, fn {key, spec} ->
-          Map.get(target.plan.agents, key) == spec
-        end)
+    unchanged? = Plan.extension_changes(initial.plan, target.plan) == {false, [], []}
 
     if target.id == initial.id and unchanged? and valid_move?(target, placements, pending_move) do
       {:ok, target, revision, Map.take(placements, Map.keys(target.plan.agents)), pending_move}

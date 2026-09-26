@@ -331,18 +331,10 @@ defmodule Jido.Topology.Controller.Runtime do
     do: Jido.Agent.Authoring.error("Topology update or placement requires an idle repair pass")
 
   defp additive_target(%{id: id} = current, %{id: id} = target) do
-    current_agents = current.plan.agents
-    target_agents = target.plan.agents
-
-    removed = Map.keys(current_agents) -- Map.keys(target_agents)
-
-    changed =
-      current_agents
-      |> Map.keys()
-      |> Enum.filter(&(Map.get(target_agents, &1) != Map.fetch!(current_agents, &1)))
+    {resources_changed?, removed, changed} = Plan.extension_changes(current.plan, target.plan)
 
     cond do
-      current.plan.resources != target.plan.resources ->
+      resources_changed? ->
         Jido.Agent.Authoring.error("Topology update cannot change resources")
 
       removed != [] ->
