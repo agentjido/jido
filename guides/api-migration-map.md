@@ -102,10 +102,10 @@ identity and state.
 | `cmd(agent, action_or_instruction, opts)` returns `{agent, directives}` | `cmd(agent, signal, opts)` returns `{:ok, candidate, directives}` or `{:error, reason}` | Build a Signal and route it to one Action or Flow. |
 | `set/2` deep-merges state without full validation | `set/2` merges domain fields and validates the complete next state | Plugin-owned keys are protected. |
 | `validate(agent, opts)` | `validate/1`, `validate_definition/1`, `validate_instance/1` | Remove the V2 `:strict` option and select the required value boundary. |
-| `schema/0` accepts NimbleOptions or Zoi | `schema/0`, `domain_schema/0`, `complete_schema/0` use static Zoi data schemas | `complete_schema/0` includes Plugin-owned fields in the Agent state map. |
+| `schema/0` accepts NimbleOptions or Zoi | `domain_schema/0` and `complete_schema/0` use static Zoi data schemas | `complete_schema/0` includes Plugin-owned fields in the Agent state map. |
 | Ad hoc Agent map conversion | No general Agent map helper | Use `Jido.Agent.Codec` for a portable definition document and the checkpoint boundary for identity and live state. Read public struct fields directly for local inspection. |
 | `on_before_cmd/2`, `on_after_cmd/3` | `handle_signal/2`, route declarations, and Plugin callbacks | Do not make a callback-for-callback port. Put domain work in Actions or Flows. |
-| `signal_routes/0..1` | `routes/0` and the `routes do` block | Routes are part of the Agent definition. |
+| `signal_routes/0..1` | `definition().routes` and the `routes do` block | Routes are part of the Agent definition. |
 | `checkpoint/2`, `restore/2` | Same callback names, plus public `checkpoint/2` and `restore/3` functions | The stored envelope and validation contract changed. V2 records are not V3 records. |
 | V2 Action patch results | Complete next domain state | Base the result on `context.agent_state` and preserve unrelated fields. |
 
@@ -113,12 +113,12 @@ identity and state.
 
 | V2 generated function | V3 generated function | Change |
 | --- | --- | --- |
-| `name/0`, `description/0`, `schema/0` | Same names | `schema/0` is now the declared domain data schema. |
-| `category/0`, `tags/0`, `vsn/0` | `metadata/0` | Move portable application metadata into the metadata map. |
-| `plugins/0`, `plugin_specs/0` | `plugins/0` | V3 returns canonical ordered declarations. The internal Spec is not a public authoring API. |
+| `name/0`, `description/0`, `schema/0` | `definition().name`, `definition().description`, `domain_schema/0` | Read definition fields from `definition/0`. |
+| `category/0`, `tags/0`, `vsn/0` | `definition().metadata` | Move portable application metadata into the metadata map. |
+| `plugins/0`, `plugin_specs/0` | `definition().plugins` | V3 returns canonical ordered declarations. The internal Spec is not a public authoring API. |
 | `plugin_state(agent, plugin)` | `Jido.AgentServer.plugin_state/3` or a Plugin runtime's `Jido.Plugin.state/2` | Read one committed Plugin-owned field from the live Agent. This is a selected view of the complete state map, not a second state store. |
 | `strategy/0`, `strategy_opts/0`, `strategy_snapshot/1` | No direct functions | Port execution to Actions or Flows and read live Turn state through the Server. |
-| `signal_routes/0..1` | `routes/0`, `route_action!/1` | An inline route can expose its generated Action module when needed for tests or codecs. |
+| `signal_routes/0..1` | `definition().routes`, `route_action!/1` | An inline route can expose its generated Action module when needed for tests or codecs. |
 | `new/1` | `new/1`, `new!/1` | The non-raising form now returns a tagged result. |
 | `cmd/2..3` with an Action, Instruction, or list | `cmd/2..3` with one Signal | One Signal selects one executable. Put an Action sequence in one Flow. |
 | `set/2`, `validate/1..2` | `Jido.Agent.set/2`, `validate/1`, `validate_definition/1`, or `validate_instance/1` | These functions are no longer generated on each Agent module. |

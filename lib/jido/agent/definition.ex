@@ -53,14 +53,6 @@ defmodule Jido.Agent.Definition do
         end
       end
 
-      @doc "Returns the Agent name."
-      @spec name() :: String.t()
-      def name, do: Map.fetch!(__agent_config__(), :name)
-
-      @doc "Returns the Agent description."
-      @spec description() :: String.t() | nil
-      def description, do: Map.get(__agent_config__(), :description)
-
       @doc "Returns the positive Agent definition version owned by this module."
       @spec vsn() :: pos_integer()
       def vsn, do: Map.fetch!(__agent_config__(), :vsn)
@@ -69,31 +61,15 @@ defmodule Jido.Agent.Definition do
       @spec domain_schema() :: Zoi.schema()
       def domain_schema, do: Map.get(__agent_config__(), :schema, Zoi.object(%{}))
 
-      @doc "Returns the authored Agent data schema."
-      @spec schema() :: Zoi.schema()
-      def schema, do: domain_schema()
-
       @doc "Returns the complete data schema, including Plugin-owned fields in Agent state."
       @spec complete_schema() :: Zoi.schema()
       def complete_schema, do: Jido.Agent.complete_schema!(definition())
-
-      @doc "Returns the canonical Agent routes."
-      @spec routes() :: list()
-      def routes, do: definition().routes
 
       @doc "Returns the Action target compiled for one inline route."
       @spec route_action!(String.t()) :: module()
       def route_action!(path) do
         Jido.Action.Inline.target!(__MODULE__, host: Jido.Agent, route: path, role: :action)
       end
-
-      @doc "Returns the canonical ordered Agent Plugin declarations."
-      @spec plugins() :: list()
-      def plugins, do: definition().plugins
-
-      @doc "Returns the Agent definition metadata."
-      @spec metadata() :: map()
-      def metadata, do: definition().metadata
 
       unquote(constructors)
 

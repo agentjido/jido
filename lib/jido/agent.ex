@@ -89,6 +89,10 @@ defmodule Jido.Agent do
   `as:` keep normal wildcard and predicate support and generate no helpers.
   A field cannot appear in both keyword and block configuration.
 
+  Read name, description, routes, Plugins, and metadata from `definition/0`.
+  Modules expose `domain_schema/0` for the authored schema and
+  `complete_schema/0` for the schema with Plugin-owned state.
+
   `Jido.Agent.new/1` and `Jido.Agent.Codec` provide data and JSON
   declaration forms through the same validator. Use `instantiate/2` for an
   Agent module and instance options. These forms preserve the definition and instance

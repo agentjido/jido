@@ -11,7 +11,7 @@ defmodule Jido.Codec.Registry do
       Jido.Codec.Registry.new!(%{
         "agents/counter" => {:agent, MyApp.Counter},
         "actions/add" => {:action, MyApp.Add},
-        "schemas/count" => {:schema, MyApp.Counter.schema()},
+        "schemas/count" => {:schema, MyApp.Counter.domain_schema()},
         "atoms/amount" => {:atom, :amount}
       })
   """

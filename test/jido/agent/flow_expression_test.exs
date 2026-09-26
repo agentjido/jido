@@ -55,7 +55,7 @@ defmodule Jido.Agent.FlowExpressionTest do
     for target <- [Add, flow] do
       definition =
         Jido.Agent.new!(%{
-          schema: Counter.schema(),
+          schema: Counter.domain_schema(),
           name: "expression_counter",
           routes: [{"counter.add", target, defaults: %{amount: 2}}]
         })
@@ -97,7 +97,7 @@ defmodule Jido.Agent.FlowExpressionTest do
     definition =
       Agent.new!(
         name: "invalid_expression",
-        schema: Counter.schema(),
+        schema: Counter.domain_schema(),
         routes: [{"counter.add", {bad_flow, %{amount: 2}}}]
       )
 

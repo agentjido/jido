@@ -56,11 +56,11 @@ defmodule JidoTest.Authoring.Agents.AuthoringTest do
     test "#{variant}: module accessors and instance constructors", %{spec: spec} do
       module = spec.attrs.module
       expected = Agent.new!(spec.attrs)
-      assert module.schema() === spec.attrs.schema
-      assert module.metadata() === spec.attrs.metadata
+      definition = module.definition()
+      assert definition === expected
+      assert module.domain_schema() === spec.attrs.schema
+      assert definition.metadata === spec.attrs.metadata
       assert module.vsn() === spec.attrs.vsn
-      assert module.routes() === expected.routes
-      assert module.plugins() === expected.plugins
 
       opts = [id: "override", state: spec.override]
       assert {:ok, decoded} = Codec.decode(spec.document, spec.registry, opts)

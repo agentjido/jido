@@ -533,9 +533,9 @@ defmodule Jido.Plugin.ContractTest do
     agent = OwnedStateAgent.new!()
 
     assert Keyword.keys(OwnedStateAgent.domain_schema().fields) == [:trace]
-    assert Keyword.keys(OwnedStateAgent.schema().fields) == [:trace]
+    assert Keyword.keys(OwnedStateAgent.domain_schema().fields) == [:trace]
     assert Enum.sort(Keyword.keys(OwnedStateAgent.complete_schema().fields)) == [:owned, :trace]
-    assert agent.schema == OwnedStateAgent.schema()
+    assert agent.schema == OwnedStateAgent.domain_schema()
     assert agent.plugins == [{OwnedStatePlugin, []}]
     assert agent.state == %{owned: %{count: 0}, trace: []}
   end

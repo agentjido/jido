@@ -68,10 +68,10 @@ interfaces. It does not start an Agent Server.
 definition = AgentDSL.Profile.definition()
 
 %{
-  name: AgentDSL.Profile.name(),
-  description: AgentDSL.Profile.description(),
-  metadata: AgentDSL.Profile.metadata(),
-  routes: AgentDSL.Profile.routes(),
+  name: definition.name,
+  description: definition.description,
+  metadata: definition.metadata,
+  routes: definition.routes,
   definition?: Jido.Agent.definition?(definition)
 }
 ```

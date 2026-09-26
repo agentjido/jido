@@ -265,11 +265,11 @@ defmodule Jido.AgentTest do
              state: %{count: 4, history: ["existing"]}
            } = agent
 
-    assert CounterAgent.name() == "counter_agent"
-    assert CounterAgent.description() == "A module-authored Agent"
-    assert CounterAgent.schema() == agent.schema
-    assert [%Router.Route{path: "counter.add", target: Add}] = CounterAgent.routes()
-    assert CounterAgent.plugins() == []
+    assert CounterAgent.definition().name == "counter_agent"
+    assert CounterAgent.definition().description == "A module-authored Agent"
+    assert CounterAgent.domain_schema() == agent.schema
+    assert [%Router.Route{path: "counter.add", target: Add}] = CounterAgent.definition().routes
+    assert CounterAgent.definition().plugins == []
     assert Agent.definition(agent) == definition
     assert {:ok, %Agent{module: CounterAgent}} = Agent.instantiate(CounterAgent)
     refute function_exported?(CounterAgent, :agent, 0)
@@ -406,18 +406,15 @@ defmodule Jido.AgentTest do
   end
 
   describe "module authoring API" do
-    test "exposes canonical definition data through generated accessors" do
+    test "exposes canonical definition data and distinct schema views" do
       definition = AuthoredAgent.definition()
 
-      assert AuthoredAgent.name() == "authored_agent"
-      assert AuthoredAgent.description() == "Exercises the generated Agent API"
+      assert definition.name == "authored_agent"
+      assert definition.description == "Exercises the generated Agent API"
       assert AuthoredAgent.domain_schema() == definition.schema
-      assert AuthoredAgent.schema() == definition.schema
       assert AuthoredAgent.complete_schema() == definition.schema
-      assert AuthoredAgent.routes() == definition.routes
-      assert AuthoredAgent.plugins() == definition.plugins
 
-      assert AuthoredAgent.metadata() == %{
+      assert definition.metadata == %{
                category: "test",
                tags: ["agent", "immutable"],
                vsn: "1.0.0"

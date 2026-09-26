@@ -117,10 +117,10 @@ defmodule Jido.Agent.SchemaTest do
     @tag agent_module: agent_module
     test "construction enforces the root refinement #{label}", %{agent_module: agent_module} do
       assert {:ok, %{count: 0, history: []}} =
-               Zoi.parse(agent_module.schema(), %{count: 0, history: []})
+               Zoi.parse(agent_module.domain_schema(), %{count: 0, history: []})
 
       assert {:error, [_ | _]} =
-               Zoi.parse(agent_module.schema(), %{count: 2, history: []})
+               Zoi.parse(agent_module.domain_schema(), %{count: 2, history: []})
 
       assert {:error, %ValidationError{}} = agent_module.new(state: %{count: 2})
     end
