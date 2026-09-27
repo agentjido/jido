@@ -2,6 +2,23 @@ defmodule JidoTest.AgentServerRuntimeFixtures do
   alias Jido.AgentServer, as: Server
   alias Jido.Signal
 
+  defmodule ProcessStart do
+    def child_spec(mode) do
+      %{id: __MODULE__, start: {__MODULE__, :start_link, [mode]}, restart: :temporary}
+    end
+
+    def start_link(:ok), do: Elixir.Agent.start_link(fn -> :ready end)
+
+    def start_link(:with_info) do
+      {:ok, pid} = start_link(:ok)
+      {:ok, pid, :info}
+    end
+
+    def start_link(:raise), do: raise("start failed")
+    def start_link(:throw), do: throw(:start_failed)
+    def start_link(result), do: result
+  end
+
   defmodule OwnedExecutionAction do
     use Jido.Action, name: "agent_owned_execution"
 

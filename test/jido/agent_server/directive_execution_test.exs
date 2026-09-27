@@ -11,6 +11,7 @@ defmodule Jido.AgentServer.DirectiveExecutionTest do
 
   alias JidoTest.AgentServerRuntimeFixtures.{
     CountedDirectiveAgent,
+    ProcessStart,
     SlowDirectiveAgent
   }
 
@@ -59,11 +60,7 @@ defmodule Jido.AgentServer.DirectiveExecutionTest do
   test "SpawnProcess faults settle after commit without killing the Agent Server", %{jido: jido} do
     observer = self()
 
-    for {spawn_fun, expected} <- [
-          {fn _spec -> raise "live start failed" end,
-           %RuntimeError{message: "live start failed"}},
-          {fn _spec -> :unexpected end, {:invalid_start_result, :unexpected}}
-        ] do
+    for mode <- [:raise, :unexpected] do
       policy = fn reason, outcome ->
         send(observer, {:spawn_process_failed, reason, outcome})
         :continue
@@ -72,7 +69,6 @@ defmodule Jido.AgentServer.DirectiveExecutionTest do
       {:ok, server} =
         Jido.start_agent(jido, RuntimeAgent,
           id: unique_id("spawn-process-fault"),
-          spawn_fun: spawn_fun,
           error_policy: policy
         )
 
@@ -81,15 +77,20 @@ defmodule Jido.AgentServer.DirectiveExecutionTest do
                  server,
                  signal("runtime.directive", %{
                    event: :committed,
-                   directive: Directive.spawn_process({Elixir.Agent, fn -> :ready end})
+                   directive: Directive.spawn_process({ProcessStart, mode})
                  })
                )
 
       assert committed.state.events == [:committed]
 
-      assert_receive {:spawn_process_failed, {:spawn_process_failed, ^expected},
+      assert_receive {:spawn_process_failed, {:spawn_process_failed, reason},
                       %Outcome{committed?: true, stage: :directive}},
                      2_000
+
+      case mode do
+        :raise -> assert {%RuntimeError{message: "start failed"}, [_ | _]} = reason
+        :unexpected -> assert reason == :unexpected
+      end
 
       eventually(fn -> Server.status(server).phase == :idle end)
       assert Process.alive?(server)

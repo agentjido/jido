@@ -41,6 +41,14 @@ defmodule Jido.AgentServer.OptionsTest do
              Options.new(agent: RemoteCounter, turn_timout: 17)
   end
 
+  test "custom process spawn callbacks are rejected" do
+    assert {:error, %Jido.Error.ValidationError{details: %{keys: [:spawn_fun]}}} =
+             Jido.AgentServer.start_link(
+               agent: FailingConstructor,
+               spawn_fun: fn _ -> :ignore end
+             )
+  end
+
   test "constructors keep their result and report malformed results" do
     assert {:ok, opts} = Options.new(agent: ZeroArityConstructor)
     assert opts.agent.id == "zero-arity"
@@ -83,7 +91,6 @@ defmodule Jido.AgentServer.OptionsTest do
   test "invalid runtime options produce configuration errors before startup" do
     for {option, fragment} <- [
           {[on_parent_death: :invalid], "on_parent_death is invalid"},
-          {[spawn_fun: fn -> :ok end], "spawn_fun must have arity 1"},
           {[error_policy: :invalid], "error_policy is invalid"},
           {[error_policy: {:max_errors, 0}], "error_policy is invalid"},
           {[error_policy: {:emit_signal, nil}], "requires an external dispatch target"},
@@ -127,7 +134,6 @@ defmodule Jido.AgentServer.OptionsTest do
                idle_timeout: 100,
                turn_timeout: :infinity,
                directive_timeout: :infinity,
-               spawn_fun: fn _ -> :ignore end,
                error_policy: {:emit_signal, {:pid, target: self()}},
                state_version: 7,
                restore: false

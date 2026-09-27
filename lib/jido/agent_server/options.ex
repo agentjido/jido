@@ -43,7 +43,6 @@ defmodule Jido.AgentServer.Options do
     pool: Zoi.atom(description: "Owning Agent InstanceManager") |> Zoi.optional(),
     idle_timeout: Zoi.any(description: "Idle timeout in milliseconds") |> Zoi.default(:infinity),
     persistence: Zoi.any(description: "Optional Agent persistence adapter") |> Zoi.optional(),
-    spawn_fun: Zoi.any(description: "Optional process spawn function") |> Zoi.optional(),
     debug_max_events: Zoi.integer(description: "Maximum event count") |> Zoi.default(500)
   }
 
@@ -121,7 +120,6 @@ defmodule Jido.AgentServer.Options do
          {:ok, parent} <- build_parent(Map.get(attrs, :parent)),
          :ok <- validate_registration(attrs),
          :ok <- validate_parent_policy(Map.get(attrs, :on_parent_death, :stop)),
-         :ok <- validate_spawn_fun(Map.get(attrs, :spawn_fun)),
          :ok <- validate_error_policy(Map.get(attrs, :error_policy, :log_only)),
          {:ok, default_dispatch} <-
            normalize_default_dispatch(Map.get(attrs, :default_dispatch)),
@@ -337,10 +335,6 @@ defmodule Jido.AgentServer.Options do
 
   defp validate_parent_policy(policy),
     do: invalid("on_parent_death is invalid", %{on_parent_death: policy})
-
-  defp validate_spawn_fun(nil), do: :ok
-  defp validate_spawn_fun(fun) when is_function(fun, 1), do: :ok
-  defp validate_spawn_fun(fun), do: invalid("spawn_fun must have arity 1", %{spawn_fun: fun})
 
   defp validate_error_policy(policy)
        when policy in [:log_only, :stop_on_error],

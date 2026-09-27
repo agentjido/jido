@@ -106,9 +106,7 @@ defmodule Jido.AgentServer.ChildOperations do
   end
 
   defp prepare(%SpawnProcess{} = directive, _context, state) do
-    {:ok,
-     %{kind: :process, directive: directive, jido: state.jido, spawn_fun: state.config.spawn_fun},
-     state}
+    {:ok, %{kind: :process, directive: directive, jido: state.jido}, state}
   end
 
   defp prepare(%SpawnChild{} = directive, context, %State{jido: jido} = state)
@@ -236,7 +234,7 @@ defmodule Jido.AgentServer.ChildOperations do
   end
 
   defp run(%{kind: :process} = operation),
-    do: DirectiveRuntime.spawn_process(operation.directive, operation.jido, operation.spawn_fun)
+    do: DirectiveRuntime.spawn_process(operation.directive, operation.jido)
 
   defp run(%{kind: :spawn, directive: directive, parent: parent} = operation) do
     with {:ok, pid, info} <- start_verified(operation),

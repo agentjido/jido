@@ -6,6 +6,7 @@ defmodule Jido.AgentServer.DirectiveRuntimeTest do
   alias Jido.AgentServer.{ChildInfo, DirectiveContext, DirectiveRuntime, ParentRef}
   alias Jido.Examples.RemoteCounter
   alias Jido.Tracing.{Context, Trace}
+  alias JidoTest.AgentServerRuntimeFixtures.ProcessStart
 
   setup %{jido: jido} do
     {:ok, server} = Jido.start_agent(jido, RemoteCounter)
@@ -132,48 +133,50 @@ defmodule Jido.AgentServer.DirectiveRuntimeTest do
     runtime: state,
     context: context
   } do
-    spec = {Elixir.Agent, fn -> :ready end}
-    directive = Directive.spawn_process(spec)
-
-    for result <- [{:ok, self()}, {:ok, self(), :info}, :ignore] do
-      runtime = %{state | config: %{state.config | spawn_fun: fn ^spec -> result end}}
-      assert {:ok, ^runtime} = DirectiveRuntime.handle(directive, context, runtime)
+    for mode <- [:ok, :with_info, :ignore] do
+      directive = Directive.spawn_process({ProcessStart, mode})
+      assert {:ok, ^state} = DirectiveRuntime.handle(directive, context, state)
     end
 
-    runtime = %{
-      state
-      | config: %{state.config | spawn_fun: fn ^spec -> {:error, :unavailable} end}
-    }
+    children =
+      DynamicSupervisor.which_children(Jido.agent_supervisor_name(state.jido))
+      |> Enum.filter(fn {_, _, _, modules} -> modules == [ProcessStart] end)
 
-    assert {:error, {:spawn_process_failed, :unavailable}, ^runtime} =
+    assert length(children) == 2
+    assert Enum.all?(children, fn {_, pid, _, _} -> Elixir.Agent.get(pid, & &1) == :ready end)
+
+    directive = Directive.spawn_process({ProcessStart, {:error, :unavailable}})
+
+    assert {:error, {:spawn_process_failed, :unavailable}, ^state} =
+             DirectiveRuntime.handle(directive, context, state)
+
+    runtime = %{state | jido: nil}
+
+    assert {:error, {:spawn_process_failed, :jido_instance_required}, ^runtime} =
              DirectiveRuntime.handle(directive, context, runtime)
-
-    assert {:ok, ^state} = DirectiveRuntime.handle(directive, context, state)
-
-    assert Enum.any?(
-             DynamicSupervisor.which_children(Jido.agent_supervisor_name(state.jido)),
-             fn {_, pid, _, modules} ->
-               modules == [Elixir.Agent] and Elixir.Agent.get(pid, & &1) == :ready
-             end
-           )
   end
 
-  test "generic spawning contains callback faults and unexpected start results", %{
+  test "generic spawning contains child start faults and unexpected results", %{
     runtime: state,
     context: context
   } do
-    directive = Directive.spawn_process({Elixir.Agent, fn -> :ready end})
+    for result <- [:unexpected, {:ok, :not_a_pid}] do
+      directive = Directive.spawn_process({ProcessStart, result})
 
-    for {spawn_fun, reason} <- [
-          {fn _spec -> raise "start failed" end, %RuntimeError{message: "start failed"}},
-          {fn _spec -> throw(:start_failed) end, {:throw, :start_failed}},
-          {fn _spec -> :unexpected end, {:invalid_start_result, :unexpected}},
-          {fn _spec -> {:ok, :not_a_pid} end, {:invalid_start_result, {:ok, :not_a_pid}}}
+      assert {:error, {:spawn_process_failed, ^result}, ^state} =
+               DirectiveRuntime.handle(directive, context, state)
+    end
+
+    for {mode, reason} <- [
+          {:raise, %RuntimeError{message: "start failed"}},
+          {:throw, {:nocatch, :start_failed}}
         ] do
-      runtime = %{state | config: %{state.config | spawn_fun: spawn_fun}}
+      directive = Directive.spawn_process({ProcessStart, mode})
 
-      assert {:error, {:spawn_process_failed, ^reason}, ^runtime} =
-               DirectiveRuntime.handle(directive, context, runtime)
+      assert {:error, {:spawn_process_failed, {^reason, stack}}, ^state} =
+               DirectiveRuntime.handle(directive, context, state)
+
+      assert [{ProcessStart, :start_link, 1, _} | _] = stack
     end
   end
 

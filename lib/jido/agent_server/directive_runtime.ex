@@ -37,7 +37,7 @@ defmodule Jido.AgentServer.DirectiveRuntime do
   end
 
   def handle(%SpawnProcess{} = directive, _context, state) do
-    case spawn_process(directive, state.jido, state.config.spawn_fun) do
+    case spawn_process(directive, state.jido) do
       :ok -> {:ok, state}
       {:error, reason} -> {:error, reason, state}
     end
@@ -170,33 +170,22 @@ defmodule Jido.AgentServer.DirectiveRuntime do
     kind, reason -> {:error, {:emit_dispatch_failed, {kind, reason}}}
   end
 
-  def spawn_process(%SpawnProcess{child_spec: child_spec}, jido, spawn_fun) do
-    try do
-      result =
-        cond do
-          is_function(spawn_fun, 1) ->
-            spawn_fun.(child_spec)
-
-          is_atom(jido) and not is_nil(jido) ->
-            DynamicSupervisor.start_child(Jido.agent_supervisor_name(jido), child_spec)
-
-          true ->
-            {:error, :jido_instance_required}
-        end
-
-      case result do
-        {:ok, pid} when is_pid(pid) -> :ok
-        {:ok, pid, _info} when is_pid(pid) -> :ok
-        :ignore -> :ok
-        {:error, reason} -> {:error, {:spawn_process_failed, reason}}
-        other -> {:error, {:spawn_process_failed, {:invalid_start_result, other}}}
-      end
-    rescue
-      error -> {:error, {:spawn_process_failed, error}}
-    catch
-      kind, reason -> {:error, {:spawn_process_failed, {kind, reason}}}
+  def spawn_process(%SpawnProcess{child_spec: child_spec}, jido)
+      when is_atom(jido) and not is_nil(jido) do
+    case DynamicSupervisor.start_child(Jido.agent_supervisor_name(jido), child_spec) do
+      {:ok, _pid} -> :ok
+      {:ok, _pid, _info} -> :ok
+      :ignore -> :ok
+      {:error, reason} -> {:error, {:spawn_process_failed, reason}}
     end
+  rescue
+    error -> {:error, {:spawn_process_failed, error}}
+  catch
+    kind, reason -> {:error, {:spawn_process_failed, {kind, reason}}}
   end
+
+  def spawn_process(%SpawnProcess{}, _jido),
+    do: {:error, {:spawn_process_failed, :jido_instance_required}}
 
   defp validate_dispatch(dispatch) do
     case Jido.Signal.Dispatch.validate_opts(dispatch) do
