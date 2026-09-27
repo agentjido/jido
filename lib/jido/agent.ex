@@ -14,6 +14,10 @@ defmodule Jido.Agent do
   second Plugin state map. `schema` describes the domain fields, while
   `complete_schema/1` composes the domain schema with the Plugin-owned fields.
 
+  Actions request deferred work with a proper list of Directives in
+  the optional third success element. Flow preserves these requests. `cmd/3`
+  validates the complete list and returns it to the caller. Only AgentServer dispatches it, after commit.
+
   The selected Action or Flow can perform synchronous external work. A failed
   command returns no candidate but does not undo completed I/O. Applications
   own external idempotency and recovery. Preparation and state assembly are

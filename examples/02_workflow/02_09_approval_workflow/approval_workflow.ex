@@ -3,7 +3,8 @@ defmodule Jido.Examples.ApprovalWorkflow do
   A multi-turn Agent that searches, selects, approves, and books a flight.
 
   Reads occur inside the search Flow. Approval commits `:submitting` state and
-  returns a booking Directive. The booking Plugin calls the supplied adapter
+  returns a booking Directive in a plain effect list. The approval Flow
+  preserves that request. The booking Plugin calls the supplied adapter
   after commit and sends one result Signal back to the Agent.
   """
 
@@ -50,7 +51,7 @@ defmodule Jido.Examples.ApprovalWorkflow do
 
     route "examples.flight.select", Jido.Examples.ApprovalWorkflow.SelectFare, as: :select_fare
 
-    route "examples.flight.approve", Jido.Examples.ApprovalWorkflow.ApproveBooking,
+    route "examples.flight.approve", Jido.Examples.ApprovalWorkflow.ApproveFlow,
       as: :approve_booking
 
     route "examples.flight.cancel", Jido.Examples.ApprovalWorkflow.Cancel, as: :cancel

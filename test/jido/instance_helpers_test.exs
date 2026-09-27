@@ -35,10 +35,15 @@ defmodule Jido.InstanceHelpersTest do
     later_namespace = "jido/test/later-options/#{unique_id()}"
     first_persistence = {Jido.Persistence.ETS, table: Module.concat(jido, FirstStore)}
     later_persistence = {Jido.Persistence.ETS, table: Module.concat(jido, LaterStore)}
-    on_exit(fn -> Jido.stop(name) end)
 
-    assert {:ok, pid} =
-             Jido.start(name: name, namespace: first_namespace, persistence: first_persistence)
+    pid =
+      start_supervised!(%{
+        id: name,
+        start:
+          {Jido, :start,
+           [[name: name, namespace: first_namespace, persistence: first_persistence]]},
+        type: :supervisor
+      })
 
     assert {:ok, ^pid} =
              Jido.start(name: name, namespace: later_namespace, persistence: later_persistence)

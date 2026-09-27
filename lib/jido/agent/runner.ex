@@ -220,7 +220,6 @@ defmodule Jido.Agent.Runner do
 
   defp normalize_exec_result({:ok, output, _directives}), do: invalid_state_output(output)
   defp normalize_exec_result({:error, reason}), do: {:error, reason}
-  defp normalize_exec_result({:error, reason, _extras}), do: {:error, reason}
 
   defp normalize_exec_result(result) do
     {:error,

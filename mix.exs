@@ -359,7 +359,11 @@ defmodule Jido.MixProject do
   defp deps do
     [
       # Jido Ecosystem
-      {:jido_action, "~> 3.0.0-beta.11"},
+      # Pin Flow effect support until it is available in a Hex release.
+      {:jido_action,
+       git: "https://github.com/agentjido/jido_action.git",
+       ref: "af16008f79e8b76d3f3995935b1366bb2a0d7031",
+       override: true},
       {:jido_signal, "~> 3.0.0-beta.4"},
 
       # Jido Deps

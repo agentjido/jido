@@ -17,3 +17,13 @@ Test direct values and live behavior. Use controlled barriers for concurrency an
 failure tests. Run the full catalog and integration acceptance, not just default
 `mix test`. Do not add an exclusion to hide a failure. Follow
 [the migration guide](guides/migration.md) for removed V2 interfaces and storage.
+
+## Flow Effect Requests
+
+Use `{:ok, state, directives}` in composable Actions.
+Flow collects the explicit requests in deterministic order. Core validates
+all Directives and the complete state before commit. AgentServer dispatches
+after commit; direct commands return the Directive list without dispatch.
+The optional third success element is a proper list of Directives. No wrapper
+is required. Failed execution returns no deferred
+batch and does not undo I/O already performed by Actions.

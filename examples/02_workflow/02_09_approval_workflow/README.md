@@ -6,7 +6,8 @@ idempotent booking request.
 ## What you will learn
 
 - How a Flow and separate commands form a multi-Turn application workflow.
-- How approval commits a typed Directive before Plugin dispatch.
+- How an approval Flow preserves a typed Directive in a plain effect list.
+- How the Server commits state before Plugin dispatch.
 - How correlated result Signals complete or fail the booking.
 
 ## Read the code
@@ -35,6 +36,11 @@ cannot replace terminal state.
 Search and booking adapters are runtime clients in execution context. Portable
 state and Directives contain no client PID. Named Actions represent first-class
 business stages or stable Signal targets; they are not one-use helper wrappers.
+
+The approval route uses a one-step Flow. `ApproveBooking` returns its request
+in a plain list, so direct Action and Flow execution preserve the same
+state and Directive. A failed Flow or state validation does not dispatch the
+batch. Untagged Action extras fail with migration guidance.
 
 ## Limits
 

@@ -35,6 +35,12 @@ An Action can do synchronous I/O before commit when its result is needed for
 the candidate. A Directive requests work after commit. Neither operation is
 part of an external transaction.
 
+Use `{:ok, state, directives}` to return deferred
+requests from an Action. Flow collects these requests and returns one batch
+only after complete success. Failed execution, candidate validation, and
+Directive validation return no batch for dispatch. See
+[Directives And Outcomes](directives-and-outcomes.md#return-explicit-effects).
+
 For an external write:
 
 - give the operation a stable application idempotency key;

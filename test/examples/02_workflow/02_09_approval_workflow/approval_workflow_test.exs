@@ -4,6 +4,8 @@ defmodule JidoTest.Examples.Workflow.ApprovalWorkflowTest do
   alias Jido.Examples.ApprovalWorkflow, as: Example
 
   alias Jido.Examples.ApprovalWorkflow.{
+    ApproveBooking,
+    ApproveFlow,
     BookingPlugin,
     FakeBookingAPI,
     FixtureSearch,
@@ -55,6 +57,11 @@ defmodule JidoTest.Examples.Workflow.ApprovalWorkflowTest do
 
     assert {:ok, candidate, [%SubmitBooking{} = directive]} =
              Example.cmd(selected, approve_signal(), context: context)
+
+    execution_context = Map.merge(context, %{agent_id: selected.id, agent_state: selected.state})
+    direct = Jido.Exec.run(ApproveBooking, %{}, execution_context)
+    assert direct == Jido.Exec.run(ApproveFlow, %{}, execution_context)
+    assert {:ok, _, [^directive]} = direct
 
     assert Map.keys(Map.from_struct(directive)) |> Enum.sort() == [:idempotency_key, :request]
     assert candidate.state.booking_status == :submitting

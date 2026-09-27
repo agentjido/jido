@@ -7,6 +7,12 @@ defmodule Jido.Agent.Directive do
   state before it interprets these Directives. A dispatch failure does not
   undo that commit. A later Agent state change must enter through a Signal.
 
+  Return `{:ok, state, directives}` from an Action.
+  Flow preserves the batch from all successful executed components. A failed
+  Flow returns no executable batch. Core validates every Directive and the
+  complete state before commit. The third element is an optional proper list
+  for both direct Actions and Flow composition.
+
   Directives request runtime operations or work that must happen after commit.
   An Action or Flow can also perform synchronous I/O before returning its
   complete state. That I/O is outside the Agent state transaction and is not

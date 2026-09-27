@@ -230,9 +230,6 @@ defmodule Jido.AgentServer.Turn do
       {:error, reason} ->
         TurnCompletion.fail_turn(reason, :execute, data)
 
-      {:error, reason, _extras} ->
-        TurnCompletion.fail_turn(reason, :execute, data)
-
       _result ->
         case Runner.finish_for_server(prepared, result) do
           {:ok, agent, directives} ->

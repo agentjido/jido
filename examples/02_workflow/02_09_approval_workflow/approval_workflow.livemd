@@ -292,3 +292,9 @@ recovery after process loss. Read the
 [source README](README.md) and the
 [behavior tests](../../../test/examples/02_workflow/02_09_approval_workflow/approval_workflow_test.exs)
 for the failure and stale-result cases.
+
+
+The approval route uses `ApproveFlow`. Its Action returns the booking request
+as the optional third result element. The Flow preserves the request until the
+complete execution succeeds. AgentServer validates and commits the candidate
+state before the booking Plugin dispatches the request.

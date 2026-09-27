@@ -89,9 +89,10 @@ Jido validates the complete state and Directive list. A direct command returns
 the Directives to its caller. A live Agent Server commits state and then
 dispatches them.
 
-Action callback extras in a Flow are not collected as Agent Directives. Put
-the final Directive list in the terminal Agent result, or use a Plugin that
-owns the required effect.
+Flow collects explicit effect requests from all successful executed components
+and returns them with its final output. The optional third success element
+is a proper list of Directives in both direct Actions and Flows. No wrapper
+is required. See [Directives](directives-and-outcomes.md) for order and failure rules.
 
 ## Test All Three Layers
 

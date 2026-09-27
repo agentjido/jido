@@ -4,8 +4,7 @@ defmodule JidoTest.Persistence.S3Test do
   alias Jido.Persistence.S3
 
   setup do
-    {:ok, store} = Elixir.Agent.start_link(fn -> %{} end)
-    on_exit(fn -> if Process.alive?(store), do: Elixir.Agent.stop(store) end)
+    store = start_supervised!({Elixir.Agent, fn -> %{} end})
     %{store: store, opts: [bucket: "jido-test", prefix: "case/", request_fn: client(store)]}
   end
 

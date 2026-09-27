@@ -568,3 +568,12 @@ with instance options. Check each result. There is no Builder value that saves
 an earlier error. Read module definitions with `module.definition()` for Agents
 or `module.topology()` for Topologies. JSON formats and document versions are
 unchanged. The Flow Builder belongs to Jido Action and is unchanged.
+
+## Compose Directive Actions In Flows
+
+Keep `{:ok, state, directives}` with a proper list of Directives. No wrapper
+is required. Flow preserves requests from every successful executed component
+and returns them with its final state. Non-list third success elements fail
+at the Action boundary. Put metadata in output. `Jido.Agent.cmd/3` still
+returns a plain Directive list without dispatch.
+See [Directives](directives-and-outcomes.md) for commit, order, and failure rules.

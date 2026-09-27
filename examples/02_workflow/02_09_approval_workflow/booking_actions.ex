@@ -151,3 +151,18 @@ defmodule Jido.Examples.ApprovalWorkflow.Cancel do
     {:error, Error.validation_error("flight can no longer be cancelled")}
   end
 end
+
+defmodule Jido.Examples.ApprovalWorkflow.ApproveFlow do
+  @moduledoc """
+  Composes booking approval without losing its deferred booking request.
+  """
+  use Jido.Flow, name: "examples_flight_booking_approve_flow"
+
+  flow do
+    step "approve",
+      action: Jido.Examples.ApprovalWorkflow.ApproveBooking,
+      params: input()
+
+    output result("approve")
+  end
+end

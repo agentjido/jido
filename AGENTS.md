@@ -5,6 +5,10 @@ Use ASD-STE100 Simplified Technical English. Do not use skills unless requested.
 ## Contract
 
 - `Jido.Agent` holds complete domain state. A Signal selects one Action or Flow.
+- Composable Actions return `{:ok, state, directives}`.
+  Core validates the complete batch and state before commit. Flow rejects
+  a third success element that is not a proper list. No wrapper is required
+  for direct Actions or Flow composition.
 - Direct success is `{:ok, candidate, directives}`. Failure returns a structured error.
 - Actions and Flows can perform I/O. A failed Turn preserves committed state; it cannot undo completed external work.
 - `Jido.AgentServer` owns live state, serial Turns, admission, commit and effects.

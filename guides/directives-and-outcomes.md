@@ -3,6 +3,39 @@
 A Directive is a typed request for runtime work after an Agent state commit.
 An Outcome is the terminal record for one admitted Turn.
 
+## Return Explicit Effects
+
+Use the explicit Action result contract:
+
+```elixir
+{:ok, next_state, directives}
+```
+
+The same result survives a one-step Flow. A longer Flow collects all successful
+executed steps, including the last step and unreferenced outputs. It returns
+one batch with its final output. `jido_action` carries opaque values; Jido core
+validates each value as an owned Directive before commit. `Jido.Agent.cmd/3` still
+returns `{:ok, candidate, directives}` without dispatch.
+
+Effects use canonical dependency order, with component name as the tie breaker.
+A nested Flow contributes once at its parent position. Choice contributes only
+the selected branch. Map and Reduce use item order; Iterate uses iteration order.
+Dispatch keeps decision effects before normal expander effects, and a
+continuation appends the next executable's effects. Worker completion order
+does not change the batch. Supported step-wise Flows return the same batch
+only at successful completion.
+
+A failed Flow, timeout, cancellation, invalid Directive, or invalid candidate
+state prevents dispatch of the deferred batch. Action I/O can already have
+occurred and cannot be undone. Map `:collect_errors` handles errors as data;
+a successful Flow retains requests from successful items only.
+
+The third element is an optional proper list of Directives. No wrapper is
+required for Flow composition. Omit the list when no Directive is needed.
+Put metadata in the output state. Non-list third success elements fail at the
+Action boundary. Use a Jido Action release that contains Flow effect support;
+the existing published dependency requirement does not identify that release.
+
 ## Built-In Directives
 
 | Directive | Operation |
