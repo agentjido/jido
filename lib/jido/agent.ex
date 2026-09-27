@@ -4,12 +4,12 @@ defmodule Jido.Agent do
 
   Jido separates declaration from instantiation. A definition declares the
   data schema, routes, Plugins, and metadata, and has no identity or state. An
-  instance has a non-empty identity and complete portable state. Use `new/1`
+  instance has a non-empty identity and complete schema-valid state. Use `new/1`
   to create a definition and `instantiate/2` to create an instance.
   `cmd/3` applies one Signal to an instance and returns a new Agent plus
   Directives. It does not start or own a process or commit live state.
 
-  `state` is the Agent's only persistent state map. It contains domain fields
+  `state` is the Agent's only domain state map. It contains domain fields
   and one top-level owned field for each stateful Plugin. Jido does not keep a
   second Plugin state map. `schema` describes the domain fields, while
   `complete_schema/1` composes the domain schema with the Plugin-owned fields.
@@ -113,11 +113,21 @@ defmodule Jido.Agent do
   map payload inside a core-owned revision envelope. Checkpoints use only this
   V3 format.
 
-  Agent state must contain portable terms. PIDs, ports, references, functions,
-  improper lists, and non-byte-aligned bitstrings are rejected with a bounded
-  path. This state rule does not restrict static direct-definition data while
-  it stays in memory. A default embedded-definition checkpoint must still be
-  fully portable.
+  Live state must match its schema and Agent invariants. This includes
+  Plugin-owned fields. A schema can permit PIDs, ports, references, functions,
+  improper lists, and bitstrings that are not byte-aligned.
+
+  Durable checkpoints must contain portable terms after custom Agent or Plugin
+  persistence conversion. Default checkpoints reject unsupported values with a
+  bounded path. A default embedded-definition checkpoint must also have a
+  portable definition. Restore checks the stored representation before
+  conversion, then checks the reconstructed live state and Agent identity.
+
+  Local runtime checkpoints copy the complete Agent for abnormal restarts while
+  the Jido instance remains alive. A copied resource handle can be stale. It
+  does not recreate a resource, transfer ownership, or install a monitor. Keep
+  resource start, stop, and reconnection in a Plugin runtime or application
+  supervision.
   """
 
   alias Jido.Agent.{Checkpoint, State, Turn}

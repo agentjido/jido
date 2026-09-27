@@ -43,6 +43,19 @@ agent.state
 
 ## Save through an adapter
 
+Live state must match its schema. Its durable representation must also be
+portable. Save applies custom Agent conversion or default-checkpoint Plugin
+conversion before the final portability check. Load checks the stored record,
+applies conversion, then validates the reconstructed live state and identity.
+Default checkpoints reject unsupported local values with a value path.
+
+A required checkpoint or storage write must succeed before a live commit and
+its directive dispatch. Local runtime snapshots copy handles but do not
+recreate resources or transfer ownership. See
+[Portable State and Checkpoints](portable-state-and-checkpoints.md) for
+conversion and [Runtime Coordination State](runtime-coordination-state.md) for
+local restart limits.
+
 An adapter configuration is a module or `{module, options}` pair. The options
 below select a table only for this guide.
 

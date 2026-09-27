@@ -71,10 +71,12 @@ error.__struct__
 ```
 
 Instantiation rejects the complete state. The same data schema runs for direct
-commands, live candidates, checkpoints, and restore.
+commands and live candidates. Checkpoint conversion can change the saved
+representation. Restore validates the reconstructed live state after conversion.
 
-Do not store PIDs, ports, references, functions, or task handles in durable
-Agent state. Put them in Plugin runtimes.
+Live state can contain local values when its schema permits them. Durable
+checkpoints must contain portable values after conversion. Keep resource
+lifecycle and ownership in Plugin runtimes or application supervision.
 
 Continue with [Plugin-Owned State](plugin-state.md) and
 [Portable State And Checkpoints](portable-state-and-checkpoints.md).

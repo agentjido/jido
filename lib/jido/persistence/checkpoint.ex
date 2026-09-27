@@ -2,60 +2,32 @@ defmodule Jido.Persistence.Checkpoint do
   @moduledoc false
 
   alias Jido.Agent
+  alias Jido.Agent.Checkpoint, as: AgentCheckpoint
   alias Jido.Error
   alias Jido.Persistence.Record
   alias Jido.Agent.Plugin.Spec, as: AgentSpec
   alias Jido.Persistence.Plugin, as: PersistencePlugin
   alias Jido.Persistence.Plugin.Spec, as: PersistenceSpec
 
-  @custom_checkpoint_kind :agent_custom
-
   @doc false
   @spec dump(Agent.instance(), map(), pos_integer(), term()) :: {:ok, map()} | {:error, term()}
   def dump(%Agent{} = agent, context, record_format, reason) do
-    with {:ok, checkpoint} <- Agent.checkpoint(agent, context),
-         {:ok, checkpoint} <- dump_plugin_state(agent, checkpoint, record_format, reason) do
-      {:ok, checkpoint}
-    end
+    convert_state = converter(:dump, record_format, reason)
+
+    AgentCheckpoint.checkpoint(agent, context, fn validated, _state ->
+      # Preserve the supplied complete state. Validation defaults must not hide
+      # a missing Plugin-owned field from its persistence conversion.
+      convert_state.(validated, agent.state)
+    end)
   end
 
-  @doc false
-  @spec load(module(), map(), pos_integer(), term()) :: {:ok, map()} | {:error, term()}
-  def load(agent_module, checkpoint, record_format, reason)
-      when is_atom(agent_module) and is_map(checkpoint) do
-    if custom_checkpoint?(checkpoint) do
-      {:ok, checkpoint}
-    else
-      with {:ok, declarations} <- plugin_declarations(agent_module, checkpoint),
-           {:ok, specs} <- Jido.Plugin.Normalizer.normalize_all(declarations),
-           {:ok, state} <-
-             load_owned_state(Map.get(checkpoint, :state), specs, record_format, reason) do
-        {:ok, Map.put(checkpoint, :state, state)}
+  defp converter(direction, record_format, reason) do
+    fn agent, state ->
+      with {:ok, specs} <- Jido.Plugin.Normalizer.normalize_all(agent.plugins) do
+        convert_owned_state(state, specs, direction, record_format, reason)
       end
     end
   end
-
-  defp dump_plugin_state(agent, checkpoint, record_format, reason) do
-    if custom_checkpoint?(checkpoint) do
-      {:ok, checkpoint}
-    else
-      with {:ok, specs} <- Jido.Plugin.Normalizer.normalize_all(agent.plugins),
-           {:ok, state} <- dump_owned_state(agent.state, specs, record_format, reason) do
-        {:ok, Map.put(checkpoint, :state, state)}
-      end
-    end
-  end
-
-  defp dump_owned_state(state, specs, record_format, reason) when is_map(state) do
-    convert_owned_state(state, specs, :dump, record_format, reason)
-  end
-
-  defp load_owned_state(state, specs, record_format, reason) when is_map(state) do
-    convert_owned_state(state, specs, :load, record_format, reason)
-  end
-
-  defp load_owned_state(_state, _specs, _record_format, _reason),
-    do: {:error, {:invalid_persistence_record, :checkpoint}}
 
   defp convert_owned_state(state, specs, direction, record_format, reason) do
     Enum.reduce_while(specs, {:ok, state}, fn
@@ -88,40 +60,16 @@ defmodule Jido.Persistence.Checkpoint do
   defp missing_plugin_state(:load, _key),
     do: {:error, {:invalid_persistence_record, :plugin_state}}
 
-  defp plugin_declarations(agent_module, checkpoint) do
-    cond do
-      generated_agent_module?(agent_module) ->
-        case agent_module.definition() do
-          %Agent{} = definition -> {:ok, definition.plugins}
-          _value -> {:error, {:invalid_persistence_record, :agent_definition}}
-        end
-
-      match?(%Agent{}, Map.get(checkpoint, :definition)) ->
-        {:ok, Map.fetch!(checkpoint, :definition).plugins}
-
-      true ->
-        {:ok, []}
-    end
-  rescue
-    _error -> {:error, {:invalid_persistence_record, :agent_definition}}
-  catch
-    _kind, _reason -> {:error, {:invalid_persistence_record, :agent_definition}}
-  end
-
-  defp generated_agent_module?(module) do
-    module != Agent and Code.ensure_loaded?(module) and
-      function_exported?(module, :definition, 0)
-  end
-
-  defp custom_checkpoint?(checkpoint), do: Map.get(checkpoint, :kind) == @custom_checkpoint_kind
-
   @doc false
   def restore_agent(record, agent_module, agent_id, instance) do
     with :ok <- validate_definition_revision(record, agent_module),
-         {:ok, checkpoint} <-
-           load(agent_module, Record.checkpoint(record), Record.format(record), :restore),
          {:ok, agent} <-
-           Agent.restore(agent_module, checkpoint, restore_context(record, instance)),
+           AgentCheckpoint.restore(
+             agent_module,
+             Record.checkpoint(record),
+             restore_context(record, instance),
+             converter(:load, Record.format(record), :restore)
+           ),
          :ok <- validate_restored_identity(agent, agent_module, agent_id) do
       {:ok, agent}
     end

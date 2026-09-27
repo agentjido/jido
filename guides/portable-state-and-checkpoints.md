@@ -1,8 +1,13 @@
 # Portable State and Checkpoints
 
-An Agent value is useful when you can move it between direct code, a live actor,
-and durable storage without a change to its meaning. Jido uses checkpoints for
-this boundary.
+Live Agent state must match its schema and Agent invariants. This rule applies
+to creation, transitions, commands, live commits, and Plugin-owned fields.
+A field with `Zoi.any()` can contain local values, including a PID or a three-bit
+value such as `<<5::size(3)>>`. No persistence adapter is required.
+
+A durable checkpoint has a separate rule: its complete stored representation
+must contain supported portable terms. A valid live Agent can therefore fail
+to checkpoint unless application conversion supplies a portable representation.
 
 A checkpoint is a portable map that represents one Agent value. It is not a
 copy of the `AgentServer` process. Mailboxes, caller data, process identifiers,
@@ -51,11 +56,16 @@ For the default Agent checkpoint, Persistence calls this facet with only:
 - the static options mapped to the Persistence facet.
 
 The facet cannot read the adapter, record key, complete Agent state, process,
-or commit result. Dump output must be portable. Load output must also match the
-paired Agent-facet state schema.
+or commit result. Conversion runs before the final checkpoint portability
+check. Dump output must be portable. Load receives validated stored data and
+can reconstruct local values. Its output must match the paired Agent-facet
+state schema and the complete Agent schema; it need not be portable.
+
+Direct `Jido.Agent.checkpoint/2` and `Jido.Agent.restore/3` do not run Plugin
+persistence conversion. Use `Jido.Persistence` for this conversion.
 
 Each callback must return `{:ok, value}` or `{:error, reason}`. A raised
-callback, an invalid return, a non-portable value, or an invalid loaded state
+callback, an invalid return, non-portable dump output, or invalid loaded state
 returns an error to the Persistence caller. A dump failure prevents the record
 write. A load failure prevents Agent restore. Keep every Plugin-owned field in
 the checkpoint; a missing field is an error. Authors should handle the error
@@ -72,7 +82,7 @@ definitions.
 ## Portable terms only
 
 Checkpoint data must remain valid outside the current process and BEAM node.
-Do not put these values in the persistent complete Agent state:
+These values must not remain in the final stored representation:
 
 - PIDs
 - ports
@@ -102,15 +112,20 @@ in a Plugin runtime or in application supervision after restore.
 
 Override `checkpoint/2` and `restore/2` when you need a durable payload that is
 different from the default Agent representation. The callbacks own an opaque
-plain-map payload.
+plain-map payload. Jido first validates live state, then calls `checkpoint/2`,
+then checks its output for portability. On restore, it validates the stored
+payload before the callback and validates the reconstructed Agent afterward.
 
 ```elixir
+# The Agent schema declares a :bits field with Zoi.any().
 def checkpoint(agent, _context) do
-  {:ok, %{id: agent.id, state: agent.state}}
+  bits = for <<bit::1 <- agent.state.bits>>, do: bit
+  {:ok, %{id: agent.id, bits: bits}}
 end
 
-def restore(%{id: id, state: state}, _context) do
-  new(id: id, state: state)
+def restore(%{id: id, bits: bits}, _context) do
+  value = for bit <- bits, into: <<>>, do: <<bit::1>>
+  new(id: id, state: %{bits: value})
 end
 ```
 
@@ -129,6 +144,34 @@ names. Jido rejects a checkpoint that changes this identity.
 Treat a format change as a data migration. Convert version-1 Agent checkpoints
 before you use the V3 code. The current Agent boundary reads and writes only
 version 2.
+
+## Live values and local restart
+
+Without durable persistence, the instance runtime checkpoint copies the
+complete Agent. A local abnormal restart restores the same terms and validates
+the live schema. A bitstring keeps its value. A PID, port, or reference keeps
+its identity but can refer to a resource that has stopped. Copying a monitor
+reference does not install a monitor in the replacement Server. Copying a port
+does not transfer its connected process. Functions retain local code references;
+they are not a durable code-version or resource recovery contract.
+
+Keep resource start, stop, ownership, and reconnection in a Plugin runtime or
+application supervision. A schema check does not prove that a resource is live.
+Clean stop removes the runtime checkpoint. Instance or BEAM loss removes it too.
+See [Runtime Coordination State](runtime-coordination-state.md).
+
+## Move from the earlier V3 live-state rule
+
+Earlier V3 code required all live state to be portable. Code that used portable
+values still works. Tests that expected `:non_portable_term` at creation or
+command execution must now check the checkpoint boundary. Use a narrower
+schema when a local value is invalid for the application.
+
+Before enabling persistence for local state, add custom Agent conversion or a
+Plugin Persistence facet, and test save and restore together. Default
+checkpoints remain strict and do not remove fields. The saved formats and
+version numbers do not change. A required checkpoint or write failure prevents
+the candidate commit and directive dispatch; it cannot undo earlier Action I/O.
 
 ## Context is not state
 
