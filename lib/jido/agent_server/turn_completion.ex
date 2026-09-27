@@ -36,18 +36,10 @@ defmodule Jido.AgentServer.TurnCompletion do
 
     case decision do
       {:continue, policy_data} ->
-        {:next_state, :idle, Idle.maybe_start_idle_timer(policy_data, :idle),
-         reply_action(active.caller, {:error, reason})}
+        return_idle(policy_data, reply_action(active.caller, {:error, reason}))
 
       {:stop, stop_reason, policy_data} ->
-        replies = reply_action(active.caller, {:error, reason})
-        stop_reason = Shutdown.normalize_reason(stop_reason)
-
-        if replies == [] do
-          {:stop, stop_reason, policy_data}
-        else
-          {:stop_and_reply, stop_reason, replies, policy_data}
-        end
+        stop(policy_data, stop_reason, reply_action(active.caller, {:error, reason}))
     end
   end
 
@@ -67,12 +59,26 @@ defmodule Jido.AgentServer.TurnCompletion do
 
     case FailurePolicy.decide(outcome, next_data) do
       {:continue, policy_data} ->
-        TraceContext.clear()
-        {:next_state, :idle, Idle.maybe_start_idle_timer(policy_data, :idle)}
+        return_idle(policy_data)
 
       {:stop, stop_reason, policy_data} ->
-        {:stop, {:shutdown, stop_reason}, policy_data}
+        stop(policy_data, stop_reason)
     end
+  end
+
+  def succeed(data, stage, actions \\ []) do
+    outcome = turn_outcome(data, :succeeded, stage, nil)
+    data |> complete_outcome(outcome) |> return_idle(actions)
+  end
+
+  def return_idle(data, actions \\ []) do
+    TraceContext.clear()
+    {:next_state, :idle, Idle.maybe_start_idle_timer(data, :idle), actions}
+  end
+
+  def stop(data, reason, replies \\ []) do
+    reason = Shutdown.normalize_reason(reason)
+    if replies == [], do: {:stop, reason, data}, else: {:stop_and_reply, reason, replies, data}
   end
 
   def turn_outcome(%State{active: active, agent: agent}, status, stage, error),

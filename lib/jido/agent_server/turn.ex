@@ -319,21 +319,12 @@ defmodule Jido.AgentServer.Turn do
       end
 
     actions = TurnCompletion.reply_action(active.caller, {:ok, agent}) ++ post_commit_actions
-    phase = if post_commit_actions == [], do: :idle, else: :directing
 
-    next_data =
-      if phase == :idle do
-        outcome = TurnCompletion.turn_outcome(next_data, :succeeded, :commit, nil)
-
-        next_data
-        |> TurnCompletion.complete_outcome(outcome)
-        |> Idle.maybe_start_idle_timer(phase)
-      else
-        Idle.maybe_start_idle_timer(next_data, phase)
-      end
-
-    if phase == :idle, do: TraceContext.clear()
-    {:next_state, phase, next_data, actions}
+    if post_commit_actions == [] do
+      TurnCompletion.succeed(next_data, :commit, actions)
+    else
+      {:next_state, :directing, next_data, actions}
+    end
   end
 
   def handle_exec_message(message, %State{active: %ActiveTurn{} = active} = data) do

@@ -1,7 +1,6 @@
 defmodule Jido.AgentServer.PostCommit do
   @moduledoc false
 
-  alias Jido.AgentServer.Idle
   alias Jido.AgentServer.TaskSupport
   alias Jido.AgentServer.TurnCompletion
   require Logger
@@ -17,11 +16,9 @@ defmodule Jido.AgentServer.PostCommit do
   alias Jido.AgentServer.DirectiveRuntime
   alias Jido.AgentServer.Inspection
   alias Jido.AgentServer.PluginLifecycle
-  alias Jido.AgentServer.Shutdown
   alias Jido.AgentServer.State
   alias Jido.Error
   alias Jido.Telemetry.Agent, as: AgentTelemetry
-  alias Jido.Tracing.Context, as: TraceContext
 
   def settle(field, event, %State{} = data) when field in [:commit_task, :directive_task] do
     pending = Map.fetch!(data, field)
@@ -271,8 +268,7 @@ defmodule Jido.AgentServer.PostCommit do
         next_data = %{next_data | active: active}
         outcome = TurnCompletion.turn_outcome(next_data, :succeeded, :directive, nil)
 
-        {:stop, Shutdown.normalize_reason(reason),
-         TurnCompletion.complete_outcome(next_data, outcome)}
+        next_data |> TurnCompletion.complete_outcome(outcome) |> TurnCompletion.stop(reason)
     end
   end
 
@@ -403,13 +399,7 @@ defmodule Jido.AgentServer.PostCommit do
 
     case {pending.rest, pending.directives} do
       {[], []} ->
-        outcome = TurnCompletion.turn_outcome(data, :succeeded, :after_commit, nil)
-
-        next_data =
-          data |> TurnCompletion.complete_outcome(outcome) |> Idle.maybe_start_idle_timer(:idle)
-
-        TraceContext.clear()
-        {:next_state, :idle, next_data}
+        TurnCompletion.succeed(data, :after_commit)
 
       {[], directives} ->
         {:keep_state, data, directive_actions(directives, data.agent.id, data.active)}
@@ -445,13 +435,7 @@ defmodule Jido.AgentServer.PostCommit do
     do: TaskSupport.finite_timeout(timeout)
 
   defp continue_directives([], _context, %State{active: %ActiveTurn{}} = data) do
-    outcome = TurnCompletion.turn_outcome(data, :succeeded, :directive, nil)
-
-    next_data =
-      data |> TurnCompletion.complete_outcome(outcome) |> Idle.maybe_start_idle_timer(:idle)
-
-    TraceContext.clear()
-    {:next_state, :idle, next_data}
+    TurnCompletion.succeed(data, :directive)
   end
 
   defp continue_directives(rest, context, data) do

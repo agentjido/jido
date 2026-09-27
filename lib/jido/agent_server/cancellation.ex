@@ -1,7 +1,6 @@
 defmodule Jido.AgentServer.Cancellation do
   @moduledoc false
 
-  alias Jido.AgentServer.Idle
   alias Jido.AgentServer.TaskSupport
   alias Jido.AgentServer.TurnCompletion
   alias Jido.AgentServer.ActiveTurn
@@ -70,16 +69,13 @@ defmodule Jido.AgentServer.Cancellation do
       :ok ->
         outcome = TurnCompletion.turn_outcome(data, :cancelled, :execute, :cancelled)
 
-        next_data =
-          data |> TurnCompletion.complete_outcome(outcome) |> Idle.maybe_start_idle_timer(:idle)
-
-        TraceContext.clear()
+        next_data = TurnCompletion.complete_outcome(data, outcome)
 
         actions =
           TurnCompletion.reply_action(active.caller, {:error, :cancelled}) ++
             [{:reply, cancel_from, :ok}]
 
-        {:next_state, :idle, next_data, actions}
+        TurnCompletion.return_idle(next_data, actions)
 
       {:error, error} ->
         outcome = TurnCompletion.turn_outcome(data, :indeterminate, :execute, error)
@@ -90,7 +86,7 @@ defmodule Jido.AgentServer.Cancellation do
           TurnCompletion.reply_action(active.caller, {:error, error}) ++
             [{:reply, cancel_from, {:error, error}}]
 
-        {:stop_and_reply, {:shutdown, {:exec_cancellation_failed, error}}, actions, next_data}
+        TurnCompletion.stop(next_data, {:exec_cancellation_failed, error}, actions)
     end
   end
 
@@ -105,11 +101,7 @@ defmodule Jido.AgentServer.Cancellation do
     TraceContext.clear()
     replies = TurnCompletion.reply_action(active.caller, {:error, error})
 
-    if replies == [] do
-      {:stop, {:shutdown, error}, next_data}
-    else
-      {:stop_and_reply, {:shutdown, error}, replies, next_data}
-    end
+    TurnCompletion.stop(next_data, error, replies)
   end
 
   defp settle_parent_cancel(:ok, %State{active: %ActiveTurn{} = active} = data, parent_reason) do
@@ -118,11 +110,7 @@ defmodule Jido.AgentServer.Cancellation do
     replies = TurnCompletion.reply_action(active.caller, {:error, error})
     next_data = TurnCompletion.complete_outcome(data, outcome)
     TraceContext.clear()
-    reason = {:shutdown, {:parent_down, parent_reason}}
-
-    if replies == [],
-      do: {:stop, reason, next_data},
-      else: {:stop_and_reply, reason, replies, next_data}
+    TurnCompletion.stop(next_data, {:parent_down, parent_reason}, replies)
   end
 
   defp settle_parent_cancel(
@@ -136,9 +124,7 @@ defmodule Jido.AgentServer.Cancellation do
     next_data = TurnCompletion.complete_outcome(data, outcome)
     TraceContext.clear()
 
-    if replies == [],
-      do: {:stop, {:shutdown, error}, next_data},
-      else: {:stop_and_reply, {:shutdown, error}, replies, next_data}
+    TurnCompletion.stop(next_data, error, replies)
   end
 
   defp cancellation_error(reason) do
@@ -171,14 +157,11 @@ defmodule Jido.AgentServer.Cancellation do
       data
       |> Map.put(:admission_task, nil)
       |> TurnCompletion.complete_outcome(outcome)
-      |> Idle.maybe_start_idle_timer(:idle)
-
-    TraceContext.clear()
 
     actions =
       TurnCompletion.reply_action(active.caller, {:error, :cancelled}) ++
         [{:reply, cancel_from, :ok}]
 
-    {:next_state, :idle, next_data, actions}
+    TurnCompletion.return_idle(next_data, actions)
   end
 end
