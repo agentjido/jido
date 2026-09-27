@@ -1,6 +1,6 @@
 defmodule Jido.Plugin.Bus.Manager.Server do
   @moduledoc "Owns one local Signal Bus for the Manager package."
-  use Jido.AgentServer.Plugin
+  @behaviour Jido.Plugin
 
   alias Jido.Plugin.Bus.Manager
   alias Jido.Plugin.Init

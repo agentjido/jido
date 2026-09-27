@@ -130,11 +130,17 @@ defmodule JidoTest.Agent.AuthoringExtensionTest do
   end
 
   defmodule Turns do
-    use Jido.Plugin, agent: __MODULE__.Agent
+    use Jido.Plugin
+
+    @impl true
+    defdelegate state_spec(opts), to: JidoTest.Agent.AuthoringExtensionTest.Turns.Agent
+
+    @impl true
+    defdelegate reduce(reduction, opts), to: JidoTest.Agent.AuthoringExtensionTest.Turns.Agent
   end
 
   defmodule Turns.Agent do
-    use Jido.Agent.Plugin
+    @behaviour Jido.Plugin
     def state_spec(_), do: {:turns, Zoi.integer() |> Zoi.default(0)}
     def reduce(reduction, _), do: {:ok, reduction.plugin_state + 1}
   end

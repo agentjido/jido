@@ -125,7 +125,7 @@ the reconstructed Agent against its live schema and identity rules.
 
 Default checkpoints reject a nested PID, port, reference, function, improper
 list, or bitstring that is not byte-aligned, with a useful value path. A custom
-Agent checkpoint can convert the complete state; a Plugin Persistence facet
+Agent checkpoint can convert the complete state; Plugin Persistence callbacks
 can convert its paired owned value. Complete custom checkpoints bypass Plugin
 conversion. Invalid converted output prevents storage. A required checkpoint
 or write failure prevents the live candidate commit and directive dispatch.

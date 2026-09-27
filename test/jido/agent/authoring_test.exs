@@ -33,11 +33,17 @@ defmodule JidoTest.Agent.AuthoringTest do
   end
 
   defmodule CountTurns do
-    use Jido.Plugin, agent: __MODULE__.Agent
+    use Jido.Plugin
+
+    @impl true
+    defdelegate state_spec(opts), to: JidoTest.Agent.AuthoringTest.CountTurns.Agent
+
+    @impl true
+    defdelegate reduce(reduction, opts), to: JidoTest.Agent.AuthoringTest.CountTurns.Agent
   end
 
   defmodule CountTurns.Agent do
-    use Jido.Agent.Plugin
+    @behaviour Jido.Plugin
 
     def state_spec(opts),
       do: {:turns, Zoi.integer() |> Zoi.default(Keyword.get(opts, :initial, 0))}
@@ -46,11 +52,17 @@ defmodule JidoTest.Agent.AuthoringTest do
   end
 
   defmodule PassThrough do
-    use Jido.Plugin, agent: __MODULE__.Agent
+    use Jido.Plugin
+
+    @impl true
+    defdelegate state_spec(opts), to: JidoTest.Agent.AuthoringTest.PassThrough.Agent
+
+    @impl true
+    defdelegate prepare(preparation, opts), to: JidoTest.Agent.AuthoringTest.PassThrough.Agent
   end
 
   defmodule PassThrough.Agent do
-    use Jido.Agent.Plugin
+    @behaviour Jido.Plugin
     def state_spec(_opts), do: :none
     def prepare(_preparation, _opts), do: {:ok, nil}
   end

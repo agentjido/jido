@@ -12,11 +12,18 @@ end
 defmodule JidoTest.TelemetryAgent.Output do
   @moduledoc false
 
-  use Jido.Plugin, agent: __MODULE__.Agent, agent_server: __MODULE__.Server
+  use Jido.Plugin
+
+  @impl true
+  defdelegate directives(opts), to: JidoTest.TelemetryAgent.Output.Agent
+
+  @impl true
+  defdelegate dispatch(runtime, directive, context, opts),
+    to: JidoTest.TelemetryAgent.Output.Server
 end
 
 defmodule JidoTest.TelemetryAgent.Output.Agent do
-  use Jido.Agent.Plugin
+  @behaviour Jido.Plugin
 
   alias JidoTest.TelemetryAgent.Deliver
 
@@ -25,7 +32,7 @@ defmodule JidoTest.TelemetryAgent.Output.Agent do
 end
 
 defmodule JidoTest.TelemetryAgent.Output.Server do
-  use Jido.AgentServer.Plugin
+  @behaviour Jido.Plugin
   alias JidoTest.TelemetryAgent.Deliver
 
   @impl true

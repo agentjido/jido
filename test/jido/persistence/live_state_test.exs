@@ -75,18 +75,14 @@ defmodule JidoTest.Persistence.LiveStateTest do
     end
   end
 
-  defmodule OwnedFacet do
-    use Jido.Agent.Plugin
+  defmodule Package do
+    use Jido.Plugin
 
     def state_spec(_opts),
       do: {:owned, Zoi.object(%{bits: Zoi.any()}) |> Zoi.default(%{bits: <<>>})}
 
     def reduce(reduction, _opts),
       do: {:ok, Map.get(reduction.signal.data, :owned, reduction.plugin_state)}
-  end
-
-  defmodule StoredFacet do
-    use Jido.Persistence.Plugin
 
     def dump(%{bits: :invalid_dump}, _context, _opts), do: {:ok, %{bits: <<5::3>>}}
     def dump(%{bits: :dump_failure}, _context, _opts), do: {:error, :conversion_failed}
@@ -96,10 +92,6 @@ defmodule JidoTest.Persistence.LiveStateTest do
 
     def load(bits, _context, _opts),
       do: {:ok, %{bits: for(bit <- bits, into: <<>>, do: <<bit::1>>)}}
-  end
-
-  defmodule Package do
-    use Jido.Plugin, agent: OwnedFacet, persistence: StoredFacet
   end
 
   defmodule PluginAgent do

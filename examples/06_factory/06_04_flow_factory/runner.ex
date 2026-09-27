@@ -21,11 +21,24 @@ end
 
 defmodule Jido.Examples.Factory.FlowFactory.Runner do
   @moduledoc "A Plugin owns the asynchronous Exec handle outside portable Agent state."
-  use Jido.Plugin, agent: __MODULE__.Agent, agent_server: __MODULE__.Server
+  use Jido.Plugin
+
+  @impl true
+  defdelegate directives(opts), to: Jido.Examples.Factory.FlowFactory.Runner.Agent
+
+  @impl true
+  defdelegate child_spec(init), to: Jido.Examples.Factory.FlowFactory.Runner.Server
+
+  @impl true
+  defdelegate await_ready(runtime, opts), to: Jido.Examples.Factory.FlowFactory.Runner.Server
+
+  @impl true
+  defdelegate dispatch(runtime, directive, context, opts),
+    to: Jido.Examples.Factory.FlowFactory.Runner.Server
 end
 
 defmodule Jido.Examples.Factory.FlowFactory.Runner.Agent do
-  use Jido.Agent.Plugin
+  @behaviour Jido.Plugin
   alias Jido.Examples.Factory.FlowFactory.{Cancel, Run}
 
   @impl true
@@ -33,8 +46,9 @@ defmodule Jido.Examples.Factory.FlowFactory.Runner.Agent do
 end
 
 defmodule Jido.Examples.Factory.FlowFactory.Runner.Server do
-  use Jido.AgentServer.Plugin
+  @behaviour Jido.Plugin
 
+  @impl true
   def child_spec(init),
     do:
       Supervisor.child_spec({Jido.Examples.Factory.FlowFactory.Runner.Runtime, init},

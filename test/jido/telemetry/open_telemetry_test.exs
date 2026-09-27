@@ -8,12 +8,16 @@ defmodule JidoTest.Telemetry.OpenTelemetryTest do
   alias JidoTest.OpenTelemetryTracer, as: TestTracer
 
   defmodule NotifyFacet do
-    use Jido.AgentServer.Plugin
+    @behaviour Jido.Plugin
     def after_commit(_runtime, _commit, _opts), do: :ok
   end
 
   defmodule NotifyPlugin do
-    use Jido.Plugin, agent_server: NotifyFacet
+    use Jido.Plugin
+
+    @impl true
+    defdelegate after_commit(runtime, commit, opts),
+      to: JidoTest.Telemetry.OpenTelemetryTest.NotifyFacet
   end
 
   defmodule Add do

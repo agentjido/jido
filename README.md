@@ -128,13 +128,11 @@ committed_agent.state.count
 
 ## Agent Plugins
 
-A `Jido.Plugin` is one package manifest for an explicit Agent capability. It
-can compose four independent owner facets: `Jido.Agent.Plugin` for pure input
-preparation and Turn work, `Jido.AgentServer.Plugin` for admission and runtime work,
-`Jido.Persistence.Plugin` for one paired durable value, and
-`Jido.Topology.Plugin` for static plan contributions. A package declares only
-the facets that it needs. A Plugin cannot change an incoming Signal. Pure and
-live data enter execution through the separate `prepared` and `runtime` slots
+Define a Plugin with `use Jido.Plugin` and the callbacks it needs. One module
+can prepare input, reduce an owned state field, manage a live runtime, convert
+its owned value for persistence, and contribute static Topology entries.
+Jido selects these capabilities from the documented callbacks. A Plugin cannot
+change an incoming Signal. Pure and live data enter execution through the separate `prepared` and `runtime` slots
 at `context.plugin_inputs[Package]`. Results enter through the normal Agent
 Signal mailbox. See the `Jido.Plugin` API docs.
 

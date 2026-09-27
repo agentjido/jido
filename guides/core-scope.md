@@ -11,7 +11,7 @@ guide and the public module documentation when you build an extension.
 | Agent values | Immutable definitions and instances, validated state, Actions, Flows, and Directives. Direct commands return a candidate; a live Server commits it. |
 | Authoring | Declarative modules, map and keyword declarations, and trusted Codecs share core validation. These forms remain supported. |
 | Live execution | Public PID-based `Jido.AgentServer` operations. `Jido` instance helpers start, find, stop, hibernate, and thaw Agents. An explicit upgrade operation waits for idle; validated definition migration preserves identity and Plugin declarations. |
-| Plugins | One callback-free package manifest can select Agent, Agent Server, Persistence, and Topology owner facets. Each facet has bounded authority. |
+| Plugins | One module implements optional callbacks. Core controls Agent, Agent Server, Persistence, and Topology authority. |
 | Persistence | Binary get and exact-byte CAS, versioned active and tombstone records, revision-zero creation, legacy active reads, and Agent-owned checkpoints. |
 | Agent relationships | Local owned children and explicit targeting of a known Erlang node. |
 | Topology | Pure definitions and plans, ordered static Plugin contribution, bounded activation, readiness, lifecycle Signals, same-target repair, additive Agent updates, exact known-node placement, and cleanup. |

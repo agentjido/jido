@@ -1,6 +1,6 @@
 defmodule Jido.Examples.Topology.InboxFacet do
   @moduledoc "Adds one static Bus and one subscription for its Agent declaration."
-  use Jido.Topology.Plugin
+  @behaviour Jido.Plugin
 
   alias Jido.Topology.Plugin.Contribution
 
@@ -21,7 +21,8 @@ end
 
 defmodule Jido.Examples.Topology.InboxPlugin do
   @moduledoc "A Plugin package with one Topology-owned facet."
-  use Jido.Plugin,
-    topology: Jido.Examples.Topology.InboxFacet,
-    option_keys: [topology: [:bus]]
+  use Jido.Plugin, option_keys: [topology: [:bus]]
+
+  @impl true
+  defdelegate contribute(context, opts), to: Jido.Examples.Topology.InboxFacet
 end

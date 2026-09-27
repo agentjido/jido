@@ -27,7 +27,7 @@ mix test test/examples/09_plugins --include example --seed 0
 - [Keyed Timers](../04_runtime/04_02_keyed_timers/README.md) shows an OTP runtime owned by a Plugin.
 - [Audit](../08_applications/08_01_audit/README.md) shows owned state and a runtime projection.
 - [Subscription](../08_applications/08_02_subscription/README.md) rebuilds a live resource from committed Plugin state.
-- [Plugin Contribution](../07_topology/07_06_plugin_contribution/README.md) shows a pure Topology facet.
+- [Plugin Contribution](../07_topology/07_06_plugin_contribution/README.md) shows a pure Topology callbacks.
 
 ## Contract summary
 

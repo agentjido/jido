@@ -1,13 +1,13 @@
 defmodule Jido.Topology.Plugin do
   @moduledoc """
-  Pure Topology-owned facet of a `Jido.Plugin` package.
+  Executes the Topology callbacks of `Jido.Plugin`.
 
   A callback can return current canonical Bus resources, ownership
   relationships, and Bus subscriptions. Bus is the first core resource type.
   It cannot start a process, activate a plan, persist data, or add another
   resource type through this contract.
 
-  `Jido.Topology.instantiate/2` invokes these facets during pure plan
+  `Jido.Topology.instantiate/2` invokes these callbacks during pure plan
   construction. It processes Agent declarations, then group declarations, in
   their source order. Each declaration keeps its Plugin order. Included
   Topologies receive contributions in their own scope. Common Topology
@@ -20,19 +20,6 @@ defmodule Jido.Topology.Plugin do
   alias Jido.Plugin.Error, as: PluginError
   alias Jido.Topology.Plugin.{Context, Contribution, Spec}
   alias Jido.Topology.Validation
-
-  @doc "Defines a Topology-owned Plugin facet."
-  defmacro __using__(_opts) do
-    quote location: :keep do
-      @behaviour Jido.Topology.Plugin
-
-      @doc false
-      def __jido_plugin_facet__, do: :topology
-    end
-  end
-
-  @callback contribute(context :: Context.t(), opts :: keyword()) ::
-              {:ok, Contribution.t()} | {:error, term()}
 
   @doc false
   @spec contribute(Jido.Plugin.Spec.t(), Context.t()) ::

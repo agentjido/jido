@@ -15,11 +15,20 @@ defmodule Jido.Plugin.RuntimeTest do
   end
 
   defmodule RuntimePlugin do
-    use Jido.Plugin, agent: __MODULE__.Agent, agent_server: __MODULE__.Server
+    use Jido.Plugin
+
+    @impl true
+    defdelegate state_spec(opts), to: Jido.Plugin.RuntimeTest.RuntimePlugin.Agent
+
+    @impl true
+    defdelegate reduce(reduction, opts), to: Jido.Plugin.RuntimeTest.RuntimePlugin.Agent
+
+    @impl true
+    defdelegate child_spec(init), to: Jido.Plugin.RuntimeTest.RuntimePlugin.Server
   end
 
   defmodule RuntimePlugin.Agent do
-    use Jido.Agent.Plugin
+    @behaviour Jido.Plugin
 
     @impl true
     def state_spec(_opts) do
@@ -34,7 +43,7 @@ defmodule Jido.Plugin.RuntimeTest do
   end
 
   defmodule RuntimePlugin.Server do
-    use Jido.AgentServer.Plugin
+    @behaviour Jido.Plugin
 
     def child_spec(init) do
       Supervisor.child_spec(
@@ -45,13 +54,16 @@ defmodule Jido.Plugin.RuntimeTest do
   end
 
   defmodule ProcessPlugin do
-    use Jido.Plugin, agent_server: __MODULE__.Server
+    use Jido.Plugin
+
+    @impl true
+    defdelegate child_spec(init), to: Jido.Plugin.RuntimeTest.ProcessPlugin.Server
 
     def start_link(init), do: GenServer.start_link(__MODULE__.Process, init)
   end
 
   defmodule ProcessPlugin.Server do
-    use Jido.AgentServer.Plugin
+    @behaviour Jido.Plugin
     def child_spec(init), do: %{id: ProcessPlugin, start: {ProcessPlugin, :start_link, [init]}}
   end
 
@@ -70,11 +82,14 @@ defmodule Jido.Plugin.RuntimeTest do
   end
 
   defmodule TemporaryRuntimePlugin do
-    use Jido.Plugin, agent_server: __MODULE__.Server
+    use Jido.Plugin
+
+    @impl true
+    defdelegate child_spec(init), to: Jido.Plugin.RuntimeTest.TemporaryRuntimePlugin.Server
   end
 
   defmodule TemporaryRuntimePlugin.Server do
-    use Jido.AgentServer.Plugin
+    @behaviour Jido.Plugin
 
     def child_spec(init) do
       %{
@@ -87,31 +102,40 @@ defmodule Jido.Plugin.RuntimeTest do
   end
 
   defmodule InvalidRuntimePlugin do
-    use Jido.Plugin, agent_server: __MODULE__.Server
+    use Jido.Plugin
+
+    @impl true
+    defdelegate child_spec(init), to: Jido.Plugin.RuntimeTest.InvalidRuntimePlugin.Server
   end
 
   defmodule InvalidRuntimePlugin.Server do
-    use Jido.AgentServer.Plugin
+    @behaviour Jido.Plugin
 
     def child_spec(_init), do: %{id: InvalidRuntimePlugin}
   end
 
   defmodule RaisingRuntimePlugin do
-    use Jido.Plugin, agent_server: __MODULE__.Server
+    use Jido.Plugin
+
+    @impl true
+    defdelegate child_spec(init), to: Jido.Plugin.RuntimeTest.RaisingRuntimePlugin.Server
   end
 
   defmodule RaisingRuntimePlugin.Server do
-    use Jido.AgentServer.Plugin
+    @behaviour Jido.Plugin
 
     def child_spec(_init), do: raise("invalid runtime configuration")
   end
 
   defmodule ConfigurableRuntimePlugin do
-    use Jido.Plugin, agent_server: __MODULE__.Server
+    use Jido.Plugin
+
+    @impl true
+    defdelegate child_spec(init), to: Jido.Plugin.RuntimeTest.ConfigurableRuntimePlugin.Server
   end
 
   defmodule ConfigurableRuntimePlugin.Server do
-    use Jido.AgentServer.Plugin
+    @behaviour Jido.Plugin
 
     def child_spec(%Plugin.Init{options: opts}) do
       :persistent_term.get(

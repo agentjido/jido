@@ -59,8 +59,8 @@ the expanded plan.
 
 ## Add Static Plugin Entries
 
-An Agent can declare a Plugin package with a `Jido.Topology.Plugin` facet. When
-Jido builds an instance plan, that facet can contribute Bus resources,
+An Agent can declare a Plugin that implements `c:Jido.Plugin.contribute/2`.
+When Jido builds an instance plan, this callback can contribute Bus resources,
 ownership relationships, and Bus subscriptions for the Agent declaration.
 
 Jido applies Agent contributions first and then group contributions. It keeps
@@ -72,7 +72,7 @@ The validated source definition stays unchanged. Jido validates the complete
 expanded graph before activation. A duplicate key, unknown endpoint, duplicate
 subscription, or graph cycle returns an error before the Controller starts.
 
-This facet is for pure static planning. It cannot add Agents or new resource
+This callback is for pure static planning. It cannot add Agents or new resource
 types. It does not start a Jido process, persist state, replace the Controller
 target, or grant live authority. See the
 [`07_06_plugin_contribution`](../examples/07_topology/07_06_plugin_contribution/README.md)

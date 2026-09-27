@@ -1,6 +1,6 @@
 defmodule Jido.Plugin.Bus.Client.Server do
   @moduledoc "Owns one Bus subscription runtime for the Client package."
-  use Jido.AgentServer.Plugin
+  @behaviour Jido.Plugin
 
   alias Jido.Plugin.Bus.Client
   alias Jido.Plugin.Bus.Client.Runtime
@@ -20,6 +20,7 @@ defmodule Jido.Plugin.Bus.Client.Server do
     :exit, reason -> {:error, {:bus_client_runtime_unavailable, reason}}
   end
 
+  @impl true
   def child_spec(%Init{} = init) do
     Supervisor.child_spec({Runtime, init}, id: Client)
   end

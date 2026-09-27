@@ -10,26 +10,43 @@ defmodule Jido.Plugin.ValidationTest do
   end
 
   defmodule Empty do
-    use Jido.Plugin, agent: __MODULE__.Agent
+    use Jido.Plugin
   end
 
   defmodule Empty.Agent do
-    use Jido.Agent.Plugin
+    @behaviour Jido.Plugin
   end
 
   defmodule Configurable do
-    use Jido.Plugin, agent: __MODULE__.Agent, agent_server: __MODULE__.Server
+    use Jido.Plugin
+
+    @impl true
+    defdelegate state_spec(opts), to: Jido.Plugin.ValidationTest.Configurable.Agent
+
+    @impl true
+    defdelegate directives(opts), to: Jido.Plugin.ValidationTest.Configurable.Agent
+
+    @impl true
+    defdelegate reduce(reduction, opts), to: Jido.Plugin.ValidationTest.Configurable.Agent
+
+    @impl true
+    defdelegate dispatch(runtime, directive, context, opts),
+      to: Jido.Plugin.ValidationTest.Configurable.Server
+
+    @impl true
+    defdelegate prepare_dispatch(runtime, signal, context, opts),
+      to: Jido.Plugin.ValidationTest.Configurable.Server
   end
 
   defmodule Configurable.Agent do
-    use Jido.Agent.Plugin
+    @behaviour Jido.Plugin
     def state_spec(opts), do: Keyword.get(opts, :state, {:owned, Zoi.integer()})
     def directives(opts), do: Keyword.get(opts, :directives, [Effect])
     def reduce(_reduction, opts), do: Keyword.fetch!(opts, :result)
   end
 
   defmodule Configurable.Server do
-    use Jido.AgentServer.Plugin
+    @behaviour Jido.Plugin
     def dispatch(_, _, _, _), do: :ok
 
     def prepare_dispatch(_, signal, _, opts),
@@ -37,29 +54,48 @@ defmodule Jido.Plugin.ValidationTest do
   end
 
   defmodule NoState do
-    use Jido.Plugin, agent: __MODULE__.Agent
+    use Jido.Plugin
+
+    @impl true
+    defdelegate reduce(reduction, opts), to: Jido.Plugin.ValidationTest.NoState.Agent
   end
 
   defmodule NoState.Agent do
-    use Jido.Agent.Plugin
+    @behaviour Jido.Plugin
     def reduce(reduction, _), do: {:ok, reduction.plugin_state}
   end
 
   defmodule ThrowingChild do
-    use Jido.Plugin, agent_server: __MODULE__.Server
+    use Jido.Plugin
+
+    @impl true
+    defdelegate child_spec(init), to: Jido.Plugin.ValidationTest.ThrowingChild.Server
   end
 
   defmodule ThrowingChild.Server do
-    use Jido.AgentServer.Plugin
+    @behaviour Jido.Plugin
     def child_spec(_), do: throw(:bad_child_spec)
   end
 
   defmodule OptionValidator do
-    use Jido.Plugin, agent: __MODULE__.Agent, agent_server: __MODULE__.Server
+    use Jido.Plugin
+
+    @impl true
+    defdelegate state_spec(opts), to: Jido.Plugin.ValidationTest.OptionValidator.Agent
+
+    @impl true
+    defdelegate directives(opts), to: Jido.Plugin.ValidationTest.OptionValidator.Agent
+
+    @impl true
+    defdelegate validate_options(opts), to: Jido.Plugin.ValidationTest.OptionValidator.Server
+
+    @impl true
+    defdelegate admit(runtime, admission, opts),
+      to: Jido.Plugin.ValidationTest.OptionValidator.Server
   end
 
   defmodule OptionValidator.Server do
-    use Jido.AgentServer.Plugin
+    @behaviour Jido.Plugin
 
     def validate_options(opts) do
       send(self(), {:callback, :validate_options, opts})
@@ -76,7 +112,7 @@ defmodule Jido.Plugin.ValidationTest do
   end
 
   defmodule OptionValidator.Agent do
-    use Jido.Agent.Plugin
+    @behaviour Jido.Plugin
 
     def state_spec(opts) do
       send(self(), {:callback, :state_spec, opts})
@@ -90,11 +126,14 @@ defmodule Jido.Plugin.ValidationTest do
   end
 
   defmodule FailingDirectives do
-    use Jido.Plugin, agent: __MODULE__.Agent
+    use Jido.Plugin
+
+    @impl true
+    defdelegate directives(opts), to: Jido.Plugin.ValidationTest.FailingDirectives.Agent
   end
 
   defmodule FailingDirectives.Agent do
-    use Jido.Agent.Plugin
+    @behaviour Jido.Plugin
 
     def directives(opts) do
       case Keyword.fetch!(opts, :failure) do
@@ -107,11 +146,14 @@ defmodule Jido.Plugin.ValidationTest do
   end
 
   defmodule FailingStateSpec do
-    use Jido.Plugin, agent: __MODULE__.Agent
+    use Jido.Plugin
+
+    @impl true
+    defdelegate state_spec(opts), to: Jido.Plugin.ValidationTest.FailingStateSpec.Agent
   end
 
   defmodule FailingStateSpec.Agent do
-    use Jido.Agent.Plugin
+    @behaviour Jido.Plugin
 
     def state_spec(opts) do
       case Keyword.fetch!(opts, :failure) do
@@ -162,7 +204,7 @@ defmodule Jido.Plugin.ValidationTest do
 
   test "invalid Plugin declarations fail with a specific contract error" do
     for {declaration, fragment} <- [
-          {Empty, "defines no capability"},
+          {Empty, "must define at least one callback"},
           {{Configurable, [:invalid]}, "options must be a keyword list"},
           {42, "Invalid Agent Plugin declaration"},
           {JidoTest.MissingPlugin, "could not be loaded"},

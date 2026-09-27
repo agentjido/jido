@@ -19,11 +19,17 @@ defmodule JidoTest.Authoring.Agents.Fixtures.AddFlow do
 end
 
 defmodule JidoTest.Authoring.Agents.Fixtures.CountTurns do
-  use Jido.Plugin, agent: __MODULE__.Agent
+  use Jido.Plugin
+
+  @impl true
+  defdelegate state_spec(opts), to: JidoTest.Authoring.Agents.Fixtures.CountTurns.Agent
+
+  @impl true
+  defdelegate reduce(reduction, opts), to: JidoTest.Authoring.Agents.Fixtures.CountTurns.Agent
 end
 
 defmodule JidoTest.Authoring.Agents.Fixtures.CountTurns.Agent do
-  use Jido.Agent.Plugin
+  @behaviour Jido.Plugin
 
   def state_spec(opts),
     do: {:turns, Zoi.integer() |> Zoi.default(Keyword.fetch!(opts, :initial))}

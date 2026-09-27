@@ -1,6 +1,6 @@
 defmodule Jido.Agent.Plugin do
   @moduledoc """
-  Pure Agent-owned facet of a `Jido.Plugin` package.
+  Executes the Agent callbacks of `Jido.Plugin`.
 
   Before route selection, an Agent Plugin can inspect the complete Agent state,
   reject a Signal, or prepare one portable package-owned input for execution.
@@ -13,35 +13,13 @@ defmodule Jido.Agent.Plugin do
   """
 
   alias Jido.Agent
-  alias Jido.Agent.Plugin.{Preparation, Reduction, Spec}
+  alias Jido.Agent.Plugin.{Preparation, Spec}
   alias Jido.Plugin.Input
   alias Jido.Plugin.Error, as: PluginError
   alias Jido.Plugin.Normalizer
   alias Jido.Signal
 
   @type state_spec :: :none | {atom(), Zoi.schema()}
-
-  @doc "Defines an Agent-owned Plugin facet."
-  defmacro __using__(_opts) do
-    quote location: :keep do
-      @behaviour Jido.Agent.Plugin
-
-      @doc false
-      def __jido_plugin_facet__, do: :agent
-    end
-  end
-
-  @callback prepare(preparation :: Preparation.t(), opts :: keyword()) ::
-              {:ok, term()} | {:error, term()}
-  @callback state_spec(opts :: keyword()) :: state_spec() | {:error, term()}
-  @callback directives(opts :: keyword()) :: [module()] | {:error, term()}
-  @callback reduce(reduction :: Reduction.t(), opts :: keyword()) ::
-              {:ok, term()} | {:error, term()}
-
-  @optional_callbacks prepare: 2,
-                      state_spec: 1,
-                      directives: 1,
-                      reduce: 2
 
   @doc false
   @spec compose_schema(Zoi.schema(), [Jido.Plugin.declaration()] | [Jido.Plugin.Spec.t()]) ::

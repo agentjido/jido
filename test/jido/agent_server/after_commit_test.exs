@@ -76,10 +76,7 @@ defmodule Jido.AgentServer.AfterCommitTest do
 
       assert start.plugin_module == package
 
-      assert start.facet_module in [
-               JidoTest.CommitProjection.ServerFacet,
-               JidoTest.CommitProjection.NotificationFacet
-             ]
+      assert start.facet_module == package
 
       assert start.stage == :after_commit
       assert_receive {:observed, [:jido, :agent, :after_commit, :stop], stop_measurements, stop}

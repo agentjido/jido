@@ -6,13 +6,13 @@ defmodule JidoTest.Persistence.PluginIntegrationTest do
   alias Jido.Persistence.ETS
 
   defmodule AgentFacet do
-    use Jido.Agent.Plugin
+    @behaviour Jido.Plugin
 
     def state_spec(_opts), do: {:owned, Zoi.integer() |> Zoi.default(0)}
   end
 
   defmodule PersistenceFacet do
-    use Jido.Persistence.Plugin
+    @behaviour Jido.Plugin
 
     def dump(value, context, opts) do
       notify(opts, {:dump, value, context})
@@ -54,11 +54,18 @@ defmodule JidoTest.Persistence.PluginIntegrationTest do
   end
 
   defmodule Package do
-    use Jido.Plugin,
-      agent: AgentFacet,
-      persistence: PersistenceFacet,
-      vsn: 4,
-      option_keys: [agent: [], persistence: [:prefix, :observer]]
+    use Jido.Plugin, vsn: 4, option_keys: [agent: [], persistence: [:prefix, :observer]]
+
+    @impl true
+    defdelegate state_spec(opts), to: JidoTest.Persistence.PluginIntegrationTest.AgentFacet
+
+    @impl true
+    defdelegate dump(value, context, opts),
+      to: JidoTest.Persistence.PluginIntegrationTest.PersistenceFacet
+
+    @impl true
+    defdelegate load(value, context, opts),
+      to: JidoTest.Persistence.PluginIntegrationTest.PersistenceFacet
   end
 
   defmodule CustomCheckpointAgent do

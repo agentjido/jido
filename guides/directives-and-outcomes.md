@@ -59,9 +59,9 @@ child = Jido.Agent.Directive.spawn_child(MyApp.Worker, :worker)
 process = Jido.Agent.Directive.spawn_process({Task, fn -> do_work() end})
 ```
 
-A Plugin Agent facet can define more Directive types. It owns their validation
-and optional pre-commit state contribution. Its paired Agent Server facet owns
-optional post-commit dispatch.
+A Plugin can declare more Directive types through `directives/1`. Each Directive
+module owns its validation. The Plugin can reduce its owned state before commit
+and dispatch Directives after commit through `reduce/2` and `dispatch/4`.
 
 ## Validate Before Commit
 

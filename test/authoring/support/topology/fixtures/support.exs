@@ -15,7 +15,7 @@ defmodule JidoTest.Authoring.Topology.Fixtures.SetValue do
 end
 
 defmodule JidoTest.Authoring.Topology.Fixtures.Inbox do
-  use Jido.Topology.Plugin
+  @behaviour Jido.Plugin
 
   def contribute(context, _opts) do
     key = "inbox_" <> context.agent_key
@@ -30,7 +30,10 @@ defmodule JidoTest.Authoring.Topology.Fixtures.Inbox do
 end
 
 defmodule JidoTest.Authoring.Topology.Fixtures.InboxPackage do
-  use Jido.Plugin, topology: JidoTest.Authoring.Topology.Fixtures.Inbox
+  use Jido.Plugin
+
+  @impl true
+  defdelegate contribute(context, opts), to: JidoTest.Authoring.Topology.Fixtures.Inbox
 end
 
 defmodule JidoTest.Authoring.Topology.Fixtures.PluginWorker do

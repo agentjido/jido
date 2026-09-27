@@ -23,11 +23,14 @@ defmodule Jido.Agent.SchemaTest do
 
   defmodule OwnedState do
     @moduledoc false
-    use Jido.Plugin, agent: __MODULE__.Agent
+    use Jido.Plugin
+
+    @impl true
+    defdelegate state_spec(opts), to: Jido.Agent.SchemaTest.OwnedState.Agent
   end
 
   defmodule OwnedState.Agent do
-    use Jido.Agent.Plugin
+    @behaviour Jido.Plugin
 
     @impl true
     def state_spec(_opts), do: {:owned, Zoi.integer() |> Zoi.default(0)}
@@ -35,11 +38,14 @@ defmodule Jido.Agent.SchemaTest do
 
   defmodule RequiredState do
     @moduledoc false
-    use Jido.Plugin, agent: __MODULE__.Agent
+    use Jido.Plugin
+
+    @impl true
+    defdelegate state_spec(opts), to: Jido.Agent.SchemaTest.RequiredState.Agent
   end
 
   defmodule RequiredState.Agent do
-    use Jido.Agent.Plugin
+    @behaviour Jido.Plugin
 
     @impl true
     def state_spec(_opts), do: {:owned, Zoi.integer()}
@@ -47,11 +53,14 @@ defmodule Jido.Agent.SchemaTest do
 
   defmodule ConfiguredState do
     @moduledoc false
-    use Jido.Plugin, agent: __MODULE__.Agent
+    use Jido.Plugin
+
+    @impl true
+    defdelegate state_spec(opts), to: Jido.Agent.SchemaTest.ConfiguredState.Agent
   end
 
   defmodule ConfiguredState.Agent do
-    use Jido.Agent.Plugin
+    @behaviour Jido.Plugin
 
     @impl true
     def state_spec(opts), do: {:owned, Zoi.integer() |> Zoi.min(Keyword.fetch!(opts, :minimum))}

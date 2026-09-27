@@ -91,13 +91,13 @@ defmodule Jido.Plugin.AuditTest do
       state = %{records: existing}
       expected = Enum.take(existing ++ incoming, -3)
 
-      assert Audit.Agent.apply_records(state, incoming, max_entries: 3) ==
+      assert Audit.apply_records(state, incoming, max_entries: 3) ==
                {:ok, %{records: expected}}
     end
 
     for invalid <- [0, -1, nil] do
       assert_raise ArgumentError, fn ->
-        Audit.Agent.apply_records(%{records: []}, [], max_entries: invalid)
+        Audit.apply_records(%{records: []}, [], max_entries: invalid)
       end
     end
   end

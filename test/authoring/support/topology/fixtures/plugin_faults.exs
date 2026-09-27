@@ -1,5 +1,5 @@
 defmodule JidoTest.Authoring.Topology.Fixtures.FaultFacet do
-  use Jido.Topology.Plugin
+  @behaviour Jido.Plugin
 
   alias Jido.Topology.Plugin.Contribution
   alias JidoTest.Authoring.Topology.Fixtures
@@ -59,7 +59,10 @@ defmodule JidoTest.Authoring.Topology.Fixtures.FaultFacet do
 end
 
 defmodule JidoTest.Authoring.Topology.Fixtures.FaultPackage do
-  use Jido.Plugin, topology: JidoTest.Authoring.Topology.Fixtures.FaultFacet
+  use Jido.Plugin
+
+  @impl true
+  defdelegate contribute(context, opts), to: JidoTest.Authoring.Topology.Fixtures.FaultFacet
 end
 
 defmodule JidoTest.Authoring.Topology.Fixtures.FaultWorker do

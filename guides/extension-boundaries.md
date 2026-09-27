@@ -15,13 +15,20 @@ only when the extension needs the authority that the contract supplies.
 | Add an application facade, policy, supervision tree, or coordination service | Ordinary Elixir and OTP | The host application owns it. It calls documented public APIs. |
 | Define executable work | `Jido.Action` or a Flow through `Jido.Exec` | Jido Action owns execution. Jido owns Agent evaluation and commit. |
 | Define, route, or deliver an event | Jido Signal values, routes, dispatch, or buses | Jido Signal owns the event and delivery contracts. |
-| Add reusable Agent behavior | A `Jido.Plugin` package with `Jido.Agent.Plugin` and, when needed, `Jido.AgentServer.Plugin` | The Agent facet is pure and bounded. The Agent Server facet owns live work and one optional runtime root. |
+| Share a client, connection pool, or service | Application-supervised OTP process | The application owns its lifetime. |
+| Change owned state with the Agent | Plugin Agent reducer | Jido protects the owned field and validates the complete candidate before commit. |
+| Handle a custom effect after commit | Plugin Directive handler | The Agent role declares ownership. The Server role dispatches after commit. |
+| Tie a runtime to one Agent's lifetime | Optional Plugin runtime | The Server owns startup, readiness, replacement, and shutdown. |
 | Replace one external infrastructure operation | The narrow adapter for that package | The package that defines the operation owns the adapter. There is no universal Jido adapter. |
 | Add static Agent or Topology syntax | `Jido.Agent.Extension` or `Jido.Topology.Extension` | The extension lowers syntax to a canonical value before runtime activation. |
-| Convert one Plugin-owned state value | `Jido.Persistence.Plugin` | The facet has no adapter, key, revision, complete-Agent, or commit authority. |
-| Add bounded static Plugin topology | `Jido.Topology.Plugin` | The facet returns canonical static entries. It has no process or live-control authority. |
+| Convert one Plugin-owned state value | `c:Jido.Plugin.dump/3` and `c:Jido.Plugin.load/3` | The callback has no adapter, key, revision, complete-Agent, or commit authority. |
+| Add bounded static Plugin topology | `c:Jido.Plugin.contribute/2` | The callback returns canonical static entries. It has no process or live-control authority. |
 | Request runtime work after an Agent commit | `Jido.Agent.Directive` | The runtime handles a typed Directive after commit. A Directive is not a durable delivery guarantee. |
 | Observe Agent behavior | A semantic Telemetry handler or the optional OpenTelemetry API mapping | Observation has no authority to change evaluation, commit, or runtime results. |
+
+A Plugin implements optional callbacks in one `Jido.Plugin` module. Start with
+[Write a Plugin](your-first-plugin.md). Use ordinary helper modules to split a
+large implementation.
 
 Data constructors and Codecs are public authoring tools. Use them for trusted systems
 that create Agent or Topology definitions. Child `node:` options and
@@ -101,9 +108,9 @@ Plugin runtime resources do not belong in checkpoints. Keep processes,
 connections, watchers, and worker pools in the supervised runtime. Keep only
 portable configuration and rebuild data in a Plugin-owned Agent field.
 
-A Persistence Plugin facet can convert only its paired owned-state value in the
+A Persistence callback can convert only its paired owned-state value in the
 default checkpoint path. A complete custom Agent checkpoint bypasses this
-conversion. The facet does not replace the byte adapter or change checkpoint
+conversion. The callback does not replace the byte adapter or change checkpoint
 and commit rules.
 
 ## Extension growth

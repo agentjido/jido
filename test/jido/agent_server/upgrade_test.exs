@@ -57,11 +57,14 @@ defmodule JidoTest.AgentServer.UpgradeTest do
   end
 
   defmodule DifferentPlugin do
-    use Jido.Plugin, agent: __MODULE__.Agent
+    use Jido.Plugin
+
+    @impl true
+    defdelegate state_spec(opts), to: JidoTest.AgentServer.UpgradeTest.DifferentPlugin.Agent
   end
 
   defmodule DifferentPlugin.Agent do
-    use Jido.Agent.Plugin
+    @behaviour Jido.Plugin
 
     def state_spec(_opts), do: {:extra, Zoi.integer() |> Zoi.default(0)}
   end

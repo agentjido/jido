@@ -1,10 +1,13 @@
 defmodule Jido.Examples.FencedInventory.Gate do
   @moduledoc "Checks external ownership through the public live admission callback."
-  use Jido.Plugin, agent_server: __MODULE__.Server
+  use Jido.Plugin
+
+  @impl true
+  defdelegate admit(runtime, admission, opts), to: Jido.Examples.FencedInventory.Gate.Server
 end
 
 defmodule Jido.Examples.FencedInventory.Gate.Server do
-  use Jido.AgentServer.Plugin
+  @behaviour Jido.Plugin
 
   alias Jido.Examples.FencedInventory.{Authority, Client}
 

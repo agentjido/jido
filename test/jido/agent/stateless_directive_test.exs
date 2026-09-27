@@ -13,18 +13,25 @@ defmodule Jido.Agent.StatelessDirectiveTest do
   end
 
   defmodule Effects do
-    use Jido.Plugin, agent: __MODULE__.Agent, agent_server: __MODULE__.Server
+    use Jido.Plugin
+
+    @impl true
+    defdelegate directives(opts), to: Jido.Agent.StatelessDirectiveTest.Effects.Agent
+
+    @impl true
+    defdelegate dispatch(runtime, directive, context, opts),
+      to: Jido.Agent.StatelessDirectiveTest.Effects.Server
   end
 
   defmodule Effects.Agent do
-    use Jido.Agent.Plugin
+    @behaviour Jido.Plugin
 
     @impl true
     def directives(_opts), do: [Effect]
   end
 
   defmodule Effects.Server do
-    use Jido.AgentServer.Plugin
+    @behaviour Jido.Plugin
 
     @impl true
     def dispatch(nil, %Effect{kind: kind}, context, _opts) do

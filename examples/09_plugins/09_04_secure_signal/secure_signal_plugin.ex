@@ -1,25 +1,19 @@
 defmodule Jido.Examples.Plugins.SecureSignal.Plugin do
   @moduledoc "Provides decrypted input and encrypts outbound secure data."
 
-  use Jido.Plugin,
-    agent_server: Jido.Examples.Plugins.SecureSignal.Plugin.Server
-end
-
-defmodule Jido.Examples.Plugins.SecureSignal.Plugin.Server do
-  @moduledoc false
-  use Jido.AgentServer.Plugin
+  use Jido.Plugin
 
   alias Jido.AgentServer.Plugin.Admission
   alias Jido.Plugin.{Init, SignalContext}
   alias Jido.Examples.Plugins.SecureSignal.Runtime
 
-  @impl Jido.AgentServer.Plugin
+  @impl Jido.Plugin
   def admit(runtime, %Admission{signal: %{data: %{"secure" => envelope}} = signal}, _opts),
     do: Runtime.decrypt(runtime, signal, envelope)
 
   def admit(_runtime, _admission, _opts), do: {:error, :secure_data_required}
 
-  @impl Jido.AgentServer.Plugin
+  @impl Jido.Plugin
   def prepare_dispatch(
         runtime,
         %Jido.Signal{data: %{"secure" => plaintext}} = signal,
@@ -33,6 +27,7 @@ defmodule Jido.Examples.Plugins.SecureSignal.Plugin.Server do
 
   def prepare_dispatch(_runtime, signal, %SignalContext{}, _opts), do: {:ok, signal}
 
+  @impl true
   def child_spec(%Init{} = init), do: Supervisor.child_spec({Runtime, init}, id: __MODULE__)
 end
 

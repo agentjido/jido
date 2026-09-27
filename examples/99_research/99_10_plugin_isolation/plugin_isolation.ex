@@ -28,7 +28,7 @@ end
 
 defmodule Jido.Examples.PluginIsolation.Owned.Agent do
   @moduledoc false
-  use Jido.Agent.Plugin
+  @behaviour Jido.Plugin
 
   alias Jido.Agent.Plugin.Reduction
 
@@ -38,7 +38,13 @@ end
 
 defmodule Jido.Examples.PluginIsolation.Owned do
   @moduledoc "Owns the protected audit counter."
-  use Jido.Plugin, agent: Jido.Examples.PluginIsolation.Owned.Agent
+  use Jido.Plugin
+
+  @impl true
+  defdelegate state_spec(opts), to: Jido.Examples.PluginIsolation.Owned.Agent
+
+  @impl true
+  defdelegate reduce(reduction, opts), to: Jido.Examples.PluginIsolation.Owned.Agent
 end
 
 defmodule Jido.Examples.PluginIsolation do

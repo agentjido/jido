@@ -1,6 +1,6 @@
 defmodule Jido.Plugin.Scheduler.Agent do
   @moduledoc "Owns recurring schedules and pending occurrences in Agent state."
-  use Jido.Agent.Plugin
+  @behaviour Jido.Plugin
 
   alias Jido.Plugin.Scheduler
   alias Jido.Plugin.Scheduler.{Acknowledge, Cancel, Cron, Durable, Occurrence, Queue, Schedule}

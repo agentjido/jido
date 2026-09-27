@@ -1,29 +1,14 @@
 defmodule Jido.Persistence.Plugin do
   @moduledoc """
-  Pure Persistence-owned facet of a `Jido.Plugin` package.
+  Executes the Persistence callbacks of `Jido.Plugin`.
 
-  This facet converts only its paired Plugin-owned state value. It receives no
+  Each callback converts only its paired Plugin-owned state value. It receives no
   adapter, record key, revision check, complete Agent state, process, or commit
   result. `Jido.Persistence` owns when the conversion runs.
   """
 
   alias Jido.Persistence.Plugin.{Context, Spec}
   alias Jido.Plugin.Error, as: PluginError
-
-  @doc "Defines a Persistence-owned Plugin facet."
-  defmacro __using__(_opts) do
-    quote location: :keep do
-      @behaviour Jido.Persistence.Plugin
-
-      @doc false
-      def __jido_plugin_facet__, do: :persistence
-    end
-  end
-
-  @callback dump(owned_state :: term(), context :: Context.t(), opts :: keyword()) ::
-              {:ok, term()} | {:error, term()}
-  @callback load(stored_value :: term(), context :: Context.t(), opts :: keyword()) ::
-              {:ok, term()} | {:error, term()}
 
   @doc false
   @spec dump(Jido.Plugin.Spec.t(), term(), Context.t()) :: {:ok, term()} | {:error, term()}

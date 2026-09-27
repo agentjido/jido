@@ -6,7 +6,10 @@ defmodule Jido.AgentServer.PluginBoundaryTest do
   alias Jido.Plugin.Init
 
   defmodule Runtime do
-    use Jido.Plugin, agent_server: __MODULE__.Server
+    use Jido.Plugin
+
+    @impl true
+    defdelegate child_spec(init), to: Jido.AgentServer.PluginBoundaryTest.Runtime.Server
 
     def start_link(init) do
       case Keyword.get(init.options, :start, :ok) do
@@ -33,7 +36,7 @@ defmodule Jido.AgentServer.PluginBoundaryTest do
   end
 
   defmodule Runtime.Server do
-    use Jido.AgentServer.Plugin
+    @behaviour Jido.Plugin
 
     def child_spec(init) do
       if Keyword.get(init.options, :invalid_spec),
@@ -44,11 +47,14 @@ defmodule Jido.AgentServer.PluginBoundaryTest do
   end
 
   defmodule StateOnly do
-    use Jido.Plugin, agent: __MODULE__.Agent
+    use Jido.Plugin
+
+    @impl true
+    defdelegate state_spec(opts), to: Jido.AgentServer.PluginBoundaryTest.StateOnly.Agent
   end
 
   defmodule StateOnly.Agent do
-    use Jido.Agent.Plugin
+    @behaviour Jido.Plugin
     def state_spec(_opts), do: {:owned, Zoi.integer() |> Zoi.default(0)}
   end
 

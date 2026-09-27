@@ -1,7 +1,7 @@
 # 09_08 Commit projection
 
-The Agent facet copies the domain count into its owned `:projection` field.
-The Server facet uses `after_commit/3` to update a live GenServer with that
+The Agent callbacks copies the domain count into its owned `:projection` field.
+The Server callbacks uses `after_commit/3` to update a live GenServer with that
 value and its matching commit revision. The Action returns no Directive and
 has no knowledge of the runtime.
 
@@ -12,7 +12,11 @@ policy if the hook fails.
 
 The runtime starts from `Jido.Plugin.Init`. Startup, restore, and runtime
 replacement rebuild the current view; they do not replay old notifications.
-This is a best-effort live projection, not a durable event stream.
+The Plugin defines state and runtime callbacks in one module.
+Its declared hook is a required step before Directive dispatch. Failure or
+timeout skips later hooks and Directives and uses the Server error policy.
+The commit and the result already sent to the caller remain unchanged.
+This view is not a durable event stream. Use Telemetry for optional observation.
 
 Use semantic Telemetry for observation alone. Use a custom Directive when an
 Action must request a specific effect. Use this hook when a Plugin must track

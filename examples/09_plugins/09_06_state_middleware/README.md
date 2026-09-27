@@ -22,3 +22,6 @@ Action, the validated note, and the number of successful Turns. Direct
 evaluation returns a candidate. Live execution commits the same reduction.
 
 Previous: [Composition](../09_05_composition/README.md) | Next: [Persisted State](../09_07_persisted_state/README.md)
+
+The Plugin uses `Jido.Plugin` and defines only its state callbacks.
+Core controls state ownership and reduction order.

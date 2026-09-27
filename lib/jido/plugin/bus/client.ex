@@ -16,5 +16,11 @@ defmodule Jido.Plugin.Bus.Client do
       ]
   """
 
-  use Jido.Plugin, agent_server: Jido.Plugin.Bus.Client.Server
+  use Jido.Plugin
+
+  @impl true
+  defdelegate await_ready(runtime, opts), to: Jido.Plugin.Bus.Client.Server
+
+  @impl true
+  defdelegate child_spec(init), to: Jido.Plugin.Bus.Client.Server
 end

@@ -57,7 +57,20 @@ end
 defmodule Jido.Examples.Runtime.JobRuntime do
   @moduledoc "A Plugin that owns linked job tasks and returns terminal Signals."
 
-  use Jido.Plugin, agent: __MODULE__.Agent, agent_server: __MODULE__.PluginServer
+  use Jido.Plugin
+
+  @impl true
+  defdelegate directives(opts), to: Jido.Examples.Runtime.JobRuntime.Agent
+
+  @impl true
+  defdelegate await_ready(runtime, opts), to: Jido.Examples.Runtime.JobRuntime.PluginServer
+
+  @impl true
+  defdelegate dispatch(runtime, directive, context, opts),
+    to: Jido.Examples.Runtime.JobRuntime.PluginServer
+
+  @impl true
+  defdelegate child_spec(init), to: Jido.Examples.Runtime.JobRuntime.PluginServer
 
   @doc "Builds the terminal Signal sent by the managed runtime."
   def settle_signal!(data) do
@@ -68,7 +81,7 @@ defmodule Jido.Examples.Runtime.JobRuntime do
 end
 
 defmodule Jido.Examples.Runtime.JobRuntime.Agent do
-  use Jido.Agent.Plugin
+  @behaviour Jido.Plugin
   alias Jido.Examples.Runtime.JobRuntime.{Cancel, Submit}
 
   @impl true
@@ -76,7 +89,7 @@ defmodule Jido.Examples.Runtime.JobRuntime.Agent do
 end
 
 defmodule Jido.Examples.Runtime.JobRuntime.PluginServer do
-  use Jido.AgentServer.Plugin
+  @behaviour Jido.Plugin
   alias Jido.Examples.Runtime.JobRuntime.Server
 
   @impl true
@@ -86,6 +99,7 @@ defmodule Jido.Examples.Runtime.JobRuntime.PluginServer do
   def dispatch(runtime, directive, context, _opts),
     do: GenServer.call(runtime, {:dispatch, directive, context.turn_context})
 
+  @impl true
   def child_spec(init),
     do: Supervisor.child_spec({Server, init}, id: Jido.Examples.Runtime.JobRuntime)
 end

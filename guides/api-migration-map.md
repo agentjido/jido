@@ -196,7 +196,7 @@ the complete candidate state, then performs Directives in list order.
 | `Jido.AgentServer.Lifecycle` | **Removed.** Core does not expose the V2 lifecycle behavior. |
 | `Jido.AgentServer.Lifecycle.Keyed` | **Removed.** Use the Jido instance registry and persistence APIs. |
 | `Jido.AgentServer.Lifecycle.Noop` | **Removed.** Start an unmanaged Server directly, or use a Jido instance for managed ownership. |
-| `Jido.AgentServer.DirectiveExec` | **Replaced** by typed Plugin Directives and the `c:Jido.AgentServer.Plugin.dispatch/4` callback. |
+| `Jido.AgentServer.DirectiveExec` | **Replaced** by typed Plugin Directives and the `c:Jido.Plugin.dispatch/4` callback. |
 | `Jido.AgentServer.SignalRouter` | **Replaced** by Agent definition routes and the Jido Signal Router contract. |
 | **Jido.AgentServer.Signal.ChildStarted** | **Private in V3.** Route the documented event type if the application needs it. Do not call its generated constructor as a Core API. |
 | **Jido.AgentServer.Signal.Orphaned** | **Private in V3.** Handle the routed event or read the public relationship state. |
@@ -270,10 +270,10 @@ required V3 Directive.
 
 Status: **Same name, new contract**.
 
-`use Jido.Plugin` declares a callback-free package manifest in V3. It selects
-no more than one Agent, Agent Server, Persistence, and Topology facet. The Agent
-definition supplies common package options. `option_keys` can map those options
-to owner facets.
+`use Jido.Plugin` defines one Plugin module with optional callbacks. Core uses
+the documented callbacks to select internal owner Specs. The Agent definition
+supplies common options. Optional `option_keys` metadata can restrict those
+options by owner. Role lists and facet selectors are removed.
 
 V2 also generates metadata and configuration functions such as `name/0`,
 `description/0`, `category/0`, `tags/0`, `vsn/0`, `otp_app/0`, `state_key/0`,
@@ -286,18 +286,18 @@ needs them.
 
 | V2 callback | V3 callback or owner |
 | --- | --- |
-| `plugin_spec/1` | Callback-free `Jido.Plugin` package manifest and its selected owner facets |
-| `mount/2` | Static defaults in Agent-facet `state_spec/1`; live setup in Agent-Server-facet `child_spec/1` |
-| `handle_signal/2` | Action or Flow logic, Agent-Server-facet `admit/3`, or explicit Agent routing |
-| `prepare_signal/2` | Action or Flow input handling; Agent-Server-facet `admit/3` for live checks |
-| `prepare_action/3` | Action or Flow input handling, or Agent-Server-facet `admit/3` with a read-only Admission value |
-| `prepare_emit/2` | Agent-Server-facet `prepare_dispatch/4` with `Jido.Plugin.SignalContext` |
-| `transform_result/3` | Domain change in the Action or Flow; Plugin-owned field change in Agent-facet `reduce/2` |
+| `plugin_spec/1` | `Jido.Plugin` package with optional callbacks |
+| `mount/2` | Static defaults in Agent `state_spec/1`; live setup in Agent Server `child_spec/1` |
+| `handle_signal/2` | Action or Flow logic, Agent Server `admit/3`, or explicit Agent routing |
+| `prepare_signal/2` | Action or Flow input handling; Agent Server `admit/3` for live checks |
+| `prepare_action/3` | Action or Flow input handling, or Agent Server `admit/3` with a read-only Admission value |
+| `prepare_emit/2` | Agent Server `prepare_dispatch/4` with `Jido.Plugin.SignalContext` |
+| `transform_result/3` | Domain change in the Action or Flow; Plugin-owned field change in Agent `reduce/2` |
 | `subscriptions/2` | `Jido.Plugin.Bus` or `Jido.Plugin.SensorManager` |
 | `signal_routes/1` | Agent routes |
-| `on_checkpoint/2`, `on_restore/2` | Persistence-facet `dump/3` and `load/3` for one paired owned value; runtime reconstruction stays in the Agent Server facet |
-| `child_spec/1` with V2 config | Agent-Server-facet `child_spec/1` with `Jido.Plugin.Init` |
-| Custom `DirectiveExec` | Directive-module `validate/1`, Agent-facet `directives/1`, and Agent-Server-facet `dispatch/4` |
+| `on_checkpoint/2`, `on_restore/2` | Persistence `dump/3` and `load/3` for one paired owned value; runtime reconstruction stays in the Agent Server callbacks |
+| `child_spec/1` with V2 config | Agent Server `child_spec/1` with `Jido.Plugin.Init` |
+| Custom `DirectiveExec` | Directive-module `validate/1`, Agent `directives/1`, and Agent Server `dispatch/4` |
 
 ### V2 Plugin support modules
 
@@ -305,7 +305,7 @@ needs them.
 | --- | --- |
 | `Jido.Plugin.Config` | **Removed.** Validate Plugin options in callbacks or in an application constructor. |
 | `Jido.Plugin.Instance` | **Removed.** V3 canonicalizes one declaration for each Plugin module. Aliased duplicate Plugin instances are not supported. |
-| `Jido.Plugin.Manifest` | **Same name, new contract.** It contains only the package module, positive version, selected owner facets, and option mapping. |
+| `Jido.Plugin.Manifest` | **Same name, new contract.** It contains only the package module, positive version, callback owner metadata, and option mapping. |
 | `Jido.Plugin.Requirements` | **Removed.** Validate applications, configuration, and dependent Plugins at application startup or definition construction. |
 | `Jido.Plugin.Routes` | **Removed.** Put routes in the Agent definition. |
 | `Jido.Plugin.Schedules` | **Replaced** by `Jido.Plugin.Scheduler`. |
@@ -315,15 +315,16 @@ needs them.
 
 | V3 module | Purpose |
 | --- | --- |
-| `Jido.Agent.Plugin` | Prepares pure input and reduces one owned state value after Directive validation. |
-| `Jido.AgentServer.Plugin` | Owns live admission, runtime lifecycle callbacks, outbound preparation, and post-commit dispatch. |
-| `Jido.Persistence.Plugin` | Converts one paired owned-state value without storage or commit authority. |
-| `Jido.Persistence.Plugin.Context` | Gives a Persistence facet package and record versions, direction, and reason. |
-| `Jido.Topology.Plugin` | Contributes bounded canonical static Topology entries. |
-| `Jido.Topology.Plugin.Context` | Gives a Topology facet package version and static Agent identity. |
+| `Jido.Plugin` | Defines all optional Plugin callbacks in one module. Capabilities follow the callbacks that the module implements. |
+| `Jido.Agent.Plugin.Preparation` | Gives pure input preparation the source Signal and current Agent state. |
+| `Jido.Agent.Plugin.Reduction` | Gives a reducer the candidate state, owned value, prepared input, and validated Directives. |
+| `Jido.AgentServer.Plugin.Admission` | Gives live admission a bounded request context. |
+| `Jido.AgentServer.Plugin.Commit` | Gives a commit hook its owned committed value and matching revision. |
+| `Jido.Persistence.Plugin.Context` | Gives Persistence callbacks the package and record versions, direction, and reason. |
+| `Jido.Topology.Plugin.Context` | Gives Topology callbacks the package version and static Agent identity. |
 | `Jido.Topology.Plugin.Contribution` | Holds current canonical Bus resources, ownership relationships, and Bus subscriptions. Bus is the first core resource type. |
-| `Jido.Plugin.Manifest` | Selects owner facets and maps common static options. |
-| `Jido.Plugin.Init` | Gives a Plugin runtime its owner, module, and declared options. It is not a state snapshot. |
+| `Jido.Plugin.Manifest` | Records callback owners and maps common static options. |
+| `Jido.Plugin.Init` | Gives a Plugin runtime its owner, module, declared options, and owned state value with its matching revision. |
 | `Jido.Plugin.SignalContext` | Gives outbound Signal preparation a bounded context. |
 | `Jido.Plugin.DirectiveContext` | Gives post-commit Plugin dispatch the value of its owned Agent state field. |
 | `Jido.Plugin.Codec` | Encodes Plugin declarations through the shared trusted Codec Registry. |

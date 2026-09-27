@@ -47,19 +47,19 @@ The nested checkpoint format remains version 2.
 
 ## Persistence Plugin conversion
 
-A Plugin package can select a `Jido.Persistence.Plugin` facet when its owned
-state needs a durable representation that differs from its live Agent value.
-For the default Agent checkpoint, Persistence calls this facet with only:
+A Plugin can implement `dump/3` and `load/3` when its owned state needs a
+durable representation that differs from its live Agent value. For the default
+Agent checkpoint, Persistence calls these callbacks with only:
 
-- the state value owned by the paired `Jido.Agent.Plugin` facet;
+- the state value declared by the Plugin's `state_spec/1`;
 - a context with package version, record format, direction, and reason;
-- the static options mapped to the Persistence facet.
+- the static options mapped to Persistence callbacks.
 
-The facet cannot read the adapter, record key, complete Agent state, process,
+The callbacks cannot read the adapter, record key, complete Agent state, process,
 or commit result. Conversion runs before the final checkpoint portability
 check. Dump output must be portable. Load receives validated stored data and
-can reconstruct local values. Its output must match the paired Agent-facet
-state schema and the complete Agent schema; it need not be portable.
+can reconstruct local values. Its output must match the Plugin's owned field
+schema and the complete Agent schema; it need not be portable.
 
 Direct `Jido.Agent.checkpoint/2` and `Jido.Agent.restore/3` do not run Plugin
 persistence conversion. Use `Jido.Persistence` for this conversion.
@@ -102,7 +102,7 @@ same value as a string loads. Jido loads the caller-supplied Agent module
 before it decodes a record. The application must load other trusted modules
 that define fixed atoms in saved state. Jido does not select modules from
 stored bytes. Use stable strings for data that can introduce new names. A
-custom Agent checkpoint or Plugin Persistence facet can convert that data at
+custom Agent checkpoint or Plugin Persistence callbacks can convert that data at
 its state boundary. Do not depend on unrestricted atom portability.
 
 Use stable identifiers and portable configuration. Rebuild runtime resources
@@ -167,8 +167,8 @@ values still works. Tests that expected `:non_portable_term` at creation or
 command execution must now check the checkpoint boundary. Use a narrower
 schema when a local value is invalid for the application.
 
-Before enabling persistence for local state, add custom Agent conversion or a
-Plugin Persistence facet, and test save and restore together. Default
+Before enabling persistence for local state, add custom Agent conversion or
+Plugin Persistence callbacks, and test save and restore together. Default
 checkpoints remain strict and do not remove fields. The saved formats and
 version numbers do not change. A required checkpoint or write failure prevents
 the candidate commit and directive dispatch; it cannot undo earlier Action I/O.
