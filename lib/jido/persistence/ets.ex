@@ -2,8 +2,12 @@ defmodule Jido.Persistence.ETS do
   @moduledoc """
   In-memory persistence adapter for development and tests.
 
-  Data is lost when the BEAM stops. The `:table` option selects the base table
-  name. The default is `:jido_persistence`.
+  With the Jido application running, tables survive their creator's exit by
+  transferring to a supervised owner. Inherited tables are lost when that owner
+  or the application stops. Without the application, tables end with their creator.
+  All data is lost when the BEAM stops.
+
+  The `:table` option selects the base table name. The default is `:jido_persistence`.
   """
 
   @behaviour Jido.Persistence.Adapter
@@ -106,7 +110,7 @@ defmodule Jido.Persistence.ETS do
   end
 
   defp heir_opts(name) do
-    case Process.whereis(Jido.Supervisor) do
+    case Process.whereis(Jido.Persistence.ETS.Owner) do
       pid when is_pid(pid) and pid != self() -> [{:heir, pid, {:jido_persistence_ets, name}}]
       _other -> []
     end

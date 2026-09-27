@@ -7,7 +7,7 @@ defmodule Jido.Application do
     Jido.Telemetry.attach_default_handler()
 
     Supervisor.start_link(
-      [Jido.Instance.NamespaceRegistry],
+      [Jido.Instance.NamespaceRegistry, Jido.Persistence.ETS.Owner],
       strategy: :one_for_one,
       name: Jido.Supervisor
     )

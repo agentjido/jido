@@ -74,16 +74,16 @@ defmodule JidoTest.Persistence.ETSTest do
     assert {:ok, "b"} = ETS.get("key", opts_b)
   end
 
-  test "an on-demand table transfers to the Jido supervisor" do
+  test "an on-demand table transfers to the supervised ETS owner" do
     opts = [table: unique_table(:on_demand)]
     table = :"#{Keyword.fetch!(opts, :table)}_records"
-    supervisor = Process.whereis(Jido.Supervisor)
+    owner = Process.whereis(Jido.Persistence.ETS.Owner)
 
     caller = spawn(fn -> :ok = ETS.put("key", "value", opts) end)
 
     monitor = Process.monitor(caller)
     assert_receive {:DOWN, ^monitor, :process, ^caller, _reason}
-    assert :ets.info(table, :owner) == supervisor
+    assert :ets.info(table, :owner) == owner
     assert {:ok, "value"} = ETS.get("key", opts)
   end
 
