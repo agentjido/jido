@@ -174,21 +174,24 @@ defmodule Jido.Plugin.Scheduler.OccurrenceTest do
 
   test "nested nonportable terms are rejected without raising" do
     port = Port.open({:spawn, "cat"}, [:binary])
-    on_exit(fn -> if Port.info(port), do: Port.close(port) end)
 
-    for value <- [self(), make_ref(), port, fn -> :ok end, [1 | :improper_tail]] do
-      assert {:error, {:invalid_job_id, :non_durable_term}} =
-               Jido.Agent.Directive.validate(
-                 Scheduler.cron({:job, %{nested: value}}, "* * * * *", tick())
-               )
+    try do
+      for value <- [self(), make_ref(), port, fn -> :ok end, [1 | :improper_tail]] do
+        assert {:error, {:invalid_job_id, :non_durable_term}} =
+                 Jido.Agent.Directive.validate(
+                   Scheduler.cron({:job, %{nested: value}}, "* * * * *", tick())
+                 )
 
-      invalid_message = %{tick() | data: %{nested: {:value, [value]}}}
+        invalid_message = %{tick() | data: %{nested: {:value, [value]}}}
 
-      assert {:error, {:invalid_message, :non_durable_term}} =
-               Jido.Agent.Directive.validate(Scheduler.cron(:job, "* * * * *", invalid_message))
+        assert {:error, {:invalid_message, :non_durable_term}} =
+                 Jido.Agent.Directive.validate(Scheduler.cron(:job, "* * * * *", invalid_message))
 
-      assert {:error, :non_durable_occurrence_scope} =
-               Scheduler.validate_occurrence_scope({ExampleJido, "agent-1", [value]})
+        assert {:error, :non_durable_occurrence_scope} =
+                 Scheduler.validate_occurrence_scope({ExampleJido, "agent-1", [value]})
+      end
+    after
+      Port.close(port)
     end
   end
 
