@@ -28,13 +28,26 @@ defmodule Jido.Topology.Resource do
   def ensure(%{kind: :bus} = spec, context) do
     case Bus.whereis(spec.id, jido: context.jido) do
       {:ok, pid} ->
-        if owned?(pid, spec, context), do: {:ok, pid}, else: {:error, :bus_identity_in_use}
+        if Process.alive?(pid),
+          do: owned_bus(pid, spec, context),
+          else: start_bus(spec, context)
 
       _other ->
-        options = Keyword.merge(spec.config, name: spec.id, jido: context.jido)
-        DynamicSupervisor.start_child(context.pool, {Bus, options})
+        start_bus(spec, context)
     end
   end
+
+  defp start_bus(spec, context) do
+    options = Keyword.merge(spec.config, name: spec.id, jido: context.jido)
+
+    case DynamicSupervisor.start_child(context.pool, {Bus, options}) do
+      {:error, {:already_started, pid}} -> owned_bus(pid, spec, context)
+      result -> result
+    end
+  end
+
+  defp owned_bus(pid, spec, context),
+    do: if(owned?(pid, spec, context), do: {:ok, pid}, else: {:error, :bus_identity_in_use})
 
   @doc false
   def whereis(%{kind: :bus} = spec, context) do
