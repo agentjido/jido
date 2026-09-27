@@ -2,7 +2,7 @@ defmodule Jido.Plugin.Init do
   @moduledoc """
   Input for one supervised Agent Plugin runtime generation.
 
-  `plugin_state` is the portable value selected from this Plugin's owned field
+  `plugin_state` is the validated value selected from this Plugin's owned field
   in the complete Agent state map. It is a runtime bootstrap view, not a second
   stored state map. It is paired with `state_version` when the Agent Server
   builds the value. A replacement runtime gets a new Init value from the latest

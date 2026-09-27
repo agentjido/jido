@@ -315,15 +315,16 @@ needs them.
 
 | V3 module | Purpose |
 | --- | --- |
-| `Jido.Agent.Plugin` | Prepares pure input and reduces one owned state value after Directive validation. |
-| `Jido.AgentServer.Plugin` | Owns live admission, runtime lifecycle callbacks, outbound preparation, and post-commit dispatch. |
-| `Jido.Persistence.Plugin` | Converts one paired owned-state value without storage or commit authority. |
-| `Jido.Persistence.Plugin.Context` | Gives a Persistence callbacks package and record versions, direction, and reason. |
-| `Jido.Topology.Plugin` | Contributes bounded canonical static Topology entries. |
-| `Jido.Topology.Plugin.Context` | Gives a Topology callbacks package version and static Agent identity. |
+| `Jido.Plugin` | Defines all optional Plugin callbacks in one module. Capabilities follow the callbacks that the module implements. |
+| `Jido.Agent.Plugin.Preparation` | Gives pure input preparation the source Signal and current Agent state. |
+| `Jido.Agent.Plugin.Reduction` | Gives a reducer the candidate state, owned value, prepared input, and validated Directives. |
+| `Jido.AgentServer.Plugin.Admission` | Gives live admission a bounded request context. |
+| `Jido.AgentServer.Plugin.Commit` | Gives a commit hook its owned committed value and matching revision. |
+| `Jido.Persistence.Plugin.Context` | Gives Persistence callbacks the package and record versions, direction, and reason. |
+| `Jido.Topology.Plugin.Context` | Gives Topology callbacks the package version and static Agent identity. |
 | `Jido.Topology.Plugin.Contribution` | Holds current canonical Bus resources, ownership relationships, and Bus subscriptions. Bus is the first core resource type. |
 | `Jido.Plugin.Manifest` | Records callback owners and maps common static options. |
-| `Jido.Plugin.Init` | Gives a Plugin runtime its owner, module, and declared options. It is not a state snapshot. |
+| `Jido.Plugin.Init` | Gives a Plugin runtime its owner, module, declared options, and owned state value with its matching revision. |
 | `Jido.Plugin.SignalContext` | Gives outbound Signal preparation a bounded context. |
 | `Jido.Plugin.DirectiveContext` | Gives post-commit Plugin dispatch the value of its owned Agent state field. |
 | `Jido.Plugin.Codec` | Encodes Plugin declarations through the shared trusted Codec Registry. |

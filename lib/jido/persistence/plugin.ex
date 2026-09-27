@@ -38,6 +38,7 @@ defmodule Jido.Persistence.Plugin do
       ) do
     with {:ok, context} <- Context.validate(context),
          :ok <- validate_context(context, spec, :load),
+         :ok <- portable(value, spec, :load),
          result <-
            PluginError.safe_apply(
              spec.package,
@@ -47,7 +48,6 @@ defmodule Jido.Persistence.Plugin do
              "Persistence Plugin load/3 failed"
            ),
          {:ok, loaded} <- callback_value(result, spec, :load),
-         :ok <- portable(loaded, spec, :load),
          {:ok, validated} <- validate_state(loaded, state_schema, spec) do
       {:ok, validated}
     end
@@ -85,7 +85,7 @@ defmodule Jido.Persistence.Plugin do
 
       {:error, path} ->
         PluginError.invalid_callback(
-          "Persistence Plugin returned a non-portable value",
+          "Persistence Plugin storage value is not portable",
           spec.package,
           spec.module,
           %{callback: callback, code: :non_portable_term, path: path}

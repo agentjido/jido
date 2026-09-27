@@ -402,6 +402,26 @@ failure, and cleanup. See
 [Agent Server Lifecycle](agent-server-lifecycle.md) and the
 [Factory examples](https://github.com/agentjido/jido/tree/release/v3/examples/06_factory).
 
+## Update the earlier V3 live-state rule
+
+Live Agent state now follows its schema and Agent invariants. This includes
+Plugin-owned state. PIDs, ports, references, functions, improper lists, and
+bitstrings that are not byte-aligned can pass when the schema permits them.
+
+Move portability assertions from constructors, transitions, and commands to
+checkpoint tests. If an application must reject a value during live execution,
+use a schema that expresses that restriction. Existing portable state and
+stored formats remain compatible; no document or checkpoint version changes.
+
+Add custom Agent checkpoint conversion or Plugin Persistence callbacks before
+enabling durable storage for local values. Test both conversion directions and
+invalid stored output. Default checkpoints still reject unsupported terms with
+paths. Restore validates stored data first and live state after conversion.
+
+Local abnormal restart copies complete state only while the instance remains
+alive. A copied handle does not recreate a resource, transfer ownership, or
+install a monitor. Keep lifecycle and reconnection in an owned runtime.
+
 ## Convert stored data explicitly
 
 V2 Storage checkpoints, Plugin pointers, and Thread append stores do not have
@@ -412,8 +432,9 @@ Agent keys start with `jido:agent:v1:`, encode the exact
 `{namespace, partition, id}` Ref tuple, and use outer record format 3. Older
 V3 beta instance-based keys and outer formats 1 and 2 also require an
 [offline migration](compare-and-swap-hibernate-and-thaw.md#move-records-from-an-earlier-v3-beta).
-Restore validates identity, definition revision, complete state, and recursive
-portability.
+Restore validates the stored representation and recursive portability before
+conversion, then checks reconstructed live state, identity, and definition
+revision.
 
 ### What you need to change
 

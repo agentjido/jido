@@ -73,13 +73,17 @@ authoritative state.
 Use `Jido.hibernate(instance, pid)` to save and stop an idle Server. A successful
 return includes completed termination. Use `Jido.thaw(instance, module, id)` to
 restore it. Normal module restore uses the current definition and validates
-complete state, identity, definition revision, and portability. Normal durable
+the stored representation, identity, and definition revision before conversion,
+then validates the reconstructed live state. Normal durable
 delete writes a compact tombstone. It does not remove the storage key.
 
 Without a persistence adapter, the instance RuntimeStore retains checkpoints
 for local abnormal restarts. This is RAM in the same instance, not durable
 storage. A clean stop deletes that runtime checkpoint. Loss of the instance or
-VM loses it. Owned-child recovery has additional parent and spawn rules.
+VM loses it. It copies local terms but does not recreate resources, transfer
+port ownership, or reinstall monitors. A saved handle can be stale after a
+restart. Keep resource lifecycle work in a Plugin runtime or application
+supervision. Owned-child recovery has additional parent and spawn rules.
 
 ETS is for development and tests and loses data when its owner VM stops.
 File writes use atomic rename and a lock within one BEAM. One BEAM must own a
@@ -114,11 +118,18 @@ incomplete migration; do not rewrite the key from the nested value. The
 [identity regression](../test/jido/persistence/checkpoint_identity_test.exs)
 checks this rule.
 
-A domain schema can accept a value that cannot move between BEAM processes or
-nodes. Save and load both check the complete checkpoint for portable terms. A
-nested PID, port, reference, function, improper list, or non-byte bitstring
-fails even when the domain field uses `Zoi.any()`. Store a stable identifier
-and rebuild a process resource after restore. The
+Live state can contain local values when its schema permits them. Save checks
+the complete stored representation after custom Agent or Plugin conversion.
+Load checks stored bytes and the decoded record before conversion, then checks
+the reconstructed Agent against its live schema and identity rules.
+
+Default checkpoints reject a nested PID, port, reference, function, improper
+list, or bitstring that is not byte-aligned, with a useful value path. A custom
+Agent checkpoint can convert the complete state; Plugin Persistence callbacks
+can convert its paired owned value. Complete custom checkpoints bypass Plugin
+conversion. Invalid converted output prevents storage. A required checkpoint
+or write failure prevents the live candidate commit and directive dispatch.
+Store stable identifiers and let the owning runtime rebuild process resources. The
 [portability regression](../test/jido/persistence/checkpoint_portability_test.exs)
 checks both directions.
 

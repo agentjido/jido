@@ -54,50 +54,24 @@ end
 
 The runtime owns process-local data. It stops and restarts with its Agent.
 
-## Define the Agent Facet
+## Define the Plugin
 
 ```elixir
-defmodule PluginRuntime.Effects.Agent do
-  use Jido.Agent.Plugin
+defmodule PluginRuntime.Effects do
+  use Jido.Plugin
 
   @impl Jido.Plugin
   def directives(_opts), do: [PluginRuntime.Record]
-end
-```
-
-The Agent facet declares the Directive owner. The Directive module owns its
-validation. The Agent facet has no runtime handle.
-
-## Define the Agent Server Facet
-
-```elixir
-defmodule PluginRuntime.Effects.Server do
-  use Jido.AgentServer.Plugin
 
   @impl Jido.Plugin
   def dispatch(runtime, directive, context, _opts) do
     GenServer.call(runtime, {:record, directive.label, context.state_version})
   end
 
+  @impl Jido.Plugin
   def child_spec(%Jido.Plugin.Init{} = init) do
     Supervisor.child_spec({PluginRuntime.Store, init}, id: __MODULE__)
   end
-end
-```
-
-The Agent Server facet owns the live callback and runtime root. Its returned
-child specification is permanent. Jido hosts each runtime generation as
-temporary under an owner-bound wrapper. This lets a replacement receive the
-fresh value from the Plugin-owned Agent field and the matching Agent state
-version.
-
-## Define the Package
-
-```elixir
-defmodule PluginRuntime.Effects do
-  use Jido.Plugin,
-    agent: PluginRuntime.Effects.Agent,
-    agent_server: PluginRuntime.Effects.Server
 
   def settled(_event, _measurements, %{agent_id: "plugin-runtime-1"} = metadata, caller) do
     send(caller, {:turn_settled, metadata})
@@ -106,6 +80,13 @@ defmodule PluginRuntime.Effects do
   def settled(_event, _measurements, _metadata, _caller), do: :ok
 end
 ```
+
+The Plugin declares its Directive types, dispatch callback, and runtime root
+in one module. The Directive module owns validation.
+
+The returned child specification is permanent. Jido hosts each runtime
+generation as temporary under an owner-bound wrapper. A replacement receives
+the current Plugin-owned state value and the matching Agent state version.
 
 ## Use The Plugin
 

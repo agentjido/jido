@@ -188,7 +188,7 @@ defmodule JidoTest.Persistence.PluginIntegrationTest do
     for {fault, code} <- [
           raise: :plugin_callback_failed,
           wrong_return: :plugin_invalid_callback_result,
-          non_portable: :non_portable_term,
+          non_portable: :plugin_invalid_callback_result,
           invalid_state: :plugin_invalid_callback_result
         ] do
       agent = owned_agent("load-#{fault}")

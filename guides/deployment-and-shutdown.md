@@ -58,8 +58,8 @@ subscribers and application connections must also have a restart or
 reconciliation rule. Do not put a PID or connection in durable Agent state.
 
 Plugin wrappers are peers of Agent Servers in the same Dynamic Supervisor.
-The four Plugin facet modules separate owner contracts. They do not create
-four runtime pools. A Plugin root, its private Supervisor, and its wrapper stop
+The Plugin callbacks have separate owner contracts. These contracts do not
+create separate runtime pools. A Plugin root, its private Supervisor, and its wrapper stop
 with the Agent Server.
 
 ## Stop and hibernate

@@ -633,8 +633,11 @@ defmodule Jido.Plugin.FacetsTest do
     assert {:error, %Jido.Error.ExecutionError{details: %{code: :non_portable_term}}} =
              PersistencePlugin.dump(spec, 7, dump_context)
 
-    assert {:error, %Jido.Error.ExecutionError{details: %{code: :non_portable_term}}} =
+    assert {:error, %Jido.Error.ExecutionError{details: %{code: :plugin_invalid_callback_result}}} =
              PersistencePlugin.load(spec, "7", load_context)
+
+    assert {:error, %Jido.Error.ExecutionError{details: %{code: :non_portable_term}}} =
+             PersistencePlugin.load(spec, self(), load_context)
 
     assert {:error, %Jido.Error.ValidationError{message: context_message}} =
              PersistencePlugin.dump(spec, 7, %{dump_context | plugin: String})

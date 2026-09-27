@@ -30,7 +30,10 @@ defmodule Jido.AgentServer do
   or a configured durable persistence record. This prevents a transient Agent
   restart from using its old initialization value. Persistence records survive
   a complete Jido instance restart. A stopping policy uses a clean shutdown and
-  does not restart the Agent from old state.
+  does not restart the Agent from old state. Runtime checkpoints copy local
+  values without a portability check. They do not recreate resources, transfer
+  ownership, or install monitors in the replacement Server. The restored Agent
+  must still match its live-state schema.
 
   `state_version` is the commit revision. Each successful Turn advances it once,
   even when the complete state equals the prior state. The checkpoint stores

@@ -37,9 +37,9 @@ the existing published dependency requirement does not identify that release.
 
 Use the built-in `Jido.Agent.Directive` types for supported runtime operations.
 Use `SpawnChild` and `StopChild` for owned Agents. Use `SpawnProcess` only for
-an untracked supervised OTP process. Declare other types through a Plugin Agent
-facet. Put validation in that facet. Put optional post-commit dispatch in the
-Plugin Agent Server facet. The V2
+an untracked supervised OTP process. Declare other types through the Plugin's
+`directives/1` callback. Put validation in each Directive module. Put optional
+post-commit dispatch in the Plugin's `dispatch/4` callback. The V2
 `DirectiveExec` protocol and custom `directive_handler` option are removed.
 
 If one directive fails, the committed state remains. Later directives in that

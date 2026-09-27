@@ -168,9 +168,7 @@ defmodule Jido.Agent.Plugin.Pipeline do
   defp validate_reduction({:ok, value}, spec, state) do
     case Zoi.parse(spec.state_schema, value) do
       {:ok, value} ->
-        with :ok <- portable(value, spec) do
-          {:ok, Map.put(state, spec.state_key, value)}
-        end
+        {:ok, Map.put(state, spec.state_key, value)}
 
       {:error, issues} ->
         PluginError.invalid_callback(
@@ -191,20 +189,5 @@ defmodule Jido.Agent.Plugin.Pipeline do
       spec.module,
       %{result: result}
     )
-  end
-
-  defp portable(value, spec) do
-    case Jido.PortableTerm.validate(value, [:plugin_state, spec.package]) do
-      :ok ->
-        :ok
-
-      {:error, path} ->
-        PluginError.invalid_callback(
-          "Agent Plugin returned a non-portable value",
-          spec.package,
-          spec.module,
-          %{code: :non_portable_term, path: path}
-        )
-    end
   end
 end

@@ -5,8 +5,8 @@ and owner.
 
 | State kind | Owner | Lifetime | Portable |
 | --- | --- | --- | --- |
-| Complete Agent state | Agent value | Until the next value replaces it | Yes |
-| Plugin-owned Agent field | Declaring Plugin | Same as complete Agent state | Yes |
+| Complete Agent state | Agent value | Until the next value replaces it | Not required for live use |
+| Plugin-owned Agent field | Declaring Plugin | Same as complete Agent state | Not required for live use |
 | Plugin runtime state | Runtime process | Process lifetime | Not necessary |
 | Runtime coordination state | Jido instance | Instance lifetime | Not necessary |
 | Persistence checkpoint | Persistence adapter | Adapter-defined | Yes |
@@ -15,8 +15,9 @@ and owner.
 
 The Agent has one complete `agent.state` map. Use domain fields for facts that
 define what the Agent knows now. Use one Plugin-owned top-level field for
-portable facts that one Plugin owns. These fields commit together through the
-Turn boundary and enter the same checkpoint. There is no separate Plugin state
+facts that one Plugin owns. These fields must match their schemas and commit
+together through the Turn boundary. Durable storage requires a portable
+representation after Agent or Plugin conversion. There is no separate Plugin state
 map.
 
 ## Plugin runtime state
@@ -37,6 +38,15 @@ The ETS table is owned by the Jido instance supervisor. It can survive a store
 process restart, but it ends when the owning Jido instance ends. It is not a
 database and is not a public durable-state extension point.
 
+The local runtime checkpoint copies the complete Agent for abnormal Server
+restarts. It permits schema-approved local values. Restore validates the live
+state but does not check resource liveness. A surviving external PID still names
+the same process. A dead PID or closed port stays dead or closed. A port keeps
+its connected process; a copied monitor reference does not monitor anything on
+behalf of the replacement Server. No resource ownership is transferred.
+Bitstrings and other local data keep their values. A clean stop removes this
+checkpoint; instance or VM loss removes it too.
+
 ## Persistence state
 
 Use `Jido.Persistence` when an Agent must survive the loss of its process, Jido
@@ -51,7 +61,7 @@ coordination store.
 
 Ask these questions in order:
 
-1. Is this a portable fact that must commit with the Turn? Put it in a domain
+1. Is this a schema-approved value that must commit with the Turn? Put it in a domain
    field or the owning Plugin's field in the complete Agent state.
 2. Is this a process resource that you can rebuild? Put it in a Plugin runtime.
 3. Is this short-lived coordination for one Jido instance? Let the owning Jido

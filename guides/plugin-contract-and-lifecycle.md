@@ -70,7 +70,9 @@ then calls `reduce/2` in package declaration order. The callback receives a
 read-only `%Jido.Agent.Plugin.Reduction{}` with the prior complete state, the
 current complete candidate state, its owned value, its pure prepared input,
 and all validated Directives. It returns only the next value for its owned
-field. Jido validates that value with the owned schema and portable-value rule.
+field. Jido validates that value with the owned schema. Local values are allowed
+when the schema accepts them. Persistence checks the stored representation for
+portability after conversion.
 
 ## Agent Server callbacks
 

@@ -214,7 +214,7 @@ defmodule JidoTest.Authoring.Agents.Cases do
       initial: %{payload: %{}},
       override: %{payload: %{"ok" => true}},
       override_state: %{payload: %{"ok" => true}},
-      invalid_state: %{payload: %{pid: self()}},
+      invalid_state: %{payload: :invalid},
       steps: [{"metadata.inspect", %{}, %{payload: %{}}}]
     }
   end
