@@ -18,9 +18,11 @@ defmodule Jido.Persistence do
   post-commit work does not undo the stored revision. Restore retains it.
   Direct `save_agent/3` calls use the revision supplied in their options.
 
-  Caller execution context is not part of the checkpoint. Only values that
-  application code puts in the portable complete Agent state can be stored.
-  This map contains both domain fields and Plugin-owned fields.
+  Caller execution context is not part of the checkpoint. Live Agent state
+  contains domain fields and Plugin-owned fields and must match its schema.
+  Custom Agent or Plugin conversion runs before Jido checks the complete
+  stored representation for portability. Restore checks the stored record
+  before conversion, then validates the reconstructed live state and identity.
 
   A Plugin Persistence facet can convert only its paired owned-state value in
   the default checkpoint path. Complete custom Agent checkpoints bypass this

@@ -8,7 +8,7 @@ defmodule Jido.Agent.PortableStateTest do
     use Jido.Action, name: "nonportable_state_action"
 
     @impl Jido.Action
-    def run(_input, _context), do: {:ok, %{payload: self()}}
+    def run(%{payload: value}, _context), do: {:ok, %{payload: value}}
   end
 
   defmodule NonportableCheckpointAgent do
@@ -21,7 +21,7 @@ defmodule Jido.Agent.PortableStateTest do
     def restore(_checkpoint, _context), do: new()
   end
 
-  test "every prohibited state term returns a typed error with a bounded path" do
+  test "local values pass live validation but default checkpoints reject them with bounded paths" do
     port = Port.open({:spawn_executable, System.find_executable("true")}, [])
     on_exit(fn -> if Port.info(port), do: Port.close(port) end)
 
@@ -37,13 +37,21 @@ defmodule Jido.Agent.PortableStateTest do
     definition = Agent.new!(name: "portable_state", schema: Zoi.object(%{payload: Zoi.any()}))
 
     for value <- values do
+      assert {:ok, agent} = Agent.instantiate(definition, state: %{payload: value})
+      assert agent.state.payload === value
+      assert {:ok, ^agent} = Agent.validate_instance(agent)
+
       assert {:error,
               %Jido.Error.ValidationError{
                 details: %{code: :non_portable_term, path: path}
-              }} = Agent.instantiate(definition, state: %{payload: value})
+              }} = Agent.checkpoint(agent)
 
-      assert Enum.take(path, 2) == [:agent_state, :payload]
+      assert Enum.take(path, 3) == [:checkpoint, :state, :payload]
       assert length(path) <= 20
+      assert {:ok, checkpoint} = Agent.checkpoint(%{agent | state: %{payload: nil}})
+
+      assert {:error, %{details: %{code: :non_portable_term, path: ^path}}} =
+               Agent.restore(Agent, %{checkpoint | state: %{payload: value}})
     end
 
     deep_value = Enum.reduce(1..30, self(), fn index, value -> %{index => value} end)
@@ -51,7 +59,7 @@ defmodule Jido.Agent.PortableStateTest do
     assert {:error,
             %Jido.Error.ValidationError{
               details: %{code: :non_portable_term, path: deep_path}
-            }} = Agent.instantiate(definition, state: %{payload: deep_value})
+            }} = checkpoint_value(definition, deep_value)
 
     assert length(deep_path) == 20
   end
@@ -65,8 +73,11 @@ defmodule Jido.Agent.PortableStateTest do
     for key <- [long_binary, long_atom] do
       assert {:error,
               %Jido.Error.ValidationError{
-                details: %{code: :non_portable_term, path: [:agent_state, :payload, segment]}
-              }} = Agent.instantiate(definition, state: %{payload: %{key => self()}})
+                details: %{
+                  code: :non_portable_term,
+                  path: [:checkpoint, :state, :payload, segment]
+                }
+              }} = checkpoint_value(definition, %{key => self()})
 
       assert is_binary(segment)
       assert byte_size(segment) == 64
@@ -76,9 +87,9 @@ defmodule Jido.Agent.PortableStateTest do
             %Jido.Error.ValidationError{
               details: %{
                 code: :non_portable_term,
-                path: [:agent_state, :payload, {:map_value, 0}]
+                path: [:checkpoint, :state, :payload, {:map_value, 0}]
               }
-            }} = Agent.instantiate(definition, state: %{payload: %{long_integer => self()}})
+            }} = checkpoint_value(definition, %{long_integer => self()})
 
     assert {:error, [root_segment]} =
              Jido.PortableTerm.validate(self(), [String.duplicate("r", 100)])
@@ -86,27 +97,38 @@ defmodule Jido.Agent.PortableStateTest do
     assert root_segment == String.duplicate("r", 64)
   end
 
-  test "transition and command candidates use the same portable-state boundary" do
+  test "transition and command candidates permit schema-approved local values" do
     definition =
       Agent.new!(
-        name: "portable_transition",
+        name: "local_transition",
         schema: Zoi.object(%{payload: Zoi.any()}),
-        routes: [{"portable.run", NonportableAction}]
+        routes: [{"local.run", NonportableAction}]
       )
 
-    agent = Agent.instantiate!(definition, state: %{payload: :portable})
+    agent = Agent.instantiate!(definition, state: %{payload: :initial})
+    port = Port.open({:spawn_executable, System.find_executable("true")}, [])
+    on_exit(fn -> if Port.info(port), do: Port.close(port) end)
 
-    assert {:error,
-            %Jido.Error.ValidationError{
-              details: %{code: :non_portable_term, path: [:agent_state, :payload]}
-            }} = Agent.transition(agent, %{payload: self()})
+    for value <- [self(), port, make_ref(), fn -> :ok end, [1 | :tail], <<5::size(3)>>] do
+      assert {:ok, transitioned} = Agent.transition(agent, %{payload: value})
+      assert transitioned.state.payload === value
+      signal = Signal.new!("local.run", %{payload: value}, source: "/test")
+      assert {:ok, candidate, []} = Agent.cmd(agent, signal)
+      assert candidate.state.payload === value
+    end
 
-    signal = Signal.new!("portable.run", %{}, source: "/test")
+    assert agent.state.payload == :initial
+  end
 
-    assert {:error,
-            %Jido.Error.ValidationError{
-              details: %{code: :non_portable_term, path: [:agent_state, :payload]}
-            }} = Agent.cmd(agent, signal)
+  test "live local values must still match the declared schema and identity" do
+    definition = Agent.new!(name: "typed_local", schema: Zoi.object(%{payload: Zoi.pid()}))
+    agent = Agent.instantiate!(definition, state: %{payload: self()})
+
+    assert {:error, %Jido.Error.ValidationError{}} =
+             Agent.instantiate(definition, state: %{payload: <<5::size(3)>>})
+
+    assert {:error, %Jido.Error.ValidationError{}} = Agent.transition(agent, %{payload: :invalid})
+    assert {:error, %Jido.Error.ValidationError{}} = Agent.validate_instance(%{agent | id: ""})
   end
 
   test "checkpoint output is portable and reports the invalid payload path" do
@@ -134,5 +156,9 @@ defmodule Jido.Agent.PortableStateTest do
                 path: [:checkpoint, :definition, :metadata, :runtime]
               }
             }} = Agent.checkpoint(agent)
+  end
+
+  defp checkpoint_value(definition, value) do
+    definition |> Agent.instantiate!(state: %{payload: value}) |> Agent.checkpoint()
   end
 end

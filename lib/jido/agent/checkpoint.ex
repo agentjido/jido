@@ -6,6 +6,8 @@ defmodule Jido.Agent.Checkpoint do
   alias Jido.Error
   alias Jido.PortableTerm
 
+  @typep state_converter :: (Agent.t(), map() -> {:ok, map()} | {:error, term()})
+
   @version 2
   @default_keys [:version, :kind, :agent_module, :vsn, :id, :state]
   @embedded_keys @default_keys ++ [:definition]
@@ -13,7 +15,14 @@ defmodule Jido.Agent.Checkpoint do
 
   @doc false
   @spec checkpoint(Agent.instance(), map()) :: {:ok, map()} | {:error, term()}
-  def checkpoint(%Agent{} = agent, context) when is_map(context) and not is_struct(context) do
+  def checkpoint(agent, context), do: checkpoint(agent, context, &keep_state/2)
+
+  # Persistence supplies conversion only for the default complete-state format.
+  # A custom callback retains ownership of its complete payload.
+  @doc false
+  @spec checkpoint(Agent.instance(), map(), state_converter()) :: {:ok, map()} | {:error, term()}
+  def checkpoint(%Agent{} = agent, context, convert_state)
+      when is_map(context) and not is_struct(context) do
     with {:ok, agent} <- Agent.validate_instance(agent),
          :ok <- current_vsn(agent.module, agent.vsn) do
       if callback?(agent.module, :checkpoint) do
@@ -30,12 +39,12 @@ defmodule Jido.Agent.Checkpoint do
            }}
         end
       else
-        default_checkpoint(agent, context)
+        default_checkpoint(agent, context, convert_state)
       end
     end
   end
 
-  def checkpoint(agent, context) do
+  def checkpoint(agent, context, _convert_state) do
     invalid("Agent checkpoint requires an Agent instance and a context map", %{
       agent: agent,
       context: context
@@ -44,17 +53,28 @@ defmodule Jido.Agent.Checkpoint do
 
   @doc false
   @spec restore(module(), map(), map()) :: {:ok, Agent.instance()} | {:error, term()}
-  def restore(module, checkpoint, context)
+  def restore(module, checkpoint, context),
+    do: restore(module, checkpoint, context, &keep_state/2)
+
+  @doc false
+  @spec restore(module(), map(), map(), state_converter()) ::
+          {:ok, Agent.instance()} | {:error, term()}
+  def restore(module, checkpoint, context, convert_state)
       when is_atom(module) and is_map(checkpoint) and not is_struct(checkpoint) and
              is_map(context) and not is_struct(context) do
     case checkpoint do
-      %{version: @version, kind: :agent_custom} -> restore_custom(module, checkpoint, context)
-      %{version: @version, kind: :agent} -> default_restore(module, checkpoint, context)
-      _other -> invalid_checkpoint(checkpoint)
+      %{version: @version, kind: :agent_custom} ->
+        restore_custom(module, checkpoint, context)
+
+      %{version: @version, kind: :agent} ->
+        default_restore(module, checkpoint, context, convert_state)
+
+      _other ->
+        invalid_checkpoint(checkpoint)
     end
   end
 
-  def restore(module, checkpoint, context) do
+  def restore(module, checkpoint, context, _convert_state) do
     invalid("Agent restore requires a module, checkpoint map, and context map", %{
       module: module,
       checkpoint: checkpoint,
@@ -64,17 +84,21 @@ defmodule Jido.Agent.Checkpoint do
 
   @doc false
   @spec default_checkpoint(Agent.instance(), map()) :: {:ok, map()} | {:error, term()}
-  def default_checkpoint(%Agent{} = agent, _context) do
+  def default_checkpoint(agent, context),
+    do: default_checkpoint(agent, context, &keep_state/2)
+
+  defp default_checkpoint(%Agent{} = agent, _context, convert_state) do
     definition = Agent.definition(agent)
 
-    with :ok <- checkpoint_definition(agent, definition) do
+    with :ok <- checkpoint_definition(agent, definition),
+         {:ok, state} <- convert_state.(agent, agent.state) do
       checkpoint = %{
         version: @version,
         kind: :agent,
         agent_module: agent.module,
         vsn: agent.vsn,
         id: agent.id,
-        state: agent.state
+        state: state
       }
 
       checkpoint =
@@ -86,24 +110,30 @@ defmodule Jido.Agent.Checkpoint do
     end
   end
 
-  def default_checkpoint(agent, _context),
+  defp default_checkpoint(agent, _context, _convert_state),
     do: invalid("Default checkpoint requires an Agent instance", %{agent: agent})
 
   @doc false
   @spec default_restore(module(), map(), map()) ::
           {:ok, Agent.instance()} | {:error, term()}
-  def default_restore(module, checkpoint, _context)
-      when is_atom(module) and is_map(checkpoint) and not is_struct(checkpoint) do
+  def default_restore(module, checkpoint, context),
+    do: default_restore(module, checkpoint, context, &keep_state/2)
+
+  defp default_restore(module, checkpoint, _context, convert_state)
+       when is_atom(module) and is_map(checkpoint) and not is_struct(checkpoint) do
     with :ok <- portable(checkpoint, :checkpoint),
          {:ok, format} <- default_format(checkpoint),
          :ok <- default_header(module, checkpoint, format),
-         {:ok, definition} <- restore_definition(module, checkpoint, format) do
-      Agent.instantiate(definition, id: checkpoint.id, state: checkpoint.state)
+         {:ok, definition} <- restore_definition(module, checkpoint, format),
+         {:ok, state} <- convert_state.(definition, checkpoint.state) do
+      Agent.instantiate(definition, id: checkpoint.id, state: state)
     end
   end
 
-  def default_restore(module, checkpoint, _context),
+  defp default_restore(module, checkpoint, _context, _convert_state),
     do: invalid_checkpoint(%{module: module, checkpoint: checkpoint})
+
+  defp keep_state(_agent, state), do: {:ok, state}
 
   defp default_format(checkpoint) do
     cond do

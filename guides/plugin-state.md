@@ -58,7 +58,8 @@ Directives.
 the prior complete state, the current complete candidate state, its current
 owned value, its pure prepared input, and all validated Directives. It returns
 only the complete next owned value. Jido validates that value with the facet
-schema and the portable-value rule.
+schema. Local values are permitted when that schema accepts them. Portability
+is a separate rule for the durable representation.
 
 A failed Turn does not commit the update. A direct command returns the
 candidate but does not commit it.
@@ -74,9 +75,10 @@ not replayed. See [Commit Projection](../examples/09_plugins/09_08_commit_projec
 A package can select `Jido.Persistence.Plugin` when its live owned value needs
 a different durable representation. The facet receives only that owned value,
 record-format context, and its mapped static options. Persistence applies the
-conversion to the default Agent checkpoint before it writes the outer record.
-On load, it validates the converted value with the paired Agent-facet schema
-before Agent restore.
+conversion to the default Agent checkpoint before the final portability check
+and record write. On load, it checks stored data before conversion, then
+validates the reconstructed local value with the paired Agent-facet schema
+and the complete Agent schema.
 
 A complete custom Agent checkpoint owns its whole payload. Persistence does not
 apply Plugin slice conversion to that custom payload.

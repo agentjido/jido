@@ -1,6 +1,11 @@
 defmodule Jido.AgentServer.RuntimeCheckpoint do
   @moduledoc false
 
+  # This instance-owned snapshot copies terms for local abnormal restarts.
+  # It does not recreate resources, verify handle liveness, transfer port
+  # ownership, or install monitors in the replacement AgentServer. Startup
+  # validates the restored Agent against its live-state schema.
+
   alias Jido.Agent
   alias Jido.AgentServer.{Options, State}
   alias Jido.RuntimeStore
