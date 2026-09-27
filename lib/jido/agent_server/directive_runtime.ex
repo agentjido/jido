@@ -36,7 +36,12 @@ defmodule Jido.AgentServer.DirectiveRuntime do
     {:error, {:reported_error, error_context, error}, state}
   end
 
-  def handle(%SpawnProcess{} = directive, _context, state), do: spawn_process(directive, state)
+  def handle(%SpawnProcess{} = directive, _context, state) do
+    case spawn_process(directive, state.jido, state.config.spawn_fun) do
+      :ok -> {:ok, state}
+      {:error, reason} -> {:error, reason, state}
+    end
+  end
 
   def handle(%SpawnChild{} = directive, context, state),
     do: ChildOperations.spawn_child(directive, context, state)
@@ -165,31 +170,31 @@ defmodule Jido.AgentServer.DirectiveRuntime do
     kind, reason -> {:error, {:emit_dispatch_failed, {kind, reason}}}
   end
 
-  defp spawn_process(%SpawnProcess{child_spec: child_spec}, state) do
+  def spawn_process(%SpawnProcess{child_spec: child_spec}, jido, spawn_fun) do
     try do
       result =
         cond do
-          is_function(state.config.spawn_fun, 1) ->
-            state.config.spawn_fun.(child_spec)
+          is_function(spawn_fun, 1) ->
+            spawn_fun.(child_spec)
 
-          is_atom(state.jido) ->
-            DynamicSupervisor.start_child(Jido.agent_supervisor_name(state.jido), child_spec)
+          is_atom(jido) and not is_nil(jido) ->
+            DynamicSupervisor.start_child(Jido.agent_supervisor_name(jido), child_spec)
 
           true ->
             {:error, :jido_instance_required}
         end
 
       case result do
-        {:ok, pid} when is_pid(pid) -> {:ok, state}
-        {:ok, pid, _info} when is_pid(pid) -> {:ok, state}
-        :ignore -> {:ok, state}
-        {:error, reason} -> {:error, {:spawn_process_failed, reason}, state}
-        other -> {:error, {:spawn_process_failed, {:invalid_start_result, other}}, state}
+        {:ok, pid} when is_pid(pid) -> :ok
+        {:ok, pid, _info} when is_pid(pid) -> :ok
+        :ignore -> :ok
+        {:error, reason} -> {:error, {:spawn_process_failed, reason}}
+        other -> {:error, {:spawn_process_failed, {:invalid_start_result, other}}}
       end
     rescue
-      error -> {:error, {:spawn_process_failed, error}, state}
+      error -> {:error, {:spawn_process_failed, error}}
     catch
-      kind, reason -> {:error, {:spawn_process_failed, {kind, reason}}, state}
+      kind, reason -> {:error, {:spawn_process_failed, {kind, reason}}}
     end
   end
 

@@ -46,7 +46,7 @@ defmodule JidoTest.Examples.MultiAgent.ChildLifecycleTest do
     assert {:ok, _} =
              Jido.AgentServer.call(parent, route_signal_3, [])
 
-    first = Server.children(parent)["worker"]
+    first = eventually(fn -> Server.children(parent)["worker"] end)
 
     {:ok, route_signal_4} =
       Worker.calculate_signal(%{
@@ -82,7 +82,7 @@ defmodule JidoTest.Examples.MultiAgent.ChildLifecycleTest do
     assert {:ok, _} =
              Jido.AgentServer.call(parent, route_signal_5, [])
 
-    first = Server.children(parent)["first"]
+    first = eventually(fn -> Server.children(parent)["first"] end)
     ref = Process.monitor(first.pid)
 
     {:ok, route_signal_6} = ChildLifecycle.stop_worker_signal(%{tag: "first"})
@@ -98,7 +98,7 @@ defmodule JidoTest.Examples.MultiAgent.ChildLifecycleTest do
     assert {:ok, _} =
              Jido.AgentServer.call(parent, route_signal_7, [])
 
-    second = Server.children(parent)["second"]
+    second = eventually(fn -> Server.children(parent)["second"] end)
     ref = Process.monitor(second.pid)
     assert :ok = Jido.stop_agent(jido, parent)
     assert_receive {:DOWN, ^ref, :process, _, _}, 1000

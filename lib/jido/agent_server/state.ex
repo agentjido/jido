@@ -25,9 +25,7 @@ defmodule Jido.AgentServer.State do
               children:
                 Zoi.map(description: "Tracked Agent and Plugin children") |> Zoi.default(%{}),
               child_spawn_requests:
-                Zoi.map(
-                  description: "Remote child creation identities, including unresolved starts"
-                )
+                Zoi.map(description: "Child creation identities, including unresolved starts")
                 |> Zoi.default(%{}),
               initial_persistence:
                 Zoi.enum([:none, :create, :restored, :ready],
@@ -62,6 +60,8 @@ defmodule Jido.AgentServer.State do
                 Zoi.any(description: "Active Plugin commit notification task") |> Zoi.optional(),
               directive_task:
                 Zoi.any(description: "Active Plugin Directive task") |> Zoi.optional(),
+              child_task:
+                Zoi.any(description: "Owned child lifecycle operation") |> Zoi.optional(),
               error_policy_tasks:
                 Zoi.map(description: "Bounded asynchronous error Signal deliveries")
                 |> Zoi.default(%{})

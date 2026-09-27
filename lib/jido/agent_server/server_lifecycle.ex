@@ -182,6 +182,7 @@ defmodule Jido.AgentServer.ServerLifecycle do
     TaskSupport.stop_task(data.admission_task)
     TaskSupport.stop_task(data.commit_task)
     TaskSupport.stop_task(data.directive_task)
+    TaskSupport.stop_task(data.child_task)
     Enum.each(data.error_policy_tasks, fn {_ref, pending} -> TaskSupport.stop_task(pending) end)
 
     if data.commit_task do
@@ -190,6 +191,10 @@ defmodule Jido.AgentServer.ServerLifecycle do
 
     if data.directive_task do
       PostCommit.finish_span_error(data.directive_task.span, {:agent_stopped, reason})
+    end
+
+    if data.child_task && data.child_task.span do
+      PostCommit.finish_span_error(data.child_task.span, {:agent_stopped, reason})
     end
 
     AgentTelemetry.interrupted(data, reason)

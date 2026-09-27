@@ -90,6 +90,30 @@ defmodule Jido.AgentServer.ChildPlacement do
     end
   end
 
+  def stop_request(target, jido, parent, reason, timeout) when target == node(),
+    do: stop_request_local(jido, parent, reason, timeout)
+
+  def stop_request(target, jido, parent, reason, timeout),
+    do: remote_call(target, :stop_request_local, [jido, parent, reason, timeout], timeout)
+
+  def stop_request_local(jido, parent, reason, timeout) do
+    with {:ok, pid} <- SpawnRegistry.retire_request(jido, parent) do
+      if is_pid(pid) do
+        case stop_process(jido, pid, reason, timeout) do
+          {:error, :noproc} -> :ok
+          result -> result
+        end
+      else
+        # Retirement fences a restart already in start_link. Wait for that
+        # supervisor callback to observe the closed request and stop the child.
+        DynamicSupervisor.which_children(Jido.agent_supervisor_name(jido))
+        :ok
+      end
+    end
+  catch
+    :exit, reason -> {:error, reason}
+  end
+
   def stop(jido, pid, reason, timeout) when node(pid) == node() do
     stop_local(jido, pid, reason, timeout)
   end

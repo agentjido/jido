@@ -14,6 +14,7 @@ defmodule Jido.AgentServer.SpawnRegistry do
   def started(jido, parent, pid), do: GenServer.call(name(jido), {:started, parent, pid})
   def failed(jido, parent), do: GenServer.call(name(jido), {:failed, parent})
   def retire(jido, pid), do: GenServer.call(name(jido), {:retire, pid})
+  def retire_request(jido, parent), do: GenServer.call(name(jido), {:retire_request, parent})
   def name(jido), do: Module.concat(jido, SpawnRegistry)
 
   @impl true
@@ -61,6 +62,21 @@ defmodule Jido.AgentServer.SpawnRegistry do
 
       _ ->
         {:reply, {:error, :spawn_request_closed}, state}
+    end
+  end
+
+  def handle_call({:retire_request, parent}, _from, state) do
+    key = {parent.pid, parent.tag}
+
+    case Map.get(state.requests, key) do
+      %{request_id: request} = entry when request == parent.spawn_ref ->
+        {:reply, {:ok, entry.pid}, put_entry(state, key, %{entry | status: :closed})}
+
+      nil ->
+        {:reply, {:ok, nil}, state}
+
+      _newer ->
+        {:reply, {:error, :spawn_request_mismatch}, state}
     end
   end
 

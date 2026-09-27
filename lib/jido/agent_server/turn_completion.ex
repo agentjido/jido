@@ -102,6 +102,8 @@ defmodule Jido.AgentServer.TurnCompletion do
   def outcome_status({:child_spawn_indeterminate, _tag, _node, _request, _reason}),
     do: :indeterminate
 
+  def outcome_status({:child_operation_indeterminate, _kind, _reason}), do: :indeterminate
+
   def outcome_status(reason) do
     case Error.to_map(reason) do
       %{type: :timeout} -> :timed_out

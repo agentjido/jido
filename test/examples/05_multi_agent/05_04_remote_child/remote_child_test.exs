@@ -16,7 +16,8 @@ defmodule JidoTest.Examples.MultiAgent.RemoteChildTest do
     assert {:ok, _} =
              peer_call(c.peer_a, Jido.AgentServer, :call, [parent, route_signal_1])
 
-    child = peer_call(c.peer_a, Server, :children, [parent], 5000)[:worker]
+    child =
+      peer_eventually(fn -> peer_call(c.peer_a, Server, :children, [parent], 5000)[:worker] end)
 
     assert node(child.pid) == c.node_b
     assert peer_call(c.peer_b, Process, :alive?, [child.pid])

@@ -11,6 +11,7 @@ defmodule Jido.AgentServer.PostCommit do
   alias Jido.AgentServer.Plugin.Commit
   alias Jido.Plugin.DirectiveContext, as: PluginDirectiveContext
   alias Jido.Plugin.SignalContext, as: PluginSignalContext
+  alias Jido.AgentServer.ChildOperations
   alias Jido.AgentServer.ActiveTurn
   alias Jido.AgentServer.DirectiveContext
   alias Jido.AgentServer.DirectiveRuntime
@@ -202,14 +203,27 @@ defmodule Jido.AgentServer.PostCommit do
   end
 
   defp handle_directive(directive, rest, context, span, data) do
-    if Directive.built_in?(directive) do
-      directive
-      |> DirectiveRuntime.handle(context, data)
-      |> complete_directive(rest, context, span)
-    else
-      start_plugin_directive(directive, rest, context, span, data)
+    cond do
+      ChildOperations.handles?(directive) ->
+        ChildOperations.start_directive(
+          directive,
+          context,
+          %{rest: rest, context: context, span: span},
+          data
+        )
+
+      Directive.built_in?(directive) ->
+        directive
+        |> DirectiveRuntime.handle(context, data)
+        |> complete_directive(rest, context, span)
+
+      true ->
+        start_plugin_directive(directive, rest, context, span, data)
     end
   end
+
+  def complete_child(result, pending),
+    do: complete_directive(result, pending.rest, pending.context, pending.span)
 
   defp complete_directive(result, rest, context, span, fault_kind \\ nil) do
     case result do

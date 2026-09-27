@@ -319,7 +319,7 @@ defmodule Jido.AgentServer.DistributedChildTest do
   test "an old request cannot recreate a stopped child, including after registry restart", c do
     alias Jido.AgentServer.{ChildPlacement, SpawnRegistry}
     parent = start_parent(c)
-    directive = Directive.spawn_child(RemoteCounter, :worker, node: c.node_b)
+    directive = Directive.spawn_child(RemoteCounter, :worker, node: c.node_b, restart: :temporary)
     dispatch(c, parent, directive)
     first = child(c, parent)
     parent_ref = peer_call(c.peer_b, Server, :status, [first.pid]).runtime.parent
@@ -331,6 +331,9 @@ defmodule Jido.AgentServer.DistributedChildTest do
       parent: parent_ref,
       register: true
     ]
+
+    peer_call(c.peer_b, Process, :exit, [first.pid, :kill])
+    peer_eventually(fn -> peer_call(c.peer_a, Server, :children, [parent])[:worker] == nil end)
 
     assert :ok = peer_call(c.peer_a, Server, :stop_child, [parent, :worker])
 
@@ -462,14 +465,17 @@ defmodule Jido.AgentServer.DistributedChildTest do
   end
 
   defp dispatch(c, parent, directive) do
+    peer_call(c.peer_a, Jido.RuntimeStore, :delete, [c.jido, :remote_test_errors, "parent"])
     signal = Jido.Signal.new!("test.remote.directive", %{directive: directive}, source: "/test")
     assert {:ok, _} = peer_call(c.peer_a, Server, :call, [parent, signal])
-    # A read is processed after the synchronous built-in Directive finishes.
-    peer_call(c.peer_a, Server, :status, [parent])
+    peer_eventually(fn -> peer_call(c.peer_a, Server, :status, [parent]).phase == :idle end)
   end
 
   defp failure(c),
-    do: peer_call(c.peer_a, Jido.RuntimeStore, :get, [c.jido, :remote_test_errors, "parent"])
+    do:
+      peer_eventually(fn ->
+        peer_call(c.peer_a, Jido.RuntimeStore, :get, [c.jido, :remote_test_errors, "parent"])
+      end)
 
   defp supervised(peer, jido),
     do: peer_call(peer, DynamicSupervisor, :which_children, [Jido.agent_supervisor_name(jido)])

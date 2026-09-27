@@ -386,9 +386,9 @@ defmodule Jido.AgentServer do
 
   @doc false
   @spec adopt_parent(server(), ParentRef.t()) :: {:ok, map()} | {:error, term()}
-  def adopt_parent(server, %ParentRef{} = parent) do
+  def adopt_parent(server, %ParentRef{} = parent, timeout \\ 5_000) do
     with {:ok, parent} <- ParentRef.new(parent) do
-      :gen_statem.call(server, {:adopt_parent, parent})
+      :gen_statem.call(server, {:adopt_parent, parent}, timeout)
     end
   end
 
@@ -399,7 +399,7 @@ defmodule Jido.AgentServer do
     :exit, reason -> {:uncertain, {:child_identity_unavailable, reason}}
   end
 
-  @doc "Adopts one orphaned Agent as a tracked child."
+  @doc "Adopts one orphaned Agent as a tracked child after current Turn work finishes."
   @spec adopt_child(server(), pid() | String.t(), term(), map()) :: :ok | {:error, term()}
   def adopt_child(server, child, tag, meta \\ %{}) do
     :gen_statem.call(server, {:adopt_child, child, tag, meta})
@@ -407,6 +407,9 @@ defmodule Jido.AgentServer do
 
   @doc """
   Stops one tracked child Agent.
+
+  The operation waits for current Turn work to finish. Inspections remain
+  available while the child stops.
 
   A supervised child exits with `:shutdown` when its DynamicSupervisor removes
   it. The reason applies only if the child is no longer in that supervisor or
@@ -656,14 +659,14 @@ defmodule Jido.AgentServer do
     end
   end
 
-  def handle_event({:call, from}, {:adopt_child, child, tag, meta}, _phase, data) do
+  def handle_event({:call, from}, {:adopt_child, child, tag, meta}, phase, data) do
     directive = %Directive.AdoptChild{child: child, tag: tag, meta: meta}
-    ChildOperations.handle_child_directive_call(directive, from, data)
+    ChildOperations.handle_child_directive_call(directive, from, phase, data)
   end
 
-  def handle_event({:call, from}, {:stop_child, tag, reason}, _phase, data) do
+  def handle_event({:call, from}, {:stop_child, tag, reason}, phase, data) do
     directive = %Directive.StopChild{tag: tag, reason: reason}
-    ChildOperations.handle_child_directive_call(directive, from, data)
+    ChildOperations.handle_child_directive_call(directive, from, phase, data)
   end
 
   def handle_event(:info, {:signal, %Signal{} = signal}, _phase, %State{}) do
@@ -733,6 +736,7 @@ defmodule Jido.AgentServer do
       :admission -> Turn.admission_result(result, data)
       :commit -> PostCommit.settle(:commit_task, {:result, result}, data)
       :directive -> PostCommit.settle(:directive_task, {:result, result}, data)
+      :child -> ChildOperations.settle({:result, result}, data)
       :error_policy -> FailurePolicy.settle(ref, {:result, result}, data)
       nil -> fallback_info(message, phase, data)
     end
@@ -751,6 +755,7 @@ defmodule Jido.AgentServer do
           :admission -> Turn.admission_down(reason, data)
           :commit -> PostCommit.settle(:commit_task, {:down, reason}, data)
           :directive -> PostCommit.settle(:directive_task, {:down, reason}, data)
+          :child -> ChildOperations.settle({:down, reason}, data)
           :error_policy -> FailurePolicy.settle(ref, {:down, reason}, data)
         end
 
@@ -809,10 +814,16 @@ defmodule Jido.AgentServer do
       phase == :admitting and TaskSupport.task_ref?(data.admission_task, ref) -> :admission
       phase == :directing and TaskSupport.task_ref?(data.commit_task, ref) -> :commit
       phase == :directing and TaskSupport.task_ref?(data.directive_task, ref) -> :directive
+      phase == :directing and TaskSupport.task_ref?(data.child_task, ref) -> :child
       Map.has_key?(data.error_policy_tasks, ref) -> :error_policy
       true -> nil
     end
   end
+
+  defp handle_process_down(ref, _pid, _reason, _phase, %State{
+         child_task: %{operation: %{kind: :stop, child: %{ref: ref}}}
+       }),
+       do: {:keep_state_and_data, [:postpone]}
 
   defp handle_process_down(ref, pid, reason, phase, %State{} = data) do
     case Map.fetch(data.attachments, pid) do

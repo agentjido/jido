@@ -22,12 +22,17 @@ Agent ID and state version.
 
 The public status can report initialization, idle work, admission, executable
 work, and Directive dispatch. The Server handles one Agent Turn at a time.
-It can keep its mailbox responsive while Plugin admission, Jido Action
-execution, and Plugin dispatch run in owned tasks.
+It keeps its mailbox responsive while Plugin admission, Jido Action execution,
+Plugin dispatch, and child lifecycle operations run in owned tasks. Explicit
+child adoption and stop calls wait for idle, then use the directing phase.
+They do not change the Agent state or commit revision.
 
 The Server applies `turn_timeout` from active admission until commit starts.
 It cancels owned pre-commit work on timeout. Directive work starts after commit
-and uses `directive_timeout` instead.
+and uses `directive_timeout` for Plugin callbacks, external Signal dispatch,
+and remote child placement. Local supervisor starts remain tracked until the
+supervisor replies. Killing the caller cannot cancel that start. A Server stop
+closes its owned child requests so a late start cannot leave an owned child.
 
 Do not read private state-machine tuples. Use:
 

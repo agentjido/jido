@@ -101,11 +101,14 @@ defmodule Jido.AgentServer.ChildLifecycle do
 
   defp verify_child_placement(pid, tag, parent, info, data) do
     case Map.get(data.child_spawn_requests, tag) do
-      %{request_id: request, directive: %{node: target} = directive} ->
+      %{request_id: request, status: status, directive: %{node: target} = directive} ->
+        # A saved local binding restores identity and cause, not the live spawn
+        # reference. Accept it only after this request completed its first start.
+        restored? = node(pid) == node() and is_nil(parent.spawn_ref) and status == :active
         child_id = Map.get(directive.opts, :id, "#{data.agent.id}/#{tag}")
         child_partition = Map.get(directive.opts, :partition, data.partition)
 
-        with true <- node(pid) == target and parent.spawn_ref == request,
+        with true <- node(pid) == target and (parent.spawn_ref == request or restored?),
              :ok <-
                ChildOperations.verify_spawned_agent(
                  info,
@@ -190,6 +193,11 @@ defmodule Jido.AgentServer.ChildLifecycle do
       parent: Inspection.parent(data.parent)
     }
   end
+
+  def handle_event(:info, {:agent_child_online, _, _, _, _, tag, _}, _phase, %State{
+        child_task: %{operation: %{tag: tag}}
+      }),
+      do: {:keep_state_and_data, [:postpone]}
 
   def handle_event(
         :info,

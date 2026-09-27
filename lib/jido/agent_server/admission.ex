@@ -46,17 +46,9 @@ defmodule Jido.AgentServer.Admission do
         %State{} = data
       )
       when phase in [:admitting, :running] do
-    reentrant =
-      case phase do
-        :admitting -> reentrant_task_call?(from, data.admission_task)
-        :running -> reentrant_turn_call?(from, data.active)
-      end
-
-    if reentrant do
-      reason = if phase == :admitting, do: :reentrant_admission, else: :reentrant_turn
-      {:keep_state_and_data, [{:reply, from, {:error, reason}}]}
-    else
-      postpone_call(from, token, signal, deadline, data)
+    case reentrant_reason(from, phase, data) do
+      nil -> postpone_call(from, token, signal, deadline, data)
+      reason -> {:keep_state_and_data, [{:reply, from, {:error, reason}}]}
     end
   end
 
@@ -66,15 +58,9 @@ defmodule Jido.AgentServer.Admission do
         :directing,
         %State{} = data
       ) do
-    cond do
-      reentrant_task_call?(from, data.commit_task) ->
-        {:keep_state_and_data, [{:reply, from, {:error, :reentrant_commit}}]}
-
-      reentrant_task_call?(from, data.directive_task) ->
-        {:keep_state_and_data, [{:reply, from, {:error, :reentrant_directive}}]}
-
-      true ->
-        postpone_call(from, token, signal, deadline, data)
+    case reentrant_reason(from, :directing, data) do
+      nil -> postpone_call(from, token, signal, deadline, data)
+      reason -> {:keep_state_and_data, [{:reply, from, {:error, reason}}]}
     end
   end
 
@@ -82,6 +68,25 @@ defmodule Jido.AgentServer.Admission do
       when phase in [:initializing, :admitting, :running, :directing] do
     postpone_cast(token, signal, data)
   end
+
+  def reentrant_reason(from, :admitting, data) do
+    if reentrant_task_call?(from, data.admission_task), do: :reentrant_admission
+  end
+
+  def reentrant_reason(from, :running, data) do
+    if reentrant_turn_call?(from, data.active), do: :reentrant_turn
+  end
+
+  def reentrant_reason(from, :directing, data) do
+    cond do
+      reentrant_task_call?(from, data.commit_task) -> :reentrant_commit
+      reentrant_task_call?(from, data.directive_task) -> :reentrant_directive
+      reentrant_task_call?(from, data.child_task) -> :reentrant_child_operation
+      true -> nil
+    end
+  end
+
+  def reentrant_reason(_from, _phase, _data), do: nil
 
   defp postpone_call(from, token, signal, deadline, %State{} = data) do
     cond do
@@ -157,6 +162,7 @@ defmodule Jido.AgentServer.Admission do
 
   defp reentrant_task_call?(_from, _pending_task), do: false
   defp related_exec_process?(pid, root, _visited, _depth) when pid == root, do: true
+  defp related_exec_process?(pid, _root, _visited, _depth) when pid == self(), do: false
   defp related_exec_process?(_pid, _root, _visited, depth) when depth >= 8, do: false
 
   defp related_exec_process?(pid, root, visited, depth) do
