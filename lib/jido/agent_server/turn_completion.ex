@@ -87,7 +87,6 @@ defmodule Jido.AgentServer.TurnCompletion do
   def complete_outcome(%State{} = data, %Outcome{} = outcome) do
     if data.active, do: ActiveTurn.cancel_timeout(data.active)
     AgentTelemetry.settled(data, outcome)
-    signal = outcome.effective_signal || outcome.source_signal
     event = if outcome.status == :succeeded, do: :turn_completed, else: :turn_failed
 
     data
@@ -95,14 +94,18 @@ defmodule Jido.AgentServer.TurnCompletion do
     |> then(fn data ->
       if outcome.status == :succeeded, do: %{data | error_count: 0}, else: data
     end)
-    |> Inspection.record_event(event, %{
-      turn_id: outcome.id,
-      signal_id: signal.id,
-      signal_type: signal.type,
-      stage: outcome.stage,
-      error: if(outcome.error, do: Inspection.public_error(outcome.error)),
-      outcome: Inspection.outcome_summary(outcome)
-    })
+    |> Inspection.record_event(event, fn ->
+      summary = Inspection.outcome_summary(outcome)
+
+      %{
+        turn_id: outcome.id,
+        signal_id: summary.signal_id,
+        signal_type: summary.signal_type,
+        stage: outcome.stage,
+        error: summary.error,
+        outcome: summary
+      }
+    end)
   end
 
   def outcome_status({:child_spawn_indeterminate, _tag, _node, _request, _reason}),

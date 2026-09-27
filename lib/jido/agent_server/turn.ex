@@ -300,13 +300,15 @@ defmodule Jido.AgentServer.Turn do
         state_version: version,
         active: committed_active
       })
-      |> Inspection.record_event(:turn_committed, %{
-        turn_id: active.turn_id,
-        signal_id: active.effective_signal.id,
-        signal_type: active.effective_signal.type,
-        state_version: version,
-        directive_count: directive_count
-      })
+      |> Inspection.record_event(:turn_committed, fn ->
+        %{
+          turn_id: active.turn_id,
+          signal_id: active.effective_signal.id,
+          signal_type: active.effective_signal.type,
+          state_version: version,
+          directive_count: directive_count
+        }
+      end)
 
     AgentTelemetry.committed(next_data, version, directive_count)
 

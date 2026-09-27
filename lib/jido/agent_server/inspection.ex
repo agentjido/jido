@@ -80,6 +80,9 @@ defmodule Jido.AgentServer.Inspection do
 
   def record_event(%State{debug: false} = data, _event, _metadata), do: data
 
+  def record_event(%State{} = data, event, metadata) when is_function(metadata, 0),
+    do: record_event(data, event, metadata.())
+
   def record_event(%State{} = data, event, metadata) do
     entry = %{event: event, at: System.system_time(:millisecond), metadata: metadata}
     events = Enum.take([entry | data.debug_events], data.config.debug_max_events)

@@ -245,10 +245,9 @@ defmodule Jido.AgentServer.PostCommit do
         next_data =
           next_data
           |> Map.put(:active, active)
-          |> Inspection.record_event(:directive_failed, %{
-            turn_id: active.turn_id,
-            error: Inspection.public_error(reason)
-          })
+          |> Inspection.record_event(:directive_failed, fn ->
+            %{turn_id: active.turn_id, error: Inspection.public_error(reason)}
+          end)
 
         outcome =
           TurnCompletion.turn_outcome(
