@@ -60,7 +60,7 @@ The runtime owns process-local data. It stops and restarts with its Agent.
 defmodule PluginRuntime.Effects.Agent do
   use Jido.Agent.Plugin
 
-  @impl Jido.Agent.Plugin
+  @impl Jido.Plugin
   def directives(_opts), do: [PluginRuntime.Record]
 end
 ```
@@ -74,7 +74,7 @@ validation. The Agent facet has no runtime handle.
 defmodule PluginRuntime.Effects.Server do
   use Jido.AgentServer.Plugin
 
-  @impl Jido.AgentServer.Plugin
+  @impl Jido.Plugin
   def dispatch(runtime, directive, context, _opts) do
     GenServer.call(runtime, {:record, directive.label, context.state_version})
   end

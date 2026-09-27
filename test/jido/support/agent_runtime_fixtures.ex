@@ -85,11 +85,20 @@ end
 defmodule JidoTest.AgentRuntimeFixtures.BootPlugin do
   @moduledoc false
 
-  use Jido.Plugin, agent: __MODULE__.Agent, agent_server: __MODULE__.Server
+  use Jido.Plugin
+
+  @impl true
+  defdelegate state_spec(opts), to: JidoTest.AgentRuntimeFixtures.BootPlugin.Agent
+
+  @impl true
+  defdelegate reduce(reduction, opts), to: JidoTest.AgentRuntimeFixtures.BootPlugin.Agent
+
+  @impl true
+  defdelegate child_spec(init), to: JidoTest.AgentRuntimeFixtures.BootPlugin.Server
 end
 
 defmodule JidoTest.AgentRuntimeFixtures.BootPlugin.Agent do
-  use Jido.Agent.Plugin
+  @behaviour Jido.Plugin
 
   @impl true
   def state_spec(_opts) do
@@ -103,7 +112,7 @@ defmodule JidoTest.AgentRuntimeFixtures.BootPlugin.Agent do
 end
 
 defmodule JidoTest.AgentRuntimeFixtures.BootPlugin.Server do
-  use Jido.AgentServer.Plugin
+  @behaviour Jido.Plugin
   alias JidoTest.AgentRuntimeFixtures.BootPluginWorker
 
   def child_spec(init) do

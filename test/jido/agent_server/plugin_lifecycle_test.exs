@@ -7,7 +7,14 @@ defmodule Jido.AgentServer.PluginLifecycleTest do
   @moduletag capture_log: true
 
   defmodule Runtime do
-    use Jido.Plugin, agent_server: __MODULE__.Server
+    use Jido.Plugin
+
+    @impl true
+    defdelegate child_spec(init), to: Jido.AgentServer.PluginLifecycleTest.Runtime.Server
+
+    @impl true
+    defdelegate await_ready(runtime, opts),
+      to: Jido.AgentServer.PluginLifecycleTest.Runtime.Server
 
     def start_link(init), do: GenServer.start_link(__MODULE__.Process, init)
   end
@@ -24,8 +31,9 @@ defmodule Jido.AgentServer.PluginLifecycleTest do
   end
 
   defmodule Runtime.Server do
-    use Jido.AgentServer.Plugin
+    @behaviour Jido.Plugin
 
+    @impl true
     def child_spec(init), do: %{id: Runtime, start: {Runtime, :start_link, [init]}}
 
     @impl true
@@ -64,7 +72,10 @@ defmodule Jido.AgentServer.PluginLifecycleTest do
   end
 
   defmodule ObservedRuntime do
-    use Jido.Plugin, agent_server: __MODULE__.Server
+    use Jido.Plugin
+
+    @impl true
+    defdelegate child_spec(init), to: Jido.AgentServer.PluginLifecycleTest.ObservedRuntime.Server
 
     def start_link(init), do: GenServer.start_link(__MODULE__.Process, init)
   end
@@ -79,7 +90,7 @@ defmodule Jido.AgentServer.PluginLifecycleTest do
   end
 
   defmodule ObservedRuntime.Server do
-    use Jido.AgentServer.Plugin
+    @behaviour Jido.Plugin
 
     def child_spec(init),
       do: %{id: ObservedRuntime, start: {ObservedRuntime, :start_link, [init]}}

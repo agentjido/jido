@@ -26,11 +26,15 @@ defmodule Jido.AgentServer.ChildOperationTaskTest do
   end
 
   defmodule HeldStopPlugin do
-    use Jido.Plugin, agent_server: __MODULE__.Server
+    use Jido.Plugin
+
+    @impl true
+    defdelegate child_spec(init),
+      to: Jido.AgentServer.ChildOperationTaskTest.HeldStopPlugin.Server
   end
 
   defmodule HeldStopPlugin.Server do
-    use Jido.AgentServer.Plugin
+    @behaviour Jido.Plugin
 
     def child_spec(init),
       do:

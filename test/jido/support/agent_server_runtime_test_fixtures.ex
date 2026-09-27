@@ -75,18 +75,30 @@ defmodule JidoTest.AgentServerRuntimeFixtures do
   end
 
   defmodule CountedDirectivePlugin do
-    use Jido.Plugin, agent: __MODULE__.Agent, agent_server: __MODULE__.Server
+    use Jido.Plugin
+
+    @impl true
+    defdelegate directives(opts),
+      to: JidoTest.AgentServerRuntimeFixtures.CountedDirectivePlugin.Agent
+
+    @impl true
+    defdelegate dispatch(runtime, directive, context, opts),
+      to: JidoTest.AgentServerRuntimeFixtures.CountedDirectivePlugin.Server
+
+    @impl true
+    defdelegate child_spec(init),
+      to: JidoTest.AgentServerRuntimeFixtures.CountedDirectivePlugin.Server
   end
 
   defmodule CountedDirectivePlugin.Agent do
-    use Jido.Agent.Plugin
+    @behaviour Jido.Plugin
 
     @impl true
     def directives(_opts), do: [CountedDirective]
   end
 
   defmodule CountedDirectivePlugin.Server do
-    use Jido.AgentServer.Plugin
+    @behaviour Jido.Plugin
 
     @impl true
     def dispatch(_runtime, %CountedDirective{test: test}, context, _opts) do
@@ -94,6 +106,7 @@ defmodule JidoTest.AgentServerRuntimeFixtures do
       :ok
     end
 
+    @impl true
     def child_spec(_init) do
       Supervisor.child_spec({Elixir.Agent, fn -> nil end}, id: CountedDirectivePlugin)
     end
@@ -132,18 +145,30 @@ defmodule JidoTest.AgentServerRuntimeFixtures do
   end
 
   defmodule SlowDirectivePlugin do
-    use Jido.Plugin, agent: __MODULE__.Agent, agent_server: __MODULE__.Server
+    use Jido.Plugin
+
+    @impl true
+    defdelegate directives(opts),
+      to: JidoTest.AgentServerRuntimeFixtures.SlowDirectivePlugin.Agent
+
+    @impl true
+    defdelegate dispatch(runtime, directive, context, opts),
+      to: JidoTest.AgentServerRuntimeFixtures.SlowDirectivePlugin.Server
+
+    @impl true
+    defdelegate child_spec(init),
+      to: JidoTest.AgentServerRuntimeFixtures.SlowDirectivePlugin.Server
   end
 
   defmodule SlowDirectivePlugin.Agent do
-    use Jido.Agent.Plugin
+    @behaviour Jido.Plugin
 
     @impl true
     def directives(_opts), do: [SlowDirective]
   end
 
   defmodule SlowDirectivePlugin.Server do
-    use Jido.AgentServer.Plugin
+    @behaviour Jido.Plugin
 
     @impl true
     def dispatch(_runtime, %SlowDirective{test: test, gate: gate}, _context, _opts)
@@ -162,6 +187,7 @@ defmodule JidoTest.AgentServerRuntimeFixtures do
       :ok
     end
 
+    @impl true
     def child_spec(_init) do
       Supervisor.child_spec({Elixir.Agent, fn -> nil end}, id: SlowDirectivePlugin)
     end
@@ -202,15 +228,23 @@ defmodule JidoTest.AgentServerRuntimeFixtures do
   end
 
   defmodule ReadinessPlugin do
-    use Jido.Plugin, agent_server: __MODULE__.Server
+    use Jido.Plugin
+
+    @impl true
+    defdelegate await_ready(runtime, opts),
+      to: JidoTest.AgentServerRuntimeFixtures.ReadinessPlugin.Server
+
+    @impl true
+    defdelegate child_spec(init), to: JidoTest.AgentServerRuntimeFixtures.ReadinessPlugin.Server
   end
 
   defmodule ReadinessPlugin.Server do
-    use Jido.AgentServer.Plugin
+    @behaviour Jido.Plugin
 
     @impl true
     def await_ready(runtime, _opts), do: GenServer.call(runtime, :await_ready)
 
+    @impl true
     def child_spec(init) do
       Supervisor.child_spec({ReadinessRuntime, init}, id: ReadinessPlugin)
     end
@@ -263,11 +297,14 @@ defmodule JidoTest.AgentServerRuntimeFixtures do
   end
 
   defmodule GenerationPlugin do
-    use Jido.Plugin, agent_server: __MODULE__.Server
+    use Jido.Plugin
+
+    @impl true
+    defdelegate child_spec(init), to: JidoTest.AgentServerRuntimeFixtures.GenerationPlugin.Server
   end
 
   defmodule GenerationPlugin.Server do
-    use Jido.AgentServer.Plugin
+    @behaviour Jido.Plugin
 
     def child_spec(init) do
       Supervisor.child_spec({GenerationRuntime, init}, id: GenerationPlugin)
@@ -297,7 +334,29 @@ defmodule JidoTest.AgentServerRuntimeFixtures do
   end
 
   defmodule FreshRuntimePlugin do
-    use Jido.Plugin, agent: __MODULE__.Agent, agent_server: __MODULE__.Server
+    use Jido.Plugin
+
+    @impl true
+    defdelegate state_spec(opts), to: JidoTest.AgentServerRuntimeFixtures.FreshRuntimePlugin.Agent
+
+    @impl true
+    defdelegate directives(opts), to: JidoTest.AgentServerRuntimeFixtures.FreshRuntimePlugin.Agent
+
+    @impl true
+    defdelegate reduce(reduction, opts),
+      to: JidoTest.AgentServerRuntimeFixtures.FreshRuntimePlugin.Agent
+
+    @impl true
+    defdelegate dispatch(runtime, directive, context, opts),
+      to: JidoTest.AgentServerRuntimeFixtures.FreshRuntimePlugin.Server
+
+    @impl true
+    defdelegate await_ready(runtime, opts),
+      to: JidoTest.AgentServerRuntimeFixtures.FreshRuntimePlugin.Server
+
+    @impl true
+    defdelegate child_spec(init),
+      to: JidoTest.AgentServerRuntimeFixtures.FreshRuntimePlugin.Server
 
     def start_link(init), do: GenServer.start_link(__MODULE__.Process, init)
   end
@@ -336,7 +395,7 @@ defmodule JidoTest.AgentServerRuntimeFixtures do
   end
 
   defmodule FreshRuntimePlugin.Agent do
-    use Jido.Agent.Plugin
+    @behaviour Jido.Plugin
 
     @impl true
     def state_spec(_opts) do
@@ -357,7 +416,7 @@ defmodule JidoTest.AgentServerRuntimeFixtures do
   end
 
   defmodule FreshRuntimePlugin.Server do
-    use Jido.AgentServer.Plugin
+    @behaviour Jido.Plugin
 
     @impl true
     def dispatch(_runtime, _directive, _context, _opts), do: :ok
@@ -372,6 +431,7 @@ defmodule JidoTest.AgentServerRuntimeFixtures do
       GenServer.call(runtime, :await_ready)
     end
 
+    @impl true
     def child_spec(init),
       do: %{id: FreshRuntimePlugin, start: {FreshRuntimePlugin, :start_link, [init]}}
   end

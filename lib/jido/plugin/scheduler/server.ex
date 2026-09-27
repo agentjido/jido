@@ -1,6 +1,6 @@
 defmodule Jido.Plugin.Scheduler.Server do
   @moduledoc "Owns timers, delivery, and readiness after Scheduler commits."
-  use Jido.AgentServer.Plugin
+  @behaviour Jido.Plugin
 
   alias Jido.Plugin.{DirectiveContext, Init}
   alias Jido.Plugin.Scheduler
@@ -31,6 +31,7 @@ defmodule Jido.Plugin.Scheduler.Server do
     :exit, reason -> {:error, {:scheduler_runtime_unavailable, reason}}
   end
 
+  @impl true
   def child_spec(%Init{} = init) do
     Supervisor.child_spec({Runtime, init}, id: Scheduler)
   end

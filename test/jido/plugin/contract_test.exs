@@ -17,11 +17,15 @@ defmodule Jido.Plugin.ContractTest do
   end
 
   defmodule AdmissionPlugin do
-    use Jido.Plugin, agent_server: __MODULE__.Server
+    use Jido.Plugin
+
+    @impl true
+    defdelegate admit(runtime, admission, opts),
+      to: Jido.Plugin.ContractTest.AdmissionPlugin.Server
   end
 
   defmodule AdmissionPlugin.Server do
-    use Jido.AgentServer.Plugin
+    @behaviour Jido.Plugin
 
     @impl true
     def admit(_runtime, _admission, opts) do
@@ -57,11 +61,14 @@ defmodule Jido.Plugin.ContractTest do
   end
 
   defmodule OwnedStatePlugin do
-    use Jido.Plugin, agent: __MODULE__.Agent
+    use Jido.Plugin
+
+    @impl true
+    defdelegate state_spec(opts), to: Jido.Plugin.ContractTest.OwnedStatePlugin.Agent
   end
 
   defmodule OwnedStatePlugin.Agent do
-    use Jido.Agent.Plugin
+    @behaviour Jido.Plugin
 
     @impl true
     def state_spec(_opts) do
@@ -74,11 +81,14 @@ defmodule Jido.Plugin.ContractTest do
   end
 
   defmodule NilOwnedStatePlugin do
-    use Jido.Plugin, agent: __MODULE__.Agent
+    use Jido.Plugin
+
+    @impl true
+    defdelegate state_spec(opts), to: Jido.Plugin.ContractTest.NilOwnedStatePlugin.Agent
   end
 
   defmodule NilOwnedStatePlugin.Agent do
-    use Jido.Agent.Plugin
+    @behaviour Jido.Plugin
 
     @impl true
     def state_spec(_opts) do
@@ -119,22 +129,33 @@ defmodule Jido.Plugin.ContractTest do
   end
 
   defmodule ReplaceDirectiveTypePlugin do
-    use Jido.Plugin, agent: __MODULE__.Agent, agent_server: __MODULE__.Server
+    use Jido.Plugin
+
+    @impl true
+    defdelegate directives(opts), to: Jido.Plugin.ContractTest.ReplaceDirectiveTypePlugin.Agent
+
+    @impl true
+    defdelegate dispatch(runtime, directive, context, opts),
+      to: Jido.Plugin.ContractTest.ReplaceDirectiveTypePlugin.Server
+
+    @impl true
+    defdelegate child_spec(init), to: Jido.Plugin.ContractTest.ReplaceDirectiveTypePlugin.Server
   end
 
   defmodule ReplaceDirectiveTypePlugin.Agent do
-    use Jido.Agent.Plugin
+    @behaviour Jido.Plugin
 
     @impl true
     def directives(_opts), do: [OwnedDirective]
   end
 
   defmodule ReplaceDirectiveTypePlugin.Server do
-    use Jido.AgentServer.Plugin
+    @behaviour Jido.Plugin
 
     @impl true
     def dispatch(_runtime, _directive, _context, _opts), do: :ok
 
+    @impl true
     def child_spec(_init) do
       Supervisor.child_spec({Elixir.Agent, fn -> nil end}, id: ReplaceDirectiveTypePlugin)
     end
@@ -160,11 +181,20 @@ defmodule Jido.Plugin.ContractTest do
   end
 
   defmodule DirectiveReducerPlugin do
-    use Jido.Plugin, agent: __MODULE__.Agent
+    use Jido.Plugin
+
+    @impl true
+    defdelegate state_spec(opts), to: Jido.Plugin.ContractTest.DirectiveReducerPlugin.Agent
+
+    @impl true
+    defdelegate reduce(reduction, opts), to: Jido.Plugin.ContractTest.DirectiveReducerPlugin.Agent
+
+    @impl true
+    defdelegate directives(opts), to: Jido.Plugin.ContractTest.DirectiveReducerPlugin.Agent
   end
 
   defmodule DirectiveReducerPlugin.Agent do
-    use Jido.Agent.Plugin
+    @behaviour Jido.Plugin
 
     @impl true
     def state_spec(_opts) do
@@ -182,22 +212,33 @@ defmodule Jido.Plugin.ContractTest do
   end
 
   defmodule ForeignDirectivePlugin do
-    use Jido.Plugin, agent: __MODULE__.Agent, agent_server: __MODULE__.Server
+    use Jido.Plugin
+
+    @impl true
+    defdelegate directives(opts), to: Jido.Plugin.ContractTest.ForeignDirectivePlugin.Agent
+
+    @impl true
+    defdelegate dispatch(runtime, directive, context, opts),
+      to: Jido.Plugin.ContractTest.ForeignDirectivePlugin.Server
+
+    @impl true
+    defdelegate child_spec(init), to: Jido.Plugin.ContractTest.ForeignDirectivePlugin.Server
   end
 
   defmodule ForeignDirectivePlugin.Agent do
-    use Jido.Agent.Plugin
+    @behaviour Jido.Plugin
 
     @impl true
     def directives(_opts), do: [ForeignDirective]
   end
 
   defmodule ForeignDirectivePlugin.Server do
-    use Jido.AgentServer.Plugin
+    @behaviour Jido.Plugin
 
     @impl true
     def dispatch(_runtime, _directive, _context, _opts), do: :ok
 
+    @impl true
     def child_spec(_init) do
       Supervisor.child_spec({Elixir.Agent, fn -> nil end}, id: ForeignDirectivePlugin)
     end
@@ -220,11 +261,21 @@ defmodule Jido.Plugin.ContractTest do
   end
 
   defmodule NormalizingDirectivePlugin do
-    use Jido.Plugin, agent: __MODULE__.Agent
+    use Jido.Plugin
+
+    @impl true
+    defdelegate state_spec(opts), to: Jido.Plugin.ContractTest.NormalizingDirectivePlugin.Agent
+
+    @impl true
+    defdelegate reduce(reduction, opts),
+      to: Jido.Plugin.ContractTest.NormalizingDirectivePlugin.Agent
+
+    @impl true
+    defdelegate directives(opts), to: Jido.Plugin.ContractTest.NormalizingDirectivePlugin.Agent
   end
 
   defmodule NormalizingDirectivePlugin.Agent do
-    use Jido.Agent.Plugin
+    @behaviour Jido.Plugin
 
     @impl true
     def state_spec(_opts) do
@@ -254,11 +305,21 @@ defmodule Jido.Plugin.ContractTest do
   end
 
   defmodule MissingValidationPlugin do
-    use Jido.Plugin, agent: __MODULE__.Agent
+    use Jido.Plugin
+
+    @impl true
+    defdelegate state_spec(opts), to: Jido.Plugin.ContractTest.MissingValidationPlugin.Agent
+
+    @impl true
+    defdelegate reduce(reduction, opts),
+      to: Jido.Plugin.ContractTest.MissingValidationPlugin.Agent
+
+    @impl true
+    defdelegate directives(opts), to: Jido.Plugin.ContractTest.MissingValidationPlugin.Agent
   end
 
   defmodule MissingValidationPlugin.Agent do
-    use Jido.Agent.Plugin
+    @behaviour Jido.Plugin
 
     @impl true
     def state_spec(_opts),
@@ -272,40 +333,59 @@ defmodule Jido.Plugin.ContractTest do
   end
 
   defmodule UnhandledDirectivePlugin do
-    use Jido.Plugin, agent: __MODULE__.Agent
+    use Jido.Plugin
+
+    @impl true
+    defdelegate directives(opts), to: Jido.Plugin.ContractTest.UnhandledDirectivePlugin.Agent
   end
 
   defmodule UnhandledDirectivePlugin.Agent do
-    use Jido.Agent.Plugin
+    @behaviour Jido.Plugin
 
     @impl true
     def directives(_opts), do: [UnhandledDirective]
   end
 
   defmodule DispatchWithoutRuntimePlugin do
-    use Jido.Plugin, agent: __MODULE__.Agent, agent_server: __MODULE__.Server
+    use Jido.Plugin
+
+    @impl true
+    defdelegate directives(opts), to: Jido.Plugin.ContractTest.DispatchWithoutRuntimePlugin.Agent
+
+    @impl true
+    defdelegate dispatch(runtime, directive, context, opts),
+      to: Jido.Plugin.ContractTest.DispatchWithoutRuntimePlugin.Server
   end
 
   defmodule DispatchWithoutRuntimePlugin.Agent do
-    use Jido.Agent.Plugin
+    @behaviour Jido.Plugin
 
     @impl true
     def directives(_opts), do: [UnhandledDirective]
   end
 
   defmodule DispatchWithoutRuntimePlugin.Server do
-    use Jido.AgentServer.Plugin
+    @behaviour Jido.Plugin
 
     @impl true
     def dispatch(_runtime, _directive, _context, _opts), do: :ok
   end
 
   defmodule BuiltInDirectivePlugin do
-    use Jido.Plugin, agent: __MODULE__.Agent
+    use Jido.Plugin
+
+    @impl true
+    defdelegate state_spec(opts), to: Jido.Plugin.ContractTest.BuiltInDirectivePlugin.Agent
+
+    @impl true
+    defdelegate reduce(reduction, opts), to: Jido.Plugin.ContractTest.BuiltInDirectivePlugin.Agent
+
+    @impl true
+    defdelegate directives(opts), to: Jido.Plugin.ContractTest.BuiltInDirectivePlugin.Agent
   end
 
   defmodule BuiltInDirectivePlugin.Agent do
-    use Jido.Agent.Plugin
+    @behaviour Jido.Plugin
 
     @impl true
     def state_spec(_opts), do: {:invalid_owner, Zoi.integer() |> Zoi.default(0)}
@@ -418,7 +498,7 @@ defmodule Jido.Plugin.ContractTest do
     assert {:error, %Jido.Error.ValidationError{message: message}} =
              Jido.Plugin.Normalizer.normalize_all([CallbackOnlyPlugin])
 
-    assert message == "Plugin must use an owner-facet Jido.Plugin manifest"
+    assert message == "Plugin must use Jido.Plugin"
   end
 
   test "requires validation for each declared Directive type" do
@@ -451,7 +531,7 @@ defmodule Jido.Plugin.ContractTest do
     assert {:error, %Jido.Error.ValidationError{message: message}} =
              Jido.Plugin.Normalizer.normalize_all([MarkerOnlyPlugin])
 
-    assert message == "Plugin must use an owner-facet Jido.Plugin manifest"
+    assert message == "Plugin must use Jido.Plugin"
   end
 
   test "contains a Plugin marker fault" do
@@ -495,7 +575,6 @@ defmodule Jido.Plugin.ContractTest do
     assert invalid.details == %{
              code: :plugin_invalid_callback_result,
              plugin: AdmissionPlugin,
-             facet: AdmissionPlugin.Server,
              result: :not_a_result
            }
 

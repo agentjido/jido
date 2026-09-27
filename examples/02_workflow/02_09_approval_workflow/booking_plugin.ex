@@ -23,7 +23,14 @@ end
 defmodule Jido.Examples.ApprovalWorkflow.BookingPlugin do
   @moduledoc "Dispatches typed booking requests without a Plugin process."
 
-  use Jido.Plugin, agent: __MODULE__.Agent, agent_server: __MODULE__.Server
+  use Jido.Plugin
+
+  @impl true
+  defdelegate directives(opts), to: Jido.Examples.ApprovalWorkflow.BookingPlugin.Agent
+
+  @impl true
+  defdelegate dispatch(runtime, directive, context, opts),
+    to: Jido.Examples.ApprovalWorkflow.BookingPlugin.Server
 
   alias Jido.Examples.ApprovalWorkflow.SubmitBooking
 
@@ -35,7 +42,7 @@ defmodule Jido.Examples.ApprovalWorkflow.BookingPlugin do
 end
 
 defmodule Jido.Examples.ApprovalWorkflow.BookingPlugin.Agent do
-  use Jido.Agent.Plugin
+  @behaviour Jido.Plugin
   alias Jido.Examples.ApprovalWorkflow.SubmitBooking
 
   @impl true
@@ -43,7 +50,7 @@ defmodule Jido.Examples.ApprovalWorkflow.BookingPlugin.Agent do
 end
 
 defmodule Jido.Examples.ApprovalWorkflow.BookingPlugin.Server do
-  use Jido.AgentServer.Plugin
+  @behaviour Jido.Plugin
   alias Jido.AgentServer, as: Server
   alias Jido.Examples.ApprovalWorkflow.SubmitBooking
   alias Jido.Signal

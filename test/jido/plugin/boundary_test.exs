@@ -6,64 +6,52 @@ defmodule Jido.Plugin.BoundaryTest do
   alias Jido.Topology.Plugin.Contribution
 
   defmodule OwnedState do
-    use Jido.Plugin, agent: __MODULE__.Agent
+    use Jido.Plugin
+
+    @impl true
+    defdelegate state_spec(opts), to: Jido.Plugin.BoundaryTest.OwnedState.Agent
+
+    @impl true
+    defdelegate reduce(reduction, opts), to: Jido.Plugin.BoundaryTest.OwnedState.Agent
   end
 
   defmodule OwnedState.Agent do
-    use Jido.Agent.Plugin
+    @behaviour Jido.Plugin
 
     def state_spec(_opts), do: {:owned, Zoi.integer() |> Zoi.default(3)}
     def reduce(reduction, _opts), do: {:ok, reduction.plugin_state}
   end
 
-  defmodule EmptyAgentFacet do
-    use Jido.Agent.Plugin
-  end
-
-  defmodule EmptyServerFacet do
-    use Jido.AgentServer.Plugin
+  defmodule Empty do
+    use Jido.Plugin
   end
 
   defmodule StatelessReducer do
-    use Jido.Agent.Plugin
-
+    use Jido.Plugin
     def reduce(_reduction, _opts), do: {:ok, 1}
   end
 
   defmodule RaisingMetadata do
-    @behaviour Jido.Agent.Plugin
-
-    def __jido_plugin_facet__, do: raise(ArgumentError, "facet metadata is unavailable")
-    def state_spec(_opts), do: :none
+    def __jido_plugin__, do: raise(ArgumentError, "metadata is unavailable")
   end
 
   defmodule ThrowingMetadata do
-    @behaviour Jido.Agent.Plugin
-
-    def __jido_plugin_facet__, do: throw(:facet_metadata_unavailable)
-    def state_spec(_opts), do: :none
+    def __jido_plugin__, do: throw(:metadata_unavailable)
   end
 
-  for {package, owner, facet} <- [
-        {EmptyAgentPackage, :agent, EmptyAgentFacet},
-        {EmptyServerPackage, :agent_server, EmptyServerFacet},
-        {StatelessReducerPackage, :agent, StatelessReducer},
-        {RaisingMetadataPackage, :agent, RaisingMetadata},
-        {ThrowingMetadataPackage, :agent, ThrowingMetadata},
-        {WrongPersistencePackage, :persistence, EmptyAgentFacet}
-      ] do
-    defmodule package do
-      @manifest %Manifest{module: __MODULE__} |> Map.put(owner, facet)
-      def __jido_plugin__, do: @manifest
-    end
+  defmodule TamperedMetadata do
+    @behaviour Jido.Plugin
+    def __jido_plugin__, do: %Manifest{module: __MODULE__, agent: __MODULE__}
+    def state_spec(_opts), do: :none
+    def after_commit(_, _, _), do: :ok
   end
 
   defmodule MismatchedPackage do
-    def __jido_plugin__, do: %Manifest{module: OwnedState, agent: EmptyAgentFacet}
+    def __jido_plugin__, do: %Manifest{module: OwnedState, agent: OwnedState}
   end
 
   defmodule TopologyFacet do
-    use Jido.Topology.Plugin
+    @behaviour Jido.Plugin
 
     def contribute(context, opts) do
       case Keyword.fetch!(opts, :result) do
@@ -77,13 +65,16 @@ defmodule Jido.Plugin.BoundaryTest do
   end
 
   defmodule TopologyPackage do
-    use Jido.Plugin, topology: TopologyFacet
+    use Jido.Plugin
+
+    @impl true
+    defdelegate contribute(context, opts), to: Jido.Plugin.BoundaryTest.TopologyFacet
   end
 
   test "stored specs without a manifest are rejected" do
     stored = %Spec{module: OwnedState, options: [label: "stored"]}
 
-    assert {:error, %{message: "Plugin specs require an owner-facet manifest"}} =
+    assert {:error, %{message: "Plugin specs require a manifest"}} =
              Jido.Plugin.Normalizer.normalize_all([stored])
 
     assert {:ok, [spec]} = Jido.Plugin.Normalizer.normalize_all([OwnedState])
@@ -93,15 +84,15 @@ defmodule Jido.Plugin.BoundaryTest do
   test "manifest accessors retain owner order and restrict mapped options" do
     manifest = %Manifest{
       module: TopologyPackage,
-      agent: EmptyAgentFacet,
-      topology: TopologyFacet,
+      agent: TopologyPackage,
+      topology: TopologyPackage,
       option_keys: %{topology: [:result]}
     }
 
     assert Manifest.owners() == [:agent, :agent_server, :persistence, :topology]
 
     assert Enum.map(Manifest.owners(), &Manifest.facet(manifest, &1)) ==
-             [EmptyAgentFacet, nil, nil, TopologyFacet]
+             [TopologyPackage, nil, nil, TopologyPackage]
 
     options = [result: {:error, :unavailable}]
     assert {:ok, ^manifest} = Manifest.validate(manifest, options)
@@ -111,15 +102,16 @@ defmodule Jido.Plugin.BoundaryTest do
   end
 
   test "invalid manifest identities and versions return configuration errors" do
-    manifest = %Manifest{module: TopologyPackage, topology: TopologyFacet}
+    manifest = %Manifest{module: TopologyPackage, topology: TopologyPackage}
 
     for {field, value, message} <- [
           {:module, nil, "Plugin package module is invalid"},
           {:module, "plugin", "Plugin package module is invalid"},
           {:vsn, 0, "Plugin package version must be positive"},
           {:vsn, "1", "Plugin package version must be positive"},
-          {:topology, nil, "Plugin manifest must select at least one facet"},
-          {:topology, "facet", "Plugin facet module is invalid"}
+          {:topology, nil, "Plugin must define at least one callback"},
+          {:topology, "facet", "Plugin callbacks must belong to the Plugin module"},
+          {:topology, false, "Plugin callbacks must belong to the Plugin module"}
         ] do
       assert {:error, %Jido.Error.ValidationError{message: ^message, kind: :config}} =
                Manifest.validate(Map.put(manifest, field, value), [])
@@ -134,7 +126,7 @@ defmodule Jido.Plugin.BoundaryTest do
   end
 
   test "manifest option mappings reject duplicate keys and unassigned options" do
-    manifest = %Manifest{module: TopologyPackage, topology: TopologyFacet}
+    manifest = %Manifest{module: TopologyPackage, topology: TopologyPackage}
 
     for mapping <- [%{topology: [:result, :result]}, %{topology: ["result"]}] do
       assert {:error, %Jido.Error.ValidationError{} = error} =
@@ -154,45 +146,29 @@ defmodule Jido.Plugin.BoundaryTest do
              Manifest.validate(manifest, result: self())
   end
 
-  test "normalization reports mismatched package identity and missing facet capabilities" do
+  test "normalization rejects mismatched metadata and invalid callback combinations" do
     assert {:error, %{details: %{plugin: MismatchedPackage, manifest: OwnedState}}} =
              Jido.Plugin.Normalizer.normalize_all([MismatchedPackage])
 
-    for {package, facet, owner} <- [
-          {EmptyAgentPackage, EmptyAgentFacet, :agent},
-          {EmptyServerPackage, EmptyServerFacet, :agent_server}
-        ] do
-      assert {:error,
-              %{
-                message: "Plugin facet defines no capability",
-                details: %{facet: ^facet, owner: ^owner}
-              }} = Jido.Plugin.Normalizer.normalize_all([package])
-    end
+    assert {:error, %{message: "Plugin must define at least one callback"}} =
+             Jido.Plugin.Normalizer.normalize_all([Empty])
 
     assert {:error, %{message: "Agent Plugin reduce/2 requires state_spec/1"}} =
-             Jido.Plugin.Normalizer.normalize_all([StatelessReducerPackage])
+             Jido.Plugin.Normalizer.normalize_all([StatelessReducer])
 
-    assert {:error, %{details: %{facet: EmptyAgentFacet, owner: :persistence}}} =
-             Jido.Plugin.Normalizer.normalize_all([WrongPersistencePackage])
+    assert {:error, %{message: "Plugin manifest must match its documented callbacks"}} =
+             Jido.Plugin.Normalizer.normalize_all([TamperedMetadata])
   end
 
-  test "facet metadata exceptions are contained at the normalization boundary" do
-    assert {:error,
-            %Jido.Error.ValidationError{
-              message: "Plugin facet metadata failed",
-              details: %{facet: RaisingMetadata, owner: :agent, error: %ArgumentError{}}
-            }} = Jido.Plugin.Normalizer.normalize_all([RaisingMetadataPackage])
+  test "package metadata exceptions are contained at the normalization boundary" do
+    for package <- [RaisingMetadata, ThrowingMetadata] do
+      assert {:error,
+              %Jido.Error.ExecutionError{message: "Agent Plugin marker failed", details: details}} =
+               Jido.Plugin.Normalizer.normalize_all([package])
 
-    assert {:error,
-            %Jido.Error.ValidationError{
-              message: "Plugin facet metadata failed",
-              details: %{
-                facet: ThrowingMetadata,
-                owner: :agent,
-                kind: :throw,
-                reason: :facet_metadata_unavailable
-              }
-            }} = Jido.Plugin.Normalizer.normalize_all([ThrowingMetadataPackage])
+      assert details.plugin == package
+      assert details.callback == :__jido_plugin__
+    end
   end
 
   test "Topology returns explicit errors and contains callback exceptions" do
@@ -203,7 +179,7 @@ defmodule Jido.Plugin.BoundaryTest do
       assert details.code == :plugin_callback_failed
       assert details.callback == :contribute
       assert details.plugin == TopologyPackage
-      assert details.facet == TopologyFacet
+      refute Map.has_key?(details, :facet)
     end
   end
 
@@ -219,7 +195,7 @@ defmodule Jido.Plugin.BoundaryTest do
 
       assert details.code == :plugin_invalid_callback_result
       assert details.plugin == TopologyPackage
-      assert details.facet == TopologyFacet
+      refute Map.has_key?(details, :facet)
 
       if result == :wrong_owner, do: assert(details.actual == OwnedState)
       if result == :invalid_shape, do: assert(%Jido.Error.ValidationError{} = details.reason)

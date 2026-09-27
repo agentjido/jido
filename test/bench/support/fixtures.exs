@@ -21,22 +21,28 @@ end
 
 defmodule JidoCoreBench.PreparePlugin do
   @moduledoc false
-  use Jido.Plugin, agent: __MODULE__.Agent
+  use Jido.Plugin
+
+  @impl true
+  defdelegate state_spec(opts), to: JidoCoreBench.PreparePlugin.Agent
 end
 
 defmodule JidoCoreBench.PreparePlugin.Agent do
-  use Jido.Agent.Plugin
+  @behaviour Jido.Plugin
   @impl true
   def state_spec(_opts), do: :none
 end
 
 defmodule JidoCoreBench.AdmitPlugin do
   @moduledoc false
-  use Jido.Plugin, agent_server: __MODULE__.Server
+  use Jido.Plugin
+
+  @impl true
+  defdelegate admit(runtime, admission, opts), to: JidoCoreBench.AdmitPlugin.Server
 end
 
 defmodule JidoCoreBench.AdmitPlugin.Server do
-  use Jido.AgentServer.Plugin
+  @behaviour Jido.Plugin
 
   @impl true
   def admit(_runtime, admission, _opts) do

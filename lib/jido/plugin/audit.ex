@@ -11,7 +11,7 @@ defmodule Jido.Plugin.Audit do
       plugins: [{Jido.Plugin.Audit, max_entries: 1_000}]
   """
 
-  use Jido.Plugin, roles: [:agent]
+  use Jido.Plugin
 
   alias Jido.Plugin.Audit.Record
   alias Jido.Signal.ID

@@ -20,14 +20,33 @@ end
 
 defmodule Jido.Examples.Applications.Audit.Plugin do
   @moduledoc "Owns committed audit state and reconciles its runtime projection."
-  use Jido.Plugin, agent: __MODULE__.Agent, agent_server: __MODULE__.Server
+  use Jido.Plugin
+
+  @impl true
+  defdelegate state_spec(opts), to: Jido.Examples.Applications.Audit.Plugin.Agent
+
+  @impl true
+  defdelegate directives(opts), to: Jido.Examples.Applications.Audit.Plugin.Agent
+
+  @impl true
+  defdelegate reduce(reduction, opts), to: Jido.Examples.Applications.Audit.Plugin.Agent
+
+  @impl true
+  defdelegate dispatch(runtime, directive, context, opts),
+    to: Jido.Examples.Applications.Audit.Plugin.Server
+
+  @impl true
+  defdelegate await_ready(runtime, opts), to: Jido.Examples.Applications.Audit.Plugin.Server
+
+  @impl true
+  defdelegate child_spec(init), to: Jido.Examples.Applications.Audit.Plugin.Server
   alias Jido.Examples.Applications.Audit.Record
 
   def record(event, outcome), do: %Record{event: event, outcome: outcome}
 end
 
 defmodule Jido.Examples.Applications.Audit.Plugin.Agent do
-  use Jido.Agent.Plugin
+  @behaviour Jido.Plugin
   alias Jido.Examples.Applications.Audit.Record
 
   @state_schema Zoi.object(%{events: Zoi.list(Zoi.any()) |> Zoi.default([])})
@@ -54,7 +73,7 @@ defmodule Jido.Examples.Applications.Audit.Plugin.Agent do
 end
 
 defmodule Jido.Examples.Applications.Audit.Plugin.Server do
-  use Jido.AgentServer.Plugin
+  @behaviour Jido.Plugin
   alias Jido.Plugin.{DirectiveContext, Init}
   alias Jido.Examples.Applications.Audit.Runtime
 
@@ -65,6 +84,7 @@ defmodule Jido.Examples.Applications.Audit.Plugin.Server do
   @impl true
   def await_ready(runtime, _opts), do: GenServer.call(runtime, :await_ready)
 
+  @impl true
   def child_spec(%Init{} = init),
     do: Supervisor.child_spec({Runtime, init}, id: Jido.Examples.Applications.Audit.Plugin)
 end

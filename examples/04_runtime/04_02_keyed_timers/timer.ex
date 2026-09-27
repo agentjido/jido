@@ -1,7 +1,20 @@
 defmodule Jido.Examples.BurstBuncher.Timer do
   @moduledoc "A keyed timer capability used only by the Burst Buncher example."
 
-  use Jido.Plugin, agent: __MODULE__.Agent, agent_server: __MODULE__.Server
+  use Jido.Plugin
+
+  @impl true
+  defdelegate directives(opts), to: Jido.Examples.BurstBuncher.Timer.Agent
+
+  @impl true
+  defdelegate dispatch(runtime, directive, context, opts),
+    to: Jido.Examples.BurstBuncher.Timer.Server
+
+  @impl true
+  defdelegate await_ready(runtime, opts), to: Jido.Examples.BurstBuncher.Timer.Server
+
+  @impl true
+  defdelegate child_spec(init), to: Jido.Examples.BurstBuncher.Timer.Server
 
   alias Jido.Examples.BurstBuncher.Timer.{Cancel, Replace}
   alias Jido.Signal
@@ -18,7 +31,7 @@ defmodule Jido.Examples.BurstBuncher.Timer do
 end
 
 defmodule Jido.Examples.BurstBuncher.Timer.Agent do
-  use Jido.Agent.Plugin
+  @behaviour Jido.Plugin
   alias Jido.Examples.BurstBuncher.Timer.{Cancel, Replace}
 
   @impl true
@@ -26,7 +39,7 @@ defmodule Jido.Examples.BurstBuncher.Timer.Agent do
 end
 
 defmodule Jido.Examples.BurstBuncher.Timer.Server do
-  use Jido.AgentServer.Plugin
+  @behaviour Jido.Plugin
   alias Jido.Examples.BurstBuncher.Timer.Runtime
   alias Jido.Plugin.{DirectiveContext, Init}
 
@@ -45,6 +58,7 @@ defmodule Jido.Examples.BurstBuncher.Timer.Server do
   end
 
   @doc false
+  @impl true
   def child_spec(%Init{} = init) do
     Supervisor.child_spec({Runtime, init}, id: Jido.Examples.BurstBuncher.Timer)
   end

@@ -63,23 +63,35 @@ defmodule JidoTest.Authoring.Agents.Fixtures.SetText do
 end
 
 defmodule JidoTest.Authoring.Agents.Fixtures.FirstFacet do
-  use Jido.Agent.Plugin
+  @behaviour Jido.Plugin
   def state_spec(_opts), do: {:first, Zoi.integer() |> Zoi.default(0)}
   def reduce(reduction, _opts), do: {:ok, reduction.state.value + 1}
 end
 
 defmodule JidoTest.Authoring.Agents.Fixtures.FirstPlugin do
-  use Jido.Plugin, agent: JidoTest.Authoring.Agents.Fixtures.FirstFacet
+  use Jido.Plugin
+
+  @impl true
+  defdelegate state_spec(opts), to: JidoTest.Authoring.Agents.Fixtures.FirstFacet
+
+  @impl true
+  defdelegate reduce(reduction, opts), to: JidoTest.Authoring.Agents.Fixtures.FirstFacet
 end
 
 defmodule JidoTest.Authoring.Agents.Fixtures.SecondFacet do
-  use Jido.Agent.Plugin
+  @behaviour Jido.Plugin
   def state_spec(_opts), do: {:second, Zoi.integer() |> Zoi.default(0)}
   def reduce(reduction, _opts), do: {:ok, reduction.state.first}
 end
 
 defmodule JidoTest.Authoring.Agents.Fixtures.SecondPlugin do
-  use Jido.Plugin, agent: JidoTest.Authoring.Agents.Fixtures.SecondFacet
+  use Jido.Plugin
+
+  @impl true
+  defdelegate state_spec(opts), to: JidoTest.Authoring.Agents.Fixtures.SecondFacet
+
+  @impl true
+  defdelegate reduce(reduction, opts), to: JidoTest.Authoring.Agents.Fixtures.SecondFacet
 end
 
 defmodule JidoTest.Authoring.Agents.Fixtures.ViaExtension do

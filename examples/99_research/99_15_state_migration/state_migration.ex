@@ -25,11 +25,24 @@ end
 
 defmodule Jido.Examples.StateMigration.Audit do
   @moduledoc "Owns audit state whose static schema accepts both formats."
-  use Jido.Plugin, agent: __MODULE__.Agent, agent_server: __MODULE__.Server
+  use Jido.Plugin
+
+  @impl true
+  defdelegate state_spec(opts), to: Jido.Examples.StateMigration.Audit.Agent
+
+  @impl true
+  defdelegate directives(opts), to: Jido.Examples.StateMigration.Audit.Agent
+
+  @impl true
+  defdelegate reduce(reduction, opts), to: Jido.Examples.StateMigration.Audit.Agent
+
+  @impl true
+  defdelegate dispatch(runtime, directive, context, opts),
+    to: Jido.Examples.StateMigration.Audit.Server
 end
 
 defmodule Jido.Examples.StateMigration.Audit.Agent do
-  use Jido.Agent.Plugin
+  @behaviour Jido.Plugin
   alias Jido.Examples.StateMigration.UpgradeAudit
 
   def state_spec(_) do
@@ -63,7 +76,7 @@ defmodule Jido.Examples.StateMigration.Audit.Agent do
 end
 
 defmodule Jido.Examples.StateMigration.Audit.Server do
-  use Jido.AgentServer.Plugin
+  @behaviour Jido.Plugin
 
   @impl true
   def dispatch(_, _, _, _), do: :ok

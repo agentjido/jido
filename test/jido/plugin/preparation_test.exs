@@ -4,7 +4,7 @@ defmodule Jido.Plugin.PreparationTest do
   alias Jido.AgentServer, as: Server
 
   defmodule PrepareFacet do
-    use Jido.Agent.Plugin
+    @behaviour Jido.Plugin
 
     alias Jido.Agent.Plugin.{Preparation, Reduction}
 
@@ -64,7 +64,16 @@ defmodule Jido.Plugin.PreparationTest do
   end
 
   defmodule Package do
-    use Jido.Plugin, agent: Jido.Plugin.PreparationTest.PrepareFacet
+    use Jido.Plugin
+
+    @impl true
+    defdelegate state_spec(opts), to: Jido.Plugin.PreparationTest.PrepareFacet
+
+    @impl true
+    defdelegate prepare(preparation, opts), to: Jido.Plugin.PreparationTest.PrepareFacet
+
+    @impl true
+    defdelegate reduce(reduction, opts), to: Jido.Plugin.PreparationTest.PrepareFacet
   end
 
   defmodule Capture do

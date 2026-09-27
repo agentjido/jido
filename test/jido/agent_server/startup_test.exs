@@ -9,19 +9,25 @@ defmodule Jido.AgentServer.StartupTest do
   end
 
   defmodule IgnoredRuntimePlugin do
-    use Jido.Plugin, agent_server: __MODULE__.Server
+    use Jido.Plugin
+
+    @impl true
+    defdelegate child_spec(init), to: Jido.AgentServer.StartupTest.IgnoredRuntimePlugin.Server
     def start_link(_init), do: :ignore
   end
 
   defmodule IgnoredRuntimePlugin.Server do
-    use Jido.AgentServer.Plugin
+    @behaviour Jido.Plugin
 
     def child_spec(init),
       do: %{id: IgnoredRuntimePlugin, start: {IgnoredRuntimePlugin, :start_link, [init]}}
   end
 
   defmodule HeldIgnoredRuntimePlugin do
-    use Jido.Plugin, agent_server: __MODULE__.Server
+    use Jido.Plugin
+
+    @impl true
+    defdelegate child_spec(init), to: Jido.AgentServer.StartupTest.HeldIgnoredRuntimePlugin.Server
 
     def start_link(init) do
       observer = :persistent_term.get({__MODULE__, :observer, init.options[:observer_key]})
@@ -34,7 +40,7 @@ defmodule Jido.AgentServer.StartupTest do
   end
 
   defmodule HeldIgnoredRuntimePlugin.Server do
-    use Jido.AgentServer.Plugin
+    @behaviour Jido.Plugin
 
     def child_spec(init),
       do: %{id: HeldIgnoredRuntimePlugin, start: {HeldIgnoredRuntimePlugin, :start_link, [init]}}

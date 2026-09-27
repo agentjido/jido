@@ -1,10 +1,13 @@
 defmodule JidoCoreBench.SchemaPlugin do
   @moduledoc false
-  use Jido.Plugin, agent: __MODULE__.Agent
+  use Jido.Plugin
+
+  @impl true
+  defdelegate state_spec(opts), to: JidoCoreBench.SchemaPlugin.Agent
 end
 
 defmodule JidoCoreBench.SchemaPlugin.Agent do
-  use Jido.Agent.Plugin
+  @behaviour Jido.Plugin
 
   def state_spec(opts) do
     {:owned,

@@ -29,12 +29,15 @@ end
 
 defmodule JidoTest.FeatureObserver do
   @moduledoc false
-  use Jido.Plugin, agent_server: JidoTest.FeatureObserver.Server
+  use Jido.Plugin
+
+  @impl true
+  defdelegate admit(runtime, admission, opts), to: JidoTest.FeatureObserver.Server
 end
 
 defmodule JidoTest.FeatureObserver.Server do
   @moduledoc false
-  use Jido.AgentServer.Plugin
+  @behaviour Jido.Plugin
 
   alias Jido.AgentServer.Plugin.Admission
 

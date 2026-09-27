@@ -1,6 +1,6 @@
 defmodule Jido.Plugin.SensorManager.Server do
   @moduledoc "Owns supervised sensor reconciliation after Agent commits."
-  use Jido.AgentServer.Plugin
+  @behaviour Jido.Plugin
 
   alias Jido.Plugin.{DirectiveContext, Init}
   alias Jido.Plugin.SensorManager
@@ -36,6 +36,7 @@ defmodule Jido.Plugin.SensorManager.Server do
     :exit, reason -> {:error, {:sensor_manager_runtime_unavailable, reason}}
   end
 
+  @impl true
   def child_spec(%Init{} = init) do
     Supervisor.child_spec({Runtime, init}, id: SensorManager)
   end

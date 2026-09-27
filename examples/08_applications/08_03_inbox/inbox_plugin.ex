@@ -1,10 +1,13 @@
 defmodule Jido.Examples.Applications.Inbox.Plugin do
   @moduledoc "Owns a small input runtime that translates external events into Signals."
-  use Jido.Plugin, agent_server: __MODULE__.Server
+  use Jido.Plugin
+
+  @impl true
+  defdelegate child_spec(init), to: Jido.Examples.Applications.Inbox.Plugin.Server
 end
 
 defmodule Jido.Examples.Applications.Inbox.Plugin.Server do
-  use Jido.AgentServer.Plugin
+  @behaviour Jido.Plugin
 
   alias Jido.Plugin.Init
   alias Jido.Examples.Applications.Inbox.Runtime

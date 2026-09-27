@@ -18,5 +18,8 @@ defmodule Jido.Plugin.Bus.Manager do
   `Jido.Plugin.Bus.Client` so the Bus exists before the Client starts.
   """
 
-  use Jido.Plugin, agent_server: Jido.Plugin.Bus.Manager.Server
+  use Jido.Plugin
+
+  @impl true
+  defdelegate child_spec(init), to: Jido.Plugin.Bus.Manager.Server
 end

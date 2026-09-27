@@ -27,7 +27,17 @@ end
 defmodule Jido.Examples.DirectiveAgent.Effects do
   @moduledoc "A real Plugin runtime that records post-commit dispatch observations."
 
-  use Jido.Plugin, agent: __MODULE__.Agent, agent_server: __MODULE__.Server
+  use Jido.Plugin
+
+  @impl true
+  defdelegate directives(opts), to: Jido.Examples.DirectiveAgent.Effects.Agent
+
+  @impl true
+  defdelegate dispatch(runtime, directive, context, opts),
+    to: Jido.Examples.DirectiveAgent.Effects.Server
+
+  @impl true
+  defdelegate child_spec(init), to: Jido.Examples.DirectiveAgent.Effects.Server
 
   def records(server) do
     %{pid: runtime} = Jido.AgentServer.children(server)[{:plugin, __MODULE__}]
@@ -36,7 +46,7 @@ defmodule Jido.Examples.DirectiveAgent.Effects do
 end
 
 defmodule Jido.Examples.DirectiveAgent.Effects.Agent do
-  use Jido.Agent.Plugin
+  @behaviour Jido.Plugin
   alias Jido.Examples.DirectiveAgent.Record
 
   @impl true
@@ -44,13 +54,14 @@ defmodule Jido.Examples.DirectiveAgent.Effects.Agent do
 end
 
 defmodule Jido.Examples.DirectiveAgent.Effects.Server do
-  use Jido.AgentServer.Plugin
+  @behaviour Jido.Plugin
   alias Jido.Examples.DirectiveAgent.EffectRuntime
 
   @impl true
   def dispatch(runtime, directive, context, _opts),
     do: GenServer.call(runtime, {:record, directive, context})
 
+  @impl true
   def child_spec(init),
     do: Supervisor.child_spec({EffectRuntime, init}, id: Jido.Examples.DirectiveAgent.Effects)
 end

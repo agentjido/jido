@@ -14,13 +14,13 @@ defmodule Jido.Agent.FlowEffectsTest do
   end
 
   defmodule AgentFacet do
-    use Jido.Agent.Plugin
+    @behaviour Jido.Plugin
     @impl true
     def directives(_), do: [Submit]
   end
 
   defmodule ServerFacet do
-    use Jido.AgentServer.Plugin
+    @behaviour Jido.Plugin
     @impl true
     def dispatch(_, request, context, _) do
       server = Jido.whereis_agent(context.jido, context.agent_id, partition: context.partition)
@@ -32,7 +32,14 @@ defmodule Jido.Agent.FlowEffectsTest do
   end
 
   defmodule Plugin do
-    use Jido.Plugin, agent: AgentFacet, agent_server: ServerFacet
+    use Jido.Plugin
+
+    @impl true
+    defdelegate directives(opts), to: Jido.Agent.FlowEffectsTest.AgentFacet
+
+    @impl true
+    defdelegate dispatch(runtime, directive, context, opts),
+      to: Jido.Agent.FlowEffectsTest.ServerFacet
   end
 
   defmodule Approve do

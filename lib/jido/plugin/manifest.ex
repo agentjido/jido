@@ -1,9 +1,9 @@
 defmodule Jido.Plugin.Manifest do
   @moduledoc """
-  Static owner-facet metadata for one Plugin package.
+  Static callback metadata for one Plugin package.
 
   A manifest contains module identities, a positive package version, and an
-  optional mapping from common declaration options to each facet. It contains
+  optional mapping from common declaration options to each callback owner. It contains
   no callback, process, Turn, persistence record, or Topology plan data.
   """
 
@@ -31,16 +31,16 @@ defmodule Jido.Plugin.Manifest do
           option_keys: %{optional(owner()) => [atom()]}
         }
 
-  @doc "Returns the closed list of Plugin facet owners."
+  @doc "Returns the closed list of Plugin callback owners."
   @spec owners() :: [owner()]
   def owners, do: @owners
 
-  @doc "Returns the facet module for one owner."
+  @doc "Returns the Plugin module when it has callbacks for an owner."
   @spec facet(t(), owner()) :: module() | nil
   def facet(%__MODULE__{} = manifest, owner) when owner in @owners,
     do: Map.fetch!(manifest, owner)
 
-  @doc "Returns the declaration options assigned to one facet."
+  @doc "Returns the declaration options assigned to one callback owner."
   @spec options_for(t(), owner(), keyword()) :: keyword()
   def options_for(%__MODULE__{option_keys: option_keys}, owner, options)
       when owner in @owners and is_list(options) do
@@ -81,10 +81,15 @@ defmodule Jido.Plugin.Manifest do
 
     cond do
       Enum.all?(facets, &is_nil/1) ->
-        invalid("Plugin manifest must select at least one facet", %{plugin: manifest.module})
+        invalid("Plugin must define at least one callback", %{plugin: manifest.module})
 
-      invalid = Enum.find(facets, &(not is_nil(&1) and not is_atom(&1))) ->
-        invalid("Plugin facet module is invalid", %{plugin: manifest.module, facet: invalid})
+      Enum.any?(facets, &(not is_nil(&1) and &1 != manifest.module)) ->
+        invalid = Enum.find(facets, &(not is_nil(&1) and &1 != manifest.module))
+
+        invalid("Plugin callbacks must belong to the Plugin module", %{
+          plugin: manifest.module,
+          facet: invalid
+        })
 
       true ->
         :ok

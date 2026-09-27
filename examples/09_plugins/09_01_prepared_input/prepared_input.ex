@@ -1,14 +1,7 @@
 defmodule Jido.Examples.Plugins.PreparedInput.Plugin do
   @moduledoc "Prepares one portable tenant input without changing the Signal."
 
-  use Jido.Plugin,
-    agent: Jido.Examples.Plugins.PreparedInput.Plugin.Agent,
-    option_keys: [agent: [:subject_prefix]]
-end
-
-defmodule Jido.Examples.Plugins.PreparedInput.Plugin.Agent do
-  @moduledoc false
-  use Jido.Agent.Plugin
+  use Jido.Plugin, option_keys: [agent: [:subject_prefix]]
 
   alias Jido.Agent.Plugin.Preparation
 

@@ -32,7 +32,19 @@ end
 
 defmodule Jido.Examples.Factory.Async do
   @moduledoc "Starts linked tasks after commit and returns results through Signals. No replay is implied."
-  use Jido.Plugin, agent: __MODULE__.Agent, agent_server: __MODULE__.Server
+  use Jido.Plugin
+
+  @impl true
+  defdelegate directives(opts), to: Jido.Examples.Factory.Async.Agent
+
+  @impl true
+  defdelegate child_spec(init), to: Jido.Examples.Factory.Async.Server
+
+  @impl true
+  defdelegate await_ready(runtime, opts), to: Jido.Examples.Factory.Async.Server
+
+  @impl true
+  defdelegate dispatch(runtime, directive, context, opts), to: Jido.Examples.Factory.Async.Server
 
   @doc false
   def result_schema do
@@ -46,7 +58,7 @@ defmodule Jido.Examples.Factory.Async do
 end
 
 defmodule Jido.Examples.Factory.Async.Agent do
-  use Jido.Agent.Plugin
+  @behaviour Jido.Plugin
   alias Jido.Examples.Factory.Async.{Cancel, Forget, Request}
 
   @impl true
@@ -54,9 +66,10 @@ defmodule Jido.Examples.Factory.Async.Agent do
 end
 
 defmodule Jido.Examples.Factory.Async.Server do
-  use Jido.AgentServer.Plugin
+  @behaviour Jido.Plugin
   alias Jido.Examples.Factory.Async.Runtime
 
+  @impl true
   def child_spec(init),
     do: Supervisor.child_spec({Runtime, init}, id: Jido.Examples.Factory.Async)
 

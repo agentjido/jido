@@ -1,14 +1,7 @@
 defmodule Jido.Examples.Plugins.RuntimeAdmission.Plugin do
   @moduledoc "Adds one live authorization input from private runtime state."
 
-  use Jido.Plugin,
-    agent_server: Jido.Examples.Plugins.RuntimeAdmission.Plugin.Server,
-    option_keys: [agent_server: [:tokens]]
-end
-
-defmodule Jido.Examples.Plugins.RuntimeAdmission.Plugin.Server do
-  @moduledoc false
-  use Jido.AgentServer.Plugin
+  use Jido.Plugin, option_keys: [agent_server: [:tokens]]
 
   alias Jido.AgentServer.Plugin.Admission
   alias Jido.Examples.Plugins.RuntimeAdmission.Runtime
@@ -25,6 +18,7 @@ defmodule Jido.Examples.Plugins.RuntimeAdmission.Plugin.Server do
     end
   end
 
+  @impl true
   def child_spec(%Init{} = init), do: Supervisor.child_spec({Runtime, init}, id: __MODULE__)
 end
 

@@ -6,7 +6,7 @@ end
 
 defmodule JidoTest.CommitProjection.AgentFacet do
   @moduledoc false
-  use Jido.Agent.Plugin
+  @behaviour Jido.Plugin
 
   def state_spec(opts), do: {Keyword.fetch!(opts, :key), Zoi.integer() |> Zoi.default(0)}
 
@@ -18,7 +18,7 @@ end
 
 defmodule JidoTest.CommitProjection.ServerFacet do
   @moduledoc false
-  use Jido.AgentServer.Plugin
+  @behaviour Jido.Plugin
 
   def after_commit(runtime, commit, opts) do
     sink = Keyword.fetch!(opts, :sink)
@@ -71,27 +71,54 @@ end
 
 defmodule JidoTest.CommitProjection.First do
   @moduledoc false
-  use Jido.Plugin,
-    agent: JidoTest.CommitProjection.AgentFacet,
-    agent_server: JidoTest.CommitProjection.ServerFacet
+  use Jido.Plugin
+
+  @impl true
+  defdelegate state_spec(opts), to: JidoTest.CommitProjection.AgentFacet
+
+  @impl true
+  defdelegate directives(opts), to: JidoTest.CommitProjection.AgentFacet
+
+  @impl true
+  defdelegate reduce(reduction, opts), to: JidoTest.CommitProjection.AgentFacet
+
+  @impl true
+  defdelegate after_commit(runtime, commit, opts), to: JidoTest.CommitProjection.ServerFacet
+
+  @impl true
+  defdelegate dispatch(runtime, directive, context, opts),
+    to: JidoTest.CommitProjection.ServerFacet
 end
 
 defmodule JidoTest.CommitProjection.Second do
   @moduledoc false
-  use Jido.Plugin,
-    agent: JidoTest.CommitProjection.AgentFacet,
-    agent_server: JidoTest.CommitProjection.NotificationFacet
+  use Jido.Plugin
+
+  @impl true
+  defdelegate state_spec(opts), to: JidoTest.CommitProjection.AgentFacet
+
+  @impl true
+  defdelegate directives(opts), to: JidoTest.CommitProjection.AgentFacet
+
+  @impl true
+  defdelegate reduce(reduction, opts), to: JidoTest.CommitProjection.AgentFacet
+
+  @impl true
+  defdelegate after_commit(runtime, commit, opts), to: JidoTest.CommitProjection.NotificationFacet
 end
 
 defmodule JidoTest.CommitProjection.NotificationFacet do
   @moduledoc false
-  use Jido.AgentServer.Plugin
+  @behaviour Jido.Plugin
   defdelegate after_commit(runtime, commit, opts), to: JidoTest.CommitProjection.ServerFacet
 end
 
 defmodule JidoTest.CommitProjection.Stateless do
   @moduledoc false
-  use Jido.Plugin, agent_server: JidoTest.CommitProjection.NotificationFacet
+  use Jido.Plugin
+
+  @impl true
+  defdelegate after_commit(runtime, commit, opts), to: JidoTest.CommitProjection.NotificationFacet
 end
 
 defmodule JidoTest.CommitProjection.Runtime do
@@ -116,7 +143,7 @@ end
 
 defmodule JidoTest.CommitProjection.RuntimeFacet do
   @moduledoc false
-  use Jido.AgentServer.Plugin
+  @behaviour Jido.Plugin
 
   def child_spec(init), do: Supervisor.child_spec({JidoTest.CommitProjection.Runtime, init}, [])
   def after_commit(runtime, commit, _opts), do: GenServer.call(runtime, {:commit, commit})
@@ -124,9 +151,22 @@ end
 
 defmodule JidoTest.CommitProjection.Projection do
   @moduledoc false
-  use Jido.Plugin,
-    agent: JidoTest.CommitProjection.AgentFacet,
-    agent_server: JidoTest.CommitProjection.RuntimeFacet
+  use Jido.Plugin
+
+  @impl true
+  defdelegate state_spec(opts), to: JidoTest.CommitProjection.AgentFacet
+
+  @impl true
+  defdelegate directives(opts), to: JidoTest.CommitProjection.AgentFacet
+
+  @impl true
+  defdelegate reduce(reduction, opts), to: JidoTest.CommitProjection.AgentFacet
+
+  @impl true
+  defdelegate child_spec(init), to: JidoTest.CommitProjection.RuntimeFacet
+
+  @impl true
+  defdelegate after_commit(runtime, commit, opts), to: JidoTest.CommitProjection.RuntimeFacet
 end
 
 defmodule JidoTest.CommitProjection.Update do

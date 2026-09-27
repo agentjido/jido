@@ -1,14 +1,9 @@
-defmodule Jido.Examples.Plugins.PersistedState.AgentFacet do
-  @moduledoc "Owns the Agent's integer state value."
-  use Jido.Agent.Plugin
+defmodule Jido.Examples.Plugins.PersistedState.Package do
+  @moduledoc "Owns one state value and converts it for persistence."
+  use Jido.Plugin
 
   @impl true
   def state_spec(_opts), do: {:owned, Zoi.integer() |> Zoi.default(0)}
-end
-
-defmodule Jido.Examples.Plugins.PersistedState.PersistenceFacet do
-  @moduledoc "Converts only the owned integer to and from its stored value."
-  use Jido.Persistence.Plugin
 
   @owned_prefix "owned:"
 
@@ -25,11 +20,4 @@ defmodule Jido.Examples.Plugins.PersistedState.PersistenceFacet do
   end
 
   def load(_value, _context, _opts), do: {:error, :invalid_owned_value}
-end
-
-defmodule Jido.Examples.Plugins.PersistedState.Package do
-  @moduledoc "Pairs one Agent-owned state value with its Persistence facet."
-  use Jido.Plugin,
-    agent: Jido.Examples.Plugins.PersistedState.AgentFacet,
-    persistence: Jido.Examples.Plugins.PersistedState.PersistenceFacet
 end

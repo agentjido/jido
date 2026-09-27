@@ -208,7 +208,7 @@ end
 Replace patch returns such as `{:ok, %{count: next_count}}` with complete state
 based on `context.agent_state`. Do not copy V2 StateOps into the new result.
 The Action must preserve protected Plugin-owned state keys. The owning Agent
-Plugin facet changes those keys through `reduce/2`.
+Plugin reducer changes those keys through `reduce/2`.
 
 Replace `signal_routes` with definition routes or the declarative `routes` block.
 Move a sequence of Actions into a Flow when it represents one command. A Flow
@@ -272,9 +272,9 @@ The Server no longer exposes the old GenServer State structure.
 | Domain calculation or branching | Action or Flow |
 | State machine domain state | Fields in the Agent schema and explicit transitions |
 | Pure input preparation | Action or Flow input handling |
-| Admission that needs live state or a resource | `c:Jido.AgentServer.Plugin.admit/3` |
-| Plugin-owned state update | `c:Jido.Agent.Plugin.reduce/2` |
-| Runtime work after commit | Typed Plugin Directive and `c:Jido.AgentServer.Plugin.dispatch/4` |
+| Admission that needs live state or a resource | `c:Jido.Plugin.admit/3` |
+| Plugin-owned state update | `c:Jido.Plugin.reduce/2` |
+| Runtime work after commit | Typed Plugin Directive and `c:Jido.Plugin.dispatch/4` |
 | Observation | Public snapshots/status and V3 telemetry |
 
 There is no callback-for-callback Strategy adapter. Rebuild behavior around
@@ -303,18 +303,18 @@ end
 
 ### What you need to change
 
-In V3, declare explicit roles and put their callbacks in the package module:
+In V3, define the required callbacks in one Plugin module:
 
 ```elixir
 defmodule MyApp.CounterPlugin do
-  use Jido.Plugin, roles: [:agent]
+  use Jido.Plugin
 
-  @impl Jido.Agent.Plugin
+  @impl Jido.Plugin
   def state_spec(_opts) do
     {:counter_plugin, Zoi.object(%{turns: Zoi.integer()}) |> Zoi.default(%{turns: 0})}
   end
 
-  @impl Jido.Agent.Plugin
+  @impl Jido.Plugin
   def reduce(%Jido.Agent.Plugin.Reduction{} = reduction, _opts) do
     {:ok, %{reduction.plugin_state | turns: reduction.plugin_state.turns + 1}}
   end
@@ -327,14 +327,17 @@ successful candidate reductions; only a successful live commit stores the count.
 Set a default on the owned object itself when the key can be absent. A default
 on a nested field alone does not create the outer Plugin-owned state object.
 
-Existing V3 separate-facet declarations remain valid. To move callbacks into a
-package, replace that owner's facet option with its entry in `roles`. Move only
-the callbacks for that role. Keep the package module, `vsn`, common options,
-`option_keys`, and state key unchanged. Stored Plugin declarations still contain
-only the package and its options, so this source change needs no data migration.
-The callback module in diagnostics and Telemetry becomes the package module.
-Audit and Heartbeat now use local roles; their former facet modules remain
-available for reuse.
+Earlier V3 role lists and separate facet declarations are removed. Replace
+`use Jido.Plugin, roles: [...]` or facet selectors with `use Jido.Plugin`.
+Move the callbacks into the Plugin module, or delegate them to ordinary helper
+modules. Replace owner behaviour annotations with `@impl true`. The owner
+modules no longer provide `use` macros or authoring behaviours.
+
+Keep the Plugin module, `vsn`, options, `option_keys`, and state key unchanged.
+Stored declarations contain only the Plugin module and options, so this source
+migration needs no data migration when those values stay unchanged. Diagnostics
+and Telemetry now name the Plugin module as the callback module. The redundant
+Audit and Heartbeat facet adapters are removed; use the Plugin modules directly.
 
 A declared `after_commit/3` hook is a required step before Directive dispatch.
 Failure or timeout skips later hooks and Directives and uses the existing error
@@ -349,20 +352,20 @@ Port each capability explicitly:
 | Manifest, requirements, automatic routes | Declare Plugins and routes on the Agent explicitly |
 | `mount/2` | Put portable defaults in the state schema; put runtime setup in an owned child |
 | Signal or Action preparation hooks | Move pure input work into the Action or Flow; use Agent Server admission for live checks |
-| Live admission | Use `c:Jido.AgentServer.Plugin.admit/3` |
-| Emit preparation | Use `c:Jido.AgentServer.Plugin.prepare_dispatch/4` with its Signal context |
-| `transform_result/3` | Put domain transformations in the Action or Flow; use `c:Jido.Agent.Plugin.reduce/2` only for its owned Agent field |
-| `DirectiveExec` or `directive_handler` | Implement `Jido.Agent.Directive.validate/1`, declare the type in the Agent facet, and implement `dispatch/4` in the Agent Server facet |
-| `child_spec(config)` | Put `child_spec/1` in the Agent Server facet; accept `Jido.Plugin.Init` and read `init.options` |
-| Plugin checkpoint or restore hooks | Use `c:Jido.Persistence.Plugin.dump/3` and `c:Jido.Persistence.Plugin.load/3` for one paired owned value |
-| Static topology metadata | Use `c:Jido.Topology.Plugin.contribute/2` for bounded canonical entries |
+| Live admission | Use `c:Jido.Plugin.admit/3` |
+| Emit preparation | Use `c:Jido.Plugin.prepare_dispatch/4` with its Signal context |
+| `transform_result/3` | Put domain transformations in the Action or Flow; use `c:Jido.Plugin.reduce/2` only for its owned Agent field |
+| `DirectiveExec` or `directive_handler` | Implement `Jido.Agent.Directive.validate/1`, declare the type in the Agent callbacks, and implement `dispatch/4` in the Agent Server callbacks |
+| `child_spec(config)` | Put `child_spec/1` in the Agent Server callbacks; accept `Jido.Plugin.Init` and read `init.options` |
+| Plugin checkpoint or restore hooks | Use `c:Jido.Plugin.dump/3` and `c:Jido.Plugin.load/3` for one paired owned value |
+| Static topology metadata | Use `c:Jido.Plugin.contribute/2` for bounded canonical entries |
 
 A runtime root must be permanent and owned. Use `Jido.Plugin.state/1` to read
 committed owned state after a restart. `Init` does not contain a state snapshot
 or state version. `await_ready/2` can wait for reconstruction; readiness failure
 stops the owner. A Plugin without a child receives `nil` in `dispatch/4`.
 
-Each Agent facet receives only its owned state and owned Directives. This is a
+Each reducer can change only its owned state. This is a
 callback API boundary. It is not a sandbox for untrusted BEAM code.
 
 **Check:** test owned state protection, callback order, readiness, owner shutdown,

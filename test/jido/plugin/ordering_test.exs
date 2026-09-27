@@ -9,11 +9,17 @@ defmodule Jido.Plugin.OrderingTest do
   end
 
   defmodule FirstStatePlugin do
-    use Jido.Plugin, agent: __MODULE__.Agent
+    use Jido.Plugin
+
+    @impl true
+    defdelegate state_spec(opts), to: Jido.Plugin.OrderingTest.FirstStatePlugin.Agent
+
+    @impl true
+    defdelegate reduce(reduction, opts), to: Jido.Plugin.OrderingTest.FirstStatePlugin.Agent
   end
 
   defmodule FirstStatePlugin.Agent do
-    use Jido.Agent.Plugin
+    @behaviour Jido.Plugin
 
     @impl true
     def state_spec(opts) do
@@ -31,11 +37,17 @@ defmodule Jido.Plugin.OrderingTest do
   end
 
   defmodule SecondStatePlugin do
-    use Jido.Plugin, agent: __MODULE__.Agent
+    use Jido.Plugin
+
+    @impl true
+    defdelegate state_spec(opts), to: Jido.Plugin.OrderingTest.SecondStatePlugin.Agent
+
+    @impl true
+    defdelegate reduce(reduction, opts), to: Jido.Plugin.OrderingTest.SecondStatePlugin.Agent
   end
 
   defmodule SecondStatePlugin.Agent do
-    use Jido.Agent.Plugin
+    @behaviour Jido.Plugin
 
     @impl true
     def state_spec(opts) do
@@ -58,47 +70,65 @@ defmodule Jido.Plugin.OrderingTest do
   end
 
   defmodule FirstDirectivePlugin do
-    use Jido.Plugin, agent: __MODULE__.Agent, agent_server: __MODULE__.Server
+    use Jido.Plugin
+
+    @impl true
+    defdelegate directives(opts), to: Jido.Plugin.OrderingTest.FirstDirectivePlugin.Agent
+
+    @impl true
+    defdelegate dispatch(runtime, directive, context, opts),
+      to: Jido.Plugin.OrderingTest.FirstDirectivePlugin.Server
   end
 
   defmodule FirstDirectivePlugin.Agent do
-    use Jido.Agent.Plugin
+    @behaviour Jido.Plugin
 
     @impl true
     def directives(_opts), do: [SharedDirective]
   end
 
   defmodule FirstDirectivePlugin.Server do
-    use Jido.AgentServer.Plugin
+    @behaviour Jido.Plugin
 
     @impl true
     def dispatch(_runtime, _directive, _context, _opts), do: :ok
   end
 
   defmodule SecondDirectivePlugin do
-    use Jido.Plugin, agent: __MODULE__.Agent, agent_server: __MODULE__.Server
+    use Jido.Plugin
+
+    @impl true
+    defdelegate directives(opts), to: Jido.Plugin.OrderingTest.SecondDirectivePlugin.Agent
+
+    @impl true
+    defdelegate dispatch(runtime, directive, context, opts),
+      to: Jido.Plugin.OrderingTest.SecondDirectivePlugin.Server
   end
 
   defmodule SecondDirectivePlugin.Agent do
-    use Jido.Agent.Plugin
+    @behaviour Jido.Plugin
 
     @impl true
     def directives(_opts), do: [SharedDirective]
   end
 
   defmodule SecondDirectivePlugin.Server do
-    use Jido.AgentServer.Plugin
+    @behaviour Jido.Plugin
 
     @impl true
     def dispatch(_runtime, _directive, _context, _opts), do: :ok
   end
 
   defmodule FirstAdmissionPlugin do
-    use Jido.Plugin, agent_server: __MODULE__.Server
+    use Jido.Plugin
+
+    @impl true
+    defdelegate admit(runtime, admission, opts),
+      to: Jido.Plugin.OrderingTest.FirstAdmissionPlugin.Server
   end
 
   defmodule FirstAdmissionPlugin.Server do
-    use Jido.AgentServer.Plugin
+    @behaviour Jido.Plugin
 
     @impl true
     def admit(runtime, _admission, _opts) do
@@ -108,11 +138,15 @@ defmodule Jido.Plugin.OrderingTest do
   end
 
   defmodule SecondAdmissionPlugin do
-    use Jido.Plugin, agent_server: __MODULE__.Server
+    use Jido.Plugin
+
+    @impl true
+    defdelegate admit(runtime, admission, opts),
+      to: Jido.Plugin.OrderingTest.SecondAdmissionPlugin.Server
   end
 
   defmodule SecondAdmissionPlugin.Server do
-    use Jido.AgentServer.Plugin
+    @behaviour Jido.Plugin
 
     @impl true
     def admit(runtime, _admission, opts) do
@@ -129,11 +163,15 @@ defmodule Jido.Plugin.OrderingTest do
   end
 
   defmodule ThirdAdmissionPlugin do
-    use Jido.Plugin, agent_server: __MODULE__.Server
+    use Jido.Plugin
+
+    @impl true
+    defdelegate admit(runtime, admission, opts),
+      to: Jido.Plugin.OrderingTest.ThirdAdmissionPlugin.Server
   end
 
   defmodule ThirdAdmissionPlugin.Server do
-    use Jido.AgentServer.Plugin
+    @behaviour Jido.Plugin
 
     @impl true
     def admit(runtime, _admission, _opts) do
@@ -143,7 +181,7 @@ defmodule Jido.Plugin.OrderingTest do
   end
 
   defmodule FirstReducerFacet do
-    use Jido.Agent.Plugin
+    @behaviour Jido.Plugin
 
     def state_spec(_opts), do: {:first_reduced, Zoi.integer() |> Zoi.default(0)}
 
@@ -152,11 +190,17 @@ defmodule Jido.Plugin.OrderingTest do
   end
 
   defmodule FirstReducerPackage do
-    use Jido.Plugin, agent: FirstReducerFacet
+    use Jido.Plugin
+
+    @impl true
+    defdelegate state_spec(opts), to: Jido.Plugin.OrderingTest.FirstReducerFacet
+
+    @impl true
+    defdelegate reduce(reduction, opts), to: Jido.Plugin.OrderingTest.FirstReducerFacet
   end
 
   defmodule SecondReducerFacet do
-    use Jido.Agent.Plugin
+    @behaviour Jido.Plugin
 
     def state_spec(_opts), do: {:second_observed, Zoi.integer() |> Zoi.default(0)}
 
@@ -167,22 +211,35 @@ defmodule Jido.Plugin.OrderingTest do
   end
 
   defmodule SecondReducerPackage do
-    use Jido.Plugin, agent: SecondReducerFacet
+    use Jido.Plugin
+
+    @impl true
+    defdelegate state_spec(opts), to: Jido.Plugin.OrderingTest.SecondReducerFacet
+
+    @impl true
+    defdelegate reduce(reduction, opts), to: Jido.Plugin.OrderingTest.SecondReducerFacet
   end
 
   defmodule FirstOutboundPlugin do
-    use Jido.Plugin, agent: __MODULE__.Agent, agent_server: __MODULE__.Server
+    use Jido.Plugin
+
+    @impl true
+    defdelegate state_spec(opts), to: Jido.Plugin.OrderingTest.FirstOutboundPlugin.Agent
+
+    @impl true
+    defdelegate prepare_dispatch(runtime, signal, context, opts),
+      to: Jido.Plugin.OrderingTest.FirstOutboundPlugin.Server
   end
 
   defmodule FirstOutboundPlugin.Agent do
-    use Jido.Agent.Plugin
+    @behaviour Jido.Plugin
 
     @impl true
     def state_spec(_opts), do: {:first, Zoi.atom() |> Zoi.default(:first_state)}
   end
 
   defmodule FirstOutboundPlugin.Server do
-    use Jido.AgentServer.Plugin
+    @behaviour Jido.Plugin
 
     @impl true
     def prepare_dispatch(runtime, signal, context, _opts) do
@@ -196,18 +253,25 @@ defmodule Jido.Plugin.OrderingTest do
   end
 
   defmodule SecondOutboundPlugin do
-    use Jido.Plugin, agent: __MODULE__.Agent, agent_server: __MODULE__.Server
+    use Jido.Plugin
+
+    @impl true
+    defdelegate state_spec(opts), to: Jido.Plugin.OrderingTest.SecondOutboundPlugin.Agent
+
+    @impl true
+    defdelegate prepare_dispatch(runtime, signal, context, opts),
+      to: Jido.Plugin.OrderingTest.SecondOutboundPlugin.Server
   end
 
   defmodule SecondOutboundPlugin.Agent do
-    use Jido.Agent.Plugin
+    @behaviour Jido.Plugin
 
     @impl true
     def state_spec(_opts), do: {:second, Zoi.atom() |> Zoi.default(:second_state)}
   end
 
   defmodule SecondOutboundPlugin.Server do
-    use Jido.AgentServer.Plugin
+    @behaviour Jido.Plugin
 
     @impl true
     def prepare_dispatch(runtime, signal, context, _opts) do
@@ -221,11 +285,15 @@ defmodule Jido.Plugin.OrderingTest do
   end
 
   defmodule InvalidOutboundPlugin do
-    use Jido.Plugin, agent_server: __MODULE__.Server
+    use Jido.Plugin
+
+    @impl true
+    defdelegate prepare_dispatch(runtime, signal, context, opts),
+      to: Jido.Plugin.OrderingTest.InvalidOutboundPlugin.Server
   end
 
   defmodule InvalidOutboundPlugin.Server do
-    use Jido.AgentServer.Plugin
+    @behaviour Jido.Plugin
 
     @impl true
     def prepare_dispatch(_runtime, signal, _context, _opts) do
@@ -235,11 +303,15 @@ defmodule Jido.Plugin.OrderingTest do
   end
 
   defmodule MustNotRunOutboundPlugin do
-    use Jido.Plugin, agent_server: __MODULE__.Server
+    use Jido.Plugin
+
+    @impl true
+    defdelegate prepare_dispatch(runtime, signal, context, opts),
+      to: Jido.Plugin.OrderingTest.MustNotRunOutboundPlugin.Server
   end
 
   defmodule MustNotRunOutboundPlugin.Server do
-    use Jido.AgentServer.Plugin
+    @behaviour Jido.Plugin
 
     @impl true
     def prepare_dispatch(_runtime, signal, _context, _opts) do

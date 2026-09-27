@@ -23,5 +23,5 @@ evaluation returns a candidate. Live execution commits the same reduction.
 
 Previous: [Composition](../09_05_composition/README.md) | Next: [Persisted State](../09_07_persisted_state/README.md)
 
-The Plugin declares `roles: [:agent]` and implements its callbacks in one module.
-The state ownership and reduction order are the same as separate facets.
+The Plugin uses `Jido.Plugin` and defines only its state callbacks.
+Core controls state ownership and reduction order.

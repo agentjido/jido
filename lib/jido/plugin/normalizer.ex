@@ -9,34 +9,8 @@ defmodule Jido.Plugin.Normalizer do
   alias Jido.Plugin.Error, as: PluginError
   alias Jido.Topology.Plugin.Spec, as: TopologySpec
 
-  @agent_callbacks [
-    prepare: 2,
-    state_spec: 1,
-    reduce: 2,
-    directives: 1,
-    update_state: 3,
-    validate_directive: 2
-  ]
-  @agent_capabilities Keyword.drop(@agent_callbacks, [:update_state, :validate_directive])
-
-  # Authority checks keep first-error order. Capability checks only test presence.
-  @server_callbacks [
-    validate_options: 1,
-    admit: 3,
-    prepare_dispatch: 4,
-    dispatch: 4,
-    await_ready: 2,
-    child_spec: 1,
-    after_commit: 3
-  ]
-  @server_capabilities Keyword.delete(@server_callbacks, :validate_options)
-  @persistence_callbacks [dump: 3, load: 3]
-  @topology_callbacks [contribute: 2]
-
-  @package_callbacks @agent_callbacks ++
-                       @server_callbacks ++
-                       @persistence_callbacks ++
-                       @topology_callbacks
+  @server_capabilities Jido.Plugin.owner_callbacks()[:agent_server]
+                       |> Keyword.delete(:validate_options)
 
   @doc false
   @spec normalize_all([Jido.Plugin.declaration()] | [Spec.t()]) ::
@@ -70,7 +44,7 @@ defmodule Jido.Plugin.Normalizer do
         if Enum.all?(values, &match?(%Spec{manifest: %Manifest{}}, &1)) do
           {:ok, values}
         else
-          PluginError.validation("Plugin specs require an owner-facet manifest", %{specs: values})
+          PluginError.validation("Plugin specs require a manifest", %{specs: values})
         end
 
       specs != [] ->
@@ -152,9 +126,7 @@ defmodule Jido.Plugin.Normalizer do
     facet = manifest.agent
     facet_options = Manifest.options_for(manifest, :agent, options)
 
-    with :ok <- validate_facet(manifest, facet, Jido.Agent.Plugin, :agent),
-         :ok <- facet_has_capability(facet, :agent),
-         do: build_agent_values(manifest.module, facet, facet_options)
+    build_agent_values(manifest.module, facet, facet_options)
   end
 
   defp build_agent_values(package, facet, options) do
@@ -180,8 +152,7 @@ defmodule Jido.Plugin.Normalizer do
     facet = manifest.agent_server
     facet_options = Manifest.options_for(manifest, :agent_server, options)
 
-    with :ok <- validate_facet(manifest, facet, Jido.AgentServer.Plugin, :agent_server),
-         :ok <- facet_has_capability(facet, :agent_server),
+    with :ok <- facet_has_capability(facet, :agent_server),
          :ok <- validate_server_options(manifest.module, facet, facet_options) do
       {:ok,
        %ServerSpec{
@@ -199,8 +170,7 @@ defmodule Jido.Plugin.Normalizer do
   defp build_persistence_spec(%Manifest{} = manifest, options) do
     facet = manifest.persistence
 
-    with :ok <- validate_facet(manifest, facet, Jido.Persistence.Plugin, :persistence),
-         true <- function_exported?(facet, :dump, 3) and function_exported?(facet, :load, 3) do
+    with true <- function_exported?(facet, :dump, 3) and function_exported?(facet, :load, 3) do
       {:ok,
        %PersistenceSpec{
          package: manifest.module,
@@ -214,9 +184,6 @@ defmodule Jido.Plugin.Normalizer do
           plugin: manifest.module,
           facet: facet
         })
-
-      {:error, _reason} = error ->
-        error
     end
   end
 
@@ -225,25 +192,13 @@ defmodule Jido.Plugin.Normalizer do
   defp build_topology_spec(%Manifest{} = manifest, options) do
     facet = manifest.topology
 
-    with :ok <- validate_facet(manifest, facet, Jido.Topology.Plugin, :topology),
-         true <- function_exported?(facet, :contribute, 2) do
-      {:ok,
-       %TopologySpec{
-         package: manifest.module,
-         module: facet,
-         options: Manifest.options_for(manifest, :topology, options),
-         vsn: manifest.vsn
-       }}
-    else
-      false ->
-        PluginError.validation("Topology Plugin facet must define contribute/2", %{
-          plugin: manifest.module,
-          facet: facet
-        })
-
-      {:error, _reason} = error ->
-        error
-    end
+    {:ok,
+     %TopologySpec{
+       package: manifest.module,
+       module: facet,
+       options: Manifest.options_for(manifest, :topology, options),
+       vsn: manifest.vsn
+     }}
   end
 
   defp validate_pair(package, agent, server, persistence, _topology) do
@@ -292,109 +247,31 @@ defmodule Jido.Plugin.Normalizer do
 
   defp invalid_package(module),
     do:
-      PluginError.validation("Plugin must use an owner-facet Jido.Plugin manifest", %{
+      PluginError.validation("Plugin must use Jido.Plugin", %{
         plugin: module
       })
 
   defp validate_package_callbacks(%Manifest{module: module} = manifest) do
-    roles = Enum.filter(Manifest.owners(), &(Manifest.facet(manifest, &1) == module))
-    allowed = Enum.flat_map(roles, &callbacks/1)
+    mismatch =
+      Enum.find(Jido.Plugin.owner_callbacks(), fn {owner, callbacks} ->
+        expected = if has_any?(module, callbacks), do: module
+        Manifest.facet(manifest, owner) != expected
+      end)
 
-    case Enum.find(@package_callbacks -- allowed, fn {function, arity} ->
-           function_exported?(module, function, arity)
-         end) do
-      nil ->
-        :ok
+    cond do
+      Jido.Plugin not in behaviours(module) ->
+        invalid_package(module)
 
-      callback when roles == [] ->
-        PluginError.validation("Plugin package manifest must not define facet callbacks", %{
+      mismatch ->
+        PluginError.validation("Plugin manifest must match its documented callbacks", %{
           plugin: module,
-          callback: callback
+          owner: elem(mismatch, 0)
         })
 
-      callback ->
-        PluginError.validation("Plugin package callback requires a declared role", %{
-          plugin: module,
-          roles: roles,
-          callback: callback
-        })
-    end
-  end
-
-  defp validate_facet(manifest, module, behaviour, owner) do
-    with :ok <- ensure_loaded(module),
-         true <- behaviour in behaviours(module),
-         :ok <- validate_facet_owner(manifest, module, owner) do
-      :ok
-    else
-      {:error, _reason} = error ->
-        error
-
-      _value ->
-        PluginError.validation("Plugin facet must use its owner behavior", %{
-          facet: module,
-          owner: owner,
-          behaviour: behaviour
-        })
-    end
-  rescue
-    error ->
-      PluginError.validation("Plugin facet metadata failed", %{
-        facet: module,
-        owner: owner,
-        error: error
-      })
-  catch
-    kind, reason ->
-      PluginError.validation("Plugin facet metadata failed", %{
-        facet: module,
-        owner: owner,
-        kind: kind,
-        reason: reason
-      })
-  end
-
-  # A package can hold several declared roles. Separate facets retain one owner.
-  defp validate_facet_owner(%Manifest{module: module}, module, _owner), do: :ok
-
-  defp validate_facet_owner(_manifest, module, owner) do
-    with true <- function_exported?(module, :__jido_plugin_facet__, 0),
-         ^owner <- module.__jido_plugin_facet__() do
-      validate_facet_authority(module, owner)
-    end
-  end
-
-  defp callbacks(:agent), do: @agent_callbacks
-  defp callbacks(:agent_server), do: @server_callbacks
-  defp callbacks(:persistence), do: @persistence_callbacks
-  defp callbacks(:topology), do: @topology_callbacks
-
-  defp validate_facet_authority(module, owner) do
-    foreign =
-      case owner do
-        :agent -> @server_callbacks ++ @persistence_callbacks ++ @topology_callbacks
-        :agent_server -> @agent_callbacks ++ @persistence_callbacks ++ @topology_callbacks
-        :persistence -> @agent_callbacks ++ @server_callbacks ++ @topology_callbacks
-        :topology -> @agent_callbacks ++ @server_callbacks ++ @persistence_callbacks
-      end
-
-    case Enum.find(foreign, fn {function, arity} ->
-           function_exported?(module, function, arity)
-         end) do
-      nil ->
+      true ->
         :ok
-
-      callback ->
-        PluginError.validation("Plugin facet defines a callback owned by another facet", %{
-          facet: module,
-          owner: owner,
-          callback: callback
-        })
     end
   end
-
-  defp facet_has_capability(module, :agent),
-    do: require_capability(module, :agent, @agent_capabilities)
 
   defp facet_has_capability(module, :agent_server),
     do: require_capability(module, :agent_server, @server_capabilities)

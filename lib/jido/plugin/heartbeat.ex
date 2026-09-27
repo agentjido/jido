@@ -16,7 +16,7 @@ defmodule Jido.Plugin.Heartbeat do
       ]
   """
 
-  use Jido.Plugin, roles: [:agent_server]
+  use Jido.Plugin
 
   alias Jido.Plugin.Heartbeat.Runtime
   alias Jido.Plugin.Init
@@ -40,6 +40,7 @@ defmodule Jido.Plugin.Heartbeat do
     end
   end
 
+  @impl true
   def child_spec(%Init{} = init) do
     Supervisor.child_spec({Runtime, init}, id: __MODULE__)
   end

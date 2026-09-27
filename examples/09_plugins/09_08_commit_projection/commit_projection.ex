@@ -38,7 +38,7 @@ end
 
 defmodule Jido.Examples.Plugins.CommitProjection.Package do
   @moduledoc "Reduces owned state and requires its live view to update after commit."
-  use Jido.Plugin, roles: [:agent, :agent_server]
+  use Jido.Plugin
 
   alias Jido.Examples.Plugins.CommitProjection.Runtime
 
@@ -48,6 +48,7 @@ defmodule Jido.Examples.Plugins.CommitProjection.Package do
   @impl true
   def reduce(reduction, _opts), do: {:ok, reduction.state.count}
 
+  @impl true
   def child_spec(init), do: Supervisor.child_spec({Runtime, init}, [])
 
   @impl true

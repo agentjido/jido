@@ -1,11 +1,11 @@
-defmodule Jido.Plugin.RolesRuntimeTest do
+defmodule Jido.Plugin.AuthoringRuntimeTest do
   use JidoTest.Case, async: false
 
   alias Jido.AgentServer, as: Server
   alias JidoTest.CommitProjection, as: Fixture
 
   defmodule LocalFirst do
-    use Jido.Plugin, roles: [:agent, :agent_server]
+    use Jido.Plugin
     defdelegate state_spec(opts), to: Fixture.AgentFacet
     defdelegate directives(opts), to: Fixture.AgentFacet
     defdelegate reduce(reduction, opts), to: Fixture.AgentFacet
@@ -14,7 +14,7 @@ defmodule Jido.Plugin.RolesRuntimeTest do
   end
 
   defmodule LocalSecond do
-    use Jido.Plugin, roles: [:agent, :agent_server]
+    use Jido.Plugin
     defdelegate state_spec(opts), to: Fixture.AgentFacet
     defdelegate directives(opts), to: Fixture.AgentFacet
     defdelegate reduce(reduction, opts), to: Fixture.AgentFacet
@@ -22,7 +22,7 @@ defmodule Jido.Plugin.RolesRuntimeTest do
   end
 
   defmodule RuntimeFacet do
-    use Jido.AgentServer.Plugin
+    @behaviour Jido.Plugin
     defdelegate child_spec(init), to: Fixture.RuntimeFacet
     defdelegate after_commit(runtime, commit, opts), to: Fixture.RuntimeFacet
 
@@ -35,12 +35,31 @@ defmodule Jido.Plugin.RolesRuntimeTest do
     end
   end
 
-  defmodule SeparateRuntime do
-    use Jido.Plugin, agent: Fixture.AgentFacet, agent_server: RuntimeFacet
+  defmodule DelegatedRuntime do
+    use Jido.Plugin
+
+    @impl true
+    defdelegate state_spec(opts), to: JidoTest.CommitProjection.AgentFacet
+
+    @impl true
+    defdelegate directives(opts), to: JidoTest.CommitProjection.AgentFacet
+
+    @impl true
+    defdelegate reduce(reduction, opts), to: JidoTest.CommitProjection.AgentFacet
+
+    @impl true
+    defdelegate child_spec(init), to: Jido.Plugin.AuthoringRuntimeTest.RuntimeFacet
+
+    @impl true
+    defdelegate after_commit(runtime, commit, opts),
+      to: Jido.Plugin.AuthoringRuntimeTest.RuntimeFacet
+
+    @impl true
+    defdelegate await_ready(runtime, opts), to: Jido.Plugin.AuthoringRuntimeTest.RuntimeFacet
   end
 
   defmodule LocalRuntime do
-    use Jido.Plugin, roles: [:agent, :agent_server]
+    use Jido.Plugin
     defdelegate state_spec(opts), to: Fixture.AgentFacet
     defdelegate reduce(reduction, opts), to: Fixture.AgentFacet
     defdelegate child_spec(init), to: RuntimeFacet
@@ -153,7 +172,7 @@ defmodule Jido.Plugin.RolesRuntimeTest do
     end
   end
 
-  for package <- [SeparateRuntime, LocalRuntime] do
+  for package <- [DelegatedRuntime, LocalRuntime] do
     @package package
     test "#{inspect(package)} gates readiness, replaces with fresh state, and stops its runtime",
          %{jido: jido} do

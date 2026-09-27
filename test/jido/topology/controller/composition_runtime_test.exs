@@ -6,12 +6,21 @@ defmodule Jido.Topology.Controller.CompositionRuntimeTest do
   alias Jido.Topology.{Controller, Ref}
 
   defmodule BlockReady do
-    use Jido.Plugin, agent_server: __MODULE__.Server
+    use Jido.Plugin
+
+    @impl true
+    defdelegate child_spec(init),
+      to: Jido.Topology.Controller.CompositionRuntimeTest.BlockReady.Server
+
+    @impl true
+    defdelegate await_ready(runtime, opts),
+      to: Jido.Topology.Controller.CompositionRuntimeTest.BlockReady.Server
   end
 
   defmodule BlockReady.Server do
-    use Jido.AgentServer.Plugin
+    @behaviour Jido.Plugin
 
+    @impl true
     def child_spec(_init) do
       %{id: BlockReady, start: {Elixir.Agent, :start_link, [fn -> :ready end]}}
     end

@@ -1,11 +1,14 @@
 defmodule Jido.Examples.Applications.BusInput do
   @moduledoc false
 
-  use Jido.Plugin, agent_server: __MODULE__.Server
+  use Jido.Plugin
+
+  @impl true
+  defdelegate child_spec(init), to: Jido.Examples.Applications.BusInput.Server
 end
 
 defmodule Jido.Examples.Applications.BusInput.Server do
-  use Jido.AgentServer.Plugin
+  @behaviour Jido.Plugin
 
   alias Jido.Plugin.Init
   alias Jido.Examples.Applications.BusInput.Runtime

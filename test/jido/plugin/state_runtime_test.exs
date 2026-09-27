@@ -14,11 +14,20 @@ defmodule Jido.Plugin.StateRuntimeTest do
   end
 
   defmodule Credits do
-    use Jido.Plugin, agent: __MODULE__.Agent
+    use Jido.Plugin
+
+    @impl true
+    defdelegate state_spec(opts), to: Jido.Plugin.StateRuntimeTest.Credits.Agent
+
+    @impl true
+    defdelegate directives(opts), to: Jido.Plugin.StateRuntimeTest.Credits.Agent
+
+    @impl true
+    defdelegate reduce(reduction, opts), to: Jido.Plugin.StateRuntimeTest.Credits.Agent
   end
 
   defmodule Credits.Agent do
-    use Jido.Agent.Plugin
+    @behaviour Jido.Plugin
 
     @impl true
     def state_spec(_opts), do: {:credits, Zoi.integer() |> Zoi.min(0) |> Zoi.default(3)}

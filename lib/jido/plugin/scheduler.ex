@@ -60,9 +60,25 @@ defmodule Jido.Plugin.Scheduler do
   state is not saved in the Agent checkpoint.
   """
 
-  use Jido.Plugin,
-    agent: Jido.Plugin.Scheduler.Agent,
-    agent_server: Jido.Plugin.Scheduler.Server
+  use Jido.Plugin
+
+  @impl true
+  defdelegate state_spec(opts), to: Jido.Plugin.Scheduler.Agent
+
+  @impl true
+  defdelegate directives(opts), to: Jido.Plugin.Scheduler.Agent
+
+  @impl true
+  defdelegate reduce(reduction, opts), to: Jido.Plugin.Scheduler.Agent
+
+  @impl true
+  defdelegate dispatch(runtime, directive, context, opts), to: Jido.Plugin.Scheduler.Server
+
+  @impl true
+  defdelegate await_ready(runtime, opts), to: Jido.Plugin.Scheduler.Server
+
+  @impl true
+  defdelegate child_spec(init), to: Jido.Plugin.Scheduler.Server
 
   alias Crontab.CronExpression.Parser
   alias Jido.PortableTerm

@@ -5,11 +5,28 @@ defmodule Jido.AgentServer.ContextTest do
   alias Jido.Signal
 
   defmodule ContextPlugin do
-    use Jido.Plugin, agent: __MODULE__.Agent, agent_server: __MODULE__.Server
+    use Jido.Plugin
+
+    @impl true
+    defdelegate state_spec(opts), to: Jido.AgentServer.ContextTest.ContextPlugin.Agent
+
+    @impl true
+    defdelegate reduce(reduction, opts), to: Jido.AgentServer.ContextTest.ContextPlugin.Agent
+
+    @impl true
+    defdelegate admit(runtime, admission, opts),
+      to: Jido.AgentServer.ContextTest.ContextPlugin.Server
+
+    @impl true
+    defdelegate prepare_dispatch(runtime, signal, context, opts),
+      to: Jido.AgentServer.ContextTest.ContextPlugin.Server
+
+    @impl true
+    defdelegate child_spec(init), to: Jido.AgentServer.ContextTest.ContextPlugin.Server
   end
 
   defmodule ContextPlugin.Agent do
-    use Jido.Agent.Plugin
+    @behaviour Jido.Plugin
 
     @impl true
     def state_spec(_opts), do: {:context_plugin, Zoi.integer() |> Zoi.default(0)}
@@ -19,7 +36,7 @@ defmodule Jido.AgentServer.ContextTest do
   end
 
   defmodule ContextPlugin.Server do
-    use Jido.AgentServer.Plugin
+    @behaviour Jido.Plugin
 
     @impl true
     def admit(_runtime, admission, _opts) do
@@ -51,6 +68,7 @@ defmodule Jido.AgentServer.ContextTest do
       {:ok, signal}
     end
 
+    @impl true
     def child_spec(init),
       do: Supervisor.child_spec({Elixir.Agent, fn -> init end}, id: ContextPlugin)
   end

@@ -8,7 +8,7 @@ defmodule Jido.Topology.PluginIntegrationTest do
 
   defmodule BusFacet do
     @moduledoc false
-    use Jido.Topology.Plugin
+    @behaviour Jido.Plugin
 
     def contribute(context, opts) do
       key = Keyword.get(opts, :fixed_bus, Keyword.fetch!(opts, :prefix) <> context.agent_key)
@@ -24,16 +24,18 @@ defmodule Jido.Topology.PluginIntegrationTest do
 
   defmodule BusPackage do
     @moduledoc false
-    use Jido.Plugin,
-      topology: BusFacet,
-      option_keys: [topology: [:prefix, :fixed_bus]]
+    use Jido.Plugin, option_keys: [topology: [:prefix, :fixed_bus]]
+
+    @impl true
+    defdelegate contribute(context, opts), to: Jido.Topology.PluginIntegrationTest.BusFacet
   end
 
   defmodule AuditPackage do
     @moduledoc false
-    use Jido.Plugin,
-      topology: BusFacet,
-      option_keys: [topology: [:prefix]]
+    use Jido.Plugin, option_keys: [topology: [:prefix]]
+
+    @impl true
+    defdelegate contribute(context, opts), to: Jido.Topology.PluginIntegrationTest.BusFacet
   end
 
   defmodule Worker do
@@ -57,7 +59,7 @@ defmodule Jido.Topology.PluginIntegrationTest do
 
   defmodule OwnershipFacet do
     @moduledoc false
-    use Jido.Topology.Plugin
+    @behaviour Jido.Plugin
 
     def contribute(context, opts) do
       {:ok,
@@ -76,9 +78,10 @@ defmodule Jido.Topology.PluginIntegrationTest do
 
   defmodule OwnershipPackage do
     @moduledoc false
-    use Jido.Plugin,
-      topology: OwnershipFacet,
-      option_keys: [topology: [:child]]
+    use Jido.Plugin, option_keys: [topology: [:child]]
+
+    @impl true
+    defdelegate contribute(context, opts), to: Jido.Topology.PluginIntegrationTest.OwnershipFacet
   end
 
   defmodule Parent do

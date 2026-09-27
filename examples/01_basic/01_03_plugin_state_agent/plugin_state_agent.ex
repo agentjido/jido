@@ -8,11 +8,17 @@ defmodule Jido.Examples.PluginStateAgent do
   """
 
   defmodule CountTurns do
-    use Jido.Plugin, agent: __MODULE__.Agent
+    use Jido.Plugin
+
+    @impl true
+    defdelegate state_spec(opts), to: Jido.Examples.PluginStateAgent.CountTurns.Agent
+
+    @impl true
+    defdelegate reduce(reduction, opts), to: Jido.Examples.PluginStateAgent.CountTurns.Agent
   end
 
   defmodule CountTurns.Agent do
-    use Jido.Agent.Plugin
+    @behaviour Jido.Plugin
 
     @impl true
     def state_spec(_opts),

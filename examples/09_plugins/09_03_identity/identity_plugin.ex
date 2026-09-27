@@ -1,20 +1,12 @@
 defmodule Jido.Examples.Plugins.Identity.Plugin do
   @moduledoc "Verifies identity, rejects replay, and signs outbound Signals."
 
-  use Jido.Plugin,
-    agent: Jido.Examples.Plugins.Identity.Plugin.Agent,
-    agent_server: Jido.Examples.Plugins.Identity.Plugin.Server,
-    option_keys: [agent: [:trusted_public_key]]
-end
-
-defmodule Jido.Examples.Plugins.Identity.Plugin.Agent do
-  @moduledoc false
-  use Jido.Agent.Plugin
+  use Jido.Plugin, option_keys: [agent: [:trusted_public_key]]
 
   alias Jido.Agent.Plugin.Preparation
   alias Jido.Examples.Plugins.Crypto
 
-  @impl Jido.Agent.Plugin
+  @impl Jido.Plugin
   def prepare(%Preparation{signal: signal}, opts) do
     trusted_public_key = Keyword.fetch!(opts, :trusted_public_key)
 
@@ -22,17 +14,12 @@ defmodule Jido.Examples.Plugins.Identity.Plugin.Agent do
       {:ok, %{public_key: trusted_public_key, nonce: nonce}}
     end
   end
-end
-
-defmodule Jido.Examples.Plugins.Identity.Plugin.Server do
-  @moduledoc false
-  use Jido.AgentServer.Plugin
 
   alias Jido.AgentServer.Plugin.Admission
   alias Jido.Plugin.{Init, SignalContext}
   alias Jido.Examples.Plugins.Identity.Runtime
 
-  @impl Jido.AgentServer.Plugin
+  @impl Jido.Plugin
   def admit(runtime, %Admission{prepared_input: prepared_input}, _opts) do
     case prepared_input do
       %{nonce: nonce} ->
@@ -46,10 +33,11 @@ defmodule Jido.Examples.Plugins.Identity.Plugin.Server do
     end
   end
 
-  @impl Jido.AgentServer.Plugin
+  @impl Jido.Plugin
   def prepare_dispatch(runtime, signal, %SignalContext{}, _opts),
     do: Runtime.sign(runtime, signal)
 
+  @impl true
   def child_spec(%Init{} = init), do: Supervisor.child_spec({Runtime, init}, id: __MODULE__)
 end
 

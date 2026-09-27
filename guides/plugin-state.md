@@ -14,12 +14,12 @@ second storage location.
 defmodule MyApp.TurnCount.Agent do
   use Jido.Agent.Plugin
 
-  @impl Jido.Agent.Plugin
+  @impl Jido.Plugin
   def state_spec(_opts) do
     {:turn_count, Zoi.integer() |> Zoi.min(0) |> Zoi.default(0)}
   end
 
-  @impl Jido.Agent.Plugin
+  @impl Jido.Plugin
   def reduce(%Jido.Agent.Plugin.Reduction{} = reduction, _opts) do
     {:ok, reduction.plugin_state + 1}
   end

@@ -37,7 +37,7 @@ defmodule Jido.Plugin.FacetsTest do
 
   defmodule AgentFacet do
     @moduledoc false
-    use Jido.Agent.Plugin
+    @behaviour Jido.Plugin
 
     alias Jido.Agent.Plugin.Reduction
 
@@ -57,7 +57,7 @@ defmodule Jido.Plugin.FacetsTest do
 
   defmodule ServerFacet do
     @moduledoc false
-    use Jido.AgentServer.Plugin
+    @behaviour Jido.Plugin
 
     alias Jido.AgentServer.Plugin.Admission
 
@@ -83,7 +83,7 @@ defmodule Jido.Plugin.FacetsTest do
 
   defmodule PersistenceFacet do
     @moduledoc false
-    use Jido.Persistence.Plugin
+    @behaviour Jido.Plugin
 
     def dump(value, _context, opts),
       do: {:ok, Keyword.fetch!(opts, :prefix) <> Integer.to_string(value)}
@@ -97,7 +97,7 @@ defmodule Jido.Plugin.FacetsTest do
 
   defmodule TopologyFacet do
     @moduledoc false
-    use Jido.Topology.Plugin
+    @behaviour Jido.Plugin
 
     alias Jido.Topology.Plugin.Contribution, as: TopologyContribution
 
@@ -116,10 +116,6 @@ defmodule Jido.Plugin.FacetsTest do
   defmodule Package do
     @moduledoc false
     use Jido.Plugin,
-      agent: AgentFacet,
-      agent_server: ServerFacet,
-      persistence: PersistenceFacet,
-      topology: TopologyFacet,
       vsn: 3,
       option_keys: [
         agent: [:agent_label],
@@ -127,11 +123,38 @@ defmodule Jido.Plugin.FacetsTest do
         persistence: [:prefix],
         topology: [:bus]
       ]
+
+    @impl true
+    defdelegate prepare(preparation, opts), to: Jido.Plugin.FacetsTest.AgentFacet
+
+    @impl true
+    defdelegate state_spec(opts), to: Jido.Plugin.FacetsTest.AgentFacet
+
+    @impl true
+    defdelegate directives(opts), to: Jido.Plugin.FacetsTest.AgentFacet
+
+    @impl true
+    defdelegate reduce(reduction, opts), to: Jido.Plugin.FacetsTest.AgentFacet
+
+    @impl true
+    defdelegate admit(runtime, admission, opts), to: Jido.Plugin.FacetsTest.ServerFacet
+
+    @impl true
+    defdelegate dispatch(runtime, directive, context, opts),
+      to: Jido.Plugin.FacetsTest.ServerFacet
+
+    @impl true
+    defdelegate dump(value, context, opts), to: Jido.Plugin.FacetsTest.PersistenceFacet
+
+    @impl true
+    defdelegate load(value, context, opts), to: Jido.Plugin.FacetsTest.PersistenceFacet
+
+    @impl true
+    defdelegate contribute(context, opts), to: Jido.Plugin.FacetsTest.TopologyFacet
   end
 
   defmodule LocalPackage do
     use Jido.Plugin,
-      roles: [:agent, :agent_server, :persistence, :topology],
       vsn: 3,
       option_keys: [
         agent: [:agent_label],
@@ -152,10 +175,22 @@ defmodule Jido.Plugin.FacetsTest do
   end
 
   defmodule MixedPackage do
-    use Jido.Plugin, roles: [:agent], agent_server: ServerFacet
+    use Jido.Plugin
+
+    @impl true
+    defdelegate admit(runtime, admission, opts), to: Jido.Plugin.FacetsTest.ServerFacet
+
+    @impl true
+    defdelegate dispatch(runtime, directive, context, opts),
+      to: Jido.Plugin.FacetsTest.ServerFacet
+
+    @impl true
     defdelegate prepare(preparation, opts), to: AgentFacet
+    @impl true
     defdelegate state_spec(opts), to: AgentFacet
+    @impl true
     defdelegate directives(opts), to: AgentFacet
+    @impl true
     defdelegate reduce(reduction, opts), to: AgentFacet
   end
 
@@ -169,97 +204,67 @@ defmodule Jido.Plugin.FacetsTest do
     end
   end
 
-  defmodule WrongOwnerPackage do
-    @moduledoc false
-    use Jido.Plugin, agent_server: AgentFacet
-  end
-
-  defmodule AgentFacetWithTopologyCallback do
-    @moduledoc false
-    use Jido.Agent.Plugin
-    def state_spec(_opts), do: :none
-    def contribute(_context, _opts), do: {:ok, %{}}
-  end
-
-  defmodule PackageWithForeignFacetCallback do
-    @moduledoc false
-    use Jido.Plugin, agent: AgentFacetWithTopologyCallback
-  end
-
-  defmodule AgentFacetWithMultipleForeignCallbacks do
-    use Jido.Agent.Plugin
-    def state_spec(_opts), do: :none
-    def child_spec(_init), do: :invalid
-    def await_ready(_runtime, _opts), do: :ok
-    def dump(value, _context, _opts), do: {:ok, value}
-  end
-
-  defmodule PackageWithMultipleForeignCallbacks do
-    use Jido.Plugin, agent: AgentFacetWithMultipleForeignCallbacks
-  end
-
-  defmodule PackageWithMultipleOwnedCallbacks do
-    use Jido.Plugin, agent: AgentFacet
-    def reduce(_reduction, _opts), do: {:ok, 1}
-    def dump(value, _context, _opts), do: {:ok, value}
-  end
-
-  defmodule PackageWithOwnedCallback do
-    @moduledoc false
-    use Jido.Plugin, agent: AgentFacet
-    def contribute(_context, _opts), do: {:ok, %{}}
-  end
-
-  defmodule AgentFacetWithDumpCallback do
-    @moduledoc false
-    use Jido.Agent.Plugin
-    def state_spec(_opts), do: :none
-    def dump(value, _context, _opts), do: {:ok, value}
-  end
-
-  defmodule TopologyFacetWithLoadCallback do
-    @moduledoc false
-    use Jido.Topology.Plugin
-    def contribute(_context, _opts), do: {:ok, %{}}
-    def load(value, _context, _opts), do: {:ok, value}
-  end
-
-  defmodule PackageWithForeignDumpCallback do
-    @moduledoc false
-    use Jido.Plugin, agent: AgentFacetWithDumpCallback
-  end
-
-  defmodule PackageWithForeignLoadCallback do
-    @moduledoc false
-    use Jido.Plugin, topology: TopologyFacetWithLoadCallback
-  end
-
   defmodule PackageWithOwnedDumpCallback do
     @moduledoc false
-    use Jido.Plugin, agent: AgentFacet
+    use Jido.Plugin
+
+    @impl true
+    defdelegate prepare(preparation, opts), to: Jido.Plugin.FacetsTest.AgentFacet
+
+    @impl true
+    defdelegate state_spec(opts), to: Jido.Plugin.FacetsTest.AgentFacet
+
+    @impl true
+    defdelegate directives(opts), to: Jido.Plugin.FacetsTest.AgentFacet
+
+    @impl true
+    defdelegate reduce(reduction, opts), to: Jido.Plugin.FacetsTest.AgentFacet
+    @impl true
     def dump(value, _context, _opts), do: {:ok, value}
   end
 
   defmodule PackageWithOwnedLoadCallback do
     @moduledoc false
-    use Jido.Plugin, agent: AgentFacet
+    use Jido.Plugin
+
+    @impl true
+    defdelegate prepare(preparation, opts), to: Jido.Plugin.FacetsTest.AgentFacet
+
+    @impl true
+    defdelegate state_spec(opts), to: Jido.Plugin.FacetsTest.AgentFacet
+
+    @impl true
+    defdelegate directives(opts), to: Jido.Plugin.FacetsTest.AgentFacet
+
+    @impl true
+    defdelegate reduce(reduction, opts), to: Jido.Plugin.FacetsTest.AgentFacet
+    @impl true
     def load(value, _context, _opts), do: {:ok, value}
   end
 
   defmodule StatelessAgentFacet do
     @moduledoc false
-    use Jido.Agent.Plugin
+    @behaviour Jido.Plugin
     def state_spec(_opts), do: :none
   end
 
   defmodule InvalidPersistencePackage do
     @moduledoc false
-    use Jido.Plugin, agent: StatelessAgentFacet, persistence: PersistenceFacet
+    use Jido.Plugin
+
+    @impl true
+    defdelegate state_spec(opts), to: Jido.Plugin.FacetsTest.StatelessAgentFacet
+
+    @impl true
+    defdelegate dump(value, context, opts), to: Jido.Plugin.FacetsTest.PersistenceFacet
+
+    @impl true
+    defdelegate load(value, context, opts), to: Jido.Plugin.FacetsTest.PersistenceFacet
   end
 
   defmodule NonPortablePersistenceFacet do
     @moduledoc false
-    use Jido.Persistence.Plugin
+    @behaviour Jido.Plugin
 
     def dump(_value, _context, _opts), do: {:ok, self()}
     def load(_value, _context, _opts), do: {:ok, self()}
@@ -267,7 +272,7 @@ defmodule Jido.Plugin.FacetsTest do
 
   defmodule InvalidLoadPersistenceFacet do
     @moduledoc false
-    use Jido.Persistence.Plugin
+    @behaviour Jido.Plugin
 
     def dump(value, _context, _opts), do: {:ok, value}
     def load(_value, _context, _opts), do: {:ok, "not an integer"}
@@ -275,17 +280,53 @@ defmodule Jido.Plugin.FacetsTest do
 
   defmodule NonPortablePersistencePackage do
     @moduledoc false
-    use Jido.Plugin, agent: AgentFacet, persistence: NonPortablePersistenceFacet
+    use Jido.Plugin
+
+    @impl true
+    defdelegate prepare(preparation, opts), to: Jido.Plugin.FacetsTest.AgentFacet
+
+    @impl true
+    defdelegate state_spec(opts), to: Jido.Plugin.FacetsTest.AgentFacet
+
+    @impl true
+    defdelegate directives(opts), to: Jido.Plugin.FacetsTest.AgentFacet
+
+    @impl true
+    defdelegate reduce(reduction, opts), to: Jido.Plugin.FacetsTest.AgentFacet
+
+    @impl true
+    defdelegate dump(value, context, opts), to: Jido.Plugin.FacetsTest.NonPortablePersistenceFacet
+
+    @impl true
+    defdelegate load(value, context, opts), to: Jido.Plugin.FacetsTest.NonPortablePersistenceFacet
   end
 
   defmodule InvalidLoadPersistencePackage do
     @moduledoc false
-    use Jido.Plugin, agent: AgentFacet, persistence: InvalidLoadPersistenceFacet
+    use Jido.Plugin
+
+    @impl true
+    defdelegate prepare(preparation, opts), to: Jido.Plugin.FacetsTest.AgentFacet
+
+    @impl true
+    defdelegate state_spec(opts), to: Jido.Plugin.FacetsTest.AgentFacet
+
+    @impl true
+    defdelegate directives(opts), to: Jido.Plugin.FacetsTest.AgentFacet
+
+    @impl true
+    defdelegate reduce(reduction, opts), to: Jido.Plugin.FacetsTest.AgentFacet
+
+    @impl true
+    defdelegate dump(value, context, opts), to: Jido.Plugin.FacetsTest.InvalidLoadPersistenceFacet
+
+    @impl true
+    defdelegate load(value, context, opts), to: Jido.Plugin.FacetsTest.InvalidLoadPersistenceFacet
   end
 
   defmodule InvalidTopologyFacet do
     @moduledoc false
-    use Jido.Topology.Plugin
+    @behaviour Jido.Plugin
 
     alias Jido.Topology.Plugin.Contribution, as: TopologyContribution
 
@@ -300,12 +341,15 @@ defmodule Jido.Plugin.FacetsTest do
 
   defmodule InvalidTopologyPackage do
     @moduledoc false
-    use Jido.Plugin, topology: InvalidTopologyFacet
+    use Jido.Plugin
+
+    @impl true
+    defdelegate contribute(context, opts), to: Jido.Plugin.FacetsTest.InvalidTopologyFacet
   end
 
   defmodule FacetWithPluginDirectiveValidation do
     @moduledoc false
-    use Jido.Agent.Plugin
+    @behaviour Jido.Plugin
 
     def directives(_opts), do: [Effect]
     def validate_directive(directive, _opts), do: {:ok, directive}
@@ -313,12 +357,18 @@ defmodule Jido.Plugin.FacetsTest do
 
   defmodule PackageWithPluginDirectiveValidation do
     @moduledoc false
-    use Jido.Plugin, agent: FacetWithPluginDirectiveValidation
+    use Jido.Plugin
+
+    @impl true
+    defdelegate directives(opts), to: Jido.Plugin.FacetsTest.FacetWithPluginDirectiveValidation
+
+    defdelegate validate_directive(directive, opts),
+      to: Jido.Plugin.FacetsTest.FacetWithPluginDirectiveValidation
   end
 
   defmodule FacetWithLegacyStateUpdate do
     @moduledoc false
-    use Jido.Agent.Plugin
+    @behaviour Jido.Plugin
 
     def state_spec(_opts), do: {:legacy_state, Zoi.integer() |> Zoi.default(0)}
     def update_state(state, _directives, _opts), do: {:ok, state}
@@ -326,24 +376,36 @@ defmodule Jido.Plugin.FacetsTest do
 
   defmodule PackageWithLegacyStateUpdate do
     @moduledoc false
-    use Jido.Plugin, agent: FacetWithLegacyStateUpdate
+    use Jido.Plugin
+
+    @impl true
+    defdelegate state_spec(opts), to: Jido.Plugin.FacetsTest.FacetWithLegacyStateUpdate
+
+    defdelegate update_state(state, directives, opts),
+      to: Jido.Plugin.FacetsTest.FacetWithLegacyStateUpdate
   end
 
   defmodule FacetWithUnvalidatedDirective do
     @moduledoc false
-    use Jido.Agent.Plugin
+    @behaviour Jido.Plugin
 
     def directives(_opts), do: [ForeignEffect]
   end
 
   defmodule PackageWithUnvalidatedDirective do
     @moduledoc false
-    use Jido.Plugin, agent: FacetWithUnvalidatedDirective
+    use Jido.Plugin
+
+    @impl true
+    defdelegate directives(opts), to: Jido.Plugin.FacetsTest.FacetWithUnvalidatedDirective
   end
 
   defmodule MisassignedOptionsPackage do
     @moduledoc false
-    use Jido.Plugin, agent: StatelessAgentFacet, option_keys: [topology: [:bus]]
+    use Jido.Plugin, option_keys: [topology: [:bus]]
+
+    @impl true
+    defdelegate state_spec(opts), to: Jido.Plugin.FacetsTest.StatelessAgentFacet
   end
 
   defmodule ReturnForeign do
@@ -353,7 +415,7 @@ defmodule Jido.Plugin.FacetsTest do
     def run(_input, context), do: {:ok, context.agent_state, [%ForeignEffect{label: "foreign"}]}
   end
 
-  test "local roles preserve owner Specs, options, version, and stored declarations" do
+  test "callback delegation preserves owner Specs, options, version, and stored declarations" do
     assert {:ok, [separate]} = Jido.Plugin.Normalizer.normalize_all([{Package, options()}])
     assert {:ok, [local]} = Jido.Plugin.Normalizer.normalize_all([{LocalPackage, options()}])
 
@@ -379,14 +441,14 @@ defmodule Jido.Plugin.FacetsTest do
     end
   end
 
-  test "local roles can use separate facets for other owners" do
+  test "Plugin callbacks can delegate to ordinary helpers" do
     assert {:ok, [spec]} = Jido.Plugin.Normalizer.normalize_all([MixedPackage])
     assert spec.agent.module == MixedPackage
-    assert spec.agent_server.module == ServerFacet
+    assert spec.agent_server.module == MixedPackage
     assert spec.manifest.module == MixedPackage
   end
 
-  test "local and separate roles share state ownership checks" do
+  test "Plugins share state ownership checks" do
     assert {:error, %{message: "Plugin-owned Agent state keys must be unique"}} =
              Jido.Plugin.Normalizer.normalize_all([
                {Package, options()},
@@ -409,13 +471,13 @@ defmodule Jido.Plugin.FacetsTest do
 
     assert spec.manifest.module == Package
     assert spec.manifest.vsn == 3
-    assert spec.agent.module == AgentFacet
+    assert spec.agent.module == Package
     assert spec.agent.options == [agent_label: "facet"]
-    assert spec.agent_server.module == ServerFacet
+    assert spec.agent_server.module == Package
     assert spec.agent_server.options == [server_label: "validated:facet"]
-    assert spec.persistence.module == PersistenceFacet
+    assert spec.persistence.module == Package
     assert spec.persistence.options == [prefix: "v3:"]
-    assert spec.topology.module == TopologyFacet
+    assert spec.topology.module == Package
     assert spec.topology.options == [bus: "facet_bus"]
 
     refute Map.has_key?(Map.from_struct(spec.agent), :runtime?)
@@ -423,8 +485,11 @@ defmodule Jido.Plugin.FacetsTest do
     refute Map.has_key?(Map.from_struct(spec.persistence), :agent_server)
     refute Map.has_key?(Map.from_struct(spec.topology), :adapter)
 
-    refute Jido.Plugin in Keyword.get_values(Package.module_info(:attributes), :behaviour)
-    refute function_exported?(Package, :prepare, 2)
+    assert Jido.Plugin in List.flatten(
+             Keyword.get_values(Package.module_info(:attributes), :behaviour)
+           )
+
+    assert function_exported?(Package, :prepare, 2)
     refute function_exported?(AgentFacet, :validate_directive, 2)
     refute function_exported?(AgentFacet, :update_state, 3)
   end
@@ -539,12 +604,7 @@ defmodule Jido.Plugin.FacetsTest do
     end
   end
 
-  test "normalization rejects wrong owners and unpaired Persistence" do
-    assert {:error, %Jido.Error.ValidationError{message: owner_message}} =
-             Jido.Plugin.Normalizer.normalize_all([WrongOwnerPackage])
-
-    assert owner_message == "Plugin facet must use its owner behavior"
-
+  test "normalization rejects unpaired Persistence and unused option mappings" do
     assert {:error, %Jido.Error.ValidationError{message: persistence_message}} =
              Jido.Plugin.Normalizer.normalize_all([InvalidPersistencePackage])
 
@@ -556,29 +616,12 @@ defmodule Jido.Plugin.FacetsTest do
     assert mapping_message == "Plugin option mapping names an unselected facet"
   end
 
-  test "normalization rejects callbacks on the wrong Plugin owner" do
-    for {package, callback} <- [
-          {PackageWithForeignFacetCallback, {:contribute, 2}},
-          {PackageWithOwnedCallback, {:contribute, 2}},
-          {PackageWithForeignDumpCallback, {:dump, 3}},
-          {PackageWithForeignLoadCallback, {:load, 3}},
-          {PackageWithOwnedDumpCallback, {:dump, 3}},
-          {PackageWithOwnedLoadCallback, {:load, 3}}
-        ] do
-      assert {:error, %Jido.Error.ValidationError{} = error} =
+  test "Persistence requires both conversion callbacks" do
+    for package <- [PackageWithOwnedDumpCallback, PackageWithOwnedLoadCallback] do
+      assert {:error, %Jido.Error.ValidationError{message: message}} =
                Jido.Plugin.Normalizer.normalize_all([package])
 
-      assert error.details.callback == callback
-    end
-  end
-
-  test "multiple invalid callbacks keep the first-error order for facets and packages" do
-    for {package, callback} <- [
-          {PackageWithMultipleForeignCallbacks, {:await_ready, 2}},
-          {PackageWithMultipleOwnedCallbacks, {:reduce, 2}}
-        ] do
-      assert {:error, %Jido.Error.ValidationError{details: %{callback: ^callback}}} =
-               Jido.Plugin.Normalizer.normalize_all([package])
+      assert message == "Persistence Plugin facet must define dump/3 and load/3"
     end
   end
 

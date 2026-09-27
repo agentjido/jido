@@ -9,11 +9,27 @@ end
 
 defmodule Jido.Examples.RuntimeReconstruction.Plugin do
   @moduledoc "Owns desired feed state and reconciles the replaceable runtime."
-  use Jido.Plugin, agent: __MODULE__.Agent, agent_server: __MODULE__.Server
+  use Jido.Plugin
+
+  @impl true
+  defdelegate state_spec(opts), to: Jido.Examples.RuntimeReconstruction.Plugin.Agent
+
+  @impl true
+  defdelegate directives(opts), to: Jido.Examples.RuntimeReconstruction.Plugin.Agent
+
+  @impl true
+  defdelegate reduce(reduction, opts), to: Jido.Examples.RuntimeReconstruction.Plugin.Agent
+
+  @impl true
+  defdelegate child_spec(init), to: Jido.Examples.RuntimeReconstruction.Plugin.Server
+
+  @impl true
+  defdelegate dispatch(runtime, directive, context, opts),
+    to: Jido.Examples.RuntimeReconstruction.Plugin.Server
 end
 
 defmodule Jido.Examples.RuntimeReconstruction.Plugin.Agent do
-  use Jido.Agent.Plugin
+  @behaviour Jido.Plugin
 
   alias Jido.Examples.RuntimeReconstruction.SetFeed
 
@@ -37,7 +53,7 @@ defmodule Jido.Examples.RuntimeReconstruction.Plugin.Agent do
 end
 
 defmodule Jido.Examples.RuntimeReconstruction.Plugin.Server do
-  use Jido.AgentServer.Plugin
+  @behaviour Jido.Plugin
   alias Jido.Examples.RuntimeReconstruction.Runtime
 
   def child_spec(init),

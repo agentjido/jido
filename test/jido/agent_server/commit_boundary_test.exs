@@ -15,14 +15,14 @@ defmodule Jido.AgentServer.CommitBoundaryTest do
 
   defmodule AgentFacet do
     @moduledoc false
-    use Jido.Agent.Plugin
+    @behaviour Jido.Plugin
 
     def directives(_opts), do: [Effect]
   end
 
   defmodule ServerFacet do
     @moduledoc false
-    use Jido.AgentServer.Plugin
+    @behaviour Jido.Plugin
 
     def dispatch(_runtime, %Effect{} = effect, _context, _opts) do
       if effect.sink, do: Elixir.Agent.update(effect.sink, &(&1 ++ [effect.label]))
@@ -40,7 +40,14 @@ defmodule Jido.AgentServer.CommitBoundaryTest do
 
   defmodule Package do
     @moduledoc false
-    use Jido.Plugin, agent: AgentFacet, agent_server: ServerFacet
+    use Jido.Plugin
+
+    @impl true
+    defdelegate directives(opts), to: Jido.AgentServer.CommitBoundaryTest.AgentFacet
+
+    @impl true
+    defdelegate dispatch(runtime, directive, context, opts),
+      to: Jido.AgentServer.CommitBoundaryTest.ServerFacet
   end
 
   defmodule CommitEffects do

@@ -81,7 +81,7 @@ defmodule JidoTest.Authoring.Topology.PluginBoundariesTest do
 
       assert details.code == :plugin_callback_failed
       assert details.plugin == Fixtures.FaultPackage
-      assert details.facet == Fixtures.FaultFacet
+      refute Map.has_key?(details, :facet)
       assert details.callback == :contribute
       assert %ArgumentError{message: "authoring fault"} = details.error
       assert {:ok, ^document} = Codec.encode(definition, registry)
@@ -108,7 +108,7 @@ defmodule JidoTest.Authoring.Topology.PluginBoundariesTest do
     if context.code do
       assert Jido.Error.code(error) == context.code
       assert error.details.plugin == Fixtures.FaultPackage
-      assert error.details.facet == Fixtures.FaultFacet
+      refute Map.has_key?(error.details, :facet)
     end
 
     case context.fixture_module do

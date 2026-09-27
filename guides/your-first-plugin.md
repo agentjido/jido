@@ -5,11 +5,11 @@ Use a Plugin when Jido must enforce an Agent rule, such as ownership of a state
 field. Use Actions or Flows for reusable work, application supervision for a
 shared client or service, and Telemetry for observation.
 
-A small Plugin needs one module and explicit roles:
+A Plugin needs one module. Implement only the callbacks it needs:
 
 ```elixir
 defmodule MyApp.CounterPlugin do
-  use Jido.Plugin, roles: [:agent]
+  use Jido.Plugin
 
   @impl true
   def state_spec(_opts), do: {:turns, Zoi.integer() |> Zoi.default(0)}
@@ -25,38 +25,35 @@ field. The reducer computes its next value after executable success. A failed
 Turn cannot commit a partial update. This example counts successful Turns; it
 does not need a runtime, Persistence callback, or Topology callback.
 
-The roles are `:agent`, `:agent_server`, `:persistence`, and `:topology`.
-Jido installs the matching callback behaviours. It rejects callbacks for roles
-that the package did not declare. It does not infer roles from helper names.
+`use Jido.Plugin` installs one behaviour. All callbacks are optional, but a
+Plugin must define at least one capability. Jido uses a fixed list of documented
+callbacks to select the internal owner Specs. Ordinary helper functions do not
+select capabilities. Use `@impl true` to check callback names and arities.
 
-Use `:agent` for pure prepared input, owned state, and owned Directives. Use
-`:agent_server` for live admission or post-commit runtime work. A typed Directive
-implements `Jido.Agent.Directive`, and the Agent role declares its type through
-`directives/1`. The Server role implements `dispatch/4`. Add `child_spec/1` only
-when the capability needs a runtime tied to one Agent's lifetime.
+Add callbacks as the Plugin needs more functions:
 
-Add `:persistence` only when one owned state value needs format conversion.
-Add `:topology` only for static canonical Topology entries. Each role keeps its
-own callback contexts and authority, even when the callbacks share a module.
+- `prepare/2` prepares portable input before route selection.
+- `admit/3` checks live input or supplies transient runtime input.
+- `directives/1` declares owned Directive types. Each type validates itself.
+- `dispatch/4` handles owned Directives after commit.
+- `child_spec/1` adds a runtime tied to one Agent's lifetime.
+- `dump/3` and `load/3` convert one owned state value.
+- `contribute/2` supplies static Topology entries.
 
-Larger Plugins can keep separate facets, or combine local roles with separate
-facets for other owners:
+A reducer needs an owned state field. Persistence needs both conversion
+callbacks and an owned state field. Dispatch needs owned Directives. Jido
+checks these requirements when it normalizes the Plugin declaration.
 
-```elixir
-use Jido.Plugin,
-  roles: [:agent],
-  agent_server: MyApp.CounterPlugin.Server,
-  vsn: 1,
-  option_keys: [agent: [:limit], agent_server: [:endpoint]]
-```
+A large Plugin can delegate callbacks to ordinary Elixir modules. There is no
+second Plugin authoring form. The Plugin module remains the stable identity
+used in Agent declarations, diagnostics, and stored definitions.
 
-Select each owner once. `roles` must be a literal list of unique owners. The
-existing `agent: Module` and `agent_server: Module` form remains valid. Both
-forms normalize to the same Manifest and owner Specs. Common options,
-`option_keys`, package identity, version, and stored declarations keep their
-existing meaning.
+Pass per-Agent options with `plugin MyApp.CounterPlugin, config: [limit: 100]`.
+Each callback receives the same options by default. `vsn` and `option_keys`
+remain optional metadata for versioning and restricted owner options. The
+Counter above needs neither option.
 
-For a required live view of owned state, declare the Server `after_commit/3`
+For a required live view of owned state, define the `after_commit/3`
 hook. It receives the exact committed value and revision before Directives.
 Failure or timeout skips later hooks and all Directives, then applies the
 Server error policy. It cannot undo the state commit or change the commit
@@ -66,4 +63,4 @@ on startup and replacement. Use Telemetry for optional observation.
 See `Jido.Plugin.Audit` for a state-only Plugin and `Jido.Plugin.Heartbeat` for
 a runtime-only Plugin. The [state middleware example](../examples/09_plugins/09_06_state_middleware/README.md)
 and [commit projection example](../examples/09_plugins/09_08_commit_projection/README.md)
-show local roles. See [the callback guide](plugin-contract-and-lifecycle.md) for the full contracts.
+use this single authoring form. See [the callback guide](plugin-contract-and-lifecycle.md) for the full contracts.

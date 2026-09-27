@@ -1,10 +1,11 @@
 defmodule Jido.Topology.BusInputs.Server do
   @moduledoc false
-  use Jido.AgentServer.Plugin
+  @behaviour Jido.Plugin
 
   alias Jido.Plugin.Bus.Client
   alias Jido.Topology.BusInputs
 
+  @impl true
   def child_spec(init) do
     children =
       init.options

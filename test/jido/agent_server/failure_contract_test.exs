@@ -39,11 +39,18 @@ defmodule Jido.AgentServer.FailureContractTest do
   end
 
   defmodule HeldReadyPlugin do
-    use Jido.Plugin, agent_server: __MODULE__.Server
+    use Jido.Plugin
+
+    @impl true
+    defdelegate child_spec(init), to: Jido.AgentServer.FailureContractTest.HeldReadyPlugin.Server
+
+    @impl true
+    defdelegate await_ready(runtime, opts),
+      to: Jido.AgentServer.FailureContractTest.HeldReadyPlugin.Server
   end
 
   defmodule HeldReadyPlugin.Server do
-    use Jido.AgentServer.Plugin
+    @behaviour Jido.Plugin
 
     def child_spec(_init) do
       Supervisor.child_spec({Elixir.Agent, fn -> nil end}, id: HeldReadyPlugin)

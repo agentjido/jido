@@ -16,9 +16,28 @@ defmodule Jido.Plugin.SensorManager do
   before a sensor process starts.
   """
 
-  use Jido.Plugin,
-    agent: Jido.Plugin.SensorManager.Agent,
-    agent_server: Jido.Plugin.SensorManager.Server
+  use Jido.Plugin
+
+  @impl true
+  defdelegate state_spec(opts), to: Jido.Plugin.SensorManager.Agent
+
+  @impl true
+  defdelegate directives(opts), to: Jido.Plugin.SensorManager.Agent
+
+  @impl true
+  defdelegate reduce(reduction, opts), to: Jido.Plugin.SensorManager.Agent
+
+  @impl true
+  defdelegate validate_options(opts), to: Jido.Plugin.SensorManager.Server
+
+  @impl true
+  defdelegate dispatch(runtime, directive, context, opts), to: Jido.Plugin.SensorManager.Server
+
+  @impl true
+  defdelegate await_ready(runtime, opts), to: Jido.Plugin.SensorManager.Server
+
+  @impl true
+  defdelegate child_spec(init), to: Jido.Plugin.SensorManager.Server
 
   alias Jido.Plugin.SensorManager.{Start, Stop}
 

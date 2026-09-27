@@ -1,51 +1,52 @@
 # Plugin Contract and Lifecycle
 
-A Plugin package adds one declared capability to an Agent. The package selects
-explicit local roles or separate facets. Each owner has the same authority in
-both forms:
+A Plugin adds callbacks to an Agent through one module and one behaviour:
+`Jido.Plugin`. Implement only the callbacks that the capability needs. Core
+controls callback execution and state ownership.
 
-| Facet | Purpose |
+| Owner | Purpose |
 | --- | --- |
-| `Jido.Agent.Plugin` | Pure input preparation, Plugin-owned state, and state reduction |
-| `Jido.AgentServer.Plugin` | Live admission, runtime, readiness, outbound preparation, commit notification, and Directive dispatch |
-| `Jido.Persistence.Plugin` | Pure dump and load of one paired owned-state value |
-| `Jido.Topology.Plugin` | Pure static Topology contribution |
+| Agent | Pure input preparation, owned state, and state reduction |
+| Agent Server | Live admission, runtime, readiness, outbound preparation, commit hooks, and Directive dispatch |
+| Persistence | Pure dump and load of one owned state value |
+| Topology | Pure static Topology contribution |
 
-## Declare a Package
+## Define a Plugin
 
 Start with [extension selection](extension-boundaries.md#select-an-extension-type)
-and [Write a Plugin](your-first-plugin.md). Use `roles: [:agent, :agent_server]`
-to implement the selected callbacks in the package module. `roles` is a literal
-list of unique owners. Separate facets remain available:
+and [Write a Plugin](your-first-plugin.md).
 
 ```elixir
-defmodule MyApp.RateLimit do
-  use Jido.Plugin,
-    agent: MyApp.RateLimit.Agent,
-    agent_server: MyApp.RateLimit.Server,
-    vsn: 1,
-    option_keys: [agent: [:limit], agent_server: [:endpoint]]
+defmodule MyApp.Counter do
+  use Jido.Plugin
+
+  @impl true
+  def state_spec(_opts), do: {:turns, Zoi.integer() |> Zoi.default(0)}
+
+  @impl true
+  def reduce(reduction, _opts), do: {:ok, reduction.plugin_state + 1}
 end
 ```
 
-Put common options in the Agent declaration:
+Add `plugin MyApp.Counter` in the Agent's `agent` block. Use
+`plugin MyApp.Counter, config: [option: value]` for common options. A Plugin
+module can appear only once in an Agent definition.
 
-```elixir
-agent do
-  plugin MyApp.RateLimit, config: [limit: 100, endpoint: "local"]
-end
-```
+The fixed documented callbacks select the internal owner Specs at compile time.
+`roles:` and separate facet selectors are not accepted. Use ordinary functions
+or `defdelegate` to split a large implementation. Only the Plugin module is
+registered with Jido.
 
-If `option_keys` is absent, each selected facet gets all common options. If it
-is present, it must assign every declared option to a selected facet. A package
-module can appear only once in one Agent definition. Local roles and separate
-facets can be combined for different owners; an owner cannot use both. Both
-forms normalize to the same Manifest and owner Specs. Package identity, stored
-definitions, versions, callback contexts, and callback order do not change.
+All callbacks receive the common options by default. Optional `option_keys`
+metadata can restrict options by owner, for example
+`option_keys: [agent: [:limit], agent_server: [:endpoint]]`. When present, it
+must assign each declared option to an owner with callbacks. `vsn` defaults to
+1. Package identity, stored definitions, versions, contexts, and callback order
+keep their existing meaning.
 
-## Agent Facet
+## Agent callbacks
 
-The Agent facet can implement these callbacks:
+Agent owns these callbacks:
 
 | Callback | Boundary |
 | --- | --- |
@@ -57,7 +58,7 @@ The Agent facet can implement these callbacks:
 `prepare/2` runs in package declaration order before route selection. It
 receives `%Jido.Agent.Plugin.Preparation{}` with the unchanged source Signal,
 Agent identity, Agent module, the complete current Agent state, and the
-Plugin's owned state. It also receives the facet's static options. It can
+Plugin's owned state. It also receives the Plugin's static options. It can
 return `{:ok, input}` or `{:error, reason}`. The input must be portable. Jido
 stores it at `context.plugin_inputs[PackageModule].prepared`. The callback
 cannot replace the Signal, caller context, route, or Agent state.
@@ -71,16 +72,16 @@ current complete candidate state, its owned value, its pure prepared input,
 and all validated Directives. It returns only the next value for its owned
 field. Jido validates that value with the owned schema and portable-value rule.
 
-## Agent Server Facet
+## Agent Server callbacks
 
-The Agent Server facet can implement `validate_options/1`, `admit/3`, `prepare_dispatch/4`,
+The Agent Server owns `validate_options/1`, `admit/3`, `prepare_dispatch/4`,
 `after_commit/3`, `dispatch/4`, and `await_ready/2`. It can also implement the
 standard OTP `child_spec/1` callback for one runtime root. The returned specification must
 use `restart: :permanent`.
 
 `validate_options/1` runs when Jido normalizes a declaration. It returns
 `:ok` or `{:error, reason}`. It checks static options before Jido starts a
-runtime. The option callback does not give a Server facet a runtime capability
+runtime. The option callback does not give a Server callbacks a runtime capability
 by itself. Use it with a live callback or `child_spec/1`.
 
 Admission runs in declaration order after pure preparation and before Turn
@@ -105,7 +106,7 @@ Use `after_commit(runtime, commit, opts)` when a Plugin must keep a live
 projection of its owned state. The Action does not need to return a custom
 Directive. The hook receives `%Jido.AgentServer.Plugin.Commit{}` with only its
 owned value, the matching revision, Turn and Agent identity, and instance and
-partition context. A stateless Plugin receives `plugin_state: nil`. A facet
+partition context. A stateless Plugin receives `plugin_state: nil`. A Plugin
 without a runtime receives `runtime: nil`.
 
 Hooks run in Plugin declaration order after each successful Turn commit and
@@ -159,17 +160,17 @@ stops, the wrapper asks the Agent Server for a new root specification. This
 keeps the declared permanent intent while it prevents an automatic restart
 with an old state-version pair.
 
-## Persistence and Topology Facets
+## Persistence and Topology callbacks
 
-The Persistence facet implements `dump/3` and `load/3` for one paired Plugin
+Define `dump/3` and `load/3` for one paired Plugin
 state value. It cannot receive the adapter, record key, expected revision,
 complete Agent, or commit result. Dump output must be portable. Load output
-must also match the Agent facet's state schema.
+must also match the owned state schema.
 
-The Topology facet implements `contribute/2`. It can return current canonical
+Define `contribute/2`. It can return current canonical
 Bus resources, ownership relationships, and Bus subscriptions. Bus is the
-first core resource type. The facet cannot start
-a process, persist data, or control live activation. Jido calls the facet while
+first core resource type. The callback cannot start
+a process, persist data, or control live activation. Jido calls the callback while
 it builds an instance Plan. It processes Agent declarations, then group
 declarations, in source order and keeps Plugin declaration order. Included
 Topologies receive the same expansion in their own scope. Common Topology
@@ -178,7 +179,7 @@ definition stays unchanged.
 
 Live placement policy uses a different boundary. A control Agent can receive
 Topology lifecycle Signals, select an exact node, and return a Plugin-owned
-Directive. The Agent Server facet can apply that Directive through
+Directive. The Agent Server callbacks can apply that Directive through
 `Jido.Topology.Controller.place_agent/4` after commit. Static contribution does
 not gain live authority.
 

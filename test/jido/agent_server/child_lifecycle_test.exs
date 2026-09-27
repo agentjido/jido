@@ -14,11 +14,15 @@ defmodule Jido.AgentServer.ChildLifecycleTest do
   alias JidoTest.AgentServerRuntimeFixtures.OwnedExecutionAgent
 
   defmodule BlockingDispatchPlugin do
-    use Jido.Plugin, agent_server: __MODULE__.Server
+    use Jido.Plugin
+
+    @impl true
+    defdelegate prepare_dispatch(runtime, signal, context, opts),
+      to: Jido.AgentServer.ChildLifecycleTest.BlockingDispatchPlugin.Server
   end
 
   defmodule BlockingDispatchPlugin.Server do
-    use Jido.AgentServer.Plugin
+    @behaviour Jido.Plugin
 
     @impl true
     def prepare_dispatch(_runtime, signal, _context, _opts) do

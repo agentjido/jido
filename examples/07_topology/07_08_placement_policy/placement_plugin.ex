@@ -1,6 +1,6 @@
 defmodule Jido.Examples.Topology.PlacementPolicy.AgentFacet do
   @moduledoc "Owns the exact-placement Directive."
-  use Jido.Agent.Plugin
+  @behaviour Jido.Plugin
 
   alias Jido.Examples.Topology.PlacementPolicy.Move
 
@@ -10,7 +10,7 @@ end
 
 defmodule Jido.Examples.Topology.PlacementPolicy.ServerFacet do
   @moduledoc "Applies a committed placement Directive through the Topology Controller."
-  use Jido.AgentServer.Plugin
+  @behaviour Jido.Plugin
 
   alias Jido.Examples.Topology.PlacementPolicy.Move
   alias Jido.Plugin.DirectiveContext
@@ -30,7 +30,12 @@ end
 
 defmodule Jido.Examples.Topology.PlacementPolicy.Plugin do
   @moduledoc "A Plugin package that applies placement policy after Agent commit."
-  use Jido.Plugin,
-    agent: Jido.Examples.Topology.PlacementPolicy.AgentFacet,
-    agent_server: Jido.Examples.Topology.PlacementPolicy.ServerFacet
+  use Jido.Plugin
+
+  @impl true
+  defdelegate directives(opts), to: Jido.Examples.Topology.PlacementPolicy.AgentFacet
+
+  @impl true
+  defdelegate dispatch(runtime, directive, context, opts),
+    to: Jido.Examples.Topology.PlacementPolicy.ServerFacet
 end
