@@ -127,7 +127,7 @@ defmodule Jido.Plugin.Normalizer do
   defp build_manifest_spec(module, options, %Manifest{} = manifest) do
     with true <- manifest.module == module,
          {:ok, manifest} <- Manifest.validate(manifest, options),
-         :ok <- callback_free_package(module),
+         :ok <- validate_package_callbacks(manifest),
          {:ok, agent} <- build_agent_spec(manifest, options),
          {:ok, server} <- build_server_spec(manifest, options),
          {:ok, persistence} <- build_persistence_spec(manifest, options),
@@ -152,7 +152,7 @@ defmodule Jido.Plugin.Normalizer do
     facet = manifest.agent
     facet_options = Manifest.options_for(manifest, :agent, options)
 
-    with :ok <- validate_facet(facet, Jido.Agent.Plugin, :agent),
+    with :ok <- validate_facet(manifest, facet, Jido.Agent.Plugin, :agent),
          :ok <- facet_has_capability(facet, :agent),
          do: build_agent_values(manifest.module, facet, facet_options)
   end
@@ -180,7 +180,7 @@ defmodule Jido.Plugin.Normalizer do
     facet = manifest.agent_server
     facet_options = Manifest.options_for(manifest, :agent_server, options)
 
-    with :ok <- validate_facet(facet, Jido.AgentServer.Plugin, :agent_server),
+    with :ok <- validate_facet(manifest, facet, Jido.AgentServer.Plugin, :agent_server),
          :ok <- facet_has_capability(facet, :agent_server),
          :ok <- validate_server_options(manifest.module, facet, facet_options) do
       {:ok,
@@ -199,7 +199,7 @@ defmodule Jido.Plugin.Normalizer do
   defp build_persistence_spec(%Manifest{} = manifest, options) do
     facet = manifest.persistence
 
-    with :ok <- validate_facet(facet, Jido.Persistence.Plugin, :persistence),
+    with :ok <- validate_facet(manifest, facet, Jido.Persistence.Plugin, :persistence),
          true <- function_exported?(facet, :dump, 3) and function_exported?(facet, :load, 3) do
       {:ok,
        %PersistenceSpec{
@@ -225,7 +225,7 @@ defmodule Jido.Plugin.Normalizer do
   defp build_topology_spec(%Manifest{} = manifest, options) do
     facet = manifest.topology
 
-    with :ok <- validate_facet(facet, Jido.Topology.Plugin, :topology),
+    with :ok <- validate_facet(manifest, facet, Jido.Topology.Plugin, :topology),
          true <- function_exported?(facet, :contribute, 2) do
       {:ok,
        %TopologySpec{
@@ -296,27 +296,35 @@ defmodule Jido.Plugin.Normalizer do
         plugin: module
       })
 
-  defp callback_free_package(module) do
-    case Enum.find(@package_callbacks, fn {function, arity} ->
+  defp validate_package_callbacks(%Manifest{module: module} = manifest) do
+    roles = Enum.filter(Manifest.owners(), &(Manifest.facet(manifest, &1) == module))
+    allowed = Enum.flat_map(roles, &callbacks/1)
+
+    case Enum.find(@package_callbacks -- allowed, fn {function, arity} ->
            function_exported?(module, function, arity)
          end) do
       nil ->
         :ok
 
-      callback ->
+      callback when roles == [] ->
         PluginError.validation("Plugin package manifest must not define facet callbacks", %{
           plugin: module,
+          callback: callback
+        })
+
+      callback ->
+        PluginError.validation("Plugin package callback requires a declared role", %{
+          plugin: module,
+          roles: roles,
           callback: callback
         })
     end
   end
 
-  defp validate_facet(module, behaviour, owner) do
+  defp validate_facet(manifest, module, behaviour, owner) do
     with :ok <- ensure_loaded(module),
          true <- behaviour in behaviours(module),
-         true <- function_exported?(module, :__jido_plugin_facet__, 0),
-         ^owner <- module.__jido_plugin_facet__(),
-         :ok <- validate_facet_authority(module, owner) do
+         :ok <- validate_facet_owner(manifest, module, owner) do
       :ok
     else
       {:error, _reason} = error ->
@@ -345,6 +353,21 @@ defmodule Jido.Plugin.Normalizer do
         reason: reason
       })
   end
+
+  # A package can hold several declared roles. Separate facets retain one owner.
+  defp validate_facet_owner(%Manifest{module: module}, module, _owner), do: :ok
+
+  defp validate_facet_owner(_manifest, module, owner) do
+    with true <- function_exported?(module, :__jido_plugin_facet__, 0),
+         ^owner <- module.__jido_plugin_facet__() do
+      validate_facet_authority(module, owner)
+    end
+  end
+
+  defp callbacks(:agent), do: @agent_callbacks
+  defp callbacks(:agent_server), do: @server_callbacks
+  defp callbacks(:persistence), do: @persistence_callbacks
+  defp callbacks(:topology), do: @topology_callbacks
 
   defp validate_facet_authority(module, owner) do
     foreign =

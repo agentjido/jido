@@ -270,8 +270,9 @@ required V3 Directive.
 
 Status: **Same name, new contract**.
 
-`use Jido.Plugin` declares a callback-free package manifest in V3. It selects
-no more than one Agent, Agent Server, Persistence, and Topology facet. The Agent
+`use Jido.Plugin` declares a package manifest in V3. Use explicit `roles` to
+implement callbacks in that module, or select separate Agent, Agent Server,
+Persistence, and Topology facets. Select each owner once. The Agent
 definition supplies common package options. `option_keys` can map those options
 to owner facets.
 
@@ -286,7 +287,7 @@ needs them.
 
 | V2 callback | V3 callback or owner |
 | --- | --- |
-| `plugin_spec/1` | Callback-free `Jido.Plugin` package manifest and its selected owner facets |
+| `plugin_spec/1` | `Jido.Plugin` package with explicit roles or separate owner facets |
 | `mount/2` | Static defaults in Agent-facet `state_spec/1`; live setup in Agent-Server-facet `child_spec/1` |
 | `handle_signal/2` | Action or Flow logic, Agent-Server-facet `admit/3`, or explicit Agent routing |
 | `prepare_signal/2` | Action or Flow input handling; Agent-Server-facet `admit/3` for live checks |

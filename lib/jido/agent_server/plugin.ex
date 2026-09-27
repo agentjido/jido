@@ -43,9 +43,9 @@ defmodule Jido.AgentServer.Plugin do
   @callback validate_options(opts :: keyword()) :: :ok | {:error, term()}
 
   @doc """
-  Receives each successful Turn commit before returned Directives run.
+  Runs a required step after each successful Turn commit, before Directives run.
 
-  Notifications run in declaration order, including commits with unchanged
+  Declared hooks run in declaration order, including commits with unchanged
   state or no Directives. Each callback receives its exact committed owned
   value and revision. Return `:ok` or `{:error, reason}`; the callback cannot
   replace state or return Directives. Startup, restore, and direct Agent
@@ -53,11 +53,12 @@ defmodule Jido.AgentServer.Plugin do
 
   Agent Server runs each callback in an owned task. Its timeout is the finite
   `directive_timeout`, or 5,000 milliseconds when that option is `:infinity`.
-  A failure skips remaining notifications and Directives and uses the Server
+  A failure skips remaining hooks and Directives and uses the Server
   error policy. The caller has already received the commit result. Neither
   failure nor timeout can undo the commit or completed external work.
 
-  Notifications are not durable or replayed after owner loss. Rebuild a live
+  Hooks are not durable or replayed after owner loss. Use Telemetry for optional
+  observation. Rebuild a live
   projection from `Jido.Plugin.Init` on startup and runtime replacement.
   """
   @callback after_commit(runtime_ref :: term() | nil, commit :: Commit.t(), opts :: keyword()) ::

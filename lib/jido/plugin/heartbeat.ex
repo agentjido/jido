@@ -16,12 +16,33 @@ defmodule Jido.Plugin.Heartbeat do
       ]
   """
 
-  use Jido.Plugin, agent_server: Jido.Plugin.Heartbeat.Server
+  use Jido.Plugin, roles: [:agent_server]
 
+  alias Jido.Plugin.Heartbeat.Runtime
+  alias Jido.Plugin.Init
   alias Jido.Plugin.Heartbeat.Signal.Tick
   alias Jido.Signal
 
   @default_interval 5_000
+
+  @impl true
+  def validate_options(opts) do
+    case configuration(opts) do
+      {:ok, _config} ->
+        :ok
+
+      {:error, reason} ->
+        {:error,
+         Jido.Error.validation_error("Heartbeat Plugin options are invalid",
+           kind: :config,
+           details: %{reason: reason}
+         )}
+    end
+  end
+
+  def child_spec(%Init{} = init) do
+    Supervisor.child_spec({Runtime, init}, id: __MODULE__)
+  end
 
   @doc false
   def configuration(opts) when is_list(opts) do

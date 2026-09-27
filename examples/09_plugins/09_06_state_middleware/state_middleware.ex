@@ -12,13 +12,7 @@ end
 defmodule Jido.Examples.Plugins.StateMiddleware.Plugin do
   @moduledoc "Observes each successful candidate and reduces one owned audit field."
 
-  use Jido.Plugin,
-    agent: Jido.Examples.Plugins.StateMiddleware.Plugin.Agent
-end
-
-defmodule Jido.Examples.Plugins.StateMiddleware.Plugin.Agent do
-  @moduledoc false
-  use Jido.Agent.Plugin
+  use Jido.Plugin, roles: [:agent]
 
   alias Jido.Agent.Plugin.{Preparation, Reduction}
   alias Jido.Examples.Plugins.StateMiddleware.Note

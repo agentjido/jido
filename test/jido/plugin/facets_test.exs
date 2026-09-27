@@ -41,6 +41,15 @@ defmodule Jido.Plugin.FacetsTest do
 
     alias Jido.Agent.Plugin.Reduction
 
+    def prepare(%Jido.Agent.Plugin.Preparation{} = preparation, opts),
+      do:
+        {:ok,
+         %{
+           owned: preparation.plugin_state,
+           state: preparation.agent_state,
+           label: opts[:agent_label]
+         }}
+
     def state_spec(_opts), do: {:facet_count, Zoi.integer() |> Zoi.default(7)}
     def directives(_opts), do: [Effect, SchemaEffect]
     def reduce(%Reduction{plugin_state: state}, _opts), do: {:ok, state + 1}
@@ -118,6 +127,36 @@ defmodule Jido.Plugin.FacetsTest do
         persistence: [:prefix],
         topology: [:bus]
       ]
+  end
+
+  defmodule LocalPackage do
+    use Jido.Plugin,
+      roles: [:agent, :agent_server, :persistence, :topology],
+      vsn: 3,
+      option_keys: [
+        agent: [:agent_label],
+        agent_server: [:server_label],
+        persistence: [:prefix],
+        topology: [:bus]
+      ]
+
+    defdelegate prepare(preparation, opts), to: AgentFacet
+    defdelegate state_spec(opts), to: AgentFacet
+    defdelegate directives(opts), to: AgentFacet
+    defdelegate reduce(reduction, opts), to: AgentFacet
+    defdelegate admit(runtime, admission, opts), to: ServerFacet
+    defdelegate dispatch(runtime, directive, context, opts), to: ServerFacet
+    defdelegate dump(value, context, opts), to: PersistenceFacet
+    defdelegate load(value, context, opts), to: PersistenceFacet
+    defdelegate contribute(context, opts), to: TopologyFacet
+  end
+
+  defmodule MixedPackage do
+    use Jido.Plugin, roles: [:agent], agent_server: ServerFacet
+    defdelegate prepare(preparation, opts), to: AgentFacet
+    defdelegate state_spec(opts), to: AgentFacet
+    defdelegate directives(opts), to: AgentFacet
+    defdelegate reduce(reduction, opts), to: AgentFacet
   end
 
   defmodule Record do
@@ -314,6 +353,56 @@ defmodule Jido.Plugin.FacetsTest do
     def run(_input, context), do: {:ok, context.agent_state, [%ForeignEffect{label: "foreign"}]}
   end
 
+  test "local roles preserve owner Specs, options, version, and stored declarations" do
+    assert {:ok, [separate]} = Jido.Plugin.Normalizer.normalize_all([{Package, options()}])
+    assert {:ok, [local]} = Jido.Plugin.Normalizer.normalize_all([{LocalPackage, options()}])
+
+    for owner <- Jido.Plugin.Manifest.owners() do
+      assert Map.fetch!(local.manifest, owner) == LocalPackage
+      local_spec = Map.fetch!(local, owner)
+      separate_spec = Map.fetch!(separate, owner)
+      assert local_spec.package == LocalPackage
+      assert local_spec.module == LocalPackage
+
+      assert %{local_spec | package: separate_spec.package, module: separate_spec.module} ==
+               separate_spec
+    end
+
+    assert local.manifest.vsn == separate.manifest.vsn
+    assert local.options == separate.options
+
+    for package <- [Package, LocalPackage] do
+      assert {:ok, document, registry} = Jido.Plugin.Codec.encode({package, options()})
+      assert {:ok, {^package, decoded}} = Jido.Plugin.Codec.decode(document, registry)
+      assert decoded == options()
+      assert Map.keys(document) |> Enum.sort() == ~w(module options type version)
+    end
+  end
+
+  test "local roles can use separate facets for other owners" do
+    assert {:ok, [spec]} = Jido.Plugin.Normalizer.normalize_all([MixedPackage])
+    assert spec.agent.module == MixedPackage
+    assert spec.agent_server.module == ServerFacet
+    assert spec.manifest.module == MixedPackage
+  end
+
+  test "local and separate roles share state ownership checks" do
+    assert {:error, %{message: "Plugin-owned Agent state keys must be unique"}} =
+             Jido.Plugin.Normalizer.normalize_all([
+               {Package, options()},
+               {LocalPackage, options()}
+             ])
+
+    for package <- [Package, LocalPackage] do
+      assert {:error, %{message: "Plugin-owned Agent state key conflicts with the domain schema"}} =
+               Jido.Agent.new(
+                 name: "conflict",
+                 schema: Zoi.object(%{facet_count: Zoi.integer()}),
+                 plugins: [{package, options()}]
+               )
+    end
+  end
+
   test "one manifest normalizes to four owner-specific Specs" do
     options = options()
     assert {:ok, [spec]} = Jido.Plugin.Normalizer.normalize_all([{Package, options}])
@@ -340,93 +429,114 @@ defmodule Jido.Plugin.FacetsTest do
     refute function_exported?(AgentFacet, :update_state, 3)
   end
 
-  test "Agent facet validates each Directive once and reduces only its owned state" do
-    agent = agent()
-    signal = Signal.new!("facet.run", %{}, source: "/test")
+  for package <- [Package, LocalPackage] do
+    @package package
+    test "#{inspect(@package)}: prepared input keeps its package identity and owner options" do
+      agent = agent(@package)
+      signal = Signal.new!("facet.run", %{}, source: "/test")
+      assert {:ok, specs} = Jido.Plugin.Normalizer.normalize_all([{@package, options()}])
+      assert {:ok, inputs} = Jido.Agent.Plugin.prepare(agent, signal, specs)
 
-    assert {:ok, candidate, [%Effect{label: "validated:facet"}]} = Agent.cmd(agent, signal)
-    assert candidate.state.visible == 3
-    assert candidate.state.seen == "facet"
-    assert candidate.state.facet_count == 8
-  end
-
-  test "explicit Agent facets use reduce and Directive-owned validation" do
-    assert {:ok, %SchemaEffect{count: 2}} =
-             Jido.Agent.Directive.validate(%SchemaEffect{count: 2})
-
-    assert {:error, _issues} = Jido.Agent.Directive.validate(%SchemaEffect{count: "2"})
-
-    assert {:error, validation_error} =
-             Jido.Plugin.Normalizer.normalize_all([PackageWithPluginDirectiveValidation])
-
-    assert validation_error.message ==
-             "Agent Plugin Directive validation belongs to the Directive module"
-
-    assert {:error, reducer_error} =
-             Jido.Plugin.Normalizer.normalize_all([PackageWithLegacyStateUpdate])
-
-    assert reducer_error.message == "Agent Plugin state middleware must define reduce/2"
-
-    assert {:error, directive_error} =
-             Jido.Plugin.Normalizer.normalize_all([PackageWithUnvalidatedDirective])
-
-    assert directive_error.message == "Agent Plugin Directive must define validate/1"
-  end
-
-  test "Agent Server admission adds runtime input without replacing pure input or command data" do
-    agent = agent()
-    signal = Signal.new!("facet.run", %{}, source: "/test")
-    assert {:ok, [spec]} = Jido.Plugin.Normalizer.normalize_all([{Package, options()}])
-    assert {:ok, command} = Jido.Agent.Command.new(agent, signal, %{request: "one"})
-
-    prepared = %Jido.Plugin.Input{prepared: %{tenant: "alpha"}}
-    command = %{command | plugin_inputs: %{Package => prepared}}
-
-    assert {:ok, admitted} =
-             Jido.AgentServer.Plugin.Callbacks.admit(command, [spec], %{Package => :runtime}, 12)
-
-    assert admitted.agent === command.agent
-    assert admitted.signal === command.signal
-    assert admitted.context === command.context
-
-    assert admitted.plugin_inputs[Package] == %Jido.Plugin.Input{
-             prepared: %{tenant: "alpha"},
-             runtime: %{
-               agent_id: agent.id,
-               agent_module: agent.module,
-               caller_context: %{request: "one"},
-               plugin_state: 7,
-               prepared_input: %{tenant: "alpha"},
-               signal_id: signal.id,
-               state_version: 12
+      assert inputs == %{
+               @package => %Jido.Plugin.Input{
+                 prepared: %{owned: 7, state: agent.state, label: "facet"}
+               }
              }
-           }
-  end
+    end
 
-  test "Server, Persistence, and Topology facets use only their owner values" do
-    assert {:ok, [spec]} = Jido.Plugin.Normalizer.normalize_all([{Package, options()}])
+    test "#{inspect(@package)}: Agent facet validates each Directive once and reduces only its owned state" do
+      agent = agent(@package)
+      signal = Signal.new!("facet.run", %{}, source: "/test")
 
-    assert :ok =
-             Jido.AgentServer.Plugin.Callbacks.dispatch(
-               spec,
-               nil,
-               %Effect{label: "validated:facet"},
-               struct(DirectiveContext)
-             )
+      assert {:ok, candidate, [%Effect{label: "validated:facet"}]} = Agent.cmd(agent, signal)
+      assert candidate.state.visible == 3
+      assert candidate.state.seen == "facet"
+      assert candidate.state.facet_count == 8
+    end
 
-    dump_context = PersistencePlugin.context(spec, :dump, 1, :test)
-    assert {:ok, "v3:7"} = PersistencePlugin.dump(spec, 7, dump_context)
+    test "#{inspect(@package)}: explicit Agent facets use reduce and Directive-owned validation" do
+      assert {:ok, %SchemaEffect{count: 2}} =
+               Jido.Agent.Directive.validate(%SchemaEffect{count: 2})
 
-    load_context = PersistencePlugin.context(spec, :load, 1, :test)
-    assert {:ok, 7} = PersistencePlugin.load(spec, "v3:7", load_context)
+      assert {:error, _issues} = Jido.Agent.Directive.validate(%SchemaEffect{count: "2"})
 
-    topology_context = TopologyPlugin.context(spec, "worker", FacetAgent)
-    assert {:ok, contribution} = TopologyPlugin.contribute(spec, topology_context)
-    assert contribution.resources == [%{key: "facet_bus", kind: :bus, config: []}]
+      assert {:error, validation_error} =
+               Jido.Plugin.Normalizer.normalize_all([PackageWithPluginDirectiveValidation])
 
-    assert contribution.connections == [
-             %{agent: "worker", to: "facet_bus", path: "facet.**"}
-           ]
+      assert validation_error.message ==
+               "Agent Plugin Directive validation belongs to the Directive module"
+
+      assert {:error, reducer_error} =
+               Jido.Plugin.Normalizer.normalize_all([PackageWithLegacyStateUpdate])
+
+      assert reducer_error.message == "Agent Plugin state middleware must define reduce/2"
+
+      assert {:error, directive_error} =
+               Jido.Plugin.Normalizer.normalize_all([PackageWithUnvalidatedDirective])
+
+      assert directive_error.message == "Agent Plugin Directive must define validate/1"
+    end
+
+    test "#{inspect(@package)}: Agent Server admission adds runtime input without replacing pure input or command data" do
+      agent = agent(@package)
+      signal = Signal.new!("facet.run", %{}, source: "/test")
+      assert {:ok, [spec]} = Jido.Plugin.Normalizer.normalize_all([{@package, options()}])
+      assert {:ok, command} = Jido.Agent.Command.new(agent, signal, %{request: "one"})
+
+      prepared = %Jido.Plugin.Input{prepared: %{tenant: "alpha"}}
+      command = %{command | plugin_inputs: %{@package => prepared}}
+
+      assert {:ok, admitted} =
+               Jido.AgentServer.Plugin.Callbacks.admit(
+                 command,
+                 [spec],
+                 %{@package => :runtime},
+                 12
+               )
+
+      assert admitted.agent === command.agent
+      assert admitted.signal === command.signal
+      assert admitted.context === command.context
+
+      assert admitted.plugin_inputs[@package] == %Jido.Plugin.Input{
+               prepared: %{tenant: "alpha"},
+               runtime: %{
+                 agent_id: agent.id,
+                 agent_module: agent.module,
+                 caller_context: %{request: "one"},
+                 plugin_state: 7,
+                 prepared_input: %{tenant: "alpha"},
+                 signal_id: signal.id,
+                 state_version: 12
+               }
+             }
+    end
+
+    test "#{inspect(@package)}: Server, Persistence, and Topology facets use only their owner values" do
+      assert {:ok, [spec]} = Jido.Plugin.Normalizer.normalize_all([{@package, options()}])
+
+      assert :ok =
+               Jido.AgentServer.Plugin.Callbacks.dispatch(
+                 spec,
+                 nil,
+                 %Effect{label: "validated:facet"},
+                 struct(DirectiveContext)
+               )
+
+      dump_context = PersistencePlugin.context(spec, :dump, 1, :test)
+      assert {:ok, "v3:7"} = PersistencePlugin.dump(spec, 7, dump_context)
+
+      load_context = PersistencePlugin.context(spec, :load, 1, :test)
+      assert {:ok, 7} = PersistencePlugin.load(spec, "v3:7", load_context)
+
+      topology_context = TopologyPlugin.context(spec, "worker", FacetAgent)
+      assert {:ok, contribution} = TopologyPlugin.contribute(spec, topology_context)
+      assert contribution.resources == [%{key: "facet_bus", kind: :bus, config: []}]
+
+      assert contribution.connections == [
+               %{agent: "worker", to: "facet_bus", path: "facet.**"}
+             ]
+    end
   end
 
   test "normalization rejects wrong owners and unpaired Persistence" do
@@ -526,7 +636,7 @@ defmodule Jido.Plugin.FacetsTest do
     assert message == "Agent Directive has no owner"
   end
 
-  defp agent do
+  defp agent(package) do
     Agent.new!(
       name: "plugin_facets",
       schema:
@@ -534,7 +644,7 @@ defmodule Jido.Plugin.FacetsTest do
           visible: Zoi.integer() |> Zoi.default(2),
           seen: Zoi.string() |> Zoi.default("")
         }),
-      plugins: [{Package, options()}],
+      plugins: [{package, options()}],
       routes: [{"facet.run", Record}]
     )
     |> Agent.instantiate!()

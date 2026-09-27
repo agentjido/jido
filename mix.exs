@@ -46,6 +46,7 @@ defmodule Jido.MixProject do
      ]},
     {"Add Capabilities",
      [
+       {"guides/your-first-plugin.md", "Write a Plugin"},
        {"guides/plugin-contract-and-lifecycle.md", "Plugin Contract And Lifecycle"},
        {"guides/plugin-runtimes.livemd", "Plugin Runtimes"},
        {"guides/jido-signal-messaging.md", "Use Jido Signal"},

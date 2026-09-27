@@ -12,7 +12,11 @@ policy if the hook fails.
 
 The runtime starts from `Jido.Plugin.Init`. Startup, restore, and runtime
 replacement rebuild the current view; they do not replay old notifications.
-This is a best-effort live projection, not a durable event stream.
+The package implements `roles: [:agent, :agent_server]` in one module.
+Its declared hook is a required step before Directive dispatch. Failure or
+timeout skips later hooks and Directives and uses the Server error policy.
+The commit and the result already sent to the caller remain unchanged.
+This view is not a durable event stream. Use Telemetry for optional observation.
 
 Use semantic Telemetry for observation alone. Use a custom Directive when an
 Action must request a specific effect. Use this hook when a Plugin must track

@@ -303,12 +303,11 @@ end
 
 ### What you need to change
 
-In V3, the package module is a callback-free manifest. Put Agent state behavior
-in an Agent facet:
+In V3, declare explicit roles and put their callbacks in the package module:
 
 ```elixir
-defmodule MyApp.CounterPlugin.Agent do
-  use Jido.Agent.Plugin
+defmodule MyApp.CounterPlugin do
+  use Jido.Plugin, roles: [:agent]
 
   @impl Jido.Agent.Plugin
   def state_spec(_opts) do
@@ -320,10 +319,6 @@ defmodule MyApp.CounterPlugin.Agent do
     {:ok, %{reduction.plugin_state | turns: reduction.plugin_state.turns + 1}}
   end
 end
-
-defmodule MyApp.CounterPlugin do
-  use Jido.Plugin, agent: MyApp.CounterPlugin.Agent
-end
 ```
 
 Add `plugin MyApp.CounterPlugin` inside the Agent's `agent` block. Use
@@ -331,6 +326,21 @@ Add `plugin MyApp.CounterPlugin` inside the Agent's `agent` block. Use
 successful candidate reductions; only a successful live commit stores the count.
 Set a default on the owned object itself when the key can be absent. A default
 on a nested field alone does not create the outer Plugin-owned state object.
+
+Existing V3 separate-facet declarations remain valid. To move callbacks into a
+package, replace that owner's facet option with its entry in `roles`. Move only
+the callbacks for that role. Keep the package module, `vsn`, common options,
+`option_keys`, and state key unchanged. Stored Plugin declarations still contain
+only the package and its options, so this source change needs no data migration.
+The callback module in diagnostics and Telemetry becomes the package module.
+Audit and Heartbeat now use local roles; their former facet modules remain
+available for reuse.
+
+A declared `after_commit/3` hook is a required step before Directive dispatch.
+Failure or timeout skips later hooks and Directives and uses the existing error
+policy. It cannot undo the commit or change the result already sent to the
+caller. Use Telemetry for optional observation. Runtime replacement still starts
+from fresh committed state and revision.
 
 Port each capability explicitly:
 

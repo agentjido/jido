@@ -2,16 +2,34 @@ defmodule Jido.Plugin do
   @moduledoc """
   Declares one reusable Plugin package and its owner-specific facets.
 
-  A new Plugin package is callback-free. It names up to one
-  `Jido.Agent.Plugin`, `Jido.AgentServer.Plugin`, `Jido.Persistence.Plugin`, and
-  `Jido.Topology.Plugin` module:
+  A small Plugin declares its roles and implements their callbacks in one module:
 
-      defmodule MyApp.Audit do
-        use Jido.Plugin,
-          agent: MyApp.Audit.Agent,
-          persistence: MyApp.Audit.Persistence,
-          vsn: 1
+      defmodule MyApp.Counter do
+        use Jido.Plugin, roles: [:agent]
+
+        @impl true
+        def state_spec(_opts), do: {:turns, Zoi.integer() |> Zoi.default(0)}
+
+        @impl true
+        def reduce(reduction, _opts), do: {:ok, reduction.plugin_state + 1}
       end
+
+  Roles are `:agent`, `:agent_server`, `:persistence`, and `:topology`. They use
+  the callbacks of `Jido.Agent.Plugin`, `Jido.AgentServer.Plugin`,
+  `Jido.Persistence.Plugin`, and `Jido.Topology.Plugin`, respectively.
+  Jido does not infer roles from function names.
+
+  Larger Plugins can select separate facet modules. Both forms use the same
+  manifest, owner Specs, validation, and execution path. A package can combine
+  local roles with separate facets for other owners:
+
+      use Jido.Plugin,
+        roles: [:agent],
+        persistence: MyApp.Counter.Persistence,
+        vsn: 1
+
+  Select each owner only once. A package without local roles cannot define
+  facet callbacks. A separate facet still implements only its owner's callbacks.
 
   Put common options in the Agent declaration. Use `option_keys` in the
   manifest when facets need different subsets:
@@ -34,20 +52,47 @@ defmodule Jido.Plugin do
 
   The Server facet can also implement `after_commit/3` to keep a live view of
   its exact committed owned value and revision, without an Action-owned
-  Directive. Startup and replacement use `Jido.Plugin.Init`; notifications
-  are bounded, best effort, and not replayed.
-
-  Every Plugin must use an owner-facet manifest. Package modules do not define
-  lifecycle callbacks.
+  Directive. Once declared, this hook is a required step before Directive
+  dispatch. Failure or timeout skips later hooks and Directives and uses the
+  Server error policy. It cannot undo the commit or change the result already
+  sent to the caller. Startup and replacement use `Jido.Plugin.Init`. Hooks
+  are bounded and are not replayed. Use Telemetry for optional observation.
   """
 
   alias Jido.Plugin.{Init, Manifest, Normalizer}
 
   @type declaration :: module() | {module(), keyword()}
-  @doc "Defines a Plugin package with one or more owner facets."
+  @doc "Defines a Plugin package with explicit local roles or separate owner facets."
   defmacro __using__(opts) when is_list(opts) do
-    allowed = [:agent, :agent_server, :persistence, :topology, :vsn, :option_keys]
+    owners = [:agent, :agent_server, :persistence, :topology]
+    allowed = owners ++ [:roles, :vsn, :option_keys]
     unknown = Keyword.keys(opts) -- allowed
+    roles = Keyword.get(opts, :roles, [])
+
+    unless is_list(roles) and Enum.all?(roles, &(&1 in owners)) and Enum.uniq(roles) == roles do
+      raise ArgumentError,
+            "Plugin roles must be a literal list of unique owners: #{inspect(owners)}"
+    end
+
+    if Enum.any?(roles, &Keyword.has_key?(opts, &1)) do
+      raise ArgumentError, "Plugin role cannot also select a separate facet for the same owner"
+    end
+
+    behaviours = %{
+      agent: Jido.Agent.Plugin,
+      agent_server: Jido.AgentServer.Plugin,
+      persistence: Jido.Persistence.Plugin,
+      topology: Jido.Topology.Plugin
+    }
+
+    role_behaviours =
+      Enum.map(roles, fn role ->
+        quote do
+          @behaviour unquote(Map.fetch!(behaviours, role))
+        end
+      end)
+
+    opts = Enum.reduce(roles, opts, &Keyword.put(&2, &1, __CALLER__.module))
 
     selected =
       Enum.filter([:agent, :agent_server, :persistence, :topology], &Keyword.has_key?(opts, &1))
@@ -69,6 +114,8 @@ defmodule Jido.Plugin do
     option_keys = Keyword.get(opts, :option_keys, [])
 
     quote location: :keep do
+      unquote_splicing(role_behaviours)
+
       @doc false
       def __jido_plugin__ do
         %Jido.Plugin.Manifest{

@@ -1,7 +1,8 @@
 # Plugin Contract and Lifecycle
 
-A Plugin package adds one declared capability to an Agent. The package module
-is callback-free. It selects no more than one facet for each Jido owner:
+A Plugin package adds one declared capability to an Agent. The package selects
+explicit local roles or separate facets. Each owner has the same authority in
+both forms:
 
 | Facet | Purpose |
 | --- | --- |
@@ -11,6 +12,11 @@ is callback-free. It selects no more than one facet for each Jido owner:
 | `Jido.Topology.Plugin` | Pure static Topology contribution |
 
 ## Declare a Package
+
+Start with [extension selection](extension-boundaries.md#select-an-extension-type)
+and [Write a Plugin](your-first-plugin.md). Use `roles: [:agent, :agent_server]`
+to implement the selected callbacks in the package module. `roles` is a literal
+list of unique owners. Separate facets remain available:
 
 ```elixir
 defmodule MyApp.RateLimit do
@@ -32,7 +38,10 @@ end
 
 If `option_keys` is absent, each selected facet gets all common options. If it
 is present, it must assign every declared option to a selected facet. A package
-module can appear only once in one Agent definition.
+module can appear only once in one Agent definition. Local roles and separate
+facets can be combined for different owners; an owner cannot use both. Both
+forms normalize to the same Manifest and owner Specs. Package identity, stored
+definitions, versions, callback contexts, and callback order do not change.
 
 ## Agent Facet
 
@@ -90,7 +99,7 @@ admission. Outbound Signal preparation runs in reverse declaration order.
 Directive dispatch starts only after commit. A dispatch failure does not roll
 back committed state.
 
-### Optional commit notification
+### Required hook before dispatch
 
 Use `after_commit(runtime, commit, opts)` when a Plugin must keep a live
 projection of its owned state. The Action does not need to return a custom
@@ -116,13 +125,14 @@ Failure or timeout skips remaining hooks and Directives and uses the existing
 error policy. The Outcome has stage `:after_commit`; skipped Directives are
 not counted as failed Directives. `Server.call/3` has already returned the
 committed Agent. Neither a hook failure nor owner loss can undo a saved
-commit or completed external work. Jido does not retry these notifications.
+commit or completed external work. Jido does not retry these hooks.
 If the error policy continues, a failed projection can remain stale until a
-later successful notification or runtime replacement.
+later successful hook or runtime replacement.
 
 Startup, restore, runtime replacement, direct `Jido.Agent.cmd/3`, and definition
 upgrades do not invoke this hook. Rebuild the current runtime view from
-`Jido.Plugin.Init`. Notifications are best effort, not a durable event stream.
+`Jido.Plugin.Init`. Declaring the hook makes it a required step before
+Directive dispatch. It is bounded and is not a durable event stream.
 Use semantic Telemetry for observation alone. Use an owned Directive for an
 explicit effect request.
 
