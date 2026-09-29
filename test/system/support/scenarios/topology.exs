@@ -89,19 +89,13 @@ defmodule JidoTest.System.Scenarios.Topology do
         old_bus = Controller.whereis_bus(controller, :work)
         runtime = runtime(controller)
 
-        monitors =
-          for pid <- [runtime, old_bus] do
-            {pid, Process.monitor(pid)}
-          end
-
-        Observability.killed(c.observer, runtime)
-        Process.exit(runtime, :kill)
-
-        for {pid, ref} <- monitors do
-          assert_receive({:DOWN, ^ref, :process, ^pid, _}, 10000)
-        end
-
-        await_new_runtime(c, controller, runtime)
+        monitor = Process.monitor(old_bus)
+        Observability.killed(c.observer, old_bus)
+        Process.exit(old_bus, :kill)
+        assert_receive {:DOWN, ^monitor, :process, ^old_bus, :killed}, 10_000
+        assert :ok = Controller.reconcile(controller)
+        assert :ok = Controller.await_ready(controller)
+        assert runtime(controller) == runtime
         assert members(controller, 2) == original
         bus = Controller.whereis_bus(controller, :work)
         assert bus != old_bus
@@ -126,7 +120,7 @@ defmodule JidoTest.System.Scenarios.Topology do
             saved.id
           end
 
-        Observability.assert_topology(c.observer, :activate, 3)
+        Observability.assert_topology(c.observer, :repair, 3)
         stop_controller(c, initial.id, original ++ [bus])
 
         for id <- ids do
@@ -215,13 +209,14 @@ defmodule JidoTest.System.Scenarios.Topology do
             pid
           end
 
-        old = [c.jido_pid | services ++ members(controller, 2)]
+        old = [c.jido_pid | services]
 
         monitors =
           for pid <- old do
             {pid, Process.monitor(pid)}
           end
 
+        member_monitors = for pid <- members(controller, 2), do: {pid, Process.monitor(pid)}
         controller_monitor = Process.monitor(controller)
         old_runtime = runtime(controller)
 
@@ -238,6 +233,12 @@ defmodule JidoTest.System.Scenarios.Topology do
           end
         after
           :sys.resume(c.world)
+        end
+
+        # The application supervisor stops the later Controller child and its
+        # local Agents when it handles the Jido failure.
+        for {pid, ref} <- member_monitors do
+          assert_receive {:DOWN, ^ref, :process, ^pid, _}, 10_000
         end
 
         assert_receive {:DOWN, ^controller_monitor, :process, ^controller, _}, 10000
