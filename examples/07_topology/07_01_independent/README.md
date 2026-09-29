@@ -17,14 +17,16 @@ Read [the Topology](independent.ex), then the shared [Cell Agent](../support/cel
 mix test test/examples/07_topology/07_01_independent --include example --seed 0
 ```
 
-Expected result: both Agents start, state changes stay isolated, and OTP
-restarts only the failed Agent.
+Expected result: both Agents start and state changes stay isolated. OTP
+restarts only the failed Agent with the same ID and committed state. A clean
+stop stays stopped after repair. Controller shutdown removes all live Agents.
 
 ## Important behavior
 
 Manual repair waits for `Controller.reconcile/1`. OTP restart and connection
-recovery continue. A healthy member keeps its committed state and PID. A clean
-stop stays stopped, including after a repair request.
+recovery continue. A replacement resumes the saved state revision. A healthy
+member keeps its committed state and PID. A clean stop stays stopped, including
+after a repair request.
 
 ## Limits
 

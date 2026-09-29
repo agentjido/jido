@@ -2,6 +2,7 @@ defmodule Jido.Examples.Topology.BusSwarmTest do
   use JidoTest.Case, async: false
   @moduletag :example
   @moduletag timeout: 120_000
+  import JidoTest.TopologyAssertions
   alias Jido.Examples.Topology.{Cell, Formats}
   alias Jido.Topology.{Codec, Controller}
 
@@ -30,7 +31,8 @@ defmodule Jido.Examples.Topology.BusSwarmTest do
       timeout: 20000
     )
 
-    Supervisor.stop(controller)
-    eventually(fn -> Jido.agent_count(jido) == 0 end, timeout: 10000)
+    coordinator = Controller.whereis_agent(controller, :coordinator)
+    stop_topology(controller, [coordinator | workers], [bus])
+    assert Jido.agent_count(jido) == 0
   end
 end

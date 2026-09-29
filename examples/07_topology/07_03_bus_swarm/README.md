@@ -27,6 +27,9 @@ and Controller shutdown removes every worker.
 Bus broadcast gives each matching subscriber the Signal. It is not a work queue.
 Startup concurrency and Agent execution capacity are separate limits.
 
+Controller shutdown removes the coordinator, all workers, their Plugin
+processes, and the Bus. The test confirms each process exit.
+
 ## Limits
 
 The scale result is local and in memory. It is not a multi-host throughput claim.

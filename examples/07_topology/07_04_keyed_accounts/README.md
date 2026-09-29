@@ -18,12 +18,15 @@ Read [the account Topology](accounts.ex), then the shared [Cell Agent](../suppor
 mix test test/examples/07_topology/07_04_keyed_accounts --include example --seed 0
 ```
 
-Expected result: the account key `acme` resolves to an Agent whose label is
-`Acme`.
+Expected result: the account key `acme/east` resolves to an Agent whose label is
+`Acme`. After a failure, the same key resolves to a new process with the same
+ID, committed state, and revision. The other account keeps its PID. Controller
+shutdown removes both Agents.
 
 ## Important behavior
 
-Keys normalize to stable strings. Duplicate keys fail planning before startup.
+Keys normalize to stable strings. Slashes are escaped in Agent IDs; lookups use
+the original account key. Duplicate keys fail planning before startup.
 
 ## Limits
 

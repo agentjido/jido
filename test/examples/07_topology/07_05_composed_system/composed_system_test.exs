@@ -1,18 +1,19 @@
 defmodule Jido.Examples.Topology.ComposedSystemTest do
   use JidoTest.Case, async: true
   @moduletag :example
+  import JidoTest.TopologyAssertions
   alias Jido.AgentServer, as: Server
   alias Jido.Examples.Topology.{Cell, ComposedFormats}
   alias Jido.Signal.Bus
   alias Jido.Topology.{Codec, Controller, Ref}
 
-  test "boots two composed teams from JSON with one shared Bus", %{jido: jido} do
+  test "composed teams reconnect to their shared Bus after it restarts", %{jido: jido} do
     {:ok, json} = ComposedFormats.json()
 
     {:ok, topology} =
       Codec.decode(JSON.decode!(json), ComposedFormats.registry(), id: "composed-example")
 
-    controller = start_supervised!({Controller, jido: jido, topology: topology})
+    controller = start_supervised!({Controller, jido: jido, topology: topology, repair: :manual})
     assert :ok = Controller.await_ready(controller)
     assert Jido.agent_count(jido) == 8
     assert %{status: :ready, resources: 1} = Controller.status(controller)
@@ -20,10 +21,8 @@ defmodule Jido.Examples.Topology.ComposedSystemTest do
     assert Controller.whereis_bus(controller, Ref.ref(:east, :events)) == bus
     assert Controller.whereis_bus(controller, Ref.ref(:west, :events)) == bus
 
-    {:ok, command_signal_1} = Cell.work_signal(%{value: 4})
-
-    assert {:ok, [_]} =
-             Bus.publish(bus, [command_signal_1])
+    assert {:ok, work} = Cell.work_signal(%{value: 4})
+    assert {:ok, [_]} = Bus.publish(bus, [work])
 
     workers =
       for {team, count} <- [east: 2, west: 3], index <- 1..count do
@@ -41,17 +40,33 @@ defmodule Jido.Examples.Topology.ComposedSystemTest do
     assert map_size(Server.children(east)) == 2
     assert map_size(Server.children(west)) == 3
 
-    {:ok, route_signal_1} = Cell.work_signal(%{value: 9})
-
-    assert {:ok, _} =
-             Jido.AgentServer.call(east, route_signal_1, [])
+    assert {:ok, work} = Cell.work_signal(%{value: 9})
+    assert {:ok, _} = Server.call(east, work)
 
     assert Server.agent(west).state.total == 0
-    assert Process.alive?(bus)
-    Supervisor.stop(controller)
+    monitor = Process.monitor(bus)
+    Process.exit(bus, :kill)
+    assert_receive {:DOWN, ^monitor, :process, ^bus, :killed}, 1_000
+    assert :ok = Controller.await_ready(controller)
+    replacement = Controller.whereis_bus(controller, :events)
+    assert is_pid(replacement) and replacement != bus
+    assert Controller.whereis_bus(controller, Ref.ref(:east, :events)) == replacement
+    assert Controller.whereis_bus(controller, Ref.ref(:west, :events)) == replacement
+    agents = [director, east, west | workers]
 
-    eventually(fn ->
-      Enum.all?(workers, &(not Process.alive?(&1))) and not Process.alive?(bus)
-    end)
+    for agent <- agents, do: assert(Jido.whereis_agent(jido, Server.agent(agent).id) == agent)
+    assert {:ok, work} = Cell.work_signal(%{value: 5})
+    assert {:ok, [_]} = Bus.publish(replacement, [work])
+
+    for worker <- workers do
+      eventually(fn -> Server.snapshot(worker).state_version == 2 end)
+      assert Server.agent(worker).state.total == 9
+      assert Server.agent(worker).state.received == 2
+    end
+
+    assert Server.agent(east).state == %{label: "east", received: 1, total: 9}
+    assert Server.agent(west).state == %{label: "west", received: 0, total: 0}
+    stop_topology(controller, agents, [replacement])
+    assert Jido.agent_count(jido) == 0
   end
 end

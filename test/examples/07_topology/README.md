@@ -9,6 +9,19 @@ Run the section behavior tests:
 mix test test/examples/07_topology --include example --seed 0
 ```
 
-The Bus swarm test is a local scale fixture. Other tests prove ownership,
-manual repair, keyed identity, composition, Plugin contribution, lifecycle
-Signals, placement-policy delegation, and cleanup.
+The Bus swarm test is a local scale fixture. The remaining tests check:
+
+- Independent Agent state recovery with manual repair, and clean stops that
+  remain stopped after reconciliation.
+- Parent exit policy and logical binding repair without restarting stopped workers.
+- Stable keyed identities and committed state after JSON transport and restart.
+- Shared Bus replacement, component exports, and subscription recovery without
+  Agent restarts.
+- Plugin contributions, recovered subscriptions, unchanged source definitions,
+  and process cleanup.
+- Lifecycle Signals and placement-policy delegation.
+
+Examples use public Jido and OTP APIs. Detailed restart limits, coordinator
+failure races, and remote moves remain in the core and peer tests. The
+[authoring suite](../../authoring/topology/README.md) checks live behavior across
+all local definition forms.

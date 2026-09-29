@@ -33,4 +33,11 @@ The application starts the control Agent first. It then gives that Agent to the
 Controller through the `:lifecycle` option. Lifecycle delivery is best effort.
 It does not change activation or repair results.
 
+Expected result: the control Agent records operation and readiness events.
+Controller shutdown removes its worker but leaves the application-owned
+control Agent alive. The application stops that Agent separately.
+
+The [test](../../../test/examples/07_topology/07_07_lifecycle_signals/lifecycle_signals_test.exs)
+checks this ownership boundary and process cleanup.
+
 Previous: [Plugin Contribution](../07_06_plugin_contribution/README.md) | Next: [Placement Policy](../07_08_placement_policy/README.md)

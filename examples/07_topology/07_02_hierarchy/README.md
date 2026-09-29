@@ -19,7 +19,9 @@ mix test test/examples/07_topology/07_02_hierarchy --include example --seed 0
 ```
 
 Expected result: the Controller starts five Agents and the leader owns exactly
-three workers.
+three workers. When the leader fails, OTP restarts it and the workers stop.
+Manual repair binds the replacement leader to the coordinator and leaves the
+workers stopped. Controller shutdown removes the remaining Agents.
 
 ## Important behavior
 
