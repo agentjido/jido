@@ -28,6 +28,11 @@ defmodule Jido.Topology.Controller.Runtime do
     Process.flag(:trap_exit, true)
 
     with {:ok, accepted, revision, placements, pending_move} <- TargetStore.load(jido, instance) do
+      # A killed coordinator cannot cancel its timers or activation tasks.
+      # The dedicated pool survives, so retire those tasks before a new pass.
+      tasks = Controller.name(jido, instance.id, :tasks)
+      Enum.each(Task.Supervisor.children(tasks), &Task.Supervisor.terminate_child(tasks, &1))
+
       supervisors =
         for role <- [:resources, :agents, :tasks],
             do: GenServer.whereis(Controller.name(jido, instance.id, role))

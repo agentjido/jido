@@ -32,7 +32,9 @@ Application supervisor (:rest_for_one)
     └── coordinator
 ```
 
-The coordinator can restart without stopping healthy members or Buses. The
+The coordinator can restart without stopping healthy members or Buses. Its
+replacement cancels prior activation tasks before it starts another bounded
+pass. The
 Agent supervisor retains child specifications and restarts abnormal exits.
 Each start rebuilds the declared definition and runtime inputs, then restores
 committed state through the AgentServer restore contract. Registration uses

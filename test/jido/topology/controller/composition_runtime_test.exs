@@ -68,6 +68,41 @@ defmodule Jido.Topology.Controller.CompositionRuntimeTest do
       persistence: {Jido.Persistence.ETS, table: __MODULE__}
   end
 
+  test "coordinator replacement cancels old activation tasks and preserves members", %{jido: jido} do
+    :persistent_term.put({BlockReady, :observer}, self())
+    on_exit(fn -> :persistent_term.erase({BlockReady, :observer}) end)
+
+    instance =
+      Jido.Topology.new!(%{
+        name: "activation_owner",
+        agents: [%{key: :slow, module: SlowCell}, %{key: :fast, module: Cell}]
+      })
+      |> Jido.Topology.instantiate(id: unique_id("activation-owner"))
+      |> Jido.Topology.unwrap!()
+
+    controller = start_supervised!({Controller, jido: jido, topology: instance, repair: :manual})
+    assert_receive {:readiness_blocked, gate}, 1_000
+    eventually(fn -> is_pid(Controller.whereis_agent(controller, :fast)) end)
+    fast = Controller.whereis_agent(controller, :fast)
+    tasks = Controller.name(jido, instance.id, :tasks)
+    eventually(fn -> length(Task.Supervisor.children(tasks)) == 1 end)
+    [activation] = Task.Supervisor.children(tasks)
+    activation_ref = Process.monitor(activation)
+
+    {_, coordinator, _, _} =
+      List.keyfind(Supervisor.which_children(controller), Controller.Runtime, 0)
+
+    coordinator_ref = Process.monitor(coordinator)
+    Process.exit(coordinator, :kill)
+    assert_receive {:DOWN, ^coordinator_ref, :process, ^coordinator, :killed}, 1_000
+    assert_receive {:DOWN, ^activation_ref, :process, ^activation, _}, 1_000
+    send(gate, :release)
+    assert :ok = Controller.await_ready(controller, 5_000)
+    assert Controller.whereis_agent(controller, :fast) == fast
+    assert is_pid(Controller.whereis_agent(controller, :slow))
+    eventually(fn -> Task.Supervisor.children(tasks) == [] end)
+  end
+
   test "status stays responsive and independent members start while readiness is blocked", %{
     jido: jido
   } do
