@@ -99,6 +99,8 @@ defmodule Jido.Topology.Controller do
       ]
 
       Supervisor.init(children, strategy: :one_for_one, auto_shutdown: :any_significant)
+    else
+      {:error, reason} -> exit(reason)
     end
   end
 

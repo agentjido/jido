@@ -775,9 +775,13 @@ defmodule Jido.Topology.Controller.Runtime do
   defp owns?(:agent, pid, spec, context) do
     agent = Server.agent(pid)
 
-    agent.module == spec.module and
-      Map.get(agent.metadata, "jido.topology") == marker(spec, context.instance_id) and
+    matches_agent?(agent, spec, context.instance_id) and
       (node(pid) != node() or AgentSupervisor.owns?(context.agents, spec.key, pid))
+  end
+
+  defp matches_agent?(agent, spec, instance_id) do
+    agent.id == spec.id and agent.module == spec.module and
+      Map.get(agent.metadata, "jido.topology") == marker(spec, instance_id)
   end
 
   defp lifecycle_signal(module, topology_id, data) do
@@ -831,9 +835,20 @@ defmodule Jido.Topology.Controller.Runtime do
   end
 
   defp live_input_status(key, pid, spec, state) do
-    with :ok <- live_bus_inputs(pid, spec),
+    with :ok <- live_agent_identity(pid, spec, state.instance.id),
+         :ok <- live_bus_inputs(pid, spec),
          :ok <- live_parent_binding(key, pid, spec, state),
          do: :ok
+  end
+
+  defp live_agent_identity(pid, spec, instance_id) do
+    case safely(fn -> Server.agent(pid, @live_query_timeout) end) do
+      %Jido.Agent{} = agent ->
+        if matches_agent?(agent, spec, instance_id), do: :ok, else: :agent_identity_in_use
+
+      _error ->
+        :member_unavailable
+    end
   end
 
   defp live_bus_inputs(_pid, %{subscriptions: []}), do: :ok
@@ -893,7 +908,7 @@ defmodule Jido.Topology.Controller.Runtime do
     keys =
       Map.keys(state.ready) ++
         for {key, reason} <- state.errors,
-            reason in [:member_unavailable, :member_stopped],
+            recoverable_member_error?(reason),
             do: key
 
     Enum.reduce(keys, state, fn key, acc ->
@@ -915,6 +930,9 @@ defmodule Jido.Topology.Controller.Runtime do
       end
     end)
   end
+
+  defp recoverable_member_error?({:member_start_failed, _reason}), do: true
+  defp recoverable_member_error?(reason), do: reason in [:member_unavailable, :member_stopped]
 
   defp replacement(key, state) do
     context = ownership_context(state)

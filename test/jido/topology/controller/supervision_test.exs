@@ -5,6 +5,45 @@ defmodule Jido.Topology.Controller.SupervisionTest do
   alias Jido.Topology.{BusInputs, Controller}
   alias JidoTest.SupervisedCounter, as: Counter
 
+  defmodule OtherCounter do
+    use Jido.Agent, name: "other_supervised_counter"
+
+    agent do
+      schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+      plugin Counter.Runtime, config: [label: "current"]
+    end
+  end
+
+  test "readiness rejects a live member whose module no longer matches the target", c do
+    {controller, _instance} = start_topology(c.jido)
+    server = Controller.whereis_agent(controller, :counter)
+    assert {:ok, _} = Server.upgrade(server, OtherCounter, &{:ok, &1.state})
+    assert Process.alive?(server)
+    assert Controller.whereis_agent(controller, :counter) == nil
+
+    assert %{status: :degraded, errors: %{"agent/counter" => :agent_identity_in_use}} =
+             Controller.status(controller)
+
+    assert {:ok, _} = Server.upgrade(server, Counter, &{:ok, &1.state})
+    assert :ok = Controller.await_ready(controller, 1_000)
+    assert Controller.whereis_agent(controller, :counter) == server
+  end
+
+  test "status stays bounded when a live member cannot answer an identity check", c do
+    {controller, _instance} = start_topology(c.jido)
+    server = Controller.whereis_agent(controller, :counter)
+    :ok = :sys.suspend(server)
+
+    try do
+      assert %{status: :degraded, errors: %{"agent/counter" => :member_unavailable}} =
+               Controller.status(controller, 1_000)
+    after
+      :ok = :sys.resume(server)
+    end
+
+    assert :ok = Controller.await_ready(controller, 1_000)
+  end
+
   test "OTP restores committed state and runtime inputs while the coordinator is paused", c do
     {controller, instance} = start_topology(c.jido)
     server = Controller.whereis_agent(controller, :counter)
@@ -302,6 +341,22 @@ defmodule Jido.Topology.Controller.SupervisionTest do
     for opts <- [[max_restarts: -1], [max_restarts: :infinity], [max_seconds: 0]] do
       assert {:error, %Jido.Error.ValidationError{}} =
                Controller.start_link([jido: c.jido, topology: instance] ++ opts)
+    end
+  end
+
+  test "pending ownership cleanup returns its startup error without an OTP wrapper", c do
+    Process.flag(:trap_exit, true)
+    {controller, instance} = start_topology(c.jido)
+    owner = GenServer.whereis(Controller.name(c.jido, instance.id, :owner))
+    :erlang.suspend_process(owner)
+
+    try do
+      assert :ok = Supervisor.stop(controller)
+
+      assert {:error, :ownership_cleanup_pending} =
+               Controller.start_link(jido: c.jido, topology: instance)
+    after
+      if Process.alive?(owner), do: :erlang.resume_process(owner)
     end
   end
 

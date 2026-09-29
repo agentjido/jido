@@ -39,6 +39,9 @@ exits.
 Each start rebuilds the declared definition and runtime inputs, then restores
 committed state through the AgentServer restore contract. Registration uses
 the Jido instance and stable Agent ID, independent of the owning supervisor.
+Readiness queries detect an owned OTP replacement even if the previous process
+failed during initial startup. They also check the live Agent ID, module, and
+Topology metadata. A changed or unavailable member makes the system degraded.
 
 The Agent supervisor uses `max_restarts` and `max_seconds` from Controller
 options (defaults: 3 restarts in 5 seconds). A supporting supervisor failure

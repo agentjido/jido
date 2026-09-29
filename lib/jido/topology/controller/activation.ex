@@ -26,16 +26,23 @@ defmodule Jido.Topology.Controller.Activation do
     case result do
       {:ok, pid} ->
         Jido.Topology.Controller.Owner.track(context.owner, pid)
-        with :ok <- Server.await_ready(pid), do: {:ok, pid}
+        await_member(pid)
 
       {:error, {:already_started, pid}} ->
-        with :ok <- Server.await_ready(pid), do: {:ok, pid}
+        await_member(pid)
 
       {:error, :already_present} ->
         {:error, :member_stopped}
 
       error ->
         error
+    end
+  end
+
+  defp await_member(pid) do
+    case Server.await_ready(pid) do
+      :ok -> {:ok, pid}
+      {:error, reason} -> {:error, {:member_start_failed, reason}}
     end
   end
 

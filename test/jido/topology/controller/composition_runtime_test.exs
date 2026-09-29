@@ -68,6 +68,36 @@ defmodule Jido.Topology.Controller.CompositionRuntimeTest do
       persistence: {Jido.Persistence.ETS, table: __MODULE__}
   end
 
+  test "manual readiness observes an OTP replacement after a crash during startup", %{jido: jido} do
+    :persistent_term.put({BlockReady, :observer}, self())
+    on_exit(fn -> :persistent_term.erase({BlockReady, :observer}) end)
+
+    instance =
+      Jido.Topology.new!(%{
+        name: "startup_restart",
+        agents: [%{key: :slow, module: SlowCell}]
+      })
+      |> Jido.Topology.instantiate(id: unique_id("startup-restart"))
+      |> Jido.Topology.unwrap!()
+
+    controller = start_supervised!({Controller, jido: jido, topology: instance, repair: :manual})
+    assert_receive {:readiness_blocked, _old_gate}, 1_000
+    agents = Controller.name(jido, instance.id, :agents)
+    [{"agent/slow", original, _, _}] = Supervisor.which_children(agents)
+    ref = Process.monitor(original)
+    Process.exit(original, :kill)
+    assert_receive {:DOWN, ^ref, :process, ^original, :killed}, 1_000
+    assert_receive {:readiness_blocked, gate}, 1_000
+    eventually(fn -> Controller.status(controller).active == 0 end)
+    send(gate, :release)
+    [{"agent/slow", replacement, _, _}] = Supervisor.which_children(agents)
+    assert replacement != original
+    assert :ok = Server.await_ready(replacement)
+    assert :ok = Controller.await_ready(controller, 1_000)
+    assert Controller.whereis_agent(controller, :slow) == replacement
+    assert Controller.status(controller).errors == %{}
+  end
+
   test "coordinator replacement cancels old activation tasks and preserves members", %{jido: jido} do
     :persistent_term.put({BlockReady, :observer}, self())
     on_exit(fn -> :persistent_term.erase({BlockReady, :observer}) end)
