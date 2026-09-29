@@ -247,7 +247,7 @@ defmodule Jido.Topology.Controller.CompositionRuntimeTest do
     assert Process.alive?(unrelated)
   end
 
-  test "a team failure leaves the shared Bus and the other team running", %{jido: jido} do
+  test "a team stop leaves the shared Bus and the other team running", %{jido: jido} do
     instance =
       Jido.Topology.unwrap!(
         with {:ok, definition} <-
@@ -271,15 +271,10 @@ defmodule Jido.Topology.Controller.CompositionRuntimeTest do
     assert {:ok, _} =
              Jido.AgentServer.call(west, route_signal_2, [])
 
-    eventually(
-      fn ->
-        replacement = Controller.whereis_agent(controller, Ref.ref(:east, :leader))
-
-        is_pid(replacement) and replacement != east and
-          map_size(Server.children(replacement)) == 2
-      end,
-      timeout: 5000
-    )
+    assert :ok = Controller.reconcile(controller)
+    eventually(fn -> Controller.status(controller).active == 0 end)
+    assert Controller.whereis_agent(controller, Ref.ref(:east, :leader)) == nil
+    assert Controller.status(controller).status == :degraded
 
     assert Controller.whereis_bus(controller, :events) == bus
     assert Controller.whereis_agent(controller, Ref.ref(:west, :leader)) == west

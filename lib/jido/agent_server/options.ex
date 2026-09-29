@@ -62,6 +62,8 @@ defmodule Jido.AgentServer.Options do
               pool_key: Zoi.any(description: "Agent InstanceManager key") |> Zoi.optional(),
               restore:
                 Zoi.any(description: "Persisted Agent restore policy") |> Zoi.default(:if_found),
+              restore_definition:
+                Zoi.any(description: "Definition source on restore") |> Zoi.default(:checkpoint),
               state_version:
                 Zoi.integer(description: "Initial Agent commit revision")
                 |> Zoi.default(0),
@@ -125,6 +127,7 @@ defmodule Jido.AgentServer.Options do
            normalize_default_dispatch(Map.get(attrs, :default_dispatch)),
          {:ok, persistence} <- resolve_persistence(attrs),
          :ok <- validate_restore(Map.get(attrs, :restore, :if_found)),
+         :ok <- validate_restore_definition(Map.get(attrs, :restore_definition, :checkpoint)),
          :ok <- validate_state_version(Map.get(attrs, :state_version, 0)),
          :ok <- validate_debug(Map.get(attrs, :debug, false)),
          :ok <- validate_debug_max_events(Map.get(attrs, :debug_max_events, 500)),
@@ -280,6 +283,12 @@ defmodule Jido.AgentServer.Options do
   defp constructor_failed(module, kind, reason) do
     invalid("Agent constructor failed", %{module: module, kind: kind, reason: reason})
   end
+
+  defp validate_restore_definition(value) when value in [:checkpoint, :current], do: :ok
+
+  defp validate_restore_definition(value),
+    do:
+      invalid("restore_definition must be :checkpoint or :current", %{restore_definition: value})
 
   defp validate_identity_options(attrs) do
     with :ok <- validate_optional_atom(Map.get(attrs, :jido), :jido),

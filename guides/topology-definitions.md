@@ -142,5 +142,10 @@ becomes `:degraded` with an input error. After reconnection or binding repair,
 a later query can report `:ready` again. Readiness does not confirm that a
 Signal has committed a target Agent Turn.
 
+Local Agents use OTP supervision independently of reconciliation. Clean stops
+stay stopped. A coordinator crash preserves healthy member and Bus processes.
+The [ownership contract](topology-supervision.md) defines restart limits,
+shutdown, logical parent policies, and remote cleanup.
+
 Continue with [Topology DSL](topology-dsl.livemd) and
 [Activate And Repair A Topology](activate-and-repair-a-topology.livemd).

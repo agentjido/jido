@@ -6,36 +6,51 @@ defmodule Jido.Topology.Controller.Activation do
   alias Jido.Topology.{BusInputs, Validation}
 
   def start(spec, context) do
-    with {:ok, persistence} <- Jido.Persistence.resolve_config(:inherit, context.jido),
-         # Load the definition before safe decoding encounters Agent-owned atoms.
-         {:ok, definition} <- definition(spec, context),
-         {:ok, agent_state, version, restore} <- saved_state(spec, context, persistence),
-         {:ok, agent} <- Agent.instantiate(definition, id: spec.id, state: agent_state) do
-      options = [
-        agent: agent,
-        jido: context.jido,
-        register: true,
-        on_parent_death: spec.on_parent_exit,
-        persistence: persistence,
-        restore: restore,
-        state_version: version
-      ]
+    child = %{
+      id: spec.key,
+      start: {__MODULE__, :start_link, [spec, context]},
+      restart: :transient,
+      modules: [Server]
+    }
 
-      child = Supervisor.child_spec({Server, options}, restart: :temporary)
-      pool = Jido.agent_supervisor_name(context.jido)
-
-      with {:ok, pid} <- DynamicSupervisor.start_child(pool, child) do
-        Jido.Topology.Controller.Owner.track(context.owner, pid)
-
-        case Server.await_ready(pid) do
-          :ok ->
-            {:ok, pid}
-
-          {:error, _} = error ->
-            DynamicSupervisor.terminate_child(pool, pid)
-            error
-        end
+    result =
+      if spec.node == node() and node(context.owner) == node() do
+        Supervisor.start_child(context.agents, child)
+      else
+        DynamicSupervisor.start_child(
+          Jido.agent_supervisor_name(context.jido),
+          %{child | restart: :temporary}
+        )
       end
+
+    case result do
+      {:ok, pid} ->
+        Jido.Topology.Controller.Owner.track(context.owner, pid)
+        with :ok <- Server.await_ready(pid), do: {:ok, pid}
+
+      {:error, {:already_started, pid}} ->
+        with :ok <- Server.await_ready(pid), do: {:ok, pid}
+
+      {:error, :already_present} ->
+        {:error, :member_stopped}
+
+      error ->
+        error
+    end
+  end
+
+  # OTP invokes this function on each restart. Keep state recovery in core
+  # and rebuild the declared configuration before every start.
+  def start_link(spec, context) do
+    with {:ok, definition} <- definition(spec, context) do
+      Server.start_link(
+        agent: definition,
+        id: spec.id,
+        initial_state: spec.initial_state,
+        jido: context.jido,
+        on_parent_death: spec.on_parent_exit,
+        restore_definition: :current
+      )
     end
   end
 
@@ -50,27 +65,6 @@ defmodule Jido.Topology.Controller.Activation do
 
     kind, reason ->
       {:error, {:placement_uncertain, spec.node, {kind, reason}}}
-  end
-
-  defp saved_state(spec, _state, nil), do: {:ok, spec.initial_state, 0, :if_found}
-
-  defp saved_state(spec, context, persistence) do
-    case Jido.Persistence.load_agent_with_revision(persistence, spec.module, spec.id,
-           instance: context.jido,
-           namespace: Jido.namespace(context.jido)
-         ) do
-      {:ok, agent, version} when agent.id == spec.id and agent.module == spec.module ->
-        {:ok, agent.state, version, :required}
-
-      {:ok, _, _} ->
-        {:error, :restored_agent_identity_mismatch}
-
-      {:error, :not_found} ->
-        {:ok, spec.initial_state, 0, false}
-
-      {:error, _} = error ->
-        error
-    end
   end
 
   defp definition(spec, context) do

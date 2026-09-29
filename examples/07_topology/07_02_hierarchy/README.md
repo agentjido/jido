@@ -23,8 +23,11 @@ three workers.
 
 ## Important behavior
 
-Ownership creates startup dependencies and cleanup order. Each Agent owns only
-its direct children.
+Ownership creates activation dependencies and logical parent bindings. All
+local Agents are OTP siblings. Each Agent owns only its direct logical
+children. `on_parent_exit: :stop` causes a clean worker shutdown. Transient
+workers then stay stopped, even if OTP restarts the leader. Select `:continue`
+when workers must stay alive until their parent binding is repaired.
 
 ## Limits
 

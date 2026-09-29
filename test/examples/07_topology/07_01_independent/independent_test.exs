@@ -23,7 +23,7 @@ defmodule Jido.Examples.Topology.IndependentTest do
     assert Jido.AgentServer.agent(right).state.total == 0
   end
 
-  test "an external policy requests repair without replacing unchanged Agents", %{jido: jido} do
+  test "OTP restarts a failed Agent while Topology repair is manual", %{jido: jido} do
     instance =
       Jido.Topology.unwrap!(
         with {:ok, definition} <-
@@ -42,12 +42,9 @@ defmodule Jido.Examples.Topology.IndependentTest do
     assert {:ok, _} =
              Jido.AgentServer.call(right, route_signal_2, [])
 
-    assert :ok = Jido.stop_agent(jido, left)
-    assert %{status: :degraded, repair: :manual} = Controller.status(controller)
-
-    assert catch_exit(Controller.await_ready(controller, 50))
-    assert Controller.whereis_agent(controller, :left) == nil
-    assert :ok = Controller.reconcile(controller)
+    monitor = Process.monitor(left)
+    Process.exit(left, :kill)
+    assert_receive {:DOWN, ^monitor, :process, ^left, :killed}, 1_000
     assert :ok = Controller.await_ready(controller)
     replacement = Controller.whereis_agent(controller, :left)
     assert is_pid(replacement) and replacement != left

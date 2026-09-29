@@ -1,13 +1,17 @@
 defmodule Jido.Topology.Controller do
   @moduledoc """
-  Starts and repairs one topology for one Jido instance.
+  Supervises and connects one topology for one Jido instance.
 
   Add this child after the Jido instance in the application supervision tree.
   Use `:rest_for_one` at that application boundary so a Jido restart also
-  rebuilds the controller. Agents stay under the existing Jido Agent pool as temporary children.
-  The controller owns reactivation and reapplies topology configuration after
-  loading saved state.
-  Buses and startup tasks have their own supervised children.
+  rebuilds this instance. Local Agents use transient OTP children in a local
+  supervisor. A coordinator restart preserves healthy Agents and Buses.
+  Agent restarts restore committed state and rebuild runtime inputs.
+
+  `:max_restarts` (3) and `:max_seconds` (5) bound local Agent restarts. A
+  supporting supervisor failure shuts down the instance. The Controller child
+  is transient, so restart-limit shutdown stays stopped. Application policy
+  owns any subsequent instance restart. See `guides/topology-supervision.md`.
 
   The controller supports eager activation, bounded startup, normal Bus input,
   logical ownership, periodic repair, additive Agent updates, and exact Erlang
@@ -38,6 +42,7 @@ defmodule Jido.Topology.Controller do
       id: {__MODULE__, instance.id},
       start: {__MODULE__, :start_link, [opts]},
       type: :supervisor,
+      restart: :transient,
       shutdown: :infinity
     }
   end
@@ -45,7 +50,18 @@ defmodule Jido.Topology.Controller do
   @doc "Starts a local controller. Returns before the topology is ready."
   def start_link(opts) do
     with {:ok, opts} <- Authoring.attrs(opts),
-         :ok <- Authoring.keys(opts, [:jido, :topology, :repair, :lifecycle]),
+         :ok <-
+           Authoring.keys(opts, [
+             :jido,
+             :topology,
+             :repair,
+             :lifecycle,
+             :max_restarts,
+             :max_seconds
+           ]),
+         max_restarts = Map.get(opts, :max_restarts, 3),
+         max_seconds = Map.get(opts, :max_seconds, 5),
+         :ok <- validate_restart_limits(max_restarts, max_seconds),
          repair = Map.get(opts, :repair, :automatic),
          :ok <- validate_repair(repair),
          lifecycle = Map.get(opts, :lifecycle),
@@ -54,7 +70,9 @@ defmodule Jido.Topology.Controller do
          {:ok, instance} <-
            Topology.instantiate(instance.definition, id: instance.id, input: instance.input),
          jido when is_atom(jido) and not is_nil(jido) <- Map.get(opts, :jido) do
-      Supervisor.start_link(__MODULE__, {jido, instance, repair, lifecycle},
+      Supervisor.start_link(
+        __MODULE__,
+        {jido, instance, repair, lifecycle, max_restarts, max_seconds},
         name: name(jido, instance.id, :controller)
       )
     else
@@ -64,15 +82,23 @@ defmodule Jido.Topology.Controller do
   end
 
   @impl true
-  def init({jido, instance, repair, lifecycle}) do
+  def init({jido, instance, repair, lifecycle, max_restarts, max_seconds}) do
     with {:ok, owner} <- Topology.Controller.Owner.start(jido, self(), instance.id) do
       children = [
-        {Task.Supervisor, name: name(jido, instance.id, :tasks)},
-        {DynamicSupervisor, name: name(jido, instance.id, :resources), strategy: :one_for_one},
+        supporting_child(
+          {DynamicSupervisor, name: name(jido, instance.id, :resources), strategy: :one_for_one}
+        ),
+        supporting_child(
+          {Topology.Controller.AgentSupervisor,
+           name: name(jido, instance.id, :agents),
+           max_restarts: max_restarts,
+           max_seconds: max_seconds}
+        ),
+        supporting_child({Task.Supervisor, name: name(jido, instance.id, :tasks)}),
         {Topology.Controller.Runtime, {jido, instance, repair, lifecycle, owner}}
       ]
 
-      Supervisor.init(children, strategy: :one_for_all)
+      Supervisor.init(children, strategy: :one_for_one, auto_shutdown: :any_significant)
     end
   end
 
@@ -171,6 +197,16 @@ defmodule Jido.Topology.Controller do
       nil
     end
   end
+
+  defp supporting_child(child),
+    do: Supervisor.child_spec(child, restart: :temporary, significant: true)
+
+  defp validate_restart_limits(restarts, seconds)
+       when is_integer(restarts) and restarts >= 0 and is_integer(seconds) and seconds > 0,
+       do: :ok
+
+  defp validate_restart_limits(_, _),
+    do: Authoring.error("Controller requires non-negative max_restarts and positive max_seconds")
 
   defp validate_repair(repair) when repair in [:automatic, :manual], do: :ok
 

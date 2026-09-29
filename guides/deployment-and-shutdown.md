@@ -25,6 +25,42 @@ The top-level Jido child has a 10-second shutdown timeout. Agent actors are
 children of its dynamic supervisor. A normal application shutdown stops the
 instance and its actors under OTP supervision.
 
+## Put an Agent directly under application supervision
+
+A fixed set of Agents needs no Topology. Add each `Jido.AgentServer` after its
+named Jido infrastructure. Give the Agent and the OTP child explicit IDs:
+
+```elixir
+children = [
+  MyApp.Jido,
+  Supervisor.child_spec(
+    {Jido.AgentServer,
+     jido: MyApp.Jido, agent: MyApp.Counter, id: "counter", restart: :transient},
+    id: :counter
+  )
+]
+
+Supervisor.start_link(children, strategy: :rest_for_one, max_restarts: 3, max_seconds: 5)
+```
+
+`:rest_for_one` starts infrastructure first and stops the Agent first. It also
+replaces the Agent if the infrastructure is replaced. `:transient` restarts an
+abnormal Agent exit but leaves normal exit, explicit stop, and hibernation
+stopped. The supervisor retains a stopped child specification. Use
+`Supervisor.restart_child/2` for an explicit restart, or terminate and delete
+the child specification when removing it from the application.
+
+See the working [OTP supervision example](https://github.com/agentjido/jido/tree/release/v3/examples/01_basic/01_05_otp_supervision).
+It commits state, kills the Agent, checks OTP recovery and Plugin cleanup, and
+stops the application. It uses no Topology or startup Task.
+
+Use Topology when group expansion, graph validation, declared connections,
+aggregate readiness, or target changes are required. Its local subtree uses
+OTP restart limits; a coordinator restart preserves healthy Agents. Read the
+[ownership contract](topology-supervision.md) before selecting an outer restart
+policy. Repair cannot restart a local member that was explicitly stopped or
+recreate a subtree that reached its restart limit.
+
 ## Start actors from stable intent
 
 Start long-lived actors from application supervision, a topology activation, or
@@ -57,14 +93,15 @@ Plugin runtime processes restart from Plugin specifications. Signal bus
 subscribers and application connections must also have a restart or
 reconciliation rule. Do not put a PID or connection in durable Agent state.
 
-Plugin wrappers are peers of Agent Servers in the same Dynamic Supervisor.
+Plugin wrappers run in the Jido Dynamic Supervisor. Agent Servers can run in
+that pool, an application supervisor, or a Topology member supervisor.
 The Plugin callbacks have separate owner contracts. These contracts do not
 create separate runtime pools. A Plugin root, its private Supervisor, and its wrapper stop
 with the Agent Server.
 
 ## Stop and hibernate
 
-Use `stop_agent/2` for a normal permanent stop:
+Use `stop_agent/2` for a clean stop under the default transient restart policy:
 
 ```elixir
 :ok = MyApp.Jido.stop_agent("agent-42")
@@ -85,7 +122,10 @@ Use hibernate when you want to save the current Agent and stop its actor:
 :ok = MyApp.Jido.hibernate(server)
 ```
 
-Use thaw with the same module, ID, and partition to restore it later.
+Use thaw with the same module, ID, and partition for instance-pool Agents.
+For a direct OTP child, restart its retained child specification to restore it.
+A `:permanent` child restarts after clean stop or hibernation as well; select
+that policy only when this is the intended application behavior.
 
 ## Deploy more than one node
 

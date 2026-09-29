@@ -52,6 +52,7 @@ defmodule Jido.Topology.Resource do
   @doc false
   def whereis(%{kind: :bus} = spec, context) do
     with {:ok, pid} <- Bus.whereis(spec.id, jido: context.jido),
+         true <- Process.alive?(pid),
          true <- owned?(pid, spec, context) do
       pid
     else

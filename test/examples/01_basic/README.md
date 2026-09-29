@@ -11,6 +11,7 @@ the `:example` tag through the shared
 | 01_02 | [Typed Command Agent](../../../examples/01_basic/01_02_typed_command_agent/README.md) | [Test](01_02_typed_command_agent/typed_command_agent_test.exs) |
 | 01_03 | [Plugin State Agent](../../../examples/01_basic/01_03_plugin_state_agent/README.md) | [Test](01_03_plugin_state_agent/plugin_state_agent_test.exs) |
 | 01_04 | [Directive Agent](../../../examples/01_basic/01_04_directive_agent/README.md) | [Test](01_04_directive_agent/directive_agent_test.exs) |
+| 01_05 | [OTP supervision](../../../examples/01_basic/01_05_otp_supervision/README.md) | [Test](01_05_otp_supervision/example_test.exs) |
 
 Run the section from the `jido` repository root:
 

@@ -1,7 +1,7 @@
 # Activate and Repair A Topology
 
-This Livebook starts a topology with manual repair, stops one member, and asks
-the controller to restore the existing target.
+This Livebook starts a topology with manual repair and shows OTP restarting a
+failed member. A separate repair request checks the existing target.
 
 ## Install Jido
 
@@ -67,19 +67,22 @@ right = Jido.Topology.Controller.whereis_agent(controller, :right)
 {left, right}
 ```
 
-## Stop One Member
+## Fail One Member
 
 ```elixir
-:ok = Jido.stop_agent(left)
+monitor = Process.monitor(left)
+Process.exit(left, :kill)
+receive do: ({:DOWN, ^monitor, :process, ^left, :killed} -> :ok)
+:ok = Jido.Topology.Controller.await_ready(controller)
 
-%{
-  left_alive?: Jido.AgentServer.alive?(left),
-  right_same?: Jido.Topology.Controller.whereis_agent(controller, :right) == right
-}
+new_left = Jido.Topology.Controller.whereis_agent(controller, :left)
+%{restarted?: new_left != left, right_same?: Jido.Topology.Controller.whereis_agent(controller, :right) == right}
 ```
 
-Manual mode retains normal child supervision but does not run a periodic repair
-pass.
+OTP restarts the transient child while repair is manual. Readiness checks find
+the replacement and [OTP ownership](topology-supervision.md) for restart limits. The Agent runtime restores its committed checkpoint while
+the same Jido instance is alive. A clean `Jido.stop_agent/1` leaves the child
+stopped; reconciliation does not override that decision.
 
 ## Request Repair
 
@@ -107,4 +110,4 @@ target. It does not apply a new definition.
 ```
 
 See [Deployment And Shutdown](deployment-and-shutdown.md) for supervision-tree
-placement.
+placement and [OTP ownership](topology-supervision.md) for restart limits.

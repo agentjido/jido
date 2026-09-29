@@ -5,7 +5,7 @@ defmodule Jido.Topology.Controller.Runtime do
   alias Jido.AgentServer, as: Server
   alias Jido.Telemetry.Topology, as: TopologyTelemetry
   alias Jido.Topology.{BusInputs, Controller, Plan, Resource}
-  alias Jido.Topology.Controller.TargetStore
+  alias Jido.Topology.Controller.{AgentSupervisor, TargetStore}
 
   alias Jido.Topology.Signal.{
     ComponentFailed,
@@ -28,6 +28,12 @@ defmodule Jido.Topology.Controller.Runtime do
     Process.flag(:trap_exit, true)
 
     with {:ok, accepted, revision, placements, pending_move} <- TargetStore.load(jido, instance) do
+      supervisors =
+        for role <- [:resources, :agents, :tasks],
+            do: GenServer.whereis(Controller.name(jido, instance.id, role))
+
+      Controller.Owner.observe_tree(owner, supervisors)
+
       state = %{
         jido: jido,
         owner: owner,
@@ -274,36 +280,8 @@ defmodule Jido.Topology.Controller.Runtime do
     if state.reconcile_timer, do: Process.cancel_timer(state.reconcile_timer)
     Enum.each(state.active, fn {_, job} -> Task.shutdown(job.task, :brutal_kill) end)
 
-    if intentional_shutdown?(reason) do
-      context = ownership_context(state)
-
-      state.instance.plan.layers
-      |> Enum.reverse()
-      |> List.flatten()
-      |> Enum.each(fn key ->
-        case agent_spec(key, state) do
-          nil ->
-            :ok
-
-          spec ->
-            safely(fn ->
-              case whereis_agent(spec, %{jido: state.jido}) do
-                pid when is_pid(pid) ->
-                  if owned?(:agent, pid, spec, context) do
-                    stop_agent(
-                      state.jido,
-                      pid,
-                      state.instance.definition.startup.task_timeout
-                    )
-                  end
-
-                _ ->
-                  :ok
-              end
-            end)
-        end
-      end)
-    end
+    # Local member shutdown belongs to the instance supervisor. The remote
+    # watcher observes that supervisor, not this replaceable coordinator.
 
     cleanup_status = if intentional_shutdown?(reason), do: :ok, else: :error
     TopologyTelemetry.finish(span, cleanup_status, %{state | ready: %{}})
@@ -615,6 +593,7 @@ defmodule Jido.Topology.Controller.Runtime do
         jido: state.jido,
         instance_id: state.instance.id,
         owner: state.owner,
+        agents: Controller.name(state.jido, state.instance.id, :agents),
         parent: if(member.parent, do: Map.fetch!(state.ready, member.parent)),
         bus_ids: bus_ids,
         retry_interval: state.instance.definition.startup.retry_interval,
@@ -692,6 +671,11 @@ defmodule Jido.Topology.Controller.Runtime do
 
   defp placement_resources(_spec, _target_node),
     do: Jido.Agent.Authoring.error("A remote topology Agent cannot subscribe to a local Bus")
+
+  defp retire(%{node: target} = spec, state, _timeout) when target == node() do
+    # The supervisor serializes retirement with an in-progress restart.
+    AgentSupervisor.retire(Controller.name(state.jido, state.instance.id, :agents), spec.key)
+  end
 
   defp retire(%{node: target_node} = spec, state, timeout) do
     context = ownership_context(state)
@@ -772,7 +756,8 @@ defmodule Jido.Topology.Controller.Runtime do
       jido: state.jido,
       instance_id: state.instance.id,
       pool: Controller.name(state.jido, state.instance.id, :resources),
-      ready: state.ready
+      ready: state.ready,
+      agents: Controller.name(state.jido, state.instance.id, :agents)
     }
   end
 
@@ -786,7 +771,8 @@ defmodule Jido.Topology.Controller.Runtime do
     agent = Server.agent(pid)
 
     agent.module == spec.module and
-      Map.get(agent.metadata, "jido.topology") == marker(spec, context.instance_id)
+      Map.get(agent.metadata, "jido.topology") == marker(spec, context.instance_id) and
+      (node(pid) != node() or AgentSupervisor.owns?(context.agents, spec.key, pid))
   end
 
   defp lifecycle_signal(module, topology_id, data) do
@@ -816,15 +802,13 @@ defmodule Jido.Topology.Controller.Runtime do
 
   defp reason_code(_reason), do: "unknown"
 
-  defp refresh_phase(%{phase: :ready} = state) do
+  defp refresh_phase(%{phase: :starting} = state), do: state
+
+  defp refresh_phase(state) do
     state = recheck_ready(state)
-
-    if map_size(state.errors) == 0,
-      do: %{state | live_errors: recheck_live_inputs(state)},
-      else: %{state | phase: :degraded, live_errors: %{}}
+    phase = if map_size(state.errors) == 0, do: :ready, else: :degraded
+    %{state | phase: phase, live_errors: recheck_live_inputs(state)}
   end
-
-  defp refresh_phase(state), do: %{state | live_errors: %{}}
 
   defp recheck_live_inputs(state) do
     Enum.reduce(state.ready, %{}, fn {key, pid}, errors ->
@@ -886,8 +870,7 @@ defmodule Jido.Topology.Controller.Runtime do
   end
 
   defp schedule_live_refresh(%{live_refresh_token: nil} = state) do
-    if state.phase == :ready and map_size(state.live_errors) > 0 and
-         map_size(state.waiters) > 0 do
+    if map_size(state.waiters) > 0 do
       token = make_ref()
       Process.send_after(self(), {:refresh_live, token}, @live_retry_interval)
       %{state | live_refresh_token: token}
@@ -899,17 +882,46 @@ defmodule Jido.Topology.Controller.Runtime do
   defp schedule_live_refresh(state), do: state
 
   defp recheck_ready(state) do
-    Enum.reduce(state.ready, state, fn {key, pid}, acc ->
-      if is_pid(pid) and alive?(pid) do
-        acc
+    # A query can observe an OTP replacement without requesting a repair pass.
+    # Only process availability errors can be cleared here. Wiring still has
+    # to pass the live input checks, and installation errors require repair.
+    keys =
+      Map.keys(state.ready) ++
+        for {key, reason} <- state.errors,
+            reason in [:member_unavailable, :member_stopped],
+            do: key
+
+    Enum.reduce(keys, state, fn key, acc ->
+      previous = Map.get(acc.ready, key)
+
+      pid =
+        if is_pid(previous) and alive?(previous),
+          do: previous,
+          else: replacement(key, acc)
+
+      if is_pid(pid) do
+        %{acc | ready: Map.put(acc.ready, key, pid), errors: Map.delete(acc.errors, key)}
       else
         %{
           acc
           | ready: Map.delete(acc.ready, key),
-            errors: Map.put(acc.errors, key, :member_unavailable)
+            errors: Map.put_new(acc.errors, key, :member_unavailable)
         }
       end
     end)
+  end
+
+  defp replacement(key, state) do
+    context = ownership_context(state)
+
+    case agent_spec(key, state) do
+      nil ->
+        Resource.whereis(Map.fetch!(state.instance.plan.resources, key), context)
+
+      spec ->
+        pid = whereis_agent(spec, context)
+        if owned?(:agent, pid, spec, context), do: pid
+    end
   end
 
   defp intentional_shutdown?(:shutdown), do: true

@@ -402,6 +402,32 @@ failure, and cleanup. See
 [Agent Server Lifecycle](agent-server-lifecycle.md) and the
 [Factory examples](https://github.com/agentjido/jido/tree/release/v3/examples/06_factory).
 
+## Update earlier V3 Topology supervision
+
+Local Topology Agents now use transient OTP children in an instance-owned
+supervisor. An abnormal exit restarts through OTP, including in manual repair
+mode. A clean stop or hibernation stays stopped; `reconcile/2` no longer
+restarts that local member. If workers must survive a logical parent outage,
+select `on_parent_exit: :continue` or `:emit_orphan`. `:stop` causes a clean
+shutdown and the transient child remains stopped.
+
+The coordinator now restarts without replacing healthy Agents or Buses.
+`max_restarts` and `max_seconds` bound local Agent restarts. A supporting
+supervisor failure shuts down the Topology instance. The Controller child is
+transient, so this shutdown does not trigger automatic instance recreation.
+Application policy must select any further restart. Remote placement and
+pending-move recovery keep their existing contract.
+
+Topology rebuilds its declared configuration on every start and restores only
+committed state through `AgentServer` with `restore_definition: :current`.
+The default `:checkpoint` option still retains saved Agent definition upgrades.
+Do not use a state checkpoint to store runtime connections or old PIDs.
+
+Applications with a fixed set of Agents can use public AgentServer child specs
+without Topology. See the [ownership contract](topology-supervision.md),
+[deployment guide](deployment-and-shutdown.md), and
+[OTP supervision example](https://github.com/agentjido/jido/tree/release/v3/examples/01_basic/01_05_otp_supervision).
+
 ## Update the earlier V3 live-state rule
 
 Live Agent state now follows its schema and Agent invariants. This includes
