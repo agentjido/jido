@@ -29,19 +29,32 @@ defmodule Jido.Topology.Controller.SupervisionTest do
     assert Controller.whereis_agent(controller, :counter) == server
   end
 
-  test "status stays bounded when a live member cannot answer an identity check", c do
-    {controller, _instance} = start_topology(c.jido)
-    server = Controller.whereis_agent(controller, :counter)
-    :ok = :sys.suspend(server)
+  for mode <- [:current, :replacement] do
+    test "status stays bounded when a #{mode} member cannot answer an identity check", c do
+      {controller, instance} = start_topology(c.jido)
+      original = Controller.whereis_agent(controller, :counter)
 
-    try do
-      assert %{status: :degraded, errors: %{"agent/counter" => :member_unavailable}} =
-               Controller.status(controller, 1_000)
-    after
-      :ok = :sys.resume(server)
+      server =
+        if unquote(mode) == :replacement do
+          kill(original)
+          id = instance.plan.agents["agent/counter"].id
+          eventually(fn -> is_pid(Jido.whereis_agent(c.jido, id)) end)
+          Jido.whereis_agent(c.jido, id)
+        else
+          original
+        end
+
+      :ok = :sys.suspend(server)
+
+      try do
+        assert %{status: :degraded, errors: %{"agent/counter" => :member_unavailable}} =
+                 Controller.status(controller, 1_000)
+      after
+        :ok = :sys.resume(server)
+      end
+
+      assert :ok = Controller.await_ready(controller, 1_000)
     end
-
-    assert :ok = Controller.await_ready(controller, 1_000)
   end
 
   test "OTP restores committed state and runtime inputs while the coordinator is paused", c do

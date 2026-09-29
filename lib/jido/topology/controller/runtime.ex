@@ -766,14 +766,16 @@ defmodule Jido.Topology.Controller.Runtime do
     }
   end
 
-  defp owned?(kind, pid, spec, context) when is_pid(pid) do
-    alive?(pid) and safely(fn -> owns?(kind, pid, spec, context) end) == true
+  defp owned?(kind, pid, spec, context, timeout \\ 5_000)
+
+  defp owned?(kind, pid, spec, context, timeout) when is_pid(pid) do
+    alive?(pid) and safely(fn -> owns?(kind, pid, spec, context, timeout) end) == true
   end
 
-  defp owned?(_kind, _pid, _spec, _context), do: false
+  defp owned?(_kind, _pid, _spec, _context, _timeout), do: false
 
-  defp owns?(:agent, pid, spec, context) do
-    agent = Server.agent(pid)
+  defp owns?(:agent, pid, spec, context, timeout) do
+    agent = Server.agent(pid, timeout)
 
     matches_agent?(agent, spec, context.instance_id) and
       (node(pid) != node() or AgentSupervisor.owns?(context.agents, spec.key, pid))
@@ -943,7 +945,7 @@ defmodule Jido.Topology.Controller.Runtime do
 
       spec ->
         pid = whereis_agent(spec, context)
-        if owned?(:agent, pid, spec, context), do: pid
+        if owned?(:agent, pid, spec, context, @live_query_timeout), do: pid
     end
   end
 
