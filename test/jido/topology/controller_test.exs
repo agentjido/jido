@@ -352,7 +352,7 @@ defmodule Jido.Topology.ControllerTest do
     eventually(fn -> Server.agent(agent).state.total == 4 end)
   end
 
-  test "repairs an agent after a normal stop", %{jido: jido} do
+  test "repair leaves an explicitly stopped Agent stopped", %{jido: jido} do
     instance =
       Jido.Topology.unwrap!(
         with {:ok, definition} <-
@@ -366,20 +366,23 @@ defmodule Jido.Topology.ControllerTest do
     old = Controller.whereis_agent(controller, :left)
     :ok = Jido.stop_agent(jido, old)
 
-    eventually(
-      fn ->
-        new = Controller.whereis_agent(controller, :left)
-        is_pid(new) and new != old and Process.alive?(new)
-      end,
-      timeout: 2_000
-    )
+    assert :ok = Controller.reconcile(controller)
+    eventually(fn -> Controller.status(controller).active == 0 end)
+    assert Controller.whereis_agent(controller, :left) == nil
+    assert Controller.status(controller).errors["agent/left"] == :member_stopped
   end
 
   test "repairs parent bindings after parent failure", %{jido: jido} do
     instance =
       Jido.Topology.unwrap!(
         with {:ok, definition} <-
-               Jido.Topology.new(Map.put(Hierarchy.topology(), :startup, retry_interval: 10)) do
+               Jido.Topology.new(
+                 Hierarchy.topology()
+                 |> Map.put(:startup, retry_interval: 10)
+                 |> Map.update!(:relationships, fn relationships ->
+                   Enum.map(relationships, &Map.put(&1, :on_parent_exit, :continue))
+                 end)
+               ) do
           Jido.Topology.instantiate(definition, id: "repair-tree")
         end
       )

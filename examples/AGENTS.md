@@ -284,7 +284,7 @@ Run the full example suite when shared support, catalog files, or more than one
 section changes:
 
 ```sh
-mix examples --seed 0
+mix test.examples --seed 0
 ```
 
 ## Catalog integrity

@@ -156,7 +156,9 @@ the runtime's `Init` when it must read the current owned value. The
 `plugin_state` field is selected from the complete Agent state map. It is not a
 second stored map.
 
-Jido puts a temporary owner wrapper beside the Agent Server. The wrapper hosts
+Jido puts a temporary owner wrapper in its shared Dynamic Supervisor. It links
+to its Agent, including an Agent supervised by an application or Topology.
+The wrapper hosts
 each root generation as temporary under its private Supervisor. If the root
 stops, the wrapper asks the Agent Server for a new root specification. This
 keeps the declared permanent intent while it prevents an automatic restart

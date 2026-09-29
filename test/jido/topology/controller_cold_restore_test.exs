@@ -65,9 +65,7 @@ defmodule JidoTest.Topology.ControllerColdRestoreTest do
                {Controller, jido: jido, topology: instance, repair: :manual}
              ])
 
-    peer_eventually(fn ->
-      peer_call(c.peer_a, Controller, :status, [controller]).active == 0
-    end)
+    assert :ok = peer_call(c.peer_a, Controller, :await_ready, [controller, 5_000])
 
     assert %{status: :ready, errors: %{}} = peer_call(c.peer_a, Controller, :status, [controller])
     restored = peer_call(c.peer_a, Controller, :whereis_agent, [controller, :worker])

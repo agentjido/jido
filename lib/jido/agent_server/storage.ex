@@ -6,25 +6,40 @@ defmodule Jido.AgentServer.Storage do
   alias Jido.Agent
   alias Jido.AgentServer.{Options, RuntimeCheckpoint, Shutdown, State}
 
-  def restore_initial_agent(%Options{restore: false, persistence: nil} = opts) do
+  def restore_initial_agent(%Options{} = opts) do
+    with {:ok, saved, version, status} <- restore(opts),
+         {:ok, agent} <- restore_definition(saved, opts) do
+      {:ok, agent, version, status}
+    end
+  end
+
+  defp restore_definition(saved, %Options{restore_definition: :checkpoint}), do: {:ok, saved}
+
+  defp restore_definition(saved, %Options{agent: current}) do
+    if saved.id == current.id and saved.module == current.module,
+      do: {:ok, %{current | state: saved.state}},
+      else: {:error, :restored_agent_identity_mismatch}
+  end
+
+  defp restore(%Options{restore: false, persistence: nil} = opts) do
     {:ok, opts.agent, opts.state_version, :none}
   end
 
-  def restore_initial_agent(%Options{restore: false} = opts) do
+  defp restore(%Options{restore: false} = opts) do
     {:ok, opts.agent, opts.state_version, :create}
   end
 
-  def restore_initial_agent(%Options{persistence: nil, restore: :required}) do
+  defp restore(%Options{persistence: nil, restore: :required}) do
     {:error, :persistence_not_configured}
   end
 
-  def restore_initial_agent(%Options{persistence: nil} = opts) do
+  defp restore(%Options{persistence: nil} = opts) do
     with {:ok, agent, version} <- RuntimeCheckpoint.restore(opts) do
       {:ok, agent, version, :none}
     end
   end
 
-  def restore_initial_agent(%Options{} = opts) do
+  defp restore(%Options{} = opts) do
     load_opts = [
       instance: opts.jido,
       namespace: Jido.namespace(opts.jido),
@@ -107,6 +122,8 @@ defmodule Jido.AgentServer.Storage do
     Jido.Persistence.save_agent(data.config.persistence, agent, opts)
   end
 
+  def persist_on_stop(_reason, %State{activation_span: span}) when not is_nil(span), do: :ok
+
   def persist_on_stop({:shutdown, :hibernate}, %State{}), do: :ok
   def persist_on_stop({:shutdown, {:persistence_failed, _reason}}, %State{}), do: :ok
 
@@ -128,6 +145,11 @@ defmodule Jido.AgentServer.Storage do
   end
 
   def persist_on_stop(_reason, %State{}), do: :ok
+
+  # A failed bootstrap must leave the last committed checkpoint available
+  # for an explicit restart after the startup fault is fixed.
+  def delete_runtime_checkpoint(_reason, %State{activation_span: span}) when not is_nil(span),
+    do: :ok
 
   def delete_runtime_checkpoint(reason, %State{} = data) do
     if Shutdown.clean?(reason), do: RuntimeCheckpoint.delete(data), else: :ok

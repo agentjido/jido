@@ -51,8 +51,9 @@ defmodule JidoTest.Topology.ControllerUpdateTest do
     assert Server.agent(hd(original)).state == %{total: 7}
 
     removed = Controller.whereis_agent(controller, :workers, 4)
-    assert :ok = Jido.stop_agent(c.jido, removed)
-    assert :ok = Controller.reconcile(controller)
+    monitor = Process.monitor(removed)
+    Process.exit(removed, :kill)
+    assert_receive {:DOWN, ^monitor, :process, ^removed, :killed}, 1_000
     assert :ok = Controller.await_ready(controller)
     replacement = Controller.whereis_agent(controller, :workers, 4)
     assert is_pid(replacement)

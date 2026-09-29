@@ -102,9 +102,9 @@ best-effort lifecycle Signals to a normal Agent route. Core supplies these
 mechanisms. It does not supply membership discovery, node selection, automatic
 rebalance, fencing, or exclusive ownership.
 
-The independent topology example stops one Agent. In manual mode, it remains
-stopped until the application requests repair. The other Agent keeps its PID
-and state. See the
+The independent topology example kills one Agent. OTP restarts it even in
+manual repair mode. A clean stop stays stopped after reconciliation. The other
+Agent keeps its PID and state. See the
 [example test](https://github.com/agentjido/jido/blob/release/v3/test/examples/07_topology/07_01_independent/independent_test.exs).
 
 This operation repairs the existing target. Use `update/3` for additive growth

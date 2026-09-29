@@ -44,4 +44,4 @@ delivery, retry, idempotency, or durable effect recovery.
 - [Behavior tests](../../../test/examples/01_basic/01_04_directive_agent/directive_agent_test.exs)
 - [Shared test setup](../../../test/examples/support/basic_sdk_case.ex)
 
-Previous: [Plugin State Agent](../01_03_plugin_state_agent/README.md) | Next: [Workflow examples](../../02_workflow/README.md)
+Previous: [Plugin State Agent](../01_03_plugin_state_agent/README.md) | Next: [OTP supervision](../01_05_otp_supervision/README.md)

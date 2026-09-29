@@ -54,7 +54,7 @@ defmodule Jido.AgentServer.Inspection do
   end
 
   def child(%ChildInfo{} = child) do
-    %{
+    info = %{
       pid: child.pid,
       module: child.module,
       id: child.id,
@@ -63,6 +63,8 @@ defmodule Jido.AgentServer.Inspection do
       kind: child.kind,
       meta: child.meta
     }
+
+    if child.lifecycle_pid, do: Map.put(info, :lifecycle_pid, child.lifecycle_pid), else: info
   end
 
   def parent(nil), do: nil

@@ -1,3 +1,8 @@
+defmodule JidoTest.Authoring.Topology.Fixtures.SetValue do
+  use Jido.Action, name: "authoring_set_value", schema: Zoi.object(%{value: Zoi.integer()})
+  def run(%{value: value}, %{agent_state: state}), do: {:ok, %{state | value: value}}
+end
+
 defmodule JidoTest.Authoring.Topology.Fixtures.Worker do
   use Jido.Agent, name: "authoring_worker"
 
@@ -7,11 +12,11 @@ defmodule JidoTest.Authoring.Topology.Fixtures.Worker do
              value: Zoi.integer() |> Zoi.default(0)
            })
   end
-end
 
-defmodule JidoTest.Authoring.Topology.Fixtures.SetValue do
-  use Jido.Action, name: "authoring_set_value", schema: Zoi.object(%{value: Zoi.integer()})
-  def run(%{value: value}, %{agent_state: state}), do: {:ok, %{state | value: value}}
+  routes do
+    signal_source "/authoring/topology"
+    route "authoring.work", JidoTest.Authoring.Topology.Fixtures.SetValue, as: :work
+  end
 end
 
 defmodule JidoTest.Authoring.Topology.Fixtures.Inbox do
@@ -42,6 +47,11 @@ defmodule JidoTest.Authoring.Topology.Fixtures.PluginWorker do
   agent do
     schema Zoi.object(%{value: Zoi.integer() |> Zoi.default(0)})
     plugin JidoTest.Authoring.Topology.Fixtures.InboxPackage
+  end
+
+  routes do
+    signal_source "/authoring/topology"
+    route "authoring.work", JidoTest.Authoring.Topology.Fixtures.SetValue, as: :work
   end
 end
 

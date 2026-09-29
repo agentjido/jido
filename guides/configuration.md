@@ -93,6 +93,7 @@ Important actor defaults are:
 | `:directive_timeout` | `5_000` | Limit each commit notification and Directive dispatch. Notifications use `5_000` when this is `:infinity`. |
 | `:idle_timeout` | `:infinity` | Stop a pool-owned idle actor after this time. |
 | `:restore` | `:if_found` | Select durable restore behavior. |
+| `:restore_definition` | `:checkpoint` | Restore the saved definition, or use `:current` to apply the supplied definition to saved state. |
 | `:error_policy` | `:log_only` | Select server behavior after a failed Turn. |
 | `:on_parent_death` | `:stop` | Select child behavior when its logical parent ends. |
 | `:debug` | `false` | Enable the local debug event buffer. |

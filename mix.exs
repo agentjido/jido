@@ -62,6 +62,7 @@ defmodule Jido.MixProject do
        {"guides/ownership-orphans-and-remote-children.md",
         "Ownership, Orphans, And Remote Children"},
        {"guides/topology-definitions.md", "Topology Definitions"},
+       {"guides/topology-supervision.md", "OTP And Topology Ownership"},
        {"guides/topology-dsl.livemd", "Topology DSL"},
        {"guides/topology-data-codecs-and-composition.md",
         "Topology Data, Codecs, And Composition"},

@@ -28,6 +28,8 @@ the `:authoring` tag. There is no authoring CI job.
   commits, rejected inputs, and recovery.
 - [Topology cases](topology/README.md) check complete pure plans, input
   validation, groups, ownership, buses, composition, and Plugin contributions.
+  Live tests check state recovery, restored wiring, clean stops, and cleanup
+  across the local forms.
 - `support/agents/` and `support/topology/` hold each corpus's case data,
   loaders, source fixtures, and saved JSON. Only `support/compiler.exs` is
   shared. Source fixtures load in selected tests, not during test discovery
@@ -49,6 +51,7 @@ authoring/
     composition_boundaries_test.exs
     plugin_boundaries_test.exs
     metadata_test.exs
+    execution_test.exs     # Live Topology execution across local forms
     README.md
   support/
     compiler.exs          # Shared source compiler
@@ -85,8 +88,8 @@ Additional boundary tests check invalid source, metadata, and malformed document
 
 Keep focused public-contract, compiler, and generated-helper tests in
 `test/jido/`. Core tests must not depend on this optional suite. Keep Topology
-controller startup, recovery, and distributed lifecycle tests in the existing
-runtime suites.
+failure races and distributed lifecycle tests in the existing runtime suites.
+Authoring execution tests check that each form produces the expected live system.
 
 ## Confirmed fixes
 

@@ -21,13 +21,17 @@ mix test test/examples/07_topology/07_05_composed_system --include example --see
 ```
 
 Expected result: two teams start with one shared Bus, all five workers receive
-the broadcast, direct team state stays isolated, and shutdown removes all
-Agents and the Bus.
+the broadcast, and direct team state stays isolated. After the Bus fails, its
+replacement accepts another broadcast without an Agent restart. Shutdown
+removes all Agents, their Plugin processes, and the Bus.
 
 ## Important behavior
 
 An import must have an explicit binding. An export is the public boundary for
 an included component. Inclusion alone does not create Agent ownership.
+
+Bus reconnection continues while Topology repair is manual. Both team exports
+resolve to the replacement Bus before the next broadcast.
 
 ## Limits
 

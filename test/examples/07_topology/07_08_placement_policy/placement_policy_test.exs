@@ -1,6 +1,7 @@
 defmodule Jido.Examples.Topology.PlacementPolicyTest do
   use JidoTest.Case, async: true
   @moduletag :example
+  import JidoTest.TopologyAssertions
 
   alias Jido.AgentServer
   alias Jido.Examples.Topology.PlacementPolicy
@@ -33,5 +34,15 @@ defmodule Jido.Examples.Topology.PlacementPolicyTest do
     assert Controller.agent_node(controller, :workers, 1) == node()
     assert Controller.whereis_agent(controller, :workers, 1) == worker
     eventually(fn -> AgentServer.agent(control).state.lifecycle_events > 0 end)
+
+    other_worker = Controller.whereis_agent(controller, :workers, 2)
+    stop_topology(controller, [worker, other_worker])
+    assert Jido.whereis_agent(jido, "placement-control") == control
+    assert AgentServer.agent(control).id == "placement-control"
+    assert Jido.agent_count(jido) == 1
+    monitors = monitor_runtime([control])
+    assert :ok = AgentServer.stop(control)
+    assert_down(monitors)
+    assert Jido.agent_count(jido) == 0
   end
 end

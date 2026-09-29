@@ -131,7 +131,8 @@ defmodule Jido.AgentServer do
         # Register the reply address before the child can finish bootstrap.
         # An alias also drops a late reply when the caller stops waiting.
         reply = :erlang.alias()
-        spec = %{child_spec(opts) | start: {__MODULE__, :start_link, [opts, reply]}}
+        %{start: {__MODULE__, :start_link, [start_opts]}} = spec = child_spec(opts)
+        spec = %{spec | start: {__MODULE__, :start_link, [start_opts, reply]}}
 
         try do
           case DynamicSupervisor.start_child(Jido.agent_supervisor_name(jido), spec) do
@@ -148,10 +149,23 @@ defmodule Jido.AgentServer do
     end
   end
 
-  @doc "Returns a child specification for one Agent Server."
+  @doc """
+  Returns a child specification for direct OTP supervision.
+
+  Set `:jido` to use named infrastructure and instance-owned recovery. The
+  default restart policy is then `:transient`: abnormal exits restart, but
+  normal exit, explicit stop, and hibernation stay stopped. Without `:jido`,
+  the default is `:temporary`. A generated ID is fixed in the child spec.
+
+  Each restart restores the last committed checkpoint and rebuilds Plugin
+  runtimes. Runtime checkpoints require the same live Jido instance. Configure
+  persistence for recovery after instance or node loss. `restore_definition:
+  :current` uses the supplied definition with saved state; the default
+  `:checkpoint` also retains saved definition upgrades.
+  """
   @spec child_spec(keyword()) :: Supervisor.child_spec()
   def child_spec(opts) do
-    id = Keyword.get(opts, :id, make_ref())
+    {id, opts} = child_identity(opts)
     default_restart = if Keyword.get(opts, :jido), do: :transient, else: :temporary
     restart = Keyword.get(opts, :restart, default_restart)
 
@@ -423,7 +437,13 @@ defmodule Jido.AgentServer do
     :gen_statem.call(server, {:stop_child, tag, reason})
   end
 
-  @doc "Returns a public view of tracked Agent and Plugin children."
+  @doc """
+  Returns a public view of tracked Agent and Plugin children.
+
+  Plugin entries include `:lifecycle_pid`, the process that owns their runtime
+  subtree, as well as `:pid`, the current runtime root. Use these PIDs to
+  inspect ownership and observe shutdown.
+  """
   @spec children(server(), timeout()) :: map()
   def children(server, timeout \\ 5_000), do: :gen_statem.call(server, :children, timeout)
 
@@ -852,6 +872,22 @@ defmodule Jido.AgentServer do
           true ->
             :keep_state_and_data
         end
+    end
+  end
+
+  defp child_identity(opts) do
+    case Keyword.get(opts, :agent) do
+      %Agent{id: id} when is_binary(id) ->
+        {id, opts}
+
+      _ ->
+        id =
+          case Keyword.get(opts, :id) do
+            nil -> Jido.Signal.ID.generate!()
+            value -> value
+          end
+
+        {id, Keyword.put(opts, :id, id)}
     end
   end
 

@@ -21,14 +21,19 @@ mix test test/examples/07_topology/07_06_plugin_contribution --include example -
 ```
 
 Expected result: planning adds the Bus and subscription, the Controller starts
-them, and a published Signal changes the worker state. A second Topology
-contributes an invalid Bus key and cannot be instantiated.
+them, and a published Signal changes the worker state. After the worker fails,
+OTP starts a replacement. Jido restores its state and subscription while the
+Bus stays alive. A second Topology contributes an invalid Bus key and cannot
+be instantiated.
 
 ## Important behavior
 
 The source definition stays unchanged. Contributions are applied during
 instantiation and validated before activation. Invalid contributions start no
 Agent or Bus process.
+
+The recovered worker accepts another published Signal. Controller shutdown
+removes the worker, its Plugin processes, and the contributed Bus.
 
 ## Limits
 

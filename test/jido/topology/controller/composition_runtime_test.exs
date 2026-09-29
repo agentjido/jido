@@ -68,6 +68,71 @@ defmodule Jido.Topology.Controller.CompositionRuntimeTest do
       persistence: {Jido.Persistence.ETS, table: __MODULE__}
   end
 
+  test "manual readiness observes an OTP replacement after a crash during startup", %{jido: jido} do
+    :persistent_term.put({BlockReady, :observer}, self())
+    on_exit(fn -> :persistent_term.erase({BlockReady, :observer}) end)
+
+    instance =
+      Jido.Topology.new!(%{
+        name: "startup_restart",
+        agents: [%{key: :slow, module: SlowCell}]
+      })
+      |> Jido.Topology.instantiate(id: unique_id("startup-restart"))
+      |> Jido.Topology.unwrap!()
+
+    controller = start_supervised!({Controller, jido: jido, topology: instance, repair: :manual})
+    assert_receive {:readiness_blocked, _old_gate}, 1_000
+    agents = Controller.name(jido, instance.id, :agents)
+    [{"agent/slow", original, _, _}] = Supervisor.which_children(agents)
+    ref = Process.monitor(original)
+    Process.exit(original, :kill)
+    assert_receive {:DOWN, ^ref, :process, ^original, :killed}, 1_000
+    assert_receive {:readiness_blocked, gate}, 1_000
+    eventually(fn -> Controller.status(controller).active == 0 end)
+    send(gate, :release)
+    [{"agent/slow", replacement, _, _}] = Supervisor.which_children(agents)
+    assert replacement != original
+    assert :ok = Server.await_ready(replacement)
+    assert :ok = Controller.await_ready(controller, 1_000)
+    assert Controller.whereis_agent(controller, :slow) == replacement
+    assert Controller.status(controller).errors == %{}
+  end
+
+  test "coordinator replacement cancels old activation tasks and preserves members", %{jido: jido} do
+    :persistent_term.put({BlockReady, :observer}, self())
+    on_exit(fn -> :persistent_term.erase({BlockReady, :observer}) end)
+
+    instance =
+      Jido.Topology.new!(%{
+        name: "activation_owner",
+        agents: [%{key: :slow, module: SlowCell}, %{key: :fast, module: Cell}]
+      })
+      |> Jido.Topology.instantiate(id: unique_id("activation-owner"))
+      |> Jido.Topology.unwrap!()
+
+    controller = start_supervised!({Controller, jido: jido, topology: instance, repair: :manual})
+    assert_receive {:readiness_blocked, gate}, 1_000
+    eventually(fn -> is_pid(Controller.whereis_agent(controller, :fast)) end)
+    fast = Controller.whereis_agent(controller, :fast)
+    tasks = Controller.name(jido, instance.id, :tasks)
+    eventually(fn -> length(Task.Supervisor.children(tasks)) == 1 end)
+    [activation] = Task.Supervisor.children(tasks)
+    activation_ref = Process.monitor(activation)
+
+    {_, coordinator, _, _} =
+      List.keyfind(Supervisor.which_children(controller), Controller.Runtime, 0)
+
+    coordinator_ref = Process.monitor(coordinator)
+    Process.exit(coordinator, :kill)
+    assert_receive {:DOWN, ^coordinator_ref, :process, ^coordinator, :killed}, 1_000
+    assert_receive {:DOWN, ^activation_ref, :process, ^activation, _}, 1_000
+    send(gate, :release)
+    assert :ok = Controller.await_ready(controller, 5_000)
+    assert Controller.whereis_agent(controller, :fast) == fast
+    assert is_pid(Controller.whereis_agent(controller, :slow))
+    eventually(fn -> Task.Supervisor.children(tasks) == [] end)
+  end
+
   test "status stays responsive and independent members start while readiness is blocked", %{
     jido: jido
   } do
@@ -247,7 +312,7 @@ defmodule Jido.Topology.Controller.CompositionRuntimeTest do
     assert Process.alive?(unrelated)
   end
 
-  test "a team failure leaves the shared Bus and the other team running", %{jido: jido} do
+  test "a team stop leaves the shared Bus and the other team running", %{jido: jido} do
     instance =
       Jido.Topology.unwrap!(
         with {:ok, definition} <-
@@ -271,15 +336,10 @@ defmodule Jido.Topology.Controller.CompositionRuntimeTest do
     assert {:ok, _} =
              Jido.AgentServer.call(west, route_signal_2, [])
 
-    eventually(
-      fn ->
-        replacement = Controller.whereis_agent(controller, Ref.ref(:east, :leader))
-
-        is_pid(replacement) and replacement != east and
-          map_size(Server.children(replacement)) == 2
-      end,
-      timeout: 5000
-    )
+    assert :ok = Controller.reconcile(controller)
+    eventually(fn -> Controller.status(controller).active == 0 end)
+    assert Controller.whereis_agent(controller, Ref.ref(:east, :leader)) == nil
+    assert Controller.status(controller).status == :degraded
 
     assert Controller.whereis_bus(controller, :events) == bus
     assert Controller.whereis_agent(controller, Ref.ref(:west, :leader)) == west

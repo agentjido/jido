@@ -19,12 +19,17 @@ mix test test/examples/07_topology/07_02_hierarchy --include example --seed 0
 ```
 
 Expected result: the Controller starts five Agents and the leader owns exactly
-three workers.
+three workers. When the leader fails, OTP restarts it and the workers stop.
+Manual repair binds the replacement leader to the coordinator and leaves the
+workers stopped. Controller shutdown removes the remaining Agents.
 
 ## Important behavior
 
-Ownership creates startup dependencies and cleanup order. Each Agent owns only
-its direct children.
+Ownership creates activation dependencies and logical parent bindings. All
+local Agents are OTP siblings. Each Agent owns only its direct logical
+children. `on_parent_exit: :stop` causes a clean worker shutdown. Transient
+workers then stay stopped, even if OTP restarts the leader. Select `:continue`
+when workers must stay alive until their parent binding is repaired.
 
 ## Limits
 

@@ -1,12 +1,12 @@
 # Jido V3 examples
 
-The main catalog has 60 fixtures in nine groups. All use the implemented
+The main catalog has 61 fixtures in nine groups. All use the implemented
 Agent and AgentServer contract. The group guides below link to their source
 and tests.
 
 | Group | Fixtures | Source and tests |
 | --- | ---: | --- |
-| 01_basic | 4 | [Source](01_basic/README.md), [tests](../test/examples/01_basic/README.md) |
+| 01_basic | 5 | [Source](01_basic/README.md), [tests](../test/examples/01_basic/README.md) |
 | 02_workflow | 9 | [Source](02_workflow/README.md), [tests](../test/examples/02_workflow/README.md) |
 | 03_llm | 6 | [Source](03_llm/README.md), [tests](../test/examples/03_llm/README.md) |
 | 04_runtime | 11 | [Source](04_runtime/README.md), [tests](../test/examples/04_runtime/README.md) |
@@ -27,7 +27,7 @@ repository. JSON fixtures stay beside their example source.
 
 ```sh
 mix test                                     # Core tests; examples are excluded
-mix examples --seed 0                        # All example tests
+mix test.examples                        # All example tests
 mix test test/examples/01_basic --include example --seed 0
 mix test --include example --include flaky --seed 0  # Complete acceptance suite
 ```

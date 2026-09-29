@@ -1,6 +1,7 @@
 defmodule Jido.Examples.Topology.LifecycleSignalsTest do
   use JidoTest.Case, async: true
   @moduletag :example
+  import JidoTest.TopologyAssertions
 
   alias Jido.AgentServer
   alias Jido.Examples.Topology.LifecycleSignals
@@ -24,5 +25,15 @@ defmodule Jido.Examples.Topology.LifecycleSignalsTest do
         "jido.topology.lifecycle.component.ready" in events and
         "jido.topology.lifecycle.operation.completed" in events
     end)
+
+    worker = Controller.whereis_agent(controller, :worker)
+    stop_topology(controller, [worker])
+    assert Jido.whereis_agent(jido, "lifecycle-control") == control
+    assert AgentServer.agent(control).id == "lifecycle-control"
+    assert Jido.agent_count(jido) == 1
+    monitors = monitor_runtime([control])
+    assert :ok = AgentServer.stop(control)
+    assert_down(monitors)
+    assert Jido.agent_count(jido) == 0
   end
 end

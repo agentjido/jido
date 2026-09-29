@@ -31,4 +31,14 @@ mix test test/examples/07_topology/07_08_placement_policy --include example --se
 The example test uses the current node. The core peer test proves real movement
 between two Erlang nodes.
 
+Expected result: placement on the current node preserves the worker PID.
+Controller shutdown removes both workers and leaves the application-owned
+control Agent alive. The application then stops the control Agent and its
+Plugin processes.
+
+Read [the control Agent](placement_policy.ex), [the Directive](move.ex), and
+[the Plugin](placement_plugin.ex). The
+[test](../../../test/examples/07_topology/07_08_placement_policy/placement_policy_test.exs)
+checks placement and cleanup through public APIs.
+
 Previous: [Lifecycle Signals](../07_07_lifecycle_signals/README.md)
