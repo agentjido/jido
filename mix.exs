@@ -363,10 +363,10 @@ defmodule Jido.MixProject do
   defp deps do
     [
       # Jido Ecosystem
-      # Pin the current V3 Flow and owned execution contracts until a Hex release.
+      # Pin the current V3 Action contracts until a Hex release.
       {:jido_action,
        git: "https://github.com/agentjido/jido_action.git",
-       ref: "45c65de0b866b29ac5eea4d32f4ea4034679e4dd",
+       ref: "8e9b3f7b268e175091b0eb3720bab3b8633d3c24",
        override: true},
       {:jido_signal, "~> 3.0.0-beta.4"},
 
