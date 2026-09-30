@@ -65,10 +65,10 @@ defmodule Jido.AgentServer.ChildOperationTaskTest do
   end
 
   test "child creation keeps inspections responsive and serializes later Turns", %{jido: jido} do
+    factory_opts = %{initial_state: %{observer: self()}}
+
     for directive <- [
-          Directive.spawn_child(HeldFactory, :worker,
-            opts: %{initial_state: %{observer: self()}}
-          ),
+          Directive.spawn_child(HeldFactory, :worker, opts: factory_opts),
           Directive.spawn_process(%{id: HeldProcess, start: {HeldProcess, :start_link, [self()]}})
         ] do
       {:ok, parent} = Jido.start_agent(jido, RuntimeAgent, id: unique_id(), directive_timeout: 20)

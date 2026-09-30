@@ -9,7 +9,8 @@ defmodule Jido.Codec.Data do
     do: Authoring.error("Authoring data is too deep")
 
   def encode(value, _registry, _depth)
-      when is_nil(value) or is_boolean(value) or is_number(value), do: {:ok, value}
+      when is_nil(value) or is_boolean(value) or is_number(value),
+      do: {:ok, value}
 
   def encode(value, _registry, _depth) when is_binary(value) do
     if String.valid?(value),

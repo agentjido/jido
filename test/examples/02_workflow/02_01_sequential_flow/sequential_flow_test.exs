@@ -3,23 +3,27 @@ defmodule JidoTest.Examples.Workflow.SequentialFlowTest do
 
   alias Jido.Examples.SequentialFlow, as: Example
 
-  test "a compiled inline Step can be reused through Builder and stored JSON" do
-    alias Jido.Flow.{Builder, Codec}
+  test "a compiled inline Step can be reused through a data definition and stored JSON" do
+    alias Jido.Flow.{Ref, Codec}
 
     assert {:ok, flow} =
-             Builder.new(
+             Jido.Flow.new(
                name: "workflow_inline_reuse",
-               schema: Zoi.object(%{amount: Zoi.integer()})
+               schema: Zoi.object(%{amount: Zoi.integer()}),
+               components: [
+                 Jido.Flow.Step.new!(
+                   name: "double",
+                   action: Example.Pipeline.step_action("double"),
+                   params: %{value: Ref.input(:amount)}
+                 ),
+                 Jido.Flow.Step.new!(
+                   name: "finish",
+                   action: Example.Finish,
+                   params: %{value: Ref.result("double", :value), failure: :none}
+                 )
+               ],
+               output: Ref.result("finish")
              )
-             |> Builder.step("double", Example.Pipeline.step_action("double"), %{
-               value: Builder.input(:amount)
-             })
-             |> Builder.step("finish", Example.Finish, %{
-               value: Builder.result("double", :value),
-               failure: :none
-             })
-             |> Builder.output(Builder.result("finish"))
-             |> Builder.build()
 
     assert {:ok, document, registry} = Codec.encode(flow)
     assert {:ok, decoded} = Codec.decode(JSON.decode!(JSON.encode!(document)), registry)

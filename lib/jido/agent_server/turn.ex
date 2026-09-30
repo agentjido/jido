@@ -192,15 +192,9 @@ defmodule Jido.AgentServer.Turn do
              exec_opts,
              data.plugin_specs
            ),
-         {:ok, handle} <- start_async_exec(prepared),
-         :ok <- link_exec(handle) do
+         {:ok, handle} <- start_async_exec(prepared) do
       {:ok, handle, prepared}
     end
-  end
-
-  defp link_exec(%{pid: pid}) when is_pid(pid) do
-    Process.link(pid)
-    :ok
   end
 
   defp start_async_exec(prepared) do

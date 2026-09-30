@@ -34,6 +34,12 @@ and remote child placement. Local supervisor starts remain tracked until the
 supervisor replies. Killing the caller cannot cancel that start. A Server stop
 closes its owned child requests so a late start cannot leave an owned child.
 
+Exec monitors the Agent Server that owns its async handle. When that Server
+exits, the live Exec controller cancels its Action and Flow workers. The Server
+does not link itself to the controller: a link could stop the controller before
+it handles owner death. Abrupt controller death does not guarantee worker
+cleanup. See the [Jido Action execution contract](https://hexdocs.pm/jido_action/).
+
 Do not read private state-machine tuples. Use:
 
 ```elixir

@@ -93,7 +93,8 @@ defmodule Jido.Plugin.Scheduler.Durable do
   end
 
   defp validate_progress(%{generation: generation, pending: nil, last_scheduled_at: _})
-       when is_integer(generation), do: :ok
+       when is_integer(generation),
+       do: :ok
 
   defp validate_progress(%{
          generation: generation,

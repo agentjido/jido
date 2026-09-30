@@ -46,7 +46,7 @@ Use separate calls only when every intermediate state is valid and useful.
 Flow uses `Jido.Expr` for bounded arithmetic, comparisons, Boolean operations,
 and string concatenation. Put these calculations in the Flow that an Agent
 route selects. The Agent uses the same `Jido.Exec` execution path for a Flow
-module and a Flow value from `Jido.Flow.Builder`.
+module and a Flow value from `Jido.Flow.new/1`.
 
 ```elixir
 defmodule MyApp.AddCount do

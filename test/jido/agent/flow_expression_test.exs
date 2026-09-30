@@ -35,7 +35,9 @@ defmodule Jido.Agent.FlowExpressionTest do
     end
   end
 
-  test "Flow DSL and Builder share Jido.Expr through Agent Codec and execution", %{jido: jido} do
+  test "Flow DSL and data definition share Jido.Expr through Agent Codec and execution", %{
+    jido: jido
+  } do
     import Jido.Expr, only: [expr: 1]
 
     amount = Ref.input(:amount)
@@ -43,10 +45,18 @@ defmodule Jido.Agent.FlowExpressionTest do
     added = Ref.result("amount", :amount)
 
     flow =
-      Jido.Flow.Builder.new(name: "expression_add", schema: Add.schema())
-      |> Jido.Flow.Builder.step("amount", Amount, %{amount: expr(min(^amount, 5))})
-      |> Jido.Flow.Builder.output(%{count: expr(^count + ^added)})
-      |> Jido.Flow.Builder.build()
+      Jido.Flow.new(
+        name: "expression_add",
+        schema: Add.schema(),
+        components: [
+          Jido.Flow.Step.new!(
+            name: "amount",
+            action: Amount,
+            params: %{amount: expr(min(^amount, 5))}
+          )
+        ],
+        output: %{count: expr(^count + ^added)}
+      )
 
     assert {:ok, flow} = flow
     assert flow == Add.flow()

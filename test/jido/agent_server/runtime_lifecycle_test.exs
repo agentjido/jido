@@ -88,7 +88,7 @@ defmodule Jido.AgentServer.RuntimeLifecycleTest do
       {:running, state} = :sys.get_state(agent)
       exec_root = state.active.exec_handle.pid
       assert exec_root in Task.Supervisor.children(task_supervisor)
-      assert agent in elem(Process.info(exec_root, :links), 1)
+      assert {:process, agent} in elem(Process.info(exec_root, :monitors), 1)
 
       send(action_worker, {:release, gate})
       assert {:ok, _agent} = Task.await(caller, 2_000)
@@ -128,23 +128,65 @@ defmodule Jido.AgentServer.RuntimeLifecycleTest do
     assert Server.status(server).state_version == 1
   end
 
-  test "Agent death stops its linked Exec and Action work", %{jido: jido} do
-    id = unique_id("owned-exec-stop")
-    {:ok, agent} = Jido.start_agent(jido, OwnedExecutionAgent, id: id)
-    gate = make_ref()
+  test "Agent death stops its Exec and Action or Flow work", %{jido: jido} do
+    for {type, label} <- [{"owned.action", :action}, {"owned.flow", :flow}] do
+      id = unique_id("owned-exec-stop")
 
-    Server.cast(agent, signal("owned.action", %{test: self(), gate: gate, label: :kill}))
-    assert_receive {:owned_execution, :kill, action_worker}, 2_000
+      {:ok, agent} =
+        Jido.start_agent(jido, OwnedExecutionAgent,
+          id: id,
+          restart: :temporary,
+          turn_timeout: :infinity,
+          exec_opts: [timeout: :infinity]
+        )
 
-    {:running, state} = :sys.get_state(agent)
-    exec_root = state.active.exec_handle.pid
-    action_ref = Process.monitor(action_worker)
-    exec_ref = Process.monitor(exec_root)
+      gate = make_ref()
+      Server.cast(agent, signal(type, %{test: self(), gate: gate, label: label}))
+      assert_receive {:owned_execution, ^label, action_worker}, 2_000
 
-    Process.exit(agent, :kill)
+      {:running, state} = :sys.get_state(agent)
+      exec_root = state.active.exec_handle.pid
+      action_ref = Process.monitor(action_worker)
+      exec_ref = Process.monitor(exec_root)
+      agent_ref = Process.monitor(agent)
+      task_supervisor = Jido.task_supervisor_name(jido)
 
-    assert_receive {:DOWN, ^exec_ref, :process, ^exec_root, _reason}, 2_000
-    assert_receive {:DOWN, ^action_ref, :process, ^action_worker, _reason}, 2_000
+      try do
+        Process.exit(agent, :kill)
+
+        assert_receive {:DOWN, ^agent_ref, :process, ^agent, :killed}, 2_000
+        assert_receive {:DOWN, ^exec_ref, :process, ^exec_root, _reason}, 2_000
+        assert_receive {:DOWN, ^action_ref, :process, ^action_worker, _reason}, 2_000
+        assert eventually(fn -> Task.Supervisor.children(task_supervisor) == [] end)
+      after
+        for pid <- [agent, exec_root, action_worker], Process.alive?(pid) do
+          ref = Process.monitor(pid)
+          Process.exit(pid, :kill)
+          assert_receive {:DOWN, ^ref, :process, ^pid, _reason}, 2_000
+        end
+      end
+    end
+  end
+
+  test "Agent death before dispatch cannot start Action or Flow work", %{jido: jido} do
+    task_supervisor = Jido.task_supervisor_name(jido)
+
+    for type <- ["owned.action", "owned.flow"] do
+      {:ok, agent} =
+        Jido.start_agent(jido, OwnedExecutionAgent,
+          id: unique_id("owned-before-dispatch"),
+          restart: :temporary
+        )
+
+      assert :ok = :sys.suspend(agent)
+      gate = make_ref()
+      Server.cast(agent, signal(type, %{test: self(), gate: gate, label: gate}))
+      monitor = Process.monitor(agent)
+      Process.exit(agent, :kill)
+      assert_receive {:DOWN, ^monitor, :process, ^agent, :killed}, 2_000
+      assert Task.Supervisor.children(task_supervisor) == []
+      refute_received {:owned_execution, ^gate, _worker}
+    end
   end
 
   test "starts and owns a Plugin runtime child outside Agent state", %{jido: jido} do

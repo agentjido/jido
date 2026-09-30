@@ -36,7 +36,8 @@ defmodule Jido.Topology.Codec.Value do
         %{"$type" => "topology.ref", "component" => component, "key" => key} = value,
         _registry
       )
-      when map_size(value) == 3, do: Ref.new(component, key)
+      when map_size(value) == 3,
+      do: Ref.new(component, key)
 
   def decode(%{"$type" => type, "key" => key} = value, registry)
       when map_size(value) == 2 and type in ["topology.input", "topology.member"] do
