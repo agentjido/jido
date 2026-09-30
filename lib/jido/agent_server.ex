@@ -48,9 +48,11 @@ defmodule Jido.AgentServer do
   Directive work use separate boundaries.
 
   Exec roots, Action tasks, Flow tasks, commit notifications, and asynchronous
-  Directives run under the Jido instance Task Supervisor. The Server also links each Exec root to
-  itself. Initial Plugin readiness and error Signal delivery are also linked
-  to the Server. Owned work cannot outlive its Agent owner.
+  Directives run under the Jido instance Task Supervisor. Each Exec root monitors
+  the Server and stops its Action and Flow work when the owner exits. Initial
+  Plugin readiness and error Signal delivery are linked to the Server. A live
+  Exec controller handles owner death; abrupt controller death does not
+  guarantee worker cleanup.
 
   Use `agent/2` for the committed Agent, `snapshot/2` for the Agent and commit
   revision, `status/2` for current runtime work, and `children/2` for live
