@@ -65,7 +65,7 @@ Follow these rules:
 7. Move calculations to private functions before you create a named Action.
 8. Use a named Action only when it is reused, needs a stable module identity,
    is a first-class extension point, or is the subject of the example.
-9. Use Builder, JSON, or direct definition forms only when the example teaches
+9. Use JSON or direct definition forms only when the example teaches
    those forms.
 10. Use the route option `as:` for the main commands that a reader will call.
 11. Use static Zoi schemas at Agent, Action, and Flow boundaries.

@@ -568,7 +568,7 @@ Pass it to `Jido.Agent.new/1` or `Jido.Topology.new/1`. Then use `instantiate/2`
 with instance options. Check each result. There is no Builder value that saves
 an earlier error. Read module definitions with `module.definition()` for Agents
 or `module.topology()` for Topologies. JSON formats and document versions are
-unchanged. The Flow Builder belongs to Jido Action and is unchanged.
+unchanged. Jido Action owns Flow data definitions. Use `Jido.Flow.new/1` for a Flow value.
 
 ## Compose Directive Actions In Flows
 
