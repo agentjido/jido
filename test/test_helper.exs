@@ -9,4 +9,17 @@ ExUnit.configure(formatters: [ExUnit.CLIFormatter, JidoTest.System.Report])
 # Agent and Topology authoring corpus: mix test.authoring
 # Runtime fault and recovery scenarios: mix test.system
 # External storage services: mix test.services (not included in mix test.all)
-ExUnit.configure(exclude: [:skip, :flaky, :peer, :example, :bench, :authoring, :system, :service])
+ExUnit.configure(
+  exclude: [
+    :skip,
+    :flaky,
+    :peer,
+    :example,
+    :bench,
+    :authoring,
+    :system,
+    :service,
+    :property,
+    :fuzz
+  ]
+)

@@ -166,8 +166,8 @@ defmodule Jido.Agent.Plugin.Pipeline do
   end
 
   defp validate_reduction({:ok, value}, spec, state) do
-    case Zoi.parse(spec.state_schema, value) do
-      {:ok, value} ->
+    case Zoi.validate(spec.state_schema, value) do
+      :ok ->
         {:ok, Map.put(state, spec.state_key, value)}
 
       {:error, issues} ->

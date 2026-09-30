@@ -14,6 +14,11 @@ defmodule Jido.Agent do
   second Plugin state map. `schema` describes the domain fields, while
   `complete_schema/1` composes the domain schema with the Plugin-owned fields.
 
+  State schemas contain static defaults and validation rules. Transforms,
+  coercion, codecs, and lazy schemas are not supported in state schemas.
+  Initialization parses defaults as input once. Instance and candidate checks
+  validate stored values without defaults, coercion, or transforms.
+
   Actions request deferred work with a proper list of Directives in
   the optional third success element. Flow preserves these requests. `cmd/3`
   validates the complete list and returns it to the caller. Only AgentServer dispatches it, after commit.
@@ -277,7 +282,9 @@ defmodule Jido.Agent do
   @doc "Returns the complete data schema, including Plugin-owned fields in Agent state."
   @spec complete_schema(t()) :: {:ok, Zoi.schema()} | {:error, Exception.t()}
   def complete_schema(%__MODULE__{} = agent) do
-    Jido.Agent.Plugin.compose_schema(agent.schema, agent.plugins)
+    with {:ok, schema} <- Jido.Agent.Plugin.compose_schema(agent.schema, agent.plugins),
+         :ok <- Jido.Agent.State.validate_schema(schema),
+         do: {:ok, schema}
   end
 
   @doc "Returns the complete data schema or raises its validation error."

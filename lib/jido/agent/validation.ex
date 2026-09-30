@@ -178,6 +178,7 @@ defmodule Jido.Agent.Validation do
          {:ok, plugin_specs} <- PluginNormalizer.normalize_all(agent.plugins),
          :ok <- State.validate_schema(agent.schema),
          {:ok, complete_schema} <- AgentPlugin.compose_schema(agent.schema, plugin_specs),
+         :ok <- State.validate_schema(complete_schema),
          {:ok, plugins} <- PluginNormalizer.canonical_declarations(plugin_specs),
          {:ok, routes} <- validate_routes(agent.routes),
          {:ok, metadata} <- field(:metadata, agent.metadata) do

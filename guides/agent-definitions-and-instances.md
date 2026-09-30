@@ -40,7 +40,10 @@ Use the module helper or instantiate a definition:
   )
 ```
 
-Instantiation applies data schema defaults and validates complete state. Do not
+Instantiation parses supplied state and checked defaults once. State schemas
+contain defaults and validation rules. They reject transforms, coercion, codecs,
+and lazy schemas. Stored instance and candidate checks do not apply defaults
+or change values. Do not
 build an Agent struct by hand and assume it is valid.
 
 ## Own Complete State

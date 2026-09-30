@@ -60,6 +60,8 @@ or commit result. Conversion runs before the final checkpoint portability
 check. Dump output must be portable. Load receives validated stored data and
 can reconstruct local values. Its output must match the Plugin's owned field
 schema and the complete Agent schema; it need not be portable.
+Jido validates the loaded value without adding defaults or changing values.
+A missing required field is an error. A valid `nil` value remains `nil`.
 
 Direct `Jido.Agent.checkpoint/2` and `Jido.Agent.restore/3` do not run Plugin
 persistence conversion. Use `Jido.Persistence` for this conversion.

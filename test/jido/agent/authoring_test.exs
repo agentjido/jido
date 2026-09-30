@@ -12,7 +12,10 @@ defmodule JidoTest.Agent.AuthoringTest do
     :ok
   end
 
-  def stringify_count(value, _opts), do: Integer.to_string(value)
+  def observe_count(value, _opts) do
+    send(self(), {:parsed_live_count, value})
+    :ok
+  end
 
   defmodule Add do
     use Jido.Action,
@@ -421,17 +424,42 @@ defmodule JidoTest.Agent.AuthoringTest do
 
   test "Codec derives an instance definition without parsing live state" do
     schema =
-      Zoi.object(%{count: Zoi.integer() |> Zoi.transform({__MODULE__, :stringify_count, []})})
+      Zoi.object(%{count: Zoi.integer() |> Zoi.refine({__MODULE__, :observe_count, []})})
 
-    assert {:ok, definition} = Agent.new(name: "transformed", schema: schema)
+    assert {:ok, definition} = Agent.new(name: "observed", schema: schema)
     assert {:ok, document, registry} = Codec.encode(definition)
     assert {:ok, ^definition} = Codec.decode(document, registry)
 
-    instance = %{definition | id: "transformed", state: %{count: 1}}
-    assert {:ok, %{state: %{count: "1"}}} = Agent.validate(instance)
+    instance = %{definition | id: "observed", state: %{count: 1}}
+    assert {:ok, %{state: %{count: 1}} = normalized} = Agent.validate(instance)
+    assert_received {:parsed_live_count, 1}
     assert {:ok, ^document} = Codec.encode(instance, registry)
     assert {:ok, generated_document, generated_registry} = Codec.encode(instance)
     assert {:ok, ^definition} = Codec.decode(generated_document, generated_registry)
+    assert {:ok, ^document} = Codec.encode(normalized, registry)
+    assert {:ok, ^generated_document, _registry} = Codec.encode(normalized)
+    refute_received {:parsed_live_count, _}
+    assert normalized.state == %{count: 1}
+
+    invalid = %{instance | state: %{count: "invalid"}}
+    assert {:error, _} = Agent.validate(invalid)
+    assert {:ok, ^document} = Codec.encode(invalid, registry)
+    refute_received {:parsed_live_count, _}
+  end
+
+  test "Codec rejects incomplete instance shapes before it derives a definition" do
+    definition = Counter.definition()
+
+    for malformed <- [
+          %{definition | id: "", state: %{}},
+          %{definition | id: nil, state: %{}},
+          %{definition | id: 1, state: %{}},
+          %{definition | id: "instance", state: nil},
+          %{definition | id: "instance", state: %URI{}},
+          %{definition | id: "instance", state: []}
+        ] do
+      assert {:error, _error} = Codec.encode(malformed)
+    end
   end
 
   test "valid direct route closures stay valid outside the Codec subset" do

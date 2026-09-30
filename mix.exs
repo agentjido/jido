@@ -158,6 +158,8 @@ defmodule Jido.MixProject do
         "test.examples": :test,
         "test.authoring": :test,
         "test.system": :test,
+        "test.property": :test,
+        "test.fuzz": :test,
         "test.services": :test,
         "test.services.minio": :test,
         "test.all": :test,
@@ -369,6 +371,8 @@ defmodule Jido.MixProject do
       {:jido_signal, "~> 3.0.0-beta.4"},
 
       # Jido Deps
+      # Local integration only; replace with a compatible released Zoi version.
+      {:zoi, path: "../zoi", override: true},
       {:spark, "~> 2.7"},
       {:splode, "~> 0.3.0"},
       {:telemetry, "~> 1.3"},
@@ -394,6 +398,7 @@ defmodule Jido.MixProject do
       {:doctor, "~> 0.21", only: [:dev, :test], runtime: false},
       {:ex_doc, "~> 0.34", only: :dev, runtime: false},
       {:excoveralls, "~> 0.18.3", only: [:dev, :test]},
+      {:stream_data, "~> 1.4", only: :test, runtime: false},
       {:mix_test_watch, "~> 1.0", only: [:dev, :test], runtime: false}
     ]
   end
@@ -410,11 +415,13 @@ defmodule Jido.MixProject do
       "test.examples": "test test/examples --only example --seed 0",
       "test.authoring": "test test/authoring --only authoring --seed 0",
       "test.system": "test test/system/runtime --only system --seed 0",
+      "test.property": "test test/property --only property --seed 0",
+      "test.fuzz": "test test/property --only fuzz --seed 0",
       "test.services":
         "test #{Path.wildcard("test/system/services/*_test.exs") |> Enum.join(" ")} --only service --seed 0",
       "test.services.minio": "test test/system/services/minio --only service --seed 0",
       "test.all":
-        "test --preload-modules --include bench --include example --include authoring --include system --include flaky --include peer --seed 0",
+        "test --preload-modules --include bench --include example --include authoring --include system --include flaky --include peer --include property --seed 0",
 
       # Helper to run docs
       docs: "docs --open",
@@ -426,7 +433,7 @@ defmodule Jido.MixProject do
         "compile --warnings-as-errors",
         "credo --strict --only warning",
         "dialyzer",
-        "test test/jido --include flaky --seed 0"
+        "test test/jido test/property --include flaky --include property --seed 0"
       ]
     ]
   end

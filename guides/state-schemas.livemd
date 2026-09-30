@@ -35,7 +35,11 @@ end
 ```
 
 Keep the data schema static. The refinement uses a named module function, so the
-declaration remains explicit.
+declaration remains explicit. State schemas contain defaults and validation
+rules. They reject transforms, coercion, codecs, string-to-boolean conversion,
+and lazy schemas. Convert external input before you create state, or use an
+Action input schema for that conversion. A successful refinement must leave
+its value unchanged. The same rules apply to Plugin-owned state.
 
 ## Declare The Agent
 
@@ -57,6 +61,17 @@ agent.state
 ```
 
 The result is `%{count: 0, minimum: 0, maximum: 10}`.
+
+Initialization parses supplied values and defaults in one traversal. Nested
+defaults pass through their type checks and refinements. Each refinement runs
+once per value in that traversal. A default of `nil` needs a nullable schema.
+Optional missing fields stay absent; explicit `nil` selects their default.
+Supplied nested maps merge with declared initial map defaults.
+
+Instance, candidate, and restored-state checks do not apply defaults or change
+values. A missing required field, including a defaulted field, is an error.
+Explicit `nil` must satisfy the stored-value schema. Defaults apply only when
+an instance is created.
 
 ## Reject An Invalid Instance
 
@@ -80,3 +95,17 @@ lifecycle and ownership in Plugin runtimes or application supervision.
 
 Continue with [Plugin-Owned State](plugin-state.md) and
 [Portable State And Checkpoints](portable-state-and-checkpoints.md).
+
+## Test object intersections
+
+Run the generated intersection cases with:
+
+```sh
+mix test.property
+mix test.fuzz
+```
+
+The cases cover branch order, nested defaults, overlapping fields, conflicts,
+missing stored fields, nullable values, and refinement call counts. CI,
+`mix quality`, and `mix test.all` include the property cases. The longer fuzz
+run is separate.

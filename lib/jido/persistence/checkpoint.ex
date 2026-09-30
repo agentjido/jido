@@ -12,13 +12,7 @@ defmodule Jido.Persistence.Checkpoint do
   @doc false
   @spec dump(Agent.instance(), map(), pos_integer(), term()) :: {:ok, map()} | {:error, term()}
   def dump(%Agent{} = agent, context, record_format, reason) do
-    convert_state = converter(:dump, record_format, reason)
-
-    AgentCheckpoint.checkpoint(agent, context, fn validated, _state ->
-      # Preserve the supplied complete state. Validation defaults must not hide
-      # a missing Plugin-owned field from its persistence conversion.
-      convert_state.(validated, agent.state)
-    end)
+    AgentCheckpoint.checkpoint(agent, context, converter(:dump, record_format, reason))
   end
 
   defp converter(direction, record_format, reason) do

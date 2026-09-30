@@ -578,3 +578,16 @@ and returns them with its final state. Non-list third success elements fail
 at the Action boundary. Put metadata in output. `Jido.Agent.cmd/3` still
 returns a plain Directive list without dispatch.
 See [Directives](directives-and-outcomes.md) for commit, order, and failure rules.
+
+## State defaults and stored validation
+
+V3 state schemas contain static defaults and validation rules. Transforms,
+coercion, codecs, string-to-boolean conversion, and lazy schemas are rejected.
+Convert raw input before state construction or in an Action input schema.
+Successful refinements must leave their values unchanged.
+
+Instance creation checks nested defaults in one traversal. Compatible object
+intersection branches retain all fields. A `nil` default requires a nullable
+schema. Optional missing fields stay absent. Stored instance, candidate,
+Plugin output, and restored-state checks do not insert defaults or change
+values. Missing required fields are errors.

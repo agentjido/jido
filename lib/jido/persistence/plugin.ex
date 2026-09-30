@@ -94,9 +94,9 @@ defmodule Jido.Persistence.Plugin do
   end
 
   defp validate_state(value, schema, spec) do
-    case Zoi.parse(schema, value) do
-      {:ok, validated} ->
-        {:ok, validated}
+    case Zoi.validate(schema, value) do
+      :ok ->
+        {:ok, value}
 
       {:error, errors} ->
         PluginError.invalid_callback(

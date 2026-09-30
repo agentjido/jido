@@ -122,10 +122,8 @@ defmodule Jido.Agent.Codec do
     do: Agent.validate_definition(definition)
 
   defp neutral_definition(%Agent{id: id, state: state} = agent)
-       when is_binary(id) and is_map(state) and not is_struct(state) do
-    with {:ok, agent} <- Agent.validate_instance(agent),
-         do: agent |> Agent.definition() |> Agent.validate_definition()
-  end
+       when is_binary(id) and byte_size(id) > 0 and is_map(state) and not is_struct(state),
+       do: agent |> Agent.definition() |> Agent.validate_definition()
 
   defp neutral_definition(value), do: Agent.validate(value)
 

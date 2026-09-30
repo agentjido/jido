@@ -126,7 +126,7 @@ defmodule Jido.Agent.Checkpoint do
          :ok <- default_header(module, checkpoint, format),
          {:ok, definition} <- restore_definition(module, checkpoint, format),
          {:ok, state} <- convert_state.(definition, checkpoint.state) do
-      Agent.instantiate(definition, id: checkpoint.id, state: state)
+      Agent.validate_instance(%{definition | id: checkpoint.id, state: state})
     end
   end
 

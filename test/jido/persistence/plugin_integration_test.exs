@@ -83,6 +83,29 @@ defmodule JidoTest.Persistence.PluginIntegrationTest do
     def restore(%{id: id, complete: state}, _context), do: new(id: id, state: state)
   end
 
+  defmodule StoredStatePackage do
+    use Jido.Plugin
+
+    @impl true
+    def state_spec(_opts) do
+      {:owned,
+       Zoi.object(
+         %{
+           count: Zoi.integer() |> Zoi.nullable() |> Zoi.default(3),
+           optional: Zoi.integer() |> Zoi.default(7) |> Zoi.optional()
+         },
+         empty_values: [nil]
+       )
+       |> Zoi.default(%{})}
+    end
+
+    @impl true
+    def dump(value, _context, _opts), do: {:ok, value}
+
+    @impl true
+    def load(value, _context, _opts), do: {:ok, Process.get({__MODULE__, :loaded}, value)}
+  end
+
   setup do
     Process.register(self(), __MODULE__.Observer)
 
@@ -221,6 +244,42 @@ defmodule JidoTest.Persistence.PluginIntegrationTest do
              Persistence.save_agent(c.persistence, incomplete, namespace: "persistence-test")
 
     assert {:error, :not_found} = ETS.get(key, opts)
+  end
+
+  test "Plugin load preserves nullable values and absent optional fields", c do
+    agent =
+      Agent.new!(name: "stored_plugin_state", plugins: [StoredStatePackage])
+      |> Agent.instantiate!(id: "stored-plugin-state")
+
+    assert {:ok, agent} = Agent.transition(agent, %{owned: %{count: nil}})
+    assert :ok = Persistence.save_agent(c.persistence, agent, namespace: "persistence-test")
+
+    assert {:ok, ^agent} =
+             Persistence.load_agent(c.persistence, Agent, agent.id, namespace: "persistence-test")
+  end
+
+  test "Plugin load rejects incomplete or invalid stored output", c do
+    agent =
+      Agent.new!(name: "invalid_loaded_state", plugins: [StoredStatePackage])
+      |> Agent.instantiate!(id: "invalid-loaded-state")
+
+    assert :ok = Persistence.save_agent(c.persistence, agent, namespace: "persistence-test")
+
+    for loaded <- [%{}, %{count: "invalid"}] do
+      Process.put({StoredStatePackage, :loaded}, loaded)
+
+      assert {:error, error} =
+               Persistence.load_agent(c.persistence, Agent, agent.id,
+                 namespace: "persistence-test"
+               )
+
+      assert Jido.Error.code(error) == :plugin_invalid_callback_result
+    end
+
+    Process.delete({StoredStatePackage, :loaded})
+
+    assert {:ok, ^agent} =
+             Persistence.load_agent(c.persistence, Agent, agent.id, namespace: "persistence-test")
   end
 
   defp owned_agent(id) do
