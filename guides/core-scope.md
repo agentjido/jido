@@ -12,7 +12,7 @@ guide and the public module documentation when you build an extension.
 | Authoring | Declarative modules, map and keyword declarations, and trusted Codecs share core validation. These forms remain supported. |
 | Live execution | Public PID-based `Jido.AgentServer` operations. `Jido` instance helpers start, find, stop, hibernate, and thaw Agents. An explicit upgrade operation waits for idle; validated definition migration preserves identity and Plugin declarations. |
 | Plugins | One module implements optional callbacks. Core controls Agent, Agent Server, Persistence, and Topology authority. |
-| Persistence | Binary get and exact-byte CAS, versioned active and tombstone records, revision-zero creation, legacy active reads, and Agent-owned checkpoints. |
+| Persistence | Binary get and exact-byte CAS, format-3 active and tombstone records, revision-zero creation, and Agent-owned checkpoints. Older records require [offline migration](compare-and-swap-hibernate-and-thaw.md#move-records-from-an-earlier-v3-beta). |
 | Agent relationships | Local owned children and explicit targeting of a known Erlang node. |
 | Topology | Pure definitions and plans, ordered static Plugin contribution, bounded activation, readiness, lifecycle Signals, same-target repair, additive Agent updates, exact known-node placement, and cleanup. |
 
