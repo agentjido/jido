@@ -24,7 +24,8 @@ defmodule Jido.MixProject do
        {"guides/actions-flows-and-instructions.md", "Actions, Flows, And Instructions"},
        {"guides/turns-commit-and-effects.md", "Turns, Commit, And Effects"},
        {"guides/directives-and-outcomes.md", "Directives And Outcomes"},
-       {"guides/errors-and-runtime-guarantees.md", "Errors And Runtime Guarantees"}
+       {"guides/errors-and-runtime-guarantees.md", "Errors And Runtime Guarantees"},
+       {"guides/public-contracts.md", "Public Contract Tests"}
      ]},
     {"Author Agents",
      [

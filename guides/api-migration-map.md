@@ -579,7 +579,7 @@ at the Action boundary. Put metadata in output. `Jido.Agent.cmd/3` still
 returns a plain Directive list without dispatch.
 See [Directives](directives-and-outcomes.md) for commit, order, and failure rules.
 
-## State defaults and stored validation
+## State default and validation contract
 
 V3 state schemas contain static defaults and validation rules. Transforms,
 coercion, codecs, string-to-boolean conversion, and lazy schemas are rejected.
@@ -591,3 +591,7 @@ intersection branches retain all fields. A `nil` default requires a nullable
 schema. Optional missing fields stay absent. Stored instance, candidate,
 Plugin output, and restored-state checks do not insert defaults or change
 values. Missing required fields are errors.
+
+The local integration uses the sibling `zoi` source for checked defaults and
+`Zoi.validate/3`. Restore a released Hex requirement after Zoi publishes these
+APIs and before package release.
