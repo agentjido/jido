@@ -88,16 +88,23 @@ defmodule Jido.Agent.Command do
 
   @doc false
   @spec normalize_signal(term()) :: {:ok, Signal.t()} | {:error, Exception.t()}
-  def normalize_signal(%Signal{} = signal) do
-    type = signal.type
-    input = if is_binary(type), do: signal, else: %{signal | type: "jido.validation"}
-
-    with {:ok, signal} <- Zoi.parse(Signal.schema(), input),
+  def normalize_signal(%Signal{type: type} = signal) when is_binary(type) do
+    with {:ok, signal} <- Zoi.parse(Signal.schema(), signal),
          {:ok, extensions} <- SignalContext.normalize(signal.extensions) do
-      {:ok, %{signal | type: type, extensions: extensions}}
+      {:ok, %{signal | extensions: extensions}}
     else
       {:error, issues} -> invalid("Agent command Signal is invalid", %{issues: issues})
     end
+  end
+
+  def normalize_signal(%Signal{} = signal) do
+    {:error, cause} = Jido.Signal.Router.route(Jido.Signal.Router.new!([]), signal)
+
+    {:error,
+     Error.routing_error(cause.message,
+       target: signal.type,
+       details: Map.put(cause.details, :cause, cause)
+     )}
   end
 
   def normalize_signal(value) do
