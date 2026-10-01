@@ -19,8 +19,10 @@ profile, not part of `mix test.all`.
 Peer tests are core contracts that start external BEAM nodes. Plain `mix test`
 and `mix quality` exclude them. Run them with `mix test.peer`. `mix quality`
 runs fast core tests, plus format, compile, lint, and Dialyzer checks.
-CI selects `mix test test/jido --include flaky --seed 0` with peer, benchmark,
-example, authoring, system, and service tags excluded by the test helper.
+CI selects
+`mix test test/jido test/property --include flaky --include property --seed 0`
+with peer, benchmark, example, authoring, system, and service tags excluded by
+the test helper.
 Benchmark, example, authoring, and system tests are secondary. Run `mix test.bench`,
 `mix test.examples`, `mix test.authoring`, or `mix test.system` separately when needed.
 Run all six normal categories with `mix test.all`. Run Redis, PostgreSQL and real
