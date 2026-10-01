@@ -98,7 +98,7 @@ defmodule Jido.Error do
 
       defp unknown_message(error) when is_binary(error), do: error
       defp unknown_message(nil), do: "Unknown error"
-      defp unknown_message(error), do: inspect(error)
+      defp unknown_message(error), do: Jido.Error.to_map(error).message
     end
   end
 
@@ -762,6 +762,20 @@ defmodule Jido.Error do
     end
   end
 
+  defp sanitize_transport({key, value}, depth) when is_atom(key) or is_binary(key) do
+    [entry] = Map.to_list(sanitize_key_value_pairs([{key, value}], depth))
+    safe_inspect(entry)
+  end
+
+  defp sanitize_transport(value, depth) when is_tuple(value) do
+    value
+    |> Tuple.to_list()
+    |> Enum.take(@transport_max_items)
+    |> Enum.map(&sanitize_transport(&1, depth - 1))
+    |> List.to_tuple()
+    |> safe_inspect()
+  end
+
   defp sanitize_transport(value, _depth), do: safe_inspect(value)
 
   defp sanitize_key(key) when is_atom(key), do: key
@@ -781,7 +795,10 @@ defmodule Jido.Error do
           true -> sanitize_transport(nested_value, depth - 1)
         end
 
-      {sanitized_key, nested_value}
+      public_key =
+        if is_binary(sanitized_key), do: truncate_string(sanitized_key), else: sanitized_key
+
+      {public_key, nested_value}
     end)
   end
 

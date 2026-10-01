@@ -26,6 +26,58 @@ defmodule JidoTest.ErrorTransportTest do
   end
 
   describe "transport key policy" do
+    test "bounds long string keys after applying the full key policy" do
+      for {suffix, expected} <- [
+            {"field", "visible"},
+            {"password", "[REDACTED]"},
+            {"stacktrace", "[OMITTED]"}
+          ],
+          prefix <- [String.duplicate("x", 700), :binary.copy(<<255>>, 700)] do
+        key = prefix <> suffix
+        value = if suffix == "field", do: "visible", else: "long-key-secret-9387"
+
+        for entries <- [%{key => value}, [{key, value}]] do
+          result = Error.to_map(Error.execution_error("Failed", details: %{nested: entries}))
+          assert [{public_key, ^expected}] = Map.to_list(result.details.nested)
+          assert String.valid?(public_key)
+          assert String.length(public_key) <= 512 + String.length("...(truncated)")
+          refute Jason.encode!(result) =~ "long-key-secret-9387"
+        end
+
+        result = Error.to_map(Error.execution_error("Failed", details: %{nested: {key, value}}))
+        assert is_binary(result.details.nested)
+        refute Jason.encode!(result) =~ "long-key-secret-9387"
+      end
+    end
+
+    test "unknown errors sanitize stored reasons before making a message" do
+      error =
+        Error.Internal.UnknownError.exception(
+          error: %{
+            password: "private-marker-9387",
+            stacktrace: ["private-marker-9387"],
+            visible: 42
+          }
+        )
+
+      result = Error.to_map(error)
+      refute Jason.encode!(result) =~ "private-marker-9387"
+      assert result.message =~ "42"
+      assert result.type == :internal
+    end
+
+    test "tuple and mixed-list details retain key redaction" do
+      for key <- [:password, "accessToken", :stacktrace],
+          nested <- [
+            [{key, "private-marker-9387"}, :other],
+            {%{key => "private-marker-9387"}, :other}
+          ] do
+        result = Error.to_map(Error.execution_error("Failed", details: %{nested: nested}))
+        refute Jason.encode!(result) =~ "private-marker-9387"
+        assert Jason.encode!(result) =~ "other"
+      end
+    end
+
     test "improper nested lists have a bounded JSON-safe fallback without leaking details" do
       for value <- [
             [{:ok, 1} | :bad],

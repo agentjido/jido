@@ -237,7 +237,7 @@ defmodule Jido.AgentServer.PostCommit do
         Logger.error("Agent Directive handling failed",
           agent_id: context.agent_id,
           signal_type: context.signal.type,
-          reason: inspect(reason)
+          reason: inspect(Jido.Error.to_map(reason))
         )
 
         active = ActiveTurn.mark_directive_failed(next_data.active)

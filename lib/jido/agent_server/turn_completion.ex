@@ -48,7 +48,7 @@ defmodule Jido.AgentServer.TurnCompletion do
       agent_id: agent_id,
       signal_id: signal.id,
       signal_type: signal.type,
-      reason: inspect(reason)
+      reason: inspect(Jido.Error.to_map(reason))
     )
   end
 

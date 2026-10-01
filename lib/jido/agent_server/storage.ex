@@ -138,7 +138,7 @@ defmodule Jido.AgentServer.Storage do
           Logger.error("Agent persistence failed during shutdown",
             agent_id: data.agent.id,
             pool: data.config.pool,
-            reason: inspect(error)
+            reason: inspect(Jido.Error.to_map(error))
           )
       end
     end
