@@ -125,4 +125,34 @@ defmodule Jido.Plugin.AuditTest do
     assert Server.agent(pid).state.count == 0
     assert Server.agent(pid).state.audit.records == []
   end
+
+  test "audit records reject non-byte terms in events, metadata and map keys" do
+    for record <- [
+          Audit.record(<<5::3>>, :ok),
+          Audit.record({:event, [<<5::3>>]}, :ok),
+          Audit.record(:event, :ok, metadata: %{nested: [%{bits: <<5::3>>}]}),
+          Audit.record(:event, :ok, metadata: %{<<5::3>> => :value})
+        ] do
+      assert {:error, %Jido.Error.ValidationError{} = error} =
+               Jido.Agent.Directive.validate(record)
+
+      assert error.message == "Audit record must contain portable data"
+      assert is_list(error.details.path)
+    end
+
+    record = Audit.record({:event, [<<5>>, %{count: 1}]}, :ok, metadata: %{source: :test})
+    assert {:ok, ^record} = Jido.Agent.Directive.validate(record)
+  end
+
+  test "rejects a non-byte audit event before the complete candidate commits", %{jido: jido} do
+    {:ok, server} = Jido.start_agent(jido, Agent, id: unique_id("audit-bits"))
+    before = Server.snapshot(server)
+
+    assert {:error, %Jido.Error.ValidationError{} = error} =
+             Server.call(server, signal("audit.record", %{event: <<5::3>>}))
+
+    assert error.message == "Audit record must contain portable data"
+    assert error.details.path == [:record, :event]
+    assert Server.snapshot(server) == before
+  end
 end

@@ -22,17 +22,16 @@ defmodule Jido.Plugin.SensorManager.Start do
   def validate(%__MODULE__{} = directive) do
     with {:ok, directive} <- Zoi.parse(@schema, Map.from_struct(directive)),
          :ok <- Jido.Plugin.SensorManager.validate_tag(directive.tag),
-         :ok <- Jido.Plugin.SensorManager.validate_sensor(directive.sensor),
-         :ok <- Jido.Action.validate_static_data(directive.config) do
-      {:ok, directive}
-    else
-      {:error, reason} when is_binary(reason) ->
-        Jido.Plugin.SensorManager.invalid("Sensor config must contain portable data", %{
-          reason: reason
-        })
+         :ok <- Jido.Plugin.SensorManager.validate_sensor(directive.sensor) do
+      case Jido.PortableTerm.validate(directive.config, :config) do
+        :ok ->
+          {:ok, directive}
 
-      {:error, _reason} = error ->
-        error
+        {:error, path} ->
+          Jido.Plugin.SensorManager.invalid("Sensor config must contain portable data", %{
+            path: path
+          })
+      end
     end
   end
 end

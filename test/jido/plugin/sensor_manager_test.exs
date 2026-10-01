@@ -282,13 +282,31 @@ defmodule Jido.Plugin.SensorManagerTest do
     for {directive, message} <- [
           {SensorManager.start(nil, TestSensor), "Sensor tag must not be nil"},
           {SensorManager.stop(self()), "Sensor tag must contain portable data"},
+          {SensorManager.start(<<5::3>>, TestSensor), "Sensor tag must contain portable data"},
+          {SensorManager.stop({:source, [<<5::3>>]}), "Sensor tag must contain portable data"},
           {SensorManager.start(:source, String), "Sensor must define child_spec/1"},
           {SensorManager.start(:source, TestSensor, %{pid: self()}),
+           "Sensor config must contain portable data"},
+          {SensorManager.start(:source, TestSensor, %{nested: [%{bits: <<5::3>>}]}),
            "Sensor config must contain portable data"}
         ] do
       assert {:error, error} = Jido.Agent.Directive.validate(directive)
       assert error.message == message
     end
+  end
+
+  test "rejects non-byte sensor config before commit or resource startup", %{jido: jido} do
+    {:ok, server} = Jido.start_agent(jido, Agent, id: unique_id("sensor-bits"))
+    before = Server.snapshot(server)
+    runtime = Server.children(server)[{:plugin, SensorManager}].pid
+
+    assert {:error, %Jido.Error.ValidationError{} = error} =
+             Server.call(server, signal("sensor.manage", %{operation: :start, value: <<5::3>>}))
+
+    assert error.message == "Sensor config must contain portable data"
+    assert error.details.path == [:config, :value]
+    assert Server.snapshot(server) == before
+    assert Runtime.sensors(runtime) == %{}
   end
 
   test "invalid retry delays fail Agent startup before a sensor retry", %{jido: jido} do
