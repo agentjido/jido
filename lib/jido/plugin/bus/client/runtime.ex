@@ -16,6 +16,8 @@ defmodule Jido.Plugin.Bus.Client.Runtime do
 
   @impl true
   def init(%Init{} = init) do
+    Process.flag(:trap_exit, true)
+
     with {:ok, config} <- validate_options(init) do
       {:ok,
        %{
@@ -157,7 +159,7 @@ defmodule Jido.Plugin.Bus.Client.Runtime do
     token = make_ref()
 
     {:ok, worker} =
-      Task.start(fn ->
+      Task.start_link(fn ->
         result =
           try do
             call_agent(state.agent_server, record.signal, state.config.timeout)

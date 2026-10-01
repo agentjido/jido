@@ -249,6 +249,66 @@ defmodule JidoTest.Persistence.S3Test do
              S3.compare_and_swap("key", :not_found, "x", blocked)
   end
 
+  test "caller death stops an entered request worker", c do
+    observer = self()
+
+    opts =
+      Keyword.merge(c.opts,
+        timeout_ms: 60_000,
+        request_fn: fn _request ->
+          send(observer, {:s3_request_entered, self()})
+
+          receive do
+            :release -> {:error, :released}
+          end
+        end
+      )
+
+    caller = spawn(fn -> S3.get("owner-death", opts) end)
+    caller_ref = Process.monitor(caller)
+    on_exit(fn -> if Process.alive?(caller), do: Process.exit(caller, :kill) end)
+    assert_receive {:s3_request_entered, worker}, 1_000
+    worker_ref = Process.monitor(worker)
+    on_exit(fn -> if Process.alive?(worker), do: Process.exit(worker, :kill) end)
+
+    Process.exit(caller, :kill)
+    assert_receive {:DOWN, ^caller_ref, :process, ^caller, :killed}, 1_000
+    assert_receive {:DOWN, ^worker_ref, :process, ^worker, _reason}, 1_000
+  end
+
+  test "request completion and timeout stop all request-owned processes", c do
+    observer = self()
+
+    for outcome <- [:complete, :timeout] do
+      opts =
+        Keyword.merge(c.opts,
+          timeout_ms: if(outcome == :timeout, do: 1_000, else: 60_000),
+          request_fn: fn _request ->
+            {:links, links} = Process.info(self(), :links)
+            send(observer, {:s3_request_entered, self(), links})
+
+            receive do
+              :release -> {:error, :controlled_result}
+            end
+          end
+        )
+
+      caller = spawn(fn -> send(observer, {:request_result, S3.get("cleanup", opts)}) end)
+      on_exit(fn -> if Process.alive?(caller), do: Process.exit(caller, :kill) end)
+      assert_receive {:s3_request_entered, worker, owned}, 1_000
+      refs = for pid <- [worker | owned], do: {pid, Process.monitor(pid)}
+      on_exit(fn -> Enum.each([worker | owned], &Process.exit(&1, :kill)) end)
+      if outcome == :complete, do: send(worker, :release)
+
+      expected = if outcome == :complete, do: :controlled_result, else: :timeout
+      assert_receive {:request_result, {:error, ^expected}}, 2_000
+
+      for {pid, ref} <- refs do
+        assert_receive {:DOWN, ^ref, :process, ^pid, _reason}, 1_000
+      end
+    end
+  end
+
   defp client(store) do
     fn request ->
       case request.method do

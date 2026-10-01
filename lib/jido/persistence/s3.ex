@@ -268,6 +268,8 @@ defmodule Jido.Persistence.S3 do
 
     {pid, monitor} =
       spawn_monitor(fn ->
+        watchdog = caller_watchdog(caller, self())
+
         reply =
           try do
             request_fn.(request)
@@ -277,6 +279,7 @@ defmodule Jido.Persistence.S3 do
             _, _reason -> {:error, :request_failed}
           end
 
+        send(watchdog, :request_complete)
         send(caller, {reply_ref, reply})
       end)
 
@@ -304,6 +307,21 @@ defmodule Jido.Persistence.S3 do
 
         {:error, :timeout}
     end
+  end
+
+  defp caller_watchdog(caller, worker) do
+    spawn_link(fn ->
+      monitor = Process.monitor(caller)
+
+      receive do
+        :request_complete ->
+          Process.demonitor(monitor, [:flush])
+          :ok
+
+        {:DOWN, ^monitor, :process, ^caller, _reason} ->
+          Process.exit(worker, :kill)
+      end
+    end)
   end
 
   defp object_key(key, opts) do

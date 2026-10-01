@@ -186,6 +186,59 @@ defmodule Jido.Plugin.Bus.IntegrationTest do
     eventually(fn -> Server.agent(agent).state.values == [3] end)
   end
 
+  test "runtime death stops its pending durable delivery worker", %{jido: jido} do
+    bus = start_supervised!({Bus, name: :plugin_bus, jido: jido})
+    {:ok, agent} = Jido.start_agent(jido, DurableBlockingAgent, id: unique_id("durable-owner"))
+    runtime = Server.children(agent)[{:plugin, Client}].pid
+    gate = make_ref()
+
+    assert {:ok, [_record]} =
+             Bus.publish(bus, [signal("bus.block", %{value: 1, observer: self(), gate: gate})])
+
+    assert_receive {:bus_turn_blocked, 1, action}, 2_000
+    delivery = :sys.get_state(runtime).pending.worker
+    delivery_ref = Process.monitor(delivery)
+    runtime_ref = Process.monitor(runtime)
+    on_exit(fn -> if Process.alive?(delivery), do: Process.exit(delivery, :kill) end)
+
+    Process.exit(runtime, :kill)
+    assert_receive {:DOWN, ^runtime_ref, :process, ^runtime, :killed}, 2_000
+    assert_receive {:DOWN, ^delivery_ref, :process, ^delivery, _reason}, 2_000
+
+    action_ref = Process.monitor(action)
+    :ok = Jido.stop_agent(jido, agent)
+    assert_receive {:DOWN, ^action_ref, :process, ^action, _reason}, 2_000
+  end
+
+  test "delivery worker death keeps its runtime available for retry", %{jido: jido} do
+    bus = start_supervised!({Bus, name: :plugin_bus, jido: jido})
+    {:ok, agent} = Jido.start_agent(jido, DurableBlockingAgent, id: unique_id("durable-worker"))
+    runtime = Server.children(agent)[{:plugin, Client}].pid
+    gate = make_ref()
+
+    assert {:ok, [_record]} =
+             Bus.publish(bus, [signal("bus.block", %{value: 1, observer: self(), gate: gate})])
+
+    assert_receive {:bus_turn_blocked, 1, action}, 2_000
+    delivery = :sys.get_state(runtime).pending.worker
+    delivery_ref = Process.monitor(delivery)
+    on_exit(fn -> if Process.alive?(delivery), do: Process.exit(delivery, :kill) end)
+    Process.exit(delivery, :kill)
+    assert_receive {:DOWN, ^delivery_ref, :process, ^delivery, :killed}, 2_000
+
+    eventually(fn ->
+      case :sys.get_state(runtime).pending do
+        %{worker: replacement} -> replacement != delivery
+        _other -> false
+      end
+    end)
+
+    assert :ok = Client.Server.ready_snapshot(runtime, [])
+    action_ref = Process.monitor(action)
+    :ok = Jido.stop_agent(jido, agent)
+    assert_receive {:DOWN, ^action_ref, :process, ^action, _reason}, 2_000
+  end
+
   test "retries durable input after an Agent turn fails", %{jido: jido} do
     table = :ets.new(:jido_bus_plugin_attempts, [:named_table, :public])
     :ets.insert(table, {:attempt, 0})
