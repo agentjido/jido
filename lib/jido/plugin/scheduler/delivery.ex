@@ -66,11 +66,19 @@ defmodule Jido.Plugin.Scheduler.Delivery do
   end
 
   defp earlier(nil, entry), do: entry
-  defp earlier({job, _}, {candidate, _} = entry) when candidate < job, do: entry
-  defp earlier(entry, _candidate), do: entry
+
+  defp earlier({job, _} = current, {candidate, _} = entry),
+    do: if(job_before?(candidate, job), do: entry, else: current)
 
   defp after_cursor?(_job, :start), do: false
-  defp after_cursor?(job, {:after, previous_job}), do: job > previous_job
+  defp after_cursor?(job, {:after, previous_job}), do: job_before?(previous_job, job)
+
+  # Term ordering treats integer and float values as equal, including nested IDs.
+  # Break those ties so every distinct map key can follow the delivery cursor.
+  defp job_before?(left, right) when left == right,
+    do: :erlang.term_to_binary(left) < :erlang.term_to_binary(right)
+
+  defp job_before?(left, right), do: left < right
 
   defp deliver(server, job, signal, timeout) do
     fresh = signal |> Signal.to_map() |> Map.delete("id") |> Signal.new!()

@@ -149,6 +149,53 @@ defmodule Jido.Plugin.Scheduler.DurableTest do
     assert {:error, _} = Agent.transition(pending, invalid)
   end
 
+  test "numeric template changes require a new generation and preserve pending progress" do
+    {armed, cron} = armed()
+    template = %{cron.signal | data: Map.put(cron.signal.data, :value, 1)}
+    integer = %{cron | signal: template, generation: 2}
+    assert {:ok, state} = Scheduler.Agent.apply_directives(armed.state.scheduler, [integer])
+    assert {:ok, numeric} = Agent.transition(armed, %{armed.state | scheduler: state})
+    assert {:ok, pending, [_]} = enqueue(numeric, @first, 2)
+    state = pending.state.scheduler
+
+    assert {:ok, ^state} = Scheduler.Agent.apply_directives(state, [integer])
+    float = %{integer | signal: %{template | data: Map.put(template.data, :value, 1.0)}}
+    assert float.signal.id === integer.signal.id
+
+    assert {:error, :schedule_generation_conflict} =
+             Scheduler.Agent.apply_directives(state, [float])
+
+    assert {:ok, replacement} =
+             Scheduler.Agent.apply_directives(state, [%{float | generation: 3}])
+
+    assert replacement.cron["job-1"].message.data.value === 1.0
+    assert replacement.cron["job-1"].pending === nil
+    assert state.cron["job-1"].pending !== nil
+  end
+
+  test "numeric occurrence payload changes fail admission with valid occurrence markers" do
+    {armed, cron} = armed()
+    template = %{cron.signal | data: Map.put(cron.signal.data, :value, 1)}
+
+    assert {:ok, state} =
+             Scheduler.Agent.apply_directives(armed.state.scheduler, [
+               %{cron | signal: template, generation: 2}
+             ])
+
+    assert {:ok, numeric} = Agent.transition(armed, %{armed.state | scheduler: state})
+    assert {:ok, pending, [_]} = enqueue(numeric, @first, 2)
+    tick = pending.state.scheduler.cron["job-1"].pending
+    changed = %{tick | data: Map.put(tick.data, :value, 1.0)}
+
+    assert Scheduler.occurrence(changed) === Scheduler.occurrence(tick)
+    assert :ok = Scheduler.admit_occurrence(pending.state.scheduler, tick)
+
+    assert {:error, :stale_or_invalid_schedule_occurrence} =
+             Scheduler.admit_occurrence(pending.state.scheduler, changed)
+
+    assert pending.state.scheduler.cron["job-1"].pending.data.value === 1
+  end
+
   test "durable delivery requires an explicit generation" do
     signal = Signal.new!("test.tick", %{}, source: "/test")
 

@@ -285,6 +285,24 @@ defmodule JidoTest.InstanceTest do
     assert TestInstance.list_agents(partition: :blue) == [{"shared", blue}]
   end
 
+  test "PID stop and hibernate require the exact explicit partition" do
+    start_supervised!(TestInstance)
+    {:ok, server} = TestInstance.start_agent(RedisTestAgent, id: "numeric", partition: 1)
+    before = Server.snapshot(server)
+
+    assert TestInstance.whereis_agent("numeric", partition: 1) == server
+    assert TestInstance.whereis_agent("numeric", partition: 1.0) == nil
+    assert {:error, :not_found} = TestInstance.stop_agent(server, partition: 1.0)
+    assert {:error, :not_found} = TestInstance.hibernate(server, partition: 1.0)
+    assert Server.snapshot(server) === before
+    assert TestInstance.whereis_agent("numeric", partition: 1) == server
+
+    monitor = Process.monitor(server)
+    assert :ok = TestInstance.stop_agent(server, partition: 1)
+    assert_receive {:DOWN, ^monitor, :process, ^server, _reason}, 1_000
+    assert TestInstance.whereis_agent("numeric", partition: 1) == nil
+  end
+
   test "works as a child in another Supervisor" do
     {:ok, supervisor} = Supervisor.start_link([TestInstance], strategy: :one_for_one)
 

@@ -1221,7 +1221,7 @@ defmodule Jido do
   end
 
   defp partition_matches?(opts, partition) do
-    not Keyword.has_key?(opts, :partition) or Keyword.get(opts, :partition) == partition
+    not Keyword.has_key?(opts, :partition) or Keyword.get(opts, :partition) === partition
   end
 
   defp owned_registry_pid(instance, agent_id, partition, pid)

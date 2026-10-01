@@ -33,7 +33,7 @@ defmodule Jido.Plugin.Scheduler.Durable do
 
   def replace(old, spec) do
     cond do
-      definition(old) == definition(spec) ->
+      definition(old) === definition(spec) ->
         {:ok, old}
 
       not enabled?(old) and not enabled?(spec) ->
@@ -71,7 +71,7 @@ defmodule Jido.Plugin.Scheduler.Durable do
   def admit(state, signal) do
     with {:ok, occurrence} <- Occurrence.from_signal(signal),
          {_job, pending} <- find_pending(state, occurrence.id),
-         true <- payload(pending) == payload(signal) do
+         true <- payload(pending) === payload(signal) do
       :ok
     else
       _ -> {:error, :stale_or_invalid_schedule_occurrence}

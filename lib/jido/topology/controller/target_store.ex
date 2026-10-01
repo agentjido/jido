@@ -68,7 +68,7 @@ defmodule Jido.Topology.Controller.TargetStore do
         placements =
           case Jido.RuntimeStore.get(jido, @placements, initial.id) do
             %{definition: definition, placements: saved}
-            when definition == initial.definition and is_map(saved) ->
+            when definition === initial.definition and is_map(saved) ->
               saved
 
             _ ->

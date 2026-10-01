@@ -28,9 +28,9 @@ defmodule Jido.Topology.Plan do
 
   @doc false
   def extension_changes(current, target) do
-    changed = for {key, spec} <- current.agents, Map.get(target.agents, key) != spec, do: key
+    changed = for {key, spec} <- current.agents, Map.get(target.agents, key) !== spec, do: key
 
-    {current.resources != target.resources, Map.keys(current.agents) -- Map.keys(target.agents),
+    {current.resources !== target.resources, Map.keys(current.agents) -- Map.keys(target.agents),
      changed}
   end
 

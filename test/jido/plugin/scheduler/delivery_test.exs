@@ -44,6 +44,30 @@ defmodule Jido.Plugin.Scheduler.DeliveryTest do
              attempt(state, {:after, :first}, {:error, :timed_out})
   end
 
+  test "failed jobs do not starve distinct IDs with equal numeric values" do
+    for jobs <- [
+          [1, 1.0],
+          [{:job, 1}, {:job, 1.0}],
+          [[1], [1.0]],
+          [%{value: 1}, %{value: 1.0}],
+          [%{1 => :value}, %{1.0 => :value}]
+        ] do
+      for job <- jobs, do: assert(:ok = Scheduler.validate_durable_id(job))
+      state = pending_state(jobs)
+
+      assert {:error, {:after, first}, {:delivery_failed, :rejected}} =
+               attempt(state, :start, {:error, :rejected})
+
+      assert {:error, {:after, second}, {:delivery_failed, :rejected}} =
+               attempt(state, {:after, first}, {:error, :rejected})
+
+      refute first === second
+
+      assert {:error, {:after, ^first}, {:delivery_failed, :rejected}} =
+               attempt(state, {:after, second}, {:error, :rejected})
+    end
+  end
+
   test "attempt distinguishes idle state from state-read failures" do
     assert {:idle, :start} = plugin_state_result(:start, {:ok, %{cron: %{}}})
 
@@ -117,8 +141,10 @@ defmodule Jido.Plugin.Scheduler.DeliveryTest do
 
   defp pending_state(jobs) do
     cron =
-      Map.new(jobs, fn job ->
-        signal = Signal.new!("scheduler.#{job}", %{job: job}, source: "/test")
+      jobs
+      |> Enum.with_index()
+      |> Map.new(fn {job, index} ->
+        signal = Signal.new!("scheduler.job#{index}", %{job: job}, source: "/test")
         {job, %{delivery: :durable, pending: signal}}
       end)
 

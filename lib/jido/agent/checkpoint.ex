@@ -211,7 +211,7 @@ defmodule Jido.Agent.Checkpoint do
       :ok
     else
       with {:ok, current} <- current_definition(agent.module) do
-        if current == definition,
+        if current === definition,
           do: :ok,
           else: definition_mismatch(agent.module, agent.vsn)
       end

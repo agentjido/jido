@@ -30,6 +30,15 @@ defmodule Jido.Agent.VersioningTest do
     def restore(%{id: id, state: state}, _context), do: new(id: id, state: state)
   end
 
+  defmodule NumericDefinitionAgent do
+    use Jido.Agent, name: "numeric_definition_agent"
+
+    agent do
+      schema Zoi.object(%{count: Zoi.number() |> Zoi.default(1)})
+      metadata %{ratio: 1}
+    end
+  end
+
   test "generated modules own a positive version and direct definitions can be unversioned" do
     assert DefaultVersionAgent.vsn() == 1
     assert DefaultVersionAgent.definition().vsn == 1
@@ -119,6 +128,26 @@ defmodule Jido.Agent.VersioningTest do
 
     assert {:error, %Jido.Error.ValidationError{details: %{code: :definition_mismatch}}} =
              Agent.restore(VersionedAgent, %{checkpoint | vsn: 2})
+  end
+
+  test "generated checkpoints reject numeric type changes in static definitions" do
+    agent = NumericDefinitionAgent.new!(id: "exact-definition")
+    assert {:ok, checkpoint} = Agent.checkpoint(agent)
+    assert {:ok, ^agent} = Agent.restore(NumericDefinitionAgent, checkpoint)
+
+    for changed <- [
+          %{agent | metadata: %{ratio: 1.0}},
+          %{agent | schema: Zoi.object(%{count: Zoi.number() |> Zoi.default(1.0)})}
+        ] do
+      assert {:ok, ^changed} = Agent.validate_instance(changed)
+
+      assert {:error, %Jido.Error.ValidationError{details: %{code: :definition_mismatch}}} =
+               Agent.checkpoint(changed)
+
+      unversioned = %{changed | vsn: nil}
+      assert {:ok, embedded} = Agent.checkpoint(unversioned)
+      assert {:ok, ^unversioned} = Agent.restore(NumericDefinitionAgent, embedded)
+    end
   end
 
   test "version-1 checkpoints are not part of the V3 format" do
