@@ -1,80 +1,66 @@
-> Approved seam review entry point. Dependent owner-seam work remains open.
+> Pending approval. Selected decisions are recorded below.
 
 # 02 — Agent authoring
 
 ## Briefing
 
-Jido supports Agent modules, Spark blocks, direct map and keyword data,
-Builder, and Codec documents. These forms use one Agent constructor, but some
-source features exist only for modules. The aligned target keeps all
-supported forms. It defines parity as equality of the canonical Agent
-definition, makes `definition/0` the module authority, keeps generated interfaces as
-module API, and gives Codec a clear portable subset. The current implementation
-now preserves the Agent `vsn`, starts Builder module input from
-`definition/0`, encodes instances from their neutral definitions, and publishes the
-pure data extension lowerer. One requirement-mapped suite proves the common
-definition and instance boundary for keyword-only and Spark-block modules. The
-contract and its implementation evidence are approved.
+Current Jido supports Agent modules with DSL blocks, direct map or keyword
+configuration, and Codec documents. These forms use the canonical Agent
+constructor. The user intentionally removed Builder. Module definitions use
+blocks for schema, metadata, Plugins, and routes. Standalone module options
+are limited to name, description, vsn, and extensions.
 
-The Overview and Agent prerequisite seams are approved. Package-boundary and
-shared-error work remain explicit assumptions and still require their own
-review.
+An exposed route declares a helper name with `as:`. The generated helper
+builds a Signal from a plain input map and optional envelope settings.
+Direct Agent evaluation and live Server execution use their normal public
+entry points. The earlier `define` syntax, positional arguments, bang Signal
+helpers, and generated live-call helpers are removed from the design contract.
+
+Direct map and keyword data remain supported. Codec encodes a validated
+neutral definition and uses the shared trusted Registry. It excludes live
+identity and state. This review does not approve the complete topic documents.
 
 ## Why this seam exists
 
-- Owner: the `Jido.Agent` authoring boundary.
-- Owns: Spark Agent syntax, inline route Actions, generated interfaces,
-  Builder, Agent and Plugin Codecs, trusted Registry use, authoring
-  normalization, validation timing, and static Agent extensions.
-- Does not own: Agent value fields, Action or Flow execution, Signal routing
-  semantics, Plugin runtime behavior, checkpoints, restore, commit, or Agent
-  Server lifecycle.
+- Owner: the Agent authoring boundary.
+- Owns: module blocks, inline route Actions, Signal helpers, Codecs, trusted
+  Registry use, normalization, and static extension lowering.
+- Adjacent owners: Agent values belong to topic 01; execution belongs to
+  jido_action; Signal behavior belongs to jido_signal; live calls belong to 08.
 
-## Current and target state
+## Current and selected contracts
 
-| Area | Current | Target |
-| --- | --- | --- |
-| Forms | Module, Spark, direct data, Builder, and Codec are supported. | Keep all forms and one canonical definition result. |
-| Module authority | `definition/0` is canonical. Builder module input reads it. The private config can remain in input form. | Keep `definition/0` as canonical and `__agent_config__/0` as private compiler data. |
-| Interfaces | `define` generates Signal and live-call helpers only on modules. | Keep module-only helpers outside definition parity. |
-| Codec | Static data uses a trusted Registry and a closed JSON format. Instance encoding derives the neutral definition and does not parse live state. | Keep definition-first encoding. Keep nonportable source forms valid but not encodable. |
-| Extensions | Spark and data users can call the documented pure lowerer. Builder and Codec accept lowered data only. | Keep one pure data-lowering boundary and keep runtime ownership out. |
-| Agent `vsn` | Generated modules, direct data, Builder, and Codec preserve the approved value and compatibility rules. | Keep the Agent-seam `vsn` contract in every applicable form. |
+| Area | Contract |
+| --- | --- |
+| Module authoring | Keep DSL blocks and the four allowed module options. |
+| Route helpers | Keep named Signal constructors with map input; execution remains explicit. |
+| Direct data | Keep map and keyword definition construction. |
+| Builder | Removed by explicit user decision; older references need cleanup. |
+| Codec | Keep trusted decode and definition-first encoding. |
+| Module authority | Use definition/0; actual compiler metadata stays private. |
 
 ## Major gaps and work remaining
 
-| Gap | Why it matters | Required outcome | Owner seam |
-| --- | --- | --- | --- |
-| Shared authoring errors | Authoring uses structured errors, but final shared codes and callback rules remain pending. | Apply the approved seam-12 contract without changing authoring meaning. | 12 Errors and contracts |
-| Release compatibility | Local tests prove the current package set, but publication gates remain broader. | Keep one compatible V3 package matrix and extension contract tests. | 90 Package boundaries, 99 Delivery |
+| Gap | Required outcome | Owner |
+| --- | --- | --- |
+| Historical evidence | Refresh remaining acceptance mapping against the selected V3 API. | 02 Agent authoring |
+| GAP-001 | Remove remaining Builder requirements and historical parity claims. | 00, 01, 02, 11, 90 |
+| Evidence | Replace historical acceptance claims with current source and test mapping. | 02, 99 |
+| Shared errors | Reconcile authoring result shapes with the selected error contract. | 12 |
 
-## Approved decisions
+## Selected decisions
 
-1. **Supported forms:** Keep module, Spark, direct data, Builder, Codec, and
-   neutral definitions.
-2. **Parity:** Define parity as canonical Agent-definition equality. Keep
-   generated interfaces as module API.
-3. **Codec input:** Accept definitions and instances, but encode only the
-   validated neutral definition.
-4. **Extensions:** Publish pure lowering for data users. Do not add extension
-   entities to Builder or Codec documents.
-5. **Portable subset:** Keep runtime route closures valid for direct use, but
-   require Registry-backed external captures for Codec.
+- GAP-009: Keep V3 module blocks; direct keyword data is still supported.
+- GAP-010: Name Signal helpers on routes with as; remove the earlier define API.
+- GAP-012: Require plain maps in both default forms; remove the struct exception.
+- GAP-001: Keep Builder removed.
 
-## Dependencies
-
-- Prerequisites: [00 Overview](../00_overview/alignment.md),
-  [90 Package boundaries](../90_package-boundaries/alignment.md),
-  [12 Errors and contracts](../12_errors-and-contracts/alignment.md), and
-  [01 Agent](../01_agent/alignment.md). Overview and Agent are approved.
-  Package boundaries and errors remain explicit pending assumptions.
-- Dependents: 04 Turn evaluation, 05 Plugins, 07 Persistence, 08 Agent Server,
-  11 Topology control plane, and 99 Delivery.
-- The pending package and error seams are explicit downstream assumptions.
-  They do not block the approved authoring contract. A later conflict requires
-  a reviewed migration.
+The inline lookup name and private metadata inventory are corrected in the
+design under GAP-011/013. Codec evidence paths are corrected under GAP-014.
+These source-based corrections do not introduce new APIs.
 
 ## Documents
 
-- [Target design](design.md)
-- [Alignment plan](alignment.md)
+- [Target design](/Users/mhostetler/Source/Jido/proj_jido_core/jido/docs/design/02_agent-authoring/design.md)
+- [Alignment](/Users/mhostetler/Source/Jido/proj_jido_core/jido/docs/design/02_agent-authoring/alignment.md)
+- [Numbered review](/Users/mhostetler/Source/Jido/proj_jido_core/jido/docs/design/GAP_ANALYSIS.md)

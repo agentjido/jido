@@ -1,8 +1,66 @@
-> Approved seam alignment. Dependent owner-seam follow-up remains open.
+> Pending approval. Current review decisions are separate from historical evidence.
 
 # Agent authoring alignment
 
-## Status
+## Current review: module block authoring
+
+On 2026-10-01, the user selected the current V3 block form under
+AUTH-REQ-009/063
+([GAP-009](/Users/mhostetler/Source/Jido/proj_jido_core/jido/docs/design/GAP_ANALYSIS.md#gap-009)).
+Standalone module options are limited to `name`, `description`, `vsn`, and
+`extensions`. Schema, metadata, Plugins, and routes belong in DSL blocks.
+Direct map/keyword construction is still supported. Combined Topology
+hosting has a separate configuration path.
+
+Evidence: [module option checks](/Users/mhostetler/Source/Jido/proj_jido_core/jido/lib/jido/agent/dsl/compiler.ex:66)
+and the existing [option rejection tests](/Users/mhostetler/Source/Jido/proj_jido_core/jido/test/jido/agent/authoring_test.exs:722).
+No implementation change is needed. Retire AUTH-REQ-010 mixed-form duplicate
+checks; keep the current compile-time rejection of unsupported options.
+Earlier keyword-only module parity and completion claims below are historical
+and require reconciliation with the current gap register. The route-helper
+question in GAP-010 is settled below. This decision does not approve the complete
+alignment.
+
+## Current review: route-based Signal helpers
+
+On 2026-10-01, the user selected the current smaller helper API under
+AUTH-REQ-021/022/023/024/025/028/030/033/034/057/058/060/064
+([GAP-010](/Users/mhostetler/Source/Jido/proj_jido_core/jido/docs/design/GAP_ANALYSIS.md#gap-010)).
+`as: :add` on a route generates `add_signal` with map input and optional
+Signal envelope options. It constructs a Signal only. Direct or live execution
+uses the normal command or Server call boundary. The separate `define` form,
+positional inputs, bang constructors, and generated live-call helpers are
+removed from the target. AUTH-REQ-026/027/029/031/032/059 are retired.
+
+Current evidence: [generator](/Users/mhostetler/Source/Jido/proj_jido_core/jido/lib/jido/agent/dsl/generator.ex),
+[envelope packaging](/Users/mhostetler/Source/Jido/proj_jido_core/jido/lib/jido/agent/interface.ex),
+and [authoring tests](/Users/mhostetler/Source/Jido/proj_jido_core/jido/test/jido/agent/authoring_test.exs).
+Current code already implements the selected API. No implementation change
+is required. References below to the older helper API belong to historical
+evidence and do not restore that API. The authoring design also corrects
+inline lookup to `route_action!/1` and retains only actual private compiler
+metadata. Shared Codec evidence paths are corrected below. These document
+corrections implement GAP-011/013/014 without adding new APIs.
+
+## Current review: route defaults
+
+On 2026-10-01, the user selected plain maps in both route-default forms
+under AUTH-REQ-007/008
+([GAP-012](/Users/mhostetler/Source/Jido/proj_jido_core/jido/docs/design/GAP_ANALYSIS.md#gap-012)).
+Retain tuple syntax with plain map defaults; remove its legacy struct exception.
+Current code already rejects structs. Signal input replaces supplied default
+keys during evaluation. This is separate from Agent.set/2 deep merge.
+V2 tuple parameters were fixed Action input and ignored Signal data; they
+were not fallback defaults. Neither V2 fixed-input semantics nor struct
+acceptance is restored by this review.
+
+Evidence: [defaults validation](/Users/mhostetler/Source/Jido/proj_jido_core/jido/lib/jido/agent/authoring.ex)
+and [current Agent authoring contract](/Users/mhostetler/Source/Jido/proj_jido_core/jido/lib/jido/agent.ex).
+Code inspection supports the selected rule. Historical acceptance mapping
+below still needs refresh; no new tests were run in this voice turn.
+No implementation change is needed for this decision.
+
+## Historical status and evidence
 
 - Design reviewed and approved: 2026-09-09.
 - Code reviewed: `ae559f4f41318d0021f8044589f99da810f4f82e` on branch
@@ -40,7 +98,7 @@ document approval.
 | `lib/jido/agent.ex:48-84,137-247` | `use Jido.Agent` installs Spark, inline Actions, module accessors, constructors, direct `cmd/3`, and persistence callbacks. |
 | `lib/jido/agent.ex:182-188,259-307` | `definition/0` uses the canonical constructor. Direct definitions and module instances have separate public entries. |
 | `lib/jido/agent/validation.ex` | One definition key set and constructor normalize static data, preserve `vsn`, compose Plugins, normalize routes, and limit instance overrides. |
-| `lib/jido/agent/authoring.ex:28-79,107-110` | Route forms use `defaults`. Explicit defaults require a plain map. The legacy target tuple accepts any map, including a struct. |
+| `lib/jido/agent/authoring.ex:28-79,107-110` | Route forms use `defaults`. Explicit defaults require a plain map. The target tuple also requires a plain map; structs are rejected. |
 | `lib/jido/agent/dsl/compiler.ex:7-71,104-108` | The compiler combines forms, lowers extensions, records private interface metadata, generates functions, and verifies the canonical definition after compile. |
 | `lib/jido/agent/dsl/compiler.ex:145-278` | Interface compilation checks exact routes, uniqueness, Signal source, argument order, schema fields, and function conflicts. |
 | `lib/jido/agent/dsl/macros.ex:27-71,104-135` | A route has one named or extension target, or one inline Action. Inline syntax compiles through `Jido.Action.Inline`. |
@@ -48,9 +106,9 @@ document approval.
 | `lib/jido/agent/interface.ex:8-71` | Runtime packaging separates payload, Signal envelope, caller context, and timeout options. |
 | `lib/jido/agent/builder.ex` | Builder module input starts from canonical `definition/0`; staged input preserves `vsn`, order, and first error; all public entries have specs. |
 | `lib/jido/agent/codec.ex` | Codec reads and writes version 2 with `vsn`, rejects version 1, derives a neutral definition from definitions or instances, and encodes no live state. |
-| `lib/jido/agent/codec.ex:103-147` | Route records store `defaults` and Registry identifiers. Codec keeps the legacy struct-default tuple form on decode. |
-| `lib/jido/agent/codec/data.ex:6-59,61-170` | Closed tagged data rejects runtime values and checks depth, node, collection, and string limits. |
-| `lib/jido/agent/codec/registry.ex` | Registry validates typed entries, unique values, and direct aliases. Route predicates must be external unary captures. Its public entries have specs. |
+| `lib/jido/agent/codec.ex:103-147` | Route records store `defaults` and Registry identifiers. Codec reconstructs routes through the current plain-map defaults validator. |
+| `lib/jido/codec/data.ex:6-59,61-170` | Closed tagged data rejects runtime values and checks depth, node, collection, and string limits. |
+| `lib/jido/codec/registry.ex` | Registry validates typed entries, unique values, and direct aliases. Route predicates must be external unary captures. Its public entries have specs. |
 | `lib/jido/plugin/codec.ex` | Plugin Codec stores canonical module and options through the same Registry, excludes runtime data, and has public specs. |
 | `lib/jido/agent/extension.ex` | Documented `lower/3` runs pure lowerers in declaration order and returns ordinary core Agent authoring data. |
 
@@ -116,8 +174,8 @@ A skipped test is not passing evidence.
   Registry. Stored strings cannot create atoms or modules.
 - `AUTH-RB-009`: Direct and Builder routes can use valid runtime predicates.
   Registry accepts only external unary captures for route predicates.
-- `AUTH-RB-010`: Explicit route defaults require a plain map. A legacy target
-  tuple accepts map structs, and Codec preserves this form.
+- `AUTH-RB-010`: Explicit route defaults require a plain map. The legacy target
+  tuple also requires a plain map; Codec does not restore the struct exception.
 - `AUTH-RB-011`: Agent extensions lower Spark entities in declaration order to
   ordinary Agent configuration. Builder and Codec have no extension-entity
   input. `Jido.Agent.Extension.lower/3` is the public pure data entry.
@@ -279,7 +337,10 @@ It is not a separate implementation plan.
 
 ## Migration and compatibility
 
-No removal or deprecation is approved in this seam.
+The current review supersedes the earlier retention claims below.
+GAP-009 selects block configuration; GAP-010 removes the older helper API.
+Builder removal was already selected by the user under GAP-001.
+The remaining historical matrix still needs reconciliation with these decisions.
 
 | Area | Compatibility rule and gate |
 | --- | --- |
@@ -291,7 +352,7 @@ No removal or deprecation is approved in this seam.
 | Builder | Keep the first-error and order rules. Module input reads `definition/0`; public fields and functions keep their specs. |
 | Codec instances | Keep instance input and static definition-first encoding. Do not parse or encode live ID or state. |
 | Route predicates | Keep valid direct predicates. Codec requires trusted Registry identifiers and external unary captures. |
-| Route defaults | Keep explicit plain maps and the legacy tuple map-struct exception. Any unification needs separate deprecation. |
+| Route defaults | Require plain maps in explicit and tuple forms. Preserve V3 fallback input semantics; GAP-012 removes the struct exception. |
 | Extensions | Keep Spark host behavior and public pure `lower/3`. Do not store extension entities in Codec data. |
 | Errors | Adopt approved seam-12 codes by boundary. Do not expose private compiler or Registry data in error output. |
 | Cross-package versions | Do not name a stale `jido_action` version. Test the declared release-compatible package set. |

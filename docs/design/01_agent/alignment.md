@@ -1,4 +1,4 @@
-> Approved seam alignment. Dependent owner-seam follow-up remains open.
+> Pending approval. Current review decisions are separate from historical evidence.
 
 # Agent alignment
 
@@ -12,10 +12,71 @@
   [12 Errors and contracts](../12_errors-and-contracts/alignment.md). Overview
   is approved. The other two remain explicit assumptions for this approved
   seam and still require their own review.
-- Alignment state: `Approved; scoped implementation complete`.
+- Historical alignment state: `Approved; scoped implementation complete`.
+- Current review: GAP-006, GAP-007, and GAP-008 are settled. Other Agent gaps remain as recorded in
+  the consolidated analysis.
 
 The review-status table in `docs/design/README.md` is the source of truth for
 document approval.
+
+## Current review: validation and write ownership
+
+On 2026-10-01, the user selected immediate complete-state validation and
+V3 write ownership under AGT-REQ-012/013/015
+([GAP-006](/Users/mhostetler/Source/Jido/proj_jido_core/jido/docs/design/GAP_ANALYSIS.md#gap-006)).
+The current code already checks domain write keys and validates the complete
+state before returning a new Agent. Domain updates cannot change Plugin-owned
+fields. Each Plugin can replace only its own field.
+
+Evidence: [set/2](/Users/mhostetler/Source/Jido/proj_jido_core/jido/lib/jido/agent.ex:364),
+[candidate validation](/Users/mhostetler/Source/Jido/proj_jido_core/jido/lib/jido/agent/state.ex:67),
+and the existing [Agent tests](/Users/mhostetler/Source/Jido/proj_jido_core/jido/test/jido/agent_test.exs).
+No validation or ownership code change is required. Retain these checks when
+the separate GAP-005 deep merge change is implemented. Related field updates
+can use one call; no separate caller validation step is required.
+
+The durable portability question in GAP-008 is settled below.
+These decisions do not approve the complete alignment. Evidence
+and completion claims below belong to the earlier review. The remaining gaps
+must be reconciled before those claims describe the current release.
+
+## Current review: state schema policy
+
+On 2026-10-01, the user selected the GAP-007 contract under AGT-REQ-007/046/047.
+Input conversion occurs before values become state. Creation applies and
+checks defaults. Later validation checks stored values without changing them.
+The current [state boundary](/Users/mhostetler/Source/Jido/proj_jido_core/jido/lib/jido/agent/state.ex)
+already implements this policy. The schema validator rejects conversion
+effects; initialization parses and checks defaults once; stored-state
+validation does not substitute defaults or change values.
+
+Existing evidence includes the
+[schema tests](/Users/mhostetler/Source/Jido/proj_jido_core/jido/test/jido/agent/schema_test.exs)
+and [intersection tests](/Users/mhostetler/Source/Jido/proj_jido_core/jido/test/jido/agent/state_intersection_test.exs).
+These were inspected, not rerun in this voice turn. No core implementation
+change is selected for this policy. Dependent topics 04, 05, and 12 still
+need their schema descriptions checked against this owner contract.
+The Zoi upstream and released-dependency gate remain open under GAP-062.
+
+## Current review: saved and live values
+
+On 2026-10-01, the user selected rejection of nonportable saved values
+([GAP-008](/Users/mhostetler/Source/Jido/proj_jido_core/jido/docs/design/GAP_ANALYSIS.md#gap-008)).
+Retain AGT-REQ-036/037 at the checkpoint boundary. Stored data is checked
+after save conversion and before restore conversion. The rule rejects PIDs,
+ports, references, functions, improper lists, and non-byte-aligned bitstrings
+at any depth. A Plugin or custom Agent callback can save a portable form
+and reconstruct schema-valid local values during restore.
+
+Current evidence: [checkpoint validation](/Users/mhostetler/Source/Jido/proj_jido_core/jido/lib/jido/agent/checkpoint.ex),
+[portable terms](/Users/mhostetler/Source/Jido/proj_jido_core/jido/lib/jido/portable_term.ex),
+and [live/checkpoint boundary tests](/Users/mhostetler/Source/Jido/proj_jido_core/jido/test/jido/agent/portable_state_test.exs).
+No code change is needed for the selected rejection policy. The old live-state
+ban in AGT-REQ-005 and its unused exclusion in AGT-REQ-038 are retired;
+AGT-REQ-048 records canonical live behavior. Server-owned tasks and monitors
+remain private runtime state. Other topics still need their broad portability
+wording corrected under GAP-002. Historical claims below that all accepted
+live state is portable no longer describe the selected contract.
 
 ## Inputs and evidence
 

@@ -1,6 +1,26 @@
-> Implemented commit-and-effects alignment.
+> Pending approval. Historical execution evidence is retained below.
 
 # Commit and effects alignment
+
+## Current review decision
+
+On 2026-10-01, the user selected the current required after-commit contract
+in [GAP-021](../GAP_ANALYSIS.md#gap-021). The [Plugin owner design](../05_plugins/design.md#required-after-commit-notification)
+defines its contract. The sequence below includes the hooks. GAP-026 is
+corrected: a Turn without Directives can still fail during its hooks and
+does not settle at commit. Commit confirmation remains separate from
+settlement. Complete document approval has not been inferred.
+
+Current source evidence is `lib/jido/agent_server/post_commit.ex` and
+`lib/jido/agent/turn/outcome.ex`. Existing cases in
+`test/jido/agent_server/after_commit_test.exs` cover empty batches, retained
+commit, hook failure, and timeout. These cases were inspected, not rerun.
+
+The user selected removal of Scheduler pending delivery in GAP-023.
+Scheduler recovery tests cited below are evidence of the current feature,
+which is selected for removal. They are not an acceptance requirement to keep
+that feature. The generic application recovery pattern remains conditional;
+its custom-checkpoint composition question remains GAP-028.
 
 ## Status
 
@@ -28,6 +48,7 @@ complete candidate + complete Directive batch
   -> required runtime or durable checkpoint
   -> complete Agent replacement + one version increment
   -> synchronous commit reply
+  -> serial required after-commit hooks
   -> serial Directive handling
   -> terminal settlement
 ```

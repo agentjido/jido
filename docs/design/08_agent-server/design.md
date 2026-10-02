@@ -1,11 +1,18 @@
-> Selected seam design. The implementation direction was selected on
-> 2026-09-10.
+> Pending approval. Selected review decisions are recorded below.
 
 # Agent Server design
 
-The requirements in this document define the selected Agent Server contract.
+The requirements in this document define the recommended Agent Server contract.
 See [alignment.md](alignment.md) for implementation evidence and deferred
 owner work.
+
+## Current review decision
+
+On 2026-10-01, the user selected the current after-commit rule in
+[GAP-021](../GAP_ANALYSIS.md#gap-021). An implemented hook is required before
+Directives. Failure stops later effects and preserves the commit and caller
+result. The model and controls below include this work, correcting GAP-038
+and GAP-039. Seam 05 owns the [callback contract](../05_plugins/design.md#required-after-commit-notification).
 
 ## Scope and owner
 
@@ -44,6 +51,7 @@ canonical Agent input or known identity
   -> validate live Directive policy
   -> checkpoint and commit one complete Agent
   -> reply with commit result
+  -> run required Plugin after-commit hooks in declaration order
   -> handle Directives in order
   -> publish one terminal Outcome
 ```
@@ -56,11 +64,13 @@ The public status compatibility map has these phases:
 | `idle` | No active Turn | Admit one Signal |
 | `admitting` | Live Plugin admission is running | Postpone within admission rules |
 | `running` | Candidate evaluation or synchronous commit work is active | Postpone within admission rules |
-| `directing` | Post-commit Directive settlement is active | Postpone within admission rules |
+| `directing` | Required after-commit hooks or Directive settlement are active | Postpone within admission rules |
 
 Private state can use more detail. It must not change public result meaning.
 The current Outcome stage compatibility set is `prepare`, `execute`,
-`finalize`, `commit`, and `directive`. Seam 13 can propose a staged observation
+`finalize`, `commit`, `after_commit`, and `directive`. A hook failure has
+`committed?: true` and stage `after_commit`; the state version and caller
+result remain committed. Seam 13 can propose a staged observation
 migration. Private seam-04 evaluator stages are not public Server phases.
 
 There is no general degraded phase. A Plugin runtime can be temporarily
@@ -158,7 +168,7 @@ then the Agent Server shall reject it with the approved overload error.
 `SRV-REQ-022`: If an asynchronous cast reaches a full postponed-event limit,
 then the Agent Server shall drop it and emit bounded failure observation.
 
-`SRV-REQ-023`: If live admission, executable work, or Directive work makes a
+`SRV-REQ-023`: If live admission, executable work, a required after-commit hook, or Directive work makes a
 synchronous call to the same activation, then the Agent Server shall reject
 the call with the owner-defined reentry error.
 
@@ -189,7 +199,7 @@ the committed snapshot, and publish one timed-out result.
 work before commit, the Agent Server shall cancel only that Turn and keep the
 committed snapshot.
 
-`SRV-REQ-031`: If cancellation arrives after commit begins or during Directive
+`SRV-REQ-031`: If cancellation arrives after commit begins or during hook or Directive
 settlement, then the Agent Server shall reject cancellation with the approved
 too-late result.
 
@@ -256,12 +266,13 @@ Agent mailbox boundary.
 ### Directive, child, and effect handling
 
 `SRV-REQ-047`: When a committed Turn has Directives, the Agent Server shall
-handle them serially in returned list order.
+handle them serially in returned list order after every required after-commit
+hook has succeeded.
 
 `SRV-REQ-048`: If one Directive fails, exits, or reaches its operation limit,
 then the Agent Server shall stop that batch and skip every later Directive.
 
-`SRV-REQ-049`: If post-commit Directive handling fails, then the Agent Server
+`SRV-REQ-049`: If a required after-commit hook or Directive handling fails, then the Agent Server
 shall preserve the committed Agent and state version.
 
 `SRV-REQ-050`: When a built-in child Directive starts, adopts, addresses, or
@@ -286,12 +297,12 @@ checkpoint.
 the Agent Server shall preserve the current active record or checkpoint before
 it stops.
 
-`SRV-REQ-055`: While admission, evaluation, or Directive settlement is active,
+`SRV-REQ-055`: While admission, evaluation, required hooks, or Directive settlement are active,
 when hibernation is requested, the Agent Server shall wait until the activation
 returns to idle before it performs hibernation.
 
 `SRV-REQ-056`: When a controlled stop begins, the Agent Server shall terminate
-owned evaluation, admission, Directive, readiness, error-policy, and Plugin
+owned evaluation, admission, after-commit hook, Directive, readiness, error-policy, and Plugin
 runtime work before termination completes.
 
 `SRV-REQ-057`: If Jido detects a broken Agent Server invariant, then the Agent
@@ -299,7 +310,7 @@ Server shall exit through OTP instead of converting it to an ordinary Agent
 error.
 
 `SRV-REQ-058`: When a Turn reaches an observed terminal point, the Agent
-Server shall create one validated Turn Outcome whose commit and Directive
+Server shall create one validated Turn Outcome whose terminal stage, commit, and Directive
 counts match the completed work.
 
 `SRV-REQ-059`: If an Agent Server exits before it creates a terminal Turn
@@ -374,6 +385,10 @@ after an abnormal activation restart.
 BEAM code loads, replace Plugin runtime structure, or migrate private Agent
 Server state.
 
+`SRV-REQ-077`: When a required after-commit hook starts, the Agent Server
+shall apply the finite `directive_timeout`, or a 5,000-millisecond limit
+when that option is `:infinity`, to that owned task.
+
 ## Public contract
 
 ### Supported compatibility entries
@@ -385,14 +400,17 @@ replacement:
 | --- | --- | --- |
 | OTP startup | `start_link/1`, `start/1`, `child_spec/1` | Standard OTP or supervised-start result |
 | Signal input | `call/3`, `cast/2`, `send_request/3`, `receive_response/2` | Commit result, best-effort send, or OTP request protocol |
-| Turn control | `cancel/2`, `cancel_turn/3` | Active pre-commit cancellation or defined rejection |
+| Turn control | `cancel/2`, `cancel_turn/3` | Active pre-commit cancellation; too late after commit begins, including during hooks |
 | Inspection | `agent/2`, `plugin_state/3`, `status/2`, `snapshot/2`, `children/2`, `await_ready/2` | Current committed or bounded runtime view |
 | Lifecycle | `stop/3`, `hibernate/2`, `attach/3`, `detach/3`, `touch/1` | Process and idle-lifecycle control |
 | Local handles | `whereis/3`, `via_tuple/3`, `alive?/1` | Replaceable PID/name lookup and liveness |
 | Debug | `set_debug/3`, `recent_events/3` | Bounded in-process diagnostic compatibility path |
 | Upgrade | `upgrade/2`, `upgrade/3`, `upgrade/4` | Quiescent code operation or validated Agent definition replacement |
 
-The target does not require new `Status`, `Commit`, or Snapshot structs. Seam
+An `after_commit/3` hook that synchronously calls the same activation receives
+`{:error, :reentrant_commit}`. The public hook input is the existing read-only
+`Jido.AgentServer.Plugin.Commit` struct. The target does not require new
+Status or Snapshot structs. Seam
 12 requires the owner to document why compatibility maps and OTP controls
 remain. Seam 13 owns any change to Outcome availability or observation data.
 
@@ -412,6 +430,7 @@ The owner of each limit must stay clear:
 | Readiness limit | One Plugin runtime readiness operation |
 | Persistence operation limit | One storage operation, if seam 07 and seam 09 configure it |
 | Directive limit | One post-commit Directive operation |
+| After-commit hook limit | One owned hook task; finite `directive_timeout`, or 5,000 milliseconds for `:infinity` |
 | Idle limit | Time with no active Turn and no attachment |
 
 A persistence write operation limit is an indeterminate persistence result. It

@@ -104,6 +104,7 @@ This table is the source of truth for design approval. A moved or changed docume
 | Design index | Current |
 | [Architectural seam template](SEAM_TEMPLATE.md) | Pending approval |
 | [Jido V3 library vision](VISION.md) | Pending approval |
+| [Consolidated gap analysis](GAP_ANALYSIS.md) | Pending approval |
 | [Overview briefing](00_overview/README.md) | Approved |
 | [Overview design](00_overview/design.md) | Pending approval |
 | [Overview alignment](00_overview/alignment.md) | Pending approval |
@@ -114,8 +115,8 @@ This table is the source of truth for design approval. A moved or changed docume
 | [Agent authoring design](02_agent-authoring/design.md) | Pending approval |
 | [Agent authoring alignment](02_agent-authoring/alignment.md) | Pending approval |
 | [Agent identity briefing](03_agent-identity/README.md) | Selected and implemented |
-| [Agent identity design](03_agent-identity/design.md) | Selected and implemented |
-| [Agent identity alignment](03_agent-identity/alignment.md) | Implemented; external delivery deferred |
+| [Agent identity design](03_agent-identity/design.md) | Pending approval |
+| [Agent identity alignment](03_agent-identity/alignment.md) | Pending approval |
 | [Turn evaluation briefing](04_turn-evaluation/README.md) | Pending approval |
 | [Turn evaluation design](04_turn-evaluation/design.md) | Pending approval |
 | [Turn evaluation alignment](04_turn-evaluation/alignment.md) | Pending approval |
@@ -123,7 +124,7 @@ This table is the source of truth for design approval. A moved or changed docume
 | [Plugin design](05_plugins/design.md) | Pending approval |
 | [Plugin alignment](05_plugins/alignment.md) | Pending approval |
 | [Commit and effects briefing](06_commit-and-effects/README.md) | Selected and implemented |
-| [Commit and effects design](06_commit-and-effects/design.md) | Selected and implemented |
+| [Commit and effects design](06_commit-and-effects/design.md) | Pending approval |
 | [Commit and effects alignment](06_commit-and-effects/alignment.md) | Pending approval |
 | [Persistence briefing](07_persistence/README.md) | Pending approval |
 | [Persistence design](07_persistence/design.md) | Pending approval |

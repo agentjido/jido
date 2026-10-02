@@ -1,4 +1,4 @@
-> Selected core identity design. The local identity contract is implemented.
+> Pending approval. Selected identity decisions are recorded below.
 
 # Stable Agent identity design
 
@@ -6,6 +6,21 @@ All requirements and decisions in this document are recommended targets. The
 [design review index](../README.md#document-review-status) is the source of
 truth for status. The delivery scope ledger records the deferred external
 delivery and placement requirements.
+
+## Current review decisions
+
+On 2026-10-01, the user selected the local/durable partition distinction
+([GAP-016](/Users/mhostetler/Source/Jido/proj_jido_core/jido/docs/design/GAP_ANALYSIS.md#gap-016)).
+Keep legacy local partition values for compatible ID/PID APIs. Stable Refs
+require `nil` or a nonempty string partition. Applications that move a local
+partition into durable use supply an explicit stable string; core does not
+silently stringify an arbitrary value. This preserves local compatibility
+without weakening the durable Ref contract. It does not approve a legacy
+persistence-key migration or the complete document.
+
+The current Ref result shapes are also corrected under GAP-015: `to_map/1`
+returns a tagged result; `to_map!/1` returns the map or raises. This is a
+document correction based on canonical code, not a new API selection.
 
 ## Scope and owner
 
@@ -98,9 +113,9 @@ error contract.
 `ID-REQ-010`: When `Jido.Agent.Ref.new!/1` receives invalid Ref attributes,
 the Ref boundary shall raise the same error returned by `new/1`.
 
-`ID-REQ-011`: When the Ref boundary encodes a Ref as a public map, it shall
-produce `%{"version" => 1, "namespace" => namespace, "partition" => partition,
-"id" => id}`.
+`ID-REQ-011`: When `Jido.Agent.Ref.to_map/1` encodes a valid Ref, the Ref
+boundary shall return `{:ok, %{"version" => 1, "namespace" => namespace,
+"partition" => partition, "id" => id}}`.
 
 `ID-REQ-012`: When the Ref boundary decodes a valid version-1 public map, it
 shall return a Ref that is exactly equal to the encoded Ref.
@@ -154,9 +169,9 @@ the identity boundary shall not change the Ref.
 PID-first public functions, the Jido public API shall keep those functions
 supported.
 
-`ID-REQ-026`: While current public partition options accept values other than
-binary strings, the Jido public API shall keep those options supported until a
-staged conversion has compatibility evidence.
+`ID-REQ-026`: While legacy ID/PID public APIs remain supported, the Jido
+public API shall keep their non-string partition options supported for local
+use.
 
 `ID-REQ-027`: When durable storage moves from a legacy key to Ref identity, the
 persistence boundary shall detect identity collisions before it writes a new
@@ -175,7 +190,8 @@ their module-based keys.
 | `%Jido.Agent.Ref{}` | Public portable identity value with only `namespace`, `partition`, and `id` |
 | `new/1`, `new!/1` | Construct and validate one Ref from a map or keyword list |
 | `validate/1` | Return `{:ok, ref}` or the approved validation error |
-| `to_map/1` | Return the version-1 string-key map |
+| `to_map/1` | Return `{:ok, map}` or `{:error, error}` for the version-1 string-key encoding |
+| `to_map!/1` | Return the version-1 map or raise the validation error |
 | `from_map/1`, `from_map!/1` | Decode and validate the version-1 map |
 | Exact equality | Struct equality is identity equality; there is no hidden normalization |
 

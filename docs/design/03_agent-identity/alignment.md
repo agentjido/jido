@@ -1,9 +1,24 @@
-> Seam alignment evidence. The Ref value and local instance consumers are
-> implemented. External Ref delivery and placement remain deferred.
+> Pending approval. Current identity decisions are separate from historical evidence.
 
 # Stable Agent identity alignment
 
-## Status
+## Current review: local and durable partitions
+
+On 2026-10-01, the user selected the GAP-016 distinction under ID-REQ-003/026.
+Keep arbitrary local partition values for compatible ID/PID APIs. Durable
+Refs require `nil` or a nonempty string. An application supplies its stable
+string mapping before durable use; core does not silently convert a value.
+No code change is required for this decision. Legacy storage-key migration
+claims remain a separate GAP-031 review question.
+
+Evidence: [Ref validation](/Users/mhostetler/Source/Jido/proj_jido_core/jido/lib/jido/agent/ref.ex)
+and [durable identity resolution](/Users/mhostetler/Source/Jido/proj_jido_core/jido/lib/jido/persistence/identity.ex).
+GAP-015 also corrects map conversion result shapes in the design: the normal
+function is tagged; the bang function returns the raw map or raises.
+This source-based correction does not add a new API. Complete document
+approval remains pending. Older execution claims below remain historical.
+
+## Historical status and evidence
 
 - Design reviewed: 2026-09-08. Ref selected on 2026-09-09. Local instance and
   persistence consumers implemented on 2026-09-09.

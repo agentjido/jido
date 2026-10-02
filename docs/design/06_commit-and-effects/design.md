@@ -1,10 +1,25 @@
-> Selected commit-and-effects design. The core contract is implemented.
+> Pending approval. Selected review decisions are recorded below.
 
 # Commit and effects design
 
 All requirements and decisions in this document are recommended targets. The
 [design review index](../README.md#document-review-status) is the source of
 truth for approval. Code remains canonical for current behavior.
+
+## Current review decision
+
+On 2026-10-01, the user selected the required after-commit hook rule in
+[GAP-021](../GAP_ANALYSIS.md#gap-021). The caller result confirms commit.
+Hooks run before Directives and can fail afterward without undoing that
+commit or caller result. Even a Turn with no Directives waits for its hooks
+before settlement. This corrects GAP-026. Seam 05 owns the
+[full callback contract](../05_plugins/design.md#required-after-commit-notification).
+
+The user subsequently selected removal of Scheduler pending delivery in
+[GAP-023](../GAP_ANALYSIS.md#gap-023). Restored recurring definitions can
+recreate future timers; core Scheduler does not promise replay of missed
+ticks or business acknowledgement. The conditional application recovery
+requirements below do not require a bundled core delivery queue.
 
 ## Scope and owner
 
@@ -29,6 +44,7 @@ validated candidate + validated Directive batch
   -> required checkpoint write
   -> replace live Agent + advance state version once
   -> confirm commit to caller
+  -> run required Plugin after-commit hooks in declaration order
   -> handle Directives in list order
   -> settle the Turn
 ```
@@ -52,7 +68,7 @@ There are three distinct completion points:
 | --- | --- |
 | Evaluation return | One candidate and Directive list exist; nothing is live. |
 | Commit confirmation | The checkpoint succeeded and the candidate is authoritative. |
-| Turn settlement | The ordinary Directive batch completed or stopped at its first failure. |
+| Turn settlement | Required hooks and the ordinary Directive batch completed, or post-commit work stopped at its first failure. |
 
 External business completion is a fourth, capability-specific point. It is not
 implied by Turn settlement.
@@ -142,7 +158,7 @@ authoritative.
 
 `COMMIT-REQ-019`: When a committed Turn has Directives, the Agent Server shall
 start the first Directive only after the candidate and next state version are
-authoritative.
+authoritative and every required after-commit hook has succeeded.
 
 `COMMIT-REQ-020`: When a committed Turn has more than one Directive, the Agent
 Server shall start them serially in their returned list order.
@@ -151,11 +167,12 @@ Server shall start them serially in their returned list order.
 then the Agent Server shall stop that batch and skip every later Directive.
 
 `COMMIT-REQ-022`: When a committed Turn has no Directives, the Agent Server
-shall settle that Turn at the commit boundary.
+shall settle that Turn only after its required after-commit hooks complete
+or one hook stops the remaining work.
 
 `COMMIT-REQ-023`: When a committed Turn has Directives, the Agent Server shall
-settle that Turn only after all Directives complete or one Directive stops the
-batch.
+settle that Turn only after all required hooks and Directives complete or
+one hook or Directive stops the remaining work.
 
 ### Failure atomicity and uncertainty
 
@@ -175,7 +192,7 @@ Agent Server shall not start the related Directive batch.
 indeterminate result, then the Agent Server shall remove that activation's
 write authority before it admits another Turn.
 
-`COMMIT-REQ-029`: If post-commit Directive handling fails, then the Agent
+`COMMIT-REQ-029`: If a required after-commit hook or Directive handling fails, then the Agent
 Server shall preserve the committed Agent and state version.
 
 `COMMIT-REQ-030`: If a Directive operation reaches its time limit, then the
@@ -210,6 +227,11 @@ state unless an explicit capability first places required portable data in a
 domain or Plugin-owned field of the complete Agent state.
 
 ### Explicit recoverable work
+
+These conditional requirements describe application or external capability
+contracts. They do not require Scheduler pending delivery in core. GAP-023
+removes that bundled capability; current source cleanup remains. Applications
+can still store their own portable intent as ordinary Agent state.
 
 `COMMIT-REQ-037`: Where a capability promises recoverable work, when it accepts
 new work, the capability shall place portable pending intent and the related
@@ -249,7 +271,7 @@ This seam adds no required public commit function, transaction object, outbox
 entry, completion cursor, or settlement-wait function. `Jido.Agent.cmd/3`
 remains the process-free candidate boundary. `Jido.AgentServer.call/3` remains
 the live command boundary and returns after commit or pre-commit failure. A
-successful call does not confirm Directive settlement or external business
+successful call does not confirm hook or Directive settlement or external business
 completion.
 
 `Jido.Agent.Turn.Outcome` remains the terminal runtime value. Its exact public

@@ -4,6 +4,20 @@ This ledger applies to the local Jido `3.0.0-beta.1` core candidate. It uses
 closed requirement ranges. Thus, it gives every prerequisite requirement ID a
 disposition without copying each ID to a separate row.
 
+## Current review update
+
+Pending approval. On 2026-10-01, the user selected removal of core Scheduler
+durable delivery in [GAP-023](../GAP_ANALYSIS.md#gap-023). The Plugin row below
+now lists declared active IDs and explicitly retired IDs. PLG-REQ-061 through
+PLG-REQ-068 retain the historical occurrence and transient-timer contract;
+PLG-REQ-069 through PLG-REQ-076 are retired. PLG-REQ-077 through PLG-REQ-084
+define the selected after-commit hook, and PLG-REQ-085 through PLG-REQ-088
+define the selected core scheduling boundary.
+
+Source removal and its migration checks remain pending. This update does
+not certify those targets as implemented or renew the historical beta
+exceptions below. Other ledger rows still need the review in GAP-065.
+
 ## Authority
 
 | Role | Owner |
@@ -31,7 +45,7 @@ beta publication; it does not turn a failed or skipped test into passing proof.
 | 02 Agent authoring | `AUTH-REQ-001` to `AUTH-REQ-062` | None | None |
 | 03 Agent identity | `ID-REQ-001` to `ID-REQ-020`; `ID-REQ-023` to `ID-REQ-028` | `ID-REQ-021`, `ID-REQ-022` | None |
 | 04 Turn evaluation | `TURN-REQ-001` to `TURN-REQ-044` | None | None |
-| 05 Plugins | `PLG-REQ-001` to `PLG-REQ-076` | None | None |
+| 05 Plugins | `PLG-REQ-001`, `PLG-REQ-003`, `PLG-REQ-005`, `PLG-REQ-007`, `PLG-REQ-009`; `PLG-REQ-011` to `PLG-REQ-016`; `PLG-REQ-018` to `PLG-REQ-029`; `PLG-REQ-031`, `PLG-REQ-032`; `PLG-REQ-035` to `PLG-REQ-040`; `PLG-REQ-042` to `PLG-REQ-044`; `PLG-REQ-046`; `PLG-REQ-049` to `PLG-REQ-051`; `PLG-REQ-053` to `PLG-REQ-056`; `PLG-REQ-059` to `PLG-REQ-068`; `PLG-REQ-077` to `PLG-REQ-088` | None | `PLG-REQ-017`, `PLG-REQ-030`, `PLG-REQ-033`, `PLG-REQ-034`, and `PLG-REQ-069` to `PLG-REQ-076` are retired by the owner design. Numeric holes are not requirements. |
 | 06 Commit and effects | `COMMIT-REQ-001` to `COMMIT-REQ-044` | None | None |
 | 07 Persistence | `PERS-REQ-001` to `PERS-REQ-051` | None | None |
 | 08 Agent Server | `SRV-REQ-001` to `SRV-REQ-076` | None | None |

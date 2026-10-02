@@ -1,7 +1,23 @@
-> Seam alignment evidence. The implementation direction was selected on
-> 2026-09-10. Seam 09 now supplies the Ref-first instance controls.
+> Pending approval. Historical execution evidence is retained below.
 
 # Agent Server alignment
+
+## Current review decision
+
+On 2026-10-01, the user selected GAP-021's required after-commit contract.
+The [Plugin design](../05_plugins/design.md#required-after-commit-notification)
+owns callback shape and order. The Server design now includes the
+`after_commit` Outcome stage, owned hook tasks during `directing`, finite
+hook limits, same-activation reentry rejection, late cancellation, and
+shutdown ownership. This corrects GAP-038 and GAP-039. A hook failure keeps
+the commit and caller result while skipping later hooks and Directives.
+Complete document approval has not been inferred.
+
+Current evidence is `lib/jido/agent_server/post_commit.ex`,
+`lib/jido/agent_server/admission.ex`, and `lib/jido/agent/turn/outcome.ex`.
+Existing cases in `test/jido/agent_server/after_commit_test.exs` cover these
+paths. They were inspected, not rerun. The execution record below is older
+evidence and does not certify the current candidate.
 
 ## Status
 
@@ -80,7 +96,7 @@ design.
 | `lib/jido/agent_server.ex` | Current error policy permits log-only, stop, maximum-error, error-Signal, and application-function behavior. |
 | `lib/jido/agent_server.ex` | Persistent startup loads durable state. Nonpersistent named startup restores `RuntimeStore`. Commits write runtime or durable checkpoints. Clean stop deletes the runtime checkpoint. |
 | `lib/jido/agent_server/active_turn.ex` | One Zoi-backed private ActiveTurn keeps Turn identity, source and effective Signals, caller, task handle, prepared result, versions, Directive progress, and the pre-commit deadline. |
-| `lib/jido/agent/turn/outcome.ex:1-195` | One public validated Outcome uses five stages, five terminal statuses, complete source/effective Signals, commit fields, and exact Directive counts. |
+| `lib/jido/agent/turn/outcome.ex` | One public validated Outcome uses six stages, five terminal statuses, complete source/effective Signals, commit fields, and exact Directive counts. |
 | `lib/jido/agent_server/plugin_lifecycle.ex` and `plugin_child.ex` | Plugin roots start in declaration order, use wrapper supervision, expose restarting state, await readiness, and stay outside Agent state. Every generation gets a newly built owned-state and state-version pair. |
 | `lib/jido/agent_server/directive_runtime.ex:80-638` | Built-in effects dispatch Signals, start and stop children, preserve relative relationships, and return explicit uncertain remote results. |
 
@@ -197,7 +213,7 @@ Server proposal and gap report. Git history retains their exact text.
 | Plugin preparation must be hidden inside `running`. | `Remove as a phase rule`. | `admitting` is current public data. Seam 04 owns evaluator stages, not Server phases. |
 | Persistent creation starts provisional runtimes, waits, writes revision zero, and then publishes. | `Implemented`. | The Registry reserves identity as `:starting`; public lookup and listing accept only `:ready`. |
 | Recovery workers can resume pending work while later Turns continue. | `Retain as capability behavior`. | Explicit capability state can do this. Ordinary Directives receive no replay guarantee. |
-| One public control model must expose only `evaluate`, `commit`, and `directive`. | `Replace`. | Current Outcomes use five supported stages. Keep them until seam 13 approves migration. |
+| One public control model must expose only `evaluate`, `commit`, and `directive`. | `Replace`. | Current Outcomes use six supported stages, including `after_commit`. Keep them until seam 13 approves migration. |
 | `turn_timeout` covers route, preparation, execution, contribution, and validation. | `Implemented with live admission`. | One 5-second default limit starts with active work and is cancelled when commit begins. `:infinity` disables it. |
 | Mailbox wait is outside the Turn limit. | `Retain`. | Caller admission deadline covers postponed time. The Server limit starts with active work. |
 | Cancellation terminates owned work, rejects late results, and preserves state. | `Implemented`. | Deterministic cancel-first and completion-first tests preserve current result values. |

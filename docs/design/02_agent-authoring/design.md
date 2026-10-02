@@ -1,12 +1,41 @@
-> Approved target seam design. Dependent owner-seam details remain open.
+> Pending approval. Current review decisions are separate from earlier approval claims.
 
 # Agent authoring design
 
-The requirements and decisions in this document are approved.
+An earlier version of this document was approved.
 The [design review index](../README.md#document-review-status) is the source of
 truth for approval. Pending package-boundary and shared-error details are
 explicit assumptions for this contract. A later conflict requires a reviewed
 migration.
+
+## Current review decisions
+
+On 2026-10-01, the user selected the current V3 block form
+([GAP-009](/Users/mhostetler/Source/Jido/proj_jido_core/jido/docs/design/GAP_ANALYSIS.md#gap-009)).
+Standalone `use Jido.Agent` accepts only `name`, `description`, `vsn`, and
+`extensions`. Schema, metadata, Plugins, and routes are declared in blocks.
+Direct `Agent.new/1` still accepts map or keyword definition data. This
+decision concerns module configuration; it does not remove direct keyword
+data or decide the combined Topology hosting API.
+
+The code already implements this form. Earlier claims of keyword-only
+module parity are superseded by this decision. Other authoring questions
+remain as recorded in the consolidated analysis. These selected decisions
+do not approve the complete document.
+
+The user selected the current route-based Signal helper API on 2026-10-01
+([GAP-010](/Users/mhostetler/Source/Jido/proj_jido_core/jido/docs/design/GAP_ANALYSIS.md#gap-010)).
+A route with `as: :add` generates `add_signal` with map input and optional
+Signal envelope options. The earlier `define` form, positional arguments,
+bang Signal helper, and generated live-call helper are removed. Execution
+stays explicit through the direct Agent or live Server boundary.
+
+The user selected plain maps for every route-default form on 2026-10-01
+([GAP-012](/Users/mhostetler/Source/Jido/proj_jido_core/jido/docs/design/GAP_ANALYSIS.md#gap-012)).
+The legacy tuple form remains supported with a plain map; its struct
+exception is removed. Signal fields override defaults during evaluation.
+This keeps the current V3 fallback behavior. V2 tuple parameters were fixed
+Action input and did not implement this default merge.
 
 ## Scope and owner
 
@@ -28,7 +57,7 @@ migration.
 All supported forms end at one boundary:
 
 ```text
-module keywords or Spark blocks -- compile and lower --+
+module identity options + Spark blocks -- compile -----+
 direct map or keyword data ----------------------------+--> Agent.new/1
 Builder staged data -----------------------------------+        |
 Codec document -- trusted Registry and decode ---------+        v
@@ -42,7 +71,8 @@ neutral definitions. It does not mean that every source form has compile-time
 functions or syntax.
 
 For a generated Agent module, `definition/0` is the canonical public definition.
-`__agent_config__/0` and `__agent_interfaces__/0` are private compiler data.
+`__agent_config__/0` is private compiler data.
+The removed `__agent_interfaces__/0` function is not part of the contract.
 They are not an Agent value and are not a public authoring document.
 
 Codec supports the portable static subset of the normalized definition. A
@@ -58,7 +88,7 @@ configuration for direct, Builder, or Codec authoring.
 
 ## Requirements
 
-The EARS requirements below are approved.
+The review index governs approval of the complete requirements below.
 
 ### Supported forms and canonical normalization
 
@@ -83,8 +113,7 @@ Agent authoring boundary shall use the `defaults` name and not the Flow step
 `params` name.
 
 `AUTH-REQ-007`: While the legacy `{target, defaults}` route form remains
-supported, the Agent authoring boundary shall preserve its acceptance of map
-values, including structs.
+supported, the Agent authoring boundary shall require a plain map for defaults.
 
 `AUTH-REQ-008`: When the explicit `defaults:` option is used, the Agent
 authoring boundary shall require a plain map.
@@ -92,16 +121,22 @@ authoring boundary shall require a plain map.
 ### Module and Spark authoring
 
 `AUTH-REQ-009`: When a module uses `Jido.Agent`, the Agent DSL compiler shall
-combine keyword fields and Spark block fields into one core configuration.
+combine the allowed module identity and extension options with schema,
+metadata, Plugin, and route block fields into one core configuration.
 
-`AUTH-REQ-010`: If a core field appears in both keyword and Spark block form,
-then the Agent DSL compiler shall reject the module at compile time.
+`AUTH-REQ-010`: Retired. Keyword declarations of schema, metadata, Plugins,
+and routes are no longer supported by standalone `use Jido.Agent`.
+AUTH-REQ-063 states the option rejection rule.
+
+`AUTH-REQ-063`: If standalone `use Jido.Agent` declares a keyword option
+outside `name`, `description`, `vsn`, and `extensions`, then the Agent DSL
+compiler shall reject the module at compile time.
 
 `AUTH-REQ-011`: When a generated Agent module exposes `definition/0`, the
 generated function shall return the canonical validated neutral definition.
 
-`AUTH-REQ-012`: The Agent DSL compiler shall keep `__agent_config__/0` and
-`__agent_interfaces__/0` as private compiler metadata.
+`AUTH-REQ-012`: The Agent DSL compiler shall keep `__agent_config__/0` as private
+compiler metadata.
 
 `AUTH-REQ-013`: When a generated Agent module exposes construction or direct
 command functions, the generated functions shall delegate to the canonical
@@ -129,56 +164,58 @@ DSL compiler shall reject the route.
 boundary shall store an ordinary executable Action target in the canonical
 route.
 
-`AUTH-REQ-020`: When `route_action/1` receives an inline route path, the
+`AUTH-REQ-020`: When `route_action!/1` receives an inline route path, the
 generated Agent module shall return the compiled Action target for reuse by
-direct data, Builder, or Codec Registry entries.
+direct data or Codec Registry entries.
 
-### Generated interfaces
+### Generated Signal helpers
 
-`AUTH-REQ-021`: When a route contains `define`, the Agent DSL compiler shall
-generate a tagged Signal constructor, a bang Signal constructor, and a live
-call helper for that interface name.
+`AUTH-REQ-021`: When a route declares `as: :name`, the Agent DSL compiler shall
+generate `name_signal(input, envelope_opts)` with an empty option list by
+default and a tagged Signal result.
 
-`AUTH-REQ-022`: When a route has no `define`, the Agent DSL compiler shall
-generate no route interface for it.
+`AUTH-REQ-022`: When a route has no `as:` name, the Agent DSL compiler shall
+generate no Signal helper for it.
 
-`AUTH-REQ-023`: If `define` refers to a wildcard route, a predicate route, or a
-non-unique exact route, then the Agent DSL compiler shall reject the interface.
+`AUTH-REQ-023`: If `as:` names a wildcard route, a predicate route, or a
+non-unique exact route, then the Agent DSL compiler shall reject the module.
 
-`AUTH-REQ-024`: If `define` has no valid `signal_source`, then the Agent DSL
-compiler shall reject the interface.
+`AUTH-REQ-024`: If an exposed route has no valid `signal_source`, then the Agent
+DSL compiler shall reject the module.
 
-`AUTH-REQ-025`: If interface names, generated arities, or existing module
-functions conflict, then the Agent DSL compiler shall reject the module.
+`AUTH-REQ-025`: If helper names or generated arities conflict with each other
+or existing module functions, then the Agent DSL compiler shall reject the
+module.
 
-`AUTH-REQ-026`: When interface arguments are declared, the Agent DSL compiler
-shall require unique executable input field names with required fields before
-optional fields.
+`AUTH-REQ-026`: Retired. Positional interface arguments are removed.
+The selected Signal helper contract is in AUTH-REQ-021.
 
-`AUTH-REQ-027`: If an optional positional field can be confused with keyword
-options, then the Agent DSL compiler shall require that field through the
-`input` option.
+`AUTH-REQ-027`: Retired. Optional positional input rules are removed.
+The selected Signal helper contract is in AUTH-REQ-021.
 
 `AUTH-REQ-028`: When a generated Signal helper packages input, it shall preserve
 omitted fields and explicit `nil`, `false`, and zero values.
 
-`AUTH-REQ-029`: When a generated helper receives positional and named input,
-it shall reject a payload key supplied by both sources.
+`AUTH-REQ-029`: Retired. Mixed positional and named payload input is removed.
+The selected Signal helper contract is in AUTH-REQ-021.
 
 `AUTH-REQ-030`: When a generated Signal helper receives envelope options, it
 shall prevent those options from replacing Signal type or data.
 
-`AUTH-REQ-031`: When a generated live helper receives `context` or `timeout`,
-it shall keep those values outside Signal data.
+`AUTH-REQ-031`: Retired. Generated live-call helpers are removed.
+The selected Signal helper contract is in AUTH-REQ-021.
 
-`AUTH-REQ-032`: When a generated live helper succeeds or fails, it shall
-preserve the public Agent Server call result or exit behavior.
+`AUTH-REQ-032`: Retired. Generated live-call helpers are removed.
+The selected Signal helper contract is in AUTH-REQ-021.
 
-`AUTH-REQ-033`: The generated interface shall document its arities, input
-fields, options, validation timing, return behavior, and raise behavior.
+`AUTH-REQ-033`: The generated Signal helper shall document its arities, map
+input, envelope options, tagged results, and command-time input validation.
 
-`AUTH-REQ-034`: The generated interface shall publish types that match its
-actual arities and broad pre-Plugin input contract.
+`AUTH-REQ-034`: The generated Signal helper shall publish types for plain map
+input, keyword envelope options, and its tagged Signal result.
+
+`AUTH-REQ-064`: If a generated Signal helper receives input that is not a
+plain map, then the helper shall return an error.
 
 ### Builder
 
@@ -267,9 +304,8 @@ use the normal Signal constructor to create a fresh ID.
 `AUTH-REQ-058`: When a generated Signal helper constructs a Signal, it shall
 preserve the normal Signal constructor time behavior.
 
-`AUTH-REQ-059`: When a generated live helper receives its first argument, it
-shall require a Server reference accepted by the public Agent Server call
-boundary.
+`AUTH-REQ-059`: Retired. Generated live-call helpers are removed.
+The selected Signal helper contract is in AUTH-REQ-021.
 
 `AUTH-REQ-060`: When a generated helper packages payload data, it shall leave
 route-default application to command evaluation.
@@ -288,11 +324,12 @@ or encode the instance ID or live state.
 | Form | Definition entry | Instance entry | Source-only features |
 | --- | --- | --- | --- |
 | Direct map or keyword | `Agent.new/1` | `Agent.instantiate/2` | None |
-| Agent module and Spark | `module.definition/0` | `module.new/1` | Compile checks, inline syntax, `define` helpers |
+| Agent module and Spark | `module.definition/0` | `module.new/1` | Compile checks, inline syntax, named Signal helpers |
 | Builder | `Builder.build/1` | `Builder.build/2` | Staged first-error workflow |
 | Codec | `Codec.decode/2` | `Codec.decode/3` | Versioned JSON data and trusted Registry |
 
-Each tagged constructor has its supported bang counterpart. Seam 01 owns the
+Agent construction entries keep their documented bang counterparts.
+Generated Signal helpers return tagged results and have no bang counterpart. Seam 01 owns the
 Agent definition and instance fields. This seam owns how authoring data reaches
 those values.
 
@@ -302,7 +339,7 @@ those values.
 `routes do` contains ordered route declarations and an optional Signal source
 for generated interfaces. A route can name one Action or Flow, contain one
 inline Action, or use one extension-owned target option. The route can contain
-`defaults`, `priority`, `match`, and zero or more `define` entries.
+`defaults`, `priority`, `match`, and one optional `as:` helper name.
 
 Plugin `config` accepts a map or keyword list. Keyword order is retained. Map
 input uses a stable sorted order. The Plugin module is its identity and can
@@ -314,28 +351,29 @@ route. A named Action is clearer when several routes reuse it, it has several
 callback clauses, or it needs a separate policy boundary. Flow binding syntax
 is not valid inline Action callback syntax.
 
-### Generated interface contract
+### Generated Signal helper contract
 
-A `define :name, args: [...]` entry generates these public roles:
+A named route declares its Signal helper directly:
 
 ```elixir
-name_signal(..., opts)    # {:ok, signal} | {:error, error}
-name_signal!(..., opts)   # signal or raise
-name(server, ..., opts)   # Agent Server call result or exit
+routes do
+  signal_source "/counter"
+  route "counter.add", MyApp.Add, as: :add
+end
 ```
 
-Required positional inputs come first. Optional positional inputs can be
-omitted. `input: %{...}` adds named payload fields. `signal: [...]` supplies
-allowed Signal envelope options. Only the live helper accepts `context` and
-`timeout`. The helper packages input. Plugin and executable validation occurs
-during command evaluation. Route defaults also apply during command
-evaluation. A Signal helper uses the normal Signal constructor for ID and time.
-The live helper accepts a Server reference, not an immutable Agent value.
-Direct evaluation stays explicit through `Agent.cmd/3`.
+This generates `add_signal(input, envelope_opts)` with an empty option list
+by default. It returns `{:ok, signal}` or `{:error, reason}`. Input is one
+plain map. Options set allowed Signal envelope fields directly; unknown
+or duplicate options are errors. Options cannot replace Signal type or data.
+Omitted payload fields stay absent. Explicit `nil`, `false`, and zero stay
+unchanged. Route defaults and Plugin/executable input validation run during
+command evaluation. Normal Signal construction supplies ID and time.
 
-Generated names that are not valid Elixir variables use safe local argument
-names. Collisions receive stable suffixes. Documentation keeps the original
-payload field names and declaration order.
+The helper builds a Signal only. Direct execution uses `Agent.cmd/3`;
+live execution uses `AgentServer.call/3`. Context and timeout remain explicit
+call options. There is no `define` declaration, positional argument list,
+generated bang Signal constructor, or generated live-call helper.
 
 ### Builder contract
 
@@ -436,4 +474,4 @@ These approved guarantees apply to dependent seams.
 | `AUTH-DEC-005` | Must every valid definition be encodable? | No. Codec supports the Registry-resolvable static subset. | Runtime closures stay valid for direct use and fail clearly at Codec. |
 | `AUTH-DEC-006` | How do data users apply extensions? | Publish the pure lowerer; Builder and Codec consume lowered core data only. | Extension syntax does not enter the document format or runtime. |
 | `AUTH-DEC-007` | How does Agent `vsn` enter authoring? | Apply the approved seam-01 default and preservation rules to all applicable forms. | Generated modules default to `1`; direct compatibility forms can use `nil`; this seam does not redefine checkpoint or restore policy. |
-| `AUTH-DEC-008` | Does explicit route `defaults:` accept structs? | No. Keep the plain-map rule and retain the legacy tuple exception until a staged migration is approved. | Existing tuple input remains compatible. |
+| `AUTH-DEC-008` | Do route defaults accept structs? | No. Require plain maps for explicit and tuple forms. | The user selected the current V3 rule in GAP-012; the old struct exception is removed. |

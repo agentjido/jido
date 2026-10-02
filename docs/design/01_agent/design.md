@@ -1,11 +1,37 @@
-> Approved target seam design. Dependent owner-seam details remain open.
+> Pending approval. Selected decisions are recorded below; other Agent questions remain open.
 
 # Agent design
 
-The requirements and decisions in this document were approved on 2026-09-09.
+An earlier version of this document was approved on 2026-09-09.
 The [design review index](../README.md#document-review-status) is the source of
 truth for approval. Pending prerequisite seam details are explicit assumptions
 for this Agent contract. A later conflict requires a reviewed migration.
+
+## Current review decisions
+
+On 2026-10-01, the user selected immediate validation and V3 write ownership
+([GAP-006](/Users/mhostetler/Source/Jido/proj_jido_core/jido/docs/design/GAP_ANALYSIS.md#gap-006)).
+A successful `set/2` update validates the complete combined state. Callers do
+not need a separate validation step. Related domain fields can be changed
+in one call. Domain updates cannot change Plugin-owned fields; each Plugin
+can replace only its own field. These decisions close the validation timing
+and write ownership questions; they do not approve the complete document.
+The selected deep merge change in GAP-005 is separate and is not yet implemented.
+
+The user also selected the GAP-007 schema policy on 2026-10-01. Input
+conversion occurs before values become Agent state. Creation applies and
+checks defaults. Later validation checks stored values without changing
+them. State schemas contain defaults and validation rules, not conversion
+effects. The Zoi upstream and released-dependency work remains open under
+GAP-062; it does not leave this contract undecided.
+
+For GAP-008, the user selected rejection of nonportable saved values on
+2026-10-01. Checkpoints are checked after custom Agent or Plugin persistence
+conversion. Restore checks stored data before conversion, then validates
+reconstructed live state. This decision concerns saved checkpoints, not a
+new restriction on live state. Local values remain allowed when the live
+schema permits them; resource reconstruction remains application or Plugin
+work. The older blanket live-state ban is retired below.
 
 ## Scope and owner
 
@@ -71,14 +97,26 @@ static data as its source definition.
 `AGT-REQ-004`: If an Agent value has only one of instance ID or instance state,
 then the Agent validator shall reject it as an incomplete Agent.
 
-`AGT-REQ-005`: The Agent instance shall contain no PID, task, monitor, timer,
-or other live runtime handle.
+`AGT-REQ-005`: Retired. The blanket live-state handle ban conflicts with the
+canonical code and the V2 fallback rule. Durable rejection remains in
+AGT-REQ-036; live-state validation is stated in AGT-REQ-048.
 
 `AGT-REQ-006`: When the Agent boundary instantiates a definition, it shall allow
 instance overrides only for `id` and `state`.
 
 `AGT-REQ-007`: When the Agent boundary constructs initial state, it shall merge
-caller state over schema defaults and validate the complete result.
+caller state over schema defaults and validate the complete result, including
+the default values, before it accepts the Agent.
+
+`AGT-REQ-046`: When an Agent state schema contains a transform, coercion,
+Codec, Lazy, or StringBoolean conversion schema, the Agent schema validator
+shall reject the schema.
+
+`AGT-REQ-047`: When the Agent boundary validates existing state, it shall
+check the stored values without substituting defaults or changing values.
+
+`AGT-REQ-048`: When the Agent boundary validates live state, it shall not
+reject a value solely because that value is nonportable.
 
 `AGT-REQ-008`: When an Agent definition comes from module DSL, direct data,
 Builder, or Codec, the Agent boundary shall use one normalized definition
@@ -105,8 +143,9 @@ shall allow it to replace only its own complete top-level state field.
 `AGT-REQ-014`: When executable output and Plugin contributions are complete,
 the Agent boundary shall validate one complete candidate state map.
 
-`AGT-REQ-015`: When `set/2` receives valid domain attributes, the Agent
-boundary shall deep-merge only domain fields and return a new validated Agent.
+`AGT-REQ-015`: When `set/2` receives domain attributes, the Agent boundary
+shall return a new Agent only after it deep-merges the domain fields and
+validates the complete combined state.
 
 `AGT-REQ-016`: When the internal transition boundary receives complete valid
 state, the Agent boundary shall replace the full state map and return a new
@@ -213,17 +252,16 @@ the boundary shall return the seam-12 `ValidationError` with code
 
 ### Portable state and errors
 
-`AGT-REQ-036`: When construction, state replacement, candidate assembly,
-checkpoint creation, or restore accepts Agent state, the Agent boundary shall
-reject every nonportable term at any depth.
+`AGT-REQ-036`: When checkpoint creation accepts converted output or restore
+accepts stored checkpoint input, the Agent boundary shall reject every
+nonportable term at any depth.
 
-`AGT-REQ-037`: If Agent state portability validation fails, then the Agent
+`AGT-REQ-037`: If checkpoint portability validation fails, then the Agent
 boundary shall return the seam-12 `ValidationError` with code
-`:non_portable_term` and a bounded path from `:agent_state`.
+`:non_portable_term` and a bounded path from `:checkpoint`.
 
-`AGT-REQ-038`: When the Agent boundary validates portable instance state, it
-shall exclude normalized static definition data from the instance-state
-portability rule.
+`AGT-REQ-038`: Retired. There is no general live-instance portability rule.
+AGT-REQ-041 still defines portability of embedded durable definitions.
 
 `AGT-REQ-039`: If an Agent public operation fails, then the Agent boundary
 shall use the approved seam-12 result and error rules, except for a registered
@@ -301,8 +339,9 @@ core-owned envelope:
 Restore checks the module and `vsn` before it gives `payload` to the custom
 callback. Restore rejects a raw custom payload without the V3 envelope.
 
-The portable-state rule applies to instance state and checkpoint state. It does
-not apply to the static definition while the definition stays in memory.
+The portability rule applies to checkpoint output after conversion and to
+stored input before restore conversion. It does not apply to live instance
+state or to the static definition while the definition stays in memory.
 Static Zoi schemas and Router match declarations can contain valid static
 function data. An embedded direct definition must be portable before the
 default checkpoint can cross a durable boundary.
