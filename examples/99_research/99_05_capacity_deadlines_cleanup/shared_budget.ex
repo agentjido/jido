@@ -88,10 +88,13 @@ defmodule Jido.Examples.SharedBudget do
   def handle_info({:DOWN, ref, :process, _, reason}, state),
     do: {:noreply, settle(state, ref, {:error, reason})}
 
+  def handle_info({:EXIT, _pid, :normal}, state), do: {:noreply, state}
+  def handle_info({:EXIT, _pid, reason}, state), do: {:stop, reason, state}
+
   @impl true
   def terminate(_, state) do
     Enum.each(state.active, fn {_, entry} -> stop_agent(entry.server) end)
-    Supervisor.stop(state.tasks)
+    stop_task_supervisor(state.tasks)
   end
 
   defp settle(state, ref, result) do
@@ -162,5 +165,12 @@ defmodule Jido.Examples.SharedBudget do
     :ok
   catch
     :exit, _ -> :ok
+  end
+
+  defp stop_task_supervisor(pid) do
+    if Process.alive?(pid), do: Supervisor.stop(pid)
+    :ok
+  catch
+    :exit, _reason -> :ok
   end
 end

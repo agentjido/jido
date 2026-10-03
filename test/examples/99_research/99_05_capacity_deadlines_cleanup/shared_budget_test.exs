@@ -91,4 +91,20 @@ defmodule JidoTest.Examples.SharedBudgetTest do
     assert :ok = stop_supervised(Example)
     for {pid, ref} <- monitors, do: assert_receive({:DOWN, ^ref, :process, ^pid, _}, 1_000)
   end
+
+  test "normal trapped exits are ignored and shutdown exits stop the service", c do
+    state = :sys.get_state(c.service)
+    assert {:noreply, ^state} = Example.handle_info({:EXIT, self(), :normal}, state)
+    assert {:stop, :shutdown, ^state} = Example.handle_info({:EXIT, self(), :shutdown}, state)
+  end
+
+  test "task supervisor loss does not mask the service exit reason", c do
+    service = c.service
+    task_supervisor = Example.status(c.service).task_supervisor
+    monitor = Process.monitor(service)
+
+    Process.exit(task_supervisor, :kill)
+
+    assert_receive {:DOWN, ^monitor, :process, ^service, :killed}, 1_000
+  end
 end

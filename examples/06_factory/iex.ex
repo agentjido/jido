@@ -273,6 +273,7 @@ defmodule Jido.Examples.Factory.IEx.Observer do
 
   @impl true
   def init(session) do
+    Process.flag(:trap_exit, true)
     Process.monitor(session.owner)
     send(self(), :poll)
 
@@ -329,6 +330,8 @@ defmodule Jido.Examples.Factory.IEx.Observer do
   end
 
   def handle_info({:DOWN, _, :process, _, _}, state), do: {:stop, :normal, close_line(state)}
+  def handle_info({:EXIT, _pid, :normal}, state), do: {:noreply, state}
+  def handle_info({:EXIT, _pid, reason}, state), do: {:stop, reason, state}
 
   @impl true
   def terminate(_, state) do

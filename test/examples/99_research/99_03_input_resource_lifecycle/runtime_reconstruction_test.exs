@@ -42,7 +42,7 @@ defmodule JidoTest.Examples.RuntimeReconstructionTest do
     resource = Runtime.inspect_runtime(replacement).resource
     ref = Process.monitor(resource)
     assert :ok = Jido.AgentServer.stop(c.server)
-    assert_receive {:DOWN, ^ref, :process, ^resource, _}, 1000
+    assert_receive {:DOWN, ^ref, :process, ^resource, :normal}, 1000
   end
 
   test "replacement Init supplies committed owned state and its version", c do
@@ -60,6 +60,13 @@ defmodule JidoTest.Examples.RuntimeReconstructionTest do
     init = Runtime.inspect_runtime(replacement).init
     assert Map.get(init, :plugin_state) == %{name: "B"}
     assert Map.get(init, :state_version) == version
+  end
+
+  test "resource exits are ignored and a trapped parent exit stops the runtime", c do
+    state = Runtime.inspect_runtime(c.runtime)
+
+    assert {:noreply, ^state} = Runtime.handle_info({:EXIT, state.resource, :normal}, state)
+    assert {:stop, :shutdown, ^state} = Runtime.handle_info({:EXIT, self(), :shutdown}, state)
   end
 
   defp plugin_runtime(server) do

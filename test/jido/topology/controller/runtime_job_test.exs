@@ -5,6 +5,12 @@ defmodule Jido.Topology.Controller.RuntimeJobTest do
 
   alias Jido.Topology.Controller.Runtime
 
+  test "normal trapped exits are ignored and shutdown exits stop the Runtime" do
+    state = %{}
+    assert {:noreply, ^state} = Runtime.handle_info({:EXIT, self(), :normal}, state)
+    assert {:stop, :shutdown, ^state} = Runtime.handle_info({:EXIT, self(), :shutdown}, state)
+  end
+
   test "timeout retains capacity until DOWN and blocks dependents", %{jido: jido} do
     {state, task} = active_job(jido)
     ref = task.ref
