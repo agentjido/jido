@@ -5,8 +5,9 @@ defmodule Jido.Topology.Controller.RuntimeJobTest do
 
   alias Jido.Topology.Controller.Runtime
 
-  test "a trapped parent exit stops the Runtime with the same reason" do
+  test "normal trapped exits are ignored and shutdown exits stop the Runtime" do
     state = %{}
+    assert {:noreply, ^state} = Runtime.handle_info({:EXIT, self(), :normal}, state)
     assert {:stop, :shutdown, ^state} = Runtime.handle_info({:EXIT, self(), :shutdown}, state)
   end
 

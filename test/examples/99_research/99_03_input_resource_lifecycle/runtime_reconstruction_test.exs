@@ -42,7 +42,7 @@ defmodule JidoTest.Examples.RuntimeReconstructionTest do
     resource = Runtime.inspect_runtime(replacement).resource
     ref = Process.monitor(resource)
     assert :ok = Jido.AgentServer.stop(c.server)
-    assert_receive {:DOWN, ^ref, :process, ^resource, _}, 1000
+    assert_receive {:DOWN, ^ref, :process, ^resource, :normal}, 1000
   end
 
   test "replacement Init supplies committed owned state and its version", c do

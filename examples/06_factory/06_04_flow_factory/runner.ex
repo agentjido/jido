@@ -112,6 +112,7 @@ defmodule Jido.Examples.Factory.FlowFactory.Runner.Runtime do
     {:reply, :ok, %{state | handle: nil}}
   end
 
+  def handle_info({:EXIT, _pid, :normal}, state), do: {:noreply, state}
   def handle_info({:EXIT, _pid, reason}, state), do: {:stop, reason, state}
   def handle_info(_, %{handle: nil} = state), do: {:noreply, state}
 

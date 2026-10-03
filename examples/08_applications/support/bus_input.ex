@@ -65,6 +65,7 @@ defmodule Jido.Examples.Applications.BusInput.Runtime do
     {:noreply, state}
   end
 
+  def handle_info({:EXIT, _pid, :normal}, state), do: {:noreply, state}
   def handle_info({:EXIT, _pid, reason}, state), do: {:stop, reason, state}
 
   @impl true
