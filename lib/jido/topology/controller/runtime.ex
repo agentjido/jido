@@ -88,6 +88,8 @@ defmodule Jido.Topology.Controller.Runtime do
   def handle_info({:DOWN, ref, :process, _pid, reason}, state),
     do: {:noreply, complete(state, ref, {:error, reason})}
 
+  def handle_info({:EXIT, _pid, reason}, state), do: {:stop, reason, state}
+
   def handle_info({:task_timeout, ref}, state) do
     case Map.get(state.active, ref) do
       nil ->

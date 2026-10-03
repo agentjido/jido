@@ -7,8 +7,10 @@ defmodule Jido.Examples.RuntimeReconstruction.Runtime do
   def input(pid, feed, text), do: GenServer.call(pid, {:input, feed, text})
 
   @impl true
-  def init(init),
-    do: {:ok, open_resource(%{init: init, resource: nil, feed: nil}, init.plugin_state.name)}
+  def init(init) do
+    Process.flag(:trap_exit, true)
+    {:ok, open_resource(%{init: init, resource: nil, feed: nil}, init.plugin_state.name)}
+  end
 
   @impl true
   def handle_call(:reconcile, _from, state) do
@@ -33,6 +35,10 @@ defmodule Jido.Examples.RuntimeReconstruction.Runtime do
 
   def handle_call({:input, _feed, _text}, _from, state),
     do: {:reply, {:error, :stale_feed}, state}
+
+  @impl true
+  def handle_info({:EXIT, _pid, :normal}, state), do: {:noreply, state}
+  def handle_info({:EXIT, _pid, reason}, state), do: {:stop, reason, state}
 
   @impl true
   def terminate(_reason, state), do: stop_resource(state.resource)

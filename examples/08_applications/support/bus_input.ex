@@ -32,6 +32,8 @@ defmodule Jido.Examples.Applications.BusInput.Runtime do
 
   @impl true
   def init(%Init{} = init) do
+    Process.flag(:trap_exit, true)
+
     state = %{
       agent_server: init.agent_server,
       jido: init.jido,
@@ -62,6 +64,8 @@ defmodule Jido.Examples.Applications.BusInput.Runtime do
     Server.cast(state.agent_server, signal)
     {:noreply, state}
   end
+
+  def handle_info({:EXIT, _pid, reason}, state), do: {:stop, reason, state}
 
   @impl true
   def terminate(_reason, state) do

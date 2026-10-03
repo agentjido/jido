@@ -88,6 +88,8 @@ defmodule Jido.Examples.SharedBudget do
   def handle_info({:DOWN, ref, :process, _, reason}, state),
     do: {:noreply, settle(state, ref, {:error, reason})}
 
+  def handle_info({:EXIT, _pid, reason}, state), do: {:stop, reason, state}
+
   @impl true
   def terminate(_, state) do
     Enum.each(state.active, fn {_, entry} -> stop_agent(entry.server) end)

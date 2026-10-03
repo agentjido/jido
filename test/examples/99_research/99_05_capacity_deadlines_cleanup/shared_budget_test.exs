@@ -91,4 +91,9 @@ defmodule JidoTest.Examples.SharedBudgetTest do
     assert :ok = stop_supervised(Example)
     for {pid, ref} <- monitors, do: assert_receive({:DOWN, ^ref, :process, ^pid, _}, 1_000)
   end
+
+  test "a trapped parent exit stops the service with the same reason", c do
+    state = :sys.get_state(c.service)
+    assert {:stop, :shutdown, ^state} = Example.handle_info({:EXIT, self(), :shutdown}, state)
+  end
 end

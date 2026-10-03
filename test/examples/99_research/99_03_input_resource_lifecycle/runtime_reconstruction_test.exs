@@ -62,6 +62,13 @@ defmodule JidoTest.Examples.RuntimeReconstructionTest do
     assert Map.get(init, :state_version) == version
   end
 
+  test "resource exits are ignored and a trapped parent exit stops the runtime", c do
+    state = Runtime.inspect_runtime(c.runtime)
+
+    assert {:noreply, ^state} = Runtime.handle_info({:EXIT, state.resource, :normal}, state)
+    assert {:stop, :shutdown, ^state} = Runtime.handle_info({:EXIT, self(), :shutdown}, state)
+  end
+
   defp plugin_runtime(server) do
     case Server.children(server)[{:plugin, Example.Plugin}] do
       %{pid: pid} when is_pid(pid) -> pid
