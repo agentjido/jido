@@ -186,12 +186,12 @@ Assign the final `04_runtime` ID after persistence moves are complete.
 
 ### `08_01_audit`
 
-- [ ] Replace the custom Audit Plugin with `Jido.Plugin.Audit`.
-- [ ] Commit one selected domain audit record with domain state.
-- [ ] Prove that a failed Flow adds no record.
-- [ ] Prove `max_entries` removes old records.
-- [ ] Remove the custom live projection from this example.
-- [ ] Link failed-Turn audit policy to the runtime Outcome example.
+- [x] Replace the custom Audit Plugin with `Jido.Plugin.Audit`.
+- [x] Commit one selected domain audit record with domain state.
+- [x] Prove that a failed Flow adds no record.
+- [x] Prove `max_entries` removes old records.
+- [x] Remove the custom live projection from this example.
+- [x] Link failed-Turn audit policy to the runtime Outcome example.
 
 ### `08_03_inbox`
 

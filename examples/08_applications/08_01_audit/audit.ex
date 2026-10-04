@@ -1,10 +1,10 @@
 defmodule Jido.Examples.Applications.Audit.Agent do
-  @moduledoc "Commits Agent and audit Plugin state only when the complete Flow succeeds."
+  @moduledoc "Commits domain and built-in Audit Plugin state in one Turn."
   use Jido.Agent, name: "application_audit_agent"
 
   agent do
     schema Zoi.object(%{successes: Zoi.integer() |> Zoi.default(0)})
-    plugin Jido.Examples.Applications.Audit.Plugin
+    plugin Jido.Plugin.Audit, config: [max_entries: 2]
   end
 
   routes do
@@ -14,7 +14,9 @@ end
 
 defmodule Jido.Examples.Applications.Audit.Decision do
   @moduledoc false
-  use Jido.Action, name: "application_audit_decision"
+  use Jido.Action,
+    name: "application_audit_decision",
+    schema: Zoi.object(%{event: Zoi.map(), fail?: Zoi.boolean()})
 
   def run(%{event: event, fail?: fail?}, _context) do
     if fail?, do: {:error, :simulated_failure}, else: {:ok, %{event: event}}
@@ -23,7 +25,9 @@ end
 
 defmodule Jido.Examples.Applications.Audit.Expand do
   @moduledoc false
-  use Jido.Action, name: "application_audit_expand"
+  use Jido.Action,
+    name: "application_audit_expand",
+    schema: Zoi.object(%{event: Zoi.map()})
 
   def run(params, _context), do: {:continue, params, Jido.Examples.Applications.Audit.Commit}
 end
@@ -33,7 +37,7 @@ defmodule Jido.Examples.Applications.Audit.Flow do
 
   use Jido.Flow,
     name: "application_audit_flow",
-    schema: Zoi.object(%{event: Zoi.any(), fail?: Zoi.boolean()})
+    schema: Zoi.object(%{event: Zoi.map(), fail?: Zoi.boolean()})
 
   flow do
     dispatch "decision",
@@ -47,11 +51,17 @@ end
 
 defmodule Jido.Examples.Applications.Audit.Commit do
   @moduledoc "Applies the Agent state and audit Directive after the Flow decision succeeds."
-  use Jido.Action, name: "application_audit_commit"
+  use Jido.Action,
+    name: "application_audit_commit",
+    schema: Zoi.object(%{event: Zoi.map()})
 
   @impl Jido.Action
   def run(%{event: event}, context) do
     next_state = %{context.agent_state | successes: context.agent_state.successes + 1}
-    {:ok, next_state, [Jido.Examples.Applications.Audit.Plugin.record(event, :accepted)]}
+
+    record =
+      Jido.Plugin.Audit.record(event, :accepted, metadata: %{agent_id: context.agent_id})
+
+    {:ok, next_state, [record]}
   end
 end
