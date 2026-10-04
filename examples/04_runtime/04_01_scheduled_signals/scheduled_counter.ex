@@ -68,7 +68,7 @@ defmodule Jido.Examples.ScheduledCounter do
     end
 
     route "examples.runtime.scheduled_counter.tick" do
-      action _input, context: context do
+      action _input, schema: Zoi.object(%{source: Zoi.any()}), context: context do
         {:ok, %{context.agent_state | count: context.agent_state.count + 1}}
       end
     end

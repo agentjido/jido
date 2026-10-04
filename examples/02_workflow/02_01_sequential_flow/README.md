@@ -27,8 +27,13 @@ errors report the boundary that rejected the value.
 
 The `double` and `gate` steps use the short inline Step syntax. The `gate` step
 is a control dependency for `finish`; its result is not copied into the final
-input. `Finish` is a named Action because the Builder and codec test reuses its
-stable module identity.
+input. `Finish` is a named Action because the runtime Flow constructor and
+codec test reuse its stable module identity.
+
+The source shows the compile-time Flow DSL. The behavior test also shows the
+reader-facing runtime Flow constructor with `Jido.Flow.new/1`, then encodes and
+decodes that data definition through `Jido.Flow.Codec`. That longer runtime
+path stays in the test so the first source Flow remains focused.
 
 ## Limits
 

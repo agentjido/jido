@@ -3,7 +3,7 @@ defmodule Jido.Examples.BusDelivery do
   A durable Bus subscription delivers ordered Signals to an Agent. The Client
   acknowledges a record after its Turn commits. The Agent owns duplicate policy.
   The Bus and its cursor are local memory; this does not prove disk durability.
-  Start the Bus in the same Jido instance as the Agent.
+  The Agent owns the Bus Manager before it starts the durable Client.
   """
   use Jido.Agent, name: "example_bus_delivery"
 
@@ -12,6 +12,8 @@ defmodule Jido.Examples.BusDelivery do
              seen: Zoi.list(Zoi.string()) |> Zoi.default([]),
              values: Zoi.list(Zoi.integer()) |> Zoi.default([])
            })
+
+    plugin Jido.Plugin.Bus.Manager, config: [name: :example_commands]
 
     plugin Jido.Plugin.Bus.Client,
       config: [

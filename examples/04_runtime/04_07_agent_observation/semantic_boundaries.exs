@@ -1,7 +1,6 @@
 # This example prints results for its user.
 # credo:disable-for-this-file Credo.Check.Warning.IoInspect
 
-alias Jido.Examples.Topology.Cell
 alias Jido.Examples.TurnObservation, as: Agent
 alias Jido.Examples.Runtime.EventProbe
 alias Jido.Topology.Controller
@@ -31,7 +30,7 @@ try do
   {:ok, definition} =
     Jido.Topology.new(
       name: "observed-topology",
-      agents: [%{key: :cell, module: Cell}]
+      agents: [%{key: :observed, module: Agent}]
     )
 
   {:ok, topology} = Jido.Topology.instantiate(definition, id: "observed-topology")

@@ -37,4 +37,4 @@ not replace Plugin runtime structure or coordinate a multi-node deployment.
 - [Source](state_migration.ex)
 - [Tests](../../../test/examples/04_runtime/04_14_state_migration/state_migration_test.exs)
 
-Previous: [Turn Upgrade](../04_13_turn_upgrade/README.md) | Next: [Multi-agent examples](../../05_multi_agent/README.md)
+Previous: [Turn Upgrade](../04_13_turn_upgrade/README.md) | Next: [Request Modes](../04_15_request_modes/README.md)

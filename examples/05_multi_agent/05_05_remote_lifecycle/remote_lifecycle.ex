@@ -30,7 +30,15 @@ defmodule Jido.Examples.RemoteLifecycle do
     end
 
     route "jido.agent.child.exit" do
-      action input, context: context do
+      action input,
+        schema:
+          Zoi.object(%{
+            tag: Zoi.any(),
+            child_id: Zoi.string(),
+            pid: Zoi.any(),
+            reason: Zoi.any()
+          }),
+        context: context do
         observation = if input.reason == :noconnection, do: :unreachable, else: :exited
         event = %{child_id: input.child_id, observation: observation, reason: input.reason}
         {:ok, %{context.agent_state | observations: context.agent_state.observations ++ [event]}}

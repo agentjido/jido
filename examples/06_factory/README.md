@@ -4,6 +4,10 @@ These application examples build from one live conversation to Agent-owned
 factories and a large Flow-driven proposal system. The default tests use local
 provider responses and need no key.
 
+This is an optional combined application suite, not four separate Jido public
+capabilities. Its preferred future home is `examples/jido_lab`, where a demo can
+span core and AI packages. See the [coverage register](../COVERAGE.md).
+
 ## Learning order
 
 1. [Live Conversation](06_01_live_conversation/README.md) — keep model history in Agent state and provider resources in context.

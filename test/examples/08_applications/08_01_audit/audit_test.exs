@@ -4,82 +4,55 @@ defmodule JidoTest.Examples.Applications.AuditTest do
   @moduletag :example
 
   alias Jido.AgentServer, as: Server
-  alias Jido.Agent.Turn.Outcome
+  alias Jido.Plugin.Audit
   alias Jido.Signal
-  alias Jido.Signal.ID
-  alias Jido.Examples.Applications.Audit.{Agent, Plugin, Runtime}
+  alias Jido.Examples.Applications.Audit.Agent
 
-  test "a failed Flow keeps Agent state and exposes one runtime Outcome", %{
-    jido: jido
-  } do
-    test_pid = self()
+  test "domain records commit with state, stay bounded, and exclude failed Flows", %{jido: jido} do
+    {:ok, agent_server} =
+      Jido.start_agent(jido, Agent, id: unique_id("audit"), error_policy: :log_only)
 
-    policy = fn reason, %Outcome{} = outcome ->
-      send(test_pid, {:audit_failure, reason, outcome})
-      :continue
+    for operation <- [:publish, :update, :archive] do
+      assert {:ok, committed} =
+               Server.call(
+                 agent_server,
+                 turn_signal(%{operation: operation}, false)
+               )
+
+      assert committed.state.successes >= 1
     end
 
-    {:ok, agent_server} =
-      Jido.start_agent(jido, Agent,
-        id: unique_id("audit"),
-        error_policy: policy
-      )
+    committed = Server.agent(agent_server)
+    assert committed.state.successes == 3
 
-    runtime = plugin_runtime(agent_server)
-
-    success =
-      Signal.new!(
-        "examples.applications.audit.turn",
-        %{event: %{operation: :publish}, fail?: false},
-        source: "/test/audit"
-      )
-
-    assert {:ok, committed} = Server.call(agent_server, success)
-    assert committed.state.successes == 1
-
-    assert committed.state.audit.events == [
-             %{event: %{operation: :publish}, outcome: :accepted}
+    assert Enum.map(committed.state.audit.records, & &1.event) == [
+             %{operation: :update},
+             %{operation: :archive}
            ]
 
-    eventually(fn -> Runtime.events(runtime) == committed.state.audit.events end)
+    assert Enum.all?(committed.state.audit.records, &(&1.outcome == :accepted))
+    assert Enum.all?(committed.state.audit.records, &(&1.metadata.agent_id == committed.id))
+    assert {:ok, committed.state.audit} == Server.plugin_state(agent_server, Audit)
+    assert Server.children(agent_server) == %{}
 
-    failure =
-      Signal.new!(
-        "examples.applications.audit.turn",
-        %{event: %{operation: :delete}, fail?: true},
-        source: "/test/audit"
-      )
+    before_failure = Server.snapshot(agent_server)
 
-    assert {:error, reason} = Server.call(agent_server, failure)
-    assert Server.agent(agent_server).state == committed.state
-    assert Runtime.events(runtime) == committed.state.audit.events
+    assert {:error, %Jido.Action.Error.ExecutionFailureError{}} =
+             Server.call(agent_server, turn_signal(%{operation: :delete}, true))
 
-    assert_receive {:audit_failure, ^reason,
-                    %Outcome{
-                      status: :failed,
-                      stage: :execute,
-                      committed?: false,
-                      state_version_before: 1,
-                      state_version_after: nil
-                    } = outcome}
+    assert Server.snapshot(agent_server) == before_failure
 
-    assert ID.valid?(outcome.id)
-    assert outcome.source_signal.id == failure.id
-    assert outcome.effective_signal.id == failure.id
-
-    assert outcome.directives == %{
-             total: 0,
-             completed: 0,
-             failed: 0,
-             failed_index: nil,
-             skipped: 0
-           }
+    assert Enum.map(Server.agent(agent_server).state.audit.records, & &1.event) == [
+             %{operation: :update},
+             %{operation: :archive}
+           ]
   end
 
-  defp plugin_runtime(agent_server) do
-    case Server.children(agent_server)[{:plugin, Plugin}] do
-      %{pid: pid} when is_pid(pid) -> pid
-      _child -> nil
-    end
+  defp turn_signal(event, fail?) do
+    Signal.new!(
+      "examples.applications.audit.turn",
+      %{event: event, fail?: fail?},
+      source: "/test/audit"
+    )
   end
 end

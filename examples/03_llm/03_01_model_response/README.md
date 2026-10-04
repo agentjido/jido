@@ -38,4 +38,4 @@ quality, or retry safety.
 - [Shared LLM adapter](../support/adapter.ex)
 - [Tests](../../../test/examples/03_llm/03_01_model_response/model_response_test.exs)
 
-Previous: [Approval Workflow](../../02_workflow/02_09_approval_workflow/README.md) | Next: [Conversation History](../03_02_conversation_history/README.md)
+Previous: [Flow Directives](../../02_workflow/02_09_flow_directives/README.md) | Next: [Conversation History](../03_02_conversation_history/README.md)

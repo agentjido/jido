@@ -18,6 +18,10 @@ public Jido APIs.
 10. [Stable Reference](04_12_stable_reference/README.md) — resolve durable identity after process and instance replacement.
 11. [Turn Upgrade](04_13_turn_upgrade/README.md) — serialize release installation at the public idle boundary.
 12. [State Migration](04_14_state_migration/README.md) — migrate domain and Plugin state as one validated commit.
+13. [Request Modes](04_15_request_modes/README.md) — compare synchronous, best-effort, and asynchronous requests.
+14. [Turn Control](04_16_turn_control/README.md) — inspect and cancel one matching active Turn.
+15. [Failure Outcome](04_17_failure_outcome/README.md) — handle errors across the commit boundary.
+16. [Heartbeat](04_18_heartbeat/README.md) — own a periodic input runtime through a Plugin.
 
 ## Run the section
 
@@ -39,3 +43,8 @@ These examples use local processes and local persistence adapters. The
 multi-node ownership and remote lifecycle contracts start in the next section.
 Agent checkpoint and recovery behavior is in the
 [persistence section](../10_persistence/README.md).
+
+Pending-job and durable-scheduling lessons stay here because Plugin runtime
+recovery and scheduling are their main contracts. State recovery and external
+delivery moved to the Persistence section. See the
+[coverage register](../COVERAGE.md) for the placement record.

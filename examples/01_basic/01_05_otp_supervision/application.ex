@@ -1,3 +1,10 @@
+defmodule Jido.Examples.OTPSupervision.Jido do
+  @moduledoc "The application-owned Jido instance and its Agent lifecycle facade."
+  use Jido,
+    otp_app: :jido,
+    namespace: "jido/examples/otp-supervision"
+end
+
 defmodule Jido.Examples.OTPSupervision.Application do
   @moduledoc "An ordinary OTP application with a directly supervised Agent."
   use Application
@@ -9,7 +16,7 @@ defmodule Jido.Examples.OTPSupervision.Application do
     jido = Keyword.get(opts, :jido, Jido.Examples.OTPSupervision.Jido)
 
     children = [
-      {Jido, name: jido},
+      jido,
       Supervisor.child_spec(
         {Jido.AgentServer, jido: jido, agent: Counter, id: "otp-counter", restart: :transient},
         id: :counter

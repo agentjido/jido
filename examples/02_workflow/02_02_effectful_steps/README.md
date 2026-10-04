@@ -1,4 +1,4 @@
-# Effectful Steps
+# Synchronous I/O Steps
 
 A Flow reads through a caller-supplied service and commits only its selected,
 portable result.
@@ -29,6 +29,11 @@ and a committed result can satisfy a repeated request.
 The service call is synchronous Action work. A later validation failure cannot
 undo it. `Read` and `Project` are named because their cache and I/O contracts are
 the subject of this example and use separate clauses.
+
+This folder keeps its original `effectful_steps` name, but the work is
+synchronous I/O. Jido also uses “effects” for deferred Directives that run
+after commit. The [Flow Directives lesson](../02_09_flow_directives/README.md)
+teaches that separate contract.
 
 ## Limits
 

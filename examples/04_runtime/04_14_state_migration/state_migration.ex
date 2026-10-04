@@ -127,7 +127,7 @@ defmodule Jido.Examples.StateMigration do
 
   routes do
     signal_source "/examples/runtime/state_migration"
-    route "examples.runtime.state_migration.wallet.migrate", Migrate
+    route "examples.runtime.state_migration.wallet.migrate", Migrate, as: :migrate
   end
 
   def migrate(server, id \\ "wallet-1-to-2", currency \\ "USD") do

@@ -3,7 +3,7 @@ defmodule Jido.Examples.Topology.InboxWorker do
   use Jido.Agent, name: "topology_inbox_worker"
 
   agent do
-    plugin Jido.Examples.Topology.InboxPlugin, config: [bus: "inbox"]
+    plugin Jido.Examples.Topology.InboxPlugin, config: [bus: "inbox", child: "helpers"]
   end
 
   agent do
@@ -28,7 +28,7 @@ defmodule Jido.Examples.Topology.InvalidInboxWorker do
   use Jido.Agent, name: "topology_invalid_inbox_worker"
 
   agent do
-    plugin Jido.Examples.Topology.InboxPlugin, config: [bus: nil]
+    plugin Jido.Examples.Topology.InboxPlugin, config: [bus: nil, child: "helpers"]
   end
 
   agent do

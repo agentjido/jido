@@ -11,17 +11,35 @@ reduces only its owned audit field.
   validated Directives.
 - How a reducer returns only its Plugin-owned state value.
 
+## Read the code
+
+Read [the Directive, Plugin, and Agent](state_middleware.ex), then read the
+[behavior tests](../../../test/examples/09_plugins/09_06_state_middleware/state_middleware_test.exs).
+
 ## Run it
 
 ```sh
 mix test test/examples/09_plugins/09_06_state_middleware --include example --seed 0
 ```
 
-The Action changes `count`. The Plugin records the count before and after the
+Expected result: the Action changes `count`. The Plugin records the count before and after the
 Action, the validated note, and the number of successful Turns. Direct
 evaluation returns a candidate. Live execution commits the same reduction.
 
-Previous: [Composition](../09_05_composition/README.md) | Next: [Commit Projection](../09_08_commit_projection/README.md)
+## Important behavior
 
-The Plugin uses `Jido.Plugin` and defines only its state callbacks.
-Core controls state ownership and reduction order.
+The Plugin uses `Jido.Plugin` and defines only its state callbacks. Core
+controls state ownership and reduction order. The reducer reads the complete
+candidate but can return only the Plugin-owned `audit` value.
+
+## Limits
+
+The audit field is committed state, not an append-only event log. The example
+does not export or persist an audit history.
+
+## Files
+
+- [Directive, Plugin, and Agent](state_middleware.ex)
+- [Tests](../../../test/examples/09_plugins/09_06_state_middleware/state_middleware_test.exs)
+
+Previous: [Composition](../09_05_composition/README.md) | Next: [Commit Projection](../09_08_commit_projection/README.md)

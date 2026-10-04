@@ -7,6 +7,7 @@ stored Topology definition.
 
 - How DSL, data, and trusted JSON Codec forms define the same Topology.
 - How one Bus subscription expands across a large Agent group.
+- How `startup.max_agents` rejects an oversized expansion before activation.
 
 ## Read the code
 
@@ -20,7 +21,8 @@ mix test test/examples/07_topology/07_03_bus_swarm --include example --seed 0
 ```
 
 Expected result: 1,001 Agents start, all workers commit one broadcast value,
-and Controller shutdown removes every worker.
+and Controller shutdown removes every worker. A request for 10,001 total
+Agents fails during planning because the default `max_agents` value is 10,000.
 
 ## Important behavior
 

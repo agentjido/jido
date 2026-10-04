@@ -5,6 +5,7 @@ committed state after an abnormal process exit.
 
 ## What you will learn
 
+- How an application defines an instance with `use Jido` and uses its facade.
 - How to use `Jido.AgentServer.child_spec/1` with explicit Agent and child IDs.
 - How OTP restart, local state recovery, and Plugin cleanup work together.
 - When ordinary supervision is sufficient without a Topology.
@@ -33,8 +34,8 @@ For interactive use, run `iex -S mix` and execute:
 
 ```elixir
 alias Jido.Examples.OTPSupervision.{Application, Counter}
+alias Jido.Examples.OTPSupervision.Jido, as: Runtime
 {:ok, app} = Application.start(:normal, [])
-jido = Jido.Examples.OTPSupervision.Jido
 {:counter, server, _, _} = List.keyfind(Supervisor.which_children(app), :counter, 0)
 :ok = Jido.AgentServer.await_ready(server)
 {:ok, signal} = Counter.increment_signal(%{amount: 7})
@@ -42,7 +43,7 @@ jido = Jido.Examples.OTPSupervision.Jido
 Process.exit(server, :kill)
 # After OTP restarts the child:
 Supervisor.which_children(app)
-server = Jido.whereis_agent(jido, "otp-counter")
+server = Runtime.whereis_agent("otp-counter")
 Jido.AgentServer.snapshot(server)
 Jido.AgentServer.children(server)
 :ok = Supervisor.stop(app)
@@ -81,6 +82,10 @@ child uses `:transient`: abnormal exits restart; `:normal`, `:shutdown`, and
 hibernation stay stopped. `Jido.stop_agent/2` uses a clean shutdown. The
 supervisor retains the stopped child spec for an explicit
 `Supervisor.restart_child(app, :counter)`.
+
+`Jido.Examples.OTPSupervision.Jido` uses `use Jido`. Its `whereis_agent/2`,
+`stop_agent/2`, and `agent_count/1` functions bind lifecycle calls to this
+application instance.
 
 The Jido runtime checkpoint records committed state before it becomes visible.
 It survives Agent failure while the same Jido instance is alive. It is cleared

@@ -29,10 +29,18 @@ The parent keeps ownership metadata on its node. The child is registered and
 supervised on the selected node. Result delivery still uses a child-to-parent
 Directive.
 
+A timeout or node disconnect during a remote start does not prove that the
+child did not start. Keep the tag unresolved. Retry only the same `SpawnChild`
+request with the same target and options. Use `AgentServer.status/1` to inspect
+`pending_child_spawns`, then use `AgentServer.children/1` and the target Agent
+identity to reconcile the result. Do not reuse the tag while the result is
+unknown.
+
 ## Limits
 
 The nodes must already be connected and run compatible code. Placement does
-not establish cluster-wide exclusive ownership.
+not establish cluster-wide exclusive ownership. Core has no public operation
+that cancels a pending remote start.
 
 ## Files
 

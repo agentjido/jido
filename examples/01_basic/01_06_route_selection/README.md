@@ -41,4 +41,4 @@ route table as the command boundary.
 - [Source](route_selection.ex)
 - [Tests](../../../test/examples/01_basic/01_06_route_selection/route_selection_test.exs)
 
-Previous: [OTP Supervision](../01_05_otp_supervision/README.md) | Next: [Workflow examples](../../02_workflow/README.md)
+Previous: [OTP Supervision](../01_05_otp_supervision/README.md) | Next: [Data-defined Agent](../01_07_data_defined_agent/README.md)

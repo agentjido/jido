@@ -46,7 +46,7 @@ defmodule Jido.Examples.Topology.PlacementPolicy do
 
   topology do
     agents do
-      group :workers, Jido.Examples.Topology.Cell, count: 2
+      group :workers, Jido.Examples.Topology.Cell, count: 2, node: Kernel.node()
     end
   end
 end

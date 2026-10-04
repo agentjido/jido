@@ -38,7 +38,14 @@ defmodule Jido.Examples.RemoteParent do
     end
 
     route "examples.multi_agent.remote_child.result" do
-      action result, context: context do
+      action result,
+        schema:
+          Zoi.object(%{
+            value: Zoi.integer(),
+            request_id: Zoi.string(),
+            executed_on: Zoi.atom()
+          }),
+        context: context do
         {:ok, %{context.agent_state | result: result}}
       end
     end

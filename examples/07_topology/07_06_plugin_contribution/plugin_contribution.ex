@@ -5,6 +5,7 @@ defmodule Jido.Examples.Topology.PluginContribution do
   topology do
     agents do
       agent :worker, Jido.Examples.Topology.InboxWorker
+      group :helpers, Jido.Examples.Topology.Cell, count: 2
     end
   end
 end

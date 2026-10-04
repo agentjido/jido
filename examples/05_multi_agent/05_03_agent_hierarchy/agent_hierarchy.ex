@@ -50,7 +50,15 @@ defmodule Jido.Examples.AgentHierarchy do
     route "jido.agent.child.started", Jido.Examples.Support.KeepState
 
     route "jido.agent.child.exit" do
-      action %{tag: tag}, context: context do
+      action %{tag: tag},
+        schema:
+          Zoi.object(%{
+            tag: Zoi.any(),
+            child_id: Zoi.string(),
+            pid: Zoi.any(),
+            reason: Zoi.any()
+          }),
+        context: context do
         lost = Enum.uniq(context.agent_state.lost_children ++ [tag])
         {:ok, %{context.agent_state | lost_children: lost}}
       end

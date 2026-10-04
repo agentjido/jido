@@ -227,8 +227,8 @@ defmodule Jido.MixProject do
           Jido.Agent.Directive.EmitToChild,
           Jido.Agent.Directive.EmitToParent,
           Jido.Agent.Directive.Error,
-          Jido.Agent.Directive.Spawn,
-          Jido.Agent.Directive.SpawnAgent,
+          Jido.Agent.Directive.SpawnProcess,
+          Jido.Agent.Directive.SpawnChild,
           Jido.Agent.Directive.Stop,
           Jido.Agent.Directive.StopChild
         ],

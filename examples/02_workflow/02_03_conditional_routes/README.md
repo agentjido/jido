@@ -29,6 +29,9 @@ The fetch step decides which provider failures are normal data. Choice does not
 turn Action errors into another branch. `Select` is named because four Choice
 options reuse it.
 
+Choice conditions are `Jido.Expr` values. They describe portable comparisons;
+they are not anonymous predicate functions.
+
 ## Limits
 
 The provider policy is local example policy. It is not an automatic retry or

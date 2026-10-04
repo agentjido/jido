@@ -29,6 +29,9 @@ The loop body is used once, so it stays inline and uses its generated name.
 `repair_size` gives replacement-state validation a normal domain input instead
 of a test-only callback.
 
+The Iterate `while` condition is a `Jido.Expr` value. It is portable static
+data, not an anonymous loop predicate.
+
 ## Limits
 
 Iteration is local to one Flow execution. This example does not model durable

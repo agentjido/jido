@@ -1,6 +1,6 @@
 defmodule Jido.Examples.ApprovalWorkflow do
   @moduledoc """
-  A multi-turn Agent that searches, selects, approves, and books a flight.
+  A multi-turn application Agent that searches, selects, approves, and books a flight.
 
   Reads occur inside the search Flow. Approval commits `:submitting` state and
   returns a booking Directive in a plain effect list. The approval Flow

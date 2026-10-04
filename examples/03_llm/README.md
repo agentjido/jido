@@ -4,6 +4,10 @@ These examples add model and tool effects to the Jido Agent and Flow contracts.
 They use deterministic local adapters, so the complete section needs no network
 access or credentials.
 
+This is an ecosystem integration suite. `jido_ai` owns model integration, tool
+orchestration, and AI policy. These six fixtures are not counted as six Jido
+public capabilities. See the [coverage register](../COVERAGE.md).
+
 `Jido.Examples.LLM.Adapter` is an example-owned service contract. It is not a
 new Jido model API. Each example passes `{module, client}` values through Turn
 context and keeps them out of Agent state, Signals, and Directives.

@@ -9,6 +9,8 @@ defmodule JidoTest.Examples.Runtime.BusDeliveryFixture do
              values: Zoi.list(Zoi.integer()) |> Zoi.default([])
            })
 
+    plugin Jido.Plugin.Bus.Manager, config: [name: :example_commands]
+
     plugin Jido.Plugin.Bus.Client,
       config: [
         bus: :example_commands,
@@ -46,13 +48,13 @@ defmodule JidoTest.Examples.Runtime.BusDeliveryTest do
   use JidoTest.FeatureSDKCase
   @moduletag group: :runtime
   alias Jido.Examples.BusDelivery
-  alias Jido.Plugin.Bus.Client
+  alias Jido.Plugin.Bus.{Client, Manager}
   alias Jido.Signal.Bus
   alias JidoTest.Examples.Runtime.BusDeliveryFixture
 
   test "durable delivery waits for a commit before it sends the next record", %{jido: jido} do
-    bus = start_supervised!({Bus, name: :example_commands, jido: jido})
     {:ok, agent} = Jido.start_agent(jido, observed(BusDeliveryFixture, :on_delivery))
+    bus = owned_bus(jido, agent)
 
     {:ok, command_signal_1} = BusDeliveryFixture.record_signal(%{value: 1})
     {:ok, command_signal_2} = BusDeliveryFixture.record_signal(%{value: 2})
@@ -73,10 +75,10 @@ defmodule JidoTest.Examples.Runtime.BusDeliveryTest do
   end
 
   test "a failed Turn retries the same record before later input", %{jido: jido} do
-    bus = start_supervised!({Bus, name: :example_commands, jido: jido})
-
     {:ok, agent} =
       Jido.start_agent(jido, observed(BusDeliveryFixture, :on_delivery), error_policy: :log_only)
+
+    bus = owned_bus(jido, agent)
 
     {:ok, command_signal_3} = BusDeliveryFixture.record_signal(%{value: 3})
     {:ok, command_signal_4} = BusDeliveryFixture.record_signal(%{value: 4})
@@ -98,8 +100,8 @@ defmodule JidoTest.Examples.Runtime.BusDeliveryTest do
   test "a restarted Client resumes the subscription and duplicate IDs keep one value", %{
     jido: jido
   } do
-    bus = start_supervised!({Bus, name: :example_commands, jido: jido})
     agent = start_agent!(jido, BusDelivery)
+    bus = owned_bus(jido, agent)
     {:ok, event} = BusDelivery.record_signal(%{value: 7})
     assert {:ok, [_]} = Bus.publish(bus, [event])
     eventually(fn -> state(agent).values == ~c"\a" end)
@@ -119,8 +121,8 @@ defmodule JidoTest.Examples.Runtime.BusDeliveryTest do
   end
 
   test "normal input outside the subscription path does not enter the Agent", %{jido: jido} do
-    bus = start_supervised!({Bus, name: :example_commands, jido: jido})
     agent = start_agent!(jido, BusDelivery)
+    bus = owned_bus(jido, agent)
 
     {:ok, command_signal_6} = BusDelivery.record_signal(%{value: 5})
 
@@ -129,9 +131,27 @@ defmodule JidoTest.Examples.Runtime.BusDeliveryTest do
 
     eventually(fn -> state(agent).values == [5] end)
     assert Server.snapshot(agent).state_version == 1
-    runtime = Server.children(agent)[{:plugin, Client}].pid
-    ref = Process.monitor(runtime)
+    children = Server.children(agent)
+    client = children[{:plugin, Client}].pid
+    manager = children[{:plugin, Manager}].pid
+    client_ref = Process.monitor(client)
+    manager_ref = Process.monitor(manager)
     assert :ok = Jido.stop_agent(jido, agent)
-    assert_receive {:DOWN, ^ref, :process, ^runtime, _}, 1000
+    assert_receive {:DOWN, ^client_ref, :process, ^client, _}, 1000
+    assert_receive {:DOWN, ^manager_ref, :process, ^manager, _}, 1000
+    eventually(fn -> Bus.whereis(:example_commands, jido: jido) == {:error, :not_found} end)
+  end
+
+  defp owned_bus(jido, agent) do
+    assert :ok = Server.await_ready(agent)
+    assert {:ok, bus} = Bus.whereis(:example_commands, jido: jido)
+
+    assert %{
+             {:plugin, Manager} => %{pid: ^bus},
+             {:plugin, Client} => %{pid: client}
+           } = Server.children(agent)
+
+    assert is_pid(client)
+    bus
   end
 end

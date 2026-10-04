@@ -1,12 +1,13 @@
 # 07_06 Plugin Contribution
 
-An Agent Plugin contributes one static Bus and one subscription during Topology
-planning, so the Topology does not repeat the wiring.
+An Agent Plugin contributes one static Bus, one subscription, and one ownership
+relation during Topology planning, so the Topology does not repeat the wiring.
 
 ## What you will learn
 
 - How a `Jido.Topology.Plugin` facet returns a pure static contribution.
-- How the common Topology validator checks contributed resources and connections.
+- How one ownership relation applies to every member of its child group.
+- How the common Topology validator checks all contributed entries.
 - How an invalid contributed resource stops planning before activation.
 
 ## Read the code
@@ -20,20 +21,20 @@ Read [the Topology](plugin_contribution.ex), [the Agent](inbox_worker.ex), then
 mix test test/examples/07_topology/07_06_plugin_contribution --include example --seed 0
 ```
 
-Expected result: planning adds the Bus and subscription, the Controller starts
-them, and a published Signal changes the worker state. After the worker fails,
-OTP starts a replacement. Jido restores its state and subscription while the
-Bus stays alive. A second Topology contributes an invalid Bus key and cannot
-be instantiated.
+Expected result: planning adds the Bus, subscription, and ownership relation.
+The Controller starts the worker and its two owned helpers. A published Signal
+changes the worker state. Controller shutdown removes the complete system. A
+second Topology contributes an invalid Bus key and cannot be instantiated.
 
 ## Important behavior
 
-The source definition stays unchanged. Contributions are applied during
-instantiation and validated before activation. Invalid contributions start no
-Agent or Bus process.
+The source definition stays unchanged. The Plugin contributes one relation to
+the `helpers` group declaration. Plan expansion applies it to both members;
+the Plugin does not run once per member. Contributions are validated before
+activation. Invalid contributions start no Agent or Bus process.
 
-The recovered worker accepts another published Signal. Controller shutdown
-removes the worker, its Plugin processes, and the contributed Bus.
+Controller shutdown removes the worker, both helpers, the worker's Plugin
+processes, and the contributed Bus.
 
 ## Limits
 

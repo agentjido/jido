@@ -1,5 +1,5 @@
 defmodule Jido.Examples.ApprovalWorkflow.FixtureSearch do
-  @moduledoc "A deterministic flight search that returns one configured result."
+  @moduledoc "A deterministic application fixture that returns one configured result."
 
   @behaviour Jido.Examples.ApprovalWorkflow.Search
 

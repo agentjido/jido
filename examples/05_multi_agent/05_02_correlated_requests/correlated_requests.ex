@@ -101,7 +101,15 @@ defmodule Jido.Examples.CorrelatedRequests do
     route "jido.agent.child.started", Jido.Examples.Support.KeepState
 
     route "jido.agent.child.exit" do
-      action input, context: context do
+      action input,
+        schema:
+          Zoi.object(%{
+            tag: Zoi.any(),
+            child_id: Zoi.string(),
+            pid: Zoi.any(),
+            reason: Zoi.any()
+          }),
+        context: context do
         state = context.agent_state
 
         if input.tag == state.request_id and state.status == :waiting,

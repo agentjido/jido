@@ -16,7 +16,7 @@ Read [the Agent](approval_workflow.ex), then [the search Flow](search_flow.ex),
 [the booking Actions](booking_actions.ex), and
 [the booking Plugin](booking_plugin.ex). Read [the ports](ports.ex) before the
 [local adapters](support/adapters.ex). Finish with
-[the behavior tests](../../../test/examples/02_workflow/02_09_approval_workflow/approval_workflow_test.exs).
+[the behavior tests](../../../test/examples/08_applications/08_04_approval_workflow/approval_workflow_test.exs).
 
 For a guided run, open [the Livebook](approval_workflow.livemd). It includes a
 Mermaid sequence diagram and uses the same source modules and local adapters.
@@ -24,7 +24,7 @@ Mermaid sequence diagram and uses the same source modules and local adapters.
 ## Run it
 
 ```sh
-mix test test/examples/02_workflow/02_09_approval_workflow --include example --seed 0
+mix test test/examples/08_applications/08_04_approval_workflow --include example --seed 0
 ```
 
 Expected result: a booking succeeds or fails in a later Turn, stale selection
@@ -38,9 +38,8 @@ state and Directives contain no client PID. Named Actions represent first-class
 business stages or stable Signal targets; they are not one-use helper wrappers.
 
 The approval route uses a one-step Flow. `ApproveBooking` returns its request
-in a plain list, so direct Action and Flow execution preserve the same
-state and Directive. A failed Flow or state validation does not dispatch the
-batch. Untagged Action extras fail with migration guidance.
+in a plain list, so direct Action and Flow execution preserve the same state
+and Directive. A failed Flow or state validation does not dispatch the batch.
 
 ## Limits
 
@@ -56,6 +55,6 @@ provide durable delivery, provider retry, or recovery after process loss.
 - [Ports](ports.ex)
 - [Local support adapters](support/adapters.ex)
 - [Guided Livebook](approval_workflow.livemd)
-- [Tests](../../../test/examples/02_workflow/02_09_approval_workflow/approval_workflow_test.exs)
+- [Tests](../../../test/examples/08_applications/08_04_approval_workflow/approval_workflow_test.exs)
 
-Previous: [Executable Continuation](../02_08_executable_continuation/README.md) | Next: [LLM examples](../../03_llm/README.md)
+Previous: [Inbox](../08_03_inbox/README.md) | Next: [Purpose Loop](../08_06_purpose_loop/README.md)

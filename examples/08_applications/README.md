@@ -9,12 +9,16 @@ external account or credential.
 1. [Audit](08_01_audit/README.md) — commit Agent and Plugin state only after a complete Flow succeeds.
 2. [Subscription](08_02_subscription/README.md) — rebuild runtime resources from committed Plugin state.
 3. [Inbox](08_03_inbox/README.md) — translate external input into Signals and reject duplicate events.
-4. [Purpose Loop](08_06_purpose_loop/README.md) — continue bounded work through scheduled finite Turns.
-5. [Fixed Group](08_07_fixed_group/README.md) — own stable roles and coordinate targeted work through a Bus.
-6. [Elastic Group](08_08_elastic_group/README.md) — apply a bounded scale, recovery, and drain policy.
+4. [Approval Workflow](08_04_approval_workflow/README.md) — correlate search, selection, approval, and one idempotent provider request.
+5. [Purpose Loop](08_06_purpose_loop/README.md) — continue bounded work through scheduled finite Turns.
+6. [Fixed Group](08_07_fixed_group/README.md) — own stable roles and coordinate targeted work through a Bus.
+7. [Elastic Group](08_08_elastic_group/README.md) — apply a bounded scale, recovery, and drain policy.
 
 Identity and encrypted Signal handling now belong to the focused
 [Plugin examples](../09_plugins/README.md).
+
+Fixed Group and Elastic Group are combined application-policy examples. They
+do not define core group, autoscaling, or distributed ownership contracts.
 
 ## Run the section
 

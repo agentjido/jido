@@ -10,6 +10,7 @@ and node-loss observation. Each Agent owns only its direct children.
 3. [Agent Hierarchy](05_03_agent_hierarchy/README.md) — form and clean up a tree through direct ownership.
 4. [Remote Child](05_04_remote_child/README.md) — place an owned child on a selected Erlang node.
 5. [Remote Lifecycle](05_05_remote_lifecycle/README.md) — distinguish observed exit from lost connectivity.
+6. [Orphan Adoption](05_06_orphan_adoption/README.md) — transfer one surviving child to a new parent.
 
 ## Run the section
 
