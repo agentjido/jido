@@ -139,7 +139,7 @@ defmodule JidoTest.Examples.Runtime.BusDeliveryTest do
     assert :ok = Jido.stop_agent(jido, agent)
     assert_receive {:DOWN, ^client_ref, :process, ^client, _}, 1000
     assert_receive {:DOWN, ^manager_ref, :process, ^manager, _}, 1000
-    assert {:error, :not_found} = Bus.whereis(:example_commands, jido: jido)
+    eventually(fn -> Bus.whereis(:example_commands, jido: jido) == {:error, :not_found} end)
   end
 
   defp owned_bus(jido, agent) do
