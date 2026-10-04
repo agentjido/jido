@@ -3,30 +3,34 @@ defmodule Jido.Examples.OTPSupervisionTest do
 
   alias Jido.AgentServer, as: Server
   alias Jido.Examples.OTPSupervision.{Application, Counter}
+  alias Jido.Examples.OTPSupervision.Jido, as: Runtime
   alias Jido.Plugin.Scheduler
 
   test "application supervision restores a commit and owns shutdown without a Topology", c do
-    jido = :"otp_example_#{c.jido}"
+    _isolated_case_instance = c.jido
 
     application =
       start_supervised!(%{
         id: Application,
-        start: {Application, :start, [:normal, [jido: jido]]},
+        start: {Application, :start, [:normal, [jido: Runtime]]},
         type: :supervisor,
         restart: :temporary
       })
 
-    assert [{:counter, server, :worker, [Server]}, {^jido, infrastructure, :supervisor, [Jido]}] =
-             Supervisor.which_children(application)
+    assert [
+             {:counter, server, :worker, [Server]},
+             {Runtime, infrastructure, :supervisor, [Jido]}
+           ] = Supervisor.which_children(application)
 
-    assert Process.whereis(jido) == infrastructure
+    assert Process.whereis(Runtime) == infrastructure
     assert :ok = Server.await_ready(server)
-    assert Jido.whereis_agent(jido, "otp-counter") == server
-    assert Jido.Topology.Controller.whereis(jido, "otp-counter") == nil
+    assert Runtime.whereis_agent("otp-counter") == server
+    assert Runtime.agent_count() == 1
+    assert Jido.Topology.Controller.whereis(Runtime, "otp-counter") == nil
 
     plugin = Server.children(server)[{:plugin, Scheduler}]
 
-    assert Enum.any?(DynamicSupervisor.which_children(Jido.agent_supervisor_name(jido)), fn
+    assert Enum.any?(DynamicSupervisor.which_children(Jido.agent_supervisor_name(Runtime)), fn
              {_, pid, _, _} -> pid == plugin.lifecycle_pid
            end)
 
@@ -38,8 +42,8 @@ defmodule Jido.Examples.OTPSupervisionTest do
     old_refs = monitor([server, plugin.pid, plugin.lifecycle_pid])
     Process.exit(server, :kill)
     await_down(old_refs)
-    eventually(fn -> is_pid(Jido.whereis_agent(jido, "otp-counter")) end)
-    replacement = Jido.whereis_agent(jido, "otp-counter")
+    eventually(fn -> is_pid(Runtime.whereis_agent("otp-counter")) end)
+    replacement = Runtime.whereis_agent("otp-counter")
     assert replacement != server
     assert :ok = Server.await_ready(replacement)
     assert Server.agent(replacement) == committed
@@ -50,7 +54,7 @@ defmodule Jido.Examples.OTPSupervisionTest do
     # A clean stop stays stopped under :transient, even though its child spec
     # remains in the application supervisor.
     refs = monitor([replacement, runtime.pid, runtime.lifecycle_pid])
-    assert :ok = Jido.stop_agent(jido, "otp-counter")
+    assert :ok = Runtime.stop_agent("otp-counter")
     await_down(refs)
 
     assert {:counter, :undefined, :worker, [Server]} =
@@ -64,7 +68,7 @@ defmodule Jido.Examples.OTPSupervisionTest do
     refs = monitor([resumed, runtime.pid, runtime.lifecycle_pid, infrastructure])
     assert :ok = Supervisor.stop(application)
     await_down(refs)
-    assert Process.whereis(jido) == nil
+    assert Process.whereis(Runtime) == nil
   end
 
   defp monitor(pids), do: Enum.map(pids, &{Process.monitor(&1), &1})

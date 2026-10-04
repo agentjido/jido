@@ -23,7 +23,10 @@ defmodule JidoTest.Examples.Persistence.DefinitionRevisionTest do
     assert Example.install(2) == c.module
     assert c.module.vsn() == 2
 
-    assert {:error, %Jido.Error.ValidationError{details: %{code: :definition_mismatch}}} =
+    assert {:error, %Jido.Error.ValidationError{details: %{code: :definition_mismatch}} = error} =
              Jido.Agent.restore(c.module, c.checkpoint)
+
+    assert Jido.Error.code(error) == :definition_mismatch
+    assert Jido.Error.to_map(error).details.code == :definition_mismatch
   end
 end

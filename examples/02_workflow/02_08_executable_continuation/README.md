@@ -6,7 +6,7 @@ one final Agent state candidate.
 ## What you will learn
 
 - How Dispatch selects the next executable.
-- How Action and Flow continuations share one context and budget.
+- How Action and Flow continuations share one context and continuation limit.
 - How the continuation limit rejects a chain without an intermediate commit.
 
 ## Read the code
@@ -21,7 +21,7 @@ mix test test/examples/02_workflow/02_08_executable_continuation --include examp
 ```
 
 Expected result: the chain returns one final value, shared context reaches the
-terminal result, and a small budget rejects a longer chain.
+terminal result, and a small continuation limit rejects a longer chain.
 
 ## Important behavior
 

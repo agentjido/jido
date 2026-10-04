@@ -251,17 +251,17 @@ audience. Record that decision in `COVERAGE.md`.
 
 ### Basic and Workflow
 
-- [ ] Refine `01_05_otp_supervision` to define and use an actual `use Jido`
+- [x] Refine `01_05_otp_supervision` to define and use an actual `use Jido`
       application module and its facade functions.
-- [ ] Move the reader-facing runtime Flow and Codec path out of test-only code,
+- [x] Move the reader-facing runtime Flow and Codec path out of test-only code,
       or document it clearly in `02_01_sequential_flow`.
-- [ ] Replace the old term “Builder” in `02_01` with “runtime Flow
+- [x] Replace the old term “Builder” in `02_01` with “runtime Flow
       constructor.”
-- [ ] Rename or clarify `02_02_effectful_steps`. It performs synchronous I/O;
+- [x] Rename or clarify `02_02_effectful_steps`. It performs synchronous I/O;
       deferred Directives are also called effects in this API.
-- [ ] Change “shared budget” in `02_08` to “shared continuation limit.”
-- [ ] Name `Jido.Expr` in the Choice and Iterate READMEs.
-- [ ] Add one `Jido.Error.code/1` and `to_map/1` assertion to an existing failure
+- [x] Change “shared budget” in `02_08` to “shared continuation limit.”
+- [x] Name `Jido.Expr` in the Choice and Iterate READMEs.
+- [x] Add one `Jido.Error.code/1` and `to_map/1` assertion to an existing failure
       example. Do not add a separate example only for these helpers.
 
 ### Runtime
