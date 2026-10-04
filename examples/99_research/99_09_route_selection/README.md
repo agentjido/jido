@@ -34,4 +34,4 @@ application-owned dispatcher.
 - [Source](route_selection.ex)
 - [Tests](../../../test/examples/99_research/99_09_route_selection/route_selection_test.exs)
 
-Previous: [Indeterminate Write](../99_08_indeterminate_write/README.md) | Next: [Plugin Isolation](../99_10_plugin_isolation/README.md)
+Previous: [Shared Budget](../99_05_capacity_deadlines_cleanup/README.md) | Next: [Plugin Isolation](../99_10_plugin_isolation/README.md)

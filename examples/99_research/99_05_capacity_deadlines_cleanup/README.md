@@ -34,4 +34,4 @@ deep Agent trees, or work on other nodes.
 - [Default worker](worker.ex)
 - [Tests](../../../test/examples/99_research/99_05_capacity_deadlines_cleanup/shared_budget_test.exs)
 
-Previous: [Handoff Reconciliation](../99_04_handoff_reconciliation/README.md) | Next: [Checkpoint Identity](../99_06_checkpoint_identity/README.md)
+Previous: [Handoff Reconciliation](../99_04_handoff_reconciliation/README.md) | Next: [Route Selection](../99_09_route_selection/README.md)

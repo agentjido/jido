@@ -9,6 +9,7 @@ defmodule JidoTest.System.Observability do
     [:jido, :agent, :after_commit],
     [:jido, :agent, :directive],
     [:jido, :persistence, :operation],
+    [:jido, :persistence, :store],
     [:jido, :topology, :operation]
   ]
   @points [
@@ -46,7 +47,7 @@ defmodule JidoTest.System.Observability do
         handler,
         events ++ @points,
         &__MODULE__.record/4,
-        {recorder, namespace}
+        {recorder, namespace, context[:persistence_contract] == :store}
       )
 
     on_exit.(fn ->
@@ -59,13 +60,27 @@ defmodule JidoTest.System.Observability do
       JidoTest.System.Report.save(context, evidence)
       assert attached?, "the system telemetry recorder detached before scenario cleanup"
       assert logger_attached?, "the system log recorder detached before scenario cleanup"
-      assert_balanced(evidence)
+
+      if context[:persistence_contract] do
+        assert_contract_balanced(evidence)
+      else
+        assert_balanced(evidence)
+      end
     end)
 
     recorder
   end
 
-  def record(event, measurements, metadata, {recorder, namespace}) do
+  def record([:jido, :persistence, :store | _] = event, measurements, metadata, {
+        recorder,
+        _namespace,
+        true
+      }) do
+    entry = {self(), event, measurements, metadata}
+    append(recorder, :events, entry)
+  end
+
+  def record(event, measurements, metadata, {recorder, namespace, _capture_store?}) do
     if metadata[:agent_namespace] == namespace or metadata[:topology_id] == namespace do
       entry = {self(), event, measurements, metadata}
       append(recorder, :events, entry)
@@ -218,7 +233,7 @@ defmodule JidoTest.System.Observability do
            end)
   end
 
-  defp assert_balanced(%{events: events, killed: killed}) do
+  defp assert_balanced(%{events: events} = evidence) do
     assert events != [], "the system scenario emitted no observed semantic events"
 
     for prefix <- [
@@ -231,6 +246,26 @@ defmodule JidoTest.System.Observability do
              "missing required semantic boundary: #{inspect(prefix)}"
     end
 
+    assert_spans_balanced(evidence)
+  end
+
+  defp assert_contract_balanced(%{events: events} = evidence) do
+    assert events != [], "the persistence contract emitted no observed semantic events"
+
+    assert Enum.any?(events, fn
+             {_, [:jido, :persistence, boundary, :start], _, _}
+             when boundary in [:operation, :store] ->
+               true
+
+             _other ->
+               false
+           end),
+           "the persistence contract emitted no persistence span"
+
+    assert_spans_balanced(evidence)
+  end
+
+  defp assert_spans_balanced(%{events: events, killed: killed}) do
     pending =
       events
       |> Enum.reverse()

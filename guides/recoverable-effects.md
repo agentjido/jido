@@ -79,5 +79,5 @@ later failed. They help diagnosis, but they are not the recovery protocol. The
 pending operation in state is the source of truth.
 
 For a complete example, see
-`examples/04_runtime/04_09_recoverable_delivery` and its tests in the
+`examples/10_persistence/10_07_recoverable_delivery` and its tests in the
 repository.

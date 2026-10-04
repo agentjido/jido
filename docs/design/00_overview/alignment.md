@@ -112,8 +112,8 @@ change runtime behavior.
 | `test/examples/99_research/99_09_route_selection/route_selection_test.exs:6-37` | Direct and live parity, first-match precedence, and fixed source-Signal selection all pass. |
 | `test/examples/99_research/99_10_plugin_isolation/plugin_isolation_test.exs:6-34` | Plugin-owned field ownership, declared-view isolation, and separate prepared inputs all pass. |
 | `test/examples/99_research/99_11_stable_reference/stable_reference_test.exs` | The Core Ref facade resolves current local PIDs and restores durable identity after a namespace is rebound to another local instance name. All three FA03 cases pass. |
-| `test/examples/99_research/99_12_definition_revision/definition_revision_test.exs` | Same-definition restore and revision-mismatch rejection pass. |
-| `test/examples/99_research/99_13_durable_delete/durable_delete_test.exs` | Compare-and-swap deletion and tombstone fencing pass without a skip. |
+| `test/examples/10_persistence/10_08_definition_revision/definition_revision_test.exs` | Same-definition restore and revision-mismatch rejection pass. |
+| `test/examples/10_persistence/10_05_durable_delete/durable_delete_test.exs` | Compare-and-swap deletion and tombstone fencing pass without a skip. |
 | `test/examples/99_research/99_03_input_resource_lifecycle/runtime_reconstruction_test.exs` | State-pull recovery and matching state-and-version Init reconstruction pass. |
 
 ### Prior validation record
@@ -136,8 +136,8 @@ mix test test/examples/99_research/99_03_input_resource_lifecycle \
   test/examples/99_research/99_09_route_selection \
   test/examples/99_research/99_10_plugin_isolation \
   test/examples/99_research/99_11_stable_reference \
-  test/examples/99_research/99_12_definition_revision \
-  test/examples/99_research/99_13_durable_delete --include example --seed 0
+  test/examples/10_persistence/10_08_definition_revision \
+  test/examples/10_persistence/10_05_durable_delete --include example --seed 0
 ```
 
 This consolidation did not rerun tests because it changes design documents

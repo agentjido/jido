@@ -34,4 +34,4 @@ and in memory.
 - [Source](stable_reference.ex)
 - [Tests](../../../test/examples/99_research/99_11_stable_reference/stable_reference_test.exs)
 
-Previous: [Plugin Isolation](../99_10_plugin_isolation/README.md) | Next: [Definition Revision](../99_12_definition_revision/README.md)
+Previous: [Plugin Isolation](../99_10_plugin_isolation/README.md) | Next: [Turn Upgrade](../99_14_turn_upgrade/README.md)

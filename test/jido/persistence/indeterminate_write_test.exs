@@ -4,7 +4,7 @@ defmodule JidoTest.Persistence.IndeterminateWriteTest do
   @moduletag capability: "PERSIST-03"
 
   alias Jido.AgentServer, as: Server
-  alias Jido.Examples.IndeterminateWriteProbe, as: Probe
+  alias Jido.Examples.Persistence.IndeterminateWrite, as: Probe
   alias Jido.Examples.PersistenceProbeStore, as: Store
   alias Jido.Persistence
 
@@ -44,7 +44,7 @@ defmodule JidoTest.Persistence.IndeterminateWriteTest do
 
     assert_receive {:signal,
                     %{
-                      type: "examples.research.indeterminate_write.applied",
+                      type: "examples.persistence.indeterminate_write.applied",
                       data: %{count: 1}
                     }}
 
@@ -63,7 +63,7 @@ defmodule JidoTest.Persistence.IndeterminateWriteTest do
              Jido.AgentServer.call(pid, route_signal_2, context: c.turn_context)
 
     assert_stored_first(c)
-    refute_received {:signal, %{type: "examples.research.indeterminate_write.applied"}}
+    refute_received {:signal, %{type: "examples.persistence.indeterminate_write.applied"}}
   end
 
   test "an indeterminate write prevents evaluation of the next Action on stale state", c do
@@ -80,7 +80,7 @@ defmodule JidoTest.Persistence.IndeterminateWriteTest do
     # Do not install a stopping error policy: this test requires a core guarantee.
     result = try_next_command(pid, c.turn_context)
     assert match?({:error, _}, result) or match?({:exit, _}, result)
-    refute_received {:signal, %{type: "examples.research.indeterminate_write.applied"}}
+    refute_received {:signal, %{type: "examples.persistence.indeterminate_write.applied"}}
     assert_stored_first(c)
   end
 
@@ -102,7 +102,7 @@ defmodule JidoTest.Persistence.IndeterminateWriteTest do
     assert_stored_first(c)
     result = try_next_command(pid, c.turn_context)
     assert match?({:error, _}, result) or match?({:exit, _}, result)
-    refute_received {:signal, %{type: "examples.research.indeterminate_write.applied"}}
+    refute_received {:signal, %{type: "examples.persistence.indeterminate_write.applied"}}
   end
 
   defp start_agent(c, write_result) do

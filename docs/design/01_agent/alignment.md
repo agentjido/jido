@@ -149,7 +149,7 @@ live state is portable no longer describe the selected contract.
   `test/jido/persistence/checkpoint_portability_test.exs`: focused tests cover
   early and defense-in-depth rejection with bounded paths for each prohibited
   term class.
-- `test/examples/99_research/99_12_definition_revision/definition_revision_test.exs`:
+- `test/examples/10_persistence/10_08_definition_revision/definition_revision_test.exs`:
   the active research control proves revision-mismatch rejection.
 
 ### Current validation attempt

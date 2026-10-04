@@ -2,7 +2,7 @@ defmodule JidoTest.Persistence.CheckpointPortabilityTest do
   use JidoTest.Case, async: true
   @moduletag capability: "PERSIST-02"
 
-  alias Jido.Examples.CheckpointPortabilityProbe, as: Probe
+  alias Jido.Examples.Persistence.PortableCheckpoint, as: Probe
   alias Jido.Examples.PersistenceProbeStore, as: Store
   alias Jido.Persistence
 
@@ -58,7 +58,7 @@ defmodule JidoTest.Persistence.CheckpointPortabilityTest do
   end
 
   test "load rejects a nested process handle supplied by storage", c do
-    assert :ok = Probe.store_payload(c.store, c.id, %{job: %{worker: self()}})
+    assert :ok = store_payload(c.store, c.id, %{job: %{worker: self()}})
 
     assert {:error,
             %Jido.Error.ValidationError{
@@ -84,7 +84,7 @@ defmodule JidoTest.Persistence.CheckpointPortabilityTest do
 
     for {value, index} <- Enum.with_index(values) do
       id = "#{c.id}-#{index}"
-      assert :ok = Probe.store_payload(c.store, id, %{job: %{runtime: value}})
+      assert :ok = store_payload(c.store, id, %{job: %{runtime: value}})
 
       assert {:error,
               %Jido.Error.ValidationError{
@@ -97,5 +97,17 @@ defmodule JidoTest.Persistence.CheckpointPortabilityTest do
       assert Enum.take(path, 6) == [:record, :checkpoint, :state, :payload, :job, :runtime]
       assert length(path) <= 20
     end
+  end
+
+  defp store_payload(store, id, payload) do
+    assert :ok =
+             Persistence.save_agent(store, Probe.new!(id: id),
+               namespace: "persistence-probe",
+               revision: 3
+             )
+
+    Store.rewrite_record(store, id, fn record ->
+      put_in(record.checkpoint.state.payload, payload)
+    end)
   end
 end

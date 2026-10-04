@@ -8,6 +8,7 @@ ExUnit.configure(formatters: [ExUnit.CLIFormatter, JidoTest.System.Report])
 # All examples, including application scenarios: mix test.examples
 # Agent and Topology authoring corpus: mix test.authoring
 # Runtime fault and recovery scenarios: mix test.system
+# Local persistence adapter contracts: mix test.persistence
 # External storage services: mix test.services (not included in mix test.all)
 ExUnit.configure(
   exclude: [

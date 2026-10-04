@@ -35,4 +35,4 @@ fields are secret.
 - [Source](agent_live_debugger.ex)
 - [Tests](../../../test/examples/04_runtime/04_05_runtime_inspection/agent_live_debugger_test.exs)
 
-Previous: [Managed Jobs](../04_04_managed_jobs/README.md) | Next: [State Recovery](../04_06_state_recovery/README.md)
+Previous: [Managed Jobs](../04_04_managed_jobs/README.md) | Next: [Agent Observation](../04_07_agent_observation/README.md)

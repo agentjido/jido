@@ -31,6 +31,7 @@ The numbered groups add one type of complexity at a time.
 | `07_topology` | Independent, hierarchical, bus-connected, keyed, composed, and Plugin-contributed systems |
 | `08_applications` | Audit, subscriptions, inboxes, purpose loops, and groups |
 | `09_plugins` | Pure preparation, live admission, identity, encrypted Signals, and composition |
+| `10_persistence` | Checkpoints, hibernate and thaw, deletion, uncertain writes, and recoverable delivery |
 
 Start with `01_basic/01_01_minimal_agent`. It compares the direct Agent command
 with the live actor call and verifies that both use the same route defaults.
@@ -39,10 +40,10 @@ with the live actor call and verifies that both use the same route defaults.
 
 The runtime group contains focused examples for the hard boundaries:
 
-- `04_06_state_recovery` — durable state recovery
+- `10_01_persistent_agent` — durable state recovery
 - `04_07_agent_observation` — semantic actor events
 - `04_08_causal_trace` — trace and causation data
-- `04_09_recoverable_delivery` — recoverable delivery protocol
+- `10_07_recoverable_delivery` — recoverable delivery protocol
 - `04_10_pending_job_recovery` — job state after restart
 - `04_11_durable_scheduling` — schedule occurrence recovery
 
@@ -52,8 +53,8 @@ expected commit, failure, and cleanup rules.
 ## Research examples
 
 `test/examples/99_research` records narrower contract investigations. These
-examples cover distributed authority, fencing, checkpoint portability,
-indeterminate writes, route selection, stable references, and upgrade cases.
+examples cover distributed authority, fencing, route selection, stable
+references, and upgrade cases.
 
 Research examples are useful evidence for an extension design. They are not an
 extra public API. Base application code on documented modules and functions.

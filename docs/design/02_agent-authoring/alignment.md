@@ -127,7 +127,7 @@ document approval.
 | `test/jido/agent/authoring_extension_test.exs:114-310` | Spark extension order, target claims, public data lowering into direct, Builder, and Codec forms, common validation, and error cases are covered. |
 | `test/jido/agent/serialization_contract_test.exs:9-43` | Agent authoring JSON and persistence records use separate namespaces and formats. |
 | `test/jido/agent/versioning_test.exs` | Generated defaults, explicit and invalid `vsn`, direct compatibility, Builder, Codec version 2, and Codec version-1 rejection are covered. |
-| `test/examples/99_research/99_12_definition_revision/definition_revision_test.exs` | Revision mismatch is an active passing control after seam-01 work. |
+| `test/examples/10_persistence/10_08_definition_revision/definition_revision_test.exs` | Revision mismatch is an active passing control after seam-01 work. |
 | `test/examples/01_basic/README.md:1-18` | The Basic suite has five focused fixtures. It does not contain a cross-form parity matrix. |
 
 ### Validation record

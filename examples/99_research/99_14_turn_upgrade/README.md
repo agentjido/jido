@@ -34,4 +34,4 @@ release, or coordinate nodes. Promotion needs clear deployment guidance.
 - [Source](turn_upgrade.ex)
 - [Tests](../../../test/examples/99_research/99_14_turn_upgrade/turn_upgrade_test.exs)
 
-Previous: [Durable Delete](../99_13_durable_delete/README.md) | Next: [State Migration](../99_15_state_migration/README.md)
+Previous: [Stable Reference](../99_11_stable_reference/README.md) | Next: [State Migration](../99_15_state_migration/README.md)
