@@ -20,6 +20,7 @@ public Jido APIs.
 12. [State Migration](04_14_state_migration/README.md) — migrate domain and Plugin state as one validated commit.
 13. [Request Modes](04_15_request_modes/README.md) — compare synchronous, best-effort, and asynchronous requests.
 14. [Turn Control](04_16_turn_control/README.md) — inspect and cancel one matching active Turn.
+15. [Failure Outcome](04_17_failure_outcome/README.md) — handle errors across the commit boundary.
 
 ## Run the section
 
