@@ -285,6 +285,7 @@ defmodule Jido.MixProject do
           Jido.Persistence.Adapter,
           Jido.Persistence.Bedrock,
           Jido.Persistence.Ecto,
+          Jido.Persistence.Ecto.Migration,
           Jido.Persistence.Ecto.Record,
           Jido.Persistence.ETS,
           Jido.Persistence.File,

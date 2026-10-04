@@ -305,20 +305,19 @@ defmodule Jido.Persistence.Ecto do
   SQL was not present while Jido compiled.
 
   The host application must create the table before it starts a Jido instance
-  that uses this adapter. The adapter does not run migrations. This migration
-  supports the default schema on PostgreSQL and SQLite:
+  that uses this adapter. The adapter does not run migrations. Call the
+  versioned migration helper from the host migration:
 
       defmodule MyApp.Repo.Migrations.CreateJidoPersistenceRecords do
         use Ecto.Migration
 
-        def change do
-          create table(:jido_persistence_records, primary_key: false) do
-            add :key, :binary, primary_key: true, null: false
-            add :value, :binary, null: false
-            add :write_token, :binary, null: false
-          end
-        end
+        def up, do: Jido.Persistence.Ecto.Migration.up(version: 1)
+        def down, do: Jido.Persistence.Ecto.Migration.down(version: 1)
       end
+
+  The helper supports the default schema on PostgreSQL and SQLite. Always pin
+  its version in the host migration. Use `:table` with a matching custom
+  schema and `:prefix` with a matching repository prefix.
 
   Configure an instance with the supervised application repository:
 

@@ -210,8 +210,9 @@ end
 ```
 
 The application owns and supervises its Ecto repository. Jido does not start
-the repository and does not run migrations. Create this table before a Jido
-instance uses the adapter:
+the repository or run migrations. Add a host migration before a Jido instance
+uses the adapter. Pin the helper version so this migration keeps the same
+behavior after later Jido upgrades:
 
 <!-- livebook:{"force_markdown":true} -->
 
@@ -219,13 +220,8 @@ instance uses the adapter:
 defmodule MyApp.Repo.Migrations.CreateJidoPersistenceRecords do
   use Ecto.Migration
 
-  def change do
-    create table(:jido_persistence_records, primary_key: false) do
-      add :key, :binary, primary_key: true, null: false
-      add :value, :binary, null: false
-      add :write_token, :binary, null: false
-    end
-  end
+  def up, do: Jido.Persistence.Ecto.Migration.up(version: 1)
+  def down, do: Jido.Persistence.Ecto.Migration.down(version: 1)
 end
 ```
 
@@ -256,6 +252,9 @@ Use `repo_options: [prefix: "tenant"]` when the table uses an Ecto query
 prefix. Use `schema: MyApp.JidoPersistenceRecord` for a different table name.
 The custom schema must have only the binary `key`, `value`, and `write_token`
 fields, and `key` must be its single primary key.
+
+Pass the same `prefix: "tenant"` to the migration helper. Pass `table:` when
+the custom schema uses a different table.
 
 The Ecto adapter supports the PostgreSQL and SQLite Ecto adapters. It rejects
 other database adapters during configuration validation because their upsert

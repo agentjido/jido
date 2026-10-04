@@ -3,6 +3,7 @@ defmodule JidoTest.Persistence.EctoTest do
 
   alias Jido.Persistence
   alias Jido.Persistence.Ecto, as: EctoPersistence
+  alias Jido.Persistence.Ecto.Migration
   alias Jido.Persistence.Ecto.Record
   alias JidoTest.AgentRuntimeFixtures.RuntimeAgent
   alias JidoTest.Persistence.{EctoRepo, EctoSupport}
@@ -60,6 +61,16 @@ defmodule JidoTest.Persistence.EctoTest do
     EctoSupport.migrate!()
     on_exit(fn -> EctoSupport.remove_database(path) end)
     {:ok, opts: [repo: EctoRepo]}
+  end
+
+  test "publishes a versioned migration contract" do
+    assert Migration.current_version() == 1
+
+    for opts <- [[version: 0], [version: 2], [table: "records"], [prefix: :tenant], [unknown: 1]] do
+      assert_raise ArgumentError, fn -> Migration.up(opts) end
+    end
+
+    assert_raise ArgumentError, fn -> Migration.up(:invalid) end
   end
 
   test "stores, replaces, and deletes exact bytes", %{opts: opts} do

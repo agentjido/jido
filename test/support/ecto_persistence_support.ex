@@ -11,12 +11,8 @@ defmodule JidoTest.Persistence.EctoMigration do
 
   use Ecto.Migration
 
-  def change do
-    create table(:jido_persistence_records, primary_key: false) do
-      add(:key, :binary, primary_key: true, null: false)
-      add(:value, :binary, null: false)
-      add(:write_token, :binary, null: false)
-    end
+  def up do
+    Jido.Persistence.Ecto.Migration.up(version: 1)
 
     create table(:constrained_jido_persistence_records, primary_key: false) do
       add(:key, :binary, primary_key: true, null: false)
@@ -25,6 +21,11 @@ defmodule JidoTest.Persistence.EctoMigration do
     end
 
     create(unique_index(:constrained_jido_persistence_records, [:value]))
+  end
+
+  def down do
+    drop(table(:constrained_jido_persistence_records))
+    Jido.Persistence.Ecto.Migration.down(version: 1)
   end
 end
 
