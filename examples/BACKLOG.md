@@ -284,10 +284,10 @@ audience. Record that decision in `COVERAGE.md`.
 
 ### Topology
 
-- [ ] Add a `max_agents` rejection case to `07_03_bus_swarm`.
-- [ ] Add one contributed ownership relation to
+- [x] Add a `max_agents` rejection case to `07_03_bus_swarm`.
+- [x] Add one contributed ownership relation to
       `07_06_plugin_contribution`.
-- [ ] Prove one contributed group declaration is applied once for all members.
+- [x] Prove one contributed group declaration is applied once for all members.
 - [ ] Add a failed activation or degraded repair case to
       `07_07_lifecycle_signals`.
 - [ ] Add a static `node:` declaration to `07_08_placement_policy`.

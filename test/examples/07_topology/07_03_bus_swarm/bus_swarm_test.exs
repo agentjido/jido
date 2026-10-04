@@ -4,7 +4,15 @@ defmodule Jido.Examples.Topology.BusSwarmTest do
   @moduletag timeout: 120_000
   import JidoTest.TopologyAssertions
   alias Jido.Examples.Topology.{Cell, Formats}
+  alias Jido.Examples.Topology.Swarm
   alias Jido.Topology.{Codec, Controller}
+
+  test "rejects a group expansion above startup.max_agents before activation" do
+    assert {:error, error} =
+             Swarm.new(id: "too-large", input: %{worker_count: 10_000})
+
+    assert Exception.message(error) =~ "max_agents"
+  end
 
   test "boots 1000 Bus workers from a stored JSON definition" do
     jido = :"topology_scale_#{System.unique_integer([:positive])}"
