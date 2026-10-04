@@ -301,14 +301,14 @@ audience. Record that decision in `COVERAGE.md`.
 
 ### Applications and Plugins
 
-- [ ] In `08_02_subscription`, use “committed state” instead of “durable state”
+- [x] In `08_02_subscription`, use “committed state” instead of “durable state”
       unless the test restores the Agent from external persistence.
-- [ ] In `09_03_identity`, state that replay protection lasts for one runtime
+- [x] In `09_03_identity`, state that replay protection lasts for one runtime
       generation.
-- [ ] Add a runtime-restart case to `09_03_identity`.
-- [ ] Show that admission can consume a nonce even when later route execution
+- [x] Add a runtime-restart case to `09_03_identity`.
+- [x] Show that admission can consume a nonce even when later route execution
       fails.
-- [ ] Bring `07_07`, `07_08`, `09_01`, `09_02`, `09_05`, `09_06`, and `09_08`
+- [x] Bring `07_07`, `07_08`, `09_01`, `09_02`, `09_05`, `09_06`, and `09_08`
       into the required README format.
 
 ## Persistence coordination

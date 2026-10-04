@@ -25,7 +25,7 @@ state version. Agent shutdown stops the replacement resource.
 
 ## Important behavior
 
-The desired subscription is durable Plugin-owned Agent data. `Jido.Plugin.Init`
+The desired subscription is committed Plugin-owned Agent data. `Jido.Plugin.Init`
 gives each runtime generation one matching committed state and state version.
 The runtime handle is temporary. A stale handle cannot submit input after a
 new generation replaces it. The Agent owns the runtime and all its resources.
