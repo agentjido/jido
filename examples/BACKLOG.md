@@ -241,11 +241,11 @@ audience. Record that decision in `COVERAGE.md`.
 
 ### Topology authoring extension
 
-- [ ] Add a focused example for `Jido.Topology.Extension` under `07_topology`.
-- [ ] Lower one custom static declaration into normal Topology entries.
-- [ ] Prove that planning starts no process.
-- [ ] Reject an unconsumed entity.
-- [ ] Activate the lowered result through the normal Controller path.
+- [x] Add a focused example for `Jido.Topology.Extension` under `07_topology`.
+- [x] Lower one custom static declaration into normal Topology entries.
+- [x] Prove that planning starts no process.
+- [x] Reject an unconsumed entity.
+- [x] Activate the lowered result through the normal Controller path.
 
 ## P2: Existing example refinements
 

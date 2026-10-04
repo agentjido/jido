@@ -15,6 +15,7 @@ and cleanup.
 7. [Lifecycle Signals](07_07_lifecycle_signals/README.md) — connect an optional control Agent through normal routes.
 8. [Placement Policy](07_08_placement_policy/README.md) — keep node selection in a Plugin and use the exact-node core mechanism.
 9. [Additive Update](07_09_additive_update/README.md) — add Agents while unchanged members keep their PIDs and state.
+10. [Topology Extension](07_10_topology_extension/README.md) — lower custom static declarations into a normal activation plan.
 
 ## Run the section
 

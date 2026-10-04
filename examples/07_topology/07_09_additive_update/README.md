@@ -37,4 +37,4 @@ example does not implement rolling deployment or distributed ownership.
 - [Source](additive_update.ex)
 - [Tests](../../../test/examples/07_topology/07_09_additive_update/additive_update_test.exs)
 
-Previous: [Placement Policy](../07_08_placement_policy/README.md) | Next: [Application examples](../../08_applications/README.md)
+Previous: [Placement Policy](../07_08_placement_policy/README.md) | Next: [Topology Extension](../07_10_topology_extension/README.md)
