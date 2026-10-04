@@ -195,13 +195,13 @@ Assign the final `04_runtime` ID after persistence moves are complete.
 
 ### `08_03_inbox`
 
-- [ ] Replace the custom single-input runtime with
+- [x] Replace the custom single-input runtime with
       `Jido.Plugin.SensorManager`.
-- [ ] Keep the external-input-to-Signal and duplicate-event lesson.
-- [ ] Start and stop one tagged sensor.
-- [ ] Replace the sensor after failure.
-- [ ] Rebuild the desired sensor set after runtime replacement.
-- [ ] Prove owner cleanup and stale-revision protection.
+- [x] Keep the external-input-to-Signal and duplicate-event lesson.
+- [x] Start and stop one tagged sensor.
+- [x] Replace the sensor after failure.
+- [x] Rebuild the desired sensor set after runtime replacement.
+- [x] Prove owner cleanup and stale-revision protection.
 
 ### `09_02_runtime_admission`
 
