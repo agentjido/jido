@@ -1,22 +1,18 @@
 # 99_04 Child Topology Runtime
 
-Status: enabled failing contract examples for
+Status: core implementation candidate for
 [issue 395](https://github.com/agentjido/jido/issues/395), with stored members
-from [issue 394](https://github.com/agentjido/jido/issues/394).
-The child runtime and gate data forms are proposals for review.
+from [issue 394](https://github.com/agentjido/jido/issues/394). These examples
+first failed in the first examples commit in this PR and now exercise the runtime and gates.
 
-## Current public contract
+## Public contract
 
-The combined Topology DSL returns an owner Agent and a Topology definition.
-Applications currently start the AgentServer and Controller separately. The
-Controller starts its target eagerly. Static `include` puts child members and
-resources in that same Controller target. It does not start a child director,
-Controller, or runtime supervisor.
-
-Jido does not yet have `Jido.Topology.Runtime`, generated Topology child
-specifications, or a `children` Topology field. The included-child control and
-standalone stored member control pass. The new runtime cases fail at the
-missing boundaries.
+A combined Topology module generates a child specification for
+`Jido.Topology.Runtime`. The Runtime owns its director, Controller, members,
+resources, and child branches. Eager mode starts the complete local member
+target. Deferred and lazy modes start control processes only. A call starts
+its requested dependency closure. Static `include` still makes one Controller
+target and does not start a child director or runtime.
 
 ## Read the code
 
@@ -24,7 +20,7 @@ Read [Parent](parent.ex) and [Child](child.ex) first. Each has its own director
 definition. Child declares Alice, Bob, and a private Bus. [Worker](worker.ex)
 has one record command. [Observe](observe.ex) records lifecycle Signals in
 director state. Then read [specifications.ex](specifications.ex), which defines
-the proposed child data form without adding DSL syntax.
+the child data form without new child DSL block syntax.
 
 | Contract | Tests |
 | --- | --- |
@@ -33,7 +29,7 @@ the proposed child data form without adding DSL syntax.
 | Aggregate child state; member and runtime restart; restart limit; call deadline; parent shutdown; persistence restore after Jido restart | [Lifecycle](../../../test/examples/99_research/99_04_child_topology_runtime/lifecycle_test.exs) |
 | JSON transport; cycles; duplicate gates; invalid command targets; parent scope; a grandchild; depth limit | [Validation and scope](../../../test/examples/99_research/99_04_child_topology_runtime/validation_test.exs) |
 
-## Proposed ownership model
+## Ownership model
 
 ```text
 Parent Runtime supervisor
@@ -60,7 +56,7 @@ with `{child, id, status}` data. It does not receive the child's private
 lifecycle stream. An event export is an explicit bridge into the parent Bus.
 An empty export list leaves the Buses isolated.
 
-## Proposed public data and API
+## Public data and API
 
 The source contains this data form:
 
@@ -71,7 +67,8 @@ The source contains this data form:
   activation: :lazy,
   gate: %{
     commands: [%{type: "examples.research.child_runtime.record", member: :alice}],
-    events: ["examples.research.child_runtime.completed"]
+    events: ["examples.research.child_runtime.completed"],
+    to: :signals
   },
   max_restarts: 1,
   max_seconds: 5
@@ -83,7 +80,7 @@ passes the entries to `Topology.new/1` in `children`. Constructor validation
 must reject cycles, duplicate child keys, and missing command targets. Runtime
 validation must reject a target beyond `max_depth` before process startup.
 
-The proposed Runtime functions use the Jido instance and Topology ID:
+The Runtime functions use the Jido instance and Topology ID:
 
 - `call(jido, id, member, signal, opts)` selects an Agent or `{:child, key}` gate.
 - `activate(jido, id, :all)` activates a deferred target.
@@ -95,10 +92,10 @@ The proposed Runtime functions use the Jido instance and Topology ID:
   `director/2`, and `controller/2` expose owned processes.
 - `await_gate_idle/4` provides a completion barrier for event forwarding.
 
-The last function is a proposed observation boundary. It lets the tests check
+The last function is a completion boundary. It lets the tests check
 event isolation after forwarding has completed, without a sleep timer.
 
-## Failure and recovery choices for review
+## Failure and recovery
 
 Lazy readiness permits dormant children and members. A child failure degrades
 parent readiness while the parent processes stay running. Child restart limits
@@ -108,13 +105,13 @@ restart that branch; the gate cannot retry without a limit.
 
 An expired activation deadline returns `{:error, :activation_timeout}` and does
 not deliver that call's Signal. A command outside the gate returns
-`{:error, :command_not_allowed}` before child startup. Member and child restart
-retain committed state. Parent shutdown stops all owned child processes.
+`{:error, :command_not_allowed}` before child startup. A clean child stop leaves a failed gate with `{:error, :child_stopped}`.
+It cannot start again through a call. Member and child restart retain committed
+state. Parent shutdown stops all owned child processes.
 
-These exact API names, status fields, errors, event payloads, Bus policy, and
-restart policy are review choices. The tests describe them; they are not yet
-implemented or approved. The related
-[API review note](../API_REVIEW.md) also covers the member definition field.
+Review these API names, status fields, errors, event payloads, Bus policy,
+and restart policy in the PR. The [API review note](../API_REVIEW.md) also
+states the member selector, JSON versions, and restore rules.
 
 ## Run it
 
@@ -124,15 +121,10 @@ Run from the local `jido` V3 repository:
 mix test test/examples/99_research/99_04_child_topology_runtime --include example --seed 0
 ```
 
-Expected result: static include and standalone stored member controls pass.
-Runtime tests fail because
-`children`, the generated child specification, or `Jido.Topology.Runtime` is
-missing. Stored member cases first fail with `Expected an Agent module`.
-The command exits with status 2. Tests stay enabled. Later runtime assertions
-have not yet run, so they do not prove the proposed recovery or isolation.
+Expected result: all 32 tests pass. They check startup, concurrent commands,
+event isolation, branch limits, committed state recovery, and process cleanup.
+The tests call core APIs directly, with no application runtime adapter.
 
-Test calls use `apply/3` only to compile before Runtime exists. They call the
-proposed API directly. There is no mock runtime or application adapter.
 Test support: [runtime assertions](../../../test/examples/support/child_topology_runtime_assertions.ex),
 [process cleanup](../../../test/examples/support/topology_assertions.ex).
 
@@ -140,8 +132,8 @@ Test support: [runtime assertions](../../../test/examples/support/child_topology
 
 These examples use local processes, trusted compiled code, in-memory JSON,
 and ETS persistence. They do not test remote placement, machine loss, idle
-eviction, distributed ownership, or an external database. New child DSL syntax
-is deferred until user review. Promote the examples after the public contract
-is approved, implemented, and all required tests pass.
+eviction, distributed ownership, or an external database. New child DSL block syntax
+needs a separate review. Keep these examples in research until the PR contract
+is accepted, then promote them to the main topology catalog.
 
 Return to the [research catalog](../README.md).

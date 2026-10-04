@@ -14,14 +14,13 @@ The distributed-authority test starts local peer nodes. It proves the external
 fencing workaround. It does not prove the missing Jido `DIST-03` contract.
 
 The member tests cover startup, mixed members, live additions, groups, static
-composition, transport, validation, and recovery. Module controls pass. Neutral
-Topology members fail with `Expected an Agent module`. The DSL argument probe
-also records the current atom restriction.
+composition, transport, validation, and recovery. DSL, data, and JSON forms
+now pass through the same core contract.
 
 The child runtime tests cover ownership, activation modes, gates, event exports,
-Bus isolation, lifecycle, recovery, and nesting validation. The static include
-control passes. The proposed Runtime and child field do not exist yet.
+Bus isolation, lifecycle, recovery, and nesting validation. Static include
+continues to compose one Controller target.
 
-All desired-contract tests stay enabled. They describe required behavior after
-the first failing boundary; they do not yet prove that behavior for data members
-or child runtimes. See the [API review note](../../../examples/99_research/API_REVIEW.md).
+The first commit in this PR records the failing examples. The tests stay
+enabled and now verify the implementation. Review the public contract in the
+[API review note](../../../examples/99_research/API_REVIEW.md) before merge.

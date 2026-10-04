@@ -23,13 +23,13 @@ try do
     {:ok, alice} = Example.stored_alice()
     IO.puts("Alice decoded from JSON. Adding Alice to the running topology.")
 
-    # This fails on current V3 before the Controller receives the new target.
+    # Add the stored definition through the normal validated target update.
     {:ok, target} = Example.expanded(initial, alice)
     :ok = Controller.update(controller, target)
     :ok = Controller.await_ready(controller)
 
     alice_server = Controller.whereis_agent(controller, :alice)
-    IO.inspect(AgentServer.agent(alice_server).state, label: "Alice state")
+    IO.puts("Alice state: #{inspect(AgentServer.agent(alice_server).state)}")
   after
     :ok = Supervisor.stop(controller)
   end

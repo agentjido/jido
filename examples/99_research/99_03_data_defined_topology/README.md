@@ -1,14 +1,15 @@
 # 99_03 DSL and Data Topology Members
 
-Status: enabled failing examples for [issue 394](https://github.com/agentjido/jido/issues/394).
-These examples define the required behavior before the core fix.
+Status: core fix implemented for review. The examples first failed for
+[issue 394](https://github.com/agentjido/jido/issues/394) in the first examples commit in this PR.
 
-## Current public contract
+## Public contract
 
-`Jido.Agent.new/1` and `Jido.Agent.Codec` produce neutral Agent definitions.
-`Jido.start_agent/3` can start these values. Topology Agent and group entries
-accept compiled Agent modules only. DSL, data, and JSON Topology definitions
-already use the same planning contract for module members.
+DSL, data, and JSON Topologies use the same planning and runtime contract.
+An Agent or group selects a compiled `module` or a neutral `definition`.
+Exactly one selector is required. A neutral definition can come from an Agent
+DSL module, direct data, or Agent Codec JSON. The Controller preserves its
+schema, routes, metadata, and Plugins.
 
 ## Approaches and executable evidence
 
@@ -21,9 +22,9 @@ already use the same planning contract for module members.
 | Static composition | [composition.ex](composition.ex) | [Composition tests](../../../test/examples/99_research/99_03_data_defined_topology/composition_test.exs) | DSL or data parents include DSL or data children, retain exact member definitions, and resolve exports. |
 | JSON transport | [transport.ex](transport.ex) | [Transport tests](../../../test/examples/99_research/99_03_data_defined_topology/transport_test.exs) | The Topology Codec retains definitions and plans. Decoded targets start and execute the selected routes. |
 | Recovery | [recovery.ex](recovery.ex) | [Recovery tests](../../../test/examples/99_research/99_03_data_defined_topology/recovery_test.exs) | Member restart, Bus repair, and Jido plus Controller restart retain the selected definition and committed state. |
-| Direct DSL argument | [DSL fixture](fixtures/direct_dsl.exs) | [DSL argument test](../../../test/examples/99_research/99_03_data_defined_topology/startup_test.exs) | Probe a neutral value in the existing positional Agent argument. This is a syntax proposal for review. |
+| DSL definition selector | [DSL fixture](fixtures/direct_dsl.exs) | [DSL argument test](../../../test/examples/99_research/99_03_data_defined_topology/startup_test.exs) | Use `agent :alice, definition: stored` and validate it through the common constructor. |
 
-Every blocked behavior has a passing module control. Direct and JSON Agent
+Each data approach has a compiled module control. Direct and JSON Agent
 values also execute alone. Alice, Bob, and Charlie share [Worker](worker.ex)
 behavior but have different schemas, routes, metadata, and Plugin selections.
 Bob has no [RecordCount Plugin](record_count.ex). The tests check these values,
@@ -54,12 +55,8 @@ To run one approach, use its test file from the table:
 mix test test/examples/99_research/99_03_data_defined_topology/groups_test.exs --include example --seed 0
 ```
 
-Expected result: module controls and standalone data Agent execution pass.
-Neutral Topology members fail at construction with `Expected an Agent module`.
-The direct DSL argument fails at compile time because Spark requires an atom.
-The tests stay enabled. The command exits with status 2 until the contract is
-implemented. Assertions after those failures describe the required behavior;
-they have not yet run for neutral members.
+Expected result: all 58 tests pass. They check exact selected definitions,
+resolved state, command results, recovery, and process cleanup.
 
 Run the original demonstration:
 
@@ -68,24 +65,19 @@ mix run examples/99_research/99_03_data_defined_topology/demo.exs
 ```
 
 It starts the DSL Topology, commits Observer total 7, decodes Alice from JSON,
-then fails before `Controller.update/3`. Cleanup stops the Controller and Jido.
-The command exits with status 1.
+and adds Alice through `Controller.update/3`. Existing Observer state and PID
+stay unchanged. Cleanup stops the Controller and Jido. The command exits with
+status 0.
 
 ## Contract for review
 
-The examples use the current `module` data field to expose its restriction.
-The shared `Definitions.entry/3` builder keeps that choice in one place.
-The DSL-based targets start from `.topology()` and replace member entries in
-the returned value. They do not change the compiled DSL definition.
+`Definitions.entry/3` selects `module` or `definition`. The direct DSL fixture
+uses `definition:`. The existing module argument remains exclusive to compiled
+modules. The fixture is compiled by the tests, outside normal source compilation.
 
-The `.exs` fixture probes existing DSL syntax. It is not part of normal source
-compilation. These examples do not approve overloading `module`, adding a
-separate `definition` field, or changing DSL syntax. Any DSL change requires
-user review before implementation.
-
-Recovery uses the same supplied definition and persistence store. The examples
-do not choose a policy for loading a changed stored document, version upgrades,
-or replacement of an existing live member.
+See the [API review note](../API_REVIEW.md) for the DSL change, JSON versions,
+and restore policy. The supplied definition is a snapshot. Additive updates
+cannot replace an existing member definition or fetch a changed stored document.
 
 ## Limits and promotion
 
@@ -94,8 +86,8 @@ entries, and ETS persistence. They do not prove database storage, remote
 placement, distributed ownership, or recovery after machine loss. Static
 `include` composes one Controller target; it does not create a child runtime.
 
-Promote the examples after the core contract is implemented, the required
-tests pass, and the DSL and version contracts have been reviewed.
+Keep these examples in research for PR review. Promote them after the DSL and
+version contracts are accepted.
 
 Test support: [definition and execution assertions](../../../test/examples/support/data_topology_assertions.ex),
 [process cleanup](../../../test/examples/support/topology_assertions.ex).

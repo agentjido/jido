@@ -1,59 +1,76 @@
 # Topology API Review: Issues 394 and 395
 
-Status: proposal only. No core or DSL changes have been made.
+Status: implementation candidate for PR review. The first commit records the
+failing examples. The later commits implement the core fix. Review these
+public contracts before merge, including the DSL member selector.
 
 ## Member selection
 
-Keep the current compiled module form:
+The compiled module form stays valid:
 
 ```elixir
 agent :alice, Worker, initial_state: %{total: 2}
 %{key: :alice, module: Worker, initial_state: %{total: 2}}
 ```
 
-Add a separate neutral definition form:
+The neutral definition has a separate selector:
 
 ```elixir
 agent :alice, definition: stored_alice, initial_state: %{total: 2}
 %{key: :alice, definition: stored_alice, initial_state: %{total: 2}}
 ```
 
-Use the same choice for groups. Exactly one of `module` and `definition` is
-required. Retain the selected neutral definition in the plan and use it during
-activation. Validate the definition and resolved initial state before startup.
-Use Agent Codec rules and the trusted Registry for Topology JSON transport.
+Groups use the same selector. Exactly one selector is required. An Agent
+instance is not a definition. Planning retains the exact definition and checks
+resolved state before startup. Activation uses that selected schema, routes,
+metadata, and Plugins. The existing positional module argument accepts a
+compiled module only.
 
-The [member examples](99_03_data_defined_topology/README.md) currently pass
-neutral values through `module` to expose the old restriction. If this proposal
-is approved, update their common builder and direct DSL fixture to use
-`definition`. The current positional DSL probe does not approve overloading
-the module argument.
+See the [member examples](99_03_data_defined_topology/README.md).
 
 ## Runtime and child gates
 
-Generate `child_spec/1` from `use Jido.Topology`. Delegate to
-`Jido.Topology.Runtime`, which starts and owns the director, Controller,
-members, and resources. Support eager, deferred, and lazy activation.
+`use Jido.Topology` generates `child_spec/1`, which delegates to
+`Jido.Topology.Runtime`. The Runtime owns an optional director, Controller,
+members, resources, and child branches. Eager mode starts all local members.
+Deferred and lazy modes start control processes only. Calls start the requested
+dependency closure. Publication delivers to active Bus subscribers only.
 
-Add a separate `children` data field for runtime nesting. A child entry selects
-a DSL or neutral Topology, an optional neutral director, one gate, an activation
-mode, and branch restart limits. The gate declares accepted commands and
-exported events. It starts the child on demand and uses parent-scoped identity.
+A `children` data entry selects a DSL or neutral Topology, an optional neutral
+director, input mapping, activation mode, gate, and branch restart limits.
+The gate declares exact command types and member targets. Event exports need
+an explicit `to` parent Bus target. Empty exports keep the Buses separate.
+Child identity is scoped under the parent ID. Each child owns its director,
+Controller, members, and resources. Static `include` still makes one Controller
+plan and rejects runtime children. There is no new child DSL block grammar.
 
-The [child examples](99_04_child_topology_runtime/README.md) specify lookup,
-call, readiness, publication, lifecycle, recovery, and completion APIs. Those
-names and policies require review. Static `include` keeps its current meaning.
-Start with child data declarations; propose new child DSL grammar separately.
+See the [child examples](99_04_child_topology_runtime/README.md) for status,
+lookup, deadlines, lifecycle events, recovery, and shutdown contracts.
 
-## Decisions that remain open
+## Version and restore rules
 
-- Approve the separate `definition` field and its DSL form, or select a different form.
-- Approve the generated Topology child specification and Runtime ownership.
-- Review the child gate data form, status and error fields, event bridge,
-  active-subscriber Bus policy, and per-child restart limits.
-- Define version and restore behavior before the core fix is complete.
-  Current examples restore the same supplied source; they do not select a
-  policy for a changed stored definition.
+Topology Codec version 2 remains the format for module-only definitions.
+Version 3 adds neutral member definitions and child runtime definitions.
+Both decode through the trusted Registry. A version 2 document cannot contain
+the new fields. Stored strings cannot select new atoms or executable modules.
 
-The user's instruction requires review and approval before any DSL change.
-These files make that proposed change available for review.
+The authored Agent version stays in the source definition and execution plan.
+The Controller derives an unversioned runtime definition because it adds
+ownership metadata and Bus input Plugins. On restart it uses the current
+accepted definition and restores committed state through Jido. State must pass
+that definition's schema. Jido does not fetch a changed database document.
+Existing members cannot change through an additive update. Such changes need
+explicit replacement or the existing Agent upgrade API.
+
+A local checkpoint survives member failure and ancestor runtime failure.
+An explicit runtime stop removes local checkpoints. Jido instance loss removes
+its local store; recovery then requires the configured persistence adapter.
+The runtime owner PID is runtime configuration and is never a stored definition.
+
+## Review scope
+
+Review the `definition:` DSL selector, generated child specification, Runtime
+API names, gate data form, event target, status and error fields, Bus policy,
+and restore rules. Keep these examples in research until the PR contract is
+accepted. Promotion to the main example catalog is a separate documentation
+change after review.

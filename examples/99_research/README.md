@@ -1,6 +1,6 @@
 # Research probes
 
-This section records unsupported core contracts.
+This section records open contracts and implementation candidates for review.
 
 1. [Distributed Authority](99_02_distributed_authority/README.md) — use an
    external ownership token to fence two local Erlang nodes.
@@ -20,11 +20,9 @@ mix test test/examples/99_research --include example --seed 0
 Expected result: the external authority admits only its newest token. The core
 DIST-03 test remains skipped because Jido itself cannot guarantee that one
 logical identity has at most one live cluster owner.
-The member examples have enabled failing tests for issue 394. Neutral members
-fail during construction with `Expected an Agent module`.
-The child runtime examples also have enabled failing tests for issue 395 and
-the additional runtime nesting contract. Their missing boundaries are the
-`children` field, generated child specification, and `Jido.Topology.Runtime`.
+The member and child runtime examples first failed in the first examples commit in this PR.
+They now pass with the implementation candidate for issues 394 and 395.
+See the API review note before accepting the DSL and runtime contracts.
 
 ## Promotion rule
 
