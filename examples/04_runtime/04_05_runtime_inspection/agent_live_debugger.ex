@@ -17,7 +17,9 @@ defmodule Jido.Examples.AgentLiveDebugger do
     signal_source "/examples/runtime/inspection"
 
     route "examples.runtime.inspection.record", as: :record_result do
-      action %{result: result}, context: context do
+      action %{result: result},
+        schema: Zoi.object(%{result: Zoi.string()}),
+        context: context do
         {:ok, %{context.agent_state | status: "complete", result: result}}
       end
     end

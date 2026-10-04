@@ -18,10 +18,10 @@ example for an application policy that only combines capabilities that the
 learning path already covers. Put that policy in a guide or a larger demo
 unless the composition itself teaches a new Jido contract.
 
-Groups `01` through `10` are the stable learning path. Group `99_research`
-records proposed, incomplete, or not yet promoted behavior. A research example
-must state its status and must not present unsupported behavior as the normal
-Jido pattern.
+All numbered groups other than `99_research` are the stable learning path.
+Group `99_research` records proposed, incomplete, or not yet promoted behavior.
+A research example must state its status and must not present unsupported
+behavior as the normal Jido pattern.
 
 A research README must name the current public contract, the remaining gap or
 reason that promotion is deferred, the executable evidence, and the proof

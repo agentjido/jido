@@ -15,8 +15,10 @@ defmodule JidoTest.Examples.Runtime.InspectionFixture do
     signal_source "/test/runtime_inspection"
 
     route "test.runtime.inspect", as: :record_result do
-      action %{result: result}, context: context do
-        context.inspection_barrier.()
+      action %{result: result},
+        schema: Zoi.object(%{result: Zoi.string()}),
+        context: context do
+        JidoTest.Examples.RuntimeBarrier.wait()
         {:ok, %{context.agent_state | status: "complete", result: result}}
       end
     end
@@ -31,6 +33,13 @@ defmodule JidoTest.Examples.Runtime.AgentLiveDebuggerTest do
 
   alias Jido.Examples.AgentLiveDebugger
   alias JidoTest.Examples.Runtime.InspectionFixture
+  alias JidoTest.Examples.RuntimeBarrier
+
+  setup do
+    start_supervised!(RuntimeBarrier)
+    :ok = RuntimeBarrier.arm(self())
+    :ok
+  end
 
   test "a snapshot uses public inspection and removes secrets", %{jido: jido} do
     agent = start_agent!(jido, AgentLiveDebugger, initial_state: %{secret_token: "secret"})
@@ -48,32 +57,20 @@ defmodule JidoTest.Examples.Runtime.AgentLiveDebuggerTest do
   end
 
   test "inspection reads the committed state while an Action is still running", %{jido: jido} do
-    owner = self()
-
-    barrier = fn ->
-      send(owner, {:inspection_waiting, self()})
-
-      receive do
-        :release -> :ok
-      after
-        5000 -> raise "inspection barrier was not released"
-      end
-    end
-
     agent = start_agent!(jido, InspectionFixture)
 
     task =
       Task.async(fn ->
         {:ok, route_signal_2} = InspectionFixture.record_result_signal(%{result: "later"})
-        Jido.AgentServer.call(agent, route_signal_2, context: %{inspection_barrier: barrier})
+        Jido.AgentServer.call(agent, route_signal_2)
       end)
 
-    assert_receive {:inspection_waiting, worker}, 1000
+    assert_receive :runtime_barrier_waiting, 1_000
     snapshot = AgentLiveDebugger.snapshot(agent)
     assert snapshot.state == %{status: "idle", result: ""}
     assert snapshot.state_version == 0
     refute snapshot.runtime_status == :idle
-    send(worker, :release)
+    assert :ok = RuntimeBarrier.release()
     assert {:ok, _} = Task.await(task)
     snapshot = AgentLiveDebugger.snapshot(agent)
     assert snapshot.state.result == "later"
