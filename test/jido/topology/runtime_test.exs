@@ -66,6 +66,64 @@ defmodule Jido.Topology.RuntimeTest do
     assert is_pid(Runtime.whereis_member(c.jido, id, :counter))
   end
 
+  test "a waiting first call permits automatic repair after a start failure", c do
+    id = unique_id("waiting_repair")
+
+    target =
+      Topology.new!(
+        name: "waiting_repair",
+        startup: %{retry_interval: 300},
+        agents: [%{key: :counter, module: CounterAgent}]
+      )
+
+    {:ok, instance} = Topology.instantiate(target, id: id)
+    member_id = instance.plan.agents["agent/counter"].id
+    {:ok, foreign} = Jido.start_agent(c.jido, CounterAgent, id: member_id)
+    start_supervised!({Runtime, jido: c.jido, id: id, topology: target, activation: :lazy})
+
+    caller = Task.async(fn -> Runtime.call(c.jido, id, :counter, add(), timeout: 1_500) end)
+
+    eventually(fn ->
+      match?(
+        %{errors: %{"agent/counter" => :agent_identity_in_use}},
+        Runtime.status(c.jido, id)
+      )
+    end)
+
+    monitor = Process.monitor(foreign)
+    assert :ok = Jido.stop_agent(c.jido, foreign)
+    assert_receive {:DOWN, ^monitor, :process, ^foreign, _}, 5_000
+
+    assert {:ok, %{state: %{count: 1}}} = Task.await(caller, 5_000)
+    assert %{active_members: 1, errors: %{}} = Runtime.status(c.jido, id)
+  end
+
+  test "readiness includes gateway and child status queries in its deadline", c do
+    id = unique_id("readiness_deadline")
+
+    target =
+      Topology.new!(
+        name: "readiness_deadline",
+        children: [%{key: :team, topology: %{name: "leaf"}}]
+      )
+
+    start_supervised!({Runtime, jido: c.jido, id: id, topology: target, activation: :lazy})
+    assert :ok = Runtime.await_ready(c.jido, id)
+
+    for role <- [:gateway, {:gate, "team"}] do
+      pid = GenServer.whereis(Controller.name(c.jido, id, role))
+      assert :ok = :sys.suspend(pid)
+
+      try do
+        started = System.monotonic_time(:millisecond)
+        assert {:error, :activation_timeout} = Runtime.await_ready(c.jido, id, 30)
+        assert System.monotonic_time(:millisecond) - started < 500
+      after
+        :sys.resume(pid)
+      end
+    end
+  end
+
   test "bad runtime options and unresolved child state fail before process startup", c do
     for extra <- [
           [activation: :bad],

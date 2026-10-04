@@ -53,7 +53,10 @@ defmodule Jido.Topology.Controller do
   end
 
   @doc "Starts a local controller. Returns before the topology is ready."
-  def start_link(opts) do
+  def start_link(opts), do: start_link(opts, nil)
+
+  @doc false
+  def start_link(opts, parent_gate) do
     with {:ok, opts} <- Authoring.attrs(opts),
          :ok <-
            Authoring.keys(opts, [
@@ -83,7 +86,7 @@ defmodule Jido.Topology.Controller do
       Supervisor.start_link(
         __MODULE__,
         {jido, instance, repair, lifecycle, activation, checkpoint_owner, max_restarts,
-         max_seconds},
+         max_seconds, parent_gate},
         name: name(jido, instance.id, :controller)
       )
     else
@@ -95,7 +98,7 @@ defmodule Jido.Topology.Controller do
   @impl true
   def init(
         {jido, instance, repair, lifecycle, activation, checkpoint_owner, max_restarts,
-         max_seconds}
+         max_seconds, parent_gate}
       ) do
     with {:ok, owner} <- Topology.Controller.Owner.start(jido, self(), instance.id) do
       children = [
@@ -110,7 +113,7 @@ defmodule Jido.Topology.Controller do
         ),
         supporting_child({Task.Supervisor, name: name(jido, instance.id, :tasks)}),
         {Topology.Controller.Runtime,
-         {jido, instance, repair, lifecycle, owner, activation, checkpoint_owner}}
+         {jido, instance, repair, lifecycle, owner, activation, checkpoint_owner, parent_gate}}
       ]
 
       Supervisor.init(children, strategy: :one_for_one, auto_shutdown: :any_significant)

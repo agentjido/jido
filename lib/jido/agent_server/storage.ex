@@ -153,12 +153,11 @@ defmodule Jido.AgentServer.Storage do
 
   def delete_runtime_checkpoint(reason, %State{} = data) do
     owner = Map.get(data.config, :checkpoint_owner)
-    # An ancestor failure sends normal shutdown to descendants. Keep the
-    # committed checkpoint when the runtime owner has already died.
-    if Shutdown.clean?(reason) and
-         (is_nil(owner) or Jido.AgentServer.Liveness.check(owner, :owner_down) == :ok),
-       do: RuntimeCheckpoint.delete(data),
-       else: :ok
+    # A sibling failure also causes clean descendant shutdown. The runtime
+    # owner clears its checkpoints after the complete tree stops cleanly.
+    if Shutdown.clean?(reason) and is_nil(owner),
+      do: RuntimeCheckpoint.delete(data),
+      else: :ok
   end
 
   defp persistence_write_opts(data, version, reason, extra_opts \\ []) do

@@ -12,7 +12,10 @@ defmodule Jido.Topology.Child do
         Authoring.error("Expected a topology module")
 
       function_exported?(module, :__topology_config__, 0) ->
-        director = if module.__topology_owner__?(), do: module.owner()
+        director =
+          if function_exported?(module, :__topology_owner__?, 0) and module.__topology_owner__?(),
+            do: module.owner()
+
         {:ok, module.__topology_config__(), director, [module | ancestors]}
 
       function_exported?(module, :topology, 0) ->

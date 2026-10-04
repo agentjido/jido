@@ -29,7 +29,10 @@ defmodule Jido.Topology.Runtime do
   end
 
   @doc "Validates the complete target before starting its supervision tree."
-  def start_link(opts) do
+  def start_link(opts), do: start_link(opts, nil)
+
+  @doc false
+  def start_link(opts, parent_gate) do
     with {:ok, opts} <- Authoring.attrs(opts),
          :ok <-
            Authoring.keys(opts, [
@@ -63,6 +66,8 @@ defmodule Jido.Topology.Runtime do
           jido: jido,
           instance: instance,
           director: director,
+          parent_gate: parent_gate,
+          checkpoint_scope: if(parent_gate, do: parent_gate.checkpoint_scope, else: id),
           activation: activation,
           repair: Map.get(opts, :repair, :automatic)
         })
@@ -102,7 +107,7 @@ defmodule Jido.Topology.Runtime do
 
   @impl true
   def init(config) do
-    {:ok, watcher} = Owner.start(config.jido, config.id, self())
+    {:ok, watcher} = Owner.start(config, self())
     config = Map.put(config, :owner, watcher)
 
     owner =
@@ -110,7 +115,7 @@ defmodule Jido.Topology.Runtime do
         [
           %{
             id: :director,
-            start: {__MODULE__, :start_director, [config, self()]},
+            start: {__MODULE__, :start_director, [config, watcher]},
             type: :worker,
             restart: :transient,
             significant: true,
@@ -123,7 +128,7 @@ defmodule Jido.Topology.Runtime do
 
     controller = %{
       id: Controller,
-      start: {__MODULE__, :start_controller, [config, self()]},
+      start: {__MODULE__, :start_controller, [config, watcher]},
       type: :supervisor,
       restart: :transient,
       significant: true,
@@ -164,19 +169,23 @@ defmodule Jido.Topology.Runtime do
     with :ok <- owner_ready(director) do
       result =
         Controller.start_link(
-          jido: config.jido,
-          topology: config.instance,
-          lifecycle: director,
-          checkpoint_owner: checkpoint_owner,
-          activation: config.activation,
-          repair: config.repair,
-          max_restarts: Map.get(config, :max_restarts, 3),
-          max_seconds: Map.get(config, :max_seconds, 5)
+          [
+            jido: config.jido,
+            topology: config.instance,
+            lifecycle: director,
+            checkpoint_owner: checkpoint_owner,
+            activation: config.activation,
+            repair: config.repair,
+            max_restarts: Map.get(config, :max_restarts, 3),
+            max_seconds: Map.get(config, :max_seconds, 5)
+          ],
+          config.parent_gate
         )
 
       case result do
         {:ok, pid} ->
           Owner.track(config.owner, pid)
+          Owner.track(config.owner, lookup(config.jido, config.id, :owner))
           {:ok, pid}
 
         error ->
@@ -236,11 +245,23 @@ defmodule Jido.Topology.Runtime do
       Gateway.safely(fn ->
         with_controller(jido, id, fn controller ->
           with :ok <- Controller.await_active(controller, Gateway.remaining(deadline)),
-               %{children: children} <- status(jido, id),
-               do: Gate.await_children(jido, id, children, Gateway.remaining(deadline))
+               do: await_children(jido, id, deadline)
         end)
       end)
     end
+  end
+
+  defp await_children(jido, id, deadline) do
+    config =
+      GenServer.call(Controller.name(jido, id, :gateway), :config, Gateway.remaining(deadline))
+
+    children =
+      Map.new(config.instance.definition.children, fn child ->
+        {child.key, Gate.status(jido, id, child.key, Gateway.remaining(deadline))}
+      end)
+
+    with :ok <- Gateway.check(deadline),
+         do: Gate.await_children(jido, id, children, Gateway.remaining(deadline))
   end
 
   @doc "Waits until the child gate has completed its current forwarding work."

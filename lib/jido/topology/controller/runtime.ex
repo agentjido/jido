@@ -20,15 +20,17 @@ defmodule Jido.Topology.Controller.Runtime do
   @live_query_timeout 100
   @live_retry_interval 100
 
-  def start_link({jido, instance, repair, lifecycle, owner, activation, checkpoint_owner}),
-    do:
-      GenServer.start_link(
-        __MODULE__,
-        {jido, instance, repair, lifecycle, owner, activation, checkpoint_owner}
-      )
+  def start_link(
+        {jido, instance, repair, lifecycle, owner, activation, checkpoint_owner, parent_gate}
+      ),
+      do:
+        GenServer.start_link(
+          __MODULE__,
+          {jido, instance, repair, lifecycle, owner, activation, checkpoint_owner, parent_gate}
+        )
 
   @impl true
-  def init({jido, instance, repair, lifecycle, owner, activation, checkpoint_owner}) do
+  def init({jido, instance, repair, lifecycle, owner, activation, checkpoint_owner, parent_gate}) do
     Process.flag(:trap_exit, true)
 
     with {:ok, accepted, revision, placements, pending_move} <- TargetStore.load(jido, instance) do
@@ -51,6 +53,7 @@ defmodule Jido.Topology.Controller.Runtime do
         repair: repair,
         activation: activation,
         checkpoint_owner: checkpoint_owner,
+        parent_gate: parent_gate,
         selected: MapSet.new(),
         lifecycle: lifecycle,
         reconcile_requested: false,
@@ -692,8 +695,9 @@ defmodule Jido.Topology.Controller.Runtime do
 
   defp schedule_reconcile(%{repair: :manual} = state), do: state
 
+  defp schedule_reconcile(%{reconcile_timer: timer} = state) when not is_nil(timer), do: state
+
   defp schedule_reconcile(state) do
-    if state.reconcile_timer, do: Process.cancel_timer(state.reconcile_timer)
     token = make_ref()
 
     timer =
@@ -708,7 +712,11 @@ defmodule Jido.Topology.Controller.Runtime do
 
   defp task_context(key, member, state) do
     if Map.has_key?(state.instance.plan.resources, key) do
-      %{jido: state.jido, pool: Controller.name(state.jido, state.instance.id, :resources)}
+      %{
+        jido: state.jido,
+        pool: Controller.name(state.jido, state.instance.id, :resources),
+        parent_gate: Map.get(state, :parent_gate)
+      }
     else
       bus_ids =
         Map.new(member.subscriptions, fn sub ->

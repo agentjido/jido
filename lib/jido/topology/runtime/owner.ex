@@ -1,6 +1,8 @@
 defmodule Jido.Topology.Runtime.Owner do
   @moduledoc false
-  alias Jido.Topology.{Controller, Runtime}
+  require Logger
+  alias Jido.AgentServer.{RuntimeCheckpoint, Shutdown}
+  alias Jido.Topology.{Child, Controller, Runtime}
 
   # The watcher lives in Jido, outside the replaceable runtime. A killed
   # supervisor cannot wait for descendant shutdown before OTP restarts it.
@@ -23,17 +25,26 @@ defmodule Jido.Topology.Runtime.Owner do
     end
   end
 
-  def start(jido, id, runtime) do
+  def start(config, runtime) do
+    jido = config.jido
+    id = config.id
+
+    scope = %{
+      jido: jido,
+      keys: owner_keys(config.instance.definition, id, config.checkpoint_scope),
+      parent_gate: config.parent_gate
+    }
+
     caller = self()
     token = make_ref()
 
     with {:ok, pid} <-
            Task.Supervisor.start_child(Jido.task_supervisor_name(jido), fn ->
              {:via, Registry, {registry, key}} = Controller.name(jido, id, :runtime_owner)
-             {:ok, _} = Registry.register(registry, key, nil)
+             {:ok, _} = Registry.register(registry, key, {:checkpoint_owner, hd(scope.keys)})
              monitor = Process.monitor(runtime)
              send(caller, {token, :ready})
-             watch(runtime, monitor, [])
+             watch(scope, runtime, monitor, [])
            end) do
       ref = Process.monitor(pid)
 
@@ -55,11 +66,45 @@ defmodule Jido.Topology.Runtime.Owner do
 
   def track(owner, pid), do: send(owner, {:track, pid})
 
-  defp watch(runtime, monitor, children) do
+  defp watch(config, runtime, monitor, children) do
     receive do
-      {:track, pid} -> watch(runtime, monitor, [pid | children])
-      {:DOWN, ^monitor, :process, ^runtime, _} -> Enum.each(children, &await_child/1)
+      {:track, pid} ->
+        watch(config, runtime, monitor, [pid | children])
+
+      {:DOWN, ^monitor, :process, ^runtime, reason} ->
+        Enum.each(children, &await_child/1)
+        registry = Jido.registry_name(config.jido)
+
+        for {_, key} = scope <- tl(config.keys),
+            {pid, {:checkpoint_owner, ^scope}} <- Registry.lookup(registry, key),
+            do: await_child(pid)
+
+        if Shutdown.clean?(reason) and live_parent_gate?(config.parent_gate) do
+          case RuntimeCheckpoint.delete_owned(config.jido, config.keys) do
+            :ok ->
+              :ok
+
+            {:error, reason} ->
+              Logger.error("Runtime checkpoint cleanup failed: #{inspect(reason)}")
+          end
+        end
     end
+  end
+
+  defp owner_keys(definition, id, scope) do
+    [
+      {scope, {:topology, id, :runtime_owner}}
+      | Enum.flat_map(definition.children, &owner_keys(&1.topology, Child.id(id, &1.key), scope))
+    ]
+  end
+
+  defp live_parent_gate?(nil), do: true
+
+  defp live_parent_gate?(%{name: name, supervisor: supervisor}) do
+    with pid when is_pid(pid) <- GenServer.whereis(name),
+         {:links, links} <- Process.info(pid, :links),
+         do: supervisor in links,
+         else: (_ -> false)
   end
 
   defp await_child(pid) do

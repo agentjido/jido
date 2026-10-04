@@ -31,11 +31,14 @@ defmodule Jido.Topology.Runtime.GateServer do
       failure: nil
     }
 
-    if child.activation == :eager, do: {:ok, state, {:continue, :boot}}, else: {:ok, state}
+    if child.activation == :eager,
+      do: {:ok, state, {:continue, :boot}},
+      else: {:ok, state, {:continue, :refresh}}
   end
 
   @impl true
   def handle_continue(:boot, state), do: {:noreply, boot(state)}
+  def handle_continue(:refresh, state), do: {:noreply, refresh(state) |> subscribe()}
 
   @impl true
   def handle_call(:status, _, state) do
@@ -94,8 +97,11 @@ defmodule Jido.Topology.Runtime.GateServer do
 
     case result do
       {:ok, pid} ->
-        state = %{state | boot: nil} |> observe(pid) |> phase(:ready)
+        state = %{state | boot: nil} |> observe(pid) |> refresh() |> subscribe()
         state = Enum.reduce(state.queued, %{state | queued: []}, &dispatch/2)
+
+        if state.phase == :starting, do: Process.send_after(self(), :refresh_child, 10)
+
         {:noreply, idle(state)}
 
       {:error, reason} ->
@@ -139,6 +145,10 @@ defmodule Jido.Topology.Runtime.GateServer do
     {:noreply, idle(%{state | idle: [from | state.idle]})}
   end
 
+  def handle_info({:attached_bus, bus, subscription}, state) do
+    {:noreply, track_bus(state, bus, subscription)}
+  end
+
   def handle_info(:refresh_child, state) do
     state = refresh(state) |> subscribe()
 
@@ -177,7 +187,24 @@ defmodule Jido.Topology.Runtime.GateServer do
 
         options = Runtime.child_options(state.config, state.child)
 
-        case DynamicSupervisor.start_child(supervisor, {Runtime, options}) do
+        parent_gate = %{
+          name: Controller.name(state.config.jido, state.config.id, {:gate, state.child.key}),
+          checkpoint_scope: state.config.checkpoint_scope,
+          supervisor:
+            Runtime.lookup(
+              state.config.jido,
+              state.config.id,
+              {:gate_supervisor, state.child.key}
+            ),
+          events?: state.child.gate.events != []
+        }
+
+        child = %{
+          Runtime.child_spec(options)
+          | start: {Runtime, :start_link, [options, parent_gate]}
+        }
+
+        case DynamicSupervisor.start_child(supervisor, child) do
           {:ok, pid} ->
             {:ok, pid}
 
@@ -230,6 +257,8 @@ defmodule Jido.Topology.Runtime.GateServer do
         {:noreply, idle(state)}
     end
   end
+
+  defp refresh(%{boot: boot} = state) when not is_nil(boot), do: state
 
   defp refresh(state) do
     case Gate.whereis_child(state.config.jido, state.config.id, state.child.key) do
@@ -294,13 +323,9 @@ defmodule Jido.Topology.Runtime.GateServer do
       pid = Resource.whereis(resource, context)
 
       if is_pid(pid) and not Map.has_key?(state.buses, pid) do
-        case Jido.Signal.Bus.subscribe(pid, "**", target: self()) do
+        case Gate.attach_bus(%{name: self(), events?: true}, pid) do
           {:ok, subscription} ->
-            %{
-              state
-              | buses: Map.put(state.buses, pid, {subscription, Process.monitor(pid)}),
-                bridge_error: nil
-            }
+            track_bus(state, pid, subscription)
 
           {:error, reason} ->
             %{state | bridge_error: reason}
@@ -309,6 +334,18 @@ defmodule Jido.Topology.Runtime.GateServer do
         state
       end
     end)
+  end
+
+  defp track_bus(state, bus, subscription) do
+    if Map.has_key?(state.buses, bus) do
+      state
+    else
+      %{
+        state
+        | buses: Map.put(state.buses, bus, {subscription, Process.monitor(bus)}),
+          bridge_error: nil
+      }
+    end
   end
 
   defp idle(%{boot: nil, queued: [], jobs: jobs} = state) when map_size(jobs) == 0 do

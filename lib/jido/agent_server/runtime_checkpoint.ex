@@ -11,6 +11,7 @@ defmodule Jido.AgentServer.RuntimeCheckpoint do
   alias Jido.RuntimeStore
 
   @hive :agent_runtime_checkpoints
+  @locations :agent_checkpoint_locations
 
   @doc false
   @spec restore(Options.t()) ::
@@ -50,11 +51,15 @@ defmodule Jido.AgentServer.RuntimeCheckpoint do
   @spec put(State.t(), Agent.t(), non_neg_integer()) :: :ok | {:error, term()}
   def put(%State{jido: jido, partition: partition} = data, %Agent{} = agent, state_version)
       when is_atom(jido) and not is_nil(jido) do
-    RuntimeStore.put(jido, @hive, key(agent.id, partition), %{
-      agent: agent,
-      state_version: state_version,
-      upgrade_from_module: data.checkpoint_origin_module || data.agent.module
-    })
+    with {:ok, owner} <- owner_key(jido, Map.get(data.config, :checkpoint_owner)),
+         :ok <- track_location(jido, owner) do
+      RuntimeStore.put(jido, @hive, key(agent.id, partition), %{
+        agent: agent,
+        state_version: state_version,
+        upgrade_from_module: data.checkpoint_origin_module || data.agent.module,
+        owner: owner
+      })
+    end
   end
 
   def put(%State{}, %Agent{}, _state_version), do: :ok
@@ -67,6 +72,79 @@ defmodule Jido.AgentServer.RuntimeCheckpoint do
   end
 
   def delete(%State{}), do: :ok
+
+  # Registered owners retain one stable scope across process replacement.
+  # The owner clears the complete scope after its final clean shutdown.
+  @doc false
+  def delete_owned(jido, keys) do
+    with {:ok, entries} <- RuntimeStore.fetch_all(jido, @locations) do
+      locations = for {{key, target}, _} <- entries, key in keys, do: target
+
+      errors =
+        Enum.flat_map(Enum.uniq([node() | locations]), fn target ->
+          case on_node(target, __MODULE__, :delete_local_owned, [jido, node(), keys]) do
+            :ok ->
+              Enum.each(keys, &RuntimeStore.delete(jido, @locations, {&1, target}))
+              []
+
+            {:error, reason} ->
+              [{target, reason}]
+          end
+        end)
+
+      if errors == [], do: :ok, else: {:error, errors}
+    end
+  end
+
+  @doc false
+  def delete_local_owned(jido, owner_node, keys) do
+    with {:ok, entries} <- RuntimeStore.fetch_all(jido, @hive) do
+      Enum.reduce_while(entries, :ok, fn {key, record}, :ok ->
+        result =
+          case record do
+            %{owner: {^owner_node, owner_key}} ->
+              if owner_key in keys, do: RuntimeStore.delete(jido, @hive, key), else: :ok
+
+            _ ->
+              :ok
+          end
+
+        if result == :ok, do: {:cont, :ok}, else: {:halt, result}
+      end)
+    end
+  end
+
+  defp owner_key(_jido, nil), do: {:ok, nil}
+
+  defp owner_key(jido, owner) do
+    case on_node(node(owner), Registry, :keys, [Jido.registry_name(jido), owner]) do
+      [key] -> registered_owner(jido, owner, key)
+      {:error, _} = error -> error
+      _ -> {:ok, owner}
+    end
+  end
+
+  defp registered_owner(jido, owner, key) do
+    case on_node(node(owner), Registry, :lookup, [Jido.registry_name(jido), key]) do
+      [{^owner, {:checkpoint_owner, scope}}] -> {:ok, {node(owner), scope}}
+      {:error, _} = error -> error
+      _ -> {:ok, {node(owner), key}}
+    end
+  end
+
+  defp track_location(jido, {owner_node, key}) when owner_node != node(),
+    do: on_node(owner_node, RuntimeStore, :put, [jido, @locations, {key, node()}, true])
+
+  defp track_location(_jido, _owner), do: :ok
+
+  defp on_node(target, module, function, args) when target == node(),
+    do: apply(module, function, args)
+
+  defp on_node(target, module, function, args) do
+    :erpc.call(target, module, function, args, 5_000)
+  catch
+    kind, reason -> {:error, {:checkpoint_owner_unavailable, kind, reason}}
+  end
 
   defp fetch(jido, key) when is_atom(jido) and not is_nil(jido),
     do: RuntimeStore.fetch(jido, @hive, key)

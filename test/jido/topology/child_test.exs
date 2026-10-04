@@ -4,6 +4,18 @@ defmodule Jido.Topology.ChildTest do
   alias Jido.Topology.Codec
   alias JidoTest.AgentFixtures.CounterAgent
 
+  defmodule ConfigOnly do
+    def __topology_config__, do: %{name: "config_only"}
+  end
+
+  test "a custom topology config provider can be a child without a director" do
+    assert {:ok, %{children: [child]}} =
+             Topology.new(name: "parent", children: [%{key: :child, topology: ConfigOnly}])
+
+    assert child.topology.name == "config_only"
+    assert child.director == nil
+  end
+
   test "child authoring rejects invalid commands, event destinations, limits, and runtime values" do
     child = %{
       key: :child,

@@ -14,11 +14,15 @@ defmodule Jido.Topology.Runtime.Gate do
     }
   end
 
-  def start_link({config, child} = args),
-    do:
-      Supervisor.start_link(__MODULE__, args,
-        name: Controller.name(config.jido, config.id, {:gate_supervisor, child.key})
-      )
+  def start_link({config, child} = args) do
+    with {:ok, pid} <-
+           Supervisor.start_link(__MODULE__, args,
+             name: Controller.name(config.jido, config.id, {:gate_supervisor, child.key})
+           ) do
+      Jido.Topology.Runtime.Owner.track(config.owner, pid)
+      {:ok, pid}
+    end
+  end
 
   @impl true
   def init({config, child}) do
@@ -70,10 +74,38 @@ defmodule Jido.Topology.Runtime.Gate do
     end
   end
 
-  def status(jido, id, key) do
+  def attach_bus(nil, _bus), do: {:ok, nil}
+  def attach_bus(%{events?: false}, _bus), do: {:ok, nil}
+
+  def attach_bus(parent_gate, bus) do
+    Gateway.safely(fn ->
+      case GenServer.whereis(parent_gate.name) do
+        nil ->
+          {:error, :child_gate_unavailable}
+
+        gate ->
+          subscription = "jido.topology.gate/" <> inspect(gate)
+
+          case Jido.Signal.Bus.subscribe(bus, "**", target: gate, subscription_id: subscription) do
+            {:ok, ^subscription} ->
+              send(gate, {:attached_bus, bus, subscription})
+              {:ok, subscription}
+
+            {:error, :subscription_already_exists} ->
+              send(gate, {:attached_bus, bus, subscription})
+              {:ok, subscription}
+
+            {:error, _} = error ->
+              error
+          end
+      end
+    end)
+  end
+
+  def status(jido, id, key, timeout \\ 5_000) do
     case Runtime.lookup(jido, id, {:gate, key}) do
       nil -> %{id: Child.id(id, key), status: :failed}
-      pid -> GenServer.call(pid, :status)
+      pid -> GenServer.call(pid, :status, timeout)
     end
   catch
     :exit, _ -> %{id: Child.id(id, key), status: :failed}
