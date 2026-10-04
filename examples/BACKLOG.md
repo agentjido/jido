@@ -177,12 +177,12 @@ Assign the final `04_runtime` ID after persistence moves are complete.
 
 ### `04_05_runtime_inspection`
 
-- [ ] Keep safe `agent`, `snapshot`, and `status` views.
-- [ ] Add `plugin_state` and `children` only if the example can stay small.
-- [ ] Enable and disable the bounded debug buffer with `set_debug`.
-- [ ] Read bounded events with `recent_events`.
-- [ ] Prove that secret state is not copied into the user-facing view.
-- [ ] Keep semantic Telemetry in `04_07_agent_observation`.
+- [x] Keep safe `agent`, `snapshot`, and `status` views.
+- [x] Add `plugin_state` and `children` only if the example can stay small.
+- [x] Enable and disable the bounded debug buffer with `set_debug`.
+- [x] Read bounded events with `recent_events`.
+- [x] Prove that secret state is not copied into the user-facing view.
+- [x] Keep semantic Telemetry in `04_07_agent_observation`.
 
 ### `08_01_audit`
 
