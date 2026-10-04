@@ -122,17 +122,8 @@ defmodule Jido.Topology.RuntimeCheckpointTest do
     assert :ok = Runtime.Owner.await_previous(c.jido, id)
 
     # A failed independent runtime still needs its own committed checkpoint.
-    ref = Process.monitor(independent)
-    Process.exit(independent, :kill)
-    assert_receive {:DOWN, ^ref, :process, ^independent, :killed}, 5_000
-
-    eventually(
-      fn ->
-        replacement = Runtime.whereis_runtime(c.jido, independent_id)
-        is_pid(replacement) and replacement != independent
-      end,
-      timeout: 5_000
-    )
+    kill(independent)
+    await_replacement(c.jido, independent_id, :runtime, independent)
 
     assert :ok = Runtime.await_ready(c.jido, independent_id)
     signal = %{signal | data: %{by: 1, label: "alias"}}
