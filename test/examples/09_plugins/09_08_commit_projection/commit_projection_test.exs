@@ -12,19 +12,38 @@ defmodule JidoTest.Examples.Plugins.CommitProjectionTest do
     assert %{pid: runtime} = Map.fetch!(Server.children(server), {:plugin, Package})
     assert Runtime.view(runtime) == {0, 0}
 
-    {:ok, route_signal_1} = Agent.add_signal(%{amount: 3})
+    {:ok, first_signal} = Agent.add_signal(%{amount: 3})
 
     assert {:ok, committed} =
-             Jido.AgentServer.call(server, route_signal_1, [])
+             Jido.AgentServer.call(server, first_signal, [])
 
     assert committed.state == candidate.state
     eventually(fn -> Server.status(server).phase == :idle end)
     assert Runtime.view(runtime) == {3, 1}
 
+    {:ok, second_signal} = Agent.add_signal(%{amount: 2})
+    assert {:ok, latest} = Server.call(server, second_signal)
+    assert latest.state.count == 5
+    eventually(fn -> Runtime.view(runtime) == {5, 2} end)
+
+    old_runtime_ref = Process.monitor(runtime)
+    Process.exit(runtime, :kill)
+    assert_receive {:DOWN, ^old_runtime_ref, :process, ^runtime, :killed}
+
+    replacement =
+      eventually(fn ->
+        case Server.children(server)[{:plugin, Package}] do
+          %{pid: pid} when is_pid(pid) and pid != runtime -> pid
+          _child -> nil
+        end
+      end)
+
+    assert Runtime.view(replacement) == {5, 2}
+
     server_ref = Process.monitor(server)
-    runtime_ref = Process.monitor(runtime)
+    runtime_ref = Process.monitor(replacement)
     assert :ok = Server.stop(server)
     assert_receive {:DOWN, ^server_ref, :process, ^server, _}
-    assert_receive {:DOWN, ^runtime_ref, :process, ^runtime, _}
+    assert_receive {:DOWN, ^runtime_ref, :process, ^replacement, _}
   end
 end

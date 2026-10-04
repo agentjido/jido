@@ -212,11 +212,11 @@ Assign the final `04_runtime` ID after persistence moves are complete.
 
 ### `09_08_commit_projection`
 
-- [ ] Rewrite the README with the required headings and corrected grammar.
-- [ ] Test runtime replacement from the latest committed Plugin state.
-- [ ] Test hook failure and timeout, or remove unsupported detailed claims from
+- [x] Rewrite the README with the required headings and corrected grammar.
+- [x] Test runtime replacement from the latest committed Plugin state.
+- [x] Test hook failure and timeout, or remove unsupported detailed claims from
       the README and link to core tests.
-- [ ] State clearly that the projection is not a durable event stream.
+- [x] State clearly that the projection is not a durable event stream.
 
 ### Move the approval workflow
 
