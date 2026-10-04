@@ -13,6 +13,7 @@ runtime boundary at a time.
 | 01_06 | [Route Selection](01_06_route_selection/README.md) | Exact routes, wildcard fallback, precedence, and direct or live parity |
 | 01_07 | [Data-defined Agent](01_07_data_defined_agent/README.md) | Neutral definitions, trusted Codec Registry, and Plugin documents |
 | 01_08 | [Custom Signal Selection](01_08_custom_signal_selection/README.md) | Custom Turn selection, route delegation, and explicit rejection |
+| 01_09 | [Agent Extension](01_09_agent_extension/README.md) | Static custom declarations lowered into normal Agent data |
 
 Run the section from the `jido` repository root:
 

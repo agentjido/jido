@@ -233,11 +233,11 @@ audience. Record that decision in `COVERAGE.md`.
 
 ### Agent authoring extension
 
-- [ ] Add a focused example for `Jido.Agent.Extension`.
-- [ ] Lower one custom static declaration into normal Agent metadata or routes.
-- [ ] Prove extension order and ownership of foreign entities.
-- [ ] Reject an unconsumed entity.
-- [ ] Prove that lowering starts no process and does not bypass validation.
+- [x] Add a focused example for `Jido.Agent.Extension`.
+- [x] Lower one custom static declaration into normal Agent metadata or routes.
+- [x] Prove extension order and ownership of foreign entities.
+- [x] Reject an unconsumed entity.
+- [x] Prove that lowering starts no process and does not bypass validation.
 
 ### Topology authoring extension
 

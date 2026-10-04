@@ -39,4 +39,4 @@ Declared routes remain the simpler default.
 - [Source](custom_signal_selection.ex)
 - [Tests](../../../test/examples/01_basic/01_08_custom_signal_selection/custom_signal_selection_test.exs)
 
-Previous: [Data-defined Agent](../01_07_data_defined_agent/README.md) | Next: [Workflow examples](../../02_workflow/README.md)
+Previous: [Data-defined Agent](../01_07_data_defined_agent/README.md) | Next: [Agent Extension](../01_09_agent_extension/README.md)
