@@ -21,6 +21,7 @@ public Jido APIs.
 13. [Request Modes](04_15_request_modes/README.md) — compare synchronous, best-effort, and asynchronous requests.
 14. [Turn Control](04_16_turn_control/README.md) — inspect and cancel one matching active Turn.
 15. [Failure Outcome](04_17_failure_outcome/README.md) — handle errors across the commit boundary.
+16. [Heartbeat](04_18_heartbeat/README.md) — own a periodic input runtime through a Plugin.
 
 ## Run the section
 

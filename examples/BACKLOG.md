@@ -148,12 +148,12 @@ Assign the final `04_runtime` ID after persistence moves are complete.
 
 ### Heartbeat
 
-- [ ] Add one focused `04_runtime` example for `Jido.Plugin.Heartbeat`.
-- [ ] Show the default heartbeat Signal.
-- [ ] Show a custom Signal type or interval.
-- [ ] Reject invalid Plugin options before work starts.
-- [ ] Prove runtime replacement and owner cleanup.
-- [ ] Keep clock-sensitive assertions behind explicit synchronization.
+- [x] Add one focused `04_runtime` example for `Jido.Plugin.Heartbeat`.
+- [x] Show the default heartbeat Signal.
+- [x] Show a custom Signal type or interval.
+- [x] Reject invalid Plugin options before work starts.
+- [x] Prove runtime replacement and owner cleanup.
+- [x] Keep clock-sensitive assertions behind explicit synchronization.
 
 ### `05_06_orphan_adoption`
 
