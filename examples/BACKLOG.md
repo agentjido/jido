@@ -119,12 +119,12 @@ Use the `02_09` slot after the current approval workflow moves to Applications.
 
 Assign the final `04_runtime` ID after persistence moves are complete.
 
-- [ ] Compare synchronous `call`, best-effort `cast`, and asynchronous
+- [x] Compare synchronous `call`, best-effort `cast`, and asynchronous
       `send_request` plus `receive_response`.
-- [ ] Show what result each mode returns.
-- [ ] Show ordering for several admitted requests.
-- [ ] Prove that a caller timeout does not cancel work that already started.
-- [ ] State the overload behavior and delivery limit of each mode.
+- [x] Show what result each mode returns.
+- [x] Show ordering for several admitted requests.
+- [x] Prove that a caller timeout does not cancel work that already started.
+- [x] State the overload behavior and delivery limit of each mode.
 
 ### Runtime Turn control
 
