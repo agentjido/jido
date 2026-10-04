@@ -12,6 +12,10 @@ defmodule Jido.Examples.Topology.PlacementPolicyTest do
     {:ok, control} = Jido.start_agent(jido, PlacementPolicy, id: "placement-control")
     instance = PlacementPolicy.new!(id: topology_id)
 
+    for member <- 1..2 do
+      assert instance.plan.agents["group/workers/#{member}"].node == node()
+    end
+
     controller =
       start_supervised!(
         {Controller, jido: jido, topology: instance, lifecycle: control, repair: :manual}
