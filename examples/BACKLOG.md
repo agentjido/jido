@@ -293,11 +293,11 @@ audience. Record that decision in `COVERAGE.md`.
 - [x] Add a static `node:` declaration to `07_08_placement_policy`.
 - [x] Link the peer test from `07_08`, or add an optional peer example that
       proves node and PID replacement.
-- [ ] Put `07_09_additive_update` in the `Jido.Examples.Topology` namespace.
-- [ ] Add `as:` to its main command route.
-- [ ] Prove that removal and changed existing entries are rejected without a
+- [x] Put `07_09_additive_update` in the `Jido.Examples.Topology` namespace.
+- [x] Add `as:` to its main command route.
+- [x] Prove that removal and changed existing entries are rejected without a
       live change.
-- [ ] Confirm Controller and Agent cleanup.
+- [x] Confirm Controller and Agent cleanup.
 
 ### Applications and Plugins
 

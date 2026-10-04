@@ -19,12 +19,15 @@ mix test test/examples/07_topology/07_09_additive_update --include example --see
 ```
 
 Expected result: three workers grow to five. The first three workers and the
-observer keep their PIDs, and committed worker state remains visible.
+observer keep their PIDs, and committed worker state remains visible. Removal
+and a changed worker definition both fail without changing the live Agents.
+Controller shutdown removes every Agent.
 
 ## Important behavior
 
 The target must keep the same Topology identity, resources, and existing Agent
-specifications. The accepted target becomes the source for later repair passes.
+specifications. Validation completes before the live target changes. The
+accepted target becomes the source for later repair passes.
 
 ## Limits
 
