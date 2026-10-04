@@ -24,6 +24,33 @@ defmodule Jido.Topology.RuntimeTest do
     end
   end
 
+  test "a lazy runtime adds and reports one neutral Agent definition", c do
+    id = unique_id("dynamic_agent")
+    topology = Topology.new!(name: "dynamic_agent")
+    start_supervised!({Runtime, jido: c.jido, id: id, topology: topology, activation: :lazy})
+
+    definition = CounterAgent.definition()
+
+    assert :ok =
+             Runtime.add_agent(c.jido, id, "alice", definition, initial_state: %{count: 2})
+
+    target = Runtime.target(c.jido, id)
+
+    assert [%{key: "alice", definition: ^definition, initial_state: %{count: 2}}] =
+             target.definition.agents
+
+    assert %{active_members: 0, dormant_members: 1, target_revision: 1} =
+             Runtime.status(c.jido, id)
+
+    assert {:ok, %{state: %{count: 5}}} =
+             Runtime.call(c.jido, id, "alice", add(3))
+
+    assert %{active_members: 1, dormant_members: 0} = Runtime.status(c.jido, id)
+
+    assert {:error, %Jido.Error.ValidationError{}} =
+             Runtime.add_agent(c.jido, id, "alice", definition)
+  end
+
   test "a headless DSL runtime starts only the requested dependency closure", c do
     target =
       Topology.new!(

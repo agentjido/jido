@@ -214,6 +214,14 @@ defmodule Jido.Topology.Runtime do
     with_controller(jido, id, &Controller.activate(&1, target))
   end
 
+  @doc "Returns the currently accepted topology target."
+  def target(jido, id), do: with_controller(jido, id, &Controller.target/1)
+
+  @doc "Adds one neutral Agent definition to the current topology target."
+  def add_agent(jido, id, key, definition, opts \\ []) do
+    with_controller(jido, id, &Controller.add_agent(&1, key, definition, opts))
+  end
+
   @doc "Publishes to an owned Bus. Dormant subscribers remain dormant."
   def publish(jido, id, bus, signals, opts \\ []),
     do: Gateway.request(jido, id, {:publish, bus, signals}, opts)

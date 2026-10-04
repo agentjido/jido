@@ -163,6 +163,33 @@ defmodule Jido.Topology.Controller do
   def reconcile(controller, timeout \\ 5_000),
     do: GenServer.call(runtime(controller), :reconcile, timeout)
 
+  @doc "Returns the currently accepted topology target."
+  @spec target(Supervisor.supervisor(), timeout()) :: Instance.t()
+  def target(controller, timeout \\ 5_000),
+    do: GenServer.call(runtime(controller), :target, timeout)
+
+  @doc "Adds one neutral Agent definition to the current topology target."
+  @spec add_agent(
+          Supervisor.supervisor(),
+          String.t() | atom(),
+          Jido.Agent.definition(),
+          keyword()
+        ) :: :ok | {:error, term()}
+  def add_agent(controller, key, definition, opts \\ [])
+
+  def add_agent(controller, key, %Jido.Agent{} = definition, opts) do
+    with {:ok, opts} <- Authoring.attrs(opts),
+         :ok <- Authoring.keys(opts, [:initial_state, :depends_on, :node, :timeout]),
+         timeout = Map.get(opts, :timeout, 5_000),
+         :ok <- validate_timeout(timeout) do
+      entry_opts = Map.drop(opts, [:timeout])
+      GenServer.call(runtime(controller), {:add_agent, key, definition, entry_opts}, timeout)
+    end
+  end
+
+  def add_agent(_controller, _key, _definition, _opts),
+    do: Authoring.error("Topology member requires a neutral Agent definition")
+
   @doc """
   Applies one validated additive Agent target to a ready local controller.
 

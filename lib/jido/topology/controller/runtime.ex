@@ -199,6 +199,30 @@ defmodule Jido.Topology.Controller.Runtime do
 
   def handle_call(:reconcile, _from, state), do: {:reply, :ok, request_pass(state)}
 
+  def handle_call(:target, _from, state), do: {:reply, state.instance, state}
+
+  def handle_call({:add_agent, key, definition, entry_opts}, _from, state) do
+    with :ok <- update_idle(state),
+         {:ok, target} <- add_agent_target(state.instance, key, definition, entry_opts),
+         {:ok, revision} <-
+           TargetStore.accept(state.jido, state.target_revision, target, state.placements) do
+      state =
+        state
+        |> Map.put(:instance, target)
+        |> Map.put(:target_revision, revision)
+        |> Map.put(:operation_override, :update)
+        |> request_pass()
+
+      {:reply, :ok, state}
+    else
+      {:error, {:indeterminate, reason}} = error ->
+        {:stop, {:target_write_indeterminate, reason}, error, state}
+
+      {:error, _reason} = error ->
+        {:reply, error, state}
+    end
+  end
+
   def handle_call({:update, target}, _from, state) do
     with :ok <- update_idle(state),
          :ok <- additive_target(state.instance, target),
@@ -411,6 +435,17 @@ defmodule Jido.Topology.Controller.Runtime do
 
   defp additive_target(_current, _target),
     do: Jido.Agent.Authoring.error("Topology update identity does not match")
+
+  defp add_agent_target(current, key, definition, entry_opts) do
+    entry =
+      entry_opts
+      |> Map.put(:key, key)
+      |> Map.put(:definition, definition)
+
+    with {:ok, topology} <-
+           Jido.Topology.new(%{current.definition | agents: current.definition.agents ++ [entry]}),
+         do: Jido.Topology.instantiate(topology, id: current.id, input: current.input)
+  end
 
   defp request_pass(state) do
     if state.reconcile_timer, do: Process.cancel_timer(state.reconcile_timer)
