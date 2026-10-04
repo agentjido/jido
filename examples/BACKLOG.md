@@ -128,12 +128,12 @@ Assign the final `04_runtime` ID after persistence moves are complete.
 
 ### Runtime Turn control
 
-- [ ] Observe an active Turn through public status data.
-- [ ] Cancel the matching Turn with `cancel_turn`.
-- [ ] Reject a stale Turn ID.
-- [ ] Prove that precommit cancellation preserves the committed snapshot.
-- [ ] State that cancellation does not reverse completed Action I/O.
-- [ ] Use a fixed test-support barrier. Do not pass the barrier through Turn
+- [x] Observe an active Turn through public status data.
+- [x] Cancel the matching Turn with `cancel_turn`.
+- [x] Reject a stale Turn ID.
+- [x] Prove that precommit cancellation preserves the committed snapshot.
+- [x] State that cancellation does not reverse completed Action I/O.
+- [x] Use a fixed test-support barrier. Do not pass the barrier through Turn
       context.
 
 ### Runtime failure policy and Outcome

@@ -19,6 +19,7 @@ public Jido APIs.
 11. [Turn Upgrade](04_13_turn_upgrade/README.md) — serialize release installation at the public idle boundary.
 12. [State Migration](04_14_state_migration/README.md) — migrate domain and Plugin state as one validated commit.
 13. [Request Modes](04_15_request_modes/README.md) — compare synchronous, best-effort, and asynchronous requests.
+14. [Turn Control](04_16_turn_control/README.md) — inspect and cancel one matching active Turn.
 
 ## Run the section
 
