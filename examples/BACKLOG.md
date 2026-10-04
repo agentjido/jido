@@ -82,27 +82,27 @@ Apply this checklist to every stable example change:
 
 ### `01_07_data_defined_agent`
 
-- [ ] Build one neutral Agent with `Jido.Agent.new/1`.
-- [ ] Construct a live instance with `Jido.Agent.instantiate/2`.
-- [ ] Show a small validated update with `Jido.Agent.set/2` if it keeps the
+- [x] Build one neutral Agent with `Jido.Agent.new/1`.
+- [x] Construct a live instance with `Jido.Agent.instantiate/2`.
+- [x] Show a small validated update with `Jido.Agent.set/2` if it keeps the
       lesson focused.
-- [ ] Encode and decode the static definition with `Jido.Agent.Codec`.
-- [ ] Include one Plugin declaration so the Agent round trip also exercises
+- [x] Encode and decode the static definition with `Jido.Agent.Codec`.
+- [x] Include one Plugin declaration so the Agent round trip also exercises
       `Jido.Plugin.Codec`.
-- [ ] Use stable identifiers from a trusted `Jido.Codec.Registry`.
-- [ ] Prove direct and live execution select the same route.
-- [ ] Reject one malformed or untrusted document.
-- [ ] State that authoring documents do not contain live identity, state, or
+- [x] Use stable identifiers from a trusted `Jido.Codec.Registry`.
+- [x] Prove direct and live execution select the same route.
+- [x] Reject one malformed or untrusted document.
+- [x] State that authoring documents do not contain live identity, state, or
       runtime resources.
 
 ### `01_08_custom_signal_selection`
 
-- [ ] Implement a custom `handle_signal/2` callback.
-- [ ] Construct a `Jido.Agent.Turn` explicitly.
-- [ ] Convert raw Signal data into valid Action input.
-- [ ] Delegate normal cases to declared routes.
-- [ ] Prove that the source Signal stays unchanged.
-- [ ] Prove that explicit rejection does not fall back and does not commit.
+- [x] Implement a custom `handle_signal/2` callback.
+- [x] Construct a `Jido.Agent.Turn` explicitly.
+- [x] Convert raw Signal data into valid Action input.
+- [x] Delegate normal cases to declared routes.
+- [x] Prove that the source Signal stays unchanged.
+- [x] Prove that explicit rejection does not fall back and does not commit.
 
 ### Multi-step Flow Directives
 

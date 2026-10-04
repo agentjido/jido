@@ -13,6 +13,8 @@ the `:example` tag through the shared
 | 01_04 | [Directive Agent](../../../examples/01_basic/01_04_directive_agent/README.md) | [Test](01_04_directive_agent/directive_agent_test.exs) |
 | 01_05 | [OTP supervision](../../../examples/01_basic/01_05_otp_supervision/README.md) | [Test](01_05_otp_supervision/example_test.exs) |
 | 01_06 | [Route Selection](../../../examples/01_basic/01_06_route_selection/README.md) | [Test](01_06_route_selection/route_selection_test.exs) |
+| 01_07 | [Data-defined Agent](../../../examples/01_basic/01_07_data_defined_agent/README.md) | [Test](01_07_data_defined_agent/data_defined_agent_test.exs) |
+| 01_08 | [Custom Signal Selection](../../../examples/01_basic/01_08_custom_signal_selection/README.md) | [Test](01_08_custom_signal_selection/custom_signal_selection_test.exs) |
 
 Run the section from the `jido` repository root:
 
