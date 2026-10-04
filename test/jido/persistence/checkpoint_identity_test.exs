@@ -35,7 +35,16 @@ defmodule JidoTest.Persistence.CheckpointIdentityTest do
   end
 
   test "a matching envelope cannot hide a different Agent ID in the checkpoint", c do
-    assert :ok = Probe.store_mismatched_checkpoint(c.store, c.id, "different-agent")
+    assert :ok =
+             Persistence.save_agent(c.store, Probe.new!(id: c.id, state: %{count: 7}),
+               namespace: "persistence-probe",
+               revision: 3
+             )
+
+    assert :ok =
+             Store.rewrite_record(c.store, c.id, fn record ->
+               put_in(record.checkpoint.id, "different-agent")
+             end)
 
     assert {:error, _} =
              Persistence.load_agent(c.store, Probe, c.id, namespace: "persistence-probe")

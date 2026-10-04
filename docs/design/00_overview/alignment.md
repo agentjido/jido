@@ -112,8 +112,8 @@ change runtime behavior.
 | `test/examples/01_basic/01_06_route_selection/route_selection_test.exs` | Direct and live parity, first-match precedence, and fallback selection all pass. |
 | `test/examples/01_basic/01_03_plugin_state_agent/plugin_state_agent_test.exs` | Plugin-owned state reduction and write protection pass. |
 | `test/examples/04_runtime/04_12_stable_reference/stable_reference_test.exs` | The Core Ref facade resolves current local PIDs and restores durable identity after a namespace is rebound to another local instance name. All three FA03 cases pass. |
-| `test/jido/agent/versioning_test.exs` | Same-definition restore and revision-mismatch rejection pass. |
-| `test/jido/persistence/record_lifecycle_test.exs` | Compare-and-swap deletion and tombstone fencing pass without a skip. |
+| `test/examples/10_persistence/10_08_definition_revision/definition_revision_test.exs` | Same-definition restore and revision-mismatch rejection pass. |
+| `test/examples/10_persistence/10_05_durable_delete/durable_delete_test.exs` | Compare-and-swap deletion and tombstone fencing pass without a skip. |
 | `test/examples/08_applications/08_02_subscription/subscription_test.exs` | Matching state-and-version Init reconstruction, stale-resource rejection, and cleanup pass. |
 
 ### Prior validation record
@@ -136,8 +136,8 @@ mix test test/examples/08_applications/08_02_subscription \
   test/examples/01_basic/01_06_route_selection \
   test/examples/01_basic/01_03_plugin_state_agent \
   test/examples/04_runtime/04_12_stable_reference \
-  test/jido/agent/versioning_test.exs \
-  test/jido/persistence/record_lifecycle_test.exs --include example --seed 0
+  test/examples/10_persistence/10_08_definition_revision \
+  test/examples/10_persistence/10_05_durable_delete --include example --seed 0
 ```
 
 This consolidation did not rerun tests because it changes design documents

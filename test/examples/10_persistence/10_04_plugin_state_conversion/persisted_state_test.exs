@@ -1,9 +1,9 @@
-defmodule JidoTest.Examples.Plugins.PersistedStateTest do
+defmodule JidoTest.Examples.Persistence.PluginStateConversionTest do
   use JidoTest.Case, async: true
 
   @moduletag :example
 
-  alias Jido.Examples.Plugins.PersistedState.Agent, as: ExampleAgent
+  alias Jido.Examples.Persistence.PluginStateConversion.Agent, as: ExampleAgent
   alias Jido.Persistence
   alias Jido.Persistence.ETS
 

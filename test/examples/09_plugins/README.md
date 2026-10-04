@@ -11,3 +11,4 @@ The tests cover direct and live preparation, live-only runtime admission,
 signature verification, replay protection, encrypted Signals, and input
 composition. They also cover full-state preparation and owned-state middleware
 reduction, and a live post-commit projection without Action-owned Directives.
+Persisted Plugin conversion is tested in `test/examples/10_persistence`.

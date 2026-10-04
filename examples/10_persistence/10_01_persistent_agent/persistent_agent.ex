@@ -1,4 +1,4 @@
-defmodule Jido.Examples.PersistentCounterRecovery do
+defmodule Jido.Examples.Persistence.PersistentAgent do
   @moduledoc """
   A Counter that stores handled command IDs in durable Agent state.
 
@@ -8,8 +8,8 @@ defmodule Jido.Examples.PersistentCounterRecovery do
   """
 
   use Jido.Agent,
-    name: "examples_persistent_counter_recovery",
-    description: "Restores a counter and rejects duplicate state changes"
+    name: "examples_persistent_agent",
+    description: "Creates, commits, and restores one persistent Agent"
 
   agent do
     schema Zoi.object(%{
@@ -20,7 +20,7 @@ defmodule Jido.Examples.PersistentCounterRecovery do
   end
 
   routes do
-    route "examples.runtime.state_recovery.increment" do
+    route "examples.persistence.persistent_agent.increment" do
       action %{amount: amount},
         schema: Zoi.object(%{amount: Zoi.integer()}),
         context: context do
@@ -70,10 +70,10 @@ defmodule Jido.Examples.PersistentCounterRecovery do
   def increment_signal!(command_id, amount \\ 1)
       when is_binary(command_id) and is_integer(amount) do
     Signal.new!(
-      "examples.runtime.state_recovery.increment",
+      "examples.persistence.persistent_agent.increment",
       %{amount: amount},
       id: command_id,
-      source: "/examples/runtime/state_recovery"
+      source: "/examples/persistence/persistent_agent"
     )
   end
 end

@@ -20,6 +20,7 @@ Use ASD-STE100 Simplified Technical English. Do not use skills unless requested.
 - Declared floor: Elixir 1.18 and OTP 27. Validate it during beta QA.
 - Default quality check: `mix quality`. It runs fast core tests, not peer, benchmark, example, authoring, system, or service tests.
 - Run filtered suites separately when needed: `mix test.peer`, `mix test.bench`, `mix test.examples`, `mix test.authoring`, and `mix test.system`.
+- Run `mix test.persistence` for the shared local persistence adapter contracts.
 - Run all six normal test categories with `mix test.all`. It includes local system tests, not external storage services.
 - Run opt-in Redis, PostgreSQL and real Bedrock tests with `mix test.services`. Run the separate MinIO profile with `mix test.services.minio`. See `test/system/README.md` for prerequisites and storage limits.
 - Compile with `mix compile --warnings-as-errors`.

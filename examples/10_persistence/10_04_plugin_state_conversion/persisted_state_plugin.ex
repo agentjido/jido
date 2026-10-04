@@ -1,4 +1,4 @@
-defmodule Jido.Examples.Plugins.PersistedState.Package do
+defmodule Jido.Examples.Persistence.PluginStateConversion.Package do
   @moduledoc "Owns one state value and converts it for persistence."
   use Jido.Plugin
 

@@ -31,6 +31,7 @@ The numbered groups add one type of complexity at a time.
 | `07_topology` | Independent, hierarchical, bus-connected, keyed, composed, and Plugin-contributed systems |
 | `08_applications` | Audit, subscriptions, inboxes, purpose loops, and groups |
 | `09_plugins` | Pure preparation, live admission, identity, encrypted Signals, and composition |
+| `10_persistence` | Checkpoints, hibernate and thaw, deletion, uncertain writes, and recoverable delivery |
 
 Start with `01_basic/01_01_minimal_agent`. It compares the direct Agent command
 with the live actor call and verifies that both use the same route defaults.
@@ -39,10 +40,10 @@ with the live actor call and verifies that both use the same route defaults.
 
 The runtime group contains focused examples for the hard boundaries:
 
-- `04_06_state_recovery` — durable state recovery
+- `10_01_persistent_agent` — durable state recovery
 - `04_07_agent_observation` — semantic actor events
 - `04_08_causal_trace` — trace and causation data
-- `04_09_recoverable_delivery` — recoverable delivery protocol
+- `10_07_recoverable_delivery` — recoverable delivery protocol
 - `04_10_pending_job_recovery` — job state after restart
 - `04_11_durable_scheduling` — schedule occurrence recovery
 - `04_12_stable_reference` — durable identity across process replacement

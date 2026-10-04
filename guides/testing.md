@@ -33,6 +33,8 @@ There are six normal categories and separate opt-in service profiles:
 CI and the test step in `mix quality` use
 `mix test test/jido --include flaky --seed 0`. They run fast core tests with a
 fixed seed, including the tagged flaky tests but excluding peer tests.
+Run the focused local persistence matrix with `mix test.persistence`. It is a
+core subset and is also included when the full core suite runs.
 
 Default `mix test` excludes `:bench`, `:example`, `:authoring`, `:system`, `:service`, `:flaky`, `:peer`, and
 approved `:skip` tests. Tests that use `JidoTest.PeerCase` get the `:peer` tag
@@ -73,7 +75,7 @@ definition migration, and additive Topology update. The
 [research result](../test/examples/99_research/README.md) is now only the
 external fencing workaround for unsupported cluster-exclusive ownership.
 
-The [example catalog](https://github.com/agentjido/jido/blob/release/v3/examples/README.md) has 67 stable fixtures and
+The [example catalog](https://github.com/agentjido/jido/blob/release/v3/examples/README.md) has 72 stable fixtures and
 one research probe. Source files live in `examples/`; tests live in
 `test/examples/`. Production builds and the Hex package exclude both trees.
 Local development and test builds compile the source examples so demos and

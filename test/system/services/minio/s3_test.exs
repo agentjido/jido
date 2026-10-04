@@ -4,12 +4,17 @@ defmodule JidoTest.System.Services.S3MinIO do
   use JidoTest.System.Case, async: false
   @moduletag :service
   @moduletag adapter: :s3_minio
+  @moduletag persistence_profile: :s3_minio
+  @moduletag persistence_tier: :service
 
   alias Jido.Agent.Ref
   alias Jido.AgentServer, as: Server
   alias Jido.Persistence
   alias JidoTest.RecoverableDeliveryAgent, as: Probe
 
+  use JidoTest.Persistence.Contracts.Store
+  use JidoTest.Persistence.Contracts.Agent
+  use JidoTest.Persistence.Contracts.Recovery
   use JidoTest.System.Scenarios.Checkpoints
   use JidoTest.System.Scenarios.Effects
   use JidoTest.System.Scenarios.Fencing

@@ -1,7 +1,7 @@
-defmodule JidoTest.Examples.Runtime.RecoverableDeliveryTest do
+defmodule JidoTest.Examples.Persistence.RecoverableDeliveryTest do
   use JidoTest.AgentCase
 
-  @moduletag group: :runtime
+  @moduletag group: :persistence
 
   alias Jido.AgentServer, as: Server
   alias JidoTest.Persistence.ProbeStore

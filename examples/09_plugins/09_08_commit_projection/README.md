@@ -34,4 +34,4 @@ mix test test/examples/09_plugins/09_08_commit_projection --include example --se
 Expected result: the domain count and live projection both become `3`, at
 revision `1`. Stopping the Server also stops the projection runtime.
 
-Previous: [Persisted State](../09_07_persisted_state/README.md).
+Previous: [State Middleware](../09_06_state_middleware/README.md).

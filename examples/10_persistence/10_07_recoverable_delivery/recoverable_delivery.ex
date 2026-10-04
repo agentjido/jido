@@ -17,9 +17,9 @@ defmodule Jido.Examples.RecoverableDelivery do
   end
 
   routes do
-    signal_source "/examples/runtime/recoverable_delivery"
+    signal_source "/examples/persistence/recoverable_delivery"
 
-    route "examples.runtime.delivery.record", as: :record_and_deliver do
+    route "examples.persistence.delivery.record", as: :record_and_deliver do
       action %{effect_id: effect_id, value: value},
         schema: Zoi.object(%{effect_id: Zoi.string() |> Zoi.min(1), value: Zoi.integer()}),
         context: context do
@@ -28,7 +28,7 @@ defmodule Jido.Examples.RecoverableDelivery do
       end
     end
 
-    route "examples.runtime.delivery.confirm", as: :confirm_delivery do
+    route "examples.persistence.delivery.confirm", as: :confirm_delivery do
       action %{effect_id: effect_id, value: value},
         schema: Zoi.object(%{effect_id: Zoi.string() |> Zoi.min(1), value: Zoi.integer()}),
         context: context do

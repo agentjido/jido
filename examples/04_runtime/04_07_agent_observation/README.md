@@ -39,4 +39,4 @@ backpressure contract.
 - [Semantic boundary demo](semantic_boundaries.exs)
 - [Tests](../../../test/examples/04_runtime/04_07_agent_observation/agent_observation_test.exs)
 
-Previous: [State Recovery](../04_06_state_recovery/README.md) | Next: [Causal Trace](../04_08_causal_trace/README.md)
+Previous: [Runtime Inspection](../04_05_runtime_inspection/README.md) | Next: [Causal Trace](../04_08_causal_trace/README.md)

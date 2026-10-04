@@ -150,7 +150,7 @@ active records remain readable through their earlier restore path.
 | `test/jido/agent_server/effect_recovery_test.exs` | Failed intent and acknowledgement writes stop the activation while confirmed records remain recoverable. |
 | `test/jido/plugin/scheduler/occurrence_recovery_test.exs` | Scheduler intent and result failures preserve the last confirmed record for restore. |
 | `test/jido/topology/controller_test.exs` and `test/jido/topology/controller/composition_runtime_test.exs` | Persistent members and Bus subscriptions restore after controller restart under the create-only rule. |
-| `test/jido/persistence/record_lifecycle_test.exs` | Durable delete and tombstone fencing pass without a skip. |
+| `test/jido/persistence/record_lifecycle_test.exs` and `test/examples/10_persistence/10_05_durable_delete` | Core and stable acceptance tests prove durable delete and tombstone fencing without a skip. |
 
 ## Requirement disposition
 

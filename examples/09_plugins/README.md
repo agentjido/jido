@@ -1,7 +1,7 @@
 # Plugin examples
 
 These examples show the Plugin data and ownership contract. They start with
-pure preparation, add live admission, then cover owned state and persistence.
+pure preparation, add live admission, then cover owned state and commit projection.
 
 ## Learning order
 
@@ -11,8 +11,7 @@ pure preparation, add live admission, then cover owned state and persistence.
 4. [Secure Signal](09_04_secure_signal/README.md) — decrypt ciphertext into a package input and preserve the incoming Signal.
 5. [Composition](09_05_composition/README.md) — use independent pure and live package inputs in one Agent.
 6. [State Middleware](09_06_state_middleware/README.md) — read complete Turn state and reduce only one owned field.
-7. [Persisted State](09_07_persisted_state/README.md) — convert one Plugin-owned field and reject invalid stored values.
-8. [Commit Projection](09_08_commit_projection/README.md) — update a live owned-state view without Action-owned Directives.
+7. [Commit Projection](09_08_commit_projection/README.md) — update a live owned-state view without Action-owned Directives.
 
 ## Run the section
 
@@ -28,6 +27,7 @@ mix test test/examples/09_plugins --include example --seed 0
 - [Audit](../08_applications/08_01_audit/README.md) shows owned state and a runtime projection.
 - [Subscription](../08_applications/08_02_subscription/README.md) rebuilds a live resource from committed Plugin state.
 - [Plugin Contribution](../07_topology/07_06_plugin_contribution/README.md) shows a pure Topology callbacks.
+- [Plugin State Conversion](../10_persistence/10_04_plugin_state_conversion/README.md) shows persisted Plugin-owned state.
 
 ## Contract summary
 

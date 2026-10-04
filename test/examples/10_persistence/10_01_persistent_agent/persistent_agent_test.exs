@@ -1,27 +1,27 @@
-defmodule JidoTest.Examples.Runtime.PersistentCounterRecoveryTest do
+defmodule JidoTest.Examples.Persistence.PersistentAgentTest do
   use JidoTest.AgentCase
 
-  @moduletag group: :runtime
+  @moduletag group: :persistence
   @moduletag complexity: 3
 
   alias Jido.AgentServer, as: Server
-  alias Jido.Examples.PersistentCounterRecovery
+  alias Jido.Examples.Persistence.PersistentAgent
   alias Jido.Persistence
   alias Jido.Persistence.ETS
 
-  test "a hibernated counter restores its last durable commit and continues", %{jido: jido} do
+  test "a persistent Agent restores its last durable commit and continues", %{jido: jido} do
     persistence = persistence(:restore)
     id = unique_id("persistent-counter")
 
     counter = start_counter(jido, id, persistence)
-    assert {:ok, _agent} = PersistentCounterRecovery.increment(counter, "command-1", 2)
-    assert {:ok, committed} = PersistentCounterRecovery.increment(counter, "command-2", 3)
+    assert {:ok, _agent} = PersistentAgent.increment(counter, "command-1", 2)
+    assert {:ok, committed} = PersistentAgent.increment(counter, "command-2", 3)
     assert committed.state.count == 5
     assert agent_result(counter).state_version == 2
 
-    hibernate(counter)
+    stop_server(jido, counter)
 
-    assert {:ok, restored} = PersistentCounterRecovery.restore(jido, id, persistence)
+    assert {:ok, restored} = PersistentAgent.restore(jido, id, persistence)
 
     assert %{
              state: %{
@@ -33,7 +33,7 @@ defmodule JidoTest.Examples.Runtime.PersistentCounterRecoveryTest do
            } = agent_result(restored)
 
     assert {:ok, continued} =
-             PersistentCounterRecovery.increment(restored, "command-3", 4)
+             PersistentAgent.increment(restored, "command-3", 4)
 
     assert continued.state.count == 9
     assert agent_result(restored).state_version == 3
@@ -42,15 +42,15 @@ defmodule JidoTest.Examples.Runtime.PersistentCounterRecoveryTest do
   test "an identical-state commit stores a new revision and restores it", %{jido: jido} do
     persistence = persistence(:duplicate)
     id = unique_id("persistent-counter")
-    duplicate = PersistentCounterRecovery.increment_signal!("command-1", 7)
+    duplicate = PersistentAgent.increment_signal!("command-1", 7)
 
     counter = start_counter(jido, id, persistence)
     assert {:ok, first} = Server.call(counter, duplicate)
     assert first.state.count == 7
-    hibernate(counter)
+    stop_server(jido, counter)
 
     assert {:ok, restored} =
-             PersistentCounterRecovery.restore(jido, id, persistence,
+             PersistentAgent.restore(jido, id, persistence,
                error_policy: fn _, _ -> :continue end
              )
 
@@ -60,7 +60,7 @@ defmodule JidoTest.Examples.Runtime.PersistentCounterRecoveryTest do
 
     # Read before hibernation so a stop-time write cannot hide a missed commit.
     assert {:ok, ^first, 2} =
-             Persistence.load_agent_with_revision(persistence, PersistentCounterRecovery, id,
+             Persistence.load_agent_with_revision(persistence, PersistentAgent, id,
                instance: jido
              )
 
@@ -69,12 +69,12 @@ defmodule JidoTest.Examples.Runtime.PersistentCounterRecoveryTest do
     assert Server.snapshot(restored) == %{agent: first, state_version: 2}
 
     assert {:ok, ^first, 2} =
-             Persistence.load_agent_with_revision(persistence, PersistentCounterRecovery, id,
+             Persistence.load_agent_with_revision(persistence, PersistentAgent, id,
                instance: jido
              )
 
-    hibernate(restored)
-    assert {:ok, restored_again} = PersistentCounterRecovery.restore(jido, id, persistence)
+    stop_server(jido, restored)
+    assert {:ok, restored_again} = PersistentAgent.restore(jido, id, persistence)
     assert Server.snapshot(restored_again) == %{agent: first, state_version: 2}
   end
 
@@ -86,21 +86,21 @@ defmodule JidoTest.Examples.Runtime.PersistentCounterRecoveryTest do
     assert :ok = ETS.put(key, <<0, 1, 2>>, opts)
 
     assert {:error, _reason} =
-             PersistentCounterRecovery.restore(jido, id, persistence)
+             PersistentAgent.restore(jido, id, persistence)
   end
 
   defp start_counter(jido, id, persistence) do
-    start_agent!(jido, PersistentCounterRecovery,
+    start_agent!(jido, PersistentAgent,
       id: id,
       persistence: persistence,
       restore: false
     )
   end
 
-  defp hibernate(server) do
+  defp stop_server(jido, server) do
     monitor = Process.monitor(server)
-    assert :ok = Server.hibernate(server)
-    assert_receive {:DOWN, ^monitor, :process, ^server, {:shutdown, :hibernate}}, 1_000
+    assert :ok = Jido.stop_agent(jido, server)
+    assert_receive {:DOWN, ^monitor, :process, ^server, _reason}, 1_000
   end
 
   defp persistence(name) do

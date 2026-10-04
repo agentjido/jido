@@ -8,7 +8,8 @@ hook with ETS, File, and SQLite/Ecto. It compares live owned state, saved
 revisions, restore, hook settlement events, scoped semantic logs, and cleanup.
 
 ```sh
-mix test.system    # Local ETS, File, and SQLite/Ecto scenarios
+mix test.persistence # Shared ETS, File, Mnesia, and SQLite/Ecto persistence contracts
+mix test.system    # Broader local ETS, File, and SQLite/Ecto scenarios
 mix test.all       # All normal suites, including local system scenarios
 mix test.services  # Opt-in Redis, PostgreSQL, and real Bedrock scenarios
 mix test.services.minio # Separate opt-in direct S3 and Bedrock snapshot profile
@@ -78,6 +79,8 @@ system/
 ```
 
 Shared Ecto, Bedrock, and recoverable-delivery fixtures live in `test/support/`.
+The shared persistence profile registry and contract macros are documented in
+[`test/support/persistence/README.md`](../support/persistence/README.md).
 Scenario modules define tests through `use`; each entry module selects its
 adapter and profile. Add common faults to the scenario modules, not separate
 copies for each service. Focused core regressions stay in `test/jido/`.
@@ -86,13 +89,17 @@ cluster conformance and restart test belongs to the opt-in service profile.
 
 ## Storage profiles and prerequisites
 
-All seven adapters run the same 21 Agent scenarios and four Topology
-scenarios. No adapter is replaced by an in-memory simulation.
+The shared persistence contracts cover all seven built-in adapter modules.
+They run store, Agent, and recovery checks for four local profiles. The active
+service profiles use the same contracts when their explicit service suite runs.
+The broader 21 Agent and four Topology scenarios do not run on Mnesia. No
+service adapter is replaced by an in-memory simulation.
 
 | Adapter | Profile | Fixture and boundary |
 | --- | --- | --- |
 | ETS | Local | A supervised table owner outside the Jido tree. Jido restart is covered; BEAM or table-owner loss is not durable. |
 | File | Local | A private per-test directory, with one BEAM writer as required by the adapter. |
+| Mnesia | Local | An application-owned RAM table with transactional compare-and-swap. The adapter does not own the schema or disk policy. |
 | Ecto | Local | Real SQLite repo, WAL mode, four connections, and migrations. |
 | PostgreSQL/Ecto | Opt-in service | Owned Docker container, loopback-only ephemeral port, empty database, four connections, real migrations. |
 | Redis | Opt-in service | A private `redis-server` process, Unix socket, AOF, and `appendfsync always`. The adapter sends its real Lua CAS script. |

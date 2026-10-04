@@ -38,4 +38,4 @@ connected Erlang nodes.
 - [Shared EventProbe](../support/event_probe.ex)
 - [Tests](../../../test/examples/04_runtime/04_08_causal_trace/causal_trace_test.exs)
 
-Previous: [Agent Observation](../04_07_agent_observation/README.md) | Next: [Recoverable Delivery](../04_09_recoverable_delivery/README.md)
+Previous: [Agent Observation](../04_07_agent_observation/README.md) | Next: [Pending Job Recovery](../04_10_pending_job_recovery/README.md)

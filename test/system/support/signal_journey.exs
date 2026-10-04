@@ -58,7 +58,7 @@ for {name, durable} <- [{:NormalJourneyAgent, nil}, {:DurableJourneyAgent, "jour
     routes do
       route "system.journey", JidoTest.System.JourneyCommit
 
-      route "examples.runtime.delivery.confirm" do
+      route "examples.persistence.delivery.confirm" do
         action %{effect_id: id, value: value}, context: context do
           directive =
             struct!(Jido.Examples.RecoverableDelivery.Confirm, effect_id: id, value: value)

@@ -1,6 +1,6 @@
 # Jido V3 examples
 
-The main catalog has 67 fixtures in nine stable groups. All use the implemented
+The main catalog has 72 fixtures in ten stable groups. All use the implemented
 Agent and AgentServer contract. One separate research probe records the missing
 distributed-authority contract. The group guides below link to source and tests.
 
@@ -9,17 +9,17 @@ distributed-authority contract. The group guides below link to source and tests.
 | 01_basic | 6 | [Source](01_basic/README.md), [tests](../test/examples/01_basic/README.md) |
 | 02_workflow | 9 | [Source](02_workflow/README.md), [tests](../test/examples/02_workflow/README.md) |
 | 03_llm | 6 | [Source](03_llm/README.md), [tests](../test/examples/03_llm/README.md) |
-| 04_runtime | 14 | [Source](04_runtime/README.md), [tests](../test/examples/04_runtime/README.md) |
+| 04_runtime | 12 | [Source](04_runtime/README.md), [tests](../test/examples/04_runtime/README.md) |
 | 05_multi_agent | 5 | [Source](05_multi_agent/README.md), [tests](../test/examples/05_multi_agent/README.md) |
 | 06_factory | 4 | [Source](06_factory/README.md), [tests](../test/examples/06_factory/README.md) |
 | 07_topology | 9 | [Source](07_topology/README.md), [tests](../test/examples/07_topology/README.md) |
 | 08_applications | 6 | [Source](08_applications/README.md), [tests](../test/examples/08_applications/README.md) |
-| 09_plugins | 8 | [Source](09_plugins/README.md), [tests](../test/examples/09_plugins/README.md) |
+| 09_plugins | 7 | [Source](09_plugins/README.md), [tests](../test/examples/09_plugins/README.md) |
+| 10_persistence | 8 | [Source](10_persistence/README.md), [tests](../test/examples/10_persistence/README.md) |
 
-The focused Plugin examples use IDs `09_01` through `09_08`.
 The [research section](99_research/README.md) retains only the unsupported
-cluster-exclusive ownership contract.
-Its test lives under `test/examples` and uses the `:example` tag.
+cluster-exclusive ownership contract. Its test lives under `test/examples` and
+uses the `:example` tag.
 
 The repository compiles `examples/` in `:dev` and `:test` only. Production builds
 compile `lib/` only. The Hex package contains neither examples nor tests.
