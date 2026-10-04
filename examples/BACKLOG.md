@@ -205,10 +205,10 @@ Assign the final `04_runtime` ID after persistence moves are complete.
 
 ### `09_02_runtime_admission`
 
-- [ ] Add `validate_options/1`.
-- [ ] Prove malformed runtime configuration fails before a child starts.
-- [ ] Prove readiness before admission begins.
-- [ ] Keep transient runtime input separate from prepared portable input.
+- [x] Add `validate_options/1`.
+- [x] Prove malformed runtime configuration fails before a child starts.
+- [x] Prove readiness before admission begins.
+- [x] Keep transient runtime input separate from prepared portable input.
 
 ### `09_08_commit_projection`
 
