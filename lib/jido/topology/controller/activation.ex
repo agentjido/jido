@@ -56,7 +56,8 @@ defmodule Jido.Topology.Controller.Activation do
         initial_state: spec.initial_state,
         jido: context.jido,
         on_parent_death: spec.on_parent_exit,
-        restore_definition: :current
+        restore_definition: :current,
+        checkpoint_owner: Map.get(context, :checkpoint_owner)
       )
     end
   end

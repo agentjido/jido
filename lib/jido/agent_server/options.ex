@@ -40,6 +40,8 @@ defmodule Jido.AgentServer.Options do
     default_dispatch: Zoi.any(description: "Default outbound Signal dispatch") |> Zoi.optional(),
     error_policy: Zoi.any(description: "Agent Server error policy") |> Zoi.default(:log_only),
     on_parent_death: Zoi.atom(description: "Parent death policy") |> Zoi.default(:stop),
+    checkpoint_owner:
+      Zoi.any(description: "Optional runtime checkpoint owner PID") |> Zoi.optional(),
     pool: Zoi.atom(description: "Owning Agent InstanceManager") |> Zoi.optional(),
     idle_timeout: Zoi.any(description: "Idle timeout in milliseconds") |> Zoi.default(:infinity),
     persistence: Zoi.any(description: "Optional Agent persistence adapter") |> Zoi.optional(),
@@ -291,7 +293,8 @@ defmodule Jido.AgentServer.Options do
       invalid("restore_definition must be :checkpoint or :current", %{restore_definition: value})
 
   defp validate_identity_options(attrs) do
-    with :ok <- validate_optional_atom(Map.get(attrs, :jido), :jido),
+    with :ok <- checkpoint_owner(Map.get(attrs, :checkpoint_owner)),
+         :ok <- validate_optional_atom(Map.get(attrs, :jido), :jido),
          :ok <- validate_optional_atom(Map.get(attrs, :registry), :registry),
          :ok <- validate_name(Map.get(attrs, :name)) do
       :ok
@@ -469,4 +472,8 @@ defmodule Jido.AgentServer.Options do
        details: %{value: value}
      )}
   end
+
+  defp checkpoint_owner(nil), do: :ok
+  defp checkpoint_owner(pid) when is_pid(pid), do: :ok
+  defp checkpoint_owner(_), do: invalid("checkpoint_owner must be a PID")
 end

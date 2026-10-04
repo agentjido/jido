@@ -5,8 +5,8 @@ defmodule JidoTest.ChildTopologyRuntimeAssertions do
 
   alias Jido.Examples.Research.ChildTopologyRuntime.{Parent, Specifications}
 
-  # Call the proposed public API directly. There is no local runtime adapter.
-  # apply/3 permits this research suite to compile before the module exists.
+  # Call core APIs directly. The initial failing commit used apply/3 so
+  # the same tests could compile before the Runtime module existed.
   def runtime, do: Jido.Topology.Runtime
   def rpc(function, args), do: apply(runtime(), function, args)
   def child_id(parent_id, key \\ :team), do: parent_id <> "/child/" <> to_string(key)
@@ -50,7 +50,7 @@ defmodule JidoTest.ChildTopologyRuntimeAssertions do
     monitors = monitor_runtime(agents, resources)
     assert :ok = Supervisor.stop(pid)
     assert_down(monitors)
-    assert Jido.agent_count(jido) == expected_agent_count
+    JidoTest.Eventually.eventually(fn -> Jido.agent_count(jido) == expected_agent_count end)
   end
 
   def kill(pid) do

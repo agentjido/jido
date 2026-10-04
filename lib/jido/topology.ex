@@ -107,6 +107,9 @@ defmodule Jido.Topology do
       @doc "Constructs an instance or raises its validation error."
       def new!(opts), do: Jido.Topology.unwrap!(new(opts))
 
+      @doc "Starts the topology runtime through an application supervisor."
+      def child_spec(opts),
+        do: Jido.Topology.Runtime.child_spec(Keyword.put(opts, :topology, __MODULE__))
     end
   end
 

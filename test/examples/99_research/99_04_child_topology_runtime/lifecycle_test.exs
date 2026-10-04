@@ -157,7 +157,7 @@ defmodule JidoTest.Examples.Research.ChildTopologyLifecycleTest do
     parent = start_supervised!({runtime(), opts(durable, id, definition)})
     assert {:ok, committed} = call_child(durable, id, 7)
     alice = rpc(:whereis_member, [durable, child_id(id), :alice])
-    stop_runtime(durable, id, parent)
+    assert Process.alive?(parent)
     stop_supervised!({runtime(), id})
     stop_supervised!(durable)
     start_supervised!({Jido, jido_opts}, id: durable)
