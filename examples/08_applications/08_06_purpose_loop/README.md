@@ -37,4 +37,4 @@ or an endless Action loop.
 - [Clock and Signals](clock.ex)
 - [Tests](../../../test/examples/08_applications/08_06_purpose_loop/purpose_loop_test.exs)
 
-Previous: [Inbox](../08_03_inbox/README.md) | Next: [Fixed Group](../08_07_fixed_group/README.md)
+Previous: [Approval Workflow](../08_04_approval_workflow/README.md) | Next: [Fixed Group](../08_07_fixed_group/README.md)

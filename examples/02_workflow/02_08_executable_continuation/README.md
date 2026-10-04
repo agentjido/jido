@@ -39,4 +39,4 @@ cancellation.
 - [Source](executable_continuation.ex)
 - [Tests](../../../test/examples/02_workflow/02_08_executable_continuation/executable_continuation_test.exs)
 
-Previous: [Nested Flow](../02_07_nested_flow/README.md) | Next: [Approval Workflow](../02_09_approval_workflow/README.md)
+Previous: [Nested Flow](../02_07_nested_flow/README.md) | Next: [Flow Directives](../02_09_flow_directives/README.md)

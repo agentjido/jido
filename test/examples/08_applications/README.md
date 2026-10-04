@@ -1,6 +1,6 @@
 # Application example tests
 
-These tests prove the public behavior described by the six
+These tests prove the public behavior described by the seven
 [application examples](../../../examples/08_applications/README.md).
 
 ```sh

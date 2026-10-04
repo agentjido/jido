@@ -1,4 +1,4 @@
-defmodule JidoTest.Examples.Workflow.ApprovalWorkflowTest do
+defmodule JidoTest.Examples.Applications.ApprovalWorkflowTest do
   use JidoTest.WorkflowSDKCase
 
   alias Jido.Examples.ApprovalWorkflow, as: Example

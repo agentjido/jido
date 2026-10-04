@@ -1,6 +1,6 @@
 # Jido V3 examples
 
-The main catalog has 74 fixtures in ten stable groups. All use the implemented
+The main catalog has 75 fixtures in ten stable groups. All use the implemented
 Agent and AgentServer contract. One separate research probe records the missing
 distributed-authority contract. The group guides below link to source and tests.
 
@@ -13,7 +13,7 @@ distributed-authority contract. The group guides below link to source and tests.
 | 05_multi_agent | 5 | [Source](05_multi_agent/README.md), [tests](../test/examples/05_multi_agent/README.md) |
 | 06_factory | 4 | [Source](06_factory/README.md), [tests](../test/examples/06_factory/README.md) |
 | 07_topology | 9 | [Source](07_topology/README.md), [tests](../test/examples/07_topology/README.md) |
-| 08_applications | 6 | [Source](08_applications/README.md), [tests](../test/examples/08_applications/README.md) |
+| 08_applications | 7 | [Source](08_applications/README.md), [tests](../test/examples/08_applications/README.md) |
 | 09_plugins | 7 | [Source](09_plugins/README.md), [tests](../test/examples/09_plugins/README.md) |
 | 10_persistence | 8 | [Source](10_persistence/README.md), [tests](../test/examples/10_persistence/README.md) |
 

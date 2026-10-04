@@ -14,7 +14,7 @@ adapter calls.
 | `02_06_bounded_iteration` | Early completion, bounds, and replacement-state validation |
 | `02_07_nested_flow` | Child result scopes, shared context, and contracts |
 | `02_08_executable_continuation` | Continuation types, shared budget, and input validation |
-| `02_09_approval_workflow` | Separate Turns, portable directives, correlation, and idempotency |
+| `02_09_flow_directives` | Ordered multi-step Directives, failure discard, and post-commit dispatch |
 
 Run the full section from the `jido` repository root:
 
@@ -34,8 +34,8 @@ Detailed scheduler timing, cancellation, and worker-lifecycle tests belong in
 the package that owns those features.
 
 The tests use a small public SDK helper for Agent startup and error inspection.
-The approval example uses local search and booking adapters. These support
-files make calls visible without network access.
+The Flow Directive example uses one local recording Plugin. It reads public
+snapshots after commit and needs no network access.
 
 ## Current limits
 
@@ -43,9 +43,7 @@ Map `:collect_errors` keeps error positions, but its error payload contains the
 message and not the complete typed Action error map. A `:fail_fast` Map rejects
 the complete Turn and prevents its dependent Reduce.
 
-A duplicate request or an ignored result Signal can still create a commit when
-its Action returns unchanged state. Provider idempotency, approval rules, and
-correlation checks are application policy. The approval example does not claim
-durable booking recovery.
+Application approval, provider idempotency, and correlation policy belong in
+the Applications section.
 
 See the matching [source examples](../../../examples/02_workflow).

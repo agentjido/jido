@@ -13,7 +13,7 @@ Each folder has a short guide, runnable source, and integration tests.
 | [02_06 Bounded Iteration](02_06_bounded_iteration/README.md) | Repeat a repair step with an explicit limit. |
 | [02_07 Nested Flow](02_07_nested_flow/README.md) | Use one Flow as a step in another Flow. |
 | [02_08 Executable Continuation](02_08_executable_continuation/README.md) | Continue execution with an Action or a Flow. |
-| [02_09 Approval Workflow](02_09_approval_workflow/README.md) | Combine a search Flow, Agent commands, Plugin dispatch, and approval Signals. |
+| [02_09 Flow Directives](02_09_flow_directives/README.md) | Collect ordered Directives and dispatch them after one commit. |
 
 Run all Workflow examples from the `jido` repository root:
 

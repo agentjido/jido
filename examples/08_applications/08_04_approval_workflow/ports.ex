@@ -1,5 +1,5 @@
 defmodule Jido.Examples.ApprovalWorkflow.Search do
-  @moduledoc "The flight search contract."
+  @moduledoc "The application flight-search contract."
 
   @callback search(client :: term(), constraints :: map()) ::
               {:ok, [map()]} | {:error, term()}

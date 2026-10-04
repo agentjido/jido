@@ -1,5 +1,5 @@
 defmodule Jido.Examples.ApprovalWorkflow.SubmitBooking do
-  @moduledoc "A portable post-commit booking request owned by the booking Plugin."
+  @moduledoc "A portable post-commit request owned by the application booking Plugin."
 
   @schema Zoi.struct(
             __MODULE__,

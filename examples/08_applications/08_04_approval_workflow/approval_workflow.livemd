@@ -1,6 +1,6 @@
 # Flight Booking Approval Workflow
 
-This Livebook uses the complete `02_09` example. You will search for a flight,
+This Livebook uses the complete `08_04` example. You will search for a flight,
 select one offer, inspect the approval Directive, and submit one booking through
 a local adapter.
 
@@ -290,7 +290,7 @@ The provider call count stays one, and live status stays `:booked`.
 This example does not provide durable Directive delivery, provider retry, or
 recovery after process loss. Read the
 [source README](README.md) and the
-[behavior tests](../../../test/examples/02_workflow/02_09_approval_workflow/approval_workflow_test.exs)
+[behavior tests](../../../test/examples/08_applications/08_04_approval_workflow/approval_workflow_test.exs)
 for the failure and stale-result cases.
 
 

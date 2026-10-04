@@ -1,5 +1,5 @@
 defmodule Jido.Examples.ApprovalWorkflow.SelectFare do
-  @moduledoc false
+  @moduledoc "Selects one current fare for later approval."
 
   use Jido.Action,
     name: "examples_flight_booking_select",

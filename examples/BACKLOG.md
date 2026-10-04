@@ -108,12 +108,12 @@ Apply this checklist to every stable example change:
 
 Use the `02_09` slot after the current approval workflow moves to Applications.
 
-- [ ] Collect Directives from more than one successful Flow component.
-- [ ] Prove canonical Directive order.
-- [ ] Include one successful component that is not part of the final output.
-- [ ] Prove that a later failure discards the complete Directive batch.
-- [ ] Prove that live dispatch starts only after the Agent commit.
-- [ ] Keep detailed Flow execution mechanics in `jido_action` tests.
+- [x] Collect Directives from more than one successful Flow component.
+- [x] Prove canonical Directive order.
+- [x] Include one successful component that is not part of the final output.
+- [x] Prove that a later failure discards the complete Directive batch.
+- [x] Prove that live dispatch starts only after the Agent commit.
+- [x] Keep detailed Flow execution mechanics in `jido_action` tests.
 
 ### Runtime request modes
 
@@ -219,10 +219,10 @@ Assign the final `04_runtime` ID after persistence moves are complete.
 
 ### Move the approval workflow
 
-- [ ] Move `02_09_approval_workflow` to `08_04_approval_workflow`.
-- [ ] Preserve its multi-Turn application, correlation, and idempotency lesson.
-- [ ] Remove or test the README claim about untagged Action extras.
-- [ ] Update previous and next links in Workflow and Applications.
+- [x] Move `02_09_approval_workflow` to `08_04_approval_workflow`.
+- [x] Preserve its multi-Turn application, correlation, and idempotency lesson.
+- [x] Remove or test the README claim about untagged Action extras.
+- [x] Update previous and next links in Workflow and Applications.
 
 ## P2: Advanced authoring examples
 

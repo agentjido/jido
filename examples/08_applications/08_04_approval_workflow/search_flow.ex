@@ -1,5 +1,5 @@
 defmodule Jido.Examples.ApprovalWorkflow.ValidateRequest do
-  @moduledoc false
+  @moduledoc "Validates one flight-search request."
 
   use Jido.Action,
     name: "examples_flight_booking_validate_request",
