@@ -43,3 +43,8 @@ These examples use local processes and local persistence adapters. The
 multi-node ownership and remote lifecycle contracts start in the next section.
 Agent checkpoint and recovery behavior is in the
 [persistence section](../10_persistence/README.md).
+
+Pending-job and durable-scheduling lessons stay here because Plugin runtime
+recovery and scheduling are their main contracts. State recovery and external
+delivery moved to the Persistence section. See the
+[coverage register](../COVERAGE.md) for the placement record.

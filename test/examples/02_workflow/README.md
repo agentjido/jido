@@ -13,7 +13,7 @@ adapter calls.
 | `02_05_ordered_batch` | Ordered Map, error collection, fail-fast, and Reduce |
 | `02_06_bounded_iteration` | Early completion, bounds, and replacement-state validation |
 | `02_07_nested_flow` | Child result scopes, shared context, and contracts |
-| `02_08_executable_continuation` | Continuation types, shared budget, and input validation |
+| `02_08_executable_continuation` | Continuation types, shared continuation limit, and input validation |
 | `02_09_flow_directives` | Ordered multi-step Directives, failure discard, and post-commit dispatch |
 
 Run the full section from the `jido` repository root:

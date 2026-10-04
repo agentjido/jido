@@ -62,21 +62,21 @@ Apply this checklist to every stable example change:
 - [x] Update [AGENTS.md](AGENTS.md) so stable groups include `09_plugins` and
       `10_persistence`. Prefer wording that does not become stale when another
       stable group is added.
-- [ ] Recount stable folders only after the research and persistence moves are
+- [x] Recount stable folders only after the research and persistence moves are
       complete.
-- [ ] Update [README.md](README.md) and all section indexes from the folder tree.
+- [x] Update [README.md](README.md) and all section indexes from the folder tree.
 - [x] Confirm that only `99_02_distributed_authority` remains in `99_research`.
 
 ### Coverage register
 
-- [ ] Add `examples/COVERAGE.md`.
-- [ ] Give each public capability one canonical example, when one exists.
-- [ ] Record the owner package: `jido`, `jido_action`, `jido_signal`, or
+- [x] Add `examples/COVERAGE.md`.
+- [x] Give each public capability one canonical example, when one exists.
+- [x] Record the owner package: `jido`, `jido_action`, `jido_signal`, or
       `jido_ai`.
-- [ ] Mark each capability as focused example, combined example, guide-only,
+- [x] Mark each capability as focused example, combined example, guide-only,
       core-test-only, planned, or out of scope.
-- [ ] Link each covered capability to its source and behavior test.
-- [ ] Do not use raw example count as the coverage score.
+- [x] Link each covered capability to its source and behavior test.
+- [x] Do not use raw example count as the coverage score.
 
 ## P1: New stable examples
 
@@ -315,48 +315,50 @@ audience. Record that decision in `COVERAGE.md`.
 
 Do not duplicate work from the active `10_persistence` stream.
 
-- [ ] Decide whether these persistence-first runtime examples move into group
-      10: `04_06`, `04_09`, `04_10`, and `04_11`.
-- [ ] Keep `04_12_stable_reference`, `04_13_turn_upgrade`, and
+- [x] Move persistence-first `04_06` and `04_09` into group 10. Keep `04_10`
+      and `04_11` in Runtime because managed-job and Scheduler recovery are
+      their main lessons.
+- [x] Keep `04_12_stable_reference`, `04_13_turn_upgrade`, and
       `04_14_state_migration` in Runtime because identity and upgrade behavior
       are their main lessons.
-- [ ] Keep `09_07_persisted_state` in Plugins and link to it from group 10.
-- [ ] Confirm group 10 covers checkpoint identity, version, portability, and
+- [x] Keep persisted Plugin state in `10_04_plugin_state_conversion` after the
+      completed persistence move, and link to it from Plugins.
+- [x] Confirm group 10 covers checkpoint identity, version, portability, and
       state validation.
-- [ ] Confirm group 10 covers exact-byte compare-and-swap.
-- [ ] Confirm group 10 covers hibernate, thaw, deletion, and tombstones.
-- [ ] Confirm group 10 covers `attach`, `detach`, `touch`, and idle
+- [x] Confirm group 10 covers exact-byte compare-and-swap.
+- [x] Confirm group 10 covers hibernate, thaw, deletion, and tombstones.
+- [x] Confirm group 10 covers `attach`, `detach`, `touch`, and idle
       hibernation.
-- [ ] Confirm group 10 covers indeterminate writes and cleanup.
-- [ ] Use local deterministic adapters by default. Keep external service checks
+- [x] Confirm group 10 covers indeterminate writes and cleanup.
+- [x] Use local deterministic adapters by default. Keep external service checks
       optional.
 
 ## Package ownership and suite placement
 
-- [ ] Move `03_llm` to `jido_ai`, or label it as ecosystem integration and
+- [x] Label `03_llm` as ecosystem integration owned by `jido_ai` and
       exclude it from the Jido public-feature count.
-- [ ] Track core Flow, Instruction, Action output, Flow extension, Codec
+- [x] Track core Flow, Instruction, Action output, Flow extension, Codec
       diagnosis, and step-wise execution in the `jido_action` example suite.
-- [ ] Keep only Flow examples here that teach a distinct Agent integration
+- [x] Keep only Flow examples here that teach a distinct Agent integration
       contract.
-- [ ] Mark `06_factory` as an optional combined application suite. Do not count
+- [x] Mark `06_factory` as an optional combined application suite. Do not count
       its four fixtures as four new public Jido capabilities.
-- [ ] Decide whether `06_factory` belongs in `jido_ai` or `examples/jido_lab`.
-- [ ] Mark `08_07_fixed_group` and `08_08_elastic_group` as combined application
+- [x] Record `examples/jido_lab` as the preferred future home for `06_factory`.
+- [x] Mark `08_07_fixed_group` and `08_08_elastic_group` as combined application
       policy, or move them to a demo location.
-- [ ] Keep `99_02_distributed_authority` in Research until Jido has a supported
+- [x] Keep `99_02_distributed_authority` in Research until Jido has a supported
       distributed authority contract.
 
 ## Deliberate non-goals
 
-- [ ] Do not add one stable example for every function overload, alias, error
+- [x] Do not add one stable example for every function overload, alias, error
       struct constructor, or utility helper.
-- [ ] Do not add one example for every Directive. Show a Directive in the
+- [x] Do not add one example for every Directive. Show a Directive in the
       workflow that gives it meaning.
-- [ ] Keep large malformed-input matrices, bounds, and scheduler interleavings
+- [x] Keep large malformed-input matrices, bounds, and scheduler interleavings
       in core tests.
-- [ ] Keep OpenTelemetry exporter setup and deployment-specific configuration
+- [x] Keep OpenTelemetry exporter setup and deployment-specific configuration
       in guides.
-- [ ] Keep provider-specific persistence checks optional.
-- [ ] Do not present application autoscaling or distributed ownership policy as
+- [x] Keep provider-specific persistence checks optional.
+- [x] Do not present application autoscaling or distributed ownership policy as
       a Jido core contract.

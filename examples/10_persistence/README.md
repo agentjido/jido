@@ -25,9 +25,14 @@ Expected result: all examples pass without network access or credentials.
 - Revision zero exists before a persistent Agent reports ready.
 - Each successful Turn writes one new revision.
 - Compare-and-swap blocks stale writes. A tombstone keeps that fence after delete.
+- Adapter compare-and-swap uses exact stored bytes or an opaque store token.
+- Attachments block idle hibernation; detach and touch control the idle timer.
 - An indeterminate write stops the old activation. Recovery reads storage before more work starts.
 - Persistence does not provide exclusive cluster ownership.
 
 ## Limits
 
-The examples use deterministic local stores and controlled faults. Use the persistence conformance suites for all local adapters and the service suites for shared external adapters.
+The examples use deterministic local stores and controlled faults. Use the
+persistence conformance suites for all local adapters and the optional service
+suites for shared external adapters. See the
+[coverage register](../COVERAGE.md) for placement and ownership decisions.

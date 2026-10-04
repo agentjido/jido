@@ -17,6 +17,9 @@ external account or credential.
 Identity and encrypted Signal handling now belong to the focused
 [Plugin examples](../09_plugins/README.md).
 
+Fixed Group and Elastic Group are combined application-policy examples. They
+do not define core group, autoscaling, or distributed ownership contracts.
+
 ## Run the section
 
 ```sh

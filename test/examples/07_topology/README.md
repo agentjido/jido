@@ -17,8 +17,8 @@ The Bus swarm test is a local scale fixture. The remaining tests check:
 - Stable keyed identities and committed state after JSON transport and restart.
 - Shared Bus replacement, component exports, and subscription recovery without
   Agent restarts.
-- Plugin contributions, recovered subscriptions, unchanged source definitions,
-  and process cleanup.
+- Plugin-contributed resources, subscriptions, group ownership, unchanged
+  source definitions, and process cleanup.
 - Lifecycle Signals, placement-policy delegation, and additive target updates.
 - Static extension lowering followed by normal Controller activation and cleanup.
 
