@@ -2,9 +2,9 @@ defmodule Jido.Agent.SerializationContractTest do
   use JidoTest.Case, async: true
 
   alias Jido.Agent.Codec
-  alias Jido.Examples.CheckpointIdentityProbe, as: Probe
-  alias Jido.Examples.PersistenceProbeStore, as: Store
   alias Jido.Persistence
+  alias JidoTest.Persistence.CheckpointIdentityProbe, as: Probe
+  alias JidoTest.Persistence.ProbeStore, as: Store
 
   test "Agent persistence uses a separate namespace and rejects an old envelope" do
     opts = [store: start_supervised!(Store)]

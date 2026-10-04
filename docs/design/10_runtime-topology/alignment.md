@@ -172,8 +172,8 @@ mix test test/examples/07_topology --only example --seed 0
 
 6 passed
 
-mix test test/examples/99_research/99_03_input_resource_lifecycle/runtime_reconstruction_test.exs \
-  test/examples/99_research/99_11_stable_reference/stable_reference_test.exs \
+mix test test/examples/08_applications/08_02_subscription/subscription_test.exs \
+  test/examples/04_runtime/04_12_stable_reference/stable_reference_test.exs \
   --include example --seed 0
 
 5 passed

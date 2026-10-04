@@ -116,7 +116,7 @@ The upgrade path replaces only the immutable Agent value and its checkpoint.
 | `test/jido/agent_server/directive_execution_test.exs:134-410` | Directive exit and timeout retain commit, record progress, stop later work, apply current error policy, and do not restart stale state. |
 | `test/jido/agent_server/runtime_lifecycle_test.exs:32-171` | Jido instance controls and PID ownership are enforced. Exec and Plugin roots belong to the activation and stay outside Agent state. |
 | `test/jido/agent_server/plugin_lifecycle_test.exs` | Readiness gates startup, public instance lookup hides `:starting` entries, replacement stays inspectable, and readiness failure stops the activation. |
-| `test/examples/99_research/99_03_input_resource_lifecycle/runtime_reconstruction_test.exs` | A split Agent and Agent Server Plugin package rebuilds a resource from matching committed owned state and state version. The public state-pull path still reconciles later commits. |
+| `test/examples/08_applications/08_02_subscription/subscription_test.exs` | A split Agent and Agent Server Plugin package rebuilds a resource from matching committed owned state and state version. |
 | `test/jido/agent_server/child_lifecycle_test.exs:59-574` | Child start, address, adoption, parent loss, identity checks, restart, and runtime-only relationships are covered. |
 | `test/jido/agent_server/distributed_child_test.exs:11-383` | Explicit known-node child placement preserves identity and uncertainty. It does not prove cluster ownership. |
 | `test/jido/agent_server/commit_boundary_test.exs` | Crashes at the first and second ordinary Directive positions do not replay a batch or reconstruct the prior activation's Outcome. |
@@ -124,7 +124,7 @@ The upgrade path replaces only the immutable Agent value and its checkpoint.
 | `test/jido/agent/turn/outcome_test.exs:8-109` | Outcome construction, stage/status consistency, version rules, Directive counts, and timing are validated. |
 | `examples/04_runtime/04_07_agent_observation/turn_observation.ex` | Public observation uses current runtime events and Turn Outcome data. |
 | `test/jido/agent_server/upgrade_test.exs` | Quiescent ordering, schema validation, Plugin-contract rejection, runtime-checkpoint restart, and namespaced durable definition replacement pass. |
-| `test/examples/99_research/99_14_turn_upgrade` and `99_15_state_migration` | UP-01 and UP-02 pass without skips through the explicit upgrade boundary. |
+| `test/examples/04_runtime/04_13_turn_upgrade` and `04_14_state_migration` | UP-01 and UP-02 pass without skips through the explicit upgrade boundary. |
 
 The FA-06 research checks are enabled and passing. Focused Server, Plugin,
 persistence, error, and example suites pass with the selected behavior.

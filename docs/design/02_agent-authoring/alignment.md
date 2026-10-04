@@ -127,7 +127,7 @@ document approval.
 | `test/jido/agent/authoring_extension_test.exs:114-310` | Spark extension order, target claims, public data lowering into direct, Builder, and Codec forms, common validation, and error cases are covered. |
 | `test/jido/agent/serialization_contract_test.exs:9-43` | Agent authoring JSON and persistence records use separate namespaces and formats. |
 | `test/jido/agent/versioning_test.exs` | Generated defaults, explicit and invalid `vsn`, direct compatibility, Builder, Codec version 2, and Codec version-1 rejection are covered. |
-| `test/examples/99_research/99_12_definition_revision/definition_revision_test.exs` | Revision mismatch is an active passing control after seam-01 work. |
+| `test/jido/agent/versioning_test.exs` | Revision mismatch is an active passing control after seam-01 work. |
 | `test/examples/01_basic/README.md:1-18` | The Basic suite has five focused fixtures. It does not contain a cross-form parity matrix. |
 
 ### Validation record
@@ -146,8 +146,9 @@ The final 2026-09-09 seam-02 checks produced these results:
 - Compile with warnings as errors: passed.
 - Full default suite: 1,110 tests passed and 302 tests were excluded by the
   standard tags.
-- Example suite: 284 tests passed and 10 tests were skipped. All 10 skips are
-  in the research examples and name deferred work.
+- The recorded example run used the earlier research corpus. Those implemented
+  contracts are now stable examples or focused core tests. Only `DIST-03`
+  remains a research contract.
 - Repository quality alias: format passed, compile passed with warnings as
   errors, Credo reported no issues, Dialyzer reported no errors or skips, and
   1,110 tests passed with one standard exclusion.

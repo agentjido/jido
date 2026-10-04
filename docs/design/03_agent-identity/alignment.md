@@ -104,8 +104,8 @@ file defines outcomes and gates. It is not an implementation plan.
 - `test/jido/agent_server/distributed_authority_test.exs:10-39`: compare-and-
   swap detects a stale write. The test for at most one live cluster owner is
   skipped.
-- `examples/99_research/99_11_stable_reference/stable_reference.ex:25-46` and
-  `test/examples/99_research/99_11_stable_reference/stable_reference_test.exs:21-80`:
+- `examples/04_runtime/04_12_stable_reference/stable_reference.ex` and
+  `test/examples/04_runtime/04_12_stable_reference/stable_reference_test.exs`:
   the Core Ref facade resolves the current local PID and restores durable state
   after the namespace is rebound to another local instance name.
 

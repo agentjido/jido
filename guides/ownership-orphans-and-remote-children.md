@@ -78,6 +78,14 @@ ID in the sender's state, let the receiver send an acknowledgement Signal only
 after its own commit, and clear the pending ID when the sender commits that
 acknowledgement. The receiver must ignore a repeated work ID.
 
+For an ownership handoff, add a monotonically increasing generation to the
+work ID. Keep the old owner authoritative while an offer is pending. Commit the
+new owner only after the new worker acknowledges the same work ID and
+generation. Reject late acknowledgements and results from older generations.
+If the recipient stops before acknowledgement, clear the offer and reconcile a
+new generation. This is an application protocol. It does not fence external
+effects or create cluster-wide ownership authority.
+
 See [Start Child Agents](child-agents.livemd),
 [Topology Definitions](topology-definitions.md), and
 [Extension Boundaries](extension-boundaries.md).

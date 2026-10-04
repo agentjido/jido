@@ -2,9 +2,9 @@ defmodule JidoTest.Persistence.CheckpointPortabilityTest do
   use JidoTest.Case, async: true
   @moduletag capability: "PERSIST-02"
 
-  alias Jido.Examples.CheckpointPortabilityProbe, as: Probe
-  alias Jido.Examples.PersistenceProbeStore, as: Store
   alias Jido.Persistence
+  alias JidoTest.Persistence.CheckpointPortabilityProbe, as: Probe
+  alias JidoTest.Persistence.ProbeStore, as: Store
 
   setup do
     {:ok,

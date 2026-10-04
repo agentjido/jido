@@ -38,4 +38,4 @@ This example does not implement a worker queue or capacity policy.
 - [Worker Agent](../support/worker.ex)
 - [Keep State Action](../../support/keep_state.ex)
 
-Previous: [Durable Scheduling](../../04_runtime/04_11_durable_scheduling/README.md) | Next: [Correlated Requests](../05_02_correlated_requests/README.md)
+Previous: [State Migration](../../04_runtime/04_14_state_migration/README.md) | Next: [Correlated Requests](../05_02_correlated_requests/README.md)

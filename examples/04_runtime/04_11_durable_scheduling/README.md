@@ -39,4 +39,4 @@ long-running application needs bounded result storage.
 - [Occurrence Actions](occurrence_actions.ex)
 - [Tests](../../../test/examples/04_runtime/04_11_durable_scheduling/durable_scheduling_test.exs)
 
-Previous: [Pending Job Recovery](../04_10_pending_job_recovery/README.md) | Next: [Multi-agent examples](../../05_multi_agent/README.md)
+Previous: [Pending Job Recovery](../04_10_pending_job_recovery/README.md) | Next: [Stable Reference](../04_12_stable_reference/README.md)

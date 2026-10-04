@@ -119,8 +119,9 @@ audit confirmed 45 research tests, exactly 11 skips, and a reason for every
 skip. It did not execute research assertions. The existing DIST-03 core skip
 is unchanged. No coverage exclusions or thresholds changed.
 
-See [the test policy](../../guides/testing.md) and
-[the research inventory](../../test/examples/99_research/README.md).
+These counts describe the historical run. The current
+[research inventory](../../test/examples/99_research/README.md) retains only
+`DIST-03`. See the [test policy](../../guides/testing.md).
 
 ## Verification
 

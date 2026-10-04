@@ -147,6 +147,19 @@ Use these fields to correlate one Turn:
 | `span_id` | Current Turn span |
 | `causation_id` | Signal that caused this Signal |
 
+## Keep progress policy outside the Turn contract
+
+Jido reports Turn lifecycle and settlement. It does not define an application
+progress stream. If long work needs intermediate progress, keep the terminal
+status, waiting reason, and final result in Agent state. Put temporary progress
+in a bounded application buffer or event service.
+
+Progress publication must not make the work fail when an observer disconnects.
+Set a retention limit, give readers a cursor, and define what happens when a
+reader falls behind. A local buffer is not durable. Save progress in portable
+state or an external durable event log only when restart recovery requires it.
+Do not put observer PIDs, callbacks, or buffer handles in Agent state.
+
 ## Detach and stop
 
 ```elixir

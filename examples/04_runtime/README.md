@@ -17,6 +17,9 @@ public Jido APIs.
 9. [Recoverable Delivery](04_09_recoverable_delivery/README.md) — resume committed external intent.
 10. [Pending Job Recovery](04_10_pending_job_recovery/README.md) — make retry after runtime loss explicit.
 11. [Durable Scheduling](04_11_durable_scheduling/README.md) — save and acknowledge schedule occurrences.
+12. [Stable Reference](04_12_stable_reference/README.md) — resolve durable identity after process and instance replacement.
+13. [Turn Upgrade](04_13_turn_upgrade/README.md) — serialize release installation at the public idle boundary.
+14. [State Migration](04_14_state_migration/README.md) — migrate domain and Plugin state as one validated commit.
 
 ## Run the section
 

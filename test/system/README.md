@@ -373,4 +373,4 @@ seed with `JIDO_SYSTEM_MODEL_SEED`, or 1..1000 rounds with
 `JIDO_SYSTEM_MODEL_ROUNDS`. Failures retain the original command list before
 bounded reduction starts, then save the shorter replay when reduction ends.
 Every run also writes the compact system report. This focused burn-in does not
-run all enabled research probes; a green burn-in is not a green `mix test.all`.
+run the retained research probe; a green burn-in is not a green `mix test.all`.

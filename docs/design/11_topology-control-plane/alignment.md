@@ -128,7 +128,7 @@ Jido core and are not core release blockers.
 | `TOP-REQ-061` | No external control-plane protocol is selected | `Deferred with its external owner` |
 | `TOP-REQ-062` | Authoring-host, Plugin, Controller, and runtime-topology evidence | `Proven` |
 | `TOP-REQ-063` to `TOP-REQ-068` | Plugin integration unit and executable example tests | `Proven` |
-| `TOP-REQ-069` to `TOP-REQ-076` | Controller update unit tests and UP-07 research example | `Proven` |
+| `TOP-REQ-069` to `TOP-REQ-076` | Controller update unit tests and the stable additive-update example | `Proven` |
 | `TOP-REQ-077` to `TOP-REQ-099` | Authoring, Codec, Controller, placement peer, lifecycle, and example tests | `Proven` |
 
 ## Executable evidence
@@ -141,7 +141,7 @@ Jido core and are not core release blockers.
 | `test/examples/07_topology` | All documented systems run through the same Controller, lifecycle Signal, and Plugin policy contracts. |
 | `test/jido/topology/controller_placement_test.exs` | Exact placement starts and moves one Agent across two connected Erlang nodes. |
 | `test/jido/topology/controller_update_test.exs` | Additive targets retain existing PIDs and state, become the later repair target, and reject removals or changed definitions. |
-| `test/examples/99_research/99_16_topology_upgrade` | UP-07 grows a live worker group with no skip and retains unchanged Agent PIDs and state. |
+| `test/examples/07_topology/07_09_additive_update` | UP-07 grows a live worker group with no skip and retains unchanged Agent PIDs and state. |
 | Distributed child and authority tests | Known-node placement works as a bounded primitive. The exclusive-owner case remains an explicit non-guarantee. |
 
 ## Compatibility decisions

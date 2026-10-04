@@ -99,6 +99,11 @@ The Plugin callbacks have separate owner contracts. These contracts do not
 create separate runtime pools. A Plugin root, its private Supervisor, and its wrapper stop
 with the Agent Server.
 
+An application service that starts temporary Agent Servers or Tasks must own
+them in its supervision subtree. Monitor each job, release its capacity on all
+exit paths, and stop the complete owned subtree during service shutdown. Do not
+leave cleanup to the request process that submitted the job.
+
 ## Stop and hibernate
 
 Use `stop_agent/2` for a clean stop under the default transient restart policy:

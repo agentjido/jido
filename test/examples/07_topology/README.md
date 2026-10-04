@@ -19,7 +19,7 @@ The Bus swarm test is a local scale fixture. The remaining tests check:
   Agent restarts.
 - Plugin contributions, recovered subscriptions, unchanged source definitions,
   and process cleanup.
-- Lifecycle Signals and placement-policy delegation.
+- Lifecycle Signals, placement-policy delegation, and additive target updates.
 
 Examples use public Jido and OTP APIs. Detailed restart limits, coordinator
 failure races, and remote moves remain in the core and peer tests. The

@@ -153,6 +153,6 @@ adapter or operator operation.
 - [x] The migration text states the non-atomic cross-key and downgrade limits.
 - [x] The migration text assigns legacy module-key inventory to the
       application.
-- [x] The stable reference research example is executable and has no skip.
+- [x] The stable runtime Ref example is executable and has no skip.
 - [x] No instance API claims transport, placement, cluster authority, or
       topology control.

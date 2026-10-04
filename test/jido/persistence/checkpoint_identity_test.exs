@@ -3,9 +3,9 @@ defmodule JidoTest.Persistence.CheckpointIdentityTest do
   @moduletag :research
   @moduletag capability: "PERSIST-01"
 
-  alias Jido.Examples.CheckpointIdentityProbe, as: Probe
-  alias Jido.Examples.PersistenceProbeStore, as: Store
   alias Jido.Persistence
+  alias JidoTest.Persistence.CheckpointIdentityProbe, as: Probe
+  alias JidoTest.Persistence.ProbeStore, as: Store
 
   setup do
     {:ok, store: {Store, store: start_supervised!(Store)}, id: unique_id("checkpoint-identity")}

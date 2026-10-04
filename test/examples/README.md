@@ -12,7 +12,7 @@ mix test.examples                      # Runs all example tests
 mix test test/examples/08_applications --include example --seed 0
 ```
 
-The research suite includes enabled failures for proposed core features.
+The research suite contains the peer-based external fencing evidence for the
+missing cluster-exclusive ownership contract.
 Use the [testing guide](../../guides/testing.md) for full acceptance and coverage
-commands. A folder with only a README links to a core test that already owns
-those assertions.
+commands. Detailed stable contracts stay in focused core tests.

@@ -37,4 +37,4 @@ durable external audit store.
 - [Plugin](audit_plugin.ex)
 - [Tests](../../../test/examples/08_applications/08_01_audit/audit_test.exs)
 
-Previous: [Placement Policy](../../07_topology/07_08_placement_policy/README.md) | Next: [Subscription](../08_02_subscription/README.md)
+Previous: [Additive Update](../../07_topology/07_09_additive_update/README.md) | Next: [Subscription](../08_02_subscription/README.md)

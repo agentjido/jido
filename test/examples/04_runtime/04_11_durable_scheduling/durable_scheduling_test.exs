@@ -4,11 +4,11 @@ defmodule JidoTest.Examples.Runtime.DurableSchedulingTest do
   @moduletag group: :runtime
 
   alias Jido.AgentServer, as: Server
-  alias Jido.Examples.PersistenceProbeStore
+  alias JidoTest.Persistence.ProbeStore
   alias Jido.Examples.ScheduledOccurrenceRecovery, as: Example
 
   setup do
-    store = {PersistenceProbeStore, store: start_supervised!(PersistenceProbeStore)}
+    store = {ProbeStore, store: start_supervised!(ProbeStore)}
     {:ok, store: store}
   end
 

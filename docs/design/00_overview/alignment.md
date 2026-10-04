@@ -109,12 +109,12 @@ change runtime behavior.
 | `test/jido/observe/agent_lifecycle_test.exs:10-45` | Direct evaluation emits no runtime events. Handler failure does not change the result. |
 | `test/jido/observe/agent_lifecycle_test.exs:48-302` | Terminal Outcomes, commit boundaries, lifecycle events, and bounded metadata are proved. |
 | `test/jido/error/normalization_test.exs:8-321` | Error constructors and public normalization are covered. |
-| `test/examples/99_research/99_09_route_selection/route_selection_test.exs:6-37` | Direct and live parity, first-match precedence, and fixed source-Signal selection all pass. |
-| `test/examples/99_research/99_10_plugin_isolation/plugin_isolation_test.exs:6-34` | Plugin-owned field ownership, declared-view isolation, and separate prepared inputs all pass. |
-| `test/examples/99_research/99_11_stable_reference/stable_reference_test.exs` | The Core Ref facade resolves current local PIDs and restores durable identity after a namespace is rebound to another local instance name. All three FA03 cases pass. |
-| `test/examples/99_research/99_12_definition_revision/definition_revision_test.exs` | Same-definition restore and revision-mismatch rejection pass. |
-| `test/examples/99_research/99_13_durable_delete/durable_delete_test.exs` | Compare-and-swap deletion and tombstone fencing pass without a skip. |
-| `test/examples/99_research/99_03_input_resource_lifecycle/runtime_reconstruction_test.exs` | State-pull recovery and matching state-and-version Init reconstruction pass. |
+| `test/examples/01_basic/01_06_route_selection/route_selection_test.exs` | Direct and live parity, first-match precedence, and fallback selection all pass. |
+| `test/examples/01_basic/01_03_plugin_state_agent/plugin_state_agent_test.exs` | Plugin-owned state reduction and write protection pass. |
+| `test/examples/04_runtime/04_12_stable_reference/stable_reference_test.exs` | The Core Ref facade resolves current local PIDs and restores durable identity after a namespace is rebound to another local instance name. All three FA03 cases pass. |
+| `test/jido/agent/versioning_test.exs` | Same-definition restore and revision-mismatch rejection pass. |
+| `test/jido/persistence/record_lifecycle_test.exs` | Compare-and-swap deletion and tombstone fencing pass without a skip. |
+| `test/examples/08_applications/08_02_subscription/subscription_test.exs` | Matching state-and-version Init reconstruction, stale-resource rejection, and cleanup pass. |
 
 ### Prior validation record
 
@@ -132,12 +132,12 @@ mix test test/jido/agent_test.exs test/jido/plugin/contract_test.exs \
   test/jido/persistence/indeterminate_write_test.exs \
   test/jido/observe/agent_lifecycle_test.exs --seed 0
 
-mix test test/examples/99_research/99_03_input_resource_lifecycle \
-  test/examples/99_research/99_09_route_selection \
-  test/examples/99_research/99_10_plugin_isolation \
-  test/examples/99_research/99_11_stable_reference \
-  test/examples/99_research/99_12_definition_revision \
-  test/examples/99_research/99_13_durable_delete --include example --seed 0
+mix test test/examples/08_applications/08_02_subscription \
+  test/examples/01_basic/01_06_route_selection \
+  test/examples/01_basic/01_03_plugin_state_agent \
+  test/examples/04_runtime/04_12_stable_reference \
+  test/jido/agent/versioning_test.exs \
+  test/jido/persistence/record_lifecycle_test.exs --include example --seed 0
 ```
 
 This consolidation did not rerun tests because it changes design documents
@@ -265,14 +265,14 @@ still define open details and prove each target behavior.
 
 | Gap | Requirement | Current evidence | Difference | Recommended disposition |
 | --- | --- | --- | --- | --- |
-| `OVR-GAP-001` | `OVR-REQ-013` through `OVR-REQ-015` | `lib/jido/agent/runner.ex`; `test/examples/99_research/99_09_route_selection/route_selection_test.exs` | `Resolved`: selection uses the first source-Signal match before preparation. | Preserve the implemented order. |
-| `OVR-GAP-002` | `OVR-REQ-020` through `OVR-REQ-022` | `lib/jido/agent/plugin.ex`; `test/examples/99_research/99_10_plugin_isolation/plugin_isolation_test.exs` | `Resolved`: Agent facets receive declared projections and package-owned prepared input. | Preserve the four-owner Plugin contract. |
+| `OVR-GAP-001` | `OVR-REQ-013` through `OVR-REQ-015` | `lib/jido/agent/runner.ex`; `test/examples/01_basic/01_06_route_selection/route_selection_test.exs` | `Resolved`: selection uses the first source-Signal match before preparation. | Preserve the implemented order. |
+| `OVR-GAP-002` | `OVR-REQ-020` through `OVR-REQ-022` | `lib/jido/agent/plugin.ex`; `test/examples/01_basic/01_03_plugin_state_agent/plugin_state_agent_test.exs` | `Resolved`: Plugin-owned state is isolated from Action writes. | Preserve the four-owner Plugin contract. |
 | `OVR-GAP-003` | `OVR-REQ-011` and `OVR-REQ-012` | Agent Ref, namespace registry, Ref facade, persistence formats, and FA03 | Ref identity, local resolution, and stable storage are implemented beside current ID and PID APIs. Topology delivery still uses compatible handles. | `Resolved for value, instance, and persistence`; seam 10 owns topology use. |
 | `OVR-GAP-004` | `OVR-REQ-009` and `OVR-REQ-010` | Agent revision, checkpoint, Codec, and restore tests | Definition revision is preserved and mismatches fail. Compatible old checkpoints retain defined handling. | `Resolved` |
 | `OVR-GAP-005` | `OVR-REQ-040` | `lib/jido/agent_server.ex`; `test/jido/agent_server/plugin_lifecycle_test.exs`; `test/jido/persistence/record_lifecycle_test.exs` | `Resolved`: revision zero is confirmed after Plugin readiness. Registry identity stays `:starting` until public `:ready` publication. | Preserve the write, cleanup, and publication order. |
 | `OVR-GAP-006` | `OVR-REQ-039` | `lib/jido/agent_server.ex:1582-1617`; `test/jido/persistence_test.exs:318-356` | Every required persistence write failure now removes the activation before later evaluation. | `Resolved by seam 06`; preserve through seams 07 and 08. |
 | `OVR-GAP-007` | `OVR-REQ-042` | `lib/jido/persistence.ex`; durable-delete and record-lifecycle tests | `Resolved`: normal delete writes a compact CAS tombstone and missing delete writes revision zero. | Keep purge and same-identity reactivation outside normal Core lifecycle. |
-| `OVR-GAP-008` | `OVR-REQ-048` | `lib/jido/plugin/init.ex`; `lib/jido/agent_server/plugin_lifecycle.ex`; `test/examples/99_research/99_03_input_resource_lifecycle/runtime_reconstruction_test.exs` | `Resolved`: first start and replacement get one matching committed owned-state and state-version pair. | Preserve the immutable input and state-pull compatibility. |
+| `OVR-GAP-008` | `OVR-REQ-048` | `lib/jido/plugin/init.ex`; `lib/jido/agent_server/plugin_lifecycle.ex`; `test/examples/08_applications/08_02_subscription/subscription_test.exs` | `Resolved`: first start and replacement get one matching committed owned-state and state-version pair. | Preserve the immutable input contract. |
 | `OVR-GAP-009` | `OVR-REQ-052`, `OVR-REQ-053`, and `OVR-REQ-065` | `Jido.Error`; seam-12 public value, raw control, and internal-type inventories | `Resolved`: current structs, maps, tuples, atoms, PIDs, OTP controls, and owner exceptions have a retention or migration rule. | Preserve the inventory and exact error projection through delivery. |
 | `OVR-GAP-010` | `OVR-REQ-005` | `lib/jido/plugin.ex`; `lib/jido/agent/plugin.ex`; `lib/jido/agent_server/plugin.ex`; `lib/jido/persistence/plugin.ex`; `lib/jido/topology/plugin.ex` | `Resolved`: one callback-free package selects four closed owner facets. Agent, Agent Server, Persistence, and Topology call their bounded facet contracts. | Preserve all four owner integrations and their delivery evidence. |
 | `OVR-GAP-011` | `OVR-REQ-043` | Agent, Plugin, checkpoint, Ref, and persistence portability tests | Each selected durable value owner rejects nonportable data at its boundary. | `Resolved` |
@@ -429,9 +429,9 @@ the implementation tasks.
 | `OVR-REQ-006` through `OVR-REQ-008` | Agent, Builder, Codec, and authoring tests | None | `Proven` |
 | `OVR-REQ-009` and `OVR-REQ-010` | Definition revision, authoring, Codec, checkpoint, and restore tests | None | `Proven` |
 | `OVR-REQ-011` and `OVR-REQ-012` | Ref contract tests, instance Ref tests, stable-key persistence tests, and three passing FA03 cases | Topology delivery, node-move, and stale-location tests remain with seam 10. | `Proven for value, local instance, and persistence` |
-| `OVR-REQ-013` through `OVR-REQ-015` | `../jido_signal/lib/jido_signal/router/index.ex`; `lib/jido/agent/runner.ex`; `test/examples/99_research/99_09_route_selection/route_selection_test.exs` | Direct and live first-match and fixed-selection tests pass. | `Proven` |
-| `OVR-REQ-016` through `OVR-REQ-018` | `lib/jido/agent/runner.ex`; `test/examples/99_research/99_09_route_selection/route_selection_test.exs` | Preserve direct and live finalization parity. | `Proven` for current behavior |
-| `OVR-REQ-019` through `OVR-REQ-023` | `lib/jido/agent/plugin.ex`; `test/jido/plugin/facets_test.exs`; `test/examples/99_research/99_10_plugin_isolation/plugin_isolation_test.exs` | Declared observation, isolated input, deterministic ownership, and direct/live compatibility tests pass. | `Proven` |
+| `OVR-REQ-013` through `OVR-REQ-015` | `../jido_signal/lib/jido_signal/router/index.ex`; `lib/jido/agent/runner.ex`; `test/examples/01_basic/01_06_route_selection/route_selection_test.exs` | Direct and live first-match and fallback-selection tests pass. | `Proven` |
+| `OVR-REQ-016` through `OVR-REQ-018` | `lib/jido/agent/runner.ex`; `test/examples/01_basic/01_06_route_selection/route_selection_test.exs` | Preserve direct and live finalization parity. | `Proven` for current behavior |
+| `OVR-REQ-019` through `OVR-REQ-023` | `lib/jido/agent/plugin.ex`; `test/jido/plugin/facets_test.exs`; `test/examples/01_basic/01_03_plugin_state_agent/plugin_state_agent_test.exs` | Declared observation, isolated input, deterministic ownership, and direct/live compatibility tests pass. | `Proven` |
 | `OVR-REQ-024` through `OVR-REQ-030` | `lib/jido/agent_server.ex:1493-1545,1639-1756`; `test/jido/agent_server/public_api_test.exs:87-181`; `test/jido/agent_server/directive_execution_test.exs:27-184` | Keep equal-state and paired pre-commit failure proof. Keep explicit executable-I/O limits. | `Proven` for current target wording |
 | `OVR-REQ-031` through `OVR-REQ-034` | `lib/jido/plugin/scheduler.ex:30-48`; `test/jido/plugin/scheduler/occurrence_recovery_test.exs:84-212` | Preserve stable ID, retry, acknowledgement, unrelated-Turn, and restart proof. | `Proven` for Scheduler |
 | `OVR-REQ-035` and `OVR-REQ-036` | `lib/jido/persistence/adapter.ex:1-46`; `test/jido/persistence_test.exs:422-503` | Run the adapter contract for every supported adapter and compatible V3 package set. | `Proven` for current adapter contract |
@@ -439,12 +439,12 @@ the implementation tasks.
 | `OVR-REQ-039` | Persistence fault and Agent Server write-authority tests | None | `Proven` |
 | `OVR-REQ-040` | Revision-zero creation, ready-only publication, and cleanup tests | None | `Proven` |
 | `OVR-REQ-041` | `lib/jido/agent_server.ex:2887-2905`; `test/jido/persistence_test.exs:359-394`; `test/jido/topology/controller_test.exs:251-285` | Preserve latest-record restore with the new record lifecycle. | `Proven` for current record |
-| `OVR-REQ-042` | Tombstone lifecycle and durable-delete research tests | None | `Proven` |
+| `OVR-REQ-042` | Tombstone lifecycle and core record-lifecycle tests | None | `Proven` |
 | `OVR-REQ-043` | Checkpoint, record, Ref, and Plugin portability tests | None | `Proven` |
 | `OVR-REQ-044` and `OVR-REQ-045` | Runtime checkpoint and complete instance-stop tests | None | `Proven` |
 | `OVR-REQ-046` and `OVR-REQ-047` | `lib/jido/agent_server.ex:2-10`; `lib/jido.ex:346-370`; `lib/jido/agent_server/plugin_lifecycle.ex:110-198`; `test/jido/supervisor_test.exs:15-54` | If pools change, prove peer Agent behavior, Plugin isolation, and restart coupling. | `Proven` for logical roles |
-| `OVR-REQ-048` | `lib/jido/plugin/init.ex`; `test/jido/agent_server/plugin_lifecycle_test.exs`; `test/examples/99_research/99_03_input_resource_lifecycle/runtime_reconstruction_test.exs` | Keep state/version coherence through later placement changes. | `Proven` |
-| `OVR-REQ-049` | `test/examples/99_research/99_03_input_resource_lifecycle/runtime_reconstruction_test.exs:14-32`; `test/jido/plugin/scheduler/occurrence_recovery_test.exs:84-212` | Preserve Signal reentry and mailbox serialization through Plugin migration. | `Proven` |
+| `OVR-REQ-048` | `lib/jido/plugin/init.ex`; `test/jido/agent_server/plugin_lifecycle_test.exs`; `test/examples/08_applications/08_02_subscription/subscription_test.exs` | Keep state/version coherence through later placement changes. | `Proven` |
+| `OVR-REQ-049` | `test/examples/08_applications/08_02_subscription/subscription_test.exs`; `test/jido/plugin/scheduler/occurrence_recovery_test.exs:84-212` | Preserve Signal reentry and mailbox serialization through Plugin migration. | `Proven` |
 | `OVR-REQ-050` and `OVR-REQ-051` | Pre-commit cancellation, commit, and Directive rejection tests | None | `Proven` |
 | `OVR-REQ-052` and `OVR-REQ-053` | `Jido.Error`; seam-12 public value and raw control inventories; error normalization tests | Preserve the inventory through delivery and add no unowned release result. | `Proven` |
 | `OVR-REQ-054` through `OVR-REQ-059` | Semantic owner modules; Agent lifecycle, persistence, Topology, telemetry consumer, and trace-context tests | Preserve the version-1 catalog and legacy overlap through delivery. | `Proven` |

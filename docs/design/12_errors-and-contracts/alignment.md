@@ -147,7 +147,7 @@ No raw control was removed or changed by this seam.
 
 - Focused error, versioning, portability, Plugin, Ref, and Agent Server context
   tests: 159 passed.
-- Definition-revision research example: 2 passed.
+- Definition-revision core tests: passed.
 - `mix quality`: 1,182 passed, 1 expected exclusion, with clean Credo and
   Dialyzer results.
 - `mix docs --warnings-as-errors`: passed.

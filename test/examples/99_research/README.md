@@ -1,12 +1,11 @@
-# Research probe tests
+# Research probe test
 
-These tests provide the executable evidence for the
-[research probes](../../../examples/99_research/README.md).
+This folder contains the executable evidence for the retained
+[distributed-authority probe](../../../examples/99_research/99_02_distributed_authority/README.md).
 
 ```sh
 mix test test/examples/99_research --include example --seed 0
 ```
 
-Every probe test uses the `:example` tag. The distributed-authority tests also
-start local peer nodes. Test-only barriers and blocking Actions stay in
-`test/examples/support/`; research source uses public Jido APIs.
+The test starts local peer nodes. It proves the external fencing workaround.
+It does not prove the missing Jido `DIST-03` contract.

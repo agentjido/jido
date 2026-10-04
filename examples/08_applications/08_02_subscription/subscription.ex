@@ -3,7 +3,11 @@ defmodule Jido.Examples.Applications.Subscription.Agent do
   use Jido.Agent, name: "application_subscription_agent"
 
   agent do
-    schema Zoi.object(%{changes: Zoi.integer() |> Zoi.default(0)})
+    schema Zoi.object(%{
+             changes: Zoi.integer() |> Zoi.default(0),
+             events: Zoi.list(Zoi.map()) |> Zoi.default([])
+           })
+
     plugin Jido.Examples.Applications.Subscription.Plugin
   end
 
@@ -29,6 +33,19 @@ defmodule Jido.Examples.Applications.Subscription.Agent do
           end
 
         {:ok, next_state, [directive]}
+      end
+    end
+
+    route "examples.applications.subscription.input" do
+      action %{topic: topic, text: text},
+        schema: Zoi.object(%{topic: Zoi.string(), text: Zoi.string()}),
+        context: context do
+        if Map.has_key?(context.agent_state.subscriptions.desired, topic) do
+          event = %{topic: topic, text: text}
+          {:ok, %{context.agent_state | events: context.agent_state.events ++ [event]}}
+        else
+          {:error, Jido.Action.Error.validation_error("stale subscription resource")}
+        end
       end
     end
   end

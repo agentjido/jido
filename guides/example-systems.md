@@ -45,15 +45,18 @@ The runtime group contains focused examples for the hard boundaries:
 - `04_09_recoverable_delivery` — recoverable delivery protocol
 - `04_10_pending_job_recovery` — job state after restart
 - `04_11_durable_scheduling` — schedule occurrence recovery
+- `04_12_stable_reference` — durable identity across process replacement
+- `04_13_turn_upgrade` — serialized release installation
+- `04_14_state_migration` — atomic domain and Plugin state migration
 
 Read the test assertions with the example module. The assertions state the
 expected commit, failure, and cleanup rules.
 
 ## Research examples
 
-`test/examples/99_research` records narrower contract investigations. These
-examples cover distributed authority, fencing, checkpoint portability,
-indeterminate writes, route selection, stable references, and upgrade cases.
+`test/examples/99_research` retains the distributed-authority investigation.
+It shows an external fencing workaround because Jido does not provide
+cluster-exclusive ownership.
 
 Research examples are useful evidence for an extension design. They are not an
 extra public API. Base application code on documented modules and functions.

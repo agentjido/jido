@@ -4,14 +4,14 @@ defmodule JidoTest.Examples.Runtime.RecoverableDeliveryTest do
   @moduletag group: :runtime
 
   alias Jido.AgentServer, as: Server
-  alias Jido.Examples.PersistenceProbeStore
+  alias JidoTest.Persistence.ProbeStore
   alias Jido.Examples.RecoverableDelivery, as: Example
   alias Jido.Examples.RecoverableDelivery.Deliver
   alias Jido.Examples.RecoverableDelivery.MemorySink, as: Sink
 
   setup %{jido: jido} do
     start_supervised!({Sink, jido: jido})
-    store = {PersistenceProbeStore, store: start_supervised!(PersistenceProbeStore)}
+    store = {ProbeStore, store: start_supervised!(ProbeStore)}
     {:ok, store: store}
   end
 

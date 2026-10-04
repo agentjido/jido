@@ -10,6 +10,7 @@ runtime boundary at a time.
 | 01_03 | [Plugin State Agent](01_03_plugin_state_agent/README.md) | Plugin-owned state and atomic commit |
 | 01_04 | [Directive Agent](01_04_directive_agent/README.md) | Whole-batch validation and ordered post-commit effects |
 | 01_05 | [OTP supervision](01_05_otp_supervision/README.md) | Application child tree, OTP restart, local checkpoints, and shutdown |
+| 01_06 | [Route Selection](01_06_route_selection/README.md) | Exact routes, wildcard fallback, precedence, and direct or live parity |
 
 Run the section from the `jido` repository root:
 

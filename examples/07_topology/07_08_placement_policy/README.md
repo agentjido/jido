@@ -41,4 +41,4 @@ Read [the control Agent](placement_policy.ex), [the Directive](move.ex), and
 [test](../../../test/examples/07_topology/07_08_placement_policy/placement_policy_test.exs)
 checks placement and cleanup through public APIs.
 
-Previous: [Lifecycle Signals](../07_07_lifecycle_signals/README.md)
+Previous: [Lifecycle Signals](../07_07_lifecycle_signals/README.md) | Next: [Additive Update](../07_09_additive_update/README.md)

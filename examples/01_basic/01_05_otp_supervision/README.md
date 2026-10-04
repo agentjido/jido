@@ -105,4 +105,4 @@ validation, declared connections, aggregate readiness, or target changes.
 - [Integration test](../../../test/examples/01_basic/01_05_otp_supervision/example_test.exs)
 - [Shared test setup](../../../test/examples/support/basic_sdk_case.ex)
 
-Previous: [Directive Agent](../01_04_directive_agent/README.md) | Next: [Workflow examples](../../02_workflow/README.md)
+Previous: [Directive Agent](../01_04_directive_agent/README.md) | Next: [Route Selection](../01_06_route_selection/README.md)

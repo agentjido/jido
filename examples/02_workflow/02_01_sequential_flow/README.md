@@ -39,4 +39,4 @@ This example does not teach parallel execution, collections, or external I/O.
 - [Source](sequential_flow.ex)
 - [Tests](../../../test/examples/02_workflow/02_01_sequential_flow/sequential_flow_test.exs)
 
-Previous: [Basic examples](../../01_basic/README.md) | Next: [Effectful Steps](../02_02_effectful_steps/README.md)
+Previous: [Route Selection](../../01_basic/01_06_route_selection/README.md) | Next: [Effectful Steps](../02_02_effectful_steps/README.md)

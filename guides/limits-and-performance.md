@@ -36,6 +36,18 @@ Agent identities or a bounded worker group when the work can be partitioned.
 Do not add concurrency inside one Agent when the operations need one serial
 state order.
 
+When several groups share one application budget, put admission in one owned
+service before you start workers. Limit active and queued jobs separately.
+Check a queue deadline before admission and again before worker start. An
+expired job must not consume a worker slot. Give each job a stable ID so retries
+and duplicate submissions have one result.
+
+The budget service must monitor workers and release capacity after success,
+failure, or process loss. Its supervisor must own call Tasks and worker Agents.
+On shutdown, stop both sets and confirm that no accepted work process remains.
+This policy limits accepted application work. It does not limit BEAM mailboxes,
+deep Agent trees, or work on another node.
+
 ## Limit topologies
 
 Topology startup defaults are:

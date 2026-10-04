@@ -123,13 +123,14 @@ Future package names describe possible ownership, not implemented packages:
 | Catch-up queues, backoff, and scheduling policy | An application or Scheduler extension, with a failing integration example before another core control is added. |
 | Private Server or Plugin runtime migration and destructive Topology updates | A separate design and acceptance pass. Core upgrade keeps Plugin declarations fixed, and Topology update adds local Agents only. |
 
-The research suite records executable contracts for replacement Init, stable
-namespace identity, durable deletion, the explicit quiescent upgrade boundary,
-validated Agent definition migration, and additive Topology updates. It also
-proves source-Signal route selection and Plugin-owned state isolation. See the current
-[research test matrix](../test/examples/99_research/README.md).
-The distributed authority example uses an explicit external authority; it does
-not prove that core elects one cluster owner.
+Stable examples now own replacement Plugin Init, Ref identity, the explicit
+idle upgrade boundary, validated Agent definition migration, additive Topology
+updates, route selection, and Plugin-owned state isolation. Focused core tests
+own durable deletion and persistence edge cases.
+
+The [research test matrix](../test/examples/99_research/README.md) retains only
+distributed authority. That example uses an explicit external authority; it
+does not prove that core elects one cluster owner.
 
 ## Package and test boundary
 

@@ -68,13 +68,13 @@ See [system tests](../test/system/README.md) for prerequisites and exact limits.
 Use `elixir test/system/burn_in.exs --runs 5 --rounds 100 --seed 93` for opt-in
 fresh-BEAM model repetition. It has no CI job and does not replace the full suite.
 
-All research example tests pass without skips. They include the explicit
-quiescent upgrade boundary, validated definition migration, and additive
-Topology update. See the
-[research results](../test/examples/99_research/README.md).
+The stable example suite includes the explicit idle upgrade boundary, validated
+definition migration, and additive Topology update. The
+[research result](../test/examples/99_research/README.md) is now only the
+external fencing workaround for unsupported cluster-exclusive ownership.
 
-The [example catalog](https://github.com/agentjido/jido/blob/release/v3/examples/README.md) has 62 main fixtures and
-16 research probes. Source files live in `examples/`; tests live in
+The [example catalog](https://github.com/agentjido/jido/blob/release/v3/examples/README.md) has 67 stable fixtures and
+one research probe. Source files live in `examples/`; tests live in
 `test/examples/`. Production builds and the Hex package exclude both trees.
 Local development and test builds compile the source examples so demos and
 shared core regression fixtures remain available.

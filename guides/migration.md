@@ -546,11 +546,11 @@ tests run. Example acceptance tests are secondary; run `mix test.examples`
 separately when needed. See the
 [test policy](https://github.com/agentjido/jido/blob/release/v3/guides/testing.md).
 
-All research example assertions pass. They include the quiescent upgrade
-boundary, validated live definition migration, and additive Topology
-updates. Stable Agent identity, durable deletion, Plugin runtime reconstruction,
-source-Signal route selection, and Plugin-owned state isolation also pass.
-Cluster-exclusive ownership remains unsupported. See
+Stable examples now cover the idle upgrade boundary, validated live definition
+migration, additive Topology updates, Ref identity, Plugin runtime
+reconstruction, route selection, and Plugin-owned state isolation. Core tests
+own durable deletion. The one research example shows an external fencing
+workaround; cluster-exclusive ownership remains unsupported. See
 [Test Agents and Plugins](test-agents-and-plugins.livemd).
 
 The release evidence record in the repository lists current

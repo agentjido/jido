@@ -1,9 +1,9 @@
 defmodule JidoTest.Persistence.CrossBeamAtomTest do
   use JidoTest.PeerCase, async: false
 
-  alias Jido.Examples.CheckpointPortabilityProbe, as: Probe
   alias Jido.Persistence
   alias Jido.Persistence.ETS
+  alias JidoTest.Persistence.CheckpointPortabilityProbe, as: Probe
   alias JidoTest.Persistence.StaticAtomAgent
 
   test "load brings in atoms defined by the trusted Agent module", c do

@@ -18,7 +18,7 @@ The prepared-input Turn evaluation contract is implemented on branch
 | `test/jido/plugin/contract_test.exs` | Owned-state and Directive boundaries pass. |
 | `test/jido/plugin/preparation_test.exs` | Complete-state reads, reduction, direct and live preparation, rejection, portability, and reserved context pass. |
 | `test/jido/plugin/ordering_test.exs` | Plugin admission and reducers are ordered and fail fast. |
-| `test/examples/99_research/99_10_plugin_isolation` | Plugin-owned state reduction and write protection pass. |
+| `test/examples/01_basic/01_03_plugin_state_agent` | Plugin-owned state reduction and write protection pass. |
 
 ## Current implementation
 
