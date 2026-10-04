@@ -6,6 +6,8 @@ Hibernation saves an idle Agent and stops its process. Thaw starts a new process
 
 - How to hibernate a persistent Agent.
 - How `Jido.thaw/4` requires saved state and restores its revision.
+- How `attach`, `detach`, and `touch` control idle hibernation through a stable
+  Agent Ref.
 
 ## Read the code
 
@@ -15,11 +17,16 @@ Read [the counter](hibernate_and_thaw.ex), then read its behavior test.
 
 `mix test test/examples/10_persistence/10_02_hibernate_and_thaw --include example --seed 0`
 
-Expected result: the old process stops, the new process has the saved count and revision, and a missing required record does not start an Agent.
+Expected result: the old process stops, the new process has the saved count and
+revision, and a missing required record does not start an Agent. An attachment
+blocks idle hibernation. Detach and touch control the timer, then thaw restores
+the revision-zero record after idle shutdown.
 
 ## Important behavior
 
-Hibernation needs configured persistence. Without it, the call returns `:persistence_not_configured` and the Agent stays live.
+Hibernation needs configured persistence. Without it, the call returns
+`:persistence_not_configured` and the Agent stays live. Attachments are local
+runtime ownership controls; they are not stored in the checkpoint.
 
 ## Limits
 

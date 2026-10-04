@@ -5,6 +5,7 @@ A durable tombstone prevents a delayed old writer from recreating a deleted Agen
 ## What you will learn
 
 - How compare-and-swap rejects stale revisions.
+- How the local adapter requires the exact stored bytes for replacement.
 - Why logical deletion keeps a durable fence.
 
 ## Read the code
@@ -15,11 +16,14 @@ Read [the order Agent](durable_delete.ex), then read its behavior test.
 
 `mix test test/examples/10_persistence/10_05_durable_delete --include example --seed 0`
 
-Expected result: load returns `:deleted`, and an old initial writer cannot replace the tombstone.
+Expected result: load returns `:deleted`, and an old initial writer cannot
+replace the tombstone. A byte comparison rejects a condition that is only a
+prefix of the stored value.
 
 ## Important behavior
 
-Deletion makes the active record unavailable, but it does not remove the revision barrier.
+Deletion makes the active record unavailable, but it does not remove the
+revision barrier. Adapter compare-and-swap checks exact bytes atomically.
 
 ## Limits
 

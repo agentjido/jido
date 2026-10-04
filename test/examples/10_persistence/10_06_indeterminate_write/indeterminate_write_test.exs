@@ -23,16 +23,22 @@ defmodule JidoTest.Examples.Persistence.IndeterminateWriteTest do
                restore: false
              )
 
+    monitor = Process.monitor(server)
+
     {:ok, route_signal_1} = Probe.increment_signal(%{request_id: "first", amount: 1})
 
     assert {:error, {:persistence_failed, :indeterminate}} =
              Jido.AgentServer.call(server, route_signal_1, context: context)
+
+    assert_receive {:DOWN, ^monitor, :process, ^server, _reason}, 1_000
+    assert Jido.whereis_agent(jido, id) == nil
 
     assert {:ok, %{state: %{count: 1}}, 1} =
              Persistence.load_agent_with_revision(store, Probe, id, instance: jido)
 
     refute_received {:signal, %{type: "examples.persistence.indeterminate_write.applied"}}
     assert match?({:error, _}, next_command(server, context))
+    assert Jido.agent_count(jido) == 0
   end
 
   defp next_command(server, context) do

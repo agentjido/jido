@@ -2,6 +2,7 @@ defmodule JidoTest.Examples.Persistence.DurableDeleteTest do
   use JidoTest.Case, async: true
   @moduletag :example
   alias Jido.Examples.DurableDelete
+  alias Jido.Persistence.ETS
   alias JidoTest.Persistence.ProbeStore
 
   setup do
@@ -54,5 +55,17 @@ defmodule JidoTest.Examples.Persistence.DurableDeleteTest do
              Jido.Persistence.load_agent(c.store, DurableDelete, c.order.id,
                namespace: "durable-delete-example"
              )
+  end
+
+  test "the local adapter compare-and-swap condition uses exact bytes" do
+    table = :"durable_delete_cas_#{System.unique_integer([:positive])}"
+    opts = [table: table]
+    on_exit(fn -> ETS.delete("record", opts) end)
+
+    assert :ok = ETS.compare_and_swap("record", :not_found, <<0, 255>>, opts)
+    assert {:error, :conflict} = ETS.compare_and_swap("record", <<0>>, <<1>>, opts)
+    assert {:ok, <<0, 255>>} = ETS.get("record", opts)
+    assert :ok = ETS.compare_and_swap("record", <<0, 255>>, <<1>>, opts)
+    assert {:ok, <<1>>} = ETS.get("record", opts)
   end
 end

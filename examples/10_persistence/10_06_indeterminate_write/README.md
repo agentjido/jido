@@ -15,7 +15,9 @@ Read [the Agent](indeterminate_write_probe.ex), then read its behavior test and 
 
 `mix test test/examples/10_persistence/10_06_indeterminate_write --include example --seed 0`
 
-Expected result: storage contains the candidate revision, no output Signal is sent, and the old process cannot run another command.
+Expected result: storage contains the candidate revision, no output Signal is
+sent, and the old process stops, releases its registration, and cannot run
+another command.
 
 ## Important behavior
 
