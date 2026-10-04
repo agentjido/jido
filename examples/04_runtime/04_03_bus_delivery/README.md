@@ -5,6 +5,7 @@ An Agent consumes ordered Signals from a durable local Bus subscription.
 ## What you will learn
 
 - How the Bus Client Plugin routes matching records into Agent Turns.
+- How the Bus Manager starts before the Client becomes ready.
 - How commit acknowledgement, retry order, and stable Signal IDs work together.
 
 ## Read the code
@@ -22,8 +23,14 @@ later input, and a restarted Client continues its subscription.
 
 ## Important behavior
 
-The Bus acknowledges a record only after the Turn commits. The Agent accepts an
-already committed Signal ID so that a repeated delivery can be acknowledged.
+Declare `Jido.Plugin.Bus.Manager` before `Jido.Plugin.Bus.Client` when one Agent
+owns and consumes the Bus. `AgentServer.await_ready/2` returns only after the
+Client has subscribed to the Manager-owned Bus.
+
+The Bus acknowledges a record only after the Turn commits. The Agent accepts
+an already committed Signal ID so that a repeated delivery can be
+acknowledged. The Client rebuilds its durable subscription after replacement.
+Both Plugin runtimes stop with the Agent owner.
 
 ## Limits
 

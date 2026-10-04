@@ -169,11 +169,11 @@ Assign the final `04_runtime` ID after persistence moves are complete.
 
 ### `04_03_bus_delivery`
 
-- [ ] Declare `Jido.Plugin.Bus.Manager` before `Jido.Plugin.Bus.Client`.
-- [ ] Stop starting the owned Bus directly in the normal behavior test.
-- [ ] Prove Manager readiness before Client subscription.
-- [ ] Prove ordered delivery and owner cleanup.
-- [ ] Keep durable Client recovery behavior in the lesson.
+- [x] Declare `Jido.Plugin.Bus.Manager` before `Jido.Plugin.Bus.Client`.
+- [x] Stop starting the owned Bus directly in the normal behavior test.
+- [x] Prove Manager readiness before Client subscription.
+- [x] Prove ordered delivery and owner cleanup.
+- [x] Keep durable Client recovery behavior in the lesson.
 
 ### `04_05_runtime_inspection`
 
