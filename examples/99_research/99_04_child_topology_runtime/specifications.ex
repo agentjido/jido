@@ -1,5 +1,5 @@
 defmodule Jido.Examples.Research.ChildTopologyRuntime.Specifications do
-  @moduledoc "Proposed child runtime data declarations. The current core rejects children."
+  @moduledoc "Child runtime data declarations for DSL and stored definitions."
 
   alias Jido.Agent
   alias Jido.Topology
@@ -20,7 +20,8 @@ defmodule Jido.Examples.Research.ChildTopologyRuntime.Specifications do
          activation: :lazy,
          gate: %{
            commands: [%{type: @command, member: :alice}],
-           events: Keyword.get(opts, :events, [@export])
+           events: Keyword.get(opts, :events, [@export]),
+           to: :signals
          },
          max_restarts: Keyword.get(opts, :max_restarts, 1),
          max_seconds: 5
@@ -58,7 +59,7 @@ defmodule Jido.Examples.Research.ChildTopologyRuntime.Specifications do
           metadata: %{"document_id" => "child/#{entry.key}"}
         )
 
-      %{entry | module: definition}
+      entry |> Map.delete(:module) |> Map.put(:definition, definition)
     end
   end
 
@@ -76,7 +77,10 @@ defmodule Jido.Examples.Research.ChildTopologyRuntime.Specifications do
   def nested_parent do
     with {:ok, leaf} <- child_entry(:dsl),
          {:ok, middle} <-
-           Topology.new(name: "middle", children: [leaf]),
+           Topology.new(
+             name: "middle",
+             children: [put_in(leaf.gate, %{commands: leaf.gate.commands, events: []})]
+           ),
          {:ok, entry} <- child_entry(:data) do
       entry = %{
         entry

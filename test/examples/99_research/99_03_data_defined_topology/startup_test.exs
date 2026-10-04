@@ -50,7 +50,7 @@ defmodule JidoTest.Examples.Research.DataTopologyStartupTest do
     test "#{form} Agent definitions share behavior but retain distinct schemas, routes, and Plugins",
          c do
       assert {:ok, entries} = Startup.data_entries(unquote(form))
-      definitions = Enum.map(entries, & &1.module)
+      definitions = Enum.map(entries, &Definitions.source/1)
       assert Enum.uniq(Enum.map(definitions, & &1.module)) == [Worker]
       assert length(Enum.uniq(Enum.map(definitions, & &1.schema))) == 3
       assert length(Enum.uniq(Enum.map(definitions, & &1.routes))) == 3
@@ -59,18 +59,20 @@ defmodule JidoTest.Examples.Research.DataTopologyStartupTest do
 
       # Standalone execution is the control. Topology must preserve these same values.
       for {entry, index} <- Enum.with_index(entries) do
-        assert Agent.definition?(entry.module)
+        assert Agent.definition?(Definitions.source(entry))
 
         assert {:ok, server} =
-                 Jido.start_agent(c.jido, entry.module,
+                 Jido.start_agent(c.jido, Definitions.source(entry),
                    id: unique_id("standalone"),
                    initial_state: entry.initial_state
                  )
 
         try do
-          assert {:ok, committed} = Example.record(server, Definitions.path(entry.module), 5)
+          assert {:ok, committed} =
+                   Example.record(server, Definitions.path(Definitions.source(entry)), 5)
+
           assert committed.state.total == entry.initial_state.total + 5
-          assert_selected(server, entry.module)
+          assert_selected(server, Definitions.source(entry))
 
           if index == 1,
             do: refute(Map.has_key?(committed.state, :records)),
@@ -117,21 +119,23 @@ defmodule JidoTest.Examples.Research.DataTopologyStartupTest do
 end
 
 defmodule JidoTest.Examples.Research.DirectDataMemberDSLTest do
+  alias Jido.Examples.Research.DataDefinedTopology.Definitions
   use ExUnit.Case, async: false
   @moduletag :example
 
-  test "the existing DSL member argument accepts a neutral Agent definition" do
+  test "the DSL definition selector accepts a neutral Agent definition" do
     path =
       Path.expand(
         "../../../../examples/99_research/99_03_data_defined_topology/fixtures/direct_dsl.exs",
         __DIR__
       )
 
-    # The current DSL requires an atom and raises here. This source uses only
-    # existing syntax. Any replacement syntax remains subject to review.
+    # The neutral definition selector keeps the compiled module form separate.
     Code.compile_file(path)
     module = Module.concat(Jido.Examples.Research.DataDefinedTopology, DirectDSL)
     assert {:ok, instance} = module.new(id: "direct-dsl")
     assert instance.plan.agents["agent/alice"]
+    assert instance.plan.agents["group/workers/1"].definition == Definitions.direct(:bob)
+    assert instance.plan.agents["group/workers/2"].definition == Definitions.direct(:bob)
   end
 end

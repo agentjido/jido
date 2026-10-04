@@ -54,6 +54,7 @@ defmodule Jido.Topology.DSL.Compiler do
           relationships: [],
           connections: [],
           includes: [],
+          children: [],
           imports: [],
           exports: [],
           startup: %{}
@@ -69,7 +70,11 @@ defmodule Jido.Topology.DSL.Compiler do
         sources(entities, field, kind)
       end)
 
+    owner? = Module.get_attribute(env.module, :jido_agent_block_declared) == true
+
     quote do
+      @doc false
+      def __topology_owner__?, do: unquote(owner?)
       @doc false
       def __topology_config__, do: unquote(Macro.escape(config))
 

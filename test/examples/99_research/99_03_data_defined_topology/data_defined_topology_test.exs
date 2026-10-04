@@ -15,7 +15,7 @@ defmodule JidoTest.Examples.Research.DataDefinedTopologyTest do
   @observer_record "examples.research.data_defined_topology.observer.record"
   @alice_record "examples.research.data_defined_topology.alice.record"
 
-  test "a valid stored Agent fails a DSL topology update and preserves the live member", c do
+  test "a neutral value in the module field is rejected and preserves the live member", c do
     {:ok, initial} = Example.initial(unique_id("data-topology-boundary"))
     assert initial.definition == HybridTopology.topology()
     controller = start_supervised!({Controller, jido: c.jido, topology: initial})
@@ -45,7 +45,10 @@ defmodule JidoTest.Examples.Research.DataDefinedTopologyTest do
       assert_receive {:DOWN, ^ref, :process, ^standalone, _}, 5_000
 
       assert {:error, %Jido.Error.ValidationError{message: "Expected an Agent module"}} =
-               Example.expanded(initial, alice)
+               Jido.Topology.new(%{
+                 initial.definition
+                 | agents: initial.definition.agents ++ [%{key: :alice, module: alice}]
+               })
 
       assert :ok = Controller.await_ready(controller)
       assert Controller.whereis_agent(controller, :observer) == observer
@@ -70,8 +73,6 @@ defmodule JidoTest.Examples.Research.DataDefinedTopologyTest do
       assert {:ok, committed} = Example.record(observer, @observer_record, 7)
       assert {:ok, definition} = Example.stored_alice()
 
-      # This assertion records the desired contract. It must fail before the
-      # core fix. Target construction fails before Controller.update/3 runs.
       assert {:ok, expanded} = Example.expanded(initial, definition)
       assert :ok = Controller.update(controller, expanded)
       assert :ok = Controller.await_ready(controller)

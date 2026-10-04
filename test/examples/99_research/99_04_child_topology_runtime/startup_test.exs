@@ -21,7 +21,7 @@ defmodule JidoTest.Examples.Research.ChildTopologyStartupTest do
   test "the proposed stored child members already run alone", c do
     for entry <- Specifications.data_entries() do
       assert {:ok, server} =
-               Jido.start_agent(c.jido, entry.module,
+               Jido.start_agent(c.jido, entry.definition,
                  id: unique_id("stored-child-control"),
                  initial_state: entry.initial_state
                )
@@ -30,9 +30,9 @@ defmodule JidoTest.Examples.Research.ChildTopologyStartupTest do
         assert {:ok, committed} = AgentServer.call(server, record())
         assert committed.state.total == 1
         assert committed.state.label == entry.initial_state.label
-        assert committed.schema == entry.module.schema
-        assert committed.routes == entry.module.routes
-        assert committed.metadata == entry.module.metadata
+        assert committed.schema == entry.definition.schema
+        assert committed.routes == entry.definition.routes
+        assert committed.metadata == entry.definition.metadata
       after
         ref = Process.monitor(server)
         assert :ok = Jido.stop_agent(c.jido, AgentServer.agent(server).id)

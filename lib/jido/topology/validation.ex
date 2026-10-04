@@ -14,6 +14,7 @@ defmodule Jido.Topology.Validation do
     :connections,
     :startup,
     :includes,
+    :children,
     :imports,
     :exports
   ]
@@ -36,7 +37,7 @@ defmodule Jido.Topology.Validation do
   def definition(attrs, ancestors \\ [], depth \\ 0)
 
   def definition(_, _, depth) when depth > 32,
-    do: Authoring.error("Topology inclusion depth exceeds 32")
+    do: Authoring.error("Topology depth exceeds 32")
 
   def definition(%Jido.Topology{} = attrs, ancestors, depth),
     do: definition(Map.from_struct(attrs), ancestors, depth)
@@ -56,6 +57,11 @@ defmodule Jido.Topology.Validation do
          {:ok, startup} <- entry(:startup, Map.get(attrs, :startup, %{})),
          {:ok, imports} <- entries(attrs, :imports, :import),
          {:ok, exports} <- entries(attrs, :exports, :export),
+         {:ok, children} <-
+           Authoring.traverse(
+             Map.get(attrs, :children, []),
+             &Jido.Topology.Child.normalize(&1, ancestors, depth)
+           ),
          {:ok, includes} <-
            Authoring.traverse(Map.get(attrs, :includes, []), &include(&1, ancestors, depth)) do
       definition = %{
@@ -70,7 +76,8 @@ defmodule Jido.Topology.Validation do
         startup: startup,
         imports: imports,
         exports: exports,
-        includes: includes
+        includes: includes,
+        children: children
       }
 
       with :ok <- names(definition), do: {:ok, definition}
@@ -89,21 +96,26 @@ defmodule Jido.Topology.Validation do
   end
 
   defp static_entry(:include, _value), do: :ok
+
+  defp static_entry(kind, value) when kind in [:agent, :group],
+    do: static(Map.delete(value, :definition))
+
   defp static_entry(_kind, value), do: static(value)
 
   defp normalize(kind, attrs) when kind in [:agent, :group] do
     with {:ok, name} <- key(attrs[:key]),
-         {:ok, _definition} <- agent_definition(attrs[:module]),
+         {:ok, selection} <- agent_selection(attrs),
          {:ok, state} <- initial_state(Map.get(attrs, :initial_state, %{})),
          {:ok, deps} <- Authoring.traverse(Map.get(attrs, :depends_on, []), &Ref.target/1),
          {:ok, placement} <- placement(Map.get(attrs, :node)) do
       agent = %{
         key: name,
-        module: attrs.module,
         initial_state: state,
         depends_on: deps,
         node: placement
       }
+
+      agent = Map.merge(agent, selection)
 
       if kind == :agent, do: {:ok, agent}, else: group(agent, attrs)
     end
@@ -180,6 +192,7 @@ defmodule Jido.Topology.Validation do
          {:ok, key} <- key(attrs[:key]),
          {:ok, source, ancestors} <- included_source(attrs[:topology], ancestors),
          {:ok, definition} <- definition(source, ancestors, depth + 1),
+         :ok <- static_include(definition),
          {:ok, inputs} <- plain_static_map(Map.get(attrs, :inputs, %{})),
          {:ok, bindings} <- bindings(Map.get(attrs, :bindings, [])),
          :ok <- unique(Enum.map(bindings, & &1.key), "Duplicate import binding") do
@@ -212,6 +225,9 @@ defmodule Jido.Topology.Validation do
     do: {:ok, value, ancestors}
 
   defp included_source(_, _), do: Authoring.error("Expected a topology module or definition")
+
+  defp static_include(%{children: []}), do: :ok
+  defp static_include(_), do: Authoring.error("Static include cannot contain runtime children")
 
   defp bindings(value) when is_map(value) and not is_struct(value) do
     value |> Enum.sort() |> Enum.map(fn {key, to} -> %{key: key, to: to} end) |> bindings()
@@ -289,11 +305,11 @@ defmodule Jido.Topology.Validation do
   defp placement(_value),
     do: Authoring.error("Topology Agent node must be an atom or topology reference")
 
-  defp plain_static_map(value) when is_map(value) and not is_struct(value) do
+  def plain_static_map(value) when is_map(value) and not is_struct(value) do
     with :ok <- static(value), do: {:ok, value}
   end
 
-  defp plain_static_map(_), do: Authoring.error("Expected a static plain map")
+  def plain_static_map(_), do: Authoring.error("Expected a static plain map")
 
   defp static(value) do
     case Jido.Action.validate_static_data(value) do
@@ -335,6 +351,28 @@ defmodule Jido.Topology.Validation do
   defp static_references(_value), do: :ok
 
   @doc false
+  def agent_source(entry), do: Map.get(entry, :definition) || Map.get(entry, :module)
+
+  defp agent_selection(attrs) do
+    case {Map.get(attrs, :module), Map.get(attrs, :definition)} do
+      {nil, %Jido.Agent{} = value} ->
+        with {:ok, definition} <- Jido.Agent.validate_definition(value),
+             do: {:ok, %{definition: definition}}
+
+      {module, nil} when not is_nil(module) ->
+        with :ok <-
+               if(is_atom(module), do: :ok, else: Authoring.error("Expected an Agent module")),
+             {:ok, _} <- agent_definition(module),
+             do: {:ok, %{module: module}}
+
+      _ ->
+        Authoring.error("An Agent entry requires exactly one module or neutral definition")
+    end
+  end
+
+  @doc false
+  def agent_definition(%Jido.Agent{} = definition), do: Jido.Agent.validate_definition(definition)
+
   def agent_definition(module) when is_atom(module) and not is_nil(module) do
     case Code.ensure_loaded(module) do
       {:module, ^module} ->
@@ -379,7 +417,8 @@ defmodule Jido.Topology.Validation do
   defp names(definition) do
     declarations =
       definition.agents ++
-        definition.groups ++ definition.resources ++ definition.imports ++ definition.includes
+        definition.groups ++
+        definition.resources ++ definition.imports ++ definition.includes ++ definition.children
 
     with :ok <- unique(Enum.map(declarations, & &1.key), "Duplicate topology key"),
          :ok <- unique(Enum.map(definition.exports, & &1.key), "Duplicate topology export"),

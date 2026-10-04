@@ -35,7 +35,7 @@ defmodule Jido.Examples.Research.DataDefinedTopology.Composition do
 
   def child(:dsl, source) do
     [agent] = Child.topology().agents
-    Topology.new(%{Child.topology() | agents: [%{agent | module: source}]})
+    Topology.new(%{Child.topology() | agents: [Definitions.select(agent, source)]})
   end
 
   def child(:data, source) do

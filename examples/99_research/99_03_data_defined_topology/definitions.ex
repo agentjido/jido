@@ -60,7 +60,14 @@ defmodule Jido.Examples.Research.DataDefinedTopology.Definitions do
   end
 
   def entry(key, source, state \\ %{}),
-    do: %{key: key, module: source, initial_state: state}
+    do: select(%{key: key, initial_state: state}, source)
+
+  def select(entry, source) do
+    field = if is_struct(source, Agent), do: :definition, else: :module
+    entry |> Map.drop([:module, :definition]) |> Map.put(field, source)
+  end
+
+  def source(entry), do: Map.get(entry, :definition) || Map.fetch!(entry, :module)
 
   def path(%Agent{routes: [route | _]}), do: route.path
   def path(module) when is_atom(module), do: path(module.definition())

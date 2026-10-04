@@ -11,13 +11,24 @@ defmodule Jido.Topology do
   A module can contain three root blocks. `agent` defines an optional control
   Agent. `routes` uses the normal Agent DSL and requires `agent`. `topology`
   contains all topology-specific sections. The control Agent and topology are
-  independent. Starting one never starts the other.
+  independent authoring values. The generated `child_spec/1` starts them through
+  `Jido.Topology.Runtime`, which owns the combined supervision tree.
 
   Pass static authoring extensions with
   `use Jido.Topology, extensions: [MyExtension]`. An extension can implement
   `Jido.Agent.Extension`, `Jido.Topology.Extension`, or both. The combined host
   sends its declarations to `lower_agent/2`, `lower_topology/2`, or both before
   common validation.
+
+  An Agent or group selects exactly one `module:` or `definition:` source.
+  A neutral definition retains its schema, routes, metadata, and Plugins.
+  Planning checks resolved state before activation. The Topology Codec uses
+  version 3 for neutral members and runtime children; module-only documents
+  retain version 2.
+
+  `children:` entries start separate runtimes through declared command and
+  event gates. Static `include` composes one plan and cannot contain runtime
+  children. See `Jido.Topology.Runtime` and the topology API review examples.
 
   During instance planning, each Agent or group declaration can add pure
   static entries through a declared `Jido.Topology.Plugin` facet. Jido adds
@@ -42,6 +53,7 @@ defmodule Jido.Topology do
               relationships: Zoi.list(Zoi.map()),
               connections: Zoi.list(Zoi.map()),
               includes: Zoi.list(Zoi.map()),
+              children: Zoi.list(Zoi.map()),
               imports: Zoi.list(Zoi.map()),
               exports: Zoi.list(Zoi.map()),
               startup: Zoi.map()
@@ -94,6 +106,7 @@ defmodule Jido.Topology do
 
       @doc "Constructs an instance or raises its validation error."
       def new!(opts), do: Jido.Topology.unwrap!(new(opts))
+
     end
   end
 
@@ -106,6 +119,7 @@ defmodule Jido.Topology do
   defp new_with_composition(attrs) do
     with {:ok, attrs} <- Validation.definition(attrs),
          {:ok, composed} <- Composition.flatten(attrs),
+         :ok <- Jido.Topology.Child.validate(attrs),
          {:ok, definition} <- Zoi.parse(@schema, attrs),
          do: {:ok, definition, composed}
   end
@@ -123,7 +137,8 @@ defmodule Jido.Topology do
          :ok <- Authoring.keys(opts, [:id, :input]),
          {:ok, id} <- Validation.key(Map.get(opts, :id)),
          {:ok, input} <- Validation.parse_input(definition.schema, Map.get(opts, :input, %{})),
-         {:ok, plan} <- Plan.build_composed(planning_definition, id, input, composed) do
+         {:ok, plan} <- Plan.build_composed(planning_definition, id, input, composed),
+         :ok <- Jido.Topology.Child.plan(definition, id, input, plan) do
       {:ok, %Instance{id: id, definition: definition, input: input, plan: plan}}
     end
   end

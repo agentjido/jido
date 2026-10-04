@@ -24,7 +24,7 @@ defmodule JidoTest.DataTopologyAssertions do
       spec = Map.fetch!(instance.plan.agents, "agent/#{entry.key}")
       server = Jido.whereis_agent(jido, spec.id)
       assert is_pid(server)
-      actual = assert_selected(server, entry.module)
+      actual = assert_selected(server, Definitions.source(entry))
       assert actual.id == spec.id
       assert actual.state.total == entry.initial_state.total
       assert actual.metadata["jido.topology"] == %{id: instance.id, key: spec.key}
@@ -35,9 +35,12 @@ defmodule JidoTest.DataTopologyAssertions do
     for entry <- entries do
       spec = Map.fetch!(instance.plan.agents, "agent/#{entry.key}")
       server = Jido.whereis_agent(jido, spec.id)
-      assert {:ok, committed} = Example.record(server, Definitions.path(entry.module), 5)
+
+      assert {:ok, committed} =
+               Example.record(server, Definitions.path(Definitions.source(entry)), 5)
+
       assert committed.state.total == entry.initial_state.total + 5
-      actual = assert_selected(server, entry.module)
+      actual = assert_selected(server, Definitions.source(entry))
 
       if actual.plugins == [],
         do: refute(Map.has_key?(committed.state, :records)),

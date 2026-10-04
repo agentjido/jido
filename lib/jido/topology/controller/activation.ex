@@ -75,7 +75,7 @@ defmodule Jido.Topology.Controller.Activation do
   end
 
   defp definition(spec, context) do
-    with {:ok, definition} <- Validation.agent_definition(spec.module) do
+    with {:ok, definition} <- Validation.agent_definition(Validation.agent_source(spec)) do
       metadata =
         Map.put(definition.metadata, "jido.topology", %{
           id: context.instance_id,

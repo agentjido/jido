@@ -86,12 +86,12 @@ defmodule Jido.Topology.Plugin do
   end
 
   defp declaration_contributions(declaration) do
-    with {:ok, agent} <- Validation.agent_definition(declaration.module),
+    with {:ok, agent} <- Validation.agent_definition(Validation.agent_source(declaration)),
          {:ok, specs} <- PluginNormalizer.normalize_all(agent.plugins) do
       specs
       |> Enum.reject(&is_nil(&1.topology))
       |> Authoring.traverse(fn spec ->
-        contribute(spec, context(spec, declaration.key, declaration.module))
+        contribute(spec, context(spec, declaration.key, agent.module))
       end)
     end
   end

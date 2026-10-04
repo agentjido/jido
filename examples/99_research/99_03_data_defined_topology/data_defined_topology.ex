@@ -29,11 +29,9 @@ defmodule Jido.Examples.Research.DataDefinedTopology do
   end
 
   def expanded(instance, member_source) do
-    # Use the existing data API to expose its module-only restriction.
-    # A separate definition field is a design choice that requires review.
     agents =
       instance.definition.agents ++
-        [%{key: :alice, module: member_source, initial_state: %{total: 2}}]
+        [__MODULE__.Definitions.entry(:alice, member_source, %{total: 2})]
 
     with {:ok, definition} <- Topology.new(%{instance.definition | agents: agents}),
          do: Topology.instantiate(definition, id: instance.id, input: instance.input)

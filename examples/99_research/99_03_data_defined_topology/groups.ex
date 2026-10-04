@@ -34,6 +34,7 @@ defmodule Jido.Examples.Research.DataDefinedTopology.Groups do
 
   alias Jido.Topology
   alias Jido.Topology.Reference
+  alias Jido.Examples.Research.DataDefinedTopology.Definitions
   alias __MODULE__.{Counted, Keyed}
 
   def definition(kind, source, authoring \\ :dsl)
@@ -41,19 +42,21 @@ defmodule Jido.Examples.Research.DataDefinedTopology.Groups do
   def definition(kind, source, :dsl) do
     base = if kind == :counted, do: Counted.topology(), else: Keyed.topology()
     [group] = base.groups
-    Topology.new(%{base | groups: [%{group | module: source}]})
+    Topology.new(%{base | groups: [Definitions.select(group, source)]})
   end
 
   def definition(:counted, source, :data) do
     Topology.new(
       name: "authoring_counted",
       groups: [
-        %{
-          key: :workers,
-          module: source,
-          count: 3,
-          initial_state: %{total: Reference.member(:index)}
-        }
+        Definitions.select(
+          %{
+            key: :workers,
+            count: 3,
+            initial_state: %{total: Reference.member(:index)}
+          },
+          source
+        )
       ]
     )
   end
@@ -63,13 +66,15 @@ defmodule Jido.Examples.Research.DataDefinedTopology.Groups do
       name: "authoring_keyed",
       schema: Zoi.object(%{members: Zoi.list(Zoi.map())}),
       groups: [
-        %{
-          key: :workers,
-          module: source,
-          members: Reference.input(:members),
-          key_by: :key,
-          initial_state: %{label: Reference.member(:label), total: Reference.member(:initial)}
-        }
+        Definitions.select(
+          %{
+            key: :workers,
+            members: Reference.input(:members),
+            key_by: :key,
+            initial_state: %{label: Reference.member(:label), total: Reference.member(:initial)}
+          },
+          source
+        )
       ]
     )
   end

@@ -1,6 +1,14 @@
 defmodule Jido.Topology.DSL.Agent do
   @moduledoc false
-  defstruct [:key, :module, :node, :__spark_metadata__, initial_state: %{}, depends_on: []]
+  defstruct [
+    :key,
+    :module,
+    :definition,
+    :node,
+    :__spark_metadata__,
+    initial_state: %{},
+    depends_on: []
+  ]
 end
 
 defmodule Jido.Topology.DSL.Group do
@@ -8,6 +16,7 @@ defmodule Jido.Topology.DSL.Group do
   defstruct [
     :key,
     :module,
+    :definition,
     :count,
     :members,
     :key_by,
@@ -59,7 +68,8 @@ defmodule Jido.Topology.DSL.Extension do
 
   @agent_fields [
     key: [type: :any, required: true],
-    module: [type: :atom, required: true],
+    module: [type: :atom],
+    definition: [type: :any],
     initial_state: [type: :any, default: %{}],
     depends_on: [type: {:list, :any}, default: []],
     node: [type: :any]
@@ -67,13 +77,13 @@ defmodule Jido.Topology.DSL.Extension do
   @agent %Spark.Dsl.Entity{
     name: :agent,
     target: DSL.Agent,
-    args: [:key, :module],
+    args: [:key, {:optional, :module, nil}],
     schema: @agent_fields
   }
   @group %Spark.Dsl.Entity{
     name: :group,
     target: DSL.Group,
-    args: [:key, :module],
+    args: [:key, {:optional, :module, nil}],
     schema: @agent_fields ++ [count: [type: :any], members: [type: :any], key_by: [type: :any]]
   }
   @bus %Spark.Dsl.Entity{
