@@ -13,7 +13,12 @@ defmodule Jido.Topology.Controller do
   is transient, so restart-limit shutdown stays stopped. Application policy
   owns any subsequent instance restart. See `guides/topology-supervision.md`.
 
-  The controller supports eager activation, bounded startup, normal Bus input,
+  `:activation` defaults to `:eager`. `:deferred` and `:lazy` start the
+  coordinator without a member pass. `activate/3` selects a target and its
+  dependencies. Repair checks only activated targets. A coordinator restart
+  retains healthy owned processes. `await_target/3` waits for a single closure.
+
+  The controller supports bounded startup, normal Bus input,
   logical ownership, periodic repair, additive Agent updates, and exact Erlang
   node placement. It does not select nodes or rebalance Agents. Those policies
   belong in a control Agent or Plugin. A normal controller shutdown stops its
@@ -48,7 +53,10 @@ defmodule Jido.Topology.Controller do
   end
 
   @doc "Starts a local controller. Returns before the topology is ready."
-  def start_link(opts) do
+  def start_link(opts), do: start_link(opts, nil)
+
+  @doc false
+  def start_link(opts, parent_gate) do
     with {:ok, opts} <- Authoring.attrs(opts),
          :ok <-
            Authoring.keys(opts, [
@@ -56,6 +64,8 @@ defmodule Jido.Topology.Controller do
              :topology,
              :repair,
              :lifecycle,
+             :activation,
+             :checkpoint_owner,
              :max_restarts,
              :max_seconds
            ]),
@@ -64,6 +74,9 @@ defmodule Jido.Topology.Controller do
          :ok <- validate_restart_limits(max_restarts, max_seconds),
          repair = Map.get(opts, :repair, :automatic),
          :ok <- validate_repair(repair),
+         {:ok, activation} <- Jido.Topology.Child.activation(Map.get(opts, :activation, :eager)),
+         checkpoint_owner = Map.get(opts, :checkpoint_owner),
+         :ok <- validate_checkpoint_owner(checkpoint_owner),
          lifecycle = Map.get(opts, :lifecycle),
          :ok <- validate_lifecycle(lifecycle),
          %Instance{} = instance <- Map.get(opts, :topology),
@@ -72,7 +85,8 @@ defmodule Jido.Topology.Controller do
          jido when is_atom(jido) and not is_nil(jido) <- Map.get(opts, :jido) do
       Supervisor.start_link(
         __MODULE__,
-        {jido, instance, repair, lifecycle, max_restarts, max_seconds},
+        {jido, instance, repair, lifecycle, activation, checkpoint_owner, max_restarts,
+         max_seconds, parent_gate},
         name: name(jido, instance.id, :controller)
       )
     else
@@ -82,7 +96,10 @@ defmodule Jido.Topology.Controller do
   end
 
   @impl true
-  def init({jido, instance, repair, lifecycle, max_restarts, max_seconds}) do
+  def init(
+        {jido, instance, repair, lifecycle, activation, checkpoint_owner, max_restarts,
+         max_seconds, parent_gate}
+      ) do
     with {:ok, owner} <- Topology.Controller.Owner.start(jido, self(), instance.id) do
       children = [
         supporting_child(
@@ -95,7 +112,8 @@ defmodule Jido.Topology.Controller do
            max_seconds: max_seconds}
         ),
         supporting_child({Task.Supervisor, name: name(jido, instance.id, :tasks)}),
-        {Topology.Controller.Runtime, {jido, instance, repair, lifecycle, owner}}
+        {Topology.Controller.Runtime,
+         {jido, instance, repair, lifecycle, owner, activation, checkpoint_owner, parent_gate}}
       ]
 
       Supervisor.init(children, strategy: :one_for_one, auto_shutdown: :any_significant)
@@ -117,6 +135,22 @@ defmodule Jido.Topology.Controller do
   @doc "Waits for current resources, Agents, Bus inputs, and ownership bindings to be ready."
   def await_ready(controller, timeout \\ 60_000),
     do: GenServer.call(runtime(controller), {:await_ready, timeout}, timeout)
+
+  @doc "Activates a member, a Bus resource, or the complete target and its dependencies."
+  def activate(controller, target \\ :all, timeout \\ 5_000),
+    do: GenServer.call(runtime(controller), {:activate, target}, timeout)
+
+  @doc "Waits for one target and its dependencies, independently of other targets."
+  def await_target(controller, target, timeout \\ 60_000),
+    do:
+      GenServer.call(runtime(controller), {:await_target, target, timeout}, call_timeout(timeout))
+
+  @doc "Waits for the activated target with a structured timeout result."
+  def await_active(controller, timeout \\ 60_000),
+    do: GenServer.call(runtime(controller), {:await_active, timeout}, call_timeout(timeout))
+
+  defp call_timeout(:infinity), do: :infinity
+  defp call_timeout(timeout), do: timeout + 100
 
   @doc """
   Requests a repair pass against the existing topology target.
@@ -240,4 +274,8 @@ defmodule Jido.Topology.Controller do
       _ -> nil
     end)
   end
+
+  defp validate_checkpoint_owner(nil), do: :ok
+  defp validate_checkpoint_owner(pid) when is_pid(pid) and node(pid) == node(), do: :ok
+  defp validate_checkpoint_owner(_), do: Authoring.error("checkpoint_owner must be a local PID")
 end

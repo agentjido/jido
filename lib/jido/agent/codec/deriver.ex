@@ -4,13 +4,18 @@ defmodule Jido.Agent.Codec.Deriver do
   alias Jido.Codec.{Data, Registry}
 
   def agent(agent) do
+    with {:ok, entries} <- entries(agent), do: Registry.derive(entries)
+  end
+
+  @doc false
+  def entries(agent) do
     entries =
       [{:agent, agent.module}, {:schema, agent.schema}] ++
         Data.registry_entries(agent.metadata) ++
         Enum.flat_map(agent.plugins, &plugin_entries/1)
 
     with {:ok, routes} <- route_entries(agent.routes),
-         do: Registry.derive(entries ++ routes)
+         do: {:ok, entries ++ routes}
   end
 
   defp plugin_entries({module, options}),

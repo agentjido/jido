@@ -64,7 +64,7 @@ defmodule Jido.Topology.Controller.RuntimeJobTest do
   test "a dead completion cannot make the Runtime ready or release waiters", %{jido: jido} do
     {state, task} = active_job(jido)
     token = make_ref()
-    waiter = {{self(), make_ref()}, nil}
+    waiter = {{self(), make_ref()}, nil, :all}
     dead = spawn(fn -> :ok end)
     monitor = Process.monitor(dead)
     assert_receive {:DOWN, ^monitor, :process, ^dead, reason}, 1_000

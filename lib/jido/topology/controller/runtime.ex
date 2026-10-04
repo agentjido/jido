@@ -20,11 +20,17 @@ defmodule Jido.Topology.Controller.Runtime do
   @live_query_timeout 100
   @live_retry_interval 100
 
-  def start_link({jido, instance, repair, lifecycle, owner}),
-    do: GenServer.start_link(__MODULE__, {jido, instance, repair, lifecycle, owner})
+  def start_link(
+        {jido, instance, repair, lifecycle, owner, activation, checkpoint_owner, parent_gate}
+      ),
+      do:
+        GenServer.start_link(
+          __MODULE__,
+          {jido, instance, repair, lifecycle, owner, activation, checkpoint_owner, parent_gate}
+        )
 
   @impl true
-  def init({jido, instance, repair, lifecycle, owner}) do
+  def init({jido, instance, repair, lifecycle, owner, activation, checkpoint_owner, parent_gate}) do
     Process.flag(:trap_exit, true)
 
     with {:ok, accepted, revision, placements, pending_move} <- TargetStore.load(jido, instance) do
@@ -45,6 +51,10 @@ defmodule Jido.Topology.Controller.Runtime do
         instance: accepted,
         target_revision: revision,
         repair: repair,
+        activation: activation,
+        checkpoint_owner: checkpoint_owner,
+        parent_gate: parent_gate,
+        selected: MapSet.new(),
         lifecycle: lifecycle,
         reconcile_requested: false,
         reconcile_timer: nil,
@@ -67,7 +77,18 @@ defmodule Jido.Topology.Controller.Runtime do
         pending_move: pending_move
       }
 
-      {:ok, state, {:continue, :reconcile}}
+      keys = Map.keys(accepted.plan.agents) ++ Map.keys(accepted.plan.resources)
+
+      selected =
+        if activation == :eager,
+          do: keys,
+          else: Enum.filter(keys, &is_pid(replacement(&1, state)))
+
+      state = %{state | selected: MapSet.new(selected)}
+
+      if selected == [],
+        do: {:ok, %{state | phase: :ready}},
+        else: {:ok, state, {:continue, :reconcile}}
     else
       {:error, reason} -> {:stop, reason}
     end
@@ -102,16 +123,25 @@ defmodule Jido.Topology.Controller.Runtime do
     end
   end
 
-  def handle_info({:expire_waiter, token}, state),
-    do: {:noreply, %{state | waiters: Map.delete(state.waiters, token)}}
+  def handle_info({:expire_waiter, token}, state) do
+    case Map.pop(state.waiters, token) do
+      {nil, _} ->
+        {:noreply, state}
+
+      {{_from, _timer, :all}, waiters} ->
+        {:noreply, %{state | waiters: waiters}}
+
+      {{from, _timer, _scope}, waiters} ->
+        GenServer.reply(from, {:error, :activation_timeout})
+        {:noreply, %{state | waiters: waiters}}
+    end
+  end
 
   def handle_info({:refresh_live, token}, %{live_refresh_token: token} = state)
       when not is_nil(token) do
     state = %{state | live_refresh_token: nil} |> refresh_phase()
 
-    if current_phase(state) == :ready,
-      do: {:noreply, reply_waiters(state)},
-      else: {:noreply, schedule_live_refresh(state)}
+    {:noreply, reply_waiters(state)}
   end
 
   def handle_info({:refresh_live, _token}, state), do: {:noreply, state}
@@ -124,6 +154,13 @@ defmodule Jido.Topology.Controller.Runtime do
      %{
        status: current_phase(state),
        repair: state.repair,
+       activation: state.activation,
+       active_members:
+         Enum.count(state.ready, fn {key, _} -> Map.has_key?(state.instance.plan.agents, key) end),
+       dormant_members:
+         Enum.count(state.instance.plan.agents, fn {key, _} ->
+           not MapSet.member?(state.selected, key)
+         end),
        agents: map_size(state.instance.plan.agents),
        target_revision: state.target_revision,
        resources: map_size(state.instance.plan.resources),
@@ -133,6 +170,31 @@ defmodule Jido.Topology.Controller.Runtime do
        active: map_size(state.active),
        pending: MapSet.size(state.pending)
      }, state}
+  end
+
+  def handle_call({:activate, target}, _from, state) do
+    case target_keys(target, state) do
+      {:ok, keys} ->
+        selected = MapSet.union(state.selected, keys)
+        state = refresh_phase(state)
+
+        if selected == state.selected and
+             (target_ready?(keys, state) or map_size(state.active) > 0) do
+          {:reply, :ok, state}
+        else
+          {:reply, :ok, request_pass(%{state | selected: selected})}
+        end
+
+      error ->
+        {:reply, error, state}
+    end
+  end
+
+  def handle_call({:await_target, target, timeout}, from, state) do
+    case target_keys(target, state) do
+      {:ok, keys} -> await_scope(keys, timeout, from, state)
+      error -> {:reply, error, state}
+    end
   end
 
   def handle_call(:reconcile, _from, state), do: {:reply, :ok, request_pass(state)}
@@ -206,24 +268,11 @@ defmodule Jido.Topology.Controller.Runtime do
     end
   end
 
-  def handle_call({:await_ready, timeout}, from, state) do
-    state = refresh_phase(state)
+  def handle_call({:await_active, timeout}, from, state),
+    do: await_scope(state.selected, timeout, from, state)
 
-    if current_phase(state) == :ready do
-      {:reply, :ok, state}
-    else
-      token = make_ref()
-
-      timer =
-        if timeout == :infinity,
-          do: nil,
-          else: Process.send_after(self(), {:expire_waiter, token}, timeout)
-
-      {:noreply,
-       %{state | waiters: Map.put(state.waiters, token, {from, timer})}
-       |> schedule_live_refresh()}
-    end
-  end
+  def handle_call({:await_ready, timeout}, from, state),
+    do: await_scope(:all, timeout, from, state)
 
   def handle_call({:agent, target, member}, _from, state) do
     key = Plan.resolve(state.instance.plan, target, :agent, member)
@@ -270,6 +319,25 @@ defmodule Jido.Topology.Controller.Runtime do
       end
 
     {:reply, pid, state}
+  end
+
+  defp await_scope(scope, timeout, from, state) do
+    state = refresh_phase(state)
+
+    if scope_ready?(scope, state) do
+      {:reply, :ok, state}
+    else
+      token = make_ref()
+
+      timer =
+        if timeout == :infinity,
+          do: nil,
+          else: Process.send_after(self(), {:expire_waiter, token}, timeout)
+
+      {:noreply,
+       %{state | waiters: Map.put(state.waiters, token, {from, timer, scope})}
+       |> schedule_live_refresh()}
+    end
   end
 
   @impl true
@@ -320,6 +388,9 @@ defmodule Jido.Topology.Controller.Runtime do
     {resources_changed?, removed, changed} = Plan.extension_changes(current.plan, target.plan)
 
     cond do
+      current.definition.children != target.definition.children ->
+        Jido.Agent.Authoring.error("Topology update cannot change child runtimes")
+
       resources_changed? ->
         Jido.Agent.Authoring.error("Topology update cannot change resources")
 
@@ -359,7 +430,12 @@ defmodule Jido.Topology.Controller.Runtime do
   end
 
   defp begin_pass(state) do
-    keys = Map.keys(state.instance.plan.agents) ++ Map.keys(state.instance.plan.resources)
+    keys =
+      if state.activation == :eager,
+        do: Map.keys(state.instance.plan.agents) ++ Map.keys(state.instance.plan.resources),
+        else: MapSet.to_list(state.selected)
+
+    state = %{state | selected: MapSet.new(keys)}
 
     operation =
       state.operation_override ||
@@ -471,7 +547,7 @@ defmodule Jido.Topology.Controller.Runtime do
         Process.demonitor(ref, [:flush])
         Process.cancel_timer(job.timer)
         result = if job.timed_out?, do: {:error, :startup_task_timeout}, else: result
-        %{state | active: active} |> record(job.key, result) |> drive()
+        %{state | active: active} |> record(job.key, result) |> drive() |> reply_waiters()
     end
   end
 
@@ -514,11 +590,7 @@ defmodule Jido.Topology.Controller.Runtime do
   defp finish_pass(state) do
     state = complete_pass(state)
 
-    if state.phase == :ready do
-      reply_waiters(state)
-    else
-      schedule_reconcile(state)
-    end
+    state
   end
 
   defp complete_pass(state) do
@@ -561,19 +633,69 @@ defmodule Jido.Topology.Controller.Runtime do
   defp reply_waiters(state) do
     state = refresh_phase(state)
 
-    if current_phase(state) == :ready do
-      Enum.each(state.waiters, fn {_, {from, timer}} ->
-        if timer, do: Process.cancel_timer(timer)
-        GenServer.reply(from, :ok)
+    waiters =
+      Enum.reduce(state.waiters, %{}, fn {token, {from, timer, scope} = waiter}, acc ->
+        if scope_ready?(scope, state) do
+          if timer, do: Process.cancel_timer(timer)
+          GenServer.reply(from, :ok)
+          acc
+        else
+          Map.put(acc, token, waiter)
+        end
       end)
 
-      %{state | phase: :ready, waiters: %{}} |> schedule_reconcile()
-    else
-      state |> schedule_live_refresh() |> schedule_reconcile()
-    end
+    %{state | waiters: waiters} |> schedule_live_refresh() |> schedule_reconcile()
   end
 
+  defp scope_ready?(:all, state), do: current_phase(state) == :ready
+  defp scope_ready?(keys, state), do: target_ready?(keys, state)
+
+  defp target_ready?(keys, state) do
+    Enum.all?(keys, fn key ->
+      Map.has_key?(state.ready, key) and not Map.has_key?(state.errors, key) and
+        not Map.has_key?(state.live_errors, key)
+    end)
+  end
+
+  defp target_keys(:all, state),
+    do:
+      {:ok,
+       MapSet.new(Map.keys(state.instance.plan.agents) ++ Map.keys(state.instance.plan.resources))}
+
+  defp target_keys({:resource, target}, state),
+    do: target_closure(Plan.resolve(state.instance.plan, target, :bus), state)
+
+  defp target_keys({:group, group, member}, state),
+    do: target_closure(Plan.resolve(state.instance.plan, group, :agent, member), state)
+
+  defp target_keys(target, state),
+    do: target_closure(Plan.resolve(state.instance.plan, target, :agent), state)
+
+  defp target_closure(nil, _), do: {:error, :unknown_member}
+
+  defp target_closure(key, state) do
+    if Map.has_key?(state.instance.plan.agents, key) or
+         Map.has_key?(state.instance.plan.resources, key),
+       do: {:ok, dependency_closure(key, state, MapSet.new())},
+       else: {:error, :unknown_member}
+  end
+
+  defp dependency_closure(key, state, keys) do
+    if MapSet.member?(keys, key),
+      do: keys,
+      else:
+        Enum.reduce(
+          spec(key, state).depends_on,
+          MapSet.put(keys, key),
+          &dependency_closure(&1, state, &2)
+        )
+  end
+
+  defp schedule_reconcile(%{phase: :starting} = state), do: state
+
   defp schedule_reconcile(%{repair: :manual} = state), do: state
+
+  defp schedule_reconcile(%{reconcile_timer: timer} = state) when not is_nil(timer), do: state
 
   defp schedule_reconcile(state) do
     token = make_ref()
@@ -590,7 +712,11 @@ defmodule Jido.Topology.Controller.Runtime do
 
   defp task_context(key, member, state) do
     if Map.has_key?(state.instance.plan.resources, key) do
-      %{jido: state.jido, pool: Controller.name(state.jido, state.instance.id, :resources)}
+      %{
+        jido: state.jido,
+        pool: Controller.name(state.jido, state.instance.id, :resources),
+        parent_gate: Map.get(state, :parent_gate)
+      }
     else
       bus_ids =
         Map.new(member.subscriptions, fn sub ->
@@ -600,6 +726,7 @@ defmodule Jido.Topology.Controller.Runtime do
       %{
         jido: state.jido,
         instance_id: state.instance.id,
+        checkpoint_owner: Map.get(state, :checkpoint_owner),
         owner: state.owner,
         agents: Controller.name(state.jido, state.instance.id, :agents),
         parent: if(member.parent, do: Map.fetch!(state.ready, member.parent)),

@@ -79,7 +79,19 @@ defmodule Jido.RuntimeStore do
   @doc false
   @spec list(atom(), hive()) :: [{key(), value()}]
   def list(instance, hive) when is_atom(instance) do
-    call(instance, {:list, hive}, [])
+    case fetch_all(instance, hive) do
+      {:ok, entries} -> entries
+      {:error, _reason} -> []
+    end
+  end
+
+  @doc false
+  @spec fetch_all(atom(), hive()) :: {:ok, [{key(), value()}]} | {:error, :not_running | :timeout}
+  def fetch_all(instance, hive) when is_atom(instance) do
+    case call(instance, {:list, hive}, {:error, :not_running}, {:error, :timeout}) do
+      entries when is_list(entries) -> {:ok, entries}
+      {:error, _reason} = error -> error
+    end
   end
 
   @impl true
@@ -122,9 +134,8 @@ defmodule Jido.RuntimeStore do
     {:reply, entries, state}
   end
 
-  defp call(instance, request, fallback, timeout_fallback \\ nil) do
+  defp call(instance, request, fallback, timeout_fallback) do
     server = Jido.runtime_store_name(instance)
-    timeout_fallback = if is_nil(timeout_fallback), do: fallback, else: timeout_fallback
 
     try do
       GenServer.call(server, request, @call_timeout)

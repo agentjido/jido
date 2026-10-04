@@ -39,10 +39,30 @@ defmodule Jido.Topology.Resource do
 
   defp start_bus(spec, context) do
     options = Keyword.merge(spec.config, name: spec.id, jido: context.jido)
+    child = Bus.child_spec(options)
 
-    case DynamicSupervisor.start_child(context.pool, {Bus, options}) do
+    child = %{
+      child
+      | start: {__MODULE__, :start_bus_link, [options, Map.get(context, :parent_gate)]}
+    }
+
+    case DynamicSupervisor.start_child(context.pool, child) do
       {:error, {:already_started, pid}} -> owned_bus(pid, spec, context)
       result -> result
+    end
+  end
+
+  @doc false
+  def start_bus_link(options, parent_gate) do
+    with {:ok, pid} <- Bus.start_link(options) do
+      case Jido.Topology.Runtime.Gate.attach_bus(parent_gate, pid) do
+        {:ok, _subscription} ->
+          {:ok, pid}
+
+        {:error, reason} ->
+          GenServer.stop(pid)
+          {:error, reason}
+      end
     end
   end
 

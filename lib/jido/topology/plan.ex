@@ -173,8 +173,8 @@ defmodule Jido.Topology.Plan do
          {:ok, target_node} <- Reference.resolve(spec.node, input, member),
          {:ok, target_node} <- target_node(target_node),
          :ok <- placement_resources(target_node, spec.subscriptions),
-         {:ok, _} <-
-           Jido.Agent.instantiate(spec.module,
+         {:ok, agent} <-
+           Jido.Agent.instantiate(Jido.Topology.Validation.agent_source(spec),
              id: Composition.escape(id) <> "/" <> key,
              state: state
            ) do
@@ -185,6 +185,7 @@ defmodule Jido.Topology.Plan do
          key: key,
          id: Composition.escape(id) <> "/" <> key,
          declaration: spec.key,
+         module: agent.module,
          initial_state: state,
          node: target_node
        })}
@@ -207,8 +208,10 @@ defmodule Jido.Topology.Plan do
           endpoint.key
 
         {:agent, :group, member} when not is_nil(member) ->
-          with {:ok, member} <- member_key(member),
-               do: endpoint.key <> "/" <> Composition.escape(member)
+          case member_key(member) do
+            {:ok, member} -> endpoint.key <> "/" <> Composition.escape(member)
+            _ -> nil
+          end
 
         {:bus, :bus, nil} ->
           endpoint.key

@@ -4,7 +4,9 @@ defmodule Jido.Topology.Codec do
 
   Version 2 embeds included definitions, import bindings, and exports. Source
   modules for included topologies are resolved during construction; stored
-  composition is a snapshot of their definitions.
+  composition is a snapshot of their definitions. Version 3 adds neutral
+  Agent definitions and separate runtime children, directors, and gates.
+  Version 2 documents cannot contain the new fields.
 
   This Codec uses `Jido.Codec.Registry` for Agent modules, data schemas,
   atoms, and static values. Stored strings cannot create atoms or modules.
@@ -23,7 +25,7 @@ defmodule Jido.Topology.Codec do
   alias Jido.Topology.Codec.{Deriver, Value}
 
   @collections EntryMetadata.collections()
-  @fields ~w(type version name schema metadata agents groups resources relationships connections startup includes imports exports)
+  @fields ~w(type version name schema metadata agents groups resources relationships connections startup includes imports exports children)
   @value_fields [
     :initial_state,
     :config,
@@ -37,7 +39,9 @@ defmodule Jido.Topology.Codec do
     :child,
     :agent,
     :depends_on,
-    :node
+    :node,
+    :gate,
+    :input
   ]
 
   @type document :: %{required(String.t()) => term()}
@@ -68,7 +72,7 @@ defmodule Jido.Topology.Codec do
     with {:ok, schema} <- Registry.identifier(registry, :schema, definition.schema),
          {:ok, metadata} <- Value.encode(definition.metadata, registry),
          {:ok, collections} <-
-           Authoring.traverse(@collections, fn {_kind, collection} ->
+           Authoring.traverse(collections(version(definition)), fn {_kind, collection} ->
              with {:ok, entries} <-
                     Authoring.traverse(
                       Map.fetch!(definition, collection),
@@ -80,7 +84,7 @@ defmodule Jido.Topology.Codec do
       document =
         Map.merge(Map.new(collections), %{
           "type" => "jido.topology",
-          "version" => 2,
+          "version" => version(definition),
           "name" => definition.name,
           "schema" => schema,
           "metadata" => metadata,
@@ -110,7 +114,7 @@ defmodule Jido.Topology.Codec do
              with {:ok, entries} <-
                     Authoring.traverse(
                       Map.get(document, Atom.to_string(collection), []),
-                      &decode_entry(&1, EntryMetadata.fields(kind), registry)
+                      &decode_entry(&1, entry_fields(kind, document["version"]), registry)
                     ),
                   do: {:ok, {collection, entries}}
            end),
@@ -157,8 +161,13 @@ defmodule Jido.Topology.Codec do
 
   defp decode_entry(_, _, _), do: Authoring.error("Expected a topology record")
 
-  defp document_header(%{"type" => "jido.topology", "version" => 2} = document),
-    do: Data.object(document, @fields)
+  defp document_header(%{"type" => "jido.topology", "version" => version} = document)
+       when version in [2, 3],
+       do:
+         Data.object(
+           document,
+           if(version == 2, do: List.delete(@fields, "children"), else: @fields)
+         )
 
   defp document_header(_), do: Authoring.error("Unknown topology document type or version")
 
@@ -168,6 +177,10 @@ defmodule Jido.Topology.Codec do
     do: Authoring.traverse(values, &encode_entry(&1, registry))
 
   defp encode_field(:kind, value, _), do: {:ok, Atom.to_string(value)}
+  defp encode_field(:definition, value, registry), do: Jido.Agent.Codec.encode(value, registry)
+  defp encode_field(:director, nil, _), do: {:ok, nil}
+  defp encode_field(:director, value, registry), do: Jido.Agent.Codec.encode(value, registry)
+  defp encode_field(:activation, value, _), do: {:ok, Atom.to_string(value)}
   defp encode_field(:module, value, registry), do: Registry.identifier(registry, :agent, value)
 
   defp encode_field(:on_parent_exit, value, _),
@@ -189,6 +202,13 @@ defmodule Jido.Topology.Codec do
   defp decode_field(:kind, "bus", _), do: {:ok, :bus}
   defp decode_field(:kind, _, _), do: Authoring.error("Unknown topology endpoint kind")
   defp decode_field(:module, value, registry), do: Registry.resolve(registry, value, :agent)
+  defp decode_field(:definition, value, registry), do: Jido.Agent.Codec.decode(value, registry)
+  defp decode_field(:director, nil, _), do: {:ok, nil}
+  defp decode_field(:director, value, registry), do: Jido.Agent.Codec.decode(value, registry)
+  defp decode_field(:activation, "eager", _), do: {:ok, :eager}
+  defp decode_field(:activation, "deferred", _), do: {:ok, :deferred}
+  defp decode_field(:activation, "lazy", _), do: {:ok, :lazy}
+  defp decode_field(:activation, _, _), do: Authoring.error("Unknown topology activation mode")
   defp decode_field(:on_parent_exit, "stop", _), do: {:ok, :stop}
   defp decode_field(:on_parent_exit, "continue", _), do: {:ok, :continue}
   defp decode_field(:on_parent_exit, "emit_orphan", _), do: {:ok, :emit_orphan}
@@ -201,4 +221,15 @@ defmodule Jido.Topology.Codec do
        do: Value.decode(value, registry)
 
   defp decode_field(_, value, _), do: {:ok, value}
+
+  defp version(definition) do
+    if definition.children != [] or
+         Enum.any?(definition.agents ++ definition.groups, &Map.has_key?(&1, :definition)) or
+         Enum.any?(definition.includes, &(version(&1.topology) == 3)), do: 3, else: 2
+  end
+
+  defp collections(2), do: Enum.reject(@collections, &(elem(&1, 1) == :children))
+  defp collections(3), do: @collections
+  defp entry_fields(kind, 2), do: List.delete(EntryMetadata.fields(kind), :definition)
+  defp entry_fields(kind, 3), do: EntryMetadata.fields(kind)
 end

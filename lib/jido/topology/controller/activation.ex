@@ -56,7 +56,8 @@ defmodule Jido.Topology.Controller.Activation do
         initial_state: spec.initial_state,
         jido: context.jido,
         on_parent_death: spec.on_parent_exit,
-        restore_definition: :current
+        restore_definition: :current,
+        checkpoint_owner: Map.get(context, :checkpoint_owner)
       )
     end
   end
@@ -75,7 +76,7 @@ defmodule Jido.Topology.Controller.Activation do
   end
 
   defp definition(spec, context) do
-    with {:ok, definition} <- Validation.agent_definition(spec.module) do
+    with {:ok, definition} <- Validation.agent_definition(Validation.agent_source(spec)) do
       metadata =
         Map.put(definition.metadata, "jido.topology", %{
           id: context.instance_id,

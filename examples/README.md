@@ -1,8 +1,9 @@
 # Jido V3 examples
 
 The main catalog has 72 fixtures in ten stable groups. All use the implemented
-Agent and AgentServer contract. One separate research probe records the missing
-distributed-authority contract. The group guides below link to source and tests.
+Agent and AgentServer contract. Separate research probes cover distributed
+authority and the data-defined Topology and child runtime candidates.
+The group guides below link to source and tests.
 
 | Group | Fixtures | Source and tests |
 | --- | ---: | --- |
@@ -17,9 +18,10 @@ distributed-authority contract. The group guides below link to source and tests.
 | 09_plugins | 7 | [Source](09_plugins/README.md), [tests](../test/examples/09_plugins/README.md) |
 | 10_persistence | 8 | [Source](10_persistence/README.md), [tests](../test/examples/10_persistence/README.md) |
 
-The [research section](99_research/README.md) retains only the unsupported
-cluster-exclusive ownership contract. Its test lives under `test/examples` and
-uses the `:example` tag.
+The [research section](99_research/README.md) records unsupported contracts.
+Its tests live under `test/examples` and use the `:example` tag. The data-defined
+member and child runtime examples now pass with the implementation candidates
+for issues 394 and 395. Their public contracts remain in PR review.
 
 The repository compiles `examples/` in `:dev` and `:test` only. Production builds
 compile `lib/` only. The Hex package contains neither examples nor tests.
