@@ -157,12 +157,13 @@ Assign the final `04_runtime` ID after persistence moves are complete.
 
 ### `05_06_orphan_adoption`
 
-- [ ] Show `on_parent_exit: :continue`.
-- [ ] Show `on_parent_exit: :emit_orphan` and the orphan Signal.
-- [ ] Adopt the surviving child through the public adoption contract.
-- [ ] Prove that the new parent can route work to the adopted child.
-- [ ] Reject an invalid or duplicate adoption.
-- [ ] Stop the complete relationship tree during cleanup.
+- [x] Show the direct child equivalent of `on_parent_exit: :continue`.
+- [x] Show the direct child equivalent of `on_parent_exit: :emit_orphan` and
+      the orphan Signal.
+- [x] Adopt the surviving child through the public adoption contract.
+- [x] Prove that the new parent can route work to the adopted child.
+- [x] Reject an invalid or duplicate adoption.
+- [x] Stop the complete relationship tree during cleanup.
 
 ## P1: Rewrites and major refinements
 
