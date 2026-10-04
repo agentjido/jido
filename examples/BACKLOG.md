@@ -266,13 +266,13 @@ audience. Record that decision in `COVERAGE.md`.
 
 ### Runtime
 
-- [ ] Add missing static route schemas in `04_01_scheduled_signals` and
+- [x] Add missing static route schemas in `04_01_scheduled_signals` and
       `04_05_runtime_inspection`.
-- [ ] Remove the dependency from `04_07_agent_observation` on private support in
+- [x] Remove the dependency from `04_07_agent_observation` on private support in
       `07_topology`.
-- [ ] Extend `04_12_stable_reference` with partition isolation.
-- [ ] Extend `04_12_stable_reference` with `Ref.to_map/1` and `Ref.from_map/1`.
-- [ ] Add `as: :migrate` to the main route in `04_14_state_migration`.
+- [x] Extend `04_12_stable_reference` with partition isolation.
+- [x] Extend `04_12_stable_reference` with `Ref.to_map/1` and `Ref.from_map/1`.
+- [x] Add `as: :migrate` to the main route in `04_14_state_migration`.
 
 ### Multi-agent
 

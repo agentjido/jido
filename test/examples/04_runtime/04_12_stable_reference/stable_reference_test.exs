@@ -63,6 +63,32 @@ defmodule JidoTest.Examples.Runtime.StableReferenceTest do
     assert second.state.messages == ["B"]
   end
 
+  test "equal namespace and ID remain isolated by partition", c do
+    other_partition = %{c.ref | partition: "team-b"}
+
+    assert {:ok, _} = Jido.start_agent_ref(c.primary, c.ref, StableReference)
+    assert {:ok, _} = Jido.start_agent_ref(c.primary, other_partition, StableReference)
+
+    assert {:ok, first} = StableReference.append(c.ref, c.primary, "team A")
+    assert {:ok, second} = StableReference.append(other_partition, c.primary, "team B")
+    assert first.state.messages == ["team A"]
+    assert second.state.messages == ["team B"]
+  end
+
+  test "a Ref round trips through its exact versioned public map", c do
+    assert {:ok, encoded} = Ref.to_map(c.ref)
+
+    assert encoded == %{
+             "version" => 1,
+             "namespace" => c.ref.namespace,
+             "partition" => "team-a",
+             "id" => "conversation"
+           }
+
+    assert {:ok, decoded} = Ref.from_map(encoded)
+    assert decoded == c.ref
+  end
+
   test "a Ref survives rebinding its namespace to another local instance", c do
     assert {:ok, first} =
              Jido.start_agent_ref(c.primary, c.ref, StableReference, persistence: c.store)
