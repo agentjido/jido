@@ -288,7 +288,7 @@ audience. Record that decision in `COVERAGE.md`.
 - [x] Add one contributed ownership relation to
       `07_06_plugin_contribution`.
 - [x] Prove one contributed group declaration is applied once for all members.
-- [ ] Add a failed activation or degraded repair case to
+- [x] Add a failed activation or degraded repair case to
       `07_07_lifecycle_signals`.
 - [ ] Add a static `node:` declaration to `07_08_placement_policy`.
 - [ ] Link the peer test from `07_08`, or add an optional peer example that
