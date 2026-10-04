@@ -28,6 +28,12 @@ replacement.
 Connected process exit is an observed exit. Lost connectivity is uncertainty.
 Reconnect requires an explicit new placement request.
 
+This example starts the child before it disconnects. For uncertainty during
+the start operation, keep the tag unresolved, retry the same start request,
+and reconcile `AgentServer.status/1`, `AgentServer.children/1`, and the target
+Agent identity. Do not create a replacement until that check resolves the old
+request.
+
 ## Limits
 
 This example does not claim that the child is dead after a disconnect. It does

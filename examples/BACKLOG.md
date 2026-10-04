@@ -276,10 +276,10 @@ audience. Record that decision in `COVERAGE.md`.
 
 ### Multi-agent
 
-- [ ] Add missing static route schemas in `05_02_correlated_requests`,
+- [x] Add missing static route schemas in `05_02_correlated_requests`,
       `05_03_agent_hierarchy`, `05_04_remote_child`, and
       `05_05_remote_lifecycle`.
-- [ ] Keep remote-start uncertainty and reconciliation visible in `05_04` and
+- [x] Keep remote-start uncertainty and reconciliation visible in `05_04` and
       `05_05`.
 
 ### Topology
