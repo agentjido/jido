@@ -17,20 +17,20 @@ Coordinate with that work before moving or adding persistence examples.
 
 Apply this checklist to every stable example change:
 
-- [ ] The example teaches one main public Jido capability.
-- [ ] The source uses public V3 APIs and production-shaped code.
-- [ ] Agent, Action, and Flow boundaries have static schemas where applicable.
-- [ ] The deterministic path needs no credentials or network service.
-- [ ] The test proves the main success case.
-- [ ] The test proves one important failure, recovery, or cleanup case.
-- [ ] The test uses explicit barriers instead of `Process.sleep/1`.
-- [ ] Test-only observers, gates, blockers, and work functions do not enter Turn
+- [x] The example teaches one main public Jido capability.
+- [x] The source uses public V3 APIs and production-shaped code.
+- [x] Agent, Action, and Flow boundaries have static schemas where applicable.
+- [x] The deterministic path needs no credentials or network service.
+- [x] The test proves the main success case.
+- [x] The test proves one important failure, recovery, or cleanup case.
+- [x] The test uses explicit barriers instead of `Process.sleep/1`.
+- [x] Test-only observers, gates, blockers, and work functions do not enter Turn
       context.
-- [ ] The source and test folders have the same numbered path.
-- [ ] The numbered README follows the template in [AGENTS.md](AGENTS.md).
-- [ ] The section source and test indexes include the example.
-- [ ] The focused section test passes with `--include example --seed 0`.
-- [ ] `mix test.examples --seed 0` passes when shared support or several sections
+- [x] The source and test folders have the same numbered path.
+- [x] The numbered README follows the template in [AGENTS.md](AGENTS.md).
+- [x] The section source and test indexes include the example.
+- [x] The focused section test passes with `--include example --seed 0`.
+- [x] `mix test.examples --seed 0` passes when shared support or several sections
       change.
 
 ## P0: Correctness and catalog repairs
