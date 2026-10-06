@@ -60,6 +60,48 @@ defmodule Jido.Topology.RuntimeTest do
              Runtime.add_agent(c.jido, id, "alice", definition)
   end
 
+  test "a lazy runtime removes one dynamic root Agent definition", c do
+    id = unique_id("remove_dynamic_agent")
+    topology = Topology.new!(name: "remove_dynamic_agent")
+    start_supervised!({Runtime, jido: c.jido, id: id, topology: topology, activation: :lazy})
+
+    definition = CounterAgent.definition()
+    assert :ok = Runtime.add_agent(c.jido, id, "alice", definition)
+    assert {:ok, %{state: %{count: 1}}} = Runtime.call(c.jido, id, "alice", add())
+
+    member = Runtime.whereis_member(c.jido, id, "alice")
+    ref = Process.monitor(member)
+
+    assert :ok = Runtime.remove_agent(c.jido, id, "alice")
+    assert_receive {:DOWN, ^ref, :process, ^member, :shutdown}, 1_000
+    assert Runtime.target(c.jido, id).definition.agents == []
+
+    assert %{
+             active_members: 0,
+             dormant_members: 0,
+             member_statuses: %{},
+             target_revision: 2
+           } = Runtime.status(c.jido, id)
+
+    assert {:error, :unknown_member} = Runtime.call(c.jido, id, "alice", add())
+    assert {:error, %Jido.Error.ValidationError{}} = Runtime.remove_agent(c.jido, id, "alice")
+  end
+
+  test "removal keeps a root Agent that another Agent requires", c do
+    id = unique_id("remove_required_agent")
+    topology = Topology.new!(name: "remove_required_agent")
+    start_supervised!({Runtime, jido: c.jido, id: id, topology: topology, activation: :lazy})
+
+    definition = CounterAgent.definition()
+    assert :ok = Runtime.add_agent(c.jido, id, "alice", definition)
+    assert :ok = Runtime.add_agent(c.jido, id, "bob", definition, depends_on: ["alice"])
+
+    assert {:error, %Jido.Error.ValidationError{}} = Runtime.remove_agent(c.jido, id, "alice")
+    assert %{definition: %{agents: agents}} = Runtime.target(c.jido, id)
+    assert Enum.map(agents, & &1.key) == ["alice", "bob"]
+    assert %{dormant_members: 2, target_revision: 2} = Runtime.status(c.jido, id)
+  end
+
   test "a headless DSL runtime starts only the requested dependency closure", c do
     target =
       Topology.new!(

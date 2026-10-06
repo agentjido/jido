@@ -222,6 +222,11 @@ defmodule Jido.Topology.Runtime do
     with_controller(jido, id, &Controller.add_agent(&1, key, definition, opts))
   end
 
+  @doc "Removes one root Agent definition from the current topology target."
+  def remove_agent(jido, id, target, opts \\ []) do
+    with_controller(jido, id, &Controller.remove_agent(&1, target, opts))
+  end
+
   @doc "Publishes to an owned Bus. Dormant subscribers remain dormant."
   def publish(jido, id, bus, signals, opts \\ []),
     do: Gateway.request(jido, id, {:publish, bus, signals}, opts)

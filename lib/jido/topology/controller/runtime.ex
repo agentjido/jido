@@ -225,6 +225,27 @@ defmodule Jido.Topology.Controller.Runtime do
     end
   end
 
+  def handle_call({:remove_agent, target, timeout}, _from, state) do
+    with :ok <- update_idle(state),
+         {:ok, key, spec, target} <- remove_agent_target(state.instance, target),
+         :ok <- retire(spec, state, timeout),
+         {:ok, revision} <-
+           TargetStore.accept(state.jido, state.target_revision, target, state.placements) do
+      state =
+        state
+        |> remove_agent_state(key, target, revision)
+        |> request_pass()
+
+      {:reply, :ok, state}
+    else
+      {:error, {:indeterminate, reason}} = error ->
+        {:stop, {:target_write_indeterminate, reason}, error, state}
+
+      {:error, _reason} = error ->
+        {:reply, error, request_pass(state)}
+    end
+  end
+
   def handle_call({:update, target}, _from, state) do
     with :ok <- update_idle(state),
          :ok <- additive_target(state.instance, target),
@@ -461,6 +482,46 @@ defmodule Jido.Topology.Controller.Runtime do
     with {:ok, topology} <-
            Jido.Topology.new(%{current.definition | agents: current.definition.agents ++ [entry]}),
          do: Jido.Topology.instantiate(topology, id: current.id, input: current.input)
+  end
+
+  defp remove_agent_target(current, target) do
+    key = Plan.resolve(current.plan, target, :agent)
+
+    case agent_spec(key, %{instance: current}) do
+      %{declaration: declaration, key: ^key} = spec when declaration == key ->
+        agents =
+          Enum.reject(
+            current.definition.agents,
+            &(Plan.resolve(current.plan, &1.key, :agent) == key)
+          )
+
+        with {:ok, topology} <- Jido.Topology.new(%{current.definition | agents: agents}),
+             {:ok, target} <-
+               Jido.Topology.instantiate(topology, id: current.id, input: current.input) do
+          {:ok, key, spec, target}
+        end
+
+      %{declaration: _declaration} ->
+        Jido.Agent.Authoring.error("Topology removal requires one root Agent")
+
+      nil ->
+        Jido.Agent.Authoring.error("Unknown topology Agent removal target")
+    end
+  end
+
+  defp remove_agent_state(state, key, target, revision) do
+    %{
+      state
+      | instance: target,
+        target_revision: revision,
+        selected: MapSet.delete(state.selected, key),
+        ready: Map.delete(state.ready, key),
+        errors: Map.delete(state.errors, key),
+        live_errors: Map.delete(state.live_errors, key),
+        pending: MapSet.delete(state.pending, key),
+        placements: Map.delete(state.placements, key),
+        operation_override: :update
+    }
   end
 
   defp request_pass(state) do

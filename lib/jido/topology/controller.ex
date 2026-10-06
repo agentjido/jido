@@ -190,6 +190,18 @@ defmodule Jido.Topology.Controller do
   def add_agent(_controller, _key, _definition, _opts),
     do: Authoring.error("Topology member requires a neutral Agent definition")
 
+  @doc "Removes one root Agent definition from an idle topology target."
+  @spec remove_agent(Supervisor.supervisor(), String.t() | atom(), keyword()) ::
+          :ok | {:error, term()}
+  def remove_agent(controller, target, opts \\ []) do
+    with {:ok, opts} <- Authoring.attrs(opts),
+         :ok <- Authoring.keys(opts, [:timeout]),
+         timeout = Map.get(opts, :timeout, 5_000),
+         :ok <- validate_timeout(timeout) do
+      GenServer.call(runtime(controller), {:remove_agent, target, timeout}, call_timeout(timeout))
+    end
+  end
+
   @doc """
   Applies one validated additive Agent target to a ready local controller.
 
@@ -198,8 +210,9 @@ defmodule Jido.Topology.Controller do
   keep their PIDs and committed state. The new target becomes the source for
   later repair passes.
 
-  Use controller replacement for removals, changed Agent definitions, resource
-  changes, or an update requested during an active pass.
+  Use `remove_agent/3` for one root Agent. Use controller replacement for other
+  removals, changed Agent definitions, resource changes, or an update requested
+  during an active pass.
   """
   @spec update(Supervisor.supervisor(), Instance.t(), timeout()) :: :ok | {:error, term()}
   def update(controller, %Instance{} = target, timeout \\ 5_000) do
