@@ -69,6 +69,52 @@ component counts now describe the watcher's remote cleanup only.
 | Target removal | Stop the instance and start the replacement target. Additive update still rejects removals. |
 | Manual repair | Initial installation runs once. Later installation and relationship repair require `reconcile/2`. OTP restart and connection recovery continue. |
 
+## Topology Hibernate and Thaw
+
+Use `Jido.Topology.Runtime.hibernate/4` for an accepted Agent member. Topology
+keeps the member in the accepted target. A running member finishes its admitted
+Turn, writes its checkpoint, stops, and leaves the local child path. A dormant
+member becomes hibernated without a process start. A repeated Hibernate is
+idempotent.
+
+Hibernate requires an idle Controller repair pass. It also checks all reverse
+dependencies. It rejects the request when a dependent Agent or resource is
+selected, starting, or ready. The error contains the sorted blocking keys.
+This check prevents a ready dependent from losing a required member.
+
+Use `Jido.Topology.Runtime.thaw/4` to start the member and wait for readiness.
+The Controller keeps the hibernation marker until activation succeeds. A
+definite failure keeps the member hibernated. A timeout or uncertain stop can
+return an `:indeterminate` error. Observe topology status before the next
+operator action. Do not treat an indeterminate error as proof that the Agent
+is running or stopped.
+
+A Topology call also thaws the necessary hibernated members before Signal
+dispatch. Normal repair, reconciliation, and eager activation do not clear a
+hibernation marker. Only explicit Thaw or call activation clears it while the
+same Controller is live.
+
+The marker is volatile Controller coordination state. A Controller or
+application restart loses it. The restored target then uses normal activation:
+an eager member starts, and a lazy member stays dormant. The durable checkpoint
+survives according to the configured persistence adapter. The hibernation
+marker does not enter the checkpoint.
+
+Topology owns the lifecycle operation and the checkpoint owner identity for
+its member. `Jido.Persistence` owns record keys, formats, revisions, and bytes.
+Application code must not stop a topology AgentServer or change its checkpoint
+directly.
+
+## Prepare an inactive Agent definition
+
+Use `Jido.Topology.Runtime.prepare_agent_definition/7` before an application
+accepts a changed definition. The member must be inactive and outside the
+accepted target. The `:preserve` policy loads saved state and validates it
+against the candidate definition. A missing checkpoint is valid. The `:reset`
+policy replaces the saved checkpoint with the candidate initial state. Jido
+owns both operations and uses its persistence revision rules. The application
+must own its separate definition workflow and recovery record.
+
 A durable accepted target is retained when its instance stops. A replacement
 that removes members must use a new Topology ID when that saved target is
 incompatible. This is a new system identity; state migration is application

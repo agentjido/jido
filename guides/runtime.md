@@ -57,3 +57,31 @@ remote location or write authority.
 Use `Jido.stop_agent/1` to stop an Agent. Use `hibernate/1` and `thaw/2` when
 persistence is configured. Each function also accepts an explicit instance.
 See [storage](storage.md) and `Jido.AgentServer` for owned children.
+
+For a Topology member, use `Jido.Topology.Runtime.hibernate/4` and
+`Jido.Topology.Runtime.thaw/4`. Do not call `Jido.AgentServer.hibernate/2` or
+start the AgentServer directly. Topology must update member selection,
+readiness, supervision, and its volatile hibernation marker as one operation.
+See [Topology supervision](topology-supervision.md#topology-hibernate-and-thaw).
+
+## Version and checkpoint ownership
+
+Jido uses several independent version values:
+
+- Agent `vsn` identifies the Agent definition. Generated Agent modules use a
+  positive value. An embedded direct definition can use `nil`.
+- Agent checkpoint `version` selects the nested checkpoint envelope. The
+  current envelope is version 2.
+- Persistence record `format` selects the outer active-record or tombstone
+  shape. The current record format is 3.
+- Persistence `revision` fences writes and records committed Agent state
+  progress. It is not an Agent definition version.
+- Plugin `vsn` identifies one Plugin package contract. It is not the Agent
+  `vsn` or persistence revision.
+
+The Agent module owns checkpoint and restore conversion for a custom payload.
+A Plugin owns conversion only for its declared state field in the default
+checkpoint. `Jido.Persistence` owns the outer key, record format, revision,
+encoding, validation, and adapter writes. A Topology owns lifecycle and the
+checkpoint owner identity for its members. Application code owns its domain
+definition history, but it must not reuse Jido version fields for that history.
