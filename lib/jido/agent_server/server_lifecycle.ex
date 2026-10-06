@@ -55,7 +55,10 @@ defmodule Jido.AgentServer.ServerLifecycle do
           Map.put(
             AgentTelemetry.lifecycle_metadata(data),
             :operation,
-            if(initial_persistence == :restored, do: :thaw, else: :activate)
+            if(initial_persistence in [:restored, :definition_upgrade],
+              do: :thaw,
+              else: :activate
+            )
           )
         )
 

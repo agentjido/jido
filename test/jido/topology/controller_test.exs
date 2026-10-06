@@ -651,6 +651,71 @@ defmodule Jido.Topology.ControllerTest do
     assert Jido.agent_count(jido) == 0
   end
 
+  test "preserve activation writes the current definition before immediate Hibernate" do
+    control = start_supervised!({Elixir.Agent, fn -> :ok end})
+    jido = unique_instance("preserve-hibernate")
+
+    start_supervised!(
+      {Jido,
+       name: jido,
+       namespace: "controller-test/#{jido}",
+       persistence: {PreparationAdapter, table: jido, control: control}},
+      id: jido
+    )
+
+    id = unique_id("preserve-hibernate")
+    start_supervised!({Jido.Topology.Runtime, empty_runtime(jido, id)})
+    source = JidoTest.AgentFixtures.CounterAgent.definition()
+    candidate = %{source | description: "preserved candidate"}
+    initial_state = %{count: 7, history: []}
+
+    assert :ok =
+             Jido.Topology.Runtime.add_agent(jido, id, :actor, source,
+               initial_state: initial_state
+             )
+
+    assert :ok = Jido.Topology.Runtime.activate(jido, id, :actor)
+    assert :ok = Jido.Topology.Runtime.await_ready(jido, id)
+    assert :ok = Jido.Topology.Runtime.remove_agent(jido, id, :actor)
+
+    assert :ok =
+             Jido.Topology.Runtime.prepare_agent_definition(
+               jido,
+               id,
+               :actor,
+               source,
+               candidate,
+               :preserve,
+               initial_state: %{count: 0, history: []}
+             )
+
+    assert :ok =
+             Jido.Topology.Runtime.add_agent(jido, id, :actor, candidate,
+               initial_state: %{count: 0, history: []}
+             )
+
+    assert :ok = Jido.Topology.Runtime.activate(jido, id, :actor)
+    assert :ok = Jido.Topology.Runtime.await_ready(jido, id)
+    member = Jido.Topology.Runtime.whereis_member(jido, id, :actor)
+
+    assert %{agent: %{description: "preserved candidate"}, state_version: 1} =
+             Server.snapshot(member)
+
+    assert :ok = Jido.Topology.Runtime.hibernate(jido, id, :actor)
+
+    physical_id = id <> "/agent/actor"
+
+    assert {:ok, persisted, 1} =
+             Jido.Persistence.load_agent_with_revision(jido, source.module, physical_id)
+
+    assert persisted.description == "preserved candidate"
+    assert persisted.state == initial_state
+
+    assert :ok = Jido.Topology.Runtime.thaw(jido, id, :actor)
+    restored = Jido.Topology.Runtime.whereis_member(jido, id, :actor)
+    assert Server.snapshot(restored).state_version == 1
+  end
+
   test "definition preparation accepts a missing checkpoint and reports storage read failure" do
     control = start_supervised!({Elixir.Agent, fn -> :ok end})
     jido = unique_instance("definition-read")

@@ -28,7 +28,7 @@ defmodule Jido.AgentServer.Storage do
   def restore_initial_agent(%Options{} = opts) do
     with {:ok, saved, version, status} <- restore(opts),
          {:ok, agent} <- restore_definition(saved, opts) do
-      {:ok, agent, version, status}
+      {:ok, agent, version, initial_persistence(status, saved, agent, opts)}
     end
   end
 
@@ -53,8 +53,9 @@ defmodule Jido.AgentServer.Storage do
   end
 
   defp restore(%Options{persistence: nil} = opts) do
-    with {:ok, agent, version} <- RuntimeCheckpoint.restore(opts) do
-      {:ok, agent, version, :none}
+    with {:ok, agent, version, status} <- RuntimeCheckpoint.restore_with_status(opts) do
+      initial_status = if status == :restored, do: :runtime_checkpoint_restored, else: :none
+      {:ok, agent, version, initial_status}
     end
   end
 
@@ -99,6 +100,15 @@ defmodule Jido.AgentServer.Storage do
 
   def persist_initial_agent(%State{initial_persistence: :create, state_version: version}),
     do: {:error, {:invalid_initial_revision, version}}
+
+  def persist_initial_agent(%State{initial_persistence: :definition_upgrade} = data) do
+    version = data.state_version + 1
+
+    case persist_definition_upgrade(data, data.agent, version) do
+      :ok -> {:ok, %{data | initial_persistence: :ready, state_version: version}}
+      {:error, _reason} = error -> error
+    end
+  end
 
   def persist_initial_agent(%State{} = data),
     do: {:ok, %{data | initial_persistence: :ready}}
@@ -214,4 +224,16 @@ defmodule Jido.AgentServer.Storage do
     |> Keyword.put(:instance, jido)
     |> Keyword.put(:namespace, Jido.namespace(jido))
   end
+
+  defp initial_persistence(
+         status,
+         saved,
+         restored,
+         %Options{restore_definition: :current}
+       )
+       when status in [:restored, :runtime_checkpoint_restored] and saved != restored,
+       do: :definition_upgrade
+
+  defp initial_persistence(:runtime_checkpoint_restored, _saved, _restored, _opts), do: :none
+  defp initial_persistence(status, _saved, _restored, _opts), do: status
 end

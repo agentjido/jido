@@ -28,7 +28,7 @@ defmodule Jido.AgentServer.State do
                 Zoi.map(description: "Child creation identities, including unresolved starts")
                 |> Zoi.default(%{}),
               initial_persistence:
-                Zoi.enum([:none, :create, :restored, :ready],
+                Zoi.enum([:none, :create, :restored, :definition_upgrade, :ready],
                   description: "Initial durable-record state"
                 )
                 |> Zoi.default(:none),

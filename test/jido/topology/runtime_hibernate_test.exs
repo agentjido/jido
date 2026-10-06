@@ -122,6 +122,34 @@ defmodule Jido.Topology.RuntimeHibernateTest do
     assert :ok = Runtime.thaw(c.jido, id, :counter)
   end
 
+  test "a call thaws the target and its hibernated dependencies", c do
+    id = unique_id("hibernate-call-dependency")
+
+    topology =
+      Topology.new!(
+        name: "hibernate_call_dependency",
+        agents: [
+          %{key: :root, module: CounterAgent},
+          %{key: :child, module: CounterAgent, depends_on: [:root]}
+        ]
+      )
+
+    start_supervised!(
+      {Runtime, jido: c.jido, id: id, topology: topology, activation: :lazy, repair: :manual}
+    )
+
+    assert :ok = Runtime.hibernate(c.jido, id, :root)
+    assert Runtime.status(c.jido, id).member_statuses["agent/root"] == :hibernated
+
+    assert {:ok, %{state: %{count: 1}}} = Runtime.call(c.jido, id, :child, add())
+
+    status = Runtime.status(c.jido, id)
+    assert status.member_statuses["agent/root"] == :ready
+    assert status.member_statuses["agent/child"] == :ready
+    assert is_pid(Runtime.whereis_member(c.jido, id, :root))
+    assert is_pid(Runtime.whereis_member(c.jido, id, :child))
+  end
+
   test "Hibernate rejects sorted transitive selected dependents", c do
     id = unique_id("hibernate-dependents")
 
@@ -317,6 +345,153 @@ defmodule Jido.Topology.RuntimeHibernateTest do
     end)
 
     assert is_pid(Runtime.whereis_member(c.jido, id, :counter))
+  end
+
+  test "Hibernate rejects a conflicting Thaw until the member is ready", c do
+    gate = String.to_atom(unique_id("hibernate-thaw-overlap"))
+    token = make_ref()
+    on_exit(fn -> :persistent_term.erase(gate) end)
+
+    definition = %{
+      CounterAgent.definition()
+      | plugins: [{ControlledReady, gate: gate}]
+    }
+
+    id = unique_id("hibernate-thaw-overlap")
+
+    topology =
+      Topology.new!(
+        name: "hibernate_thaw_overlap",
+        agents: [%{key: :counter, definition: definition}]
+      )
+
+    start_supervised!(
+      {Runtime, jido: c.jido, id: id, topology: topology, activation: :eager, repair: :manual}
+    )
+
+    assert :ok = Runtime.await_ready(c.jido, id)
+    assert :ok = Runtime.hibernate(c.jido, id, :counter)
+    :persistent_term.put(gate, {:block, self(), token})
+
+    thaw = Task.async(fn -> Runtime.thaw(c.jido, id, :counter) end)
+    assert_receive {:readiness_blocked, ^token, readiness}
+
+    assert {:error, {:lifecycle_conflict, "agent/counter", :wake}} =
+             Runtime.hibernate(c.jido, id, :counter)
+
+    send(readiness, {:release_readiness, token})
+    assert :ok = Task.await(thaw)
+    assert Runtime.status(c.jido, id).member_statuses["agent/counter"] == :ready
+  end
+
+  test "Thaw and call checkout reject a queued Hibernate", c do
+    id = unique_id("hibernate-checkout-overlap")
+    start_runtime(c.jido, id, :eager)
+    assert :ok = Runtime.await_ready(c.jido, id)
+
+    controller = Runtime.controller(c.jido, id)
+    {:ok, _pid, lease} = Controller.checkout_for_call(controller, :counter, 1_000)
+    hibernate = Task.async(fn -> Runtime.hibernate(c.jido, id, :counter) end)
+    runtime = controller_runtime(controller)
+
+    eventually(fn -> :sys.get_state(runtime).hibernate_waiters != [] end)
+
+    assert {:error, {:lifecycle_conflict, "agent/counter", :hibernate}} =
+             Runtime.thaw(c.jido, id, :counter)
+
+    assert {:error, {:lifecycle_conflict, "agent/counter", :hibernate}} =
+             Controller.checkout_for_call(controller, :counter, 1_000)
+
+    assert :ok = Controller.release_call(controller, lease)
+    assert :ok = Task.await(hibernate)
+    assert Runtime.status(c.jido, id).member_statuses["agent/counter"] == :hibernated
+
+    assert :ok = Runtime.thaw(c.jido, id, :counter)
+    assert Runtime.status(c.jido, id).member_statuses["agent/counter"] == :ready
+  end
+
+  test "remote monitor disconnect keeps Hibernate uncertain until a live member responds", c do
+    id = unique_id("hibernate-disconnect-live")
+    start_runtime(c.jido, id, :eager)
+    assert :ok = Runtime.await_ready(c.jido, id)
+
+    runtime = c.jido |> Runtime.controller(id) |> controller_runtime()
+    key = "agent/counter"
+    pid = Runtime.whereis_member(c.jido, id, :counter)
+    state = :sys.get_state(runtime)
+    spec = Map.fetch!(state.instance.plan.agents, key)
+    monitor = make_ref()
+
+    uncertain = %{
+      state
+      | unavailable: MapSet.put(state.unavailable, key),
+        hibernate_uncertain: %{key => %{pid: pid, spec: spec}},
+        hibernate_monitors: %{monitor => key}
+    }
+
+    assert {:noreply, disconnected} =
+             Controller.Runtime.handle_info(
+               {:DOWN, monitor, :process, pid, :noconnection},
+               uncertain
+             )
+
+    assert Map.has_key?(disconnected.hibernate_uncertain, key)
+    assert MapSet.member?(disconnected.unavailable, key)
+    refute MapSet.member?(disconnected.hibernated, key)
+
+    assert {:reply, {:error, {:lifecycle_conflict, ^key, :hibernate}}, ^disconnected} =
+             Controller.Runtime.handle_call(
+               {:thaw, :counter, 1_000},
+               {self(), make_ref()},
+               disconnected
+             )
+
+    assert {:noreply, resolved} =
+             Controller.Runtime.handle_info(
+               {:refresh_live, disconnected.live_refresh_token},
+               disconnected
+             )
+
+    refute Map.has_key?(resolved.hibernate_uncertain, key)
+    refute MapSet.member?(resolved.unavailable, key)
+    refute MapSet.member?(resolved.hibernated, key)
+    assert resolved.ready[key] == pid
+  end
+
+  test "remote monitor disconnect marks Hibernate only after absence is confirmed", c do
+    id = unique_id("hibernate-disconnect-absent")
+    start_runtime(c.jido, id, :lazy)
+
+    runtime = c.jido |> Runtime.controller(id) |> controller_runtime()
+    key = "agent/counter"
+    state = :sys.get_state(runtime)
+    spec = state.instance.plan.agents |> Map.fetch!(key) |> Map.put(:id, unique_id("missing"))
+    monitor = make_ref()
+
+    uncertain = %{
+      state
+      | unavailable: MapSet.put(state.unavailable, key),
+        hibernate_uncertain: %{key => %{pid: self(), spec: spec}},
+        hibernate_monitors: %{monitor => key}
+    }
+
+    assert {:noreply, disconnected} =
+             Controller.Runtime.handle_info(
+               {:DOWN, monitor, :process, self(), :noconnection},
+               uncertain
+             )
+
+    refute MapSet.member?(disconnected.hibernated, key)
+
+    assert {:noreply, resolved} =
+             Controller.Runtime.handle_info(
+               {:refresh_live, disconnected.live_refresh_token},
+               disconnected
+             )
+
+    refute Map.has_key?(resolved.hibernate_uncertain, key)
+    refute MapSet.member?(resolved.unavailable, key)
+    assert MapSet.member?(resolved.hibernated, key)
   end
 
   test "Hibernate waits for a Gateway-admitted call before it checkpoints", c do

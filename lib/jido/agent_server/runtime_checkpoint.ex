@@ -45,12 +45,20 @@ defmodule Jido.AgentServer.RuntimeCheckpoint do
   @doc false
   @spec restore(Options.t()) ::
           {:ok, Agent.t(), non_neg_integer()} | {:error, term()}
-  def restore(%Options{agent: %Agent{} = initial} = options) do
+  def restore(%Options{agent: %Agent{}} = options) do
+    with {:ok, agent, version, _status} <- restore_with_status(options),
+         do: {:ok, agent, version}
+  end
+
+  @doc false
+  @spec restore_with_status(Options.t()) ::
+          {:ok, Agent.t(), non_neg_integer(), :none | :restored} | {:error, term()}
+  def restore_with_status(%Options{agent: %Agent{} = initial} = options) do
     case fetch(options.jido, key(initial.id, options.partition)) do
       {:ok, %{agent: %Agent{} = agent, state_version: version}}
       when agent.id == initial.id and agent.module == initial.module and
              is_integer(version) and version >= 0 ->
-        {:ok, agent, version}
+        {:ok, agent, version, :restored}
 
       {:ok,
        %{
@@ -60,10 +68,10 @@ defmodule Jido.AgentServer.RuntimeCheckpoint do
        }}
       when agent.id == initial.id and source_module == initial.module and
              is_integer(version) and version >= 0 ->
-        {:ok, agent, version}
+        {:ok, agent, version, :restored}
 
       :error ->
-        {:ok, initial, options.state_version}
+        {:ok, initial, options.state_version, :none}
 
       {:error, :not_running} ->
         {:error, :runtime_checkpoint_unavailable}

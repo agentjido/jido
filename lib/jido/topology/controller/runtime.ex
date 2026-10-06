@@ -123,15 +123,19 @@ defmodule Jido.Topology.Controller.Runtime do
         handle_other_down(ref, reason, state)
 
       {key, hibernate_monitors} ->
-        state = %{
-          state
-          | hibernate_monitors: hibernate_monitors,
-            hibernate_uncertain: Map.delete(state.hibernate_uncertain, key)
-        }
+        state = %{state | hibernate_monitors: hibernate_monitors}
 
-        spec = agent_spec(key, state)
-        _ = cleanup_hibernated(spec, state)
-        {:noreply, mark_hibernated(state, key)}
+        if reason == :noconnection do
+          {:noreply, schedule_live_refresh(state)}
+        else
+          spec = agent_spec(key, state)
+          _ = cleanup_hibernated(spec, state)
+
+          {:noreply,
+           state
+           |> drop_uncertain_hibernate(key)
+           |> mark_hibernated(key)}
+        end
     end
   end
 
@@ -578,6 +582,9 @@ defmodule Jido.Topology.Controller.Runtime do
       is_nil(key) or not Map.has_key?(state.instance.plan.agents, key) ->
         {:error, :unknown_member}
 
+      MapSet.member?(state.waking, key) ->
+        lifecycle_conflict(key, :wake)
+
       MapSet.member?(state.hibernated, key) ->
         {:already_hibernated, key}
 
@@ -698,6 +705,13 @@ defmodule Jido.Topology.Controller.Runtime do
   end
 
   defp mark_hibernated(state, key) do
+    state
+    |> put_hibernated(key)
+    |> refresh_phase()
+    |> reply_waiters()
+  end
+
+  defp put_hibernated(state, key) do
     %{
       state
       | hibernated: MapSet.put(state.hibernated, key),
@@ -709,12 +723,11 @@ defmodule Jido.Topology.Controller.Runtime do
         errors: Map.delete(state.errors, key),
         live_errors: Map.delete(state.live_errors, key)
     }
-    |> refresh_phase()
-    |> reply_waiters()
   end
 
   defp begin_wake(kind, target, timeout, from, state) do
-    with {:ok, key, scope} <- wake_target(target, state) do
+    with {:ok, key, scope} <- wake_target(target, state),
+         :ok <- wake_allowed(scope, state) do
       state = refresh_phase(state)
 
       if target_ready?(scope, state) and not MapSet.member?(state.hibernated, key) do
@@ -753,6 +766,23 @@ defmodule Jido.Topology.Controller.Runtime do
       {:error, _reason} = error -> {:reply, error, state}
     end
   end
+
+  defp wake_allowed(scope, state) do
+    pending = pending_hibernate_keys(state)
+
+    case scope |> MapSet.intersection(pending) |> Enum.sort() do
+      [key | _rest] -> lifecycle_conflict(key, :hibernate)
+      [] -> :ok
+    end
+  end
+
+  defp pending_hibernate_keys(state) do
+    waiter_keys = Enum.map(state.hibernate_waiters, & &1.key)
+    MapSet.new(waiter_keys ++ Map.keys(state.hibernate_uncertain))
+  end
+
+  defp lifecycle_conflict(key, intent),
+    do: {:error, {:lifecycle_conflict, key, intent}}
 
   defp wake_target(target, state) do
     key = resolve_agent_key(target, state)
@@ -1631,17 +1661,39 @@ defmodule Jido.Topology.Controller.Runtime do
 
   defp settle_uncertain_hibernates(state) do
     Enum.reduce(state.hibernate_uncertain, state, fn {key, entry}, acc ->
-      case safely(fn -> Server.status(entry.pid, @live_query_timeout) end) do
-        %{phase: :idle} -> clear_uncertain_hibernate(acc, key)
-        {:error, _reason} -> acc
-        _other -> acc
+      case lookup_agent(entry.spec, state.jido, @live_query_timeout) do
+        {:ok, nil} ->
+          acc
+          |> drop_uncertain_hibernate(key)
+          |> put_hibernated(key)
+
+        {:ok, pid} ->
+          context = ownership_context(acc)
+
+          if owned?(:agent, pid, entry.spec, context, @live_query_timeout) and
+               match?(%{phase: :idle}, safely(fn -> Server.status(pid, @live_query_timeout) end)) do
+            clear_uncertain_hibernate(acc, key, pid)
+          else
+            acc
+          end
+
+        {:error, _reason} ->
+          acc
       end
     end)
   end
 
-  defp clear_uncertain_hibernate(state, key) do
-    {entry, uncertain} = Map.pop(state.hibernate_uncertain, key)
+  defp clear_uncertain_hibernate(state, key, pid) do
+    state = drop_uncertain_hibernate(state, key)
 
+    %{
+      state
+      | unavailable: MapSet.delete(state.unavailable, key),
+        ready: Map.put(state.ready, key, pid)
+    }
+  end
+
+  defp drop_uncertain_hibernate(state, key) do
     monitor =
       Enum.find_value(state.hibernate_monitors, fn
         {monitor, ^key} -> monitor
@@ -1652,10 +1704,8 @@ defmodule Jido.Topology.Controller.Runtime do
 
     %{
       state
-      | unavailable: MapSet.delete(state.unavailable, key),
-        hibernate_uncertain: uncertain,
-        hibernate_monitors: Map.delete(state.hibernate_monitors, monitor),
-        ready: if(entry, do: Map.put(state.ready, key, entry.pid), else: state.ready)
+      | hibernate_uncertain: Map.delete(state.hibernate_uncertain, key),
+        hibernate_monitors: Map.delete(state.hibernate_monitors, monitor)
     }
   end
 
@@ -1730,7 +1780,7 @@ defmodule Jido.Topology.Controller.Runtime do
   end
 
   defp schedule_live_refresh(%{live_refresh_token: nil} = state) do
-    if map_size(state.waiters) > 0 do
+    if map_size(state.waiters) > 0 or map_size(state.hibernate_uncertain) > 0 do
       token = make_ref()
       Process.send_after(self(), {:refresh_live, token}, @live_retry_interval)
       %{state | live_refresh_token: token}

@@ -234,6 +234,64 @@ defmodule Jido.Topology.RuntimeCheckpointTest do
     assert Runtime.whereis_member(c.jido, id, :actor) == nil
   end
 
+  test "preserve activation updates the RuntimeCheckpoint before immediate Hibernate", c do
+    id = unique_id("fallback-preserve-hibernate")
+    topology = Topology.new!(name: "fallback_preserve_hibernate")
+
+    start_supervised!(
+      {Runtime, jido: c.jido, id: id, topology: topology, activation: :lazy, repair: :manual}
+    )
+
+    source = CounterAgent.definition()
+    candidate = %{source | description: "preserved candidate"}
+    initial_state = %{count: 0, history: []}
+    preserved_state = %{count: 7, history: ["checkpoint"]}
+
+    assert :ok = Runtime.add_agent(c.jido, id, :actor, source, initial_state: initial_state)
+    assert :ok = Runtime.activate(c.jido, id, :actor)
+    assert :ok = Runtime.await_ready(c.jido, id)
+    assert {:ok, %{state: ^preserved_state}} = Runtime.call(c.jido, id, :actor, add(7))
+    assert :ok = Runtime.remove_agent(c.jido, id, :actor)
+
+    assert :ok =
+             Runtime.prepare_agent_definition(
+               c.jido,
+               id,
+               :actor,
+               source,
+               candidate,
+               :preserve,
+               initial_state: %{count: 0, history: []}
+             )
+
+    assert :ok =
+             Runtime.add_agent(c.jido, id, :actor, candidate,
+               initial_state: %{count: 0, history: []}
+             )
+
+    assert :ok = Runtime.activate(c.jido, id, :actor)
+    assert :ok = Runtime.await_ready(c.jido, id)
+    member = Runtime.whereis_member(c.jido, id, :actor)
+
+    assert %{agent: %{description: "preserved candidate"}, state_version: 2} =
+             AgentServer.snapshot(member)
+
+    assert :ok = Runtime.hibernate(c.jido, id, :actor)
+
+    physical_id = id <> "/agent/actor"
+    key = Jido.partition_key(physical_id, nil)
+
+    assert {:ok, %{agent: persisted, state_version: 2}} =
+             Jido.RuntimeStore.fetch(c.jido, :agent_runtime_checkpoints, key)
+
+    assert persisted.description == "preserved candidate"
+    assert persisted.state == preserved_state
+
+    assert :ok = Runtime.thaw(c.jido, id, :actor)
+    restored = Runtime.whereis_member(c.jido, id, :actor)
+    assert AgentServer.snapshot(restored).state_version == 2
+  end
+
   test "definition preparation handles a missing RuntimeCheckpoint without a tombstone", c do
     id = unique_id("missing-fallback-definition")
     topology = Topology.new!(name: "missing_fallback_definition")
