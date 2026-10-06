@@ -21,9 +21,30 @@ defmodule Jido.Codec.RegistryTest do
 
     assert %Zoi.Types.Struct{module: Registry} = Registry.schema()
     assert {:ok, %Registry{entries: ^entries} = registry} = Registry.new(entries)
+    assert Registry.stable?(registry)
     assert Registry.new!(registry) == registry
     assert {:ok, Add} = Registry.resolve(registry, "aliases/add", :action)
     assert {:ok, "actions/add"} = Registry.identifier(registry, :action, Add)
+  end
+
+  test "derived Registries stay temporary" do
+    assert {:ok, %Registry{provenance: :temporary} = registry} =
+             Registry.derive([{:atom, :count}])
+
+    refute Registry.stable?(registry)
+    assert {:ok, ^registry} = Registry.new(registry)
+    assert {:error, %Jido.Error.ValidationError{}} = Registry.require_stable(registry)
+  end
+
+  test "Registry structs cannot bypass provenance and size validation" do
+    invalid_provenance = struct(Registry, entries: %{}, provenance: :unknown)
+    invalid_entries = struct(Registry, entries: %URI{}, provenance: :stable)
+    oversized_entries = Map.new(0..10_000, &{Integer.to_string(&1), {:atom, :count}})
+    oversized = struct(Registry, entries: oversized_entries, provenance: :stable)
+
+    for registry <- [invalid_provenance, invalid_entries, oversized] do
+      assert {:error, %Jido.Error.ValidationError{}} = Registry.new(registry)
+    end
   end
 
   test "resolve and identifier reject unknown values and mismatched kinds" do

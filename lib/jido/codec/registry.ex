@@ -8,6 +8,10 @@ defmodule Jido.Codec.Registry do
   Stored documents cannot create atoms or derive module names. An `:alias`
   entry points directly to a canonical identifier and is used only for reads.
 
+  A Registry built from an application map has `:stable` provenance. A Registry
+  derived by a Codec has `:temporary` provenance. Durable views and documents
+  can require stable application-owned identifiers.
+
       Jido.Codec.Registry.new!(%{
         "agents/counter" => {:agent, MyApp.Counter},
         "actions/add" => {:action, MyApp.Add},
@@ -18,8 +22,12 @@ defmodule Jido.Codec.Registry do
   alias Jido.Agent.Authoring
 
   @kinds [:agent, :action, :flow, :plugin, :schema, :route_match, :atom, :value]
-  @schema Zoi.struct(__MODULE__, %{entries: Zoi.map()})
+  @schema Zoi.struct(__MODULE__, %{
+            entries: Zoi.map(),
+            provenance: Zoi.enum([:stable, :temporary])
+          })
   @type kind :: :agent | :action | :flow | :plugin | :schema | :route_match | :atom | :value
+  @type provenance :: :stable | :temporary
   @type t :: unquote(Zoi.type_spec(@schema))
   @enforce_keys Zoi.Struct.enforce_keys(@schema)
   defstruct Zoi.Struct.struct_fields(@schema)
@@ -30,18 +38,32 @@ defmodule Jido.Codec.Registry do
 
   @doc "Validates a trusted identifier map."
   @spec new(map() | t()) :: {:ok, t()} | {:error, Exception.t()}
-  def new(%__MODULE__{entries: entries}), do: new(entries)
+  def new(%__MODULE__{entries: entries, provenance: provenance}) do
+    build(entries, provenance)
+  end
 
   def new(entries)
       when is_map(entries) and not is_struct(entries) and map_size(entries) <= 10_000 do
-    with :ok <- validate_entries(entries),
-         :ok <- unique_values(entries),
-         :ok <- aliases(entries) do
-      {:ok, %__MODULE__{entries: entries}}
-    end
+    build(entries, :stable)
   end
 
   def new(_entries), do: Authoring.error("Registry must contain at most 10000 entries")
+
+  defp build(entries, provenance)
+       when is_map(entries) and not is_struct(entries) and map_size(entries) <= 10_000 and
+              provenance in [:stable, :temporary] do
+    with :ok <- validate_entries(entries),
+         :ok <- unique_values(entries),
+         :ok <- aliases(entries) do
+      {:ok, %__MODULE__{entries: entries, provenance: provenance}}
+    end
+  end
+
+  defp build(_entries, provenance) when provenance not in [:stable, :temporary],
+    do: Authoring.error("Registry provenance must be stable or temporary")
+
+  defp build(_entries, _provenance),
+    do: Authoring.error("Registry must contain at most 10000 entries")
 
   @doc "Validates a Registry or raises its error."
   @spec new!(map() | t()) :: t() | no_return()
@@ -85,7 +107,24 @@ defmodule Jido.Codec.Registry do
     |> Map.new(fn {{kind, _} = entry, index} ->
       {"#{kind}/#{index}", entry}
     end)
-    |> new()
+    |> build(:temporary)
+  end
+
+  @doc "Returns true when the Registry has stable application-owned identifiers."
+  @spec stable?(t()) :: boolean()
+  def stable?(%__MODULE__{provenance: :stable}), do: true
+  def stable?(%__MODULE__{}), do: false
+
+  @doc "Requires a Registry with stable application-owned identifiers."
+  @spec require_stable(t()) :: :ok | {:error, Exception.t()}
+  def require_stable(%__MODULE__{} = registry) do
+    if stable?(registry) do
+      :ok
+    else
+      Authoring.error("This operation requires a stable Registry", %{
+        provenance: registry.provenance
+      })
+    end
   end
 
   defp validate_entry({id, {kind, value}}) when kind in @kinds do
