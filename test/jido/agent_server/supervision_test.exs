@@ -67,7 +67,7 @@ defmodule Jido.AgentServer.SupervisionTest do
       assert :ok = Server.await_ready(replacement)
       assert Server.agent(replacement).state == committed.state
       assert Server.agent(replacement).metadata == Counter.definition().metadata
-      assert Server.snapshot(replacement).state_version == 1
+      assert Server.snapshot(replacement).state_version == 2
       runtime = Server.children(replacement)[{:plugin, Counter.Runtime}].pid
       init = Elixir.Agent.get(runtime, & &1)
       assert init.options == [label: "current"]
