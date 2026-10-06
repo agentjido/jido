@@ -149,6 +149,7 @@ defmodule Jido.Topology.Controller.Runtime do
   @impl true
   def handle_call(:status, _from, state) do
     state = refresh_phase(state)
+    errors = Map.merge(state.errors, state.live_errors)
 
     {:reply,
      %{
@@ -161,11 +162,12 @@ defmodule Jido.Topology.Controller.Runtime do
          Enum.count(state.instance.plan.agents, fn {key, _} ->
            not MapSet.member?(state.selected, key)
          end),
+       member_statuses: member_statuses(state, errors),
        agents: map_size(state.instance.plan.agents),
        target_revision: state.target_revision,
        resources: map_size(state.instance.plan.resources),
        ready: map_size(state.ready),
-       errors: Map.merge(state.errors, state.live_errors),
+       errors: errors,
        components: state.instance.plan.components,
        active: map_size(state.active),
        pending: MapSet.size(state.pending)
@@ -402,6 +404,20 @@ defmodule Jido.Topology.Controller.Runtime do
        do: :degraded
 
   defp current_phase(state), do: state.phase
+
+  defp member_statuses(state, errors) do
+    Map.new(state.instance.plan.agents, fn {key, _member} ->
+      status =
+        cond do
+          Map.has_key?(errors, key) -> :error
+          Map.has_key?(state.ready, key) -> :ready
+          MapSet.member?(state.selected, key) -> :starting
+          true -> :dormant
+        end
+
+      {key, status}
+    end)
+  end
 
   defp update_idle(%{active: active, pending_move: nil}) when map_size(active) == 0, do: :ok
 

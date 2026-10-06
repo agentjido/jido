@@ -39,13 +39,22 @@ defmodule Jido.Topology.RuntimeTest do
     assert [%{key: "alice", definition: ^definition, initial_state: %{count: 2}}] =
              target.definition.agents
 
-    assert %{active_members: 0, dormant_members: 1, target_revision: 1} =
+    assert %{
+             active_members: 0,
+             dormant_members: 1,
+             member_statuses: %{"agent/alice" => :dormant},
+             target_revision: 1
+           } =
              Runtime.status(c.jido, id)
 
     assert {:ok, %{state: %{count: 5}}} =
              Runtime.call(c.jido, id, "alice", add(3))
 
-    assert %{active_members: 1, dormant_members: 0} = Runtime.status(c.jido, id)
+    assert %{
+             active_members: 1,
+             dormant_members: 0,
+             member_statuses: %{"agent/alice" => :ready}
+           } = Runtime.status(c.jido, id)
 
     assert {:error, %Jido.Error.ValidationError{}} =
              Runtime.add_agent(c.jido, id, "alice", definition)
@@ -112,7 +121,10 @@ defmodule Jido.Topology.RuntimeTest do
 
     eventually(fn ->
       match?(
-        %{errors: %{"agent/counter" => :agent_identity_in_use}},
+        %{
+          errors: %{"agent/counter" => :agent_identity_in_use},
+          member_statuses: %{"agent/counter" => :error}
+        },
         Runtime.status(c.jido, id)
       )
     end)
@@ -122,7 +134,12 @@ defmodule Jido.Topology.RuntimeTest do
     assert_receive {:DOWN, ^monitor, :process, ^foreign, _}, 5_000
 
     assert {:ok, %{state: %{count: 1}}} = Task.await(caller, 5_000)
-    assert %{active_members: 1, errors: %{}} = Runtime.status(c.jido, id)
+
+    assert %{
+             active_members: 1,
+             errors: %{},
+             member_statuses: %{"agent/counter" => :ready}
+           } = Runtime.status(c.jido, id)
   end
 
   test "readiness includes gateway and child status queries in its deadline", c do

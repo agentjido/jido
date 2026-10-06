@@ -153,7 +153,13 @@ defmodule Jido.Topology.Controller.CompositionRuntimeTest do
 
     controller = start_supervised!({Controller, jido: jido, topology: instance})
     assert_receive {:readiness_blocked, gate}, 1000
-    assert %{status: :starting, active: active} = Controller.status(controller, 100)
+
+    assert %{
+             status: :starting,
+             active: active,
+             member_statuses: %{"agent/a_slow" => :starting}
+           } = Controller.status(controller, 100)
+
     assert active <= 2
     eventually(fn -> is_pid(Controller.whereis_agent(controller, :z_fast)) end)
 
@@ -168,7 +174,10 @@ defmodule Jido.Topology.Controller.CompositionRuntimeTest do
 
     eventually(
       fn ->
-        Controller.status(controller, 100).errors["agent/a_slow"] == :startup_task_timeout
+        status = Controller.status(controller, 100)
+
+        status.errors["agent/a_slow"] == :startup_task_timeout and
+          status.member_statuses["agent/a_slow"] == :error
       end,
       timeout: 2000
     )

@@ -226,7 +226,7 @@ defmodule Jido.Topology.Runtime do
   def publish(jido, id, bus, signals, opts \\ []),
     do: Gateway.request(jido, id, {:publish, bus, signals}, opts)
 
-  @doc "Returns readiness, active and dormant member counts, and child states."
+  @doc "Returns readiness, keyed member states, member counts, and child states."
   def status(jido, id) do
     with_controller(jido, id, fn controller ->
       status = Controller.status(controller)
