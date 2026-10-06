@@ -101,6 +101,8 @@ defmodule Jido.Topology.Controller do
          max_seconds, parent_gate}
       ) do
     with {:ok, owner} <- Topology.Controller.Owner.start(jido, self(), instance.id) do
+      checkpoint_owner = checkpoint_owner || owner
+
       children = [
         supporting_child(
           {DynamicSupervisor, name: name(jido, instance.id, :resources), strategy: :one_for_one}
@@ -138,7 +140,55 @@ defmodule Jido.Topology.Controller do
 
   @doc "Activates a member, a Bus resource, or the complete target and its dependencies."
   def activate(controller, target \\ :all, timeout \\ 5_000),
-    do: GenServer.call(runtime(controller), {:activate, target}, timeout)
+    do: GenServer.call(runtime(controller), {:activate, target, :ensure}, timeout)
+
+  @doc "Hibernates one accepted Agent member after its admitted work finishes."
+  @spec hibernate(Supervisor.supervisor(), term(), keyword()) :: :ok | {:error, term()}
+  def hibernate(controller, target, opts \\ []) do
+    with {:ok, opts} <- Authoring.attrs(opts),
+         :ok <- Authoring.keys(opts, [:timeout]),
+         timeout = Map.get(opts, :timeout, 5_000),
+         :ok <- validate_lifecycle_timeout(timeout) do
+      GenServer.call(
+        runtime(controller),
+        {:hibernate, target, deadline(timeout)},
+        call_timeout(timeout)
+      )
+    end
+  catch
+    :exit, {:timeout, _details} -> {:error, {:indeterminate, :hibernate_timeout}}
+    :exit, {:noproc, _details} -> {:error, :topology_not_running}
+  end
+
+  @doc "Thaws one accepted Agent member and waits for its dependency closure."
+  @spec thaw(Supervisor.supervisor(), term(), keyword()) :: :ok | {:error, term()}
+  def thaw(controller, target, opts \\ []) do
+    with {:ok, opts} <- Authoring.attrs(opts),
+         :ok <- Authoring.keys(opts, [:timeout]),
+         timeout = Map.get(opts, :timeout, 5_000),
+         :ok <- validate_lifecycle_timeout(timeout) do
+      GenServer.call(runtime(controller), {:thaw, target, timeout}, call_timeout(timeout))
+    end
+  catch
+    :exit, {:timeout, _details} -> {:error, {:indeterminate, :activation_timeout}}
+    :exit, {:noproc, _details} -> {:error, :topology_not_running}
+  end
+
+  @doc false
+  def checkout_for_call(controller, target, timeout),
+    do:
+      GenServer.call(
+        runtime(controller),
+        {:checkout_for_call, target, timeout},
+        call_timeout(timeout)
+      )
+
+  @doc false
+  def release_call(controller, lease) do
+    GenServer.call(runtime(controller), {:release_call, lease})
+  catch
+    :exit, _reason -> :ok
+  end
 
   @doc "Waits for one target and its dependencies, independently of other targets."
   def await_target(controller, target, timeout \\ 60_000),
@@ -151,6 +201,9 @@ defmodule Jido.Topology.Controller do
 
   defp call_timeout(:infinity), do: :infinity
   defp call_timeout(timeout), do: timeout + 100
+
+  defp deadline(:infinity), do: :infinity
+  defp deadline(timeout), do: System.monotonic_time(:millisecond) + timeout
 
   @doc """
   Requests a repair pass against the existing topology target.
@@ -340,6 +393,12 @@ defmodule Jido.Topology.Controller do
 
   defp validate_timeout(_timeout),
     do: Authoring.error("Controller timeout must be a positive integer or :infinity")
+
+  defp validate_lifecycle_timeout(:infinity), do: :ok
+  defp validate_lifecycle_timeout(timeout) when is_integer(timeout) and timeout >= 0, do: :ok
+
+  defp validate_lifecycle_timeout(_timeout),
+    do: Authoring.error("Controller lifecycle timeout must be non-negative or :infinity")
 
   defp definition_modules(%Jido.Agent{module: module}, %Jido.Agent{module: module}), do: :ok
 

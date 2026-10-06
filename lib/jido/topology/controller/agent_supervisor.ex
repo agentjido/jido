@@ -25,7 +25,15 @@ defmodule Jido.Topology.Controller.AgentSupervisor do
   def retire(supervisor, key) do
     case Supervisor.terminate_child(supervisor, key) do
       :ok -> Supervisor.delete_child(supervisor, key)
+      {:error, :not_found} -> delete_child(supervisor, key)
+    end
+  end
+
+  defp delete_child(supervisor, key) do
+    case Supervisor.delete_child(supervisor, key) do
+      :ok -> :ok
       {:error, :not_found} -> :ok
+      {:error, :running} -> {:error, :running}
     end
   end
 end

@@ -214,6 +214,16 @@ defmodule Jido.Topology.Runtime do
     with_controller(jido, id, &Controller.activate(&1, target))
   end
 
+  @doc "Hibernates one accepted Agent member without changing the topology target."
+  def hibernate(jido, id, target, opts \\ []) do
+    with_controller(jido, id, &Controller.hibernate(&1, target, opts))
+  end
+
+  @doc "Thaws one accepted Agent member and waits for readiness."
+  def thaw(jido, id, target, opts \\ []) do
+    with_controller(jido, id, &Controller.thaw(&1, target, opts))
+  end
+
   @doc "Returns the currently accepted topology target."
   def target(jido, id), do: with_controller(jido, id, &Controller.target/1)
 

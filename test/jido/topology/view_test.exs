@@ -158,6 +158,22 @@ defmodule Jido.Topology.ViewTest do
            }
   end
 
+  test "projects hibernated and unavailable member lifecycle values" do
+    lifecycle_status =
+      Map.merge(status(), %{
+        hibernated_members: 1,
+        errors: %{},
+        member_statuses: %{
+          "agent/compiled" => :hibernated,
+          "agent/stored" => :unavailable
+        }
+      })
+
+    assert {:ok, view} = View.project(instance(), lifecycle_status, registry())
+    assert view["readiness"]["hibernated_members"] == 1
+    assert Enum.map(view["members"]["items"], & &1["status"]) == ["hibernated", "unavailable"]
+  end
+
   test "uses safe defaults for an incomplete status snapshot" do
     assert {:ok, view} = View.project(instance(), %{status: :ready}, registry())
 

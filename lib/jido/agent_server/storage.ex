@@ -111,6 +111,25 @@ defmodule Jido.AgentServer.Storage do
     persist_agent(data, agent, version, :commit)
   end
 
+  @doc false
+  def persist_hibernate(%State{config: %{persistence: nil}} = data, opts) do
+    if Keyword.get(opts, :topology, false) do
+      RuntimeCheckpoint.put(data, data.agent, data.state_version)
+    else
+      {:error, :persistence_not_configured}
+    end
+  end
+
+  def persist_hibernate(%State{} = data, opts) do
+    persist_agent(
+      data,
+      data.agent,
+      data.state_version,
+      :hibernate,
+      Keyword.delete(opts, :topology)
+    )
+  end
+
   def persist_definition_upgrade(%State{config: %{persistence: nil}} = data, target, version) do
     RuntimeCheckpoint.put(data, target, version)
   end

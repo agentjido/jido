@@ -1,6 +1,7 @@
 defmodule JidoTest.Topology.ControllerPlacementTest do
   use JidoTest.PeerCase, async: false
 
+  alias Jido.AgentServer, as: Server
   alias Jido.Examples.Topology.Cell
   alias Jido.Topology.Controller
 
@@ -48,6 +49,54 @@ defmodule JidoTest.Topology.ControllerPlacementTest do
     assert :ok = peer_call(c.peer_a, Controller, :await_ready, [controller])
     assert second == peer_call(c.peer_a, Controller, :whereis_agent, [controller, :worker])
     assert c.node_a == peer_call(c.peer_a, Controller, :agent_node, [controller, :worker])
+
+    assert :ok =
+             peer_call(c.peer_a, Supervisor, :terminate_child, [
+               Jido.Supervisor,
+               {Controller, id}
+             ])
+  end
+
+  test "Hibernate cleans a placed member and Thaw restores it on its accepted node", c do
+    id = "placed-hibernate-#{System.unique_integer([:positive])}"
+
+    instance =
+      Jido.Topology.unwrap!(
+        with {:ok, definition} <-
+               Jido.Topology.new(%{
+                 name: "placed_hibernate",
+                 agents: [%{key: :worker, module: Cell, node: c.node_b}]
+               }) do
+          Jido.Topology.instantiate(definition, id: id)
+        end
+      )
+
+    assert {:ok, controller} =
+             peer_call(c.peer_a, Supervisor, :start_child, [
+               Jido.Supervisor,
+               {Controller, jido: c.jido, topology: instance, repair: :manual}
+             ])
+
+    assert :ok = peer_call(c.peer_a, Controller, :await_ready, [controller])
+    original = peer_call(c.peer_a, Controller, :whereis_agent, [controller, :worker])
+    assert is_pid(original)
+    assert node(original) == c.node_b
+    {:ok, signal} = Cell.work_signal(%{value: 4})
+    assert {:ok, %{state: %{total: 4}}} = peer_call(c.peer_a, Server, :call, [original, signal])
+
+    assert :ok = peer_call(c.peer_a, Controller, :hibernate, [controller, :worker])
+    assert nil == peer_call(c.peer_a, Controller, :whereis_agent, [controller, :worker])
+    assert nil == peer_call(c.peer_b, Jido, :whereis_agent, [c.jido, "#{id}/agent/worker"])
+
+    assert %{member_statuses: %{"agent/worker" => :hibernated}} =
+             peer_call(c.peer_a, Controller, :status, [controller])
+
+    assert :ok = peer_call(c.peer_a, Controller, :thaw, [controller, :worker])
+    restored = peer_call(c.peer_a, Controller, :whereis_agent, [controller, :worker])
+    assert is_pid(restored)
+    assert restored != original
+    assert node(restored) == c.node_b
+    assert peer_call(c.peer_a, Server, :agent, [restored]).state.total == 4
 
     assert :ok =
              peer_call(c.peer_a, Supervisor, :terminate_child, [

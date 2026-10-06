@@ -27,7 +27,7 @@ defmodule Jido.Topology.View do
     error_limit: {50, 100}
   }
   @status_values [:starting, :ready, :degraded]
-  @member_status_values [:dormant, :starting, :ready, :error]
+  @member_status_values [:dormant, :hibernated, :unavailable, :starting, :ready, :error]
   @child_status_values [:dormant, :starting, :ready, :degraded, :failed]
   @activation_values [:eager, :deferred, :lazy]
 
@@ -215,6 +215,7 @@ defmodule Jido.Topology.View do
         "ready" => ready?(status, state),
         "active_members" => nonnegative(Map.get(status, :active_members)),
         "dormant_members" => nonnegative(Map.get(status, :dormant_members)),
+        "hibernated_members" => nonnegative(Map.get(status, :hibernated_members)),
         "ready_components" => nonnegative(Map.get(status, :ready)),
         "pending_components" => nonnegative(Map.get(status, :pending))
       },

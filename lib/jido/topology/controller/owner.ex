@@ -2,6 +2,7 @@ defmodule Jido.Topology.Controller.Owner do
   @moduledoc false
 
   alias Jido.AgentServer
+  alias Jido.AgentServer.RuntimeCheckpoint
   alias Jido.Telemetry.Semantic
   alias Jido.Topology.Controller.TargetStore
 
@@ -19,7 +20,7 @@ defmodule Jido.Topology.Controller.Owner do
       with {:ok, pid} <-
              Task.Supervisor.start_child(Jido.task_supervisor_name(jido), fn ->
                {:via, Registry, {registry, key}} = name
-               {:ok, _} = Registry.register(registry, key, nil)
+               {:ok, _} = Registry.register(registry, key, {:checkpoint_owner, topology_id})
                ref = Process.monitor(controller)
                send(caller, {token, :ready})
                await_down(jido, controller, topology_id, ref, %{}, [])
@@ -119,6 +120,7 @@ defmodule Jido.Topology.Controller.Owner do
       end)
 
     _ = TargetStore.forget_local(jido, topology_id)
+    _ = RuntimeCheckpoint.delete_owned(jido, [topology_id])
 
     Semantic.point(
       [:jido, :topology, :ownership, :settled],

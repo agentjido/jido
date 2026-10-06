@@ -103,12 +103,19 @@ defmodule Jido.Topology.Runtime.Gateway do
   end
 
   defp execute(config, {:call, target, signal}, deadline, opts) do
-    with :ok <- ready(config, target, deadline),
-         pid when is_pid(pid) <- Runtime.whereis_member(config.jido, config.id, target),
-         :ok <- check(deadline) do
-      Jido.AgentServer.call(pid, signal, Keyword.put(opts, :timeout, remaining(deadline)))
+    with :ok <- check(deadline),
+         controller when is_pid(controller) <- Runtime.controller(config.jido, config.id),
+         {:ok, pid, lease} <-
+           Controller.checkout_for_call(controller, target, remaining(deadline)) do
+      try do
+        with :ok <- check(deadline) do
+          Jido.AgentServer.call(pid, signal, Keyword.put(opts, :timeout, remaining(deadline)))
+        end
+      after
+        Controller.release_call(controller, lease)
+      end
     else
-      nil -> {:error, :member_unavailable}
+      nil -> {:error, :topology_not_running}
       error -> error
     end
   end

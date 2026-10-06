@@ -635,7 +635,7 @@ defmodule Jido.AgentServer do
   end
 
   def handle_event({:call, from}, {:hibernate, opts}, :idle, %State{} = data) do
-    case Storage.persist_agent(data, data.agent, data.state_version, :hibernate, opts) do
+    case Storage.persist_hibernate(data, opts) do
       :ok ->
         {:stop_and_reply, {:shutdown, :hibernate}, [{:reply, from, :ok}], data}
 
