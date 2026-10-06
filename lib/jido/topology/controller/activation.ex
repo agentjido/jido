@@ -75,7 +75,8 @@ defmodule Jido.Topology.Controller.Activation do
       {:error, {:placement_uncertain, spec.node, {kind, reason}}}
   end
 
-  defp definition(spec, context) do
+  @doc false
+  def definition(spec, context) do
     with {:ok, definition} <- Validation.agent_definition(Validation.agent_source(spec)) do
       metadata =
         Map.put(definition.metadata, "jido.topology", %{

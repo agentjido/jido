@@ -6,6 +6,25 @@ defmodule Jido.AgentServer.Storage do
   alias Jido.Agent
   alias Jido.AgentServer.{Options, RuntimeCheckpoint, Shutdown, State}
 
+  @doc false
+  def prepare_definition(jido, %Agent{} = source, %Agent{} = candidate, policy, opts) do
+    with {:ok, persistence} <- Jido.Persistence.resolve_config(:inherit, jido) do
+      case persistence do
+        nil ->
+          RuntimeCheckpoint.prepare_definition(jido, source, candidate, policy, opts)
+
+        adapter ->
+          Jido.Persistence.prepare_agent(
+            adapter,
+            source,
+            candidate,
+            policy,
+            preparation_opts(jido, opts)
+          )
+      end
+    end
+  end
+
   def restore_initial_agent(%Options{} = opts) do
     with {:ok, saved, version, status} <- restore(opts),
          {:ok, agent} <- restore_definition(saved, opts) do
@@ -168,5 +187,12 @@ defmodule Jido.AgentServer.Storage do
     |> Keyword.put(:revision, version)
     |> Keyword.put(:expected_revision, data.state_version)
     |> Keyword.put(:reason, reason)
+  end
+
+  defp preparation_opts(jido, opts) do
+    opts
+    |> Keyword.take([:partition])
+    |> Keyword.put(:instance, jido)
+    |> Keyword.put(:namespace, Jido.namespace(jido))
   end
 end

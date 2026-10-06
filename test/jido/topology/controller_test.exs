@@ -512,6 +512,374 @@ defmodule Jido.Topology.ControllerTest do
       persistence: {Jido.Persistence.ETS, table: __MODULE__}
   end
 
+  defmodule PreparationAdapter do
+    @behaviour Jido.Persistence.Adapter
+
+    def validate_options(opts), do: Jido.Persistence.ETS.validate_options(opts)
+
+    def get(key, opts) do
+      case Elixir.Agent.get(Keyword.fetch!(opts, :control), & &1) do
+        :ok -> Jido.Persistence.ETS.get(key, opts)
+        {:error, reason} -> {:error, reason}
+      end
+    end
+
+    defdelegate put(key, value, opts), to: Jido.Persistence.ETS
+    defdelegate compare_and_swap(key, expected, value, opts), to: Jido.Persistence.ETS
+    defdelegate delete(key, opts), to: Jido.Persistence.ETS
+  end
+
+  test "prepares durable checkpoint definitions without accepting or starting the member" do
+    control = start_supervised!({Elixir.Agent, fn -> :ok end})
+    jido = unique_instance("definition-preparation")
+
+    start_supervised!(
+      {Jido,
+       name: jido,
+       namespace: "controller-test/#{jido}",
+       persistence: {PreparationAdapter, table: jido, control: control}},
+      id: jido
+    )
+
+    id = unique_id("definition-preparation")
+    start_supervised!({Jido.Topology.Runtime, empty_runtime(jido, id)})
+    source = JidoTest.AgentFixtures.CounterAgent.definition()
+    compatible = %{source | description: "compatible candidate"}
+
+    assert :ok =
+             Jido.Topology.Runtime.add_agent(jido, id, :actor, source,
+               initial_state: %{count: 7, history: []}
+             )
+
+    assert :ok = Jido.Topology.Runtime.activate(jido, id, :actor)
+    assert :ok = Jido.Topology.Runtime.await_ready(jido, id)
+    assert :ok = Jido.Topology.Runtime.remove_agent(jido, id, :actor)
+    assert Jido.agent_count(jido) == 0
+
+    assert :ok =
+             Jido.Topology.Runtime.prepare_agent_definition(
+               jido,
+               id,
+               :actor,
+               source,
+               compatible,
+               :preserve,
+               initial_state: %{count: 2, history: []}
+             )
+
+    assert Jido.Topology.Runtime.target(jido, id).definition.agents == []
+    assert Jido.Topology.Runtime.whereis_member(jido, id, :actor) == nil
+
+    physical_id = id <> "/agent/actor"
+
+    assert {:ok, saved, 0} =
+             Jido.Persistence.load_agent_with_revision(jido, source.module, physical_id)
+
+    assert saved.state == %{count: 7, history: []}
+
+    incompatible = %{
+      source
+      | schema:
+          Zoi.object(%{
+            count: Zoi.string() |> Zoi.default("zero"),
+            history: Zoi.list(Zoi.string()) |> Zoi.default([])
+          })
+    }
+
+    assert {:error, %Jido.Error.ValidationError{}} =
+             Jido.Topology.Runtime.prepare_agent_definition(
+               jido,
+               id,
+               :actor,
+               source,
+               incompatible,
+               :preserve,
+               initial_state: %{count: "reset", history: []}
+             )
+
+    assert {:ok, unchanged, 0} =
+             Jido.Persistence.load_agent_with_revision(jido, source.module, physical_id)
+
+    assert unchanged == saved
+
+    candidate = %{source | description: "reset candidate"}
+    initial_state = %{count: 2, history: []}
+
+    tasks =
+      for _index <- 1..2 do
+        Task.async(fn ->
+          Jido.Topology.Runtime.prepare_agent_definition(
+            jido,
+            id,
+            :actor,
+            source,
+            candidate,
+            :reset,
+            initial_state: initial_state
+          )
+        end)
+      end
+
+    assert Enum.map(tasks, &Task.await/1) == [:ok, :ok]
+
+    assert {:ok, prepared, 1} =
+             Jido.Persistence.load_agent_with_revision(jido, source.module, physical_id)
+
+    assert prepared.state == initial_state
+    assert prepared.description == "reset candidate"
+
+    key =
+      Jido.Persistence.agent_key(
+        Jido.Agent.Ref.new!(namespace: "controller-test/#{jido}", id: physical_id)
+      )
+
+    assert {:ok, bytes_before} = Jido.Persistence.ETS.get(key, table: jido, control: control)
+
+    assert :ok =
+             Jido.Topology.Runtime.prepare_agent_definition(
+               jido,
+               id,
+               :actor,
+               source,
+               candidate,
+               :reset,
+               initial_state: initial_state
+             )
+
+    assert {:ok, ^bytes_before} = Jido.Persistence.ETS.get(key, table: jido, control: control)
+    assert %{kind: :active, revision: 1} = :erlang.binary_to_term(bytes_before, [:safe])
+    assert Jido.agent_count(jido) == 0
+  end
+
+  test "definition preparation accepts a missing checkpoint and reports storage read failure" do
+    control = start_supervised!({Elixir.Agent, fn -> :ok end})
+    jido = unique_instance("definition-read")
+
+    start_supervised!(
+      {Jido,
+       name: jido,
+       namespace: "controller-test/#{jido}",
+       persistence: {PreparationAdapter, table: jido, control: control}},
+      id: jido
+    )
+
+    id = unique_id("definition-read")
+    start_supervised!({Jido.Topology.Runtime, empty_runtime(jido, id)})
+    source = JidoTest.AgentFixtures.CounterAgent.definition()
+    candidate = %{source | description: "candidate"}
+
+    assert :ok =
+             Jido.Topology.Runtime.prepare_agent_definition(
+               jido,
+               id,
+               :missing,
+               source,
+               candidate,
+               :preserve,
+               initial_state: %{count: 0, history: []}
+             )
+
+    physical_id = id <> "/agent/missing"
+
+    assert {:error, :not_found} =
+             Jido.Persistence.load_agent(jido, source.module, physical_id)
+
+    assert :ok =
+             Jido.Topology.Runtime.prepare_agent_definition(
+               jido,
+               id,
+               :missing,
+               source,
+               candidate,
+               :reset,
+               initial_state: %{count: 3, history: []}
+             )
+
+    assert {:ok, %{state: %{count: 3}}, 0} =
+             Jido.Persistence.load_agent_with_revision(jido, source.module, physical_id)
+
+    Elixir.Agent.update(control, fn _ -> {:error, :storage_unavailable} end)
+
+    assert {:error, :storage_unavailable} =
+             Jido.Topology.Runtime.prepare_agent_definition(
+               jido,
+               id,
+               :other,
+               source,
+               candidate,
+               :preserve,
+               initial_state: %{count: 0, history: []}
+             )
+  end
+
+  test "definition preparation rejects unsupported policy, module changes, and writer state", %{
+    jido: jido
+  } do
+    id = unique_id("definition-guards")
+    start_supervised!({Jido.Topology.Runtime, empty_runtime(jido, id)})
+    source = JidoTest.AgentFixtures.CounterAgent.definition()
+    candidate = %{source | description: "candidate"}
+    other = LifecycleControl.definition()
+    opts = [initial_state: %{count: 0, history: []}]
+
+    assert {:error, {:unsupported_definition_policy, :migrate}} =
+             Jido.Topology.Runtime.prepare_agent_definition(
+               jido,
+               id,
+               :actor,
+               source,
+               candidate,
+               :migrate,
+               opts
+             )
+
+    assert {:error, {:agent_module_mismatch, _, _}} =
+             Jido.Topology.Runtime.prepare_agent_definition(
+               jido,
+               id,
+               :actor,
+               source,
+               other,
+               :preserve,
+               initial_state: %{events: []}
+             )
+
+    for forbidden <- [[revision: 1], [partition: "private"], [checkpoint: <<1, 2, 3>>]] do
+      assert {:error, %Jido.Error.ValidationError{}} =
+               Jido.Topology.Runtime.prepare_agent_definition(
+                 jido,
+                 id,
+                 :actor,
+                 source,
+                 candidate,
+                 :preserve,
+                 forbidden
+               )
+    end
+
+    assert :ok = Jido.Topology.Runtime.add_agent(jido, id, :actor, source, opts)
+
+    assert {:error, {:definition_preparation_rejected, :accepted}} =
+             Jido.Topology.Runtime.prepare_agent_definition(
+               jido,
+               id,
+               :actor,
+               source,
+               candidate,
+               :preserve,
+               opts
+             )
+
+    assert :ok = Jido.Topology.Runtime.activate(jido, id, :actor)
+    assert :ok = Jido.Topology.Runtime.await_ready(jido, id)
+    active = Jido.Topology.Runtime.whereis_member(jido, id, :actor)
+
+    assert {:error, {:definition_preparation_rejected, :accepted}} =
+             Jido.Topology.Runtime.prepare_agent_definition(
+               jido,
+               id,
+               :actor,
+               source,
+               candidate,
+               :reset,
+               opts
+             )
+
+    assert Process.alive?(active)
+  end
+
+  test "definition preparation rejects selected, ready, repair, stopped-child, and live state", %{
+    jido: jido
+  } do
+    source = JidoTest.AgentFixtures.CounterAgent.definition()
+    candidate = %{source | description: "candidate"}
+    opts = [initial_state: %{count: 0, history: []}]
+
+    for {field, value, reason} <- [
+          {:selected, MapSet.new(["agent/actor"]), :selected},
+          {:ready, %{"agent/actor" => self()}, :ready},
+          {:pending, MapSet.new(["agent/actor"]), :starting},
+          {:active, %{make_ref() => :repair_job}, :repair_active}
+        ] do
+      id = unique_id("definition-#{field}")
+      start_supervised!({Jido.Topology.Runtime, empty_runtime(jido, id)}, id: {field, id})
+      runtime = Jido.Topology.Runtime.controller(jido, id) |> controller_runtime()
+      original = :sys.get_state(runtime)
+      :sys.replace_state(runtime, &Map.put(&1, field, value))
+
+      assert {:error, {:definition_preparation_rejected, ^reason}} =
+               Jido.Topology.Runtime.prepare_agent_definition(
+                 jido,
+                 id,
+                 :actor,
+                 source,
+                 candidate,
+                 :preserve,
+                 opts
+               )
+
+      :sys.replace_state(runtime, fn _ -> original end)
+    end
+
+    stopped_id = unique_id("definition-stopped")
+    start_supervised!({Jido.Topology.Runtime, empty_runtime(jido, stopped_id)})
+    agents = Controller.name(jido, stopped_id, :agents)
+    test_pid = self()
+
+    assert {:ok, child} =
+             Supervisor.start_child(agents, %{
+               id: "agent/actor",
+               start:
+                 {Task, :start_link,
+                  [
+                    fn ->
+                      send(test_pid, {:temporary_child_started, self()})
+
+                      receive do
+                        :stop -> :ok
+                      end
+                    end
+                  ]},
+               restart: :transient
+             })
+
+    assert_receive {:temporary_child_started, ^child}
+    monitor = Process.monitor(child)
+    send(child, :stop)
+    assert_receive {:DOWN, ^monitor, :process, ^child, :normal}
+
+    assert {:error, {:definition_preparation_rejected, :stopped_child}} =
+             Jido.Topology.Runtime.prepare_agent_definition(
+               jido,
+               stopped_id,
+               :actor,
+               source,
+               candidate,
+               :preserve,
+               opts
+             )
+
+    live_id = unique_id("definition-live")
+    start_supervised!({Jido.Topology.Runtime, empty_runtime(jido, live_id)})
+    physical_id = live_id <> "/agent/actor"
+
+    {:ok, live} =
+      Jido.start_agent(jido, source, id: physical_id, initial_state: opts[:initial_state])
+
+    assert {:error, {:definition_preparation_rejected, :live_process}} =
+             Jido.Topology.Runtime.prepare_agent_definition(
+               jido,
+               live_id,
+               :actor,
+               source,
+               candidate,
+               :preserve,
+               opts
+             )
+
+    assert Process.alive?(live)
+  end
+
   test "restores committed state and Bus subscriptions after controller shutdown" do
     start_supervised!(PersistentJido)
     id = unique_id("persistent-topology")
@@ -559,6 +927,26 @@ defmodule Jido.Topology.ControllerTest do
     )
 
     assert :ok = Controller.await_ready(controller, 5000)
+  end
+
+  defp empty_runtime(jido, id) do
+    [
+      jido: jido,
+      id: id,
+      topology: Jido.Topology.new!(name: "definition_preparation"),
+      activation: :lazy,
+      repair: :manual
+    ]
+  end
+
+  defp unique_instance(prefix),
+    do: String.to_atom(unique_id(prefix))
+
+  defp controller_runtime(controller) do
+    Enum.find_value(Supervisor.which_children(controller), fn
+      {Jido.Topology.Controller.Runtime, pid, _, _} -> pid
+      _other -> nil
+    end)
   end
 
   test "repairs a Bus and its subscriptions after a Bus failure", %{jido: jido} do

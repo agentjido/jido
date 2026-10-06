@@ -157,6 +157,36 @@ defmodule Jido.Persistence do
   end
 
   @doc false
+  @spec prepare_agent(
+          adapter_config() | atom(),
+          Agent.definition(),
+          Agent.instance(),
+          :preserve | :reset,
+          keyword()
+        ) ::
+          :ok | {:error, term()}
+  def prepare_agent(source, source_definition, candidate, policy, opts \\ [])
+
+  def prepare_agent(source, %Agent{} = source_definition, %Agent{} = candidate, policy, opts)
+      when policy in [:preserve, :reset] do
+    with :ok <- validate_preparation_agents(source_definition, candidate) do
+      case load_agent_with_revision(source, source_definition.module, candidate.id, opts) do
+        {:ok, saved, revision} ->
+          prepare_loaded_agent(source, saved, candidate, revision, policy, opts)
+
+        {:error, :not_found} ->
+          prepare_missing_agent(source, candidate, policy, opts)
+
+        {:error, _reason} = error ->
+          error
+      end
+    end
+  end
+
+  def prepare_agent(_source, _source_definition, _candidate, policy, _opts),
+    do: {:error, {:unsupported_definition_policy, policy}}
+
+  @doc false
   @spec create_agent(adapter_config() | atom(), Agent.t(), keyword()) ::
           :ok | {:error, term()}
   def create_agent(source, %Agent{} = agent, opts \\ []) do
@@ -336,6 +366,71 @@ defmodule Jido.Persistence do
 
   defp validate_replacement_agents(_current_agent, _target_agent),
     do: {:error, :agent_identity_mismatch}
+
+  defp validate_preparation_agents(
+         %Agent{id: nil, state: nil, module: module},
+         %Agent{id: id, state: state, module: module}
+       )
+       when is_binary(id) and is_map(state) and not is_struct(state),
+       do: :ok
+
+  defp validate_preparation_agents(%Agent{module: source}, %Agent{module: candidate})
+       when source != candidate,
+       do: {:error, {:agent_module_mismatch, source, candidate}}
+
+  defp validate_preparation_agents(_source, _candidate),
+    do: {:error, :invalid_definition_preparation_agents}
+
+  defp prepare_loaded_agent(_source, saved, candidate, _revision, :preserve, _opts) do
+    validate_preserved_state(saved, candidate)
+  end
+
+  defp prepare_loaded_agent(_source, candidate, candidate, _revision, :reset, _opts), do: :ok
+
+  defp prepare_loaded_agent(source, saved, candidate, revision, :reset, opts) do
+    write_opts =
+      opts
+      |> Keyword.put(:revision, revision + 1)
+      |> Keyword.put(:expected_revision, revision)
+      |> Keyword.put(:reason, :definition_preparation)
+
+    case replace_agent(source, saved, candidate, write_opts) do
+      :ok -> :ok
+      {:error, :conflict} -> exact_prepared_agent(source, candidate, opts)
+      {:error, _reason} = error -> error
+    end
+  end
+
+  defp prepare_missing_agent(_source, _candidate, :preserve, _opts), do: :ok
+
+  defp prepare_missing_agent(source, candidate, :reset, opts) do
+    create_opts =
+      opts |> Keyword.put(:revision, 0) |> Keyword.put(:reason, :definition_preparation)
+
+    case create_agent(source, candidate, create_opts) do
+      :ok -> :ok
+      {:error, :conflict} -> exact_prepared_agent(source, candidate, opts)
+      {:error, _reason} = error -> error
+    end
+  end
+
+  defp exact_prepared_agent(source, candidate, opts) do
+    case load_agent_with_revision(source, candidate.module, candidate.id, opts) do
+      {:ok, ^candidate, _revision} -> :ok
+      {:ok, _other, _revision} -> {:error, :conflict}
+      {:error, _reason} = error -> error
+    end
+  end
+
+  defp validate_preserved_state(
+         %Agent{id: id, module: module, state: state},
+         %Agent{id: id, module: module} = candidate
+       ) do
+    with {:ok, _validated} <- Agent.validate_instance(%{candidate | state: state}), do: :ok
+  end
+
+  defp validate_preserved_state(_saved, _candidate),
+    do: {:error, :saved_agent_identity_mismatch}
 
   defp check_revision(current, record, expected_revision) do
     cond do

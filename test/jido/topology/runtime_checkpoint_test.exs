@@ -130,6 +130,151 @@ defmodule Jido.Topology.RuntimeCheckpointTest do
     assert {:ok, %{state: %{count: 8}}} = Runtime.call(c.jido, independent_id, :counter, signal)
   end
 
+  test "definition preparation validates and resets the RuntimeCheckpoint fallback", c do
+    id = unique_id("fallback-definition")
+    topology = Topology.new!(name: "fallback_definition")
+
+    start_supervised!(
+      {Runtime, jido: c.jido, id: id, topology: topology, activation: :lazy, repair: :manual}
+    )
+
+    source = CounterAgent.definition()
+    compatible = %{source | description: "compatible candidate"}
+
+    assert :ok =
+             Runtime.add_agent(c.jido, id, :actor, source,
+               initial_state: %{count: 4, history: []}
+             )
+
+    assert {:ok, %{state: %{count: 7}}} = Runtime.call(c.jido, id, :actor, add(3))
+    assert :ok = Runtime.remove_agent(c.jido, id, :actor)
+
+    assert :ok =
+             Runtime.prepare_agent_definition(
+               c.jido,
+               id,
+               :actor,
+               source,
+               compatible,
+               :preserve,
+               initial_state: %{count: 1, history: []}
+             )
+
+    physical_id = id <> "/agent/actor"
+    key = Jido.partition_key(physical_id, nil)
+
+    assert {:ok, %{agent: preserved, state_version: 1} = before} =
+             Jido.RuntimeStore.fetch(c.jido, :agent_runtime_checkpoints, key)
+
+    assert preserved.state == %{count: 7, history: ["checkpoint"]}
+
+    incompatible = %{
+      source
+      | schema:
+          Zoi.object(%{
+            count: Zoi.string() |> Zoi.default("zero"),
+            history: Zoi.list(Zoi.string()) |> Zoi.default([])
+          })
+    }
+
+    assert {:error, %Jido.Error.ValidationError{}} =
+             Runtime.prepare_agent_definition(
+               c.jido,
+               id,
+               :actor,
+               source,
+               incompatible,
+               :preserve,
+               initial_state: %{count: "reset", history: []}
+             )
+
+    assert {:ok, ^before} =
+             Jido.RuntimeStore.fetch(c.jido, :agent_runtime_checkpoints, key)
+
+    candidate = %{source | description: "reset candidate"}
+    initial_state = %{count: 2, history: []}
+
+    tasks =
+      for _index <- 1..2 do
+        Task.async(fn ->
+          Runtime.prepare_agent_definition(
+            c.jido,
+            id,
+            :actor,
+            source,
+            candidate,
+            :reset,
+            initial_state: initial_state
+          )
+        end)
+      end
+
+    assert Enum.map(tasks, &Task.await/1) == [:ok, :ok]
+
+    assert {:ok, %{agent: prepared, state_version: 2, owner: owner} = reset} =
+             Jido.RuntimeStore.fetch(c.jido, :agent_runtime_checkpoints, key)
+
+    assert prepared.state == initial_state
+    assert prepared.description == "reset candidate"
+    assert match?({_node, _scope}, owner)
+
+    assert :ok =
+             Runtime.prepare_agent_definition(
+               c.jido,
+               id,
+               :actor,
+               source,
+               candidate,
+               :reset,
+               initial_state: initial_state
+             )
+
+    assert {:ok, ^reset} = Jido.RuntimeStore.fetch(c.jido, :agent_runtime_checkpoints, key)
+    assert Runtime.target(c.jido, id).definition.agents == []
+    assert Runtime.whereis_member(c.jido, id, :actor) == nil
+  end
+
+  test "definition preparation handles a missing RuntimeCheckpoint without a tombstone", c do
+    id = unique_id("missing-fallback-definition")
+    topology = Topology.new!(name: "missing_fallback_definition")
+
+    start_supervised!(
+      {Runtime, jido: c.jido, id: id, topology: topology, activation: :lazy, repair: :manual}
+    )
+
+    source = CounterAgent.definition()
+    candidate = %{source | description: "candidate"}
+    physical_id = id <> "/agent/actor"
+    key = Jido.partition_key(physical_id, nil)
+
+    assert :ok =
+             Runtime.prepare_agent_definition(
+               c.jido,
+               id,
+               :actor,
+               source,
+               candidate,
+               :preserve,
+               initial_state: %{count: 3, history: []}
+             )
+
+    assert :error = Jido.RuntimeStore.fetch(c.jido, :agent_runtime_checkpoints, key)
+
+    assert :ok =
+             Runtime.prepare_agent_definition(
+               c.jido,
+               id,
+               :actor,
+               source,
+               candidate,
+               :reset,
+               initial_state: %{count: 3, history: []}
+             )
+
+    assert {:ok, %{agent: %{state: %{count: 3}}, state_version: 0}} =
+             Jido.RuntimeStore.fetch(c.jido, :agent_runtime_checkpoints, key)
+  end
+
   defp target,
     do: Topology.new!(name: "checkpoints", agents: [%{key: :counter, module: CounterAgent}])
 

@@ -3,9 +3,11 @@ defmodule Jido.Topology.Controller.Runtime do
   use GenServer
 
   alias Jido.AgentServer, as: Server
+  alias Jido.AgentServer.Storage
   alias Jido.Telemetry.Topology, as: TopologyTelemetry
   alias Jido.Topology.{BusInputs, Controller, Plan, Resource}
   alias Jido.Topology.Controller.{AgentSupervisor, TargetStore}
+  alias Jido.Topology.Controller.Activation
 
   alias Jido.Topology.Signal.{
     ComponentFailed,
@@ -246,6 +248,30 @@ defmodule Jido.Topology.Controller.Runtime do
     end
   end
 
+  def handle_call(
+        {:prepare_agent_definition, target, source, candidate, policy, initial_state},
+        _from,
+        state
+      ) do
+    with :ok <- preparation_not_accepted(state, target),
+         {:ok, key, spec, prepared} <-
+           preparation_agent(state, target, candidate, initial_state),
+         :ok <- preparation_available(state, key, spec),
+         :ok <-
+           Storage.prepare_definition(
+             state.jido,
+             source,
+             prepared,
+             policy,
+             partition: nil,
+             checkpoint_owner: state.checkpoint_owner
+           ) do
+      {:reply, :ok, state}
+    else
+      {:error, _reason} = error -> {:reply, error, state}
+    end
+  end
+
   def handle_call({:update, target}, _from, state) do
     with :ok <- update_idle(state),
          :ok <- additive_target(state.instance, target),
@@ -482,6 +508,75 @@ defmodule Jido.Topology.Controller.Runtime do
     with {:ok, topology} <-
            Jido.Topology.new(%{current.definition | agents: current.definition.agents ++ [entry]}),
          do: Jido.Topology.instantiate(topology, id: current.id, input: current.input)
+  end
+
+  defp preparation_agent(state, target, candidate, initial_state) do
+    with {:ok, planned} <-
+           add_agent_target(state.instance, target, candidate, %{initial_state: initial_state}),
+         key when is_binary(key) <- Plan.resolve(planned.plan, target, :agent),
+         spec when not is_nil(spec) <- Map.get(planned.plan.agents, key),
+         {:ok, definition} <-
+           Activation.definition(spec, %{instance_id: state.instance.id, bus_ids: %{}}),
+         {:ok, prepared} <-
+           Jido.Agent.instantiate(definition, id: spec.id, state: spec.initial_state) do
+      {:ok, key, spec, prepared}
+    else
+      nil -> Jido.Agent.Authoring.error("Unknown definition preparation target")
+      {:error, _reason} = error -> error
+    end
+  end
+
+  defp preparation_available(state, key, spec) do
+    cond do
+      MapSet.member?(state.selected, key) ->
+        preparation_rejected(:selected)
+
+      Map.has_key?(state.ready, key) ->
+        preparation_rejected(:ready)
+
+      MapSet.member?(state.pending, key) or state.phase == :starting ->
+        preparation_rejected(:starting)
+
+      map_size(state.active) > 0 or not is_nil(state.pending_move) ->
+        preparation_rejected(:repair_active)
+
+      stopped_agent_child?(state, key) ->
+        preparation_rejected(:stopped_child)
+
+      live_agent?(state, spec) ->
+        preparation_rejected(:live_process)
+
+      true ->
+        :ok
+    end
+  end
+
+  defp preparation_not_accepted(state, target) do
+    if is_nil(Plan.resolve(state.instance.plan, target, :agent)),
+      do: :ok,
+      else: preparation_rejected(:accepted)
+  end
+
+  defp preparation_rejected(reason),
+    do: {:error, {:definition_preparation_rejected, reason}}
+
+  defp stopped_agent_child?(state, key) do
+    state.jido
+    |> Controller.name(state.instance.id, :agents)
+    |> Supervisor.which_children()
+    |> Enum.any?(fn
+      {^key, pid, _type, _modules} when pid in [:undefined, :restarting] -> true
+      _child -> false
+    end)
+  end
+
+  defp live_agent?(state, %{node: target, id: id}) when target == node(),
+    do: is_pid(Jido.whereis_agent(state.jido, id))
+
+  defp live_agent?(state, %{node: target, id: id}) do
+    is_pid(:erpc.call(target, Jido, :whereis_agent, [state.jido, id], @live_query_timeout))
+  catch
+    _kind, _reason -> true
   end
 
   defp remove_agent_target(current, target) do

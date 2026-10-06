@@ -202,6 +202,45 @@ defmodule Jido.Topology.Controller do
     end
   end
 
+  @doc "Validates or resets one inactive member checkpoint without accepting the member."
+  @spec prepare_agent_definition(
+          Supervisor.supervisor(),
+          String.t() | atom(),
+          Jido.Agent.definition(),
+          Jido.Agent.definition(),
+          :preserve | :reset,
+          keyword()
+        ) :: :ok | {:error, term()}
+  def prepare_agent_definition(controller, key, source, candidate, policy, opts \\ [])
+
+  def prepare_agent_definition(
+        controller,
+        key,
+        %Jido.Agent{} = source,
+        %Jido.Agent{} = candidate,
+        policy,
+        opts
+      ) do
+    with :ok <- definition_policy(policy),
+         {:ok, source} <- Jido.Agent.validate_definition(source),
+         {:ok, candidate} <- Jido.Agent.validate_definition(candidate),
+         :ok <- definition_modules(source, candidate),
+         {:ok, opts} <- Authoring.attrs(opts),
+         :ok <- Authoring.keys(opts, [:initial_state, :timeout]),
+         timeout = Map.get(opts, :timeout, 5_000),
+         :ok <- validate_timeout(timeout) do
+      GenServer.call(
+        runtime(controller),
+        {:prepare_agent_definition, key, source, candidate, policy,
+         Map.get(opts, :initial_state, %{})},
+        timeout
+      )
+    end
+  end
+
+  def prepare_agent_definition(_controller, _key, _source, _candidate, _policy, _opts),
+    do: Authoring.error("Definition preparation requires neutral Agent definitions")
+
   @doc """
   Applies one validated additive Agent target to a ready local controller.
 
@@ -301,6 +340,20 @@ defmodule Jido.Topology.Controller do
 
   defp validate_timeout(_timeout),
     do: Authoring.error("Controller timeout must be a positive integer or :infinity")
+
+  defp definition_modules(%Jido.Agent{module: module}, %Jido.Agent{module: module}), do: :ok
+
+  defp definition_modules(%Jido.Agent{module: source}, %Jido.Agent{module: candidate}),
+    do: {:error, {:agent_module_mismatch, source, candidate}}
+
+  defp definition_policy(policy) when policy in [:preserve, :reset], do: :ok
+  defp definition_policy(:migrate), do: {:error, {:unsupported_definition_policy, :migrate}}
+
+  defp definition_policy(policy),
+    do:
+      Authoring.error("Definition preparation policy must be :preserve or :reset", %{
+        policy: policy
+      })
 
   @doc false
   def name(jido, id, role),

@@ -227,6 +227,15 @@ defmodule Jido.Topology.Runtime do
     with_controller(jido, id, &Controller.remove_agent(&1, target, opts))
   end
 
+  @doc "Validates or resets one inactive member checkpoint for a candidate definition."
+  def prepare_agent_definition(jido, id, key, source, candidate, policy, opts \\ []) do
+    with_controller(
+      jido,
+      id,
+      &Controller.prepare_agent_definition(&1, key, source, candidate, policy, opts)
+    )
+  end
+
   @doc "Publishes to an owned Bus. Dormant subscribers remain dormant."
   def publish(jido, id, bus, signals, opts \\ []),
     do: Gateway.request(jido, id, {:publish, bus, signals}, opts)

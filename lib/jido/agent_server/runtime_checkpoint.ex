@@ -14,6 +14,35 @@ defmodule Jido.AgentServer.RuntimeCheckpoint do
   @locations :agent_checkpoint_locations
 
   @doc false
+  def prepare_definition(jido, %Agent{} = source, %Agent{} = candidate, policy, opts)
+      when policy in [:preserve, :reset] do
+    partition = Keyword.get(opts, :partition)
+
+    with :ok <- preparation_agents(source, candidate) do
+      case fetch(jido, key(candidate.id, partition)) do
+        {:ok, %{agent: %Agent{} = saved, state_version: revision}}
+        when is_integer(revision) and revision >= 0 ->
+          prepare_loaded(jido, source, saved, candidate, revision, policy, opts)
+
+        :error ->
+          prepare_missing(jido, source, candidate, policy, opts)
+
+        {:error, :not_running} ->
+          {:error, :runtime_checkpoint_unavailable}
+
+        {:error, :timeout} ->
+          {:error, :runtime_checkpoint_unavailable}
+
+        {:ok, _invalid} ->
+          {:error, :invalid_runtime_checkpoint}
+      end
+    end
+  end
+
+  def prepare_definition(_jido, _source, _candidate, policy, _opts),
+    do: {:error, {:unsupported_definition_policy, policy}}
+
+  @doc false
   @spec restore(Options.t()) ::
           {:ok, Agent.t(), non_neg_integer()} | {:error, term()}
   def restore(%Options{agent: %Agent{} = initial} = options) do
@@ -136,6 +165,66 @@ defmodule Jido.AgentServer.RuntimeCheckpoint do
     do: on_node(owner_node, RuntimeStore, :put, [jido, @locations, {key, node()}, true])
 
   defp track_location(_jido, _owner), do: :ok
+
+  defp preparation_agents(
+         %Agent{id: nil, state: nil, module: module},
+         %Agent{id: id, state: state, module: module}
+       )
+       when is_binary(id) and is_map(state) and not is_struct(state),
+       do: :ok
+
+  defp preparation_agents(%Agent{module: source}, %Agent{module: candidate})
+       when source != candidate,
+       do: {:error, {:agent_module_mismatch, source, candidate}}
+
+  defp preparation_agents(_source, _candidate),
+    do: {:error, :invalid_definition_preparation_agents}
+
+  defp prepare_loaded(_jido, _source, saved, candidate, _revision, :preserve, _opts) do
+    validate_preserved_state(saved, candidate)
+  end
+
+  defp prepare_loaded(_jido, _source, candidate, candidate, _revision, :reset, _opts), do: :ok
+
+  defp prepare_loaded(jido, source, saved, candidate, revision, :reset, opts) do
+    with :ok <- saved_identity(saved, source, candidate),
+         do: put_prepared(jido, source, candidate, revision + 1, opts)
+  end
+
+  defp prepare_missing(_jido, _source, _candidate, :preserve, _opts), do: :ok
+
+  defp prepare_missing(jido, source, candidate, :reset, opts),
+    do: put_prepared(jido, source, candidate, 0, opts)
+
+  defp put_prepared(jido, source, candidate, revision, opts) do
+    partition = Keyword.get(opts, :partition)
+
+    with {:ok, owner} <- owner_key(jido, Keyword.get(opts, :checkpoint_owner)),
+         :ok <- track_location(jido, owner) do
+      RuntimeStore.put(jido, @hive, key(candidate.id, partition), %{
+        agent: candidate,
+        state_version: revision,
+        upgrade_from_module: source.module,
+        owner: owner
+      })
+    end
+  end
+
+  defp validate_preserved_state(saved, candidate) do
+    with :ok <- saved_identity(saved, Jido.Agent.definition(candidate), candidate),
+         {:ok, _validated} <- Agent.validate_instance(%{candidate | state: saved.state}),
+         do: :ok
+  end
+
+  defp saved_identity(
+         %Agent{id: id, module: module},
+         %Agent{module: module},
+         %Agent{id: id, module: module}
+       ),
+       do: :ok
+
+  defp saved_identity(_saved, _source, _candidate),
+    do: {:error, :saved_agent_identity_mismatch}
 
   defp on_node(target, module, function, args) when target == node(),
     do: apply(module, function, args)
