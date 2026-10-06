@@ -3,13 +3,15 @@ defmodule Jido.Agent.State do
 
   alias Jido.Error
   alias Jido.Util.DeepMerge
+  alias Zoi.Types.Meta
 
   @doc false
   def defaults_from_schema(%Zoi.Types.Map{fields: fields}) do
     Enum.reduce(fields, %{}, fn
-      {key, %Zoi.Types.Default{value: value, meta: %{required: required}}}, defaults
-      when required != false ->
-        Map.put(defaults, key, value)
+      {key, %{meta: %Meta{required: required} = meta}}, defaults when required != false ->
+        if Meta.default?(meta),
+          do: Map.put(defaults, key, Meta.default(meta)),
+          else: defaults
 
       {_key, _field_schema}, defaults ->
         defaults
@@ -69,8 +71,9 @@ defmodule Jido.Agent.State do
   def validate_candidate(state, %Zoi.Types.Map{} = schema)
       when is_map(state) and not is_struct(state) do
     missing_keys =
-      for {key, %Zoi.Types.Default{meta: %{required: required}}} <- schema.fields,
+      for {key, %{meta: %Meta{required: required} = meta}} <- schema.fields,
           required != false,
+          Meta.default?(meta),
           not Map.has_key?(state, key),
           do: key
 
