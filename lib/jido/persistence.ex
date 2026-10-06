@@ -415,9 +415,9 @@ defmodule Jido.Persistence do
   end
 
   defp exact_prepared_agent(source, candidate, opts) do
-    case load_agent_with_revision(source, candidate.module, candidate.id, opts) do
-      {:ok, ^candidate, _revision} -> :ok
-      {:ok, _other, _revision} -> {:error, :conflict}
+    case load_agent(source, candidate.module, candidate.id, opts) do
+      {:ok, ^candidate} -> :ok
+      {:ok, _other} -> {:error, :conflict}
       {:error, _reason} = error -> error
     end
   end

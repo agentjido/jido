@@ -263,7 +263,7 @@ defmodule Jido.Topology.Controller.Runtime do
       {:ok, key, spec} ->
         if leased?(state, key) do
           waiter = %{from: from, key: key, spec: spec, deadline: deadline}
-          {:noreply, %{state | hibernate_waiters: state.hibernate_waiters ++ [waiter]}}
+          {:noreply, %{state | hibernate_waiters: [waiter | state.hibernate_waiters]}}
         else
           {reply, state} = perform_hibernate(key, spec, deadline, state)
           {:reply, reply, state}
@@ -683,9 +683,8 @@ defmodule Jido.Topology.Controller.Runtime do
     end
   end
 
-  defp cleanup_hibernated(%{node: target, key: key}, state) when target == node() do
-    AgentSupervisor.retire(Controller.name(state.jido, state.instance.id, :agents), key)
-  end
+  defp cleanup_hibernated(%{node: target} = spec, state) when target == node(),
+    do: retire(spec, state, 0)
 
   defp cleanup_hibernated(_spec, _state), do: :ok
 
@@ -897,9 +896,11 @@ defmodule Jido.Topology.Controller.Runtime do
 
   defp process_hibernate_waiters(state) do
     {waiting, state} =
-      Enum.reduce(state.hibernate_waiters, {[], state}, fn waiter, {waiting, acc} ->
+      state.hibernate_waiters
+      |> Enum.reverse()
+      |> Enum.reduce({[], state}, fn waiter, {waiting, acc} ->
         if leased?(acc, waiter.key) do
-          {waiting ++ [waiter], acc}
+          {[waiter | waiting], acc}
         else
           {reply, acc} = resume_hibernate(waiter, acc)
 
@@ -912,18 +913,16 @@ defmodule Jido.Topology.Controller.Runtime do
   end
 
   defp resume_hibernate(waiter, state) do
-    cond do
-      MapSet.member?(state.hibernated, waiter.key) ->
-        {:ok, state}
-
-      hibernate_idle(state) != :ok ->
-        {hibernate_idle(state), state}
-
-      hibernate_blockers(waiter.key, state) != [] ->
-        {{:error, {:hibernate_blocked, hibernate_blockers(waiter.key, state)}}, state}
-
-      true ->
+    if MapSet.member?(state.hibernated, waiter.key) do
+      {:ok, state}
+    else
+      with :ok <- hibernate_idle(state),
+           [] <- hibernate_blockers(waiter.key, state) do
         perform_hibernate(waiter.key, waiter.spec, waiter.deadline, state)
+      else
+        [_ | _] = blockers -> {{:error, {:hibernate_blocked, blockers}}, state}
+        {:error, _reason} = error -> {error, state}
+      end
     end
   end
 
