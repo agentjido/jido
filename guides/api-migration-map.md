@@ -79,7 +79,8 @@ Jido supervisor.
 | `await/3`, `await_all/3`, `await_any/3`, `await_child/4` | `Jido.AgentServer.call/3`, `send_request/3`, `receive_response/2`, and application coordination | A successful call waits for one commit. `await_ready/2` only waits for Plugin runtime readiness. |
 | `cancel/2` | `Jido.AgentServer.cancel/2` or `cancel_turn/3` | Use the stable Turn ID when cancellation must not affect a later Turn. |
 | `get_child/2`, `get_children/1` | `Jido.AgentServer.children/2` | The public result is a view. Do not depend on private child records. |
-| `list_actions/1`, `list_plugins/1`, `list_sensors/1`, `list_demos/1`, the matching `get_*_by_slug/1` calls, and `refresh_discovery/0` | Explicit module references and `Jido.Codec.Registry` | V3 does not scan and publish an application catalog. |
+| `list_actions/1`, `get_action_by_slug/1`, `refresh_discovery/0` | `Jido.Discovery.list_actions/1`, `get_action_by_slug/1`, and `refresh/1` | V3 Discovery publishes an Action inventory. It does not grant execution authority. |
+| `list_plugins/1`, `list_sensors/1`, `list_demos/1`, and the matching `get_*_by_slug/1` calls | Explicit module references and `Jido.Codec.Registry` | V3 does not publish catalogs for these component types. |
 | `default_instance/0`, `generate_id/0`, `debug/0..2` | Same names | These calls remain. Use public Agent constructors instead of assigning generated IDs by hand when possible. |
 
 ## Map Agent modules and generated functions
@@ -485,7 +486,7 @@ V3 adds these modules:
 | `Jido.Error.ValidationError` | **Retained type.** Zoi now supplies schema issues. |
 | `Jido.Config.Defaults` | **Removed.** Runtime modules own their defaults. `Jido.Telemetry` owns semantic log defaults. |
 | <code>Jido.RuntimeStore</code> | **Private in V3.** It is instance-local coordination state, not durable application storage. Use public instance and relationship functions. Do not copy its internal keys. |
-| `Jido.Discovery` | **Removed.** Its catalog, list, slug lookup, refresh, timestamp, and asynchronous initialization functions have no Core V3 catalog. Use explicit modules and a trusted `Jido.Codec.Registry`. |
+| `Jido.Discovery` | **Retained with a smaller contract.** It builds an Action-only catalog in a supervised startup Task. It does not discover Agents, Plugins, Sensors, or Demos. Use product-owned allowlists for authority. |
 | `Jido.Util` | **Retained call surface for internal support.** Prefer the domain modules that own validation, IDs, lookup, and executable resolution. |
 
 ## Remove installer and generator calls

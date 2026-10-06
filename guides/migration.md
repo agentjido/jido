@@ -36,7 +36,8 @@ custom runtime behavior can cost more to port than the Agent definitions.
 | V2 Plugins and custom directives | High | Rewrite callbacks, state ownership, and runtime setup | Test startup, commit, dispatch, restart, and cleanup |
 | Worker pools or mutable Pods | High | Use explicit owned workers and static Topology | Test capacity, cancellation, and child failure |
 | Stored Agents, Plugin checkpoints, Thread stores | High | Write and rehearse an application data conversion | Restore a backup and reconcile pending work |
-| Integrated Memory, Discovery, identity profiles | High | Select an application-owned replacement | Test the behavior the removed API supplied |
+| Integrated Memory or identity profiles | High | Select an application-owned replacement | Test the behavior the removed API supplied |
+| Discovery | Medium | Use the Action-only catalog and move authority to the application | Test the scan, allowlist, and assignment rules |
 
 ## Choose the upgrade order
 
@@ -511,7 +512,7 @@ code-revision pinning from those tests. See
 | --- | --- |
 | Sensor behavior, structs, and built-in Sensors | Use explicit input Plugins; SensorManager still needs a callback port |
 | Native cron directives and Agent schedules | Use Scheduler/Heartbeat Plugins and explicit occurrence acknowledgement |
-| Discovery | Supply explicit modules and a trusted Codec Registry |
+| Discovery | Use `Jido.Discovery` for Action inventory. Use explicit modules and a trusted Codec Registry for other types. |
 | Identity profiles and evolution | Keep policy in the application; there is no profile API adapter |
 | Integrated Memory spaces | Model state/history and compaction in the application |
 | Thread Agent/Plugin integration | Use application-owned history values and persistence |

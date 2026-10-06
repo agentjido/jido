@@ -50,6 +50,7 @@ defmodule Jido.MixProject do
        {"guides/your-first-plugin.md", "Write a Plugin"},
        {"guides/plugin-contract-and-lifecycle.md", "Plugin Contract And Lifecycle"},
        {"guides/plugin-runtimes.livemd", "Plugin Runtimes"},
+       {"guides/discovery.md", "Discover Actions"},
        {"guides/jido-signal-messaging.md", "Use Jido Signal"},
        {"guides/signal-buses.livemd", "Connect A Signal Bus"},
        {"guides/signal-dispatch.livemd", "Dispatch Signals"},
