@@ -133,6 +133,9 @@ defmodule Jido.Agent do
   does not recreate a resource, transfer ownership, or install a monitor. Keep
   resource start, stop, and reconnection in a Plugin runtime or application
   supervision.
+
+  Use `Jido.Agent.View` to build a safe JSON projection for an application UI
+  or API. The view omits private state and runtime details.
   """
 
   alias Jido.Agent.{Checkpoint, State, Turn}
