@@ -36,6 +36,9 @@ defmodule Jido.Topology do
   Included Topologies receive the same expansion in their own scope. The
   source definition stays unchanged, and common validation checks the complete
   plan before activation.
+
+  Use `Jido.Topology.View` to combine an accepted instance and one status
+  snapshot into bounded JSON data for an application UI or API.
   """
 
   alias Jido.Agent.Authoring
