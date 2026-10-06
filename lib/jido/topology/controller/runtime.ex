@@ -603,8 +603,9 @@ defmodule Jido.Topology.Controller.Runtime do
     active_keys = Map.new(state.active, fn {_ref, job} -> {job.key, true} end)
 
     key
-    |> reverse_dependency_closure(state, MapSet.new())
-    |> MapSet.delete(key)
+    |> reverse_dependency_closure(state, %{})
+    |> Map.delete(key)
+    |> Map.keys()
     |> Enum.filter(fn dependent ->
       MapSet.member?(state.selected, dependent) or
         MapSet.member?(state.pending, dependent) or
@@ -621,8 +622,8 @@ defmodule Jido.Topology.Controller.Runtime do
         if key in member.depends_on, do: [candidate], else: []
       end)
 
-    Enum.reduce(dependents, MapSet.put(found, key), fn dependent, acc ->
-      if MapSet.member?(acc, dependent),
+    Enum.reduce(dependents, Map.put(found, key, true), fn dependent, acc ->
+      if Map.has_key?(acc, dependent),
         do: acc,
         else: reverse_dependency_closure(dependent, state, acc)
     end)

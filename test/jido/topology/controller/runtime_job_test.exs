@@ -137,15 +137,41 @@ defmodule Jido.Topology.Controller.RuntimeJobTest do
       instance: instance,
       target_revision: 0,
       repair: :manual,
+      activation: :lazy,
+      checkpoint_owner: self(),
+      parent_gate: nil,
+      selected: MapSet.new(["agent/parent", "agent/child"]),
+      hibernated: MapSet.new(),
+      unavailable: MapSet.new(),
+      waking: MapSet.new(),
+      lifecycle: nil,
       reconcile_requested: false,
       reconcile_timer: nil,
       reconcile_token: nil,
       ready: %{},
       errors: %{},
+      live_errors: %{},
+      live_refresh_token: nil,
       waiters: %{},
+      wake_waiters: %{},
+      call_leases: %{},
+      lease_monitors: %{},
+      hibernate_uncertain: %{},
+      hibernate_monitors: %{},
+      hibernate_waiters: [],
       phase: :starting,
       pending: MapSet.new(["agent/child"]),
-      active: %{task.ref => %{key: "agent/parent", task: task, timer: timer, timed_out?: false}}
+      active: %{
+        task.ref => %{key: "agent/parent", task: task, timer: timer, timed_out?: false}
+      },
+      pass_count: 0,
+      operation_span: nil,
+      operation: nil,
+      operation_id: nil,
+      operation_override: nil,
+      last_status: nil,
+      placements: %{},
+      pending_move: nil
     }
 
     {state, task}
