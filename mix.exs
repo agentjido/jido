@@ -389,9 +389,10 @@ defmodule Jido.MixProject do
     [
       # Jido Ecosystem
       {:jido_action, "~> 2.3"},
-      {:jido_signal, "~> 2.3"},
+      {:jido_signal, "~> 2.3 and >= 2.3.1"},
 
       # Jido Deps
+      {:zoi, "~> 0.18.11"},
       {:nimble_options, "~> 1.1"},
       {:splode, "~> 0.3.0"},
       {:telemetry, "~> 1.3"},

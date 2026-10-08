@@ -159,6 +159,9 @@ defmodule Jido.Agent.Schema do
     end)
   end
 
+  # Match the schema representation without requiring the removed wrapper module.
+  defp extract_default(%{meta: %{required: false}}), do: :none
+  defp extract_default(%{meta: %{default: {:value, value}}}), do: {:ok, value}
   defp extract_default(%{__struct__: Zoi.Types.Default, value: value}), do: {:ok, value}
   defp extract_default(_), do: :none
 end

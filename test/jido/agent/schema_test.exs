@@ -3,6 +3,52 @@ defmodule JidoTest.Agent.SchemaTest do
 
   alias Jido.Agent.Schema
 
+  defmodule DefaultAgent do
+    use Jido.Agent,
+      name: "zoi_default_agent",
+      schema:
+        Zoi.object(%{
+          requests: Zoi.map() |> Zoi.default(%{}),
+          enabled: Zoi.boolean() |> Zoi.default(false),
+          result: Zoi.any() |> Zoi.default(nil),
+          history: Zoi.list(Zoi.string()) |> Zoi.default([]),
+          settings:
+            Zoi.object(%{mode: Zoi.string() |> Zoi.default("auto")})
+            |> Zoi.default(%{mode: "manual"})
+        })
+  end
+
+  test "generated agents retain defaults before the first request" do
+    agent = DefaultAgent.new()
+
+    assert agent.state.requests == %{}
+    assert agent.state.enabled == false
+    assert Map.fetch(agent.state, :result) == {:ok, nil}
+    assert agent.state.history == []
+    assert agent.state.settings == %{mode: "manual"}
+
+    assert DefaultAgent.new(state: %{enabled: true}).state.enabled == true
+  end
+
+  test "missing optional fields follow Zoi default ordering" do
+    schema =
+      Zoi.object(%{
+        skipped: Zoi.string() |> Zoi.default("skip") |> Zoi.optional(),
+        included: Zoi.string() |> Zoi.optional() |> Zoi.default("keep")
+      })
+
+    assert {:ok, expected} = Zoi.parse(schema, %{})
+    assert Schema.defaults_from_zoi_schema(schema) == expected
+  end
+
+  test "nested default values retain Zoi parsing semantics" do
+    nested = Zoi.object(%{count: Zoi.integer() |> Zoi.default(7)}) |> Zoi.default(%{})
+    schema = Zoi.object(%{nested: nested})
+
+    assert {:ok, expected} = Zoi.parse(schema, %{})
+    assert Schema.defaults_from_zoi_schema(schema) == expected
+  end
+
   describe "merge_with_plugins/2" do
     test "nil base with no plugins returns nil" do
       assert Schema.merge_with_plugins(nil, []) == nil
