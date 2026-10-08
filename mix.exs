@@ -375,8 +375,11 @@ defmodule Jido.MixProject do
       {:jido_signal, "~> 3.0.0-beta.4"},
 
       # Jido Deps
-      # Use the sibling fork for checked defaults and stored-value validation.
-      {:zoi, path: "../zoi", override: true},
+      # Pin the public fork until checked defaults and stored-value validation ship on Hex.
+      {:zoi,
+       git: "https://github.com/mikehostetler/zoi.git",
+       ref: "2fff2a23e23e7ac0b26f62f49bbc1b12f7818ac9",
+       override: true},
       {:spark, "~> 2.7"},
       {:splode, "~> 0.3.0"},
       {:telemetry, "~> 1.3"},
