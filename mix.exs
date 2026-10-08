@@ -1,7 +1,7 @@
 defmodule Jido.MixProject do
   use Mix.Project
 
-  @version "2.3.3"
+  @version "2.4.0"
 
   def vsn do
     @version

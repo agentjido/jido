@@ -2,6 +2,25 @@
 
 <!-- changelog -->
 
+## [v2.4.0](https://github.com/agentjido/jido/compare/v2.3.3...v2.4.0) (2026-10-08)
+
+
+
+
+### Features:
+
+* agent: enforce optional state size budgets by mikehostetler
+
+### Bug Fixes:
+
+* schema: preserve defaults with Zoi 0.18.11 by mikehostetler
+
+* deps: update mint for security advisory by mikehostetler
+
+* lifecycle: preserve normal owner shutdown reasons (#367) by Iulian Costan
+
+* error: preserve validation paths in transport (#336) by mikehostetler
+
 ## [v2.3.3](https://github.com/agentjido/jido/compare/v2.3.2...v2.3.3) (2026-08-10)
 
 
