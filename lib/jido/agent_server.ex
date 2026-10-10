@@ -47,8 +47,12 @@ defmodule Jido.AgentServer do
    ```
 
    Signal routing is owned by AgentServer, not the Agent. Strategies can define
-  `signal_routes/1` to map signal types to strategy commands. Unmatched signals
-  fall back to `{signal.type, signal.data}` as the action.
+  `signal_routes/1` to map signal types to strategy commands. A signal that matches
+  no route is not executed: the server records a routing error
+  (`Jido.Error.routing_error/2`, with the `signal_type` in its details), handles it
+  through the agent's error policy, and returns `{:error, error}` to a synchronous
+  `call/3`. The one built-in exception is `jido.agent.stop`, which stops the agent
+  without an explicit route.
 
   ## Options
 
