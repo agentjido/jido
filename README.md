@@ -506,6 +506,14 @@ mix test
 mix quality  # Runs formatter, dialyzer, and credo
 ```
 
+### Generating Documentation
+
+```bash
+mix docs
+```
+
+HTML and Markdown documentation is generated in `doc/`, including Markdown pages and `llms.txt`.
+
 ## Contributing
 
 We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details on:
