@@ -329,6 +329,9 @@ its owning `AgentServer`.
 - [Plugins](guides/plugins.md) - Composable capability bundles
 - [Strategies](guides/strategies.md) - Execution strategies (Direct, FSM)
 
+**Examples:**
+- [Parallel Search MCP actions](examples/parallel_search/README.md) - Run anonymous web search and page fetching with a separate companion app
+
 **Advanced:**
 - [FSM Strategy Deep Dive](guides/fsm-strategy.livemd) - State machine workflows
 - [Worker Pools](guides/worker-pools.md) - Pre-warmed agent pools for throughput
