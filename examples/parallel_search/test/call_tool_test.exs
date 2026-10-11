@@ -76,6 +76,7 @@ defmodule ParallelSearch.CallToolTest do
     opts = ParallelSearch.Client.options()
     assert opts[:url] == "https://search.parallel.ai/mcp"
     assert opts[:transport] == :http
+    assert opts[:security] == %{trusted_origins: ["https://search.parallel.ai"]}
     assert opts[:headers] == [{"user-agent", "jido-parallel-search-example/0.1.0"}]
   end
 

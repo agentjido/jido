@@ -11,6 +11,7 @@ defmodule ParallelSearch.Client do
       transport: :http,
       url: @url,
       headers: [{"user-agent", @user_agent}],
+      security: %{trusted_origins: ["https://search.parallel.ai"]},
       protocol_mode: :legacy_only,
       protocol_version: "2025-03-26",
       handshake_timeout: 30_000,
