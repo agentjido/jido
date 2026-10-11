@@ -60,7 +60,7 @@ outcome =
 
 case outcome do
   {:ok, results} ->
-    IO.puts(Jason.encode!(results, pretty: true))
+    IO.puts(Jason.encode!(results, pretty: true, escape: :unicode_safe))
 
   {:error, message} ->
     IO.puts(:stderr, message)
