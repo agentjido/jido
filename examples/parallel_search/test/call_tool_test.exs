@@ -62,8 +62,13 @@ defmodule ParallelSearch.CallToolTest do
     opts =
       Keyword.put(ParallelSearch.Client.options(), :url, "http://localhost:#{bypass.port}/mcp")
 
-    {:ok, client} = ExMCP.Client.start_link(opts)
-    on_exit(fn -> if Process.alive?(client), do: ExMCP.Client.stop(client) end)
+    client =
+      start_supervised!(%{
+        id: ExMCP.Client,
+        start: {ExMCP.Client, :start_link, [opts]},
+        restart: :temporary
+      })
+
     %{client: client, bypass: bypass}
   end
 
