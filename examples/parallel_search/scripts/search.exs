@@ -37,7 +37,7 @@ outcome =
                %{
                  tool: "web_fetch",
                  arguments: %{
-                   "urls" => ["https://elixir-lang.org/getting-started/introduction.html"],
+                   "urls" => ["https://hexdocs.pm/elixir/introduction.html"],
                    "objective" => "Extract the Elixir introduction",
                    "session_id" => session_id
                  }

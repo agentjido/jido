@@ -16,7 +16,7 @@ mix run scripts/search.exs
 mix run scripts/search.exs "Find official Elixir OTP supervision documentation"
 ```
 
-The script discovers `web_search` and `web_fetch`, calls both through `Jido.Exec.run`, and prints their complete MCP results. Fetch reads the fixed Elixir introduction page, independently of the search objective. Both calls share a fresh session ID. It does not load credentials, start a model, or run an agent reasoning loop.
+The script discovers `web_search` and `web_fetch`, calls both through `Jido.Exec.run`, and prints their complete MCP results. Fetch reads the canonical Elixir introduction page on HexDocs, independently of the search objective. Both calls share a fresh session ID. It does not load credentials, start a model, or run an agent reasoning loop.
 
 ## Reuse the action
 
