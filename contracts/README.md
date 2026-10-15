@@ -1,8 +1,15 @@
-# Agent API contract
+# Agent and Topology API contracts
 
 `jido.agent` protects the public path from declaration to definition, instance,
 and direct command. It has 25 active obligations. The obligation IDs refine the
 Agent, Turn, effect, Plugin, and error promises in `guides/public-contracts.md`.
+
+`jido.topology` adds 17 active obligations for the shared Agent host, static
+graph authoring, pure planning, and versioned documents. Read
+`jido/topology.obligations.md` for the promises and
+`jido/topology.decisions.yml` for the scope. The public DSL stays unchanged.
+See [the Topology baseline](jido/topology.baseline.md) for focused mutation
+results, reproducible commands, and remaining API decisions.
 
 Read `jido/agent.obligations.md` for the promises and
 `jido/agent.decisions.yml` for the scope decisions. The implementation module
@@ -29,11 +36,11 @@ mix test.ci
 ```
 
 `mix test.contract` runs Covenant's passing-test gate and writes
-`contracts/coverage.json`. All 25 obligations must have passing tests. Core tests,
+`contracts/coverage.json`. All 42 obligations must have passing tests. Core tests,
 property tests, and the contract gate run through `mix test.ci`. `mix quality`
 also runs the contract gate. Keep the existing package line-coverage gate.
 
-## Mutation review
+## Agent mutation review
 
 The macro run covers the 20 files listed in the obligations front matter.
 It runs only the public API contract tests. It does not mutate AgentServer,
@@ -98,7 +105,7 @@ Generic mutation operators do not produce every semantic defect, such as all
 possible argument swaps. Fixed input examples and the existing property tests
 remain required.
 
-This contract does not cover checkpoint/restore behavior, AgentServer,
+The Agent component does not cover checkpoint/restore behavior, AgentServer,
 Topology deployment, persistence backends, or Directive dispatch. Source value
 immutability cannot undo external work that an Action already performed.
 Initialization follows Zoi input defaults, including nil-triggered defaults;
@@ -131,3 +138,25 @@ exposed `<name>_signal/1,2` helpers. Codec encoding/decoding, public Turn
 constructors and validation, and `Jido.Agent.Extension.lower/3` are also tested.
 Private compiler exports, generated inline module names, and runtime records
 remain open to change.
+
+## Topology guards
+
+The Topology component uses 27 focused tests in three files under
+`test/contract/jido/`. They use the shared compiler helper, fresh Topology
+modules, neutral Agent definitions, and existing core fixtures. They do not
+load the optional authoring corpus or start AgentServer. Run the optional
+corpus separately with `mix test.authoring`.
+
+The guarded path is declaration, static definition, input, and plan. It
+includes the generated Agent API and direct commands, ordered extensions and
+Plugin contributions, includes, child declarations, error boundaries, and
+Codec versions 2 and 3. Runtime activation, Controller behavior, persistence,
+and dispatch remain outside this component.
+
+The initial Topology mutation checks select 22 sites from its 13-module
+profile and nine sites from a separate shared compiler profile. Both use macro
+mode, verified checkpoints, and selective compilation. The shared Agent
+modules remain in the Agent component's ownership list; the Topology check
+selects them with explicit module overrides. Each profile runs only the
+Topology contract tests. These are focused results, not full component scores.
+Use the exact commands and site table in `jido/topology.baseline.md`.

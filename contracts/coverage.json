@@ -1,9 +1,9 @@
 {
   "apps": {
     "jido": {
-      "active": 25,
+      "active": 42,
       "coverage": 1.0,
-      "covered": 25
+      "covered": 42
     }
   },
   "components": {
@@ -376,12 +376,227 @@
           ]
         }
       }
+    },
+    "jido.topology": {
+      "active": 17,
+      "app": "jido",
+      "coverage": 1.0,
+      "covered": 17,
+      "form": "light",
+      "obligations": {
+        "jido.topology.I1": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 4,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test a combined host retains the Agent API and separate constructor meanings",
+            "test inline Actions retain route lookup, helpers, defaults, and direct execution",
+            "test keyword graph options and description are assigned to the correct definition",
+            "test optional blocks remain independent and only an explicit Agent selects a child director"
+          ]
+        },
+        "jido.topology.I10": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 3,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test counted groups, ownership, subscriptions, and empty dependencies produce exact layers",
+            "test invalid sizes, graph cycles, missing endpoints, and duplicate owners fail before planning",
+            "test keyed groups sort stable escaped identities and reject duplicate or absent member keys"
+          ]
+        },
+        "jido.topology.I11": {
+          "failing": 0,
+          "kind": "ordering",
+          "passing": 3,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test counted groups, ownership, subscriptions, and empty dependencies produce exact layers",
+            "test exact placement is retained and remote Agents cannot use a local Bus",
+            "test invalid sizes, graph cycles, missing endpoints, and duplicate owners fail before planning"
+          ]
+        },
+        "jido.topology.I12": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 2,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test repeated includes isolate input and identity while sharing only declared Bus bindings",
+            "test stored includes and references retain their scopes and exact plan"
+          ]
+        },
+        "jido.topology.I13": {
+          "failing": 0,
+          "kind": "ordering",
+          "passing": 2,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test Plugin contributions run Agent then group then Plugin order without changing saved declarations",
+            "test invalid Plugin contributions return structured errors and preserve application rejection reasons"
+          ]
+        },
+        "jido.topology.I14": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 4,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test Plugin contributions run Agent then group then Plugin order without changing saved declarations",
+            "test definition and planning operations do not spawn runtime processes",
+            "test input defaults preserve explicit false and zero and failed planning leaves the source reusable",
+            "test repeated includes isolate input and identity while sharing only declared Bus bindings"
+          ]
+        },
+        "jido.topology.I15": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 10,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test document decoding requires supported versions, strict fields, and trusted Registry kinds",
+            "test exact placement is retained and remote Agents cannot use a local Bus",
+            "test input defaults preserve explicit false and zero and failed planning leaves the source reusable",
+            "test invalid Plugin contributions return structured errors and preserve application rejection reasons",
+            "test invalid extension declarations and outputs fail at compilation",
+            "test invalid sections, field presence, and dependencies retain authored source locations",
+            "test invalid sizes, graph cycles, missing endpoints, and duplicate owners fail before planning",
+            "test members require one current module or neutral Agent definition and valid resolved state",
+            "test public tuple and raising boundaries reject invalid fields, options, references, and runtime data",
+            "test source provider faults retain their causes for includes and children"
+          ]
+        },
+        "jido.topology.I16": {
+          "failing": 0,
+          "kind": "persisted_format",
+          "passing": 4,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test both encoding paths and decoding enforce bounds and exclude instance data",
+            "test document decoding requires supported versions, strict fields, and trusted Registry kinds",
+            "test stored includes and references retain their scopes and exact plan",
+            "test version 2 module documents and version 3 neutral members retain definitions and plans"
+          ]
+        },
+        "jido.topology.I17": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 3,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test child declarations retain directors and validate resolved command members and event targets",
+            "test optional blocks remain independent and only an explicit Agent selects a child director",
+            "test source provider faults retain their causes for includes and children"
+          ]
+        },
+        "jido.topology.I2": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 3,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test a combined host retains the Agent API and separate constructor meanings",
+            "test optional blocks remain independent and only an explicit Agent selects a child director",
+            "test public tuple and raising boundaries reject invalid fields, options, references, and runtime data"
+          ]
+        },
+        "jido.topology.I3": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 3,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test a combined host retains the Agent API and separate constructor meanings",
+            "test invalid sections, field presence, and dependencies retain authored source locations",
+            "test optional blocks remain independent and only an explicit Agent selects a child director"
+          ]
+        },
+        "jido.topology.I4": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 2,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test computed options and mixed extension callbacks evaluate once and retain their order",
+            "test map, keyword, attribute options and caller scope produce the same graph"
+          ]
+        },
+        "jido.topology.I5": {
+          "failing": 0,
+          "kind": "ordering",
+          "passing": 4,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test computed options and mixed extension callbacks evaluate once and retain their order",
+            "test inline Actions retain route lookup, helpers, defaults, and direct execution",
+            "test invalid extension declarations and outputs fail at compilation",
+            "test keyword graph options and description are assigned to the correct definition"
+          ]
+        },
+        "jido.topology.I6": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 2,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test the shared host and member planning read current Plugin contracts after reload",
+            "test the shared host and members reject a reloaded invalid Action contract"
+          ]
+        },
+        "jido.topology.I7": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 2,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test map, keyword, attribute options and caller scope produce the same graph",
+            "test version 2 module documents and version 3 neutral members retain definitions and plans"
+          ]
+        },
+        "jido.topology.I8": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 1,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test input defaults preserve explicit false and zero and failed planning leaves the source reusable"
+          ]
+        },
+        "jido.topology.I9": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 1,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test members require one current module or neutral Agent definition and valid resolved state"
+          ]
+        }
+      }
     }
   },
   "covenant": "0.1.0",
   "totals": {
-    "active": 25,
+    "active": 42,
     "coverage": 1.0,
-    "covered": 25
+    "covered": 42
   }
 }

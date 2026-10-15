@@ -1,0 +1,17 @@
+- id: topology-contract-scope
+  date: 2026-10-15
+  decision: Protect Topology authoring, its shared Agent host, pure planning, and static documents. Keep runtime activation, AgentServer, Controller, persistence, and dispatch outside the component.
+  driver: Add guards before Agent and Topology compiler consolidation while the public DSL remains unchanged.
+  approved_by: User request in this chat on 2026-10-15
+
+- id: topology-document-scope
+  date: 2026-10-15
+  decision: Protect current graph documents. Defer a complete combined Agent and Topology document and root version-option support to separate API work.
+  driver: Current documents omit the root Agent, and current Topology compilation rejects root vsn options. This guard rollout does not change the DSL or implementation.
+  approved_by: Scope from the user request; contract boundary decision by Codex
+
+- id: topology-focused-mutation
+  date: 2026-10-15
+  decision: Use focused mutation selections and a separate shared-compiler profile. Exclude Spark provider declarations and runtime modules from mutation targets.
+  driver: Fresh compiled hosts test public DSL behavior. Shared compiler modules remain owned by the Agent profile. The existing Spark provider mutation limitation remains open.
+  approved_by: User request for focused checks without the full 1302-mutant rerun
