@@ -25,8 +25,6 @@ defmodule Jido.Topology.Extension do
   second Topology runtime or bypass normal definition and composition checks.
   """
 
-  alias Jido.Agent.Authoring
-
   @type config :: map()
   @type entities :: [struct()]
   @type lower_result :: {:ok, config(), entities()} | {:error, Exception.t()}
@@ -36,46 +34,6 @@ defmodule Jido.Topology.Extension do
   @doc false
   @spec lower([module()], config(), entities()) ::
           {:ok, config()} | {:error, Exception.t()}
-  def lower(extensions, config, entities) when is_list(extensions) do
-    if length(extensions) != length(Enum.uniq(extensions)) do
-      Authoring.error("Duplicate Topology extension")
-    else
-      Enum.reduce_while(extensions, {:ok, config, entities}, fn extension, {:ok, attrs, rest} ->
-        if is_atom(extension) and Code.ensure_loaded?(extension) and
-             function_exported?(extension, :lower_topology, 2) do
-          case extension.lower_topology(attrs, rest) do
-            {:ok, result, remaining}
-            when is_map(result) and not is_struct(result) and is_list(remaining) ->
-              {:cont, {:ok, result, remaining}}
-
-            {:error, error} when is_exception(error) ->
-              {:halt, {:error, error}}
-
-            other ->
-              {:halt,
-               Authoring.error("Invalid Topology extension result", %{
-                 extension: extension,
-                 result: other
-               })}
-          end
-        else
-          {:halt,
-           Authoring.error("Topology extension must implement lower_topology/2", %{
-             extension: extension
-           })}
-        end
-      end)
-      |> finish()
-    end
-  end
-
-  def lower(_extensions, _config, _entities),
-    do: Authoring.error("Topology extensions must be a list")
-
-  defp finish({:ok, config, []}), do: {:ok, config}
-
-  defp finish({:ok, _config, entities}),
-    do: Authoring.error("Unclaimed Topology extension entities", %{entities: entities})
-
-  defp finish({:error, _} = error), do: error
+  def lower(extensions, config, entities),
+    do: Jido.Agent.Authoring.Extension.lower(extensions, config, entities, :topology)
 end

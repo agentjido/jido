@@ -1,140 +1,106 @@
 defmodule Jido.Topology.DSL.Agent do
   @moduledoc false
-  defstruct [
-    :key,
-    :module,
-    :definition,
-    :node,
-    :__spark_metadata__,
-    initial_state: %{},
-    depends_on: []
-  ]
+  defstruct Jido.Topology.DSL.Entity.struct_fields(:agent)
 end
 
 defmodule Jido.Topology.DSL.Group do
   @moduledoc false
-  defstruct [
-    :key,
-    :module,
-    :definition,
-    :count,
-    :members,
-    :key_by,
-    :node,
-    :__spark_metadata__,
-    initial_state: %{},
-    depends_on: []
-  ]
+  defstruct Jido.Topology.DSL.Entity.struct_fields(:group, count: nil)
 end
 
 defmodule Jido.Topology.DSL.Bus do
   @moduledoc false
-  defstruct [:key, :__spark_metadata__, kind: :bus, config: []]
+  defstruct Jido.Topology.DSL.Entity.struct_fields(:resource)
 end
 
 defmodule Jido.Topology.DSL.Owns do
   @moduledoc false
-  defstruct [:parent, :child, :__spark_metadata__, on_parent_exit: :stop]
+  defstruct Jido.Topology.DSL.Entity.struct_fields(:owns)
 end
 
 defmodule Jido.Topology.DSL.Subscribe do
   @moduledoc false
-  defstruct [:agent, :to, :path, :__spark_metadata__]
+  defstruct Jido.Topology.DSL.Entity.struct_fields(:subscribe)
 end
 
 defmodule Jido.Topology.DSL.Include do
   @moduledoc false
-  defstruct [:key, :topology, :__spark_metadata__, inputs: %{}, bindings: []]
+  defstruct Jido.Topology.DSL.Entity.struct_fields(:include)
 end
 
 defmodule Jido.Topology.DSL.Binding do
   @moduledoc false
-  defstruct [:key, :to, :__spark_metadata__]
+  defstruct Jido.Topology.DSL.Entity.struct_fields(:binding)
 end
 
 defmodule Jido.Topology.DSL.Import do
   @moduledoc false
-  defstruct [:key, :__spark_metadata__, kind: :bus]
+  defstruct Jido.Topology.DSL.Entity.struct_fields(:import)
 end
 
 defmodule Jido.Topology.DSL.Export do
   @moduledoc false
-  defstruct [:key, :kind, :from, :__spark_metadata__]
+  defstruct Jido.Topology.DSL.Entity.struct_fields(:export)
 end
 
 defmodule Jido.Topology.DSL.Extension do
   @moduledoc false
   alias Jido.Topology.DSL
+  alias Jido.Topology.EntryMetadata
+  alias Jido.Topology.DSL.Entity
 
-  @agent_fields [
-    key: [type: :any, required: true],
-    module: [type: :atom],
-    definition: [type: :any],
-    initial_state: [type: :any, default: %{}],
-    depends_on: [type: {:list, :any}, default: []],
-    node: [type: :any]
-  ]
   @agent %Spark.Dsl.Entity{
     name: :agent,
     target: DSL.Agent,
     args: [:key, {:optional, :module, nil}],
-    schema: @agent_fields
+    schema: Entity.schema(EntryMetadata.schema(:agent))
   }
   @group %Spark.Dsl.Entity{
     name: :group,
     target: DSL.Group,
     args: [:key, {:optional, :module, nil}],
-    schema: @agent_fields ++ [count: [type: :any], members: [type: :any], key_by: [type: :any]]
+    schema:
+      Entity.schema(
+        Keyword.update!(EntryMetadata.schema(:group), :count, &Keyword.delete(&1, :default))
+      )
   }
   @bus %Spark.Dsl.Entity{
     name: :bus,
     target: DSL.Bus,
     args: [:key],
-    schema: [key: [type: :any, required: true], config: [type: :any, default: []]]
+    schema: Entity.schema(Keyword.delete(EntryMetadata.schema(:resource), :kind))
   }
   @owns %Spark.Dsl.Entity{
     name: :owns,
     target: DSL.Owns,
     args: [:parent, :child],
-    schema: [
-      parent: [type: :any, required: true],
-      child: [type: :any, required: true],
-      on_parent_exit: [type: {:in, [:stop, :continue, :emit_orphan]}, default: :stop]
-    ]
+    schema: Entity.schema(EntryMetadata.schema(:owns))
   }
   @subscribe %Spark.Dsl.Entity{
     name: :subscribe,
     target: DSL.Subscribe,
     args: [:agent],
-    schema: [
-      agent: [type: :any, required: true],
-      to: [type: :any, required: true],
-      path: [type: :string, required: true]
-    ]
+    schema: Entity.schema(EntryMetadata.schema(:subscribe))
   }
 
   @binding %Spark.Dsl.Entity{
     name: :bind,
     target: DSL.Binding,
     args: [:key],
-    schema: [key: [type: :any, required: true], to: [type: :any, required: true]]
+    schema: Entity.schema(EntryMetadata.schema(:binding))
   }
   @include %Spark.Dsl.Entity{
     name: :include,
     target: DSL.Include,
     args: [:key, :topology],
     entities: [bindings: [@binding]],
-    schema: [
-      key: [type: :any, required: true],
-      topology: [type: :any, required: true],
-      inputs: [type: :map, default: %{}]
-    ]
+    schema: Entity.schema(Keyword.delete(EntryMetadata.schema(:include), :bindings))
   }
   @import_bus %Spark.Dsl.Entity{
     name: :bus,
     target: DSL.Import,
     args: [:key],
-    schema: [key: [type: :any, required: true]]
+    schema: Entity.schema(Keyword.delete(EntryMetadata.schema(:import), :kind))
   }
   @exports Enum.map([:agent, :group, :bus], fn kind ->
              %Spark.Dsl.Entity{
@@ -142,7 +108,7 @@ defmodule Jido.Topology.DSL.Extension do
                target: DSL.Export,
                args: [:key],
                auto_set_fields: [kind: kind],
-               schema: [key: [type: :any, required: true], from: [type: :any, required: true]]
+               schema: Entity.schema(Keyword.delete(EntryMetadata.schema(:export), :kind))
              }
            end)
 
@@ -173,16 +139,13 @@ defmodule Jido.Topology.DSL.Extension do
     entities: [@import_bus]
   }
   @exports_section %Spark.Dsl.Section{name: :exports, patchable?: true, entities: @exports}
-  @startup_schema [
-    concurrency: [type: :pos_integer],
-    max_agents: [type: :pos_integer],
-    retry_interval: [type: :pos_integer],
-    task_timeout: [type: :pos_integer]
-  ]
   @nested_startup_section %Spark.Dsl.Section{
     name: :startup,
     patchable?: true,
-    schema: @startup_schema
+    schema:
+      Enum.map(EntryMetadata.schema(:startup), fn {key, opts} ->
+        {key, Keyword.delete(opts, :default)}
+      end)
   }
 
   @entity_sections [
@@ -205,6 +168,7 @@ defmodule Jido.Topology.DSL.Extension do
   end
 
   use Spark.Dsl.Extension,
+    persisters: [Jido.Topology.DSL.Compiler],
     sections: [
       %Spark.Dsl.Section{
         name: :topology,

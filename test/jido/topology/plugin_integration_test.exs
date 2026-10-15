@@ -93,6 +93,35 @@ defmodule Jido.Topology.PluginIntegrationTest do
     end
   end
 
+  defmodule EmptyPackage do
+    use Jido.Plugin
+
+    @impl true
+    def contribute(context, _opts), do: {:ok, %Contribution{plugin: context.plugin}}
+  end
+
+  defmodule EmptyWorker do
+    use Jido.Agent, name: "empty_topology_plugin_worker"
+
+    agent do
+      plugin EmptyPackage
+    end
+  end
+
+  test "expansion reports empty contributions as unchanged" do
+    definition = Topology.new!(name: "empty", agents: [%{key: :worker, module: EmptyWorker}])
+    assert {:ok, ^definition, false} = TopologyPlugin.expand_with_changes(definition)
+    assert {:ok, ^definition} = TopologyPlugin.expand_definition(definition)
+  end
+
+  test "expansion carries changes from included Topologies" do
+    child = Topology.new!(name: "child", agents: [%{key: :worker, module: Worker}])
+    root = Topology.new!(name: "root", includes: [%{key: :child, topology: child}])
+    assert {:ok, expanded, true} = TopologyPlugin.expand_with_changes(root)
+    assert root.resources == []
+    assert [%{topology: %{resources: [_, _]}}] = expanded.includes
+  end
+
   test "instantiation adds ordered Agent and group contributions without changing the definition" do
     definition =
       Topology.new!(

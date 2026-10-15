@@ -49,7 +49,7 @@ defmodule Jido.Agent.Authoring do
   end
 
   def routes(routes) when is_list(routes) do
-    traverse(routes, fn
+    traverse_indexed(routes, fn
       {path, target, opts} when is_list(opts) ->
         route(path, target, opts)
 
@@ -94,6 +94,26 @@ defmodule Jido.Agent.Authoring do
   end
 
   defp traverse(_tail, _fun, _acc), do: error("Expected a proper list")
+
+  def at({:error, %{details: details} = error}, path) do
+    details = details || %{}
+    path = List.wrap(path) ++ Map.get(details, :source_path, [])
+    {:error, %{error | details: Map.put(details, :source_path, path)}}
+  end
+
+  def at(result, _path), do: result
+
+  def traverse_indexed(values, fun), do: traverse_indexed(values, fun, 0, [])
+  defp traverse_indexed([], _fun, _index, acc), do: {:ok, Enum.reverse(acc)}
+
+  defp traverse_indexed([value | rest], fun, index, acc) do
+    case at(fun.(value), index) do
+      {:ok, value} -> traverse_indexed(rest, fun, index + 1, [value | acc])
+      {:error, _} = error -> error
+    end
+  end
+
+  defp traverse_indexed(_tail, _fun, _index, _acc), do: error("Expected a proper list")
 
   def error(message, details \\ %{}),
     do: {:error, Error.validation_error(message, kind: :config, details: details)}

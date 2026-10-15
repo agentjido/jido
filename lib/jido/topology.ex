@@ -81,7 +81,6 @@ defmodule Jido.Topology do
 
       import Jido.Topology.Reference, only: [input: 1, member: 1]
       import Jido.Topology.Ref, only: [ref: 2]
-      @topology_options unquote(opts)
       @before_compile Jido.Topology.DSL.Compiler
 
       @doc "Returns the topology owner Agent definition."
@@ -105,7 +104,7 @@ defmodule Jido.Topology do
       def topology, do: Jido.Topology.new!(__topology_config__())
 
       @doc "Constructs a topology instance without starting processes."
-      def new(opts), do: Jido.Topology.instantiate(topology(), opts)
+      def new(opts), do: Jido.Topology.instantiate(__topology_config__(), opts)
 
       @doc "Constructs an instance or raises its validation error."
       def new!(opts), do: Jido.Topology.unwrap!(new(opts))
@@ -134,20 +133,25 @@ defmodule Jido.Topology do
   def new!(attrs), do: unwrap!(new(attrs))
 
   @doc "Validates input, applies static Plugin contributions, and builds an execution plan."
-  @spec instantiate(t(), map() | keyword()) :: {:ok, Instance.t()} | {:error, Exception.t()}
+  @spec instantiate(t() | map() | keyword(), map() | keyword()) ::
+          {:ok, Instance.t()} | {:error, Exception.t()}
   def instantiate(definition, opts) do
-    with {:ok, definition, _static_composed} <- new_with_composition(definition),
-         {:ok, planning_definition} <- Plugin.expand_definition(definition),
-         {:ok, composed} <- Composition.flatten(planning_definition),
+    with {:ok, definition, static_composed} <- new_with_composition(definition),
+         {:ok, planning_definition, changed?} <- Plugin.expand_with_changes(definition),
+         {:ok, composed} <- composition(planning_definition, changed?, static_composed),
          {:ok, opts} <- Authoring.attrs(opts),
          :ok <- Authoring.keys(opts, [:id, :input]),
          {:ok, id} <- Validation.key(Map.get(opts, :id)),
          {:ok, input} <- Validation.parse_input(definition.schema, Map.get(opts, :input, %{})),
-         {:ok, plan} <- Plan.build_composed(planning_definition, id, input, composed),
+         {:ok, plan} <- Plan.expand(planning_definition, id, input, composed),
          :ok <- Jido.Topology.Child.plan(definition, id, input, plan) do
       {:ok, %Instance{id: id, definition: definition, input: input, plan: plan}}
     end
   end
+
+  defp composition(_definition, false, composed), do: {:ok, composed}
+
+  defp composition(definition, true, _composed), do: Composition.flatten(definition)
 
   @doc false
   def unwrap!({:ok, value}), do: value

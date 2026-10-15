@@ -44,3 +44,31 @@ remain in their existing opt-in suites.
 The separate intersection checks use seed 389 and assert their exact input count.
 They cover branch order, defaults, overlapping fields, conflicts, missing fields,
 nullable values, and refinement counts. Their counts are printed in the test output.
+
+## Agent Covenant gate
+
+The `jido.agent` Covenant component refines AGT-001, AGT-002, TURN-001,
+TURN-002, the direct-command part of EFFECT-001, PLUG-001, and Agent error
+handling. Its 25 active obligations cover authoring, definition data, instances,
+and direct commands. The tests use public entry points and fresh DSL fixtures.
+Checkpoint storage and live AgentServer behavior keep their separate tests.
+
+Run `mix test.contract` for passing-test obligation coverage. `mix test.ci`
+runs the core and property checks, then this contract gate. For a focused
+mutation check of the three test gaps found during this rollout, run:
+
+```sh
+MIX_ENV=test mix covenant.mutate jido.agent --macros \
+  --only m0684,m0985,m1034 --jobs 1 --seed 0 --timeout 5000 \
+  --max-runtime 120000 --out tmp/covenant/agent-focused.json
+```
+
+The development dependency is the sibling `../covenant` fork on
+`feat/macro-mutation`. Setup, scope, survivor review rules, and tool limits are
+in the repository's `contracts/README.md`. That file also gives the separate
+full-run command. Mutant IDs depend on the source and module profile; check the
+reported sites after a source change. The obligation report is
+`contracts/coverage.json`. The earlier full run and current focused result are
+recorded in `contracts/jido/agent.baseline.md`. A focused result does not verify
+the full mutation profile. A passing obligation report does not replace mutation
+review or the package line-coverage gate.

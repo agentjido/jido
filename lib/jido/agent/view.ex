@@ -55,15 +55,7 @@ defmodule Jido.Agent.View do
   end
 
   defp definition(module) when is_atom(module) and not is_nil(module) do
-    with {:module, ^module} <- Code.ensure_loaded(module),
-         true <- function_exported?(module, :__agent_config__, 0),
-         {:ok, definition} <-
-           Agent.__definition_from_module__(module, module.__agent_config__()) do
-      {:ok, definition}
-    else
-      {:error, _reason} -> Authoring.error("Agent module could not be loaded")
-      false -> Authoring.error("Expected an Agent module")
-    end
+    Jido.Agent.Source.definition(module)
   end
 
   defp definition(_source),

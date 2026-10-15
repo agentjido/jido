@@ -67,6 +67,7 @@ defmodule Jido.Examples.Factory.FlowFactory.Runner.Runtime do
   @moduledoc false
   use GenServer
   alias Jido.AgentServer, as: Server
+  alias Jido.AgentServer.Execution.Local
   alias Jido.Examples.Factory.FlowFactory.{Cancel, Pipeline, Run}
 
   def start_link(init), do: GenServer.start_link(__MODULE__, init)
@@ -93,15 +94,21 @@ defmodule Jido.Examples.Factory.FlowFactory.Runner.Runtime do
     id = Jido.Signal.ID.generate!()
     owner = self()
 
-    case Jido.Exec.start(runner, id, Pipeline, Map.from_struct(intent), context,
-           mode: :local,
+    case Local.start(runner, id, Pipeline, Map.from_struct(intent), context,
            owner: owner,
            max_concurrency: 3,
            timeout: timeout,
            on_complete: fn id, _ -> send(owner, {:flow_complete, id}) end
          ) do
-      {:ok, pid} ->
-        handle = %{runner: runner, id: id, pid: pid, ref: Process.monitor(pid)}
+      {:ok, pid, execution_id} ->
+        handle = %{
+          runner: runner,
+          id: id,
+          execution_id: execution_id,
+          pid: pid,
+          ref: Process.monitor(pid)
+        }
+
         {:reply, :ok, %{state | handle: handle, mission_id: intent.mission_id}}
 
       {:error, error} ->
@@ -127,7 +134,7 @@ defmodule Jido.Examples.Factory.FlowFactory.Runner.Runtime do
   def handle_info(_, %{handle: nil} = state), do: {:noreply, state}
 
   def handle_info({:flow_complete, id}, %{handle: %{id: id} = handle} = state) do
-    result = Jido.Exec.result(handle.runner, id)
+    result = Local.result(handle.runner, id, handle.execution_id)
     :ok = release(handle)
 
     data =

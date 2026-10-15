@@ -30,9 +30,11 @@ Caller context also accepts `nil` as an empty map.
 
 An Agent behavior module can implement `handle_signal/2` for custom selection.
 When this callback is absent, Jido uses the Agent routes. A module created with
-`use Jido.Agent` also supplies static configuration through `__agent_config__/0`.
-`Agent.instantiate(module, options)` requires this authoring configuration.
-Use `module.definition()` to read a module definition.
+`use Jido.Agent` compiles its static fields into a neutral Agent value.
+`module.definition()` checks the current Plugin and Action contracts before it
+returns that value. `Agent.instantiate(module, options)` uses the same current
+contracts to construct an instance. Plugin specifications and complete state
+schemas are derived for each use; they are not stored in the compiled value.
 
 Agent Server startup and `SpawnChild` also accept constructor modules with
 `new/0` or `new/1`. Such a constructor can return an Agent whose behavior module

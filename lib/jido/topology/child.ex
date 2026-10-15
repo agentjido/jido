@@ -24,6 +24,10 @@ defmodule Jido.Topology.Child do
       true ->
         Authoring.error("Expected a topology module")
     end
+  rescue
+    error -> Validation.source_error(module, :error, error)
+  catch
+    kind, reason -> Validation.source_error(module, kind, reason)
   end
 
   def source(%Jido.Topology{} = value, ancestors), do: {:ok, value, nil, ancestors}
@@ -36,15 +40,17 @@ defmodule Jido.Topology.Child do
   def normalize(attrs, ancestors, depth) do
     with {:ok, attrs} <- Authoring.attrs(attrs),
          :ok <- Authoring.keys(attrs, EntryMetadata.fields(:runtime_child)),
+         attrs = EntryMetadata.apply_defaults(:runtime_child, attrs),
          {:ok, key} <- Validation.key(attrs[:key]),
-         {:ok, source, owner, ancestors} <- source(attrs[:topology], ancestors),
+         {:ok, source, owner, ancestors} <-
+           Authoring.at(source(attrs[:topology], ancestors), :topology),
          {:ok, topology} <- Validation.definition(source, ancestors, depth + 1),
          topology = struct(Jido.Topology, topology),
          {:ok, director} <- director(Map.get(attrs, :director, owner)),
-         {:ok, input} <- Validation.plain_static_map(Map.get(attrs, :input, %{})),
-         {:ok, activation} <- activation(Map.get(attrs, :activation, :lazy)),
-         {:ok, gate} <- gate(Map.get(attrs, :gate, %{})),
-         :ok <- limits(Map.get(attrs, :max_restarts, 3), Map.get(attrs, :max_seconds, 5)) do
+         {:ok, input} <- Validation.plain_static_map(attrs.input),
+         {:ok, activation} <- activation(attrs.activation),
+         {:ok, gate} <- gate(attrs.gate),
+         :ok <- limits(attrs.max_restarts, attrs.max_seconds) do
       {:ok,
        %{
          key: key,
@@ -53,8 +59,8 @@ defmodule Jido.Topology.Child do
          input: input,
          activation: activation,
          gate: gate,
-         max_restarts: Map.get(attrs, :max_restarts, 3),
-         max_seconds: Map.get(attrs, :max_seconds, 5)
+         max_restarts: attrs.max_restarts,
+         max_seconds: attrs.max_seconds
        }}
     end
   end

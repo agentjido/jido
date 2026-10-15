@@ -85,8 +85,8 @@ defmodule Jido.Topology.ValidationTest do
 
     assert {:error,
             %Jido.Error.ValidationError{
-              message: "Expected an Agent module",
-              details: %{module: ^missing_module}
+              message: "Agent module could not be loaded",
+              details: %{module: ^missing_module, reason: :nofile}
             }} =
              Topology.new(
                name: "unavailable-agent-module",

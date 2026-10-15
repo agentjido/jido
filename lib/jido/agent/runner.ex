@@ -72,7 +72,8 @@ defmodule Jido.Agent.Runner do
       when is_list(exec_opts) and is_list(plugin_specs) do
     with :ok <- at(:input, Command.validate_caller_context(command.context)),
          {:ok, turn} <- at(:route, select(command.agent, source_signal)),
-         {:ok, schema} <- at(:input, Plugin.compose_schema(command.agent.schema, plugin_specs)) do
+         {:ok, schema} <-
+           at(:input, Plugin.compose_schema_from_specs(command.agent.schema, plugin_specs)) do
       {:ok,
        prepared(
          command.agent,

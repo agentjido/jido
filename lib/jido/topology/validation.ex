@@ -45,25 +45,30 @@ defmodule Jido.Topology.Validation do
   def definition(attrs, ancestors, depth) do
     with {:ok, attrs} <- Authoring.attrs(attrs),
          :ok <- Authoring.keys(attrs, @fields),
-         {:ok, name} <- key(Map.get(attrs, :name)),
+         {:ok, name} <- at(:name, key(Map.get(attrs, :name))),
          schema = Map.get(attrs, :schema, Zoi.object(%{})),
-         :ok <- field(:schema, schema),
-         {:ok, metadata} <- plain_static_map(Map.get(attrs, :metadata, %{})),
+         :ok <- at(:schema, field(:schema, schema)),
+         {:ok, metadata} <- at(:metadata, plain_static_map(Map.get(attrs, :metadata, %{}))),
          {:ok, agents} <- entries(attrs, :agents, :agent),
          {:ok, groups} <- entries(attrs, :groups, :group),
          {:ok, resources} <- entries(attrs, :resources, :resource),
          {:ok, relationships} <- entries(attrs, :relationships, :owns),
          {:ok, connections} <- entries(attrs, :connections, :subscribe),
-         {:ok, startup} <- entry(:startup, Map.get(attrs, :startup, %{})),
+         {:ok, startup} <- at(:startup, entry(:startup, Map.get(attrs, :startup, %{}))),
          {:ok, imports} <- entries(attrs, :imports, :import),
          {:ok, exports} <- entries(attrs, :exports, :export),
          {:ok, children} <-
-           Authoring.traverse(
+           Authoring.traverse_indexed(
              Map.get(attrs, :children, []),
              &Jido.Topology.Child.normalize(&1, ancestors, depth)
-           ),
+           )
+           |> Authoring.at(:children),
          {:ok, includes} <-
-           Authoring.traverse(Map.get(attrs, :includes, []), &include(&1, ancestors, depth)) do
+           Authoring.traverse_indexed(
+             Map.get(attrs, :includes, []),
+             &include(&1, ancestors, depth)
+           )
+           |> Authoring.at(:includes) do
       definition = %{
         name: name,
         schema: schema,
@@ -85,29 +90,46 @@ defmodule Jido.Topology.Validation do
   end
 
   defp entries(attrs, field, kind),
-    do: Authoring.traverse(Map.get(attrs, field, []), &entry(kind, &1))
+    do:
+      Authoring.traverse_indexed(Map.get(attrs, field, []), &entry(kind, &1))
+      |> Authoring.at(field)
 
   def entry(kind, attrs) do
     with {:ok, attrs} <- Authoring.attrs(attrs),
-         :ok <- Authoring.keys(attrs, EntryMetadata.fields(kind)),
+         :ok <- entry_keys(attrs, kind),
+         attrs = EntryMetadata.apply_defaults(kind, attrs),
          {:ok, value} <- normalize(kind, attrs),
          :ok <- static_entry(kind, value),
          do: {:ok, value}
   end
 
+  defp entry_keys(attrs, kind) do
+    case Authoring.keys(attrs, EntryMetadata.fields(kind)) do
+      {:error, %{details: %{keys: [key | _]}}} = error -> at(key, error)
+      result -> result
+    end
+  end
+
   defp static_entry(:include, _value), do: :ok
 
-  defp static_entry(kind, value) when kind in [:agent, :group],
-    do: static(Map.delete(value, :definition))
-
-  defp static_entry(_kind, value), do: static(value)
+  defp static_entry(kind, value) do
+    EntryMetadata.fields(kind)
+    |> Enum.reject(&(&1 == :definition and kind in [:agent, :group]))
+    |> Enum.reduce_while(:ok, fn field, :ok ->
+      case at(field, static(Map.get(value, field))) do
+        :ok -> {:cont, :ok}
+        {:error, _} = error -> {:halt, error}
+      end
+    end)
+  end
 
   defp normalize(kind, attrs) when kind in [:agent, :group] do
-    with {:ok, name} <- key(attrs[:key]),
+    with {:ok, name} <- at(:key, key(attrs[:key])),
          {:ok, selection} <- agent_selection(attrs),
-         {:ok, state} <- initial_state(Map.get(attrs, :initial_state, %{})),
-         {:ok, deps} <- Authoring.traverse(Map.get(attrs, :depends_on, []), &Ref.target/1),
-         {:ok, placement} <- placement(Map.get(attrs, :node)) do
+         {:ok, state} <- at(:initial_state, initial_state(attrs.initial_state)),
+         {:ok, deps} <-
+           at(:depends_on, Authoring.traverse_indexed(attrs.depends_on, &Ref.target/1)),
+         {:ok, placement} <- at(:node, placement(Map.get(attrs, :node))) do
       agent = %{
         key: name,
         initial_state: state,
@@ -122,79 +144,76 @@ defmodule Jido.Topology.Validation do
   end
 
   defp normalize(:resource, attrs) do
-    with {:ok, name} <- key(attrs[:key]),
-         kind = Map.get(attrs, :kind, :bus),
-         {:ok, config} <- Resource.validate(kind, Map.get(attrs, :config, [])) do
+    with {:ok, name} <- at(:key, key(attrs[:key])),
+         kind = attrs.kind,
+         {:ok, config} <- resource_config(kind, attrs.config) do
       {:ok, %{key: name, kind: kind, config: config}}
     end
   end
 
   defp normalize(:owns, attrs) do
-    with {:ok, parent} <- Ref.target(attrs[:parent]),
-         {:ok, child} <- Ref.target(attrs[:child]),
-         policy = Map.get(attrs, :on_parent_exit, :stop),
+    with {:ok, parent} <- at(:parent, Ref.target(attrs[:parent])),
+         {:ok, child} <- at(:child, Ref.target(attrs[:child])),
+         policy = attrs.on_parent_exit,
          :ok <- one_of(policy, [:stop, :continue, :emit_orphan], :on_parent_exit) do
       {:ok, %{parent: parent, child: child, on_parent_exit: policy}}
     end
   end
 
   defp normalize(:subscribe, attrs) do
-    with {:ok, agent} <- Ref.target(attrs[:agent]),
-         {:ok, bus} <- Ref.target(attrs[:to]),
-         :ok <- path(attrs[:path]) do
+    with {:ok, agent} <- at(:agent, Ref.target(attrs[:agent])),
+         {:ok, bus} <- at(:to, Ref.target(attrs[:to])),
+         :ok <- at(:path, path(attrs[:path])) do
       {:ok, %{agent: agent, to: bus, path: attrs.path}}
     end
   end
 
   defp normalize(:startup, attrs) do
-    result =
-      Map.merge(
-        %{
-          concurrency: 32,
-          max_agents: 10_000,
-          retry_interval: 1_000,
-          task_timeout: 10_000
-        },
-        attrs
-      )
-
-    with :ok <- positive(result.concurrency, :concurrency),
-         :ok <- positive(result.max_agents, :max_agents),
-         :ok <- positive(result.retry_interval, :retry_interval),
-         :ok <- positive(result.task_timeout, :task_timeout),
-         do: {:ok, result}
+    with :ok <- positive(attrs.concurrency, :concurrency),
+         :ok <- positive(attrs.max_agents, :max_agents),
+         :ok <- positive(attrs.retry_interval, :retry_interval),
+         :ok <- positive(attrs.task_timeout, :task_timeout),
+         do: {:ok, attrs}
   end
 
   defp normalize(:import, attrs) do
-    with {:ok, key} <- key(attrs[:key]),
+    with {:ok, key} <- at(:key, key(attrs[:key])),
          :ok <- one_of(attrs[:kind], [:bus], :kind),
          do: {:ok, %{key: key, kind: :bus}}
   end
 
   defp normalize(:export, attrs) do
-    with {:ok, key} <- key(attrs[:key]),
+    with {:ok, key} <- at(:key, key(attrs[:key])),
          :ok <- one_of(attrs[:kind], [:agent, :group, :bus], :kind),
-         {:ok, from} <- Ref.target(attrs[:from]),
+         {:ok, from} <- at(:from, Ref.target(attrs[:from])),
          do: {:ok, %{key: key, kind: attrs.kind, from: from}}
   end
 
   defp normalize(:binding, attrs) do
-    with {:ok, key} <- key(attrs[:key]),
-         {:ok, to} <- Ref.target(attrs[:to]),
+    with {:ok, key} <- at(:key, key(attrs[:key])),
+         {:ok, to} <- at(:to, Ref.target(attrs[:to])),
          do: {:ok, %{key: key, to: to}}
   end
 
   defp normalize(:include, attrs), do: include(attrs, [], 0)
 
+  defp resource_config(kind, config) do
+    case Resource.validate(kind, config) do
+      {:error, %{details: %{field: field}}} = error -> at(field, error)
+      result -> at(:config, result)
+    end
+  end
+
   defp include(attrs, ancestors, depth) do
     with {:ok, attrs} <- Authoring.attrs(attrs),
-         :ok <- Authoring.keys(attrs, EntryMetadata.fields(:include)),
-         {:ok, key} <- key(attrs[:key]),
-         {:ok, source, ancestors} <- included_source(attrs[:topology], ancestors),
-         {:ok, definition} <- definition(source, ancestors, depth + 1),
-         :ok <- static_include(definition),
-         {:ok, inputs} <- plain_static_map(Map.get(attrs, :inputs, %{})),
-         {:ok, bindings} <- bindings(Map.get(attrs, :bindings, [])),
+         :ok <- entry_keys(attrs, :include),
+         attrs = EntryMetadata.apply_defaults(:include, attrs),
+         {:ok, key} <- at(:key, key(attrs[:key])),
+         {:ok, source, ancestors} <- at(:topology, included_source(attrs[:topology], ancestors)),
+         {:ok, definition} <- at(:topology, definition(source, ancestors, depth + 1)),
+         :ok <- at(:topology, static_include(definition)),
+         {:ok, inputs} <- at(:inputs, plain_static_map(attrs.inputs)),
+         {:ok, bindings} <- at(:bindings, bindings(attrs.bindings)),
          :ok <- unique(Enum.map(bindings, & &1.key), "Duplicate import binding") do
       {:ok,
        %{
@@ -217,6 +236,10 @@ defmodule Jido.Topology.Validation do
       true ->
         Authoring.error("Expected a topology module or definition")
     end
+  rescue
+    error -> source_error(module, :error, error)
+  catch
+    kind, reason -> source_error(module, kind, reason)
   end
 
   defp included_source(%Jido.Topology{} = value, ancestors), do: {:ok, value, ancestors}
@@ -226,6 +249,14 @@ defmodule Jido.Topology.Validation do
 
   defp included_source(_, _), do: Authoring.error("Expected a topology module or definition")
 
+  def source_error(module, kind, reason),
+    do:
+      Authoring.error("Topology module configuration failed", %{
+        module: module,
+        kind: kind,
+        reason: reason
+      })
+
   defp static_include(%{children: []}), do: :ok
   defp static_include(_), do: Authoring.error("Static include cannot contain runtime children")
 
@@ -233,18 +264,18 @@ defmodule Jido.Topology.Validation do
     value |> Enum.sort() |> Enum.map(fn {key, to} -> %{key: key, to: to} end) |> bindings()
   end
 
-  defp bindings(values), do: Authoring.traverse(values, &entry(:binding, &1))
+  defp bindings(values), do: Authoring.traverse_indexed(values, &entry(:binding, &1))
 
   defp group(agent, %{members: members, key_by: key_by} = attrs) do
     cond do
       Map.has_key?(attrs, :count) ->
-        Authoring.error("A group uses count or members, not both")
+        at(:count, Authoring.error("A group uses count or members, not both"))
 
       not (is_atom(key_by) or is_binary(key_by)) ->
-        Authoring.error("Group key_by must name a member field")
+        at(:key_by, Authoring.error("Group key_by must name a member field"))
 
       not (is_list(members) or match?(%Reference{kind: :input}, members)) ->
-        Authoring.error("Group members must be a list or input reference")
+        at(:members, Authoring.error("Group members must be a list or input reference"))
 
       true ->
         {:ok, Map.merge(agent, %{members: members, key_by: key_by})}
@@ -252,11 +283,11 @@ defmodule Jido.Topology.Validation do
   end
 
   defp group(agent, attrs) do
-    count = Map.get(attrs, :count, 1)
+    count = Map.get(attrs, :count, EntryMetadata.default(:group, :count))
 
     cond do
       Map.has_key?(attrs, :members) or Map.has_key?(attrs, :key_by) ->
-        Authoring.error("A keyed group requires members and key_by")
+        at(:members, Authoring.error("A keyed group requires members and key_by"))
 
       is_integer(count) and count >= 0 ->
         {:ok, Map.put(agent, :count, count)}
@@ -265,7 +296,7 @@ defmodule Jido.Topology.Validation do
         {:ok, Map.put(agent, :count, count)}
 
       true ->
-        Authoring.error("Group count must be nonnegative or an input reference")
+        at(:count, Authoring.error("Group count must be nonnegative or an input reference"))
     end
   end
 
@@ -356,13 +387,16 @@ defmodule Jido.Topology.Validation do
   defp agent_selection(attrs) do
     case {Map.get(attrs, :module), Map.get(attrs, :definition)} do
       {nil, %Jido.Agent{} = value} ->
-        with {:ok, definition} <- Jido.Agent.validate_definition(value),
+        with {:ok, definition} <- at(:definition, Jido.Agent.validate_definition(value)),
              do: {:ok, %{definition: definition}}
 
       {module, nil} when not is_nil(module) ->
         with :ok <-
-               if(is_atom(module), do: :ok, else: Authoring.error("Expected an Agent module")),
-             {:ok, _} <- agent_definition(module),
+               at(
+                 :module,
+                 if(is_atom(module), do: :ok, else: Authoring.error("Expected an Agent module"))
+               ),
+             {:ok, _} <- at(:module, agent_definition(module)),
              do: {:ok, %{module: module}}
 
       _ ->
@@ -371,28 +405,10 @@ defmodule Jido.Topology.Validation do
   end
 
   @doc false
-  def agent_definition(%Jido.Agent{} = definition), do: Jido.Agent.validate_definition(definition)
+  def agent_definition(%Jido.Agent{} = definition), do: Jido.Agent.Source.definition(definition)
 
-  def agent_definition(module) when is_atom(module) and not is_nil(module) do
-    case Code.ensure_loaded(module) do
-      {:module, ^module} ->
-        with true <- function_exported?(module, :__agent_config__, 0),
-             {:ok, definition} <-
-               Jido.Agent.__definition_from_module__(module, module.__agent_config__()) do
-          {:ok, definition}
-        else
-          {:error, _error} = error -> error
-          _ -> Authoring.error("Expected an Agent module", %{module: module})
-        end
-
-      {:error, _reason} ->
-        Authoring.error("Expected an Agent module", %{module: module})
-    end
-  rescue
-    _error -> Authoring.error("Expected an Agent module", %{module: module})
-  catch
-    _kind, _reason -> Authoring.error("Expected an Agent module", %{module: module})
-  end
+  def agent_definition(module) when is_atom(module) and not is_nil(module),
+    do: Jido.Agent.Source.definition(module)
 
   def agent_definition(_module), do: Authoring.error("Expected an Agent module")
 
@@ -406,28 +422,49 @@ defmodule Jido.Topology.Validation do
   defp path(_), do: Authoring.error("Bus subscription path must be a nonempty string")
 
   defp positive(value, _field) when is_integer(value) and value > 0, do: :ok
-  defp positive(_, field), do: Authoring.error("Expected a positive integer", %{field: field})
+
+  defp positive(_, field),
+    do: at(field, Authoring.error("Expected a positive integer", %{field: field}))
 
   defp one_of(value, allowed, field) do
     if value in allowed,
       do: :ok,
-      else: Authoring.error("Unsupported topology option", %{field: field, value: value})
+      else:
+        at(field, Authoring.error("Unsupported topology option", %{field: field, value: value}))
   end
 
   defp names(definition) do
     declarations =
-      definition.agents ++
-        definition.groups ++
-        definition.resources ++ definition.imports ++ definition.includes ++ definition.children
+      for field <- [:agents, :groups, :resources, :imports, :includes, :children],
+          do: {field, Map.fetch!(definition, field)}
 
-    with :ok <- unique(Enum.map(declarations, & &1.key), "Duplicate topology key"),
-         :ok <- unique(Enum.map(definition.exports, & &1.key), "Duplicate topology export"),
+    with :ok <- unique_entries(declarations, "Duplicate topology key"),
+         :ok <- unique_entries([exports: definition.exports], "Duplicate topology export"),
          do: :ok
+  end
+
+  defp unique_entries(collections, message) do
+    entries =
+      for {field, entries} <- collections,
+          {entry, index} <- Enum.with_index(entries),
+          do: {entry.key, [field, index, :key]}
+
+    Enum.reduce_while(entries, MapSet.new(), fn {key, path}, seen ->
+      if MapSet.member?(seen, key),
+        do: {:halt, at(path, Authoring.error(message))},
+        else: {:cont, MapSet.put(seen, key)}
+    end)
+    |> case do
+      %MapSet{} -> :ok
+      error -> error
+    end
   end
 
   defp unique(values, message) do
     if length(values) == MapSet.size(MapSet.new(values)), do: :ok, else: Authoring.error(message)
   end
+
+  defp at(field, result), do: Authoring.at(result, field)
 
   def layers(edges) do
     {remaining, dependents} =

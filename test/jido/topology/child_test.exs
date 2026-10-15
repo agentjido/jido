@@ -8,12 +8,99 @@ defmodule Jido.Topology.ChildTest do
     def __topology_config__, do: %{name: "config_only"}
   end
 
-  test "a custom topology config provider can be a child without a director" do
-    assert {:ok, %{children: [child]}} =
-             Topology.new(name: "parent", children: [%{key: :child, topology: ConfigOnly}])
+  defmodule RaisedConfig do
+    def __topology_config__, do: raise(ArgumentError, "configuration failed")
+  end
 
-    assert child.topology.name == "config_only"
-    assert child.director == nil
+  defmodule ThrownConfig do
+    def __topology_config__, do: throw(:configuration_failed)
+  end
+
+  defmodule ExitedConfig do
+    def __topology_config__, do: exit(:configuration_failed)
+  end
+
+  defmodule InvalidConfig do
+    def __topology_config__, do: nil
+  end
+
+  defmodule RaisedTopology do
+    def topology, do: raise(ArgumentError, "configuration failed")
+  end
+
+  defmodule RaisedOwnerFlag do
+    def __topology_config__, do: %{name: "child"}
+    def __topology_owner__?, do: raise(ArgumentError, "configuration failed")
+  end
+
+  defmodule RaisedOwner do
+    def __topology_config__, do: %{name: "child"}
+    def __topology_owner__?, do: true
+    def owner, do: raise(ArgumentError, "configuration failed")
+  end
+
+  test "a custom topology config provider can be included or used as a child without a director" do
+    for collection <- [:includes, :children] do
+      assert {:ok, definition} =
+               Topology.new(%{
+                 collection => [%{key: :child, topology: ConfigOnly}],
+                 name: "parent"
+               })
+
+      assert [entry] = Map.fetch!(definition, collection)
+      assert entry.topology.name == "config_only"
+      if collection == :children, do: assert(entry.director == nil)
+    end
+  end
+
+  test "provider exceptions, throws, and exits return structured errors with their causes" do
+    for collection <- [:includes, :children],
+        {provider, kind, reason} <- [
+          {RaisedConfig, :error, %ArgumentError{message: "configuration failed"}},
+          {ThrownConfig, :throw, :configuration_failed},
+          {ExitedConfig, :exit, :configuration_failed}
+        ] do
+      attrs = %{collection => [%{key: :child, topology: provider}], name: "parent"}
+      assert {:error, error} = Topology.new(attrs)
+      assert error.message == "Topology module configuration failed"
+
+      assert error.details == %{
+               module: provider,
+               kind: kind,
+               reason: reason,
+               source_path: [collection, 0, :topology]
+             }
+
+      assert_raise Jido.Error.ValidationError, error.message, fn -> Topology.new!(attrs) end
+    end
+  end
+
+  test "child fallback and owner callback failures use the same error boundary" do
+    for provider <- [RaisedTopology, RaisedOwnerFlag, RaisedOwner] do
+      assert {:error, error} =
+               Topology.new(name: "parent", children: [%{key: :child, topology: provider}])
+
+      assert error.message == "Topology module configuration failed"
+      assert error.details.module == provider
+      assert error.details.kind == :error
+      assert error.details.reason == %ArgumentError{message: "configuration failed"}
+      assert error.details.source_path == [:children, 0, :topology]
+    end
+  end
+
+  test "invalid returned configuration keeps its validation error" do
+    assert {:error, expected} = Topology.new(nil)
+
+    for collection <- [:includes, :children] do
+      assert {:error, error} =
+               Topology.new(%{
+                 collection => [%{key: :child, topology: InvalidConfig}],
+                 name: "parent"
+               })
+
+      assert error.message == expected.message
+      refute Map.has_key?(error.details, :reason)
+    end
   end
 
   test "child authoring rejects invalid commands, event destinations, limits, and runtime values" do

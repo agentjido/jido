@@ -27,8 +27,18 @@ defmodule Jido.Agent.Plugin do
   def compose_schema(%Zoi.Types.Map{fields: fields} = domain_schema, declarations)
       when is_list(fields) do
     with {:ok, specs} <- Normalizer.normalize_all(declarations),
-         agent_specs = specs(specs),
-         :ok <- state_key_conflicts(fields, agent_specs) do
+         do: compose_schema_from_specs(domain_schema, specs)
+  end
+
+  def compose_schema(schema, _declarations), do: compose_schema_from_specs(schema, [])
+
+  # Callers pass the specifications from the current validation result.
+  @doc false
+  def compose_schema_from_specs(%Zoi.Types.Map{fields: fields} = domain_schema, plugin_specs)
+      when is_list(fields) do
+    agent_specs = specs(plugin_specs)
+
+    with :ok <- state_key_conflicts(fields, agent_specs) do
       plugin_fields =
         for %Spec{state_key: key, state_schema: schema} <- agent_specs,
             not is_nil(key),
@@ -40,7 +50,7 @@ defmodule Jido.Agent.Plugin do
     end
   end
 
-  def compose_schema(schema, _declarations) do
+  def compose_schema_from_specs(schema, _specs) do
     PluginError.validation("Agent domain schema must be a field-based Zoi object", %{
       schema: schema
     })

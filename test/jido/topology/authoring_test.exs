@@ -401,11 +401,8 @@ defmodule Jido.Topology.AuthoringTest do
   end
 
   test "DSL semantic errors retain the declaration source line" do
-    source =
-      Enum.find(Swarm.__topology_sources__(), &(&1.field == :agents and &1.index == 0))
-
-    assert source.line > 1
-    line = source.line
+    line = Map.fetch!(Swarm.__topology_sources__(), [:agents, 0])
+    assert line > 1
 
     error =
       assert_raise CompileError, fn ->

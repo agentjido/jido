@@ -748,6 +748,37 @@ defmodule JidoTest.Agent.AuthoringTest do
     end
   end
 
+  test "semantic errors point to the failed field or declaration" do
+    for {body, declaration, message} <- [
+          {"agent do\n  schema nil\nend", "schema nil", "schema"},
+          {"agent do\n  plugin String, config: nil\nend", "plugin String", "map or keyword"},
+          {"agent do\n  plugin #{inspect(CountTurns)}\n  plugin String\nend", "plugin String",
+           "Plugin"},
+          {"agent do\nend\nroutes do\n  route \"valid\", #{inspect(Add)}\n  route \"invalid\", String\nend",
+           "route \"invalid\"", "Invalid Agent route executable"}
+        ] do
+      module = Module.concat(JidoTest, "LocatedAgent#{System.unique_integer([:positive])}")
+
+      source = """
+      defmodule #{inspect(module)} do
+        use Jido.Agent, name: "located"
+        #{body}
+      end
+      """
+
+      line =
+        source
+        |> String.split("\n")
+        |> Enum.find_index(&String.contains?(&1, declaration))
+        |> Kernel.+(1)
+
+      error = assert_raise CompileError, fn -> compile_isolated(source) end
+      assert error.description =~ message
+      assert Path.expand(error.file) == Path.expand("agent_dsl_fixture.ex")
+      assert error.line == line, inspect(error)
+    end
+  end
+
   test "routes require an explicit agent block" do
     assert_raise CompileError, ~r/agent block is required/i, fn ->
       compile_isolated("""
@@ -809,6 +840,74 @@ defmodule JidoTest.Agent.AuthoringTest do
         assert candidate.state.count == 3
       end
     end)
+  end
+
+  test "definitions retain forward Plugin references and read current Plugin state schemas" do
+    module = Module.concat(JidoTest, "PluginReload#{System.unique_integer([:positive])}")
+    plugin = Module.concat(module, State)
+
+    plugin_source = fn key, default ->
+      """
+      defmodule #{inspect(plugin)} do
+        use Jido.Plugin
+        @impl true
+        def state_spec(_opts), do: {#{inspect(key)}, Zoi.integer() |> Zoi.default(#{default})}
+      end
+      """
+    end
+
+    compile_isolated("""
+    defmodule #{inspect(module)} do
+      use Jido.Agent, name: "plugin_reload"
+      agent do
+        schema Zoi.object(%{domain: Zoi.integer() |> Zoi.default(0)})
+        plugin #{inspect(plugin)}
+      end
+    end
+    #{plugin_source.(:owned, 1)}
+    """)
+
+    definition = module.definition()
+    assert definition.plugins == [{plugin, []}]
+    assert module.new!().state == %{domain: 0, owned: 1}
+
+    ExUnit.CaptureIO.capture_io(:stderr, fn -> compile_isolated(plugin_source.(:owned, 2)) end)
+    assert module.definition() == definition
+    assert module.new!().state == %{domain: 0, owned: 2}
+    assert {:ok, %{domain: 0, owned: 2}} = Zoi.parse(module.complete_schema(), %{})
+
+    ExUnit.CaptureIO.capture_io(:stderr, fn -> compile_isolated(plugin_source.(:domain, 2)) end)
+    assert {:error, _} = Jido.Agent.Source.definition(module)
+    assert {:error, _} = module.new()
+  end
+
+  test "an unchanged Agent checks a reloaded Action contract" do
+    module = Module.concat(JidoTest, "ActionReload#{System.unique_integer([:positive])}")
+    action = Module.concat(module, Action)
+
+    compile_isolated("""
+    defmodule #{inspect(module)} do
+      use Jido.Agent, name: "action_reload"
+      agent do
+      end
+      routes do
+        route "reload.run", #{inspect(action)}
+      end
+    end
+    defmodule #{inspect(action)} do
+      use Jido.Action, name: "reload_action"
+      def run(_params, _context), do: {:ok, %{}}
+    end
+    """)
+
+    assert {:ok, _} = Jido.Agent.Source.definition(module)
+
+    ExUnit.CaptureIO.capture_io(:stderr, fn ->
+      compile_isolated("defmodule #{inspect(action)} do\ndef run(_, _), do: {:ok, %{}}\nend")
+    end)
+
+    assert {:error, _} = Jido.Agent.Source.definition(module)
+    assert {:error, _} = module.new()
   end
 
   defp compile_agent(routes, opts \\ "", extra \\ "", source? \\ true) do

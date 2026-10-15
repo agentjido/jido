@@ -233,13 +233,9 @@ defmodule Jido.Agent do
   def instantiate(source, overrides \\ [])
 
   def instantiate(module, overrides) when is_atom(module) do
-    with {:module, ^module} <- Code.ensure_loaded(module) do
-      if function_exported?(module, :__agent_config__, 0),
-        do: __new_from_module__(module, module.__agent_config__(), overrides),
-        else: Jido.Agent.Authoring.error("Expected an Agent module")
-    else
-      _ -> Jido.Agent.Authoring.error("Agent module could not be loaded")
-    end
+    with {:ok, agent, _specs, _schema} <-
+           Jido.Agent.Source.instantiate_with_plugins(module, overrides),
+         do: {:ok, agent}
   end
 
   def instantiate(%__MODULE__{} = definition, overrides) do
@@ -312,20 +308,6 @@ defmodule Jido.Agent do
 
   @doc false
   defdelegate default_restore(module, checkpoint, context), to: Checkpoint
-
-  @doc false
-  @spec __definition_from_module__(module(), map() | keyword()) ::
-          {:ok, definition()} | {:error, Exception.t()}
-  def __definition_from_module__(module, definition) when is_atom(module) do
-    Validation.definition_from_module(module, definition)
-  end
-
-  @doc false
-  @spec __new_from_module__(module(), map() | keyword(), map() | keyword()) ::
-          {:ok, instance()} | {:error, Exception.t()}
-  def __new_from_module__(module, definition, overrides) when is_atom(module) do
-    Validation.new_from_module(module, definition, overrides)
-  end
 
   @doc false
   @spec transition(instance(), term()) :: {:ok, instance()} | {:error, Exception.t()}

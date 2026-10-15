@@ -164,6 +164,8 @@ defmodule Jido.MixProject do
         "test.system": :test,
         "test.property": :test,
         "test.fuzz": :test,
+        "test.contract": :test,
+        "test.ci": :test,
         "test.services": :test,
         "test.services.minio": :test,
         "test.all": :test,
@@ -393,6 +395,7 @@ defmodule Jido.MixProject do
       {:ecto_sql, "~> 3.14", optional: true},
 
       # Development & Test Dependencies
+      {:covenant, path: "../covenant", only: [:dev, :test], runtime: false},
       {:ecto_sqlite3, "~> 0.24.1", only: :test},
       {:postgrex, "~> 0.19 or ~> 1.0", only: :test},
       {:opentelemetry, "~> 1.0", only: :test, runtime: false},
@@ -425,6 +428,11 @@ defmodule Jido.MixProject do
       "test.system": "test test/system/runtime --only system --seed 0",
       "test.property": "test test/property --only property --seed 0",
       "test.fuzz": "test test/property --only fuzz --seed 0",
+      "test.contract": "covenant.check",
+      "test.ci": [
+        "test test/jido test/property --include flaky --include property --seed 0",
+        "covenant.check"
+      ],
       "test.services":
         "test #{Path.wildcard("test/system/services/*_test.exs") |> Enum.join(" ")} --only service --seed 0",
       "test.services.minio": "test test/system/services/minio --only service --seed 0",
@@ -440,6 +448,7 @@ defmodule Jido.MixProject do
         "format --check-formatted",
         "compile --warnings-as-errors",
         "credo --strict --only warning",
+        "covenant.check",
         "dialyzer",
         "test test/jido test/property --include flaky --include property --seed 0"
       ]

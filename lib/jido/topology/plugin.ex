@@ -16,7 +16,6 @@ defmodule Jido.Topology.Plugin do
   """
 
   alias Jido.Agent.Authoring
-  alias Jido.Plugin.Normalizer, as: PluginNormalizer
   alias Jido.Plugin.Error, as: PluginError
   alias Jido.Topology.Plugin.{Context, Contribution, Spec}
   alias Jido.Topology.Validation
@@ -66,28 +65,44 @@ defmodule Jido.Topology.Plugin do
   @spec expand_definition(Jido.Topology.t()) ::
           {:ok, Jido.Topology.t()} | {:error, term()}
   def expand_definition(%Jido.Topology{} = definition) do
-    with {:ok, includes} <-
+    with {:ok, expanded, _changed?} <- expand_with_changes(definition), do: {:ok, expanded}
+  end
+
+  @doc false
+  @spec expand_with_changes(Jido.Topology.t()) ::
+          {:ok, Jido.Topology.t(), boolean()} | {:error, term()}
+  def expand_with_changes(%Jido.Topology{} = definition) do
+    with {:ok, expanded_includes} <-
            Authoring.traverse(definition.includes, &expand_include/1),
+         {includes, changes} = Enum.unzip(expanded_includes),
          definition = %{definition | includes: includes},
          {:ok, nested} <-
            Authoring.traverse(
              definition.agents ++ definition.groups,
              &declaration_contributions/1
            ),
-         expanded <- append_contributions(definition, List.flatten(nested)),
-         {:ok, attrs} <- Validation.definition(expanded) do
-      {:ok, struct(Jido.Topology, attrs)}
+         {expanded, changed?} <- append_contributions(definition, List.flatten(nested)),
+         changed? = changed? or Enum.any?(changes),
+         {:ok, expanded} <- validate_changed(expanded, changed?) do
+      {:ok, expanded, changed?}
     end
   end
 
+  defp validate_changed(definition, false), do: {:ok, definition}
+
+  defp validate_changed(definition, true) do
+    with {:ok, attrs} <- Validation.definition(definition),
+         do: {:ok, struct(Jido.Topology, attrs)}
+  end
+
   defp expand_include(include) do
-    with {:ok, topology} <- expand_definition(include.topology),
-         do: {:ok, %{include | topology: topology}}
+    with {:ok, topology, changed?} <- expand_with_changes(include.topology),
+         do: {:ok, {%{include | topology: topology}, changed?}}
   end
 
   defp declaration_contributions(declaration) do
-    with {:ok, agent} <- Validation.agent_definition(Validation.agent_source(declaration)),
-         {:ok, specs} <- PluginNormalizer.normalize_all(agent.plugins) do
+    with {:ok, agent, specs, _schema} <-
+           Jido.Agent.Source.definition_with_plugins(Validation.agent_source(declaration)) do
       specs
       |> Enum.reject(&is_nil(&1.topology))
       |> Authoring.traverse(fn spec ->
@@ -97,13 +112,18 @@ defmodule Jido.Topology.Plugin do
   end
 
   defp append_contributions(definition, contributions) do
-    %{
+    resources = Enum.flat_map(contributions, & &1.resources)
+    relationships = Enum.flat_map(contributions, & &1.relationships)
+    connections = Enum.flat_map(contributions, & &1.connections)
+
+    expanded = %{
       definition
-      | resources: definition.resources ++ Enum.flat_map(contributions, & &1.resources),
-        relationships:
-          definition.relationships ++ Enum.flat_map(contributions, & &1.relationships),
-        connections: definition.connections ++ Enum.flat_map(contributions, & &1.connections)
+      | resources: definition.resources ++ resources,
+        relationships: definition.relationships ++ relationships,
+        connections: definition.connections ++ connections
     }
+
+    {expanded, resources != [] or relationships != [] or connections != []}
   end
 
   defp callback_contribution({:ok, %Contribution{} = contribution}, spec) do

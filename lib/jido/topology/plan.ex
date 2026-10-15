@@ -2,7 +2,7 @@ defmodule Jido.Topology.Plan do
   @moduledoc "An expanded topology with stable IDs, exact nodes, and dependency layers."
 
   alias Jido.Agent.Authoring
-  alias Jido.Topology.{Composition, Plugin, Ref, Reference, Resource, Validation}
+  alias Jido.Topology.{Composition, Ref, Reference, Resource, Validation}
 
   @schema Zoi.struct(__MODULE__, %{
             agents: Zoi.map(),
@@ -20,10 +20,9 @@ defmodule Jido.Topology.Plan do
 
   @doc false
   def build(definition, id, input) do
-    with {:ok, definition} <- Plugin.expand_definition(definition),
-         :ok <- root_imports(definition),
-         {:ok, composed} <- Composition.flatten(definition),
-         do: expand_plan(definition, id, input, composed)
+    with :ok <- root_imports(definition),
+         {:ok, instance} <- Jido.Topology.instantiate(definition, id: id, input: input),
+         do: {:ok, instance.plan}
   end
 
   @doc false
@@ -36,12 +35,9 @@ defmodule Jido.Topology.Plan do
 
   # The caller must supply the composition from this definition's validation.
   @doc false
-  def build_composed(definition, id, input, composed) do
-    with :ok <- root_imports(definition), do: expand_plan(definition, id, input, composed)
-  end
-
-  defp expand_plan(definition, id, input, composed) do
-    with {:ok, inputs} <- Composition.inputs(definition, input),
+  def expand(definition, id, input, composed) do
+    with :ok <- root_imports(definition),
+         {:ok, inputs} <- Composition.inputs(definition, input),
          {:ok, expanded} <- expand(composed.nodes, inputs, definition.startup.max_agents),
          resource_specs = Enum.filter(composed.nodes, &Resource.resource?/1),
          {:ok, components} <- component_limits(composed.scopes, expanded, resource_specs),

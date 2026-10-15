@@ -1,5 +1,14 @@
 import Config
 
+if config_env() in [:dev, :test] do
+  # Resolve from each worker's private project copy, without a source-tree path.
+  config :covenant,
+    root: ".",
+    contracts_dir: "contracts",
+    test_paths: ["test/contract"],
+    sibling_dir: false
+end
+
 # Declare fallback log metadata for local tests and lint checks. This does not
 # set a formatter policy in applications that depend on Jido.
 if config_env() in [:dev, :test] do

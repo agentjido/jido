@@ -42,3 +42,8 @@ if selected_generated_suite? do
     formatters: [ExUnit.CLIFormatter, JidoTest.System.Report, JidoTest.Property.Report]
   )
 end
+
+# Keep both Jido reports and add passing-test evidence for the API contract.
+ExUnit.configure(
+  formatters: Enum.uniq(ExUnit.configuration()[:formatters] ++ [Covenant.Formatter])
+)

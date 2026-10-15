@@ -223,26 +223,7 @@ defmodule Jido.AgentServer.Options do
   defp instantiate_agent(module, id, initial_state) when is_atom(module) and not is_nil(module) do
     overrides = instance_overrides(id, initial_state)
 
-    with {:module, ^module} <- Code.ensure_loaded(module) do
-      if function_exported?(module, :__agent_config__, 0) do
-        Validation.new_from_module_with_plugins(module, module.__agent_config__(), overrides)
-      else
-        result =
-          cond do
-            function_exported?(module, :new, 1) -> module.new(overrides)
-            function_exported?(module, :new, 0) -> module.new()
-            true -> invalid("Agent module must implement new/0 or new/1", %{module: module})
-          end
-
-        with {:ok, agent} <- normalize_agent_result(result, module),
-             :ok <- validate_requested_id(agent, id, module) do
-          Validation.validate_instance_with_plugins(agent)
-        end
-      end
-    else
-      {:error, reason} ->
-        invalid("Agent module could not be loaded", %{module: module, reason: reason})
-    end
+    Jido.Agent.Source.instantiate_with_plugins(module, overrides, &instantiate_custom_agent/2)
   rescue
     error -> constructor_failed(module, :error, error)
   catch
@@ -251,6 +232,19 @@ defmodule Jido.AgentServer.Options do
 
   defp instantiate_agent(value, _id, _initial_state),
     do: invalid("agent is required", %{agent: value})
+
+  defp instantiate_custom_agent(module, overrides) do
+    result =
+      cond do
+        function_exported?(module, :new, 1) -> module.new(overrides)
+        function_exported?(module, :new, 0) -> module.new()
+        true -> invalid("Agent module must implement new/0 or new/1", %{module: module})
+      end
+
+    with {:ok, agent} <- normalize_agent_result(result, module),
+         :ok <- validate_requested_id(agent, Keyword.get(overrides, :id), module),
+         do: Validation.validate_instance_with_plugins(agent)
+  end
 
   defp normalize_agent_result({:ok, %Agent{} = agent}, _module), do: {:ok, agent}
   defp normalize_agent_result(%Agent{} = agent, _module), do: {:ok, agent}

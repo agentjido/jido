@@ -1,0 +1,387 @@
+{
+  "apps": {
+    "jido": {
+      "active": 25,
+      "coverage": 1.0,
+      "covered": 25
+    }
+  },
+  "components": {
+    "jido.agent": {
+      "active": 25,
+      "app": "jido",
+      "coverage": 1.0,
+      "covered": 25,
+      "form": "light",
+      "obligations": {
+        "jido.agent.I1": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 5,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test a bare Agent module keeps the empty canonical definition",
+            "test a neutral Agent struct has the same complete fields as data construction",
+            "test all supported declarations give the same complete neutral value",
+            "test computed options and extensions evaluate once and lower to ordinary values",
+            "test unexposed DSL routes keep predicates and block options"
+          ]
+        },
+        "jido.agent.I10": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 2,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test a Plugin without an Agent facet adds no Agent state or input",
+            "test one schema composes domain and Plugin state and rejects ownership conflicts"
+          ]
+        },
+        "jido.agent.I11": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 3,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test data keyword boundaries keep the last duplicate",
+            "test initialization merges required map defaults and preserves optional absence",
+            "test set shallowly replaces domain fields and validates the full state"
+          ]
+        },
+        "jido.agent.I12": {
+          "failing": 0,
+          "kind": "ordering",
+          "passing": 6,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test Router priority selects one Action or Flow and merges defaults shallowly",
+            "test an unexposed route accepts its predicate as a keyword option",
+            "test custom selection accepts normalized input and binds only the original Signal",
+            "test data definitions support a module that implements the callback without behavior metadata",
+            "test map, tuple, and Router route declarations keep every supported option",
+            "test unexposed DSL routes keep predicates and block options"
+          ]
+        },
+        "jido.agent.I13": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 6,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test Router priority selects one Action or Flow and merges defaults shallowly",
+            "test a lone inline Action and remaining route block fields retain their behavior",
+            "test an unexposed route accepts its predicate as a keyword option",
+            "test map, duplicate keyword, and nil Signal data retain input and source semantics",
+            "test map, tuple, and Router route declarations keep every supported option",
+            "test unexposed DSL routes keep predicates and block options"
+          ]
+        },
+        "jido.agent.I14": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 5,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test Turn constructors retain exact input until selection normalizes it",
+            "test Turn constructors validate the full supplied source envelope",
+            "test custom selection accepts normalized input and binds only the original Signal",
+            "test direct default selection reports malformed Signal data",
+            "test map, duplicate keyword, and nil Signal data retain input and source semantics"
+          ]
+        },
+        "jido.agent.I15": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 2,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test direct execution forwards policy options to the executor",
+            "test reserved caller keys fail and allowed context preserves exact values"
+          ]
+        },
+        "jido.agent.I16": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 5,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test Directives return in order without dispatch and the entire list must be valid",
+            "test Plugin preparation and reduction use declaration order and package-owned inputs",
+            "test complete candidates preserve identity and failures do not damage the next command",
+            "test invalid executable values identify the callback and rejected value",
+            "test owned custom Directives validate before any reduction and keep their order"
+          ]
+        },
+        "jido.agent.I17": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 2,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test complete candidates preserve identity and failures do not damage the next command",
+            "test failure returns no candidate but cannot undo completed Action work"
+          ]
+        },
+        "jido.agent.I18": {
+          "failing": 0,
+          "kind": "ordering",
+          "passing": 7,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test Plugin callback rejections keep their application-owned reason",
+            "test Plugin failures stop later callbacks and executable ownership violations fail",
+            "test Plugin faults keep their callback cause and non-portable input path",
+            "test Plugin preparation and reduction use declaration order and package-owned inputs",
+            "test a Plugin without an Agent facet adds no Agent state or input",
+            "test one schema composes domain and Plugin state and rejects ownership conflicts",
+            "test owned custom Directives validate before any reduction and keep their order"
+          ]
+        },
+        "jido.agent.I19": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 3,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test Directives return in order without dispatch and the entire list must be valid",
+            "test failure returns no candidate but cannot undo completed Action work",
+            "test owned custom Directives validate before any reduction and keep their order"
+          ]
+        },
+        "jido.agent.I2": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 2,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test a neutral Agent struct has the same complete fields as data construction",
+            "test definitions reject every partial or complete instance form"
+          ]
+        },
+        "jido.agent.I20": {
+          "failing": 0,
+          "kind": "persisted_format",
+          "passing": 6,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test document limits reject excess depth, string size, and collection size",
+            "test external route predicates use trusted references and retain their exact function",
+            "test malformed documents produce nonempty validation messages",
+            "test route documents reject untrusted kinds, malformed defaults and local match closures",
+            "test stable trusted Registry references supply code and schemas",
+            "test version-2 documents round trip exact static data and omit live values"
+          ]
+        },
+        "jido.agent.I21": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 7,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test authoring and generated helper errors have nonempty messages",
+            "test both generated helper arities reject name conflicts",
+            "test extensions cannot leave exposed Signal helpers with missing, duplicate, or conditional routes",
+            "test generated public functions construct definitions, instances, and Signals",
+            "test inline route declarations keep their helper and execution behavior",
+            "test invalid DSL declarations fail at compile time with source locations",
+            "test one exposed route remains valid after extension lowering"
+          ]
+        },
+        "jido.agent.I22": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 16,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test a bare Agent module keeps the empty canonical definition",
+            "test a lone inline Action and remaining route block fields retain their behavior",
+            "test a lowering callback returns its supplied validation error",
+            "test an unexposed route accepts its predicate as a keyword option",
+            "test authoring and generated helper errors have nonempty messages",
+            "test computed options and extensions evaluate once and lower to ordinary values",
+            "test extension declarations reject non-module values",
+            "test extension validation rejects duplicate owners, invalid configuration, and invalid results",
+            "test extensions cannot leave exposed Signal helpers with missing, duplicate, or conditional routes",
+            "test inline route declarations keep their helper and execution behavior",
+            "test inline routes reject combined targets, multiple Actions, and malformed Action arguments",
+            "test invalid lowered fields and unconsumed entities fail at the core boundary",
+            "test one exposed route remains valid after extension lowering",
+            "test route target claims retain plain routes and reject non-atom target options",
+            "test route target option callbacks must return unique atom names",
+            "test whole option maps, lists, and module attributes use one evaluation"
+          ]
+        },
+        "jido.agent.I23": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 14,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test Plugin callback rejections keep their application-owned reason",
+            "test Plugin faults keep their callback cause and non-portable input path",
+            "test Plugin validation faults have nonempty messages",
+            "test Turn constructors retain exact input until selection normalizes it",
+            "test authoring and generated helper errors have nonempty messages",
+            "test built-in direct command faults have nonempty messages without fixed wording",
+            "test built-in validation faults have nonempty messages without fixed wording",
+            "test callback faults retain their cause and application error values pass through",
+            "test direct default selection reports malformed Signal data",
+            "test invalid declaration paths identify the field and route or Plugin index",
+            "test invalid executable values identify the callback and rejected value",
+            "test malformed documents produce nonempty validation messages",
+            "test normalization errors identify each route position",
+            "test routing errors preserve structured causes, target, and retry hints"
+          ]
+        },
+        "jido.agent.I24": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 4,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test a bare Agent module keeps the empty canonical definition",
+            "test bang boundaries raise the same errors returned by tuple boundaries",
+            "test generated public functions construct definitions, instances, and Signals",
+            "test reloaded Plugin state schemas are current and conflicts raise at accessors"
+          ]
+        },
+        "jido.agent.I25": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 4,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test Turn constructors retain exact input until selection normalizes it",
+            "test generated public functions construct definitions, instances, and Signals",
+            "test inline route declarations keep their helper and execution behavior",
+            "test required top-level public functions and Turn constructors remain available"
+          ]
+        },
+        "jido.agent.I3": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 14,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test a Plugin without an Agent facet adds no Agent state or input",
+            "test a valid definition constructor returns without recursive normalization",
+            "test constructors reject invalid fields and preserve error paths",
+            "test data definitions support a module that implements the callback without behavior metadata",
+            "test dependency errors identify the authored route or Plugin line",
+            "test inline routes reject combined targets, multiple Actions, and malformed Action arguments",
+            "test invalid DSL declarations fail at compile time with source locations",
+            "test invalid declaration paths identify the field and route or Plugin index",
+            "test invalid schema, metadata, and Plugin options report their authored line",
+            "test map, tuple, and Router route declarations keep every supported option",
+            "test normalization errors identify each route position",
+            "test route maps and option tuples retain the default priority",
+            "test state schemas reject transforms, coercion, lazy input, and non-static defaults",
+            "test static schema validation rejects nested input conversion and MFA transforms"
+          ]
+        },
+        "jido.agent.I4": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 2,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test data keyword boundaries keep the last duplicate",
+            "test invalid DSL declarations fail at compile time with source locations"
+          ]
+        },
+        "jido.agent.I5": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 6,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test a neutral Agent struct has the same complete fields as data construction",
+            "test all supported declarations give the same complete neutral value",
+            "test independent instances preserve the neutral definition and explicit values",
+            "test map, tuple, and Router route declarations keep every supported option",
+            "test route maps and option tuples retain the default priority",
+            "test version-2 documents round trip exact static data and omit live values"
+          ]
+        },
+        "jido.agent.I6": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 2,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test an unchanged module rejects a reloaded invalid Action contract",
+            "test reloaded Plugin state schemas are current and conflicts raise at accessors"
+          ]
+        },
+        "jido.agent.I7": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 3,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test data keyword boundaries keep the last duplicate",
+            "test independent instances preserve the neutral definition and explicit values",
+            "test instance overrides have a strict boundary"
+          ]
+        },
+        "jido.agent.I8": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 4,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test a static refinement cannot change a value during initialization",
+            "test independent instances preserve the neutral definition and explicit values",
+            "test initialization merges required map defaults and preserves optional absence",
+            "test nested initialization defaults do not become stored-state repair"
+          ]
+        },
+        "jido.agent.I9": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 6,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test a static refinement cannot change a value during initialization",
+            "test complete candidates preserve identity and failures do not damage the next command",
+            "test initialization merges required map defaults and preserves optional absence",
+            "test nested initialization defaults do not become stored-state repair",
+            "test static schema validation rejects nested input conversion and MFA transforms",
+            "test stored validation returns exact values and never converts or supplies required fields"
+          ]
+        }
+      }
+    }
+  },
+  "covenant": "0.1.0",
+  "totals": {
+    "active": 25,
+    "coverage": 1.0,
+    "covered": 25
+  }
+}

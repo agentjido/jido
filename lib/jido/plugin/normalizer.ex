@@ -16,7 +16,7 @@ defmodule Jido.Plugin.Normalizer do
   @spec normalize_all([Jido.Plugin.declaration()] | [Spec.t()]) ::
           {:ok, [Spec.t()]} | {:error, term()}
   def normalize_all(declarations) when is_list(declarations) do
-    with {:ok, specs} <- normalize_specs(declarations),
+    with {:ok, specs} <- normalize_specs(declarations, &normalize/1),
          :ok <- unique_packages(specs),
          :ok <- unique_state_keys(specs),
          :ok <- unique_directives(specs) do
@@ -36,7 +36,22 @@ defmodule Jido.Plugin.Normalizer do
     end
   end
 
-  defp normalize_specs(values) do
+  # Normalize declaration syntax without loading current Plugin contracts.
+  @doc false
+  def declarations(values) when is_list(values) do
+    with {:ok, values} <- normalize_specs(values, &declaration/1),
+         do:
+           {:ok,
+            Enum.map(values, fn
+              %Spec{module: module, options: options} -> {module, options}
+              declaration -> declaration
+            end)}
+  end
+
+  def declarations(values),
+    do: PluginError.validation("Agent Plugins must be a list", %{plugins: values})
+
+  defp normalize_specs(values, prepare) do
     {specs, declarations} = Enum.split_with(values, &match?(%Spec{}, &1))
 
     cond do
@@ -54,14 +69,14 @@ defmodule Jido.Plugin.Normalizer do
         )
 
       true ->
-        normalize_declarations(declarations)
+        normalize_declarations(declarations, prepare)
     end
   end
 
-  defp normalize_declarations(declarations) do
+  defp normalize_declarations(declarations, prepare) do
     declarations
     |> Enum.reduce_while({:ok, []}, fn declaration, {:ok, specs} ->
-      case normalize(declaration) do
+      case prepare.(declaration) do
         {:ok, spec} -> {:cont, {:ok, [spec | specs]}}
         {:error, _reason} = error -> {:halt, error}
       end
@@ -72,11 +87,15 @@ defmodule Jido.Plugin.Normalizer do
     end
   end
 
-  defp normalize(module) when is_atom(module), do: build_spec(module, [])
+  defp normalize(value) do
+    with {:ok, {module, options}} <- declaration(value), do: build_spec(module, options)
+  end
 
-  defp normalize({module, options}) when is_atom(module) and is_list(options) do
+  defp declaration(module) when is_atom(module), do: {:ok, {module, []}}
+
+  defp declaration({module, options}) when is_atom(module) and is_list(options) do
     if Keyword.keyword?(options) do
-      build_spec(module, options)
+      {:ok, {module, options}}
     else
       PluginError.validation("Agent Plugin options must be a keyword list", %{
         plugin: module,
@@ -85,7 +104,7 @@ defmodule Jido.Plugin.Normalizer do
     end
   end
 
-  defp normalize(declaration),
+  defp declaration(declaration),
     do: PluginError.validation("Invalid Agent Plugin declaration", %{plugin: declaration})
 
   defp build_spec(module, options) do

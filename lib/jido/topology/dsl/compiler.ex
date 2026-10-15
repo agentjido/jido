@@ -1,37 +1,58 @@
 defmodule Jido.Topology.DSL.Compiler do
   @moduledoc false
+  use Spark.Dsl.Transformer
+
   alias Jido.Agent.Authoring
-  alias Jido.Topology.DSL
-  alias Jido.Topology.Validation
-  alias Spark.Dsl.Entity
+  alias Jido.Topology.EntryMetadata
+  alias Jido.Topology.DSL.Entity, as: DslEntity
+  alias Jido.Agent.Authoring.SourceMap
   alias Spark.Dsl.Extension
 
+  # Spark stores entities before our final compiler runs. Check storage here,
+  # after extension transformers, while the property annotations are available.
+  @impl true
+  def transform(dsl) do
+    env = Spark.Dsl.Transformer.get_persisted(dsl, :env)
+
+    error =
+      for {kind, _field, section, module} <- DslEntity.entries(),
+          entity <- section_entities(dsl, section),
+          is_struct(entity, module),
+          sources = SourceMap.entity(entity, []),
+          field <- EntryMetadata.fields(kind),
+          reduce: nil do
+        nil ->
+          line = SourceMap.lookup(sources, [field], env.line)
+
+          case escape(Map.fetch!(entity, field), %{env | line: line}) do
+            {:ok, _} -> nil
+            {:error, error} -> error
+          end
+
+        error ->
+          error
+      end
+
+    if error, do: {:error, error}, else: :ok
+  end
+
   defmacro __before_compile__(env) do
-    original = Module.get_attribute(env.module, :topology_options)
-    config = unwrap!(Authoring.attrs(original), env)
+    config = Module.get_attribute(env.module, :jido_agent_options)
     config = Map.drop(config, [:description])
     {extensions, config} = Map.pop(config, :extensions, [])
     validate_extensions!(extensions, env)
     extensions = Enum.filter(extensions, &extension?(&1, :lower_topology))
     dsl = Module.get_attribute(env.module, :spark_dsl_config) || %{}
-    agents = section_entities(dsl, :agents)
     fields = opts(dsl, [:topology], [:schema, :metadata])
 
-    entity_groups = [
-      {:agents, :agent, Enum.filter(agents, &is_struct(&1, DSL.Agent))},
-      {:groups, :group, Enum.filter(agents, &is_struct(&1, DSL.Group))},
-      {:resources, :resource, core_entities(:resources, section_entities(dsl, :resources))},
-      {:relationships, :owns,
-       core_entities(:relationships, section_entities(dsl, :relationships))},
-      {:connections, :subscribe,
-       core_entities(:connections, section_entities(dsl, :connections))},
-      {:includes, :include, core_entities(:topologies, section_entities(dsl, :topologies))},
-      {:imports, :import, core_entities(:imports, section_entities(dsl, :imports))},
-      {:exports, :export, core_entities(:exports, section_entities(dsl, :exports))}
-    ]
+    entity_groups =
+      for {_kind, field, section, module} <- DslEntity.entries() do
+        entities = Enum.filter(section_entities(dsl, section), &is_struct(&1, module))
+        {field, entities}
+      end
 
     fields =
-      Enum.reduce(entity_groups, fields, fn {field, _kind, entities}, fields ->
+      Enum.reduce(entity_groups, fields, fn {field, entities}, fields ->
         put_entities(fields, field, entities)
       end)
 
@@ -43,40 +64,32 @@ defmodule Jido.Topology.DSL.Compiler do
     if overlap != [],
       do: fail!(env, "Fields declared in both keyword and block form: #{inspect(overlap)}")
 
-    config =
-      Map.merge(
-        %{
-          schema: Zoi.object(%{}),
-          metadata: %{},
-          agents: [],
-          groups: [],
-          resources: [],
-          relationships: [],
-          connections: [],
-          includes: [],
-          children: [],
-          imports: [],
-          exports: [],
-          startup: %{}
-        },
-        Map.merge(config, fields)
-      )
+    defaults =
+      Map.new(EntryMetadata.collections(), fn {_kind, field} -> {field, []} end)
+      |> Map.merge(%{schema: Zoi.object(%{}), metadata: %{}, startup: %{}})
+
+    config = Map.merge(defaults, Map.merge(config, fields))
 
     entities = foreign_entities(dsl)
     config = unwrap!(Jido.Topology.Extension.lower(extensions, config, entities), env)
 
     sources =
-      Enum.flat_map(entity_groups, fn {field, kind, entities} ->
-        sources(entities, field, kind)
+      Enum.reduce(entity_groups, field_sources(dsl), fn {field, entities}, locations ->
+        entities
+        |> Enum.with_index()
+        |> Enum.reduce(locations, fn {entity, index}, acc ->
+          Map.merge(acc, source_locations(entity, [field, index]))
+        end)
       end)
 
     owner? = Module.get_attribute(env.module, :jido_agent_block_declared) == true
+    escaped_config = Jido.Topology.unwrap!(escape(config, env))
 
     quote do
       @doc false
       def __topology_owner__?, do: unquote(owner?)
       @doc false
-      def __topology_config__, do: unquote(Macro.escape(config))
+      def __topology_config__, do: unquote(escaped_config)
 
       @doc false
       def __topology_sources__, do: unquote(Macro.escape(sources))
@@ -91,57 +104,32 @@ defmodule Jido.Topology.DSL.Compiler do
 
     case Jido.Topology.new(config) do
       {:ok, _definition} -> :ok
-      {:error, error} -> fail_from_source(config, module.__topology_sources__(), error, env)
+      {:error, error} -> fail_from_source(module.__topology_sources__(), error, env)
     end
   end
 
-  @spec fail_from_source(map(), list(), Exception.t(), map()) :: no_return()
-  defp fail_from_source(config, sources, error, env) do
-    located =
-      Enum.find_value(sources, fn source ->
-        with entries when is_list(entries) <- Map.get(config, source.field),
-             {:ok, entry} <- Enum.fetch(entries, source.index),
-             {:error, source_error} <- Validation.entry(source.kind, entry) do
-          {source, source_error}
-        else
-          _other -> nil
-        end
-      end)
-
-    case located do
-      {source, source_error} -> fail!(%{env | line: source.line}, Exception.message(source_error))
-      nil -> fail!(env, Exception.message(error))
-    end
+  @spec fail_from_source(map(), Exception.t(), map()) :: no_return()
+  defp fail_from_source(sources, error, env) do
+    path = Map.get(error.details || %{}, :source_path, [])
+    line = SourceMap.lookup(sources, path, env.line)
+    fail!(%{env | line: line}, Exception.message(error))
   end
 
-  defp sources(entities, field, kind) do
-    entities
+  defp field_sources(dsl) do
+    SourceMap.section(dsl, [:topology], [:schema, :metadata], [])
+    |> Map.merge(
+      SourceMap.section(dsl, [:topology, :startup], EntryMetadata.fields(:startup), [:startup])
+    )
+  end
+
+  defp source_locations(entity, path) do
+    entity
+    |> Map.get(:bindings, [])
     |> Enum.with_index()
-    |> Enum.map(fn {entity, index} -> source(field, kind, index, entity) end)
+    |> Enum.reduce(SourceMap.entity(entity, path), fn {binding, index}, acc ->
+      Map.merge(acc, source_locations(binding, path ++ [:bindings, index]))
+    end)
   end
-
-  defp source(field, kind, index, entity) do
-    %{field: field, kind: kind, index: index, line: source_line(entity)}
-  end
-
-  defp source_line(%_{} = entity) do
-    property_annos =
-      entity
-      |> Map.from_struct()
-      |> Map.keys()
-      |> Enum.map(&Entity.property_anno(entity, &1))
-
-    [Entity.anno(entity) | property_annos]
-    |> Enum.reject(&is_nil/1)
-    |> Enum.map(&:erl_anno.line/1)
-    |> Enum.reject(&(&1 == 1))
-    |> Enum.min(fn -> annotation_line(Entity.anno(entity)) end)
-  end
-
-  defp source_line(_entity), do: 1
-
-  defp annotation_line(nil), do: 1
-  defp annotation_line(annotation), do: :erl_anno.line(annotation)
 
   defp opts(dsl, path, keys) do
     Enum.reduce(keys, %{}, fn key, acc ->
@@ -155,28 +143,16 @@ defmodule Jido.Topology.DSL.Compiler do
   defp section_entities(dsl, section), do: Extension.get_entities(dsl, [:topology, section])
 
   defp section_opts(dsl, :startup) do
-    keys = [:concurrency, :max_agents, :retry_interval, :task_timeout]
+    keys = EntryMetadata.fields(:startup)
     opts(dsl, [:topology, :startup], keys)
   end
 
   defp put_entities(fields, _, []), do: fields
 
   defp put_entities(fields, key, entities) do
-    values = Enum.map(entities, &lower/1)
+    values = Enum.map(entities, &DslEntity.lower/1)
 
     Map.put(fields, key, values)
-  end
-
-  defp lower(entity) do
-    value =
-      entity
-      |> Map.from_struct()
-      |> Map.delete(:__spark_metadata__)
-      |> Map.reject(fn {_, value} -> is_nil(value) end)
-
-    if Map.has_key?(value, :bindings),
-      do: Map.update!(value, :bindings, &Enum.map(&1, fn binding -> lower(binding) end)),
-      else: value
   end
 
   defp foreign_entities(dsl) do
@@ -191,20 +167,11 @@ defmodule Jido.Topology.DSL.Compiler do
     end)
   end
 
-  defp core_entities(section, entities),
-    do: Enum.filter(entities, &core_entity?([section], &1))
-
-  defp core_entity?([:topology, section], entity), do: core_entity?([section], entity)
-
-  defp core_entity?([:agents], entity),
-    do: is_struct(entity, DSL.Agent) or is_struct(entity, DSL.Group)
-
-  defp core_entity?([:resources], entity), do: is_struct(entity, DSL.Bus)
-  defp core_entity?([:relationships], entity), do: is_struct(entity, DSL.Owns)
-  defp core_entity?([:connections], entity), do: is_struct(entity, DSL.Subscribe)
-  defp core_entity?([:topologies], entity), do: is_struct(entity, DSL.Include)
-  defp core_entity?([:imports], entity), do: is_struct(entity, DSL.Import)
-  defp core_entity?([:exports], entity), do: is_struct(entity, DSL.Export)
+  defp core_entity?([:topology, section], entity) do
+    Enum.any?(DslEntity.entries(), fn {_kind, _field, candidate, module} ->
+      section == candidate and is_struct(entity, module)
+    end)
+  end
 
   defp core_entity?(_path, _entity), do: false
 
@@ -227,6 +194,18 @@ defmodule Jido.Topology.DSL.Compiler do
     do: Code.ensure_loaded?(module) and function_exported?(module, callback, 2)
 
   defp extension?(_module, _callback), do: false
+
+  defp escape(value, env) do
+    {:ok, Macro.escape(value)}
+  rescue
+    ArgumentError ->
+      {:error,
+       CompileError.exception(
+         file: env.file,
+         line: env.line,
+         description: "Topology data must not contain runtime values"
+       )}
+  end
 
   defp unwrap!({:error, %{details: %{entities: [entity | _]}} = error}, env),
     do: fail!(Authoring.location(env, entity), Exception.message(error))

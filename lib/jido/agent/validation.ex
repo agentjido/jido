@@ -54,11 +54,7 @@ defmodule Jido.Agent.Validation do
   end
 
   def instantiate_with_plugins(%Agent{} = definition, overrides) do
-    with {:ok, definition, plugin_specs, schema} <-
-           validate_definition_with_plugins(definition),
-         {:ok, agent} <- instantiate_validated(definition, schema, overrides) do
-      {:ok, agent, plugin_specs, schema}
-    end
+    instantiate_validated(validate_definition_with_plugins(definition), overrides)
   end
 
   def instantiate_with_plugins(value, _overrides),
@@ -83,21 +79,10 @@ defmodule Jido.Agent.Validation do
 
   @doc false
   @spec validate_definition(term()) :: {:ok, Agent.t()} | {:error, Exception.t()}
-  def validate_definition(%Agent{id: nil, state: nil} = agent) do
-    with {:ok, agent, _plugin_specs, _schema} <- validate_common(agent) do
-      {:ok, %{agent | id: nil, state: nil}}
-    end
+  def validate_definition(value) do
+    with {:ok, agent, _specs, _schema} <- validate_definition_with_plugins(value),
+         do: {:ok, agent}
   end
-
-  def validate_definition(%Agent{} = agent) do
-    invalid("Agent definition cannot contain instance identity or state", %{
-      id: agent.id,
-      state: agent.state
-    })
-  end
-
-  def validate_definition(value),
-    do: invalid("Expected a neutral Jido.Agent definition", %{value: value})
 
   @doc false
   @spec validate_instance(term()) :: {:ok, Agent.t()} | {:error, Exception.t()}
@@ -115,46 +100,31 @@ defmodule Jido.Agent.Validation do
   def validate_instance_with_plugins(value),
     do: invalid("Expected a Jido.Agent instance", %{value: value})
 
-  @doc false
-  @spec definition_from_module(module(), map() | keyword()) ::
-          {:ok, Agent.t()} | {:error, Exception.t()}
-  def definition_from_module(module, definition) when is_atom(module) do
-    with {:ok, definition} <- normalize_attrs(definition, :definition) do
-      definition
-      |> Map.put(:module, module)
-      |> Map.put_new(:vsn, 1)
-      |> new()
-    end
-  end
-
-  @doc false
-  @spec new_from_module(module(), map() | keyword(), map() | keyword()) ::
-          {:ok, Agent.t()} | {:error, Exception.t()}
-  def new_from_module(module, definition, overrides) when is_atom(module) do
-    with {:ok, agent, _specs, _schema} <-
-           new_from_module_with_plugins(module, definition, overrides),
-         do: {:ok, agent}
-  end
-
-  def new_from_module_with_plugins(module, definition, overrides) when is_atom(module) do
-    with {:ok, attrs} <- normalize_attrs(definition, :definition),
+  # The compiler supplies the module identity; direct definitions can be unversioned.
+  def module_definition(module, attrs) do
+    with {:ok, attrs} <- normalize_attrs(attrs, :definition),
          attrs = attrs |> Map.put(:module, module) |> Map.put_new(:vsn, 1),
          :ok <- known_keys(attrs),
          :ok <- reject_instance_data(attrs),
-         {:ok, definition, plugin_specs, schema} <- build_definition_with_plugins(attrs),
-         {:ok, agent} <- instantiate_validated(definition, schema, overrides) do
-      {:ok, agent, plugin_specs, schema}
+         true <- is_integer(attrs.vsn) and attrs.vsn > 0,
+         {:ok, definition} <- static(build_definition_value(attrs)),
+         {:ok, plugins} <-
+           plugins_at(PluginNormalizer.declarations(definition.plugins), definition.plugins) do
+      {:ok, %{definition | plugins: plugins}}
+    else
+      false -> invalid("Agent vsn must be a positive integer", %{}) |> Authoring.at(:vsn)
+      error -> error
     end
   end
 
   defp build_definition(attrs) do
-    with {:ok, agent, _plugin_specs, _schema} <- build_definition_with_plugins(attrs) do
+    with {:ok, agent, _plugin_specs, _schema} <- validate_common(build_definition_value(attrs)) do
       {:ok, agent}
     end
   end
 
-  defp build_definition_with_plugins(attrs) do
-    agent = %Agent{
+  defp build_definition_value(attrs) do
+    %Agent{
       id: nil,
       module: Map.get(attrs, :module, Agent),
       vsn: Map.get(attrs, :vsn),
@@ -166,52 +136,105 @@ defmodule Jido.Agent.Validation do
       routes: Map.get(attrs, :routes, []),
       metadata: Map.get(attrs, :metadata, %{})
     }
-
-    validate_common(agent)
   end
 
-  defp validate_common(%Agent{} = agent) do
-    with {:ok, name} <- field(:name, agent.name),
-         {:ok, description} <- field(:description, agent.description),
-         :ok <- validate_module(agent.module),
-         {:ok, vsn} <- field(:vsn, agent.vsn),
-         {:ok, plugin_specs} <- PluginNormalizer.normalize_all(agent.plugins),
-         :ok <- State.validate_schema(agent.schema),
-         {:ok, complete_schema} <- AgentPlugin.compose_schema(agent.schema, plugin_specs),
-         :ok <- State.validate_schema(complete_schema),
-         {:ok, plugins} <- PluginNormalizer.canonical_declarations(plugin_specs),
-         {:ok, routes} <- validate_routes(agent.routes),
-         {:ok, metadata} <- field(:metadata, agent.metadata) do
-      validated = %{
-        agent
-        | name: name,
-          description: description,
-          vsn: vsn,
-          plugins: plugins,
-          routes: routes,
-          metadata: metadata
-      }
-
-      {:ok, validated, plugin_specs, complete_schema}
+  defp validate_common(agent) do
+    with {:ok, name} <- field(:name, agent.name) |> Authoring.at(:name),
+         {:ok, description} <-
+           field(:description, agent.description) |> Authoring.at(:description),
+         :ok <- validate_module(agent.module) |> Authoring.at(:module),
+         {:ok, vsn} <- field(:vsn, agent.vsn) |> Authoring.at(:vsn),
+         {:ok, specs, schema} <- plugin_schema(agent),
+         {:ok, routes} <- Authoring.routes(agent.routes) |> Authoring.at(:routes),
+         :ok <- validate_targets(routes),
+         {:ok, metadata} <- field(:metadata, agent.metadata) |> Authoring.at(:metadata) do
+      {:ok,
+       %{
+         agent
+         | name: name,
+           description: description,
+           vsn: vsn,
+           routes: routes,
+           metadata: metadata,
+           plugins: Enum.map(specs, &{&1.module, &1.options})
+       }, specs, schema}
     end
   end
 
-  defp validate_definition_with_plugins(%Agent{id: nil, state: nil} = definition),
+  defp static(%Agent{} = agent) do
+    with {:ok, name} <- field(:name, agent.name) |> Authoring.at(:name),
+         {:ok, description} <-
+           field(:description, agent.description) |> Authoring.at(:description),
+         {:ok, vsn} <- field(:vsn, agent.vsn) |> Authoring.at(:vsn),
+         :ok <- State.validate_schema(agent.schema) |> Authoring.at(:schema),
+         {:ok, routes} <- Authoring.routes(agent.routes) |> Authoring.at(:routes),
+         {:ok, metadata} <- field(:metadata, agent.metadata) |> Authoring.at(:metadata) do
+      {:ok,
+       %{
+         agent
+         | name: name,
+           description: description,
+           vsn: vsn,
+           routes: routes,
+           metadata: metadata
+       }}
+    end
+  end
+
+  # Re-read module contracts and Plugin-owned schemas for each use. The compiler
+  # stores only static fields and declarations in the neutral Agent value.
+  def dependencies(%Agent{} = agent) do
+    with :ok <- validate_module(agent.module) |> Authoring.at(:module),
+         {:ok, specs, schema} <- plugin_schema(agent),
+         :ok <- validate_targets(agent.routes),
+         do: {:ok, agent, specs, schema}
+  end
+
+  defp plugin_schema(agent) do
+    with {:ok, specs} <- plugins_at(PluginNormalizer.normalize_all(agent.plugins), agent.plugins),
+         :ok <- State.validate_schema(agent.schema) |> Authoring.at(:schema),
+         {:ok, schema} <-
+           AgentPlugin.compose_schema_from_specs(agent.schema, specs) |> Authoring.at(:plugins),
+         :ok <- State.validate_schema(schema) |> Authoring.at(:plugins),
+         do: {:ok, specs, schema}
+  end
+
+  defp plugins_at({:error, %{details: details}} = error, declarations)
+       when is_list(declarations) do
+    plugin = Map.get(details || %{}, :plugin)
+
+    index =
+      Enum.find_index(declarations, fn
+        {module, _opts} -> module == plugin
+        module -> module == plugin
+      end)
+
+    Authoring.at(error, if(is_nil(index), do: [:plugins], else: [:plugins, index]))
+  end
+
+  defp plugins_at(result, _declarations), do: Authoring.at(result, :plugins)
+
+  def validate_definition_with_plugins(%Agent{id: nil, state: nil} = definition),
     do: validate_common(definition)
 
-  defp validate_definition_with_plugins(%Agent{} = definition) do
+  def validate_definition_with_plugins(%Agent{} = definition) do
     invalid("Agent definition cannot contain instance identity or state", %{
       id: definition.id,
       state: definition.state
     })
   end
 
-  defp instantiate_validated(definition, schema, overrides) do
-    with {:ok, overrides} <- normalize_attrs(overrides, :instance),
+  def validate_definition_with_plugins(value),
+    do: invalid("Expected a neutral Jido.Agent definition", %{value: value})
+
+  @doc false
+  def instantiate_validated(validation, overrides) do
+    with {:ok, definition, specs, schema} <- validation,
+         {:ok, overrides} <- normalize_attrs(overrides, :instance),
          :ok <- validate_instance_overrides(overrides),
          {:ok, id} <- instance_id(Map.get(overrides, :id)),
          {:ok, state} <- State.initialize(Map.get(overrides, :state, %{}), schema) do
-      {:ok, %{definition | id: id, state: state}}
+      {:ok, %{definition | id: id, state: state}, specs, schema}
     end
   end
 
@@ -292,21 +315,10 @@ defmodule Jido.Agent.Validation do
     |> Enum.member?(Agent)
   end
 
-  defp validate_routes(routes) when is_list(routes) do
-    with {:ok, routes} <- Jido.Agent.Authoring.routes(routes),
-         :ok <- validate_targets(routes) do
-      {:ok, routes}
-    else
-      {:error, %_{} = error} -> {:error, error}
-      {:error, reason} -> invalid("Invalid Agent routes", %{reason: reason})
-    end
-  end
-
-  defp validate_routes(routes),
-    do: invalid("Agent routes must be a list", %{routes: routes})
-
   defp validate_targets(routes) do
-    Enum.reduce_while(routes, :ok, fn route, :ok ->
+    routes
+    |> Enum.with_index()
+    |> Enum.reduce_while(:ok, fn {route, index}, :ok ->
       {target, _defaults} = Authoring.split_target(route.target)
 
       case Jido.Instruction.validate(target) do
@@ -314,7 +326,9 @@ defmodule Jido.Agent.Validation do
           {:cont, :ok}
 
         {:error, reason} ->
-          {:halt, invalid("Invalid Agent route executable", %{target: target, reason: reason})}
+          {:halt,
+           invalid("Invalid Agent route executable", %{target: target, reason: reason})
+           |> Authoring.at([:routes, index, :target])}
       end
     end)
   end

@@ -2,11 +2,11 @@ defmodule Jido.Agent.DSL.Compiler do
   @moduledoc false
 
   alias Jido.Agent.Authoring
+  alias Jido.Agent.Authoring.SourceMap
   alias Spark.Dsl.Extension
 
   defmacro __before_compile__(env) do
-    original = Module.get_attribute(env.module, :jido_agent_options)
-    config = unwrap!(Authoring.attrs(original), env)
+    config = Module.get_attribute(env.module, :jido_agent_options)
     config = host_config(config, env)
     {extensions, config} = Map.pop(config, :extensions, [])
 
@@ -32,26 +32,28 @@ defmodule Jido.Agent.DSL.Compiler do
       |> Extension.get_entities([:agent])
       |> Enum.split_with(&match?(%Jido.Agent.DSL.Plugin{}, &1))
 
+    sources = sources(dsl, routes, plugins)
+
     config =
       config
       |> Map.put_new(:description, nil)
-      |> Map.merge(block_fields(dsl, routes, plugins, env))
+      |> Map.merge(block_fields(dsl, routes, plugins, env, sources))
 
     config = unwrap!(Jido.Agent.Extension.lower(extensions, config, entities), env)
-    config = Map.put_new(config, :vsn, 1)
 
-    unless is_integer(config.vsn) and config.vsn > 0 do
-      fail!(env, "Agent vsn must be a positive integer")
-    end
+    definition =
+      unwrap!(Jido.Agent.Validation.module_definition(env.module, config), env, sources)
 
     if extensions != [],
-      do: validate_lowered_routes!(routes, Map.get(config, :routes, []), env)
+      do: validate_lowered_routes!(routes, definition.routes, env)
 
     generated = generate(routes, source, env)
 
     quote do
       @doc false
-      def __agent_config__, do: unquote(Macro.escape(config))
+      def __agent_config__, do: unquote(Macro.escape(definition))
+      @doc false
+      def __agent_sources__, do: unquote(Macro.escape(sources))
 
       unquote_splicing(generated)
 
@@ -73,8 +75,6 @@ defmodule Jido.Agent.DSL.Compiler do
   end
 
   defp validate_lowered_routes!(routes, lowered, env) do
-    lowered = unwrap!(Authoring.routes(lowered), env)
-
     for route <- routes, not is_nil(route.as) do
       case Enum.filter(lowered, &(&1.path == route.path)) do
         [final] when is_nil(final.match) ->
@@ -91,18 +91,32 @@ defmodule Jido.Agent.DSL.Compiler do
 
   def verify(module) do
     env = %{file: to_string(module.module_info(:compile)[:source]), line: 1}
-    unwrap!(Jido.Agent.__definition_from_module__(module, module.__agent_config__()), env)
+    unwrap!(Jido.Agent.Source.definition(module), env, module.__agent_sources__())
     :ok
   end
 
-  defp block_fields(dsl, routes, plugins, env) do
+  defp sources(dsl, routes, plugins) do
+    locations = SourceMap.section(dsl, [:agent], [:schema, :metadata], [])
+    locations = Map.merge(locations, SourceMap.section(dsl, [:agent], [], [:plugins]))
+
+    Enum.reduce([routes: routes, plugins: plugins], locations, fn {field, entities}, sources ->
+      entities
+      |> Enum.with_index()
+      |> Enum.reduce(sources, fn {entity, index}, sources ->
+        Map.merge(sources, SourceMap.entity(entity, [field, index]))
+      end)
+    end)
+  end
+
+  defp block_fields(dsl, routes, plugins, env, sources) do
     %{
       schema: Extension.get_opt(dsl, [:agent], :schema, Zoi.object(%{})),
       metadata: Extension.get_opt(dsl, [:agent], :metadata, %{}),
       routes: Enum.map(routes, &lower_route(&1, env)),
       plugins:
-        Enum.map(plugins, fn plugin ->
-          {plugin.module, unwrap!(Authoring.options(plugin.config), env)}
+        Enum.map(Enum.with_index(plugins), fn {plugin, index} ->
+          options = Authoring.options(plugin.config) |> Authoring.at([:plugins, index])
+          {plugin.module, unwrap!(options, env, sources)}
         end)
     }
   end
@@ -162,6 +176,13 @@ defmodule Jido.Agent.DSL.Compiler do
   defp unwrap!(:ok, _env), do: :ok
   defp unwrap!({:ok, value}, _env), do: value
   defp unwrap!({:error, error}, env), do: fail!(env, Exception.message(error))
+
+  defp unwrap!({:ok, value}, _env, _sources), do: value
+
+  defp unwrap!({:error, error}, env, sources) do
+    line = SourceMap.lookup(sources, Map.get(error.details || %{}, :source_path, []), env.line)
+    fail!(%{env | line: line}, Exception.message(error))
+  end
 
   defp fail!(env, message),
     do: raise(CompileError, file: env.file, line: env.line, description: message)

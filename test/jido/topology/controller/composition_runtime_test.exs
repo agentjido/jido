@@ -346,9 +346,12 @@ defmodule Jido.Topology.Controller.CompositionRuntimeTest do
              Jido.AgentServer.call(west, route_signal_2, [])
 
     assert :ok = Controller.reconcile(controller)
-    eventually(fn -> Controller.status(controller).active == 0 end)
+
+    eventually(fn ->
+      match?(%{status: :degraded, active: 0}, Controller.status(controller))
+    end)
+
     assert Controller.whereis_agent(controller, Ref.ref(:east, :leader)) == nil
-    assert Controller.status(controller).status == :degraded
 
     assert Controller.whereis_bus(controller, :events) == bus
     assert Controller.whereis_agent(controller, Ref.ref(:west, :leader)) == west

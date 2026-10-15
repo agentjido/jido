@@ -25,8 +25,13 @@ end
 Pass authoring extension modules to the Agent:
 
 ```elixir
-use Jido.Agent, extensions: [MyApp.AgentExtension]
+use Jido.Agent, name: "extended_agent", extensions: [MyApp.AgentExtension]
 ```
+
+Both hosts accept keyword options, map options, or a module attribute that
+contains either form. Core evaluates the options once, after preceding module
+attributes are available. Extension entities remain inside the existing
+`agent`, `routes`, and `topology` sections.
 
 Core first collects its data schema, Plugins, routes, and metadata. It then
 calls extensions in declaration order.
@@ -111,7 +116,7 @@ end
 Pass it to the Topology declaration:
 
 ```elixir
-use Jido.Topology, extensions: [MyApp.TopologyExtension]
+use Jido.Topology, name: "extended_topology", extensions: [MyApp.TopologyExtension]
 ```
 
 Core collects normal Agents, groups, resources, relationships, connections,
