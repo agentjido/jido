@@ -65,10 +65,10 @@ MIX_ENV=test mix covenant.mutate jido.agent --macros \
 
 The development dependency is the sibling `../covenant` fork on
 `feat/macro-mutation`. Setup, scope, survivor review rules, and tool limits are
-in the repository's `contracts/README.md`. That file also gives the separate
+in the repository's `test/contracts/README.md`. That file also gives the separate
 full-run command. Mutant IDs depend on the source and module profile; check the
 reported sites after a source change. The obligation report is
-`contracts/coverage.json`. The earlier full run and current focused result are
-recorded in `contracts/jido/agent.baseline.md`. A focused result does not verify
+`test/contracts/coverage.json`. The earlier full run and current focused result are
+recorded in `test/contracts/jido/agent.baseline.md`. A focused result does not verify
 the full mutation profile. A passing obligation report does not replace mutation
 review or the package line-coverage gate.

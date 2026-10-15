@@ -4,7 +4,7 @@ if config_env() in [:dev, :test] do
   # Resolve from each worker's private project copy, without a source-tree path.
   config :covenant,
     root: ".",
-    contracts_dir: "contracts",
+    contracts_dir: "test/contracts",
     test_paths: ["test/contract"],
     sibling_dir: false
 end

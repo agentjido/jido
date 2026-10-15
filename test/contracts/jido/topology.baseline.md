@@ -121,7 +121,7 @@ identify the exact results used for this record:
 - Runtime activation, AgentServer, Controller, persistence, and dispatch need
   their existing runtime tests. They are outside this authoring component.
 - Spark provider declarations remain outside the mutation profiles because of
-  the existing asynchronous worker failure documented in `contracts/README.md`.
+  the existing asynchronous worker failure documented in `test/contracts/README.md`.
   Generic mutation operators and this small selection cannot prove all behavior.
   Keep core tests, property tests, and the independent optional authoring corpus.
 

@@ -36,7 +36,7 @@ mix test.ci
 ```
 
 `mix test.contract` runs Covenant's passing-test gate and writes
-`contracts/coverage.json`. All 42 obligations must have passing tests. Core tests,
+`test/contracts/coverage.json`. All 42 obligations must have passing tests. Core tests,
 property tests, and the contract gate run through `mix test.ci`. `mix quality`
 also runs the contract gate. Keep the existing package line-coverage gate.
 
