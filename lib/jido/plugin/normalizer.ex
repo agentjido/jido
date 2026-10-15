@@ -361,7 +361,7 @@ defmodule Jido.Plugin.Normalizer do
         schema: schema
       })
     else
-      case Jido.Action.validate_static_data(schema) do
+      case Jido.Authoring.Config.validate_static_data(schema) do
         :ok ->
           {:ok, {key, schema}}
 

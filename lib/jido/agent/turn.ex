@@ -144,7 +144,7 @@ defmodule Jido.Agent.Turn do
   def normalize_input(value), do: invalid_input(value)
 
   defp validate_plan(%__MODULE__{} = turn) do
-    with :ok <- Jido.Executable.validate(turn.executable), do: normalize_input(turn.input)
+    with :ok <- Jido.Instruction.validate(turn.executable), do: normalize_input(turn.input)
   end
 
   defp invalid_input(value) do

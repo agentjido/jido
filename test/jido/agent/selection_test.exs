@@ -248,23 +248,32 @@ defmodule Jido.Agent.SelectionTest do
     end
   end
 
-  test "state selects the top-level executable without a continuation", %{jido: jido} do
+  test "state selects the top-level executable in direct commands" do
     agent = CustomAgent.new!()
     source = signal("selection.state", nil)
-    assert {:ok, server} = Jido.start_agent(jido, agent, exec_opts: [max_continuations: 0])
 
     assert {:ok, prepared} = Runner.prepare(agent, source, [])
     assert prepared.turn.executable == Record
-    assert {:ok, first, []} = Agent.cmd(agent, source, max_continuations: 0)
-    assert {:ok, live} = Server.call(server, source)
+    assert {:ok, first, []} = Agent.cmd(agent, source)
     assert first.state == %{input: %{calls: 0}, calls: 1}
-    assert live.state == first.state
 
     assert {:ok, prepared} = Runner.prepare(first, source, [])
     assert prepared.turn.executable == RecordFlow
-    assert {:ok, second, []} = Agent.cmd(first, source, max_continuations: 0)
-    assert {:ok, live} = Server.call(server, source)
+    assert {:ok, second, []} = Agent.cmd(first, source)
     assert second.state == %{input: %{calls: 1}, calls: 2}
+  end
+
+  test "state selects the top-level executable in live commands", %{jido: jido} do
+    agent = CustomAgent.new!()
+    source = signal("selection.state", nil)
+    assert {:ok, server} = Jido.start_agent(jido, agent)
+
+    assert {:ok, first, []} = Agent.cmd(agent, source)
+    assert {:ok, live} = Server.call(server, source)
+    assert live.state == first.state
+
+    assert {:ok, second, []} = Agent.cmd(first, source)
+    assert {:ok, live} = Server.call(server, source)
     assert live.state == second.state
   end
 

@@ -39,26 +39,33 @@ defmodule Jido.DiscoveryTest do
   end
 
   defmodule FlowDescriptor do
-    @doc false
-    def __jido_executable__, do: Jido.Executable.flow(__MODULE__)
+    @behaviour Jido.Flow
+
+    @impl true
+    def flow, do: raise("discovery must not build Flows")
+    @impl true
+    def validate_params(params), do: {:ok, params}
+    @impl true
+    def validate_output(output), do: {:ok, output}
   end
 
   defmodule InvalidAction do
-    @doc false
-    def __jido_executable__, do: Jido.Executable.action(__MODULE__)
+    @behaviour Jido.Action
+
+    @impl true
+    def run(params, _context), do: {:ok, params}
   end
 
   defmodule InvalidMetadataAction do
-    @doc false
-    def __jido_executable__, do: Jido.Executable.action(__MODULE__)
+    @behaviour Jido.Action
 
-    @doc false
+    @impl true
     def validate_params(params), do: {:ok, params}
 
-    @doc false
+    @impl true
     def validate_output(output), do: {:ok, output}
 
-    @doc false
+    @impl true
     def run(params, _context), do: {:ok, params}
 
     @doc false

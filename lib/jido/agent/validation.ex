@@ -309,7 +309,7 @@ defmodule Jido.Agent.Validation do
     Enum.reduce_while(routes, :ok, fn route, :ok ->
       {target, _defaults} = Authoring.split_target(route.target)
 
-      case Jido.Executable.validate(target) do
+      case Jido.Instruction.validate(target) do
         :ok ->
           {:cont, :ok}
 

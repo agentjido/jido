@@ -367,11 +367,8 @@ defmodule Jido.MixProject do
   defp deps do
     [
       # Jido Ecosystem
-      # Pin the current V3 Action contracts until a Hex release.
-      {:jido_action,
-       git: "https://github.com/agentjido/jido_action.git",
-       ref: "8e9b3f7b268e175091b0eb3720bab3b8633d3c24",
-       override: true},
+      # Use the sibling V3 Action checkout for local integration.
+      {:jido_action, path: "../jido_action", override: true},
       {:jido_signal, "~> 3.0.0-beta.4"},
 
       # Jido Deps

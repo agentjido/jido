@@ -153,8 +153,8 @@ defmodule Jido.Util do
   defp implements_action?(module) when is_atom(module) do
     match?({:module, _}, Code.ensure_compiled(module)) and
       match?(
-        {:ok, %Jido.Executable{kind: :action, target: ^module}},
-        Jido.Executable.resolve(module)
+        {:ok, %Jido.Instruction{kind: :action, target: ^module}},
+        Jido.Instruction.resolve(module)
       )
   end
 

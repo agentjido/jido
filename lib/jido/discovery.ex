@@ -23,7 +23,7 @@ defmodule Jido.Discovery do
 
   require Logger
 
-  alias Jido.Executable
+  alias Jido.Instruction
 
   @catalog_key {__MODULE__, :catalog}
   @catalog_version 1
@@ -249,7 +249,10 @@ defmodule Jido.Discovery do
       function_exported?(module, :__jido_inline_action__, 0) ->
         :skip
 
-      not function_exported?(module, :__jido_executable__, 0) ->
+      not (module.module_info(:attributes)
+           |> Keyword.get_values(:behaviour)
+           |> List.flatten()
+           |> Enum.member?(Jido.Action)) ->
         :skip
 
       true ->
@@ -258,13 +261,13 @@ defmodule Jido.Discovery do
   end
 
   defp validate_action(module) do
-    with {:ok, %Executable{kind: :action, target: ^module} = executable} <-
-           Executable.resolve(module),
-         :ok <- Executable.validate(executable),
+    with {:ok, %Instruction{kind: :action, target: ^module} = executable} <-
+           Instruction.resolve(module),
+         :ok <- Instruction.validate(executable),
          {:ok, metadata} <- action_metadata(module) do
       {:ok, metadata}
     else
-      {:ok, %Executable{}} -> :skip
+      {:ok, %Instruction{}} -> :skip
       {:error, error} -> {:error, error}
     end
   end

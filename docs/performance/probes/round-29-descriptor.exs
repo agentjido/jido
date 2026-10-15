@@ -1,21 +1,21 @@
 # Contract probe only. This supplies no timing evidence.
 defmodule JidoCoreDescriptorProbe do
-  @behaviour Jido.Executable
+  @behaviour Jido.Action
 
-  @impl true
-  def __jido_executable__ do
+  def __jido_authoring_kind__ do
     calls = Process.get(__MODULE__, 0) + 1
     Process.put(__MODULE__, calls)
 
     if calls == 1,
-      do: Jido.Executable.action(__MODULE__),
-      else: :invalid_descriptor
+      do: :action,
+      else: :flow
   end
 
   @impl true
   def validate_params(value), do: {:ok, value}
   @impl true
   def validate_output(value), do: {:ok, value}
+  @impl true
   def run(_params, context), do: {:ok, context.agent_state}
 end
 
@@ -30,7 +30,9 @@ try do
 
   2 = Process.get(Probe)
 
-  IO.puts("Round 29: the second route validates its descriptor and returns a structured error")
+  IO.puts(
+    "Round 29: the second route validates its Instruction target and returns a structured error"
+  )
 after
   Process.delete(Probe)
 end

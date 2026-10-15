@@ -259,7 +259,10 @@ defmodule JidoTest.Agent.AuthoringTest do
 
   test "inline routes compile ordinary Actions with access to private helpers" do
     target = InlineCounter.route_action!("inline.add")
-    assert target.__jido_executable__().kind == :action
+
+    assert {:ok, %Jido.Instruction{kind: :action, target: ^target}} =
+             Jido.Instruction.resolve(target)
+
     assert target.name() == "inline_authoring_add"
 
     {:ok, signal} =

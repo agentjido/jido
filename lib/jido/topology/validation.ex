@@ -312,7 +312,7 @@ defmodule Jido.Topology.Validation do
   def plain_static_map(_), do: Authoring.error("Expected a static plain map")
 
   defp static(value) do
-    case Jido.Action.validate_static_data(value) do
+    case Jido.Authoring.Config.validate_static_data(value) do
       :ok -> static_references(value)
       _ -> Authoring.error("Topology data must not contain runtime values")
     end

@@ -25,7 +25,7 @@ defmodule Jido.Agent.Codec.Deriver do
     Authoring.traverse(routes, fn route ->
       {target, defaults} = Authoring.split_target(route.target)
 
-      with {:ok, executable} <- Jido.Executable.resolve(target) do
+      with {:ok, executable} <- Jido.Instruction.resolve(target) do
         entries = [{executable.kind, target} | Data.registry_entries(defaults)]
 
         {:ok,

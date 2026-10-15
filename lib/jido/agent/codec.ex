@@ -130,7 +130,7 @@ defmodule Jido.Agent.Codec do
   defp encode_route(route, registry) do
     {target, defaults} = Authoring.split_target(route.target)
 
-    with {:ok, executable} <- Jido.Executable.resolve(target),
+    with {:ok, executable} <- Jido.Instruction.resolve(target),
          {:ok, target_id} <- Registry.identifier(registry, executable.kind, target),
          {:ok, defaults} <- Data.encode(defaults, registry),
          {:ok, match} <- match_id(route.match, registry) do

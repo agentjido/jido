@@ -151,7 +151,7 @@ defmodule Jido.Agent.State do
   end
 
   defp static_schema(schema) do
-    case Jido.Action.validate_static_data(schema) do
+    case Jido.Authoring.Config.validate_static_data(schema) do
       :ok ->
         :ok
 

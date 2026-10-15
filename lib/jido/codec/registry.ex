@@ -156,7 +156,7 @@ defmodule Jido.Codec.Registry do
   defp value_valid(:schema, value), do: Jido.Agent.State.validate_schema(value)
 
   defp value_valid(:value, value) when is_struct(value) do
-    case Jido.Action.validate_static_data(value) do
+    case Jido.Authoring.Config.validate_static_data(value) do
       :ok -> :ok
       _ -> Authoring.error("Registry value must contain static data")
     end
@@ -181,8 +181,8 @@ defmodule Jido.Codec.Registry do
   end
 
   defp value_valid(kind, value) when kind in [:action, :flow] do
-    with {:ok, %{kind: ^kind}} <- Jido.Executable.resolve(value),
-         :ok <- Jido.Executable.validate(value) do
+    with {:ok, %{kind: ^kind}} <- Jido.Instruction.resolve(value),
+         :ok <- Jido.Instruction.validate(value) do
       :ok
     else
       _ -> Authoring.error("Invalid Registry executable", %{kind: kind})

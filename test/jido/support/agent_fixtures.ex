@@ -2,22 +2,24 @@ defmodule JidoTest.AgentFixtures do
   @moduledoc false
 
   alias Jido.Flow
-  alias Jido.Flow.{Dispatch, Ref, Step}
+  alias Jido.Flow.Ref
   alias __MODULE__.{Add, DispatchDecision, DispatchExpander}
 
   def two_step_flow do
-    Flow.new!(
+    Flow.new!(%{
       name: "agent_server_two_step_flow",
       components: [
-        Step.new!(
+        %{
+          kind: :step,
           name: "first",
           action: Add,
           params: %{
             by: Ref.input(:first_by),
             label: Ref.input(:first_label)
           }
-        ),
-        Step.new!(
+        },
+        %{
+          kind: :step,
           name: "second",
           action: Add,
           params: %{
@@ -25,15 +27,16 @@ defmodule JidoTest.AgentFixtures do
             by: Ref.input(:second_by),
             label: Ref.input(:second_label)
           }
-        )
+        }
       ],
       output: Ref.result("second")
-    )
+    })
   end
 
   def dispatch_flow do
     dispatch =
-      Dispatch.new!(
+      %{
+        kind: :dispatch,
         name: "dispatch",
         decision: DispatchDecision,
         expander: DispatchExpander,
@@ -41,13 +44,13 @@ defmodule JidoTest.AgentFixtures do
           by: Ref.input(:by),
           label: Ref.input(:label)
         }
-      )
+      }
 
-    Flow.new!(
+    Flow.new!(%{
       name: "agent_server_dispatch_flow",
       components: [dispatch],
       output: Ref.result("dispatch")
-    )
+    })
   end
 end
 

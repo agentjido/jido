@@ -225,7 +225,9 @@ defmodule Jido.Topology.Codec do
   defp version(definition) do
     if definition.children != [] or
          Enum.any?(definition.agents ++ definition.groups, &Map.has_key?(&1, :definition)) or
-         Enum.any?(definition.includes, &(version(&1.topology) == 3)), do: 3, else: 2
+         Enum.any?(definition.includes, &(version(&1.topology) == 3)),
+       do: 3,
+       else: 2
   end
 
   defp collections(2), do: Enum.reject(@collections, &(elem(&1, 1) == :children))

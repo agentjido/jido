@@ -83,7 +83,7 @@ defmodule Jido.Agent.View do
   defp operation(route, registry) do
     {target, _defaults} = Authoring.split_target(route.target)
 
-    with {:ok, executable} <- Jido.Executable.resolve(target),
+    with {:ok, executable} <- Jido.Instruction.resolve(target),
          {:ok, target_id} <- Registry.identifier(registry, executable.kind, target) do
       {:ok,
        %{

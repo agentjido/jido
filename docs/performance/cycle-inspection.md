@@ -77,5 +77,10 @@ This check used runtime `16531024` and the pinned Action v3 dependency.
 | ---: | --- | --- |
 | 29 | `Validation.validate_targets/1` calls `Jido.Executable.validate/1` for each route. Module validation invokes the public executable descriptor callback before it checks required exports. The callback can return an invalid descriptor on a later route. The probe reaches that second call and returns the structured route error. An unconditional per-target cache would skip it. Flow values already have a constant descriptor validation path. | Reject unconditional repeated-target validation removal. Keep callback checks and the first invalid-route error. A cache limited to a new stable-descriptor contract is outside this cycle. |
 
+The historical finding above used the removed Executable descriptor API.
+The current probe uses `Jido.Instruction.validate/1`. It changes the authored
+target kind before the second route validation. The second route must reject
+the target because it does not export the required Flow callback.
+
 Probe: `docs/performance/probes/round-29-descriptor.exs`. This is a contract
 check, not a measured performance result.

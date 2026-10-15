@@ -7,22 +7,15 @@ defmodule Jido.Agent.CodecTest do
   alias JidoTest.AgentFixtures.Add
 
   defmodule ChangingTarget do
-    def __jido_executable__ do
-      count = Process.get({__MODULE__, :count}, 0) + 1
-      Process.put({__MODULE__, :count}, count)
+    @behaviour Jido.Action
 
-      if count == Process.get({__MODULE__, :fail_at}) do
-        case Process.get({__MODULE__, :failure}) do
-          :invalid -> :invalid
-          :raise -> raise "descriptor failed"
-        end
-      else
-        Jido.Executable.action(__MODULE__)
-      end
-    end
+    def __jido_authoring_kind__, do: Process.get({__MODULE__, :kind}, :action)
 
+    @impl true
     def validate_params(value), do: {:ok, value}
+    @impl true
     def validate_output(value), do: {:ok, value}
+    @impl true
     def run(_input, _context), do: raise("encoding must not execute Actions")
   end
 
@@ -57,28 +50,19 @@ defmodule Jido.Agent.CodecTest do
     end
   end
 
-  test "generated Codec returns descriptor errors and stops at the first failed route" do
-    for index <- 1..3, failure <- [:invalid, :raise] do
-      Process.delete({ChangingTarget, :fail_at})
+  test "Codec validates the current Instruction target contract" do
+    definition =
+      Agent.new!(name: "changing_target", routes: [{"counter.route", ChangingTarget}])
 
-      definition =
-        Agent.new!(
-          name: "changing_target",
-          routes: for(n <- 1..3, do: {"counter.route#{n}", ChangingTarget})
-        )
+    assert {:ok, _document, registry} = Codec.encode(definition)
 
-      Process.put({ChangingTarget, :count}, 0)
-      Process.put({ChangingTarget, :fail_at}, 3 + index)
-      Process.put({ChangingTarget, :failure}, failure)
+    Process.put({ChangingTarget, :kind}, :flow)
 
-      assert {:error, %Jido.Action.Error.ConfigurationError{} = error} = Codec.encode(definition)
-      assert error.message == "invalid executable descriptor"
-      assert error.details.executable == ChangingTarget
-
-      assert error.details.reason ==
-               if(failure == :invalid, do: :invalid_descriptor, else: :descriptor_callback_failed)
-
-      assert Process.get({ChangingTarget, :count}) == 3 + index
+    for result <- [Codec.encode(definition), Codec.encode(definition, registry)] do
+      assert {:error, %Jido.Error.ValidationError{} = error} = result
+      assert error.message == "Invalid Agent route executable"
+      assert error.details.target == ChangingTarget
+      assert error.details.reason.details.reason == "missing flow/0"
     end
   end
 end
