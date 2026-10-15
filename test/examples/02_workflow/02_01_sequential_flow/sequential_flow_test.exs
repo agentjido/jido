@@ -7,23 +7,25 @@ defmodule JidoTest.Examples.Workflow.SequentialFlowTest do
     alias Jido.Flow.{Ref, Codec}
 
     assert {:ok, flow} =
-             Jido.Flow.new(
+             Jido.Flow.new(%{
                name: "workflow_inline_reuse",
                schema: Zoi.object(%{amount: Zoi.integer()}),
                components: [
-                 Jido.Flow.Step.new!(
+                 %{
+                   kind: :step,
                    name: "double",
                    action: Example.Pipeline.step_action("double"),
                    params: %{value: Ref.input(:amount)}
-                 ),
-                 Jido.Flow.Step.new!(
+                 },
+                 %{
+                   kind: :step,
                    name: "finish",
                    action: Example.Finish,
                    params: %{value: Ref.result("double", :value), failure: :none}
-                 )
+                 }
                ],
                output: Ref.result("finish")
-             )
+             })
 
     assert {:ok, document, registry} = Codec.encode(flow)
     assert {:ok, decoded} = Codec.decode(JSON.decode!(JSON.encode!(document)), registry)
@@ -92,12 +94,12 @@ defmodule JidoTest.Examples.Workflow.SequentialFlowTest do
 
     {:ok, route_signal_5} = Example.double_value_signal(%{value: -1})
 
-    assert {:error, %Jido.Flow.Error.InvalidExecutionError{details: %{context: "Flow"}}} =
+    assert {:error, %Jido.Action.Error.InvalidInputError{details: %{phase: :flow_input}}} =
              Jido.AgentServer.call(server, route_signal_5, [])
 
     {:ok, route_signal_6} = Example.double_value_signal(%{value: 4, failure: :output})
 
-    assert {:error, %Jido.Flow.Error.InvalidExecutionError{details: %{context: "Flow output"}}} =
+    assert {:error, %Jido.Action.Error.InvalidInputError{details: %{phase: :flow_output}}} =
              Jido.AgentServer.call(server, route_signal_6, [])
 
     {:ok, route_signal_7} = Example.double_value_signal(%{value: 4, failure: :candidate})

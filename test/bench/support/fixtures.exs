@@ -97,16 +97,16 @@ defmodule JidoCoreBench.Fixtures do
   def signal(count \\ 1), do: Jido.Signal.new!("bench.add.#{count}", %{}, source: "/bench")
 
   def flow do
-    alias Jido.Flow.{Step, Ref}
+    alias Jido.Flow.Ref
 
-    Jido.Flow.new!(
+    Jido.Flow.new!(%{
       name: "core_bench_flow",
       components: [
-        Step.new!(name: "first", action: Add, params: %{}),
-        Step.new!(name: "second", action: Add, params: %{state: Ref.result("first")})
+        %{kind: :step, name: "first", action: Add, params: %{}},
+        %{kind: :step, name: "second", action: Add, params: %{state: Ref.result("first")}}
       ],
       output: Ref.result("second")
-    )
+    })
   end
 
   # The older Action revision uses :jido. Released v3 uses :task_supervisor.

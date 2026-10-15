@@ -48,8 +48,6 @@ defmodule Jido.AgentServer.ContextTest do
         end
       end
 
-      if delay = Map.get(admission.caller_context, :prepare_delay), do: Process.sleep(delay)
-
       if Map.get(admission.caller_context, :prepare_error) do
         {:error, :prepared_too_late}
       else
@@ -112,7 +110,7 @@ defmodule Jido.AgentServer.ContextTest do
 
       {:ok, server} =
         Jido.start_agent(jido, Agent,
-          turn_timeout: if(@failure == :timeout, do: 50, else: 10_000),
+          turn_timeout: 10_000,
           error_policy: policy
         )
 
@@ -139,6 +137,8 @@ defmodule Jido.AgentServer.ContextTest do
 
       if @failure == :exit do
         Process.exit(worker, :kill)
+      else
+        send(server, {:timeout, timer, {:turn_timeout, turn_id}})
       end
 
       assert {:error, error} = Task.await(caller)
@@ -203,16 +203,30 @@ defmodule Jido.AgentServer.ContextTest do
     end
 
     {:ok, server} =
-      Jido.start_agent(jido, Agent, turn_timeout: 50, error_policy: policy)
+      Jido.start_agent(jido, Agent, turn_timeout: 10_000, error_policy: policy)
+
+    gate = make_ref()
+
+    caller =
+      Task.async(fn ->
+        Server.call(server, signal("context.input", %{value: 7}),
+          context: %{observer: test, gate: gate, prepare_error: true}
+        )
+      end)
+
+    assert_receive {:admission_blocked, ^gate, worker}, 2_000
+
+    # Deliver the preparation error after the absolute deadline, before the
+    # timer message. This tests result ordering without a scheduler race.
+    :sys.replace_state(server, fn {:admitting, state} ->
+      active = %{state.active | timeout_deadline: System.monotonic_time(:millisecond) - 1}
+      {:admitting, %{state | active: active}}
+    end)
+
+    send(worker, {:release, gate})
 
     assert {:error, %Jido.Error.TimeoutError{} = error} =
-             Server.call(server, signal("context.input", %{value: 7}),
-               context: %{
-                 observer: test,
-                 prepare_delay: 100,
-                 prepare_error: true
-               }
-             )
+             Task.await(caller)
 
     assert Jido.Error.code(error) == :agent_turn_timeout
 

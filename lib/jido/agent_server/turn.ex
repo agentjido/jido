@@ -1,6 +1,7 @@
 defmodule Jido.AgentServer.Turn do
   @moduledoc false
 
+  alias Jido.AgentServer.Execution
   alias Jido.AgentServer.Cancellation
   alias Jido.AgentServer.Idle
   alias Jido.AgentServer.PostCommit
@@ -25,10 +26,19 @@ defmodule Jido.AgentServer.Turn do
     TaskSupport.release_task_result(pending)
     data = %{data | admission_task: nil}
 
-    case result do
-      {:ok, %Jido.Agent.Command{} = command} -> begin_turn_execution(command, data)
-      {:error, reason} -> TurnCompletion.fail_turn(reason, :prepare, data)
-      other -> TurnCompletion.fail_turn({:invalid_plugin_admission_result, other}, :prepare, data)
+    if ActiveTurn.expired?(data.active) do
+      Cancellation.timeout_admission(data)
+    else
+      case result do
+        {:ok, %Jido.Agent.Command{} = command} ->
+          begin_turn_execution(command, data)
+
+        {:error, reason} ->
+          TurnCompletion.fail_turn(reason, :prepare, data)
+
+        other ->
+          TurnCompletion.fail_turn({:invalid_plugin_admission_result, other}, :prepare, data)
+      end
     end
   end
 
@@ -158,60 +168,21 @@ defmodule Jido.AgentServer.Turn do
     TraceContext.put(data.active.span.trace)
     command = %{command | signal: signal}
 
-    case start_exec(command, data) do
-      {:ok, handle, prepared} ->
-        active = ActiveTurn.begin_execution(data.active, handle, prepared)
-        data = %{data | active: active}
-
-        if ActiveTurn.expired?(active) do
-          Cancellation.timeout_execution(data)
-        else
-          {:next_state, :running, data}
-        end
-
-      {:error, reason} ->
-        if ActiveTurn.expired?(data.active),
-          do: Cancellation.timeout_admission(data),
-          else: TurnCompletion.fail_turn(reason, :prepare, data)
+    case Runner.prepare_for_server(
+           command,
+           data.active.source_signal,
+           data.config.exec_opts,
+           data.plugin_specs
+         ) do
+      {:ok, prepared} ->
+        Execution.start(prepared, data)
 
       {:error, stage, reason} ->
-        if ActiveTurn.expired?(data.active),
-          do: Cancellation.timeout_admission(data),
-          else: TurnCompletion.fail_turn(reason, evaluator_outcome_stage(stage), data)
+        TurnCompletion.fail_turn(reason, evaluator_outcome_stage(stage), data)
     end
   end
 
-  defp start_exec(%Jido.Agent.Command{} = command, %State{} = data) do
-    exec_opts =
-      Keyword.put(data.config.exec_opts, :task_supervisor, Jido.task_supervisor_name(data.jido))
-
-    with {:ok, prepared} <-
-           Runner.prepare_for_server(
-             command,
-             data.active.source_signal,
-             exec_opts,
-             data.plugin_specs
-           ),
-         {:ok, handle} <- start_async_exec(prepared) do
-      {:ok, handle, prepared}
-    end
-  end
-
-  defp start_async_exec(prepared) do
-    {:ok,
-     Jido.Exec.run_async(
-       prepared.turn.executable,
-       prepared.turn.input,
-       prepared.context,
-       prepared.exec_opts
-     )}
-  rescue
-    error -> {:error, error}
-  catch
-    kind, reason -> {:error, {kind, reason}}
-  end
-
-  defp finish_turn(result, %State{active: %ActiveTurn{prepared: prepared}} = data) do
+  def finish_turn(result, %State{active: %ActiveTurn{prepared: prepared}} = data) do
     if ActiveTurn.expired?(data.active) do
       Cancellation.timeout_execution(data)
     else
@@ -317,18 +288,6 @@ defmodule Jido.AgentServer.Turn do
       TurnCompletion.succeed(next_data, :commit, actions)
     else
       {:next_state, :directing, next_data, actions}
-    end
-  end
-
-  def handle_exec_message(message, %State{active: %ActiveTurn{} = active} = data) do
-    handle_exec_message(active.exec_handle, message, data)
-  end
-
-  def handle_exec_message(handle, message, %State{} = data) do
-    case Jido.Exec.handle_message(handle, message) do
-      {:done, result} -> finish_turn(result, data)
-      :ignore -> :keep_state_and_data
-      {:error, error} -> TurnCompletion.fail_turn(error, :execute, data)
     end
   end
 end

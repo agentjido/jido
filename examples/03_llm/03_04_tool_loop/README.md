@@ -4,7 +4,7 @@ This example runs a bounded ReAct model-and-tool loop in one Agent Turn.
 
 ## What you will learn
 
-- How Flow Dispatch and executable continuations select the next Action.
+- How Flow Dispatch selects an answer Action or a tool-round Flow.
 - How several external calls can lead to one terminal Agent commit.
 
 ## Read the code
@@ -27,6 +27,10 @@ failed or cancelled work does not commit partial state.
 Model and tool calls occur during Flow execution because each result selects
 the next step. Completed external effects remain after a later failure. The
 application model-step limit bounds the loop.
+
+Only the Dispatch expander returns a continuation. A tool returns the next
+model input as a normal result. The selected tool-round Flow calls the model
+Flow with that input. The model-step count decreases before each model call.
 
 ## Limits
 

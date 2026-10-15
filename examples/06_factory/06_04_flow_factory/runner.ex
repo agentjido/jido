@@ -20,7 +20,7 @@ defmodule Jido.Examples.Factory.FlowFactory.Cancel do
 end
 
 defmodule Jido.Examples.Factory.FlowFactory.Runner do
-  @moduledoc "A Plugin owns the asynchronous Exec handle outside portable Agent state."
+  @moduledoc "A Plugin owns a started execution outside portable Agent state."
   use Jido.Plugin
 
   @impl true
@@ -89,14 +89,24 @@ defmodule Jido.Examples.Factory.FlowFactory.Runner.Runtime do
         flow_deadline: System.monotonic_time(:millisecond) + timeout
       })
 
-    handle =
-      Jido.Exec.run_async(Pipeline, Map.from_struct(intent), context,
-        task_supervisor: Jido.task_supervisor_name(state.init.jido),
-        max_concurrency: 3,
-        timeout: timeout
-      )
+    runner = Jido.exec_runner_name(state.init.jido)
+    id = Jido.Signal.ID.generate!()
+    owner = self()
 
-    {:reply, :ok, %{state | handle: handle, mission_id: intent.mission_id}}
+    case Jido.Exec.start(runner, id, Pipeline, Map.from_struct(intent), context,
+           mode: :local,
+           owner: owner,
+           max_concurrency: 3,
+           timeout: timeout,
+           on_complete: fn id, _ -> send(owner, {:flow_complete, id}) end
+         ) do
+      {:ok, pid} ->
+        handle = %{runner: runner, id: id, pid: pid, ref: Process.monitor(pid)}
+        {:reply, :ok, %{state | handle: handle, mission_id: intent.mission_id}}
+
+      {:error, error} ->
+        {:reply, {:error, error}, state}
+    end
   end
 
   def handle_call({%Run{}, _}, _, state), do: {:reply, {:error, :already_running}, state}
@@ -108,7 +118,7 @@ defmodule Jido.Examples.Factory.FlowFactory.Runner.Runtime do
   end
 
   def handle_call({%Cancel{}, _}, _, state) do
-    if state.handle, do: Jido.Exec.cancel(state.handle)
+    release(state.handle)
     {:reply, :ok, %{state | handle: nil}}
   end
 
@@ -116,35 +126,47 @@ defmodule Jido.Examples.Factory.FlowFactory.Runner.Runtime do
   def handle_info({:EXIT, _pid, reason}, state), do: {:stop, reason, state}
   def handle_info(_, %{handle: nil} = state), do: {:noreply, state}
 
-  def handle_info(message, state) do
-    case Jido.Exec.handle_message(state.handle, message) do
-      {:done, result} ->
-        data =
-          case result do
-            {:ok, output} ->
-              %{status: :completed, output: output, error: ""}
+  def handle_info({:flow_complete, id}, %{handle: %{id: id} = handle} = state) do
+    result = Jido.Exec.result(handle.runner, id)
+    :ok = release(handle)
 
-            {:error, error} ->
-              %{status: :failed, output: %{}, error: Jido.Examples.Factory.Error.message(error)}
-          end
+    data =
+      case result do
+        {:ok, output} ->
+          %{status: :completed, output: output, error: ""}
 
-        signal =
-          Jido.Signal.new!(
-            "examples.factory.flow.finished",
-            Map.put(data, :mission_id, state.mission_id),
-            source: "/examples/factory/flow"
-          )
+        {:ok, output, _effects} ->
+          %{status: :completed, output: output, error: ""}
 
-        Server.cast(state.init.agent_server, signal)
-        {:noreply, %{state | handle: nil}}
+        {:error, error} ->
+          %{status: :failed, output: %{}, error: Jido.Examples.Factory.Error.message(error)}
+      end
 
-      :ignore ->
-        {:noreply, state}
-    end
+    signal =
+      Jido.Signal.new!(
+        "examples.factory.flow.finished",
+        Map.put(data, :mission_id, state.mission_id),
+        source: "/examples/factory/flow"
+      )
+
+    Server.cast(state.init.agent_server, signal)
+    {:noreply, %{state | handle: nil}}
+  end
+
+  def handle_info({:DOWN, ref, :process, _pid, reason}, %{handle: %{ref: ref}} = state),
+    do: {:stop, {:execution_worker_exited, reason}, state}
+
+  def handle_info(_message, state), do: {:noreply, state}
+
+  defp release(nil), do: :ok
+
+  defp release(handle) do
+    Process.demonitor(handle.ref, [:flush])
+    Runic.Runner.cancel(handle.runner, handle.id)
   end
 
   def terminate(_, state) do
-    if state.handle, do: Jido.Exec.cancel(state.handle)
+    release(state.handle)
     :ok
   end
 end

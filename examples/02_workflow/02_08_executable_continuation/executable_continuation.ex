@@ -1,5 +1,5 @@
 defmodule Jido.Examples.ExecutableContinuation do
-  @moduledoc "One Turn owns the complete Flow and Action continuation chain."
+  @moduledoc "One Turn owns Dispatch selection and bounded Flow execution."
   use Jido.Agent, name: "workflow_continuation_agent"
 
   agent do
@@ -29,15 +29,14 @@ defmodule Jido.Examples.ExecutableContinuation.Expand do
       })
 
   @impl true
-  def run(%{remaining: 0} = input, context) do
-    {:ok,
-     %{
-       value: input.value,
-       request: Map.get(context, :request, "none")
-     }}
-  end
+  def run(input, _context) do
+    target =
+      if input.remaining == 0,
+        do: Jido.Examples.ExecutableContinuation.Finish,
+        else: Jido.Examples.ExecutableContinuation.Repeat
 
-  def run(input, _context), do: {:continue, input, Jido.Examples.ExecutableContinuation.Add}
+    {:continue, input, target}
+  end
 end
 
 defmodule Jido.Examples.ExecutableContinuation.Add do
@@ -53,8 +52,39 @@ defmodule Jido.Examples.ExecutableContinuation.Add do
 
   @impl true
   def run(input, _context) do
-    {:continue, %{input | value: input.value + 1, remaining: input.remaining - 1},
-     Jido.Examples.ExecutableContinuation.Pipeline}
+    {:ok, %{input | value: input.value + 1, remaining: input.remaining - 1}}
+  end
+end
+
+defmodule Jido.Examples.ExecutableContinuation.Finish do
+  @moduledoc false
+  use Jido.Action, name: "workflow_continuation_finish"
+
+  def run(input, context),
+    do: {:ok, %{value: input.value, request: Map.get(context, :request, "none")}}
+end
+
+defmodule Jido.Examples.ExecutableContinuation.Repeat do
+  @moduledoc "The selected Flow permits at most three additions before one terminal result."
+  use Jido.Flow, name: "workflow_continuation_repeat"
+
+  flow do
+    iterate "add" do
+      state Zoi.object(%{value: Zoi.integer(), remaining: Zoi.integer() |> Zoi.min(0)}),
+        initial: input()
+
+      action Jido.Examples.ExecutableContinuation.Add
+      params state()
+      update body_result()
+      while state(:remaining) > 0
+      max_iterations 3
+    end
+
+    step "finish",
+      action: Jido.Examples.ExecutableContinuation.Finish,
+      params: result("add", :state)
+
+    output result("finish")
   end
 end
 
@@ -66,7 +96,7 @@ defmodule Jido.Examples.ExecutableContinuation.Decision do
 end
 
 defmodule Jido.Examples.ExecutableContinuation.Pipeline do
-  @moduledoc "Terminal Dispatch selects a result or the next executable in the same Exec call."
+  @moduledoc "Terminal Dispatch selects an Action or bounded Flow in the same Exec call."
   use Jido.Flow,
     name: "workflow_continuation",
     schema:

@@ -70,7 +70,7 @@ defmodule Jido.AgentServer.RuntimeLifecycleTest do
     {:ok, agent} =
       Jido.start_agent(jido, OwnedExecutionAgent, id: unique_id("owned-execution"))
 
-    task_supervisor = Process.whereis(Jido.task_supervisor_name(jido))
+    task_supervisor = Process.whereis(Module.concat(Jido.exec_runner_name(jido), TaskSupervisor))
     assert is_pid(task_supervisor)
     test = self()
 
@@ -85,10 +85,10 @@ defmodule Jido.AgentServer.RuntimeLifecycleTest do
       assert_receive {:owned_execution, ^label, action_worker}, 2_000
       assert action_worker in Task.Supervisor.children(task_supervisor)
 
+      eventually(fn -> elem(:sys.get_state(agent), 0) == :running end, timeout: 2_000)
       {:running, state} = :sys.get_state(agent)
       exec_root = state.active.exec_handle.pid
-      assert exec_root in Task.Supervisor.children(task_supervisor)
-      assert {:process, agent} in elem(Process.info(exec_root, :monitors), 1)
+      assert exec_root == Runic.Runner.lookup(Jido.exec_runner_name(jido), state.active.turn_id)
 
       send(action_worker, {:release, gate})
       assert {:ok, _agent} = Task.await(caller, 2_000)
@@ -110,6 +110,7 @@ defmodule Jido.AgentServer.RuntimeLifecycleTest do
       end)
 
     assert_receive {:owned_execution, :routing, worker}, 2_000
+    eventually(fn -> elem(:sys.get_state(server), 0) == :running end, timeout: 2_000)
     {:running, state} = :sys.get_state(server)
     owner_ref = Map.fetch!(state.attachments, owner)
     Elixir.Agent.stop(owner)
@@ -144,12 +145,13 @@ defmodule Jido.AgentServer.RuntimeLifecycleTest do
       Server.cast(agent, signal(type, %{test: self(), gate: gate, label: label}))
       assert_receive {:owned_execution, ^label, action_worker}, 2_000
 
+      eventually(fn -> elem(:sys.get_state(agent), 0) == :running end, timeout: 2_000)
       {:running, state} = :sys.get_state(agent)
       exec_root = state.active.exec_handle.pid
       action_ref = Process.monitor(action_worker)
       exec_ref = Process.monitor(exec_root)
       agent_ref = Process.monitor(agent)
-      task_supervisor = Jido.task_supervisor_name(jido)
+      task_supervisor = Module.concat(Jido.exec_runner_name(jido), TaskSupervisor)
 
       try do
         Process.exit(agent, :kill)
@@ -169,7 +171,7 @@ defmodule Jido.AgentServer.RuntimeLifecycleTest do
   end
 
   test "Agent death before dispatch cannot start Action or Flow work", %{jido: jido} do
-    task_supervisor = Jido.task_supervisor_name(jido)
+    task_supervisor = Module.concat(Jido.exec_runner_name(jido), TaskSupervisor)
 
     for type <- ["owned.action", "owned.flow"] do
       {:ok, agent} =

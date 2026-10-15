@@ -179,6 +179,7 @@ defmodule Jido.AgentServer.ServerLifecycle do
   end
 
   defp terminate_agent(reason, data) do
+    TaskSupport.stop_task(data.execution_task)
     terminate_active_exec(data)
 
     stop_plugin_readiness(data.plugin_bootstrap)
@@ -212,7 +213,8 @@ defmodule Jido.AgentServer.ServerLifecycle do
   defp terminate_active_exec(data) do
     if match?(%ActiveTurn{exec_handle: handle} when not is_nil(handle), data.active) do
       try do
-        _result = Jido.Exec.cancel(data.active.exec_handle)
+        handle = data.active.exec_handle
+        _result = Runic.Runner.cancel(handle.runner, handle.id)
       catch
         _kind, _reason -> :ok
       end

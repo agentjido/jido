@@ -2,8 +2,9 @@ defmodule Jido.AgentServer do
   @moduledoc """
   The responsive OTP owner for one live `Jido.Agent`.
 
-  This Server uses four active `:gen_statem` states: `:idle`, `:admitting`,
-  `:running`, and `:directing`. One Signal selects one Action or Flow. Live
+  This Server exposes four runtime phases: `:idle`, `:admitting`,
+  `:running`, and `:directing`. The state machine also uses private `:starting`,
+  `:settling`, and `:cancelling` states within the public `:running` phase. One Signal selects one Action or Flow. Live
   Plugin admission, `Jido.Exec`, and outbound Plugin work run asynchronously.
   The Server commits only the terminal complete state result. It then
   notifies selected Plugin `after_commit/3` hooks in declaration order, then
@@ -47,12 +48,13 @@ defmodule Jido.AgentServer do
   Caller wait, Plugin readiness, persistence operations, and post-commit
   Directive work use separate boundaries.
 
-  Exec roots, Action tasks, Flow tasks, commit notifications, and asynchronous
-  Directives run under the Jido instance Task Supervisor. Each Exec root monitors
-  the Server and stops its Action and Flow work when the owner exits. Initial
-  Plugin readiness and error Signal delivery are linked to the Server. A live
-  Exec controller handles owner death; abrupt controller death does not
-  guarantee worker cleanup.
+  Each Turn starts one owned local execution under the Jido instance Runic
+  Runner. Runic owns its Worker, native task scope, and execution Task Supervisor.
+  Owner death stops this work, including abrupt AgentServer death. Core waits
+  for confirmed Worker cleanup before commit or the next Turn. Local execution
+  writes no Runic Store data and does not resume. Commit notifications and
+  Directives use the core Task Supervisor. Initial Plugin readiness and error
+  Signal delivery are linked to the Server.
 
   Use `agent/2` for the committed Agent, `snapshot/2` for the Agent and commit
   revision, `status/2` for current runtime work, and `children/2` for live
@@ -551,6 +553,9 @@ defmodule Jido.AgentServer do
   def init(opts), do: ServerLifecycle.init(opts)
 
   @impl true
+  def handle_event(type, event, phase, data) when phase in [:starting, :settling, :cancelling],
+    do: handle_event(type, event, :running, data)
+
   def handle_event({:call, _from}, :await_ready, :initializing, %State{}) do
     {:keep_state_and_data, [:postpone]}
   end
@@ -734,6 +739,9 @@ defmodule Jido.AgentServer do
   @impl true
   def terminate(reason, phase, data), do: ServerLifecycle.terminate(reason, phase, data)
 
+  defp route_info({:exec_settled, id}, _phase, data),
+    do: Jido.AgentServer.Execution.settled(id, data)
+
   defp route_info({:plugin_readiness, _, _} = message, :initializing, data),
     do: ServerLifecycle.handle_event(:info, message, :initializing, data)
 
@@ -758,6 +766,7 @@ defmodule Jido.AgentServer do
 
   defp route_info({ref, result} = message, phase, data) when is_reference(ref) do
     case task_owner(data, phase, ref) do
+      :execution -> Jido.AgentServer.Execution.result(result, data)
       :admission -> Turn.admission_result(result, data)
       :commit -> PostCommit.settle(:commit_task, {:result, result}, data)
       :directive -> PostCommit.settle(:directive_task, {:result, result}, data)
@@ -777,6 +786,7 @@ defmodule Jido.AgentServer do
 
       task = task_owner(data, phase, ref) ->
         case task do
+          :execution -> Jido.AgentServer.Execution.down(reason, data)
           :admission -> Turn.admission_down(reason, data)
           :commit -> PostCommit.settle(:commit_task, {:down, reason}, data)
           :directive -> PostCommit.settle(:directive_task, {:down, reason}, data)
@@ -830,12 +840,13 @@ defmodule Jido.AgentServer do
     do: fallback_info(message, phase, data)
 
   defp fallback_info(message, :running, %State{active: %ActiveTurn{}} = data),
-    do: Turn.handle_exec_message(message, data)
+    do: Jido.AgentServer.Execution.message(message, data)
 
   defp fallback_info(_message, _phase, %State{}), do: :keep_state_and_data
 
   defp task_owner(%State{} = data, phase, ref) do
     cond do
+      TaskSupport.task_ref?(data.execution_task, ref) -> :execution
       phase == :admitting and TaskSupport.task_ref?(data.admission_task, ref) -> :admission
       phase == :directing and TaskSupport.task_ref?(data.commit_task, ref) -> :commit
       phase == :directing and TaskSupport.task_ref?(data.directive_task, ref) -> :directive
@@ -869,7 +880,7 @@ defmodule Jido.AgentServer do
             ChildLifecycle.handle_child_down(child_entry, pid, reason, data)
 
           phase == :running and match?(%ActiveTurn{}, data.active) ->
-            Turn.handle_exec_message({:DOWN, ref, :process, pid, reason}, data)
+            Jido.AgentServer.Execution.message({:DOWN, ref, :process, pid, reason}, data)
 
           true ->
             :keep_state_and_data

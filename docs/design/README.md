@@ -132,6 +132,8 @@ This table is the source of truth for design approval. A moved or changed docume
 | [Agent Server briefing](08_agent-server/README.md) | Pending approval |
 | [Agent Server design](08_agent-server/design.md) | Pending approval |
 | [Agent Server alignment](08_agent-server/alignment.md) | Pending approval |
+| [Durable Agent execution design](08_agent-server/durable-execution.md) | Pending approval |
+| [Durable Agent execution implementation plan](../integration/2026-10-15-durable-agent-execution-plan.md) | Pending approval |
 | [Jido instance briefing](09_jido-instance/README.md) | Selected and implemented |
 | [Jido instance design](09_jido-instance/design.md) | Selected and implemented |
 | [Jido instance alignment](09_jido-instance/alignment.md) | Implemented |

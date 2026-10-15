@@ -12,7 +12,7 @@ defmodule Jido.RuntimeTopologyTest do
 
   @moduletag capture_log: true
 
-  test "an instance owns six isolated standard services", %{jido: jido, jido_pid: jido_pid} do
+  test "an instance owns seven isolated standard services", %{jido: jido, jido_pid: jido_pid} do
     assert standard_children(jido_pid) == expected_children(jido)
 
     other = :"#{jido}_other"
@@ -31,7 +31,7 @@ defmodule Jido.RuntimeTopologyTest do
   test "each standard service can be replaced without restarting its siblings", %{
     jido: base_jido
   } do
-    for index <- 0..5 do
+    for index <- 0..6 do
       jido = :"#{base_jido}_restart_#{index}"
       jido_pid = start_supervised!({Jido, name: jido}, id: jido)
       {target, child_id} = Enum.at(services(jido), index)
@@ -175,6 +175,7 @@ defmodule Jido.RuntimeTopologyTest do
 
   defp expected_children(jido) do
     %{
+      Runic.Runner => {:supervisor, [Runic.Runner]},
       Jido.task_supervisor_name(jido) => {:supervisor, [Task.Supervisor]},
       RegistrationGuard => {:worker, [RegistrationGuard]},
       Jido.registry_name(jido) => {:supervisor, [RegistryWorker]},
@@ -197,6 +198,7 @@ defmodule Jido.RuntimeTopologyTest do
 
   defp services(jido) do
     [
+      {Jido.exec_runner_name(jido), Runic.Runner},
       {Jido.task_supervisor_name(jido), Jido.task_supervisor_name(jido)},
       {Jido.registration_guard_name(jido), RegistrationGuard},
       {Jido.registry_name(jido), Jido.registry_name(jido)},

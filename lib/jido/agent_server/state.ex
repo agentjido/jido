@@ -54,6 +54,8 @@ defmodule Jido.AgentServer.State do
               startup_reply:
                 Zoi.any(description: "Temporary supervised startup reply address")
                 |> Zoi.optional(),
+              execution_task:
+                Zoi.any(description: "Pending execution lifecycle operation") |> Zoi.optional(),
               admission_task:
                 Zoi.any(description: "Active Plugin admission task") |> Zoi.optional(),
               commit_task:

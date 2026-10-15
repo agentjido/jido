@@ -31,14 +31,14 @@ defmodule JidoTest.Examples.Workflow.NestedFlowTest do
     assert {:error, parent_error} =
              Jido.AgentServer.call(server, route_signal_3, [])
 
-    assert Enum.any?(errors(parent_error), &(&1.type == :flow_invalid_execution))
+    assert %Jido.Action.Error.InvalidInputError{details: %{phase: :flow_input}} = parent_error
 
     {:ok, route_signal_4} = Example.draft_and_review_signal(%{text: ""})
 
     assert {:error, child_error} =
              Jido.AgentServer.call(server, route_signal_4, [])
 
-    assert Enum.any?(errors(child_error), &(&1.type == :flow_invalid_execution))
+    assert Enum.any?(errors(child_error), &(&1.type == :validation_error))
     assert Server.snapshot(server) == before
   end
 

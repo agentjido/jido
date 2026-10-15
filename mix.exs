@@ -114,6 +114,7 @@ defmodule Jido.MixProject do
         fn path ->
           (String.starts_with?(path, "test/bench/") or
              String.starts_with?(path, "test/authoring/") or
+             String.starts_with?(path, "test/property/") or
              String.starts_with?(path, "test/system/")) and
             not String.ends_with?(path, "_test.exs")
         end
@@ -370,6 +371,8 @@ defmodule Jido.MixProject do
       # Use the sibling V3 Action checkout for local integration.
       {:jido_action, path: "../jido_action", override: true},
       {:jido_signal, "~> 3.0.0-beta.4"},
+      # AgentServer owns native Runic Runners and Worker cleanup.
+      {:runic, path: "../runic", override: true},
 
       # Jido Deps
       # Pin the public fork until checked defaults and stored-value validation ship on Hex.

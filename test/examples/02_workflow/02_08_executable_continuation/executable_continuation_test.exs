@@ -3,8 +3,10 @@ defmodule JidoTest.Examples.Workflow.ExecutableContinuationTest do
 
   alias Jido.Examples.ExecutableContinuation, as: Example
 
-  test "Flow and Action continuations share context and commit one terminal result", %{jido: jido} do
-    server = start_agent!(jido, Example, exec_opts: [max_continuations: 5])
+  test "Dispatch selects a Flow that shares context and commits one terminal result", %{
+    jido: jido
+  } do
+    server = start_agent!(jido, Example)
     before = Server.snapshot(server)
 
     {:ok, route_signal_1} = Example.add_repeatedly_signal(%{value: 2, remaining: 2})
@@ -16,8 +18,8 @@ defmodule JidoTest.Examples.Workflow.ExecutableContinuationTest do
     assert Server.snapshot(server) == %{agent: agent, state_version: before.state_version + 1}
   end
 
-  test "one continuation budget bounds the complete chain", %{jido: jido} do
-    server = start_agent!(jido, Example, exec_opts: [max_continuations: 3])
+  test "the selected Flow's iteration limit prevents an intermediate commit", %{jido: jido} do
+    server = start_agent!(jido, Example)
 
     {:ok, route_signal_2} = Example.add_repeatedly_signal(%{value: 1, remaining: 0})
 
@@ -26,21 +28,19 @@ defmodule JidoTest.Examples.Workflow.ExecutableContinuationTest do
 
     before = Server.snapshot(server)
 
-    {:ok, route_signal_3} = Example.add_repeatedly_signal(%{value: 2, remaining: 2})
+    {:ok, route_signal_3} = Example.add_repeatedly_signal(%{value: 2, remaining: 4})
 
     assert {:error, error} =
              Jido.AgentServer.call(server, route_signal_3, [])
 
     assert Enum.any?(
              errors(error),
-             &(&1.type == :execution_error and
-                 &1.message == "continuation limit exceeded" and
-                 &1.details.max_continuations == 3 and &1.details.count == 4)
+             &(&1.type == :flow_execution_error and &1.details.max_iterations == 3)
            )
 
     assert Server.snapshot(server) == before
 
-    {:ok, route_signal_4} = Example.add_repeatedly_signal(%{value: 2, remaining: 1})
+    {:ok, route_signal_4} = Example.add_repeatedly_signal(%{value: 2, remaining: 3})
 
     assert {:ok, _} =
              Jido.AgentServer.call(server, route_signal_4, [])
@@ -54,7 +54,7 @@ defmodule JidoTest.Examples.Workflow.ExecutableContinuationTest do
 
     {:ok, route_signal_5} = Example.add_repeatedly_signal(%{value: 2, remaining: -1})
 
-    assert {:error, %Jido.Flow.Error.InvalidExecutionError{details: %{phase: :flow_input}}} =
+    assert {:error, %Jido.Action.Error.InvalidInputError{details: %{phase: :flow_input}}} =
              Jido.AgentServer.call(server, route_signal_5, [])
 
     assert Server.snapshot(server) == before

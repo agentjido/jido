@@ -38,33 +38,20 @@ defmodule Jido.AgentServer.Cancellation do
   end
 
   def cancel_execution(mode, cancel_from, %ActiveTurn{} = active, %State{} = data) do
-    result = Jido.Exec.cancel(active.exec_handle)
-    settle_cancel_result(result, data, %{mode: mode, from: cancel_from})
-  rescue
-    error ->
-      settle_cancel_result({:error, cancellation_error(error)}, data, %{
-        mode: mode,
-        from: cancel_from
-      })
-  catch
-    kind, reason ->
-      settle_cancel_result({:error, cancellation_error({kind, reason})}, data, %{
-        mode: mode,
-        from: cancel_from
-      })
+    Jido.AgentServer.Execution.cancel(mode, cancel_from, active, data)
   end
 
-  defp settle_cancel_result(result, data, %{mode: :timeout}),
+  def settle_cancel_result(result, data, %{mode: :timeout}),
     do: settle_timeout_cancel(result, data)
 
-  defp settle_cancel_result(result, data, %{mode: {:parent, parent_reason}}),
-    do: settle_parent_cancel(result, data, parent_reason)
+  def settle_cancel_result(result, data, %{mode: {:parent, parent_reason}, from: from}),
+    do: settle_parent_cancel(result, data, parent_reason, from)
 
-  defp settle_cancel_result(
-         result,
-         %State{active: %ActiveTurn{} = active} = data,
-         %{mode: :user, from: cancel_from}
-       ) do
+  def settle_cancel_result(
+        result,
+        %State{active: %ActiveTurn{} = active} = data,
+        %{mode: :user, from: cancel_from}
+      ) do
     case result do
       :ok ->
         outcome = TurnCompletion.turn_outcome(data, :cancelled, :execute, :cancelled)
@@ -73,7 +60,7 @@ defmodule Jido.AgentServer.Cancellation do
 
         actions =
           TurnCompletion.reply_action(active.caller, {:error, :cancelled}) ++
-            [{:reply, cancel_from, :ok}]
+            TurnCompletion.reply_action(cancel_from, :ok)
 
         TurnCompletion.return_idle(next_data, actions)
 
@@ -84,7 +71,7 @@ defmodule Jido.AgentServer.Cancellation do
 
         actions =
           TurnCompletion.reply_action(active.caller, {:error, error}) ++
-            [{:reply, cancel_from, {:error, error}}]
+            TurnCompletion.reply_action(cancel_from, {:error, error})
 
         TurnCompletion.stop(next_data, {:exec_cancellation_failed, error}, actions)
     end
@@ -104,10 +91,19 @@ defmodule Jido.AgentServer.Cancellation do
     TurnCompletion.stop(next_data, error, replies)
   end
 
-  defp settle_parent_cancel(:ok, %State{active: %ActiveTurn{} = active} = data, parent_reason) do
+  defp settle_parent_cancel(
+         :ok,
+         %State{active: %ActiveTurn{} = active} = data,
+         parent_reason,
+         from
+       ) do
     error = {:parent_down, :cancelled}
     outcome = TurnCompletion.turn_outcome(data, :cancelled, :execute, error)
-    replies = TurnCompletion.reply_action(active.caller, {:error, error})
+
+    replies =
+      TurnCompletion.reply_action(active.caller, {:error, error}) ++
+        TurnCompletion.reply_action(from, :ok)
+
     next_data = TurnCompletion.complete_outcome(data, outcome)
     TraceContext.clear()
     TurnCompletion.stop(next_data, {:parent_down, parent_reason}, replies)
@@ -116,21 +112,20 @@ defmodule Jido.AgentServer.Cancellation do
   defp settle_parent_cancel(
          {:error, reason},
          %State{active: %ActiveTurn{} = active} = data,
-         _parent_reason
+         _parent_reason,
+         from
        ) do
     error = {:parent_down, {:cancellation_failed, reason}}
     outcome = TurnCompletion.turn_outcome(data, :indeterminate, :execute, error)
-    replies = TurnCompletion.reply_action(active.caller, {:error, error})
+
+    replies =
+      TurnCompletion.reply_action(active.caller, {:error, error}) ++
+        TurnCompletion.reply_action(from, {:error, error})
+
     next_data = TurnCompletion.complete_outcome(data, outcome)
     TraceContext.clear()
 
     TurnCompletion.stop(next_data, error, replies)
-  end
-
-  defp cancellation_error(reason) do
-    Error.execution_error("Agent Exec cancellation failed",
-      details: %{code: :agent_exec_cancel_failed, reason: reason}
-    )
   end
 
   def timeout_admission(%State{active: %ActiveTurn{} = active} = data) do
@@ -160,7 +155,7 @@ defmodule Jido.AgentServer.Cancellation do
 
     actions =
       TurnCompletion.reply_action(active.caller, {:error, :cancelled}) ++
-        [{:reply, cancel_from, :ok}]
+        TurnCompletion.reply_action(cancel_from, :ok)
 
     TurnCompletion.return_idle(next_data, actions)
   end

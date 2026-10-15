@@ -480,17 +480,13 @@ defmodule JidoTest.Property.ContractsTest do
   end
 
   defp candidate_flow do
-    Jido.Flow.new!(
+    Jido.Flow.new!(%{
       name: "property_candidate_flow",
       components: [
-        Jido.Flow.Step.new!(
-          name: "candidate",
-          action: Candidate,
-          params: Jido.Flow.Ref.input(nil)
-        )
+        %{kind: :step, name: "candidate", action: Candidate, params: Jido.Flow.Ref.input(nil)}
       ],
       output: Jido.Flow.Ref.result("candidate")
-    )
+    })
   end
 
   defp assert_candidate({:ok, agent, directives}, %{"accepted" => true} = expected) do

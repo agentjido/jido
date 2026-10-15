@@ -188,13 +188,14 @@ defmodule Jido.AgentServer.PublicAPITest do
     assert %Zoi.Types.Struct{module: DirectiveContext} = DirectiveContext.schema()
   end
 
-  test "runs an Action continuation chain before the single commit" do
+  test "rejects a root Action continuation without a commit" do
     server = start_supervised!({Server, agent: agent([{"counter.chain", ContinueToAdd}])})
 
-    assert {:ok, %Agent{state: %{count: 3, history: ["continued"]}}} =
+    assert {:error, %{details: %{reason: :unsupported_continuation}}} =
              Server.call(server, signal("counter.chain", %{by: 3, label: "continued"}))
 
-    assert %{state_version: 1} = Server.status(server)
+    assert %{state_version: 0} = Server.status(server)
+    assert Server.agent(server).state == %{count: 0, history: []}
   end
 
   test "runs one multi-step Flow as one turn" do
@@ -243,7 +244,8 @@ defmodule Jido.AgentServer.PublicAPITest do
     assert %{phase: :running, state_version: 0, active: %{signal_type: "counter.block"}} =
              Server.status(server, 500)
 
-    assert {:running, _data} = :sys.get_state(server, 500)
+    assert {phase, _data} = :sys.get_state(server, 500)
+    assert phase in [:starting, :running]
     assert is_tuple(:sys.get_status(server, 500))
 
     send(worker, {:release, gate})

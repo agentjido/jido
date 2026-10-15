@@ -91,10 +91,10 @@ defmodule Jido.AgentServer.Admission do
   defp postpone_call(from, token, signal, deadline, %State{} = data) do
     cond do
       AdmissionDeadline.expired?(deadline) ->
+        data = forget_postponed(data, token)
         AgentTelemetry.admission_rejected(data, signal, :deadline_expired)
 
-        {:keep_state, forget_postponed(data, token),
-         [{:reply, from, {:error, :admission_timeout}}]}
+        {:keep_state, data, [{:reply, from, {:error, :admission_timeout}}]}
 
       MapSet.member?(data.postponed_tokens, token) ->
         {:keep_state_and_data, [:postpone]}

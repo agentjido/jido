@@ -7,7 +7,7 @@ defmodule JidoTest.Property.RuntimeContractTest do
   alias Jido.Agent
   alias Jido.AgentServer, as: Server
   alias Jido.Flow
-  alias Jido.Flow.{Ref, Step}
+  alias Jido.Flow.Ref
   alias JidoTest.AgentFixtures.{Add, BlockingAdd, Fail, InvalidState, WithDirective}
   alias JidoTest.Property.Fuzz
 
@@ -109,10 +109,11 @@ defmodule JidoTest.Property.RuntimeContractTest do
 
   defp counter do
     held_flow =
-      Flow.new!(
+      Flow.new!(%{
         name: "property_held_counter",
         components: [
-          Step.new!(
+          %{
+            kind: :step,
             name: "held",
             action: BlockingAdd,
             params: %{
@@ -121,10 +122,10 @@ defmodule JidoTest.Property.RuntimeContractTest do
               test_pid: Ref.input(:test_pid),
               gate: Ref.input(:gate)
             }
-          )
+          }
         ],
         output: Ref.result("held")
-      )
+      })
 
     Agent.new!(
       name: "property_counter",
@@ -212,6 +213,9 @@ defmodule JidoTest.Property.RuntimeContractTest do
   defp blocked(server, key, gate) do
     assert_receive {:agent_action_blocked, ^gate, worker}, 2_000
     remember(key, worker)
+    # Work can start before the lifecycle task delivers its start result.
+    # Wait for the private handle before this test sends retired-handle events.
+    eventually(fn -> elem(:sys.get_state(server), 0) == :running end, timeout: 2_000)
     {:running, data} = :sys.get_state(server)
     handle = data.active.exec_handle
     remember(key, handle.pid)
@@ -283,14 +287,10 @@ defmodule JidoTest.Property.RuntimeContractTest do
         assert Server.agent(server).state == %{count: expected_count, history: expected_history}
         assert Server.status(server).state_version == expected_revision
 
-        # Use the actual completed/cancelled handle and timer, not an arbitrary ref.
-        send(
-          server,
-          {:jido_exec_async_result, old.exec_handle.ref, root,
-           {:ok, %{count: 999_999, history: ["stale"]}}}
-        )
-
-        send(server, {:DOWN, old.exec_handle.monitor_ref, :process, root, :normal})
+        # Send notifications from the actual retired execution.
+        send(server, {:exec_settled, old.turn_id})
+        send(server, {old.exec_handle.ref, {:ok, %{count: 999_999, history: ["stale"]}}})
+        send(server, {:DOWN, old.exec_handle.ref, :process, root, :normal})
         send(server, {:timeout, old.timeout_timer, {:turn_timeout, old.turn_id}})
         {:running, unchanged} = :sys.get_state(server)
         assert unchanged.active.turn_id == current.turn_id

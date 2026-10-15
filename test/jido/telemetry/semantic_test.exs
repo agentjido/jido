@@ -102,10 +102,10 @@ defmodule Jido.Telemetry.SemanticTest do
       :telemetry.attach(
         handler,
         event,
-        fn _name, _measurements, _metadata, counter ->
-          :atomics.add(counter, 1, 1)
+        fn _name, _measurements, metadata, {counter, turn_id} ->
+          if metadata[:turn_id] == turn_id, do: :atomics.add(counter, 1, 1)
         end,
-        count
+        {count, "one"}
       )
 
     on_exit(fn -> :telemetry.detach(handler) end)
@@ -125,10 +125,10 @@ defmodule Jido.Telemetry.SemanticTest do
       :telemetry.attach_many(
         handler,
         for(ending <- [:stop, :exception], do: prefix ++ [ending]),
-        fn _name, _measurements, _metadata, counter ->
-          :atomics.add(counter, 1, 1)
+        fn _name, _measurements, metadata, {counter, turn_id} ->
+          if metadata[:turn_id] == turn_id, do: :atomics.add(counter, 1, 1)
         end,
-        count
+        {count, "competing"}
       )
 
     on_exit(fn -> :telemetry.detach(handler) end)

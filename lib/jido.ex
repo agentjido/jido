@@ -637,6 +637,7 @@ defmodule Jido do
         )
 
       base_children = [
+        {Runic.Runner, name: exec_runner_name(name)},
         {Task.Supervisor,
          name: task_supervisor_name(name), max_children: Keyword.fetch!(opts, :max_tasks)},
         {Jido.AgentServer.RegistrationGuard, jido: name},
@@ -667,6 +668,10 @@ defmodule Jido do
   """
   @spec generate_id() :: Jido.Signal.ID.uuid7()
   defdelegate generate_id(), to: Jido.Signal.ID, as: :generate!
+
+  @doc false
+  def exec_runner_name(nil), do: Jido.ExecRunner
+  def exec_runner_name(name), do: Module.concat(name, ExecRunner)
 
   @doc "Returns the Registry name for the default Jido instance."
   @spec registry_name() :: atom()

@@ -2,9 +2,64 @@
 
 Date: 2026-10-14. Repository: `jido`. Branch: `release/v3`.
 
-The baseline below records the first inventory run. The follow-up section records the two independent fixes and the current test result.
+The baseline below records the first inventory run. The historical sections
+retain the evidence before the AgentServer change.
 
-## Completed independent patches
+## Started execution integration
+
+Checkpoint: `4e9112d`. AgentServer now uses one owned local started execution
+per Turn. See the [implementation and simplification check](started-execution.md).
+
+The core and property suite passes: 1,488 passed, 51 excluded. The 269
+missing-async failures and 27 live follow-up failures are resolved. No tests
+were skipped or disabled for this integration.
+
+The local Agent system suite passes all 63 tests across ETS, file, and Ecto
+adapters. Action passes all 1,059 tests. Runic passes 2,027 tests with its 13
+existing skips. All nine authoring JSON export Dialyzer diagnostics are fixed.
+The generator now emits a return spec that matches static schema support.
+
+The first full package run after AgentServer integration passed 2,430 of 2,437
+tests, with two existing skips and 161 normal exclusions. Its seven failures
+are now fixed:
+
+| Example | Original failures | Fix |
+| --- | ---: | --- |
+| `02_08_executable_continuation` | 2 | Dispatch selects an Action or a Flow with native bounded Iterate. |
+| `03_04_tool_loop` | 4 | Dispatch selects a ToolRound Flow; normal tool output feeds ReasonFlow under the existing step budget. |
+| `06_04_flow_factory` | 1 | Choice selects roles before Map starts quality and security work at the same causal depth. |
+
+All 23 focused tests for these three examples pass. The Factory overlap
+assertion is unchanged. Runic retains its documented stable order. No scheduler
+change or graph padding was required.
+
+The Turn deadline test now uses a barrier and an expired absolute deadline.
+It exposed a result-ordering race: a late admission error could reach the caller
+before the timer message. AgentServer now checks the deadline before it accepts
+any admission result. All seven context tests pass, including timeout recovery.
+
+The first extended full run also exposed a private-state test race. Work can
+start before the Server receives the lifecycle task's start result. Tests that
+read the native handle now wait for `:running`; the public responsiveness test
+accepts `:starting` and `:running`. The 42 focused runtime tests pass, including
+the property and fuzz variants.
+
+The final full run (`mix test.all --include fuzz --cover --warnings-as-errors`)
+passes all 2,451 tests, with two existing skips and 147 service exclusions.
+Core coverage is 93.0%. `mix quality` passes, including Dialyzer with no errors.
+Action's full suite with the pinned Runic fork passes all 1,059 tests, with
+95.06% coverage. See the implementation report for the commands, extra check
+failures, package limits, and one unreproduced Registry failure.
+
+Input and output error assertions in the other Flow examples now use the
+current structured Action errors and pass.
+
+The first broad run also found an expired-call queue metric that counted its
+own expired entry. Admission now removes that entry before it emits rejection
+telemetry. All three adapter cases pass. A peer startup error from that run
+did not recur in its focused run or the final serial full run.
+
+## Independent patches before the checkpoint
 
 - Removed `max_continuations` from the selection test. Direct and live selection checks are now separate tests. The direct check passes; the live check remains enabled and reaches the missing async API.
 - Fixed improper-list wrapping, unwrapping, and local identity detection in `jido_action/lib/jido_exec/fact.ex`. Four regression tests cover root and nested values, native Fact propagation, and public `Jido.Exec.run/4` input/output. The original core local-value test now passes.
@@ -22,9 +77,10 @@ The baseline below records the first inventory run. The follow-up section record
 | Core focused direct selection, local state, Flow, Codec, and Registry checks | 18 passed |
 | Core `mix test test/jido --seed 0` | 1,139 passed, 296 failed, 37 excluded |
 
-The current core failures contain 269 explicit missing-async failures and 27 live follow-up failures. The removed-option and direct improper-list failure groups are resolved. The added direct selection test increases the executed test count by one; the original mixed test is retained as a live check.
+At the checkpoint, core failures contained 269 explicit missing-async failures and 27 live follow-up failures. The removed-option and direct improper-list failure groups were resolved. The added direct selection test increased the executed test count by one; the original mixed test was retained as a live check.
 
-Next: change the AgentServer execution lifecycle, then rerun the live failure groups before changing assertions.
+The next step at that point was the AgentServer lifecycle change. It is now
+implemented and verified as described above.
 
 ## Baseline command and scope
 

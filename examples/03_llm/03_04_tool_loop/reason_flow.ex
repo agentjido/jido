@@ -65,7 +65,7 @@ defmodule Jido.Examples.ReActAgent.RouteModelDecision do
 
   @impl true
   def run(%{kind: :tool} = input, _context) do
-    {:continue, input, Jido.Examples.ReActAgent.RunTool}
+    {:continue, input, Jido.Examples.ReActAgent.ToolRound}
   end
 
   def run(%{kind: :answer} = input, _context) do
@@ -94,14 +94,14 @@ defmodule Jido.Examples.ReActAgent.RunTool do
             %{role: :tool, name: input.tool_name, content: result}
           ]
 
-      {:continue,
+      {:ok,
        %{
          prompt: nil,
          messages: messages,
          new_turn?: false,
          max_steps: input.max_steps,
          steps_remaining: input.steps_remaining
-       }, Jido.Examples.ReActAgent.ReasonFlow}
+       }}
     else
       :error -> {:error, {:unknown_tool, input.tool_name}}
       {:error, reason} -> {:error, reason}
@@ -129,7 +129,7 @@ defmodule Jido.Examples.ReActAgent.CommitAnswer do
 end
 
 defmodule Jido.Examples.ReActAgent.ReasonFlow do
-  @moduledoc "Runs model and tool continuations until the model returns an answer."
+  @moduledoc "Dispatch selects an answer Action or the next bounded tool round."
 
   use Jido.Flow,
     name: "examples_llm_react_reason_flow",
@@ -147,6 +147,19 @@ defmodule Jido.Examples.ReActAgent.ReasonFlow do
         steps_remaining: input(:steps_remaining)
       }
 
+    output result("reason")
+  end
+end
+
+defmodule Jido.Examples.ReActAgent.ToolRound do
+  @moduledoc "Runs one tool, then passes its transcript to the next model call."
+  use Jido.Flow,
+    name: "examples_llm_react_tool_round",
+    schema: Jido.Examples.ReActAgent.Contracts.tool_decision()
+
+  flow do
+    step "tool", action: Jido.Examples.ReActAgent.RunTool, params: input()
+    step "reason", action: Jido.Examples.ReActAgent.ReasonFlow, params: result("tool")
     output result("reason")
   end
 end

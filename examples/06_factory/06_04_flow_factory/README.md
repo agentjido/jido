@@ -5,7 +5,7 @@ builds, reviews, repairs, and hands off a software proposal.
 
 ## What you will learn
 
-- How a Plugin owns an asynchronous Exec handle after the mission Turn commits.
+- How a Plugin owns a started Exec after the mission Turn commits.
 - How nested Flows, Map, Choice, and bounded Iterate coordinate real Agent work.
 
 ## Read the code
@@ -37,13 +37,12 @@ flowchart TD
     Design --> Discovery
     Discovery --> Components[Map: API, UI, Test]
     Components --> Integration
-    Integration --> Quality
-    Integration --> Choice{Security requested?}
-    Choice -->|Yes| Security
-    Choice -->|No| Skip[Skip review]
-    Quality --> Verdict
-    Security --> Verdict
-    Skip --> Verdict
+    Integration --> Choice{Select review roles}
+    Choice -->|Requested| Both[Quality and Security]
+    Choice -->|Not requested| Quality[Quality only]
+    Both --> Reviews[Map: parallel reviewers]
+    Quality --> Reviews
+    Reviews --> Verdict
     Verdict -->|Changes required; at most twice| Repair[Next revision]
     Repair --> Components
     Verdict -->|Accepted| Handoff
@@ -56,6 +55,11 @@ hashes, role, and revision reject stale or changed results. Failure,
 cancellation, deadline, or owner shutdown cancels the Flow and stops the worker
 tree. The writer is a runtime service port; deterministic and live adapters do
 not enter Agent state.
+
+Choice selects the complete reviewer list before Map starts worker calls.
+Quality and security are then items of the same Map. They can run together
+under Runic's stable causal-wave admission. The verdict joins all requested
+review results and supplies the skipped-security result when it is absent.
 
 ## Limits
 

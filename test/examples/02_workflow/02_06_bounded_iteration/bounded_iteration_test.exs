@@ -59,7 +59,7 @@ defmodule JidoTest.Examples.Workflow.BoundedIterationTest do
 
     {:ok, command_signal_5} = Example.repair_signal(%{missing: -1})
 
-    assert {:error, %Jido.Flow.Error.InvalidExecutionError{details: %{phase: :flow_input}}} =
+    assert {:error, %Jido.Action.Error.InvalidInputError{details: %{phase: :flow_input}}} =
              Server.call(
                server,
                command_signal_5

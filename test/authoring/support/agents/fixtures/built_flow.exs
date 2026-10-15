@@ -2,18 +2,19 @@ defmodule JidoTest.Authoring.Agents.Fixtures.BuiltFlow do
   alias Jido.Flow.Ref
 
   {:ok, flow} =
-    Jido.Flow.new(
+    Jido.Flow.new(%{
       name: "corpus_built_flow",
       schema: Zoi.object(%{value: Zoi.integer()}),
       components: [
-        Jido.Flow.Step.new!(
+        %{
+          kind: :step,
           name: "set",
           action: JidoTest.Authoring.Agents.Fixtures.SetTotal,
           params: %{value: Ref.input(:value)}
-        )
+        }
       ],
       output: Ref.result("set")
-    )
+    })
 
   @flow flow
   use Jido.Agent, name: "authoring_built_flow"

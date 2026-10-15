@@ -23,7 +23,7 @@ defmodule JidoTest.Examples.Workflow.ParallelJoinTest do
     {:ok, route_signal_2} = Example.fetch_pair_signal(%{value: 3, fail: :invalid})
 
     assert {:error,
-            %Jido.Flow.Error.InvalidExecutionError{
+            %Jido.Action.Error.InvalidInputError{
               details: %{phase: :flow_input, errors: [%{path: [:fail]}]}
             }} =
              Jido.AgentServer.call(server, route_signal_2, [])
@@ -65,7 +65,7 @@ defmodule JidoTest.Examples.Workflow.ParallelJoinTest do
 
     assert Enum.any?(
              errors(error),
-             &(&1.message == "retriever failed" and &1.details.source == :left)
+             &(&1.message == "retriever failed" and &1.details.node_path == ["left"])
            )
 
     assert Server.snapshot(server) == before

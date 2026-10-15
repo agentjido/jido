@@ -344,7 +344,7 @@ defmodule Jido.AgentServer.FailureContractTest do
 
       assert {:error,
               %Jido.Action.Error.ExecutionFailureError{
-                details: %{reason: :expected_failure, retry: false}
+                details: %{reason: :expected_failure}
               }} = Server.call(server, signal("counter.fail"))
 
       assert_receive {:error_delivery, worker, emitted}, 1_000

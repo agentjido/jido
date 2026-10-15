@@ -95,54 +95,52 @@ defmodule Jido.Examples.Factory.FlowFactory.Discovery do
   end
 end
 
-defmodule Jido.Examples.Factory.FlowFactory.SkipSecurityReview do
+defmodule Jido.Examples.Factory.FlowFactory.ReviewRoles do
   @moduledoc false
-  use Jido.Action, name: "flow_factory_skip_security_review"
+  use Jido.Action, name: "flow_factory_review_roles"
 
-  def run(_params, _context) do
-    {:ok,
-     %{
-       verdict: :accepted,
-       findings: [],
-       skipped: true,
-       text: "Security review was not requested."
-     }}
-  end
+  def run(input, _context), do: {:ok, input}
 end
 
 defmodule Jido.Examples.Factory.FlowFactory.Review do
   @moduledoc "Quality and optional security review run independently before a join."
   alias Jido.Examples.Factory.FlowFactory.AskWorker
-  alias Jido.Examples.Factory.FlowFactory.SkipSecurityReview
+  alias Jido.Examples.Factory.FlowFactory.ReviewRoles
   use Jido.Flow, name: "flow_factory_review"
 
   flow do
-    step "quality",
+    choice "roles" do
+      option "required",
+        condition: input(:security) == true,
+        action: ReviewRoles,
+        params: %{roles: ["quality", "security"]}
+
+      otherwise action: ReviewRoles, params: %{roles: ["quality"]}
+    end
+
+    map "reviews",
+      collection: result("roles", :roles),
       action: AskWorker,
       params: %{
         mission_id: input(:mission_id),
         goal: input(:goal),
-        role: "quality",
+        role: item(),
         revision: input(:revision),
         inputs: input(:bundle)
       }
 
-    choice "security" do
-      option "required",
-        condition: input(:security) == true,
-        action: AskWorker,
-        params: %{
-          mission_id: input(:mission_id),
-          goal: input(:goal),
-          role: "security",
-          revision: input(:revision),
-          inputs: input(:bundle)
-        }
+    step "verdict", reviews <- result("reviews") do
+      quality = Enum.find(reviews, &(&1.role == "quality"))
 
-      otherwise action: SkipSecurityReview, params: %{}
-    end
+      security =
+        Enum.find(reviews, &(&1.role == "security")) ||
+          %{
+            verdict: :accepted,
+            findings: [],
+            skipped: true,
+            text: "Security review was not requested."
+          }
 
-    step "verdict", [quality <- result("quality"), security <- result("security")] do
       {:ok,
        %{
          accepted: quality.verdict == :accepted and security.verdict == :accepted,

@@ -51,9 +51,12 @@ defmodule Jido.DiscoveryTest do
 
   defmodule InvalidAction do
     @behaviour Jido.Action
-
     @impl true
     def run(params, _context), do: {:ok, params}
+    @impl true
+    def validate_params(params), do: {:ok, params}
+    @impl true
+    def validate_output(output), do: {:ok, output}
   end
 
   defmodule InvalidMetadataAction do

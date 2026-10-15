@@ -14,8 +14,9 @@ defmodule Jido.AgentServer.ActiveTurn do
                 Zoi.struct(Signal, description: "Signal after live admission")
                 |> Zoi.optional(),
               caller: Zoi.any(description: "Optional synchronous caller") |> Zoi.optional(),
-              exec_handle:
-                Zoi.any(description: "Caller-owned Jido.Exec handle") |> Zoi.optional(),
+              exec_handle: Zoi.any(description: "Owned Runic Worker reference") |> Zoi.optional(),
+              cancel_request:
+                Zoi.any(description: "Requested execution cancellation") |> Zoi.optional(),
               prepared: Zoi.any(description: "Prepared Agent command") |> Zoi.optional(),
               turn_context:
                 Zoi.map(description: "Prepared transient Turn context") |> Zoi.default(%{}),
