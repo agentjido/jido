@@ -139,46 +139,30 @@ defmodule Jido.Agent.Validation do
   end
 
   defp validate_common(agent) do
-    with {:ok, name} <- field(:name, agent.name) |> Authoring.at(:name),
-         {:ok, description} <-
-           field(:description, agent.description) |> Authoring.at(:description),
+    with {:ok, agent} <- normalize_fields(agent, [:name, :description]),
          :ok <- validate_module(agent.module) |> Authoring.at(:module),
-         {:ok, vsn} <- field(:vsn, agent.vsn) |> Authoring.at(:vsn),
+         {:ok, agent} <- normalize_fields(agent, [:vsn]),
          {:ok, specs, schema} <- plugin_schema(agent),
-         {:ok, routes} <- Authoring.routes(agent.routes) |> Authoring.at(:routes),
-         :ok <- validate_targets(routes),
-         {:ok, metadata} <- field(:metadata, agent.metadata) |> Authoring.at(:metadata) do
-      {:ok,
-       %{
-         agent
-         | name: name,
-           description: description,
-           vsn: vsn,
-           routes: routes,
-           metadata: metadata,
-           plugins: Enum.map(specs, &{&1.module, &1.options})
-       }, specs, schema}
+         {:ok, agent} <- normalize_fields(agent, [:routes]),
+         :ok <- validate_targets(agent.routes),
+         {:ok, agent} <- normalize_fields(agent, [:metadata]) do
+      {:ok, %{agent | plugins: Enum.map(specs, &{&1.module, &1.options})}, specs, schema}
     end
   end
 
-  defp static(%Agent{} = agent) do
-    with {:ok, name} <- field(:name, agent.name) |> Authoring.at(:name),
-         {:ok, description} <-
-           field(:description, agent.description) |> Authoring.at(:description),
-         {:ok, vsn} <- field(:vsn, agent.vsn) |> Authoring.at(:vsn),
+  defp static(agent) do
+    with {:ok, agent} <- normalize_fields(agent, [:name, :description, :vsn]),
          :ok <- State.validate_schema(agent.schema) |> Authoring.at(:schema),
-         {:ok, routes} <- Authoring.routes(agent.routes) |> Authoring.at(:routes),
-         {:ok, metadata} <- field(:metadata, agent.metadata) |> Authoring.at(:metadata) do
-      {:ok,
-       %{
-         agent
-         | name: name,
-           description: description,
-           vsn: vsn,
-           routes: routes,
-           metadata: metadata
-       }}
-    end
+         do: normalize_fields(agent, [:routes, :metadata])
+  end
+
+  defp normalize_fields(agent, fields) do
+    Enum.reduce_while(fields, {:ok, agent}, fn key, {:ok, agent} ->
+      case field(key, Map.fetch!(agent, key)) |> Authoring.at(key) do
+        {:ok, value} -> {:cont, {:ok, Map.put(agent, key, value)}}
+        error -> {:halt, error}
+      end
+    end)
   end
 
   # Re-read module contracts and Plugin-owned schemas for each use. The compiler
@@ -278,6 +262,8 @@ defmodule Jido.Agent.Validation do
   def field(:description, description) do
     invalid("Agent description must be a string or nil", %{description: description})
   end
+
+  def field(:routes, routes), do: Authoring.routes(routes)
 
   def field(:metadata, metadata) when is_map(metadata) and not is_struct(metadata),
     do: {:ok, metadata}

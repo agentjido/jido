@@ -19,8 +19,6 @@ defmodule Jido.Topology.Validation do
     :exports
   ]
 
-  def keys(attrs), do: Authoring.keys(attrs, @fields)
-
   def field(:name, value) do
     with {:ok, _} <- key(value), do: :ok
   end
@@ -34,39 +32,45 @@ defmodule Jido.Topology.Validation do
 
   def field(_, _), do: :ok
 
-  def definition(attrs, ancestors \\ [], depth \\ 0)
+  def definition(attrs, ancestors \\ [], depth \\ 0) do
+    with {:ok, definition, _resolved} <- resolve(attrs, %{}, ancestors, depth),
+         do: {:ok, definition}
+  end
 
-  def definition(_, _, depth) when depth > 32,
+  def resolve(attrs, resolved, ancestors \\ [], depth \\ 0)
+
+  def resolve(_, _, _, depth) when depth > 32,
     do: Authoring.error("Topology depth exceeds 32")
 
-  def definition(%Jido.Topology{} = attrs, ancestors, depth),
-    do: definition(Map.from_struct(attrs), ancestors, depth)
+  def resolve(%Jido.Topology{} = attrs, resolved, ancestors, depth),
+    do: resolve(Map.from_struct(attrs), resolved, ancestors, depth)
 
-  def definition(attrs, ancestors, depth) do
+  def resolve(attrs, resolved, ancestors, depth) do
     with {:ok, attrs} <- Authoring.attrs(attrs),
          :ok <- Authoring.keys(attrs, @fields),
          {:ok, name} <- at(:name, key(Map.get(attrs, :name))),
          schema = Map.get(attrs, :schema, Zoi.object(%{})),
          :ok <- at(:schema, field(:schema, schema)),
          {:ok, metadata} <- at(:metadata, plain_static_map(Map.get(attrs, :metadata, %{}))),
-         {:ok, agents} <- entries(attrs, :agents, :agent),
-         {:ok, groups} <- entries(attrs, :groups, :group),
-         {:ok, resources} <- entries(attrs, :resources, :resource),
-         {:ok, relationships} <- entries(attrs, :relationships, :owns),
-         {:ok, connections} <- entries(attrs, :connections, :subscribe),
+         {:ok, agents, resolved} <- entries(attrs, :agents, :agent, resolved),
+         {:ok, groups, resolved} <- entries(attrs, :groups, :group, resolved),
+         {:ok, resources, resolved} <- entries(attrs, :resources, :resource, resolved),
+         {:ok, relationships, resolved} <- entries(attrs, :relationships, :owns, resolved),
+         {:ok, connections, resolved} <- entries(attrs, :connections, :subscribe, resolved),
          {:ok, startup} <- at(:startup, entry(:startup, Map.get(attrs, :startup, %{}))),
-         {:ok, imports} <- entries(attrs, :imports, :import),
-         {:ok, exports} <- entries(attrs, :exports, :export),
+         {:ok, imports, resolved} <- entries(attrs, :imports, :import, resolved),
+         {:ok, exports, resolved} <- entries(attrs, :exports, :export, resolved),
          {:ok, children} <-
            Authoring.traverse_indexed(
              Map.get(attrs, :children, []),
              &Jido.Topology.Child.normalize(&1, ancestors, depth)
            )
            |> Authoring.at(:children),
-         {:ok, includes} <-
-           Authoring.traverse_indexed(
+         {:ok, includes, resolved} <-
+           traverse_resolved(
              Map.get(attrs, :includes, []),
-             &include(&1, ancestors, depth)
+             resolved,
+             &include(&1, ancestors, depth, &2)
            )
            |> Authoring.at(:includes) do
       definition = %{
@@ -85,22 +89,42 @@ defmodule Jido.Topology.Validation do
         children: children
       }
 
-      with :ok <- names(definition), do: {:ok, definition}
+      with :ok <- names(definition), do: {:ok, definition, resolved}
     end
   end
 
-  defp entries(attrs, field, kind),
+  defp entries(attrs, field, kind, resolved),
     do:
-      Authoring.traverse_indexed(Map.get(attrs, field, []), &entry(kind, &1))
+      traverse_resolved(Map.get(attrs, field, []), resolved, &entry(kind, &1, &2))
       |> Authoring.at(field)
 
+  defp traverse_resolved(entries, resolved, fun),
+    do: traverse_resolved(entries, resolved, fun, 0, [])
+
+  defp traverse_resolved([], resolved, _fun, _index, acc),
+    do: {:ok, Enum.reverse(acc), resolved}
+
+  defp traverse_resolved([entry | rest], resolved, fun, index, acc) do
+    case Authoring.at(fun.(entry, resolved), index) do
+      {:ok, entry, resolved} -> traverse_resolved(rest, resolved, fun, index + 1, [entry | acc])
+      error -> error
+    end
+  end
+
+  defp traverse_resolved(_, _resolved, _fun, _index, _acc),
+    do: Authoring.error("Expected a proper list")
+
   def entry(kind, attrs) do
+    with {:ok, value, _resolved} <- entry(kind, attrs, %{}), do: {:ok, value}
+  end
+
+  defp entry(kind, attrs, resolved) do
     with {:ok, attrs} <- Authoring.attrs(attrs),
          :ok <- entry_keys(attrs, kind),
          attrs = EntryMetadata.apply_defaults(kind, attrs),
-         {:ok, value} <- normalize(kind, attrs),
+         {:ok, value, resolved} <- normalize(kind, attrs, resolved),
          :ok <- static_entry(kind, value),
-         do: {:ok, value}
+         do: {:ok, value, resolved}
   end
 
   defp entry_keys(attrs, kind) do
@@ -123,9 +147,9 @@ defmodule Jido.Topology.Validation do
     end)
   end
 
-  defp normalize(kind, attrs) when kind in [:agent, :group] do
+  defp normalize(kind, attrs, resolved) when kind in [:agent, :group] do
     with {:ok, name} <- at(:key, key(attrs[:key])),
-         {:ok, selection} <- agent_selection(attrs),
+         {:ok, selection, resolved} <- agent_selection(attrs, resolved),
          {:ok, state} <- at(:initial_state, initial_state(attrs.initial_state)),
          {:ok, deps} <-
            at(:depends_on, Authoring.traverse_indexed(attrs.depends_on, &Ref.target/1)),
@@ -139,8 +163,15 @@ defmodule Jido.Topology.Validation do
 
       agent = Map.merge(agent, selection)
 
-      if kind == :agent, do: {:ok, agent}, else: group(agent, attrs)
+      with {:ok, value} <- if(kind == :agent, do: {:ok, agent}, else: group(agent, attrs)),
+           do: {:ok, value, resolved}
     end
+  end
+
+  defp normalize(:include, attrs, resolved), do: include(attrs, [], 0, resolved)
+
+  defp normalize(kind, attrs, resolved) do
+    with {:ok, value} <- normalize(kind, attrs), do: {:ok, value, resolved}
   end
 
   defp normalize(:resource, attrs) do
@@ -195,8 +226,6 @@ defmodule Jido.Topology.Validation do
          do: {:ok, %{key: key, to: to}}
   end
 
-  defp normalize(:include, attrs), do: include(attrs, [], 0)
-
   defp resource_config(kind, config) do
     case Resource.validate(kind, config) do
       {:error, %{details: %{field: field}}} = error -> at(field, error)
@@ -204,13 +233,15 @@ defmodule Jido.Topology.Validation do
     end
   end
 
-  defp include(attrs, ancestors, depth) do
+  defp include(attrs, ancestors, depth, resolved) do
     with {:ok, attrs} <- Authoring.attrs(attrs),
          :ok <- entry_keys(attrs, :include),
          attrs = EntryMetadata.apply_defaults(:include, attrs),
          {:ok, key} <- at(:key, key(attrs[:key])),
-         {:ok, source, ancestors} <- at(:topology, included_source(attrs[:topology], ancestors)),
-         {:ok, definition} <- at(:topology, definition(source, ancestors, depth + 1)),
+         {:ok, source, _owner, ancestors} <-
+           at(:topology, Jido.Topology.Source.load(attrs[:topology], ancestors, :include)),
+         {:ok, definition, resolved} <-
+           at(:topology, resolve(source, resolved, ancestors, depth + 1)),
          :ok <- at(:topology, static_include(definition)),
          {:ok, inputs} <- at(:inputs, plain_static_map(attrs.inputs)),
          {:ok, bindings} <- at(:bindings, bindings(attrs.bindings)),
@@ -221,41 +252,9 @@ defmodule Jido.Topology.Validation do
          topology: struct(Jido.Topology, definition),
          inputs: inputs,
          bindings: bindings
-       }}
+       }, resolved}
     end
   end
-
-  defp included_source(module, ancestors) when is_atom(module) and not is_nil(module) do
-    cond do
-      module in ancestors ->
-        Authoring.error("Recursive topology inclusion", %{module: module})
-
-      Code.ensure_loaded?(module) and function_exported?(module, :__topology_config__, 0) ->
-        {:ok, module.__topology_config__(), [module | ancestors]}
-
-      true ->
-        Authoring.error("Expected a topology module or definition")
-    end
-  rescue
-    error -> source_error(module, :error, error)
-  catch
-    kind, reason -> source_error(module, kind, reason)
-  end
-
-  defp included_source(%Jido.Topology{} = value, ancestors), do: {:ok, value, ancestors}
-
-  defp included_source(value, ancestors) when is_map(value) or is_list(value),
-    do: {:ok, value, ancestors}
-
-  defp included_source(_, _), do: Authoring.error("Expected a topology module or definition")
-
-  def source_error(module, kind, reason),
-    do:
-      Authoring.error("Topology module configuration failed", %{
-        module: module,
-        kind: kind,
-        reason: reason
-      })
 
   defp static_include(%{children: []}), do: :ok
   defp static_include(_), do: Authoring.error("Static include cannot contain runtime children")
@@ -384,20 +383,20 @@ defmodule Jido.Topology.Validation do
   @doc false
   def agent_source(entry), do: Map.get(entry, :definition) || Map.get(entry, :module)
 
-  defp agent_selection(attrs) do
+  defp agent_selection(attrs, resolved) do
     case {Map.get(attrs, :module), Map.get(attrs, :definition)} do
       {nil, %Jido.Agent{} = value} ->
-        with {:ok, definition} <- at(:definition, Jido.Agent.validate_definition(value)),
-             do: {:ok, %{definition: definition}}
+        with {:ok, {:ok, definition, _specs, _schema}, resolved} <-
+               at(:definition, Jido.Agent.Source.resolve(value, resolved)),
+             do: {:ok, %{definition: definition}, resolved}
+
+      {module, nil} when is_atom(module) and not is_nil(module) ->
+        with {:ok, _validation, resolved} <-
+               at(:module, Jido.Agent.Source.resolve(module, resolved)),
+             do: {:ok, %{module: module}, resolved}
 
       {module, nil} when not is_nil(module) ->
-        with :ok <-
-               at(
-                 :module,
-                 if(is_atom(module), do: :ok, else: Authoring.error("Expected an Agent module"))
-               ),
-             {:ok, _} <- at(:module, agent_definition(module)),
-             do: {:ok, %{module: module}}
+        at(:module, Authoring.error("Expected an Agent module"))
 
       _ ->
         Authoring.error("An Agent entry requires exactly one module or neutral definition")

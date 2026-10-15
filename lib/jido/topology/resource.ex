@@ -4,14 +4,10 @@ defmodule Jido.Topology.Resource do
   alias Jido.Agent.Authoring
   alias Jido.Signal.Bus
 
-  @kinds [:bus]
   @reserved_bus_options [:name, :jido, :registry]
 
   @doc false
-  def kinds, do: @kinds
-
-  @doc false
-  def resource?(%{kind: kind}), do: kind in @kinds
+  def resource?(%{kind: :bus}), do: true
   def resource?(_value), do: false
 
   @doc false

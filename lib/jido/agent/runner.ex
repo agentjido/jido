@@ -20,7 +20,6 @@ defmodule Jido.Agent.Runner do
       :turn,
       :context,
       :exec_opts,
-      :plugin_inputs,
       :plugin_specs
     ]
     defstruct @enforce_keys
@@ -32,7 +31,6 @@ defmodule Jido.Agent.Runner do
             turn: Jido.Agent.Turn.t(),
             context: map(),
             exec_opts: keyword(),
-            plugin_inputs: %{optional(module()) => Jido.Plugin.Input.t()},
             plugin_specs: [Jido.Agent.Plugin.Spec.t()]
           }
   end
@@ -153,7 +151,6 @@ defmodule Jido.Agent.Runner do
       turn: turn,
       context: context,
       exec_opts: exec_opts,
-      plugin_inputs: plugin_inputs,
       plugin_specs: plugin_specs
     }
   end
@@ -173,7 +170,7 @@ defmodule Jido.Agent.Runner do
                {:ok, output, directives},
                prepared.agent,
                prepared.turn.source_signal,
-               prepared.plugin_inputs,
+               prepared.context.plugin_inputs,
                prepared.plugin_specs
              )
            ),

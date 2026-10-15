@@ -144,40 +144,6 @@ defmodule Jido.Agent do
   alias Jido.Error
   alias Jido.Signal
 
-  @schema Zoi.struct(
-            __MODULE__,
-            %{
-              id:
-                Zoi.string(description: "Unique Agent instance identifier")
-                |> Zoi.nullable()
-                |> Zoi.optional(),
-              module: Zoi.atom(description: "Agent behavior module"),
-              vsn:
-                Zoi.integer(description: "Agent definition version")
-                |> Zoi.min(1)
-                |> Zoi.nullable()
-                |> Zoi.optional(),
-              name: Zoi.string(description: "Agent name"),
-              description:
-                Zoi.string(description: "Agent description")
-                |> Zoi.nullable()
-                |> Zoi.optional(),
-              schema: Zoi.any(description: "Static data schema for Agent-owned state"),
-              plugins:
-                Zoi.list(Zoi.any(), description: "Canonical ordered Plugin declarations")
-                |> Zoi.default([]),
-              state:
-                Zoi.map(description: "Sole combined domain and Plugin-owned Agent state")
-                |> Zoi.nullable()
-                |> Zoi.optional(),
-              routes:
-                Zoi.list(Zoi.any(), description: "Canonical Signal Router routes")
-                |> Zoi.default([]),
-              metadata: Zoi.map(description: "Agent definition metadata") |> Zoi.default(%{})
-            },
-            coerce: true
-          )
-
   @type definition :: %__MODULE__{id: nil, state: nil}
   @type instance :: %__MODULE__{id: String.t(), state: map()}
   @type t :: definition() | instance()
@@ -199,17 +165,34 @@ defmodule Jido.Agent do
 
   @optional_callbacks handle_signal: 2, checkpoint: 2, restore: 2
 
-  @enforce_keys Zoi.Struct.enforce_keys(@schema)
-  defstruct Zoi.Struct.struct_fields(@schema)
+  @enforce_keys [:module, :name, :schema]
+  defstruct [
+    :id,
+    :module,
+    :vsn,
+    :name,
+    :description,
+    :schema,
+    :state,
+    plugins: [],
+    routes: [],
+    metadata: %{}
+  ]
 
   @doc "Declares one Agent module with a reusable definition and default Signal behavior."
   defmacro __using__(opts) do
     quote location: :keep do
       use Jido.Agent.Definition,
-        dsl: Jido.Agent.DSL,
-        agent_options: unquote(opts),
-        constructors?: true,
-        combined_extensions?: false
+        host: :agent,
+        agent_options: unquote(opts)
+
+      @doc "Creates one Agent instance from this module definition."
+      @spec new(map() | keyword()) :: {:ok, Jido.Agent.instance()} | {:error, Exception.t()}
+      def new(overrides \\ []), do: Jido.Agent.instantiate(__MODULE__, overrides)
+
+      @doc "Creates one Agent instance or raises its validation error."
+      @spec new!(map() | keyword()) :: Jido.Agent.instance() | no_return()
+      def new!(overrides \\ []), do: Jido.Agent.instantiate!(__MODULE__, overrides)
     end
   end
 
@@ -315,14 +298,6 @@ defmodule Jido.Agent do
     with {:ok, agent, _specs, schema} <- Validation.validate_instance_with_plugins(agent) do
       transition_validated(agent, next_state, schema)
     end
-  end
-
-  @doc false
-  @spec transition_validated(instance(), term()) ::
-          {:ok, instance()} | {:error, Exception.t()}
-  def transition_validated(%__MODULE__{} = agent, next_state) do
-    with {:ok, schema} <- complete_schema(agent),
-         do: transition_validated(agent, next_state, schema)
   end
 
   @doc false

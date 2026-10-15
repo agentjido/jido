@@ -181,6 +181,56 @@ defmodule JidoTest.Contract.TopologyDocumentTest do
              Topology.new(name: "include", includes: [%{key: :root, topology: definition}])
   end
 
+  @tag obligation: ["jido.topology.I12", "jido.topology.I15", "jido.topology.I17"]
+  test "recursive module providers report include and child cycles before the depth limit" do
+    for {field, message} <- [
+          includes: "Recursive topology inclusion",
+          children: "Child topology cycle"
+        ] do
+      module = Module.concat(__MODULE__, "Cycle#{System.unique_integer([:positive])}")
+
+      JidoTest.AuthoringCompiler.with_compiled(
+        """
+        defmodule #{inspect(module)} do
+          def __topology_config__ do
+            [name: "recursive", #{field}: [%{key: :again, topology: __MODULE__}]]
+          end
+        end
+        """,
+        fn _ ->
+          assert {:error, %ValidationError{} = error} =
+                   Topology.new(%{field => [%{key: :first, topology: module}], :name => "parent"})
+
+          assert error.message == message
+          assert error.details.module == module
+          assert Enum.take(error.details.source_path, 2) == [field, 0]
+        end,
+        modules: [module]
+      )
+    end
+  end
+
+  @tag obligation: ["jido.topology.I12", "jido.topology.I17"]
+  test "legacy graph providers are runtime children only and do not infer an owner" do
+    module = Module.concat(__MODULE__, "Legacy#{System.unique_integer([:positive])}")
+
+    JidoTest.AuthoringCompiler.with_compiled(
+      "defmodule #{inspect(module)} do\ndef topology, do: [name: \"legacy\"]\nend",
+      fn _ ->
+        assert {:ok, definition} =
+                 Topology.new(name: "parent", children: [%{key: :legacy, topology: module}])
+
+        assert [child] = definition.children
+        assert child.topology.name == "legacy"
+        assert child.director == nil
+
+        assert {:error, %ValidationError{}} =
+                 Topology.new(name: "parent", includes: [%{key: :legacy, topology: module}])
+      end,
+      modules: [module]
+    )
+  end
+
   @tag obligation: ["jido.topology.I15", "jido.topology.I17"]
   test "source provider faults retain their causes for includes and children" do
     T.with_topology("", fn module ->

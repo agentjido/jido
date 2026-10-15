@@ -36,13 +36,8 @@ defmodule Jido.Topology.DSL.Compiler do
     if error, do: {:error, error}, else: :ok
   end
 
-  defmacro __before_compile__(env) do
-    config = Module.get_attribute(env.module, :jido_agent_options)
-    config = Map.drop(config, [:description])
-    {extensions, config} = Map.pop(config, :extensions, [])
-    validate_extensions!(extensions, env)
-    extensions = Enum.filter(extensions, &extension?(&1, :lower_topology))
-    dsl = Module.get_attribute(env.module, :spark_dsl_config) || %{}
+  def lower(options, extensions, dsl, env) do
+    config = Map.drop(options, [:description, :vsn])
     fields = opts(dsl, [:topology], [:schema, :metadata])
 
     entity_groups =
@@ -93,8 +88,6 @@ defmodule Jido.Topology.DSL.Compiler do
 
       @doc false
       def __topology_sources__, do: unquote(Macro.escape(sources))
-
-      @after_verify {Jido.Topology.DSL.Compiler, :verify}
     end
   end
 
@@ -174,26 +167,6 @@ defmodule Jido.Topology.DSL.Compiler do
   end
 
   defp core_entity?(_path, _entity), do: false
-
-  defp validate_extensions!(extensions, env) when is_list(extensions) do
-    invalid =
-      Enum.find(extensions, fn extension ->
-        not extension?(extension, :lower_agent) and
-          not extension?(extension, :lower_topology)
-      end)
-
-    if invalid do
-      fail!(env, "Authoring extension must implement lower_agent/2 or lower_topology/2")
-    end
-  end
-
-  defp validate_extensions!(_extensions, env),
-    do: fail!(env, "Topology extensions must be a list")
-
-  defp extension?(module, callback) when is_atom(module) and not is_nil(module),
-    do: Code.ensure_loaded?(module) and function_exported?(module, callback, 2)
-
-  defp extension?(_module, _callback), do: false
 
   defp escape(value, env) do
     {:ok, Macro.escape(value)}

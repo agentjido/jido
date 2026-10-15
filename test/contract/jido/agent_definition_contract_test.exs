@@ -266,6 +266,9 @@ defmodule JidoTest.Contract.AgentDefinitionTest do
       assert {:error, %ValidationError{}} = Agent.set(source, attrs)
     end
 
+    assert {:error, %ValidationError{message: "Agent domain schema must be a Zoi object"}} =
+             Agent.set(%{source | schema: nil}, %{})
+
     assert {:error, %ValidationError{}} = Agent.set(F.definition(), %{})
 
     assert {:error, %ValidationError{}} =

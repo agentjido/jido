@@ -226,7 +226,7 @@ defmodule JidoTest.AgentContract do
   end
 
   defmodule InvalidClaims do
-    def route_target_options, do: [:ref, :ref]
+    def route_target_options, do: Process.get(:agent_contract_claims, [:ref, :ref])
     def lower_agent(config, entities), do: {:ok, config, entities}
   end
 

@@ -34,6 +34,37 @@ defmodule JidoTest.TopologyContract do
     )
   end
 
+  defmodule ObservedPlugin do
+    use Jido.Plugin
+
+    def state_spec(_opts) do
+      send(self(), :read_planning_plugin)
+      {:observed, Zoi.integer() |> Zoi.default(0)}
+    end
+
+    def contribute(context, _opts) do
+      {:ok,
+       %Jido.Topology.Plugin.Contribution{
+         plugin: context.plugin,
+         resources: [%{key: context.agent_key <> "_bus"}]
+       }}
+    end
+  end
+
+  defmodule ObservedAgent do
+    @behaviour Jido.Agent
+    def __agent_config__ do
+      send(self(), :read_planning_agent)
+
+      %Jido.Agent{
+        module: __MODULE__,
+        name: "observed",
+        schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}),
+        plugins: [ObservedPlugin]
+      }
+    end
+  end
+
   defmodule Role do
     defstruct [:key, :definition, :__spark_metadata__]
   end

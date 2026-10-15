@@ -111,7 +111,7 @@ defmodule Jido.Topology.PluginIntegrationTest do
   test "expansion reports empty contributions as unchanged" do
     definition = Topology.new!(name: "empty", agents: [%{key: :worker, module: EmptyWorker}])
     assert {:ok, ^definition, false} = TopologyPlugin.expand_with_changes(definition)
-    assert {:ok, ^definition} = TopologyPlugin.expand_definition(definition)
+    assert {:ok, ^definition, false} = TopologyPlugin.expand_with_changes(definition)
   end
 
   test "expansion carries changes from included Topologies" do
@@ -132,7 +132,7 @@ defmodule Jido.Topology.PluginIntegrationTest do
       )
 
     assert Enum.map(definition.resources, & &1.key) == ["explicit"]
-    assert {:ok, expanded} = TopologyPlugin.expand_definition(definition)
+    assert {:ok, expanded, true} = TopologyPlugin.expand_with_changes(definition)
 
     assert Enum.map(expanded.resources, & &1.key) == [
              "explicit",

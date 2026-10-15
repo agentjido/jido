@@ -73,6 +73,11 @@ defmodule JidoTest.Agent.AuthoringExtensionTest do
     def route_target_options, do: [:ref, :ref]
   end
 
+  defmodule ImproperRouteTargetOptions do
+    def route_target_options, do: Process.get(:improper_route_target_options)
+    def lower_agent(config, entities), do: {:ok, config, entities}
+  end
+
   defmodule ObservedTargets do
     def route_target_options do
       send(self(), :read_route_targets)
@@ -207,18 +212,28 @@ defmodule JidoTest.Agent.AuthoringExtensionTest do
     end
 
     assert {:error, error} =
-             Jido.Agent.Extension.route_target_extension([Labels, ConflictingRouteTarget], :ref)
+             Jido.Agent.Extension.lower([Labels, ConflictingRouteTarget], target_config(:ref), [])
 
     assert Exception.message(error) == "Conflicting Agent extension route target option :ref"
 
     assert {:error, error} =
-             Jido.Agent.Extension.route_target_extension([InvalidRouteTargetOptions], :ref)
+             Jido.Agent.Extension.lower([InvalidRouteTargetOptions], target_config(:ref), [])
 
     assert Exception.message(error) ==
              "Agent extension route_target_options/0 must return unique atom names"
 
-    assert {:error, error} = Jido.Agent.Extension.route_target_extension(:invalid, :ref)
-    assert Exception.message(error) == "Invalid Agent extension route target option"
+    assert {:error, error} = Jido.Agent.Extension.lower(:invalid, target_config(:ref), [])
+    assert Exception.message(error) == "Agent extensions and entities must be proper lists"
+  end
+
+  test "improper target option declarations return a structured authoring error" do
+    Process.put(:improper_route_target_options, [:ref | :invalid])
+
+    assert {:error, error} =
+             Extension.lower([ImproperRouteTargetOptions], target_config(:ref), [])
+
+    assert Exception.message(error) ==
+             "Agent extension route_target_options/0 must return unique atom names"
   end
 
   test "a route has only one module or extension target" do
@@ -449,5 +464,13 @@ defmodule JidoTest.Agent.AuthoringExtensionTest do
         Process.exit(pid, :kill)
         flunk("Agent compilation did not finish")
     end
+  end
+
+  defp target_config(option) do
+    %{
+      routes: [
+        %{path: "test", target: %Jido.Agent.Extension.RouteTarget{option: option, value: Add}}
+      ]
+    }
   end
 end

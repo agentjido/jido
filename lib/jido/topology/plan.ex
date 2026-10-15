@@ -36,13 +36,18 @@ defmodule Jido.Topology.Plan do
   # The caller must supply the composition from this definition's validation.
   @doc false
   def expand(definition, id, input, composed) do
+    with {:ok, _attrs, resolved} <- Validation.resolve(definition, %{}),
+         do: expand(definition, id, input, composed, resolved)
+  end
+
+  def expand(definition, id, input, composed, resolved) do
     with :ok <- root_imports(definition),
          {:ok, inputs} <- Composition.inputs(definition, input),
          {:ok, expanded} <- expand(composed.nodes, inputs, definition.startup.max_agents),
          resource_specs = Enum.filter(composed.nodes, &Resource.resource?/1),
          {:ok, components} <- component_limits(composed.scopes, expanded, resource_specs),
          {:ok, agents} <-
-           Authoring.traverse(expanded, &agent(&1, id, Map.fetch!(inputs, &1.scope))),
+           Authoring.traverse(expanded, &agent(&1, id, Map.fetch!(inputs, &1.scope), resolved)),
          {:ok, resources} <-
            Authoring.traverse(
              resource_specs,
@@ -157,7 +162,7 @@ defmodule Jido.Topology.Plan do
     |> Map.merge(%{member_key: key, member: member, kind: :agent})
   end
 
-  defp agent(spec, id, input) do
+  defp agent(spec, id, input, resolved) do
     key =
       if Map.has_key?(spec, :member_key),
         do: spec.key <> "/" <> Composition.escape(spec.member_key),
@@ -169,8 +174,9 @@ defmodule Jido.Topology.Plan do
          {:ok, target_node} <- Reference.resolve(spec.node, input, member),
          {:ok, target_node} <- target_node(target_node),
          :ok <- placement_resources(target_node, spec.subscriptions),
-         {:ok, agent} <-
-           Jido.Agent.instantiate(Jido.Topology.Validation.agent_source(spec),
+         {:ok, agent, _specs, _schema} <-
+           Jido.Agent.Validation.instantiate_validated(
+             Map.fetch!(resolved, Validation.agent_source(spec)),
              id: Composition.escape(id) <> "/" <> key,
              state: state
            ) do

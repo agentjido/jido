@@ -12,6 +12,20 @@ defmodule JidoTest.Contract.TopologyAuthoringTest do
     :ok
   end
 
+  @tag obligation: ["jido.topology.I1", "jido.topology.I3"]
+  test "root Agent version and description do not become graph fields" do
+    T.with_topology(
+      "",
+      fn module ->
+        assert module.vsn() == 2
+        assert module.definition().description == "owner description"
+        assert %Topology{name: "versioned", agents: [], metadata: %{}} = module.topology()
+        refute Map.has_key?(Map.from_struct(module.topology()), :vsn)
+      end,
+      ~s(name: "versioned", vsn: 2, description: "owner description")
+    )
+  end
+
   @tag obligation: ["jido.topology.I1", "jido.topology.I2", "jido.topology.I3"]
   test "a combined host retains the Agent API and separate constructor meanings" do
     T.with_topology(
@@ -257,6 +271,8 @@ defmodule JidoTest.Contract.TopologyAuthoringTest do
   @tag obligation: ["jido.topology.I3", "jido.topology.I15"]
   test "invalid sections, field presence, and dependencies retain authored source locations" do
     for body <- [
+          "agent do\nschema Zoi.object(%{first: Zoi.integer()})\nplugin A.First\nend",
+          "agent do\nend\nroutes do\nroute \"test.run\", String\nend",
           "routes do\nroute \"test.add\", A.Add\nend",
           "topology do\nagents do\ngroup :workers, definition: T.worker(), count: nil\nend\nend",
           "topology do\nagents do\nagent :worker, String\nend\nend",

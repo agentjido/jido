@@ -2,27 +2,13 @@ defmodule Jido.Agent.Definition do
   @moduledoc false
 
   defmacro __using__(opts) do
-    dsl = Keyword.fetch!(opts, :dsl)
+    host = Keyword.fetch!(opts, :host)
     agent_opts = Keyword.fetch!(opts, :agent_options)
-    constructors? = Keyword.fetch!(opts, :constructors?)
-    combined_extensions? = Keyword.fetch!(opts, :combined_extensions?)
 
-    constructors =
-      if constructors? do
-        quote location: :keep do
-          @doc "Creates one Agent instance from this module definition."
-          @spec new(map() | keyword()) ::
-                  {:ok, Jido.Agent.instance()} | {:error, Exception.t()}
-          def new(overrides \\ []) do
-            Jido.Agent.instantiate(__MODULE__, overrides)
-          end
-
-          @doc "Creates one Agent instance or raises its validation error."
-          @spec new!(map() | keyword()) :: Jido.Agent.instance() | no_return()
-          def new!(overrides \\ []) do
-            Jido.Agent.instantiate!(__MODULE__, overrides)
-          end
-        end
+    dsl =
+      case host do
+        :agent -> Jido.Agent.DSL
+        :topology -> Jido.Topology.DSL
       end
 
     quote location: :keep do
@@ -34,7 +20,7 @@ defmodule Jido.Agent.Definition do
       @before_compile Jido.Agent.DSL.Compiler
       @behaviour Jido.Agent
 
-      @jido_agent_combined_extensions unquote(combined_extensions?)
+      @jido_agent_host unquote(host)
 
       @doc "Returns the neutral canonical Agent definition."
       @spec definition() :: Jido.Agent.definition()
@@ -67,8 +53,6 @@ defmodule Jido.Agent.Definition do
       def route_action!(path) do
         Jido.Action.Inline.target!(__MODULE__, host: Jido.Agent, route: path, role: :action)
       end
-
-      unquote(constructors)
 
       @doc "Applies one Signal to an Agent value without starting a Server."
       @spec cmd(Jido.Agent.instance(), Jido.Signal.t(), keyword()) ::

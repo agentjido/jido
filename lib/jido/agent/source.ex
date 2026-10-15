@@ -3,6 +3,26 @@ defmodule Jido.Agent.Source do
 
   alias Jido.Agent.{Authoring, Validation}
 
+  # This map belongs to one authoring operation. Do not retain it across calls.
+  def resolve(source, resolved) do
+    case Map.fetch(resolved, source) do
+      {:ok, validation} ->
+        {:ok, validation, resolved}
+
+      :error ->
+        with {:ok, definition, _specs, _schema} = validation <- definition_with_plugins(source) do
+          resolved = Map.put(resolved, source, validation)
+
+          resolved =
+            if is_struct(source, Jido.Agent),
+              do: Map.put(resolved, definition, validation),
+              else: resolved
+
+          {:ok, validation, resolved}
+        end
+    end
+  end
+
   def definition(source) do
     with {:ok, definition, _specs, _schema} <- definition_with_plugins(source),
          do: {:ok, definition}

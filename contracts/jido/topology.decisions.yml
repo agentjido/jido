@@ -6,8 +6,8 @@
 
 - id: topology-document-scope
   date: 2026-10-15
-  decision: Protect current graph documents. Defer a complete combined Agent and Topology document and root version-option support to separate API work.
-  driver: Current documents omit the root Agent, and current Topology compilation rejects root vsn options. This guard rollout does not change the DSL or implementation.
+  decision: Protect current graph documents. Defer a complete combined Agent and Topology document to separate API work. Preserve root Agent version options through the shared compiler.
+  driver: Current documents omit the root Agent. The shared compiler now separates Agent version and description from graph options, with a positive contract test.
   approved_by: Scope from the user request; contract boundary decision by Codex
 
 - id: topology-focused-mutation

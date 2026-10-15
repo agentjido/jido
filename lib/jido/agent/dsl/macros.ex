@@ -26,8 +26,6 @@ defmodule Jido.Agent.DSL.Macros do
   end
 
   @doc false
-  def default_name(path), do: path
-
   defp build(path, target, options, caller) do
     validate_options!(options, caller)
     {options, extension_options} = Keyword.split(options, @route_options)
@@ -61,7 +59,7 @@ defmodule Jido.Agent.DSL.Macros do
 
     compiled =
       Inline.compile!(identity, parsed, action_caller,
-        default_name: quote(do: unquote(__MODULE__).default_name(unquote(route_path))),
+        default_name: route_path,
         remove_imports: [{__MODULE__, [route: 2, route: 3, route: 4]}]
       )
 

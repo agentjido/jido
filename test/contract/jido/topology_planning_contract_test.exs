@@ -6,6 +6,83 @@ defmodule JidoTest.Contract.TopologyPlanningTest do
   alias Jido.Topology.{Plan, Ref, Reference}
   alias JidoTest.TopologyContract, as: T
 
+  @tag obligation: "jido.topology.I15"
+  test "entry lists reject invalid containers and improper tails with their field path" do
+    for field <- [
+          :agents,
+          :groups,
+          :resources,
+          :relationships,
+          :connections,
+          :imports,
+          :exports,
+          :includes
+        ] do
+      assert {:error, %ValidationError{} = error} =
+               Topology.new(%{field => :invalid, :name => "invalid"})
+
+      assert error.message == "Expected a proper list"
+      assert error.details.source_path == [field]
+    end
+
+    assert {:error, %ValidationError{} = error} =
+             Topology.new(
+               name: "invalid",
+               agents: [%{key: :worker, definition: T.worker()} | :tail]
+             )
+
+    assert error.message == "Expected a proper list"
+    assert error.details.source_path == [:agents]
+  end
+
+  @tag obligation: ["jido.topology.I6", "jido.topology.I9", "jido.topology.I14"]
+  test "one planning operation resolves current contracts once and validates each member" do
+    attrs = [
+      name: "resolved",
+      agents: [%{key: :leader, module: T.ObservedAgent}],
+      groups: [
+        %{
+          key: :workers,
+          module: T.ObservedAgent,
+          count: 3,
+          initial_state: %{count: Reference.member(:index)}
+        }
+      ],
+      includes: [
+        %{
+          key: :included,
+          topology: [name: "included", agents: [%{key: :worker, module: T.ObservedAgent}]]
+        }
+      ]
+    ]
+
+    assert {:ok, instance} = Topology.instantiate(attrs, id: "resolved")
+    assert_receive :read_planning_agent
+    assert_receive :read_planning_plugin
+    refute_received :read_planning_agent
+    refute_received :read_planning_plugin
+    assert map_size(instance.plan.agents) == 5
+
+    for index <- 1..3,
+        do:
+          assert(instance.plan.agents["group/workers/#{index}"].initial_state == %{count: index})
+
+    assert map_size(instance.plan.resources) == 3
+
+    assert {:ok, ^instance} = Topology.instantiate(attrs, id: "resolved")
+    assert_receive :read_planning_agent
+    assert_receive :read_planning_plugin
+    refute_received :read_planning_agent
+    refute_received :read_planning_plugin
+
+    invalid =
+      Keyword.put(attrs, :groups, [
+        %{key: :workers, module: T.ObservedAgent, count: 3, initial_state: %{count: "invalid"}}
+      ])
+
+    assert {:error, %ValidationError{}} = Topology.instantiate(invalid, id: "invalid")
+  end
+
   @tag obligation: ["jido.topology.I8", "jido.topology.I14", "jido.topology.I15"]
   test "input defaults preserve explicit false and zero and failed planning leaves the source reusable" do
     definition =

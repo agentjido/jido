@@ -114,9 +114,8 @@ identify the exact results used for this record:
 
 ## Open API decisions
 
-- Root `vsn` options on `use Jido.Topology` currently fail graph validation.
-  The guards preserve the default version and do not accept that defect as a
-  permanent API promise. Add a positive version guard with the compiler fix.
+- Root `vsn` options are fixed by the shared compiler change below. A positive
+  contract test protects explicit versions and keeps them out of graph fields.
 - Existing Topology documents contain the graph and omit the root Agent.
   A complete combined document needs a separate versioned format decision.
 - Runtime activation, AgentServer, Controller, persistence, and dispatch need
@@ -125,3 +124,86 @@ identify the exact results used for this record:
   the existing asynchronous worker failure documented in `contracts/README.md`.
   Generic mutation operators and this small selection cannot prove all behavior.
   Keep core tests, property tests, and the independent optional authoring corpus.
+
+
+## Agent and Topology consolidation
+
+The guard checkpoint is `6900d7d7`. Steps 2–7 keep the public DSL unchanged.
+Only the `jido` package changed. AgentServer implementation files did not change.
+The unrelated durable-execution design documents are outside this work.
+
+- One internal host selector replaces the paired setup flags. The public
+  Agent and Topology entry modules retain their different constructors.
+- One final compiler entry reads current options and Spark state. It calls
+  separate Agent and graph lowering functions, then verifies both definitions.
+  Early Spark checks and deferred caller-scope evaluation remain in place.
+- Shared field normalization preserves validation order and Plugin callback
+  order. An explicit Agent struct replaces its unused private Zoi schema.
+- Each planning call resolves each member Agent source once. It reuses the
+  current definition, Plugin specifications, and complete state schema during
+  contribution expansion and member creation. Each member still initializes
+  and validates its own state. No resolved data survives the planning call.
+- `Topology.Source` shares provider loading and fault handling. Static includes
+  and runtime children keep their different provider and owner rules.
+- Removed unused helpers and duplicate prepared Plugin inputs. Kept the
+  internal Pipeline error clause because an existing test protects it.
+
+The implementation adds 294 lines and removes 314 lines under `lib`, including
+55 lines in the new source loader: a net reduction of 20 lines.
+
+| Check | Result |
+| --- | --- |
+| Format, compile with warnings as errors, warning lint | Passed |
+| Core and property tests, seed 0 | 1,532 passed; 51 normal profile exclusions |
+| Authoring corpus, seed 0 | 444 passed |
+| Covenant gate | 108 passed; all 42 obligations covered |
+| Shared compiler selection | 13 killed |
+| Topology planning selection | 11 killed initially; 2 gaps found and then caught by added tests |
+| Shared Agent source selection through Topology | 2 killed |
+| Agent selection | 12 killed; 234 existing annotations deferred |
+
+These checks cover 40 distinct selected sites. Every selected site has an exact
+kill after the focused follow-up. There are no unresolved selected survivors,
+timeouts, or invalid mutants. These results establish no full-component score.
+The earlier 1,302-mutant matrix was not rerun. Enumeration of current sites does
+not execute those mutants.
+
+The first compiler mutation probe found that compile-time root Agent dependency
+verification lacked a direct guard. The final guard rejects invalid root Action
+and Plugin contracts. The planning probe found missing guards for module cycles
+and improper entry lists. Added tests catch both mutations. The older planning
+report retains the two original survivors as evidence; the gap report records
+their passing follow-up.
+
+Updated 133 survivor locations. Removed 20 entries for deleted mutation sites.
+Replaced three incorrect historical claims with direct tests and focused kills:
+`Agent.set/2` can reach its invalid-schema branch, and a later extension route
+can reach the non-atom target-option guard. No new survivor exceptions were
+added. The remaining 234 annotations were matched to current sites, but the
+focused run does not revalidate their historical judgments.
+
+`mix quality` still stops at the same ten existing Dialyzer warnings listed
+above. No new warnings or test skips were added. The core tests ran separately.
+
+### Focused artifacts
+
+All mutation runs use seed 0, macro mutation, selective recompilation, a 5,000 ms
+per-test timeout, and complete component contract suites. Compiler and final
+Agent checks use two workers. The two shared source mutations use one worker.
+No fail-fast credit is used. Final compiler and Agent checks omit checkpoints;
+input changes during the earlier compiler probe made that checkpoint unusable.
+
+| Artifact | Selected IDs | SHA-256 |
+| --- | --- | --- |
+| `tmp/covenant/topology-host-refactor.json` | m003, m054, m056, m057, m075, m083, m085, m095, m100, m114, m182, m183, m197 | `3e56e9f4e256e1d887c0e705a51fe03f85f92207dcaaedfbce2553a2e15a1217` |
+| `tmp/covenant/topology-planning-refactor.json` | m0733, m0739, m0826, m0832, m0953, m0956, m0965, m0972, m0989, m1038, m1047, m1243, m1246 | `5f11924c981dcb756ebba67f8576a8ea27ee87ef18b88d183cb09b555a8d6ee3` |
+| `tmp/covenant/topology-gap-refactor.json` | m0953, m1047 | `468d79f5630ff3cef3d90a1ae255f4c2d20f1fc21118e9f32375975bb65ab4bc` |
+| `tmp/covenant/topology-source-refactor.json` | m152, m153 | `78dd50d127347c1f9887f14b3ab1209a6a3b8d5849e18a33da8a56b66f10154d` |
+| `tmp/covenant/agent-refactor.json` | m0053, m0059, m0644, m0645, m0646, m0684, m0855, m1177, m1179, m1180, m1181, m1190 | `d227d5bc0070f4eb81c5792818445012f112341e2b7d47fd42c53c0584406852` |
+
+The compiler profile selects `Jido.Agent.Definition`, `Jido.Agent.DSL.Compiler`,
+and `Jido.Topology.DSL.Compiler` through the Topology contract. The planning and
+gap profiles use the current 14-module Topology list. The shared source profile
+selects Agent Source, Validation, Runner, and Extension through that contract.
+The final Agent profile uses its normal module list with `--only` for the twelve
+listed sites. Re-enumerate IDs when source changes.

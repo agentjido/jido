@@ -367,6 +367,25 @@ defmodule JidoTest.Contract.AgentAuthoringTest do
                Agent.Extension.lower(extensions, %{routes: [%{target: route_target}]}, [])
     end
 
+    for claims <- [[:ref, "invalid"], [:ref | :tail]] do
+      Process.put(:agent_contract_claims, claims)
+
+      assert {:error, %ValidationError{} = error} =
+               Agent.Extension.lower([F.InvalidClaims], %{routes: [%{target: target}]}, [])
+
+      assert error.message ==
+               "Agent extension route_target_options/0 must return unique atom names"
+    end
+
+    assert {:error, %ValidationError{} = error} =
+             Agent.Extension.lower(
+               [F.Labels],
+               %{routes: [%{target: target}, %{target: %{target | option: "invalid"}}]},
+               []
+             )
+
+    assert error.message == "Invalid Agent extension route target option"
+
     assert {:error, %ValidationError{}} =
              Agent.Extension.lower(
                [F.Labels],

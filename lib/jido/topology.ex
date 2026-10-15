@@ -74,14 +74,11 @@ defmodule Jido.Topology do
   defmacro __using__(opts) do
     quote location: :keep do
       use Jido.Agent.Definition,
-        dsl: Jido.Topology.DSL,
-        agent_options: unquote(opts),
-        constructors?: false,
-        combined_extensions?: true
+        host: :topology,
+        agent_options: unquote(opts)
 
       import Jido.Topology.Reference, only: [input: 1, member: 1]
       import Jido.Topology.Ref, only: [ref: 2]
-      @before_compile Jido.Topology.DSL.Compiler
 
       @doc "Returns the topology owner Agent definition."
       @spec owner() :: Jido.Agent.definition()
@@ -118,15 +115,16 @@ defmodule Jido.Topology do
   @doc "Validates static authoring data."
   @spec new(map() | keyword() | t()) :: {:ok, t()} | {:error, Exception.t()}
   def new(attrs) do
-    with {:ok, definition, _composed} <- new_with_composition(attrs), do: {:ok, definition}
+    with {:ok, definition, _composed, _resolved} <- new_with_composition(attrs),
+         do: {:ok, definition}
   end
 
   defp new_with_composition(attrs) do
-    with {:ok, attrs} <- Validation.definition(attrs),
+    with {:ok, attrs, resolved} <- Validation.resolve(attrs, %{}),
          {:ok, composed} <- Composition.flatten(attrs),
          :ok <- Jido.Topology.Child.validate(attrs),
          {:ok, definition} <- Zoi.parse(@schema, attrs),
-         do: {:ok, definition, composed}
+         do: {:ok, definition, composed, resolved}
   end
 
   @doc "Validates a definition or raises its error."
@@ -136,14 +134,14 @@ defmodule Jido.Topology do
   @spec instantiate(t() | map() | keyword(), map() | keyword()) ::
           {:ok, Instance.t()} | {:error, Exception.t()}
   def instantiate(definition, opts) do
-    with {:ok, definition, static_composed} <- new_with_composition(definition),
-         {:ok, planning_definition, changed?} <- Plugin.expand_with_changes(definition),
+    with {:ok, definition, static_composed, resolved} <- new_with_composition(definition),
+         {:ok, planning_definition, changed?} <- Plugin.expand_with_changes(definition, resolved),
          {:ok, composed} <- composition(planning_definition, changed?, static_composed),
          {:ok, opts} <- Authoring.attrs(opts),
          :ok <- Authoring.keys(opts, [:id, :input]),
          {:ok, id} <- Validation.key(Map.get(opts, :id)),
          {:ok, input} <- Validation.parse_input(definition.schema, Map.get(opts, :input, %{})),
-         {:ok, plan} <- Plan.expand(planning_definition, id, input, composed),
+         {:ok, plan} <- Plan.expand(planning_definition, id, input, composed, resolved),
          :ok <- Jido.Topology.Child.plan(definition, id, input, plan) do
       {:ok, %Instance{id: id, definition: definition, input: input, plan: plan}}
     end

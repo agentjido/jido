@@ -4,7 +4,6 @@ defmodule Jido.Topology.ResourceTest do
   alias Jido.Topology.Resource
 
   test "Bus is the only registered core resource kind" do
-    assert Resource.kinds() == [:bus]
     assert Resource.resource?(%{kind: :bus})
     refute Resource.resource?(%{kind: :queue})
   end

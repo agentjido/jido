@@ -6,19 +6,27 @@ defmodule Jido.Agent.DSL.Compiler do
   alias Spark.Dsl.Extension
 
   defmacro __before_compile__(env) do
-    config = Module.get_attribute(env.module, :jido_agent_options)
-    config = host_config(config, env)
-    {extensions, config} = Map.pop(config, :extensions, [])
-
-    extensions =
-      if Module.get_attribute(env.module, :jido_agent_combined_extensions) do
-        Enum.filter(extensions, &extension?(&1, :lower_agent))
-      else
-        extensions
-      end
-
-    # Module access can read an older loaded version during recompilation.
+    options = Module.get_attribute(env.module, :jido_agent_options)
+    host = Module.get_attribute(env.module, :jido_agent_host)
+    {extensions, options} = Map.pop(options, :extensions, [])
+    {agent_extensions, topology_extensions} = extensions(host, extensions, env)
+    config = host_config(host, options, env)
+    # Read current compile state once. Loaded module code can be stale on reload.
     dsl = Module.get_attribute(env.module, :spark_dsl_config) || %{}
+    agent = lower(config, agent_extensions, dsl, env)
+
+    topology =
+      if host == :topology,
+        do: Jido.Topology.DSL.Compiler.lower(options, topology_extensions, dsl, env)
+
+    quote do
+      unquote(agent)
+      unquote(topology)
+      @after_verify {Jido.Agent.DSL.Compiler, :verify}
+    end
+  end
+
+  defp lower(config, extensions, dsl, env) do
     routes = Extension.get_entities(dsl, [:routes])
     source = Extension.get_opt(dsl, [:routes], :signal_source)
 
@@ -56,8 +64,6 @@ defmodule Jido.Agent.DSL.Compiler do
       def __agent_sources__, do: unquote(Macro.escape(sources))
 
       unquote_splicing(generated)
-
-      @after_verify {Jido.Agent.DSL.Compiler, :verify}
     end
   end
 
@@ -65,13 +71,31 @@ defmodule Jido.Agent.DSL.Compiler do
   def register_agent_block!(module),
     do: Module.put_attribute(module, :jido_agent_block_declared, true)
 
-  defp host_config(config, env) do
-    if Module.get_attribute(env.module, :jido_agent_combined_extensions) do
-      Map.take(config, [:name, :description, :extensions, :vsn])
-    else
-      unwrap!(Authoring.keys(config, [:name, :description, :vsn, :extensions]), env)
-      config
-    end
+  defp host_config(:topology, config, _env),
+    do: Map.take(config, [:name, :description, :vsn])
+
+  defp host_config(:agent, config, env) do
+    unwrap!(Authoring.keys(config, [:name, :description, :vsn]), env)
+    config
+  end
+
+  defp extensions(:agent, extensions, _env), do: {extensions, []}
+
+  defp extensions(:topology, extensions, env) do
+    unwrap!(
+      Authoring.traverse(extensions, fn extension ->
+        if extension?(extension, :lower_agent) or extension?(extension, :lower_topology),
+          do: {:ok, extension},
+          else:
+            Authoring.error(
+              "Authoring extension must implement lower_agent/2 or lower_topology/2"
+            )
+      end),
+      env
+    )
+
+    {Enum.filter(extensions, &extension?(&1, :lower_agent)),
+     Enum.filter(extensions, &extension?(&1, :lower_topology))}
   end
 
   defp validate_lowered_routes!(routes, lowered, env) do
@@ -92,6 +116,10 @@ defmodule Jido.Agent.DSL.Compiler do
   def verify(module) do
     env = %{file: to_string(module.module_info(:compile)[:source]), line: 1}
     unwrap!(Jido.Agent.Source.definition(module), env, module.__agent_sources__())
+
+    if function_exported?(module, :__topology_config__, 0),
+      do: Jido.Topology.DSL.Compiler.verify(module)
+
     :ok
   end
 

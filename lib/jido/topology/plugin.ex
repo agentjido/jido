@@ -62,47 +62,45 @@ defmodule Jido.Topology.Plugin do
   end
 
   @doc false
-  @spec expand_definition(Jido.Topology.t()) ::
-          {:ok, Jido.Topology.t()} | {:error, term()}
-  def expand_definition(%Jido.Topology{} = definition) do
-    with {:ok, expanded, _changed?} <- expand_with_changes(definition), do: {:ok, expanded}
-  end
-
-  @doc false
   @spec expand_with_changes(Jido.Topology.t()) ::
           {:ok, Jido.Topology.t(), boolean()} | {:error, term()}
-  def expand_with_changes(%Jido.Topology{} = definition) do
+  def expand_with_changes(definition) do
+    with {:ok, attrs, resolved} <- Validation.resolve(definition, %{}),
+         do: expand_with_changes(struct(Jido.Topology, attrs), resolved)
+  end
+
+  def expand_with_changes(%Jido.Topology{} = definition, resolved) do
     with {:ok, expanded_includes} <-
-           Authoring.traverse(definition.includes, &expand_include/1),
+           Authoring.traverse(definition.includes, &expand_include(&1, resolved)),
          {includes, changes} = Enum.unzip(expanded_includes),
          definition = %{definition | includes: includes},
          {:ok, nested} <-
            Authoring.traverse(
              definition.agents ++ definition.groups,
-             &declaration_contributions/1
+             &declaration_contributions(&1, resolved)
            ),
          {expanded, changed?} <- append_contributions(definition, List.flatten(nested)),
          changed? = changed? or Enum.any?(changes),
-         {:ok, expanded} <- validate_changed(expanded, changed?) do
+         {:ok, expanded} <- validate_changed(expanded, changed?, resolved) do
       {:ok, expanded, changed?}
     end
   end
 
-  defp validate_changed(definition, false), do: {:ok, definition}
+  defp validate_changed(definition, false, _resolved), do: {:ok, definition}
 
-  defp validate_changed(definition, true) do
-    with {:ok, attrs} <- Validation.definition(definition),
+  defp validate_changed(definition, true, resolved) do
+    with {:ok, attrs, _resolved} <- Validation.resolve(definition, resolved),
          do: {:ok, struct(Jido.Topology, attrs)}
   end
 
-  defp expand_include(include) do
-    with {:ok, topology, changed?} <- expand_with_changes(include.topology),
+  defp expand_include(include, resolved) do
+    with {:ok, topology, changed?} <- expand_with_changes(include.topology, resolved),
          do: {:ok, {%{include | topology: topology}, changed?}}
   end
 
-  defp declaration_contributions(declaration) do
+  defp declaration_contributions(declaration, resolved) do
     with {:ok, agent, specs, _schema} <-
-           Jido.Agent.Source.definition_with_plugins(Validation.agent_source(declaration)) do
+           Map.fetch!(resolved, Validation.agent_source(declaration)) do
       specs
       |> Enum.reject(&is_nil(&1.topology))
       |> Authoring.traverse(fn spec ->

@@ -387,14 +387,15 @@
         "jido.topology.I1": {
           "failing": 0,
           "kind": "functional",
-          "passing": 4,
+          "passing": 5,
           "status": "active",
           "testable": true,
           "tests": [
             "test a combined host retains the Agent API and separate constructor meanings",
             "test inline Actions retain route lookup, helpers, defaults, and direct execution",
             "test keyword graph options and description are assigned to the correct definition",
-            "test optional blocks remain independent and only an explicit Agent selects a child director"
+            "test optional blocks remain independent and only an explicit Agent selects a child director",
+            "test root Agent version and description do not become graph fields"
           ]
         },
         "jido.topology.I10": {
@@ -424,10 +425,12 @@
         "jido.topology.I12": {
           "failing": 0,
           "kind": "functional",
-          "passing": 2,
+          "passing": 4,
           "status": "active",
           "testable": true,
           "tests": [
+            "test legacy graph providers are runtime children only and do not infer an owner",
+            "test recursive module providers report include and child cycles before the depth limit",
             "test repeated includes isolate input and identity while sharing only declared Bus bindings",
             "test stored includes and references retain their scopes and exact plan"
           ]
@@ -446,24 +449,26 @@
         "jido.topology.I14": {
           "failing": 0,
           "kind": "functional",
-          "passing": 4,
+          "passing": 5,
           "status": "active",
           "testable": true,
           "tests": [
             "test Plugin contributions run Agent then group then Plugin order without changing saved declarations",
             "test definition and planning operations do not spawn runtime processes",
             "test input defaults preserve explicit false and zero and failed planning leaves the source reusable",
+            "test one planning operation resolves current contracts once and validates each member",
             "test repeated includes isolate input and identity while sharing only declared Bus bindings"
           ]
         },
         "jido.topology.I15": {
           "failing": 0,
           "kind": "functional",
-          "passing": 10,
+          "passing": 12,
           "status": "active",
           "testable": true,
           "tests": [
             "test document decoding requires supported versions, strict fields, and trusted Registry kinds",
+            "test entry lists reject invalid containers and improper tails with their field path",
             "test exact placement is retained and remote Agents cannot use a local Bus",
             "test input defaults preserve explicit false and zero and failed planning leaves the source reusable",
             "test invalid Plugin contributions return structured errors and preserve application rejection reasons",
@@ -472,6 +477,7 @@
             "test invalid sizes, graph cycles, missing endpoints, and duplicate owners fail before planning",
             "test members require one current module or neutral Agent definition and valid resolved state",
             "test public tuple and raising boundaries reject invalid fields, options, references, and runtime data",
+            "test recursive module providers report include and child cycles before the depth limit",
             "test source provider faults retain their causes for includes and children"
           ]
         },
@@ -491,12 +497,14 @@
         "jido.topology.I17": {
           "failing": 0,
           "kind": "functional",
-          "passing": 3,
+          "passing": 5,
           "status": "active",
           "testable": true,
           "tests": [
             "test child declarations retain directors and validate resolved command members and event targets",
+            "test legacy graph providers are runtime children only and do not infer an owner",
             "test optional blocks remain independent and only an explicit Agent selects a child director",
+            "test recursive module providers report include and child cycles before the depth limit",
             "test source provider faults retain their causes for includes and children"
           ]
         },
@@ -515,13 +523,14 @@
         "jido.topology.I3": {
           "failing": 0,
           "kind": "functional",
-          "passing": 3,
+          "passing": 4,
           "status": "active",
           "testable": true,
           "tests": [
             "test a combined host retains the Agent API and separate constructor meanings",
             "test invalid sections, field presence, and dependencies retain authored source locations",
-            "test optional blocks remain independent and only an explicit Agent selects a child director"
+            "test optional blocks remain independent and only an explicit Agent selects a child director",
+            "test root Agent version and description do not become graph fields"
           ]
         },
         "jido.topology.I4": {
@@ -551,10 +560,11 @@
         "jido.topology.I6": {
           "failing": 0,
           "kind": "functional",
-          "passing": 2,
+          "passing": 3,
           "status": "active",
           "testable": true,
           "tests": [
+            "test one planning operation resolves current contracts once and validates each member",
             "test the shared host and member planning read current Plugin contracts after reload",
             "test the shared host and members reject a reloaded invalid Action contract"
           ]
@@ -583,11 +593,12 @@
         "jido.topology.I9": {
           "failing": 0,
           "kind": "functional",
-          "passing": 1,
+          "passing": 2,
           "status": "active",
           "testable": true,
           "tests": [
-            "test members require one current module or neutral Agent definition and valid resolved state"
+            "test members require one current module or neutral Agent definition and valid resolved state",
+            "test one planning operation resolves current contracts once and validates each member"
           ]
         }
       }

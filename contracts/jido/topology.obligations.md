@@ -4,6 +4,7 @@ modules:
   - Jido.Topology.DSL.Compiler
   - Jido.Topology.Extension
   - Jido.Topology.Validation
+  - Jido.Topology.Source
   - Jido.Topology.Composition
   - Jido.Topology.Plan
   - Jido.Topology.Reference
@@ -25,8 +26,8 @@ The module list selects mutation targets; it does not expose internal APIs.
 
 The graph document does not represent the root Agent definition. A complete
 combined authoring document needs a separate format decision. Root `vsn`
-options on `use Jido.Topology` are also deferred: the current graph compiler
-rejects them. The default Agent version remains guarded.
+options on `use Jido.Topology` remain Agent fields and do not enter graph
+validation. The guards cover both the default and an explicit version.
 
 ## Obligations
 

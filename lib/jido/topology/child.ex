@@ -3,39 +3,7 @@ defmodule Jido.Topology.Child do
   alias Jido.Agent.Authoring
   alias Jido.Topology.{Composition, EntryMetadata, Plan, Reference, Validation}
 
-  def source(module, ancestors) when is_atom(module) and not is_nil(module) do
-    cond do
-      module in ancestors ->
-        Authoring.error("Child topology cycle", %{module: module})
-
-      not Code.ensure_loaded?(module) ->
-        Authoring.error("Expected a topology module")
-
-      function_exported?(module, :__topology_config__, 0) ->
-        director =
-          if function_exported?(module, :__topology_owner__?, 0) and module.__topology_owner__?(),
-            do: module.owner()
-
-        {:ok, module.__topology_config__(), director, [module | ancestors]}
-
-      function_exported?(module, :topology, 0) ->
-        {:ok, module.topology(), nil, [module | ancestors]}
-
-      true ->
-        Authoring.error("Expected a topology module")
-    end
-  rescue
-    error -> Validation.source_error(module, :error, error)
-  catch
-    kind, reason -> Validation.source_error(module, kind, reason)
-  end
-
-  def source(%Jido.Topology{} = value, ancestors), do: {:ok, value, nil, ancestors}
-
-  def source(value, ancestors) when is_map(value) or is_list(value),
-    do: {:ok, value, nil, ancestors}
-
-  def source(_, _), do: Authoring.error("Expected a topology module or definition")
+  def source(value, ancestors), do: Jido.Topology.Source.load(value, ancestors, :child)
 
   def normalize(attrs, ancestors, depth) do
     with {:ok, attrs} <- Authoring.attrs(attrs),

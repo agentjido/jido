@@ -29,21 +29,13 @@ defmodule Jido.Agent.Extension do
 
   @optional_callbacks route_target_options: 0
 
-  @doc false
-  @spec route_target_extension([module()], atom()) :: {:ok, module()} | {:error, term()}
-  def route_target_extension(extensions, option) when is_list(extensions) and is_atom(option) do
-    with {:ok, claims} <- route_target_claims(extensions), do: route_target_claim(claims, option)
-  end
-
-  def route_target_extension(_extensions, option), do: invalid_route_option(option)
-
   defp route_target_claims(extensions) do
     Enum.reduce_while(extensions, {:ok, %{}}, fn extension, {:ok, claims} ->
       if is_atom(extension) and Code.ensure_loaded?(extension) and
            function_exported?(extension, :route_target_options, 0) do
         options = extension.route_target_options()
 
-        if is_list(options) and options == Enum.uniq(options) and Enum.all?(options, &is_atom/1) do
+        if valid_route_options?(options) do
           claims =
             Enum.reduce(
               options,
@@ -67,6 +59,13 @@ defmodule Jido.Agent.Extension do
       end
     end)
   end
+
+  defp valid_route_options?(options) when is_list(options),
+    do:
+      not List.improper?(options) and options == Enum.uniq(options) and
+        Enum.all?(options, &is_atom/1)
+
+  defp valid_route_options?(_options), do: false
 
   @doc """
   Lowers static extension data to ordinary Agent authoring data.
