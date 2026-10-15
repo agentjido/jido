@@ -5,7 +5,7 @@ defmodule Jido.AgentServer do
   This Server exposes four runtime phases: `:idle`, `:admitting`,
   `:running`, and `:directing`. The state machine also uses private `:starting`,
   `:settling`, and `:cancelling` states within the public `:running` phase. One Signal selects one Action or Flow. Live
-  Plugin admission, `Jido.Exec`, and outbound Plugin work run asynchronously.
+  Plugin admission, Action and Flow execution, and outbound Plugin work run asynchronously.
   The Server commits only the terminal complete state result. It then
   notifies selected Plugin `after_commit/3` hooks in declaration order, then
   interprets returned Directives in list order before it accepts the next Signal.

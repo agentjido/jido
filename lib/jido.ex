@@ -637,7 +637,7 @@ defmodule Jido do
         )
 
       base_children = [
-        {Runic.Runner, name: exec_runner_name(name)},
+        {Runic.Runner, name: exec_runner_name(name), store: Jido.AgentServer.Execution.Store},
         {Task.Supervisor,
          name: task_supervisor_name(name), max_children: Keyword.fetch!(opts, :max_tasks)},
         {Jido.AgentServer.RegistrationGuard, jido: name},

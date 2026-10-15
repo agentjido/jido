@@ -2,18 +2,28 @@
 
 This integration replaces the removed async Exec API in AgentServer.
 The checkpoint before implementation is `4e9112d` in `jido`.
-Implementation changes span `jido`, `jido_action`, and `runic`.
+Core uses the sibling Action and Runic checkouts for this integration.
 
 ## Execution contract
 
-Each Turn starts one `Jido.Exec.start/6` execution with `mode: :local`
-and `owner: server_pid`. Each Jido instance has a Runic Runner. The
-application also provides a Runner for standalone AgentServers.
+Each Turn starts one local execution through `Jido.AgentServer.Execution.Local`.
+The adapter uses `Jido.Exec.compile/2` and `Jido.Exec.result/2` with native Runic
+execution observations. It passes `owner: server_pid` to the Runic Worker.
+Each Jido instance has a Runic Runner. The application also provides a Runner
+for standalone AgentServers.
 
 Runic owns the Worker, its native task scope, task dispatch, retries, and
 per-attempt timeouts. Local execution accepts runtime values. It writes no
-Runic Store data and cannot resume. Durable Exec behavior remains the default
-for other callers.
+Runic Store data and cannot resume. The core Runner uses a store that retains
+no data. This also prevents initial build events from being stored. The
+adapter uses local input facts and does not request portable execution data.
+`Jido.Exec.start/6` remains the durable API in Action.
+
+Runic can log raw node and error values when it applies a failed result. The
+local adapter stops warning logs in that failed Worker after the failure hook.
+Core reports the error through its existing redaction boundary. Caller failure
+hooks still receive the original error. The logger setting is local to the
+Worker, which stops after the Turn.
 
 Core uses private `:starting`, `:settling`, and `:cancelling` states within
 the public `:running` phase. Short linked tasks call the blocking lifecycle
@@ -44,21 +54,38 @@ State changes do not reset it. Candidate validation, persistence, commit,
 
 ## Simplification check
 
-The ownership model is simpler. AgentServer uses the same started execution
-API as other managed callers. Runic provides the execution tree and cancellation
+The ownership model stays in Runic. Core adapts the Action and Flow compiler
+to local Worker execution. Runic provides the execution tree and cancellation
 barrier. Core has no replacement async handle API, scheduler, continuation loop,
 or task-tree controller.
 
-This change does **not** reduce total source size. Core runtime changes add
-153 net lines, including the 173-line Execution module. Turn execution code
-shrinks by 41 net lines. The extra lifecycle states handle blocking calls and
-start, cancellation, and settlement races. Normal completion uses two short
-lifecycle tasks. Runic owns the Action and Flow tasks in a separate pool.
+The local adapter adds input and option conversion code. The lifecycle states
+handle blocking calls and start, cancellation, and settlement races. Normal
+completion uses two short lifecycle tasks. Runic owns the Action and Flow tasks
+in a separate pool.
 
 The result is a smaller execution responsibility in core, with more explicit
 transition code. It is not a claim of fewer processes or faster Turns.
 
-## Verification
+## Core repair checks (2026-10-15)
+
+The repair changes only `jido`. Focused tests cover local input, context, and
+output values; retry classification; option errors before dispatch; caller
+failure hooks; cancellation; owner death; and Worker cleanup.
+
+The final default core run passed all 1,444 tests.
+
+The wider core and runtime run passed 2,093 tests. One peer test timed out while
+loading support code and passed when run alone. Two existing skips remain.
+The Topology runtime test now waits for readiness before it checks member counts.
+
+The full `mix test.all` run stopped after the Factory example failed. That
+example still passes local options to durable `Jido.Exec.start/6`. It needs a
+separate migration. No skip tags were added. `mix quality` passed format,
+strict compilation, and lint, then stopped on nine Action authoring type-spec
+errors in Dialyzer. Those errors remain outside this execution repair.
+
+## Earlier integration verification
 
 Checks used Elixir 1.20.4 and OTP 29 on 2026-10-14. Core selects the sibling
 Action and Runic checkouts. Action's final standalone checks select the pinned

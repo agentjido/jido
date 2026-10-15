@@ -126,6 +126,7 @@ defmodule Jido.Topology.RuntimeTest do
     assert is_pid(Runtime.whereis_member(c.jido, id, :first))
     assert Runtime.whereis_member(c.jido, id, :idle) == nil
     assert {:ok, _} = Runtime.call(c.jido, id, {:group, :group, 1}, add(3))
+    assert :ok = Runtime.await_ready(c.jido, id)
     assert %{active_members: 3, dormant_members: 2} = Runtime.status(c.jido, id)
     assert {:error, :unknown_member} = Runtime.call(c.jido, id, :missing, add())
     assert {:error, :unknown_member} = Runtime.call(c.jido, id, {:group, :group, :missing}, add())

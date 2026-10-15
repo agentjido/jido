@@ -2,6 +2,7 @@ defmodule Jido.AgentServer.Execution do
   @moduledoc false
 
   alias Jido.AgentServer.{ActiveTurn, Cancellation, TaskSupport, Turn, TurnCompletion}
+  alias Jido.AgentServer.Execution.Local
 
   def start(prepared, data) do
     owner = self()
@@ -10,7 +11,6 @@ defmodule Jido.AgentServer.Execution do
 
     opts =
       Keyword.merge(prepared.exec_opts,
-        mode: :local,
         owner: owner,
         max_concurrency: Keyword.get(prepared.exec_opts, :max_concurrency, 1),
         on_complete: fn ^id, _workflow -> send(owner, {:exec_settled, id}) end
@@ -20,7 +20,7 @@ defmodule Jido.AgentServer.Execution do
     data = %{data | active: ActiveTurn.begin_execution(data.active, handle, prepared)}
 
     operation(data, :start, fn ->
-      Jido.Exec.start(
+      Local.start(
         runner,
         id,
         prepared.turn.executable,
@@ -42,7 +42,7 @@ defmodule Jido.AgentServer.Execution do
     handle = data.active.exec_handle
 
     operation(data, :settle, fn ->
-      result = Jido.Exec.result(handle.runner, handle.id)
+      result = Local.result(handle.runner, handle.id, handle.execution_id)
       {result, Runic.Runner.cancel(handle.runner, handle.id)}
     end)
   end
@@ -55,8 +55,11 @@ defmodule Jido.AgentServer.Execution do
     complete(pending.kind, result, data)
   end
 
-  defp complete(:start, {:ok, pid}, data) do
-    handle = %{data.active.exec_handle | pid: pid, ref: Process.monitor(pid)}
+  defp complete(:start, {:ok, pid, execution_id}, data) do
+    handle =
+      data.active.exec_handle
+      |> Map.merge(%{pid: pid, ref: Process.monitor(pid), execution_id: execution_id})
+
     data = %{data | active: %{data.active | exec_handle: handle}}
 
     cond do

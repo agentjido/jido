@@ -10,7 +10,7 @@ defmodule Jido.Application do
       [
         Jido.Instance.NamespaceRegistry,
         Jido.Persistence.ETS.Owner,
-        {Runic.Runner, name: Jido.exec_runner_name(nil)},
+        {Runic.Runner, name: Jido.exec_runner_name(nil), store: Jido.AgentServer.Execution.Store},
         {Jido.Discovery, []}
       ],
       strategy: :one_for_one,
