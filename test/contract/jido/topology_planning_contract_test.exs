@@ -483,6 +483,98 @@ defmodule JidoTest.Contract.TopologyPlanningTest do
     assert {:error, %ValidationError{}} = Topology.instantiate(conflict, id: "conflict")
   end
 
+  @tag obligation: ["jido.topology.I13", "jido.topology.I15"]
+  test "an included contribution collision fails before parent callbacks with its local path" do
+    definition =
+      Topology.new!(
+        name: "root",
+        agents: [%{key: :parent, definition: T.worker([T.Audit])}],
+        includes: [
+          %{
+            key: :nested,
+            topology: %{
+              name: "nested",
+              agents: [%{key: :worker, definition: T.worker([T.Bus])}],
+              resources: [%{key: :bus_worker}]
+            }
+          }
+        ]
+      )
+
+    assert {:error, %ValidationError{} = error} = Topology.instantiate(definition, id: "root")
+    assert error.details.source_path === [:resources, 1, :key]
+    assert_received {:contributed, T.Bus, "worker"}
+    refute_received {:contributed, T.Audit, "parent"}
+  end
+
+  @tag obligation: ["jido.topology.I13", "jido.topology.I17"]
+  test "all child event targets are checked before child contribution callbacks" do
+    definition =
+      Topology.new!(
+        name: "parent",
+        children: [
+          %{
+            key: :first,
+            topology: %{
+              name: "first",
+              agents: [%{key: :worker, definition: T.worker([T.Bus])}]
+            }
+          },
+          %{
+            key: :second,
+            topology: %{name: "second"},
+            gate: %{events: ["public.**"], to: :missing}
+          }
+        ]
+      )
+
+    assert {:error, %ValidationError{}} = Topology.instantiate(definition, id: "parent")
+    refute_received {:contributed, _, _}
+  end
+
+  @tag obligation: ["jido.topology.I13", "jido.topology.I15", "jido.topology.I17"]
+  test "static child graphs and command targets are checked at every depth before parent contributions" do
+    child = %{
+      key: :leaf,
+      topology: %{
+        name: "leaf",
+        agents: [%{key: :worker, definition: T.worker()}],
+        exports: [%{key: :public, kind: :agent, from: :worker}],
+        children: [%{key: :nested, topology: %{name: "nested"}}]
+      },
+      gate: %{
+        commands: [
+          %{type: "contract.run", member: :worker},
+          %{type: "contract.child.run", member: {:child, :nested}}
+        ]
+      }
+    }
+
+    parent = [%{key: :parent, definition: T.worker([T.Audit])}]
+
+    for depth <- 1..3 do
+      attrs = child_tree(child, depth) |> Map.put(:agents, parent)
+      assert {:ok, definition} = Topology.new(attrs)
+      assert {:ok, _} = Topology.instantiate(definition, id: "valid")
+      assert_received {:contributed, T.Audit, "parent"}
+
+      for invalid <- [
+            put_in(child.topology.exports, [%{key: :public, kind: :agent, from: :missing}]),
+            put_in(child.gate.commands, [%{type: "contract.run", member: :missing}]),
+            put_in(child.gate.commands, [%{type: "contract.run", member: {:child, :missing}}])
+          ] do
+        attrs = child_tree(invalid, depth) |> Map.put(:agents, parent)
+        assert {:error, %ValidationError{} = error} = Topology.new(attrs)
+
+        assert {:error, %ValidationError{} = planned_error} =
+                 Topology.instantiate(attrs, id: "bad")
+
+        assert planned_error.message == error.message
+        refute_received {:contributed, _, _}
+      end
+    end
+  end
+
   @tag obligation: ["jido.topology.I15", "jido.topology.I2"]
   test "public tuple and raising boundaries reject invalid fields, options, references, and runtime data" do
     for attrs <- [
@@ -532,6 +624,12 @@ defmodule JidoTest.Contract.TopologyPlanningTest do
 
     assert_receive {:spawns, []}
     assert_receive {:DOWN, ^monitor, :process, ^tracer, :normal}
+  end
+
+  defp child_tree(child, 1), do: %{name: "parent", children: [child]}
+
+  defp child_tree(child, depth) do
+    %{name: "parent", children: [%{key: :nested, topology: child_tree(child, depth - 1)}]}
   end
 
   defp collect_spawns(owner, spawns) do

@@ -3,6 +3,7 @@ defmodule Jido.Topology.DSL.Compiler do
   use Spark.Dsl.Transformer
 
   alias Jido.Agent.Authoring
+  alias Jido.Agent.Authoring.Compiler
   alias Jido.Topology.EntryMetadata
   alias Jido.Topology.DSL.Entity, as: DslEntity
   alias Jido.Agent.Authoring.SourceMap
@@ -57,7 +58,8 @@ defmodule Jido.Topology.DSL.Compiler do
     overlap = Enum.filter(Map.keys(fields), &Map.has_key?(config, &1))
 
     if overlap != [],
-      do: fail!(env, "Fields declared in both keyword and block form: #{inspect(overlap)}")
+      do:
+        Compiler.fail!(env, "Fields declared in both keyword and block form: #{inspect(overlap)}")
 
     defaults =
       Map.new(EntryMetadata.collections(), fn {_kind, field} -> {field, []} end)
@@ -66,7 +68,7 @@ defmodule Jido.Topology.DSL.Compiler do
     config = Map.merge(defaults, Map.merge(config, fields))
 
     entities = foreign_entities(dsl)
-    config = unwrap!(Jido.Topology.Extension.lower(extensions, config, entities), env)
+    config = unwrap_extension!(Jido.Topology.Extension.lower(extensions, config, entities), env)
 
     sources =
       Enum.reduce(entity_groups, field_sources(dsl), fn {field, entities}, locations ->
@@ -78,34 +80,7 @@ defmodule Jido.Topology.DSL.Compiler do
       end)
 
     owner? = Module.get_attribute(env.module, :jido_agent_block_declared) == true
-    escaped_config = Jido.Topology.unwrap!(escape(config, env))
-
-    quote do
-      @doc false
-      def __topology_owner__?, do: unquote(owner?)
-      @doc false
-      def __topology_config__, do: unquote(escaped_config)
-
-      @doc false
-      def __topology_sources__, do: unquote(Macro.escape(sources))
-    end
-  end
-
-  def verify(module) do
-    env = %{file: to_string(module.module_info(:compile)[:source]), line: 1}
-    config = module.__topology_config__()
-
-    case Jido.Topology.new(config) do
-      {:ok, _definition} -> :ok
-      {:error, error} -> fail_from_source(module.__topology_sources__(), error, env)
-    end
-  end
-
-  @spec fail_from_source(map(), Exception.t(), map()) :: no_return()
-  defp fail_from_source(sources, error, env) do
-    path = Map.get(error.details || %{}, :source_path, [])
-    line = SourceMap.lookup(sources, path, env.line)
-    fail!(%{env | line: line}, Exception.message(error))
+    {config, sources, owner?}
   end
 
   defp field_sources(dsl) do
@@ -168,7 +143,13 @@ defmodule Jido.Topology.DSL.Compiler do
 
   defp core_entity?(_path, _entity), do: false
 
-  defp escape(value, env) do
+  defp unwrap_extension!({:error, %{details: %{entities: [entity | _]}} = error}, env),
+    do: Compiler.fail!(Authoring.location(env, entity), Exception.message(error))
+
+  defp unwrap_extension!(result, env), do: Compiler.unwrap!(result, env)
+
+  @doc false
+  def escape(value, env) do
     {:ok, Macro.escape(value)}
   rescue
     ArgumentError ->
@@ -179,13 +160,4 @@ defmodule Jido.Topology.DSL.Compiler do
          description: "Topology data must not contain runtime values"
        )}
   end
-
-  defp unwrap!({:error, %{details: %{entities: [entity | _]}} = error}, env),
-    do: fail!(Authoring.location(env, entity), Exception.message(error))
-
-  defp unwrap!({:ok, value}, _), do: value
-  defp unwrap!({:error, error}, env), do: fail!(env, Exception.message(error))
-
-  defp fail!(env, message),
-    do: raise(CompileError, file: env.file, line: env.line, description: message)
 end

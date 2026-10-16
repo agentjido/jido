@@ -1,8 +1,7 @@
 ---
 modules:
   - Jido.Agent
-  - Jido.Agent.Definition
-  - Jido.Agent.DSL.Compiler
+  - Jido.Agent.Authoring.Compiler
   - Jido.Agent.DSL.Macros
   - Jido.Agent.Authoring
   - Jido.Agent.Authoring.Extension
@@ -18,7 +17,6 @@ modules:
   - Jido.Agent.Plugin
   - Jido.Agent.Plugin.Pipeline
   - Jido.Agent.Interface
-  - Jido.Agent.DSL.Generator
   - Jido.Agent.Callback
 ---
 

@@ -112,18 +112,8 @@ defmodule Jido.Agent.Extension do
   defp route_target(%{target: %Jido.Agent.Extension.RouteTarget{} = target}), do: target
   defp route_target(_route), do: nil
 
-  defp claim_routes(claims, routes) do
-    Enum.reduce_while(routes, {:ok, []}, fn route, {:ok, claimed} ->
-      case claim_route_target(claims, route) do
-        {:ok, route} -> {:cont, {:ok, [route | claimed]}}
-        {:error, _} = error -> {:halt, error}
-      end
-    end)
-    |> case do
-      {:ok, routes} -> {:ok, Enum.reverse(routes)}
-      error -> error
-    end
-  end
+  defp claim_routes(claims, routes),
+    do: Authoring.traverse(routes, &claim_route_target(claims, &1))
 
   defp claim_route_target(
          claims,
@@ -143,15 +133,10 @@ defmodule Jido.Agent.Extension do
 
   defp claim_route_target(_claims, route), do: {:ok, route}
 
-  defp claim_route_target_value(claims, target) do
-    with {:ok, extension} <- route_target_claim(claims, target.option),
-         do: {:ok, %{target | extension: extension}}
-  end
-
-  defp route_target_claim(claims, option) when is_atom(option) do
+  defp claim_route_target_value(claims, %{option: option} = target) when is_atom(option) do
     case Map.get(claims, option, []) do
       [extension] ->
-        {:ok, extension}
+        {:ok, %{target | extension: extension}}
 
       [] ->
         Authoring.error("Unknown Agent extension route target option #{inspect(option)}", %{
@@ -166,7 +151,7 @@ defmodule Jido.Agent.Extension do
     end
   end
 
-  defp route_target_claim(_claims, option), do: invalid_route_option(option)
+  defp claim_route_target_value(_claims, %{option: option}), do: invalid_route_option(option)
 
   defp invalid_route_option(option),
     do: Authoring.error("Invalid Agent extension route target option", %{option: option})

@@ -37,7 +37,7 @@ defmodule Jido.Agent.Validation do
   def new(%{} = attrs) do
     with :ok <- known_keys(attrs),
          :ok <- reject_instance_data(attrs),
-         {:ok, agent} <- build_definition(attrs) do
+         {:ok, agent, _specs, _schema} <- validate_common(build_definition_value(attrs)) do
       {:ok, agent}
     end
   end
@@ -114,12 +114,6 @@ defmodule Jido.Agent.Validation do
     else
       false -> invalid("Agent vsn must be a positive integer", %{}) |> Authoring.at(:vsn)
       error -> error
-    end
-  end
-
-  defp build_definition(attrs) do
-    with {:ok, agent, _plugin_specs, _schema} <- validate_common(build_definition_value(attrs)) do
-      {:ok, agent}
     end
   end
 

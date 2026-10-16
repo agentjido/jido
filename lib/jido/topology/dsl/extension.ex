@@ -161,8 +161,8 @@ defmodule Jido.Topology.DSL.Extension do
 
   @doc false
   def validate_metadata(value) do
-    case Jido.Topology.Validation.field(:metadata, value) do
-      :ok -> {:ok, value}
+    case Jido.Topology.Validation.plain_static_map(value) do
+      {:ok, value} -> {:ok, value}
       {:error, error} -> {:error, Exception.message(error)}
     end
   end
@@ -174,7 +174,10 @@ defmodule Jido.Topology.DSL.Extension do
         name: :topology,
         patchable?: true,
         schema: [
-          schema: [type: :any],
+          schema: [
+            type: {:custom, Jido.Agent.Authoring.Compiler, :validate_schema_storage, []},
+            type_doc: "Zoi schema"
+          ],
           metadata: [type: {:custom, __MODULE__, :validate_metadata, []}, type_doc: "map"]
         ],
         sections: @topology_sections

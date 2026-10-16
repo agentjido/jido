@@ -42,9 +42,10 @@ also runs the contract gate. Keep the existing package line-coverage gate.
 
 ## Agent mutation review
 
-The macro run covers the 20 files listed in the obligations front matter.
-It runs only the public API contract tests. It does not mutate AgentServer,
-Topology, or dependency packages. Directives are returned without dispatch.
+The macro run covers the 18 files listed in the obligations front matter.
+It runs only the public API contract tests. It does not select AgentServer,
+Topology implementation files, or dependency packages. The Topology contract
+checks the shared compiler separately. Directives are returned without dispatch.
 Fixtures use fresh module namespaces and wait for compiler exit, including
 `after_verify`, before assertions or cleanup. No precompiled Agent fixture is
 used, so this suite needs no extra `--recompile` arguments.
@@ -68,16 +69,17 @@ run without `--fail-fast` for the obligation matrix.
 
 For a focused check, select IDs from a matrix made with the same source and
 module profile. IDs can change when source changes. Check the reported sites.
-The three test gaps found in this rollout can be checked with:
+For example, the current option validation, Signal helper generation, and route
+claim paths can be checked with:
 
 ```sh
 MIX_ENV=test mix covenant.mutate jido.agent --macros \
-  --only m0684,m0985,m1034 --jobs 1 --seed 0 --timeout 5000 \
+  --only m0183,m0348,m0680 --jobs 1 --seed 0 --timeout 5000 \
   --max-runtime 120000 --out tmp/covenant/agent-focused.json
 ```
 
-This runs all 76 contract tests for each selected mutant. It gives exact test
-attribution for these three mutants. It does not verify the other 1,299 mutants.
+This runs all 78 Agent contract tests for each selected mutant. It gives exact test
+attribution for these three mutants. It does not verify the other mutation sites.
 For a shorter development check, add `--fail-fast` and
 `--prioritize tmp/covenant/agent-focused.json`, and use a different output path.
 Prior results select a test to run first; every verdict is measured again.
@@ -99,7 +101,7 @@ a new full-run score.
 
 The fork skips structural declarations, compiler attributes in some contexts,
 and quoted code outside macro definitions. In particular, the ordinary
-`Jido.Agent.DSL.Generator.function/3` function returns quoted helper code that
+`Jido.Agent.Authoring.Compiler.signal_function/3` function returns quoted helper code that
 is not mutated inside the quote. Explicit helper tests protect this code.
 Generic mutation operators do not produce every semantic defect, such as all
 possible argument swaps. Fixed input examples and the existing property tests
@@ -116,7 +118,7 @@ mutation profile. During the pilot, a malformed provider attribute caused
 Spark's asynchronous `__after_verify__/1` to exit the Covenant worker with
 `UndefinedFunctionError: nil.__struct__/0`. The fork did not record an invalid
 verdict or finish that job. The partial 21-file run is not a complete result.
-The 20-file profile still tests fresh DSL compilation, compiler macros, inline
+The current 18-file profile still tests fresh DSL compilation, compiler macros, inline
 Actions, extension lowering, and generated helpers. Provider declarations and
 metadata validation remain covered by public contract tests and line coverage.
 This is a tool limit, not an accepted behavior gap. No mutation score is claimed
@@ -141,7 +143,7 @@ remain open to change.
 
 ## Topology guards
 
-The Topology component uses 27 focused tests in three files under
+The Topology component uses 37 focused tests in three files under
 `test/contract/jido/`. They use the shared compiler helper, fresh Topology
 modules, neutral Agent definitions, and existing core fixtures. They do not
 load the optional authoring corpus or start AgentServer. Run the optional

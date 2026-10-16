@@ -69,10 +69,12 @@ defmodule Jido.Topology.Codec do
   end
 
   defp encode_validated(definition, registry) do
+    version = version(definition)
+
     with {:ok, schema} <- Registry.identifier(registry, :schema, definition.schema),
          {:ok, metadata} <- Value.encode(definition.metadata, registry),
          {:ok, collections} <-
-           Authoring.traverse(collections(version(definition)), fn {_kind, collection} ->
+           Authoring.traverse(collections(version), fn {_kind, collection} ->
              with {:ok, entries} <-
                     Authoring.traverse(
                       Map.fetch!(definition, collection),
@@ -84,7 +86,7 @@ defmodule Jido.Topology.Codec do
       document =
         Map.merge(Map.new(collections), %{
           "type" => "jido.topology",
-          "version" => version(definition),
+          "version" => version,
           "name" => definition.name,
           "schema" => schema,
           "metadata" => metadata,

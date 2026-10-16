@@ -104,11 +104,11 @@ defmodule Jido.Topology.Child do
 
   defp event(_), do: Authoring.error("Expected a child Signal path")
 
-  def validate(definition, parent_plan \\ nil) do
+  def validate(definition) do
     Authoring.traverse(definition.children, fn child ->
       with {:ok, composed} <- Composition.flatten(child.topology),
            :ok <- commands(child, composed),
-           :ok <- parent_bus(child, parent_plan) do
+           :ok <- validate(child.topology) do
         {:ok, child}
       end
     end)
@@ -130,7 +130,6 @@ defmodule Jido.Topology.Child do
     end)
   end
 
-  defp parent_bus(_child, nil), do: :ok
   defp parent_bus(%{gate: %{to: nil}}, _), do: :ok
 
   defp parent_bus(child, plan) do
@@ -140,7 +139,10 @@ defmodule Jido.Topology.Child do
   end
 
   def plan(definition, id, input, parent_plan) do
-    with :ok <- validate(definition, parent_plan),
+    with {:ok, _} <-
+           Authoring.traverse(definition.children, fn child ->
+             with :ok <- parent_bus(child, parent_plan), do: {:ok, child}
+           end),
          {:ok, _} <-
            Authoring.traverse(definition.children, fn child ->
              with {:ok, mapped} <- Reference.resolve(child.input, input),

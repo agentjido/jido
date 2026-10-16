@@ -204,7 +204,7 @@
         "jido.agent.I22": {
           "failing": 0,
           "kind": "functional",
-          "passing": 16,
+          "passing": 18,
           "status": "active",
           "testable": true,
           "tests": [
@@ -212,6 +212,7 @@
             "test a lone inline Action and remaining route block fields retain their behavior",
             "test a lowering callback returns its supplied validation error",
             "test an unexposed route accepts its predicate as a keyword option",
+            "test anonymous schema values report their authored block line",
             "test authoring and generated helper errors have nonempty messages",
             "test computed options and extensions evaluate once and lower to ordinary values",
             "test extension declarations reject non-module values",
@@ -223,6 +224,7 @@
             "test one exposed route remains valid after extension lowering",
             "test route target claims retain plain routes and reject non-atom target options",
             "test route target option callbacks must return unique atom names",
+            "test static MFA schema rules retain their validation behavior",
             "test whole option maps, lists, and module attributes use one evaluation"
           ]
         },
@@ -278,12 +280,13 @@
         "jido.agent.I3": {
           "failing": 0,
           "kind": "functional",
-          "passing": 14,
+          "passing": 16,
           "status": "active",
           "testable": true,
           "tests": [
             "test a Plugin without an Agent facet adds no Agent state or input",
             "test a valid definition constructor returns without recursive normalization",
+            "test anonymous schema values report their authored block line",
             "test constructors reject invalid fields and preserve error paths",
             "test data definitions support a module that implements the callback without behavior metadata",
             "test dependency errors identify the authored route or Plugin line",
@@ -295,6 +298,7 @@
             "test normalization errors identify each route position",
             "test route maps and option tuples retain the default priority",
             "test state schemas reject transforms, coercion, lazy input, and non-static defaults",
+            "test static MFA schema rules retain their validation behavior",
             "test static schema validation rejects nested input conversion and MFA transforms"
           ]
         },
@@ -387,7 +391,7 @@
         "jido.topology.I1": {
           "failing": 0,
           "kind": "functional",
-          "passing": 5,
+          "passing": 6,
           "status": "active",
           "testable": true,
           "tests": [
@@ -395,7 +399,8 @@
             "test inline Actions retain route lookup, helpers, defaults, and direct execution",
             "test keyword graph options and description are assigned to the correct definition",
             "test optional blocks remain independent and only an explicit Agent selects a child director",
-            "test root Agent version and description do not become graph fields"
+            "test root Agent version and description do not become graph fields",
+            "test static MFA schema rules retain validation in both root roles"
           ]
         },
         "jido.topology.I10": {
@@ -438,12 +443,15 @@
         "jido.topology.I13": {
           "failing": 0,
           "kind": "ordering",
-          "passing": 2,
+          "passing": 5,
           "status": "active",
           "testable": true,
           "tests": [
             "test Plugin contributions run Agent then group then Plugin order without changing saved declarations",
-            "test invalid Plugin contributions return structured errors and preserve application rejection reasons"
+            "test all child event targets are checked before child contribution callbacks",
+            "test an included contribution collision fails before parent callbacks with its local path",
+            "test invalid Plugin contributions return structured errors and preserve application rejection reasons",
+            "test static child graphs and command targets are checked at every depth before parent contributions"
           ]
         },
         "jido.topology.I14": {
@@ -463,10 +471,11 @@
         "jido.topology.I15": {
           "failing": 0,
           "kind": "functional",
-          "passing": 12,
+          "passing": 16,
           "status": "active",
           "testable": true,
           "tests": [
+            "test an included contribution collision fails before parent callbacks with its local path",
             "test document decoding requires supported versions, strict fields, and trusted Registry kinds",
             "test entry lists reject invalid containers and improper tails with their field path",
             "test exact placement is retained and remote Agents cannot use a local Bus",
@@ -478,7 +487,10 @@
             "test members require one current module or neutral Agent definition and valid resolved state",
             "test public tuple and raising boundaries reject invalid fields, options, references, and runtime data",
             "test recursive module providers report include and child cycles before the depth limit",
-            "test source provider faults retain their causes for includes and children"
+            "test schema failures in both root roles retain their authored locations",
+            "test source provider faults retain their causes for includes and children",
+            "test static MFA schema rules retain validation in both root roles",
+            "test static child graphs and command targets are checked at every depth before parent contributions"
           ]
         },
         "jido.topology.I16": {
@@ -497,15 +509,17 @@
         "jido.topology.I17": {
           "failing": 0,
           "kind": "functional",
-          "passing": 5,
+          "passing": 7,
           "status": "active",
           "testable": true,
           "tests": [
+            "test all child event targets are checked before child contribution callbacks",
             "test child declarations retain directors and validate resolved command members and event targets",
             "test legacy graph providers are runtime children only and do not infer an owner",
             "test optional blocks remain independent and only an explicit Agent selects a child director",
             "test recursive module providers report include and child cycles before the depth limit",
-            "test source provider faults retain their causes for includes and children"
+            "test source provider faults retain their causes for includes and children",
+            "test static child graphs and command targets are checked at every depth before parent contributions"
           ]
         },
         "jido.topology.I2": {
@@ -536,12 +550,13 @@
         "jido.topology.I4": {
           "failing": 0,
           "kind": "functional",
-          "passing": 2,
+          "passing": 3,
           "status": "active",
           "testable": true,
           "tests": [
             "test computed options and mixed extension callbacks evaluate once and retain their order",
-            "test map, keyword, attribute options and caller scope produce the same graph"
+            "test map, keyword, attribute options and caller scope produce the same graph",
+            "test schema failures in both root roles retain their authored locations"
           ]
         },
         "jido.topology.I5": {
@@ -583,11 +598,12 @@
         "jido.topology.I8": {
           "failing": 0,
           "kind": "functional",
-          "passing": 1,
+          "passing": 2,
           "status": "active",
           "testable": true,
           "tests": [
-            "test input defaults preserve explicit false and zero and failed planning leaves the source reusable"
+            "test input defaults preserve explicit false and zero and failed planning leaves the source reusable",
+            "test static MFA schema rules retain validation in both root roles"
           ]
         },
         "jido.topology.I9": {

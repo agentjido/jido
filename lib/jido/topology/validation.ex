@@ -3,34 +3,8 @@ defmodule Jido.Topology.Validation do
   alias Jido.Agent.Authoring
   alias Jido.Topology.{EntryMetadata, Ref, Reference, Resource}
 
-  @fields [
-    :name,
-    :schema,
-    :metadata,
-    :agents,
-    :groups,
-    :resources,
-    :relationships,
-    :connections,
-    :startup,
-    :includes,
-    :children,
-    :imports,
-    :exports
-  ]
-
-  def field(:name, value) do
-    with {:ok, _} <- key(value), do: :ok
-  end
-
-  def field(:schema, %Zoi.Types.Map{} = schema), do: Jido.Agent.State.validate_schema(schema)
-  def field(:schema, _), do: Authoring.error("Topology input schema must be a Zoi object")
-
-  def field(:metadata, value) do
-    with {:ok, _} <- plain_static_map(value), do: :ok
-  end
-
-  def field(_, _), do: :ok
+  @fields [:name, :schema, :metadata, :startup] ++
+            Enum.map(EntryMetadata.collections(), &elem(&1, 1))
 
   def definition(attrs, ancestors \\ [], depth \\ 0) do
     with {:ok, definition, _resolved} <- resolve(attrs, %{}, ancestors, depth),
@@ -50,7 +24,7 @@ defmodule Jido.Topology.Validation do
          :ok <- Authoring.keys(attrs, @fields),
          {:ok, name} <- at(:name, key(Map.get(attrs, :name))),
          schema = Map.get(attrs, :schema, Zoi.object(%{})),
-         :ok <- at(:schema, field(:schema, schema)),
+         :ok <- at(:schema, validate_schema(schema)),
          {:ok, metadata} <- at(:metadata, plain_static_map(Map.get(attrs, :metadata, %{}))),
          {:ok, agents, resolved} <- entries(attrs, :agents, :agent, resolved),
          {:ok, groups, resolved} <- entries(attrs, :groups, :group, resolved),
@@ -92,6 +66,9 @@ defmodule Jido.Topology.Validation do
       with :ok <- names(definition), do: {:ok, definition, resolved}
     end
   end
+
+  defp validate_schema(%Zoi.Types.Map{} = schema), do: Jido.Agent.State.validate_schema(schema)
+  defp validate_schema(_), do: Authoring.error("Topology input schema must be a Zoi object")
 
   defp entries(attrs, field, kind, resolved),
     do:
@@ -432,7 +409,8 @@ defmodule Jido.Topology.Validation do
         at(field, Authoring.error("Unsupported topology option", %{field: field, value: value}))
   end
 
-  defp names(definition) do
+  @doc false
+  def names(definition) do
     declarations =
       for field <- [:agents, :groups, :resources, :imports, :includes, :children],
           do: {field, Map.fetch!(definition, field)}

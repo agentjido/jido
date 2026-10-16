@@ -62,13 +62,8 @@ defmodule Jido.Topology.Plugin do
   end
 
   @doc false
-  @spec expand_with_changes(Jido.Topology.t()) ::
+  @spec expand_with_changes(Jido.Topology.t(), map()) ::
           {:ok, Jido.Topology.t(), boolean()} | {:error, term()}
-  def expand_with_changes(definition) do
-    with {:ok, attrs, resolved} <- Validation.resolve(definition, %{}),
-         do: expand_with_changes(struct(Jido.Topology, attrs), resolved)
-  end
-
   def expand_with_changes(%Jido.Topology{} = definition, resolved) do
     with {:ok, expanded_includes} <-
            Authoring.traverse(definition.includes, &expand_include(&1, resolved)),
@@ -81,16 +76,10 @@ defmodule Jido.Topology.Plugin do
            ),
          {expanded, changed?} <- append_contributions(definition, List.flatten(nested)),
          changed? = changed? or Enum.any?(changes),
-         {:ok, expanded} <- validate_changed(expanded, changed?, resolved) do
+         # Entries are normalized by contribute/2. Combined names can still conflict.
+         :ok <- if(changed?, do: Validation.names(expanded), else: :ok) do
       {:ok, expanded, changed?}
     end
-  end
-
-  defp validate_changed(definition, false, _resolved), do: {:ok, definition}
-
-  defp validate_changed(definition, true, resolved) do
-    with {:ok, attrs, _resolved} <- Validation.resolve(definition, resolved),
-         do: {:ok, struct(Jido.Topology, attrs)}
   end
 
   defp expand_include(include, resolved) do

@@ -1,4 +1,11 @@
 defmodule JidoTest.Topology.InvalidSourceLocatedTopology do
+  @behaviour Jido.Agent
+
+  def __agent_config__,
+    do: %{Jido.Examples.Topology.Swarm.__agent_config__() | module: __MODULE__}
+
+  def __agent_sources__, do: Jido.Examples.Topology.Swarm.__agent_sources__()
+
   def __topology_config__ do
     config = Jido.Examples.Topology.Swarm.__topology_config__()
     [agent] = config.agents
@@ -406,7 +413,7 @@ defmodule Jido.Topology.AuthoringTest do
 
     error =
       assert_raise CompileError, fn ->
-        Jido.Topology.DSL.Compiler.verify(JidoTest.Topology.InvalidSourceLocatedTopology)
+        Jido.Agent.Authoring.Compiler.verify(JidoTest.Topology.InvalidSourceLocatedTopology)
       end
 
     assert error.file == Path.expand(__ENV__.file)

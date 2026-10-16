@@ -502,6 +502,37 @@ defmodule JidoTest.Contract.AgentAuthoringTest do
     assert Exception.message(error) =~ "authoring_fixture.ex:4"
   end
 
+  @tag obligation: ["jido.agent.I3", "jido.agent.I22"]
+  test "anonymous schema values report their authored block line" do
+    for field <- [
+          "Zoi.any() |> Zoi.default(fn -> :ok end)",
+          "Zoi.integer() |> Zoi.refine(fn value -> {:ok, value} end)"
+        ] do
+      error =
+        assert_raise Spark.Error.DslError, fn ->
+          F.with_agent("agent do\n  schema Zoi.object(%{value: #{field}})\nend", fn _ -> :ok end)
+        end
+
+      assert Exception.message(error) =~ "authoring_fixture.ex:4"
+    end
+  end
+
+  @tag obligation: ["jido.agent.I3", "jido.agent.I22"]
+  test "static MFA schema rules retain their validation behavior" do
+    F.with_agent(
+      """
+      agent do
+        schema Zoi.object(%{value: Zoi.integer() |> Zoi.default(1) |> Zoi.refine({__MODULE__, :positive, []})})
+      end
+      def positive(value, _opts), do: if(value > 0, do: :ok, else: {:error, "must be positive"})
+      """,
+      fn module ->
+        assert module.new!().state === %{value: 1}
+        assert {:error, %ValidationError{}} = module.new(state: %{value: 0})
+      end
+    )
+  end
+
   @tag obligation: "jido.agent.I22"
   test "whole option maps, lists, and module attributes use one evaluation" do
     for expression <- [

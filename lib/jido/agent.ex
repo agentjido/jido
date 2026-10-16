@@ -182,7 +182,7 @@ defmodule Jido.Agent do
   @doc "Declares one Agent module with a reusable definition and default Signal behavior."
   defmacro __using__(opts) do
     quote location: :keep do
-      use Jido.Agent.Definition,
+      use Jido.Agent.Authoring.Compiler,
         host: :agent,
         agent_options: unquote(opts)
 

@@ -262,8 +262,14 @@ defmodule JidoTest.Contract.TopologyAuthoringTest do
           {"unknown: true", ""},
           {"metadata: %{}", "topology do\nmetadata %{owner: true}\nend"}
         ] do
-      assert_raise CompileError, fn ->
-        T.with_topology(body, fn _ -> :ok end, "name: \"invalid\", #{options}")
+      error =
+        assert_raise CompileError, fn ->
+          T.with_topology(body, fn _ -> :ok end, "name: \"invalid\", #{options}")
+        end
+
+      if options == "extensions: [T.Unclaimed]" do
+        assert Path.basename(error.file) == "authoring_fixture.ex"
+        assert error.line == 8
       end
     end
   end
@@ -294,6 +300,58 @@ defmodule JidoTest.Contract.TopologyAuthoringTest do
         assert [%{count: 1}] = module.topology().groups
       end
     )
+  end
+
+  @tag obligation: ["jido.topology.I4", "jido.topology.I15"]
+  test "schema failures in both root roles retain their authored locations" do
+    for section <- [:agent, :topology],
+        field <- [
+          "Zoi.any() |> Zoi.default(fn -> :ok end)",
+          "Zoi.integer() |> Zoi.refine(fn value -> {:ok, value} end)"
+        ] do
+      error =
+        assert_raise Spark.Error.DslError, fn ->
+          T.with_topology(
+            "#{section} do\n  schema Zoi.object(%{value: #{field}})\nend",
+            fn _ -> :ok end
+          )
+        end
+
+      assert Exception.message(error) =~ "authoring_fixture.ex:6"
+    end
+
+    for section <- [:agent, :topology] do
+      error =
+        assert_raise CompileError, fn ->
+          T.with_topology("#{section} do\n  schema Zoi.integer()\nend", fn _ -> :ok end)
+        end
+
+      assert Path.basename(error.file) == "authoring_fixture.ex"
+      assert error.line == 7
+    end
+  end
+
+  @tag obligation: ["jido.topology.I1", "jido.topology.I8", "jido.topology.I15"]
+  test "static MFA schema rules retain validation in both root roles" do
+    for section <- [:agent, :topology] do
+      T.with_topology(
+        """
+        #{section} do
+          schema Zoi.object(%{value: Zoi.integer() |> Zoi.default(1) |> Zoi.refine({__MODULE__, :positive, []})})
+        end
+        def positive(value, _opts), do: if(value > 0, do: :ok, else: {:error, "must be positive"})
+        """,
+        fn module ->
+          if section == :agent do
+            assert module.new_agent!().state === %{value: 1}
+            assert {:error, _} = module.new_agent(state: %{value: 0})
+          else
+            assert {:ok, %{input: %{value: 1}}} = module.new(id: "schema")
+            assert {:error, _} = module.new(id: "schema", input: %{value: 0})
+          end
+        end
+      )
+    end
   end
 
   @tag obligation: "jido.topology.I6"

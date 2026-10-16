@@ -3,7 +3,6 @@ defmodule Jido.Topology.PluginIntegrationTest do
 
   alias Jido.Topology
   alias Jido.Topology.Plan
-  alias Jido.Topology.Plugin, as: TopologyPlugin
   alias Jido.Topology.Plugin.Contribution
 
   defmodule BusFacet do
@@ -108,18 +107,12 @@ defmodule Jido.Topology.PluginIntegrationTest do
     end
   end
 
-  test "expansion reports empty contributions as unchanged" do
+  test "empty contributions preserve reusable declarations and plans" do
     definition = Topology.new!(name: "empty", agents: [%{key: :worker, module: EmptyWorker}])
-    assert {:ok, ^definition, false} = TopologyPlugin.expand_with_changes(definition)
-    assert {:ok, ^definition, false} = TopologyPlugin.expand_with_changes(definition)
-  end
-
-  test "expansion carries changes from included Topologies" do
-    child = Topology.new!(name: "child", agents: [%{key: :worker, module: Worker}])
-    root = Topology.new!(name: "root", includes: [%{key: :child, topology: child}])
-    assert {:ok, expanded, true} = TopologyPlugin.expand_with_changes(root)
-    assert root.resources == []
-    assert [%{topology: %{resources: [_, _]}}] = expanded.includes
+    assert {:ok, instance} = Topology.instantiate(definition, id: "empty")
+    assert {:ok, ^instance} = Topology.instantiate(definition, id: "empty")
+    assert instance.definition == definition
+    assert instance.plan.resources == %{}
   end
 
   test "instantiation adds ordered Agent and group contributions without changing the definition" do
@@ -132,21 +125,16 @@ defmodule Jido.Topology.PluginIntegrationTest do
       )
 
     assert Enum.map(definition.resources, & &1.key) == ["explicit"]
-    assert {:ok, expanded, true} = TopologyPlugin.expand_with_changes(definition)
-
-    assert Enum.map(expanded.resources, & &1.key) == [
-             "explicit",
-             "inbox_alpha",
-             "audit_alpha",
-             "inbox_workers",
-             "audit_workers"
-           ]
-
     assert {:ok, instance} = Topology.instantiate(definition, id: "plugin-plan")
     assert instance.definition == definition
-    assert Map.has_key?(instance.plan.resources, "bus/inbox_alpha")
-    assert Map.has_key?(instance.plan.resources, "bus/audit_alpha")
-    assert Map.has_key?(instance.plan.resources, "bus/inbox_workers")
+
+    assert Enum.sort(Map.keys(instance.plan.resources)) == [
+             "bus/audit_alpha",
+             "bus/audit_workers",
+             "bus/explicit",
+             "bus/inbox_alpha",
+             "bus/inbox_workers"
+           ]
 
     assert instance.plan.agents["agent/alpha"].subscriptions == [
              %{bus: "bus/inbox_alpha", path: "plugin.work"},
@@ -178,6 +166,9 @@ defmodule Jido.Topology.PluginIntegrationTest do
       )
 
     assert {:ok, instance} = Topology.instantiate(root, id: "plugin-components")
+    assert instance.definition == root
+    assert root.resources == []
+    assert [%{topology: %{resources: []}}] = instance.definition.includes
     assert Map.has_key?(instance.plan.resources, "component/child/bus/inbox_worker")
     assert Map.has_key?(instance.plan.resources, "component/child/bus/audit_worker")
 

@@ -2,6 +2,7 @@ defmodule Jido.Agent.DSL.Macros do
   @moduledoc false
 
   alias Jido.Action.Inline
+  alias Jido.Authoring.Options
 
   @entity :"Elixir.Jido.Agent.DSL.Extension.Routes.Route"
   @route_options [:as, :defaults, :priority, :match, :do]
@@ -25,9 +26,8 @@ defmodule Jido.Agent.DSL.Macros do
     build(path, target, options ++ block, __CALLER__)
   end
 
-  @doc false
   defp build(path, target, options, caller) do
-    validate_options!(options, caller)
+    Options.validate!(options, caller, "route options must be a keyword list", "route option")
     {options, extension_options} = Keyword.split(options, @route_options)
     target = extension_target(target, extension_options, caller)
 
@@ -36,13 +36,13 @@ defmodule Jido.Agent.DSL.Macros do
 
     cond do
       inline && not is_nil(target) ->
-        error!(caller, "route cannot combine a target module with an inline Action")
+        Options.error!(caller, "route cannot combine a target module with an inline Action")
 
       inline ->
         build_inline(path, inline, route_options, route_block, caller)
 
       is_nil(target) ->
-        error!(caller, "route requires a target module or one inline Action")
+        Options.error!(caller, "route requires a target module or one inline Action")
 
       true ->
         call_entity(path, target, route_options, route_block, caller)
@@ -77,7 +77,7 @@ defmodule Jido.Agent.DSL.Macros do
     if Keyword.keyword?(options) do
       Inline.parse_callback!(nil, options, caller)
     else
-      error!(caller, "inline route Action has an invalid declaration")
+      Options.error!(caller, "inline route Action has an invalid declaration")
     end
   end
 
@@ -95,7 +95,7 @@ defmodule Jido.Agent.DSL.Macros do
   end
 
   defp parse_inline!(_args, caller) do
-    error!(caller, "inline route Action has an invalid declaration")
+    Options.error!(caller, "inline route Action has an invalid declaration")
   end
 
   defp clause_options?(pattern, options) do
@@ -133,7 +133,7 @@ defmodule Jido.Agent.DSL.Macros do
         {{metadata, args}, remaining}
 
       _ ->
-        error!(caller, "route accepts only one inline Action")
+        Options.error!(caller, "route accepts only one inline Action")
     end
   end
 
@@ -144,15 +144,6 @@ defmodule Jido.Agent.DSL.Macros do
       require unquote(@entity)
       unquote(@entity).__route__(unquote(path), unquote(target), unquote(options))
     end
-  end
-
-  defp validate_options!(options, caller) do
-    unless Keyword.keyword?(options) do
-      error!(caller, "route options must be a keyword list")
-    end
-
-    keys = Keyword.keys(options)
-    if length(keys) != length(Enum.uniq(keys)), do: error!(caller, "duplicate route option")
   end
 
   defp extension_target(target, [], _caller), do: target
@@ -167,14 +158,10 @@ defmodule Jido.Agent.DSL.Macros do
   end
 
   defp extension_target(_target, [{option, _value} | _], caller) do
-    error!(
+    Options.error!(
       caller,
       "route requires exactly one target module or extension target option; " <>
         "got target module with #{inspect(option)}"
     )
-  end
-
-  defp error!(caller, description) do
-    raise CompileError, file: caller.file, line: caller.line, description: description
   end
 end

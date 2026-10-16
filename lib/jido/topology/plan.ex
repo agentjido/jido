@@ -33,13 +33,8 @@ defmodule Jido.Topology.Plan do
      changed}
   end
 
-  # The caller must supply the composition from this definition's validation.
+  # The caller supplies the composition and sources from this definition's validation.
   @doc false
-  def expand(definition, id, input, composed) do
-    with {:ok, _attrs, resolved} <- Validation.resolve(definition, %{}),
-         do: expand(definition, id, input, composed, resolved)
-  end
-
   def expand(definition, id, input, composed, resolved) do
     with :ok <- root_imports(definition),
          {:ok, inputs} <- Composition.inputs(definition, input),

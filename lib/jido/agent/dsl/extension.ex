@@ -37,7 +37,10 @@ defmodule Jido.Agent.DSL.Extension do
     name: :agent,
     patchable?: true,
     schema: [
-      schema: [type: :any],
+      schema: [
+        type: {:custom, Jido.Agent.Authoring.Compiler, :validate_schema_storage, []},
+        type_doc: "Zoi schema"
+      ],
       metadata: [type: {:custom, __MODULE__, :validate_metadata, []}, type_doc: "map"]
     ],
     entities: [@plugin],
@@ -53,7 +56,7 @@ defmodule Jido.Agent.DSL.Extension do
   @doc false
   def mark_agent_block do
     quote generated: true do
-      Jido.Agent.DSL.Compiler.register_agent_block!(__MODULE__)
+      Jido.Agent.Authoring.Compiler.register_agent_block!(__MODULE__)
     end
   end
 
