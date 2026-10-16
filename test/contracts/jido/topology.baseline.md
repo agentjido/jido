@@ -974,3 +974,81 @@ Local evidence remains ignored. These digests identify the reports and scripts:
 | `tmp/covenant/remaining-refinements/run-mutants.py` | `e29522a17c632aa7bb5a77c8df8d6d07f58df53a2336a398abecdc51f9e8ddf0` |
 | `tmp/covenant/remaining-refinements/manual-regressions.py` | `9df577f5cfa3609ebe86374ecbff9dc2cdf2ff0af952e452a92c5ee851bfa47e` |
 | `cover/cov.json` | `2838c400b173d59240a66668b4cf582f2324e088a1574325981e6edf1d21292a` |
+
+## Final local reductions — 2026-10-16
+
+This pass completes items 17, 18, and 21–25. Graph edges and root import
+placeholders use one reduction. Graph fields receive their final values once.
+Ready layers use a sorted list. The nine DSL structs use one ordered table.
+Agent lowering returns generated code directly. Agent and Topology share the
+indexed source-location walk. Registry bang construction uses the existing
+result unwrap helper. The library delta is **43 added, 90 removed: 47 fewer
+lines**. The public DSL and AgentServer source are unchanged.
+
+Focused guards cover later route and Agent locations, nested binding property
+locations, absent Group count with keyed members, Registry bang agreement,
+forward and repeated dependencies, sorted branch/join layers, empty graphs,
+and final graph field defaults. Existing obligations remain unchanged.
+
+All **13 selected mutation executions** are killed with exact attribution.
+They cover 11 distinct sites; the two shared source-path sites run through
+both components. There are no invalid mutants, survivors, timeouts, partial
+verdicts, or new survivor exceptions. Each selected mutation runs its complete
+component contract suite. The full 1,302-mutant profile was not rerun.
+Catalog enumeration does not execute mutations or establish a full score.
+
+| Profile | ID | Site | Operator | Change |
+| --- | --- | --- | --- | --- |
+| agent | m0219 | `lib/jido/agent/authoring/compiler.ex:218:5` | return_nil | `quote do @doc false def __agent_config__ do unquote(Macro.e…` → `nil` |
+| agent | m0398 | `lib/jido/agent/authoring/source_map.ex:23:58` | element_removal | `field` → `(removed)` |
+| agent | m0399 | `lib/jido/agent/authoring/source_map.ex:23:65` | element_removal | `index` → `(removed)` |
+| topology | m0512 | `lib/jido/topology/composition.ex:186:7` | element_removal | `parent: parent` → `(removed)` |
+| topology | m0513 | `lib/jido/topology/composition.ex:187:7` | element_removal | `on_parent_exit: Map.get(owner, :policy, :stop)` → `(removed)` |
+| topology | m0514 | `lib/jido/topology/composition.ex:188:7` | element_removal | `subscriptions: subscriptions` → `(removed)` |
+| topology | m0515 | `lib/jido/topology/composition.ex:189:7` | element_removal | `depends_on: Enum.uniq(List.wrap(parent) ++ node.depends_on ++ Enum.map(…` → `(removed)` |
+| topology | m0551 | `lib/jido/topology/composition.ex:271:11` | condition_negate | `if String.starts_with?(key, "import/")` → `if !(String.starts_with?(key, "import/"))` |
+| topology | m1469 | `lib/jido/topology/validation.ex:446:49` | arithmetic_swap | `-` → `+` |
+| topology | m1474 | `lib/jido/topology/validation.ex:448:30` | integer_shift | `0` → `1` |
+| source-topology | m011 | `lib/jido/agent/authoring/source_map.ex:23:58` | element_removal | `field` → `(removed)` |
+| source-topology | m012 | `lib/jido/agent/authoring/source_map.ex:23:65` | element_removal | `index` → `(removed)` |
+| registry-agent | m1331 | `lib/jido/codec/registry.ex:70:36` | return_nil | `Authoring.unwrap!(new(entries))` → `nil` |
+
+The standard Agent and Topology profiles use their current obligation module
+lists. `source-topology` selects only `Jido.Agent.Authoring.SourceMap` through
+Topology tests. `registry-agent` adds `Jido.Codec.Registry` to the Agent module
+list. All commands use macro mode, seed 0, selective recompilation, 5,000 ms
+per-test timeouts, and no fail-fast or checkpoint credit. Exact commands and
+site descriptors are saved in
+`tmp/covenant/next-reductions/mutation-commands.json`.
+
+The Agent survivor ledger retains all 215 historical decisions. Only 12
+locations move; 203 remain unchanged. Each entry matches its exact new catalog
+site, operator, function, module, and mutation. No judgment changed.
+Focused checks defer the retained historical verdicts.
+
+Restored-source validation passes all 130 Covenant tests and all 42
+obligations. The final normal suite passes 2,611 tests, with two existing
+skips and 161 exclusions. Fresh focused coverage passes 2,105 tests and
+reports 92.4% package coverage. Format, warning lint, and clean compilation
+with warnings treated as errors pass. Dialyzer retains the same ten known
+findings. No source, test, or skip in AgentServer changed.
+
+Four separate semantic probes reject unsorted layers, missing graph edges,
+a retained payload, and a warm-up helper. Exact source bytes are restored.
+These probes receive no Covenant credit. The refreshed benchmarks compare
+61 checked cases on both source versions. Three fresh-BEAM load runs complete
+600 measured cycles with no retained binaries, owned ETS tables, queued
+messages, or helper processes. See the
+[verification report](../../../docs/performance/2026-10-16-agent-topology-refinement.md)
+for the first peer timing failure, full passing rerun, memory measurements,
+source hashes, and measurement limits.
+
+Selected evidence under `tmp/covenant/next-reductions/`:
+
+| Evidence | SHA-256 |
+| --- | --- |
+| `contracts-final.log` | `b1db9b5c36c34a96c3656ba7441fbdf6a14716310c09eb521e18f60a29d37de3` |
+| `coverage-focused.log` | `6fe5844e6e928f9b86e8ec5053c1e6919122c517b3bf558c2021ec8a23acd2ba` |
+| `benchmark-memory-summary.json` | `8d1b2928fb57ea8ae3ca6d9fc681e71427ee708007176a358c675881f7d37158` |
+| `authoring-memory-summary.json` | `5b0e25ddc8c8278fef0e6292c1415a0369ca258eebf759cb45c1f27e2c133afe` |
+| `semantic-probes.json` | `6752483ca3a3f85dabd5a31293a33e2b4d798b0ef9486fd714395d8e298cfbf2` |

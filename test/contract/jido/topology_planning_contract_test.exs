@@ -251,7 +251,9 @@ defmodule JidoTest.Contract.TopologyPlanningTest do
         name: "graph",
         agents: [
           %{key: :leader, definition: T.worker()},
-          %{key: :ready, definition: T.worker()}
+          %{key: :ready, definition: T.worker()},
+          %{key: :branch, definition: T.worker(), depends_on: [:leader]},
+          %{key: :after, definition: T.worker(), depends_on: [:workers, :workers]}
         ],
         groups: [
           %{
@@ -275,8 +277,23 @@ defmodule JidoTest.Contract.TopologyPlanningTest do
 
     assert instance.plan.layers === [
              ["agent/leader", "agent/ready", "bus/audit", "bus/events"],
-             ["group/workers/1", "group/workers/2"]
+             ["agent/branch", "group/workers/1", "group/workers/2"],
+             ["agent/after"]
            ]
+
+    for spec <-
+          [
+            instance.plan.agents["agent/leader"],
+            instance.plan.agents["agent/ready"],
+            instance.plan.agents["agent/branch"],
+            instance.plan.agents["agent/after"]
+          ] ++ Map.values(instance.plan.resources) do
+      assert Map.take(spec, [:parent, :on_parent_exit, :subscriptions]) === %{
+               parent: nil,
+               on_parent_exit: :stop,
+               subscriptions: []
+             }
+    end
 
     for index <- 1..2 do
       spec = instance.plan.agents["group/workers/#{index}"]
@@ -303,6 +320,15 @@ defmodule JidoTest.Contract.TopologyPlanningTest do
       )
 
     assert {:ok, %{plan: %{layers: [["agent/after"]]}}} = Topology.instantiate(empty, id: "empty")
+
+    assert {:ok, %{plan: plan}} =
+             Topology.instantiate(Topology.new!(name: "no-nodes"), id: "no-nodes")
+
+    assert Map.take(plan, [:agents, :resources, :layers]) === %{
+             agents: %{},
+             resources: %{},
+             layers: []
+           }
   end
 
   @tag obligation: "jido.topology.I10"

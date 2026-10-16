@@ -193,3 +193,18 @@ removed sites. No new exemption was added. Format, forced compilation, and
 warning lint pass. Dialyzer retains the same ten known findings. The full
 1,302-mutant run was not repeated. See the [Topology record](topology.baseline.md#remaining-authoring-reductions--2026-10-15)
 for exact commands, sites, source restoration, and evidence hashes.
+
+## Final local reductions — 2026-10-16
+
+Agent lowering now returns its generated code directly. Both authoring paths
+use the shared indexed source-location walk. Registry bang construction uses
+the common result unwrap helper. The existing public DSL remains unchanged.
+
+The focused Agent profile kills three selected mutations. A second profile
+adds Registry and kills its selected bang-result mutation. Topology separately
+checks both shared source-path mutations. All selected results have exact
+attribution, without invalid mutants, survivors, timeouts, or partial credit.
+The earlier 1,302-mutant profile was not rerun. All 215 historical survivor
+decisions remain; 12 locations move with no judgment changes. See the
+[Topology record](topology.baseline.md#final-local-reductions--2026-10-16) for
+exact sites, profiles, and local evidence paths.

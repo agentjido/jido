@@ -67,12 +67,7 @@ defmodule Jido.Codec.Registry do
 
   @doc "Validates a Registry or raises its error."
   @spec new!(map() | t()) :: t() | no_return()
-  def new!(entries) do
-    case new(entries) do
-      {:ok, registry} -> registry
-      {:error, error} -> raise error
-    end
-  end
+  def new!(entries), do: Authoring.unwrap!(new(entries))
 
   @doc "Resolves a stored identifier of the required kind."
   @spec resolve(t(), String.t(), kind()) :: {:ok, term()} | {:error, term()}

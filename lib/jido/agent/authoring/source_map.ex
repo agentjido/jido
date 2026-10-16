@@ -16,6 +16,14 @@ defmodule Jido.Agent.Authoring.SourceMap do
     Map.put(properties, path, first)
   end
 
+  def collect(groups, locations, source \\ &entity/2) do
+    for {field, entities} <- groups,
+        {entity, index} <- Enum.with_index(entities),
+        reduce: locations do
+      locations -> Map.merge(locations, source.(entity, [field, index]))
+    end
+  end
+
   def section(dsl, path, fields, prefix) do
     locations =
       case Extension.get_section_anno(dsl, path) do

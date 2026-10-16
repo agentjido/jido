@@ -334,6 +334,8 @@ defmodule JidoTest.Contract.AgentAuthoringTest do
   test "dependency errors identify the authored route or Plugin line" do
     for {body, line} <- [
           {"agent do\nend\nroutes do\nroute \"test.run\", Enum\nend", 7},
+          {"agent do\nend\nroutes do\nroute \"test.first\", F.Return\nroute \"test.second\", Enum\nend",
+           8},
           {"agent do\nschema F.schema()\nplugin F.First, config: [key: :count]\nend", 4},
           {"agent do\nplugin Enum\nend", 5}
         ] do

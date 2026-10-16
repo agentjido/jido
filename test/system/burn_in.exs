@@ -2,11 +2,33 @@
 # Each child is a fresh Mix/BEAM run. The selected tests retain their own
 # state, cleanup and observability assertions; this is not a second framework.
 {opts, [], []} =
-  OptionParser.parse(System.argv(), strict: [runs: :integer, rounds: :integer, seed: :integer])
+  OptionParser.parse(System.argv(),
+    strict: [runs: :integer, rounds: :integer, seed: :integer, profile: :string]
+  )
 
 runs = Keyword.get(opts, :runs, 5)
 rounds = Keyword.get(opts, :rounds, 100)
 seed = Keyword.get(opts, :seed, 93)
+profile = Keyword.get(opts, :profile, "runtime")
+
+paths =
+  case profile do
+    "runtime" ->
+      ["test/system/runtime/turn_model_test.exs", "test/system/runtime/peers_test.exs"]
+
+    "authoring" ->
+      ["test/system/runtime/authoring_load_test.exs"]
+
+    "all" ->
+      [
+        "test/system/runtime/turn_model_test.exs",
+        "test/system/runtime/peers_test.exs",
+        "test/system/runtime/authoring_load_test.exs"
+      ]
+
+    _ ->
+      raise "profile must be runtime, authoring, or all"
+  end
 
 unless runs in 1..100 and rounds in 1..1_000 and seed >= 0,
   do: raise("runs must be 1..100, rounds 1..1000, seed non-negative")
@@ -16,24 +38,20 @@ unless File.regular?("mix.exs") and File.dir?("test/system/runtime"),
 
 for offset <- 0..(runs - 1) do
   current_seed = seed + offset
-  IO.puts("System burn-in #{offset + 1}/#{runs}; seed=#{current_seed}; rounds=#{rounds}")
+
+  IO.puts(
+    "System burn-in #{offset + 1}/#{runs}; profile=#{profile}; seed=#{current_seed}; rounds=#{rounds}"
+  )
 
   {_stream, status} =
     System.cmd(
       "mix",
-      [
-        "test",
-        "test/system/runtime/turn_model_test.exs",
-        "test/system/runtime/peers_test.exs",
-        "--only",
-        "scenario:burn_in",
-        "--seed",
-        to_string(current_seed)
-      ],
+      ["test" | paths] ++ ["--only", "scenario:burn_in", "--seed", to_string(current_seed)],
       env: [
         {"MIX_ENV", "test"},
         {"JIDO_SYSTEM_MODEL_SEED", to_string(current_seed)},
-        {"JIDO_SYSTEM_MODEL_ROUNDS", to_string(rounds)}
+        {"JIDO_SYSTEM_MODEL_ROUNDS", to_string(rounds)},
+        {"JIDO_AUTHORING_LOAD_ROUNDS", to_string(rounds)}
       ],
       into: IO.stream(:stdio, :line),
       stderr_to_stdout: true

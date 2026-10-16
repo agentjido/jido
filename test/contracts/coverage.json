@@ -239,7 +239,7 @@
         "jido.agent.I23": {
           "failing": 0,
           "kind": "functional",
-          "passing": 16,
+          "passing": 17,
           "status": "active",
           "testable": true,
           "tests": [
@@ -251,6 +251,7 @@
             "test built-in direct command faults have nonempty messages without fixed wording",
             "test built-in validation faults have nonempty messages without fixed wording",
             "test callback faults retain their cause and application error values pass through",
+            "test definitions and trusted registries accept the same Agent module forms",
             "test direct default selection reports malformed Signal data",
             "test invalid declaration paths identify the field and route or Plugin index",
             "test invalid executable values identify the callback and rejected value",
@@ -496,7 +497,7 @@
         "jido.topology.I15": {
           "failing": 0,
           "kind": "functional",
-          "passing": 19,
+          "passing": 20,
           "status": "active",
           "testable": true,
           "tests": [
@@ -510,6 +511,7 @@
             "test invalid extension declarations and outputs fail at compilation",
             "test invalid sections, field presence, and dependencies retain authored source locations",
             "test invalid sizes, graph cycles, missing endpoints, and duplicate owners fail before planning",
+            "test later entries and nested binding properties keep their authored source lines",
             "test members require one current module or neutral Agent definition and valid resolved state",
             "test nested forms return canonical definitions and supplied structs are revalidated",
             "test nested tagged maps reject decoded key collisions and preserve reference errors",
@@ -569,12 +571,13 @@
         "jido.topology.I3": {
           "failing": 0,
           "kind": "functional",
-          "passing": 4,
+          "passing": 5,
           "status": "active",
           "testable": true,
           "tests": [
             "test a combined host retains the Agent API and separate constructor meanings",
             "test invalid sections, field presence, and dependencies retain authored source locations",
+            "test later entries and nested binding properties keep their authored source lines",
             "test optional blocks remain independent and only an explicit Agent selects a child director",
             "test root Agent version and description do not become graph fields"
           ]

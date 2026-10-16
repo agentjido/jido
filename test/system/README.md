@@ -1,7 +1,8 @@
 # System verification
 
 This suite checks runtime invariants across real components. It is separate
-from pure authoring checks and focused core regressions.
+from focused core regressions. The authoring load test also checks resource
+use across repeated pure Agent and Topology operations.
 
 The commit projection scenario checks the optional Plugin `after_commit/3`
 hook with ETS, File, and SQLite/Ecto. It compares live owned state, saved
@@ -30,6 +31,7 @@ strict-startup, upload, and cold-rebuild gaps remain. See
 system/
   runtime/                  # :system; included in mix test.all
     agents_test.exs
+    authoring_load_test.exs
     commit_projection_test.exs
     topology_test.exs
     observability_test.exs
@@ -381,3 +383,36 @@ seed with `JIDO_SYSTEM_MODEL_SEED`, or 1..1000 rounds with
 bounded reduction starts, then save the shorter replay when reduction ends.
 Every run also writes the compact system report. This focused burn-in does not
 run the retained research probe; a green burn-in is not a green `mix test.all`.
+
+### Authoring load
+
+Run the pure Agent and Topology load check without the runtime scenarios:
+
+```sh
+JIDO_AUTHORING_LOAD_ROUNDS=20 mix test test/system/runtime/authoring_load_test.exs --only system --seed 0
+elixir test/system/burn_in.exs --profile authoring --runs 3 --rounds 50 --seed 93
+```
+
+The default burn-in profile is `runtime`. Use `--profile all` to run both
+profiles. Each burn-in run starts a fresh BEAM. The authoring test uses four
+monitored workers. Each worker completes one warm-up cycle, waits at a start
+barrier, then repeats definition, validation, Codec, and planning operations.
+The fixture has owned Plugin state, a 128 KiB metadata binary, an input-sized
+Agent group, ownership, a Bus subscription, a static include, and a child
+command gate. It checks JSON document round trips, exact definitions and
+plans, owned state defaults, invalid state, and an unresolved child member.
+It does not start AgentServer.
+
+After all operation results are discarded, each worker performs a major
+garbage collection. Its retained process memory must be at most 1 MiB above
+its warm baseline. Its retained binary references must be at most 64 KiB
+at both the warm baseline and final checkpoint. Each worker must own no ETS
+tables and have an empty mailbox. Spawn tracing and a trace-delivery barrier
+check that the operations start no helper processes, including during warm-up.
+Worker monitors confirm cleanup. The test prints the baseline, final
+measurements, and limits as one JSON record.
+
+These checks use worker resources, not whole-VM memory. They are retained
+memory limits, not peak-memory or speed measurements. Use 1..1000 rounds per
+worker. The test has failure deadlines and does not use sleep timers to infer
+completion.

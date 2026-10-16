@@ -20,18 +20,23 @@ defmodule JidoTest.Contract.AgentCodecTest do
     end
   end
 
-  @tag obligation: ["jido.agent.I3", "jido.agent.I20"]
+  @tag obligation: ["jido.agent.I3", "jido.agent.I20", "jido.agent.I23"]
   test "definitions and trusted registries accept the same Agent module forms" do
     F.with_agent("", fn generated ->
       for module <- [Agent, generated, F.BareSelection] do
         assert {:ok, %Agent{module: ^module}} = Agent.new(name: "eligible", module: module)
-        assert {:ok, registry} = Registry.new(%{"agent" => {:agent, module}})
+        entries = %{"agent" => {:agent, module}}
+        assert {:ok, registry} = Registry.new(entries)
+        assert Registry.new!(entries) === registry
         assert {:ok, ^module} = Registry.resolve(registry, "agent", :agent)
       end
 
       for module <- [Enum, nil, JidoTest.MissingAgent] do
         assert {:error, %ValidationError{}} = Agent.new(name: "invalid", module: module)
-        assert {:error, %ValidationError{}} = Registry.new(%{"agent" => {:agent, module}})
+        entries = %{"agent" => {:agent, module}}
+        assert {:error, %ValidationError{} = error} = Registry.new(entries)
+        raised = assert_raise ValidationError, fn -> Registry.new!(entries) end
+        assert_same_error(raised, error)
       end
     end)
   end

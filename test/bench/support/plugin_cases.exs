@@ -54,7 +54,7 @@ defmodule JidoCoreBench.PluginCases do
                 %{
                   agent_id: agent.id,
                   agent_state: agent.state,
-                  plugin_inputs: result.plugin_inputs,
+                  plugin_inputs: %{},
                   signal: signal
                 }
               )

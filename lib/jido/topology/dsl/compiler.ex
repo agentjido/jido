@@ -69,14 +69,7 @@ defmodule Jido.Topology.DSL.Compiler do
     entities = foreign_entities(dsl)
     config = unwrap_extension!(Jido.Topology.Extension.lower(extensions, config, entities), env)
 
-    sources =
-      Enum.reduce(entity_groups, field_sources(dsl), fn {field, entities}, locations ->
-        entities
-        |> Enum.with_index()
-        |> Enum.reduce(locations, fn {entity, index}, acc ->
-          Map.merge(acc, source_locations(entity, [field, index]))
-        end)
-      end)
+    sources = SourceMap.collect(entity_groups, field_sources(dsl), &source_locations/2)
 
     owner? = Module.get_attribute(env.module, :jido_agent_block_declared) == true
     {config, sources, owner?}

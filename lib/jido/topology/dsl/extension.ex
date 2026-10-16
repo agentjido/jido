@@ -1,46 +1,18 @@
-defmodule Jido.Topology.DSL.Agent do
-  @moduledoc false
-  defstruct Jido.Topology.DSL.Entity.struct_fields(:agent)
-end
-
-defmodule Jido.Topology.DSL.Group do
-  @moduledoc false
-  defstruct Jido.Topology.DSL.Entity.struct_fields(:group, count: nil)
-end
-
-defmodule Jido.Topology.DSL.Bus do
-  @moduledoc false
-  defstruct Jido.Topology.DSL.Entity.struct_fields(:resource)
-end
-
-defmodule Jido.Topology.DSL.Owns do
-  @moduledoc false
-  defstruct Jido.Topology.DSL.Entity.struct_fields(:owns)
-end
-
-defmodule Jido.Topology.DSL.Subscribe do
-  @moduledoc false
-  defstruct Jido.Topology.DSL.Entity.struct_fields(:subscribe)
-end
-
-defmodule Jido.Topology.DSL.Include do
-  @moduledoc false
-  defstruct Jido.Topology.DSL.Entity.struct_fields(:include)
-end
-
-defmodule Jido.Topology.DSL.Binding do
-  @moduledoc false
-  defstruct Jido.Topology.DSL.Entity.struct_fields(:binding)
-end
-
-defmodule Jido.Topology.DSL.Import do
-  @moduledoc false
-  defstruct Jido.Topology.DSL.Entity.struct_fields(:import)
-end
-
-defmodule Jido.Topology.DSL.Export do
-  @moduledoc false
-  defstruct Jido.Topology.DSL.Entity.struct_fields(:export)
+for {module, kind, overrides} <- [
+      {Jido.Topology.DSL.Agent, :agent, []},
+      {Jido.Topology.DSL.Group, :group, [count: nil]},
+      {Jido.Topology.DSL.Bus, :resource, []},
+      {Jido.Topology.DSL.Owns, :owns, []},
+      {Jido.Topology.DSL.Subscribe, :subscribe, []},
+      {Jido.Topology.DSL.Include, :include, []},
+      {Jido.Topology.DSL.Binding, :binding, []},
+      {Jido.Topology.DSL.Import, :import, []},
+      {Jido.Topology.DSL.Export, :export, []}
+    ] do
+  defmodule module do
+    @moduledoc false
+    defstruct Jido.Topology.DSL.Entity.struct_fields(kind, overrides)
+  end
 end
 
 defmodule Jido.Topology.DSL.Extension do

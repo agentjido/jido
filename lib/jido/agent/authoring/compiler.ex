@@ -168,7 +168,7 @@ defmodule Jido.Agent.Authoring.Compiler do
     {agent_options, topology_options} = split_options(host, options, env)
     # Read current compile state once. Loaded module code can be stale on reload.
     dsl = Module.get_attribute(env.module, :spark_dsl_config) || %{}
-    agent = agent_options |> lower_agent(agent_extensions, dsl, env) |> emit_agent()
+    agent = lower_agent(agent_options, agent_extensions, dsl, env)
 
     topology =
       if host == :topology do
@@ -213,10 +213,8 @@ defmodule Jido.Agent.Authoring.Compiler do
     if extensions != [],
       do: validate_lowered_routes!(routes, definition.routes, env)
 
-    {definition, sources, generate(routes, source, env)}
-  end
+    generated = generate(routes, source, env)
 
-  defp emit_agent({definition, sources, generated}) do
     quote do
       @doc false
       def __agent_config__, do: unquote(Macro.escape(definition))
@@ -308,13 +306,7 @@ defmodule Jido.Agent.Authoring.Compiler do
     locations = SourceMap.section(dsl, [:agent], [:schema, :metadata], [])
     locations = Map.merge(locations, SourceMap.section(dsl, [:agent], [], [:plugins]))
 
-    Enum.reduce([routes: routes, plugins: plugins], locations, fn {field, entities}, sources ->
-      entities
-      |> Enum.with_index()
-      |> Enum.reduce(sources, fn {entity, index}, sources ->
-        Map.merge(sources, SourceMap.entity(entity, [field, index]))
-      end)
-    end)
+    SourceMap.collect([routes: routes, plugins: plugins], locations)
   end
 
   defp block_fields(dsl, routes, plugins, env, sources) do

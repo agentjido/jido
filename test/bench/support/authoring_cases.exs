@@ -18,7 +18,38 @@ defmodule JidoCoreBench.AuthoringCases do
         |> Map.put(:verify, fn definition, result -> F.equal!(result, {:ok, definition}) end)
       end
 
-    definitions ++ registry_cases()
+    definitions ++ registry_cases() ++ codec_cases(sizes)
+  end
+
+  defp codec_cases(sizes) do
+    for size <- sizes, operation <- [:encode, :decode, :decode_instance] do
+      F.checked(
+        "authoring/codec/routes_#{size}/#{operation}",
+        fn _ ->
+          definition = F.definition(size, JidoCoreBench.Add, [JidoCoreBench.PreparePlugin])
+          {:ok, document, registry} = Codec.encode(definition)
+          %{definition: definition, document: document, registry: registry}
+        end,
+        fn prepared ->
+          case operation do
+            :encode -> Codec.encode(prepared.definition, prepared.registry)
+            :decode -> Codec.decode(prepared.document, prepared.registry)
+            :decode_instance -> Codec.decode(prepared.document, prepared.registry, id: "decoded")
+          end
+        end,
+        fn result -> F.equal!(elem(result, 0), :ok) end
+      )
+      |> Map.put(:verify, fn prepared, result ->
+        expected =
+          case operation do
+            :encode -> prepared.document
+            :decode -> prepared.definition
+            :decode_instance -> Jido.Agent.instantiate!(prepared.definition, id: "decoded")
+          end
+
+        F.equal!(result, {:ok, expected})
+      end)
+    end
   end
 
   defp registry_cases do

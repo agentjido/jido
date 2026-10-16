@@ -129,10 +129,7 @@ defmodule Jido.Topology.Composition do
            local: spec.key,
            scope: path,
            kind: kind,
-           depends_on: Enum.map(deps, & &1.key),
-           parent: nil,
-           on_parent_exit: :stop,
-           subscriptions: []
+           depends_on: Enum.map(deps, & &1.key)
          })}
       end
     end)
@@ -185,14 +182,13 @@ defmodule Jido.Topology.Composition do
     parent = Map.get(owner, :parent)
     subscriptions = Map.get(connections, node.key, [])
 
-    %{
-      node
-      | parent: parent,
-        on_parent_exit: Map.get(owner, :policy, :stop),
-        subscriptions: subscriptions,
-        depends_on:
-          Enum.uniq(List.wrap(parent) ++ node.depends_on ++ Enum.map(subscriptions, & &1.bus))
-    }
+    Map.merge(node, %{
+      parent: parent,
+      on_parent_exit: Map.get(owner, :policy, :stop),
+      subscriptions: subscriptions,
+      depends_on:
+        Enum.uniq(List.wrap(parent) ++ node.depends_on ++ Enum.map(subscriptions, & &1.bus))
+    })
   end
 
   defp endpoint(scopes, path, target, seen) do
@@ -267,19 +263,16 @@ defmodule Jido.Topology.Composition do
   end
 
   defp graph(nodes) do
-    edges = Map.new(nodes, &{&1.key, &1.depends_on})
-
     edges =
-      Enum.reduce(nodes, edges, fn node, edges ->
+      Enum.reduce(nodes, %{}, fn node, edges ->
+        edges = Map.put(edges, node.key, node.depends_on)
+
         Enum.reduce(node.depends_on, edges, fn key, edges ->
           if String.starts_with?(key, "import/"), do: Map.put_new(edges, key, []), else: edges
         end)
       end)
 
-    case Validation.layers(edges) do
-      {:ok, _} -> :ok
-      error -> error
-    end
+    with {:ok, _} <- Validation.layers(edges), do: :ok
   end
 
   defp fetch_scope(scopes, path) do

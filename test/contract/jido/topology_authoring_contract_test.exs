@@ -397,11 +397,47 @@ defmodule JidoTest.Contract.TopologyAuthoringTest do
     end
 
     T.with_topology(
-      "topology do\nagents do\ngroup :workers, definition: T.worker()\nend\nend",
+      "topology do\nagents do\ngroup :workers, definition: T.worker()\n" <>
+        "group :keyed, definition: T.worker(), members: [], key_by: :key\nend\nend",
       fn module ->
-        assert [%{count: 1}] = module.topology().groups
+        assert [%{count: 1}, keyed] = module.topology().groups
+        assert keyed.members === [] and keyed.key_by === :key
+        refute Map.has_key?(keyed, :count)
       end
     )
+  end
+
+  @tag obligation: ["jido.topology.I3", "jido.topology.I15"]
+  test "later entries and nested binding properties keep their authored source lines" do
+    for {body, line} <- [
+          {"topology do\nagents do\nagent :first, definition: T.worker()\nagent :second, String\nend\nend",
+           9},
+          {"""
+           topology do
+             topologies do
+               include :empty, %{name: "empty"}
+               include :team, %{name: "team", imports: [%{key: :events, kind: :bus}, %{key: :audit, kind: :bus}]} do
+                 bind :events, to: :events
+                 bind :audit do
+                   to 7
+                 end
+               end
+             end
+           end
+           """, 12}
+        ] do
+      error =
+        assert_raise CompileError, fn ->
+          T.with_topology(
+            body,
+            fn _ -> :ok end,
+            ~s(name: "source_lines", resources: [%{key: :events}, %{key: :audit}])
+          )
+        end
+
+      assert Path.basename(error.file) == "authoring_fixture.ex"
+      assert error.line == line, inspect(error)
+    end
   end
 
   @tag obligation: ["jido.topology.I4", "jido.topology.I15"]

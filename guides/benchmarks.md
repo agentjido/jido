@@ -9,11 +9,11 @@ ERL_FLAGS='+S 2:2' mix run test/bench/run.exs --profile short --output test/benc
 ERL_FLAGS='+S 2:2' mix run test/bench/run.exs --profile scale --output test/bench/results/scale
 ```
 
-| Profile | Cases | Route counts | Thread sizes | Warm-up | Time samples | Resource samples |
+| Profile | Cases | Route counts | Topology group sizes | Warm-up | Time samples | Resource samples |
 | --- | ---: | --- | --- | ---: | ---: | ---: |
-| smoke | 158 | 1, 8 | 1, 32 | 1 | 2 | 1 |
-| short | 238 | 1, 16 | 1, 100, 1000 | 5 | 30 | 3 |
-| scale | 282 | 1, 16, 64 | 1, 100, 1000, 10000 | 10 | 60 | 5 |
+| smoke | 128 | 1, 8 | 16, 128 | 1 | 2 | 1 |
+| short | 200 | 1, 16 | 16, 256 | 5 | 30 | 3 |
+| scale | 242 | 1, 16, 64 | 16, 256, 1024 | 10 | 60 | 5 |
 
 Use `--filter SUBSTRING` for selected case IDs. An empty selection is an error.
 Each run writes `report.json` and `report.md`. Raw reports under `test/bench/results/`
@@ -24,13 +24,20 @@ are ignored by Git. Keep the same scripts for both sides of a comparison.
 Agent cases cover construction, validation, command preparation, routing, direct
 Action and two-step Flow commands, state transition, and checkpoint/restore.
 Live server cases cover calls, Plugin admission, Flow calls, 20 casts with a completion call,
-snapshots, failure, and start/stop. Data cases cover Thread append, normalization,
-last entry and slice, Audit buffers and 100-record ID batches, deep merge, Codec, and spans.
+snapshots, failure, and start/stop. Data cases cover Audit buffers and
+100-record ID batches, deep merge, Codec, and spans.
 A no-op Plugin case measures the command preparation callback path.
-Additional cases cover mixed Thread kinds, large caller contexts, reserved-key
-errors, and Codec encoding with a generated Registry.
+Additional cases cover large caller contexts, reserved-key errors, and Codec
+encoding with a generated Registry.
 Keyword merge cases cover 25-operation batches with 8, 128, or 1,024 keys,
 plus duplicate keys, empty overrides, and non-keyword replacement lists.
+The `authoring/` cases cover neutral Agent definitions, Registry derivation,
+and public Agent Codec encode, decode, and decode-to-instance operations.
+The `topology/` cases cover definition validation and composed Topology
+planning, encoding, decoding, and decoding to an instance. Composed fixtures
+have Agent definitions, a group with an input count, ownership, a Bus
+subscription, a static include, and a runtime child with a command gate.
+Group sizes are 16 times the profile route counts.
 Plugin schema cases cover validation and preparation with up to 10,000 owned
 list items. ETS cases cover 100-operation get, put, CAS, and conflict batches
 with default and custom table options. They delete their own keys after each
@@ -102,6 +109,21 @@ For repeated measurements, run `test/bench/run.exs` from each worktree in a
 fresh VM. Alternate the baseline and candidate order. Use a new output
 directory for each pair. Compare reports from the same pair.
 
+For Agent and Topology changes, run the full smoke profile first. Then run
+the same focused profiles on both revisions:
+
+```sh
+ERL_FLAGS='+S 2:2' mix run test/bench/run.exs --profile short --filter authoring/ --output test/bench/results/authoring-short
+ERL_FLAGS='+S 2:2' mix run test/bench/run.exs --profile scale --filter topology/ --output test/bench/results/topology-scale
+```
+
+These operations do not start AgentServer. Their setup prepares the source
+definition, Registry, document, and expected instance outside the timed call.
+Each result is checked against the expected definition, document, or plan.
+Use the [authoring load test](../test/system/README.md#authoring-load) for
+repeated operations and post-GC memory limits. A passing memory limit is
+not evidence of a speed gain.
+
 Reports record source revision and hash, source dirtiness, tool hash, lock hash,
 runtime, host, and settings. Comparison rejects different environments, settings,
 methods, tool hashes, and case sets. Ratios are candidate divided by baseline.
@@ -109,7 +131,7 @@ A ratio below one is lower; one run alone does not establish a speed gain.
 
 See the [50-round plan](https://github.com/agentjido/jido/blob/310755ac/docs/plans/2026-09-05-core-performance.md) for the idea
 list, acceptance gates, required tests, and commit process. Distributed load,
-complete durable recovery, scheduling, and topology need additional fixtures
+complete durable recovery, scheduling, and live Topology operation need additional fixtures
 before those optimization rounds can run.
 
 Schema version 2 adds the caller collection before timing. Do not compare its

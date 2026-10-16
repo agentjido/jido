@@ -441,15 +441,15 @@ defmodule Jido.Topology.Validation do
     remaining = Map.drop(remaining, ready)
 
     {remaining, next} =
-      Enum.reduce(ready, {remaining, MapSet.new()}, fn key, {counts, next} ->
+      Enum.reduce(ready, {remaining, []}, fn key, {counts, next} ->
         Enum.reduce(Map.get(dependents, key, []), {counts, next}, fn dependent, {counts, next} ->
           count = Map.fetch!(counts, dependent) - 1
           counts = Map.put(counts, dependent, count)
-          next = if count == 0, do: MapSet.put(next, dependent), else: next
+          next = if count == 0, do: [dependent | next], else: next
           {counts, next}
         end)
       end)
 
-    collect_layers(remaining, dependents, next |> MapSet.to_list() |> Enum.sort(), [ready | acc])
+    collect_layers(remaining, dependents, Enum.sort(next), [ready | acc])
   end
 end
