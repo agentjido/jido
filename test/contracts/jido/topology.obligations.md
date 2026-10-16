@@ -42,8 +42,8 @@ validation. The guards cover both the default and an explicit version.
 
 ### jido.topology.I2 — Constructor meanings
 
-- **scope:** `Jido.Topology.__using__/1`, `Jido.Topology.new/1`, `Jido.Topology.new!/1`
-- **must:** Keep generated public names and arities. Definition and owner access return the Agent definition. new_agent creates an Agent instance. topology returns a graph definition. new/1 creates a Topology instance. Raising constructors raise the corresponding validation error.
+- **scope:** `Jido.Topology.__using__/1`, `Jido.Topology.define/1`, `Jido.Topology.new/1`, `Jido.Topology.instantiate!/2`
+- **must:** Keep generated public names and arities. Definition and owner access return the Agent definition. Top-level define/1 creates a graph definition and new/1 wraps it. Generated instantiate_agent/0,1 creates an Agent instance and new_agent/0,1 wraps it. topology returns a graph definition. Generated instantiate/1 creates a Topology instance and new/1 wraps it. Matching bang forms raise the corresponding validation error, including top-level instantiate!/2. Compatibility wrappers keep results, defaults, and errors.
 - **why:** Consolidation must preserve supported entry points.
 - **kind:** functional
 - **status:** active

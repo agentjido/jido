@@ -208,3 +208,18 @@ The earlier 1,302-mutant profile was not rerun. All 215 historical survivor
 decisions remain; 12 locations move with no judgment changes. See the
 [Topology record](topology.baseline.md#final-local-reductions--2026-10-16) for
 exact sites, profiles, and local evidence paths.
+
+## Explicit constructors and supported wrappers — 2026-10-16
+
+`Jido.Agent.define/1` and `define!/1` construct neutral definitions. Generated
+Agent modules expose `instantiate/0,1` and `instantiate!/0,1`. Existing `new`
+and bang forms call these explicit functions with their original defaults,
+results, and errors. They remain supported without deprecation warnings.
+The public DSL is unchanged.
+
+The restored-source Covenant gate passes 85 Agent and 47 Topology tests and
+all 42 obligations. All eight selected Agent constructor mutations are killed
+with exact attribution. The historical ledger retains all 215 decisions:
+seven source locations move and 208 remain unchanged. No judgment changes.
+See the [Topology record](topology.baseline.md#explicit-constructors-and-supported-wrappers--2026-10-16)
+for commands, sites, evidence hashes, and package validation.

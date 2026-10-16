@@ -75,7 +75,7 @@ defmodule MyApp.Counter do
   end
 end
 
-agent = MyApp.Counter.new!(id: "counter-1")
+agent = MyApp.Counter.instantiate!(id: "counter-1")
 
 signal =
   Jido.Signal.new!(

@@ -1052,3 +1052,72 @@ Selected evidence under `tmp/covenant/next-reductions/`:
 | `benchmark-memory-summary.json` | `8d1b2928fb57ea8ae3ca6d9fc681e71427ee708007176a358c675881f7d37158` |
 | `authoring-memory-summary.json` | `5b0e25ddc8c8278fef0e6292c1415a0369ca258eebf759cb45c1f27e2c133afe` |
 | `semantic-probes.json` | `6752483ca3a3f85dabd5a31293a33e2b4d798b0ef9486fd714395d8e298cfbf2` |
+
+## Explicit constructors and supported wrappers — 2026-10-16
+
+`Jido.Topology.define/1` and `define!/1` construct static definitions.
+`instantiate!/2` adds the raising instance boundary. Generated Topology
+modules expose `instantiate/1`, `instantiate!/1`, `instantiate_agent/0,1`,
+and `instantiate_agent!/0,1`. Existing `new`, `new_agent`, and bang forms
+call the explicit constructors. All compatibility wrappers keep their
+original arities, defaults, values, and errors, without deprecation warnings.
+The public DSL remains unchanged.
+
+The focused profiles use all tests from their component obligation module
+lists. Only the following 22 mutations are executed. Catalog enumeration
+executes no mutations. All 22 are killed with exact attribution, with no
+invalid mutants, survivors, timeouts, or partial credit. The earlier full
+1,302-mutant run is not repeated.
+
+```sh
+env MIX_ENV=test ERL_FLAGS='+S 2:2' mix covenant.mutate jido.agent --macros --only m0005,m0006,m0007,m0008,m0009,m0010,m0011,m0012 --jobs 2 --seed 0 --timeout 5000 --max-runtime 300000 --selective-recompile --out tmp/covenant/constructor-api/agent-mutants.json
+env MIX_ENV=test ERL_FLAGS='+S 2:2' mix covenant.mutate jido.topology --macros --only m0018,m0019,m0020,m0021,m0022,m0023,m0024,m0025,m0026,m0028,m0030,m0031,m0032,m0040 --jobs 2 --seed 0 --timeout 5000 --max-runtime 300000 --selective-recompile --out tmp/covenant/constructor-api/topology-mutants.json
+```
+
+All selected sites use `return_nil`. Exact sites in this source version:
+
+| Component | Mutant IDs | Lines |
+| --- | --- | --- |
+| Agent | m0005–m0012 | 197, 201, 205, 209, 217, 222, 227, 231 |
+| Topology | m0018–m0026 | 97, 103, 109, 113, 116, 121, 125, 130, 134 |
+| Topology | m0028, m0030, m0031, m0032, m0040 | 145, 158, 162, 166, 187 |
+
+The Agent ledger retains 215 exact historical decisions. Seven locations
+move; 208 remain unchanged. Each entry matches its exact catalog location,
+operator, function, module, and mutation. No judgment or exemption changes.
+The focused checks do not establish a new full mutation score.
+
+Local evidence is under `tmp/covenant/constructor-api/`. Full site descriptors,
+commands, and return codes are in `mutation-commands.json`. Source hashes:
+
+- `lib/jido/agent.ex`: `f40d5663fed62d6f1a0b838a7e7e5192eccc062aa6bde8561b37881c119b0752`
+- `lib/jido/topology.ex`: `42f6c25a19226a8a12d5be14fcfb2c45d2c7881d8831d9a8da51d473608e60e9`
+
+| Evidence | SHA-256 |
+| --- | --- |
+| `mutation-commands.json` | `0e64ecf3e8247ee7b16e1afd91bc0f10d705427347dff0a67cd8d25457dff3a9` |
+| `agent-mutants.json` | `f662ab4f0f2dd6a42af12e29ee53d172ba531cfbe9f45073c8aae04caed924e4` |
+| `topology-mutants.json` | `3d5dae4e6bad8a65ee40cd78ddfc0f1f203f23b69327b208418fe44178b7bfc6` |
+| `ledger-rebase.json` | `dae9f3ac5887597c74876bd13848a70753defae0d87c261c5a4c786c0201c447` |
+
+Restored-source validation passes all 132 Covenant tests and all 42
+obligations. Fresh focused coverage passes 2,107 tests, with 51 existing
+exclusions and 92.4% package line coverage. Agent has 97.7% line coverage;
+Topology has 95.6%. Format, compilation with warnings treated as errors,
+warning lint, and API documentation generation pass. Dialyzer retains the
+same ten known findings. All 105 protected AgentServer and other-thread
+files match their previous hashes.
+
+The first full six-category run reports 2,612 of 2,613 tests passed. One
+remote lifecycle test times out while waiting for its child to start
+(`remote_lifecycle_test.exs:27`, `start_pair/2` at line 118). All four tests
+from that module pass in isolation on both the current source and an
+isolated copy of checkpoint `f748b0406f62ae4ddc9a478d99f96b57e2645c62`.
+This does not establish the cause of the full-run timeout. No AgentServer
+source, test, or skip changes. The first run and both isolated logs are
+retained in the evidence directory.
+
+The full six-category rerun passes all 2,613 tests, with the same two
+existing skips and 161 exclusions (`tests-all-final.log`). No source
+changes occur between the first full run, the isolated current-source
+check, and this passing rerun.

@@ -6,6 +6,43 @@ defmodule JidoTest.Contract.TopologyPlanningTest do
   alias Jido.Topology.{Plan, Ref, Reference}
   alias JidoTest.TopologyContract, as: T
 
+  @tag obligation: ["jido.topology.I2", "jido.topology.I8", "jido.topology.I15"]
+  test "explicit constructors preserve definition aliases and raising instance boundaries" do
+    attrs = [name: "constructors", agents: [%{key: :worker, definition: T.worker()}]]
+    assert {:ok, definition} = Topology.define(attrs)
+
+    for source <- [attrs, Map.new(attrs), definition] do
+      assert Topology.define(source) === {:ok, definition}
+      assert Topology.new(source) === {:ok, definition}
+      assert Topology.define!(source) === definition
+      assert Topology.new!(source) === definition
+      assert {:ok, instance} = Topology.instantiate(source, id: "graph")
+      assert Topology.instantiate!(source, id: "graph") === instance
+    end
+
+    for attrs <- [nil, [name: "invalid", agents: :invalid], [name: "invalid", unknown: 1]] do
+      assert {:error, error} = Topology.define(attrs)
+      assert {:error, legacy_error} = Topology.new(attrs)
+
+      for actual <- [
+            legacy_error,
+            assert_raise(error.__struct__, fn -> Topology.define!(attrs) end),
+            assert_raise(error.__struct__, fn -> Topology.new!(attrs) end)
+          ] do
+        assert Map.drop(Map.from_struct(actual), [:stacktrace]) ===
+                 Map.drop(Map.from_struct(error), [:stacktrace])
+      end
+    end
+
+    for opts <- [[], [id: ""], [id: "graph", input: :invalid]] do
+      assert {:error, error} = Topology.instantiate(definition, opts)
+      raised = assert_raise error.__struct__, fn -> Topology.instantiate!(definition, opts) end
+
+      assert Map.drop(Map.from_struct(raised), [:stacktrace]) ===
+               Map.drop(Map.from_struct(error), [:stacktrace])
+    end
+  end
+
   @tag obligation: "jido.topology.I15"
   test "entry lists reject invalid containers and improper tails with their field path" do
     for field <- [

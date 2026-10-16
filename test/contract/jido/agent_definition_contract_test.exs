@@ -5,6 +5,37 @@ defmodule JidoTest.Contract.AgentDefinitionTest do
   alias Jido.Error.ValidationError
   alias JidoTest.AgentContract, as: F
 
+  @tag obligation: [
+         "jido.agent.I1",
+         "jido.agent.I2",
+         "jido.agent.I3",
+         "jido.agent.I4",
+         "jido.agent.I24",
+         "jido.agent.I25"
+       ]
+  test "explicit definition constructors preserve compatibility results and errors" do
+    definition = F.definition()
+
+    for attrs <- [
+          Map.from_struct(definition),
+          Map.to_list(Map.from_struct(definition)),
+          definition,
+          [name: "first", name: "last"]
+        ] do
+      assert {:ok, expected} = Agent.define(attrs)
+      assert expected.id == nil and expected.state == nil
+      assert Agent.new(attrs) === {:ok, expected}
+      assert Agent.define!(attrs) === expected
+      assert Agent.new!(attrs) === expected
+    end
+
+    for attrs <- [nil, [name: 2], [name: "valid", unknown: 1], F.instance()] do
+      assert_same_error(fn -> Agent.define(attrs) end, fn -> Agent.define!(attrs) end)
+      assert_same_error(fn -> Agent.define(attrs) end, fn -> Agent.new!(attrs) end)
+      assert_same_error(fn -> Agent.new(attrs) end, fn -> Agent.define!(attrs) end)
+    end
+  end
+
   @tag obligation: ["jido.agent.I1", "jido.agent.I5"]
   test "all supported declarations give the same complete neutral value" do
     F.with_agent(
@@ -321,6 +352,8 @@ defmodule JidoTest.Contract.AgentDefinitionTest do
   @tag obligation: "jido.agent.I25"
   test "required top-level public functions and Turn constructors remain available" do
     required = [
+      define: 1,
+      define!: 1,
       new: 1,
       new!: 1,
       instantiate: 1,

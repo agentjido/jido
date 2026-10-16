@@ -55,11 +55,17 @@ defmodule JidoTest.Contract.TopologyAuthoringTest do
               vsn: 0,
               domain_schema: 0,
               complete_schema: 0,
+              instantiate_agent: 0,
+              instantiate_agent: 1,
+              instantiate_agent!: 0,
+              instantiate_agent!: 1,
               new_agent: 0,
               new_agent: 1,
               new_agent!: 0,
               new_agent!: 1,
               topology: 0,
+              instantiate: 1,
+              instantiate!: 1,
               new: 1,
               new!: 1,
               cmd: 2,
@@ -72,6 +78,7 @@ defmodule JidoTest.Contract.TopologyAuthoringTest do
             do: assert(function_exported?(module, name, arity))
 
         refute function_exported?(module, :new, 0)
+        refute function_exported?(module, :instantiate, 0)
         assert %Agent{id: nil, state: nil, module: ^module, vsn: 1} = module.definition()
         assert module.owner() === module.definition()
         assert module.vsn() == 1
@@ -82,9 +89,13 @@ defmodule JidoTest.Contract.TopologyAuthoringTest do
         assert module.topology().metadata === %{graph: true}
 
         assert {:ok, agent} = module.new_agent(id: "owner", state: %{count: 4})
+        assert module.instantiate_agent(id: "owner", state: %{count: 4}) === {:ok, agent}
+        assert module.instantiate_agent!(id: "owner", state: %{count: 4}) === agent
         assert agent === module.new_agent!(id: "owner", state: %{count: 4})
         assert module.new_agent!().id != agent.id
         assert {:ok, %{state: %{count: 0, first: 0}}} = module.new_agent()
+        assert {:ok, %{state: %{count: 0, first: 0}}} = module.instantiate_agent()
+        assert module.instantiate_agent!().state === module.new_agent!().state
         assert {:ok, signal} = module.add_signal(%{amount: 3})
         assert signal.source == "/topology"
 
@@ -95,12 +106,22 @@ defmodule JidoTest.Contract.TopologyAuthoringTest do
         assert agent.state.count == 4
 
         assert {:ok, %Topology.Instance{input: %{count: 2}} = instance} = module.new(id: "graph")
+        assert module.instantiate(id: "graph") === {:ok, instance}
+        assert module.instantiate!(id: "graph") === instance
         assert instance === module.new!(id: "graph")
         assert instance.definition === module.topology()
         assert instance.plan.agents["agent/worker"].initial_state === %{}
         assert {:error, error} = module.new(input: %{})
+        assert {:error, explicit_error} = module.instantiate(input: %{})
+        assert explicit_error.message === error.message
+        assert explicit_error.details === error.details
+        assert_raise error.__struct__, fn -> module.instantiate!(input: %{}) end
         assert_raise error.__struct__, fn -> module.new!(input: %{}) end
         assert {:error, error} = module.new_agent(id: "")
+        assert {:error, explicit_error} = module.instantiate_agent(id: "")
+        assert explicit_error.message === error.message
+        assert explicit_error.details === error.details
+        assert_raise error.__struct__, fn -> module.instantiate_agent!(id: "") end
         assert_raise error.__struct__, fn -> module.new_agent!(id: "") end
       end
     )

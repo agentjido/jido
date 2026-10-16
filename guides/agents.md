@@ -1,14 +1,25 @@
 # Agent values and state
 
 An Agent definition has `id: nil` and `state: nil`. Call `MyAgent.definition()` or
-`Jido.Agent.new/1` to create a definition. Call `MyAgent.new/1` or
+`Jido.Agent.define/1` to create a definition. Call `MyAgent.instantiate/1` or
 `Jido.Agent.instantiate/2` to create an instance. The bang forms raise on error.
 Instance options contain only `:id` and `:state`.
 
 Use `use Jido.Agent` for `name`, `description`, `vsn`, and `extensions` only.
 Declare schema, metadata, and Plugins in `agent do`, and routes in `routes do`.
 Jido validates each module definition at compilation. For generated data,
-`Jido.Agent.new/1` accepts the complete definition as a map or keyword list.
+`Jido.Agent.define/1` accepts the complete definition as a map or keyword list.
+
+The existing constructors remain supported compatibility wrappers:
+
+| Existing API | Explicit API | Result |
+| --- | --- | --- |
+| `Jido.Agent.new(attrs)` | `Jido.Agent.define(attrs)` | Neutral definition |
+| `MyAgent.new(opts)` | `MyAgent.instantiate(opts)` | Agent instance |
+
+The bang forms follow the same mapping. Generated Agent modules keep the
+zero-argument forms of both `new` and `instantiate`. Compatibility wrappers
+keep their current behavior and do not emit deprecation warnings.
 
 Read definition fields through `MyAgent.definition()`. Use `domain_schema/0`
 for the authored schema or `complete_schema/0` for the schema with Plugin state.

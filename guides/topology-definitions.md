@@ -4,6 +4,29 @@ A `Jido.Topology` is a declarative description of Agents, groups, resources,
 and logical ownership. You first declare the system and then instantiate it
 with input. Declaration, validation, and planning start no processes.
 
+Use explicit constructors for each stage:
+
+```elixir
+definition = Jido.Topology.define!(attrs)
+instance = Jido.Topology.instantiate!(definition, id: "deployment", input: %{})
+
+definition = MyTopology.topology()
+instance = MyTopology.instantiate!(id: "deployment", input: %{})
+owner = MyTopology.instantiate_agent!(id: "controller")
+```
+
+The non-bang forms return `{:ok, value}` or `{:error, error}`. Existing
+constructors remain supported wrappers without deprecation warnings:
+
+| Existing API | Explicit API | Result |
+| --- | --- | --- |
+| `Jido.Topology.new(attrs)` | `Jido.Topology.define(attrs)` | Graph definition |
+| `MyTopology.new(opts)` | `MyTopology.instantiate(opts)` | Topology instance |
+| `MyTopology.new_agent(opts)` | `MyTopology.instantiate_agent(opts)` | Owner Agent instance |
+
+The bang forms follow the same mapping. Owner Agent constructors keep their
+zero-argument forms. Topology instance constructors require options with an ID.
+
 ## Main Values
 
 | Value | Purpose |

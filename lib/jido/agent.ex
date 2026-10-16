@@ -4,7 +4,7 @@ defmodule Jido.Agent do
 
   Jido separates declaration from instantiation. A definition declares the
   data schema, routes, Plugins, and metadata, and has no identity or state. An
-  instance has a non-empty identity and complete schema-valid state. Use `new/1`
+  instance has a non-empty identity and complete schema-valid state. Use `define/1`
   to create a definition and `instantiate/2` to create an instance.
   `cmd/3` applies one Signal to an instance and returns a new Agent plus
   Directives. It does not start or own a process or commit live state.
@@ -99,16 +99,21 @@ defmodule Jido.Agent do
   `as:` keep normal wildcard and predicate support and generate no helpers.
   `use Jido.Agent` accepts only `:name`, `:description`, `:vsn`, and
   `:extensions`. Module definitions are validated at compilation. Direct
-  `new/1` construction still accepts a map or keyword list of definition fields.
+  `define/1` construction accepts a map or keyword list of definition fields.
 
   Read name, description, routes, Plugins, and metadata from `definition/0`.
   Modules expose `domain_schema/0` for the authored schema and
   `complete_schema/0` for the schema with Plugin-owned state.
 
-  `Jido.Agent.new/1` and `Jido.Agent.Codec` provide data and JSON
+  `Jido.Agent.define/1` and `Jido.Agent.Codec` provide data and JSON
   declaration forms through the same validator. Use `instantiate/2` for an
   Agent module and instance options. These forms preserve the definition and instance
   boundaries above.
+
+  Generated Agent modules expose `instantiate/1` and `instantiate!/1` for
+  instance construction. The existing `Jido.Agent.new/1` and `new!/1` functions
+  wrap definition construction. Generated module `new/1` and `new!/1`
+  functions wrap instance construction and keep their optional arguments.
 
   A generated Agent module owns a positive definition `vsn` and defaults to
   `1`. Direct and behavior-only definitions can use `nil` for compatibility.
@@ -187,25 +192,43 @@ defmodule Jido.Agent do
         agent_options: unquote(opts)
 
       @doc "Creates one Agent instance from this module definition."
-      @spec new(map() | keyword()) :: {:ok, Jido.Agent.instance()} | {:error, Exception.t()}
-      def new(overrides \\ []), do: Jido.Agent.instantiate(__MODULE__, overrides)
+      @spec instantiate(map() | keyword()) ::
+              {:ok, Jido.Agent.instance()} | {:error, Exception.t()}
+      def instantiate(overrides \\ []), do: Jido.Agent.instantiate(__MODULE__, overrides)
 
       @doc "Creates one Agent instance or raises its validation error."
+      @spec instantiate!(map() | keyword()) :: Jido.Agent.instance() | no_return()
+      def instantiate!(overrides \\ []), do: Jido.Agent.instantiate!(__MODULE__, overrides)
+
+      @doc "Compatibility wrapper for instantiate/1."
+      @spec new(map() | keyword()) :: {:ok, Jido.Agent.instance()} | {:error, Exception.t()}
+      def new(overrides \\ []), do: instantiate(overrides)
+
+      @doc "Compatibility wrapper for instantiate!/1."
       @spec new!(map() | keyword()) :: Jido.Agent.instance() | no_return()
-      def new!(overrides \\ []), do: Jido.Agent.instantiate!(__MODULE__, overrides)
+      def new!(overrides \\ []), do: instantiate!(overrides)
     end
   end
 
   @doc "Creates one validated neutral Agent definition."
-  @spec new(map() | keyword() | definition()) ::
+  @spec define(map() | keyword() | definition()) ::
           {:ok, definition()} | {:error, Exception.t()}
-  def new(attrs) do
+  def define(attrs) do
     with {:ok, agent, _specs, _schema} <- Validation.new(attrs), do: {:ok, agent}
   end
 
   @doc "Creates one neutral Agent definition or raises its validation error."
+  @spec define!(map() | keyword() | definition()) :: definition() | no_return()
+  def define!(attrs), do: Authoring.unwrap!(define(attrs))
+
+  @doc "Compatibility wrapper for define/1."
+  @spec new(map() | keyword() | definition()) ::
+          {:ok, definition()} | {:error, Exception.t()}
+  def new(attrs), do: define(attrs)
+
+  @doc "Compatibility wrapper for define!/1."
   @spec new!(map() | keyword() | definition()) :: definition() | no_return()
-  def new!(attrs), do: Authoring.unwrap!(new(attrs))
+  def new!(attrs), do: define!(attrs)
 
   @doc "Creates one Agent instance from a neutral definition or Agent module."
   @spec instantiate(definition() | module(), map() | keyword()) ::

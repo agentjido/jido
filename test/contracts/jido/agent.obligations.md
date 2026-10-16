@@ -34,7 +34,7 @@ mutation targets. It does not make internal functions public.
 
 ### jido.agent.I1 — Equivalent declarations
 
-- **scope:** `Jido.Agent.new/1`, `Jido.Agent.Codec.decode/2`
+- **scope:** `Jido.Agent.define/1`, `Jido.Agent.new/1`, `Jido.Agent.Codec.decode/2`
 - **must:** Equivalent supported module, map, keyword, and JSON declarations produce equal neutral definitions when module and version match.
 - **why:** One canonical value must serve each authoring form.
 - **kind:** functional
@@ -42,7 +42,7 @@ mutation targets. It does not make internal functions public.
 
 ### jido.agent.I2 — Neutral definitions
 
-- **scope:** `Jido.Agent.new/1`, `Jido.Agent.definition/1`
+- **scope:** `Jido.Agent.define/1`, `Jido.Agent.new/1`, `Jido.Agent.definition/1`
 - **must:** A definition has nil identity and nil state. The definition constructor rejects identity-only, state-only, and instance values.
 - **why:** Definition data must be reusable.
 - **kind:** functional
@@ -50,7 +50,7 @@ mutation targets. It does not make internal functions public.
 
 ### jido.agent.I3 — Validated declarations
 
-- **scope:** `Jido.Agent.new/1`
+- **scope:** `Jido.Agent.define/1`, `Jido.Agent.new/1`
 - **must:** Validate fields, versions, schemas, executable targets, and Plugin declarations. Reject unknown fields.
 - **why:** Invalid declarations must fail before execution.
 - **kind:** functional
@@ -58,7 +58,7 @@ mutation targets. It does not make internal functions public.
 
 ### jido.agent.I4 — Duplicate policies
 
-- **scope:** `Jido.Agent.new/1`, `Jido.Agent.set/2`, `Jido.Agent.__using__/1`
+- **scope:** `Jido.Agent.define/1`, `Jido.Agent.new/1`, `Jido.Agent.set/2`, `Jido.Agent.__using__/1`
 - **must:** Data keyword inputs keep the last duplicate value. DSL option duplicates fail compilation.
 - **why:** Each language has an explicit duplicate policy.
 - **kind:** functional
@@ -218,7 +218,7 @@ mutation targets. It does not make internal functions public.
 
 ### jido.agent.I24 — Raising boundaries
 
-- **scope:** `Jido.Agent.new!/1`, `Jido.Agent.instantiate!/2`, `Jido.Agent.complete_schema!/1`
+- **scope:** `Jido.Agent.define!/1`, `Jido.Agent.new!/1`, `Jido.Agent.instantiate!/2`, `Jido.Agent.complete_schema!/1`
 - **must:** Bang constructors raise the returned validation error. Generated definition and schema accessors return their documented values or raise the corresponding validation error.
 - **why:** Raising and tuple APIs must agree.
 - **kind:** functional
@@ -226,8 +226,8 @@ mutation targets. It does not make internal functions public.
 
 ### jido.agent.I25 — Public entry points
 
-- **scope:** `Jido.Agent.new/1`, `Jido.Agent.instantiate/2`, `Jido.Agent.cmd/3`
-- **must:** Retain the listed public function names and arities, including generated module functions. Internal compiler and runtime structures are outside this promise.
+- **scope:** `Jido.Agent.define/1`, `Jido.Agent.new/1`, `Jido.Agent.instantiate/2`, `Jido.Agent.__using__/1`, `Jido.Agent.cmd/3`
+- **must:** Provide define/1 and define!/1 for neutral definitions and generated instantiate/0,1 and instantiate!/0,1 for instances. Retain the listed public function names and arities. Top-level new/new! wrap definition construction; generated new/new! wrap instance construction with unchanged results, defaults, and errors. Internal compiler and runtime structures are outside this promise.
 - **why:** Refactoring must preserve supported entry points.
 - **kind:** functional
 - **status:** active

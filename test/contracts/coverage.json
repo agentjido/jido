@@ -17,7 +17,7 @@
         "jido.agent.I1": {
           "failing": 0,
           "kind": "functional",
-          "passing": 7,
+          "passing": 8,
           "status": "active",
           "testable": true,
           "tests": [
@@ -25,6 +25,7 @@
             "test a neutral Agent struct has the same complete fields as data construction",
             "test all supported declarations give the same complete neutral value",
             "test computed options and extensions evaluate once and lower to ordinary values",
+            "test explicit definition constructors preserve compatibility results and errors",
             "test omitted definition fields use defaults while explicit nil retains its meaning",
             "test route arities preserve module and extension targets with empty options",
             "test unexposed DSL routes keep predicates and block options"
@@ -164,12 +165,13 @@
         "jido.agent.I2": {
           "failing": 0,
           "kind": "functional",
-          "passing": 3,
+          "passing": 4,
           "status": "active",
           "testable": true,
           "tests": [
             "test a neutral Agent struct has the same complete fields as data construction",
             "test definitions reject every partial or complete instance form",
+            "test explicit definition constructors preserve compatibility results and errors",
             "test omitted definition fields use defaults while explicit nil retains its meaning"
           ]
         },
@@ -265,12 +267,13 @@
         "jido.agent.I24": {
           "failing": 0,
           "kind": "functional",
-          "passing": 4,
+          "passing": 5,
           "status": "active",
           "testable": true,
           "tests": [
             "test a bare Agent module keeps the empty canonical definition",
             "test bang boundaries raise the same errors returned by tuple boundaries",
+            "test explicit definition constructors preserve compatibility results and errors",
             "test generated public functions construct definitions, instances, and Signals",
             "test reloaded Plugin state schemas are current and conflicts raise at accessors"
           ]
@@ -278,11 +281,12 @@
         "jido.agent.I25": {
           "failing": 0,
           "kind": "functional",
-          "passing": 5,
+          "passing": 6,
           "status": "active",
           "testable": true,
           "tests": [
             "test Turn constructors retain exact input until selection normalizes it",
+            "test explicit definition constructors preserve compatibility results and errors",
             "test generated public functions construct definitions, instances, and Signals",
             "test inline route declarations keep their helper and execution behavior",
             "test required top-level public functions and Turn constructors remain available",
@@ -292,7 +296,7 @@
         "jido.agent.I3": {
           "failing": 0,
           "kind": "functional",
-          "passing": 18,
+          "passing": 19,
           "status": "active",
           "testable": true,
           "tests": [
@@ -303,6 +307,7 @@
             "test data definitions support a module that implements the callback without behavior metadata",
             "test definitions and trusted registries accept the same Agent module forms",
             "test dependency errors identify the authored route or Plugin line",
+            "test explicit definition constructors preserve compatibility results and errors",
             "test inline routes reject combined targets, multiple Actions, and malformed Action arguments",
             "test invalid DSL declarations fail at compile time with source locations",
             "test invalid declaration paths identify the field and route or Plugin index",
@@ -319,11 +324,12 @@
         "jido.agent.I4": {
           "failing": 0,
           "kind": "functional",
-          "passing": 2,
+          "passing": 3,
           "status": "active",
           "testable": true,
           "tests": [
             "test data keyword boundaries keep the last duplicate",
+            "test explicit definition constructors preserve compatibility results and errors",
             "test invalid DSL declarations fail at compile time with source locations"
           ]
         },
@@ -497,7 +503,7 @@
         "jido.topology.I15": {
           "failing": 0,
           "kind": "functional",
-          "passing": 20,
+          "passing": 21,
           "status": "active",
           "testable": true,
           "tests": [
@@ -505,6 +511,7 @@
             "test document decoding requires supported versions, strict fields, and trusted Registry kinds",
             "test entry lists reject invalid containers and improper tails with their field path",
             "test exact placement is retained and remote Agents cannot use a local Bus",
+            "test explicit constructors preserve definition aliases and raising instance boundaries",
             "test input defaults preserve explicit false and zero and failed planning leaves the source reusable",
             "test instance decoding rejects static graph faults before contributions and instance options",
             "test invalid Plugin contributions return structured errors and preserve application rejection reasons",
@@ -559,11 +566,12 @@
         "jido.topology.I2": {
           "failing": 0,
           "kind": "functional",
-          "passing": 3,
+          "passing": 4,
           "status": "active",
           "testable": true,
           "tests": [
             "test a combined host retains the Agent API and separate constructor meanings",
+            "test explicit constructors preserve definition aliases and raising instance boundaries",
             "test optional blocks remain independent and only an explicit Agent selects a child director",
             "test public tuple and raising boundaries reject invalid fields, options, references, and runtime data"
           ]
@@ -636,10 +644,11 @@
         "jido.topology.I8": {
           "failing": 0,
           "kind": "functional",
-          "passing": 3,
+          "passing": 4,
           "status": "active",
           "testable": true,
           "tests": [
+            "test explicit constructors preserve definition aliases and raising instance boundaries",
             "test input defaults preserve explicit false and zero and failed planning leaves the source reusable",
             "test member initialization checks defaults and refinements and keeps authored state",
             "test static MFA schema rules retain validation in both root roles"

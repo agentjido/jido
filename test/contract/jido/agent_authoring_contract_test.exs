@@ -31,6 +31,10 @@ defmodule JidoTest.Contract.AgentAuthoringTest do
               vsn: 0,
               domain_schema: 0,
               complete_schema: 0,
+              instantiate: 0,
+              instantiate: 1,
+              instantiate!: 0,
+              instantiate!: 1,
               new: 0,
               new: 1,
               new!: 0,
@@ -50,9 +54,28 @@ defmodule JidoTest.Contract.AgentAuthoringTest do
         assert {:ok, complete} = Agent.complete_schema(module.definition())
         assert module.complete_schema() === complete
         assert {:ok, instance} = module.new(id: "fixed")
+        assert module.instantiate(id: "fixed") === {:ok, instance}
+        assert module.instantiate!(id: "fixed") === instance
         assert module.new!(id: "fixed") === instance
         assert {:ok, %{state: %{first: 0, count: 0}}} = module.new()
+        assert {:ok, %{state: %{first: 0, count: 0}}} = module.instantiate()
+        assert module.instantiate!().state === instance.state
         assert module.new!().id != instance.id
+
+        for opts <- [[id: ""], [state: %{count: "invalid"}], [name: "other"]] do
+          assert {:error, error} = module.instantiate(opts)
+          assert {:error, legacy_error} = module.new(opts)
+
+          for actual <- [
+                legacy_error,
+                assert_raise(error.__struct__, fn -> module.instantiate!(opts) end),
+                assert_raise(error.__struct__, fn -> module.new!(opts) end)
+              ] do
+            assert Map.drop(Map.from_struct(actual), [:stacktrace]) ===
+                     Map.drop(Map.from_struct(error), [:stacktrace])
+          end
+        end
+
         assert {:ok, default} = module.add_signal(%{})
         assert default.data === %{}
         assert default.source == "/default"
