@@ -32,6 +32,20 @@ defmodule JidoCoreBenchTest do
     end
   end
 
+  test "AgentServer2 profile checks turns, Plugin roots, child lifetimes, and cleanup" do
+    workloads = Suite.workloads("agent_server2")
+    assert length(workloads) == 4
+
+    for workload <- workloads do
+      assert length(Measure.timing(workload, 1, 2).wall_ns.samples) == 2
+      resources = Measure.resources(workload)
+      assert resources.median.owned_remaining == 0
+      assert resources.median.owned_process_starts >= 2
+      assert Suite.ensure_idle!() == :ok
+      assert DynamicSupervisor.which_children(Jido.agent_supervisor_name(JidoCoreBench)) == []
+    end
+  end
+
   test "resource samples use separate callers and keep raw measurements" do
     owner = self()
     tag = make_ref()

@@ -225,7 +225,7 @@ defmodule Jido do
 
       @doc "Sends one synchronous Signal through a stable Agent Ref."
       @spec call(Jido.Agent.Ref.t(), Jido.Signal.t(), timeout() | keyword()) ::
-              Jido.AgentServer.signal_result()
+              Jido.AgentServer.signal_result() | {:ok, Jido.Agent.instance(), [struct()]}
       def call(%Jido.Agent.Ref{} = ref, signal, timeout_or_opts \\ 5_000) do
         Jido.call(__MODULE__, ref, signal, timeout_or_opts)
       end
@@ -233,6 +233,16 @@ defmodule Jido do
       @doc "Sends one asynchronous Signal through a stable Agent Ref."
       @spec cast(Jido.Agent.Ref.t(), Jido.Signal.t()) :: :ok | {:error, term()}
       def cast(%Jido.Agent.Ref{} = ref, signal), do: Jido.cast(__MODULE__, ref, signal)
+
+      @doc "Submits one AgentServer2 turn through a stable Agent Ref."
+      def submit(%Jido.Agent.Ref{} = ref, signal, opts \\ []),
+        do: Jido.submit(__MODULE__, ref, signal, opts)
+
+      @doc "Collects an AgentServer2 pending reply in its submitting process."
+      def await(pending, timeout \\ 5_000), do: Jido.await(pending, timeout)
+
+      @doc "Discards an AgentServer2 pending reply without cancelling its turn."
+      def abandon(pending), do: Jido.abandon(pending)
 
       @doc "Starts one asynchronous Signal request through a stable Agent Ref."
       @spec send_request(Jido.Agent.Ref.t(), Jido.Signal.t(), timeout()) :: term()
@@ -546,6 +556,7 @@ defmodule Jido do
       Required for persistent Agents.
     - `:max_tasks` - Task Supervisor child limit; defaults to `1_000`
     - `:persistence` - Optional default persistence adapter
+    - `:agent_server2` - Optional runtime defaults for the AgentServer2 prototype
 
   ## Example
 
@@ -633,7 +644,10 @@ defmodule Jido do
       true =
         :ets.insert(
           runtime_store,
-          {{@instance_config_hive, :persistence}, Keyword.get(opts, :persistence)}
+          [
+            {{@instance_config_hive, :persistence}, Keyword.get(opts, :persistence)},
+            {{@instance_config_hive, :agent_server2}, Keyword.get(opts, :agent_server2, [])}
+          ]
         )
 
       base_children = [
@@ -703,6 +717,16 @@ defmodule Jido do
     ArgumentError -> nil
   end
 
+  @doc false
+  def instance_agent_server2_options(name) do
+    case :ets.lookup(runtime_store_name(name), {@instance_config_hive, :agent_server2}) do
+      [{_, opts}] -> opts
+      [] -> []
+    end
+  rescue
+    ArgumentError -> []
+  end
+
   @doc "Returns the AgentSupervisor name for the default Jido instance."
   @spec agent_supervisor_name() :: atom()
   def agent_supervisor_name, do: agent_supervisor_name(@default_instance)
@@ -752,7 +776,15 @@ defmodule Jido do
   def agent_ref(instance, id, opts \\ []),
     do: RefFacade.build_ref(instance, id, opts)
 
-  @doc "Resolves the current local PID for one stable Agent Ref."
+  @doc """
+  Resolves the current local worker for one stable Agent Ref. Each operation
+  resolves the Ref again; it does not retry or replay an accepted turn.
+
+  Returns `{:error, :not_found}` when there is no live registration,
+  `{:error, :recovering}` while AgentServer2 is registered but not ready, or
+  `{:error, :unavailable}` when the Registry cannot be read. A worker can still
+  stop after resolution. Caller timeout does not cancel an accepted turn.
+  """
   @spec resolve_agent(atom(), Ref.t()) :: {:ok, pid()} | {:error, term()}
   def resolve_agent(instance, %Ref{} = ref), do: RefFacade.resolve(instance, ref)
 
@@ -770,13 +802,23 @@ defmodule Jido do
 
   @doc "Sends one synchronous Signal through a stable Agent Ref."
   @spec call(atom(), Ref.t(), Jido.Signal.t(), timeout() | keyword()) ::
-          Jido.AgentServer.signal_result()
+          Jido.AgentServer.signal_result() | {:ok, Jido.Agent.instance(), [struct()]}
   def call(instance, %Ref{} = ref, signal, timeout_or_opts \\ 5_000),
     do: RefFacade.call(instance, ref, signal, timeout_or_opts)
 
   @doc "Sends one best-effort asynchronous Signal through a stable Agent Ref."
   @spec cast(atom(), Ref.t(), Jido.Signal.t()) :: :ok | {:error, term()}
   def cast(instance, %Ref{} = ref, signal), do: RefFacade.cast(instance, ref, signal)
+
+  @doc "Submits one AgentServer2 turn through a stable Agent Ref."
+  def submit(instance, %Ref{} = ref, signal, opts \\ []),
+    do: RefFacade.submit(instance, ref, signal, opts)
+
+  @doc "Collects an AgentServer2 pending reply in its submitting process."
+  defdelegate await(pending, timeout \\ 5_000), to: Jido.AgentServer2
+
+  @doc "Discards an AgentServer2 pending reply without cancelling its turn."
+  defdelegate abandon(pending), to: Jido.AgentServer2
 
   @doc "Starts one asynchronous Signal request through a stable Agent Ref."
   @spec send_request(atom(), Ref.t(), Jido.Signal.t(), timeout()) :: term()

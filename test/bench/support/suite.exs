@@ -2,6 +2,7 @@ Code.require_file("fixtures.exs", __DIR__)
 Code.require_file("measure.exs", __DIR__)
 Code.require_file("report.exs", __DIR__)
 Code.require_file("runtime_cases.exs", __DIR__)
+Code.require_file("agent_server2_cases.exs", __DIR__)
 Code.require_file("data_cases.exs", __DIR__)
 Code.require_file("edge_cases.exs", __DIR__)
 Code.require_file("merge_cases.exs", __DIR__)
@@ -105,6 +106,8 @@ defmodule JidoCoreBench.Suite do
     :ok
   end
 
+  def workloads("agent_server2"), do: JidoCoreBench.AgentServer2Cases.workloads()
+
   def workloads(profile) do
     s = settings(profile)
 
@@ -129,6 +132,8 @@ defmodule JidoCoreBench.Suite do
   end
 
   def metadata, do: %{source: source(), environment: environment()}
+
+  def settings("agent_server2"), do: %{settings("smoke") | profile: "agent_server2"}
 
   def settings("smoke"),
     do: %{
@@ -160,7 +165,8 @@ defmodule JidoCoreBench.Suite do
       resource_samples: 5
     }
 
-  def settings(_), do: raise(ArgumentError, "profile must be smoke, short, or scale")
+  def settings(_),
+    do: raise(ArgumentError, "profile must be smoke, short, scale, or agent_server2")
 
   defp source do
     files = Path.wildcard(Path.expand("../**/*.exs", __DIR__)) |> Enum.sort()

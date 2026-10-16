@@ -4,6 +4,7 @@ defmodule Jido.Instance.RefFacade do
   alias Jido.Agent
   alias Jido.Agent.Ref
   alias Jido.AgentServer
+  alias Jido.AgentServer2
   alias Jido.Error
 
   @default_timeout 5_000
@@ -27,12 +28,36 @@ defmodule Jido.Instance.RefFacade do
   @doc false
   @spec resolve(atom(), Ref.t()) :: {:ok, pid()} | {:error, term()}
   def resolve(instance, %Ref{} = ref) when is_atom(instance) do
+    with {:ok, pid, _runtime} <- resolve_target(instance, ref), do: {:ok, pid}
+  end
+
+  defp resolve_target(instance, ref) do
     with {:ok, ref} <- Ref.validate(ref),
          :ok <- require_matching_namespace(instance, ref.namespace) do
-      case Jido.whereis_agent(instance, ref.id, partition: ref.partition) do
-        pid when is_pid(pid) -> {:ok, pid}
-        nil -> {:error, :not_found}
+      key = AgentServer.RegistrationGuard.registry_key(ref.id, ref.partition)
+
+      case Registry.lookup(Jido.registry_name(instance), key) do
+        [{pid, status}] ->
+          runtime_target(pid, status)
+
+        _ ->
+          {:error, :not_found}
       end
+    end
+  rescue
+    ArgumentError -> {:error, :unavailable}
+  end
+
+  defp runtime_target(pid, status) do
+    case {status, :proc_lib.translate_initial_call(pid)} do
+      {:ready, {runtime, :init, 1}} when runtime in [AgentServer, AgentServer2] ->
+        {:ok, pid, runtime}
+
+      {:starting, {AgentServer2, :init, 1}} ->
+        {:error, :recovering}
+
+      _ ->
+        {:error, :not_found}
     end
   end
 
@@ -57,27 +82,32 @@ defmodule Jido.Instance.RefFacade do
 
   @doc false
   def call(instance, %Ref{} = ref, signal, timeout_or_opts \\ @default_timeout) do
-    with_server(instance, ref, &AgentServer.call(&1, signal, timeout_or_opts))
+    with_server(instance, ref, :call, [signal, timeout_or_opts])
   end
 
   @doc false
   def cast(instance, %Ref{} = ref, signal) do
-    with_server(instance, ref, &AgentServer.cast(&1, signal))
+    with_server(instance, ref, :cast, [signal])
+  end
+
+  @doc false
+  def submit(instance, %Ref{} = ref, signal, opts \\ []) do
+    with_server(instance, ref, :submit, [signal, opts])
   end
 
   @doc false
   def send_request(instance, %Ref{} = ref, signal, timeout \\ @default_timeout) do
-    with_server(instance, ref, &AgentServer.send_request(&1, signal, timeout))
+    with_server(instance, ref, :send_request, [signal, timeout])
   end
 
   @doc false
   def stop(instance, %Ref{} = ref, reason \\ :shutdown, timeout \\ @default_timeout) do
-    with_server(instance, ref, &AgentServer.stop(&1, reason, timeout))
+    with_server(instance, ref, :stop, [reason, timeout])
   end
 
   @doc false
   def hibernate(instance, %Ref{} = ref, opts \\ []) do
-    with_server(instance, ref, &AgentServer.hibernate(&1, opts))
+    with_server(instance, ref, :hibernate, [opts])
   end
 
   @doc false
@@ -105,71 +135,84 @@ defmodule Jido.Instance.RefFacade do
 
   @doc false
   def cancel(instance, %Ref{} = ref, timeout \\ @default_timeout) do
-    with_server(instance, ref, &AgentServer.cancel(&1, timeout))
+    with_server(instance, ref, :cancel, [timeout])
   end
 
   @doc false
   def cancel_turn(instance, %Ref{} = ref, turn_id, timeout \\ @default_timeout) do
-    with_server(instance, ref, &AgentServer.cancel_turn(&1, turn_id, timeout))
+    with_server(instance, ref, :cancel_turn, [turn_id, timeout])
   end
 
   @doc false
   def attach(instance, %Ref{} = ref, owner_pid \\ self(), timeout \\ @default_timeout) do
-    with_server(instance, ref, &AgentServer.attach(&1, owner_pid, timeout))
+    with_server(instance, ref, :attach, [owner_pid, timeout])
   end
 
   @doc false
   def detach(instance, %Ref{} = ref, owner_pid \\ self(), timeout \\ @default_timeout) do
-    with_server(instance, ref, &AgentServer.detach(&1, owner_pid, timeout))
+    with_server(instance, ref, :detach, [owner_pid, timeout])
   end
 
   @doc false
   def touch(instance, %Ref{} = ref) do
-    with_server(instance, ref, &AgentServer.touch/1)
+    with_server(instance, ref, :touch, [])
   end
 
   @doc false
   def agent(instance, %Ref{} = ref, timeout \\ @default_timeout) do
-    with_server(instance, ref, &AgentServer.agent(&1, timeout))
+    with_server(instance, ref, :agent, [timeout])
   end
 
   @doc false
   def plugin_state(instance, %Ref{} = ref, plugin, timeout \\ @default_timeout) do
-    with_server(instance, ref, &AgentServer.plugin_state(&1, plugin, timeout))
+    with_server(instance, ref, :plugin_state, [plugin, timeout])
   end
 
   @doc false
   def status(instance, %Ref{} = ref, timeout \\ @default_timeout) do
-    with_server(instance, ref, &AgentServer.status(&1, timeout))
+    with_server(instance, ref, :status, [timeout])
   end
 
   @doc false
   def snapshot(instance, %Ref{} = ref, timeout \\ @default_timeout) do
-    with_server(instance, ref, &AgentServer.snapshot(&1, timeout))
+    with_server(instance, ref, :snapshot, [timeout])
   end
 
   @doc false
   def children(instance, %Ref{} = ref, timeout \\ @default_timeout) do
-    with_server(instance, ref, &AgentServer.children(&1, timeout))
+    with_server(instance, ref, :children, [timeout])
   end
 
   @doc false
   def await_ready(instance, %Ref{} = ref, timeout \\ @default_timeout) do
-    with_server(instance, ref, &AgentServer.await_ready(&1, timeout))
+    with_server(instance, ref, :await_ready, [timeout])
   end
 
   @doc false
   def set_debug(instance, %Ref{} = ref, enabled, timeout \\ @default_timeout) do
-    with_server(instance, ref, &AgentServer.set_debug(&1, enabled, timeout))
+    with_server(instance, ref, :set_debug, [enabled, timeout])
   end
 
   @doc false
   def recent_events(instance, %Ref{} = ref, opts \\ [], timeout \\ @default_timeout) do
-    with_server(instance, ref, &AgentServer.recent_events(&1, opts, timeout))
+    with_server(instance, ref, :recent_events, [opts, timeout])
   end
 
-  defp with_server(instance, ref, operation) do
-    with {:ok, pid} <- resolve(instance, ref), do: operation.(pid)
+  defp with_server(instance, ref, operation, args) do
+    with {:ok, pid, runtime} <- resolve_target(instance, ref) do
+      if function_exported?(runtime, operation, length(args) + 1),
+        do: invoke(runtime, operation, [pid | args]),
+        else: {:error, {:unsupported_runtime_operation, operation}}
+    end
+  end
+
+  defp invoke(runtime, operation, args) do
+    apply(runtime, operation, args)
+  catch
+    :exit, reason ->
+      if runtime == AgentServer2 and not match?({:timeout, _}, reason),
+        do: {:error, :unavailable},
+        else: exit(reason)
   end
 
   defp ref_options(%Ref{} = ref, opts) do

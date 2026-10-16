@@ -1,0 +1,71 @@
+- id: agent-server2-prototype-scope
+  date: 2026-10-16
+  decision: Protect implemented standalone AgentServer2 behavior. Keep runtime in one file and all test fixtures in one separate folder. Do not change the existing AgentServer.
+  driver: Establish executable obligations for each implemented feature.
+  approved_by: User request in this chat
+
+- id: agent-server2-focused-mutation
+  date: 2026-10-16
+  decision: Mutate only Jido.AgentServer2 with a small explicit site selection. Do not repeat the earlier 1302-mutant Agent run or claim a full component score.
+  driver: Check important safety decisions with bounded local work.
+  approved_by: User request in this chat
+
+- id: agent-server2-policy-and-observation
+  date: 2026-10-16
+  decision: Use owned Runic scheduling for per-node execution policy. Keep the outer deadline and commit boundary in AgentServer2. Run failure callbacks and error dispatch in bounded tasks after one terminal outcome. Retain safe summaries only and leave instance integration and directive effects for later.
+  driver: Implement items 21–25 without a second retry engine or changes to the existing AgentServer.
+  approved_by: User request in this chat
+
+- id: agent-server2-instance-and-effects
+  date: 2026-10-16
+  decision: Keep AgentServer2 runtime in one file. Add only instance option validation and stored defaults in Jido. Use the existing instance Runner, Registry, registration guard, and supervisor without changing AgentServer. Validate the full directive batch before commit. Send commit success before ordered owned effect tasks; give the whole batch a separate finite deadline and safe outcome. Start with explicit Emit dispatch and Plugin-owned custom directives through a handler.
+  driver: Implement items 26–30 with a clear commit boundary. Keep implicit dispatch, process/control directives, Plugin trees, and persistence for later steps.
+  approved_by: User request in this chat
+
+- id: agent-server2-live-plugin-boundary
+  date: 2026-10-16
+  decision: Keep the prototype in one file. Use existing Plugin callback contracts for supervised startup, readiness, and live admission. Keep an independent owner monitor for provisional trees. Reject turns until ready, and stop this activation on root loss until replacement is implemented. Extend ordered post-commit effects with default and self Signal dispatch, Stop, reported errors, and instance-supervised application processes.
+  driver: Implement items 31–35 without changes to the existing AgentServer or authoring DSL. Use focused mutation checks only.
+  approved_by: User request in this chat
+
+- id: agent-server2-plugin-post-commit
+  date: 2026-10-16
+  decision: Reuse existing Plugin callback envelopes in the single AgentServer2 runtime file. Run ordered commit hooks under a separate finite batch budget before ordered directives. Use each declared live dispatcher before the custom handler fallback. Preserve commit success on callback failure and stop later post-commit work.
+  driver: Complete features 36–37 without changing AgentServer or the public authoring DSL. Keep runtime replacement for item 38.
+  approved_by: User request in this chat
+
+- id: agent-server2-plugin-shutdown-and-options
+  date: 2026-10-16
+  decision: Keep runtime implementation in one file and preserve the public authoring DSL. Use supervised shutdown for established Plugin trees and retain ownership of provisional roots during forced startup abort. Confirm root death even when roots trap exits. Accept both OTP child-start success forms. Require callbacks to finish linked child work before returning; longer-lived owned resources belong in Plugin runtime trees. Keep one runtime key list and one set of defaults, with field-specific timeout errors and unchanged configuration precedence.
+  driver: Fix review findings F1–F4 before Plugin runtime replacement. Add focused Covenant guards and mutation checks without changing AgentServer or running the full mutation catalog.
+  approved_by: User request in this chat
+
+- id: agent-server2-activation-supervision
+  date: 2026-10-16
+  decision: Replace Runtime with a normal activation Supervisor. Keep all runtime modules in one file. Use one_for_all for the server and required roots, with local recovery inside Plugin supervisors. Keep runtime relationship metadata in a supervisor-owned ETS table, separate from Agent commits. Use normal bounded OTP starts and readiness for long initialization; do not inspect process links to cancel arbitrary blocked start functions. Add owned and independent child placement, activation parent monitors, orphan policy, and adoption. Keep the existing AgentServer intact.
+  driver: Implement the user-approved activation architecture beside the incumbent runtime, with focused tests and mutation checks.
+  approved_by: User request in this chat
+
+- id: agent-server2-activation-review-fixes
+  date: 2026-10-16
+  decision: Keep the activation tree and all runtime changes in agent_server2.ex. Retain the Runic scope until cleanup is confirmed and gate recovery with the existing readiness task and budget. Require owned Plugin roots. Reject adoption during orphan delivery, unavailable ancestry, and bare workers. Release lost adopted-child tags. Remove unused worker snapshots and duplicate Plugin initialization and directive-owner rules. Keep the callback-child contract unchanged.
+  driver: Fix review findings F1–F7 with focused regression tests and selected mutations. Leave AgentServer, the public authoring DSL, and the other thread's design documents intact.
+  approved_by: User request in this chat
+
+- id: agent-server2-local-ref-checkpoint
+  date: 2026-10-16
+  decision: Keep activation recovery in agent_server2.ex. Route existing Ref operations through a small runtime dispatch in RefFacade and add submit, await, and abandon instance wrappers. Resolve identity per operation without replay. Store the canonical Agent plus revision in activation-owned ETS and publish atomically against the expected prior revision before success. Validate state, identity, and exact definition/version before Plugin reconstruction and readiness. Preserve local Agent-state rules without portable callbacks. Checkpoint loss or conflict closes the activation. Whole activation replacement and saved child relationships remain separate work.
+  driver: Complete B1, REF1 and item 39 / P1-P2, with Covenant guards, selected mutations, and memory checks. Keep the public authoring DSL unchanged and leave AgentServer intact.
+  approved_by: User request in this chat
+
+- id: agent-server2-durable-boundary
+  date: 2026-10-16
+  decision: Keep all runtime changes in agent_server2.ex. Persistence is opt-in with a stable Jido instance namespace and explicit create or restore policy. Reuse existing Persistence record, compare-and-swap, Agent checkpoint, and Plugin conversion APIs. Bound startup storage and required commit writes in owned tasks. Confirm durable write before local publication and success. Hold turns during save; caller timeout does not cancel it. Failed or unknown required writes close the activation. Reload durable authority on every worker recovery before Plugin Init, and recreate resources through existing callbacks. No implicit migration, replay, relationship restore, or writer lease is added.
+  driver: Complete B2 item 40 and P3-P5 with focused Covenant checks, a restore demo, and retained-resource measurements. Keep AgentServer and the public DSL unchanged. No commits.
+  approved_by: User request in this chat
+
+- id: agent-server2-local-controls
+  date: 2026-10-16
+  decision: Keep B3 controls in agent_server2.ex. Quiesce rejects parked requests and waits for execution cleanup and post-commit work. Cancel only pre-commit work. Use finite control budgets and explicit resume. Keep attached owners and admission in activation metadata across worker replacement. Disable idle timeout by default, with explicit stop or persistent hibernate policy. Hibernate saves the current revision and confirms root exit. Known no-write failure restores prior admission; conflict or unknown write keeps the live Agent blocked, including recovery during save. No child-family quiesce or distributed ownership policy is added.
+  driver: Complete B3 H1 and items 41-42 with scoped tests, selected mutations, demo, and memory checks. Keep the public authoring DSL unchanged and AgentServer intact. No commits.
+  approved_by: User request in this chat

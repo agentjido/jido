@@ -161,3 +161,12 @@ component's ownership list; the Topology check selects them with explicit module
 overrides. Each profile runs only the Topology contract tests. Focused results
 do not establish full component scores. Use the latest commands and site tables
 in [the Topology baseline](jido/topology.baseline.md).
+
+## AgentServer2 prototype
+
+The separate `jido.agent_server2` component protects the activation runtime.
+Its 231 tests cover 94 obligations, including durable save/restore, admission controls, owners, idle expiry, and confirmed hibernation. All fixtures are in `test/contract/agent_server2/`. Read the
+[suite guide](../contract/agent_server2/README.md) and
+[focused mutation baseline](jido/agent_server2.baseline.md). This component
+does not extend the Agent or Topology authoring contract or replace the
+existing AgentServer tests.
