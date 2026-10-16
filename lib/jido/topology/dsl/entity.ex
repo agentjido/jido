@@ -4,17 +4,20 @@ defmodule Jido.Topology.DSL.Entity do
   alias Jido.Topology.{DSL, EntryMetadata}
 
   @entries [
-    {:agent, :agents, :agents, DSL.Agent},
-    {:group, :groups, :agents, DSL.Group},
-    {:resource, :resources, :resources, DSL.Bus},
-    {:owns, :relationships, :relationships, DSL.Owns},
-    {:subscribe, :connections, :connections, DSL.Subscribe},
-    {:include, :includes, :topologies, DSL.Include},
-    {:import, :imports, :imports, DSL.Import},
-    {:export, :exports, :exports, DSL.Export}
+    {:agent, :agents, DSL.Agent},
+    {:group, :agents, DSL.Group},
+    {:resource, :resources, DSL.Bus},
+    {:owns, :relationships, DSL.Owns},
+    {:subscribe, :connections, DSL.Subscribe},
+    {:include, :topologies, DSL.Include},
+    {:import, :imports, DSL.Import},
+    {:export, :exports, DSL.Export}
   ]
 
-  def entries, do: @entries
+  def entries do
+    for {kind, section, module} <- @entries,
+        do: {kind, EntryMetadata.collection(kind), section, module}
+  end
 
   def struct_fields(kind, overrides \\ []) do
     fields = Enum.map(EntryMetadata.schema(kind), fn {key, opts} -> {key, opts[:default]} end)
@@ -45,7 +48,7 @@ defmodule Jido.Topology.DSL.Entity do
   end
 
   def lower(%module{} = entity) do
-    {kind, _, _, _} = Enum.find(@entries, &(elem(&1, 3) == module))
+    {kind, _, _} = Enum.find(@entries, &(elem(&1, 2) == module))
     lower_fields(entity, kind)
   end
 

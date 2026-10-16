@@ -4,7 +4,7 @@ defmodule Jido.Agent.AuthoringContractTest do
   alias Jido.Agent
   alias Jido.Agent.{Command, Directive}
   alias JidoTest.AgentFixtures.Add
-  alias Jido.Agent.Codec.Deriver
+  alias Jido.Agent.Codec
   alias Jido.Codec.Registry
 
   defmodule Factory do
@@ -85,7 +85,7 @@ defmodule Jido.Agent.AuthoringContractTest do
         routes: [{"counter.add", {Add, %{by: 1}}}]
       )
 
-    assert {:ok, %{entries: entries}} = Deriver.agent(definition)
+    assert {:ok, _document, %{entries: entries}} = Codec.encode(definition)
 
     assert entries === %{
              "agent/0" => {:agent, Agent},

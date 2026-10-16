@@ -7,6 +7,125 @@ defmodule JidoTest.Contract.AgentCodecTest do
   alias Jido.Error.ValidationError
   alias JidoTest.AgentContract, as: F
 
+  defmodule CurrentPlugin do
+    use Jido.Plugin
+
+    def state_spec(_opts) do
+      send(self(), :codec_plugin_read)
+
+      case Process.get(:codec_plugin_default, 1) do
+        :invalid -> :invalid
+        default -> {:owned, Zoi.integer() |> Zoi.default(default)}
+      end
+    end
+  end
+
+  @tag obligation: ["jido.agent.I3", "jido.agent.I20"]
+  test "definitions and trusted registries accept the same Agent module forms" do
+    F.with_agent("", fn generated ->
+      for module <- [Agent, generated, F.BareSelection] do
+        assert {:ok, %Agent{module: ^module}} = Agent.new(name: "eligible", module: module)
+        assert {:ok, registry} = Registry.new(%{"agent" => {:agent, module}})
+        assert {:ok, ^module} = Registry.resolve(registry, "agent", :agent)
+      end
+
+      for module <- [Enum, nil, JidoTest.MissingAgent] do
+        assert {:error, %ValidationError{}} = Agent.new(name: "invalid", module: module)
+        assert {:error, %ValidationError{}} = Registry.new(%{"agent" => {:agent, module}})
+      end
+    end)
+  end
+
+  @tag obligation: ["jido.agent.I6", "jido.agent.I8", "jido.agent.I20"]
+  test "compound Codecs read each current Plugin contract once per operation" do
+    definition = F.definition(plugins: [CurrentPlugin])
+    assert_received :codec_plugin_read
+    refute_received :codec_plugin_read
+
+    assert {:ok, document, registry} = one_plugin_read(fn -> Codec.encode(definition) end)
+    assert {:ok, ^document} = one_plugin_read(fn -> Codec.encode(definition, registry) end)
+    assert {:ok, ^definition} = one_plugin_read(fn -> Codec.decode(document, registry) end)
+
+    for default <- [3, 7] do
+      Process.put(:codec_plugin_default, default)
+
+      assert {:ok, instance} =
+               one_plugin_read(fn -> Codec.decode(document, registry, id: "decoded") end)
+
+      assert instance.state.owned === default
+      assert Agent.definition(instance) === definition
+    end
+
+    Process.put(:codec_plugin_default, :invalid)
+
+    assert {:error, %ValidationError{}} =
+             one_plugin_read(fn -> Codec.decode(document, registry) end)
+
+    assert {:error, %ValidationError{}} =
+             one_plugin_read(fn -> Codec.decode(document, registry, id: "decoded") end)
+
+    assert {:error, %ValidationError{}} =
+             one_plugin_read(fn -> Codec.encode(definition, registry) end)
+  end
+
+  @tag obligation: ["jido.agent.I20", "jido.agent.I23"]
+  test "nested Plugin records keep standalone validation and document error precedence" do
+    definition = F.definition(plugins: [F.First, F.Second])
+    assert {:ok, document, registry} = Codec.encode(definition)
+    [plugin | _] = document["plugins"]
+    assert {:ok, {F.First, []}} = Jido.Plugin.Codec.decode(plugin, registry)
+    assert {:ok, ^plugin} = Jido.Plugin.Codec.encode(F.First, registry)
+
+    for changes <- [
+          %{"type" => "unknown"},
+          %{"version" => 2},
+          %{"unknown" => true},
+          %{"module" => document["schema"]},
+          %{"module" => "missing"},
+          %{"options" => false}
+        ] do
+      invalid = Map.merge(plugin, changes)
+      nested = %{document | "plugins" => [invalid]}
+      assert {:error, %ValidationError{}} = Jido.Plugin.Codec.decode(invalid, registry)
+      assert {:error, %ValidationError{} = error} = Codec.decode(nested, registry)
+      assert {:error, %ValidationError{} = actual} = Codec.decode(nested, registry, unknown: true)
+      assert_same_error(actual, error)
+    end
+
+    assert {:error, %ValidationError{}} = Jido.Plugin.Codec.encode(F.First, %{})
+    assert {:error, %ValidationError{}} = Jido.Plugin.Codec.decode(plugin, %{})
+
+    duplicate = %{document | "plugins" => [plugin, plugin]}
+
+    assert {:error, %ValidationError{details: details} = error} =
+             Codec.decode(duplicate, registry)
+
+    assert details.source_path === [:plugins, 0]
+
+    assert {:error, %ValidationError{} = actual} =
+             Codec.decode(duplicate, registry, unknown: true)
+
+    assert_same_error(actual, error)
+
+    # A bad definition still fails before its instance options.
+    invalid = %{document | "name" => nil}
+    assert {:error, %ValidationError{} = error} = Codec.decode(invalid, registry)
+    assert {:error, %ValidationError{} = actual} = Codec.decode(invalid, registry, unknown: true)
+    assert_same_error(actual, error)
+  end
+
+  defp assert_same_error(actual, expected) do
+    fields = [:__struct__, :message, :kind, :subject, :details]
+    assert Map.take(actual, fields) === Map.take(expected, fields)
+  end
+
+  defp one_plugin_read(fun) do
+    result = fun.()
+    assert_received :codec_plugin_read
+    refute_received :codec_plugin_read
+    result
+  end
+
   @tag obligation: ["jido.agent.I20", "jido.agent.I5"]
   test "version-2 documents round trip exact static data and omit live values" do
     definition =
@@ -92,6 +211,45 @@ defmodule JidoTest.Contract.AgentCodecTest do
           )
 
     assert {:error, %ValidationError{}} = Codec.decode(expected, %{})
+  end
+
+  @tag obligation: ["jido.agent.I20", "jido.agent.I23"]
+  test "nested map keys resolve trusted aliases before duplicate detection" do
+    definition = F.definition(metadata: %{"nested" => %{key: {false, 0, 1.0}}})
+    assert {:ok, document, registry} = Codec.encode(definition)
+    assert {:ok, key_id} = Registry.identifier(registry, :atom, :key)
+
+    registry = Registry.new!(Map.put(registry.entries, "old-key", {:alias, key_id}))
+    key = %{"$type" => "atom", "id" => key_id}
+    alias_key = %{"$type" => "atom", "id" => "old-key"}
+    nested = %{"$type" => "map", "entries" => [[alias_key, 7]]}
+    metadata = %{"$type" => "map", "entries" => [["nested", nested]]}
+
+    assert {:ok, decoded} = Codec.decode(%{document | "metadata" => metadata}, registry)
+    assert decoded.metadata === %{"nested" => %{key: 7}}
+    assert {:ok, ^definition} = Codec.decode(JSON.decode!(JSON.encode!(document)), registry)
+
+    for entries <- [[["key"]], false] do
+      malformed = %{nested | "entries" => entries}
+      metadata = %{metadata | "entries" => [["nested", malformed]]}
+
+      assert {:error, %ValidationError{}} =
+               Codec.decode(%{document | "metadata" => metadata}, registry)
+    end
+
+    duplicate = %{nested | "entries" => [[key, 1], [alias_key, 2]]}
+    metadata = %{metadata | "entries" => [["nested", duplicate]]}
+
+    assert {:error, %ValidationError{}} =
+             Codec.decode(%{document | "metadata" => metadata}, registry)
+
+    missing_key = %{"$type" => "atom", "id" => "missing-key"}
+    missing_value = %{"$type" => "atom", "id" => "missing-value"}
+    nested = %{nested | "entries" => [[missing_key, missing_value]]}
+    metadata = %{metadata | "entries" => [["nested", nested]]}
+
+    assert {:error, %ValidationError{details: %{id: "missing-key", kind: :atom}}} =
+             Codec.decode(%{document | "metadata" => metadata}, registry)
   end
 
   @tag obligation: "jido.agent.I20"

@@ -88,6 +88,7 @@ defmodule JidoTest.Contract.AgentDefinitionTest do
           plugins: [:invalid, [Enum], [{F.First, :invalid}]],
           routes: [
             :invalid,
+            :lists.append([{"test.run", F.Return}], :tail),
             [{"test.run", Enum}],
             [{"test.run", [F.Add]}],
             [{"test.run", {F.Add, nil}}]
@@ -117,6 +118,28 @@ defmodule JidoTest.Contract.AgentDefinitionTest do
           Zoi.object(%{value: Zoi.any() |> Zoi.default(self())})
         ] do
       assert {:error, %ValidationError{}} = Agent.new(name: "invalid_schema", schema: schema)
+    end
+  end
+
+  @tag obligation: ["jido.agent.I1", "jido.agent.I2", "jido.agent.I3"]
+  test "omitted definition fields use defaults while explicit nil retains its meaning" do
+    assert {:ok, definition} = Agent.new(name: "defaults")
+
+    assert definition === %Agent{
+             module: Agent,
+             name: "defaults",
+             schema: Zoi.object(%{})
+           }
+
+    for attrs <- [%{name: "defaults"}, [name: "defaults"]] do
+      assert Agent.new(attrs) === {:ok, definition}
+    end
+
+    assert {:ok, ^definition} =
+             Agent.new(name: "defaults", id: nil, state: nil, description: nil, vsn: nil)
+
+    for field <- [:module, :schema, :plugins, :routes, :metadata] do
+      assert {:error, %ValidationError{}} = Agent.new(%{field => nil, :name => "defaults"})
     end
   end
 

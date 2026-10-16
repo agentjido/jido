@@ -28,7 +28,6 @@ defmodule Jido.Agent.Codec do
   """
   alias Jido.Agent
   alias Jido.Agent.Authoring
-  alias Jido.Agent.Codec.Deriver
   alias Jido.Codec.{Data, Registry}
 
   @fields ~w(type version module vsn name description schema metadata plugins routes)
@@ -40,7 +39,8 @@ defmodule Jido.Agent.Codec do
           {:ok, document(), Registry.t()} | {:error, term()}
   def encode(agent) do
     with {:ok, definition} <- neutral_definition(agent),
-         {:ok, registry} <- Deriver.agent(definition),
+         {:ok, entries} <- registry_entries(definition),
+         {:ok, registry} <- Registry.derive(entries),
          {:ok, document} <- encode_validated(definition, registry),
          do: {:ok, document, registry}
   end
@@ -50,16 +50,16 @@ defmodule Jido.Agent.Codec do
           {:ok, document()} | {:error, term()}
   def encode(agent, registry) do
     with {:ok, definition} <- neutral_definition(agent),
+         {:ok, registry} <- Registry.new(registry),
          do: encode_validated(definition, registry)
   end
 
   defp encode_validated(agent, registry) do
-    with {:ok, registry} <- Registry.new(registry),
-         {:ok, module} <- Registry.identifier(registry, :agent, agent.module),
+    with {:ok, module} <- Registry.identifier(registry, :agent, agent.module),
          {:ok, schema} <- Registry.identifier(registry, :schema, agent.schema),
          {:ok, metadata} <- Data.encode(agent.metadata, registry),
          {:ok, plugins} <-
-           Authoring.traverse(agent.plugins, &Jido.Plugin.Codec.encode(&1, registry)),
+           Authoring.traverse(agent.plugins, &Jido.Plugin.Codec.encode_declaration(&1, registry)),
          {:ok, routes} <- Authoring.traverse(agent.routes, &encode_route(&1, registry)) do
       document = %{
         "type" => "jido.agent",
@@ -82,6 +82,11 @@ defmodule Jido.Agent.Codec do
   @spec decode(document(), Registry.t() | map()) ::
           {:ok, Agent.definition()} | {:error, term()}
   def decode(document, registry) do
+    with {:ok, definition, _specs, _schema} <- decode_with_plugins(document, registry),
+         do: {:ok, definition}
+  end
+
+  defp decode_with_plugins(document, registry) do
     with :ok <- Data.check_document(document),
          :ok <- definition_object(document),
          {:ok, registry} <- Registry.new(registry),
@@ -89,9 +94,9 @@ defmodule Jido.Agent.Codec do
          {:ok, schema} <- Registry.resolve(registry, document["schema"], :schema),
          {:ok, metadata} <- Data.decode(document["metadata"], registry),
          {:ok, plugins} <-
-           collection(document["plugins"], &Jido.Plugin.Codec.decode(&1, registry)),
+           collection(document["plugins"], &Jido.Plugin.Codec.decode_spec(&1, registry)),
          {:ok, routes} <- collection(document["routes"], &decode_route(&1, registry)) do
-      Agent.new(%{
+      Agent.Validation.new(%{
         module: module,
         vsn: document["vsn"],
         name: document["name"],
@@ -108,7 +113,9 @@ defmodule Jido.Agent.Codec do
   @spec decode(document(), Registry.t() | map(), map() | keyword()) ::
           {:ok, Agent.instance()} | {:error, term()}
   def decode(document, registry, opts) do
-    with {:ok, definition} <- decode(document, registry), do: Agent.instantiate(definition, opts)
+    with {:ok, agent, _specs, _schema} <-
+           Agent.Validation.instantiate_validated(decode_with_plugins(document, registry), opts),
+         do: {:ok, agent}
   end
 
   defp definition_object(%{"type" => "jido.agent", "version" => 2} = document) do
@@ -126,6 +133,40 @@ defmodule Jido.Agent.Codec do
        do: agent |> Agent.definition() |> Agent.validate_definition()
 
   defp neutral_definition(value), do: Agent.validate(value)
+
+  @doc false
+  def registry_entries(agent) do
+    entries =
+      [{:agent, agent.module}, {:schema, agent.schema}] ++
+        Data.registry_entries(agent.metadata) ++
+        Enum.flat_map(agent.plugins, &plugin_entries/1)
+
+    with {:ok, routes} <- route_entries(agent.routes),
+         do: {:ok, entries ++ routes}
+  end
+
+  defp plugin_entries({module, options}),
+    do: [{:plugin, module} | Data.registry_entries(options)]
+
+  defp route_entries(routes) do
+    Authoring.traverse(routes, fn route ->
+      {target, defaults} = Authoring.split_target(route.target)
+
+      with {:ok, executable} <- Jido.Instruction.resolve(target) do
+        entries = [{executable.kind, target} | Data.registry_entries(defaults)]
+
+        {:ok,
+         if(is_nil(route.match),
+           do: entries,
+           else: entries ++ [{:route_match, route.match}]
+         )}
+      end
+    end)
+    |> case do
+      {:ok, entries} -> {:ok, List.flatten(entries)}
+      error -> error
+    end
+  end
 
   defp encode_route(route, registry) do
     {target, defaults} = Authoring.split_target(route.target)

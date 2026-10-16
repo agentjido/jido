@@ -1,20 +1,19 @@
-defmodule Jido.Topology.Codec.DeriverTest do
+defmodule Jido.Topology.Codec.RegistryDerivationTest do
   use JidoTest.Case, async: true
 
   alias Jido.Examples.Topology.{Accounts, ComposedSystem}
   alias Jido.Topology.Codec
-  alias Jido.Topology.Codec.Deriver
 
-  test "derivation preserves the Registry used by encoding" do
+  test "the generated Registry supports explicit encoding and decoding" do
     for definition <- [Accounts.topology(), ComposedSystem.topology()] do
-      assert {:ok, derived} = Deriver.topology(definition)
-      assert {:ok, _document, encoded} = Codec.encode(definition)
-      assert derived == encoded
+      assert {:ok, document, registry} = Codec.encode(definition)
+      assert {:ok, ^document} = Codec.encode(definition, registry)
+      assert {:ok, ^definition} = Codec.decode(document, registry)
     end
   end
 
   test "generated IDs preserve first occurrence order" do
-    assert {:ok, %{entries: entries}} = Deriver.topology(Accounts.topology())
+    assert {:ok, _document, %{entries: entries}} = Codec.encode(Accounts.topology())
 
     assert %{
              "schema/0" => {:schema, _schema},
@@ -31,7 +30,7 @@ defmodule Jido.Topology.Codec.DeriverTest do
   end
 
   test "derivation includes nested Agent, schema, and atom entries" do
-    assert {:ok, registry} = Deriver.topology(ComposedSystem.topology())
+    assert {:ok, _document, registry} = Codec.encode(ComposedSystem.topology())
     kinds = registry.entries |> Map.values() |> Enum.map(&elem(&1, 0))
 
     for kind <- [:agent, :schema, :atom] do

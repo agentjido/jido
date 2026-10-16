@@ -6,15 +6,7 @@ defmodule Jido.Agent.DSL.Macros do
 
   @entity :"Elixir.Jido.Agent.DSL.Extension.Routes.Route"
   @route_options [:as, :defaults, :priority, :match, :do]
-  defmacro route(path, target_or_options) do
-    if Keyword.keyword?(target_or_options) do
-      build(path, nil, target_or_options, __CALLER__)
-    else
-      build(path, target_or_options, [], __CALLER__)
-    end
-  end
-
-  defmacro route(path, target_or_options, options) do
+  defmacro route(path, target_or_options, options \\ []) do
     if Keyword.keyword?(target_or_options) do
       build(path, nil, target_or_options ++ options, __CALLER__)
     else

@@ -1,8 +1,9 @@
 defmodule JidoTest.Contract.TopologyDocumentTest do
   use Covenant.Case, component: "jido.topology", async: false
 
+  alias Jido.Codec.Registry
   alias Jido.Topology
-  alias Jido.Topology.{Codec, Reference}
+  alias Jido.Topology.{Codec, Ref, Reference}
   alias Jido.Error.ValidationError
   alias JidoTest.TopologyContract, as: T
 
@@ -52,11 +53,76 @@ defmodule JidoTest.Contract.TopologyDocumentTest do
           Map.put(document, "agents", [Map.put(agent, "module", document["schema"])]),
           Map.put(document, "agents", [Map.put(agent, "module", "untrusted/module")])
         ] do
-      assert {:error, %ValidationError{}} = Codec.decode(invalid, registry)
+      assert {:error, %ValidationError{} = expected} = Codec.decode(invalid, registry)
+
+      assert {:error, %ValidationError{} = actual} =
+               Codec.decode(invalid, registry, unknown: true)
+
+      assert actual.message == expected.message
+      assert actual.details == expected.details
     end
 
     assert {:error, _} = Codec.decode(document, %{})
     assert {:error, _} = Codec.encode(definition, %{})
+
+    invalid_registry = %{"invalid" => :invalid}
+    assert {:error, %ValidationError{} = expected} = Jido.Codec.Registry.new(invalid_registry)
+
+    assert {:error, %ValidationError{} = actual} =
+             Codec.decode(Map.put(document, "version", 999), invalid_registry, unknown: true)
+
+    assert actual.message == expected.message
+    assert actual.details == expected.details
+  end
+
+  @tag obligation: [
+         "jido.topology.I6",
+         "jido.topology.I9",
+         "jido.topology.I14",
+         "jido.topology.I16"
+       ]
+  test "instance decoding resolves current source contracts once per operation" do
+    assert {:ok, document, registry} =
+             Codec.encode(%{
+               name: "resolved_document",
+               agents: [%{key: :leader, module: T.ObservedAgent}],
+               groups: [%{key: :workers, module: T.ObservedAgent, count: 2}]
+             })
+
+    assert_received :read_planning_agent
+    assert_received :read_planning_plugin
+
+    for _ <- 1..2 do
+      assert {:ok, instance} = Codec.decode(document, registry, id: "resolved_document")
+      assert_receive :read_planning_agent
+      assert_receive :read_planning_plugin
+      refute_received :read_planning_agent
+      refute_received :read_planning_plugin
+      assert map_size(instance.plan.agents) == 3
+      assert Enum.sort(Map.keys(instance.plan.resources)) == ["bus/leader_bus", "bus/workers_bus"]
+    end
+  end
+
+  @tag obligation: ["jido.topology.I13", "jido.topology.I15", "jido.topology.I16"]
+  test "instance decoding rejects static graph faults before contributions and instance options" do
+    definition =
+      Topology.new!(
+        name: "ordered_document",
+        agents: [%{key: :worker, definition: T.worker([T.Audit])}],
+        resources: [%{key: :events}],
+        connections: [%{agent: :worker, to: :events, path: "contract.**"}]
+      )
+
+    assert {:ok, document, registry} = Codec.encode(definition)
+    invalid = %{document | "resources" => []}
+    assert {:error, %ValidationError{} = expected} = Codec.decode(invalid, registry)
+    assert {:error, %ValidationError{} = actual} = Codec.decode(invalid, registry, unknown: true)
+    assert actual.message == expected.message
+    assert actual.details == expected.details
+    refute_received {:contributed, _, _}
+
+    assert {:error, %ValidationError{}} = Codec.decode(document, registry, unknown: true)
+    assert_received {:contributed, T.Audit, "worker"}
   end
 
   @tag obligation: "jido.topology.I16"
@@ -72,8 +138,16 @@ defmodule JidoTest.Contract.TopologyDocumentTest do
       assert {:error, _} = Codec.encode(%{definition | metadata: %{"large" => value}})
       assert {:error, _} = Codec.encode(%{definition | metadata: %{"large" => value}}, registry)
 
-      assert {:error, _} =
-               Codec.decode(Map.put(document, "metadata", %{"large" => value}), registry)
+      bounded =
+        Map.put(document, "metadata", %{"$type" => "map", "entries" => [["large", value]]})
+
+      assert {:error, %ValidationError{} = expected} = Codec.decode(bounded, registry)
+
+      assert {:error, %ValidationError{} = actual} =
+               Codec.decode(bounded, registry, unknown: true)
+
+      assert actual.message == expected.message
+      assert actual.details == expected.details
     end
 
     assert {:ok, instance} = Topology.instantiate(definition, id: "private")
@@ -101,7 +175,15 @@ defmodule JidoTest.Contract.TopologyDocumentTest do
       )
 
     root =
-      Topology.new!(name: "root", includes: [%{key: :leaf, topology: leaf, inputs: %{count: 2}}])
+      Topology.new!(
+        name: "root",
+        includes: [%{key: :leaf, topology: leaf, inputs: %{count: 2}}],
+        metadata: %{
+          Reference.input(:count) => %{
+            "nested" => {Ref.ref(:leaf, :workers), [Reference.member(:index), %{flag: false}]}
+          }
+        }
+      )
 
     assert {:ok, document, registry} = Codec.encode(root)
     assert {:ok, ^root} = Codec.decode(JSON.decode!(JSON.encode!(document)), registry)
@@ -111,6 +193,56 @@ defmodule JidoTest.Contract.TopologyDocumentTest do
     assert instance.plan.layers === [
              ["component/leaf/group/workers/1", "component/leaf/group/workers/2"]
            ]
+  end
+
+  @tag obligation: ["jido.topology.I15", "jido.topology.I16"]
+  test "nested tagged maps reject decoded key collisions and preserve reference errors" do
+    definition = Topology.new!(name: "nested_maps", metadata: %{same: 0})
+    assert {:ok, document, registry} = Codec.encode(definition)
+    assert {:ok, canonical} = Registry.identifier(registry, :atom, :same)
+    registry = Registry.new!(Map.put(registry.entries, "aliases/same", {:alias, canonical}))
+
+    duplicate = %{
+      "$type" => "map",
+      "entries" => [
+        [%{"$type" => "atom", "id" => canonical}, 1],
+        [%{"$type" => "atom", "id" => "aliases/same"}, 2]
+      ]
+    }
+
+    invalid_references = [
+      %{"$type" => "topology.input", "key" => false},
+      %{"$type" => "topology.ref", "component" => "", "key" => "worker"}
+    ]
+
+    assert {:error, %ValidationError{} = collision} =
+             Codec.decode(%{document | "metadata" => duplicate}, registry)
+
+    assert collision.message == "Duplicate decoded map key"
+
+    cases =
+      [{duplicate, collision}] ++
+        Enum.map(invalid_references, fn encoded ->
+          assert {:error, %ValidationError{} = expected} =
+                   Codec.decode(%{document | "metadata" => encoded}, registry)
+
+          refute {expected.message, expected.details} == {collision.message, collision.details}
+          {encoded, expected}
+        end)
+
+    for {value, expected} <- cases do
+      nested = %{"$type" => "map", "entries" => [["nested", value]]}
+      invalid = %{document | "metadata" => nested}
+
+      for result <- [
+            Codec.decode(invalid, registry),
+            Codec.decode(invalid, registry, unknown: true)
+          ] do
+        assert {:error, %ValidationError{} = actual} = result
+        assert actual.message == expected.message
+        assert actual.details == expected.details
+      end
+    end
   end
 
   @tag obligation: "jido.topology.I17"
@@ -156,6 +288,7 @@ defmodule JidoTest.Contract.TopologyDocumentTest do
     assert instance.plan.agents === %{}
     assert {:ok, %{"version" => 3} = document, registry} = Codec.encode(definition)
     assert {:ok, ^definition} = Codec.decode(JSON.decode!(JSON.encode!(document)), registry)
+    assert {:ok, ^instance} = Codec.decode(document, registry, id: "two", input: %{count: 2})
     assert {:error, _} = Codec.decode(Map.put(document, "version", 2), registry)
 
     for update <- [

@@ -146,3 +146,50 @@ Their SHA-256 digests identify the evidence used in this report:
 `tmp/covenant/agent-rollout-evidence.json` records the evidence audit and keeps
 the historical full run separate from the current focused run. It does not
 merge verdicts or claim a passing current full-profile gate.
+
+## Agent and Topology DRY refinement — 2026-10-15
+
+The pass from `e578c829` is recorded in the
+[Topology baseline](topology.baseline.md#agent-and-topology-dry-refinement--2026-10-15).
+It gives the five changes, exact commands and selected sites, annotation audit,
+and separate manual regression evidence. The contract gate passes 122 tests
+across all 42 obligations. All 19 focused Covenant sites are killed. Both
+manual regressions failed with the old bodies and passed after source
+restoration. The combined run passes 2,097 tests with 92.4% package line
+coverage. Format, compilation with warnings as errors, and warning lint pass.
+Dialyzer retains the same ten existing warnings. The full historical mutation
+profile was not rerun.
+
+## Shared code reduction — 2026-10-15
+
+The next Agent/Topology pass removes 68 net library lines. Shared map decoding
+keeps the Agent and Topology error rules and recursive value handling. The
+Agent contract now has 81 tests. The final gate passes all 125 tests and all
+42 obligations. The combined suite passes 2,100 tests with 92.4% line coverage.
+
+Three focused shared-Data mutations run through all 81 Agent contract tests.
+All three are killed with exact attribution and no invalid mutants or timeouts.
+The Topology checks and six separate semantic probes also pass. The earlier
+full 1,302-mutant run was not repeated.
+
+The ledger retains 219 exact historical entries: eight locations moved, and
+one entry for the removed registration wrapper was retired. No judgments or
+survivor exceptions were added. The historical verdicts were not rerun.
+See [the Topology record](topology.baseline.md) for commands, exact sites,
+source restoration, and evidence hashes.
+
+## Remaining authoring reductions — 2026-10-15
+
+Items 1–15 remove 143 net library lines and both internal Deriver modules.
+The final gate passes 84 Agent and 45 Topology tests across all 42 obligations.
+The combined suite passes 2,104 tests, with 51 existing exclusions and 92.4%
+package line coverage. Nine Agent mutations, nine Topology mutations, and
+one shared Registry-profile mutation are killed with exact attribution.
+A separate initialization omission probe also fails its public guard and
+passes after exact source restoration; it receives no Covenant kill credit.
+
+The ledger retains 215 exact historical decisions and retires four changed or
+removed sites. No new exemption was added. Format, forced compilation, and
+warning lint pass. Dialyzer retains the same ten known findings. The full
+1,302-mutant run was not repeated. See the [Topology record](topology.baseline.md#remaining-authoring-reductions--2026-10-15)
+for exact commands, sites, source restoration, and evidence hashes.

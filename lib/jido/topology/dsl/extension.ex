@@ -112,33 +112,20 @@ defmodule Jido.Topology.DSL.Extension do
              }
            end)
 
-  @agents_section %Spark.Dsl.Section{
-    name: :agents,
-    patchable?: true,
-    entities: [@agent, @group]
-  }
-  @resources_section %Spark.Dsl.Section{name: :resources, patchable?: true, entities: [@bus]}
-  @relationships_section %Spark.Dsl.Section{
-    name: :relationships,
-    patchable?: true,
-    entities: [@owns]
-  }
-  @connections_section %Spark.Dsl.Section{
-    name: :connections,
-    patchable?: true,
-    entities: [@subscribe]
-  }
-  @topologies_section %Spark.Dsl.Section{
-    name: :topologies,
-    patchable?: true,
-    entities: [@include]
-  }
-  @imports_section %Spark.Dsl.Section{
-    name: :imports,
-    patchable?: true,
-    entities: [@import_bus]
-  }
-  @exports_section %Spark.Dsl.Section{name: :exports, patchable?: true, entities: @exports}
+  @entity_sections Enum.map(
+                     [
+                       agents: [@agent, @group],
+                       resources: [@bus],
+                       relationships: [@owns],
+                       connections: [@subscribe],
+                       topologies: [@include],
+                       imports: [@import_bus],
+                       exports: @exports
+                     ],
+                     fn {name, entities} ->
+                       %Spark.Dsl.Section{name: name, patchable?: true, entities: entities}
+                     end
+                   )
   @nested_startup_section %Spark.Dsl.Section{
     name: :startup,
     patchable?: true,
@@ -148,15 +135,6 @@ defmodule Jido.Topology.DSL.Extension do
       end)
   }
 
-  @entity_sections [
-    @agents_section,
-    @resources_section,
-    @relationships_section,
-    @connections_section,
-    @topologies_section,
-    @imports_section,
-    @exports_section
-  ]
   @topology_sections @entity_sections ++ [@nested_startup_section]
 
   @doc false

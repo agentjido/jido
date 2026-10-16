@@ -37,8 +37,7 @@ defmodule Jido.Topology.DSL.Compiler do
     if error, do: {:error, error}, else: :ok
   end
 
-  def lower(options, extensions, dsl, env) do
-    config = Map.drop(options, [:description, :vsn])
+  def lower(config, extensions, dsl, env) do
     fields = opts(dsl, [:topology], [:schema, :metadata])
 
     entity_groups =
@@ -48,11 +47,11 @@ defmodule Jido.Topology.DSL.Compiler do
       end
 
     fields =
-      Enum.reduce(entity_groups, fields, fn {field, entities}, fields ->
-        put_entities(fields, field, entities)
-      end)
+      for {field, [_ | _] = entities} <- entity_groups,
+          into: fields,
+          do: {field, Enum.map(entities, &DslEntity.lower/1)}
 
-    startup = section_opts(dsl, :startup)
+    startup = opts(dsl, [:topology, :startup], EntryMetadata.fields(:startup))
 
     fields = if startup == %{}, do: fields, else: Map.put(fields, :startup, startup)
     overlap = Enum.filter(Map.keys(fields), &Map.has_key?(config, &1))
@@ -109,19 +108,6 @@ defmodule Jido.Topology.DSL.Compiler do
   end
 
   defp section_entities(dsl, section), do: Extension.get_entities(dsl, [:topology, section])
-
-  defp section_opts(dsl, :startup) do
-    keys = EntryMetadata.fields(:startup)
-    opts(dsl, [:topology, :startup], keys)
-  end
-
-  defp put_entities(fields, _, []), do: fields
-
-  defp put_entities(fields, key, entities) do
-    values = Enum.map(entities, &DslEntity.lower/1)
-
-    Map.put(fields, key, values)
-  end
 
   defp foreign_entities(dsl) do
     dsl

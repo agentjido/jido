@@ -71,7 +71,7 @@ Test files stay in this folder.
 
 To add a case, add its source, a Corpus variant, a Cases clause, and a saved
 JSON document. Supply complete expected plans. Do not derive expected values
-from `Plan.build/3` or rewrite snapshots during tests.
+from `Topology.instantiate/2` or rewrite snapshots during tests.
 
 Planning and boundary tests are pure. Only `execution_test.exs` starts runtime
 processes. It excludes the `configured` variant from live execution because

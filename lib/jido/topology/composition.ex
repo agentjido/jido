@@ -4,15 +4,16 @@ defmodule Jido.Topology.Composition do
   alias Jido.Topology.{Ref, Reference, Validation}
 
   def flatten(definition) do
-    with {:ok, scopes} <- scopes(definition, [], %{}),
+    with {:ok, scopes} <- scopes(definition, [], %{}, %{}),
          :ok <- validate_bindings(scopes),
          {:ok, collections} <-
            Authoring.traverse(Enum.sort(scopes), fn {path, context} ->
              nodes(context.definition, path, scopes)
            end),
          nodes = List.flatten(collections),
-         {:ok, nodes} <- relationships(nodes, scopes),
-         {:ok, nodes} <- connections(nodes, scopes),
+         {:ok, owners} <- relationships(scopes),
+         {:ok, subscriptions} <- connections(scopes),
+         nodes = Enum.map(nodes, &graph_metadata(&1, owners, subscriptions)),
          {:ok, lookup} <- lookup(scopes),
          :ok <- validate_exports(scopes),
          :ok <- graph(nodes) do
@@ -47,13 +48,13 @@ defmodule Jido.Topology.Composition do
 
   def escape(value), do: URI.encode(to_string(value), &URI.char_unreserved?/1)
 
-  defp scopes(_definition, _path, acc) when map_size(acc) >= 1_000,
+  defp scopes(_definition, _path, _bindings, acc) when map_size(acc) >= 1_000,
     do: Authoring.error("Topology exceeds 1000 component scopes")
 
-  defp scopes(definition, path, acc) do
+  defp scopes(definition, path, bindings, acc) do
     context = %{
       definition: definition,
-      bindings: %{},
+      bindings: bindings,
       endpoints: endpoint_index(definition),
       exports: Map.new(definition.exports, &{&1.key, &1})
     }
@@ -64,9 +65,8 @@ defmodule Jido.Topology.Composition do
       child_path = path ++ [include.key]
       bindings = Map.new(include.bindings, &{&1.key, %{path: path, target: &1.to}})
 
-      case scopes(include.topology, child_path, acc) do
+      case scopes(include.topology, child_path, bindings, acc) do
         {:ok, acc} ->
-          acc = Map.update!(acc, child_path, &Map.put(&1, :bindings, bindings))
           {:cont, {:ok, acc}}
 
         {:error, _error} = error ->
@@ -90,26 +90,24 @@ defmodule Jido.Topology.Composition do
   end
 
   defp validate_bindings(scopes) do
-    Enum.reduce_while(scopes, :ok, fn
-      {[], _}, :ok ->
-        {:cont, :ok}
+    Authoring.check_each(scopes, fn
+      {[], _} ->
+        :ok
 
-      {path, context}, :ok ->
+      {path, context} ->
         required = Enum.map(context.definition.imports, & &1.key) |> Enum.sort()
         supplied = Map.keys(context.bindings) |> Enum.sort()
 
         if required == supplied do
-          case Authoring.traverse(required, &endpoint(scopes, path, &1, [])) do
-            {:ok, _} -> {:cont, :ok}
-            error -> {:halt, error}
-          end
+          Authoring.check_each(required, fn key ->
+            with {:ok, _} <- endpoint(scopes, path, key, []), do: :ok
+          end)
         else
-          {:halt,
-           Authoring.error("Import bindings must match the child requirements", %{
-             path: path,
-             required: required,
-             supplied: supplied
-           })}
+          Authoring.error("Import bindings must match the child requirements", %{
+            path: path,
+            required: required,
+            supplied: supplied
+          })
         end
     end)
   end
@@ -140,7 +138,7 @@ defmodule Jido.Topology.Composition do
     end)
   end
 
-  defp relationships(nodes, scopes) do
+  defp relationships(scopes) do
     records =
       Enum.flat_map(Enum.sort(scopes), fn {path, context} ->
         Enum.map(context.definition.relationships, &{path, &1})
@@ -156,29 +154,13 @@ defmodule Jido.Topology.Composition do
            end) do
       owners = Map.new(records)
 
-      if length(records) == map_size(owners) do
-        {:ok,
-         Enum.map(nodes, fn node ->
-           case Map.get(owners, node.key) do
-             nil ->
-               node
-
-             owner ->
-               %{
-                 node
-                 | parent: owner.parent,
-                   on_parent_exit: owner.policy,
-                   depends_on: Enum.uniq([owner.parent | node.depends_on])
-               }
-           end
-         end)}
-      else
-        Authoring.error("Each Agent or group can have only one owner")
-      end
+      if length(records) == map_size(owners),
+        do: {:ok, owners},
+        else: Authoring.error("Each Agent or group can have only one owner")
     end
   end
 
-  defp connections(nodes, scopes) do
+  defp connections(scopes) do
     records =
       Enum.flat_map(Enum.sort(scopes), fn {path, context} ->
         Enum.map(context.definition.connections, &{path, &1})
@@ -192,23 +174,25 @@ defmodule Jido.Topology.Composition do
                   :ok <- kind(bus, [:bus]),
                   do: {:ok, {agent.key, %{bus: bus.key, path: edge.path}}}
            end) do
-      if length(records) == length(Enum.uniq(records)) do
-        connections = Enum.group_by(records, &elem(&1, 0), &elem(&1, 1))
-
-        {:ok,
-         Enum.map(nodes, fn node ->
-           subscriptions = Map.get(connections, node.key, [])
-
-           %{
-             node
-             | subscriptions: subscriptions,
-               depends_on: Enum.uniq(node.depends_on ++ Enum.map(subscriptions, & &1.bus))
-           }
-         end)}
-      else
-        Authoring.error("Duplicate Bus subscription")
-      end
+      if length(records) == length(Enum.uniq(records)),
+        do: {:ok, Enum.group_by(records, &elem(&1, 0), &elem(&1, 1))},
+        else: Authoring.error("Duplicate Bus subscription")
     end
+  end
+
+  defp graph_metadata(node, owners, connections) do
+    owner = Map.get(owners, node.key, %{})
+    parent = Map.get(owner, :parent)
+    subscriptions = Map.get(connections, node.key, [])
+
+    %{
+      node
+      | parent: parent,
+        on_parent_exit: Map.get(owner, :policy, :stop),
+        subscriptions: subscriptions,
+        depends_on:
+          Enum.uniq(List.wrap(parent) ++ node.depends_on ++ Enum.map(subscriptions, & &1.bus))
+    }
   end
 
   defp endpoint(scopes, path, target, seen) do
@@ -258,15 +242,11 @@ defmodule Jido.Topology.Composition do
   end
 
   defp validate_exports(scopes) do
-    Enum.reduce_while(scopes, :ok, fn {path, context}, :ok ->
-      case Authoring.traverse(context.definition.exports, fn export ->
-             with {:ok, target} <- endpoint(scopes, path, export.from, []),
-                  :ok <- kind(target, [export.kind]),
-                  do: {:ok, target}
-           end) do
-        {:ok, _} -> {:cont, :ok}
-        error -> {:halt, error}
-      end
+    Authoring.check_each(scopes, fn {path, context} ->
+      Authoring.check_each(context.definition.exports, fn export ->
+        with {:ok, target} <- endpoint(scopes, path, export.from, []),
+             do: kind(target, [export.kind])
+      end)
     end)
   end
 

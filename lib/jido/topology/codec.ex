@@ -22,7 +22,7 @@ defmodule Jido.Topology.Codec do
   alias Jido.Codec.{Data, Registry}
   alias Jido.Topology
   alias Jido.Topology.EntryMetadata
-  alias Jido.Topology.Codec.{Deriver, Value}
+  alias Jido.Topology.Codec.Value
 
   @collections EntryMetadata.collections()
   @fields ~w(type version name schema metadata agents groups resources relationships connections startup includes imports exports children)
@@ -51,7 +51,8 @@ defmodule Jido.Topology.Codec do
           {:ok, document(), Registry.t()} | {:error, term()}
   def encode(definition) do
     with {:ok, definition} <- Topology.new(definition),
-         {:ok, registry} <- Deriver.topology(definition),
+         {:ok, entries} <- definition_entries(definition),
+         {:ok, registry} <- Registry.derive(entries),
          {:ok, document} <- encode_validated(definition, registry),
          :ok <- Data.check_document(document),
          do: {:ok, document, registry}
@@ -97,14 +98,57 @@ defmodule Jido.Topology.Codec do
     end
   end
 
+  defp definition_entries(definition) do
+    agents = definition.agents ++ definition.groups
+
+    entries =
+      Value.registry_entries(definition.metadata) ++
+        Enum.flat_map(agents, fn agent ->
+          Value.registry_entries(agent.initial_state) ++
+            Value.registry_entries(Map.take(agent, [:count, :members, :key_by, :node]))
+        end) ++
+        Enum.flat_map(definition.resources, &Value.registry_entries(&1.config))
+
+    with {:ok, members} <- Authoring.traverse(agents, &member_entries/1),
+         {:ok, included} <-
+           Authoring.traverse(definition.includes, fn include ->
+             with {:ok, nested} <- definition_entries(include.topology),
+                  do: {:ok, Value.registry_entries(include.inputs) ++ nested}
+           end),
+         {:ok, children} <-
+           Authoring.traverse(definition.children, fn child ->
+             with {:ok, nested} <- definition_entries(child.topology),
+                  {:ok, owner} <- owner_entries(child.director),
+                  do:
+                    {:ok,
+                     nested ++
+                       owner ++
+                       Value.registry_entries(child.input) ++ Value.registry_entries(child.gate)}
+           end) do
+      {:ok,
+       [{:schema, definition.schema}] ++
+         List.flatten(members) ++ entries ++ List.flatten(included) ++ List.flatten(children)}
+    end
+  end
+
+  defp member_entries(%{definition: definition}),
+    do: Jido.Agent.Codec.registry_entries(definition)
+
+  defp member_entries(%{module: module}), do: {:ok, [{:agent, module}]}
+  defp owner_entries(nil), do: {:ok, []}
+  defp owner_entries(definition), do: Jido.Agent.Codec.registry_entries(definition)
+
   @doc "Decodes a definition without starting processes."
   @spec decode(document(), Registry.t() | map()) ::
           {:ok, Topology.t()} | {:error, term()}
   def decode(document, registry) do
+    with {:ok, attrs} <- decode_attrs(document, registry), do: Topology.new(attrs)
+  end
+
+  defp decode_attrs(document, registry) do
     with :ok <- Data.check_document(document),
          {:ok, registry} <- Registry.new(registry),
-         {:ok, attrs} <- decode_document(document, registry),
-         do: Topology.new(attrs)
+         do: decode_document(document, registry)
   end
 
   defp decode_document(document, registry) do
@@ -136,8 +180,7 @@ defmodule Jido.Topology.Codec do
   @spec decode(document(), Registry.t() | map(), map() | keyword()) ::
           {:ok, Jido.Topology.Instance.t()} | {:error, term()}
   def decode(document, registry, opts) do
-    with {:ok, definition} <- decode(document, registry),
-         do: Topology.instantiate(definition, opts)
+    with {:ok, attrs} <- decode_attrs(document, registry), do: Topology.instantiate(attrs, opts)
   end
 
   defp encode_entry(entry, registry) do

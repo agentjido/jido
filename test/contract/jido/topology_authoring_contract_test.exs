@@ -17,6 +17,7 @@ defmodule JidoTest.Contract.TopologyAuthoringTest do
     T.with_topology(
       "",
       fn module ->
+        assert module.definition().name == "versioned"
         assert module.vsn() == 2
         assert module.definition().description == "owner description"
         assert %Topology{name: "versioned", agents: [], metadata: %{}} = module.topology()
@@ -118,6 +119,21 @@ defmodule JidoTest.Contract.TopologyAuthoringTest do
         assert {:ok, %Agent{}} = module.new_agent()
         assert {:ok, %{plan: %{agents: agents, resources: resources}}} = module.new(id: "empty")
         assert agents === %{} and resources === %{}
+        topology = module.topology()
+
+        for field <- [
+              :agents,
+              :groups,
+              :resources,
+              :relationships,
+              :connections,
+              :includes,
+              :imports,
+              :exports,
+              :children
+            ],
+            do: assert(Map.fetch!(topology, field) === [])
+
         root = Topology.new!(name: "root", children: [%{key: :child, topology: module}])
         assert [child] = root.children
         assert child.director === if(owner?, do: module.definition(), else: nil)
@@ -135,6 +151,7 @@ defmodule JidoTest.Contract.TopologyAuthoringTest do
       end
       topology do
         agents do
+          agent :base, definition: T.worker()
           role :worker, T.worker()
         end
       end
@@ -146,11 +163,94 @@ defmodule JidoTest.Contract.TopologyAuthoringTest do
         assert_receive {:observed, {:lowered, :roles}}
         assert_receive {:observed, {:lowered, :topology_dual}}
         refute_received {:observed, _}
+        assert module.definition().name == "computed"
+        assert module.definition().description == "computed owner"
+        assert module.vsn() == 3
         assert module.definition().metadata === %{owner: "label", dual: true}
         assert module.topology().metadata === %{order: [:roles, :dual]}
-        assert [%{key: "worker"}] = module.topology().agents
+        assert Enum.map(module.topology().agents, & &1.key) == ["base", "worker"]
       end,
-      "(A.observe(:options); [name: \"computed\", extensions: [A.Labels, T.Roles, T.Dual]])"
+      "(A.observe(:options); [name: \"computed\", description: \"computed owner\", vsn: 3, " <>
+        "extensions: [A.Labels, T.Roles, T.Dual]])"
+    )
+  end
+
+  @tag obligation: ["jido.topology.I7", "jido.topology.I11", "jido.topology.I12"]
+  test "core sections lower to their collections with include bindings and exports" do
+    T.with_topology(
+      """
+      defmodule Included do
+        use Jido.Topology, name: "included"
+        topology do
+          imports do
+            bus :events
+          end
+          exports do
+            bus :public_events, from: :events
+          end
+        end
+      end
+      topology do
+        agents do
+          agent :lead, definition: T.worker()
+          group :workers, definition: T.worker(), count: 2
+          agent :backup, definition: T.worker()
+        end
+        resources do
+          bus :events
+          bus :audit
+        end
+        relationships do
+          owns :lead, :workers, on_parent_exit: :continue
+        end
+        connections do
+          subscribe :workers, to: :events, path: "contract.**"
+        end
+        topologies do
+          include :team, __MODULE__.Included do
+            bind :events, to: :events
+          end
+        end
+        exports do
+          group :public_workers, from: :workers
+        end
+        startup do
+          concurrency 2
+          max_agents 4
+          retry_interval 37
+          task_timeout 211
+        end
+      end
+      """,
+      fn module ->
+        definition = module.topology()
+        assert [%{key: "lead"}, %{key: "backup"}] = definition.agents
+        assert [%{key: "workers", count: 2}] = definition.groups
+        assert [%{key: "events", kind: :bus}, %{key: "audit", kind: :bus}] = definition.resources
+
+        assert [%{parent: "lead", child: "workers", on_parent_exit: :continue}] =
+                 definition.relationships
+
+        assert [%{agent: "workers", to: "events", path: "contract.**"}] = definition.connections
+        assert [%{key: "public_workers", kind: :group, from: "workers"}] = definition.exports
+
+        assert definition.startup === %{
+                 concurrency: 2,
+                 max_agents: 4,
+                 retry_interval: 37,
+                 task_timeout: 211
+               }
+
+        assert [%{key: "team", topology: included, bindings: [%{key: "events", to: "events"}]}] =
+                 definition.includes
+
+        assert [%{key: "events", kind: :bus}] = included.imports
+        assert [%{key: "public_events", kind: :bus, from: "events"}] = included.exports
+        assert {:ok, %{plan: plan}} = module.new(id: "collections")
+        assert map_size(plan.agents) == 4
+        assert map_size(plan.resources) == 2
+        assert plan.agents["group/workers/1"].parent == "agent/lead"
+      end
     )
   end
 
@@ -267,8 +367,10 @@ defmodule JidoTest.Contract.TopologyAuthoringTest do
           T.with_topology(body, fn _ -> :ok end, "name: \"invalid\", #{options}")
         end
 
+      assert Path.basename(error.file) == "authoring_fixture.ex"
+      assert error.line > 0
+
       if options == "extensions: [T.Unclaimed]" do
-        assert Path.basename(error.file) == "authoring_fixture.ex"
         assert error.line == 8
       end
     end

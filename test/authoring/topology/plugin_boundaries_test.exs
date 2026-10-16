@@ -6,7 +6,7 @@ defmodule JidoTest.Authoring.Topology.PluginBoundariesTest do
 
   alias Jido.Error.{ExecutionError, ValidationError}
   alias Jido.Topology
-  alias Jido.Topology.{Codec, Plan}
+  alias Jido.Topology.Codec
   alias JidoTest.Authoring.Compiler
   alias JidoTest.Authoring.Topology.{Corpus, Fixtures}
 
@@ -49,7 +49,7 @@ defmodule JidoTest.Authoring.Topology.PluginBoundariesTest do
 
       for result <- [
             Topology.instantiate(definition, id: "fault"),
-            Plan.build(definition, "fault", %{}),
+            Topology.instantiate(definition, id: "fault", input: %{}),
             context.fixture_module.new(id: "fault"),
             Codec.decode(spec.document, spec.registry, id: "fault")
           ] do

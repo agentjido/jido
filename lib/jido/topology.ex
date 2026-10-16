@@ -120,10 +120,9 @@ defmodule Jido.Topology do
   end
 
   defp new_with_composition(attrs) do
-    with {:ok, attrs, resolved} <- Validation.resolve(attrs, %{}),
-         {:ok, composed} <- Composition.flatten(attrs),
-         :ok <- Jido.Topology.Child.validate(attrs),
-         {:ok, definition} <- Zoi.parse(@schema, attrs),
+    with {:ok, definition, resolved} <- Validation.resolve(attrs, %{}),
+         {:ok, composed} <- Composition.flatten(definition),
+         :ok <- Jido.Topology.Child.validate(definition),
          do: {:ok, definition, composed, resolved}
   end
 
@@ -152,6 +151,5 @@ defmodule Jido.Topology do
   defp composition(definition, true, _composed), do: Composition.flatten(definition)
 
   @doc false
-  def unwrap!({:ok, value}), do: value
-  def unwrap!({:error, error}), do: raise(error)
+  defdelegate unwrap!(result), to: Authoring
 end

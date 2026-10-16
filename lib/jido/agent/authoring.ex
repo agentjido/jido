@@ -82,18 +82,30 @@ defmodule Jido.Agent.Authoring do
     end
   end
 
-  def traverse(values, fun), do: traverse(values, fun, [])
+  def traverse(values, fun), do: traverse(values, fn value, _index -> fun.(value) end, 0, [])
 
-  defp traverse([], _fun, acc), do: {:ok, Enum.reverse(acc)}
+  def traverse_indexed(values, fun),
+    do: traverse(values, fn value, index -> at(fun.(value), index) end, 0, [])
 
-  defp traverse([value | tail], fun, acc) do
-    case fun.(value) do
-      {:ok, result} -> traverse(tail, fun, [result | acc])
+  defp traverse([], _fun, _index, acc), do: {:ok, Enum.reverse(acc)}
+
+  defp traverse([value | tail], fun, index, acc) do
+    case fun.(value, index) do
+      {:ok, result} -> traverse(tail, fun, index + 1, [result | acc])
       {:error, _error} = error -> error
     end
   end
 
-  defp traverse(_tail, _fun, _acc), do: error("Expected a proper list")
+  defp traverse(_tail, _fun, _index, _acc), do: error("Expected a proper list")
+
+  def check_each(values, fun) do
+    Enum.reduce_while(values, :ok, fn value, :ok ->
+      case fun.(value) do
+        :ok -> {:cont, :ok}
+        {:error, _} = error -> {:halt, error}
+      end
+    end)
+  end
 
   def at({:error, %{details: details} = error}, path) do
     details = details || %{}
@@ -103,17 +115,8 @@ defmodule Jido.Agent.Authoring do
 
   def at(result, _path), do: result
 
-  def traverse_indexed(values, fun), do: traverse_indexed(values, fun, 0, [])
-  defp traverse_indexed([], _fun, _index, acc), do: {:ok, Enum.reverse(acc)}
-
-  defp traverse_indexed([value | rest], fun, index, acc) do
-    case at(fun.(value), index) do
-      {:ok, value} -> traverse_indexed(rest, fun, index + 1, [value | acc])
-      {:error, _} = error -> error
-    end
-  end
-
-  defp traverse_indexed(_tail, _fun, _index, _acc), do: error("Expected a proper list")
+  def unwrap!({:ok, value}), do: value
+  def unwrap!({:error, error}), do: raise(error)
 
   def error(message, details \\ %{}),
     do: {:error, Error.validation_error(message, kind: :config, details: details)}

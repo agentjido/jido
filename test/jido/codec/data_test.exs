@@ -55,6 +55,16 @@ defmodule Jido.Codec.DataTest do
 
     assert {:error, %Jido.Error.ValidationError{message: "Duplicate decoded map key"}} =
              Data.decode(duplicate, registry)
+
+    for {entries, message} <- [
+          {[["key"]], "Invalid map entry"},
+          {:invalid, "Invalid tagged authoring value"},
+          {[[] | :tail], "Invalid map entry"},
+          {[["key", 1] | :tail], "Expected a proper list"}
+        ] do
+      assert {:error, %Jido.Error.ValidationError{message: ^message}} =
+               Data.decode(%{"$type" => "map", "entries" => entries}, registry)
+    end
   end
 
   test "map traversal keeps the map, depth, node, string, and list bounds" do

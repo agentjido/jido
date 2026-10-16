@@ -138,7 +138,7 @@ defmodule Jido.Agent do
   or API. The view omits private state and runtime details.
   """
 
-  alias Jido.Agent.{Checkpoint, State, Turn}
+  alias Jido.Agent.{Authoring, Checkpoint, State, Turn}
   alias Jido.Agent.Runner
   alias Jido.Agent.Validation
   alias Jido.Error
@@ -199,16 +199,13 @@ defmodule Jido.Agent do
   @doc "Creates one validated neutral Agent definition."
   @spec new(map() | keyword() | definition()) ::
           {:ok, definition()} | {:error, Exception.t()}
-  def new(attrs), do: Validation.new(attrs)
+  def new(attrs) do
+    with {:ok, agent, _specs, _schema} <- Validation.new(attrs), do: {:ok, agent}
+  end
 
   @doc "Creates one neutral Agent definition or raises its validation error."
   @spec new!(map() | keyword() | definition()) :: definition() | no_return()
-  def new!(attrs) do
-    case new(attrs) do
-      {:ok, agent} -> agent
-      {:error, error} -> raise error
-    end
-  end
+  def new!(attrs), do: Authoring.unwrap!(new(attrs))
 
   @doc "Creates one Agent instance from a neutral definition or Agent module."
   @spec instantiate(definition() | module(), map() | keyword()) ::
@@ -230,12 +227,7 @@ defmodule Jido.Agent do
 
   @doc "Creates one Agent instance or raises its validation error."
   @spec instantiate!(definition() | module(), map() | keyword()) :: instance() | no_return()
-  def instantiate!(source, overrides \\ []) do
-    case instantiate(source, overrides) do
-      {:ok, agent} -> agent
-      {:error, error} -> raise error
-    end
-  end
+  def instantiate!(source, overrides \\ []), do: Authoring.unwrap!(instantiate(source, overrides))
 
   @doc "Validates one Agent value."
   @spec validate(term()) :: {:ok, t()} | {:error, Exception.t()}
@@ -271,12 +263,7 @@ defmodule Jido.Agent do
 
   @doc "Returns the complete data schema or raises its validation error."
   @spec complete_schema!(t()) :: Zoi.schema() | no_return()
-  def complete_schema!(%__MODULE__{} = agent) do
-    case complete_schema(agent) do
-      {:ok, schema} -> schema
-      {:error, error} -> raise error
-    end
-  end
+  def complete_schema!(%__MODULE__{} = agent), do: Authoring.unwrap!(complete_schema(agent))
 
   @doc "Builds a complete-state checkpoint through the Agent module callback."
   @spec checkpoint(instance(), map()) :: {:ok, map()} | {:error, term()}

@@ -109,6 +109,10 @@ defmodule JidoTest.Contract.AgentAuthoringTest do
     for {body, options} <- [
           {"agent do\nend", ", name: \"duplicate\""},
           {"agent do\nend", ", unknown: 1"},
+          {"agent do\nend", ", schema: F.schema()"},
+          {"agent do\nend", ", metadata: %{owner: :contract}"},
+          {"agent do\nend", ", routes: [{\"test.run\", F.Return}]"},
+          {"agent do\nend", ", plugins: [F.First]"},
           {"agent do\nend", ", vsn: 0"},
           {"agent do\nend", ", vsn: nil"},
           {"routes do\nroute \"test.run\", F.Return\nend", ""},
@@ -191,8 +195,14 @@ defmodule JidoTest.Contract.AgentAuthoringTest do
         """)
 
         assert {:error, error} = module.new()
-        assert_raise error.__struct__, fn -> module.definition() end
-        assert_raise error.__struct__, fn -> module.complete_schema() end
+
+        for bang <- [&module.new!/0, &module.definition/0, &module.complete_schema/0] do
+          raised = assert_raise error.__struct__, bang
+
+          assert Map.drop(Map.from_struct(raised), [:stacktrace]) ===
+                   Map.drop(Map.from_struct(error), [:stacktrace])
+        end
+
         assert {:error, _} = Agent.instantiate(definition)
       end
     )
@@ -742,5 +752,26 @@ defmodule JidoTest.Contract.AgentAuthoringTest do
         assert {:error, %Jido.Error.RoutingError{}} = module.cmd(module.new!(), F.signal(nil))
       end
     )
+  end
+
+  @tag obligation: ["jido.agent.I1", "jido.agent.I22", "jido.agent.I25"]
+  test "route arities preserve module and extension targets with empty options" do
+    for declaration <- [
+          ~s(route "test.run", F.Return),
+          ~s(route "test.run", F.Return, []),
+          ~s(route "test.run", F.Return, [] do\nend),
+          ~s(route "test.run", [ref: F.Return], [])
+        ] do
+      F.with_agent(
+        "agent do\nend\nroutes do\n#{declaration}\nend",
+        fn module ->
+          assert module.definition().routes ===
+                   F.definition(routes: [{"test.run", F.Return}]).routes
+
+          assert {:ok, _, []} = module.cmd(module.new!(), F.signal())
+        end,
+        ", extensions: [F.Labels]"
+      )
+    end
   end
 end

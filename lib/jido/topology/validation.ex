@@ -47,7 +47,7 @@ defmodule Jido.Topology.Validation do
              &include(&1, ancestors, depth, &2)
            )
            |> Authoring.at(:includes) do
-      definition = %{
+      definition = %Jido.Topology{
         name: name,
         schema: schema,
         metadata: metadata,
@@ -111,17 +111,10 @@ defmodule Jido.Topology.Validation do
     end
   end
 
-  defp static_entry(:include, _value), do: :ok
-
   defp static_entry(kind, value) do
     EntryMetadata.fields(kind)
     |> Enum.reject(&(&1 == :definition and kind in [:agent, :group]))
-    |> Enum.reduce_while(:ok, fn field, :ok ->
-      case at(field, static(Map.get(value, field))) do
-        :ok -> {:cont, :ok}
-        {:error, _} = error -> {:halt, error}
-      end
-    end)
+    |> Authoring.check_each(fn field -> at(field, static(Map.get(value, field))) end)
   end
 
   defp normalize(kind, attrs, resolved) when kind in [:agent, :group] do
@@ -144,8 +137,6 @@ defmodule Jido.Topology.Validation do
            do: {:ok, value, resolved}
     end
   end
-
-  defp normalize(:include, attrs, resolved), do: include(attrs, [], 0, resolved)
 
   defp normalize(kind, attrs, resolved) do
     with {:ok, value} <- normalize(kind, attrs), do: {:ok, value, resolved}
@@ -226,7 +217,7 @@ defmodule Jido.Topology.Validation do
       {:ok,
        %{
          key: key,
-         topology: struct(Jido.Topology, definition),
+         topology: definition,
          inputs: inputs,
          bindings: bindings
        }, resolved}
@@ -329,28 +320,13 @@ defmodule Jido.Topology.Validation do
   defp static_references(%Ref{} = reference), do: Ref.validate(reference)
 
   defp static_references(value) when is_map(value) and not is_struct(value) do
-    Enum.reduce_while(value, :ok, fn {key, item}, :ok ->
-      case static_references(key) do
-        :ok ->
-          case static_references(item) do
-            :ok -> {:cont, :ok}
-            {:error, _error} = error -> {:halt, error}
-          end
-
-        {:error, _error} = error ->
-          {:halt, error}
-      end
+    Authoring.check_each(value, fn {key, item} ->
+      with :ok <- static_references(key), do: static_references(item)
     end)
   end
 
-  defp static_references(value) when is_list(value) do
-    Enum.reduce_while(value, :ok, fn item, :ok ->
-      case static_references(item) do
-        :ok -> {:cont, :ok}
-        {:error, _error} = error -> {:halt, error}
-      end
-    end)
-  end
+  defp static_references(value) when is_list(value),
+    do: Authoring.check_each(value, &static_references/1)
 
   defp static_references(value) when is_tuple(value),
     do: value |> Tuple.to_list() |> static_references()
@@ -381,12 +357,7 @@ defmodule Jido.Topology.Validation do
   end
 
   @doc false
-  def agent_definition(%Jido.Agent{} = definition), do: Jido.Agent.Source.definition(definition)
-
-  def agent_definition(module) when is_atom(module) and not is_nil(module),
-    do: Jido.Agent.Source.definition(module)
-
-  def agent_definition(_module), do: Authoring.error("Expected an Agent module")
+  defdelegate agent_definition(source), to: Jido.Agent.Source, as: :definition
 
   defp path(value) when is_binary(value) and byte_size(value) > 0 do
     case Jido.Signal.Router.add(Jido.Signal.Router.new!(), {value, __MODULE__}) do

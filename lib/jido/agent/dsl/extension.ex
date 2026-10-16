@@ -56,7 +56,7 @@ defmodule Jido.Agent.DSL.Extension do
   @doc false
   def mark_agent_block do
     quote generated: true do
-      Jido.Agent.Authoring.Compiler.register_agent_block!(__MODULE__)
+      Module.put_attribute(__MODULE__, :jido_agent_block_declared, true)
     end
   end
 

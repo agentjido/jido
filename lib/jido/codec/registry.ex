@@ -128,23 +128,16 @@ defmodule Jido.Codec.Registry do
   end
 
   defp validate_entry({id, {kind, value}}) when kind in @kinds do
-    with :ok <- identifier_valid(id), :ok <- value_valid(kind, value), do: {:ok, id}
+    with :ok <- identifier_valid(id), do: value_valid(kind, value)
   end
 
   defp validate_entry({id, {:alias, value}}) do
-    with :ok <- identifier_valid(id), :ok <- identifier_valid(value), do: {:ok, id}
+    with :ok <- identifier_valid(id), do: identifier_valid(value)
   end
 
   defp validate_entry(_entry), do: Authoring.error("Invalid Registry entry")
 
-  defp validate_entries(entries) do
-    Enum.reduce_while(entries, :ok, fn entry, :ok ->
-      case validate_entry(entry) do
-        {:ok, _id} -> {:cont, :ok}
-        {:error, _error} = error -> {:halt, error}
-      end
-    end)
-  end
+  defp validate_entries(entries), do: Authoring.check_each(entries, &validate_entry/1)
 
   defp identifier_valid(id) when is_binary(id) and byte_size(id) in 1..255 do
     if String.valid?(id), do: :ok, else: Authoring.error("Invalid Registry identifier")
@@ -195,11 +188,7 @@ defmodule Jido.Codec.Registry do
 
   defp agent_module?(module) do
     Code.ensure_loaded?(module) and
-      (function_exported?(module, :handle_signal, 2) or
-         module.module_info(:attributes)
-         |> Keyword.get_values(:behaviour)
-         |> List.flatten()
-         |> Enum.member?(Jido.Agent))
+      Jido.Agent.Validation.loaded_agent_module?(module)
   end
 
   defp unique_values(entries) do

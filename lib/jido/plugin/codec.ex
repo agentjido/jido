@@ -15,7 +15,7 @@ defmodule Jido.Plugin.Codec do
   def encode(plugin) do
     with {:ok, [plugin]} <- Jido.Plugin.Normalizer.canonical_declarations([plugin]),
          {:ok, registry} <- derive_registry(plugin),
-         {:ok, document} <- encode_normalized(plugin, registry),
+         {:ok, document} <- encode_declaration(plugin, registry),
          do: {:ok, document, registry}
   end
 
@@ -25,10 +25,12 @@ defmodule Jido.Plugin.Codec do
   def encode(plugin, registry) do
     with {:ok, [{module, options}]} <- Jido.Plugin.Normalizer.canonical_declarations([plugin]),
          {:ok, registry} <- Registry.new(registry),
-         do: encode_normalized({module, options}, registry)
+         do: encode_declaration({module, options}, registry)
   end
 
-  defp encode_normalized({module, options}, registry) do
+  # The enclosing Codec has validated the declaration and Registry.
+  @doc false
+  def encode_declaration({module, options}, %Registry{} = registry) do
     with {:ok, module_id} <- Registry.identifier(registry, :plugin, module),
          {:ok, options} <- Data.encode(options, registry) do
       document = %{
@@ -49,9 +51,22 @@ defmodule Jido.Plugin.Codec do
     with :ok <- Data.check_document(document),
          :ok <- document_header(document),
          {:ok, registry} <- Registry.new(registry),
-         {:ok, module} <- Registry.resolve(registry, document["module"], :plugin),
+         {:ok, plugin} <- decode_fields(document, registry) do
+      {:ok, {plugin.module, plugin.options}}
+    end
+  end
+
+  # The enclosing document has passed its bounds check and Registry validation.
+  # Retain the current Plugin spec so Agent validation can reuse this read.
+  @doc false
+  def decode_spec(document, %Registry{} = registry) do
+    with :ok <- document_header(document), do: decode_fields(document, registry)
+  end
+
+  defp decode_fields(document, registry) do
+    with {:ok, module} <- Registry.resolve(registry, document["module"], :plugin),
          {:ok, options} <- Data.decode(document["options"], registry),
-         {:ok, [plugin]} <- Jido.Plugin.Normalizer.canonical_declarations([{module, options}]) do
+         {:ok, [plugin]} <- Jido.Plugin.Normalizer.normalize_all([{module, options}]) do
       {:ok, plugin}
     end
   end

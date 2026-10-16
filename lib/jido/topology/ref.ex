@@ -11,12 +11,7 @@ defmodule Jido.Topology.Ref do
   def schema, do: @schema
 
   @doc "Names a public export. Nested components must re-export their public endpoints."
-  def ref(component, key) do
-    case new(component, key) do
-      {:ok, value} -> value
-      {:error, error} -> raise error
-    end
-  end
+  def ref(component, key), do: Authoring.unwrap!(new(component, key))
 
   @doc false
   def new(component, key) do

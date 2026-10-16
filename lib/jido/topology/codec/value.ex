@@ -47,22 +47,7 @@ defmodule Jido.Topology.Codec.Value do
 
   def decode(%{"$type" => "map", "entries" => pairs} = value, registry)
       when map_size(value) == 2 do
-    with {:ok, pairs} <-
-           Authoring.traverse(pairs, fn
-             [key, item] ->
-               with {:ok, key} <- decode(key, registry),
-                    {:ok, item} <- decode(item, registry),
-                    do: {:ok, {key, item}}
-
-             _ ->
-               Authoring.error("Invalid topology map entry")
-           end) do
-      decoded = Map.new(pairs)
-
-      if length(pairs) == map_size(decoded),
-        do: {:ok, decoded},
-        else: Authoring.error("Duplicate decoded map key")
-    end
+    Data.decode_map(pairs, &decode(&1, registry), "Invalid topology map entry")
   end
 
   def decode(%{"$type" => "tuple", "items" => items} = value, registry)

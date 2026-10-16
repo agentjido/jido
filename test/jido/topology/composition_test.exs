@@ -36,11 +36,14 @@ defmodule Jido.Topology.CompositionTest do
     assert instance.definition.startup.concurrency == 4
   end
 
-  test "direct Plan construction equals instance planning with normalized input" do
+  test "normalized input preserves the exact instance plan" do
     for input <- [%{east_workers: 0, west_workers: 2}, %{east_workers: 3, west_workers: 1}] do
       instance = ComposedSystem.new!(id: "direct/plan", input: input)
-      assert {:ok, plan} = Plan.build(instance.definition, instance.id, instance.input)
-      assert plan == instance.plan
+
+      assert {:ok, replanned} =
+               Topology.instantiate(instance.definition, id: instance.id, input: instance.input)
+
+      assert replanned.plan == instance.plan
     end
   end
 
@@ -61,18 +64,18 @@ defmodule Jido.Topology.CompositionTest do
 
     assert {:error, root_error} = Topology.instantiate(definition, id: "root")
     assert Exception.message(root_error) =~ "unbound imports"
-    assert {:error, plan_error} = Plan.build(invalid, "root", %{})
-    assert Map.drop(plan_error, [:stacktrace]) == Map.drop(root_error, [:stacktrace])
+    assert {:error, explicit_input_error} = Topology.instantiate(invalid, id: "root", input: %{})
+    assert Map.drop(explicit_input_error, [:stacktrace]) == Map.drop(graph_error, [:stacktrace])
   end
 
-  test "direct Plan construction still checks the declaration graph" do
+  test "instance construction with explicit input still checks the declaration graph" do
     definition =
       Jido.Topology.new!(%{name: "cycle", groups: [%{key: :workers, module: Cell, count: 0}]})
 
     [group] = definition.groups
     invalid = %{definition | groups: [%{group | depends_on: ["workers"]}]}
 
-    assert {:error, error} = Plan.build(invalid, "cycle", %{})
+    assert {:error, error} = Topology.instantiate(invalid, id: "cycle", input: %{})
     assert Exception.message(error) =~ "cycle"
     assert {:error, instance_error} = Topology.instantiate(invalid, id: "cycle")
     assert Map.drop(instance_error, [:stacktrace]) == Map.drop(error, [:stacktrace])

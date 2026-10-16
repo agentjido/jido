@@ -2,7 +2,6 @@ defmodule Jido.Topology.PluginIntegrationTest do
   use ExUnit.Case, async: true
 
   alias Jido.Topology
-  alias Jido.Topology.Plan
   alias Jido.Topology.Plugin.Contribution
 
   defmodule BusFacet do
@@ -148,8 +147,10 @@ defmodule Jido.Topology.PluginIntegrationTest do
              ]
     end
 
-    assert {:ok, direct_plan} = Plan.build(definition, instance.id, instance.input)
-    assert direct_plan == instance.plan
+    assert {:ok, replanned} =
+             Topology.instantiate(definition, id: instance.id, input: instance.input)
+
+    assert replanned.plan == instance.plan
   end
 
   test "included definitions receive scoped contributions" do

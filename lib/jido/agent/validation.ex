@@ -4,7 +4,6 @@ defmodule Jido.Agent.Validation do
   alias Jido.Agent
   alias Jido.Agent.Authoring
   alias Jido.Agent.State
-  alias Jido.Error
   alias Jido.Agent.Plugin, as: AgentPlugin
   alias Jido.Plugin.Normalizer, as: PluginNormalizer
 
@@ -25,8 +24,9 @@ defmodule Jido.Agent.Validation do
 
   @doc false
   @spec new(map() | keyword() | Agent.t()) ::
-          {:ok, Agent.t()} | {:error, Exception.t()}
-  def new(%Agent{} = agent), do: validate_definition(agent)
+          {:ok, Agent.definition(), [Jido.Plugin.Spec.t()], Zoi.schema()}
+          | {:error, Exception.t()}
+  def new(%Agent{} = agent), do: validate_definition_with_plugins(agent)
 
   def new(attrs) when is_list(attrs) do
     with {:ok, attrs} <- normalize_attrs(attrs, :definition) do
@@ -36,14 +36,13 @@ defmodule Jido.Agent.Validation do
 
   def new(%{} = attrs) do
     with :ok <- known_keys(attrs),
-         :ok <- reject_instance_data(attrs),
-         {:ok, agent, _specs, _schema} <- validate_common(build_definition_value(attrs)) do
-      {:ok, agent}
+         :ok <- reject_instance_data(attrs) do
+      validate_common(build_definition_value(attrs))
     end
   end
 
   def new(value),
-    do: invalid("Agent definition must be a map or keyword list", %{value: value})
+    do: Authoring.error("Agent definition must be a map or keyword list", %{value: value})
 
   @doc false
   @spec instantiate(Agent.t(), map() | keyword()) ::
@@ -58,7 +57,7 @@ defmodule Jido.Agent.Validation do
   end
 
   def instantiate_with_plugins(value, _overrides),
-    do: invalid("Expected a neutral Jido.Agent definition", %{value: value})
+    do: Authoring.error("Expected a neutral Jido.Agent definition", %{value: value})
 
   @doc false
   @spec validate(term()) :: {:ok, Agent.t()} | {:error, Exception.t()}
@@ -69,13 +68,13 @@ defmodule Jido.Agent.Validation do
       do: validate_instance(agent)
 
   def validate(%Agent{} = agent) do
-    invalid("Agent must be a complete definition or instance", %{
+    Authoring.error("Agent must be a complete definition or instance", %{
       id: agent.id,
       state: agent.state
     })
   end
 
-  def validate(value), do: invalid("Expected a Jido.Agent value", %{value: value})
+  def validate(value), do: Authoring.error("Expected a Jido.Agent value", %{value: value})
 
   @doc false
   @spec validate_definition(term()) :: {:ok, Agent.t()} | {:error, Exception.t()}
@@ -98,7 +97,7 @@ defmodule Jido.Agent.Validation do
   end
 
   def validate_instance_with_plugins(value),
-    do: invalid("Expected a Jido.Agent instance", %{value: value})
+    do: Authoring.error("Expected a Jido.Agent instance", %{value: value})
 
   # The compiler supplies the module identity; direct definitions can be unversioned.
   def module_definition(module, attrs) do
@@ -112,25 +111,13 @@ defmodule Jido.Agent.Validation do
            plugins_at(PluginNormalizer.declarations(definition.plugins), definition.plugins) do
       {:ok, %{definition | plugins: plugins}}
     else
-      false -> invalid("Agent vsn must be a positive integer", %{}) |> Authoring.at(:vsn)
+      false -> Authoring.error("Agent vsn must be a positive integer", %{}) |> Authoring.at(:vsn)
       error -> error
     end
   end
 
-  defp build_definition_value(attrs) do
-    %Agent{
-      id: nil,
-      module: Map.get(attrs, :module, Agent),
-      vsn: Map.get(attrs, :vsn),
-      name: Map.get(attrs, :name),
-      description: Map.get(attrs, :description),
-      schema: Map.get(attrs, :schema, Zoi.object(%{})),
-      plugins: Map.get(attrs, :plugins, []),
-      state: nil,
-      routes: Map.get(attrs, :routes, []),
-      metadata: Map.get(attrs, :metadata, %{})
-    }
-  end
+  defp build_definition_value(attrs),
+    do: struct(Agent, Map.merge(%{module: Agent, schema: Zoi.object(%{})}, attrs))
 
   defp validate_common(agent) do
     with {:ok, agent} <- normalize_fields(agent, [:name, :description]),
@@ -183,6 +170,7 @@ defmodule Jido.Agent.Validation do
 
     index =
       Enum.find_index(declarations, fn
+        %Jido.Plugin.Spec{module: module} -> module == plugin
         {module, _opts} -> module == plugin
         module -> module == plugin
       end)
@@ -196,14 +184,14 @@ defmodule Jido.Agent.Validation do
     do: validate_common(definition)
 
   def validate_definition_with_plugins(%Agent{} = definition) do
-    invalid("Agent definition cannot contain instance identity or state", %{
+    Authoring.error("Agent definition cannot contain instance identity or state", %{
       id: definition.id,
       state: definition.state
     })
   end
 
   def validate_definition_with_plugins(value),
-    do: invalid("Expected a neutral Jido.Agent definition", %{value: value})
+    do: Authoring.error("Expected a neutral Jido.Agent definition", %{value: value})
 
   @doc false
   def instantiate_validated(validation, overrides) do
@@ -225,7 +213,7 @@ defmodule Jido.Agent.Validation do
   defp known_keys(attrs) do
     case Map.keys(attrs) -- @definition_keys do
       [] -> :ok
-      [key | _] -> invalid("Unknown Agent definition key", %{key: key})
+      [key | _] -> Authoring.error("Unknown Agent definition key", %{key: key})
     end
   end
 
@@ -237,7 +225,7 @@ defmodule Jido.Agent.Validation do
     if keys == [] do
       :ok
     else
-      invalid("Agent.new/1 accepts definition data only", %{keys: keys})
+      Authoring.error("Agent.new/1 accepts definition data only", %{keys: keys})
     end
   end
 
@@ -245,7 +233,7 @@ defmodule Jido.Agent.Validation do
   defp instance_id(id), do: validate_id(id)
 
   defp validate_id(id) when is_binary(id) and byte_size(id) > 0, do: {:ok, id}
-  defp validate_id(id), do: invalid("Agent id must be a non-empty string", %{id: id})
+  defp validate_id(id), do: Authoring.error("Agent id must be a non-empty string", %{id: id})
 
   @doc false
   def field(:name, name), do: Jido.Util.validate_name(name)
@@ -254,7 +242,7 @@ defmodule Jido.Agent.Validation do
     do: {:ok, description}
 
   def field(:description, description) do
-    invalid("Agent description must be a string or nil", %{description: description})
+    Authoring.error("Agent description must be a string or nil", %{description: description})
   end
 
   def field(:routes, routes), do: Authoring.routes(routes)
@@ -263,52 +251,52 @@ defmodule Jido.Agent.Validation do
     do: {:ok, metadata}
 
   def field(:metadata, metadata),
-    do: invalid("Agent metadata must be a map", %{metadata: metadata})
+    do: Authoring.error("Agent metadata must be a map", %{metadata: metadata})
 
   def field(:vsn, nil), do: {:ok, nil}
   def field(:vsn, vsn) when is_integer(vsn) and vsn > 0, do: {:ok, vsn}
 
   def field(:vsn, vsn),
-    do: invalid("Agent vsn must be a positive integer or nil", %{vsn: vsn})
+    do: Authoring.error("Agent vsn must be a positive integer or nil", %{vsn: vsn})
 
   defp validate_module(module) when is_atom(module) and not is_nil(module) do
     case Code.ensure_loaded(module) do
       {:module, ^module} ->
-        if module == Agent or agent_behaviour?(module) or
-             function_exported?(module, :handle_signal, 2) do
+        if loaded_agent_module?(module) do
           :ok
         else
-          invalid("Agent module must implement the Jido.Agent behavior", %{module: module})
+          Authoring.error("Agent module must implement the Jido.Agent behavior", %{module: module})
         end
 
       {:error, reason} ->
-        invalid("Agent module could not be loaded", %{module: module, reason: reason})
+        Authoring.error("Agent module could not be loaded", %{module: module, reason: reason})
     end
   end
 
-  defp validate_module(module), do: invalid("Agent module must be a module", %{module: module})
+  defp validate_module(module),
+    do: Authoring.error("Agent module must be a module", %{module: module})
 
-  defp agent_behaviour?(module) do
-    module.module_info(:attributes)
-    |> Keyword.get_values(:behaviour)
-    |> List.flatten()
-    |> Enum.member?(Agent)
+  @doc false
+  def loaded_agent_module?(Agent), do: true
+
+  def loaded_agent_module?(module) do
+    Agent in List.flatten(Keyword.get_values(module.module_info(:attributes), :behaviour)) or
+      function_exported?(module, :handle_signal, 2)
   end
 
   defp validate_targets(routes) do
     routes
     |> Enum.with_index()
-    |> Enum.reduce_while(:ok, fn {route, index}, :ok ->
+    |> Authoring.check_each(fn {route, index} ->
       {target, _defaults} = Authoring.split_target(route.target)
 
       case Jido.Instruction.validate(target) do
         :ok ->
-          {:cont, :ok}
+          :ok
 
         {:error, reason} ->
-          {:halt,
-           invalid("Invalid Agent route executable", %{target: target, reason: reason})
-           |> Authoring.at([:routes, index, :target])}
+          Authoring.error("Invalid Agent route executable", %{target: target, reason: reason})
+          |> Authoring.at([:routes, index, :target])
       end
     end)
   end
@@ -316,18 +304,14 @@ defmodule Jido.Agent.Validation do
   defp normalize_attrs(attrs, source) do
     case Authoring.to_attrs(attrs) do
       {:ok, attrs} -> {:ok, attrs}
-      :error -> invalid("Agent #{source} must be a map or keyword list", %{value: attrs})
+      :error -> Authoring.error("Agent #{source} must be a map or keyword list", %{value: attrs})
     end
   end
 
   defp validate_instance_overrides(overrides) do
     case Map.keys(overrides) -- @instance_keys do
       [] -> :ok
-      [key | _] -> invalid("Agent instances can set only :id and :state", %{key: key})
+      [key | _] -> Authoring.error("Agent instances can set only :id and :state", %{key: key})
     end
-  end
-
-  defp invalid(message, details) do
-    {:error, Error.validation_error(message, kind: :config, details: details)}
   end
 end

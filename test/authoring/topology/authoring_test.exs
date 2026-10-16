@@ -4,7 +4,7 @@ defmodule JidoTest.Authoring.Topology.AuthoringTest do
   use ExUnit.Case, async: false
   @moduletag :authoring
   alias Jido.Topology
-  alias Jido.Topology.{Codec, Plan}
+  alias Jido.Topology.Codec
   alias JidoTest.Authoring.Topology.Corpus
 
   setup %{variant: variant} do
@@ -45,8 +45,11 @@ defmodule JidoTest.Authoring.Topology.AuthoringTest do
         assert instance.definition === definition
         assert instance.input === scenario.normalized
         assert instance.plan === scenario.plan
-        assert {:ok, plan} = Plan.build(definition, "corpus", scenario.normalized)
-        assert plan === scenario.plan
+
+        assert {:ok, normalized_instance} =
+                 Topology.instantiate(definition, id: "corpus", input: scenario.normalized)
+
+        assert normalized_instance.plan === scenario.plan
       end
 
       for input <- spec.invalid_inputs do

@@ -1,21 +1,18 @@
 defmodule Jido.Agent.State do
   @moduledoc false
 
+  alias Jido.Agent.Authoring
   alias Jido.Error
   alias Jido.Util.DeepMerge
   alias Zoi.Types.Meta
 
   @doc false
   def defaults_from_schema(%Zoi.Types.Map{fields: fields}) do
-    Enum.reduce(fields, %{}, fn
-      {key, %{meta: %Meta{required: required} = meta}}, defaults when required != false ->
-        if Meta.default?(meta),
-          do: Map.put(defaults, key, Meta.default(meta)),
-          else: defaults
-
-      {_key, _field_schema}, defaults ->
-        defaults
-    end)
+    for {key, %{meta: %Meta{required: required} = meta}} <- fields,
+        required != false,
+        Meta.default?(meta),
+        into: %{},
+        do: {key, Meta.default(meta)}
   end
 
   @doc false
@@ -35,8 +32,9 @@ defmodule Jido.Agent.State do
   end
 
   @spec validate_schema(term()) :: :ok | {:error, Error.ValidationError.t()}
-  def validate_schema(%Zoi.Types.Map{fields: fields} = schema) when is_list(fields),
-    do: validate_state_schema(schema)
+  def validate_schema(%Zoi.Types.Map{fields: fields} = schema) when is_list(fields) do
+    with :ok <- static_schema(schema), do: validation_only_schema(schema)
+  end
 
   def validate_schema(schema) do
     {:error,
@@ -102,10 +100,6 @@ defmodule Jido.Agent.State do
      )}
   end
 
-  defp validate_state_schema(schema) do
-    with :ok <- static_schema(schema), do: validation_only_schema(schema)
-  end
-
   defp validation_only_schema(%{__struct__: type, meta: %Zoi.Types.Meta{} = meta} = schema) do
     cond do
       Enum.any?(meta.effects, &match?({:transform, _}, &1)) ->
@@ -125,14 +119,8 @@ defmodule Jido.Agent.State do
     end
   end
 
-  defp validation_only_schema(values) when is_list(values) do
-    Enum.reduce_while(values, :ok, fn value, :ok ->
-      case validation_only_schema(value) do
-        :ok -> {:cont, :ok}
-        {:error, _} = error -> {:halt, error}
-      end
-    end)
-  end
+  defp validation_only_schema(values) when is_list(values),
+    do: Authoring.check_each(values, &validation_only_schema/1)
 
   defp validation_only_schema(values) when is_tuple(values),
     do: values |> Tuple.to_list() |> validation_only_schema()

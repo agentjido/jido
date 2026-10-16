@@ -94,15 +94,22 @@ defmodule Jido.Codec.Data do
 
   def decode(%{"$type" => "map", "entries" => entries} = data, registry)
       when map_size(data) == 2 and is_list(entries) do
+    decode_map(entries, &decode(&1, registry), "Invalid map entry")
+  end
+
+  def decode(_value, _registry), do: Authoring.error("Invalid tagged authoring value")
+
+  @doc false
+  def decode_map(entries, decode_value, invalid_entry_message) do
     with {:ok, pairs} <-
            Authoring.traverse(entries, fn
              [key, value] ->
-               with {:ok, key} <- decode(key, registry),
-                    {:ok, value} <- decode(value, registry),
+               with {:ok, key} <- decode_value.(key),
+                    {:ok, value} <- decode_value.(value),
                     do: {:ok, {key, value}}
 
              _ ->
-               Authoring.error("Invalid map entry")
+               Authoring.error(invalid_entry_message)
            end),
          decoded = Map.new(pairs),
          true <- length(pairs) == map_size(decoded) do
@@ -112,8 +119,6 @@ defmodule Jido.Codec.Data do
       error -> error
     end
   end
-
-  def decode(_value, _registry), do: Authoring.error("Invalid tagged authoring value")
 
   def check_document(value) do
     case check(value, 0, 0) do

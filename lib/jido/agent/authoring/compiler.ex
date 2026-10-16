@@ -5,6 +5,8 @@ defmodule Jido.Agent.Authoring.Compiler do
   alias Jido.Agent.Authoring.SourceMap
   alias Spark.Dsl.Extension
 
+  @agent_root_options [:name, :description, :vsn]
+
   defmacro __using__(opts) do
     host = Keyword.fetch!(opts, :host)
     agent_opts = Keyword.fetch!(opts, :agent_options)
@@ -28,12 +30,7 @@ defmodule Jido.Agent.Authoring.Compiler do
 
       @doc "Returns the neutral canonical Agent definition."
       @spec definition() :: Jido.Agent.definition()
-      def definition do
-        case Jido.Agent.Source.definition(__MODULE__) do
-          {:ok, definition} -> definition
-          {:error, error} -> raise error
-        end
-      end
+      def definition, do: Jido.Agent.Authoring.unwrap!(Jido.Agent.Source.definition(__MODULE__))
 
       @doc "Returns the positive Agent definition version owned by this module."
       @spec vsn() :: pos_integer()
@@ -168,14 +165,14 @@ defmodule Jido.Agent.Authoring.Compiler do
     host = Module.get_attribute(env.module, :jido_agent_host)
     {extensions, options} = Map.pop(options, :extensions, [])
     {agent_extensions, topology_extensions} = extensions(host, extensions, env)
-    config = host_config(host, options, env)
+    {agent_options, topology_options} = split_options(host, options, env)
     # Read current compile state once. Loaded module code can be stale on reload.
     dsl = Module.get_attribute(env.module, :spark_dsl_config) || %{}
-    agent = config |> lower_agent(agent_extensions, dsl, env) |> emit_agent()
+    agent = agent_options |> lower_agent(agent_extensions, dsl, env) |> emit_agent()
 
     topology =
       if host == :topology do
-        options
+        topology_options
         |> Jido.Topology.DSL.Compiler.lower(topology_extensions, dsl, env)
         |> emit_topology(env)
       end
@@ -243,16 +240,14 @@ defmodule Jido.Agent.Authoring.Compiler do
     end
   end
 
-  @doc false
-  def register_agent_block!(module),
-    do: Module.put_attribute(module, :jido_agent_block_declared, true)
+  defp split_options(:topology, options, _env) do
+    {agent, topology} = Map.split(options, @agent_root_options)
+    {agent, Map.merge(topology, Map.take(agent, [:name]))}
+  end
 
-  defp host_config(:topology, config, _env),
-    do: Map.take(config, [:name, :description, :vsn])
-
-  defp host_config(:agent, config, env) do
-    unwrap!(Authoring.keys(config, [:name, :description, :vsn]), env)
-    config
+  defp split_options(:agent, options, env) do
+    unwrap!(Authoring.keys(options, @agent_root_options), env)
+    {options, nil}
   end
 
   defp extensions(:agent, extensions, _env), do: {extensions, []}

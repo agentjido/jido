@@ -11,7 +11,7 @@ modules:
   - Jido.Agent.Validation
   - Jido.Agent.State
   - Jido.Agent.Codec
-  - Jido.Agent.Codec.Deriver
+  - Jido.Plugin.Codec
   - Jido.Agent.Runner
   - Jido.Agent.Turn
   - Jido.Agent.Plugin

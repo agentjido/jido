@@ -53,9 +53,7 @@ defmodule Jido.Agent.Authoring.Extension do
     end
   end
 
-  defp proper_list?([]), do: true
-  defp proper_list?([_head | tail]), do: proper_list?(tail)
-  defp proper_list?(_tail), do: false
+  defp proper_list?(value), do: is_list(value) and not List.improper?(value)
 
   defp invalid_result(label, extension, result),
     do:

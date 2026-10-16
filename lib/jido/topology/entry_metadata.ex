@@ -75,6 +75,7 @@ defmodule Jido.Topology.EntryMetadata do
     binding: {nil, [key: [type: :any, required: true], to: [type: :any, required: true]]}
   ]
 
+  def collection(kind), do: @entries |> Keyword.fetch!(kind) |> elem(0)
   def schema(kind), do: @entries |> Keyword.fetch!(kind) |> elem(1)
   def fields(kind), do: Keyword.keys(schema(kind))
 

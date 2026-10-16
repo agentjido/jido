@@ -1,11 +1,11 @@
 # Agent and Topology API contracts
 
 `jido.agent` protects the public path from declaration to definition, instance,
-and direct command. It has 25 active obligations. The obligation IDs refine the
-Agent, Turn, effect, Plugin, and error promises in `guides/public-contracts.md`.
+and direct command. Its obligation IDs refine the Agent, Turn, effect, Plugin,
+and error promises in `guides/public-contracts.md`.
 
-`jido.topology` adds 17 active obligations for the shared Agent host, static
-graph authoring, pure planning, and versioned documents. Read
+`jido.topology` protects the shared Agent host, static graph authoring, pure
+planning, and versioned documents. Read
 `jido/topology.obligations.md` for the promises and
 `jido/topology.decisions.yml` for the scope. The public DSL stays unchanged.
 See [the Topology baseline](jido/topology.baseline.md) for focused mutation
@@ -36,16 +36,19 @@ mix test.ci
 ```
 
 `mix test.contract` runs Covenant's passing-test gate and writes
-`test/contracts/coverage.json`. All 42 obligations must have passing tests. Core tests,
-property tests, and the contract gate run through `mix test.ci`. `mix quality`
-also runs the contract gate. Keep the existing package line-coverage gate.
+`test/contracts/coverage.json`. All active obligations must have passing tests.
+Core tests, property tests, and the contract gate run through `mix test.ci`.
+`mix quality` also runs the contract gate. Keep the existing package
+line-coverage gate.
 
 ## Agent mutation review
 
-The macro run covers the 18 files listed in the obligations front matter.
-It runs only the public API contract tests. It does not select AgentServer,
-Topology implementation files, or dependency packages. The Topology contract
-checks the shared compiler separately. Directives are returned without dispatch.
+The Agent mutation profile uses the module list in
+`jido/agent.obligations.md`, including the shared authoring compiler and Plugin
+Codec. It runs only the public API contract tests. It does not select
+AgentServer, Topology implementation files, or dependency packages. The
+Topology contract checks the shared compiler separately. Directives are returned
+without dispatch.
 Fixtures use fresh module namespaces and wait for compiler exit, including
 `after_verify`, before assertions or cleanup. No precompiled Agent fixture is
 used, so this suite needs no extra `--recompile` arguments.
@@ -67,22 +70,15 @@ Mutation credit and line coverage answer different questions. An invalid mutant
 has no kill credit. A fail-fast run has partial obligation credit. Use a complete
 run without `--fail-fast` for the obligation matrix.
 
-For a focused check, select IDs from a matrix made with the same source and
-module profile. IDs can change when source changes. Check the reported sites.
-For example, the current option validation, Signal helper generation, and route
-claim paths can be checked with:
+For a focused check, use the latest commands and site tables in
+[the Agent baseline](jido/agent.baseline.md). Select IDs from a matrix made with
+the same source and module profile. IDs can change when source or profiles
+change. Check the reported sites. Each selected mutant runs the Agent contract
+tests; a focused result does not verify other mutation sites.
 
-```sh
-MIX_ENV=test mix covenant.mutate jido.agent --macros \
-  --only m0183,m0348,m0680 --jobs 1 --seed 0 --timeout 5000 \
-  --max-runtime 120000 --out tmp/covenant/agent-focused.json
-```
-
-This runs all 78 Agent contract tests for each selected mutant. It gives exact test
-attribution for these three mutants. It does not verify the other mutation sites.
-For a shorter development check, add `--fail-fast` and
-`--prioritize tmp/covenant/agent-focused.json`, and use a different output path.
-Prior results select a test to run first; every verdict is measured again.
+For a shorter development check, add `--fail-fast`, pass a prior result path to
+`--prioritize`, and use a different output path. Prior results select a test to
+run first; every verdict is measured again.
 Known annotations outside the selection are deferred. Unknown annotations and
 stale annotations within the selection still fail.
 
@@ -118,9 +114,9 @@ mutation profile. During the pilot, a malformed provider attribute caused
 Spark's asynchronous `__after_verify__/1` to exit the Covenant worker with
 `UndefinedFunctionError: nil.__struct__/0`. The fork did not record an invalid
 verdict or finish that job. The partial 21-file run is not a complete result.
-The current 18-file profile still tests fresh DSL compilation, compiler macros, inline
-Actions, extension lowering, and generated helpers. Provider declarations and
-metadata validation remain covered by public contract tests and line coverage.
+The Agent mutation profile still tests fresh DSL compilation, compiler macros,
+inline Actions, extension lowering, and generated helpers. Provider declarations
+and metadata validation remain covered by public contract tests and line coverage.
 This is a tool limit, not an accepted behavior gap. No mutation score is claimed
 for the excluded provider file.
 
@@ -143,11 +139,11 @@ remain open to change.
 
 ## Topology guards
 
-The Topology component uses 37 focused tests in three files under
-`test/contract/jido/`. They use the shared compiler helper, fresh Topology
-modules, neutral Agent definitions, and existing core fixtures. They do not
-load the optional authoring corpus or start AgentServer. Run the optional
-corpus separately with `mix test.authoring`.
+The Topology contract tests are in
+`test/contract/jido/topology_*_contract_test.exs`. They use the shared compiler
+helper, fresh Topology modules, neutral Agent definitions, and existing core
+fixtures. They do not load the optional authoring corpus or start AgentServer.
+Run the optional corpus separately with `mix test.authoring`.
 
 The guarded path is declaration, static definition, input, and plan. It
 includes the generated Agent API and direct commands, ordered extensions and
@@ -155,10 +151,13 @@ Plugin contributions, includes, child declarations, error boundaries, and
 Codec versions 2 and 3. Runtime activation, Controller behavior, persistence,
 and dispatch remain outside this component.
 
-The initial Topology mutation checks select 22 sites from its 13-module
-profile and nine sites from a separate shared compiler profile. Both use macro
-mode, verified checkpoints, and selective compilation. The shared Agent
-modules remain in the Agent component's ownership list; the Topology check
-selects them with explicit module overrides. Each profile runs only the
-Topology contract tests. These are focused results, not full component scores.
-Use the exact commands and site table in `jido/topology.baseline.md`.
+The initial Topology baseline selected 22 sites from its then-current 13-module
+profile and nine sites from a separate shared compiler profile. Those historical
+runs used macro mode, verified checkpoints, and selective compilation.
+
+The current Topology mutation profile uses the module list in
+`jido/topology.obligations.md`. Shared Agent modules remain in the Agent
+component's ownership list; the Topology check selects them with explicit module
+overrides. Each profile runs only the Topology contract tests. Focused results
+do not establish full component scores. Use the latest commands and site tables
+in [the Topology baseline](jido/topology.baseline.md).

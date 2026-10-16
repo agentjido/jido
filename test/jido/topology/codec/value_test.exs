@@ -18,6 +18,8 @@ defmodule Jido.Topology.Codec.ValueTest do
 
     for {entries, message} <- [
           {[["key"]], "Invalid topology map entry"},
+          {:invalid, "Expected a proper list"},
+          {[["key", 1] | :tail], "Expected a proper list"},
           {[["key", 1], ["key", 2]], "Duplicate decoded map key"}
         ] do
       assert {:error, error} = Value.decode(%{"$type" => "map", "entries" => entries}, registry)

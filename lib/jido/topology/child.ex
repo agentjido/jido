@@ -13,7 +13,6 @@ defmodule Jido.Topology.Child do
          {:ok, source, owner, ancestors} <-
            Authoring.at(source(attrs[:topology], ancestors), :topology),
          {:ok, topology} <- Validation.definition(source, ancestors, depth + 1),
-         topology = struct(Jido.Topology, topology),
          {:ok, director} <- director(Map.get(attrs, :director, owner)),
          {:ok, input} <- Validation.plain_static_map(attrs.input),
          {:ok, activation} <- activation(attrs.activation),
@@ -105,28 +104,22 @@ defmodule Jido.Topology.Child do
   defp event(_), do: Authoring.error("Expected a child Signal path")
 
   def validate(definition) do
-    Authoring.traverse(definition.children, fn child ->
+    Authoring.check_each(definition.children, fn child ->
       with {:ok, composed} <- Composition.flatten(child.topology),
            :ok <- commands(child, composed),
-           :ok <- validate(child.topology) do
-        {:ok, child}
-      end
+           do: validate(child.topology)
     end)
-    |> case do
-      {:ok, _} -> :ok
-      error -> error
-    end
   end
 
   defp commands(child, composed) do
-    Enum.reduce_while(child.gate.commands, :ok, fn command, :ok ->
+    Authoring.check_each(child.gate.commands, fn command ->
       valid? =
         case command.member do
           {:child, key} -> Enum.any?(child.topology.children, &(&1.key == key))
           target -> not is_nil(member_key(%{lookup: composed.lookup}, target))
         end
 
-      if valid?, do: {:cont, :ok}, else: {:halt, Authoring.error("Unknown child command member")}
+      if valid?, do: :ok, else: Authoring.error("Unknown child command member")
     end)
   end
 
@@ -139,12 +132,9 @@ defmodule Jido.Topology.Child do
   end
 
   def plan(definition, id, input, parent_plan) do
-    with {:ok, _} <-
-           Authoring.traverse(definition.children, fn child ->
-             with :ok <- parent_bus(child, parent_plan), do: {:ok, child}
-           end),
-         {:ok, _} <-
-           Authoring.traverse(definition.children, fn child ->
+    with :ok <- Authoring.check_each(definition.children, &parent_bus(&1, parent_plan)),
+         :ok <-
+           Authoring.check_each(definition.children, fn child ->
              with {:ok, mapped} <- Reference.resolve(child.input, input),
                   :ok <- validate_director(child.director, id(id, child.key)),
                   {:ok, instance} <-
@@ -152,8 +142,7 @@ defmodule Jido.Topology.Child do
                       id: id(id, child.key),
                       input: mapped
                     ),
-                  :ok <- resolved_commands(child, instance.plan),
-                  do: {:ok, child}
+                  do: resolved_commands(child, instance.plan)
            end),
          do: :ok
   end
@@ -171,7 +160,7 @@ defmodule Jido.Topology.Child do
   defp member_key(plan, target), do: Plan.resolve(plan, target, :agent)
 
   defp resolved_commands(child, plan) do
-    Enum.reduce_while(child.gate.commands, :ok, fn command, :ok ->
+    Authoring.check_each(child.gate.commands, fn command ->
       valid? =
         case command.member do
           {:child, _} -> true
@@ -179,8 +168,8 @@ defmodule Jido.Topology.Child do
         end
 
       if valid?,
-        do: {:cont, :ok},
-        else: {:halt, Authoring.error("Unknown resolved child command member")}
+        do: :ok,
+        else: Authoring.error("Unknown resolved child command member")
     end)
   end
 end

@@ -1,7 +1,7 @@
 defmodule JidoCoreBench.AuthoringCases do
   @moduledoc false
   alias Jido.Agent.Codec
-  alias Jido.Agent.Codec.Deriver
+  alias Jido.Codec.Registry
   alias JidoCoreBench.Fixtures, as: F
 
   def workloads(sizes) do
@@ -37,8 +37,12 @@ defmodule JidoCoreBench.AuthoringCases do
         end,
         fn {definition, _document, _registry} ->
           case operation do
-            :derive -> Deriver.agent(definition)
-            :encode -> Codec.encode(definition)
+            :derive ->
+              with {:ok, entries} <- Codec.registry_entries(definition),
+                   do: Registry.derive(entries)
+
+            :encode ->
+              Codec.encode(definition)
           end
         end,
         fn result -> F.equal!(elem(result, 0), :ok) end

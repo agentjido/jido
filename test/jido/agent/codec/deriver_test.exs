@@ -1,8 +1,8 @@
-defmodule Jido.Agent.Codec.DeriverTest do
+defmodule Jido.Agent.Codec.RegistryDerivationTest do
   use ExUnit.Case, async: true
 
   alias Jido.Agent
-  alias Jido.Agent.Codec.Deriver
+  alias Jido.Agent.Codec
   alias JidoTest.AgentFixtures.Add
 
   test "agent derivation records first occurrences of all referenced kinds" do
@@ -17,7 +17,7 @@ defmodule Jido.Agent.Codec.DeriverTest do
         routes: [{"counter.add", {Add, %{by: 1}}, match: &String.trim/1}]
       )
 
-    assert {:ok, registry} = Deriver.agent(definition)
+    assert {:ok, _document, registry} = Codec.encode(definition)
     kinds = registry.entries |> Map.values() |> Enum.map(&elem(&1, 0))
 
     for kind <- [:agent, :schema, :atom, :value, :plugin, :action, :route_match] do
@@ -32,6 +32,6 @@ defmodule Jido.Agent.Codec.DeriverTest do
     [route] = definition.routes
     invalid = %{definition | routes: [%{route | target: 42}, route]}
 
-    assert {:error, %Jido.Action.Error.ConfigurationError{}} = Deriver.agent(invalid)
+    assert {:error, %Jido.Action.Error.ConfigurationError{}} = Codec.registry_entries(invalid)
   end
 end

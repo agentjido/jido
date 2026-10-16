@@ -1,7 +1,7 @@
 defmodule Jido.Topology.Plan do
   @moduledoc "An expanded topology with stable IDs, exact nodes, and dependency layers."
 
-  alias Jido.Agent.Authoring
+  alias Jido.Agent.{Authoring, State}
   alias Jido.Topology.{Composition, Ref, Reference, Resource, Validation}
 
   @schema Zoi.struct(__MODULE__, %{
@@ -17,13 +17,6 @@ defmodule Jido.Topology.Plan do
 
   @doc "Returns the plan schema."
   def schema, do: @schema
-
-  @doc false
-  def build(definition, id, input) do
-    with :ok <- root_imports(definition),
-         {:ok, instance} <- Jido.Topology.instantiate(definition, id: id, input: input),
-         do: {:ok, instance.plan}
-  end
 
   @doc false
   def extension_changes(current, target) do
@@ -102,31 +95,35 @@ defmodule Jido.Topology.Plan do
   end
 
   defp component_limits(scopes, agents, resources) do
-    with {:ok, pairs} <-
-           Authoring.traverse(Enum.sort(scopes), fn {path, context} ->
-             count = Enum.count(agents, &List.starts_with?(&1.scope, path))
+    components =
+      Map.new(scopes, fn {path, _context} -> {path, %{path: path, agents: 0, resources: 0}} end)
 
-             with :ok <- size_limit(count, context.definition.startup.max_agents),
-                  do:
-                    {:ok,
-                     {path,
-                      %{
-                        path: path,
-                        agents: count,
-                        resources: Enum.count(resources, &List.starts_with?(&1.scope, path))
-                      }}}
-           end),
-         do: {:ok, Map.new(pairs)}
+    components = Enum.reduce(agents, components, &count_component(&2, &1.scope, :agents))
+    components = Enum.reduce(resources, components, &count_component(&2, &1.scope, :resources))
+
+    Enum.reduce_while(Enum.sort(scopes), {:ok, components}, fn {path, context}, result ->
+      case size_limit(Map.fetch!(components, path).agents, context.definition.startup.max_agents) do
+        :ok -> {:cont, result}
+        error -> {:halt, error}
+      end
+    end)
+  end
+
+  defp count_component(components, path, field) do
+    components = update_in(components, [path, field], &(&1 + 1))
+
+    if path == [],
+      do: components,
+      else: count_component(components, Enum.drop(path, -1), field)
   end
 
   defp expand_group(%{count: count} = group, input, remaining) do
     with {:ok, count} <- Reference.resolve(count, input),
          :ok <- count_valid(count),
          :ok <- size_limit(count, remaining) do
-      members =
-        if count == 0, do: [], else: Enum.map(1..count, &{Integer.to_string(&1), %{index: &1}})
+      indices = if count == 0, do: [], else: 1..count
 
-      {:ok, Enum.map(members, &group_agent(group, &1))}
+      {:ok, Enum.map(indices, &group_agent(group, {Integer.to_string(&1), %{index: &1}}))}
     end
   end
 
@@ -169,12 +166,9 @@ defmodule Jido.Topology.Plan do
          {:ok, target_node} <- Reference.resolve(spec.node, input, member),
          {:ok, target_node} <- target_node(target_node),
          :ok <- placement_resources(target_node, spec.subscriptions),
-         {:ok, agent, _specs, _schema} <-
-           Jido.Agent.Validation.instantiate_validated(
-             Map.fetch!(resolved, Validation.agent_source(spec)),
-             id: Composition.escape(id) <> "/" <> key,
-             state: state
-           ) do
+         {:ok, definition, _specs, schema} <-
+           Map.fetch!(resolved, Validation.agent_source(spec)),
+         {:ok, _initialized_state} <- State.initialize(state, schema) do
       {:ok,
        spec
        |> Map.drop([:member])
@@ -182,7 +176,7 @@ defmodule Jido.Topology.Plan do
          key: key,
          id: Composition.escape(id) <> "/" <> key,
          declaration: spec.key,
-         module: agent.module,
+         module: definition.module,
          initial_state: state,
          node: target_node
        })}

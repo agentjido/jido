@@ -2,6 +2,8 @@
 modules:
   - Jido.Topology
   - Jido.Topology.DSL.Compiler
+  - Jido.Topology.DSL.Entity
+  - Jido.Topology.EntryMetadata
   - Jido.Topology.Extension
   - Jido.Topology.Validation
   - Jido.Topology.Source
@@ -12,7 +14,6 @@ modules:
   - Jido.Topology.Plugin
   - Jido.Topology.Child
   - Jido.Topology.Codec
-  - Jido.Topology.Codec.Deriver
   - Jido.Topology.Codec.Value
 ---
 
