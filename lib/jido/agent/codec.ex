@@ -25,6 +25,9 @@ defmodule Jido.Agent.Codec do
   Valid direct definitions can contain local route-match closures. These
   runtime-only closures are outside the Codec subset. Encodable route matches
   must be external unary captures in the trusted Registry.
+
+  A non-nil Agent topology or nonempty schedules are outside this document
+  version. Encoding returns an error until a combined format is available.
   """
   alias Jido.Agent
   alias Jido.Agent.Authoring
@@ -124,6 +127,12 @@ defmodule Jido.Agent.Codec do
 
   defp definition_object(_document),
     do: Authoring.error("Unknown authoring document type or version")
+
+  defp neutral_definition(%Agent{topology: topology}) when not is_nil(topology),
+    do: Authoring.error("Agent topology documents are not supported yet", %{field: :topology})
+
+  defp neutral_definition(%Agent{schedules: schedules}) when schedules != [],
+    do: Authoring.error("Agent schedule documents are not supported yet", %{field: :schedules})
 
   defp neutral_definition(%Agent{id: nil, state: nil} = definition),
     do: Agent.validate_definition(definition)

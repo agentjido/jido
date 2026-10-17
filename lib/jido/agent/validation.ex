@@ -14,6 +14,8 @@ defmodule Jido.Agent.Validation do
     :name,
     :description,
     :schema,
+    :topology,
+    :schedules,
     :plugins,
     :state,
     :routes,
@@ -126,7 +128,8 @@ defmodule Jido.Agent.Validation do
          {:ok, specs, schema} <- plugin_schema(agent),
          {:ok, agent} <- normalize_fields(agent, [:routes]),
          :ok <- validate_targets(agent.routes),
-         {:ok, agent} <- normalize_fields(agent, [:metadata]) do
+         {:ok, agent} <- normalize_fields(agent, [:metadata, :topology, :schedules]),
+         :ok <- Jido.Agent.Schedules.validate_owner(agent) do
       {:ok, %{agent | plugins: Enum.map(specs, &{&1.module, &1.options})}, specs, schema}
     end
   end
@@ -134,7 +137,9 @@ defmodule Jido.Agent.Validation do
   defp static(agent) do
     with {:ok, agent} <- normalize_fields(agent, [:name, :description, :vsn]),
          :ok <- State.validate_schema(agent.schema) |> Authoring.at(:schema),
-         do: normalize_fields(agent, [:routes, :metadata])
+         {:ok, agent} <- normalize_fields(agent, [:routes, :metadata, :topology, :schedules]),
+         :ok <- Jido.Agent.Schedules.validate_owner(agent),
+         do: {:ok, agent}
   end
 
   defp normalize_fields(agent, fields) do
@@ -246,6 +251,10 @@ defmodule Jido.Agent.Validation do
   end
 
   def field(:routes, routes), do: Authoring.routes(routes)
+
+  def field(:topology, topology), do: Jido.Agent.Topology.validate(topology)
+
+  def field(:schedules, schedules), do: Jido.Agent.Schedules.validate(schedules)
 
   def field(:metadata, metadata) when is_map(metadata) and not is_struct(metadata),
     do: {:ok, metadata}

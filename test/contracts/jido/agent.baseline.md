@@ -223,3 +223,149 @@ with exact attribution. The historical ledger retains all 215 decisions:
 seven source locations move and 208 remain unchanged. No judgment changes.
 See the [Topology record](topology.baseline.md#explicit-constructors-and-supported-wrappers--2026-10-16)
 for commands, sites, evidence hashes, and package validation.
+
+## Agent-owned composition and schedule authoring — 2026-10-16
+
+The canonical Agent now holds optional topology intent and ordered schedule
+declarations. Plain Agents have `topology: nil` and `schedules: []`. The topology
+map keeps its collection shape. Agent, group, and child declarations use one
+module-or-definition source rule. Root endpoints, explicit includes, imported
+Agent Refs, containment, and group delivery modes remain static data.
+
+Schedules require the Scheduler Plugin. Interval and cron declarations keep
+portable Signal templates. They do not create jobs, seed Scheduler state, or
+start timers. The existing JSON document format rejects the new fields when
+it cannot retain them. AgentServer, AgentServer2, and legacy Topology source
+files are unchanged. Runtime integration remains a later step.
+
+Nine new obligations, I26–I34, guard this boundary. The contract gate passes
+390 tests and all 145 package obligations, including all 34 Agent obligations.
+The core suite passes 1,873 tests, with 1,163 existing exclusions and 92.7%
+line coverage. The Agent and authoring regression selection also passed 833
+tests before the final policy guard was added. The final mutation baseline
+includes all 27 composition and schedule tests.
+
+Format and compilation with warnings as errors pass. Strict lint passes for
+the eight new authoring and guard files. The package warning lint check finds
+one existing Logger metadata warning at `lib/jido/agent_server2.ex:2977`.
+That file and its Logger configuration are unchanged.
+
+The final focused mutation run catches all 20 selected sites, with exact
+credit and no survivors, invalid mutations, timeouts, or partial credit.
+The first run found two missing cases: an unrelated Plugin must not satisfy
+the Scheduler requirement, and a gate command type must not be empty. Both
+cases now catch their selected mutations. No survivor exemption was added.
+
+The selected profile contains these six modules: `Jido.Agent.Authoring`,
+`Jido.Agent.Codec`, `Jido.Agent.Schedules`, `Jido.Agent.Topology`,
+`Jido.Agent.Topology.Reference`, and `Jido.Agent.Validation`. Its catalog has
+963 sites. Catalog enumeration runs no mutations. The historical 1,302-site
+profile was not rerun; no new full-profile score is claimed.
+
+The focused command uses a temporary copy of the current obligations file,
+without the historical survivor ledger. The historical ledger is checked
+separately: all 215 decisions identify one current site. Only 81 source
+locations move; operators, mutations, sorts, and reasons remain unchanged.
+
+```sh
+env MIX_ENV=test ERL_FLAGS='+S 4:4' mix covenant.mutate jido.agent \
+  --contracts tmp/covenant/agent-authoring/contracts \
+  --module Jido.Agent.Authoring --module Jido.Agent.Codec \
+  --module Jido.Agent.Schedules --module Jido.Agent.Topology \
+  --module Jido.Agent.Topology.Reference --module Jido.Agent.Validation \
+  --test-path test/contract/jido/agent_topology_contract_test.exs \
+  --test-path test/contract/jido/agent_composition_authoring_contract_test.exs \
+  --only m186,m283,m296,m308,m316,m325,m342,m356,m360,m560,m593,m605,m616,m627,m667,m691,m710,m714,m715,m739 \
+  --jobs 1 --seed 0 --timeout 5000 --max-runtime 300000 \
+  --out tmp/covenant/agent-authoring/mutants.json
+```
+
+Local evidence stays in `tmp/covenant/agent-authoring/`. The final report
+records each selected site, operator, mutation, and killing test. SHA-256:
+
+| File | SHA-256 |
+| --- | --- |
+| `catalog.json` | `4f5be3679f8aec5512a1f2b13f3b93f18f42a2c3dbbd77a0654ec575ff3e3076` |
+| `mutants.json` | `cb11346653b8db814cfdfc19f3b20062d42b50b3fdab0bfbe5f37ed5e9a17060` |
+| `ledger-moves.json` | `f3e63fd7ded66fe66e4dc1cc245389a08d84059cc48848883496014553d7b83d` |
+
+## Authoring review fixes F1–F7 — 2026-10-16
+
+This pass keeps the public DSL and topology collection shape. It changes only
+Agent authoring and its guards. Runtime, legacy `Jido.Topology`, and the design
+Markdown files from the other thread remain unchanged. No commit was made.
+
+- One schema-aware decoder now serves topology and schedules. It unwraps only
+  optional fields that use an internal presence marker. Literal tuples and
+  explicit nil, false, and zero values keep their meaning.
+- Child source normalization retains the canonical neutral Agent returned by
+  validation. The same rule applies to Agents, groups, children, and includes.
+- Included export kinds take part in delivery validation. Known group exports
+  require one or broadcast; known Agent exports reject group delivery modes.
+  Unknown export kinds remain intent for the later binding boundary.
+- Shared key validation, identity, and uniqueness checks replace separate
+  rules. Empty and oversized atom keys fail. Atom and string aliases cannot
+  bypass the self-ownership check. Schedules no longer use a topology helper.
+- Source locations now include topology entries, schedules, nested bindings,
+  and included maps. Spark option errors retain structured field paths. With
+  compiler annotations enabled, errors use the field location when available,
+  or the containing declaration location.
+- Topology DSL lowering extracts authored data and locations, then calls its
+  extensions. Agent extensions can lower that composition before the common
+  Agent validator applies canonical rules and defaults. The earlier topology
+  validation pass and repeated include subtree scans are removed.
+- Group count has one conditional default. Bus kind uses the Spark fixed-field
+  mechanism and the common resource schema.
+
+Eleven new Covenant tests cover these cases. Existing obligations are refined,
+and I35 adds error-location guards. The final package contract gate passes
+401 tests and all 146 obligations, including all 35 Agent obligations. The
+Agent and Topology unit and authoring selection passes 920 tests, with four
+existing exclusions. This pass adds no skip or exclusion.
+
+Formatting and compilation with warnings as errors pass. Strict lint passes
+for the eight focused helper, topology, schedule, and guard files. Warning
+lint passes for the shared compiler. Its broader strict checks retain
+existing alias and complexity suggestions in unchanged code. The earlier
+package lint result, including the AgentServer2 Logger warning, is unchanged.
+
+The final focused mutation run catches all 20 selected sites from a catalog
+of 866 sites. All credit is exact. There are no survivors, invalid mutations,
+timeouts, or new survivor exemptions. All 38 composition and schedule guards
+pass before and after mutation. The full historical 1,302-mutant profile was
+not rerun. Catalog enumeration executes no mutations.
+
+The historical ledger retains all 215 judgments. An exact-site audit moves
+15 locations and changes no operator, mutation, sort, or reason.
+
+```sh
+env MIX_ENV=test ERL_FLAGS='+S 4:4' mix test \
+  test/jido/agent_test.exs test/jido/agent test/jido/topology \
+  test/authoring/agents test/authoring/topology --include authoring --seed 0
+
+env MIX_ENV=test ERL_FLAGS='+S 4:4' mix test.contract
+
+env MIX_ENV=test ERL_FLAGS='+S 4:4' mix covenant.mutate jido.agent \
+  --contracts tmp/covenant/agent-authoring-refinement/contracts \
+  --module Jido.Agent.Authoring --module Jido.Agent.Authoring.Compiler \
+  --module Jido.Agent.Authoring.SourceMap --module Jido.Agent.Schedules \
+  --module Jido.Agent.Topology --module Jido.Agent.Topology.Ref \
+  --module Jido.Agent.Topology.Reference \
+  --test-path test/contract/jido/agent_topology_contract_test.exs \
+  --test-path test/contract/jido/agent_composition_authoring_contract_test.exs \
+  --test-path test/contract/jido/agent_authoring_refinement_contract_test.exs \
+  --only m011,m017,m031,m032,m035,m047,m255,m322,m327,m651,m663,m664,m665,m678,m812,m814,m817,m819,m820,m852 \
+  --jobs 1 --seed 0 --timeout 5000 --max-runtime 300000 \
+  --out tmp/covenant/agent-authoring-refinement/mutants.json
+```
+
+The temporary contract directory holds a copy of the current Agent obligations
+without the historical survivor ledger. The ledger receives a separate exact
+site audit. Local evidence stays under
+`tmp/covenant/agent-authoring-refinement/`:
+
+| File | SHA-256 |
+| --- | --- |
+| `catalog.json` | `5319bf7f78a6174e0c12b0faa63e3278ab77401794c068190b4dddbacb3cb6e8` |
+| `mutants.json` | `5be49bf2132f79a61c29ab5a702bca8eea97b5ef80cd338812087037d35fd989` |
+| `ledger-audit.json` | `41e7992185c6d6461461d6db9b77c4e789723c5a29ee56abf3eafe26a9f88975` |

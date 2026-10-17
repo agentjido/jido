@@ -18,6 +18,10 @@ modules:
   - Jido.Agent.Plugin.Pipeline
   - Jido.Agent.Interface
   - Jido.Agent.Callback
+  - Jido.Agent.Topology
+  - Jido.Agent.Topology.Reference
+  - Jido.Agent.Topology.Ref
+  - Jido.Agent.Schedules
 ---
 
 ## Purpose
@@ -26,7 +30,9 @@ Protect Agent authoring, canonical definitions, instances, and direct commands.
 The public DSL syntax stays unchanged. This contract refines the AGT, TURN,
 EFFECT, PLUG, and ERROR entries in `guides/public-contracts.md`.
 
-Checkpoint/restore behavior, AgentServer, Topology, persistence, and Directive
+Agent-owned topology and schedule authoring are part of this component. They
+remain declaration data. Activation, timer installation, schedule state seeding,
+checkpoint/restore behavior, AgentServer, legacy Topology, persistence, and Directive
 dispatch are outside this component. The module list selects implementation
 mutation targets. It does not make internal functions public.
 
@@ -232,3 +238,82 @@ mutation targets. It does not make internal functions public.
 - **kind:** functional
 - **status:** active
 
+### jido.agent.I26 — One Agent composition definition
+
+- **scope:** `Jido.Agent.define/1`, `Jido.Agent.__using__/1`, `Jido.Agent.instantiate/2`
+- **must:** Store optional topology intent on the canonical Agent. A plain Agent has nil topology. Preserve the composition collections without a member wrapper, default input schema, or separate topology constructor, instance, or activation API. Instantiation retains declarations without resolving child sources or state references.
+- **why:** Composition belongs to the enclosing Agent lifecycle.
+- **kind:** functional
+- **status:** active
+
+### jido.agent.I27 — Common child declarations
+
+- **scope:** `Jido.Agent.define/1`, `Jido.Agent.__using__/1`
+- **must:** Agent, group, and child entries require exactly one module or neutral Agent definition. Retain the normalized neutral child definition, including in static includes. Preserve initial state and eager, lazy, or deferred process startup intent. Child entries use the child Agent as root behavior, without a separate director or input lifecycle.
+- **why:** A composed child uses the same Agent model as a plain child.
+- **kind:** functional
+- **status:** active
+
+### jido.agent.I28 — Root and static references
+
+- **scope:** `Jido.Agent.__using__/1`, `Jido.Agent.define/1`
+- **must:** Allow the enclosing Agent as a root endpoint in relationships, connections, and exports without adding a member. Keep root, state, input, member, and included-export references as static data. Scope topology helpers to the topology block and reject malformed endpoint references. Keys are nonempty atom or UTF-8 string values of at most 255 bytes. Atom and string spellings share one identity for uniqueness and self-ownership checks.
+- **why:** Root behavior must be addressable without a second coordinator.
+- **kind:** functional
+- **status:** active
+
+### jido.agent.I29 — Containment and imported identity
+
+- **scope:** `Jido.Agent.define/1`, `Jido.Agent.__using__/1`
+- **must:** Record owned or independent containment separately from logical parent-exit policy. Imported Agent endpoints retain validated stable Agent Refs and do not become created or adopted members.
+- **why:** A logical edge does not establish process containment or lifecycle authority.
+- **kind:** functional
+- **status:** active
+
+### jido.agent.I30 — Group and delivery shape
+
+- **scope:** `Jido.Agent.define/1`, `Jido.Agent.__using__/1`
+- **must:** Accept non-negative fixed counts or state/input sources, or keyed member lists with stable unique keys. Reject conflicting count/members, invalid key_by, and duplicate declaration keys. Preserve member order and zero counts. Apply count one only when count and members are absent. Known local and included group exports require explicit one or broadcast delivery; known single-Agent exports reject group delivery mode. Unresolved export kinds remain binding intent with validated delivery shape.
+- **why:** Group creation and delivery must have explicit, bounded intent.
+- **kind:** functional
+- **status:** active
+
+### jido.agent.I31 — Explicit static includes
+
+- **scope:** `Jido.Agent.define/1`, `Jido.Agent.__using__/1`
+- **must:** Includes accept explicit composition maps with validated declaration shape and preserve parameter mappings and bindings. Reject implicit extraction from an Agent module, definition, or instance. Do not create an included root Agent.
+- **why:** Static composition reuse must not silently discard Agent behavior.
+- **kind:** functional
+- **status:** active
+
+### jido.agent.I32 — Agent schedule declarations
+
+- **scope:** `Jido.Agent.define/1`, `Jido.Agent.__using__/1`, `Jido.Agent.instantiate/2`
+- **must:** Equivalent DSL, map, and keyword schedules yield equal ordered declarations on the Agent. Required, optional, and defaulted fields preserve literal values without treating user tuples as internal presence markers. Require the Scheduler Plugin. A plain Agent can declare schedules with nil topology. Instance options cannot replace schedules.
+- **why:** Scheduling is an Agent capability, independent of composition.
+- **kind:** functional
+- **status:** active
+
+### jido.agent.I33 — Validated inert schedules
+
+- **scope:** `Jido.Agent.define/1`, `Jido.Agent.__using__/1`, `Jido.Agent.instantiate/2`
+- **must:** Require unique keys and exactly one valid bounded interval or cron expression. Validate cron timezone, portable type/data templates, delivery mode, explicit durable generations, and skip-only missed-occurrence policy. Reject fixed envelope identities and unsupported targets. Preserve exact template data. Authoring and instantiation do not install jobs or seed Scheduler job state; declaration templates have no generated identity or time.
+- **why:** This boundary records intent without changing runtime behavior.
+- **kind:** functional
+- **status:** active
+
+### jido.agent.I34 — Authoring document loss prevention
+
+- **scope:** `Jido.Agent.Codec.encode/1`, `Jido.Agent.Codec.encode/2`
+- **must:** Reject non-nil topology or nonempty schedule declarations in the existing document format. Continue encoding supported plain definitions. Do not silently drop new declaration data.
+- **why:** The current format cannot represent the new authoring fields.
+- **kind:** persisted-format
+- **status:** active
+
+### jido.agent.I35 — Authoring error locations
+
+- **scope:** `Jido.Agent.define/1`, `Jido.Agent.__using__/1`
+- **must:** Keep structured field paths for invalid declaration options. When compiler annotations are enabled, DSL errors identify the source field or declaration, including topology entries, schedules, included maps, and nested bindings. Agent extensions can lower authored composition before final Agent validation; invalid lowered data still fails at that validation boundary.
+- **why:** Shared validation must retain useful diagnostics and one canonical result after extension lowering.
+- **kind:** functional
+- **status:** active

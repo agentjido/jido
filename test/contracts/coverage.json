@@ -1,31 +1,38 @@
 {
   "apps": {
     "jido": {
-      "active": 136,
+      "active": 146,
       "coverage": 1.0,
-      "covered": 136
+      "covered": 146
     }
   },
   "components": {
     "jido.agent": {
-      "active": 25,
+      "active": 35,
       "app": "jido",
       "coverage": 1.0,
-      "covered": 25,
+      "covered": 35,
       "form": "light",
       "obligations": {
         "jido.agent.I1": {
           "failing": 0,
           "kind": "functional",
-          "passing": 8,
+          "passing": 15,
           "status": "active",
           "testable": true,
           "tests": [
+            "test DSL decoding preserves literal markers, false, nil, zero, and fixed Bus kind",
             "test a bare Agent module keeps the empty canonical definition",
             "test a neutral Agent struct has the same complete fields as data construction",
+            "test a plain Agent has no composition wrapper or topology value",
+            "test all child sources retain the normalized neutral definition, including inside includes",
             "test all supported declarations give the same complete neutral value",
+            "test commands and checkpoint restore retain topology as definition data",
             "test computed options and extensions evaluate once and lower to ordinary values",
+            "test declarations preserve exact values and defer source binding",
             "test explicit definition constructors preserve compatibility results and errors",
+            "test map, keyword, and DSL authoring have one canonical Agent value",
+            "test marker-shaped required and defaulted values cannot bypass validation",
             "test omitted definition fields use defaults while explicit nil retains its meaning",
             "test route arities preserve module and extension targets with empty options",
             "test unexposed DSL routes keep predicates and block options"
@@ -165,20 +172,23 @@
         "jido.agent.I2": {
           "failing": 0,
           "kind": "functional",
-          "passing": 4,
+          "passing": 7,
           "status": "active",
           "testable": true,
           "tests": [
             "test a neutral Agent struct has the same complete fields as data construction",
+            "test a plain Agent has no composition wrapper or topology value",
             "test definitions reject every partial or complete instance form",
             "test explicit definition constructors preserve compatibility results and errors",
-            "test omitted definition fields use defaults while explicit nil retains its meaning"
+            "test map, keyword, and DSL authoring have one canonical Agent value",
+            "test omitted definition fields use defaults while explicit nil retains its meaning",
+            "test state sources and lazy startup stay declarations when an Agent value is constructed"
           ]
         },
         "jido.agent.I20": {
           "failing": 0,
           "kind": "persisted_format",
-          "passing": 10,
+          "passing": 11,
           "status": "active",
           "testable": true,
           "tests": [
@@ -191,6 +201,7 @@
             "test nested map keys resolve trusted aliases before duplicate detection",
             "test route documents reject untrusted kinds, malformed defaults and local match closures",
             "test stable trusted Registry references supply code and schemas",
+            "test the old Agent document format rejects composition instead of dropping it",
             "test version-2 documents round trip exact static data and omit live values"
           ]
         },
@@ -213,28 +224,37 @@
         "jido.agent.I22": {
           "failing": 0,
           "kind": "functional",
-          "passing": 19,
+          "passing": 28,
           "status": "active",
           "testable": true,
           "tests": [
+            "test Agent extensions lower authored topology before canonical validation and defaults",
             "test a bare Agent module keeps the empty canonical definition",
             "test a lone inline Action and remaining route block fields retain their behavior",
             "test a lowering callback returns its supplied validation error",
+            "test an empty block is an empty topology map and reference helpers stay in their section",
+            "test an explicit composition input schema stays separate from the Agent domain schema",
             "test an unexposed route accepts its predicate as a keyword option",
             "test anonymous schema values report their authored block line",
             "test authoring and generated helper errors have nonempty messages",
             "test computed options and extensions evaluate once and lower to ordinary values",
+            "test declarations preserve exact values and defer source binding",
             "test extension declarations reject non-module values",
             "test extension validation rejects duplicate owners, invalid configuration, and invalid results",
             "test extensions cannot leave exposed Signal helpers with missing, duplicate, or conditional routes",
+            "test fixed definition configuration needs no composition input schema",
             "test inline route declarations keep their helper and execution behavior",
             "test inline routes reject combined targets, multiple Actions, and malformed Action arguments",
+            "test invalid extension output still reaches the final validator at its declaration",
             "test invalid lowered fields and unconsumed entities fail at the core boundary",
+            "test one Agent holds the existing topology map shape and all declaration sections",
             "test one exposed route remains valid after extension lowering",
             "test route arities preserve module and extension targets with empty options",
             "test route target claims retain plain routes and reject non-atom target options",
             "test route target option callbacks must return unique atom names",
+            "test state sources and lazy startup stay declarations when an Agent value is constructed",
             "test static MFA schema rules retain their validation behavior",
+            "test topology extension declarations lower through the shared static authoring boundary",
             "test whole option maps, lists, and module attributes use one evaluation"
           ]
         },
@@ -281,22 +301,77 @@
         "jido.agent.I25": {
           "failing": 0,
           "kind": "functional",
-          "passing": 6,
+          "passing": 8,
           "status": "active",
           "testable": true,
           "tests": [
             "test Turn constructors retain exact input until selection normalizes it",
+            "test a plain Agent has no composition wrapper or topology value",
             "test explicit definition constructors preserve compatibility results and errors",
             "test generated public functions construct definitions, instances, and Signals",
             "test inline route declarations keep their helper and execution behavior",
+            "test map, keyword, and DSL authoring have one canonical Agent value",
             "test required top-level public functions and Turn constructors remain available",
             "test route arities preserve module and extension targets with empty options"
+          ]
+        },
+        "jido.agent.I26": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 1,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test root endpoints refer to the enclosing Agent without adding a coordinator"
+          ]
+        },
+        "jido.agent.I27": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 5,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test DSL decoding preserves literal markers, false, nil, zero, and fixed Bus kind",
+            "test all child collections require exactly one Agent source",
+            "test all child sources retain the normalized neutral definition, including inside includes",
+            "test composition rejects invalid containment, startup, and gate declarations",
+            "test startup policy, containment, and logical parent policy are independent data"
+          ]
+        },
+        "jido.agent.I28": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 7,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test composition rejects invalid containment, startup, and gate declarations",
+            "test included group exports require and retain delivery, while Agent exports reject it",
+            "test keys have one nonempty UTF-8 byte bound in declarations, schedules, and references",
+            "test root and value reference helpers stay scoped to topology blocks",
+            "test root endpoints refer to the enclosing Agent without adding a coordinator",
+            "test self ownership uses the same key identity for all endpoint forms",
+            "test unresolved export kinds remain binding intent with valid delivery shape"
+          ]
+        },
+        "jido.agent.I29": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 4,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test composition rejects invalid containment, startup, and gate declarations",
+            "test imported Agent endpoints retain stable Refs without creating or adopting Agents",
+            "test self ownership uses the same key identity for all endpoint forms",
+            "test startup policy, containment, and logical parent policy are independent data"
           ]
         },
         "jido.agent.I3": {
           "failing": 0,
           "kind": "functional",
-          "passing": 19,
+          "passing": 22,
           "status": "active",
           "testable": true,
           "tests": [
@@ -312,13 +387,90 @@
             "test invalid DSL declarations fail at compile time with source locations",
             "test invalid declaration paths identify the field and route or Plugin index",
             "test invalid schema, metadata, and Plugin options report their authored line",
+            "test invalid topology shape has a structured error at the Agent boundary",
             "test map, tuple, and Router route declarations keep every supported option",
+            "test marker-shaped required and defaulted values cannot bypass validation",
             "test normalization errors identify each route position",
             "test omitted definition fields use defaults while explicit nil retains its meaning",
             "test route maps and option tuples retain the default priority",
             "test state schemas reject transforms, coercion, lazy input, and non-static defaults",
             "test static MFA schema rules retain their validation behavior",
-            "test static schema validation rejects nested input conversion and MFA transforms"
+            "test static schema validation rejects nested input conversion and MFA transforms",
+            "test worker startup policy is checked in the DSL"
+          ]
+        },
+        "jido.agent.I30": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 6,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test Agent extensions lower authored topology before canonical validation and defaults",
+            "test fixed groups reject conflicting membership, unstable keys, and duplicate declarations",
+            "test group delivery modes are explicit and preserve one versus broadcast",
+            "test included group exports require and retain delivery, while Agent exports reject it",
+            "test keys have one nonempty UTF-8 byte bound in declarations, schedules, and references",
+            "test unresolved export kinds remain binding intent with valid delivery shape"
+          ]
+        },
+        "jido.agent.I31": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 3,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test all child sources retain the normalized neutral definition, including inside includes",
+            "test included group exports require and retain delivery, while Agent exports reject it",
+            "test static includes require explicit composition data and preserve parameter mappings"
+          ]
+        },
+        "jido.agent.I32": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 2,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test schedule DSL and data forms produce equal inert Agent definitions",
+            "test schedule declarations require the Scheduler Plugin and retain declaration order"
+          ]
+        },
+        "jido.agent.I33": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 5,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test DSL schedule conflicts and invalid explicit values are rejected",
+            "test invalid schedules fail at a structured authoring boundary",
+            "test keys have one nonempty UTF-8 byte bound in declarations, schedules, and references",
+            "test marker-shaped required and defaulted values cannot bypass validation",
+            "test schedule DSL and data forms produce equal inert Agent definitions"
+          ]
+        },
+        "jido.agent.I34": {
+          "failing": 0,
+          "kind": "persisted_format",
+          "passing": 1,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test the existing document format rejects new authoring data without loss"
+          ]
+        },
+        "jido.agent.I35": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 3,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test field errors, included maps, and nested bindings retain source locations",
+            "test invalid extension output still reaches the final validator at its declaration",
+            "test topology conflicts and schedule conflicts report their own declaration lines"
           ]
         },
         "jido.agent.I4": {
@@ -336,10 +488,11 @@
         "jido.agent.I5": {
           "failing": 0,
           "kind": "functional",
-          "passing": 6,
+          "passing": 7,
           "status": "active",
           "testable": true,
           "tests": [
+            "test DSL decoding preserves literal markers, false, nil, zero, and fixed Bus kind",
             "test a neutral Agent struct has the same complete fields as data construction",
             "test all supported declarations give the same complete neutral value",
             "test independent instances preserve the neutral definition and explicit values",
@@ -1850,8 +2003,8 @@
   },
   "covenant": "0.1.0",
   "totals": {
-    "active": 136,
+    "active": 146,
     "coverage": 1.0,
-    "covered": 136
+    "covered": 146
   }
 }

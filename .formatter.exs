@@ -15,6 +15,8 @@ agent_locals = [
   match: 1,
   signal_source: 1,
   topology: 1,
+  schedules: 1,
+  schedule: 2,
   agents: 1,
   agent: 2,
   agent: 3,

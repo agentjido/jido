@@ -3,6 +3,7 @@ defmodule Jido.Agent.Authoring.Compiler do
 
   alias Jido.Agent.Authoring
   alias Jido.Agent.Authoring.SourceMap
+  alias Jido.Agent.DSL.Schedules, as: ScheduleDSL
   alias Spark.Dsl.Extension
 
   @agent_root_options [:name, :description, :vsn]
@@ -20,7 +21,7 @@ defmodule Jido.Agent.Authoring.Compiler do
     quote location: :keep do
       @jido_agent_options Jido.Agent.Authoring.Compiler.options!(unquote(agent_opts), __ENV__)
       Jido.Agent.Authoring.Compiler.setup_dsl(__ENV__, unquote(dsl), @jido_agent_options)
-      import Jido.Agent.Authoring.Compiler, only: [agent: 1, routes: 1, topology: 1]
+      import Jido.Agent.Authoring.Compiler, only: [agent: 1, routes: 1, topology: 1, schedules: 1]
       unquote_splicing(extension_imports(agent_opts, __CALLER__))
       use Jido.Action.Inline
       @before_compile Jido.Agent.Authoring.Compiler
@@ -145,7 +146,7 @@ defmodule Jido.Agent.Authoring.Compiler do
 
   # Expand blocks after the module body has evaluated the options. Spark owns
   # the block contents and supplies the imports captured during setup.
-  for name <- [:agent, :routes, :topology] do
+  for name <- [:agent, :routes, :topology, :schedules] do
     defmacro unquote(name)(do: body) do
       name = unquote(name)
 
@@ -168,7 +169,16 @@ defmodule Jido.Agent.Authoring.Compiler do
     {agent_options, topology_options} = split_options(host, options, env)
     # Read current compile state once. Loaded module code can be stale on reload.
     dsl = Module.get_attribute(env.module, :spark_dsl_config) || %{}
-    agent = lower_agent(agent_options, agent_extensions, dsl, env)
+
+    {agent_options, topology_sources} =
+      if host == :agent do
+        {topology, sources} = Jido.Agent.DSL.Topology.lower(topology_extensions, dsl, env)
+        {Map.put(agent_options, :topology, topology), sources}
+      else
+        {agent_options, %{}}
+      end
+
+    agent = lower_agent(agent_options, agent_extensions, dsl, env, topology_sources)
 
     topology =
       if host == :topology do
@@ -184,7 +194,7 @@ defmodule Jido.Agent.Authoring.Compiler do
     end
   end
 
-  defp lower_agent(config, extensions, dsl, env) do
+  defp lower_agent(config, extensions, dsl, env, topology_sources) do
     routes = Extension.get_entities(dsl, [:routes])
     source = Extension.get_opt(dsl, [:routes], :signal_source)
 
@@ -198,14 +208,14 @@ defmodule Jido.Agent.Authoring.Compiler do
       |> Extension.get_entities([:agent])
       |> Enum.split_with(&match?(%Jido.Agent.DSL.Plugin{}, &1))
 
-    sources = sources(dsl, routes, plugins)
+    sources = Map.merge(sources(dsl, routes, plugins), topology_sources)
 
     config =
       config
       |> Map.put_new(:description, nil)
       |> Map.merge(block_fields(dsl, routes, plugins, env, sources))
 
-    config = unwrap!(Jido.Agent.Extension.lower(extensions, config, entities), env)
+    config = unwrap!(Jido.Agent.Extension.lower(extensions, config, entities), env, sources)
 
     definition =
       unwrap!(Jido.Agent.Validation.module_definition(env.module, config), env, sources)
@@ -248,9 +258,7 @@ defmodule Jido.Agent.Authoring.Compiler do
     {options, nil}
   end
 
-  defp extensions(:agent, extensions, _env), do: {extensions, []}
-
-  defp extensions(:topology, extensions, env) do
+  defp extensions(_host, extensions, env) do
     {agent, topology} = partition_extensions(extensions, {[], []}, env)
     {Enum.reverse(agent), Enum.reverse(topology)}
   end
@@ -306,7 +314,12 @@ defmodule Jido.Agent.Authoring.Compiler do
     locations = SourceMap.section(dsl, [:agent], [:schema, :metadata], [])
     locations = Map.merge(locations, SourceMap.section(dsl, [:agent], [], [:plugins]))
 
-    SourceMap.collect([routes: routes, plugins: plugins], locations)
+    locations = Map.merge(locations, SourceMap.section(dsl, [:schedules], [], [:schedules]))
+
+    SourceMap.collect(
+      [routes: routes, plugins: plugins, schedules: Extension.get_entities(dsl, [:schedules])],
+      locations
+    )
   end
 
   defp block_fields(dsl, routes, plugins, env, sources) do
@@ -314,6 +327,7 @@ defmodule Jido.Agent.Authoring.Compiler do
       schema: Extension.get_opt(dsl, [:agent], :schema, Zoi.object(%{})),
       metadata: Extension.get_opt(dsl, [:agent], :metadata, %{}),
       routes: Enum.map(routes, &lower_route(&1, env)),
+      schedules: ScheduleDSL.lower(dsl),
       plugins:
         Enum.map(Enum.with_index(plugins), fn {plugin, index} ->
           options = Authoring.options(plugin.config) |> Authoring.at([:plugins, index])

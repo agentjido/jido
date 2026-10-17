@@ -4,6 +4,67 @@ defmodule Jido.Agent.Authoring do
   alias Jido.Error
   alias Jido.Signal.Router
 
+  # Preserve an explicit value when Spark uses nil for an omitted option.
+  def present(value, type) do
+    case Spark.Options.validate([value: value], value: [type: type]) do
+      {:ok, opts} -> {:ok, {:present, opts[:value]}}
+      {:error, error} -> {:error, Exception.message(error)}
+    end
+  end
+
+  def dsl_schema(schema) do
+    Enum.map(schema, fn {key, opts} ->
+      opts =
+        if presence_field?(opts),
+          do: Keyword.update!(opts, :type, &{:custom, __MODULE__, :present, [&1]}),
+          else: opts
+
+      {key, opts}
+    end)
+  end
+
+  def dsl_fields(entity, schema) do
+    for {key, opts} <- schema,
+        value = Map.fetch!(entity, key),
+        not (presence_field?(opts) and is_nil(value)),
+        into: %{} do
+      value = if presence_field?(opts), do: elem(value, 1), else: value
+      {key, value}
+    end
+  end
+
+  defp presence_field?(opts),
+    do: opts[:required] != true and not Keyword.has_key?(opts, :default)
+
+  def validate_options(attrs, schema) do
+    case Spark.Options.validate(Enum.to_list(attrs), schema) do
+      {:ok, fields} ->
+        {:ok, Map.new(fields)}
+
+      {:error, error} ->
+        error(Exception.message(error)) |> at(error.keys_path ++ List.wrap(error.key))
+    end
+  end
+
+  def key?(key) when is_atom(key) and key not in [nil, true, false],
+    do: key?(Atom.to_string(key))
+
+  def key?(key) when is_binary(key),
+    do: byte_size(key) in 1..255 and String.valid?(key)
+
+  def key?(_key), do: false
+
+  def key_identity(key) when is_atom(key), do: Atom.to_string(key)
+  def key_identity(key) when is_binary(key), do: key
+
+  def unique_keys(keys, message \\ "Declaration keys must be unique") do
+    identities = Enum.map(keys, &key_identity/1)
+
+    if length(identities) == MapSet.size(MapSet.new(identities)),
+      do: :ok,
+      else: error(message)
+  end
+
   def attrs(value) do
     case to_attrs(value, :reject) do
       {:ok, attrs} -> {:ok, attrs}

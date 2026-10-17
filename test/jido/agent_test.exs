@@ -189,6 +189,8 @@ defmodule Jido.AgentTest do
                :schema,
                :plugins,
                :state,
+               :topology,
+               :schedules,
                :routes,
                :metadata
              ])

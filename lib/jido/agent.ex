@@ -105,6 +105,84 @@ defmodule Jido.Agent do
   Modules expose `domain_schema/0` for the authored schema and
   `complete_schema/0` for the schema with Plugin-owned state.
 
+  An Agent can also declare a `topology do` block. The block retains the
+  topology sections: `agents` (including groups), `resources`, `relationships`,
+  `connections`, `topologies` (static includes), `imports`, `exports`, and
+  `startup`. Runtime child declarations use the `children` option in this block.
+
+      topology do
+        agents do
+          agent :coordinator, MyApp.Coordinator
+          group :workers, MyApp.Worker, count: 2, activation: :lazy
+        end
+
+        resources do
+          bus :events
+        end
+      end
+
+  `definition().topology` is a plain map with the current topology collection
+  shape. Direct definitions accept the same map through `:topology`. Omit the
+  block or pass `nil` for a plain Agent. The enclosing Agent supplies root
+  behavior; it is not inserted as a member of its own topology.
+
+  This authoring boundary checks static declaration shape. It does not resolve
+  member sources, validate graph dependencies, or start processes. There is one
+  Agent lifecycle: define, instantiate, activate, operate, then stop or hibernate.
+  Topology has no separate constructor, instance, or activation API.
+
+  Worker `activation` is `:eager` by default and can be `:lazy` or `:deferred`.
+  `:deferred` records explicit-start intent. This is process
+  startup intent within the Agent Activation. A lazy worker can still have its
+  Agent value constructed before its processes start.
+
+  Use fixed declarations or module configuration for fixed composition. Use
+  `state(:workers)` for a group count drawn from Agent domain state when the
+  initial child set is accepted. This records a snapshot source. A later state
+  change must not silently resize that set; composition changes are explicit.
+
+  Agent, group, and `children` entries select exactly one `module` or neutral
+  `definition` source. A composed child uses its own Agent as root behavior.
+  `placement: :owned | :independent` records containment separately from an
+  `owns` edge and its logical parent-exit policy. Static `include` takes an
+  explicit composition map, such as `OtherAgent.definition().topology`; it
+  does not extract composition from an Agent module or create an included root.
+
+  Inside topology blocks, `root()` names the enclosing Agent in connections,
+  relationships, and exports. An imported `agent` can supply a stable Agent
+  `ref:` without becoming a created member. Group subscriptions require
+  `delivery: :one | :broadcast`; single-Agent subscriptions omit that option.
+
+  No topology input schema is added by default. An explicit `schema` and
+  `input/1` remain available for mapped composition data. `member/1` names a
+  group member field, and `ref/2` names an included export. These declarations
+  remain data at this boundary. The Agent JSON codec currently rejects a
+  non-nil topology so it cannot discard this data.
+
+  Schedules are an Agent capability and do not require a topology:
+
+      agent do
+        plugin Jido.Plugin.Scheduler
+      end
+
+      schedules do
+        schedule :refresh, every: 60_000,
+          signal: %{type: "team.refresh", data: %{}}
+
+        schedule :report, cron: "0 9 * * *", timezone: "Etc/UTC",
+          signal: %{type: "team.report", data: %{}}
+      end
+
+  Read ordered declarations from `definition().schedules`. Each declaration
+  requires exactly one bounded positive interval or valid cron expression.
+  Delivery targets the owning Agent. Templates accept `type` and `data` only;
+  runtime delivery must create fresh envelope identity and time. Durable intent
+  requires `delivery: :durable` and an explicit `generation`. Missed slots use
+  `missed: :skip`. These fields record intent only. Authoring and instantiation
+  do not install jobs or seed Scheduler job state. Activation integration must
+  seed fresh state once, preserve saved changes on restore, and enable delivery
+  after readiness. The current JSON document also rejects nonempty schedules.
+
   `Jido.Agent.define/1` and `Jido.Agent.Codec` provide data and JSON
   declaration forms through the same validator. Use `instantiate/2` for an
   Agent module and instance options. These forms preserve the definition and instance
@@ -179,6 +257,8 @@ defmodule Jido.Agent do
     :description,
     :schema,
     :state,
+    :topology,
+    schedules: [],
     plugins: [],
     routes: [],
     metadata: %{}

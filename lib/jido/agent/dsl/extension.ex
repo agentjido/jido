@@ -73,5 +73,12 @@ end
 
 defmodule Jido.Agent.DSL do
   @moduledoc false
-  use Spark.Dsl, default_extensions: [extensions: [Jido.Agent.DSL.Extension]]
+  use Spark.Dsl,
+    default_extensions: [
+      extensions: [
+        Jido.Agent.DSL.Extension,
+        Jido.Agent.DSL.Topology.Extension,
+        Jido.Agent.DSL.Schedules
+      ]
+    ]
 end
