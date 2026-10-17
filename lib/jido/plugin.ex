@@ -20,7 +20,6 @@ defmodule Jido.Plugin do
   portable input and reduce one owned field in the complete Agent state.
   Agent Server callbacks admit live input, manage a supervised runtime, and
   run work after commit. Persistence callbacks convert the owned state value.
-  Topology callbacks contribute to a plan without starting processes.
 
   Configure a Plugin with `{MyApp.Counter, options}` in the Agent declaration.
   Each callback receives those options. The optional `option_keys` mapping can
@@ -83,8 +82,6 @@ defmodule Jido.Plugin do
               {:ok, term()} | {:error, term()}
   @callback load(term(), Jido.Persistence.Plugin.Context.t(), keyword()) ::
               {:ok, term()} | {:error, term()}
-  @callback contribute(Jido.Topology.Plugin.Context.t(), keyword()) ::
-              {:ok, Jido.Topology.Plugin.Contribution.t()} | {:error, term()}
 
   @owner_callbacks [
     agent: [prepare: 2, state_spec: 1, directives: 1, reduce: 2],
@@ -97,8 +94,7 @@ defmodule Jido.Plugin do
       await_ready: 2,
       after_commit: 3
     ],
-    persistence: [dump: 3, load: 3],
-    topology: [contribute: 2]
+    persistence: [dump: 3, load: 3]
   ]
   @optional_callbacks Enum.flat_map(@owner_callbacks, &elem(&1, 1))
 

@@ -3,7 +3,7 @@ defmodule Jido.Plugin.Scheduler.DurableTest do
   @moduletag capability: "REC-03"
 
   alias Jido.Agent
-  alias Jido.Examples.ScheduledOccurrenceRecovery, as: Example
+  alias JidoTest.ScheduledOccurrenceFixtures.Example, as: Example
   alias Jido.Plugin.DirectiveContext
   alias Jido.Plugin.Scheduler
   alias Jido.Plugin.Scheduler.Durable

@@ -4,7 +4,6 @@ defmodule Jido.Instance.RefFacade do
   alias Jido.Agent
   alias Jido.Agent.Ref
   alias Jido.AgentServer
-  alias Jido.AgentServer2
   alias Jido.Error
 
   @default_timeout 5_000
@@ -50,10 +49,10 @@ defmodule Jido.Instance.RefFacade do
 
   defp runtime_target(pid, status) do
     case {status, :proc_lib.translate_initial_call(pid)} do
-      {:ready, {runtime, :init, 1}} when runtime in [AgentServer, AgentServer2] ->
+      {:ready, {runtime, :init, 1}} when runtime == AgentServer ->
         {:ok, pid, runtime}
 
-      {:starting, {AgentServer2, :init, 1}} ->
+      {:starting, {AgentServer, :init, 1}} ->
         {:error, :recovering}
 
       _ ->
@@ -93,11 +92,6 @@ defmodule Jido.Instance.RefFacade do
   @doc false
   def submit(instance, %Ref{} = ref, signal, opts \\ []) do
     with_server(instance, ref, :submit, [signal, opts])
-  end
-
-  @doc false
-  def send_request(instance, %Ref{} = ref, signal, timeout \\ @default_timeout) do
-    with_server(instance, ref, :send_request, [signal, timeout])
   end
 
   @doc false
@@ -174,11 +168,6 @@ defmodule Jido.Instance.RefFacade do
   end
 
   @doc false
-  def snapshot(instance, %Ref{} = ref, timeout \\ @default_timeout) do
-    with_server(instance, ref, :snapshot, [timeout])
-  end
-
-  @doc false
   def children(instance, %Ref{} = ref, timeout \\ @default_timeout) do
     with_server(instance, ref, :children, [timeout])
   end
@@ -186,16 +175,6 @@ defmodule Jido.Instance.RefFacade do
   @doc false
   def await_ready(instance, %Ref{} = ref, timeout \\ @default_timeout) do
     with_server(instance, ref, :await_ready, [timeout])
-  end
-
-  @doc false
-  def set_debug(instance, %Ref{} = ref, enabled, timeout \\ @default_timeout) do
-    with_server(instance, ref, :set_debug, [enabled, timeout])
-  end
-
-  @doc false
-  def recent_events(instance, %Ref{} = ref, opts \\ [], timeout \\ @default_timeout) do
-    with_server(instance, ref, :recent_events, [opts, timeout])
   end
 
   defp with_server(instance, ref, operation, args) do
@@ -210,7 +189,7 @@ defmodule Jido.Instance.RefFacade do
     apply(runtime, operation, args)
   catch
     :exit, reason ->
-      if runtime == AgentServer2 and not match?({:timeout, _}, reason),
+      if not match?({:timeout, _}, reason),
         do: {:error, :unavailable},
         else: exit(reason)
   end

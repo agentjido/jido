@@ -125,7 +125,7 @@ defmodule Jido.Plugin.Bus.IntegrationTest do
 
   test "casts normal Bus input into the Agent", %{jido: jido} do
     bus = start_supervised!({Bus, name: :plugin_bus, jido: jido})
-    {:ok, agent} = Jido.start_agent(jido, Agent, id: unique_id("bus"))
+    {:ok, agent} = JidoTest.AgentServerAssertions.start_agent(jido, Agent, id: unique_id("bus"))
 
     assert {:ok, [_record]} = Bus.publish(bus, [signal("bus.input", %{value: 1})])
     eventually(fn -> Server.agent(agent).state.values == [1] end)
@@ -133,7 +133,12 @@ defmodule Jido.Plugin.Bus.IntegrationTest do
 
   test "acknowledges durable input only after ordered Agent commits", %{jido: jido} do
     bus = start_supervised!({Bus, name: :plugin_bus, jido: jido})
-    {:ok, agent} = Jido.start_agent(jido, DurableBlockingAgent, id: unique_id("durable-bus"))
+
+    {:ok, agent} =
+      JidoTest.AgentServerAssertions.start_agent(jido, DurableBlockingAgent,
+        id: unique_id("durable-bus")
+      )
+
     observer = self()
     first_gate = make_ref()
     second_gate = make_ref()
@@ -168,14 +173,21 @@ defmodule Jido.Plugin.Bus.IntegrationTest do
 
   test "reattaches a durable subscription after its runtime restarts", %{jido: jido} do
     bus = start_supervised!({Bus, name: :plugin_bus, jido: jido})
-    {:ok, agent} = Jido.start_agent(jido, DurableAgent, id: unique_id("durable-restart"))
-    runtime = Server.children(agent)[{:plugin, Client}].pid
 
+    {:ok, agent} =
+      JidoTest.AgentServerAssertions.start_agent(jido, DurableAgent,
+        id: unique_id("durable-restart")
+      )
+
+    runtime = JidoTest.AgentServerAssertions.plugin(agent, Client).pid
+
+    root = Server.activation(agent)
     Process.exit(runtime, :kill)
+    agent = JidoTest.AgentServerAssertions.replacement(root, agent)
 
     new_runtime =
       eventually(fn ->
-        case Server.children(agent)[{:plugin, Client}].pid do
+        case JidoTest.AgentServerAssertions.plugin(agent, Client).pid do
           pid when is_pid(pid) and pid != runtime -> pid
           _other -> nil
         end
@@ -188,8 +200,13 @@ defmodule Jido.Plugin.Bus.IntegrationTest do
 
   test "runtime death stops its pending durable delivery worker", %{jido: jido} do
     bus = start_supervised!({Bus, name: :plugin_bus, jido: jido})
-    {:ok, agent} = Jido.start_agent(jido, DurableBlockingAgent, id: unique_id("durable-owner"))
-    runtime = Server.children(agent)[{:plugin, Client}].pid
+
+    {:ok, agent} =
+      JidoTest.AgentServerAssertions.start_agent(jido, DurableBlockingAgent,
+        id: unique_id("durable-owner")
+      )
+
+    runtime = JidoTest.AgentServerAssertions.plugin(agent, Client).pid
     gate = make_ref()
 
     assert {:ok, [_record]} =
@@ -201,10 +218,12 @@ defmodule Jido.Plugin.Bus.IntegrationTest do
     runtime_ref = Process.monitor(runtime)
     on_exit(fn -> if Process.alive?(delivery), do: Process.exit(delivery, :kill) end)
 
+    root = Server.activation(agent)
     Process.exit(runtime, :kill)
     assert_receive {:DOWN, ^runtime_ref, :process, ^runtime, :killed}, 2_000
     assert_receive {:DOWN, ^delivery_ref, :process, ^delivery, _reason}, 2_000
 
+    agent = JidoTest.AgentServerAssertions.replacement(root, agent)
     action_ref = Process.monitor(action)
     :ok = Jido.stop_agent(jido, agent)
     assert_receive {:DOWN, ^action_ref, :process, ^action, _reason}, 2_000
@@ -212,8 +231,13 @@ defmodule Jido.Plugin.Bus.IntegrationTest do
 
   test "delivery worker death keeps its runtime available for retry", %{jido: jido} do
     bus = start_supervised!({Bus, name: :plugin_bus, jido: jido})
-    {:ok, agent} = Jido.start_agent(jido, DurableBlockingAgent, id: unique_id("durable-worker"))
-    runtime = Server.children(agent)[{:plugin, Client}].pid
+
+    {:ok, agent} =
+      JidoTest.AgentServerAssertions.start_agent(jido, DurableBlockingAgent,
+        id: unique_id("durable-worker")
+      )
+
+    runtime = JidoTest.AgentServerAssertions.plugin(agent, Client).pid
     gate = make_ref()
 
     assert {:ok, [_record]} =
@@ -248,7 +272,11 @@ defmodule Jido.Plugin.Bus.IntegrationTest do
     end)
 
     bus = start_supervised!({Bus, name: :plugin_bus, jido: jido})
-    {:ok, agent} = Jido.start_agent(jido, DurableAgent, id: unique_id("durable-retry"))
+
+    {:ok, agent} =
+      JidoTest.AgentServerAssertions.start_agent(jido, DurableAgent,
+        id: unique_id("durable-retry")
+      )
 
     assert {:ok, [_record]} = Bus.publish(bus, [signal("bus.retry", %{value: 9})])
     eventually(fn -> Server.agent(agent).state.values == [9] end)
@@ -257,17 +285,19 @@ defmodule Jido.Plugin.Bus.IntegrationTest do
 
   test "Manager owns a Bus named for its Agent by default", %{jido: jido} do
     id = unique_id("managed-bus")
-    {:ok, agent} = Jido.start_agent(jido, ManagerAgent, id: id)
+    {:ok, agent} = JidoTest.AgentServerAssertions.start_agent(jido, ManagerAgent, id: id)
 
     assert {:ok, bus} = Bus.whereis(id, jido: jido)
-    assert Server.children(agent)[{:plugin, Manager}].pid == bus
+    assert JidoTest.AgentServerAssertions.plugin(agent, Manager).pid == bus
 
     assert :ok = Jido.stop_agent(jido, agent)
     eventually(fn -> Bus.whereis(id, jido: jido) == {:error, :not_found} end)
   end
 
   test "one Agent can own a Bus and consume from it", %{jido: jido} do
-    {:ok, agent} = Jido.start_agent(jido, OwnedBusAgent, id: unique_id("owned-bus"))
+    {:ok, agent} =
+      JidoTest.AgentServerAssertions.start_agent(jido, OwnedBusAgent, id: unique_id("owned-bus"))
+
     assert {:ok, bus} = Bus.whereis(:owned_plugin_bus, jido: jido)
 
     assert {:ok, [_record]} = Bus.publish(bus, [signal("bus.input", %{value: 11})])
@@ -317,16 +347,20 @@ defmodule Jido.Plugin.Bus.IntegrationTest do
   end
 
   test "Client reconnects when its owned Bus restarts", %{jido: jido} do
-    {:ok, agent} = Jido.start_agent(jido, OwnedBusAgent, id: unique_id("owned-restart"))
-    children = Server.children(agent)
-    bus = children[{:plugin, Manager}].pid
-    client = children[{:plugin, Client}].pid
+    {:ok, agent} =
+      JidoTest.AgentServerAssertions.start_agent(jido, OwnedBusAgent,
+        id: unique_id("owned-restart")
+      )
 
+    bus = JidoTest.AgentServerAssertions.plugin(agent, Manager).pid
+    root = Server.activation(agent)
     Process.exit(bus, :kill)
+    agent = JidoTest.AgentServerAssertions.replacement(root, agent)
+    client = JidoTest.AgentServerAssertions.plugin(agent, Client).pid
 
     restarted_bus =
       eventually(fn ->
-        case Server.children(agent)[{:plugin, Manager}].pid do
+        case JidoTest.AgentServerAssertions.plugin(agent, Manager).pid do
           pid when is_pid(pid) and pid != bus -> pid
           _other -> nil
         end

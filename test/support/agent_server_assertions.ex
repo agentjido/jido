@@ -1,0 +1,40 @@
+defmodule JidoTest.AgentServerAssertions do
+  @moduledoc false
+
+  alias Jido.AgentServer
+
+  # Use only at a test barrier where no commit can occur between the reads.
+  def committed(server) do
+    %{agent: AgentServer.agent(server), state_version: AgentServer.status(server).state_version}
+  end
+
+  def plugin(server, package) do
+    case List.keyfind(
+           Supervisor.which_children(AgentServer.activation(server)),
+           {:plugin, package},
+           0
+         ) do
+      {_, pid, _, _} when is_pid(pid) -> %{pid: pid}
+      _ -> nil
+    end
+  end
+
+  def replacement(activation, previous) do
+    JidoTest.Eventually.eventually(fn ->
+      case AgentServer.Activation.worker(activation) do
+        pid when is_pid(pid) and pid != previous ->
+          if AgentServer.await_ready(pid) == :ok, do: pid
+
+        _ ->
+          nil
+      end
+    end)
+  end
+
+  def start_agent(instance, agent, opts \\ []) do
+    with {:ok, server} <- Jido.start_agent(instance, agent, opts),
+         :ok <- AgentServer.await_ready(server) do
+      {:ok, server}
+    end
+  end
+end

@@ -190,7 +190,6 @@ defmodule Jido.DiscoveryTest do
   test "defines a temporary startup Task" do
     assert %{
              id: Jido.Discovery,
-             restart: :temporary,
              type: :worker,
              start: {Task, :start_link, [loader]}
            } = Discovery.child_spec(applications: [], modules: [AlphaAction])

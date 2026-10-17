@@ -44,12 +44,4 @@ defmodule Jido.Agent.SourceTest do
     assert {:error, error} = Source.definition(InvalidConfig)
     assert error.message == expected.message
   end
-
-  test "Topology adds the declaration path without replacing the configuration cause" do
-    assert {:error, error} =
-             Jido.Topology.new(name: "broken", agents: [%{key: :worker, module: BrokenConfig}])
-
-    assert error.details.source_path == [:agents, 0, :module]
-    assert error.details.reason == %ArgumentError{message: "configuration failed"}
-  end
 end

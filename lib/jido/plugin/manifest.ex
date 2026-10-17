@@ -9,7 +9,7 @@ defmodule Jido.Plugin.Manifest do
 
   alias Jido.Error
 
-  @owners [:agent, :agent_server, :persistence, :topology]
+  @owners [:agent, :agent_server, :persistence]
 
   @enforce_keys [:module]
   defstruct module: nil,
@@ -17,17 +17,15 @@ defmodule Jido.Plugin.Manifest do
             agent: nil,
             agent_server: nil,
             persistence: nil,
-            topology: nil,
             option_keys: %{}
 
-  @type owner :: :agent | :agent_server | :persistence | :topology
+  @type owner :: :agent | :agent_server | :persistence
   @type t :: %__MODULE__{
           module: module(),
           vsn: pos_integer(),
           agent: module() | nil,
           agent_server: module() | nil,
           persistence: module() | nil,
-          topology: module() | nil,
           option_keys: %{optional(owner()) => [atom()]}
         }
 

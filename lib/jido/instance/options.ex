@@ -4,7 +4,7 @@ defmodule Jido.Instance.Options do
   alias Jido.Error
 
   @allowed_keys [
-    :agent_server2,
+    :agent_server,
     :debug,
     :max_tasks,
     :name,
@@ -23,7 +23,7 @@ defmodule Jido.Instance.Options do
          :ok <- validate_otp_app(Keyword.get(opts, :otp_app)),
          :ok <- validate_namespace(Keyword.get(opts, :namespace)),
          :ok <- validate_debug(Keyword.get(opts, :debug)),
-         :ok <- Jido.AgentServer2.validate_defaults(Keyword.get(opts, :agent_server2, [])),
+         :ok <- Jido.AgentServer.validate_defaults(Keyword.get(opts, :agent_server, [])),
          :ok <- validate_max_tasks(Keyword.get(opts, :max_tasks, @default_max_tasks)),
          {:ok, persistence} <- validate_persistence(Keyword.get(opts, :persistence)) do
       validated =

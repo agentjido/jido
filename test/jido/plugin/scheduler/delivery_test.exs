@@ -8,30 +8,30 @@ defmodule Jido.Plugin.Scheduler.DeliveryTest do
   test "attempt delivers one pending job and rotates in stable job order" do
     state = pending_state([:third, :first, :second])
 
-    assert {:delivered, {:after, :first}, {:ok, :first}} =
-             attempt(state, :start, {:ok, :first})
+    assert {:delivered, {:after, :first}, {:ok, :first, []}} =
+             attempt(state, :start, {:ok, :first, []})
 
-    assert {:delivered, {:after, :second}, {:ok, :second}} =
-             attempt(state, {:after, :first}, {:ok, :second})
+    assert {:delivered, {:after, :second}, {:ok, :second, []}} =
+             attempt(state, {:after, :first}, {:ok, :second, []})
 
-    assert {:delivered, {:after, :third}, {:ok, :third}} =
-             attempt(state, {:after, :second}, {:ok, :third})
+    assert {:delivered, {:after, :third}, {:ok, :third, []}} =
+             attempt(state, {:after, :second}, {:ok, :third, []})
 
-    assert {:delivered, {:after, :first}, {:ok, :wrapped}} =
-             attempt(state, {:after, :third}, {:ok, :wrapped})
+    assert {:delivered, {:after, :first}, {:ok, :wrapped, []}} =
+             attempt(state, {:after, :third}, {:ok, :wrapped, []})
   end
 
   test "attempt rotates after a nil job ID" do
     state = pending_state([nil, "second"])
 
-    assert {:delivered, {:after, nil}, {:ok, :nil_job}} =
-             attempt(state, :start, {:ok, :nil_job})
+    assert {:delivered, {:after, nil}, {:ok, :nil_job, []}} =
+             attempt(state, :start, {:ok, :nil_job, []})
 
-    assert {:delivered, {:after, "second"}, {:ok, :string_job}} =
-             attempt(state, {:after, nil}, {:ok, :string_job})
+    assert {:delivered, {:after, "second"}, {:ok, :string_job, []}} =
+             attempt(state, {:after, nil}, {:ok, :string_job, []})
 
-    assert {:delivered, {:after, nil}, {:ok, :wrapped}} =
-             attempt(state, {:after, "second"}, {:ok, :wrapped})
+    assert {:delivered, {:after, nil}, {:ok, :wrapped, []}} =
+             attempt(state, {:after, "second"}, {:ok, :wrapped, []})
   end
 
   test "attempt returns typed Agent delivery errors with the selected cursor" do
@@ -98,7 +98,7 @@ defmodule Jido.Plugin.Scheduler.DeliveryTest do
         end
 
         receive do
-          {:"$gen_call", _from, {:signal, _ref, _signal, _deadline, %{}}} ->
+          {:"$gen_call", _from, {:turn, _ref, _signal, %{}, _deadline}} ->
             send(owner, :agent_call_received)
             exit(:simulated_agent_loss)
         end
@@ -117,7 +117,7 @@ defmodule Jido.Plugin.Scheduler.DeliveryTest do
     assert_receive {:"$gen_call", plugin_from, {:plugin_state, Scheduler}}, 1_000
     :gen_statem.reply(plugin_from, {:ok, state})
 
-    assert_receive {:"$gen_call", agent_from, {:signal, _ref, delivered, _deadline, %{}}},
+    assert_receive {:"$gen_call", agent_from, {:turn, _ref, delivered, %{}, _deadline}},
                    1_000
 
     {_job, %{pending: original}} =

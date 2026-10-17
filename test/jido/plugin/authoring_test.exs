@@ -88,7 +88,7 @@ defmodule Jido.Plugin.AuthoringTest do
     assert spec.agent.module == Combined
     assert spec.agent_server.module == Combined
     assert spec.persistence == nil
-    assert spec.topology == nil
+    refute Map.has_key?(spec, :topology)
   end
 
   test "arbitrary helper names do not select runtime capabilities" do

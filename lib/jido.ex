@@ -54,14 +54,14 @@ defmodule Jido do
 
   ## Observe Runtime Work
 
-  Use `Jido.AgentServer.snapshot/2` for the committed Agent and revision. Use
-  `Jido.AgentServer.status/2` for current runtime work. A per-Agent debug buffer
-  keeps a short diagnostic history when it is enabled.
+  Use `Jido.AgentServer.agent/2` for the committed Agent. Use
+  `Jido.AgentServer.status/2` for the revision and current runtime work. Use
+  `Jido.AgentServer.history/2` for bounded Turn history.
 
   `Jido.Telemetry` is the system-wide observation contract. Its semantic event
   catalog supplies Telemetry events, standard metrics, bounded logs, and
   optional OpenTelemetry spans. Instance `debug/1` functions change semantic
-  log detail. They do not enable an Agent debug buffer.
+  log detail.
 
   See [Runtime State and Debugging](runtime-state-and-debugging.html) and
   [Telemetry, Tracing, and Logs](telemetry-tracing-and-logs.html).
@@ -225,7 +225,7 @@ defmodule Jido do
 
       @doc "Sends one synchronous Signal through a stable Agent Ref."
       @spec call(Jido.Agent.Ref.t(), Jido.Signal.t(), timeout() | keyword()) ::
-              Jido.AgentServer.signal_result() | {:ok, Jido.Agent.instance(), [struct()]}
+              Jido.AgentServer.signal_result()
       def call(%Jido.Agent.Ref{} = ref, signal, timeout_or_opts \\ 5_000) do
         Jido.call(__MODULE__, ref, signal, timeout_or_opts)
       end
@@ -234,27 +234,15 @@ defmodule Jido do
       @spec cast(Jido.Agent.Ref.t(), Jido.Signal.t()) :: :ok | {:error, term()}
       def cast(%Jido.Agent.Ref{} = ref, signal), do: Jido.cast(__MODULE__, ref, signal)
 
-      @doc "Submits one AgentServer2 turn through a stable Agent Ref."
+      @doc "Submits one AgentServer turn through a stable Agent Ref."
       def submit(%Jido.Agent.Ref{} = ref, signal, opts \\ []),
         do: Jido.submit(__MODULE__, ref, signal, opts)
 
-      @doc "Collects an AgentServer2 pending reply in its submitting process."
+      @doc "Collects an AgentServer pending reply in its submitting process."
       def await(pending, timeout \\ 5_000), do: Jido.await(pending, timeout)
 
-      @doc "Discards an AgentServer2 pending reply without cancelling its turn."
+      @doc "Discards an AgentServer pending reply without cancelling its turn."
       def abandon(pending), do: Jido.abandon(pending)
-
-      @doc "Starts one asynchronous Signal request through a stable Agent Ref."
-      @spec send_request(Jido.Agent.Ref.t(), Jido.Signal.t(), timeout()) :: term()
-      def send_request(%Jido.Agent.Ref{} = ref, signal, timeout \\ 5_000) do
-        Jido.send_request(__MODULE__, ref, signal, timeout)
-      end
-
-      @doc "Receives an Agent request response with the standard OTP envelope."
-      @spec receive_response(term(), timeout()) :: term()
-      def receive_response(request_id, timeout \\ 5_000) do
-        Jido.receive_response(request_id, timeout)
-      end
 
       @doc "Stops the local Agent resolved by a stable Agent Ref."
       @spec stop_agent_ref(Jido.Agent.Ref.t(), term(), timeout()) ::
@@ -323,12 +311,6 @@ defmodule Jido do
         Jido.status(__MODULE__, ref, timeout)
       end
 
-      @doc "Returns a committed snapshot through a stable Agent Ref."
-      @spec snapshot(Jido.Agent.Ref.t(), timeout()) :: map() | {:error, term()}
-      def snapshot(%Jido.Agent.Ref{} = ref, timeout \\ 5_000) do
-        Jido.snapshot(__MODULE__, ref, timeout)
-      end
-
       @doc "Returns child runtime status through a stable Agent Ref."
       @spec children(Jido.Agent.Ref.t(), timeout()) :: map() | {:error, term()}
       def children(%Jido.Agent.Ref{} = ref, timeout \\ 5_000) do
@@ -341,27 +323,7 @@ defmodule Jido do
         Jido.await_ready(__MODULE__, ref, timeout)
       end
 
-      @doc "Enables or disables one Agent's bounded runtime event buffer."
-      @spec set_agent_debug(Jido.Agent.Ref.t(), boolean(), timeout()) ::
-              :ok | {:error, term()}
-      def set_agent_debug(%Jido.Agent.Ref{} = ref, enabled, timeout \\ 5_000) do
-        Jido.set_agent_debug(__MODULE__, ref, enabled, timeout)
-      end
-
-      @doc "Returns one Agent's recent runtime events in newest-first order."
-      @spec recent_events(Jido.Agent.Ref.t(), keyword(), timeout()) ::
-              {:ok, [map()]} | {:error, term()}
-      def recent_events(%Jido.Agent.Ref{} = ref, opts \\ [], timeout \\ 5_000) do
-        Jido.recent_events(__MODULE__, ref, opts, timeout)
-      end
-
       # Compatible relationship and persistence API
-
-      @doc "Fetches one Agent logical-parent binding under this Jido instance."
-      @spec agent_parent_binding(String.t(), keyword()) :: {:ok, map()} | :error
-      def agent_parent_binding(child_id, opts \\ []) do
-        Jido.agent_parent_binding(__MODULE__, child_id, opts)
-      end
 
       @doc "Persists and stops one live Agent Server."
       def hibernate(server, opts \\ []) do
@@ -405,8 +367,6 @@ defmodule Jido do
       - `debug(:verbose)` — log all terminal semantic events
       - `debug(:off)` — use the global semantic log configuration
 
-      This function does not control an Agent's bounded event buffer. Use
-      `set_agent_debug/3` for that buffer.
       """
       @spec debug() :: Jido.debug_level()
       def debug, do: Jido.Debug.level(__MODULE__)
@@ -556,7 +516,7 @@ defmodule Jido do
       Required for persistent Agents.
     - `:max_tasks` - Task Supervisor child limit; defaults to `1_000`
     - `:persistence` - Optional default persistence adapter
-    - `:agent_server2` - Optional runtime defaults for the AgentServer2 prototype
+    - `:agent_server` - Optional AgentServer runtime defaults
 
   ## Example
 
@@ -588,7 +548,6 @@ defmodule Jido do
         registration_guard_name(name),
         registry_name(name),
         runtime_store_name(name),
-        Jido.AgentServer.SpawnRegistry.name(name),
         agent_supervisor_name(name)
       ]
 
@@ -646,18 +605,17 @@ defmodule Jido do
           runtime_store,
           [
             {{@instance_config_hive, :persistence}, Keyword.get(opts, :persistence)},
-            {{@instance_config_hive, :agent_server2}, Keyword.get(opts, :agent_server2, [])}
+            {{@instance_config_hive, :agent_server}, Keyword.get(opts, :agent_server, [])}
           ]
         )
 
       base_children = [
-        {Runic.Runner, name: exec_runner_name(name), store: Jido.AgentServer.Execution.Store},
+        {Runic.Runner, name: exec_runner_name(name), store: Jido.AgentServer.Store},
         {Task.Supervisor,
          name: task_supervisor_name(name), max_children: Keyword.fetch!(opts, :max_tasks)},
         {Jido.AgentServer.RegistrationGuard, jido: name},
         {Jido.AgentServer.RegistryWorker, keys: :unique, name: registry_name(name)},
         {Jido.RuntimeStore, name: runtime_store},
-        {Jido.AgentServer.SpawnRegistry, jido: name},
         {DynamicSupervisor,
          name: agent_supervisor_name(name),
          strategy: :one_for_one,
@@ -718,8 +676,8 @@ defmodule Jido do
   end
 
   @doc false
-  def instance_agent_server2_options(name) do
-    case :ets.lookup(runtime_store_name(name), {@instance_config_hive, :agent_server2}) do
+  def instance_agent_server_options(name) do
+    case :ets.lookup(runtime_store_name(name), {@instance_config_hive, :agent_server}) do
       [{_, opts}] -> opts
       [] -> []
     end
@@ -781,7 +739,7 @@ defmodule Jido do
   resolves the Ref again; it does not retry or replay an accepted turn.
 
   Returns `{:error, :not_found}` when there is no live registration,
-  `{:error, :recovering}` while AgentServer2 is registered but not ready, or
+  `{:error, :recovering}` while AgentServer is registered but not ready, or
   `{:error, :unavailable}` when the Registry cannot be read. A worker can still
   stop after resolution. Caller timeout does not cancel an accepted turn.
   """
@@ -802,7 +760,7 @@ defmodule Jido do
 
   @doc "Sends one synchronous Signal through a stable Agent Ref."
   @spec call(atom(), Ref.t(), Jido.Signal.t(), timeout() | keyword()) ::
-          Jido.AgentServer.signal_result() | {:ok, Jido.Agent.instance(), [struct()]}
+          Jido.AgentServer.signal_result()
   def call(instance, %Ref{} = ref, signal, timeout_or_opts \\ 5_000),
     do: RefFacade.call(instance, ref, signal, timeout_or_opts)
 
@@ -810,24 +768,15 @@ defmodule Jido do
   @spec cast(atom(), Ref.t(), Jido.Signal.t()) :: :ok | {:error, term()}
   def cast(instance, %Ref{} = ref, signal), do: RefFacade.cast(instance, ref, signal)
 
-  @doc "Submits one AgentServer2 turn through a stable Agent Ref."
+  @doc "Submits one AgentServer turn through a stable Agent Ref."
   def submit(instance, %Ref{} = ref, signal, opts \\ []),
     do: RefFacade.submit(instance, ref, signal, opts)
 
-  @doc "Collects an AgentServer2 pending reply in its submitting process."
-  defdelegate await(pending, timeout \\ 5_000), to: Jido.AgentServer2
+  @doc "Collects an AgentServer pending reply in its submitting process."
+  defdelegate await(pending, timeout \\ 5_000), to: Jido.AgentServer
 
-  @doc "Discards an AgentServer2 pending reply without cancelling its turn."
-  defdelegate abandon(pending), to: Jido.AgentServer2
-
-  @doc "Starts one asynchronous Signal request through a stable Agent Ref."
-  @spec send_request(atom(), Ref.t(), Jido.Signal.t(), timeout()) :: term()
-  def send_request(instance, %Ref{} = ref, signal, timeout \\ 5_000),
-    do: RefFacade.send_request(instance, ref, signal, timeout)
-
-  @doc "Receives an Agent request response with the standard OTP envelope."
-  @spec receive_response(term(), timeout()) :: term()
-  defdelegate receive_response(request_id, timeout \\ 5_000), to: Jido.AgentServer
+  @doc "Discards an AgentServer pending reply without cancelling its turn."
+  defdelegate abandon(pending), to: Jido.AgentServer
 
   @doc "Stops the local Agent resolved by a stable Agent Ref."
   @spec stop_agent_ref(atom(), Ref.t(), term(), timeout()) :: :ok | {:error, term()}
@@ -884,11 +833,6 @@ defmodule Jido do
   def status(instance, %Ref{} = ref, timeout \\ 5_000),
     do: RefFacade.status(instance, ref, timeout)
 
-  @doc "Returns a committed snapshot through a stable Agent Ref."
-  @spec snapshot(atom(), Ref.t(), timeout()) :: map() | {:error, term()}
-  def snapshot(instance, %Ref{} = ref, timeout \\ 5_000),
-    do: RefFacade.snapshot(instance, ref, timeout)
-
   @doc "Returns child runtime status through a stable Agent Ref."
   @spec children(atom(), Ref.t(), timeout()) :: map() | {:error, term()}
   def children(instance, %Ref{} = ref, timeout \\ 5_000),
@@ -898,17 +842,6 @@ defmodule Jido do
   @spec await_ready(atom(), Ref.t(), timeout()) :: :ok | {:error, term()}
   def await_ready(instance, %Ref{} = ref, timeout \\ 5_000),
     do: RefFacade.await_ready(instance, ref, timeout)
-
-  @doc "Enables or disables one Agent's bounded runtime event buffer."
-  @spec set_agent_debug(atom(), Ref.t(), boolean(), timeout()) :: :ok | {:error, term()}
-  def set_agent_debug(instance, %Ref{} = ref, enabled, timeout \\ 5_000),
-    do: RefFacade.set_debug(instance, ref, enabled, timeout)
-
-  @doc "Returns one Agent's recent runtime events in newest-first order."
-  @spec recent_events(atom(), Ref.t(), keyword(), timeout()) ::
-          {:ok, [map()]} | {:error, term()}
-  def recent_events(instance, %Ref{} = ref, opts \\ [], timeout \\ 5_000),
-    do: RefFacade.recent_events(instance, ref, opts, timeout)
 
   # ---------------------------------------------------------------------------
   # Agent Lifecycle
@@ -961,9 +894,13 @@ defmodule Jido do
           DynamicSupervisor.on_start_child()
   def start_agent(instance, agent, opts) when is_atom(instance) do
     if is_list(opts) and Keyword.keyword?(opts) do
-      opts
-      |> Keyword.merge(agent: agent, jido: instance, register: true)
-      |> Jido.AgentServer.start()
+      {instance_opts, runtime_opts} = Keyword.split(opts, [:id, :state])
+
+      with {:ok, agent} <- startup_agent(agent, instance_opts) do
+        runtime_opts
+        |> Keyword.merge(agent: agent, jido: instance)
+        |> Jido.AgentServer.start()
+      end
     else
       {:error,
        Jido.Error.validation_error("Agent startup options must be a keyword list", kind: :config)}
@@ -1048,7 +985,7 @@ defmodule Jido do
       when is_atom(instance) and is_binary(id) and is_list(opts) do
     if Keyword.keyword?(opts) do
       Jido.AgentServer.whereis(
-        registry_name(instance),
+        instance,
         id,
         partition: Keyword.get(opts, :partition)
       )
@@ -1118,42 +1055,6 @@ defmodule Jido do
       {:error, _reason} = error -> error
     end
   end
-
-  @doc "Fetches one Agent logical-parent binding from the default instance."
-  @spec agent_parent_binding(String.t()) :: {:ok, map()} | :error
-  def agent_parent_binding(child_id),
-    do: agent_parent_binding(@default_instance, child_id, [])
-
-  @doc """
-  Fetches a parent binding with default-instance options, or fetches it from a
-  selected instance with default options.
-  """
-  @spec agent_parent_binding(atom() | String.t(), keyword() | String.t()) ::
-          {:ok, map()} | :error
-  def agent_parent_binding(child_id, opts) when is_binary(child_id) and is_list(opts),
-    do: agent_parent_binding(@default_instance, child_id, opts)
-
-  def agent_parent_binding(instance, child_id) when is_atom(instance),
-    do: agent_parent_binding(instance, child_id, [])
-
-  @doc "Fetches a parent binding with options from the selected Jido instance."
-  @spec agent_parent_binding(atom(), String.t(), keyword()) :: {:ok, map()} | :error
-  def agent_parent_binding(instance, child_id, opts)
-      when is_atom(instance) and is_binary(child_id) and is_list(opts) do
-    with true <- Keyword.keyword?(opts),
-         {:ok, binding} <-
-           RuntimeStore.fetch(
-             instance,
-             :agent_relationships,
-             partition_key(child_id, Keyword.get(opts, :partition))
-           ) do
-      normalize_parent_binding(binding)
-    else
-      _reason -> :error
-    end
-  end
-
-  def agent_parent_binding(_instance, _child_id, _opts), do: :error
 
   defp validate_compat_options(operation, opts) do
     if Keyword.keyword?(opts),
@@ -1228,29 +1129,29 @@ defmodule Jido do
   def thaw(instance, agent_module, agent_id, opts)
       when is_atom(instance) and is_atom(agent_module) and is_binary(agent_id) and
              is_list(opts) do
-    opts = opts |> Keyword.put(:id, agent_id) |> Keyword.put(:restore, :required)
+    opts =
+      opts
+      |> Keyword.put(:id, agent_id)
+      |> Keyword.put_new(:persistence, :inherit)
+      |> Keyword.put(:persistence_mode, :restore)
+
     start_agent(instance, agent_module, opts)
   end
 
-  defp normalize_parent_binding(%{parent_id: parent_id, tag: _tag} = binding)
-       when is_binary(parent_id) do
-    {:ok,
-     binding
-     |> Map.put_new(:parent_partition, nil)
-     |> Map.update(:meta, %{}, fn
-       meta when is_map(meta) -> meta
-       _other -> %{}
-     end)}
+  defp startup_agent(%Jido.Agent{id: id} = agent, opts) when is_binary(id) do
+    if Keyword.delete(opts, :id) == [] and Keyword.get(opts, :id, id) == id,
+      do: Jido.Agent.validate_instance(agent),
+      else: invalid_compat_input(:start_agent, %{opts: opts})
   end
 
-  defp normalize_parent_binding(_binding), do: :error
+  defp startup_agent(source, opts), do: Jido.Agent.instantiate(source, opts)
 
   defp owned_agent_server(instance, server, opts) do
     with true <- not is_nil(instance),
          true <- Keyword.keyword?(opts),
          pid when is_pid(pid) <- safe_whereis(server),
-         {:ok, %{agent_id: agent_id, partition: partition}} <-
-           Jido.AgentServer.creation_info(pid),
+         %{jido: ^instance, agent_id: agent_id, partition: partition} <-
+           Jido.AgentServer.status(pid),
          true <- partition_matches?(opts, partition),
          ^pid <- owned_registry_pid(instance, agent_id, partition, pid) do
       {:ok, pid}

@@ -48,8 +48,8 @@ defmodule Jido.Agent.TurnEvaluationTest do
 
   test "custom selection rejects malformed Signal types before callback", %{jido: jido} do
     agent = CustomRouteAgent.new!()
-    {:ok, server} = Jido.start_agent(jido, agent)
-    before = Jido.AgentServer.snapshot(server)
+    {:ok, server} = JidoTest.AgentServerAssertions.start_agent(jido, agent)
+    before = JidoTest.AgentServerAssertions.committed(server)
     source = Signal.new!("source.custom", %{observer: self()}, source: "/test")
 
     for type <- [:invalid, nil, 42] do
@@ -58,14 +58,14 @@ defmodule Jido.Agent.TurnEvaluationTest do
       assert {:error, %Jido.Error.RoutingError{}} =
                Jido.AgentServer.call(server, %{source | type: type})
 
-      assert Jido.AgentServer.snapshot(server) == before
+      assert JidoTest.AgentServerAssertions.committed(server) == before
       refute_received {:selected, ^type}
     end
   end
 
   test "invalid callback Turn sources return errors and preserve the live server", %{jido: jido} do
     agent = InvalidSourceAgent.new!(id: "invalid-source")
-    assert {:ok, server} = Jido.start_agent(jido, agent)
+    assert {:ok, server} = JidoTest.AgentServerAssertions.start_agent(jido, agent)
 
     replacement = Signal.new!("source.replacement", %{}, source: "/test")
 
@@ -83,7 +83,7 @@ defmodule Jido.Agent.TurnEvaluationTest do
     end
 
     valid = Signal.new!("source.valid", %{}, source: "/test")
-    assert {:ok, live} = Jido.AgentServer.call(server, valid)
+    assert {:ok, live, _} = Jido.AgentServer.call(server, valid)
     assert {:ok, direct, []} = Jido.Agent.cmd(agent, valid)
     assert live.state == direct.state
     assert live.state.count == 1
@@ -126,8 +126,8 @@ defmodule Jido.Agent.TurnEvaluationTest do
     assert {:ok, direct, []} = Jido.Agent.cmd(agent, source)
     assert direct.state == %{count: 1, history: ["source.route"]}
 
-    assert {:ok, server} = Jido.start_agent(jido, agent)
-    assert {:ok, live} = Jido.AgentServer.call(server, source)
+    assert {:ok, server} = JidoTest.AgentServerAssertions.start_agent(jido, agent)
+    assert {:ok, live, _} = Jido.AgentServer.call(server, source)
     assert live.state == direct.state
 
     assert_receive {:selected, "source.route"}

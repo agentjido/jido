@@ -46,7 +46,7 @@ defmodule Jido.Plugin.Scheduler.OccurrenceRuntimeTest do
 
     {:ok, route_signal_1} = Agent.arm_schedule_signal(%{job_id: "job-1", cron: "* * * * * *"})
 
-    assert {:ok, _} =
+    assert {:ok, _, _} =
              Jido.AgentServer.call(server, route_signal_1, [])
 
     [first | _] = await_ticks(server, 1)
@@ -74,7 +74,7 @@ defmodule Jido.Plugin.Scheduler.OccurrenceRuntimeTest do
 
     {:ok, route_signal_2} = Agent.arm_schedule_signal(%{job_id: "job-1", cron: "* * * * * *"})
 
-    assert {:ok, _} =
+    assert {:ok, _, _} =
              Jido.AgentServer.call(server, route_signal_2, [])
 
     [first, second | _] = await_ticks(server, 2)
@@ -84,7 +84,7 @@ defmodule Jido.Plugin.Scheduler.OccurrenceRuntimeTest do
 
     {:ok, route_signal_3} = Agent.arm_schedule_signal(%{job_id: "job-1", cron: "* * * * * *"})
 
-    assert {:ok, _} =
+    assert {:ok, _, _} =
              Jido.AgentServer.call(server, route_signal_3, [])
 
     replacement =
@@ -101,15 +101,26 @@ defmodule Jido.Plugin.Scheduler.OccurrenceRuntimeTest do
 
     {:ok, route_signal_4} = Agent.arm_schedule_signal(%{job_id: "job-1", cron: "* * * * * *"})
 
-    assert {:ok, _} =
+    assert {:ok, _, _} =
              Jido.AgentServer.call(server, route_signal_4, [])
 
     [first | _] = await_ticks(server, 1)
-    scheduler = Server.children(server)[{:plugin, Scheduler}].pid
+    scheduler = JidoTest.AgentServerAssertions.plugin(server, Scheduler).pid
+    root = Server.activation(server)
     kill(scheduler)
+    server = JidoTest.AgentServerAssertions.replacement(root, server)
 
-    eventually(fn -> Server.children(server)[{:plugin, Scheduler}].pid != scheduler end)
+    eventually(fn ->
+      JidoTest.AgentServerAssertions.plugin(server, Scheduler).pid != scheduler
+    end)
+
+    runtime = JidoTest.AgentServerAssertions.plugin(server, Scheduler).pid
+    {spec, job, _monitor, token} = :sys.get_state(runtime).cron_jobs["job-1"]
+    assert Process.alive?(job)
+    assert spec.generation == first.occurrence.generation
     count = length(Server.agent(server).state.ticks)
+    {:ok, scheduled_at, 0} = DateTime.from_iso8601(first.occurrence.scheduled_at)
+    send(runtime, {:cron_tick, "job-1", token, scheduled_at})
     ticks = await_ticks(server, count + 1)
     assert List.last(ticks).occurrence == first.occurrence
     assert List.last(ticks).signal_id != first.signal_id
@@ -120,13 +131,13 @@ defmodule Jido.Plugin.Scheduler.OccurrenceRuntimeTest do
 
     {:ok, route_signal_5} = Agent.arm_schedule_signal(%{job_id: "job-1", cron: "* * * * * *"})
 
-    assert {:ok, _} =
+    assert {:ok, _, _} =
              Jido.AgentServer.call(server, route_signal_5, [])
 
     [first | _] = await_ticks(server, 1)
-    kill(server)
+    assert :ok = Server.stop(server)
 
-    restored = start_agent(c, :required)
+    restored = start_agent(c, :restore)
     count = length(Server.agent(restored).state.ticks)
     ticks = await_ticks(restored, count + 1)
     assert List.last(ticks).occurrence == first.occurrence
@@ -143,13 +154,12 @@ defmodule Jido.Plugin.Scheduler.OccurrenceRuntimeTest do
     assert next.occurrence.scheduled_at == "2030-01-01T00:00:02.000000Z"
   end
 
-  defp start_agent(c, restore \\ false) do
+  defp start_agent(c, mode \\ :create) do
     assert {:ok, server} =
-             Jido.start_agent(c.jido, TimedAgent,
+             JidoTest.AgentServerAssertions.start_agent(c.jido, TimedAgent,
                id: c.agent_id,
                persistence: c.persistence,
-               restore: restore,
-               restart: :temporary
+               persistence_mode: mode
              )
 
     server

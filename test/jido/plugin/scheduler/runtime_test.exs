@@ -281,7 +281,7 @@ defmodule Jido.Plugin.Scheduler.RuntimeTest do
                  second_runtime
                )
 
-      refute_received {:"$gen_cast", {:signal, _ref, _signal}}
+      refute_received {:"$gen_cast", {:turn, _ref, _signal, %{}, :infinity}}
 
       {_spec, _job, _ref, current_token} = second_runtime.cron_jobs.job
 
@@ -291,7 +291,7 @@ defmodule Jido.Plugin.Scheduler.RuntimeTest do
                  second_runtime
                )
 
-      assert_receive {:"$gen_cast", {:signal, _ref, signal}}
+      assert_receive {:"$gen_cast", {:turn, _ref, signal, %{}, :infinity}}
       assert signal.type == "jido.scheduler.enqueue"
       assert signal.data.generation == 2
 
@@ -303,7 +303,7 @@ defmodule Jido.Plugin.Scheduler.RuntimeTest do
                  cancelled_runtime
                )
 
-      refute_received {:"$gen_cast", {:signal, _ref, _signal}}
+      refute_received {:"$gen_cast", {:turn, _ref, _signal, %{}, :infinity}}
     after
       Runtime.terminate(:normal, second_runtime)
     end
@@ -332,7 +332,7 @@ defmodule Jido.Plugin.Scheduler.RuntimeTest do
 
     assert_receive {:deliver, token, traced}
     assert {:noreply, _runtime} = Runtime.handle_info({:deliver, token, traced}, armed)
-    assert_receive {:"$gen_cast", {:signal, _ref, delivered}}
+    assert_receive {:"$gen_cast", {:turn, _ref, delivered, %{}, :infinity}}
     trace = Trace.get(delivered)
     assert trace.trace_id == source_trace.trace_id
     assert trace.span_id not in [source_trace.span_id, local_trace.span_id]
@@ -673,7 +673,7 @@ defmodule Jido.Plugin.Scheduler.RuntimeTest do
         :gen_statem.reply(from, {:ok, %{cron: cron}})
         scheduler_agent(test_pid, cron)
 
-      {:"$gen_cast", {:signal, _ref, signal}} ->
+      {:"$gen_cast", {:turn, _ref, signal, %{}, :infinity}} ->
         send(test_pid, {:scheduler_agent_cast, signal})
         scheduler_agent(test_pid, cron)
     end

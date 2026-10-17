@@ -40,13 +40,13 @@ defmodule JidoTest.Agent.CandidateCompletenessTest do
     assert {:error, %Jido.Error.ValidationError{details: %{missing_keys: [:history]}}} =
              Counter.cmd(initial, signal)
 
-    assert {:ok, server} = Jido.start_agent(jido, initial)
-    before = Server.snapshot(server)
+    assert {:ok, server} = JidoTest.AgentServerAssertions.start_agent(jido, initial)
+    before = JidoTest.AgentServerAssertions.committed(server)
 
     assert {:error, %Jido.Error.ValidationError{details: %{missing_keys: [:history]}}} =
              Server.call(server, signal)
 
-    assert Server.snapshot(server) == before
+    assert JidoTest.AgentServerAssertions.committed(server) == before
   end
 
   test "a candidate can omit a field that has no default", %{jido: jido} do
@@ -56,8 +56,8 @@ defmodule JidoTest.Agent.CandidateCompletenessTest do
     assert {:ok, direct, []} = Counter.cmd(initial, signal)
     assert direct.state == %{count: 1, history: []}
 
-    assert {:ok, server} = Jido.start_agent(jido, initial)
-    assert {:ok, live} = Server.call(server, signal)
+    assert {:ok, server} = JidoTest.AgentServerAssertions.start_agent(jido, initial)
+    assert {:ok, live, _} = Server.call(server, signal)
     assert live.state == direct.state
   end
 end

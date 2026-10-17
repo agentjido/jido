@@ -9,25 +9,16 @@ defmodule Jido.Agent.Authoring.Compiler do
   @agent_root_options [:name, :description, :vsn]
 
   defmacro __using__(opts) do
-    host = Keyword.fetch!(opts, :host)
     agent_opts = Keyword.fetch!(opts, :agent_options)
-
-    dsl =
-      case host do
-        :agent -> Jido.Agent.DSL
-        :topology -> Jido.Topology.DSL
-      end
 
     quote location: :keep do
       @jido_agent_options Jido.Agent.Authoring.Compiler.options!(unquote(agent_opts), __ENV__)
-      Jido.Agent.Authoring.Compiler.setup_dsl(__ENV__, unquote(dsl), @jido_agent_options)
+      Jido.Agent.Authoring.Compiler.setup_dsl(__ENV__, Jido.Agent.DSL, @jido_agent_options)
       import Jido.Agent.Authoring.Compiler, only: [agent: 1, routes: 1, topology: 1, schedules: 1]
       unquote_splicing(extension_imports(agent_opts, __CALLER__))
       use Jido.Action.Inline
       @before_compile Jido.Agent.Authoring.Compiler
       @behaviour Jido.Agent
-
-      @jido_agent_host unquote(host)
 
       @doc "Returns the neutral canonical Agent definition."
       @spec definition() :: Jido.Agent.definition()
@@ -163,33 +154,18 @@ defmodule Jido.Agent.Authoring.Compiler do
 
   defmacro __before_compile__(env) do
     options = Module.get_attribute(env.module, :jido_agent_options)
-    host = Module.get_attribute(env.module, :jido_agent_host)
     {extensions, options} = Map.pop(options, :extensions, [])
-    {agent_extensions, topology_extensions} = extensions(host, extensions, env)
-    {agent_options, topology_options} = split_options(host, options, env)
+    {agent_extensions, topology_extensions} = extensions(extensions, env)
+    unwrap!(Authoring.keys(options, @agent_root_options), env)
     # Read current compile state once. Loaded module code can be stale on reload.
     dsl = Module.get_attribute(env.module, :spark_dsl_config) || %{}
+    {topology, sources} = Jido.Agent.DSL.Topology.lower(topology_extensions, dsl, env)
 
-    {agent_options, topology_sources} =
-      if host == :agent do
-        {topology, sources} = Jido.Agent.DSL.Topology.lower(topology_extensions, dsl, env)
-        {Map.put(agent_options, :topology, topology), sources}
-      else
-        {agent_options, %{}}
-      end
-
-    agent = lower_agent(agent_options, agent_extensions, dsl, env, topology_sources)
-
-    topology =
-      if host == :topology do
-        topology_options
-        |> Jido.Topology.DSL.Compiler.lower(topology_extensions, dsl, env)
-        |> emit_topology(env)
-      end
+    agent =
+      lower_agent(Map.put(options, :topology, topology), agent_extensions, dsl, env, sources)
 
     quote do
       unquote(agent)
-      unquote(topology)
       @after_verify {Jido.Agent.Authoring.Compiler, :verify}
     end
   end
@@ -235,30 +211,7 @@ defmodule Jido.Agent.Authoring.Compiler do
     end
   end
 
-  defp emit_topology({config, sources, owner?}, env) do
-    escaped = Jido.Topology.unwrap!(Jido.Topology.DSL.Compiler.escape(config, env))
-
-    quote do
-      @doc false
-      def __topology_owner__?, do: unquote(owner?)
-      @doc false
-      def __topology_config__, do: unquote(escaped)
-      @doc false
-      def __topology_sources__, do: unquote(Macro.escape(sources))
-    end
-  end
-
-  defp split_options(:topology, options, _env) do
-    {agent, topology} = Map.split(options, @agent_root_options)
-    {agent, Map.merge(topology, Map.take(agent, [:name]))}
-  end
-
-  defp split_options(:agent, options, env) do
-    unwrap!(Authoring.keys(options, @agent_root_options), env)
-    {options, nil}
-  end
-
-  defp extensions(_host, extensions, env) do
+  defp extensions(extensions, env) do
     {agent, topology} = partition_extensions(extensions, {[], []}, env)
     {Enum.reverse(agent), Enum.reverse(topology)}
   end
@@ -302,10 +255,6 @@ defmodule Jido.Agent.Authoring.Compiler do
   def verify(module) do
     env = %{file: to_string(module.module_info(:compile)[:source]), line: 1}
     unwrap!(Jido.Agent.Source.definition(module), env, module.__agent_sources__())
-
-    if function_exported?(module, :__topology_config__, 0) do
-      unwrap!(Jido.Topology.new(module.__topology_config__()), env, module.__topology_sources__())
-    end
 
     :ok
   end

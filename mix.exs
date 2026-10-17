@@ -112,7 +112,7 @@ defmodule Jido.MixProject do
       deps: deps(),
       test_ignore_filters: [
         fn path ->
-          (String.starts_with?(path, "test/contract/agent_server2/") or
+          (String.starts_with?(path, "test/contract/agent_server/") or
              String.starts_with?(path, "test/bench/") or
              String.starts_with?(path, "test/authoring/") or
              String.starts_with?(path, "test/property/") or
@@ -184,9 +184,9 @@ defmodule Jido.MixProject do
 
   # Specifies which paths to compile per environment.
   defp elixirc_paths(:test),
-    do: ["lib", "examples", "test/support", "test/jido/support", "test/examples/support"]
+    do: ["lib", "test/support", "test/jido/support"]
 
-  defp elixirc_paths(:dev), do: ["lib", "examples"]
+  defp elixirc_paths(:dev), do: ["lib"]
   defp elixirc_paths(_), do: ["lib"]
 
   defp docs do

@@ -159,12 +159,14 @@ defmodule Jido.Agent.SchemaTest do
       jido: jido,
       agent_module: agent_module
     } do
-      {:ok, server} = Jido.start_agent(jido, agent_module, id: unique_id())
-      before = Server.snapshot(server)
+      {:ok, server} =
+        JidoTest.AgentServerAssertions.start_agent(jido, agent_module, id: unique_id())
+
+      before = JidoTest.AgentServerAssertions.committed(server)
       command = signal("counter.add", %{by: 2, label: "invalid"})
 
       assert {:error, %ValidationError{}} = Server.call(server, command)
-      assert Server.snapshot(server) == before
+      assert JidoTest.AgentServerAssertions.committed(server) == before
     end
 
     @tag agent_module: agent_module
@@ -172,13 +174,17 @@ defmodule Jido.Agent.SchemaTest do
       jido: jido,
       agent_module: agent_module
     } do
-      {:ok, server} = Jido.start_agent(jido, agent_module, id: unique_id())
-      initial = Server.snapshot(server).agent.state
+      {:ok, server} =
+        JidoTest.AgentServerAssertions.start_agent(jido, agent_module, id: unique_id())
+
+      initial = Server.agent(server).state
       expected = %{initial | count: 1, history: ["valid"]}
 
-      assert {:ok, agent} = Server.call(server, signal("counter.add", %{by: 1, label: "valid"}))
+      assert {:ok, agent, _} =
+               Server.call(server, signal("counter.add", %{by: 1, label: "valid"}))
+
       assert agent.state == expected
-      assert %{agent: ^agent, state_version: 1} = Server.snapshot(server)
+      assert %{agent: ^agent, state_version: 1} = JidoTest.AgentServerAssertions.committed(server)
     end
   end
 end

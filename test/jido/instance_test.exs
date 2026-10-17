@@ -181,7 +181,11 @@ defmodule JidoTest.InstanceTest do
              Jido.Persistence.resolve_config(:inherit, TestInstance)
 
     agent = RedisTestAgent.new!(id: "configured-persistence")
-    assert {:ok, server} = TestInstance.start_agent(agent, restore: false)
+
+    assert {:ok, server} =
+             TestInstance.start_agent(agent, persistence: :inherit, persistence_mode: :create)
+
+    assert :ok = Server.await_ready(server)
     assert :ok = TestInstance.hibernate(server)
 
     assert {:ok, ^agent} =
@@ -206,9 +210,13 @@ defmodule JidoTest.InstanceTest do
       RedisTestAgent.new!(id: "redis-instance-agent")
       |> then(fn agent -> %{agent | state: %{agent.state | counter: 42}} end)
 
-    assert {:ok, pid} = module.start_agent(agent, restore: false)
+    assert {:ok, pid} =
+             module.start_agent(agent, persistence: :inherit, persistence_mode: :create)
+
+    assert :ok = Server.await_ready(pid)
     assert :ok = module.hibernate(pid)
     assert {:ok, thawed_pid} = module.thaw(RedisTestAgent, agent.id)
+    assert :ok = Server.await_ready(thawed_pid)
     assert Server.agent(thawed_pid).state.counter == 42
   end
 
@@ -223,12 +231,19 @@ defmodule JidoTest.InstanceTest do
 
     partitioned = %{agent | state: %{agent.state | counter: 20}}
 
-    assert {:ok, pid} = module.start_agent(agent, restore: false)
+    assert {:ok, pid} =
+             module.start_agent(agent, persistence: :inherit, persistence_mode: :create)
 
     assert {:ok, partitioned_pid} =
-             module.start_agent(partitioned, partition: "blue", restore: false)
+             module.start_agent(partitioned,
+               partition: "blue",
+               persistence: :inherit,
+               persistence_mode: :create
+             )
 
+    assert :ok = Server.await_ready(pid)
     assert :ok = module.hibernate(pid)
+    assert :ok = Server.await_ready(partitioned_pid)
     assert :ok = module.hibernate(partitioned_pid)
 
     assert {:ok, restored_pid} = module.thaw(RedisTestAgent, agent.id)
@@ -236,6 +251,8 @@ defmodule JidoTest.InstanceTest do
     assert {:ok, restored_partitioned_pid} =
              module.thaw(RedisTestAgent, agent.id, partition: "blue")
 
+    assert :ok = Server.await_ready(restored_pid)
+    assert :ok = Server.await_ready(restored_partitioned_pid)
     assert Server.agent(restored_pid).state.counter == 10
     assert Server.agent(restored_partitioned_pid).state.counter == 20
   end
@@ -277,30 +294,30 @@ defmodule JidoTest.InstanceTest do
     {:ok, _pid} = TestInstance.start_link()
 
     {:ok, plain} = TestInstance.start_agent(RedisTestAgent, id: "shared")
-    {:ok, blue} = TestInstance.start_agent(RedisTestAgent, id: "shared", partition: :blue)
+    {:ok, blue} = TestInstance.start_agent(RedisTestAgent, id: "shared", partition: "blue")
 
     assert TestInstance.whereis_agent("shared") == plain
-    assert TestInstance.whereis_agent("shared", partition: :blue) == blue
+    assert TestInstance.whereis_agent("shared", partition: "blue") == blue
     assert TestInstance.list_agents() == [{"shared", plain}]
-    assert TestInstance.list_agents(partition: :blue) == [{"shared", blue}]
+    assert TestInstance.list_agents(partition: "blue") == [{"shared", blue}]
   end
 
   test "PID stop and hibernate require the exact explicit partition" do
     start_supervised!(TestInstance)
-    {:ok, server} = TestInstance.start_agent(RedisTestAgent, id: "numeric", partition: 1)
-    before = Server.snapshot(server)
+    {:ok, server} = TestInstance.start_agent(RedisTestAgent, id: "numeric", partition: "1")
+    before = JidoTest.AgentServerAssertions.committed(server)
 
-    assert TestInstance.whereis_agent("numeric", partition: 1) == server
-    assert TestInstance.whereis_agent("numeric", partition: 1.0) == nil
-    assert {:error, :not_found} = TestInstance.stop_agent(server, partition: 1.0)
-    assert {:error, :not_found} = TestInstance.hibernate(server, partition: 1.0)
-    assert Server.snapshot(server) === before
-    assert TestInstance.whereis_agent("numeric", partition: 1) == server
+    assert TestInstance.whereis_agent("numeric", partition: "1") == server
+    assert TestInstance.whereis_agent("numeric", partition: "1.0") == nil
+    assert {:error, :not_found} = TestInstance.stop_agent(server, partition: "1.0")
+    assert {:error, :not_found} = TestInstance.hibernate(server, partition: "1.0")
+    assert JidoTest.AgentServerAssertions.committed(server) === before
+    assert TestInstance.whereis_agent("numeric", partition: "1") == server
 
     monitor = Process.monitor(server)
-    assert :ok = TestInstance.stop_agent(server, partition: 1)
+    assert :ok = TestInstance.stop_agent(server, partition: "1")
     assert_receive {:DOWN, ^monitor, :process, ^server, _reason}, 1_000
-    assert TestInstance.whereis_agent("numeric", partition: 1) == nil
+    assert TestInstance.whereis_agent("numeric", partition: "1") == nil
   end
 
   test "works as a child in another Supervisor" do

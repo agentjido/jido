@@ -3,7 +3,6 @@ defmodule JidoTest.Persistence.IndeterminateWriteTest do
   @moduletag :research
   @moduletag capability: "PERSIST-03"
 
-  alias Jido.AgentServer, as: Server
   alias Jido.Persistence
   alias JidoTest.Persistence.IndeterminateWriteProbe, as: Probe
   alias JidoTest.Persistence.ProbeStore, as: Store
@@ -39,7 +38,7 @@ defmodule JidoTest.Persistence.IndeterminateWriteTest do
 
     {:ok, route_signal_1} = Probe.increment_signal(%{request_id: "first", amount: 1})
 
-    assert {:ok, agent} =
+    assert {:ok, agent, _} =
              Jido.AgentServer.call(pid, route_signal_1, context: c.turn_context)
 
     assert_receive {:signal,
@@ -48,7 +47,7 @@ defmodule JidoTest.Persistence.IndeterminateWriteTest do
                       data: %{count: 1}
                     }}
 
-    assert Server.snapshot(pid) == %{agent: agent, state_version: 1}
+    assert JidoTest.AgentServerAssertions.committed(pid) == %{agent: agent, state_version: 1}
 
     assert {:ok, ^agent, 1} =
              Persistence.load_agent_with_revision(c.store, Probe, c.id, instance: c.jido)
@@ -59,7 +58,7 @@ defmodule JidoTest.Persistence.IndeterminateWriteTest do
 
     {:ok, route_signal_2} = Probe.increment_signal(%{request_id: "first", amount: 1})
 
-    assert {:error, {:persistence_failed, :indeterminate}} =
+    assert {:error, %Jido.Error.ExecutionError{details: %{reason: :indeterminate}}} =
              Jido.AgentServer.call(pid, route_signal_2, context: c.turn_context)
 
     assert_stored_first(c)
@@ -71,7 +70,7 @@ defmodule JidoTest.Persistence.IndeterminateWriteTest do
 
     {:ok, route_signal_3} = Probe.increment_signal(%{request_id: "first", amount: 1})
 
-    assert {:error, {:persistence_failed, :indeterminate}} =
+    assert {:error, %Jido.Error.ExecutionError{details: %{reason: :indeterminate}}} =
              Jido.AgentServer.call(pid, route_signal_3, context: c.turn_context)
 
     assert_stored_first(c)
@@ -88,15 +87,18 @@ defmodule JidoTest.Persistence.IndeterminateWriteTest do
     {_store, opts} = c.store
 
     assert {:ok, pid} =
-             Jido.start_agent(c.jido, Probe,
+             JidoTest.AgentServerAssertions.start_agent(c.jido, Probe,
                id: c.id,
                persistence: {LostReply, opts},
-               restore: false
+               persistence_mode: :create
              )
 
     {:ok, route_signal_4} = Probe.increment_signal(%{request_id: "first", amount: 1})
 
-    assert {:error, {:persistence_failed, {:indeterminate, %Jido.Error.ExecutionError{}}}} =
+    assert {:error,
+            %Jido.Error.ExecutionError{
+              details: %{reason: {:indeterminate, %Jido.Error.ExecutionError{}}}
+            }} =
              Jido.AgentServer.call(pid, route_signal_4, context: c.turn_context)
 
     assert_stored_first(c)
@@ -108,10 +110,10 @@ defmodule JidoTest.Persistence.IndeterminateWriteTest do
   defp start_agent(c, write_result) do
     {Store, opts} = c.store
 
-    Jido.start_agent(c.jido, Probe,
+    JidoTest.AgentServerAssertions.start_agent(c.jido, Probe,
       id: c.id,
       persistence: {Store, Keyword.put(opts, :write_result, write_result)},
-      restore: false
+      persistence_mode: :create
     )
   end
 

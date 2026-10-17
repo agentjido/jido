@@ -103,10 +103,10 @@ defmodule Jido.Plugin.AuditTest do
   end
 
   test "commits bounded audit records with domain state", %{jido: jido} do
-    {:ok, pid} = Jido.start_agent(jido, Agent, id: unique_id("audit"))
+    {:ok, pid} = JidoTest.AgentServerAssertions.start_agent(jido, Agent, id: unique_id("audit"))
 
     for event <- [:one, :two, :three] do
-      assert {:ok, _agent} = Server.call(pid, signal("audit.record", %{event: event}))
+      assert {:ok, _agent, _} = Server.call(pid, signal("audit.record", %{event: event}))
     end
 
     agent = Server.agent(pid)
@@ -119,7 +119,10 @@ defmodule Jido.Plugin.AuditTest do
   end
 
   test "rejects non-portable audit data before commit", %{jido: jido} do
-    {:ok, pid} = Jido.start_agent(jido, NonPortableAgent, id: unique_id("audit-portable"))
+    {:ok, pid} =
+      JidoTest.AgentServerAssertions.start_agent(jido, NonPortableAgent,
+        id: unique_id("audit-portable")
+      )
 
     assert {:error, %Jido.Error.ValidationError{}} = Server.call(pid, signal("audit.bad"))
     assert Server.agent(pid).state.count == 0
@@ -145,14 +148,16 @@ defmodule Jido.Plugin.AuditTest do
   end
 
   test "rejects a non-byte audit event before the complete candidate commits", %{jido: jido} do
-    {:ok, server} = Jido.start_agent(jido, Agent, id: unique_id("audit-bits"))
-    before = Server.snapshot(server)
+    {:ok, server} =
+      JidoTest.AgentServerAssertions.start_agent(jido, Agent, id: unique_id("audit-bits"))
+
+    before = JidoTest.AgentServerAssertions.committed(server)
 
     assert {:error, %Jido.Error.ValidationError{} = error} =
              Server.call(server, signal("audit.record", %{event: <<5::3>>}))
 
     assert error.message == "Audit record must contain portable data"
     assert error.details.path == [:record, :event]
-    assert Server.snapshot(server) == before
+    assert JidoTest.AgentServerAssertions.committed(server) == before
   end
 end

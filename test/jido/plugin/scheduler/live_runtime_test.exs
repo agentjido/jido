@@ -23,11 +23,14 @@ defmodule Jido.Plugin.Scheduler.LiveRuntimeTest do
   end
 
   test "delayed and cron Signals return through the Agent mailbox", %{jido: jido} do
-    {:ok, pid} = Jido.start_agent(jido, FastRuntimeAgent, id: unique_id("schedule"))
+    {:ok, pid} =
+      JidoTest.AgentServerAssertions.start_agent(jido, FastRuntimeAgent,
+        id: unique_id("schedule")
+      )
 
     delayed = Signal.new!("runtime.record", %{event: :delayed}, source: "/test")
 
-    assert {:ok, agent} =
+    assert {:ok, agent, _} =
              Server.call(
                pid,
                signal("runtime.directive", %{
@@ -41,7 +44,7 @@ defmodule Jido.Plugin.Scheduler.LiveRuntimeTest do
 
     tick = Signal.new!("cron.tick", %{}, source: "/test")
 
-    assert {:ok, _agent} =
+    assert {:ok, _agent, _} =
              Server.call(
                pid,
                signal("runtime.directive", %{
@@ -53,7 +56,7 @@ defmodule Jido.Plugin.Scheduler.LiveRuntimeTest do
     assert Map.has_key?(Server.agent(pid).state.scheduler.cron, :heartbeat)
     eventually_agent(pid, &(&1.state.ticks > 0), 5_000)
 
-    assert {:ok, _agent} =
+    assert {:ok, _agent, _} =
              Server.call(
                pid,
                signal("runtime.directive", %{
@@ -66,7 +69,11 @@ defmodule Jido.Plugin.Scheduler.LiveRuntimeTest do
   end
 
   test "rejects invalid Scheduler data before commit", %{jido: jido} do
-    {:ok, pid} = Jido.start_agent(jido, RuntimeAgent, id: unique_id("invalid-scheduler"))
+    {:ok, pid} =
+      JidoTest.AgentServerAssertions.start_agent(jido, RuntimeAgent,
+        id: unique_id("invalid-scheduler")
+      )
+
     tick = Signal.new!("cron.tick", %{}, source: "/test")
 
     for directive <- [
@@ -103,12 +110,16 @@ defmodule Jido.Plugin.Scheduler.LiveRuntimeTest do
   end
 
   test "reduces Scheduler changes in list order and reconciles the final state", %{jido: jido} do
-    {:ok, pid} = Jido.start_agent(jido, RuntimeAgent, id: unique_id("scheduler-order"))
+    {:ok, pid} =
+      JidoTest.AgentServerAssertions.start_agent(jido, RuntimeAgent,
+        id: unique_id("scheduler-order")
+      )
+
     tick = Signal.new!("cron.tick", %{}, source: "/test")
     cron = Scheduler.cron(:heartbeat, "* * * * * * *", tick)
     cancel = Scheduler.cancel(:heartbeat)
 
-    assert {:ok, agent} =
+    assert {:ok, agent, _} =
              Server.call(
                pid,
                signal("runtime.directive", %{
@@ -119,7 +130,7 @@ defmodule Jido.Plugin.Scheduler.LiveRuntimeTest do
 
     assert Map.has_key?(agent.state.scheduler.cron, :heartbeat)
 
-    assert {:ok, agent} =
+    assert {:ok, agent, _} =
              Server.call(
                pid,
                signal("runtime.directive", %{
@@ -132,11 +143,14 @@ defmodule Jido.Plugin.Scheduler.LiveRuntimeTest do
   end
 
   test "restarts the Scheduler runtime from committed Plugin state", %{jido: jido} do
-    {:ok, pid} = Jido.start_agent(jido, FastRuntimeAgent, id: unique_id("scheduler-restart"))
+    {:ok, pid} =
+      JidoTest.AgentServerAssertions.start_agent(jido, FastRuntimeAgent,
+        id: unique_id("scheduler-restart")
+      )
 
     tick = Signal.new!("cron.tick", %{}, source: "/test")
 
-    assert {:ok, agent} =
+    assert {:ok, agent, _} =
              Server.call(
                pid,
                signal("runtime.directive", %{
@@ -146,15 +160,17 @@ defmodule Jido.Plugin.Scheduler.LiveRuntimeTest do
              )
 
     assert Map.has_key?(agent.state.scheduler.cron, :heartbeat)
-    child = Server.children(pid)[{:plugin, Scheduler}]
+    child = JidoTest.AgentServerAssertions.plugin(pid, Scheduler)
     monitor = Process.monitor(child.pid)
+    root = Server.activation(pid)
     Process.exit(child.pid, :kill)
 
     assert_receive {:DOWN, ^monitor, :process, _pid, :killed}
+    pid = JidoTest.AgentServerAssertions.replacement(root, pid)
 
     restarted =
       eventually(fn ->
-        case Server.children(pid)[{:plugin, Scheduler}] do
+        case JidoTest.AgentServerAssertions.plugin(pid, Scheduler) do
           %{pid: new_pid} = current when is_pid(new_pid) and new_pid != child.pid -> current
           _child -> nil
         end
@@ -166,10 +182,14 @@ defmodule Jido.Plugin.Scheduler.LiveRuntimeTest do
   end
 
   test "the Scheduler runtime restarts a failed cron Job", %{jido: jido} do
-    {:ok, pid} = Jido.start_agent(jido, RuntimeAgent, id: unique_id("cron-job-restart"))
+    {:ok, pid} =
+      JidoTest.AgentServerAssertions.start_agent(jido, RuntimeAgent,
+        id: unique_id("cron-job-restart")
+      )
+
     tick = Signal.new!("cron.tick", %{}, source: "/test")
 
-    assert {:ok, _agent} =
+    assert {:ok, _agent, _} =
              Server.call(
                pid,
                signal("runtime.directive", %{
@@ -178,7 +198,7 @@ defmodule Jido.Plugin.Scheduler.LiveRuntimeTest do
                })
              )
 
-    scheduler = eventually(fn -> Server.children(pid)[{:plugin, Scheduler}] end)
+    scheduler = eventually(fn -> JidoTest.AgentServerAssertions.plugin(pid, Scheduler) end)
 
     {_spec, old_job_pid, _ref, _token} =
       eventually(fn ->
@@ -203,7 +223,7 @@ defmodule Jido.Plugin.Scheduler.LiveRuntimeTest do
 
     assert Process.alive?(new_job_pid)
 
-    assert {:ok, _agent} =
+    assert {:ok, _agent, _} =
              Server.call(
                pid,
                signal("runtime.directive", %{

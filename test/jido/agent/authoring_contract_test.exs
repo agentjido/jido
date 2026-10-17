@@ -64,9 +64,6 @@ defmodule Jido.Agent.AuthoringContractTest do
   end
 
   test "constructor modules and behavior modules have separate contracts" do
-    assert {:ok, %{agent: %{module: Agent, id: "factory"}}} =
-             Jido.AgentServer.Options.new(agent: Factory)
-
     assert :ok = Directive.validate_agent_target(Factory)
     assert {:error, %{message: "Expected an Agent module"}} = Agent.instantiate(Factory, [])
 

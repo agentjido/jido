@@ -29,7 +29,8 @@ defmodule Jido.Plugin.HeartbeatTest do
   end
 
   test "a runtime-only Plugin can feed Signals into its Agent", %{jido: jido} do
-    {:ok, pid} = Jido.start_agent(jido, HeartbeatAgent, id: unique_id("heartbeat"))
+    {:ok, pid} =
+      JidoTest.AgentServerAssertions.start_agent(jido, HeartbeatAgent, id: unique_id("heartbeat"))
 
     eventually(fn ->
       case Server.agent(pid).state.heartbeats do
@@ -38,13 +39,7 @@ defmodule Jido.Plugin.HeartbeatTest do
       end
     end)
 
-    assert %{
-             {:plugin, Heartbeat} => %{
-               kind: :plugin,
-               module: Heartbeat,
-               pid: runtime_pid
-             }
-           } = Server.children(pid)
+    %{pid: runtime_pid} = JidoTest.AgentServerAssertions.plugin(pid, Heartbeat)
 
     assert is_pid(runtime_pid)
   end
@@ -63,16 +58,19 @@ defmodule Jido.Plugin.HeartbeatTest do
     send(runtime, :tick)
 
     assert_receive {:"$gen_cast",
-                    {:signal, _token,
+                    {:turn, _token,
                      %Jido.Signal{
                        id: first_id,
                        type: "jido.agent.heartbeat",
                        source: "/plugin/heartbeat",
                        data: ^data
-                     }}}
+                     }, %{}, :infinity}}
 
     send(runtime, :tick)
-    assert_receive {:"$gen_cast", {:signal, _token, %Jido.Signal{id: second_id, data: ^data}}}
+
+    assert_receive {:"$gen_cast",
+                    {:turn, _token, %Jido.Signal{id: second_id, data: ^data}, %{}, :infinity}}
+
     refute first_id == second_id
   end
 

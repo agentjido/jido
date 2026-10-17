@@ -124,8 +124,8 @@ defmodule Jido.Agent.SelectionTest do
       assert_receive {:executed, ^input, ^source}
       assert direct.state == %{input: input, calls: 1}
 
-      assert {:ok, server} = Jido.start_agent(jido, agent)
-      assert {:ok, live} = Server.call(server, source, context: %{observer: self()})
+      assert {:ok, server} = JidoTest.AgentServerAssertions.start_agent(jido, agent)
+      assert {:ok, live, _} = Server.call(server, source, context: %{observer: self()})
       assert_receive {:executed, ^input, execution_signal}
       assert execution_signal.data == source.data
       assert live.state == direct.state
@@ -154,8 +154,8 @@ defmodule Jido.Agent.SelectionTest do
       assert {:ok, direct, []} = Agent.cmd(agent, source)
       assert direct.state == %{input: expected, calls: 1}
 
-      assert {:ok, server} = Jido.start_agent(jido, agent)
-      assert {:ok, live} = Server.call(server, source)
+      assert {:ok, server} = JidoTest.AgentServerAssertions.start_agent(jido, agent)
+      assert {:ok, live, _} = Server.call(server, source)
       assert live.state == direct.state
     end
   end
@@ -180,9 +180,9 @@ defmodule Jido.Agent.SelectionTest do
 
       agent = Agent.instantiate!(definition)
       source = signal("selection.empty", data)
-      assert {:ok, server} = Jido.start_agent(jido, agent)
+      assert {:ok, server} = JidoTest.AgentServerAssertions.start_agent(jido, agent)
       assert {:ok, direct, []} = Agent.cmd(agent, source)
-      assert {:ok, live} = Server.call(server, source)
+      assert {:ok, live, _} = Server.call(server, source)
       assert direct.state == %{input: %{}, calls: 1}
       assert live.state == direct.state
     end
@@ -191,7 +191,7 @@ defmodule Jido.Agent.SelectionTest do
   test "invalid route data returns its Signal context before executable work", %{jido: jido} do
     for definition <- definitions() do
       agent = Agent.instantiate!(definition)
-      assert {:ok, server} = Jido.start_agent(jido, agent)
+      assert {:ok, server} = JidoTest.AgentServerAssertions.start_agent(jido, agent)
 
       for data <- ["hello", 3, [1, 2], [{"value", 3}], [{:value, 3} | :invalid]] do
         source = signal("selection.action", data)
@@ -228,7 +228,7 @@ defmodule Jido.Agent.SelectionTest do
       |> Agent.instantiate!()
 
     source = signal("selection.validated", value: "invalid")
-    assert {:ok, server} = Jido.start_agent(jido, agent)
+    assert {:ok, server} = JidoTest.AgentServerAssertions.start_agent(jido, agent)
     assert {:error, _error} = Agent.cmd(agent, source, context: %{observer: self()})
     assert {:error, _error} = Server.call(server, source, context: %{observer: self()})
     assert Server.agent(server).state == agent.state
@@ -239,10 +239,10 @@ defmodule Jido.Agent.SelectionTest do
     for data <- ["hello", [1, 2], nil] do
       agent = CustomAgent.new!()
       source = signal("selection.raw", data)
-      assert {:ok, server} = Jido.start_agent(jido, agent)
+      assert {:ok, server} = JidoTest.AgentServerAssertions.start_agent(jido, agent)
 
       assert {:ok, direct, []} = Agent.cmd(agent, source)
-      assert {:ok, live} = Server.call(server, source)
+      assert {:ok, live, _} = Server.call(server, source)
       assert direct.state == %{input: %{payload: data}, calls: 1}
       assert live.state == direct.state
     end
@@ -266,14 +266,14 @@ defmodule Jido.Agent.SelectionTest do
   test "state selects the top-level executable in live commands", %{jido: jido} do
     agent = CustomAgent.new!()
     source = signal("selection.state", nil)
-    assert {:ok, server} = Jido.start_agent(jido, agent)
+    assert {:ok, server} = JidoTest.AgentServerAssertions.start_agent(jido, agent)
 
     assert {:ok, first, []} = Agent.cmd(agent, source)
-    assert {:ok, live} = Server.call(server, source)
+    assert {:ok, live, _} = Server.call(server, source)
     assert live.state == first.state
 
     assert {:ok, second, []} = Agent.cmd(first, source)
-    assert {:ok, live} = Server.call(server, source)
+    assert {:ok, live, _} = Server.call(server, source)
     assert live.state == second.state
   end
 
@@ -281,7 +281,7 @@ defmodule Jido.Agent.SelectionTest do
     jido: jido
   } do
     agent = CustomAgent.new!()
-    assert {:ok, server} = Jido.start_agent(jido, agent)
+    assert {:ok, server} = JidoTest.AgentServerAssertions.start_agent(jido, agent)
 
     results = [
       {:error, :rejected},
@@ -314,7 +314,7 @@ defmodule Jido.Agent.SelectionTest do
 
   test "callback errors, throws, and exits are contained in direct and live calls", %{jido: jido} do
     agent = CustomAgent.new!()
-    assert {:ok, server} = Jido.start_agent(jido, agent)
+    assert {:ok, server} = JidoTest.AgentServerAssertions.start_agent(jido, agent)
 
     for kind <- [:error, :throw, :exit] do
       source = signal("selection.fault", %{kind: kind})

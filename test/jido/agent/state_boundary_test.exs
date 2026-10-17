@@ -21,8 +21,8 @@ defmodule Jido.Agent.StateBoundaryTest do
       Agent.new!(name: "state_boundary", schema: schema, routes: [{"state.replace", Replace}])
 
     agent = Agent.instantiate!(definition, id: unique_id("defaults"))
-    {:ok, server} = Jido.start_agent(jido, agent)
-    before = AgentServer.snapshot(server)
+    {:ok, server} = JidoTest.AgentServerAssertions.start_agent(jido, agent)
+    before = JidoTest.AgentServerAssertions.committed(server)
 
     for candidate <- [
           %{},
@@ -34,7 +34,7 @@ defmodule Jido.Agent.StateBoundaryTest do
       input = signal("state.replace", %{candidate: candidate})
       assert {:error, %Jido.Error.ValidationError{}} = Agent.cmd(agent, input)
       assert {:error, %Jido.Error.ValidationError{}} = AgentServer.call(server, input)
-      assert AgentServer.snapshot(server) === before
+      assert JidoTest.AgentServerAssertions.committed(server) === before
       assert Agent.validate_instance(agent) === {:ok, agent}
     end
   end
@@ -62,19 +62,19 @@ defmodule Jido.Agent.StateBoundaryTest do
       Agent.new!(name: "owned_defaults", plugins: [OwnedState], routes: [{"owned.reduce", Keep}])
 
     agent = Agent.instantiate!(definition, id: unique_id("owned-defaults"))
-    {:ok, server} = Jido.start_agent(jido, agent)
-    before = AgentServer.snapshot(server)
+    {:ok, server} = JidoTest.AgentServerAssertions.start_agent(jido, agent)
+    before = JidoTest.AgentServerAssertions.committed(server)
 
     for owned <- [%{}, nil, %{count: "bad"}] do
       input = signal("owned.reduce", %{owned: owned})
       assert {:error, _} = Agent.cmd(agent, input)
       assert {:error, _} = AgentServer.call(server, input)
-      assert AgentServer.snapshot(server) === before
+      assert JidoTest.AgentServerAssertions.committed(server) === before
     end
 
     input = signal("owned.reduce", %{owned: %{count: nil}})
     assert {:ok, direct, []} = Agent.cmd(agent, input)
-    assert {:ok, live} = AgentServer.call(server, input)
+    assert {:ok, live, _} = AgentServer.call(server, input)
     assert direct.state.owned === %{count: nil}
     assert live.state === direct.state
     assert Agent.validate_instance(live) === {:ok, live}

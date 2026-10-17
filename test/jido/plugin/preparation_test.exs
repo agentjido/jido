@@ -122,9 +122,9 @@ defmodule Jido.Plugin.PreparationTest do
   test "live execution uses the same pure preparation", %{jido: jido} do
     agent = agent(:ok)
     source = signal("prepare.run", %{value: 8})
-    {:ok, server} = Jido.start_agent(jido, agent)
+    {:ok, server} = JidoTest.AgentServerAssertions.start_agent(jido, agent)
 
-    assert {:ok, next} = Server.call(server, source)
+    assert {:ok, next, _} = Server.call(server, source)
     assert next.state.value == 8
     assert next.state.action_signal_id == source.id
     assert next.state.prepared_signal_id == source.id

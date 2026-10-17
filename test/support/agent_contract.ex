@@ -291,6 +291,6 @@ defmodule JidoTest.AgentContract do
 
   defmodule PassiveContributor do
     use Jido.Plugin
-    def contribute(_, _), do: raise("Agent commands must not call this facet")
+    def admit(_, _, _), do: raise("Agent commands must not call this facet")
   end
 end

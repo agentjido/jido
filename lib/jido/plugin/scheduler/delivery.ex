@@ -84,7 +84,7 @@ defmodule Jido.Plugin.Scheduler.Delivery do
     fresh = signal |> Signal.to_map() |> Map.delete("id") |> Signal.new!()
 
     case Server.call(server, fresh, timeout) do
-      {:ok, _value} = result -> {:delivered, {:after, job}, result}
+      {:ok, _agent, _directives} = result -> {:delivered, {:after, job}, result}
       {:error, reason} -> {:error, {:after, job}, {:delivery_failed, reason}}
     end
   rescue

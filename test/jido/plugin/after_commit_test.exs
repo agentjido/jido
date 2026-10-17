@@ -48,13 +48,6 @@ defmodule Jido.Plugin.AfterCommitTest do
     def after_commit(_runtime, _commit, _opts), do: :ok
   end
 
-  defmodule WrongTopology do
-    @moduledoc false
-    @behaviour Jido.Plugin
-    def contribute(_context, _opts), do: {:error, :unused}
-    def after_commit(_runtime, _commit, _opts), do: :ok
-  end
-
   defmodule AgentPackage do
     @moduledoc false
     use Jido.Plugin
@@ -87,17 +80,6 @@ defmodule Jido.Plugin.AfterCommitTest do
       to: Jido.Plugin.AfterCommitTest.WrongPersistence
   end
 
-  defmodule TopologyPackage do
-    @moduledoc false
-    use Jido.Plugin
-
-    @impl true
-    defdelegate contribute(context, opts), to: Jido.Plugin.AfterCommitTest.WrongTopology
-
-    @impl true
-    defdelegate after_commit(runtime, commit, opts), to: Jido.Plugin.AfterCommitTest.WrongTopology
-  end
-
   test "a commit-only Server facet needs no runtime or Agent facet" do
     assert {:ok, [spec]} = Jido.Plugin.Normalizer.normalize_all([{Stateless, sink: :sink}])
     refute spec.agent_server.runtime?
@@ -113,7 +95,7 @@ defmodule Jido.Plugin.AfterCommitTest do
     assert spec.agent_server.options == [sink: :sink]
   end
 
-  for package <- [Manifest, AgentPackage, PersistencePackage, TopologyPackage] do
+  for package <- [Manifest, AgentPackage, PersistencePackage] do
     @package package
     test "#{inspect(package)} can combine a commit hook with other callbacks" do
       assert {:ok, [spec]} = Jido.Plugin.Normalizer.normalize_all([{@package, key: :owned}])

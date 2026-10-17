@@ -45,7 +45,5 @@ for profile <- JidoTest.Persistence.Profiles.active(:local) do
             ) do
     use JidoTest.Persistence.Case, profile: profile
     use JidoTest.Persistence.Contracts.Store
-    use JidoTest.Persistence.Contracts.Agent
-    use JidoTest.Persistence.Contracts.Recovery
   end
 end

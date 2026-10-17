@@ -94,20 +94,20 @@ defmodule Jido.Agent.StateIntersectionTest do
       )
 
     agent = Agent.instantiate!(definition, id: unique_id("intersection"))
-    {:ok, server} = Jido.start_agent(c.jido, agent)
-    before = AgentServer.snapshot(server)
+    {:ok, server} = JidoTest.AgentServerAssertions.start_agent(c.jido, agent)
+    before = JidoTest.AgentServerAssertions.committed(server)
 
     for owned <- [%{}, %{nested: %{}}, %{nested: %{a: 3}}, %{nested: %{b: 4}}] do
       input = signal("intersection.reduce", %{owned: owned})
       assert {:error, _} = Agent.cmd(agent, input)
       assert {:error, _} = AgentServer.call(server, input)
-      assert AgentServer.snapshot(server) === before
+      assert JidoTest.AgentServerAssertions.committed(server) === before
     end
 
     owned = %{nested: %{a: nil, b: 7}}
     input = signal("intersection.reduce", %{owned: owned})
     assert {:ok, direct, []} = Agent.cmd(agent, input)
-    assert {:ok, live} = AgentServer.call(server, input)
+    assert {:ok, live, _} = AgentServer.call(server, input)
     assert direct.state.owned === owned
     assert live.state === direct.state
     assert Agent.validate_instance(live) === {:ok, live}

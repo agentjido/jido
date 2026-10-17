@@ -2,8 +2,6 @@ defmodule Jido.Plugin.BoundaryTest do
   use ExUnit.Case, async: true
 
   alias Jido.Plugin.{Manifest, Spec}
-  alias Jido.Topology.Plugin, as: TopologyPlugin
-  alias Jido.Topology.Plugin.Contribution
 
   defmodule OwnedState do
     use Jido.Plugin
@@ -50,25 +48,9 @@ defmodule Jido.Plugin.BoundaryTest do
     def __jido_plugin__, do: %Manifest{module: OwnedState, agent: OwnedState}
   end
 
-  defmodule TopologyFacet do
-    @behaviour Jido.Plugin
-
-    def contribute(context, opts) do
-      case Keyword.fetch!(opts, :result) do
-        :invalid_shape -> {:ok, %Contribution{plugin: context.plugin, resources: :invalid}}
-        :wrong_owner -> {:ok, %Contribution{plugin: OwnedState}}
-        :raise -> raise ArgumentError, "invalid topology input"
-        :throw -> throw(:invalid_topology_input)
-        result -> result
-      end
-    end
-  end
-
-  defmodule TopologyPackage do
+  defmodule RuntimePackage do
     use Jido.Plugin
-
-    @impl true
-    defdelegate contribute(context, opts), to: Jido.Plugin.BoundaryTest.TopologyFacet
+    def admit(_runtime, _admission, opts), do: {:ok, opts}
   end
 
   test "stored specs without a manifest are rejected" do
@@ -83,35 +65,35 @@ defmodule Jido.Plugin.BoundaryTest do
 
   test "manifest accessors retain owner order and restrict mapped options" do
     manifest = %Manifest{
-      module: TopologyPackage,
-      agent: TopologyPackage,
-      topology: TopologyPackage,
-      option_keys: %{topology: [:result]}
+      module: RuntimePackage,
+      agent: RuntimePackage,
+      agent_server: RuntimePackage,
+      option_keys: %{agent_server: [:result]}
     }
 
-    assert Manifest.owners() == [:agent, :agent_server, :persistence, :topology]
+    assert Manifest.owners() == [:agent, :agent_server, :persistence]
 
     assert Enum.map(Manifest.owners(), &Manifest.facet(manifest, &1)) ==
-             [TopologyPackage, nil, nil, TopologyPackage]
+             [RuntimePackage, RuntimePackage, nil]
 
     options = [result: {:error, :unavailable}]
     assert {:ok, ^manifest} = Manifest.validate(manifest, options)
     assert Manifest.options_for(manifest, :agent, options) == []
-    assert Manifest.options_for(manifest, :topology, options) == options
+    assert Manifest.options_for(manifest, :agent_server, options) == options
     assert Manifest.options_for(%{manifest | option_keys: %{}}, :agent, options) == options
   end
 
   test "invalid manifest identities and versions return configuration errors" do
-    manifest = %Manifest{module: TopologyPackage, topology: TopologyPackage}
+    manifest = %Manifest{module: RuntimePackage, agent_server: RuntimePackage}
 
     for {field, value, message} <- [
           {:module, nil, "Plugin package module is invalid"},
           {:module, "plugin", "Plugin package module is invalid"},
           {:vsn, 0, "Plugin package version must be positive"},
           {:vsn, "1", "Plugin package version must be positive"},
-          {:topology, nil, "Plugin must define at least one callback"},
-          {:topology, "facet", "Plugin callbacks must belong to the Plugin module"},
-          {:topology, false, "Plugin callbacks must belong to the Plugin module"}
+          {:agent_server, nil, "Plugin must define at least one callback"},
+          {:agent_server, "facet", "Plugin callbacks must belong to the Plugin module"},
+          {:agent_server, false, "Plugin callbacks must belong to the Plugin module"}
         ] do
       assert {:error, %Jido.Error.ValidationError{message: ^message, kind: :config}} =
                Manifest.validate(Map.put(manifest, field, value), [])
@@ -126,21 +108,21 @@ defmodule Jido.Plugin.BoundaryTest do
   end
 
   test "manifest option mappings reject duplicate keys and unassigned options" do
-    manifest = %Manifest{module: TopologyPackage, topology: TopologyPackage}
+    manifest = %Manifest{module: RuntimePackage, agent_server: RuntimePackage}
 
-    for mapping <- [%{topology: [:result, :result]}, %{topology: ["result"]}] do
+    for mapping <- [%{agent_server: [:result, :result]}, %{agent_server: ["result"]}] do
       assert {:error, %Jido.Error.ValidationError{} = error} =
                Manifest.validate(%{manifest | option_keys: mapping}, [])
 
       assert error.message == "Plugin option mapping must contain unique atom keys"
-      assert error.details.mapping == {:topology, mapping.topology}
+      assert error.details.mapping == {:agent_server, mapping.agent_server}
     end
 
     assert {:error, %{message: "Plugin option mapping must be a map"}} =
              Manifest.validate(%{manifest | option_keys: []}, [])
 
     assert {:error, %{details: %{options: [:unknown]}}} =
-             Manifest.validate(%{manifest | option_keys: %{topology: [:result]}}, unknown: 1)
+             Manifest.validate(%{manifest | option_keys: %{agent_server: [:result]}}, unknown: 1)
 
     assert {:error, %{message: "Plugin declaration options must be static data"}} =
              Manifest.validate(manifest, result: self())
@@ -169,57 +151,5 @@ defmodule Jido.Plugin.BoundaryTest do
       assert details.plugin == package
       assert details.callback == :__jido_plugin__
     end
-  end
-
-  test "Topology returns explicit errors and contains callback exceptions" do
-    assert topology_result({:error, :unavailable}) == {:error, :unavailable}
-
-    for result <- [:raise, :throw] do
-      assert {:error, %Jido.Error.ExecutionError{details: details}} = topology_result(result)
-      assert details.code == :plugin_callback_failed
-      assert details.callback == :contribute
-      assert details.plugin == TopologyPackage
-      refute Map.has_key?(details, :facet)
-    end
-  end
-
-  test "Topology rejects invalid result shapes and changed contribution ownership" do
-    for {result, message} <- [
-          {:unexpected, "Topology Plugin contribute/2 returned an invalid result"},
-          {{:ok, %{}}, "Topology Plugin contribute/2 returned an invalid result"},
-          {:invalid_shape, "Topology Plugin returned an invalid contribution"},
-          {:wrong_owner, "Topology Plugin contribution changed package identity"}
-        ] do
-      assert {:error, %Jido.Error.ExecutionError{message: ^message, details: details}} =
-               topology_result(result)
-
-      assert details.code == :plugin_invalid_callback_result
-      assert details.plugin == TopologyPackage
-      refute Map.has_key?(details, :facet)
-
-      if result == :wrong_owner, do: assert(details.actual == OwnedState)
-      if result == :invalid_shape, do: assert(%Jido.Error.ValidationError{} = details.reason)
-    end
-  end
-
-  test "Topology contribution contexts enforce static identity fields" do
-    {:ok, [spec]} = Jido.Plugin.Normalizer.normalize_all([TopologyPackage])
-    context = TopologyPlugin.context(spec, "agent/worker", __MODULE__)
-    assert {:ok, ^context} = Jido.Topology.Plugin.Context.validate(context)
-    assert {:ok, ^context} = Zoi.parse(Jido.Topology.Plugin.Context.schema(), context)
-
-    for invalid <- [%{context | plugin_vsn: 0}, %{context | agent_key: ""}] do
-      assert {:error,
-              %{message: "Topology Plugin context is invalid", details: %{issues: [_ | _]}}} =
-               Jido.Topology.Plugin.Context.validate(invalid)
-    end
-
-    assert {:error, %{details: %{value: %{}}}} = Jido.Topology.Plugin.Context.validate(%{})
-  end
-
-  defp topology_result(result) do
-    {:ok, [spec]} = Jido.Plugin.Normalizer.normalize_all([{TopologyPackage, result: result}])
-    context = TopologyPlugin.context(spec, "worker", __MODULE__)
-    TopologyPlugin.contribute(spec, context)
   end
 end

@@ -90,10 +90,12 @@ defmodule Jido.Plugin.SensorManagerTest do
   end
 
   test "reconciles desired sensors and restarts a failed sensor", %{jido: jido} do
-    {:ok, agent} = Jido.start_agent(jido, Agent, id: unique_id("sensor-manager"))
-    runtime = Server.children(agent)[{:plugin, SensorManager}].pid
+    {:ok, agent} =
+      JidoTest.AgentServerAssertions.start_agent(jido, Agent, id: unique_id("sensor-manager"))
 
-    assert {:ok, committed} =
+    runtime = JidoTest.AgentServerAssertions.plugin(agent, SensorManager).pid
+
+    assert {:ok, committed, _} =
              Server.call(agent, signal("sensor.manage", %{operation: :start, value: 7}))
 
     assert committed.state.sensors.desired == %{
@@ -116,7 +118,7 @@ defmodule Jido.Plugin.SensorManagerTest do
     assert Process.alive?(second_sensor)
     eventually(fn -> Server.agent(agent).state.readings == [7, 7] end)
 
-    assert {:ok, stopped} =
+    assert {:ok, stopped, _} =
              Server.call(agent, signal("sensor.manage", %{operation: :stop}))
 
     assert stopped.state.sensors.desired == %{}
@@ -125,10 +127,12 @@ defmodule Jido.Plugin.SensorManagerTest do
   end
 
   test "restores sensors when an internal supervisor fails", %{jido: jido} do
-    {:ok, agent} = Jido.start_agent(jido, Agent, id: unique_id("sensor-supervisor"))
-    runtime = Server.children(agent)[{:plugin, SensorManager}].pid
+    {:ok, agent} =
+      JidoTest.AgentServerAssertions.start_agent(jido, Agent, id: unique_id("sensor-supervisor"))
 
-    assert {:ok, _committed} =
+    runtime = JidoTest.AgentServerAssertions.plugin(agent, SensorManager).pid
+
+    assert {:ok, _committed, _} =
              Server.call(agent, signal("sensor.manage", %{operation: :start, value: 5}))
 
     first_sensor = eventually(fn -> Runtime.sensors(runtime)[:source] end)
@@ -150,8 +154,8 @@ defmodule Jido.Plugin.SensorManagerTest do
   end
 
   test "reuses unchanged sensors and replaces changed configurations", %{jido: jido} do
-    {:ok, agent} = Jido.start_agent(jido, Agent)
-    runtime = Server.children(agent)[{:plugin, SensorManager}].pid
+    {:ok, agent} = JidoTest.AgentServerAssertions.start_agent(jido, Agent)
+    runtime = JidoTest.AgentServerAssertions.plugin(agent, SensorManager).pid
     desired = %{source: %{module: TestSensor, config: %{value: 3}}}
 
     assert :ok = Runtime.reconcile(runtime, desired, 1, 1_000)
@@ -171,8 +175,8 @@ defmodule Jido.Plugin.SensorManagerTest do
   end
 
   test "older reconciliation and retry cannot replace a newer sensor set", %{jido: jido} do
-    {:ok, agent} = Jido.start_agent(jido, Agent)
-    runtime = Server.children(agent)[{:plugin, SensorManager}].pid
+    {:ok, agent} = JidoTest.AgentServerAssertions.start_agent(jido, Agent)
+    runtime = JidoTest.AgentServerAssertions.plugin(agent, SensorManager).pid
     controller = child_pid(runtime, Jido.Plugin.SensorManager.Runtime.Controller)
     gate = start_supervised!({Elixir.Agent, fn -> [{:error, :offline}, :ok] end})
     old = %{source: %{module: ControlledSensor, config: %{gate: gate}}}
@@ -193,8 +197,8 @@ defmodule Jido.Plugin.SensorManagerTest do
   end
 
   test "replaces only the sensor whose numeric config type changes", %{jido: jido} do
-    {:ok, agent} = Jido.start_agent(jido, Agent)
-    runtime = Server.children(agent)[{:plugin, SensorManager}].pid
+    {:ok, agent} = JidoTest.AgentServerAssertions.start_agent(jido, Agent)
+    runtime = JidoTest.AgentServerAssertions.plugin(agent, SensorManager).pid
     gate = start_supervised!({Elixir.Agent, fn -> [:ok, :ok, :ok] end})
 
     desired = %{
@@ -219,8 +223,8 @@ defmodule Jido.Plugin.SensorManagerTest do
   end
 
   test "retries failed starts and failed restarts without a new command", %{jido: jido} do
-    {:ok, agent} = Jido.start_agent(jido, Agent)
-    runtime = Server.children(agent)[{:plugin, SensorManager}].pid
+    {:ok, agent} = JidoTest.AgentServerAssertions.start_agent(jido, Agent)
+    runtime = JidoTest.AgentServerAssertions.plugin(agent, SensorManager).pid
     gate = start_supervised!({Elixir.Agent, fn -> [{:error, :offline}, :ignore, :with_info] end})
     desired = %{source: %{module: ControlledSensor, config: %{gate: gate}}}
 
@@ -249,8 +253,8 @@ defmodule Jido.Plugin.SensorManagerTest do
   end
 
   test "invalid child specs return errors and removing them cancels retries", %{jido: jido} do
-    {:ok, agent} = Jido.start_agent(jido, Agent)
-    runtime = Server.children(agent)[{:plugin, SensorManager}].pid
+    {:ok, agent} = JidoTest.AgentServerAssertions.start_agent(jido, Agent)
+    runtime = JidoTest.AgentServerAssertions.plugin(agent, SensorManager).pid
 
     for {failure, reason, version} <- [
           {:raise, %RuntimeError{message: "invalid sensor spec"}, 1},
@@ -296,16 +300,18 @@ defmodule Jido.Plugin.SensorManagerTest do
   end
 
   test "rejects non-byte sensor config before commit or resource startup", %{jido: jido} do
-    {:ok, server} = Jido.start_agent(jido, Agent, id: unique_id("sensor-bits"))
-    before = Server.snapshot(server)
-    runtime = Server.children(server)[{:plugin, SensorManager}].pid
+    {:ok, server} =
+      JidoTest.AgentServerAssertions.start_agent(jido, Agent, id: unique_id("sensor-bits"))
+
+    before = JidoTest.AgentServerAssertions.committed(server)
+    runtime = JidoTest.AgentServerAssertions.plugin(server, SensorManager).pid
 
     assert {:error, %Jido.Error.ValidationError{} = error} =
              Server.call(server, signal("sensor.manage", %{operation: :start, value: <<5::3>>}))
 
     assert error.message == "Sensor config must contain portable data"
     assert error.details.path == [:config, :value]
-    assert Server.snapshot(server) == before
+    assert JidoTest.AgentServerAssertions.committed(server) == before
     assert Runtime.sensors(runtime) == %{}
   end
 
@@ -315,7 +321,7 @@ defmodule Jido.Plugin.SensorManagerTest do
       definition = %{Agent.definition() | plugins: [{SensorManager, retry_delay_ms: delay}]}
 
       assert {:error, %Jido.Error.ValidationError{details: %{retry_delay_ms: ^delay}}} =
-               Jido.start_agent(jido, definition, id: id)
+               JidoTest.AgentServerAssertions.start_agent(jido, definition, id: id)
 
       assert Jido.whereis_agent(jido, id) == nil
     end

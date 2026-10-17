@@ -5,7 +5,6 @@ defmodule Jido.Plugin.FacetsTest do
   alias Jido.Persistence.Plugin, as: PersistencePlugin
   alias Jido.Plugin.DirectiveContext
   alias Jido.Signal
-  alias Jido.Topology.Plugin, as: TopologyPlugin
 
   defmodule Effect do
     @moduledoc false
@@ -95,24 +94,6 @@ defmodule Jido.Plugin.FacetsTest do
     end
   end
 
-  defmodule TopologyFacet do
-    @moduledoc false
-    @behaviour Jido.Plugin
-
-    alias Jido.Topology.Plugin.Contribution, as: TopologyContribution
-
-    def contribute(context, opts) do
-      bus = Keyword.fetch!(opts, :bus)
-
-      {:ok,
-       %TopologyContribution{
-         plugin: context.plugin,
-         resources: [%{key: bus, config: []}],
-         connections: [%{agent: context.agent_key, to: bus, path: "facet.**"}]
-       }}
-    end
-  end
-
   defmodule Package do
     @moduledoc false
     use Jido.Plugin,
@@ -120,8 +101,7 @@ defmodule Jido.Plugin.FacetsTest do
       option_keys: [
         agent: [:agent_label],
         agent_server: [:server_label],
-        persistence: [:prefix],
-        topology: [:bus]
+        persistence: [:prefix]
       ]
 
     @impl true
@@ -148,9 +128,6 @@ defmodule Jido.Plugin.FacetsTest do
 
     @impl true
     defdelegate load(value, context, opts), to: Jido.Plugin.FacetsTest.PersistenceFacet
-
-    @impl true
-    defdelegate contribute(context, opts), to: Jido.Plugin.FacetsTest.TopologyFacet
   end
 
   defmodule LocalPackage do
@@ -159,8 +136,7 @@ defmodule Jido.Plugin.FacetsTest do
       option_keys: [
         agent: [:agent_label],
         agent_server: [:server_label],
-        persistence: [:prefix],
-        topology: [:bus]
+        persistence: [:prefix]
       ]
 
     defdelegate prepare(preparation, opts), to: AgentFacet
@@ -171,7 +147,6 @@ defmodule Jido.Plugin.FacetsTest do
     defdelegate dispatch(runtime, directive, context, opts), to: ServerFacet
     defdelegate dump(value, context, opts), to: PersistenceFacet
     defdelegate load(value, context, opts), to: PersistenceFacet
-    defdelegate contribute(context, opts), to: TopologyFacet
   end
 
   defmodule MixedPackage do
@@ -324,29 +299,6 @@ defmodule Jido.Plugin.FacetsTest do
     defdelegate load(value, context, opts), to: Jido.Plugin.FacetsTest.InvalidLoadPersistenceFacet
   end
 
-  defmodule InvalidTopologyFacet do
-    @moduledoc false
-    @behaviour Jido.Plugin
-
-    alias Jido.Topology.Plugin.Contribution, as: TopologyContribution
-
-    def contribute(context, _opts) do
-      {:ok,
-       %TopologyContribution{
-         plugin: context.plugin,
-         resources: [%{key: "invalid", module: __MODULE__}]
-       }}
-    end
-  end
-
-  defmodule InvalidTopologyPackage do
-    @moduledoc false
-    use Jido.Plugin
-
-    @impl true
-    defdelegate contribute(context, opts), to: Jido.Plugin.FacetsTest.InvalidTopologyFacet
-  end
-
   defmodule FacetWithPluginDirectiveValidation do
     @moduledoc false
     @behaviour Jido.Plugin
@@ -402,7 +354,7 @@ defmodule Jido.Plugin.FacetsTest do
 
   defmodule MisassignedOptionsPackage do
     @moduledoc false
-    use Jido.Plugin, option_keys: [topology: [:bus]]
+    use Jido.Plugin, option_keys: [persistence: [:prefix]]
 
     @impl true
     defdelegate state_spec(opts), to: Jido.Plugin.FacetsTest.StatelessAgentFacet
@@ -465,7 +417,7 @@ defmodule Jido.Plugin.FacetsTest do
     end
   end
 
-  test "one manifest normalizes to four owner-specific Specs" do
+  test "one manifest normalizes to three owner-specific Specs" do
     options = options()
     assert {:ok, [spec]} = Jido.Plugin.Normalizer.normalize_all([{Package, options}])
 
@@ -477,13 +429,10 @@ defmodule Jido.Plugin.FacetsTest do
     assert spec.agent_server.options == [server_label: "validated:facet"]
     assert spec.persistence.module == Package
     assert spec.persistence.options == [prefix: "v3:"]
-    assert spec.topology.module == Package
-    assert spec.topology.options == [bus: "facet_bus"]
 
     refute Map.has_key?(Map.from_struct(spec.agent), :runtime?)
     refute Map.has_key?(Map.from_struct(spec.agent_server), :state_schema)
     refute Map.has_key?(Map.from_struct(spec.persistence), :agent_server)
-    refute Map.has_key?(Map.from_struct(spec.topology), :adapter)
 
     assert Jido.Plugin in List.flatten(
              Keyword.get_values(Package.module_info(:attributes), :behaviour)
@@ -577,7 +526,7 @@ defmodule Jido.Plugin.FacetsTest do
              }
     end
 
-    test "#{inspect(@package)}: Server, Persistence, and Topology facets use only their owner values" do
+    test "#{inspect(@package)}: Server and Persistence facets use only their owner values" do
       assert {:ok, [spec]} = Jido.Plugin.Normalizer.normalize_all([{@package, options()}])
 
       assert :ok =
@@ -593,14 +542,6 @@ defmodule Jido.Plugin.FacetsTest do
 
       load_context = PersistencePlugin.context(spec, :load, 1, :test)
       assert {:ok, 7} = PersistencePlugin.load(spec, "v3:7", load_context)
-
-      topology_context = TopologyPlugin.context(spec, "worker", FacetAgent)
-      assert {:ok, contribution} = TopologyPlugin.contribute(spec, topology_context)
-      assert contribution.resources == [%{key: "facet_bus", kind: :bus, config: []}]
-
-      assert contribution.connections == [
-               %{agent: "worker", to: "facet_bus", path: "facet.**"}
-             ]
     end
   end
 
@@ -655,18 +596,6 @@ defmodule Jido.Plugin.FacetsTest do
     assert state_message == "Persistence Plugin loaded invalid owned state"
   end
 
-  test "Topology validates context ownership and each canonical entry" do
-    assert {:ok, [spec]} = Jido.Plugin.Normalizer.normalize_all([InvalidTopologyPackage])
-    context = TopologyPlugin.context(spec, "worker", FacetAgent)
-
-    assert {:error, %Jido.Error.ValidationError{}} = TopologyPlugin.contribute(spec, context)
-
-    assert {:error, %Jido.Error.ValidationError{message: message}} =
-             TopologyPlugin.contribute(spec, %{context | plugin: String})
-
-    assert message == "Topology Plugin context does not match its owner"
-  end
-
   test "an executable cannot return a Directive without an owner" do
     agent =
       Agent.new!(
@@ -700,8 +629,7 @@ defmodule Jido.Plugin.FacetsTest do
     [
       agent_label: "facet",
       server_label: "validated:facet",
-      prefix: "v3:",
-      bus: "facet_bus"
+      prefix: "v3:"
     ]
   end
 end

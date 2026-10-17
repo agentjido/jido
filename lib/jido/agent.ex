@@ -268,7 +268,6 @@ defmodule Jido.Agent do
   defmacro __using__(opts) do
     quote location: :keep do
       use Jido.Agent.Authoring.Compiler,
-        host: :agent,
         agent_options: unquote(opts)
 
       @doc "Creates one Agent instance from this module definition."

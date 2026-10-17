@@ -7,7 +7,6 @@ defmodule Jido.Plugin.Normalizer do
   alias Jido.Persistence.Plugin.Spec, as: PersistenceSpec
   alias Jido.Plugin.{Manifest, Spec}
   alias Jido.Plugin.Error, as: PluginError
-  alias Jido.Topology.Plugin.Spec, as: TopologySpec
 
   @server_capabilities Jido.Plugin.owner_callbacks()[:agent_server]
                        |> Keyword.delete(:validate_options)
@@ -124,9 +123,8 @@ defmodule Jido.Plugin.Normalizer do
          {:ok, agent} <- build_agent_spec(manifest, options),
          {:ok, server} <- build_server_spec(manifest, options),
          {:ok, persistence} <- build_persistence_spec(manifest, options),
-         {:ok, topology} <- build_topology_spec(manifest, options),
-         :ok <- validate_pair(module, agent, server, persistence, topology) do
-      {:ok, aggregate(module, options, manifest, agent, server, persistence, topology)}
+         :ok <- validate_pair(module, agent, server, persistence) do
+      {:ok, aggregate(module, options, manifest, agent, server, persistence)}
     else
       false ->
         PluginError.validation("Plugin manifest package module does not match", %{
@@ -206,21 +204,7 @@ defmodule Jido.Plugin.Normalizer do
     end
   end
 
-  defp build_topology_spec(%Manifest{topology: nil}, _options), do: {:ok, nil}
-
-  defp build_topology_spec(%Manifest{} = manifest, options) do
-    facet = manifest.topology
-
-    {:ok,
-     %TopologySpec{
-       package: manifest.module,
-       module: facet,
-       options: Manifest.options_for(manifest, :topology, options),
-       vsn: manifest.vsn
-     }}
-  end
-
-  defp validate_pair(package, agent, server, persistence, _topology) do
+  defp validate_pair(package, agent, server, persistence) do
     cond do
       not is_nil(persistence) and (is_nil(agent) or is_nil(agent.state_key)) ->
         PluginError.validation("Persistence Plugin facet requires a stateful Agent facet", %{
@@ -550,15 +534,14 @@ defmodule Jido.Plugin.Normalizer do
     end
   end
 
-  defp aggregate(module, options, manifest, agent, server, persistence, topology) do
+  defp aggregate(module, options, manifest, agent, server, persistence) do
     %Spec{
       module: module,
       options: options,
       manifest: manifest,
       agent: agent,
       agent_server: server,
-      persistence: persistence,
-      topology: topology
+      persistence: persistence
     }
   end
 

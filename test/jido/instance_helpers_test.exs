@@ -96,26 +96,13 @@ defmodule Jido.InstanceHelpersTest do
     assert %Jido.Agent{id: ^id} = AgentServer.agent(server)
   end
 
-  test "default instance helpers cover runtime names and parent bindings" do
+  test "default instance helpers cover runtime names" do
     assert Jido.registry_name() == Jido.registry_name(Jido.default_instance())
     assert Jido.agent_supervisor_name() == Jido.agent_supervisor_name(Jido.default_instance())
     assert Jido.task_supervisor_name() == Jido.task_supervisor_name(Jido.default_instance())
     assert Jido.runtime_store_name() == Jido.runtime_store_name(Jido.default_instance())
 
     assert {:ok, _jido} = Jido.start()
-
-    binding = %{parent_id: "parent", tag: :child, meta: %{}}
-
-    assert :ok =
-             Jido.RuntimeStore.put(
-               Jido.default_instance(),
-               :agent_relationships,
-               "child",
-               binding
-             )
-
-    assert {:ok, %{parent_id: "parent", parent_partition: nil, tag: :child, meta: %{}}} =
-             Jido.agent_parent_binding("child")
   end
 
   test "hibernate and thaw use the default instance when no instance is given" do
@@ -132,31 +119,12 @@ defmodule Jido.InstanceHelpersTest do
     agent = DefaultAgent.new!(id: id)
 
     assert {:ok, server} = Jido.start_agent(agent, persistence: persistence)
+    assert :ok = AgentServer.await_ready(server)
     assert :ok = Jido.hibernate(server)
     assert Jido.whereis_agent(id) == nil
 
     assert {:ok, restored_server} = Jido.thaw(DefaultAgent, id, persistence: persistence)
+    assert :ok = AgentServer.await_ready(restored_server)
     assert %Jido.Agent{id: ^id} = AgentServer.agent(restored_server)
-  end
-
-  test "invalid parent bindings are rejected and missing metadata is normalized", %{jido: jido} do
-    assert :error = Jido.agent_parent_binding(jido, "child", [:invalid])
-    assert :error = Jido.agent_parent_binding(jido, :invalid, [])
-
-    for binding <- [:invalid, %{parent_id: 42, tag: :child}] do
-      assert :ok = Jido.RuntimeStore.put(jido, :agent_relationships, "child", binding)
-      assert :error = Jido.agent_parent_binding(jido, "child")
-    end
-
-    binding = %{parent_id: "parent", tag: :child, meta: :invalid}
-    assert :ok = Jido.RuntimeStore.put(jido, :agent_relationships, "child", binding)
-
-    assert {:ok, %{parent_id: "parent", parent_partition: nil, tag: :child, meta: %{}}} =
-             Jido.agent_parent_binding(jido, "child")
-
-    pid = spawn(fn -> :ok end)
-    ref = Process.monitor(pid)
-    assert_receive {:DOWN, ^ref, :process, ^pid, _}
-    assert {:error, :not_found} = Jido.stop_agent(jido, pid)
   end
 end

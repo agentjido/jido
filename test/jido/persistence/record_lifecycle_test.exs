@@ -29,15 +29,15 @@ defmodule JidoTest.Persistence.RecordLifecycleTest do
     {ETS, table: :"record_lifecycle_#{name}_#{System.unique_integer([:positive])}"}
   end
 
-  test "a new persistent activation stores revision zero before start returns", %{jido: jido} do
+  test "a new persistent activation stores revision zero before readiness", %{jido: jido} do
     persistence = persistence(:initial)
     id = unique_id("initial-record")
 
     assert {:ok, pid} =
-             Jido.start_agent(jido, RuntimeAgent,
+             JidoTest.AgentServerAssertions.start_agent(jido, RuntimeAgent,
                id: id,
                persistence: persistence,
-               restore: false
+               persistence_mode: :create
              )
 
     assert Process.alive?(pid)
@@ -63,61 +63,6 @@ defmodule JidoTest.Persistence.RecordLifecycleTest do
              revision: 0,
              checkpoint: record.checkpoint
            }
-  end
-
-  test "restore modes create only where the contract permits", %{jido: jido} do
-    required_store = persistence(:required_missing)
-    required_id = unique_id("required-missing")
-
-    assert {:error, :not_found} =
-             Jido.start_agent(jido, RuntimeAgent,
-               id: required_id,
-               persistence: required_store,
-               restore: :required
-             )
-
-    assert {:error, :not_found} =
-             Persistence.load_agent(required_store, RuntimeAgent, required_id, instance: jido)
-
-    if_found_store = persistence(:if_found_missing)
-    if_found_id = unique_id("if-found-missing")
-
-    assert {:ok, _pid} =
-             Jido.start_agent(jido, RuntimeAgent,
-               id: if_found_id,
-               persistence: if_found_store,
-               restore: :if_found
-             )
-
-    assert {:ok, _agent, 0} =
-             Persistence.load_agent_with_revision(if_found_store, RuntimeAgent, if_found_id,
-               instance: jido
-             )
-
-    active_store = persistence(:active_conflict)
-    active_id = unique_id("active-conflict")
-    active = RuntimeAgent.new!(id: active_id)
-    assert :ok = Persistence.save_agent(active_store, active, instance: jido)
-
-    assert {:error, {:persistence_failed, :conflict}} =
-             Jido.start_agent(jido, RuntimeAgent,
-               id: active_id,
-               persistence: active_store,
-               restore: false
-             )
-
-    tombstone_store = persistence(:tombstone_conflict)
-    tombstone_id = unique_id("tombstone-conflict")
-
-    assert :ok =
-             Persistence.delete_agent(tombstone_store, RuntimeAgent, tombstone_id, instance: jido)
-
-    assert {:error, {:persistence_failed, :conflict}} =
-             Jido.start_agent(jido, RuntimeAgent,
-               id: tombstone_id,
-               persistence: tombstone_store,
-               restore: false
-             )
   end
 
   test "logical deletion writes compact tombstones and fences delayed writers", %{jido: jido} do

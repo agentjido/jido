@@ -324,7 +324,7 @@ defmodule JidoTest.Agent.AuthoringTest do
   end
 
   test "generated documentation and specs describe one map-based constructor" do
-    module = Jido.Examples.MinimalAgent
+    module = JidoTest.AuthoringDocsAgent
     assert {_, [signature], %{"en" => help}, _} = function_docs(module, :increment_signal, 2)
     assert signature =~ "increment_signal(input, envelope_opts"
     assert help =~ "plain input map"
@@ -982,7 +982,7 @@ defmodule JidoTest.Agent.AuthoringRuntimeTest do
 
   test "generated Action and Flow helpers commit the direct candidate", %{jido: jido} do
     agent = Counter.new!()
-    {:ok, server} = Jido.start_agent(jido, agent)
+    {:ok, server} = JidoTest.AgentServerAssertions.start_agent(jido, agent)
 
     {:ok, command_signal_1} = Counter.add_signal(%{amount: 3})
 
@@ -994,7 +994,7 @@ defmodule JidoTest.Agent.AuthoringRuntimeTest do
 
     {:ok, route_signal_1} = Counter.add_signal(%{amount: 3})
 
-    assert {:ok, ^expected} =
+    assert {:ok, ^expected, _} =
              Jido.AgentServer.call(server, route_signal_1, [])
 
     assert expected.state == %{count: 3, turns: 1}
@@ -1009,38 +1009,38 @@ defmodule JidoTest.Agent.AuthoringRuntimeTest do
 
     {:ok, route_signal_2} = Counter.flow_add_signal(%{amount: 2})
 
-    assert {:ok, ^flow_candidate} =
+    assert {:ok, ^flow_candidate, _} =
              Jido.AgentServer.call(server, route_signal_2, [])
 
     assert flow_candidate.state == %{count: 5, turns: 2}
-    assert Server.snapshot(server).state_version == 2
+    assert Server.status(server).state_version == 2
   end
 
   test "generated inline helpers apply route defaults", %{jido: jido} do
-    {:ok, server} = Jido.start_agent(jido, InlineCounter)
+    {:ok, server} = JidoTest.AgentServerAssertions.start_agent(jido, InlineCounter)
 
     {:ok, route_signal_3} = InlineCounter.add_inline_signal(%{amount: 4})
 
-    assert {:ok, committed} =
+    assert {:ok, committed, _} =
              Jido.AgentServer.call(server, route_signal_3, [])
 
     assert committed.state == %{count: 4}
   end
 
   test "a live helper forwards runtime validation without a commit", %{jido: jido} do
-    {:ok, server} = Jido.start_agent(jido, Counter)
-    before = Server.snapshot(server)
+    {:ok, server} = JidoTest.AgentServerAssertions.start_agent(jido, Counter)
+    before = JidoTest.AgentServerAssertions.committed(server)
 
     {:ok, route_signal_4} = Counter.add_signal(%{amount: 2})
 
     assert {:error, %Jido.Error.ValidationError{}} =
              Jido.AgentServer.call(server, route_signal_4, timeout: :invalid)
 
-    assert Server.snapshot(server) == before
+    assert JidoTest.AgentServerAssertions.committed(server) == before
 
     {:ok, route_signal_5} = Counter.add_signal(%{amount: 0})
 
-    assert {:ok, committed} =
+    assert {:ok, committed, _} =
              Jido.AgentServer.call(server, route_signal_5, context: %{})
 
     assert committed.state.count == 0
@@ -1053,13 +1053,13 @@ defmodule JidoTest.Agent.AuthoringRuntimeTest do
     assert {:ok, candidate, []} = PreparedCounter.cmd(agent, signal)
     assert candidate.state.count == 2
 
-    {:ok, server} = Jido.start_agent(jido, agent)
+    {:ok, server} = JidoTest.AgentServerAssertions.start_agent(jido, agent)
 
     {:ok, route_signal_6} = PreparedCounter.add_signal(%{amount: 2})
 
-    assert {:ok, ^candidate} =
+    assert {:ok, ^candidate, _} =
              Jido.AgentServer.call(server, route_signal_6, [])
 
-    assert Server.snapshot(server).state_version == 1
+    assert Server.status(server).state_version == 1
   end
 end
