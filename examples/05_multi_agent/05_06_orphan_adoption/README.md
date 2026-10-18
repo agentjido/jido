@@ -1,4 +1,4 @@
-# 05_06 Orphan Adoption
+# 05_06 Independent Agent Ownership
 
 An independent Agent can survive its owner's supervisor and later accept a new owner.
 
@@ -23,5 +23,9 @@ mix test test/examples/05_multi_agent/05_06_orphan_adoption --include example --
 ```
 
 Adoption is local. It does not provide a distributed lease.
+
+This transfers local runtime ownership. It does not move a declared topology
+member or change an Agent definition. Declared members follow their owning
+supervisor lifetime; independent Agents use the explicit policy shown here.
 
 Previous: [Correlated Requests](../05_02_correlated_requests/README.md) | Next: [Topology](../../07_topology/README.md)

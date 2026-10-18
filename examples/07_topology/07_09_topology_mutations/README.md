@@ -44,4 +44,20 @@ coordinated snapshot of all member states.
 - [Tests](../../../test/examples/07_topology/07_09_topology_mutations/mutations_test.exs)
 - [Test runtime assertions](../../../test/examples/support/agent_topology_assertions.ex)
 
-Previous: [Local Bus Broadcast](../07_03_bus_swarm/README.md) | Next: [Application examples](../../08_applications/README.md)
+The add Action declares `count: state(:worker_count)`. A state-only command
+can then resize that group without changing its declaration. `Diff.between/2`
+reports the state change; the Server binds the count and reconciles processes.
+Explicit `agent_update` can instead replace the count with a fixed integer.
+
+A File-backed test starts the Agent, adds three bound workers, replaces the
+observer, hibernates the complete activation, and thaws it twice. Both restores
+preserve the complete portable snapshot and revision, including member
+count, definitions, and initial inputs. Old processes stop before new ones
+start. Live member state is deliberately not captured by the root snapshot;
+members restart from the saved initial inputs. Snapshot capture expands module
+references into nested definition data.
+
+[Connection Changes](../07_12_connection_changes/README.md) also changes an edge,
+hibernates, thaws, and proves that new work follows the saved destination.
+
+Previous: [Nested Agents](../07_02_hierarchy/README.md) | Next: [Connection Changes](../07_12_connection_changes/README.md)

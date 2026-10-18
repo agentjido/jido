@@ -1,13 +1,17 @@
-# Example updates
+# Example coverage follow-up
 
-Keep example numbers stable. Test one example at a time. Stop at the next
-failure and review its lesson before changing it.
+Keep example numbers stable. Do not restore deleted APIs or duplicate the core
+mutation and fault matrices in learning examples.
 
-- Update local runtime directives in multi-agent and causal trace examples.
-- Update remaining Agent construction, Server replies, and readiness checks.
-- Keep Plugin callbacks in one module when separate modules add no value.
-- Validate each retained example, its failure case, and owned process cleanup.
-- Run the complete example suite after the individual examples pass.
+The current catalog covers direct connections, connection changes, final Diff,
+and live Plugin changes. File-backed topology tests prove member mutations and
+connection edits across hibernate/thaw. A root checkpoint does not capture live
+member state. Coordinated multi-Agent persistence needs an explicit future
+contract before it becomes an example.
 
-Factory and Elastic Group moved to `examples/jido_lab/experiments/jido_core`
-in the workspace. They require separate application API updates there.
+Remaining work belongs outside the stable core learning path:
+
+- Review stale references in the wider guides separately from example READMEs.
+- Update the moved Factory and Elastic Group applications in JidoLab before use.
+- Keep provider compatibility and model behavior evidence in `jido_ai`.
+- Keep remote placement and cluster ownership in research until supported.

@@ -7,7 +7,7 @@ The retained example numbers stay unchanged.
 - [05_02 Correlated Requests](05_02_correlated_requests/README.md)
 - [05_06 Orphan Adoption](05_06_orphan_adoption/README.md)
 
-The API update for these examples is still in progress. Nested definition
+Owned and independent runtime Agents are supported locally. Nested definition
 ownership is covered by [07_02 Nested Agents](../07_topology/07_02_hierarchy/README.md).
 Remote placement and node-loss behavior remain [research](../99_research/README.md).
 

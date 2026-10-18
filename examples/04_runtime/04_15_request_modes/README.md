@@ -44,4 +44,14 @@ explicit cancellation when a caller timeout must stop eligible active work.
 - [Source](request_modes.ex)
 - [Tests](../../../test/examples/04_runtime/04_15_request_modes/request_modes_test.exs)
 
+```elixir
+{:ok, agent, directives} = Jido.AgentServer.call(server, signal)
+:ok = Jido.AgentServer.cast(server, signal)
+pending = Jido.AgentServer.submit(server, signal)
+{:ok, agent, directives} = Jido.AgentServer.await(pending)
+```
+
+Errors return `{:error, reason}`. A caller wait timeout does not cancel an
+accepted or queued Turn. Cast returns before the work commits.
+
 Previous: [State Migration](../04_14_state_migration/README.md) | Next: [Turn Control](../04_16_turn_control/README.md)

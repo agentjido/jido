@@ -11,7 +11,7 @@ These examples move from one durable Agent record to recovery after uncertain wr
 5. [Durable Delete](10_05_durable_delete/README.md) — keep a tombstone fence against stale writers.
 6. [Indeterminate Write](10_06_indeterminate_write/README.md) — stop an activation after an uncertain result.
 7. [Recoverable Delivery](10_07_recoverable_delivery/README.md) — save and resume external delivery intent.
-8. [Definition Revision](10_08_definition_revision/README.md) — reject restore across an undeclared definition change.
+8. [Definition Revision](10_08_definition_revision/README.md) — retain saved definitions and code provenance; upgrade explicitly.
 
 ## Run the section
 

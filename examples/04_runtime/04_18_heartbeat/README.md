@@ -45,4 +45,4 @@ scheduling and persistence lessons when a missed occurrence must be recovered.
 - [Source](heartbeat.ex)
 - [Tests](../../../test/examples/04_runtime/04_18_heartbeat/heartbeat_test.exs)
 
-Previous: [Failure Outcome](../04_17_failure_outcome/README.md) | Next: [Multi-agent examples](../../05_multi_agent/README.md)
+Previous: [Failure Outcome](../04_17_failure_outcome/README.md) | Next: [Definition Changes and Diff](../04_19_definition_changes/README.md)

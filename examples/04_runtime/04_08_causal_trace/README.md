@@ -4,7 +4,7 @@ A parent and two child Agents keep one trace across work and result Signals.
 
 ## What you will learn
 
-- How spawn, child work, and parent result Turns retain causal metadata.
+- How `agent_start`, `agent_send`, and `owner_send` retain causal metadata.
 - How an external collector correlates work without changing business Signals.
 
 ## Read the code
@@ -28,8 +28,8 @@ causal fields to runtime events.
 
 ## Limits
 
-The example test runs locally. Core tests cover the same causal contract across
-connected Erlang nodes.
+The example proves local causal propagation only. It does not prove remote
+Agent placement or cross-node lifecycle guarantees.
 
 ## Files
 

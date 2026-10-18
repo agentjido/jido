@@ -43,4 +43,8 @@ which domain fields are secret. Semantic Telemetry remains in the next lesson.
 - [Source](agent_live_debugger.ex)
 - [Tests](../../../test/examples/04_runtime/04_05_runtime_inspection/agent_live_debugger_test.exs)
 
+`children/1` lists owned Agents, not Plugin runtimes. `Server.snapshot/1` is a
+live Agent value with a runtime revision. `Persistence.snapshot/1` produces a
+portable saved value. The redacted debugger view is neither of these snapshots.
+
 Previous: [Managed Jobs](../04_04_managed_jobs/README.md) | Next: [Agent Observation](../04_07_agent_observation/README.md)

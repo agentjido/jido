@@ -1,4 +1,4 @@
-# 07_01 Named Members
+# 07_01 Named Agents
 
 Two named members keep separate state under one owning Agent.
 
@@ -43,8 +43,19 @@ coordinated snapshot of running member states.
 - [Tests](../../../test/examples/07_topology/07_01_independent/independent_test.exs)
 - [Test runtime assertions](../../../test/examples/support/agent_topology_assertions.ex)
 
-Previous: [Topology overview](../README.md) | Next: [Nested Agents](../07_02_hierarchy/README.md)
+```elixir
+topology do
+  agent :left, Jido.Examples.Topology.Cell do
+    initial_state %{label: "left"}
+  end
+  agent :right, Jido.Examples.Topology.Cell do
+    initial_state %{label: "right"}
+  end
+end
+```
 
-The tests also encode this composed definition as JSON, decode it through a
-trusted Registry, and start the same named members. This is the small current
-replacement for the former data-defined Topology research matrix.
+The JSON test encodes this definition with a trusted Registry, decodes it,
+and starts the same named Agents. Data authoring does not start processes.
+Continue with [Direct Connections](../07_11_direct_connections/README.md).
+
+Previous: [Topology overview](../README.md) | Next: [Direct Connections](../07_11_direct_connections/README.md)

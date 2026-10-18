@@ -1,6 +1,7 @@
 # 04_03 Bus Delivery
 
-An Agent consumes ordered Signals from a durable local Bus subscription.
+An Agent consumes ordered Signals from a replayable local Bus subscription.
+The subscription supports acknowledgement and retry; the example store is in memory.
 
 ## What you will learn
 

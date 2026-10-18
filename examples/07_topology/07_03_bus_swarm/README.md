@@ -44,7 +44,19 @@ small behavior example, not a 1,000-worker capacity test.
 - [Tests](../../../test/examples/07_topology/07_03_bus_swarm/bus_swarm_test.exs)
 - [Test runtime assertions](../../../test/examples/support/agent_topology_assertions.ex)
 
-Previous: [Nested Agents](../07_02_hierarchy/README.md) | Next: [Topology Mutations](../07_09_topology_mutations/README.md)
-
 This is also the fixed-group lesson: the Agent declares stable worker roles
 and the Bus routes work. A separate controller membership table is not needed.
+
+```elixir
+connections do
+  connect "examples.topology.cell.work", from: :root, to: bus(:work)
+  connect "examples.topology.cell.work", from: bus(:work), to: :workers,
+    delivery: :broadcast
+end
+```
+
+Start with [Direct Connections](../07_11_direct_connections/README.md) for the
+simpler Agent-to-Agent path. An ordinary Action must return `emit/1` explicitly.
+Connections fan out to every match; they do not use route precedence.
+
+Previous: [Direct Connections](../07_11_direct_connections/README.md) | Next: [Nested Agents](../07_02_hierarchy/README.md)

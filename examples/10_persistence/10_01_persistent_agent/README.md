@@ -32,4 +32,20 @@ The example uses local ETS storage. ETS data does not survive a BEAM restart.
 - [Agent tests](../../../test/examples/10_persistence/10_01_persistent_agent/persistent_agent_test.exs)
 - [Identity test](../../../test/examples/10_persistence/10_01_persistent_agent/checkpoint_identity_test.exs)
 
+```elixir
+opts = [id: "counter", persistence: {Jido.Persistence.File, path: "tmp/counters"}]
+{:ok, server} = Jido.start_agent(instance, Jido.Examples.Persistence.PersistentAgent,
+  Keyword.put(opts, :persistence_mode, :create))
+:ok = Jido.AgentServer.await_ready(server)
+:ok = Jido.stop_agent(instance, server)
+# Use the same ID and store:
+{:ok, restored} = Jido.start_agent(instance, Jido.Examples.Persistence.PersistentAgent,
+  Keyword.put(opts, :persistence_mode, :restore))
+:ok = Jido.AgentServer.await_ready(restored)
+```
+
+`:create` requires a new record. `:restore` requires an existing record. The
+[hibernate lesson](../10_02_hibernate_and_thaw/README.md) shows complete shutdown
+and thaw rather than starting two owners for the same identity.
+
 Next: [Hibernate And Thaw](../10_02_hibernate_and_thaw/README.md)

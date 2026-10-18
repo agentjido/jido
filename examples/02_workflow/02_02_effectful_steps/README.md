@@ -46,4 +46,4 @@ recovery.
 - [Tests](../../../test/examples/02_workflow/02_02_effectful_steps/effectful_steps_test.exs)
 - [Shared test adapter](../../../test/examples/support/workflow_sdk_case.ex)
 
-Previous: [Sequential Flow](../02_01_sequential_flow/README.md) | Next: [Conditional Routes](../02_03_conditional_routes/README.md)
+Previous: [Sequential Flow](../02_01_sequential_flow/README.md) | Next: [Choice and Fallback](../02_03_conditional_routes/README.md)

@@ -18,8 +18,15 @@ Read [the observed Agent](turn_observation.ex), then the shared
 mix test test/examples/04_runtime/04_07_agent_observation --include example --seed 0
 ```
 
-Expected result: one event reports a successful commit and another reports a
-post-commit Directive failure without exposing private Agent state.
+Expected result: both Turn events report successful commits. A separate
+effects event reports the later Directive failure without exposing private
+Agent state.
+
+The standalone collector also prints the public metric names:
+
+```sh
+MIX_ENV=test mix run examples/04_runtime/04_07_agent_observation/demo.exs
+```
 
 ## Important behavior
 
@@ -36,10 +43,15 @@ backpressure contract.
 - [Agent](turn_observation.ex)
 - [Shared EventProbe](../support/event_probe.ex)
 - [Demo](demo.exs)
-- [Semantic boundary demo](semantic_boundaries.exs)
 - [Tests](../../../test/examples/04_runtime/04_07_agent_observation/agent_observation_test.exs)
-
-Previous: [Runtime Inspection](../04_05_runtime_inspection/README.md) | Next: [Causal Trace](../04_08_causal_trace/README.md)
 
 Turn commit and effect dispatch have separate results. Inspect the Turn event
 for the commit and `[:jido, :agent_server, :effects, :stop]` for delivery failure.
+
+`Jido.Telemetry.metrics/0` supplies current AgentServer counters and Turn
+and persistence duration summaries. Lifecycle, commit, effects, and settlement
+are point events with counters only. `turn.settled` records the commit result;
+`effects.stop` can report a later failure without undoing it. See the
+[metric guide](../../../guides/telemetry-tracing-and-logs.md).
+
+Previous: [Runtime Inspection](../04_05_runtime_inspection/README.md) | Next: [Causal Trace](../04_08_causal_trace/README.md)

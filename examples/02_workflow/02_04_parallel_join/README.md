@@ -39,4 +39,4 @@ and cancellation belong to Jido Flow and Agent Server core tests.
 - [Source](parallel_join.ex)
 - [Tests](../../../test/examples/02_workflow/02_04_parallel_join/parallel_join_test.exs)
 
-Previous: [Conditional Routes](../02_03_conditional_routes/README.md) | Next: [Ordered Batch](../02_05_ordered_batch/README.md)
+Previous: [Choice and Fallback](../02_03_conditional_routes/README.md) | Next: [Ordered Batch](../02_05_ordered_batch/README.md)

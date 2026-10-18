@@ -40,7 +40,7 @@ does not define remote placement, orphan adoption, or member-state recovery.
 - [Tests](../../../test/examples/07_topology/07_02_hierarchy/hierarchy_test.exs)
 - [Test runtime assertions](../../../test/examples/support/agent_topology_assertions.ex)
 
-Previous: [Named Members](../07_01_independent/README.md) | Next: [Local Bus Broadcast](../07_03_bus_swarm/README.md)
-
 This is also the Agent hierarchy lesson. Nested definitions replace the old
 recursive spawn example; subtree ownership follows the OTP supervisor tree.
+
+Previous: [Local Bus Broadcast](../07_03_bus_swarm/README.md) | Next: [Topology Mutations](../07_09_topology_mutations/README.md)

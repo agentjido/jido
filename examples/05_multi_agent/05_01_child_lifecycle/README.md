@@ -1,11 +1,11 @@
-# 05_01 Child Lifecycle
+# 05_01 Owned Agent Lifecycle
 
 A parent Agent starts, tracks, restarts, and stops owned child Agents without
 putting child PIDs in domain state.
 
 ## What you will learn
 
-- How `SpawnChild` and `StopChild` Directives manage owned children.
+- How `agent_start` and `agent_stop` Directives manage owned children.
 - How stable child identity survives an abnormal restart.
 
 ## Read the code

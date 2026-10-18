@@ -22,4 +22,12 @@ an upgrade Action. Restore does not select a new definition automatically.
 - [Tests](../../../test/examples/10_persistence/10_08_definition_revision/definition_revision_test.exs)
 - [Schema and state upgrade](../../04_runtime/04_14_state_migration/README.md)
 
+A nested definition is captured as data rather than reselected from current
+source on restore. Topology intent includes members, their initial inputs,
+counts, and connections. It does not include a coordinated live snapshot of
+all running members. The [topology mutation test](../../07_topology/07_09_topology_mutations/README.md)
+checks member changes across two File-backed hibernate/thaw cycles. The
+[connection test](../../07_topology/07_12_connection_changes/README.md) proves
+that thawed outputs still follow a changed edge.
+
 Previous: [Recoverable Delivery](../10_07_recoverable_delivery/README.md)

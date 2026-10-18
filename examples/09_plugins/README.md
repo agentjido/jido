@@ -11,6 +11,7 @@ pure preparation, add live admission, then cover owned state.
 4. [Secure Signal](09_04_secure_signal/README.md) — decrypt ciphertext into a package input and preserve the incoming Signal.
 5. [Composition](09_05_composition/README.md) — use independent pure and live package inputs in one Agent.
 6. [State Middleware](09_06_state_middleware/README.md) — read complete Turn state and reduce only one owned field.
+7. [Live Plugin Changes](09_09_live_plugin_changes/README.md) — install, configure, quiesce, replace, and remove owned runtime resources.
 
 ## Run the section
 
@@ -33,8 +34,12 @@ mix test test/examples/09_plugins --include example --seed 0
 - `Jido.AgentServer.Plugin.admit/3` can reject or return one transient runtime input.
 - Neither preparation nor admission can change the Agent, incoming Signal, caller context, route, or another package input.
 - `Jido.Agent.Plugin.reduce/2` can read the complete candidate and return only its owned state value.
-- `Jido.AgentServer.Plugin.after_commit/3` receives the exact committed owned value and revision before returned Directives.
+- Unchanged Plugins receive the exact committed owned value and revision through `Jido.AgentServer.Plugin.after_commit/3` before returned Directives. Changed Plugins rebuild from that commit instead.
 - `Jido.Persistence.Plugin.dump/3` and `load/3` convert only their paired Plugin-owned state value.
 - Direct `Jido.Agent.cmd/3` runs pure preparation but not live admission or commit notification.
 - Actions and Flows read `context.plugin_inputs[Package].prepared` and
   `context.plugin_inputs[Package].runtime`.
+
+Configuration commits rebuild changed Plugins from `Jido.Plugin.Init`.
+New, removed, and reconfigured Plugins do not receive `after_commit/3` for that
+commit; unchanged Plugins retain their normal notification.

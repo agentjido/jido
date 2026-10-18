@@ -70,16 +70,16 @@ distinct Agent route or commit integration contract.
 | Active Turn inspection and cancellation | `jido` | Focused example | [Source](04_runtime/04_16_turn_control/turn_control.ex), [test](../test/examples/04_runtime/04_16_turn_control/turn_control_test.exs) |
 | Failure policy and public Turn Outcome | `jido` | Focused example | [Source](04_runtime/04_17_failure_outcome/failure_outcome.ex), [test](../test/examples/04_runtime/04_17_failure_outcome/failure_outcome_test.exs) |
 | Heartbeat Plugin lifecycle | `jido` | Focused example | [Source](04_runtime/04_18_heartbeat/heartbeat.ex), [test](../test/examples/04_runtime/04_18_heartbeat/heartbeat_test.exs) |
+| Pure definition changes, final Diff, and live route changes | `jido` | Focused example | [Source](04_runtime/04_19_definition_changes/definition_changes.ex), [tests](../test/examples/04_runtime/04_19_definition_changes/definition_changes_test.exs) |
 
 ## Multi-agent contracts
 
 | Capability | Owner | Status | Canonical evidence |
 | --- | --- | --- | --- |
-| Direct child lifecycle | `jido` | Focused example | [Source](05_multi_agent/05_01_child_lifecycle/child_lifecycle.ex), [test](../test/examples/05_multi_agent/05_01_child_lifecycle/child_lifecycle_test.exs) |
+| Owned Agent lifecycle | `jido` | Focused example | [Source](05_multi_agent/05_01_child_lifecycle/child_lifecycle.ex), [test](../test/examples/05_multi_agent/05_01_child_lifecycle/child_lifecycle_test.exs) |
 | Correlated child request and stale reply rejection | `jido` | Focused example | [Source](05_multi_agent/05_02_correlated_requests/correlated_requests.ex), [test](../test/examples/05_multi_agent/05_02_correlated_requests/correlated_requests_test.exs) |
 | Exact remote child placement | `jido` | Out of scope | [Source](99_research/05_04_remote_child/README.md), [rejection test](../test/examples/99_research/05_04_remote_child/remote_start_test.exs) |
-| Remote exit versus connection uncertainty | `jido` | Out of scope | [Source](99_research/05_05_remote_lifecycle/README.md), [status](99_research/05_05_remote_lifecycle/README.md) |
-| Orphan policy and child adoption | `jido` | Focused example | [Source](05_multi_agent/05_06_orphan_adoption/orphan_adoption.ex), [test](../test/examples/05_multi_agent/05_06_orphan_adoption/orphan_adoption_test.exs) |
+| Independent runtime ownership and adoption | `jido` | Focused example | [Source](05_multi_agent/05_06_orphan_adoption/orphan_adoption.ex), [test](../test/examples/05_multi_agent/05_06_orphan_adoption/orphan_adoption_test.exs) |
 
 ## Topology contracts
 
@@ -89,6 +89,9 @@ distinct Agent route or commit integration contract.
 | Nested Agent definitions and subtree cleanup | `jido` | Focused example | [Source](07_topology/07_02_hierarchy/hierarchy.ex), [test](../test/examples/07_topology/07_02_hierarchy/hierarchy_test.exs) |
 | Declared local Bus and explicit broadcast | `jido` | Focused example | [Source](07_topology/07_03_bus_swarm/swarm.ex), [test](../test/examples/07_topology/07_03_bus_swarm/bus_swarm_test.exs) |
 | Live member mutations | `jido` | Focused example | [Source](07_topology/07_09_topology_mutations/mutations.ex), [test](../test/examples/07_topology/07_09_topology_mutations/mutations_test.exs) |
+| Direct output connections and exact contracts | `jido` | Focused example | [Source](07_topology/07_11_direct_connections/direct_connections.ex), [tests](../test/examples/07_topology/07_11_direct_connections/direct_connections_test.exs) |
+| Connection mutations, process preservation, and restored delivery | `jido` | Focused example | [Source](07_topology/07_12_connection_changes/connection_changes.ex), [tests](../test/examples/07_topology/07_12_connection_changes/connection_changes_test.exs) |
+| Mutated members survive File-backed hibernate/thaw | `jido` | Focused example | [Source](07_topology/07_09_topology_mutations/mutations.ex), [tests](../test/examples/07_topology/07_09_topology_mutations/mutations_test.exs) |
 
 ## Application and Plugin contracts
 
@@ -105,6 +108,7 @@ distinct Agent route or commit integration contract.
 | Encrypted Signal preparation | `jido` | Focused example | [Source](09_plugins/09_04_secure_signal/secure_signal.ex), [test](../test/examples/09_plugins/09_04_secure_signal/secure_signal_test.exs) |
 | Independent Plugin input composition | `jido` | Focused example | [Source](09_plugins/09_05_composition/composition.ex), [test](../test/examples/09_plugins/09_05_composition/composition_test.exs) |
 | Plugin-owned state reduction | `jido` | Focused example | [Source](09_plugins/09_06_state_middleware/state_middleware.ex), [test](../test/examples/09_plugins/09_06_state_middleware/state_middleware_test.exs) |
+| Live Plugin configuration and owned-state removal | `jido` | Focused example | [Source](09_plugins/09_09_live_plugin_changes/live_plugin_changes.ex), [tests](../test/examples/09_plugins/09_09_live_plugin_changes/live_plugin_changes_test.exs) |
 
 ## Persistence contracts
 

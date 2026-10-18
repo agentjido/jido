@@ -43,4 +43,10 @@ make external operations idempotent when a retry is possible.
 - [Source](turn_control.ex)
 - [Tests](../../../test/examples/04_runtime/04_16_turn_control/turn_control_test.exs)
 
+`cancel/2` targets whichever eligible Turn is active when the Server handles
+the request. `cancel_turn/3` also checks the supplied ID, so a delayed request
+cannot cancel a later Turn. A different active ID returns `{:error, :stale_turn}`. An idle Server
+returns `{:error, :not_running}`. Commit in progress returns
+`{:error, :commit_in_progress}`. Neither API reverses committed effects.
+
 Previous: [Request Modes](../04_15_request_modes/README.md) | Next: [Failure Outcome](../04_17_failure_outcome/README.md)

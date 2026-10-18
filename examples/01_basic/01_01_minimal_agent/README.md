@@ -33,6 +33,7 @@ Start an instance with `state:` and wait for readiness before using it:
 alias Jido.AgentServer, as: Server
 alias Jido.Examples.MinimalAgent
 
+{:ok, _instance} = Jido.start(name: MyJido)
 {:ok, server} = Jido.start_agent(MyJido, MinimalAgent, id: "counter", state: %{count: 4})
 :ok = Server.await_ready(server)
 {:ok, signal} = MinimalAgent.increment_signal(%{amount: 3})

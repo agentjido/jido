@@ -46,4 +46,9 @@ prior commit or undo external work.
 - [Source](failure_outcome.ex)
 - [Tests](../../../test/examples/04_runtime/04_17_failure_outcome/failure_outcome_test.exs)
 
+Read `Server.status/1` for `last_outcome` and `last_effect_outcome`.
+`Server.history/1` retains bounded Turn summaries when debug history is enabled.
+A successful commit can have a later effects failure. Do not classify the
+commit as failed from the effects summary.
+
 Previous: [Turn Control](../04_16_turn_control/README.md) | Next: [Heartbeat](../04_18_heartbeat/README.md)

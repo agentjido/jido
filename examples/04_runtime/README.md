@@ -16,11 +16,12 @@ public Jido APIs.
 8. [Pending Job Recovery](04_10_pending_job_recovery/README.md) — make retry after runtime loss explicit.
 9. [Durable Scheduling](04_11_durable_scheduling/README.md) — save and acknowledge schedule occurrences.
 10. [Stable Reference](04_12_stable_reference/README.md) — resolve durable identity after process and instance replacement.
-12. [State Migration](04_14_state_migration/README.md) — upgrade a saved definition and state with one Action.
-13. [Request Modes](04_15_request_modes/README.md) — compare synchronous, best-effort, and asynchronous requests.
-14. [Turn Control](04_16_turn_control/README.md) — inspect and cancel one matching active Turn.
-15. [Failure Outcome](04_17_failure_outcome/README.md) — handle errors across the commit boundary.
-16. [Heartbeat](04_18_heartbeat/README.md) — own a periodic input runtime through a Plugin.
+11. [State Migration](04_14_state_migration/README.md) — upgrade a saved definition and state with one Action.
+12. [Request Modes](04_15_request_modes/README.md) — compare synchronous, best-effort, and asynchronous requests.
+13. [Turn Control](04_16_turn_control/README.md) — inspect and cancel one matching active Turn.
+14. [Failure Outcome](04_17_failure_outcome/README.md) — handle errors across the commit boundary.
+15. [Heartbeat](04_18_heartbeat/README.md) — own a periodic input runtime through a Plugin.
+16. [Definition Changes and Diff](04_19_definition_changes/README.md) — compare pure mutation with a live route change.
 
 ## Run the section
 
@@ -38,8 +39,7 @@ credentials.
 
 ## Limits
 
-These examples use local processes and local persistence adapters. The
-multi-node ownership and remote lifecycle contracts start in the next section.
+These examples use local processes and local persistence adapters. Remote placement and cluster ownership remain unsupported research contracts.
 Agent checkpoint and recovery behavior is in the
 [persistence section](../10_persistence/README.md).
 

@@ -9,7 +9,7 @@ runtime boundary at a time.
 | 01_02 | [Typed Command Agent](01_02_typed_command_agent/README.md) | Typed Action input, route defaults, and complete candidate validation |
 | 01_03 | [Plugin State Agent](01_03_plugin_state_agent/README.md) | Plugin-owned state and atomic commit |
 | 01_04 | [Directive Agent](01_04_directive_agent/README.md) | Whole-batch validation and ordered post-commit effects |
-| 01_05 | [OTP supervision](01_05_otp_supervision/README.md) | Application child tree, OTP restart, local checkpoints, and shutdown |
+| 01_05 | [OTP supervision](01_05_otp_supervision/README.md) | Activation supervisor tree, worker restart, local checkpoints, and shutdown |
 | 01_06 | [Route Selection](01_06_route_selection/README.md) | Exact routes, wildcard fallback, precedence, and direct or live parity |
 | 01_07 | [Data-defined Agent](01_07_data_defined_agent/README.md) | Neutral definitions, trusted Codec Registry, and Plugin documents |
 | 01_09 | [Agent Extension](01_09_agent_extension/README.md) | Static DSL declarations stored as validated, versioned contributions |

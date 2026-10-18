@@ -82,4 +82,73 @@ defmodule JidoTest.Examples.Topology.MutationsTest do
     assert Server.children(server) == children
     stop_topology(server)
   end
+
+  test "a state-only change rebinds the count and reports its data Diff", %{jido: jido} do
+    server = start_topology(jido, Mutations)
+    assert {:ok, add} = Mutations.workers_add_signal(%{count: 2})
+    assert {:ok, _, [_]} = Server.call(server, add)
+    assert :ok = Server.await_ready(server)
+    before = Server.agent(server)
+    children = members(server)
+    assert {:ok, bind} = Mutations.workers_bind_signal(%{count: 3})
+    assert {:ok, accepted, []} = Server.call(server, bind)
+    assert :ok = Server.await_ready(server)
+    diff = Jido.Agent.Diff.between(before, accepted)
+    assert Jido.Agent.Diff.changed?(diff, :state)
+    refute Jido.Agent.Diff.changed?(diff, :agents)
+    assert length(labeled(server, "worker")) == 3
+    assert children -- members(server) == []
+    stop_topology(server)
+  end
+
+  @tag :tmp_dir
+  test "a mutated topology survives repeated File-backed hibernate and thaw", %{
+    jido: jido,
+    tmp_dir: path
+  } do
+    persistence = {Jido.Persistence.File, path: path}
+    id = unique_id("saved-topology")
+
+    {:ok, server} =
+      JidoTest.ExampleRuntime.start_agent(jido, Mutations,
+        id: id,
+        persistence: persistence,
+        persistence_mode: :create
+      )
+
+    assert {:ok, add} = Mutations.workers_add_signal(%{count: 2})
+    assert {:ok, _, _} = Server.call(server, add)
+    assert :ok = Server.await_ready(server)
+    assert {:ok, bind} = Mutations.workers_bind_signal(%{count: 3})
+    assert {:ok, _, []} = Server.call(server, bind)
+    assert :ok = Server.await_ready(server)
+    assert {:ok, replace} = Mutations.observer_replace_signal()
+    assert {:ok, accepted, _} = Server.call(server, replace)
+    assert :ok = Server.await_ready(server)
+    assert accepted.topology != Mutations.definition().topology
+    assert {:ok, work} = Cell.work_signal(%{value: 9})
+    for worker <- labeled(server, "worker"), do: assert({:ok, _, []} = Server.call(worker, work))
+    snapshot = Server.snapshot(server)
+    assert {:ok, portable} = Jido.Persistence.snapshot(snapshot.agent)
+
+    restored =
+      Enum.reduce(1..2, server, fn _, live ->
+        monitors = monitor_runtime(Server.activation(live))
+        assert :ok = Jido.hibernate(jido, live)
+        assert_down(monitors)
+        assert Jido.agent_count(jido) == 0
+        assert {:ok, awake} = Jido.thaw(jido, Mutations, id, persistence: persistence)
+        assert :ok = Server.await_ready(awake)
+        assert Server.snapshot(awake).state_version == snapshot.state_version
+        assert {:ok, ^portable} = Jido.Persistence.snapshot(Server.agent(awake))
+        assert length(labeled(awake, "worker")) == 3
+        assert length(labeled(awake, "replacement")) == 1
+        # The root saves intent. Live member state is not a coordinated checkpoint.
+        assert Enum.all?(labeled(awake, "worker"), &(Server.agent(&1).state.total == 0))
+        awake
+      end)
+
+    stop_topology(restored)
+    assert Jido.agent_count(jido) == 0
+  end
 end

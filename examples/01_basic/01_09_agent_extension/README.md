@@ -55,4 +55,9 @@ version identifies its contract; it does not perform an automatic upgrade.
 - [Source](agent_extension.ex)
 - [Tests](../../../test/examples/01_basic/01_09_agent_extension/agent_extension_test.exs)
 
+`Agent.validate_runtime_support/1` checks declared runtime support before live
+startup. This provider returns `:none`, so it needs no runtime adapter and can
+run in an AgentServer. A provider that declares an unsupported adapter fails
+that check. Pure authoring does not start an adapter.
+
 Previous: [Data-defined Agent](../01_07_data_defined_agent/README.md) | Next: [Workflow examples](../../02_workflow/README.md)
