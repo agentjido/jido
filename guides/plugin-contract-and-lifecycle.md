@@ -170,21 +170,10 @@ state value. It cannot receive the adapter, record key, expected revision,
 complete Agent, or commit result. Dump output must be portable. Load output
 must also match the owned state schema.
 
-Define `contribute/2`. It can return current canonical
-Bus resources, ownership relationships, and Bus subscriptions. Bus is the
-first core resource type. The callback cannot start
-a process, persist data, or control live activation. Jido calls the callback while
-it builds an instance Plan. It processes Agent declarations, then group
-declarations, in source order and keeps Plugin declaration order. Included
-Topologies receive the same expansion in their own scope. Common Topology
-validation checks the complete graph before Controller activation. The source
-definition stays unchanged.
-
-Live placement policy uses a different boundary. A control Agent can receive
-Topology lifecycle Signals, select an exact node, and return a Plugin-owned
-Directive. The Agent Server callbacks can apply that Directive through
-`Jido.Topology.Controller.place_agent/4` after commit. Static contribution does
-not gain live authority.
+Use `Jido.Agent.Extension` for static contribution data. Its
+`c:Jido.Agent.Extension.lower/2` callback reads DSL data and explicit config.
+Declare core topology Agents and connections on the Agent definition.
+Static contribution callbacks cannot start processes or change live activation.
 
 See [Plugin Runtimes](plugin-runtimes.livemd) and
 [Plugin-Owned State](plugin-state.md).

@@ -1,6 +1,6 @@
 # Data Definitions and Codecs
 
-Use `Jido.Agent.new/1` for a map or keyword declaration. Use `Jido.Agent.Codec`
+Use `Jido.Agent.define/1` for a map or keyword declaration. Use `Jido.Agent.Codec`
 for a versioned JSON-compatible declaration. These forms produce the same
 canonical Agent definition as the module DSL. They do not start a process.
 
@@ -8,10 +8,11 @@ canonical Agent definition as the module DSL. They do not start a process.
 
 ```elixir
 {:ok, definition} =
-  Jido.Agent.new(
+  Jido.Agent.define(
     name: "built_counter",
     schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}),
-    routes: [{"counter.add", MyApp.Add, defaults: %{amount: 1}}]
+    routes: [%{path: "counter.add", handler: %{kind: :action, target: MyApp.Add},
+               defaults: %{amount: 1}}]
   )
 
 {:ok, instance} = Jido.Agent.instantiate(definition, id: "built-1")
@@ -28,17 +29,16 @@ Caller context also accepts `nil` as an empty map.
 
 ## Module Roles
 
-An Agent behavior module can implement `handle_signal/2` for custom selection.
-When this callback is absent, Jido uses the Agent routes. A module created with
+Routes select Actions or Flows. Put state-dependent decisions in that work.
+A module created with
 `use Jido.Agent` compiles its static fields into a neutral Agent value.
 `module.definition()` checks the current Plugin and Action contracts before it
 returns that value. `Agent.instantiate(module, options)` uses the same current
 contracts to construct an instance. Plugin specifications and complete state
 schemas are derived for each use; they are not stored in the compiled value.
 
-Agent Server startup and `SpawnChild` also accept constructor modules with
-`new/0` or `new/1`. Such a constructor can return an Agent whose behavior module
-is different. It does not need to declare Agent configuration itself.
+Pass a definition, Agent module, or Agent instance to Agent Server startup.
+Use `Jido.Agent.instantiate/2` to create an instance from a definition.
 
 ## Encode Static Authoring Data
 
@@ -52,8 +52,7 @@ json = JSON.encode!(document)
 
 The document stores static Agent configuration. It does not store instance
 state, runtime resources, completed work, or a live deployment.
-The current V3 document version is 2. The Codec does not decode version-1
-Agent documents.
+The current Agent document version is 1. The Codec rejects other versions.
 
 ## Use A Trusted Registry
 

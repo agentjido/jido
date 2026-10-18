@@ -30,7 +30,7 @@ defmodule JidoTest.AgentServer.IntegrationTest do
     first_spec = Server.child_spec(agent: c.agent, runner: c.runner)
     second_spec = Server.child_spec(agent: other, runner: c.runner)
     assert first_spec.id != second_spec.id
-    assert first_spec == Server.child_spec(agent: c.agent, runner: c.runner)
+    assert first_spec.id == Server.child_spec(agent: c.agent, runner: c.runner).id
     {:ok, supervisor} = Supervisor.start_link([first_spec, second_spec], strategy: :one_for_one)
     on_exit(fn -> if Process.alive?(supervisor), do: Supervisor.stop(supervisor) end)
 

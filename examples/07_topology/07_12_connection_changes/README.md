@@ -36,7 +36,8 @@ roll back a committed topology after a later delivery failure.
 The persistence test uses a temporary File store. It compares the complete
 portable snapshot and runtime revision before and after thaw, then sends work
 to prove the restored connection. Snapshot capture expands module references
-into nested definition data. It does not save the current state of live
-members: those restart from their saved initial inputs.
+into nested definition data. Each persistent member restores its own confirmed
+record. The right member retains its earlier total of 5, then receives 4 and
+reaches 9. These independent records do not form an atomic family snapshot.
 
 Previous: [Topology Mutations](../07_09_topology_mutations/README.md) | Next: [Application examples](../../08_applications/README.md)

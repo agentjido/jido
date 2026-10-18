@@ -10,20 +10,30 @@ defmodule JidoTest.Examples.Workflow.EffectfulStepsTest do
     )
   end
 
-  test "caller context reaches the read and only selected output persists", %{jido: jido} do
+  test "portable service context stays outside committed Agent state", %{jido: jido} do
     client = service()
     persistence = {Jido.Persistence.ETS, table: :"workflow_#{System.unique_integer([:positive])}"}
     server = start_agent!(jido, Example, persistence: persistence, persistence_mode: :create)
     before = Server.snapshot(server)
     {:ok, command} = Example.fetch_record_signal(%{key: "one"})
-    context = %{service: {Service, client}, private_request: make_ref()}
+    service_name = Module.concat(__MODULE__, ReadService)
+    Process.register(client, service_name)
+    context = %{service: {Service, service_name}, private_request: "request-1"}
+
+    assert {:error, _} =
+             Server.call(server, command,
+               context: %{service: {Service, client}, private_request: make_ref()}
+             )
+
+    assert Service.calls(client) == []
+    assert Server.snapshot(server) == before
 
     assert {:ok, candidate, []} = Example.cmd(before.agent, command, context: context)
     assert Server.snapshot(server) == before
     assert {:ok, ^candidate, _directives} = Server.call(server, command, context: context)
     assert candidate.state == %{key: "one", result: %{revision: "r1", answer: "safe"}}
 
-    assert {:ok, ^candidate, 1} =
+    assert {:ok, ^candidate, 2} =
              Jido.Persistence.load_agent_with_revision(persistence, Example, candidate.id,
                instance: jido
              )
@@ -33,7 +43,7 @@ defmodule JidoTest.Examples.Workflow.EffectfulStepsTest do
     assert_receive {:DOWN, ^monitor, :process, ^server, {:shutdown, :hibernate}}, 1000
     assert {:ok, restored} = Jido.thaw(jido, Example, candidate.id, persistence: persistence)
     assert :ok = Jido.AgentServer.await_ready(restored)
-    assert Server.snapshot(restored) == %{agent: candidate, state_version: 1}
+    assert Server.snapshot(restored) == %{agent: candidate, state_version: 2}
   end
 
   test "a guard prevents I/O while a later validation failure cannot undo it", %{jido: jido} do

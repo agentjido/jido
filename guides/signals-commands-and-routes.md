@@ -50,8 +50,9 @@ The live Server adds these reserved context keys for execution:
 - `:jido`
 - `:partition`
 
-Caller context is not stored or copied into emitted Signals. Application code
-must select any value that must enter state or a new Signal.
+Caller context does not become Agent state or emitted Signal data. A persistent
+Flow saves portable caller context for recovery. Application code must select
+values that enter state or a new Signal.
 
 `Jido.Agent.cmd/3` runs pure Agent Plugin preparation. It does not run live
 admission or use Plugin runtimes. Therefore, a pure signature check can work in
@@ -63,9 +64,9 @@ live Agent Server boundary.
 A route can pair an executable with a defaults map:
 
 ```elixir
-routes: [
-  {"counter.add", {MyApp.Add, %{amount: 1}}}
-]
+routes do
+  route "counter.add", MyApp.Add, defaults: %{amount: 1}
+end
 ```
 
 Signal data replaces matching default keys. The merge is shallow. A supplied
@@ -83,39 +84,14 @@ Route patterns can use Jido Signal Router patterns and match predicates. A
 command uses the first matching target in Router order. No match returns
 `Jido.Error.RoutingError` before executable work starts.
 
-Router priority and specificity put an exact route before matching wildcard
-routes. Test all overlapping patterns.
+Declaration order sets precedence. Put a specific route before a matching
+wildcard route. Routes have no priority option. Test overlapping patterns.
 
-## Select A Turn In A Callback
+## Use Agent State In An Action
 
-Implement `handle_signal/2` when selection needs current Agent state, custom
-input conversion, or an explicit error. Return `{:ok, %Jido.Agent.Turn{}}` or
-`{:error, reason}`. Declared routes and custom callbacks use the same Turn
-validation and execution path.
-
-Turn input accepts the same maps, keyword lists, and `nil` as default routing.
-The runner normalizes this input to a map before execution. Constructors keep
-the input value supplied by the callback. A custom callback can convert other
-Signal data, such as a string or a non-keyword list, into valid Turn input.
-
-Call `Jido.Agent.handle_signal/2` to use declared routes for the remaining cases:
-
-```elixir
-@impl Jido.Agent
-def handle_signal(%Jido.Signal{type: "message.raw", data: text}, _agent)
-    when is_binary(text) do
-  Jido.Agent.Turn.new(MyApp.HandleMessage, %{text: text})
-end
-
-def handle_signal(signal, agent) do
-  Jido.Agent.handle_signal(signal, agent)
-end
-```
-
-The callback receives the original Signal. It can convert Signal data into
-executable input, but it cannot replace the Turn's source Signal. Selecting an
-executable does not consume a continuation. An error ends preparation; it does
-not cause an automatic fallback to declared routes.
+Declare routes to select Actions or Flows. Put decisions that need current
+Agent state in the selected Action or Flow. An Action reads that state from
+`context.agent_state`.
 
 ## Generate Interfaces
 

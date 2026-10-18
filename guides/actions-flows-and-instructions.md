@@ -35,8 +35,10 @@ A Flow can run dependent, conditional, parallel, mapped, reduced, iterated, and
 nested work. Its final output must be one complete candidate state for the
 Agent.
 
-Intermediate Flow results do not become Agent revisions. The complete Flow is
-one executable inside one Turn and produces at most one Agent commit.
+Intermediate Flow results do not become committed Agent state. The complete Flow
+is one executable inside one Turn and produces at most one Agent state commit.
+Persistence saves step progress in separate execution records and resumes an
+interrupted Flow from its last confirmed step boundary.
 
 A sequence of Server calls is different. Each call has its own Turn and commit.
 Use separate calls only when every intermediate state is valid and useful.

@@ -11,9 +11,13 @@ defmodule Jido.AgentServer.Supervisor do
   alias Jido.AgentServer, as: Server
   alias Runic.Runner
 
-  def start_link(opts, parent \\ nil) do
+  @doc false
+  def start_spec(opts, parent \\ nil),
+    do: {__MODULE__, :start_link, [opts, parent, :atomics.new(1, [])]}
+
+  def start_link(opts, parent \\ nil, lifetime \\ :atomics.new(1, [])) do
     with {:ok, opts} <- Server.activation_options(opts) do
-      Supervisor.start_link(__MODULE__, {opts, parent}) |> finish_start(parent)
+      Supervisor.start_link(__MODULE__, {opts, parent, lifetime}) |> finish_start(parent)
     end
   end
 
@@ -31,9 +35,15 @@ defmodule Jido.AgentServer.Supervisor do
   defp finish_start(error, _parent), do: error
 
   @impl true
-  def init({opts, parent}) do
+  def init({opts, parent, lifetime}) do
     state = :ets.new(__MODULE__, [:set, :public])
-    :ets.insert(state, [{:parent, parent}, {:checkpoint, opts[:agent], 0}])
+
+    :ets.insert(state, [
+      {:parent, parent},
+      {:checkpoint, opts[:agent], 0},
+      {:durable_lifetime, lifetime}
+    ])
+
     opts = Keyword.put(opts, :activation_state, state)
 
     children = [
@@ -106,12 +116,21 @@ defmodule Jido.AgentServer.Supervisor do
 
   @doc false
   def persistence_mode(state, requested) do
-    if :ets.insert_new(state, {:durable_started, true}), do: requested, else: :restore
+    lifetime = :ets.lookup_element(state, :durable_lifetime, 2)
+
+    if :atomics.get(lifetime, 1) == 1 or not :ets.insert_new(state, {:durable_started, true}),
+      do: :restore,
+      else: requested
   end
 
   @doc false
-  def restore_durable(state, agent, revision),
-    do: :ets.insert(state, {:checkpoint, agent, revision})
+  def restore_durable(state, agent, revision) do
+    # The parent child specification retains this reference across root loss.
+    # A separate start has a new reference and still enforces strict :create.
+    lifetime = :ets.lookup_element(state, :durable_lifetime, 2)
+    :atomics.put(lifetime, 1, 1)
+    :ets.insert(state, {:checkpoint, agent, revision})
+  end
 
   @doc false
   def start_plugin(spec, state) do

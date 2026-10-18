@@ -19,11 +19,12 @@ defmodule Jido.Agent.Topology do
 
   def entry(:agent, value) do
     with {:ok, value} <-
-           Data.fields(value, [:name, :definition, :count, :initial_state], %{
+           Data.fields(value, [:name, :definition, :count, :initial_state, :identities], %{
              count: 1,
              initial_state: %{}
            }),
          :ok <- Error.at(Data.name(value[:name]), :name),
+         :ok <- identities(Map.get(value, :identities, %{})),
          true <- Map.has_key?(value, :definition) do
       {:ok, value}
     else
@@ -39,6 +40,17 @@ defmodule Jido.Agent.Topology do
          :ok <- Error.at(Data.plain_map(value[:to]), :to),
          do: {:ok, value}
   end
+
+  defp identities(value) when is_map(value) and not is_struct(value) do
+    if Enum.all?(value, fn {slot, id} ->
+         is_integer(slot) and slot > 0 and is_binary(id) and byte_size(id) > 0
+       end),
+       do: :ok,
+       else: Error.fail(:invalid_member_identity, :identities, "Expected positive slots and IDs")
+  end
+
+  defp identities(_),
+    do: Error.fail(:invalid_member_identity, :identities, "Expected a member identity Map")
 
   def normalize(value, parent, opts) do
     with {:ok, topology} <-

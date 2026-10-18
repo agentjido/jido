@@ -1,9 +1,9 @@
 # Extension boundaries
 
 Jido is a local Agent library. It coordinates public contracts from Jido
-Action and Jido Signal. It does not own application architecture, durable
-workflow recovery, cluster policy, transport gateways, AI policy, or browser
-sessions.
+Action and Jido Signal. It owns persistent Flow recovery at step boundaries. The host application owns
+application architecture, cluster policy, transport gateways, AI policy, and
+browser sessions.
 
 Use ordinary Elixir and OTP composition first. Use a Jido extension contract
 only when the extension needs the authority that the contract supplies.
@@ -20,9 +20,9 @@ only when the extension needs the authority that the contract supplies.
 | Handle a custom effect after commit | Plugin Directive handler | The Agent role declares ownership. The Server role dispatches after commit. |
 | Tie a runtime to one Agent's lifetime | Optional Plugin runtime | The Server owns startup, readiness, replacement, and shutdown. |
 | Replace one external infrastructure operation | The narrow adapter for that package | The package that defines the operation owns the adapter. There is no universal Jido adapter. |
-| Add static Agent or Topology syntax | `Jido.Agent.Extension` or `Jido.Topology.Extension` | The extension lowers syntax to a canonical value before runtime activation. |
+| Add static Agent or Topology syntax | `Jido.Agent.Extension` | The extension lowers syntax to a canonical value before runtime activation. |
 | Convert one Plugin-owned state value | `c:Jido.Plugin.dump/3` and `c:Jido.Plugin.load/3` | The callback has no adapter, key, revision, complete-Agent, or commit authority. |
-| Add bounded static Plugin topology | `c:Jido.Plugin.contribute/2` | The callback returns canonical static entries. It has no process or live-control authority. |
+| Add static extension data | `c:Jido.Agent.Extension.lower/2` | The callback returns static contribution data. It cannot start processes. |
 | Request runtime work after an Agent commit | `Jido.Agent.Directive` | The runtime handles a typed Directive after commit. A Directive is not a durable delivery guarantee. |
 | Observe Agent behavior | A semantic Telemetry handler or the optional OpenTelemetry API mapping | Observation has no authority to change evaluation, commit, or runtime results. |
 

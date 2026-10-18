@@ -143,8 +143,8 @@ defmodule JidoTest.Examples.Topology.MutationsTest do
         assert {:ok, ^portable} = Jido.Persistence.snapshot(Server.agent(awake))
         assert length(labeled(awake, "worker")) == 3
         assert length(labeled(awake, "replacement")) == 1
-        # The root saves intent. Live member state is not a coordinated checkpoint.
-        assert Enum.all?(labeled(awake, "worker"), &(Server.agent(&1).state.total == 0))
+        # Each member restores its own confirmed commit.
+        assert Enum.all?(labeled(awake, "worker"), &(Server.agent(&1).state.total == 9))
         awake
       end)
 

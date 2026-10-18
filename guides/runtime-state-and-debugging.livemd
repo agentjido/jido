@@ -54,12 +54,12 @@ end
 ```
 
 `debug: true` enables the event buffer for this Agent. `debug_max_events` must
-be a positive integer. Its default is 500.
+be a positive integer. Its default is 100, and its maximum is 10,000.
 
 ## Run a Turn
 
 ```elixir
-{:ok, committed} =
+{:ok, committed, []} =
   with {:ok, signal} <- DebugGuide.Counter.add_signal(%{amount: 2}) do
     Jido.AgentServer.call(counter, signal, [])
   end
@@ -90,8 +90,7 @@ Use each view for one purpose:
 | `agent/1` | The current committed `Jido.Agent` value |
 | `snapshot/1` | `%{agent: agent, state_version: revision}` |
 | `status/1` | A narrow view of current runtime work |
-| `children/1` | Current Agent and Plugin child ownership |
-| `plugin_state/2` | One declared Plugin-owned field from the Agent state map |
+| `children/1` | Current Agent activations by name |
 
 The snapshot is a live runtime value. It is not a Codec document or a durable
 checkpoint.
@@ -106,71 +105,19 @@ The status contains these top-level fields:
 
 Do not read private `:gen_statem` data. Its shape is not a public contract.
 
-## Read recent events
+## Read Turn History
 
 ```elixir
-{:ok, events} = Jido.AgentServer.recent_events(counter, limit: 10)
-
-Enum.map(events, fn entry ->
-  outcome = entry.metadata[:outcome] || %{}
-
-  %{
-    event: entry.event,
-    at: entry.at,
-    status: outcome[:status],
-    stage: outcome[:stage],
-    committed?: outcome[:committed?]
-  }
-end)
+outcomes = Jido.AgentServer.history(counter)
+Enum.take(outcomes, -10)
 ```
 
-Events are newest-first. The buffer can contain:
+With `debug: true`, the Server keeps bounded Turn outcomes in completion order.
+`debug_max_events` sets the limit at startup. History is local process data;
+a restart clears it. It is not a durable audit record.
 
-- `:turn_committed` after a new revision becomes live.
-- `:turn_completed` after a successful Turn settles.
-- `:turn_failed` after a failed, cancelled, timed-out, or indeterminate Turn.
-- `:directive_failed` after one post-commit Directive fails.
-- `:error_signal_delivery_failed` when error-policy Signal delivery fails.
-
-A terminal Turn entry contains a bounded summary map. It includes Turn and
-Signal IDs, status, stage, commit state, revisions, Directive count, and duration.
-It excludes full Signals, Agent state, and raw errors. Post-commit work has a
-separate `status/1` `last_effect_outcome` summary.
-
-The debug outcome uses the runtime Outcome vocabulary. Its statuses are
-`:succeeded`, `:failed`, `:cancelled`, `:timed_out`, and `:indeterminate`. Its
-stages can include `:prepare`, `:execute`, `:finalize`, `:commit`, and
-`:directive`. Semantic Telemetry maps these values to its smaller public status
-and stage vocabulary.
-
-The event buffer is for a short investigation. It is not durable, and it is not
-an audit record. A restart starts a new buffer.
-
-## Enable and disable the Agent buffer
-
-You can enable the buffer after the Agent starts:
-
-```elixir
-:ok = Jido.AgentServer.set_debug(counter, false)
-{:error, :debug_not_enabled} = Jido.AgentServer.recent_events(counter)
-
-:ok = Jido.AgentServer.set_debug(counter, true)
-
-{:ok, _committed} =
-  with {:ok, signal} <- DebugGuide.Counter.add_signal(%{amount: 3}) do
-    Jido.AgentServer.call(counter, signal, [])
-  end
-
-{:ok, new_events} = Jido.AgentServer.recent_events(counter)
-```
-
-Disabling the buffer clears it. Enabling it does not add events for work that
-already finished.
-
-For a stable Agent Ref, use the generated instance functions
-`MyApp.Jido.set_agent_debug/3` and `MyApp.Jido.recent_events/3`. These functions
-resolve the current local Agent activation before they call the same buffer
-API.
+Use `status/1` for current work and the latest outcome. Use semantic Telemetry
+for application observation.
 
 ## Change semantic log detail
 

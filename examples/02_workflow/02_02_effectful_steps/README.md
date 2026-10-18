@@ -7,7 +7,8 @@ portable result.
 
 - How runtime clients pass through execution context.
 - How an early guard can prevent external I/O.
-- How output projection and Agent persistence keep transient data out of state.
+- How output projection selects committed Agent state.
+- How persistent Flows use portable service names in execution context.
 
 ## Read the code
 
@@ -27,7 +28,13 @@ and a committed result can satisfy a repeated request.
 ## Important behavior
 
 The service call is synchronous Action work. A later validation failure cannot
-undo it. `Read` and `Project` are named because their cache and I/O contracts are
+undo it. Persistence enables Flow recovery, so its context must be portable.
+The persistent test uses a named service and a request ID. The application must
+recreate that service before recovery. Flows without persistence can use live
+clients and references in context.
+
+Only selected output becomes Agent state. Flow recovery records can also contain
+portable context and intermediate service results. `Read` and `Project` are named because their cache and I/O contracts are
 the subject of this example and use separate clauses.
 
 This folder keeps its original `effectful_steps` name, but the work is

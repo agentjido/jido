@@ -16,7 +16,9 @@ defmodule Jido.Persistence.Record do
   @doc false
   @spec build_active(Agent.t(), Ref.t(), non_neg_integer(), map()) ::
           {:ok, map()} | {:error, term()}
-  def build_active(%Agent{} = agent, %Ref{} = ref, revision, checkpoint) do
+  @spec build_active(Agent.t(), Ref.t(), non_neg_integer(), map(), map() | nil) ::
+          {:ok, map()} | {:error, term()}
+  def build_active(%Agent{} = agent, %Ref{} = ref, revision, checkpoint, server_turn \\ nil) do
     record = %{
       fmt: @format_version,
       kind: :active,
@@ -28,6 +30,8 @@ defmodule Jido.Persistence.Record do
       rev: revision,
       checkpoint: checkpoint
     }
+
+    record = if is_nil(server_turn), do: record, else: Map.put(record, :server_turn, server_turn)
 
     with :ok <- validate(record, ref, agent.module),
          do: {:ok, record}
@@ -63,6 +67,7 @@ defmodule Jido.Persistence.Record do
   def decode(value) when is_binary(value) do
     # Load the trusted envelope fields before safe decoding on a cold node.
     _ = Code.ensure_loaded?(Jido.Persistence.Snapshot)
+    _ = Code.ensure_loaded?(Jido.Signal)
     {:ok, :erlang.binary_to_term(value, [:safe])}
   rescue
     ArgumentError -> {:error, :invalid_persistence_record}
@@ -136,7 +141,14 @@ defmodule Jido.Persistence.Record do
   end
 
   defp validate_exact_shape(%{fmt: _, kind: :active} = record),
-    do: exact_keys(record, @active_keys)
+    do:
+      exact_keys(
+        record,
+        if(Map.has_key?(record, :server_turn),
+          do: @active_keys ++ [:server_turn],
+          else: @active_keys
+        )
+      )
 
   defp validate_exact_shape(%{fmt: _} = record), do: exact_keys(record, @common_keys)
 
@@ -178,8 +190,32 @@ defmodule Jido.Persistence.Record do
   end
 
   defp validate_active(record) do
-    with :ok <- validate_checkpoint(record), do: validate_agent_vsn(record)
+    with :ok <- validate_checkpoint(record),
+         :ok <- validate_agent_vsn(record),
+         do: validate_server_turn(Map.get(record, :server_turn))
   end
+
+  defp validate_server_turn(nil), do: :ok
+
+  defp validate_server_turn(
+         %{
+           id: id,
+           status: status,
+           signal: %Jido.Signal{},
+           admitted_signal: %Jido.Signal{},
+           context: context,
+           plugin_inputs: inputs,
+           fingerprint: fingerprint,
+           expires_at: expires_at
+         } = turn
+       )
+       when is_binary(id) and byte_size(id) > 0 and
+              status in [:running, :completed, :failed, :cancelled] and
+              is_map(context) and is_map(inputs) and is_binary(fingerprint) and
+              (expires_at == :infinity or is_integer(expires_at)) and map_size(turn) == 8,
+       do: :ok
+
+  defp validate_server_turn(_), do: invalid(:server_turn)
 
   defp validate_checkpoint(record) do
     checkpoint = Map.get(record, :checkpoint)

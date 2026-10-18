@@ -1,7 +1,8 @@
 # Turns, Commit, and Effects
 
 A Turn is one admitted Signal execution for one Agent. It has one stable Turn
-ID and can commit at most one new Agent revision.
+ID and can commit Agent state at most once. With persistence, a Flow also saves
+acceptance and terminal status in record revisions.
 
 ## Follow The Turn
 
@@ -25,9 +26,10 @@ belong to the Agent Server.
 Candidate validation must finish before commit. With persistence enabled, Jido
 writes the checkpoint before it changes live state or reports success.
 
-Each successful Turn increases `state_version` by one, even when the returned
-state compares equal to the prior state. An error before commit leaves the
-version unchanged.
+Each successful Action Turn increases `state_version` by one, even when Agent
+state is unchanged. An Action error before commit leaves the version unchanged.
+A persistent Flow saves acceptance and terminal status in separate revisions.
+A failed Flow preserves Agent state but still saves its failure receipt.
 
 ## Separate State From External Effects
 

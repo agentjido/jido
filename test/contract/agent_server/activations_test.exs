@@ -516,7 +516,7 @@ defmodule JidoTest.AgentServer.ActivationsTest do
 
     assert_eventually(
       Enum.any?(elem(Process.info(guard, :messages), 1), fn
-        {:"$gen_call", _, {:claim, {:agent, "abandoned"}, _}} -> true
+        {:"$gen_call", _, {:claim, {:agent, "abandoned"}, _, _}} -> true
         _ -> false
       end)
     )

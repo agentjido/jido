@@ -38,7 +38,8 @@ Add callbacks as the Plugin needs more functions:
 - `dispatch/4` handles owned Directives after commit.
 - `child_spec/1` adds a runtime tied to one Agent's lifetime.
 - `dump/3` and `load/3` convert one owned state value.
-- `contribute/2` supplies static Topology entries.
+
+Use `Jido.Agent.Extension` for static contribution data.
 
 A reducer needs an owned state field. Persistence needs both conversion
 callbacks and an owned state field. Dispatch needs owned Directives. Jido
@@ -48,7 +49,7 @@ A large Plugin can delegate callbacks to ordinary Elixir modules. There is no
 second Plugin authoring form. The Plugin module remains the stable identity
 used in Agent declarations, diagnostics, and stored definitions.
 
-Pass per-Agent options with `plugin MyApp.CounterPlugin, config: [limit: 100]`.
+Pass per-Agent options with `plugin MyApp.CounterPlugin, config: %{limit: 100}`.
 Each callback receives the same options by default. `vsn` and `option_keys`
 remain optional metadata for versioning and restricted owner options. The
 Counter above needs neither option.

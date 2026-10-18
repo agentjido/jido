@@ -13,8 +13,12 @@ defmodule Jido.Persistence do
 
   Agent Servers create revision zero before a new persistent activation reports
   ready. They store later `state_version` values as the record revision. Each
-  successful Turn writes one new revision, including an identical-state result.
-  A failure before commit leaves the stored revision unchanged. A failure in
+  successful ordinary Turn writes one new revision, including an identical-state result.
+  With persistence enabled, each Flow Turn also saves acceptance before execution.
+  Its optional `server_turn` envelope field belongs to AgentServer, outside Agent domain state.
+  Completion saves the candidate Agent and terminal receipt in one write.
+  Failed or cancelled durable Turns save a terminal receipt with unchanged state.
+  An ordinary failure before commit leaves the stored revision unchanged. A failure in
   post-commit work does not undo the stored revision. Restore retains it.
   Direct `save_agent/3` calls use the revision supplied in their options.
 
@@ -23,7 +27,8 @@ defmodule Jido.Persistence do
   A topology-only change needs a new revision. Child Agent state is saved in
   separate records; this is not an atomic save of a whole Agent family.
 
-  Caller execution context is not part of the checkpoint. Live Agent state
+  Caller execution context is not part of the Agent snapshot. A pending Flow
+  saves its portable context in the Server Turn receipt. Live Agent state
   contains domain fields and Plugin-owned fields and must match its schema.
   Custom Agent or Plugin conversion runs before Jido checks the complete
   stored representation for portability. Restore checks the stored record
@@ -276,21 +281,10 @@ defmodule Jido.Persistence do
 
   def load_agent_with_revision(source, agent_module, agent_id, opts)
       when is_atom(agent_module) and is_binary(agent_id) do
-    PersistenceTelemetry.observe(:load, source, agent_module, agent_id, opts, fn ->
-      AdapterOps.protect(:get, fn ->
-        with :ok <- Source.validate_operation_options(opts),
-             {:ok, {adapter, adapter_opts}, instance} <- Source.resolve(source, opts),
-             {:ok, ref} <- Identity.resolve(instance, agent_id, opts),
-             {:ok, value, _condition} <-
-               Store.read({adapter, adapter_opts}, Identity.agent_key(ref)),
-             {:ok, record} <- decode_record(value, agent_module),
-             :ok <- Record.validate(record, ref, agent_module),
-             :ok <- Record.require_active(record),
-             {:ok, agent} <- Checkpoint.restore_agent(record, agent_module, agent_id, instance) do
-          {:ok, agent, Record.revision(record)}
-        end
-      end)
-    end)
+    case load_agent_with_server_turn(source, agent_module, agent_id, opts) do
+      {:ok, agent, revision, _turn} -> {:ok, agent, revision}
+      error -> error
+    end
   end
 
   def load_agent_with_revision(_source, agent_module, agent_id, _opts),
@@ -333,6 +327,26 @@ defmodule Jido.Persistence do
   @doc false
   @spec agent_key(Ref.t()) :: binary()
   def agent_key(%Ref{} = ref), do: Identity.agent_key(ref)
+
+  @doc false
+  def load_agent_with_server_turn(source, agent_module, agent_id, opts)
+      when is_atom(agent_module) and is_binary(agent_id) do
+    PersistenceTelemetry.observe(:load, source, agent_module, agent_id, opts, fn ->
+      AdapterOps.protect(:get, fn ->
+        with :ok <- Source.validate_operation_options(opts),
+             {:ok, {adapter, adapter_opts}, instance} <- Source.resolve(source, opts),
+             {:ok, ref} <- Identity.resolve(instance, agent_id, opts),
+             {:ok, value, _condition} <-
+               Store.read({adapter, adapter_opts}, Identity.agent_key(ref)),
+             {:ok, record} <- decode_record(value, agent_module),
+             :ok <- Record.validate(record, ref, agent_module),
+             :ok <- Record.require_active(record),
+             {:ok, agent} <- Checkpoint.restore_agent(record, agent_module, agent_id, instance) do
+          {:ok, agent, Record.revision(record), Map.get(record, :server_turn)}
+        end
+      end)
+    end)
+  end
 
   defp expected_revision(opts) do
     case Keyword.fetch(opts, :expected_revision) do
@@ -505,7 +519,8 @@ defmodule Jido.Persistence do
 
     with true <- is_integer(revision) and revision >= 0,
          {:ok, checkpoint} <- Checkpoint.dump(agent, context, record_format, reason),
-         {:ok, record} <- Record.build_active(agent, ref, revision, checkpoint) do
+         {:ok, record} <-
+           Record.build_active(agent, ref, revision, checkpoint, Keyword.get(opts, :server_turn)) do
       {:ok, record}
     else
       false -> {:error, {:invalid_checkpoint, :shape}}

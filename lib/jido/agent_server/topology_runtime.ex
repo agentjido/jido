@@ -5,6 +5,51 @@ defmodule Jido.AgentServer.TopologyRuntime do
   alias Jido.AgentServer, as: Server
   alias Jido.AgentServer.Supervisor, as: ServerSupervisor
 
+  # Save slot identities with the topology. A removed slot loses its identity,
+  # so re-adding that slot cannot restore an earlier member lifetime.
+  def identify(before, candidate) do
+    with {:ok, desired} <- Topology.bind(candidate, candidate.state),
+         {:ok, previous} <- previous_members(before) do
+      members =
+        Enum.map(candidate.topology.agents, fn declaration ->
+          member = Enum.find(desired, &(&1.name == declaration.name))
+          old = Enum.find(previous, &(&1.name == member.name))
+          same? = old && old.definition == member.definition && old.state == member.state
+
+          retained =
+            cond do
+              same? ->
+                before.topology.agents
+                |> Enum.find(&(&1.name == member.name))
+                |> Map.get(:identities, %{})
+
+              is_nil(before) ->
+                Map.get(declaration, :identities, %{})
+
+              true ->
+                %{}
+            end
+
+          identities =
+            Map.new(1..member.count, fn slot ->
+              identity =
+                if is_nil(before) or (same? && slot <= old.count),
+                  do: Map.get(retained, slot, "initial"),
+                  else: Base.url_encode64(:crypto.strong_rand_bytes(16), padding: false)
+
+              {slot, identity}
+            end)
+
+          Map.put(declaration, :identities, identities)
+        end)
+
+      {:ok, put_in(candidate.topology.agents, members)}
+    end
+  end
+
+  defp previous_members(nil), do: {:ok, []}
+  defp previous_members(agent), do: Topology.bind(agent, agent.state)
+
   def validate(agent) do
     with :ok <- Agent.validate_runtime_support(agent),
          {:ok, members} <- Topology.bind(agent, agent.state),
@@ -42,7 +87,18 @@ defmodule Jido.AgentServer.TopologyRuntime do
         Map.new(
           for member <- members, index <- 1..member.count do
             tag = tag(member.name, index)
-            {tag, %{name: member.name, definition: member.definition, state: member.state}}
+            declaration = Enum.find(agent.topology.agents, &(&1.name == member.name))
+            default = if data.persistence in [nil, false], do: nil, else: "initial"
+            identity = Map.get(declaration, :identities, %{}) |> Map.get(index, default)
+
+            {tag,
+             %{
+               name: member.name,
+               slot: index,
+               definition: member.definition,
+               state: member.state,
+               identity: identity
+             }}
           end
         )
 
@@ -71,30 +127,47 @@ defmodule Jido.AgentServer.TopologyRuntime do
       if Map.get(previous, tag) == member and Map.has_key?(live, tag) do
         Server.await_ready(Map.fetch!(live, tag), data.readiness_timeout)
       else
+        id = data.agent.id <> "/" <> tag
+        id = if member.identity, do: id <> "/" <> member.identity, else: id
+
         agent =
           Agent.instantiate!(member.definition,
-            id: data.agent.id <> "/" <> tag,
+            id: id,
             state: member.state
           )
 
-        with {:ok, worker} <-
+        with {:ok, persistence} <- member_persistence(data, agent),
+             {:ok, worker} <-
                Server.spawn_child(data.owner, agent, tag,
                  restart: :permanent,
-                 server_options: [persistence: false]
+                 server_options: persistence
                ),
              do: Server.await_ready(worker, data.readiness_timeout)
       end
     end)
   end
 
+  defp member_persistence(%{persistence: persistence}, _agent) when persistence in [nil, false],
+    do: {:ok, [persistence: false]}
+
+  defp member_persistence(data, agent) do
+    options = [instance: data.jido, partition: data.partition]
+
+    case Jido.Persistence.load_agent_with_revision(
+           data.persistence,
+           agent.module,
+           agent.id,
+           options
+         ) do
+      {:ok, _, _} -> {:ok, [persistence: data.persistence, persistence_mode: :restore]}
+      {:error, :not_found} -> {:ok, [persistence: data.persistence, persistence_mode: :create]}
+      error -> error
+    end
+  end
+
   def send_agent(state, name, signal) do
     live = children(state)
-
-    targets =
-      for {tag, %{name: ^name}} <- plans(state),
-          pid = Map.get(live, tag),
-          is_pid(pid),
-          do: pid
+    targets = members(state, name)
 
     case targets do
       [] ->
@@ -106,6 +179,21 @@ defmodule Jido.AgentServer.TopologyRuntime do
       pids ->
         reduce(pids, &Server.cast(&1, signal))
     end
+  end
+
+  def members(state, name) do
+    live = children(state)
+
+    state
+    |> plans()
+    |> Enum.filter(fn {_, member} -> member.name == name end)
+    |> Enum.sort_by(fn {_, member} -> member.slot end)
+    |> Enum.flat_map(fn {tag, _member} ->
+      case Map.get(live, tag) do
+        pid when is_pid(pid) -> [pid]
+        _ -> []
+      end
+    end)
   end
 
   def owner_send(nil, _), do: {:error, :owner_not_found}

@@ -1,139 +1,61 @@
 # Authoring Extensions
 
-An authoring extension adds static declarations and lowers them into ordinary
-Core configuration. It changes how an application describes an Agent or
-Topology. It does not add an imperative runtime path.
+An extension adds static Agent declarations. Use `Jido.Agent.Extension` for
+both DSL and map contributions. It does not start runtime work.
 
-## Extend Agent Authoring
-
-An Agent authoring extension lowers static declarations into ordinary Agent
-configuration.
-
-## Implement The Agent Contract
-
-An extension module implements `Jido.Agent.Extension`:
+## Define A Provider
 
 ```elixir
-@behaviour Jido.Agent.Extension
-
-@impl Jido.Agent.Extension
-def lower_agent(config, foreign_entities) do
-  {:ok, updated_config, remaining_entities}
-end
-```
-
-Pass authoring extension modules to the Agent:
-
-```elixir
-use Jido.Agent, name: "extended_agent", extensions: [MyApp.AgentExtension]
-```
-
-Both hosts accept keyword options, map options, or a module attribute that
-contains either form. Core evaluates the options once, after preceding module
-attributes are available. Extension entities remain inside the existing
-`agent`, `routes`, and `topology` sections.
-
-Core first collects its data schema, Plugins, routes, and metadata. It then
-calls extensions in declaration order.
-
-The same lowerer accepts static data. For example, a label entity can add one
-metadata field to a direct definition:
-
-```elixir
-defmodule MyApp.Label do
-  defstruct [:key, :value]
-end
-
 defmodule MyApp.Labels do
-  @behaviour Jido.Agent.Extension
+  @section %Spark.Dsl.Section{
+    name: :labels,
+    schema: [owner: [type: :string, required: true]]
+  }
+  @schema Zoi.object(%{owner: Zoi.string() |> Zoi.min(1)}, unrecognized_keys: :error)
 
-  @impl true
-  def lower_agent(config, entities) do
-    {labels, remaining} = Enum.split_with(entities, &match?(%MyApp.Label{}, &1))
+  use Jido.Agent.Extension, id: "app.labels", vsn: 1, sections: [@section]
 
-    metadata =
-      Enum.reduce(labels, Map.get(config, :metadata, %{}), fn label, values ->
-        Map.put(values, label.key, label.value)
-      end)
+  @impl Jido.Agent.Extension
+  def lower(dsl, config) do
+    {:ok, Map.put(config, :owner, Spark.Dsl.Extension.get_opt(dsl, [:labels], :owner))}
+  end
 
-    {:ok, Map.put(config, :metadata, metadata), remaining}
+  @impl Jido.Agent.Extension
+  def normalize(data), do: Zoi.parse(@schema, data)
+end
+
+defmodule MyApp.LabelledAgent do
+  use Jido.Agent, name: "labelled_agent", extensions: [MyApp.Labels]
+
+  agent do
+    schema Zoi.object(%{})
+  end
+
+  labels do
+    owner "app"
   end
 end
 
-source = %{name: "labelled_agent", schema: Zoi.object(%{})}
-entities = [struct!(MyApp.Label, key: :owner, value: "app")]
-{:ok, lowered} = Jido.Agent.Extension.lower([MyApp.Labels], source, entities)
-{:ok, definition} = Jido.Agent.new(lowered)
-"app" = definition.metadata.owner
+{:ok, definition} = MyApp.LabelledAgent.definition()
+[%{provider: MyApp.Labels, data: %{owner: "app"}}] = definition.extensions
 ```
 
-`Extension.lower/3` returns lowered data, not a validated Agent. The caller
-must pass it to `Jido.Agent.new/1` or another normal validator.
+`c:Jido.Agent.Extension.lower/2` reads Spark declarations and explicit config.
+`c:Jido.Agent.Extension.normalize/1` validates contribution data from both the
+DSL and maps. `c:Jido.Agent.Extension.verify/2` checks references after core
+normalization. The provider ID and version identify the stored contribution.
 
-## Consume Only Owned Entities
+## Keep Contributions Static
 
-An extension must return the entities that belong to later extensions. After
-the last extension runs, no foreign entity can remain. Jido rejects duplicate
-extensions, invalid callback results, unclaimed entities, and invalid final
-Agent configuration.
+Jido stores contributions in `agent.extensions`, separate from core metadata
+and Agent state. Declare core topology Agents and connections on the Agent.
+Use `Jido.Agent.define/1` for direct definitions. The Codec uses the same
+contribution validation.
 
-## Keep Lowering Static
+Callbacks must give deterministic results. They must not start processes, run
+Actions or Flows, or contact services. `runtime_support/0` describes optional
+runtime support; Agent definition code does not activate it.
 
-The lowering callback runs while Jido builds the Agent definition. It must not:
-
-- start a process;
-- run an Action or Flow;
-- contact a service;
-- read changing runtime state; or
-- hide executable code in opaque data.
-
-Lowering should produce the same semantic Agent data that the constructor or Codec
-can represent. New syntax must not create a second runtime contract.
-
-## Preserve Core Boundaries
-
-An authoring extension can add syntax. It cannot bypass state validation,
-Plugin ownership, route selection, Agent Server admission, or commit rules.
-
-If an extension needs a live resource, use a Plugin runtime. If it needs a
-system of actors, use a Topology or application supervision tree.
-
-## Extend Topology Authoring
-
-A Topology authoring extension uses the same static lowering model. It can add
-entities to sections under `topology do`. The extension implements
-`Jido.Topology.Extension`:
-
-```elixir
-@behaviour Jido.Topology.Extension
-
-@impl Jido.Topology.Extension
-def lower_topology(config, foreign_entities) do
-  {:ok, updated_config, remaining_entities}
-end
-```
-
-Pass it to the Topology declaration:
-
-```elixir
-use Jido.Topology, name: "extended_topology", extensions: [MyApp.TopologyExtension]
-```
-
-Core collects normal Agents, groups, resources, relationships, connections,
-composition data, and startup policy from `topology do`. It then collects
-foreign entities from extension sections. Each extension consumes its entities
-in extension order and returns ordinary Topology configuration.
-
-The callback receives entity structs, not raw Spark section state. Put required
-lowering input in an entity. Use distinct structs for entities with different
-meanings. Preserve the relative order of entities that belong to later
-extensions. Do not depend on order between separate Spark sections.
-
-The final configuration passes the same validation, composition, planning, and
-controller paths as data and Codec definitions. An extension can describe a
-refined topology, but it cannot add a second activation runtime or put dynamic
-runtime data in a static definition.
-
-See [Agent DSL](agent-dsl.livemd), [Data Definitions And Codecs](data-definitions-and-codecs.md),
-[Topology Definitions](topology-definitions.md), and
+See [the extension example](../examples/01_basic/01_09_agent_extension/README.md),
+[Data Definitions and Codecs](data-definitions-and-codecs.md), and
 [Extension Boundaries](extension-boundaries.md).

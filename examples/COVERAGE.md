@@ -126,6 +126,24 @@ distinct Agent route or commit integration contract.
 All persistence examples use deterministic local adapters. Shared external
 adapter checks remain optional service tests.
 
+## Durable execution learning path
+
+The [Durable section](11_durable/README.md) contains four implemented proofs and
+three proposed outlines requested for review. Planned rows describe missing
+example evidence; they do not claim that every underlying capability is absent.
+Only the implemented lesson counts in the executable catalog.
+
+| Capability | Owner | Status | Canonical evidence |
+| --- | --- | --- | --- |
+| Committed Agent request across SIGKILL and fresh-BEAM restore | `jido` | Focused example | [Source](11_durable/11_01_saved_agent/saved_agent.ex), [test](../test/examples/11_durable/11_01_saved_agent/saved_agent_test.exs) |
+| AgentServer Flow Turn recovery after process loss | `jido` / Runic | Focused example | [Source](11_durable/11_02_saved_progress/saved_progress.ex), [test](../test/examples/11_durable/11_02_saved_progress/saved_progress_test.exs) |
+| AgentServer Turn recovery after whole-BEAM loss with a DETS byte adapter | `jido` / Runic; example adapter | Focused example | [Source](11_durable/11_03_vm_recovery/vm_recovery.ex), [test](../test/examples/11_durable/11_03_vm_recovery/vm_recovery_test.exs) |
+| Accepted serial Flow Turn and atomic completion in a topology member | `jido` AgentServer / Runic graph | Focused example | [Source](11_durable/11_04_accepted_work/accepted_work.ex), [test](../test/examples/11_durable/11_04_accepted_work/accepted_work_test.exs) |
+| Active topology work across member, root, and whole-BEAM loss | `jido` / Runic | Core-test-only | [Crash matrix](../test/jido/agent_server/durable_topology_test.exs), [BEAM proof](../test/jido/agent_server/durable_topology_peer_test.exs) |
+| Final commit before lost reply; dedicated lesson pending | `jido` AgentServer | Planned | [Outline](11_durable/11_05_saved_completion/README.md) |
+| Stored approval wait within the serial Turn contract | Design pending | Planned | [Outline](11_durable/11_06_durable_wait/README.md) |
+| External operation uncertainty across execution loss | Integration and provider adapter | Planned | [Outline](11_durable/11_07_external_uncertainty/README.md) |
+
 ## Ecosystem and combined suites
 
 | Capability | Owner | Status | Canonical evidence |

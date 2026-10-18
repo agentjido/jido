@@ -80,24 +80,16 @@ not check external service readiness.
 Use a finite `max_agents` and startup concurrency. The controller starts only
 the expanded plan.
 
-## Add Static Plugin Entries
+## Add Static Extension Data
 
-An Agent can declare a Plugin that implements `c:Jido.Plugin.contribute/2`.
-When Jido builds an instance plan, this callback can contribute Bus resources,
-ownership relationships, and Bus subscriptions for the Agent declaration.
+Use `Jido.Agent.Extension` for static contribution data. Its
+`c:Jido.Agent.Extension.lower/2` callback reads DSL declarations and explicit
+configuration. `c:Jido.Agent.Extension.normalize/1` validates the contribution.
+`c:Jido.Agent.Extension.verify/2` checks references in the complete definition.
 
-Jido applies Agent contributions first and then group contributions. It keeps
-source declaration order and Plugin declaration order. Included Topologies
-receive contributions in their own scope. A group gets one contribution for
-the declaration, and all its members use the resulting group wiring.
-
-The validated source definition stays unchanged. Jido validates the complete
-expanded graph before activation. A duplicate key, unknown endpoint, duplicate
-subscription, or graph cycle returns an error before the Controller starts.
-
-This callback is for pure static planning. It cannot add Agents or new resource
-types. It does not start a Jido process, persist state, replace the Controller
-target, or grant live authority.
+Jido stores contributions in `agent.extensions`. Declare core Agents and
+connections in the Agent topology. Contributions do not start processes or
+change the live process tree.
 
 ## Separate Static And Dynamic Systems
 

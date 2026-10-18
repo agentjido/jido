@@ -1,19 +1,19 @@
 defmodule Jido.AgentServer do
   @moduledoc """
-  A small, in-memory process for serial Agent turns.
+  A process for serial Agent Turns. Persistence enables Flow recovery.
 
   Turn calls wait for five seconds by default. A caller timeout does not cancel
   a turn. A separate admission deadline can expire queued work before it starts.
   Each turn runs in an owned Runic Runner Worker. Reads stay
   available while a turn runs. Calls run in order. A returned error keeps the
-  saved Agent and revision, but it cannot undo external I/O. State lives only
-  as long as its activation lives. An activation-owned checkpoint restores the
+  saved Agent state, but it cannot undo external I/O. Without persistence, state
+  lives only as long as its activation. An activation-owned checkpoint restores the
   last published Agent and revision after worker failure. It is local memory,
   not durable storage, and does not replay turns or post-commit effects.
 
   `turn_timeout:` defaults to 60,000 ms and covers all active work before commit.
   Timeout and cancellation stop owned work before replying or starting another
-  turn. They preserve the saved Agent and revision, but cannot undo external I/O.
+  Turn. They preserve the saved Agent state, but cannot undo external I/O.
 
   Set the application default with
   `config :jido, Jido.AgentServer, turn_timeout: 60_000`.
@@ -165,7 +165,10 @@ defmodule Jido.AgentServer do
 
   Existing Agent and Plugin checkpoint conversion applies at the portable save
   boundary. Restore validates exact definition/version before Plugin resources
-  start. No implicit migration, turn replay, effect replay, or family restore occurs.
+  start. Persistent topology members retain slot identities in the root definition
+  and restore their own last confirmed records. These records do not form an
+  atomic family snapshot. Pending Flows resume from saved step boundaries.
+  No implicit migration or post-commit effect replay occurs.
   `quiesce/2` closes admission, rejects queued turns, and waits for owned work
   and effects. Its default policy finishes the turn; `active: :cancel` cancels
   pre-commit work. Required saves and post-commit work must finish. Reads remain
@@ -189,6 +192,23 @@ defmodule Jido.AgentServer do
 
   The adapter's storage determines durability. ETS survives activation loss but
   does not survive a BEAM restart. Revision checks are not a writer lease.
+  Persistence enables Flow recovery. Each routed Flow is the current
+  serial Turn. The Server saves acceptance with the Agent record before dispatch,
+  confirms native graph checkpoints before the next runnable, and saves the final
+  Agent state and completion together. Other state-changing Turns wait. Reads,
+  status, and cancellation remain available. Direct Actions retain their ordinary
+  Turn contract.
+
+  Recovery reloads the same Turn ID and graph. It does not restore the caller's
+  Pending handle or mailbox. Caller context and Plugin inputs must be portable.
+  Flow and Action code must remain compatible while work is pending. The Turn's
+  absolute timeout survives recovery. `status/2` exposes the latest durable Turn
+  ID and status, not an unbounded receipt history. A repeated Signal is a new Turn.
+
+  Cancellation saves a terminal receipt before stopping work. Normal stop retains
+  pending work for the next activation. Hibernation drains the current Turn under
+  its existing control policy. Post-commit hooks and effects are not replayed.
+  Checkpoints do not provide exactly-once external I/O or a durable Signal inbox.
   """
 
   @behaviour :gen_statem
@@ -257,6 +277,7 @@ defmodule Jido.AgentServer do
   alias Jido.Telemetry.Semantic
   alias Jido.Tracing.Context, as: TraceContext
   alias Runic.Runner
+  alias Jido.AgentServer.DurableTurn
 
   defmodule CompositionRuntime do
     @moduledoc false
@@ -356,13 +377,13 @@ defmodule Jido.AgentServer do
   defmodule Store do
     @moduledoc false
     @behaviour Runic.Runner.Store
-    # AgentServer owns the committed Agent. Turn execution is not durable.
+    # Durable Flow Turns use the Agent adapter. Ordinary Turns save no graph.
     @impl true
-    def init_store(_opts), do: {:ok, nil}
+    def init_store(opts), do: {:ok, Keyword.get(opts, :jido)}
     @impl true
-    def save(_id, _log, _state), do: :ok
+    defdelegate save(id, log, state), to: Jido.AgentServer.CheckpointStore
     @impl true
-    def load(_id, _state), do: {:error, :not_found}
+    defdelegate load(id, state), to: Jido.AgentServer.CheckpointStore
     @impl true
     def list(_state), do: {:ok, []}
     @impl true
@@ -377,7 +398,7 @@ defmodule Jido.AgentServer do
 
     %{
       id: {__MODULE__, opts[:jido], opts[:partition], agent.id},
-      start: {ServerSupervisor, :start_link, [opts]},
+      start: ServerSupervisor.start_spec(opts),
       restart: :transient,
       type: :supervisor,
       shutdown: :infinity
@@ -1121,7 +1142,7 @@ defmodule Jido.AgentServer do
         registry = Jido.registry_name(jido)
         key = registry_key(id, opts[:partition])
 
-        with :ok <- Jido.AgentServer.RegistrationGuard.claim(jido, key, self()),
+        with :ok <- Jido.AgentServer.RegistrationGuard.claim(jido, key, self(), opts[:activation]),
              :ok <- register_ready(registry, key) do
           {:ok,
            Map.new(
@@ -1174,6 +1195,7 @@ defmodule Jido.AgentServer do
         runner_ref: Process.monitor(Process.whereis(runner)),
         state_version: Keyword.get(opts, :state_version, 0),
         active: nil,
+        server_turn: nil,
         postponed: MapSet.new(),
         queued_from: %{},
         admission_mode: runtime_value(opts[:activation_state], :admission, :open),
@@ -1229,7 +1251,8 @@ defmodule Jido.AgentServer do
       replies = Enum.flat_map(data.ready_waiters, &reply(&1, :ok))
 
       {:ok, :idle, arm_idle(%{data | bootstrap: nil, ready_waiters: []}),
-       replies ++ [{:next_event, :internal, :control_progress}]}
+       replies ++
+         [{:next_event, :internal, :recover_turn}, {:next_event, :internal, :control_progress}]}
     end
   end
 
@@ -1249,26 +1272,37 @@ defmodule Jido.AgentServer do
     with :ok <- ServerSupervisor.close_execution(data.activation_state),
          {:ok, config} <- Jido.Persistence.resolve_config(data.persistence, data.jido),
          true <- not is_nil(config),
-         {:ok, agent, revision} <- durable_load(config, data.agent, mode, durable_options(data)),
+         {:ok, agent, revision, turn} <-
+           durable_load(config, data.agent, mode, durable_options(data)),
          {:ok, agent} <- Jido.Agent.Validation.validate_instance(agent),
          true <- is_integer(revision) and revision >= 0,
          true <- agent.id == data.agent.id,
-         true <- agent.module == data.agent.module do
-      {:ok, agent, revision, config}
+         true <- agent.module == data.agent.module,
+         :ok <- validate_pending_turn(agent, turn) do
+      {:ok, agent, revision, config, turn}
     else
       false -> {:error, :incompatible_durable_checkpoint}
       {:error, _} = error -> error
     end
   end
 
+  defp validate_pending_turn(agent, %{status: :running} = receipt) do
+    with {:ok, specs} <- Jido.Plugin.Normalizer.normalize_all(Jido.Agent.runtime_plugins(agent)),
+         {:ok, _} <- DurableTurn.restore(agent, receipt, receipt.context, specs),
+         do: :ok
+  end
+
+  defp validate_pending_turn(_agent, _receipt), do: :ok
+
   defp durable_load(config, agent, :create, opts) do
     with {:ok, agent} <- Jido.Agent.Composition.bind(agent),
+         {:ok, agent} <- TopologyRuntime.identify(nil, agent),
          :ok <- Jido.Persistence.create_agent(config, agent, opts),
-         do: {:ok, agent, 0}
+         do: {:ok, agent, 0, nil}
   end
 
   defp durable_load(config, agent, :restore, opts),
-    do: Jido.Persistence.load_agent_with_revision(config, agent.module, agent.id, opts)
+    do: Jido.Persistence.load_agent_with_server_turn(config, agent.module, agent.id, opts)
 
   @doc false
   def bootstrap_current_plugins(data, owner), do: bootstrap_plugins(data, data.activation, owner)
@@ -1372,7 +1406,7 @@ defmodule Jido.AgentServer do
 
         spec = %{
           child_spec(opts)
-          | start: {ServerSupervisor, :start_link, [opts, parent]},
+          | start: ServerSupervisor.start_spec(opts, parent),
             restart: parent.restart
         }
 
@@ -1417,6 +1451,12 @@ defmodule Jido.AgentServer do
       context = :gen_statem.call(server, :child_context, timeout)
       live_children(context.state)
     end
+  end
+
+  @doc "Returns live topology members in slot order. Await readiness before use."
+  def members(server, name, timeout \\ 5_000) do
+    with :ok <- validate_wait(timeout),
+         do: :gen_statem.call(server, {:topology_members, name}, timeout)
   end
 
   defp live_children(nil), do: %{}
@@ -1700,6 +1740,10 @@ defmodule Jido.AgentServer do
     }
 
     {:keep_state_and_data, reply(from, context)}
+  end
+
+  def handle_event({:call, from}, {:topology_members, name}, _phase, data) do
+    {:keep_state_and_data, reply(from, TopologyRuntime.members(data.activation_state, name))}
   end
 
   def handle_event({:call, from}, {:reserve_child, tag, token}, _phase, data) do
@@ -2074,6 +2118,8 @@ defmodule Jido.AgentServer do
       effects: effect_status(data.active),
       last_effect_outcome: data.last_effect_outcome,
       state_version: data.state_version,
+      durable_turn:
+        if(data.server_turn, do: Map.take(data.server_turn, [:id, :status]), else: nil),
       error_count: data.error_count,
       last_outcome: data.last_outcome,
       owners: Map.keys(data.owners),
@@ -2222,12 +2268,27 @@ defmodule Jido.AgentServer do
         %{active: %{operation: %{task: %{ref: ref}} = operation}} = data
       ) do
     complete_task(operation.task)
+
+    storage_expired =
+      if operation.kind in [:durable_accept, :durable_terminal, :durable_advance, :durable_start] do
+        {timer, deadline} = data.active.durable_storage
+        Process.cancel_timer(timer)
+        System.monotonic_time(:millisecond) >= deadline
+      else
+        false
+      end
+
     data = put_in(data.active.operation, nil)
 
-    if phase not in [:cleaning, :saving, :policy, :effects] and expired?(data.active) do
-      abort_turn(phase, data, :turn_timeout)
-    else
-      operation_result(operation.kind, result, data)
+    cond do
+      storage_expired ->
+        stop_durable(data, :indeterminate)
+
+      phase not in [:cleaning, :saving, :policy, :effects] and expired?(data.active) ->
+        abort_turn(phase, data, :turn_timeout)
+
+      true ->
+        operation_result(operation.kind, result, data)
     end
   end
 
@@ -2282,6 +2343,14 @@ defmodule Jido.AgentServer do
         active: %{worker_ref: ref}
       }),
       do: :keep_state_and_data
+
+  def handle_event(
+        :info,
+        {:DOWN, ref, :process, _pid, reason},
+        _phase,
+        %{active: %{worker_ref: ref, durable: true}} = data
+      ),
+      do: {:stop, {:durable_worker_lost, reason}, data}
 
   def handle_event(
         :info,
@@ -2400,13 +2469,46 @@ defmodule Jido.AgentServer do
     {:keep_state, %{data | child_monitors: monitors}}
   end
 
+  def handle_event(
+        :internal,
+        :recover_turn,
+        :idle,
+        %{server_turn: %{status: :running} = receipt} = data
+      ) do
+    start_turn(
+      :cast,
+      receipt.signal,
+      receipt.context,
+      data,
+      {:restore, receipt}
+    )
+  end
+
+  def handle_event(:internal, :recover_turn, _phase, _data), do: :keep_state_and_data
+
+  def handle_event(:info, {:durable_advance, id}, :starting, %{active: %{turn_id: id}}),
+    do: {:keep_state_and_data, [:postpone]}
+
+  def handle_event(:info, {:durable_advance, id}, :running, %{active: %{turn_id: id}} = data),
+    do: durable_advance(data)
+
+  def handle_event(:internal, :durable_advance, :running, data), do: durable_advance(data)
+
+  def handle_event(
+        :info,
+        {:durable_storage_timeout, id},
+        _phase,
+        %{active: %{turn_id: id}} = data
+      ),
+      do: stop_durable(data, :indeterminate)
+
   def handle_event(:info, _message, _phase, _data), do: :keep_state_and_data
 
   defp bootstrap_timeout(%{bootstrap: %{kind: :persistence}}), do: :persistence_timeout
   defp bootstrap_timeout(_data), do: :readiness_timeout
 
   defp finish_bootstrap(
-         {:ok, agent, revision, config},
+         {:ok, agent, revision, config, turn},
          %{bootstrap: %{kind: :persistence}} = data
        ) do
     ServerSupervisor.restore_durable(data.activation_state, agent, revision)
@@ -2418,6 +2520,7 @@ defmodule Jido.AgentServer do
         plugin_specs: specs,
         state_version: revision,
         persistence: config,
+        server_turn: turn,
         bootstrap: nil
     }
 
@@ -2467,7 +2570,7 @@ defmodule Jido.AgentServer do
 
       # Runic also stops owned execution after abrupt owner death.
       try do
-        Runner.cancel(data.runner, data.active.turn_id)
+        Runner.cancel(data.runner, data.active.worker_id)
       catch
         :exit, _ -> :ok
       end
@@ -2487,7 +2590,19 @@ defmodule Jido.AgentServer do
         :cast -> nil
       end
 
-    turn_id = Jido.Signal.ID.generate!()
+    turn_id =
+      case mode do
+        {:restore, receipt} -> receipt.id
+        _ -> Jido.Signal.ID.generate!()
+      end
+
+    timeout =
+      case mode do
+        {:restore, %{expires_at: :infinity}} -> :infinity
+        {:restore, receipt} -> max(0, receipt.expires_at - System.system_time(:millisecond))
+        _ -> data.turn_timeout
+      end
+
     agent = data.agent
     trace = TraceContext.begin_turn(signal)
 
@@ -2524,22 +2639,33 @@ defmodule Jido.AgentServer do
       worker: nil,
       worker_ref: nil,
       execution_id: nil,
+      worker_id: turn_id,
+      durable: match?({:restore, _}, mode),
+      durable_finalized: false,
+      durable_storage: nil,
+      durable_next: nil,
+      advance_pending: false,
       result: nil,
       abort_reason: nil,
       cancel_waiters: [],
       deadline:
-        if(data.turn_timeout == :infinity,
+        if(timeout == :infinity,
           do: :infinity,
-          else: System.monotonic_time(:millisecond) + data.turn_timeout
+          else: System.monotonic_time(:millisecond) + timeout
         ),
       timer:
-        if(data.turn_timeout == :infinity,
+        if(timeout == :infinity,
           do: nil,
-          else: Process.send_after(self(), {:turn_timeout, turn_id}, data.turn_timeout)
+          else: Process.send_after(self(), {:turn_timeout, turn_id}, timeout)
         )
     }
 
     case mode do
+      {:restore, receipt} ->
+        operation(:restore_turn, %{data | active: active}, fn ->
+          DurableTurn.restore(agent, receipt, context, data.plugin_specs)
+        end)
+
       :turn ->
         operation(:prepare, %{data | active: active}, fn ->
           prepare_turn(agent, signal, context, data)
@@ -2577,6 +2703,68 @@ defmodule Jido.AgentServer do
     end
   end
 
+  defp durable_write(kind, data, agent, receipt) do
+    opts =
+      durable_options(data) ++
+        [
+          revision: data.state_version + 1,
+          expected_revision: data.state_version,
+          server_turn: receipt
+        ]
+
+    durable_operation(kind, data, fn ->
+      Jido.Persistence.save_agent(data.persistence, agent, opts)
+    end)
+  end
+
+  defp durable_operation(kind, data, fun) do
+    timer =
+      Process.send_after(
+        self(),
+        {:durable_storage_timeout, data.active.turn_id},
+        data.persistence_timeout
+      )
+
+    operation(
+      kind,
+      put_in(
+        data.active.durable_storage,
+        {timer, System.monotonic_time(:millisecond) + data.persistence_timeout}
+      ),
+      fun
+    )
+  end
+
+  defp publish_durable_revision(data) do
+    case ServerSupervisor.publish_checkpoint(
+           data.activation_state,
+           data.agent,
+           data.state_version + 1
+         ) do
+      :ok -> {:ok, %{data | state_version: data.state_version + 1}}
+      error -> error
+    end
+  end
+
+  defp start_durable_worker(data) do
+    data = put_in(data.active.worker_id, DurableTurn.identity(data))
+    owner = self()
+    hooks = execution_hooks(Keyword.get(data.exec_opts, :hooks, []), TraceContext.get())
+    policy = execution_policy(data.exec_opts)
+
+    durable_operation(:durable_start, data, fn ->
+      DurableTurn.start(data, owner, hooks, policy)
+    end)
+  end
+
+  defp durable_advance(%{active: %{operation: nil}} = data),
+    do:
+      durable_operation(:durable_advance, data, fn ->
+        DurableTurn.advance(data.runner, data.active.worker_id)
+      end)
+
+  defp durable_advance(data), do: {:keep_state, put_in(data.active.advance_pending, true)}
+
   defp operation(kind, data, fun) do
     captured = TraceContext.capture()
     task = Task.async(fn -> TraceContext.with_context(captured, fun) end)
@@ -2584,6 +2772,11 @@ defmodule Jido.AgentServer do
     phases = %{
       upgrade: :preparing,
       prepare: :preparing,
+      restore_turn: :preparing,
+      durable_accept: :saving,
+      durable_start: :starting,
+      durable_advance: :running,
+      durable_terminal: :saving,
       start: :starting,
       execute: :starting,
       settle: :settling,
@@ -2603,20 +2796,97 @@ defmodule Jido.AgentServer do
 
   defp operation_result(:upgrade, result, data), do: finish(data, result)
 
-  defp operation_result(:prepare, {:ok, prepared}, data) do
+  defp operation_result(kind, {:ok, prepared}, data) when kind in [:prepare, :restore_turn] do
     data = put_in(data.active.prepared, prepared)
-    owner = self()
-    runner = data.runner
-    id = data.active.turn_id
-    exec_opts = data.exec_opts
-    operation(:start, data, fn -> start_worker(runner, id, owner, prepared, exec_opts) end)
+
+    case DurableTurn.instruction(prepared) do
+      {:ok, %{kind: :flow}} when data.persistence not in [nil, false] ->
+        if kind == :restore_turn do
+          start_durable_worker(data)
+        else
+          case DurableTurn.accept(data, prepared) do
+            {:ok, receipt} ->
+              data = %{data | server_turn: receipt, active: %{data.active | durable: true}}
+              durable_write(:durable_accept, data, data.agent, receipt)
+
+            {:error, reason} ->
+              cleanup(data, {:error, reason})
+          end
+        end
+
+      _ ->
+        owner = self()
+        runner = data.runner
+        id = data.active.turn_id
+        exec_opts = data.exec_opts
+        operation(:start, data, fn -> start_worker(runner, id, owner, prepared, exec_opts) end)
+    end
   end
+
+  defp operation_result(:restore_turn, {:error, reason}, data), do: stop_durable(data, reason)
+
+  defp operation_result(:durable_accept, :ok, data) do
+    case publish_durable_revision(data) do
+      {:ok, data} -> start_durable_worker(data)
+      {:error, reason} -> stop_durable(data, reason)
+    end
+  end
+
+  defp operation_result(:durable_start, {:ok, worker, id}, data) do
+    active = %{data.active | worker: worker, worker_ref: Process.monitor(worker), worker_id: id}
+
+    case ServerSupervisor.remember_execution(data.activation_state, data.runner, id, worker) do
+      :ok ->
+        {:next_state, :running, %{data | active: active},
+         [{:next_event, :internal, :durable_advance}]}
+
+      {:error, reason} ->
+        stop_durable(%{data | active: active}, reason)
+    end
+  end
+
+  defp operation_result(:durable_advance, :running, data) do
+    pending = Map.get(data.active, :advance_pending, false)
+    data = put_in(data.active.advance_pending, false)
+
+    {:next_state, :running, data,
+     if(pending, do: [{:next_event, :internal, :durable_advance}], else: [])}
+  end
+
+  defp operation_result(:durable_advance, :complete, data),
+    do: handle_event(:info, {:worker_complete, data.active.turn_id}, :running, data)
+
+  defp operation_result(:durable_terminal, :ok, data) do
+    case publish_durable_revision(data) do
+      {:ok, data} ->
+        data = put_in(data.active.durable_finalized, true)
+
+        case data.active.durable_next do
+          {:finish, result} -> finish(data, result)
+          {:abort, phase, reason} -> abort_turn(phase, data, reason)
+        end
+
+      {:error, reason} ->
+        stop_durable(data, reason)
+    end
+  end
+
+  defp operation_result(:durable_advance, {:error, :non_portable_flow_output}, data),
+    do:
+      cleanup(
+        data,
+        {:error, execution_error("Flow output is not portable data", :non_portable_flow_output)}
+      )
+
+  defp operation_result(kind, {:error, reason}, data)
+       when kind in [:durable_accept, :durable_start, :durable_advance, :durable_terminal],
+       do: stop_durable(data, reason)
 
   defp operation_result(:start, {:ok, worker, input, context}, data) do
     # Publish ownership before execution can call back into this server.
     active = %{data.active | worker: worker, worker_ref: Process.monitor(worker)}
     runner = data.runner
-    id = active.turn_id
+    id = active.worker_id
     policy = execution_policy(data.exec_opts)
 
     case ServerSupervisor.remember_execution(data.activation_state, runner, id, worker) do
@@ -2639,6 +2909,10 @@ defmodule Jido.AgentServer do
   defp operation_result(:cleanup, :ok, data) do
     ServerSupervisor.forget_execution(data.activation_state)
     if data.active.worker_ref, do: Process.demonitor(data.active.worker_ref, [:flush])
+
+    if data.active.durable,
+      do: Jido.AgentServer.CheckpointStore.unregister(data.jido, data.active.worker_id)
+
     data = data |> put_in([:active, :worker], nil) |> put_in([:active, :worker_ref], nil)
 
     cond do
@@ -2784,6 +3058,21 @@ defmodule Jido.AgentServer do
   defp expired?(%{deadline: :infinity}), do: false
   defp expired?(active), do: System.monotonic_time(:millisecond) >= active.deadline
 
+  defp abort_turn(phase, %{active: %{durable: true, durable_finalized: false}} = data, reason) do
+    if data.active.operation, do: Task.shutdown(data.active.operation.task, :brutal_kill)
+    if data.active.durable_storage, do: Process.cancel_timer(elem(data.active.durable_storage, 0))
+    data = put_in(data.active.operation, nil)
+    status = if reason == :cancelled, do: :cancelled, else: :failed
+    receipt = %{data.server_turn | status: status}
+
+    data =
+      data
+      |> Map.put(:server_turn, receipt)
+      |> put_in([:active, :durable_next], {:abort, phase, reason})
+
+    durable_write(:durable_terminal, data, data.agent, receipt)
+  end
+
   defp abort_turn(:cleaning, data, reason) do
     data =
       if data.active.abort_reason, do: data, else: put_in(data.active.failure_stage, :cleaning)
@@ -2802,7 +3091,7 @@ defmodule Jido.AgentServer do
 
   defp cleanup(data, result) do
     runner = data.runner
-    id = data.active.turn_id
+    id = data.active.worker_id
     worker = data.active.worker
 
     operation(:cleanup, put_in(data.active.result, result), fn ->
@@ -2918,9 +3207,14 @@ defmodule Jido.AgentServer do
 
   defp settle_worker(runner, active, config) do
     result =
-      with {:ok, observation} <- Runner.execution(runner, active.turn_id, active.execution_id),
-           {:ok, workflow} <- Runner.get_workflow(runner, active.turn_id),
-           do: Jido.Exec.result(workflow, observation)
+      if active.durable do
+        with {:ok, workflow} <- Runner.get_workflow(runner, active.worker_id),
+             do: Jido.Exec.result(workflow)
+      else
+        with {:ok, observation} <- Runner.execution(runner, active.worker_id, active.execution_id),
+             {:ok, workflow} <- Runner.get_workflow(runner, active.worker_id),
+             do: Jido.Exec.result(workflow, observation)
+      end
 
     case AgentRunner.finish_for_server(active.prepared, result) do
       {:error, _stage, reason} ->
@@ -2936,6 +3230,12 @@ defmodule Jido.AgentServer do
         end
     end
   end
+
+  defp identify_topology(%{persistence: persistence, agent: before}, candidate)
+       when persistence not in [nil, false],
+       do: TopologyRuntime.identify(before, candidate)
+
+  defp identify_topology(_config, candidate), do: {:ok, candidate}
 
   defp execution_error(message, reason),
     do: Jido.Error.execution_error(message, %{reason: reason})
@@ -3049,8 +3349,69 @@ defmodule Jido.AgentServer do
     end
   end
 
-  defp finish(%{active: active} = data, {:ok, candidate, directives} = result)
+  defp finish(%{active: %{durable: true, durable_finalized: false}} = data, {:error, _} = result) do
+    receipt = %{data.server_turn | status: :failed}
+
+    data =
+      data
+      |> Map.put(:server_turn, receipt)
+      |> put_in([:active, :durable_next], {:finish, result})
+
+    durable_write(:durable_terminal, data, data.agent, receipt)
+  end
+
+  defp finish(%{active: active} = data, {:ok, candidate, directives})
        when not is_map_key(active, :configuration_checked) do
+    case identify_topology(data, candidate) do
+      {:ok, candidate} -> configure_commit(data, active, {:ok, candidate, directives})
+      {:error, reason} -> finish(data, {:error, reason})
+    end
+  end
+
+  defp finish(%{active: %{paused_plugins: [_ | _] = paused}} = data, {:error, _} = result) do
+    data = put_in(data.active.result, result)
+
+    operation(:resume_plugins, data, fn ->
+      CompositionRuntime.pause(paused, data.plugin_refs, :resume)
+    end)
+  end
+
+  defp finish(%{persistence: persistence} = data, {:ok, candidate, _} = result)
+       when persistence not in [nil, false] do
+    cancel_timer(data.active)
+    deadline = System.monotonic_time(:millisecond) + data.persistence_timeout
+
+    timer =
+      Process.send_after(
+        self(),
+        {:persistence_timeout, data.active.turn_id},
+        data.persistence_timeout
+      )
+
+    active = Map.merge(data.active, %{result: result, storage: {timer, deadline}})
+
+    receipt =
+      if data.active.durable, do: %{data.server_turn | status: :completed}, else: data.server_turn
+
+    data = %{data | server_turn: receipt}
+
+    opts =
+      durable_options(data) ++
+        [
+          revision: data.state_version + 1,
+          expected_revision: data.state_version,
+          server_turn: receipt
+        ]
+
+    operation(:save, %{data | active: active}, fn ->
+      Jido.Persistence.save_agent(persistence, candidate, opts)
+    end)
+  end
+
+  defp finish(data, {:ok, _, _} = result), do: publish_commit(data, result)
+  defp finish(data, result), do: finish_result(data, result)
+
+  defp configure_commit(data, active, {:ok, candidate, directives} = result) do
     changed = Jido.Agent.Mutation.changed_plugins(data.agent, candidate, directives)
 
     paused =
@@ -3077,40 +3438,6 @@ defmodule Jido.AgentServer do
           CompositionRuntime.pause(paused, data.plugin_refs, :quiesce)
         end)
   end
-
-  defp finish(%{active: %{paused_plugins: [_ | _] = paused}} = data, {:error, _} = result) do
-    data = put_in(data.active.result, result)
-
-    operation(:resume_plugins, data, fn ->
-      CompositionRuntime.pause(paused, data.plugin_refs, :resume)
-    end)
-  end
-
-  defp finish(%{persistence: persistence} = data, {:ok, candidate, _} = result)
-       when persistence not in [nil, false] do
-    cancel_timer(data.active)
-    deadline = System.monotonic_time(:millisecond) + data.persistence_timeout
-
-    timer =
-      Process.send_after(
-        self(),
-        {:persistence_timeout, data.active.turn_id},
-        data.persistence_timeout
-      )
-
-    active = Map.merge(data.active, %{result: result, storage: {timer, deadline}})
-
-    opts =
-      durable_options(data) ++
-        [revision: data.state_version + 1, expected_revision: data.state_version]
-
-    operation(:save, %{data | active: active}, fn ->
-      Jido.Persistence.save_agent(persistence, candidate, opts)
-    end)
-  end
-
-  defp finish(data, {:ok, _, _} = result), do: publish_commit(data, result)
-  defp finish(data, result), do: finish_result(data, result)
 
   defp stop_durable(data, reason),
     do: stop_failed(data, execution_error("Required durable commit failed", reason), :saving)
@@ -3805,6 +4132,7 @@ defmodule Jido.AgentServer do
             opts =
               Keyword.merge(durable_options(data),
                 revision: data.state_version,
+                server_turn: data.server_turn,
                 expected_revision: data.state_version
               )
 
@@ -3873,7 +4201,9 @@ defmodule Jido.AgentServer do
   end
 
   defp idle_transition(data, replies \\ []) do
-    {:next_state, :idle, arm_idle(data), replies ++ [{:next_event, :internal, :control_progress}]}
+    {:next_state, :idle, arm_idle(data),
+     replies ++
+       [{:next_event, :internal, :recover_turn}, {:next_event, :internal, :control_progress}]}
   end
 
   defp cancel_idle(%{idle_timer: nil} = data), do: data

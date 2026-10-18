@@ -137,7 +137,8 @@ The instance debug setting has priority for events from that Jido instance.
 `:on` selects `:interesting`, and `:verbose` selects `:all`.
 
 This instance setting does not enable the bounded event buffer for an Agent.
-Use the Agent `:debug` option or `Jido.AgentServer.set_debug/3` for that buffer.
+Set `debug: true` at Agent startup to enable that buffer. Read it with
+`Jido.AgentServer.history/1`.
 The semantic metadata allowlist applies in all debug modes.
 
 OpenTelemetry is optional. A host that uses it must add both
@@ -150,6 +151,53 @@ config :jido, :opentelemetry, enabled: false
 
 Use `Jido.Telemetry.open_telemetry?/0` to check if Jido has an active SDK
 tracer. Jido does not start the SDK or configure its sampler or exporter.
+
+## Resolve environment references
+
+`use Jido.Agent` imports `env/1` for configuration in Plugin and Extension
+declarations. The helper stores the variable name without reading its value:
+
+```elixir
+# Inside an Agent DSL configuration map:
+%{credentials: %{token: env("API_KEY")}}
+
+# The same data for Map authoring:
+%{credentials: %{token: Jido.Config.env("API_KEY")}}
+# => %{credentials: %{token: {:env, "API_KEY"}}}
+```
+
+The runtime consumer calls `Jido.Config.resolve/1` before it starts resources:
+
+```elixir
+case Jido.Config.resolve(options) do
+  {:ok, resolved} -> start_resources(resolved)
+  {:error, error} -> {:stop, error}
+end
+```
+
+This is a runtime initialization fragment. The consumer validates the resolved
+configuration with its own schema. Values remain strings, including empty
+strings. Missing variables return a structured configuration error with the
+variable name and its path in the configuration.
+
+Resolution walks plain map values, lists, keyword lists, and tuples. It keeps
+map keys and structs unchanged. Agent validation, JSON encoding, and snapshot
+loading retain the references. Keep resolved credentials in runtime data.
+Each replacement runtime resolves from the current environment. Save a selected
+destination as domain data when a workflow must keep the same destination
+after recovery.
+
+The host application owns `.env` file loading. If the application uses Dotenvy,
+load files before it starts Jido:
+
+```elixir
+vars = Dotenvy.source!([".env", System.get_env()])
+System.put_env(vars)
+```
+
+The application must supply the Dotenvy dependency. Existing environment values
+take precedence because they are the last input. `System.put_env/1` makes the
+values available to other OTP processes. Jido Core uses `System.fetch_env/1`.
 
 ## Keep ownership clear
 

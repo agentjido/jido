@@ -10,7 +10,7 @@ keep separate results. A missing case or failed run supplies no passed evidence.
 | AGT-002 | Instance and candidate state satisfy the complete schema; source values remain unchanged. | Defaults, depth 0–70 nested defaults, object intersections, nullable and invalid nil, optional fields, invalid state, schema policy, transition histories. |
 | TURN-001 | Each valid Signal selects one Action or Flow. | Ordered routes, missing routes, malformed types, custom selection, source binding. |
 | TURN-002 | The complete candidate and Directive batch validate before commit. | Valid batch, invalid state, invalid Directive at each position. |
-| TURN-003 | A failed Turn before commit preserves the committed snapshot and revision. | Mixed successful and failed histories, next successful Turn. |
+| TURN-003 | A failed Turn before commit preserves the committed Agent. Persistent Flows can advance the record revision to save acceptance and failure. | Mixed successful and failed histories, next successful Turn. |
 | EFFECT-001 | Direct commands return ordered effects; live effects run after commit. | Ordered effects, first failure stops remaining effects, committed state retained. |
 | PLUG-001 | Plugin input and state stay within their owner; callbacks follow declaration order. | Valid callbacks, ownership violations, callback faults. |
 | LIFE-001 | AgentServer admits serial Turns and owns execution cancellation and cleanup. | Blocked cancellation, server death, stale messages from a previous Turn. |

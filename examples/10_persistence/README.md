@@ -23,7 +23,9 @@ Expected result: all examples pass without network access or credentials.
 
 - Persistence stores versioned checkpoints, not an event journal.
 - Revision zero exists before a persistent Agent reports ready.
-- Each successful Turn writes one new revision.
+- Each successful Action Turn writes one new revision.
+- Persistence also enables Flow recovery. Flows save acceptance and terminal status
+  in Agent record revisions; step progress uses separate execution records.
 - Compare-and-swap blocks stale writes. A tombstone keeps that fence after delete.
 - Adapter compare-and-swap uses exact stored bytes or an opaque store token.
 - Attachments block idle hibernation; detach and touch control the idle timer.
@@ -36,3 +38,6 @@ The examples use deterministic local stores and controlled faults. Use the
 persistence conformance suites for all local adapters and the optional service
 suites for shared external adapters. See the
 [coverage register](../COVERAGE.md) for placement and ownership decisions.
+
+Continue with [Durable examples](../11_durable/README.md) for an abrupt whole-BEAM
+restart proof and the proposed execution recovery learning path.

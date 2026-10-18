@@ -77,6 +77,11 @@ defmodule Jido.RuntimeStore do
   end
 
   @doc false
+  def delete_owned(instance, hive, key, owner) do
+    call(instance, {:delete_owned, hive, key, owner}, {:error, :not_running}, {:error, :timeout})
+  end
+
+  @doc false
   @spec list(atom(), hive()) :: [{key(), value()}]
   def list(instance, hive) when is_atom(instance) do
     case fetch_all(instance, hive) do
@@ -122,6 +127,11 @@ defmodule Jido.RuntimeStore do
 
   def handle_call({:delete, hive, key}, _from, %{table: table} = state) do
     true = :ets.delete(table, {hive, key})
+    {:reply, :ok, state}
+  end
+
+  def handle_call({:delete_owned, hive, key, owner}, _from, %{table: table} = state) do
+    :ets.match_delete(table, {{hive, key}, {owner, :_}})
     {:reply, :ok, state}
   end
 

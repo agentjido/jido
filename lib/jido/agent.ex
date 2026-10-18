@@ -61,6 +61,7 @@ defmodule Jido.Agent do
       use Jido.Agent.DSL, unquote(Macro.escape(opts))
       import Jido.Agent.DSL.Macros
       import Jido.Agent.Directive, only: [emit: 1, emit: 2]
+      import Jido.Config, only: [env: 1]
       unquote_splicing(Enum.map(imports, fn module -> quote do: import(unquote(module)) end))
     end
   end

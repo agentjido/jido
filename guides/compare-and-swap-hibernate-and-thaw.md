@@ -3,12 +3,16 @@
 Persistence must protect an Agent from stale writers. Jido uses record revisions
 and adapter compare-and-swap operations for this purpose.
 
-## One Turn, one revision
+## Record revisions
 
-An `AgentServer` has a `state_version`. Each successful Turn increases it once,
-even when the next Agent state is identical to the current state. A failure
-before commit keeps the current revision. A failure during post-commit work does
-not undo it.
+An `AgentServer` has a `state_version`. Each successful Action Turn increases it
+once, even when Agent state is unchanged. An Action failure before commit keeps
+the current revision.
+
+Persistence also enables Flow recovery. A Flow saves acceptance, then completion
+or failure in a later revision. Failure keeps Agent state unchanged. Intermediate
+step checkpoints use separate records. A failure during post-commit work does not
+undo the final Agent record.
 
 The server supplies its current revision as `:expected_revision` when it saves.
 The write succeeds only when storage still has that revision. Before a new

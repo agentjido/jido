@@ -56,7 +56,7 @@ defmodule Jido do
 
   Use `Jido.AgentServer.agent/2` for the committed Agent. Use
   `Jido.AgentServer.status/2` for the revision and current runtime work. Use
-  `Jido.AgentServer.history/2` for bounded Turn history.
+  `Jido.AgentServer.history/1` for bounded Turn history.
 
   `Jido.Telemetry` is the system-wide observation contract. Its semantic event
   catalog supplies Telemetry events, standard metrics, bounded logs, and
@@ -438,8 +438,8 @@ defmodule Jido do
   - `debug(:verbose)` — log all terminal semantic events
   - `debug(:off)` — use the global semantic log configuration
 
-  This function does not control an Agent's bounded event buffer. Use
-  `Jido.AgentServer.set_debug/3` for that buffer.
+  Set `debug: true` at Agent startup to enable its bounded history buffer.
+  Read that buffer with `Jido.AgentServer.history/1`.
   """
   @spec debug() :: debug_level()
   def debug, do: Jido.Debug.level(@default_instance)
@@ -610,7 +610,8 @@ defmodule Jido do
         )
 
       base_children = [
-        {Runic.Runner, name: exec_runner_name(name), store: Jido.AgentServer.Store},
+        {Runic.Runner,
+         name: exec_runner_name(name), store: Jido.AgentServer.Store, store_opts: [jido: name]},
         {Task.Supervisor,
          name: task_supervisor_name(name), max_children: Keyword.fetch!(opts, :max_tasks)},
         {Jido.AgentServer.RegistrationGuard, jido: name},

@@ -37,8 +37,9 @@ closes its owned child requests so a late start cannot leave an owned child.
 Each Turn starts an owned local execution under the instance Runic Runner.
 Runic stops its Worker and native task scope when the Server exits, including
 abrupt Server death. Core confirms cleanup before commit or the next Turn.
-Local execution writes no Runic Store data and does not resume. Agent state
-persistence remains the core commit boundary.
+Without persistence, execution stays in memory and interrupted Flows do not resume.
+With persistence, AgentServer saves Flow progress at step boundaries and restores
+the current Turn after a crash.
 
 Do not read private state-machine tuples. Use:
 
@@ -67,6 +68,50 @@ instance stays alive. A normal stop removes the runtime checkpoint.
 Configured persistence is separate. It can restore state after the complete
 instance or VM restarts. A new persistent Server confirms a revision-zero
 record after Plugin readiness and before its start call succeeds.
+
+A persistent activation restores after its Server or supervisor fails. A new
+explicit `:create` start still rejects an existing record. Persistent members
+of an Agent's inline topology retain their slot IDs and restore their own last
+confirmed records. Removing a slot ends that identity. Adding it again creates
+a new identity. These records do not form an atomic family snapshot.
+
+Start an AgentServer with a persistence adapter to run routed
+Flows as durable serial Turns. The Server saves acceptance before dispatch,
+confirms graph checkpoints before further work, and commits the final Agent state
+and completion receipt together. Other state-changing Turns wait. Reads, status,
+and cancellation stay available. No durability Plugin or completion route is needed.
+
+```elixir
+{:ok, server} = Jido.start_agent(MyJido, ReportAgent,
+  id: "report-agent", persistence: :inherit)
+:ok = Jido.AgentServer.await_ready(server)
+Jido.AgentServer.call(server, report_signal)
+Jido.AgentServer.status(server).durable_turn
+# %{id: turn_id, status: :completed}
+```
+
+The application supplies retained storage and starts known roots after BEAM loss.
+The OTP supervisor restarts processes within a live BEAM. AgentServer restores
+saved work; Runic restores graph progress. Interrupted Actions start again from
+their beginning. The registration guard stops a Server whose activation has died
+before it admits a replacement with the same identity. A member restart keeps
+the root and its other members active. Caller handles, queued Signals, post-commit hooks, and effects
+are not durable. Repeated Signals start new Turns.
+
+Implementation and test order:
+
+1. Save the accepted Turn with its Agent; reject nonportable context before dispatch.
+2. Confirm each graph checkpoint; a rejected save must block the next Action.
+3. Restore the same Turn after Worker, Server, or activation loss; steps 1–5 must
+   not repeat when step 6 was interrupted.
+4. Save cancellation before stopping work; commit completion with the candidate
+   Agent. Test a crash after the write but before its reply.
+5. Restore topology member identities and independent records. Kill a writer BEAM
+   and restore the same pending Turn in a fresh BEAM.
+
+See [Core Turn tests](../test/jido/agent_server/durable_turn_test.exs),
+[topology tests](../test/jido/agent_server/durable_topology_test.exs), and
+[the examples](../examples/11_durable/README.md).
 
 Use `Jido.stop_agent/3` when the instance owns the Server. Use
 `Jido.AgentServer.stop/3` for a direct Server reference. A `Stop` Directive

@@ -53,9 +53,10 @@ A File-backed test starts the Agent, adds three bound workers, replaces the
 observer, hibernates the complete activation, and thaws it twice. Both restores
 preserve the complete portable snapshot and revision, including member
 count, definitions, and initial inputs. Old processes stop before new ones
-start. Live member state is deliberately not captured by the root snapshot;
-members restart from the saved initial inputs. Snapshot capture expands module
-references into nested definition data.
+start. Members inherit persistence and restore their own confirmed state. The
+root saves slot identities so removed and recreated slots get fresh lifetimes.
+These independent records are not an atomic family snapshot. Snapshot capture
+expands module references into nested definition data.
 
 [Connection Changes](../07_12_connection_changes/README.md) also changes an edge,
 hibernates, thaws, and proves that new work follows the saved destination.

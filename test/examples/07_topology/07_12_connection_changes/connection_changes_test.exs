@@ -67,9 +67,10 @@ defmodule JidoTest.Examples.Topology.ConnectionChangesTest do
     assert {:ok, ^portable} = Jido.Persistence.snapshot(Server.agent(restored))
     [left] = labeled(restored, "left")
     [right] = labeled(restored, "right")
+    assert Server.agent(right).state.total == 5
     assert {:ok, work} = Example.work_signal(%{value: 4})
     assert {:ok, _, [_]} = Server.call(restored, work)
-    eventually(fn -> Server.agent(right).state.total == 4 end)
+    eventually(fn -> Server.agent(right).state.total == 9 end)
     assert Server.agent(left).state.total == 0
     stop_topology(restored)
     assert Jido.agent_count(jido) == 0

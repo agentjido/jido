@@ -115,7 +115,7 @@ agent = MyApp.Counter.new(id: "counter-1")
 
 V3 module options contain only `name`, `description`, `vsn`, and `extensions`.
 Move schema, metadata, and Plugin declarations into `agent do`. Move route
-entries into `routes do`. Direct `Jido.Agent.new/1` definitions still accept
+entries into `routes do`. Direct `Jido.Agent.define/1` definitions still accept
 maps and keyword lists.
 
 ### What you need to change
@@ -359,7 +359,7 @@ Port each capability explicitly:
 | `DirectiveExec` or `directive_handler` | Implement `Jido.Agent.Directive.validate/1`, declare the type in the Agent callbacks, and implement `dispatch/4` in the Agent Server callbacks |
 | `child_spec(config)` | Put `child_spec/1` in the Agent Server callbacks; accept `Jido.Plugin.Init` and read `init.options` |
 | Plugin checkpoint or restore hooks | Use `c:Jido.Plugin.dump/3` and `c:Jido.Plugin.load/3` for one paired owned value |
-| Static topology metadata | Use `c:Jido.Plugin.contribute/2` for bounded canonical entries |
+| Static topology metadata | Use `c:Jido.Agent.Extension.lower/2` for bounded canonical entries |
 
 A runtime root must be permanent and owned. Use `Jido.Plugin.state/1` to read
 committed owned state after a restart. `Init` does not contain a state snapshot

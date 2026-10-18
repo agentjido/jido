@@ -10,40 +10,26 @@ must contain supported portable terms. A valid live Agent can therefore fail
 to checkpoint unless application conversion supplies a portable representation.
 
 A checkpoint is a portable map that represents one Agent value. It is not a
-copy of the `AgentServer` process. Mailboxes, caller data, process identifiers,
-monitors, tasks, and Plugin runtime processes do not enter the record.
+copy of the `AgentServer` process. Mailboxes, process identifiers,
+monitors, tasks, and Plugin runtime processes do not enter the snapshot.
+A persistent Flow separately saves portable caller context in its Turn receipt.
 
 ## The default checkpoint
 
-The public Agent checkpoint boundary uses core default behavior when an Agent
-module does not define `checkpoint/2` or `restore/2`. The default checkpoint
-contains the Agent identity and its complete validated state. The one state map
-includes domain fields and each Plugin-owned top-level field. A generated Agent
-module also owns a positive `vsn`. Jido stores it in the version-2 checkpoint
-and rejects a module or `vsn` mismatch before it accepts saved state.
+Use `Jido.Persistence.snapshot/2` to capture the complete Agent definition and
+state. Nested Agent definitions and code fingerprints are part of the snapshot.
+Restore uses the saved definition. It does not rebuild static fields from the
+current Agent module.
 
 ```elixir
-{:ok, checkpoint} = Jido.Agent.checkpoint(agent, %{
-  instance: MyApp.Jido,
-  partition: nil,
-  revision: 7,
-  reason: :manual
-})
-
-{:ok, restored} = Jido.Agent.restore(MyAgent, checkpoint, %{
-  instance: MyApp.Jido,
-  partition: nil,
-  revision: 7,
-  reason: :restore
-})
+{:ok, snapshot} = Jido.Persistence.snapshot(agent, context: %{reason: :manual})
+{:ok, restored} = Jido.Persistence.restore(snapshot, context: %{reason: :restore})
 ```
 
-Application code usually uses `Jido.Persistence` instead of these callbacks.
-Persistence adds the active-or-tombstone record format, storage identity,
-Agent `vsn`, revision, and adapter boundary. All durable Agents use a stable
-namespaced Ref key and outer format 3. Earlier outer formats require an
-[offline migration](compare-and-swap-hibernate-and-thaw.md#move-records-from-an-earlier-v3-beta).
-The nested checkpoint format remains version 2.
+The snapshot format is 1. It contains `:agent`, `:references`, and
+`:state_format`. Persistence stores this snapshot in an outer format-4 record
+with a stable namespaced identity and revision. See
+[Hibernate and Thaw](compare-and-swap-hibernate-and-thaw.md).
 
 ## Persistence Plugin conversion
 
@@ -63,8 +49,8 @@ schema and the complete Agent schema; it need not be portable.
 Jido validates the loaded value without adding defaults or changing values.
 A missing required field is an error. A valid `nil` value remains `nil`.
 
-Direct `Jido.Agent.checkpoint/2` and `Jido.Agent.restore/3` do not run Plugin
-persistence conversion. Use `Jido.Persistence` for this conversion.
+`Jido.Persistence.snapshot/2` and `Jido.Persistence.restore/2` apply Plugin
+conversion on the default state path.
 
 Each callback must return `{:ok, value}` or `{:error, reason}`. A raised
 callback, an invalid return, non-portable dump output, or invalid loaded state
@@ -73,13 +59,9 @@ write. A load failure prevents Agent restore. Keep every Plugin-owned field in
 the checkpoint; a missing field is an error. Authors should handle the error
 and fix the callback or record instead of assuming a partial Agent exists.
 
-Direct and behavior-only definitions use the version-2 checkpoint format with
-an embedded definition. This includes an explicitly unversioned direct
-definition that uses a generated module as its behavior but owns changed static
-data. Direct definitions can contain runtime authoring data in memory. The
-default checkpoint can store them only when the complete map is portable. Use
-an exact generated Agent definition or a custom durable format for other
-definitions.
+A snapshot retains the complete saved definition, including data-defined
+fields and nested topology. The complete stored representation must be portable.
+Code fingerprints detect changes to the implementations that it requires.
 
 ## Portable terms only
 
@@ -131,21 +113,17 @@ def restore(%{id: id, bits: bits}, _context) do
 end
 ```
 
-The public `Jido.Agent.checkpoint/2` function wraps a new custom payload in a
-core-owned version-2 envelope. The envelope contains `agent_module`, `vsn`, and
-the opaque `payload`. `Jido.Agent.restore/3` checks the module and `vsn`, then
-passes only the payload to the callback. Raw custom payload maps are not
-checkpoint envelopes and restore rejects them.
+The optional callbacks `c:Jido.Agent.checkpoint/2` and
+`c:Jido.Agent.restore/2` convert the state payload. The snapshot keeps the
+saved definition and marks the payload with `state_format: :custom`.
+Restore passes the payload to the callback and uses its returned state.
+The returned Agent must retain the saved ID. The saved definition stays
+authoritative.
 
-Persistence does not apply Plugin owned-state conversion to a complete custom
-checkpoint. The custom callback owns the complete payload and its migration.
-
-Restore must return an Agent with the module and ID that the persistence record
-names. Jido rejects a checkpoint that changes this identity.
-
-Treat a format change as a data migration. Convert version-1 Agent checkpoints
-before you use the V3 code. The current Agent boundary reads and writes only
-version 2.
+Custom callbacks bypass Plugin state conversion. The application owns the
+complete custom state payload. Use `Jido.Persistence.upgrade/3` with an upgrade
+Action when saved data or code references need an explicit change. Test the
+upgraded snapshot through restore before use.
 
 ## Live values and local restart
 

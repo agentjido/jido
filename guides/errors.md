@@ -14,8 +14,9 @@ the closed registry from `error.details.code`. Call `stable_codes/0` to inspect
 that registry. Do not match a message. A returned application or adjacent
 package error keeps its original owner and shape.
 
-A pre-commit failure retains the previous Agent and revision. A directive failure
-retains the new commit. Review `Jido.AgentServer.status/1` summary maps and
+A pre-commit failure retains the previous Agent. A persistent Flow can advance
+the record revision to save acceptance and failure. An ordinary Action failure
+keeps the revision unchanged. A directive failure retains the new commit. Review `Jido.AgentServer.status/1` summary maps and
 runtime error policy to choose the application response. Every required persistence write error stops
 that activation even when ordinary error policy would continue. A new activation
 must restore authoritative state.

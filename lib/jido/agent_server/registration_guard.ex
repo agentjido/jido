@@ -9,8 +9,8 @@ defmodule Jido.AgentServer.RegistrationGuard do
     GenServer.start_link(__MODULE__, instance, name: Jido.registration_guard_name(instance))
   end
 
-  def claim(instance, key, pid) when is_atom(instance) and is_pid(pid) do
-    GenServer.call(Jido.registration_guard_name(instance), {:claim, key, pid})
+  def claim(instance, key, pid, activation) when is_atom(instance) and is_pid(pid) do
+    GenServer.call(Jido.registration_guard_name(instance), {:claim, key, pid, activation})
   catch
     :exit, _reason -> {:error, :registration_guard_unavailable}
   end
@@ -30,21 +30,23 @@ defmodule Jido.AgentServer.RegistrationGuard do
   end
 
   @impl true
-  def handle_call({:claim, key, pid}, _from, state) do
+  def handle_call({:claim, key, pid, activation}, _from, state) do
     case Map.get(state.claims, key) do
-      {^pid, _ref} ->
+      {^pid, _ref, _activation} ->
         {:reply, :ok, state}
 
-      {owner, _ref} when is_pid(owner) ->
+      {owner, ref, previous_activation} when is_pid(owner) ->
+        stop_orphan(owner, ref, previous_activation)
+
         if Process.alive?(owner) do
           {:reply, {:error, {:already_started, owner}}, state}
         else
           state = drop_claim(state, key)
-          {:reply, :ok, add_claim(state, key, pid)}
+          {:reply, :ok, add_claim(state, key, pid, activation)}
         end
 
       nil ->
-        {:reply, :ok, add_claim(state, key, pid)}
+        {:reply, :ok, add_claim(state, key, pid, activation)}
     end
   end
 
@@ -56,7 +58,7 @@ defmodule Jido.AgentServer.RegistrationGuard do
         state = %{state | registry_pid: pid, registry_ref: ref}
         state = seed_claims(state)
 
-        Enum.each(state.claims, fn {_key, {owner, _ref}} ->
+        Enum.each(state.claims, fn {_key, {owner, _ref, _activation}} ->
           send(owner, {:jido_registry_restarted, pid})
         end)
 
@@ -83,6 +85,22 @@ defmodule Jido.AgentServer.RegistrationGuard do
     end
   end
 
+  # A killed activation can leave its trapping Server alive during shutdown.
+  # Stop that orphan before OTP starts another Server with the same identity.
+  defp stop_orphan(owner, ref, activation) when is_pid(activation) do
+    if not Process.alive?(activation) do
+      Process.exit(owner, :kill)
+
+      receive do
+        {:DOWN, ^ref, :process, ^owner, _reason} -> :ok
+      after
+        1_000 -> :ok
+      end
+    end
+  end
+
+  defp stop_orphan(_owner, _ref, _activation), do: :ok
+
   defp seed_claims(state) do
     entries =
       Registry.select(state.registry, [{{:"$1", :"$2", :"$3"}, [], [{{:"$1", :"$2"}}]}])
@@ -91,7 +109,7 @@ defmodule Jido.AgentServer.RegistrationGuard do
       {{:agent, _partitioned_id} = key, pid}, acc when is_pid(pid) ->
         if Map.has_key?(acc.claims, key) or not Process.alive?(pid),
           do: acc,
-          else: add_claim(acc, key, pid)
+          else: add_claim(acc, key, pid, nil)
 
       _entry, acc ->
         acc
@@ -100,14 +118,19 @@ defmodule Jido.AgentServer.RegistrationGuard do
     :exit, _reason -> state
   end
 
-  defp add_claim(state, key, pid) do
+  defp add_claim(state, key, pid, activation) do
     ref = Process.monitor(pid)
-    %{state | claims: Map.put(state.claims, key, {pid, ref}), refs: Map.put(state.refs, ref, key)}
+
+    %{
+      state
+      | claims: Map.put(state.claims, key, {pid, ref, activation}),
+        refs: Map.put(state.refs, ref, key)
+    }
   end
 
   defp drop_claim(state, key) do
     case Map.pop(state.claims, key) do
-      {{_pid, ref}, claims} ->
+      {{_pid, ref, _activation}, claims} ->
         Process.demonitor(ref, [:flush])
         %{state | claims: claims, refs: Map.delete(state.refs, ref)}
 
