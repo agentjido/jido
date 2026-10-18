@@ -13,7 +13,7 @@ mix test.examples
 Run one example file while you change it:
 
 ```shell
-mix test test/examples/01_basic/01_01_minimal_agent/minimal_agent_test.exs
+mix test test/examples/01_basic/01_01_minimal_agent/minimal_agent_test.exs --include example --seed 0
 ```
 
 ## Follow the examples in order
@@ -26,10 +26,9 @@ The numbered groups add one type of complexity at a time.
 | `02_workflow` | Sequential, conditional, parallel, iterative, nested, and approval workflows |
 | `03_llm` | Model responses, conversation history, tool use, parallel tools, and repair |
 | `04_runtime` | Scheduling, buses, managed jobs, inspection, observation, and recovery |
-| `05_multi_agent` | Child lifecycle, requests, worker groups, hierarchies, and remote children |
-| `06_factory` | Runtime-built conversations, systems, departments, and flows |
-| `07_topology` | Independent, hierarchical, bus-connected, keyed, composed, and Plugin-contributed systems |
-| `08_applications` | Audit, subscriptions, inboxes, purpose loops, and groups |
+| `05_multi_agent` | Local runtime lifecycle, correlated requests, and adoption |
+| `07_topology` | Named members, nested Agents, local Bus connections, and mutations |
+| `08_applications` | Audit, subscriptions, inboxes, approvals, and purpose loops |
 | `09_plugins` | Pure preparation, live admission, identity, encrypted Signals, and composition |
 | `10_persistence` | Checkpoints, hibernate and thaw, deletion, uncertain writes, and recoverable delivery |
 
@@ -47,15 +46,14 @@ The runtime group contains focused examples for the hard boundaries:
 - `04_10_pending_job_recovery` — job state after restart
 - `04_11_durable_scheduling` — schedule occurrence recovery
 - `04_12_stable_reference` — durable identity across process replacement
-- `04_13_turn_upgrade` — serialized release installation
-- `04_14_state_migration` — atomic domain and Plugin state migration
+- `04_14_state_migration` — snapshot definition and state upgrades
 
 Read the test assertions with the example module. The assertions state the
 expected commit, failure, and cleanup rules.
 
 ## Research examples
 
-`test/examples/99_research` retains the distributed-authority investigation.
+`test/examples/99_research` retains remote runtime proposals and the distributed-authority investigation.
 It shows an external fencing workaround because Jido does not provide
 cluster-exclusive ownership.
 

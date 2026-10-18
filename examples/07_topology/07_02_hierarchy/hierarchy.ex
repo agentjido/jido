@@ -1,23 +1,30 @@
 defmodule Jido.Examples.Topology.Hierarchy do
-  @moduledoc "A coordinator owns a team leader, which owns three workers."
-  use Jido.Topology, name: "hierarchy"
+  @moduledoc "An Agent owns a team whose definition declares two workers."
+  use Jido.Agent, name: "topology_hierarchy"
 
-  topology do
-    agents do
-      agent :coordinator, Jido.Examples.Topology.Cell
-      agent :leader, Jido.Examples.Topology.Cell
+  routes do
+    signal_source "/examples/topology/hierarchy"
 
-      group :workers, Jido.Examples.Topology.Cell do
-        count 3
+    route "examples.topology.hierarchy.team.remove", as: :team_remove do
+      action _input, schema: Zoi.object(%{}), context: context do
+        {:ok, context.agent_state, [Jido.Agent.Directive.agent_remove(:team)]}
       end
     end
+  end
 
-    relationships do
-      owns :coordinator, :leader
+  topology do
+    agent :team, Jido.Examples.Topology.Hierarchy.Team
+  end
+end
 
-      owns :leader, :workers do
-        on_parent_exit :stop
-      end
+defmodule Jido.Examples.Topology.Hierarchy.Team do
+  @moduledoc "A reusable Agent definition with its own member declarations."
+  use Jido.Agent, name: "topology_team"
+
+  topology do
+    agent :workers, Jido.Examples.Topology.Cell do
+      count 2
+      initial_state %{label: "worker"}
     end
   end
 end

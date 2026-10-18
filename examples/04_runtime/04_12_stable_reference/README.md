@@ -45,4 +45,4 @@ ownership, routing, or fencing.
 - [Source](stable_reference.ex)
 - [Tests](../../../test/examples/04_runtime/04_12_stable_reference/stable_reference_test.exs)
 
-Previous: [Durable Scheduling](../04_11_durable_scheduling/README.md) | Next: [Turn Upgrade](../04_13_turn_upgrade/README.md)
+Previous: [Durable Scheduling](../04_11_durable_scheduling/README.md) | Next: [State Migration](../04_14_state_migration/README.md)

@@ -155,10 +155,10 @@ their original results. Existing AgentServer2 calls return three-element success
 
 ```sh
 mix run --no-start agent_server2_demo.exs
-mix run --no-start agent_server2_load.exs 10 1000 10000
+mix run --no-start agent_server_load.exs 10 1000 10000
 mix run --no-start test/bench/run.exs --profile agent_server2 --output tmp/agent-server2-activation/bench
 mix test test/bench/core_bench_test.exs --include bench --seed 0
-mix test test/system/runtime/agent_server2_load_test.exs --include system --seed 0
+mix test test/system/runtime/agent_server_load_test.exs --include system --seed 0
 ```
 
 The load script runs each size twice with half the Agents using Plugins. The
@@ -182,6 +182,6 @@ queues new turns; cancellation returns `:commit_in_progress`. Caller wait does
 not cancel save. Existing checkpoint callbacks own portable conversion.
 
 Run the demo with `mix run --no-start agent_server2_demo.exs`. Run the two-cycle
-load check with `mix run --no-start agent_server2_load.exs --persistent 10 1000`.
+load check with `mix run --no-start agent_server_load.exs --persistent 10 1000`.
 That check separates intentionally saved ETS records from process cleanup and
 removes the records before comparing resource baselines. ETS is not disk storage.

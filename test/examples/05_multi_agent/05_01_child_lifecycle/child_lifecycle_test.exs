@@ -21,13 +21,13 @@ defmodule JidoTest.Examples.MultiAgent.ChildLifecycleTest do
 
     {:ok, route_signal_1} = ChildLifecycle.start_worker_signal(%{tag: "worker"})
 
-    assert {:ok, _} =
+    assert {:ok, _, _directives} =
              Jido.AgentServer.call(parent, route_signal_1, [])
 
     child = eventually(fn -> Server.children(parent)["worker"] end)
-    assert child.id == "#{before.agent.id}/worker"
-    assert Jido.whereis_agent(jido, child.id) == child.pid
-    assert Server.status(child.pid).runtime.parent.id == before.agent.id
+    assert Server.agent(child.pid).id == "#{before.agent.id}/worker"
+    assert Jido.whereis_agent(jido, Server.agent(child.pid).id) == child.pid
+    assert Server.status(child.pid).parent.activation == Server.activation(parent)
     assert state(parent) == %{desired: ["worker"]}
 
     {:ok, route_signal_2} = ChildLifecycle.start_worker_signal(%{tag: "worker"})
@@ -43,7 +43,7 @@ defmodule JidoTest.Examples.MultiAgent.ChildLifecycleTest do
 
     {:ok, route_signal_3} = ChildLifecycle.start_worker_signal(%{tag: "worker"})
 
-    assert {:ok, _} =
+    assert {:ok, _, _directives} =
              Jido.AgentServer.call(parent, route_signal_3, [])
 
     first = eventually(fn -> Server.children(parent)["worker"] end)
@@ -56,7 +56,7 @@ defmodule JidoTest.Examples.MultiAgent.ChildLifecycleTest do
         value: 3
       })
 
-    assert {:ok, committed} =
+    assert {:ok, committed, _directives} =
              Jido.AgentServer.call(first.pid, route_signal_4, [])
 
     Process.exit(first.pid, :kill)
@@ -69,7 +69,7 @@ defmodule JidoTest.Examples.MultiAgent.ChildLifecycleTest do
         end
       end)
 
-    assert next.id == first.id
+    assert Server.agent(next.pid).id == committed.id
     assert Server.snapshot(next.pid).agent.state == committed.state
     assert Server.snapshot(next.pid).state_version == 1
   end
@@ -79,7 +79,7 @@ defmodule JidoTest.Examples.MultiAgent.ChildLifecycleTest do
 
     {:ok, route_signal_5} = ChildLifecycle.start_worker_signal(%{tag: "first"})
 
-    assert {:ok, _} =
+    assert {:ok, _, _directives} =
              Jido.AgentServer.call(parent, route_signal_5, [])
 
     first = eventually(fn -> Server.children(parent)["first"] end)
@@ -87,7 +87,7 @@ defmodule JidoTest.Examples.MultiAgent.ChildLifecycleTest do
 
     {:ok, route_signal_6} = ChildLifecycle.stop_worker_signal(%{tag: "first"})
 
-    assert {:ok, _} =
+    assert {:ok, _, _directives} =
              Jido.AgentServer.call(parent, route_signal_6, [])
 
     assert_receive {:DOWN, ^ref, :process, _, _}, 1000
@@ -95,13 +95,14 @@ defmodule JidoTest.Examples.MultiAgent.ChildLifecycleTest do
 
     {:ok, route_signal_7} = ChildLifecycle.start_worker_signal(%{tag: "second"})
 
-    assert {:ok, _} =
+    assert {:ok, _, _directives} =
              Jido.AgentServer.call(parent, route_signal_7, [])
 
     second = eventually(fn -> Server.children(parent)["second"] end)
+    second_id = Server.agent(second.pid).id
     ref = Process.monitor(second.pid)
     assert :ok = Jido.stop_agent(jido, parent)
     assert_receive {:DOWN, ^ref, :process, _, _}, 1000
-    eventually(fn -> Jido.whereis_agent(jido, second.id) == nil end)
+    eventually(fn -> Jido.whereis_agent(jido, second_id) == nil end)
   end
 end

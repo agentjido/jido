@@ -11,7 +11,7 @@ defmodule JidoTest.Examples.MultiAgent.CorrelatedRequestsTest do
     {:ok, route_signal_1} =
       CorrelatedRequests.request_signal(%{request_id: "request-1", value: 7})
 
-    assert {:ok, pending} =
+    assert {:ok, pending, _directives} =
              Jido.AgentServer.call(parent, route_signal_1, [])
 
     assert pending.state.status == :waiting

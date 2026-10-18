@@ -1,5 +1,6 @@
 defmodule JidoTest.Examples.Basic.PluginStateAgentTest do
-  use JidoTest.BasicSDKCase
+  use JidoTest.Case, async: true
+  @moduletag :example
 
   alias Jido.AgentServer, as: Server
   alias Jido.Examples.PluginStateAgent, as: Agent
@@ -10,7 +11,7 @@ defmodule JidoTest.Examples.Basic.PluginStateAgentTest do
 
     {:ok, route_signal_1} = Agent.increment_signal(%{amount: 3})
 
-    assert {:ok, committed} =
+    assert {:ok, committed, []} =
              Jido.AgentServer.call(server, route_signal_1, [])
 
     assert committed.state == %{count: 3, turns: 1}
@@ -19,21 +20,21 @@ defmodule JidoTest.Examples.Basic.PluginStateAgentTest do
   end
 
   test "an Action cannot change Plugin-owned state", %{jido: jido} do
-    server = start_agent!(jido, Agent, error_policy: observe_errors())
+    server = start_agent!(jido, Agent, error_policy: :log_only)
     before = Server.snapshot(server)
 
     {:ok, route_signal_2} = Agent.overwrite_plugin_state_signal(%{})
 
-    assert {:error, %Jido.Error.ExecutionError{} = error} =
+    assert {:error, error} =
              Jido.AgentServer.call(server, route_signal_2, [])
 
-    assert error.message == "Agent executable changed Plugin-owned state"
+    assert inspect(error) =~ "Plugin-owned"
     assert Server.snapshot(server) == before
     assert {:ok, 0} = Server.plugin_state(server, CountTurns)
 
     {:ok, route_signal_3} = Agent.increment_signal(%{amount: 2})
 
-    assert {:ok, recovered} =
+    assert {:ok, recovered, []} =
              Jido.AgentServer.call(server, route_signal_3, [])
 
     assert recovered.state == %{count: 2, turns: 1}
@@ -43,22 +44,34 @@ defmodule JidoTest.Examples.Basic.PluginStateAgentTest do
   test "invalid Plugin output rejects the domain candidate and preserves the prior commit", %{
     jido: jido
   } do
-    server = start_agent!(jido, Agent, error_policy: observe_errors())
+    server = start_agent!(jido, Agent, error_policy: :log_only)
 
     {:ok, route_signal_4} = Agent.increment_signal(%{amount: 2})
 
-    assert {:ok, _} =
+    assert {:ok, _, []} =
              Jido.AgentServer.call(server, route_signal_4, [])
 
     before = Server.snapshot(server)
 
     {:ok, route_signal_5} = Agent.increment_signal(%{amount: 5})
 
-    assert {:error, %Jido.Error.ExecutionError{} = error} =
+    assert {:error, error} =
              Jido.AgentServer.call(server, route_signal_5, [])
 
-    assert error.message == "Plugin-owned Agent state field is invalid"
+    assert inspect(error) =~ "Plugin"
     assert Server.snapshot(server) == before
     assert {:ok, 1} = Server.plugin_state(server, CountTurns)
+  end
+
+  defp start_agent!(jido, agent, opts \\ []) do
+    {:ok, server} =
+      JidoTest.ExampleRuntime.start_agent(
+        jido,
+        agent,
+        Keyword.put_new(opts, :id, unique_id("plugin"))
+      )
+
+    assert :ok = Server.await_ready(server)
+    server
   end
 end

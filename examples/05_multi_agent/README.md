@@ -1,39 +1,19 @@
 # Multi-agent examples
 
-These examples move from local child ownership to explicit remote placement
-and node-loss observation. Each Agent owns only its direct children.
+These examples cover local runtime ownership and request correlation.
+The retained example numbers stay unchanged.
 
-## Learning order
+- [05_01 Local Lifecycle](05_01_child_lifecycle/README.md)
+- [05_02 Correlated Requests](05_02_correlated_requests/README.md)
+- [05_06 Orphan Adoption](05_06_orphan_adoption/README.md)
 
-1. [Child Lifecycle](05_01_child_lifecycle/README.md) — start, restart, and stop an owned child.
-2. [Correlated Requests](05_02_correlated_requests/README.md) — match a child result to one pending request.
-3. [Agent Hierarchy](05_03_agent_hierarchy/README.md) — form and clean up a tree through direct ownership.
-4. [Remote Child](05_04_remote_child/README.md) — place an owned child on a selected Erlang node.
-5. [Remote Lifecycle](05_05_remote_lifecycle/README.md) — distinguish observed exit from lost connectivity.
-6. [Orphan Adoption](05_06_orphan_adoption/README.md) — transfer one surviving child to a new parent.
-
-## Run the section
+The API update for these examples is still in progress. Nested definition
+ownership is covered by [07_02 Nested Agents](../07_topology/07_02_hierarchy/README.md).
+Remote placement and node-loss behavior remain [research](../99_research/README.md).
 
 ```sh
 mix test test/examples/05_multi_agent --include example --seed 0
 ```
 
-Expected result: the local and two-node behavior tests pass without network
-services or credentials.
-
-Run the optional two-node demonstration:
-
-```sh
-mix run examples/05_multi_agent/05_04_remote_child/demo.exs
-```
-
-## Shared support
-
-- [Worker Agent](support/worker.ex) doubles work for the child lifecycle and correlated request examples.
-- [Keep State Action](../support/keep_state.ex) handles lifecycle Signals that do not change domain state.
-
-## Limits
-
-These examples do not provide a cluster-wide ownership lease or an application
-worker pool. See the [distributed authority research item](../99_research/99_02_distributed_authority/README.md)
-for the unsupported ownership contract.
+The [Worker](support/worker.ex) supports local lifecycle and correlation.
+These examples do not provide cluster ownership or automatic remote failover.

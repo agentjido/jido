@@ -47,7 +47,7 @@ defmodule JidoTest.Examples.Workflow.SequentialFlowTest do
     assert candidate.state == %{value: 8, label: "kept"}
     assert Server.snapshot(server) == before
 
-    assert {:ok, ^candidate} = Server.call(server, command)
+    assert {:ok, ^candidate, _directives} = Server.call(server, command)
     assert Server.snapshot(server) == %{agent: candidate, state_version: 1}
   end
 
@@ -56,7 +56,7 @@ defmodule JidoTest.Examples.Workflow.SequentialFlowTest do
 
     {:ok, route_signal_1} = Example.double_value_signal(%{value: 3})
 
-    assert {:ok, _} =
+    assert {:ok, _, _directives} =
              Jido.AgentServer.call(server, route_signal_1, [])
 
     before = Server.snapshot(server)
@@ -75,7 +75,7 @@ defmodule JidoTest.Examples.Workflow.SequentialFlowTest do
 
     {:ok, route_signal_3} = Example.double_value_signal(%{value: 5})
 
-    assert {:ok, recovered} =
+    assert {:ok, recovered, _directives} =
              Jido.AgentServer.call(server, route_signal_3, [])
 
     assert recovered.state.value == 10
@@ -87,7 +87,7 @@ defmodule JidoTest.Examples.Workflow.SequentialFlowTest do
 
     {:ok, route_signal_4} = Example.double_value_signal(%{value: 3})
 
-    assert {:ok, _} =
+    assert {:ok, _, _directives} =
              Jido.AgentServer.call(server, route_signal_4, [])
 
     before = Server.snapshot(server)
@@ -104,7 +104,7 @@ defmodule JidoTest.Examples.Workflow.SequentialFlowTest do
 
     {:ok, route_signal_7} = Example.double_value_signal(%{value: 4, failure: :candidate})
 
-    assert {:error, %Jido.Error.ValidationError{subject: :state}} =
+    assert {:error, %Jido.Agent.Error{code: :invalid_state, path: [:state]}} =
              Jido.AgentServer.call(server, route_signal_7, [])
 
     assert Server.snapshot(server) == before

@@ -16,7 +16,7 @@ defmodule JidoTest.System.Scenarios.Effects do
           {:ok, signal} =
             Probe.record_and_deliver_signal(%{effect_id: "effect", value: 7})
 
-          assert {:ok, saved} = Server.call(server, signal)
+          assert {:ok, saved, _} = Server.call(server, signal)
           assert_receive {:effect_attempt, "effect", task}, 10000
 
           records =
@@ -36,7 +36,7 @@ defmodule JidoTest.System.Scenarios.Effects do
           assert Jido.whereis_agent(c.jido, saved.id) == nil
           :ok = Sink.hold(c.jido, :none)
 
-          restored = start_agent(c, id: saved.id, restore: :required)
+          restored = start_agent(c, id: saved.id, persistence_mode: :restore)
           assert_receive {:effect_attempt, "effect", retry_task}, 10000
           assert retry_task != task
           completed(c, restored, %{"effect" => 7})
@@ -55,7 +55,7 @@ defmodule JidoTest.System.Scenarios.Effects do
 
         {:ok, route_signal_1} = Probe.record_and_deliver_signal(%{effect_id: "effect", value: 7})
 
-        assert {:ok, saved} =
+        assert {:ok, saved, _} =
                  Jido.AgentServer.call(server, route_signal_1, [])
 
         assert_receive {:effect_attempt, "effect", task}, 10000
@@ -67,7 +67,7 @@ defmodule JidoTest.System.Scenarios.Effects do
         assert_receive {:DOWN, ^monitor, :process, ^server, _}, 10000
         assert {:ok, ^saved, 1} = load(c, saved.id)
         Observability.assert_persistence(c.observer, :rejected)
-        restored = start_agent(c, id: saved.id, restore: :required)
+        restored = start_agent(c, id: saved.id, persistence_mode: :restore)
         completed(c, restored, %{"effect" => 7})
         assert Server.snapshot(restored).state_version == 2
         stop_agent(c, restored)

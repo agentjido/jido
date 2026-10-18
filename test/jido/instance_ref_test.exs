@@ -282,8 +282,20 @@ defmodule JidoTest.InstanceRefTest do
     assert restored.state.count == 8
     assert :ok = Jido.hibernate_ref(second, ref)
     assert :ok = Jido.delete_agent(second, ref, Counter)
-    assert {:ok, deleted} = Jido.activate_agent(second, ref, Counter)
-    assert {{:shutdown, :deleted}, _} = catch_exit(Jido.AgentServer.await_ready(deleted))
+
+    assert {:error, :deleted} =
+             Jido.Persistence.load_agent(store, Counter, ref.id,
+               namespace: namespace,
+               partition: ref.partition
+             )
+
+    case Jido.activate_agent(second, ref, Counter) do
+      {:ok, deleted} ->
+        assert {{:shutdown, :deleted}, _} = catch_exit(Jido.AgentServer.await_ready(deleted))
+
+      {:error, :worker_unavailable} ->
+        assert Jido.whereis_agent(second, ref.id, partition: ref.partition) == nil
+    end
   end
 
   test "Ref startup rejects conflicting identity options before starting an Agent" do

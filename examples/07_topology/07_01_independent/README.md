@@ -1,15 +1,16 @@
-# 07_01 Independent Agents
+# 07_01 Named Members
 
-A Topology starts two unrelated Agents with separate state and identity.
+Two named members keep separate state under one owning Agent.
 
 ## What you will learn
 
-- How a declarative Topology defines singleton Agents.
-- How OTP restarts a failed Agent while repair is manual.
+- How `topology` declares members on a normal Agent definition.
+- How `initial_state` gives each member its own starting values.
+- How the owning AgentServer supervisor controls runtime lifetime.
 
 ## Read the code
 
-Read [the Topology](independent.ex), then the shared [Cell Agent](../support/cell.ex).
+Read the owner definition first, then the shared Cell Agent and tests.
 
 ## Run it
 
@@ -17,25 +18,33 @@ Read [the Topology](independent.ex), then the shared [Cell Agent](../support/cel
 mix test test/examples/07_topology/07_01_independent --include example --seed 0
 ```
 
-Expected result: both Agents start and state changes stay isolated. OTP
-restarts only the failed Agent with the same ID and committed state. A clean
-stop stays stopped after repair. Controller shutdown removes all live Agents.
+Expected result: The root and two members start. A command changes only the selected member.
+Stopping the owner stops its member runtimes.
 
 ## Important behavior
 
-Manual repair waits for `Controller.reconcile/1`. OTP restart and connection
-recovery continue. A replacement resumes the saved state revision. A healthy
-member keeps its committed state and PID. A clean stop stays stopped, including
-after a repair request.
+Call `Server.await_ready(server)` before using the member runtimes.
+`Server.children(server)` returns runtime records; its tags are opaque. The
+tests identify these example members through their domain labels.
+
+These members have separate domain state and share the owning supervisor
+lifetime. They are not independently supervised application roots.
 
 ## Limits
 
-This example has no ownership relationship or shared resource.
+This example does not promise to preserve live member state when the whole
+owner runtime restarts. A parent snapshot stores topology intent, not a
+coordinated snapshot of running member states.
 
 ## Files
 
 - [Source](independent.ex)
-- [Tests](../../../test/examples/07_topology/07_01_independent/independent_test.exs)
 - [Cell Agent](../support/cell.ex)
+- [Tests](../../../test/examples/07_topology/07_01_independent/independent_test.exs)
+- [Test runtime assertions](../../../test/examples/support/agent_topology_assertions.ex)
 
-Previous: [Flow Factory](../../06_factory/06_04_flow_factory/README.md) | Next: [Owned Hierarchy](../07_02_hierarchy/README.md)
+Previous: [Topology overview](../README.md) | Next: [Nested Agents](../07_02_hierarchy/README.md)
+
+The tests also encode this composed definition as JSON, decode it through a
+trusted Registry, and start the same named members. This is the small current
+replacement for the former data-defined Topology research matrix.

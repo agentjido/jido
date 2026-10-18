@@ -1,7 +1,6 @@
 defmodule JidoCoreBench.AuthoringCases do
   @moduledoc false
   alias Jido.Agent.Codec
-  alias Jido.Codec.Registry
   alias JidoCoreBench.Fixtures, as: F
 
   def workloads(sizes) do
@@ -32,9 +31,15 @@ defmodule JidoCoreBench.AuthoringCases do
         end,
         fn prepared ->
           case operation do
-            :encode -> Codec.encode(prepared.definition, prepared.registry)
-            :decode -> Codec.decode(prepared.document, prepared.registry)
-            :decode_instance -> Codec.decode(prepared.document, prepared.registry, id: "decoded")
+            :encode ->
+              Codec.encode(prepared.definition, prepared.registry)
+
+            :decode ->
+              Codec.decode(prepared.document, prepared.registry)
+
+            :decode_instance ->
+              with {:ok, definition} <- Codec.decode(prepared.document, prepared.registry),
+                   do: Jido.Agent.instantiate(definition, id: "decoded")
           end
         end,
         fn result -> F.equal!(elem(result, 0), :ok) end
@@ -69,8 +74,7 @@ defmodule JidoCoreBench.AuthoringCases do
         fn {definition, _document, _registry} ->
           case operation do
             :derive ->
-              with {:ok, entries} <- Codec.registry_entries(definition),
-                   do: Registry.derive(entries)
+              with {:ok, _, registry} <- Codec.encode(definition), do: {:ok, registry}
 
             :encode ->
               Codec.encode(definition)

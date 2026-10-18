@@ -1,3 +1,4 @@
+Code.require_file("delivery.exs", __DIR__)
 Code.require_file("adapters.exs", __DIR__)
 Code.require_file("observability.exs", __DIR__)
 Code.require_file("fault_adapter.exs", __DIR__)
@@ -5,7 +6,7 @@ Code.require_file("controlled_agent.exs", __DIR__)
 Code.require_file("migration_agent.exs", __DIR__)
 Code.require_file("bus_agent.exs", __DIR__)
 
-for file <- ~w(checkpoints effects fencing recovery execution restoration overload topology),
+for file <- ~w(checkpoints effects fencing recovery execution restoration overload),
     do: Code.require_file("scenarios/#{file}.exs", __DIR__)
 
 defmodule JidoTest.System.Case do
@@ -31,7 +32,6 @@ defmodule JidoTest.System.Case do
     world =
       start_supervised!(%{
         id: :system_world,
-        restart: :temporary,
         start:
           {Supervisor, :start_link,
            [
@@ -103,13 +103,14 @@ defmodule JidoTest.System.Case do
         [
           id: JidoTest.Case.unique_id(),
           persistence: context.persistence,
-          restore: false,
-          restart: :temporary
+          persistence_mode: :create
         ],
         opts
       )
 
     {:ok, server} = Jido.start_agent(context.jido, module, opts)
+    :ok = Jido.AgentServer.await_ready(server)
+    Process.put({:activation, server}, Jido.AgentServer.activation(server))
     server
   end
 
@@ -123,6 +124,8 @@ defmodule JidoTest.System.Case do
     )
   end
 
+  defdelegate start_result(jido, module, opts), to: JidoTest.AgentServerAssertions
+
   def read_bytes(adapter, key, opts) do
     case adapter.get(key, opts) do
       {:ok, bytes, _token} -> {:ok, bytes}
@@ -133,7 +136,13 @@ defmodule JidoTest.System.Case do
   def kill_agent(context, server) do
     monitors = monitor_agent_tree(context, server)
     JidoTest.System.Observability.killed(context.observer, server)
-    Process.exit(server, :kill)
+
+    :ok =
+      DynamicSupervisor.terminate_child(
+        Jido.agent_supervisor_name(context.jido),
+        Process.get({:activation, server})
+      )
+
     await_down(monitors)
     assert_empty_agent_pool(context)
   end

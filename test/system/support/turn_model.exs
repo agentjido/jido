@@ -199,7 +199,7 @@ defmodule JidoTest.System.TurnModel do
   end
 
   defp execute(_c, _base, server, _model, _expected, %{op: :success, value: value}) do
-    assert {:ok, _} = Server.call(server, ControlledAgent.signal(value))
+    assert {:ok, _, _} = Server.call(server, ControlledAgent.signal(value))
     server
   end
 
@@ -212,13 +212,13 @@ defmodule JidoTest.System.TurnModel do
        when op in [:cancel, :timeout] do
     gate = make_ref()
     signal = ControlledAgent.signal(value, gate: gate, observer: self())
-    request = Server.send_request(server, signal, :infinity)
+    request = Server.submit(server, signal)
     assert_receive {:work_held, ^gate, worker}, 10_000
     monitor = Process.monitor(worker)
 
     {_, _, _, started} =
       Observability.await(c.observer, fn
-        {^server, [:jido, :agent, :turn, :start], _, %{source_signal_id: source}} ->
+        {^server, [:jido, :agent_server, :turn, :start], _, %{signal_id: source}} ->
           source == signal.id
 
         _ ->
@@ -227,10 +227,10 @@ defmodule JidoTest.System.TurnModel do
 
     if op == :cancel do
       assert :ok = Server.cancel_turn(server, started.turn_id)
-      assert {:reply, {:error, :cancelled}} = Server.receive_response(request, 10_000)
+      assert {:error, :cancelled} = Server.await(request, 10_000)
     else
-      assert {:reply, {:error, %Jido.Error.TimeoutError{}}} =
-               Server.receive_response(request, 10_000)
+      assert {:error, :turn_timeout} =
+               Server.await(request, 10_000)
     end
 
     assert_receive {:DOWN, ^monitor, :process, ^worker, _}, 10_000
@@ -286,17 +286,20 @@ defmodule JidoTest.System.TurnModel do
 
   defp fenced(c, server, signal, reason) do
     monitors = monitor_agent_tree(c, server)
-    assert {:error, {:persistence_failed, ^reason}} = Server.call(server, signal)
+
+    assert {:error, %Jido.Error.ExecutionError{details: %{reason: ^reason}}} =
+             Server.call(server, signal)
+
     await_down(monitors)
     assert_empty_agent_pool(c)
-    Observability.assert_turn(c.observer, signal, :error, false)
+    Observability.assert_turn(c.observer, signal, :indeterminate, false)
   end
 
   defp activate(c, base, model, restore) do
     start_agent(c,
       module: ControlledAgent,
       id: "#{base}-#{model.epoch}",
-      restore: restore,
+      persistence_mode: if(restore == false, do: :create, else: :restore),
       turn_timeout: 100
     )
   end

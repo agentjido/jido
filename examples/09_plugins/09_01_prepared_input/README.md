@@ -41,4 +41,4 @@ runtime state or grant external authority.
 - [Plugin and Agent](prepared_input.ex)
 - [Tests](../../../test/examples/09_plugins/09_01_prepared_input/prepared_input_test.exs)
 
-Previous: [Elastic Group](../../08_applications/08_08_elastic_group/README.md) | Next: [Runtime Admission](../09_02_runtime_admission/README.md)
+Previous: [Applications](../../08_applications/README.md) | Next: [Runtime Admission](../09_02_runtime_admission/README.md)

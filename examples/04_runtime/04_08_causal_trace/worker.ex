@@ -29,7 +29,7 @@ defmodule Jido.Examples.CausalTrace.Worker do
           })
 
         {:ok, %{context.agent_state | value: value},
-         [Jido.Agent.Directive.emit_to_parent(result)]}
+         [Jido.AgentServer.Directive.owner_send(result)]}
       end
     end
   end

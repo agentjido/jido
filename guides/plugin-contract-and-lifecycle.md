@@ -139,7 +139,6 @@ Directive dispatch. It is bounded and is not a durable event stream.
 Use semantic Telemetry for observation alone. Use an owned Directive for an
 explicit effect request.
 
-See [Commit Projection](../examples/09_plugins/09_08_commit_projection/README.md).
 
 ### Runtime lifecycle
 

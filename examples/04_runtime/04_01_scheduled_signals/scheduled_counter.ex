@@ -42,9 +42,9 @@ defmodule Jido.Examples.ScheduledCounter do
       end
     end
 
-    route "examples.runtime.scheduled_counter.enable_cron", as: :enable_cron do
-      defaults %{expression: "* * * * * * *"}
-
+    route "examples.runtime.scheduled_counter.enable_cron",
+      as: :enable_cron,
+      defaults: %{expression: "* * * * * * *"} do
       action %{job_id: job_id, expression: expression},
         schema: Zoi.object(%{job_id: Zoi.any(), expression: Zoi.string()}),
         context: context do

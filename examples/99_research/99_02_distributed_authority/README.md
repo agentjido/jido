@@ -8,7 +8,8 @@ persistence writes, and external effects.
 ## Current public contract
 
 Jido provides local Agent identity, shared persistence adapter hooks, live
-Plugin admission, and exact-node placement. It does not provide a cluster owner
+Plugin admission, and a local OTP runtime. The peer test starts each Agent
+on its own node; the core runtime does not place remote Agents. It does not provide a cluster owner
 claim, lease, or leader election contract.
 
 ## Executable evidence

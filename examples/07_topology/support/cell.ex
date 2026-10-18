@@ -25,7 +25,5 @@ defmodule Jido.Examples.Topology.Cell do
          }}
       end
     end
-
-    route "jido.agent.**", Jido.Examples.Support.KeepState
   end
 end

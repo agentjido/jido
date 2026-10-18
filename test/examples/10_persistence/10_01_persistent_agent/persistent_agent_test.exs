@@ -14,14 +14,15 @@ defmodule JidoTest.Examples.Persistence.PersistentAgentTest do
     id = unique_id("persistent-counter")
 
     counter = start_counter(jido, id, persistence)
-    assert {:ok, _agent} = PersistentAgent.increment(counter, "command-1", 2)
-    assert {:ok, committed} = PersistentAgent.increment(counter, "command-2", 3)
+    assert {:ok, _agent, _directives} = PersistentAgent.increment(counter, "command-1", 2)
+    assert {:ok, committed, _directives} = PersistentAgent.increment(counter, "command-2", 3)
     assert committed.state.count == 5
     assert agent_result(counter).state_version == 2
 
     stop_server(jido, counter)
 
     assert {:ok, restored} = PersistentAgent.restore(jido, id, persistence)
+    assert :ok = Jido.AgentServer.await_ready(restored)
 
     assert %{
              state: %{
@@ -32,7 +33,7 @@ defmodule JidoTest.Examples.Persistence.PersistentAgentTest do
              state_version: 2
            } = agent_result(restored)
 
-    assert {:ok, continued} =
+    assert {:ok, continued, _directives} =
              PersistentAgent.increment(restored, "command-3", 4)
 
     assert continued.state.count == 9
@@ -45,7 +46,7 @@ defmodule JidoTest.Examples.Persistence.PersistentAgentTest do
     duplicate = PersistentAgent.increment_signal!("command-1", 7)
 
     counter = start_counter(jido, id, persistence)
-    assert {:ok, first} = Server.call(counter, duplicate)
+    assert {:ok, first, _directives} = Server.call(counter, duplicate)
     assert first.state.count == 7
     stop_server(jido, counter)
 
@@ -54,8 +55,9 @@ defmodule JidoTest.Examples.Persistence.PersistentAgentTest do
                error_policy: fn _, _ -> :continue end
              )
 
+    assert :ok = Server.await_ready(restored)
     assert Server.snapshot(restored) == %{agent: first, state_version: 1}
-    assert {:ok, ^first} = Server.call(restored, duplicate)
+    assert {:ok, ^first, _directives} = Server.call(restored, duplicate)
     assert Server.snapshot(restored) == %{agent: first, state_version: 2}
 
     # Read before hibernation so a stop-time write cannot hide a missed commit.
@@ -75,6 +77,7 @@ defmodule JidoTest.Examples.Persistence.PersistentAgentTest do
 
     stop_server(jido, restored)
     assert {:ok, restored_again} = PersistentAgent.restore(jido, id, persistence)
+    assert :ok = Jido.AgentServer.await_ready(restored_again)
     assert Server.snapshot(restored_again) == %{agent: first, state_version: 2}
   end
 
@@ -85,15 +88,15 @@ defmodule JidoTest.Examples.Persistence.PersistentAgentTest do
 
     assert :ok = ETS.put(key, <<0, 1, 2>>, opts)
 
-    assert {:error, _reason} =
-             PersistentAgent.restore(jido, id, persistence)
+    assert {:ok, server} = PersistentAgent.restore(jido, id, persistence)
+    assert catch_exit(Server.await_ready(server))
   end
 
   defp start_counter(jido, id, persistence) do
     start_agent!(jido, PersistentAgent,
       id: id,
       persistence: persistence,
-      restore: false
+      persistence_mode: :create
     )
   end
 

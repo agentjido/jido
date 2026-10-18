@@ -22,8 +22,8 @@ defmodule Jido.Examples.ReActAgent do
   routes do
     signal_source "/examples/llm/tool_loop"
 
-    route "examples.llm.tool_loop.ask", Jido.Examples.ReActAgent.ReasonFlow, as: :ask do
-      defaults %{messages: [], new_turn?: true, max_steps: 8, steps_remaining: 8}
-    end
+    route "examples.llm.tool_loop.ask", Jido.Examples.ReActAgent.ReasonFlow,
+      as: :ask,
+      defaults: %{messages: [], new_turn?: true, max_steps: 8, steps_remaining: 8}
   end
 end

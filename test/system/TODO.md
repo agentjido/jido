@@ -1,3 +1,8 @@
+> Historical record: the results and API descriptions below are from September
+> 2026. They are not the current suite count or API contract. See [README.md](README.md)
+> and [SCENARIOS.md](SCENARIOS.md) for the current suite. Removed Topology and
+> projection probes below are retained only as historical evidence.
+
 # Runtime system test work
 
 Keep each new scenario tied to an explicit state, effect, resource, and

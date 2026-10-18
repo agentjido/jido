@@ -30,7 +30,7 @@ defmodule JidoTest.AgentCaseTest do
           :snapshot -> Server.snapshot(state.server)
         end
 
-      {:ok, _agent} = Server.call(state.server, state.command)
+      {:ok, _agent, _directives} = Server.call(state.server, state.command)
       {:reply, result, state}
     end
 
@@ -40,7 +40,7 @@ defmodule JidoTest.AgentCaseTest do
   end
 
   setup %{jido: jido} do
-    {:ok, server} = Jido.start_agent(jido, CounterAgent, id: unique_id())
+    {:ok, server} = JidoTest.ExampleRuntime.start_agent(jido, CounterAgent, id: unique_id())
     command = signal("counter.add", %{by: 1, label: "between reads"})
     proxy = start_supervised!({CommitAfterRead, server: server, command: command})
 

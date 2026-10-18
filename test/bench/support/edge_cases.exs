@@ -42,6 +42,7 @@ defmodule JidoCoreBench.EdgeCases do
               Map.merge(context, %{
                 agent_id: agent.id,
                 agent_state: agent.state,
+                agent_topology: agent.topology,
                 plugin_inputs: %{},
                 signal: signal
               })
@@ -63,7 +64,7 @@ defmodule JidoCoreBench.EdgeCases do
         "codec/generated/#{n}",
         fn _ -> F.definition(n) end,
         &Jido.Agent.Codec.encode/1,
-        fn {:ok, document, _registry} -> F.equal!(length(document["routes"]), n) end
+        fn {:ok, document, _registry} -> F.equal!(length(document["agent"]["routes"]), n) end
       )
       |> Map.put(:verify, fn definition, {:ok, document, registry} ->
         F.equal!(Jido.Agent.Codec.decode(document, registry), {:ok, definition})

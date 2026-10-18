@@ -8,7 +8,7 @@ defmodule JidoTest.Examples.Workflow.BoundedIterationTest do
 
     {:ok, command_signal_1} = Example.repair_signal(%{missing: 0})
 
-    assert {:ok, complete} =
+    assert {:ok, complete, _directives} =
              Server.call(
                server,
                command_signal_1
@@ -18,7 +18,7 @@ defmodule JidoTest.Examples.Workflow.BoundedIterationTest do
 
     {:ok, command_signal_2} = Example.repair_signal(%{missing: 3})
 
-    assert {:ok, repaired} =
+    assert {:ok, repaired, _directives} =
              Server.call(
                server,
                command_signal_2
@@ -33,7 +33,7 @@ defmodule JidoTest.Examples.Workflow.BoundedIterationTest do
 
     {:ok, command_signal_3} = Example.repair_signal(%{missing: 1})
 
-    assert {:ok, _} =
+    assert {:ok, _, _directives} =
              Server.call(
                server,
                command_signal_3

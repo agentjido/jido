@@ -13,14 +13,12 @@ defmodule Jido.Examples.OTPSupervision.Counter do
   routes do
     signal_source "/examples/basic/otp_supervision"
 
-    route "examples.basic.otp_supervision.increment", as: :increment do
+    route "examples.basic.otp_supervision.increment", as: :increment, defaults: %{amount: 1} do
       action %{amount: amount},
         schema: Zoi.object(%{amount: Zoi.integer()}),
         context: context do
         {:ok, %{context.agent_state | count: context.agent_state.count + amount}}
       end
-
-      defaults %{amount: 1}
     end
   end
 end

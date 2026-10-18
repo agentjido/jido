@@ -553,7 +553,7 @@ defmodule Jido.Persistence do
   end
 
   defp decode_record(value, agent_module) do
-    # Only the caller-supplied module can provide atoms before safe decoding.
+    # The caller module supplies domain atoms; Record loads trusted envelope fields.
     _ = Code.ensure_loaded?(agent_module)
     Record.decode(value)
   end

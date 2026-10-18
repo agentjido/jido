@@ -16,5 +16,4 @@ defmodule JidoTest.System.Services.Redis do
   use JidoTest.System.Scenarios.Execution
   use JidoTest.System.Scenarios.Restoration
   use JidoTest.System.Scenarios.Overload
-  use JidoTest.System.Scenarios.Topology
 end

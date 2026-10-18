@@ -2,7 +2,7 @@ Code.require_file("fixtures.exs", __DIR__)
 Code.require_file("measure.exs", __DIR__)
 Code.require_file("report.exs", __DIR__)
 Code.require_file("runtime_cases.exs", __DIR__)
-Code.require_file("agent_server2_cases.exs", __DIR__)
+Code.require_file("agent_server_cases.exs", __DIR__)
 Code.require_file("data_cases.exs", __DIR__)
 Code.require_file("edge_cases.exs", __DIR__)
 Code.require_file("merge_cases.exs", __DIR__)
@@ -11,7 +11,6 @@ Code.require_file("persistence_cases.exs", __DIR__)
 Code.require_file("scheduler_cases.exs", __DIR__)
 Code.require_file("codec_cases.exs", __DIR__)
 Code.require_file("authoring_cases.exs", __DIR__)
-Code.require_file("topology_cases.exs", __DIR__)
 
 defmodule JidoCoreBench.Suite do
   @moduledoc false
@@ -27,8 +26,7 @@ defmodule JidoCoreBench.Suite do
     PersistenceCases,
     SchedulerCases,
     CodecCases,
-    AuthoringCases,
-    TopologyCases
+    AuthoringCases
   }
 
   def run(profile, filter \\ nil) do
@@ -106,7 +104,7 @@ defmodule JidoCoreBench.Suite do
     :ok
   end
 
-  def workloads("agent_server2"), do: JidoCoreBench.AgentServer2Cases.workloads()
+  def workloads("agent_server"), do: JidoCoreBench.AgentServerCases.workloads()
 
   def workloads(profile) do
     s = settings(profile)
@@ -121,8 +119,7 @@ defmodule JidoCoreBench.Suite do
       PersistenceCases.workloads() ++
       SchedulerCases.workloads(s.payloads) ++
       CodecCases.workloads() ++
-      AuthoringCases.workloads(s.sizes) ++
-      TopologyCases.workloads(s.sizes)
+      AuthoringCases.workloads(s.sizes)
   end
 
   def write!(report, directory) do
@@ -133,7 +130,7 @@ defmodule JidoCoreBench.Suite do
 
   def metadata, do: %{source: source(), environment: environment()}
 
-  def settings("agent_server2"), do: %{settings("smoke") | profile: "agent_server2"}
+  def settings("agent_server"), do: %{settings("smoke") | profile: "agent_server"}
 
   def settings("smoke"),
     do: %{
@@ -166,7 +163,7 @@ defmodule JidoCoreBench.Suite do
     }
 
   def settings(_),
-    do: raise(ArgumentError, "profile must be smoke, short, scale, or agent_server2")
+    do: raise(ArgumentError, "profile must be smoke, short, scale, or agent_server")
 
   defp source do
     files = Path.wildcard(Path.expand("../**/*.exs", __DIR__)) |> Enum.sort()

@@ -25,7 +25,7 @@ defmodule JidoTest.System.SupervisionTest do
 
     {:ok, route_signal_1} = Probe.record_and_deliver_signal(%{effect_id: "saved", value: 7})
 
-    assert {:ok, _} =
+    assert {:ok, _, _} =
              Jido.AgentServer.call(server, route_signal_1, [])
 
     completed(c, server, %{"saved" => 7})

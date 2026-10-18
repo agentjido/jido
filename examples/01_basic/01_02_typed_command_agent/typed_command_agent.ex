@@ -3,6 +3,7 @@ defmodule Jido.Examples.TypedCommandAgent do
   An Agent with typed commands and complete candidate-state validation.
 
   The schema owns the count bounds. Actions do not repeat that check.
+  An invalid candidate returns `Jido.Agent.Error` with code `:invalid_state`.
   The profile route supplies a default patch. A Signal patch replaces that
   entire nested map before the Action validates its input.
   """
@@ -36,7 +37,9 @@ defmodule Jido.Examples.TypedCommandAgent do
   routes do
     signal_source "/examples/basic/typed_command_agent"
 
-    route "basic.typed_command.patch_profile", as: :patch_profile do
+    route "basic.typed_command.patch_profile",
+      as: :patch_profile,
+      defaults: %{patch: %{name: "Route default", push: true}} do
       action %{patch: patch},
         schema:
           Zoi.object(%{
@@ -51,8 +54,6 @@ defmodule Jido.Examples.TypedCommandAgent do
         profile = %{profile | name: String.trim(profile.name)}
         {:ok, %{context.agent_state | profile: profile}}
       end
-
-      defaults %{patch: %{name: "Route default", push: true}}
     end
 
     route "basic.typed_command.set_count", as: :set_count do

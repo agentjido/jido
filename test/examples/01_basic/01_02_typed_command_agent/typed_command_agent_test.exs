@@ -1,8 +1,9 @@
 defmodule JidoTest.Examples.Basic.TypedCommandAgentTest do
-  use JidoTest.BasicSDKCase
+  use JidoTest.Case, async: true
+  @moduletag :example
 
   alias Jido.AgentServer, as: Server
-  alias Jido.Error.ValidationError
+  alias Jido.Agent.Error
   alias Jido.Examples.TypedCommandAgent, as: Agent
 
   test "route defaults and typed command input agree in direct and live execution", %{jido: jido} do
@@ -31,13 +32,13 @@ defmodule JidoTest.Examples.Basic.TypedCommandAgentTest do
       assert candidate.state.profile == expected_profile
       assert Server.snapshot(server) == before
 
-      assert {:ok, ^candidate} = Server.call(server, command)
+      assert {:ok, ^candidate, []} = Server.call(server, command)
       assert Server.snapshot(server) == %{agent: candidate, state_version: 1}
     end
   end
 
   test "invalid typed input does not commit and a valid command recovers", %{jido: jido} do
-    server = start_agent!(jido, Agent, error_policy: observe_errors())
+    server = start_agent!(jido, Agent, error_policy: :log_only)
     before = Server.snapshot(server)
 
     for patch <- [%{push: "yes"}, %{unknown: true}, nil] do
@@ -53,7 +54,7 @@ defmodule JidoTest.Examples.Basic.TypedCommandAgentTest do
 
     {:ok, route_signal_1} = Agent.patch_profile_signal(%{patch: %{name: "Valid"}})
 
-    assert {:ok, recovered} =
+    assert {:ok, recovered, []} =
              Jido.AgentServer.call(server, route_signal_1, [])
 
     assert recovered.state.profile.name == "Valid"
@@ -61,22 +62,32 @@ defmodule JidoTest.Examples.Basic.TypedCommandAgentTest do
   end
 
   test "complete Agent validation rejects an out-of-bounds candidate", %{jido: jido} do
-    server = start_agent!(jido, Agent, error_policy: observe_errors())
+    server = start_agent!(jido, Agent, error_policy: :log_only)
     before = Server.snapshot(server)
 
     {:ok, route_signal_2} = Agent.set_count_signal(%{count: 6})
 
-    assert {:error, %ValidationError{message: "Agent state does not match its schema"}} =
-             Jido.AgentServer.call(server, route_signal_2, [])
+    assert {:error, %Error{code: :invalid_state, path: [:state]}} =
+             Agent.cmd(before.agent, route_signal_2)
+
+    assert {:error, %Error{code: :invalid_state, path: [:state]}} =
+             Server.call(server, route_signal_2)
 
     assert Server.snapshot(server) == before
 
     {:ok, route_signal_3} = Agent.set_count_signal(%{count: 5})
 
-    assert {:ok, recovered} =
+    assert {:ok, recovered, []} =
              Jido.AgentServer.call(server, route_signal_3, [])
 
     assert recovered.state.count == 5
     assert Server.snapshot(server) == %{agent: recovered, state_version: 1}
+  end
+
+  defp start_agent!(jido, agent, opts \\ []) do
+    opts = Keyword.put_new_lazy(opts, :id, &unique_id/0)
+    {:ok, server} = JidoTest.ExampleRuntime.start_agent(jido, agent, opts)
+    assert :ok = Server.await_ready(server)
+    server
   end
 end

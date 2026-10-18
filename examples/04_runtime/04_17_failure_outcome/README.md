@@ -5,7 +5,7 @@ A Turn Outcome records where work stopped and whether state committed.
 ## What you will learn
 
 - How a precommit Action failure produces an uncommitted Outcome.
-- How `Jido.Agent.Directive.Error` reports a postcommit failure.
+- How `Jido.AgentServer.Directive.ErrorReport` reports a postcommit failure.
 - How a continuing policy keeps the Agent available.
 - How `:stop_on_error` stops the Agent after one failure.
 - How `{:emit_signal, dispatch}` sends one bounded public error Signal.
@@ -22,18 +22,17 @@ Directive for postcommit policy handling.
 mix test test/examples/04_runtime/04_17_failure_outcome --include example --seed 0
 ```
 
-Expected result: the precommit Outcome has stage `:execute` and no new state
+Expected result: the precommit Outcome has stage `:running` and no new state
 version. The Error Directive Outcome has stage `:directive` and version one.
 
 ## Important behavior
 
-An error policy receives the failure reason and the public
-`Jido.Agent.Turn.Outcome`. The Outcome contains status, stage, commit state,
-state versions, and a bounded Directive summary. It does not contain private
+An error policy receives the failure reason and a public summary map. The map contains status, stage, commit state,
+state versions, and the Directive count. It does not contain private
 Agent Server state.
 
 The continuing policy returns `:continue`. The stopping policy uses
-`:stop_on_error`. The emitted-Signal policy sends `jido.agent.error` to an
+`:stop_on_error`. The emitted-Signal policy sends `jido.agent_server.error` to an
 external dispatch target and does not emit another error Signal when that
 Signal fails.
 

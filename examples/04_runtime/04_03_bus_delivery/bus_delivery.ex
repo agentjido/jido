@@ -13,16 +13,16 @@ defmodule Jido.Examples.BusDelivery do
              values: Zoi.list(Zoi.integer()) |> Zoi.default([])
            })
 
-    plugin Jido.Plugin.Bus.Manager, config: [name: :example_commands]
+    plugin Jido.Plugin.Bus.Manager, config: %{name: :example_commands}
 
     plugin Jido.Plugin.Bus.Client,
-      config: [
+      config: %{
         bus: :example_commands,
         path: "examples.runtime.bus_delivery.**",
         durable: "example-consumer",
         start_from: :origin,
         retry_delay_ms: 10
-      ]
+      }
   end
 
   routes do

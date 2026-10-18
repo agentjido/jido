@@ -48,12 +48,24 @@ ExUnit.configure(
   formatters: Enum.uniq(ExUnit.configuration()[:formatters] ++ [Covenant.Formatter])
 )
 
-# Compile example helpers only when examples are selected. Parallel compilation
-# resolves dependencies between the case templates.
-if Enum.any?(ExUnit.configuration()[:include], fn
-     {tag, _} -> tag == :example
-     tag -> tag == :example
-   end) do
+# A full discovery compiles excluded example tests too. Load their sources
+# before those tests. Focused core commands do not need the example sources.
+requested_paths =
+  System.argv()
+  |> Enum.drop(1)
+  |> Enum.map(&(&1 |> String.split(":", parts: 2) |> hd()))
+  |> Enum.filter(&File.exists?/1)
+  |> Enum.map(&Path.expand/1)
+
+loads_examples? =
+  requested_paths == [] or Path.expand("test") in requested_paths or
+    Enum.any?(requested_paths, &String.starts_with?(&1, Path.expand("test/examples")))
+
+if loads_examples? or
+     Enum.any?(ExUnit.configuration()[:include], fn
+       {tag, _} -> tag == :example
+       tag -> tag == :example
+     end) do
   {:ok, _, _} =
     Kernel.ParallelCompiler.compile(
       Path.wildcard("examples/**/*.ex") ++

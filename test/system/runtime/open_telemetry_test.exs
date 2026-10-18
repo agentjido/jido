@@ -75,28 +75,26 @@ defmodule JidoTest.System.OpenTelemetryTest do
     :ok
   end
 
-  test "exported SDK spans preserve Signal parentage through Turn, commit, and persistence", c do
+  test "exported SDK spans preserve Signal parentage through Turn and persistence", c do
     server = start_agent(c, module: ControlledAgent)
     trace = Trace.new_root()
     {:ok, signal} = Trace.put(ControlledAgent.signal(7, secret: "private-export-data"), trace)
-    assert {:ok, saved} = Server.call(server, signal)
+    assert {:ok, saved, _} = Server.call(server, signal)
     stop_agent(c, server)
     spans = exports([])
-    [turn] = Enum.filter(spans, &(&1.name == "jido.agent.turn"))
-    [commit] = Enum.filter(spans, &(&1.name == "jido.agent.commit"))
+    [turn] = Enum.filter(spans, &(&1.name == "jido.agent_server.turn"))
 
     [write] =
       Enum.filter(
         spans,
         &(&1.name == "jido.persistence.compare_and_swap" and
-            &1.attributes["jido.persistence.reason"] == "commit")
+            &1.attributes["jido.revision.after"] == 1)
       )
 
     assert turn.trace_id == String.to_integer(trace.trace_id, 16)
     assert turn.parent_span_id == String.to_integer(trace.span_id, 16)
-    assert commit.parent_span_id == turn.span_id
-    assert write.parent_span_id == commit.span_id
-    assert Enum.uniq(Enum.map([turn, commit, write], & &1.trace_id)) == [turn.trace_id]
+    assert write.parent_span_id == turn.span_id
+    assert Enum.uniq(Enum.map([turn, write], & &1.trace_id)) == [turn.trace_id]
     assert turn.attributes["jido.state.version.after"] == 1
     assert turn.attributes["jido.committed"] == true
     refute inspect(spans) =~ "private-export-data"
@@ -107,7 +105,7 @@ defmodule JidoTest.System.OpenTelemetryTest do
   @tag exporter_failure: true
   test "an SDK exporter exception cannot change a committed result or stored revision", c do
     server = start_agent(c, module: ControlledAgent)
-    assert {:ok, saved} = Server.call(server, ControlledAgent.signal(7))
+    assert {:ok, saved, _} = Server.call(server, ControlledAgent.signal(7))
     assert_receive :export_attempted, 5_000
     assert {:ok, ^saved, 1} = load(c, saved.id, ControlledAgent)
     stop_agent(c, server)
@@ -120,20 +118,20 @@ defmodule JidoTest.System.OpenTelemetryTest do
     :ok =
       :telemetry.attach(
         handler,
-        [:jido, :agent, :turn, :stop],
+        [:jido, :agent_server, :turn, :stop],
         &__MODULE__.fail_handler/4,
         self()
       )
 
     on_exit(fn -> :telemetry.detach(handler) end)
     server = start_agent(c, module: ControlledAgent)
-    assert {:ok, _} = Server.call(server, ControlledAgent.signal(7))
+    assert {:ok, _, _} = Server.call(server, ControlledAgent.signal(7))
     assert_receive :handler_attempted, 5_000
     refute Enum.any?(:telemetry.list_handlers([]), &(&1.id == handler))
-    assert {:ok, saved} = Server.call(server, ControlledAgent.signal(9))
+    assert {:ok, saved, _} = Server.call(server, ControlledAgent.signal(9))
     assert {:ok, ^saved, 2} = load(c, saved.id, ControlledAgent)
     stop_agent(c, server)
-    turns = exports([]) |> Enum.filter(&(&1.name == "jido.agent.turn"))
+    turns = exports([]) |> Enum.filter(&(&1.name == "jido.agent_server.turn"))
     assert length(turns) == 2
   end
 
@@ -152,7 +150,7 @@ defmodule JidoTest.System.OpenTelemetryTest do
         {microseconds, _} =
           :timer.tc(fn ->
             for value <- 1..25,
-                do: assert({:ok, _} = Server.call(server, ControlledAgent.signal(value)))
+                do: assert({:ok, _, _} = Server.call(server, ControlledAgent.signal(value)))
           end)
 
         {enabled?, microseconds}
@@ -163,7 +161,7 @@ defmodule JidoTest.System.OpenTelemetryTest do
     assert %{postponed: 0, message_queue_len: 0} = Server.status(server).admission
     stop_agent(c, server)
     assert_empty_agent_pool(c)
-    assert length(Enum.filter(exports([]), &(&1.name == "jido.agent.turn"))) == 50
+    assert length(Enum.filter(exports([]), &(&1.name == "jido.agent_server.turn"))) == 50
 
     # Hardware and scheduler load affect these costs. Record measurements, not
     # an unstable timing ratio assertion. Both modes retain the system recorder.

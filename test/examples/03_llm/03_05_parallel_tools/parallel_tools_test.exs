@@ -37,7 +37,7 @@ defmodule JidoTest.Examples.LLM.ParallelToolsTest do
     send(b, {:release, "b"})
     assert_receive {:DOWN, ^ref_b, :process, ^b, _}, 1000
     send(a, {:release, "a"})
-    assert {:ok, agent} = Task.await(task)
+    assert {:ok, agent, _directives} = Task.await(task)
     results = [%{id: "a", result: "a"}, %{id: "b", result: "b"}]
     assert agent.state.tool_results == results
     assert List.last(calls(model)) == {:finish, %{prompt: "parallel", results: results}}
@@ -65,7 +65,7 @@ defmodule JidoTest.Examples.LLM.ParallelToolsTest do
     send(a, {:release, :a})
     assert_receive {:provider_waiting, :b, b, _, _}, 1000
     send(b, {:release, :b})
-    assert {:ok, _} = Task.await(task)
+    assert {:ok, _, _directives} = Task.await(task)
   end
 
   test "complete plan admission rejects duplicate IDs, unknown names, and bad arguments before any effect",
@@ -111,7 +111,7 @@ defmodule JidoTest.Examples.LLM.ParallelToolsTest do
 
     {:ok, command_signal_4} = Example.plan_signal(%{prompt: "empty"})
 
-    assert {:ok, _} =
+    assert {:ok, _, _directives} =
              Server.call(
                server,
                command_signal_4,
@@ -123,7 +123,7 @@ defmodule JidoTest.Examples.LLM.ParallelToolsTest do
 
     {:ok, command_signal_5} = Example.plan_signal(%{prompt: "error"})
 
-    assert {:ok, agent} =
+    assert {:ok, agent, _directives} =
              Server.call(
                server,
                command_signal_5,
@@ -144,7 +144,7 @@ defmodule JidoTest.Examples.LLM.ParallelToolsTest do
 
     {:ok, command_signal_6} = Example.plan_signal(%{prompt: "seed"})
 
-    assert {:ok, _} =
+    assert {:ok, _, _directives} =
              Server.call(
                server,
                command_signal_6,

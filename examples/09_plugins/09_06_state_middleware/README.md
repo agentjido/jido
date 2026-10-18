@@ -42,4 +42,4 @@ does not export or persist an audit history.
 - [Directive, Plugin, and Agent](state_middleware.ex)
 - [Tests](../../../test/examples/09_plugins/09_06_state_middleware/state_middleware_test.exs)
 
-Previous: [Composition](../09_05_composition/README.md) | Next: [Commit Projection](../09_08_commit_projection/README.md)
+Previous: [Composition](../09_05_composition/README.md) | Next: [Persistence examples](../../10_persistence/README.md)

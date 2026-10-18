@@ -3,7 +3,6 @@ defmodule Jido.Examples.DataDefinedAgent do
 
   alias Jido.Agent
   alias Jido.Agent.Codec
-  alias Jido.Codec.Registry
 
   defmodule Add do
     @moduledoc "Adds one validated amount to the current count."
@@ -28,29 +27,17 @@ defmodule Jido.Examples.DataDefinedAgent do
 
   @doc "Returns the validated neutral Agent definition."
   def definition do
-    Agent.new!(
+    Agent.define!(%{
       name: "basic_data_defined_agent",
       schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}),
-      plugins: [CountTurns],
-      routes: [{"examples.basic.data_defined.add", Add}]
-    )
-  end
-
-  @doc "Returns the stable allowlist used to encode and decode the definition."
-  def registry(definition \\ definition()) do
-    Registry.new!(%{
-      "agents/neutral" => {:agent, Agent},
-      "actions/add" => {:action, Add},
-      "plugins/count-turns" => {:plugin, CountTurns},
-      "schemas/count" => {:schema, definition.schema}
+      extensions: [%{id: CountTurns.id(), provider: CountTurns, vsn: 1, data: %{}}],
+      routes: [%{path: "examples.basic.data_defined.add", handler: %{kind: :action, target: Add}}]
     })
   end
 
-  @doc "Encodes the static definition with stable Registry identifiers."
+  @doc "Encodes one validated definition with a trusted reference Registry."
   def encode do
-    definition = definition()
-    registry = registry(definition)
-    {:ok, document} = Codec.encode(definition, registry)
+    {:ok, document, registry} = Codec.encode(definition())
     {document, registry}
   end
 

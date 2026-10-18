@@ -34,7 +34,7 @@ defmodule JidoTest.AgentCase do
     id = Keyword.get_lazy(opts, :id, fn -> unique_agent_id(agent) end)
     start_opts = Keyword.put(opts, :id, id)
 
-    case Jido.start_agent(jido, agent, start_opts) do
+    case JidoTest.ExampleRuntime.start_agent(jido, agent, start_opts) do
       {:ok, server} -> server
       {:error, reason} -> raise "could not start #{inspect(agent)}: #{inspect(reason)}"
     end

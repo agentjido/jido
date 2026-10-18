@@ -11,9 +11,10 @@ defmodule JidoTest.Examples.Applications.PurposeLoopTest do
   test "scheduled finite turns continue without client input and ignore duplicate ticks", %{
     jido: jido
   } do
-    {:ok, agent_server} = Jido.start_agent(jido, Agent, id: unique_id("purpose-loop"))
+    {:ok, agent_server} =
+      JidoTest.ExampleRuntime.start_agent(jido, Agent, id: unique_id("purpose-loop"))
 
-    assert {:ok, started} =
+    assert {:ok, started, _directives} =
              Server.call(
                agent_server,
                signal("examples.applications.purpose_loop.start", %{
@@ -28,7 +29,7 @@ defmodule JidoTest.Examples.Applications.PurposeLoopTest do
     assert started.state.completed == []
 
     duplicate = Signals.tick(started.state.generation, started.state.next_sequence)
-    assert {:ok, first_turn} = Server.call(agent_server, duplicate)
+    assert {:ok, first_turn, _directives} = Server.call(agent_server, duplicate)
     assert first_turn.state.completed == ["a"]
 
     eventually(
@@ -47,7 +48,7 @@ defmodule JidoTest.Examples.Applications.PurposeLoopTest do
 
     idle_state = Server.agent(agent_server).state
 
-    assert {:ok, woken} =
+    assert {:ok, woken, _directives} =
              Server.call(
                agent_server,
                signal("examples.applications.purpose_loop.enqueue", %{work: ["d"]})
@@ -83,13 +84,13 @@ defmodule JidoTest.Examples.Applications.PurposeLoopTest do
     persistence = {Jido.Persistence.ETS, table: table}
 
     {:ok, agent_server} =
-      Jido.start_agent(jido, Agent,
+      JidoTest.ExampleRuntime.start_agent(jido, Agent,
         id: id,
         persistence: persistence,
-        restore: false
+        persistence_mode: :create
       )
 
-    assert {:ok, started} =
+    assert {:ok, started, _directives} =
              Server.call(
                agent_server,
                signal("examples.applications.purpose_loop.start", %{
@@ -101,10 +102,10 @@ defmodule JidoTest.Examples.Applications.PurposeLoopTest do
              )
 
     first_tick = Signals.tick(started.state.generation, started.state.next_sequence)
-    assert {:ok, first_turn} = Server.call(agent_server, first_tick)
+    assert {:ok, first_turn, _directives} = Server.call(agent_server, first_tick)
     assert first_turn.state.completed == ["one"]
 
-    assert {:ok, paused} =
+    assert {:ok, paused, _directives} =
              Server.call(agent_server, signal("examples.applications.purpose_loop.pause"))
 
     assert paused.state.phase == :paused
@@ -136,9 +137,10 @@ defmodule JidoTest.Examples.Applications.PurposeLoopTest do
     assert {:ok, restarted_server} =
              Jido.thaw(jido, Agent, id, persistence: persistence)
 
+    assert :ok = Server.await_ready(restarted_server)
     assert restarted_server != agent_server
 
-    assert {:ok, resumed} =
+    assert {:ok, resumed, _directives} =
              Server.call(restarted_server, signal("examples.applications.purpose_loop.resume"))
 
     assert resumed.state.phase == :running
@@ -147,7 +149,7 @@ defmodule JidoTest.Examples.Applications.PurposeLoopTest do
       timeout: 2_000
     )
 
-    assert {:ok, draining} =
+    assert {:ok, draining, _directives} =
              Server.call(restarted_server, signal("examples.applications.purpose_loop.drain"))
 
     assert draining.state.phase == :draining
@@ -162,7 +164,7 @@ defmodule JidoTest.Examples.Applications.PurposeLoopTest do
       timeout: 2_000
     )
 
-    assert {:ok, rejected} =
+    assert {:ok, rejected, _directives} =
              Server.call(
                restarted_server,
                signal("examples.applications.purpose_loop.enqueue", %{work: ["late"]})
@@ -187,8 +189,8 @@ defmodule JidoTest.Examples.Applications.PurposeLoopTest do
 
   defp scheduler_runtime(agent_server) do
     eventually(fn ->
-      case Server.children(agent_server)[{:plugin, Scheduler}] do
-        %{pid: pid} when is_pid(pid) -> pid
+      case JidoTest.ExampleRuntime.plugin(Server.activation(agent_server), Scheduler) do
+        pid when is_pid(pid) -> pid
         _child -> nil
       end
     end)

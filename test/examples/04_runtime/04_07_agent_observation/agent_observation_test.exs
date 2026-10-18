@@ -14,14 +14,14 @@ defmodule JidoTest.Examples.Runtime.AgentObservationTest do
     probe = EventProbe.attach(id)
 
     try do
-      assert {:ok, server} = Jido.start_agent(jido, Example, id: id)
+      assert {:ok, server} = JidoTest.ExampleRuntime.start_agent(jido, Example, id: id)
       {:ok, success} = Example.record_signal(%{value: 7})
 
       {:ok, delivery} =
         Example.send_to_missing_child_signal(%{value: 11})
 
-      assert {:ok, _} = Server.call(server, success)
-      assert {:ok, _} = Server.call(server, delivery)
+      assert {:ok, _, _directives} = Server.call(server, success)
+      assert {:ok, _, _directives} = Server.call(server, delivery)
       eventually(fn -> Server.status(server).phase == :idle end)
 
       settled =
@@ -29,7 +29,7 @@ defmodule JidoTest.Examples.Runtime.AgentObservationTest do
           events =
             Enum.filter(
               EventProbe.events(probe),
-              &(&1.event == [:jido, :agent, :turn, :settled])
+              &(&1.event == [:jido, :agent_server, :turn, :settled])
             )
 
           if length(events) == 2 do
@@ -38,19 +38,25 @@ defmodule JidoTest.Examples.Runtime.AgentObservationTest do
         end)
 
       assert [recorded] =
-               Enum.filter(settled, &(&1.metadata.source_signal_id == success.id))
+               Enum.filter(settled, &(&1.metadata.signal_id == success.id))
 
       assert recorded.metadata.status == :ok
       assert recorded.metadata.committed?
       assert recorded.measurements.state_version_after == 1
 
       assert [failed_delivery] =
-               Enum.filter(settled, &(&1.metadata.source_signal_id == delivery.id))
+               Enum.filter(settled, &(&1.metadata.signal_id == delivery.id))
 
-      assert failed_delivery.metadata.status == :error
-      assert failed_delivery.metadata.stage == :directive
+      assert failed_delivery.metadata.status == :ok
+      assert failed_delivery.metadata.stage == :commit
       assert failed_delivery.metadata.committed?
       assert failed_delivery.measurements.state_version_after == 2
+
+      assert Enum.any?(EventProbe.events(probe), fn event ->
+               event.event == [:jido, :agent_server, :effects, :stop] and
+                 event.metadata.status == :error and event.metadata.stage == :directive
+             end)
+
       refute inspect(settled) =~ "private-agent-state"
     after
       EventProbe.detach(probe)

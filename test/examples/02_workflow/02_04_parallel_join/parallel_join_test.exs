@@ -13,7 +13,7 @@ defmodule JidoTest.Examples.Workflow.ParallelJoinTest do
 
     {:ok, route_signal_1} = Example.fetch_pair_signal(%{value: 3})
 
-    assert {:ok, agent} =
+    assert {:ok, agent, _directives} =
              Jido.AgentServer.call(server, route_signal_1, context: %{request: "generated"})
 
     assert agent.state.result.left == %{side: :left, value: 3, request: "generated"}
@@ -37,7 +37,7 @@ defmodule JidoTest.Examples.Workflow.ParallelJoinTest do
 
     {:ok, route_signal_3} = Example.fetch_pair_signal(%{value: 2})
 
-    assert {:ok, agent} =
+    assert {:ok, agent, _directives} =
              Jido.AgentServer.call(server, route_signal_3, context: %{request: "shared"})
 
     assert agent.state.result == %{
@@ -53,7 +53,7 @@ defmodule JidoTest.Examples.Workflow.ParallelJoinTest do
 
     {:ok, route_signal_4} = Example.fetch_pair_signal(%{value: 1})
 
-    assert {:ok, _} =
+    assert {:ok, _, _directives} =
              Jido.AgentServer.call(server, route_signal_4, [])
 
     before = Server.snapshot(server)

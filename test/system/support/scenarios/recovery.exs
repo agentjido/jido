@@ -15,7 +15,7 @@ defmodule JidoTest.System.Scenarios.Recovery do
         {:ok, route_signal_1} =
           Probe.record_and_deliver_signal(%{effect_id: "stable-effect", value: 7})
 
-        assert {:ok, saved} =
+        assert {:ok, saved, _} =
                  Jido.AgentServer.call(server, route_signal_1, [])
 
         assert_receive {:effect_attempt, "stable-effect", first}, 10000
@@ -27,7 +27,7 @@ defmodule JidoTest.System.Scenarios.Recovery do
         :ok = FaultAdapter.sequence(c.control, [{2, :reject}, {2, :reject}])
 
         for _ <- 1..2 do
-          restored = start_agent(c, id: saved.id, restore: :required)
+          restored = start_agent(c, id: saved.id, persistence_mode: :restore)
           assert_receive {:effect_attempt, "stable-effect", worker}, 10000
           assert_receive {:effect_barrier, :after_write, "stable-effect", ^worker}, 10000
           monitors = monitor_agent_tree(c, restored)
@@ -39,7 +39,7 @@ defmodule JidoTest.System.Scenarios.Recovery do
 
         assert FaultAdapter.remaining(c.control) == []
         :ok = Sink.hold(c.jido, :none)
-        final = start_agent(c, id: saved.id, restore: :required)
+        final = start_agent(c, id: saved.id, persistence_mode: :restore)
         completed(c, final, %{"stable-effect" => 7})
         assert %{agent: acknowledged, state_version: 2} = Server.snapshot(final)
         assert {:ok, ^acknowledged, 2} = load(c, saved.id)
@@ -58,7 +58,7 @@ defmodule JidoTest.System.Scenarios.Recovery do
           {:ok, route_signal_2} =
             Probe.record_and_deliver_signal(%{effect_id: "original", value: 7})
 
-          assert {:ok, _} =
+          assert {:ok, _, _} =
                    Jido.AgentServer.call(server, route_signal_2, [])
 
           completed(c, server, %{"original" => 7})
@@ -87,12 +87,12 @@ defmodule JidoTest.System.Scenarios.Recovery do
 
           replacement =
             if @late_boundary == :replacement do
-              current = start_agent(c, id: original.id, restore: :required)
+              current = start_agent(c, id: original.id, persistence_mode: :restore)
 
               {:ok, route_signal_3} =
                 Probe.record_and_deliver_signal(%{effect_id: "new", value: 9})
 
-              assert {:ok, _} =
+              assert {:ok, _, _} =
                        Jido.AgentServer.call(current, route_signal_3, [])
 
               Observability.await_turn(c.observer, current, 4)
@@ -106,10 +106,10 @@ defmodule JidoTest.System.Scenarios.Recovery do
                        )
 
               assert {:error, :deleted} =
-                       Jido.start_agent(c.jido, Probe,
+                       start_result(c.jido, Probe,
                          id: original.id,
                          persistence: c.store,
-                         restore: :required
+                         persistence_mode: :restore
                        )
 
               nil

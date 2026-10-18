@@ -7,9 +7,7 @@ defmodule JidoTest.System.PeerRuntime do
   @moduledoc false
   use GenServer
   alias Jido.AgentServer, as: Server
-  alias JidoTest.RemoteChildFixtures
   alias JidoTest.System.ControlledAgent
-  alias JidoTest.RemoteChildFixtures.LifecycleParent
   @instance JidoTest.System.PeerInstance
 
   def start_link(_opts), do: GenServer.start_link(__MODULE__, [], name: __MODULE__)
@@ -33,9 +31,9 @@ defmodule JidoTest.System.PeerRuntime do
     {:ok, _} = Supervisor.start_child(Jido.Supervisor, __MODULE__)
 
     events =
-      for boundary <- [:turn, :commit, :lifecycle, :directive],
+      for boundary <- [:turn],
           ending <- [:start, :stop, :exception],
-          do: [:jido, :agent, boundary, ending]
+          do: [:jido, :agent_server, boundary, ending]
 
     :ok = :telemetry.attach_many(__MODULE__, events, &__MODULE__.record/4, namespace)
 
@@ -59,53 +57,19 @@ defmodule JidoTest.System.PeerRuntime do
     start(namespace, nil, persistence)
   end
 
-  def record(event, measures, %{agent_namespace: namespace} = meta, namespace),
+  def record(event, measures, meta, _namespace),
     do: GenServer.call(__MODULE__, {:record, {self(), event, measures, meta}})
 
-  def record(_, _, _, _), do: :ok
-
-  def activate(id, restore),
-    do:
-      Jido.start_agent(@instance, ControlledAgent, id: id, restore: restore, restart: :temporary)
-
-  def activate_parent(id, opts \\ []),
-    do:
-      Jido.start_agent(
-        @instance,
-        LifecycleParent,
-        Keyword.merge([id: id, restart: :temporary], opts)
-      )
-
-  def create_worker(parent, node) do
-    {:ok, route_signal_1} =
-      LifecycleParent.create_worker_signal(%{
-        target_node: node,
-        worker_module: ControlledAgent
-      })
-
-    Jido.AgentServer.call(parent, route_signal_1, [])
+  def activate(id, restore) do
+    with {:ok, server} <-
+           Jido.start_agent(@instance, ControlledAgent,
+             id: id,
+             persistence: Jido.instance_persistence(@instance),
+             persistence_mode: if(restore == false, do: :create, else: :restore)
+           ),
+         :ok <- Server.await_ready(server),
+         do: {:ok, server}
   end
-
-  def activate_startup_parent(id, timeout),
-    do:
-      RemoteChildFixtures.start_parent(@instance,
-        id: id,
-        directive_timeout: timeout,
-        restart: :temporary
-      )
-
-  def request_spawn(parent, node) do
-    directive =
-      Jido.AgentServer.Directive.agent_start(ControlledAgent, :worker,
-        node: node,
-        restart: :temporary
-      )
-
-    signal = Jido.Signal.new!("test.remote.directive", %{directive: directive}, source: "/system")
-    Server.call(parent, signal)
-  end
-
-  def startup_error(id), do: Jido.RuntimeStore.get(@instance, :remote_test_errors, id)
 
   def whereis(id), do: Jido.whereis_agent(@instance, id)
 

@@ -73,8 +73,6 @@ requirements.
 - `test/jido/topology/plugin_integration_test.exs` proves ordered Agent and
   group contribution, source-definition preservation, direct-plan parity,
   included-scope expansion, and conflict rejection.
-- `test/examples/07_topology/07_06_plugin_contribution` proves that a
-  contributed Bus and subscription work through the local Controller.
 - The existing Topology suites prove authoring, composition, stable local
   plans, readiness, repair, restore, conflict handling, and cleanup.
 - `test/jido/topology/controller_update_test.exs` and research case UP-07 prove

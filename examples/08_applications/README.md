@@ -11,14 +11,9 @@ external account or credential.
 3. [Inbox](08_03_inbox/README.md) — translate external input into Signals and reject duplicate events.
 4. [Approval Workflow](08_04_approval_workflow/README.md) — correlate search, selection, approval, and one idempotent provider request.
 5. [Purpose Loop](08_06_purpose_loop/README.md) — continue bounded work through scheduled finite Turns.
-6. [Fixed Group](08_07_fixed_group/README.md) — own stable roles and coordinate targeted work through a Bus.
-7. [Elastic Group](08_08_elastic_group/README.md) — apply a bounded scale, recovery, and drain policy.
 
 Identity and encrypted Signal handling now belong to the focused
 [Plugin examples](../09_plugins/README.md).
-
-Fixed Group and Elastic Group are combined application-policy examples. They
-do not define core group, autoscaling, or distributed ownership contracts.
 
 ## Run the section
 
@@ -29,11 +24,8 @@ mix test test/examples/08_applications --include example --seed 0
 Expected result: each application commits its state, handles its documented
 failure or recovery case, and cleans all owned processes.
 
-## Shared support
-
-- [Bus input Plugin](support/bus_input.ex) connects the fixed and elastic group roles to a local Bus.
-
 ## Limits
 
-The fixed and elastic group examples show application policy built from public
-Jido APIs. They do not define a Jido group or autoscaling API.
+Fixed roles and Bus communication are covered by the topology examples.
+Elastic scaling policy moved to the application demonstrations in JidoLab.
+These local examples do not define distributed ownership or autoscaling APIs.

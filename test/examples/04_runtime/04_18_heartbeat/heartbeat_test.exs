@@ -10,7 +10,7 @@ defmodule JidoTest.Examples.Runtime.HeartbeatTest do
 
   test "explicit ticks deliver the default and custom Signals", %{jido: jido} do
     {:ok, default_server} =
-      Jido.start_agent(jido, DefaultAgent, id: unique_id("heartbeat-default"))
+      JidoTest.ExampleRuntime.start_agent(jido, DefaultAgent, id: unique_id("heartbeat-default"))
 
     default_runtime = runtime(default_server)
     send(default_runtime, :tick)
@@ -26,7 +26,7 @@ defmodule JidoTest.Examples.Runtime.HeartbeatTest do
     end)
 
     {:ok, custom_server} =
-      Jido.start_agent(jido, CustomAgent, id: unique_id("heartbeat-custom"))
+      JidoTest.ExampleRuntime.start_agent(jido, CustomAgent, id: unique_id("heartbeat-custom"))
 
     custom_runtime = runtime(custom_server)
     send(custom_runtime, :tick)
@@ -62,7 +62,12 @@ defmodule JidoTest.Examples.Runtime.HeartbeatTest do
   end
 
   test "the owner replaces a failed runtime and stops the replacement", %{jido: jido} do
-    {:ok, server} = Jido.start_agent(jido, DefaultAgent, id: unique_id("heartbeat-lifecycle"))
+    {:ok, server} =
+      JidoTest.ExampleRuntime.start_agent(jido, DefaultAgent,
+        id: unique_id("heartbeat-lifecycle")
+      )
+
+    activation = AgentServer.activation(server)
     old_runtime = runtime(server)
     old_monitor = Process.monitor(old_runtime)
 
@@ -71,12 +76,14 @@ defmodule JidoTest.Examples.Runtime.HeartbeatTest do
 
     new_runtime =
       eventually(fn ->
-        case runtime(server) do
+        case JidoTest.ExampleRuntime.plugin(activation, Heartbeat) do
           pid when is_pid(pid) and pid != old_runtime -> pid
           _pid -> false
         end
       end)
 
+    server = Jido.AgentServer.Supervisor.worker(activation)
+    assert :ok = AgentServer.await_ready(server)
     send(new_runtime, :tick)
     eventually(fn -> length(AgentServer.agent(server).state.events) == 1 end)
 
@@ -86,8 +93,6 @@ defmodule JidoTest.Examples.Runtime.HeartbeatTest do
   end
 
   defp runtime(server) do
-    AgentServer.children(server)
-    |> Map.fetch!({:plugin, Heartbeat})
-    |> Map.fetch!(:pid)
+    JidoTest.ExampleRuntime.plugin(AgentServer.activation(server), Heartbeat)
   end
 end

@@ -40,3 +40,6 @@ backpressure contract.
 - [Tests](../../../test/examples/04_runtime/04_07_agent_observation/agent_observation_test.exs)
 
 Previous: [Runtime Inspection](../04_05_runtime_inspection/README.md) | Next: [Causal Trace](../04_08_causal_trace/README.md)
+
+Turn commit and effect dispatch have separate results. Inspect the Turn event
+for the commit and `[:jido, :agent_server, :effects, :stop]` for delivery failure.

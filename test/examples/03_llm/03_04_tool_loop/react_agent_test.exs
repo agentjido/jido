@@ -31,7 +31,7 @@ defmodule JidoTest.Examples.LLM.ReActAgentTest do
 
     agent = start_agent!(jido, ReActAgent)
 
-    assert {:ok, committed} =
+    assert {:ok, committed, _directives} =
              ask(agent, @prompt, {ScriptedModel, model}, %{
                "search" => {SearchTool, search}
              })
@@ -92,7 +92,7 @@ defmodule JidoTest.Examples.LLM.ReActAgentTest do
 
     agent = start_agent!(jido, ReActAgent)
 
-    assert {:ok, committed} =
+    assert {:ok, committed, _directives} =
              ask(agent, @prompt, {ScriptedModel, model}, %{
                "search" => {SearchTool, search}
              })
@@ -175,7 +175,7 @@ defmodule JidoTest.Examples.LLM.ReActAgentTest do
 
     assert %{state: %{turns: 0, messages: []}, state_version: 0} = agent_result(agent)
     fresh = start_supervised!({ScriptedModel, [{:answer, "fresh context"}]})
-    assert {:ok, agent} = ask(agent, "next", {ScriptedModel, fresh}, %{})
+    assert {:ok, agent, _directives} = ask(agent, "next", {ScriptedModel, fresh}, %{})
     assert agent.state.last_answer == "fresh context"
     assert ScriptedModel.calls(fresh) == [[%{role: :user, content: "next"}]]
   end

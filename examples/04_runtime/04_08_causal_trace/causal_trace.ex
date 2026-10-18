@@ -29,7 +29,7 @@ defmodule Jido.Examples.CausalTrace do
             node: Zoi.atom() |> Zoi.optional()
           }),
         context: context do
-        alias Jido.Agent.Directive
+        alias Jido.AgentServer.Directive
         alias Jido.Examples.CausalTrace.Worker
 
         if context.agent_state.request_id == "" do
@@ -43,8 +43,8 @@ defmodule Jido.Examples.CausalTrace do
                 })
 
               [
-                Directive.spawn_child(Worker, slot, node: input[:node], restart: :temporary),
-                Directive.emit_to_child(
+                Directive.agent_start(Worker, slot, node: input[:node], restart: :temporary),
+                Directive.agent_send(
                   slot,
                   command_signal_1
                 )

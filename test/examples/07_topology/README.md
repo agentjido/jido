@@ -1,28 +1,18 @@
 # Topology example tests
 
-This folder mirrors the numbered learning path in
-[the Topology examples](../../../examples/07_topology/README.md).
-
-Run the section behavior tests:
+These tests mirror the four retained lessons in
+[the topology catalog](../../../examples/07_topology/README.md).
 
 ```sh
 mix test test/examples/07_topology --include example --seed 0
 ```
 
-The Bus swarm test is a local scale fixture. The remaining tests check:
+- `07_01`: separate member state and owner shutdown.
+- `07_02`: nested member startup and complete subtree removal.
+- `07_03`: local Bus broadcast and owned runtime cleanup.
+- `07_09`: add, resize, replace, remove, and invalid-mutation isolation.
 
-- Independent Agent state recovery with manual repair, and clean stops that
-  remain stopped after reconciliation.
-- Parent exit policy and logical binding repair without restarting stopped workers.
-- Stable keyed identities and committed state after JSON transport and restart.
-- Shared Bus replacement, component exports, and subscription recovery without
-  Agent restarts.
-- Plugin-contributed resources, subscriptions, group ownership, unchanged
-  source definitions, and process cleanup.
-- Lifecycle Signals, placement-policy delegation, and additive target updates.
-- Static extension lowering followed by normal Controller activation and cleanup.
-
-Examples use public Jido and OTP APIs. Detailed restart limits, coordinator
-failure races, and remote moves remain in the core and peer tests. The
-[authoring suite](../../authoring/topology/README.md) checks live behavior across
-all local definition forms.
+Tests use public AgentServer reads, readiness waits, and OTP monitors. Child
+tags are opaque. The [shared assertions](../support/agent_topology_assertions.ex)
+contain only test setup and shutdown observation. Detailed recovery and
+runtime fault contracts stay in the AgentServer core contract tests.

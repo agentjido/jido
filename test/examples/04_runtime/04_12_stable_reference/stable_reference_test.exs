@@ -33,7 +33,9 @@ defmodule JidoTest.Examples.Runtime.StableReferenceTest do
     assert {:ok, first} =
              Jido.start_agent_ref(c.primary, c.ref, StableReference, persistence: c.store)
 
-    assert {:ok, _} = StableReference.append(c.ref, c.primary, "first")
+    assert :ok = Jido.AgentServer.await_ready(first)
+
+    assert {:ok, _, _directives} = StableReference.append(c.ref, c.primary, "first")
     monitor = Process.monitor(first)
     Process.exit(first, :kill)
     assert_receive {:DOWN, ^monitor, :process, ^first, _reason}, 1_000
@@ -47,18 +49,21 @@ defmodule JidoTest.Examples.Runtime.StableReferenceTest do
       end)
 
     assert replacement != first
-    assert {:ok, agent} = StableReference.append(c.ref, c.primary, "second")
+    assert :ok = Jido.AgentServer.await_ready(replacement)
+    assert {:ok, agent, _directives} = StableReference.append(c.ref, c.primary, "second")
     assert agent.state.messages == ["first", "second"]
   end
 
   test "equal IDs in separate namespaces reach separate conversations", c do
     other_ref = %{c.ref | namespace: c.other_namespace}
 
-    assert {:ok, _} = Jido.start_agent_ref(c.primary, c.ref, StableReference)
-    assert {:ok, _} = Jido.start_agent_ref(c.other, other_ref, StableReference)
+    assert {:ok, server} = Jido.start_agent_ref(c.primary, c.ref, StableReference)
+    assert :ok = Jido.AgentServer.await_ready(server)
+    assert {:ok, server} = Jido.start_agent_ref(c.other, other_ref, StableReference)
+    assert :ok = Jido.AgentServer.await_ready(server)
 
-    assert {:ok, first} = StableReference.append(c.ref, c.primary, "A")
-    assert {:ok, second} = StableReference.append(other_ref, c.other, "B")
+    assert {:ok, first, _directives} = StableReference.append(c.ref, c.primary, "A")
+    assert {:ok, second, _directives} = StableReference.append(other_ref, c.other, "B")
     assert first.state.messages == ["A"]
     assert second.state.messages == ["B"]
   end
@@ -66,11 +71,16 @@ defmodule JidoTest.Examples.Runtime.StableReferenceTest do
   test "equal namespace and ID remain isolated by partition", c do
     other_partition = %{c.ref | partition: "team-b"}
 
-    assert {:ok, _} = Jido.start_agent_ref(c.primary, c.ref, StableReference)
-    assert {:ok, _} = Jido.start_agent_ref(c.primary, other_partition, StableReference)
+    assert {:ok, server} = Jido.start_agent_ref(c.primary, c.ref, StableReference)
+    assert :ok = Jido.AgentServer.await_ready(server)
+    assert {:ok, server} = Jido.start_agent_ref(c.primary, other_partition, StableReference)
+    assert :ok = Jido.AgentServer.await_ready(server)
 
-    assert {:ok, first} = StableReference.append(c.ref, c.primary, "team A")
-    assert {:ok, second} = StableReference.append(other_partition, c.primary, "team B")
+    assert {:ok, first, _directives} = StableReference.append(c.ref, c.primary, "team A")
+
+    assert {:ok, second, _directives} =
+             StableReference.append(other_partition, c.primary, "team B")
+
     assert first.state.messages == ["team A"]
     assert second.state.messages == ["team B"]
   end
@@ -93,7 +103,9 @@ defmodule JidoTest.Examples.Runtime.StableReferenceTest do
     assert {:ok, first} =
              Jido.start_agent_ref(c.primary, c.ref, StableReference, persistence: c.store)
 
-    assert {:ok, _} = StableReference.append(c.ref, c.primary, "saved")
+    assert :ok = Jido.AgentServer.await_ready(first)
+
+    assert {:ok, _, _directives} = StableReference.append(c.ref, c.primary, "saved")
     assert :ok = Jido.hibernate_ref(c.primary, c.ref)
     refute Process.alive?(first)
     assert :ok = stop_supervised(c.primary)
@@ -101,10 +113,12 @@ defmodule JidoTest.Examples.Runtime.StableReferenceTest do
     rebound = :"ref_rebound_#{System.unique_integer([:positive])}"
     start_supervised!({Jido, name: rebound, namespace: c.ref.namespace}, id: rebound)
 
-    assert {:ok, _} =
+    assert {:ok, rebound_server} =
              Jido.activate_agent(rebound, c.ref, StableReference, persistence: c.store)
 
-    assert {:ok, agent} = StableReference.append(c.ref, rebound, "restored")
+    assert :ok = Jido.AgentServer.await_ready(rebound_server)
+
+    assert {:ok, agent, _directives} = StableReference.append(c.ref, rebound, "restored")
     assert agent.state.messages == ["saved", "restored"]
   end
 end

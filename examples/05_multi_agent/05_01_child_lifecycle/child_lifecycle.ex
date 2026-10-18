@@ -24,7 +24,7 @@ defmodule Jido.Examples.ChildLifecycle do
           candidate = %{context.agent_state | desired: context.agent_state.desired ++ [input.tag]}
 
           directive =
-            Jido.Agent.Directive.spawn_child(Jido.Examples.Worker, input.tag,
+            Jido.AgentServer.Directive.agent_start(Jido.Examples.Worker, input.tag,
               restart: input.restart
             )
 
@@ -42,7 +42,7 @@ defmodule Jido.Examples.ChildLifecycle do
           | desired: List.delete(context.agent_state.desired, tag)
         }
 
-        {:ok, candidate, [Jido.Agent.Directive.stop_child(tag)]}
+        {:ok, candidate, [Jido.AgentServer.Directive.agent_stop(tag)]}
       end
     end
 

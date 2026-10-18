@@ -1,82 +1,38 @@
 defmodule Jido.Examples.AgentExtension do
-  @moduledoc "Defines two static Agent authoring extensions."
-
-  defmodule Label do
-    @moduledoc false
-    defstruct [:key, :value, :__spark_metadata__]
-  end
-
-  defmodule Flag do
-    @moduledoc false
-    defstruct [:name, :__spark_metadata__]
-  end
+  @moduledoc "Defines one static Agent contribution provider."
 
   defmodule Labels do
-    @moduledoc "Lowers owned label declarations into normal Agent metadata."
-    @behaviour Jido.Agent.Extension
+    @moduledoc "Stores a validated owner label in its own Agent contribution."
 
-    @label %Spark.Dsl.Entity{
-      name: :label,
-      target: Label,
-      args: [:key, :value],
-      schema: [key: [type: :atom, required: true], value: [type: :any, required: true]]
+    @section %Spark.Dsl.Section{
+      name: :labels,
+      schema: [owner: [type: :string, required: true]]
     }
+    @schema Zoi.object(%{owner: Zoi.string() |> Zoi.min(1)}, unrecognized_keys: :error)
 
-    use Spark.Dsl.Extension,
-      dsl_patches: [%Spark.Dsl.Patch.AddEntity{section_path: [:agent], entity: @label}]
+    use Jido.Agent.Extension, id: "examples.labels", vsn: 1, sections: [@section]
 
     @impl Jido.Agent.Extension
-    def lower_agent(config, entities) do
-      {labels, rest} = Enum.split_with(entities, &match?(%Label{}, &1))
-
-      metadata =
-        Enum.reduce(labels, config.metadata, fn label, metadata ->
-          Map.put(metadata, label.key, label.value)
-        end)
-        |> Map.update(:extension_order, [:labels], &(&1 ++ [:labels]))
-
-      {:ok, %{config | metadata: metadata}, rest}
+    def lower(dsl, config) do
+      {:ok, Map.put(config, :owner, Spark.Dsl.Extension.get_opt(dsl, [:labels], :owner))}
     end
-  end
-
-  defmodule Flags do
-    @moduledoc "Lowers owned flag declarations after the label extension."
-    @behaviour Jido.Agent.Extension
-
-    @flag %Spark.Dsl.Entity{
-      name: :flag,
-      target: Flag,
-      args: [:name],
-      schema: [name: [type: :atom, required: true]]
-    }
-
-    use Spark.Dsl.Extension,
-      dsl_patches: [%Spark.Dsl.Patch.AddEntity{section_path: [:agent], entity: @flag}]
 
     @impl Jido.Agent.Extension
-    def lower_agent(config, entities) do
-      {flags, rest} = Enum.split_with(entities, &match?(%Flag{}, &1))
-      names = Enum.map(flags, & &1.name)
-
-      metadata =
-        config.metadata
-        |> Map.put(:flags, names)
-        |> Map.update(:extension_order, [:flags], &(&1 ++ [:flags]))
-
-      {:ok, %{config | metadata: metadata}, rest}
-    end
+    def normalize(data), do: Zoi.parse(@schema, data)
   end
 
   defmodule Agent do
-    @moduledoc "An ordinary validated Agent after both extensions lower."
+    @moduledoc "Keeps extension data separate from core metadata and Agent state."
     use Jido.Agent,
       name: "basic_agent_extension",
-      extensions: [Labels, Flags]
+      extensions: [Labels]
 
     agent do
       schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
-      label(:owner, "examples")
-      flag(:audited)
+    end
+
+    labels do
+      owner("examples")
     end
 
     routes do

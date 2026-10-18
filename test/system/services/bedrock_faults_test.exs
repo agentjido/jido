@@ -15,7 +15,7 @@ defmodule JidoTest.System.Services.BedrockFaults do
 
     {:ok, route_signal_1} = Probe.record_and_deliver_signal(%{effect_id: "saved", value: 7})
 
-    assert {:ok, _} =
+    assert {:ok, _, _} =
              Jido.AgentServer.call(server, route_signal_1, [])
 
     completed(c, server, %{"saved" => 7})
@@ -103,7 +103,7 @@ defmodule JidoTest.System.Services.BedrockFaults do
   defp assert_checkpoint(c) do
     assert {:ok, stored, 2} = load(c, c.snapshot.agent.id)
     assert stored == c.snapshot.agent
-    restored = start_agent(c, id: stored.id, restore: :required)
+    restored = start_agent(c, id: stored.id, persistence_mode: :restore)
     assert Server.snapshot(restored) == c.snapshot
     stop_agent(c, restored)
     assert_empty_agent_pool(c)

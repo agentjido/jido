@@ -29,9 +29,8 @@ tests are valid evidence, but they do not each represent a new Jido capability.
 | Plugin-owned Agent state | `jido` | Focused example | [Source](01_basic/01_03_plugin_state_agent/plugin_state_agent.ex), [test](../test/examples/01_basic/01_03_plugin_state_agent/plugin_state_agent_test.exs) |
 | Typed post-commit Directive dispatch | `jido` | Focused example | [Source](01_basic/01_04_directive_agent/directive_agent.ex), [test](../test/examples/01_basic/01_04_directive_agent/directive_agent_test.exs) |
 | Application supervision and runtime replacement | `jido` | Focused example | [Source](01_basic/01_05_otp_supervision/application.ex), [test](../test/examples/01_basic/01_05_otp_supervision/example_test.exs) |
-| Route specificity and priority | `jido` | Focused example | [Source](01_basic/01_06_route_selection/route_selection.ex), [test](../test/examples/01_basic/01_06_route_selection/route_selection_test.exs) |
+| Route declaration order and fallback | `jido` | Focused example | [Source](01_basic/01_06_route_selection/route_selection.ex), [test](../test/examples/01_basic/01_06_route_selection/route_selection_test.exs) |
 | Data-defined Agent and trusted Codec | `jido` | Focused example | [Source](01_basic/01_07_data_defined_agent/data_defined_agent.ex), [test](../test/examples/01_basic/01_07_data_defined_agent/data_defined_agent_test.exs) |
-| Custom Signal selection and explicit Turn construction | `jido` | Focused example | [Source](01_basic/01_08_custom_signal_selection/custom_signal_selection.ex), [test](../test/examples/01_basic/01_08_custom_signal_selection/custom_signal_selection_test.exs) |
 | Agent authoring extension lowering | `jido` | Focused example | [Source](01_basic/01_09_agent_extension/agent_extension.ex), [test](../test/examples/01_basic/01_09_agent_extension/agent_extension_test.exs) |
 
 ## Flow integration contracts
@@ -66,8 +65,7 @@ distinct Agent route or commit integration contract.
 | Pending managed-job recovery | `jido` | Focused example | [Source](04_runtime/04_10_pending_job_recovery/pending_job_recovery.ex), [test](../test/examples/04_runtime/04_10_pending_job_recovery/pending_job_recovery_test.exs) |
 | Durable scheduling occurrence protocol | `jido` | Focused example | [Source](04_runtime/04_11_durable_scheduling/scheduled_occurrence_recovery.ex), [test](../test/examples/04_runtime/04_11_durable_scheduling/durable_scheduling_test.exs) |
 | Stable Agent Ref and partition identity | `jido` | Focused example | [Source](04_runtime/04_12_stable_reference/stable_reference.ex), [test](../test/examples/04_runtime/04_12_stable_reference/stable_reference_test.exs) |
-| Serialized Turn upgrade | `jido` | Focused example | [Source](04_runtime/04_13_turn_upgrade/turn_upgrade.ex), [test](../test/examples/04_runtime/04_13_turn_upgrade/turn_upgrade_test.exs) |
-| Validated state migration | `jido` | Focused example | [Source](04_runtime/04_14_state_migration/state_migration.ex), [test](../test/examples/04_runtime/04_14_state_migration/state_migration_test.exs) |
+| Snapshot upgrade Actions | `jido` | Focused example | [Source](04_runtime/04_14_state_migration/state_migration.ex), [test](../test/examples/04_runtime/04_14_state_migration/state_migration_test.exs) |
 | Call, cast, and asynchronous request modes | `jido` | Focused example | [Source](04_runtime/04_15_request_modes/request_modes.ex), [test](../test/examples/04_runtime/04_15_request_modes/request_modes_test.exs) |
 | Active Turn inspection and cancellation | `jido` | Focused example | [Source](04_runtime/04_16_turn_control/turn_control.ex), [test](../test/examples/04_runtime/04_16_turn_control/turn_control_test.exs) |
 | Failure policy and public Turn Outcome | `jido` | Focused example | [Source](04_runtime/04_17_failure_outcome/failure_outcome.ex), [test](../test/examples/04_runtime/04_17_failure_outcome/failure_outcome_test.exs) |
@@ -79,25 +77,18 @@ distinct Agent route or commit integration contract.
 | --- | --- | --- | --- |
 | Direct child lifecycle | `jido` | Focused example | [Source](05_multi_agent/05_01_child_lifecycle/child_lifecycle.ex), [test](../test/examples/05_multi_agent/05_01_child_lifecycle/child_lifecycle_test.exs) |
 | Correlated child request and stale reply rejection | `jido` | Focused example | [Source](05_multi_agent/05_02_correlated_requests/correlated_requests.ex), [test](../test/examples/05_multi_agent/05_02_correlated_requests/correlated_requests_test.exs) |
-| Owned Agent hierarchy | `jido` | Focused example | [Source](05_multi_agent/05_03_agent_hierarchy/agent_hierarchy.ex), [test](../test/examples/05_multi_agent/05_03_agent_hierarchy/agent_hierarchy_test.exs) |
-| Exact remote child placement | `jido` | Focused example | [Source](05_multi_agent/05_04_remote_child/remote_child.ex), [test](../test/examples/05_multi_agent/05_04_remote_child/remote_child_test.exs) |
-| Remote exit versus connection uncertainty | `jido` | Focused example | [Source](05_multi_agent/05_05_remote_lifecycle/remote_lifecycle.ex), [test](../test/examples/05_multi_agent/05_05_remote_lifecycle/remote_lifecycle_test.exs) |
+| Exact remote child placement | `jido` | Out of scope | [Source](99_research/05_04_remote_child/README.md), [rejection test](../test/examples/99_research/05_04_remote_child/remote_start_test.exs) |
+| Remote exit versus connection uncertainty | `jido` | Out of scope | [Source](99_research/05_05_remote_lifecycle/README.md), [status](99_research/05_05_remote_lifecycle/README.md) |
 | Orphan policy and child adoption | `jido` | Focused example | [Source](05_multi_agent/05_06_orphan_adoption/orphan_adoption.ex), [test](../test/examples/05_multi_agent/05_06_orphan_adoption/orphan_adoption_test.exs) |
 
 ## Topology contracts
 
 | Capability | Owner | Status | Canonical evidence |
 | --- | --- | --- | --- |
-| Independent Agents and repair | `jido` | Focused example | [Source](07_topology/07_01_independent/independent.ex), [test](../test/examples/07_topology/07_01_independent/independent_test.exs) |
-| Declared ownership hierarchy | `jido` | Focused example | [Source](07_topology/07_02_hierarchy/hierarchy.ex), [test](../test/examples/07_topology/07_02_hierarchy/hierarchy_test.exs) |
-| Bounded Bus swarm in DSL, data, and Codec forms | `jido` | Focused example | [Source](07_topology/07_03_bus_swarm/swarm.ex), [test](../test/examples/07_topology/07_03_bus_swarm/bus_swarm_test.exs) |
-| Keyed group identity | `jido` | Focused example | [Source](07_topology/07_04_keyed_accounts/accounts.ex), [test](../test/examples/07_topology/07_04_keyed_accounts/keyed_accounts_test.exs) |
-| Topology composition, imports, bindings, and exports | `jido` | Focused example | [Source](07_topology/07_05_composed_system/composed_system.ex), [test](../test/examples/07_topology/07_05_composed_system/composed_system_test.exs) |
-| Plugin-contributed static wiring | `jido` | Focused example | [Source](07_topology/07_06_plugin_contribution/plugin_contribution.ex), [test](../test/examples/07_topology/07_06_plugin_contribution/plugin_contribution_test.exs) |
-| Lifecycle Signals and degraded repair | `jido` | Focused example | [Source](07_topology/07_07_lifecycle_signals/lifecycle_signals.ex), [test](../test/examples/07_topology/07_07_lifecycle_signals/lifecycle_signals_test.exs) |
-| Static and policy-selected exact placement | `jido` | Focused example | [Source](07_topology/07_08_placement_policy/placement_policy.ex), [test](../test/examples/07_topology/07_08_placement_policy/placement_policy_test.exs) |
-| Additive live target update | `jido` | Focused example | [Source](07_topology/07_09_additive_update/additive_update.ex), [test](../test/examples/07_topology/07_09_additive_update/additive_update_test.exs) |
-| Topology authoring extension lowering | `jido` | Focused example | [Source](07_topology/07_10_topology_extension/topology_extension.ex), [test](../test/examples/07_topology/07_10_topology_extension/topology_extension_test.exs) |
+| Named members and separate state | `jido` | Focused example | [Source](07_topology/07_01_independent/independent.ex), [test](../test/examples/07_topology/07_01_independent/independent_test.exs) |
+| Nested Agent definitions and subtree cleanup | `jido` | Focused example | [Source](07_topology/07_02_hierarchy/hierarchy.ex), [test](../test/examples/07_topology/07_02_hierarchy/hierarchy_test.exs) |
+| Declared local Bus and explicit broadcast | `jido` | Focused example | [Source](07_topology/07_03_bus_swarm/swarm.ex), [test](../test/examples/07_topology/07_03_bus_swarm/bus_swarm_test.exs) |
+| Live member mutations | `jido` | Focused example | [Source](07_topology/07_09_topology_mutations/mutations.ex), [test](../test/examples/07_topology/07_09_topology_mutations/mutations_test.exs) |
 
 ## Application and Plugin contracts
 
@@ -108,15 +99,12 @@ distinct Agent route or commit integration contract.
 | Managed sensor input and duplicate rejection | `jido` | Focused example | [Source](08_applications/08_03_inbox/inbox.ex), [test](../test/examples/08_applications/08_03_inbox/inbox_test.exs) |
 | Multi-Turn approval correlation and idempotency | `jido` | Focused example | [Source](08_applications/08_04_approval_workflow/approval_workflow.ex), [test](../test/examples/08_applications/08_04_approval_workflow/approval_workflow_test.exs) |
 | Bounded scheduled purpose loop | `jido` | Focused example | [Source](08_applications/08_06_purpose_loop/purpose_loop.ex), [test](../test/examples/08_applications/08_06_purpose_loop/purpose_loop_test.exs) |
-| Fixed group coordination policy | `jido` | Combined example | [Source](08_applications/08_07_fixed_group/fixed_group.ex), [test](../test/examples/08_applications/08_07_fixed_group/fixed_group_test.exs) |
-| Elastic scale, recovery, and drain policy | `jido` | Combined example | [Source](08_applications/08_08_elastic_group/elastic_group.ex), [test](../test/examples/08_applications/08_08_elastic_group/elastic_group_test.exs) |
 | Pure prepared Plugin input | `jido` | Focused example | [Source](09_plugins/09_01_prepared_input/prepared_input.ex), [test](../test/examples/09_plugins/09_01_prepared_input/prepared_input_test.exs) |
 | Live Plugin admission input | `jido` | Focused example | [Source](09_plugins/09_02_runtime_admission/runtime_admission.ex), [test](../test/examples/09_plugins/09_02_runtime_admission/runtime_admission_test.exs) |
 | Signed identity and runtime-generation replay protection | `jido` | Focused example | [Source](09_plugins/09_03_identity/identity.ex), [test](../test/examples/09_plugins/09_03_identity/identity_test.exs) |
 | Encrypted Signal preparation | `jido` | Focused example | [Source](09_plugins/09_04_secure_signal/secure_signal.ex), [test](../test/examples/09_plugins/09_04_secure_signal/secure_signal_test.exs) |
 | Independent Plugin input composition | `jido` | Focused example | [Source](09_plugins/09_05_composition/composition.ex), [test](../test/examples/09_plugins/09_05_composition/composition_test.exs) |
 | Plugin-owned state reduction | `jido` | Focused example | [Source](09_plugins/09_06_state_middleware/state_middleware.ex), [test](../test/examples/09_plugins/09_06_state_middleware/state_middleware_test.exs) |
-| Live projection after commit | `jido` | Focused example | [Source](09_plugins/09_08_commit_projection/commit_projection.ex), [test](../test/examples/09_plugins/09_08_commit_projection/commit_projection_test.exs) |
 
 ## Persistence contracts
 
@@ -129,7 +117,7 @@ distinct Agent route or commit integration contract.
 | Exact-byte CAS, deletion, and tombstone fencing | `jido` | Focused example | [Source](10_persistence/10_05_durable_delete/durable_delete.ex), [test](../test/examples/10_persistence/10_05_durable_delete/durable_delete_test.exs) |
 | Indeterminate write isolation and cleanup | `jido` | Focused example | [Source](10_persistence/10_06_indeterminate_write/indeterminate_write_probe.ex), [test](../test/examples/10_persistence/10_06_indeterminate_write/indeterminate_write_test.exs) |
 | Recoverable external delivery intent | `jido` | Focused example | [Source](10_persistence/10_07_recoverable_delivery/recoverable_delivery.ex), [test](../test/examples/10_persistence/10_07_recoverable_delivery/recoverable_delivery_test.exs) |
-| Definition revision compatibility | `jido` | Focused example | [Source](10_persistence/10_08_definition_revision/definition_revision.ex), [test](../test/examples/10_persistence/10_08_definition_revision/definition_revision_test.exs) |
+| Saved definitions, code references, and explicit upgrades | `jido` | Focused example | [Source](10_persistence/10_08_definition_revision/definition_revision.ex), [test](../test/examples/10_persistence/10_08_definition_revision/definition_revision_test.exs) |
 
 All persistence examples use deterministic local adapters. Shared external
 adapter checks remain optional service tests.
@@ -139,15 +127,13 @@ adapter checks remain optional service tests.
 | Capability | Owner | Status | Canonical evidence |
 | --- | --- | --- | --- |
 | Model response, history, tool use, bounded tool loops, and output repair | `jido_ai` | Combined example | [Jido ecosystem integration sources](03_llm/README.md), [tests](../test/examples/03_llm/README.md) |
-| Conversation, multi-Agent factory, department plan, and Flow factory applications | `jido` | Combined example | [Optional Factory suite](06_factory/README.md), [tests](../test/examples/06_factory/README.md) |
 | Distributed exclusive authority and fencing | `jido` | Out of scope | [Research evidence](99_research/99_02_distributed_authority/README.md), [peer test](../test/examples/99_research/99_02_distributed_authority/fenced_inventory_test.exs) |
 
 The LLM group is an ecosystem integration suite, not Jido public-feature
 coverage. `jido_ai` owns its model and tool orchestration contracts and has its
-own example catalog. The Factory group is an optional combined application
-suite. Its four fixtures do not count as four new Jido capabilities. Its best
-future home is `examples/jido_lab`, where application demonstrations can span
-packages without changing core ownership.
+own example catalog. Factory and Elastic Group moved to
+[application demonstrations](../../examples/jido_lab/experiments/jido_core/README.md).
+They need API updates before they can run as JidoLab applications.
 
 ## Contracts owned by other packages
 
@@ -168,12 +154,12 @@ Flow examples that prove a distinct Agent integration or commit boundary.
 - Recoverable delivery moved from `04_09` to `10_07`.
 - `04_10` and `04_11` stay in Runtime because managed-job and Scheduler
   recovery are their main lessons. Their persistence is supporting evidence.
-- Stable Ref, Turn upgrade, and state migration stay in Runtime because
+- Stable Ref and snapshot upgrades stay in Runtime because
   identity and upgrade behavior are their main lessons.
 - Persisted Plugin state moved from `09_07` to `10_04`. The Plugin index links
   to the persistence lesson.
-- Fixed and elastic groups stay as combined application policy examples. They
-  are not separate core capacity or autoscaling claims.
+- Fixed groups use the topology lessons. Elastic scaling policy belongs to the
+  application demonstrations in JidoLab.
 - Distributed authority stays in Research until Jido has a supported fencing
   and exclusive-ownership contract.
 

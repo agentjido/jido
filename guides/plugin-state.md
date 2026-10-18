@@ -64,7 +64,7 @@ For a live projection, implement `after_commit/3` in the same Plugin module.
 It receives only the owned committed value and its matching revision, before
 returned Directives. The Action does not need to know about
 the runtime. Rebuild from `Init` on startup and replacement; notifications are
-not replayed. See [Commit Projection](../examples/09_plugins/09_08_commit_projection/README.md).
+not replayed. See the [after-commit contract](plugin-contract-and-lifecycle.md#required-hook-before-dispatch).
 
 ## Convert One Owned Value for Persistence
 

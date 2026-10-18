@@ -47,11 +47,11 @@ defmodule Jido.Examples.CorrelatedRequests do
               })
 
             directives = [
-              Jido.Agent.Directive.spawn_child(Jido.Examples.Worker, request_id,
+              Jido.AgentServer.Directive.agent_start(Jido.Examples.Worker, request_id,
                 restart: :temporary,
                 opts: %{error_policy: :stop_on_error, exec_opts: [timeout: 1000]}
               ),
-              Jido.Agent.Directive.emit_to_child(
+              Jido.AgentServer.Directive.agent_send(
                 request_id,
                 command_signal_1
               )
@@ -69,7 +69,8 @@ defmodule Jido.Examples.CorrelatedRequests do
         state = context.agent_state
 
         if state.request_id == request_id and state.status == :waiting do
-          {:ok, %{state | status: :cancelled}, [Jido.Agent.Directive.stop_child(request_id)]}
+          {:ok, %{state | status: :cancelled},
+           [Jido.AgentServer.Directive.agent_stop(request_id)]}
         else
           {:error, Jido.Action.Error.validation_error("request is not waiting")}
         end
@@ -91,7 +92,7 @@ defmodule Jido.Examples.CorrelatedRequests do
         if input.request_id == state.request_id and input.job_id == state.request_id and
              input.tag == state.request_id and state.status == :waiting do
           {:ok, %{state | status: :completed, result: input.value},
-           [Jido.Agent.Directive.stop_child(state.request_id)]}
+           [Jido.AgentServer.Directive.agent_stop(state.request_id)]}
         else
           {:error, Jido.Action.Error.validation_error("result is stale or unrelated")}
         end

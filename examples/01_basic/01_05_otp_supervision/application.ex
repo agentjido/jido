@@ -18,7 +18,7 @@ defmodule Jido.Examples.OTPSupervision.Application do
     children = [
       jido,
       Supervisor.child_spec(
-        {Jido.AgentServer, jido: jido, agent: Counter, id: "otp-counter", restart: :transient},
+        {Jido.AgentServer, jido: jido, agent: Counter.instantiate!(id: "otp-counter")},
         id: :counter
       )
     ]

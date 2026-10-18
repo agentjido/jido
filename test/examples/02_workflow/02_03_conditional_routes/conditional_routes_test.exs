@@ -10,7 +10,7 @@ defmodule JidoTest.Examples.Workflow.ConditionalRoutesTest do
 
     {:ok, route_signal_1} = Example.fetch_signal(%{})
 
-    assert {:ok, agent} =
+    assert {:ok, agent, _directives} =
              Jido.AgentServer.call(server, route_signal_1, context: %{service: {Service, client}})
 
     assert agent.state == %{route: :primary, result: %{answer: "primary"}}
@@ -28,7 +28,7 @@ defmodule JidoTest.Examples.Workflow.ConditionalRoutesTest do
 
     {:ok, route_signal_2} = Example.fetch_signal(%{})
 
-    assert {:ok, fallback} =
+    assert {:ok, fallback, _directives} =
              Jido.AgentServer.call(server, route_signal_2,
                context: %{service: {Service, unavailable}}
              )

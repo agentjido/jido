@@ -24,7 +24,7 @@ defmodule JidoTest.System.Services.RedisFaults do
 
     {:ok, route_signal_1} = Probe.record_and_deliver_signal(%{effect_id: "saved", value: 7})
 
-    assert {:ok, _} =
+    assert {:ok, _, _} =
              Jido.AgentServer.call(server, route_signal_1, [])
 
     completed(c, server, %{"saved" => 7})
@@ -36,7 +36,7 @@ defmodule JidoTest.System.Services.RedisFaults do
     assert {:ok, "PONG"} = RedisServer.command(socket, ["PING"])
     assert {:ok, stored, 2} = load(c, snapshot.agent.id)
     assert stored == snapshot.agent
-    restored = start_agent(c, id: stored.id, restore: :required)
+    restored = start_agent(c, id: stored.id, persistence_mode: :restore)
     assert Server.snapshot(restored) == snapshot
     stop_agent(c, restored)
     assert Sink.records(c.jido) == %{"saved" => 7}
@@ -71,7 +71,7 @@ defmodule JidoTest.System.Services.RedisFaults do
     {:ok, signal} =
       Probe.record_and_deliver_signal(%{effect_id: "uncertain", value: 7})
 
-    assert {:error, {:persistence_failed, {:indeterminate, :closed}}} =
+    assert {:error, %Jido.Error.ExecutionError{details: %{reason: {:indeterminate, :closed}}}} =
              Server.call(server, signal)
 
     await_down(monitors)
@@ -82,7 +82,7 @@ defmodule JidoTest.System.Services.RedisFaults do
              load(c, id)
 
     Observability.assert_persistence(c.observer, :indeterminate)
-    restored = start_agent(c, id: id, restore: :required)
+    restored = start_agent(c, id: id, persistence_mode: :restore)
     completed(c, restored, %{"uncertain" => 7})
     stop_agent(c, restored)
     assert Sink.records(c.jido) == %{"uncertain" => 7}

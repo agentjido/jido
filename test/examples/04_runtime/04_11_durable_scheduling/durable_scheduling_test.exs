@@ -18,7 +18,7 @@ defmodule JidoTest.Examples.Runtime.DurableSchedulingTest do
 
     {:ok, route_signal_1} = Example.arm_schedule_signal(%{job_id: "job-1", cron: "* * * * * *"})
 
-    assert {:ok, _} =
+    assert {:ok, _, _directives} =
              Jido.AgentServer.call(server, route_signal_1, [])
 
     [first | _] = await_ticks(server, 1)
@@ -27,8 +27,8 @@ defmodule JidoTest.Examples.Runtime.DurableSchedulingTest do
     assert Server.agent(server).state.scheduler.cron["job-1"].pending == nil
 
     ref = Process.monitor(server)
-    Process.exit(server, :kill)
-    assert_receive {:DOWN, ^ref, :process, ^server, :killed}, 1000
+    assert :ok = Jido.stop_agent(c.jido, server)
+    assert_receive {:DOWN, ^ref, :process, ^server, _reason}, 1000
     eventually(fn -> Jido.whereis_agent(c.jido, id) == nil end)
 
     restored = start_example(c, id, :required)
@@ -56,11 +56,10 @@ defmodule JidoTest.Examples.Runtime.DurableSchedulingTest do
 
   defp start_example(c, id, restore) do
     assert {:ok, server} =
-             Jido.start_agent(c.jido, Example,
+             JidoTest.ExampleRuntime.start_agent(c.jido, Example,
                id: id,
                persistence: c.store,
-               restore: restore,
-               restart: :temporary
+               persistence_mode: if(restore == false, do: :create, else: :restore)
              )
 
     server

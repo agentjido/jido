@@ -39,7 +39,7 @@ defmodule JidoTest.System.FaultAdapter do
 
   @impl true
   def compare_and_swap(key, expected, value, opts) do
-    revision = :erlang.binary_to_term(value, [:safe]).revision
+    revision = :erlang.binary_to_term(value, [:safe]).rev
 
     case take(opts, revision) do
       :reject ->

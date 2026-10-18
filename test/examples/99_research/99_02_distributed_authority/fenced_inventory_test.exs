@@ -6,6 +6,16 @@ defmodule JidoTest.Examples.FencedInventoryTest do
   alias Jido.AgentServer, as: Server
 
   setup c do
+    sources = Path.wildcard("examples/99_research/99_02_distributed_authority/**/*.ex")
+
+    for peer <- [c.peer_a, c.peer_b] do
+      assert {:ok, _, _} =
+               peer_call(peer, Kernel.ParallelCompiler, :compile, [
+                 sources,
+                 [return_diagnostics: true]
+               ])
+    end
+
     {:ok, authority} =
       peer_call(c.peer_a, Supervisor, :start_child, [Jido.Supervisor, {Authority, []}])
 
@@ -22,7 +32,7 @@ defmodule JidoTest.Examples.FencedInventoryTest do
 
     {:ok, route_signal_1} = Example.record_signal(%{value: 1})
 
-    assert {:ok, _} =
+    assert {:ok, _, []} =
              peer_call(c.peer_a, Jido.AgentServer, :call, [old, route_signal_1])
 
     token2 = peer_call(c.peer_b, Authority, :claim, [c.authority])
@@ -38,7 +48,7 @@ defmodule JidoTest.Examples.FencedInventoryTest do
 
     {:ok, route_signal_3} = Example.record_signal(%{value: 2})
 
-    assert {:ok, _} =
+    assert {:ok, _, []} =
              peer_call(c.peer_b, Jido.AgentServer, :call, [replacement, route_signal_3])
 
     assert peer_call(c.peer_a, Authority, :effects, [c.authority]) == [{token1, 1}, {token2, 2}]
@@ -71,7 +81,7 @@ defmodule JidoTest.Examples.FencedInventoryTest do
 
     {:ok, route_signal_4} = Example.record_signal(%{value: 1})
 
-    assert {:ok, _} =
+    assert {:ok, _, []} =
              peer_call(c.peer_b, Jido.AgentServer, :call, [owner, route_signal_4])
 
     assert :ok = peer_call(c.peer_a, GenServer, :stop, [c.authority])
@@ -90,7 +100,7 @@ defmodule JidoTest.Examples.FencedInventoryTest do
 
     {:ok, route_signal_6} = Example.record_signal(%{value: 1})
 
-    assert {:ok, _} =
+    assert {:ok, _, []} =
              peer_call(c.peer_b, Jido.AgentServer, :call, [old, route_signal_6])
 
     cookie = peer_call(c.peer_b, Node, :get_cookie, [])
@@ -109,7 +119,7 @@ defmodule JidoTest.Examples.FencedInventoryTest do
 
     {:ok, route_signal_8} = Example.record_signal(%{value: 2})
 
-    assert {:ok, _} =
+    assert {:ok, _, []} =
              peer_call(c.peer_a, Jido.AgentServer, :call, [replacement, route_signal_8])
 
     assert true = peer_call(c.peer_b, Node, :set_cookie, [c.node_a, cookie])
@@ -130,11 +140,18 @@ defmodule JidoTest.Examples.FencedInventoryTest do
         %{authority: c.authority, token: token}
       ])
 
-    peer_call(peer, Jido, :start_agent, [
-      c.jido,
-      Example,
-      [id: "inventory", persistence: {Store, opts(c, token)}, restore: :if_found]
-    ])
+    with {:ok, server} <-
+           peer_call(peer, Jido, :start_agent, [
+             c.jido,
+             Example,
+             [
+               id: "inventory",
+               persistence: {Store, opts(c, token)},
+               persistence_mode: if(token == 1, do: :create, else: :restore)
+             ]
+           ]),
+         :ok <- peer_call(peer, Server, :await_ready, [server]),
+         do: {:ok, server}
   end
 
   defp opts(c, token), do: [authority: c.authority, token: token]

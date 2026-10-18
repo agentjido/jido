@@ -104,7 +104,7 @@ defmodule Jido.Examples.Plugins.RuntimeAdmission.Agent do
            })
 
     plugin Jido.Examples.Plugins.RuntimeAdmission.Plugin,
-      config: [tokens: [{"allow", "operator"}]]
+      config: %{tokens: [{"allow", "operator"}]}
   end
 
   routes do

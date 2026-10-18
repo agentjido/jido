@@ -11,7 +11,7 @@ defmodule JidoTest.Examples.Workflow.ExecutableContinuationTest do
 
     {:ok, route_signal_1} = Example.add_repeatedly_signal(%{value: 2, remaining: 2})
 
-    assert {:ok, agent} =
+    assert {:ok, agent, _directives} =
              Jido.AgentServer.call(server, route_signal_1, context: %{request: "chain"})
 
     assert agent.state == %{value: 4, request: "chain"}
@@ -23,7 +23,7 @@ defmodule JidoTest.Examples.Workflow.ExecutableContinuationTest do
 
     {:ok, route_signal_2} = Example.add_repeatedly_signal(%{value: 1, remaining: 0})
 
-    assert {:ok, _} =
+    assert {:ok, _, _directives} =
              Jido.AgentServer.call(server, route_signal_2, [])
 
     before = Server.snapshot(server)
@@ -42,7 +42,7 @@ defmodule JidoTest.Examples.Workflow.ExecutableContinuationTest do
 
     {:ok, route_signal_4} = Example.add_repeatedly_signal(%{value: 2, remaining: 3})
 
-    assert {:ok, _} =
+    assert {:ok, _, _directives} =
              Jido.AgentServer.call(server, route_signal_4, [])
 
     assert Server.snapshot(server).state_version == 2

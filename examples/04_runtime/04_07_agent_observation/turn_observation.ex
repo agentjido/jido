@@ -35,7 +35,7 @@ defmodule Jido.Examples.TurnObservation do
             source: "/examples/runtime/observation"
           )
 
-        directive = Jido.Agent.Directive.emit_to_child(:missing, signal)
+        directive = Jido.AgentServer.Directive.agent_send(:missing, signal)
         {:ok, %{context.agent_state | value: value}, [directive]}
       end
     end

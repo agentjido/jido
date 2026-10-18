@@ -17,7 +17,7 @@ defmodule JidoTest.BasicSDKCase do
 
   def start_agent!(jido, agent, opts \\ []) do
     opts = Keyword.put_new_lazy(opts, :id, &JidoTest.Case.unique_id/0)
-    {:ok, server} = Jido.start_agent(jido, agent, opts)
+    {:ok, server} = JidoTest.ExampleRuntime.start_agent(jido, agent, opts)
     server
   end
 

@@ -3405,7 +3405,12 @@ defmodule Jido.AgentServer do
           turn_id: active.turn_id,
           signal_id: active.signal_id,
           state_version: data.state_version,
-          default_dispatch: data.default_dispatch
+          default_dispatch: data.default_dispatch,
+          plugin_specs: data.plugin_specs,
+          plugin_refs: data.plugin_refs,
+          source_signal: active.source_signal,
+          effective_signal: active.prepared.signal,
+          turn_context: active.turn_context
         }
 
         owner = directive_owner(data.plugin_specs, directive)
@@ -3437,17 +3442,8 @@ defmodule Jido.AgentServer do
   defp run_effect(directive, handler, context) do
     case directive do
       %Emit{signal: signal, dispatch: dispatch} ->
-        {:ok, signal} = TraceContext.propagate_to(signal, context.signal_id)
-
-        case dispatch do
-          nil ->
-            TopologyRuntime.emit(context, signal)
-
-          target ->
-            Signal.Dispatch.dispatch(
-              signal,
-              DispatchPreparation.inherit_bus_scope(target, context.jido)
-            )
+        with {:ok, signal} <- prepare_outbound(signal, dispatch, context) do
+          dispatch_outbound(signal, dispatch, context)
         end
 
       %AgentStart{} = directive ->
@@ -3457,10 +3453,12 @@ defmodule Jido.AgentServer do
         stop_child(context.server, name, reason)
 
       %AgentSend{name: name, signal: signal} ->
-        TopologyRuntime.send_agent(context.activation_state, name, signal)
+        with {:ok, signal} <- prepare_outbound(signal, {:agent, name}, context),
+             do: TopologyRuntime.send_agent(context.activation_state, name, signal)
 
       %OwnerSend{signal: signal} ->
-        TopologyRuntime.owner_send(context.parent, signal)
+        with {:ok, signal} <- prepare_outbound(signal, :owner, context),
+             do: TopologyRuntime.owner_send(context.parent, signal)
 
       %ServerStop{reason: reason} ->
         {:stop, reason}
@@ -3484,6 +3482,44 @@ defmodule Jido.AgentServer do
     end
   catch
     _, _ -> {:error, :directive_failed}
+  end
+
+  defp prepare_outbound(signal, target, context) do
+    signal_context = %Jido.Plugin.SignalContext{
+      turn_id: context.turn_id,
+      agent_id: context.agent.id,
+      source_signal: context.source_signal,
+      effective_signal: context.effective_signal,
+      turn_context: context.turn_context,
+      target: target,
+      state_version: context.state_version,
+      plugin_state: nil,
+      jido: context.jido,
+      partition: context.partition
+    }
+
+    with {:ok, signal} <- TraceContext.propagate_to(signal, context.signal_id),
+         do:
+           Callbacks.prepare_dispatch(
+             signal,
+             context.plugin_specs,
+             context.plugin_refs,
+             signal_context,
+             context.agent.state
+           )
+  end
+
+  defp dispatch_outbound(signal, dispatch, context) do
+    case dispatch do
+      nil ->
+        TopologyRuntime.emit(context, signal)
+
+      target ->
+        Signal.Dispatch.dispatch(
+          signal,
+          DispatchPreparation.inherit_bus_scope(target, context.jido)
+        )
+    end
   end
 
   defp effect_status(nil), do: nil

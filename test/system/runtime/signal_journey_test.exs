@@ -69,21 +69,23 @@ for adapter <- [:ets, :file, :ecto] do
             assert :sys.get_state(old_client).pending == nil
           else
             snapshot = Server.snapshot(server)
-            kill_agent(c, server)
             stop_supervised!(:journey_bus)
+            # Lose the Bus first. Explicit client shutdown otherwise removes
+            # its subscription, which is different from a Bus outage.
+            kill_agent(c, server)
             _replacement_bus = start_bus(c, store)
 
             result =
               Jido.start_agent(c.jido, module,
                 id: saved.id,
                 persistence: c.persistence,
-                restore: :required,
-                restart: :temporary
+                persistence_mode: :restore
               )
 
             replacement =
               case result do
                 {:ok, pid} ->
+                  :ok = Server.await_ready(pid)
                   pid
 
                 error ->
@@ -93,6 +95,7 @@ for adapter <- [:ets, :file, :ecto] do
               end
 
             assert :ok = Client.Server.await_ready(client(replacement), [])
+            retry_delivery(client(replacement))
             Observability.await_turn(c.observer, replacement, 3)
             assert Server.snapshot(replacement).agent == snapshot.agent
             assert {:ok, ^saved, 3} = load(c, saved.id, module)
@@ -109,15 +112,16 @@ for adapter <- [:ets, :file, :ecto] do
         assert length(Sink.attempts(c.jido)) == 1
 
         turns =
-          for {_, [:jido, :agent, :turn, :stop], _, meta} <- Observability.events(c.observer),
-              meta[:source_signal_id] == signal.id,
+          for {_, [:jido, :agent_server, :turn, :stop], _, meta} <-
+                Observability.events(c.observer),
+              meta[:signal_id] == signal.id,
               do: meta
 
         assert length(turns) == if(@boundary == :replay, do: 2, else: 1)
         assert Enum.all?(turns, &(&1.trace_id == trace.trace_id and &1.committed?))
 
         assert Enum.any?(Observability.events(c.observer), fn
-                 {_, [:jido, :agent, :directive, :stop], _, meta} ->
+                 {_, [:jido, :agent_server, :effects, :stop], _, meta} ->
                    meta[:trace_id] == trace.trace_id
 
                  _ ->
@@ -136,9 +140,25 @@ for adapter <- [:ets, :file, :ecto] do
         )
 
     defp client(server) do
-      Server.children(server)
-      |> Map.values()
-      |> Enum.find_value(fn child -> if child.module == Client, do: child.pid end)
+      JidoTest.AgentServerAssertions.plugin(server, Client).pid
+    end
+
+    defp retry_delivery(client) do
+      # A replay can reach the Server while bootstrap admission is closed.
+      # Wait for that attempt, then drive the normal scheduled retry.
+      case :sys.get_state(client).pending do
+        %{worker: worker} ->
+          monitor = Process.monitor(worker)
+          assert_receive {:DOWN, ^monitor, :process, ^worker, _}, 5_000
+
+        _ ->
+          :ok
+      end
+
+      case :sys.get_state(client).pending do
+        %{token: token} -> send(client, {:retry_record, token})
+        nil -> :ok
+      end
     end
   end
 end

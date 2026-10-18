@@ -11,7 +11,7 @@ defmodule JidoTest.System.RedisPartition do
     # Keep the host observer active while the two isolated peers use the same
     # real Redis checkpoint store through their independent control channels.
     server = start_agent(c, module: ControlledAgent)
-    assert {:ok, _} = Jido.AgentServer.call(server, ControlledAgent.signal(1))
+    assert {:ok, _, _} = Jido.AgentServer.call(server, ControlledAgent.signal(1))
     stop_agent(c, server)
     {:ok, cookie: Base.url_encode64(:crypto.strong_rand_bytes(24), padding: false)}
   end
@@ -37,7 +37,7 @@ defmodule JidoTest.System.RedisPartition do
     assert :ok = Peers.call(peer_b, :watch, [node_a])
 
     assert {:ok, old} = Peers.call(peer_a, :activate, ["partitioned-agent", false])
-    assert {:ok, _} = Peers.call(peer_a, :work, [old, 1])
+    assert {:ok, _, _} = Peers.call(peer_a, :work, [old, 1])
 
     assert %{state_version: 1, agent: %{state: %{value: 1}}} =
              Peers.call(peer_a, :snapshot, [old])
@@ -50,7 +50,7 @@ defmodule JidoTest.System.RedisPartition do
 
     assert {:ok, replacement} = Peers.call(peer_b, :activate, ["partitioned-agent", :required])
     assert Peers.call(peer_b, :snapshot, [replacement]).state_version == 1
-    assert {:ok, _} = Peers.call(peer_b, :work, [replacement, 2])
+    assert {:ok, _, _} = Peers.call(peer_b, :work, [replacement, 2])
 
     assert %{state_version: 2, agent: %{state: %{value: 2}}} =
              Peers.call(peer_b, :snapshot, [replacement])
@@ -60,7 +60,7 @@ defmodule JidoTest.System.RedisPartition do
     :ok = Peers.rejoin(left, right, c.cookie)
     assert :ok = :peer.call(peer_a, Process, :send, [worker, {:release_work, gate}, []])
 
-    assert {:error, {:persistence_failed, :conflict}} =
+    assert {:error, %Jido.Error.ExecutionError{details: %{reason: :conflict}}} =
              Peers.call(peer_a, :await_work_result, [signal_id])
 
     assert :ok = Peers.call(peer_a, :await_pid_down, [old])
@@ -87,8 +87,8 @@ defmodule JidoTest.System.RedisPartition do
     new_events = Peers.call(peer_b, :events)
 
     assert Enum.any?(old_events, fn
-             {_, [:jido, :agent, :turn, :stop], _,
-              %{source_signal_id: ^signal_id, committed?: false}} ->
+             {_, [:jido, :agent_server, :turn, :stop], _,
+              %{signal_id: ^signal_id, committed?: false}} ->
                true
 
              _ ->
@@ -96,7 +96,7 @@ defmodule JidoTest.System.RedisPartition do
            end)
 
     assert Enum.any?(new_events, fn
-             {_, [:jido, :agent, :turn, :stop], _, %{committed?: true}} -> true
+             {_, [:jido, :agent_server, :turn, :stop], _, %{committed?: true}} -> true
              _ -> false
            end)
 

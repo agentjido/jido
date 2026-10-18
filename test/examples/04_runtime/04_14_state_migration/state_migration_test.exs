@@ -5,83 +5,61 @@ defmodule JidoTest.Examples.Runtime.StateMigrationTest do
 
   alias Jido.AgentServer, as: Server
   alias Jido.Examples.StateMigration
-  alias Jido.Examples.StateMigration.StrictWallet
-  alias JidoTest.Persistence.ProbeStore
+  alias Jido.Examples.StateMigration.WalletV1ToV2
+  alias Jido.Persistence
 
-  test "a compatible schema migrates domain and Plugin state in one commit", c do
-    {:ok, server} = Jido.start_agent(c.jido, StateMigration, id: unique_id("wallet"))
-    assert Server.snapshot(server).state_version == 0
-    assert {:ok, agent} = StateMigration.migrate(server)
-    assert agent.state == migrated_state()
-    assert Server.snapshot(server).state_version == 1
-    assert Jido.whereis_agent(c.jido, agent.id) == server
-
-    assert {:ok, repeated} = StateMigration.migrate(server)
-    assert repeated.state == agent.state
-    assert {:error, _reason} = StateMigration.migrate(server, "another-upgrade")
-    assert Server.agent(server) == repeated
-  end
-
-  test "invalid target state leaves domain and Plugin state unchanged", c do
-    {:ok, server} = Jido.start_agent(c.jido, StateMigration)
+  test "one upgrade commits the definition and state while preserving identity", c do
+    server = start_wallet(c)
     before = Server.snapshot(server)
-    assert {:error, _reason} = StateMigration.migrate(server, "bad-currency", "INVALID")
-    assert Server.snapshot(server) == before
-    assert {:ok, agent} = StateMigration.migrate(server)
-    assert agent.state == migrated_state()
-  end
 
-  test "a saved migration restores and remains idempotent", c do
-    persistence = persistence()
-    id = unique_id("saved-wallet")
-
-    {:ok, server} =
-      Jido.start_agent(c.jido, StateMigration, id: id, persistence: persistence)
-
-    assert {:ok, _agent} = StateMigration.migrate(server)
-    assert :ok = Jido.hibernate(c.jido, server)
-
-    assert {:ok, replacement} =
-             Jido.thaw(c.jido, StateMigration, id, persistence: persistence)
-
-    assert replacement != server
-    assert Server.agent(replacement).state == migrated_state()
-    assert Server.snapshot(replacement).state_version == 1
-    assert {:ok, repeated} = StateMigration.migrate(replacement)
-    assert repeated.state == migrated_state()
-  end
-
-  test "a strict definition upgrade persists the new definition and complete state", c do
-    persistence = persistence()
-    id = unique_id("strict-wallet")
-
-    {:ok, server} =
-      Jido.start_agent(c.jido, StrictWallet, id: id, persistence: persistence)
-
-    assert {:ok, upgraded} = StateMigration.upgrade(server)
-    assert upgraded.state == migrated_state()
-    assert upgraded.module == StateMigration.MigratedWallet
+    assert {:ok, upgraded, []} = Server.upgrade(server, WalletV1ToV2)
+    assert upgraded.vsn == 2
+    assert upgraded.state == %{wallet: %{format: 2, amount: 100, currency: "USD"}}
+    assert upgraded.schema != before.agent.schema
+    assert upgraded.id == before.agent.id
+    assert upgraded.module == StateMigration
+    assert %{agent: ^upgraded, state_version: 1} = Server.snapshot(server)
     assert Jido.whereis_agent(c.jido, upgraded.id) == server
-    assert Server.snapshot(server).state_version == 1
-
-    assert :ok = Jido.hibernate(c.jido, server)
-
-    assert {:ok, restored} =
-             Jido.thaw(c.jido, StateMigration.MigratedWallet, id, persistence: persistence)
-
-    assert Server.agent(restored).state == migrated_state()
-    assert Server.snapshot(restored).state_version == 1
+    assert {:ok, _} = Zoi.parse(upgraded.schema, upgraded.state)
+    assert {:error, _} = Zoi.parse(upgraded.schema, before.agent.state)
   end
 
-  defp persistence do
-    store = start_supervised!(ProbeStore)
-    {ProbeStore, store: store}
+  test "invalid target data preserves the definition, state, and revision", c do
+    server = start_wallet(c)
+    before = Server.snapshot(server)
+
+    assert {:error, _} = Server.upgrade(server, WalletV1ToV2, context: %{currency: "INVALID"})
+    assert Server.snapshot(server) == before
+    assert {:ok, upgraded, []} = Server.upgrade(server, WalletV1ToV2)
+    assert upgraded.vsn == 2
   end
 
-  defp migrated_state do
-    %{
-      wallet: %{format: 2, amount: 100, currency: "USD"},
-      audit: %{format: 2, entries: ["opened"], upgrade_id: "wallet-1-to-2"}
-    }
+  test "a saved upgrade restores its definition and state without the source definition" do
+    original = StateMigration.instantiate!(id: "saved-wallet")
+    assert {:ok, saved} = Persistence.snapshot(original)
+    assert {:ok, upgraded} = Persistence.upgrade(saved, WalletV1ToV2)
+    assert {:ok, saved_upgrade} = Persistence.snapshot(upgraded)
+    assert {:ok, restored} = Persistence.restore(saved_upgrade)
+    assert restored == upgraded
+    assert restored.module == StateMigration
+    assert restored.vsn == 2
+    assert StateMigration.instantiate!(id: "saved-wallet").vsn == 1
+    assert restored.state == %{wallet: %{format: 2, amount: 100, currency: "USD"}}
+  end
+
+  test "the Action accepts an upgraded snapshot and rejects an unsupported version" do
+    assert {:ok, saved} = Persistence.snapshot(StateMigration.instantiate!(id: "saved-wallet"))
+    assert {:ok, upgraded} = Persistence.upgrade(saved, WalletV1ToV2)
+    assert {:ok, saved_upgrade} = Persistence.snapshot(upgraded)
+    assert {:ok, ^upgraded} = Persistence.upgrade(saved_upgrade, WalletV1ToV2)
+    assert {:error, _} = Persistence.upgrade(put_in(saved.agent.vsn, 3), WalletV1ToV2)
+  end
+
+  defp start_wallet(c) do
+    {:ok, server} =
+      JidoTest.ExampleRuntime.start_agent(c.jido, StateMigration, id: unique_id("wallet"))
+
+    assert :ok = Server.await_ready(server)
+    server
   end
 end

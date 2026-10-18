@@ -23,7 +23,7 @@ defmodule JidoCoreBench.DataCases do
         end,
         fn {:ok, result} ->
           case op do
-            :encode -> F.equal!(length(result["routes"]), size)
+            :encode -> F.equal!(length(result["agent"]["routes"]), size)
             :decode -> F.equal!(result, F.definition(size))
           end
         end

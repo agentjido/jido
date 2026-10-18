@@ -1,13 +1,10 @@
-# Multi-agent example tests
+# Local multi-agent tests
 
-This folder mirrors the numbered learning path in
-[the multi-agent examples](../../../examples/05_multi_agent/README.md).
-
-Run the section behavior tests:
+See [the local examples](../../../examples/05_multi_agent/README.md).
+Local lifecycle, request correlation, and adoption retain their original IDs.
+Their API update is still in progress. Nested ownership tests live in group 07;
+remote startup rejection lives in research.
 
 ```sh
 mix test test/examples/05_multi_agent --include example --seed 0
 ```
-
-The local tests use public AgentServer APIs. The remote tests start isolated,
-connected Erlang peers and confirm cleanup through the public APIs on each node.

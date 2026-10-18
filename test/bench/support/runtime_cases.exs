@@ -26,7 +26,8 @@ defmodule JidoCoreBench.RuntimeCases do
               if mode == :start_stop do
                 nil
               else
-                {:ok, pid} = Server.start_link(agent: a, jido: JidoCoreBench, register: false)
+                {:ok, pid} = Server.start(agent: a, jido: JidoCoreBench)
+                :ok = Server.await_ready(pid)
                 pid
               end
 
@@ -39,12 +40,12 @@ defmodule JidoCoreBench.RuntimeCases do
 
               :start_stop ->
                 {:ok, child} =
-                  Server.start_link(
+                  Server.start(
                     agent: %{p.agent | id: "core-bench-lifecycle"},
-                    jido: JidoCoreBench,
-                    register: false
+                    jido: JidoCoreBench
                   )
 
+                :ok = Server.await_ready(child)
                 F.barrier(p.context)
                 :ok = Server.stop(child, :normal)
                 Process.alive?(child)
@@ -72,7 +73,7 @@ defmodule JidoCoreBench.RuntimeCases do
                 :ok
 
               _ ->
-                {:ok, a} = result
+                {:ok, a, []} = result
 
                 expected =
                   case mode do

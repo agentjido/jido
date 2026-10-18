@@ -10,6 +10,8 @@ defmodule Jido.Examples.Runtime.EventProbe do
 
   # Version-1 semantic span families. Attaching does not create these events.
   @prefixes [
+    [:jido, :agent_server, :turn],
+    [:jido, :agent_server, :effects],
     [:jido, :agent, :lifecycle],
     [:jido, :agent, :turn],
     [:jido, :agent, :commit],
@@ -20,6 +22,7 @@ defmodule Jido.Examples.Runtime.EventProbe do
   ]
   @events for(prefix <- @prefixes, ending <- [:start, :stop, :exception], do: prefix ++ [ending]) ++
             [
+              [:jido, :agent_server, :turn, :settled],
               [:jido, :agent, :turn, :settled],
               [:jido, :agent, :admission, :rejected],
               [:jido, :scheduler, :delivery],

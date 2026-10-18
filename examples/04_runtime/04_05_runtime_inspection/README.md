@@ -6,7 +6,7 @@ A debugger reads committed Agent state and runtime phase through public APIs.
 
 - How `agent/2`, `snapshot/2`, and `status/2` describe a running Agent.
 - How `plugin_state/3` and `children/2` expose bounded public runtime views.
-- How to enable, read, bound, and disable the opt-in debug event buffer.
+- How to enable, read, and bound the debug history.
 - How to redact private fields before inspection data leaves the application.
 
 ## Read the code
@@ -28,11 +28,9 @@ test support holds an active Turn.
 Inspection does not change the Agent. During active work, the snapshot still
 contains the last committed state while status reports a non-idle phase.
 
-The bounded debug buffer is off by default. `set_debug/3` enables collection
-for later Turns. `recent_events/3` returns newest events first and honors the
-configured maximum. Disabling the buffer clears it. Debug entries contain
-bounded outcome and identity data. They do not copy Agent state, full Signals,
-or private Server state.
+Debug history is off by default. Start with `debug: true` to collect terminal
+Turn summaries. `debug_max_events:` sets the bound. `history/1` returns entries
+in commit order. Entries exclude Agent state and full Signals.
 
 ## Limits
 

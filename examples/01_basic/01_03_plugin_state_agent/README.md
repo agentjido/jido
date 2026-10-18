@@ -10,7 +10,7 @@ An Agent and a Plugin update their separate state fields in one atomic commit.
 
 ## Read the code
 
-Read [the Agent and its `CountTurns` Plugin](plugin_state_agent.ex) first. Then
+Read [the Agent](plugin_state_agent.ex), then its [CountTurns Plugin](count_turns.ex). Then
 read [the behavior tests](../../../test/examples/01_basic/01_03_plugin_state_agent/plugin_state_agent_test.exs).
 
 ## Run it

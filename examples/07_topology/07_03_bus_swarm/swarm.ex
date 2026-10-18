@@ -1,36 +1,40 @@
 defmodule Jido.Examples.Topology.Swarm do
-  @moduledoc "A Bus broadcasts work Signals to a group of 1000 Agents by default."
-  use Jido.Topology, name: "bus_swarm"
+  @moduledoc "A declared local Bus broadcasts each work output to three members."
+  use Jido.Agent, name: "topology_bus_swarm", extensions: [Jido.Plugin.Bus.DSL]
 
-  topology do
+  agent do
     schema Zoi.object(%{
-             worker_count: Zoi.integer() |> Zoi.min(0) |> Zoi.default(1_000)
+             sent: Zoi.integer() |> Zoi.default(0),
+             worker_count: Zoi.integer() |> Zoi.min(1) |> Zoi.default(3)
            })
+  end
 
-    metadata %{purpose: "Bus fan-out"}
+  routes do
+    signal_source "/examples/topology/bus_swarm"
 
-    agents do
-      agent :coordinator, Jido.Examples.Topology.Cell
-
-      group :workers, Jido.Examples.Topology.Cell do
-        count input(:worker_count)
+    route "examples.topology.cell.work", as: :work, emits: ["examples.topology.cell.work"] do
+      action %{value: _value},
+        schema: Zoi.object(%{value: Zoi.integer()}),
+        context: context do
+        {:ok, %{context.agent_state | sent: context.agent_state.sent + 1},
+         [Jido.Agent.Directive.emit(context.signal)]}
       end
     end
+  end
 
-    resources do
-      bus :work
-    end
+  signal_bus do
+    name :work
+  end
 
-    relationships do
-      owns :coordinator, :workers
+  topology do
+    agent :workers, Jido.Examples.Topology.Cell do
+      count state(:worker_count)
+      initial_state %{label: "worker"}
     end
 
     connections do
-      subscribe :workers, to: :work, path: "examples.topology.cell.work"
-    end
-
-    startup do
-      concurrency 32
+      connect "examples.topology.cell.work", from: :root, to: bus(:work)
+      connect "examples.topology.cell.work", from: bus(:work), to: :workers, delivery: :broadcast
     end
   end
 end

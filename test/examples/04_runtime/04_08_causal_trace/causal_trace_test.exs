@@ -12,11 +12,11 @@ defmodule JidoTest.Examples.Runtime.CausalTraceTest do
     probe = EventProbe.attach([id, id <> "/left", id <> "/right"])
 
     try do
-      assert {:ok, server} = Jido.start_agent(jido, Example, id: id)
+      assert {:ok, server} = JidoTest.ExampleRuntime.start_agent(jido, Example, id: id)
 
       {:ok, route_signal_1} = Example.start_work_signal(%{request_id: "request-1", value: 7})
 
-      assert {:ok, _} =
+      assert {:ok, _, _directives} =
                Jido.AgentServer.call(server, route_signal_1, [])
 
       eventually(fn -> Server.agent(server).state.results == %{left: 14, right: 14} end)
@@ -25,20 +25,20 @@ defmodule JidoTest.Examples.Runtime.CausalTraceTest do
         eventually(fn ->
           turns =
             for %{
-                  event: [:jido, :agent, :turn, :settled],
+                  event: [:jido, :agent_server, :turn, :settled],
                   metadata: metadata
                 } <- EventProbe.events(probe) do
               metadata
             end
 
-          if length(turns) == 7 do
+          if length(turns) == 5 do
             turns
           end
         end)
 
-      [parent] = Enum.filter(turns, &(&1.signal_type == "examples.runtime.causal_trace.begin"))
-      children = Enum.filter(turns, &(&1.signal_type == "examples.runtime.causal_trace.compute"))
-      results = Enum.filter(turns, &(&1.signal_type == "examples.runtime.causal_trace.result"))
+      [parent] = Enum.filter(turns, &(&1.signal_id == route_signal_1.id))
+      children = Enum.filter(turns, &(&1.agent_id != id))
+      results = Enum.filter(turns, &(&1.agent_id == id and &1.signal_id != route_signal_1.id))
 
       assert length(children) == 2
       assert length(results) == 2

@@ -14,7 +14,7 @@ defmodule JidoTest.Examples.Plugins.IdentityTest do
     {agent_public, _agent_private} = Crypto.agent_key_pair()
 
     {:ok, agent_server} =
-      Jido.start_agent(jido, Agent,
+      JidoTest.ExampleRuntime.start_agent(jido, Agent,
         id: unique_id("identity"),
         default_dispatch: {:pid, target: self()}
       )
@@ -28,13 +28,13 @@ defmodule JidoTest.Examples.Plugins.IdentityTest do
 
     assert {:ok, signed} = Crypto.sign(unsigned, peer_private, peer_public, "identity-once")
 
-    direct = Agent.define!(%{id: unique_id("identity-direct")})
+    direct = Agent.instantiate!(id: unique_id("identity-direct"))
 
     assert {:ok, direct, [%Jido.Agent.Directive.Emit{}]} = Jido.Agent.cmd(direct, signed)
     assert direct.state.accepted == 1
     assert direct.state.last_public_key == Base.encode16(peer_public, case: :lower)
 
-    assert {:ok, committed} = Server.call(agent_server, signed)
+    assert {:ok, committed, _directives} = Server.call(agent_server, signed)
     assert committed.state.accepted == 1
     assert committed.state.last_public_key == Base.encode16(peer_public, case: :lower)
 
@@ -45,21 +45,24 @@ defmodule JidoTest.Examples.Plugins.IdentityTest do
     assert {:error, :replayed_signal} = Server.call(agent_server, signed)
     assert Server.agent(agent_server).state.accepted == 1
 
-    old_runtime = Server.children(agent_server)[{:plugin, Plugin}].pid
+    activation = Server.activation(agent_server)
+    old_runtime = JidoTest.ExampleRuntime.plugin(activation, Plugin)
     old_runtime_ref = Process.monitor(old_runtime)
     Process.exit(old_runtime, :kill)
     assert_receive {:DOWN, ^old_runtime_ref, :process, ^old_runtime, :killed}
 
     replacement_runtime =
       eventually(fn ->
-        case Server.children(agent_server)[{:plugin, Plugin}] do
-          %{pid: pid} when is_pid(pid) and pid != old_runtime -> pid
+        case JidoTest.ExampleRuntime.plugin(activation, Plugin) do
+          pid when is_pid(pid) and pid != old_runtime -> pid
           _child -> nil
         end
       end)
 
+    agent_server = Jido.AgentServer.Supervisor.worker(activation)
+    assert :ok = Server.await_ready(agent_server)
     assert Process.alive?(replacement_runtime)
-    assert {:ok, committed} = Server.call(agent_server, signed)
+    assert {:ok, committed, _directives} = Server.call(agent_server, signed)
     assert committed.state.accepted == 2
     assert_receive {:signal, %Signal{type: "examples.plugins.identity.accepted"}}
 

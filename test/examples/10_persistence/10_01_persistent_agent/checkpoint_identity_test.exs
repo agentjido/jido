@@ -11,7 +11,7 @@ defmodule JidoTest.Examples.Persistence.CheckpointIdentityTest do
     store = {ProbeStore, store: start_supervised!(ProbeStore)}
     requested_id = unique_id("example-checkpoint-identity")
 
-    agent = Probe.new!(id: requested_id, state: %{count: 7})
+    agent = Probe.instantiate!(id: requested_id, state: %{count: 7})
 
     assert :ok =
              Persistence.save_agent(store, agent,
@@ -21,7 +21,7 @@ defmodule JidoTest.Examples.Persistence.CheckpointIdentityTest do
 
     assert :ok =
              ProbeStore.rewrite_record(store, requested_id, fn record ->
-               put_in(record.checkpoint.id, "different-agent")
+               put_in(record.checkpoint.agent.id, "different-agent")
              end)
 
     assert {:error, {:invalid_persistence_record, :checkpoint_identity}} =

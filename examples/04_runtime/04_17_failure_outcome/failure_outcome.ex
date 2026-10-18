@@ -31,12 +31,12 @@ defmodule Jido.Examples.FailureOutcome do
       name: "runtime_failure_outcome_report",
       schema: Zoi.object(%{name: Zoi.string() |> Zoi.min(1)})
 
-    alias Jido.Agent.Directive
+    alias Jido.AgentServer.Directive
 
     def run(%{name: name}, context) do
       state = %{context.agent_state | accepted: context.agent_state.accepted ++ [name]}
       error = Jido.Error.execution_error("Postcommit notification failed", details: %{name: name})
-      {:ok, state, [Directive.error(error, :notification)]}
+      {:ok, state, [Directive.error_report(error, :notification)]}
     end
   end
 end

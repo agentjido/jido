@@ -12,14 +12,14 @@ defmodule JidoTest.Examples.Runtime.BurstBuncherTest do
 
     {:ok, route_signal_1} = BurstBuncher.add_item_signal(%{item_id: "item-1", item: %{value: 1}})
 
-    assert {:ok, first} =
+    assert {:ok, first, _directives} =
              Jido.AgentServer.call(buncher, route_signal_1, [])
 
     assert first.state.buffer == [%{id: "item-1", value: %{value: 1}}]
 
     {:ok, route_signal_2} = BurstBuncher.add_item_signal(%{item_id: "item-2", item: %{value: 2}})
 
-    assert {:ok, second} =
+    assert {:ok, second, _directives} =
              Jido.AgentServer.call(buncher, route_signal_2, [])
 
     assert second.state.buffer == []
@@ -47,22 +47,24 @@ defmodule JidoTest.Examples.Runtime.BurstBuncherTest do
 
     {:ok, route_signal_3} = BurstBuncher.add_item_signal(%{item_id: "item-1", item: :first})
 
-    assert {:ok, first} =
+    assert {:ok, first, _directives} =
              Jido.AgentServer.call(buncher, route_signal_3, [])
 
     assert first.state.timer_generation == 1
 
     {:ok, route_signal_4} = BurstBuncher.add_item_signal(%{item_id: "item-2", item: :second})
 
-    assert {:ok, second} =
+    assert {:ok, second, _directives} =
              Jido.AgentServer.call(buncher, route_signal_4, [])
 
     assert second.state.timer_generation == 2
 
-    assert {:ok, unchanged} = Server.call(buncher, BurstBuncher.timer_flush_signal!(1))
+    assert {:ok, unchanged, _directives} =
+             Server.call(buncher, BurstBuncher.timer_flush_signal!(1))
+
     assert Enum.map(unchanged.state.buffer, & &1.id) == ["item-1", "item-2"]
 
-    assert {:ok, flushed} = Server.call(buncher, BurstBuncher.timer_flush_signal!(2))
+    assert {:ok, flushed, _directives} = Server.call(buncher, BurstBuncher.timer_flush_signal!(2))
     assert flushed.state.buffer == []
 
     assert_receive {:signal,
@@ -79,13 +81,13 @@ defmodule JidoTest.Examples.Runtime.BurstBuncherTest do
     {:ok, duplicate} =
       BurstBuncher.add_item_signal(%{item_id: "item-1", item: :first})
 
-    assert {:ok, _agent} = Server.call(buncher, duplicate)
-    assert {:ok, unchanged} = Server.call(buncher, duplicate)
+    assert {:ok, _agent, _directives} = Server.call(buncher, duplicate)
+    assert {:ok, unchanged, _directives} = Server.call(buncher, duplicate)
     assert Enum.map(unchanged.state.buffer, & &1.id) == ["item-1"]
 
     {:ok, route_signal_5} = BurstBuncher.add_item_signal(%{item_id: "item-2", item: :second})
 
-    assert {:ok, _agent} =
+    assert {:ok, _agent, _directives} =
              Jido.AgentServer.call(buncher, route_signal_5, [])
 
     assert_receive {:signal,
@@ -100,7 +102,7 @@ defmodule JidoTest.Examples.Runtime.BurstBuncherTest do
 
   defp start_buncher(jido, state) do
     start_agent!(jido, BurstBuncher,
-      initial_state: Map.new(state),
+      state: Map.new(state),
       default_dispatch: {:pid, target: self()}
     )
   end
@@ -110,7 +112,7 @@ defmodule JidoTest.Examples.Runtime.BurstBuncherTest do
 
     {:ok, route_signal_6} = BurstBuncher.add_item_signal(%{item_id: "item", item: :value})
 
-    assert {:ok, _} =
+    assert {:ok, _, _directives} =
              Jido.AgentServer.call(buncher, route_signal_6, [])
 
     assert_receive {:signal,

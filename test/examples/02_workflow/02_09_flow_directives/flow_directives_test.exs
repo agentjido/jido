@@ -16,7 +16,7 @@ defmodule JidoTest.Examples.Workflow.FlowDirectivesTest do
   test "live dispatch starts after the single Agent commit", %{jido: jido} do
     server = start_agent!(jido, Example)
     {:ok, signal} = Example.run_signal(%{})
-    assert {:ok, committed} = Jido.AgentServer.call(server, signal)
+    assert {:ok, committed, _directives} = Jido.AgentServer.call(server, signal)
 
     eventually(fn -> length(Effects.records(server)) == 3 end)
     records = Effects.records(server)

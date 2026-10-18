@@ -62,5 +62,4 @@ on startup and replacement. Use Telemetry for optional observation.
 
 See `Jido.Plugin.Audit` for a state-only Plugin and `Jido.Plugin.Heartbeat` for
 a runtime-only Plugin. The [state middleware example](../examples/09_plugins/09_06_state_middleware/README.md)
-and [commit projection example](../examples/09_plugins/09_08_commit_projection/README.md)
-use this single authoring form. See [the callback guide](plugin-contract-and-lifecycle.md) for the full contracts.
+uses this single authoring form. See [the callback guide](plugin-contract-and-lifecycle.md) for the full contracts.

@@ -4,9 +4,9 @@ Agent Server request modes provide different reply and delivery contracts.
 
 ## What you will learn
 
-- How `call/3` waits for one commit and returns `{:ok, agent}`.
+- How `call/3` waits for one commit and returns `{:ok, agent, directives}`.
 - How `cast/2` returns `:ok` before best-effort delivery completes.
-- How `send_request/3` separates sending from `receive_response/2`.
+- How `submit/3` separates sending from `await/2`.
 - Why a caller timeout does not cancel work that already started.
 
 ## Read the code
@@ -26,8 +26,8 @@ stop waiting while the active work still commits.
 ## Important behavior
 
 One Agent Server accepts Turns in serial order. `call/3` returns a direct
-success or error. `send_request/3` returns a request identifier, and
-`receive_response/2` returns the OTP response envelope.
+success or error. `submit/3` returns a Pending handle.
+The same caller uses `await/2` to collect the success tuple or error.
 
 The default postponed-Signal limit is 1,000. Calls and asynchronous requests
 return an overload error when Jido can reject admission. A cast always returns

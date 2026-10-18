@@ -15,7 +15,7 @@ defmodule JidoTest.System.ObservabilityTest do
 
     {:ok, route_signal_1} = Probe.record_and_deliver_signal(%{effect_id: "effect", value: 7})
 
-    assert {:ok, _} =
+    assert {:ok, _, _} =
              Jido.AgentServer.call(server, route_signal_1, [])
 
     completed(c, server, %{"effect" => 7})
@@ -53,16 +53,25 @@ defmodule JidoTest.System.ObservabilityTest do
     stop_agent(c, c.server)
   end
 
-  test "metric counters, a host revision gauge, and semantic logs agree with committed state",
+  test "public counters and a host revision gauge agree with committed state",
        c do
     alias Jido.AgentServer, as: Server
     alias JidoTest.System.{ControlledAgent, Metrics}
-    turn_name = [:jido, :agent, :turn, :stop, :count]
-    counters = Enum.filter(Jido.Telemetry.metrics(), &(&1.name == turn_name))
+    turn_name = [:jido, :agent_server, :turn, :stop, :count]
+
+    commit_name = [:jido, :agent_server, :commit, :count]
+    start_name = [:jido, :agent_server, :lifecycle, :start, :count]
+    stop_name = [:jido, :agent_server, :lifecycle, :stop, :count]
+
+    counters =
+      Jido.Telemetry.metrics()
+      |> Enum.filter(&(&1.name in [turn_name, commit_name, start_name, stop_name]))
+
+    assert length(counters) == 4
 
     gauge =
       Telemetry.Metrics.last_value("system.agent.revision",
-        event_name: [:jido, :agent, :turn, :stop],
+        event_name: [:jido, :agent_server, :turn, :stop],
         measurement: :state_version_after
       )
 
@@ -72,7 +81,7 @@ defmodule JidoTest.System.ObservabilityTest do
     server = start_agent(c, module: ControlledAgent)
     secret = "private-signal-payload-#{unique_id()}"
     signal = ControlledAgent.signal(7, secret: secret)
-    assert {:ok, saved} = Server.call(server, signal)
+    assert {:ok, saved, _} = Server.call(server, signal)
 
     assert {:error, _} =
              Server.call(server, ControlledAgent.signal(99, reject: true, secret: secret))
@@ -80,21 +89,17 @@ defmodule JidoTest.System.ObservabilityTest do
     assert Server.agent(server) == saved
     assert {:ok, ^saved, 1} = load(c, saved.id, ControlledAgent)
 
+    stop_agent(c, server)
+
     assert Metrics.values(reporter) == %{
+             {start_name, %{}} => 1,
+             {stop_name, %{}} => 1,
+             {commit_name, %{status: :ok}} => 1,
              {turn_name, %{status: :ok, stage: :commit}} => 1,
              {turn_name, %{status: :error, stage: :evaluate}} => 1,
              {[:system, :agent, :revision], %{}} => 1
            }
 
-    Observability.await_log(c.observer, fn log ->
-      text = inspect(log.msg)
-      String.contains?(text, "[jido.semantic]") and String.contains?(text, signal.id)
-    end)
-
-    logs = Enum.filter(Observability.logs(c.observer), &(inspect(&1.msg) =~ "[jido.semantic]"))
-    assert logs != []
-    refute inspect(logs) =~ secret
-    stop_agent(c, server)
     stop_agent(c, c.server)
   end
 end

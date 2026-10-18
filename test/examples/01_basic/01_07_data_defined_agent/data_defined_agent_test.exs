@@ -1,37 +1,28 @@
 defmodule JidoTest.Examples.Basic.DataDefinedAgentTest do
-  use JidoTest.BasicSDKCase
+  use JidoTest.Case, async: true
+  @moduletag :example
 
   alias Jido.Agent
   alias Jido.Agent.Codec
+  alias Jido.AgentServer, as: Server
   alias Jido.Examples.DataDefinedAgent, as: Example
 
-  test "a trusted static definition has equal direct and live execution", %{jido: jido} do
+  test "data and JSON definitions use the same direct and live contract", %{jido: jido} do
     {document, registry} = Example.encode()
-    assert {:ok, definition} = Codec.decode(JSON.decode!(JSON.encode!(document)), registry)
+    assert {:ok, definition} = Codec.decode(Jason.decode!(Jason.encode!(document)), registry)
     assert definition == Example.definition()
-
-    [plugin_document] = document["plugins"]
-
-    assert {:ok, {Example.CountTurns, []}} =
-             Jido.Plugin.Codec.decode(plugin_document, registry)
-
-    direct = Agent.instantiate!(definition, id: unique_id("data-defined-direct"))
-    assert {:ok, direct} = Agent.set(direct, count: 4)
-    live = Agent.instantiate!(definition, id: unique_id("data-defined-live"), state: direct.state)
-    {:ok, server} = Jido.start_agent(jido, live)
-    signal = Example.signal!(3)
-
-    assert {:ok, direct_result, []} = Agent.cmd(direct, signal)
-    assert {:ok, live_result} = Jido.AgentServer.call(server, signal)
-    assert direct_result.state == %{count: 7, turns: 1}
-    assert live_result.state == direct_result.state
+    direct = Agent.instantiate!(definition, id: unique_id("direct"))
+    live = Agent.instantiate!(definition, id: unique_id("live"))
+    {:ok, server} = JidoTest.ExampleRuntime.start_agent(jido, live)
+    assert :ok = Server.await_ready(server)
+    assert {:ok, candidate, []} = Agent.cmd(direct, Example.signal!(3))
+    assert {:ok, committed, []} = Server.call(server, Example.signal!(3))
+    assert candidate.state == %{count: 3, turns: 1}
+    assert committed.state == candidate.state
   end
 
-  test "an unknown Registry target cannot enter the definition" do
-    {document, registry} = Example.encode()
-    [route] = document["routes"]
-    untrusted = %{document | "routes" => [%{route | "target" => "actions/untrusted"}]}
-
-    assert {:error, %Jido.Error.ValidationError{}} = Codec.decode(untrusted, registry)
+  test "a document cannot resolve references outside its trusted Registry" do
+    {document, _registry} = Example.encode()
+    assert {:error, _} = Codec.decode(document, %{})
   end
 end

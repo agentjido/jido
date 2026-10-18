@@ -1,16 +1,14 @@
 defmodule Jido.Examples.Topology.Independent do
-  @moduledoc "Two independent Agents with distinct initial state."
-  use Jido.Topology, name: "independent"
+  @moduledoc "Two named members keep separate state under one owning Agent."
+  use Jido.Agent, name: "topology_independent"
 
   topology do
-    agents do
-      agent :left, Jido.Examples.Topology.Cell do
-        initial_state %{label: "left"}
-      end
+    agent :left, Jido.Examples.Topology.Cell do
+      initial_state %{label: "left"}
+    end
 
-      agent :right, Jido.Examples.Topology.Cell do
-        initial_state %{label: "right"}
-      end
+    agent :right, Jido.Examples.Topology.Cell do
+      initial_state %{label: "right"}
     end
   end
 end

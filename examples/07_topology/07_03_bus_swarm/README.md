@@ -1,18 +1,16 @@
-# 07_03 Bus Swarm
+# 07_03 Local Bus Broadcast
 
-A Controller starts one coordinator, 1,000 worker Agents, and one Bus from a
-stored Topology definition.
+One declared local Bus broadcasts work outputs to three counted members.
 
 ## What you will learn
 
-- How DSL, data, and trusted JSON Codec forms define the same Topology.
-- How one Bus subscription expands across a large Agent group.
-- How `startup.max_agents` rejects an oversized expansion before activation.
+- How `Jido.Plugin.Bus.DSL` contributes an explicit local Bus.
+- How connections carry root outputs through the Bus to members.
+- Why a counted destination requires `delivery: :broadcast`.
 
 ## Read the code
 
-Read [the DSL Topology](swarm.ex), [the data and Codec forms](formats.ex),
-the [JSON fixture](fixtures/swarm.json), then the shared [Cell Agent](../support/cell.ex).
+Read the root Agent and its connections, then the Cell Agent and tests.
 
 ## Run it
 
@@ -20,28 +18,33 @@ the [JSON fixture](fixtures/swarm.json), then the shared [Cell Agent](../support
 mix test test/examples/07_topology/07_03_bus_swarm --include example --seed 0
 ```
 
-Expected result: 1,001 Agents start, all workers commit one broadcast value,
-and Controller shutdown removes every worker. A request for 10,001 total
-Agents fails during planning because the default `max_agents` value is 10,000.
+Expected result: One root command commits and emits a work Signal. Each of the three members
+commits its own Turn and records the value. Owner shutdown stops the owned
+supervisor tree.
 
 ## Important behavior
 
-Bus broadcast gives each matching subscriber the Signal. It is not a work queue.
-Startup concurrency and Agent execution capacity are separate limits.
+The count binds from root state at startup. A root command is selected by its
+route; its emitted Signal follows the declared output connections. The root
+reply confirms its own commit. The tests wait separately for member commits.
 
-Controller shutdown removes the coordinator, all workers, their Plugin
-processes, and the Bus. The test confirms each process exit.
+The Bus runtime belongs to the AgentServer supervisor. The cleanup test
+monitors that supervisor and its supervised descendants through public OTP APIs.
 
 ## Limits
 
-The scale result is local and in memory. It is not a multi-host throughput claim.
+Delivery uses best-effort casts. This example does not promise durable
+delivery, acknowledgements, or atomic changes across all members. It is a
+small behavior example, not a 1,000-worker capacity test.
 
 ## Files
 
-- [DSL](swarm.ex)
-- [Data and Codec](formats.ex)
-- [JSON fixture](fixtures/swarm.json)
-- [Tests](../../../test/examples/07_topology/07_03_bus_swarm/bus_swarm_test.exs)
+- [Source](swarm.ex)
 - [Cell Agent](../support/cell.ex)
+- [Tests](../../../test/examples/07_topology/07_03_bus_swarm/bus_swarm_test.exs)
+- [Test runtime assertions](../../../test/examples/support/agent_topology_assertions.ex)
 
-Previous: [Owned Hierarchy](../07_02_hierarchy/README.md) | Next: [Keyed Accounts](../07_04_keyed_accounts/README.md)
+Previous: [Nested Agents](../07_02_hierarchy/README.md) | Next: [Topology Mutations](../07_09_topology_mutations/README.md)
+
+This is also the fixed-group lesson: the Agent declares stable worker roles
+and the Bus routes work. A separate controller membership table is not needed.

@@ -11,7 +11,7 @@ defmodule Jido.Examples.Applications.Inbox.Agent do
              seen: Zoi.list(Zoi.string()) |> Zoi.default([])
            })
 
-    plugin SensorManager, config: [retry_delay_ms: 10]
+    plugin SensorManager, config: %{retry_delay_ms: 10}
   end
 
   routes do

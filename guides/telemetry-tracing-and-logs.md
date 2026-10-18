@@ -1,198 +1,112 @@
-# Telemetry, tracing, and logs
+# Telemetry, Tracing, and Logs
 
-Jido uses one semantic event catalog for runtime observation. Telemetry
-handlers, metric reporters, semantic logs, and the optional OpenTelemetry
-mapping all use this catalog.
+Use `Jido.Telemetry.metrics/0` for the standard metric catalog. Attach Telemetry
+handlers for event observation. Use a host-managed OpenTelemetry SDK for traces.
+Observation is best effort and is not a durable audit record.
 
-Observation does not change an Agent result. It does not make work durable and
-it does not replace an audit record. An abrupt process or VM failure can prevent
-a terminal event.
+## Current events
 
-## Select the correct tool
+AgentServer events use the `[:jido, :agent_server]` prefix.
 
-| Need | Tool |
-| --- | --- |
-| Inspect one committed Agent | `Jido.AgentServer.agent/1` |
-| Inspect the committed Agent and revision | `Jido.AgentServer.snapshot/1` |
-| Inspect current runtime work | `Jido.AgentServer.status/1` |
-| Keep a short history for one Agent | Agent debug buffer |
-| Observe runtime work across Agents | Semantic Telemetry events |
-| Build standard runtime metrics | `Jido.Telemetry.metrics/0` |
-| Correlate work across services | Optional OpenTelemetry mapping |
-| Record durable business or security facts | Application audit records |
+| Event suffix | Meaning | Metric |
+| --- | --- | --- |
+| `[:lifecycle, :start]` | Server starts | Count |
+| `[:lifecycle, :stop]` | Server stops | Count |
+| `[:turn, :start]` | Turn starts | None |
+| `[:turn, :stop]` | Evaluation and commit result | Count and duration |
+| `[:commit]` | Committed state becomes live | Count |
+| `[:directives, :returned]` | Committed Turn returns Directives | Count |
+| `[:turn, :settled]` | Evaluation and commit result is recorded | Count |
+| `[:effects, :start]` | Owned effects start | Count |
+| `[:effects, :stop]` | Owned effects finish | Count |
 
-See [Runtime State and Debugging](runtime-state-and-debugging.html) for the
-inspection APIs and the Agent debug buffer.
+Turn stop and settlement can occur before effects finish. Use effects stop to
+observe the effects result. A failed effect does not undo a committed revision.
+Settlement and effects are point events; neither has a duration measurement.
+The returned-Directives counter counts events, including events with zero
+Directives. Read the `directive_count` measurement for the number of Directives.
 
-## Understand one Turn
+Persistence emits `[:jido, :persistence, :operation, ending]`, where `ending` is
+`:start`, `:stop`, or `:exception`. Both terminal events have count and duration
+metrics. Scheduler emits `[:jido, :scheduler, :delivery]` with a delivery counter.
 
-An admitted Signal starts one Agent Turn span. The Turn evaluates a candidate
-Agent and then attempts one commit.
-
-If evaluation or commit fails, the Turn ends without a new live revision. Jido
-then emits the terminal `turn.settled` event.
-
-If commit succeeds, the Server assigns the committed Agent and revision, then
-ends the Turn span before it replies to the caller.
-The caller can receive the committed Agent while Plugin commit notifications
-and Directive work are still active. Each hook and Directive has its own
-span. Jido emits `turn.settled` after all owned attempts stop.
-
-The normal order is:
-
-```text
-agent.turn.start
-  agent.commit.start
-  agent.commit.stop
-agent.turn.stop              committed Agent is live
-  agent.after_commit.start   zero or more Plugin notifications
-  agent.after_commit.stop
-  agent.directive.start      zero or more Directives
-  agent.directive.stop
-agent.turn.settled           terminal bounded result
-```
-
-A notification or Directive failure does not undo a successful commit. Use `committed?`,
-`status`, `stage`, and the state revisions to distinguish a pre-commit failure
-from a post-commit failure.
-
-## Event catalog
-
-Span families use `:start` and one terminal event. A returned failure uses
-`:stop`. An error, throw, or exit that escapes the observed boundary uses
-`:exception`. Point events have no matching start event.
-
-| Family | Event | Main metadata | Main measurements |
-| --- | --- | --- | --- |
-| Agent lifecycle | `[:jido, :agent, :lifecycle, event]` | Agent identity, `operation`, `status`, `activation_id` | `duration`, `state_version` |
-| Turn result | `[:jido, :agent, :turn, event]` | Turn, Signal, trace, `status`, `stage`, `committed?` | `duration`, revisions, `directive_count` |
-| Commit | `[:jido, :agent, :commit, event]` | Turn identity, `status`, `stage` | `duration` |
-| Plugin commit notification | `[:jido, :agent, :after_commit, event]` | Turn identity, `plugin_module`, `facet_module`, `status`, `stage` | `duration`, start `state_version` |
-| Directive | `[:jido, :agent, :directive, event]` | Turn identity, `directive_module`, `status` | `duration`, `directive_index` |
-| Turn settlement | `[:jido, :agent, :turn, :settled]` | Turn identity, `status`, `stage`, `committed?` | total `duration`, revisions, Directive counts |
-| Admission rejection | `[:jido, :agent, :admission, :rejected]` | Agent and Signal identity, `admission_reason` | `queue_depth`, `queue_limit` |
-| Persistence | `[:jido, :persistence, :operation, event]` | Agent identity, `operation`, `adapter_module`, `persistence_reason` | `duration`, revisions |
-| Local Topology | `[:jido, :topology, :operation, event]` | `topology_id`, `topology_operation`, `status` | `duration`, component counts |
-| Topology ownership settlement | `[:jido, :topology, :ownership, :settled]` | `topology_id`, `topology_operation: :cleanup`, `status` | `component_count`, `ready_count`, `failed_count` |
-| Scheduler delivery | `[:jido, :scheduler, :delivery]` | `scheduler_outcome`, `status` | `count` |
-
-Fields can be absent when they do not apply. Every event contains
-`schema_version: 1`.
-
-Lifecycle operations are `:activate`, `:stop`, `:hibernate`, and `:thaw`.
-Persistence operations are `:load`, `:compare_and_swap`, and `:delete`.
-Topology operations are `:activate`, `:repair`, and `:cleanup`.
-
-Public status values are `:ok`, `:error`, `:cancelled`, `:timed_out`,
-`:conflict`, `:indeterminate`, `:not_found`, and `:rejected`. Public Turn stages
-are `:evaluate`, `:commit`, `:after_commit`, and `:directive`.
+There are no default metrics for the removed Agent lifecycle spans, commit
+spans, Plugin commit notification spans, Directive spans, admission rejection
+points, or Topology controller events. AgentServer does not currently emit a
+Turn `:exception` event; failed Turns use `:stop` with a non-OK status.
 
 ## Attach a handler
 
-Use `:telemetry.attach_many/4` when one consumer needs more than one event.
-The handler runs in the process that emits the event. It must return quickly.
-It must not call the observed Agent or do storage or network work.
-
 ```elixir
-defmodule MyApp.JidoObserver do
+defmodule MyApp.TurnObserver do
   def handle(event, measurements, metadata, receiver) do
     send(receiver, {:jido_event, event, measurements, metadata})
   end
 end
 
-events = [
-  [:jido, :agent, :turn, :stop],
-  [:jido, :agent, :turn, :exception],
-  [:jido, :agent, :turn, :settled],
-  [:jido, :agent, :admission, :rejected]
-]
+:ok = :telemetry.attach_many(
+  "my-turn-observer",
+  [
+    [:jido, :agent_server, :turn, :stop],
+    [:jido, :agent_server, :effects, :stop]
+  ],
+  &MyApp.TurnObserver.handle/4,
+  self()
+)
 
-:ok =
-  :telemetry.attach_many(
-    "my-app-jido-observer",
-    events,
-    &MyApp.JidoObserver.handle/4,
-    self()
-  )
+# Remove the handler when it is no longer needed.
+:ok = :telemetry.detach("my-turn-observer")
 ```
 
-Detach the handler when its owner stops:
+Handlers run in the emitting process. Keep them short. Do not call the observed
+Server or perform storage or network work in a handler.
 
-```elixir
-:ok = :telemetry.detach("my-app-jido-observer")
-```
+Turn metadata includes `agent_id`, `turn_id`, `signal_id`, status, stage, and
+available trace IDs. Terminal measurements include `state_version_before`,
+`state_version_after`, and `directive_count`. Turn duration uses Erlang native
+time units. Persistence metadata can also include namespace, operation, adapter,
+and persistence reason. Do not assume every event has every field.
 
-Use `agent_namespace`, `agent_partition`, and `agent_id` to select one logical
-Agent. Use `activation_id` to select one live activation and `turn_id` to
-select one Turn.
-
-For an executable example, see [Observe Agent Turns](observe-agent-turns.html).
-
-## Safe metadata
-
-Jido applies one strict allowlist before it emits an event. The public fields
-can include:
-
-- Agent identity: `agent_namespace`, `agent_partition`, and `agent_id`.
-- Runtime identity: `agent_module` and `activation_id`.
-- Plugin notification identity: `plugin_module` and `facet_module`.
-- Turn and Signal identity: `turn_id`, `source_signal_id`, `signal_id`, and
-  `signal_type`.
-- Trace and cause identity: `trace_id`, `span_id`, `parent_span_id`,
-  `causation_id`, `cause_turn_id`, and `child_activation_id`.
-- Result fields: `status`, `stage`, `kind`, `committed?`, `error_type`,
-  `error_code`, and `retryable?`.
-- Operation fields for Directive, persistence, Topology, and Scheduler work.
-
-IDs and types have a maximum size of 256 bytes. An Agent partition has a
-maximum size of 128 bytes. Invalid UTF-8 and invalid values are omitted.
-
-Measurements contain integer times, durations, revisions, queue sizes, and
-counts. Times and durations in raw events use the Erlang native time unit.
-
-Events do not contain Agent state, Plugin-owned state, Signal data, Directive
-data, caller context, checkpoints, persistence records, encoded keys, raw
-errors, error messages, stacktraces, PIDs, references, credentials, or
-arbitrary application metadata.
-
-`error_code` is present only for a code that `Jido.Error.code/1` recognizes.
-Telemetry does not contain the full error returned to the caller.
+The scalar metadata filter excludes Agent state, Plugin state, Signal data,
+Directive data, raw errors, process handles, credentials, and caller context.
 
 ## Metrics
-
-`Jido.Telemetry.metrics/0` returns `Telemetry.Metrics` definitions. Pass this
-list to a compatible reporter in the host application:
 
 ```elixir
 metrics = Jido.Telemetry.metrics()
 ```
 
-The list contains count and duration metrics for both `:stop` and `:exception`
-events from these span families:
+Pass the list to a `Telemetry.Metrics` compatible reporter. The catalog has
+14 definitions. Metric names follow the event name and end in `.count` or
+`.duration`. For example:
 
-- Agent lifecycle
-- Turn result
-- commit
-- Plugin commit notification
-- Directive
-- persistence
-- local Topology
+```elixir
+"jido.agent_server.turn.stop.count"
+"jido.agent_server.turn.stop.duration"
+"jido.agent_server.commit.count"
+"jido.agent_server.effects.stop.count"
+"jido.persistence.operation.exception.duration"
+"jido.scheduler.delivery.count"
+```
 
-It also contains Turn settlement count and duration, admission rejection count,
-Topology ownership settlement count tagged by status, and Scheduler delivery
-count. Duration summaries convert the Erlang native unit to
-milliseconds.
+Duration summaries convert native units to milliseconds. Point events have
+counters only. Tags use bounded `status`, `stage`, `operation`,
+`persistence_reason`, and `scheduler_outcome` values. Default tags do not include
+Agent, Signal, Turn, trace, module, or error IDs.
 
-Default metric tags use only `operation`, `status`, `stage`,
-`admission_reason`, `persistence_reason`, `topology_operation`, and
-`scheduler_outcome`. They do not use Agent, Signal, Turn, trace, Topology,
-module, or error IDs. A host can build a separate high-cardinality view when it
-needs one.
+A host can define a revision gauge separately:
+
+```elixir
+Telemetry.Metrics.last_value("my_app.agent.revision",
+  event_name: [:jido, :agent_server, :turn, :stop],
+  measurement: :state_version_after
+)
+```
 
 ## Semantic logs
 
-Jido attaches its semantic log handler when the Jido application starts.
-Configure its global mode as follows:
+Jido attaches its semantic log handler at application startup. It uses the same
+event names as the metric catalog. Configure it with:
 
 ```elixir
 config :jido, :telemetry,
@@ -203,112 +117,34 @@ config :jido, :telemetry,
 | Mode | Output |
 | --- | --- |
 | `:off` | No semantic log entries |
-| `:errors` | Non-OK terminal events and exceptions |
-| `:interesting` | Error entries and operations at or above the slow threshold |
-| `:all` | All terminal semantic events |
+| `:errors` | Non-OK status and exception events |
+| `:interesting` | Errors and events at or above the slow threshold |
+| `:all` | All catalog events, including lifecycle and effects start points |
 
 The default mode is `:off`. The default slow threshold is 1,000 milliseconds.
-The logger does not log span start events.
-
-`MyApp.Jido.debug(:on)` selects `:interesting` for that Jido instance.
-`MyApp.Jido.debug(:verbose)` selects `:all`, and
-`MyApp.Jido.debug(:off)` removes the instance override. This control changes
-semantic log detail. It does not enable the Agent debug buffer and it does not
-weaken metadata filtering.
+`Jido.Debug.enable(instance, :verbose)` selects `:all` for events emitted within
+that instance's semantic log scope. `Jido.Debug.disable(instance)` removes the
+override. Metadata filtering still applies.
 
 ## OpenTelemetry
 
-Jido declares `opentelemetry_api` as an optional dependency. A host that wants
-traces must add the API and SDK to its own dependencies:
-
-```elixir
-defp deps do
-  [
-    {:jido, "~> 3.0"},
-    {:opentelemetry_api, "~> 1.0"},
-    {:opentelemetry, "~> 1.0"}
-  ]
-end
-```
-
-The host must start and configure the SDK. The host also owns its sampler,
-resource, exporter, collector, credentials, storage, dashboards, and alerts.
-Jido does not start an SDK and does not export trace data.
-
-Use this check after the host starts the SDK:
+The host must supply the optional `opentelemetry_api` dependency and start and
+configure its own SDK. The host owns sampling, resources, export, and storage.
+Jido does not start an SDK or export trace data itself.
 
 ```elixir
 Jido.Telemetry.open_telemetry?()
 ```
 
-The result is `false` when the optional API is absent, the Jido mapping is
-disabled, or the active tracer is a no-op tracer. Semantic Telemetry, metrics,
-and logs continue to work in all three cases.
-
-Disable only the Jido mapping as follows:
+The result is false when the API is absent, mapping is disabled, or the active
+tracer is a no-op tracer. Telemetry events, metrics, and logs still work.
 
 ```elixir
 config :jido, :opentelemetry, enabled: false
 ```
 
-### Span mapping
+The Turn span is named `jido.agent_server.turn`. Persistence operation spans
+include the operation name. Point events map to instantaneous spans with the
+current trace context where available. They do not have metric durations.
 
-| Semantic work | OpenTelemetry span name |
-| --- | --- |
-| Agent lifecycle | `jido.agent.lifecycle.<operation>` |
-| Turn result | `jido.agent.turn` |
-| Commit | `jido.agent.commit` |
-| Plugin commit notification | `jido.agent.after_commit` |
-| Directive | `jido.agent.directive` |
-| Persistence | `jido.persistence.<operation>` |
-| Local Topology | `jido.topology.<operation>` |
-| Turn settlement | `jido.agent.turn.settled` |
-| Admission rejection | `jido.agent.admission.rejected` |
-| Scheduler delivery | `jido.scheduler.delivery` |
-
-Point events become zero-duration spans. The settlement span has a link to its
-completed Turn span. Jido maps only safe semantic fields to `jido.*`
-attributes. A non-OK operation, except cancellation, gets OpenTelemetry error
-status. An escaping fault adds an exception event with only its safe type and
-kind.
-
-## Trace context on Signals
-
-`Jido.Signal.Trace` owns the public W3C carrier. Signals store `traceparent`
-and optional `tracestate` values in their CloudEvents context attributes.
-
-```elixir
-signal = Jido.Signal.new!("orders.requested", %{}, source: "/orders")
-trace = Jido.Signal.Trace.new(trace_flags: "01")
-{:ok, signal} = Jido.Signal.Trace.put(signal, trace)
-
-Jido.Signal.Trace.get(signal)
-```
-
-When a Signal has a valid carrier, its span becomes the parent of the new Agent
-Turn span. An untraced Signal starts a local root span, and the host SDK makes
-the sampling decision. An outgoing Signal carries the current Turn span.
-
-Trace parentage and Signal causation are separate. `parent_span_id` describes
-the trace graph. `causation_id` identifies the Signal that caused the outgoing
-Signal.
-
-Jido-owned Tasks capture and attach the current process context. They restore
-the earlier context after they stop. A lower package must transfer context for
-Tasks that it starts.
-
-Plugin commit notification spans use the completed Turn span as their parent,
-as Directive spans do. This parent rule applies to an untraced local Signal and
-to a Signal with an incoming W3C carrier. The notification may run after the
-Turn span ends, but its trace parent remains that Turn.
-
-## Operating rules
-
-- Keep Telemetry handlers small and non-blocking.
-- Do not use telemetry or debug history as an audit record.
-- Do not use high-cardinality IDs as default metric tags.
-- Do not add application state or payloads to the Jido event catalog.
-- Configure exporters and credentials only in the host application.
-- Use `turn.settled` when you need the final notification and Directive result.
-- Use the Turn `:stop` event when you need the time at which a commit became
-  live.
+Read [Observe Agent Turns](observe-agent-turns.html) for a runnable observer.

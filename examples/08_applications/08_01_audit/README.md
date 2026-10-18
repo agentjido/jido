@@ -41,4 +41,4 @@ example does not provide an external compliance archive.
 - [Agent and Flow](audit.ex)
 - [Tests](../../../test/examples/08_applications/08_01_audit/audit_test.exs)
 
-Previous: [Additive Update](../../07_topology/07_09_additive_update/README.md) | Next: [Subscription](../08_02_subscription/README.md)
+Previous: [Additive Update](../../07_topology/07_09_topology_mutations/README.md) | Next: [Subscription](../08_02_subscription/README.md)

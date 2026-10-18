@@ -10,7 +10,7 @@ defmodule JidoTest.Examples.Runtime.ManagedJobsTest do
 
     {:ok, route_signal_1} = ManagedJobs.start_job_signal(%{job_id: "job", value: 3})
 
-    assert {:ok, pending} =
+    assert {:ok, pending, _directives} =
              Jido.AgentServer.call(agent, route_signal_1,
                context: JidoTest.JobRunner.context(self())
              )
@@ -42,7 +42,7 @@ defmodule JidoTest.Examples.Runtime.ManagedJobsTest do
 
     {:ok, route_signal_2} = ManagedJobs.start_job_signal(%{job_id: "job", value: 3})
 
-    assert {:ok, _} =
+    assert {:ok, _, _directives} =
              Jido.AgentServer.call(agent, route_signal_2,
                context: JidoTest.JobRunner.context(self())
              )
@@ -54,7 +54,7 @@ defmodule JidoTest.Examples.Runtime.ManagedJobsTest do
     eventually(fn -> state(agent).status == :completed end)
     assert state(agent).result == "artifact:6"
     assert Server.snapshot(agent).state_version == 2
-    assert JobServer.jobs(Server.children(agent)[{:plugin, Jobs}].pid) == []
+    assert JobServer.jobs(JidoTest.ExampleRuntime.plugin(Server.activation(agent), Jobs)) == []
   end
 
   test "cancellation stops work and rejects its later result", %{jido: jido} do
@@ -63,7 +63,7 @@ defmodule JidoTest.Examples.Runtime.ManagedJobsTest do
 
     {:ok, route_signal_3} = ManagedJobs.cancel_job_signal(%{job_id: "job"})
 
-    assert {:ok, _} =
+    assert {:ok, _, _directives} =
              Jido.AgentServer.call(agent, route_signal_3, [])
 
     assert_receive {:DOWN, ^ref, :process, ^worker, _}, 1000
@@ -86,29 +86,32 @@ defmodule JidoTest.Examples.Runtime.ManagedJobsTest do
   test "capability loss kills its work but requires explicit pending-job recovery", %{jido: jido} do
     {agent, worker} = start_job(jido)
     ref = Process.monitor(worker)
-    old = Server.children(agent)[{:plugin, Jobs}].pid
+    activation = Server.activation(agent)
+    old = JidoTest.ExampleRuntime.plugin(Server.activation(agent), Jobs)
     Process.exit(old, :kill)
     assert_receive {:DOWN, ^ref, :process, ^worker, _}, 1000
 
     runtime =
       eventually(fn ->
-        case Server.children(agent)[{:plugin, Jobs}] do
-          %{pid: pid} when is_pid(pid) and pid != old -> pid
+        case JidoTest.ExampleRuntime.plugin(activation, Jobs) do
+          pid when is_pid(pid) and pid != old -> pid
           _ -> nil
         end
       end)
 
+    agent = Jido.AgentServer.Supervisor.worker(activation)
+    assert :ok = Server.await_ready(agent)
     assert JobServer.jobs(runtime) == []
     assert state(agent).status == :running
 
     {:ok, route_signal_5} = ManagedJobs.cancel_job_signal(%{job_id: "job"})
 
-    assert {:ok, _} =
+    assert {:ok, _, _directives} =
              Jido.AgentServer.call(agent, route_signal_5, [])
 
     {:ok, route_signal_6} = ManagedJobs.start_job_signal(%{job_id: "retry-with-new-id", value: 5})
 
-    assert {:ok, _} =
+    assert {:ok, _, _directives} =
              Jido.AgentServer.call(agent, route_signal_6, [])
 
     eventually(fn -> state(agent).status == :completed end)

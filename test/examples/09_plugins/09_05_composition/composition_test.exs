@@ -8,7 +8,8 @@ defmodule JidoTest.Examples.Plugins.CompositionTest do
   alias Jido.Signal
 
   test "pure and live package inputs remain isolated", %{jido: jido} do
-    {:ok, server} = Jido.start_agent(jido, Agent, id: unique_id("plugin-composition"))
+    {:ok, server} =
+      JidoTest.ExampleRuntime.start_agent(jido, Agent, id: unique_id("plugin-composition"))
 
     source =
       Signal.new!("examples.plugins.composition.accept", %{token: "allow"},
@@ -16,7 +17,7 @@ defmodule JidoTest.Examples.Plugins.CompositionTest do
         subject: "tenant/ACME"
       )
 
-    assert {:ok, committed} = Server.call(server, source)
+    assert {:ok, committed, _directives} = Server.call(server, source)
     assert committed.state == %{accepted: 1, owner: "acme:operator"}
 
     rejected = %{source | id: Jido.Signal.ID.generate!(), subject: nil}

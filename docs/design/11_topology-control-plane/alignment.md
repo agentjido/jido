@@ -136,7 +136,6 @@ Jido core and are not core release blockers.
 | Evidence | Behavior proved |
 | --- | --- |
 | `test/jido/topology/plugin_integration_test.exs` | Explicit entries stay first. Agent, group, and Plugin order is stable. Bus, subscription, and ownership entries enter the common graph. Source definitions stay unchanged. Direct planning matches instantiation. Included contributions stay in their component scope. A duplicate contribution fails before activation. |
-| `test/examples/07_topology/07_06_plugin_contribution` | A Topology-only Plugin package contributes a Bus and subscription. The Controller starts them, and a published Signal reaches the Agent. |
 | `test/jido/topology` | Authoring, validation, composition, input, group, Controller, readiness, repair, restore, conflict, and cleanup behavior stays valid. |
 | `test/examples/07_topology` | All documented systems run through the same Controller, lifecycle Signal, and Plugin policy contracts. |
 | `test/jido/topology/controller_placement_test.exs` | Exact placement starts and moves one Agent across two connected Erlang nodes. |

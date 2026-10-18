@@ -1,46 +1,30 @@
-defmodule Jido.Examples.Topology.BusSwarmTest do
-  use JidoTest.Case, async: false
+defmodule JidoTest.Examples.Topology.BusSwarmTest do
+  use JidoTest.Case, async: true
   @moduletag :example
-  @moduletag timeout: 120_000
-  import JidoTest.TopologyAssertions
-  alias Jido.Examples.Topology.{Cell, Formats}
+  import JidoTest.AgentTopologyAssertions
+  alias Jido.AgentServer, as: Server
   alias Jido.Examples.Topology.Swarm
-  alias Jido.Topology.{Codec, Controller}
 
-  test "rejects a group expansion above startup.max_agents before activation" do
-    assert {:error, error} =
-             Swarm.new(id: "too-large", input: %{worker_count: 10_000})
+  test "a local Bus broadcasts a work output to every counted member", %{jido: jido} do
+    server = start_topology(jido, Swarm)
+    workers = members(server)
+    assert length(workers) == 3
+    assert Jido.agent_count(jido) == 4
+    assert {:ok, signal} = Swarm.work_signal(%{value: 5})
+    assert {:ok, accepted, [_]} = Server.call(server, signal)
+    assert accepted.state.sent == 1
 
-    assert Exception.message(error) =~ "max_agents"
+    # The root reply confirms its commit. Each member commits a separate Turn.
+    eventually(fn -> Enum.all?(workers, &(Server.agent(&1).state.total == 5)) end)
+    assert Enum.all?(workers, &(Server.snapshot(&1).state_version == 1))
+    stop_topology(server)
+    assert Jido.agent_count(jido) == 0
   end
 
-  test "boots 1000 Bus workers from a stored JSON definition" do
-    jido = :"topology_scale_#{System.unique_integer([:positive])}"
-    start_supervised!({Jido, name: jido, max_tasks: 4096})
-    {:ok, json} = Formats.json()
-    {:ok, instance} = Codec.decode(JSON.decode!(json), Formats.registry(), id: "large")
-    controller = start_supervised!({Controller, jido: jido, topology: instance})
-    assert :ok = Controller.await_ready(controller, 90000)
-    assert %{agents: 1001, resources: 1, status: :ready} = Controller.status(controller)
-    assert Jido.agent_count(jido) == 1001
-    bus = Controller.whereis_bus(controller, :work)
-
-    {:ok, command_signal_1} = Cell.work_signal(%{value: 1})
-
-    assert {:ok, [_]} =
-             Jido.Signal.Bus.publish(bus, [command_signal_1])
-
-    workers =
-      for index <- 1..1000 do
-        Controller.whereis_agent(controller, :workers, index)
-      end
-
-    eventually(fn -> Enum.all?(workers, &(Jido.AgentServer.agent(&1).state.total == 1)) end,
-      timeout: 20000
-    )
-
-    coordinator = Controller.whereis_agent(controller, :coordinator)
-    stop_topology(controller, [coordinator | workers], [bus])
+  test "stopping the owner stops its Bus runtime and member tree", %{jido: jido} do
+    server = start_topology(jido, Swarm)
+    assert length(members(server)) == 3
+    stop_topology(server)
     assert Jido.agent_count(jido) == 0
   end
 end

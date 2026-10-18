@@ -8,13 +8,21 @@ defmodule JidoTest.System.Metrics do
     recorder = start_supervised!({Agent, fn -> %{} end}, id: __MODULE__)
     id = {__MODULE__, make_ref()}
     events = metrics |> Enum.map(& &1.event_name) |> Enum.uniq()
-    :ok = :telemetry.attach_many(id, events, &__MODULE__.record/4, {namespace, recorder, metrics})
+
+    :ok =
+      :telemetry.attach_many(
+        id,
+        events,
+        &__MODULE__.record/4,
+        {namespace, Process.group_leader(), recorder, metrics}
+      )
+
     on_exit(fn -> :telemetry.detach(id) end)
     recorder
   end
 
-  def record(event, measurements, metadata, {namespace, recorder, metrics}) do
-    if metadata[:agent_namespace] == namespace do
+  def record(event, measurements, metadata, {namespace, leader, recorder, metrics}) do
+    if metadata[:agent_namespace] == namespace or Process.group_leader() == leader do
       for metric <- metrics, metric.event_name == event do
         key = {metric.name, Map.take(metadata, metric.tags)}
 

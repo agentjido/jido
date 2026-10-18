@@ -7,14 +7,15 @@ defmodule JidoTest.Examples.Basic.DirectiveAgentTest do
 
   test "every handler observes committed state and dispatch follows batch order", %{jido: jido} do
     server = start_agent!(jido, Agent)
-    %{pid: runtime} = Server.children(server)[{:plugin, Effects}]
+    id = Server.agent(server).id
+    runtime = Effects.runtime(jido, id)
     runtime_monitor = Process.monitor(runtime)
     server_monitor = Process.monitor(server)
     command = change(7, :valid)
 
-    assert {:ok, committed} = Server.call(server, command)
+    assert {:ok, committed, _directives} = Server.call(server, command)
     await_idle(server)
-    records = Effects.records(server)
+    records = Effects.records(jido, Server.agent(server).id)
 
     assert Enum.map(records, & &1.label) == ["first", "second", "third"]
 
@@ -41,13 +42,18 @@ defmodule JidoTest.Examples.Basic.DirectiveAgentTest do
 
     await_idle(server)
     assert Server.snapshot(server) == before
-    assert Effects.records(server) == []
+    assert Effects.records(jido, Server.agent(server).id) == []
 
-    assert {:ok, recovered} = Server.call(server, change(2, :valid))
+    assert {:ok, recovered, _directives} = Server.call(server, change(2, :valid))
     await_idle(server)
     assert recovered.state.count == 2
     assert Server.snapshot(server) == %{agent: recovered, state_version: 1}
-    assert Enum.map(Effects.records(server), & &1.label) == ["first", "second", "third"]
+
+    assert Enum.map(Effects.records(jido, Server.agent(server).id), & &1.label) == [
+             "first",
+             "second",
+             "third"
+           ]
   end
 
   test "a failed second dispatch preserves the commit and prevents the third effect", %{
@@ -56,13 +62,13 @@ defmodule JidoTest.Examples.Basic.DirectiveAgentTest do
     server = start_agent!(jido, Agent, error_policy: observe_errors())
     command = change(9, :dispatch_failure)
 
-    assert {:ok, committed} = Server.call(server, command)
-    assert_receive {:sdk_error, %Jido.Error.ExecutionError{}, outcome}, 1_000
-    assert outcome.committed?
-    assert outcome.source_signal.id == command.id
+    assert {:ok, committed, _directives} = Server.call(server, command)
     await_idle(server)
 
-    records = Effects.records(server)
+    assert %{status: :failed, completed: 1, total: 3, committed_version: 1} =
+             Server.status(server).last_effect_outcome
+
+    records = Effects.records(jido, Server.agent(server).id)
     assert Enum.map(records, & &1.label) == ["first", "second"]
     assert Enum.all?(records, &(&1.snapshot == %{agent: committed, state_version: 1}))
     assert committed.state == %{count: 9}

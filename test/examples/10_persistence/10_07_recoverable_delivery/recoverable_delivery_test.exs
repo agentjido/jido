@@ -22,15 +22,15 @@ defmodule JidoTest.Examples.Persistence.RecoverableDeliveryTest do
 
     {:ok, route_signal_1} = Example.record_and_deliver_signal(%{effect_id: "effect-1", value: 7})
 
-    assert {:ok, committed} =
+    assert {:ok, committed, _directives} =
              Jido.AgentServer.call(server, route_signal_1, [])
 
     assert committed.state.delivery.pending == %{"effect-1" => 7}
     assert Sink.records(c.jido) == %{}
 
     server_ref = Process.monitor(server)
-    Process.exit(server, :kill)
-    assert_receive {:DOWN, ^server_ref, :process, ^server, :killed}, 1000
+    assert :ok = Jido.stop_agent(c.jido, server)
+    assert_receive {:DOWN, ^server_ref, :process, ^server, _reason}, 1000
     eventually(fn -> Jido.whereis_agent(c.jido, id) == nil end)
 
     assert :ok = Sink.available(c.jido, true)
@@ -52,11 +52,10 @@ defmodule JidoTest.Examples.Persistence.RecoverableDeliveryTest do
 
   defp start_example(c, id, restore) do
     assert {:ok, server} =
-             Jido.start_agent(c.jido, Example,
+             JidoTest.ExampleRuntime.start_agent(c.jido, Example,
                id: id,
                persistence: c.store,
-               restore: restore,
-               restart: :temporary
+               persistence_mode: if(restore == false, do: :create, else: :restore)
              )
 
     server

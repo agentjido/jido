@@ -51,8 +51,8 @@ defmodule JidoTest.Examples.Applications.ApprovalWorkflowTest do
     api = start_supervised!(FakeBookingAPI)
     server = start_agent!(jido, Example)
     refute Map.has_key?(Server.children(server), {:plugin, BookingPlugin})
-    assert {:ok, _} = search(server)
-    assert {:ok, selected} = select(server)
+    assert {:ok, _, _directives} = search(server)
+    assert {:ok, selected, _directives} = select(server)
     context = %{booking_adapter: {FakeBookingAPI, api}}
 
     assert {:ok, candidate, [%SubmitBooking{} = directive]} =
@@ -68,7 +68,9 @@ defmodule JidoTest.Examples.Applications.ApprovalWorkflowTest do
     assert FakeBookingAPI.calls(api) == []
     assert Server.agent(server) == selected
 
-    assert {:ok, ^candidate} = Server.call(server, approve_signal(), context: context)
+    assert {:ok, ^candidate, _directives} =
+             Server.call(server, approve_signal(), context: context)
+
     eventually(fn -> Server.agent(server).state.booking_status == :booked end)
 
     assert [{key, request}] = FakeBookingAPI.calls(api)
@@ -80,11 +82,11 @@ defmodule JidoTest.Examples.Applications.ApprovalWorkflowTest do
   test "a stale selection fails and cancelled work cannot be approved", %{jido: jido} do
     api = start_supervised!(FakeBookingAPI)
     server = start_agent!(jido, Example)
-    assert {:ok, _} = search(server)
+    assert {:ok, _, _directives} = search(server)
 
     {:ok, route_signal_3} = Example.update_preferences_signal(%{constraints: @constraints})
 
-    assert {:ok, refreshed} =
+    assert {:ok, refreshed, _directives} =
              Jido.AgentServer.call(server, route_signal_3,
                context: %{search: {FixtureSearch, {:ok, @offers}}}
              )
@@ -95,11 +97,11 @@ defmodule JidoTest.Examples.Applications.ApprovalWorkflowTest do
     assert Enum.any?(errors(error), &(&1.message == "flight search revision is stale"))
     assert Server.snapshot(server) == before
 
-    assert {:ok, _} = select(server, 2)
+    assert {:ok, _, _directives} = select(server, 2)
 
     {:ok, route_signal_4} = Example.cancel_signal(%{})
 
-    assert {:ok, cancelled} =
+    assert {:ok, cancelled, _directives} =
              Jido.AgentServer.call(server, route_signal_4, [])
 
     assert cancelled.state.booking_status == :cancelled
@@ -119,13 +121,13 @@ defmodule JidoTest.Examples.Applications.ApprovalWorkflowTest do
   test "a duplicate approval makes no second provider call", %{jido: jido} do
     api = start_supervised!(FakeBookingAPI)
     server = start_agent!(jido, Example)
-    assert {:ok, _} = search(server)
-    assert {:ok, _} = select(server)
+    assert {:ok, _, _directives} = search(server)
+    assert {:ok, _, _directives} = select(server)
     context = %{booking_adapter: {FakeBookingAPI, api}}
 
     {:ok, route_signal_6} = Example.approve_booking_signal(%{})
 
-    assert {:ok, _submitting} =
+    assert {:ok, _submitting, _directives} =
              Jido.AgentServer.call(server, route_signal_6, context: context)
 
     eventually(fn -> Server.agent(server).state.booking_status == :booked end)
@@ -142,12 +144,12 @@ defmodule JidoTest.Examples.Applications.ApprovalWorkflowTest do
   test "stale result Signals cannot replace a terminal booking", %{jido: jido} do
     api = start_supervised!(FakeBookingAPI)
     server = start_agent!(jido, Example)
-    assert {:ok, _} = search(server)
-    assert {:ok, _} = select(server)
+    assert {:ok, _, _directives} = search(server)
+    assert {:ok, _, _directives} = select(server)
 
     {:ok, route_signal_8} = Example.approve_booking_signal(%{})
 
-    assert {:ok, approved} =
+    assert {:ok, approved, _directives} =
              Jido.AgentServer.call(server, route_signal_8,
                context: %{booking_adapter: {FakeBookingAPI, api}}
              )
@@ -167,7 +169,7 @@ defmodule JidoTest.Examples.Applications.ApprovalWorkflowTest do
     ]
 
     for message <- messages do
-      assert({:ok, ^booked} = Server.call(server, message))
+      assert({:ok, ^booked, _directives} = Server.call(server, message))
     end
 
     assert length(FakeBookingAPI.calls(api)) == 1
@@ -176,12 +178,12 @@ defmodule JidoTest.Examples.Applications.ApprovalWorkflowTest do
   test "provider failure enters through a separate result Turn", %{jido: jido} do
     api = start_supervised!({FakeBookingAPI, result: :timeout})
     server = start_agent!(jido, Example)
-    assert {:ok, _} = search(server)
-    assert {:ok, _} = select(server)
+    assert {:ok, _, _directives} = search(server)
+    assert {:ok, _, _directives} = select(server)
 
     {:ok, route_signal_9} = Example.approve_booking_signal(%{})
 
-    assert {:ok, agent} =
+    assert {:ok, agent, _directives} =
              Jido.AgentServer.call(server, route_signal_9,
                context: %{booking_adapter: {FakeBookingAPI, api}}
              )

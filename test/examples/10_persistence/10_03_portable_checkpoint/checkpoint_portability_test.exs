@@ -16,20 +16,20 @@ defmodule JidoTest.Examples.Persistence.PortableCheckpointTest do
             %Jido.Error.ValidationError{
               details: %{
                 code: :non_portable_term,
-                path: [:record, :checkpoint, :state, :payload, :job, :worker]
+                path: [:record, :checkpoint, :agent, :state, :payload, :job, :worker]
               }
             }} = Persistence.load_agent(store, Probe, id, namespace: "persistence-probe")
   end
 
   defp store_payload(store, id, payload) do
     assert :ok =
-             Persistence.save_agent(store, Probe.new!(id: id),
+             Persistence.save_agent(store, Probe.instantiate!(id: id),
                namespace: "persistence-probe",
                revision: 3
              )
 
     ProbeStore.rewrite_record(store, id, fn record ->
-      put_in(record.checkpoint.state.payload, payload)
+      put_in(record.checkpoint.agent.state.payload, payload)
     end)
   end
 end

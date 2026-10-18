@@ -44,7 +44,9 @@ defmodule JidoTest.Examples.Runtime.TurnControlTest do
 
   test "public status identifies and cancels only the matching active Turn", %{jido: jido} do
     {:ok, server} =
-      Jido.start_agent(jido, TurnControlBlockingAgent, id: unique_id("turn-control"))
+      JidoTest.ExampleRuntime.start_agent(jido, TurnControlBlockingAgent,
+        id: unique_id("turn-control")
+      )
 
     :ok = RuntimeBarrier.arm(self())
 
@@ -65,11 +67,11 @@ defmodule JidoTest.Examples.Runtime.TurnControlTest do
     assert %{
              phase: phase,
              state_version: 0,
-             active: %{turn_id: turn_id, signal_type: signal_type, start_version: 0}
+             active: %{turn_id: turn_id, signal_id: signal_id, start_version: 0}
            } = AgentServer.status(server)
 
     assert phase == :running
-    assert signal_type == "test.examples.runtime.turn_control.complete"
+    assert is_binary(signal_id)
     assert {:error, :stale_turn} = AgentServer.cancel_turn(server, "stale-turn-id")
     assert :ok = AgentServer.cancel_turn(server, turn_id)
     assert {:error, :cancelled} = Task.await(caller)

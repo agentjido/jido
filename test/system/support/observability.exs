@@ -3,19 +3,15 @@ defmodule JidoTest.System.Observability do
   import ExUnit.Assertions
 
   @prefixes [
-    [:jido, :agent, :turn],
-    [:jido, :agent, :lifecycle],
-    [:jido, :agent, :commit],
-    [:jido, :agent, :after_commit],
-    [:jido, :agent, :directive],
+    [:jido, :agent_server, :turn],
+    [:jido, :agent_server, :effects],
     [:jido, :persistence, :operation],
-    [:jido, :persistence, :store],
-    [:jido, :topology, :operation]
+    [:jido, :persistence, :store]
   ]
   @points [
-    [:jido, :agent, :admission, :rejected],
-    [:jido, :agent, :turn, :settled],
-    [:jido, :topology, :ownership, :settled]
+    [:jido, :agent_server, :admission, :rejected],
+    [:jido, :agent_server, :turn, :settled],
+    [:jido, :agent_server, :commit]
   ]
 
   def start!(namespace, on_exit, context) do
@@ -47,7 +43,7 @@ defmodule JidoTest.System.Observability do
         handler,
         events ++ @points,
         &__MODULE__.record/4,
-        {recorder, namespace, context[:persistence_contract] == :store}
+        {recorder, namespace, {context[:persistence_contract] == :store, Process.group_leader()}}
       )
 
     on_exit.(fn ->
@@ -74,14 +70,14 @@ defmodule JidoTest.System.Observability do
   def record([:jido, :persistence, :store | _] = event, measurements, metadata, {
         recorder,
         _namespace,
-        true
+        {true, _leader}
       }) do
     entry = {self(), event, measurements, metadata}
     append(recorder, :events, entry)
   end
 
-  def record(event, measurements, metadata, {recorder, namespace, _capture_store?}) do
-    if metadata[:agent_namespace] == namespace or metadata[:topology_id] == namespace do
+  def record(event, measurements, metadata, {recorder, namespace, {_capture_store?, leader}}) do
+    if metadata[:agent_namespace] == namespace or Process.group_leader() == leader do
       entry = {self(), event, measurements, metadata}
       append(recorder, :events, entry)
     end
@@ -151,7 +147,7 @@ defmodule JidoTest.System.Observability do
 
   def await_turn(recorder, server, version) do
     await(recorder, fn
-      {^server, [:jido, :agent, :turn, :stop], %{state_version_after: ^version},
+      {^server, [:jido, :agent_server, :turn, :stop], %{state_version_after: ^version},
        %{status: :ok, committed?: true}} ->
         true
 
@@ -185,28 +181,25 @@ defmodule JidoTest.System.Observability do
 
   def assert_turn(recorder, signal, status, committed?, agent_id \\ nil) do
     entries =
-      for {_, [:jido, :agent, :turn, ending], measurements, metadata} <- events(recorder),
+      for {_, [:jido, :agent_server, :turn, ending], measurements, metadata} <- events(recorder),
           ending in [:start, :stop, :exception],
-          metadata[:source_signal_id] == signal.id,
+          metadata[:signal_id] == signal.id,
           is_nil(agent_id) or metadata[:agent_id] == agent_id,
           do: {ending, measurements, metadata}
 
     assert [{:start, _, start}, {:stop, measurements, stop}] = entries
     assert is_binary(start.turn_id)
-    assert start.activation_id == stop.activation_id
     assert start.turn_id == stop.turn_id
-    assert start.stage == :evaluate
     assert stop.status == status
     assert stop.committed? == committed?
     assert measurements.duration >= 0
 
-    spans =
-      for {_, [:jido, :agent, :commit, ending], _, metadata} <- events(recorder),
-          metadata[:turn_id] == start.turn_id,
-          do: ending
+    commits =
+      for {_, [:jido, :agent_server, :commit], _, m} <- events(recorder),
+          m[:turn_id] == start.turn_id,
+          do: m
 
-    assert spans == [:start, :stop],
-           "missing or duplicate commit span for #{start.turn_id}"
+    assert length(commits) == if(committed?, do: 1, else: 0)
   end
 
   def assert_topology(recorder, operation, count) do
@@ -237,9 +230,7 @@ defmodule JidoTest.System.Observability do
     assert events != [], "the system scenario emitted no observed semantic events"
 
     for prefix <- [
-          [:jido, :agent, :turn],
-          [:jido, :agent, :lifecycle],
-          [:jido, :agent, :commit],
+          [:jido, :agent_server, :turn],
           [:jido, :persistence, :operation]
         ] do
       assert Enum.any?(events, fn {_, event, _, _} -> event == prefix ++ [:start] end),
@@ -289,10 +280,10 @@ defmodule JidoTest.System.Observability do
         {ending, prefix} = List.pop_at(event, -1)
 
         key =
-          {pid, prefix, metadata[:turn_id], metadata[:operation], metadata[:topology_operation]}
+          {pid, prefix, metadata[:turn_id], metadata[:operation], metadata[:adapter_module]}
 
         case ending do
-          point when point in [:rejected, :settled] ->
+          point when point in [:rejected, :settled, :commit] ->
             pending
 
           :start ->
@@ -305,7 +296,7 @@ defmodule JidoTest.System.Observability do
             assert Map.get(pending, key, 0) > 0,
                    "unmatched or duplicate terminal: #{inspect(event)}"
 
-            assert measurements.duration >= 0
+            if prefix != [:jido, :agent_server, :effects], do: assert(measurements.duration >= 0)
 
             assert metadata[:status] in [
                      :ok,

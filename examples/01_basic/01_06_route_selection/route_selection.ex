@@ -1,5 +1,5 @@
 defmodule Jido.Examples.RouteSelection do
-  @moduledoc "Shows exact, wildcard, and fallback route selection."
+  @moduledoc "Shows route declaration order with exact, wildcard, and fallback routes."
 
   defmodule Record do
     @moduledoc "Stores the selected handler name."
@@ -22,29 +22,14 @@ defmodule Jido.Examples.RouteSelection do
   routes do
     signal_source "/examples/basic/route_selection"
 
-    route "**", Record do
-      defaults %{handler: "fallback"}
-    end
+    # The first matching route wins. Keep the fallback last.
+    route "examples.basic.route_selection.order.create", Record,
+      as: :create,
+      defaults: %{handler: "create"}
 
-    route "examples.basic.route_selection.order.*", Record do
-      defaults %{handler: "order"}
-      priority 100
-    end
+    route "examples.basic.route_selection.order.*", Record, defaults: %{handler: "order"}
 
-    route "examples.basic.route_selection.order.create", Record, as: :create do
-      defaults %{handler: "create"}
-      priority -100
-    end
-
-    route "examples.basic.route_selection.order.priority", Record do
-      defaults %{handler: "low-priority"}
-      priority -10
-    end
-
-    route "examples.basic.route_selection.order.priority", Record do
-      defaults %{handler: "high-priority"}
-      priority 10
-    end
+    route "**", Record, defaults: %{handler: "fallback"}
   end
 
   @doc "Builds one command Signal for this router."
@@ -58,7 +43,7 @@ defmodule Jido.Examples.RouteSelection do
 end
 
 defmodule Jido.Examples.RouteSelection.Strict do
-  @moduledoc "Has no fallback route, so unmatched input returns a routing error."
+  @moduledoc "Has no fallback route, so unmatched input returns an unmatched_input error."
   use Jido.Agent, name: "basic_strict_route_selection"
 
   agent do

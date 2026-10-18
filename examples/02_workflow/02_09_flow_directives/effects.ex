@@ -31,7 +31,9 @@ defmodule Jido.Examples.FlowDirectives.Effects do
 
   @doc "Reads recorded labels and the public snapshots seen during dispatch."
   def records(server) do
-    %{pid: runtime} = Jido.AgentServer.children(server)[{:plugin, __MODULE__}]
+    id = Jido.AgentServer.agent(server).id
+    instance = Jido.AgentServer.status(server).jido
+    [{runtime, _}] = Registry.lookup(Jido.registry_name(instance), {__MODULE__, id})
     GenServer.call(runtime, :records)
   end
 end
@@ -40,7 +42,13 @@ defmodule Jido.Examples.FlowDirectives.Effects.Runtime do
   @moduledoc false
   use GenServer
 
-  def start_link(init), do: GenServer.start_link(__MODULE__, init)
+  def start_link(init) do
+    name =
+      {:via, Registry,
+       {Jido.registry_name(init.jido), {Jido.Examples.FlowDirectives.Effects, init.agent_id}}}
+
+    GenServer.start_link(__MODULE__, init, name: name)
+  end
 
   @impl true
   def init(init), do: {:ok, %{server: init.agent_server, records: []}}

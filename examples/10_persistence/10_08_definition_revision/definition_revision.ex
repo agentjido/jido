@@ -1,31 +1,33 @@
 defmodule Jido.Examples.DefinitionRevision do
-  @moduledoc """
-  Installs two revisions of one isolated cart module to model a deployment.
-  Agent `vsn` is declared as static module data. Only the probe Cart module is
-  replaced.
-  """
-  def install(revision) do
-    module = __MODULE__.Cart
-    unload()
+  @moduledoc "A saved definition retains its version and checks its executable references."
 
-    quoted =
-      quote do
-        defmodule unquote(module) do
-          use Jido.Agent, name: "examples_versioned_cart", vsn: unquote(revision)
-
-          agent do
-            schema Zoi.object(%{total: Zoi.integer() |> Zoi.default(0)})
-          end
-        end
-      end
-
-    Code.compile_quoted(quoted)
-    module
+  defmodule Add do
+    use Jido.Action, name: "definition_revision_add"
+    def run(_input, %{agent_state: state}), do: {:ok, %{total: state.total + 1}}
   end
 
-  def unload do
-    :code.purge(__MODULE__.Cart)
-    :code.delete(__MODULE__.Cart)
-    :ok
+  defmodule Upgrade do
+    @moduledoc "Explicitly selects the current Action for an older snapshot."
+    use Jido.Action, name: "definition_revision_upgrade"
+
+    def run(%{snapshot: snapshot}, _context) do
+      agent = %{
+        snapshot.agent
+        | vsn: 2,
+          routes: Jido.Examples.DefinitionRevision.definition().routes
+      }
+
+      with {:ok, saved} <- Jido.Persistence.snapshot(agent), do: {:ok, %{snapshot: saved}}
+    end
+  end
+
+  use Jido.Agent, name: "examples_versioned_cart", vsn: 1
+
+  agent do
+    schema Zoi.object(%{total: Zoi.integer() |> Zoi.default(0)})
+  end
+
+  routes do
+    route "examples.persistence.definition_revision.add", Add, as: :add
   end
 end

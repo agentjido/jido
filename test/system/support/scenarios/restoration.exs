@@ -9,26 +9,26 @@ defmodule JidoTest.System.Scenarios.Restoration do
       alias JidoTest.RecoverableDeliverySink, as: Sink
       alias JidoTest.System.{ControlledAgent, FaultAdapter, MigrationAgent, Observability}
 
-      for restore <- [:required, :if_found] do
+      for restore <- [:restore] do
         @restore_mode restore
         test "#{@restore_mode} refuses an unsupported Plugin record without a reset", c do
           server = start_agent(c, module: MigrationAgent)
-          assert {:ok, saved} = Server.call(server, ControlledAgent.signal(7))
+          assert {:ok, saved, _} = Server.call(server, ControlledAgent.signal(7))
           stop_agent(c, server)
           {adapter, opts} = c.store
           key = Persistence.agent_key(Jido.Agent.Ref.new!(namespace: c.namespace, id: saved.id))
           assert {:ok, original} = read_bytes(adapter, key, opts)
           record = :erlang.binary_to_term(original, [:safe])
-          assert record.checkpoint.state.owned == %{format: 1, value: 0}
-          incompatible = put_in(record.checkpoint.state.owned, %{format: 99, value: 0})
+          assert record.checkpoint.agent.state.owned == %{format: 1, value: 0}
+          incompatible = put_in(record.checkpoint.agent.state.owned, %{format: 99, value: 0})
           bytes = :erlang.term_to_binary(incompatible)
           assert :ok = adapter.put(key, bytes, opts)
 
           assert {:error, :unsupported_plugin_format} =
-                   Jido.start_agent(c.jido, MigrationAgent,
+                   start_result(c.jido, MigrationAgent,
                      id: saved.id,
                      persistence: c.store,
-                     restore: @restore_mode
+                     persistence_mode: @restore_mode
                    )
 
           assert {:ok, ^bytes} = read_bytes(adapter, key, opts)
@@ -39,7 +39,10 @@ defmodule JidoTest.System.Scenarios.Restoration do
           # Repair only the owned fixture bytes. A subsequent activation must
           # load the original state, not a default written by the failed load.
           assert :ok = adapter.put(key, original, opts)
-          restored = start_agent(c, module: MigrationAgent, id: saved.id, restore: :required)
+
+          restored =
+            start_agent(c, module: MigrationAgent, id: saved.id, persistence_mode: :restore)
+
           assert Server.snapshot(restored) == %{agent: saved, state_version: 1}
           stop_agent(c, restored)
           assert Sink.attempts(c.jido) == []
@@ -54,11 +57,10 @@ defmodule JidoTest.System.Scenarios.Restoration do
 
         activation =
           Task.async(fn ->
-            Jido.start_agent(c.jido, DeliveryAgent,
+            start_result(c.jido, DeliveryAgent,
               id: saved.id,
               persistence: c.persistence,
-              restart: :temporary,
-              restore: :required
+              persistence_mode: :restore
             )
           end)
 
@@ -80,16 +82,18 @@ defmodule JidoTest.System.Scenarios.Restoration do
         {:ok, signal} =
           DeliveryAgent.record_and_deliver_signal(%{effect_id: "deleted-restore", value: 99})
 
-        assert {:error, {:persistence_failed, :conflict}} = Server.call(restored, signal)
+        assert {:error, %Jido.Error.ExecutionError{details: %{reason: :conflict}}} =
+                 Server.call(restored, signal)
+
         await_down(monitors)
-        Observability.assert_turn(c.observer, signal, :error, false)
+        Observability.assert_turn(c.observer, signal, :indeterminate, false)
         Observability.assert_persistence(c.observer, :conflict)
 
         assert {:error, :deleted} =
-                 Jido.start_agent(c.jido, DeliveryAgent,
+                 start_result(c.jido, DeliveryAgent,
                    id: saved.id,
                    persistence: c.persistence,
-                   restore: :required
+                   persistence_mode: :restore
                  )
 
         assert Jido.whereis_agent(c.jido, saved.id) == nil

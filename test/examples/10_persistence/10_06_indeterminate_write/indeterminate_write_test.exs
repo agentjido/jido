@@ -17,17 +17,17 @@ defmodule JidoTest.Examples.Persistence.IndeterminateWriteTest do
     context = %{reply_to: observer}
 
     assert {:ok, server} =
-             Jido.start_agent(jido, Probe,
+             JidoTest.ExampleRuntime.start_agent(jido, Probe,
                id: id,
                persistence: {ProbeStore, Keyword.put(opts, :write_result, :indeterminate)},
-               restore: false
+               persistence_mode: :create
              )
 
     monitor = Process.monitor(server)
 
     {:ok, route_signal_1} = Probe.increment_signal(%{request_id: "first", amount: 1})
 
-    assert {:error, {:persistence_failed, :indeterminate}} =
+    assert {:error, %Jido.Error.ExecutionError{details: %{reason: :indeterminate}}} =
              Jido.AgentServer.call(server, route_signal_1, context: context)
 
     assert_receive {:DOWN, ^monitor, :process, ^server, _reason}, 1_000

@@ -15,7 +15,7 @@ defmodule JidoTest.System.Services.BedrockStrict do
   @tag :research
   test "a strict three-node Bedrock cluster retains committed Agent state after node loss", c do
     local = start_agent(c, module: ControlledAgent)
-    assert {:ok, _} = Jido.AgentServer.call(local, ControlledAgent.signal(1))
+    assert {:ok, _, _} = Jido.AgentServer.call(local, ControlledAgent.signal(1))
     stop_agent(c, local)
     cookie = Base.url_encode64(:crypto.strong_rand_bytes(24), padding: false)
     peers = for _ <- 1..3, do: Peers.start!(cookie, &on_exit/1)
@@ -55,12 +55,12 @@ defmodule JidoTest.System.Services.BedrockStrict do
     assert rpc(right, :log_nodes, []) |> Enum.uniq() |> length() == 3
     for {peer, _} <- peers, do: assert(:ok == rpc(peer, :start_jido, [c.namespace, c.tmp_dir]))
     assert {:ok, server} = Peers.call(left, :activate, ["strict-agent", false])
-    assert {:ok, _} = Peers.call(left, :work, [server, 31])
+    assert {:ok, _, _} = Peers.call(left, :work, [server, 31])
     before = Peers.call(left, :snapshot, [server])
     assert before.state_version == 1
 
     assert Enum.any?(Peers.call(left, :events), fn
-             {_, [:jido, :agent, :turn, :stop], _, %{committed?: true}} -> true
+             {_, [:jido, :agent_server, :turn, :stop], _, %{committed?: true}} -> true
              _ -> false
            end)
 
@@ -69,7 +69,7 @@ defmodule JidoTest.System.Services.BedrockStrict do
     assert recovered_layout.epoch > layout.epoch
     assert {:ok, restored} = Peers.call(right, :activate, ["strict-agent", :required])
     assert Peers.call(right, :snapshot, [restored]) == before
-    assert {:ok, _} = Peers.call(right, :work, [restored, 32])
+    assert {:ok, _, _} = Peers.call(right, :work, [restored, 32])
     assert Peers.call(right, :snapshot, [restored]).state_version == 2
     for peer <- [right, last], do: Peers.stop(peer)
     assert_empty_agent_pool(c)

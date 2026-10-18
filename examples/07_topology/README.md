@@ -1,21 +1,17 @@
 # Topology examples
 
-These examples define and activate complete Agent systems. Construction
-and planning start no process. A Controller owns activation, repair, inspection,
-and cleanup.
+A normal Agent definition contains named members and output connections.
+AgentServer applies that definition under its OTP supervisor. Pure Agent
+construction starts no processes.
 
 ## Learning order
 
-1. [Independent Agents](07_01_independent/README.md) — start unrelated singleton Agents and request repair.
-2. [Owned Hierarchy](07_02_hierarchy/README.md) — declare direct parent and child relationships.
-3. [Bus Swarm](07_03_bus_swarm/README.md) — define the same 1,000-worker system with DSL, data, and JSON.
-4. [Keyed Accounts](07_04_keyed_accounts/README.md) — derive stable group identity from input records.
-5. [Composed System](07_05_composed_system/README.md) — include reusable Topologies with imports, bindings, and exports.
-6. [Plugin Contribution](07_06_plugin_contribution/README.md) — let an Agent Plugin add static topology wiring.
-7. [Lifecycle Signals](07_07_lifecycle_signals/README.md) — connect an optional control Agent through normal routes.
-8. [Placement Policy](07_08_placement_policy/README.md) — keep node selection in a Plugin and use the exact-node core mechanism.
-9. [Additive Update](07_09_additive_update/README.md) — add Agents while unchanged members keep their PIDs and state.
-10. [Topology Extension](07_10_topology_extension/README.md) — lower custom static declarations into a normal activation plan.
+- `01` [Named Members](07_01_independent/README.md) — separate initial state, commands, and owner shutdown.
+- `02` [Nested Agents](07_02_hierarchy/README.md) — reusable definitions and subtree removal.
+- `03` [Local Bus Broadcast](07_03_bus_swarm/README.md) — a declared Bus and explicit counted delivery.
+- `09` [Topology Mutations](07_09_topology_mutations/README.md) — add, resize, replace, and remove members.
+
+The retained example IDs stay stable.
 
 ## Run the section
 
@@ -23,16 +19,18 @@ and cleanup.
 mix test test/examples/07_topology --include example --seed 0
 ```
 
-Expected result: each planned system starts, proves its declared relationships
-or delivery behavior, and cleans its local resources.
+Expected result: each local system starts, proves its member state or delivery
+behavior, and stops its owned runtime tree.
 
 ## Shared support
 
-The [Cell Agent](support/cell.ex) is the small shared worker used throughout the
-section.
+The [Cell Agent](support/cell.ex) records received work. The
+[test assertions](../../test/examples/support/agent_topology_assertions.ex)
+start ready Agents and monitor shutdown through public AgentServer and OTP APIs.
 
 ## Limits
 
-The Controller repairs one target and can place an Agent on an exact Erlang
-node. It does not discover nodes, select capacity policy, rebalance a system,
-or provide distributed authority.
+These examples use local runtime support. They do not define a separate
+Controller, placement policy, keyed expansion, or imports and exports.
+A parent snapshot captures its own state and topology intent, not the current
+state of every running member.

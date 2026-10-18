@@ -9,7 +9,7 @@ defmodule JidoTest.Examples.Plugins.StateMiddlewareTest do
 
   test "state middleware reads the Turn and changes only its owned field", %{jido: jido} do
     first = input_signal(2, "first")
-    direct = Agent.define!(%{id: unique_id("state-middleware-direct")})
+    direct = Agent.instantiate!(id: unique_id("state-middleware-direct"))
 
     assert {:ok, candidate, [_note]} = Jido.Agent.cmd(direct, first)
     assert direct.state.count == 0
@@ -20,12 +20,12 @@ defmodule JidoTest.Examples.Plugins.StateMiddlewareTest do
            }
 
     {:ok, server} =
-      Jido.start_agent(jido, Agent, id: unique_id("state-middleware-live"))
+      JidoTest.ExampleRuntime.start_agent(jido, Agent, id: unique_id("state-middleware-live"))
 
-    assert {:ok, committed} = Server.call(server, first)
+    assert {:ok, committed, _directives} = Server.call(server, first)
     assert committed.state == candidate.state
 
-    assert {:ok, committed} = Server.call(server, input_signal(3, "second"))
+    assert {:ok, committed, _directives} = Server.call(server, input_signal(3, "second"))
 
     assert committed.state == %{
              count: 5,

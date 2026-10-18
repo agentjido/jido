@@ -61,6 +61,8 @@ defmodule Jido.Persistence.Record do
   @doc false
   @spec decode(term()) :: {:ok, term()} | {:error, :invalid_persistence_record}
   def decode(value) when is_binary(value) do
+    # Load the trusted envelope fields before safe decoding on a cold node.
+    _ = Code.ensure_loaded?(Jido.Persistence.Snapshot)
     {:ok, :erlang.binary_to_term(value, [:safe])}
   rescue
     ArgumentError -> {:error, :invalid_persistence_record}

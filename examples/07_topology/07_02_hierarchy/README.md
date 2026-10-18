@@ -1,16 +1,16 @@
-# 07_02 Owned Hierarchy
+# 07_02 Nested Agents
 
-A Topology declares a coordinator, its leader, and three workers owned by that
-leader.
+An Agent owns a team whose Agent definition declares two workers.
 
 ## What you will learn
 
-- How `owns` creates direct Agent ownership relationships.
-- How a group expands into stable child members.
+- How an Agent definition can contain another Agent definition.
+- How each nested Agent owns its declared member runtimes.
+- How `agent_remove` removes a nested owner and its complete subtree.
 
 ## Read the code
 
-Read [the Topology](hierarchy.ex), then the shared [Cell Agent](../support/cell.ex).
+Read the root Agent, then `Hierarchy.Team` in the same file, then the Cell Agent and tests.
 
 ## Run it
 
@@ -18,27 +18,29 @@ Read [the Topology](hierarchy.ex), then the shared [Cell Agent](../support/cell.
 mix test test/examples/07_topology/07_02_hierarchy --include example --seed 0
 ```
 
-Expected result: the Controller starts five Agents and the leader owns exactly
-three workers. When the leader fails, OTP restarts it and the workers stop.
-Manual repair binds the replacement leader to the coordinator and leaves the
-workers stopped. Controller shutdown removes the remaining Agents.
+Expected result: The root, team, and two workers start. Workers keep separate state.
+Removing the team leaves the root running and stops the complete team subtree.
 
 ## Important behavior
 
-Ownership creates activation dependencies and logical parent bindings. All
-local Agents are OTP siblings. Each Agent owns only its direct logical
-children. `on_parent_exit: :stop` causes a clean worker shutdown. Transient
-workers then stay stopped, even if OTP restarts the leader. Select `:continue`
-when workers must stay alive until their parent binding is repaired.
+Containment comes from nested Agent declarations. There is no separate
+`owns` graph or Controller. The remove Action returns a data mutation.
+AgentServer validates and commits it, then reconciles the runtime.
+Wait for `Server.await_ready(server)` after the mutation.
 
 ## Limits
 
-This example does not use a Bus or show automatic repair.
+Removal is intentional and does not leave a detached team. This example
+does not define remote placement, orphan adoption, or member-state recovery.
 
 ## Files
 
 - [Source](hierarchy.ex)
-- [Tests](../../../test/examples/07_topology/07_02_hierarchy/hierarchy_test.exs)
 - [Cell Agent](../support/cell.ex)
+- [Tests](../../../test/examples/07_topology/07_02_hierarchy/hierarchy_test.exs)
+- [Test runtime assertions](../../../test/examples/support/agent_topology_assertions.ex)
 
-Previous: [Independent Agents](../07_01_independent/README.md) | Next: [Bus Swarm](../07_03_bus_swarm/README.md)
+Previous: [Named Members](../07_01_independent/README.md) | Next: [Local Bus Broadcast](../07_03_bus_swarm/README.md)
+
+This is also the Agent hierarchy lesson. Nested definitions replace the old
+recursive spawn example; subtree ownership follows the OTP supervisor tree.

@@ -39,4 +39,4 @@ policy, or durable request ledger.
 - [Worker Agent](../support/worker.ex)
 - [Keep State Action](../../support/keep_state.ex)
 
-Previous: [Child Lifecycle](../05_01_child_lifecycle/README.md) | Next: [Agent Hierarchy](../05_03_agent_hierarchy/README.md)
+Previous: [Child Lifecycle](../05_01_child_lifecycle/README.md) | Next: [Orphan Adoption](../05_06_orphan_adoption/README.md)

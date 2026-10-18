@@ -13,14 +13,14 @@ defmodule JidoTest.Examples.Workflow.EffectfulStepsTest do
   test "caller context reaches the read and only selected output persists", %{jido: jido} do
     client = service()
     persistence = {Jido.Persistence.ETS, table: :"workflow_#{System.unique_integer([:positive])}"}
-    server = start_agent!(jido, Example, persistence: persistence, restore: false)
+    server = start_agent!(jido, Example, persistence: persistence, persistence_mode: :create)
     before = Server.snapshot(server)
     {:ok, command} = Example.fetch_record_signal(%{key: "one"})
     context = %{service: {Service, client}, private_request: make_ref()}
 
     assert {:ok, candidate, []} = Example.cmd(before.agent, command, context: context)
     assert Server.snapshot(server) == before
-    assert {:ok, ^candidate} = Server.call(server, command, context: context)
+    assert {:ok, ^candidate, _directives} = Server.call(server, command, context: context)
     assert candidate.state == %{key: "one", result: %{revision: "r1", answer: "safe"}}
 
     assert {:ok, ^candidate, 1} =
@@ -32,6 +32,7 @@ defmodule JidoTest.Examples.Workflow.EffectfulStepsTest do
     assert :ok = Server.hibernate(server)
     assert_receive {:DOWN, ^monitor, :process, ^server, {:shutdown, :hibernate}}, 1000
     assert {:ok, restored} = Jido.thaw(jido, Example, candidate.id, persistence: persistence)
+    assert :ok = Jido.AgentServer.await_ready(restored)
     assert Server.snapshot(restored) == %{agent: candidate, state_version: 1}
   end
 
@@ -42,7 +43,7 @@ defmodule JidoTest.Examples.Workflow.EffectfulStepsTest do
 
     {:ok, route_signal_1} = Example.fetch_record_signal(%{key: "seed"})
 
-    assert {:ok, _} =
+    assert {:ok, _, _directives} =
              Jido.AgentServer.call(server, route_signal_1, context: context)
 
     before = Server.snapshot(server)
@@ -84,12 +85,12 @@ defmodule JidoTest.Examples.Workflow.EffectfulStepsTest do
 
     {:ok, route_signal_4} = Example.fetch_record_signal(%{key: "one"})
 
-    assert {:ok, committed} =
+    assert {:ok, committed, _directives} =
              Jido.AgentServer.call(server, route_signal_4, context: %{service: {Service, first}})
 
     {:ok, route_signal_5} = Example.fetch_record_signal(%{key: "one"})
 
-    assert {:ok, ^committed} =
+    assert {:ok, ^committed, _directives} =
              Jido.AgentServer.call(server, route_signal_5, [])
 
     assert Service.calls(first) == [read: %{key: "one"}]
@@ -103,7 +104,7 @@ defmodule JidoTest.Examples.Workflow.EffectfulStepsTest do
 
     {:ok, route_signal_7} = Example.fetch_record_signal(%{key: "two"})
 
-    assert {:ok, next} =
+    assert {:ok, next, _directives} =
              Jido.AgentServer.call(server, route_signal_7, context: %{service: {Service, second}})
 
     assert next.state.result.answer == "second"

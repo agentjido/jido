@@ -16,7 +16,7 @@ defmodule JidoTest.System.FileStorageTest do
 
     {:ok, command_signal_1} = Probe.record_and_deliver_signal(%{effect_id: "saved", value: 7})
 
-    assert {:ok, _} =
+    assert {:ok, _, _} =
              Server.call(
                server,
                command_signal_1
@@ -42,7 +42,7 @@ defmodule JidoTest.System.FileStorageTest do
      opts: opts}
   end
 
-  for restore <- [:required, :if_found] do
+  for restore <- [:restore] do
     @restore restore
     test "#{@restore} restoration rejects a corrupt file without replacing it", c do
       stop_agent(c, c.server)
@@ -50,10 +50,10 @@ defmodule JidoTest.System.FileStorageTest do
       File.write!(c.path, corrupt)
 
       assert {:error, :invalid_persistence_record} =
-               Jido.start_agent(c.jido, Probe,
+               start_result(c.jido, Probe,
                  id: c.snapshot.agent.id,
                  persistence: c.store,
-                 restore: @restore
+                 persistence_mode: @restore
                )
 
       assert File.read!(c.path) == corrupt
@@ -75,7 +75,7 @@ defmodule JidoTest.System.FileStorageTest do
 
       # File returns the OS error without a write-outcome classification.
       # Persistence treats that uncertainty as indeterminate and fences the Agent.
-      assert {:error, {:persistence_failed, {:indeterminate, :eacces}}} =
+      assert {:error, %Jido.Error.ExecutionError{details: %{reason: {:indeterminate, :eacces}}}} =
                Server.call(c.server, signal)
 
       await_down(monitors)
@@ -83,7 +83,7 @@ defmodule JidoTest.System.FileStorageTest do
       assert {:ok, saved, 2} = load(c, c.snapshot.agent.id)
       assert saved == c.snapshot.agent
       assert File.ls!(c.directory) == [Path.basename(c.path)]
-      Observability.assert_turn(c.observer, signal, :error, false)
+      Observability.assert_turn(c.observer, signal, :indeterminate, false)
       Observability.assert_persistence(c.observer, :indeterminate)
     after
       File.chmod!(c.directory, 448)
@@ -133,7 +133,7 @@ defmodule JidoTest.System.FileStorageTest do
   end
 
   defp assert_restores(c) do
-    restored = start_agent(c, id: c.snapshot.agent.id, restore: :required)
+    restored = start_agent(c, id: c.snapshot.agent.id, persistence_mode: :restore)
     assert Server.snapshot(restored) == c.snapshot
     stop_agent(c, restored)
     assert_empty_agent_pool(c)

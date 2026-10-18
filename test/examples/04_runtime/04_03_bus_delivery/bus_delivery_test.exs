@@ -29,20 +29,20 @@ defmodule JidoTest.Examples.Runtime.BusDeliveryFixture do
       as: :record,
       do:
         action(%{value: value}, schema: Zoi.object(%{value: Zoi.integer()}), context: context) do
-          context.plugin_inputs()[JidoTest.FeatureObserver].runtime().on_delivery().(%{
+          context.plugin_inputs[JidoTest.FeatureObserver].runtime.on_delivery.(%{
             value: value
           })
 
-          state = context.agent_state()
+          state = context.agent_state
 
-          if context.signal().id() in state.seen() do
+          if context.signal.id in state.seen do
             {:ok, state}
           else
             {:ok,
              %{
                state
-               | seen: state.seen() ++ [context.signal().id()],
-                 values: state.values() ++ [value]
+               | seen: state.seen ++ [context.signal.id],
+                 values: state.values ++ [value]
              }}
           end
         end
@@ -59,7 +59,11 @@ defmodule JidoTest.Examples.Runtime.BusDeliveryTest do
   alias JidoTest.Examples.Runtime.BusDeliveryFixture
 
   test "durable delivery waits for a commit before it sends the next record", %{jido: jido} do
-    {:ok, agent} = Jido.start_agent(jido, observed(BusDeliveryFixture, :on_delivery))
+    {:ok, agent} =
+      JidoTest.ExampleRuntime.start_agent(jido, observed(BusDeliveryFixture, :on_delivery),
+        id: unique_id("bus-observer")
+      )
+
     bus = owned_bus(jido, agent)
 
     {:ok, command_signal_1} = BusDeliveryFixture.record_signal(%{value: 1})
@@ -82,7 +86,10 @@ defmodule JidoTest.Examples.Runtime.BusDeliveryTest do
 
   test "a failed Turn retries the same record before later input", %{jido: jido} do
     {:ok, agent} =
-      Jido.start_agent(jido, observed(BusDeliveryFixture, :on_delivery), error_policy: :log_only)
+      JidoTest.ExampleRuntime.start_agent(jido, observed(BusDeliveryFixture, :on_delivery),
+        id: unique_id("bus-observer"),
+        error_policy: :log_only
+      )
 
     bus = owned_bus(jido, agent)
 
@@ -111,9 +118,18 @@ defmodule JidoTest.Examples.Runtime.BusDeliveryTest do
     {:ok, event} = BusDelivery.record_signal(%{value: 7})
     assert {:ok, [_]} = Bus.publish(bus, [event])
     eventually(fn -> state(agent).values == ~c"\a" end)
-    old = Server.children(agent)[{:plugin, Client}].pid
+    activation = Server.activation(agent)
+    old = JidoTest.ExampleRuntime.plugin(Server.activation(agent), Client)
     Process.exit(old, :kill)
-    eventually(fn -> Server.children(agent)[{:plugin, Client}].pid != old end)
+
+    eventually(fn ->
+      runtime = JidoTest.ExampleRuntime.plugin(activation, Client)
+      is_pid(runtime) and runtime != old
+    end)
+
+    agent = Jido.AgentServer.Supervisor.worker(activation)
+    assert :ok = Server.await_ready(agent)
+    bus = owned_bus(jido, agent)
 
     {:ok, command_signal_5} = BusDelivery.record_signal(%{value: 9})
 
@@ -137,9 +153,9 @@ defmodule JidoTest.Examples.Runtime.BusDeliveryTest do
 
     eventually(fn -> state(agent).values == [5] end)
     assert Server.snapshot(agent).state_version == 1
-    children = Server.children(agent)
-    client = children[{:plugin, Client}].pid
-    manager = children[{:plugin, Manager}].pid
+    activation = Server.activation(agent)
+    client = JidoTest.ExampleRuntime.plugin(activation, Client)
+    manager = JidoTest.ExampleRuntime.plugin(activation, Manager)
     client_ref = Process.monitor(client)
     manager_ref = Process.monitor(manager)
     assert :ok = Jido.stop_agent(jido, agent)
@@ -152,11 +168,9 @@ defmodule JidoTest.Examples.Runtime.BusDeliveryTest do
     assert :ok = Server.await_ready(agent)
     assert {:ok, bus} = Bus.whereis(:example_commands, jido: jido)
 
-    assert %{
-             {:plugin, Manager} => %{pid: ^bus},
-             {:plugin, Client} => %{pid: client}
-           } = Server.children(agent)
-
+    activation = Server.activation(agent)
+    assert JidoTest.ExampleRuntime.plugin(activation, Manager) == bus
+    client = JidoTest.ExampleRuntime.plugin(activation, Client)
     assert is_pid(client)
     bus
   end

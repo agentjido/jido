@@ -97,9 +97,7 @@ subscription, or graph cycle returns an error before the Controller starts.
 
 This callback is for pure static planning. It cannot add Agents or new resource
 types. It does not start a Jido process, persist state, replace the Controller
-target, or grant live authority. See the
-[`07_06_plugin_contribution`](../examples/07_topology/07_06_plugin_contribution/README.md)
-example.
+target, or grant live authority.
 
 ## Separate Static And Dynamic Systems
 

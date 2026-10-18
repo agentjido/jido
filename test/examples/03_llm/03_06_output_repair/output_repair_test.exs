@@ -15,7 +15,7 @@ defmodule JidoTest.Examples.LLM.OutputRepairTest do
 
     {:ok, command_signal_1} = Example.answer_signal(%{prompt: "valid"})
 
-    assert {:ok, agent} =
+    assert {:ok, agent, _directives} =
              Server.call(
                server,
                command_signal_1,
@@ -27,7 +27,7 @@ defmodule JidoTest.Examples.LLM.OutputRepairTest do
 
     {:ok, command_signal_2} = Example.answer_signal(%{prompt: "repair"})
 
-    assert {:ok, agent} =
+    assert {:ok, agent, _directives} =
              Server.call(
                server,
                command_signal_2,
@@ -63,7 +63,7 @@ defmodule JidoTest.Examples.LLM.OutputRepairTest do
 
     {:ok, command_signal_3} = Example.answer_signal(%{prompt: "last repair"})
 
-    assert {:ok, agent} =
+    assert {:ok, agent, _directives} =
              Server.call(
                server,
                command_signal_3,

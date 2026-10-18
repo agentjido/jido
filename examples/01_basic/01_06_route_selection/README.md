@@ -4,8 +4,8 @@ One Agent selects an exact order route, an order wildcard, or a final fallback.
 
 ## What you will learn
 
-- How route class and specificity give an exact route precedence over wildcards.
-- How explicit priority selects between equally specific routes.
+- How the first matching route in declaration order selects the handler.
+- Why specific routes must come before broader routes and the fallback.
 - How direct and live execution select the same route from the same Signal.
 
 ## Read the code
@@ -18,18 +18,22 @@ Read [the router Agent](route_selection.ex), then read its behavior test.
 mix test test/examples/01_basic/01_06_route_selection --include example --seed 0
 ```
 
-Expected result: `order.create` uses the exact route even though broad routes
-were declared first. Another order command uses the single wildcard, equal
-exact routes use priority, and unrelated input uses the fallback. Direct and
-live execution produce the same state for each Signal.
+Expected result: `order.create` uses the first, exact route. Another order
+command uses the next, single-wildcard route. Unrelated input uses the final
+fallback. Direct and live execution produce the same state for each Signal.
+A separate test moves the wildcard first and proves that it then wins for
+`order.create`.
 
 ## Important behavior
 
-Jido orders matches by exact, single-wildcard, and multi-wildcard route class.
-It then uses pattern complexity, higher explicit priority, and registration
-order. Selection happens before Jido prepares or runs the route Action. Use a
-`**` route only when the Agent has a defined fallback policy. Without one,
-unmatched input returns `Jido.Error.RoutingError`.
+Jido selects the first matching route in declaration order. Exact routes have
+no automatic preference over wildcard routes. Route paths must be unique.
+Selection happens before Jido prepares or runs the route Action. A handler
+failure does not cause Jido to try the next route.
+
+Use a `**` route only when the Agent has a defined fallback policy, and put it
+last. Without a matching route, the command returns
+`%Jido.Agent.Error{code: :unmatched_input}`.
 
 ## Limits
 

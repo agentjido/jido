@@ -9,7 +9,7 @@ defmodule JidoTest.Examples.LLM.ConversationHistoryTest do
 
     {:ok, command_signal_1} = Example.append_message_signal(%{message_id: "1", text: "first"})
 
-    assert {:ok, _} =
+    assert {:ok, _, _directives} =
              Server.call(
                server,
                command_signal_1,
@@ -18,7 +18,7 @@ defmodule JidoTest.Examples.LLM.ConversationHistoryTest do
 
     {:ok, command_signal_2} = Example.append_message_signal(%{message_id: "2", text: "second"})
 
-    assert {:ok, _} =
+    assert {:ok, _, _directives} =
              Server.call(
                server,
                command_signal_2,
@@ -58,12 +58,12 @@ defmodule JidoTest.Examples.LLM.ConversationHistoryTest do
     persistence =
       {Jido.Persistence.ETS, table: :"llm_history_#{System.unique_integer([:positive])}"}
 
-    server = start_agent!(jido, Example, persistence: persistence, restore: false)
+    server = start_agent!(jido, Example, persistence: persistence, persistence_mode: :create)
     old = service(ok: %{answer: "A"})
 
     {:ok, command_signal_5} = Example.append_message_signal(%{message_id: "1", text: "first"})
 
-    assert {:ok, agent} =
+    assert {:ok, agent, _directives} =
              Server.call(
                server,
                command_signal_5,
@@ -74,11 +74,12 @@ defmodule JidoTest.Examples.LLM.ConversationHistoryTest do
     assert :ok = Server.hibernate(server)
     assert_receive {:DOWN, ^ref, :process, ^server, {:shutdown, :hibernate}}, 1000
     assert {:ok, restored} = Jido.thaw(jido, Example, agent.id, persistence: persistence)
+    assert :ok = Jido.AgentServer.await_ready(restored)
     fresh = service(ok: %{answer: "B"})
 
     {:ok, command_signal_6} = Example.append_message_signal(%{message_id: "2", text: "second"})
 
-    assert {:ok, _} =
+    assert {:ok, _, _directives} =
              Server.call(
                restored,
                command_signal_6,

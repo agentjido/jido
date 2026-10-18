@@ -13,7 +13,7 @@ defmodule Jido.Examples.RecoverableDelivery do
 
   agent do
     schema Zoi.object(%{value: Zoi.integer() |> Zoi.default(0)})
-    plugin Output, config: [sink: MemorySink]
+    plugin Output, config: %{sink: MemorySink}
   end
 
   routes do

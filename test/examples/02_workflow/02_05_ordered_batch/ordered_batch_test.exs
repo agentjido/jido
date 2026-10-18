@@ -8,7 +8,7 @@ defmodule JidoTest.Examples.Workflow.OrderedBatchTest do
 
     {:ok, command_signal_1} = Example.convert_all_signal(%{values: [3, 1, 2]})
 
-    assert {:ok, agent} =
+    assert {:ok, agent, _directives} =
              Server.call(
                server,
                command_signal_1
@@ -28,7 +28,7 @@ defmodule JidoTest.Examples.Workflow.OrderedBatchTest do
 
     {:ok, command_signal_2} = Example.collect_results_signal(%{values: [1, -1, 2]})
 
-    assert {:ok, agent} =
+    assert {:ok, agent, _directives} =
              Server.call(
                server,
                command_signal_2
@@ -46,7 +46,7 @@ defmodule JidoTest.Examples.Workflow.OrderedBatchTest do
 
     {:ok, command_signal_3} = Example.convert_all_signal(%{values: ~c"\a"})
 
-    assert {:ok, _} =
+    assert {:ok, _, _directives} =
              Server.call(
                server,
                command_signal_3
@@ -70,7 +70,7 @@ defmodule JidoTest.Examples.Workflow.OrderedBatchTest do
     for build_signal <- [&Example.convert_all_signal/1, &Example.collect_results_signal/1] do
       server = start_agent!(jido, Example)
       assert {:ok, signal} = build_signal.(%{values: []})
-      assert {:ok, agent} = Server.call(server, signal)
+      assert {:ok, agent, _directives} = Server.call(server, signal)
       assert agent.state.items == []
       assert Server.snapshot(server) == %{agent: agent, state_version: 1}
     end

@@ -49,12 +49,14 @@ defmodule JidoTest.System.Scenarios.Fencing do
         {:ok, signal} =
           Probe.record_and_deliver_signal(%{effect_id: "stale", value: 99})
 
-        assert {:error, {:persistence_failed, :conflict}} = Server.call(server, signal)
+        assert {:error, %Jido.Error.ExecutionError{details: %{reason: :conflict}}} =
+                 Server.call(server, signal)
+
         assert_receive {:DOWN, ^monitor, :process, ^server, _}, 10000
-        Observability.assert_turn(c.observer, signal, :error, false)
+        Observability.assert_turn(c.observer, signal, :indeterminate, false)
         Observability.assert_persistence(c.observer, :conflict)
         assert Sink.records(c.jido) == %{}
-        restored = start_agent(c, id: initial.id, restore: :required)
+        restored = start_agent(c, id: initial.id, persistence_mode: :restore)
         assert Server.snapshot(restored) == %{agent: winner, state_version: 1}
         stop_agent(c, restored)
       end
@@ -74,14 +76,20 @@ defmodule JidoTest.System.Scenarios.Fencing do
         {:ok, signal} =
           Probe.record_and_deliver_signal(%{effect_id: "deleted", value: 99})
 
-        assert {:error, {:persistence_failed, :conflict}} = Server.call(server, signal)
+        assert {:error, %Jido.Error.ExecutionError{details: %{reason: :conflict}}} =
+                 Server.call(server, signal)
+
         assert_receive {:DOWN, ^monitor, :process, ^server, _}, 10000
         assert {:error, :deleted} = load(c, id)
 
         assert {:error, :deleted} =
-                 Jido.start_agent(c.jido, Probe, id: id, persistence: c.store, restore: :required)
+                 start_result(c.jido, Probe,
+                   id: id,
+                   persistence: c.store,
+                   persistence_mode: :restore
+                 )
 
-        Observability.assert_turn(c.observer, signal, :error, false)
+        Observability.assert_turn(c.observer, signal, :indeterminate, false)
         assert Sink.records(c.jido) == %{}
       end
     end

@@ -29,7 +29,7 @@ defmodule Jido.Examples.Persistence.IndeterminateWrite do
 
         directives =
           if sink = context[:reply_to],
-            do: [Jido.Agent.Directive.emit_to_pid(output, sink)],
+            do: [Jido.AgentServer.Directive.signal_send(output, sink)],
             else: []
 
         {:ok, next, directives}

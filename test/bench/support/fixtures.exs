@@ -19,6 +19,16 @@ defmodule JidoCoreBench.Fail do
   end
 end
 
+defmodule JidoCoreBench.Flow do
+  use Jido.Flow, name: "core_bench_flow"
+
+  flow do
+    step "first", action: JidoCoreBench.Add, params: %{}
+    step "second", action: JidoCoreBench.Add, params: %{state: result("first")}
+    output result("second")
+  end
+end
+
 defmodule JidoCoreBench.PreparePlugin do
   @moduledoc false
   use Jido.Plugin
@@ -81,12 +91,31 @@ defmodule JidoCoreBench.Fixtures do
   def payload(:large_list), do: Enum.to_list(1..5_000)
 
   def definition(count \\ 1, target \\ Add, plugins \\ []) do
-    CoreAgent.new!(
+    CoreAgent.define!(%{
       name: "core_bench",
       schema: @schema,
-      plugins: plugins,
-      routes: for(n <- 1..count, do: {"bench.add.#{n}", target})
-    )
+      extensions: contributions(plugins),
+      routes:
+        for(
+          n <- 1..count,
+          do: %{
+            path: "bench.add.#{n}",
+            handler: %{
+              kind: if(target == JidoCoreBench.Flow, do: :flow, else: :action),
+              target: target
+            }
+          }
+        )
+    })
+  end
+
+  def contributions(plugins) do
+    Enum.map(plugins, fn entry ->
+      {module, config} =
+        if is_atom(entry), do: {entry, %{}}, else: {elem(entry, 0), Map.new(elem(entry, 1))}
+
+      %{id: module.id(), provider: module, vsn: module.vsn(), data: config}
+    end)
   end
 
   def agent(count \\ 1, data \\ nil, target \\ Add, plugins \\ []) do
@@ -97,16 +126,7 @@ defmodule JidoCoreBench.Fixtures do
   def signal(count \\ 1), do: Jido.Signal.new!("bench.add.#{count}", %{}, source: "/bench")
 
   def flow do
-    alias Jido.Flow.Ref
-
-    Jido.Flow.new!(%{
-      name: "core_bench_flow",
-      components: [
-        %{kind: :step, name: "first", action: Add, params: %{}},
-        %{kind: :step, name: "second", action: Add, params: %{state: Ref.result("first")}}
-      ],
-      output: Ref.result("second")
-    })
+    JidoCoreBench.Flow
   end
 
   # The older Action revision uses :jido. Released v3 uses :task_supervisor.
@@ -141,7 +161,7 @@ defmodule JidoCoreBench.Fixtures do
   def workloads(sizes, payloads) do
     for size <- sizes,
         kind <- payloads,
-        operation <- [:new, :validate, :prepare, :route, :cmd, :flow, :transition, :checkpoint] do
+        operation <- [:new, :validate, :prepare, :route, :cmd, :flow, :transition, :snapshot] do
       data = payload(kind)
       target = if operation == :flow, do: flow(), else: Add
       id = "agent/#{operation}/routes_#{size}/#{kind}"
@@ -159,7 +179,7 @@ defmodule JidoCoreBench.Fixtures do
             )
 
           :validate ->
-            CoreAgent.validate_instance(p.agent)
+            CoreAgent.validate(p.agent)
 
           :prepare ->
             Runner.prepare(p.agent, p.signal, Keyword.put(exec_opts(), :context, p.context))
@@ -176,8 +196,8 @@ defmodule JidoCoreBench.Fixtures do
           :transition ->
             CoreAgent.transition(p.agent, %{p.agent.state | count: 1})
 
-          :checkpoint ->
-            CoreAgent.checkpoint(p.agent)
+          :snapshot ->
+            Jido.Persistence.snapshot(p.agent)
         end
       end
 
@@ -198,9 +218,9 @@ defmodule JidoCoreBench.Fixtures do
             {:ok, %Jido.Agent.Turn{executable: executable, input: %{}}} = result
             equal!(executable, target)
 
-          :checkpoint ->
+          :snapshot ->
             {:ok, checkpoint} = result
-            {:ok, restored} = CoreAgent.restore(CoreAgent, checkpoint)
+            {:ok, restored} = Jido.Persistence.restore(checkpoint)
             equal!(restored.state, %{count: 0, payload: data})
 
           op when op in [:new, :validate, :transition] ->

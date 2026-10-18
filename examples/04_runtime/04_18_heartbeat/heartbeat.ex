@@ -28,7 +28,7 @@ defmodule Jido.Examples.Heartbeat do
 
     agent do
       schema Zoi.object(%{events: Zoi.list(Zoi.map()) |> Zoi.default([])})
-      plugin Heartbeat, config: [interval: 60_000, signal_data: %{kind: "default"}]
+      plugin Heartbeat, config: %{interval: 60_000, signal_data: %{kind: "default"}}
     end
 
     routes do
@@ -44,12 +44,12 @@ defmodule Jido.Examples.Heartbeat do
       schema Zoi.object(%{events: Zoi.list(Zoi.map()) |> Zoi.default([])})
 
       plugin Heartbeat,
-        config: [
+        config: %{
           interval: 60_000,
           signal_type: "examples.runtime.heartbeat.custom",
           signal_data: %{kind: "custom"},
           source: "/examples/runtime/heartbeat"
-        ]
+        }
     end
 
     routes do

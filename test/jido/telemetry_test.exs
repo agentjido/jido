@@ -34,35 +34,44 @@ defmodule JidoTest.TelemetryTest do
     metrics = Telemetry.metrics()
     names = Enum.map(metrics, & &1.name)
 
-    assert length(names) == 33
+    spans = [
+      {[:jido, :agent_server, :turn], [:stop]},
+      {[:jido, :persistence, :operation], [:stop, :exception]}
+    ]
 
-    for prefix <- [
-          [:jido, :agent, :lifecycle],
-          [:jido, :agent, :turn],
-          [:jido, :agent, :commit],
-          [:jido, :agent, :after_commit],
-          [:jido, :agent, :directive],
-          [:jido, :persistence, :operation],
-          [:jido, :topology, :operation]
-        ],
-        ending <- [:stop, :exception],
-        metric <- [:count, :duration] do
-      assert (prefix ++ [ending, metric]) in names
+    points = [
+      [:jido, :agent_server, :lifecycle, :start],
+      [:jido, :agent_server, :lifecycle, :stop],
+      [:jido, :agent_server, :commit],
+      [:jido, :agent_server, :directives, :returned],
+      [:jido, :agent_server, :effects, :start],
+      [:jido, :agent_server, :effects, :stop],
+      [:jido, :agent_server, :turn, :settled],
+      [:jido, :scheduler, :delivery]
+    ]
+
+    assert length(names) == 14
+    assert length(Enum.uniq(names)) == length(names)
+
+    for {prefix, endings} <- spans, ending <- endings, kind <- [:count, :duration] do
+      metric = Enum.find(metrics, &(&1.name == prefix ++ [ending, kind]))
+      assert metric.event_name == prefix ++ [ending]
+      if kind == :duration, do: assert(metric.unit == :millisecond)
     end
 
-    assert [:jido, :agent, :turn, :settled, :count] in names
-    assert [:jido, :agent, :admission, :rejected, :count] in names
-    assert [:jido, :scheduler, :delivery, :count] in names
-    assert [:jido, :topology, :ownership, :settled, :count] in names
+    for event <- points do
+      assert %Elixir.Telemetry.Metrics.Counter{event_name: ^event} =
+               Enum.find(metrics, &(&1.name == event ++ [:count]))
 
-    ownership_metric =
-      Enum.find(metrics, &(&1.name == [:jido, :topology, :ownership, :settled, :count]))
+      refute Enum.any?(metrics, &(&1.name == event ++ [:duration]))
+    end
 
-    assert ownership_metric.event_name == [:jido, :topology, :ownership, :settled]
-    assert ownership_metric.tags == [:status]
+    refute Enum.any?(
+             metrics,
+             &Enum.any?(&1.event_name, fn part -> part in [:agent, :topology] end)
+           )
 
-    allowed =
-      ~w(operation status stage admission_reason persistence_reason topology_operation scheduler_outcome component_kind)a
+    allowed = ~w(operation status stage persistence_reason scheduler_outcome)a
 
     for metric <- metrics, tag <- metric.tags do
       assert tag in allowed
@@ -99,25 +108,25 @@ defmodule JidoTest.TelemetryTest do
     assert log =~ "status=conflict"
   end
 
-  test "ownership cleanup failure is a semantic error log" do
+  test "effects failure is a semantic error log" do
     Application.put_env(:jido, :telemetry, semantic_log_mode: :errors)
 
     log =
       capture_log(fn ->
         Jido.Telemetry.Semantic.point(
-          [:jido, :topology, :ownership, :settled],
-          %{topology_id: "topology-1", topology_operation: :cleanup, status: :error},
-          %{component_count: 3, failed_count: 1}
+          [:jido, :agent_server, :effects, :stop],
+          %{agent_id: "agent-1", stage: :directive, status: :error},
+          %{directive_count: 3, directive_completed: 1}
         )
       end)
 
-    assert log =~ "event=topology.ownership.settled"
+    assert log =~ "event=agent_server.effects.stop"
     assert log =~ "status=error"
   end
 
   test "per-instance debug mode takes priority over global semantic logging" do
     instance = :telemetry_debug_instance
-    event = [:jido, :agent, :turn, :stop]
+    event = [:jido, :agent_server, :turn, :stop]
     metadata = %{jido_instance: instance, status: :ok, stage: :commit}
     Application.put_env(:jido, :telemetry, semantic_log_mode: :off)
     Debug.enable(instance, :verbose)
@@ -125,13 +134,13 @@ defmodule JidoTest.TelemetryTest do
 
     log = capture_log(fn -> Jido.Telemetry.Semantic.point(event, metadata) end)
 
-    assert log =~ "event=agent.turn.stop"
+    assert log =~ "event=agent_server.turn.stop"
   end
 
   test "semantic emission is independent of consumer configuration" do
     Application.put_env(:jido, :telemetry, semantic_log_mode: :off)
 
-    event = [:jido, :agent, :admission, :rejected]
+    event = [:jido, :agent_server, :effects, :stop]
     handler = {__MODULE__, make_ref()}
 
     :ok =
@@ -149,13 +158,13 @@ defmodule JidoTest.TelemetryTest do
     assert :ok =
              Jido.Telemetry.Semantic.point(
                event,
-               %{status: :rejected, admission_reason: :overloaded, private: "secret"},
-               %{queue_depth: 2}
+               %{status: :error, stage: :directive, private: "secret"},
+               %{directive_count: 2}
              )
 
-    assert_receive {:semantic_event, ^event, %{queue_depth: 2}, metadata}
+    assert_receive {:semantic_event, ^event, %{directive_count: 2}, metadata}
     assert metadata.schema_version == 1
-    assert metadata.status == :rejected
+    assert metadata.status == :error
     refute Map.has_key?(metadata, :private)
   end
 

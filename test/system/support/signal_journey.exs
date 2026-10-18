@@ -39,36 +39,61 @@ defmodule JidoTest.System.JourneyCommit do
   end
 end
 
+defmodule JidoTest.System.JourneyConfirm do
+  @moduledoc false
+  use Jido.Action, name: "system_journey_confirm"
+
+  def run(%{effect_id: id, value: value}, context) do
+    directive = struct!(Jido.Examples.RecoverableDelivery.Confirm, effect_id: id, value: value)
+    {:ok, context.agent_state, [directive]}
+  end
+end
+
 for {name, durable} <- [{:NormalJourneyAgent, nil}, {:DurableJourneyAgent, "journey"}] do
   defmodule Module.concat(JidoTest.System, name) do
     @moduledoc false
-    use Jido.Agent, name: Macro.underscore(to_string(name))
+    @name Macro.underscore(to_string(name))
     @durable durable
+    @schema Zoi.object(%{value: Zoi.integer() |> Zoi.default(0)})
 
-    agent do
-      schema Zoi.object(%{value: Zoi.integer() |> Zoi.default(0)})
-
-      plugin(Jido.Examples.RecoverableDelivery.Output,
-        config: %{sink: JidoTest.RecoverableDeliverySink}
-      )
-
-      plugin(Jido.Plugin.Bus.Client,
-        config: %{bus: :journey, path: "system.journey", durable: @durable, retry_delay_ms: 60000}
-      )
+    def definition do
+      Jido.Agent.define!(%{
+        name: @name,
+        module: __MODULE__,
+        schema: @schema,
+        extensions: [
+          %{
+            id: Jido.Examples.RecoverableDelivery.Output.id(),
+            provider: Jido.Examples.RecoverableDelivery.Output,
+            vsn: 1,
+            data: %{sink: JidoTest.RecoverableDeliverySink}
+          },
+          %{
+            id: Jido.Plugin.Bus.Client.id(),
+            provider: Jido.Plugin.Bus.Client,
+            vsn: 1,
+            data: %{
+              bus: :journey,
+              path: "system.journey",
+              durable: @durable,
+              retry_delay_ms: 60000
+            }
+          }
+        ],
+        routes: [
+          %{
+            path: "system.journey",
+            handler: %{kind: :action, target: JidoTest.System.JourneyCommit}
+          },
+          %{
+            path: "examples.persistence.delivery.confirm",
+            handler: %{kind: :action, target: JidoTest.System.JourneyConfirm}
+          }
+        ]
+      })
     end
 
-    routes do
-      route "system.journey", JidoTest.System.JourneyCommit
-
-      route "examples.persistence.delivery.confirm" do
-        action %{effect_id: id, value: value}, context: context do
-          directive =
-            struct!(Jido.Examples.RecoverableDelivery.Confirm, effect_id: id, value: value)
-
-          {:ok, context.agent_state, [directive]}
-        end
-      end
-    end
+    def instantiate!(opts), do: Jido.Agent.instantiate!(__MODULE__, opts)
   end
 end
 

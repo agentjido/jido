@@ -1,35 +1,20 @@
-# Research probes
+# Research examples
 
-This section records open contracts and implementation candidates for review.
+Research records an unsupported contract. It is separate from the stable
+learning path. Original example numbers remain unchanged.
 
-1. [Distributed Authority](99_02_distributed_authority/README.md) — use an
-   external ownership token to fence two local Erlang nodes.
-2. [Hybrid DSL and Data-Defined Topology](99_03_data_defined_topology/README.md) —
-   compare DSL, data, and JSON members at startup, addition, composition, and recovery.
-3. [Child Topology Runtime](99_04_child_topology_runtime/README.md) —
-   define separate child runtimes, lazy gates, Bus isolation, and branch recovery.
-
-The [API review note](API_REVIEW.md) lists the proposed public changes.
-
-## Run the section
+- [05_04 Remote Child](05_04_remote_child/README.md): remote startup is rejected.
+- [05_05 Remote Lifecycle](05_05_remote_lifecycle/README.md): node-loss lifecycle is unsupported.
+- [99_02 Distributed Authority](99_02_distributed_authority/README.md): external
+  fencing is an application workaround, not a Jido cluster ownership guarantee.
 
 ```sh
 mix test test/examples/99_research --include example --seed 0
 ```
 
-Expected result: the external authority admits only its newest token. The core
-DIST-03 test remains skipped because Jido itself cannot guarantee that one
-logical identity has at most one live cluster owner.
-The member and child runtime examples first failed in the first examples commit in this PR.
-They now pass with the implementation candidate for issues 394 and 395.
-See the API review note before accepting the DSL and runtime contracts.
-
-## Promotion rule
-
-Keep this probe in research until Jido has a public cluster-exclusive ownership
-contract. External fencing is an application workaround, not that core
-contract.
-
-Promote the member examples after Topology accepts neutral Agent definitions
-and the required tests pass. Promote the child examples after the runtime and
-gate contracts are approved, implemented, and verified.
+The remote rejection test checks the current local runtime boundary. The old
+remote success proposals are retained as `.exs` files and are not loaded.
+The separate Topology Controller, director, and gate proposals were removed.
+Use [Agent topology](../07_topology/README.md) for current local composition,
+[data authoring](../01_basic/01_07_data_defined_agent/README.md) for definitions,
+and the [authoring tests](../../test/authoring/agents/json_test.exs) for format checks.

@@ -1,53 +1,38 @@
 # Jido V3 examples
 
-The main catalog has 82 fixtures in ten stable groups. All use the implemented
-Agent and AgentServer contract. Separate research examples cover distributed
-authority, data-defined Topologies, and child runtimes.
-The [coverage register](COVERAGE.md) maps
-capabilities to owners and evidence. Counts below are navigation inventory, not
-a coverage score.
+The stable catalog has 64 examples in 9 groups. Original
+example numbers stay unchanged. API updates and individual checks are in progress.
 
-| Group | Fixtures | Source and tests |
+| Group | Examples | Source and tests |
 | --- | ---: | --- |
-| 01_basic | 9 | [Source](01_basic/README.md), [tests](../test/examples/01_basic/README.md) |
+| 01_basic | 8 | [Source](01_basic/README.md), [tests](../test/examples/01_basic/README.md) |
 | 02_workflow | 9 | [Source](02_workflow/README.md), [tests](../test/examples/02_workflow/README.md) |
 | 03_llm | 6 | [Source](03_llm/README.md), [tests](../test/examples/03_llm/README.md) |
-| 04_runtime | 16 | [Source](04_runtime/README.md), [tests](../test/examples/04_runtime/README.md) |
-| 05_multi_agent | 6 | [Source](05_multi_agent/README.md), [tests](../test/examples/05_multi_agent/README.md) |
-| 06_factory | 4 | [Source](06_factory/README.md), [tests](../test/examples/06_factory/README.md) |
-| 07_topology | 10 | [Source](07_topology/README.md), [tests](../test/examples/07_topology/README.md) |
-| 08_applications | 7 | [Source](08_applications/README.md), [tests](../test/examples/08_applications/README.md) |
-| 09_plugins | 7 | [Source](09_plugins/README.md), [tests](../test/examples/09_plugins/README.md) |
+| 04_runtime | 15 | [Source](04_runtime/README.md), [tests](../test/examples/04_runtime/README.md) |
+| 05_multi_agent | 3 | [Source](05_multi_agent/README.md), [tests](../test/examples/05_multi_agent/README.md) |
+| 07_topology | 4 | [Source](07_topology/README.md), [tests](../test/examples/07_topology/README.md) |
+| 08_applications | 5 | [Source](08_applications/README.md), [tests](../test/examples/08_applications/README.md) |
+| 09_plugins | 6 | [Source](09_plugins/README.md), [tests](../test/examples/09_plugins/README.md) |
 | 10_persistence | 8 | [Source](10_persistence/README.md), [tests](../test/examples/10_persistence/README.md) |
 
-The [research section](99_research/README.md) records unsupported contracts.
-Its tests live under `test/examples` and use the `:example` tag. The data-defined
-member and child runtime examples now pass with the implementation for issues
-394 and 395. Promotion to the main catalog remains a separate documentation task.
+The [coverage register](COVERAGE.md) maps capabilities to evidence.
+The [research catalog](99_research/README.md) states unsupported contracts.
 
-The repository compiles `examples/` in `:dev` and `:test` only. Production builds
-compile `lib/` only. The Hex package contains neither examples nor tests.
-Run demos with `mix run examples/.../demo.exs` or use `iex -S mix` from this
-repository. JSON fixtures stay beside their example source.
+Factory and Elastic Group moved to
+[application demonstrations](../../examples/jido_lab/experiments/jido_core/README.md).
+Those retained applications need separate API updates and are not loaded here.
+LLM examples use deterministic adapters and test Agent integration; model
+behavior belongs to `jido_ai`.
 
 ```sh
-mix test                                     # Core tests; examples are excluded
-mix test.examples                        # All example tests
-mix test test/examples/01_basic --include example --seed 0
-mix test --include example --include flaky --seed 0  # Complete acceptance suite
+mix test
+mix test test/examples/01_basic/01_01_minimal_agent --include example --seed 0
+mix test.examples
 ```
 
-Every numbered example folder has at least one small executable behavior test.
-Deeper core regression suites can reuse the same example modules. The exact
-DIST-03 exclusion is the only approved skip in the complete suite;
-cluster-exclusive ownership remains unsupported.
+The example test loader compiles all `.ex` example sources before running a
+selected test. One source failure can therefore block another example.
+Fix each reviewed failure before continuing the sequence.
 
-LLM and Factory tests use deterministic adapters and local HTTP/SSE servers.
-The LLM group is an ecosystem integration suite owned by `jido_ai`. Factory is
-an optional combined application suite. Neither folder count is a Jido public
-feature count. Live provider demos require separate credentials and budget.
-The recursive analysis stress runner and 1,000-worker Topology test are
-independent scale checks. They do not prove multi-host capacity.
-
-Use the [testing guide](../guides/testing.md) for current test commands
-and the [migration guide](../guides/migration.md) for V2 changes.
+The Hex package excludes examples and tests. Production compiles `lib/` only.
+See [testing](../guides/testing.md) for test categories and optional services.

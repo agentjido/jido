@@ -27,7 +27,7 @@ defmodule JidoTest.System.Scenarios.Checkpoints do
               end
             end)
 
-          assert_receive {:checkpoint_barrier, @stage, ^server}, 10000
+          assert_receive {:checkpoint_barrier, @stage, writer}, 10000
 
           revision =
             if @stage == :before_write do
@@ -51,15 +51,22 @@ defmodule JidoTest.System.Scenarios.Checkpoints do
           # obtain child state. Its supervisor owns and removes Plugin workers.
           monitor = Process.monitor(server)
           Observability.killed(c.observer, server)
-          Process.exit(server, :kill)
-          assert_receive {:DOWN, ^monitor, :process, ^server, :killed}, 10000
+          Observability.killed(c.observer, writer)
+
+          :ok =
+            DynamicSupervisor.terminate_child(
+              Jido.agent_supervisor_name(c.jido),
+              Process.get({:activation, server})
+            )
+
+          assert_receive {:DOWN, ^monitor, :process, ^server, _}, 10000
           await_down(children)
           assert_empty_agent_pool(c)
           assert {:exit, _} = Task.await(caller, 10000)
           assert Jido.whereis_agent(c.jido, id) == nil
           assert {:ok, ^stored, ^revision} = load(c, id)
 
-          restored = start_agent(c, id: id, restore: :required)
+          restored = start_agent(c, id: id, persistence_mode: :restore)
 
           records =
             if revision == 0 do
@@ -92,7 +99,10 @@ defmodule JidoTest.System.Scenarios.Checkpoints do
 
         FaultAdapter.arm(c.control, {1, :lost_reply})
 
-        assert {:error, {:persistence_failed, {:indeterminate, :system_lost_reply}}} =
+        assert {:error,
+                %Jido.Error.ExecutionError{
+                  details: %{reason: {:indeterminate, :system_lost_reply}}
+                }} =
                  Server.call(server, signal)
 
         assert_receive {:DOWN, ^monitor, :process, ^server, _}, 10000
@@ -101,10 +111,10 @@ defmodule JidoTest.System.Scenarios.Checkpoints do
         assert {:ok, %{state: %{value: 7, delivery: %{pending: %{"effect" => 7}}}}, 1} =
                  load(c, id)
 
-        Observability.assert_turn(c.observer, signal, :error, false)
+        Observability.assert_turn(c.observer, signal, :indeterminate, false)
         Observability.assert_persistence(c.observer, :indeterminate)
 
-        restored = start_agent(c, id: id, restore: :required)
+        restored = start_agent(c, id: id, persistence_mode: :restore)
         completed(c, restored, %{"effect" => 7})
         assert Sink.records(c.jido) == %{"effect" => 7}
         stop_agent(c, restored)

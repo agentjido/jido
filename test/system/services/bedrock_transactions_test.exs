@@ -20,7 +20,7 @@ defmodule JidoTest.System.Services.BedrockTransactions do
     {:ok, route_signal_1} =
       Probe.record_and_deliver_signal(%{effect_id: "before-abort", value: 7})
 
-    assert {:ok, _} =
+    assert {:ok, _, _} =
              Jido.AgentServer.call(server, route_signal_1, [])
 
     completed(c, server, %{"before-abort" => 7})
@@ -97,7 +97,7 @@ defmodule JidoTest.System.Services.BedrockTransactions do
       Probe.record_and_deliver_signal(%{effect_id: "lost-commit-reply", value: 19})
 
     request =
-      Server.send_request(
+      Server.submit(
         server,
         command_signal_1,
         :infinity
@@ -105,7 +105,7 @@ defmodule JidoTest.System.Services.BedrockTransactions do
 
     assert_receive {:commit_reply_held, ^sequencer, version}, 10000
     assert is_binary(version)
-    assert {:reply, {:error, _}} = Server.receive_response(request, 10000)
+    assert {:error, _} = Server.await(request, 10000)
     await_down(monitors)
     assert_empty_agent_pool(c)
     :telemetry.detach(handler)
@@ -115,7 +115,7 @@ defmodule JidoTest.System.Services.BedrockTransactions do
     assert {:ok, pending, 1} = load(c, id)
     assert pending.state.delivery.pending == %{"lost-commit-reply" => 19}
     assert Sink.attempts(c.jido) == []
-    restored = start_agent(c, id: id, restore: :required)
+    restored = start_agent(c, id: id, persistence_mode: :restore)
     completed(c, restored, %{"lost-commit-reply" => 19})
     assert {:ok, saved, 2} = load(c, id)
     assert saved == Server.agent(restored)

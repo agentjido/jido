@@ -1,44 +1,27 @@
 # 01_07 Data-defined Agent
 
-One neutral Agent definition uses the same validation, execution, and Plugin
-contracts as a module-defined Agent.
+One data definition uses the same Agent and Plugin contracts as the DSL.
 
-## What you will learn
-
-- How to build and instantiate an Agent with `Jido.Agent.new/1`.
-- How a trusted `Jido.Codec.Registry` protects stored authoring documents.
-- How Agent and Plugin Codecs preserve static configuration only.
-
-## Read the code
-
-Read [the data-defined Agent](data_defined_agent.ex), then read its behavior
-test.
-
-## Run it
+Read [the definition and Action](data_defined_agent.ex), then the tests.
+`Agent.define!/1` validates data. `Agent.instantiate!/2` adds identity and state.
+`Agent.Codec.encode/1` returns a document and a trusted reference Registry.
+JSON import resolves only references from that Registry and creates no atoms.
 
 ```sh
 mix test test/examples/01_basic/01_07_data_defined_agent --include example --seed 0
 ```
 
-Expected result: the trusted document round trip succeeds, direct and live
-execution select the same route, and an unknown target identifier is rejected.
+Expected result: JSON round trips preserve the definition; direct and live
+commands produce the same state. Import with an empty Registry fails.
+The Registry from `encode/1` is local. Applications must retain or supply a
+trusted Registry for stored documents. A document does not start a process.
 
-## Important behavior
-
-`Jido.Agent.set/2` validates a small state update before execution. The Agent
-document contains the static definition, route target, schema identifier, and
-Plugin declaration. It does not contain live identity, state, PIDs, or runtime
-resources. Registry entries are an application allowlist. Document strings do
-not become modules or atoms.
-
-## Limits
-
-This example does not load authoring documents from an untrusted network. An
-application must add its own size, authorization, and storage policy.
-
-## Files
+See [Named Members](../../07_topology/07_01_independent/README.md) for a JSON
+round trip that starts a composed Agent. The core authoring tests cover the
+full DSL, data, and JSON format matrix.
 
 - [Source](data_defined_agent.ex)
 - [Tests](../../../test/examples/01_basic/01_07_data_defined_agent/data_defined_agent_test.exs)
+- [Authoring tests](../../../test/authoring/agents/json_test.exs)
 
-Previous: [Route Selection](../01_06_route_selection/README.md) | Next: [Custom Signal Selection](../01_08_custom_signal_selection/README.md)
+Previous: [Route Selection](../01_06_route_selection/README.md) | Next: [Agent Extension](../01_09_agent_extension/README.md)

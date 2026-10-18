@@ -18,7 +18,7 @@ defmodule JidoTest.System.Services.S3Pressure do
     {:ok, signal} =
       Probe.record_and_deliver_signal(%{effect_id: "seed", value: 7})
 
-    assert {:ok, _agent} = Server.call(server, signal)
+    assert {:ok, _agent, _} = Server.call(server, signal)
     completed(c, server, %{"seed" => 7})
     stop_agent(c, server)
 
@@ -73,7 +73,7 @@ defmodule JidoTest.System.Services.S3Pressure do
     end
 
     assert {:ok, final, final_revision} = load(c, id)
-    restored = start_agent(c, id: id, restore: :required)
+    restored = start_agent(c, id: id, persistence_mode: :restore)
     assert Server.snapshot(restored) == %{agent: final, state_version: final_revision}
     stop_agent(c, restored)
     assert_empty_agent_pool(c)
@@ -91,7 +91,7 @@ defmodule JidoTest.System.Services.S3Pressure do
     {:ok, signal} =
       Probe.record_and_deliver_signal(%{effect_id: "lost-seed", value: 7})
 
-    assert {:ok, _agent} = Server.call(server, signal)
+    assert {:ok, _agent, _} = Server.call(server, signal)
     completed(c, server, %{"lost-seed" => 7})
     stop_agent(c, server)
     assert {:ok, initial, revision} = load(c, id)
@@ -141,7 +141,7 @@ defmodule JidoTest.System.Services.S3Pressure do
                revision: revision + 1
              )
 
-    restored = start_agent(c, id: id, restore: :required)
+    restored = start_agent(c, id: id, persistence_mode: :restore)
     assert Server.snapshot(restored) == %{agent: candidate, state_version: next_revision}
     stop_agent(c, restored)
     assert_empty_agent_pool(c)

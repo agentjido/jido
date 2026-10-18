@@ -23,7 +23,7 @@ defmodule JidoTest.System.Services.MinIOSnapshots do
 
     {:ok, route_signal_1} = Probe.record_and_deliver_signal(%{effect_id: "snapshot", value: 17})
 
-    assert {:ok, _} =
+    assert {:ok, _, _} =
              Jido.AgentServer.call(server, route_signal_1, [])
 
     completed(c, server, %{"snapshot" => 17})
@@ -124,7 +124,7 @@ defmodule JidoTest.System.Services.MinIOSnapshots do
 #{Observability.format_logs(c.observer)}"
 
     assert {:ok, ^saved, 2} = load(c, saved.id)
-    restored = start_agent(c, id: saved.id, restore: :required)
+    restored = start_agent(c, id: saved.id, persistence_mode: :restore)
     assert Server.snapshot(restored) == snapshot
     stop_agent(c, restored)
     assert_empty_agent_pool(c)

@@ -13,7 +13,7 @@ defmodule JidoTest.Examples.Runtime.ScheduledCounterTest do
 
     {:ok, route_signal_1} = ScheduledCounter.schedule_once_signal(%{delay_ms: 10})
 
-    assert {:ok, scheduled} =
+    assert {:ok, scheduled, _directives} =
              Jido.AgentServer.call(counter, route_signal_1, [])
 
     assert scheduled.state.schedule_requests == 1
@@ -36,7 +36,7 @@ defmodule JidoTest.Examples.Runtime.ScheduledCounterTest do
         expression: "0 0 0 1 1 * 2099"
       })
 
-    assert {:ok, enabled} =
+    assert {:ok, enabled, _directives} =
              Jido.AgentServer.call(counter, route_signal_2, [])
 
     assert enabled.state.cron_enabled
@@ -46,7 +46,7 @@ defmodule JidoTest.Examples.Runtime.ScheduledCounterTest do
 
     {:ok, route_signal_3} = ScheduledCounter.disable_cron_signal(%{job_id: :heartbeat})
 
-    assert {:ok, disabled} =
+    assert {:ok, disabled, _directives} =
              Jido.AgentServer.call(counter, route_signal_3, [])
 
     refute disabled.state.cron_enabled

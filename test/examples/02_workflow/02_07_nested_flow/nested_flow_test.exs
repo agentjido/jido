@@ -9,7 +9,7 @@ defmodule JidoTest.Examples.Workflow.NestedFlowTest do
 
     {:ok, route_signal_1} = Example.draft_and_review_signal(%{text: "draft"})
 
-    assert {:ok, agent} =
+    assert {:ok, agent, _directives} =
              Jido.AgentServer.call(server, route_signal_1, context: %{request: "shared"})
 
     assert agent.state.result == %{text: "draft:writer:editor", request: "shared"}
@@ -21,7 +21,7 @@ defmodule JidoTest.Examples.Workflow.NestedFlowTest do
 
     {:ok, route_signal_2} = Example.draft_and_review_signal(%{text: "seed"})
 
-    assert {:ok, _} =
+    assert {:ok, _, _directives} =
              Jido.AgentServer.call(server, route_signal_2, [])
 
     before = Server.snapshot(server)
@@ -47,7 +47,7 @@ defmodule JidoTest.Examples.Workflow.NestedFlowTest do
 
     {:ok, route_signal_5} = Example.draft_and_review_signal(%{text: "plain"})
 
-    assert {:ok, agent} =
+    assert {:ok, agent, _directives} =
              Jido.AgentServer.call(server, route_signal_5, [])
 
     assert agent.state.result == %{text: "plain:writer:editor", request: "none"}

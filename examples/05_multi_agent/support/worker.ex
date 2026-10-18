@@ -28,7 +28,7 @@ defmodule Jido.Examples.Worker do
           )
 
         {:ok, %{completed: context.agent_state.completed ++ [result]},
-         [Jido.Agent.Directive.emit_to_parent(reply)]}
+         [Jido.AgentServer.Directive.owner_send(reply)]}
       end
     end
   end

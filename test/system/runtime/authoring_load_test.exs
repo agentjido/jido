@@ -6,8 +6,6 @@ defmodule JidoTest.System.AuthoringLoad do
 
   alias Jido.Agent
   alias Jido.Agent.Codec, as: AgentCodec
-  alias Jido.Topology
-  alias Jido.Topology.{Codec, Reference}
 
   @workers 4
   @payload_bytes 131_072
@@ -160,48 +158,11 @@ defmodule JidoTest.System.AuthoringLoad do
     {:ok, ^definition} = AgentCodec.decode(json_copy(document), registry)
     state = %{count: round, payload: payload}
     id = "load-#{index}-#{round}"
-    {:ok, agent} = AgentCodec.decode(document, registry, id: id, state: state)
+    {:ok, agent} = Agent.instantiate(definition, id: id, state: state)
     assert agent.state === Map.put(state, :owned, 1)
     assert Agent.definition(agent) === definition
-    assert {:error, _} = AgentCodec.decode(document, registry, id: id, state: %{count: :bad})
+    assert {:error, _} = Agent.instantiate(definition, id: id, state: %{count: :bad})
 
-    leaf = %{
-      name: "leaf",
-      schema: Zoi.object(%{count: Zoi.integer()}),
-      groups: [%{key: :workers, definition: definition, count: Reference.input(:count)}]
-    }
-
-    topology =
-      Topology.new!(%{
-        name: "load_graph",
-        schema: Zoi.object(%{count: Zoi.integer()}),
-        agents: [%{key: :leader, definition: definition}],
-        groups: [%{key: :workers, definition: definition, count: Reference.input(:count)}],
-        resources: [%{key: :events}],
-        relationships: [%{parent: :leader, child: :workers}],
-        connections: [%{agent: :workers, to: :events, path: "load.**"}],
-        includes: [
-          %{
-            key: :included,
-            topology: %{name: "included", agents: [%{key: :worker, definition: definition}]}
-          }
-        ],
-        children: [
-          %{
-            key: :child,
-            topology: leaf,
-            input: %{count: Reference.input(:count)},
-            gate: %{commands: [%{type: "load.run", member: {:group, :workers, "2"}}]}
-          }
-        ]
-      })
-
-    {:ok, document, registry} = Codec.encode(topology)
-    {:ok, ^topology} = Codec.decode(json_copy(document), registry)
-    assert {:error, _} = Topology.instantiate(topology, id: id, input: %{count: 1})
-    {:ok, expected} = Topology.instantiate(topology, id: id, input: %{count: 2})
-    {:ok, ^expected} = Codec.decode(document, registry, id: id, input: %{count: 2})
-    assert map_size(expected.plan.agents) == 4
     :ok
   end
 

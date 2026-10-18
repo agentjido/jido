@@ -1,50 +1,38 @@
-defmodule Jido.Examples.Topology.HierarchyTest do
+defmodule JidoTest.Examples.Topology.HierarchyTest do
   use JidoTest.Case, async: true
   @moduletag :example
-  import JidoTest.TopologyAssertions
+  import JidoTest.AgentTopologyAssertions
   alias Jido.AgentServer, as: Server
-  alias Jido.Examples.Topology.Hierarchy
-  alias Jido.Topology.Controller
+  alias Jido.Examples.Topology.{Cell, Hierarchy}
 
-  test "owned workers stay stopped after their leader restarts", %{jido: jido} do
-    controller =
-      start_supervised!(
-        {Controller,
-         jido: jido, topology: Hierarchy.new!(id: "hierarchy-example"), repair: :manual}
-      )
+  test "a nested definition starts its own declared members", %{jido: jido} do
+    server = start_topology(jido, Hierarchy)
+    [team] = members(server)
+    workers = members(team)
+    assert length(workers) == 2
+    assert Jido.agent_count(jido) == 4
 
-    assert :ok = Controller.await_ready(controller)
-    leader = Controller.whereis_agent(controller, :leader)
-    coordinator = Controller.whereis_agent(controller, :coordinator)
-    workers = for index <- 1..3, do: Controller.whereis_agent(controller, :workers, index)
-    assert map_size(Server.children(leader)) == 3
-    assert Jido.agent_count(jido) == 5
-
-    monitors = monitor_runtime([leader | workers])
-    Process.exit(leader, :kill)
-    assert_down(monitors)
-
-    eventually(fn ->
-      replacement = Controller.whereis_agent(controller, :leader)
-      is_pid(replacement) and replacement != leader
-    end)
-
-    replacement = Controller.whereis_agent(controller, :leader)
-    assert :ok = Controller.reconcile(controller)
-
-    eventually(fn ->
-      status = Controller.status(controller)
-
-      status.active == 0 and
-        status.errors == Map.new(1..3, &{"group/workers/#{&1}", :member_stopped})
-    end)
-
-    assert Controller.whereis_agent(controller, :coordinator) == coordinator
-    assert Server.status(replacement).runtime.parent.pid == coordinator
-    assert Server.children(coordinator)["agent/leader"].pid == replacement
-    assert Server.children(replacement) == %{}
-    for index <- 1..3, do: assert(Controller.whereis_agent(controller, :workers, index) == nil)
-    stop_topology(controller, [coordinator, replacement])
+    [first, second] = workers
+    before = Server.snapshot(second)
+    assert {:ok, work} = Cell.work_signal(%{value: 3})
+    assert {:ok, changed, []} = Server.call(first, work)
+    assert changed.state.total == 3
+    assert Server.snapshot(second) == before
+    stop_topology(server)
     assert Jido.agent_count(jido) == 0
+  end
+
+  test "removing a nested owner stops its complete subtree", %{jido: jido} do
+    server = start_topology(jido, Hierarchy)
+    [team] = members(server)
+    monitors = monitor_runtime(Server.activation(team))
+    assert {:ok, signal} = Hierarchy.team_remove_signal()
+    assert {:ok, accepted, [_]} = Server.call(server, signal)
+    assert accepted.topology.agents == []
+    assert :ok = Server.await_ready(server)
+    assert_down(monitors)
+    assert members(server) == []
+    assert Jido.agent_count(jido) == 1
+    stop_topology(server)
   end
 end

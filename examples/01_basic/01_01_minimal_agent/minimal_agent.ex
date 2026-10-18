@@ -3,6 +3,7 @@ defmodule Jido.Examples.MinimalAgent do
   The smallest stateful Agent example.
 
   The route defaults to one increment. Signal data can override the amount.
+  Start with `state: %{count: value}`. Server calls return `{:ok, agent, []}`.
   """
 
   use Jido.Agent,
@@ -16,14 +17,12 @@ defmodule Jido.Examples.MinimalAgent do
   routes do
     signal_source "/examples/basic/minimal_agent"
 
-    route "basic.minimal.increment", as: :increment do
+    route "basic.minimal.increment", as: :increment, defaults: %{amount: 1} do
       action %{amount: amount},
         schema: Zoi.object(%{amount: Zoi.integer()}),
         context: context do
         {:ok, %{context.agent_state | count: context.agent_state.count + amount}}
       end
-
-      defaults %{amount: 1}
     end
   end
 end

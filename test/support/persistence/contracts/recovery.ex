@@ -18,7 +18,8 @@ defmodule JidoTest.Persistence.Contracts.Recovery do
         FaultAdapter.configure(control, {:rejected, :contract_prewrite})
         {:ok, signal} = PersistentProbe.set_signal(%{value: 7})
 
-        assert {:error, {:persistence_failed, {:rejected, :contract_prewrite}}} =
+        assert {:error,
+                %Jido.Error.ExecutionError{details: %{reason: {:rejected, :contract_prewrite}}}} =
                  Server.call(server, signal)
 
         assert_receive {:DOWN, ^monitor, :process, ^server, _reason}, 5_000
@@ -44,7 +45,10 @@ defmodule JidoTest.Persistence.Contracts.Recovery do
         FaultAdapter.configure(control, {:lost_reply, :contract_lost_reply})
         {:ok, signal} = PersistentProbe.set_and_emit_signal(%{value: 13})
 
-        assert {:error, {:persistence_failed, {:indeterminate, :contract_lost_reply}}} =
+        assert {:error,
+                %Jido.Error.ExecutionError{
+                  details: %{reason: {:indeterminate, :contract_lost_reply}}
+                }} =
                  Server.call(server, signal, context: %{observer: self()})
 
         assert_receive {:DOWN, ^monitor, :process, ^server, _reason}, 5_000
@@ -64,11 +68,12 @@ defmodule JidoTest.Persistence.Contracts.Recovery do
 
   def start!(context, id, persistence) do
     {:ok, server} =
-      Jido.start_agent(context.jido, JidoTest.Persistence.PersistentProbe,
+      JidoTest.AgentServerAssertions.start_agent(
+        context.jido,
+        JidoTest.Persistence.PersistentProbe,
         id: id,
         persistence: persistence,
-        restore: false,
-        restart: :temporary
+        persistence_mode: :create
       )
 
     server
@@ -77,10 +82,10 @@ defmodule JidoTest.Persistence.Contracts.Recovery do
   def restore!(context, id) do
     {:ok, server} =
       Jido.thaw(context.jido, JidoTest.Persistence.PersistentProbe, id,
-        persistence: context.store,
-        restart: :temporary
+        persistence: context.store
       )
 
+    :ok = Jido.AgentServer.await_ready(server)
     server
   end
 end

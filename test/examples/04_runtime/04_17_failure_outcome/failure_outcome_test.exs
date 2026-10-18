@@ -4,9 +4,7 @@ defmodule JidoTest.Examples.Runtime.FailureOutcomeTest do
   @moduletag :example
 
   alias Jido.AgentServer.Directive.ErrorReport, as: ErrorDirective
-  alias Jido.Agent.Turn.Outcome
   alias Jido.AgentServer
-  alias Jido.AgentServer.Signal.Error, as: ErrorSignal
   alias Jido.Examples.FailureOutcome
 
   test "a continuing policy observes both sides of the commit boundary", %{jido: jido} do
@@ -18,7 +16,7 @@ defmodule JidoTest.Examples.Runtime.FailureOutcomeTest do
     end
 
     {:ok, server} =
-      Jido.start_agent(jido, FailureOutcome,
+      JidoTest.ExampleRuntime.start_agent(jido, FailureOutcome,
         id: unique_id("failure-outcome"),
         error_policy: policy
       )
@@ -27,34 +25,28 @@ defmodule JidoTest.Examples.Runtime.FailureOutcomeTest do
     assert {:error, precommit_error} = AgentServer.call(server, reject)
 
     assert_receive {:failure_outcome, ^precommit_error,
-                    %Outcome{
+                    %{
                       status: :failed,
-                      stage: :execute,
+                      stage: :running,
                       committed?: false,
                       state_version_before: 0,
-                      state_version_after: nil
+                      state_version_after: 0
                     }}
 
     assert %{state_version: 0, agent: %{state: %{accepted: []}}} = AgentServer.snapshot(server)
 
     {:ok, report} = FailureOutcome.report_signal(%{name: "saved"})
-    assert {:ok, committed} = AgentServer.call(server, report)
+    assert {:ok, committed, _directives} = AgentServer.call(server, report)
     assert committed.state.accepted == ["saved"]
 
     assert_receive {:failure_outcome, {:reported_error, :notification, reported_error},
-                    %Outcome{
+                    %{
                       status: :failed,
                       stage: :directive,
                       committed?: true,
                       state_version_before: 0,
                       state_version_after: 1,
-                      directives: %{
-                        total: 1,
-                        completed: 0,
-                        failed: 1,
-                        failed_index: 0,
-                        skipped: 0
-                      }
+                      directive_count: 1
                     }}
 
     assert %Jido.Error.ExecutionError{} = reported_error
@@ -69,35 +61,33 @@ defmodule JidoTest.Examples.Runtime.FailureOutcomeTest do
 
   test "the stopping policy terminates the Agent after a failure", %{jido: jido} do
     {:ok, server} =
-      Jido.start_agent(jido, FailureOutcome,
+      JidoTest.ExampleRuntime.start_agent(jido, FailureOutcome,
         id: unique_id("stopping-policy"),
-        error_policy: :stop_on_error,
-        restart: :temporary
+        error_policy: :stop_on_error
       )
 
     monitor = Process.monitor(server)
     {:ok, reject} = FailureOutcome.reject_signal(%{reason: "stop"})
     assert {:error, _reason} = AgentServer.call(server, reject)
 
-    assert_receive {:DOWN, ^monitor, :process, ^server, {:shutdown, {:agent_error, _reason}}},
+    assert_receive {:DOWN, ^monitor, :process, ^server, {:shutdown, :agent_error}},
                    2_000
   end
 
   test "the emitted-Signal policy publishes bounded failure data", %{jido: jido} do
     {:ok, server} =
-      Jido.start_agent(jido, FailureOutcome,
+      JidoTest.ExampleRuntime.start_agent(jido, FailureOutcome,
         id: unique_id("emitted-policy"),
         error_policy: {:emit_signal, {:pid, target: self()}}
       )
 
     {:ok, reject} = FailureOutcome.reject_signal(%{reason: "publish"})
-    assert {:error, reason} = AgentServer.call(server, reject)
+    assert {:error, _reason} = AgentServer.call(server, reject)
 
     assert_receive {:signal, signal}, 1_000
-    assert signal.type == ErrorSignal.type()
-    assert signal.data.stage == :execute
+    assert signal.type == "jido.agent_server.error"
+    assert signal.data.stage == :running
     refute signal.data.committed?
-    assert signal.data.error == Jido.Error.to_map(reason)
-    assert signal.data.agent_id == AgentServer.agent(server).id
+    assert signal.source == "/agent/#{AgentServer.agent(server).id}"
   end
 end

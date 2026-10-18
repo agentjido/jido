@@ -124,7 +124,7 @@ The upgrade path replaces only the immutable Agent value and its checkpoint.
 | `test/jido/agent/turn/outcome_test.exs:8-109` | Outcome construction, stage/status consistency, version rules, Directive counts, and timing are validated. |
 | `examples/04_runtime/04_07_agent_observation/turn_observation.ex` | Public observation uses current runtime events and Turn Outcome data. |
 | `test/jido/agent_server/upgrade_test.exs` | Quiescent ordering, schema validation, Plugin-contract rejection, runtime-checkpoint restart, and namespaced durable definition replacement pass. |
-| `test/examples/04_runtime/04_13_turn_upgrade` and `04_14_state_migration` | UP-01 and UP-02 pass without skips through the explicit upgrade boundary. |
+| `test/examples/04_runtime/04_14_state_migration` and `test/examples/10_persistence/10_08_definition_revision` | Snapshot upgrade Actions replace the former release-install callback example. Focused tests cover atomic state/schema upgrades and code-reference checks. |
 
 The FA-06 research checks are enabled and passing. Focused Server, Plugin,
 persistence, error, and example suites pass with the selected behavior.

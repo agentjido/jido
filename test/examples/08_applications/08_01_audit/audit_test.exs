@@ -10,10 +10,13 @@ defmodule JidoTest.Examples.Applications.AuditTest do
 
   test "domain records commit with state, stay bounded, and exclude failed Flows", %{jido: jido} do
     {:ok, agent_server} =
-      Jido.start_agent(jido, Agent, id: unique_id("audit"), error_policy: :log_only)
+      JidoTest.ExampleRuntime.start_agent(jido, Agent,
+        id: unique_id("audit"),
+        error_policy: :log_only
+      )
 
     for operation <- [:publish, :update, :archive] do
-      assert {:ok, committed} =
+      assert {:ok, committed, _directives} =
                Server.call(
                  agent_server,
                  turn_signal(%{operation: operation}, false)

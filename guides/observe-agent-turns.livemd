@@ -1,7 +1,6 @@
 # Observe Agent Turns
 
-This Livebook observes the live result and final settlement of one Agent Turn.
-It shows why these are separate events.
+This Livebook observes the evaluation and commit result of one Agent Turn.
 
 ## Install Jido
 
@@ -56,9 +55,8 @@ handler_id = "observe-guide-#{System.unique_integer([:positive])}"
   :telemetry.attach_many(
     handler_id,
     [
-      [:jido, :agent, :turn, :stop],
-      [:jido, :agent, :turn, :exception],
-      [:jido, :agent, :turn, :settled]
+      [:jido, :agent_server, :turn, :stop],
+      [:jido, :agent_server, :turn, :settled]
     ],
     &ObserveGuide.Forwarder.handle/4,
     observer
@@ -76,7 +74,9 @@ handler_id = "observe-guide-#{System.unique_integer([:positive])}"
     id: "observed-counter"
   )
 
-{:ok, committed} =
+:ok = Jido.AgentServer.await_ready(counter)
+
+{:ok, committed, []} =
   with {:ok, signal} <- ObserveGuide.Counter.add_signal(%{amount: 2}) do
     Jido.AgentServer.call(counter, signal, [])
   end
@@ -86,7 +86,7 @@ committed.state
 
 The Turn `:stop` event reports the live result. On success, its
 `state_version_after` revision is already live. The `turn.settled` event reports
-the final bounded result after all owned Directive work stops.
+the recorded evaluation and commit result. Effects can finish later.
 
 This Agent returns no Directives, so the two events occur close together.
 
@@ -121,35 +121,22 @@ Both events have the same `turn_id`. For a successful Turn, `committed?` is
 For a pre-commit failure, the Turn terminal event has `committed?: false`. No
 new revision becomes live. Settlement follows without Directive work.
 
-For a post-commit Directive failure, the Turn `:stop` event remains successful.
-The later settlement event has `committed?: true`, `stage: :directive`, and a
-non-OK status. The committed revision is not rolled back.
+For a post-commit Directive failure, the Turn result remains successful. The
+later `[:jido, :agent_server, :effects, :stop]` event reports the failure. The
+committed revision is not rolled back. This point event has no duration.
 
 ## Read safe fields
 
-The event metadata can include stable Agent identity, activation, Turn, Signal,
-trace, status, stage, and safe error fields. Measurements contain integer
-durations, revisions, queue sizes, and counts.
+Turn metadata includes `agent_id`, `turn_id`, `signal_id`, status, stage, and
+available trace IDs. Measurements include revisions and Directive counts.
+Only the Turn stop event has a duration measurement.
 
-The event does not contain Agent state, Plugin-owned state, Signal data, caller
-context, process handles, or raw error details.
-
-Use these fields to correlate one Turn:
-
-| Field | Meaning |
-| --- | --- |
-| `agent_id` | Logical Agent ID |
-| `activation_id` | Current Agent Server activation |
-| `turn_id` | One admitted Turn |
-| `source_signal_id` | Signal that entered the runtime |
-| `signal_id` | Effective Signal selected for execution |
-| `trace_id` | Distributed trace |
-| `span_id` | Current Turn span |
-| `causation_id` | Signal that caused this Signal |
+Events do not contain Agent or Plugin state, Signal data, caller context,
+process handles, or raw error details.
 
 ## Keep progress policy outside the Turn contract
 
-Jido reports Turn lifecycle and settlement. It does not define an application
+Jido reports Turn and effects results. It does not define an application
 progress stream. If long work needs intermediate progress, keep the terminal
 status, waiting reason, and final result in Agent state. Put temporary progress
 in a bounded application buffer or event service.

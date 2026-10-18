@@ -7,32 +7,11 @@ defmodule Jido.Examples.PluginStateAgent do
   paths preserve the prior Agent state.
   """
 
-  defmodule CountTurns do
-    use Jido.Plugin
-
-    @impl true
-    defdelegate state_spec(opts), to: Jido.Examples.PluginStateAgent.CountTurns.Agent
-
-    @impl true
-    defdelegate reduce(reduction, opts), to: Jido.Examples.PluginStateAgent.CountTurns.Agent
-  end
-
-  defmodule CountTurns.Agent do
-    @behaviour Jido.Plugin
-
-    @impl true
-    def state_spec(_opts),
-      do: {:turns, Zoi.integer() |> Zoi.min(0) |> Zoi.max(1) |> Zoi.default(0)}
-
-    @impl true
-    def reduce(reduction, _opts), do: {:ok, reduction.plugin_state + 1}
-  end
-
   use Jido.Agent, name: "basic_sdk_plugin_state"
 
   agent do
     schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
-    plugin CountTurns
+    plugin Jido.Examples.PluginStateAgent.CountTurns
   end
 
   routes do

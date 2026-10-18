@@ -18,7 +18,7 @@ defmodule Jido.Examples.RecoverableDelivery.Probe do
 
     try do
       :ok = Sink.available(jido, false)
-      {:ok, server} = Jido.start_agent(jido, Agent, opts ++ [restore: false])
+      {:ok, server} = Jido.start_agent(jido, Agent, opts ++ [persistence_mode: :create])
 
       {:ok, route_signal_1} = Agent.record_and_deliver_signal(%{effect_id: "effect-1", value: 7})
 
@@ -30,7 +30,7 @@ defmodule Jido.Examples.RecoverableDelivery.Probe do
       Process.exit(server, :kill)
       down(agent_ref)
       :ok = Sink.available(jido, true)
-      {:ok, restored} = Jido.start_agent(jido, Agent, opts ++ [restore: :required])
+      {:ok, restored} = Jido.start_agent(jido, Agent, opts ++ [persistence_mode: :restore])
       await(fn -> Server.agent(restored).state.delivery.completed == %{"effect-1" => 7} end)
 
       snapshot = Server.snapshot(restored)

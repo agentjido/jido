@@ -22,7 +22,6 @@ defmodule JidoTest.System.Services.S3MinIO do
   use JidoTest.System.Scenarios.Execution
   use JidoTest.System.Scenarios.Restoration
   use JidoTest.System.Scenarios.Overload
-  use JidoTest.System.Scenarios.Topology
 
   test "real object tombstones repeat and maintenance deletion removes only the selected key",
        c do
@@ -31,7 +30,7 @@ defmodule JidoTest.System.Services.S3MinIO do
 
     {:ok, route_signal_1} = Probe.record_and_deliver_signal(%{effect_id: "maintenance", value: 1})
 
-    assert {:ok, _agent} =
+    assert {:ok, _agent, _} =
              Jido.AgentServer.call(server, route_signal_1, [])
 
     stop_agent(c, server)

@@ -9,10 +9,10 @@ defmodule Jido.Examples.Plugins.Composition.Agent do
            })
 
     plugin Jido.Examples.Plugins.PreparedInput.Plugin,
-      config: [subject_prefix: "tenant/"]
+      config: %{subject_prefix: "tenant/"}
 
     plugin Jido.Examples.Plugins.RuntimeAdmission.Plugin,
-      config: [tokens: [{"allow", "operator"}]]
+      config: %{tokens: [{"allow", "operator"}]}
   end
 
   routes do

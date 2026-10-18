@@ -11,7 +11,10 @@ defmodule JidoTest.Examples.Persistence.PluginStateConversionTest do
     jido: jido
   } do
     persistence = persistence()
-    agent = ExampleAgent.new!(id: unique_id("persisted-plugin"), state: %{visible: 3, owned: 7})
+
+    agent =
+      ExampleAgent.instantiate!(id: unique_id("persisted-plugin"), state: %{visible: 3, owned: 7})
+
     clean_record_on_exit(persistence, agent, jido)
 
     assert :ok =
@@ -20,7 +23,7 @@ defmodule JidoTest.Examples.Persistence.PluginStateConversionTest do
                revision: 2
              )
 
-    assert %{checkpoint: %{state: %{visible: 3, owned: "owned:7"}}} =
+    assert %{checkpoint: %{agent: %{state: %{visible: 3, owned: "owned:7"}}}} =
              record(persistence, agent, jido)
 
     assert {:ok, ^agent, 2} =
@@ -31,7 +34,10 @@ defmodule JidoTest.Examples.Persistence.PluginStateConversionTest do
 
   test "a malformed or missing owned value cannot restore an Agent", %{jido: jido} do
     persistence = persistence()
-    agent = ExampleAgent.new!(id: unique_id("invalid-plugin"), state: %{visible: 3, owned: 7})
+
+    agent =
+      ExampleAgent.instantiate!(id: unique_id("invalid-plugin"), state: %{visible: 3, owned: 7})
+
     clean_record_on_exit(persistence, agent, jido)
 
     assert :ok = Persistence.save_agent(persistence, agent, instance: jido)
@@ -40,38 +46,40 @@ defmodule JidoTest.Examples.Persistence.PluginStateConversionTest do
     replace_record(
       persistence,
       agent,
-      put_in(saved, [:checkpoint, :state, :owned], "invalid"),
+      put_in(saved.checkpoint.agent.state.owned, "invalid"),
       jido
     )
 
     assert {:error, :invalid_owned_value} =
              Persistence.load_agent(persistence, ExampleAgent, agent.id, instance: jido)
 
-    assert {:error, :invalid_owned_value} =
-             Jido.start_agent(jido, ExampleAgent,
+    assert catch_exit(
+             JidoTest.ExampleRuntime.start_agent(jido, ExampleAgent,
                id: agent.id,
                persistence: persistence,
-               restart: :temporary
+               persistence_mode: :restore
              )
+           )
 
     assert Jido.whereis_agent(jido, agent.id) == nil
 
     replace_record(
       persistence,
       agent,
-      update_in(saved, [:checkpoint, :state], &Map.delete(&1, :owned)),
+      update_in(saved.checkpoint.agent.state, &Map.delete(&1, :owned)),
       jido
     )
 
     assert {:error, {:invalid_persistence_record, :plugin_state}} =
              Persistence.load_agent(persistence, ExampleAgent, agent.id, instance: jido)
 
-    assert {:error, {:invalid_persistence_record, :plugin_state}} =
-             Jido.start_agent(jido, ExampleAgent,
+    assert catch_exit(
+             JidoTest.ExampleRuntime.start_agent(jido, ExampleAgent,
                id: agent.id,
                persistence: persistence,
-               restart: :temporary
+               persistence_mode: :restore
              )
+           )
 
     assert Jido.whereis_agent(jido, agent.id) == nil
   end

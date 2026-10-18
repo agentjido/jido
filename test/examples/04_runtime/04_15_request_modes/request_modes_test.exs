@@ -44,42 +44,46 @@ defmodule JidoTest.Examples.Runtime.RequestModesTest do
   end
 
   test "call, cast, and asynchronous request expose their result contracts", %{jido: jido} do
-    {:ok, server} = Jido.start_agent(jido, RequestModes, id: unique_id("request-modes"))
+    {:ok, server} =
+      JidoTest.ExampleRuntime.start_agent(jido, RequestModes, id: unique_id("request-modes"))
 
     {:ok, call_signal} = RequestModes.record_signal(%{label: "call"})
-    assert {:ok, called} = AgentServer.call(server, call_signal)
+    assert {:ok, called, _directives} = AgentServer.call(server, call_signal)
     assert called.state.history == ["call"]
 
     {:ok, cast_signal} = RequestModes.record_signal(%{label: "cast"})
     assert :ok = AgentServer.cast(server, cast_signal)
 
     {:ok, request_signal} = RequestModes.record_signal(%{label: "request"})
-    request_id = AgentServer.send_request(server, request_signal)
-    assert {:reply, {:ok, requested}} = AgentServer.receive_response(request_id)
+    request_id = AgentServer.submit(server, request_signal)
+    assert {:ok, requested, []} = AgentServer.await(request_id)
     assert requested.state.history == ["call", "cast", "request"]
   end
 
   test "several admitted asynchronous requests commit in serial order", %{jido: jido} do
-    {:ok, server} = Jido.start_agent(jido, RequestModes, id: unique_id("request-order"))
+    {:ok, server} =
+      JidoTest.ExampleRuntime.start_agent(jido, RequestModes, id: unique_id("request-order"))
 
     requests =
       for label <- ~w[first second third] do
         {:ok, signal} = RequestModes.record_signal(%{label: label})
-        AgentServer.send_request(server, signal)
+        AgentServer.submit(server, signal)
       end
 
-    replies = Enum.map(requests, &AgentServer.receive_response/1)
+    replies = Enum.map(requests, &AgentServer.await/1)
 
     assert [
-             {:reply, {:ok, %{state: %{history: ["first"]}}}},
-             {:reply, {:ok, %{state: %{history: ["first", "second"]}}}},
-             {:reply, {:ok, %{state: %{history: ["first", "second", "third"]}}}}
+             {:ok, %{state: %{history: ["first"]}}, []},
+             {:ok, %{state: %{history: ["first", "second"]}}, []},
+             {:ok, %{state: %{history: ["first", "second", "third"]}}, []}
            ] = replies
   end
 
   test "a caller timeout does not cancel work that already started", %{jido: jido} do
     {:ok, server} =
-      Jido.start_agent(jido, RequestModesBlockingAgent, id: unique_id("request-timeout"))
+      JidoTest.ExampleRuntime.start_agent(jido, RequestModesBlockingAgent,
+        id: unique_id("request-timeout")
+      )
 
     :ok = RuntimeBarrier.arm(self())
 

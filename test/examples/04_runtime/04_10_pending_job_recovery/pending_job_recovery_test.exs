@@ -19,13 +19,13 @@ defmodule JidoTest.Examples.Runtime.PendingJobRecoveryTest do
 
     {:ok, route_signal_1} = Example.request_job_signal(%{job_id: "job-1", value: 3})
 
-    assert {:ok, _} =
+    assert {:ok, _, _directives} =
              Jido.AgentServer.call(server, route_signal_1, [])
 
     {:ok, route_signal_2} =
       Example.approve_job_signal(%{job_id: "job-1", attempt_id: "attempt-1"})
 
-    assert {:ok, approved} =
+    assert {:ok, approved, _directives} =
              Jido.AgentServer.call(server, route_signal_2,
                context: JidoTest.JobRunner.context(self())
              )
@@ -35,19 +35,19 @@ defmodule JidoTest.Examples.Runtime.PendingJobRecoveryTest do
 
     server_ref = Process.monitor(server)
     task_ref = Process.monitor(first_task)
-    Process.exit(server, :kill)
-    assert_receive {:DOWN, ^server_ref, :process, ^server, :killed}, 1000
+    assert :ok = Jido.stop_agent(c.jido, server)
+    assert_receive {:DOWN, ^server_ref, :process, ^server, _reason}, 1000
     assert_receive {:DOWN, ^task_ref, :process, ^first_task, _reason}, 1000
     eventually(fn -> Jido.whereis_agent(c.jido, id) == nil end)
 
     restored = start_example(c, id, :required)
     assert Server.agent(restored).state.status == :running
     assert Server.agent(restored).state.approved?
-    assert JobServer.jobs(Server.children(restored)[{:plugin, Jobs}].pid) == []
+    assert JobServer.jobs(JidoTest.ExampleRuntime.plugin(Server.activation(restored), Jobs)) == []
 
     {:ok, route_signal_3} = Example.retry_job_signal(%{job_id: "job-1", attempt_id: "attempt-2"})
 
-    assert {:ok, retrying} =
+    assert {:ok, retrying, _directives} =
              Jido.AgentServer.call(restored, route_signal_3,
                context: JidoTest.JobRunner.context(self())
              )
@@ -75,11 +75,10 @@ defmodule JidoTest.Examples.Runtime.PendingJobRecoveryTest do
 
   defp start_example(c, id, restore) do
     assert {:ok, server} =
-             Jido.start_agent(c.jido, Example,
+             JidoTest.ExampleRuntime.start_agent(c.jido, Example,
                id: id,
                persistence: c.store,
-               restore: restore,
-               restart: :temporary
+               persistence_mode: if(restore == false, do: :create, else: :restore)
              )
 
     server

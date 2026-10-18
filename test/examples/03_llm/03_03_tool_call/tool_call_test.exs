@@ -16,7 +16,7 @@ defmodule JidoTest.Examples.LLM.ToolCallTest do
 
     {:ok, command_signal_1} = Example.ask_signal(%{prompt: "question"})
 
-    assert {:ok, agent} =
+    assert {:ok, agent, _directives} =
              Server.call(
                server,
                command_signal_1,
@@ -95,7 +95,7 @@ defmodule JidoTest.Examples.LLM.ToolCallTest do
 
     {:ok, command_signal_3} = Example.ask_signal(%{prompt: "seed"})
 
-    assert {:ok, _} =
+    assert {:ok, _, _directives} =
              Server.call(
                server,
                command_signal_3,

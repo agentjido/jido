@@ -17,13 +17,13 @@ defmodule JidoTest.System.Scenarios.Execution do
           id = Server.agent(server).id
           gate = make_ref()
           signal = ControlledAgent.signal(99, gate: gate, observer: self())
-          request = Server.send_request(server, signal, :infinity)
+          request = Server.submit(server, signal)
           assert_receive {:work_held, ^gate, worker}, 10_000
           monitor = Process.monitor(worker)
 
           {_, _, _, started} =
             Observability.await(c.observer, fn
-              {^server, [:jido, :agent, :turn, :start], _, %{source_signal_id: source}} ->
+              {^server, [:jido, :agent_server, :turn, :start], _, %{signal_id: source}} ->
                 source == signal.id
 
               _ ->
@@ -34,32 +34,29 @@ defmodule JidoTest.System.Scenarios.Execution do
 
           if @execution_outcome == :cancelled do
             assert :ok = Server.cancel_turn(server, turn_id)
-            assert {:reply, {:error, :cancelled}} = Server.receive_response(request, 10_000)
+            assert {:error, :cancelled} = Server.await(request, 10_000)
           else
-            assert {:reply, {:error, %Jido.Error.TimeoutError{} = error}} =
-                     Server.receive_response(request, 10_000)
-
-            assert Jido.Error.code(error) == :agent_turn_timeout
+            assert {:error, :turn_timeout} = Server.await(request, 10_000)
           end
 
           assert_receive {:DOWN, ^monitor, :process, ^worker, _}, 10_000
           assert {:ok, %{state: %{value: 0}}, 0} = load(c, id, ControlledAgent)
-          assert {:error, :stale_turn} = Server.cancel_turn(server, turn_id)
+          assert {:error, :not_running} = Server.cancel_turn(server, turn_id)
           send(server, {make_ref(), {:ok, %{value: 99}}})
           assert Server.agent(server).state == %{value: 0}
 
           {_, _, _, metadata} =
             Observability.await(c.observer, fn
-              {^server, [:jido, :agent, :turn, :stop], _, %{turn_id: ^turn_id}} -> true
+              {^server, [:jido, :agent_server, :turn, :stop], _, %{turn_id: ^turn_id}} -> true
               _ -> false
             end)
 
           assert metadata.status == @execution_outcome
           refute metadata.committed?
 
-          assert {:ok, accepted} = Server.call(server, ControlledAgent.signal(7))
+          assert {:ok, accepted, _} = Server.call(server, ControlledAgent.signal(7))
           kill_agent(c, server)
-          restored = start_agent(c, module: ControlledAgent, id: id, restore: :required)
+          restored = start_agent(c, module: ControlledAgent, id: id, persistence_mode: :restore)
           assert Server.snapshot(restored) == %{agent: accepted, state_version: 1}
           assert {:ok, ^accepted, 1} = load(c, id, ControlledAgent)
           assert Sink.attempts(c.jido) == []
@@ -97,11 +94,11 @@ defmodule JidoTest.System.Scenarios.Execution do
               end
             end)
 
-          assert_receive {:checkpoint_barrier, @commit_stage, ^server}, 10000
+          assert_receive {:checkpoint_barrier, @commit_stage, writer}, 10000
 
           {_, _, _, started} =
             Observability.await(c.observer, fn
-              {^server, [:jido, :agent, :turn, :start], _, %{source_signal_id: signal_id}} ->
+              {^server, [:jido, :agent_server, :turn, :start], _, %{signal_id: signal_id}} ->
                 signal_id == signal.id
 
               _ ->
@@ -118,11 +115,13 @@ defmodule JidoTest.System.Scenarios.Execution do
               nil
             end
 
-          send(server, :release_checkpoint)
+          send(writer, :release_checkpoint)
 
           if cancel do
-            assert {:reply, {:error, :stale_turn}} = Server.receive_response(cancel, 10000)
-            assert {:ok, _} = Task.await(caller, 10000)
+            assert {:reply, {:error, :commit_in_progress}} =
+                     :gen_statem.wait_response(cancel, 10000)
+
+            assert {:ok, _, _} = Task.await(caller, 10000)
           end
 
           completed(c, server, %{"committed" => 7})
@@ -136,7 +135,7 @@ defmodule JidoTest.System.Scenarios.Execution do
           attempts = Sink.attempts(c.jido)
           assert attempts != []
           assert Enum.all?(attempts, &(&1.effect_id == "committed"))
-          restored = start_agent(c, id: id, restore: :required)
+          restored = start_agent(c, id: id, persistence_mode: :restore)
           assert Server.snapshot(restored) == snapshot
           stop_agent(c, restored)
           assert Sink.records(c.jido) == %{"committed" => 7}

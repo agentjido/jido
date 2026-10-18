@@ -9,9 +9,9 @@ defmodule Jido.Examples.Plugins.Identity.Agent do
            })
 
     plugin Jido.Examples.Plugins.Identity.Plugin,
-      config: [
+      config: %{
         trusted_public_key: elem(Jido.Examples.Plugins.Crypto.peer_key_pair(), 0)
-      ]
+      }
   end
 
   routes do

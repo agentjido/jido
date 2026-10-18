@@ -401,7 +401,7 @@ registration checks do not establish exclusive ownership across a cluster.
 **Check:** test shutdown, detached owners, idle expiry, worker limits, remote
 failure, and cleanup. See
 [Agent Server Lifecycle](agent-server-lifecycle.md) and the
-[Factory examples](https://github.com/agentjido/jido/tree/release/v3/examples/06_factory).
+[topology examples](../examples/07_topology/README.md).
 
 ## Update earlier V3 Topology supervision
 

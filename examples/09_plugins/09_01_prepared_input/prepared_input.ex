@@ -35,7 +35,7 @@ defmodule Jido.Examples.Plugins.PreparedInput.Agent do
            })
 
     plugin Jido.Examples.Plugins.PreparedInput.Plugin,
-      config: [subject_prefix: "tenant/"]
+      config: %{subject_prefix: "tenant/"}
   end
 
   routes do

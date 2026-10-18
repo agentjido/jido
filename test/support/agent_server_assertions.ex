@@ -40,4 +40,23 @@ defmodule JidoTest.AgentServerAssertions do
       {:ok, server}
     end
   end
+
+  def start_result(instance, agent, opts) do
+    with {:ok, server} <- Jido.start_agent(instance, agent, opts) do
+      monitor = Process.monitor(server)
+
+      try do
+        :ok = AgentServer.await_ready(server)
+        Process.demonitor(monitor, [:flush])
+        {:ok, server}
+      catch
+        :exit, _ ->
+          receive do
+            {:DOWN, ^monitor, :process, ^server, {:shutdown, reason}} -> {:error, reason}
+          after
+            5_000 -> raise "bootstrap did not stop"
+          end
+      end
+    end
+  end
 end

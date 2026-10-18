@@ -15,11 +15,20 @@ defmodule JidoTest.FeatureSDKCase do
     :yes = :global.register_name({JidoTest.FeatureObserver, owner_key}, self())
 
     Jido.Agent.define!(
-      Map.update(
-        module.definition() |> Map.from_struct() |> Map.drop([:id, :state]),
-        :plugins,
-        [{JidoTest.FeatureObserver, [owner_key: owner_key, key: key]}],
-        &(&1 ++ [{JidoTest.FeatureObserver, [owner_key: owner_key, key: key]}])
+      module.definition()
+      |> Map.from_struct()
+      |> Map.drop([:id, :state])
+      |> Map.update!(
+        :extensions,
+        &(&1 ++
+            [
+              %{
+                id: JidoTest.FeatureObserver.id(),
+                provider: JidoTest.FeatureObserver,
+                vsn: JidoTest.FeatureObserver.vsn(),
+                data: %{owner_key: owner_key, key: key}
+              }
+            ])
       )
     )
   end

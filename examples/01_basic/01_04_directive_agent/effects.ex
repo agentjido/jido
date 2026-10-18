@@ -30,32 +30,7 @@ defmodule Jido.Examples.DirectiveAgent.Effects do
   use Jido.Plugin
 
   @impl true
-  defdelegate directives(opts), to: Jido.Examples.DirectiveAgent.Effects.Agent
-
-  @impl true
-  defdelegate dispatch(runtime, directive, context, opts),
-    to: Jido.Examples.DirectiveAgent.Effects.Server
-
-  @impl true
-  defdelegate child_spec(init), to: Jido.Examples.DirectiveAgent.Effects.Server
-
-  def records(server) do
-    %{pid: runtime} = Jido.AgentServer.children(server)[{:plugin, __MODULE__}]
-    GenServer.call(runtime, :records)
-  end
-end
-
-defmodule Jido.Examples.DirectiveAgent.Effects.Agent do
-  @behaviour Jido.Plugin
-  alias Jido.Examples.DirectiveAgent.Record
-
-  @impl true
-  def directives(_opts), do: [Record]
-end
-
-defmodule Jido.Examples.DirectiveAgent.Effects.Server do
-  @behaviour Jido.Plugin
-  alias Jido.Examples.DirectiveAgent.EffectRuntime
+  def directives(_opts), do: [Jido.Examples.DirectiveAgent.Record]
 
   @impl true
   def dispatch(runtime, directive, context, _opts),
@@ -63,7 +38,16 @@ defmodule Jido.Examples.DirectiveAgent.Effects.Server do
 
   @impl true
   def child_spec(init),
-    do: Supervisor.child_spec({EffectRuntime, init}, id: Jido.Examples.DirectiveAgent.Effects)
+    do: Supervisor.child_spec({Jido.Examples.DirectiveAgent.EffectRuntime, init}, id: __MODULE__)
+
+  def runtime(jido, id) do
+    case Registry.lookup(Jido.registry_name(jido), {__MODULE__, id}) do
+      [{pid, _}] -> pid
+      [] -> nil
+    end
+  end
+
+  def records(jido, id), do: GenServer.call(runtime(jido, id), :records)
 end
 
 defmodule Jido.Examples.DirectiveAgent.EffectRuntime do
@@ -71,7 +55,13 @@ defmodule Jido.Examples.DirectiveAgent.EffectRuntime do
 
   use GenServer
 
-  def start_link(init), do: GenServer.start_link(__MODULE__, init)
+  def start_link(init) do
+    name =
+      {:via, Registry,
+       {Jido.registry_name(init.jido), {Jido.Examples.DirectiveAgent.Effects, init.agent_id}}}
+
+    GenServer.start_link(__MODULE__, init, name: name)
+  end
 
   @impl true
   def init(init), do: {:ok, %{server: init.agent_server, records: []}}

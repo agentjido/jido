@@ -9,11 +9,11 @@ defmodule JidoTest.Examples.Applications.InboxTest do
   alias Jido.Plugin.SensorManager.Runtime
 
   test "managed input survives duplicate events, failures, and runtime replacement", %{jido: jido} do
-    {:ok, agent_server} = Jido.start_agent(jido, Agent, id: unique_id("inbox"))
+    {:ok, agent_server} = JidoTest.ExampleRuntime.start_agent(jido, Agent, id: unique_id("inbox"))
     agent_id = Server.agent(agent_server).id
     manager = manager(agent_server)
 
-    assert {:ok, started} = Server.call(agent_server, sensor_signal(:start))
+    assert {:ok, started, _directives} = Server.call(agent_server, sensor_signal(:start))
     start_version = Server.snapshot(agent_server).state_version
 
     desired = %{
@@ -47,11 +47,21 @@ defmodule JidoTest.Examples.Applications.InboxTest do
     Sensor.push(replacement, %{event_id: "after-sensor-restart"})
     eventually(fn -> Server.agent(agent_server).state.accepted == 3 end)
 
+    activation = Server.activation(agent_server)
     manager_monitor = Process.monitor(manager)
     Process.exit(manager, :kill)
     assert_receive {:DOWN, ^manager_monitor, :process, ^manager, :killed}, 1_000
 
-    next_manager = eventually(fn -> changed_manager(agent_server, manager) end)
+    next_manager =
+      eventually(fn ->
+        case JidoTest.ExampleRuntime.plugin(activation, SensorManager) do
+          pid when is_pid(pid) and pid != manager -> pid
+          _ -> nil
+        end
+      end)
+
+    agent_server = Jido.AgentServer.Supervisor.worker(activation)
+    assert :ok = Server.await_ready(agent_server)
 
     restored_sensor =
       eventually(fn ->
@@ -64,7 +74,7 @@ defmodule JidoTest.Examples.Applications.InboxTest do
     Sensor.push(restored_sensor, %{event_id: "after-manager-restart"})
     eventually(fn -> Server.agent(agent_server).state.accepted == 4 end)
 
-    assert {:ok, stopped} = Server.call(agent_server, sensor_signal(:stop))
+    assert {:ok, stopped, _directives} = Server.call(agent_server, sensor_signal(:stop))
     assert stopped.state.sensors.desired == %{}
     eventually(fn -> Sensor.whereis(agent_id, "mailbox") == nil end)
 
@@ -72,7 +82,7 @@ defmodule JidoTest.Examples.Applications.InboxTest do
     assert Runtime.sensors(next_manager) == %{}
     assert Sensor.whereis(agent_id, "mailbox") == nil
 
-    assert {:ok, _started_again} = Server.call(agent_server, sensor_signal(:start))
+    assert {:ok, _started_again, _directives} = Server.call(agent_server, sensor_signal(:start))
     final_sensor = eventually(fn -> Sensor.whereis(agent_id, "mailbox") end)
     final_sensor_monitor = Process.monitor(final_sensor)
     final_manager = manager(agent_server)
@@ -96,15 +106,6 @@ defmodule JidoTest.Examples.Applications.InboxTest do
   end
 
   defp manager(agent_server) do
-    Server.children(agent_server)
-    |> Map.fetch!({:plugin, SensorManager})
-    |> Map.fetch!(:pid)
-  end
-
-  defp changed_manager(agent_server, old_manager) do
-    case manager(agent_server) do
-      pid when is_pid(pid) and pid != old_manager -> pid
-      _pid -> nil
-    end
+    JidoTest.ExampleRuntime.plugin(Server.activation(agent_server), SensorManager)
   end
 end

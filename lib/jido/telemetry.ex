@@ -2,21 +2,13 @@ defmodule Jido.Telemetry do
   @moduledoc """
   The public runtime observability API.
 
-  Jido uses one version-1 semantic event catalog for Telemetry handlers,
-  metrics, semantic logs, and optional OpenTelemetry spans. The catalog covers
-  Agent lifecycle, Turn result, commit, Plugin commit notification, Directive
-  work, Turn settlement, admission rejection, persistence, local Topology
-  operations, Topology ownership settlement, and Scheduler delivery.
+  AgentServer emits Turn spans and lifecycle, commit, Directive, effects, and
+  settlement point events under `[:jido, :agent_server]`. Persistence emits
+  operation spans. Scheduler delivery is a point event.
 
-  A successful Turn span ends when its commit becomes live. Plugin
-  notifications and Directive work can continue after this point. The separate
-  `[:jido, :agent, :turn, :settled]` event reports the terminal bounded result
-  after all owned notification and Directive attempts stop. A post-commit
-  failure does not undo the committed Agent or its revision.
-
-  Span events use `:start` and one terminal event. A returned result uses
-  `:stop`. An error, throw, or exit that escapes the observed boundary uses
-  `:exception`.
+  Turn stop and settlement report the evaluation and commit result. Effects
+  can finish later. The effects stop event reports their bounded result; an
+  effects failure does not undo the committed Agent or its revision.
 
   Event metadata has a strict scalar allowlist. It excludes Agent and Plugin
   state, Signal and Directive data, raw errors, records, process handles,
@@ -45,14 +37,20 @@ defmodule Jido.Telemetry do
   @log_scope_key {:jido, :semantic_log_scope}
 
   @span_metrics [
-    {"jido.agent.lifecycle", [:jido, :agent, :lifecycle], [:operation, :status]},
-    {"jido.agent.turn", [:jido, :agent, :turn], [:status, :stage]},
-    {"jido.agent.commit", [:jido, :agent, :commit], [:status]},
-    {"jido.agent.after_commit", [:jido, :agent, :after_commit], [:status]},
-    {"jido.agent.directive", [:jido, :agent, :directive], [:status]},
-    {"jido.persistence.operation", [:jido, :persistence, :operation],
-     [:operation, :status, :persistence_reason]},
-    {"jido.topology.operation", [:jido, :topology, :operation], [:topology_operation, :status]}
+    {[:jido, :agent_server, :turn], [:stop], [:status, :stage]},
+    {[:jido, :persistence, :operation], [:stop, :exception],
+     [:operation, :status, :persistence_reason]}
+  ]
+
+  @point_metrics [
+    {[:jido, :agent_server, :lifecycle, :start], []},
+    {[:jido, :agent_server, :lifecycle, :stop], []},
+    {[:jido, :agent_server, :commit], [:status]},
+    {[:jido, :agent_server, :directives, :returned], []},
+    {[:jido, :agent_server, :effects, :start], []},
+    {[:jido, :agent_server, :effects, :stop], [:status, :stage]},
+    {[:jido, :agent_server, :turn, :settled], [:status, :stage]},
+    {[:jido, :scheduler, :delivery], [:scheduler_outcome]}
   ]
 
   @typedoc "A Jido telemetry event name."
@@ -67,11 +65,13 @@ defmodule Jido.Telemetry do
   @doc """
   Returns metric definitions for the Jido semantic event catalog.
 
-  The result contains count and duration metrics for normal and exception span
-  endings. It also contains Turn settlement, admission rejection, Topology
-  ownership settlement, and Scheduler delivery metrics. Default tags use only bounded result and
-  operation values. They do not use Agent, Signal, Turn, trace, module, or
-  error IDs.
+  Turn stop and persistence span endings have count and duration metrics.
+  Lifecycle, commit, returned Directives, effects, settlement, and Scheduler
+  delivery have counters only. Point events do not measure duration. Each
+  counter counts events, not the number of Directives in an event.
+
+  Tags use bounded status, stage, and operation values. They do not contain
+  Agent, Signal, Turn, trace, module, or error IDs.
 
   Pass the returned list to a `Telemetry.Metrics` compatible reporter in the
   host application.
@@ -79,29 +79,12 @@ defmodule Jido.Telemetry do
   @spec metrics() :: [Telemetry.Metrics.t()]
   def metrics do
     Enum.flat_map(@span_metrics, &span_metrics/1) ++
-      [
-        Telemetry.Metrics.counter("jido.agent.turn.settled.count",
-          event_name: [:jido, :agent, :turn, :settled],
-          tags: [:status, :stage]
-        ),
-        Telemetry.Metrics.summary("jido.agent.turn.settled.duration",
-          event_name: [:jido, :agent, :turn, :settled],
-          tags: [:status, :stage],
-          unit: {:native, :millisecond}
-        ),
-        Telemetry.Metrics.counter("jido.agent.admission.rejected.count",
-          event_name: [:jido, :agent, :admission, :rejected],
-          tags: [:admission_reason]
-        ),
-        Telemetry.Metrics.counter("jido.scheduler.delivery.count",
-          event_name: [:jido, :scheduler, :delivery],
-          tags: [:scheduler_outcome]
-        ),
-        Telemetry.Metrics.counter("jido.topology.ownership.settled.count",
-          event_name: [:jido, :topology, :ownership, :settled],
-          tags: [:status]
+      Enum.map(@point_metrics, fn {event, tags} ->
+        Telemetry.Metrics.counter(Enum.join(event ++ [:count], "."),
+          event_name: event,
+          tags: tags
         )
-      ]
+      end)
   end
 
   @doc """
@@ -117,7 +100,7 @@ defmodule Jido.Telemetry do
   @doc false
   @spec attach_default_handler() :: :ok
   def attach_default_handler do
-    attach(@semantic_handler_id, semantic_terminal_events(), &__MODULE__.handle_semantic_event/4)
+    attach(@semantic_handler_id, semantic_events(), &__MODULE__.handle_semantic_event/4)
     :ok
   end
 
@@ -144,10 +127,10 @@ defmodule Jido.Telemetry do
     _kind, _reason -> :ok
   end
 
-  defp span_metrics({name, event, tags}) do
-    for ending <- [:stop, :exception], metric <- [:count, :duration] do
+  defp span_metrics({event, endings, tags}) do
+    for ending <- endings, metric <- [:count, :duration] do
       event_name = event ++ [ending]
-      metric_name = "#{name}.#{ending}.#{metric}"
+      metric_name = Enum.join(event_name ++ [metric], ".")
 
       case metric do
         :count ->
@@ -163,19 +146,8 @@ defmodule Jido.Telemetry do
     end
   end
 
-  defp semantic_terminal_events do
-    span_events =
-      for {_name, prefix, _tags} <- @span_metrics,
-          ending <- [:stop, :exception],
-          do: prefix ++ [ending]
-
-    span_events ++
-      [
-        [:jido, :agent, :turn, :settled],
-        [:jido, :agent, :admission, :rejected],
-        [:jido, :scheduler, :delivery],
-        [:jido, :topology, :ownership, :settled]
-      ]
+  defp semantic_events do
+    metrics() |> Enum.map(& &1.event_name) |> Enum.uniq()
   end
 
   defp attach(id, events, handler) do

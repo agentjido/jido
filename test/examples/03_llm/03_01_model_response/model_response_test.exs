@@ -8,7 +8,7 @@ defmodule JidoTest.Examples.LLM.ModelResponseTest do
     persistence =
       {Jido.Persistence.ETS, table: :"llm_response_#{System.unique_integer([:positive])}"}
 
-    server = start_agent!(jido, Example, persistence: persistence, restore: false)
+    server = start_agent!(jido, Example, persistence: persistence, persistence_mode: :create)
     before = Server.snapshot(server)
     assert {:ok, signal} = Example.generate_signal(%{prompt: "hello"})
     assert signal.data == %{prompt: "hello"}
@@ -20,7 +20,7 @@ defmodule JidoTest.Examples.LLM.ModelResponseTest do
 
     {:ok, route_signal_1} = Example.generate_signal(%{prompt: "hello"})
 
-    assert {:ok, ^candidate} =
+    assert {:ok, ^candidate, _directives} =
              Jido.AgentServer.call(server, route_signal_1, context: %{model: client(model)})
 
     assert candidate.state == %{answer: "one"}
@@ -50,7 +50,7 @@ defmodule JidoTest.Examples.LLM.ModelResponseTest do
 
     {:ok, command_signal_2} = Example.generate_signal(%{prompt: "seed"})
 
-    assert {:ok, _} =
+    assert {:ok, _, _directives} =
              Server.call(
                server,
                command_signal_2,
@@ -82,7 +82,7 @@ defmodule JidoTest.Examples.LLM.ModelResponseTest do
 
     {:ok, command_signal_4} = Example.generate_signal(%{prompt: "hello"})
 
-    assert {:ok, _} =
+    assert {:ok, _, _directives} =
              Server.call(
                server,
                command_signal_4,
@@ -124,7 +124,7 @@ defmodule JidoTest.Examples.LLM.ModelResponseTest do
 
     {:ok, command_signal_7} = Example.generate_signal(%{prompt: "seed"})
 
-    assert {:ok, _} =
+    assert {:ok, _, _directives} =
              Server.call(
                server,
                command_signal_7,
