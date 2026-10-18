@@ -39,7 +39,7 @@ defmodule JidoTest.System.Services.BedrockRestart do
   } do
     assert :ok = AdapterConformance.assert_binary_get_and_cas(Bedrock, opts, :real_bedrock)
 
-    agent = Counter.new!(id: "counter")
+    agent = Counter.instantiate!(id: "counter")
 
     assert :ok = Persistence.save_agent(store, agent, namespace: "persistence-test", revision: 0)
     assert :ok = BedrockIntegration.restart!()

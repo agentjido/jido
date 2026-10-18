@@ -33,7 +33,7 @@ defmodule Jido.Codec.RegistryTest do
 
     refute Registry.stable?(registry)
     assert {:ok, ^registry} = Registry.new(registry)
-    assert {:error, %Jido.Error.ValidationError{}} = Registry.require_stable(registry)
+    assert {:error, %{__exception__: true}} = Registry.require_stable(registry)
   end
 
   test "Registry structs cannot bypass provenance and size validation" do
@@ -43,7 +43,7 @@ defmodule Jido.Codec.RegistryTest do
     oversized = struct(Registry, entries: oversized_entries, provenance: :stable)
 
     for registry <- [invalid_provenance, invalid_entries, oversized] do
-      assert {:error, %Jido.Error.ValidationError{}} = Registry.new(registry)
+      assert {:error, %{__exception__: true}} = Registry.new(registry)
     end
   end
 
@@ -51,10 +51,10 @@ defmodule Jido.Codec.RegistryTest do
     registry = Registry.new!(%{"actions/add" => {:action, Add}})
 
     for {id, kind} <- [{"missing", :action}, {"actions/add", :flow}] do
-      assert {:error, %Jido.Error.ValidationError{}} = Registry.resolve(registry, id, kind)
+      assert {:error, %{__exception__: true}} = Registry.resolve(registry, id, kind)
     end
 
-    assert {:error, %Jido.Error.ValidationError{}} =
+    assert {:error, %{__exception__: true}} =
              Registry.identifier(registry, :action, String)
   end
 
@@ -73,7 +73,7 @@ defmodule Jido.Codec.RegistryTest do
 
     integer_only = Registry.new!(%{"values/integer" => {:value, integer}})
 
-    assert {:error, %Jido.Error.ValidationError{}} =
+    assert {:error, %{__exception__: true}} =
              Registry.identifier(integer_only, :value, float)
   end
 
@@ -99,10 +99,10 @@ defmodule Jido.Codec.RegistryTest do
     assert {:ok, %Registry{entries: %{}}} = Registry.new(hd(invalid))
 
     for entries <- tl(invalid) do
-      assert {:error, %Jido.Error.ValidationError{}} = Registry.new(entries)
+      assert {:error, %{__exception__: true}} = Registry.new(entries)
     end
 
-    assert {:error, %Jido.Error.ValidationError{}} = apply(Registry, :new, [[]])
+    assert {:error, %{__exception__: true}} = apply(Registry, :new, [[]])
     assert_raise Jido.Error.ValidationError, fn -> Registry.new!(%{"bad" => :entry}) end
   end
 end

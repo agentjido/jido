@@ -11,7 +11,7 @@ defmodule JidoCoreBench.AuthoringCases do
           "authoring/definition/#{size}",
           fn _ -> F.definition(size) end,
           fn definition ->
-            definition |> Map.from_struct() |> Map.drop([:id, :state]) |> Jido.Agent.new()
+            definition |> Map.from_struct() |> Map.drop([:id, :state]) |> Jido.Agent.define()
           end,
           fn {:ok, definition} -> F.equal!(length(definition.routes), size) end
         )

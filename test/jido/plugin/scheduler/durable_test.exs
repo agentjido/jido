@@ -276,11 +276,18 @@ defmodule Jido.Plugin.Scheduler.DurableTest do
           Enum.map([0, -1, 1.5, :manual, 4_294_967_296], &{:delivery_interval, &1}) ++
             Enum.map([0, -1, 1.5, :manual, 2_147_483_598], &{:delivery_timeout, &1}) ++
             Enum.map([0, -1, 1.5, :manual, 4_294_967_296], &{:retry_delay_ms, &1}) do
-      assert {:error, %Jido.Error.ValidationError{}} =
-               Agent.new(
+      assert {:error, %{__exception__: true}} =
+               Agent.define(%{
                  name: "invalid-delivery",
-                 plugins: [{Scheduler, [{option, value}]}]
-               )
+                 extensions: [
+                   %{
+                     id: Scheduler.id(),
+                     provider: Scheduler,
+                     vsn: Scheduler.vsn(),
+                     data: %{option => value}
+                   }
+                 ]
+               })
     end
 
     assert {:scheduler, _schema} =
@@ -293,11 +300,18 @@ defmodule Jido.Plugin.Scheduler.DurableTest do
 
   test "time scale options must name a loaded callback module" do
     for time_scale <- [nil, String, __MODULE__.MissingTimeScale] do
-      assert {:error, %Jido.Error.ValidationError{}} =
-               Agent.new(
+      assert {:error, %{__exception__: true}} =
+               Agent.define(%{
                  name: "invalid-time-scale",
-                 plugins: [{Scheduler, [time_scale: time_scale]}]
-               )
+                 extensions: [
+                   %{
+                     id: Scheduler.id(),
+                     provider: Scheduler,
+                     vsn: Scheduler.vsn(),
+                     data: %{time_scale: time_scale}
+                   }
+                 ]
+               })
     end
 
     assert {:scheduler, _schema} =
@@ -309,7 +323,7 @@ defmodule Jido.Plugin.Scheduler.DurableTest do
 
     assert {:ok, armed, [cron]} =
              Example.cmd(
-               Example.new!(id: "agent-1"),
+               Example.instantiate!(id: "agent-1"),
                command_signal_4
              )
 

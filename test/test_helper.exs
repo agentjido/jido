@@ -47,3 +47,17 @@ end
 ExUnit.configure(
   formatters: Enum.uniq(ExUnit.configuration()[:formatters] ++ [Covenant.Formatter])
 )
+
+# Compile example helpers only when examples are selected. Parallel compilation
+# resolves dependencies between the case templates.
+if Enum.any?(ExUnit.configuration()[:include], fn
+     {tag, _} -> tag == :example
+     tag -> tag == :example
+   end) do
+  {:ok, _, _} =
+    Kernel.ParallelCompiler.compile(
+      Path.wildcard("examples/**/*.ex") ++
+        Path.wildcard(Path.join(__DIR__, "examples/support/*.ex")),
+      return_diagnostics: true
+    )
+end

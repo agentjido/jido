@@ -13,7 +13,7 @@ end
 # set a formatter policy in applications that depend on Jido.
 if config_env() in [:dev, :test] do
   config :logger, :default_formatter,
-    metadata: [:agent_id, :pool, :reason, :signal_id, :signal_type]
+    metadata: [:agent_id, :pool, :reason, :signal_id, :signal_type, :turn_id]
 end
 
 # Git hooks and git_ops configuration for conventional commits

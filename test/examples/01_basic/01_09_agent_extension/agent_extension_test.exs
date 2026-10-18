@@ -54,6 +54,6 @@ defmodule JidoTest.Examples.Basic.AgentExtensionTest do
     assert Exception.message(error) == "Unclaimed Agent extension entities"
 
     assert {:ok, lowered} = Extension.lower([Invalid], config, [])
-    assert {:error, %Jido.Error.ValidationError{}} = Jido.Agent.new(lowered)
+    assert {:error, %Jido.Error.ValidationError{}} = Jido.Agent.define(lowered)
   end
 end

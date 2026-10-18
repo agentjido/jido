@@ -853,7 +853,7 @@ defmodule Jido do
   The one-argument form uses the default instance started by `Jido.start/1`:
 
       {:ok, _jido} = Jido.start()
-      agent = MyAgent.new!(id: "agent-1")
+      agent = MyAgent.instantiate!(id: "agent-1")
       {:ok, server} = Jido.start_agent(agent)
 
   Pass an instance as the first argument when the application runs more than
@@ -1140,7 +1140,7 @@ defmodule Jido do
 
   defp startup_agent(%Jido.Agent{id: id} = agent, opts) when is_binary(id) do
     if Keyword.delete(opts, :id) == [] and Keyword.get(opts, :id, id) == id,
-      do: Jido.Agent.validate_instance(agent),
+      do: Jido.Agent.Validation.validate_instance(agent),
       else: invalid_compat_input(:start_agent, %{opts: opts})
   end
 

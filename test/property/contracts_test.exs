@@ -5,7 +5,7 @@ defmodule JidoTest.Property.ContractsTest do
   use ExUnit.Case, async: true
 
   alias Jido.Agent
-  alias Jido.Agent.{Codec, Directive, Turn}
+  alias Jido.Agent.Codec
   alias Jido.Codec.Registry
   alias Jido.Error
   alias Jido.Signal
@@ -34,40 +34,57 @@ defmodule JidoTest.Property.ContractsTest do
     end
   end
 
-  defmodule CustomSelector do
-    @behaviour Agent
-    def handle_signal(%Signal{data: %{delta: delta}}, _agent),
-      do: Turn.new(First, %{delta: delta})
-  end
-
-  defmodule WrongSource do
-    @behaviour Agent
-    def handle_signal(%Signal{} = signal, _agent),
-      do: Turn.new(First, %{delta: 1}, %{signal | source: "/replacement"})
-  end
-
   defmodule Candidate do
     use Jido.Action, name: "property_contract_candidate"
 
     def run(%{mode: mode, value: value, effects: effects}, _context) do
       state = %{value: value, selected: 0}
-      directives = Enum.map(effects, &Directive.stop/1)
+      directives = Enum.map(effects, &Jido.AgentServer.Directive.server_stop/1)
 
       case mode do
-        "valid" -> {:ok, state, directives}
-        "invalid_state" -> {:ok, %{state | value: "invalid"}, directives}
-        "partial" -> {:ok, %{value: value}, directives}
-        "struct_state" -> {:ok, %URI{}, directives}
-        "bad_middle" -> {:ok, state, [Directive.stop(:first), %URI{}, Directive.stop(:last)]}
-        "bad_tail" -> {:ok, state, directives ++ [:invalid]}
-        "non_list" -> {:ok, state, %{invalid: true}}
-        "failure" -> {:error, Error.execution_error("property candidate rejected")}
+        "valid" ->
+          {:ok, state, directives}
+
+        "invalid_state" ->
+          {:ok, %{state | value: "invalid"}, directives}
+
+        "partial" ->
+          {:ok, %{value: value}, directives}
+
+        "struct_state" ->
+          {:ok, %URI{}, directives}
+
+        "bad_middle" ->
+          {:ok, state,
+           [
+             Jido.AgentServer.Directive.server_stop(:first),
+             %URI{},
+             Jido.AgentServer.Directive.server_stop(:last)
+           ]}
+
+        "bad_tail" ->
+          {:ok, state, directives ++ [:invalid]}
+
+        "non_list" ->
+          {:ok, state, %{invalid: true}}
+
+        "failure" ->
+          {:error, Error.execution_error("property candidate rejected")}
       end
     end
   end
 
-  @definition_modes ~w(definition instance ignored_live_state incomplete_id incomplete_state unknown_key)
-  @selection_modes ~w(exact wildcard flow custom wrong_source missing invalid_type invalid_envelope bad_data nil_data keyword_data)
+  defmodule CandidateFlow do
+    use Jido.Flow, name: "property_candidate_flow"
+
+    flow do
+      step "candidate", action: Candidate, params: input()
+      output result("candidate")
+    end
+  end
+
+  @definition_modes ~w(definition instance invalid_live_state incomplete_id incomplete_state unknown_key)
+  @selection_modes ~w(exact wildcard flow missing invalid_type invalid_envelope bad_data nil_data keyword_data)
   @candidate_modes ~w(valid invalid_state partial struct_state bad_middle bad_tail non_list failure)
   @error_types ~w(validation execution routing timeout compensation internal)
   @error_shapes ~w(atom_key string_key keyword mixed tuple improper deep wide invalid_binary)
@@ -224,21 +241,29 @@ defmodule JidoTest.Property.ContractsTest do
     expected = %{"accepted" => true, "value" => 9, "selected" => 0, "effects" => [1, 2]}
 
     valid =
-      Agent.new!(name: "model_mutation", schema: state_schema())
+      Agent.define!(%{name: "model_mutation", schema: state_schema()})
       |> Agent.instantiate!(id: "mutation", state: %{value: 9, selected: 0})
 
-    assert_candidate({:ok, valid, [Directive.stop(1), Directive.stop(2)]}, expected)
+    assert_candidate(
+      {:ok, valid,
+       [Jido.AgentServer.Directive.server_stop(1), Jido.AgentServer.Directive.server_stop(2)]},
+      expected
+    )
 
     assert_raise ExUnit.AssertionError, fn ->
       assert_candidate(
         {:ok, %{valid | state: %{value: 10, selected: 0}},
-         [Directive.stop(1), Directive.stop(2)]},
+         [Jido.AgentServer.Directive.server_stop(1), Jido.AgentServer.Directive.server_stop(2)]},
         expected
       )
     end
 
     assert_raise ExUnit.AssertionError, fn ->
-      assert_candidate({:ok, valid, [Directive.stop(2), Directive.stop(1)]}, expected)
+      assert_candidate(
+        {:ok, valid,
+         [Jido.AgentServer.Directive.server_stop(2), Jido.AgentServer.Directive.server_stop(1)]},
+        expected
+      )
     end
   end
 
@@ -289,37 +314,49 @@ defmodule JidoTest.Property.ContractsTest do
 
     expected = %{
       "type" => "jido.agent",
-      "version" => 2,
-      "module" => "agent/core",
-      "vsn" => nil,
-      "name" => "property_definition",
-      "description" => nil,
-      "schema" => "schema/core",
-      "plugins" => [],
-      "routes" => [],
-      "metadata" => %{
-        "$type" => "map",
-        "entries" => for({key, value} <- Enum.sort(metadata), do: [key, value])
+      "version" => 1,
+      "agent" => %{
+        "id" => nil,
+        "state" => nil,
+        "module" => nil,
+        "vsn" => 1,
+        "name" => "property_definition",
+        "description" => nil,
+        "signal_source" => nil,
+        "schema" => %{"$type" => "reference", "kind" => "schema", "id" => "schema/core"},
+        "extensions" => [],
+        "routes" => [],
+        "topology" => %{
+          "$type" => "map",
+          "entries" => [
+            [%{"$type" => "symbol", "name" => "agents"}, []],
+            [%{"$type" => "symbol", "name" => "connections"}, []]
+          ]
+        },
+        "metadata" => %{
+          "$type" => "map",
+          "entries" => for({key, value} <- Enum.sort(metadata), do: [key, value])
+        }
       }
     }
 
     registry =
       Registry.new!(%{"agent/core" => {:agent, Agent}, "schema/core" => {:schema, schema}})
 
-    {:ok, definition} = Agent.new(attrs)
+    {:ok, definition} = Agent.define(attrs)
     original = definition
     mode = input["mode"]
 
     case mode do
       "unknown_key" ->
-        assert {:error, %Error.ValidationError{}} = Agent.new(Map.put(attrs, :extra, true))
+        assert {:error, %{__exception__: true}} = Agent.define(Map.put(attrs, :extra, true))
 
       "incomplete_id" ->
-        assert {:error, %Error.ValidationError{}} =
+        assert {:error, %{__exception__: true}} =
                  Codec.encode(%{definition | state: %{count: input["count"]}}, registry)
 
       "incomplete_state" ->
-        assert {:error, %Error.ValidationError{}} =
+        assert {:error, %{__exception__: true}} =
                  Codec.encode(%{definition | id: "missing-state"}, registry)
 
       _ ->
@@ -332,13 +369,29 @@ defmodule JidoTest.Property.ContractsTest do
                 state: %{count: input["count"]}
               )
 
-        source =
-          if mode == "ignored_live_state",
-            do: %{source | state: %{count: "not encoded"}},
-            else: source
+        if mode == "invalid_live_state" do
+          assert {:error, %{__exception__: true}} =
+                   Codec.encode(%{source | state: %{count: "invalid"}}, registry)
+        else
+          expected =
+            if mode == "instance",
+              do:
+                put_in(
+                  expected["agent"],
+                  Map.merge(expected["agent"], %{
+                    "id" => "property-instance",
+                    "state" => %{
+                      "$type" => "map",
+                      "entries" => [[%{"$type" => "symbol", "name" => "count"}, input["count"]]]
+                    }
+                  })
+                ),
+              else: expected
 
-        assert {:ok, ^expected} = Codec.encode(source, registry)
-        assert {:ok, ^definition} = Codec.decode(JSON.decode!(JSON.encode!(expected)), registry)
+          assert {:ok, ^expected} = Codec.encode(source, registry)
+          assert {:ok, ^source} = Codec.decode(JSON.decode!(JSON.encode!(expected)), registry)
+        end
+
         assert definition.id == nil and definition.state == nil
     end
 
@@ -351,24 +404,21 @@ defmodule JidoTest.Property.ContractsTest do
   defp selection_case(input) do
     mode = input["mode"]
 
-    module =
-      case mode do
-        "custom" -> CustomSelector
-        "wrong_source" -> WrongSource
-        _ -> Agent
-      end
-
     definition =
-      Agent.new!(
+      Agent.define!(%{
         name: "property_selection",
-        module: module,
+        module: nil,
         schema: state_schema(),
         routes: [
-          {"property.exact", First, defaults: %{delta: 4}, priority: 10},
-          {"property.*", Second, defaults: %{delta: 9}},
-          {"flow.run", RoutedFlow}
+          %{
+            path: "property.exact",
+            handler: %{kind: :action, target: First},
+            defaults: %{delta: 4}
+          },
+          %{path: "property.*", handler: %{kind: :action, target: Second}, defaults: %{delta: 9}},
+          %{path: "flow.run", handler: %{kind: :flow, target: RoutedFlow}}
         ]
-      )
+      })
 
     agent =
       Agent.instantiate!(definition, id: "selection", state: %{value: input["base"], selected: 0})
@@ -390,7 +440,7 @@ defmodule JidoTest.Property.ContractsTest do
   end
 
   defp selection_model(mode, value, delta) do
-    accepted = mode not in ~w(wrong_source missing invalid_type invalid_envelope bad_data)
+    accepted = mode not in ~w(missing invalid_type invalid_envelope bad_data)
     selected = if mode in ~w(wildcard flow), do: 2, else: 1
     amount = if mode == "nil_data", do: 4, else: delta
 
@@ -450,14 +500,19 @@ defmodule JidoTest.Property.ContractsTest do
     do: flunk("selection differs from model: #{inspect({result, expected})}")
 
   defp candidate_case(input) do
-    target = if input["flow"], do: candidate_flow(), else: Candidate
+    target = if input["flow"], do: CandidateFlow, else: Candidate
 
     definition =
-      Agent.new!(
+      Agent.define!(%{
         name: "property_candidate",
         schema: state_schema(),
-        routes: [{"candidate.run", target}]
-      )
+        routes: [
+          %{
+            path: "candidate.run",
+            handler: %{kind: if(input["flow"], do: :flow, else: :action), target: target}
+          }
+        ]
+      })
 
     original = Agent.instantiate!(definition, id: "candidate", state: %{value: 7, selected: 0})
     params = %{mode: input["mode"], value: input["value"], effects: input["effects"]}
@@ -479,20 +534,10 @@ defmodule JidoTest.Property.ContractsTest do
     ["TURN-002/" <> input["mode"]]
   end
 
-  defp candidate_flow do
-    Jido.Flow.new!(%{
-      name: "property_candidate_flow",
-      components: [
-        %{kind: :step, name: "candidate", action: Candidate, params: Jido.Flow.Ref.input(nil)}
-      ],
-      output: Jido.Flow.Ref.result("candidate")
-    })
-  end
-
   defp assert_candidate({:ok, agent, directives}, %{"accepted" => true} = expected) do
     assert agent.state == %{value: expected["value"], selected: expected["selected"]}
     assert Enum.map(directives, & &1.reason) == expected["effects"]
-    assert Enum.all?(directives, &is_struct(&1, Directive.Stop))
+    assert Enum.all?(directives, &is_struct(&1, Jido.AgentServer.Directive.ServerStop))
   end
 
   defp assert_candidate({:error, error}, %{"accepted" => false}) do

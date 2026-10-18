@@ -14,7 +14,7 @@ defmodule JidoTest.FeatureSDKCase do
     owner_key = System.unique_integer([:positive, :monotonic])
     :yes = :global.register_name({JidoTest.FeatureObserver, owner_key}, self())
 
-    Jido.Agent.new!(
+    Jido.Agent.define!(
       Map.update(
         module.definition() |> Map.from_struct() |> Map.drop([:id, :state]),
         :plugins,

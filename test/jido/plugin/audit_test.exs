@@ -20,7 +20,7 @@ defmodule Jido.Plugin.AuditTest do
     agent do
       schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
 
-      plugin Audit, config: [max_entries: 2]
+      plugin Audit, config: %{max_entries: 2}
     end
 
     routes do

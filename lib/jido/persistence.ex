@@ -18,6 +18,11 @@ defmodule Jido.Persistence do
   post-commit work does not undo the stored revision. Restore retains it.
   Direct `save_agent/3` calls use the revision supplied in their options.
 
+  State and current topology are saved together under one `rev`. The record
+  uses `fmt` for its storage format and `vsn` for saved Agent provenance.
+  A topology-only change needs a new revision. Child Agent state is saved in
+  separate records; this is not an atomic save of a whole Agent family.
+
   Caller execution context is not part of the checkpoint. Live Agent state
   contains domain fields and Plugin-owned fields and must match its schema.
   Custom Agent or Plugin conversion runs before Jido checks the complete
@@ -29,12 +34,14 @@ defmodule Jido.Persistence do
   conversion and keep their opaque callback contract.
 
   Each durable Agent uses one exact `{namespace, partition, id}` Ref key and
-  record format 3. Supply `:namespace`, or use the namespace of a live Jido
+  record format 4. Supply `:namespace`, or use the namespace of a live Jido
   `:instance`. The Agent module is checked in the record, but is not part of
   its key. `:instance` also supplies checkpoint callback context.
 
-  Formats 1 and 2 and their instance-based keys require an offline migration
-  before this version starts. See the persistence guide for the cutover steps.
+  New writes use record format 4 with a complete snapshot format 1 payload.
+  Earlier checkpoint payloads require explicit conversion before this version
+  starts. The record reader retains format 3 keys for adapter cutover only.
+  Restore does not rebuild a saved definition from the current source module.
   """
 
   alias Jido.Agent
@@ -45,6 +52,40 @@ defmodule Jido.Persistence do
   alias Jido.PortableTerm
 
   @type adapter_config :: {module(), keyword()} | module() | nil | false
+
+  @doc "Captures the complete Agent as portable data without writing storage."
+  def snapshot(agent, opts \\ []) do
+    with {:ok, opts} <- Jido.Agent.Validation.options(opts, [:context]),
+         :ok <- Jido.Agent.Data.plain_map(Map.get(opts, :context, %{})),
+         do:
+           Checkpoint.dump(
+             agent,
+             Map.get(opts, :context, %{}),
+             Record.format_version(),
+             :snapshot
+           )
+  end
+
+  @doc "Restores saved definition and state without consulting the source definition."
+  def restore(snapshot, opts \\ []) do
+    with {:ok, opts} <- Jido.Agent.Validation.options(opts, [:context]),
+         :ok <- Jido.Agent.Data.plain_map(Map.get(opts, :context, %{})),
+         do: Checkpoint.restore_snapshot(snapshot, Map.get(opts, :context, %{}))
+  end
+
+  @doc "Runs an explicit data upgrade Action before resolving saved code references."
+  def upgrade(snapshot, action, opts \\ []) do
+    with {:ok, opts} <- Jido.Agent.Validation.options(opts, [:context]),
+         context = Map.get(opts, :context, %{}),
+         :ok <- Jido.Agent.Data.plain_map(context),
+         do:
+           Jido.Persistence.Snapshot.upgrade(
+             snapshot,
+             action,
+             context,
+             &restore(&1, context: context)
+           )
+  end
 
   @doc "Normalizes an adapter declaration."
   @spec normalize_adapter(adapter_config()) :: {module(), keyword()} | nil
@@ -359,8 +400,8 @@ defmodule Jido.Persistence do
          %Agent{id: id} = target_agent
        )
        when is_binary(id) do
-    with {:ok, _current} <- Agent.validate_instance(current_agent),
-         {:ok, _target} <- Agent.validate_instance(target_agent),
+    with {:ok, _current} <- Jido.Agent.Validation.validate_instance(current_agent),
+         {:ok, _target} <- Jido.Agent.Validation.validate_instance(target_agent),
          do: :ok
   end
 
@@ -426,7 +467,8 @@ defmodule Jido.Persistence do
          %Agent{id: id, module: module, state: state},
          %Agent{id: id, module: module} = candidate
        ) do
-    with {:ok, _validated} <- Agent.validate_instance(%{candidate | state: state}), do: :ok
+    with {:ok, _validated} <- Jido.Agent.Validation.validate_instance(%{candidate | state: state}),
+         do: :ok
   end
 
   defp validate_preserved_state(_saved, _candidate),

@@ -7,7 +7,7 @@ defmodule JidoTest.Persistence.CheckpointIdentityProbe do
   end
 
   def store_mismatched_checkpoint(store, requested_id, checkpoint_id) do
-    agent = new!(id: requested_id, state: %{count: 7})
+    agent = instantiate!(id: requested_id, state: %{count: 7})
 
     with :ok <-
            Jido.Persistence.save_agent(store, agent, namespace: "persistence-probe", revision: 3) do
@@ -28,7 +28,7 @@ defmodule JidoTest.Persistence.CheckpointPortabilityProbe do
 
   def store_payload(store, id, payload) do
     with :ok <-
-           Jido.Persistence.save_agent(store, new!(id: id),
+           Jido.Persistence.save_agent(store, instantiate!(id: id),
              namespace: "persistence-probe",
              revision: 3
            ) do
@@ -65,7 +65,7 @@ defmodule JidoTest.Persistence.IndeterminateWriteProbe do
 
         directives =
           if sink = context[:reply_to],
-            do: [Jido.Agent.Directive.emit_to_pid(output, sink)],
+            do: [Jido.AgentServer.Directive.signal_send(output, sink)],
             else: []
 
         {:ok, next, directives}

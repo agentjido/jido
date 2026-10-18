@@ -65,12 +65,12 @@ defmodule JidoTest.AgentServer.ActivationRacesTest do
   end
 
   defp plugin_agent(plugin) do
-    Jido.Agent.define!(
+    Jido.Agent.define!(%{
       name: "activation_races",
       schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}),
-      plugins: [plugin],
-      routes: [{"work", F.Work}]
-    )
+      extensions: [JidoTest.AgentContract.contribution(plugin)],
+      routes: [%{path: "work", handler: %{kind: :action, target: F.Work}}]
+    })
     |> Jido.Agent.instantiate!(id: "activation-races")
   end
 
@@ -79,7 +79,7 @@ defmodule JidoTest.AgentServer.ActivationRacesTest do
     schedulers = :erlang.system_flag(:schedulers_online, 1)
     on_exit(fn -> :erlang.system_flag(:schedulers_online, schedulers) end)
     {:ok, parent} = Server.start(agent: agent("lookup-parent"), jido: c.jido)
-    {:ok, owned} = Server.Activation.child_supervisor(Server.activation(parent))
+    {:ok, owned} = Server.Supervisor.child_supervisor(Server.activation(parent))
 
     for {placement, failure} <- [
           {:instance, :missing_worker},
@@ -182,10 +182,10 @@ defmodule JidoTest.AgentServer.ActivationRacesTest do
         F.down(server)
 
         assert_eventually(
-          match?(pid when is_pid(pid) and pid != server, Server.Activation.worker(root))
+          match?(pid when is_pid(pid) and pid != server, Server.Supervisor.worker(root))
         )
 
-        replacement = Server.Activation.worker(root)
+        replacement = Server.Supervisor.worker(root)
         assert Server.status(replacement).phase == :initializing
         refute Server.status(replacement).ready?
         assert Server.agent(replacement) == c.agent

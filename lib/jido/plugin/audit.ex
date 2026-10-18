@@ -5,8 +5,9 @@ defmodule Jido.Plugin.Audit do
   Audit records commit with the domain state that produced them. This Plugin
   does not use a runtime and does not record every Turn automatically. Actions
   select the domain facts that must be audited. A failed Turn cannot add a
-  record because it does not commit. Use `Jido.Agent.Turn.Outcome` at the Server
-  error-policy boundary to audit failed Turns.
+  record because it does not commit. Use the terminal summary map passed to
+  the `Jido.AgentServer` error-policy callback to audit failed Turns outside
+  the Agent state. The same summary is available as `status/1` `last_outcome`.
 
       plugins: [{Jido.Plugin.Audit, max_entries: 1_000}]
   """

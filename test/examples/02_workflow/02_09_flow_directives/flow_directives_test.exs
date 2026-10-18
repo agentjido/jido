@@ -5,7 +5,7 @@ defmodule JidoTest.Examples.Workflow.FlowDirectivesTest do
   alias Jido.Examples.FlowDirectives.Effects
 
   test "a Flow returns every Directive in canonical component order" do
-    agent = Example.new!(id: unique_id("flow-directives"))
+    agent = Example.instantiate!(id: unique_id("flow-directives"))
     {:ok, signal} = Example.run_signal(%{})
 
     assert {:ok, candidate, directives} = Jido.Agent.cmd(agent, signal)

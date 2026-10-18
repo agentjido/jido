@@ -20,7 +20,7 @@ defmodule JidoTest.Examples.Plugins.RuntimeAdmissionTest do
   end
 
   test "direct cmd does not run live admission" do
-    agent = Agent.new!(id: unique_id("runtime-direct"))
+    agent = Agent.define!(%{id: unique_id("runtime-direct")})
     assert {:error, _reason} = Jido.Agent.cmd(agent, authorization_signal("allow"))
     assert agent.state == %{accepted: 0, principal: ""}
   end

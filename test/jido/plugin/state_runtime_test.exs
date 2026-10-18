@@ -67,11 +67,11 @@ defmodule Jido.Plugin.StateRuntimeTest do
   end
 
   test "state-only Plugins compose optional state into the Agent" do
-    agent = DataAgent.new!()
+    agent = DataAgent.instantiate!(id: Jido.Signal.ID.generate!())
 
     assert agent.state == %{credits: 3}
     assert agent.schema.fields == []
-    assert Keyword.keys(Jido.Agent.complete_schema!(agent).fields) == [:credits]
+    assert Keyword.keys(Jido.Agent.schema(agent).fields) == [:credits]
   end
 
   test "state-only Plugin Directives update state without a Plugin runtime", %{jido: jido} do

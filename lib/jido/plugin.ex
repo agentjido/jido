@@ -21,10 +21,12 @@ defmodule Jido.Plugin do
   Agent Server callbacks admit live input, manage a supervised runtime, and
   run work after commit. Persistence callbacks convert the owned state value.
 
-  Configure a Plugin with `{MyApp.Counter, options}` in the Agent declaration.
-  Each callback receives those options. The optional `option_keys` mapping can
-  restrict options by owner when needed. Use `vsn` to set the stored Plugin
-  version; it defaults to 1.
+  Configure a Plugin in the Agent DSL with `plugin MyApp.Counter, config: %{}`.
+  Map definitions store the same data once in the `extensions` contribution list.
+  A Plugin uses the Agent provider contract and can add Spark sections. Set `id`
+  to give the provider a stable name and `vsn` to set its version (default 1).
+  Runtime callbacks receive config as keyword options. The optional `option_keys`
+  mapping can restrict those options by owner.
 
   A reducer requires `state_spec/1`. Persistence requires an owned state field
   and both `dump/3` and `load/3`. Runtime dispatch requires owned Directives.
@@ -34,6 +36,15 @@ defmodule Jido.Plugin do
   `context.plugin_inputs[MyApp.Counter].prepared` and
   `context.plugin_inputs[MyApp.Counter].runtime`.
   `after_commit/3` is a required step before Directive dispatch when defined.
+
+  A live options change or removal requires runtime Plugins to implement both
+  `quiesce/2` and `resume/2`. These callbacks must be idempotent. Quiescence must
+  stop autonomous changes and drain outstanding work before it returns. Resume
+  must also be safe when quiescence did not finish. The old root remains paused
+  through save. Reconciliation replaces it from the accepted state and options.
+  On pre-commit rejection or cancellation, resume reopens the old root. A storage
+  failure stops the Activation. Changed Plugins do not receive `after_commit/3`
+  for the configuration commit; unchanged Plugins keep their normal hooks.
   """
 
   alias Jido.Plugin.{Init, Manifest, Normalizer}
@@ -60,6 +71,11 @@ defmodule Jido.Plugin do
               :ok | {:error, term()}
   @callback child_spec(Init.t()) :: Supervisor.child_spec()
   @callback await_ready(term(), keyword()) :: :ok | {:error, term()}
+
+  @doc "Pauses autonomous work before a live Plugin change. Must be idempotent."
+  @callback quiesce(term(), keyword()) :: :ok | {:error, term()}
+  @doc "Resumes a paused Plugin after a rejected change. Must be idempotent."
+  @callback resume(term(), keyword()) :: :ok | {:error, term()}
 
   @doc """
   Runs after a successful Turn commit and before Directive dispatch.
@@ -92,6 +108,8 @@ defmodule Jido.Plugin do
       dispatch: 4,
       child_spec: 1,
       await_ready: 2,
+      quiesce: 2,
+      resume: 2,
       after_commit: 3
     ],
     persistence: [dump: 3, load: 3]
@@ -107,7 +125,7 @@ defmodule Jido.Plugin do
       raise ArgumentError, "use Jido.Plugin options must be a keyword list"
     end
 
-    unknown = Keyword.keys(opts) -- [:vsn, :option_keys]
+    unknown = Keyword.keys(opts) -- [:vsn, :option_keys, :id, :sections]
 
     if unknown != [] do
       raise ArgumentError,
@@ -116,6 +134,23 @@ defmodule Jido.Plugin do
     end
 
     quote location: :keep do
+      use Jido.Agent.Extension,
+        id: unquote(Keyword.get(opts, :id, Atom.to_string(__CALLER__.module))),
+        vsn: unquote(Keyword.get(opts, :vsn, 1)),
+        sections: unquote(Keyword.get(opts, :sections, []))
+
+      def runtime_support, do: __MODULE__
+
+      def normalize(data) do
+        with :ok <- Jido.Agent.Data.plain_map(data),
+             :ok <- Jido.Agent.Data.static(data),
+             do: {:ok, data}
+      end
+
+      # Agent schema composition validates Plugin contracts once per boundary.
+      def verify(_data, _definition), do: :ok
+
+      defoverridable runtime_support: 0, normalize: 1, verify: 2
       @behaviour Jido.Plugin
       @before_compile Jido.Plugin
       @jido_plugin_vsn unquote(Keyword.get(opts, :vsn, 1))

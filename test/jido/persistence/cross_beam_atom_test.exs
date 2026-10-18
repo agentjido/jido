@@ -11,7 +11,7 @@ defmodule JidoTest.Persistence.CrossBeamAtomTest do
     {ETS, adapter_opts} = source
     assert peer_call(c.peer_b, :code, :is_loaded, [StaticAtomAgent]) == false
 
-    agent = StaticAtomAgent.new!(id: "static-atom")
+    agent = StaticAtomAgent.instantiate!(id: "static-atom")
 
     assert :ok =
              peer_call(c.peer_a, Persistence, :save_agent, [
@@ -40,7 +40,7 @@ defmodule JidoTest.Persistence.CrossBeamAtomTest do
 
     name = "jido_unloaded_checkpoint_atom_#{System.unique_integer([:positive])}"
     atom = String.to_atom(name)
-    atom_agent = Probe.new!(id: "unloaded-atom", state: %{payload: %{value: atom}})
+    atom_agent = Probe.instantiate!(id: "unloaded-atom", state: %{payload: %{value: atom}})
 
     assert :ok =
              peer_call(c.peer_a, Persistence, :save_agent, [
@@ -67,7 +67,7 @@ defmodule JidoTest.Persistence.CrossBeamAtomTest do
       peer_call(c.peer_b, :erlang, :binary_to_existing_atom, [name, :utf8])
     end
 
-    string_agent = Probe.new!(id: "stable-string", state: %{payload: %{value: name}})
+    string_agent = Probe.instantiate!(id: "stable-string", state: %{payload: %{value: name}})
 
     assert :ok =
              peer_call(c.peer_a, Persistence, :save_agent, [

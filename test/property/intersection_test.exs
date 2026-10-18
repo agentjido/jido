@@ -64,14 +64,11 @@ defmodule JidoTest.Property.IntersectionTest do
       end)
 
     definition =
-      Agent.new!(
-        name: "generated_intersection",
-        schema: Zoi.object(%{root: field})
-      )
+      Agent.define!(%{name: "generated_intersection", schema: Zoi.object(%{root: field})})
 
     expected = %{root: nest(%{a: a, b: value + 1}, depth)}
     initial = if mode in [:provided, :nullable], do: expected, else: %{}
-    result = Agent.instantiate(definition, state: initial)
+    result = Agent.instantiate(definition, id: Jido.Signal.ID.generate!(), state: initial)
     labels = collect_checks([]) |> Enum.frequencies()
     expected_labels = %{left_a: 1, right_b: 1}
 
@@ -84,22 +81,25 @@ defmodule JidoTest.Property.IntersectionTest do
            "mode=#{mode} reverse=#{reverse?} depth=#{depth} result=#{inspect(result)}"
 
     if mode == :conflict do
-      assert {:error, %Jido.Error.ValidationError{details: %{errors: errors}}} = result
+      assert {:error, %Jido.Agent.Error{details: %{issues: errors}}} = result
       path = [:root] ++ List.duplicate(:child, depth) ++ [:a]
       assert Enum.any?(errors, &(&1.path == path))
     else
       assert {:ok, agent} = result
       assert agent.state === expected
-      assert Agent.validate_instance(agent) === {:ok, agent}
-      assert {:ok, checkpoint} = Agent.checkpoint(agent)
-      assert Agent.restore(Agent, checkpoint) === {:ok, agent}
+      assert Agent.validate(agent) === {:ok, agent}
+      assert {:ok, checkpoint} = Jido.Persistence.snapshot(agent)
+      assert Jido.Persistence.restore(checkpoint) === {:ok, agent}
 
       if mode == :missing do
         incomplete = %{root: nest(%{a: a}, depth)}
-        assert {:error, %Jido.Error.ValidationError{}} = Agent.transition(agent, incomplete)
+        assert {:error, %{__exception__: true}} = Agent.transition(agent, incomplete)
 
-        assert {:error, %Jido.Error.ValidationError{}} =
-                 Agent.restore(Agent, %{checkpoint | state: incomplete})
+        assert {:error, %{__exception__: true}} =
+                 Jido.Persistence.restore(%{
+                   checkpoint
+                   | agent: %{checkpoint.agent | state: incomplete}
+                 })
 
         assert agent.state === expected
       else

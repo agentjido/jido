@@ -116,7 +116,7 @@ defmodule JidoTest.Persistence.EctoTest do
 
   test "works through the complete Jido persistence boundary", %{opts: opts} do
     store = {EctoPersistence, opts}
-    agent = RuntimeAgent.new!(id: "ecto-agent", state: %{events: [:saved], ticks: 2})
+    agent = RuntimeAgent.instantiate!(id: "ecto-agent", state: %{events: [:saved], ticks: 2})
 
     assert :ok =
              Persistence.save_agent(store, agent,

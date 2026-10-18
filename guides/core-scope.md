@@ -57,7 +57,7 @@ duplicate external work.
 The durable scheduling integration test rejects result writes, checks the
 configured delay, then permits a write. It verifies that the same saved work
 commits once and that the acknowledgement clears it. See the
-[recovery tests](https://github.com/agentjido/jido/blob/release/v3/test/jido/plugin/scheduler/occurrence_recovery_test.exs).
+[recovery tests](https://github.com/agentjido/jido/blob/release/v3/test/jido/plugin/scheduler/occurrence_runtime_test.exs).
 
 ## Topology repair timing
 

@@ -85,7 +85,7 @@ defmodule JidoTest.TelemetryAgent do
         schema: Zoi.object(%{value: Zoi.integer()}),
         context: context do
         signal = Jido.Signal.new!("test.telemetry.deliver", %{value: value}, source: "/test")
-        directive = Jido.Agent.Directive.emit_to_child(:missing, signal)
+        directive = Jido.AgentServer.Directive.agent_send(:missing, signal)
         {:ok, %{context.agent_state | value: value}, [directive]}
       end
     end

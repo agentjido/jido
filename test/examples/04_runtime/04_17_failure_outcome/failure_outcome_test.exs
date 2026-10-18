@@ -3,7 +3,7 @@ defmodule JidoTest.Examples.Runtime.FailureOutcomeTest do
 
   @moduletag :example
 
-  alias Jido.Agent.Directive.Error, as: ErrorDirective
+  alias Jido.AgentServer.Directive.ErrorReport, as: ErrorDirective
   alias Jido.Agent.Turn.Outcome
   alias Jido.AgentServer
   alias Jido.AgentServer.Signal.Error, as: ErrorSignal
@@ -60,7 +60,7 @@ defmodule JidoTest.Examples.Runtime.FailureOutcomeTest do
     assert %Jido.Error.ExecutionError{} = reported_error
 
     assert %ErrorDirective{context: :notification} =
-             Jido.Agent.Directive.error(reported_error, :notification)
+             Jido.AgentServer.Directive.error_report(reported_error, :notification)
 
     eventually(fn -> AgentServer.status(server).phase == :idle end)
     assert Process.alive?(server)

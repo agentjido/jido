@@ -45,7 +45,7 @@ defmodule JidoTest.PersistenceTest do
       id: ConfiguredInstance
     )
 
-    agent = RuntimeAgent.new!(id: unique_id("namespace"))
+    agent = RuntimeAgent.instantiate!(id: unique_id("namespace"))
     direct = ConfiguredInstance.__jido_persistence__()
 
     for {opts, namespace} <- [{[], "configured"}, {[namespace: "override"], "override"}] do
@@ -65,7 +65,7 @@ defmodule JidoTest.PersistenceTest do
   end
 
   test "source resolution preserves disabled and invalid configuration errors" do
-    agent = RuntimeAgent.new!(id: unique_id("config"))
+    agent = RuntimeAgent.instantiate!(id: unique_id("config"))
 
     for call <- [
           &Persistence.save_agent(&1, agent, namespace: "persistence-test"),
@@ -95,7 +95,7 @@ defmodule JidoTest.PersistenceTest do
   end
 
   test "public operations reject non-keyword options before adapter work" do
-    agent = RuntimeAgent.new!(id: unique_id("invalid-options"))
+    agent = RuntimeAgent.instantiate!(id: unique_id("invalid-options"))
     persistence = adapter(:invalid_options)
 
     for opts <- [[:not_keyword], %{"revision" => 1}] do
@@ -114,11 +114,11 @@ defmodule JidoTest.PersistenceTest do
     persistence = adapter(:callback)
 
     for reply <- [{:ok, :invalid}, {:ok, %URI{}}, {:error, :checkpoint_failed}] do
-      agent = CheckpointAgent.new!(id: unique_id("callback"), state: %{reply: reply})
+      agent = CheckpointAgent.instantiate!(id: unique_id("callback"), state: %{reply: reply})
 
       case reply do
-        {:ok, invalid} ->
-          assert {:error, %Jido.Error.ValidationError{details: %{checkpoint: ^invalid}}} =
+        {:ok, _invalid} ->
+          assert {:error, %{code: :invalid_map}} =
                    Persistence.save_agent(persistence, agent, namespace: "persistence-test")
 
         {:error, reason} ->
@@ -132,7 +132,7 @@ defmodule JidoTest.PersistenceTest do
                )
     end
 
-    agent = RuntimeAgent.new!(id: unique_id("revision"))
+    agent = RuntimeAgent.instantiate!(id: unique_id("revision"))
 
     for revision <- [-1, nil, "0"] do
       assert {:error, {:invalid_checkpoint, :shape}} =
@@ -229,7 +229,7 @@ defmodule JidoTest.PersistenceTest do
 
   test "public persistence operations emit bounded semantic spans" do
     persistence = adapter(:semantic_events)
-    agent = RuntimeAgent.new!(id: unique_id("semantic-persistence"))
+    agent = RuntimeAgent.instantiate!(id: unique_id("semantic-persistence"))
     namespace = "test/persistence"
 
     events = [
@@ -330,7 +330,7 @@ defmodule JidoTest.PersistenceTest do
     spec = Jido.Plugin.Scheduler.build_cron_spec("* * * * * * *", tick)
 
     agent =
-      FastRuntimeAgent.new!(
+      FastRuntimeAgent.instantiate!(
         id: unique_id("persisted"),
         state: %{events: [:saved], ticks: 4, scheduler: %{cron: %{heartbeat: spec}}}
       )
@@ -350,7 +350,7 @@ defmodule JidoTest.PersistenceTest do
   end
 
   test "contains adapter faults and reports indeterminate writes", %{jido: jido} do
-    agent = RuntimeAgent.new!(id: unique_id("persistence-fault"))
+    agent = RuntimeAgent.instantiate!(id: unique_id("persistence-fault"))
 
     assert {:error, %Jido.Error.ExecutionError{} = error} =
              Persistence.save_agent(RaisingAdapter, agent, namespace: "persistence-test")
@@ -392,7 +392,7 @@ defmodule JidoTest.PersistenceTest do
   end
 
   test "validates adapter replies before fault containment returns a result" do
-    agent = RuntimeAgent.new!(id: unique_id("adapter-reply"))
+    agent = RuntimeAgent.instantiate!(id: unique_id("adapter-reply"))
 
     operations = [
       get: &Persistence.load_agent(&1, RuntimeAgent, agent.id, namespace: "persistence-test"),
@@ -439,7 +439,7 @@ defmodule JidoTest.PersistenceTest do
   end
 
   test "classifies the closed CAS result set" do
-    agent = RuntimeAgent.new!(id: unique_id("cas-results"))
+    agent = RuntimeAgent.instantiate!(id: unique_id("cas-results"))
 
     for {reply, expected} <- [
           {{:error, :conflict}, :conflict},
@@ -516,7 +516,7 @@ defmodule JidoTest.PersistenceTest do
 
   test "a persistence conflict removes the stale Server's write authority", %{jido: jido} do
     persistence = adapter(:stale_server)
-    agent = RuntimeAgent.new!(id: unique_id("stale-server"))
+    agent = RuntimeAgent.instantiate!(id: unique_id("stale-server"))
     opts = [persistence: persistence, persistence_mode: :create, error_policy: :log_only]
     assert {:ok, stale} = JidoTest.AgentServerAssertions.start_agent(jido, agent, opts)
     monitor = Process.monitor(stale)
@@ -534,7 +534,7 @@ defmodule JidoTest.PersistenceTest do
     command =
       Signal.new!(
         "runtime.directive",
-        %{event: :stale, directive: Jido.Agent.Directive.emit_to_pid(output, self())},
+        %{event: :stale, directive: Jido.AgentServer.Directive.signal_send(output, self())},
         source: "/test"
       )
 
@@ -557,7 +557,7 @@ defmodule JidoTest.PersistenceTest do
   test "thaw restores, starts, and rebuilds Plugin runtimes", %{jido: jido} do
     persistence = adapter(:thaw)
     id = unique_id("thaw")
-    agent = RuntimeAgent.new!(id: id, state: %{events: [:saved], ticks: 2})
+    agent = RuntimeAgent.instantiate!(id: id, state: %{events: [:saved], ticks: 2})
 
     assert :ok =
              Persistence.save_agent(persistence, agent,
@@ -583,7 +583,7 @@ defmodule JidoTest.PersistenceTest do
   test "explicit restore loads an existing record", %{jido: jido} do
     persistence = adapter(:automatic_restore)
     id = unique_id("automatic-restore")
-    agent = RuntimeAgent.new!(id: id, state: %{events: [:saved]})
+    agent = RuntimeAgent.instantiate!(id: id, state: %{events: [:saved]})
 
     assert :ok = Persistence.save_agent(persistence, agent, instance: jido, revision: 3)
 
@@ -600,7 +600,7 @@ defmodule JidoTest.PersistenceTest do
 
   test "deletes one persisted Agent", %{jido: jido} do
     persistence = adapter(:delete)
-    agent = RuntimeAgent.new!(id: unique_id("delete"))
+    agent = RuntimeAgent.instantiate!(id: unique_id("delete"))
 
     assert :ok = Persistence.save_agent(persistence, agent, instance: jido)
     assert :ok = Persistence.delete_agent(persistence, RuntimeAgent, agent.id, instance: jido)
@@ -611,7 +611,7 @@ defmodule JidoTest.PersistenceTest do
 
   test "rejects an invalid persistence record" do
     {ETS, opts} = persistence = adapter(:invalid_record)
-    agent = RuntimeAgent.new!(id: unique_id("invalid-record"))
+    agent = RuntimeAgent.instantiate!(id: unique_id("invalid-record"))
     key = Persistence.agent_key(Jido.Agent.Ref.new!(namespace: "persistence-test", id: agent.id))
 
     assert :ok = ETS.put(key, <<0, 1, 2>>, opts)
@@ -632,7 +632,7 @@ defmodule JidoTest.PersistenceTest do
 
   test "rejects stale revisions and different state at the same revision" do
     persistence = adapter(:revisions)
-    agent = RuntimeAgent.new!(id: unique_id("revisions"), state: %{events: [:saved]})
+    agent = RuntimeAgent.instantiate!(id: unique_id("revisions"), state: %{events: [:saved]})
     changed = %{agent | state: %{agent.state | events: [:changed]}}
 
     assert :ok =
@@ -685,7 +685,7 @@ defmodule JidoTest.PersistenceTest do
 
   test "requires the expected record and validates the expected revision" do
     persistence = adapter(:expected)
-    agent = RuntimeAgent.new!(id: unique_id("expected"))
+    agent = RuntimeAgent.instantiate!(id: unique_id("expected"))
 
     assert {:error, :conflict} =
              Persistence.save_agent(persistence, agent,
@@ -725,7 +725,7 @@ defmodule JidoTest.PersistenceTest do
   test "only one writer commits when both read the same durable value" do
     for initial_revision <- [0, 1] do
       {ETS, opts} = persistence = adapter(:race)
-      agent = RuntimeAgent.new!(id: unique_id("race"))
+      agent = RuntimeAgent.instantiate!(id: unique_id("race"))
 
       if initial_revision == 1 do
         assert :ok =

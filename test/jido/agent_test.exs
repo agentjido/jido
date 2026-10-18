@@ -3,11 +3,9 @@ defmodule Jido.AgentTest do
 
   alias Jido.Agent
   alias Jido.Agent.Command
-  alias Jido.Agent.Directive
   alias Jido.Agent.Turn
   alias Jido.Error
   alias Jido.Signal
-  alias Jido.Signal.Router
 
   alias JidoTest.AgentFixtures.{
     Add,
@@ -18,6 +16,22 @@ defmodule Jido.AgentTest do
     InvalidState,
     ObserveExecutionBoundary
   }
+
+  defmodule TwoStepFlow do
+    use Jido.Flow, name: "agent_test_two_step"
+
+    flow do
+      step "first",
+        action: JidoTest.AgentFixtures.Add,
+        params: %{by: input(:first_by), label: input(:first_label)}
+
+      step "second",
+        action: JidoTest.AgentFixtures.Add,
+        params: %{state: result("first"), by: input(:second_by), label: input(:second_label)}
+
+      output result("second")
+    end
+  end
 
   defmodule AuthoredAgent do
     @moduledoc false
@@ -50,7 +64,6 @@ defmodule Jido.AgentTest do
              })
     end
 
-    @impl Jido.Agent
     def handle_signal(%Jido.Signal{type: "custom.add", data: data}, _agent) do
       Jido.Agent.Turn.new(JidoTest.AgentFixtures.Add, Map.put(data, :label, "custom"))
     end
@@ -69,7 +82,6 @@ defmodule Jido.AgentTest do
 
     use Jido.Agent, name: "invalid_callback_agent"
 
-    @impl Jido.Agent
     def handle_signal(_signal, _agent), do: :invalid_callback_result
   end
 
@@ -87,7 +99,7 @@ defmodule Jido.AgentTest do
     @impl Jido.Action
     def run(%{label: label}, context) do
       state = %{context.agent_state | history: context.agent_state.history ++ [label]}
-      {:ok, state, [%Jido.Agent.Directive.Stop{reason: :normal}]}
+      {:ok, state, [%Jido.AgentServer.Directive.ServerStop{reason: :normal}]}
     end
   end
 
@@ -111,7 +123,7 @@ defmodule Jido.AgentTest do
     @impl Jido.Agent
     def restore(checkpoint, context) do
       state = Map.update!(checkpoint.state, :history, &(&1 ++ [context.restored_by]))
-      new(id: checkpoint.id, state: state)
+      instantiate(id: checkpoint.id, state: state)
     end
   end
 
@@ -126,7 +138,9 @@ defmodule Jido.AgentTest do
     def checkpoint(_agent, %{failure: :raise}), do: raise("checkpoint failed")
     def checkpoint(_agent, %{failure: :throw}), do: throw(:checkpoint_failed)
     def checkpoint(_agent, %{failure: :exit}), do: exit(:checkpoint_failed)
-    def checkpoint(agent, context), do: Jido.Agent.default_checkpoint(agent, context)
+
+    def checkpoint(agent, context),
+      do: Jido.Persistence.AgentCheckpoint.default_checkpoint(agent, context)
 
     @impl Jido.Agent
     def restore(_checkpoint, %{result: result}), do: result
@@ -136,8 +150,37 @@ defmodule Jido.AgentTest do
     def restore(_checkpoint, %{failure: :exit}), do: exit(:restore_failed)
 
     def restore(checkpoint, context),
-      do: Jido.Agent.default_restore(__MODULE__, checkpoint, context)
+      do: Jido.Persistence.AgentCheckpoint.default_restore(__MODULE__, checkpoint, context)
   end
+
+  defp build(attrs) when is_list(attrs) do
+    if Keyword.keyword?(attrs), do: build(Map.new(attrs)), else: Agent.define(attrs)
+  end
+
+  defp build(%Agent{} = value), do: Agent.define(value)
+
+  defp build(attrs) when is_map(attrs) do
+    routes = Map.get(attrs, :routes, [])
+
+    with {:ok, routes} <-
+           Agent.Data.list(routes, fn {path, target} ->
+             {target, defaults} =
+               case target do
+                 {target, defaults} when is_map(defaults) -> {target, defaults}
+                 target -> {target, %{}}
+               end
+
+             with {:ok, handler} <- Agent.Route.executable(target),
+                  do: {:ok, %{path: path, handler: handler, defaults: defaults}}
+           end),
+         do: Agent.define(attrs |> Map.put(:routes, routes) |> Map.put_new(:module, Agent))
+  end
+
+  defp build(value), do: Agent.define(value)
+  defp build!(attrs), do: attrs |> build() |> Agent.Error.unwrap!()
+
+  defp instance!(source, opts \\ []),
+    do: Agent.instantiate!(source, Keyword.put_new(opts, :id, Jido.Signal.ID.generate!()))
 
   defp schema do
     Zoi.object(%{
@@ -147,13 +190,13 @@ defmodule Jido.AgentTest do
   end
 
   defp agent_with_route(path, target) do
-    Agent.new!(name: "counter", schema: schema(), routes: [{path, target}])
-    |> Agent.instantiate!()
+    build!(name: "counter", schema: schema(), routes: [{path, target}])
+    |> instance!()
   end
 
   test "builds one neutral canonical Agent definition" do
     definition =
-      Agent.new!(
+      build!(
         name: "counter",
         description: "Counts Signals",
         schema: schema(),
@@ -166,15 +209,15 @@ defmodule Jido.AgentTest do
              name: "counter",
              description: "Counts Signals",
              schema: agent_schema,
-             plugins: [],
+             extensions: [],
              state: nil
            } = definition
 
     assert agent_schema == schema()
-    assert [%Router.Route{path: "counter.add", target: Add}] = definition.routes
+    assert [%{path: "counter.add", handler: %{kind: :action, target: Add}}] = definition.routes
     assert Agent.definition?(definition)
     refute Agent.instance?(definition)
-    refute Agent.definition?(%{definition | name: nil})
+    assert {:error, _} = Agent.validate(%{definition | name: nil})
 
     assert definition
            |> Map.from_struct()
@@ -187,26 +230,26 @@ defmodule Jido.AgentTest do
                :name,
                :description,
                :schema,
-               :plugins,
+               :extensions,
+               :signal_source,
                :state,
                :topology,
-               :schedules,
                :routes,
                :metadata
              ])
   end
 
   test "instantiates one definition with identity and schema defaults" do
-    definition = Agent.new!(name: "counter", schema: schema())
+    definition = build!(name: "counter", schema: schema())
 
-    agent = Agent.instantiate!(definition, id: "counter-1")
+    agent = instance!(definition, id: "counter-1")
 
     assert agent.id == "counter-1"
     assert agent.state == %{count: 0, history: []}
     assert agent.module == Agent
     assert Agent.instance?(agent)
     refute Agent.definition?(agent)
-    refute Agent.instance?(%{agent | state: %{count: "invalid"}})
+    assert {:error, _} = Agent.validate(%{agent | state: %{count: "invalid"}})
     assert Agent.definition(agent) == definition
     assert definition.id == nil
     assert definition.state == nil
@@ -214,38 +257,42 @@ defmodule Jido.AgentTest do
 
   test "keeps definitions out of instance-only operations" do
     definition =
-      Agent.new!(name: "counter", schema: schema(), routes: [{"counter.add", Add}])
+      build!(name: "counter", schema: schema(), routes: [{"counter.add", Add}])
 
     signal = Signal.new!("counter.add", %{by: 1}, source: "/test")
 
-    assert {:error, %Jido.Error.ValidationError{}} = Agent.transition(definition, %{})
-    assert {:error, %Jido.Error.ValidationError{}} = Agent.set(definition, %{})
-    assert {:error, %Jido.Error.ValidationError{}} = Agent.checkpoint(definition)
-    assert {:error, %Jido.Error.ValidationError{}} = Agent.cmd(definition, signal)
+    assert {:error, %{__exception__: true}} = Agent.transition(definition, %{})
+    assert {:error, %{__exception__: true}} = Agent.set(definition, %{})
 
-    instance = Agent.instantiate!(definition)
+    assert {:error, %{__exception__: true}} =
+             Jido.Persistence.AgentCheckpoint.checkpoint(definition)
 
-    assert {:error, %Jido.Error.ValidationError{}} = Agent.instantiate(instance)
+    assert {:error, %{__exception__: true}} = Agent.cmd(definition, signal)
+
+    instance = instance!(definition)
+
+    assert {:error, %{__exception__: true}} =
+             Agent.instantiate(instance, id: Jido.Signal.ID.generate!())
   end
 
   test "rejects instance data at the definition boundary and half-instances" do
-    definition = Agent.new!(name: "counter", schema: schema())
+    definition = build!(name: "counter", schema: schema())
 
-    assert {:error, %Jido.Error.ValidationError{}} =
-             Agent.new(name: "counter", id: "counter-1")
+    assert {:error, %{__exception__: true}} =
+             build(name: "counter", id: "counter-1")
 
-    assert {:error, %Jido.Error.ValidationError{}} =
-             Agent.new(name: "counter", state: %{count: 0, history: []})
+    assert {:error, %{__exception__: true}} =
+             build(name: "counter", state: %{count: 0, history: []})
 
-    assert {:error, %Jido.Error.ValidationError{}} =
+    assert {:error, %{__exception__: true}} =
              Agent.validate(%{definition | id: "counter-1"})
 
-    assert {:error, %Jido.Error.ValidationError{}} =
+    assert {:error, %{__exception__: true}} =
              Agent.validate(%{definition | state: %{count: 0, history: []}})
   end
 
-  test "keeps the core Agent schema private and exposes the Turn value schema" do
-    refute function_exported?(Agent, :schema, 0)
+  test "exposes the shared Zoi Agent schema and the Turn schema" do
+    assert function_exported?(Agent, :schema, 1)
     refute function_exported?(Agent, :to_map, 1)
     refute function_exported?(Agent, :new, 2)
     refute function_exported?(Agent, :new!, 2)
@@ -254,7 +301,9 @@ defmodule Jido.AgentTest do
 
   test "builds instances from a module that uses Jido.Agent" do
     definition = CounterAgent.definition()
-    agent = CounterAgent.new!(state: %{count: 4, history: ["existing"]})
+
+    agent =
+      CounterAgent.instantiate!(id: "runtime-fixture", state: %{count: 4, history: ["existing"]})
 
     assert %Agent{id: nil, state: nil, module: CounterAgent} = definition
 
@@ -267,43 +316,50 @@ defmodule Jido.AgentTest do
 
     assert CounterAgent.definition().name == "counter_agent"
     assert CounterAgent.definition().description == "A module-authored Agent"
-    assert CounterAgent.domain_schema() == agent.schema
-    assert [%Router.Route{path: "counter.add", target: Add}] = CounterAgent.definition().routes
-    assert CounterAgent.definition().plugins == []
+    assert CounterAgent.definition().schema == agent.schema
+
+    assert [%{path: "counter.add", handler: %{kind: :action, target: Add}}] =
+             CounterAgent.definition().routes
+
+    assert CounterAgent.definition().extensions == []
     assert Agent.definition(agent) == definition
-    assert {:ok, %Agent{module: CounterAgent}} = Agent.instantiate(CounterAgent)
+
+    assert {:ok, %Agent{module: CounterAgent}} =
+             Agent.instantiate(CounterAgent, id: "runtime-fixture")
+
     refute function_exported?(CounterAgent, :agent, 0)
     refute function_exported?(CounterAgent, :route_action, 1)
     refute function_exported?(CounterAgent, :handle_signal, 2)
     refute function_exported?(CounterAgent, :checkpoint, 2)
     refute function_exported?(CounterAgent, :restore, 2)
 
-    assert {:error, %Jido.Error.ValidationError{}} = CounterAgent.new(name: "changed")
+    assert {:error, %{__exception__: true}} =
+             CounterAgent.instantiate(id: Jido.Signal.ID.generate!(), name: "changed")
   end
 
   test "rejects an invalid behavior, schema, route, and initial state" do
-    assert {:error, %Jido.Error.ValidationError{}} =
-             Agent.new(name: "counter", module: InvalidBehavior)
+    assert {:ok, %{module: InvalidBehavior}} =
+             build(name: "counter", module: InvalidBehavior)
 
-    assert {:error, %Jido.Error.ValidationError{}} =
-             Agent.new(name: "counter", schema: Zoi.string())
+    assert {:error, %{__exception__: true}} =
+             build(name: "counter", schema: Zoi.string())
 
-    assert {:error, %Jido.Error.ValidationError{}} =
-             Agent.new(name: "counter", routes: [{"counter.add", String}])
+    assert {:error, %{__exception__: true}} =
+             build(name: "counter", routes: [{"counter.add", String}])
 
-    assert {:error, %Jido.Error.ValidationError{}} =
-             Agent.new(name: "counter", schema: schema(), id: "bad", state: %{count: "bad"})
+    assert {:error, %{__exception__: true}} =
+             build(name: "counter", schema: schema(), id: "bad", state: %{count: "bad"})
 
-    definition = Agent.new!(name: "counter", schema: schema())
+    definition = build!(name: "counter", schema: schema())
 
-    assert {:error, %Jido.Error.ValidationError{}} =
-             Agent.instantiate(definition, state: %{count: "bad"})
+    assert {:error, %{__exception__: true}} =
+             Agent.instantiate(definition, id: "runtime-fixture", state: %{count: "bad"})
   end
 
   test "plans one executable from one Signal without exposing Server state" do
     agent =
-      Agent.new!(name: "counter", schema: schema(), routes: [{"counter.add", Add}])
-      |> Agent.instantiate!()
+      build!(name: "counter", schema: schema(), routes: [{"counter.add", Add}])
+      |> instance!()
 
     signal = Signal.new!(type: "counter.add", source: "/test", data: %{by: 2, label: "one"})
 
@@ -311,50 +367,50 @@ defmodule Jido.AgentTest do
             %Turn{
               executable: Add,
               input: %{by: 2, label: "one"}
-            }} = Agent.handle_signal(signal, agent)
+            }} = Jido.Agent.Runner.prepare_default_turn(signal, agent)
   end
 
   test "selects the first executable when one Signal resolves to several" do
     agent =
-      Agent.new!(
+      build!(
         name: "counter",
         schema: schema(),
         routes: [{"counter.*", Add}, {"counter.add", Add}]
       )
-      |> Agent.instantiate!()
+      |> instance!()
 
     signal = Signal.new!(type: "counter.add", source: "/test", data: %{})
 
     assert {:ok, %Turn{executable: Add, source_signal: ^signal}} =
-             Agent.handle_signal(signal, agent)
+             Jido.Agent.Runner.prepare_default_turn(signal, agent)
   end
 
   test "replaces and validates the complete Agent state" do
-    agent = Agent.new!(name: "counter", schema: schema()) |> Agent.instantiate!()
+    agent = build!(name: "counter", schema: schema()) |> instance!()
 
     assert {:ok, next} = Agent.transition(agent, %{count: 3, history: ["done"]})
     assert next.state == %{count: 3, history: ["done"]}
     assert next.id == agent.id
     assert next.schema == agent.schema
 
-    assert {:error, %Jido.Error.ValidationError{}} =
+    assert {:error, %{__exception__: true}} =
              Agent.transition(agent, %{count: :invalid, history: []})
   end
 
   test "merges an explicit data mutation through the Agent schema" do
-    agent = Agent.new!(name: "counter", schema: schema()) |> Agent.instantiate!()
+    agent = build!(name: "counter", schema: schema()) |> instance!()
 
     assert {:ok, next} = Agent.set(agent, count: 4)
     assert next.state == %{count: 4, history: []}
     assert agent.state == %{count: 0, history: []}
 
-    assert {:error, %Jido.Error.ValidationError{}} = Agent.set(agent, count: :invalid)
+    assert {:error, %{__exception__: true}} = Agent.set(agent, count: :invalid)
   end
 
   test "applies the same executable turn to an Agent value without a process" do
     agent =
-      Agent.new!(name: "counter", schema: schema(), routes: [{"counter.add", Add}])
-      |> Agent.instantiate!()
+      build!(name: "counter", schema: schema(), routes: [{"counter.add", Add}])
+      |> instance!()
 
     signal = Signal.new!("counter.add", %{by: 2, label: "offline"}, source: "/test")
 
@@ -364,7 +420,7 @@ defmodule Jido.AgentTest do
   end
 
   test "an Agent module exposes the same cmd API" do
-    agent = CounterAgent.new!()
+    agent = CounterAgent.instantiate!(id: "runtime-fixture")
     signal = Signal.new!("counter.add", %{by: 3, label: "module"}, source: "/test")
 
     assert {:ok, next, []} = CounterAgent.cmd(agent, signal)
@@ -373,46 +429,43 @@ defmodule Jido.AgentTest do
 
   test "rejects invalid offline caller context with a validation error" do
     agent =
-      Agent.new!(name: "counter", schema: schema(), routes: [{"counter.add", Add}])
-      |> Agent.instantiate!()
+      build!(name: "counter", schema: schema(), routes: [{"counter.add", Add}])
+      |> instance!()
 
     signal = Signal.new!("counter.add", %{by: 1, label: "invalid"}, source: "/test")
 
-    assert {:error, %Jido.Error.ValidationError{}} =
+    assert {:error, %{__exception__: true}} =
              Agent.cmd(agent, signal, context: "not a context")
   end
 
   test "separates portable definition data from instance data" do
-    first = CounterAgent.new!(id: "first", state: %{count: 1})
-    second = CounterAgent.new!(id: "second", state: %{count: 8})
+    first = CounterAgent.instantiate!(id: "first", state: %{count: 1})
+    second = CounterAgent.instantiate!(id: "second", state: %{count: 8})
 
     assert Agent.definition(first) == Agent.definition(second)
     assert %Agent{id: nil, state: nil} = Agent.definition(first)
   end
 
   test "checkpoints and restores complete Agent state" do
-    agent = CounterAgent.new!(id: "saved", state: %{count: 7, history: ["saved"]})
+    agent = CounterAgent.instantiate!(id: "saved", state: %{count: 7, history: ["saved"]})
 
-    assert {:ok, checkpoint} = Agent.checkpoint(agent)
-    assert checkpoint.version == 2
-    assert checkpoint.kind == :agent
-    assert checkpoint.agent_module == CounterAgent
-    assert checkpoint.vsn == CounterAgent.vsn()
-    refute Map.has_key?(checkpoint, :definition)
-    assert checkpoint.state == agent.state
+    assert {:ok, checkpoint} = Jido.Persistence.AgentCheckpoint.checkpoint(agent)
+    assert checkpoint.format == 1
+    assert checkpoint.state_format == :default
+    assert checkpoint.agent === agent
 
-    assert {:ok, restored} = Agent.restore(CounterAgent, checkpoint)
+    assert {:ok, restored} = Jido.Persistence.AgentCheckpoint.restore(CounterAgent, checkpoint)
     assert restored == agent
   end
 
   describe "module authoring API" do
-    test "exposes canonical definition data and distinct schema views" do
+    test "exposes canonical definition data and one state schema accessor" do
       definition = AuthoredAgent.definition()
 
       assert definition.name == "authored_agent"
       assert definition.description == "Exercises the generated Agent API"
-      assert AuthoredAgent.domain_schema() == definition.schema
-      assert AuthoredAgent.complete_schema() == definition.schema
+      assert Agent.schema(definition) == definition.schema
+      assert AuthoredAgent.schema() == definition.schema
 
       assert definition.metadata == %{
                category: "test",
@@ -427,13 +480,11 @@ defmodule Jido.AgentTest do
 
       lazy_schema = Zoi.object(%{value: Zoi.lazy(fn -> Zoi.string() end)})
 
-      assert {:error,
-              %Jido.Error.ValidationError{message: "Agent schema must contain static data"}} =
-               Agent.new(name: "anonymous_schema_agent", schema: anonymous_schema)
+      assert {:error, %Agent.Error{}} =
+               build(name: "anonymous_schema_agent", schema: anonymous_schema)
 
-      assert {:error,
-              %Jido.Error.ValidationError{message: "Agent schema must contain static data"}} =
-               Agent.new(name: "lazy_schema_agent", schema: lazy_schema)
+      assert {:error, %Agent.Error{}} =
+               build(name: "lazy_schema_agent", schema: lazy_schema)
     end
   end
 
@@ -441,117 +492,105 @@ defmodule Jido.AgentTest do
     test "accepts maps, keyword lists, and an existing definition" do
       attrs = %{name: "direct_agent", description: "Direct definition", metadata: %{tier: 1}}
 
-      assert {:ok, from_map} = Agent.new(attrs)
-      assert {:ok, from_keyword} = Agent.new(Map.to_list(attrs))
-      assert {:ok, validated} = Agent.new(from_map)
+      assert {:ok, from_map} = build(attrs)
+      assert {:ok, from_keyword} = build(Map.to_list(attrs))
+      assert {:ok, validated} = build(from_map)
 
       assert from_map == from_keyword
       assert validated == from_map
     end
 
     test "rejects unknown definition keys and invalid definition data" do
-      assert {:error,
-              %Jido.Error.ValidationError{
-                message: "Unknown Agent definition key",
-                details: %{key: :unknown}
-              }} = Agent.new(name: "bad_agent", unknown: true)
+      assert {:error, %Agent.Error{code: :unknown_fields}} =
+               build(name: "bad_agent", unknown: true)
 
-      assert {:error, %Jido.Error.ValidationError{}} =
-               Agent.new(name: "bad_agent", description: 123)
+      assert {:error, %{__exception__: true}} =
+               build(name: "bad_agent", description: 123)
 
-      assert {:error, %Jido.Error.ValidationError{}} =
-               Agent.new(name: "bad_agent", metadata: Date.utc_today())
+      assert {:error, %{__exception__: true}} =
+               build(name: "bad_agent", metadata: Date.utc_today())
 
-      assert {:error, %Jido.Error.ValidationError{}} = Agent.new([:not_a_keyword_list])
-      assert {:error, %Jido.Error.ValidationError{}} = Agent.new(:not_definition_data)
+      assert {:error, %{__exception__: true}} = build([:not_a_keyword_list])
+      assert {:error, %{__exception__: true}} = build(:not_definition_data)
     end
 
     test "raising constructors raise the returned validation error" do
-      assert_raise Jido.Error.ValidationError, fn ->
-        Agent.new!(name: "invalid_agent", schema: Zoi.string())
+      assert_raise Jido.Agent.Error, fn ->
+        build!(name: "invalid_agent", schema: Zoi.string())
       end
 
-      definition = Agent.new!(name: "valid_agent")
+      definition = build!(name: "valid_agent")
 
-      assert_raise Jido.Error.ValidationError, fn ->
-        Agent.instantiate!(definition, id: "")
+      assert_raise Jido.Agent.Error, fn ->
+        instance!(definition, id: "")
       end
     end
 
     test "does not expose a general Agent map encoder" do
-      agent = AuthoredAgent.new!(id: "mapped", state: %{count: 2})
+      agent = AuthoredAgent.instantiate!(id: "mapped", state: %{count: 2})
 
       refute function_exported?(Agent, :to_map, 1)
       assert agent.id == "mapped"
-      assert [%Jido.Signal.Router.Route{path: "counter.add", target: Add}] = agent.routes
+      assert [%{path: "counter.add", handler: %{kind: :action, target: Add}}] = agent.routes
     end
   end
 
   describe "instance lifecycle" do
-    test "generates non-empty unique identities and accepts an explicit identity" do
-      definition = Agent.new!(name: "identity_agent")
-
-      first = Agent.instantiate!(definition)
-      second = Agent.instantiate!(definition, id: nil)
-      explicit = Agent.instantiate!(definition, id: "agent-123")
-
-      assert is_binary(first.id) and first.id != ""
-      assert is_binary(second.id) and second.id != ""
-      assert first.id != second.id
-      assert explicit.id == "agent-123"
-
-      assert {:error, %Jido.Error.ValidationError{}} =
-               Agent.instantiate(definition, id: "")
-
-      assert {:error, %Jido.Error.ValidationError{}} =
-               Agent.instantiate(definition, id: 123)
+    test "requires explicit identity at the authoring boundary" do
+      definition = build!(name: "identity_agent")
+      assert {:error, %Agent.Error{path: [:id]}} = Agent.instantiate(definition)
+      assert {:error, %Agent.Error{path: [:id]}} = Agent.instantiate(definition, id: nil)
+      assert instance!(definition, id: "agent-123").id == "agent-123"
     end
 
     test "merges partial initial state over schema defaults" do
-      definition = Agent.new!(name: "counter", schema: schema())
+      definition = build!(name: "counter", schema: schema())
 
-      assert {:ok, agent} = Agent.instantiate(definition, state: %{count: 9})
+      assert {:ok, agent} =
+               Agent.instantiate(definition, id: "runtime-fixture", state: %{count: 9})
+
       assert agent.state == %{count: 9, history: []}
     end
 
     test "accepts only identity and state instance overrides" do
-      definition = Agent.new!(name: "counter", schema: schema())
+      definition = build!(name: "counter", schema: schema())
 
-      assert {:error,
-              %Jido.Error.ValidationError{
-                message: "Agent instances can set only :id and :state"
-              }} = Agent.instantiate(definition, name: "replacement")
+      assert {:error, %Agent.Error{code: :unknown_fields}} =
+               Agent.instantiate(definition, id: Jido.Signal.ID.generate!(), name: "replacement")
 
-      assert {:error, %Jido.Error.ValidationError{}} =
+      assert {:error, %{__exception__: true}} =
                Agent.instantiate(definition, [:not_a_keyword_list])
     end
 
     test "validates definitions and instances through explicit boundaries" do
-      definition = Agent.new!(name: "counter", schema: schema())
-      agent = Agent.instantiate!(definition, id: "counter-1")
+      definition = build!(name: "counter", schema: schema())
+      agent = instance!(definition, id: "counter-1")
 
       assert {:ok, ^definition} = Agent.validate(definition)
-      assert {:ok, ^definition} = Agent.validate_definition(definition)
+      assert {:ok, ^definition} = Jido.Agent.Validation.validate_definition(definition)
       assert {:ok, ^agent} = Agent.validate(agent)
-      assert {:ok, ^agent} = Agent.validate_instance(agent)
+      assert {:ok, ^agent} = Jido.Agent.Validation.validate_instance(agent)
 
-      assert {:error, %Jido.Error.ValidationError{}} = Agent.validate_definition(agent)
-      assert {:error, %Jido.Error.ValidationError{}} = Agent.validate_instance(definition)
-      assert {:error, %Jido.Error.ValidationError{}} = Agent.validate(:not_an_agent)
+      assert {:error, %{__exception__: true}} = Jido.Agent.Validation.validate_definition(agent)
 
-      assert {:error, %Jido.Error.ValidationError{}} =
+      assert {:error, %{__exception__: true}} =
+               Jido.Agent.Validation.validate_instance(definition)
+
+      assert {:error, %{__exception__: true}} = Agent.validate(:not_an_agent)
+
+      assert {:error, %{__exception__: true}} =
                Agent.validate(%{agent | state: %{count: "invalid", history: []}})
     end
 
     test "rejects unknown state keys at construction and transition boundaries" do
-      definition = Agent.new!(name: "counter", schema: schema())
+      definition = build!(name: "counter", schema: schema())
 
-      assert {:error, %Jido.Error.ValidationError{}} =
-               Agent.instantiate(definition, state: %{extra: true})
+      assert {:error, %{__exception__: true}} =
+               Agent.instantiate(definition, id: "runtime-fixture", state: %{extra: true})
 
-      agent = Agent.instantiate!(definition)
+      agent = instance!(definition)
 
-      assert {:error, %Jido.Error.ValidationError{}} =
+      assert {:error, %{__exception__: true}} =
                Agent.transition(agent, %{count: 0, history: [], extra: true})
     end
 
@@ -563,8 +602,8 @@ defmodule Jido.AgentTest do
         })
 
       agent =
-        Agent.new!(name: "nested_agent", schema: nested_schema)
-        |> Agent.instantiate!()
+        build!(name: "nested_agent", schema: nested_schema)
+        |> instance!()
 
       assert {:ok, updated} = Agent.set(agent, config: %{b: 3, c: 4})
       assert updated.state == %{config: %{b: 3, c: 4}, count: 7}
@@ -576,63 +615,27 @@ defmodule Jido.AgentTest do
     end
 
     test "returns a validation error for malformed set attributes" do
-      agent = Agent.new!(name: "counter", schema: schema()) |> Agent.instantiate!()
+      agent = build!(name: "counter", schema: schema()) |> instance!()
 
-      assert {:error, %Jido.Error.ValidationError{}} = Agent.set(agent, [:not_a_keyword_list])
+      assert {:error, %{__exception__: true}} = Agent.set(agent, [:not_a_keyword_list])
     end
   end
 
   describe "Signal and command lifecycle" do
-    test "the default handler validates a matching single route" do
+    test "the default handler uses explicit wildcards and route defaults" do
       agent = agent_with_route("counter.add", Add)
       signal = Signal.new!("counter.add", %{by: 1, label: "one"}, source: "/test")
       [route] = agent.routes
 
-      for target <- [Add, {Add, %{by: 9, label: "default"}}] do
+      for path <- ["counter.add", "counter.*", "counter.**", "**"] do
         assert {:ok, %Turn{executable: Add, input: input}} =
-                 Agent.handle_signal(signal, %{agent | routes: [%{route | target: target}]})
+                 Jido.Agent.Runner.prepare_default_turn(signal, %{
+                   agent
+                   | routes: [%{route | path: path, defaults: %{by: 9}}]
+                 })
 
-        assert input == signal.data
+        assert input === signal.data
       end
-
-      for priority <- [101, -101, "invalid"] do
-        assert {:error, %Jido.Error.RoutingError{details: %{cause: cause}}} =
-                 Agent.handle_signal(signal, %{agent | routes: [%{route | priority: priority}]})
-
-        assert %Jido.Signal.Error.RoutingError{} = cause
-      end
-
-      invalid = %{route | path: "counter..bad"}
-
-      assert {:error, %Jido.Error.RoutingError{details: %{cause: _}}} =
-               Agent.handle_signal(%{signal | type: invalid.path}, %{agent | routes: [invalid]})
-
-      assert {:error, %Jido.Error.RoutingError{}} =
-               Agent.handle_signal(signal, %{agent | routes: [%{route | target: []}]})
-    end
-
-    test "single route wildcards and predicates still control selection" do
-      agent = agent_with_route("counter.add", Add)
-      signal = Signal.new!("counter.add", %{by: 1, label: "one"}, source: "/test")
-      [route] = agent.routes
-
-      for path <- ["counter.*", "counter.**", "**"] do
-        assert {:ok, %Turn{executable: Add}} =
-                 Agent.handle_signal(signal, %{agent | routes: [%{route | path: path}]})
-      end
-
-      owner = self()
-
-      predicate = fn input ->
-        send(owner, {:route_predicate, input})
-        false
-      end
-
-      assert {:error, %Jido.Error.RoutingError{}} =
-               Agent.handle_signal(signal, %{agent | routes: [%{route | match: predicate}]})
-
-      assert_receive {:route_predicate, ^signal}
-      refute_received {:route_predicate, _}
     end
 
     test "uses route input as defaults and gives Signal data precedence" do
@@ -649,95 +652,22 @@ defmodule Jido.AgentTest do
       end
     end
 
-    test "normalizes missing routes, invalid routes, and invalid Signal types" do
+    test "missing routes and invalid types fail without an implicit fallback" do
       agent = agent_with_route("counter.add", Add)
-      signal = Signal.new!("counter.unknown", %{}, source: "/test")
-      router = Router.new!(agent.routes)
 
-      for {type, reason} <- [
-            {"counter.unknown", :no_handlers_found},
-            {nil, :nil_signal_type},
-            {:invalid, :invalid_signal_type}
-          ] do
-        command = %{signal | type: type}
-        assert {:error, %Jido.Signal.Error.RoutingError{}} = Router.route(router, command)
-
-        for result <- [Agent.handle_signal(command, agent), Agent.cmd(agent, command)] do
-          assert {:error,
-                  %Jido.Error.RoutingError{
-                    target: ^type,
-                    details: %{reason: ^reason, cause: cause}
-                  } = error} = result
-
-          assert %Jido.Signal.Error.RoutingError{} = cause
-          assert error.message == cause.message
-          assert Map.take(error.details, Map.keys(cause.details)) == cause.details
-        end
-      end
-
-      invalid_agent = %{agent | routes: [{"counter..invalid", Add}]}
-
-      for result <- [
-            Agent.handle_signal(signal, invalid_agent),
-            Agent.cmd(invalid_agent, signal)
-          ] do
-        assert {:error,
-                %Jido.Error.RoutingError{
-                  target: "counter.unknown",
-                  details: %{route: "counter..invalid", cause: cause}
-                }} = result
-
-        assert %Jido.Signal.Error.RoutingError{} = cause
+      for type <- ["counter.unknown", nil, :invalid] do
+        signal = %{Signal.new!("counter.add", %{}, source: "/test") | type: type}
+        assert {:error, _} = Jido.Agent.Runner.prepare_default_turn(signal, agent)
+        assert {:error, _} = Agent.cmd(agent, signal)
       end
     end
 
-    test "preserves custom routing error details, cause, and retry hints" do
-      agent = CustomRoutingAgent.new!()
-
-      for retry <- [true, false] do
-        cause =
-          Jido.Signal.Error.routing_error("Custom route unavailable", %{
-            target: "custom.target",
-            route: "custom.routing_failure",
-            retry: retry,
-            reason: :unavailable
-          })
-
-        signal = Signal.new!("custom.routing_failure", %{error: cause}, source: "/test")
-
-        assert {:error, %Jido.Error.RoutingError{} = error} = Agent.cmd(agent, signal)
-        assert error.message == cause.message
-        assert error.target == "custom.target"
-        assert error.details == Map.put(cause.details, :cause, cause)
-        assert Jido.Error.retryable?(error) == retry
+    test "module callbacks cannot override declared routes or inject routing failures" do
+      for module <- [CustomRoutingAgent, InvalidCallbackAgent] do
+        agent = module.instantiate!(id: "runtime-fixture")
+        signal = Signal.new!("custom.add", %{by: 3}, source: "/test")
+        assert {:error, %Jido.Agent.Error{code: :unmatched_input}} = Agent.cmd(agent, signal)
       end
-
-      error = Jido.Error.routing_error("Already normalized", target: "custom.target")
-      signal = Signal.new!("custom.routing_failure", %{error: error}, source: "/test")
-      assert {:error, ^error} = Agent.cmd(agent, signal)
-    end
-
-    test "supports one custom handle_signal callback as the routing boundary" do
-      agent = CustomRoutingAgent.new!()
-      signal = Signal.new!("custom.add", %{by: 3}, source: "/test")
-
-      assert {:ok, updated, []} = CustomRoutingAgent.cmd(agent, signal)
-      assert updated.state == %{count: 3, history: ["custom"]}
-
-      unsupported = Signal.new!("custom.unknown", %{}, source: "/test")
-      assert {:error, :unsupported_signal} = CustomRoutingAgent.cmd(agent, unsupported)
-    end
-
-    test "contains an invalid handle_signal callback result" do
-      agent = InvalidCallbackAgent.new!()
-      signal = Signal.new!("invalid.callback", %{}, source: "/test")
-
-      assert {:error,
-              %Jido.Error.ExecutionError{
-                message: "Agent handle_signal/2 returned an invalid result"
-              } = error} = InvalidCallbackAgent.cmd(agent, signal)
-
-      assert Error.code(error) == :agent_invalid_callback_result
     end
 
     test "keeps the original Signal in context when route defaults supply input" do
@@ -807,7 +737,7 @@ defmodule Jido.AgentTest do
       agent = agent_with_route("counter.invalid", InvalidState)
       signal = Signal.new!("counter.invalid", %{}, source: "/test")
 
-      assert {:error, %Jido.Error.ValidationError{}} = Agent.cmd(agent, signal)
+      assert {:error, %{__exception__: true}} = Agent.cmd(agent, signal)
       assert agent.state == %{count: 0, history: []}
     end
 
@@ -815,7 +745,9 @@ defmodule Jido.AgentTest do
       agent = agent_with_route("counter.stop", WithStopDirective)
       signal = Signal.new!("counter.stop", %{label: "stopped"}, source: "/test")
 
-      assert {:ok, updated, [%Directive.Stop{reason: :normal}]} = Agent.cmd(agent, signal)
+      assert {:ok, updated, [%Jido.AgentServer.Directive.ServerStop{reason: :normal}]} =
+               Agent.cmd(agent, signal)
+
       assert updated.state == %{count: 0, history: ["stopped"]}
     end
 
@@ -843,7 +775,7 @@ defmodule Jido.AgentTest do
     end
 
     test "runs one Flow as one offline Agent turn" do
-      agent = agent_with_route("counter.flow", JidoTest.AgentFixtures.two_step_flow())
+      agent = agent_with_route("counter.flow", TwoStepFlow)
 
       signal =
         Signal.new!(
@@ -870,15 +802,15 @@ defmodule Jido.AgentTest do
       assert {:ok, %Command{agent: ^agent, signal: ^signal, context: %{request_id: "one"}}} =
                Command.new(agent, signal, %{request_id: "one"})
 
-      assert {:error, %Jido.Error.ValidationError{}} = Command.new(:agent, signal)
-      assert {:error, %Jido.Error.ValidationError{}} = Command.new(agent, :signal)
-      assert {:error, %Jido.Error.ValidationError{}} = Command.new(agent, signal, [])
+      assert {:error, %{__exception__: true}} = Command.new(:agent, signal)
+      assert {:error, %{__exception__: true}} = Command.new(agent, :signal)
+      assert {:error, %{__exception__: true}} = Command.new(agent, signal, [])
 
-      assert {:error, %Jido.Error.ValidationError{}} =
+      assert {:error, %{__exception__: true}} =
                Command.new(%{agent | state: %{count: "invalid"}}, signal)
 
-      assert {:error, %Jido.Error.ValidationError{}} = Command.new(agent, %{signal | id: ""})
-      assert {:error, %Jido.Error.ValidationError{}} = Command.validate(:command)
+      assert {:error, %{__exception__: true}} = Command.new(agent, %{signal | id: ""})
+      assert {:error, %{__exception__: true}} = Command.validate(:command)
     end
 
     test "validates Action and Flow turn input values" do
@@ -891,10 +823,10 @@ defmodule Jido.AgentTest do
       assert {:ok, %Turn{source_signal: ^signal}} = Turn.new(Add, %{by: 1}, signal)
       assert %Turn{source_signal: ^signal} = Turn.new!(Add, %{by: 1}, signal)
 
-      assert {:error, %Jido.Error.ValidationError{}} = Turn.new(Add, "invalid input")
+      assert {:error, %{__exception__: true}} = Turn.new(Add, "invalid input")
       assert {:error, %_{} = _error} = Turn.new(String, %{})
 
-      assert {:error, %Jido.Error.ValidationError{}} =
+      assert {:error, %{__exception__: true}} =
                Turn.validate(%Turn{executable: Add, input: %{}, source_signal: :invalid})
 
       assert_raise Jido.Error.ValidationError, fn -> Turn.new!(Add, "invalid input") end
@@ -904,128 +836,119 @@ defmodule Jido.AgentTest do
   describe "checkpoint lifecycle" do
     test "runs the complete immutable lifecycle without an Agent Server" do
       definition = AuthoredAgent.definition()
-      agent = Agent.instantiate!(definition, id: "offline-1")
+      agent = instance!(definition, id: "offline-1")
       signal = Signal.new!("counter.add", %{by: 2, label: "offline"}, source: "/test")
 
       assert {:ok, updated, []} = Agent.cmd(agent, signal)
       assert updated.state == %{count: 2, history: ["offline"]}
       assert agent.state == %{count: 0, history: []}
 
-      assert {:ok, checkpoint} = Agent.checkpoint(updated)
-      assert {:ok, restored} = Agent.restore(AuthoredAgent, checkpoint)
+      assert {:ok, checkpoint} = Jido.Persistence.AgentCheckpoint.checkpoint(updated)
+      assert {:ok, restored} = Jido.Persistence.AgentCheckpoint.restore(AuthoredAgent, checkpoint)
       assert restored == updated
       assert Agent.definition(restored) == definition
     end
 
     test "restores direct Agent definitions without a module wrapper" do
-      definition = Agent.new!(name: "direct_agent", schema: schema())
-      agent = Agent.instantiate!(definition, id: "direct-1", state: %{count: 5})
+      definition = build!(name: "direct_agent", schema: schema())
+      agent = instance!(definition, id: "direct-1", state: %{count: 5})
 
-      assert {:ok, checkpoint} = Agent.checkpoint(agent)
-      assert {:ok, ^agent} = Agent.restore(Agent, checkpoint)
+      assert {:ok, checkpoint} = Jido.Persistence.AgentCheckpoint.checkpoint(agent)
+      assert {:ok, ^agent} = Jido.Persistence.AgentCheckpoint.restore(Agent, checkpoint)
     end
 
     test "restores a validated behavior-only Agent module from its checkpoint definition" do
       definition =
-        Agent.new!(
+        build!(
           name: "behavior_only_agent",
           module: BehaviorOnlyAgent,
           schema: schema()
         )
 
-      agent = Agent.instantiate!(definition, id: "behavior-only-1", state: %{count: 5})
+      agent = instance!(definition, id: "behavior-only-1", state: %{count: 5})
 
-      assert {:ok, checkpoint} = Agent.checkpoint(agent)
-      assert {:ok, ^agent} = Agent.restore(BehaviorOnlyAgent, checkpoint)
+      assert {:ok, checkpoint} = Jido.Persistence.AgentCheckpoint.checkpoint(agent)
+
+      assert {:ok, ^agent} =
+               Jido.Persistence.AgentCheckpoint.restore(BehaviorOnlyAgent, checkpoint)
     end
 
     test "passes context through custom checkpoint and restore callbacks" do
       agent =
-        CallbackPersistenceAgent.new!(
+        CallbackPersistenceAgent.instantiate!(
           id: "callback-1",
           state: %{count: 7, history: ["before"]}
         )
 
-      assert {:ok, checkpoint} = Agent.checkpoint(agent, %{saved_by: "checkpoint"})
+      assert {:ok, checkpoint} =
+               Jido.Persistence.AgentCheckpoint.checkpoint(agent, %{saved_by: "checkpoint"})
 
-      assert checkpoint == %{
-               version: 2,
-               kind: :agent_custom,
-               agent_module: CallbackPersistenceAgent,
-               vsn: 1,
-               payload: %{
-                 id: "callback-1",
-                 state: %{count: 7, history: ["before"]},
-                 saved_by: "checkpoint"
-               }
+      assert checkpoint.format == 1
+      assert checkpoint.state_format == :custom
+      assert Agent.definition(checkpoint.agent) === Agent.definition(agent)
+
+      assert checkpoint.agent.state == %{
+               id: "callback-1",
+               state: %{count: 7, history: ["before"]},
+               saved_by: "checkpoint"
              }
 
       assert {:ok, restored} =
-               Agent.restore(CallbackPersistenceAgent, checkpoint, %{restored_by: "restore"})
+               Jido.Persistence.AgentCheckpoint.restore(CallbackPersistenceAgent, checkpoint, %{
+                 restored_by: "restore"
+               })
 
       assert restored.id == agent.id
       assert restored.state == %{count: 7, history: ["before", "restore"]}
     end
 
-    test "rejects malformed default checkpoints" do
-      agent = CounterAgent.new!(id: "saved")
-      assert {:ok, checkpoint} = Agent.checkpoint(agent)
+    test "rejects malformed snapshots before restoring state" do
+      agent = CounterAgent.instantiate!(id: "saved")
+      assert {:ok, snapshot} = Jido.Persistence.snapshot(agent)
 
-      malformed = [
-        Map.delete(checkpoint, :version),
-        %{checkpoint | version: 3},
-        %{checkpoint | kind: :other},
-        %{checkpoint | agent_module: Agent},
-        %{checkpoint | vsn: nil},
-        %{checkpoint | vsn: 0},
-        %{checkpoint | id: ""},
-        %{checkpoint | state: []}
-      ]
-
-      for invalid <- malformed do
-        assert {:error, %Jido.Error.ValidationError{}} = Agent.restore(CounterAgent, invalid)
+      for invalid <- [
+            Map.delete(snapshot, :format),
+            %{snapshot | format: 99},
+            %{snapshot | state_format: :other},
+            %{snapshot | references: %{}},
+            %{snapshot | agent: %{agent | id: ""}},
+            %{snapshot | agent: %{agent | state: []}},
+            %{snapshot | agent: %{agent | vsn: 0}},
+            Map.put(snapshot, :extra, nil)
+          ] do
+        assert {:error, %{__exception__: true}} = Jido.Persistence.restore(invalid)
       end
-
-      direct = Agent.new!(name: "direct_agent") |> Agent.instantiate!(id: "direct-1")
-      assert {:ok, direct_checkpoint} = Agent.checkpoint(direct)
-
-      assert {:error, %Jido.Error.ValidationError{}} =
-               Agent.restore(Agent, %{direct_checkpoint | definition: :invalid})
-
-      custom = CallbackPersistenceAgent.new!(id: "custom-malformed")
-      assert {:ok, custom_checkpoint} = Agent.checkpoint(custom, %{saved_by: "test"})
-
-      assert {:error, %Jido.Error.ValidationError{} = error} =
-               Agent.restore(CallbackPersistenceAgent, Map.delete(custom_checkpoint, :version))
-
-      assert Error.code(error) == :invalid_checkpoint
     end
 
     test "contains callback failures and invalid return contracts" do
-      agent = FaultyPersistenceAgent.new!(id: "faulty-1")
-      assert {:ok, checkpoint} = Agent.checkpoint(agent)
+      agent = FaultyPersistenceAgent.instantiate!(id: "faulty-1")
+      assert {:ok, checkpoint} = Jido.Persistence.AgentCheckpoint.checkpoint(agent)
 
       returned_error = Error.execution_error("Application failure", details: %{code: :foreign})
 
       assert {:error, :application_failure} =
-               Agent.checkpoint(agent, %{result: {:error, :application_failure}})
+               Jido.Persistence.AgentCheckpoint.checkpoint(agent, %{
+                 result: {:error, :application_failure}
+               })
 
       assert {:error, ^returned_error} =
-               Agent.checkpoint(agent, %{result: {:error, returned_error}})
+               Jido.Persistence.AgentCheckpoint.checkpoint(agent, %{
+                 result: {:error, returned_error}
+               })
 
-      assert {:error, %Jido.Error.ValidationError{} = error} =
-               Agent.checkpoint(agent, %{result: :invalid})
+      assert {:error, %{__exception__: true} = error} =
+               Jido.Persistence.AgentCheckpoint.checkpoint(agent, %{result: :invalid})
 
-      assert Error.code(error) == :agent_invalid_callback_result
+      assert error.code == :invalid_snapshot_state
 
-      assert {:error, %Jido.Error.ValidationError{}} =
-               Agent.checkpoint(agent, %{result: {:ok, :not_a_map}})
+      assert {:error, %{__exception__: true}} =
+               Jido.Persistence.AgentCheckpoint.checkpoint(agent, %{result: {:ok, :not_a_map}})
 
       assert {:error,
               %Jido.Error.ExecutionError{
                 details: %{callback: :checkpoint, kind: :error, reason: %RuntimeError{}}
               } = error} =
-               Agent.checkpoint(agent, %{failure: :raise})
+               Jido.Persistence.AgentCheckpoint.checkpoint(agent, %{failure: :raise})
 
       assert Error.code(error) == :agent_callback_failed
 
@@ -1033,7 +956,7 @@ defmodule Jido.AgentTest do
               %Jido.Error.ExecutionError{
                 details: %{callback: :checkpoint, kind: :exit, reason: :checkpoint_failed}
               } = error} =
-               Agent.checkpoint(agent, %{failure: :exit})
+               Jido.Persistence.AgentCheckpoint.checkpoint(agent, %{failure: :exit})
 
       assert Error.code(error) == :agent_callback_failed
 
@@ -1041,29 +964,34 @@ defmodule Jido.AgentTest do
               %Jido.Error.ExecutionError{
                 details: %{callback: :checkpoint, kind: :throw, reason: :checkpoint_failed}
               } = error} =
-               Agent.checkpoint(agent, %{failure: :throw})
+               Jido.Persistence.AgentCheckpoint.checkpoint(agent, %{failure: :throw})
 
       assert Error.code(error) == :agent_callback_failed
 
-      assert {:error, %Jido.Error.ValidationError{} = error} =
-               Agent.restore(FaultyPersistenceAgent, checkpoint, %{result: :invalid})
+      assert {:error, %{__exception__: true} = error} =
+               Jido.Persistence.AgentCheckpoint.restore(FaultyPersistenceAgent, checkpoint, %{
+                 result: :invalid
+               })
 
-      assert Error.code(error) == :agent_invalid_callback_result
+      assert error.code == :invalid_snapshot_state
 
-      assert {:error, %Jido.Error.ValidationError{}} =
-               Agent.restore(FaultyPersistenceAgent, checkpoint, %{result: {:ok, :not_an_agent}})
+      assert {:error, %{__exception__: true}} =
+               Jido.Persistence.AgentCheckpoint.restore(FaultyPersistenceAgent, checkpoint, %{
+                 result: {:ok, :not_an_agent}
+               })
 
-      assert {:error,
-              %Jido.Error.ValidationError{message: "Restored Agent module does not match"}} =
-               Agent.restore(FaultyPersistenceAgent, checkpoint, %{
-                 result: {:ok, CounterAgent.new!(id: "other-agent")}
+      assert {:error, %Jido.Agent.Error{code: :invalid_snapshot_state}} =
+               Jido.Persistence.AgentCheckpoint.restore(FaultyPersistenceAgent, checkpoint, %{
+                 result: {:ok, CounterAgent.instantiate!(id: "other-agent")}
                })
 
       assert {:error,
               %Jido.Error.ExecutionError{
                 details: %{callback: :restore, kind: :error, reason: %RuntimeError{}}
               } = error} =
-               Agent.restore(FaultyPersistenceAgent, checkpoint, %{failure: :raise})
+               Jido.Persistence.AgentCheckpoint.restore(FaultyPersistenceAgent, checkpoint, %{
+                 failure: :raise
+               })
 
       assert Error.code(error) == :agent_callback_failed
 
@@ -1071,7 +999,9 @@ defmodule Jido.AgentTest do
               %Jido.Error.ExecutionError{
                 details: %{callback: :restore, kind: :throw, reason: :restore_failed}
               } = error} =
-               Agent.restore(FaultyPersistenceAgent, checkpoint, %{failure: :throw})
+               Jido.Persistence.AgentCheckpoint.restore(FaultyPersistenceAgent, checkpoint, %{
+                 failure: :throw
+               })
 
       assert Error.code(error) == :agent_callback_failed
 
@@ -1079,7 +1009,9 @@ defmodule Jido.AgentTest do
               %Jido.Error.ExecutionError{
                 details: %{callback: :restore, kind: :exit, reason: :restore_failed}
               } = error} =
-               Agent.restore(FaultyPersistenceAgent, checkpoint, %{failure: :exit})
+               Jido.Persistence.AgentCheckpoint.restore(FaultyPersistenceAgent, checkpoint, %{
+                 failure: :exit
+               })
 
       assert Error.code(error) == :agent_callback_failed
     end

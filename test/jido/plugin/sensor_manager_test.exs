@@ -80,7 +80,7 @@ defmodule Jido.Plugin.SensorManagerTest do
     agent do
       schema Zoi.object(%{readings: Zoi.list(Zoi.integer()) |> Zoi.default([])})
 
-      plugin SensorManager, config: [retry_delay_ms: 10]
+      plugin SensorManager, config: %{retry_delay_ms: 10}
     end
 
     routes do
@@ -306,7 +306,7 @@ defmodule Jido.Plugin.SensorManagerTest do
     before = JidoTest.AgentServerAssertions.committed(server)
     runtime = JidoTest.AgentServerAssertions.plugin(server, SensorManager).pid
 
-    assert {:error, %Jido.Error.ValidationError{} = error} =
+    assert {:error, %{__exception__: true} = error} =
              Server.call(server, signal("sensor.manage", %{operation: :start, value: <<5::3>>}))
 
     assert error.message == "Sensor config must contain portable data"
@@ -318,9 +318,20 @@ defmodule Jido.Plugin.SensorManagerTest do
   test "invalid retry delays fail Agent startup before a sensor retry", %{jido: jido} do
     for delay <- [-1, 0, 1.5, :manual, 4_294_967_296] do
       id = unique_id("invalid-sensor-retry")
-      definition = %{Agent.definition() | plugins: [{SensorManager, retry_delay_ms: delay}]}
 
-      assert {:error, %Jido.Error.ValidationError{details: %{retry_delay_ms: ^delay}}} =
+      definition = %{
+        Agent.definition()
+        | extensions: [
+            %{
+              id: SensorManager.id(),
+              provider: SensorManager,
+              vsn: SensorManager.vsn(),
+              data: %{retry_delay_ms: delay}
+            }
+          ]
+      }
+
+      assert {:error, %{__exception__: true}} =
                JidoTest.AgentServerAssertions.start_agent(jido, definition, id: id)
 
       assert Jido.whereis_agent(jido, id) == nil

@@ -10,7 +10,7 @@ defmodule Jido.Agent.ViewTest do
     Registry.new!(%{
       "agents/counter/v1" => {:agent, CounterAgent},
       "agents/core/v1" => {:agent, Agent},
-      "schemas/counter/v1" => {:schema, CounterAgent.domain_schema()},
+      "schemas/counter/v1" => {:schema, CounterAgent.definition().schema},
       "schemas/empty/v1" => {:schema, Zoi.object(%{})},
       "actions/add/v1" => {:action, Add}
     })
@@ -22,12 +22,14 @@ defmodule Jido.Agent.ViewTest do
     assert compiled == from_definition
 
     data =
-      Agent.new!(
+      Agent.define!(%{
         name: "data_counter",
         description: "A stored counter",
         metadata: %{"private" => "do not expose"},
-        routes: [{"counter.add", {Add, %{by: 3}}}]
-      )
+        routes: [
+          %{path: "counter.add", handler: %{kind: :action, target: Add}, defaults: %{by: 3}}
+        ]
+      })
 
     assert {:ok, view} = View.project(data, registry())
 
@@ -37,8 +39,8 @@ defmodule Jido.Agent.ViewTest do
              "id" => nil,
              "name" => "data_counter",
              "description" => "A stored counter",
-             "definition_vsn" => nil,
-             "agent_type_id" => "agents/core/v1",
+             "definition_vsn" => 1,
+             "agent_type_id" => nil,
              "schema_id" => "schemas/empty/v1",
              "operations" => %{
                "items" => [
@@ -46,7 +48,7 @@ defmodule Jido.Agent.ViewTest do
                    "signal_type" => "counter.add",
                    "kind" => "action",
                    "target_id" => "actions/add/v1",
-                   "priority" => 0
+                   "emits" => nil
                  }
                ],
                "total" => 1,
@@ -61,7 +63,7 @@ defmodule Jido.Agent.ViewTest do
   end
 
   test "an instance exposes identity but not state" do
-    instance = CounterAgent.new!(id: "alice", state: %{count: 4})
+    instance = CounterAgent.instantiate!(id: "alice", state: %{count: 4})
 
     assert {:ok, view} = View.project(instance, registry())
     assert view["id"] == "alice"
@@ -70,31 +72,34 @@ defmodule Jido.Agent.ViewTest do
 
   test "operation output is bounded and reports truncation" do
     definition =
-      Agent.new!(
+      Agent.define!(%{
         name: "bounded",
         routes: [
-          {"counter.one", Add},
-          {"counter.two", Add}
+          %{path: "counter.one", handler: %{kind: :action, target: Add}},
+          %{path: "counter.two", handler: %{kind: :action, target: Add}}
         ]
-      )
+      })
 
     assert {:ok, view} = View.project(definition, registry(), operation_limit: 1)
     assert %{"total" => 2, "truncated" => true, "items" => [item]} = view["operations"]
     assert item["signal_type"] == "counter.one"
 
-    assert {:error, %Jido.Error.ValidationError{}} =
+    assert {:error, %{__exception__: true}} =
              View.project(definition, registry(), operation_limit: 501)
   end
 
   test "operation limits also bound Registry resolution work" do
     definition =
-      Agent.new!(
+      Agent.define!(%{
         name: "bounded_resolution",
         routes: [
-          {"counter.one", Add},
-          {"counter.two", JidoTest.TestActions.BasicAction}
+          %{path: "counter.one", handler: %{kind: :action, target: Add}},
+          %{
+            path: "counter.two",
+            handler: %{kind: :action, target: JidoTest.TestActions.BasicAction}
+          }
         ]
-      )
+      })
 
     assert {:ok, view} = View.project(definition, registry(), operation_limit: 1)
     assert %{"total" => 2, "truncated" => true, "items" => [_]} = view["operations"]
@@ -112,7 +117,7 @@ defmodule Jido.Agent.ViewTest do
     stable_without_action =
       Registry.new!(%{
         "agents/counter/v1" => {:agent, CounterAgent},
-        "schemas/counter/v1" => {:schema, CounterAgent.domain_schema()}
+        "schemas/counter/v1" => {:schema, CounterAgent.definition().schema}
       })
 
     assert {:error, %Jido.Error.ValidationError{message: message}} =

@@ -33,7 +33,7 @@ defmodule JidoTest.Persistence.ProbeStore do
     Elixir.Agent.get_and_update(Keyword.fetch!(opts, :store), fn records ->
       if Map.get(records, key, :not_found) == expected do
         result =
-          case if(record.revision == 0,
+          case if(record.rev == 0,
                  do: :ok,
                  else: Keyword.get(opts, :write_result, :ok)
                ) do

@@ -67,14 +67,6 @@ defmodule Jido.Agent.Plugin do
   end
 
   @doc false
-  @spec prepares?([Jido.Plugin.Spec.t()] | [Spec.t()]) :: boolean()
-  def prepares?(plugin_specs) do
-    plugin_specs
-    |> specs()
-    |> Enum.any?(&function_exported?(&1.module, :prepare, 2))
-  end
-
-  @doc false
   @spec prepare(Agent.instance(), Signal.t(), [Jido.Plugin.Spec.t()] | [Spec.t()]) ::
           {:ok, %{optional(module()) => Input.t()}} | {:error, term()}
   def prepare(%Agent{} = agent, %Signal{} = signal, plugin_specs) when is_list(plugin_specs) do

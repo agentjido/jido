@@ -7,7 +7,7 @@ defmodule JidoTest.Examples.Plugins.CommitProjectionTest do
 
   test "a Plugin projects committed state without Action-owned Directives", %{jido: jido} do
     signal = signal("examples.plugins.commit_projection.add", %{amount: 3})
-    assert {:ok, candidate, []} = Jido.Agent.cmd(Agent.new!(), signal)
+    assert {:ok, candidate, []} = Jido.Agent.cmd(Agent.define!(), signal)
     {:ok, server} = Jido.start_agent(jido, Agent, id: unique_id())
     assert %{pid: runtime} = Map.fetch!(Server.children(server), {:plugin, Package})
     assert Runtime.view(runtime) == {0, 0}

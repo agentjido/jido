@@ -118,7 +118,7 @@ defmodule Jido.Agent.FlowEffectsTest do
   end
 
   test "direct and Flow commands return the same candidate and directives without dispatch" do
-    agent = BookingAgent.new!()
+    agent = BookingAgent.instantiate!(id: Jido.Signal.ID.generate!())
     context = %{observer: self()}
 
     assert {:ok, candidate, [%Submit{key: "booking-1"}]} =
@@ -166,7 +166,7 @@ defmodule Jido.Agent.FlowEffectsTest do
   test "all Flow requests reach the caller in order and dispatch once after one commit", %{
     jido: jido
   } do
-    agent = BookingAgent.new!()
+    agent = BookingAgent.instantiate!(id: Jido.Signal.ID.generate!())
 
     assert {:ok, candidate, [%Submit{key: "first"}, %Submit{key: "second"}]} =
              Jido.Agent.cmd(agent, command_signal("multiple"), context: %{observer: self()})

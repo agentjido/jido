@@ -5,7 +5,7 @@ defmodule JidoTest.System.BusAgent do
   agent do
     schema Zoi.object(%{value: Zoi.integer() |> Zoi.default(0)})
 
-    plugin Jido.Plugin.Bus.Client, config: [bus: :system_bus, path: "system.work"]
+    plugin(Jido.Plugin.Bus.Client, config: %{bus: :system_bus, path: "system.work"})
   end
 
   routes do

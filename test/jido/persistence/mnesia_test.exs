@@ -35,7 +35,7 @@ defmodule JidoTest.Persistence.MnesiaTest do
 
   test "saves, loads, and tombstones an Agent checkpoint", %{opts: opts} do
     source = {Mnesia, opts}
-    agent = RuntimeAgent.new!(id: "mnesia-checkpoint")
+    agent = RuntimeAgent.instantiate!(id: "mnesia-checkpoint")
 
     assert :ok = Persistence.save_agent(source, agent, namespace: "persistence-test")
 

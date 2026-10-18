@@ -20,7 +20,7 @@ defmodule Jido.Plugin.Scheduler.OccurrenceRuntimeTest do
   end
 
   test "the candidate stores recurring schedule intent and its generation" do
-    agent = Agent.new!()
+    agent = Agent.instantiate!(id: Jido.Signal.ID.generate!())
 
     {:ok, command_signal_1} = Agent.arm_schedule_signal(%{job_id: "job-1", cron: "* * * * * *"})
 

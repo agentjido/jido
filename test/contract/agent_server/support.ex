@@ -138,12 +138,16 @@ defmodule JidoTest.AgentServer.Fixtures do
   end
 
   def agent do
-    Jido.Agent.define!(
+    Jido.Agent.define!(%{
       name: "server2_contract",
       schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}),
-      plugins: [Gate],
-      routes: [{"work", Work}, {"flow", Flow}, {"parallel", Parallel}]
-    )
+      extensions: [%{id: Gate.id(), provider: Gate, vsn: Gate.vsn(), data: %{}}],
+      routes: [
+        %{path: "work", handler: %{kind: :action, target: Work}},
+        %{path: "flow", handler: %{kind: :flow, target: Flow}},
+        %{path: "parallel", handler: %{kind: :flow, target: Parallel}}
+      ]
+    })
     |> Jido.Agent.instantiate!(id: "server2-contract-instance")
   end
 
@@ -155,7 +159,7 @@ defmodule JidoTest.AgentServer.Fixtures do
   end
 
   def start(context, opts \\ []) do
-    context |> start_activation(opts) |> Server.Activation.worker()
+    context |> start_activation(opts) |> Server.Supervisor.worker()
   end
 
   def start_activation(context, opts \\ []) do

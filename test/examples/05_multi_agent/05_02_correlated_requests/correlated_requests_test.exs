@@ -25,7 +25,7 @@ defmodule JidoTest.Examples.MultiAgent.CorrelatedRequestsTest do
   end
 
   test "wrong correlation and duplicate request IDs preserve the candidate" do
-    agent = CorrelatedRequests.new!()
+    agent = CorrelatedRequests.instantiate!(id: Jido.Signal.ID.generate!())
 
     {:ok, command_signal_1} =
       CorrelatedRequests.request_signal(%{request_id: "request-1", value: 7})
@@ -62,7 +62,7 @@ defmodule JidoTest.Examples.MultiAgent.CorrelatedRequestsTest do
   end
 
   test "cancellation returns explicit child-stop intent" do
-    agent = CorrelatedRequests.new!()
+    agent = CorrelatedRequests.instantiate!(id: Jido.Signal.ID.generate!())
 
     {:ok, command_signal_3} =
       CorrelatedRequests.request_signal(%{request_id: "request-1", value: 7})
@@ -75,7 +75,7 @@ defmodule JidoTest.Examples.MultiAgent.CorrelatedRequestsTest do
 
     {:ok, command_signal_4} = CorrelatedRequests.cancel_signal(%{request_id: "request-1"})
 
-    assert {:ok, cancelled, [%Jido.Agent.Directive.StopChild{tag: "request-1"}]} =
+    assert {:ok, cancelled, [%Jido.AgentServer.Directive.AgentStop{name: "request-1"}]} =
              CorrelatedRequests.cmd(
                pending,
                command_signal_4

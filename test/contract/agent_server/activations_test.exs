@@ -72,12 +72,24 @@ defmodule JidoTest.AgentServer.ActivationsTest do
   end
 
   defp agent(id, plugins \\ []) do
-    Jido.Agent.define!(
+    Jido.Agent.define!(%{
       name: "activation_contract",
       schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}),
-      plugins: plugins,
-      routes: [{"work", F.Work}]
-    )
+      extensions:
+        Enum.map(
+          plugins,
+          fn declaration ->
+            {provider, options} =
+              case declaration do
+                {provider, options} -> {provider, options}
+                provider -> {provider, []}
+              end
+
+            %{id: provider.id(), provider: provider, vsn: provider.vsn(), data: Map.new(options)}
+          end
+        ),
+      routes: [%{path: "work", handler: %{kind: :action, target: F.Work}}]
+    })
     |> Jido.Agent.instantiate!(id: id)
   end
 
@@ -89,7 +101,10 @@ defmodule JidoTest.AgentServer.ActivationsTest do
     server = F.start(c)
     activation = root(server)
     assert activation != server
-    assert {:supervisor, Server.Activation, 1} == :proc_lib.translate_initial_call(activation)
+    refute Code.ensure_loaded?(Module.concat(Server, "Activation"))
+    refute Code.ensure_loaded?(Module.concat(Server, "CompositionSubscription"))
+    refute function_exported?(Server, :spawn_composed, 4)
+    assert {:supervisor, Server.Supervisor, 1} == :proc_lib.translate_initial_call(activation)
     assert [{Server, ^server, :worker, _}] = Supervisor.which_children(activation)
     assert Server.child_spec(agent: c.agent, runner: c.runner).type == :supervisor
     assert Server.agent(server) == c.agent
@@ -408,7 +423,7 @@ defmodule JidoTest.AgentServer.ActivationsTest do
     Process.exit(parent, :kill)
     F.down(parent)
     F.down(owned_root)
-    replacement = Server.Activation.worker(parent_root)
+    replacement = Server.Supervisor.worker(parent_root)
     assert replacement != parent
     assert Server.children(replacement) == %{}
     assert DynamicSupervisor.which_children(child(parent_root, :owned_agents)) == []
@@ -434,18 +449,18 @@ defmodule JidoTest.AgentServer.ActivationsTest do
     assert Server.await_ready(server) == :ok
 
     for _ <- 1..3 do
-      previous = Server.Activation.worker(activation)
+      previous = Server.Supervisor.worker(activation)
       Process.exit(previous, :kill)
       F.down(previous)
 
       assert_eventually(
-        match?(pid when is_pid(pid) and pid != previous, Server.Activation.worker(activation))
+        match?(pid when is_pid(pid) and pid != previous, Server.Supervisor.worker(activation))
       )
 
-      assert Server.await_ready(Server.Activation.worker(activation)) == :ok
+      assert Server.await_ready(Server.Supervisor.worker(activation)) == :ok
     end
 
-    last = Server.Activation.worker(activation)
+    last = Server.Supervisor.worker(activation)
     Process.exit(last, :kill)
     F.down(activation)
     F.down(last)

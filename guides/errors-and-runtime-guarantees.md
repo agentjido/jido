@@ -85,14 +85,16 @@ must still handle node loss and authority.
 
 ## Observe Settlement
 
-The Turn span can finish at commit. Directive work can fail later. Use
-`Jido.Agent.Turn.Outcome`, the settled telemetry event, or the bounded debug
-buffer when you need terminal settlement.
+The Turn span can finish at commit. Directive work can fail later.
+`Jido.AgentServer.status/1` returns `last_outcome` for the Turn and
+`last_effect_outcome` for post-commit work. With `debug: true`, `history/1`
+retains bounded Turn summaries. A successful commit does not confirm effects.
 
-The `{:emit_signal, dispatch}` error policy sends a custom
-`Jido.AgentServer.Signal.Error` with type `jido.agent.error`. Its data contains
-the Agent and Turn IDs, status, stage, commit flag, and transport error map.
-Its context carries the failed input's causation ID and available trace context.
+The `{:emit_signal, dispatch}` error policy sends a Signal with type
+`jido.agent_server.error`. Its data is the terminal Turn summary. It contains
+IDs, status, stage, commit state, revisions, Directive count, and duration.
+It excludes Signal data, Agent state, and raw errors. Its trace context links
+back to the failed input Signal.
 
 See [Admission, Cancellation, And Timeouts](admission-cancellation-and-timeouts.md)
 and [Extension Boundaries](extension-boundaries.md).

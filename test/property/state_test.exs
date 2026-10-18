@@ -89,22 +89,27 @@ defmodule JidoTest.Property.StateTest do
       end)
 
     result =
-      Agent.new(name: "property_state", schema: Zoi.object(%{root: field}, empty_values: [nil]))
+      Agent.define(%{
+        name: "property_state",
+        schema: Zoi.object(%{root: field}, empty_values: [nil])
+      })
 
     cond do
       mode in ~w(transform_schema coercion_schema) ->
-        assert {:error, %Jido.Error.ValidationError{subject: :schema}} = result
+        assert {:error, %Jido.Agent.Error{path: [:schema | _]}} = result
         refute_received :state_transform_called
 
       mode == "invalid_default" ->
         assert {:ok, definition} = result
-        assert {:error, %Jido.Error.ValidationError{}} = Agent.instantiate(definition)
+
+        assert {:error, %{__exception__: true}} =
+                 Agent.instantiate(definition, id: Jido.Signal.ID.generate!())
 
       mode == "optional_field" ->
         assert {:ok, definition} = result
-        agent = Agent.instantiate!(definition)
+        agent = Agent.instantiate!(definition, id: Jido.Signal.ID.generate!())
         assert agent.state === optional_shape(depth)
-        assert Agent.validate_instance(agent) === {:ok, agent}
+        assert Agent.validate(agent) === {:ok, agent}
         assert Agent.transition(agent, agent.state) === {:ok, agent}
 
       true ->
@@ -117,7 +122,7 @@ defmodule JidoTest.Property.StateTest do
             _ -> %{}
           end
 
-        agent = Agent.instantiate!(definition, state: state)
+        agent = Agent.instantiate!(definition, id: Jido.Signal.ID.generate!(), state: state)
         expected = if mode == "nullable_nil", do: nil, else: value
         assert agent.state === %{root: nest(expected, depth)}
 
@@ -129,16 +134,19 @@ defmodule JidoTest.Property.StateTest do
         case mode do
           "incomplete_candidate" ->
             candidate = if depth == 0, do: %{}, else: %{root: %{}}
-            assert {:error, %Jido.Error.ValidationError{}} = Agent.transition(agent, candidate)
+            assert {:error, %{__exception__: true}} = Agent.transition(agent, candidate)
             assert agent.state === %{root: nest(value, depth)}
 
           "restored_state" ->
-            assert {:ok, checkpoint} = Agent.checkpoint(agent)
-            assert {:ok, ^agent} = Agent.restore(Agent, checkpoint)
+            assert {:ok, checkpoint} = Jido.Persistence.snapshot(agent)
+            assert {:ok, ^agent} = Jido.Persistence.restore(checkpoint)
 
             for invalid <- [%{}, %{root: nest(nil, depth)}] do
-              assert {:error, %Jido.Error.ValidationError{}} =
-                       Agent.restore(Agent, %{checkpoint | state: invalid})
+              assert {:error, %{__exception__: true}} =
+                       Jido.Persistence.restore(%{
+                         checkpoint
+                         | agent: %{checkpoint.agent | state: invalid}
+                       })
             end
 
           "state_history" ->
@@ -148,12 +156,12 @@ defmodule JidoTest.Property.StateTest do
                 assert {:ok, next} = Agent.transition(old, %{root: nest(next_value, depth)})
                 assert old.state === %{root: nest(model, depth)}
                 assert next.state === %{root: nest(next_value, depth)}
-                assert Agent.validate_instance(next) === {:ok, next}
+                assert Agent.validate(next) === {:ok, next}
                 {next, next_value}
               end)
 
           _ ->
-            assert Agent.validate_instance(agent) === {:ok, agent}
+            assert Agent.validate(agent) === {:ok, agent}
         end
 
         flush_checks()

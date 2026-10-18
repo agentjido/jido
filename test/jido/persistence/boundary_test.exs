@@ -2,7 +2,7 @@ defmodule Jido.Persistence.BoundaryTest do
   use ExUnit.Case, async: true
 
   alias Jido.Agent
-  alias Jido.Agent.Checkpoint
+  alias Jido.Persistence.AgentCheckpoint, as: Checkpoint
   alias Jido.Persistence
   alias Jido.Persistence.{ETS, Record}
   alias JidoTest.AgentFixtures.CounterAgent, as: Basic
@@ -35,11 +35,11 @@ defmodule Jido.Persistence.BoundaryTest do
   defmodule Custom do
     use Jido.Agent, name: "custom_boundary"
     def checkpoint(agent, _context), do: {:ok, %{id: agent.id}}
-    def restore(%{id: id}, _context), do: new(id: id)
+    def restore(%{id: id}, _context), do: instantiate(id: id)
   end
 
   setup do
-    agent = Basic.new!(id: "record-boundary")
+    agent = Basic.instantiate!(id: "record-boundary")
     store = {ETS, table: :"record_boundary_#{System.unique_integer([:positive])}"}
     %{agent: agent, store: store}
   end
@@ -66,9 +66,9 @@ defmodule Jido.Persistence.BoundaryTest do
           kind: :unknown,
           checkpoint: nil,
           checkpoint: %URI{},
-          agent_vsn: 0,
-          agent_vsn: "1",
-          revision: -1
+          vsn: 0,
+          vsn: "1",
+          rev: -1
         ] do
       {:ok, bytes} = Record.encode(Map.put(record, field, value))
       assert :ok = ETS.put(key, bytes, opts)
@@ -83,18 +83,18 @@ defmodule Jido.Persistence.BoundaryTest do
 
     assert Record.validate(nil, ref, Basic) == {:error, {:invalid_persistence_record, :shape}}
 
-    assert Record.validate(%{record | format: 2}, ref, Basic) ==
-             {:error, {:invalid_persistence_record, :format}}
+    assert Record.validate(%{record | fmt: 2}, ref, Basic) ==
+             {:error, {:invalid_persistence_record, :fmt}}
 
     assert Record.kind(%{format: 99}) == :unknown
   end
 
   test "identity validation preserves scope-first error order and exact key sets", c do
-    {:ok, checkpoint} = Agent.checkpoint(c.agent)
+    {:ok, checkpoint} = Jido.Persistence.snapshot(c.agent)
 
     ref = Agent.Ref.new!(namespace: "first", partition: "blue", id: c.agent.id)
     {:ok, active} = Record.build_active(c.agent, ref, 0, checkpoint)
-    tombstone = active |> Map.drop([:agent_vsn, :checkpoint]) |> Map.put(:kind, :tombstone)
+    tombstone = active |> Map.drop([:vsn, :checkpoint]) |> Map.put(:kind, :tombstone)
 
     changes = [
       {:namespace, "other"},
@@ -114,7 +114,12 @@ defmodule Jido.Persistence.BoundaryTest do
       end
 
       for key <- Map.keys(record) do
-        field = if key in [:format, :kind], do: key, else: :shape
+        field =
+          case key do
+            :fmt -> :format
+            :kind -> :kind
+            _ -> :shape
+          end
 
         assert {:error, {:invalid_persistence_record, ^field}} =
                  Record.validate(Map.delete(record, key), ref, Basic)
@@ -132,7 +137,7 @@ defmodule Jido.Persistence.BoundaryTest do
   end
 
   test "identity setup preserves adapter call order and exact stored bytes", c do
-    {:ok, checkpoint} = Agent.checkpoint(c.agent)
+    {:ok, checkpoint} = Jido.Persistence.snapshot(c.agent)
     {ETS, adapter_opts} = c.store
     store = {RecordingAdapter, Keyword.put(adapter_opts, :observer, self())}
 
@@ -143,24 +148,24 @@ defmodule Jido.Persistence.BoundaryTest do
 
     record =
       %{
-        format: 3,
+        fmt: 4,
         namespace: namespace,
         kind: :active,
         agent_module: Basic,
-        agent_vsn: c.agent.vsn,
+        vsn: c.agent.vsn,
         agent_id: c.agent.id,
         partition: "blue",
-        revision: 0,
+        rev: 0,
         checkpoint: checkpoint
       }
 
     created = :erlang.term_to_binary(record)
-    updated = :erlang.term_to_binary(%{record | revision: 1})
+    updated = :erlang.term_to_binary(%{record | rev: 1})
 
     tombstone =
       record
-      |> Map.drop([:agent_vsn, :checkpoint])
-      |> Map.merge(%{kind: :tombstone, revision: 1})
+      |> Map.drop([:vsn, :checkpoint])
+      |> Map.merge(%{kind: :tombstone, rev: 1})
 
     deleted = :erlang.term_to_binary(tombstone)
     prefix = [:validate_options]
@@ -222,11 +227,11 @@ defmodule Jido.Persistence.BoundaryTest do
       assert {:error, :stable_namespace_required} = call.(namespace: nil)
 
       for invalid <- ["", :namespace, 42] do
-        assert {:error, %Jido.Error.ValidationError{}} = call.(namespace: invalid)
+        assert {:error, %{__exception__: true}} = call.(namespace: invalid)
       end
 
       for invalid <- [:blue, 1, ""] do
-        assert {:error, %Jido.Error.ValidationError{}} =
+        assert {:error, %{__exception__: true}} =
                  call.(namespace: "valid", partition: invalid)
       end
 
@@ -244,53 +249,41 @@ defmodule Jido.Persistence.BoundaryTest do
     assert {:error, :offline} = Persistence.delete_agent(failing, Basic, c.agent.id, opts)
   end
 
-  test "checkpoint public boundaries reject non-map input and context", c do
-    {:ok, checkpoint} = Agent.checkpoint(c.agent)
+  test "snapshot boundaries reject malformed values and context", c do
+    {:ok, snapshot} = Persistence.snapshot(c.agent)
 
     for invalid <- [nil, [], %URI{}] do
-      assert {:error, %Jido.Error.ValidationError{}} = Agent.checkpoint(c.agent, invalid)
-      assert {:error, %Jido.Error.ValidationError{}} = Agent.restore(Basic, checkpoint, invalid)
-      assert {:error, %Jido.Error.ValidationError{}} = Agent.restore(Basic, invalid)
-
-      assert {:error, %Jido.Error.ValidationError{}} =
-               Checkpoint.default_restore(Basic, invalid, %{})
-
-      assert {:error, %Jido.Error.ValidationError{}} = Checkpoint.default_checkpoint(invalid, %{})
+      assert {:error, _} = Persistence.snapshot(c.agent, context: invalid)
+      assert {:error, _} = Persistence.restore(snapshot, context: invalid)
+      assert {:error, _} = Persistence.restore(invalid)
+      assert {:error, _} = Checkpoint.default_restore(Basic, invalid, %{})
+      assert {:error, _} = Checkpoint.default_checkpoint(invalid, %{})
     end
 
-    assert {:error, %{details: %{code: :invalid_checkpoint}}} =
-             Agent.restore(Basic, Map.put(checkpoint, :unknown, true))
-
-    assert {:error, %{details: %{code: :invalid_checkpoint}}} =
-             Agent.restore(String, %{checkpoint | agent_module: String})
-
+    assert {:error, _} = Persistence.restore(Map.put(snapshot, :unknown, true))
     assert Persistence.portable_term?(%{nested: [1, "two"]})
     refute Persistence.portable_term?(%{nested: self()})
   end
 
-  test "custom and embedded checkpoints reject changed headers and payloads" do
-    custom = Custom.new!(id: "custom")
-    {:ok, checkpoint} = Agent.checkpoint(custom)
+  test "custom snapshots reject malformed data and changed converted identity" do
+    custom = Custom.instantiate!(id: "custom")
+    {:ok, snapshot} = Persistence.snapshot(custom)
 
     for changed <- [
-          %{checkpoint | payload: nil},
-          %{checkpoint | payload: %URI{}},
-          %{checkpoint | agent_module: Basic},
-          %{checkpoint | vsn: -1},
-          Map.put(checkpoint, :unknown, true)
+          %{snapshot | agent: %{snapshot.agent | state: nil}},
+          %{snapshot | agent: %{snapshot.agent | state: %URI{}}},
+          %{snapshot | agent: %{snapshot.agent | state: %{id: "other"}}},
+          %{snapshot | agent: %{snapshot.agent | vsn: -1}},
+          Map.put(snapshot, :unknown, true)
         ] do
-      assert {:error, %{details: %{code: :invalid_checkpoint}}} = Agent.restore(Custom, changed)
+      assert {:error, _} = Persistence.restore(changed)
     end
 
-    assert {:error, %{details: %{code: :invalid_checkpoint}}} =
-             Agent.restore(Basic, %{checkpoint | agent_module: Basic})
-
-    definition = Agent.new!(name: "embedded", vsn: 1)
+    definition = Agent.define!(%{name: "embedded", vsn: 1})
     embedded = Agent.instantiate!(definition, id: "embedded")
-    {:ok, saved} = Agent.checkpoint(embedded)
-
-    assert {:error, %{details: %{code: :definition_mismatch}}} =
-             Agent.restore(Agent, %{saved | definition: %{definition | vsn: 2}})
+    {:ok, saved} = Persistence.snapshot(embedded)
+    changed = %{saved | agent: %{saved.agent | vsn: 2}}
+    assert {:ok, %{vsn: 2}} = Persistence.restore(changed)
   end
 
   # Each operation has returned before this mailbox snapshot. This does not

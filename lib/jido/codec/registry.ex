@@ -15,18 +15,39 @@ defmodule Jido.Codec.Registry do
       Jido.Codec.Registry.new!(%{
         "agents/counter" => {:agent, MyApp.Counter},
         "actions/add" => {:action, MyApp.Add},
-        "schemas/count" => {:schema, MyApp.Counter.domain_schema()},
+        "schemas/count" => {:schema, MyApp.Counter.definition().schema},
         "atoms/amount" => {:atom, :amount}
       })
   """
   alias Jido.Agent.Authoring
 
-  @kinds [:agent, :action, :flow, :plugin, :schema, :route_match, :atom, :value]
+  @kinds [
+    :agent,
+    :action,
+    :flow,
+    :plugin,
+    :schema,
+    :route_match,
+    :atom,
+    :value,
+    :extension,
+    :transform
+  ]
   @schema Zoi.struct(__MODULE__, %{
             entries: Zoi.map(),
             provenance: Zoi.enum([:stable, :temporary])
           })
-  @type kind :: :agent | :action | :flow | :plugin | :schema | :route_match | :atom | :value
+  @type kind ::
+          :agent
+          | :action
+          | :flow
+          | :plugin
+          | :schema
+          | :route_match
+          | :atom
+          | :value
+          | :extension
+          | :transform
   @type provenance :: :stable | :temporary
   @type t :: unquote(Zoi.type_spec(@schema))
   @enforce_keys Zoi.Struct.enforce_keys(@schema)
@@ -141,7 +162,7 @@ defmodule Jido.Codec.Registry do
   defp identifier_valid(_id), do: Authoring.error("Invalid Registry identifier")
 
   defp value_valid(:atom, value) when is_atom(value), do: :ok
-  defp value_valid(:schema, value), do: Jido.Agent.State.validate_schema(value)
+  defp value_valid(:schema, value), do: Jido.Agent.Data.schema(value)
 
   defp value_valid(:value, value) when is_struct(value) do
     case Jido.Authoring.Config.validate_static_data(value) do
@@ -160,6 +181,17 @@ defmodule Jido.Codec.Registry do
     if agent_module?(value),
       do: :ok,
       else: Authoring.error("Invalid Registry module", %{kind: :agent})
+  end
+
+  defp value_valid(:extension, value) when is_atom(value) do
+    with {:ok, _} <- Jido.Agent.Extension.provider(value), do: :ok
+  end
+
+  defp value_valid(:transform, {module, function, 1})
+       when is_atom(module) and is_atom(function) do
+    if Code.ensure_loaded?(module) and function_exported?(module, function, 1),
+      do: :ok,
+      else: Authoring.error("Invalid transform reference")
   end
 
   defp value_valid(:plugin, value) when is_atom(value) do

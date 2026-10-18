@@ -109,10 +109,10 @@ defmodule JidoTest.ScheduledOccurrenceFixtures.DurableAgent do
   use Jido.Agent, name: "durable_occurrence_probe"
 
   agent do
-    schema ScheduledOccurrenceRecovery.domain_schema()
+    schema ScheduledOccurrenceRecovery.definition().schema
 
     plugin Jido.Plugin.Scheduler,
-      config: [time_scale: JidoTest.ScheduledOccurrenceFixtures.Clock, delivery_interval: 25]
+      config: %{time_scale: JidoTest.ScheduledOccurrenceFixtures.Clock, delivery_interval: 25}
   end
 
   routes do
@@ -136,7 +136,8 @@ defmodule JidoTest.ScheduledOccurrenceFixtures.FastRuntimeAgent do
              ticks: Zoi.integer() |> Zoi.default(0)
            })
 
-    plugin Jido.Plugin.Scheduler, config: [time_scale: JidoTest.ScheduledOccurrenceFixtures.Clock]
+    plugin Jido.Plugin.Scheduler,
+      config: %{time_scale: JidoTest.ScheduledOccurrenceFixtures.Clock}
   end
 
   routes do
@@ -156,7 +157,8 @@ defmodule JidoTest.ScheduledOccurrenceFixtures.TimedAgent do
              ticks: Zoi.list(Zoi.map()) |> Zoi.default([])
            })
 
-    plugin Jido.Plugin.Scheduler, config: [time_scale: JidoTest.ScheduledOccurrenceFixtures.Clock]
+    plugin Jido.Plugin.Scheduler,
+      config: %{time_scale: JidoTest.ScheduledOccurrenceFixtures.Clock}
   end
 
   routes do

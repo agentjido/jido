@@ -15,4 +15,4 @@ an explicit ownership decision. Local Registry uniqueness and storage revision
 fencing do not establish cluster-exclusive ownership.
 
 See the [Multi-agent examples](https://github.com/agentjido/jido/blob/release/v3/examples/05_multi_agent/README.md) and
-[remote lifecycle tests](../test/jido/agent_server/remote_lifecycle_test.exs).
+[remote lifecycle tests](../test/contract/agent_server/activations_test.exs).

@@ -25,8 +25,14 @@ defmodule Jido.Agent.StateIntersectionTest do
 
   test "creation retains both intersection fields and checks each branch once" do
     for reverse? <- [false, true], nested <- [%{a: 3, b: 4}, %{}] do
-      definition = Agent.new!(name: "intersection_state", schema: schema(reverse?))
-      assert {:ok, agent} = Agent.instantiate(definition, state: %{nested: nested})
+      definition = Agent.define!(%{name: "intersection_state", schema: schema(reverse?)})
+
+      assert {:ok, agent} =
+               Agent.instantiate(definition,
+                 id: Jido.Signal.ID.generate!(),
+                 state: %{nested: nested}
+               )
+
       expected = Map.merge(%{a: 1, b: 2}, nested)
       assert agent.state === %{nested: expected}
       assert_received {:intersection_checked, :a, a}
@@ -34,7 +40,7 @@ defmodule Jido.Agent.StateIntersectionTest do
       assert a === expected.a
       assert b === expected.b
       refute_received {:intersection_checked, _, _}
-      assert Agent.validate_instance(agent) === {:ok, agent}
+      assert Agent.validate(agent) === {:ok, agent}
       assert_received {:intersection_checked, :a, ^a}
       assert_received {:intersection_checked, :b, ^b}
       refute_received {:intersection_checked, _, _}
@@ -42,19 +48,28 @@ defmodule Jido.Agent.StateIntersectionTest do
   end
 
   test "updates and checkpoint restore retain stored values and reject missing fields" do
-    definition = Agent.new!(name: "intersection_restore", schema: schema())
-    agent = Agent.instantiate!(definition, state: %{nested: %{a: 3, b: 4}})
+    definition = Agent.define!(%{name: "intersection_restore", schema: schema()})
+
+    agent =
+      Agent.instantiate!(definition,
+        id: Jido.Signal.ID.generate!(),
+        state: %{nested: %{a: 3, b: 4}}
+      )
+
     candidate = %{nested: %{a: 5, b: 6}}
     assert {:ok, updated} = Agent.transition(agent, candidate)
     assert updated.state === candidate
-    assert {:ok, checkpoint} = Agent.checkpoint(updated)
-    assert Agent.restore(Agent, checkpoint) === {:ok, updated}
+    assert {:ok, checkpoint} = Jido.Persistence.snapshot(updated)
+    assert Jido.Persistence.restore(checkpoint) === {:ok, updated}
 
     for invalid <- [%{nested: %{a: 5}}, %{nested: %{b: 6}}, %{nested: %{a: nil, b: 6}}] do
-      assert {:error, %Jido.Error.ValidationError{}} = Agent.transition(updated, invalid)
+      assert {:error, %{__exception__: true}} = Agent.transition(updated, invalid)
 
-      assert {:error, %Jido.Error.ValidationError{}} =
-               Agent.restore(Agent, %{checkpoint | state: invalid})
+      assert {:error, %{__exception__: true}} =
+               Jido.Persistence.restore(%{
+                 checkpoint
+                 | agent: %{checkpoint.agent | state: invalid}
+               })
 
       assert updated.state === candidate
     end
@@ -87,11 +102,11 @@ defmodule Jido.Agent.StateIntersectionTest do
 
   test "Plugin output preserves nullable fields and cannot fill missing stored fields", c do
     definition =
-      Agent.new!(
+      Agent.define!(%{
         name: "intersection_plugin",
-        plugins: [Owned],
-        routes: [{"intersection.reduce", Keep}]
-      )
+        extensions: [%{id: Owned.id(), provider: Owned, vsn: Owned.vsn(), data: %{}}],
+        routes: [%{path: "intersection.reduce", handler: %{kind: :action, target: Keep}}]
+      })
 
     agent = Agent.instantiate!(definition, id: unique_id("intersection"))
     {:ok, server} = JidoTest.AgentServerAssertions.start_agent(c.jido, agent)
@@ -110,6 +125,6 @@ defmodule Jido.Agent.StateIntersectionTest do
     assert {:ok, live, _} = AgentServer.call(server, input)
     assert direct.state.owned === owned
     assert live.state === direct.state
-    assert Agent.validate_instance(live) === {:ok, live}
+    assert Agent.validate(live) === {:ok, live}
   end
 end

@@ -98,15 +98,15 @@ defmodule JidoTest.AgentServer.CommitPluginsTest do
     {mode, second_mode} = if mode == :last_gate, do: {:ok, :gate}, else: {mode, :ok}
 
     agent =
-      Jido.Agent.define!(
+      Jido.Agent.define!(%{
         name: "commit_plugins",
         schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}),
-        plugins: [
-          {plugin, [observer: __MODULE__, mode: mode]},
-          {Second, [observer: __MODULE__, mode: second_mode]}
+        extensions: [
+          JidoTest.AgentContract.contribution(plugin, %{observer: __MODULE__, mode: mode}),
+          JidoTest.AgentContract.contribution(Second, %{observer: __MODULE__, mode: second_mode})
         ],
-        routes: [{"work", F.Work}]
-      )
+        routes: [%{path: "work", handler: %{kind: :action, target: F.Work}}]
+      })
       |> Jido.Agent.instantiate!(id: "commit-plugins")
 
     F.start(%{c | agent: agent}, opts)
@@ -221,7 +221,7 @@ defmodule JidoTest.AgentServer.CommitPluginsTest do
     assert {:error, _} =
              Server.call(
                server,
-               batch([%Effect{}, %Jido.Agent.Directive.StopChild{tag: :unknown}])
+               batch([%Effect{}, %Jido.AgentServer.Directive.AgentStop{name: nil}])
              )
 
     assert {:error, _} = Server.call(server, F.signal(%{mode: :fail}))

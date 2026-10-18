@@ -9,38 +9,44 @@ defmodule JidoTest.Examples.Runtime.BusDeliveryFixture do
              values: Zoi.list(Zoi.integer()) |> Zoi.default([])
            })
 
-    plugin Jido.Plugin.Bus.Manager, config: [name: :example_commands]
+    plugin(Jido.Plugin.Bus.Manager, config: %{name: :example_commands})
 
-    plugin Jido.Plugin.Bus.Client,
-      config: [
+    plugin(Jido.Plugin.Bus.Client,
+      config: %{
         bus: :example_commands,
         path: "examples.runtime.bus_delivery.**",
         durable: "test-consumer",
         start_from: :origin,
         retry_delay_ms: 10
-      ]
+      }
+    )
   end
 
   routes do
     signal_source "/test/bus_delivery"
 
-    route "examples.runtime.bus_delivery.record", as: :record do
-      action %{value: value}, schema: Zoi.object(%{value: Zoi.integer()}), context: context do
-        context.plugin_inputs[JidoTest.FeatureObserver].runtime.on_delivery.(%{value: value})
-        state = context.agent_state
+    route("examples.runtime.bus_delivery.record",
+      as: :record,
+      do:
+        action(%{value: value}, schema: Zoi.object(%{value: Zoi.integer()}), context: context) do
+          context.plugin_inputs()[JidoTest.FeatureObserver].runtime().on_delivery().(%{
+            value: value
+          })
 
-        if context.signal.id in state.seen do
-          {:ok, state}
-        else
-          {:ok,
-           %{
-             state
-             | seen: state.seen ++ [context.signal.id],
-               values: state.values ++ [value]
-           }}
+          state = context.agent_state()
+
+          if context.signal().id() in state.seen() do
+            {:ok, state}
+          else
+            {:ok,
+             %{
+               state
+               | seen: state.seen() ++ [context.signal().id()],
+                 values: state.values() ++ [value]
+             }}
+          end
         end
-      end
-    end
+    )
   end
 end
 

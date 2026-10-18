@@ -1,326 +1,221 @@
 defmodule Jido.Agent.Validation do
   @moduledoc false
+  alias Jido.Agent.{Data, Error, Extension, Route, Topology}
 
-  alias Jido.Agent
-  alias Jido.Agent.Authoring
-  alias Jido.Agent.State
-  alias Jido.Agent.Plugin, as: AgentPlugin
-  alias Jido.Plugin.Normalizer, as: PluginNormalizer
-
-  @definition_keys [
+  @fields [
     :id,
+    :state,
     :module,
-    :vsn,
     :name,
     :description,
+    :vsn,
     :schema,
-    :topology,
-    :schedules,
-    :plugins,
-    :state,
+    :metadata,
+    :signal_source,
     :routes,
-    :metadata
+    :topology,
+    :extensions
   ]
 
-  @instance_keys [:id, :state]
-
-  @doc false
-  @spec new(map() | keyword() | Agent.t()) ::
-          {:ok, Agent.definition(), [Jido.Plugin.Spec.t()], Zoi.schema()}
-          | {:error, Exception.t()}
-  def new(%Agent{} = agent), do: validate_definition_with_plugins(agent)
-
-  def new(attrs) when is_list(attrs) do
-    with {:ok, attrs} <- normalize_attrs(attrs, :definition) do
-      new(attrs)
-    end
+  def state_schema(%Jido.Agent{} = agent) do
+    with {:ok, schema} <-
+           Jido.Agent.Plugin.compose_schema(agent.schema, Jido.Agent.runtime_plugins(agent)),
+         :ok <- Error.at(Data.schema(schema), :schema),
+         do: {:ok, schema}
   end
 
-  def new(%{} = attrs) do
-    with :ok <- known_keys(attrs),
-         :ok <- reject_instance_data(attrs) do
-      validate_common(build_definition_value(attrs))
-    end
-  end
+  def define(input, opts \\ [])
+  def define(%Jido.Agent{} = input, opts), do: define(Map.from_struct(input), opts)
 
-  def new(value),
-    do: Authoring.error("Agent definition must be a map or keyword list", %{value: value})
+  def define(input, opts) do
+    related? = Keyword.get(opts, :related?, true)
 
-  @doc false
-  @spec instantiate(Agent.t(), map() | keyword()) ::
-          {:ok, Agent.t()} | {:error, Exception.t()}
-  def instantiate(definition, overrides) do
-    with {:ok, agent, _specs, _schema} <- instantiate_with_plugins(definition, overrides),
-         do: {:ok, agent}
-  end
+    defaults = %{
+      id: nil,
+      state: nil,
+      module: nil,
+      description: nil,
+      vsn: 1,
+      schema: Zoi.object(%{}),
+      metadata: %{},
+      signal_source: nil,
+      routes: [],
+      topology: %{},
+      extensions: []
+    }
 
-  def instantiate_with_plugins(%Agent{} = definition, overrides) do
-    instantiate_validated(validate_definition_with_plugins(definition), overrides)
-  end
-
-  def instantiate_with_plugins(value, _overrides),
-    do: Authoring.error("Expected a neutral Jido.Agent definition", %{value: value})
-
-  @doc false
-  @spec validate(term()) :: {:ok, Agent.t()} | {:error, Exception.t()}
-  def validate(%Agent{id: nil, state: nil} = agent), do: validate_definition(agent)
-
-  def validate(%Agent{id: id, state: state} = agent)
-      when is_binary(id) and is_map(state) and not is_struct(state),
-      do: validate_instance(agent)
-
-  def validate(%Agent{} = agent) do
-    Authoring.error("Agent must be a complete definition or instance", %{
-      id: agent.id,
-      state: agent.state
-    })
-  end
-
-  def validate(value), do: Authoring.error("Expected a Jido.Agent value", %{value: value})
-
-  @doc false
-  @spec validate_definition(term()) :: {:ok, Agent.t()} | {:error, Exception.t()}
-  def validate_definition(value) do
-    with {:ok, agent, _specs, _schema} <- validate_definition_with_plugins(value),
-         do: {:ok, agent}
-  end
-
-  @doc false
-  @spec validate_instance(term()) :: {:ok, Agent.t()} | {:error, Exception.t()}
-  def validate_instance(agent) do
-    with {:ok, agent, _specs, _schema} <- validate_instance_with_plugins(agent), do: {:ok, agent}
-  end
-
-  @doc false
-  def validate_instance_with_plugins(%Agent{} = agent) do
-    with {:ok, agent, specs, schema} <- validate_common(agent),
-         {:ok, agent} <- validate_instance_data(agent, schema),
-         do: {:ok, agent, specs, schema}
-  end
-
-  def validate_instance_with_plugins(value),
-    do: Authoring.error("Expected a Jido.Agent instance", %{value: value})
-
-  # The compiler supplies the module identity; direct definitions can be unversioned.
-  def module_definition(module, attrs) do
-    with {:ok, attrs} <- normalize_attrs(attrs, :definition),
-         attrs = attrs |> Map.put(:module, module) |> Map.put_new(:vsn, 1),
-         :ok <- known_keys(attrs),
-         :ok <- reject_instance_data(attrs),
-         true <- is_integer(attrs.vsn) and attrs.vsn > 0,
-         {:ok, definition} <- static(build_definition_value(attrs)),
-         {:ok, plugins} <-
-           plugins_at(PluginNormalizer.declarations(definition.plugins), definition.plugins) do
-      {:ok, %{definition | plugins: plugins}}
+    with {:ok, definition} <- Data.fields(input, @fields, defaults),
+         :ok <- fields(definition),
+         {:ok, extensions} <- Error.at(Extension.normalize(definition.extensions), :extensions),
+         {:ok, routes} <-
+           Error.at(Data.list(definition.routes, &Route.normalize(&1, related?)), :routes),
+         :ok <- Error.at(Data.unique(routes, & &1.path), :routes),
+         :ok <- Error.at(Data.unique(Enum.reject(routes, &is_nil(&1.as)), & &1.as), :routes),
+         definition = %{definition | routes: routes, extensions: extensions},
+         {:ok, topology} <-
+           Error.at(Topology.normalize(definition.topology, definition, opts), :topology),
+         definition = %{definition | topology: topology},
+         :ok <- verify_extensions(extensions, definition, related?),
+         :ok <- struct_fields(definition),
+         :ok <- plugin_schema(definition, related? and Keyword.get(opts, :plugin_schema?, true)) do
+      {:ok, struct!(Jido.Agent, definition)}
     else
-      false -> Authoring.error("Agent vsn must be a positive integer", %{}) |> Authoring.at(:vsn)
-      error -> error
+      {:error, %Error{} = error} ->
+        {:error,
+         %{
+           error
+           | details:
+               Map.put_new(
+                 error.details,
+                 :definition,
+                 if(is_map(input), do: Map.get(input, :name), else: nil)
+               )
+         }}
+
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 
-  defp build_definition_value(attrs),
-    do: struct(Agent, Map.merge(%{module: Agent, schema: Zoi.object(%{})}, attrs))
+  defp verify_extensions(extensions, definition, true),
+    do: Error.at(Extension.verify(extensions, definition), :extensions)
 
-  defp validate_common(agent) do
-    with {:ok, agent} <- normalize_fields(agent, [:name, :description]),
-         :ok <- validate_module(agent.module) |> Authoring.at(:module),
-         {:ok, agent} <- normalize_fields(agent, [:vsn]),
-         {:ok, specs, schema} <- plugin_schema(agent),
-         {:ok, agent} <- normalize_fields(agent, [:routes]),
-         :ok <- validate_targets(agent.routes),
-         {:ok, agent} <- normalize_fields(agent, [:metadata, :topology, :schedules]),
-         :ok <- Jido.Agent.Schedules.validate_owner(agent) do
-      {:ok, %{agent | plugins: Enum.map(specs, &{&1.module, &1.options})}, specs, schema}
+  defp verify_extensions(_, _, false), do: :ok
+
+  defp struct_fields(fields) do
+    case Zoi.validate(Jido.Agent.__schema__(), struct!(Jido.Agent, fields)) do
+      :ok ->
+        :ok
+
+      {:error, issues} ->
+        Error.fail(:invalid_agent, [], "Agent fields do not match the Zoi schema", %{
+          issues: issues
+        })
     end
   end
 
-  defp static(agent) do
-    with {:ok, agent} <- normalize_fields(agent, [:name, :description, :vsn]),
-         :ok <- State.validate_schema(agent.schema) |> Authoring.at(:schema),
-         {:ok, agent} <- normalize_fields(agent, [:routes, :metadata, :topology, :schedules]),
-         :ok <- Jido.Agent.Schedules.validate_owner(agent),
-         do: {:ok, agent}
+  defp plugin_schema(fields, true) do
+    with {:ok, _schema} <- state_schema(struct!(Jido.Agent, fields)), do: :ok
   end
 
-  defp normalize_fields(agent, fields) do
-    Enum.reduce_while(fields, {:ok, agent}, fn key, {:ok, agent} ->
-      case field(key, Map.fetch!(agent, key)) |> Authoring.at(key) do
-        {:ok, value} -> {:cont, {:ok, Map.put(agent, key, value)}}
-        error -> {:halt, error}
-      end
-    end)
+  defp plugin_schema(_, false), do: :ok
+
+  def validate(%Jido.Agent{id: nil, state: nil} = value), do: validate_definition(value)
+  def validate(%Jido.Agent{} = value), do: validate_instance(value)
+  def validate(_), do: Error.fail(:invalid_agent, [], "Expected a Jido.Agent struct")
+
+  def validate_definition(value, opts \\ [])
+
+  def validate_definition(%Jido.Agent{id: nil, state: nil} = value, opts) do
+    with {:ok, normalized} <- define(value, opts) do
+      if normalized === value,
+        do: {:ok, value},
+        else: Error.fail(:not_canonical, [], "Definition must contain its normalized fields")
+    end
   end
 
-  # Re-read module contracts and Plugin-owned schemas for each use. The compiler
-  # stores only static fields and declarations in the neutral Agent value.
-  def dependencies(%Agent{} = agent) do
-    with :ok <- validate_module(agent.module) |> Authoring.at(:module),
-         {:ok, specs, schema} <- plugin_schema(agent),
-         :ok <- validate_targets(agent.routes),
-         do: {:ok, agent, specs, schema}
+  def validate_definition(_, _opts),
+    do: Error.fail(:definition_required, [], "Expected a definition with nil id and state")
+
+  def validate_instance(value) do
+    with {:ok, agent, _specs, _schema} <- validate_instance_with_plugins(value), do: {:ok, agent}
   end
 
-  defp plugin_schema(agent) do
-    with {:ok, specs} <- plugins_at(PluginNormalizer.normalize_all(agent.plugins), agent.plugins),
-         :ok <- State.validate_schema(agent.schema) |> Authoring.at(:schema),
-         {:ok, schema} <-
-           AgentPlugin.compose_schema_from_specs(agent.schema, specs) |> Authoring.at(:plugins),
-         :ok <- State.validate_schema(schema) |> Authoring.at(:plugins),
+  def instantiate(source, opts) do
+    with {:ok, definition} <- resolve(source),
+         {:ok, opts} <- options(opts, [:id, :state]),
+         :ok <- Error.at(Data.nonempty(opts[:id]), :id),
+         {:ok, schema} <- Jido.Agent.Validation.state_schema(definition),
+         {:ok, state} <- Error.at(Data.initialize(schema, Map.get(opts, :state, %{})), :state),
+         {:ok, _} <- Topology.bind(definition, state),
+         do: {:ok, %{definition | id: opts.id, state: state}}
+  end
+
+  def resolve(%Jido.Agent{} = definition), do: validate_definition(definition)
+
+  def resolve(module) when is_atom(module) and module not in [nil, true, false] do
+    if Code.ensure_loaded?(module) and function_exported?(module, :definition, 0),
+      do: resolve_module(module),
+      else:
+        Error.fail(:unresolved_definition, [], "Agent definition module is not available", %{
+          module: module
+        })
+  end
+
+  def resolve(_),
+    do: Error.fail(:definition_required, [], "Expected an Agent definition or module")
+
+  defp resolve_module(module) do
+    validate_definition(module.definition())
+  rescue
+    reason -> definition_failed(module, :error, reason)
+  catch
+    kind, reason -> definition_failed(module, kind, reason)
+  end
+
+  defp definition_failed(module, kind, reason),
+    do:
+      Error.fail(:definition_failed, [], "Agent module definition failed", %{
+        module: module,
+        kind: kind,
+        reason: reason
+      })
+
+  def loaded_agent_module?(module),
+    do: Code.ensure_loaded?(module) and function_exported?(module, :definition, 0)
+
+  defp dependencies(agent) do
+    with {:ok, specs} <- Jido.Plugin.Normalizer.normalize_all(Jido.Agent.runtime_plugins(agent)),
+         {:ok, schema} <- Jido.Agent.Plugin.compose_schema_from_specs(agent.schema, specs),
+         :ok <- Error.at(Data.schema(schema), :schema),
          do: {:ok, specs, schema}
   end
 
-  defp plugins_at({:error, %{details: details}} = error, declarations)
-       when is_list(declarations) do
-    plugin = Map.get(details || %{}, :plugin)
-
-    index =
-      Enum.find_index(declarations, fn
-        %Jido.Plugin.Spec{module: module} -> module == plugin
-        {module, _opts} -> module == plugin
-        module -> module == plugin
-      end)
-
-    Authoring.at(error, if(is_nil(index), do: [:plugins], else: [:plugins, index]))
+  def validate_instance_with_plugins(%Jido.Agent{} = value) do
+    with :ok <- Error.at(Data.nonempty(value.id), :id),
+         {:ok, definition} <-
+           validate_definition(Jido.Agent.definition(value), plugin_schema?: false),
+         {:ok, specs, schema} <- dependencies(definition),
+         :ok <- Error.at(Data.complete(schema, value.state), :state),
+         {:ok, _} <- Topology.bind(definition, value.state),
+         do: {:ok, value, specs, schema}
   end
 
-  defp plugins_at(result, _declarations), do: Authoring.at(result, :plugins)
+  def validate_instance_with_plugins(_),
+    do: Error.fail(:instance_required, [], "Expected an Agent instance")
 
-  def validate_definition_with_plugins(%Agent{id: nil, state: nil} = definition),
-    do: validate_common(definition)
-
-  def validate_definition_with_plugins(%Agent{} = definition) do
-    Authoring.error("Agent definition cannot contain instance identity or state", %{
-      id: definition.id,
-      state: definition.state
-    })
+  def options(opts, allowed) when is_list(opts) do
+    if Keyword.keyword?(opts) and
+         length(Keyword.keys(opts)) == length(Enum.uniq(Keyword.keys(opts))),
+       do: Data.fields(Map.new(opts), allowed),
+       else: Error.fail(:invalid_options, [], "Expected unique keyword options")
   end
 
-  def validate_definition_with_plugins(value),
-    do: Authoring.error("Expected a neutral Jido.Agent definition", %{value: value})
+  def options(opts, allowed), do: Data.fields(opts, allowed)
 
-  @doc false
-  def instantiate_validated(validation, overrides) do
-    with {:ok, definition, specs, schema} <- validation,
-         {:ok, overrides} <- normalize_attrs(overrides, :instance),
-         :ok <- validate_instance_overrides(overrides),
-         {:ok, id} <- instance_id(Map.get(overrides, :id)),
-         {:ok, state} <- State.initialize(Map.get(overrides, :state, %{}), schema) do
-      {:ok, %{definition | id: id, state: state}, specs, schema}
-    end
+  defp fields(definition) do
+    with :ok <- neutral(definition),
+         :ok <- Error.at(Data.nonempty(definition[:name]), :name),
+         :ok <- optional_module(definition.module),
+         :ok <- optional_description(definition.description),
+         :ok <- Error.at(Data.positive(definition.vsn), :vsn),
+         :ok <- Error.at(Data.schema(definition.schema), :schema),
+         :ok <- Error.at(Data.plain_map(definition.metadata), :metadata),
+         :ok <- Error.at(Data.static(definition.metadata), :metadata),
+         :ok <- source(definition.signal_source),
+         do: :ok
   end
 
-  defp validate_instance_data(agent, schema) do
-    with {:ok, id} <- validate_id(agent.id),
-         {:ok, state} <- State.validate(agent.state, schema),
-         do: {:ok, %{agent | id: id, state: state}}
-  end
+  defp neutral(%{id: nil, state: nil}), do: :ok
+  defp neutral(_), do: Error.fail(:definition_required, [], "Definition id and state must be nil")
+  defp optional_module(nil), do: :ok
+  defp optional_module(module), do: Error.at(Data.name(module), :module)
+  defp optional_description(nil), do: :ok
+  defp optional_description(value) when is_binary(value), do: :ok
 
-  defp known_keys(attrs) do
-    case Map.keys(attrs) -- @definition_keys do
-      [] -> :ok
-      [key | _] -> Authoring.error("Unknown Agent definition key", %{key: key})
-    end
-  end
+  defp optional_description(_),
+    do: Error.fail(:invalid_description, :description, "Expected a description string or nil")
 
-  defp reject_instance_data(attrs) do
-    keys =
-      @instance_keys
-      |> Enum.filter(&(Map.has_key?(attrs, &1) and not is_nil(Map.get(attrs, &1))))
-
-    if keys == [] do
-      :ok
-    else
-      Authoring.error("Agent.new/1 accepts definition data only", %{keys: keys})
-    end
-  end
-
-  defp instance_id(nil), do: {:ok, Jido.Signal.ID.generate!()}
-  defp instance_id(id), do: validate_id(id)
-
-  defp validate_id(id) when is_binary(id) and byte_size(id) > 0, do: {:ok, id}
-  defp validate_id(id), do: Authoring.error("Agent id must be a non-empty string", %{id: id})
-
-  @doc false
-  def field(:name, name), do: Jido.Util.validate_name(name)
-
-  def field(:description, description) when is_nil(description) or is_binary(description),
-    do: {:ok, description}
-
-  def field(:description, description) do
-    Authoring.error("Agent description must be a string or nil", %{description: description})
-  end
-
-  def field(:routes, routes), do: Authoring.routes(routes)
-
-  def field(:topology, topology), do: Jido.Agent.Topology.validate(topology)
-
-  def field(:schedules, schedules), do: Jido.Agent.Schedules.validate(schedules)
-
-  def field(:metadata, metadata) when is_map(metadata) and not is_struct(metadata),
-    do: {:ok, metadata}
-
-  def field(:metadata, metadata),
-    do: Authoring.error("Agent metadata must be a map", %{metadata: metadata})
-
-  def field(:vsn, nil), do: {:ok, nil}
-  def field(:vsn, vsn) when is_integer(vsn) and vsn > 0, do: {:ok, vsn}
-
-  def field(:vsn, vsn),
-    do: Authoring.error("Agent vsn must be a positive integer or nil", %{vsn: vsn})
-
-  defp validate_module(module) when is_atom(module) and not is_nil(module) do
-    case Code.ensure_loaded(module) do
-      {:module, ^module} ->
-        if loaded_agent_module?(module) do
-          :ok
-        else
-          Authoring.error("Agent module must implement the Jido.Agent behavior", %{module: module})
-        end
-
-      {:error, reason} ->
-        Authoring.error("Agent module could not be loaded", %{module: module, reason: reason})
-    end
-  end
-
-  defp validate_module(module),
-    do: Authoring.error("Agent module must be a module", %{module: module})
-
-  @doc false
-  def loaded_agent_module?(Agent), do: true
-
-  def loaded_agent_module?(module) do
-    Agent in List.flatten(Keyword.get_values(module.module_info(:attributes), :behaviour)) or
-      function_exported?(module, :handle_signal, 2)
-  end
-
-  defp validate_targets(routes) do
-    routes
-    |> Enum.with_index()
-    |> Authoring.check_each(fn {route, index} ->
-      {target, _defaults} = Authoring.split_target(route.target)
-
-      case Jido.Instruction.validate(target) do
-        :ok ->
-          :ok
-
-        {:error, reason} ->
-          Authoring.error("Invalid Agent route executable", %{target: target, reason: reason})
-          |> Authoring.at([:routes, index, :target])
-      end
-    end)
-  end
-
-  defp normalize_attrs(attrs, source) do
-    case Authoring.to_attrs(attrs) do
-      {:ok, attrs} -> {:ok, attrs}
-      :error -> Authoring.error("Agent #{source} must be a map or keyword list", %{value: attrs})
-    end
-  end
-
-  defp validate_instance_overrides(overrides) do
-    case Map.keys(overrides) -- @instance_keys do
-      [] -> :ok
-      [key | _] -> Authoring.error("Agent instances can set only :id and :state", %{key: key})
-    end
-  end
+  defp source(nil), do: :ok
+  defp source(value), do: Error.at(Data.nonempty(value), :signal_source)
 end

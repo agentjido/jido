@@ -9,7 +9,7 @@ defmodule JidoTest.Examples.Factory.BatchTest do
     do: signal("examples.factory.workshop.submit_jobs", %{request_id: id, goals: goals})
 
   test "a batch creates distinct jobs in order and a retry does not add jobs or events" do
-    original = Workshop.new!()
+    original = Workshop.instantiate!(id: Jido.Signal.ID.generate!())
     goals = Enum.map(1..20, &"Goal #{&1}")
     request = batch("batch", goals)
     assert {:ok, agent, effects} = Workshop.cmd(original, request)
@@ -19,7 +19,7 @@ defmodule JidoTest.Examples.Factory.BatchTest do
     assert Enum.map(ids, &agent.state.jobs[&1].goal) == goals
     assert agent.state.active_job_id == ""
     assert length(effects) == 20
-    assert Enum.all?(effects, &match?(%Jido.Agent.Directive.EmitToParent{}, &1))
+    assert Enum.all?(effects, &match?(%Jido.AgentServer.Directive.OwnerSend{}, &1))
     assert {:ok, same, []} = Workshop.cmd(agent, request)
     assert same.state == agent.state
     assert {:error, _} = Workshop.cmd(agent, batch("batch", ["Changed"]))
@@ -27,7 +27,13 @@ defmodule JidoTest.Examples.Factory.BatchTest do
 
   test "capacity and job ID conflicts reject the whole batch" do
     goals = Enum.map(1..19, &"Goal #{&1}")
-    assert {:ok, agent, _} = Workshop.cmd(Workshop.new!(), batch("first", goals))
+
+    assert {:ok, agent, _} =
+             Workshop.cmd(
+               Workshop.instantiate!(id: Jido.Signal.ID.generate!()),
+               batch("first", goals)
+             )
+
     assert {:error, _} = Workshop.cmd(agent, batch("second", ["One", "Two"]))
     assert map_size(agent.state.jobs) == 19
     assert {:ok, full, [_]} = Workshop.cmd(agent, batch("second", ["One"]))
@@ -35,7 +41,7 @@ defmodule JidoTest.Examples.Factory.BatchTest do
 
     assert {:ok, occupied, _} =
              Workshop.cmd(
-               Workshop.new!(),
+               Workshop.instantiate!(id: Jido.Signal.ID.generate!()),
                signal("examples.factory.command", %{
                  operation: :submit,
                  request_id: "batch/1",
@@ -48,7 +54,7 @@ defmodule JidoTest.Examples.Factory.BatchTest do
   end
 
   test "one invalid goal rejects all batch jobs before effects" do
-    agent = Workshop.new!()
+    agent = Workshop.instantiate!(id: Jido.Signal.ID.generate!())
 
     for goals <- [[], ["Valid", ""], ["Valid", "   "], ["Valid", 42]] do
       assert {:error, _} = Workshop.cmd(agent, batch("invalid", goals))

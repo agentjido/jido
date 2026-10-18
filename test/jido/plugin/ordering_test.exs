@@ -454,7 +454,7 @@ defmodule Jido.Plugin.OrderingTest do
                {SecondStatePlugin, result: :second_failed}
              ])
 
-    agent = %{Agent.new!() | state: %{first: 0, second: 0}}
+    agent = %{Agent.instantiate!(id: Jido.Signal.ID.generate!()) | state: %{first: 0, second: 0}}
 
     assert Jido.Agent.Plugin.Pipeline.run(
              {:ok, agent.state, []},
@@ -471,8 +471,20 @@ defmodule Jido.Plugin.OrderingTest do
     assert {:ok, specs} = Jido.Plugin.Normalizer.normalize_all(declarations)
 
     agent =
-      Jido.Agent.new!(name: "ordered_reducer_agent", plugins: declarations)
-      |> Jido.Agent.instantiate!()
+      Jido.Agent.define!(%{
+        name: "ordered_reducer_agent",
+        extensions:
+          Enum.map(declarations, fn declaration ->
+            {provider, options} =
+              case declaration do
+                {provider, options} -> {provider, options}
+                provider -> {provider, []}
+              end
+
+            %{id: provider.id(), provider: provider, vsn: provider.vsn(), data: Map.new(options)}
+          end)
+      })
+      |> Jido.Agent.instantiate!(id: Jido.Signal.ID.generate!())
 
     assert {:ok, state, []} =
              Jido.Agent.Plugin.Pipeline.run(
@@ -494,7 +506,9 @@ defmodule Jido.Plugin.OrderingTest do
   end
 
   defp command do
-    {:ok, command} = Command.new(Agent.new!(), signal("plugin.command"))
+    {:ok, command} =
+      Command.new(Agent.instantiate!(id: Jido.Signal.ID.generate!()), signal("plugin.command"))
+
     command
   end
 end

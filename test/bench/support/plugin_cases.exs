@@ -32,7 +32,7 @@ defmodule JidoCoreBench.PluginCases do
         end,
         fn {agent, signal, context} ->
           case operation do
-            :validate -> Jido.Agent.validate_instance(agent)
+            :validate -> Jido.Agent.validate(agent)
             :prepare -> Runner.prepare(agent, signal, context: context)
           end
         end,

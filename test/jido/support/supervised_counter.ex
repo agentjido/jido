@@ -17,7 +17,7 @@ defmodule JidoTest.SupervisedCounter do
 
   agent do
     schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
-    plugin JidoTest.SupervisedCounter.Runtime, config: [label: "current"]
+    plugin JidoTest.SupervisedCounter.Runtime, config: %{label: "current"}
   end
 
   routes do

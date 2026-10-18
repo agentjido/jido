@@ -23,7 +23,7 @@ defmodule JidoTest.Agent.ReplacementTest do
   end
 
   test "set and complete Action candidates replace a domain field", %{jido: jido} do
-    initial = Configured.new!(id: unique_id("config-reset"), state: %{config: %{a: 1}})
+    initial = Configured.instantiate!(id: unique_id("config-reset"), state: %{config: %{a: 1}})
 
     assert {:ok, updated} = Jido.Agent.set(initial, config: %{})
     assert updated.state.config == %{}

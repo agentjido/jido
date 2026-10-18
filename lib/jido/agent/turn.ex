@@ -7,15 +7,18 @@ defmodule Jido.Agent.Turn do
   and Agent state to the execution context.
 
   `source_signal` is the unchanged Signal that selected the Turn. It can be
-  `nil` only while an application callback constructs a Turn. The evaluator
-  binds and validates the source Signal before executable work starts.
+  `nil` while a Turn is constructed. The runner binds and validates the source
+  Signal before executable work starts.
 
   `input` accepts a map, keyword list, or `nil`. Constructors preserve the
   supplied value. Before execution, the runner converts keyword lists to maps
   and `nil` to an empty map. The last value for a duplicate keyword key wins.
 
-  The Server keeps runtime progress in a private active-turn record and creates
-  one `Jido.Agent.Turn.Outcome` at the terminal runtime boundary.
+  The Server keeps runtime progress in a private active-turn record. Its
+  `status/1` and `history/1` functions expose terminal summary maps with IDs,
+  status, stage, commit state, revisions, directive count, and duration.
+  These summaries exclude Signal data, Agent state, and raw errors.
+  Post-commit effects have a separate summary in `status/1`.
   """
 
   alias Jido.Error
@@ -24,6 +27,7 @@ defmodule Jido.Agent.Turn do
             __MODULE__,
             %{
               executable: Zoi.any(description: "Action or Flow executable target"),
+              route: Zoi.any(description: "Selected authored route") |> Zoi.default(nil),
               input: Zoi.any(description: "Executable input") |> Zoi.default(%{}),
               source_signal:
                 Zoi.struct(Jido.Signal, description: "Unchanged source Signal")

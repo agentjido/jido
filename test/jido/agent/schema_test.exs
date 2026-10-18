@@ -4,7 +4,6 @@ defmodule Jido.Agent.SchemaTest do
   @moduletag :basic_contract
 
   alias Jido.AgentServer, as: Server
-  alias Jido.Error.ValidationError
 
   defmodule Bounds do
     @moduledoc false
@@ -96,37 +95,54 @@ defmodule Jido.Agent.SchemaTest do
   end
 
   test "composition preserves required Plugin fields and the root rule" do
-    definition = %{PlainAgent.definition() | plugins: [RequiredState]}
+    definition = %{PlainAgent.definition() | extensions: [contribution(RequiredState)]}
 
-    assert {:error, %ValidationError{details: %{errors: errors}}} =
-             Jido.Agent.instantiate(definition)
+    assert {:error, %Jido.Agent.Error{details: %{issues: errors}}} =
+             Jido.Agent.instantiate(definition, id: Jido.Signal.ID.generate!())
 
     assert Enum.any?(errors, &(&1.code == :required and &1.path == [:owned]))
 
-    assert {:ok, agent} = Jido.Agent.instantiate(definition, state: %{owned: 7})
+    assert {:ok, agent} =
+             Jido.Agent.instantiate(definition,
+               id: Jido.Signal.ID.generate!(),
+               state: %{owned: 7}
+             )
+
     assert agent.state == %{count: 0, history: [], owned: 7}
 
-    assert {:error, %ValidationError{}} =
-             Jido.Agent.instantiate(definition, state: %{owned: 7, count: 2})
+    assert {:error, %{__exception__: true}} =
+             Jido.Agent.instantiate(definition,
+               id: Jido.Signal.ID.generate!(),
+               state: %{owned: 7, count: 2}
+             )
   end
 
   test "validation composes the current Plugin options and domain schema on each call" do
-    definition = %{PlainAgent.definition() | plugins: [{ConfiguredState, minimum: 0}]}
-    assert {:ok, agent} = Jido.Agent.instantiate(definition, state: %{owned: 0})
-    assert {:ok, ^agent} = Jido.Agent.validate_instance(agent)
+    definition = %{
+      PlainAgent.definition()
+      | extensions: [contribution(ConfiguredState, %{minimum: 0})]
+    }
 
-    changed = %{agent | plugins: [{ConfiguredState, minimum: 1}]}
-    assert {:error, %ValidationError{}} = Jido.Agent.validate_instance(changed)
+    assert {:ok, agent} =
+             Jido.Agent.instantiate(definition,
+               id: Jido.Signal.ID.generate!(),
+               state: %{owned: 0}
+             )
+
+    assert {:ok, ^agent} = Jido.Agent.validate(agent)
+
+    changed = %{agent | extensions: [contribution(ConfiguredState, %{minimum: 1})]}
+    assert {:error, %{__exception__: true}} = Jido.Agent.validate(changed)
 
     changed = %{changed | state: %{changed.state | owned: 1}}
-    assert {:ok, ^changed} = Jido.Agent.validate_instance(changed)
+    assert {:ok, ^changed} = Jido.Agent.validate(changed)
 
     changed = %{
       changed
       | schema: Zoi.object(%{count: Zoi.string(), history: Zoi.list(Zoi.string())})
     }
 
-    assert {:error, %ValidationError{}} = Jido.Agent.validate_instance(changed)
+    assert {:error, %{__exception__: true}} = Jido.Agent.validate(changed)
   end
 
   for {label, agent_module} <- [
@@ -136,22 +152,23 @@ defmodule Jido.Agent.SchemaTest do
     @tag agent_module: agent_module
     test "construction enforces the root refinement #{label}", %{agent_module: agent_module} do
       assert {:ok, %{count: 0, history: []}} =
-               Zoi.parse(agent_module.domain_schema(), %{count: 0, history: []})
+               Zoi.parse(agent_module.definition().schema, %{count: 0, history: []})
 
       assert {:error, [_ | _]} =
-               Zoi.parse(agent_module.domain_schema(), %{count: 2, history: []})
+               Zoi.parse(agent_module.definition().schema, %{count: 2, history: []})
 
-      assert {:error, %ValidationError{}} = agent_module.new(state: %{count: 2})
+      assert {:error, %{__exception__: true}} =
+               agent_module.instantiate(id: "invalid", state: %{count: 2})
     end
 
     @tag agent_module: agent_module
     test "cmd rejects a candidate outside the root refinement #{label}", %{
       agent_module: agent_module
     } do
-      agent = agent_module.new!()
+      agent = agent_module.instantiate!(id: unique_id())
       command = signal("counter.add", %{by: 2, label: "invalid"})
 
-      assert {:error, %ValidationError{}} = agent_module.cmd(agent, command)
+      assert {:error, %{__exception__: true}} = agent_module.cmd(agent, command)
     end
 
     @tag agent_module: agent_module
@@ -165,7 +182,7 @@ defmodule Jido.Agent.SchemaTest do
       before = JidoTest.AgentServerAssertions.committed(server)
       command = signal("counter.add", %{by: 2, label: "invalid"})
 
-      assert {:error, %ValidationError{}} = Server.call(server, command)
+      assert {:error, %{__exception__: true}} = Server.call(server, command)
       assert JidoTest.AgentServerAssertions.committed(server) == before
     end
 
@@ -187,4 +204,7 @@ defmodule Jido.Agent.SchemaTest do
       assert %{agent: ^agent, state_version: 1} = JidoTest.AgentServerAssertions.committed(server)
     end
   end
+
+  defp contribution(provider, data \\ %{}),
+    do: %{id: provider.id(), provider: provider, vsn: provider.vsn(), data: data}
 end

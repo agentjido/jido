@@ -61,7 +61,7 @@ defmodule JidoTest.Persistence.TokenTest do
     {:ok, store} = Elixir.Agent.start_link(fn -> %{} end)
     on_exit(fn -> if Process.alive?(store), do: Elixir.Agent.stop(store) end)
 
-    agent = CounterAgent.new!(id: "token-#{System.unique_integer([:positive])}")
+    agent = CounterAgent.instantiate!(id: "token-#{System.unique_integer([:positive])}")
     %{agent: agent, store: {TokenAdapter, store: store, observer: self()}}
   end
 

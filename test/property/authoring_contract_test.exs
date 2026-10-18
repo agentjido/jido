@@ -100,19 +100,27 @@ defmodule JidoTest.Property.AuthoringContractTest do
           inline =
             for {candidate, _} <- :code.all_loaded(),
                 function_exported?(candidate, :__jido_inline_action__, 0),
-                match?({^module, _}, candidate.__jido_inline_action__()),
-                do: candidate
+                match?({^module, _}, candidate.__jido_inline_action__()) do
+              candidate
+            end
 
           assert [target] = inline
           assert apply(module, :route_action!, ["property.authored.add"]) == target
 
           declaration =
-            Agent.new!(%{
+            Agent.define!(%{
               module: module,
               name: "property_authored_history",
+              signal_source: "/property-authored",
               vsn: 1,
               schema: Zoi.object(%{value: Zoi.integer(), history: Zoi.list(Zoi.integer())}),
-              routes: [{"property.authored.add", target}]
+              routes: [
+                %{
+                  path: "property.authored.add",
+                  as: :add,
+                  handler: %{kind: :action, target: target}
+                }
+              ]
             })
 
           definition = apply(module, :definition, [])
@@ -123,12 +131,13 @@ defmodule JidoTest.Property.AuthoringContractTest do
           assert {:ok, ^definition} = Codec.decode(JSON.decode!(JSON.encode!(document)), registry)
 
           original =
-            apply(module, :new!, [
+            apply(module, :instantiate!, [
               [id: "authored", state: %{value: input["initial"], history: []}]
             ])
 
           assert Agent.definition(original) === declaration
-          assert {:ok, ^document} = Codec.encode(original, registry)
+          assert {:ok, encoded_instance, instance_registry} = Codec.encode(original)
+          assert {:ok, ^original} = Codec.decode(encoded_instance, instance_registry)
 
           {current, _model, _history} =
             Enum.reduce(input["history"], {original, input["initial"], []}, fn delta,

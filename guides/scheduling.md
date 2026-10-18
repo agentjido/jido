@@ -13,4 +13,4 @@ busy or offline slots according to its stated policy; it does not promise to
 replay every missed interval.
 
 See [scheduled occurrence tests](../test/jido/plugin/scheduler/occurrence_runtime_test.exs)
-and [recovery tests](../test/jido/plugin/scheduler/occurrence_recovery_test.exs).
+and [recovery tests](../test/jido/plugin/scheduler/occurrence_runtime_test.exs).

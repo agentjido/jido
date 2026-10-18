@@ -13,7 +13,7 @@ defmodule JidoTest.Persistence.CheckpointPortabilityTest do
 
   test "nested portable values survive a save and load", c do
     agent =
-      Probe.new!(
+      Probe.instantiate!(
         id: c.id,
         state: %{payload: %{job: %{id: "job-1", attempts: [1, 2], result: {:ok, "done"}}}}
       )
@@ -28,14 +28,12 @@ defmodule JidoTest.Persistence.CheckpointPortabilityTest do
   end
 
   test "default persistence rejects a process handle accepted by live state", c do
-    agent = Probe.new!(id: c.id, state: %{payload: %{job: %{worker: self()}}})
+    agent = Probe.instantiate!(id: c.id, state: %{payload: %{job: %{worker: self()}}})
 
     assert {:error,
-            %Jido.Error.ValidationError{
-              details: %{
-                code: :non_portable_term,
-                path: [:checkpoint, :state, :payload, :job, :worker]
-              }
+            %Jido.Agent.Error{
+              code: :non_portable_term,
+              path: [:snapshot, :agent, :state, :payload, :job, :worker]
             }} = Persistence.save_agent(c.store, agent, namespace: "persistence-probe")
 
     key = Persistence.agent_key(Jido.Agent.Ref.new!(namespace: "persistence-probe", id: c.id))
@@ -43,14 +41,12 @@ defmodule JidoTest.Persistence.CheckpointPortabilityTest do
   end
 
   test "default persistence rejects a nested improper list without raising", c do
-    agent = Probe.new!(id: c.id, state: %{payload: %{job: %{values: [1 | self()]}}})
+    agent = Probe.instantiate!(id: c.id, state: %{payload: %{job: %{values: [1 | self()]}}})
 
     assert {:error,
-            %Jido.Error.ValidationError{
-              details: %{
-                code: :non_portable_term,
-                path: [:checkpoint, :state, :payload, :job, :values, 1]
-              }
+            %Jido.Agent.Error{
+              code: :non_portable_term,
+              path: [:snapshot, :agent, :state, :payload, :job, :values, 1]
             }} = Persistence.save_agent(c.store, agent, namespace: "persistence-probe")
 
     key = Persistence.agent_key(Jido.Agent.Ref.new!(namespace: "persistence-probe", id: c.id))
@@ -64,7 +60,7 @@ defmodule JidoTest.Persistence.CheckpointPortabilityTest do
             %Jido.Error.ValidationError{
               details: %{
                 code: :non_portable_term,
-                path: [:record, :checkpoint, :state, :payload, :job, :worker]
+                path: [:record, :checkpoint, :agent, :state, :payload, :job, :worker]
               }
             }} = Persistence.load_agent(c.store, Probe, c.id, namespace: "persistence-probe")
   end
@@ -87,27 +83,32 @@ defmodule JidoTest.Persistence.CheckpointPortabilityTest do
       assert :ok = store_payload(c.store, id, %{job: %{runtime: value}})
 
       assert {:error,
-              %Jido.Error.ValidationError{
-                details: %{
-                  code: :non_portable_term,
-                  path: path
-                }
-              }} = Persistence.load_agent(c.store, Probe, id, namespace: "persistence-probe")
+              %Jido.Error.ValidationError{details: %{code: :non_portable_term, path: path}}} =
+               Persistence.load_agent(c.store, Probe, id, namespace: "persistence-probe")
 
-      assert Enum.take(path, 6) == [:record, :checkpoint, :state, :payload, :job, :runtime]
+      assert Enum.take(path, 7) == [
+               :record,
+               :checkpoint,
+               :agent,
+               :state,
+               :payload,
+               :job,
+               :runtime
+             ]
+
       assert length(path) <= 20
     end
   end
 
   defp store_payload(store, id, payload) do
     assert :ok =
-             Persistence.save_agent(store, Probe.new!(id: id),
+             Persistence.save_agent(store, Probe.instantiate!(id: id),
                namespace: "persistence-probe",
                revision: 3
              )
 
     Store.rewrite_record(store, id, fn record ->
-      put_in(record.checkpoint.state.payload, payload)
+      put_in(record.checkpoint.agent.state.payload, payload)
     end)
   end
 end

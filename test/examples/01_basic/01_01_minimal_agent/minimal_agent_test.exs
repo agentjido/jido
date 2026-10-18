@@ -10,7 +10,7 @@ defmodule JidoTest.Examples.Basic.MinimalAgentTest do
     assert definition.state == nil
 
     for {data, expected_count} <- [{%{}, 5}, {%{amount: 3}, 7}, {%{amount: 0}, 4}] do
-      agent = MinimalAgent.new!(id: unique_id(), state: %{count: 4})
+      agent = MinimalAgent.instantiate!(id: unique_id(), state: %{count: 4})
       server = start_agent!(jido, MinimalAgent, id: agent.id, initial_state: agent.state)
       before = Server.snapshot(server)
       command = signal("basic.minimal.increment", data)

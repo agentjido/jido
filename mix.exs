@@ -114,6 +114,7 @@ defmodule Jido.MixProject do
         fn path ->
           (String.starts_with?(path, "test/contract/agent_server/") or
              String.starts_with?(path, "test/bench/") or
+             String.starts_with?(path, "test/examples/support/") or
              String.starts_with?(path, "test/authoring/") or
              String.starts_with?(path, "test/property/") or
              String.starts_with?(path, "test/system/")) and
@@ -227,15 +228,14 @@ defmodule Jido.MixProject do
         ],
         "Agent Directives": [
           Jido.Agent.Directive,
-          Jido.Agent.Directive.AdoptChild,
           Jido.Agent.Directive.Emit,
-          Jido.Agent.Directive.EmitToChild,
-          Jido.Agent.Directive.EmitToParent,
-          Jido.Agent.Directive.Error,
-          Jido.Agent.Directive.SpawnProcess,
-          Jido.Agent.Directive.SpawnChild,
-          Jido.Agent.Directive.Stop,
-          Jido.Agent.Directive.StopChild
+          Jido.AgentServer.Directive.AgentSend,
+          Jido.AgentServer.Directive.OwnerSend,
+          Jido.AgentServer.Directive.ErrorReport,
+          Jido.AgentServer.Directive.ProcessStart,
+          Jido.AgentServer.Directive.AgentStart,
+          Jido.AgentServer.Directive.ServerStop,
+          Jido.AgentServer.Directive.AgentStop
         ],
         "Actor Runtime": [
           Jido,

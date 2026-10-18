@@ -27,7 +27,7 @@ defmodule Jido.Agent.VersioningTest do
     def checkpoint(agent, _context), do: {:ok, %{id: agent.id, state: agent.state}}
 
     @impl Jido.Agent
-    def restore(%{id: id, state: state}, _context), do: new(id: id, state: state)
+    def restore(%{id: id, state: state}, _context), do: instantiate(id: id, state: state)
   end
 
   defmodule NumericDefinitionAgent do
@@ -39,164 +39,90 @@ defmodule Jido.Agent.VersioningTest do
     end
   end
 
-  test "generated modules own a positive version and direct definitions can be unversioned" do
+  test "definitions and instances have a positive definition version" do
     assert DefaultVersionAgent.vsn() == 1
-    assert DefaultVersionAgent.definition().vsn == 1
-    assert DefaultVersionAgent.new!().vsn == 1
-
     assert VersionedAgent.vsn() == 3
     assert VersionedAgent.definition().vsn == 3
-    assert VersionedAgent.new!().vsn == 3
+    assert VersionedAgent.instantiate!(id: "version").vsn == 3
+    assert Agent.define!(%{name: "default"}).vsn == 1
+    assert Agent.define!(%{name: "explicit", vsn: 7}).vsn == 7
 
-    assert Agent.new!(name: "unversioned").vsn == nil
-    assert Agent.new!(name: "direct_versioned", vsn: 7).vsn == 7
-
-    for invalid <- [0, -1, 1.0, "1", :one] do
-      assert {:error, %Jido.Error.ValidationError{}} =
-               Agent.new(name: "invalid_vsn", vsn: invalid)
+    for invalid <- [nil, 0, -1, 1.0, "1", :one] do
+      assert {:error, %{path: [:vsn]}} = Agent.define(%{name: "invalid", vsn: invalid})
     end
   end
 
-  test "invalid generated module versions fail during compilation" do
-    module = Module.concat(__MODULE__, "InvalidVersion#{System.unique_integer([:positive])}")
+  test "invalid module versions fail Spark option validation" do
+    module = Module.concat(__MODULE__, "Invalid#{System.unique_integer([:positive])}")
 
-    assert_raise CompileError, ~r/Agent vsn must be a positive integer/, fn ->
+    assert_raise Spark.Options.ValidationError, fn ->
       Code.compile_quoted(
         quote do
           defmodule unquote(module) do
-            use Jido.Agent, name: "invalid_generated_version", vsn: 0
+            use Jido.Agent, name: "invalid_version", vsn: 0
           end
         end
       )
     end
   end
 
-  test "definition, map, data, and Codec preserve the version" do
-    agent = VersionedAgent.new!(id: "versioned", state: %{count: 2})
-    assert Agent.definition(agent).vsn == 3
-    assert Map.fetch!(agent, :vsn) == 3
-
-    assert Jido.Agent.new!(%{name: "built", vsn: 8}) |> Map.fetch!(:vsn) == 8
-
-    assert {:ok, document, registry} = Codec.encode(VersionedAgent.definition())
-    assert document["version"] == 2
-    assert document["vsn"] == 3
-    assert {:ok, %{vsn: 3}} = Codec.decode(document, registry)
-
-    version_one = document |> Map.delete("vsn") |> Map.put("version", 1)
-    assert {:error, %Jido.Error.ValidationError{}} = Codec.decode(version_one, registry)
-
-    direct = Agent.new!(name: "direct_codec")
-    assert {:ok, direct_document, direct_registry} = Codec.encode(direct)
-    assert {:ok, %{vsn: nil}} = Codec.decode(direct_document, direct_registry)
-
-    direct_version_one = direct_document |> Map.delete("vsn") |> Map.put("version", 1)
-
-    assert {:error, %Jido.Error.ValidationError{}} =
-             Codec.decode(direct_version_one, direct_registry)
-  end
-
-  test "generated default checkpoints use version 2 and reject changed definitions" do
-    agent = VersionedAgent.new!(id: "versioned", state: %{count: 5})
-
-    assert {:ok,
-            %{
-              version: 2,
-              kind: :agent,
-              agent_module: VersionedAgent,
-              vsn: 3,
-              id: "versioned",
-              state: %{count: 5}
-            } = checkpoint} = Agent.checkpoint(agent)
-
-    assert {:ok, ^agent} = Agent.restore(VersionedAgent, checkpoint)
-
-    changed = %{agent | metadata: %{changed: true}}
-
-    assert {:error, %Jido.Error.ValidationError{details: %{code: :definition_mismatch}} = error} =
-             Agent.checkpoint(changed)
-
-    assert Jido.Error.code(error) == :definition_mismatch
-  end
-
-  test "default restore rejects module and version mismatches before state acceptance" do
-    agent = VersionedAgent.new!(id: "versioned", state: %{count: 5})
-    assert {:ok, checkpoint} = Agent.checkpoint(agent)
-
-    assert {:error, %Jido.Error.ValidationError{}} =
-             Agent.restore(DefaultVersionAgent, checkpoint)
-
-    assert {:error, %Jido.Error.ValidationError{details: %{code: :definition_mismatch}}} =
-             Agent.restore(VersionedAgent, %{checkpoint | vsn: 2})
-  end
-
-  test "generated checkpoints reject numeric type changes in static definitions" do
-    agent = NumericDefinitionAgent.new!(id: "exact-definition")
-    assert {:ok, checkpoint} = Agent.checkpoint(agent)
-    assert {:ok, ^agent} = Agent.restore(NumericDefinitionAgent, checkpoint)
-
-    for changed <- [
-          %{agent | metadata: %{ratio: 1.0}},
-          %{agent | schema: Zoi.object(%{count: Zoi.number() |> Zoi.default(1.0)})}
+  test "JSON format and definition version are distinct" do
+    for value <- [
+          VersionedAgent.definition(),
+          VersionedAgent.instantiate!(id: "json"),
+          Agent.define!(%{name: "data", vsn: 8})
         ] do
-      assert {:ok, ^changed} = Agent.validate_instance(changed)
-
-      assert {:error, %Jido.Error.ValidationError{details: %{code: :definition_mismatch}}} =
-               Agent.checkpoint(changed)
-
-      unversioned = %{changed | vsn: nil}
-      assert {:ok, embedded} = Agent.checkpoint(unversioned)
-      assert {:ok, ^unversioned} = Agent.restore(NumericDefinitionAgent, embedded)
+      assert {:ok, document, registry} = Codec.encode(value)
+      assert document["version"] == 1
+      assert document["agent"]["vsn"] == value.vsn
+      assert {:ok, ^value} = Codec.decode(document, registry)
+      assert {:error, _} = Codec.decode(%{document | "version" => 99}, registry)
     end
   end
 
-  test "version-1 checkpoints are not part of the V3 format" do
-    agent = DefaultVersionAgent.new!(id: "legacy")
-
-    checkpoint = %{
-      version: 1,
-      kind: :agent,
-      agent_module: DefaultVersionAgent,
-      id: agent.id,
-      definition: Agent.definition(agent),
-      state: agent.state
-    }
-
-    assert {:error, %Jido.Error.ValidationError{details: %{code: :invalid_checkpoint}}} =
-             Agent.restore(DefaultVersionAgent, checkpoint)
+  test "snapshots retain the accepted definition without a source definition lookup" do
+    original = VersionedAgent.instantiate!(id: "accepted", state: %{count: 5})
+    changed = %{original | metadata: %{changed: true}, vsn: 9}
+    assert {:ok, snapshot} = Jido.Persistence.snapshot(changed)
+    assert snapshot.format == 1
+    assert snapshot.agent === changed
+    assert snapshot.state_format == :default
+    assert {:ok, ^changed} = Jido.Persistence.restore(snapshot)
+    assert VersionedAgent.vsn() == 3
+    assert original.metadata == %{}
   end
 
-  test "an explicit unversioned definition derived from a generated module stays embedded" do
-    definition = %{VersionedAgent.definition() | vsn: nil, metadata: %{owner: :application}}
-    agent = Agent.instantiate!(definition, id: "derived", state: %{count: 2})
+  test "snapshots keep exact numeric values in schemas and metadata" do
+    agent = NumericDefinitionAgent.instantiate!(id: "exact")
 
-    assert {:ok, %{version: 2, definition: ^definition} = checkpoint} =
-             Agent.checkpoint(agent)
-
-    assert {:ok, ^agent} = Agent.restore(VersionedAgent, checkpoint)
+    for changed <- [
+          agent,
+          %{agent | metadata: %{ratio: 1.0}},
+          %{agent | schema: Zoi.object(%{count: Zoi.number() |> Zoi.default(1.0)})}
+        ] do
+      assert {:ok, snapshot} = Jido.Persistence.snapshot(changed)
+      assert snapshot.agent === changed
+      assert {:ok, restored} = Jido.Persistence.restore(snapshot)
+      assert restored === changed
+    end
   end
 
-  test "custom callbacks use the V3 core envelope" do
-    agent = CustomCheckpointAgent.new!(id: "custom", state: %{count: 9})
-    assert {:ok, checkpoint} = Agent.checkpoint(agent)
+  test "old envelopes need explicit conversion" do
+    for snapshot <- [%{version: 1, kind: :agent}, %{fmt: 4, kind: :agent, state: %{}}] do
+      assert {:error, _} = Jido.Persistence.restore(snapshot)
+    end
+  end
 
-    assert checkpoint == %{
-             version: 2,
-             kind: :agent_custom,
-             agent_module: CustomCheckpointAgent,
-             vsn: 4,
-             payload: %{id: "custom", state: %{count: 9}}
-           }
-
-    assert {:ok, ^agent} = Agent.restore(CustomCheckpointAgent, checkpoint)
-
-    assert {:error, %Jido.Error.ValidationError{details: %{code: :invalid_checkpoint}}} =
-             Agent.restore(CustomCheckpointAgent, checkpoint.payload)
-
-    assert {:error, %Jido.Error.ValidationError{details: %{code: :definition_mismatch}}} =
-             Agent.restore(CustomCheckpointAgent, %{checkpoint | vsn: 3})
-
-    assert {:error, %Jido.Error.ValidationError{details: %{code: :definition_mismatch}}} =
-             Agent.checkpoint(%{agent | vsn: 3})
+  test "custom callbacks convert state under the same saved definition" do
+    agent = CustomCheckpointAgent.instantiate!(id: "custom", state: %{count: 9})
+    assert {:ok, snapshot} = Jido.Persistence.snapshot(agent)
+    assert snapshot.state_format == :custom
+    assert snapshot.agent.state == %{id: "custom", state: %{count: 9}}
+    assert Agent.definition(snapshot.agent) === Agent.definition(agent)
+    assert Map.has_key?(snapshot.references, CustomCheckpointAgent)
+    assert {:ok, ^agent} = Jido.Persistence.restore(snapshot)
+    assert {:error, _} = Jido.Persistence.restore(snapshot.agent.state)
+    assert {:ok, changed} = Jido.Persistence.snapshot(%{agent | vsn: 5})
+    assert {:ok, %{vsn: 5}} = Jido.Persistence.restore(changed)
   end
 end

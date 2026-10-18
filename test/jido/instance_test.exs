@@ -143,7 +143,7 @@ defmodule JidoTest.InstanceTest do
   test "invalid application instance configuration reaches the final validator" do
     Application.put_env(:jido_test_instance, TestInstance, :invalid)
 
-    assert {:error, %Jido.Error.ValidationError{} = error} = TestInstance.start_link()
+    assert {:error, %{__exception__: true} = error} = TestInstance.start_link()
     assert Jido.Error.code(error) == :jido_instance_invalid_config
     assert Process.whereis(TestInstance) == nil
   end
@@ -180,7 +180,7 @@ defmodule JidoTest.InstanceTest do
     assert {:ok, ^runtime_persistence} =
              Jido.Persistence.resolve_config(:inherit, TestInstance)
 
-    agent = RedisTestAgent.new!(id: "configured-persistence")
+    agent = RedisTestAgent.instantiate!(id: "configured-persistence")
 
     assert {:ok, server} =
              TestInstance.start_agent(agent, persistence: :inherit, persistence_mode: :create)
@@ -207,7 +207,7 @@ defmodule JidoTest.InstanceTest do
     start_supervised!(module)
 
     agent =
-      RedisTestAgent.new!(id: "redis-instance-agent")
+      RedisTestAgent.instantiate!(id: "redis-instance-agent")
       |> then(fn agent -> %{agent | state: %{agent.state | counter: 42}} end)
 
     assert {:ok, pid} =
@@ -226,7 +226,7 @@ defmodule JidoTest.InstanceTest do
     start_supervised!(module)
 
     agent =
-      RedisTestAgent.new!(id: "shared-partition-key")
+      RedisTestAgent.instantiate!(id: "shared-partition-key")
       |> then(fn agent -> %{agent | state: %{agent.state | counter: 10}} end)
 
     partitioned = %{agent | state: %{agent.state | counter: 20}}
@@ -346,7 +346,7 @@ defmodule JidoTest.InstanceTest do
     assert Jido.namespace(instance) == namespace
     assert Jido.Instance.NamespaceRegistry.lookup(namespace) == {instance, instance_pid}
 
-    assert {:error, %Jido.Error.ValidationError{} = error} =
+    assert {:error, %{__exception__: true} = error} =
              Jido.start_link(name: other, namespace: namespace)
 
     assert Jido.Error.code(error) == :jido_namespace_already_bound

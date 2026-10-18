@@ -7,7 +7,6 @@ defmodule JidoTest.System.PeerRuntime do
   @moduledoc false
   use GenServer
   alias Jido.AgentServer, as: Server
-  alias Jido.Agent.Directive
   alias JidoTest.RemoteChildFixtures
   alias JidoTest.System.ControlledAgent
   alias JidoTest.RemoteChildFixtures.LifecycleParent
@@ -96,7 +95,12 @@ defmodule JidoTest.System.PeerRuntime do
       )
 
   def request_spawn(parent, node) do
-    directive = Directive.spawn_child(ControlledAgent, :worker, node: node, restart: :temporary)
+    directive =
+      Jido.AgentServer.Directive.agent_start(ControlledAgent, :worker,
+        node: node,
+        restart: :temporary
+      )
+
     signal = Jido.Signal.new!("test.remote.directive", %{directive: directive}, source: "/system")
     Server.call(parent, signal)
   end

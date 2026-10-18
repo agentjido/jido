@@ -34,23 +34,31 @@ defmodule JidoTest.Agent.CandidateCompletenessTest do
   end
 
   test "direct and live Turns reject a candidate that omits a defaulted field", %{jido: jido} do
-    initial = Counter.new!(id: unique_id("partial"), state: %{history: ["old"]})
+    initial = Counter.instantiate!(id: unique_id("partial"), state: %{history: ["old"]})
     signal = Signal.new!("candidate.partial", %{}, source: "/test")
 
-    assert {:error, %Jido.Error.ValidationError{details: %{missing_keys: [:history]}}} =
+    assert {:error,
+            %Jido.Agent.Error{
+              code: :incomplete_state,
+              details: %{issues: [%Zoi.Error{path: [:history]}]}
+            }} =
              Counter.cmd(initial, signal)
 
     assert {:ok, server} = JidoTest.AgentServerAssertions.start_agent(jido, initial)
     before = JidoTest.AgentServerAssertions.committed(server)
 
-    assert {:error, %Jido.Error.ValidationError{details: %{missing_keys: [:history]}}} =
+    assert {:error,
+            %Jido.Agent.Error{
+              code: :incomplete_state,
+              details: %{issues: [%Zoi.Error{path: [:history]}]}
+            }} =
              Server.call(server, signal)
 
     assert JidoTest.AgentServerAssertions.committed(server) == before
   end
 
   test "a candidate can omit a field that has no default", %{jido: jido} do
-    initial = Counter.new!(id: unique_id("optional"), state: %{note: "old"})
+    initial = Counter.instantiate!(id: unique_id("optional"), state: %{note: "old"})
     signal = Signal.new!("candidate.clear", %{}, source: "/test")
 
     assert {:ok, direct, []} = Counter.cmd(initial, signal)

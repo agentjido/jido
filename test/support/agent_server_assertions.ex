@@ -21,7 +21,7 @@ defmodule JidoTest.AgentServerAssertions do
 
   def replacement(activation, previous) do
     JidoTest.Eventually.eventually(fn ->
-      case AgentServer.Activation.worker(activation) do
+      case AgentServer.Supervisor.worker(activation) do
         pid when is_pid(pid) and pid != previous ->
           if AgentServer.await_ready(pid) == :ok, do: pid
 
@@ -32,6 +32,9 @@ defmodule JidoTest.AgentServerAssertions do
   end
 
   def start_agent(instance, agent, opts \\ []) do
+    opts =
+      if is_atom(agent), do: Keyword.put_new(opts, :id, Jido.Signal.ID.generate!()), else: opts
+
     with {:ok, server} <- Jido.start_agent(instance, agent, opts),
          :ok <- AgentServer.await_ready(server) do
       {:ok, server}

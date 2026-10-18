@@ -77,7 +77,7 @@ defmodule Jido.InstanceHelpersTest do
   test "start_agent uses the default instance when no instance is given" do
     assert {:ok, _jido} = Jido.start()
 
-    agent = DefaultAgent.new!(id: unique_id("default-agent"))
+    agent = DefaultAgent.instantiate!(id: unique_id("default-agent"))
     agent_id = agent.id
     assert {:ok, server} = Jido.start_agent(agent)
     assert %Jido.Agent{id: ^agent_id} = AgentServer.agent(server)
@@ -116,7 +116,7 @@ defmodule Jido.InstanceHelpersTest do
     end)
 
     id = unique_id("default-persisted-agent")
-    agent = DefaultAgent.new!(id: id)
+    agent = DefaultAgent.instantiate!(id: id)
 
     assert {:ok, server} = Jido.start_agent(agent, persistence: persistence)
     assert :ok = AgentServer.await_ready(server)

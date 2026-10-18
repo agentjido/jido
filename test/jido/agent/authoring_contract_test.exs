@@ -1,105 +1,77 @@
 defmodule Jido.Agent.AuthoringContractTest do
   use ExUnit.Case, async: true
-
   alias Jido.Agent
-  alias Jido.Agent.{Command, Directive}
-  alias JidoTest.AgentFixtures.Add
-  alias Jido.Agent.Codec
+  alias Jido.Agent.Command
+  alias Jido.AgentServer.Directive, as: Runtime
   alias Jido.Codec.Registry
+  alias JidoTest.AgentFixtures.Add
 
   defmodule Factory do
-    def new, do: Agent.new!(name: "factory") |> Agent.instantiate!(id: "factory")
+    def new, do: Agent.define!(%{name: "factory"})
   end
 
-  test "input normalization preserves each public boundary's duplicate policy" do
-    assert {:ok, %{name: "last"} = definition} = Agent.new(name: "first", name: "last")
-    assert {:ok, %{id: "last"}} = Agent.instantiate(definition, id: "first", id: "last")
-
+  test "Map authoring and instance options reject ambiguous duplicates" do
+    assert {:error, %{code: :invalid_map}} = Agent.define(name: "first", name: "last")
+    definition = Agent.define!(%{name: "state", schema: Zoi.object(%{count: Zoi.integer()})})
+    assert {:error, %{code: :invalid_options}} = Agent.instantiate(definition, id: "a", id: "b")
     assert {:ok, %{key: 2}} = Command.normalize_context(key: 1, key: 2)
     assert {:ok, %{}} = Command.normalize_context(nil)
-
-    agent = Agent.new!(name: "state", schema: Zoi.object(%{count: Zoi.integer()}))
-    instance = Agent.instantiate!(agent, state: %{count: 0})
+    instance = Agent.instantiate!(definition, id: "state", state: %{count: 0})
     assert {:ok, %{state: %{count: 2}}} = Agent.set(instance, count: 1, count: 2)
 
     for value <- [~D[2026-09-07], [:invalid], [key: 1] ++ [:invalid], [1 | :tail]] do
-      assert {:error, %{details: %{context: ^value}}} = Command.normalize_context(value)
-      assert {:error, %{details: %{attrs: ^value}}} = Agent.set(instance, value)
-      assert {:error, %{details: %{value: ^value}}} = Agent.instantiate(agent, value)
+      assert {:error, _} = Command.normalize_context(value)
+      assert {:error, _} = Agent.set(instance, value)
+      assert {:error, _} = Agent.instantiate(definition, value)
     end
   end
 
-  test "each route accepts one executable and rejects target lists" do
-    for target <- [[], [Add], [Add, Add], {[Add], %{by: 1}}] do
-      assert {:error, %{message: "Invalid Agent route executable"}} =
-               Agent.new(name: "routes", routes: [{"counter.add", target}])
-    end
-  end
-
-  test "route defaults must be plain maps in every authoring form" do
+  test "routes accept one module with separate plain Map defaults" do
     for defaults <- [%{}, %{by: 2}] do
-      target = {Add, defaults}
-
-      assert {:ok, %{routes: [%{target: ^target}]}} =
-               Agent.new(name: "routes", routes: [{"counter.add", target}])
+      assert {:ok, definition} = Agent.define(%{name: "routes", routes: [route(Add, defaults)]})
+      assert [%{handler: %{target: Add, kind: :action}, defaults: ^defaults}] = definition.routes
     end
 
-    assert {:error, %{message: "Route defaults must be a plain map"}} =
-             Agent.new(name: "routes", routes: [{"counter.add", Add, defaults: %URI{port: 1}}])
-
-    for route <- [
-          {"counter.add", {Add, %URI{port: 1}}},
-          %{path: "counter.add", target: {Add, %URI{port: 1}}},
-          %Jido.Signal.Router.Route{path: "counter.add", target: {Add, %URI{port: 1}}}
-        ] do
-      assert {:error, %{message: "Route defaults must be a plain map"}} =
-               Agent.new(name: "routes", routes: [route])
+    for target <- [[], [Add], {Add, %{}}] do
+      assert {:error, _} = Agent.define(%{name: "routes", routes: [route(target, %{})]})
     end
 
-    assert {:ok, %{routes: [%{target: Add}]}} =
-             Agent.new(name: "routes", routes: [{"counter.add", Add}])
-
-    assert {:error, %{message: "Invalid Agent route executable"}} =
-             Agent.new(name: "routes", routes: [{"counter.add", {Add, nil}}])
+    for defaults <- [nil, [], [by: 1], %URI{}] do
+      assert {:error, %{path: [:routes, 0, :defaults]}} =
+               Agent.define(%{name: "routes", routes: [route(Add, defaults)]})
+    end
   end
 
-  test "constructor modules and behavior modules have separate contracts" do
-    assert :ok = Directive.validate_agent_target(Factory)
-    assert {:error, %{message: "Expected an Agent module"}} = Agent.instantiate(Factory, [])
-
-    assert {:error, %{message: "Agent module must implement the Jido.Agent behavior"}} =
-             Agent.new(name: "behavior", module: Factory)
+  test "module provenance does not make a factory an Agent definition source" do
+    assert {:error, _} = Runtime.validate_agent_target(Factory)
+    assert {:error, %{code: :unresolved_definition}} = Agent.instantiate(Factory, id: "factory")
+    assert {:ok, definition} = Agent.define(%{name: "origin", module: Factory})
+    assert definition.module == Factory
   end
 
-  test "generated Registry IDs follow first occurrence and keep exact distinct values" do
-    schema = Zoi.object(%{})
-
+  test "Registry derivation retains exact distinct values without duplicate entries" do
     definition =
-      Agent.new!(
+      Agent.define!(%{
         name: "registry",
-        schema: schema,
         metadata: %{a: [:repeat, %URI{port: 1}, :repeat, %URI{port: 1.0}], b: {:last, <<255>>}},
-        routes: [{"counter.add", {Add, %{by: 1}}}]
-      )
+        routes: [route(Add, %{by: 1})]
+      })
 
-    assert {:ok, _document, %{entries: entries}} = Codec.encode(definition)
+    assert {:ok, document, registry} = Agent.Codec.encode(definition)
+    assert {:ok, ^definition} = Agent.Codec.decode(document, registry)
+    values = Map.values(registry.entries)
+    assert Enum.count(values, &(&1 === {:atom, :repeat})) == 1
+    assert {:value, %URI{port: 1}} in values
+    assert Enum.any?(values, &(&1 === {:value, %URI{port: 1.0}}))
 
-    assert entries === %{
-             "agent/0" => {:agent, Agent},
-             "schema/1" => {:schema, schema},
-             "atom/2" => {:atom, :a},
-             "atom/3" => {:atom, :repeat},
-             "value/4" => {:value, %URI{port: 1}},
-             "value/5" => {:value, %URI{port: 1.0}},
-             "atom/6" => {:atom, :b},
-             "atom/7" => {:atom, :last},
-             "action/8" => {:action, Add},
-             "atom/9" => {:atom, :by}
-           }
-
-    registry = Registry.new!(%{"integer" => {:value, %URI{port: 1}}})
-
-    assert {:error, %Jido.Error.ValidationError{}} =
-             Registry.identifier(registry, :value, %URI{port: 1.0})
+    assert {:error, _} =
+             Registry.identifier(
+               Registry.new!(%{"integer" => {:value, %URI{port: 1}}}),
+               :value,
+               %URI{port: 1.0}
+             )
   end
+
+  defp route(target, defaults),
+    do: %{path: "counter.add", handler: %{kind: :action, target: target}, defaults: defaults}
 end

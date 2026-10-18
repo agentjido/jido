@@ -54,12 +54,12 @@ Directives run in list order. The first failure stops the rest of the batch.
 The Agent commit remains. A caller waiting for the state transition can receive
 the committed Agent before later runtime work fails.
 
-Use the settled telemetry event when an observer must know the result of the
-complete Turn, including Directives. The event contains a bounded result
-projection. It does not contain the complete `Jido.Agent.Turn.Outcome`.
-
-The Agent Server creates the Outcome as a terminal runtime record. A custom
-error policy receives it after a failure. It is not an authoring value.
+Read `Jido.AgentServer.status/1` to distinguish the Turn result from the
+post-commit result. `last_outcome` records the Turn's status, commit state,
+revisions, IDs, Directive count, and duration. The error-policy callback
+receives this summary after a failure. `last_effect_outcome` records the
+separate post-commit status, stage, counts, and committed revision.
+Neither summary contains full Signals, Agent state, or raw errors.
 
 An optional Plugin commit notification runs before returned Directives. It
 receives only the owned committed value and its exact revision. Failure uses

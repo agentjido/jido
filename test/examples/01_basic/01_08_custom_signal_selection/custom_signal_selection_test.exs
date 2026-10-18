@@ -5,7 +5,7 @@ defmodule JidoTest.Examples.Basic.CustomSignalSelectionTest do
 
   test "custom selection converts input and preserves the source Signal", %{jido: jido} do
     signal = Example.raw_signal!("3")
-    agent = Example.new!(id: unique_id("custom-selection-direct"))
+    agent = Example.instantiate!(id: unique_id("custom-selection-direct"))
 
     assert {:ok, turn} = Example.handle_signal(signal, agent)
     assert turn.input == %{amount: 3}
@@ -26,7 +26,7 @@ defmodule JidoTest.Examples.Basic.CustomSignalSelectionTest do
         source: "/examples/basic/custom_signal_selection"
       )
 
-    agent = Example.new!(id: unique_id("custom-selection-normal"))
+    agent = Example.instantiate!(id: unique_id("custom-selection-normal"))
     server = start_agent!(jido, Example)
 
     assert {:ok, direct, []} = Jido.Agent.cmd(agent, signal)

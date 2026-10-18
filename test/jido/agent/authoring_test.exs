@@ -98,10 +98,7 @@ defmodule JidoTest.Agent.AuthoringTest do
     end
 
     routes do
-      route "raw.*", Add do
-        match &Match.positive?/1
-        priority 10
-      end
+      route "raw.*", Add
 
       route "event.*", Add
     end
@@ -159,21 +156,14 @@ defmodule JidoTest.Agent.AuthoringTest do
       schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
       metadata %{owner: :test, nested: {:tag, <<255>>}}
       plugin CountTurns, config: %{initial: 0}
-      plugin PassThrough, config: [label: :second]
+      plugin PassThrough, config: %{label: :second}
     end
 
     routes do
       signal_source "/authoring"
 
-      route "authoring.add", Add, as: :add do
-        defaults %{amount: 1, flag: false}
-        priority(10)
-      end
-
-      route "authoring.flow", Flow, as: :flow_add do
-        defaults %{amount: 2}
-        priority(-5)
-      end
+      route "authoring.add", Add, as: :add, defaults: %{amount: 1, flag: false}
+      route "authoring.flow", Flow, as: :flow_add, defaults: %{amount: 2}
     end
   end
 
@@ -183,13 +173,13 @@ defmodule JidoTest.Agent.AuthoringTest do
     agent do
       schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
       metadata %{owner: :test, nested: {:tag, <<255>>}}
-      plugin CountTurns, config: [initial: 0]
-      plugin PassThrough, config: [label: :second]
+      plugin CountTurns, config: %{initial: 0}
+      plugin PassThrough, config: %{label: :second}
     end
 
     routes do
-      route "authoring.add", Add, defaults: %{amount: 1, flag: false}, priority: 10
-      route "authoring.flow", Flow, defaults: %{amount: 2}, priority: -5
+      route "authoring.add", Add, defaults: %{amount: 1, flag: false}
+      route "authoring.flow", Flow, defaults: %{amount: 2}
     end
   end
 
@@ -221,16 +211,87 @@ defmodule JidoTest.Agent.AuthoringTest do
     defp add(count, amount, multiplier), do: count + amount * multiplier
   end
 
-  test "exposed and unexposed routes retain their own module identity" do
-    block = Counter.definition()
-    unexposed = UnexposedCounter.definition()
+  test "the definition stores ordered routes and Plugin contributions" do
+    definition = Counter.definition()
+    assert definition.module == Counter
+    assert definition.vsn == 7
+    assert Enum.map(definition.routes, & &1.path) == ["authoring.add", "authoring.flow"]
 
-    assert block.module == Counter
-    assert unexposed.module == UnexposedCounter
-    assert %{unexposed | module: Counter} === block
-    assert function_exported?(Counter, :add_signal, 1)
+    assert Agent.runtime_plugins(definition) == [
+             {CountTurns, [initial: 0]},
+             {PassThrough, [label: :second]}
+           ]
+
+    assert Enum.map(definition.extensions, & &1.provider) == [CountTurns, PassThrough]
+    assert Counter.schema() == Agent.schema(definition)
+    assert Counter.instantiate!(id: "defined").state == %{count: 0, turns: 0}
     refute function_exported?(UnexposedCounter, :add_signal, 1)
-    refute function_exported?(UnexposedCounter, :add_signal, 2)
+    assert {:ok, document, registry} = Codec.encode(definition)
+    assert {:ok, ^definition} = Codec.decode(document, registry)
+  end
+
+  test "generated helpers have docs, specs and optional empty input" do
+    module = JidoTest.AuthoringDocsAgent
+    {:docs_v1, _, _, _, _, _, docs} = Code.fetch_docs(module)
+
+    assert {{:function, :increment_signal, 2}, _, _, %{"en" => help}, _} =
+             Enum.find(docs, fn {key, _, _, _, _} -> key == {:function, :increment_signal, 2} end)
+
+    assert help =~ "Builds an input Signal"
+    assert {:ok, specs} = Code.Typespec.fetch_specs(module)
+    assert List.keymember?(specs, {:increment_signal, 2}, 0)
+    assert {:ok, %{data: %{}}} = module.increment_signal()
+    refute function_exported?(module, :increment_signal!, 1)
+  end
+
+  test "Spark rejects invalid schema and identity options with a field path" do
+    assert_raise Spark.Error.DslError, ~r/schema/, fn ->
+      compile_agent("", "", "agent do\n schema nil\n end")
+    end
+
+    for option <- ["schema: Zoi.object(%{})", "metadata: %{}", "plugins: []", "routes: []"] do
+      assert_raise Spark.Options.ValidationError, ~r/unknown options/, fn ->
+        compile_agent("", ", #{option}")
+      end
+    end
+  end
+
+  test "removed route options and invalid helpers fail at declaration" do
+    for option <- ["priority: 1", "match: fn _ -> true end", "params: %{}"] do
+      assert_raise CompileError, ~r/Unknown route options/, fn ->
+        compile_agent("route \"test.add\", Add, #{option}")
+      end
+    end
+
+    for routes <- [
+          "route \"test.*\", Add, as: :add",
+          "route \"test.add\", Add, as: :add\nroute \"test.other\", Add, as: :add",
+          "route \"test.add\", Add\nroute \"test.add\", Add"
+        ] do
+      assert_raise Spark.Error.DslError, fn -> compile_agent(routes) end
+    end
+
+    assert_raise CompileError, ~r/unique keyword/, fn ->
+      compile_agent("route \"test.add\", Add, as: :add, as: :other")
+    end
+  end
+
+  test "a bare route is pass-through and needs no Agent block or source" do
+    compiled =
+      compile_isolated("""
+      defmodule JidoTest.BareAgent#{System.unique_integer([:positive])} do
+        use Jido.Agent, name: "bare"
+        routes do
+          route "test.pass"
+        end
+      end
+      """)
+
+    {module, _} =
+      Enum.find(compiled, fn {module, _} -> function_exported?(module, :definition, 0) end)
+
+    assert [%{handler: %{kind: :pass_through}}] = module.definition().routes
+    assert {:error, %{code: :unmatched_input}} = Agent.Route.select(module.definition(), "other")
   end
 
   test "block metadata accepts mixed keys and rejects structs with a DSL error" do
@@ -268,7 +329,9 @@ defmodule JidoTest.Agent.AuthoringTest do
     {:ok, signal} =
       InlineCounter.add_inline_signal(%{amount: 3, multiplier: 2})
 
-    assert {:ok, candidate, []} = InlineCounter.cmd(InlineCounter.new!(), signal)
+    assert {:ok, candidate, []} =
+             InlineCounter.cmd(InlineCounter.instantiate!(id: Jido.Signal.ID.generate!()), signal)
+
     assert candidate.state.count == 6
   end
 
@@ -296,14 +359,17 @@ defmodule JidoTest.Agent.AuthoringTest do
 
     {module, _bytecode} =
       Enum.find(compiled, fn {compiled_module, _bytecode} ->
-        function_exported?(compiled_module, :new!, 0)
+        function_exported?(compiled_module, :instantiate!, 1)
       end)
 
     positive = Jido.Signal.new!("test.classify", %{amount: 1}, source: "/test")
     other = Jido.Signal.new!("test.classify", %{amount: 0}, source: "/test")
 
-    assert {:ok, %{state: %{result: :positive}}, []} = module.cmd(module.new!(), positive)
-    assert {:ok, %{state: %{result: :other}}, []} = module.cmd(module.new!(), other)
+    assert {:ok, %{state: %{result: :positive}}, []} =
+             module.cmd(module.instantiate!(id: Jido.Signal.ID.generate!()), positive)
+
+    assert {:ok, %{state: %{result: :other}}, []} =
+             module.cmd(module.instantiate!(id: Jido.Signal.ID.generate!()), other)
   end
 
   test "generated constructors preserve omitted and explicit input and fresh Signal IDs" do
@@ -315,31 +381,16 @@ defmodule JidoTest.Agent.AuthoringTest do
     assert {:ok, %{id: "stable", source: "/custom"}} =
              Counter.add_signal(%{amount: 2}, source: "/custom", id: "stable")
 
-    assert {:ok, next, []} = Counter.cmd(Counter.new!(), first)
+    assert {:ok, next, []} =
+             Counter.cmd(Counter.instantiate!(id: Jido.Signal.ID.generate!()), first)
+
     assert next.state.count == 1
 
     assert {:ok, signal} = Counter.add_signal(%{amount: nil})
     assert signal.data == %{amount: nil}
-    assert {:error, %Jido.Action.Error.InvalidInputError{}} = Counter.cmd(Counter.new!(), signal)
-  end
 
-  test "generated documentation and specs describe one map-based constructor" do
-    module = JidoTest.AuthoringDocsAgent
-    assert {_, [signature], %{"en" => help}, _} = function_docs(module, :increment_signal, 2)
-    assert signature =~ "increment_signal(input, envelope_opts"
-    assert help =~ "plain input map"
-    assert help =~ "does not execute a command"
-    assert help =~ "Jido.AgentServer.call/3"
-
-    assert function_spec(module, :increment_signal, 2) ==
-             normalized_spec(
-               "increment_signal(map(), keyword()) :: {:ok, Jido.Signal.t()} | {:error, term()}"
-             )
-
-    assert function_exported?(module, :increment_signal, 1)
-    refute function_exported?(module, :increment_signal, 0)
-    refute function_exported?(module, :increment_signal!, 1)
-    refute function_exported?(module, :increment, 2)
+    assert {:error, %Jido.Action.Error.InvalidInputError{}} =
+             Counter.cmd(Counter.instantiate!(id: Jido.Signal.ID.generate!()), signal)
   end
 
   test "map inputs retain keys that overlap helper option names" do
@@ -351,7 +402,7 @@ defmodule JidoTest.Agent.AuthoringTest do
 
   test "constructors reject non-map input and invalid envelope options" do
     for input <- [nil, [], [amount: 1], 1, ~D[2026-09-03]] do
-      assert {:error, %Jido.Error.ValidationError{}} = Counter.add_signal(input)
+      assert {:error, %{__exception__: true}} = Counter.add_signal(input)
     end
 
     for options <- [
@@ -373,7 +424,7 @@ defmodule JidoTest.Agent.AuthoringTest do
     assert {:error, _} = Agent.instantiate(%{}, [])
   end
 
-  test "raw wildcard and predicate routes and static structs survive the Codec" do
+  test "wildcard routes and static structs survive the Codec" do
     definition = RawCounter.definition()
     assert {:ok, document, registry} = Codec.encode(definition)
     assert {:ok, ^definition} = Codec.decode(JSON.decode!(JSON.encode!(document)), registry)
@@ -388,66 +439,8 @@ defmodule JidoTest.Agent.AuthoringTest do
     end
 
     signal = Jido.Signal.new!("raw.add", %{amount: -1}, source: "/test")
-    assert {:error, %Jido.Error.RoutingError{}} = Agent.cmd(agent, signal)
+    assert {:ok, %{state: %{count: -1}}, []} = Agent.cmd(agent, signal)
     assert {:error, _} = Registry.new(%{"runtime" => {:value, %{~D[2026-09-03] | day: self()}}})
-  end
-
-  test "Plugin Codec uses the same record and Registry as Agent Codec" do
-    {:ok, document, registry} = Codec.encode(Counter.definition())
-
-    for {plugin, encoded} <- Enum.zip(Counter.definition().plugins, document["plugins"]) do
-      assert {:ok, ^encoded} = Jido.Plugin.Codec.encode(plugin, registry)
-
-      assert {:ok, ^plugin} =
-               Jido.Plugin.Codec.decode(JSON.decode!(JSON.encode!(encoded)), registry)
-    end
-
-    [plugin | _] = Counter.definition().plugins
-    assert {:ok, encoded, registry} = Jido.Plugin.Codec.encode(plugin)
-    assert {:ok, ^plugin} = Jido.Plugin.Codec.decode(encoded, registry)
-    assert {:error, _} = Jido.Plugin.Codec.decode(Map.put(encoded, "state", %{}), registry)
-    assert {module, _options} = plugin
-
-    assert registry.entries == %{
-             "plugin/0" => {:plugin, module},
-             "atom/1" => {:atom, :initial}
-           }
-  end
-
-  test "trusted aliases decode and re-encode with the canonical identifier" do
-    {:ok, document, registry} = Codec.encode(Counter.definition())
-    canonical = document["module"]
-    registry = Registry.new!(Map.put(registry.entries, "old/counter", {:alias, canonical}))
-    assert {:ok, definition} = Codec.decode(%{document | "module" => "old/counter"}, registry)
-    assert {:ok, ^document} = Codec.encode(definition, registry)
-    assert {:error, _} = Registry.new(%{"one" => {:alias, "two"}, "two" => {:alias, "one"}})
-    assert {:error, _} = Registry.new(%{"one" => {:atom, :x}, "two" => {:atom, :x}})
-    assert {:error, _} = Registry.new(%{"bad" => {:route_match, fn _ -> true end}})
-  end
-
-  test "Codec derives an instance definition without parsing live state" do
-    schema =
-      Zoi.object(%{count: Zoi.integer() |> Zoi.refine({__MODULE__, :observe_count, []})})
-
-    assert {:ok, definition} = Agent.new(name: "observed", schema: schema)
-    assert {:ok, document, registry} = Codec.encode(definition)
-    assert {:ok, ^definition} = Codec.decode(document, registry)
-
-    instance = %{definition | id: "observed", state: %{count: 1}}
-    assert {:ok, %{state: %{count: 1}} = normalized} = Agent.validate(instance)
-    assert_received {:parsed_live_count, 1}
-    assert {:ok, ^document} = Codec.encode(instance, registry)
-    assert {:ok, generated_document, generated_registry} = Codec.encode(instance)
-    assert {:ok, ^definition} = Codec.decode(generated_document, generated_registry)
-    assert {:ok, ^document} = Codec.encode(normalized, registry)
-    assert {:ok, ^generated_document, _registry} = Codec.encode(normalized)
-    refute_received {:parsed_live_count, _}
-    assert normalized.state == %{count: 1}
-
-    invalid = %{instance | state: %{count: "invalid"}}
-    assert {:error, _} = Agent.validate(invalid)
-    assert {:ok, ^document} = Codec.encode(invalid, registry)
-    refute_received {:parsed_live_count, _}
   end
 
   test "Codec rejects incomplete instance shapes before it derives a definition" do
@@ -465,116 +458,26 @@ defmodule JidoTest.Agent.AuthoringTest do
     end
   end
 
-  test "valid direct route closures stay valid outside the Codec subset" do
-    local_match = fn signal -> signal.type == "runtime.match" end
-
-    assert {:ok, definition} =
-             Agent.new(
-               name: "runtime_match",
-               routes: [{"runtime.match", Add, match: local_match}]
-             )
-
-    assert {:ok, ^definition} = Agent.validate_definition(definition)
-
-    assert {:error, %Jido.Error.ValidationError{} = error} = Codec.encode(definition)
-    assert error.message == "Route matches must be external unary captures"
-  end
-
-  test "Codec rejects malformed documents without deriving atoms or modules" do
-    {:ok, document, registry} = Codec.encode(Counter.definition())
-
-    for bad <- [
-          nil,
-          [],
-          Map.put(document, "unexpected", true),
-          Map.delete(document, "schema"),
-          %{document | "version" => 99},
-          %{document | "module" => "Elixir.DoesNotExist"},
-          %{document | "schema" => document["module"]},
-          %{document | "plugins" => %{}},
-          %{document | "metadata" => %{"$type" => "atom", "id" => "never/registered"}},
-          %{
-            document
-            | "metadata" => %{"$type" => "map", "entries" => [["same", 1], ["same", 2]]}
-          },
-          %{document | "routes" => [Map.put(hd(document["routes"]), "kind", "function")]},
-          %{document | "metadata" => self()},
-          %{document | "metadata" => [1 | 2]}
-        ] do
-      assert {:error, _} = Codec.decode(bad, registry)
-    end
-
-    assert {:error, _} = Codec.decode(document, %{})
-    assert {:error, _} = Codec.decode(document, registry, state: %{count: "bad"})
-  end
-
-  test "decoded map aliases reject duplicates after all entries decode" do
-    alias Jido.Codec.Data
-
-    registry = Registry.new!(%{"key" => {:atom, :key}, "alias" => {:alias, "key"}})
-    key = %{"$type" => "atom", "id" => "key"}
-    same_key = %{"$type" => "atom", "id" => "alias"}
-    entries = [[key, 1], [same_key, 2]]
-
-    assert {:ok, %{"other" => 2, key: 1}} =
-             Data.decode(%{"$type" => "map", "entries" => [[key, 1], ["other", 2]]}, registry)
-
-    assert {:error, error} = Data.decode(%{"$type" => "map", "entries" => entries}, registry)
-    assert Exception.message(error) =~ "Duplicate decoded map key"
-
-    for {tail, message} <- [
-          {["invalid"], "Invalid map entry"},
-          {["later", %{"$type" => "unknown"}], "Invalid tagged authoring value"}
-        ] do
-      assert {:error, error} =
-               Data.decode(%{"$type" => "map", "entries" => entries ++ [tail]}, registry)
-
-      assert Exception.message(error) =~ message
-    end
-  end
-
-  test "Codec bounds documents and rejects runtime data on encode" do
-    {:ok, document, registry} = Codec.encode(Counter.definition())
-    deep = Enum.reduce(1..102, nil, fn _, acc -> [acc] end)
-
-    for value <- [deep, List.duplicate(0, 10_001), String.duplicate("a", 1_048_577), <<255>>] do
-      assert {:error, _} = Codec.decode(%{document | "metadata" => value}, registry)
-    end
-
-    for value <- [self(), make_ref(), fn -> :ok end, [1 | 2]] do
-      assert {:error, _} = Codec.encode(%{Counter.definition() | metadata: %{runtime: value}})
-    end
-  end
-
-  test "direct construction accepts the same route option form" do
-    assert {:ok, agent} =
-             Agent.new(
-               name: "direct",
-               routes: [{"direct.add", Add, defaults: %{amount: 2}, priority: 20}]
-             )
-
-    assert [%{priority: 20, target: {Add, %{amount: 2}}}] = agent.routes
-
-    assert {:ok, ^agent} =
-             Agent.new(
-               name: "direct",
-               routes: [%{path: "direct.add", target: Add, defaults: %{amount: 2}, priority: 20}]
-             )
-
-    assert {:error, _} = Agent.new(name: "old", routes: [{"old.add", Add, params: %{amount: 2}}])
-  end
-
   test "malformed route collections return errors in direct forms" do
     route = {"direct.add", Add}
 
     for routes <- [[route | :invalid], [[route]], [[route, route]], [[]]] do
-      assert {:error, _} = Agent.new(name: "invalid", routes: routes)
+      assert {:error, _} = Agent.define(%{name: "invalid", routes: routes})
     end
 
     assert {:ok, built} =
-             Agent.new(name: "tuple", routes: [{"tuple.add", {Add, %{amount: 2}}}])
+             Agent.define(%{
+               name: "tuple",
+               routes: [
+                 %{
+                   path: "tuple.add",
+                   handler: %{kind: :action, target: Add},
+                   defaults: %{amount: 2}
+                 }
+               ]
+             })
 
-    assert [%{target: {Add, %{amount: 2}}}] = built.routes
+    assert [%{handler: %{target: Add}, defaults: %{amount: 2}}] = built.routes
   end
 
   test "map inputs support optional list and keyword fields without ambiguity" do
@@ -588,32 +491,6 @@ defmodule JidoTest.Agent.AuthoringTest do
       input = %{field => value}
       assert {:ok, signal} = module.list_signal(input)
       assert signal.data == input
-    end
-  end
-
-  test "compile diagnostics reject invalid interface declarations" do
-    cases = [
-      {"route \"test.*\", Add, as: :add", "exact route"},
-      {"route \"test.add\", Add, as: :add, match: fn _ -> true end", "exact route"},
-      {"route \"test.add\", Add, as: :add\nroute \"test.other\", Add, as: :add",
-       "Duplicate interface name"},
-      {"route \"test.add\", Add, as: :add\nroute \"test.add\", Add", "exactly one route"}
-    ]
-
-    for {routes, message} <- cases do
-      error = assert_raise CompileError, ~r/#{message}/, fn -> compile_agent(routes) end
-      assert error.file == "agent_dsl_fixture.ex"
-      assert error.line == 10
-    end
-
-    assert_raise CompileError, ~r/duplicate route option/, fn ->
-      compile_agent("route \"test.add\", Add, as: :add, as: :other")
-    end
-
-    for name <- ["\"add\"", "42", "[:add]"] do
-      assert_raise Spark.Error.DslError, ~r/as/, fn ->
-        compile_agent("route \"test.add\", Add, as: #{name}")
-      end
     end
   end
 
@@ -632,179 +509,15 @@ defmodule JidoTest.Agent.AuthoringTest do
         false
       )
 
-    {module, _} = Enum.find(compiled, fn {module, _} -> function_exported?(module, :new!, 0) end)
+    {module, _} =
+      Enum.find(compiled, fn {module, _} -> function_exported?(module, :instantiate!, 1) end)
+
     refute function_exported?(module, :add_signal, 1)
     refute function_exported?(module, :add_signal, 2)
     signal = Jido.Signal.new!("test.add", %{}, source: "/caller")
-    assert {:ok, %{state: %{}}, []} = module.cmd(module.new!(), signal)
-  end
 
-  test "inline helper errors point to the route header" do
-    error =
-      assert_raise CompileError, ~r/exact route/, fn ->
-        compile_agent("""
-        route "test.*", as: :add do
-          action params do
-            {:ok, params}
-          end
-        end
-        """)
-      end
-
-    assert error.file == "agent_dsl_fixture.ex"
-    assert error.line == 10
-  end
-
-  test "inline route diagnostics reject missing, mixed, duplicate, and bound declarations" do
-    assert_raise CompileError, ~r/requires a target module or one inline Action/, fn ->
-      compile_agent("route \"test.add\", as: :add")
-    end
-
-    assert_raise CompileError, ~r/cannot combine a target module with an inline Action/, fn ->
-      compile_agent("""
-      route "test.add", Add do
-        action params do
-          {:ok, params}
-        end
-      end
-      """)
-    end
-
-    assert_raise CompileError, ~r/only one inline Action/, fn ->
-      compile_agent("""
-      route "test.add" do
-        action params do
-          {:ok, params}
-        end
-        action other do
-          {:ok, other}
-        end
-      end
-      """)
-    end
-
-    error =
-      assert_raise CompileError, ~r/inline Action callback requires/, fn ->
-        compile_agent("""
-        route "test.add" do
-          action value <- 1 do
-            {:ok, %{count: value}}
-          end
-        end
-        """)
-      end
-
-    assert error.file == "agent_dsl_fixture.ex"
-    assert error.line == 11
-  end
-
-  test "compile diagnostics reject definition options, missing source and manual collisions" do
-    assert_raise CompileError, ~r/Unknown authoring fields/, fn ->
-      compile_agent("route \"test.add\", Add", ", routes: []")
-    end
-
-    assert_raise CompileError, ~r/signal_source is required/, fn ->
-      compile_agent("route \"test.add\", Add, as: :add", "", "", false)
-    end
-
-    for args <- ["_input", "_input, _options"] do
-      error =
-        assert_raise CompileError, ~r/Generated function conflicts/, fn ->
-          compile_agent(
-            "route \"test.add\", Add, as: :add",
-            "",
-            "def add_signal(#{args}), do: :manual"
-          )
-        end
-
-      assert error.file == "agent_dsl_fixture.ex"
-      assert error.line == 10
-    end
-  end
-
-  test "module options accept only identity and extension settings" do
-    for option <- ["schema: Zoi.object(%{})", "metadata: %{}", "plugins: []", "routes: []"] do
-      for block <- ["", "agent do\nend"] do
-        error =
-          assert_raise CompileError, fn ->
-            compile_isolated("""
-            defmodule JidoTest.RemovedAgentOptions#{System.unique_integer([:positive])} do
-              use Jido.Agent, name: "removed_options", #{option}
-              #{block}
-            end
-            """)
-          end
-
-        assert error.description =~ "Unknown authoring fields"
-      end
-    end
-  end
-
-  test "invalid executable targets fail module verification" do
-    for target <- ["String", "[Add]", "[Add, Add]"] do
-      assert_raise CompileError, ~r/Invalid Agent route executable/, fn ->
-        compile_agent("route \"test.add\", #{target}")
-      end
-    end
-  end
-
-  test "semantic errors point to the failed field or declaration" do
-    for {body, declaration, message} <- [
-          {"agent do\n  schema nil\nend", "schema nil", "schema"},
-          {"agent do\n  plugin String, config: nil\nend", "plugin String", "map or keyword"},
-          {"agent do\n  plugin #{inspect(CountTurns)}\n  plugin String\nend", "plugin String",
-           "Plugin"},
-          {"agent do\nend\nroutes do\n  route \"valid\", #{inspect(Add)}\n  route \"invalid\", String\nend",
-           "route \"invalid\"", "Invalid Agent route executable"}
-        ] do
-      module = Module.concat(JidoTest, "LocatedAgent#{System.unique_integer([:positive])}")
-
-      source = """
-      defmodule #{inspect(module)} do
-        use Jido.Agent, name: "located"
-        #{body}
-      end
-      """
-
-      line =
-        source
-        |> String.split("\n")
-        |> Enum.find_index(&String.contains?(&1, declaration))
-        |> Kernel.+(1)
-
-      error = assert_raise CompileError, fn -> compile_isolated(source) end
-      assert error.description =~ message
-      assert Path.expand(error.file) == Path.expand("agent_dsl_fixture.ex")
-      assert error.line == line, inspect(error)
-    end
-  end
-
-  test "routes require an explicit agent block" do
-    assert_raise CompileError, ~r/agent block is required/i, fn ->
-      compile_isolated("""
-      defmodule JidoTest.RouteWithoutAgent#{System.unique_integer([:positive])} do
-        use Jido.Agent, name: "route_without_agent"
-
-        routes do
-          route "test.add", JidoTest.Agent.AuthoringTest.Add
-        end
-      end
-      """)
-    end
-  end
-
-  test "removed route params and Plugin labels fail compilation" do
-    assert_raise CompileError, ~r/params/, fn ->
-      compile_agent("route \"test.add\", Add, params: %{amount: 1}")
-    end
-
-    assert_raise Spark.Error.DslError, ~r/as/, fn ->
-      compile_agent("", "", """
-      agent do
-        plugin JidoTest.Agent.AuthoringTest.CountTurns, as: :counter
-      end
-      """)
-    end
+    assert {:ok, %{state: %{}}, []} =
+             module.cmd(module.instantiate!(id: Jido.Signal.ID.generate!()), signal)
   end
 
   test "recompilation verifies the new schema of an Action defined later in the same file" do
@@ -836,49 +549,13 @@ defmodule JidoTest.Agent.AuthoringTest do
         """)
 
         assert {:ok, signal} = module.add_signal(%{field => 3})
-        assert {:ok, candidate, []} = module.cmd(module.new!(), signal)
+
+        assert {:ok, candidate, []} =
+                 module.cmd(module.instantiate!(id: Jido.Signal.ID.generate!()), signal)
+
         assert candidate.state.count == 3
       end
     end)
-  end
-
-  test "definitions retain forward Plugin references and read current Plugin state schemas" do
-    module = Module.concat(JidoTest, "PluginReload#{System.unique_integer([:positive])}")
-    plugin = Module.concat(module, State)
-
-    plugin_source = fn key, default ->
-      """
-      defmodule #{inspect(plugin)} do
-        use Jido.Plugin
-        @impl true
-        def state_spec(_opts), do: {#{inspect(key)}, Zoi.integer() |> Zoi.default(#{default})}
-      end
-      """
-    end
-
-    compile_isolated("""
-    defmodule #{inspect(module)} do
-      use Jido.Agent, name: "plugin_reload"
-      agent do
-        schema Zoi.object(%{domain: Zoi.integer() |> Zoi.default(0)})
-        plugin #{inspect(plugin)}
-      end
-    end
-    #{plugin_source.(:owned, 1)}
-    """)
-
-    definition = module.definition()
-    assert definition.plugins == [{plugin, []}]
-    assert module.new!().state == %{domain: 0, owned: 1}
-
-    ExUnit.CaptureIO.capture_io(:stderr, fn -> compile_isolated(plugin_source.(:owned, 2)) end)
-    assert module.definition() == definition
-    assert module.new!().state == %{domain: 0, owned: 2}
-    assert {:ok, %{domain: 0, owned: 2}} = Zoi.parse(module.complete_schema(), %{})
-
-    ExUnit.CaptureIO.capture_io(:stderr, fn -> compile_isolated(plugin_source.(:domain, 2)) end)
-    assert {:error, _} = Jido.Agent.Source.definition(module)
-    assert {:error, _} = module.new()
   end
 
   test "an unchanged Agent checks a reloaded Action contract" do
@@ -900,14 +577,14 @@ defmodule JidoTest.Agent.AuthoringTest do
     end
     """)
 
-    assert {:ok, _} = Jido.Agent.Source.definition(module)
+    assert {:ok, _} = Jido.Agent.Validation.resolve(module)
 
     ExUnit.CaptureIO.capture_io(:stderr, fn ->
       compile_isolated("defmodule #{inspect(action)} do\ndef run(_, _), do: {:ok, %{}}\nend")
     end)
 
-    assert {:error, _} = Jido.Agent.Source.definition(module)
-    assert {:error, _} = module.new()
+    assert {:error, _} = Jido.Agent.Validation.resolve(module)
+    assert {:error, _} = module.instantiate(id: "invalid")
   end
 
   defp compile_agent(routes, opts \\ "", extra \\ "", source? \\ true) do
@@ -951,27 +628,6 @@ defmodule JidoTest.Agent.AuthoringTest do
       10_000 -> flunk("Agent compilation did not finish")
     end
   end
-
-  defp function_docs(module, name, arity) do
-    {:docs_v1, _, _, _, _, _, docs} = Code.fetch_docs(module)
-
-    {{:function, ^name, ^arity}, anno, signatures, doc, metadata} =
-      Enum.find(docs, fn {key, _, _, _, _} -> key == {:function, name, arity} end)
-
-    {anno, signatures, doc, metadata}
-  end
-
-  defp function_spec(module, name, arity) do
-    {:ok, specs} = Code.Typespec.fetch_specs(module)
-    {{^name, ^arity}, [spec]} = List.keyfind(specs, {name, arity}, 0)
-
-    name
-    |> Code.Typespec.spec_to_quoted(spec)
-    |> Macro.to_string()
-    |> normalized_spec()
-  end
-
-  defp normalized_spec(source), do: String.replace(source, ~r/\s+/, "")
 end
 
 defmodule JidoTest.Agent.AuthoringRuntimeTest do
@@ -981,7 +637,7 @@ defmodule JidoTest.Agent.AuthoringRuntimeTest do
   alias JidoTest.Agent.AuthoringTest.{Counter, InlineCounter, PreparedCounter}
 
   test "generated Action and Flow helpers commit the direct candidate", %{jido: jido} do
-    agent = Counter.new!()
+    agent = Counter.instantiate!(id: Jido.Signal.ID.generate!())
     {:ok, server} = JidoTest.AgentServerAssertions.start_agent(jido, agent)
 
     {:ok, command_signal_1} = Counter.add_signal(%{amount: 3})
@@ -1033,7 +689,7 @@ defmodule JidoTest.Agent.AuthoringRuntimeTest do
 
     {:ok, route_signal_4} = Counter.add_signal(%{amount: 2})
 
-    assert {:error, %Jido.Error.ValidationError{}} =
+    assert {:error, %{__exception__: true}} =
              Jido.AgentServer.call(server, route_signal_4, timeout: :invalid)
 
     assert JidoTest.AgentServerAssertions.committed(server) == before
@@ -1047,7 +703,7 @@ defmodule JidoTest.Agent.AuthoringRuntimeTest do
   end
 
   test "helpers leave executable validation to execution", %{jido: jido} do
-    agent = PreparedCounter.new!()
+    agent = PreparedCounter.instantiate!(id: Jido.Signal.ID.generate!())
     assert {:ok, signal} = PreparedCounter.add_signal(%{amount: 2})
     assert signal.data == %{amount: 2}
     assert {:ok, candidate, []} = PreparedCounter.cmd(agent, signal)

@@ -2,8 +2,7 @@ defmodule Jido.Persistence.Checkpoint do
   @moduledoc false
 
   alias Jido.Agent
-  alias Jido.Agent.Checkpoint, as: AgentCheckpoint
-  alias Jido.Error
+  alias Jido.Persistence.AgentCheckpoint
   alias Jido.Persistence.Record
   alias Jido.Agent.Plugin.Spec, as: AgentSpec
   alias Jido.Persistence.Plugin, as: PersistencePlugin
@@ -11,13 +10,13 @@ defmodule Jido.Persistence.Checkpoint do
 
   @doc false
   @spec dump(Agent.instance(), map(), pos_integer(), term()) :: {:ok, map()} | {:error, term()}
-  def dump(%Agent{} = agent, context, record_format, reason) do
+  def dump(agent, context, record_format, reason) do
     AgentCheckpoint.checkpoint(agent, context, converter(:dump, record_format, reason))
   end
 
   defp converter(direction, record_format, reason) do
     fn agent, state ->
-      with {:ok, specs} <- Jido.Plugin.Normalizer.normalize_all(agent.plugins) do
+      with {:ok, specs} <- Jido.Plugin.Normalizer.normalize_all(Jido.Agent.runtime_plugins(agent)) do
         convert_owned_state(state, specs, direction, record_format, reason)
       end
     end
@@ -56,48 +55,29 @@ defmodule Jido.Persistence.Checkpoint do
 
   @doc false
   def restore_agent(record, agent_module, agent_id, instance) do
-    with :ok <- validate_definition_revision(record, agent_module),
-         {:ok, agent} <-
+    with {:ok, agent} <-
            AgentCheckpoint.restore(
              agent_module,
              Record.checkpoint(record),
              restore_context(record, instance),
              converter(:load, Record.format(record), :restore)
            ),
-         :ok <- validate_restored_identity(agent, agent_module, agent_id) do
+         :ok <- validate_restored_identity(agent, agent_module, agent_id),
+         true <- agent.vsn == Record.agent_vsn(record) do
       {:ok, agent}
+    else
+      false -> {:error, {:invalid_persistence_record, :vsn}}
+      error -> error
     end
   end
 
-  defp validate_definition_revision(record, agent_module) do
-    case Record.agent_vsn(record) do
-      nil ->
-        :ok
-
-      saved_vsn ->
-        case current_definition_revision(agent_module) do
-          ^saved_vsn ->
-            :ok
-
-          current_vsn ->
-            {:error,
-             Error.validation_error("Stored Agent definition revision does not match",
-               kind: :config,
-               subject: agent_module,
-               details: %{
-                 code: :definition_mismatch,
-                 saved_vsn: saved_vsn,
-                 current_vsn: current_vsn
-               }
-             )}
-        end
-    end
-  end
-
-  defp current_definition_revision(agent_module) do
-    if Code.ensure_loaded?(agent_module) and function_exported?(agent_module, :vsn, 0),
-      do: agent_module.vsn(),
-      else: nil
+  @doc false
+  def restore_snapshot(snapshot, context) do
+    Jido.Persistence.Snapshot.load(
+      snapshot,
+      context,
+      converter(:load, Record.format_version(), :restore)
+    )
   end
 
   defp validate_restored_identity(%Agent{module: module, id: id}, module, id), do: :ok

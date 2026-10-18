@@ -5,7 +5,6 @@ defmodule JidoTest.AgentServer.StartupTest do
   use Covenant.Case, component: "jido.agent_server2", async: false
 
   alias Jido.AgentServer, as: Server
-  alias Jido.Error.ValidationError
   alias JidoTest.AgentServer.Fixtures, as: F
 
   setup do
@@ -28,7 +27,7 @@ defmodule JidoTest.AgentServer.StartupTest do
           [agent: c.agent, runner: c.runner, name: "bad"],
           [agent: c.agent, runner: c.runner, max_postponed_signals: -1]
         ] do
-      assert {:error, %ValidationError{}} = Server.start_link(opts)
+      assert {:error, %{__exception__: true}} = Server.start_link(opts)
     end
   end
 
@@ -40,7 +39,7 @@ defmodule JidoTest.AgentServer.StartupTest do
     Supervisor.stop(pid)
     fake = start_supervised!(Supervisor.child_spec({Agent, fn -> :fake end}, id: name))
     true = Process.register(fake, name)
-    assert {:error, %ValidationError{}} = Server.start_link(agent: c.agent, runner: name)
+    assert {:error, %{__exception__: true}} = Server.start_link(agent: c.agent, runner: name)
   end
 
   @tag obligation: "jido.agent_server2.I2"
@@ -57,14 +56,17 @@ defmodule JidoTest.AgentServer.StartupTest do
           [turn_timeout: 4_294_967_296]
         ] do
       Application.put_env(:jido, Server, value)
-      assert {:error, %ValidationError{}} = Server.start_link(agent: c.agent, runner: c.runner)
+
+      assert {:error, %{__exception__: true}} =
+               Server.start_link(agent: c.agent, runner: c.runner)
+
       server = F.start(c, turn_timeout: :infinity)
       assert {:ok, %{state: %{count: 1}}, []} = Server.call(server, F.signal())
       Server.stop(server)
     end
 
     for timeout <- [-1, 1.5, :bad, 4_294_967_296] do
-      assert {:error, %ValidationError{}} =
+      assert {:error, %{__exception__: true}} =
                Server.start_link(agent: c.agent, runner: c.runner, turn_timeout: timeout)
     end
   end
@@ -105,10 +107,10 @@ defmodule JidoTest.AgentServer.StartupTest do
         ] do
       opts = [{field, value}]
 
-      assert {:error, %ValidationError{} = startup_error} =
+      assert {:error, %{__exception__: true} = startup_error} =
                Server.start_link(Keyword.merge([agent: c.agent, runner: c.runner], opts))
 
-      assert {:error, %ValidationError{} = defaults_error} = Server.validate_defaults(opts)
+      assert {:error, %{__exception__: true} = defaults_error} = Server.validate_defaults(opts)
       assert startup_error.message =~ Atom.to_string(field)
       assert defaults_error.message =~ Atom.to_string(field)
     end
@@ -116,10 +118,10 @@ defmodule JidoTest.AgentServer.StartupTest do
 
   @tag obligation: "jido.agent_server2.I2"
   test "runtime settings reject duplicate option keys before startup", c do
-    assert {:error, %ValidationError{}} =
+    assert {:error, %{__exception__: true}} =
              Server.validate_defaults(turn_timeout: 0, turn_timeout: :invalid)
 
-    assert {:error, %ValidationError{}} =
+    assert {:error, %{__exception__: true}} =
              Server.start_link(
                agent: c.agent,
                runner: c.runner,
@@ -156,12 +158,12 @@ defmodule JidoTest.AgentServer.StartupTest do
     end
 
     for wait <- [-1, :bad, 4_294_967_296] do
-      assert {:error, %ValidationError{}} = Server.call(server, F.signal(), timeout: wait)
+      assert {:error, %{__exception__: true}} = Server.call(server, F.signal(), timeout: wait)
 
-      assert {:error, %ValidationError{}} =
+      assert {:error, %{__exception__: true}} =
                Server.submit(server, F.signal(), admission_timeout: wait)
 
-      assert {:error, %ValidationError{}} = Server.cancel(server, wait)
+      assert {:error, %{__exception__: true}} = Server.cancel(server, wait)
     end
 
     F.unchanged(server, c.agent)

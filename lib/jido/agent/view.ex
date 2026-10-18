@@ -41,7 +41,7 @@ defmodule Jido.Agent.View do
          {:ok, registry} <- Registry.new(registry),
          :ok <- Registry.require_stable(registry),
          {:ok, agent} <- definition(source),
-         {:ok, agent_type_id} <- Registry.identifier(registry, :agent, agent.module),
+         {:ok, agent_type_id} <- agent_type_id(agent.module, registry),
          {:ok, schema_id} <- Registry.identifier(registry, :schema, agent.schema),
          {:ok, operations} <- operations(agent.routes, registry, limit),
          view <- build(agent, agent_type_id, schema_id, operations),
@@ -50,12 +50,15 @@ defmodule Jido.Agent.View do
     end
   end
 
+  defp agent_type_id(nil, _registry), do: {:ok, nil}
+  defp agent_type_id(module, registry), do: Registry.identifier(registry, :agent, module)
+
   defp definition(%Agent{} = agent) do
     Agent.validate(agent)
   end
 
   defp definition(module) when is_atom(module) and not is_nil(module) do
-    Jido.Agent.Source.definition(module)
+    Jido.Agent.Validation.resolve(module)
   end
 
   defp definition(_source),
@@ -73,19 +76,21 @@ defmodule Jido.Agent.View do
   end
 
   defp operation(route, registry) do
-    {target, _defaults} = Authoring.split_target(route.target)
-
-    with {:ok, executable} <- Jido.Instruction.resolve(target),
-         {:ok, target_id} <- Registry.identifier(registry, executable.kind, target) do
+    with {:ok, target_id} <- target_id(route.handler, registry) do
       {:ok,
        %{
          "signal_type" => route.path,
-         "kind" => Atom.to_string(executable.kind),
+         "kind" => Atom.to_string(route.handler.kind),
          "target_id" => target_id,
-         "priority" => route.priority
+         "emits" => route.emits
        }}
     end
   end
+
+  defp target_id(%{kind: kind, target: target}, registry) when kind in [:action, :flow],
+    do: Registry.identifier(registry, kind, target)
+
+  defp target_id(_, _), do: {:ok, nil}
 
   defp build(agent, agent_type_id, schema_id, operations) do
     %{

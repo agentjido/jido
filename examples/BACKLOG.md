@@ -141,7 +141,7 @@ Assign the final `04_runtime` ID after persistence moves are complete.
 - [x] Show one precommit failure.
 - [x] Show one postcommit notification or Directive failure.
 - [x] Inspect the public `Jido.Agent.Turn.Outcome` stage and commit data.
-- [x] Show a structured `Jido.Agent.Directive.Error` in its normal workflow.
+- [x] Show a structured `Jido.AgentServer.Directive.ErrorReport` in its normal workflow.
 - [x] Compare one continuing policy and one stopping policy.
 - [x] Show one bounded custom or emitted-Signal policy without making a separate
       example for every policy form.

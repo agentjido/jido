@@ -186,7 +186,7 @@ defmodule JidoTest.Examples.Applications.ElasticGroupTest do
     alias Jido.Examples.Applications.ElasticGroup.WorkerAgent
 
     worker =
-      WorkerAgent.new!(
+      WorkerAgent.instantiate!(
         id: "worker",
         state: %{group_id: "group", member_id: "worker", generation: 1}
       )
@@ -228,7 +228,8 @@ defmodule JidoTest.Examples.Applications.ElasticGroupTest do
     assert duplicate.state.current_task == %{}
 
     controller =
-      ControllerAgent.new!(
+      ControllerAgent.instantiate!(
+        id: Jido.Signal.ID.generate!(),
         state: %{
           group_id: "group",
           generation: 1,

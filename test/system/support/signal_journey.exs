@@ -48,11 +48,13 @@ for {name, durable} <- [{:NormalJourneyAgent, nil}, {:DurableJourneyAgent, "jour
     agent do
       schema Zoi.object(%{value: Zoi.integer() |> Zoi.default(0)})
 
-      plugin Jido.Examples.RecoverableDelivery.Output,
-        config: [sink: JidoTest.RecoverableDeliverySink]
+      plugin(Jido.Examples.RecoverableDelivery.Output,
+        config: %{sink: JidoTest.RecoverableDeliverySink}
+      )
 
-      plugin Jido.Plugin.Bus.Client,
-        config: [bus: :journey, path: "system.journey", durable: @durable, retry_delay_ms: 60_000]
+      plugin(Jido.Plugin.Bus.Client,
+        config: %{bus: :journey, path: "system.journey", durable: @durable, retry_delay_ms: 60000}
+      )
     end
 
     routes do

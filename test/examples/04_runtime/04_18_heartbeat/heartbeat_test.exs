@@ -44,11 +44,18 @@ defmodule JidoTest.Examples.Runtime.HeartbeatTest do
 
   test "invalid options fail before an Agent or runtime starts" do
     assert {:error, %Jido.Error.ValidationError{} = error} =
-             Agent.new(
+             Agent.define(%{
                name: "runtime_heartbeat_invalid",
                schema: Zoi.object(%{}),
-               plugins: [{Heartbeat, [interval: 0]}]
-             )
+               extensions: [
+                 %{
+                   id: Heartbeat.id(),
+                   provider: Heartbeat,
+                   vsn: Heartbeat.vsn(),
+                   data: %{interval: 0}
+                 }
+               ]
+             })
 
     assert error.message == "Heartbeat Plugin options are invalid"
     assert error.details.reason == {:invalid_heartbeat_interval, 0}

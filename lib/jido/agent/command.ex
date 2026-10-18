@@ -50,7 +50,7 @@ defmodule Jido.Agent.Command do
   @doc "Validates one Agent command."
   @spec validate(term()) :: {:ok, t()} | {:error, Exception.t()}
   def validate(%__MODULE__{} = command) do
-    with {:ok, agent} <- Agent.validate_instance(command.agent),
+    with {:ok, agent} <- Jido.Agent.Validation.validate_instance(command.agent),
          {:ok, signal} <- normalize_signal(command.signal),
          :ok <- validate_caller_context(command.context),
          :ok <- validate_plugin_inputs(command.plugin_inputs) do
@@ -115,7 +115,10 @@ defmodule Jido.Agent.Command do
   @spec validate_caller_context(term()) :: :ok | {:error, Exception.t()}
   def validate_caller_context(context) when is_map(context) and not is_struct(context) do
     reserved =
-      Enum.filter([:agent_id, :agent_state, :signal, :plugin_inputs], &Map.has_key?(context, &1))
+      Enum.filter(
+        [:agent_id, :agent_state, :agent_topology, :signal, :plugin_inputs],
+        &Map.has_key?(context, &1)
+      )
 
     if reserved == [],
       do: :ok,

@@ -23,4 +23,4 @@ clock through a bounded query. Failed remote liveness checks during a partition
 do not prove that the remote process died.
 
 See the [routing example](https://github.com/agentjido/jido/blob/release/v3/examples/01_basic/README.md) and
-[remote API tests](../test/jido/agent_server/remote_api_test.exs).
+[remote API tests](../test/contract/agent_server/requests_test.exs).

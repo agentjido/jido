@@ -33,7 +33,14 @@ defmodule JidoTest.Examples.Factory.WorkshopTest do
   end
 
   test "only scheduler polls start queued work, with one active item and FIFO order" do
-    {agent, [_event]} = command(Workshop.new!(), :submit, "first", "First goal")
+    {agent, [_event]} =
+      command(
+        Workshop.instantiate!(id: Jido.Signal.ID.generate!()),
+        :submit,
+        "first",
+        "First goal"
+      )
+
     {agent, [_event]} = command(agent, :submit, "second", "Second goal")
     assert agent.state.queue == ["first", "second"]
     assert agent.state.active_job_id == ""
@@ -43,8 +50,8 @@ defmodule JidoTest.Examples.Factory.WorkshopTest do
     {agent,
      [
        _event,
-       %Jido.Agent.Directive.SpawnChild{restart: :temporary},
-       %Jido.Agent.Directive.EmitToChild{}
+       %Jido.AgentServer.Directive.AgentStart{restart: :temporary},
+       %Jido.AgentServer.Directive.AgentSend{}
      ]} = poll(agent)
 
     assert agent.state.active_job_id == "first"
@@ -56,7 +63,7 @@ defmodule JidoTest.Examples.Factory.WorkshopTest do
     assert busy.state.active_job_id == "first"
     {agent, _} = tick(busy)
     {agent, _} = tick(agent)
-    {agent, [_event, %Jido.Agent.Directive.StopChild{}]} = tick(agent)
+    {agent, [_event, %Jido.AgentServer.Directive.AgentStop{}]} = tick(agent)
     assert agent.state.jobs["first"].status == :completed
     assert agent.state.jobs["second"].status == :queued
     assert agent.state.active_job_id == ""
@@ -66,7 +73,9 @@ defmodule JidoTest.Examples.Factory.WorkshopTest do
   end
 
   test "pause frees the active slot; resume queues at the end and stale work cannot advance" do
-    {agent, _} = command(Workshop.new!(), :submit, "first", "First")
+    {agent, _} =
+      command(Workshop.instantiate!(id: Jido.Signal.ID.generate!()), :submit, "first", "First")
+
     {agent, _} = command(agent, :submit, "second", "Second")
     {agent, _} = poll(agent)
     {agent, _} = tick(agent)
@@ -93,7 +102,9 @@ defmodule JidoTest.Examples.Factory.WorkshopTest do
   end
 
   test "paused and cancelled queued items do not block pending work" do
-    {agent, _} = command(Workshop.new!(), :submit, "paused", "Paused")
+    {agent, _} =
+      command(Workshop.instantiate!(id: Jido.Signal.ID.generate!()), :submit, "paused", "Paused")
+
     {agent, _} = command(agent, :submit, "cancelled", "Cancelled")
     {agent, _} = command(agent, :submit, "ready", "Ready")
     {agent, _} = command(agent, :pause, "paused")

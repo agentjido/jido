@@ -120,7 +120,7 @@ defmodule JidoTest.AgentServer.ControlTest do
 
   defp replacement(root, old) do
     eventually(fn ->
-      pid = Server.Activation.worker(root)
+      pid = Server.Supervisor.worker(root)
       if is_pid(pid) and pid != old, do: pid
     end)
   end
@@ -221,12 +221,12 @@ defmodule JidoTest.AgentServer.ControlTest do
   @tag obligation: "jido.agent_server2.I87"
   test "owned callbacks and nested tasks reject synchronous control", c do
     agent =
-      Jido.Agent.define!(
+      Jido.Agent.define!(%{
         name: "control_probe",
         schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}),
-        routes: [{"work", Probe}]
-      )
-      |> Jido.Agent.instantiate!()
+        routes: [%{path: "work", handler: %{kind: :action, target: Probe}}]
+      })
+      |> Jido.Agent.instantiate!(id: Jido.Signal.ID.generate!())
 
     server = F.start(c, agent: agent)
 
@@ -240,7 +240,7 @@ defmodule JidoTest.AgentServer.ControlTest do
   @tag obligation: "jido.agent_server2.I88"
   test "closed admission and owners survive worker recovery without control replay", c do
     root = F.start_activation(c)
-    server = Server.Activation.worker(root)
+    server = Server.Supervisor.worker(root)
     assert :ok = Server.attach(server)
     assert :ok = Server.quiesce(server)
     Process.exit(server, :kill)
@@ -476,7 +476,7 @@ defmodule JidoTest.AgentServer.ControlTest do
   @tag obligation: "jido.agent_server2.I88"
   test "interrupted quiesce recovers closed after execution cleanup", c do
     root = F.start_activation(c)
-    server = Server.Activation.worker(root)
+    server = Server.Supervisor.worker(root)
     turn = F.blocked(server, c.runner)
 
     pending =
@@ -558,13 +558,20 @@ defmodule JidoTest.AgentServer.ControlTest do
   @tag obligation: "jido.agent_server2.I91"
   test "hibernate success waits for Plugin shutdown and root DOWN", c do
     agent =
-      Jido.Agent.define!(
+      Jido.Agent.define!(%{
         name: "shutdown_control",
         schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}),
-        plugins: [{ShutdownPlugin, observer: c.observer}],
-        routes: [{"work", F.Work}]
-      )
-      |> Jido.Agent.instantiate!()
+        extensions: [
+          %{
+            id: ShutdownPlugin.id(),
+            provider: ShutdownPlugin,
+            vsn: ShutdownPlugin.vsn(),
+            data: %{observer: c.observer}
+          }
+        ],
+        routes: [%{path: "work", handler: %{kind: :action, target: F.Work}}]
+      })
+      |> Jido.Agent.instantiate!(id: Jido.Signal.ID.generate!())
 
     {server, _} = persistent(c, agent: agent)
     root = Server.activation(server)

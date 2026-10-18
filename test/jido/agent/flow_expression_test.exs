@@ -29,9 +29,7 @@ defmodule Jido.Agent.FlowExpressionTest do
     routes do
       signal_source "/expression"
 
-      route "counter.add", Add, as: :add do
-        defaults %{amount: 2}
-      end
+      route "counter.add", Add, as: :add, defaults: %{amount: 2}
     end
   end
 
@@ -67,18 +65,24 @@ defmodule Jido.Agent.FlowExpressionTest do
     assert {:ok, ^flow} =
              Jido.Flow.Codec.decode(JSON.decode!(JSON.encode!(flow_document)), flow_registry)
 
-    for target <- [Add, flow] do
+    for target <- [Add] do
       definition =
-        Jido.Agent.new!(%{
-          schema: Counter.domain_schema(),
+        Jido.Agent.define!(%{
+          schema: Counter.definition().schema,
           name: "expression_counter",
-          routes: [{"counter.add", target, defaults: %{amount: 2}}]
+          routes: [
+            %{
+              path: "counter.add",
+              handler: %{kind: :flow, target: target},
+              defaults: %{amount: 2}
+            }
+          ]
         })
 
       assert {:ok, document, registry} = Codec.encode(definition)
       assert {:ok, decoded} = Codec.decode(JSON.decode!(JSON.encode!(document)), registry)
       assert decoded == definition
-      instance = Agent.instantiate!(decoded, state: %{count: 10})
+      instance = Agent.instantiate!(decoded, id: Jido.Signal.ID.generate!(), state: %{count: 10})
 
       {:ok, command_signal_1} = Counter.add_signal(%{})
 
@@ -99,15 +103,23 @@ defmodule Jido.Agent.FlowExpressionTest do
   end
 
   test "Flow expressions commit through AgentServer", %{jido: jido} do
-    for target <- [Add, Add.flow()] do
+    for target <- [Add] do
       definition =
-        Agent.new!(%{
-          schema: Counter.domain_schema(),
+        Agent.define!(%{
+          schema: Counter.definition().schema,
           name: "expression_counter",
-          routes: [{"counter.add", target, defaults: %{amount: 2}}]
+          routes: [
+            %{
+              path: "counter.add",
+              handler: %{kind: :flow, target: target},
+              defaults: %{amount: 2}
+            }
+          ]
         })
 
-      instance = Agent.instantiate!(definition, state: %{count: 10})
+      instance =
+        Agent.instantiate!(definition, id: Jido.Signal.ID.generate!(), state: %{count: 10})
+
       {:ok, server} = JidoTest.AgentServerAssertions.start_agent(jido, instance)
 
       {:ok, route_signal_1} = Counter.add_signal(%{amount: 9})
@@ -119,46 +131,37 @@ defmodule Jido.Agent.FlowExpressionTest do
     end
   end
 
-  test "expression failures preserve the direct Agent state" do
-    bad_flow = %{Add.flow() | output: %{count: Jido.Expr.new!(:/, [1, 0])}}
+  defmodule Invalid do
+    use Jido.Flow, name: "invalid_expression"
 
-    definition =
-      Agent.new!(
-        name: "invalid_expression",
-        schema: Counter.domain_schema(),
-        routes: [{"counter.add", {bad_flow, %{amount: 2}}}]
-      )
-
-    instance = Agent.instantiate!(definition, state: %{count: 10})
-
-    {:ok, command_signal_3} = Counter.add_signal(%{})
-
-    assert {:error, error} =
-             Agent.cmd(instance, command_signal_3)
-
-    assert is_exception(error)
-    assert instance.state == %{count: 10}
+    flow do
+      step "amount", action: Amount, params: %{amount: 1}
+      output %{count: 1 / 0}
+    end
   end
 
-  test "expression failures preserve committed AgentServer state", %{jido: jido} do
-    bad_flow = %{Add.flow() | output: %{count: Jido.Expr.new!(:/, [1, 0])}}
-
+  test "expression failures preserve direct and committed state", %{jido: jido} do
     definition =
-      Agent.new!(
+      Agent.define!(%{
         name: "invalid_expression",
-        schema: Counter.domain_schema(),
-        routes: [{"counter.add", {bad_flow, %{amount: 2}}}]
-      )
+        schema: Counter.definition().schema,
+        routes: [%{path: "counter.add", handler: %{kind: :flow, target: Invalid}}]
+      })
 
-    instance = Agent.instantiate!(definition, state: %{count: 10})
+    instance = Agent.instantiate!(definition, id: unique_id(), state: %{count: 10})
     {:ok, server} = JidoTest.AgentServerAssertions.start_agent(jido, instance)
     before = JidoTest.AgentServerAssertions.committed(server)
-
-    {:ok, route_signal_2} = Counter.add_signal(%{})
-
-    assert {:error, _error} =
-             Jido.AgentServer.call(server, route_signal_2, [])
-
+    {:ok, input} = Counter.add_signal(%{})
+    assert {:error, error} = Agent.cmd(instance, input)
+    assert is_exception(error)
+    assert {:error, _} = Jido.AgentServer.call(server, input)
     assert JidoTest.AgentServerAssertions.committed(server) == before
+    assert instance.state == %{count: 10}
+
+    assert {:error, _} =
+             Agent.define(%{
+               definition
+               | routes: [%{path: "bad", handler: %{kind: :flow, target: Add.flow()}}]
+             })
   end
 end

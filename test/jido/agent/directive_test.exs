@@ -47,14 +47,13 @@ defmodule Jido.Agent.DirectiveTest do
     assert {:error, :wrong_type} = OverrideDirective.validate(:invalid)
   end
 
-  test "built-in validation checks Error, SpawnProcess and child adoption fields" do
-    process = Directive.spawn_process({Elixir.Agent, fn -> 0 end})
+  test "built-in validation checks runtime error and process requests" do
+    process = Jido.AgentServer.Directive.process_start({Elixir.Agent, fn -> 0 end})
     refute Map.has_key?(process, :tag)
 
     for directive <- [
-          Directive.error(:failed, :action),
-          process,
-          Directive.adopt_child(self(), :child)
+          Jido.AgentServer.Directive.error_report(:failed, :action),
+          process
         ] do
       assert Directive.built_in?(directive)
       assert {:ok, ^directive} = Directive.validate(directive)
@@ -67,22 +66,27 @@ defmodule Jido.Agent.DirectiveTest do
   end
 
   test "child start validation rejects unsupported lifecycle options and malformed targets" do
-    assert :ok = Directive.validate_restart_policy(:temporary)
-    assert {:error, message} = Directive.validate_restart_policy(:invalid)
+    assert :ok = Jido.AgentServer.Directive.validate_restart_policy(:temporary)
+    assert {:error, message} = Jido.AgentServer.Directive.validate_restart_policy(:invalid)
     assert message =~ "restart must be one of"
-    assert :ok = Directive.validate_spawn_child_opts(%{id: "child"})
+    assert :ok = Jido.AgentServer.Directive.validate_agent_start_opts(%{id: "child"})
 
     assert {:error, message} =
-             Directive.validate_spawn_child_opts(%{restore: :required, persistence: :invalid})
+             Jido.AgentServer.Directive.validate_agent_start_opts(%{
+               restore: :required,
+               persistence: :invalid
+             })
 
     assert message =~ "does not support lifecycle options"
-    assert {:error, message} = Directive.validate_spawn_child_opts([])
+    assert {:error, message} = Jido.AgentServer.Directive.validate_agent_start_opts([])
     assert message =~ "opts must be a map"
-    assert {:error, {:invalid_agent, 42}} = Directive.validate_agent_target(42)
-    agent = JidoTest.AgentFixtures.CounterAgent.new!()
+    assert {:error, {:invalid_agent, 42}} = Jido.AgentServer.Directive.validate_agent_target(42)
+    agent = JidoTest.AgentFixtures.CounterAgent.instantiate!(id: "invalid-target")
     invalid = %{agent | state: %{count: :invalid, history: []}}
-    assert {:error, _} = Directive.validate_agent_target(invalid)
-    assert {:error, _} = Directive.validate(Directive.spawn_child(invalid, :child))
+    assert {:error, _} = Jido.AgentServer.Directive.validate_agent_target(invalid)
+
+    assert {:error, _} =
+             Directive.validate(Jido.AgentServer.Directive.agent_start(invalid, :child))
   end
 
   test "Signal Directives validate the complete outbound envelope" do
@@ -99,16 +103,16 @@ defmodule Jido.Agent.DirectiveTest do
         ],
         directive <- [
           Directive.emit(malformed),
-          Directive.emit_to_parent(malformed),
-          Directive.emit_to_child(:child, malformed)
+          Jido.AgentServer.Directive.owner_send(malformed),
+          Jido.AgentServer.Directive.agent_send(:child, malformed)
         ] do
       assert {:error, _reason} = Directive.validate(directive)
     end
 
     for directive <- [
           Directive.emit(signal),
-          Directive.emit_to_parent(signal),
-          Directive.emit_to_child(:child, signal)
+          Jido.AgentServer.Directive.owner_send(signal),
+          Jido.AgentServer.Directive.agent_send(:child, signal)
         ] do
       assert {:ok, ^directive} = Directive.validate(directive)
     end
@@ -127,7 +131,7 @@ defmodule Jido.Agent.DirectiveTest do
           %{restart: :permanent}
         ] do
       assert_raise ArgumentError, fn ->
-        Directive.spawn_child(JidoTest.AgentFixtures.CounterAgent, :child, opts)
+        Jido.AgentServer.Directive.agent_start(JidoTest.AgentFixtures.CounterAgent, :child, opts)
       end
     end
   end
@@ -138,7 +142,7 @@ defmodule Jido.Agent.DirectiveTest do
           {[id: "child"], [role: :worker]}
         ] do
       directive =
-        Directive.spawn_child(JidoTest.AgentFixtures.CounterAgent, :child,
+        Jido.AgentServer.Directive.agent_start(JidoTest.AgentFixtures.CounterAgent, :child,
           node: node(),
           opts: opts,
           meta: meta,

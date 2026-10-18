@@ -1,11 +1,14 @@
 defmodule Jido.Agent.Directive do
   @moduledoc """
-  Runtime work returned by an Agent executable turn.
+  Changes and runtime work returned by an Agent executable turn.
 
-  A Directive does not change Agent domain state. The terminal Action or Flow
-  output is the complete next Agent state. `Jido.AgentServer` commits that
-  state before it interprets these Directives. A dispatch failure does not
-  undo that commit. A later Agent state change must enter through a Signal.
+  The terminal Action or Flow output is complete next Agent state. Plugin-owned
+  fields must remain unchanged until their owning Plugin reduces the batch.
+  Topology and Plugin Directives edit definition data on that same candidate.
+  Plugin-owned Directives can change their owner's state during reduction and
+  request runtime work after commit. `Jido.AgentServer` commits the candidate
+  before it dispatches runtime work. A dispatch failure does not undo that
+  commit. A later Agent state change must enter through a Signal.
 
   Return `{:ok, state, directives}` from an Action.
   Flow preserves the batch from all successful executed components. A failed
@@ -24,19 +27,21 @@ defmodule Jido.Agent.Directive do
   it needs another validation rule.
   """
 
-  alias __MODULE__.{
-    AdoptChild,
-    Emit,
-    EmitToChild,
-    EmitToParent,
-    Error,
-    SpawnChild,
-    SpawnProcess,
-    Stop,
-    StopChild
+  alias __MODULE__.Emit
+  alias Jido.AgentServer.Directive, as: Runtime
+
+  alias Jido.AgentServer.Directive.{
+    AgentSend,
+    AgentStart,
+    AgentStop,
+    ErrorReport,
+    OwnerSend,
+    ProcessStart,
+    ServerStop
   }
 
   alias Jido.Signal
+  alias __MODULE__.{PluginAdd, PluginConfigure, PluginRemove}
   alias Jido.Signal.Context, as: SignalContext
 
   @callback validate(directive :: struct()) :: {:ok, struct()} | {:error, term()}
@@ -67,49 +72,30 @@ defmodule Jido.Agent.Directive do
     end
   end
 
-  @type t ::
-          AdoptChild.t()
-          | Emit.t()
-          | EmitToChild.t()
-          | EmitToParent.t()
-          | Error.t()
-          | SpawnChild.t()
-          | SpawnProcess.t()
-          | Stop.t()
-          | StopChild.t()
+  @type t :: struct()
 
   @built_ins [
-    AdoptChild,
     Emit,
-    EmitToChild,
-    EmitToParent,
-    Error,
-    SpawnChild,
-    SpawnProcess,
-    Stop,
-    StopChild
+    AgentSend,
+    AgentStart,
+    AgentStop,
+    ErrorReport,
+    OwnerSend,
+    ProcessStart,
+    ServerStop
   ]
 
-  @restart_policies [:permanent, :temporary, :transient]
-  @unsupported_spawn_child_opts [
-    :node,
-    :lifecycle_mod,
-    :pool,
-    :pool_key,
-    :idle_timeout,
-    :persistence,
-    :restore,
-    :state_version
-  ]
+  @mutation_modules Jido.Agent.Mutation.modules()
 
   @doc "Returns true when the value is a built-in Agent Directive."
   @spec built_in?(term()) :: boolean()
-  def built_in?(%{__struct__: module}), do: module in @built_ins
+  def built_in?(%{__struct__: module}), do: module in @built_ins or module in @mutation_modules
   def built_in?(_value), do: false
 
   @doc false
   @spec built_in_module?(module()) :: boolean()
-  def built_in_module?(module) when is_atom(module), do: module in @built_ins
+  def built_in_module?(module) when is_atom(module),
+    do: module in @built_ins or module in @mutation_modules
 
   @doc false
   @spec validator?(module()) :: boolean()
@@ -119,7 +105,7 @@ defmodule Jido.Agent.Directive do
   @doc "Validates one built-in or custom Agent Directive."
   @spec validate(struct()) :: {:ok, struct()} | {:error, term()}
   def validate(%{__struct__: module, signal: %Signal{} = signal} = directive)
-      when module in [Emit, EmitToParent, EmitToChild] do
+      when module in [Emit, OwnerSend, AgentSend] do
     with {:ok, signal} <- Zoi.parse(Signal.schema(), signal),
          {:ok, extensions} <- SignalContext.normalize(signal.extensions) do
       directive
@@ -130,19 +116,22 @@ defmodule Jido.Agent.Directive do
   end
 
   def validate(%{__struct__: module} = directive)
-      when module in [Emit, EmitToParent, EmitToChild] do
+      when module in [Emit, OwnerSend, AgentSend] do
     {:error,
      Jido.Error.validation_error("Agent Signal Directive requires a Jido.Signal",
        details: %{directive: directive}
      )}
   end
 
-  def validate(%SpawnChild{} = directive) do
-    with {:ok, directive} <- Zoi.parse(SpawnChild.schema(), Map.from_struct(directive)),
-         :ok <- validate_agent_target(directive.agent) do
+  def validate(%AgentStart{} = directive) do
+    with {:ok, directive} <- Zoi.parse(AgentStart.schema(), Map.from_struct(directive)),
+         :ok <- Runtime.validate_agent_target(directive.agent) do
       {:ok, directive}
     end
   end
+
+  def validate(%{__struct__: module} = directive) when module in @mutation_modules,
+    do: Jido.Agent.Mutation.validate(directive)
 
   def validate(%{__struct__: module} = directive) when module in @built_ins do
     Zoi.parse(module.schema(), Map.from_struct(directive))
@@ -191,120 +180,112 @@ defmodule Jido.Agent.Directive do
      )}
   end
 
-  @doc false
-  def validate_restart_policy(restart, _opts \\ [])
-  def validate_restart_policy(restart, _opts) when restart in @restart_policies, do: :ok
-
-  def validate_restart_policy(restart, _opts) do
-    {:error, "restart must be one of #{inspect(@restart_policies)}, got: #{inspect(restart)}"}
-  end
-
-  @doc false
-  def validate_spawn_child_opts(opts, _refinement_opts \\ [])
-
-  def validate_spawn_child_opts(opts, _refinement_opts) when is_map(opts) do
-    unsupported = Enum.filter(@unsupported_spawn_child_opts, &Map.has_key?(opts, &1))
-
-    case unsupported do
-      [] -> :ok
-      [:node] -> {:error, "Use SpawnChild.node for placement, not opts.node"}
-      keys -> {:error, "SpawnChild does not support lifecycle options #{inspect(keys)}"}
-    end
-  end
-
-  def validate_spawn_child_opts(value, _refinement_opts),
-    do: {:error, "SpawnChild opts must be a map, got: #{inspect(value)}"}
-
-  @doc false
-  def validate_agent_target(%Jido.Agent{} = agent) do
-    case Jido.Agent.validate(agent) do
-      {:ok, _agent} -> :ok
-      {:error, error} -> {:error, error}
-    end
-  end
-
-  def validate_agent_target(module) when is_atom(module) do
-    with {:module, ^module} <- Code.ensure_loaded(module),
-         true <- function_exported?(module, :new, 0) or function_exported?(module, :new, 1) do
-      :ok
-    else
-      _reason -> {:error, {:invalid_agent_module, module}}
-    end
-  end
-
-  def validate_agent_target(value), do: {:error, {:invalid_agent, value}}
-
-  @doc "Creates an Emit Directive."
-  @spec emit(Signal.t(), term()) :: Emit.t()
-  def emit(signal, dispatch \\ nil), do: %Emit{signal: signal, dispatch: dispatch}
-
-  @doc "Creates an Emit Directive for one target PID."
-  @spec emit_to_pid(Signal.t(), pid(), keyword()) :: Emit.t()
-  def emit_to_pid(signal, pid, opts \\ []) when is_pid(pid) and is_list(opts) do
-    %Emit{signal: signal, dispatch: {:pid, Keyword.put(opts, :target, pid)}}
-  end
-
-  @doc "Creates an EmitToParent Directive."
-  @spec emit_to_parent(Signal.t()) :: EmitToParent.t()
-  def emit_to_parent(signal), do: %EmitToParent{signal: signal}
-
-  @doc "Creates an EmitToChild Directive."
-  @spec emit_to_child(term(), Signal.t()) :: EmitToChild.t()
-  def emit_to_child(tag, signal), do: %EmitToChild{tag: tag, signal: signal}
-
-  @doc "Creates an Error Directive."
-  @spec error(term(), atom() | nil) :: Error.t()
-  def error(error, context \\ nil), do: %Error{error: error, context: context}
-
-  @doc "Creates a SpawnProcess Directive for an untracked supervised OTP process."
-  @spec spawn_process(Supervisor.child_spec()) :: SpawnProcess.t()
-  def spawn_process(child_spec), do: %SpawnProcess{child_spec: child_spec}
-
   @doc """
-  Creates a SpawnChild Directive. Pass `node: target_node` for remote placement.
+  Creates an emission request. It does not dispatch a Signal.
 
-  Accepts the unique keyword options `:node`, `:opts`, `:meta`, and `:restart`.
-  `:opts` and `:meta` accept plain maps or unique keyword lists. Invalid option
-  containers, duplicate keys, and unknown options raise `ArgumentError`.
-  Directive validation checks field values before a Turn commits.
+  The type/data form uses the owning Agent's explicit Signal source when the
+  command runs. The full-Signal form preserves its envelope.
   """
-  @spec spawn_child(module() | Jido.Agent.t(), term(), keyword()) :: SpawnChild.t()
-  def spawn_child(agent, tag, opts \\ []) do
-    unless Keyword.keyword?(opts), do: raise(ArgumentError, "expected keyword options")
-    opts = Keyword.validate!(opts, [:node, :opts, :meta, :restart])
+  @spec emit(Signal.t() | String.t(), term()) :: Emit.t() | map() | {:error, term()}
+  def emit(signal_or_type, dispatch_or_data \\ nil)
 
-    %SpawnChild{
-      agent: agent,
-      tag: tag,
-      node: Keyword.get(opts, :node),
-      opts: option_map!(opts, :opts),
-      meta: option_map!(opts, :meta),
-      restart: Keyword.get(opts, :restart, :transient)
+  def emit(type, data) when is_binary(type) do
+    with :ok <- Jido.Agent.Data.exact(type),
+         :ok <- Jido.Agent.Data.plain_map(data),
+         do: %{kind: :emit, type: type, data: data}
+  end
+
+  def emit(%Signal{} = signal, dispatch), do: %Emit{signal: signal, dispatch: dispatch}
+
+  @doc "Replaces the complete topology data."
+  def topology_set(topology), do: %__MODULE__.TopologySet{topology: topology}
+
+  def agent_add(name, definition, opts \\ []),
+    do:
+      struct!(
+        __MODULE__.AgentAdd,
+        mutation_options(opts, [:count, :initial_state]) ++ [name: name, definition: definition]
+      )
+
+  def agent_update(name, changes), do: %__MODULE__.AgentUpdate{name: name, changes: changes}
+
+  def agent_replace(name, definition, opts \\ []),
+    do:
+      struct!(
+        __MODULE__.AgentReplace,
+        mutation_options(opts, [:count, :initial_state]) ++ [name: name, definition: definition]
+      )
+
+  def agent_remove(name), do: %__MODULE__.AgentRemove{name: name}
+
+  def route_add(path, handler \\ %{kind: :pass_through}, opts \\ []),
+    do:
+      struct!(
+        __MODULE__.RouteAdd,
+        mutation_options(opts, [:as, :defaults, :emits]) ++ [path: path, handler: handler]
+      )
+
+  def route_update(path, changes), do: %__MODULE__.RouteUpdate{path: path, changes: changes}
+
+  def route_replace(path, handler, opts \\ []),
+    do:
+      struct!(
+        __MODULE__.RouteReplace,
+        mutation_options(opts, [:as, :defaults, :emits]) ++ [path: path, handler: handler]
+      )
+
+  def route_remove(path), do: %__MODULE__.RouteRemove{path: path}
+  def routes_reorder(paths), do: %__MODULE__.RoutesReorder{paths: paths}
+  def routes_set(routes), do: %__MODULE__.RoutesSet{routes: routes}
+
+  def connection_add(path, opts),
+    do:
+      struct!(
+        __MODULE__.ConnectionAdd,
+        mutation_options(opts, [:from, :to, :delivery]) ++ [path: path]
+      )
+
+  def connection_update(path, opts),
+    do:
+      struct!(
+        __MODULE__.ConnectionUpdate,
+        mutation_options(opts, [:from, :to, :changes]) ++ [path: path]
+      )
+
+  def connection_replace(path, opts),
+    do:
+      struct!(
+        __MODULE__.ConnectionReplace,
+        mutation_options(opts, [:from, :to, :delivery]) ++ [path: path]
+      )
+
+  def connection_remove(path, opts),
+    do: struct!(__MODULE__.ConnectionRemove, mutation_options(opts, [:from, :to]) ++ [path: path])
+
+  def plugin_add(module, options \\ [], opts \\ []) do
+    opts = mutation_options(opts, [:initial])
+
+    %PluginAdd{
+      module: module,
+      options: options,
+      initial: if(Keyword.has_key?(opts, :initial), do: {:value, opts[:initial]}, else: :default)
     }
   end
 
-  defp option_map!(opts, key) do
-    case Jido.Agent.Authoring.to_attrs(Keyword.get(opts, key, %{}), :reject) do
-      {:ok, value} -> value
-      :error -> raise ArgumentError, "#{key} must be a plain map or unique keyword list"
-    end
+  def plugin_configure(module, options, opts \\ []),
+    do: %PluginConfigure{
+      module: module,
+      options: options,
+      migrate: mutation_options(opts, [:migrate])[:migrate]
+    }
+
+  def plugin_remove(module, opts \\ []),
+    do: %PluginRemove{module: module, state: mutation_options(opts, [:state])[:state]}
+
+  defp mutation_options(opts, allowed) do
+    unless Keyword.keyword?(opts) and Enum.uniq(Keyword.keys(opts)) == Keyword.keys(opts),
+      do: raise(ArgumentError, "Expected unique keyword options")
+
+    Keyword.validate!(opts, allowed)
   end
-
-  @doc "Creates an AdoptChild Directive."
-  @spec adopt_child(pid() | String.t(), term(), map()) :: AdoptChild.t()
-  def adopt_child(child, tag, meta \\ %{}), do: %AdoptChild{child: child, tag: tag, meta: meta}
-
-  @doc """
-  Creates a StopChild Directive.
-
-  A supervised child exits with `:shutdown` when its DynamicSupervisor removes
-  it. The reason applies only if the child is no longer in that supervisor or
-  is a standalone tracked process.
-  """
-  @spec stop_child(term(), term()) :: StopChild.t()
-  def stop_child(tag, reason \\ :normal), do: %StopChild{tag: tag, reason: reason}
-
-  @doc "Creates a Stop Directive."
-  @spec stop(term()) :: Stop.t()
-  def stop(reason \\ :normal), do: %Stop{reason: reason}
 end

@@ -16,7 +16,7 @@ defmodule JidoTest.Persistence.IndeterminateWriteTest do
     def compare_and_swap(key, expected, value, opts) do
       :ok = Store.compare_and_swap(key, expected, value, Keyword.put(opts, :write_result, :ok))
 
-      if :erlang.binary_to_term(value, [:safe]).revision == 0 do
+      if :erlang.binary_to_term(value, [:safe]).rev == 0 do
         :ok
       else
         raise "stored write reply lost"

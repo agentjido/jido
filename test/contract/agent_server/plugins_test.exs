@@ -3,7 +3,10 @@ Code.require_file("support.ex", __DIR__)
 defmodule JidoTest.AgentServer.PluginsTest do
   use JidoTest.Case, async: false
   use Covenant.Case, component: "jido.agent_server2", async: false
-  alias Jido.Agent.Directive.{Emit, Error, SpawnProcess, Stop}
+  alias Jido.Agent.Directive.Emit
+  alias Jido.AgentServer.Directive.ErrorReport
+  alias Jido.AgentServer.Directive.ProcessStart
+  alias Jido.AgentServer.Directive.ServerStop
   alias Jido.AgentServer, as: Server
   alias Jido.Signal.Bus
   alias Jido.Tracing.Trace
@@ -289,12 +292,16 @@ defmodule JidoTest.AgentServer.PluginsTest do
     opts = Keyword.put(opts, :observer, observer)
     second_opts = Keyword.put(second_opts, :observer, observer)
 
-    Jido.Agent.define!(
+    Jido.Agent.define!(%{
       name: "server2_live_plugins",
       schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}),
-      plugins: [F.Gate, {First, opts}, {Second, second_opts}],
-      routes: [{"work", F.Work}]
-    )
+      extensions: [
+        %{id: F.Gate.id(), provider: F.Gate, vsn: F.Gate.vsn(), data: %{}},
+        %{id: First.id(), provider: First, vsn: First.vsn(), data: Map.new(opts)},
+        %{id: Second.id(), provider: Second, vsn: Second.vsn(), data: Map.new(second_opts)}
+      ],
+      routes: [%{path: "work", handler: %{kind: :action, target: F.Work}}]
+    })
     |> Jido.Agent.instantiate!(id: "server2-live-instance")
   end
 
@@ -309,28 +316,48 @@ defmodule JidoTest.AgentServer.PluginsTest do
   defp trapping_agent(first_opts \\ [], second_opts \\ []) do
     {:registered_name, observer} = Process.info(self(), :registered_name)
 
-    Jido.Agent.define!(
+    Jido.Agent.define!(%{
       name: "server2_trapping_plugins",
       schema: Zoi.object(%{}),
-      plugins: [
-        {TrappingFirst, Keyword.put(first_opts, :observer, observer)},
-        {TrappingSecond, Keyword.put(second_opts, :observer, observer)}
+      extensions: [
+        %{
+          id: TrappingFirst.id(),
+          provider: TrappingFirst,
+          vsn: TrappingFirst.vsn(),
+          data: Map.new(Keyword.put(first_opts, :observer, observer))
+        },
+        %{
+          id: TrappingSecond.id(),
+          provider: TrappingSecond,
+          vsn: TrappingSecond.vsn(),
+          data: Map.new(Keyword.put(second_opts, :observer, observer))
+        }
       ]
-    )
+    })
     |> Jido.Agent.instantiate!(id: "server2-trapping-instance")
   end
 
   defp supervisor_agent(first_opts, second_opts) do
     {:registered_name, observer} = Process.info(self(), :registered_name)
 
-    Jido.Agent.define!(
+    Jido.Agent.define!(%{
       name: "server2_supervisor_plugins",
       schema: Zoi.object(%{}),
-      plugins: [
-        {SupervisorPlugin, Keyword.put(first_opts, :observer, observer)},
-        {TrappingSecond, Keyword.put(second_opts, :observer, observer)}
+      extensions: [
+        %{
+          id: SupervisorPlugin.id(),
+          provider: SupervisorPlugin,
+          vsn: SupervisorPlugin.vsn(),
+          data: Map.new(Keyword.put(first_opts, :observer, observer))
+        },
+        %{
+          id: TrappingSecond.id(),
+          provider: TrappingSecond,
+          vsn: TrappingSecond.vsn(),
+          data: Map.new(Keyword.put(second_opts, :observer, observer))
+        }
       ]
-    )
+    })
     |> Jido.Agent.instantiate!(id: "server2-supervisor-instance")
   end
 
@@ -418,12 +445,12 @@ defmodule JidoTest.AgentServer.PluginsTest do
     ref = Process.monitor(server)
 
     assert {:error, :terminal_directive_not_last} =
-             Server.call(server, batch([%Stop{}, %Emit{signal: F.signal()}]))
+             Server.call(server, batch([%ServerStop{}, %Emit{signal: F.signal()}]))
 
     F.unchanged(server, c.agent)
 
-    assert {:ok, %{state: %{count: 1}}, [%Stop{}]} =
-             Server.call(server, batch([%Stop{reason: :done}]))
+    assert {:ok, %{state: %{count: 1}}, [%ServerStop{}]} =
+             Server.call(server, batch([%ServerStop{reason: :done}]))
 
     assert_receive {:DOWN, ^ref, :process, ^server, {:shutdown, :done}}, 1_000
     F.clean(c.runner)
@@ -442,7 +469,7 @@ defmodule JidoTest.AgentServer.PluginsTest do
       )
 
     ds = [
-      %Error{error: "private error"},
+      %ErrorReport{error: "private error"},
       %Emit{signal: F.signal(), dispatch: {:pid, target: self()}}
     ]
 
@@ -464,14 +491,17 @@ defmodule JidoTest.AgentServer.PluginsTest do
   test "reported errors can stop the activation after its success reply", c do
     server = F.start(c, error_policy: :stop_on_error)
     ref = Process.monitor(server)
-    assert {:ok, _, _} = Server.call(server, batch([%Error{error: :reported}]))
+    assert {:ok, _, _} = Server.call(server, batch([%ErrorReport{error: :reported}]))
     assert_receive {:DOWN, ^ref, :process, ^server, {:shutdown, :agent_error}}, 1_000
   end
 
   @tag obligation: "jido.agent_server2.I48"
   test "reported error Signals describe the effect failure and preserve turn success", c do
     server = F.start(c, error_policy: {:emit_signal, {:pid, target: self()}})
-    assert {:ok, saved, _} = Server.call(server, batch([%Error{error: "PRIVATE_REPORTED_ERROR"}]))
+
+    assert {:ok, saved, _} =
+             Server.call(server, batch([%ErrorReport{error: "PRIVATE_REPORTED_ERROR"}]))
+
     assert_receive {:signal, signal}, 1_000
     assert signal.type == "jido.agent_server.error"
     assert %{committed?: true, stage: :directive, status: :failed} = signal.data
@@ -486,13 +516,13 @@ defmodule JidoTest.AgentServer.PluginsTest do
     server = F.start(c)
 
     assert {:error, :jido_instance_required} =
-             Server.call(server, batch([%SpawnProcess{child_spec: {Agent, fn -> 1 end}}]))
+             Server.call(server, batch([%ProcessStart{child_spec: {Agent, fn -> 1 end}}]))
 
     F.unchanged(server, c.agent)
     instance = F.start(c, jido: c.jido, runner: Jido.exec_runner_name(c.jido))
 
     assert {:error, :invalid_child_spec} =
-             Server.call(instance, batch([%SpawnProcess{child_spec: :invalid}]))
+             Server.call(instance, batch([%ProcessStart{child_spec: :invalid}]))
 
     F.unchanged(instance, c.agent)
     observer = self()
@@ -509,7 +539,7 @@ defmodule JidoTest.AgentServer.PluginsTest do
          ]}
     }
 
-    assert {:ok, _, _} = Server.call(instance, batch([%SpawnProcess{child_spec: spec}]))
+    assert {:ok, _, _} = Server.call(instance, batch([%ProcessStart{child_spec: spec}]))
     assert_receive {:spawned, pid}, 1_000
 
     assert Enum.any?(
@@ -745,7 +775,7 @@ defmodule JidoTest.AgentServer.PluginsTest do
         error_policy: {:emit_signal, {:bus, target: :scoped}}
       )
 
-    assert {:ok, _, _} = Server.call(policy_server, batch([%Error{error: :reported}]))
+    assert {:ok, _, _} = Server.call(policy_server, batch([%ErrorReport{error: :reported}]))
 
     assert_receive {:signal,
                     %{
@@ -858,7 +888,7 @@ defmodule JidoTest.AgentServer.PluginsTest do
     assert_receive {:DOWN, ^server_ref, :process, ^server, :killed}, 1_000
     assert_root_down(tracked)
     assert Process.alive?(activation)
-    replacement = Server.Activation.worker(activation)
+    replacement = Server.Supervisor.worker(activation)
     assert replacement != server
     assert Server.await_ready(replacement) == :ok
   end
@@ -879,7 +909,7 @@ defmodule JidoTest.AgentServer.PluginsTest do
 
     assert_root_down(second_root)
     assert Process.alive?(activation)
-    replacement = Server.Activation.worker(activation)
+    replacement = Server.Supervisor.worker(activation)
     assert replacement != server
     assert Server.await_ready(replacement) == :ok
   end
@@ -976,7 +1006,7 @@ defmodule JidoTest.AgentServer.PluginsTest do
     assert_root_down(leaf)
     assert_root_down(second_root)
     assert Process.alive?(activation)
-    replacement = Server.Activation.worker(activation)
+    replacement = Server.Supervisor.worker(activation)
     assert replacement != server
     assert Server.await_ready(replacement) == :ok
   end
@@ -1056,12 +1086,19 @@ defmodule JidoTest.AgentServer.PluginsTest do
     {:registered_name, observer} = Process.info(self(), :registered_name)
 
     agent =
-      Jido.Agent.define!(
+      Jido.Agent.define!(%{
         name: "stateless_live_plugin",
         schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}),
-        plugins: [{AdmissionOnly, [observer: observer]}],
-        routes: [{"work", F.Work}]
-      )
+        extensions: [
+          %{
+            id: AdmissionOnly.id(),
+            provider: AdmissionOnly,
+            vsn: AdmissionOnly.vsn(),
+            data: %{observer: observer}
+          }
+        ],
+        routes: [%{path: "work", handler: %{kind: :action, target: F.Work}}]
+      })
       |> Jido.Agent.instantiate!(id: "stateless-live")
 
     server = F.start(%{c | agent: agent})

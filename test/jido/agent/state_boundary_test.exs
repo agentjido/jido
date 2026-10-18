@@ -8,7 +8,7 @@ defmodule Jido.Agent.StateBoundaryTest do
     use Jido.Action, name: "state_boundary_replace"
 
     def run(%{candidate: candidate}, _context),
-      do: {:ok, candidate, [Jido.Agent.Directive.stop(:invalid_state_committed)]}
+      do: {:ok, candidate, [Jido.AgentServer.Directive.server_stop(:invalid_state_committed)]}
   end
 
   test "invalid complete state cannot commit or run its effects", %{jido: jido} do
@@ -18,7 +18,11 @@ defmodule Jido.Agent.StateBoundaryTest do
       })
 
     definition =
-      Agent.new!(name: "state_boundary", schema: schema, routes: [{"state.replace", Replace}])
+      Agent.define!(%{
+        name: "state_boundary",
+        schema: schema,
+        routes: [%{path: "state.replace", handler: %{kind: :action, target: Replace}}]
+      })
 
     agent = Agent.instantiate!(definition, id: unique_id("defaults"))
     {:ok, server} = JidoTest.AgentServerAssertions.start_agent(jido, agent)
@@ -32,10 +36,10 @@ defmodule Jido.Agent.StateBoundaryTest do
           %{nested: %{count: "bad"}}
         ] do
       input = signal("state.replace", %{candidate: candidate})
-      assert {:error, %Jido.Error.ValidationError{}} = Agent.cmd(agent, input)
-      assert {:error, %Jido.Error.ValidationError{}} = AgentServer.call(server, input)
+      assert {:error, %{__exception__: true}} = Agent.cmd(agent, input)
+      assert {:error, %{__exception__: true}} = AgentServer.call(server, input)
       assert JidoTest.AgentServerAssertions.committed(server) === before
-      assert Agent.validate_instance(agent) === {:ok, agent}
+      assert Agent.validate(agent) === {:ok, agent}
     end
   end
 
@@ -59,7 +63,13 @@ defmodule Jido.Agent.StateBoundaryTest do
 
   test "Plugin reductions validate stored output without defaults", %{jido: jido} do
     definition =
-      Agent.new!(name: "owned_defaults", plugins: [OwnedState], routes: [{"owned.reduce", Keep}])
+      Agent.define!(%{
+        name: "owned_defaults",
+        extensions: [
+          %{id: OwnedState.id(), provider: OwnedState, vsn: OwnedState.vsn(), data: %{}}
+        ],
+        routes: [%{path: "owned.reduce", handler: %{kind: :action, target: Keep}}]
+      })
 
     agent = Agent.instantiate!(definition, id: unique_id("owned-defaults"))
     {:ok, server} = JidoTest.AgentServerAssertions.start_agent(jido, agent)
@@ -77,6 +87,6 @@ defmodule Jido.Agent.StateBoundaryTest do
     assert {:ok, live, _} = AgentServer.call(server, input)
     assert direct.state.owned === %{count: nil}
     assert live.state === direct.state
-    assert Agent.validate_instance(live) === {:ok, live}
+    assert Agent.validate(live) === {:ok, live}
   end
 end

@@ -1,74 +1,43 @@
-Code.require_file("../support/agents/corpus.exs", __DIR__)
+Code.require_file("../support/agents/composable_fixtures.exs", __DIR__)
 
 defmodule JidoTest.Authoring.Agents.ExecutionTest do
-  use JidoTest.Case, async: false
+  use ExUnit.Case, async: true
   @moduletag :authoring
   alias Jido.Agent
-  alias Jido.AgentServer, as: Server
-  alias JidoTest.Authoring.Agents.Corpus
+  alias JidoTest.ComposableAgent.{Team, Worker}
 
-  setup %{variant: variant} do
-    Corpus.load!(variant)
-    {:ok, spec: Corpus.spec(variant)}
+  test "construction binds child input but preserves the complete authored definition" do
+    definition = Team.definition()
+    instance = Agent.instantiate!(definition, id: "team", state: %{value: "copied", workers: 3})
+    assert Agent.definition(instance) === definition
+    assert {:ok, [planner, workers]} = Agent.Topology.bind(instance, instance.state)
+    assert planner.state.value == "copied"
+    assert workers.count == 3
+    assert workers.definition === Worker.definition()
+    assert instance.topology === definition.topology
+    assert instance.extensions === definition.extensions
   end
 
-  for variant <- Corpus.variants() do
-    @tag variant: variant
-    test "#{variant}: module and neutral definitions start as the same Agent", %{
-      spec: spec,
-      jido: jido
-    } do
-      definition = Agent.new!(spec.attrs)
-      sources = [spec.attrs.module | Enum.map(Corpus.forms(), &Corpus.definition(spec, &1))]
+  test "composition exposes data operations without the old runtime graph API" do
+    assert {:module, Agent.Composition} = Code.ensure_loaded(Agent.Composition)
 
-      for source <- sources do
-        id = unique_id("definition-startup")
-        expected = Agent.instantiate!(definition, id: id, state: spec.override)
-        assert expected.state === spec.override_state
-
-        assert {:ok, server} =
-                 Jido.start_agent(jido, source, id: id, initial_state: spec.override)
-
-        assert Server.agent(server) === expected
-        assert Agent.definition(Server.agent(server)) === definition
-        assert Server.snapshot(server).state_version == 0
-      end
+    for {function, arity} <- [
+          project: 1,
+          validate_graph: 1,
+          expand_groups: 1,
+          members_of: 2,
+          instantiate_node: 2,
+          error: 1,
+          error: 2,
+          static_definition: 1,
+          changed_plugins: 2,
+          changed_plugins: 3,
+          change?: 1
+        ] do
+      refute function_exported?(Agent.Composition, function, arity)
     end
-  end
 
-  for variant <- Corpus.variants(), form <- Corpus.forms() do
-    @tag variant: variant, form: form
-    test "#{variant}/#{form}: direct and live state sequence", %{
-      spec: spec,
-      form: form,
-      jido: jido
-    } do
-      instance = Corpus.instance(spec, Corpus.definition(spec, form), "execution")
-      assert {:ok, server} = Jido.start_agent(jido, instance)
-
-      {_last, commits} =
-        Enum.reduce(spec.steps, {instance, 0}, fn {type, data, expected}, {previous, commits} ->
-          signal = Jido.Signal.new!(type, data, source: spec.source)
-
-          case expected do
-            {:error, error_module} ->
-              before = Server.snapshot(server)
-              assert {:error, direct_error} = Agent.cmd(previous, signal)
-              assert direct_error.__struct__ == error_module
-              assert {:error, live_error} = Server.call(server, signal)
-              assert live_error.__struct__ == error_module
-              assert Server.snapshot(server) === before
-              {previous, commits}
-
-            state when is_map(state) ->
-              assert {:ok, candidate, []} = Agent.cmd(previous, signal)
-              assert candidate.state === state
-              assert {:ok, ^candidate} = Server.call(server, signal)
-              {candidate, commits + 1}
-          end
-        end)
-
-      assert Server.snapshot(server).state_version == commits
-    end
+    instance = Team.instantiate!(id: "team", state: %{value: "copied", workers: 3})
+    assert {:ok, ^instance} = Agent.Composition.bind(instance)
   end
 end

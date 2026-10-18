@@ -7,7 +7,7 @@ defmodule JidoTest.Examples.Persistence.DurableDeleteTest do
 
   setup do
     store = {ProbeStore, store: start_supervised!(ProbeStore)}
-    order = DurableDelete.new!(id: "order")
+    order = DurableDelete.instantiate!(id: "order")
 
     :ok =
       Jido.Persistence.save_agent(store, order, namespace: "durable-delete-example", revision: 0)

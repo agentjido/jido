@@ -1,37 +1,47 @@
 defmodule Jido.Agent.Codec.RegistryDerivationTest do
   use ExUnit.Case, async: true
-
   alias Jido.Agent
   alias Jido.Agent.Codec
-  alias JidoTest.AgentFixtures.Add
+  alias JidoTest.AgentFixtures.{Add, CounterAgent}
 
-  test "agent derivation records first occurrences of all referenced kinds" do
-    schema = Zoi.object(%{count: Zoi.integer()})
-
+  test "derivation records all referenced kinds and keeps first occurrences" do
     definition =
-      Agent.new!(
+      Agent.define!(%{
         name: "derived",
-        schema: schema,
+        module: CounterAgent,
+        schema: Zoi.object(%{count: Zoi.integer()}),
         metadata: %{status: :ready, uri: %URI{host: "example.com"}},
-        plugins: [{Jido.Plugin.Scheduler, time_scale: SchedEx.IdentityTimeScale}],
-        routes: [{"counter.add", {Add, %{by: 1}}, match: &String.trim/1}]
-      )
+        extensions: [
+          %{
+            id: Jido.Plugin.Scheduler.id(),
+            provider: Jido.Plugin.Scheduler,
+            vsn: 1,
+            data: %{time_scale: SchedEx.IdentityTimeScale}
+          }
+        ],
+        routes: [
+          %{path: "counter.add", handler: %{kind: :action, target: Add}, defaults: %{by: 1}}
+        ]
+      })
 
-    assert {:ok, _document, registry} = Codec.encode(definition)
-    kinds = registry.entries |> Map.values() |> Enum.map(&elem(&1, 0))
+    assert {:ok, _, registry} = Codec.encode(definition)
+    values = Map.values(registry.entries)
 
-    for kind <- [:agent, :schema, :atom, :value, :plugin, :action, :route_match] do
-      assert kind in kinds
-    end
+    for kind <- [:agent, :schema, :atom, :value, :plugin, :action],
+        do: assert(Enum.any?(values, &(elem(&1, 0) == kind)))
 
-    assert Enum.count(registry.entries, fn {_id, entry} -> entry == {:atom, :status} end) == 1
+    assert Enum.count(values, &(&1 == {:atom, :status})) == 1
   end
 
-  test "agent derivation stops at the first invalid route" do
-    definition = Agent.new!(name: "invalid_route", routes: [{"valid", Add}])
-    [route] = definition.routes
-    invalid = %{definition | routes: [%{route | target: 42}, route]}
+  test "derivation rejects invalid handler data before creating a Registry" do
+    definition =
+      Agent.define!(%{
+        name: "invalid",
+        routes: [%{path: "valid", handler: %{kind: :action, target: Add}}]
+      })
 
-    assert {:error, %Jido.Action.Error.ConfigurationError{}} = Codec.registry_entries(invalid)
+    [route] = definition.routes
+    invalid = %{definition | routes: [%{route | handler: %{route.handler | target: 42}}, route]}
+    assert {:error, %{path: [:routes, 0, :handler]}} = Codec.encode(invalid)
   end
 end

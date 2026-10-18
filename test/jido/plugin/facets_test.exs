@@ -409,11 +409,18 @@ defmodule Jido.Plugin.FacetsTest do
 
     for package <- [Package, LocalPackage] do
       assert {:error, %{message: "Plugin-owned Agent state key conflicts with the domain schema"}} =
-               Jido.Agent.new(
+               Jido.Agent.define(%{
                  name: "conflict",
                  schema: Zoi.object(%{facet_count: Zoi.integer()}),
-                 plugins: [{package, options()}]
-               )
+                 extensions: [
+                   %{
+                     id: package.id(),
+                     provider: package,
+                     vsn: package.vsn(),
+                     data: Map.new(options())
+                   }
+                 ]
+               })
     end
   end
 
@@ -598,12 +605,12 @@ defmodule Jido.Plugin.FacetsTest do
 
   test "an executable cannot return a Directive without an owner" do
     agent =
-      Agent.new!(
+      Agent.define!(%{
         name: "foreign_plugin_directive",
         schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}),
-        routes: [{"facet.foreign", ReturnForeign}]
-      )
-      |> Agent.instantiate!()
+        routes: [%{path: "facet.foreign", handler: %{kind: :action, target: ReturnForeign}}]
+      })
+      |> Agent.instantiate!(id: Jido.Signal.ID.generate!())
 
     signal = Signal.new!("facet.foreign", %{}, source: "/test")
 
@@ -612,17 +619,19 @@ defmodule Jido.Plugin.FacetsTest do
   end
 
   defp agent(package) do
-    Agent.new!(
+    Agent.define!(%{
       name: "plugin_facets",
       schema:
         Zoi.object(%{
           visible: Zoi.integer() |> Zoi.default(2),
           seen: Zoi.string() |> Zoi.default("")
         }),
-      plugins: [{package, options()}],
-      routes: [{"facet.run", Record}]
-    )
-    |> Agent.instantiate!()
+      extensions: [
+        %{id: package.id(), provider: package, vsn: package.vsn(), data: Map.new(options())}
+      ],
+      routes: [%{path: "facet.run", handler: %{kind: :action, target: Record}}]
+    })
+    |> Agent.instantiate!(id: Jido.Signal.ID.generate!())
   end
 
   defp options do

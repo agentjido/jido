@@ -2,11 +2,10 @@ defmodule Jido.Agent.Runner do
   @moduledoc false
 
   alias Jido.Agent
-  alias Jido.Agent.{Authoring, Callback, Command, Plugin, Turn, Validation}
+  alias Jido.Agent.{Command, Plugin, Turn, Validation}
   alias Jido.Agent.Plugin.Pipeline, as: PluginPipeline
   alias Jido.Error
   alias Jido.Signal
-  alias Jido.Signal.Router
 
   @type stage :: :route | :prepare | :input | :compose | :validate
 
@@ -92,12 +91,9 @@ defmodule Jido.Agent.Runner do
   def finish_for_server(%Prepared{} = prepared, result), do: do_finish(prepared, result)
 
   @doc false
-  @spec prepare_default_turn(Signal.t(), Agent.instance()) :: Agent.handle_result()
+  @spec prepare_default_turn(Signal.t(), Agent.instance()) :: {:ok, Turn.t()} | {:error, term()}
   def prepare_default_turn(%Signal{} = signal, %Agent{} = agent) do
-    agent
-    |> default_selection(signal)
-    |> finish_selection(signal, agent.module)
-    |> normalize_result_routing_error(signal)
+    select(agent, signal)
   end
 
   defp prepare_direct(agent, signal, opts) do
@@ -140,6 +136,7 @@ defmodule Jido.Agent.Runner do
       Map.merge(caller_context, %{
         agent_id: agent.id,
         agent_state: agent.state,
+        agent_topology: agent.topology,
         plugin_inputs: plugin_inputs,
         signal: signal
       })
@@ -163,6 +160,8 @@ defmodule Jido.Agent.Runner do
 
   defp do_finish(%Prepared{} = prepared, result) do
     with {:ok, output, directives} <- at(:compose, normalize_exec_result(result)),
+         {:ok, directives} <-
+           at(:compose, Jido.Agent.Contract.directives(prepared.agent, directives)),
          {:ok, output, directives} <-
            at(
              :compose,
@@ -171,50 +170,58 @@ defmodule Jido.Agent.Runner do
                prepared.agent,
                prepared.turn.source_signal,
                prepared.context.plugin_inputs,
-               prepared.plugin_specs
+               prepared.plugin_specs,
+               prepared.turn.route
              )
            ),
+         {:ok, _agent} <-
+           at(:validate, Agent.transition_validated(prepared.agent, output, prepared.schema)),
          {:ok, agent} <-
-           at(:validate, Agent.transition_validated(prepared.agent, output, prepared.schema)) do
+           at(:validate, Jido.Agent.Composition.apply(prepared.agent, output, directives)) do
       {:ok, agent, directives}
     end
   end
 
-  defp select(%Agent{module: module} = agent, signal) do
-    result =
-      if module != Agent and function_exported?(module, :handle_signal, 2),
-        do: Callback.invoke(module, :handle_signal, [signal, agent]),
-        else: default_selection(agent, signal)
-
-    result
-    |> finish_selection(signal, module)
+  defp select(agent, signal) do
+    default_selection(agent, signal)
+    |> finish_selection(signal)
     |> normalize_result_routing_error(signal)
   end
 
   defp default_selection(agent, signal) do
-    with {:ok, router} <- Router.new(agent.routes),
-         {:ok, target} <- route_first(router, signal),
-         {executable, defaults} = Authoring.split_target(target),
-         {:ok, input} <- merge_route_input(defaults || %{}, signal) do
-      {:ok, %Turn{executable: executable, input: input}}
+    with {:ok, route} <- Jido.Agent.Route.select(agent, signal.type) do
+      case route.handler do
+        %{kind: kind, target: target} when kind in [:action, :flow] ->
+          with {:ok, input} <- merge_route_input(route, signal),
+               do: {:ok, %Turn{executable: target, input: input, route: route}}
+
+        handler ->
+          {:ok,
+           %Turn{
+             executable: Jido.Agent.Turn.SignalHandler,
+             input: %{handler: handler},
+             route: route
+           }}
+      end
     end
   end
 
-  defp finish_selection({:ok, %Turn{} = turn}, signal, _module) do
+  defp finish_selection({:ok, %Turn{} = turn}, signal) do
     with {:ok, turn} <- Turn.bind_source(turn, signal),
          do: Turn.validate_selected(turn)
   end
 
-  defp finish_selection({:error, _reason} = error, _signal, _module), do: error
-
-  defp finish_selection(result, _signal, module),
-    do: {:error, invalid_callback_result(result, module)}
+  defp finish_selection({:error, _reason} = error, _signal), do: error
 
   defp normalize_exec_result({:ok, output}), do: normalize_exec_result({:ok, output, []})
 
   defp normalize_exec_result({:ok, output, directives})
        when is_map(output) and not is_struct(output),
-       do: {:ok, output, List.wrap(directives)}
+       do:
+         with(
+           {:ok, values} <- Jido.Agent.Data.list(directives, &{:ok, &1}),
+           do: {:ok, output, values}
+         )
 
   defp normalize_exec_result({:ok, output, _directives}), do: invalid_state_output(output)
   defp normalize_exec_result({:error, reason}), do: {:error, reason}
@@ -224,13 +231,6 @@ defmodule Jido.Agent.Runner do
      Error.execution_error("Agent executable returned an invalid result",
        details: %{code: :agent_invalid_callback_result, callback: :execute, result: result}
      )}
-  end
-
-  defp route_first(router, signal) do
-    case Router.route(router, signal) do
-      {:ok, [target | _targets]} -> {:ok, target}
-      {:error, error} -> {:error, error}
-    end
   end
 
   defp normalize_routing_error(%Jido.Signal.Error.RoutingError{} = error, signal) do
@@ -247,10 +247,10 @@ defmodule Jido.Agent.Runner do
 
   defp normalize_result_routing_error(result, _signal), do: result
 
-  defp merge_route_input(defaults, %Signal{} = signal) do
+  defp merge_route_input(route, %Signal{} = signal) do
     case Turn.normalize_input(signal.data) do
       {:ok, input} ->
-        {:ok, Map.merge(defaults, input)}
+        Jido.Agent.Route.params(route, input)
 
       {:error, _error} ->
         {:error,
@@ -266,17 +266,6 @@ defmodule Jido.Agent.Runner do
      Error.execution_error("Agent executable output must be a plain state map",
        details: %{code: :agent_invalid_callback_result, callback: :execute, output: output}
      )}
-  end
-
-  defp invalid_callback_result(result, module) do
-    Error.execution_error("Agent handle_signal/2 returned an invalid result",
-      details: %{
-        code: :agent_invalid_callback_result,
-        module: module,
-        callback: :handle_signal,
-        result: result
-      }
-    )
   end
 
   defp at(_stage, {:ok, _value} = result), do: result

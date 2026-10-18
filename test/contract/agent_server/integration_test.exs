@@ -6,7 +6,7 @@ defmodule JidoTest.AgentServer.IntegrationTest do
 
   import JidoTest.Eventually
   alias Jido.Agent.Directive.Emit
-  alias Jido.Agent.Directive.Stop
+  alias Jido.AgentServer.Directive.ServerStop
   alias Jido.AgentServer, as: Server
   alias Jido.Error.ValidationError
   alias Jido.Tracing.Context
@@ -49,8 +49,8 @@ defmodule JidoTest.AgentServer.IntegrationTest do
     {_, replacement, _, _} =
       Enum.find(Supervisor.which_children(supervisor), &(elem(&1, 0) == first_spec.id))
 
-    assert Server.agent(Server.Activation.worker(replacement)).id == c.agent.id
-    Server.stop(Server.Activation.worker(replacement))
+    assert Server.agent(Server.Supervisor.worker(replacement)).id == c.agent.id
+    Server.stop(Server.Supervisor.worker(replacement))
 
     assert {_, :undefined, _, _} =
              Enum.find(Supervisor.which_children(supervisor), &(elem(&1, 0) == first_spec.id))
@@ -264,7 +264,7 @@ defmodule JidoTest.AgentServer.IntegrationTest do
     good = %Emit{signal: F.signal(%{}, "effect"), dispatch: {:pid, target: self()}}
 
     for batch <- [
-          [%Stop{reason: :normal}, good],
+          [%ServerStop{reason: :normal}, good],
           [good, %Emit{signal: :invalid, dispatch: {:pid, target: self()}}],
           [good, %Emit{signal: F.signal(), dispatch: {:pid, target: :bad}}],
           [%UnownedEffect{}]

@@ -177,7 +177,7 @@ defmodule Jido.Plugin.PreparationTest do
   end
 
   defp agent(mode) do
-    Jido.Agent.new!(
+    Jido.Agent.define!(%{
       name: "plugin_preparation_agent",
       schema:
         Zoi.object(%{
@@ -188,9 +188,11 @@ defmodule Jido.Plugin.PreparationTest do
           prepared_signal_type: Zoi.string() |> Zoi.default(""),
           value: Zoi.integer() |> Zoi.default(0)
         }),
-      routes: [{"prepare.run", Capture}],
-      plugins: [{Package, mode: mode}]
-    )
+      routes: [%{path: "prepare.run", handler: %{kind: :action, target: Capture}}],
+      extensions: [
+        %{id: Package.id(), provider: Package, vsn: Package.vsn(), data: %{mode: mode}}
+      ]
+    })
     |> Jido.Agent.instantiate!(id: unique_id("prepared"))
   end
 end

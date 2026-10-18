@@ -49,7 +49,7 @@ defmodule Jido.Plugin.ContractTest do
 
     @impl Jido.Action
     def run(_params, context) do
-      {:ok, context.agent_state, [%Jido.Agent.Directive.Stop{}]}
+      {:ok, context.agent_state, [%Jido.AgentServer.Directive.ServerStop{}]}
     end
   end
 
@@ -116,7 +116,7 @@ defmodule Jido.Plugin.ContractTest do
 
   defmodule OwnedDirective do
     defstruct value: nil
-    def validate(%__MODULE__{}), do: {:ok, %Jido.Agent.Directive.Stop{}}
+    def validate(%__MODULE__{}), do: {:ok, %Jido.AgentServer.Directive.ServerStop{}}
   end
 
   defmodule ReturnOwnedDirective do
@@ -394,7 +394,7 @@ defmodule Jido.Plugin.ContractTest do
     def reduce(reduction, _opts), do: {:ok, reduction.plugin_state}
 
     @impl true
-    def directives(_opts), do: [Jido.Agent.Directive.Stop]
+    def directives(_opts), do: [Jido.AgentServer.Directive.ServerStop]
   end
 
   defmodule InvalidStateAgent do
@@ -555,11 +555,11 @@ defmodule Jido.Plugin.ContractTest do
 
   test "admission accepts only a runtime input result or an explicit error" do
     agent =
-      Jido.Agent.new!(
+      Jido.Agent.define!(%{
         name: "plugin_admission_contract",
         schema: Zoi.object(%{trace: Zoi.list(Zoi.string()) |> Zoi.default([])})
-      )
-      |> Jido.Agent.instantiate!()
+      })
+      |> Jido.Agent.instantiate!(id: Jido.Signal.ID.generate!())
 
     signal = Signal.new!("trace.run", %{trace: []}, source: "/test")
     assert {:ok, command} = Jido.Agent.Command.new(agent, signal)
@@ -591,22 +591,22 @@ defmodule Jido.Plugin.ContractTest do
   end
 
   test "validates the complete Action state" do
-    agent = InvalidStateAgent.new!()
+    agent = InvalidStateAgent.instantiate!(id: Jido.Signal.ID.generate!())
     signal = Signal.new!("invalid.run", %{}, source: "/test")
 
-    assert {:error, %Jido.Error.ValidationError{}} = InvalidStateAgent.cmd(agent, signal)
+    assert {:error, %{__exception__: true}} = InvalidStateAgent.cmd(agent, signal)
   end
 
   test "validates Directives in offline Agent.cmd/3" do
-    agent = DirectiveAgent.new!()
+    agent = DirectiveAgent.instantiate!(id: Jido.Signal.ID.generate!())
     signal = Signal.new!("directive.stop", %{}, source: "/test")
 
-    assert {:ok, _next_agent, [%Jido.Agent.Directive.Stop{reason: :normal}]} =
+    assert {:ok, _next_agent, [%Jido.AgentServer.Directive.ServerStop{reason: :normal}]} =
              DirectiveAgent.cmd(agent, signal)
   end
 
   test "preserves an Action error" do
-    agent = FailingAgent.new!()
+    agent = FailingAgent.instantiate!(id: Jido.Signal.ID.generate!())
     signal = Signal.new!("failure.run", %{}, source: "/test")
 
     assert {:error, %Jido.Action.Error.ExecutionFailureError{message: "action_failed"}} =
@@ -614,7 +614,7 @@ defmodule Jido.Plugin.ContractTest do
   end
 
   test "does not let validation replace a Directive type" do
-    agent = ReplaceDirectiveTypeAgent.new!()
+    agent = ReplaceDirectiveTypeAgent.instantiate!(id: Jido.Signal.ID.generate!())
     signal = Signal.new!("directive.replace", %{}, source: "/test")
 
     assert {:error, %Jido.Error.ValidationError{message: message}} =
@@ -624,7 +624,7 @@ defmodule Jido.Plugin.ContractTest do
   end
 
   test "gives a Plugin state reducer only its owned Directives" do
-    agent = DirectiveReducerAgent.new!()
+    agent = DirectiveReducerAgent.instantiate!(id: Jido.Signal.ID.generate!())
     signal = Signal.new!("directive.reduce", %{}, source: "/test")
 
     assert {:ok, next_agent, [%ReducedDirective{}, %ForeignDirective{}]} =
@@ -634,7 +634,7 @@ defmodule Jido.Plugin.ContractTest do
   end
 
   test "normalizes a Directive before Plugin state reduction" do
-    agent = NormalizingDirectiveAgent.new!()
+    agent = NormalizingDirectiveAgent.instantiate!(id: Jido.Signal.ID.generate!())
     signal = Signal.new!("directive.normalize", %{}, source: "/test")
 
     assert {:ok, next_agent, [%NormalizedDirective{value: "normalized"}]} =
@@ -644,18 +644,18 @@ defmodule Jido.Plugin.ContractTest do
   end
 
   test "adds Plugin state to the Agent schema without author schema work" do
-    agent = OwnedStateAgent.new!()
+    agent = OwnedStateAgent.instantiate!(id: Jido.Signal.ID.generate!())
 
-    assert Keyword.keys(OwnedStateAgent.domain_schema().fields) == [:trace]
-    assert Keyword.keys(OwnedStateAgent.domain_schema().fields) == [:trace]
-    assert Enum.sort(Keyword.keys(OwnedStateAgent.complete_schema().fields)) == [:owned, :trace]
-    assert agent.schema == OwnedStateAgent.domain_schema()
-    assert agent.plugins == [{OwnedStatePlugin, []}]
+    assert Keyword.keys(OwnedStateAgent.definition().schema.fields) == [:trace]
+    assert Keyword.keys(OwnedStateAgent.definition().schema.fields) == [:trace]
+    assert Enum.sort(Keyword.keys(OwnedStateAgent.schema().fields)) == [:owned, :trace]
+    assert agent.schema == OwnedStateAgent.definition().schema
+    assert Jido.Agent.runtime_plugins(agent) == [{OwnedStatePlugin, []}]
     assert agent.state == %{owned: %{count: 0}, trace: []}
   end
 
   test "Agent.set/2 changes domain state but not Plugin-owned state" do
-    agent = OwnedStateAgent.new!()
+    agent = OwnedStateAgent.instantiate!(id: Jido.Signal.ID.generate!())
 
     assert {:ok, changed} = Jido.Agent.set(agent, %{trace: ["changed"]})
     assert changed.state == %{owned: %{count: 0}, trace: ["changed"]}
@@ -667,7 +667,7 @@ defmodule Jido.Plugin.ContractTest do
   end
 
   test "does not let an executable change Plugin-owned state" do
-    agent = OwnedStateAgent.new!()
+    agent = OwnedStateAgent.instantiate!(id: Jido.Signal.ID.generate!())
     signal = Signal.new!("owned.overwrite", %{}, source: "/test")
 
     assert {:error, %Jido.Error.ExecutionError{message: message} = error} =
@@ -680,7 +680,7 @@ defmodule Jido.Plugin.ContractTest do
   test "uses strict equality for numeric changes in nested Plugin-owned state" do
     assert {:ok, specs} = Jido.Plugin.Normalizer.normalize_all([OwnedStatePlugin])
     original = %{owned: %{count: 1, nested: %{value: 2}}}
-    agent = %{OwnedStateAgent.new!() | state: original}
+    agent = %{OwnedStateAgent.instantiate!(id: Jido.Signal.ID.generate!()) | state: original}
     signal = Signal.new!("owned.pipeline", %{}, source: "/test")
 
     for changed <- [
@@ -702,7 +702,7 @@ defmodule Jido.Plugin.ContractTest do
   end
 
   test "treats a missing Plugin key and a nil Plugin value as different state" do
-    agent = NilOwnedStateAgent.new!()
+    agent = NilOwnedStateAgent.instantiate!(id: Jido.Signal.ID.generate!())
     signal = Signal.new!("owned.delete_nil", %{}, source: "/test")
 
     assert agent.state == %{nil_owned: nil}
@@ -714,14 +714,24 @@ defmodule Jido.Plugin.ContractTest do
   end
 
   test "rejects unknown state keys and domain state key conflicts" do
-    assert {:error, %Jido.Error.ValidationError{}} =
-             OwnedStateAgent.new(state: %{owned: %{count: 0}, trace: [], extra: true})
+    assert {:error, %{__exception__: true}} =
+             OwnedStateAgent.instantiate(
+               id: Jido.Signal.ID.generate!(),
+               state: %{owned: %{count: 0}, trace: [], extra: true}
+             )
 
-    assert {:error, %Jido.Error.ValidationError{}} =
-             Jido.Agent.new(
+    assert {:error, %{__exception__: true}} =
+             Jido.Agent.define(%{
                name: "conflicting_state_agent",
                schema: Zoi.object(%{owned: Zoi.map()}),
-               plugins: [OwnedStatePlugin]
-             )
+               extensions: [
+                 %{
+                   id: OwnedStatePlugin.id(),
+                   provider: OwnedStatePlugin,
+                   vsn: OwnedStatePlugin.vsn(),
+                   data: %{}
+                 }
+               ]
+             })
   end
 end

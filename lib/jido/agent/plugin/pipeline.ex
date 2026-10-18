@@ -12,12 +12,29 @@ defmodule Jido.Agent.Plugin.Pipeline do
   @type result :: {:ok, map(), [struct()]} | {:error, term()}
 
   @doc false
-  @spec run(result(), Agent.instance(), Signal.t(), %{optional(module()) => Input.t()}, [Spec.t()]) ::
+  @spec run(
+          result(),
+          Agent.instance(),
+          Signal.t(),
+          %{optional(module()) => Input.t()},
+          [Spec.t()],
+          map() | nil
+        ) ::
           result()
-  def run({:ok, state, directives}, %Agent{} = agent, %Signal{} = signal, plugin_inputs, specs)
+  def run(result, agent, signal, plugin_inputs, specs, route \\ nil)
+
+  def run(
+        {:ok, state, directives},
+        %Agent{} = agent,
+        %Signal{} = signal,
+        plugin_inputs,
+        specs,
+        route
+      )
       when is_map(state) and is_map(plugin_inputs) and is_list(directives) and is_list(specs) do
     with :ok <- protect_owned_state(state, agent.state, specs),
          {:ok, directives} <- validate_directives(directives, specs),
+         :ok <- Jido.Agent.Contract.check_emissions(route, directives),
          {:ok, state} <-
            reduce_owned_state(
              state,
@@ -31,7 +48,7 @@ defmodule Jido.Agent.Plugin.Pipeline do
     end
   end
 
-  def run({:error, _reason} = error, _agent, _signal, _plugin_inputs, _specs), do: error
+  def run({:error, _reason} = error, _agent, _signal, _plugin_inputs, _specs, _route), do: error
 
   defp protect_owned_state(state, original_state, specs) do
     changed =

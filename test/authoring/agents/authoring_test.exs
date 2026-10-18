@@ -1,80 +1,82 @@
-Code.require_file("../support/agents/corpus.exs", __DIR__)
+Code.require_file("../support/agents/composable_compiler.exs", __DIR__)
 
 defmodule JidoTest.Authoring.Agents.AuthoringTest do
-  use ExUnit.Case, async: false
+  use ExUnit.Case, async: true
   @moduletag :authoring
   alias Jido.Agent
-  alias Jido.Agent.Codec
-  alias JidoTest.Authoring.Agents.Corpus
+  alias JidoTest.ComposableAgent.Compiler
 
-  setup %{variant: variant} do
-    Corpus.load!(variant)
-    {:ok, spec: Corpus.spec(variant)}
-  end
+  test "Map and DSL definitions initialize the same complete state with static Zoi schemas" do
+    cases = [
+      {"Zoi.object(%{name: Zoi.string()})", Zoi.object(%{name: Zoi.string()}), %{name: "Ada"},
+       %{name: "Ada"}},
+      {"Zoi.object(%{enabled: Zoi.boolean() |> Zoi.default(false), amount: Zoi.integer() |> Zoi.default(0), note: Zoi.string() |> Zoi.nullable() |> Zoi.default(nil)})",
+       Zoi.object(%{
+         enabled: Zoi.boolean() |> Zoi.default(false),
+         amount: Zoi.integer() |> Zoi.default(0),
+         note: Zoi.string() |> Zoi.nullable() |> Zoi.default(nil)
+       }), %{}, %{enabled: false, amount: 0, note: nil}},
+      {"Zoi.object(%{profile: Zoi.object(%{name: Zoi.string()})})",
+       Zoi.object(%{profile: Zoi.object(%{name: Zoi.string()})}), %{profile: %{name: "Ada"}},
+       %{profile: %{name: "Ada"}}},
+      {"Zoi.object(%{items: Zoi.list(Zoi.string()) |> Zoi.default([])})",
+       Zoi.object(%{items: Zoi.list(Zoi.string()) |> Zoi.default([])}), %{}, %{items: []}}
+    ]
 
-  for variant <- Corpus.variants(), form <- Corpus.forms() do
-    @tag variant: variant, form: form
-    test "#{variant}/#{form}: definition, JSON, and instance contract", %{spec: spec, form: form} do
-      definition = Corpus.definition(spec, form)
-      assert definition === Agent.new!(spec.attrs)
-      assert Agent.definition?(definition)
-      assert definition.id == nil
-      assert definition.state == nil
-      assert {:ok, document} = Codec.encode(definition, spec.registry)
-      assert document === spec.document
+    for {source, schema, supplied, expected} <- cases do
+      module = Compiler.compile("agent do schema #{source} end")
+      from_map = Agent.define!(%{module: module, name: "generated", schema: schema})
+      assert module.definition() === from_map
+      assert Map.from_struct(module.definition()) === Map.from_struct(from_map)
 
-      Enum.reduce(1..3, definition, fn _, current ->
-        assert {:ok, ^document} = Codec.encode(current, spec.registry)
-        assert {:ok, decoded} = Codec.decode(JSON.decode!(JSON.encode!(document)), spec.registry)
-        assert decoded === definition
-        decoded
-      end)
+      for definition <- [module.definition(), from_map] do
+        instance = Agent.instantiate!(definition, id: "one", state: supplied)
+        assert instance.state === expected
+        assert Agent.definition(instance) === definition
+        assert {:ok, ^instance} = Agent.validate(instance)
 
-      assert {:ok, generated, registry} = Codec.encode(definition)
-      assert {:ok, ^definition} = Codec.decode(JSON.decode!(JSON.encode!(generated)), registry)
-
-      for field <- ~w(id state as interfaces signal_source inline_action) do
-        refute Map.has_key?(document, field)
+        assert {:error, _} =
+                 Agent.instantiate(definition,
+                   id: "bad",
+                   state: Map.put(supplied, :unknown, true)
+                 )
       end
-
-      instance = Corpus.instance(spec, definition, "default")
-      assert instance.state === spec.initial
-      assert Agent.definition(instance) === definition
-      assert {:ok, ^document} = Codec.encode(instance, spec.registry)
-
-      assert {:error, %Jido.Error.ValidationError{}} =
-               Agent.instantiate(definition, state: spec.invalid_state)
-
-      overridden = Agent.instantiate!(definition, id: "override", state: spec.override)
-      assert overridden.state === spec.override_state
-      assert overridden.id == "override"
     end
   end
 
-  for variant <- Corpus.variants() do
-    @tag variant: variant
-    test "#{variant}: module accessors and instance constructors", %{spec: spec} do
-      module = spec.attrs.module
-      expected = Agent.new!(spec.attrs)
-      definition = module.definition()
-      assert definition === expected
-      assert module.domain_schema() === spec.attrs.schema
-      assert definition.metadata === spec.attrs.metadata
-      assert module.vsn() === spec.attrs.vsn
+  test "partial identity and state combinations are invalid" do
+    definition = Agent.define!(%{name: "boundary"})
 
-      opts = [id: "override", state: spec.override]
-      assert {:ok, decoded} = Codec.decode(spec.document, spec.registry, opts)
-
-      for instance <- [
-            module.new!(opts),
-            Agent.instantiate!(module, opts),
-            Agent.instantiate!(Agent.new!(spec.attrs), opts),
-            decoded
-          ] do
-        assert instance.state === spec.override_state
-        assert instance.id == "override"
-        assert Agent.instance?(instance)
-      end
+    for value <- [
+          %{definition | id: "one"},
+          %{definition | state: %{}},
+          %{definition | id: "", state: %{}}
+        ] do
+      assert {:error, _} = Agent.validate(value)
+      refute Agent.definition?(value)
+      refute Agent.instance?(value)
     end
+
+    assert {:ok, ^definition} = Agent.define(%{name: "boundary", id: nil, state: nil})
+
+    for attrs <- [%{id: "one"}, %{state: %{}}] do
+      assert {:error, _} = Agent.define(Map.merge(%{name: "boundary"}, attrs))
+    end
+  end
+
+  test "stored state validation cannot insert missing defaults" do
+    definition =
+      Agent.define!(%{
+        name: "strict",
+        schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+      })
+
+    assert {:error, _} = Agent.validate(%{definition | id: "one", state: %{}})
+    assert {:error, _} = Agent.instantiate(definition, id: "one", state: %{count: "2"})
+
+    assert {:ok, %{state: %{count: 0}}} =
+             Agent.instantiate(definition, id: "one", state: %{count: nil})
+
+    assert {:ok, %{state: %{count: 0}}} = Agent.instantiate(definition, id: "one")
   end
 end

@@ -196,7 +196,7 @@ defmodule JidoTest.CommitProjection.Agent do
     schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
 
     plugin JidoTest.CommitProjection.First,
-      config: [key: :first, sink: JidoTest.CommitProjection.Sink]
+      config: %{key: :first, sink: JidoTest.CommitProjection.Sink}
   end
 
   routes do
@@ -213,7 +213,7 @@ defmodule JidoTest.CommitProjection.ProjectionAgent do
     schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
 
     plugin JidoTest.CommitProjection.Projection,
-      config: [key: :projection, observer: JidoTest.CommitProjection.Observer]
+      config: %{key: :projection, observer: JidoTest.CommitProjection.Observer}
   end
 
   routes do
@@ -229,12 +229,12 @@ defmodule JidoTest.CommitProjection.TimeoutAgent do
     schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
 
     plugin JidoTest.CommitProjection.First,
-      config: [
+      config: %{
         key: :first,
         sink: JidoTest.CommitProjection.Sink,
         observer: JidoTest.CommitProjection.Observer,
         gate: "timeout"
-      ]
+      }
   end
 
   routes do

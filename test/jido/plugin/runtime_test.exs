@@ -237,7 +237,7 @@ defmodule Jido.Plugin.RuntimeTest do
     Process.put({__MODULE__, :observer_key}, observer_key)
     on_exit(fn -> :persistent_term.erase({__MODULE__, :observer, observer_key}) end)
 
-    agent = RuntimeAgent.new!()
+    agent = RuntimeAgent.instantiate!(id: Jido.Signal.ID.generate!())
     agent_host = start_supervised!({AgentHost, {agent, self()}})
 
     init = %Plugin.Init{

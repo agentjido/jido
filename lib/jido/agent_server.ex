@@ -50,16 +50,16 @@ defmodule Jido.AgentServer do
   `child_spec/1` supervises an activation root with transient restart. The root
   owns this worker and required Plugin roots in one `:one_for_all` group.
   `start/1` and instance lookup return the request worker; `activation/1` returns
-  its supervisor. `Activation.start_link/1` returns `{:ok, root}` for
+  its supervisor. `Jido.AgentServer.Supervisor.start_link/1` returns `{:ok, root}` for
   standalone supervision. Explicit stop confirms the complete root's death.
   Recovery uses the last published Agent and revision with fresh readiness.
   Recovery waits for the previous turn's Runic scope to close before
   admitting work, within the readiness budget. A Plugin supervisor can recover
   its internal workers locally.
   Runtime relationship metadata survives worker recovery in a supervisor-owned
-  ETS table. Whole activation replacement does not restore later adoption or
-  commits. A restarted owned-child DynamicSupervisor starts empty; recreating
-  those children needs the later checkpoint feature.
+  ETS table. Whole activation replacement restores only saved composition
+  intent. A restarted owned-child DynamicSupervisor starts empty; accepted
+  topology declarations rebuild the child set.
 
   Use `start(agent: instance, jido: MyJido, partition: "tenant")` for instance
   supervision. It shares that instance's Runner, claims its Registry identity,
@@ -77,12 +77,36 @@ defmodule Jido.AgentServer do
 
   Directives are validated as a complete batch before commit. The default
   `max_directives_per_turn:` is 1,000; use a non-negative integer or `:infinity`.
-  `Emit` uses its explicit dispatch, `default_dispatch:`, or a cast to this server,
-  in that order. Bus dispatch inherits the instance unless its scope is explicit.
+  `Emit` uses explicit dispatch first. Otherwise it uses accepted topology
+  connections, its owning topology, `default_dispatch:`, or a cast to this server. Bus dispatch inherits the instance unless its scope is explicit.
   Cast acceptance does not confirm admission, commit, or delivery. Trace and
-  causation follow the source Signal. `Stop` must be last. `Error` applies the
-  failure policy after commit. `SpawnProcess` requires a Jido instance and starts
+  causation follow the source Signal. `ServerStop` must be last. `ErrorReport` applies the
+  failure policy after commit. `ProcessStart` requires a Jido instance and starts
   an untracked child under its supervisor; that child can outlive this server.
+  Topology and Plugin changes are applied to the candidate before commit.
+  One accepted revision holds the complete target. After save, the supervisor
+  rebuilds changed Plugin resources before another turn. `await_ready/2` waits
+  for this step. Reads and the commit reply can precede readiness. A resource
+  startup failure stops the supervisor; recovery uses the saved target.
+  Declared local agents and buses run under the owning supervisor. Counts and
+  initial inputs bind from accepted state. Changed definitions or bound inputs
+  replace affected agents; unchanged slots retain their processes. Connection
+  edits retain processes. Remote startup and unknown runtime endpoint kinds
+  fail validation before commit. Topology agents use permanent supervision.
+
+  `snapshot/2` returns `%{agent: agent, state_version: revision}` from one server
+  event. It is a live value; `Jido.Persistence.snapshot/2` converts it to portable
+  data. `upgrade/3` runs an explicit snapshot upgrade Action in serial order and
+  uses the normal validation, quiescence, save, checkpoint and reconciliation
+  boundary. It returns `{:ok, candidate, []}` after commit. Use `await_ready/2`
+  to wait for process changes. Snapshot reads during startup return `:not_ready`.
+
+  Existing runtime Plugins must implement idempotent `quiesce/2` and `resume/2`
+  before a live configuration change is accepted. A failed pre-commit change
+  resumes old resources. New roots rebuild from the accepted state and revision.
+  New, removed, or reconfigured Plugins do not receive `after_commit/3` for that
+  configuration commit. Unchanged Plugins retain their normal hooks.
+
   Plugin-owned custom directives use
   `directive_handler: fn directive, context -> :ok | {:error, reason} end`.
   Other built-in directives remain rejected.
@@ -218,8 +242,14 @@ defmodule Jido.AgentServer do
 
   alias Jido.Agent
   alias Jido.Agent.Directive
-  alias Jido.Agent.Directive.{Emit, Error, SpawnProcess, Stop}
+  alias Jido.Agent.Directive.Emit
+  alias Jido.AgentServer.TopologyRuntime
+  alias Jido.AgentServer.Directive.{AgentStart, AgentStop, AgentSend, OwnerSend}
+  alias Jido.AgentServer.Directive.ErrorReport
+  alias Jido.AgentServer.Directive.ProcessStart
+  alias Jido.AgentServer.Directive.ServerStop
   alias Jido.AgentServer.Plugin.Callbacks
+  alias Jido.AgentServer.Supervisor, as: ServerSupervisor
   alias Jido.Dispatch.Preparation, as: DispatchPreparation
   alias Jido.Agent.Command
   alias Jido.Agent.Runner, as: AgentRunner
@@ -228,271 +258,90 @@ defmodule Jido.AgentServer do
   alias Jido.Tracing.Context, as: TraceContext
   alias Runic.Runner
 
-  defmodule Activation do
-    @moduledoc """
-    The OTP root for an AgentServer and its private resources.
-
-    `start_link/1` returns `{:ok, supervisor}`. `worker/1` returns the request
-    endpoint. Use `AgentServer.child_spec/1` in an application supervisor.
-    Required Plugin roots and the server recover together with `:one_for_all`.
-    A Plugin supervisor controls recovery inside its own tree.
-    """
-    use Supervisor
+  defmodule CompositionRuntime do
+    @moduledoc false
+    alias Jido.Agent.{Error, Mutation}
     alias Jido.AgentServer, as: Server
 
-    def start_link(opts, parent \\ nil) do
-      with {:ok, opts} <- Server.activation_options(opts) do
-        Supervisor.start_link(__MODULE__, {opts, parent}) |> finish_start(parent)
-      end
-    end
+    def check(data, candidate, directives) do
+      changed = Mutation.changed_plugins(data.agent, candidate, directives)
 
-    defp finish_start({:ok, root} = result, parent) do
-      case record_child(parent, root) do
-        :ok ->
-          result
+      cond do
+        is_nil(data.activation) and
+            (not Jido.Agent.Topology.empty?(candidate.topology) or
+               Jido.AgentServer.TopologyRuntime.buses(candidate) != [] or changed != []) ->
+          {:error, :activation_required}
 
-        error ->
-          Supervisor.stop(root)
-          error
-      end
-    end
-
-    defp finish_start(error, _parent), do: error
-
-    @impl true
-    def init({opts, parent}) do
-      state = :ets.new(__MODULE__, [:set, :public])
-      :ets.insert(state, [{:parent, parent}, {:checkpoint, opts[:agent], 0}])
-      opts = Keyword.put(opts, :activation_state, state)
-
-      children = [
-        %{
-          id: Server,
-          start: {__MODULE__, :start_worker, [opts, self()]},
-          restart: :transient,
-          significant: true,
-          shutdown: 10_000
-        }
-      ]
-
-      Supervisor.init(children,
-        strategy: :one_for_all,
-        auto_shutdown: :any_significant,
-        max_restarts: 3,
-        max_seconds: 5
-      )
-    end
-
-    # The checkpoint is the canonical Agent and revision, not a serialized
-    # runtime map. Local state rules apply; portable save/export is separate.
-    @doc false
-    def start_worker(opts, activation) do
-      state = Keyword.fetch!(opts, :activation_state)
-      # The recovery group has stopped its owned DynamicSupervisor. Its children
-      # are not checkpoints; keep only independent relationships across recovery.
-      :ets.match_delete(state, {{:child, :_}, %{placement: :owned}})
-
-      checkpoint =
-        if opts[:persistence] in [nil, false],
-          do: restore_checkpoint(state, opts[:agent]),
-          else: {:ok, opts[:agent], 0}
-
-      with {:ok, agent, revision} <- checkpoint,
-           opts = Keyword.merge(opts, agent: agent, state_version: revision),
-           {:ok, pid} <- Server.start_worker(opts, activation) do
-        :ets.insert(state, {:worker, pid})
-        {:ok, pid}
-      end
-    end
-
-    defp restore_checkpoint(state, initial) do
-      with [{:checkpoint, agent, revision}] <- :ets.lookup(state, :checkpoint),
-           true <- is_integer(revision) and revision >= 0,
-           {:ok, agent} <- Jido.Agent.validate_instance(agent),
-           true <- agent.id == initial.id,
-           true <- Jido.Agent.definition(agent) === Jido.Agent.definition(initial) do
-        {:ok, agent, revision}
-      else
-        _ -> {:error, :invalid_local_checkpoint}
-      end
-    end
-
-    @doc false
-    def publish_checkpoint(nil, _agent, _revision), do: :ok
-
-    def publish_checkpoint(state, agent, revision) do
-      match_spec = [
-        {{:checkpoint, :_, revision - 1}, [], [{:const, {:checkpoint, agent, revision}}]}
-      ]
-
-      case :ets.select_replace(state, match_spec) do
-        1 -> :ok
-        0 -> {:error, :checkpoint_conflict}
-      end
-    rescue
-      ArgumentError -> {:error, :checkpoint_unavailable}
-    end
-
-    @doc false
-    def persistence_mode(state, requested) do
-      if :ets.insert_new(state, {:durable_started, true}), do: requested, else: :restore
-    end
-
-    @doc false
-    def restore_durable(state, agent, revision),
-      do: :ets.insert(state, {:checkpoint, agent, revision})
-
-    @doc false
-    def start_plugin(spec, state) do
-      [{:worker, owner}] = :ets.lookup(state, :worker)
-      {:ok, init} = :gen_statem.call(owner, {:plugin_init, spec.module})
-
-      {:ok, %{start: {module, function, args}}} =
-        Jido.AgentServer.Plugin.Callbacks.child_spec(init, spec)
-
-      apply(module, function, args)
-    end
-
-    def worker(activation) do
-      case List.keyfind(Supervisor.which_children(activation), Server, 0) do
-        {Server, pid, :worker, _} when is_pid(pid) -> pid
-        _ -> nil
-      end
-    end
-
-    def start_plugin(activation, spec, child_spec, state) do
-      child_spec = %{
-        child_spec
-        | id: {:plugin, spec.module},
-          start: {__MODULE__, :start_plugin, [spec, state]}
-      }
-
-      case Supervisor.start_child(activation, child_spec) do
-        {:ok, pid} when is_pid(pid) ->
-          {:ok, pid}
-
-        {:ok, pid, _info} when is_pid(pid) ->
-          {:ok, pid}
-
-        {:error, {:already_started, pid}} = error ->
-          case List.keyfind(Supervisor.which_children(activation), child_spec.id, 0) do
-            {_, ^pid, _, _} when is_pid(pid) -> {:ok, pid}
-            _ -> error
+        true ->
+          with :ok <- validate_runtime(%{data | agent: candidate}) do
+            Enum.reduce_while(data.plugin_specs, :ok, fn spec, :ok ->
+              if spec.module in changed and match?(%{runtime?: true}, spec.agent_server) and
+                   not (function_exported?(spec.module, :quiesce, 2) and
+                          function_exported?(spec.module, :resume, 2)) do
+                {:halt,
+                 Error.fail(
+                   :plugin_quiescence_required,
+                   [:extensions],
+                   "Plugin changes require quiesce and resume callbacks",
+                   %{plugin: spec.module}
+                 )}
+              else
+                {:cont, :ok}
+              end
+            end)
           end
-
-        {:ok, _} ->
-          {:error, :plugin_root_required}
-
-        error ->
-          error
       end
     end
 
-    def execution(nil), do: nil
-    def execution(state), do: :ets.lookup(state, :execution) |> List.first()
+    def validate_runtime(data), do: Jido.AgentServer.TopologyRuntime.validate(data.agent)
 
-    def remember_execution(nil, _runner, _id, _worker), do: :ok
+    def pause(specs, refs, callback) do
+      Enum.reduce_while(specs, :ok, fn spec, :ok ->
+        result =
+          bounded(fn ->
+            Jido.Plugin.Error.safe_apply(
+              spec.module,
+              spec.module,
+              callback,
+              [Map.get(refs, spec.module), spec.agent_server.options],
+              "Plugin configuration boundary failed"
+            )
+          end)
 
-    def remember_execution(state, runner, id, worker) do
-      case Registry.lookup(Module.concat(runner, Registry), {Runic.TaskScope, worker}) do
-        [{scope, _}] ->
-          :ets.insert(state, {:execution, runner, id, scope})
-          :ok
+        if result == :ok,
+          do: {:cont, :ok},
+          else: {:halt, {:error, {callback, spec.module, result}}}
+      end)
+    end
 
-        [] ->
-          {:error, :ownership_scope_unavailable}
+    defp bounded(fun) do
+      task = Task.async(fun)
+
+      case Task.yield(task, 5_000) || Task.shutdown(task, :brutal_kill) do
+        {:ok, result} -> result
+        _ -> {:error, :plugin_control_timeout}
       end
     end
 
-    def forget_execution(nil), do: :ok
-    def forget_execution(state), do: :ets.delete(state, :execution)
-
-    def close_execution(state) do
-      case execution(state) do
-        nil ->
-          :ok
-
-        {:execution, runner, id, scope} = execution ->
-          # Owner DOWN and supervisor recovery have separate recipients. Keep
-          # admission closed until the old scope has stopped its native work,
-          # even when its Worker has already left the Runner registry.
-          result =
-            case Runner.lookup(runner, id) do
-              nil -> Runic.TaskScope.close(scope)
-              _worker -> Runner.cancel(runner, id)
-            end
-
-          if result == :ok, do: :ets.delete_object(state, execution)
-          result
+    def plugins(data, owner, changed) do
+      with :ok <-
+             Enum.reduce_while(changed, :ok, fn module, :ok ->
+               case remove_spec(data.activation, {:plugin, module}) do
+                 :ok -> {:cont, :ok}
+                 error -> {:halt, error}
+               end
+             end),
+           {:ok, refs} <- Server.bootstrap_current_plugins(data, owner) do
+        {:ok, refs}
       end
     end
 
-    def parent(state), do: :ets.lookup_element(state, :parent, 2)
+    def reconcile(data), do: Jido.AgentServer.TopologyRuntime.reconcile(data)
 
-    def records(state), do: :ets.match_object(state, {{:child, :_}, :_})
-
-    def reserve(state, tag, token, caller) do
-      case :ets.lookup(state, {:child, tag}) do
-        [] -> :ok
-        [{_, %{root: _root}}] -> throw(:tag_in_use)
-        [{_, %{caller: owner}}] -> if Process.alive?(owner), do: throw(:tag_in_use)
-      end
-
-      :ets.insert(state, {{:child, tag}, %{token: token, caller: caller}})
-      :ok
-    catch
-      :tag_in_use -> {:error, :tag_in_use}
-    end
-
-    def release(state, tag, token) do
-      case :ets.lookup(state, {:child, tag}) do
-        [{_, %{token: ^token}}] ->
-          :ets.delete(state, {:child, tag})
-          [{:worker, owner}] = :ets.lookup(state, :worker)
-          send(owner, {:child_released, tag, token})
-
-        _ ->
-          :ok
-      end
-
-      :ok
-    rescue
-      ArgumentError -> :ok
-    end
-
-    def record_child(parent, root, restart? \\ true)
-    def record_child(nil, _root, _restart?), do: :ok
-
-    def record_child(parent, root, restart?) do
-      key = {:child, parent.tag}
-      record = %{token: parent.token, root: root, restart?: restart?, placement: parent.placement}
-      match_spec = [{{key, %{token: parent.token}}, [], [{:const, {key, record}}]}]
-
-      case :ets.select_replace(parent.state, match_spec) do
-        1 ->
-          [{:worker, owner}] = :ets.lookup(parent.state, :worker)
-          send(owner, {:child_registered, parent.tag, parent.token, root})
-          :ok
-
-        0 ->
-          {:error, :parent_changed}
-      end
-    rescue
-      ArgumentError ->
-        if Process.alive?(parent.activation), do: {:error, :parent_changed}, else: :ok
-    end
-
-    def child_supervisor(activation) do
-      spec = %{
-        id: :owned_agents,
-        start: {DynamicSupervisor, :start_link, [[strategy: :one_for_one]]},
-        type: :supervisor
-      }
-
-      case Supervisor.start_child(activation, spec) do
-        {:ok, pid} -> {:ok, pid}
-        {:error, {:already_started, pid}} -> {:ok, pid}
-        error -> error
+    defp remove_spec(root, id) do
+      case Supervisor.terminate_child(root, id) do
+        :ok -> Supervisor.delete_child(root, id)
+        {:error, :not_found} -> :ok
       end
     end
   end
@@ -528,7 +377,7 @@ defmodule Jido.AgentServer do
 
     %{
       id: {__MODULE__, opts[:jido], opts[:partition], agent.id},
-      start: {Activation, :start_link, [opts]},
+      start: {ServerSupervisor, :start_link, [opts]},
       restart: :transient,
       type: :supervisor,
       shutdown: :infinity
@@ -540,7 +389,7 @@ defmodule Jido.AgentServer do
     if Keyword.keyword?(opts) and not is_nil(opts[:jido]) do
       with {:ok, opts} <- runtime_options(opts),
            :ok <- validate_options(opts),
-           {:ok, _agent} <- Agent.validate_instance(opts[:agent]) do
+           {:ok, _agent} <- Jido.Agent.Validation.validate_instance(opts[:agent]) do
         case start_activation(
                Jido.agent_supervisor_name(opts[:jido]),
                child_spec(opts)
@@ -605,10 +454,13 @@ defmodule Jido.AgentServer do
   @spec start_link(keyword()) :: :gen_statem.start_ret()
   def start_link(opts) when is_list(opts) do
     with {:ok, opts} <- activation_options(opts),
-         {:ok, specs} <- Jido.Plugin.Normalizer.normalize_all(opts[:agent].plugins) do
-      if opts[:persistence] not in [nil, false] or
+         {:ok, specs} <-
+           Jido.Plugin.Normalizer.normalize_all(Jido.Agent.runtime_plugins(opts[:agent])) do
+      if not Jido.Agent.Topology.empty?(opts[:agent].topology) or
+           TopologyRuntime.buses(opts[:agent]) != [] or
+           opts[:persistence] not in [nil, false] or
            Enum.any?(specs, &match?(%{agent_server: %{runtime?: true}}, &1)) do
-        invalid_options("runtime Plugins require an Activation; use child_spec/1 or start/1")
+        invalid_options("runtime Plugins require a supervisor; use child_spec/1 or start/1")
       else
         start_worker(opts, nil)
       end
@@ -622,7 +474,8 @@ defmodule Jido.AgentServer do
     if Keyword.keyword?(opts) do
       with {:ok, opts} <- runtime_options(opts),
            :ok <- validate_options(opts),
-           {:ok, agent} <- Agent.validate_instance(Keyword.fetch!(opts, :agent)),
+           {:ok, agent} <- Jido.Agent.Validation.validate_instance(Keyword.fetch!(opts, :agent)),
+           :ok <- Agent.validate_runtime_support(agent),
            do: {:ok, Keyword.put(opts, :agent, agent)}
     else
       invalid_options("options must be a keyword list")
@@ -1298,7 +1151,7 @@ defmodule Jido.AgentServer do
   defp init_registered(agent, runner, opts, monitors) do
     Semantic.point([:jido, :agent_server, :lifecycle, :start], %{agent_id: agent.id})
 
-    {:ok, specs} = Jido.Plugin.Normalizer.normalize_all(agent.plugins)
+    {:ok, specs} = Jido.Plugin.Normalizer.normalize_all(Jido.Agent.runtime_plugins(agent))
 
     data =
       Map.merge(Map.new(@runtime_keys, &{&1, Keyword.fetch!(opts, &1)}), %{
@@ -1333,7 +1186,7 @@ defmodule Jido.AgentServer do
       })
 
     if data.persistence not in [nil, false] do
-      mode = Activation.persistence_mode(data.activation_state, data.persistence_mode)
+      mode = ServerSupervisor.persistence_mode(data.activation_state, data.persistence_mode)
       bootstrap(data, :persistence, data.persistence_timeout, fn -> durable_start(data, mode) end)
     else
       initialize_plugins(data)
@@ -1341,13 +1194,35 @@ defmodule Jido.AgentServer do
   end
 
   defp initialize_plugins(data) do
-    if Activation.execution(data.activation_state) != nil or
+    case Jido.Agent.Composition.bind(data.agent) do
+      {:ok, agent} ->
+        {:ok, specs} = Jido.Plugin.Normalizer.normalize_all(Jido.Agent.runtime_plugins(agent))
+
+        if data.activation_state,
+          do: ServerSupervisor.restore_durable(data.activation_state, agent, data.state_version)
+
+        initialize_bound_plugins(%{data | agent: agent, plugin_specs: specs})
+
+      {:error, reason} ->
+        {:stop, reason}
+    end
+  end
+
+  defp initialize_bound_plugins(data) do
+    if not Jido.Agent.Topology.empty?(data.agent.topology) or
+         TopologyRuntime.buses(data.agent) != [] or
+         ServerSupervisor.execution(data.activation_state) != nil or
          Enum.any?(data.plugin_specs, &match?(%{agent_server: %{runtime?: true}}, &1)) do
       owner = self()
 
       bootstrap(data, :plugins, data.readiness_timeout, fn ->
-        with :ok <- Activation.close_execution(data.activation_state),
-             do: bootstrap_plugins(data, data.activation, owner)
+        runtime = Map.put(data, :owner, owner)
+
+        with :ok <- ServerSupervisor.close_execution(data.activation_state),
+             :ok <- CompositionRuntime.validate_runtime(runtime),
+             {:ok, refs} <- bootstrap_plugins(data, data.activation, owner),
+             {:ok, _} <- CompositionRuntime.reconcile(runtime),
+             do: {:ok, refs}
       end)
     else
       mark_ready(data)
@@ -1371,14 +1246,14 @@ defmodule Jido.AgentServer do
   defp durable_options(data), do: [instance: data.jido, partition: data.partition]
 
   defp durable_start(data, mode) do
-    with :ok <- Activation.close_execution(data.activation_state),
+    with :ok <- ServerSupervisor.close_execution(data.activation_state),
          {:ok, config} <- Jido.Persistence.resolve_config(data.persistence, data.jido),
          true <- not is_nil(config),
          {:ok, agent, revision} <- durable_load(config, data.agent, mode, durable_options(data)),
-         {:ok, agent} <- Agent.validate_instance(agent),
+         {:ok, agent} <- Jido.Agent.Validation.validate_instance(agent),
          true <- is_integer(revision) and revision >= 0,
          true <- agent.id == data.agent.id,
-         true <- Agent.definition(agent) === Agent.definition(data.agent) do
+         true <- agent.module == data.agent.module do
       {:ok, agent, revision, config}
     else
       false -> {:error, :incompatible_durable_checkpoint}
@@ -1387,11 +1262,16 @@ defmodule Jido.AgentServer do
   end
 
   defp durable_load(config, agent, :create, opts) do
-    with :ok <- Jido.Persistence.create_agent(config, agent, opts), do: {:ok, agent, 0}
+    with {:ok, agent} <- Jido.Agent.Composition.bind(agent),
+         :ok <- Jido.Persistence.create_agent(config, agent, opts),
+         do: {:ok, agent, 0}
   end
 
   defp durable_load(config, agent, :restore, opts),
     do: Jido.Persistence.load_agent_with_revision(config, agent.module, agent.id, opts)
+
+  @doc false
+  def bootstrap_current_plugins(data, owner), do: bootstrap_plugins(data, data.activation, owner)
 
   defp bootstrap_plugins(data, activation, owner) do
     Enum.reduce_while(data.plugin_specs, {:ok, %{}}, fn spec, {:ok, refs} ->
@@ -1402,7 +1282,7 @@ defmodule Jido.AgentServer do
           {:cont, {:ok, Map.put(refs, spec.module, nil)}}
 
         {:ok, child_spec} ->
-          case Activation.start_plugin(activation, spec, child_spec, data.activation_state) do
+          case ServerSupervisor.start_plugin(activation, spec, child_spec, data.activation_state) do
             {:ok, pid} ->
               {:cont, {:ok, Map.put(refs, spec.module, pid)}}
 
@@ -1471,34 +1351,42 @@ defmodule Jido.AgentServer do
   def spawn_child(server, %Agent{} = agent, tag, opts) do
     token = make_ref()
 
-    with {:ok, _agent} <- Agent.validate_instance(agent),
+    with {:ok, _agent} <- Jido.Agent.Validation.validate_instance(agent),
          {:ok, context, parent} <- child_options(server, tag, opts, token),
          :ok <- :gen_statem.call(server, {:reserve_child, tag, token}) do
       try do
         supervisor =
           case parent.placement do
             :owned ->
-              {:ok, supervisor} = Activation.child_supervisor(context.activation)
+              {:ok, supervisor} = ServerSupervisor.child_supervisor(context.activation)
               supervisor
 
             :independent ->
               Jido.agent_supervisor_name(context.jido)
           end
 
-        opts = Keyword.put(context.opts, :agent, agent)
-        spec = %{child_spec(opts) | start: {Activation, :start_link, [opts, parent]}}
+        opts =
+          context.opts
+          |> Keyword.merge(Keyword.get(opts, :server_options, []))
+          |> Keyword.put(:agent, agent)
+
+        spec = %{
+          child_spec(opts)
+          | start: {ServerSupervisor, :start_link, [opts, parent]},
+            restart: parent.restart
+        }
 
         case start_activation(supervisor, spec) do
           {:ok, worker} ->
             {:ok, worker}
 
           error ->
-            Activation.release(context.state, tag, token)
+            ServerSupervisor.release(context.state, tag, token)
             error
         end
       catch
         :exit, reason ->
-          Activation.release(context.state, tag, token)
+          ServerSupervisor.release(context.state, tag, token)
           {:error, {:child_start_failed, reason}}
       end
     end
@@ -1506,6 +1394,22 @@ defmodule Jido.AgentServer do
 
   def spawn_child(_server, _agent, _tag, _opts),
     do: invalid_options("expected a complete child Agent instance")
+
+  @doc "Returns one committed Agent and revision from the same server event."
+  def snapshot(server, timeout \\ 5_000) do
+    with :ok <- validate_wait(timeout), do: :gen_statem.call(server, :snapshot, timeout)
+  end
+
+  @doc "Runs a snapshot upgrade Action through the serial commit boundary."
+  def upgrade(server, action, opts \\ []) do
+    with {:ok, options} <- Jido.Agent.Validation.options(opts, [:context, :timeout]),
+         context = Map.get(options, :context, %{}),
+         :ok <- Jido.Agent.Data.plain_map(context),
+         timeout = Map.get(options, :timeout, 5_000),
+         :ok <- validate_wait(timeout) do
+      :gen_statem.call(server, {:upgrade, make_ref(), action, context}, timeout)
+    end
+  end
 
   @doc "Returns live tagged children with separate worker and activation PIDs."
   def children(server, timeout \\ 5_000) do
@@ -1519,7 +1423,7 @@ defmodule Jido.AgentServer do
 
   defp live_children(state) do
     Map.new(
-      Enum.flat_map(Activation.records(state), fn
+      Enum.flat_map(ServerSupervisor.records(state), fn
         {{:child, tag}, %{root: root} = record} ->
           case live_child(root) do
             nil -> []
@@ -1532,12 +1436,35 @@ defmodule Jido.AgentServer do
     )
   end
 
-  @doc "Stops the complete tagged child activation and confirms its shutdown."
+  @doc """
+  Stops the complete tagged child activation and confirms its shutdown.
+  Removing a permanent entry uses OTP supervisor shutdown.
+  """
   def stop_child(server, tag, reason \\ :shutdown) do
     case Map.fetch(children(server), tag) do
-      {:ok, %{pid: worker, activation: root}} ->
-        :ok = stop(worker, reason)
-        :gen_statem.call(server, {:forget_child, tag, root})
+      {:ok, %{pid: worker, activation: root, placement: placement}} ->
+        context = :gen_statem.call(server, :child_context)
+        [{_, record}] = :ets.lookup(context.state, {:child, tag})
+
+        result =
+          if Map.get(record, :restart, :transient) == :permanent do
+            supervisor =
+              case placement do
+                :owned ->
+                  {:ok, supervisor} = ServerSupervisor.child_supervisor(context.activation)
+                  supervisor
+
+                :independent ->
+                  Jido.agent_supervisor_name(context.jido)
+              end
+
+            DynamicSupervisor.terminate_child(supervisor, root)
+          else
+            stop(worker, reason)
+          end
+
+        with :ok <- result,
+             do: :gen_statem.call(server, {:forget_child, tag, root})
 
       :error ->
         {:error, :child_not_found}
@@ -1584,11 +1511,11 @@ defmodule Jido.AgentServer do
          :ok <- :gen_statem.call(server, {:reserve_child, tag, token}) do
       try do
         result = :gen_statem.call(child, {:attach_parent, parent})
-        if result != :ok, do: Activation.release(context.state, tag, token)
+        if result != :ok, do: ServerSupervisor.release(context.state, tag, token)
         result
       catch
         :exit, _ ->
-          Activation.release(context.state, tag, token)
+          ServerSupervisor.release(context.state, tag, token)
           {:error, :child_unavailable}
       end
     end
@@ -1605,7 +1532,7 @@ defmodule Jido.AgentServer do
         {:error, :self_adoption}
 
       true ->
-        case ancestor?(context.activation, root, MapSet.new()) do
+        case ancestor?(context.activation, root, []) do
           true -> {:error, :cyclic_parent}
           false -> :ok
           error -> error
@@ -1615,18 +1542,19 @@ defmodule Jido.AgentServer do
     :exit, _ -> {:error, :child_unavailable}
   end
 
+  @spec ancestor?(pid() | nil, pid(), [pid()]) :: boolean() | {:error, atom()}
   defp ancestor?(nil, _root, _visited), do: false
   defp ancestor?(root, root, _visited), do: true
 
   defp ancestor?(current, root, visited) do
-    if MapSet.member?(visited, current) do
+    if current in visited do
       true
     else
-      worker = Activation.worker(current)
+      worker = ServerSupervisor.worker(current)
 
       case :gen_statem.call(worker, :parent) do
         nil -> false
-        parent -> ancestor?(parent.activation, root, MapSet.put(visited, current))
+        parent -> ancestor?(parent.activation, root, [current | visited])
       end
     end
   catch
@@ -1634,7 +1562,7 @@ defmodule Jido.AgentServer do
   end
 
   defp live_child(root) do
-    if Process.alive?(root), do: Activation.worker(root)
+    if Process.alive?(root), do: ServerSupervisor.worker(root)
   catch
     :exit, _ -> nil
   end
@@ -1655,7 +1583,8 @@ defmodule Jido.AgentServer do
   defp child_options(server, tag, opts, token) do
     if Keyword.keyword?(opts) and
          length(Keyword.keys(opts)) == length(Enum.uniq(Keyword.keys(opts))) and
-         Keyword.keys(opts) -- [:placement, :on_parent_exit, :orphan_dispatch] == [] do
+         Keyword.keys(opts) --
+           [:placement, :on_parent_exit, :orphan_dispatch, :restart, :server_options, :meta] == [] do
       context = :gen_statem.call(server, :child_context)
       placement = Keyword.get(opts, :placement, :owned)
       policy = Keyword.get(opts, :on_parent_exit, :stop)
@@ -1664,6 +1593,14 @@ defmodule Jido.AgentServer do
       cond do
         is_nil(context.activation) ->
           {:error, :activation_required}
+
+        Jido.AgentServer.Directive.validate_restart_policy(
+          Keyword.get(opts, :restart, :transient)
+        ) != :ok ->
+          {:error, :invalid_restart_policy}
+
+        not Keyword.keyword?(Keyword.get(opts, :server_options, [])) ->
+          {:error, :invalid_child_options}
 
         not (is_atom(tag) or is_binary(tag)) or is_nil(tag) ->
           {:error, :invalid_child_tag}
@@ -1686,6 +1623,8 @@ defmodule Jido.AgentServer do
         true ->
           {:ok, context,
            %{
+             restart: Keyword.get(opts, :restart, :transient),
+             meta: Keyword.get(opts, :meta, %{}),
              activation: context.activation,
              state: context.state,
              token: token,
@@ -1712,7 +1651,7 @@ defmodule Jido.AgentServer do
   defp monitor_parent(nil), do: nil
 
   defp monitor_parent(state) do
-    case Activation.parent(state) do
+    case ServerSupervisor.parent(state) do
       nil -> nil
       parent -> Map.put(parent, :monitor, Process.monitor(parent.activation))
     end
@@ -1735,7 +1674,7 @@ defmodule Jido.AgentServer do
 
   defp monitor_children(state) do
     Map.new(
-      Enum.map(Activation.records(state), fn {{:child, tag}, record} ->
+      Enum.map(ServerSupervisor.records(state), fn {{:child, tag}, record} ->
         {kind, pid} =
           case record do
             %{root: root} -> {:root, root}
@@ -1765,7 +1704,7 @@ defmodule Jido.AgentServer do
 
   def handle_event({:call, from}, {:reserve_child, tag, token}, _phase, data) do
     {caller, _} = from
-    result = Activation.reserve(data.activation_state, tag, token, caller)
+    result = ServerSupervisor.reserve(data.activation_state, tag, token, caller)
 
     data =
       if result == :ok,
@@ -1781,8 +1720,11 @@ defmodule Jido.AgentServer do
 
   def handle_event({:call, from}, {:forget_child, tag, root}, _phase, data) do
     case :ets.lookup(data.activation_state, {:child, tag}) do
-      [{_, %{root: ^root, token: token}}] -> Activation.release(data.activation_state, tag, token)
-      _ -> :ok
+      [{_, %{root: ^root, token: token}}] ->
+        ServerSupervisor.release(data.activation_state, tag, token)
+
+      _ ->
+        :ok
     end
 
     {:keep_state_and_data, reply(from, :ok)}
@@ -1803,7 +1745,7 @@ defmodule Jido.AgentServer do
         {:keep_state_and_data, reply(from, {:error, :self_adoption})}
 
       true ->
-        case Activation.record_child(parent, data.activation, false) do
+        case ServerSupervisor.record_child(parent, data.activation, false) do
           :ok ->
             :ets.insert(data.activation_state, {:parent, parent})
             parent = Map.put(parent, :monitor, Process.monitor(parent.activation))
@@ -1964,18 +1906,76 @@ defmodule Jido.AgentServer do
   # durable checkpoint. Do not give that Plugin the supplied initial state.
   def handle_event(
         {:call, _from},
-        {:plugin_init, _package},
+        {kind, _package},
         :restoring,
         %{bootstrap: %{kind: :persistence}}
-      ),
+      )
+      when kind in [:plugin_init, :plugin_start],
       do: {:keep_state_and_data, [:postpone]}
 
-  def handle_event({:call, from}, {:plugin_init, package}, _phase, data) do
+  def handle_event({:call, from}, {kind, package}, _phase, data)
+      when kind in [:plugin_init, :plugin_start] do
     spec = Enum.find(data.plugin_specs, &(&1.module == package))
 
-    init = plugin_init(data, spec, self())
+    result =
+      cond do
+        is_nil(spec) -> {:error, :plugin_not_found}
+        kind == :plugin_init -> {:ok, plugin_init(data, spec, self())}
+        true -> {:ok, plugin_init(data, spec, self()), spec}
+      end
 
-    {:keep_state_and_data, reply(from, {:ok, init})}
+    {:keep_state_and_data, reply(from, result)}
+  end
+
+  def handle_event({:call, from}, :snapshot, phase, _data)
+      when phase in [:initializing, :restoring],
+      do: {:keep_state_and_data, reply(from, {:error, :not_ready})}
+
+  def handle_event({:call, from}, :snapshot, _phase, data),
+    do:
+      {:keep_state_and_data, reply(from, %{agent: data.agent, state_version: data.state_version})}
+
+  def handle_event({:call, from}, {:upgrade, token, action, context}, :idle, data) do
+    data = %{
+      data
+      | postponed: MapSet.delete(data.postponed, token),
+        queued_from: Map.delete(data.queued_from, token)
+    }
+
+    if data.admission_mode == :open do
+      signal = Signal.new!("jido.agent_server.upgrade", %{}, source: "/agent_server")
+      start_turn({:call, from}, signal, context, data, {:upgrade, action})
+    else
+      reject_turn({:call, from}, {:not_admitting, data.admission_mode}, data)
+    end
+  end
+
+  def handle_event({:call, from}, {:upgrade, token, _action, _context}, _phase, data) do
+    if reentrant?({:call, from}, data) or bootstrap_caller?(from, data),
+      do: reject_turn({:call, from}, :reentrant_turn, data),
+      else: postpone_turn({:call, from}, token, data)
+  end
+
+  def handle_event(:cast, {kind, _source, _signal}, phase, data)
+      when kind in [:topology_output, :topology_bus] and
+             (phase in [:initializing, :restoring] or
+                (phase == :effects and is_map(data.active) and
+                   :erlang.is_map_key(:reconciling, data.active) and
+                   :erlang.map_get(:reconciling, data.active) == true)),
+      do: {:keep_state_and_data, [:postpone]}
+
+  def handle_event(:cast, {:topology_output, tag, signal}, _phase, data) do
+    case TopologyRuntime.member_output(Map.put(data, :server, self()), tag, signal) do
+      :ok -> :keep_state_and_data
+      {:error, reason} -> {:stop, {:shutdown, {:topology_delivery_failed, reason}}, data}
+    end
+  end
+
+  def handle_event(:cast, {:topology_bus, name, signal}, _phase, data) do
+    case TopologyRuntime.output(Map.put(data, :server, self()), %{kind: :bus, name: name}, signal) do
+      :ok -> :keep_state_and_data
+      {:error, reason} -> {:stop, {:shutdown, {:topology_delivery_failed, reason}}, data}
+    end
   end
 
   def handle_event({:call, from}, :agent, _phase, data),
@@ -1985,11 +1985,17 @@ defmodule Jido.AgentServer do
       when phase in [:restoring, :initializing] do
     {caller, _} = from
 
-    if owned_process?(caller, data.bootstrap.task.pid, MapSet.new(), 0) do
+    if owned_process?(caller, data.bootstrap.task.pid, [], 0) do
       {:keep_state_and_data, reply(from, {:error, :reentrant_turn})}
     else
       {:keep_state, %{data | ready_waiters: [from | data.ready_waiters]}}
     end
+  end
+
+  def handle_event({:call, from}, :await_ready, :effects, %{active: %{reconciling: true}} = data) do
+    if reentrant?({:call, from}, data),
+      do: {:keep_state_and_data, reply(from, {:error, :reentrant_turn})},
+      else: {:keep_state, %{data | ready_waiters: [from | data.ready_waiters]}}
   end
 
   def handle_event({:call, from}, :await_ready, _phase, _data),
@@ -2056,7 +2062,8 @@ defmodule Jido.AgentServer do
           :idle -> :idle
           _ -> :running
         end,
-      ready?: phase not in [:restoring, :initializing],
+      ready?:
+        phase not in [:restoring, :initializing] and not match?(%{reconciling: true}, data.active),
       plugin_count: length(data.plugin_specs),
       activation: data.activation,
       generation: data.generation,
@@ -2099,6 +2106,19 @@ defmodule Jido.AgentServer do
 
   def handle_event(:info, {:persistence_timeout, id}, :saving, %{active: %{turn_id: id}} = data),
     do: stop_durable(data, :indeterminate)
+
+  def handle_event(
+        :info,
+        {:composition_timeout, id},
+        :effects,
+        %{active: %{turn_id: id, reconciling: true}} = data
+      ),
+      do:
+        stop_failed(
+          data,
+          execution_error("Composition readiness timed out", :composition_timeout),
+          :effects
+        )
 
   def handle_event(:internal, :effect_next, :effects, data), do: next_effect(data)
 
@@ -2173,6 +2193,7 @@ defmodule Jido.AgentServer do
              :running,
              :settling,
              :cleaning,
+             :reconfiguring,
              :saving,
              :policy,
              :effects
@@ -2223,7 +2244,14 @@ defmodule Jido.AgentServer do
         :max_directives_per_turn,
         :default_dispatch,
         :jido,
-        :plugin_specs
+        :plugin_specs,
+        :plugin_refs,
+        :agent,
+        :activation,
+        :activation_state,
+        :parent,
+        :runner,
+        :partition
       ])
 
     operation(:settle, data, fn -> settle_worker(runner, active, config) end)
@@ -2348,7 +2376,7 @@ defmodule Jido.AgentServer do
       {:keep_state,
        %{data | child_monitors: forget_child_monitors(data.child_monitors, tag, token)}}
 
-  def handle_event(:info, {:DOWN, ref, :process, _pid, reason}, _phase, data)
+  def handle_event(:info, {:DOWN, ref, :process, pid, reason}, _phase, data)
       when is_map_key(data.child_monitors, ref) do
     {{kind, tag, token}, monitors} = Map.pop(data.child_monitors, ref)
 
@@ -2356,9 +2384,13 @@ defmodule Jido.AgentServer do
       [{_, %{root: _root}}] when kind == :reservation ->
         :ok
 
-      [{_, %{token: ^token} = record}] ->
-        if kind == :reservation or record.restart? == false or reason in [:normal, :shutdown] or
-             match?({:shutdown, _}, reason),
+      [{_, %{token: ^token, caller: ^pid} = record}] when kind == :reservation ->
+        :ets.delete_object(data.activation_state, {{:child, tag}, record})
+
+      [{_, %{token: ^token, root: ^pid} = record}] ->
+        if record.restart? == false or
+             (Map.get(record, :restart, :transient) != :permanent and
+                (reason in [:normal, :shutdown] or match?({:shutdown, _}, reason))),
            do: :ets.delete_object(data.activation_state, {{:child, tag}, record})
 
       _ ->
@@ -2377,8 +2409,17 @@ defmodule Jido.AgentServer do
          {:ok, agent, revision, config},
          %{bootstrap: %{kind: :persistence}} = data
        ) do
-    Activation.restore_durable(data.activation_state, agent, revision)
-    data = %{data | agent: agent, state_version: revision, persistence: config, bootstrap: nil}
+    ServerSupervisor.restore_durable(data.activation_state, agent, revision)
+    {:ok, specs} = Jido.Plugin.Normalizer.normalize_all(Jido.Agent.runtime_plugins(agent))
+
+    data = %{
+      data
+      | agent: agent,
+        plugin_specs: specs,
+        state_version: revision,
+        persistence: config,
+        bootstrap: nil
+    }
 
     case initialize_plugins(data) do
       {:ok, phase, next} -> {:next_state, phase, next}
@@ -2437,7 +2478,7 @@ defmodule Jido.AgentServer do
     :ok
   end
 
-  defp start_turn(type, signal, context, data) do
+  defp start_turn(type, signal, context, data, mode \\ :turn) do
     data = cancel_idle(data)
 
     from =
@@ -2498,9 +2539,22 @@ defmodule Jido.AgentServer do
         )
     }
 
-    operation(:prepare, %{data | active: active}, fn ->
-      prepare_turn(agent, signal, context, data)
-    end)
+    case mode do
+      :turn ->
+        operation(:prepare, %{data | active: active}, fn ->
+          prepare_turn(agent, signal, context, data)
+        end)
+
+      {:upgrade, action} ->
+        operation(:upgrade, %{data | active: active}, fn ->
+          with {:ok, snapshot} <- Jido.Persistence.snapshot(agent, context: context),
+               {:ok, candidate} <- Jido.Persistence.upgrade(snapshot, action, context: context),
+               {:ok, candidate} <- Jido.Agent.Composition.bind(candidate),
+               :ok <- CompositionRuntime.check(data, candidate, []) do
+            {:ok, candidate, []}
+          end
+        end)
+    end
   end
 
   defp prepare_turn(agent, signal, context, data) do
@@ -2528,11 +2582,15 @@ defmodule Jido.AgentServer do
     task = Task.async(fn -> TraceContext.with_context(captured, fun) end)
 
     phases = %{
+      upgrade: :preparing,
       prepare: :preparing,
       start: :starting,
       execute: :starting,
       settle: :settling,
       cleanup: :cleaning,
+      reconfigure: :reconfiguring,
+      resume_plugins: :cleaning,
+      reconcile: :effects,
       save: :saving,
       policy: :policy,
       commit_hook: :effects,
@@ -2542,6 +2600,8 @@ defmodule Jido.AgentServer do
     {:next_state, Map.fetch!(phases, kind),
      put_in(data.active.operation, %{kind: kind, task: task})}
   end
+
+  defp operation_result(:upgrade, result, data), do: finish(data, result)
 
   defp operation_result(:prepare, {:ok, prepared}, data) do
     data = put_in(data.active.prepared, prepared)
@@ -2559,7 +2619,7 @@ defmodule Jido.AgentServer do
     id = active.turn_id
     policy = execution_policy(data.exec_opts)
 
-    case Activation.remember_execution(data.activation_state, runner, id, worker) do
+    case ServerSupervisor.remember_execution(data.activation_state, runner, id, worker) do
       :ok ->
         operation(:execute, %{data | active: active}, fn ->
           Runner.start_execution(runner, id, Jido.Exec.Fact.local_value(input),
@@ -2577,8 +2637,9 @@ defmodule Jido.AgentServer do
     do: {:next_state, :running, put_in(data.active.execution_id, execution_id)}
 
   defp operation_result(:cleanup, :ok, data) do
-    Activation.forget_execution(data.activation_state)
+    ServerSupervisor.forget_execution(data.activation_state)
     if data.active.worker_ref, do: Process.demonitor(data.active.worker_ref, [:flush])
+    data = data |> put_in([:active, :worker], nil) |> put_in([:active, :worker_ref], nil)
 
     cond do
       data.active.abort_reason -> finish(data, {:error, data.active.abort_reason})
@@ -2606,6 +2667,38 @@ defmodule Jido.AgentServer do
       true -> stop_durable(data, :indeterminate)
     end
   end
+
+  defp operation_result(:reconfigure, :ok, data), do: finish(data, data.active.result)
+  defp operation_result(:reconfigure, {:error, reason}, data), do: finish(data, {:error, reason})
+
+  defp operation_result(:resume_plugins, :ok, data) do
+    data = put_in(data.active.paused_plugins, [])
+    finish_result(data, data.active.result)
+  end
+
+  defp operation_result(:resume_plugins, _, data),
+    do:
+      stop_failed(data, execution_error("Plugin resume failed", :plugin_resume_failed), :cleaning)
+
+  defp operation_result(:reconcile, {:ok, refs, _members}, data) do
+    Process.cancel_timer(data.active.effect_timer)
+    replies = Enum.flat_map(data.ready_waiters, &reply(&1, :ok))
+    data = %{data | plugin_refs: refs, ready_waiters: []}
+    data = put_in(data.active.reconciling, false)
+    data = put_in(data.active.paused_plugins, [])
+
+    case begin_effects(data, data.active.effects) do
+      {:next_state, phase, next, actions} -> {:next_state, phase, next, replies ++ actions}
+    end
+  end
+
+  defp operation_result(:reconcile, _, data),
+    do:
+      stop_failed(
+        data,
+        execution_error("Committed composition is not ready", :composition_not_ready),
+        :effects
+      )
 
   defp operation_result(:policy, decision, data) do
     if System.monotonic_time(:millisecond) >= data.active.policy_deadline,
@@ -2834,8 +2927,11 @@ defmodule Jido.AgentServer do
         {:error, if(match?({:error, _}, result), do: :running, else: :settling), reason}
 
       {:ok, candidate, directives} ->
-        case validate_batch(directives, config) do
-          :ok -> {:ok, candidate, directives}
+        with {:ok, candidate} <- Jido.Agent.Composition.bind(candidate),
+             :ok <- CompositionRuntime.check(config, candidate, directives),
+             :ok <- validate_batch(directives, %{config | agent: candidate}) do
+          {:ok, candidate, directives}
+        else
           {:error, reason} -> {:error, :directives, reason}
         end
     end
@@ -2912,7 +3008,7 @@ defmodule Jido.AgentServer do
   defp bootstrap_caller?(_from, %{bootstrap: nil}), do: false
 
   defp bootstrap_caller?({caller, _}, data),
-    do: owned_process?(caller, data.bootstrap.task.pid, MapSet.new(), 0)
+    do: owned_process?(caller, data.bootstrap.task.pid, [], 0)
 
   defp reentrant?(:cast, _data), do: false
   defp reentrant?(_type, %{active: nil}), do: false
@@ -2921,12 +3017,13 @@ defmodule Jido.AgentServer do
     do:
       Enum.any?(
         [data.active.worker, operation_pid(data.active.operation)],
-        fn root -> is_pid(root) and owned_process?(caller, root, MapSet.new(), 0) end
+        fn root -> is_pid(root) and owned_process?(caller, root, [], 0) end
       )
 
   defp operation_pid(nil), do: nil
   defp operation_pid(operation), do: operation.task.pid
 
+  @spec owned_process?(pid(), pid(), [pid()], non_neg_integer()) :: boolean()
   defp owned_process?(pid, root, _visited, _depth) when pid == root, do: true
   defp owned_process?(pid, _root, _visited, _depth) when pid == self(), do: false
 
@@ -2934,10 +3031,10 @@ defmodule Jido.AgentServer do
     do: false
 
   defp owned_process?(pid, root, visited, depth) do
-    if MapSet.member?(visited, pid) do
+    if pid in visited do
       false
     else
-      visited = MapSet.put(visited, pid)
+      visited = [pid | visited]
 
       callers =
         case Process.info(pid, :dictionary) do
@@ -2950,6 +3047,43 @@ defmodule Jido.AgentServer do
         &owned_process?(&1, root, visited, depth + 1)
       )
     end
+  end
+
+  defp finish(%{active: active} = data, {:ok, candidate, directives} = result)
+       when not is_map_key(active, :configuration_checked) do
+    changed = Jido.Agent.Mutation.changed_plugins(data.agent, candidate, directives)
+
+    paused =
+      Enum.filter(
+        data.plugin_specs,
+        &(&1.module in changed and match?(%{runtime?: true}, &1.agent_server))
+      )
+
+    active =
+      Map.merge(active, %{
+        configuration_checked: true,
+        paused_plugins: paused,
+        changed_plugins: changed,
+        diff: Jido.Agent.Diff.between(data.agent, candidate),
+        result: result
+      })
+
+    data = %{data | active: active}
+
+    if paused == [],
+      do: finish(data, result),
+      else:
+        operation(:reconfigure, data, fn ->
+          CompositionRuntime.pause(paused, data.plugin_refs, :quiesce)
+        end)
+  end
+
+  defp finish(%{active: %{paused_plugins: [_ | _] = paused}} = data, {:error, _} = result) do
+    data = put_in(data.active.result, result)
+
+    operation(:resume_plugins, data, fn ->
+      CompositionRuntime.pause(paused, data.plugin_refs, :resume)
+    end)
   end
 
   defp finish(%{persistence: persistence} = data, {:ok, candidate, _} = result)
@@ -2982,7 +3116,11 @@ defmodule Jido.AgentServer do
     do: stop_failed(data, execution_error("Required durable commit failed", reason), :saving)
 
   defp publish_commit(data, {:ok, candidate, _directives} = result) do
-    case Activation.publish_checkpoint(data.activation_state, candidate, data.state_version + 1) do
+    case ServerSupervisor.publish_checkpoint(
+           data.activation_state,
+           candidate,
+           data.state_version + 1
+         ) do
       :ok ->
         finish_result(data, result)
 
@@ -2995,8 +3133,27 @@ defmodule Jido.AgentServer do
     {next, status, stage, count} =
       case result do
         {:ok, candidate, directives} ->
-          {%{data | agent: candidate, state_version: data.state_version + 1, error_count: 0},
-           :succeeded, :commit, length(directives)}
+          changed = data.active.changed_plugins
+
+          {:ok, specs} =
+            Jido.Plugin.Normalizer.normalize_all(Jido.Agent.runtime_plugins(candidate))
+
+          active =
+            Map.merge(data.active, %{
+              changed_plugins: changed,
+              composition_changed:
+                TopologyRuntime.changed?(data.active.diff, data.agent, candidate),
+              commit_plugins: Enum.reject(specs, &(&1.module in changed))
+            })
+
+          {%{
+             data
+             | agent: candidate,
+               plugin_specs: specs,
+               active: active,
+               state_version: data.state_version + 1,
+               error_count: 0
+           }, :succeeded, :commit, length(directives)}
 
         {:error, reason} ->
           if is_nil(data.active.from),
@@ -3026,9 +3183,15 @@ defmodule Jido.AgentServer do
 
     case result do
       {:ok, _, directives} ->
-        if directives != [] or Callbacks.commit_specs(next.plugin_specs) != [],
-          do: begin_effects(next, directives),
-          else: complete_terminal(next, :continue)
+        effects = Enum.reject(directives, &Jido.Agent.Mutation.mutation?/1)
+
+        if next.active.composition_changed or next.active.changed_plugins != [] do
+          begin_reconciliation(next, effects)
+        else
+          if effects != [] or Callbacks.commit_specs(next.plugin_specs) != [],
+            do: begin_effects(next, effects),
+            else: complete_terminal(next, :continue)
+        end
 
       {:error, _} when status == :failed ->
         apply_failure_policy(next)
@@ -3046,7 +3209,7 @@ defmodule Jido.AgentServer do
     else
       Enum.reduce_while(Enum.with_index(directives), :ok, fn {directive, index}, :ok ->
         result =
-          if match?(%Stop{}, directive) and index != length(directives) - 1,
+          if match?(%ServerStop{}, directive) and index != length(directives) - 1,
             do: {:error, :terminal_directive_not_last},
             else: validate_effect(directive, config)
 
@@ -3058,13 +3221,48 @@ defmodule Jido.AgentServer do
     end
   end
 
+  defp validate_effect(%{__struct__: module}, _)
+       when module in [
+              Directive.AgentAdd,
+              Directive.AgentUpdate,
+              Directive.AgentReplace,
+              Directive.AgentRemove,
+              Directive.RouteAdd,
+              Directive.RouteUpdate,
+              Directive.RouteReplace,
+              Directive.RouteRemove,
+              Directive.RoutesReorder,
+              Directive.RoutesSet,
+              Directive.ConnectionAdd,
+              Directive.ConnectionUpdate,
+              Directive.ConnectionReplace,
+              Directive.ConnectionRemove,
+              Directive.TopologySet,
+              Directive.PluginAdd,
+              Directive.PluginConfigure,
+              Directive.PluginRemove
+            ],
+       do: :ok
+
   defp validate_effect(%Emit{dispatch: dispatch}, config),
     do: validate_dispatch(dispatch || config.default_dispatch)
 
-  defp validate_effect(%Stop{}, _), do: :ok
-  defp validate_effect(%Error{}, _), do: :ok
+  defp validate_effect(%AgentStart{} = directive, config),
+    do: Jido.AgentServer.RuntimeDirectives.validate_start(directive, config)
 
-  defp validate_effect(%SpawnProcess{child_spec: spec}, config) do
+  defp validate_effect(%AgentStop{name: name}, config),
+    do: Jido.AgentServer.RuntimeDirectives.validate_runtime_target(name, config)
+
+  defp validate_effect(%AgentSend{name: name}, config),
+    do: Jido.AgentServer.RuntimeDirectives.validate_target(name, config)
+
+  defp validate_effect(%OwnerSend{}, %{parent: nil}), do: {:error, :owner_not_found}
+  defp validate_effect(%OwnerSend{}, _), do: :ok
+
+  defp validate_effect(%ServerStop{}, _), do: :ok
+  defp validate_effect(%ErrorReport{}, _), do: :ok
+
+  defp validate_effect(%ProcessStart{child_spec: spec}, config) do
     if is_nil(config.jido) do
       {:error, :jido_instance_required}
     else
@@ -3107,11 +3305,44 @@ defmodule Jido.AgentServer do
     end
   end
 
+  defp begin_reconciliation(data, effects) do
+    owner = self()
+    replies = reply(data.active.from, data.active.result) ++ cancel_replies(data.active, :ok)
+
+    active =
+      Map.merge(data.active, %{
+        from: nil,
+        cancel_waiters: [],
+        effects: effects,
+        reconciling: true,
+        effect_deadline: System.monotonic_time(:millisecond) + data.readiness_timeout,
+        effect_timer:
+          Process.send_after(
+            self(),
+            {:composition_timeout, data.active.turn_id},
+            data.readiness_timeout
+          )
+      })
+
+    data = %{data | active: active}
+    runtime = Map.put(data, :owner, owner)
+
+    {:next_state, phase, next} =
+      operation(:reconcile, data, fn ->
+        with {:ok, refs} <-
+               CompositionRuntime.plugins(runtime, owner, data.active.changed_plugins),
+             {:ok, members} <- CompositionRuntime.reconcile(runtime),
+             do: {:ok, refs, members}
+      end)
+
+    {:next_state, phase, next, replies}
+  end
+
   defp begin_effects(data, directives) do
     active = data.active
     replies = reply(active.from, active.result) ++ cancel_replies(active, :ok)
 
-    hooks = Callbacks.commit_specs(data.plugin_specs)
+    hooks = Callbacks.commit_specs(Map.get(active, :commit_plugins, data.plugin_specs))
     timeout = if hooks == [], do: data.directive_timeout, else: data.commit_timeout
     timer_kind = if hooks == [], do: :effect_timeout, else: :commit_timeout
 
@@ -3166,6 +3397,8 @@ defmodule Jido.AgentServer do
 
         context = %{
           agent: data.agent,
+          activation_state: data.activation_state,
+          parent: data.parent,
           jido: data.jido,
           partition: data.partition,
           server: self(),
@@ -3206,9 +3439,9 @@ defmodule Jido.AgentServer do
       %Emit{signal: signal, dispatch: dispatch} ->
         {:ok, signal} = TraceContext.propagate_to(signal, context.signal_id)
 
-        case dispatch || context.default_dispatch do
+        case dispatch do
           nil ->
-            cast(context.server, signal)
+            TopologyRuntime.emit(context, signal)
 
           target ->
             Signal.Dispatch.dispatch(
@@ -3217,13 +3450,25 @@ defmodule Jido.AgentServer do
             )
         end
 
-      %Stop{reason: reason} ->
+      %AgentStart{} = directive ->
+        Jido.AgentServer.RuntimeDirectives.start(directive, context)
+
+      %AgentStop{name: name, reason: reason} ->
+        stop_child(context.server, name, reason)
+
+      %AgentSend{name: name, signal: signal} ->
+        TopologyRuntime.send_agent(context.activation_state, name, signal)
+
+      %OwnerSend{signal: signal} ->
+        TopologyRuntime.owner_send(context.parent, signal)
+
+      %ServerStop{reason: reason} ->
         {:stop, reason}
 
-      %Error{error: error, context: error_context} ->
+      %ErrorReport{error: error, context: error_context} ->
         {:reported_error, {:reported_error, error_context, error}}
 
-      %SpawnProcess{child_spec: spec} ->
+      %ProcessStart{child_spec: spec} ->
         case DynamicSupervisor.start_child(Jido.agent_supervisor_name(context.jido), spec) do
           {:ok, _} -> :ok
           {:ok, _, _} -> :ok
@@ -3462,7 +3707,7 @@ defmodule Jido.AgentServer do
     reentrant?({:call, from}, data) or bootstrap_caller?(from, data) or
       Enum.any?([data.parent_effect, data.control], fn operation ->
         operation != nil and operation.task != nil and
-          owned_process?(caller, operation.task.pid, MapSet.new(), 0)
+          owned_process?(caller, operation.task.pid, [], 0)
       end)
   end
 

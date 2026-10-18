@@ -2,7 +2,6 @@ defmodule Jido.Agent.ValidationTest do
   use ExUnit.Case, async: true
 
   alias Jido.Agent
-  alias Jido.Error.ValidationError
 
   defmodule CallbackPlugin do
     use Jido.Plugin
@@ -44,138 +43,100 @@ defmodule Jido.Agent.ValidationTest do
     def state_spec(_opts), do: {:owned, Zoi.integer()}
   end
 
-  test "checks Plugin schema composition before routes and metadata" do
-    assert {:error,
-            %ValidationError{
-              message: "Plugin-owned Agent state key conflicts with the domain schema"
-            }} =
-             Agent.new(
+  test "Plugin ownership conflicts remain structured validation errors" do
+    assert {:error, %Jido.Error.ValidationError{} = reason} =
+             Agent.define(%{
                name: "conflict",
                schema: Zoi.object(%{owned: Zoi.integer()}),
-               plugins: [StatePlugin],
-               routes: nil,
-               metadata: nil
-             )
-  end
-
-  test "keeps defaults and explicit nil values at the definition boundary" do
-    expected = %Agent{
-      id: nil,
-      module: Agent,
-      name: "defaults",
-      description: nil,
-      schema: Zoi.object(%{}),
-      plugins: [],
-      state: nil,
-      routes: [],
-      metadata: %{}
-    }
-
-    assert {:ok, ^expected} = Agent.new(name: "defaults")
-
-    assert {:ok, ^expected} =
-             Agent.new(%{
-               name: "defaults",
-               id: nil,
-               state: nil,
-               description: nil
+               extensions: [entry(StatePlugin)]
              })
 
-    for field <- [:name, :module, :schema, :plugins, :routes, :metadata] do
-      assert {:error, %ValidationError{}} = Agent.new(Map.put(%{name: "defaults"}, field, nil))
+    assert Exception.message(reason) =~ "conflicts"
+  end
+
+  test "neutral definitions use explicit canonical defaults" do
+    assert {:ok, definition} = Agent.define(%{name: "defaults"})
+
+    assert definition === %Agent{
+             name: "defaults",
+             id: nil,
+             state: nil,
+             module: nil,
+             description: nil,
+             vsn: 1,
+             schema: Zoi.object(%{}),
+             extensions: [],
+             routes: [],
+             signal_source: nil,
+             topology: %{agents: [], connections: []},
+             metadata: %{}
+           }
+
+    assert Agent.define(%{name: "defaults", id: nil, state: nil, description: nil}) ==
+             {:ok, definition}
+
+    for field <- [:name, :schema, :extensions, :routes, :metadata, :topology] do
+      assert {:error, _} = Agent.define(Map.put(%{name: "defaults"}, field, nil))
     end
   end
 
-  test "rejects unknown keys and instance data before common fields or callbacks" do
-    attrs = %{name: nil, id: "instance", state: %{}, plugins: [CallbackPlugin]}
-
-    assert {:error,
-            %ValidationError{message: "Unknown Agent definition key", details: %{key: :extra}}} =
-             Agent.new(Map.put(attrs, :extra, true))
-
-    assert {:error,
-            %ValidationError{
-              message: "Agent.new/1 accepts definition data only",
-              details: %{keys: [:id, :state]}
-            }} = Agent.new(attrs)
-
+  test "unknown fields and instance data fail before provider callbacks" do
+    attrs = %{name: nil, id: "instance", state: %{}, extensions: [entry(CallbackPlugin)]}
+    assert {:error, %{code: :unknown_fields}} = Agent.define(Map.put(attrs, :extra, true))
+    assert {:error, %{code: :definition_required}} = Agent.define(attrs)
     refute_received {:callback, _, _}
   end
 
-  test "rejects unknown nil keys in definition maps and keyword lists" do
-    attrs = %{nil => :unexpected, name: "nil_key", plugins: [CallbackPlugin]}
+  test "unknown nil keys fail in every authoring boundary" do
+    attrs = %{nil => :unexpected, name: "nil_key", extensions: [entry(CallbackPlugin)]}
 
     for input <- [attrs, Enum.to_list(attrs)] do
-      assert {:error,
-              %ValidationError{message: "Unknown Agent definition key", details: %{key: nil}}} =
-               Agent.new(input)
-
+      assert {:error, _} = Agent.define(input)
       refute_received {:callback, _, _}
     end
-  end
 
-  test "rejects unknown nil keys in instance maps and keyword lists" do
-    definition = Agent.new!(name: "nil_key")
-    overrides = %{nil => :unexpected, id: "nil-key-instance"}
+    definition = Agent.define!(%{name: "nil_key"})
 
-    for input <- [overrides, Enum.to_list(overrides)] do
-      assert {:error,
-              %ValidationError{
-                message: "Agent instances can set only :id and :state",
-                details: %{key: nil}
-              }} = Agent.instantiate(definition, input)
+    for input <- [%{nil => :unexpected, id: "instance"}, [{nil, :unexpected}, {:id, "instance"}]] do
+      assert {:error, %{code: :unknown_fields}} = Agent.instantiate(definition, input)
     end
   end
 
-  test "reports the first common field error when later fields also fail" do
+  test "field validation follows one fixed order" do
     failures = [
-      {:name, nil},
-      {:description, 123},
-      {:module, nil},
-      {:plugins, nil},
-      {:schema, nil},
-      {:routes, nil},
-      {:metadata, nil}
+      name: nil,
+      module: true,
+      description: 123,
+      vsn: 0,
+      schema: nil,
+      metadata: nil,
+      signal_source: ""
     ]
 
     for index <- 0..(length(failures) - 1) do
       {field, value} = Enum.at(failures, index)
+      assert {:error, expected} = Agent.define(Map.put(%{name: "order"}, field, value))
 
-      assert {:error, %ValidationError{} = expected} =
-               Agent.new(Map.put(%{name: "order"}, field, value))
+      assert {:error, actual} =
+               Agent.define(Map.merge(%{name: "order"}, Map.new(Enum.drop(failures, index))))
 
-      attrs = Map.merge(%{name: "order"}, Map.new(Enum.drop(failures, index)))
-      assert {:error, %ValidationError{} = actual} = Agent.new(attrs)
-      assert {actual.message, actual.details} == {expected.message, expected.details}
+      assert actual === expected
     end
   end
 
-  test "calls Plugin schema callbacks once in order before route and metadata checks" do
-    opts = [label: :first]
+  test "Plugin schema callbacks receive their current config" do
+    assert {:ok, definition} =
+             Agent.define(%{
+               name: "callbacks",
+               extensions: [entry(CallbackPlugin, %{label: :first})]
+             })
 
-    for extra <- [%{}, %{routes: nil}, %{metadata: nil}] do
-      result =
-        Agent.new(Map.merge(%{name: "callbacks", plugins: [{CallbackPlugin, opts}]}, extra))
-
-      if extra == %{} do
-        assert {:ok, %Agent{plugins: [{CallbackPlugin, ^opts}]}} = result
-      else
-        assert {:error, %ValidationError{}} = result
-      end
-
-      for callback <- [:state_spec, :directives] do
-        assert_received {:callback, actual, ^opts}
-        assert actual == callback
-      end
-
-      refute_received {:callback, _, _}
-    end
-
-    assert {:error, %ValidationError{}} =
-             Agent.new(name: "callbacks", plugins: [CallbackPlugin], schema: nil)
-
-    assert_received {:callback, :state_spec, []}
-    assert_received {:callback, :directives, []}
-    refute_received {:callback, _, _}
+    assert Agent.runtime_plugins(definition) == [{CallbackPlugin, [label: :first]}]
+    assert_received {:callback, :state_spec, [label: :first]}
+    assert_received {:callback, :directives, [label: :first]}
+    assert {:error, %{path: [:schema]}} = Agent.define(%{name: "bad_schema", schema: nil})
   end
+
+  defp entry(provider, data \\ %{}),
+    do: %{id: provider.id(), provider: provider, vsn: provider.vsn(), data: data}
 end

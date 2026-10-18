@@ -1,68 +1,57 @@
 defmodule Jido.Agent.CodecTest do
   use ExUnit.Case, async: true
-
   alias Jido.Agent
   alias Jido.Agent.Codec
-  alias Jido.Codec.Data
   alias JidoTest.AgentFixtures.Add
 
   defmodule ChangingTarget do
     @behaviour Jido.Action
-
     def __jido_authoring_kind__, do: Process.get({__MODULE__, :kind}, :action)
-
     @impl true
     def validate_params(value), do: {:ok, value}
     @impl true
     def validate_output(value), do: {:ok, value}
     @impl true
-    def run(_input, _context), do: raise("encoding must not execute Actions")
+    def run(_, _), do: raise("encoding must not run Actions")
   end
 
-  test "Codec round trips every accepted route defaults form" do
-    for target <- [Add, {Add, %{}}, {Add, %{by: 2}}] do
+  test "Codec retains route defaults and a complete instance" do
+    for defaults <- [%{}, %{by: 2}] do
       definition =
-        Agent.new!(name: "defaults", routes: [{"counter.add", target, priority: 7}])
+        Agent.define!(%{
+          name: "defaults",
+          routes: [
+            %{path: "counter.add", handler: %{kind: :action, target: Add}, defaults: defaults}
+          ]
+        })
 
-      assert {:ok, document, registry} = Codec.encode(definition)
-      assert {:ok, ^document} = Codec.encode(definition, registry)
-      assert {:ok, ^definition} = Codec.decode(JSON.decode!(JSON.encode!(document)), registry)
+      for value <- [definition, Agent.instantiate!(definition, id: "encoded")] do
+        assert {:ok, document, registry} = Codec.encode(value)
+        assert {:ok, ^document} = Codec.encode(value, registry)
+        assert {:ok, ^value} = Codec.decode(JSON.decode!(JSON.encode!(document)), registry)
+      end
+
+      [route] = definition.routes
+
+      for invalid <- [false, 1, "invalid", [], {1, 2}, %URI{}] do
+        assert {:error, %{path: [:routes, 0, :defaults]}} =
+                 Codec.encode(%{definition | routes: [%{route | defaults: invalid}]})
+      end
     end
   end
 
-  test "Codec rejects defaults that are not plain maps" do
+  test "Codec validates the current executable kind" do
     definition =
-      Agent.new!(
-        name: "defaults",
-        metadata: %{uri: %URI{port: 1}},
-        routes: [{"counter.add", Add}]
-      )
+      Agent.define!(%{
+        name: "changing_target",
+        routes: [%{path: "counter.route", handler: %{kind: :action, target: ChangingTarget}}]
+      })
 
-    {:ok, document, registry} = Codec.encode(definition)
-    [route] = document["routes"]
-
-    for defaults <- [false, 1, 1.0, "invalid", [], {1, 2}, %URI{port: 1}] do
-      assert {:ok, encoded} = Data.encode(defaults, registry)
-      invalid = %{document | "routes" => [%{route | "defaults" => encoded}]}
-
-      assert {:error, %Jido.Error.ValidationError{message: "Route defaults must be a plain map"}} =
-               Codec.decode(invalid, registry)
-    end
-  end
-
-  test "Codec validates the current Instruction target contract" do
-    definition =
-      Agent.new!(name: "changing_target", routes: [{"counter.route", ChangingTarget}])
-
-    assert {:ok, _document, registry} = Codec.encode(definition)
-
+    assert {:ok, _, registry} = Codec.encode(definition)
     Process.put({ChangingTarget, :kind}, :flow)
 
     for result <- [Codec.encode(definition), Codec.encode(definition, registry)] do
-      assert {:error, %Jido.Error.ValidationError{} = error} = result
-      assert error.message == "Invalid Agent route executable"
-      assert error.details.target == ChangingTarget
-      assert error.details.reason.details.reason == "missing flow/0"
+      assert {:error, %{code: :invalid_executable, path: [:routes, 0, :handler]}} = result
     end
   end
 end

@@ -47,8 +47,8 @@ defmodule JidoCoreBench.AgentServer2Cases do
           # Start from the measured caller so spawn tracing includes the tree.
           # The instance load profile separately uses its DynamicSupervisor.
           previous_trap = Process.flag(:trap_exit, true)
-          {:ok, root} = Server.Activation.start_link(agent: a, jido: JidoCoreBench)
-          pid = Server.Activation.worker(root)
+          {:ok, root} = Server.Supervisor.start_link(agent: a, jido: JidoCoreBench)
+          pid = Server.Supervisor.worker(root)
           :ok = Server.await_ready(pid)
 
           family =

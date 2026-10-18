@@ -17,7 +17,7 @@ defmodule JidoTest.Persistence.LiveStateTest do
       }
 
       effect =
-        Jido.Agent.Directive.emit_to_pid(
+        Jido.AgentServer.Directive.signal_send(
           Jido.Signal.new!("local.updated", %{}, source: "/test"),
           input.observer
         )
@@ -70,7 +70,7 @@ defmodule JidoTest.Persistence.LiveStateTest do
 
     def restore(payload, _context) do
       bits = for bit <- payload.bits, into: <<>>, do: <<bit::1>>
-      agent = new!(id: payload.id, state: %{payload: bits})
+      agent = instantiate!(id: payload.id, state: %{payload: bits})
       {:ok, %{agent | state: %{agent.state | count: payload.count}}}
     end
   end
@@ -119,7 +119,7 @@ defmodule JidoTest.Persistence.LiveStateTest do
     defdelegate delete(key, opts), to: ETS
 
     def compare_and_swap(key, expected, value, opts) do
-      if :erlang.binary_to_term(value, [:safe]).revision == 0,
+      if :erlang.binary_to_term(value, [:safe]).rev == 0,
         do: ETS.compare_and_swap(key, expected, value, opts),
         else: {:error, {:rejected, :storage_unavailable}}
     end
@@ -130,10 +130,10 @@ defmodule JidoTest.Persistence.LiveStateTest do
   end
 
   test "custom conversion saves and restores a non-byte-aligned value", c do
-    agent = CustomAgent.new!(id: unique_id(), state: %{payload: <<5::3>>, count: 2})
-    assert {:ok, checkpoint} = Agent.checkpoint(agent)
-    assert checkpoint.payload.bits == [1, 0, 1]
-    assert {:ok, ^agent} = Agent.restore(CustomAgent, checkpoint)
+    agent = CustomAgent.instantiate!(id: unique_id(), state: %{payload: <<5::3>>, count: 2})
+    assert {:ok, checkpoint} = Jido.Persistence.snapshot(agent)
+    assert checkpoint.agent.state.bits == [1, 0, 1]
+    assert {:ok, ^agent} = Jido.Persistence.restore(checkpoint)
     assert :ok = Persistence.save_agent(c.persistence, agent, instance: c.jido)
 
     assert {:ok, ^agent} =
@@ -141,12 +141,14 @@ defmodule JidoTest.Persistence.LiveStateTest do
   end
 
   test "custom output and restored schema and identity remain strict", c do
-    agent = CustomAgent.new!(id: unique_id(), state: %{payload: <<5::3>>})
+    agent = CustomAgent.instantiate!(id: unique_id(), state: %{payload: <<5::3>>})
     assert :ok = Persistence.save_agent(c.persistence, agent, instance: c.jido)
     record = record(c, agent.id)
 
     for {field, value} <- [id: "different", count: :invalid, bits: self()] do
-      changed = put_in(record, [:checkpoint, :payload, field], value)
+      changed =
+        put_in(record, [:checkpoint, Access.key(:agent), Access.key(:state), field], value)
+
       put_record(c, agent.id, changed)
 
       assert {:error, _reason} =
@@ -154,8 +156,8 @@ defmodule JidoTest.Persistence.LiveStateTest do
     end
 
     for changed <- [
-          put_in(record, [:checkpoint, :vsn], 99),
-          put_in(record, [:checkpoint, :agent_module], LocalAgent)
+          put_in(record, [:checkpoint, Access.key(:agent), Access.key(:vsn)], 99),
+          put_in(record, [:checkpoint, Access.key(:agent), Access.key(:module)], LocalAgent)
         ] do
       put_record(c, agent.id, changed)
 
@@ -165,21 +167,28 @@ defmodule JidoTest.Persistence.LiveStateTest do
 
     invalid = %{agent | state: %{agent.state | payload: :invalid_dump}}
 
-    assert {:error,
-            %{details: %{code: :non_portable_term, path: [:checkpoint, :payload, :value]}}} =
+    assert {:error, %{code: :non_portable_term, path: [:snapshot, :agent, :state, :value]}} =
              Persistence.save_agent(c.persistence, invalid, instance: c.jido)
   end
 
   test "Plugin conversion handles local owned state for generated and embedded definitions", c do
     for definition <- [
           PluginAgent.definition(),
-          Agent.new!(name: "embedded_local_plugin", plugins: [Package]),
-          Agent.new!(name: "embedded_generated_plugin", module: PluginAgent, plugins: [Package])
+          Agent.define!(%{
+            name: "embedded_local_plugin",
+            extensions: [%{id: Package.id(), provider: Package, vsn: Package.vsn(), data: %{}}]
+          }),
+          Agent.define!(%{
+            name: "embedded_generated_plugin",
+            module: PluginAgent,
+            extensions: [%{id: Package.id(), provider: Package, vsn: Package.vsn(), data: %{}}]
+          })
         ] do
       agent = Agent.instantiate!(definition, id: unique_id(), state: %{owned: %{bits: <<5::3>>}})
-      assert {:error, %{details: %{code: :non_portable_term}}} = Agent.checkpoint(agent)
+      assert {:ok, snapshot} = Jido.Persistence.snapshot(agent)
+      assert {:ok, ^agent} = Jido.Persistence.restore(snapshot)
       assert :ok = Persistence.save_agent(c.persistence, agent, instance: c.jido)
-      assert record(c, agent.id).checkpoint.state.owned == [1, 0, 1]
+      assert record(c, agent.id).checkpoint.agent.state.owned == [1, 0, 1]
 
       assert {:ok, ^agent} =
                Persistence.load_agent(c.persistence, agent.module, agent.id, instance: c.jido)
@@ -188,20 +197,24 @@ defmodule JidoTest.Persistence.LiveStateTest do
 
   test "Plugin conversion cannot hide invalid stored records or invalid restored owned state",
        c do
-    agent = PluginAgent.new!(id: unique_id(), state: %{owned: %{bits: <<5::3>>}})
+    agent = PluginAgent.instantiate!(id: unique_id(), state: %{owned: %{bits: <<5::3>>}})
     assert :ok = Persistence.save_agent(c.persistence, agent, instance: c.jido)
     record = record(c, agent.id)
 
     for value <- [self(), <<5::3>>, :invalid_state] do
-      put_record(c, agent.id, put_in(record, [:checkpoint, :state, :owned], value))
+      put_record(
+        c,
+        agent.id,
+        put_in(record, [:checkpoint, Access.key(:agent), Access.key(:state), :owned], value)
+      )
 
       assert {:error, _reason} =
                Persistence.load_agent(c.persistence, PluginAgent, agent.id, instance: c.jido)
     end
 
     for changed <- [
-          put_in(record, [:checkpoint, :id], "different"),
-          put_in(record, [:checkpoint, :vsn], 99)
+          put_in(record, [:checkpoint, Access.key(:agent), Access.key(:id)], "different"),
+          put_in(record, [:checkpoint, Access.key(:agent), Access.key(:vsn)], 99)
         ] do
       put_record(c, agent.id, changed)
 
@@ -211,7 +224,12 @@ defmodule JidoTest.Persistence.LiveStateTest do
   end
 
   test "live execution commits local domain and Plugin values without persistence", c do
-    initial = PluginAgent.new!(state: %{payload: self(), owned: %{bits: <<5::3>>}})
+    initial =
+      PluginAgent.instantiate!(
+        id: Jido.Signal.ID.generate!(),
+        state: %{payload: self(), owned: %{bits: <<5::3>>}}
+      )
+
     assert {:ok, server} = JidoTest.AgentServerAssertions.start_agent(c.jido, initial)
     port = Port.open({:spawn_executable, System.find_executable("true")}, [])
     on_exit(fn -> if Port.info(port), do: Port.close(port) end)

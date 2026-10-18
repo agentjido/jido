@@ -60,8 +60,8 @@ Read [the 94 obligations](../../contracts/jido/agent_server2.obligations.md),
 [scope decisions](../../contracts/jido/agent_server2.decisions.yml), and
 [the mutation baseline](../../contracts/jido/agent_server2.baseline.md).
 The component is `jido.agent_server2`; its mutation targets are
-`Jido.AgentServer2` and its nested `Activation` supervisor. Existing Agent, Topology, AgentServer, and dependencies
-are not mutation targets. Required-root replacement is covered. Durable state recovery is covered. Distributed behavior remains outside this contract. Runtime tree helpers remain in the same source file.
+`Jido.AgentServer` and `Jido.AgentServer.Supervisor`. Agent data, Topology,
+and dependencies are not mutation targets. Required-root replacement is covered. Durable state recovery is covered. Distributed behavior remains outside this contract. The supervisor has its own source file.
 
 Passing-test obligation coverage and mutation coverage are different checks.
 The B1 focused profile also selects `Jido.Instance.RefFacade` with an explicit
@@ -86,8 +86,8 @@ to rename. Shared Jido and Ref facade modules keep their names.
 
 `Server.child_spec(opts)` returns a supervisor specification. OTP receives the
 root PID; `Server.start(opts)` returns the worker. For standalone supervision,
-`Server.Activation.start_link(opts)` returns `{:ok, root}`. Use
-`Server.Activation.worker(root)` to find the worker and a trapping OTP owner for
+`Server.Supervisor.start_link(opts)` returns `{:ok, root}`. Use
+`Server.Supervisor.worker(root)` to find the worker and a trapping OTP owner for
 a linked supervisor. `Server.activation(worker)` returns its root.
 `Server.start_link(opts)` remains the bare-worker API and rejects runtime Plugins and persistence.
 Use the activation path for normal operation, with or without Plugins.

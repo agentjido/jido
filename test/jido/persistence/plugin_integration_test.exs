@@ -73,14 +73,14 @@ defmodule JidoTest.Persistence.PluginIntegrationTest do
 
     agent do
       schema Zoi.object(%{value: Zoi.integer() |> Zoi.default(0)})
-      plugin Package, config: [prefix: "sealed:"]
+      plugin Package, config: %{prefix: "sealed:"}
     end
 
     @impl Jido.Agent
     def checkpoint(agent, _context), do: {:ok, %{id: agent.id, complete: agent.state}}
 
     @impl Jido.Agent
-    def restore(%{id: id, complete: state}, _context), do: new(id: id, state: state)
+    def restore(%{id: id, complete: state}, _context), do: instantiate(id: id, state: state)
   end
 
   defmodule StoredStatePackage do
@@ -116,11 +116,13 @@ defmodule JidoTest.Persistence.PluginIntegrationTest do
     options = [prefix: "sealed:", observer: __MODULE__.Observer]
 
     agent =
-      Agent.new!(
+      Agent.define!(%{
         name: "persistence_plugin_integration",
         schema: Zoi.object(%{visible: Zoi.integer() |> Zoi.default(1)}),
-        plugins: [{Package, options}]
-      )
+        extensions: [
+          %{id: Package.id(), provider: Package, vsn: Package.vsn(), data: Map.new(options)}
+        ]
+      })
       |> Agent.instantiate!(id: "owned-state", state: %{visible: 8, owned: 12})
 
     assert :ok =
@@ -133,7 +135,7 @@ defmodule JidoTest.Persistence.PluginIntegrationTest do
     assert_receive {:dump, 12, dump_context}
     assert dump_context.plugin == Package
     assert dump_context.plugin_vsn == 4
-    assert dump_context.record_format == 3
+    assert dump_context.record_format == 4
     assert dump_context.direction == :dump
     assert dump_context.reason == :test
 
@@ -141,12 +143,14 @@ defmodule JidoTest.Persistence.PluginIntegrationTest do
     key = Persistence.agent_key(Jido.Agent.Ref.new!(namespace: "persistence-test", id: agent.id))
     assert {:ok, bytes} = ETS.get(key, opts)
     record = :erlang.binary_to_term(bytes, [:safe])
-    assert record.checkpoint.state.visible == 8
-    assert record.checkpoint.state.owned == "sealed:12"
-    refute Map.has_key?(record.checkpoint.state, :adapter)
+    assert record.checkpoint.agent.state.visible == 8
+    assert record.checkpoint.agent.state.owned == "sealed:12"
+    refute Map.has_key?(record.checkpoint.agent.state, :adapter)
 
     assert {:ok, restored} =
-             Persistence.load_agent(c.persistence, Agent, agent.id, namespace: "persistence-test")
+             Persistence.load_agent(c.persistence, agent.module, agent.id,
+               namespace: "persistence-test"
+             )
 
     assert_receive {:load, "sealed:12", load_context}
     assert load_context.direction == :load
@@ -156,7 +160,7 @@ defmodule JidoTest.Persistence.PluginIntegrationTest do
 
   test "complete custom checkpoints bypass Plugin slice conversion", c do
     agent =
-      CustomCheckpointAgent.new!(
+      CustomCheckpointAgent.instantiate!(
         id: "custom-checkpoint",
         state: %{value: 7, owned: 9}
       )
@@ -171,7 +175,7 @@ defmodule JidoTest.Persistence.PluginIntegrationTest do
     key = Persistence.agent_key(Jido.Agent.Ref.new!(namespace: "persistence-test", id: agent.id))
     assert {:ok, bytes} = ETS.get(key, opts)
 
-    assert %{checkpoint: %{kind: :agent_custom, payload: payload}} =
+    assert %{checkpoint: %{state_format: :custom, agent: %{state: payload}}} =
              :erlang.binary_to_term(bytes, [:safe])
 
     assert payload == %{id: agent.id, complete: %{value: 7, owned: 9}}
@@ -219,7 +223,7 @@ defmodule JidoTest.Persistence.PluginIntegrationTest do
       Process.put({PersistenceFacet, :load_fault}, fault)
 
       assert {:error, error} =
-               Persistence.load_agent(c.persistence, Agent, agent.id,
+               Persistence.load_agent(c.persistence, agent.module, agent.id,
                  namespace: "persistence-test"
                )
 
@@ -228,7 +232,7 @@ defmodule JidoTest.Persistence.PluginIntegrationTest do
       Process.delete({PersistenceFacet, :load_fault})
 
       assert {:ok, ^agent} =
-               Persistence.load_agent(c.persistence, Agent, agent.id,
+               Persistence.load_agent(c.persistence, agent.module, agent.id,
                  namespace: "persistence-test"
                )
     end
@@ -248,19 +252,41 @@ defmodule JidoTest.Persistence.PluginIntegrationTest do
 
   test "Plugin load preserves nullable values and absent optional fields", c do
     agent =
-      Agent.new!(name: "stored_plugin_state", plugins: [StoredStatePackage])
+      Agent.define!(%{
+        name: "stored_plugin_state",
+        extensions: [
+          %{
+            id: StoredStatePackage.id(),
+            provider: StoredStatePackage,
+            vsn: StoredStatePackage.vsn(),
+            data: %{}
+          }
+        ]
+      })
       |> Agent.instantiate!(id: "stored-plugin-state")
 
     assert {:ok, agent} = Agent.transition(agent, %{owned: %{count: nil}})
     assert :ok = Persistence.save_agent(c.persistence, agent, namespace: "persistence-test")
 
     assert {:ok, ^agent} =
-             Persistence.load_agent(c.persistence, Agent, agent.id, namespace: "persistence-test")
+             Persistence.load_agent(c.persistence, agent.module, agent.id,
+               namespace: "persistence-test"
+             )
   end
 
   test "Plugin load rejects incomplete or invalid stored output", c do
     agent =
-      Agent.new!(name: "invalid_loaded_state", plugins: [StoredStatePackage])
+      Agent.define!(%{
+        name: "invalid_loaded_state",
+        extensions: [
+          %{
+            id: StoredStatePackage.id(),
+            provider: StoredStatePackage,
+            vsn: StoredStatePackage.vsn(),
+            data: %{}
+          }
+        ]
+      })
       |> Agent.instantiate!(id: "invalid-loaded-state")
 
     assert :ok = Persistence.save_agent(c.persistence, agent, namespace: "persistence-test")
@@ -269,7 +295,7 @@ defmodule JidoTest.Persistence.PluginIntegrationTest do
       Process.put({StoredStatePackage, :loaded}, loaded)
 
       assert {:error, error} =
-               Persistence.load_agent(c.persistence, Agent, agent.id,
+               Persistence.load_agent(c.persistence, agent.module, agent.id,
                  namespace: "persistence-test"
                )
 
@@ -279,15 +305,19 @@ defmodule JidoTest.Persistence.PluginIntegrationTest do
     Process.delete({StoredStatePackage, :loaded})
 
     assert {:ok, ^agent} =
-             Persistence.load_agent(c.persistence, Agent, agent.id, namespace: "persistence-test")
+             Persistence.load_agent(c.persistence, agent.module, agent.id,
+               namespace: "persistence-test"
+             )
   end
 
   defp owned_agent(id) do
-    Agent.new!(
+    Agent.define!(%{
       name: "persistence_plugin_faults",
       schema: Zoi.object(%{visible: Zoi.integer() |> Zoi.default(1)}),
-      plugins: [{Package, prefix: "sealed:"}]
-    )
+      extensions: [
+        %{id: Package.id(), provider: Package, vsn: Package.vsn(), data: %{prefix: "sealed:"}}
+      ]
+    })
     |> Agent.instantiate!(id: id, state: %{visible: 8, owned: 12})
   end
 end

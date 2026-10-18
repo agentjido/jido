@@ -15,8 +15,8 @@ that registry. Do not match a message. A returned application or adjacent
 package error keeps its original owner and shape.
 
 A pre-commit failure retains the previous Agent and revision. A directive failure
-retains the new commit. Review `Jido.Agent.Turn.Outcome` and runtime error policy
-to choose the application response. Every required persistence write error stops
+retains the new commit. Review `Jido.AgentServer.status/1` summary maps and
+runtime error policy to choose the application response. Every required persistence write error stops
 that activation even when ordinary error policy would continue. A new activation
 must restore authoritative state.
 

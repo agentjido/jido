@@ -37,13 +37,11 @@ defmodule JidoTest.AgentRuntimeFixtures.ReplyToParent do
   @moduledoc false
   use Jido.Action, name: "agent_reply_to_parent"
 
-  alias Jido.Agent.Directive
-
   @impl Jido.Action
   def run(%{reply: reply} = params, context) do
     state = context.agent_state
     next_state = %{state | events: state.events ++ [Map.get(params, :event, :ping)]}
-    {:ok, next_state, [Directive.emit_to_parent(reply)]}
+    {:ok, next_state, [Jido.AgentServer.Directive.owner_send(reply)]}
   end
 end
 

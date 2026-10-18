@@ -37,7 +37,7 @@ defmodule JidoTest.Persistence.PersistentProbe do
 
         directives =
           if observer = context[:observer] do
-            [Jido.Agent.Directive.emit_to_pid(signal, observer)]
+            [Jido.AgentServer.Directive.signal_send(signal, observer)]
           else
             []
           end

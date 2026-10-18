@@ -28,7 +28,7 @@ defmodule JidoTest.Examples.Plugins.IdentityTest do
 
     assert {:ok, signed} = Crypto.sign(unsigned, peer_private, peer_public, "identity-once")
 
-    direct = Agent.new!(id: unique_id("identity-direct"))
+    direct = Agent.define!(%{id: unique_id("identity-direct")})
 
     assert {:ok, direct, [%Jido.Agent.Directive.Emit{}]} = Jido.Agent.cmd(direct, signed)
     assert direct.state.accepted == 1

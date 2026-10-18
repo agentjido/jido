@@ -1,61 +1,39 @@
-Code.require_file("../support/compiler.exs", __DIR__)
+Code.require_file("../support/agents/composable_compiler.exs", __DIR__)
 
 defmodule JidoTest.Authoring.Agents.MetadataTest do
-  use ExUnit.Case, async: false
+  use ExUnit.Case, async: true
   @moduletag :authoring
   alias Jido.Agent
-  alias Jido.Agent.Codec
-  alias JidoTest.Authoring.Compiler
-  alias JidoTest.Authoring.Agents.Fixtures
-  @fixtures Path.expand("../support/agents/fixtures", __DIR__)
+  alias JidoTest.ComposableAgent.Compiler
 
-  test "metadata keeps atom, string, and mixed keys across authoring forms and JSON" do
-    assert {_, []} = Compiler.compile_file(Path.join(@fixtures, "metadata_maps.exs"))
-
-    for {module, metadata} <- [
-          {Fixtures.AtomMetadata, %{case: "atom-key"}},
-          {Fixtures.StringMetadata, %{"case" => "string-key"}},
-          {Fixtures.MixedMetadata,
-           %{"case" => "string-key", :case => "atom-key", :nested => %{"enabled" => false}}}
+  test "metadata preserves atom, string, mixed keys and static values in Map and DSL" do
+    for metadata <- [
+          %{case: "atom"},
+          %{"case" => "string"},
+          %{"case" => "string", :case => "atom", :nested => %{enabled: false}},
+          %{date: ~D[2026-09-13], tuple: {:ok, 1.0}}
         ] do
-      attrs = %{module: module, name: "metadata_maps", vsn: 1, metadata: metadata}
-      assert {:ok, expected} = Agent.new(attrs)
+      module = Compiler.compile("agent do metadata #{inspect(metadata)} end")
+      expected = Agent.define!(%{name: "generated", module: module, metadata: metadata})
+      assert module.definition() === expected
       assert expected.metadata === metadata
-
-      for definition <- [
-            module.definition(),
-            Agent.new!(Map.to_list(attrs))
-          ] do
-        assert definition === expected
-        assert {:ok, document, registry} = Codec.encode(definition)
-        assert {:ok, ^expected} = Codec.decode(JSON.decode!(JSON.encode!(document)), registry)
-      end
+      assert Agent.definition(Agent.instantiate!(expected, id: "one")) === expected
     end
   end
 
-  test "data forms reject metadata structs and non-map values" do
-    for metadata <- [~D[2026-09-13], nil, false, 42, "invalid", [], [case: "invalid"]] do
-      attrs = %{name: "invalid_metadata", metadata: metadata}
-
-      for result <- [
-            Agent.new(attrs),
-            Agent.new(Map.to_list(attrs))
-          ] do
-        assert {:error, %Jido.Error.ValidationError{}} = result
-      end
-    end
-  end
-
-  for file <- ["metadata_struct", "metadata_list", "metadata_nil"] do
-    @file_path "invalid/#{file}.exs"
-    test "invalid metadata source: #{file}" do
-      error =
-        assert_raise Spark.Error.DslError, fn ->
-          Compiler.compile_file(Path.join(@fixtures, @file_path))
-        end
-
-      assert error.path == [:agent]
-      assert Exception.message(error) =~ "Agent metadata must be a map"
+  test "metadata rejects structs, non-Map values and live values" do
+    for metadata <- [
+          ~D[2026-09-13],
+          nil,
+          false,
+          42,
+          "invalid",
+          [],
+          [case: "invalid"],
+          %{pid: self()},
+          %{callback: fn -> :ok end}
+        ] do
+      assert {:error, _} = Agent.define(%{name: "invalid", metadata: metadata})
     end
   end
 end

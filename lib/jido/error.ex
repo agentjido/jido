@@ -936,6 +936,8 @@ defmodule Jido.Error do
   defp unified_type(%CompensationError{}), do: :compensation_error
   defp unified_type(%InternalError{}), do: :internal
   defp unified_type(%Internal.UnknownError{}), do: :internal
+  defp unified_type(%Jido.Agent.Error{code: :unmatched_input}), do: :routing_error
+  defp unified_type(%Jido.Agent.Error{}), do: :validation_error
 
   # Cross-package error mapping (jido_action, jido_signal)
   defp unified_type(%Jido.Action.Error.InvalidInputError{}), do: :validation_error

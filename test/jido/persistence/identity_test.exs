@@ -24,7 +24,7 @@ defmodule Jido.Persistence.IdentityTest do
 
   setup do
     table = :"identity_#{System.unique_integer([:positive])}"
-    %{store: {ETS, table: table}, agent: Basic.new!(id: "counter")}
+    %{store: {ETS, table: table}, agent: Basic.instantiate!(id: "counter")}
   end
 
   test "writers with different instance names share one CAS record", c do
@@ -57,7 +57,7 @@ defmodule Jido.Persistence.IdentityTest do
   test "the module cannot create a second durable identity", c do
     opts = [namespace: "shared"]
     assert :ok = Persistence.create_agent(c.store, c.agent, opts)
-    other = RuntimeAgent.new!(id: c.agent.id)
+    other = RuntimeAgent.instantiate!(id: c.agent.id)
     assert {:error, :conflict} = Persistence.create_agent(c.store, other, opts)
 
     assert {:error, {:invalid_persistence_record, :agent_module}} =

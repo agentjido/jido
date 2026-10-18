@@ -49,7 +49,7 @@ defmodule Jido.Plugin.Bus.IntegrationTest do
     agent do
       schema Zoi.object(%{values: Zoi.list(Zoi.integer()) |> Zoi.default([])})
 
-      plugin Client, config: [bus: :plugin_bus, path: "bus.**"]
+      plugin Client, config: %{bus: :plugin_bus, path: "bus.**"}
     end
 
     routes do
@@ -63,14 +63,15 @@ defmodule Jido.Plugin.Bus.IntegrationTest do
     agent do
       schema Zoi.object(%{values: Zoi.list(Zoi.integer()) |> Zoi.default([])})
 
-      plugin Client,
-        config: [
+      plugin(Client,
+        config: %{
           bus: :plugin_bus,
           path: "bus.**",
           durable: "durable-bus-agent",
           start_from: :origin,
           retry_delay_ms: 10
-        ]
+        }
+      )
     end
 
     routes do
@@ -85,14 +86,15 @@ defmodule Jido.Plugin.Bus.IntegrationTest do
     agent do
       schema Zoi.object(%{values: Zoi.list(Zoi.integer()) |> Zoi.default([])})
 
-      plugin Client,
-        config: [
+      plugin(Client,
+        config: %{
           bus: :plugin_bus,
           path: "bus.**",
           durable: "durable-bus-barrier",
           start_from: :origin,
           retry_delay_ms: 10
-        ]
+        }
+      )
     end
 
     routes do
@@ -114,8 +116,8 @@ defmodule Jido.Plugin.Bus.IntegrationTest do
     agent do
       schema Zoi.object(%{values: Zoi.list(Zoi.integer()) |> Zoi.default([])})
 
-      plugin Manager, config: [name: :owned_plugin_bus]
-      plugin Client, config: [bus: :owned_plugin_bus, path: "bus.**", retry_delay_ms: 10]
+      plugin Manager, config: %{name: :owned_plugin_bus}
+      plugin Client, config: %{bus: :owned_plugin_bus, path: "bus.**", retry_delay_ms: 10}
     end
 
     routes do

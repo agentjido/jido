@@ -73,22 +73,24 @@ A direct `Jido.Agent.cmd/3` call returns the list but does not dispatch it.
 
 ## Read An Outcome
 
-`Jido.Agent.Turn.Outcome` records:
+`Jido.AgentServer.status/1` exposes `last_outcome`, a terminal summary map:
 
-- the Turn and Agent IDs;
-- source and effective Signals;
+- Turn and source Signal IDs;
 - terminal status and stage;
 - state versions before and after the Turn;
 - whether the Turn committed;
-- Directive completion, failure, and skip counts;
-- timing and an optional error.
+- returned Directive count and duration.
 
 Statuses are `:succeeded`, `:failed`, `:cancelled`, `:timed_out`, and
 `:indeterminate`. The first recovery question is always `committed?`.
+The summary excludes Signal data, Agent state, and raw errors. The error-policy
+callback receives this same summary. With `debug: true`, `history/1` retains a
+bounded list of these maps in completion order.
 
-An optional Plugin `after_commit/3` failure uses stage `:after_commit`. The
-commit remains. Remaining notifications and Directives are skipped; no
-Directive is counted as failed until Directive handling itself starts.
+Post-commit work has a separate `last_effect_outcome` summary with its status,
+stage, completed and total Directive counts, Turn ID, and committed revision.
+A Plugin `after_commit/3` failure uses stage `:after_commit`. The commit and
+successful Turn summary remain. Later notifications and Directives do not run.
 
 ## Do Not Use Directives As A Queue
 

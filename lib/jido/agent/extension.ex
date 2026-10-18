@@ -1,158 +1,185 @@
 defmodule Jido.Agent.Extension do
   @moduledoc """
-  Lowers additional Agent DSL declarations into ordinary Agent configuration.
+  One contribution contract for Extensions and Plugins.
 
-  Pass Spark extension modules through `use Jido.Agent, extensions: [Extension]`.
-  Each extension also implements `lower_agent/2`. Core first collects its own
-  schema, routes and Plugins. It then calls extensions in declaration order with
-  that configuration and the remaining foreign entities from `agent do`.
-
-  Return updated configuration and any entities owned by another extension.
-  All entities must be consumed. Common Agent validation still applies, and
-  execution uses the same runtime as direct definitions.
-
-  Lowering must be static: do not start processes, run Actions or contact external
-  services. Keep semantic lowering usable from data-based authoring. Extensions
-  do not create another Agent runtime or bypass state validation.
-
-  An extension can implement `route_target_options/0` to own keyword route
-  targets. Core assigns each target to its owner before it calls `lower_agent/2`.
+  `lower/2` reads Spark declarations and explicit Plugin config. `normalize/1`
+  validates both Map and DSL data. `verify/2` checks references after core
+  normalization. These callbacks must be deterministic and must not run work.
+  `runtime_support/0` is descriptive; Agent does not activate it.
   """
+  alias Jido.Agent.{Data, Error}
+  @callback id() :: String.t()
+  @callback vsn() :: pos_integer()
+  @callback lower(map(), map()) :: {:ok, map()} | {:error, term()}
+  @callback normalize(map()) :: {:ok, map()} | {:error, term()}
+  @callback verify(map(), map()) :: :ok | {:error, term()}
+  @callback runtime_support() :: :none | module()
+  @callback endpoint_kinds() :: [atom()]
+  @callback endpoints(map()) :: [map()]
+  @callback authoring_imports() :: [module()]
+  @callback verify_connection(map(), map()) :: :ok | {:error, term()}
 
-  alias Jido.Agent.Authoring
+  defmacro __using__(opts) do
+    quote do
+      @behaviour Jido.Agent.Extension
+      use Spark.Dsl.Extension, sections: unquote(Keyword.get(opts, :sections, []))
+      def id, do: unquote(Keyword.fetch!(opts, :id))
+      def vsn, do: unquote(Keyword.get(opts, :vsn, 1))
+      def lower(_dsl, config), do: {:ok, config}
 
-  @callback lower_agent(map(), [struct()]) ::
-              {:ok, map(), [struct()]} | {:error, Exception.t()}
-
-  @doc "Returns the keyword route target options that this extension owns."
-  @callback route_target_options() :: [atom()]
-
-  @optional_callbacks route_target_options: 0
-
-  defp route_target_claims(extensions) do
-    Enum.reduce_while(extensions, {:ok, %{}}, fn extension, {:ok, claims} ->
-      if is_atom(extension) and Code.ensure_loaded?(extension) and
-           function_exported?(extension, :route_target_options, 0) do
-        options = extension.route_target_options()
-
-        if valid_route_options?(options) do
-          claims =
-            Enum.reduce(
-              options,
-              claims,
-              &Map.update(&2, &1, [extension], fn owners -> [extension | owners] end)
-            )
-
-          {:cont, {:ok, claims}}
-        else
-          {:halt,
-           Authoring.error(
-             "Agent extension route_target_options/0 must return unique atom names",
-             %{
-               extension: extension,
-               options: options
-             }
-           )}
-        end
-      else
-        {:cont, {:ok, claims}}
+      def normalize(data) do
+        with :ok <- Jido.Agent.Data.plain_map(data),
+             :ok <- Jido.Agent.Data.static(data),
+             do: {:ok, data}
       end
-    end)
+
+      def verify(_data, _definition), do: :ok
+      def runtime_support, do: :none
+      def authoring_imports, do: []
+      def endpoint_kinds, do: []
+      def endpoints(_data), do: []
+      def verify_connection(_data, _connection), do: :ok
+
+      defoverridable lower: 2,
+                     normalize: 1,
+                     verify: 2,
+                     runtime_support: 0,
+                     authoring_imports: 0,
+                     endpoint_kinds: 0,
+                     endpoints: 1,
+                     verify_connection: 2
+    end
   end
 
-  defp valid_route_options?(options) when is_list(options),
-    do:
-      not List.improper?(options) and options == Enum.uniq(options) and
-        Enum.all?(options, &is_atom/1)
+  def providers(providers) do
+    with {:ok, providers} <- Data.list(providers, &provider/1),
+         :ok <- Data.unique(providers, & &1),
+         :ok <- Data.unique(providers, & &1.id()),
+         :ok <- namespaces(providers) do
+      {:ok, providers}
+    end
+  end
 
-  defp valid_route_options?(_options), do: false
+  def provider(module) when is_atom(module) and module not in [nil, true, false] do
+    callbacks = [
+      id: 0,
+      vsn: 0,
+      sections: 0,
+      lower: 2,
+      normalize: 1,
+      verify: 2,
+      runtime_support: 0,
+      authoring_imports: 0,
+      endpoint_kinds: 0,
+      endpoints: 1,
+      verify_connection: 2
+    ]
 
-  @doc """
-  Lowers static extension data to ordinary Agent authoring data.
-
-  The function calls each extension in declaration order. It returns only the
-  lowered core configuration after every entity and route target is claimed.
-  Pass the returned map to `Jido.Agent.new/1` or
-  another static authoring boundary. This function starts no process and runs
-  no Action or Flow.
-  """
-  @spec lower([module()], map(), [struct()]) ::
-          {:ok, map()} | {:error, Exception.t()}
-  def lower(extensions, config, entities),
-    do:
-      Jido.Agent.Authoring.Extension.lower(
-        extensions,
-        config,
-        entities,
-        :agent,
-        &claim_route_targets/2
+    if match?({:module, _}, Code.ensure_compiled(module)) and
+         Enum.all?(callbacks, fn {f, a} -> function_exported?(module, f, a) end) do
+      with :ok <- Data.nonempty(module.id()),
+           :ok <- Data.positive(module.vsn()),
+           do: {:ok, module}
+    else
+      Error.fail(
+        :invalid_provider,
+        [],
+        "Provider #{inspect(module)} does not implement the Agent contribution contract",
+        %{provider: module}
       )
+    end
+  end
 
-  defp claim_route_targets(extensions, %{routes: routes} = config) when is_list(routes) do
-    case Enum.find_value(routes, &route_target/1) do
-      nil ->
-        {:ok, config}
+  def provider(value),
+    do: Error.fail(:invalid_provider, [], "Expected a provider module", %{provider: value})
 
-      %{option: option} when is_atom(option) ->
-        with {:ok, claims} <- route_target_claims(extensions),
-             {:ok, routes} <- claim_routes(claims, routes) do
-          {:ok, %{config | routes: routes}}
+  def normalize(entries) do
+    with {:ok, entries} <- Data.list(entries, &entry/1),
+         {:ok, _} <- providers(Enum.map(entries, & &1.provider)),
+         do: {:ok, entries}
+  end
+
+  defp entry(value) do
+    with {:ok, value} <- Data.fields(value, [:id, :provider, :vsn, :data]),
+         {:ok, provider} <- provider(value[:provider]),
+         :ok <- identity(value, provider),
+         :ok <- Data.plain_map(value[:data]),
+         {:ok, data} <- result(provider.normalize(value.data)),
+         :ok <- Data.plain_map(data),
+         :ok <- Data.static(data) do
+      {:ok, %{id: provider.id(), provider: provider, vsn: provider.vsn(), data: data}}
+    end
+  end
+
+  defp identity(value, provider) do
+    if value[:id] === provider.id() and value[:vsn] === provider.vsn(),
+      do: :ok,
+      else:
+        Error.fail(:provider_identity, [], "Provider ID or version does not match its contract")
+  end
+
+  def lower(providers, dsl, plugins) do
+    with :ok <- Data.plain_map(dsl),
+         :ok <- Data.plain_map(plugins),
+         {:ok, providers} <- providers(providers) do
+      Data.list(providers, fn provider ->
+        config = Map.get(plugins, provider, %{})
+
+        with :ok <- Data.plain_map(config),
+             {:ok, data} <- result(provider.lower(dsl, config)) do
+          {:ok, %{id: provider.id(), provider: provider, vsn: provider.vsn(), data: data}}
         end
-
-      %{option: option} ->
-        invalid_route_option(option)
+      end)
     end
   end
 
-  defp claim_route_targets(_extensions, config), do: {:ok, config}
-
-  defp route_target(%{target: {%Jido.Agent.Extension.RouteTarget{} = target, _defaults}}),
-    do: target
-
-  defp route_target(%{target: %Jido.Agent.Extension.RouteTarget{} = target}), do: target
-  defp route_target(_route), do: nil
-
-  defp claim_routes(claims, routes),
-    do: Authoring.traverse(routes, &claim_route_target(claims, &1))
-
-  defp claim_route_target(
-         claims,
-         %{target: {%Jido.Agent.Extension.RouteTarget{} = target, defaults}} = route
-       ) do
-    with {:ok, target} <- claim_route_target_value(claims, target),
-         do: {:ok, %{route | target: {target, defaults}}}
+  def verify(entries, definition) do
+    with {:ok, _} <-
+           Data.list(entries, fn entry ->
+             with :ok <- result(entry.provider.verify(entry.data, definition)), do: {:ok, entry}
+           end),
+         do: :ok
   end
 
-  defp claim_route_target(
-         claims,
-         %{target: %Jido.Agent.Extension.RouteTarget{} = target} = route
-       ) do
-    with {:ok, target} <- claim_route_target_value(claims, target),
-         do: {:ok, %{route | target: target}}
+  def endpoints(entries), do: Enum.flat_map(entries, & &1.provider.endpoints(&1.data))
+
+  def verify_connection(entries, connection) do
+    with {:ok, _} <-
+           Data.list(entries, fn entry ->
+             with :ok <- result(entry.provider.verify_connection(entry.data, connection)),
+                  do: {:ok, entry}
+           end),
+         do: :ok
   end
 
-  defp claim_route_target(_claims, route), do: {:ok, route}
+  defp namespaces(providers) do
+    sections =
+      Enum.flat_map(providers, fn provider -> Enum.map(provider.sections(), & &1.name) end)
 
-  defp claim_route_target_value(claims, %{option: option} = target) when is_atom(option) do
-    case Map.get(claims, option, []) do
-      [extension] ->
-        {:ok, %{target | extension: extension}}
+    kinds = Enum.flat_map(providers, & &1.endpoint_kinds())
 
-      [] ->
-        Authoring.error("Unknown Agent extension route target option #{inspect(option)}", %{
-          option: option
-        })
+    cond do
+      Enum.any?(
+        sections,
+        &(&1 in [:agent, :routes, :topology, :__agent__, :__routes__, :__topology__])
+      ) ->
+        Error.fail(:namespace_conflict, [], "Provider cannot replace a core section")
 
-      extensions ->
-        Authoring.error("Conflicting Agent extension route target option #{inspect(option)}", %{
-          option: option,
-          extensions: Enum.reverse(extensions)
-        })
+      :agent in kinds ->
+        Error.fail(:namespace_conflict, [], "Provider cannot replace agent endpoints")
+
+      true ->
+        with :ok <- Data.unique(sections, & &1), do: Data.unique(kinds, & &1)
     end
   end
 
-  defp claim_route_target_value(_claims, %{option: option}), do: invalid_route_option(option)
+  defp result({:error, %Error{}} = error), do: error
 
-  defp invalid_route_option(option),
-    do: Authoring.error("Invalid Agent extension route target option", %{option: option})
+  defp result({:error, reason}),
+    do:
+      Error.fail(:provider_error, [], "Provider rejected its data: #{inspect(reason)}", %{
+        reason: reason
+      })
+
+  defp result(result), do: result
 end

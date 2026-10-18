@@ -15,7 +15,7 @@ defmodule JidoTest.Examples.Factory.LiveConversationTest do
         HTTP.text("Hello")
       end)
 
-    agent = LiveConversation.new!()
+    agent = LiveConversation.instantiate!(id: Jido.Signal.ID.generate!())
 
     {:ok, signal} =
       LiveConversation.chat_signal(%{request_id: "pure", text: "First"})

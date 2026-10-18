@@ -1,476 +1,82 @@
 defmodule JidoTest.Agent.AuthoringExtensionTest do
-  use ExUnit.Case, async: false
-
+  use ExUnit.Case, async: true
   alias Jido.Agent
-  alias Jido.Agent.{Codec, Extension}
-
-  defmodule Label do
-    defstruct [:key, :value, :__spark_metadata__]
-  end
-
-  defmodule Ref do
-    defstruct [:target]
-  end
+  alias Jido.Agent.Extension
 
   defmodule Labels do
-    @label %Spark.Dsl.Entity{
-      name: :label,
-      target: Label,
-      args: [:key, :value],
-      schema: [key: [type: :atom, required: true], value: [type: :any, required: true]]
+    @section %Spark.Dsl.Section{
+      name: :labels,
+      schema: [value: [type: :string, required: true]]
     }
-    use Spark.Dsl.Extension,
-      dsl_patches: [%Spark.Dsl.Patch.AddEntity{section_path: [:agent], entity: @label}]
+    use Jido.Agent.Extension, id: "test.labels", sections: [@section]
 
-    def route_target_options, do: [:ref]
+    def lower(dsl, config) do
+      {:ok, Map.put(config, :label, Spark.Dsl.Extension.get_opt(dsl, [:labels], :value))}
+    end
 
-    def lower_agent(config, entities) do
-      {labels, rest} = Enum.split_with(entities, &match?(%Label{}, &1))
-      metadata = Enum.reduce(labels, config.metadata, &Map.put(&2, &1.key, &1.value))
+    def normalize(data), do: Jido.Agent.Data.fields(data, [:label])
+    def verify(%{label: "blocked"}, _), do: {:error, :blocked_label}
+    def verify(_, _), do: :ok
+  end
 
-      routes =
-        Enum.map(config.routes, fn
-          %{target: %Ref{target: target}} = route ->
-            %{route | target: target}
+  defmodule Host do
+    use Jido.Agent, name: "labels", extensions: [Labels]
 
-          %{
-            target:
-              {%Jido.Agent.Extension.RouteTarget{
-                 extension: __MODULE__,
-                 option: :ref,
-                 value: target
-               }, defaults}
-          } = route ->
-            %{route | target: {target, defaults}}
-
-          %{
-            target: %Jido.Agent.Extension.RouteTarget{
-              extension: __MODULE__,
-              option: :ref,
-              value: target
-            }
-          } = route ->
-            %{route | target: target}
-
-          route ->
-            route
-        end)
-
-      {:ok, %{config | metadata: metadata, routes: routes}, rest}
+    labels do
+      value("accepted")
     end
   end
 
-  defmodule Unclaimed do
-    use Spark.Dsl.Extension, dsl_patches: Labels.dsl_patches()
-    def lower_agent(config, entities), do: {:ok, config, entities}
+  defmodule DuplicateID do
+    use Jido.Agent.Extension, id: "test.labels"
   end
 
-  defmodule ConflictingRouteTarget do
-    def route_target_options, do: [:ref]
+  defmodule CoreSection do
+    @section %Spark.Dsl.Section{name: :routes}
+    use Jido.Agent.Extension, id: "test.core_section", sections: [@section]
   end
 
-  defmodule InvalidRouteTargetOptions do
-    def route_target_options, do: [:ref, :ref]
+  defmodule CoreEndpoint do
+    use Jido.Agent.Extension, id: "test.core_endpoint"
+    def endpoint_kinds, do: [:agent]
   end
 
-  defmodule ImproperRouteTargetOptions do
-    def route_target_options, do: Process.get(:improper_route_target_options)
-    def lower_agent(config, entities), do: {:ok, config, entities}
+  defp contribution(provider, data),
+    do: %{id: provider.id(), provider: provider, vsn: provider.vsn(), data: data}
+
+  test "DSL lowering and Map data produce the same contribution once" do
+    entry = contribution(Labels, %{label: "accepted"})
+    assert Host.definition().extensions === [entry]
+
+    assert {:ok, definition} =
+             Agent.define(%{name: "labels", module: Host, extensions: [entry]})
+
+    assert definition === Host.definition()
+    assert Agent.runtime_plugins(definition) == []
+    assert Labels.runtime_support() == :none
   end
 
-  defmodule ObservedTargets do
-    def route_target_options do
-      send(self(), :read_route_targets)
-      [:observed, :ref]
-    end
-
-    def lower_agent(config, entities), do: {:ok, config, entities}
-  end
-
-  defmodule BadConfig do
-    use Spark.Dsl.Extension
-    def lower_agent(config, entities), do: {:ok, Map.put(config, :surprise, true), entities}
-  end
-
-  defmodule First do
-    def lower_agent(config, entities), do: {:ok, Map.put(config, :order, [:first]), entities}
-  end
-
-  defmodule Second do
-    def lower_agent(%{order: [:first]} = config, []),
-      do: {:ok, %{config | order: [:first, :second]}, []}
-  end
-
-  defmodule InvalidResult do
-    def lower_agent(_, _), do: :invalid
-  end
-
-  defmodule Reject do
-    def lower_agent(_, _), do: Jido.Agent.Authoring.error("Extension rejection")
-  end
-
-  defmodule InvalidRoutes do
-    use Spark.Dsl.Extension
-    def lower_agent(config, entities), do: {:ok, %{config | routes: :invalid}, entities}
-  end
-
-  defmodule RewriteRoutes do
-    use Spark.Dsl.Extension
-
-    def lower_agent(config, entities) do
-      routes =
-        case config.metadata.rewrite do
-          :remove -> []
-          :duplicate -> config.routes ++ config.routes
-          :predicate -> Enum.map(config.routes, &Map.put(&1, :match, fn _ -> true end))
-        end
-
-      {:ok, %{config | routes: routes}, entities}
+  test "provider identity and core namespaces are unique" do
+    for providers <- [[Labels, Labels], [Labels, DuplicateID], [CoreSection], [CoreEndpoint]] do
+      assert {:error, %Agent.Error{}} = Extension.providers(providers)
     end
   end
 
-  defmodule Add do
-    use Jido.Action, name: "extension_add", schema: Zoi.object(%{amount: Zoi.integer()})
-    def run(%{amount: n}, %{agent_state: state}), do: {:ok, %{state | count: state.count + n}}
-  end
-
-  defmodule Turns do
-    use Jido.Plugin
-
-    @impl true
-    defdelegate state_spec(opts), to: JidoTest.Agent.AuthoringExtensionTest.Turns.Agent
-
-    @impl true
-    defdelegate reduce(reduction, opts), to: JidoTest.Agent.AuthoringExtensionTest.Turns.Agent
-  end
-
-  defmodule Turns.Agent do
-    @behaviour Jido.Plugin
-    def state_spec(_), do: {:turns, Zoi.integer() |> Zoi.default(0)}
-    def reduce(reduction, _), do: {:ok, reduction.plugin_state + 1}
-  end
-
-  test "foreign entities lower with ordinary Plugins, routes and generated helpers" do
-    module = Module.concat(__MODULE__, "Agent#{System.unique_integer([:positive])}")
-
-    compile_isolated(
-      quote do
-        defmodule unquote(module) do
-          use Jido.Agent, name: "extended_agent", extensions: [Labels]
-
-          agent do
-            schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
-            label(:owner, "consumer")
-            plugin Turns
-          end
-
-          routes do
-            signal_source "/extension"
-
-            route "add", %Ref{target: Add}, as: :add
-
-            route "ordinary", Add
-            route "extension_target", ref: Add
-            route "extension_target_defaults", ref: Add, defaults: %{amount: 1}
-          end
-        end
-      end
-    )
-
-    definition = module.definition()
-    assert definition.metadata == %{owner: "consumer"}
-    assert [{Turns, []}] = definition.plugins
-    assert Enum.count(definition.routes, &(&1.target == Add)) == 3
-    assert Enum.any?(definition.routes, &(&1.target == {Add, %{amount: 1}}))
-    {:ok, signal} = module.add_signal(%{amount: 3})
-    assert {:ok, %{state: %{count: 3, turns: 1}}, []} = Agent.cmd(module.new!(), signal)
-    assert {:ok, document, registry} = Jido.Agent.Codec.encode(definition)
-    assert {:ok, ^definition} = Jido.Agent.Codec.decode(document, registry)
-  end
-
-  test "extension route target options must be declared and unambiguous" do
-    assert_raise CompileError, ~r/Unknown Agent extension route target option :unknown/, fn ->
-      compile_isolated(
-        quote do
-          defmodule unquote(
-                      Module.concat(
-                        __MODULE__,
-                        "UnknownRouteTarget#{System.unique_integer([:positive])}"
-                      )
-                    ) do
-            use Jido.Agent, name: "unknown_route_target", extensions: [Labels]
-
-            agent do
-            end
-
-            routes do
-              route "unknown", unknown: Add
-            end
-          end
-        end
-      )
-    end
-
-    assert {:error, error} =
-             Jido.Agent.Extension.lower([Labels, ConflictingRouteTarget], target_config(:ref), [])
-
-    assert Exception.message(error) == "Conflicting Agent extension route target option :ref"
-
-    assert {:error, error} =
-             Jido.Agent.Extension.lower([InvalidRouteTargetOptions], target_config(:ref), [])
-
-    assert Exception.message(error) ==
-             "Agent extension route_target_options/0 must return unique atom names"
-
-    assert {:error, error} = Jido.Agent.Extension.lower(:invalid, target_config(:ref), [])
-    assert Exception.message(error) == "Agent extensions and entities must be proper lists"
-  end
-
-  test "improper target option declarations return a structured authoring error" do
-    Process.put(:improper_route_target_options, [:ref | :invalid])
-
-    assert {:error, error} =
-             Extension.lower([ImproperRouteTargetOptions], target_config(:ref), [])
-
-    assert Exception.message(error) ==
-             "Agent extension route_target_options/0 must return unique atom names"
-  end
-
-  test "a route has only one module or extension target" do
-    for routes <- [
-          quote(do: route("mixed", Add, ref: Add)),
-          quote(do: route("multiple", ref: Add, other: Add))
+  test "normalization and verification reject invalid provider data" do
+    for entry <- [
+          contribution(Labels, %{unknown: true}),
+          contribution(Labels, %{label: "blocked"}),
+          contribution(Labels, %{label: self()}),
+          %{contribution(Labels, %{label: "valid"}) | vsn: 99}
         ] do
-      assert_raise CompileError,
-                   ~r/route requires exactly one target module or extension target option/,
-                   fn ->
-                     compile_isolated(
-                       quote do
-                         defmodule unquote(
-                                     Module.concat(
-                                       __MODULE__,
-                                       "InvalidRouteTarget#{System.unique_integer([:positive])}"
-                                     )
-                                   ) do
-                           use Jido.Agent, name: "invalid_route_target", extensions: [Labels]
-
-                           agent do
-                           end
-
-                           routes do
-                             unquote(routes)
-                           end
-                         end
-                       end
-                     )
-                   end
+      assert {:error, %Agent.Error{path: [:extensions | _]}} =
+               Agent.define(%{name: "labels", extensions: [entry]})
     end
   end
 
-  test "lowering reads target declarations once and keeps route order and defaults" do
-    target = %Extension.RouteTarget{option: :observed, value: Add}
-
-    routes = [
-      %{path: "ordinary", target: Add},
-      %{path: "first", target: target},
-      %{path: "second", target: {target, %{amount: 2}}}
-    ]
-
-    # Both extensions claim :ref, but an unused claim is not a conflict.
-    assert {:ok, lowered} =
-             Extension.lower([ObservedTargets, Labels], %{routes: routes, metadata: %{}}, [])
-
-    claimed = %{target | extension: ObservedTargets}
-
-    assert lowered.routes == [
-             %{path: "ordinary", target: Add},
-             %{path: "first", target: claimed},
-             %{path: "second", target: {claimed, %{amount: 2}}}
-           ]
-
-    assert_received :read_route_targets
-    refute_received :read_route_targets
-
-    ordinary = %{routes: [%{path: "ordinary", target: Add}]}
-    assert {:ok, ^ordinary} = Extension.lower([ObservedTargets], ordinary, [])
-    refute_received :read_route_targets
-  end
-
-  test "lowering keeps the first target error and conflict owner order" do
-    target = %Extension.RouteTarget{option: :ref, value: Add}
-    config = %{routes: [%{target: target}]}
-
-    assert {:error, error} = Extension.lower([Labels, ConflictingRouteTarget], config, [])
-    assert error.details.extensions == [Labels, ConflictingRouteTarget]
-
-    for option <- [:unknown, "invalid"] do
-      first = %{target: %{target | option: option}}
-
-      assert {:error, error} =
-               Extension.lower(
-                 [Labels, ConflictingRouteTarget],
-                 %{routes: [first | config.routes]},
-                 []
-               )
-
-      assert error.details.option == option
-    end
-
-    assert {:error, error} =
-             Extension.lower(
-               [InvalidRouteTargetOptions],
-               %{routes: [%{target: %{target | option: "invalid"}}]},
-               []
-             )
-
-    assert Exception.message(error) == "Invalid Agent extension route target option"
-  end
-
-  test "unclaimed declarations fail at compilation" do
-    assert_raise CompileError, ~r/Unclaimed Agent extension entities/, fn ->
-      compile_isolated(
-        quote do
-          defmodule unquote(
-                      Module.concat(
-                        __MODULE__,
-                        "UnclaimedAgent#{System.unique_integer([:positive])}"
-                      )
-                    ) do
-            use Jido.Agent, name: "unclaimed", extensions: [Unclaimed]
-
-            agent do
-              label(:owner, "consumer")
-            end
-          end
-        end
-      )
-    end
-  end
-
-  test "extension output still passes the common Agent validation" do
-    assert_raise CompileError, ~r/Unknown/, fn ->
-      compile_isolated(
-        quote do
-          defmodule unquote(
-                      Module.concat(
-                        __MODULE__,
-                        "InvalidAgent#{System.unique_integer([:positive])}"
-                      )
-                    ) do
-            use Jido.Agent, name: "invalid", extensions: [BadConfig]
-          end
-        end
-      )
-    end
-  end
-
-  test "extensions execute in declared order through the shared data contract" do
-    assert {:ok, %{order: [:first, :second]}} =
-             Extension.lower([First, Second], %{}, [])
-
-    assert {:ok, %{}} = Extension.lower([], %{}, [])
-  end
-
-  test "public data lowering feeds direct, data and Codec authoring" do
-    source = %{
-      name: "data_extended_agent",
-      vsn: 9,
-      schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}),
-      metadata: %{source: :data},
-      plugins: [{Turns, []}],
-      routes: [{"add", Add, defaults: %{amount: 1}, priority: 4}]
-    }
-
-    assert {:ok, lowered} = Extension.lower([Labels], source, [%Label{key: :owner, value: "app"}])
-    assert lowered.metadata == %{source: :data, owner: "app"}
-
-    direct = Agent.new!(lowered)
-    assert {:ok, document, registry} = Codec.encode(direct)
-    assert {:ok, ^direct} = Codec.decode(JSON.decode!(JSON.encode!(document)), registry)
-    refute Map.has_key?(document, "extensions")
-    refute Map.has_key?(document, "entities")
-  end
-
-  test "duplicate, absent and invalid extension contracts return structured errors" do
-    for extensions <- [[First, First], [String], [nil], [InvalidResult], :invalid] do
-      assert {:error, error} = Extension.lower(extensions, %{}, [])
-      assert is_exception(error)
-    end
-
-    assert {:error, error} = Extension.lower([Reject], %{}, [])
-    assert Exception.message(error) == "Extension rejection"
-    assert {:error, error} = Extension.lower([], %{}, [%Label{key: :x}])
-    assert Exception.message(error) == "Unclaimed Agent extension entities"
-  end
-
-  test "invalid lowered routes use compile diagnostics" do
-    assert_raise CompileError, ~r/Agent routes must be a list/, fn ->
-      compile_isolated(
-        quote do
-          defmodule unquote(
-                      Module.concat(
-                        __MODULE__,
-                        "InvalidRoutes#{System.unique_integer([:positive])}"
-                      )
-                    ) do
-            use Jido.Agent, name: "invalid_routes", extensions: [InvalidRoutes]
-          end
-        end
-      )
-    end
-  end
-
-  test "as requires one exact route without a predicate after extension lowering" do
-    for rewrite <- [:remove, :duplicate, :predicate] do
-      module = Module.concat(__MODULE__, "Rewritten#{System.unique_integer([:positive])}")
-
-      assert_raise CompileError, ~r/retain exactly one route without a match predicate/, fn ->
-        compile_isolated(
-          quote do
-            defmodule unquote(module) do
-              use Jido.Agent, name: "rewritten_route", extensions: [RewriteRoutes]
-
-              agent do
-                metadata %{rewrite: unquote(rewrite)}
-              end
-
-              routes do
-                signal_source "/rewritten"
-                route "add", Add, as: :add
-              end
-            end
-          end
-        )
-      end
-    end
-  end
-
-  defp compile_isolated(ast) do
-    owner = self()
-
-    {pid, ref} =
-      spawn_monitor(fn -> send(owner, {self(), :compiled, Code.compile_quoted(ast)}) end)
-
-    receive do
-      {:DOWN, ^ref, :process, ^pid, :normal} ->
-        receive do
-          {^pid, :compiled, result} -> result
-        end
-
-      {:DOWN, ^ref, :process, ^pid, {error, stack}} ->
-        reraise error, stack
-    after
-      10_000 ->
-        Process.exit(pid, :kill)
-        flunk("Agent compilation did not finish")
-    end
-  end
-
-  defp target_config(option) do
-    %{
-      routes: [
-        %{path: "test", target: %Jido.Agent.Extension.RouteTarget{option: option, value: Add}}
-      ]
-    }
+  test "a provider must implement the current contribution contract" do
+    assert {:error, %Agent.Error{code: :invalid_provider}} = Extension.provider(String)
+    assert {:error, %Agent.Error{code: :invalid_provider}} = Extension.provider(nil)
+    refute Code.ensure_loaded?(Module.concat(Extension, "RouteTarget"))
   end
 end

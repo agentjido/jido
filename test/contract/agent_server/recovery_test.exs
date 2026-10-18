@@ -78,10 +78,10 @@ defmodule JidoTest.AgentServer.RecoveryTest do
     F.down(server)
 
     assert_eventually(
-      match?(pid when is_pid(pid) and pid != server, Server.Activation.worker(root))
+      match?(pid when is_pid(pid) and pid != server, Server.Supervisor.worker(root))
     )
 
-    replacement = Server.Activation.worker(root)
+    replacement = Server.Supervisor.worker(root)
     assert Server.await_ready(replacement) == :ok
     replacement
   end
@@ -167,10 +167,10 @@ defmodule JidoTest.AgentServer.RecoveryTest do
     assert Task.await(request) == {:error, :unavailable}
 
     assert_eventually(
-      match?(pid when is_pid(pid) and pid != server, Server.Activation.worker(root))
+      match?(pid when is_pid(pid) and pid != server, Server.Supervisor.worker(root))
     )
 
-    replacement = Server.Activation.worker(root)
+    replacement = Server.Supervisor.worker(root)
     assert Server.await_ready(replacement) == :ok
     assert Jido.agent(c.jido, ref) == c.agent
     assert Jido.status(c.jido, ref).state_version == 0
@@ -179,12 +179,14 @@ defmodule JidoTest.AgentServer.RecoveryTest do
   @tag obligation: ["jido.agent_server2.I70", "jido.agent_server2.I73"]
   test "Plugin reconstruction uses restored state and revision before Ref admission opens", c do
     agent =
-      Agent.define!(
+      Agent.define!(%{
         name: "recover_plugin",
         schema: c.agent.schema,
-        plugins: [{Plugin, observer: c.observer}],
-        routes: [{"work", F.Work}]
-      )
+        extensions: [
+          %{id: Plugin.id(), provider: Plugin, vsn: Plugin.vsn(), data: %{observer: c.observer}}
+        ],
+        routes: [%{path: "work", handler: %{kind: :action, target: F.Work}}]
+      })
       |> Agent.instantiate!(id: "recover-plugin")
 
     {:ok, server} = Server.start(agent: agent, jido: c.jido)
@@ -329,7 +331,12 @@ defmodule JidoTest.AgentServer.RecoveryTest do
     for mode <- [:hook, :directive] do
       agent =
         if mode == :hook,
-          do: %{c.agent | plugins: c.agent.plugins ++ [{CommitPlugin, observer: c.observer}]},
+          do: %{
+            c.agent
+            | extensions:
+                c.agent.extensions ++
+                  [JidoTest.AgentContract.contribution(CommitPlugin, %{observer: c.observer})]
+          },
           else: c.agent
 
       server = F.start(%{c | agent: agent}, directive_handler: handler)
@@ -378,8 +385,8 @@ defmodule JidoTest.AgentServer.RecoveryTest do
           :revision_type -> {:checkpoint, c.agent, "1"}
           :id -> {:checkpoint, %{c.agent | id: "other"}, 1}
           :state -> {:checkpoint, %{c.agent | state: %{count: "bad", probe: 0}}, 1}
-          :definition -> {:checkpoint, %{c.agent | routes: []}, 1}
-          :vsn -> {:checkpoint, %{c.agent | vsn: 2}, 1}
+          :definition -> {:checkpoint, %{c.agent | routes: :invalid}, 1}
+          :vsn -> {:checkpoint, %{c.agent | vsn: -1}, 1}
           :missing -> nil
         end
 

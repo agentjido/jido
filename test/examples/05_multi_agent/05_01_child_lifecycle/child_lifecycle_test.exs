@@ -9,7 +9,7 @@ defmodule JidoTest.Examples.MultiAgent.ChildLifecycleTest do
 
     {:ok, command_signal_1} = ChildLifecycle.start_worker_signal(%{tag: "worker"})
 
-    assert {:ok, candidate, [%Jido.Agent.Directive.SpawnChild{tag: "worker"}]} =
+    assert {:ok, candidate, [%Jido.AgentServer.Directive.AgentStart{name: "worker"}]} =
              ChildLifecycle.cmd(
                before.agent,
                command_signal_1

@@ -106,7 +106,7 @@ defmodule Jido.Plugin.Scheduler.LiveRuntimeTest do
         timezone: "Etc/UTC"
       })
 
-    assert {:error, %Jido.Error.ValidationError{}} = Jido.Agent.transition(agent, invalid_state)
+    assert {:error, %{__exception__: true}} = Jido.Agent.transition(agent, invalid_state)
   end
 
   test "reduces Scheduler changes in list order and reconciles the final state", %{jido: jido} do

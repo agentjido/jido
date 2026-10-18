@@ -144,17 +144,17 @@ defmodule JidoTest.System.AuthoringLoad do
     payload = :binary.copy(<<65 + rem(round, 26)>>, @payload_bytes)
 
     definition =
-      Agent.new!(
+      Agent.define!(%{
         name: "load_member",
         schema:
           Zoi.object(%{
             count: Zoi.integer() |> Zoi.default(0),
             payload: Zoi.string() |> Zoi.default("")
           }),
-        plugins: [Owned],
+        extensions: [%{id: Owned.id(), provider: Owned, vsn: Owned.vsn(), data: %{}}],
         metadata: %{payload: payload},
-        routes: [{"load.run", Run}]
-      )
+        routes: [%{path: "load.run", handler: %{kind: :action, target: Run}}]
+      })
 
     {:ok, document, registry} = AgentCodec.encode(definition)
     {:ok, ^definition} = AgentCodec.decode(json_copy(document), registry)

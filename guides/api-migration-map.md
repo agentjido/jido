@@ -157,7 +157,6 @@ identity and state.
 | `Jido.Agent.Command` | Carries the Agent, Signal, caller context, and isolated Plugin inputs through live admission. | Agent Server owns this envelope. Plugin `admit/3` receives a bounded `Jido.AgentServer.Plugin.Admission` value. Direct `cmd/3` does not create a Command. |
 | `Jido.Agent.Extension` | Lowers extra declarative Agent DSL entities into Core configuration. | Use it for static authoring extensions. It does not add a runtime. |
 | `Jido.Agent.Turn` | Declares one selected executable, its input, and the unchanged source Signal. | Most applications observe it through the Server, not by constructing it. |
-| `Jido.Agent.Turn.Outcome` | Gives one stable terminal Turn result. | The Agent Server produces it for error policy and observation code. It has no public authoring API and is not domain history. |
 
 ## Map the actor runtime
 
@@ -192,7 +191,7 @@ the complete candidate state, then performs Directives in list order.
 | <code>Jido.AgentServer.ParentRef</code> | **Same name, private data.** V3 adds a monitor, creation cause, and remote spawn reference. Use attach, detach, adopt, and parent-binding APIs. |
 | **Jido.AgentServer.Options** | **Private in V3.** Use documented startup options. `storage` becomes `persistence`; restore and Turn limits are new; native schedules and custom directive handlers are rejected. |
 | **Jido.AgentServer.State** | **Private in V3.** Use the public query functions. The V2 struct is not a migration format. |
-| `Jido.AgentServer.Status` | **Removed.** `status/2` and `Jido.Agent.Turn.Outcome` cover separate live and terminal views. |
+| `Jido.AgentServer.Status` | **Removed.** `status/1` includes live state and the terminal `last_outcome` and `last_effect_outcome` summary maps. |
 | `Jido.AgentServer.State.Lifecycle` | **Removed.** Runtime lifecycle state is private. |
 | `Jido.AgentServer.Lifecycle` | **Removed.** Core does not expose the V2 lifecycle behavior. |
 | `Jido.AgentServer.Lifecycle.Keyed` | **Removed.** Use the Jido instance registry and persistence APIs. |

@@ -1,385 +1,154 @@
 defmodule Jido.Agent do
   @moduledoc """
-  The canonical immutable Agent value.
+  Author Agent definitions as Maps or with the Spark DSL.
 
-  Jido separates declaration from instantiation. A definition declares the
-  data schema, routes, Plugins, and metadata, and has no identity or state. An
-  instance has a non-empty identity and complete schema-valid state. Use `define/1`
-  to create a definition and `instantiate/2` to create an instance.
-  `cmd/3` applies one Signal to an instance and returns a new Agent plus
-  Directives. It does not start or own a process or commit live state.
+  Definitions and instances use this struct. A definition has nil `id` and
+  `state`. An instance has a nonempty `id` and complete `state`, including
+  Plugin-owned fields. Authoring and instance construction do not start
+  processes or execute handlers. JSON uses trusted Registry references.
 
-  `state` is the Agent's only domain state map. It contains domain fields
-  and one top-level owned field for each stateful Plugin. Jido does not keep a
-  second Plugin state map. `schema` describes the domain fields, while
-  `complete_schema/1` composes the domain schema with the Plugin-owned fields.
-
-  State schemas contain static defaults and validation rules. Transforms,
-  coercion, codecs, and lazy schemas are not supported in state schemas.
-  Initialization parses defaults as input once. Instance and candidate checks
-  validate stored values without defaults, coercion, or transforms.
-
-  Actions request deferred work with a proper list of Directives in
-  the optional third success element. Flow preserves these requests. `cmd/3`
-  validates the complete list and returns it to the caller. Only AgentServer dispatches it, after commit.
-
-  The selected Action or Flow can perform synchronous external work. A failed
-  command returns no candidate but does not undo completed I/O. Applications
-  own external idempotency and recovery. Preparation and state assembly are
-  deterministic for fixed inputs and executable results; changing external
-  responses can change those results. Use fixed or recorded responses when
-  reproducible evaluation is required.
-
-  Before route selection, each Agent Plugin can inspect the source Signal,
-  Agent identity, and its owned state. It can reject the command or return one
-  portable input under its package key. It cannot change the source Signal,
-  caller context, route, or Agent state. After executable work, a stateful
-  Plugin can reduce only its declared state field. The Agent validates one
-  complete state proposal.
-
-  Default Signal routing accepts an executable target or `{executable, defaults}`.
-  Signal data can be a map, keyword list, or `nil`. Keyword lists become maps;
-  the last value for a duplicate key wins. `nil` becomes an empty map. The
-  defaults map is combined with this input using `Map.merge(defaults, input)`.
-  Signal values take precedence. The merge is shallow: a supplied nested map
-  replaces the corresponding default map. Empty input uses all defaults.
-  Other data returns a validation error. The executable validates the combined
-  input before execution. Invalid supplied values do not fall back to defaults.
-  The Signal in execution context keeps its original data.
-
-      routes: [{"counter.add", {MyApp.Add, %{amount: 1}}}]
-
-  With this route, `%{}` uses amount 1 and `%{amount: 7}` uses amount 7.
-  Route maps are caller-overridable defaults. This changes the earlier behavior,
-  which replaced the complete input with the route map. Applications that need
-  fixed behavior must enforce it in the Action or construct the input explicitly
-  in `handle_signal/2`.
-
-  Routing failures during command preparation return `Jido.Error.RoutingError`
-  through both `cmd/3` and `Jido.AgentServer.call/3`. Missing routes and invalid
-  Signal types use this public type. When several targets match, Jido uses the
-  first target in Router order. Errors from the Signal Router retain their
-  message, details, and retry hints; the original error is available in
-  `details.cause`. The target is the original error target or, when absent, the
-  Signal type.
-
-  ## Declarative authoring
-
-  Each route selects one Action or Flow. Target lists are not accepted. Use a
-  Flow when one Signal must run several operations. Route defaults must be
-  plain maps, including defaults supplied in a target tuple.
-
-  An Agent module declares schema, metadata, Plugins, and routes in DSL blocks:
-
-      defmodule MyApp.Counter do
-        use Jido.Agent, name: "counter"
-
-        agent do
-          schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
-        end
-
-        routes do
-          signal_source "/counter"
-
-          route "counter.add", MyApp.Add, as: :add do
-            defaults %{amount: 1}
-          end
-        end
-      end
-
-  The route setting `as: :add` generates `add_signal(input, envelope_opts \\ [])`.
-  For example, `Counter.add_signal(%{amount: 2}, source: "/caller")` returns
-  `{:ok, signal}`. Input must be a plain map. Omitted fields remain absent so
-  route defaults apply during execution. Envelope options cannot replace the
-  Signal type or data. Plugins and executables validate input during execution.
-  Use `Jido.AgentServer.call(server, signal, context: %{}, timeout: 5000)`
-  for a live Agent, or `cmd/3` for direct execution.
-
-  Exposed routes must be exact and have no match predicate. Routes without
-  `as:` keep normal wildcard and predicate support and generate no helpers.
-  `use Jido.Agent` accepts only `:name`, `:description`, `:vsn`, and
-  `:extensions`. Module definitions are validated at compilation. Direct
-  `define/1` construction accepts a map or keyword list of definition fields.
-
-  Read name, description, routes, Plugins, and metadata from `definition/0`.
-  Modules expose `domain_schema/0` for the authored schema and
-  `complete_schema/0` for the schema with Plugin-owned state.
-
-  An Agent can also declare a `topology do` block. The block retains the
-  topology sections: `agents` (including groups), `resources`, `relationships`,
-  `connections`, `topologies` (static includes), `imports`, `exports`, and
-  `startup`. Runtime child declarations use the `children` option in this block.
-
-      topology do
-        agents do
-          agent :coordinator, MyApp.Coordinator
-          group :workers, MyApp.Worker, count: 2, activation: :lazy
-        end
-
-        resources do
-          bus :events
-        end
-      end
-
-  `definition().topology` is a plain map with the current topology collection
-  shape. Direct definitions accept the same map through `:topology`. Omit the
-  block or pass `nil` for a plain Agent. The enclosing Agent supplies root
-  behavior; it is not inserted as a member of its own topology.
-
-  This authoring boundary checks static declaration shape. It does not resolve
-  member sources, validate graph dependencies, or start processes. There is one
-  Agent lifecycle: define, instantiate, activate, operate, then stop or hibernate.
-  Topology has no separate constructor, instance, or activation API.
-
-  Worker `activation` is `:eager` by default and can be `:lazy` or `:deferred`.
-  `:deferred` records explicit-start intent. This is process
-  startup intent within the Agent Activation. A lazy worker can still have its
-  Agent value constructed before its processes start.
-
-  Use fixed declarations or module configuration for fixed composition. Use
-  `state(:workers)` for a group count drawn from Agent domain state when the
-  initial child set is accepted. This records a snapshot source. A later state
-  change must not silently resize that set; composition changes are explicit.
-
-  Agent, group, and `children` entries select exactly one `module` or neutral
-  `definition` source. A composed child uses its own Agent as root behavior.
-  `placement: :owned | :independent` records containment separately from an
-  `owns` edge and its logical parent-exit policy. Static `include` takes an
-  explicit composition map, such as `OtherAgent.definition().topology`; it
-  does not extract composition from an Agent module or create an included root.
-
-  Inside topology blocks, `root()` names the enclosing Agent in connections,
-  relationships, and exports. An imported `agent` can supply a stable Agent
-  `ref:` without becoming a created member. Group subscriptions require
-  `delivery: :one | :broadcast`; single-Agent subscriptions omit that option.
-
-  No topology input schema is added by default. An explicit `schema` and
-  `input/1` remain available for mapped composition data. `member/1` names a
-  group member field, and `ref/2` names an included export. These declarations
-  remain data at this boundary. The Agent JSON codec currently rejects a
-  non-nil topology so it cannot discard this data.
-
-  Schedules are an Agent capability and do not require a topology:
-
-      agent do
-        plugin Jido.Plugin.Scheduler
-      end
-
-      schedules do
-        schedule :refresh, every: 60_000,
-          signal: %{type: "team.refresh", data: %{}}
-
-        schedule :report, cron: "0 9 * * *", timezone: "Etc/UTC",
-          signal: %{type: "team.report", data: %{}}
-      end
-
-  Read ordered declarations from `definition().schedules`. Each declaration
-  requires exactly one bounded positive interval or valid cron expression.
-  Delivery targets the owning Agent. Templates accept `type` and `data` only;
-  runtime delivery must create fresh envelope identity and time. Durable intent
-  requires `delivery: :durable` and an explicit `generation`. Missed slots use
-  `missed: :skip`. These fields record intent only. Authoring and instantiation
-  do not install jobs or seed Scheduler job state. Activation integration must
-  seed fresh state once, preserve saved changes on restore, and enable delivery
-  after readiness. The current JSON document also rejects nonempty schedules.
-
-  `Jido.Agent.define/1` and `Jido.Agent.Codec` provide data and JSON
-  declaration forms through the same validator. Use `instantiate/2` for an
-  Agent module and instance options. These forms preserve the definition and instance
-  boundaries above.
-
-  Generated Agent modules expose `instantiate/1` and `instantiate!/1` for
-  instance construction. The existing `Jido.Agent.new/1` and `new!/1` functions
-  wrap definition construction. Generated module `new/1` and `new!/1`
-  functions wrap instance construction and keep their optional arguments.
-
-  A generated Agent module owns a positive definition `vsn` and defaults to
-  `1`. Direct and behavior-only definitions can use `nil` for compatibility.
-  The default generated-module checkpoint stores the module, `vsn`, identity,
-  and complete combined state in format version 2. Restore rejects a module or
-  `vsn` mismatch before it constructs an Agent. Custom callbacks keep an opaque
-  map payload inside a core-owned revision envelope. Checkpoints use only this
-  V3 format.
-
-  Live state must match its schema and Agent invariants. This includes
-  Plugin-owned fields. A schema can permit PIDs, ports, references, functions,
-  improper lists, and bitstrings that are not byte-aligned.
-
-  Durable checkpoints must contain portable terms after custom Agent or Plugin
-  persistence conversion. Default checkpoints reject unsupported values with a
-  bounded path. A default embedded-definition checkpoint must also have a
-  portable definition. Restore checks the stored representation before
-  conversion, then checks the reconstructed live state and Agent identity.
-
-  Local runtime checkpoints copy the complete Agent for abnormal restarts while
-  the Jido instance remains alive. A copied resource handle can be stale. It
-  does not recreate a resource, transfer ownership, or install a monitor. Keep
-  resource start, stop, and reconnection in a Plugin runtime or application
-  supervision.
-
-  Use `Jido.Agent.View` to build a safe JSON projection for an application UI
-  or API. The view omits private state and runtime details.
+  Routes select one handler in declaration order. Connections select recipients
+  for outputs. Providers add explicit, validated data to `extensions`.
   """
-
-  alias Jido.Agent.{Authoring, Checkpoint, State, Turn}
+  alias Jido.Agent.{Data, Validation}
   alias Jido.Agent.Runner
-  alias Jido.Agent.Validation
-  alias Jido.Error
   alias Jido.Signal
+  alias Jido.Error
+
+  @type t :: %__MODULE__{}
+  @callback checkpoint(instance(), map()) :: {:ok, map()} | {:error, term()}
+  @callback restore(map(), map()) :: {:ok, instance()} | {:error, term()}
+  @optional_callbacks checkpoint: 2, restore: 2
+
+  @schema Zoi.struct(__MODULE__, %{
+            id: Zoi.string() |> Zoi.nullable() |> Zoi.default(nil),
+            state: Zoi.map() |> Zoi.nullable() |> Zoi.default(nil),
+            module: Zoi.atom() |> Zoi.nullable() |> Zoi.default(nil),
+            name: Zoi.string(),
+            description: Zoi.string() |> Zoi.nullable() |> Zoi.default(nil),
+            vsn: Zoi.integer() |> Zoi.default(1),
+            schema: Zoi.any(),
+            metadata: Zoi.map() |> Zoi.default(%{}),
+            signal_source: Zoi.string() |> Zoi.nullable() |> Zoi.default(nil),
+            routes: Zoi.list(Zoi.any()) |> Zoi.default([]),
+            topology: Zoi.map(),
+            extensions: Zoi.list(Zoi.any()) |> Zoi.default([])
+          })
+  @enforce_keys Zoi.Struct.enforce_keys(@schema)
+  defstruct Zoi.Struct.struct_fields(@schema)
+  @doc false
+  def __schema__, do: @schema
+
+  @doc "Returns the state schema, including Plugin-owned fields."
+  def schema(%__MODULE__{} = agent),
+    do: Validation.state_schema(agent) |> Jido.Agent.Error.unwrap!()
 
   @type definition :: %__MODULE__{id: nil, state: nil}
   @type instance :: %__MODULE__{id: String.t(), state: map()}
-  @type t :: definition() | instance()
-  @type handle_result :: {:ok, Turn.t()} | {:error, term()}
 
-  @doc """
-  Selects one Action or Flow and its input from the received Signal and current Agent.
-
-  Return `{:ok, turn}` or `{:error, reason}`. Turn input can be a map, keyword
-  list, or `nil`. The runner binds the original Signal, validates the Turn, and
-  normalizes its input to a map before execution. A callback cannot replace
-  the source Signal. It can call `Jido.Agent.handle_signal/2` to use the Agent's
-  declared routes. An error does not cause an automatic route fallback.
-  """
-  @callback handle_signal(signal :: Signal.t(), agent :: instance()) :: handle_result()
-  @callback checkpoint(agent :: instance(), context :: map()) :: {:ok, map()} | {:error, term()}
-  @callback restore(checkpoint :: map(), context :: map()) ::
-              {:ok, instance()} | {:error, term()}
-
-  @optional_callbacks handle_signal: 2, checkpoint: 2, restore: 2
-
-  @enforce_keys [:module, :name, :schema]
-  defstruct [
-    :id,
-    :module,
-    :vsn,
-    :name,
-    :description,
-    :schema,
-    :state,
-    :topology,
-    schedules: [],
-    plugins: [],
-    routes: [],
-    metadata: %{}
-  ]
-
-  @doc "Declares one Agent module with a reusable definition and default Signal behavior."
   defmacro __using__(opts) do
-    quote location: :keep do
-      use Jido.Agent.Authoring.Compiler,
-        agent_options: unquote(opts)
+    opts = Jido.Agent.DSL.Discovery.options!(opts, __CALLER__)
 
-      @doc "Creates one Agent instance from this module definition."
-      @spec instantiate(map() | keyword()) ::
-              {:ok, Jido.Agent.instance()} | {:error, Exception.t()}
-      def instantiate(overrides \\ []), do: Jido.Agent.instantiate(__MODULE__, overrides)
+    imports =
+      Enum.flat_map(opts[:extensions], fn provider ->
+        if function_exported?(provider, :authoring_imports, 0),
+          do: provider.authoring_imports(),
+          else: []
+      end)
 
-      @doc "Creates one Agent instance or raises its validation error."
-      @spec instantiate!(map() | keyword()) :: Jido.Agent.instance() | no_return()
-      def instantiate!(overrides \\ []), do: Jido.Agent.instantiate!(__MODULE__, overrides)
-
-      @doc "Compatibility wrapper for instantiate/1."
-      @spec new(map() | keyword()) :: {:ok, Jido.Agent.instance()} | {:error, Exception.t()}
-      def new(overrides \\ []), do: instantiate(overrides)
-
-      @doc "Compatibility wrapper for instantiate!/1."
-      @spec new!(map() | keyword()) :: Jido.Agent.instance() | no_return()
-      def new!(overrides \\ []), do: instantiate!(overrides)
+    quote do
+      use Jido.Action.Inline
+      use Jido.Agent.DSL, unquote(Macro.escape(opts))
+      import Jido.Agent.DSL.Macros
+      import Jido.Agent.Directive, only: [emit: 1, emit: 2]
+      unquote_splicing(Enum.map(imports, fn module -> quote do: import(unquote(module)) end))
     end
   end
 
-  @doc "Creates one validated neutral Agent definition."
-  @spec define(map() | keyword() | definition()) ::
-          {:ok, definition()} | {:error, Exception.t()}
-  def define(attrs) do
-    with {:ok, agent, _specs, _schema} <- Validation.new(attrs), do: {:ok, agent}
-  end
+  def define(map), do: Validation.define(map)
+  def define!(map), do: map |> define() |> Jido.Agent.Error.unwrap!()
 
-  @doc "Creates one neutral Agent definition or raises its validation error."
-  @spec define!(map() | keyword() | definition()) :: definition() | no_return()
-  def define!(attrs), do: Authoring.unwrap!(define(attrs))
-
-  @doc "Compatibility wrapper for define/1."
-  @spec new(map() | keyword() | definition()) ::
-          {:ok, definition()} | {:error, Exception.t()}
-  def new(attrs), do: define(attrs)
-
-  @doc "Compatibility wrapper for define!/1."
-  @spec new!(map() | keyword() | definition()) :: definition() | no_return()
-  def new!(attrs), do: define!(attrs)
-
-  @doc "Creates one Agent instance from a neutral definition or Agent module."
-  @spec instantiate(definition() | module(), map() | keyword()) ::
-          {:ok, instance()} | {:error, Exception.t()}
-  def instantiate(source, overrides \\ [])
-
-  def instantiate(module, overrides) when is_atom(module) do
-    with {:ok, agent, _specs, _schema} <-
-           Jido.Agent.Source.instantiate_with_plugins(module, overrides),
-         do: {:ok, agent}
-  end
-
-  def instantiate(%__MODULE__{} = definition, overrides) do
-    Validation.instantiate(definition, overrides)
-  end
-
-  def instantiate(_source, _overrides),
-    do: Jido.Agent.Authoring.error("Expected a neutral Agent definition or Agent module")
-
-  @doc "Creates one Agent instance or raises its validation error."
-  @spec instantiate!(definition() | module(), map() | keyword()) :: instance() | no_return()
-  def instantiate!(source, overrides \\ []), do: Authoring.unwrap!(instantiate(source, overrides))
-
-  @doc "Validates one Agent value."
-  @spec validate(term()) :: {:ok, t()} | {:error, Exception.t()}
+  @doc "Validates a definition or instance, including schema, routes, and provider data."
   def validate(value), do: Validation.validate(value)
 
-  @doc "Validates one neutral Agent definition."
-  @spec validate_definition(term()) :: {:ok, definition()} | {:error, Exception.t()}
-  def validate_definition(value), do: Validation.validate_definition(value)
+  @doc "Checks definition shape only. Use validate/1 to check the field values."
+  def definition?(%__MODULE__{id: nil, state: nil}), do: true
+  def definition?(_), do: false
 
-  @doc "Validates one Agent instance."
-  @spec validate_instance(term()) :: {:ok, instance()} | {:error, Exception.t()}
-  def validate_instance(value), do: Validation.validate_instance(value)
+  @doc "Checks instance shape only. Use validate/1 to check complete state and definition data."
+  def instance?(%__MODULE__{id: id, state: state})
+      when is_binary(id) and byte_size(id) > 0 and is_map(state) and not is_struct(state),
+      do: true
 
-  @doc "Returns true when the value is a neutral Agent definition."
-  @spec definition?(term()) :: boolean()
-  def definition?(value), do: match?({:ok, %__MODULE__{}}, validate_definition(value))
+  def instance?(_), do: false
 
-  @doc "Returns true when the value has complete Agent instance data."
-  @spec instance?(term()) :: boolean()
-  def instance?(value), do: match?({:ok, %__MODULE__{}}, validate_instance(value))
+  def definition(%__MODULE__{} = value), do: %{value | id: nil, state: nil}
+  def definition(module) when is_atom(module), do: module.definition()
 
-  @doc "Returns the neutral canonical definition for an Agent value."
-  @spec definition(t()) :: definition()
-  def definition(%__MODULE__{} = agent), do: %{agent | id: nil, state: nil}
+  def instantiate(source, opts \\ []), do: Validation.instantiate(source, opts)
 
-  @doc "Returns the complete data schema, including Plugin-owned fields in Agent state."
-  @spec complete_schema(t()) :: {:ok, Zoi.schema()} | {:error, Exception.t()}
-  def complete_schema(%__MODULE__{} = agent) do
-    with {:ok, schema} <- Jido.Agent.Plugin.compose_schema(agent.schema, agent.plugins),
-         :ok <- Jido.Agent.State.validate_schema(schema),
-         do: {:ok, schema}
+  def instantiate!(source, opts \\ []),
+    do: source |> instantiate(opts) |> Jido.Agent.Error.unwrap!()
+
+  @doc "Applies ordered data mutations and returns the candidate and its final Diff."
+  def mutate(%__MODULE__{} = agent, directives), do: Jido.Agent.Mutation.apply(agent, directives)
+  def mutate(_, _), do: Jido.Agent.Error.fail(:invalid_agent, [], "Expected an Agent value")
+
+  @doc "Returns runtime Plugin declarations from provider contributions."
+  def runtime_plugins(%__MODULE__{extensions: entries}) do
+    Enum.flat_map(entries, fn entry ->
+      case entry.provider.runtime_support() do
+        :none ->
+          []
+
+        module ->
+          if Code.ensure_loaded?(module) and function_exported?(module, :__jido_plugin__, 0),
+            do: [{module, Enum.sort(entry.data)}],
+            else: []
+      end
+    end)
   end
 
-  @doc "Returns the complete data schema or raises its validation error."
-  @spec complete_schema!(t()) :: Zoi.schema() | no_return()
-  def complete_schema!(%__MODULE__{} = agent), do: Authoring.unwrap!(complete_schema(agent))
-
-  @doc "Builds a complete-state checkpoint through the Agent module callback."
-  @spec checkpoint(instance(), map()) :: {:ok, map()} | {:error, term()}
-  defdelegate checkpoint(agent, context \\ %{}), to: Checkpoint
-
-  @doc "Restores an Agent through its module callback."
-  @spec restore(module(), map(), map()) :: {:ok, instance()} | {:error, term()}
-  defdelegate restore(module, checkpoint, context \\ %{}), to: Checkpoint
-
   @doc false
-  defdelegate default_checkpoint(agent, context), to: Checkpoint
+  def validate_runtime_support(%__MODULE__{extensions: entries}) do
+    unknown =
+      Enum.find(entries, fn entry ->
+        module = entry.provider.runtime_support()
 
-  @doc false
-  defdelegate default_restore(module, checkpoint, context), to: Checkpoint
+        module != :none and
+          not (Code.ensure_loaded?(module) and function_exported?(module, :__jido_plugin__, 0))
+      end)
+
+    if unknown,
+      do:
+        Jido.Agent.Error.fail(
+          :runtime_support_not_available,
+          [:extensions],
+          "Provider runtime support has no Plugin adapter",
+          %{provider: unknown.provider}
+        ),
+      else: :ok
+  end
+
+  @doc "Builds a Signal for a declared helper. It does not select or run a handler."
+  def input_signal(definition, type, data, opts \\ []) do
+    with {:ok, opts} <-
+           Validation.options(opts, [:source, :id, :time, :subject, :datacontenttype]),
+         source = Map.get(opts, :source, definition.signal_source),
+         :ok <- Jido.Agent.Error.at(Jido.Agent.Data.nonempty(source), :source),
+         :ok <- Jido.Agent.Data.plain_map(data) do
+      Jido.Signal.new(type, data, Map.put(opts, :source, source))
+    end
+  end
+
+  @doc "Exports an Agent definition or instance as a JSON string."
+  def to_json(agent, registry) do
+    with {:ok, document} <- Jido.Agent.Codec.encode(agent, registry),
+         do: Jason.encode(document)
+  end
+
+  @doc "Imports a JSON string through a trusted Registry and validates the Agent."
+  def from_json(json, registry), do: Jido.Agent.Codec.from_json(json, registry)
 
   @doc false
   @spec transition(instance(), term()) :: {:ok, instance()} | {:error, Exception.t()}
@@ -393,8 +162,8 @@ defmodule Jido.Agent do
   @spec transition_validated(instance(), term(), Zoi.schema()) ::
           {:ok, instance()} | {:error, Exception.t()}
   def transition_validated(%__MODULE__{} = agent, next_state, schema) do
-    with {:ok, state} <- State.validate_candidate(next_state, schema) do
-      {:ok, %{agent | state: state}}
+    with :ok <- Jido.Agent.Error.at(Data.complete(schema, next_state), :state) do
+      {:ok, %{agent | state: next_state}}
     end
   end
 
@@ -422,7 +191,10 @@ defmodule Jido.Agent do
   end
 
   @doc """
-  Applies one Signal to an Agent value without starting a Server.
+  Runs one complete Turn through `Jido.Exec.run/4` without an AgentServer.
+
+  Returns the next Agent value and validated Directives. It does not dispatch
+  those Directives, save state, resume work, or deduplicate inputs.
 
   This function runs pure Agent Plugin preparation. It does not run live Agent
   Server Plugin admission, runtime work, replay protection, or outbound Signal
@@ -440,18 +212,6 @@ defmodule Jido.Agent do
 
   def cmd(%__MODULE__{}, %Signal{}, opts),
     do: invalid("Agent.cmd/3 options must be a keyword list", %{opts: opts})
-
-  @doc """
-  Selects a Turn using the Agent's declared routes.
-
-  Use this function as an explicit fallback from a custom `c:handle_signal/2`
-  callback. It normalizes Signal data, applies route defaults, and returns a
-  validated Turn with map input, bound to the original Signal. It does not
-  invoke the custom callback or execute the Turn.
-  """
-  @spec handle_signal(Signal.t(), instance()) :: handle_result()
-  def handle_signal(%Signal{} = signal, %__MODULE__{} = agent),
-    do: Runner.prepare_default_turn(signal, agent)
 
   defp normalize_domain_attrs(attrs) do
     case Jido.Agent.Authoring.to_attrs(attrs) do

@@ -12,7 +12,7 @@ defmodule JidoTest.Persistence.CheckpointIdentityTest do
   end
 
   test "a valid record retains the requested Agent ID, state, and revision", c do
-    agent = Probe.new!(id: c.id, state: %{count: 7})
+    agent = Probe.instantiate!(id: c.id, state: %{count: 7})
 
     assert :ok =
              Persistence.save_agent(c.store, agent, namespace: "persistence-probe", revision: 3)
@@ -25,7 +25,9 @@ defmodule JidoTest.Persistence.CheckpointIdentityTest do
 
   test "a mismatched record envelope is rejected", c do
     assert :ok =
-             Persistence.save_agent(c.store, Probe.new!(id: c.id), namespace: "persistence-probe")
+             Persistence.save_agent(c.store, Probe.instantiate!(id: c.id),
+               namespace: "persistence-probe"
+             )
 
     assert :ok =
              Store.rewrite_record(c.store, c.id, &%{&1 | agent_id: "different-agent"})
@@ -36,14 +38,14 @@ defmodule JidoTest.Persistence.CheckpointIdentityTest do
 
   test "a matching envelope cannot hide a different Agent ID in the checkpoint", c do
     assert :ok =
-             Persistence.save_agent(c.store, Probe.new!(id: c.id, state: %{count: 7}),
+             Persistence.save_agent(c.store, Probe.instantiate!(id: c.id, state: %{count: 7}),
                namespace: "persistence-probe",
                revision: 3
              )
 
     assert :ok =
              Store.rewrite_record(c.store, c.id, fn record ->
-               put_in(record.checkpoint.id, "different-agent")
+               put_in(record.checkpoint.agent.id, "different-agent")
              end)
 
     assert {:error, _} =

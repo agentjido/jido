@@ -9,15 +9,15 @@ defmodule Jido.Agent.SerializationContractTest do
   test "Agent persistence uses a separate namespace and rejects an old envelope" do
     opts = [store: start_supervised!(Store)]
     store = {Store, opts}
-    agent = Probe.new!(id: unique_id())
+    agent = Probe.instantiate!(id: unique_id())
     assert :ok = Persistence.save_agent(store, agent, namespace: "persistence-test")
     key = Persistence.agent_key(Jido.Agent.Ref.new!(namespace: "persistence-test", id: agent.id))
     assert "jido:agent:v1:" <> _identity = key
     assert {:ok, bytes} = Store.get(key, opts)
     record = :erlang.binary_to_term(bytes, [:safe])
-    assert record.format == 3
+    assert record.fmt == 4
     assert record.kind == :active
-    assert record.agent_vsn == Probe.vsn()
+    assert record.vsn == Probe.vsn()
     assert record.agent_id == agent.id
 
     # These old identifiers are intentional rejection fixtures.
@@ -40,10 +40,11 @@ defmodule Jido.Agent.SerializationContractTest do
              Persistence.load_agent(store, Probe, agent.id, namespace: "persistence-test")
   end
 
-  test "Agent authoring JSON declares its type and rejects the old type" do
-    assert {:ok, document, registry} = Codec.encode(Probe.definition())
-    assert document["type"] == "jido.agent"
-    assert {:ok, _definition} = Codec.decode(document, registry)
-    assert {:error, _reason} = Codec.decode(%{document | "type" => "jido.actor"}, registry)
+  test "authoring JSON preserves the full Agent through a trusted Registry" do
+    definition = Probe.definition()
+    assert {:ok, document, registry} = Codec.encode(definition)
+    assert {:ok, ^definition} = Codec.decode(document, registry)
+    assert {:error, _} = Codec.decode(document, %{})
+    assert {:error, _} = Codec.decode(%{}, registry)
   end
 end
