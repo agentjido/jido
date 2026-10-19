@@ -22,6 +22,9 @@ signal =
 Use a stable type and source. Do not use a new Signal ID as the only business
 idempotency key.
 
+See [Typed Signals In Actions And Flow](typed-signals.livemd) to validate a
+complete Signal at Action boundaries and construct a request from a Flow result.
+
 ## Choose Direct Or Routed Delivery
 
 Use `Jido.AgentServer.call/3` when a producer has one actor reference and needs

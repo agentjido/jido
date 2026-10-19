@@ -1,8 +1,10 @@
 # Durable Flow integration
 
 **Status: production wait transitions and durable AgentServer input are implemented.**
-Action provides `Jido.Exec.WaitHost` for native graph transitions. AgentServer
-owns persistence, Signal acceptance, clock delivery, Worker release, and restore.
+Action provides `Jido.Exec.Waits` for request inspection, matching, and native
+wait completion. `Jido.AgentServer.WaitHost` owns input receipts, duplicate IDs,
+retention limits, clock delivery, and portability checks. AgentServer owns
+persistence, Signal acceptance, Worker release, and restore.
 Example 11_06 uses one suspended Flow. Normal Exec still rejects waits.
 
 The implementation extends Action revision `63268a6f` and Jido revision

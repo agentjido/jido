@@ -48,6 +48,11 @@ A matching decision commits `:approved` or `:cancelled`. The timer commits
 Wait input is saved before acknowledgement. The selected result is saved
 before downstream work. A storage conflict or uncertain write stops the
 activation. Restore reads the stored result before execution can continue.
+Jido owns input receipts and saves them in the same native checkpoint as the
+Flow. The shared `Jido.Exec.Waits` operations resolve Flow results without
+running Actions or hooks. Jido supplies UTC time and keeps acceptance time at
+or above the opening time and all prior acceptance times. Receipt order breaks
+ties if the wall clock moves backwards.
 Hibernation saves the running Turn; thaw resumes it. The original caller handle
 does not survive hibernation. Use status and Agent reads after restore.
 
@@ -61,9 +66,10 @@ completes the Flow and commits `:cancelled` instead.
 
 This example needs durable AgentServer execution. Ordinary Exec still rejects
 waits. There is no early-input mailbox or automatic recovery scanner. The
-application owns Signal delivery, authorization, storage, and clock policy.
+application owns Signal delivery, authorization, and storage setup.
 A request needed before the wait cannot be a deferred post-commit Directive.
-Wait input and resolution counts are bounded; this is not graph compaction.
+Jido retains at most 1,024 accepted inputs per execution. Equal retries remain
+inert at that limit. This bound does not provide graph compaction or a byte limit.
 Map and Iterate Flow bodies remain unsupported. The Turn deadline also remains
 in force; this lesson uses `turn_timeout: :infinity` so the Flow timer owns expiry.
 

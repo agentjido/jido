@@ -52,6 +52,7 @@ defmodule Jido.MixProject do
        {"guides/plugin-runtimes.livemd", "Plugin Runtimes"},
        {"guides/discovery.md", "Discover Actions"},
        {"guides/jido-signal-messaging.md", "Use Jido Signal"},
+       {"guides/typed-signals.livemd", "Typed Signals In Actions And Flow"},
        {"guides/signal-buses.livemd", "Connect A Signal Bus"},
        {"guides/signal-dispatch.livemd", "Dispatch Signals"},
        {"guides/schedules-and-heartbeats.livemd", "Schedules And Heartbeats"},
@@ -372,9 +373,9 @@ defmodule Jido.MixProject do
   defp deps do
     [
       # Jido Ecosystem
-      # Use the sibling V3 Action checkout for local integration.
+      # Use the sibling V3 Action and Signal checkouts for local integration.
       {:jido_action, path: "../jido_action", override: true},
-      {:jido_signal, "~> 3.0.0-beta.4"},
+      {:jido_signal, path: "../jido_signal", override: true},
       # AgentServer owns native Runic Runners and Worker cleanup.
       {:runic, path: "../runic", override: true},
 

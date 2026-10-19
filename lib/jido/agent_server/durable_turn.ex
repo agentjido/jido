@@ -1,9 +1,9 @@
 defmodule Jido.AgentServer.DurableTurn do
   @moduledoc false
 
-  alias Jido.AgentServer.CheckpointStore
+  alias Jido.AgentServer.{CheckpointStore, WaitHost}
   alias Runic.Runner
-  alias Jido.Exec.WaitHost
+  alias Jido.Exec.Waits
 
   def instruction(prepared),
     do: Jido.Instruction.resolve(prepared.turn.executable, prepared.turn.input, prepared.context)
@@ -85,7 +85,6 @@ defmodule Jido.AgentServer.DurableTurn do
       max_concurrency: 1,
       scheduler: Runic.Runner.Scheduler.Default,
       scheduler_policies: [{:default, policy}],
-      run_context: %{_global: WaitHost.context(data.active.prepared.context, id, :system)},
       hooks:
         hooks
         |> Keyword.put(:on_complete, fn runnable, result, state ->
@@ -108,8 +107,12 @@ defmodule Jido.AgentServer.DurableTurn do
          :ok <- CheckpointStore.register(data.jido, id, data.persistence, owner),
          :ok <- CheckpointStore.create(data.jido, id),
          {:ok, saved} <-
-           CheckpointStore.update_workflow(data.jido, id, &WaitHost.resolve(&1, now())) do
-      if saved && not Runic.Workflow.is_runnable?(saved) && WaitHost.pending(saved) != [] do
+           CheckpointStore.update_workflow(data.jido, id, &WaitHost.resolve(&1, now())),
+         options =
+           Keyword.put(options, :run_context, %{
+             _global: WaitHost.context(data.active.prepared.context, id, saved)
+           }) do
+      if saved && not Runic.Workflow.is_runnable?(saved) && Waits.pending(saved) != [] do
         waiting(saved)
       else
         with {:ok, worker} <-
@@ -195,7 +198,7 @@ defmodule Jido.AgentServer.DurableTurn do
           with {:ok, settled} <- Runner.get_workflow(runner, id),
                :ok <- portable_facts(settled),
                :ok <- Runner.checkpoint(runner, id) do
-            if WaitHost.pending(settled) == [], do: :complete, else: waiting(settled)
+            if Waits.pending(settled) == [], do: :complete, else: waiting(settled)
           end
 
         {:error, :admission_stopped} ->
@@ -227,7 +230,7 @@ defmodule Jido.AgentServer.DurableTurn do
   end
 
   defp waiting(workflow),
-    do: {:waiting, WaitHost.pending(workflow), WaitHost.next_deadline(workflow)}
+    do: {:waiting, Waits.pending(workflow), Waits.next_deadline(workflow)}
 
   defp now, do: System.system_time(:millisecond)
 
