@@ -203,10 +203,16 @@ defmodule JidoTest.AgentServer.DurableTurnTest do
   test "a rejected step checkpoint cannot dispatch the next Action", c do
     server = start(c, persistence: {F.Storage, path: c.tmp_dir})
     id = Server.agent(server).id
+    activation = Server.activation(server)
+    monitor = Process.monitor(activation)
     F.Probe.configure(:reject_checkpoint)
     pending = Server.submit(server, signal("request", %{value: 0}))
     assert {:error, _} = Server.await(pending)
     assert F.Probe.records() == Enum.to_list(1..5)
+
+    # The failed Turn replies before the activation has fully stopped.
+    # Confirm shutdown before starting another server with the same identity.
+    assert_receive {:DOWN, ^monitor, :process, ^activation, :shutdown}, 5_000
 
     assert {:ok, restored} =
              Jido.thaw(c.jido, F.Worker, id, persistence: {F.Storage, path: c.tmp_dir})
