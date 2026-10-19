@@ -1,8 +1,11 @@
-# Jido 3.0.0-beta.2 release preparation
+# Jido 3.0.0-beta.2 release record
 
 Prepared on 2026-10-19 from `release/v3`, source baseline `50788a22`,
 with the recovery fix and test repairs described below.
-This record covers the new Hex dependency set. Jido beta.2 is not published.
+This record covers the new Hex dependency set. Jido beta.2 was published on
+2026-10-19 from tag `v3.0.0-beta.2`, commit `eb5f5818`.
+[Hex package](https://hex.pm/packages/jido/3.0.0-beta.2) and
+[GitHub prerelease](https://github.com/agentjido/jido/releases/tag/v3.0.0-beta.2).
 
 ## Package set
 
@@ -30,6 +33,12 @@ Covenant's local library files match Hex 0.2.0.
 | `mix hex.audit` | Elixir 1.20.4 / OTP 29.1 | Pass: no retired or advisory packages |
 | `mix hex.build --unpack` | Elixir 1.20.4 / OTP 29.1 | Pass: beta.2 package with Hex dependencies and no overrides |
 | Fresh unpacked production package, `mix deps.get` and `mix compile --warnings-as-errors` | Elixir 1.20.4 / OTP 29.1 | Pass, including the recovery fix |
+| Exact-tag CI | OTP 27 / Elixir 1.18; OTP 28 / Elixir 1.18 and 1.19; OTP 29 / Elixir 1.20 | Pass: all required jobs |
+| Publish workflow preflight | Elixir 1.20 / OTP 29 | Pass: quality, 1,733 tests passed, one approved skip, 134 excluded, 93.8% coverage, docs, and Hex audit |
+| Published archive and documentation | Hex beta.2 | Pass: all 254 packaged files match the release tag, archive checksum matches Hex metadata, documentation returns HTTP 200 |
+
+[Exact-tag CI](https://github.com/agentjido/jido/actions/runs/39292405561) and
+[publish workflow, attempt 2](https://github.com/agentjido/jido/actions/runs/39293472383/attempts/2).
 
 The first quality run found an asynchronous output assertion with a 100 ms
 limit. The call acknowledges commit before Directive delivery. The test now
@@ -46,6 +55,20 @@ A later contract run found a Plugin startup test that could install a monitor
 after its startup deadline. The test now reads the worker from the Plugin
 startup event. It does not wait on the supervisor behind the blocked sibling
 start. The original startup timeout and cleanup assertions remain.
+
+CI also found that the rejected-checkpoint recovery test could call `thaw`
+before the old activation stopped. Commit `eb5f5818` adds an activation monitor
+and waits for shutdown before restore. It preserves the checkpoint and replay
+assertions.
+
+Publish attempt 1 found a similar ordering assumption in a system test. A failed
+restore can return its worker error before the activation root exits. The shared
+pool assertion now waits for root shutdown before checking the child count.
+This test fixture fix is a separate commit, `5872552f`; it does not change the
+published tag or any Hex package file. All 60 storage and recovery scenarios,
+the full local suite, and
+[follow-up CI](https://github.com/agentjido/jido/actions/runs/39295441965) passed.
+Publish attempt 2 passed all checks on the existing release tag before upload.
 
 The published Action beta.21 archive matches all 130 release-tag files.
 Its release CI passed 1,158 tests and properties with 94.89% coverage.
@@ -68,16 +91,15 @@ coverage total does not remove this review cost.
 - The normal suite excludes external Redis, PostgreSQL, Bedrock, and MinIO
   service profiles. It does not prove those service contracts.
 - Bedrock strict startup and snapshot recovery have open evidence gaps. The
-  beta.1 exception applied to beta.1 only. Do not carry it into beta.2 without
-  a scope decision or passing service evidence.
+  maintainer authorized beta.2 publication on 2026-10-19. Publication does not
+  supply passing evidence for the paused service profiles.
 - The cluster-exclusive ownership research probe remains skipped by user
   direction. Core does not supply distributed fencing or exactly-once effect
   delivery.
 - Historical design and delivery records describe older source revisions.
   Use this record for beta.2 checks and the migration guide for API changes.
-- Publication needs exact-candidate CI and a completed release decision.
-  Preparation does not publish Jido to Hex. Keep the prepared tag local until
-  the release decision. Generate release history with GitOps.
+- Exact-tag CI and the publish workflow passed. The published tag remains at
+  `eb5f5818`. Release history was generated with GitOps.
 
 See [migration](../guides/migration.md),
 [service test policy](../test/system/README.md), and the historical
