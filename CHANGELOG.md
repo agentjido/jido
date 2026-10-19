@@ -2,6 +2,289 @@
 
 <!-- changelog -->
 
+## [v3.0.0-beta.2](https://github.com/agentjido/jido/compare/v3.0.0-beta.1...v3.0.0-beta.2) (2026-10-19)
+### Breaking Changes:
+
+* agent_server: remove custom process spawn callback by mikehostetler
+
+* agent: replace supplied state fields in set by mikehostetler
+
+* agent: use DSL blocks for module definitions by mikehostetler
+
+* agent: remove redundant definition getters by mikehostetler
+
+* agent: require plain map route defaults by mikehostetler
+
+* agent: require one executable per route by mikehostetler
+
+* name route Signal helpers with as by mikehostetler
+
+* use one durable Agent identity by mikehostetler
+
+* replace Agent and Topology Builders with data constructors by mikehostetler
+
+* use map-based route signal constructors by mikehostetler
+
+* consolidate signal delivery on Emit by mikehostetler
+
+
+
+### Features:
+
+* signal_action: add shared contracts and agent routes by mikehostetler
+
+* agent_server: checkpoint persistent Flow recovery by mikehostetler
+
+* agent: add owned topology and schedule authoring by mikehostetler
+
+* checkpoint AgentServer2 activation runtime and controls by mikehostetler
+
+* authoring: add explicit constructors with compatibility wrappers by mikehostetler
+
+* topology: hibernate and thaw members by mikehostetler
+
+* topology: prepare inactive agent definitions by mikehostetler
+
+* topology: remove dynamic root agents by mikehostetler
+
+* topology: add safe JSON views by mikehostetler
+
+* topology: report keyed member status by mikehostetler
+
+* agent: add safe JSON views by mikehostetler
+
+* codec: track registry provenance by mikehostetler
+
+* restore action discovery catalog by mikehostetler
+
+* topology: add dynamic agent members by mikehostetler
+
+* persistence: add versioned Ecto migration helper by mikehostetler
+
+* topology: support stored definitions and supervised runtimes (#396) by mikehostetler
+
+* examples: define plugin runtime boundaries by mikehostetler
+
+* examples: document exact topology placement by mikehostetler
+
+* examples: demonstrate topology repair signals by mikehostetler
+
+* examples: enforce topology planning contracts by mikehostetler
+
+* examples: add topology extension authoring by mikehostetler
+
+* examples: add agent extension authoring by mikehostetler
+
+* examples: harden runtime admission by mikehostetler
+
+* examples: deepen runtime inspection by mikehostetler
+
+* examples: demonstrate orphan adoption by mikehostetler
+
+* examples: cover heartbeat lifecycle by mikehostetler
+
+* examples: explain runtime failure outcomes by mikehostetler
+
+* examples: teach precise turn cancellation by mikehostetler
+
+* examples: compare runtime request modes by mikehostetler
+
+* examples: teach flow directive batches by mikehostetler
+
+* examples: add agent authoring lessons by mikehostetler
+
+* agent: preserve flow effects through validated turns by mikehostetler
+
+* persistence: add opt-in Mnesia adapter by mikehostetler
+
+* persistence: share byte store across runtime owners by mikehostetler
+
+* label live agent server processes by mikehostetler
+
+* plugin: notify runtimes after Agent Turn commits by mikehostetler
+
+### Bug Fixes:
+
+* agent_server: confirm recovery cleanup on OTP 27 by mikehostetler
+
+* runtime: checkpoint local execution repair by mikehostetler
+
+* deps: pin public Zoi patches for v3 validation by mikehostetler
+
+* topology: harden lifecycle transitions by mikehostetler
+
+* topology: complete hibernate integration by mikehostetler
+
+* deps: use the upstream-based local Zoi fork by mikehostetler
+
+* examples: correct inventory and fixture boundaries by mikehostetler
+
+* preserve shutdown cleanup from Argus audit (#392) by mikehostetler
+
+* v3: preserve state through intersection validation by mikehostetler
+
+* identity: preserve exact terms at runtime boundaries by mikehostetler
+
+* plugin: reject nonportable audit and sensor data by mikehostetler
+
+* runtime: stop Bus and S3 workers with their owners by mikehostetler
+
+* error: redact secret fields in errors and runtime logs by mikehostetler
+
+* agent: reject malformed Signal types before selection by mikehostetler
+
+* v3: align Flow construction and owned worker cleanup (#390) by mikehostetler
+
+* agent: separate live state from checkpoint portability (#385) by mikehostetler
+
+* persistence: handle ETS transfers in a supervised owner by mikehostetler
+
+* topology: accept owned buses after restart races by mikehostetler
+
+* agent_server: run child lifecycle work in owned tasks by mikehostetler
+
+* agent_server: validate all startup options before construction by mikehostetler
+
+* agent_server: handle remote lifecycle PID checks by mikehostetler
+
+* agent: reject ambiguous child Directive options by mikehostetler
+
+* agent: align default route and Turn input handling by mikehostetler
+
+* persistence: load trusted agent code before safe decode by mikehostetler
+
+* agent-server: preserve metadata on definition upgrade by mikehostetler
+
+* harden AgentServer lifecycle and simplify routing by mikehostetler
+
+* establish shared persistence write authority by mikehostetler
+
+* keep AgentServer responsive during policy and cancel work by mikehostetler
+
+* accept pending placement before retiring Agent by mikehostetler
+
+* recover Agent registration after Registry restart by mikehostetler
+
+* recheck live Topology inputs on readiness queries by mikehostetler
+
+* stop late child when relationship write fails by mikehostetler
+
+* parent Plugin notification spans to their Turn by mikehostetler
+
+* return validation errors for malformed public inputs by mikehostetler
+
+* report topology ownership settlement in telemetry by mikehostetler
+
+* emit turn stop after committed state assignment by mikehostetler
+
+* contain spawn process start faults after commit by mikehostetler
+
+* ignore stale sensor manager revisions by mikehostetler
+
+* reject incomplete defaulted agent candidates by mikehostetler
+
+* block agent activation when runtime checkpoint is unavailable by mikehostetler
+
+* plugin: complete post-commit failure handling by mikehostetler
+
+* topology: load definitions before checkpoint restore by mikehostetler
+
+* core: contain invalid input and refine v3 internals (#380) by mikehostetler
+
+### Performance:
+
+* agent_server: build debug event metadata only when enabled by mikehostetler
+
+* agent_server: reuse validated startup definitions by mikehostetler
+
+* agent_server: narrow worker task inputs by mikehostetler
+
+* agent: resolve extension target owners once per lowering by mikehostetler
+
+### Refactoring:
+
+* remove legacy topology and promote AgentServer2 by mikehostetler
+
+* authoring: finalize Agent and Topology hardening by mikehostetler
+
+* authoring: checkpoint Agent and Topology simplification by mikehostetler
+
+* authoring: checkpoint Agent and Topology refinements by mikehostetler
+
+* agent: checkpoint Agent and Topology authoring consolidation by mikehostetler
+
+* agent: checkpoint authoring refinements and API contracts by mikehostetler
+
+* topology: simplify lifecycle paths by mikehostetler
+
+* examples: harden additive topology updates by mikehostetler
+
+* examples: define multi-agent route contracts by mikehostetler
+
+* examples: complete runtime refinements by mikehostetler
+
+* examples: clarify basic workflow contracts by mikehostetler
+
+* examples: manage inbox sensors by mikehostetler
+
+* examples: use built-in audit plugin by mikehostetler
+
+* examples: make bus delivery agent-owned by mikehostetler
+
+* examples: promote completed research lessons by mikehostetler
+
+* topology: delegate local Agent lifetimes to OTP (#386) by mikehostetler
+
+* plugin: use one callback authoring form (#384) by mikehostetler
+
+* agent_server: share Turn completion transitions by mikehostetler
+
+* agent_server: carry validated Plugin specs through callbacks by mikehostetler
+
+* agent: share callback failure handling by mikehostetler
+
+* agent: share checkpoint restoration validation by mikehostetler
+
+* agent: avoid repeated state initialization work by mikehostetler
+
+* agent: reuse complete schemas through each Turn by mikehostetler
+
+* agent: share Turn preparation across selectors by mikehostetler
+
+* agent_server: centralize runtime configuration by mikehostetler
+
+* persistence: share record content validation by mikehostetler
+
+* agent_server: reuse cleanup for error policy tasks by mikehostetler
+
+* agent_server: share post-commit task cleanup by mikehostetler
+
+* plugin: keep spec fields with their owners by mikehostetler
+
+* agent_server: reuse startup plugin validation by mikehostetler
+
+* agent: reuse validated plugin specs in commands by mikehostetler
+
+* topology: share target extension comparison by mikehostetler
+
+* topology: centralize authoring entry metadata by mikehostetler
+
+* jido: resolve safe ExDNA and Reach findings by mikehostetler
+
+* agent_server: use Jido.Exec directly by mikehostetler
+
+* jido: remove redundant AgentServer paths by mikehostetler
+
+* split AgentServer runtime responsibilities by mikehostetler
+
+* agent_server: remove duplicated runtime paths by mikehostetler
+
+* agent_server: separate runtime responsibilities by mikehostetler
+
+* persistence: organize storage and use one key prefix by mikehostetler
+
+* plugin: migrate bundled plugins to owner facets by mikehostetler
+
 ## [v3.0.0-beta.1](https://github.com/agentjido/jido/compare/v3.0.0-beta.1...v3.0.0-beta.1) (2026-09-14)
 ### Breaking Changes:
 

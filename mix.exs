@@ -1,7 +1,7 @@
 defmodule Jido.MixProject do
   use Mix.Project
 
-  @version "3.0.0-beta.1"
+  @version "3.0.0-beta.2"
   @description "A declarative actor and agent framework for Elixir"
 
   # This is the source of truth for the guide set. ExDoc adds a guide after
