@@ -167,11 +167,19 @@ defmodule JidoTest.System.Case do
     |> Enum.uniq()
   end
 
-  def assert_empty_agent_pool(context),
-    do:
-      assert(
-        DynamicSupervisor.count_children(Jido.agent_supervisor_name(context.jido)).active == 0
-      )
+  def assert_empty_agent_pool(context) do
+    pool = Jido.agent_supervisor_name(context.jido)
+
+    # A failed bootstrap can stop its worker before the activation root exits.
+    # Confirm root shutdown before checking the pool's child count.
+    monitors =
+      for {_, pid, _, _} <- DynamicSupervisor.which_children(pool),
+          is_pid(pid),
+          do: {pid, Process.monitor(pid)}
+
+    await_down(monitors)
+    assert DynamicSupervisor.count_children(pool).active == 0
+  end
 
   def stop_agent(context, server) do
     ref = Process.monitor(server)
