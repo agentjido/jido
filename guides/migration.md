@@ -1,14 +1,13 @@
 # Upgrade from Jido v2 to v3
 
 This guide covers the change from published Jido `2.3.3` to the local
-`3.0.0-beta.1` candidate. The public names remain `Jido.Agent` and
+`3.0.0-beta.2` candidate. The public names remain `Jido.Agent` and
 `Jido.AgentServer`. Their contracts have changed. There is no V2 compatibility
 mode, automatic code rewrite, or automatic stored-data conversion.
 
 The comparison fixes V2 at commit
 [`69f3b405`](https://github.com/agentjido/jido/tree/69f3b40506ce3ea1a2c80b255b737d6c3a453cf2)
-and this V3 spike at commit
-[`77966b1a`](https://github.com/agentjido/jido/tree/77966b1a). See the
+and the current V3 candidate. See the
 [V2 to V3 API map](api-migration-map.md) for the detailed status and change for
 each public module.
 
@@ -21,6 +20,32 @@ This guide follows the change-by-change structure of the
 The Jido changes below are based on the
 [V2 source](https://github.com/agentjido/jido/tree/v2.3.3) and this candidate.
 New features that do not require a V2 code change are outside its scope.
+
+## Upgrade from beta.1 to beta.2
+
+This update also changes the beta API. Review these areas even if the
+application already uses beta.1:
+
+- Define and instantiate Agents with `Jido.Agent.define/1` and
+  `Jido.Agent.instantiate/2`, or the module DSL. Keep definitions separate from
+  instances. Runtime state belongs to an instance.
+- Route each Signal to one Action or Flow. Return the complete candidate state
+  and a proper list of Directives. Validate Plugin-owned fields and state that
+  the handler does not change.
+- Use the current `Jido.AgentServer` activation lifecycle. The former
+  `AgentServer2` implementation is now `AgentServer`. Check startup, readiness,
+  cancellation, Plugin recovery, and topology changes against its module docs.
+- Port topology and Plugin declarations to the current Agent definition.
+  Rehearse stored-data upgrades with application fixtures. Do not assume that
+  beta.1 snapshots can load without conversion.
+- Use Action beta.21 and Signal beta.5 together. Flow waits use Runic managed
+  execution. Jido supplies the wait host and AgentServer recovery integration.
+  See executable example `11_06` for one suspended Flow.
+- Use `Jido.SignalAction` in Jido when an Action shares a typed Signal contract.
+  `jido_action` has no dependency on `jido_signal`.
+
+Check the complete migration sections below and run the application's tests.
+A beta version constraint alone does not establish API or stored-data compatibility.
 
 ## Estimate the migration work
 
@@ -61,8 +86,8 @@ rg -n 'mount|prepare_signal|prepare_action|transform_result|on_checkpoint|on_res
 ## Update dependencies and installation
 
 The candidate requires Elixir 1.18 or later. The declared OTP minimum is 27.
-Core now requires `jido_action ~> 3.0.0-beta.11` and
-`jido_signal ~> 3.0.0-beta.4`.
+Core now requires `jido_action ~> 3.0.0-beta.21`,
+`jido_signal ~> 3.0.0-beta.5`, and `runic ~> 0.1.0-alpha.12`.
 
 ### What you need to change
 
@@ -75,7 +100,7 @@ For evaluation before publication, point the application at this checkout:
 After the package is published, the equivalent Hex requirement will be:
 
 ```elixir
-{:jido, "~> 3.0.0-beta.1"}
+{:jido, "~> 3.0.0-beta.2"}
 ```
 
 Update direct `jido_action` and `jido_signal` constraints if your application
@@ -539,13 +564,11 @@ The default quality check includes core tests, not benchmark or example tests:
 mix quality
 ```
 
-The current local candidate passes `mix quality` on Elixir 1.20.3 / OTP
-29.0.5. Its full local suite fails the cluster-authority research probe, and
-its included Bedrock service profile has open failures. On Elixir 1.18.5 /
-OTP 27.3.4.12, test compilation fails in an example Directive before core
-tests run. Example acceptance tests are secondary; run `mix test.examples`
-separately when needed. See the
-[test policy](https://github.com/agentjido/jido/blob/release/v3/guides/testing.md).
+The beta.2 release checks use published dependencies. See the
+[beta.2 release record](https://github.com/agentjido/jido/blob/release/v3/docs/release-beta.2.md)
+for exact test results and the minimum-runtime check. Run `mix test.all --cover`
+for all normal local categories. External service tests require separate setup;
+see the [test policy](https://github.com/agentjido/jido/blob/release/v3/guides/testing.md).
 
 Stable examples now cover the idle upgrade boundary, validated live definition
 migration, additive Topology updates, Ref identity, Plugin runtime
@@ -554,8 +577,6 @@ own durable deletion. The one research example shows an external fencing
 workaround; cluster-exclusive ownership remains unsupported. See
 [Test Agents and Plugins](test-agents-and-plugins.livemd).
 
-The release evidence record in the repository lists current
-passes, failures, and checks still required. Bedrock persistence is included
-in the beta scope, so its strict startup and snapshot failures block
-publication. Exact-commit CI and human release approval also remain. Deferred
-requirements do not add contracts to this beta candidate.
+The real Bedrock and MinIO profiles still need service evidence. The local
+suite does not establish distributed fencing or exactly-once effect delivery.
+Do not use a passing local suite as proof of these guarantees.

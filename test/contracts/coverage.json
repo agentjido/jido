@@ -1213,11 +1213,12 @@
         "jido.agent_server2.I6": {
           "failing": 0,
           "kind": "functional",
-          "passing": 3,
+          "passing": 4,
           "status": "active",
           "testable": true,
           "tests": [
             "test Action and Flow turns serialize and each starts from the preceding commit",
+            "test recovery confirms scope termination before clearing execution ownership",
             "test recovery keeps admission closed until the old execution scope stops",
             "test recovery stops the activation when prior cleanup exceeds the readiness budget"
           ]
@@ -1271,7 +1272,7 @@
         "jido.agent_server2.I64": {
           "failing": 0,
           "kind": "functional",
-          "passing": 8,
+          "passing": 9,
           "status": "active",
           "testable": true,
           "tests": [
@@ -1279,6 +1280,7 @@
             "test a required Plugin cannot borrow a named root outside its activation",
             "test an ignored required Plugin root cannot publish readiness",
             "test parent group recovery stops owned children and starts its DynamicSupervisor empty",
+            "test recovery confirms scope termination before clearing execution ownership",
             "test recovery keeps admission closed until the old execution scope stops",
             "test recovery stops the activation when prior cleanup exceeds the readiness budget",
             "test required roots recover with a fresh server, references, readiness, and committed Agent",
@@ -1924,7 +1926,7 @@
       }
     }
   },
-  "covenant": "0.1.0",
+  "covenant": "0.2.0",
   "totals": {
     "active": 147,
     "coverage": 1.0,

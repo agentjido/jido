@@ -373,14 +373,14 @@ defmodule Jido.MixProject do
   defp deps do
     [
       # Jido Ecosystem
-      # Use the sibling V3 Action and Signal checkouts for local integration.
-      {:jido_action, path: "../jido_action", override: true},
-      {:jido_signal, path: "../jido_signal", override: true},
+      # Keep the published V3 packages together.
+      {:jido_action, "~> 3.0.0-beta.21"},
+      {:jido_signal, "~> 3.0.0-beta.5"},
       # AgentServer owns native Runic Runners and Worker cleanup.
-      {:runic, path: "../runic", override: true},
+      {:runic, "~> 0.1.0-alpha.12"},
 
       # Jido Deps
-      {:zoi, "~> 0.18.11", override: true},
+      {:zoi, "~> 0.18.11"},
       {:spark, "~> 2.7"},
       {:splode, "~> 0.3.0"},
       {:telemetry, "~> 1.3"},
@@ -394,7 +394,7 @@ defmodule Jido.MixProject do
       {:ecto_sql, "~> 3.14", optional: true},
 
       # Development & Test Dependencies
-      {:covenant, path: "../covenant", only: [:dev, :test], runtime: false},
+      {:covenant, "~> 0.2.0", only: [:dev, :test], runtime: false},
       {:ecto_sqlite3, "~> 0.24.1", only: :test},
       {:postgrex, "~> 0.19 or ~> 1.0", only: :test},
       {:opentelemetry, "~> 1.0", only: :test, runtime: false},

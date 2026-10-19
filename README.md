@@ -9,14 +9,11 @@ Jido is a declarative actor and agent framework for Elixir. You declare what an
 Agent is, instantiate that declaration as an Agent value, and run the value as
 an OTP actor when you need a live process.
 
-Version `3.0.0-beta.1` is an evaluation beta with breaking changes from V2.
-Core quality, authoring, and local system checks pass with the out-of-scope
-cluster-authority probe skipped. The optional Bedrock adapter is included, but
-its real service and MinIO snapshot tests are skipped pending an upstream fix;
-do not rely on it for proven durability. The Elixir 1.18/OTP 27 test gate fails
-during example compilation, so this beta is verified only on Elixir 1.20.3/OTP
-29.0.5. The release approver accepted these two limits for beta.1 only. See the
-[migration guide](guides/migration.md) for the API changes and known limits.
+Version `3.0.0-beta.2` is an evaluation candidate with breaking changes from V2
+and beta.1. See the [migration guide](guides/migration.md) for required changes
+and the [release record](https://github.com/agentjido/jido/blob/release/v3/docs/release-beta.2.md)
+for checks and known limits. External storage service tests and distributed
+ownership guarantees require separate evidence.
 
 ## Core model
 
@@ -161,12 +158,12 @@ dependency and migration.
 
 ## Installation
 
-Use the beta package from Hex:
+After beta.2 is published, use the beta package from Hex:
 
 ```elixir
 def deps do
   [
-    {:jido, "~> 3.0.0-beta.1"}
+    {:jido, "~> 3.0.0-beta.2"}
   ]
 end
 ```
