@@ -16,7 +16,7 @@ results are historical evidence; those probes remain skipped.
 | Restore boundaries | `support/scenarios/restoration.exs` | Explicit restore mode reject an unsupported Plugin record; a tombstone during a held read prevents activation |
 | Independent state oracle | `support/turn_model.exs` | Mixed success, rejection, cancellation, timeout, conflict, deletion, restart, and uncertain writes; seeded generation and bounded failure reduction |
 | Combined overload | `support/scenarios/overload.exs` | Caller timeout, full queue, rejected calls/cast, Bus replacement, and worker death; exact request and event accounting |
-| Immediate supervisor replacement | `runtime/supervision_test.exs` | Held old child, bounded name-release wait, replacement tree and unchanged checkpoint; passes with local Jido fix |
+| Immediate supervisor replacement | `runtime/supervision_test.exs` | Held old task supervisor and Flow runner, bounded name-release wait, replacement tree and unchanged checkpoint |
 | Redis storage faults | `services/redis_faults_test.exs` | Real SIGKILL/AOF restart and TCP proxy reply loss after Lua execution; both pass |
 | PostgreSQL | `services/postgres_test.exs` | Real isolated Docker database; current shared Agent scenarios pass |
 | Bedrock storage faults | `services/bedrock_faults_test.exs` | Paused; earlier Bedrock 0.7.2 runs passed restarts and coordinator/log replacement, while unassisted placeholder cleanup failed |

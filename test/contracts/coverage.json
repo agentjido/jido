@@ -2,22 +2,22 @@
   "apps": {
     "jido": {
       "active": 147,
-      "coverage": 1.0,
-      "covered": 147
+      "coverage": 0.9728,
+      "covered": 143
     }
   },
   "components": {
     "jido.agent": {
       "active": 45,
       "app": "jido",
-      "coverage": 1.0,
-      "covered": 45,
+      "coverage": 0.9111,
+      "covered": 41,
       "form": "light",
       "obligations": {
         "jido.agent.I1": {
-          "failing": 0,
+          "failing": 1,
           "kind": "functional",
-          "passing": 1,
+          "passing": 0,
           "status": "active",
           "testable": true,
           "tests": [
@@ -25,9 +25,9 @@
           ]
         },
         "jido.agent.I10": {
-          "failing": 0,
+          "failing": 1,
           "kind": "functional",
-          "passing": 1,
+          "passing": 0,
           "status": "active",
           "testable": true,
           "tests": [
@@ -35,9 +35,9 @@
           ]
         },
         "jido.agent.I11": {
-          "failing": 0,
+          "failing": 1,
           "kind": "functional",
-          "passing": 1,
+          "passing": 0,
           "status": "active",
           "testable": true,
           "tests": [
@@ -164,9 +164,9 @@
           ]
         },
         "jido.agent.I22": {
-          "failing": 0,
+          "failing": 1,
           "kind": "functional",
-          "passing": 1,
+          "passing": 0,
           "status": "active",
           "testable": true,
           "tests": [
@@ -626,11 +626,12 @@
         "jido.agent_server2.I17": {
           "failing": 0,
           "kind": "functional",
-          "passing": 7,
+          "passing": 8,
           "status": "active",
           "testable": true,
           "tests": [
             "test Action and Flow timeouts stop work in preparation, execution, and validation",
+            "test a 90-day Turn rearms bounded timers without changing its deadline",
             "test built-in timeout is 60 seconds; global setting is read only at startup",
             "test delayed timer cannot permit commit when cleanup result was queued first",
             "test first abort reason wins while cleanup is blocked",
@@ -668,10 +669,11 @@
         "jido.agent_server2.I2": {
           "failing": 0,
           "kind": "functional",
-          "passing": 6,
+          "passing": 7,
           "status": "active",
           "testable": true,
           "tests": [
+            "test a 90-day Turn rearms bounded timers without changing its deadline",
             "test built-in timeout is 60 seconds; global setting is read only at startup",
             "test configuration rejects typos and invalid values; explicit settings bypass unused defaults",
             "test named startup and maximum finite waits remain usable",
@@ -1925,7 +1927,7 @@
   "covenant": "0.1.0",
   "totals": {
     "active": 147,
-    "coverage": 1.0,
-    "covered": 147
+    "coverage": 0.9728,
+    "covered": 143
   }
 }

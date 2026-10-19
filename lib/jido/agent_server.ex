@@ -470,7 +470,8 @@ defmodule Jido.AgentServer do
   instance's Runner, Store, and registration. Turns are local and temporary.
   `max_postponed_signals:` defaults to 1,000; use a non-negative integer or
   `:infinity`. This bounds postponed turns, not the process mailbox.
-  `turn_timeout:` defaults to 60,000 ms; use `0..4_294_967_295` or `:infinity`.
+  `turn_timeout:` defaults to 60,000 ms; use any non-negative integer in
+  milliseconds or `:infinity`. Long Turn deadlines use bounded timer intervals.
   """
   @spec start_link(keyword()) :: :gen_statem.start_ret()
   def start_link(opts) when is_list(opts) do
@@ -644,7 +645,12 @@ defmodule Jido.AgentServer do
   end
 
   defp validate_runtime(opts) do
-    with :ok <- validate_timeout(opts, :turn_timeout, false),
+    with :ok <-
+           validate_setting(
+             opts[:turn_timeout] == :infinity or
+               (is_integer(opts[:turn_timeout]) and opts[:turn_timeout] >= 0),
+             :turn_timeout
+           ),
          :ok <- validate_exec(opts[:exec_opts]),
          :ok <- validate_error_policy(opts[:error_policy]),
          :ok <- validate_timeout(opts, :error_policy_timeout),
@@ -2207,8 +2213,21 @@ defmodule Jido.AgentServer do
     end
   end
 
-  def handle_event(:info, {:turn_timeout, id}, phase, %{active: %{turn_id: id}} = data),
-    do: abort_turn(phase, data, :turn_timeout)
+  def handle_event(:info, {:turn_timeout, id}, phase, %{active: %{turn_id: id}} = data) do
+    cond do
+      data.active.deadline == :infinity ->
+        :keep_state_and_data
+
+      expired?(data.active) ->
+        abort_turn(phase, data, :turn_timeout)
+
+      true ->
+        cancel_timer(data.active)
+        remaining = remaining_wait(data.active.deadline)
+        timer = Process.send_after(self(), {:turn_timeout, id}, min(remaining, @max_timeout))
+        {:keep_state, put_in(data.active.timer, timer)}
+    end
+  end
 
   def handle_event(type, {:turn, token, _signal, _context, _deadline}, _phase, data)
       when data.admission_mode != :open do
@@ -2656,7 +2675,7 @@ defmodule Jido.AgentServer do
       timer:
         if(timeout == :infinity,
           do: nil,
-          else: Process.send_after(self(), {:turn_timeout, turn_id}, timeout)
+          else: Process.send_after(self(), {:turn_timeout, turn_id}, min(timeout, @max_timeout))
         )
     }
 

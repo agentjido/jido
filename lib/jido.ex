@@ -544,6 +544,7 @@ defmodule Jido do
       :ok
     else
       names = [
+        exec_runner_name(name),
         task_supervisor_name(name),
         registration_guard_name(name),
         registry_name(name),

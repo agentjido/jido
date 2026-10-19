@@ -139,7 +139,7 @@ defmodule JidoTest.System.TurnModel do
           assert {:ok, stored, revision} = load(c, snapshot.agent.id, ControlledAgent)
           assert {stored.state, revision} == {%{value: expected.value}, expected.revision}
           assert Server.status(server).admission.postponed == 0
-          assert Process.info(server, :message_queue_len) == {:message_queue_len, 0}
+          assert Process.info(server, :messages) == {:messages, []}
           {server, expected}
         end)
 

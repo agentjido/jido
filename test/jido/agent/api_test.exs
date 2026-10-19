@@ -38,7 +38,10 @@ defmodule Jido.Agent.APITest do
     assert {:ok, ^instance} = Agent.validate(instance)
     assert {:error, _} = Agent.validate(%{instance | state: %{count: "wrong", turns: 0}})
     assert Counter.schema() === Agent.schema(definition)
-    assert :ok = Zoi.validate(Agent.schema(instance), %{count: 2, turns: 3})
+
+    assert {:ok, %{count: 2, turns: 3}} =
+             Zoi.parse(Agent.schema(instance), %{count: 2, turns: 3})
+
     refute function_exported?(Agent, :validate_definition, 1)
     refute function_exported?(Agent, :validate_instance, 1)
     refute function_exported?(Agent, :schema, 0)

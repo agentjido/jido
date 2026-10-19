@@ -11,6 +11,31 @@ defmodule JidoTest.AgentServer.LifecycleTest do
     F.setup_runtime()
   end
 
+  @tag obligation: ["jido.agent_server2.I2", "jido.agent_server2.I17"]
+  test "a 90-day Turn rearms bounded timers without changing its deadline", c do
+    duration = 90 * 24 * 60 * 60 * 1_000
+    assert :ok = Server.validate_defaults(turn_timeout: duration)
+    server = F.start(c, turn_timeout: duration)
+    turn = F.blocked(server, c.runner)
+    {_, %{active: active}} = :sys.get_state(server)
+    assert active.deadline > System.monotonic_time(:millisecond) + duration - 5_000
+    assert Process.read_timer(active.timer) <= 4_294_967_295
+
+    send(server, {:turn_timeout, turn.id})
+    assert %{active: %{turn_id: id}} = Server.status(server)
+    assert id == turn.id
+    {_, %{active: rearmed}} = :sys.get_state(server)
+    assert rearmed.deadline == active.deadline
+    assert rearmed.timer != active.timer
+    assert Process.read_timer(active.timer) == false
+    assert Process.read_timer(rearmed.timer) <= 4_294_967_295
+
+    F.release(turn)
+    assert {:ok, %{state: %{count: 1}}, []} = Server.await(turn.pending)
+    assert Process.read_timer(rearmed.timer) == false
+    F.clean(c.runner)
+  end
+
   @tag obligation: ["jido.agent_server2.I17", "jido.agent_server2.I21"]
   test "Action and Flow timeouts stop work in preparation, execution, and validation", c do
     for type <- ["work", "flow"], stage <- [:preparing, :running, :settling] do

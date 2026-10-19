@@ -41,6 +41,33 @@ defmodule JidoTest.AgentServer.DurableTurnTest do
     server
   end
 
+  test "a 90-day saved deadline survives AgentServer loss", c do
+    duration = 90 * 24 * 60 * 60 * 1_000
+    server = start(c, turn_timeout: duration)
+    id = Server.agent(server).id
+    pending = Server.submit(server, signal("request", %{value: 0}))
+    assert_receive {:durable_barrier, :step_6, action}, 5_000
+    {_, %{active: before}} = :sys.get_state(server)
+    monitor = Process.monitor(server)
+    action_monitor = Process.monitor(action)
+    Process.exit(server, :kill)
+    assert_receive {:DOWN, ^monitor, :process, ^server, :killed}, 5_000
+    assert_receive {:DOWN, ^action_monitor, :process, ^action, _}, 5_000
+    restored = replacement(c, id, server)
+    assert_receive {:durable_barrier, :step_6, _}, 5_000
+    {_, %{active: after_restore}} = :sys.get_state(restored)
+    assert after_restore.turn_id == before.turn_id
+    assert_in_delta after_restore.deadline, before.deadline, 1_000
+    assert Process.read_timer(after_restore.timer) <= 4_294_967_295
+    assert F.Probe.records() == Enum.to_list(1..6) ++ [6]
+    F.Probe.release()
+    assert :ok = Server.quiesce(restored)
+    assert Server.agent(restored).state == %{count: 10}
+    assert Server.status(restored).durable_turn == %{id: before.turn_id, status: :completed}
+    assert F.Probe.records() == Enum.to_list(1..6) ++ Enum.to_list(6..10)
+    assert {:error, _} = Server.await(pending)
+  end
+
   for victim <- [:server, :activation, :worker] do
     test "#{victim} loss resumes the current Turn at step 6", c do
       server = start(c)

@@ -29,11 +29,34 @@ repeat. Runic owns graph progress; there is no second step counter.
 | [11_02 Saved Progress](11_02_saved_progress/README.md) | Implemented | AgentServer resumes step 6 after process loss; steps 1–5 do not repeat. |
 | [11_03 VM Recovery](11_03_vm_recovery/README.md) | Implemented | Restore the same Turn in a fresh BEAM with a small DETS byte adapter. |
 | [11_04 Accepted Work](11_04_accepted_work/README.md) | Implemented | A topology member runs and commits a durable report Turn. |
-| [11_05 Saved Completion](11_05_saved_completion/README.md) | Proposed lesson | Show the final-write failure window already covered by Core tests. |
-| [11_06 Durable Wait](11_06_durable_wait/README.md) | Proposed | Define a saved wait without allowing concurrent state-changing Turns. |
-| [11_07 External Uncertainty](11_07_external_uncertainty/README.md) | Proposed | Use an external operation ID when interrupted I/O can repeat. |
+| [11_05 Saved Completion](11_05_saved_completion/README.md) | Implemented | Restore completion after a lost storage reply without repeated work. |
+| [11_06 Durable Wait](11_06_durable_wait/README.md) | Implemented | Restore a saved approval wait between completed Flow Turns. |
+| [11_07 External Uncertainty](11_07_external_uncertainty/README.md) | Implemented | Repeat an interrupted provider call with the same operation ID. |
 
-Numbers stay stable. Proposed folders have no skipped or placeholder tests.
+Numbers stay stable. The seven implemented lessons have runnable source and behavior tests.
+
+## Proposed lessons
+
+These README-only spikes are explicitly requested design work. They are not
+implemented examples or evidence of supported behavior. Start with the
+[integration checklist](flow-control/INTEGRATION.md), then review the
+[Flow control DSL proposal](flow-control/README.md). The checklist records
+dependency selection, upstream API gates, core seams, and proof order.
+
+| Example | Status | Planned proof |
+| --- | --- | --- |
+| [11_08 Flow Signal Wait](11_08_flow_signal_wait/README.md) | README proposal | Step 6 waits for an external event in the same ten-step Flow Turn. |
+| [11_09 Flow Timer](11_09_flow_timer/README.md) | README proposal | A timer is a saved Flow control step, with no long-running Action. |
+| [11_10 Signal Selection](11_10_signal_selection/README.md) | README proposal | Step 6 selects approval, rejection, or a 30-day timeout. |
+| [11_11 Suspended Activation](11_11_suspended_activation/README.md) | README proposal | A waiting Flow releases execution resources and resumes after activation. |
+| [11_12 Ninety-Day Flow](11_12_ninety_day_flow/README.md) | README proposal | A Flow runs across 90 days through several saved waits. |
+| [11_13 Topology Wait](11_13_topology_wait/README.md) | README proposal | A topology member resumes a waiting Flow from another member’s Signal. |
+| [11_14 Recovery Compatibility](11_14_recovery_compatibility/README.md) | README proposal | Pending work resumes only with a compatible execution definition. |
+| [11_15 Execution Rollover](11_15_execution_rollover/README.md) | README proposal | Atomically finish one Turn and accept a new Turn in the same chain. |
+| [11_16 Retry Recovery](11_16_retry_recovery/README.md) | README proposal | Keep retry limits and retry deadlines across AgentServer recovery. |
+| [11_17 Turn Receipts](11_17_turn_receipts/README.md) | README proposal | Find accepted work and its final result after the original caller is lost. |
+| [11_18 Composed Recovery](11_18_composed_recovery/README.md) | README proposal | Recover waits inside repeated and nested Flow components without identity collisions. |
+| [11_19 Failed Work Recovery](11_19_failed_work_recovery/README.md) | README proposal | Inspect failed pending work and define a safe, explicit recovery decision. |
 
 ## Ownership
 
@@ -55,7 +78,8 @@ Test barriers are confined to test support.
 Persistence enables Flow recovery. Direct Actions remain
 ordinary Turns. Caller handles and queued Signals do not survive a crash. A
 repeated Signal is a new Turn, not a deduplicated request. The Turn timeout survives
-recovery. Flow and Action code must remain compatible while work is pending.
+recovery. Approval waits in `11_06` are Agent state between completed Turns;
+they do not hold a Flow open. Flow and Action code must remain compatible while work is pending.
 
 Completion commits Agent state and the terminal receipt together. Post-commit
 hooks and effects are not replayed. Cancellation saves its terminal receipt before

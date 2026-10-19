@@ -128,10 +128,9 @@ adapter checks remain optional service tests.
 
 ## Durable execution learning path
 
-The [Durable section](11_durable/README.md) contains four implemented proofs and
-three proposed outlines requested for review. Planned rows describe missing
-example evidence; they do not claim that every underlying capability is absent.
-Only the implemented lesson counts in the executable catalog.
+The [Durable section](11_durable/README.md) contains seven executable lessons.
+Each lesson states its proof and its limits. Core tests retain the detailed
+crash and storage fault matrices.
 
 | Capability | Owner | Status | Canonical evidence |
 | --- | --- | --- | --- |
@@ -140,9 +139,9 @@ Only the implemented lesson counts in the executable catalog.
 | AgentServer Turn recovery after whole-BEAM loss with a DETS byte adapter | `jido` / Runic; example adapter | Focused example | [Source](11_durable/11_03_vm_recovery/vm_recovery.ex), [test](../test/examples/11_durable/11_03_vm_recovery/vm_recovery_test.exs) |
 | Accepted serial Flow Turn and atomic completion in a topology member | `jido` AgentServer / Runic graph | Focused example | [Source](11_durable/11_04_accepted_work/accepted_work.ex), [test](../test/examples/11_durable/11_04_accepted_work/accepted_work_test.exs) |
 | Active topology work across member, root, and whole-BEAM loss | `jido` / Runic | Core-test-only | [Crash matrix](../test/jido/agent_server/durable_topology_test.exs), [BEAM proof](../test/jido/agent_server/durable_topology_peer_test.exs) |
-| Final commit before lost reply; dedicated lesson pending | `jido` AgentServer | Planned | [Outline](11_durable/11_05_saved_completion/README.md) |
-| Stored approval wait within the serial Turn contract | Design pending | Planned | [Outline](11_durable/11_06_durable_wait/README.md) |
-| External operation uncertainty across execution loss | Integration and provider adapter | Planned | [Outline](11_durable/11_07_external_uncertainty/README.md) |
+| Final commit before lost storage reply | `jido` AgentServer | Focused example | [Source](11_durable/11_05_saved_completion/saved_completion.ex), [test](../test/examples/11_durable/11_05_saved_completion/saved_completion_test.exs) |
+| Stored approval wait between completed Flow Turns | `jido` AgentServer | Focused example | [Source](11_durable/11_06_durable_wait/durable_wait.ex), [test](../test/examples/11_durable/11_06_durable_wait/durable_wait_test.exs) |
+| Stable operation ID after acceptance before step save | Application / provider | Focused example | [Source](11_durable/11_07_external_uncertainty/external_uncertainty.ex), [test](../test/examples/11_durable/11_07_external_uncertainty/external_uncertainty_test.exs) |
 
 ## Ecosystem and combined suites
 
@@ -197,3 +196,22 @@ Flow examples that prove a distinct Agent integration or commit boundary.
 - Provider-specific persistence checks stay optional.
 - Application autoscaling and distributed ownership policy are not Jido core
   contracts.
+
+## Proposed durable Flow controls
+
+The [README-only spikes](11_durable/README.md#proposed-lessons) reserve 11_08–11_19.
+They are Planned, have no executable evidence, and do not increase the seven
+implemented durable lessons. See the [DSL proposal](11_durable/flow-control/README.md).
+
+| Proposed contract | README plan |
+| --- | --- |
+| Execution Rollover | [11_15](11_durable/11_15_execution_rollover/README.md) |
+| Retry Recovery | [11_16](11_durable/11_16_retry_recovery/README.md) |
+| Turn Receipts | [11_17](11_durable/11_17_turn_receipts/README.md) |
+| Composed Recovery | [11_18](11_durable/11_18_composed_recovery/README.md) |
+| Failed Work Recovery | [11_19](11_durable/11_19_failed_work_recovery/README.md) |
+
+The [integration checklist](11_durable/flow-control/INTEGRATION.md) defines the
+upstream API gates and proof order for these plans. Matching test folders contain
+README plans only; they add no executable coverage. The verified patched Action
+API, not the proposed syntax, will determine the final source.

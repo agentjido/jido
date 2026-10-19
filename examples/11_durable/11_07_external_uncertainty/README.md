@@ -1,48 +1,62 @@
 # 11_07 External Uncertainty
 
-Status: **Proposed outline. No executable source or tests yet.**
+A provider accepts a publication, execution crashes before the step save, and
+recovery calls the provider with the same operation ID.
 
-Prove how recovery handles an external operation whose result was not saved.
+## What you will learn
 
-## Planned code
+- Save intent at a Flow step boundary before external work.
+- Reuse the operation ID when the interrupted Action runs again.
+- Keep unsafe work in an explicit `:needs_attention` outcome.
 
-Publish the report through a deterministic local provider that accepts a stable
-operation ID. Save intent before the provider call. Kill execution after the
-provider accepts the operation but before the node result is checkpointed.
-Keep provider state outside the killed BEAM for this test.
+## Read the code
 
-```text
-save operation ID → provider accepts publication → CRASH before result save
-recover → query or repeat same operation ID → one provider publication
+Read [the Agent and publication Flow](external_uncertainty.ex), then the
+[local provider](support/memory_provider.ex).
+
+Supply `operation_id`, `report`, and `policy` in `publish_signal/1`.
+For `policy: :idempotent`, pass portable execution context:
+
+```elixir
+context: %{publication_provider: {ProviderModule, RegisteredProviderName}}
 ```
 
-## Acceptance tests to add
+The provider implements `publish(address, operation_id, report)`. It must retain
+the operation ID and result, accept the same ID and data again, and reject
+conflicting data. The application owns the provider and its retention policy.
 
-- Recover with the original operation ID and confirm one provider publication.
-- Reject a repeated operation ID with different publication data.
-- For a provider without idempotency or result lookup, retain an explicit needs-attention outcome.
-- Prove that uncertain unsafe work is not dispatched automatically.
-- Show that cancellation stops local work but cannot undo provider acceptance.
-- Keep provider cleanup and all crash barriers in test support.
+## Important behavior
 
-## Current evidence and gap
+The `intent` step saves the operation ID before `publish` starts. The test holds
+the Action after provider acceptance and kills the Server. Recovery makes two
+provider calls but creates one publication. Different data with the same ID
+fails. Cancellation stops local work; it cannot undo provider acceptance.
+`policy: :manual` saves `:needs_attention` and does not call the provider.
 
-The [recoverable effects guide](../../../guides/recoverable-effects.md) and
-[delivery example](../../10_persistence/10_07_recoverable_delivery/README.md)
-provide the current application pattern. The execution integration still needs
-a declared replay policy and a way to preserve uncertainty. Provider-specific
-behavior belongs to the provider adapter; AI tool policy belongs to `jido_ai`.
+Crash barriers remain in
+[test support](../../../test/examples/support/durable_publication_probe.ex).
+The provider lives outside the killed Agent tree.
 
 ## Limits
 
-This proves the selected provider contract, not exactly-once arbitrary I/O.
-The provider stub is a test fixture, not a production delivery service. Retries
-need an explicit finite policy and must never invent a new operation ID to
-conceal uncertainty.
+The local provider keeps data in memory. This test proves Agent process loss,
+not provider or BEAM loss. A production provider must retain IDs and results
+across its own failures. Core cannot make arbitrary I/O exactly once. Manual
+policy prevents dispatch; it does not resolve an operation already sent to an
+unsafe provider. Reconciliation and later authorization belong to the application.
 
-## Run status
+## Run it
 
-There is no run command for this outline. Do not add passing placeholders or
-skipped tests. Add source and a focused behavior test when this stage is built.
+```sh
+mix test test/examples/11_durable/11_07_external_uncertainty --include example --seed 0 --warnings-as-errors
+```
+
+Expected result: the success, recovery, and rejection assertions pass. Tests stop
+the Agents and release all held test calls. No external service is required.
+
+## Files
+
+- [Source](external_uncertainty.ex)
+- [Tests](../../../test/examples/11_durable/11_07_external_uncertainty/external_uncertainty_test.exs)
 
 Previous: [Durable Wait](../11_06_durable_wait/README.md) | [Durable overview](../README.md)

@@ -53,7 +53,7 @@ defmodule JidoTest.AgentServer.StartupTest do
           [:invalid],
           [turn_timout: 5],
           [turn_timeout: -1],
-          [turn_timeout: 4_294_967_296]
+          [turn_timeout: 1.5]
         ] do
       Application.put_env(:jido, Server, value)
 
@@ -65,7 +65,7 @@ defmodule JidoTest.AgentServer.StartupTest do
       Server.stop(server)
     end
 
-    for timeout <- [-1, 1.5, :bad, 4_294_967_296] do
+    for timeout <- [-1, 1.5, :bad] do
       assert {:error, %{__exception__: true}} =
                Server.start_link(agent: c.agent, runner: c.runner, turn_timeout: timeout)
     end

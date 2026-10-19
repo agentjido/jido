@@ -592,8 +592,6 @@ schema. Optional missing fields stay absent. Stored instance, candidate,
 Plugin output, and restored-state checks do not insert defaults or change
 values. Missing required fields are errors.
 
-The V3 branch pins the tested
-[Zoi source](https://github.com/mikehostetler/zoi/commit/ad24cc0644edb60d546c90a73a798856f0528820)
-for checked defaults, `Zoi.validate/3`, and object intersection fixes. A fresh
-checkout downloads this source through Mix. Restore released Hex requirements
-for Zoi and Jido Action before package release.
+Core uses the Hex `zoi ~> 0.18.11` dependency. Jido checks defaults,
+rejects changes to stored values, and merges compatible object intersection
+results at its state boundary. No Zoi fork or `Zoi.validate/3` API is required.

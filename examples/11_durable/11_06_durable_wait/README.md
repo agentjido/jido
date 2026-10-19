@@ -1,41 +1,48 @@
 # 11_06 Durable Wait
 
-Status: **Proposed outline. No executable source or tests yet.**
+An approval wait survives hibernation without a blocked Action or active Turn.
 
-Define an approval wait that survives BEAM loss without a blocked Action.
+## What you will learn
 
-## Design boundary
+- Store a wait and its absolute deadline in Agent state.
+- Complete the request Flow before a later approval Flow begins.
+- Reject conflicting and duplicate decisions.
 
-One durable Flow remains the current Turn. Ordinary state-changing Signals wait.
-An approval cannot enter through a second ordinary Turn while the first Turn is
-waiting. A saved wait needs an explicit, narrowly scoped control-input contract,
-or the application must end the first Flow and model approval as a later Turn.
+## Read the code
 
-Do not add a background execution coordinator or restore the removed Plugin path.
+Read [the Agent and two Flows](durable_wait.ex). `request_signal/1` supplies a
+stable request ID and an absolute Unix deadline in milliseconds.
+`resolve_signal/1` supplies that ID and `decision: :approve` or `:cancel`.
 
-## Decisions and tests before implementation
+## Important behavior
 
-- Choose a control-input contract or a sequence of separate completed Turns.
-- Save the wait and its absolute deadline as portable data.
-- Restore the wait without repeating completed Actions.
-- Consume approval once; reject late or conflicting approval.
-- Save cancellation and stop pending work.
-- Define hibernation while a saved wait is active.
+The request Flow commits `:waiting` and releases the Turn. Hibernation saves
+that state. After thaw, a matching decision becomes `:approved` or `:cancelled`.
+An elapsed deadline becomes `:expired`. The deadline is not reset on restore.
+A second decision or a different request ID returns an error.
 
-## Current evidence and gap
-
-The [approval workflow](../../08_applications/08_04_approval_workflow/README.md)
-uses multiple Turns. Core durable Flow Turns provide step recovery, not saved
-external waits. No wait API is approved or implemented by this outline.
+The tests restore pending, expired, and cancelled requests. They also prove
+that duplicate approval cannot change the completed request.
 
 ## Limits
 
-A blocking Action is not a durable wait. This outline does not add a durable
-mailbox or permit unrelated state-changing Turns during a pending Flow.
+There is no suspended Flow or durable mailbox. The wait is data between Turns.
+Expiry is evaluated when a decision arrives; no timer sends a decision. The
+application owns delivery, authorization, and clock policy. `Server.cancel/1`
+cancels execution, not this stored domain request; use the resolve route.
 
-## Run status
+## Run it
 
-There is no run command for this outline. Do not add passing placeholders or
-skipped tests. Add source and a focused behavior test when this stage is built.
+```sh
+mix test test/examples/11_durable/11_06_durable_wait --include example --seed 0 --warnings-as-errors
+```
 
-Previous: [Saved Completion](../11_05_saved_completion/README.md) | Next: [External Uncertainty — proposed](../11_07_external_uncertainty/README.md)
+Expected result: the success, recovery, and rejection assertions pass. Tests stop
+the Agents and release all held test calls. No external service is required.
+
+## Files
+
+- [Source](durable_wait.ex)
+- [Tests](../../../test/examples/11_durable/11_06_durable_wait/durable_wait_test.exs)
+
+Previous: [Saved Completion](../11_05_saved_completion/README.md) | Next: [External Uncertainty](../11_07_external_uncertainty/README.md)

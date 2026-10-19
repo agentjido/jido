@@ -1,8 +1,11 @@
 # Jido V3 examples
 
-The stable catalog has 72 executable examples in 10 groups. Original
+The stable catalog has 75 executable examples in 10 groups. Original
 example numbers stay unchanged. Stable examples teach the current local runtime
 contract; research entries state unsupported behavior.
+
+The [durable Flow proposals](11_durable/README.md#proposed-lessons) reserve
+11_08–11_19 as README-only spikes. They are not part of the executable count.
 
 | Group | Examples | Source and tests |
 | --- | ---: | --- |
@@ -15,10 +18,7 @@ contract; research entries state unsupported behavior.
 | 08_applications | 5 | [Source](08_applications/README.md), [tests](../test/examples/08_applications/README.md) |
 | 09_plugins | 7 | [Source](09_plugins/README.md), [tests](../test/examples/09_plugins/README.md) |
 | 10_persistence | 8 | [Source](10_persistence/README.md), [tests](../test/examples/10_persistence/README.md) |
-| 11_durable | 4 | [Source and three proposed outlines](11_durable/README.md), [tests](../test/examples/11_durable/README.md) |
-
-The three README-only outlines in `11_durable` are for review and are excluded
-from executable example counts. They have no placeholder or skipped tests.
+| 11_durable | 7 | [Source](11_durable/README.md), [tests](../test/examples/11_durable/README.md) |
 
 The [coverage register](COVERAGE.md) maps capabilities to evidence.
 The [research catalog](99_research/README.md) states unsupported contracts.

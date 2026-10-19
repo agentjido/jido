@@ -1,44 +1,46 @@
 # 11_05 Saved Completion
 
-Status: **Proposed outline. No executable source or tests yet.**
+A report and its completed Turn survive a lost storage reply.
 
-Show the failure window between the final storage write and the caller reply.
+## What you will learn
 
-## Planned code
+- AgentServer saves candidate state and the terminal receipt together.
+- A completed Flow does not run again after restore.
+- A caller Pending handle is local; it does not survive Server loss.
 
-Keep the Flow as the current Turn. Save the candidate Agent state and terminal
-Turn receipt together. If that write succeeds and its reply is lost, restore the
-completed Agent without executing or applying the Flow again.
+## Read the code
 
-```text
-confirmed graph → final Agent + completion in one write → caller reply
-                                      CRASH ↑
-restore → completed Agent; no second Flow execution
-```
+Read [the Agent and report Flow](saved_completion.ex). The Flow returns a report
+and completion count. It has no recovery code. AgentServer owns recovery.
 
-## Current evidence and lesson gap
+## Important behavior
 
-Core implements this contract. The lost-completion-reply test in
-[durable Turn tests](../../../test/jido/agent_server/durable_turn_test.exs) proves it.
-The dedicated example remains an outline until it can teach this boundary through
-an application-shaped adapter without copying the Core fault matrix.
+The test adapter saves the final record, then holds the storage reply. The test
+kills the Server at that boundary. The replacement loads the completed Agent
+with a count of one. Execution hooks confirm that completed work did not repeat.
+A later request starts a new Turn and increases the count to two.
 
-## Acceptance tests for the lesson
-
-- Lose the final commit reply and restore the completed Turn.
-- Prove that completed Actions do not repeat.
-- Prove that the next state-changing Turn starts after completion.
-- Distinguish a local Pending handle from the saved terminal Turn receipt.
+The barrier adapter and execution counter are
+[test support](../../../test/examples/support/durable_completion_probe.ex), not
+application code. Storage uses the existing File adapter.
 
 ## Limits
 
-There is no background result delivery or reducer against newer Agent state.
-Other state-changing Turns wait while the Flow runs. A repeated Signal creates
-a new Turn. Exactly-once caller delivery and external I/O remain separate concerns.
+This proves process-loss recovery after a successful save. It does not provide
+request deduplication, caller reply replay, or replay of post-commit effects.
 
-## Run status
+## Run it
 
-There is no run command for this outline. Do not add passing placeholders or
-skipped tests. Add source and a focused behavior test when this stage is built.
+```sh
+mix test test/examples/11_durable/11_05_saved_completion --include example --seed 0 --warnings-as-errors
+```
 
-Previous: [Accepted Work](../11_04_accepted_work/README.md) | Next: [Durable Wait — proposed](../11_06_durable_wait/README.md)
+Expected result: the success, recovery, and rejection assertions pass. Tests stop
+the Agents and release all held test calls. No external service is required.
+
+## Files
+
+- [Source](saved_completion.ex)
+- [Tests](../../../test/examples/11_durable/11_05_saved_completion/saved_completion_test.exs)
+
+Previous: [Accepted Work](../11_04_accepted_work/README.md) | Next: [Durable Wait](../11_06_durable_wait/README.md)

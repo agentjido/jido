@@ -19,5 +19,13 @@ Remaining work belongs outside the stable core learning path:
 The [Durable section](11_durable/README.md) now proves saved Agent state across
 whole-BEAM loss, Flow step recovery, and accepted work owned by an activation.
 Core tests cover active topology work, lost acceptance and completion replies,
-and serial Turn order. The remaining outlines cover a dedicated completion
-lesson, saved waits, and external uncertainty. Keep the one-current-Turn rule.
+and serial Turn order. The remaining lessons now cover saved completion,
+approval state between completed Turns, and provider operation IDs. Keep the
+one-current-Turn rule. Provider retention, delivery, and unsafe-operation
+reconciliation remain application responsibilities.
+
+Durability research is recorded in README-only proposals 11_08–11_19. The new
+lessons cover execution rollover, saved retries, stable Turn receipts, composed
+wait recovery, and failed work recovery. Existing wait proposals now record
+input identity, early/duplicate input, timer races, losing-wait cleanup, and
+the request-and-wait gap. These plans add no executable coverage.

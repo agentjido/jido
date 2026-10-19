@@ -25,7 +25,7 @@ Distributed behavior is outside this component. Required durable saves, restore,
 ### jido.agent_server2.I2 — Runtime defaults
 
 - **scope:** `Jido.AgentServer.start_link/1`
-- **must:** Use a 60000 ms built-in turn timeout and the declared built-in runtime defaults. Read valid application turn_timeout defaults at startup; do not accept other application runtime defaults. Explicit values override unused application configuration. Reject unknown configuration keys and finite waits outside 0..4294967295. Name each invalid timeout field in its validation error.
+- **must:** Use a 60000 ms built-in turn timeout and the declared built-in runtime defaults. Read valid application turn_timeout defaults at startup; do not accept other application runtime defaults. Explicit values override unused application configuration. Reject unknown configuration keys and finite caller waits outside 0..4294967295. Accept non-negative integer Turn timeouts, including 90 days; arm bounded timer intervals without resetting the active or saved deadline. Name each invalid timeout field in its validation error.
 - **why:** Configuration errors must be detected before work starts.
 - **kind:** functional
 - **status:** active

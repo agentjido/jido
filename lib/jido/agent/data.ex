@@ -99,7 +99,7 @@ defmodule Jido.Agent.Data do
   end
 
   def parse_value(schema, input) do
-    case Zoi.parse(schema, input, parse_defaults: true, immutable_refinements: true) do
+    case Jido.Schema.parse(schema, input, :initialize) do
       {:ok, initialized} ->
         if preserves?(input, initialized),
           do: {:ok, initialized},
@@ -129,7 +129,7 @@ defmodule Jido.Agent.Data do
 
   def complete(schema, state) do
     with :ok <- plain_map(state) do
-      case Zoi.parse(%{schema | unrecognized_keys: :error}, state, mode: :validate) do
+      case Jido.Schema.parse(%{schema | unrecognized_keys: :error}, state, :stored) do
         {:ok, ^state} ->
           :ok
 

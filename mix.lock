@@ -69,5 +69,5 @@
   "websockex": {:hex, :websockex, "0.5.1", "9de28d37bbe34f371eb46e29b79c94c94fff79f93c960d842fbf447253558eb4", [:mix], [{:telemetry, "~> 1.0", [hex: :telemetry, repo: "hexpm", optional: false]}], "hexpm", "8ef39576ed56bc3804c9cd8626f8b5d6b5721848d2726c0ccd4f05385a3c9f14"},
   "yamerl": {:hex, :yamerl, "0.10.0", "4ff81fee2f1f6a46f1700c0d880b24d193ddb74bd14ef42cb0bcf46e81ef2f8e", [:rebar3], [], "hexpm", "346adb2963f1051dc837a2364e4acf6eb7d80097c0f53cbdc3046ec8ec4b4e6e"},
   "yaml_elixir": {:hex, :yaml_elixir, "2.12.2", "9dd1330fb4cd9a36a7b0f502e5b12486eff632792ee4a5f0eba52a4d4ec32c9c", [:mix], [{:yamerl, "~> 0.10", [hex: :yamerl, repo: "hexpm", optional: false]}], "hexpm", "e7c1b10122f973e6558462d51c39026ba0e14afbc6745318e990ea82cfe9e159"},
-  "zoi": {:git, "https://github.com/mikehostetler/zoi.git", "2fff2a23e23e7ac0b26f62f49bbc1b12f7818ac9", [ref: "2fff2a23e23e7ac0b26f62f49bbc1b12f7818ac9"]},
+  "zoi": {:hex, :zoi, "0.18.11", "d278490068df1b453b1d23cfda3bd66dfe609013fb38ed624387c8bae13b485e", [:mix], [{:decimal, "~> 2.0 or ~> 3.0", [hex: :decimal, repo: "hexpm", optional: true]}, {:phoenix_html, "~> 2.14.2 or ~> 3.0 or ~> 4.1", [hex: :phoenix_html, repo: "hexpm", optional: true]}], "hexpm", "02786ed534335541b0f21aa3787875019dc91bb5f01e32aba72ce2b987c40640"},
 }

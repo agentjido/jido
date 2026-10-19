@@ -83,7 +83,7 @@ defmodule Jido.Agent.Validation do
   defp verify_extensions(_, _, false), do: :ok
 
   defp struct_fields(fields) do
-    case Zoi.validate(Jido.Agent.__schema__(), struct!(Jido.Agent, fields)) do
+    case Jido.Schema.validate(Jido.Agent.__schema__(), struct!(Jido.Agent, fields)) do
       :ok ->
         :ok
 

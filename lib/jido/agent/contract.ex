@@ -96,7 +96,7 @@ defmodule Jido.Agent.Contract do
     do: Error.fail(:invalid_directive, [], "Expected a registered emission directive")
 
   defp signal(signal) do
-    case Zoi.validate(Jido.Signal.schema(), signal) do
+    case Jido.Schema.validate(Jido.Signal.schema(), signal) do
       :ok ->
         Data.static(signal)
 

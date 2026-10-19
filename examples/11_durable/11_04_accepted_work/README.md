@@ -54,4 +54,4 @@ External effects and post-commit directives do not gain exactly-once delivery.
 - [Tests](../../../test/examples/11_durable/11_04_accepted_work/accepted_work_test.exs)
 - [Core execution](../../../lib/jido/agent_server/durable_turn.ex)
 
-Previous: [VM Recovery](../11_03_vm_recovery/README.md) | Next: [Saved Completion — proposed lesson](../11_05_saved_completion/README.md)
+Previous: [VM Recovery](../11_03_vm_recovery/README.md) | Next: [Saved Completion](../11_05_saved_completion/README.md)
