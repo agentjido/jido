@@ -213,12 +213,19 @@ defmodule Jido.AgentServer.Supervisor do
         # even when its Worker has already left the Runner registry.
         result =
           case Runner.lookup(runner, id) do
-            nil -> Runic.TaskScope.close(scope)
+            nil -> close_scope(scope)
             _worker -> Runner.cancel(runner, id)
           end
 
         if result == :ok, do: :ets.delete_object(state, execution)
         result
+    end
+  end
+
+  defp close_scope(scope) do
+    case Runic.TaskScope.confirm_close(scope) do
+      {:error, {:ownership_scope_failed, :noproc}} -> :ok
+      result -> result
     end
   end
 

@@ -158,6 +158,38 @@ defmodule JidoTest.AgentServer.ActivationRacesTest do
   end
 
   @tag obligation: ["jido.agent_server2.I6", "jido.agent_server2.I64"]
+  test "recovery confirms scope termination before clearing execution ownership", c do
+    for {reason, result} <- [
+          {:normal, :ok},
+          {:scope_failed, {:error, {:ownership_scope_failed, :scope_failed}}}
+        ] do
+      # Model an owner-driven exit before the concurrent close gets its reply.
+      scope =
+        spawn(fn ->
+          receive do
+            {:system, _from, {:terminate, :normal}} -> exit(reason)
+          end
+        end)
+
+      on_exit(fn -> Process.exit(scope, :kill) end)
+      monitor = Process.monitor(scope)
+      state = :ets.new(__MODULE__, [:set, :public])
+      execution = {:execution, c.runner, make_ref(), scope}
+      :ets.insert(state, execution)
+
+      assert Server.Supervisor.close_execution(state) == result
+      assert_receive {:DOWN, ^monitor, :process, ^scope, ^reason}
+      assert Server.Supervisor.execution(state) == if(result == :ok, do: nil, else: execution)
+
+      if result == :ok do
+        :ets.insert(state, execution)
+        assert Server.Supervisor.close_execution(state) == :ok
+        assert Server.Supervisor.execution(state) == nil
+      end
+    end
+  end
+
+  @tag obligation: ["jido.agent_server2.I6", "jido.agent_server2.I64"]
   test "recovery keeps admission closed until the old execution scope stops", c do
     for worker_dies_first? <- [false, true] do
       server = F.start(c, turn_timeout: :infinity)

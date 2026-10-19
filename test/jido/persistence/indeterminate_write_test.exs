@@ -41,11 +41,13 @@ defmodule JidoTest.Persistence.IndeterminateWriteTest do
     assert {:ok, agent, _} =
              Jido.AgentServer.call(pid, route_signal_1, context: c.turn_context)
 
+    # The commit reply precedes asynchronous Directive dispatch.
     assert_receive {:signal,
                     %{
                       type: "test.persistence.indeterminate_write.applied",
                       data: %{count: 1}
-                    }}
+                    }},
+                   5_000
 
     assert JidoTest.AgentServerAssertions.committed(pid) == %{agent: agent, state_version: 1}
 

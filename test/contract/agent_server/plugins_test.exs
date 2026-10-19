@@ -916,21 +916,20 @@ defmodule JidoTest.AgentServer.PluginsTest do
 
   @tag obligation: ["jido.agent_server2.I50", "jido.agent_server2.I52"]
   test "startup timeout stops an established exit-trapping root while its sibling starts", c do
-    server =
-      F.start(
-        %{
-          c
-          | agent: trapping_agent([owned_table: true, shutdown: :brutal_kill], start_mode: :gate)
-        },
-        readiness_timeout: 100
+    # Read the worker from the startup event. A supervisor lookup can wait
+    # behind the sibling's blocked start until after the readiness deadline.
+    {server, {first, _} = first_root} =
+      watch_start(
+        c,
+        trapping_agent([owned_table: true, shutdown: :brutal_kill], start_mode: :gate),
+        TrappingFirst
       )
 
-    {first, _} = first_root = watch_root(TrappingFirst)
+    server_ref = Process.monitor(server)
     assert_receive {:plugin_owned_table, TrappingFirst, ^first, table}, 1_000
     {second, _} = second_root = watch_root(TrappingSecond)
     assert_receive {:plugin_start_blocked, TrappingSecond, starter, ^second}, 1_000
     starter_process = watch_process(starter)
-    server_ref = Process.monitor(server)
 
     assert_receive {:DOWN, ^server_ref, :process, ^server, {:shutdown, :readiness_timeout}},
                    1_000
