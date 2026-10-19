@@ -23,6 +23,50 @@ Use `type` for stable event meaning. Use `source` to identify the producing
 part of the application. A Signal ID identifies the message. It does not prove
 that a business request is unique.
 
+## Define A Signal And Action Together
+
+Use `Jido.SignalAction` to share one input schema between a Signal and an Action.
+Keep the normal `run/2` callback:
+
+```elixir
+defmodule MyApp.CreateThread do
+  use Jido.SignalAction,
+    name: "create_thread",
+    description: "Create a named chat thread",
+    vsn: 1,
+    input: [type: "chat.thread.create", schema: Zoi.object(%{name: Zoi.string()})],
+    output: [type: "chat.thread.created", schema: Zoi.object(%{id: Zoi.string()})]
+
+  @impl Jido.Action
+  def run(data, %{client: client}), do: MyApp.Threads.create(client, data)
+end
+
+{:ok, request} = MyApp.CreateThread.new(%{name: "General"}, source: "/caller")
+{:ok, data} = Jido.Exec.run(MyApp.CreateThread, request.data, %{client: client})
+{:ok, reply} = MyApp.CreateThread.reply(request, data, source: "/chat")
+```
+
+The input schema checks Signal data and Action parameters. The output schema
+checks Action results and reply data. The Signal envelope has its own schema.
+Each definition uses the full Signal type string. The keyword options also accept
+`dataschema:` for a schema URI. Tuple forms are not supported.
+`reply/3` builds `chat.thread.created` with a new ID. It keeps the
+request trace and sets the causation ID to the request ID. It does not dispatch
+the reply. Errors use the normal Action error contract.
+
+A module route uses the declared input type. `route MyApp.CreateThread` selects
+that Action and keeps the normal complete Agent state contract. For domain work
+that must run after commit, select a handler that returns a Plugin Directive:
+
+```elixir
+routes do
+  route MyApp.CreateThread, via: MyApp.ExecuteAfterCommit
+end
+```
+
+This expands to `route "chat.thread.create", MyApp.ExecuteAfterCommit`. The
+handler and its Plugin keep control of execution after commit.
+
 ## Prepare A Command
 
 `Jido.Agent.Command` is the live Agent Server admission envelope. It carries

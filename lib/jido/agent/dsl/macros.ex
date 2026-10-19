@@ -72,8 +72,9 @@ defmodule Jido.Agent.DSL.RouteMacros do
     unless Keyword.keyword?(options) and Enum.uniq(Keyword.keys(options)) == Keyword.keys(options),
       do: error!(caller, "Route requires unique keyword options")
 
-    unknown = Keyword.keys(options) -- [:as, :defaults, :emits, :do]
+    unknown = Keyword.keys(options) -- [:as, :defaults, :emits, :do, :via]
     if unknown != [], do: error!(caller, "Unknown route options: #{inspect(unknown)}")
+    {path, target, options} = signal_action_route(path, target, options, caller)
     {body, options} = Keyword.pop(options, :do)
     {declaration, handler} = handler(path, target, body, caller)
 
@@ -81,6 +82,28 @@ defmodule Jido.Agent.DSL.RouteMacros do
       unquote(declaration)
       require unquote(@entity)
       unquote(@entity).__route__(unquote(path), unquote(handler), unquote(options))
+    end
+  end
+
+  defp signal_action_route(path, target, options, caller) do
+    case Macro.expand(path, caller) do
+      module when is_atom(module) and module not in [nil, true, false] ->
+        if target != nil or Keyword.has_key?(options, :do),
+          do: error!(caller, "A SignalAction route accepts :via instead of a target or block")
+
+        {via, options} = Keyword.pop(options, :via, path)
+
+        if via in [nil, true, false],
+          do: error!(caller, ":via requires an Action or Flow module")
+
+        type = quote do: Jido.SignalAction.route_type!(unquote(path), __ENV__)
+        {type, via, options}
+
+      _ ->
+        if Keyword.has_key?(options, :via),
+          do: error!(caller, ":via requires a SignalAction module route")
+
+        {path, target, options}
     end
   end
 

@@ -218,7 +218,8 @@ defmodule Jido.MixProject do
           Jido.Agent.Turn.Outcome
         ],
         "Agent Authoring": [
-          Jido.Agent.Extension
+          Jido.Agent.Extension,
+          Jido.SignalAction
         ],
         "Authoring Codecs": [
           Jido.Codec.Registry,
