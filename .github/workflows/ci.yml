@@ -25,7 +25,9 @@ jobs:
       runner: blacksmith-2vcpu-ubuntu-2404
       credo_command: mix credo --strict --only warning
       docs_command: mix docs --no-open -f html --warnings-as-errors
-      # Core tests and generated properties. Fuzz, peer, benchmark, and example tests stay separate.
-      test_command: mix test.ci
+      # Core contracts, then the executable learning and integration catalog.
+      test_command: |
+        mix test.ci
+        mix test.examples --warnings-as-errors --seed 0
       # Check Hex publication when changes reach main, including its merge queue.
       validate_hex_package: ${{ github.base_ref == 'main' || github.ref == 'refs/heads/main' || github.event.merge_group.base_ref == 'refs/heads/main' }}

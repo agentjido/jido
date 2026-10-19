@@ -594,4 +594,4 @@ values. Missing required fields are errors.
 
 Core uses the Hex `zoi ~> 0.18.11` dependency. Jido checks defaults,
 rejects changes to stored values, and merges compatible object intersection
-results at its state boundary. No Zoi fork or `Zoi.validate/3` API is required.
+results at its state boundary. No Zoi fork or additional validation API is required.

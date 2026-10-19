@@ -8,7 +8,7 @@ defmodule Jido.Examples.Plugins.SecureSignal.Agent do
              peer: Zoi.string() |> Zoi.default("")
            })
 
-    plugin Jido.Examples.Plugins.Identity.Plugin,
+    plugin Jido.Examples.Plugins.SecureSignal.Identity.Plugin,
       config: %{
         trusted_public_key: elem(Jido.Examples.Plugins.Crypto.peer_key_pair(), 0)
       }
@@ -39,7 +39,7 @@ defmodule Jido.Examples.Plugins.SecureSignal.Agent do
           context.agent_state
           | accepted: context.agent_state.accepted + 1,
             peer:
-              context.plugin_inputs[Jido.Examples.Plugins.Identity.Plugin]
+              context.plugin_inputs[Jido.Examples.Plugins.SecureSignal.Identity.Plugin]
               |> Map.fetch!(:prepared)
               |> Map.fetch!(:public_key)
               |> Base.encode16(case: :lower)

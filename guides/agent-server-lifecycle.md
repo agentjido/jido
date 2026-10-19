@@ -31,8 +31,8 @@ The Server applies `turn_timeout` from active admission until commit starts.
 It accepts any non-negative integer in milliseconds, or `:infinity`. The default
 is 60,000 ms. Long deadlines use bounded local timer intervals. Recovery retains
 the saved absolute deadline; it does not start the duration again. Caller waits
-keep their separate timeout limit. Long Turn budgets do not add saved Flow waits;
-see the [Flow control proposal](../examples/11_durable/flow-control/README.md).
+keep their separate timeout limit. Durable Flows can also suspend on saved waits;
+see [Durable Wait](../examples/11_durable/11_06_durable_wait/README.md).
 It cancels owned pre-commit work on timeout. Directive work starts after commit
 and uses `directive_timeout` for Plugin callbacks, external Signal dispatch,
 and remote child placement. Local supervisor starts remain tracked until the

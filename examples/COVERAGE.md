@@ -42,7 +42,7 @@ distinct Agent route or commit integration contract.
 | Capability | Owner | Status | Canonical evidence |
 | --- | --- | --- | --- |
 | Sequential Flow in an Agent route | `jido_action` | Focused example | [Source](02_workflow/02_01_sequential_flow/sequential_flow.ex), [test](../test/examples/02_workflow/02_01_sequential_flow/sequential_flow_test.exs) |
-| Synchronous I/O steps through caller context | `jido_action` | Focused example | [Source](02_workflow/02_02_effectful_steps/effectful_steps.ex), [test](../test/examples/02_workflow/02_02_effectful_steps/effectful_steps_test.exs) |
+| Synchronous I/O, bounded retries, and commit through caller context | `jido_action` | Focused example | [Source](02_workflow/02_02_effectful_steps/effectful_steps.ex), [test](../test/examples/02_workflow/02_02_effectful_steps/effectful_steps_test.exs) |
 | Conditional route Flow | `jido_action` | Focused example | [Source](02_workflow/02_03_conditional_routes/conditional_routes.ex), [test](../test/examples/02_workflow/02_03_conditional_routes/conditional_routes_test.exs) |
 | Parallel join in one Agent Turn | `jido_action` | Focused example | [Source](02_workflow/02_04_parallel_join/parallel_join.ex), [test](../test/examples/02_workflow/02_04_parallel_join/parallel_join_test.exs) |
 | Ordered batch and reduction | `jido_action` | Focused example | [Source](02_workflow/02_05_ordered_batch/ordered_batch.ex), [test](../test/examples/02_workflow/02_05_ordered_batch/ordered_batch_test.exs) |
@@ -66,8 +66,8 @@ distinct Agent route or commit integration contract.
 | Durable scheduling occurrence protocol | `jido` | Focused example | [Source](04_runtime/04_11_durable_scheduling/scheduled_occurrence_recovery.ex), [test](../test/examples/04_runtime/04_11_durable_scheduling/durable_scheduling_test.exs) |
 | Stable Agent Ref and partition identity | `jido` | Focused example | [Source](04_runtime/04_12_stable_reference/stable_reference.ex), [test](../test/examples/04_runtime/04_12_stable_reference/stable_reference_test.exs) |
 | Snapshot upgrade Actions | `jido` | Focused example | [Source](04_runtime/04_14_state_migration/state_migration.ex), [test](../test/examples/04_runtime/04_14_state_migration/state_migration_test.exs) |
-| Call, cast, and asynchronous request modes | `jido` | Focused example | [Source](04_runtime/04_15_request_modes/request_modes.ex), [test](../test/examples/04_runtime/04_15_request_modes/request_modes_test.exs) |
-| Active Turn inspection and cancellation | `jido` | Focused example | [Source](04_runtime/04_16_turn_control/turn_control.ex), [test](../test/examples/04_runtime/04_16_turn_control/turn_control_test.exs) |
+| Request modes, overload, admission deadlines, await, and abandon | `jido` | Focused example | [Source](04_runtime/04_15_request_modes/request_modes.ex), [test](../test/examples/04_runtime/04_15_request_modes/request_modes_test.exs) |
+| Active Turn inspection, cancellation, quiesce, and resume | `jido` | Focused example | [Source](04_runtime/04_16_turn_control/turn_control.ex), [test](../test/examples/04_runtime/04_16_turn_control/turn_control_test.exs) |
 | Failure policy and public Turn Outcome | `jido` | Focused example | [Source](04_runtime/04_17_failure_outcome/failure_outcome.ex), [test](../test/examples/04_runtime/04_17_failure_outcome/failure_outcome_test.exs) |
 | Heartbeat Plugin lifecycle | `jido` | Focused example | [Source](04_runtime/04_18_heartbeat/heartbeat.ex), [test](../test/examples/04_runtime/04_18_heartbeat/heartbeat_test.exs) |
 | Pure definition changes, final Diff, and live route changes | `jido` | Focused example | [Source](04_runtime/04_19_definition_changes/definition_changes.ex), [tests](../test/examples/04_runtime/04_19_definition_changes/definition_changes_test.exs) |
@@ -97,9 +97,9 @@ distinct Agent route or commit integration contract.
 
 | Capability | Owner | Status | Canonical evidence |
 | --- | --- | --- | --- |
-| Committed audit state | `jido` | Focused example | [Source](08_applications/08_01_audit/audit.ex), [test](../test/examples/08_applications/08_01_audit/audit_test.exs) |
+| Core Audit Plugin: committed records | `jido` | Focused example | [Source](08_applications/08_01_audit/audit.ex), [test](../test/examples/08_applications/08_01_audit/audit_test.exs) |
 | Subscription resource rebuilt from committed state | `jido` | Focused example | [Source](08_applications/08_02_subscription/subscription.ex), [test](../test/examples/08_applications/08_02_subscription/subscription_test.exs) |
-| Managed sensor input and duplicate rejection | `jido` | Focused example | [Source](08_applications/08_03_inbox/inbox.ex), [test](../test/examples/08_applications/08_03_inbox/inbox_test.exs) |
+| Core SensorManager Plugin: input and duplicate rejection | `jido` | Focused example | [Source](08_applications/08_03_inbox/inbox.ex), [test](../test/examples/08_applications/08_03_inbox/inbox_test.exs) |
 | Multi-Turn approval correlation and idempotency | `jido` | Focused example | [Source](08_applications/08_04_approval_workflow/approval_workflow.ex), [test](../test/examples/08_applications/08_04_approval_workflow/approval_workflow_test.exs) |
 | Bounded scheduled purpose loop | `jido` | Focused example | [Source](08_applications/08_06_purpose_loop/purpose_loop.ex), [test](../test/examples/08_applications/08_06_purpose_loop/purpose_loop_test.exs) |
 | Pure prepared Plugin input | `jido` | Focused example | [Source](09_plugins/09_01_prepared_input/prepared_input.ex), [test](../test/examples/09_plugins/09_01_prepared_input/prepared_input_test.exs) |
@@ -109,6 +109,7 @@ distinct Agent route or commit integration contract.
 | Independent Plugin input composition | `jido` | Focused example | [Source](09_plugins/09_05_composition/composition.ex), [test](../test/examples/09_plugins/09_05_composition/composition_test.exs) |
 | Plugin-owned state reduction | `jido` | Focused example | [Source](09_plugins/09_06_state_middleware/state_middleware.ex), [test](../test/examples/09_plugins/09_06_state_middleware/state_middleware_test.exs) |
 | Live Plugin configuration and owned-state removal | `jido` | Focused example | [Source](09_plugins/09_09_live_plugin_changes/live_plugin_changes.ex), [tests](../test/examples/09_plugins/09_09_live_plugin_changes/live_plugin_changes_test.exs) |
+| Plugin-defined DSL sections, entities, and JSON data | `jido` | Focused example | [Source](09_plugins/09_10_plugin_dsl/thresholds.ex), [test](../test/examples/09_plugins/09_10_plugin_dsl/plugin_dsl_test.exs) |
 
 ## Persistence contracts
 
@@ -140,18 +141,18 @@ crash and storage fault matrices.
 | Accepted serial Flow Turn and atomic completion in a topology member | `jido` AgentServer / Runic graph | Focused example | [Source](11_durable/11_04_accepted_work/accepted_work.ex), [test](../test/examples/11_durable/11_04_accepted_work/accepted_work_test.exs) |
 | Active topology work across member, root, and whole-BEAM loss | `jido` / Runic | Core-test-only | [Crash matrix](../test/jido/agent_server/durable_topology_test.exs), [BEAM proof](../test/jido/agent_server/durable_topology_peer_test.exs) |
 | Final commit before lost storage reply | `jido` AgentServer | Focused example | [Source](11_durable/11_05_saved_completion/saved_completion.ex), [test](../test/examples/11_durable/11_05_saved_completion/saved_completion_test.exs) |
-| Stored approval wait between completed Flow Turns | `jido` AgentServer | Focused example | [Source](11_durable/11_06_durable_wait/durable_wait.ex), [test](../test/examples/11_durable/11_06_durable_wait/durable_wait_test.exs) |
+| Suspended approval Flow with durable Signal input and timer selection | `jido` AgentServer | Focused example | [Source](11_durable/11_06_durable_wait/durable_wait.ex), [test](../test/examples/11_durable/11_06_durable_wait/durable_wait_test.exs) |
 | Stable operation ID after acceptance before step save | Application / provider | Focused example | [Source](11_durable/11_07_external_uncertainty/external_uncertainty.ex), [test](../test/examples/11_durable/11_07_external_uncertainty/external_uncertainty_test.exs) |
 
 ## Ecosystem and combined suites
 
 | Capability | Owner | Status | Canonical evidence |
 | --- | --- | --- | --- |
-| Model response, history, tool use, bounded tool loops, and output repair | `jido_ai` | Combined example | [Jido ecosystem integration sources](03_llm/README.md), [tests](../test/examples/03_llm/README.md) |
+| Model response, history, tool use, bounded tool loops, and output repair | Example-owned ports; `jido_ai` owns SDK AI APIs | Combined example | [Jido ecosystem integration sources](03_llm/README.md), [tests](../test/examples/03_llm/README.md) |
 | Distributed exclusive authority and fencing | `jido` | Out of scope | [Research evidence](99_research/99_02_distributed_authority/README.md), [peer test](../test/examples/99_research/99_02_distributed_authority/fenced_inventory_test.exs) |
 
-The LLM group is an ecosystem integration suite, not Jido public-feature
-coverage. `jido_ai` owns its model and tool orchestration contracts and has its
+The LLM group tests example-owned adapters. It does not prove current `jido_ai`
+compatibility and is not Jido public-feature coverage. `jido_ai` owns its model and tool orchestration contracts and has its
 own example catalog. Factory and Elastic Group moved to
 [application demonstrations](../../examples/jido_lab/experiments/jido_core/README.md).
 They need API updates before they can run as JidoLab applications.
@@ -201,17 +202,17 @@ Flow examples that prove a distinct Agent integration or commit boundary.
 
 The [README-only spikes](11_durable/README.md#proposed-lessons) reserve 11_08–11_19.
 They are Planned, have no executable evidence, and do not increase the seven
-implemented durable lessons. See the [DSL proposal](11_durable/flow-control/README.md).
+implemented durable lessons. See the [DSL proposal](11_durable/proposals/flow-control/README.md).
 
 | Proposed contract | README plan |
 | --- | --- |
-| Execution Rollover | [11_15](11_durable/11_15_execution_rollover/README.md) |
-| Retry Recovery | [11_16](11_durable/11_16_retry_recovery/README.md) |
-| Turn Receipts | [11_17](11_durable/11_17_turn_receipts/README.md) |
-| Composed Recovery | [11_18](11_durable/11_18_composed_recovery/README.md) |
-| Failed Work Recovery | [11_19](11_durable/11_19_failed_work_recovery/README.md) |
+| Execution Rollover | [11_15](11_durable/proposals/11_15_execution_rollover/README.md) |
+| Retry Recovery | [11_16](11_durable/proposals/11_16_retry_recovery/README.md) |
+| Turn Receipts | [11_17](11_durable/proposals/11_17_turn_receipts/README.md) |
+| Composed Recovery | [11_18](11_durable/proposals/11_18_composed_recovery/README.md) |
+| Failed Work Recovery | [11_19](11_durable/proposals/11_19_failed_work_recovery/README.md) |
 
-The [integration checklist](11_durable/flow-control/INTEGRATION.md) defines the
-upstream API gates and proof order for these plans. Matching test folders contain
-README plans only; they add no executable coverage. The verified patched Action
+The [integration checklist](11_durable/proposals/flow-control/INTEGRATION.md) defines the
+upstream API gates and proof order for these plans. Design and test plans are under
+`11_durable/proposals/`; they add no executable coverage. The verified patched Action
 API, not the proposed syntax, will determine the final source.

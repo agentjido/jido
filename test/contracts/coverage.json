@@ -2,22 +2,22 @@
   "apps": {
     "jido": {
       "active": 147,
-      "coverage": 0.9728,
-      "covered": 143
+      "coverage": 1.0,
+      "covered": 147
     }
   },
   "components": {
     "jido.agent": {
       "active": 45,
       "app": "jido",
-      "coverage": 0.9111,
-      "covered": 41,
+      "coverage": 1.0,
+      "covered": 45,
       "form": "light",
       "obligations": {
         "jido.agent.I1": {
-          "failing": 1,
+          "failing": 0,
           "kind": "functional",
-          "passing": 0,
+          "passing": 1,
           "status": "active",
           "testable": true,
           "tests": [
@@ -25,9 +25,9 @@
           ]
         },
         "jido.agent.I10": {
-          "failing": 1,
+          "failing": 0,
           "kind": "functional",
-          "passing": 0,
+          "passing": 1,
           "status": "active",
           "testable": true,
           "tests": [
@@ -35,9 +35,9 @@
           ]
         },
         "jido.agent.I11": {
-          "failing": 1,
+          "failing": 0,
           "kind": "functional",
-          "passing": 0,
+          "passing": 1,
           "status": "active",
           "testable": true,
           "tests": [
@@ -164,9 +164,9 @@
           ]
         },
         "jido.agent.I22": {
-          "failing": 1,
+          "failing": 0,
           "kind": "functional",
-          "passing": 0,
+          "passing": 1,
           "status": "active",
           "testable": true,
           "tests": [
@@ -1927,7 +1927,7 @@
   "covenant": "0.1.0",
   "totals": {
     "active": 147,
-    "coverage": 0.9728,
-    "covered": 143
+    "coverage": 1.0,
+    "covered": 147
   }
 }

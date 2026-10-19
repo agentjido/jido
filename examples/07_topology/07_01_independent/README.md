@@ -10,7 +10,7 @@ Two named members keep separate state under one owning Agent.
 
 ## Read the code
 
-Read the owner definition first, then the shared Cell Agent and tests.
+Read the owner definition first, then the local Cell Agent and tests.
 
 ## Run it
 
@@ -39,16 +39,16 @@ coordinated snapshot of running member states.
 ## Files
 
 - [Source](independent.ex)
-- [Cell Agent](../support/cell.ex)
+- [Cell Agent](cell.ex)
 - [Tests](../../../test/examples/07_topology/07_01_independent/independent_test.exs)
 - [Test runtime assertions](../../../test/examples/support/agent_topology_assertions.ex)
 
 ```elixir
 topology do
-  agent :left, Jido.Examples.Topology.Cell do
+  agent :left, Jido.Examples.Topology.Independent.Cell do
     initial_state %{label: "left"}
   end
-  agent :right, Jido.Examples.Topology.Cell do
+  agent :right, Jido.Examples.Topology.Independent.Cell do
     initial_state %{label: "right"}
   end
 end
@@ -59,3 +59,8 @@ and starts the same named Agents. Data authoring does not start processes.
 Continue with [Direct Connections](../07_11_direct_connections/README.md).
 
 Previous: [Topology overview](../README.md) | Next: [Direct Connections](../07_11_direct_connections/README.md)
+
+The JSON test builds its stable Registry independently. Each member declares
+the core Scheduler Plugin. A scheduled command proves that an imported member
+starts its Plugin runtime. Stopping the owner stops these runtimes too.
+For creation requested by a Turn, see [dynamic children](../../05_multi_agent/05_01_child_lifecycle/README.md).

@@ -2,8 +2,8 @@ defmodule JidoTest.Examples.Runtime.ManagedJobsTest do
   use JidoTest.FeatureSDKCase
   @moduletag group: :runtime
   alias Jido.Examples.ManagedJobs
-  alias Jido.Examples.Runtime.JobRuntime, as: Jobs
-  alias Jido.Examples.Runtime.JobRuntime.Server, as: JobServer
+  alias Jido.Examples.ManagedJobs.JobRuntime, as: Jobs
+  alias Jido.Examples.ManagedJobs.JobRuntime.Server, as: JobServer
 
   defp start_job(jido) do
     agent = start_agent!(jido, ManagedJobs, error_policy: :log_only)

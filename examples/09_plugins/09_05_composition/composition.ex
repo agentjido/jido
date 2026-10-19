@@ -8,10 +8,10 @@ defmodule Jido.Examples.Plugins.Composition.Agent do
              owner: Zoi.string() |> Zoi.default("")
            })
 
-    plugin Jido.Examples.Plugins.PreparedInput.Plugin,
+    plugin Jido.Examples.Plugins.Composition.Tenant,
       config: %{subject_prefix: "tenant/"}
 
-    plugin Jido.Examples.Plugins.RuntimeAdmission.Plugin,
+    plugin Jido.Examples.Plugins.Composition.Authorization,
       config: %{tokens: [{"allow", "operator"}]}
   end
 
@@ -20,10 +20,10 @@ defmodule Jido.Examples.Plugins.Composition.Agent do
 
     route "examples.plugins.composition.accept" do
       action %{token: _token}, schema: Zoi.object(%{token: Zoi.string()}), context: context do
-        tenant = context.plugin_inputs[Jido.Examples.Plugins.PreparedInput.Plugin].prepared
+        tenant = context.plugin_inputs[Jido.Examples.Plugins.Composition.Tenant].prepared
 
         authorization =
-          context.plugin_inputs[Jido.Examples.Plugins.RuntimeAdmission.Plugin].runtime
+          context.plugin_inputs[Jido.Examples.Plugins.Composition.Authorization].runtime
 
         {:ok,
          %{

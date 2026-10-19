@@ -70,7 +70,7 @@ defmodule Jido.AgentAuthoringTest do
     assert Minimal.definition() |> Map.from_struct() ===
              Agent.define!(%{name: "minimal", module: Minimal}) |> Map.from_struct()
 
-    assert Zoi.validate(Agent.__schema__(), expected) == :ok
+    assert Zoi.parse(Agent.__schema__(), expected) == {:ok, expected}
     assert Agent.define!(expected) === expected
   end
 

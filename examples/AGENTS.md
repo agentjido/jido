@@ -18,7 +18,9 @@ example for an application policy that only combines capabilities that the
 learning path already covers. Put that policy in a guide or a larger demo
 unless the composition itself teaches a new Jido contract.
 
-All numbered groups other than `99_research` are the stable learning path.
+Numbered lessons with source and behavior tests are the stable learning path.
+The `11_durable/proposals/` and `99_research/` folders hold design work.
+All numbered groups other than `99_research` contain stable lessons.
 Group `99_research` records proposed, incomplete, or not yet promoted behavior.
 A research example must state its status and must not present unsupported
 behavior as the normal Jido pattern.
@@ -177,8 +179,11 @@ Apply these placement rules:
   file shorter. Do not add a shared abstraction when local code is easier for a
   reader to understand.
 - Do not make one numbered example depend on private support from another
-  numbered example. Move the code to section support or `examples/support/`,
-  based on the scope of reuse.
+  numbered example. Copy small teaching modules into each lesson when this
+  makes the lesson easier to read. Use distinct module names for each copy.
+- Share code when readers gain a clear, stable building block. Do not require
+  shared code only because two lessons use similar behavior. Local duplication
+  is acceptable when it makes a lesson complete and easier to understand.
 - Keep fixture data beside its consumer in `fixtures/`.
 - Keep a section-level launcher at the section root only when it starts more
   than one numbered example. Put other launchers in their numbered folder.

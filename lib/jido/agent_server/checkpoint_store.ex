@@ -46,6 +46,33 @@ defmodule Jido.AgentServer.CheckpointStore do
 
   def load(_id, _jido), do: {:error, :not_found}
 
+  # Only the AgentServer owner calls this, after its Worker has stopped.
+  # Compare against the read token: never overwrite a newer graph.
+  def update_workflow(jido, id, transition) do
+    with {:ok, config} <- config(jido, id),
+         {:ok, bytes, condition} <- Store.read(config, key(id)),
+         {:ok, %{log: log}} <- decode(bytes) do
+      if is_nil(log) do
+        {:ok, nil}
+      else
+        workflow = Runic.Workflow.from_events(log)
+
+        case transition.(workflow) do
+          {:ok, ^workflow} ->
+            {:ok, workflow}
+
+          {:ok, next} ->
+            with :ok <-
+                   write(config, id, condition, %{fmt: 1, log: Runic.Workflow.event_log(next)}),
+                 do: {:ok, next}
+
+          error ->
+            error
+        end
+      end
+    end
+  end
+
   defp config(jido, id) when is_atom(jido) and not is_nil(jido) do
     case Jido.RuntimeStore.fetch(jido, __MODULE__, id) do
       {:ok, {owner, config}} ->

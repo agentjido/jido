@@ -3,6 +3,7 @@ defmodule Jido.AgentServer.DurableTurn do
 
   alias Jido.AgentServer.CheckpointStore
   alias Runic.Runner
+  alias Jido.Exec.WaitHost
 
   def instruction(prepared),
     do: Jido.Instruction.resolve(prepared.turn.executable, prepared.turn.input, prepared.context)
@@ -84,7 +85,7 @@ defmodule Jido.AgentServer.DurableTurn do
       max_concurrency: 1,
       scheduler: Runic.Runner.Scheduler.Default,
       scheduler_policies: [{:default, policy}],
-      run_context: %{_global: data.active.prepared.context},
+      run_context: %{_global: WaitHost.context(data.active.prepared.context, id, :system)},
       hooks:
         hooks
         |> Keyword.put(:on_complete, fn runnable, result, state ->
@@ -106,9 +107,22 @@ defmodule Jido.AgentServer.DurableTurn do
          {:ok, workflow} <- Jido.Exec.compile(%{instruction | context: %{}}),
          :ok <- CheckpointStore.register(data.jido, id, data.persistence, owner),
          :ok <- CheckpointStore.create(data.jido, id),
-         {:ok, worker} <-
-           resume_or_start(data.runner, id, workflow, instruction, options, data.activation_state) do
-      {:ok, worker, id}
+         {:ok, saved} <-
+           CheckpointStore.update_workflow(data.jido, id, &WaitHost.resolve(&1, now())) do
+      if saved && not Runic.Workflow.is_runnable?(saved) && WaitHost.pending(saved) != [] do
+        waiting(saved)
+      else
+        with {:ok, worker} <-
+               resume_or_start(
+                 data.runner,
+                 id,
+                 workflow,
+                 instruction,
+                 options,
+                 data.activation_state
+               ),
+             do: {:ok, worker, id}
+      end
     end
   end
 
@@ -169,13 +183,53 @@ defmodule Jido.AgentServer.DurableTurn do
          :ok <- portable_facts(workflow),
          :ok <- Runner.checkpoint(runner, id) do
       case Runner.step(runner, id) do
-        :ok -> :running
-        {:error, :busy} -> :running
-        {:error, reason} when reason in [:not_runnable, :admission_stopped] -> :complete
-        error -> error
+        :ok ->
+          :running
+
+        {:error, :busy} ->
+          :running
+
+        {:error, :not_runnable} ->
+          # A native task can finish between get_workflow and step. Confirm
+          # the quiescent graph rather than the earlier active snapshot.
+          with {:ok, settled} <- Runner.get_workflow(runner, id),
+               :ok <- portable_facts(settled),
+               :ok <- Runner.checkpoint(runner, id) do
+            if WaitHost.pending(settled) == [], do: :complete, else: waiting(settled)
+          end
+
+        {:error, :admission_stopped} ->
+          :complete
+
+        error ->
+          error
       end
     end
   end
+
+  def suspend(runner, id), do: Runner.stop(runner, id, persist: false)
+
+  def deliver(data, input) do
+    id = data.active.worker_id
+
+    # Acceptance is saved independently of consumption. Recovery can consume
+    # it even if the acknowledgement or the next save is lost.
+    case CheckpointStore.update_workflow(data.jido, id, fn workflow ->
+           case WaitHost.accept(workflow, input, now()) do
+             {:ok, next} -> {:ok, next}
+             {:error, reason} -> {:rejected, reason}
+           end
+         end) do
+      {:ok, %Runic.Workflow{}} -> :ok
+      {:ok, nil} -> {:error, :missing_wait_checkpoint}
+      result -> result
+    end
+  end
+
+  defp waiting(workflow),
+    do: {:waiting, WaitHost.pending(workflow), WaitHost.next_deadline(workflow)}
+
+  defp now, do: System.system_time(:millisecond)
 
   defp portable_facts(workflow) do
     if Enum.all?(Runic.Workflow.facts(workflow), fn fact ->

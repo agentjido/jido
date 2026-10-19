@@ -58,4 +58,33 @@ defmodule JidoTest.Examples.Plugins.LivePluginChangesTest do
     assert plugin(server, Cache) == nil
     assert :ok = Jido.stop_agent(jido, server)
   end
+
+  @tag :tmp_dir
+  test "thaw rebuilds changed Plugin options and state without replaying hooks", c do
+    persistence = {Jido.Persistence.File, path: c.tmp_dir}
+    id = unique_id("saved-plugin")
+
+    {:ok, server} =
+      JidoTest.ExampleRuntime.start_agent(c.jido, Example, id: id, persistence: persistence)
+
+    {:ok, install} = Example.install_signal()
+    assert {:ok, _, _} = Server.call(server, install)
+    {:ok, configure} = Example.configure_signal(%{capacity: 4})
+    assert {:ok, _, _} = Server.call(server, configure)
+    {:ok, refresh} = Example.refresh_signal()
+    assert {:ok, saved, []} = Server.call(server, refresh)
+    assert :ok = Server.quiesce(server)
+    old = plugin(server, Cache).pid
+    assert CacheRuntime.snapshot(old).notifications == 1
+    assert :ok = Server.hibernate(server)
+    refute Process.alive?(old)
+    assert {:ok, awake} = Jido.thaw(c.jido, Example, id, persistence: persistence)
+    assert :ok = Server.await_ready(awake)
+    assert Server.agent(awake) == saved
+
+    assert %{capacity: 4, value: 5, revision: 3, entries: [{3, 5}], notifications: 0} =
+             CacheRuntime.snapshot(plugin(awake, Cache).pid)
+
+    assert :ok = Jido.stop_agent(c.jido, awake)
+  end
 end

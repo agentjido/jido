@@ -20,7 +20,7 @@ The [Durable section](11_durable/README.md) now proves saved Agent state across
 whole-BEAM loss, Flow step recovery, and accepted work owned by an activation.
 Core tests cover active topology work, lost acceptance and completion replies,
 and serial Turn order. The remaining lessons now cover saved completion,
-approval state between completed Turns, and provider operation IDs. Keep the
+one suspended approval Flow, and provider operation IDs. Keep the
 one-current-Turn rule. Provider retention, delivery, and unsafe-operation
 reconciliation remain application responsibilities.
 

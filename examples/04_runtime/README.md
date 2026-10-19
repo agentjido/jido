@@ -1,27 +1,35 @@
 # Runtime examples
 
-These examples move from short-lived runtime work to observation and durable
-scheduling. Each example uses deterministic local services and
-public Jido APIs.
+Use the paths below to find the runtime boundary that you need. Numbers stay
+stable. Each lesson uses public Jido APIs and deterministic local services.
 
-## Learning order
+## Requests and control
 
-1. [Scheduled Signals](04_01_scheduled_signals/README.md) — emit later work with Scheduler Directives.
-2. [Keyed Timers](04_02_keyed_timers/README.md) — own replaceable OTP timers in a Plugin runtime.
-3. [Bus Delivery](04_03_bus_delivery/README.md) — consume an ordered durable Bus subscription.
-4. [Managed Jobs](04_04_managed_jobs/README.md) — run linked work after the request commit.
-5. [Runtime Inspection](04_05_runtime_inspection/README.md) — read safe snapshots and runtime status.
-6. [Agent Observation](04_07_agent_observation/README.md) — collect semantic SDK events.
-7. [Causal Trace](04_08_causal_trace/README.md) — follow one trace through parent and child work.
-8. [Pending Job Recovery](04_10_pending_job_recovery/README.md) — make retry after runtime loss explicit.
-9. [Durable Scheduling](04_11_durable_scheduling/README.md) — save and acknowledge schedule occurrences.
-10. [Stable Reference](04_12_stable_reference/README.md) — resolve durable identity after process and instance replacement.
-11. [State Migration](04_14_state_migration/README.md) — upgrade a saved definition and state with one Action.
-12. [Request Modes](04_15_request_modes/README.md) — compare synchronous, best-effort, and asynchronous requests.
-13. [Turn Control](04_16_turn_control/README.md) — inspect and cancel one matching active Turn.
-14. [Failure Outcome](04_17_failure_outcome/README.md) — handle errors across the commit boundary.
-15. [Heartbeat](04_18_heartbeat/README.md) — own a periodic input runtime through a Plugin.
-16. [Definition Changes and Diff](04_19_definition_changes/README.md) — compare pure mutation with a live route change.
+1. [Request Modes](04_15_request_modes/README.md): call, cast, submit, await, overload, and admission deadlines.
+2. [Turn Control](04_16_turn_control/README.md): inspect, cancel, quiesce, and resume.
+3. [Failure Outcome](04_17_failure_outcome/README.md): errors before and after commit.
+
+## Input and effects
+
+1. [Scheduled Signals](04_01_scheduled_signals/README.md): later work through Scheduler Directives.
+2. [Keyed Timers](04_02_keyed_timers/README.md): replaceable timers in a Plugin runtime.
+3. [Bus Delivery](04_03_bus_delivery/README.md): an ordered durable Bus subscription.
+4. [Managed Jobs](04_04_managed_jobs/README.md): linked work after commit.
+5. [Heartbeat](04_18_heartbeat/README.md): a periodic input Plugin.
+
+## Observation
+
+1. [Runtime Inspection](04_05_runtime_inspection/README.md): safe snapshots and status.
+2. [Agent Observation](04_07_agent_observation/README.md): semantic SDK events.
+3. [Causal Trace](04_08_causal_trace/README.md): parent and child work in one trace.
+
+## Changes and recovery
+
+1. [Definition Changes and Diff](04_19_definition_changes/README.md): pure mutation and live route changes.
+2. [Stable Reference](04_12_stable_reference/README.md): durable identity after runtime replacement.
+3. [State Migration](04_14_state_migration/README.md): change schema, definition, and state together. Continue with [Definition Revision](../10_persistence/10_08_definition_revision/README.md).
+4. [Pending Job Recovery](04_10_pending_job_recovery/README.md): explicit retry after runtime loss.
+5. [Durable Scheduling](04_11_durable_scheduling/README.md): save and acknowledge occurrences.
 
 ## Run the section
 
@@ -29,21 +37,15 @@ public Jido APIs.
 mix test test/examples/04_runtime --include example --seed 0
 ```
 
-Expected result: the runtime behavior tests pass without network access or
-credentials.
+Expected result: runtime tests pass without network access or credentials.
 
-## Shared support
+## Code layout and limits
 
-- [Event probe](support/event_probe.ex) collects semantic telemetry for two observation examples.
-- [Job runtime](support/job_runtime.ex) supplies the managed work port and Plugin runtime used by two job examples.
+The two job lessons keep their own ports and Plugin runtimes beside the Agent.
+This local duplication keeps the important behavior visible. The small
+[event probe](support/event_probe.ex) remains shared by observation lessons.
 
-## Limits
-
-These examples use local processes and local persistence adapters. Remote placement and cluster ownership remain unsupported research contracts.
-Agent checkpoint and recovery behavior is in the
-[persistence section](../10_persistence/README.md).
-
-Pending-job and durable-scheduling lessons stay here because Plugin runtime
-recovery and scheduling are their main contracts. State recovery and external
-delivery moved to the Persistence section. See the
-[coverage register](../COVERAGE.md) for the placement record.
+These examples use local processes and persistence adapters. Remote placement
+and cluster ownership remain [research contracts](../99_research/README.md).
+See [Persistence](../10_persistence/README.md) and
+[Durable execution](../11_durable/README.md) for stored state and Flow recovery.

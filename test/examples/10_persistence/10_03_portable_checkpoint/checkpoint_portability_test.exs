@@ -32,4 +32,19 @@ defmodule JidoTest.Examples.Persistence.PortableCheckpointTest do
       put_in(record.checkpoint.agent.state.payload, payload)
     end)
   end
+
+  test "nested portable values survive a complete checkpoint round trip" do
+    store = {ProbeStore, store: start_supervised!(ProbeStore)}
+
+    payload = %{
+      job: %{steps: [%{name: "read", values: [1, 2, nil, true]}]},
+      result: {:ok, "ready"}
+    }
+
+    agent = Probe.instantiate!(id: unique_id("portable"), state: %{payload: payload})
+    assert :ok = Persistence.save_agent(store, agent, namespace: "portable", revision: 3)
+
+    assert {:ok, ^agent, 3} =
+             Persistence.load_agent_with_revision(store, Probe, agent.id, namespace: "portable")
+  end
 end

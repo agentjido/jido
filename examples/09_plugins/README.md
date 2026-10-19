@@ -1,17 +1,24 @@
 # Plugin examples
 
-These examples show the Plugin data and ownership contract. They start with
-pure preparation, add live admission, then cover owned state.
+Plugins can extend Agent authoring and execution. A Plugin can add a domain
+language to the Agent DSL, validate its data, own state, and manage runtime
+resources. These are parts of one extension contract.
 
 ## Learning order
 
-1. [Prepared Input](09_01_prepared_input/README.md) — derive one portable package input without changing the Signal.
-2. [Runtime Admission](09_02_runtime_admission/README.md) — derive one transient package input from private runtime state.
-3. [Identity](09_03_identity/README.md) — combine pure signature verification with live replay protection.
-4. [Secure Signal](09_04_secure_signal/README.md) — decrypt ciphertext into a package input and preserve the incoming Signal.
-5. [Composition](09_05_composition/README.md) — use independent pure and live package inputs in one Agent.
-6. [State Middleware](09_06_state_middleware/README.md) — read complete Turn state and reduce only one owned field.
-7. [Live Plugin Changes](09_09_live_plugin_changes/README.md) — install, configure, quiesce, replace, and remove owned runtime resources.
+1. [Prepared Input](09_01_prepared_input/README.md) — derive portable input from the incoming Signal.
+2. [Runtime Admission](09_02_runtime_admission/README.md) — derive transient input from private runtime state.
+3. [State Middleware](09_06_state_middleware/README.md) — read the complete candidate and reduce one owned field.
+4. [Plugin DSL](09_10_plugin_dsl/README.md) — add a section and named entities to Agent syntax; use the same Plugin through Map and JSON authoring.
+5. [Composition](09_05_composition/README.md) — combine pure and live inputs in one Agent.
+6. [Live Plugin Changes](09_09_live_plugin_changes/README.md) — change runtime options and restore the accepted Plugin after hibernation.
+7. [Identity](09_03_identity/README.md) — combine signature checks with live replay protection.
+8. [Secure Signal](09_04_secure_signal/README.md) — decrypt input and encrypt output in Plugin order.
+
+Numbers are stable IDs. Use this reading order. Each lesson keeps its teaching
+code local. Small copies of input and identity Plugins make the composition
+lessons readable without opening an earlier lesson. Cryptographic primitives
+remain in [shared support](support/crypto.ex).
 
 ## Run the section
 
@@ -19,27 +26,24 @@ pure preparation, add live admission, then cover owned state.
 mix test test/examples/09_plugins --include example --seed 0
 ```
 
-## Related use cases
+## Core Plugins and related lessons
 
-- [Plugin State Agent](../01_basic/01_03_plugin_state_agent/README.md) shows one Plugin-owned Agent state field.
-- [Directive Agent](../01_basic/01_04_directive_agent/README.md) shows validation and post-commit dispatch.
-- [Keyed Timers](../04_runtime/04_02_keyed_timers/README.md) shows an OTP runtime owned by a Plugin.
-- [Audit](../08_applications/08_01_audit/README.md) shows owned state and a runtime projection.
-- [Subscription](../08_applications/08_02_subscription/README.md) rebuilds a live resource from committed Plugin state.
-- [Plugin State Conversion](../10_persistence/10_04_plugin_state_conversion/README.md) shows persisted Plugin-owned state.
+- [Plugin State Agent](../01_basic/01_03_plugin_state_agent/README.md): one owned state field.
+- [Directive Agent](../01_basic/01_04_directive_agent/README.md): validation and post-commit dispatch.
+- [JSON and Scheduler](../01_basic/01_07_data_defined_agent/README.md): import a saved document with a core runtime Plugin.
+- [Keyed Timers](../04_runtime/04_02_keyed_timers/README.md): Plugin-owned OTP timers.
+- [Audit](../08_applications/08_01_audit/README.md): bounded records in owned Agent state.
+- [SensorManager](../08_applications/08_03_inbox/README.md): manage an input source and reject duplicates.
+- [Subscription](../08_applications/08_02_subscription/README.md): rebuild a live resource from committed state.
+- [Plugin State Conversion](../10_persistence/10_04_plugin_state_conversion/README.md): convert persisted owned state.
 
 ## Contract summary
 
-- `Jido.Agent.Plugin.prepare/2` can reject or return one portable input.
-- `Jido.AgentServer.Plugin.admit/3` can reject or return one transient runtime input.
-- Neither preparation nor admission can change the Agent, incoming Signal, caller context, route, or another package input.
-- `Jido.Agent.Plugin.reduce/2` can read the complete candidate and return only its owned state value.
-- Unchanged Plugins receive the exact committed owned value and revision through `Jido.AgentServer.Plugin.after_commit/3` before returned Directives. Changed Plugins rebuild from that commit instead.
-- `Jido.Persistence.Plugin.dump/3` and `load/3` convert only their paired Plugin-owned state value.
-- Direct `Jido.Agent.cmd/3` runs pure preparation but not live admission or commit notification.
-- Actions and Flows read `context.plugin_inputs[Package].prepared` and
-  `context.plugin_inputs[Package].runtime`.
-
-Configuration commits rebuild changed Plugins from `Jido.Plugin.Init`.
-New, removed, and reconfigured Plugins do not receive `after_commit/3` for that
-commit; unchanged Plugins retain their normal notification.
+- `lower/2`, `normalize/1`, and `verify/2` turn custom syntax into validated, versioned data.
+- `prepare/2` returns portable input; `admit/3` returns live input. Neither changes the incoming Signal or another Plugin's input.
+- Actions read `context.plugin_inputs[Plugin].prepared` and `.runtime`.
+- `reduce/2` reads complete candidate state and returns only its owned value.
+- `after_commit/3` receives the committed value and revision before Directives run.
+- Changed Plugins rebuild from `Jido.Plugin.Init`; they do not receive a hook for that configuration commit.
+- `dump/3` and `load/3` convert only owned state. Startup and thaw rebuild runtime resources without replaying commit hooks.
+- Direct `Agent.cmd/3` runs pure callbacks. Live admission, runtime callbacks, and commit hooks require AgentServer.

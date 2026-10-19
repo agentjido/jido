@@ -52,3 +52,7 @@ runtime revision. This example does not coordinate upgrades across Agents.
 - [Tests](../../../test/examples/04_runtime/04_14_state_migration/state_migration_test.exs)
 
 Previous: [Stable Reference](../04_12_stable_reference/README.md) | Next: [Request Modes](../04_15_request_modes/README.md)
+
+Read this lesson before [Definition Revision](../../10_persistence/10_08_definition_revision/README.md).
+This lesson teaches the upgrade Action. The next lesson adds saved code
+references and restore rejection. Together they form one upgrade path.

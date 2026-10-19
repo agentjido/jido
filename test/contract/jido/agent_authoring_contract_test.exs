@@ -55,7 +55,7 @@ defmodule JidoTest.Contract.AgentAuthoringTest do
       })
 
     assert from_map === Leaf.definition()
-    assert :ok = Zoi.validate(Agent.__schema__(), from_map)
+    assert {:ok, ^from_map} = Zoi.parse(Agent.__schema__(), from_map)
   end
 
   @tag obligation: ["jido.agent.I2", "jido.agent.I3", "jido.agent.I7", "jido.agent.I9"]
@@ -118,7 +118,8 @@ defmodule JidoTest.Contract.AgentAuthoringTest do
     definition = F.definition(extensions: [F.contribution(F.First)])
     agent = Agent.instantiate!(definition, id: "plugin")
     assert agent.state.first == 0
-    assert :ok = Zoi.validate(Agent.schema(agent), agent.state)
+    assert {:ok, state} = Zoi.parse(Agent.schema(agent), agent.state)
+    assert state === agent.state
     assert {:error, _} = Agent.set(agent, first: 2)
     assert {:ok, next} = Agent.set(agent, settings: %{})
     assert next.state.settings == %{}

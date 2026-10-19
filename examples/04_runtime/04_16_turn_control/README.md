@@ -50,3 +50,15 @@ returns `{:error, :not_running}`. Commit in progress returns
 `{:error, :commit_in_progress}`. Neither API reverses committed effects.
 
 Previous: [Request Modes](../04_15_request_modes/README.md) | Next: [Failure Outcome](../04_17_failure_outcome/README.md)
+
+`quiesce/2` closes admission, rejects queued Turns with `:quiesced`, and waits
+for active work and effects. Reads remain available. With `active: :cancel`,
+eligible work stops before commit. `resume/2` opens admission after the Server
+settles. Rejected queued work does not run on resume. The tests prove both
+finish and cancel policies through public status and snapshots.
+
+```elixir
+:ok = Jido.AgentServer.quiesce(server)
+Jido.AgentServer.snapshot(server)
+:ok = Jido.AgentServer.resume(server)
+```

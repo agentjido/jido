@@ -26,7 +26,10 @@ agent_locals = [
   timezone: 1,
   signal: 1,
   signal_bus: 1,
-  name: 1
+  name: 1,
+  thresholds: 1,
+  threshold: 2,
+  on: 1
 ]
 
 # Used by "mix format"

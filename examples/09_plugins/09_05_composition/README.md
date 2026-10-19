@@ -13,8 +13,8 @@ One Agent combines a pure tenant input with a live authorization input.
 
 Read [the composed Agent](composition.ex), then read the
 [behavior tests](../../../test/examples/09_plugins/09_05_composition/composition_test.exs).
-The Agent reuses the prepared-input and runtime-admission Plugins from the
-earlier lessons.
+Read [the local input Plugins](inputs.ex) next. These small local copies keep
+both inputs visible in this lesson. Their contracts match the earlier lessons.
 
 ## Run it
 
@@ -41,4 +41,4 @@ language or allow one Plugin to change another Plugin's input.
 - [Composed Agent](composition.ex)
 - [Tests](../../../test/examples/09_plugins/09_05_composition/composition_test.exs)
 
-Previous: [Secure Signal](../09_04_secure_signal/README.md) | Next: [State Middleware](../09_06_state_middleware/README.md)
+Previous: [Plugin DSL](../09_10_plugin_dsl/README.md) | Next: [Live Plugin Changes](../09_09_live_plugin_changes/README.md)

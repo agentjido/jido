@@ -50,4 +50,4 @@ Pass-through and transform routes are shown in
 They emit Signals rather than changing domain state. Routes select the first
 match; output connections select all matching edges.
 
-Previous: [OTP Supervision](../01_05_otp_supervision/README.md) | Next: [Data-defined Agent](../01_07_data_defined_agent/README.md)
+Previous: [Typed Command Agent](../01_02_typed_command_agent/README.md) | Next: [Plugin State Agent](../01_03_plugin_state_agent/README.md)

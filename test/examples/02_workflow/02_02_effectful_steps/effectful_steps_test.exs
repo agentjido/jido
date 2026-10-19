@@ -2,7 +2,7 @@ defmodule JidoTest.Examples.Workflow.EffectfulStepsTest do
   use JidoTest.WorkflowSDKCase
 
   alias Jido.Examples.EffectfulSteps, as: Example
-  alias JidoTest.WorkflowService, as: Service
+  alias Jido.Examples.EffectfulSteps.ReadService, as: Service
 
   defp service do
     start_supervised!(
@@ -120,5 +120,37 @@ defmodule JidoTest.Examples.Workflow.EffectfulStepsTest do
     assert next.state.result.answer == "second"
     assert Service.calls(second) == [read: %{key: "two"}]
     assert Server.snapshot(server).state_version == 3
+  end
+
+  test "bounded retries repeat the read and commit the Agent only once", %{jido: jido} do
+    client =
+      start_supervised!(
+        {Service,
+         %{
+           read: [
+             {:error, :unavailable},
+             {:ok, %{revision: "r1", answer: "recovered"}}
+           ]
+         }}
+      )
+
+    server = start_agent!(jido, Example, exec_opts: [max_attempts: 2, backoff: :none])
+    {:ok, command} = Example.fetch_record_signal(%{key: "retry"})
+
+    assert {:ok, %{state: %{result: %{answer: "recovered"}}}, []} =
+             Server.call(server, command, context: %{service: {Service, client}})
+
+    assert Service.calls(client) == [read: %{key: "retry"}, read: %{key: "retry"}]
+    assert Server.snapshot(server).state_version == 1
+  end
+
+  test "retry exhaustion preserves the previous Agent commit", %{jido: jido} do
+    client = start_supervised!({Service, %{read: {:error, :unavailable}}})
+    server = start_agent!(jido, Example, exec_opts: [max_attempts: 2, backoff: :none])
+    before = Server.snapshot(server)
+    {:ok, command} = Example.fetch_record_signal(%{key: "retry"})
+    assert {:error, _} = Server.call(server, command, context: %{service: {Service, client}})
+    assert length(Service.calls(client)) == 2
+    assert Server.snapshot(server) == before
   end
 end

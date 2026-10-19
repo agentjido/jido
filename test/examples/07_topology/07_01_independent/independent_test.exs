@@ -3,11 +3,14 @@ defmodule JidoTest.Examples.Topology.IndependentTest do
   @moduletag :example
   import JidoTest.AgentTopologyAssertions
   alias Jido.AgentServer, as: Server
-  alias Jido.Examples.Topology.{Cell, Independent}
+  alias Jido.Examples.Topology.Independent
+  alias Independent.Cell
 
   test "a JSON definition starts the same declared members", %{jido: jido} do
     definition = Jido.Examples.Topology.Independent.definition()
-    assert {:ok, document, registry} = Jido.Agent.Codec.encode(definition)
+    registry = Independent.registry()
+    assert Jido.Codec.Registry.stable?(registry)
+    assert {:ok, document} = Jido.Agent.Codec.encode(definition, registry)
 
     assert {:ok, decoded} =
              Jido.Agent.Codec.decode(Jason.decode!(Jason.encode!(document)), registry)
@@ -20,6 +23,12 @@ defmodule JidoTest.Examples.Topology.IndependentTest do
              "right"
            ]
 
+    [left] = labeled(server, "left")
+    assert {:ok, %{cron: %{}}} = Server.plugin_state(left, Jido.Plugin.Scheduler)
+    {:ok, schedule} = Cell.schedule_signal(%{value: 4})
+    assert {:ok, _, [_]} = Server.call(left, schedule)
+    eventually(fn -> Server.agent(left).state.total == 4 end)
+    assert Server.agent(left).state.received == 1
     stop_topology(server)
   end
 
@@ -33,7 +42,13 @@ defmodule JidoTest.Examples.Topology.IndependentTest do
 
     assert {:ok, work} = Cell.work_signal(%{value: 4})
     assert {:ok, changed, []} = Server.call(left, work)
-    assert changed.state == %{label: "left", received: 1, total: 4}
+
+    assert Map.take(changed.state, [:label, :received, :total]) == %{
+             label: "left",
+             received: 1,
+             total: 4
+           }
+
     assert Server.snapshot(right) == before
     stop_topology(server)
     assert Jido.agent_count(jido) == 0

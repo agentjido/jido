@@ -38,4 +38,9 @@ The revision cache is transient local runtime state. This lesson does not
 provide an external cache service, distributed invalidation, or durable effects.
 Detailed fault and cancellation barriers remain in core tests.
 
-Previous: [State Middleware](../09_06_state_middleware/README.md) | Next: [Persistence examples](../../10_persistence/README.md)
+Previous: [Composition](../09_05_composition/README.md) | Next: [Identity](../09_03_identity/README.md)
+
+The File persistence test changes Plugin options, commits owned state, then
+hibernates and thaws the Agent. Thaw uses the saved capacity, owned value, and
+revision to rebuild the runtime. It does not replay `after_commit/3`. A runtime
+must be able to start from `Jido.Plugin.Init` alone.

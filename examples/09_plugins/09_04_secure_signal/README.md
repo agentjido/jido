@@ -11,7 +11,7 @@ it is signed.
 ## Read the code
 
 Read [the Agent](secure_signal.ex), [the secure Plugin](secure_signal_plugin.ex),
-then [the identity Plugin](../09_03_identity/identity_plugin.ex).
+then [the identity Plugin](identity_plugin.ex).
 
 ## Run it
 
@@ -41,8 +41,8 @@ key exchange, rotation, or secure hardware storage.
 
 - [Agent](secure_signal.ex)
 - [Secure Plugin](secure_signal_plugin.ex)
-- [Identity Plugin](../09_03_identity/identity_plugin.ex)
+- [Identity Plugin](identity_plugin.ex)
 - [Shared cryptographic helpers](../support/crypto.ex)
 - [Tests](../../../test/examples/09_plugins/09_04_secure_signal/secure_signal_test.exs)
 
-Previous: [Identity](../09_03_identity/README.md) | Next: [Composition](../09_05_composition/README.md)
+Previous: [Identity](../09_03_identity/README.md) | Next: [Plugin overview](../README.md)

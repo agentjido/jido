@@ -53,15 +53,7 @@ defmodule JidoTest.Examples.Persistence.PluginStateConversionTest do
     assert {:error, :invalid_owned_value} =
              Persistence.load_agent(persistence, ExampleAgent, agent.id, instance: jido)
 
-    assert catch_exit(
-             JidoTest.ExampleRuntime.start_agent(jido, ExampleAgent,
-               id: agent.id,
-               persistence: persistence,
-               persistence_mode: :restore
-             )
-           )
-
-    assert Jido.whereis_agent(jido, agent.id) == nil
+    assert_restore_rejected(jido, agent.id, persistence)
 
     replace_record(
       persistence,
@@ -73,15 +65,21 @@ defmodule JidoTest.Examples.Persistence.PluginStateConversionTest do
     assert {:error, {:invalid_persistence_record, :plugin_state}} =
              Persistence.load_agent(persistence, ExampleAgent, agent.id, instance: jido)
 
-    assert catch_exit(
-             JidoTest.ExampleRuntime.start_agent(jido, ExampleAgent,
-               id: agent.id,
-               persistence: persistence,
-               persistence_mode: :restore
-             )
-           )
+    assert_restore_rejected(jido, agent.id, persistence)
+  end
 
-    assert Jido.whereis_agent(jido, agent.id) == nil
+  defp assert_restore_rejected(jido, id, persistence) do
+    # Restore can stop the activation before start_agent returns its endpoint.
+    case Jido.start_agent(jido, ExampleAgent,
+           id: id,
+           persistence: persistence,
+           persistence_mode: :restore
+         ) do
+      {:ok, server} -> assert catch_exit(Jido.AgentServer.await_ready(server))
+      {:error, :worker_unavailable} -> :ok
+    end
+
+    eventually(fn -> Jido.whereis_agent(jido, id) == nil and Jido.agent_count(jido) == 0 end)
   end
 
   defp persistence do

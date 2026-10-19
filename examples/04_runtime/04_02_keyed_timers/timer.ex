@@ -3,21 +3,10 @@ defmodule Jido.Examples.BurstBuncher.Timer do
 
   use Jido.Plugin
 
-  @impl true
-  defdelegate directives(opts), to: Jido.Examples.BurstBuncher.Timer.Agent
-
-  @impl true
-  defdelegate dispatch(runtime, directive, context, opts),
-    to: Jido.Examples.BurstBuncher.Timer.Server
-
-  @impl true
-  defdelegate await_ready(runtime, opts), to: Jido.Examples.BurstBuncher.Timer.Server
-
-  @impl true
-  defdelegate child_spec(init), to: Jido.Examples.BurstBuncher.Timer.Server
-
   alias Jido.Examples.BurstBuncher.Timer.{Cancel, Replace}
   alias Jido.Signal
+  alias Jido.Examples.BurstBuncher.Timer.Runtime
+  alias Jido.Plugin.{DirectiveContext, Init}
 
   @doc "Creates or replaces one keyed timer."
   @spec replace(term(), non_neg_integer(), Signal.t()) :: Replace.t()
@@ -28,20 +17,9 @@ defmodule Jido.Examples.BurstBuncher.Timer do
   @doc "Cancels one keyed timer when it exists."
   @spec cancel(term()) :: Cancel.t()
   def cancel(timer_id), do: struct!(Cancel, timer_id: timer_id)
-end
-
-defmodule Jido.Examples.BurstBuncher.Timer.Agent do
-  @behaviour Jido.Plugin
-  alias Jido.Examples.BurstBuncher.Timer.{Cancel, Replace}
 
   @impl true
   def directives(_opts), do: [Replace, Cancel]
-end
-
-defmodule Jido.Examples.BurstBuncher.Timer.Server do
-  @behaviour Jido.Plugin
-  alias Jido.Examples.BurstBuncher.Timer.Runtime
-  alias Jido.Plugin.{DirectiveContext, Init}
 
   @impl true
   def dispatch(runtime, directive, %DirectiveContext{}, opts) do

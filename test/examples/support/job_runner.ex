@@ -1,7 +1,7 @@
 defmodule JidoTest.JobRunner.Barrier do
   @moduledoc false
 
-  @behaviour Jido.Examples.Runtime.JobRunner
+  @behaviour Jido.Examples.ManagedJobs.JobRunner
 
   @impl true
   def run({owner, label}, value) do

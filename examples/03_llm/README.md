@@ -54,3 +54,7 @@ compatibility, image understanding, or provider-specific token limits.
 Grounding, history compaction, delegation, and recursive analysis are useful
 application policies. They belong in later application or multi-Agent examples
 when they use a distinct Jido contract. They do not need separate LLM examples.
+
+These examples do not call `jido_ai`. Their passing tests do not establish
+compatibility with its latest API. Use the current `jido_ai` examples and tests
+when you need that integration proof.

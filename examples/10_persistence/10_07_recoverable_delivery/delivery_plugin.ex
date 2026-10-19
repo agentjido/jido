@@ -35,27 +35,7 @@ defmodule Jido.Examples.RecoverableDelivery.Output do
 
   use Jido.Plugin
 
-  @impl true
-  defdelegate state_spec(opts), to: Jido.Examples.RecoverableDelivery.Output.Agent
-
-  @impl true
-  defdelegate directives(opts), to: Jido.Examples.RecoverableDelivery.Output.Agent
-
-  @impl true
-  defdelegate reduce(reduction, opts), to: Jido.Examples.RecoverableDelivery.Output.Agent
-
-  @impl true
-  defdelegate dispatch(runtime, directive, context, opts),
-    to: Jido.Examples.RecoverableDelivery.Output.Server
-
-  @impl true
-  defdelegate child_spec(init), to: Jido.Examples.RecoverableDelivery.Output.Server
-end
-
-defmodule Jido.Examples.RecoverableDelivery.Output.Agent do
-  @behaviour Jido.Plugin
-
-  alias Jido.Examples.RecoverableDelivery.{Confirm, Deliver}
+  alias Jido.Examples.RecoverableDelivery.{Confirm, Deliver, Worker}
 
   @impl true
   def state_spec(_opts) do
@@ -109,11 +89,6 @@ defmodule Jido.Examples.RecoverableDelivery.Output.Agent do
         {:error, :unknown_delivery_confirmation}
     end
   end
-end
-
-defmodule Jido.Examples.RecoverableDelivery.Output.Server do
-  @behaviour Jido.Plugin
-  alias Jido.Examples.RecoverableDelivery.{Confirm, Deliver, Worker}
 
   @impl true
   def dispatch(runtime, %Deliver{}, _context, _opts), do: GenServer.cast(runtime, :wake)

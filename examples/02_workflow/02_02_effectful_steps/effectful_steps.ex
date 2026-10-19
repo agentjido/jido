@@ -43,38 +43,15 @@ defmodule Jido.Examples.EffectfulSteps.Read do
             {:ok, Map.merge(input, %{record: record, cached: false})}
 
           {:error, reason} ->
-            {:error, Jido.Action.Error.execution_error("read failed", reason: reason)}
+            {:error,
+             Jido.Action.Error.execution_error("read failed",
+               reason: reason,
+               retry: reason == :unavailable
+             )}
         end
 
       _ ->
         {:error, Jido.Action.Error.validation_error("service context required", field: :service)}
-    end
-  end
-end
-
-defmodule Jido.Examples.EffectfulSteps.Project do
-  @moduledoc false
-
-  use Jido.Action,
-    name: "workflow_effect_project",
-    schema:
-      Zoi.object(%{
-        key: Zoi.string() |> Zoi.min(1),
-        record: Zoi.map(),
-        cached: Zoi.boolean(),
-        allowed: Zoi.boolean() |> Zoi.optional(),
-        expected_revision: Zoi.string() |> Zoi.optional()
-      })
-
-  @impl true
-  def run(%{cached: true} = input, _context), do: {:ok, %{key: input.key, result: input.record}}
-
-  def run(input, _context) do
-    if input.record.revision == input.expected_revision do
-      # The application explicitly selects portable output. Jido does not redact it.
-      {:ok, %{key: input.key, result: Map.take(input.record, [:revision, :answer])}}
-    else
-      {:error, Jido.Action.Error.validation_error("source revision is stale", stage: :project)}
     end
   end
 end
@@ -100,7 +77,22 @@ defmodule Jido.Examples.EffectfulSteps.Pipeline do
     end
 
     step "read", action: Jido.Examples.EffectfulSteps.Read, params: result("guard")
-    step "project", action: Jido.Examples.EffectfulSteps.Project, params: result("read")
+
+    step "project", input <- result("read") do
+      cond do
+        input.cached ->
+          {:ok, %{key: input.key, result: input.record}}
+
+        input.record.revision == input.expected_revision ->
+          # Select portable output before the Agent commits it.
+          {:ok, %{key: input.key, result: Map.take(input.record, [:revision, :answer])}}
+
+        true ->
+          {:error,
+           Jido.Action.Error.validation_error("source revision is stale", stage: :project)}
+      end
+    end
+
     output result("project")
   end
 end

@@ -14,6 +14,8 @@ defmodule JidoTest.Examples.RuntimeBarrier do
   def handle_call({:arm, observer}, _from, state),
     do: {:reply, :ok, %{state | observer: observer, waiter: nil}}
 
+  def handle_call(:wait, _from, %{observer: nil} = state), do: {:reply, :ok, state}
+
   def handle_call(:wait, from, %{observer: observer, waiter: nil} = state) do
     send(observer, :runtime_barrier_waiting)
     {:noreply, %{state | waiter: from}}
@@ -21,6 +23,6 @@ defmodule JidoTest.Examples.RuntimeBarrier do
 
   def handle_call(:release, _from, %{waiter: waiter} = state) when not is_nil(waiter) do
     GenServer.reply(waiter, :ok)
-    {:reply, :ok, %{state | waiter: nil}}
+    {:reply, :ok, %{state | waiter: nil, observer: nil}}
   end
 end

@@ -9,8 +9,8 @@ defmodule Jido.Examples.PendingJobRecovery do
 
   use Jido.Agent, name: "example_pending_job_recovery"
 
-  alias Jido.Examples.Runtime.{JobRunner, JobRuntime}
-  alias Jido.Examples.Runtime.JobRuntime.{Cancel, Submit}
+  alias Jido.Examples.PendingJobRecovery.{JobRunner, JobRuntime}
+  alias Jido.Examples.PendingJobRecovery.JobRuntime.{Cancel, Submit}
 
   agent do
     schema Zoi.object(%{

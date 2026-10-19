@@ -10,7 +10,7 @@ The [source overview](../../../examples/11_durable/README.md) defines ownership 
 - `11_04`: restore a topology member and its completed report Turn.
 
 - `11_05`: restore saved completion after a lost storage reply.
-- `11_06`: restore approval state and its absolute deadline between Turns.
+- `11_06`: restore one suspended approval Flow and its absolute wait deadline.
 - `11_07`: repeat a provider call with one operation ID and one publication.
 
 Crash controls and barriers remain in test support. Child BEAM tests need local
@@ -18,9 +18,9 @@ sockets and `kill`, but no external service or credentials.
 
 ## Pending integration
 
-11_08–11_19 have README-only test plans in matching folders. They add no tests
-or coverage yet. Follow the
-[integration checklist](../../../examples/11_durable/flow-control/INTEGRATION.md)
+11_08–11_19 have [design and test plans](../../../examples/11_durable/proposals/README.md).
+They are separate from this executable test tree and add no coverage. Follow the
+[integration checklist](../../../examples/11_durable/proposals/flow-control/INTEGRATION.md)
 for the patched Action dependency, per-lesson gates, and proof order. Keep
 11_01–11_07 green before promoting a new lesson. No skipped test skeletons are
 part of this preparation.

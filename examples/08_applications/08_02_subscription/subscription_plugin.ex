@@ -29,34 +29,12 @@ defmodule Jido.Examples.Applications.Subscription.Plugin do
   @moduledoc "Owns desired subscription state and reconciles a runtime projection."
   use Jido.Plugin
 
-  @impl true
-  defdelegate state_spec(opts), to: Jido.Examples.Applications.Subscription.Plugin.Agent
-
-  @impl true
-  defdelegate directives(opts), to: Jido.Examples.Applications.Subscription.Plugin.Agent
-
-  @impl true
-  defdelegate reduce(reduction, opts), to: Jido.Examples.Applications.Subscription.Plugin.Agent
-
-  @impl true
-  defdelegate dispatch(runtime, directive, context, opts),
-    to: Jido.Examples.Applications.Subscription.Plugin.Server
-
-  @impl true
-  defdelegate await_ready(runtime, opts),
-    to: Jido.Examples.Applications.Subscription.Plugin.Server
-
-  @impl true
-  defdelegate child_spec(init), to: Jido.Examples.Applications.Subscription.Plugin.Server
   alias Jido.Examples.Applications.Subscription.{Subscribe, Unsubscribe}
+  alias Jido.Plugin.{DirectiveContext, Init}
+  alias Jido.Examples.Applications.Subscription.Runtime
 
   def subscribe(topic, config \\ %{}), do: %Subscribe{topic: topic, config: config}
   def unsubscribe(topic), do: %Unsubscribe{topic: topic}
-end
-
-defmodule Jido.Examples.Applications.Subscription.Plugin.Agent do
-  @behaviour Jido.Plugin
-  alias Jido.Examples.Applications.Subscription.{Subscribe, Unsubscribe}
 
   @state_schema Zoi.object(%{desired: Zoi.map() |> Zoi.default(%{})})
                 |> Zoi.default(%{desired: %{}})
@@ -85,12 +63,6 @@ defmodule Jido.Examples.Applications.Subscription.Plugin.Agent do
 
     {:ok, next}
   end
-end
-
-defmodule Jido.Examples.Applications.Subscription.Plugin.Server do
-  @behaviour Jido.Plugin
-  alias Jido.Plugin.{DirectiveContext, Init}
-  alias Jido.Examples.Applications.Subscription.Runtime
 
   @impl true
   def dispatch(runtime, _directive, %DirectiveContext{} = context, _opts),

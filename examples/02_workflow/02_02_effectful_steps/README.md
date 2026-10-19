@@ -14,7 +14,7 @@ portable result.
 
 Read [the Agent and Flow](effectful_steps.ex) first. Then read
 [the behavior tests](../../../test/examples/02_workflow/02_02_effectful_steps/effectful_steps_test.exs)
-and [the shared service adapter](../../../test/examples/support/workflow_sdk_case.ex).
+and [the local service adapter](support/read_service.ex).
 
 ## Run it
 
@@ -34,8 +34,9 @@ recreate that service before recovery. Flows without persistence can use live
 clients and references in context.
 
 Only selected output becomes Agent state. Flow recovery records can also contain
-portable context and intermediate service results. `Read` and `Project` are named because their cache and I/O contracts are
-the subject of this example and use separate clauses.
+portable context and intermediate service results. `Read` remains named because
+its cache and I/O clauses are the subject of the lesson. Projection is inline
+next to the Flow that uses it.
 
 This folder keeps its original `effectful_steps` name, but the work is
 synchronous I/O. Jido also uses “effects” for deferred Directives that run
@@ -44,13 +45,16 @@ teaches that separate contract.
 
 ## Limits
 
-This example does not provide external retry, idempotency, or durable effect
-recovery.
+Use `exec_opts: [max_attempts: 2, backoff: :none]` for the local retry proof.
+Only `:unavailable` is marked safe to retry. A successful retry repeats the
+external read and commits Agent state once. Exhaustion preserves prior state.
+These are execution retries in one Turn. They do not prove saved retry budgets
+across a crash. External writes still need application idempotency.
 
 ## Files
 
 - [Source](effectful_steps.ex)
 - [Tests](../../../test/examples/02_workflow/02_02_effectful_steps/effectful_steps_test.exs)
-- [Shared test adapter](../../../test/examples/support/workflow_sdk_case.ex)
+- [Local service adapter](support/read_service.ex)
 
 Previous: [Sequential Flow](../02_01_sequential_flow/README.md) | Next: [Choice and Fallback](../02_03_conditional_routes/README.md)

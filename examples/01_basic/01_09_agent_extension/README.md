@@ -60,4 +60,4 @@ startup. This provider returns `:none`, so it needs no runtime adapter and can
 run in an AgentServer. A provider that declares an unsupported adapter fails
 that check. Pure authoring does not start an adapter.
 
-Previous: [Data-defined Agent](../01_07_data_defined_agent/README.md) | Next: [Workflow examples](../../02_workflow/README.md)
+Previous: [Data-defined Agent](../01_07_data_defined_agent/README.md) | Next: [Plugin DSL](../../09_plugins/09_10_plugin_dsl/README.md)

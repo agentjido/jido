@@ -23,8 +23,8 @@ record is removed, and one failed Flow adds no record.
 
 ## Important behavior
 
-The named commit Action is a first-class Flow continuation. It selects a domain
-fact and returns a typed Audit Directive with the domain candidate. The Plugin
+A guard Step rejects failed work. The next inline Step selects a domain fact
+and returns a typed Audit Directive with the domain candidate. The Plugin
 has no runtime projection. Its bounded records are part of portable Agent state.
 
 Audit records describe successful domain decisions. Use the

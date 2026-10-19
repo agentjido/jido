@@ -50,8 +50,8 @@ json = JSON.encode!(document)
   Jido.Agent.Codec.decode(JSON.decode!(json), registry)
 ```
 
-The document stores static Agent configuration. It does not store instance
-state, runtime resources, completed work, or a live deployment.
+The document stores an Agent definition or a complete instance with its state.
+It does not store runtime resources, completed work, or a live deployment.
 The current Agent document version is 1. The Codec rejects other versions.
 
 ## Use A Trusted Registry
@@ -64,11 +64,43 @@ Document strings do not create atoms or derive module names. Treat the Registry
 as an application allowlist. For stored documents, define stable application
 identifiers instead of using generated temporary identifiers.
 
+## Import An Agent With Plugins
+
+Agent JSON stores Plugin contributions in `extensions`. Each contribution
+contains its provider, ID, version, and configuration data. Register the Plugin
+module as a trusted `:plugin` reference, and register its option keys and any
+other referenced values. Import validates the current Plugin contract and state
+schema. Missing references and invalid Plugin options fail before startup.
+
+```elixir
+extensions = [
+  %{
+    id: Jido.Plugin.Scheduler.id(),
+    provider: Jido.Plugin.Scheduler,
+    vsn: Jido.Plugin.Scheduler.vsn(),
+    data: %{retry_delay_ms: 25}
+  }
+]
+```
+
+Import does not activate Plugins. Instantiate the decoded definition, start it
+with `Jido.start_agent/2`, and call `Jido.AgentServer.await_ready/1`. AgentServer
+then starts each declared runtime Plugin. An imported Action or Flow route can
+return Scheduler Directives through the same commit boundary as a DSL Agent.
+
+The separate `Jido.Plugin.Scheduler.DSL` provider validates static `schedules`
+data. It does not start the Scheduler runtime or activate those schedules.
+Use the runtime `Jido.Plugin.Scheduler` contribution for this use case.
+
+See the [data-defined Agent example](https://github.com/agentjido/jido/tree/release/v3/examples/01_basic/01_07_data_defined_agent)
+for a JSON import with stable Registry IDs, Plugin options, and a scheduled
+command. A Plugin's code must already be installed and allowed by the host.
+
 ## Keep Formats Separate
 
 | Format | Purpose |
 | --- | --- |
-| Agent Codec | Static Agent definition |
+| Agent Codec | Agent definition or complete instance data |
 | Plugin Codec | Plugin module and options |
 | Topology Codec | Static system composition |
 | Agent checkpoint | Portable identity and live state |

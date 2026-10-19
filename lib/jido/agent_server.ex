@@ -199,6 +199,12 @@ defmodule Jido.AgentServer do
   status, and cancellation remain available. Direct Actions retain their ordinary
   Turn contract.
 
+  A Flow wait releases its quiescent Runic Worker. `status/2` reports `:waiting`
+  and open wait IDs. `deliver_wait/4` saves a Signal addressed to an open wait;
+  it bypasses queued Turns without starting another state transition. Acceptance
+  is saved before acknowledgement, and selection before downstream execution.
+  Timer deadlines are absolute UTC values. Restore retains those deadlines.
+
   Recovery reloads the same Turn ID and graph. It does not restore the caller's
   Pending handle or mailbox. Caller context and Plugin inputs must be portable.
   Flow and Action code must remain compatible while work is pending. The Turn's
@@ -206,8 +212,9 @@ defmodule Jido.AgentServer do
   ID and status, not an unbounded receipt history. A repeated Signal is a new Turn.
 
   Cancellation saves a terminal receipt before stopping work. Normal stop retains
-  pending work for the next activation. Hibernation drains the current Turn under
-  its existing control policy. Post-commit hooks and effects are not replayed.
+  pending work for the next activation. Hibernation can save an already suspended
+  Turn without draining its wait. A running Worker still uses the drain or cancel
+  policy. Post-commit hooks and effects are not replayed.
   Checkpoints do not provide exactly-once external I/O or a durable Signal inbox.
   """
 
@@ -1114,6 +1121,28 @@ defmodule Jido.AgentServer do
   def status(server, timeout \\ 5_000) do
     with :ok <- validate_wait(timeout), do: :gen_statem.call(server, :status, timeout)
   end
+
+  @doc """
+  Saves a Signal as input to an open durable Flow wait. This is not a new Turn.
+
+  Use the wait ID from `status/2`. Signal `id` identifies a retry, `type` selects
+  the event, and `data` is the payload. `:ok` confirms saved acceptance, not
+  completion. A caller timeout does not cancel delivery. Retry the same Signal
+  and wait ID. Delivery is available only while the Worker is suspended.
+  """
+  @spec deliver_wait(:gen_statem.server_ref(), String.t(), Signal.t(), timeout()) ::
+          :ok | {:error, term()}
+  def deliver_wait(server, wait_id, signal, timeout \\ 5_000)
+
+  def deliver_wait(server, wait_id, %Signal{} = signal, timeout) do
+    with :ok <- validate_wait(timeout) do
+      input = %{id: signal.id, event: signal.type, payload: signal.data, wait_id: wait_id}
+      :gen_statem.call(server, {:wait_input, input}, timeout)
+    end
+  end
+
+  def deliver_wait(_server, _wait_id, _signal, _timeout),
+    do: invalid_options("wait input must be a Signal")
 
   @doc "Waits for Plugin startup and readiness. Caller timeout does not stop startup."
   def await_ready(server, timeout \\ 5_000) do
@@ -2110,6 +2139,7 @@ defmodule Jido.AgentServer do
         case phase do
           phase when phase in [:restoring, :initializing] -> :initializing
           :idle -> :idle
+          :waiting -> :waiting
           _ -> :running
         end,
       ready?:
@@ -2137,24 +2167,47 @@ defmodule Jido.AgentServer do
         limit: data.max_postponed_signals,
         message_queue_len: mailbox
       },
-      active: active_status(data.active, phase)
+      active: active_status(data.active, phase),
+      waits: if(data.active, do: data.active.waits, else: [])
     }
 
     {:keep_state_and_data, [{:reply, from, status}]}
   end
 
+  def handle_event(
+        {:call, from},
+        {:wait_input, input},
+        :waiting,
+        %{active: %{operation: nil}} = data
+      )
+      when data.admission_mode != :blocked and
+             (is_nil(data.control) or data.control.kind == :quiesce) do
+    data = data |> cancel_wait_timer() |> put_in([:active, :wait_from], from)
+    durable_operation(:durable_input, data, fn -> DurableTurn.deliver(data, input) end)
+  end
+
+  def handle_event({:call, from}, {:wait_input, _input}, _phase, _data),
+    do: {:keep_state_and_data, reply(from, {:error, :not_waiting})}
+
   def handle_event({:call, from}, {:cancel, _id}, :idle, _data),
     do: {:keep_state_and_data, reply(from, {:error, :not_running})}
 
-  def handle_event({:call, from}, {:cancel, _id}, :saving, _data),
-    do: {:keep_state_and_data, reply(from, {:error, :commit_in_progress})}
+  def handle_event({:call, from}, {:cancel, _id}, :waiting, %{admission_mode: :blocked}),
+    do: {:keep_state_and_data, reply(from, {:error, :unsafe_resume})}
+
+  def handle_event({:call, from}, {:cancel, _id}, phase, _data)
+      when phase in [:saving, :hibernating],
+      do: {:keep_state_and_data, reply(from, {:error, :commit_in_progress})}
 
   def handle_event({:call, from}, {:cancel, _id}, phase, _data) when phase in [:policy, :effects],
     do: {:keep_state_and_data, reply(from, {:error, :not_running})}
 
   def handle_event(:info, {:turn_timeout, _id}, phase, _data)
-      when phase in [:saving, :policy, :effects],
+      when phase in [:saving, :hibernating, :policy, :effects],
       do: :keep_state_and_data
+
+  def handle_event(:info, {:turn_timeout, _id}, :waiting, %{admission_mode: :blocked}),
+    do: :keep_state_and_data
 
   def handle_event(:info, {:persistence_timeout, id}, :saving, %{active: %{turn_id: id}} = data),
     do: stop_durable(data, :indeterminate)
@@ -2256,6 +2309,8 @@ defmodule Jido.AgentServer do
              :preparing,
              :starting,
              :running,
+             :waiting,
+             :hibernating,
              :settling,
              :cleaning,
              :reconfiguring,
@@ -2289,7 +2344,14 @@ defmodule Jido.AgentServer do
     complete_task(operation.task)
 
     storage_expired =
-      if operation.kind in [:durable_accept, :durable_terminal, :durable_advance, :durable_start] do
+      if operation.kind in [
+           :durable_accept,
+           :durable_terminal,
+           :durable_advance,
+           :durable_start,
+           :durable_suspend,
+           :durable_input
+         ] do
         {timer, deadline} = data.active.durable_storage
         Process.cancel_timer(timer)
         System.monotonic_time(:millisecond) >= deadline
@@ -2515,6 +2577,16 @@ defmodule Jido.AgentServer do
 
   def handle_event(
         :info,
+        {:wait_wake, id, token},
+        :waiting,
+        %{active: %{turn_id: id, wait_token: token, operation: nil}} = data
+      )
+      when data.admission_mode != :blocked and
+             (is_nil(data.control) or data.control.kind == :quiesce),
+      do: start_durable_worker(cancel_wait_timer(data))
+
+  def handle_event(
+        :info,
         {:durable_storage_timeout, id},
         _phase,
         %{active: %{turn_id: id}} = data
@@ -2578,6 +2650,7 @@ defmodule Jido.AgentServer do
     end
 
     if data.active do
+      if data.active.wait_timer, do: Process.cancel_timer(data.active.wait_timer)
       if data.active.operation, do: Task.shutdown(data.active.operation.task, :brutal_kill)
 
       if phase == :effects and is_nil(data.active.effect_outcome),
@@ -2664,6 +2737,11 @@ defmodule Jido.AgentServer do
       durable_storage: nil,
       durable_next: nil,
       advance_pending: false,
+      waits: [],
+      wait_deadline: nil,
+      wait_timer: nil,
+      wait_token: nil,
+      wait_from: nil,
       result: nil,
       abort_reason: nil,
       cancel_waiters: [],
@@ -2796,6 +2874,8 @@ defmodule Jido.AgentServer do
       durable_start: :starting,
       durable_advance: :running,
       durable_terminal: :saving,
+      durable_suspend: :starting,
+      durable_input: :starting,
       start: :starting,
       execute: :starting,
       settle: :settling,
@@ -2852,7 +2932,14 @@ defmodule Jido.AgentServer do
   end
 
   defp operation_result(:durable_start, {:ok, worker, id}, data) do
-    active = %{data.active | worker: worker, worker_ref: Process.monitor(worker), worker_id: id}
+    active = %{
+      data.active
+      | worker: worker,
+        worker_ref: Process.monitor(worker),
+        worker_id: id,
+        waits: [],
+        wait_deadline: nil
+    }
 
     case ServerSupervisor.remember_execution(data.activation_state, data.runner, id, worker) do
       :ok ->
@@ -2862,6 +2949,42 @@ defmodule Jido.AgentServer do
       {:error, reason} ->
         stop_durable(%{data | active: active}, reason)
     end
+  end
+
+  defp operation_result(:durable_start, {:waiting, waits, deadline}, data),
+    do: wait_for_input(data, waits, deadline)
+
+  defp operation_result(:durable_advance, {:waiting, waits, deadline}, data) do
+    if data.active.worker_ref, do: Process.demonitor(data.active.worker_ref, [:flush])
+
+    data =
+      data
+      |> put_in([:active, :worker], nil)
+      |> put_in([:active, :worker_ref], nil)
+      |> put_in([:active, :waits], waits)
+      |> put_in([:active, :wait_deadline], deadline)
+
+    durable_operation(:durable_suspend, data, fn ->
+      DurableTurn.suspend(data.runner, data.active.worker_id)
+    end)
+  end
+
+  defp operation_result(:durable_suspend, :ok, data) do
+    ServerSupervisor.forget_execution(data.activation_state)
+    wait_for_input(data, data.active.waits, data.active.wait_deadline)
+  end
+
+  defp operation_result(:durable_input, :ok, data) do
+    from = data.active.wait_from
+    data = put_in(data.active.wait_from, nil)
+    {:next_state, phase, data} = start_durable_worker(data)
+    {:next_state, phase, data, reply(from, :ok)}
+  end
+
+  defp operation_result(:durable_input, {:rejected, reason}, data) do
+    from = data.active.wait_from
+    data = data |> put_in([:active, :wait_from], nil) |> arm_wait_timer()
+    {:next_state, :waiting, data, reply(from, {:error, reason})}
   end
 
   defp operation_result(:durable_advance, :running, data) do
@@ -2898,7 +3021,14 @@ defmodule Jido.AgentServer do
       )
 
   defp operation_result(kind, {:error, reason}, data)
-       when kind in [:durable_accept, :durable_start, :durable_advance, :durable_terminal],
+       when kind in [
+              :durable_accept,
+              :durable_start,
+              :durable_advance,
+              :durable_terminal,
+              :durable_suspend,
+              :durable_input
+            ],
        do: stop_durable(data, reason)
 
   defp operation_result(:start, {:ok, worker, input, context}, data) do
@@ -3081,6 +3211,8 @@ defmodule Jido.AgentServer do
     if data.active.operation, do: Task.shutdown(data.active.operation.task, :brutal_kill)
     if data.active.durable_storage, do: Process.cancel_timer(elem(data.active.durable_storage, 0))
     data = put_in(data.active.operation, nil)
+    if data.active.wait_from, do: :gen_statem.reply(data.active.wait_from, {:error, reason})
+    data = put_in(data.active.wait_from, nil)
     status = if reason == :cancelled, do: :cancelled, else: :failed
     receipt = %{data.server_turn | status: status}
 
@@ -3109,6 +3241,7 @@ defmodule Jido.AgentServer do
   end
 
   defp cleanup(data, result) do
+    data = cancel_wait_timer(data)
     runner = data.runner
     id = data.active.worker_id
     worker = data.active.worker
@@ -3135,6 +3268,7 @@ defmodule Jido.AgentServer do
            ),
          {:ok, input} <- execution_input(instruction),
          {:ok, workflow} <- Jido.Exec.compile(%{instruction | context: %{}}),
+         :ok <- Jido.Exec.Node.Wait.validate_host(workflow),
          {:ok, worker} <-
            Runner.start_workflow(runner, id, workflow,
              owner: owner,
@@ -3283,7 +3417,9 @@ defmodule Jido.AgentServer do
     replies =
       if data.active,
         do:
-          reply(data.active.from, {:error, error}) ++ cancel_replies(data.active, {:error, error}),
+          reply(data.active.from, {:error, error}) ++
+            reply(data.active.wait_from, {:error, error}) ++
+            cancel_replies(data.active, {:error, error}),
         else: []
 
     {:stop_and_reply, {:shutdown, :execution_lifecycle_failed}, replies, data}
@@ -4136,7 +4272,8 @@ defmodule Jido.AgentServer do
       data.control != nil and System.monotonic_time(:millisecond) >= data.control.deadline ->
         control_timeout(data)
 
-      data.admission_mode == :quiescing and settled?(data) ->
+      data.admission_mode == :quiescing and
+          (settled?(data) or suspended_hibernation?(data)) ->
         case data.control do
           nil ->
             {:keep_state, set_admission(data, :quiesced)}
@@ -4178,8 +4315,14 @@ defmodule Jido.AgentServer do
             agent = data.agent
             task = Task.async(fn -> Jido.Persistence.save_agent(source, agent, opts) end)
 
-            {:keep_state,
-             %{data | control: %{data.control | task: task, timer: timer, deadline: deadline}}}
+            next = %{
+              data
+              | control: %{data.control | task: task, timer: timer, deadline: deadline}
+            }
+
+            if suspended_hibernation?(data),
+              do: {:next_state, :hibernating, cancel_wait_timer(next)},
+              else: {:keep_state, next}
 
           _ ->
             :keep_state_and_data
@@ -4216,7 +4359,15 @@ defmodule Jido.AgentServer do
     # A failed idle save closes admission. Do not start an automatic retry loop.
     mode = if control.from == nil and mode == :open, do: :quiesced, else: mode
     data = data |> set_admission(mode) |> Map.put(:control, nil) |> arm_idle()
-    {:keep_state, data, reply(control.from, hibernate_error(reason, safe?))}
+
+    if data.active && data.active.waits != [] do
+      if safe? and expired?(data.active), do: send(self(), {:turn_timeout, data.active.turn_id})
+
+      {:next_state, :waiting, arm_wait_timer(data),
+       reply(control.from, hibernate_error(reason, safe?))}
+    else
+      {:keep_state, data, reply(control.from, hibernate_error(reason, safe?))}
+    end
   end
 
   defp idle_transition(data, replies \\ []) do
@@ -4270,6 +4421,42 @@ defmodule Jido.AgentServer do
       )
       |> Map.put(:stage, phase)
       |> Map.put(:worker_pid, active.worker)
+
+  defp wait_for_input(data, waits, deadline) do
+    data =
+      data
+      |> put_in([:active, :waits], waits)
+      |> put_in([:active, :wait_deadline], deadline)
+      |> put_in([:active, :advance_pending], false)
+      |> arm_wait_timer()
+
+    {:next_state, :waiting, data, [{:next_event, :internal, :control_progress}]}
+  end
+
+  defp suspended_hibernation?(%{
+         control: %{kind: :hibernate},
+         active: %{worker: nil, operation: nil, waits: [_ | _]}
+       }),
+       do: true
+
+  defp suspended_hibernation?(_data), do: false
+
+  defp cancel_wait_timer(%{active: nil} = data), do: data
+
+  defp cancel_wait_timer(data) do
+    if data.active.wait_timer, do: Process.cancel_timer(data.active.wait_timer)
+    data |> put_in([:active, :wait_timer], nil) |> put_in([:active, :wait_token], nil)
+  end
+
+  defp arm_wait_timer(%{active: %{wait_deadline: deadline}} = data) when is_integer(deadline) do
+    data = cancel_wait_timer(data)
+    token = make_ref()
+    delay = min(@max_timeout, max(0, deadline - System.system_time(:millisecond)))
+    timer = Process.send_after(self(), {:wait_wake, data.active.turn_id, token}, delay)
+    data |> put_in([:active, :wait_timer], timer) |> put_in([:active, :wait_token], token)
+  end
+
+  defp arm_wait_timer(data), do: data
 
   defp complete_task(task) do
     Process.demonitor(task.ref, [:flush])

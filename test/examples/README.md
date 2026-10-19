@@ -17,3 +17,8 @@ The research suite contains the peer-based external fencing evidence for the
 missing cluster-exclusive ownership contract.
 Use the [testing guide](../../guides/testing.md) for full acceptance and coverage
 commands. Detailed stable contracts stay in focused core tests.
+
+The [catalog checks](catalog_test.exs) verify counts, section indexes, matching
+source and test folders, repository documentation links, and the absence of skipped
+stable tests. Design plans stay under `examples/11_durable/proposals/`. CI runs
+the example suite after the core contract and property suite.

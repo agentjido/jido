@@ -120,6 +120,7 @@ defmodule Jido.Schema do
   defp refine(schema, value) do
     Enum.reduce_while(schema.meta.effects, {:ok, value}, fn effect, {:ok, value} ->
       context = %Zoi.Context{
+        path: [],
         schema: %{schema | meta: %{schema.meta | effects: [effect]}},
         input: value,
         parsed: value,

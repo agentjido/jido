@@ -109,4 +109,61 @@ defmodule JidoTest.Examples.Runtime.RequestModesTest do
 
     eventually(fn -> AgentServer.agent(server).state.history == ["completed"] end)
   end
+
+  defp blocked(jido, opts \\ []) do
+    {:ok, server} =
+      JidoTest.ExampleRuntime.start_agent(
+        jido,
+        RequestModesBlockingAgent,
+        Keyword.put_new(opts, :id, unique_id())
+      )
+
+    :ok = RuntimeBarrier.arm(self())
+    pending = AgentServer.submit(server, record("active"))
+    assert_receive :runtime_barrier_waiting, 1_000
+    {server, pending}
+  end
+
+  defp record(label),
+    do:
+      Jido.Signal.new!(
+        "test.examples.runtime.request_modes.record",
+        %{label: label},
+        source: "/test/examples/runtime/request_modes"
+      )
+
+  test "capacity rejects excess work and admission expiry leaves no queued work", %{jido: jido} do
+    {server, active} = blocked(jido, max_postponed_signals: 1)
+
+    assert {:error, :admission_timeout} =
+             AgentServer.call(server, record("expired"), admission_timeout: 0)
+
+    queued = AgentServer.submit(server, record("queued"))
+    assert AgentServer.status(server).admission.postponed == 1
+
+    assert {:error, {:overloaded, %{limit: 1, postponed: 1}}} =
+             AgentServer.call(server, record("excess"))
+
+    assert :ok = AgentServer.cast(server, record("dropped"))
+    assert AgentServer.status(server).admission.postponed == 1
+    assert :ok = RuntimeBarrier.release()
+    assert {:ok, _, []} = AgentServer.await(active)
+    assert {:ok, %{state: %{history: ["active", "queued"]}}, []} = AgentServer.await(queued)
+    assert AgentServer.status(server).state_version == 2
+  end
+
+  test "await can be repeated after timeout and abandon does not cancel a Turn", %{jido: jido} do
+    {server, active} = blocked(jido)
+    assert {:error, :timeout} = AgentServer.await(active, 0)
+    assert :ok = RuntimeBarrier.release()
+    assert {:ok, _, []} = AgentServer.await(active)
+
+    :ok = RuntimeBarrier.arm(self())
+    abandoned = AgentServer.submit(server, record("abandoned"))
+    assert_receive :runtime_barrier_waiting, 1_000
+    assert :ok = AgentServer.abandon(abandoned)
+    assert :ok = RuntimeBarrier.release()
+    assert :ok = AgentServer.quiesce(server)
+    assert AgentServer.agent(server).state.history == ["active", "abandoned"]
+  end
 end

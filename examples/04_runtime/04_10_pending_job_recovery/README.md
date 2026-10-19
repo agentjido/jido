@@ -9,8 +9,8 @@ An Agent saves approval and requires an explicit new attempt after runtime loss.
 
 ## Read the code
 
-Read [the pending-job Agent](pending_job_recovery.ex), then the shared
-[job runtime](../support/job_runtime.ex), and then the behavior test.
+Read [the pending-job Agent](pending_job_recovery.ex), then the local
+[job runtime](job_runtime.ex), and then the behavior test.
 
 ## Run it
 
@@ -34,7 +34,7 @@ runtime service must be supplied again when a retry needs a non-default client.
 ## Files
 
 - [Agent](pending_job_recovery.ex)
-- [Shared job runtime](../support/job_runtime.ex)
+- [Local job runtime](job_runtime.ex)
 - [Tests](../../../test/examples/04_runtime/04_10_pending_job_recovery/pending_job_recovery_test.exs)
 
 Previous: [Causal Trace](../04_08_causal_trace/README.md) | Next: [Durable Scheduling](../04_11_durable_scheduling/README.md)

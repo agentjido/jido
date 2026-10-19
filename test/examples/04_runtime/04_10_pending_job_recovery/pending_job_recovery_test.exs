@@ -5,8 +5,8 @@ defmodule JidoTest.Examples.Runtime.PendingJobRecoveryTest do
 
   alias Jido.Examples.PendingJobRecovery, as: Example
   alias JidoTest.Persistence.ProbeStore
-  alias Jido.Examples.Runtime.JobRuntime, as: Jobs
-  alias Jido.Examples.Runtime.JobRuntime.Server, as: JobServer
+  alias Jido.Examples.PendingJobRecovery.JobRuntime, as: Jobs
+  alias Jido.Examples.PendingJobRecovery.JobRuntime.Server, as: JobServer
 
   setup do
     store = {ProbeStore, store: start_supervised!(ProbeStore)}

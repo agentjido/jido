@@ -9,8 +9,8 @@ defmodule Jido.Examples.ManagedJobs do
 
   use Jido.Agent, name: "example_managed_jobs"
 
-  alias Jido.Examples.Runtime.{JobRunner, JobRuntime}
-  alias Jido.Examples.Runtime.JobRuntime.{Cancel, Submit}
+  alias Jido.Examples.ManagedJobs.{JobRunner, JobRuntime}
+  alias Jido.Examples.ManagedJobs.JobRuntime.{Cancel, Submit}
 
   agent do
     schema Zoi.object(%{

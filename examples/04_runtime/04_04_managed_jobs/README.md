@@ -9,8 +9,8 @@ An Agent commits portable job intent before a supervised Plugin starts linked wo
 
 ## Read the code
 
-Read [the managed-jobs Agent](managed_jobs.ex) first. Then read the shared
-[job runtime](../support/job_runtime.ex) and the behavior test.
+Read [the managed-jobs Agent](managed_jobs.ex) first. Then read the local
+[job runtime](job_runtime.ex) and the behavior test.
 
 ## Run it
 
@@ -35,7 +35,7 @@ application must choose an explicit retry after loss.
 ## Files
 
 - [Agent](managed_jobs.ex)
-- [Shared job runtime](../support/job_runtime.ex)
+- [Local job runtime](job_runtime.ex)
 - [Tests](../../../test/examples/04_runtime/04_04_managed_jobs/managed_jobs_test.exs)
 
 Previous: [Bus Delivery](../04_03_bus_delivery/README.md) | Next: [Runtime Inspection](../04_05_runtime_inspection/README.md)

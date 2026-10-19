@@ -55,3 +55,9 @@ Errors return `{:error, reason}`. A caller wait timeout does not cancel an
 accepted or queued Turn. Cast returns before the work commits.
 
 Previous: [State Migration](../04_14_state_migration/README.md) | Next: [Turn Control](../04_16_turn_control/README.md)
+
+The tests also prove overload with one queued slot, cast drop under overload,
+and an expired admission deadline. `await(pending, 0)` can time out while the
+same owner can await again. `abandon/1` drops reply tracking; active work still
+commits. Pending handles belong to the submitting process. Admission timeout
+limits when work can start; caller timeout limits how long the caller waits.

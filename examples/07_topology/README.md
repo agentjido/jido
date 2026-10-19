@@ -33,3 +33,6 @@ the current state of every running member. Tests compare portable snapshots:
 module references become captured nested definitions at the storage boundary.
 There is no separate Controller, placement engine, graph runtime, distributed
 ownership, or coordinated multi-Agent checkpoint.
+
+For child creation selected by a Turn, see [dynamic child lifecycle](../05_multi_agent/05_01_child_lifecycle/README.md).
+Topology declares members and connections as Agent definition data.

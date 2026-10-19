@@ -14,3 +14,7 @@ preparation and owned-state middleware reduction.
 Persisted Plugin conversion is tested in `test/examples/10_persistence`.
 
 Live Plugin Changes (`09_09`) proves installation, validated replacement, explicit owned-state discard, and runtime cleanup.
+
+Plugin DSL (`09_10`) proves custom section and entity lowering, owned-state
+reduction, Map validation, and JSON import through a stable Registry. Live
+Plugin Changes also proves File-backed thaw without replaying commit hooks.

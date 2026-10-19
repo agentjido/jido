@@ -54,4 +54,4 @@ are not included.
 - [Shared cryptographic helpers](../support/crypto.ex)
 - [Tests](../../../test/examples/09_plugins/09_03_identity/identity_test.exs)
 
-Previous: [Runtime Admission](../09_02_runtime_admission/README.md) | Next: [Secure Signal](../09_04_secure_signal/README.md)
+Previous: [Live Plugin Changes](../09_09_live_plugin_changes/README.md) | Next: [Secure Signal](../09_04_secure_signal/README.md)

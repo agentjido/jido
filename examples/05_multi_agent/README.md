@@ -17,3 +17,7 @@ mix test test/examples/05_multi_agent --include example --seed 0
 
 The [Worker](support/worker.ex) supports local lifecycle and correlation.
 These examples do not provide cluster ownership or automatic remote failover.
+
+Compare [declared topology](../07_topology/README.md) when members and
+connections belong to a saved Agent definition. This section teaches child
+creation and ownership decisions made during execution.
