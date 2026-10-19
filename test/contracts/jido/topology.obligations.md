@@ -20,9 +20,9 @@ modules:
 ## Purpose
 
 This component records the retired standalone Topology API. The Agent is now
-the sole composition unit. The replacement contracts are `jido.agent.I26`
-through `jido.agent.I31`, and `jido.agent.I36` through `jido.agent.I45`.
-The module names below remain historical mutation targets only.
+the sole composition unit. The active `jido.agent` component now owns the
+replacement composition contract. The module names below remain historical
+mutation targets only.
 
 ## Obligations
 

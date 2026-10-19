@@ -2,7 +2,7 @@ defmodule Jido.Agent.Runner do
   @moduledoc false
 
   alias Jido.Agent
-  alias Jido.Agent.{Command, Plugin, Turn, Validation}
+  alias Jido.Agent.{Command, Composition, Mutation, Plugin, Turn, Validation}
   alias Jido.Agent.Plugin.Pipeline, as: PluginPipeline
   alias Jido.Error
   alias Jido.Signal
@@ -174,10 +174,12 @@ defmodule Jido.Agent.Runner do
                prepared.turn.route
              )
            ),
-         {:ok, _agent} <-
-           at(:validate, Agent.transition_validated(prepared.agent, output, prepared.schema)),
-         {:ok, agent} <-
-           at(:validate, Jido.Agent.Composition.apply(prepared.agent, output, directives)) do
+         result =
+           if(Enum.any?(directives, &Mutation.mutation?/1),
+             do: Composition.apply(prepared.agent, output, directives),
+             else: Agent.transition_validated(prepared.agent, output, prepared.schema)
+           ),
+         {:ok, agent} <- at(:validate, result) do
       {:ok, agent, directives}
     end
   end

@@ -16,34 +16,7 @@ defmodule JidoTest.Contract.AgentAuthoringTest do
     end
   end
 
-  defmodule ShortSchedule do
-    use Jido.Agent, name: "scheduled", extensions: [Jido.Plugin.Scheduler.DSL]
-
-    routes do
-      route "tick"
-    end
-
-    schedules do
-      schedule :tick, every: 1000, signal: %{type: "tick"}
-    end
-  end
-
-  defmodule BlockSchedule do
-    use Jido.Agent, name: "scheduled", extensions: [Jido.Plugin.Scheduler.DSL]
-
-    routes do
-      route "tick"
-    end
-
-    schedules do
-      schedule :tick do
-        every 1000
-        signal %{type: "tick"}
-      end
-    end
-  end
-
-  @tag obligation: ["jido.agent.I1", "jido.agent.I22"]
+  @tag obligation: "jido.agent.I1"
   test "independent Map and DSL declarations produce the same canonical Agent" do
     from_map =
       Agent.define!(%{
@@ -139,7 +112,7 @@ defmodule JidoTest.Contract.AgentAuthoringTest do
              })
   end
 
-  @tag obligation: ["jido.agent.I20", "jido.agent.I34"]
+  @tag obligation: "jido.agent.I20"
   test "the trusted JSON codec retains the complete definition and instance" do
     for value <- [Leaf.definition(), Leaf.instantiate!(id: "json")] do
       assert {:ok, _, registry} = Agent.Codec.encode(value)
@@ -162,7 +135,7 @@ defmodule JidoTest.Contract.AgentAuthoringTest do
     assert {:error, _} = Leaf.work_signal(%{}, data: %{forged: true})
   end
 
-  @tag obligation: ["jido.agent.I23", "jido.agent.I24", "jido.agent.I35"]
+  @tag obligation: ["jido.agent.I23", "jido.agent.I24"]
   test "invalid definitions return structured paths and bang forms raise the same error" do
     attrs = %{name: "invalid", routes: [%{path: "x", handler: %{kind: :missing}}]}
     assert {:error, %Agent.Error{path: [:routes, 0, :handler]} = error} = Agent.define(attrs)
@@ -199,14 +172,7 @@ defmodule JidoTest.Contract.AgentAuthoringTest do
     end
   end
 
-  @tag obligation: [
-         "jido.agent.I26",
-         "jido.agent.I27",
-         "jido.agent.I28",
-         "jido.agent.I29",
-         "jido.agent.I30",
-         "jido.agent.I31"
-       ]
+  @tag obligation: "jido.agent.I26"
   test "one Agent owns immediate named members and logical output connections" do
     assert Leaf.definition().topology === %{agents: [], connections: []}
 
@@ -233,22 +199,5 @@ defmodule JidoTest.Contract.AgentAuthoringTest do
     end
 
     refute Code.ensure_loaded?(Module.concat(Jido, "Topology"))
-  end
-
-  @tag obligation: ["jido.agent.I32", "jido.agent.I33"]
-  test "schedule authoring uses one inert provider contribution" do
-    assert Map.delete(ShortSchedule.definition(), :module) ===
-             Map.delete(BlockSchedule.definition(), :module)
-
-    [entry] = ShortSchedule.definition().extensions
-    assert entry.provider == Jido.Plugin.Scheduler.DSL
-    assert [%{timing: %{kind: :every, milliseconds: 1000}}] = entry.data.schedules
-
-    invalid =
-      put_in(entry.data.schedules, [
-        %{name: :bad, timing: %{kind: :every, milliseconds: 0}, signal: %{type: "tick"}}
-      ])
-
-    assert {:error, _} = Agent.define(%{ShortSchedule.definition() | extensions: [invalid]})
   end
 end

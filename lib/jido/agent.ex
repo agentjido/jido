@@ -84,7 +84,9 @@ defmodule Jido.Agent do
   def instance?(_), do: false
 
   def definition(%__MODULE__{} = value), do: %{value | id: nil, state: nil}
-  def definition(module) when is_atom(module), do: module.definition()
+
+  def definition(module) when is_atom(module),
+    do: module |> Validation.resolve() |> Jido.Agent.Error.unwrap!()
 
   def instantiate(source, opts \\ []), do: Validation.instantiate(source, opts)
 
@@ -93,7 +95,6 @@ defmodule Jido.Agent do
 
   @doc "Applies ordered data mutations and returns the candidate and its final Diff."
   def mutate(%__MODULE__{} = agent, directives), do: Jido.Agent.Mutation.apply(agent, directives)
-  def mutate(_, _), do: Jido.Agent.Error.fail(:invalid_agent, [], "Expected an Agent value")
 
   @doc "Returns runtime Plugin declarations from provider contributions."
   def runtime_plugins(%__MODULE__{extensions: entries}) do

@@ -7,7 +7,7 @@ defmodule Jido.Agent.Composition do
     apply_changes(agent, state, directives, Enum.filter(directives, &Mutation.mutation?/1))
   end
 
-  # Runner has already checked the complete state and effect batch.
+  # Runner checks complete state before this internal composition step.
   defp apply_changes(agent, state, _directives, []), do: {:ok, %{agent | state: state}}
 
   defp apply_changes(agent, state, directives, changes) do

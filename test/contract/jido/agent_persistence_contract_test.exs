@@ -1,5 +1,5 @@
 defmodule JidoTest.Contract.AgentPersistenceTest do
-  use Covenant.Case, component: "jido.agent", async: true
+  use ExUnit.Case, async: true
   alias Jido.Agent
   alias Jido.Agent.Directive, as: D
   alias Jido.Persistence, as: P
@@ -65,7 +65,6 @@ defmodule JidoTest.Contract.AgentPersistenceTest do
     %{store: store, opts: [namespace: "snapshot-contract"]}
   end
 
-  @tag obligation: "jido.agent.I36"
   test "state and ordered definition edits form one complete candidate" do
     source = Team.instantiate!(id: "team")
     effects = [D.agent_update(:first, %{initial_state: %{count: 4}}), D.route_add("next")]
@@ -83,7 +82,6 @@ defmodule JidoTest.Contract.AgentPersistenceTest do
              Agent.cmd(source, F.signal(%{output: %{count: "bad"}, directives: effects}))
   end
 
-  @tag obligation: ["jido.agent.I37", "jido.agent.I45"]
   test "one saved Agent freezes member definitions and retains symbolic input declarations" do
     agent = Team.instantiate!(id: "frozen", state: %{count: 4})
     assert {:ok, saved} = P.snapshot(agent)
@@ -99,7 +97,6 @@ defmodule JidoTest.Contract.AgentPersistenceTest do
     assert Team.definition().topology === agent.topology
   end
 
-  @tag obligation: ["jido.agent.I37", "jido.agent.I38"]
   test "custom state converters cannot replace the saved definition or identity" do
     agent = %{
       Custom.instantiate!(id: "custom")
@@ -120,7 +117,6 @@ defmodule JidoTest.Contract.AgentPersistenceTest do
     assert {:error, :rejected} = P.restore(saved, context: %{result: {:error, :rejected}})
   end
 
-  @tag obligation: "jido.agent.I38"
   test "invalid envelopes and changed code fail before a custom converter runs" do
     {:ok, saved} = P.snapshot(Custom.instantiate!(id: "preflight"))
 
@@ -139,7 +135,6 @@ defmodule JidoTest.Contract.AgentPersistenceTest do
     refute_received :restored
   end
 
-  @tag obligation: ["jido.agent.I38", "jido.agent.I39"]
   test "nonportable values and legacy checkpoint envelopes are rejected" do
     agent = Custom.instantiate!(id: "portable")
 
@@ -154,7 +149,6 @@ defmodule JidoTest.Contract.AgentPersistenceTest do
     end
   end
 
-  @tag obligation: "jido.agent.I39"
   test "format, definition version and storage revision have separate meanings" do
     agent = Team.instantiate!(id: "versioned")
     assert Team.vsn() == 7
@@ -164,7 +158,6 @@ defmodule JidoTest.Contract.AgentPersistenceTest do
     assert {:ok, %{vsn: 8}} = P.restore(saved)
   end
 
-  @tag obligation: ["jido.agent.I38", "jido.agent.I40"]
   test "one record saves definition and state and fences stale writes", c do
     agent = Team.instantiate!(id: "revision")
     assert :ok = P.create_agent(c.store, agent, c.opts)

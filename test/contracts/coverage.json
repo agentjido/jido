@@ -1,17 +1,17 @@
 {
   "apps": {
     "jido": {
-      "active": 147,
+      "active": 132,
       "coverage": 1.0,
-      "covered": 147
+      "covered": 132
     }
   },
   "components": {
     "jido.agent": {
-      "active": 45,
+      "active": 30,
       "app": "jido",
       "coverage": 1.0,
-      "covered": 45,
+      "covered": 30,
       "form": "light",
       "obligations": {
         "jido.agent.I1": {
@@ -163,16 +163,6 @@
             "test Signal helpers preserve input and protect the source envelope"
           ]
         },
-        "jido.agent.I22": {
-          "failing": 0,
-          "kind": "functional",
-          "passing": 1,
-          "status": "active",
-          "testable": true,
-          "tests": [
-            "test independent Map and DSL declarations produce the same canonical Agent"
-          ]
-        },
         "jido.agent.I23": {
           "failing": 0,
           "kind": "functional",
@@ -215,36 +205,6 @@
             "test one Agent owns immediate named members and logical output connections"
           ]
         },
-        "jido.agent.I27": {
-          "failing": 0,
-          "kind": "functional",
-          "passing": 1,
-          "status": "active",
-          "testable": true,
-          "tests": [
-            "test one Agent owns immediate named members and logical output connections"
-          ]
-        },
-        "jido.agent.I28": {
-          "failing": 0,
-          "kind": "functional",
-          "passing": 1,
-          "status": "active",
-          "testable": true,
-          "tests": [
-            "test one Agent owns immediate named members and logical output connections"
-          ]
-        },
-        "jido.agent.I29": {
-          "failing": 0,
-          "kind": "functional",
-          "passing": 1,
-          "status": "active",
-          "testable": true,
-          "tests": [
-            "test one Agent owns immediate named members and logical output connections"
-          ]
-        },
         "jido.agent.I3": {
           "failing": 0,
           "kind": "functional",
@@ -255,112 +215,15 @@
             "test definitions are neutral and instances need explicit identity and complete stored state"
           ]
         },
-        "jido.agent.I30": {
-          "failing": 0,
-          "kind": "functional",
-          "passing": 1,
-          "status": "active",
-          "testable": true,
-          "tests": [
-            "test one Agent owns immediate named members and logical output connections"
-          ]
-        },
-        "jido.agent.I31": {
-          "failing": 0,
-          "kind": "functional",
-          "passing": 1,
-          "status": "active",
-          "testable": true,
-          "tests": [
-            "test one Agent owns immediate named members and logical output connections"
-          ]
-        },
-        "jido.agent.I32": {
-          "failing": 0,
-          "kind": "functional",
-          "passing": 1,
-          "status": "active",
-          "testable": true,
-          "tests": [
-            "test schedule authoring uses one inert provider contribution"
-          ]
-        },
-        "jido.agent.I33": {
-          "failing": 0,
-          "kind": "functional",
-          "passing": 1,
-          "status": "active",
-          "testable": true,
-          "tests": [
-            "test schedule authoring uses one inert provider contribution"
-          ]
-        },
-        "jido.agent.I34": {
-          "failing": 0,
-          "kind": "persisted_format",
-          "passing": 1,
-          "status": "active",
-          "testable": true,
-          "tests": [
-            "test the trusted JSON codec retains the complete definition and instance"
-          ]
-        },
-        "jido.agent.I35": {
-          "failing": 0,
-          "kind": "functional",
-          "passing": 1,
-          "status": "active",
-          "testable": true,
-          "tests": [
-            "test invalid definitions return structured paths and bang forms raise the same error"
-          ]
-        },
         "jido.agent.I36": {
           "failing": 0,
           "kind": "functional",
-          "passing": 3,
+          "passing": 2,
           "status": "active",
           "testable": true,
           "tests": [
             "test route edits have strict identities and the Diff reports net changes",
-            "test state and ordered definition edits form one complete candidate",
             "test the final graph resolves after the batch and removals do not cascade"
-          ]
-        },
-        "jido.agent.I37": {
-          "failing": 0,
-          "kind": "persisted_format",
-          "passing": 2,
-          "status": "active",
-          "testable": true,
-          "tests": [
-            "test custom state converters cannot replace the saved definition or identity",
-            "test one saved Agent freezes member definitions and retains symbolic input declarations"
-          ]
-        },
-        "jido.agent.I38": {
-          "failing": 0,
-          "kind": "functional",
-          "passing": 5,
-          "status": "active",
-          "testable": true,
-          "tests": [
-            "test custom state converters cannot replace the saved definition or identity",
-            "test invalid envelopes and changed code fail before a custom converter runs",
-            "test nonportable values and legacy checkpoint envelopes are rejected",
-            "test one record saves definition and state and fences stale writes",
-            "test snapshots save current Plugin declarations and owned conversion once"
-          ]
-        },
-        "jido.agent.I39": {
-          "failing": 0,
-          "kind": "persisted_format",
-          "passing": 2,
-          "status": "active",
-          "testable": true,
-          "tests": [
-            "test format, definition version and storage revision have separate meanings",
-            "test nonportable values and legacy checkpoint envelopes are rejected"
           ]
         },
         "jido.agent.I4": {
@@ -371,16 +234,6 @@
           "testable": true,
           "tests": [
             "test duplicate declarations fail and instance reuse preserves order and exact values"
-          ]
-        },
-        "jido.agent.I40": {
-          "failing": 0,
-          "kind": "persisted_format",
-          "passing": 1,
-          "status": "active",
-          "testable": true,
-          "tests": [
-            "test one record saves definition and state and fences stale writes"
           ]
         },
         "jido.agent.I41": {
@@ -419,25 +272,14 @@
             "test an affected Plugin cannot change configuration and run its owned directives in one batch"
           ]
         },
-        "jido.agent.I44": {
+        "jido.agent.I45": {
           "failing": 0,
-          "kind": "persisted_format",
+          "kind": "functional",
           "passing": 1,
           "status": "active",
           "testable": true,
           "tests": [
-            "test snapshots save current Plugin declarations and owned conversion once"
-          ]
-        },
-        "jido.agent.I45": {
-          "failing": 0,
-          "kind": "functional",
-          "passing": 2,
-          "status": "active",
-          "testable": true,
-          "tests": [
-            "test binding copies one state value without replacing the authored references",
-            "test one saved Agent freezes member definitions and retains symbolic input declarations"
+            "test binding copies one state value without replacing the authored references"
           ]
         },
         "jido.agent.I5": {
@@ -1928,8 +1770,8 @@
   },
   "covenant": "0.2.0",
   "totals": {
-    "active": 147,
+    "active": 132,
     "coverage": 1.0,
-    "covered": 147
+    "covered": 132
   }
 }

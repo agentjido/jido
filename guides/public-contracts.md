@@ -49,26 +49,22 @@ nullable values, and refinement counts. Their counts are printed in the test out
 
 The `jido.agent` Covenant component refines AGT-001, AGT-002, TURN-001,
 TURN-002, the direct-command part of EFFECT-001, PLUG-001, and Agent error
-handling. Its 25 active obligations cover authoring, definition data, instances,
-and direct commands. The tests use public entry points and fresh DSL fixtures.
-Checkpoint storage and live AgentServer behavior keep their separate tests.
+handling. Its active obligations cover current `Jido.Agent.*` value, authoring,
+direct-command, and composition behavior. The tests use public entry points and
+fresh DSL fixtures. Persistence, Scheduler internals, shared codecs, and live
+AgentServer behavior keep their owner tests.
 
 Run `mix test.contract` for passing-test obligation coverage. `mix test.ci`
-runs the core and property checks, then this contract gate. For a focused
-mutation check of the three test gaps found during this rollout, run:
+runs the core and property checks, then this contract gate. Run mutation
+analysis only at an explicit review checkpoint:
 
 ```sh
 MIX_ENV=test mix covenant.mutate jido.agent --macros \
-  --only m0684,m0985,m1034 --jobs 1 --seed 0 --timeout 5000 \
-  --max-runtime 120000 --out tmp/covenant/agent-focused.json
+  --jobs 4 --seed 0 --timeout 5000 --max-runtime 3600000
 ```
 
-The development dependency is the sibling `../covenant` fork on
-`feat/macro-mutation`. Setup, scope, survivor review rules, and tool limits are
-in the repository's `test/contracts/README.md`. That file also gives the separate
-full-run command. Mutant IDs depend on the source and module profile; check the
-reported sites after a source change. The obligation report is
-`test/contracts/coverage.json`. The earlier full run and current focused result are
-recorded in `test/contracts/jido/agent.baseline.md`. A focused result does not verify
-the full mutation profile. A passing obligation report does not replace mutation
-review or the package line-coverage gate.
+Scope and tool limits are in `test/contracts/README.md`. Mutant IDs depend on
+the source and module profile. The obligation report is
+`test/contracts/coverage.json`. The previous mutation evidence used an older
+profile and is not a current result. A passing obligation report does not
+replace mutation review or the package line-coverage gate.

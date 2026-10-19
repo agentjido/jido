@@ -2,7 +2,6 @@ defmodule JidoTest.Contract.AgentCompositionChangesTest do
   use Covenant.Case, component: "jido.agent", async: true
   alias Jido.Agent
   alias Jido.Agent.{Diff, Directive, Topology}
-  alias Jido.Persistence
   alias JidoTest.AgentContract, as: F
 
   defmodule Worker do
@@ -152,20 +151,6 @@ defmodule JidoTest.Contract.AgentCompositionChangesTest do
     assert {:ok, removed, _} = cmd(migrated, [Directive.plugin_remove(Counter, state: :discard)])
     assert removed.state === source.state
     assert Agent.runtime_plugins(removed) == []
-  end
-
-  @tag obligation: ["jido.agent.I38", "jido.agent.I44"]
-  test "snapshots save current Plugin declarations and owned conversion once" do
-    assert {:ok, added, _} = cmd(F.instance(), [Directive.plugin_add(Counter)])
-    assert {:ok, saved} = Persistence.snapshot(added)
-    assert saved.agent.extensions === added.extensions
-    assert saved.agent.state.counter == %{value: 3}
-    assert Map.has_key?(saved.references, Counter)
-    assert {:ok, ^added} = Persistence.restore(saved)
-    assert {:ok, removed, _} = cmd(added, [Directive.plugin_remove(Counter, state: :discard)])
-    assert {:ok, saved} = Persistence.snapshot(removed)
-    assert saved.agent.extensions == []
-    assert {:ok, ^removed} = Persistence.restore(saved)
   end
 
   @tag obligation: ["jido.agent.I42", "jido.agent.I45"]

@@ -1,17 +1,11 @@
-- id: agent-contract-scope
-  date: 2026-10-15
-  decision: Protect the 25 Agent authoring and direct-execution obligations in one component. Keep checkpoint behavior, AgentServer, Topology, and dispatch outside this rollout.
-  driver: The canonical definition must support all authoring forms and independent instances while internal code remains open to change.
-  approved_by: User request in this chat on 2026-10-15
+- id: agent-contract-hardening
+  date: 2026-10-19
+  decision: Keep the Covenant component on Jido.Agent value, authoring, direct command, and composition code. Remove persistence, AgentServer, Scheduler provider, and shared codec or Plugin ownership claims.
+  driver: The obligation set and mutation profile must follow current code ownership and current public APIs.
+  approved_by: User-requested hardening pass
 
-- id: local-macro-mutation-fork
-  date: 2026-10-15
-  decision: Use the sibling Covenant fork as a dev/test dependency. Run macro mutation with fresh DSL compilation and review each survivor.
-  driver: The local feat/macro-mutation branch supports the compiler and macro checks needed by Agent authoring.
-  approved_by: User request in this chat on 2026-10-15
-
-- id: spark-provider-mutation-limit
-  date: 2026-10-15
-  decision: Exclude the Spark provider declaration file from the mutation profile. Keep its public DSL behavior in the contract tests and line-coverage gate.
-  driver: A malformed provider attribute exits the local Covenant worker from an asynchronous Spark after_verify callback. Only Jido can change in this rollout; the incomplete 21-file run cannot establish a mutation result.
-  approved_by: Scope from the user request; local test-profile decision by Codex
+- id: reset-agent-mutation-evidence
+  date: 2026-10-19
+  decision: Remove the historical survivor ledger and do not claim a current full mutation result until the hardened profile completes.
+  driver: The historical full run used an older source shape, and many saved source locations no longer exist.
+  approved_by: User-requested hardening pass
