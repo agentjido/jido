@@ -158,14 +158,7 @@ defmodule Jido.Telemetry do
   end
 
   defp semantic_log_mode do
-    instance_mode =
-      case Process.get(@log_scope_key) do
-        instance when is_atom(instance) and not is_nil(instance) ->
-          Debug.override(instance, :semantic_log_mode)
-
-        _other ->
-          nil
-      end
+    instance_mode = Debug.override(Process.get(@log_scope_key), :semantic_log_mode)
 
     if instance_mode in @log_modes,
       do: instance_mode,
@@ -196,10 +189,14 @@ defmodule Jido.Telemetry do
   end
 
   defp slow_semantic?(measurements) do
-    duration = Map.get(measurements, :duration, 0)
+    case Map.fetch(measurements, :duration) do
+      {:ok, duration} ->
+        System.convert_time_unit(duration, :native, :microsecond) / 1_000 >=
+          semantic_slow_threshold_ms()
 
-    System.convert_time_unit(duration, :native, :microsecond) / 1_000 >=
-      semantic_slow_threshold_ms()
+      :error ->
+        false
+    end
   end
 
   defp semantic_slow_threshold_ms do

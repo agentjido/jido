@@ -164,6 +164,16 @@ defmodule JidoTest.Telemetry.OpenTelemetryTest do
     assert OpenTelemetry.detach_trace_context(nil) == :ok
     incoming = Jido.Signal.Trace.new(trace_flags: "01")
 
+    context_without_state =
+      OpenTelemetry.context_from_trace(%{
+        traceparent: Jido.Signal.Trace.to_traceparent(incoming),
+        tracestate: [:invalid]
+      })
+
+    OpenTelemetry.with_context(context_without_state, fn ->
+      assert :otel_span.hex_trace_id(:otel_tracer.current_span_ctx()) == incoming.trace_id
+    end)
+
     context =
       OpenTelemetry.context_from_trace(%{traceparent: Jido.Signal.Trace.to_traceparent(incoming)})
 
@@ -175,6 +185,14 @@ defmodule JidoTest.Telemetry.OpenTelemetryTest do
     end
 
     assert OpenTelemetry.current_context() == before
+
+    restore =
+      OpenTelemetry.restore_trace_context(%{
+        traceparent: Jido.Signal.Trace.to_traceparent(incoming)
+      })
+
+    refute is_nil(restore)
+    assert OpenTelemetry.detach_trace_context(restore) == :ok
   end
 
   test "configuration maps disable tracing and malformed configuration fails closed" do
@@ -250,6 +268,7 @@ defmodule JidoTest.Telemetry.OpenTelemetryTest do
     assert final_attributes["jido.status"] == "ok"
     assert final_attributes["jido.stage"] == "commit"
     assert final_attributes["jido.state.version.after"] == 4
+    refute Map.has_key?(final_attributes, "error.type")
     assert_receive {:otel_end, ^span_ids, ended_at} when is_integer(ended_at)
     assert ended_at >= span.at
     refute_received {:otel_status, ^span_ids, _status}
@@ -316,6 +335,36 @@ defmodule JidoTest.Telemetry.OpenTelemetryTest do
     assert_receive {:otel_start, _span, _parent, "jido.persistence.load", _opts}
     Semantic.finish(persistence, %{status: :ok})
     assert_receive {:otel_end, _ids, _timestamp}
+
+    lifecycle_without_operation = Semantic.start([:jido, :agent, :lifecycle], %{})
+    assert_receive {:otel_start, _span, _parent, "jido.agent.lifecycle", _opts}
+    Semantic.finish(lifecycle_without_operation, %{status: :ok})
+    assert_receive {:otel_end, _ids, _timestamp}
+
+    persistence_without_operation = Semantic.start([:jido, :persistence, :operation], %{})
+    assert_receive {:otel_start, _span, _parent, "jido.persistence.operation", _opts}
+    Semantic.finish(persistence_without_operation, %{status: :ok})
+    assert_receive {:otel_end, _ids, _timestamp}
+  end
+
+  test "invalid error fields cannot become OpenTelemetry attributes or status" do
+    span = OpenTelemetry.start([:jido, :invalid_error], %{}, %{})
+    assert_receive {:otel_start, otel_span, _parent, "jido.invalid_error", _opts}
+    ids = TestTracer.ids(otel_span)
+
+    assert :ok =
+             OpenTelemetry.finish(
+               span,
+               :exception,
+               %{status: :error, error_type: %{private: true}, kind: "error"},
+               %{},
+               12
+             )
+
+    assert_receive {:otel_set_attributes, ^ids, %{}}
+    assert_receive {:otel_event, ^ids, "exception", %{}}
+    refute_received {:otel_status, ^ids, :error}
+    assert_receive {:otel_end, ^ids, 12}
   end
 
   test "settlement is a zero-duration span linked to its completed Turn" do
@@ -389,6 +438,70 @@ defmodule JidoTest.Telemetry.OpenTelemetryTest do
     refute :otel_span.is_valid(:otel_tracer.current_span_ctx())
   end
 
+  test "OpenTelemetry carrier conversion retains validated tracestate" do
+    incoming = Jido.Signal.Trace.new(trace_flags: "01", tracestate: "vendor=value")
+
+    context =
+      OpenTelemetry.context_from_trace(%{
+        traceparent: Jido.Signal.Trace.to_traceparent(incoming),
+        tracestate: incoming.tracestate
+      })
+
+    trace =
+      OpenTelemetry.with_context(context, fn ->
+        span = OpenTelemetry.start([:jido, :carrier], %{}, %{})
+        assert_receive {:otel_start, _span, parent, "jido.carrier", _opts}
+        assert :otel_span.hex_trace_id(parent) == incoming.trace_id
+        mapped = OpenTelemetry.trace_context(span)
+        OpenTelemetry.finish(span, :stop, %{}, %{}, 10)
+        mapped
+      end)
+
+    assert trace.trace_id == incoming.trace_id
+    assert trace.trace_flags == "01"
+    assert trace.tracestate == "vendor=value"
+  end
+
+  test "a new Turn removes the previous Turn parent context" do
+    incoming = Jido.Signal.Trace.new()
+    traced = Signal.new!("test.trace.first", %{}, source: "/test")
+    assert {:ok, traced} = Jido.Signal.Trace.put(traced, incoming)
+
+    Context.begin_turn(traced)
+    assert :otel_span.is_valid(:otel_tracer.current_span_ctx())
+
+    untraced = Signal.new!("test.trace.second", %{}, source: "/test")
+    Context.begin_turn(untraced)
+    refute :otel_span.is_valid(:otel_tracer.current_span_ctx())
+  end
+
+  test "finishing a foreign span does not replace the task context" do
+    foreign = OpenTelemetry.start([:jido, :foreign], %{}, %{})
+    assert_receive {:otel_start, foreign_span, _parent, "jido.foreign", _opts}
+    foreign_ids = TestTracer.ids(foreign_span)
+
+    incoming = Jido.Signal.Trace.new()
+
+    task_context =
+      OpenTelemetry.context_from_trace(%{
+        traceparent: Jido.Signal.Trace.to_traceparent(incoming)
+      })
+
+    task =
+      Task.async(fn ->
+        OpenTelemetry.with_context(task_context, fn ->
+          before = OpenTelemetry.current_context()
+          assert :ok = OpenTelemetry.finish(foreign, :stop, %{}, %{}, 10)
+          assert OpenTelemetry.current_context() == before
+          :ok
+        end)
+      end)
+
+    assert :ok = Task.await(task)
+    assert_receive {:otel_end, ^foreign_ids, 10}
+    :otel_ctx.detach(foreign.restore_context)
+  end
+
   test "an untraced Signal lets the SDK make the root sampling decision" do
     source = Signal.new!("test.trace.source", %{}, source: "/test")
     trace = Context.begin_turn(source)
@@ -436,6 +549,9 @@ defmodule JidoTest.Telemetry.OpenTelemetryTest do
 
     assert span.otel == nil
     assert :ok = Semantic.finish(span, %{status: :ok, stage: :commit})
+
+    assert :opentelemetry.set_default_tracer(:otel_tracer_noop)
+    refute OpenTelemetry.enabled?()
   end
 
   test "a tracer callback failure does not stop semantic emission or leak context" do

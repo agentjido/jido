@@ -2,6 +2,7 @@ defmodule Jido.Telemetry.Semantic do
   @moduledoc false
 
   alias Jido.Error
+  alias Jido.Signal.Trace, as: SignalTrace
   alias Jido.Telemetry.OpenTelemetry
 
   @schema_version 1
@@ -19,8 +20,15 @@ defmodule Jido.Telemetry.Semantic do
 
   @signed_measurements [:system_time, :monotonic_time]
   @count_measurements ~w(count duration state_version state_version_before state_version_after directive_count directive_index directive_completed directive_failed directive_skipped queue_depth queue_limit wait_duration expected_revision revision_before revision_after target_revision component_count ready_count failed_count epoch)a
-  @trace_keys [:trace_id, :span_id, :parent_span_id, :causation_id]
-  @trace_carrier_keys @trace_keys ++ [:trace_flags, :traceparent, :tracestate]
+  @trace_metadata_keys [:trace_id, :span_id, :parent_span_id, :causation_id]
+  @trace_carrier_keys [
+    :trace_id,
+    :span_id,
+    :parent_span_id,
+    :causation_id,
+    :traceparent,
+    :tracestate
+  ]
   @log_scope_key {:jido, :semantic_log_scope}
 
   @type span :: %{
@@ -41,13 +49,15 @@ defmodule Jido.Telemetry.Semantic do
     at = System.monotonic_time()
     trace = Map.take(metadata, @trace_carrier_keys)
     log_scope = log_scope(metadata)
-    metadata = normalize_metadata(metadata)
+    metadata = metadata |> Map.drop(@trace_carrier_keys) |> normalize_metadata()
     measurements = normalize_measurements(measurements)
 
     otel = OpenTelemetry.start(prefix, metadata, measurements, Keyword.put(opts, :start_time, at))
     trace = Map.merge(valid_trace(trace) || %{}, OpenTelemetry.trace_context(otel) || %{})
     trace = if map_size(trace) == 0, do: nil, else: trace
-    metadata = Map.merge(metadata, normalize_metadata(Map.take(trace || %{}, @trace_keys)))
+
+    metadata =
+      Map.merge(metadata, normalize_metadata(Map.take(trace || %{}, @trace_metadata_keys)))
 
     span = %{
       prefix: prefix,
@@ -219,7 +229,7 @@ defmodule Jido.Telemetry.Semantic do
   defp normalize_field({:error_type, value}, acc) when is_atom(value) and not is_nil(value),
     do: Map.put(acc, :error_type, value)
 
-  defp normalize_field({:error_code, value}, acc) when is_atom(value) do
+  defp normalize_field({:error_code, value}, acc) do
     if value in Error.stable_codes(), do: Map.put(acc, :error_code, value), else: acc
   end
 
@@ -235,12 +245,28 @@ defmodule Jido.Telemetry.Semantic do
   defp maybe_put(map, _key, nil), do: map
   defp maybe_put(map, key, value), do: Map.put(map, key, value)
 
-  defp log_scope(%{jido_instance: instance}) when is_atom(instance) and not is_nil(instance),
+  defp log_scope(%{jido_instance: instance}) when is_atom(instance),
     do: instance
 
   defp log_scope(_metadata), do: nil
 
-  defp valid_trace(%{traceparent: traceparent} = trace) when is_binary(traceparent), do: trace
+  defp valid_trace(%{traceparent: traceparent} = trace) do
+    case SignalTrace.from_traceparent(traceparent, Map.get(trace, :tracestate)) do
+      {:ok, w3c} ->
+        %{
+          trace_id: w3c.trace_id,
+          span_id: w3c.span_id,
+          trace_flags: w3c.trace_flags,
+          traceparent: SignalTrace.to_traceparent(w3c)
+        }
+        |> Map.merge(Map.take(trace, [:parent_span_id, :causation_id]))
+        |> maybe_put(:tracestate, w3c.tracestate)
+
+      {:error, :invalid_traceparent} ->
+        nil
+    end
+  end
+
   defp valid_trace(_trace), do: nil
 
   defp claim_terminal?(%{terminal_guard: guard}),

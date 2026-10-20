@@ -82,6 +82,9 @@ defmodule JidoTest.Telemetry.ContextTest do
 
   test "clear removes the current context" do
     assert :ok = Context.put(Trace.new_root())
+    assert :ok = Context.put(nil)
+    assert Context.get() == nil
+    assert :ok = Context.put(Trace.new_root())
     assert :ok = Context.clear()
     assert Context.get() == nil
   end
@@ -95,6 +98,10 @@ defmodule JidoTest.Telemetry.ContextTest do
 
     assert_raise FunctionClauseError, fn ->
       apply(Context, :with_context, [nil, :not_a_function])
+    end
+
+    assert_raise FunctionClauseError, fn ->
+      apply(Context, :with_context, [Context.capture(), :not_a_function])
     end
   end
 end

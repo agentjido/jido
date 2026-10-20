@@ -1,0 +1,95 @@
+- at: lib/jido/telemetry.ex:38:15
+  operator: element_removal
+  mutation: "`:off` → `(removed)`"
+  sort: equivalent
+  reason: Removing off from the accepted list does not change explicit off configuration because the fallback also returns off. Debug overrides never store off.
+
+- at: lib/jido/telemetry.ex:173:14
+  operator: clause_removal
+  mutation: "`case _other ->` → `(removed)`"
+  sort: equivalent
+  reason: An invalid log mode either selects off or raises inside the contained semantic handler. Both paths return ok without a log.
+
+- at: lib/jido/telemetry.ex:172:12
+  operator: guard_removal
+  mutation: "`when mode in @log_modes` → `(no guard)`"
+  sort: equivalent
+  reason: An invalid mode then reaches no log_semantic clause. The semantic handler contains that failure and returns ok without a log, which is the same published behavior as off.
+
+- at: lib/jido/telemetry.ex:177:67
+  operator: return_nil
+  mutation: "`false` → `nil`"
+  sort: equivalent
+  reason: The private result is used only as an if condition. False and nil both suppress the log.
+
+- at: lib/jido/telemetry.ex:197:14
+  operator: clause_removal
+  mutation: "`case :error ->` → `(removed)`"
+  sort: equivalent
+  reason: Missing duration either returns false or raises inside the contained semantic handler. Both paths return ok without a log.
+
+- at: lib/jido/telemetry.ex:225:34
+  operator: guard_removal
+  mutation: "`when is_map(config)` → `(no guard)`"
+  sort: equivalent
+  reason: A non-map and non-list configuration either returns nil or makes Map.get fail inside the contained handler. Both paths fail closed without a log.
+
+- at: lib/jido/telemetry/open_telemetry.ex:73:38
+  operator: integer_shift
+  mutation: "`1` → `2`"
+  sort: equivalent
+  reason: The terminal guard uses only atomics slot 1. An unused second slot cannot change span behavior.
+
+- at: lib/jido/telemetry/open_telemetry.ex:207:55
+  operator: return_nil
+  mutation: "`true` → `nil`"
+  sort: equivalent
+  reason: The strict Boolean check in enabled?/0 rejects both values and its catch returns false for the nil case. The tuple no-op tracer remains disabled.
+
+- at: lib/jido/telemetry/open_telemetry.ex:208:45
+  operator: return_nil
+  mutation: "`true` → `nil`"
+  sort: equivalent
+  reason: The strict Boolean check in enabled?/0 rejects both values and its catch returns false for the nil case. The atom no-op tracer remains disabled.
+
+- at: lib/jido/telemetry/open_telemetry.ex:309:65
+  operator: return_nil
+  mutation: "`:ok` → `nil`"
+  sort: equivalent
+  reason: The stop branch return is private and ignored by the safe callback wrapper.
+
+- at: lib/jido/telemetry/open_telemetry.ex:328:44
+  operator: integer_shift
+  mutation: "`1` → `2`"
+  sort: equivalent
+  reason: The terminal claim uses only atomics slot 1. An unused second slot cannot change the one-terminal-event rule.
+
+- at: lib/jido/telemetry/open_telemetry.ex:341:36
+  operator: return_nil
+  mutation: "`:ok` → `nil`"
+  sort: equivalent
+  reason: Cross-process deactivation intentionally does no work, and finish/5 does not use this private return value.
+
+- at: lib/jido/telemetry/open_telemetry.ex:378:38
+  operator: clause_removal
+  mutation: "`case {:error, :invalid_traceparent} ->` → `(removed)`"
+  sort: equivalent
+  reason: This parser receives carrier data injected from a validated span. If the dependency returns invalid data, the outer trace_context/1 catch also converts the missing clause to nil.
+
+- at: lib/jido/telemetry/persistence.ex:50:61
+  operator: return_nil
+  mutation: "`%{}` → `nil`"
+  sort: equivalent
+  reason: Semantic measurement normalization converts both nil and an empty map to the same empty measurement map.
+
+- at: lib/jido/telemetry/semantic.ex:67:36
+  operator: integer_shift
+  mutation: "`1` → `2`"
+  sort: equivalent
+  reason: The semantic terminal guard uses only atomics slot 1. An unused second slot cannot change span behavior.
+
+- at: lib/jido/telemetry/semantic.ex:273:48
+  operator: integer_shift
+  mutation: "`1` → `2`"
+  sort: equivalent
+  reason: The terminal claim reads and updates only atomics slot 1. An unused second slot cannot change the one-terminal-event rule.

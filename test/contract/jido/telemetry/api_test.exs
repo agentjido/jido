@@ -142,8 +142,9 @@ defmodule JidoTest.Telemetry.ApiTest do
   @tag obligation: ["jido.telemetry.I2", "jido.telemetry.I4", "jido.telemetry.I8"]
   test "semantic log configuration and formatting fail closed at exact bounds" do
     event = [:jido, :persistence, :operation, :stop]
-    long_id = String.duplicate("a", 129)
-    kept_id = String.duplicate("a", 125) <> "..."
+    exact_id = String.duplicate("b", 128)
+    long_id = "X" <> String.duplicate("a", 128)
+    kept_id = "X" <> String.duplicate("a", 124) <> "..."
 
     Application.put_env(:jido, :telemetry, %{
       semantic_log_mode: :interesting,
@@ -164,6 +165,19 @@ defmodule JidoTest.Telemetry.ApiTest do
     assert log =~ "agent_id=#{kept_id} duration="
     assert log =~ " operation=load"
     refute log =~ long_id
+
+    exact_log =
+      capture_log(fn ->
+        Telemetry.handle_semantic_event(
+          event,
+          %{duration: native_ms(2)},
+          %{agent_id: exact_id, status: :ok},
+          nil
+        )
+      end)
+
+    assert exact_log =~ "agent_id=#{exact_id}"
+    refute exact_log =~ "#{String.slice(exact_id, 0, 125)}..."
 
     for config <- [
           %{semantic_log_mode: :interesting, semantic_slow_threshold_ms: 3},
@@ -191,6 +205,55 @@ defmodule JidoTest.Telemetry.ApiTest do
 
     Application.put_env(:jido, :telemetry, semantic_log_mode: :all)
     assert Telemetry.handle_semantic_event(:invalid, :invalid, :invalid, nil) == :ok
+  end
+
+  @tag obligation: "jido.telemetry.I4"
+  test "interesting logging uses exact duration and threshold boundaries" do
+    event = [:jido, :persistence, :operation, :stop]
+    metadata = %{operation: :load, status: :ok}
+
+    Application.put_env(:jido, :telemetry,
+      semantic_log_mode: :interesting,
+      semantic_slow_threshold_ms: 2
+    )
+
+    assert capture_log(fn ->
+             Telemetry.handle_semantic_event(event, %{duration: native_us(1_999)}, metadata, nil)
+           end) == ""
+
+    assert capture_log(fn ->
+             Telemetry.handle_semantic_event(event, %{duration: native_us(2_001)}, metadata, nil)
+           end) =~ "event=persistence.operation.stop"
+
+    Application.put_env(:jido, :telemetry,
+      semantic_log_mode: :interesting,
+      semantic_slow_threshold_ms: 0
+    )
+
+    assert capture_log(fn ->
+             Telemetry.handle_semantic_event(event, %{duration: 0}, metadata, nil)
+           end) =~ "event=persistence.operation.stop"
+
+    assert capture_log(fn -> Telemetry.handle_semantic_event(event, %{}, metadata, nil) end) == ""
+
+    Application.put_env(:jido, :telemetry,
+      semantic_log_mode: :interesting,
+      semantic_slow_threshold_ms: -1
+    )
+
+    assert capture_log(fn ->
+             Telemetry.handle_semantic_event(event, %{duration: 0}, metadata, nil)
+           end) == ""
+
+    Application.put_env(:jido, :telemetry, semantic_log_mode: :interesting)
+
+    assert capture_log(fn ->
+             Telemetry.handle_semantic_event(event, %{duration: native_ms(999)}, metadata, nil)
+           end) == ""
+
+    assert capture_log(fn ->
+             Telemetry.handle_semantic_event(event, %{duration: native_ms(1_000)}, metadata, nil)
+           end) =~ "event=persistence.operation.stop"
   end
 
   @tag obligation: "jido.telemetry.I4"
@@ -222,6 +285,24 @@ defmodule JidoTest.Telemetry.ApiTest do
     log = capture_log(fn -> Semantic.point(event, metadata) end)
 
     assert log =~ "event=agent_server.turn.stop"
+  end
+
+  @tag obligation: "jido.telemetry.I4"
+  test "non-instance values cannot select a debug override" do
+    invalid_instance = "not-an-instance"
+    Application.put_env(:jido, :telemetry, semantic_log_mode: :off)
+    Debug.enable(invalid_instance, :verbose)
+    on_exit(fn -> Debug.reset(invalid_instance) end)
+
+    log =
+      capture_log(fn ->
+        Semantic.point(
+          [:jido, :agent_server, :turn, :stop],
+          %{jido_instance: invalid_instance, status: :ok, stage: :commit}
+        )
+      end)
+
+    assert log == ""
   end
 
   @tag obligation: ["jido.telemetry.I2", "jido.telemetry.I3"]
@@ -257,4 +338,5 @@ defmodule JidoTest.Telemetry.ApiTest do
   end
 
   defp native_ms(ms), do: System.convert_time_unit(ms, :millisecond, :native)
+  defp native_us(us), do: System.convert_time_unit(us, :microsecond, :native)
 end

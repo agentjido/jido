@@ -36,9 +36,7 @@ defmodule Jido.Telemetry.Persistence do
 
   defp start_measurements(opts) do
     opts = safe_options(opts)
-
-    %{}
-    |> maybe_put_revision(:expected_revision, Keyword.get(opts, :expected_revision))
+    %{expected_revision: Keyword.get(opts, :expected_revision)}
   end
 
   defp result_measurements({:ok, _agent, revision}, :load, _opts),
@@ -46,7 +44,7 @@ defmodule Jido.Telemetry.Persistence do
 
   defp result_measurements(:ok, :compare_and_swap, opts) do
     opts = safe_options(opts)
-    maybe_put_revision(%{}, :revision_after, Keyword.get(opts, :revision, 0))
+    %{revision_after: Keyword.get(opts, :revision, 0)}
   end
 
   defp result_measurements(_result, _operation, _opts), do: %{}
@@ -55,41 +53,29 @@ defmodule Jido.Telemetry.Persistence do
     if Keyword.keyword?(opts), do: opts, else: []
   end
 
-  defp instance(source) when is_atom(source) and not is_nil(source) do
-    cond do
-      function_exported?(source, :__jido_persistence__, 0) ->
-        source
-
-      is_pid(Process.whereis(source)) and is_pid(Process.whereis(Jido.runtime_store_name(source))) ->
-        source
-
-      true ->
-        nil
+  defp instance(source) do
+    if function_exported?(source, :__jido_persistence__, 0) or
+         (is_pid(Process.whereis(source)) and
+            is_pid(Process.whereis(Jido.runtime_store_name(source)))) do
+      source
     end
   rescue
     _error -> nil
   end
 
-  defp instance(_source), do: nil
+  defp namespace(nil), do: nil
 
-  defp namespace(instance) when is_atom(instance) and not is_nil(instance) do
+  defp namespace(instance) do
     Jido.namespace(instance)
   catch
     _, _ -> nil
   end
 
-  defp namespace(_instance), do: nil
+  defp adapter_module({adapter, _opts}), do: adapter
 
-  defp adapter_module({adapter, _opts}) when is_atom(adapter), do: adapter
-
-  defp adapter_module(source) when is_atom(source) and not is_nil(source) do
+  defp adapter_module(source) do
     if function_exported?(source, :get, 2), do: source
+  rescue
+    _error -> nil
   end
-
-  defp adapter_module(_source), do: nil
-
-  defp maybe_put_revision(map, key, value) when is_integer(value) and value >= 0,
-    do: Map.put(map, key, value)
-
-  defp maybe_put_revision(map, _key, _value), do: map
 end

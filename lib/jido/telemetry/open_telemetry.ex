@@ -306,7 +306,7 @@ defmodule Jido.Telemetry.OpenTelemetry do
     call(:otel_span, :add_event, [span_ctx, "exception", attrs])
   end
 
-  defp maybe_record_exception(_span_ctx, :stop, _metadata), do: false
+  defp maybe_record_exception(_span_ctx, :stop, _metadata), do: :ok
 
   defp kind(%{kind: kind}) when is_atom(kind), do: Atom.to_string(kind)
   defp kind(_metadata), do: nil
@@ -335,8 +335,7 @@ defmodule Jido.Telemetry.OpenTelemetry do
 
   defp deactivate_span(%Span{started_by: pid, restore_context: restore_context})
        when pid == self() do
-    _ = call(:otel_ctx, :detach, [restore_context])
-    :ok
+    call(:otel_ctx, :detach, [restore_context])
   end
 
   defp deactivate_span(_span), do: :ok
@@ -364,19 +363,9 @@ defmodule Jido.Telemetry.OpenTelemetry do
 
   defp trace_from_carrier(carrier) do
     fields =
-      Enum.reduce(carrier, %{}, fn
-        {key, value}, acc when is_binary(key) and is_binary(value) ->
-          case String.downcase(key) do
-            "traceparent" -> Map.put(acc, :traceparent, value)
-            "tracestate" -> Map.put(acc, :tracestate, value)
-            _other -> acc
-          end
+      Map.new(carrier, fn {key, value} -> {String.downcase(key), value} end)
 
-        _field, acc ->
-          acc
-      end)
-
-    case SignalTrace.from_traceparent(fields[:traceparent], fields[:tracestate]) do
+    case SignalTrace.from_traceparent(fields["traceparent"], fields["tracestate"]) do
       {:ok, trace} ->
         %{
           trace_id: trace.trace_id,
@@ -394,9 +383,9 @@ defmodule Jido.Telemetry.OpenTelemetry do
   defp safely(fun) do
     fun.()
   rescue
-    _error -> false
+    _error -> :ok
   catch
-    _kind, _reason -> false
+    _kind, _reason -> :ok
   end
 
   defp call(module, function, arguments), do: apply(module, function, arguments)

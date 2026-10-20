@@ -14,7 +14,7 @@ defmodule Jido.Debug do
     disable(instance)
   end
 
-  def enable(instance, level) when level in [:on, :verbose] do
+  def enable(instance, level) do
     :persistent_term.put(
       {:jido_debug, instance},
       %{level: level, overrides: build_overrides(level)}

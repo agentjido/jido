@@ -103,8 +103,6 @@ defmodule Jido.Tracing.Context do
 
   defp attach_open_telemetry_parent(trace) do
     Process.put(@otel_restore_key, OpenTelemetry.restore_trace_context(trace))
-
-    :ok
   end
 
   defp restore_open_telemetry_context do

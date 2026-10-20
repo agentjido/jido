@@ -118,9 +118,29 @@ defmodule JidoTest.Telemetry.PersistenceTest do
                     %{adapter_module: AdapterSource}}
 
     assert_receive {:persistence_event, [:jido, :persistence, :operation, :stop],
-                    %{duration: second_duration}, %{status: :ok}}
+                    second_measurements, %{status: :ok}}
 
+    assert %{duration: second_duration} = second_measurements
     assert second_duration >= 0
+    refute Map.has_key?(second_measurements, :revision_after)
+
+    assert :ok =
+             Persistence.observe(
+               :compare_and_swap,
+               AdapterSource,
+               String,
+               "agent-1",
+               [expected_revision: 0],
+               fn -> :ok end
+             )
+
+    assert_receive {:persistence_event, [:jido, :persistence, :operation, :start],
+                    %{expected_revision: 0}, _}
+
+    assert_receive {:persistence_event, [:jido, :persistence, :operation, :stop],
+                    %{duration: third_duration, revision_after: 0}, %{status: :ok}}
+
+    assert third_duration >= 0
   end
 
   @tag obligation: ["jido.telemetry.I3", "jido.telemetry.I4"]
@@ -143,6 +163,86 @@ defmodule JidoTest.Telemetry.PersistenceTest do
 
     assert log =~ "event=persistence.operation.stop"
     assert log =~ "status=conflict"
+  end
+
+  @tag obligation: ["jido.telemetry.I2", "jido.telemetry.I3", "jido.telemetry.I4"]
+  test "a live instance source supplies its namespace and debug scope" do
+    attach(self())
+    suffix = System.unique_integer([:positive])
+    instance = :"telemetry_live_instance_#{suffix}"
+    namespace = "telemetry/live/#{suffix}"
+    start_supervised!({Jido, name: instance, namespace: namespace})
+
+    Application.put_env(:jido, :telemetry, semantic_log_mode: :off)
+    Debug.enable(instance, :on)
+
+    on_exit(fn ->
+      Debug.reset(instance)
+      Application.delete_env(:jido, :telemetry)
+    end)
+
+    log =
+      capture_log(fn ->
+        assert {:error, :conflict} =
+                 Persistence.observe(:load, instance, String, "agent-1", [], fn ->
+                   {:error, :conflict}
+                 end)
+      end)
+
+    assert_receive {:persistence_event, [:jido, :persistence, :operation, :start], _,
+                    %{agent_namespace: ^namespace}}
+
+    assert_receive {:persistence_event, [:jido, :persistence, :operation, :stop], _,
+                    %{status: :conflict}}
+
+    assert log =~ "event=persistence.operation.stop"
+  end
+
+  @tag obligation: ["jido.telemetry.I3", "jido.telemetry.I4"]
+  test "a partial process pair is not an instance debug scope" do
+    source = :"telemetry_partial_instance_#{System.unique_integer([:positive])}"
+    pid = spawn(fn -> receive do: (:stop -> :ok) end)
+    Process.register(pid, source)
+    Application.put_env(:jido, :telemetry, semantic_log_mode: :off)
+    Debug.enable(source, :on)
+
+    on_exit(fn ->
+      Debug.reset(source)
+      Application.delete_env(:jido, :telemetry)
+      send(pid, :stop)
+    end)
+
+    log =
+      capture_log(fn ->
+        assert {:error, :conflict} =
+                 Persistence.observe(:load, source, String, "agent-1", [], fn ->
+                   {:error, :conflict}
+                 end)
+      end)
+
+    assert log == ""
+  end
+
+  @tag obligation: "jido.telemetry.I3"
+  test "persistence observation rejects unsupported calls before work runs" do
+    refute_received :ran
+
+    assert_raise FunctionClauseError, fn ->
+      apply(Persistence, :observe, [
+        :invalid,
+        nil,
+        String,
+        "agent-1",
+        [],
+        fn -> send(self(), :ran) end
+      ])
+    end
+
+    assert_raise FunctionClauseError, fn ->
+      apply(Persistence, :observe, [:load, nil, String, "agent-1", [], :not_a_function])
+    end
+
+    refute_received :ran
   end
 
   defp attach(owner) do

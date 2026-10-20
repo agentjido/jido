@@ -116,6 +116,10 @@ defmodule JidoTest.Telemetry.SemanticTest do
       assert Semantic.normalize_metadata(%{key => value}) == %{key => value, schema_version: 1}
     end
 
+    for key <- [:committed?, :retryable?] do
+      assert Semantic.normalize_metadata(%{key => "true"}) == %{schema_version: 1}
+    end
+
     assert Semantic.normalize_metadata(%{agent_id: String.duplicate("a", 256)}).agent_id ==
              String.duplicate("a", 256)
 
@@ -180,6 +184,18 @@ defmodule JidoTest.Telemetry.SemanticTest do
              error_type: :timeout,
              retryable?: true
            }
+
+    coded =
+      Jido.Error.timeout_error("private",
+        timeout: 10,
+        details: %{code: :agent_turn_timeout}
+      )
+
+    assert Semantic.error_metadata(coded) == %{
+             error_type: :timeout,
+             error_code: :agent_turn_timeout,
+             retryable?: true
+           }
   end
 
   test "topology operation vocabulary includes update and exact placement" do
@@ -214,6 +230,7 @@ defmodule JidoTest.Telemetry.SemanticTest do
     assert :ok = Semantic.finish(span, %{status: :ok})
     assert :ok = Semantic.finish(span, %{status: :ok})
     assert :atomics.get(count, 1) == 1
+    assert Semantic.finish(nil) == :ok
   end
 
   test "competing finishes emit one terminal semantic event" do
@@ -301,8 +318,10 @@ defmodule JidoTest.Telemetry.SemanticTest do
     trace = Jido.Signal.Trace.new(trace_flags: "01", tracestate: "vendor=value")
 
     metadata = %{
-      trace_id: trace.trace_id,
-      span_id: trace.span_id,
+      trace_id: "ignored",
+      span_id: "ignored",
+      parent_span_id: String.duplicate("a", 16),
+      causation_id: "signal-1",
       trace_flags: trace.trace_flags,
       traceparent: Jido.Signal.Trace.to_traceparent(trace),
       tracestate: trace.tracestate,
@@ -327,6 +346,8 @@ defmodule JidoTest.Telemetry.SemanticTest do
     span = Semantic.start([:jido, :exact], metadata)
     assert span.trace.tracestate == "vendor=value"
     assert span.trace.trace_flags == "01"
+    assert span.trace.parent_span_id == String.duplicate("a", 16)
+    assert span.trace.causation_id == "signal-1"
     assert Process.get({:jido, :semantic_log_scope}) == :outer
 
     assert_receive {:exact_event, [:jido, :exact, :start],
@@ -336,6 +357,8 @@ defmodule JidoTest.Telemetry.SemanticTest do
     assert is_integer(system_time)
     assert start_metadata.trace_id == trace.trace_id
     assert start_metadata.span_id == trace.span_id
+    assert start_metadata.parent_span_id == String.duplicate("a", 16)
+    assert start_metadata.causation_id == "signal-1"
 
     future_span = %{
       span
@@ -345,6 +368,35 @@ defmodule JidoTest.Telemetry.SemanticTest do
     assert :ok = Semantic.finish(future_span, %{status: :ok})
 
     assert_receive {:exact_event, [:jido, :exact, :stop], %{duration: 0}, %{status: :ok}}
+
+    past_span = Semantic.start([:jido, :exact], metadata)
+    assert_receive {:exact_event, [:jido, :exact, :start], _, _}
+    one_second = System.convert_time_unit(1, :second, :native)
+    past_span = %{past_span | at: System.monotonic_time() - one_second}
+
+    assert :ok = Semantic.finish(past_span, %{status: :ok})
+
+    assert_receive {:exact_event, [:jido, :exact, :stop], %{duration: duration}, %{status: :ok}}
+    assert duration >= one_second
+
+    minimal = Semantic.start([:jido, :exact], %{traceparent: metadata.traceparent})
+    assert_receive {:exact_event, [:jido, :exact, :start], _, minimal_metadata}
+    assert minimal.trace.trace_id == trace.trace_id
+    assert minimal.trace.span_id == trace.span_id
+    assert minimal.trace.traceparent == metadata.traceparent
+    assert minimal_metadata.trace_id == trace.trace_id
+    assert minimal_metadata.span_id == trace.span_id
+
+    invalid =
+      Semantic.start(
+        [:jido, :exact],
+        %{traceparent: "malformed", trace_id: "private", span_id: "private"}
+      )
+
+    assert_receive {:exact_event, [:jido, :exact, :start], _, invalid_metadata}
+    assert invalid.trace == nil
+    refute Map.has_key?(invalid_metadata, :trace_id)
+    refute Map.has_key?(invalid_metadata, :span_id)
     assert Process.get({:jido, :semantic_log_scope}) == :outer
     Process.delete({:jido, :semantic_log_scope})
   end

@@ -23,11 +23,15 @@ defmodule JidoTest.OpenTelemetryTracer do
     sequence = System.unique_integer([:positive, :monotonic])
     span_id = band(sequence, 0xFFFFFFFFFFFFFFFF)
 
-    {trace_id, trace_flags} =
+    {trace_id, trace_flags, tracestate} =
       if :otel_span.is_valid(parent) do
-        {span_ctx(parent, :trace_id), span_ctx(parent, :trace_flags)}
+        {
+          span_ctx(parent, :trace_id),
+          span_ctx(parent, :trace_flags),
+          span_ctx(parent, :tracestate)
+        }
       else
-        {sequence, 1}
+        {sequence, 1, :otel_tracestate.new()}
       end
 
     span =
@@ -37,6 +41,7 @@ defmodule JidoTest.OpenTelemetryTracer do
         span_id: span_id,
         hex_span_id: hex_id(span_id, 64),
         trace_flags: trace_flags,
+        tracestate: tracestate,
         is_valid: true,
         is_remote: false,
         is_recording: true,
