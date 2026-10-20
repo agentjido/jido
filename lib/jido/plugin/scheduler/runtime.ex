@@ -6,9 +6,8 @@ defmodule Jido.Plugin.Scheduler.Runtime do
   alias Jido.AgentServer, as: Server
   alias Jido.Plugin.{DirectiveContext, Init}
   alias Jido.Plugin.Scheduler
-  alias Jido.Plugin.Scheduler.{Cancel, Cron, Delivery, Durable, Occurrence, Schedule, WallClock}
+  alias Jido.Plugin.Scheduler.{Cancel, Cron, Occurrence, Schedule, WallClock}
   alias Jido.Signal
-  alias Jido.Telemetry.Semantic
   alias Jido.Tracing.Trace
 
   def start_link(%Init{} = init), do: GenServer.start_link(__MODULE__, init)
@@ -29,12 +28,7 @@ defmodule Jido.Plugin.Scheduler.Runtime do
       last_reconciled_version: nil,
       timers: %{},
       retry_timer: nil,
-      retry_token: nil,
-      pending_timer: nil,
-      pending_wake: false,
-      delivery_task: nil,
-      delivery_timeout: nil,
-      delivery_cursor: :start
+      retry_token: nil
     }
 
     {:ok, runtime, {:continue, :reconcile_agent}}
@@ -93,47 +87,6 @@ defmodule Jido.Plugin.Scheduler.Runtime do
   end
 
   @impl true
-  def handle_cast(:pending_changed, runtime), do: {:noreply, wake_pending(runtime)}
-
-  @impl true
-  def handle_info(
-        {:deliver_pending, token},
-        %{delivery_task: nil, pending_timer: {_timer, token, _kind}} = runtime
-      ),
-      do: {:noreply, start_delivery_task(%{runtime | pending_timer: nil})}
-
-  def handle_info({:deliver_pending, _token}, runtime), do: {:noreply, runtime}
-
-  def handle_info(:deliver_pending, %{delivery_task: nil} = runtime) do
-    runtime = runtime |> cancel_pending_timer() |> Map.put(:pending_timer, nil)
-    {:noreply, start_delivery(runtime)}
-  end
-
-  def handle_info(:deliver_pending, runtime),
-    do: {:noreply, %{runtime | pending_wake: true}}
-
-  def handle_info({ref, outcome}, %{delivery_task: %Task{ref: ref}} = runtime) do
-    Process.demonitor(ref, [:flush])
-    runtime = %{runtime | delivery_cursor: outcome_cursor(outcome, runtime)}
-    {:noreply, finish_delivery(runtime, outcome)}
-  end
-
-  def handle_info(
-        {:DOWN, ref, :process, _pid, reason},
-        %{delivery_task: %Task{ref: ref}} = runtime
-      ) do
-    outcome = {:error, runtime.delivery_cursor, {:delivery_task_down, reason}}
-    {:noreply, finish_delivery(runtime, outcome)}
-  end
-
-  def handle_info({:delivery_timeout, ref}, %{delivery_task: %Task{ref: ref}} = runtime) do
-    Task.shutdown(runtime.delivery_task, :brutal_kill)
-    outcome = {:error, runtime.delivery_cursor, :delivery_timeout}
-    {:noreply, finish_delivery(runtime, outcome)}
-  end
-
-  def handle_info({:delivery_timeout, _ref}, runtime), do: {:noreply, runtime}
-
   def handle_info({:deliver, token, signal}, runtime) do
     case Map.pop(runtime.timers, token) do
       {nil, _timers} ->
@@ -160,31 +113,7 @@ defmodule Jido.Plugin.Scheduler.Runtime do
     case cron_job_by_ref(runtime.cron_jobs, ref) do
       {job_id, {tracked_spec, _job, ^ref, _token}} ->
         runtime = %{runtime | cron_jobs: Map.delete(runtime.cron_jobs, job_id)}
-
-        case {reason, Map.fetch(runtime.desired_cron, job_id)} do
-          {:normal, {:ok, ^tracked_spec}} ->
-            notify(runtime, {:scheduler_cron_dormant, job_id})
-
-            {:noreply,
-             %{runtime | dormant_cron: Map.put(runtime.dormant_cron, job_id, tracked_spec)}}
-
-          {_reason, {:ok, spec}} ->
-            case start_tracked_cron(runtime, job_id, spec) do
-              {:ok, runtime} ->
-                {:noreply, runtime}
-
-              {:error, restart_reason, runtime} ->
-                notify(
-                  runtime,
-                  {:scheduler_retry_scheduled, job_id, reason, restart_reason}
-                )
-
-                {:noreply, schedule_reconcile_retry(runtime, runtime.last_reconciled_version)}
-            end
-
-          {_reason, :error} ->
-            {:noreply, runtime}
-        end
+        handle_cron_down(runtime, job_id, tracked_spec, reason)
 
       nil ->
         {:noreply, runtime}
@@ -213,30 +142,8 @@ defmodule Jido.Plugin.Scheduler.Runtime do
   def handle_info({:retry_reconcile, _token, _state_version}, runtime),
     do: {:noreply, runtime}
 
-  defp start_delivery(runtime) do
-    if Enum.any?(runtime.desired_cron, fn {_job, spec} -> Durable.enabled?(spec) end) do
-      start_delivery_task(runtime)
-    else
-      runtime
-    end
-  end
-
-  defp start_delivery_task(runtime) do
-    timeout = Keyword.get(runtime.options, :delivery_timeout, 5_000)
-    agent_server = runtime.agent_server
-    cursor = runtime.delivery_cursor
-
-    task = Task.async(fn -> Delivery.attempt(agent_server, cursor, timeout) end)
-    timer = Process.send_after(self(), {:delivery_timeout, task.ref}, 2 * timeout + 100)
-    %{runtime | delivery_task: task, delivery_timeout: timer}
-  end
-
   @impl true
   def terminate(_reason, runtime) do
-    if runtime.delivery_task, do: Task.shutdown(runtime.delivery_task, :brutal_kill)
-    _ = cancel_pending_timer(runtime)
-    if runtime.delivery_timeout, do: Process.cancel_timer(runtime.delivery_timeout)
-
     Enum.each(runtime.cron_jobs, fn {_id, {_spec, job, ref, _token}} ->
       Process.demonitor(ref, [:flush])
       SchedEx.cancel(job)
@@ -257,8 +164,6 @@ defmodule Jido.Plugin.Scheduler.Runtime do
   end
 
   defp reconcile_cron(runtime, desired) when is_map(desired) do
-    pending? = Enum.any?(desired, fn {_job, spec} -> match?(%Signal{}, spec[:pending]) end)
-    desired = Map.new(desired, fn {job, spec} -> {job, Durable.definition(spec)} end)
     runtime = runtime |> stop_changed_jobs(desired) |> Map.put(:desired_cron, desired)
 
     Enum.reduce_while(desired, {:ok, runtime}, fn {job_id, spec}, {:ok, runtime} ->
@@ -270,28 +175,25 @@ defmodule Jido.Plugin.Scheduler.Runtime do
           {:halt, {:error, {:cron_activation_failed, job_id, reason}, runtime}}
       end
     end)
-    |> case do
-      {:ok, runtime} -> {:ok, sync_pending(runtime, pending?)}
-      error -> error
-    end
   end
 
   defp ensure_cron_job(runtime, job_id, spec) do
-    if Map.get(runtime.dormant_cron, job_id) == spec do
-      {:ok, runtime}
-    else
-      case Map.get(runtime.cron_jobs, job_id) do
-        {^spec, job, _ref, _token} ->
-          if Process.alive?(job) do
-            {:ok, runtime}
-          else
-            runtime |> drop_cron_job(job_id) |> start_tracked_cron(job_id, spec)
-          end
+    case {Map.get(runtime.dormant_cron, job_id), Map.get(runtime.cron_jobs, job_id)} do
+      {^spec, _tracked} ->
+        {:ok, runtime}
 
-        nil ->
-          start_tracked_cron(runtime, job_id, spec)
-      end
+      {_dormant, {^spec, job, _ref, _token}} ->
+        ensure_live_cron(runtime, job_id, spec, job)
+
+      {_dormant, nil} ->
+        start_tracked_cron(runtime, job_id, spec)
     end
+  end
+
+  defp ensure_live_cron(runtime, job_id, spec, job) do
+    if Process.alive?(job),
+      do: {:ok, runtime},
+      else: runtime |> drop_cron_job(job_id) |> start_tracked_cron(job_id, spec)
   end
 
   defp schedule_reconcile_retry(runtime, state_version) do
@@ -381,10 +283,9 @@ defmodule Jido.Plugin.Scheduler.Runtime do
          :ok <- validate_time_scale_runtime(time_scale, spec.timezone) do
       SchedEx.run_every(
         fn scheduled_at ->
-          case await_cron_slot(scheduled_at, options) do
-            :ok -> send(runtime_pid, {:cron_tick, job_id, token, scheduled_at})
-            :cancelled -> exit(:normal)
-          end
+          scheduled_at
+          |> await_cron_slot(options)
+          |> deliver_cron_tick(runtime_pid, job_id, token, scheduled_at)
         end,
         spec.cron_expression,
         options
@@ -400,73 +301,43 @@ defmodule Jido.Plugin.Scheduler.Runtime do
     end
   end
 
-  defp cron_tick(%{delivery: :durable}, _signal, _scope, job, generation, time),
-    do: Durable.enqueue_signal(job, generation, time)
+  defp deliver_cron_tick(:ok, runtime, job_id, token, scheduled_at),
+    do: send(runtime, {:cron_tick, job_id, token, scheduled_at})
+
+  defp deliver_cron_tick(:cancelled, _runtime, _job_id, _token, _scheduled_at),
+    do: exit(:normal)
+
+  defp handle_cron_down(runtime, job_id, tracked_spec, reason) do
+    case {reason, Map.fetch(runtime.desired_cron, job_id)} do
+      {:normal, {:ok, ^tracked_spec}} ->
+        notify(runtime, {:scheduler_cron_dormant, job_id})
+
+        {:noreply, %{runtime | dormant_cron: Map.put(runtime.dormant_cron, job_id, tracked_spec)}}
+
+      {_reason, {:ok, spec}} ->
+        restart_cron(runtime, job_id, spec, reason)
+
+      {_reason, :error} ->
+        {:noreply, runtime}
+    end
+  end
+
+  defp restart_cron(runtime, job_id, spec, reason) do
+    case start_tracked_cron(runtime, job_id, spec) do
+      {:ok, runtime} ->
+        {:noreply, runtime}
+
+      {:error, restart_reason, runtime} ->
+        notify(runtime, {:scheduler_retry_scheduled, job_id, reason, restart_reason})
+        {:noreply, schedule_reconcile_retry(runtime, runtime.last_reconciled_version)}
+    end
+  end
 
   defp cron_tick(_spec, signal, _scope, _job, nil, _time), do: fresh_signal(signal)
 
   defp cron_tick(_spec, signal, scope, job, generation, time) do
     {:ok, tick} = Occurrence.attach(fresh_signal(signal), scope, job, generation, time)
     tick
-  end
-
-  defp finish_delivery(runtime, outcome) do
-    if runtime.delivery_timeout, do: Process.cancel_timer(runtime.delivery_timeout)
-    emit_delivery(outcome)
-
-    runtime = %{runtime | delivery_task: nil, delivery_timeout: nil}
-
-    cond do
-      runtime.pending_wake ->
-        schedule_pending(%{runtime | pending_wake: false}, 0)
-
-      match?({:idle, _cursor}, outcome) ->
-        runtime
-
-      true ->
-        schedule_pending(runtime, Keyword.get(runtime.options, :delivery_interval, 100))
-    end
-  end
-
-  defp schedule_pending(%{delivery_task: nil, pending_timer: nil} = runtime, delay) do
-    if Enum.any?(runtime.desired_cron, fn {_job, spec} -> Durable.enabled?(spec) end) do
-      token = make_ref()
-      timer = Process.send_after(self(), {:deliver_pending, token}, delay)
-      kind = if delay == 0, do: :immediate, else: :retry
-      %{runtime | pending_timer: {timer, token, kind}}
-    else
-      runtime
-    end
-  end
-
-  defp schedule_pending(runtime, _delay), do: runtime
-
-  defp wake_pending(%{delivery_task: %Task{}} = runtime),
-    do: %{runtime | pending_wake: true}
-
-  defp wake_pending(%{pending_timer: {_timer, _token, :immediate}} = runtime), do: runtime
-
-  defp wake_pending(runtime) do
-    runtime
-    |> cancel_pending_timer()
-    |> Map.put(:pending_timer, nil)
-    |> schedule_pending(0)
-  end
-
-  defp cancel_pending_timer(%{pending_timer: {timer, _token, _kind}} = runtime) do
-    _ = Process.cancel_timer(timer)
-    runtime
-  end
-
-  defp cancel_pending_timer(runtime), do: runtime
-
-  defp sync_pending(runtime, true), do: wake_pending(runtime)
-
-  defp sync_pending(runtime, false) do
-    runtime
-    |> cancel_pending_timer()
-    |> Map.put(:pending_timer, nil)
-    |> Map.put(:pending_wake, false)
   end
 
   defp validate_scope(nil, _scope), do: :ok
@@ -529,34 +400,4 @@ defmodule Jido.Plugin.Scheduler.Runtime do
   defp stale_state_version?(last, incoming)
        when is_integer(last) and is_integer(incoming),
        do: incoming <= last
-
-  defp outcome_cursor({:idle, cursor}, _runtime), do: cursor
-  defp outcome_cursor({:delivered, cursor, _result}, _runtime), do: cursor
-  defp outcome_cursor({:error, cursor, _reason}, _runtime), do: cursor
-  defp outcome_cursor(_outcome, runtime), do: runtime.delivery_cursor
-
-  defp emit_delivery(outcome) do
-    outcome = delivery_outcome(outcome)
-
-    Semantic.point(
-      [:jido, :scheduler, :delivery],
-      %{
-        scheduler_outcome: outcome,
-        status: if(outcome in [:idle, :delivered], do: :ok, else: :error)
-      },
-      %{count: 1}
-    )
-  end
-
-  defp delivery_outcome({:idle, _cursor}), do: :idle
-  defp delivery_outcome({:delivered, _cursor, _result}), do: :delivered
-
-  defp delivery_outcome({:error, _cursor, {kind, _reason}})
-       when kind in [:state_read_failed, :state_read_unavailable, :invalid_scheduler_state],
-       do: :state_read_error
-
-  defp delivery_outcome({:error, _cursor, :delivery_timeout}), do: :timeout
-  defp delivery_outcome({:error, _cursor, {:delivery_task_down, _reason}}), do: :task_error
-  defp delivery_outcome({:error, _cursor, _reason}), do: :delivery_error
-  defp delivery_outcome(_outcome), do: :invalid_result
 end

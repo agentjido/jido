@@ -1,0 +1,317 @@
+# Supervised Resources
+
+## Overview
+
+Your Plugin needs a process: a cache, a connection pool, a rate limiter. If
+an Action starts it, nothing owns it, and it outlives the Agent. Declare it
+with `child_spec/1` instead. The Agent Server starts it under the Agent's
+activation supervisor, waits until it's ready, passes its PID to your Plugin
+callbacks, and restarts it together with the Server.
+
+In this Livebook you'll build a deduplication Plugin whose runtime refuses
+repeated Signal IDs:
+
+```text
+first Signal    -> commits %{messages: ["hello"], accepted: 1}
+same Signal ID  -> {:error, :duplicate_signal}
+```
+
+Then you'll kill the runtime and watch the activation recover. Run the
+cells from top to bottom.
+
+## Install
+
+```elixir
+Mix.install([{:jido, "~> 3.0.0-beta.2"}])
+```
+
+## The Callbacks
+
+| Callback | Invoked | Receives |
+| --- | --- | --- |
+| `child_spec/1` | When the activation starts, recovers, or replaces the runtime | A `Jido.Plugin.Init` value |
+| `await_ready/2` | After every runtime root starts, in declaration order, before the first Turn | The runtime PID |
+| `admit/3` | Before each live Turn | The runtime PID first |
+| `after_commit/3` | After each commit, before Directives | The runtime PID first |
+| `dispatch/4`, `prepare_dispatch/4` | After commit | The runtime PID first |
+
+## Define the Runtime
+
+The runtime is a plain GenServer. Its `start_link/1` receives a
+`Jido.Plugin.Init` with the Agent ID, the Plugin's committed state value, the
+revision (`state_version`), the Jido instance, and the Plugin options.
+
+This one registers in an application Registry so the notebook can find it:
+
+```elixir
+{:ok, _registry} = Registry.start_link(keys: :unique, name: GuidePlugins.Registry)
+```
+
+```elixir
+defmodule GuidePlugins.Dedupe.Runtime do
+  use GenServer
+
+  alias Jido.Plugin.Init
+
+  def start_link(%Init{} = init) do
+    name = {:via, Registry, {GuidePlugins.Registry, {:dedupe, init.agent_id}}}
+    GenServer.start_link(__MODULE__, init, name: name)
+  end
+
+  def whereis(agent_id) do
+    case Registry.lookup(GuidePlugins.Registry, {:dedupe, agent_id}) do
+      [{pid, _}] -> pid
+      [] -> nil
+    end
+  end
+
+  def info(runtime), do: GenServer.call(runtime, :info)
+
+  @impl true
+  def init(%Init{} = init) do
+    {:ok,
+     %{
+       seen: MapSet.new(),
+       accepted: init.plugin_state,
+       revision: init.state_version,
+       commits: 0
+     }}
+  end
+
+  @impl true
+  def handle_call(:ready?, _from, state), do: {:reply, :ok, state}
+
+  def handle_call(:info, _from, state),
+    do: {:reply, %{state | seen: MapSet.size(state.seen)}, state}
+
+  def handle_call({:claim, signal_id}, _from, state) do
+    if MapSet.member?(state.seen, signal_id),
+      do: {:reply, {:error, :duplicate_signal}, state},
+      else: {:reply, :ok, %{state | seen: MapSet.put(state.seen, signal_id)}}
+  end
+
+  def handle_call({:commit, commit}, _from, state) do
+    {:reply, :ok,
+     %{
+       state
+       | accepted: commit.plugin_state,
+         revision: commit.state_version,
+         commits: state.commits + 1
+     }}
+  end
+end
+```
+
+`init/1` builds only from the committed value and revision in
+`Jido.Plugin.Init`. Every runtime generation starts from a known commit.
+
+## Define the Plugin
+
+```elixir
+defmodule GuidePlugins.Dedupe do
+  use Jido.Plugin
+
+  alias GuidePlugins.Dedupe.Runtime
+
+  @impl true
+  def state_spec(_opts),
+    do: {:accepted, Zoi.integer() |> Zoi.min(0) |> Zoi.default(0)}
+
+  @impl true
+  def reduce(reduction, _opts), do: {:ok, reduction.plugin_state + 1}
+
+  @impl true
+  def child_spec(init), do: Supervisor.child_spec({Runtime, init}, id: __MODULE__)
+
+  @impl true
+  def await_ready(runtime, _opts), do: GenServer.call(runtime, :ready?)
+
+  @impl true
+  def admit(runtime, admission, _opts) do
+    with :ok <- GenServer.call(runtime, {:claim, admission.signal.id}),
+         do: {:ok, nil}
+  end
+
+  @impl true
+  def after_commit(runtime, commit, _opts),
+    do: GenServer.call(runtime, {:commit, commit})
+end
+```
+
+Rules for the child spec:
+
+- Use `:permanent` restart, the `Supervisor.child_spec/2` default. With any
+  other restart type, the activation stops during startup with reason
+  `:invalid_plugin_child_spec`.
+- Return quickly from `start_link/1`. Do slow work, such as opening a
+  connection, behind `await_ready/2`.
+
+## Define the Agent
+
+This notebook attaches the Plugin with `extensions:` because a Livebook cell
+has no source file for `plugin` discovery. In application code, write
+`plugin GuidePlugins.Dedupe` in the `agent` block.
+
+```elixir
+defmodule GuidePlugins.Inbox do
+  use Jido.Agent,
+    name: "inbox",
+    extensions: [GuidePlugins.Dedupe]
+
+  agent do
+    schema(Zoi.object(%{messages: Zoi.list(Zoi.string()) |> Zoi.default([])}))
+  end
+
+  routes do
+    signal_source("/guides/supervised-resources")
+
+    route "inbox.receive", as: :receive do
+      action %{text: text},
+        name: "receive",
+        schema: Zoi.object(%{text: Zoi.string()}),
+        context: context do
+        {:ok, %{context.agent_state | messages: context.agent_state.messages ++ [text]}}
+      end
+    end
+  end
+end
+```
+
+## Start and Wait
+
+```elixir
+{:ok, _jido} = Jido.start()
+{:ok, inbox} = Jido.start_agent(GuidePlugins.Inbox, id: "inbox-1")
+
+Jido.AgentServer.await_ready(inbox)
+```
+
+The result is `:ok`.
+
+Until every `await_ready/2` returns `:ok`, reads work and Turns return
+`{:error, :not_ready}`. `readiness_timeout:` limits the whole wait. The
+default is 5,000 ms. A caller timeout on `await_ready/2` doesn't cancel
+startup.
+
+## Refuse a Repeat
+
+Send the same Signal twice:
+
+```elixir
+signal = GuidePlugins.Inbox.receive_signal!(%{text: "hello"})
+
+{:ok, agent, []} = Jido.AgentServer.call(inbox, signal)
+repeat = Jido.AgentServer.call(inbox, signal)
+
+{agent.state, repeat}
+```
+
+The result is `{%{messages: ["hello"], accepted: 1}, {:error, :duplicate_signal}}`.
+The second call has the same Signal ID, so the runtime refused it in
+`admit/3`.
+
+## Read the Runtime
+
+```elixir
+runtime = GuidePlugins.Dedupe.Runtime.whereis("inbox-1")
+GuidePlugins.Dedupe.Runtime.info(runtime)
+```
+
+The result is `%{seen: 1, accepted: 1, revision: 1, commits: 1}`.
+
+`after_commit/3` delivered that commit as a `Jido.AgentServer.Plugin.Commit`:
+the Plugin's committed value, the revision, and identity fields. It has no
+complete Agent and no way to change state.
+
+Hooks run after every commit, in declaration order, before any Directive.
+`commit_timeout:` limits the whole hook batch. The default is 5,000 ms. A
+failed hook skips later hooks and all Directives. The commit and the reply
+to the caller stay intact.
+
+## Crash the Runtime
+
+Kill the runtime and monitor the Server:
+
+```elixir
+server_ref = Process.monitor(inbox)
+Process.exit(runtime, :kill)
+
+receive do
+  {:DOWN, ^server_ref, :process, _pid, reason} -> reason
+after
+  1_000 -> :still_running
+end
+```
+
+The result is `:shutdown`. The activation supervisor uses `:one_for_all`, so
+losing a required runtime also stops the Server. Then it restarts both.
+Wait for the new Server:
+
+```elixir
+new_inbox =
+  Enum.find_value(1..50, fn _ ->
+    Process.sleep(20)
+
+    case Jido.whereis_agent("inbox-1") do
+      pid when is_pid(pid) and pid != inbox -> pid
+      _ -> nil
+    end
+  end)
+
+:ok = Jido.AgentServer.await_ready(new_inbox)
+runtime = GuidePlugins.Dedupe.Runtime.whereis("inbox-1")
+
+{Jido.AgentServer.agent(new_inbox).state, GuidePlugins.Dedupe.Runtime.info(runtime)}
+```
+
+The result is
+`{%{messages: ["hello"], accepted: 1}, %{seen: 0, accepted: 1, revision: 1, commits: 0}}`.
+
+The committed state survived: the Server recovered from its activation
+checkpoint. The new runtime started from that commit (`accepted: 1`,
+`revision: 1`). The `seen` set is empty because it lived only in the old
+process.
+
+## Memory Isn't State
+
+Send the old Signal again:
+
+```elixir
+{:ok, agent, []} = Jido.AgentServer.call(new_inbox, signal)
+agent.state
+```
+
+The result is `%{messages: ["hello", "hello"], accepted: 2}`. The duplicate
+got through.
+
+Two rules follow:
+
+- If the runtime must remember something across restarts, store it in the
+  Plugin's owned state and rebuild it from `Jido.Plugin.Init`.
+- If a running resource needs a later committed value, read it with
+  `Jido.Plugin.state/2`. Don't cache the complete Agent.
+
+## Stop the Example
+
+```elixir
+:ok = Jido.stop_agent("inbox-1")
+:ok = Jido.stop()
+```
+
+## Summary
+
+- `child_spec/1` declares one `:permanent` runtime root. It receives a
+  `Jido.Plugin.Init`.
+- The Server starts every root, then blocks Turns until each `await_ready/2`
+  returns `:ok`.
+- Runtime callbacks receive the runtime PID as their first argument.
+- `after_commit/3` sees each committed owned value and revision before
+  Directives run.
+- The Server and its runtime roots fail and restart together.
+- A new runtime rebuilds from committed state. In-memory data is lost.
+
+## Next
+
+[Custom Directives](plugin-custom-directives.livemd) lets a runtime run work
+after commit. [Plugin Persistence](plugin-persistence-and-live-changes.md)
+covers changing a running Plugin.

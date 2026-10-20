@@ -29,7 +29,6 @@ stable. Each lesson uses public Jido APIs and deterministic local services.
 2. [Stable Reference](04_12_stable_reference/README.md): durable identity after runtime replacement.
 3. [State Migration](04_14_state_migration/README.md): change schema, definition, and state together. Continue with [Definition Revision](../10_persistence/10_08_definition_revision/README.md).
 4. [Pending Job Recovery](04_10_pending_job_recovery/README.md): explicit retry after runtime loss.
-5. [Durable Scheduling](04_11_durable_scheduling/README.md): save and acknowledge occurrences.
 
 ## Run the section
 

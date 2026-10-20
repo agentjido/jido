@@ -13,88 +13,88 @@ defmodule Jido.MixProject do
   @guide_toc [
     {"Start Here",
      [
-       {"guides/getting-started.livemd", "Getting Started"},
-       {"guides/build-your-first-agent.livemd", "Build Your First Agent"},
-       {"guides/actor-and-agent-framework.md", "Actors, Agents, And Jido"}
+       {"guides/getting-started.livemd", "Getting Started"}
      ]},
-    {"Core Contracts",
+    {"From TypeScript",
      [
-       {"guides/agent-definitions-and-instances.md", "Agent Definitions And Instances"},
-       {"guides/signals-commands-and-routes.md", "Signals, Commands, And Routes"},
-       {"guides/actions-flows-and-instructions.md", "Actions, Flows, And Instructions"},
-       {"guides/turns-commit-and-effects.md", "Turns, Commit, And Effects"},
-       {"guides/directives-and-outcomes.md", "Directives And Outcomes"},
-       {"guides/errors-and-runtime-guarantees.md", "Errors And Runtime Guarantees"},
-       {"guides/public-contracts.md", "Public Contract Tests"}
+       {"guides/nodejs-and-the-beam.md", "Node.js and the BEAM"},
+       {"guides/typescript-concept-map.md", "TypeScript Concept Map"},
+       {"guides/types-and-validation.md", "Types and Validation"},
+       {"guides/errors-and-async.md", "Errors and Async"},
+       {"guides/effects-as-data.md", "Effects as Data"}
+     ]},
+    {"Core Concepts",
+     [
+       {"guides/otp-concepts-for-jido.md", "OTP Concepts"},
+       {"guides/signal-to-effects.md", "Life of a Signal"},
+       {"guides/pure-or-live-execution.md", "Pure or Live Execution"}
      ]},
     {"Author Agents",
      [
-       {"guides/agent-dsl.livemd", "Agent DSL"},
-       {"guides/state-schemas.livemd", "State Schemas"},
-       {"guides/route-interfaces.livemd", "Route Interfaces"},
-       {"guides/plugin-state.md", "Plugin-Owned State"},
-       {"guides/data-definitions-and-codecs.md", "Data Definitions And Codecs"},
-       {"guides/authoring-extensions.md", "Authoring Extensions"}
+       {"guides/define-and-instantiate-an-agent.livemd", "Define an Agent"},
+       {"guides/build-agent-routes.livemd", "Routes and Handlers"},
+       {"guides/typed-signal-actions.livemd", "Typed Signals"},
+       {"guides/agent-results-and-directives.md", "State and Directives"},
+       {"guides/agent-mutations-and-diffs.livemd", "Mutations and Diffs"},
+       {"guides/agent-documents-and-views.md", "Documents and Views"}
      ]},
-    {"Run Actors",
+    {"Compose Agents",
      [
-       {"guides/jido-instances.livemd", "Jido Instances"},
-       {"guides/start-and-address-agents.livemd", "Start And Address Agents"},
-       {"guides/agent-server-lifecycle.md", "Agent Server Lifecycle"},
-       {"guides/calls-casts-and-requests.livemd", "Calls, Casts, And Requests"},
-       {"guides/admission-cancellation-and-timeouts.md", "Admission, Cancellation, And Timeouts"},
-       {"guides/runtime-state-and-debugging.livemd", "Runtime State And Debugging"}
+       {"guides/composition-vocabulary.md", "Composition Vocabulary"},
+       {"guides/declare-agent-topology.livemd", "Nested Agents"},
+       {"guides/connect-agent-outputs.livemd", "Connect Agent Outputs"},
+       {"guides/change-live-composition.md", "Change Live Composition"}
      ]},
-    {"Add Capabilities",
+    {"Build Plugins",
      [
-       {"guides/your-first-plugin.md", "Write a Plugin"},
-       {"guides/plugin-contract-and-lifecycle.md", "Plugin Contract And Lifecycle"},
-       {"guides/plugin-runtimes.livemd", "Plugin Runtimes"},
-       {"guides/discovery.md", "Discover Actions"},
-       {"guides/jido-signal-messaging.md", "Use Jido Signal"},
-       {"guides/typed-signals.livemd", "Typed Signals In Actions And Flow"},
-       {"guides/signal-buses.livemd", "Connect A Signal Bus"},
-       {"guides/signal-dispatch.livemd", "Dispatch Signals"},
-       {"guides/schedules-and-heartbeats.livemd", "Schedules And Heartbeats"},
-       {"guides/durable-schedule-occurrences.md", "Durable Schedule Occurrences"},
-       {"guides/managed-sensors.livemd", "Manage Sensors"}
+       {"guides/extensions-and-plugins.md", "Extensions or Plugins"},
+       {"guides/write-a-stateful-plugin.livemd", "Stateful Plugins"},
+       {"guides/plugin-supervised-resources.livemd", "Supervised Resources"},
+       {"guides/plugin-custom-directives.livemd", "Custom Directives"},
+       {"guides/plugin-persistence-and-live-changes.md", "Plugin Persistence"}
      ]},
-    {"Compose Systems",
+    {"Use Built-In Plugins",
      [
-       {"guides/child-agents.livemd", "Start Child Agents"},
-       {"guides/ownership-orphans-and-remote-children.md",
-        "Ownership, Orphans, And Remote Children"},
-       {"guides/topology-definitions.md", "Topology Definitions"},
-       {"guides/topology-supervision.md", "OTP And Topology Ownership"},
-       {"guides/topology-dsl.livemd", "Topology DSL"},
-       {"guides/topology-data-codecs-and-composition.md",
-        "Topology Data, Codecs, And Composition"},
-       {"guides/activate-and-repair-a-topology.livemd", "Activate And Repair A Topology"}
+       {"guides/signal-bus-plugin.livemd", "Signal Bus"},
+       {"guides/audit-records.md", "Audit Records"},
+       {"guides/heartbeats-and-schedules.livemd", "Heartbeats and Schedules"},
+       {"guides/managed-sensors.livemd", "Managed Sensors"}
      ]},
-    {"Persist And Recover",
+    {"Run Agent Servers",
      [
-       {"guides/portable-state-and-checkpoints.md", "Portable State And Checkpoints"},
+       {"guides/start-and-address-live-agents.livemd", "Start and Address Agents"},
+       {"guides/send-signals-to-live-agents.livemd", "Call, Cast, and Await"},
+       {"guides/agent-server-admission.md", "Admission and Deadlines"},
+       {"guides/inspect-and-control-activations.livemd", "Inspect Activations"},
+       {"guides/agent-activation-control.md", "Supervision and Lifecycle"}
+     ]},
+    {"Build Durable Systems",
+     [
+       {"guides/durability-model.md", "Durability Model"},
+       {"guides/make-an-agent-durable.livemd", "Make an Agent Durable"},
+       {"guides/durable-agent-activation.livemd", "Durable Activation"},
+       {"guides/durable-turns-and-flows.livemd", "Durable Turns and Flows"},
+       {"guides/durable-revisions-and-conflicts.md", "Revisions and Conflicts"},
+       {"guides/checkpoints-and-data-upgrades.md", "Checkpoints and Upgrades"},
+       {"guides/recovery-and-effect-limits.md", "Recovery Limits"}
+     ]},
+    {"Storage and Adapters",
+     [
+       {"guides/persistence-storage-model.md", "Storage Model"},
        {"guides/persistence-adapters.livemd", "Persistence Adapters"},
-       {"guides/compare-and-swap-hibernate-and-thaw.md", "Compare And Swap, Hibernate, And Thaw"},
-       {"guides/recoverable-effects.md", "Recoverable Effects"},
-       {"guides/runtime-coordination-state.md", "Runtime Coordination State"},
-       {"guides/audit-records.md", "Audit Records"}
+       {"guides/custom-persistence-adapter.md", "Custom Adapters"}
      ]},
-    {"Operate And Extend",
+    {"Operate Jido",
      [
-       {"guides/configuration.md", "Configuration"},
-       {"guides/observe-agent-turns.livemd", "Observe Agent Turns"},
-       {"guides/telemetry-tracing-and-logs.md", "Telemetry, Tracing, And Logs"},
-       {"guides/test-agents-and-plugins.livemd", "Test Agents And Plugins"},
-       {"guides/deployment-and-shutdown.md", "Deployment And Shutdown"},
-       {"guides/limits-and-performance.md", "Limits And Performance"},
-       {"guides/extension-boundaries.md", "Extension Boundaries"},
-       {"guides/example-systems.md", "Example Systems"}
+       {"guides/configuration-and-tenant-isolation.md", "Instances and Tenants"},
+       {"guides/action-discovery-and-permission.md", "Action Discovery"},
+       {"guides/observe-agent-turns.livemd", "Observability"},
+       {"guides/test-jido-systems.livemd", "Testing"},
+       {"guides/deployment-and-performance.md", "Deployment and Sizing"}
      ]},
-    {"Upgrade",
+    {"Reference",
      [
-       {"guides/migration.md", "Upgrade From Jido v2 To v3"},
-       {"guides/api-migration-map.md", "V2 To V3 API Map"}
+       {"guides/v2-to-v3-migration.md", "Migrating from V2"}
      ]}
   ]
 
@@ -113,7 +113,7 @@ defmodule Jido.MixProject do
       deps: deps(),
       test_ignore_filters: [
         fn path ->
-          (String.starts_with?(path, "test/contract/agent_server/") or
+          (String.starts_with?(path, "test/contract/") or
              String.starts_with?(path, "test/bench/") or
              String.starts_with?(path, "test/examples/support/") or
              String.starts_with?(path, "test/authoring/") or
@@ -262,11 +262,8 @@ defmodule Jido.MixProject do
           Jido.Plugin.Heartbeat,
           Jido.Plugin.Heartbeat.Signal.Tick,
           Jido.Plugin.Scheduler,
-          Jido.Plugin.Scheduler.Acknowledge,
           Jido.Plugin.Scheduler.Cancel,
           Jido.Plugin.Scheduler.Cron,
-          Jido.Plugin.Scheduler.Enqueue,
-          Jido.Plugin.Scheduler.Signal.Enqueue,
           Jido.Plugin.Scheduler.Occurrence,
           Jido.Plugin.Scheduler.Schedule,
           Jido.Plugin.SensorManager,
@@ -311,9 +308,6 @@ defmodule Jido.MixProject do
           Jido.Error.RoutingError,
           Jido.Error.TimeoutError,
           Jido.Error.ValidationError
-        ],
-        Utilities: [
-          Jido.Util
         ]
       ]
     ]

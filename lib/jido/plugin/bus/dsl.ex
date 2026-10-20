@@ -34,16 +34,18 @@ defmodule Jido.Plugin.Bus.DSL do
   @impl Jido.Agent.Extension
   def normalize(value) do
     with {:ok, value} <- Data.fields(value, [:buses]),
-         {:ok, buses} <-
-           Data.list(value[:buses], fn bus ->
-             with {:ok, bus} <- Data.fields(bus, [:name]),
-                  :ok <- Data.name(bus[:name]),
-                  do: {:ok, bus}
-           end) do
-      if length(buses) == 1,
-        do: {:ok, %{buses: buses}},
-        else: Error.fail(:bus_count, [], "This provider declares exactly one local bus")
+         {:ok, buses} <- Data.list(value[:buses], &normalize_bus/1) do
+      case buses do
+        [_bus] -> {:ok, %{buses: buses}}
+        _buses -> Error.fail(:bus_count, [], "This provider declares exactly one local bus")
+      end
     end
+  end
+
+  defp normalize_bus(bus) do
+    with {:ok, bus} <- Data.fields(bus, [:name]),
+         :ok <- Data.name(bus[:name]),
+         do: {:ok, bus}
   end
 
   @impl Jido.Agent.Extension

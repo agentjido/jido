@@ -1,7 +1,7 @@
 defmodule Jido.AgentServer.DurableTurn do
   @moduledoc false
 
-  alias Jido.AgentServer.{CheckpointStore, WaitHost}
+  alias __MODULE__.{CheckpointStore, WaitHost}
   alias Runic.Runner
   alias Jido.Exec.Waits
 
@@ -9,11 +9,8 @@ defmodule Jido.AgentServer.DurableTurn do
     do: Jido.Instruction.resolve(prepared.turn.executable, prepared.turn.input, prepared.context)
 
   def accept(data, prepared) do
-    with {:ok, %{kind: :flow} = instruction} <- instruction(prepared),
-         {:ok, _} <-
-           Jido.Exec.Validation.input(instruction.target, instruction.params, %{
-             phase: :flow_input
-           }),
+    with {:ok, instruction} <- flow_instruction(prepared),
+         {:ok, _} <- validate_input(instruction),
          receipt = %{
            id: data.active.turn_id,
            signal: data.active.source_signal,
@@ -54,8 +51,16 @@ defmodule Jido.AgentServer.DurableTurn do
          do: {:ok, prepared}
   end
 
+  def validate_restore(agent, %{status: :running} = receipt) do
+    with {:ok, specs} <- Jido.Plugin.Normalizer.normalize_all(Jido.Agent.runtime_plugins(agent)),
+         {:ok, _} <- restore(agent, receipt, receipt.context, specs),
+         do: :ok
+  end
+
+  def validate_restore(_agent, _receipt), do: :ok
+
   def compatible(prepared, receipt) do
-    with {:ok, %{kind: :flow} = instruction} <- instruction(prepared),
+    with {:ok, instruction} <- flow_instruction(prepared),
          true <- fingerprint(instruction.target) == receipt.fingerprint do
       :ok
     else
@@ -82,8 +87,6 @@ defmodule Jido.AgentServer.DurableTurn do
       owner: owner,
       dispatch_mode: :manual,
       checkpoint_strategy: :manual,
-      max_concurrency: 1,
-      scheduler: Runic.Runner.Scheduler.Default,
       scheduler_policies: [{:default, policy}],
       hooks:
         hooks
@@ -132,10 +135,7 @@ defmodule Jido.AgentServer.DurableTurn do
   defp resume_or_start(runner, id, workflow, instruction, options, activation_state) do
     case Runner.resume(runner, id, options) do
       {:error, :not_found} ->
-        with {:ok, input} <-
-               Jido.Exec.Validation.input(instruction.target, instruction.params, %{
-                 phase: :flow_input
-               }),
+        with {:ok, input} <- validate_input(instruction),
              {:ok, worker} <-
                Runner.start_workflow(
                  runner,
@@ -161,18 +161,8 @@ defmodule Jido.AgentServer.DurableTurn do
              :ok <- Runner.checkpoint(runner, id),
              do: {:ok, worker}
 
-      {:ok, worker} ->
-        with :ok <-
-               Jido.AgentServer.Supervisor.remember_execution(
-                 activation_state,
-                 runner,
-                 id,
-                 worker
-               ),
-             do: {:ok, worker}
-
-      error ->
-        error
+      result ->
+        result
     end
   end
 
@@ -240,6 +230,20 @@ defmodule Jido.AgentServer.DurableTurn do
        end), do: :ok, else: {:error, :non_portable_flow_output}
   end
 
+  defp flow_instruction(prepared) do
+    case instruction(prepared) do
+      {:ok, %{kind: :flow} = instruction} -> {:ok, instruction}
+      {:ok, _instruction} -> {:error, :not_durable_flow}
+      error -> error
+    end
+  end
+
+  defp validate_input(instruction),
+    do:
+      Jido.Exec.Validation.input(instruction.target, instruction.params, %{
+        phase: :flow_input
+      })
+
   def fingerprint(target) do
     flow = if is_atom(target), do: target.flow(), else: target
     versions = versions({:flow, target}, %{}) |> Enum.sort()
@@ -253,7 +257,6 @@ defmodule Jido.AgentServer.DurableTurn do
     if Map.has_key?(acc, module) do
       acc
     else
-      Code.ensure_loaded!(module)
       acc = Map.put(acc, module, module.module_info(:md5))
       if kind == :flow, do: versions({:flow, module.flow()}, acc), else: acc
     end

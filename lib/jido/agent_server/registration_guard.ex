@@ -9,7 +9,7 @@ defmodule Jido.AgentServer.RegistrationGuard do
     GenServer.start_link(__MODULE__, instance, name: Jido.registration_guard_name(instance))
   end
 
-  def claim(instance, key, pid, activation) when is_atom(instance) and is_pid(pid) do
+  def claim(instance, key, pid, activation) do
     GenServer.call(Jido.registration_guard_name(instance), {:claim, key, pid, activation})
   catch
     :exit, _reason -> {:error, :registration_guard_unavailable}
@@ -35,7 +35,7 @@ defmodule Jido.AgentServer.RegistrationGuard do
       {^pid, _ref, _activation} ->
         {:reply, :ok, state}
 
-      {owner, ref, previous_activation} when is_pid(owner) ->
+      {owner, ref, previous_activation} ->
         stop_orphan(owner, ref, previous_activation)
 
         if Process.alive?(owner) do
@@ -52,24 +52,20 @@ defmodule Jido.AgentServer.RegistrationGuard do
 
   @impl true
   def handle_info(:watch_registry, state) do
+    current = state.registry_pid
+
     case Process.whereis(state.registry) do
-      pid when is_pid(pid) and pid != state.registry_pid ->
-        ref = Process.monitor(pid)
-        state = %{state | registry_pid: pid, registry_ref: ref}
-        state = seed_claims(state)
-
-        Enum.each(state.claims, fn {_key, {owner, _ref, _activation}} ->
-          send(owner, {:jido_registry_restarted, pid})
-        end)
-
-        {:noreply, state}
-
-      pid when is_pid(pid) ->
-        {:noreply, state}
-
       nil ->
         Process.send_after(self(), :watch_registry, @watch_interval)
         {:noreply, state}
+
+      ^current ->
+        {:noreply, state}
+
+      pid ->
+        ref = Process.monitor(pid)
+        state = %{state | registry_pid: pid, registry_ref: ref}
+        {:noreply, seed_claims(state)}
     end
   end
 
@@ -99,7 +95,7 @@ defmodule Jido.AgentServer.RegistrationGuard do
     end
   end
 
-  defp stop_orphan(_owner, _ref, _activation), do: :ok
+  defp stop_orphan(_owner, _ref, _activation), do: nil
 
   defp seed_claims(state) do
     entries =
@@ -129,14 +125,8 @@ defmodule Jido.AgentServer.RegistrationGuard do
   end
 
   defp drop_claim(state, key) do
-    case Map.pop(state.claims, key) do
-      {{_pid, ref, _activation}, claims} ->
-        Process.demonitor(ref, [:flush])
-        %{state | claims: claims, refs: Map.delete(state.refs, ref)}
-
-      {nil, _claims} ->
-        state
-    end
+    {{_pid, ref, _activation}, claims} = Map.pop(state.claims, key)
+    %{state | claims: claims, refs: Map.delete(state.refs, ref)}
   end
 
   def registry_key(id, partition), do: {:agent, Jido.partition_key(id, partition)}

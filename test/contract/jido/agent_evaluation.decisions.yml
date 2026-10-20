@@ -1,0 +1,23 @@
+- id: extract-agent-evaluation
+  date: 2026-10-19
+  decision: Move pure route selection, executable evaluation, candidate validation, Agent Plugin preparation and reduction, and returned Directive promises from jido.agent to jido.agent_evaluation.
+  driver: Agent authoring values and pure evaluation have different change and failure boundaries.
+  approved_by: Approved Jido V3 Covenant component map
+
+- id: evaluation-mutation-profile
+  date: 2026-10-19
+  decision: Mutate Runner, SignalHandler, Contract, Agent Plugin preparation, and Agent Plugin reduction behavior. Keep Turn constructors, callback context structs, and normalized specifications outside the profile as shared values or data declarations.
+  driver: The mutation profile must target evaluation decisions without claiming Agent authoring or generic Plugin normalization.
+  approved_by: User-requested component hardening pass
+
+- id: remove-unused-authoring-result-api
+  date: 2026-10-19
+  decision: Remove Jido.Agent.Contract.result/3 and pass_through/2 with their isolated authoring tests. Keep the Directive normalization and emission checks used by Runner and Plugin Pipeline.
+  driver: No production, guide, or package example calls the old result API. It duplicated the active evaluation path and left two result models in core.
+  approved_by: User-requested trim and hardening pass
+
+- id: close-internal-evaluation-paths
+  date: 2026-10-19
+  decision: Require Plugin Pipeline evaluation to start with one successful executable result and one selected route. Remove its error pass-through and missing-route forms, redundant internal list guards, and the unused Runner conversion of Signal routing errors.
+  driver: Public entry points validate options, Signals, Agent definitions, and executable results before these internal functions run. The extra paths had no production caller and weakened the component boundary.
+  approved_by: User-requested trim and hardening pass

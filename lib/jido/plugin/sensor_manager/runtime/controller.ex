@@ -15,9 +15,9 @@ defmodule Jido.Plugin.SensorManager.Runtime.Controller do
   def init({%PluginInit{} = init, root}) do
     {:ok,
      %{
-       desired: %{},
        init: init,
        last_reconciled_version: nil,
+       retry_delay_ms: Keyword.get(init.options, :retry_delay_ms, @default_retry_delay),
        retry_timer: nil,
        retry_token: nil,
        root: root,
@@ -29,7 +29,7 @@ defmodule Jido.Plugin.SensorManager.Runtime.Controller do
   def handle_continue(:restore, state) do
     with {:ok, plugin_state} <- Plugin.state(state.init),
          {:ok, state} <- reconcile(state, plugin_state.desired) do
-      {:noreply, state}
+      {:noreply, %{state | last_reconciled_version: state.init.state_version}}
     else
       {:error, reason} -> {:stop, {:sensor_restore_failed, reason}, state}
       {:error, reason, state} -> {:stop, {:sensor_restore_failed, reason}, state}
@@ -49,7 +49,7 @@ defmodule Jido.Plugin.SensorManager.Runtime.Controller do
         _from,
         %{last_reconciled_version: last_version} = state
       )
-      when is_integer(version) and is_integer(last_version) and version <= last_version do
+      when is_integer(last_version) and version <= last_version do
     {:reply, :ok, state}
   end
 
@@ -87,7 +87,7 @@ defmodule Jido.Plugin.SensorManager.Runtime.Controller do
 
   def handle_info({:retry_reconcile, _token, _version}, state), do: {:noreply, state}
 
-  defp reconcile(state, desired) when is_map(desired) do
+  defp reconcile(state, desired) do
     state = state |> stop_changed(desired) |> Map.put(:desired, desired)
 
     Enum.reduce_while(desired, {:ok, state}, &reconcile_sensor/2)
@@ -105,10 +105,7 @@ defmodule Jido.Plugin.SensorManager.Runtime.Controller do
   defp same_spec?(left, right), do: left === right
 
   defp restart_sensor(state, tag) do
-    case Map.fetch(state.desired, tag) do
-      {:ok, spec} -> restart_sensor(state, tag, spec)
-      :error -> {:noreply, state}
-    end
+    restart_sensor(state, tag, Map.fetch!(state.desired, tag))
   end
 
   defp restart_sensor(state, tag, spec) do
@@ -120,7 +117,7 @@ defmodule Jido.Plugin.SensorManager.Runtime.Controller do
 
   defp reconcile_sensor({tag, spec}, {:ok, state}) do
     case Map.get(state.sensors, tag) do
-      %{spec: current_spec, pid: pid} when is_pid(pid) ->
+      %{spec: current_spec} ->
         continue_if_same_spec(state, tag, current_spec, spec)
 
       nil ->
@@ -164,9 +161,7 @@ defmodule Jido.Plugin.SensorManager.Runtime.Controller do
   end
 
   defp stop_sensor(state, sensor) do
-    Process.demonitor(sensor.ref, [:flush])
     _ = DynamicSupervisor.terminate_child(sensor_supervisor(state), sensor.pid)
-    :ok
   end
 
   defp start_sensor(state, tag, %{module: module, config: config} = spec) do
@@ -210,19 +205,18 @@ defmodule Jido.Plugin.SensorManager.Runtime.Controller do
   end
 
   defp sensor_supervisor(state) do
-    state.root
-    |> Supervisor.which_children()
-    |> Enum.find_value(fn
-      {DynamicSupervisor, pid, :supervisor, _modules} when is_pid(pid) -> pid
-      _child -> nil
-    end)
+    {DynamicSupervisor, pid, :supervisor, _modules} =
+      state.root
+      |> Supervisor.which_children()
+      |> List.keyfind(DynamicSupervisor, 0)
+
+    pid
   end
 
   defp schedule_retry(state, version) do
     state = cancel_retry(state)
     token = make_ref()
-    delay = Keyword.get(state.init.options, :retry_delay_ms, @default_retry_delay)
-    timer = Process.send_after(self(), {:retry_reconcile, token, version}, delay)
+    timer = Process.send_after(self(), {:retry_reconcile, token, version}, state.retry_delay_ms)
     %{state | retry_timer: timer, retry_token: token}
   end
 

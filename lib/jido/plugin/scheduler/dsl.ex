@@ -5,6 +5,7 @@ end
 
 defmodule Jido.Plugin.Scheduler.DSL do
   @moduledoc "Static schedule authoring. This provider does not start timers."
+  alias Crontab.CronExpression.Parser
   alias Jido.Agent.{Data, Error, Route}
   alias Spark.Dsl.Extension, as: E
 
@@ -27,47 +28,55 @@ defmodule Jido.Plugin.Scheduler.DSL do
   def lower(dsl, config) do
     schedules = E.get_entities(dsl, [:schedules])
 
-    if config != %{} and schedules != [],
-      do: Error.fail(:ambiguous_config, [], "Use schedule DSL or Plugin data, not both"),
-      else: if(config != %{}, do: {:ok, config}, else: lower_schedules(schedules))
+    cond do
+      config != %{} and schedules != [] ->
+        Error.fail(:ambiguous_config, [], "Use schedule DSL or Plugin data, not both")
+
+      config != %{} ->
+        {:ok, config}
+
+      true ->
+        lower_schedules(schedules)
+    end
   end
 
   defp lower_schedules(schedules) do
-    with {:ok, entries} <-
-           Data.list(schedules, fn entry ->
-             cond do
-               entry.every != nil and (entry.cron != nil or entry.timezone != nil) ->
-                 Error.fail(
-                   :schedule_timing,
-                   [],
-                   "Use one interval or cron; timezone is valid only with cron"
-                 )
-
-               entry.every != nil ->
-                 {:ok,
-                  %{
-                    name: entry.name,
-                    timing: %{kind: :every, milliseconds: entry.every},
-                    signal: entry.signal
-                  }}
-
-               entry.cron != nil ->
-                 {:ok,
-                  %{
-                    name: entry.name,
-                    timing: %{
-                      kind: :cron,
-                      expression: entry.cron,
-                      timezone: entry.timezone || "Etc/UTC"
-                    },
-                    signal: entry.signal
-                  }}
-
-               true ->
-                 Error.fail(:schedule_timing, [], "Schedule needs an interval or cron")
-             end
-           end),
+    with {:ok, entries} <- Data.list(schedules, &lower_schedule/1),
          do: {:ok, %{schedules: entries}}
+  end
+
+  defp lower_schedule(entry) do
+    cond do
+      entry.every != nil and (entry.cron != nil or entry.timezone != nil) ->
+        Error.fail(
+          :schedule_timing,
+          [],
+          "Use one interval or cron; timezone is valid only with cron"
+        )
+
+      entry.every != nil ->
+        {:ok,
+         %{
+           name: entry.name,
+           timing: %{kind: :every, milliseconds: entry.every},
+           signal: entry.signal
+         }}
+
+      entry.cron != nil ->
+        {:ok,
+         %{
+           name: entry.name,
+           timing: %{
+             kind: :cron,
+             expression: entry.cron,
+             timezone: entry.timezone || "Etc/UTC"
+           },
+           signal: entry.signal
+         }}
+
+      true ->
+        Error.fail(:schedule_timing, [], "Schedule needs an interval or cron")
+    end
   end
 
   @impl Jido.Agent.Extension
@@ -97,7 +106,7 @@ defmodule Jido.Plugin.Scheduler.DSL do
            Data.fields(value, [:kind, :expression, :timezone], %{timezone: "Etc/UTC"}),
          :ok <- Data.nonempty(value[:expression]),
          :ok <- Data.nonempty(value.timezone),
-         {:ok, _} <- Crontab.CronExpression.Parser.parse(value.expression),
+         {:ok, _} <- Parser.parse(value.expression),
          :ok <- timezone(value.timezone) do
       {:ok, value}
     else
@@ -131,21 +140,22 @@ defmodule Jido.Plugin.Scheduler.DSL do
 
   @impl Jido.Agent.Extension
   def verify(data, definition) do
-    with {:ok, _} <-
-           Data.list(data.schedules, fn schedule ->
-             case Route.select(definition, schedule.signal.type) do
-               {:ok, _} ->
-                 {:ok, schedule}
-
-               {:error, _} ->
-                 Error.fail(
-                   :schedule_input,
-                   [:schedules, schedule.name],
-                   "Scheduled Signal has no input route",
-                   %{type: schedule.signal.type}
-                 )
-             end
-           end),
+    with {:ok, _} <- Data.list(data.schedules, &verify_schedule(&1, definition)),
          do: :ok
+  end
+
+  defp verify_schedule(schedule, definition) do
+    case Route.select(definition, schedule.signal.type) do
+      {:ok, _} ->
+        {:ok, schedule}
+
+      {:error, _} ->
+        Error.fail(
+          :schedule_input,
+          [:schedules, schedule.name],
+          "Scheduled Signal has no input route",
+          %{type: schedule.signal.type}
+        )
+    end
   end
 end

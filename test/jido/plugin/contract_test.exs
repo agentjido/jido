@@ -568,7 +568,7 @@ defmodule Jido.Plugin.ContractTest do
              Jido.Plugin.Normalizer.normalize_all([{AdmissionPlugin, mode: :invalid}])
 
     assert {:error, %Jido.Error.ExecutionError{} = invalid} =
-             Jido.AgentServer.Plugin.Callbacks.admit(command, invalid_specs, %{})
+             Jido.AgentServer.Plugin.Callbacks.admit(command, invalid_specs, %{}, 0)
 
     assert invalid.message == "Agent Server Plugin admit/3 returned an invalid result"
 
@@ -581,13 +581,16 @@ defmodule Jido.Plugin.ContractTest do
     assert {:ok, accept_specs} =
              Jido.Plugin.Normalizer.normalize_all([{AdmissionPlugin, mode: :accept}])
 
-    assert {:ok, accepted} = Jido.AgentServer.Plugin.Callbacks.admit(command, accept_specs, %{})
+    assert {:ok, accepted} =
+             Jido.AgentServer.Plugin.Callbacks.admit(command, accept_specs, %{}, 0)
+
     assert accepted.plugin_inputs[AdmissionPlugin].runtime == :runtime_input
 
     assert {:ok, reject_specs} =
              Jido.Plugin.Normalizer.normalize_all([{AdmissionPlugin, mode: :reject}])
 
-    assert {:error, :denied} = Jido.AgentServer.Plugin.Callbacks.admit(command, reject_specs, %{})
+    assert {:error, :denied} =
+             Jido.AgentServer.Plugin.Callbacks.admit(command, reject_specs, %{}, 0)
   end
 
   test "validates the complete Action state" do
@@ -693,7 +696,8 @@ defmodule Jido.Plugin.ContractTest do
                  agent,
                  signal,
                  %{},
-                 Jido.Agent.Plugin.specs(specs)
+                 Jido.Agent.Plugin.specs(specs),
+                 %{emits: nil}
                )
 
       assert error.message == "Agent executable changed Plugin-owned state"

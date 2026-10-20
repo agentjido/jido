@@ -98,10 +98,7 @@ defmodule Jido.Plugin.Manifest do
        when is_map(option_keys) do
     owner_keys = Map.keys(option_keys)
 
-    invalid_owner =
-      Enum.find_value(owner_keys, fn owner ->
-        if owner not in @owners, do: {:invalid, owner}
-      end)
+    invalid_owner = Enum.find(owner_keys, &(&1 not in @owners))
 
     invalid_keys =
       Enum.find_value(option_keys, fn {owner, keys} ->
@@ -111,17 +108,15 @@ defmodule Jido.Plugin.Manifest do
       end)
 
     unselected_owner =
-      Enum.find_value(owner_keys, fn owner ->
-        if owner in @owners and is_nil(Map.fetch!(manifest, owner)), do: {:unselected, owner}
-      end)
+      Enum.find(owner_keys, &(&1 in @owners and is_nil(Map.fetch!(manifest, &1))))
 
     assigned = option_keys |> Map.values() |> List.flatten() |> MapSet.new()
     unassigned = options |> Keyword.keys() |> Enum.reject(&MapSet.member?(assigned, &1))
 
     cond do
-      invalid_owner ->
+      not is_nil(invalid_owner) ->
         invalid("Plugin option mapping has an unknown owner", %{
-          owner: elem(invalid_owner, 1),
+          owner: invalid_owner,
           owners: @owners
         })
 
@@ -132,7 +127,7 @@ defmodule Jido.Plugin.Manifest do
 
       unselected_owner ->
         invalid("Plugin option mapping names an unselected facet", %{
-          owner: elem(unselected_owner, 1)
+          owner: unselected_owner
         })
 
       map_size(option_keys) > 0 and unassigned != [] ->

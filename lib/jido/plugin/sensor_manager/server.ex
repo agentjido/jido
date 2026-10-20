@@ -8,22 +8,25 @@ defmodule Jido.Plugin.SensorManager.Server do
 
   @impl true
   def validate_options(opts) do
-    delay = Keyword.get(opts, :retry_delay_ms, 1_000)
+    case Keyword.fetch(opts, :retry_delay_ms) do
+      :error ->
+        :ok
 
-    if is_integer(delay) and delay in 1..4_294_967_295 do
-      :ok
-    else
-      {:error,
-       Jido.Error.validation_error("Sensor Manager retry delay is invalid",
-         kind: :config,
-         details: %{retry_delay_ms: delay}
-       )}
+      {:ok, delay} when is_integer(delay) and delay in 1..4_294_967_295 ->
+        :ok
+
+      {:ok, delay} ->
+        {:error,
+         Jido.Error.validation_error("Sensor Manager retry delay is invalid",
+           kind: :config,
+           details: %{retry_delay_ms: delay}
+         )}
     end
   end
 
   @impl true
   def dispatch(runtime, _directive, %DirectiveContext{} = context, opts) do
-    timeout = Keyword.get(opts, :timeout, 5_000)
+    timeout = timeout(opts)
     Runtime.reconcile(runtime, context.plugin_state.desired, context.state_version, timeout)
   catch
     :exit, reason -> {:error, {:sensor_manager_runtime_unavailable, reason}}
@@ -31,7 +34,7 @@ defmodule Jido.Plugin.SensorManager.Server do
 
   @impl true
   def await_ready(runtime, opts) do
-    Runtime.await_ready(runtime, Keyword.get(opts, :timeout, 5_000))
+    Runtime.await_ready(runtime, timeout(opts))
   catch
     :exit, reason -> {:error, {:sensor_manager_runtime_unavailable, reason}}
   end
@@ -40,4 +43,6 @@ defmodule Jido.Plugin.SensorManager.Server do
   def child_spec(%Init{} = init) do
     Supervisor.child_spec({Runtime, init}, id: SensorManager)
   end
+
+  defp timeout(opts), do: Keyword.get(opts, :timeout, 5_000)
 end

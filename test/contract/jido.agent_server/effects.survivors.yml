@@ -1,0 +1,23 @@
+- at: lib/jido/agent_server/effects.ex:97:9
+  operator: clause_removal
+  mutation: "`case _ ->` → `(removed)`"
+  sort: equivalent
+  reason: An unaccepted DynamicSupervisor result and a missing fallback clause both leave run/3 through its catch boundary and produce the same safe failed effect result. The raw start reason is not published.
+
+- at: lib/jido/agent_server/effects.ex:153:11
+  operator: clause_removal
+  mutation: "`case _ ->` → `(removed)`"
+  sort: equivalent
+  reason: A child-spec check error and the CaseClauseError from a removed error clause both leave the same catch boundary as invalid_child_spec before commit.
+
+- at: lib/jido/agent_server/effects.ex:200:36
+  operator: element_removal
+  mutation: "`partition: config.partition` → `(removed)`"
+  sort: equivalent
+  reason: This call is an early validation pass. An explicit child partition remains in options and takes precedence. An omitted partition is valid in both forms, and spawn_child reapplies the live parent partition.
+
+- at: lib/jido/agent_server/effects.ex:200:65
+  operator: element_removal
+  mutation: "`runner: config.runner` → `(removed)`"
+  sort: equivalent
+  reason: This call is an early validation pass. An explicit child Runner remains in options and takes precedence. Otherwise activation_options selects the same Runner from the selected Jido instance before spawn_child reapplies the live parent context.

@@ -22,13 +22,11 @@ defmodule Jido.Plugin.Bus.Client.Runtime do
       {:ok,
        %{
          agent_server: init.agent_server,
-         bus: nil,
-         bus_ref: nil,
          config: config,
+         connection: nil,
          pending: nil,
          reconnect_token: nil,
-         retry_timer: nil,
-         subscription_id: nil
+         retry_timer: nil
        }, {:continue, :subscribe}}
     end
   end
@@ -43,35 +41,24 @@ defmodule Jido.Plugin.Bus.Client.Runtime do
 
   @impl true
   def handle_call(:await_ready, _from, state) do
-    case Bus.whereis(state.config.bus, state.config.lookup_opts) do
-      {:ok, bus} when bus == state.bus and is_binary(state.subscription_id) ->
+    case {Bus.whereis(state.config.bus, state.config.lookup_opts), state.connection} do
+      {{:ok, registered}, %{bus: current}} when registered == current ->
         {:reply, :ok, state}
 
-      {:ok, _replacement} ->
-        if state.bus_ref, do: Process.demonitor(state.bus_ref, [:flush])
-
+      {{:ok, _replacement}, _connection} ->
         state =
           state
-          |> cancel_record_retry()
-          |> Map.merge(%{bus: nil, bus_ref: nil, subscription_id: nil, reconnect_token: nil})
+          |> disconnect()
+          |> Map.put(:reconnect_token, nil)
 
         case connect(state) do
           {:ok, connected} -> {:reply, :ok, connected}
           {:error, _reason} -> {:reply, {:error, :not_ready}, schedule_reconnect(state)}
         end
 
-      {:error, _reason} ->
+      {{:error, _reason}, _connection} ->
         {:reply, {:error, :not_ready}, state}
     end
-  end
-
-  def handle_call(:ready_snapshot, _from, state) do
-    ready? =
-      is_pid(state.bus) and Process.alive?(state.bus) and
-        is_binary(state.subscription_id) and
-        Bus.whereis(state.config.bus, state.config.lookup_opts) == {:ok, state.bus}
-
-    {:reply, if(ready?, do: :ok, else: {:error, :not_ready}), state}
   end
 
   @impl true
@@ -82,12 +69,11 @@ defmodule Jido.Plugin.Bus.Client.Runtime do
 
   def handle_info(
         {:DOWN, ref, :process, bus, _reason},
-        %{bus: bus, bus_ref: ref} = state
+        %{connection: %{bus: bus, ref: ref}} = state
       ) do
     state =
       state
-      |> cancel_record_retry()
-      |> Map.merge(%{bus: nil, bus_ref: nil, subscription_id: nil})
+      |> disconnect()
       |> schedule_reconnect()
 
     {:noreply, state}
@@ -95,7 +81,7 @@ defmodule Jido.Plugin.Bus.Client.Runtime do
 
   def handle_info(
         {:signal, durable_id, %RecordedSignal{} = record},
-        %{subscription_id: durable_id, pending: nil} = state
+        %{connection: %{id: durable_id}, pending: nil} = state
       ) do
     deliver_record(record, state)
   end
@@ -111,9 +97,8 @@ defmodule Jido.Plugin.Bus.Client.Runtime do
 
   def handle_info(
         {:delivery_result, token, result},
-        %{pending: %{stage: :deliver, token: token, record: record, worker_ref: ref}} = state
+        %{pending: %{stage: :deliver, token: token, record: record}} = state
       ) do
-    Process.demonitor(ref, [:flush])
     state = %{state | pending: nil}
 
     case result do
@@ -123,8 +108,8 @@ defmodule Jido.Plugin.Bus.Client.Runtime do
   end
 
   def handle_info(
-        {:DOWN, ref, :process, _pid, _reason},
-        %{pending: %{stage: :deliver, worker_ref: ref, record: record}} = state
+        {:EXIT, worker, _reason},
+        %{pending: %{stage: :deliver, worker: worker, record: record}} = state
       ) do
     {:noreply, next} = retry(record, :deliver, %{state | pending: nil})
     {:noreply, next}
@@ -142,16 +127,13 @@ defmodule Jido.Plugin.Bus.Client.Runtime do
   def handle_info(_message, state), do: {:noreply, state}
 
   @impl true
-  def terminate(_reason, %{bus: bus, subscription_id: id} = state)
-      when is_pid(bus) and is_binary(id) do
-    _ = cancel_record_retry(state)
-    _ = Bus.unsubscribe(bus, id)
-    :ok
-  end
-
   def terminate(_reason, state) do
-    _ = cancel_record_retry(state)
-    :ok
+    state = cancel_record_retry(state)
+
+    case state.connection do
+      %{bus: bus, id: id} -> Bus.unsubscribe(bus, id)
+      nil -> :ok
+    end
   end
 
   defp deliver_record(%RecordedSignal{} = record, state) do
@@ -176,15 +158,14 @@ defmodule Jido.Plugin.Bus.Client.Runtime do
       record: record,
       stage: :deliver,
       token: token,
-      worker: worker,
-      worker_ref: Process.monitor(worker)
+      worker: worker
     }
 
     {:noreply, %{state | pending: pending}}
   end
 
   defp acknowledge(%RecordedSignal{} = record, state) do
-    case Bus.ack(state.bus, state.subscription_id, record.cursor) do
+    case Bus.ack(state.connection.bus, state.connection.id, record.cursor) do
       :ok -> {:noreply, %{state | pending: nil}}
       {:error, _reason} -> retry(record, :ack, state)
     end
@@ -201,15 +182,17 @@ defmodule Jido.Plugin.Bus.Client.Runtime do
     if state.retry_timer, do: Process.cancel_timer(state.retry_timer)
 
     case state.pending do
-      %{worker: worker, worker_ref: ref} ->
-        Process.demonitor(ref, [:flush])
-        Process.exit(worker, :kill)
-
-      _ ->
-        :ok
+      %{worker: worker} -> Process.exit(worker, :kill)
+      _pending -> :ok
     end
 
     %{state | pending: nil, retry_timer: nil}
+  end
+
+  defp disconnect(state) do
+    state
+    |> cancel_record_retry()
+    |> Map.put(:connection, nil)
   end
 
   defp schedule_reconnect(state) do
@@ -221,7 +204,8 @@ defmodule Jido.Plugin.Bus.Client.Runtime do
   defp connect(state) do
     with {:ok, bus} <- Bus.whereis(state.config.bus, state.config.lookup_opts),
          {:ok, subscription_id} <- subscribe(bus, state.config) do
-      {:ok, %{state | bus: bus, bus_ref: Process.monitor(bus), subscription_id: subscription_id}}
+      connection = %{bus: bus, id: subscription_id, ref: Process.monitor(bus)}
+      {:ok, %{state | connection: connection}}
     end
   end
 
@@ -258,28 +242,33 @@ defmodule Jido.Plugin.Bus.Client.Runtime do
       timeout: Keyword.get(opts, :timeout, @default_timeout)
     }
 
-    cond do
-      is_nil(config.bus) ->
-        {:error, {:missing_bus_option, :bus}}
-
-      not is_binary(config.path) or config.path == "" ->
-        {:error, {:invalid_bus_path, config.path}}
-
-      not is_nil(config.durable) and
-          (not is_binary(config.durable) or config.durable == "") ->
-        {:error, {:invalid_durable_id, config.durable}}
-
-      not is_nil(config.start_from) and is_nil(config.durable) ->
-        {:error, {:requires_option, :start_from, :durable}}
-
-      not is_integer(config.retry_delay_ms) or config.retry_delay_ms <= 0 ->
-        {:error, {:invalid_retry_delay, config.retry_delay_ms}}
-
-      not is_integer(config.timeout) or config.timeout <= 0 ->
-        {:error, {:invalid_timeout, config.timeout}}
-
-      true ->
-        {:ok, config}
+    with :ok <- validate_bus(config.bus),
+         :ok <- validate_path(config.path),
+         :ok <- validate_durable(config.durable),
+         :ok <- validate_start_from(config.start_from, config.durable),
+         :ok <- validate_positive(config.retry_delay_ms, :invalid_retry_delay),
+         :ok <- validate_positive(config.timeout, :invalid_timeout) do
+      {:ok, config}
     end
   end
+
+  defp validate_bus(nil), do: {:error, {:missing_bus_option, :bus}}
+  defp validate_bus(_bus), do: :ok
+
+  defp validate_path(path) when is_binary(path) and path != "", do: :ok
+  defp validate_path(path), do: {:error, {:invalid_bus_path, path}}
+
+  defp validate_durable(nil), do: :ok
+  defp validate_durable(id) when is_binary(id) and id != "", do: :ok
+  defp validate_durable(id), do: {:error, {:invalid_durable_id, id}}
+
+  defp validate_start_from(nil, _durable), do: :ok
+
+  defp validate_start_from(_start_from, nil),
+    do: {:error, {:requires_option, :start_from, :durable}}
+
+  defp validate_start_from(_start_from, _durable), do: :ok
+
+  defp validate_positive(value, _error) when is_integer(value) and value > 0, do: :ok
+  defp validate_positive(value, error), do: {:error, {error, value}}
 end

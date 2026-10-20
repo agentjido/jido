@@ -1,159 +1,364 @@
-# Observe Agent Turns
+# Observability
 
-This Livebook observes the evaluation and commit result of one Agent Turn.
+## Overview
 
-## Install Jido
+Every Agent Server Turn emits `:telemetry` events with a fixed set of names,
+measurements, and metadata. Jido also keeps a short Turn history per Agent,
+writes optional semantic log lines, and maps Turns to OpenTelemetry spans when
+your application runs an SDK. This Livebook attaches a handler, runs live
+Turns, and shows what each source reports.
 
 ```elixir
-Mix.install([
-  {:jido, path: Path.expand("..", __DIR__)}
-])
+Mix.install([{:jido, "~> 3.0.0-beta.2"}])
 ```
 
-## Define an Agent and an observer
+## An Agent to Watch
+
+The counter returns one `Emit` Directive per Turn, so the Turn has effects to
+observe. `default_dispatch:` sends the emitted Signal to this Livebook
+process.
 
 ```elixir
-defmodule ObserveGuide.Counter do
-  use Jido.Agent, name: "observe_guide_counter"
+defmodule Watch.Counter do
+  use Jido.Agent, name: "watched_counter"
 
   agent do
     schema(Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}))
   end
 
   routes do
-    signal_source("/guides/observe")
+    signal_source("/watch")
 
-    route "counter.add", as: :add do
+    route "counter.increment", as: :increment, defaults: %{amount: 1} do
       action %{amount: amount},
-        name: "observe_guide_add",
         schema: Zoi.object(%{amount: Zoi.integer()}),
         context: context do
-        {:ok, %{context.agent_state | count: context.agent_state.count + amount}}
+        count = context.agent_state.count + amount
+
+        {:ok, %{context.agent_state | count: count},
+         [Jido.Agent.Directive.emit("counter.changed", %{count: count})]}
       end
     end
   end
 end
-
-defmodule ObserveGuide.Forwarder do
-  def handle(event, measurements, metadata, receiver) do
-    send(receiver, {:jido_event, event, measurements, metadata})
-  end
-end
 ```
 
-The handler only sends the bounded event to another process. Telemetry handlers
-run in the process that emits the event. Do not call the observed Agent or do
-storage or network work in a handler.
+## Attach a Handler
 
-## Attach the handler
+`Jido.Telemetry.metrics/0` lists the event catalog as `Telemetry.Metrics`
+definitions. The handler below forwards each event to this process.
 
 ```elixir
-observer = self()
-handler_id = "observe-guide-#{System.unique_integer([:positive])}"
+defmodule Watch.Handler do
+  def handle(event, measurements, metadata, test_pid) do
+    send(test_pid, {:jido_event, event, measurements, metadata})
+  end
+end
 
-:ok =
-  :telemetry.attach_many(
-    handler_id,
-    [
-      [:jido, :agent_server, :turn, :stop],
-      [:jido, :agent_server, :turn, :settled]
-    ],
-    &ObserveGuide.Forwarder.handle/4,
-    observer
-  )
+events =
+  Jido.Telemetry.metrics()
+  |> Enum.map(& &1.event_name)
+  |> Enum.uniq()
+  |> Kernel.++([[:jido, :agent_server, :turn, :start]])
+
+:telemetry.attach_many("watch-guide", events, &Watch.Handler.handle/4, self())
 ```
 
-## Run one Turn
+The result is `:ok`. Use a module function as the handler. `:telemetry`
+logs a performance warning for anonymous functions.
+
+## Run a Turn
+
+`debug: true` turns on the Turn history for this Agent.
 
 ```elixir
 {:ok, _jido} = Jido.start()
 
 {:ok, counter} =
-  Jido.start_agent(
-    ObserveGuide.Counter,
-    id: "observed-counter"
+  Jido.start_agent(Watch.Counter,
+    id: "watched-1",
+    debug: true,
+    default_dispatch: {:pid, target: self()}
   )
 
-:ok = Jido.AgentServer.await_ready(counter)
-
-{:ok, committed, []} =
-  with {:ok, signal} <- ObserveGuide.Counter.add_signal(%{amount: 2}) do
-    Jido.AgentServer.call(counter, signal, [])
-  end
-
-committed.state
+signal = Watch.Counter.increment_signal!(%{amount: 2})
+{:ok, agent, _directives} = Jido.AgentServer.call(counter, signal)
+agent.state.count
 ```
 
-The Turn `:stop` event reports the live result. On success, its
-`state_version_after` revision is already live. The `turn.settled` event reports
-the recorded evaluation and commit result. Effects can finish later.
-
-This Agent returns no Directives, so the two events occur close together.
+The result is `2`. Collect the events:
 
 ```elixir
-events =
-  for _index <- 1..2 do
-    receive do
-      {:jido_event, name, measurements, metadata} ->
-        %{name: name, measurements: measurements, metadata: metadata}
-    after
-      5_000 ->
-        raise "an Agent Turn event did not arrive"
-    end
+collect = fn collect, acc ->
+  receive do
+    {:jido_event, event, measurements, metadata} ->
+      collect.(collect, [{event, measurements, metadata} | acc])
+  after
+    100 -> Enum.reverse(acc)
   end
+end
 
-Enum.map(events, fn event ->
-  %{
-    name: event.name,
-    status: event.metadata.status,
-    stage: event.metadata.stage,
-    committed?: event.metadata.committed?,
-    turn_id: event.metadata.turn_id,
-    state_version_before: event.measurements.state_version_before,
-    state_version_after: event.measurements[:state_version_after]
-  }
-end)
+seen = collect.(collect, [])
+Enum.map(seen, fn {event, _, _} -> Enum.join(event, ".") end)
 ```
 
-Both events have the same `turn_id`. For a successful Turn, `committed?` is
-`true` and `status` is `:ok`.
+The list holds the events in order:
 
-For a pre-commit failure, the Turn terminal event has `committed?: false`. No
-new revision becomes live. Settlement follows without Directive work.
+```text
+jido.agent_server.lifecycle.start
+jido.agent_server.turn.start
+jido.agent_server.commit
+jido.agent_server.directives.returned
+jido.agent_server.turn.stop
+jido.agent_server.turn.settled
+jido.agent_server.effects.start
+jido.agent_server.effects.stop
+```
 
-For a post-commit Directive failure, the Turn result remains successful. The
-later `[:jido, :agent_server, :effects, :stop]` event reports the failure. The
-committed revision is not rolled back. This point event has no duration.
+## The Event Catalog
 
-## Read safe fields
+| Event | When | Measurements |
+| --- | --- | --- |
+| `[:jido, :agent_server, :lifecycle, :start]` | The Server starts | time |
+| `[:jido, :agent_server, :lifecycle, :stop]` | The Server stops | time |
+| `[:jido, :agent_server, :turn, :start]` | A Turn is admitted | time |
+| `[:jido, :agent_server, :commit]` | A candidate is committed | revisions, `directive_count` |
+| `[:jido, :agent_server, :directives, :returned]` | Directives are queued | `directive_count` |
+| `[:jido, :agent_server, :turn, :stop]` | Evaluation and commit end | `duration`, revisions, `directive_count` |
+| `[:jido, :agent_server, :turn, :exception]` | The Turn raises | `duration` |
+| `[:jido, :agent_server, :turn, :settled]` | The Turn result is final | revisions, `directive_count` |
+| `[:jido, :agent_server, :effects, :start]` | Directives start | `directive_count` |
+| `[:jido, :agent_server, :effects, :stop]` | Directives end | `directive_count`, `directive_completed` |
+| `[:jido, :persistence, :operation, :start \| :stop \| :exception]` | A storage call | `duration` |
 
-Turn metadata includes `agent_id`, `turn_id`, `signal_id`, status, stage, and
-available trace IDs. Measurements include revisions and Directive counts.
-Only the Turn stop event has a duration measurement.
+Revisions are `state_version_before` and `state_version_after`. `duration`
+is in native time units. Point events carry `system_time` and
+`monotonic_time`.
 
-Events do not contain Agent or Plugin state, Signal data, caller context,
-process handles, or raw error details.
-
-## Keep progress policy outside the Turn contract
-
-Jido reports Turn and effects results. It does not define an application
-progress stream. If long work needs intermediate progress, keep the terminal
-status, waiting reason, and final result in Agent state. Put temporary progress
-in a bounded application buffer or event service.
-
-Progress publication must not make the work fail when an observer disconnects.
-Set a retention limit, give readers a cursor, and define what happens when a
-reader falls behind. A local buffer is not durable. Save progress in portable
-state or an external durable event log only when restart recovery requires it.
-Do not put observer PIDs, callbacks, or buffer handles in Agent state.
-
-## Detach and stop
+Look at the Turn stop event:
 
 ```elixir
-:ok = :telemetry.detach(handler_id)
+{_event, measurements, metadata} =
+  Enum.find(seen, fn {event, _, _} -> event == [:jido, :agent_server, :turn, :stop] end)
+
+{Map.keys(measurements) |> Enum.sort(),
+ Map.take(metadata, [:agent_id, :status, :stage, :committed?, :schema_version])}
+```
+
+The result is:
+
+```text
+{[:directive_count, :duration, :state_version_after, :state_version_before],
+ %{status: :ok, agent_id: "watched-1", schema_version: 1, stage: :commit,
+   committed?: true}}
+```
+
+Metadata also holds `turn_id`, `signal_id`, `trace_id`, and `span_id`.
+
+## Metadata Rules
+
+Metadata is an allowlist of scalar values. It never holds Agent or Plugin
+state, Signal or Directive data, raw errors, process handles, credentials,
+or caller context. Fixed fields use fixed values:
+
+| Field | Values |
+| --- | --- |
+| `status` | `:ok`, `:error`, `:cancelled`, `:timed_out`, `:conflict`, `:indeterminate`, `:not_found`, `:rejected` |
+| `stage` | `:evaluate`, `:commit`, `:after_commit`, `:directive` |
+| `committed?` | `true` or `false` |
+| `schema_version` | `1` |
+
+Errors add `error_type` and, for stable codes, `error_code`.
+
+## A Failed Turn
+
+```elixir
+bad = Watch.Counter.increment_signal!(%{amount: "two"})
+{:error, _reason} = Jido.AgentServer.call(counter, bad)
+
+for {event, _, metadata} <- collect.(collect, []) do
+  {Enum.join(event, "."), Map.take(metadata, [:status, :stage, :committed?])}
+end
+```
+
+The Turn fails in evaluation, before commit:
+
+```text
+[{"jido.agent_server.turn.start", %{}},
+ {"jido.agent_server.turn.stop", %{status: :error, stage: :evaluate, committed?: false}},
+ {"jido.agent_server.turn.settled", %{status: :error, stage: :evaluate, committed?: false}}]
+```
+
+No commit, Directive, or effects events follow.
+
+## Metrics
+
+Pass `Jido.Telemetry.metrics/0` to any `Telemetry.Metrics` reporter in your
+supervision tree:
+
+```elixir
+Jido.Telemetry.metrics()
+|> Enum.map(fn metric -> {Enum.join(metric.name, "."), metric.tags} end)
+```
+
+The result has 13 definitions:
+
+| Metric | Type | Tags |
+| --- | --- | --- |
+| `jido.agent_server.turn.stop.count` | counter | `status`, `stage` |
+| `jido.agent_server.turn.stop.duration` | summary, ms | `status`, `stage` |
+| `jido.persistence.operation.stop.count` | counter | `operation`, `status`, `persistence_reason` |
+| `jido.persistence.operation.stop.duration` | summary, ms | same |
+| `jido.persistence.operation.exception.count` | counter | same |
+| `jido.persistence.operation.exception.duration` | summary, ms | same |
+| `jido.agent_server.lifecycle.start.count` | counter | none |
+| `jido.agent_server.lifecycle.stop.count` | counter | none |
+| `jido.agent_server.commit.count` | counter | `status` |
+| `jido.agent_server.directives.returned.count` | counter | none |
+| `jido.agent_server.effects.start.count` | counter | none |
+| `jido.agent_server.effects.stop.count` | counter | `status`, `stage` |
+| `jido.agent_server.turn.settled.count` | counter | `status`, `stage` |
+
+Tags never contain Agent, Signal, Turn, or trace IDs, so the metric
+cardinality stays fixed.
+
+## Turn History
+
+`status/1` returns the last Turn outcome. With `debug: true`, `history/1`
+returns the last 100 outcomes. Set `debug_max_events:` (1 to 10,000) to keep
+a different number.
+
+```elixir
+Jido.AgentServer.history(counter)
+|> Enum.map(&Map.take(&1, [:status, :stage, :committed?, :state_version_after]))
+```
+
+The result has one entry per Turn, oldest first:
+
+```text
+[%{status: :succeeded, stage: :commit, committed?: true, state_version_after: 1},
+ %{status: :failed, stage: :running, committed?: false, state_version_after: 1}]
+```
+
+History uses `:succeeded` and `:failed` for `status`, and the Server phase
+for `stage`. The failed Turn shows `stage: :running`, where telemetry reports
+`stage: :evaluate`. Each outcome also holds `turn_id`, `signal_id`, `directive_count`, and
+`duration_ms`. It never holds state or Signal data. Without `debug: true`,
+`history/1` returns `[]`.
+
+## Semantic Logs
+
+Jido attaches a log handler, `"jido-semantic-logger"`, at startup. It is off
+by default. Turn it on in config:
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+# config/runtime.exs
+config :jido, :telemetry,
+  semantic_log_mode: :interesting,
+  semantic_slow_threshold_ms: 1_000
+```
+
+| Mode | Logs |
+| --- | --- |
+| `:off` | Nothing. The default. |
+| `:errors` | Failed, cancelled, and timed-out events, at `:warning`. |
+| `:interesting` | Errors, and events slower than `semantic_slow_threshold_ms`. |
+| `:all` | Every catalog event. Successful events log at `:debug`. |
+
+The handler reads the setting on each event:
+
+```elixir
+Application.put_env(:jido, :telemetry, semantic_log_mode: :errors)
+Jido.AgentServer.call(counter, bad)
+```
+
+The Livebook output shows two warnings:
+
+```text
+[warning] [jido.semantic] event=agent_server.turn.stop agent_id=watched-1
+  committed?=false ... stage=evaluate status=error ...
+[warning] [jido.semantic] event=agent_server.turn.settled ...
+```
+
+Each line uses the same allowlisted fields as the telemetry metadata.
+
+### Instance Debug Level
+
+`Jido.debug/1` and `MyApp.Jido.debug/1` set a per-instance log level. `:on`
+uses the `:interesting` mode and `:verbose` uses `:all`. The `debug:`
+instance option sets it at startup.
+
+The level applies only to events that name their instance. In this release,
+persistence events do and Agent Server events don't, so `Jido.debug(:verbose)`
+doesn't add Turn log lines. Use `semantic_log_mode` for Turn logs.
+
+```elixir
+Jido.debug(:verbose)
+Jido.debug()
+```
+
+The result is `:verbose`.
+
+## Trace Context
+
+Each Turn runs in a W3C trace. When the Signal carries a `traceparent`, the
+Turn joins that trace. Otherwise the Turn starts a new one. Emitted Signals
+carry a child trace, so the next Agent's Turn joins the same trace.
+
+```elixir
+trace = Jido.Signal.Trace.new()
+traced = Watch.Counter.increment_signal!(%{amount: 1})
+{:ok, traced} = Jido.Signal.Trace.put(traced, trace)
+
+{:ok, _agent, _} = Jido.AgentServer.call(counter, traced)
+
+{_event, _, metadata} =
+  Enum.find(collect.(collect, []), fn {event, _, metadata} ->
+    event == [:jido, :agent_server, :turn, :stop] and metadata.signal_id == traced.id
+  end)
+
+{metadata.trace_id == trace.trace_id, metadata.parent_span_id == trace.span_id}
+```
+
+The result is `{true, true}`: the Turn's span is a child of the Signal's
+span, in the same trace.
+
+## OpenTelemetry
+
+Jido maps Turns and persistence operations to OpenTelemetry spans when:
+
+- your application depends on `opentelemetry_api` and runs an SDK such as
+  `opentelemetry`; and
+- `config :jido, :opentelemetry, enabled: false` isn't set.
+
+Jido doesn't start the SDK or configure sampling and export.
+`Jido.Telemetry.open_telemetry?/0` reports whether the mapping is active:
+
+```elixir
+Jido.Telemetry.open_telemetry?()
+```
+
+The result here is `false`, because this Livebook has no SDK.
+
+## Clean Up
+
+```elixir
+Application.delete_env(:jido, :telemetry)
+Jido.debug(:off)
+:telemetry.detach("watch-guide")
 :ok = Jido.stop_agent(counter)
-:ok = Jido.stop()
 ```
 
-Read [Telemetry, Tracing, and Logs](telemetry-tracing-and-logs.html) before you
-connect a production metric reporter or OpenTelemetry exporter.
+```elixir
+Jido.stop()
+```
+
+The last result is `:ok`.
+
+## Next
+
+- [Inspect Activations](inspect-and-control-activations.livemd) – status,
+  queues, and Server control.
+- [Life of a Signal](signal-to-effects.md) – the stages each event reports.

@@ -1,0 +1,185 @@
+- at: lib/jido/agent_server/plugin.ex:22:76
+  operator: integer_shift
+  mutation: "`5000` → `5001`"
+  sort: unpromised
+  reason: The contract keeps Plugin state reads available but does not fix this internal call timeout to the exact millisecond.
+
+- at: lib/jido/agent_server/plugin.ex:22:76
+  operator: integer_shift
+  mutation: "`5000` → `4999`"
+  sort: unpromised
+  reason: The contract keeps Plugin state reads available but does not fix this internal call timeout to the exact millisecond.
+
+- at: lib/jido/agent_server/plugin.ex:45:12
+  operator: string_empty
+  mutation: "`\"Plugin changes require quiesce and resume callbacks\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured quiescence error code, path, and Plugin identity, not its human-readable prose.
+
+- at: lib/jido/agent_server/plugin.ex:64:15
+  operator: clause_removal
+  mutation: "`case _ ->` → `(removed)`"
+  sort: equivalent
+  reason: The outer bootstrap catch maps the resulting CaseClauseError to the same plugin_start_failed result.
+
+- at: lib/jido/agent_server/plugin.ex:67:11
+  operator: clause_removal
+  mutation: "`case _ ->` → `(removed)`"
+  sort: unpromised
+  reason: Both paths reject startup and clean provisional roots. The contract does not expose the internal invalid_plugin_child_spec versus plugin_start_failed shutdown label.
+
+- at: lib/jido/agent_server/plugin.ex:118:13
+  operator: string_empty
+  mutation: "`\"Plugin configuration boundary failed\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes safe callback failure and recovery, not the safe_apply diagnostic prose.
+
+- at: lib/jido/agent_server/plugin.ex:190:35
+  operator: clause_removal
+  mutation: "`case {:error, :plugin_not_found} ->` → `(removed)`"
+  sort: unpromised
+  reason: Both race paths fail the stale root start. The contract does not fix whether this private race returns ignore or exits before bootstrap rejects it.
+
+- at: lib/jido/agent_server/plugin.ex:207:25
+  operator: guard_removal
+  mutation: "`when is_pid(pid)` → `(no guard)`"
+  sort: equivalent
+  reason: OTP permits the three-element successful Supervisor start result only with a pid in this position.
+
+- at: lib/jido/agent_server/plugin.ex:212:27
+  operator: guard_removal
+  mutation: "`when is_pid(pid)` → `(no guard)`"
+  sort: equivalent
+  reason: The preceding Supervisor already_started result guarantees that pid is a pid before this child lookup.
+
+- at: lib/jido/agent_server/plugin.ex:213:13
+  operator: clause_removal
+  mutation: "`case _ ->` → `(removed)`"
+  sort: equivalent
+  reason: A child mismatch returns the original start error with this clause and becomes the same plugin_start_failed bootstrap result without it.
+
+- at: lib/jido/agent_server/plugin.ex:219:13
+  operator: clause_removal
+  mutation: "`case error ->` → `(removed)`"
+  sort: equivalent
+  reason: The sole production caller maps a returned Supervisor error and the removed-clause exception to the same plugin_start_failed bootstrap result.
+
+- at: lib/jido/agent_server/plugin.ex:228:11
+  operator: clause_removal
+  mutation: "`case _ ->` → `(removed)`"
+  sort: unpromised
+  reason: Both paths reject bootstrap. The contract does not expose the internal plugin_not_ready versus plugin_start_failed shutdown label.
+
+- at: lib/jido/agent_server/plugin.ex:236:27
+  operator: integer_shift
+  mutation: "`5000` → `5001`"
+  sort: unpromised
+  reason: Live configuration callbacks must be bounded, but the contract does not fix this private control budget to the exact millisecond.
+
+- at: lib/jido/agent_server/plugin.ex:236:27
+  operator: integer_shift
+  mutation: "`5000` → `4999`"
+  sort: unpromised
+  reason: Live configuration callbacks must be bounded, but the contract does not fix this private control budget to the exact millisecond.
+
+- at: lib/jido/agent_server/plugin.ex:238:9
+  operator: clause_removal
+  mutation: "`case _ ->` → `(removed)`"
+  sort: evaluation-gap
+  reason: This clause converts a blocked control callback into a safe timeout result. Exercising it requires more than the mutation runner's five-second per-test limit.
+
+- at: lib/jido/agent_server/plugin.ex:246:15
+  operator: clause_removal
+  mutation: "`case error ->` → `(removed)`"
+  sort: equivalent
+  reason: Under the activation's exclusive Supervisor ownership, terminate followed by delete cannot reach this error path; not-found termination is handled separately.
+
+- at: lib/jido/agent_server/plugin/callbacks.ex:25:7
+  operator: string_empty
+  mutation: "`\"Agent Server Plugin commit notification failed\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes callback failure handling and structured callback details, not human-readable prose.
+
+- at: lib/jido/agent_server/plugin/callbacks.ex:29:7
+  operator: string_empty
+  mutation: "`\"Agent Server Plugin after_commit/3 returned an invalid result\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes invalid-result rejection and structured callback details, not human-readable prose.
+
+- at: lib/jido/agent_server/plugin/callbacks.ex:100:7
+  operator: string_empty
+  mutation: "`\"Agent Server Plugin Directive dispatch failed\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes Directive callback failure handling and structured details, not human-readable prose.
+
+- at: lib/jido/agent_server/plugin/callbacks.ex:102:37
+  operator: string_empty
+  mutation: "`\"Agent Server Plugin dispatch/4 returned an invalid result\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes invalid-result rejection and structured callback details, not human-readable prose.
+
+- at: lib/jido/agent_server/plugin/callbacks.ex:117:9
+  operator: string_empty
+  mutation: "`\"Agent Server Plugin readiness check failed\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes readiness failure and structured callback details, not human-readable prose.
+
+- at: lib/jido/agent_server/plugin/callbacks.ex:121:9
+  operator: string_empty
+  mutation: "`\"Agent Server Plugin await_ready/2 returned an invalid result\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes invalid readiness rejection and structured callback details, not human-readable prose.
+
+- at: lib/jido/agent_server/plugin/callbacks.ex:152:7
+  operator: string_empty
+  mutation: "`\"Agent Server Plugin admission failed\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes admission failure handling and structured callback details, not human-readable prose.
+
+- at: lib/jido/agent_server/plugin/callbacks.ex:163:7
+  operator: string_empty
+  mutation: "`\"Agent Server Plugin outbound Signal preparation failed\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes outbound callback failure handling and structured details, not human-readable prose.
+
+- at: lib/jido/agent_server/plugin/callbacks.ex:174:11
+  operator: string_empty
+  mutation: "`\"Agent Server Plugin prepare_dispatch/4 returned an invalid result\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes invalid-result rejection and structured callback details, not human-readable prose.
+
+- at: lib/jido/agent_server/plugin/callbacks.ex:190:7
+  operator: string_empty
+  mutation: "`\"Agent Server Plugin admit/3 returned an invalid result\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes invalid admission rejection and structured callback details, not human-readable prose.
+
+- at: lib/jido/agent_server/plugin/callbacks.ex:204:11
+  operator: string_empty
+  mutation: "`\"Agent Server Plugin prepare_dispatch/4 returned an invalid Signal\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes complete Signal validation and structured validation details, not human-readable prose.
+
+- at: lib/jido/agent_server/plugin/callbacks.ex:224:9
+  operator: string_empty
+  mutation: "`\"Agent Server Plugin child_spec/1 raised\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes child-spec failure and structured exception details, not human-readable prose.
+
+- at: lib/jido/agent_server/plugin/callbacks.ex:234:9
+  operator: string_empty
+  mutation: "`\"Agent Server Plugin child_spec/1 failed\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes child-spec failure and structured throw details, not human-readable prose.
+
+- at: lib/jido/agent_server/plugin/callbacks.ex:253:13
+  operator: string_empty
+  mutation: "`\"Agent Server Plugin runtime root must use :permanent restart\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes permanent-root rejection and structured restart details, not human-readable prose.
+
+- at: lib/jido/agent_server/plugin/callbacks.ex:290:7
+  operator: string_empty
+  mutation: "`\"Agent Server Plugin child_spec/1 returned an invalid child specification\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes child-spec validation and structured failure details, not human-readable prose.

@@ -1,0 +1,34 @@
+- id: activation-boundary
+  date: 2026-10-19
+  decision: Use jido.agent_server.activation for the local OTP root, instance registration, readiness publication, worker replacement, local checkpoints, activation control records, and activation-owned child records.
+  driver: These values survive worker replacement but do not survive complete activation loss and are not durable storage.
+  approved_by: User-approved Jido V3 component map
+
+- id: activation-instance-handoff
+  date: 2026-10-19
+  decision: Keep Ref construction and routing in jido.instance. Move selected-instance activation ownership, fixed-default consumption, and activation uniqueness from old AgentServer obligations I36, I38, and I69 to this component.
+  driver: The instance selects and resolves an activation. The activation owns the selected local process lifetime.
+  approved_by: Component hardening pass
+
+- id: activation-plugin-handoff
+  date: 2026-10-19
+  decision: Own the coupling of the worker and required Plugin roots, plus final readiness publication. Keep Plugin callback order, deadlines, and resource behavior in jido.agent_server.plugin_runtime.
+  driver: OTP group recovery and public readiness are activation results. Plugin lifecycle rules have a separate owner.
+  approved_by: Component hardening pass
+
+- id: activation-mutation-profile
+  date: 2026-10-19
+  decision: Mutate Jido.AgentServer.Supervisor, Jido.AgentServer.RegistrationGuard, and Jido.AgentServer.RegistryWorker. Keep the public Jido.AgentServer facade out of this focused profile while the core state machine remains one module.
+  driver: These three modules carry the present activation seams. Including the complete state machine would overlap every future AgentServer component.
+  approved_by: Component hardening pass
+
+- id: activation-obligation-migration
+  date: 2026-10-19
+  decision: >-
+    Replace old AgentServer I35 and I63 with activation I1; I36 and I69 with
+    I2; I38 with I3; I37 and the readiness part of I64 with I4; the recovery
+    part of I64 with I5; I72 with I6; I73 and I75 with I7; I74 and I76 with
+    I8; I88 and the owner part of I89 with I9; the idle part of I89 and I90
+    with I10; and the activation-record parts of I64 and I75 with I11.
+  driver: The replacement keeps every retired activation promise under one explicit final owner without copying compound old obligations.
+  approved_by: Component hardening pass

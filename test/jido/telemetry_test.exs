@@ -5,6 +5,7 @@ defmodule JidoTest.TelemetryTest do
 
   alias Jido.Debug
   alias Jido.Telemetry
+  alias Jido.Telemetry.Semantic
 
   setup do
     config = Application.fetch_env(:jido, :telemetry)
@@ -46,11 +47,10 @@ defmodule JidoTest.TelemetryTest do
       [:jido, :agent_server, :directives, :returned],
       [:jido, :agent_server, :effects, :start],
       [:jido, :agent_server, :effects, :stop],
-      [:jido, :agent_server, :turn, :settled],
-      [:jido, :scheduler, :delivery]
+      [:jido, :agent_server, :turn, :settled]
     ]
 
-    assert length(names) == 14
+    assert length(names) == 13
     assert length(Enum.uniq(names)) == length(names)
 
     for {prefix, endings} <- spans, ending <- endings, kind <- [:count, :duration] do
@@ -71,7 +71,7 @@ defmodule JidoTest.TelemetryTest do
              &Enum.any?(&1.event_name, fn part -> part in [:agent, :topology] end)
            )
 
-    allowed = ~w(operation status stage persistence_reason scheduler_outcome)a
+    allowed = ~w(operation status stage persistence_reason)a
 
     for metric <- metrics, tag <- metric.tags do
       assert tag in allowed
@@ -113,7 +113,7 @@ defmodule JidoTest.TelemetryTest do
 
     log =
       capture_log(fn ->
-        Jido.Telemetry.Semantic.point(
+        Semantic.point(
           [:jido, :agent_server, :effects, :stop],
           %{agent_id: "agent-1", stage: :directive, status: :error},
           %{directive_count: 3, directive_completed: 1}
@@ -132,7 +132,7 @@ defmodule JidoTest.TelemetryTest do
     Debug.enable(instance, :verbose)
     on_exit(fn -> Debug.reset(instance) end)
 
-    log = capture_log(fn -> Jido.Telemetry.Semantic.point(event, metadata) end)
+    log = capture_log(fn -> Semantic.point(event, metadata) end)
 
     assert log =~ "event=agent_server.turn.stop"
   end
@@ -156,7 +156,7 @@ defmodule JidoTest.TelemetryTest do
     on_exit(fn -> :telemetry.detach(handler) end)
 
     assert :ok =
-             Jido.Telemetry.Semantic.point(
+             Semantic.point(
                event,
                %{status: :error, stage: :directive, private: "secret"},
                %{directive_count: 2}

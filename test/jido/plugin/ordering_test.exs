@@ -348,11 +348,16 @@ defmodule Jido.Plugin.OrderingTest do
     command = command()
 
     assert {:ok, admitted} =
-             Jido.AgentServer.Plugin.Callbacks.admit(command, specs, %{
-               FirstAdmissionPlugin => :first_runtime,
-               SecondAdmissionPlugin => :second_runtime,
-               ThirdAdmissionPlugin => :third_runtime
-             })
+             Jido.AgentServer.Plugin.Callbacks.admit(
+               command,
+               specs,
+               %{
+                 FirstAdmissionPlugin => :first_runtime,
+                 SecondAdmissionPlugin => :second_runtime,
+                 ThirdAdmissionPlugin => :third_runtime
+               },
+               0
+             )
 
     assert admitted.plugin_inputs == %{
              FirstAdmissionPlugin => %Jido.Plugin.Input{runtime: :first},
@@ -371,7 +376,7 @@ defmodule Jido.Plugin.OrderingTest do
                ThirdAdmissionPlugin
              ])
 
-    assert Jido.AgentServer.Plugin.Callbacks.admit(command, failing_specs, %{}) ==
+    assert Jido.AgentServer.Plugin.Callbacks.admit(command, failing_specs, %{}, 0) ==
              {:error, :denied}
 
     assert_received {:admitted, :first, nil}
@@ -461,7 +466,8 @@ defmodule Jido.Plugin.OrderingTest do
              agent,
              signal("plugin.reduce"),
              %{},
-             Jido.Agent.Plugin.specs(specs)
+             Jido.Agent.Plugin.specs(specs),
+             %{emits: nil}
            ) ==
              {:error, :second_failed}
   end
@@ -492,7 +498,8 @@ defmodule Jido.Plugin.OrderingTest do
                agent,
                signal("plugin.reduce"),
                %{},
-               Jido.Agent.Plugin.specs(specs)
+               Jido.Agent.Plugin.specs(specs),
+               %{emits: nil}
              )
 
     assert state.first_reduced == 1

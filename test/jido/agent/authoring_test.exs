@@ -230,7 +230,7 @@ defmodule JidoTest.Agent.AuthoringTest do
     assert {:ok, ^definition} = Codec.decode(document, registry)
   end
 
-  test "generated helpers have docs, specs and optional empty input" do
+  test "generated Signal helpers have tuple and raising forms" do
     module = JidoTest.AuthoringDocsAgent
     {:docs_v1, _, _, _, _, _, docs} = Code.fetch_docs(module)
 
@@ -238,10 +238,25 @@ defmodule JidoTest.Agent.AuthoringTest do
              Enum.find(docs, fn {key, _, _, _, _} -> key == {:function, :increment_signal, 2} end)
 
     assert help =~ "Builds an input Signal"
+
+    assert {{:function, :increment_signal!, 2}, _, _, %{"en" => bang_help}, _} =
+             Enum.find(docs, fn {key, _, _, _, _} -> key == {:function, :increment_signal!, 2} end)
+
+    assert bang_help =~ "raises for an invalid Signal input"
     assert {:ok, specs} = Code.Typespec.fetch_specs(module)
     assert List.keymember?(specs, {:increment_signal, 2}, 0)
+    assert List.keymember?(specs, {:increment_signal!, 2}, 0)
     assert {:ok, %{data: %{}}} = module.increment_signal()
-    refute function_exported?(module, :increment_signal!, 1)
+    assert %{data: %{}} = module.increment_signal!()
+
+    assert %{data: %{amount: "not validated during construction"}} =
+             module.increment_signal!(%{amount: "not validated during construction"})
+
+    assert_raise Agent.Error, "Expected a plain Map", fn -> module.increment_signal!([]) end
+
+    assert_raise ArgumentError, ~r/invalid input Signal/, fn ->
+      module.increment_signal!(%{}, source: "not a URI reference")
+    end
   end
 
   test "Spark rejects invalid schema and identity options with a field path" do
@@ -648,7 +663,7 @@ defmodule JidoTest.Agent.AuthoringRuntimeTest do
                command_signal_1
              )
 
-    {:ok, route_signal_1} = Counter.add_signal(%{amount: 3})
+    route_signal_1 = Counter.add_signal!(%{amount: 3})
 
     assert {:ok, ^expected, _} =
              Jido.AgentServer.call(server, route_signal_1, [])

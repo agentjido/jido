@@ -1,0 +1,300 @@
+# Custom Directives
+
+## Overview
+
+Your order Agent must email the customer when an order is placed. If the
+Action calls the mailer, a Turn that fails later still sends the email for
+an order that never committed. A custom Directive fixes the order of
+events: the Action returns the email as data, Jido validates it before
+commit, and the owning Plugin sends it after commit.
+
+In this Livebook you'll build a notifier Plugin. When it's done, a placed
+order produces this delivery, stamped with the revision it belongs to:
+
+```text
+%{to: "ada@example.com", message: "Order A-100 confirmed", revision: 1}
+```
+
+Run the cells from top to bottom.
+
+## Install
+
+```elixir
+Mix.install([{:jido, "~> 3.0.0-beta.2"}])
+```
+
+## The Pieces
+
+| Piece | Invoked | Role |
+| --- | --- | --- |
+| `use Jido.Agent.Directive` | — | Makes a struct a Directive with a `validate/1` callback. |
+| `validate/1` | Before commit, for every returned Directive | Accepts or rejects the Directive. |
+| `directives/1` | When Jido normalizes the Plugin | Claims Directive types for this Plugin. |
+| `dispatch/4` | After commit, once per owned Directive, in order | Performs the Directive. |
+| `prepare_dispatch/4` | Before each outbound Signal leaves | Adjusts the Signal. |
+| `directive_handler:` | After commit, for owned Directives with no `dispatch/4` | Server-level fallback. |
+
+Each custom Directive type has exactly one owning Plugin. A Directive with no
+owner fails the Turn before commit with `"Agent Directive has no owner"`.
+
+## Define the Directive
+
+`use Jido.Agent.Directive` adds a default `validate/1`. When the module
+defines `schema/0`, the default validates the struct against it.
+
+```elixir
+defmodule GuidePlugins.Notify do
+  use Jido.Agent.Directive
+
+  @schema Zoi.struct(
+            __MODULE__,
+            %{
+              to: Zoi.string() |> Zoi.min(1),
+              message: Zoi.string() |> Zoi.min(1)
+            },
+            coerce: true
+          )
+
+  @enforce_keys Zoi.Struct.enforce_keys(@schema)
+  defstruct Zoi.Struct.struct_fields(@schema)
+
+  def schema, do: @schema
+end
+```
+
+Override `validate/1` for rules a schema can't express. It must return
+`{:ok, directive}` with the same struct type, or `{:error, reason}`.
+
+## Define the Outbox
+
+The notifier needs somewhere to deliver. This runtime records deliveries. In
+your application it's the mailer, queue, or webhook client.
+
+```elixir
+{:ok, _registry} = Registry.start_link(keys: :unique, name: GuidePlugins.Registry)
+
+defmodule GuidePlugins.Outbox do
+  use GenServer
+
+  def start_link(init) do
+    name = {:via, Registry, {GuidePlugins.Registry, {:outbox, init.agent_id}}}
+    GenServer.start_link(__MODULE__, [], name: name)
+  end
+
+  def deliveries(agent_id) do
+    [{pid, _}] = Registry.lookup(GuidePlugins.Registry, {:outbox, agent_id})
+    GenServer.call(pid, :deliveries)
+  end
+
+  @impl true
+  def init(deliveries), do: {:ok, deliveries}
+
+  @impl true
+  def handle_call({:deliver, delivery}, _from, deliveries),
+    do: {:reply, :ok, deliveries ++ [delivery]}
+
+  def handle_call(:deliveries, _from, deliveries), do: {:reply, deliveries, deliveries}
+end
+```
+
+## Define the Plugin
+
+```elixir
+defmodule GuidePlugins.Notifier do
+  use Jido.Plugin
+
+  @impl true
+  def directives(_opts), do: [GuidePlugins.Notify]
+
+  @impl true
+  def child_spec(init), do: Supervisor.child_spec({GuidePlugins.Outbox, init}, id: __MODULE__)
+
+  @impl true
+  def dispatch(outbox, %GuidePlugins.Notify{} = notify, context, _opts) do
+    GenServer.call(
+      outbox,
+      {:deliver, %{to: notify.to, message: notify.message, revision: context.state_version}}
+    )
+  end
+
+  @impl true
+  def prepare_dispatch(_outbox, signal, context, _opts) do
+    {:ok, %{signal | subject: "agents/" <> context.agent_id}}
+  end
+end
+```
+
+- `directives/1` claims `Notify`. No other Plugin can claim it, and no Plugin
+  can claim a built-in Directive.
+- `dispatch/4` receives the runtime PID, the validated Directive, and a
+  `Jido.Plugin.DirectiveContext`: Turn ID, Agent ID, source Signal, committed
+  revision, this Plugin's committed state, and the caller's Turn context.
+- `prepare_dispatch/4` sees every outbound Signal from `Emit`, `AgentSend`,
+  and `OwnerSend`, with a `Jido.Plugin.SignalContext` that includes the
+  target.
+
+## Define the Agent
+
+The notebook attaches the Plugin with `extensions:`, because a Livebook cell
+has no source file for `plugin` discovery.
+
+```elixir
+defmodule GuidePlugins.Orders do
+  use Jido.Agent,
+    name: "orders",
+    extensions: [GuidePlugins.Notifier]
+
+  agent do
+    schema(Zoi.object(%{placed: Zoi.list(Zoi.string()) |> Zoi.default([])}))
+  end
+
+  routes do
+    signal_source("/guides/custom-directives")
+
+    route "order.place", as: :place do
+      action %{order_id: order_id, email: email},
+        name: "place_order",
+        schema: Zoi.object(%{order_id: Zoi.string(), email: Zoi.string()}),
+        context: context do
+        {:ok, %{context.agent_state | placed: context.agent_state.placed ++ [order_id]},
+         [
+           %GuidePlugins.Notify{to: email, message: "Order #{order_id} confirmed"},
+           emit("order.placed", %{order_id: order_id})
+         ]}
+      end
+    end
+  end
+end
+```
+
+The Action returns two Directives: one custom, one built-in. Neither runs
+inside the Action.
+
+## Evaluate Without Effects
+
+`cmd/3` returns the Directives as data:
+
+```elixir
+agent = GuidePlugins.Orders.instantiate!(id: "orders-1")
+place = GuidePlugins.Orders.place_signal!(%{order_id: "A-100", email: "ada@example.com"})
+
+{:ok, candidate, [notify, emit]} = GuidePlugins.Orders.cmd(agent, place)
+{candidate.state.placed, notify, emit.signal.type}
+```
+
+The result is:
+
+```text
+{["A-100"],
+ %GuidePlugins.Notify{to: "ada@example.com", message: "Order A-100 confirmed"},
+ "order.placed"}
+```
+
+Nothing was sent. In a test, you assert on this tuple.
+
+## Invalid Directives
+
+Validation runs before commit. An empty address fails the Turn:
+
+```elixir
+bad = GuidePlugins.Orders.place_signal!(%{order_id: "A-101", email: ""})
+{:error, errors} = GuidePlugins.Orders.cmd(agent, bad)
+Enum.map(errors, & &1.__struct__)
+```
+
+The result is `[Zoi.Error]`. The default `validate/1` returns the raw Zoi
+error list, not a `Jido.Error` struct. The Agent state doesn't change.
+
+## Deliver After Commit
+
+Run it live. `default_dispatch:` sends emitted Signals to this notebook:
+
+```elixir
+{:ok, _jido} = Jido.start()
+
+{:ok, orders} =
+  Jido.start_agent(GuidePlugins.Orders,
+    id: "orders-1",
+    default_dispatch: {:pid, target: self()}
+  )
+
+:ok = Jido.AgentServer.await_ready(orders)
+{:ok, committed, _directives} = Jido.AgentServer.call(orders, place)
+committed.state.placed
+```
+
+The result is `["A-100"]`. After the commit, the Server ran the Directives in
+order: `dispatch/4` delivered `Notify`, then `Emit` sent the Signal through
+`prepare_dispatch/4`.
+
+```elixir
+GuidePlugins.Outbox.deliveries("orders-1")
+```
+
+The result is
+`[%{to: "ada@example.com", message: "Order A-100 confirmed", revision: 1}]`.
+
+```elixir
+receive do
+  {:signal, %Jido.Signal{type: "order.placed"} = signal} -> {signal.subject, signal.data}
+after
+  1_000 -> :no_signal
+end
+```
+
+The result is `{"agents/orders-1", %{order_id: "A-100"}}`. The Plugin set the
+subject on the way out.
+
+## When Dispatch Fails
+
+Commit doesn't guarantee delivery. If `dispatch/4` returns an error or times
+out, the Server stops the rest of the batch. The commit and the success reply
+stand. `directive_timeout:` limits the whole batch. The default is 5,000 ms.
+`Jido.AgentServer.status/2` reports the result in `last_effect_outcome`.
+
+For work that must eventually happen, make delivery idempotent and track
+pending work in the Plugin's owned state.
+
+## Handler Fallback
+
+A Plugin that owns a Directive only to reduce state has no `dispatch/4`. By
+default, the Server does nothing with that Directive after commit. To run
+it, start the Server with `directive_handler:`:
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+Jido.start_agent(MyApp.Agent,
+  directive_handler: fn directive, context ->
+    MyApp.Effects.run(directive, context.agent, context.state_version)
+  end
+)
+```
+
+The handler receives the Directive and a context with the committed Agent,
+revision, Server PID, instance, partition, Turn ID, and source Signal ID. It
+returns `:ok` or `{:error, reason}`. A Plugin's `dispatch/4` always takes
+precedence.
+
+## Stop the Example
+
+```elixir
+:ok = Jido.stop_agent("orders-1")
+:ok = Jido.stop()
+```
+
+## Summary
+
+- A custom Directive is a struct with `use Jido.Agent.Directive`.
+- `directives/1` claims Directive types. Each type has one owner.
+- Jido validates every Directive before commit.
+- `dispatch/4` performs owned Directives after commit.
+- `prepare_dispatch/4` adjusts outbound Signals.
+- `directive_handler:` runs owned Directives that have no dispatcher.
+
+## Next
+
+[Plugin Persistence](plugin-persistence-and-live-changes.md) covers saving
+Plugin state and changing Plugins on a running Agent.
+[State and Directives](agent-results-and-directives.md) covers the full result
+contract.

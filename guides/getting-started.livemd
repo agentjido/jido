@@ -1,52 +1,88 @@
 # Getting Started
 
-This Livebook declares one Agent definition, instantiates it as an Agent value,
-and runs the value in a live Agent Server. Run each cell in order.
+## Overview
 
-## Install Jido
+You'll build a counter Agent and run it two ways: as plain data, then as a
+live process. By the end, this works:
 
-From this repository, use the local checkout:
+<!-- livebook:{"force_markdown":true} -->
 
 ```elixir
-Mix.install([
-  {:jido, path: Path.expand("..", __DIR__)}
-])
+signal = GettingStarted.Counter.increment_signal!(%{amount: 4})
+{:ok, committed, []} = Jido.AgentServer.call(counter, signal)
+committed.state.count
+# => 4
 ```
 
-An application can use `{:jido, "~> 3.0.0-beta.1"}` after that beta is
-available from Hex.
+Along the way you'll use the four parts of Jido:
 
-## Define One Action
+| Part | What it is |
+| --- | --- |
+| Agent definition | A module that declares a state schema and routes. |
+| Agent instance | The definition plus an `id` and validated state. |
+| Signal | A message. Its `type` selects one route, and the route runs one Action. |
+| Agent Server | A process that owns one instance and commits each change. |
 
-An Action gets validated input and Turn context. The current Agent state is in
-`context.agent_state`. Return the complete next state.
+Run the cells from top to bottom. The whole notebook takes about two minutes.
+
+## Install
 
 ```elixir
-defmodule GettingStarted.Add do
+Mix.install([{:jido, "~> 3.0.0-beta.2"}])
+```
+
+This also installs [jido_action](https://hexdocs.pm/jido_action/) and
+[jido_signal](https://hexdocs.pm/jido_signal/), which provide Actions and
+Signals.
+
+## Define The Actions
+
+An Agent does its work in Actions. Jido passes the current Agent state at
+`context.agent_state`. Your Action returns the complete next state, not a
+partial update:
+
+```elixir
+defmodule GettingStarted.Increment do
   use Jido.Action,
-    name: "getting_started_add",
+    name: "increment",
+    description: "Adds an amount to the counter",
     schema: Zoi.object(%{amount: Zoi.integer()})
 
-  @impl Jido.Action
+  @impl true
   def run(%{amount: amount}, %{agent_state: state}) do
     {:ok, %{state | count: state.count + amount}}
   end
 end
 ```
 
-Jido uses the Action and Flow contracts from
-[Jido Action](https://hexdocs.pm/jido_action/). An Action can do I/O. Such I/O
-is outside the Agent state commit.
+An Action can also return a list of Directives. A Directive is work for the
+runtime to do after it commits the state. `emit/2` asks for one outbound
+Signal:
 
-## Declare One Agent
+```elixir
+defmodule GettingStarted.Reset do
+  use Jido.Action,
+    name: "reset",
+    description: "Sets the counter to zero and reports the previous value",
+    schema: Zoi.object(%{})
 
-The declaration describes the Agent data schema and the routes from Signals to
-executable work. It does not start a process. The route option `as:` adds Signal
-constructors.
+  @impl true
+  def run(_params, %{agent_state: state}) do
+    {:ok, %{state | count: 0},
+     [Jido.Agent.Directive.emit("counter.cleared", %{previous: state.count})]}
+  end
+end
+```
+
+`emit/2` returns data. It sends nothing.
+
+## Declare The Agent
 
 ```elixir
 defmodule GettingStarted.Counter do
-  use Jido.Agent, name: "getting_started_counter"
+  use Jido.Agent,
+    name: "counter",
+    description: "Counts increments"
 
   agent do
     schema(Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}))
@@ -55,64 +91,228 @@ defmodule GettingStarted.Counter do
   routes do
     signal_source("/guides/getting-started")
 
-    route "counter.add", GettingStarted.Add, as: :add do
-      defaults(%{amount: 1})
-    end
+    route "counter.increment", GettingStarted.Increment,
+      as: :increment,
+      defaults: %{amount: 1}
+
+    route "counter.reset", GettingStarted.Reset, as: :reset
   end
 end
 ```
 
-The module declaration produces a reusable neutral Agent definition. It has no
-identity and no live state.
+| Line | Effect |
+| --- | --- |
+| `schema` | Validates the complete state. `Zoi.default(0)` sets the starting count. |
+| `signal_source` | The `source` for Signals this Agent builds. |
+| `route` | Maps one Signal type to one Action. The first matching route wins. |
+| `defaults:` | Fills parameters that the Signal data leaves out. |
+| `as: :increment` | Generates `increment_signal/2` and `increment_signal!/2`. |
 
-## Apply A Direct Command
+Jido validates the declaration at compile time. A route to a module that
+isn't an Action fails the build, not the first request.
 
-`new!/1` instantiates the declared Agent with an identity and initial state. A
-direct command returns a new Agent value and its Directives. It does not start a
-process or commit live state.
+## Create An Instance
+
+The module gives you a definition, with no `id` and no `state`:
 
 ```elixir
-agent = GettingStarted.Counter.new!(id: "direct-counter")
-{:ok, signal} = GettingStarted.Counter.add_signal(%{amount: 3})
-{:ok, candidate, []} = GettingStarted.Counter.cmd(agent, signal)
+definition = GettingStarted.Counter.definition()
 
-{agent.state.count, candidate.state.count}
+{definition.name, definition.id, definition.state}
 ```
 
-The result is `{0, 3}`. The original Agent is unchanged.
+The result is `{"counter", nil, nil}`.
 
-## Run The Live Actor
+`instantiate!/1` adds an identity and validated state:
 
-An Agent Server is the live actor for one Agent instance. It accepts one Turn
-at a time and commits each valid candidate.
+```elixir
+agent = GettingStarted.Counter.instantiate!(id: "counter-1")
+
+{agent.id, agent.state}
+```
+
+The result is `{"counter-1", %{count: 0}}`. Both values are `%Jido.Agent{}`
+structs. A struct with an `id` but no `state`, or the reverse, is invalid.
+
+## Run A Signal As Data
+
+The generated constructor builds a Signal with the route's type and the
+Agent's source:
+
+```elixir
+signal = GettingStarted.Counter.increment_signal!(%{amount: 2})
+
+{signal.type, signal.source, signal.data}
+```
+
+The result is `{"counter.increment", "/guides/getting-started", %{amount: 2}}`.
+
+`cmd/2` routes the Signal, runs the Action, and validates the result:
+
+```elixir
+{:ok, candidate, directives} = GettingStarted.Counter.cmd(agent, signal)
+
+{agent.state.count, candidate.state.count, directives}
+```
+
+The result is `{0, 2, []}`. `agent` is unchanged. `cmd/2` starts no process,
+saves nothing, and runs no Directives.
+
+With no data, the route default supplies `amount: 1`:
+
+```elixir
+signal = GettingStarted.Counter.increment_signal!()
+{:ok, candidate, []} = GettingStarted.Counter.cmd(candidate, signal)
+
+candidate.state.count
+```
+
+The result is `3`.
+
+## Read A Directive
+
+```elixir
+reset = GettingStarted.Counter.reset_signal!()
+{:ok, cleared, [emit]} = GettingStarted.Counter.cmd(candidate, reset)
+
+{cleared.state.count, emit.signal.type, emit.signal.data}
+```
+
+The result is `{0, "counter.cleared", %{previous: 3}}`. Jido built a complete
+Signal from the Agent's `signal_source`. It hasn't been sent.
+
+## Handle Errors
+
+Invalid data returns an exception struct and leaves the Agent unchanged:
+
+```elixir
+bad = GettingStarted.Counter.increment_signal!(%{amount: "two"})
+{:error, error} = GettingStarted.Counter.cmd(agent, bad)
+
+{error.__struct__, Exception.message(error)}
+```
+
+The result is
+`{Jido.Action.Error.InvalidInputError, "invalid type: expected integer, at amount"}`.
+Jido also logs a warning for the failed Action.
+
+A Signal type with no route fails before any Action runs:
+
+```elixir
+unknown = Jido.Signal.new!("counter.unknown", %{}, source: "/guides/getting-started")
+{:error, error} = GettingStarted.Counter.cmd(agent, unknown)
+
+Exception.message(error)
+```
+
+The result is `"No route accepts this Signal type"`.
+
+## Start A Live Agent
+
+A live Agent runs under a Jido instance. `Jido.start/0` starts the default
+instance for scripts and Livebook. In an application, you add your own Jido
+module to your supervision tree.
 
 ```elixir
 {:ok, _jido} = Jido.start()
-
-{:ok, counter} =
-  Jido.start_agent(
-    GettingStarted.Counter,
-    id: "live-counter"
-  )
-
-{:ok, committed} =
-  with {:ok, signal} <- GettingStarted.Counter.add_signal(%{amount: 3}) do
-    Jido.AgentServer.call(counter, signal, [])
-  end
-
-snapshot = Jido.AgentServer.snapshot(counter)
-
-{committed.state.count, snapshot.state_version}
 ```
 
-The result is `{3, 1}`. The Server owns the committed value and its revision.
+```elixir
+{:ok, counter} =
+  Jido.start_agent(GettingStarted.Counter,
+    id: "live-counter",
+    default_dispatch: {:pid, target: self()}
+  )
+```
 
-## Stop The Example
+`default_dispatch:` sends emitted Signals to this notebook's process. Without
+it, the Server sends emitted Signals back to itself, which starts another Turn.
+[Life of a Signal](signal-to-effects.md) covers the delivery rules.
+
+## Send Signals
+
+`Jido.AgentServer.call/3` runs one Turn and returns after the commit:
 
 ```elixir
-:ok = Jido.stop_agent(counter)
+signal = GettingStarted.Counter.increment_signal!(%{amount: 4})
+{:ok, committed, []} = Jido.AgentServer.call(counter, signal)
+
+committed.state.count
+```
+
+The result is `4`. Read the committed state at any time:
+
+```elixir
+Jido.AgentServer.agent(counter).state.count
+```
+
+The result is `4`. `status/1` reports the revision and the last Turn:
+
+```elixir
+status = Jido.AgentServer.status(counter)
+
+{status.state_version, status.last_outcome.status}
+```
+
+The result is `{1, :succeeded}`. Each committed Turn adds one to
+`state_version`.
+
+## Receive An Emit
+
+The Server commits the reset, replies to `call/3`, then dispatches
+`counter.cleared`:
+
+```elixir
+reset = GettingStarted.Counter.reset_signal!()
+{:ok, committed, [_emit]} = Jido.AgentServer.call(counter, reset)
+
+receive do
+  {:signal, %Jido.Signal{type: "counter.cleared"} = cleared} -> cleared.data
+after
+  1_000 -> :no_signal
+end
+```
+
+The result is `%{previous: 4}`.
+
+## Failed Turns
+
+A failed Turn returns an error and keeps the last committed state:
+
+```elixir
+signal = GettingStarted.Counter.increment_signal!(%{amount: 10})
+{:ok, _committed, []} = Jido.AgentServer.call(counter, signal)
+
+bad = GettingStarted.Counter.increment_signal!(%{amount: "ten"})
+{:error, _error} = Jido.AgentServer.call(counter, bad)
+
+Jido.AgentServer.agent(counter).state.count
+```
+
+The result is `10`.
+
+## Clean Up
+
+```elixir
+:ok = Jido.stop_agent("live-counter")
 :ok = Jido.stop()
 ```
 
-Continue with [Build Your First Agent](build-your-first-agent.livemd) or read
-[Actors, Agents, And Jido](actor-and-agent-framework.md).
+## Summary
+
+- An Agent module declares a schema and routes. It doesn't start a process.
+- `instantiate!/1` turns a definition into an instance with an `id` and state.
+- The first route matching the Signal type runs one Action.
+- An Action returns the complete next state and, optionally, Directives.
+- `cmd/2` returns a candidate and Directives without committing or sending.
+- An Agent Server runs one Turn at a time. It commits, replies, then runs
+  Directives.
+- A failed Turn leaves the committed state unchanged.
+
+## Next
+
+- [OTP Concepts](otp-concepts-for-jido.md) – the processes and supervisors
+  behind the Agent Server.
+- [Life of a Signal](signal-to-effects.md) – every stage of a Turn.
+- [Pure or Live Execution](pure-or-live-execution.md) – when to use `cmd/2`
+  and when to start a Server.

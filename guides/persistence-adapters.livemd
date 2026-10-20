@@ -1,218 +1,191 @@
 # Persistence Adapters
 
-This Livebook stores an Agent checkpoint, loads it, and logically deletes it.
-It uses the ETS adapter, which is suitable for local development and tests.
+## Overview
+
+An adapter decides where Jido keeps Agent records. Jido ships seven
+adapters. Each one stores the same bytes under the same keys, so you can move
+from the ETS adapter in tests to Postgres in production without changing an
+Agent.
+
+| Adapter | Storage | Survives | Extra dependencies |
+| --- | --- | --- | --- |
+| `Jido.Persistence.ETS` | Memory | Process exits, not a BEAM stop | None |
+| `Jido.Persistence.File` | Local directory | BEAM restart | None |
+| `Jido.Persistence.Mnesia` | Mnesia table | What your table copies allow | None (OTP) |
+| `Jido.Persistence.Ecto` | Postgres or SQLite | Database durability | `ecto_sql` and a driver |
+| `Jido.Persistence.Redis` | Redis | Redis durability | A Redis client |
+| `Jido.Persistence.S3` | S3 objects | Object storage | An S3 client |
+| `Jido.Persistence.Bedrock` | Bedrock KV | Bedrock durability | `bedrock`, `bedrock_raft` |
+
+This Livebook runs ETS, File and Mnesia with the same Agent: it starts the
+Agent, runs one Turn, hibernates it, and thaws it. The other adapters appear
+as configuration blocks. For what an adapter stores, see
+[Storage Model](persistence-storage-model.md). For the write rules, see
+[Durability Model](durability-model.md).
+
+## Install
 
 ```elixir
-Mix.install([
-  {:jido, path: Path.expand("..", __DIR__)}
-])
+Mix.install([{:jido, "~> 3.0.0-beta.2"}])
 ```
 
-## Define a portable Agent
+## The Counter
 
 ```elixir
-defmodule PersistenceGuide.Counter do
-  use Jido.Agent, name: "persistence_counter"
+defmodule AdapterGuide.Counter do
+  use Jido.Agent, name: "counter"
 
   agent do
-    schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+    schema(Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}))
   end
 
   routes do
-    route "increment" do
-      action %{by: by},
-        name: "persistence_guide_increment",
-        schema: Zoi.object(%{by: Zoi.integer() |> Zoi.default(1)}),
+    signal_source("/guides/adapters")
+
+    route "counter.add", as: :add, defaults: %{amount: 1} do
+      action %{amount: amount},
+        schema: Zoi.object(%{amount: Zoi.integer()}),
         context: context do
-        {:ok, %{context.agent_state | count: context.agent_state.count + by}}
+        {:ok, %{context.agent_state | count: context.agent_state.count + amount}}
       end
     end
   end
 end
+
+{:ok, _} = Jido.start(namespace: "adapter-guide")
 ```
 
-Create and change the Agent as a value. No actor is necessary for this step.
+The cell returns `{:ok, pid}` for the default Jido instance. Persistence keys
+need a stable namespace, so the instance sets `namespace: "adapter-guide"`.
+Without one, a save returns `{:error, :stable_namespace_required}`.
+
+The next cell defines `round_trip`. It starts the Agent with an explicit
+store, adds 5, hibernates it, waits for the process to stop, and thaws it
+from the same store:
 
 ```elixir
-agent = PersistenceGuide.Counter.new!(id: "guide-counter")
-signal = Jido.Signal.new!("increment", %{by: 4}, source: "/guides/persistence")
-{:ok, agent, []} = PersistenceGuide.Counter.cmd(agent, signal)
-agent.state
-```
+round_trip = fn store, id ->
+  {:ok, pid} = Jido.start_agent(AdapterGuide.Counter, id: id, persistence: store)
+  :ok = Jido.AgentServer.await_ready(pid)
 
-## Save through an adapter
+  signal = AdapterGuide.Counter.add_signal!(%{amount: 5})
+  {:ok, _agent, []} = Jido.AgentServer.call(pid, signal)
 
-Live state must match its schema. Its durable representation must also be
-portable. Save applies custom Agent conversion or default-checkpoint Plugin
-conversion before the final portability check. Load checks the stored record,
-applies conversion, then validates the reconstructed live state and identity.
-Default checkpoints reject unsupported local values with a value path.
+  ref = Process.monitor(pid)
+  :ok = Jido.hibernate(pid)
+  receive do: ({:DOWN, ^ref, :process, ^pid, _} -> :ok)
 
-A required checkpoint or storage write must succeed before a live commit and
-its directive dispatch. Local runtime snapshots copy handles but do not
-recreate resources or transfer ownership. See
-[Portable State and Checkpoints](portable-state-and-checkpoints.md) for
-conversion and [Runtime Coordination State](runtime-coordination-state.md) for
-local restart limits.
+  {:ok, thawed} = Jido.thaw(AdapterGuide.Counter, id, persistence: store)
+  :ok = Jido.AgentServer.await_ready(thawed)
+  snapshot = Jido.AgentServer.snapshot(thawed)
+  :ok = Jido.stop_agent(thawed)
 
-An adapter configuration is a module or `{module, options}` pair. The options
-below select a table only for this guide.
-
-```elixir
-store = {Jido.Persistence.ETS, table: :persistence_guide}
-
-:ok =
-  Jido.Persistence.save_agent(
-    store,
-    agent,
-    revision: 1,
-    namespace: "persistence-guide"
-  )
-```
-
-Jido owns the key format, active and tombstone record meaning, validation,
-encoding, and revision check. An adapter only stores binary keys and binary
-values. Runtime adapters must implement binary `get/2` and atomic
-`compare_and_swap/4`. A `get/2` result can also return an opaque binary token
-with the bytes. Jido checks the record and then passes that token to the
-adapter's conditional write. Adapters that return bytes only keep exact-byte
-comparison. `put/3` and `delete/2` are optional maintenance operations.
-
-## Load and logically delete
-
-The same namespace, partition, and Agent ID identify the record on every operation.
-
-```elixir
-{:ok, restored} =
-  Jido.Persistence.load_agent(
-    store,
-    PersistenceGuide.Counter,
-    "guide-counter",
-    namespace: "persistence-guide"
-  )
-
-restored.state
-```
-
-```elixir
-:ok =
-  Jido.Persistence.delete_agent(
-    store,
-    PersistenceGuide.Counter,
-    "guide-counter",
-    namespace: "persistence-guide"
-  )
-
-{:error, :deleted} =
-  Jido.Persistence.load_agent(
-    store,
-    PersistenceGuide.Counter,
-    "guide-counter",
-    namespace: "persistence-guide"
-  )
-```
-
-Normal delete replaces the exact active record with a compact tombstone. The
-tombstone contains identity and revision, but no checkpoint or Agent state. It
-prevents a delayed normal writer from recreating that record lifetime. Delete
-of a missing identity creates a revision-zero tombstone.
-
-Physical tombstone purge is a storage maintenance task. Core does not use it
-for normal Agent deletion.
-
-## Choose an adapter
-
-Jido includes these adapters:
-
-| Adapter | Use |
-| --- | --- |
-| `Jido.Persistence.ETS` | Tests and local development. Data ends with the BEAM. |
-| `Jido.Persistence.File` | One local BEAM with no shared writers. |
-| `Jido.Persistence.Mnesia` | An application-owned Mnesia table with transactional CAS. |
-| `Jido.Persistence.Redis` | Shared durable storage through an application-supplied command function. |
-| `Jido.Persistence.S3` | Direct single-object checkpoints for infrequent writes through an application-supplied signed request function. |
-| `Jido.Persistence.Bedrock` | Shared durable storage through Bedrock KV 0.7 transactions. |
-| `Jido.Persistence.Ecto` | PostgreSQL or SQLite through an application Ecto repository. |
-
-Configure persistence on a Jido instance when most actors use the same store.
-An Agent start option can override or disable that configuration.
-
-```elixir
-defmodule PersistenceGuide.AppJido do
-  use Jido,
-    otp_app: :my_app,
-    namespace: "my-app/agents",
-    persistence: {Jido.Persistence.ETS, table: :my_app_agents}
+  {snapshot.agent.state, snapshot.state_version}
 end
 ```
 
-The ETS adapter creates its table when first used. The File adapter is for one
-local writer domain. The Redis adapter lets the host application own its Redis
-client and connection policy. A Redis TTL applies to tombstones too. Thus, it
-also limits the duration of the delayed-writer fence.
-The Mnesia adapter requires a running Mnesia application and an existing
-`set` table with `[:key, :value]` attributes. The application owns table
-copies and disk policy; see the [storage guide](storage.html).
+The start writes revision 0 and the Turn writes revision 1. A thawed Agent
+keeps both its state and its revision.
 
-## Configure direct S3 checkpoints
+## ETS
 
-Give the S3 adapter a bucket and a function that signs and sends one request:
+```elixir
+ets = {Jido.Persistence.ETS, table: :adapter_guide}
+
+{round_trip.(ets, "ets-1"), :ets.info(:adapter_guide_records, :size)}
+```
+
+The result is `{{%{count: 5}, 1}, 1}`: the thawed state, revision 1, and one
+row. The adapter adds `_records` to the base name.
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `:table` | `:jido_persistence` | Base name. The ETS table is `<table>_records`. |
+
+The table is a public named `set`. While the `:jido` application runs, a
+supervised owner process inherits it, so it outlives the process that
+created it. All data is gone when the BEAM stops. Use ETS for tests and
+development.
+
+## File
+
+```elixir
+dir = Path.join(System.tmp_dir!(), "jido-adapter-guide")
+File.rm_rf!(dir)
+file = {Jido.Persistence.File, path: dir}
+
+{round_trip.(file, "file-1"), Path.wildcard(Path.join(dir, "records/*.bin")) |> length()}
+```
+
+The result is `{{%{count: 5}, 1}, 1}`. The record is one file at
+`<path>/records/<hash>.bin`, where the hash is the URL-safe Base64 SHA-256 of
+the storage key.
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `:path` | required | Base directory. Created on first write. |
+
+Each write goes to a temporary file, then an atomic rename. A per-key lock
+serializes writes within one BEAM. The adapter doesn't call `fsync`, so a
+power loss or OS crash can lose the latest write. One BEAM instance must own
+the directory. Don't share it between nodes or through different symbolic
+links.
+
+## Mnesia
+
+The application owns Mnesia. Start it and create a `set` table with the
+attributes `[:key, :value]`:
+
+```elixir
+{:ok, _} = Application.ensure_all_started(:mnesia)
+
+case :mnesia.create_table(:jido_records, attributes: [:key, :value], ram_copies: [node()]) do
+  {:atomic, :ok} -> :ok
+  {:aborted, {:already_exists, :jido_records}} -> :ok
+end
+```
+
+The cell returns `:ok`. This table holds RAM copies on one node. It doesn't
+need a disk schema.
+
+```elixir
+mnesia = {Jido.Persistence.Mnesia, table: :jido_records}
+
+{round_trip.(mnesia, "mnesia-1"), :mnesia.table_info(:jido_records, :size)}
+```
+
+The result is `{{%{count: 5}, 1}, 1}`.
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `:table` | required | An existing `set` table with attributes `[:key, :value]`. |
+
+`:table` is the only accepted option. Keep the default record name, which
+equals the table name. The adapter doesn't start Mnesia or create tables. It
+waits up to 5,000 ms for the table. A wrong table type, a `local_content`
+table, or an extra option fails with `:invalid_mnesia_options`. A missing
+table or a stopped Mnesia fails with `{:mnesia_unavailable, reason}`. Durability follows your table copies:
+`ram_copies` are lost when the nodes stop, and `disc_copies` survive.
+
+Each compare-and-swap is one transaction with a write lock on the key. A call
+from inside your own Mnesia transaction returns
+`{:error, {:rejected, :nested_transaction}}`.
+
+## Ecto
+
+`Jido.Persistence.Ecto` stores records in Postgres or SQLite3. Add the
+optional dependency and a driver:
 
 <!-- livebook:{"force_markdown":true} -->
 
 ```elixir
-persistence =
-  {Jido.Persistence.S3,
-   bucket: "my-agent-checkpoints",
-   prefix: "production/agents/",
-   timeout_ms: 5_000,
-   request_fn: &MyApp.S3Client.one_request/1}
+{:ecto_sql, "~> 3.14"},
+{:postgrex, "~> 0.19"}
 ```
 
-The request function receives one map with `method`, `bucket`, `key`,
-`headers`, `body`, `timeout_ms`, `retry: false`, and
-`follow_redirects: false`. It returns `{:ok, %{status: status, headers:
-headers, body: body, code: code}}` or an error. `code` is the parsed S3 error
-code for failed requests. See `Jido.Persistence.S3` for exact response rules.
-The host owns the endpoint, credentials, signing, HTTP client, and connection
-pool. It must stop requests by the given timeout and must not retry a
-conditional write. A lost write reply is indeterminate, even if a later read
-finds the same bytes. Keep credentials, object bodies, ETags, and signed
-headers out of client logs and telemetry.
-
-The adapter uses `If-None-Match: *` to create an object and `If-Match` with
-the ETag from the validated read to replace it. It sends a SHA-256 checksum
-on writes and checks the returned checksum on reads. The endpoint must
-support these conditions and return the checksum. Test each S3 provider and
-configuration before use; a MinIO pass alone does not prove AWS S3 behavior.
-Keep active objects and tombstones from automatic expiry. S3 versioning can
-retain old versions and make maintenance deletion create a delete marker.
-Normal Agent deletion remains a conditional tombstone write. This adapter
-uses one object per key and limits each object to 5,000,000 bytes. It suits
-checkpoints with infrequent writes, not a low-latency write path.
-
-## Configure the Ecto adapter
-
-Ecto SQL is an optional Jido dependency. Add Ecto SQL and the driver for the
-application database. For PostgreSQL, add these dependencies:
-
-<!-- livebook:{"force_markdown":true} -->
-
-```elixir
-def deps do
-  [
-    {:jido, "~> 3.0"},
-    {:ecto_sql, "~> 3.14"},
-    {:postgrex, "~> 1.0"}
-  ]
-end
-```
-
-The application owns and supervises its Ecto repository. Jido does not start
-the repository or run migrations. Add a host migration before a Jido instance
-uses the adapter. Pin the helper version so this migration keeps the same
-behavior after later Jido upgrades:
+Without `ecto_sql` at compile time, the adapter reports that it requires the
+optional `:ecto_sql` dependency. Create the table with a migration. Pin
+`:version` so a later Jido release can't change an old migration:
 
 <!-- livebook:{"force_markdown":true} -->
 
@@ -225,130 +198,165 @@ defmodule MyApp.Repo.Migrations.CreateJidoPersistenceRecords do
 end
 ```
 
-The `key` and `value` columns keep the exact adapter bytes. The primary key
-makes create-only writes atomic. `write_token` is private adapter data. It lets
-a same-value CAS report one changed row. Do not add timestamps or other stored
-fields to the default schema.
-
-The repository database role must have direct select, insert, update, and
-delete access to this table. Do not add a trigger or rule that hides rows,
-suppresses writes, or changes the three adapter columns. CAS uses the database
-affected-row result.
-
-Configure the repository on the Jido instance:
+The migration creates `jido_persistence_records` with three binary columns:
+`key` (primary key), `value` and `write_token`. It accepts `:table` and
+`:prefix`. Use the same values in the adapter's schema and repo options.
 
 <!-- livebook:{"force_markdown":true} -->
 
 ```elixir
-defmodule MyApp.Jido do
-  use Jido,
-    otp_app: :my_app,
-    namespace: "my-app/agents",
-    persistence: {Jido.Persistence.Ecto, repo: MyApp.Repo}
-end
+children = [
+  MyApp.Repo,
+  {Jido,
+   name: MyApp.Jido,
+   namespace: "my-app",
+   persistence: {Jido.Persistence.Ecto, repo: MyApp.Repo}}
+]
 ```
 
-Use `repo_options: [prefix: "tenant"]` when the table uses an Ecto query
-prefix. Use `schema: MyApp.JidoPersistenceRecord` for a different table name.
-The custom schema must have only the binary `key`, `value`, and `write_token`
-fields, and `key` must be its single primary key.
+The instance store applies to Agents started with `persistence: :inherit`,
+and to every `Jido.thaw/4`.
 
-Pass the same `prefix: "tenant"` to the migration helper. Pass `table:` when
-the custom schema uses a different table.
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `:repo` | required | A started `Ecto.Repo` with the Postgres or SQLite3 adapter. |
+| `:schema` | `Jido.Persistence.Ecto.Record` | A schema with binary `key`, `value` and `write_token` fields. |
+| `:repo_options` | `[]` | Passed to each repo call, such as `prefix:`. `:on_conflict` and `:conflict_target` are rejected. |
 
-The Ecto adapter supports the PostgreSQL and SQLite Ecto adapters. It rejects
-other database adapters during configuration validation because their upsert
-and affected-row rules do not prove this CAS contract.
+`write_token` changes on every successful write, so the affected-row count
+stays correct even when the new bytes equal the old bytes.
 
-## Configure Bedrock KV
+## Redis
 
-Bedrock support is optional. Its core adapter unit tests remain active. Real
-Bedrock service checks, including previously passing single-node storage and
-transaction cases, are paused in this beta pending upstream fixes. Strict
-multi-node startup and MinIO-backed snapshot recovery are not verified. Known
-upstream defects are
-tracked in [Bedrock issue 319](https://github.com/bedrock-kv/bedrock/issues/319)
-and [Jido issue 370](https://github.com/agentjido/jido/issues/370). Do not rely
-on this beta for those durability paths until fixed and retested.
+`Jido.Persistence.Redis` doesn't depend on a Redis client. You pass a
+function that runs one command:
 
-Add the supported `0.7.x` client to the host
-application:
+<!-- livebook:{"force_markdown":true} -->
 
 ```elixir
-def deps do
-  [
-    {:jido, "~> 3.0"},
-    {:bedrock, "~> 0.7.2"},
-    {:bedrock_raft, "~> 0.10.0", override: true}
-  ]
-end
+children = [
+  {Redix, name: MyApp.Redix},
+  {Jido,
+   name: MyApp.Jido,
+   namespace: "my-app",
+   persistence:
+     {Jido.Persistence.Redis,
+      command_fn: &Redix.command(MyApp.Redix, &1), prefix: "my-app"}}
+]
 ```
 
-The explicit Bedrock Raft dependency keeps the host on the tested `0.10.x`
-client API used by Bedrock `0.7.2` and later `0.7.x` releases.
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `:command_fn` | required | Arity-1 function. Takes a command list, returns `{:ok, result}` or `{:error, reason}`. |
+| `:prefix` | `"jido"` | The Redis key is `"<prefix>:<key>"`. |
+| `:ttl` | none | Positive key lifetime in milliseconds. |
 
-Define the Bedrock cluster and repo. The repo must use `Bedrock.Repo`:
+A compare-and-swap is one Lua `EVAL`, so the connection must permit `EVAL`.
+A `command_fn` error during a compare-and-swap is reported as indeterminate.
+Durability follows your Redis persistence settings (AOF or RDB). A `:ttl`
+expires active records and tombstones alike.
+
+## S3
+
+`Jido.Persistence.S3` stores one object per record and uses conditional
+`PUT` requests. You supply the signed HTTP call:
+
+<!-- livebook:{"force_markdown":true} -->
 
 ```elixir
-defmodule MyApp.BedrockCluster do
-  use Bedrock.Cluster, otp_app: :my_app, name: "my_app"
-end
-
-defmodule MyApp.BedrockRepo do
-  use Bedrock.Repo, cluster: MyApp.BedrockCluster
-end
+persistence =
+  {Jido.Persistence.S3,
+   bucket: "my-app-agents",
+   prefix: "jido/",
+   request_fn: &MyApp.S3Client.request/1}
 ```
 
-Configure the Bedrock cluster for the deployment. Bedrock uses strict
-durability mode by default. Keep strict mode for production. It validates log
-replication and persistent coordinator, log, and materializer paths when the
-cluster starts. Follow the Bedrock durability guide for local file or
-S3-compatible object storage settings.
+`request_fn` receives a map with `:method` (`:get`, `:put` or `:delete`),
+`:bucket`, `:key`, `:headers`, `:body`, `:timeout_ms`, `:retry` (`false`) and
+`:follow_redirects` (`false`). It returns
+`{:ok, %{status: integer, headers: headers, body: binary, code: s3_code_or_nil}}`
+or `{:error, reason}`. Your client owns credentials, signing, pools and the
+endpoint. It must not retry writes or follow redirects.
 
-Add the cluster before the Jido instance in the application supervision tree:
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `:bucket` | required | Bucket name. |
+| `:request_fn` | required | Arity-1 function that signs and sends one request. |
+| `:prefix` | `"jido/"` | Object key prefix. The object key is `prefix <> "k_" <> base64url(key)`. |
+| `:timeout_ms` | `5_000` | Per-request limit, at most `120_000`. |
+
+Unknown or duplicate options are rejected. Objects are limited to 5,000,000
+bytes. Each write sends a SHA-256 checksum, and each read validates the
+`x-amz-checksum-sha256` header before it returns an ETag-based token. Each
+save is at least one HTTP round trip, so S3 suits low-frequency Agents.
+
+## Bedrock
+
+`Jido.Persistence.Bedrock` stores records in a Bedrock KV cluster. Add the
+optional dependencies and supervise the cluster in your application:
+
+<!-- livebook:{"force_markdown":true} -->
 
 ```elixir
-children = [MyApp.BedrockCluster, MyApp.Jido]
+{:bedrock, "~> 0.7.2"},
+{:bedrock_raft, "~> 0.10.0"}
 ```
 
-Select the repo in the Jido instance:
+<!-- livebook:{"force_markdown":true} -->
 
 ```elixir
-defmodule MyApp.Jido do
-  use Jido,
-    otp_app: :my_app,
-    namespace: "my-app/agents",
-    persistence:
-      {Jido.Persistence.Bedrock,
-       repo: MyApp.BedrockRepo,
-       prefix: "my-app:jido:",
-       timeout_in_ms: 5_000}
-end
+persistence = {Jido.Persistence.Bedrock, repo: MyApp.BedrockRepo}
 ```
 
-The prefix defaults to `"jido:persistence:"`. It must be a non-empty binary
-in the Bedrock user keyspace. The timeout must be a positive integer in
-milliseconds or `:infinity`. The adapter rejects a stored key larger than
-16 KiB and a value larger than 128 KiB before it starts a transaction.
+The instance store applies to Agents started with `persistence: :inherit`,
+and to every `Jido.thaw/4`.
 
-The adapter uses one Bedrock transaction for each CAS. `Repo.get/1` adds the
-read conflict, and `Repo.put/2` writes the new exact bytes. Bedrock normally
-retries transaction failures. The adapter sets `retry_limit: 0` for writes
-because a lost commit reply can have an unknown result. It reports a resolver
-abort as a confirmed conflict. It reports every other write failure as
-indeterminate. Jido then stops the affected activation and requires restore
-before another write.
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `:repo` | required | A module defined with `use Bedrock.Repo`. |
+| `:prefix` | `"jido:persistence:"` | Non-empty key prefix. |
+| `:timeout_in_ms` | `5_000` | Positive integer or `:infinity`. |
 
-Each adapter operation runs in a fresh process. It cannot join an application
-Bedrock transaction and report success before that outer transaction commits.
-The adapter stores the Jido bytes without an envelope, so `get/2` returns the
-exact bytes used by CAS.
+Each compare-and-swap is one strictly serializable transaction with
+`retry_limit: 0`, so a lost commit reply is reported as indeterminate, not
+retried into a false conflict. Keys are limited to 16 KiB and values to
+128 KiB. Use Bedrock's strict durability mode in production.
 
-A successful Bedrock transaction is strictly serializable. Bedrock 0.7 reports
-success after every required log has appended and synced its write-ahead log.
-The cluster durability profile still controls deployment durability. The
-adapter does not make Bedrock relaxed mode durable.
+## Choose an Adapter
 
-Next, read
-[Compare-and-Swap, Hibernate, and Thaw](compare-and-swap-hibernate-and-thaw.html)
-for the live actor lifecycle.
+| You need | Use |
+| --- | --- |
+| Tests and local development | ETS |
+| One node, data that survives a restart, no database | File |
+| An existing Mnesia cluster | Mnesia |
+| A relational database you already run | Ecto with Postgres |
+| One local database file | Ecto with SQLite3 |
+| Shared low-latency storage across nodes | Redis |
+| Rarely written Agents in object storage | S3 |
+| Strictly serializable distributed KV | Bedrock |
+
+Every Turn on a persisted Agent writes one record before it commits. Choose
+an adapter whose write latency fits your Turn rate.
+
+To store records somewhere else, see
+[Custom Adapters](custom-persistence-adapter.md).
+
+## Clean Up
+
+```elixir
+:ok = Jido.stop()
+:stopped = :mnesia.stop()
+File.rm_rf!(dir)
+```
+
+The cell stops the Jido instance and Mnesia and deletes the File adapter's
+directory. It returns the list of deleted paths.
+
+## Next
+
+- [Custom Adapters](custom-persistence-adapter.md) – implement
+  `Jido.Persistence.Adapter`.
+- [Make an Agent Durable](make-an-agent-durable.livemd) – configure an
+  instance and start durable Agents.
+- [Instances and Tenants](configuration-and-tenant-isolation.md) – namespaces
+  and per-instance persistence.

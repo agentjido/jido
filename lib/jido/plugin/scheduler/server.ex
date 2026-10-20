@@ -1,23 +1,12 @@
 defmodule Jido.Plugin.Scheduler.Server do
-  @moduledoc "Owns timers, delivery, and readiness after Scheduler commits."
+  @moduledoc "Owns timers and readiness after Scheduler commits."
   @behaviour Jido.Plugin
 
   alias Jido.Plugin.{DirectiveContext, Init}
   alias Jido.Plugin.Scheduler
-  alias Jido.Plugin.Scheduler.{Acknowledge, Durable, Queue, Runtime}
+  alias Jido.Plugin.Scheduler.Runtime
 
   @impl true
-  def dispatch(runtime, %Queue{} = directive, %DirectiveContext{} = context, _opts) do
-    if Durable.current_queue?(context.plugin_state, directive) do
-      GenServer.cast(runtime, :pending_changed)
-    else
-      :ok
-    end
-  end
-
-  def dispatch(runtime, %Acknowledge{}, _context, _opts),
-    do: GenServer.cast(runtime, :pending_changed)
-
   def dispatch(runtime, directive, %DirectiveContext{} = context, opts) do
     GenServer.call(runtime, {:directive, directive, context}, Keyword.get(opts, :timeout, 5_000))
   catch

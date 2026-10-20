@@ -1,0 +1,285 @@
+# Inspect Activations
+
+## Overview
+
+A running Agent Server answers read requests while it works. You can read the
+committed Agent, the Server's phase and queue, recent Turn outcomes, Plugin
+state, and the processes in its activation. This Livebook starts one Agent
+with a Plugin and two nested members, then reads each view.
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+Jido.AgentServer.agent(server)        # committed Agent
+Jido.AgentServer.snapshot(server)     # Agent plus revision, read together
+Jido.AgentServer.status(server)       # phase, queue, active Turn, last outcome
+Jido.AgentServer.history(server)      # recent outcomes, with debug: true
+```
+
+Run the cells from top to bottom.
+
+## Install
+
+```elixir
+Mix.install([{:jido, "~> 3.0.0-beta.2"}])
+```
+
+## The Example Agent
+
+`Guides.Tally` is a Plugin that counts Turns in its own `:tally` field.
+`Guides.Notes` uses it, declares two `Guides.Helper` members, and appends
+text to `notes`. The `ms` field adds a delay.
+
+```elixir
+defmodule Guides.Tally do
+  use Jido.Plugin
+
+  @impl true
+  def state_spec(_opts) do
+    {:tally, Zoi.object(%{turns: Zoi.integer()}) |> Zoi.default(%{turns: 0})}
+  end
+
+  @impl true
+  def reduce(%Jido.Agent.Plugin.Reduction{plugin_state: tally}, _opts) do
+    {:ok, %{tally | turns: tally.turns + 1}}
+  end
+end
+
+defmodule Guides.Helper do
+  use Jido.Agent, name: "helper"
+
+  agent do
+    schema(Zoi.object(%{jobs: Zoi.integer() |> Zoi.default(0)}))
+  end
+end
+
+defmodule Guides.Notes do
+  use Jido.Agent, name: "notes", extensions: [Guides.Tally]
+
+  agent do
+    schema(Zoi.object(%{notes: Zoi.list(Zoi.string()) |> Zoi.default([])}))
+  end
+
+  topology do
+    agent :helpers, Guides.Helper, count: 2
+  end
+
+  routes do
+    signal_source("/guides/inspect")
+
+    route "note.add", as: :add do
+      action %{text: text, ms: ms},
+        name: "add_note",
+        schema: Zoi.object(%{text: Zoi.string(), ms: Zoi.integer() |> Zoi.default(0)}),
+        context: context do
+        Process.sleep(ms)
+        {:ok, %{context.agent_state | notes: context.agent_state.notes ++ [text]}}
+      end
+    end
+  end
+end
+```
+
+## Start With Debug
+
+`debug: true` keeps recent Turn outcomes for `history/1`.
+`debug_max_events:` sets how many, default 100, range 1 to 10,000.
+
+```elixir
+{:ok, _} = Jido.start()
+{:ok, server} = Jido.start_agent(Guides.Notes, id: "notes-1", debug: true, debug_max_events: 20)
+Jido.AgentServer.await_ready(server)
+```
+
+The result is `:ok`. `start_agent/2` can return before Plugin runtimes and
+nested members are ready. `await_ready/2` waits for them. Until then, new
+Turns return `{:error, :not_ready}`. A caller timeout on `await_ready/2`
+doesn't stop startup.
+
+## Read the Agent
+
+```elixir
+note = Guides.Notes.add_signal!(%{text: "first"})
+{:ok, _agent, []} = Jido.AgentServer.call(server, note)
+
+Jido.AgentServer.agent(server).state
+```
+
+The result is `%{notes: ["first"], tally: %{turns: 1}}`. `agent/2` returns the
+committed Agent. It never shows a candidate from a running Turn.
+
+`plugin_state/3` reads one Plugin's field:
+
+```elixir
+{Jido.AgentServer.plugin_state(server, Guides.Tally),
+ Jido.AgentServer.plugin_state(server, Enum)}
+```
+
+The result is `{{:ok, %{turns: 1}}, {:error, :plugin_not_found}}`.
+
+`snapshot/2` returns the Agent and its revision from the same Server event:
+
+```elixir
+snapshot = Jido.AgentServer.snapshot(server)
+{snapshot.state_version, snapshot.agent.state.notes}
+```
+
+The result is `{1, ["first"]}`. Two separate reads, `agent/2` then
+`status/2`, can straddle a commit. Use `snapshot/2` when the revision must
+match the state.
+
+## Read the Status
+
+`status/2` returns a map. Read the fields you need:
+
+```elixir
+status = Jido.AgentServer.status(server)
+Map.take(status, [:phase, :ready?, :agent_id, :state_version, :error_count, :admission])
+```
+
+The result is:
+
+```text
+%{
+  phase: :idle,
+  ready?: true,
+  agent_id: "notes-1",
+  state_version: 1,
+  error_count: 0,
+  admission: %{mode: :open, postponed: 0, limit: 1000, message_queue_len: 0}
+}
+```
+
+| Field | Value |
+| --- | --- |
+| `phase` | `:initializing`, `:idle`, `:running`, or `:waiting` (a durable Flow is suspended). |
+| `ready?` | Plugin runtimes and members are ready. |
+| `agent_id`, `partition`, `jido` | Identity. |
+| `state_version` | Committed revision. Increases by 1 per commit. |
+| `generation` | A reference that changes each time the Server process starts, recovery included. |
+| `activation` | The activation supervisor PID. |
+| `parent` | The parent link for a nested member, or `nil`. |
+| `plugin_count` | Attached Plugins. |
+| `admission` | Mode (`:open` or `:quiesced`), queued Turns, limit, mailbox length. |
+| `active` | The running Turn, or `nil`. |
+| `last_outcome` | The most recent finished Turn. |
+| `effects`, `last_effect_outcome` | The running and the last Directive batch. |
+| `error_count` | Consecutive failed Turns, for `{:max_errors, n}`. |
+| `owners`, `idle_timeout`, `idle_policy` | Idle shutdown. See [Supervision and Lifecycle](agent-activation-control.md). |
+| `durable_turn`, `waits` | Durable Flow progress. |
+
+`last_outcome` is a Turn summary:
+
+```elixir
+Map.take(status.last_outcome, [:status, :stage, :committed?, :state_version_before, :state_version_after])
+```
+
+The result is
+`%{status: :succeeded, stage: :commit, committed?: true, state_version_before: 0, state_version_after: 1}`.
+The full summary also has `signal_id`, `turn_id`, `directive_count`, and
+`duration_ms`. `status` is `:succeeded`, `:failed`, `:cancelled`, or
+`:timed_out`. Summaries never contain Agent state, Signal data, or context.
+
+## See the Active Turn
+
+Submit a slow Turn and read `active` while it runs:
+
+```elixir
+slow = Guides.Notes.add_signal!(%{text: "slow", ms: 300})
+pending = Jido.AgentServer.submit(server, slow)
+
+active =
+  Enum.find_value(1..100, fn _ ->
+    Process.sleep(10)
+    Jido.AgentServer.status(server).active
+  end)
+
+{:ok, _agent, []} = Jido.AgentServer.await(pending, 2_000)
+{Jido.AgentServer.status(server).phase, active.stage, active.signal_id == slow.id}
+```
+
+The result is `{:idle, :running, true}`. `active` also has `turn_id`,
+`start_version`, `committed_version`, and `worker_pid`. Pass `turn_id` to
+`cancel_turn/3`; see [Admission and Deadlines](agent-server-admission.md).
+
+## Read the History
+
+`history/1` returns retained outcomes, oldest first:
+
+```elixir
+server
+|> Jido.AgentServer.history()
+|> Enum.map(&{&1.status, &1.state_version_after})
+```
+
+The result is `[succeeded: 1, succeeded: 2]`. Without `debug: true`,
+`history/1` returns `[]`. The history lives in Server memory and is lost when
+the Server stops.
+
+## The Activation Tree
+
+Each started Agent has an activation: a supervisor that holds its Server and
+its nested members.
+
+```elixir
+activation = Jido.AgentServer.activation(server)
+
+activation
+|> Supervisor.which_children()
+|> Enum.map(fn {id, _pid, type, _modules} -> {id, type} end)
+```
+
+The result is `[{:owned_agents, :supervisor}, {Jido.AgentServer, :worker}]`. `activation/1` returns `nil` for a bare `start_link/1` worker.
+
+`children/2` lists live children by tag:
+
+```elixir
+server |> Jido.AgentServer.children() |> Map.keys() |> Enum.sort()
+```
+
+The result is `["$topology/helpers/1", "$topology/helpers/2"]`. Each value is
+`%{pid: pid, activation: pid, placement: :owned}`. `members/3` returns the
+PIDs for one topology member, in slot order:
+
+```elixir
+{length(Jido.AgentServer.members(server, :helpers)), Jido.AgentServer.members(server, :missing)}
+```
+
+The result is `{2, []}`. See [Nested Agents](declare-agent-topology.livemd)
+for topology.
+
+## Owners and Idle Time
+
+An owner is a process that keeps the Agent from idle shutdown:
+
+```elixir
+:ok = Jido.AgentServer.attach(server)
+owners = Jido.AgentServer.status(server).owners
+:ok = Jido.AgentServer.detach(server)
+
+{owners == [self()], Jido.AgentServer.status(server).owners, Jido.AgentServer.touch(server)}
+```
+
+The result is `{true, [], :ok}`.
+
+- `attach/3` adds an owner. A repeated attach is a no-op.
+- `detach/3` removes one. The last detach starts a new idle period.
+- `touch/1` restarts the idle period. It doesn't open closed admission.
+
+They matter only with a finite `idle_timeout:`. See
+[Supervision and Lifecycle](agent-activation-control.md).
+
+## Stop the Example
+
+```elixir
+:ok = Jido.stop_agent(server)
+:ok = Jido.stop()
+```
+
+Stopping the Agent stops its activation and both helpers.
+
+## Next
+
+- [Observability](observe-agent-turns.livemd) for telemetry events and logs.
+- [Supervision and Lifecycle](agent-activation-control.md) for restarts,
+  stops, and idle shutdown.

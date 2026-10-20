@@ -36,7 +36,7 @@ defmodule JidoTest.Persistence.EctoSupport do
 
   def database_path(name) do
     suffix = System.unique_integer([:positive, :monotonic])
-    Path.join(System.tmp_dir!(), "jido-ecto-#{name}-#{suffix}.sqlite3")
+    Path.join(System.tmp_dir!(), "jido-ecto-#{name}-#{System.pid()}-#{suffix}.sqlite3")
   end
 
   def repo_start_options(path) do

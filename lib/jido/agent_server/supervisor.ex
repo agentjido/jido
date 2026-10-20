@@ -36,7 +36,7 @@ defmodule Jido.AgentServer.Supervisor do
 
   @impl true
   def init({opts, parent, lifetime}) do
-    state = :ets.new(__MODULE__, [:set, :public])
+    state = :ets.new(__MODULE__, [:public])
 
     :ets.insert(state, [
       {:parent, parent},
@@ -114,40 +114,6 @@ defmodule Jido.AgentServer.Supervisor do
     ArgumentError -> {:error, :checkpoint_unavailable}
   end
 
-  @doc false
-  def persistence_mode(state, requested) do
-    lifetime = :ets.lookup_element(state, :durable_lifetime, 2)
-
-    if :atomics.get(lifetime, 1) == 1 or not :ets.insert_new(state, {:durable_started, true}),
-      do: :restore,
-      else: requested
-  end
-
-  @doc false
-  def restore_durable(state, agent, revision) do
-    # The parent child specification retains this reference across root loss.
-    # A separate start has a new reference and still enforces strict :create.
-    lifetime = :ets.lookup_element(state, :durable_lifetime, 2)
-    :atomics.put(lifetime, 1, 1)
-    :ets.insert(state, {:checkpoint, agent, revision})
-  end
-
-  @doc false
-  def start_plugin(spec, state) do
-    [{:worker, owner}] = :ets.lookup(state, :worker)
-
-    case :gen_statem.call(owner, {:plugin_start, spec.module}) do
-      {:ok, init, current_spec} ->
-        {:ok, %{start: {module, function, args}}} =
-          Jido.AgentServer.Plugin.Callbacks.child_spec(init, current_spec)
-
-        apply(module, function, args)
-
-      {:error, :plugin_not_found} ->
-        :ignore
-    end
-  end
-
   def worker(activation) do
     case List.keyfind(Supervisor.which_children(activation), Server, 0) do
       {Server, pid, :worker, _} when is_pid(pid) -> pid
@@ -155,32 +121,25 @@ defmodule Jido.AgentServer.Supervisor do
     end
   end
 
-  def start_plugin(activation, spec, child_spec, state) do
-    child_spec = %{
-      child_spec
-      | id: {:plugin, spec.module},
-        start: {__MODULE__, :start_plugin, [spec, state]}
-    }
+  @doc false
+  def start_activation(supervisor, spec) do
+    with {:ok, root} <- DynamicSupervisor.start_child(supervisor, spec) do
+      worker = live_worker(root)
 
-    case Supervisor.start_child(activation, child_spec) do
-      {:ok, pid} when is_pid(pid) ->
-        {:ok, pid}
-
-      {:ok, pid, _info} when is_pid(pid) ->
-        {:ok, pid}
-
-      {:error, {:already_started, pid}} = error ->
-        case List.keyfind(Supervisor.which_children(activation), child_spec.id, 0) do
-          {_, ^pid, _, _} when is_pid(pid) -> {:ok, pid}
-          _ -> error
-        end
-
-      {:ok, _} ->
-        {:error, :plugin_root_required}
-
-      error ->
-        error
+      if is_pid(worker) and Process.alive?(worker) do
+        {:ok, worker}
+      else
+        DynamicSupervisor.terminate_child(supervisor, root)
+        {:error, :worker_unavailable}
+      end
     end
+  end
+
+  @doc false
+  def live_worker(root) do
+    if Process.alive?(root), do: worker(root)
+  catch
+    :exit, _ -> nil
   end
 
   def execution(nil), do: nil
@@ -200,7 +159,11 @@ defmodule Jido.AgentServer.Supervisor do
   end
 
   def forget_execution(nil), do: :ok
-  def forget_execution(state), do: :ets.delete(state, :execution)
+
+  def forget_execution(state) do
+    :ets.delete(state, :execution)
+    :ok
+  end
 
   def close_execution(state) do
     case execution(state) do
@@ -296,14 +259,13 @@ defmodule Jido.AgentServer.Supervisor do
   def child_supervisor(activation) do
     spec = %{
       id: :owned_agents,
-      start: {DynamicSupervisor, :start_link, [[strategy: :one_for_one]]},
+      start: {DynamicSupervisor, :start_link, [[]]},
       type: :supervisor
     }
 
     case Supervisor.start_child(activation, spec) do
-      {:ok, pid} -> {:ok, pid}
       {:error, {:already_started, pid}} -> {:ok, pid}
-      error -> error
+      result -> result
     end
   end
 end

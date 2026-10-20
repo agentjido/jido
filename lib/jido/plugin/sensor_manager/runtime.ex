@@ -29,11 +29,11 @@ defmodule Jido.Plugin.SensorManager.Runtime do
   end
 
   defp controller(runtime) do
-    runtime
-    |> Supervisor.which_children()
-    |> Enum.find_value(fn
-      {Controller, pid, :worker, _modules} when is_pid(pid) -> pid
-      _child -> nil
-    end)
+    {Controller, pid, :worker, _modules} =
+      runtime
+      |> Supervisor.which_children()
+      |> List.keyfind(Controller, 0)
+
+    pid
   end
 end

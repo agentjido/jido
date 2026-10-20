@@ -18,11 +18,18 @@ defmodule Jido.Agent.DSL do
       quote unquote: false do
         for route <- @agent_definition.routes, route.as != nil do
           helper = String.to_atom(Atom.to_string(route.as) <> "_signal")
+          bang_helper = String.to_atom(Atom.to_string(route.as) <> "_signal!")
 
-          @doc "Builds an input Signal. Use Jido.Agent.cmd/3 or Jido.AgentServer.call/3 to run it."
-          @spec unquote(helper)(map(), keyword()) :: {:ok, Jido.Signal.t()} | {:error, term()}
+          @doc "Builds an input Signal without target validation or execution."
+          @spec unquote(helper)(map(), keyword() | map()) ::
+                  {:ok, Jido.Signal.t()} | {:error, term()}
           def unquote(helper)(data \\ %{}, opts \\ []),
             do: Jido.Agent.input_signal(@agent_definition, unquote(route.path), data, opts)
+
+          @doc "Builds an input Signal or raises for an invalid Signal input. It does not validate or run the target."
+          @spec unquote(bang_helper)(map(), keyword() | map()) :: Jido.Signal.t() | no_return()
+          def unquote(bang_helper)(data \\ %{}, opts \\ []),
+            do: Jido.Agent.input_signal!(@agent_definition, unquote(route.path), data, opts)
         end
       end
 

@@ -16,7 +16,7 @@ defmodule Jido.Instance.Options do
 
   @doc false
   @spec validate(term()) :: {:ok, keyword()} | {:error, Error.ValidationError.t()}
-  def validate(opts) when is_list(opts) do
+  def validate(opts) do
     with true <- Keyword.keyword?(opts),
          :ok <- validate_known_keys(opts),
          :ok <- validate_name(Keyword.get(opts, :name)),
@@ -37,9 +37,6 @@ defmodule Jido.Instance.Options do
       {:error, _error} = error -> error
     end
   end
-
-  def validate(value),
-    do: invalid("Jido instance options must be a keyword list", %{value: value})
 
   @doc false
   @spec validate!(term()) :: keyword() | no_return()
@@ -62,7 +59,6 @@ defmodule Jido.Instance.Options do
   defp validate_name(name),
     do: invalid("Jido instance name must be a non-nil atom", %{name: name})
 
-  defp validate_otp_app(nil), do: :ok
   defp validate_otp_app(otp_app) when is_atom(otp_app), do: :ok
   defp validate_otp_app(otp_app), do: invalid("otp_app must be an atom", %{otp_app: otp_app})
 

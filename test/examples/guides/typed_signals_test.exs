@@ -1,5 +1,5 @@
-# Run the notebook examples against Jido's Action and Signal dependencies.
-filename = Path.expand("../../../guides/typed-signals.livemd", __DIR__)
+# Run the notebook examples against the current Jido package.
+filename = Path.expand("../../../guides/typed-signal-actions.livemd", __DIR__)
 
 ExUnit.CaptureLog.capture_log(fn ->
   ~r/```elixir\n(.*?)\n```/s
@@ -18,104 +18,48 @@ defmodule Jido.Examples.TypedSignalsTest do
   @moduletag :example
   @moduletag capture_log: true
 
-  defp request do
-    SignalExamples.AreaRequested.new!(%{"width" => 3, "height" => 4},
-      id: "boundary-request",
-      source: "/examples/tests",
-      subject: "rectangle-test",
-      time: "2026-01-01T00:00:00Z",
-      extensions: %{"causationid" => "original-cause"}
-    )
+  test "SignalAction builds and validates the routed Signal" do
+    assert {:ok, signal} = Typed.AddItem.new(%{sku: "tea"})
+    assert signal.type == "cart.item.add"
+    assert signal.source == "/guides/typed"
+    assert signal.data == %{quantity: 1, sku: "tea"}
+
+    assert {:error, issues} = Typed.AddItem.new(%{sku: 1})
+    assert Enum.any?(issues, &(&1.message == "invalid type: expected string"))
   end
 
-  test "input validation preserves the supplied native Signal" do
-    signal = request()
+  test "module route uses the SignalAction type and defaults" do
+    agent = Typed.Cart.instantiate!(id: "typed-guide-cart")
+    signal = Typed.Cart.add_item_signal!(%{sku: "tea", quantity: 2})
 
-    assert {:ok, %{signal: ^signal}} =
-             SignalExamples.CalculateArea.validate_params(%{signal: signal})
+    assert signal.type == Typed.AddItem.type()
+    assert {:ok, candidate, []} = Typed.Cart.cmd(agent, signal)
+    assert candidate.state.items == %{"tea" => 2}
   end
 
-  test "wrong envelope, type, dataschema, and data fail before the callback" do
-    signal = request()
+  test "typed reply gets a new identity and the request causation" do
+    request = Typed.PriceQuote.new!(%{items: %{"tea" => 3}})
 
-    for invalid <- [
-          %{signal | source: ""},
-          %{signal | type: "example.wrong"},
-          %{signal | dataschema: "urn:example:area:requested:2"},
-          %{signal | data: %{"width" => "3", "height" => 4}},
-          Jido.Signal.to_map(signal)
-        ] do
-      assert {:error, %Jido.Action.Error.InvalidInputError{}} =
-               Jido.Exec.run(SignalExamples.CalculateArea, %{signal: invalid})
-    end
+    assert {:ok, result} = Jido.Exec.run(Typed.PriceQuote, request.data)
+    assert {:ok, reply} = Typed.PriceQuote.reply(request, result)
+    assert reply.type == "cart.quote.ready"
+    assert reply.data == %{total_cents: 1_350}
+    assert reply.id != request.id
+    assert reply.extensions["jidocausationid"] == request.id
   end
 
-  test "output validation rejects the wrong completion definition or data" do
-    {:ok, %{signal: completion}} =
-      Jido.Exec.run(SignalExamples.CalculateArea, %{signal: request()})
-
-    for invalid <- [
-          %{completion | type: "example.wrong"},
-          %{completion | dataschema: "urn:example:area:completed:2"},
-          %{completion | data: %{"area" => "12"}}
-        ] do
-      assert {:error, %Jido.Action.Error.InvalidInputError{}} =
-               SignalExamples.CalculateArea.validate_output(%{signal: invalid})
-    end
-  end
-
-  test "the two-step Flow constructs its label request from the area result" do
-    assert {:ok, %{signal: label}} =
-             Jido.Exec.run(SignalExamples.AreaLabelFlow, %{signal: request()})
-
-    assert label.type == SignalExamples.LabelRequested.type()
-    assert label.data == %{"text" => "Area: 12"}
-    refute label.id == request().id
-  end
-
-  test "new Signals retain trace context and name their immediate cause" do
-    {:ok, signal} =
-      Jido.Signal.put_context(
-        request(),
-        "traceparent",
-        "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"
+  test "via route returns the owned Directive after pure evaluation" do
+    agent =
+      Typed.QuotingCart.instantiate!(
+        id: "typed-guide-quoting-cart",
+        state: %{items: %{"tea" => 3}}
       )
 
-    assert {:ok, %{signal: completion}} =
-             Jido.Exec.run(SignalExamples.CalculateArea, %{signal: signal})
+    request = Typed.PriceQuote.new!(%{items: agent.state.items})
 
-    assert {:ok, %{signal: label}} =
-             Jido.Exec.run(SignalExamples.PrepareLabel, %{signal: completion})
+    assert {:ok, accepted, [%Typed.RequestQuote{request: ^request}]} =
+             Typed.QuotingCart.cmd(agent, request)
 
-    assert Jido.Signal.get_context(completion, "causationid") == signal.id
-    assert Jido.Signal.get_context(label, "causationid") == completion.id
-
-    assert Jido.Signal.get_context(label, "traceparent") ==
-             Jido.Signal.get_context(signal, "traceparent")
-
-    assert completion.id != signal.id
-    assert label.id != completion.id
-  end
-
-  test "a domain failure returns an error and the consumer constructs its Signal" do
-    signal = %{request() | data: %{"width" => 101, "height" => 100}}
-
-    assert {:error, %Jido.Action.Error.ExecutionFailureError{details: %{code: :area_limit}}} =
-             Jido.Exec.run(SignalExamples.AreaLabelFlow, %{signal: signal})
-
-    failure =
-      SignalExamples.AreaFailed.new!(
-        %{"code" => "area_limit"},
-        SignalExamples.Boundary.child_options(signal)
-      )
-
-    assert Jido.Signal.get_context(failure, "causationid") == signal.id
-    assert failure.data == %{"code" => "area_limit"}
-  end
-
-  test "schema export exposes the current limit" do
-    exported = SignalExamples.CalculateArea.to_json()
-    assert exported["input_schema"]["properties"]["signal"] == %{}
-    assert exported["output_schema"]["properties"]["signal"] == %{}
+    assert accepted.state.quotes == 1
   end
 end

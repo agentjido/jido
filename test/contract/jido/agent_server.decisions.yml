@@ -1,0 +1,41 @@
+- id: agent-server-current-name
+  date: 2026-10-19
+  decision: Use jido.agent_server as the Covenant component for the current Jido.AgentServer runtime. Remove the obsolete prototype name and its stale mutation baseline.
+  driver: The production module, source path, test namespace, Signal types, configuration, and public API all use AgentServer.
+  approved_by: User request to use the AgentServer name
+
+- id: agent-server-future-split
+  date: 2026-10-19
+  decision: Keep the remaining obligations together during the name cleanup. Stable Ref identity and routing moved from I70 and I71 to jido.instance. Activation obligations later moved through the reviewed component refactor plan, leaving 85 transitional obligations. Move durable, Plugin runtime, effect, and composition obligations only through the same plan.
+  driver: A name cleanup must not silently change runtime ownership or public behavior.
+  approved_by: User request to refine the component before the boundary split
+
+- id: agent-server-activation-ownership
+  date: 2026-10-19
+  decision: Move I36, I38, and I69 to jido.agent_server.activation. Keep only I70 and I71 in jido.instance.
+  driver: Instance owns Ref construction, selection, and routing. The activation owns the selected instance registration, consumption of fixed instance defaults, and one live activation identity.
+  approved_by: Component hardening pass
+
+- id: agent-server-durable-migration
+  date: 2026-10-20
+  decision: Move I77 through I83, I91 through I93, I100, and I101 to jido.agent_server.durable. Keep I84 through I87 and I94 in the core control component.
+  driver: Durable state has storage authority, portability, and indeterminate-write rules that do not belong to the transient Turn state machine.
+  approved_by: Component hardening pass
+
+- id: agent-server-durable-turn-activation
+  date: 2026-10-20
+  decision: Activate jido.agent_server.durable_turn with new obligations and retire no root obligation IDs. Keep execution retry and user Worker hook policy in root obligations I27 and I28.
+  driver: The root contract had no complete durable Flow range to move, while retry and user-hook behavior remain root execution policy.
+  approved_by: Component hardening pass
+
+- id: agent-server-core-mutation-owner
+  date: 2026-10-20
+  decision: Target Jido.AgentServer.Core in the final jido.agent_server mutation profile. Keep Jido.AgentServer as the public API and shared gen_statem coordinator, covered through public contract tests and the focused profiles of each behavior owner.
+  driver: Mutating the shared coordinator repeats activation, effects, Plugin runtime, composition, durable state, and durable Flow behavior. Core now owns the request, admission, execution-policy, ownership, queue, terminal-summary, and failure-policy decisions that belong only to this component.
+  approved_by: Component hardening pass
+
+- id: agent-server-final-boundary
+  date: 2026-10-20
+  decision: Activate jido.agent_server as the final core component with 37 obligations and eight focused test files. Keep all moved behavior under its approved AgentServer subcomponent.
+  driver: The root contract now contains only core request, Turn, cancellation, failure-policy, control, and observation promises. Its full mutation profile has no surviving valid mutant.
+  approved_by: Component hardening pass

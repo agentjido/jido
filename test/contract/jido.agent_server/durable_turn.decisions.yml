@@ -1,0 +1,23 @@
+- id: durable-turn-boundary
+  date: 2026-10-20
+  decision: Use jido.agent_server.durable_turn for accepted Flow receipts, Runic workflow checkpoints, wait input receipts, wait resolution, and recovery of persistent Flow execution.
+  driver: Agent durability owns complete Agent records, while durable Turn coordination owns progress inside one accepted Flow Turn.
+  approved_by: User-approved Jido V3 component map
+
+- id: durable-turn-code-seam
+  date: 2026-10-20
+  decision: Keep the public API and gen_statem transitions in Jido.AgentServer. Keep Flow coordination in Jido.AgentServer.DurableTurn and move CheckpointStore and WaitHost under its namespace without compatibility delegates.
+  driver: The storage and wait modules have no external production callers and are implementation parts of durable Flow coordination.
+  approved_by: Component hardening pass
+
+- id: durable-turn-obligation-origin
+  date: 2026-10-20
+  decision: Define durable Turn obligations from current durable Flow, checkpoint, and wait behavior instead of moving credit from general AgentServer obligations.
+  driver: The root AgentServer contract did not have a complete durable Flow obligation range.
+  approved_by: Component hardening pass
+
+- id: durable-turn-mutation-profile
+  date: 2026-10-20
+  decision: Mutate DurableTurn, DurableTurn.CheckpointStore, and DurableTurn.WaitHost. Do not mutate the shared AgentServer state machine in this focused profile.
+  driver: The focused profile must test durable Flow decisions without overlapping the core Turn and durable Agent components.
+  approved_by: Component hardening pass

@@ -27,8 +27,9 @@ delays and schedule expressions do not change Agent or Plugin state.
 
 ## Limits
 
-This example does not prove durable occurrence recovery. That contract appears
-in `04_11_durable_scheduling`.
+The Scheduler restores future recurring timers from saved Agent state. It does
+not save, retry, or acknowledge the work that a timer emits. Use explicit
+application state or a durable Signal Bus when that work must survive loss.
 
 ## Files
 

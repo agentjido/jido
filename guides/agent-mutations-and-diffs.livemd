@@ -1,0 +1,308 @@
+# Mutations and Diffs
+
+## Overview
+
+An Agent's routes, child Agents, connections, and Plugins are data on its
+definition, and you can change them while it runs. Mutation Directives are
+ordered, validated edits to that data. `Jido.Agent.mutate/2` applies them to
+an Agent value and returns a `Jido.Agent.Diff` that lists what changed.
+
+```text
+{:ok, candidate, diff} =
+  Jido.Agent.mutate(agent, [Directive.route_add("greet.wave", Mut.Wave)])
+
+Enum.map(diff.routes.added, & &1.path)
+#=> ["greet.wave"]
+```
+
+When a handler returns the same Directives from a Turn, the new definition
+commits together with the new state. This Livebook edits a greeter Agent
+directly, reads the Diffs, then has the Agent add a route to itself from a
+Turn.
+
+## Install
+
+```elixir
+Mix.install([{:jido, "~> 3.0.0-beta.2"}])
+```
+
+## The Greeter
+
+The `learn` route returns a Mutation Directive instead of changing state.
+`Mut.Visits` is a Plugin you'll add later.
+
+```elixir
+alias Jido.Agent.Directive
+
+defmodule Mut.Greet do
+  use Jido.Action, name: "greet", schema: Zoi.object(%{name: Zoi.string()})
+
+  @impl true
+  def run(%{name: name}, %{agent_state: state}), do: {:ok, %{state | last: "hello " <> name}}
+end
+
+defmodule Mut.Wave do
+  use Jido.Action, name: "wave", schema: Zoi.object(%{})
+
+  @impl true
+  def run(_params, %{agent_state: state}), do: {:ok, %{state | last: "wave"}}
+end
+
+defmodule Mut.Visits do
+  use Jido.Plugin
+
+  @impl true
+  def state_spec(_opts), do: {:visits, Zoi.integer() |> Zoi.default(0)}
+
+  @impl true
+  def reduce(reduction, _opts), do: {:ok, reduction.plugin_state + 1}
+end
+
+defmodule Mut.Learn do
+  use Jido.Action, name: "learn", schema: Zoi.object(%{path: Zoi.string()})
+
+  @impl true
+  def run(%{path: path}, %{agent_state: state}) do
+    {:ok, state, [Jido.Agent.Directive.route_add(path, %{kind: :action, target: Mut.Wave})]}
+  end
+end
+
+defmodule Mut.Greeter do
+  use Jido.Agent, name: "greeter"
+
+  agent do
+    schema(Zoi.object(%{last: Zoi.string() |> Zoi.default("")}))
+  end
+
+  routes do
+    signal_source("/guides/mutations")
+    route "greet.hello", Mut.Greet, as: :hello
+    route "greet.learn", Mut.Learn, as: :learn
+  end
+end
+
+agent = Mut.Greeter.instantiate!(id: "greeter-1")
+
+Enum.map(agent.routes, & &1.path)
+```
+
+The result is `["greet.hello", "greet.learn"]`.
+
+## Add A Route
+
+`Jido.Agent.mutate/2` takes an Agent value and a list of Mutation Directives
+and returns `{:ok, candidate, diff}`.
+
+```elixir
+{:ok, waving, diff} =
+  Jido.Agent.mutate(agent, [Directive.route_add("greet.wave", %{kind: :action, target: Mut.Wave})])
+
+Enum.map(waving.routes, & &1.path)
+```
+
+The result is `["greet.hello", "greet.learn", "greet.wave"]`. New routes go at
+the end of the table.
+
+The handler uses the same map shape as `Jido.Agent.define/1`. You can also
+pass a module, as in `route_add("greet.wave", Mut.Wave)`, and Jido resolves
+whether it's an Action or a Flow.
+
+`mutate/2` runs nothing and leaves `agent` unchanged. It works on definitions
+and instances.
+
+## Read The Diff
+
+```elixir
+{Jido.Agent.Diff.changed?(diff, :routes), Jido.Agent.Diff.changed?(diff, :state),
+ Enum.map(diff.routes.added, & &1.path), diff.routes.order}
+```
+
+The result is:
+
+```text
+{true, false, ["greet.wave"],
+ %{before: ["greet.hello", "greet.learn"], after: ["greet.hello", "greet.learn", "greet.wave"]}}
+```
+
+A Diff has one entry for each collection: `routes`, `agents`, `connections`,
+and `extensions` (Plugins). Each entry has `added`, `removed`, `updated` (with
+`before` and `after`), and `order` on both sides. The Diff also records
+changed top-level `fields`, and `state` is either `%{before: _, after: _}` or
+`nil`.
+
+`changed?/2` checks one part. `empty?/1` checks all of them. A live Agent
+Server uses the Diff to decide which child Agents and Plugin runtimes to
+start, stop, or restart.
+
+## Update And Reorder
+
+Edits apply in list order. Each edit sees the result of the one before it.
+
+```elixir
+{:ok, tuned, diff} =
+  Jido.Agent.mutate(waving, [
+    Directive.route_update("greet.hello", %{defaults: %{name: "world"}}),
+    Directive.routes_reorder(["greet.wave", "greet.hello", "greet.learn"])
+  ])
+
+{Enum.map(tuned.routes, & &1.path),
+ Enum.map(diff.routes.updated, &{&1.before.defaults, &1.after.defaults})}
+```
+
+The result is `{["greet.wave", "greet.hello", "greet.learn"], [{%{}, %{name: "world"}}]}`.
+
+| Constructor | Effect |
+| --- | --- |
+| `route_update(path, changes)` | Merges `handler`, `as`, `defaults`, or `emits` into one route. |
+| `route_replace(path, handler, opts)` | Replaces the whole route. |
+| `routes_reorder(paths)` | Sets the order. Must name every path exactly once. |
+
+Order changes behavior, because the first matching route wins.
+
+## Batch Failures
+
+A batch applies completely or not at all. The error `path` points at the edit
+that failed.
+
+```elixir
+{:error, duplicate} = Jido.Agent.mutate(agent, [Directive.route_add("greet.hello", Mut.Wave)])
+
+{:error, missing} =
+  Jido.Agent.mutate(agent, [
+    Directive.route_add("greet.wave", Mut.Wave),
+    Directive.route_remove("nope.missing")
+  ])
+
+{{duplicate.code, duplicate.path}, {missing.code, missing.path}}
+```
+
+The result is `{{:already_exists, [:directives, 0]}, {:not_found, [:directives, 1]}}`.
+The second batch's valid first edit was not applied either. After all edits,
+Jido validates the complete candidate like any other Agent.
+
+## Edits That Cancel
+
+The Diff compares final values, not the edit history:
+
+```elixir
+{:ok, same, diff} =
+  Jido.Agent.mutate(agent, [
+    Directive.route_add("temp.route", Mut.Wave),
+    Directive.route_remove("temp.route")
+  ])
+
+{same == agent, Jido.Agent.Diff.empty?(diff)}
+```
+
+The result is `{true, true}`.
+
+## Plugin Edits
+
+Plugin edits are the only mutations that change state. Adding a Plugin with
+an owned field adds that field with its schema default:
+
+```elixir
+{:ok, counted, diff} = Jido.Agent.mutate(agent, [Directive.plugin_add(Mut.Visits)])
+
+{counted.state, Jido.Agent.Diff.changed?(diff, :extensions), diff.state}
+```
+
+The result is:
+
+```text
+{%{last: "", visits: 0}, true, %{before: %{last: ""}, after: %{last: "", visits: 0}}}
+```
+
+Removing that Plugin deletes its field, so Jido requires `state: :discard`:
+
+```elixir
+{:error, refused} = Jido.Agent.mutate(counted, [Directive.plugin_remove(Mut.Visits)])
+{:ok, removed, _diff} = Jido.Agent.mutate(counted, [Directive.plugin_remove(Mut.Visits, state: :discard)])
+
+{refused.code, removed.state}
+```
+
+The result is `{:plugin_state_discard_required, %{last: ""}}`.
+
+`plugin_add/3` accepts `initial:` to set the field's starting value.
+`plugin_configure/3` changes a Plugin's options. If the owned field's schema
+changes, pass `migrate: {module, function, args}` to convert the old value.
+
+## Mutate From A Turn
+
+A handler can return Mutation Directives with its state. Jido applies them to
+the candidate before commit.
+
+```elixir
+learn = Mut.Greeter.learn_signal!(%{path: "greet.wave"})
+{:ok, learned, directives} = Mut.Greeter.cmd(agent, learn)
+
+{Enum.map(learned.routes, & &1.path), Enum.map(directives, & &1.__struct__)}
+```
+
+The result is `{["greet.hello", "greet.learn", "greet.wave"], [Jido.Agent.Directive.RouteAdd]}`.
+
+The candidate now handles `greet.wave`. The original `agent` does not:
+
+```elixir
+wave = Jido.Signal.new!("greet.wave", %{}, source: "/guides/mutations")
+{:ok, waved, []} = Mut.Greeter.cmd(learned, wave)
+{:error, _no_route} = Mut.Greeter.cmd(agent, wave)
+
+waved.state
+```
+
+The result is `%{last: "wave"}`.
+
+## Run It Live
+
+On a live Agent Server, the new route and the state commit as one revision.
+
+```elixir
+{:ok, _jido} = Jido.start()
+{:ok, greeter} = Jido.start_agent(agent)
+
+{:ok, committed, _directives} = Jido.AgentServer.call(greeter, learn)
+{:ok, after_wave, []} = Jido.AgentServer.call(greeter, wave)
+
+{Enum.map(committed.routes, & &1.path), Jido.AgentServer.status(greeter).state_version,
+ after_wave.state}
+```
+
+The result is `{["greet.hello", "greet.learn", "greet.wave"], 2, %{last: "wave"}}`.
+Revision 1 added the route. Revision 2 used it.
+
+Route edits change data only. Topology and Plugin edits also change
+processes: child Agents start and stop, and Plugin runtimes restart. The
+Server does that after commit, from the Diff. See
+[Change Live Composition](change-live-composition.md).
+
+```elixir
+:ok = Jido.stop_agent(greeter)
+:ok = Jido.stop()
+```
+
+## Directive Reference
+
+All constructors are in `Jido.Agent.Directive`:
+
+| Target | Constructors |
+| --- | --- |
+| Routes | `route_add/3`, `route_update/2`, `route_replace/3`, `route_remove/1`, `routes_reorder/1`, `routes_set/1` |
+| Child Agents | `agent_add/3`, `agent_update/2`, `agent_replace/3`, `agent_remove/1` |
+| Connections | `connection_add/2`, `connection_update/2`, `connection_replace/2`, `connection_remove/2` |
+| Whole topology | `topology_set/1` |
+| Plugins | `plugin_add/3`, `plugin_configure/3`, `plugin_remove/2` |
+
+Routes are keyed by path, child Agents by name, and connections by
+`{from, to, path}`. Add fails on an existing key. Update, replace, and remove
+fail on a missing key. [Nested Agents](declare-agent-topology.livemd) and
+[Connect Agent Outputs](connect-agent-outputs.livemd) cover the topology
+entries.
+
+## Next
+
+- [Documents and Views](agent-documents-and-views.md) stores and shares
+  definitions as JSON.
+- [Composition Vocabulary](composition-vocabulary.md) defines the terms for
+  Agents built from Agents.

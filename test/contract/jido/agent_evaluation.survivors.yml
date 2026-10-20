@@ -1,0 +1,167 @@
+- at: lib/jido/agent/contract.ex:42:19
+  operator: element_removal
+  mutation: "`kind: :emit` → `(removed)`"
+  sort: equivalent
+  reason: The only caller enters this private clause after directives/2 has already matched kind as emit. Data.fields/2 also checks that no other fields are present.
+
+- at: lib/jido/agent/contract.ex:48:19
+  operator: element_removal
+  mutation: "`kind: :emit` → `(removed)`"
+  sort: equivalent
+  reason: The only caller enters this private clause after directives/2 has already matched kind as emit. Data.fields/2 also checks that no other fields are present.
+
+- at: lib/jido/agent/contract.ex:58:44
+  operator: string_empty
+  mutation: "`\"Expected a registered emission directive\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured error code and path. It does not fix human-readable error prose.
+
+- at: lib/jido/agent/contract.ex:66:41
+  operator: string_empty
+  mutation: "`\"Invalid Signal envelope\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured error code, path, and issues. It does not fix human-readable error prose.
+
+- at: lib/jido/agent/contract.ex:83:20
+  operator: string_empty
+  mutation: "`\"Signal type is outside the route contract\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured error code, path, Signal type, and route. It does not fix human-readable error prose.
+
+- at: lib/jido/agent/plugin.ex:32:50
+  operator: return_nil
+  mutation: "`compose_schema_from_specs(schema, [])` → `nil`"
+  sort: unpromised
+  reason: This fallback checks an Agent state schema during authoring. The shared module contains authoring support, but jido.agent_evaluation does not own invalid authoring schema behavior.
+
+- at: lib/jido/agent/plugin.ex:52:17
+  operator: return_nil
+  mutation: "`PluginError.validation(\"Agent domain schema must be a field…` → `nil`"
+  sort: unpromised
+  reason: This branch rejects an invalid Agent state schema during authoring. It is outside the evaluation contract.
+
+- at: lib/jido/agent/plugin.ex:52:28
+  operator: string_empty
+  mutation: "`\"Agent domain schema must be a field-based Zoi object\"` → `\"\"`"
+  sort: log-only
+  reason: Human-readable error prose is not part of the evaluation contract.
+
+- at: lib/jido/agent/plugin.ex:53:7
+  operator: element_removal
+  mutation: "`schema: schema` → `(removed)`"
+  sort: unpromised
+  reason: Rejected authoring schema diagnostics belong to jido.agent_model_and_authoring, not jido.agent_evaluation.
+
+- at: lib/jido/agent/plugin.ex:63:13
+  operator: clause_removal
+  mutation: "`fn _spec ->` → `(removed)`"
+  sort: unpromised
+  reason: Filtering normalized Plugin facets that have no Agent facet is shared normalization support. The evaluation contract starts with the Agent Plugin specifications selected by this function.
+
+- at: lib/jido/agent/plugin.ex:112:9
+  operator: string_empty
+  mutation: "`\"Agent Plugin preparation failed\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the callback, Plugin identity, and retained cause. It does not fix human-readable error prose.
+
+- at: lib/jido/agent/plugin.ex:127:11
+  operator: string_empty
+  mutation: "`\"Agent Plugin prepare/2 returned a non-portable input\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the non-portable code and exact prepared-input path. It does not fix human-readable error prose.
+
+- at: lib/jido/agent/plugin.ex:139:7
+  operator: string_empty
+  mutation: "`\"Agent Plugin prepare/2 returned an invalid result\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the invalid callback code and result. It does not fix human-readable error prose.
+
+- at: lib/jido/agent/plugin.ex:156:12
+  operator: clause_removal
+  mutation: "`case spec ->` → `(removed)`"
+  sort: unpromised
+  reason: Plugin state-key conflict detection is Agent definition authoring behavior. It is outside the evaluation contract.
+
+- at: lib/jido/agent/plugin.ex:157:32
+  operator: string_empty
+  mutation: "`\"Plugin-owned Agent state key conflicts with the domain schema\"` → `\"\"`"
+  sort: log-only
+  reason: Human-readable authoring error prose is not part of the evaluation contract.
+
+- at: lib/jido/agent/plugin.ex:158:11
+  operator: element_removal
+  mutation: "`plugin: spec.package` → `(removed)`"
+  sort: unpromised
+  reason: Plugin state-key conflict diagnostics belong to jido.agent_model_and_authoring, not jido.agent_evaluation.
+
+- at: lib/jido/agent/plugin.ex:159:11
+  operator: element_removal
+  mutation: "`state_key: spec.state_key` → `(removed)`"
+  sort: unpromised
+  reason: Plugin state-key conflict diagnostics belong to jido.agent_model_and_authoring, not jido.agent_evaluation.
+
+- at: lib/jido/agent/plugin/pipeline.ex:60:10
+  operator: string_empty
+  mutation: "`\"Agent executable changed Plugin-owned state\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the stable error code and changed keys. It does not fix human-readable error prose.
+
+- at: lib/jido/agent/plugin/pipeline.ex:79:34
+  operator: string_empty
+  mutation: "`\"Agent executable returned an invalid Directive\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the callback code and rejected Directive. It does not fix human-readable error prose.
+
+- at: lib/jido/agent/plugin/pipeline.ex:103:35
+  operator: string_empty
+  mutation: "`\"Agent Directive has no owner\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the rejected Directive. It does not fix human-readable error prose.
+
+- at: lib/jido/agent/plugin/pipeline.ex:172:9
+  operator: string_empty
+  mutation: "`\"Agent Plugin reduction failed\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the callback, Plugin identity, and retained cause. It does not fix human-readable error prose.
+
+- at: lib/jido/agent/plugin/pipeline.ex:187:11
+  operator: string_empty
+  mutation: "`\"Plugin-owned Agent state field is invalid\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the invalid callback code and schema issues. It does not fix human-readable error prose.
+
+- at: lib/jido/agent/plugin/pipeline.ex:199:7
+  operator: string_empty
+  mutation: "`\"Agent Plugin reduce/2 returned an invalid result\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the invalid callback code and result. It does not fix human-readable error prose.
+
+- at: lib/jido/agent/runner.ex:230:28
+  operator: string_empty
+  mutation: "`\"Agent executable returned an invalid result\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the executable callback code and rejected result. It does not fix human-readable error prose.
+
+- at: lib/jido/agent/runner.ex:242:33
+  operator: string_empty
+  mutation: "`\"Agent Signal data must be a map, keyword list, or nil\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the invalid field and exact Signal input. It does not fix human-readable error prose.
+
+- at: lib/jido/agent/runner.ex:251:28
+  operator: string_empty
+  mutation: "`\"Agent executable output must be a plain state map\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the executable callback code and rejected output. It does not fix human-readable error prose.
+
+- at: lib/jido/agent/turn/signal_handler.ex:16:17
+  operator: element_removal
+  mutation: "`kind: :transform` → `(removed)`"
+  sort: equivalent
+  reason: Route normalization permits this target tuple only for a transform handler. Action and Flow handlers do not use SignalHandler, and pass-through handlers have no target.
+
+- at: lib/jido/agent/turn/signal_handler.ex:28:11
+  operator: string_empty
+  mutation: "`\"Transform must return {:ok, Signal} or {:error, reason}\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the invalid-result code. It does not fix human-readable error prose.

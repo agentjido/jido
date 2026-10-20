@@ -5,28 +5,24 @@ Code.require_file("runtime_cases.exs", __DIR__)
 Code.require_file("agent_server_cases.exs", __DIR__)
 Code.require_file("data_cases.exs", __DIR__)
 Code.require_file("edge_cases.exs", __DIR__)
-Code.require_file("merge_cases.exs", __DIR__)
 Code.require_file("plugin_cases.exs", __DIR__)
 Code.require_file("persistence_cases.exs", __DIR__)
-Code.require_file("scheduler_cases.exs", __DIR__)
 Code.require_file("codec_cases.exs", __DIR__)
 Code.require_file("authoring_cases.exs", __DIR__)
 
 defmodule JidoCoreBench.Suite do
   @moduledoc false
   alias JidoCoreBench.{
-    Fixtures,
-    Measure,
-    Report,
-    RuntimeCases,
+    AuthoringCases,
+    CodecCases,
     DataCases,
     EdgeCases,
-    MergeCases,
-    PluginCases,
+    Fixtures,
+    Measure,
     PersistenceCases,
-    SchedulerCases,
-    CodecCases,
-    AuthoringCases
+    PluginCases,
+    Report,
+    RuntimeCases
   }
 
   def run(profile, filter \\ nil) do
@@ -114,10 +110,8 @@ defmodule JidoCoreBench.Suite do
       RuntimeCases.workloads(s.payloads) ++
       DataCases.workloads() ++
       EdgeCases.workloads(s.sizes) ++
-      MergeCases.workloads() ++
       PluginCases.workloads() ++
       PersistenceCases.workloads() ++
-      SchedulerCases.workloads(s.payloads) ++
       CodecCases.workloads() ++
       AuthoringCases.workloads(s.sizes)
   end

@@ -5,7 +5,7 @@ defmodule Jido.AgentAuthoringTest do
   use ExUnit.Case, async: true
   @moduletag :authoring
   alias Jido.Agent
-  alias Jido.Agent.{Contract, Error, Route, Topology}
+  alias Jido.Agent.{Error, Route, Topology}
   alias JidoTest.ComposableAgent.{Action, Flow, Minimal, Named, Team, Worker}
   alias JidoTest.ComposableAgent.Compiler
 
@@ -299,7 +299,6 @@ defmodule Jido.AgentAuthoringTest do
     assert {:error, %Error{code: :unmatched_input}} = Route.select(definition, "other.request")
     reverse = Agent.define!(%{name: "ordered", routes: [exact, broad]})
     assert {:ok, ^exact} = Route.select(reverse, "work.request")
-    assert {:error, :failed} = Contract.result(definition, broad, {:error, :failed})
     assert {:ok, ^broad} = Route.select(definition, "work.request")
 
     assert {:error, %Error{code: :unmatched_input}} =
@@ -428,89 +427,6 @@ defmodule Jido.AgentAuthoringTest do
     end
   end
 
-  test "result contract validates the whole batch and never invents an emission" do
-    definition = Named.definition()
-    {:ok, action} = Route.select(definition, "work.request")
-    state = %{value: "complete"}
-    request = Jido.Agent.Directive.emit("work.done", %{value: "done"})
-
-    assert {:ok, %{state: ^state, emissions: []}} =
-             Contract.result(definition, action, {:ok, state})
-
-    assert {:ok, %{state: ^state, emissions: [^request]}} =
-             Contract.result(definition, action, {:ok, state, [request]})
-
-    assert {:error, %Error{code: :undeclared_emission}} =
-             Contract.result(
-               definition,
-               action,
-               {:ok, state, [request, Jido.Agent.Directive.emit("other.type", %{})]}
-             )
-
-    assert {:error, %Error{}} = Contract.result(definition, action, {:ok, %{}, [request]})
-
-    assert {:error, %Error{}} =
-             Contract.result(definition, action, {:ok, state, [request | :invalid]})
-
-    assert {:error, %Error{}} =
-             Contract.result(definition, action, {:ok, state, [%{kind: :unknown}]})
-
-    assert {:error, %Error{path: [:directives, 0, :signal_source]}} =
-             Contract.result(%{definition | signal_source: nil}, action, {:ok, state, [request]})
-
-    signal = Jido.Signal.new!("work.done", %{}, source: "/supplied")
-
-    assert {:ok, %{emissions: [%{signal: ^signal}]}} =
-             Contract.result(
-               %{definition | signal_source: nil},
-               action,
-               {:ok, state, [Jido.Agent.Directive.emit(signal)]}
-             )
-
-    {:ok, flow} = Route.select(definition, "plan.request")
-
-    assert {:error, %Error{code: :undeclared_emission}} =
-             Contract.result(definition, flow, {:ok, state, [request]})
-
-    unrestricted = %{action | emits: nil}
-
-    assert {:ok, _} =
-             Contract.result(
-               definition,
-               unrestricted,
-               {:ok, state, [Jido.Agent.Directive.emit("other.type", %{})]}
-             )
-
-    several = %{action | emits: ["work.done", "other.type"]}
-
-    assert {:ok, _} =
-             Contract.result(
-               definition,
-               several,
-               {:ok, state, [request, Jido.Agent.Directive.emit("other.type", %{})]}
-             )
-  end
-
-  test "pass-through is unchanged and transforms accept one Signal result only" do
-    {:ok, pass} = Route.select(Named.definition(), "pass.request")
-    signal = Jido.Signal.new!("pass.request", %{value: "original"}, source: "/caller")
-
-    assert Contract.pass_through(pass, signal) ==
-             {:ok, %{emissions: [Jido.Agent.Directive.emit(signal)]}}
-
-    {:ok, transform} = Route.select(Team.definition(), "external.request")
-    output = %{signal | type: "work.request"}
-
-    assert Contract.result(Team.definition(), transform, {:ok, output}) ==
-             {:ok, %{emissions: [Jido.Agent.Directive.emit(output)]}}
-
-    assert {:error, %Error{code: :invalid_result}} =
-             Contract.result(Team.definition(), transform, {:ok, %{value: "state"}})
-
-    assert {:error, %Error{code: :invalid_result}} =
-             Contract.result(Team.definition(), transform, {:ok, output, []})
-  end
-
   test "topology binds copied inputs and counts without creating another composition unit" do
     definition = Team.definition()
 
@@ -624,13 +540,6 @@ defmodule Jido.AgentAuthoringTest do
              composed(%{agents: [member()], connections: [edge("work.done", :worker, :root)]})
 
     assert {:ok, [%{status: :compatible}]} = Topology.checks(definition)
-
-    assert {:ok, %{emissions: []}} =
-             Contract.result(
-               definition,
-               hd(Enum.drop(definition.routes, 1)),
-               {:ok, %{value: "complete", workers: 2}}
-             )
   end
 
   test "a team replaces a leaf through the same routes and explicit root outputs" do

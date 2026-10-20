@@ -1,0 +1,23 @@
+- id: durable-boundary
+  date: 2026-10-20
+  decision: Use jido.agent_server.durable for persistence-backed AgentServer create, restore, commit, hibernate, snapshot, and upgrade coordination.
+  driver: Durable Agent state has different authority and failure rules from the core transient Turn state machine and from durable Flow progress.
+  approved_by: User-approved Jido V3 component map
+
+- id: durable-code-seam
+  date: 2026-10-20
+  decision: Keep public APIs and gen_statem transitions in Jido.AgentServer. Move durable validation, startup, save, result, snapshot, upgrade, and topology identity decisions into Jido.AgentServer.Durable.
+  driver: One internal owner can hold durable decisions without a second state machine or a new public server type.
+  approved_by: Component hardening pass
+
+- id: durable-obligation-migration
+  date: 2026-10-20
+  decision: Replace AgentServer I77 through I83, I91 through I93, I100, and I101 with durable I1 through I12. Composition I5 through I7 retain target validation and resource reconciliation. Activation retains memory-only checkpoints and default idle-stop behavior.
+  driver: Each durable promise needs one final owner without taking record formats, local activation state, or Flow progress from their owners.
+  approved_by: Component hardening pass
+
+- id: durable-mutation-profile
+  date: 2026-10-20
+  decision: Mutate only Jido.AgentServer.Durable in the focused profile. Keep Jido.AgentServer, Jido.Persistence, the activation Supervisor, and DurableTurn out of this profile.
+  driver: The focused profile must test extracted durable decisions without overlapping core, persistence, activation, or durable Flow owners.
+  approved_by: Component hardening pass

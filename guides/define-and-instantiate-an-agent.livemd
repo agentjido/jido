@@ -1,0 +1,266 @@
+# Define an Agent
+
+## Overview
+
+An Agent definition fixes the shape of an Agent's state before any Signal
+arrives. Jido checks it when the module compiles, and checks every instance
+against it, so a running Agent never holds state its schema doesn't allow.
+
+By the end of this Livebook you'll have a profile Agent that does this:
+
+```text
+Define.Profile.instantiate!(id: "profile-1").state
+#=> %{name: "Anonymous", tags: [], visits: 0}
+```
+
+You'll declare it with the DSL, create instances, update and validate them,
+then build the same kind of Agent from a plain map.
+
+## Install
+
+```elixir
+Mix.install([{:jido, "~> 3.0.0-beta.2"}])
+```
+
+## Supporting Modules
+
+The profile needs one Action and one Plugin. The Plugin owns a `visits` field
+and adds 1 on every successful Turn. It's here to show how Plugin fields join
+the state schema. [Stateful Plugins](write-a-stateful-plugin.livemd) covers
+writing one.
+
+```elixir
+defmodule Define.Visits do
+  use Jido.Plugin
+
+  @impl true
+  def state_spec(_opts), do: {:visits, Zoi.integer() |> Zoi.default(0)}
+
+  @impl true
+  def reduce(reduction, _opts), do: {:ok, reduction.plugin_state + 1}
+end
+
+defmodule Define.Rename do
+  use Jido.Action,
+    name: "rename",
+    schema: Zoi.object(%{name: Zoi.string()})
+
+  @impl true
+  def run(%{name: name}, %{agent_state: state}) do
+    {:ok, %{state | name: String.trim(name)}}
+  end
+end
+```
+
+## Declare The Agent
+
+```elixir
+defmodule Define.Profile do
+  use Jido.Agent,
+    name: "profile",
+    description: "Owns one display profile",
+    vsn: 2,
+    extensions: [Define.Visits]
+
+  agent do
+    schema(
+      Zoi.object(%{
+        name: Zoi.string() |> Zoi.default("Anonymous"),
+        tags: Zoi.list(Zoi.string()) |> Zoi.default([])
+      })
+    )
+
+    metadata(%{domain: "profiles"})
+  end
+
+  routes do
+    signal_source("/guides/define")
+    route "profile.rename", Define.Rename, as: :rename
+  end
+end
+```
+
+| Option | Where | Rule |
+| --- | --- | --- |
+| `name` | `use Jido.Agent` | Required non-empty string. |
+| `description` | `use Jido.Agent` | Optional string. |
+| `vsn` | `use Jido.Agent` | Positive integer. Default `1`. |
+| `schema` | `agent` | A static Zoi object for domain state. |
+| `extensions` | `use Jido.Agent` | Plugin and Extension modules with no options. |
+| `metadata` | `agent` | A plain map of static data. |
+
+A bad route, schema, or Plugin fails the build.
+
+In a project source file, you can also write `plugin(Define.Visits)` inside
+the `agent` block, and pass options with `config:`. That form finds Plugins by
+reading the module's source file. A Livebook cell has no source file, so this
+Livebook uses `extensions:`.
+
+## The Definition
+
+`definition/0` returns the reusable blueprint. A definition has `id: nil`
+and `state: nil`.
+
+```elixir
+definition = Define.Profile.definition()
+
+{definition.name, definition.vsn, definition.metadata, definition.id,
+ Jido.Agent.definition?(definition)}
+```
+
+The result is `{"profile", 2, %{domain: "profiles"}, nil, true}`.
+
+## Create An Instance
+
+`instantiate!/1` adds an `id` and builds state from the schema defaults.
+
+```elixir
+agent = Define.Profile.instantiate!(id: "profile-1")
+
+{agent.state, Jido.Agent.instance?(agent)}
+```
+
+The result is `{%{name: "Anonymous", tags: [], visits: 0}, true}`. The
+`visits` field comes from the Plugin, not from your schema.
+
+Pass `state:` to set initial values. Fields you leave out get their defaults:
+
+```elixir
+agent2 = Define.Profile.instantiate!(id: "profile-2", state: %{name: "Ada", tags: ["admin"]})
+
+agent2.state
+```
+
+The result is `%{name: "Ada", tags: ["admin"], visits: 0}`.
+
+`instantiate/1` returns `{:ok, agent}` or `{:error, %Jido.Agent.Error{}}`.
+It rejects wrong types, unknown keys, and a missing `id`:
+
+```elixir
+{:error, wrong_type} = Define.Profile.instantiate(id: "p3", state: %{name: 42})
+{:error, unknown_key} = Define.Profile.instantiate(id: "p3", state: %{nickname: "x"})
+{:error, no_id} = Define.Profile.instantiate(state: %{})
+
+{wrong_type.code, unknown_key.code, {no_id.path, Exception.message(no_id)}}
+```
+
+The result is `{:invalid_state, :invalid_state, {[:id], "Expected a nonempty string"}}`.
+Each `Jido.Agent.Error` carries a `code`, a `path` to the bad field, and
+`details`.
+
+## Plugin-Owned Fields
+
+Jido composes each Plugin's field into the state schema:
+
+```elixir
+Define.Profile.schema().fields |> Keyword.keys()
+```
+
+The result is `[:name, :tags, :visits]`.
+
+Your Actions can read `visits`. Only the Plugin can change it. Run one rename:
+
+```elixir
+signal = Define.Profile.rename_signal!(%{name: " Grace "})
+{:ok, renamed, []} = Define.Profile.cmd(agent, signal)
+
+renamed.state
+```
+
+The result is `%{name: "Grace", tags: [], visits: 1}`. The Action trimmed the
+name. The Plugin counted the Turn.
+
+## Update With set/2
+
+`Jido.Agent.set/2` replaces top-level domain fields outside a Turn and
+validates the complete result. Use it in setup code and tests.
+
+```elixir
+{:ok, updated} = Jido.Agent.set(agent, name: "Linus")
+{:error, plugin_field} = Jido.Agent.set(agent, visits: 9)
+
+{updated.state.name, Exception.message(plugin_field)}
+```
+
+The result is `{"Linus", "Agent.set/2 accepts only domain state keys"}`.
+
+A nested map you pass replaces the old map. To keep nested values, merge
+first: `Jido.Agent.set(agent, config: Map.merge(agent.state.config, %{enabled: true}))`.
+
+## Validate A Value
+
+`definition?/1` and `instance?/1` check shape only. `Jido.Agent.validate/1`
+checks fields, routes, Plugins, and complete state.
+
+```elixir
+broken = %{agent | state: %{name: "x"}}
+{:error, error} = Jido.Agent.validate(broken)
+
+{Jido.Agent.validate(agent) |> elem(0), Jido.Agent.instance?(broken), error.code}
+```
+
+The result is `{:ok, true, :incomplete_state}`. `broken` has instance shape
+but is not a valid instance. Call `validate/1` on any `%Jido.Agent{}` you
+build by hand.
+
+## Define From A Map
+
+`Jido.Agent.define/1` builds a definition from a plain map at runtime. It runs
+the same validation as the DSL. It accepts a map, not a keyword list.
+
+```elixir
+{:ok, data_definition} =
+  Jido.Agent.define(%{
+    name: "profile_data",
+    schema: Zoi.object(%{name: Zoi.string() |> Zoi.default("Anonymous")}),
+    signal_source: "/guides/define",
+    routes: [%{path: "profile.rename", handler: %{kind: :action, target: Define.Rename}}]
+  })
+
+{:ok, data_agent} = Jido.Agent.instantiate(data_definition, id: "data-1")
+signal = Jido.Signal.new!("profile.rename", %{name: "Hopper"}, source: "/guides/define")
+{:ok, data_candidate, []} = Jido.Agent.cmd(data_agent, signal)
+
+{data_definition.module, data_candidate.state}
+```
+
+The result is `{nil, %{name: "Hopper"}}`. A map definition has no module, so
+it has no generated helpers such as `rename_signal/2`. Build Signals with
+`Jido.Signal.new!/3`. To store definitions as JSON, see
+[Documents and Views](agent-documents-and-views.md).
+
+## Schema Rules
+
+State schemas validate values. They never convert them. Metadata must be
+static data.
+
+```elixir
+{:error, coerced} =
+  Jido.Agent.define(%{name: "coerced", schema: Zoi.object(%{n: Zoi.integer(coerce: true)})})
+
+{:error, live} = Jido.Agent.define(%{name: "live", metadata: %{owner: self()}})
+
+{Exception.message(coerced), Exception.message(live)}
+```
+
+The result is
+`{"State schemas cannot convert values", "Authoring data cannot contain live values"}`.
+
+Defaults and refinements such as `Zoi.min/2` are allowed. Coercion and
+transforms are not, and neither are PIDs, functions, or references in
+metadata. This keeps every definition portable data.
+
+## Summary
+
+- One `%Jido.Agent{}` struct has two valid forms: a definition (`id` and
+  `state` are `nil`) or an instance (both set and valid).
+- The DSL and `Jido.Agent.define/1` produce the same validated definition.
+- `instantiate/2` fills defaults and rejects wrong types, unknown keys, and a
+  missing `id`.
+- Plugins add owned fields. Only the owning Plugin changes them.
+- `set/2` updates domain fields. `validate/1` checks a whole value.
+
+## Next
+
+[Routes and Handlers](build-agent-routes.livemd) shows how to map each
+Signal type to work.

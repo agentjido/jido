@@ -1,0 +1,17 @@
+- id: generic-plugin-boundary
+  date: 2026-10-19
+  decision: Use jido.plugin only for Plugin declaration, metadata, callback shapes, context values, Codec behavior, and normalization faults.
+  driver: Callback execution order, live process ownership, persistence conversion, and bundled Plugin behavior have separate approved owners.
+  approved_by: User-approved Jido V3 component map
+
+- id: generic-plugin-fixtures
+  date: 2026-10-19
+  decision: Use only local generic test Plugins in the jido.plugin contract.
+  driver: Audit, Bus, Heartbeat, Scheduler, and SensorManager must be able to change without changing the generic Plugin contract.
+  approved_by: Generic Plugin extraction
+
+- id: generic-plugin-mutation-profile
+  date: 2026-10-19
+  decision: Mutate Jido.Plugin, Manifest, Normalizer, Codec, Input, and Error. Keep Spec and Zoi-backed context structs outside the mutation profile as data declarations.
+  driver: The selected modules contain generic behavior. The excluded modules are data shapes that focused contract tests validate directly.
+  approved_by: Generic Plugin extraction

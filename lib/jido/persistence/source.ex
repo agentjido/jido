@@ -7,7 +7,6 @@ defmodule Jido.Persistence.Source do
 
   def resolve_config(:inherit, jido), do: resolve_instance_config(jido)
   def resolve_config(nil, _jido), do: {:ok, nil}
-  def resolve_config(false, _jido), do: {:ok, nil}
 
   def resolve_config(config, _jido) do
     config

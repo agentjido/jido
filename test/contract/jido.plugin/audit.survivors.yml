@@ -1,0 +1,53 @@
+- at: lib/jido/plugin/audit.ex:56:14
+  operator: comparison_swap
+  mutation: "`<=` → `<`"
+  sort: equivalent
+  reason: At equality the alternate branch drops zero records and returns the same state value. The current branch avoids that unnecessary list operation.
+
+- at: lib/jido/plugin/audit.ex:68:25
+  operator: comparison_swap
+  mutation: "`>=` → `>`"
+  sort: equivalent
+  reason: When the incoming count equals the limit, both branches return the complete incoming list and retain no old record. The current branch avoids reading old state.
+
+- at: lib/jido/plugin/audit/record.ex:7:43
+  operator: string_empty
+  mutation: "`\"Stable audit record identifier\"` → `\"\"`"
+  sort: unpromised
+  reason: The contract fixes the Record field and validation rule. It does not fix schema description prose.
+
+- at: lib/jido/plugin/audit/record.ex:8:44
+  operator: string_empty
+  mutation: "`\"Record time in Unix milliseconds\"` → `\"\"`"
+  sort: unpromised
+  reason: The contract fixes the Record field and validation rule. It does not fix schema description prose.
+
+- at: lib/jido/plugin/audit/record.ex:9:43
+  operator: string_empty
+  mutation: "`\"Domain event\"` → `\"\"`"
+  sort: unpromised
+  reason: The contract fixes the Record field and validation rule. It does not fix schema description prose.
+
+- at: lib/jido/plugin/audit/record.ex:10:46
+  operator: string_empty
+  mutation: "`\"Domain outcome\"` → `\"\"`"
+  sort: unpromised
+  reason: The contract fixes the Record field and validation rule. It does not fix schema description prose.
+
+- at: lib/jido/plugin/audit/record.ex:11:46
+  operator: string_empty
+  mutation: "`\"Portable record metadata\"` → `\"\"`"
+  sort: unpromised
+  reason: The contract fixes the Record field and validation rule. It does not fix schema description prose.
+
+- at: lib/jido/plugin/audit/record.ex:29:35
+  operator: string_empty
+  mutation: "`\"Audit record must contain portable data\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured configuration error and rejected path. It does not fix human-readable error prose.
+
+- at: lib/jido/plugin/audit/record.ex:33:17
+  operator: string_empty
+  mutation: "`\"Audit record id must be a UUID7\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured configuration error and rejected ID. It does not fix human-readable error prose.

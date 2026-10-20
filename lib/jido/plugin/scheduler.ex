@@ -3,12 +3,13 @@ defmodule Jido.Plugin.Scheduler do
   Adds delayed and recurring Signals to an Agent.
 
   The Plugin owns the `:scheduler` part of Agent state. This state contains the
-  durable recurring schedule definitions. Its supervised runtime owns timers,
-  job references, and other process values.
+  recurring schedule definitions. Its supervised runtime owns timers and job
+  references.
 
   A delayed Signal from `schedule/2` is a runtime-only one-shot. It is not in
   Agent state or in a checkpoint. A Scheduler, Agent, or VM restart can discard
-  it. Use a recurring durable schedule when work must survive a restart.
+  it. Recurring definitions can restore future timers when Agent state is
+  restored. Slots that pass while the runtime is offline are not replayed.
 
   Pass `generation: integer` (0 through 2,147,483,647) to `cron/4` to add logical occurrence
   metadata. Use a new generation when replacing or recreating a schedule, and
@@ -21,31 +22,6 @@ defmodule Jido.Plugin.Scheduler do
 
       {:ok, occurrence} = Jido.Plugin.Scheduler.occurrence(context.signal)
       occurrence.id
-
-  Add `delivery: :durable` to save one pending occurrence per job before its
-  business work. Declare the enqueue route in the Agent:
-
-      route "jido.scheduler.enqueue", Jido.Plugin.Scheduler.Enqueue
-
-  Return `acknowledge(occurrence.id)` with the business Action's next state.
-  That commit removes pending work. Failed Turns retain it for retry. Completed,
-  cancelled, and replaced durable ticks are rejected before execution.
-
-  Durable delivery needs Agent persistence for recovery after Agent or VM loss.
-  The fixed policy skips slots while a job is pending and slots missed offline.
-  The `jido.scheduler.enqueue` route is a trusted internal control route. It does
-  not authenticate the Signal source. Do not expose this Signal type to
-  untrusted ingress. Valid control Signals for cancelled or replaced generations
-  are safe no-ops. Malformed control Signals still fail validation.
-
-  `:delivery_interval` sets the delay between pending-work attempts in milliseconds
-  (default 100; positive integer up to 4,294,967,295). One job is tried per attempt.
-  Activation and newly queued work can start an immediate attempt. This option
-  changes runtime cadence, not occurrence identity, acknowledgement, or skip policy.
-  `:delivery_timeout` sets each state-read and delivery call timeout (default
-  5,000 milliseconds; positive integer up to 2,147,483,597). External work can
-  repeat before acknowledgement, so its receiver must use the occurrence ID to
-  handle duplicates.
 
   `:retry_delay_ms` sets the delay after a recurring job cannot start (default
   1,000; positive integer up to 4,294,967,295). A valid finite cron expression
@@ -84,10 +60,8 @@ defmodule Jido.Plugin.Scheduler do
   alias Jido.PortableTerm
 
   alias Jido.Plugin.Scheduler.{
-    Acknowledge,
     Cancel,
     Cron,
-    Durable,
     Occurrence,
     Schedule
   }
@@ -103,27 +77,22 @@ defmodule Jido.Plugin.Scheduler do
   @doc "Creates one recurring Signal Directive."
   @spec cron(term(), String.t(), Signal.t(), keyword()) :: Cron.t()
   def cron(job_id, cron, signal, opts \\ []) do
+    if Keyword.has_key?(opts, :delivery) do
+      raise ArgumentError, "Scheduler delivery is not supported"
+    end
+
     %Cron{
       job_id: job_id,
       cron: cron,
       signal: signal,
       timezone: Keyword.get(opts, :timezone),
-      generation: Keyword.get(opts, :generation),
-      delivery: Keyword.get(opts, :delivery, :best_effort)
+      generation: Keyword.get(opts, :generation)
     }
   end
 
   @doc "Reads logical occurrence metadata from a recurring tick."
   @spec occurrence(Signal.t()) :: {:ok, Occurrence.t()} | {:error, term()}
   defdelegate occurrence(signal), to: Occurrence, as: :from_signal
-
-  @doc "Checks that a durable occurrence matches the current Scheduler state."
-  @spec admit_occurrence(map(), Signal.t()) :: :ok | {:error, term()}
-  defdelegate admit_occurrence(state, signal), to: Durable, as: :admit
-
-  @doc "Confirms a pending durable occurrence with the business state commit."
-  @spec acknowledge(String.t()) :: Acknowledge.t()
-  def acknowledge(occurrence_id), do: %Acknowledge{occurrence_id: occurrence_id}
 
   @doc "Creates one recurring schedule cancellation Directive."
   @spec cancel(term()) :: Cancel.t()
@@ -132,12 +101,10 @@ defmodule Jido.Plugin.Scheduler do
   @doc false
   def validate_cron_state(cron, _opts) do
     Enum.reduce_while(cron, :ok, fn {job_id, spec}, :ok ->
-      with :ok <- validate_durable_id(job_id),
+      with :ok <- validate_job_id(job_id),
            {:ok, _timezone} <-
              validate_cron_spec(spec.cron_expression, spec.message, spec.timezone),
-           :ok <- validate_occurrence(spec.message, Map.get(spec, :generation)),
-           :ok <- validate_durable_message(Map.get(spec, :pending)),
-           :ok <- Durable.validate(spec) do
+           :ok <- validate_occurrence(spec.message, Map.get(spec, :generation)) do
         {:cont, :ok}
       else
         {:error, reason} ->
@@ -151,15 +118,13 @@ defmodule Jido.Plugin.Scheduler do
           String.t(),
           term(),
           String.t() | nil,
-          non_neg_integer() | nil,
-          :best_effort | :durable
+          non_neg_integer() | nil
         ) :: map()
   def build_cron_spec(
         cron_expression,
         message,
         timezone \\ nil,
-        generation \\ nil,
-        delivery \\ :best_effort
+        generation \\ nil
       )
       when is_binary(cron_expression) and (is_nil(timezone) or is_binary(timezone)) do
     spec = %{
@@ -168,16 +133,12 @@ defmodule Jido.Plugin.Scheduler do
       timezone: normalize_timezone_value(timezone)
     }
 
-    spec = if is_nil(generation), do: spec, else: Map.put(spec, :generation, generation)
-
-    if delivery == :durable,
-      do: Map.merge(spec, %{delivery: :durable, pending: nil, last_scheduled_at: nil}),
-      else: spec
+    if is_nil(generation), do: spec, else: Map.put(spec, :generation, generation)
   end
 
   @doc false
   def validate_occurrence_scope(scope) do
-    if PortableTerm.valid?(scope), do: :ok, else: {:error, :non_durable_occurrence_scope}
+    if PortableTerm.valid?(scope), do: :ok, else: {:error, :nonportable_occurrence_scope}
   end
 
   @doc false
@@ -188,7 +149,7 @@ defmodule Jido.Plugin.Scheduler do
   def validate_cron_spec(cron_expression, message, timezone) do
     with :ok <- validate_cron_expression_type(cron_expression),
          {:ok, timezone} <- validate_timezone_option(timezone),
-         :ok <- validate_durable_message(message),
+         :ok <- validate_message(message),
          :ok <- validate_cron_syntax(cron_expression),
          :ok <- validate_timezone_support(timezone) do
       {:ok, timezone}
@@ -225,16 +186,16 @@ defmodule Jido.Plugin.Scheduler do
   defp normalize_timezone_value(""), do: @default_timezone
   defp normalize_timezone_value(timezone) when is_binary(timezone), do: timezone
 
-  defp validate_durable_message(message) do
+  defp validate_message(message) do
     if PortableTerm.valid?(message),
       do: :ok,
-      else: {:error, {:invalid_message, :non_durable_term}}
+      else: {:error, {:invalid_message, :nonportable_term}}
   end
 
   @doc false
-  def validate_durable_id(id) do
+  def validate_job_id(id) do
     if PortableTerm.valid?(id),
       do: :ok,
-      else: {:error, {:invalid_job_id, :non_durable_term}}
+      else: {:error, {:invalid_job_id, :nonportable_term}}
   end
 end

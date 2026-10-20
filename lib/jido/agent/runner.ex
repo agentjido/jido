@@ -37,7 +37,7 @@ defmodule Jido.Agent.Runner do
   @doc false
   @spec run(Agent.instance(), Signal.t(), keyword()) ::
           {:ok, Agent.instance(), [struct()]} | {:error, term()}
-  def run(%Agent{} = agent, %Signal{} = signal, opts) when is_list(opts) do
+  def run(%Agent{} = agent, %Signal{} = signal, opts) do
     with {:ok, prepared} <- prepare(agent, signal, opts),
          result <-
            Jido.Exec.run(
@@ -53,7 +53,7 @@ defmodule Jido.Agent.Runner do
   @doc false
   @spec prepare(Agent.instance(), Signal.t(), keyword()) ::
           {:ok, Prepared.t()} | {:error, term()}
-  def prepare(%Agent{} = agent, %Signal{} = signal, opts) when is_list(opts) do
+  def prepare(%Agent{} = agent, %Signal{} = signal, opts) do
     prepare_direct(agent, signal, opts) |> unstage()
   end
 
@@ -65,8 +65,7 @@ defmodule Jido.Agent.Runner do
         %Signal{} = source_signal,
         exec_opts,
         plugin_specs
-      )
-      when is_list(exec_opts) and is_list(plugin_specs) do
+      ) do
     with :ok <- at(:input, Command.validate_caller_context(command.context)),
          {:ok, turn} <- at(:route, select(command.agent, source_signal)),
          {:ok, schema} <-
@@ -102,8 +101,7 @@ defmodule Jido.Agent.Runner do
     with {:ok, caller_context} <- at(:input, Command.normalize_context(caller_context)),
          :ok <- at(:input, Command.validate_caller_context(caller_context)),
          validation = Validation.validate_instance_with_plugins(agent),
-         {:ok, agent, specs, schema} <-
-           at(:input, normalize_result_routing_error(validation, signal)),
+         {:ok, agent, specs, schema} <- at(:input, validation),
          {:ok, signal} <- at(:input, Command.normalize_signal(signal)),
          plugin_specs = Plugin.specs(specs),
          {:ok, plugin_inputs} <- at(:prepare, Plugin.prepare(agent, signal, plugin_specs)),
@@ -187,7 +185,6 @@ defmodule Jido.Agent.Runner do
   defp select(agent, signal) do
     default_selection(agent, signal)
     |> finish_selection(signal)
-    |> normalize_result_routing_error(signal)
   end
 
   defp default_selection(agent, signal) do
@@ -234,20 +231,6 @@ defmodule Jido.Agent.Runner do
        details: %{code: :agent_invalid_callback_result, callback: :execute, result: result}
      )}
   end
-
-  defp normalize_routing_error(%Jido.Signal.Error.RoutingError{} = error, signal) do
-    Error.routing_error(error.message,
-      target: error.target || signal.type,
-      details: Map.put(error.details || %{}, :cause, error)
-    )
-  end
-
-  defp normalize_routing_error(error, _signal), do: error
-
-  defp normalize_result_routing_error({:error, error}, signal),
-    do: {:error, normalize_routing_error(error, signal)}
-
-  defp normalize_result_routing_error(result, _signal), do: result
 
   defp merge_route_input(route, %Signal{} = signal) do
     case Turn.normalize_input(signal.data) do

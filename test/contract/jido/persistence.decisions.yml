@@ -1,0 +1,29 @@
+- id: persistence-component-boundary
+  date: 2026-10-20
+  decision: Use jido.persistence for portable Agent records, adapter configuration, storage operations, snapshots, revisions, tombstones, and Plugin-owned state conversion.
+  driver: These rules are data and storage contracts. They do not depend on one live AgentServer activation.
+  approved_by: Approved Jido V3 Covenant component map
+
+- id: persistence-test-ownership
+  date: 2026-10-20
+  decision: Move shared persistence contract tests to test/contract/jido/persistence. Keep one-backend tests in test/jido/persistence. Keep live recovery and durable commit tests in the AgentServer durable components.
+  driver: A shared contract must not claim backend implementation details or runtime recovery policy.
+  approved_by: Component hardening pass
+
+- id: persistence-mutation-profile
+  date: 2026-10-20
+  decision: Mutate the shared persistence coordinator, adapter boundary, record, snapshot, checkpoint, identity, source, Plugin conversion, and Store modules. Do not mutate each backend in this component profile.
+  driver: The shared modules own portable behavior. Backend modules have separate implementation and service profiles, while conformance tests prove the common adapter contract.
+  approved_by: Component hardening pass
+
+- id: remove-duplicate-revision-zero-activation-test
+  date: 2026-10-20
+  decision: Remove the persistence-side activation test for revision-zero creation before readiness. Keep the stronger jido.agent_server.durable contract test as its owner.
+  driver: AgentServer publication order is not a persistence record rule, and the active durable component already protects it.
+  approved_by: Component hardening pass
+
+- id: remove-unused-definition-preparation
+  date: 2026-10-20
+  decision: Remove the hidden replace_agent and prepare_agent APIs and their private helper chain.
+  driver: No production module, guide, example, or sibling V3 package in this workspace calls them. The functions formed a second unused definition-change model beside the active AgentServer upgrade path.
+  approved_by: Component hardening pass

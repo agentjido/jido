@@ -1,0 +1,23 @@
+- id: composition-boundary
+  date: 2026-10-19
+  decision: Use jido.agent_server.composition for live child relationships, accepted topology resources, local Buses, connection delivery, and their cleanup.
+  driver: jido.agent owns logical topology data, while AgentServer composition owns the OTP resources derived from accepted data.
+  approved_by: User-approved Jido V3 component map
+
+- id: composition-code-seam
+  date: 2026-10-19
+  decision: Move child API behavior and the composition pre-commit check from Jido.AgentServer into Jido.AgentServer.CompositionRuntime. Keep public entry points and gen_statem events in Jido.AgentServer. Keep generic activation start and worker lookup in Jido.AgentServer.Supervisor.
+  driver: Child ownership needs one behavior owner without creating a second state machine or changing the public API.
+  approved_by: Component hardening pass
+
+- id: composition-obligation-migration
+  date: 2026-10-19
+  decision: Replace AgentServer I65 through I68, I95 through I99, and I102 with composition I1 through I9. Keep snapshot and upgrade persistence promises outside this component. Keep Plugin callback and reconstruction rules in plugin_runtime.
+  driver: Each runtime composition promise needs one final owner and no duplicate Plugin or durable contract.
+  approved_by: Component hardening pass
+
+- id: composition-mutation-profile
+  date: 2026-10-19
+  decision: Mutate CompositionRuntime, TopologyRuntime, and TopologyBus. Do not mutate the shared AgentServer state machine or Supervisor in this focused profile.
+  driver: The focused profile must test composition decisions without overlapping core Turn and activation owners.
+  approved_by: Component hardening pass

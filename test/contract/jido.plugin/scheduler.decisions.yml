@@ -1,0 +1,29 @@
+- id: bundled-scheduler-boundary
+  date: 2026-10-19
+  decision: Give schedule definitions, timer reconciliation, generations, occurrence metadata, restart recovery, and clock rules to jido.plugin.scheduler.
+  driver: These rules are bundled Scheduler Plugin behavior, not generic Plugin SDK behavior.
+  approved_by: Approved Jido V3 Covenant component map
+
+- id: remove-scheduler-delivery
+  date: 2026-10-19
+  decision: Remove Scheduler durable business delivery, enqueue control Signals, pending work, retries, admission, and acknowledgement.
+  driver: Timer production and durable business delivery are different ownership domains. The Scheduler must not be a second delivery system.
+  approved_by: Approved Jido V3 Covenant component map
+
+- id: reject-retired-saved-definitions
+  date: 2026-10-19
+  decision: Reject saved Scheduler definitions that contain retired delivery fields.
+  driver: Silently stripping pending delivery state can lose business work. An explicit restore failure is safer and makes migration necessary.
+  approved_by: Jido V3 hardening pass
+
+- id: best-effort-timer-slots
+  date: 2026-10-19
+  decision: Restore future recurring timers, but do not replay slots that passed while the Scheduler runtime was offline.
+  driver: Scheduler owns timer production. Durable replay belongs to an explicit delivery or application-state design.
+  approved_by: Approved Jido V3 Covenant component map
+
+- id: scheduler-mutation-profile
+  date: 2026-10-19
+  decision: Mutate the Scheduler root, Directive definitions, occurrence identity, runtime, server, and clock helpers. Verify the Spark DSL with contract and authoring tests instead of AST mutation.
+  driver: Mutating the Spark entity target to nil exits Spark's compile verifier before Covenant can classify the mutant. The executable DSL contract still protects normalization, validation, and route verification.
+  approved_by: User-requested component hardening pass

@@ -1,0 +1,248 @@
+# Make an Agent Durable
+
+## Overview
+
+A live Agent keeps its committed state in memory. When the Server stops, the
+state goes with it. This Livebook adds a persistence adapter to a Jido
+instance, starts a counter that saves every commit, stops it, and restores it
+from storage with the same state and revision.
+
+The Livebook uses `Jido.Persistence.ETS`. It keeps records for as long as the
+BEAM runs, so a restore works after a stop but not after a restart. For storage
+that survives a restart, see [Persistence Adapters](persistence-adapters.livemd).
+
+Run the cells from top to bottom.
+
+## Install
+
+```elixir
+Mix.install([{:jido, "~> 3.0.0-beta.2"}])
+```
+
+## Define the Counter
+
+```elixir
+defmodule Durable.Add do
+  use Jido.Action,
+    name: "add",
+    schema: Zoi.object(%{amount: Zoi.integer()})
+
+  @impl true
+  def run(%{amount: amount}, %{agent_state: state}) do
+    {:ok, %{state | count: state.count + amount}}
+  end
+end
+
+defmodule Durable.Counter do
+  use Jido.Agent, name: "counter"
+
+  agent do
+    schema(Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}))
+  end
+
+  routes do
+    signal_source("/guides/durable")
+    route "counter.add", Durable.Add, as: :add, defaults: %{amount: 1}
+  end
+end
+```
+
+Nothing in the Agent mentions storage. Persistence is a property of the
+running instance, not of the definition.
+
+## Configure the Instance
+
+```elixir
+defmodule Durable.Jido do
+  use Jido,
+    otp_app: :guides,
+    namespace: "guides/durable",
+    persistence: {Jido.Persistence.ETS, table: :guide_agents}
+end
+
+{:ok, _sup} = Durable.Jido.start_link()
+```
+
+The result is `{:ok, pid}` for the instance supervisor.
+
+| Option | Purpose |
+| --- | --- |
+| `namespace:` | Required for persistence. Part of every record key: `{namespace, partition, id}`. Keep it stable across releases. |
+| `persistence:` | The instance adapter. `{module, opts}` or a module. `:table` names the ETS table; the default is `:jido_persistence`. |
+
+The instance adapter is a default to select, not a switch. Agents still start
+with `persistence: false` unless you ask for it.
+
+## Start a Durable Agent
+
+```elixir
+{:ok, counter} =
+  Durable.Jido.start_agent(Durable.Counter,
+    id: "counter-1",
+    persistence: :inherit
+  )
+
+:ok = Jido.AgentServer.await_ready(counter)
+Jido.AgentServer.status(counter).state_version
+```
+
+The result is `0`. `persistence: :inherit` selects the instance adapter. The
+default `persistence_mode: :create` wrote revision 0 before the activation
+reported ready.
+
+`start_agent/2` returns `{:ok, pid}` before that write. Call
+`Jido.AgentServer.await_ready/2` before you rely on the record. A failed write
+makes `await_ready/2` exit.
+
+Read the stored record directly:
+
+```elixir
+{:ok, stored} = Jido.Persistence.load_agent(Durable.Jido, Durable.Counter, "counter-1")
+stored.state
+```
+
+The result is `%{count: 0}`.
+
+## Commit and Save
+
+```elixir
+signal = Durable.Counter.add_signal!(%{amount: 5})
+{:ok, agent, []} = Jido.AgentServer.call(counter, signal)
+
+{agent.state, Jido.AgentServer.status(counter).state_version}
+```
+
+The result is `{%{count: 5}, 1}`. The Server saved revision 1 before it
+replied, so the stored record already matches:
+
+```elixir
+{:ok, stored} = Jido.Persistence.load_agent(Durable.Jido, Durable.Counter, "counter-1")
+stored.state
+```
+
+The result is `%{count: 5}`.
+
+Each successful Turn writes one new revision, even when the state does not
+change. A failed Turn writes nothing.
+
+## Stop and Restore
+
+```elixir
+:ok = Durable.Jido.stop_agent("counter-1")
+
+{:ok, restored} =
+  Durable.Jido.start_agent(Durable.Counter,
+    id: "counter-1",
+    persistence: :inherit,
+    persistence_mode: :restore
+  )
+
+:ok = Jido.AgentServer.await_ready(restored)
+agent = Jido.AgentServer.agent(restored)
+{agent.state, Jido.AgentServer.status(restored).state_version}
+```
+
+The result is `{%{count: 5}, 1}`. `:restore` loads the record and continues
+from its revision. The next commit writes revision 2.
+
+`Durable.Jido.thaw(Durable.Counter, "counter-1")` is the short form. It sets
+`persistence: :inherit` and `persistence_mode: :restore` for you.
+[Durable Activation](durable-agent-activation.livemd) covers it with
+hibernate.
+
+## Create Twice
+
+`:create` refuses to overwrite an existing record. Try it on a stopped Agent:
+
+```elixir
+:ok = Durable.Jido.stop_agent("counter-1")
+
+{:ok, duplicate} =
+  Durable.Jido.start_agent(Durable.Counter,
+    id: "counter-1",
+    persistence: :inherit
+  )
+
+try do
+  Jido.AgentServer.await_ready(duplicate)
+catch
+  :exit, reason -> reason
+end
+```
+
+The result is an exit tuple whose first element is `{:shutdown, :conflict}`.
+The activation stopped before it accepted a Signal. The stored record is
+unchanged at revision 1.
+
+Startup failures follow this pattern: `start_agent/2` returns `{:ok, pid}`,
+then `await_ready/2` exits with the reason.
+
+| Exit reason | Cause |
+| --- | --- |
+| `{:shutdown, :conflict}` | `:create` found an existing record. |
+| `{:shutdown, :not_found}` | `:restore` found no record. |
+| `{:shutdown, :deleted}` | `:restore` found a tombstone. |
+| `{:shutdown, :stable_namespace_required}` | The instance has no `namespace:`. |
+| `{:shutdown, :incompatible_durable_checkpoint}` | `:inherit` with no instance adapter. |
+
+## Choose an Adapter
+
+You select the adapter at start:
+
+| `persistence:` | Effect |
+| --- | --- |
+| `false` | The default. No records. |
+| `:inherit` | The instance adapter. |
+| `Module` or `{Module, opts}` | This adapter, for this Agent only. |
+
+An explicit adapter overrides the instance adapter:
+
+```elixir
+{:ok, other} =
+  Durable.Jido.start_agent(Durable.Counter,
+    id: "counter-2",
+    persistence: {Jido.Persistence.ETS, table: :guide_other},
+    persistence_timeout: 2_000
+  )
+
+:ok = Jido.AgentServer.await_ready(other)
+
+{:ok, stored} =
+  Jido.Persistence.load_agent(
+    {Jido.Persistence.ETS, table: :guide_other},
+    Durable.Counter,
+    "counter-2",
+    namespace: "guides/durable"
+  )
+
+stored.state
+```
+
+The result is `%{count: 0}`. The record is in `:guide_other`, not in the
+instance table.
+
+`persistence_timeout:` (default 5,000 ms) limits each storage operation. A
+save that does not finish in time stops the activation and reports an unknown
+outcome, because the remote write can still land.
+
+To make every Agent on an instance durable, start the instance with an Agent
+Server default: `Durable.Jido.start_link(agent_server: [persistence: :inherit])`.
+Agents then use the instance adapter unless they pass `persistence: false`.
+
+## Stop the Example
+
+```elixir
+:ok = Durable.Jido.stop_agent("counter-2")
+:ok = Jido.stop(Durable.Jido)
+```
+
+ETS records stay until the BEAM stops.
+
+## Next
+
+- [Durable Activation](durable-agent-activation.livemd) – hibernate, thaw,
+  Refs, and deletion.
+- [Durability Model](durability-model.md) – what the record holds and what is
+  never replayed.
+- [Revisions and Conflicts](durable-revisions-and-conflicts.md) – how
+  revision checks reject stale writes.

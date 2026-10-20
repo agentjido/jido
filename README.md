@@ -5,48 +5,57 @@
 [![CI](https://github.com/agentjido/jido/actions/workflows/ci.yml/badge.svg)](https://github.com/agentjido/jido/actions/workflows/ci.yml)
 [![License](https://img.shields.io/hexpm/l/jido.svg)](https://github.com/agentjido/jido/blob/main/LICENSE)
 
-Jido is a declarative actor and agent framework for Elixir. You declare what an
-Agent is, instantiate that declaration as an Agent value, and run the value as
-an OTP actor when you need a live process.
+Build validated, supervised agents for Elixir: declare an Agent's state and
+routes once, test it as plain data, and run it as an OTP process that commits
+state before it performs side effects.
 
-Version `3.0.0-beta.2` is an evaluation candidate with breaking changes from V2
-and beta.1. See the [migration guide](guides/migration.md) for required changes
-and the [release record](https://github.com/agentjido/jido/blob/release/v3/docs/release-beta.2.md)
-for checks and known limits. External storage service tests and distributed
-ownership guarantees require separate evidence.
+```elixir
+signal = MyApp.Counter.increment_signal!(%{amount: 2})
 
-## Core model
+# Plain data: no process, nothing saved, nothing sent
+{:ok, candidate, []} = MyApp.Counter.cmd(agent, signal)
 
-Jido follows the declarative style common in Elixir. The declaration describes
-the Agent. It does not run an imperative process loop.
+# Live process: one Turn at a time, committed before effects run
+{:ok, counter} = Jido.start_agent(agent)
+{:ok, committed, []} = Jido.AgentServer.call(counter, signal)
+```
 
-1. Declare an Agent definition with its data schema, routes, Plugins, and
-   metadata.
-2. Instantiate the definition with an identity and initial state.
-3. Route Signals to one Action or Flow.
-4. Let the executable propose the next domain state and Directives.
-5. Validate and commit the complete Agent value.
-6. Let the Agent Server dispatch runtime effects after commit.
+Version `3.0.0-beta.2` is an evaluation candidate with breaking changes from
+V2 and beta.1. The
+[release record](https://github.com/agentjido/jido/blob/release/v3/docs/release-beta.2.md)
+lists its checks and known limits.
 
-Direct `Jido.Agent.cmd/3` returns a candidate Agent and Directives; the Server
-commits live state. Actions and Flows can perform synchronous I/O before they
-return. A failed Turn preserves committed Agent state but does not undo external
-work that already completed. Applications own external idempotency and recovery.
-State assembly is repeatable for fixed inputs and executable results.
+## Where This Package Fits
 
-The Agent callback and Plugin code cannot replace private Agent Server state.
+Jido is the core runtime of the Jido ecosystem. It owns Agents, the Agent
+Server, Plugins, state transitions, and Directives. Other packages build on
+it. See [jido.run](https://jido.run) for the ecosystem overview and
+cross-package tutorials.
 
-One `%Jido.Agent{}` has two valid forms. A definition has `id: nil` and
-`state: nil`. An instance has a non-empty `id` and validated state. A value
-that has only an id or only state is invalid.
+**Works best with:**
 
-Agent modules provide declarative `agent` and `routes` blocks, with an optional
-`as:` route setting for a Signal constructor. Direct map and keyword
-construction, module construction, and the JSON-compatible Codec use the same
-Agent validation. See the
-`Jido.Agent` and `Jido.Agent.Codec` API documentation.
+- [jido_action](https://hex.pm/packages/jido_action) – the Actions and Flows
+  that Agent routes run. Installed with Jido.
+- [jido_signal](https://hex.pm/packages/jido_signal) – the Signal envelope,
+  routing, dispatch, and bus. Installed with Jido.
+- [jido_ai](https://hex.pm/packages/jido_ai) – model calls, tool use, and AI
+  agent behavior on top of Jido Agents.
 
-## Example
+## Installation
+
+```elixir
+def deps do
+  [
+    {:jido, "~> 3.0.0-beta.2"}
+  ]
+end
+```
+
+Jido requires Elixir 1.18 and OTP 27 or later.
+
+## Quick Start
+
+Declare an Agent with a state schema and one route:
 
 ```elixir
 defmodule MyApp.Counter do
@@ -57,86 +66,152 @@ defmodule MyApp.Counter do
   end
 
   routes do
-    signal_source("/example")
+    signal_source("/my_app")
 
-    route "counter.increment", as: :increment do
+    route "counter.increment", as: :increment, defaults: %{amount: 1} do
       action %{amount: amount},
         name: "increment",
         schema: Zoi.object(%{amount: Zoi.integer()}),
         context: context do
         {:ok, %{context.agent_state | count: context.agent_state.count + amount}}
       end
-
-      defaults(%{amount: 1})
     end
   end
 end
+```
 
+Create an instance and apply a Signal to it as data:
+
+```elixir
 agent = MyApp.Counter.instantiate!(id: "counter-1")
-
-signal =
-  Jido.Signal.new!(
-    "counter.increment",
-    %{amount: 2},
-    source: "/example"
-  )
+signal = MyApp.Counter.increment_signal!(%{amount: 2})
 
 {:ok, candidate, []} = MyApp.Counter.cmd(agent, signal)
 candidate.state.count
 # => 2
 ```
 
-`cmd/2` is the main entry point for an Agent value. It routes one Signal and
-returns a candidate Agent plus the Directives that a runtime can dispatch. The
-original Agent value stays unchanged.
+`cmd/2` returns a candidate Agent and a list of Directives. `agent` is
+unchanged. No process starts and nothing is saved.
 
-Run the same Agent value as a live actor when it needs process identity,
-serialized message handling, persistence, or runtime effects:
+Run the same value as a live process:
 
 ```elixir
 {:ok, _jido} = Jido.start()
 {:ok, counter} = Jido.start_agent(agent)
 
-{:ok, committed_agent} = Jido.AgentServer.call(counter, signal)
-committed_agent.state.count
+{:ok, committed, []} = Jido.AgentServer.call(counter, signal)
+committed.state.count
 # => 2
 ```
 
-The default instance is also implicit for Agent lookup, listing, counts, stop,
-hibernate, and thaw. Pass an instance as the first argument only when the
-application runs more than one Jido supervisor.
+`call/3` returns `{:ok, committed_agent, directives}` after the Server commits
+the new state. The reply confirms the commit. Directives run after it.
 
-The route setting `as: :increment` creates `increment_signal/1,2`. Each route
-can name one helper. Omit `as:` to generate no helper. Use the Signal with
-`cmd/2` or `Jido.AgentServer.call/3`:
+`as: :increment` generated `increment_signal!/2`, which returns the Signal or
+raises when the data isn't a plain map or an option is invalid.
+`increment_signal/2` returns `{:ok, signal}` or `{:error, reason}` instead.
+Neither checks the data against the Action schema; the Turn does that. `defaults:` fills `amount` when the Signal data
+leaves it out.
+
+## Why This Library?
+
+- **State is validated on every change.** An Action returns the complete next
+  state. Jido checks it against the schema, including Plugin-owned fields,
+  before commit. A failed Turn leaves the committed state unchanged.
+- **Side effects wait for the commit.** Actions return Directives as data. The
+  Agent Server runs them only after the state is committed, so a failed Turn
+  sends no Signals and starts no processes.
+- **The same Agent runs with or without a process.** Unit-test routes with
+  `cmd/2` and no setup. Run the identical value in an Agent Server in
+  production.
+- **It is standard OTP.** Each live Agent is a `:gen_statem` under a
+  supervisor, addressed through a Registry. No custom scheduler.
+
+Jido doesn't undo external I/O. An Action that calls an HTTP API before a
+failed validation has still made that call. Make such calls idempotent, or
+return them as Directives.
+
+## Documentation
+
+Full documentation is on [HexDocs](https://hexdocs.pm/jido). Start with:
+
+- [Getting Started](guides/getting-started.livemd) – build and run a counter
+  Agent in Livebook.
+- [OTP Concepts](guides/otp-concepts-for-jido.md) – the processes,
+  supervisors, and timeouts behind a live Agent.
+- [Life of a Signal](guides/signal-to-effects.md) – each stage of a Turn,
+  from admission to effects.
+- [Pure or Live Execution](guides/pure-or-live-execution.md) – when to use
+  `cmd/2` and when to start an Agent Server.
+
+## Features
+
+- Agent definitions from the `agent`/`routes` DSL, plain maps with
+  `Jido.Agent.define/1`, or JSON through `Jido.Agent.Codec`. All three run the
+  same validation.
+- Routes to Actions, Flows, transforms, and pass-through handlers, matched in
+  declaration order with exact types or `*` wildcards.
+- Generated Signal constructors from `as:` and typed Signals with
+  `Jido.SignalAction`.
+- Built-in Directives to emit Signals, send to other Agents, start and stop
+  Agents and processes, and stop the Server.
+- Nested Agents with counts and state bindings, connected by declared
+  Signal routes.
+- Plugins that prepare input, own a state field, supervise runtime resources,
+  and handle their own Directives.
+- Built-in Plugins for Signal buses, audit records, heartbeats and schedules,
+  and managed sensors.
+- Optional persistence with ETS, File, Mnesia, Ecto, Redis, S3, and Bedrock
+  adapters, hibernate and thaw, and revision checks.
+- Telemetry under `[:jido, :agent_server]`, Turn status, and bounded Turn
+  history.
+
+## Examples
+
+### Test a route without a process
 
 ```elixir
-{:ok, increment_signal} = MyApp.Counter.increment_signal(%{amount: 3})
-{:ok, candidate, []} = MyApp.Counter.cmd(agent, increment_signal)
+test "increment adds the amount" do
+  agent = MyApp.Counter.instantiate!(id: "test")
+  signal = MyApp.Counter.increment_signal!(%{amount: 3})
 
-{:ok, committed_agent} =
-  with {:ok, signal} <- MyApp.Counter.increment_signal(%{amount: 3}) do
-    Jido.AgentServer.call(counter, signal, [])
-  end
-
-committed_agent.state.count
-# => 5
+  assert {:ok, %{state: %{count: 3}}, []} = MyApp.Counter.cmd(agent, signal)
+end
 ```
 
-## Agent Plugins
+### Emit a Signal after commit
 
-Define a Plugin with `use Jido.Plugin` and the callbacks it needs. One module
-can prepare input, reduce an owned state field, manage a live runtime, convert
-its owned value for persistence, and contribute static Topology entries.
-Jido selects these capabilities from the documented callbacks. A Plugin cannot
-change an incoming Signal. Pure and live data enter execution through the separate `prepared` and `runtime` slots
-at `context.plugin_inputs[Package]`. Results enter through the normal Agent
-Signal mailbox. See the `Jido.Plugin` API docs.
+An Action returns an `emit/2` Directive. The Server sends it after the commit,
+here to the calling process:
 
-## Persistence
+```elixir
+defmodule MyApp.Reset do
+  use Jido.Action, name: "reset", schema: Zoi.object(%{})
 
-Persistence is optional. Configure a stable namespace and one binary adapter
-on the Jido instance:
+  @impl true
+  def run(_params, %{agent_state: state}) do
+    {:ok, %{state | count: 0},
+     [Jido.Agent.Directive.emit("counter.cleared", %{previous: state.count})]}
+  end
+end
+
+# In the Agent: route "counter.reset", MyApp.Reset, as: :reset
+
+{:ok, counter} =
+  Jido.start_agent(MyApp.Counter, id: "counter-2", default_dispatch: {:pid, target: self()})
+reset = MyApp.Counter.reset_signal!()
+{:ok, _committed, [_emit]} = Jido.AgentServer.call(counter, reset)
+
+receive do
+  {:signal, %Jido.Signal{type: "counter.cleared", data: data}} -> data
+end
+# => %{previous: 0}
+```
+
+### Persist every commit
+
+Add an adapter and a stable namespace to your Jido instance:
 
 ```elixir
 defmodule MyApp.Jido do
@@ -147,58 +222,14 @@ defmodule MyApp.Jido do
 end
 ```
 
-Agents inherit this adapter unless their start options override or disable it.
-A new persistent activation writes revision zero before its start call
-succeeds. A successful Agent commit is stored before the Server reports
-success. Normal durable delete writes a tombstone. `hibernate/2` saves and
-stops one Server. `thaw/3` restores and starts it. Jido does not start or
-supervise the application storage process. See the
-[persistence adapter guide](guides/persistence-adapters.livemd) for the Ecto
-dependency and migration.
-
-## Installation
-
-After beta.2 is published, use the beta package from Hex:
+Persistence is off by default. Opt in when you start an Agent:
 
 ```elixir
-def deps do
-  [
-    {:jido, "~> 3.0.0-beta.2"}
-  ]
-end
+{:ok, pid} = MyApp.Jido.start_agent(MyApp.Counter, id: "counter-1", persistence: :inherit)
 ```
 
-For local development, point your application at this checkout:
-
-```elixir
-def deps do
-  [
-    {:jido, path: "../jido"}
-  ]
-end
-```
-
-## Guides and validation
-
-Start with the [Getting Started Livebook](guides/getting-started.livemd), then
-[build your first Agent](guides/build-your-first-agent.livemd). Read
-[Actors, Agents, and Jido](guides/actor-and-agent-framework.md) for the framework
-model and [Agent Definitions and Instances](guides/agent-definitions-and-instances.md)
-for the value contract.
-
-The guide set also covers [Agent Turns](guides/turns-commit-and-effects.md),
-[Plugin contracts](guides/plugin-contract-and-lifecycle.md),
-[actor lifecycle](guides/agent-server-lifecycle.md),
-[topologies](guides/topology-definitions.md),
-[persistence and recovery](guides/portable-state-and-checkpoints.md), and
-[operations](guides/configuration.md). Use the
-[example systems catalog](guides/example-systems.md) to find an executable
-contract test. If you have V2 application code, use the
-[migration guide](guides/migration.md).
-
-[Design documents](docs/design/README.md) contain deferred proposals. They do
-not define the API implemented by this branch. Cluster-exclusive ownership is
-not supported.
+That Agent saves each commit before the Server replies. `hibernate/2` saves and
+stops it, and `thaw/3` restores it. Jido doesn't start or supervise your Repo.
 
 ## License
 

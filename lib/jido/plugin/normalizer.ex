@@ -198,8 +198,7 @@ defmodule Jido.Plugin.Normalizer do
     else
       false ->
         PluginError.validation("Persistence Plugin facet must define dump/3 and load/3", %{
-          plugin: manifest.module,
-          facet: facet
+          plugin: manifest.module
         })
     end
   end
@@ -219,8 +218,7 @@ defmodule Jido.Plugin.Normalizer do
       not is_nil(server) and server.dispatch? and
           (is_nil(agent) or agent.directive_modules == []) ->
         PluginError.validation("Agent Server Plugin dispatch requires Agent-owned Directives", %{
-          plugin: package,
-          facet: server.module
+          plugin: package
         })
 
       not is_nil(agent) and agent.directive_modules != [] and
@@ -317,7 +315,7 @@ defmodule Jido.Plugin.Normalizer do
       :ok
     else
       PluginError.validation("Plugin facet defines no capability", %{
-        facet: module,
+        plugin: module,
         owner: owner
       })
     end
@@ -344,28 +342,25 @@ defmodule Jido.Plugin.Normalizer do
        when is_exception(reason),
        do: error
 
-  defp validate_state_spec({nil, _schema}, package, facet) do
+  defp validate_state_spec({nil, _schema}, package, _facet) do
     PluginError.validation("Plugin-owned Agent state key must not be nil", %{
       plugin: package,
-      facet: facet,
       state_key: nil
     })
   end
 
-  defp validate_state_spec({:__struct__, _schema}, package, facet) do
+  defp validate_state_spec({:__struct__, _schema}, package, _facet) do
     PluginError.validation("Plugin-owned Agent state key is reserved", %{
       plugin: package,
-      facet: facet,
       state_key: :__struct__
     })
   end
 
-  defp validate_state_spec({key, schema}, package, facet)
+  defp validate_state_spec({key, schema}, package, _facet)
        when is_atom(key) and not is_nil(key) and key != :__struct__ and is_struct(schema) do
     if is_nil(Zoi.Type.impl_for(schema)) do
       PluginError.validation("Plugin-owned Agent state schema must be a Zoi schema", %{
         plugin: package,
-        facet: facet,
         schema: schema
       })
     else
@@ -376,7 +371,6 @@ defmodule Jido.Plugin.Normalizer do
         {:error, reason} ->
           PluginError.validation("Plugin-owned Agent state schema must contain static data", %{
             plugin: package,
-            facet: facet,
             state_key: key,
             reason: reason
           })
@@ -384,10 +378,9 @@ defmodule Jido.Plugin.Normalizer do
     end
   end
 
-  defp validate_state_spec(value, package, facet) do
+  defp validate_state_spec(value, package, _facet) do
     PluginError.validation("Agent Plugin state_spec/1 returned an invalid value", %{
       plugin: package,
-      facet: facet,
       value: value
     })
   end
@@ -411,47 +404,42 @@ defmodule Jido.Plugin.Normalizer do
 
   defp validate_directive_modules({:error, _reason} = error, _package, _facet), do: error
 
-  defp validate_directive_modules(directives, package, facet) when is_list(directives) do
+  defp validate_directive_modules(directives, package, _facet) when is_list(directives) do
     atom_modules? = Enum.all?(directives, &is_atom/1)
-    unloaded = if atom_modules?, do: first_invalid(directives, &(not Code.ensure_loaded?(&1)))
+    unloaded = if atom_modules?, do: Enum.find(directives, &(not Code.ensure_loaded?(&1)))
 
     not_struct =
       if atom_modules? and unloaded == nil,
-        do: first_invalid(directives, &(not function_exported?(&1, :__struct__, 0)))
+        do: Enum.find(directives, &(not function_exported?(&1, :__struct__, 0)))
 
     cond do
       not atom_modules? ->
         PluginError.validation("Agent Plugin Directive modules must be atoms", %{
           plugin: package,
-          facet: facet,
           directives: directives
         })
 
       Enum.uniq(directives) != directives ->
         PluginError.validation("Agent Plugin Directive modules must be unique", %{
           plugin: package,
-          facet: facet,
           directives: directives
         })
 
       unloaded != nil ->
         PluginError.validation("Agent Plugin Directive modules must be loaded", %{
           plugin: package,
-          facet: facet,
-          directive: elem(unloaded, 1)
+          directive: unloaded
         })
 
       not_struct != nil ->
         PluginError.validation("Agent Plugin Directive modules must define a struct", %{
           plugin: package,
-          facet: facet,
-          directive: elem(not_struct, 1)
+          directive: not_struct
         })
 
       Enum.any?(directives, &Directive.built_in_module?/1) ->
         PluginError.validation("Agent Plugin cannot own a built-in Directive", %{
-          plugin: package,
-          facet: facet
+          plugin: package
         })
 
       true ->
@@ -459,16 +447,11 @@ defmodule Jido.Plugin.Normalizer do
     end
   end
 
-  defp validate_directive_modules(value, package, facet) do
+  defp validate_directive_modules(value, package, _facet) do
     PluginError.validation("Agent Plugin directives/1 must return a list", %{
       plugin: package,
-      facet: facet,
       directives: value
     })
-  end
-
-  defp first_invalid(values, predicate) do
-    Enum.find_value(values, fn value -> if predicate.(value), do: {:invalid, value} end)
   end
 
   defp validate_agent_contract(package, facet, state_key, directives) do
@@ -479,27 +462,24 @@ defmodule Jido.Plugin.Normalizer do
       function_exported?(facet, :validate_directive, 2) ->
         PluginError.validation(
           "Agent Plugin Directive validation belongs to the Directive module",
-          %{plugin: package, facet: facet, callback: {:validate_directive, 2}}
+          %{plugin: package, callback: {:validate_directive, 2}}
         )
 
       function_exported?(facet, :update_state, 3) ->
         PluginError.validation("Agent Plugin state middleware must define reduce/2", %{
           plugin: package,
-          facet: facet,
           callback: {:update_state, 3}
         })
 
       invalid_directive ->
         PluginError.validation("Agent Plugin Directive must define validate/1", %{
           plugin: package,
-          facet: facet,
           directive: invalid_directive
         })
 
       reducer? and is_nil(state_key) ->
         PluginError.validation("Agent Plugin reduce/2 requires state_spec/1", %{
-          plugin: package,
-          facet: facet
+          plugin: package
         })
 
       true ->

@@ -1,0 +1,300 @@
+# Testing
+
+## Overview
+
+Most Jido tests need no process. `cmd/3` runs a route and returns the
+candidate state and Directives as data, so you assert on values. Tests that
+need a live Server start their own Jido instance under the test supervisor,
+which keeps them independent and safe to run with `async: true`. This
+Livebook runs each kind of test with ExUnit.
+
+```elixir
+Mix.install([{:jido, "~> 3.0.0-beta.2"}])
+```
+
+```elixir
+ExUnit.start(autorun: false)
+```
+
+In a project, `test/test_helper.exs` calls `ExUnit.start()` and `mix test`
+runs the files. Here, `ExUnit.run/0` runs the modules defined above it.
+
+## The Code Under Test
+
+A Plugin that counts Turns, and a counter Agent that uses it:
+
+```elixir
+defmodule Shop.TurnCount do
+  use Jido.Plugin
+
+  alias Jido.Agent.Plugin.Reduction
+
+  @impl true
+  def state_spec(_opts) do
+    {:turns, Zoi.integer() |> Zoi.min(0) |> Zoi.default(0)}
+  end
+
+  @impl true
+  def reduce(%Reduction{plugin_state: turns}, _opts), do: {:ok, turns + 1}
+end
+
+defmodule Shop.Counter do
+  use Jido.Agent,
+    name: "shop_counter",
+    extensions: [Shop.TurnCount]
+
+  agent do
+    schema(Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}))
+  end
+
+  routes do
+    signal_source("/shop")
+
+    route "counter.increment", as: :increment, defaults: %{amount: 1} do
+      action %{amount: amount},
+        schema: Zoi.object(%{amount: Zoi.integer() |> Zoi.positive()}),
+        context: context do
+        count = context.agent_state.count + amount
+
+        {:ok, %{context.agent_state | count: count},
+         [Jido.Agent.Directive.emit("counter.changed", %{count: count})]}
+      end
+    end
+  end
+end
+```
+
+## Test Routes With cmd/3
+
+`cmd/3` runs in the test process. Build an instance, send a Signal, and match
+on the result:
+
+```elixir
+defmodule Shop.CounterTest do
+  use ExUnit.Case, async: true
+
+  alias Jido.Agent.Directive.Emit
+
+  @moduletag :capture_log
+
+  setup do
+    %{agent: Shop.Counter.instantiate!(id: "counter-1")}
+  end
+
+  test "increment adds the amount", %{agent: agent} do
+    signal = Shop.Counter.increment_signal!(%{amount: 3})
+
+    assert {:ok, candidate, [%Emit{signal: emitted}]} = Shop.Counter.cmd(agent, signal)
+    assert candidate.state.count == 3
+    assert emitted.type == "counter.changed"
+    assert emitted.data == %{count: 3}
+  end
+
+  test "the input agent is unchanged", %{agent: agent} do
+    signal = Shop.Counter.increment_signal!(%{amount: 3})
+    {:ok, _candidate, _} = Shop.Counter.cmd(agent, signal)
+
+    assert agent.state.count == 0
+  end
+
+  test "invalid input fails before any change", %{agent: agent} do
+    signal = Shop.Counter.increment_signal!(%{amount: -1})
+
+    assert {:error, _reason} = Shop.Counter.cmd(agent, signal)
+  end
+
+  test "an unknown type has no route", %{agent: agent} do
+    signal = Jido.Signal.new!("counter.unknown", %{}, source: "/test")
+
+    assert {:error, error} = Shop.Counter.cmd(agent, signal)
+    assert error.message == "No route accepts this Signal type"
+  end
+end
+```
+
+Directives come back as structs. Match their fields. `cmd/3` doesn't run
+them, so an `Emit` sends nothing during the test.
+
+A failed Action logs a warning. `@moduletag :capture_log` keeps that output
+out of the test report and prints it only when a test fails.
+
+## Test a Plugin
+
+A Plugin runs inside `cmd/3` too: `prepare/2` before the route and
+`reduce/2` after it. Test it through an Agent that uses it, and assert on
+the field it owns:
+
+```elixir
+defmodule Shop.TurnCountTest do
+  use ExUnit.Case, async: true
+
+  @moduletag :capture_log
+
+  test "each successful Turn adds one" do
+    agent = Shop.Counter.instantiate!(id: "counter-1")
+    signal = Shop.Counter.increment_signal!(%{amount: 1})
+
+    {:ok, agent, _} = Shop.Counter.cmd(agent, signal)
+    {:ok, agent, _} = Shop.Counter.cmd(agent, signal)
+
+    assert agent.state.turns == 2
+  end
+
+  test "a failed Turn doesn't count" do
+    agent = Shop.Counter.instantiate!(id: "counter-1")
+    bad = Shop.Counter.increment_signal!(%{amount: 0})
+
+    {:error, _} = Shop.Counter.cmd(agent, bad)
+    assert agent.state.turns == 0
+  end
+end
+```
+
+`admit/3`, `after_commit/3`, and Plugin runtimes run only on a live Server.
+Test them with the live setup below.
+
+## One Instance Per Test
+
+A live test starts a Jido instance with `start_supervised/1`. ExUnit stops it
+when the test ends. Give each instance a unique name, so async tests never
+share a registry:
+
+```elixir
+defmodule Shop.LiveCase do
+  def start_jido(opts \\ []) do
+    name = :"jido_test_#{System.unique_integer([:positive])}"
+    {:ok, _pid} = ExUnit.Callbacks.start_supervised({Jido, Keyword.put(opts, :name, name)})
+    name
+  end
+end
+```
+
+Pass the instance name as the first argument to `Jido.start_agent/3` and the
+other instance functions.
+
+## Wait Without Sleeping
+
+Every check below waits on a message or a reply. None of them use
+`Process.sleep/1`:
+
+- `call/3` returns after commit. Assert on the committed Agent it returns.
+- `cast/2` returns at once. A later `call/3` or `status/1` runs after the
+  cast's Turn, because Turns are serial.
+- Emitted Signals run after the reply. Send them to the test process with
+  `default_dispatch: {:pid, target: self()}` and use `assert_receive`.
+
+```elixir
+defmodule Shop.LiveCounterTest do
+  use ExUnit.Case, async: true
+
+  setup do
+    %{jido: Shop.LiveCase.start_jido()}
+  end
+
+  test "a call commits and the Emit arrives", %{jido: jido} do
+    {:ok, pid} =
+      Jido.start_agent(jido, Shop.Counter,
+        id: "counter-1",
+        default_dispatch: {:pid, target: self()}
+      )
+
+    signal = Shop.Counter.increment_signal!(%{amount: 2})
+
+    assert {:ok, agent, [_emit]} = Jido.AgentServer.call(pid, signal)
+    assert agent.state.count == 2
+    assert_receive {:signal, %Jido.Signal{type: "counter.changed", data: %{count: 2}}}
+  end
+
+  test "a cast is visible to the next call", %{jido: jido} do
+    {:ok, pid} =
+      Jido.start_agent(jido, Shop.Counter,
+        id: "counter-1",
+        default_dispatch: {:pid, target: self()}
+      )
+
+    signal = Shop.Counter.increment_signal!(%{amount: 1})
+
+    :ok = Jido.AgentServer.cast(pid, signal)
+    {:ok, agent, _} = Jido.AgentServer.call(pid, signal)
+
+    assert agent.state.count == 2
+  end
+end
+```
+
+Both tests use the ID `"counter-1"`. They run at the same time without a
+conflict because each has its own instance.
+
+## Persistent Agents
+
+Give the test instance a namespace and an ETS table of its own. ETS records
+live in memory and end with the BEAM, so nothing persists between test runs:
+
+```elixir
+defmodule Shop.DurableCounterTest do
+  use ExUnit.Case, async: true
+
+  setup do
+    n = System.unique_integer([:positive])
+
+    jido =
+      Shop.LiveCase.start_jido(
+        namespace: "test/#{n}",
+        persistence: {Jido.Persistence.ETS, table: :"shop_test_#{n}"}
+      )
+
+    %{jido: jido}
+  end
+
+  test "state survives hibernate and thaw", %{jido: jido} do
+    {:ok, pid} =
+      Jido.start_agent(jido, Shop.Counter,
+        id: "counter-1",
+        persistence: :inherit,
+        default_dispatch: {:pid, target: self()}
+      )
+
+    :ok = Jido.AgentServer.await_ready(pid)
+    signal = Shop.Counter.increment_signal!(%{amount: 5})
+    {:ok, _agent, _} = Jido.AgentServer.call(pid, signal)
+
+    :ok = Jido.hibernate(jido, pid)
+    refute Process.alive?(pid)
+
+    {:ok, thawed} = Jido.thaw(jido, Shop.Counter, "counter-1")
+    :ok = Jido.AgentServer.await_ready(thawed)
+    agent = Jido.AgentServer.agent(thawed)
+
+    assert agent.state.count == 5
+    assert agent.state.turns == 1
+  end
+end
+```
+
+A persistent Agent writes its first record before it reports ready.
+`start_agent/3` and `thaw/3` return before that, so call
+`Jido.AgentServer.await_ready/2` before the first Signal. A call sent too
+early returns `{:error, :not_ready}`. `hibernate/2` returns after the record
+is saved and the Server has stopped.
+
+## Run the Tests
+
+```elixir
+ExUnit.run()
+```
+
+The result is `%{total: 9, failures: 0, excluded: 0, skipped: 0}`. ExUnit
+stopped each test instance, so no Agent or Jido instance from these tests is
+still running:
+
+```elixir
+Enum.filter(Process.registered(), &String.starts_with?(Atom.to_string(&1), "jido_test_"))
+```
+
+The result is `[]`.
+
+## Next
+
+- [Pure or Live Execution](pure-or-live-execution.md) – what `cmd/3` runs
+  and what it leaves to the Server.
+- [Observability](observe-agent-turns.livemd) – assert on telemetry events.

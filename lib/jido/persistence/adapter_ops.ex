@@ -11,9 +11,6 @@ defmodule Jido.Persistence.AdapterOps do
       {:ok, value, token} when is_binary(value) and is_binary(token) and byte_size(token) > 0 ->
         {:ok, value, {:token, token}}
 
-      {:ok, _value, _token} ->
-        invalid_adapter_result(:get, :invalid_token_read)
-
       result when is_tuple(result) and tuple_size(result) > 2 and elem(result, 0) == :ok ->
         invalid_adapter_result(:get, :invalid_token_read)
 

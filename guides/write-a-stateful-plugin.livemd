@@ -1,0 +1,248 @@
+# Stateful Plugins
+
+## Overview
+
+You want every Turn to record who sent it, and to refuse blocked senders,
+without touching any route. A stateful Plugin does that. It owns one field
+in the Agent state, sees every Signal before the route runs, and updates its
+field after each successful Action.
+
+By the end of this Livebook, one Plugin adds a `ledger` field to a counter
+Agent:
+
+```text
+%{count: 2, ledger: %{turns: 1, last_actor: "ada"}}
+```
+
+The counter's Actions never mention the ledger. Run the cells from top to
+bottom.
+
+## Install
+
+```elixir
+Mix.install([{:jido, "~> 3.0.0-beta.2"}])
+```
+
+## The Callbacks
+
+| Callback | Invoked | Returns |
+| --- | --- | --- |
+| `state_spec/1` | When Jido composes the Agent state schema | `{key, zoi_schema}` for one owned field |
+| `prepare/2` | Before route selection, in `cmd/3` and on a live Server | `{:ok, input}` or `{:error, reason}` |
+| `admit/3` | After `prepare/2`, on a live Server only | `{:ok, runtime_input}` or `{:error, reason}` |
+| `reduce/2` | After the Action succeeds, before state validation | `{:ok, next_owned_value}` |
+
+## Define the Plugin
+
+```elixir
+defmodule GuidePlugins.Ledger do
+  use Jido.Plugin
+
+  alias Jido.Agent.Plugin.{Preparation, Reduction}
+  alias Jido.AgentServer.Plugin.Admission
+
+  @impl true
+  def state_spec(_opts) do
+    {:ledger,
+     Zoi.object(%{
+       turns: Zoi.integer() |> Zoi.min(0),
+       last_actor: Zoi.string()
+     })
+     |> Zoi.default(%{turns: 0, last_actor: ""})}
+  end
+
+  @impl true
+  def prepare(%Preparation{signal: %{subject: actor}}, _opts)
+      when is_binary(actor) and actor != "" do
+    {:ok, %{actor: actor}}
+  end
+
+  def prepare(%Preparation{}, _opts), do: {:error, :actor_required}
+
+  @impl true
+  def admit(_runtime, %Admission{prepared_input: %{actor: actor}}, opts) do
+    if actor in Keyword.get(opts, :blocked, ["mallory"]),
+      do: {:error, :actor_blocked},
+      else: {:ok, %{admitted: actor}}
+  end
+
+  @impl true
+  def reduce(%Reduction{plugin_state: ledger, prepared_input: input}, _opts) do
+    {:ok, %{ledger | turns: ledger.turns + 1, last_actor: input.actor}}
+  end
+end
+```
+
+Each callback receives a read-only struct:
+
+- `Jido.Agent.Plugin.Preparation`: the Signal, Agent ID, complete Agent state,
+  and this Plugin's owned value.
+- `Jido.AgentServer.Plugin.Admission`: the Signal, caller context, committed
+  revision, owned value, and this Plugin's prepared input.
+- `Jido.Agent.Plugin.Reduction`: the state before the Turn, the candidate
+  state, the prepared input, and every validated Directive.
+
+None of them can return a replacement Signal, route, context, or Agent.
+
+## Attach It
+
+In application code, declare the Plugin in the `agent` block:
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+agent do
+  schema(Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}))
+  plugin GuidePlugins.Ledger, config: %{blocked: ["mallory", "eve"]}
+end
+```
+
+`plugin` needs a source file, and a Livebook cell doesn't have one. This
+notebook uses `extensions:`, which attaches the same Plugin with no options.
+`admit/3` then falls back to `["mallory"]`.
+
+```elixir
+defmodule GuidePlugins.Counter do
+  use Jido.Agent,
+    name: "ledgered_counter",
+    extensions: [GuidePlugins.Ledger]
+
+  agent do
+    schema(Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}))
+  end
+
+  routes do
+    signal_source("/guides/stateful-plugins")
+
+    route "counter.increment", as: :increment, defaults: %{amount: 1} do
+      action %{amount: amount},
+        name: "increment",
+        schema: Zoi.object(%{amount: Zoi.integer()}),
+        context: context do
+        {:ok, %{context.agent_state | count: context.agent_state.count + amount}}
+      end
+    end
+
+    route "counter.tamper", as: :tamper do
+      action _input, name: "tamper", schema: Zoi.object(%{}), context: context do
+        state = context.agent_state
+        {:ok, %{state | ledger: %{state.ledger | turns: 99}}}
+      end
+    end
+  end
+end
+```
+
+The `tamper` route tries to overwrite the ledger. You'll run it below.
+
+## The Composed State
+
+The Plugin's field joins the Agent schema, with its default:
+
+```elixir
+agent = GuidePlugins.Counter.instantiate!(id: "counter-1")
+agent.state
+```
+
+The result is `%{count: 0, ledger: %{turns: 0, last_actor: ""}}`.
+
+## Prepare and Reduce
+
+The Plugin reads the actor from the Signal `subject`:
+
+```elixir
+signal = GuidePlugins.Counter.increment_signal!(%{amount: 2}, subject: "ada")
+{:ok, candidate, []} = GuidePlugins.Counter.cmd(agent, signal)
+candidate.state
+```
+
+The result is `%{count: 2, ledger: %{turns: 1, last_actor: "ada"}}`.
+`prepare/2` returned `%{actor: "ada"}`, the Action changed `count`, and
+`reduce/2` wrote the next ledger from the prepared input.
+
+## Reject a Signal
+
+Without a subject, `prepare/2` rejects the Signal before route selection:
+
+```elixir
+anonymous = GuidePlugins.Counter.increment_signal!(%{amount: 2})
+GuidePlugins.Counter.cmd(agent, anonymous)
+```
+
+The result is `{:error, :actor_required}`. Jido returns the Plugin's reason
+as-is, not wrapped in a `Jido.Error` struct. The Action never ran.
+
+## Owned State Is Protected
+
+An Action can read `context.agent_state.ledger`. It can't change it:
+
+```elixir
+tamper = GuidePlugins.Counter.tamper_signal!(%{}, subject: "ada")
+{:error, error} = GuidePlugins.Counter.cmd(agent, tamper)
+Exception.message(error)
+```
+
+The result is `"Agent executable changed Plugin-owned state"`. Only the
+owning Plugin's `reduce/2` writes its field.
+
+## Admission Is Live Only
+
+`cmd/3` doesn't call `admit/3`, so a blocked actor gets through pure
+evaluation:
+
+```elixir
+blocked = GuidePlugins.Counter.increment_signal!(%{amount: 1}, subject: "mallory")
+{:ok, candidate, []} = GuidePlugins.Counter.cmd(agent, blocked)
+candidate.state.ledger.last_actor
+```
+
+The result is `"mallory"`. Put rules that must hold everywhere in
+`prepare/2`. Put rules that depend on live resources, such as tokens, leases,
+and rate limits, in `admit/3`.
+
+## Run It Live
+
+```elixir
+{:ok, _jido} = Jido.start()
+{:ok, counter} = Jido.start_agent(GuidePlugins.Counter, id: "ledgered")
+
+{:ok, committed, []} = Jido.AgentServer.call(counter, signal)
+rejected = Jido.AgentServer.call(counter, blocked)
+
+{committed.state.count, rejected}
+```
+
+The result is `{2, {:error, :actor_blocked}}`. The Server ran `admit/3` and
+refused mallory before the Action started.
+
+`plugin_state/2` reads the committed owned value:
+
+```elixir
+Jido.AgentServer.plugin_state(counter, GuidePlugins.Ledger)
+```
+
+The result is `{:ok, %{turns: 1, last_actor: "ada"}}`. The rejected Turn
+changed nothing.
+
+## Stop the Example
+
+```elixir
+:ok = Jido.stop_agent("ledgered")
+:ok = Jido.stop()
+```
+
+## Summary
+
+- `state_spec/1` declares one owned field in the complete state schema.
+- `prepare/2` runs in `cmd/3` and live. Its result is at
+  `context.plugin_inputs[Plugin].prepared`.
+- `admit/3` runs live only. Its result is at
+  `context.plugin_inputs[Plugin].runtime`.
+- `reduce/2` writes the owned field after the Action succeeds.
+- Actions can read Plugin-owned state but can't change it.
+
+## Next
+
+[Supervised Resources](plugin-supervised-resources.livemd) gives a Plugin a
+process. [Custom Directives](plugin-custom-directives.livemd) lets it run work
+after commit.

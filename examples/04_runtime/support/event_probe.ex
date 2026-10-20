@@ -25,7 +25,6 @@ defmodule Jido.Examples.Runtime.EventProbe do
               [:jido, :agent_server, :turn, :settled],
               [:jido, :agent, :turn, :settled],
               [:jido, :agent, :admission, :rejected],
-              [:jido, :scheduler, :delivery],
               [:jido, :topology, :ownership, :settled]
             ]
 

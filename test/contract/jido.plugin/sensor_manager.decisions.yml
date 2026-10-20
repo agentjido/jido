@@ -1,0 +1,17 @@
+- id: bundled-sensor-manager-boundary
+  date: 2026-10-19
+  decision: Give desired sensor Directives, desired state reduction, reconciliation, retry ownership, and stale-work fencing to jido.plugin.sensor_manager.
+  driver: These rules are bundled SensorManager product behavior, not generic Plugin SDK behavior.
+  approved_by: Approved Jido V3 Covenant component map
+
+- id: sensor-manager-consumer-boundary
+  date: 2026-10-19
+  decision: Keep sensor implementation behavior, generic Plugin callback timing, AgentServer commit atomicity, and receiving Agent work outside jido.plugin.sensor_manager.
+  driver: SensorManager owns process alignment after a commit but does not define the sensor or its consumer.
+  approved_by: Approved Jido V3 Covenant component map
+
+- id: sensor-manager-mutation-profile
+  date: 2026-10-19
+  decision: Mutate only the Jido.Plugin.SensorManager module root and its behavior-bearing helpers.
+  driver: These modules contain the bundled Plugin's desired-state, reconciliation, retry, and fencing decisions.
+  approved_by: User-requested component hardening pass

@@ -2,7 +2,7 @@
 
 **Status: production wait transitions and durable AgentServer input are implemented.**
 Action provides `Jido.Exec.Waits` for request inspection, matching, and native
-wait completion. `Jido.AgentServer.WaitHost` owns input receipts, duplicate IDs,
+wait completion. `Jido.AgentServer.DurableTurn.WaitHost` owns input receipts, duplicate IDs,
 retention limits, clock delivery, and portability checks. AgentServer owns
 persistence, Signal acceptance, Worker release, and restore.
 Example 11_06 uses one suspended Flow. Normal Exec still rejects waits.

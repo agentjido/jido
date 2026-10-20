@@ -17,7 +17,7 @@ defmodule Jido.Instance.NamespaceRegistry do
           {:ok, claim()} | {:error, Error.ValidationError.t()}
   def claim(nil, _instance), do: {:ok, nil}
 
-  def claim(namespace, instance) when is_binary(namespace) and is_atom(instance) do
+  def claim(namespace, instance) do
     GenServer.call(__MODULE__, {:claim, namespace, instance, self()})
   end
 
@@ -26,13 +26,11 @@ defmodule Jido.Instance.NamespaceRegistry do
           :ok | {:error, Error.ValidationError.t()}
   def bind(nil, nil, _instance, _owner), do: :ok
 
-  def bind(claim, namespace, instance, owner)
-      when is_reference(claim) and is_binary(namespace) and is_atom(instance) and is_pid(owner) do
+  def bind(claim, namespace, instance, owner) when is_reference(claim) do
     GenServer.call(__MODULE__, {:bind, claim, namespace, instance, owner})
   end
 
-  def bind(:existing, namespace, instance, owner)
-      when is_binary(namespace) and is_atom(instance) and is_pid(owner) do
+  def bind(:existing, namespace, instance, owner) do
     GenServer.call(__MODULE__, {:bind_existing, namespace, instance, owner})
   end
 
@@ -40,26 +38,22 @@ defmodule Jido.Instance.NamespaceRegistry do
   @spec release(claim()) :: :ok
   def release(nil), do: :ok
   def release(:existing), do: :ok
-  def release(claim) when is_reference(claim), do: GenServer.call(__MODULE__, {:release, claim})
+  def release(claim), do: GenServer.call(__MODULE__, {:release, claim})
 
   @doc false
   @spec namespace(atom()) :: String.t() | nil
-  def namespace(instance) when is_atom(instance) do
-    GenServer.call(__MODULE__, {:namespace, instance})
-  end
+  def namespace(instance), do: GenServer.call(__MODULE__, {:namespace, instance})
 
   @doc false
   @spec lookup(String.t()) :: {atom(), pid()} | nil
-  def lookup(namespace) when is_binary(namespace) do
-    GenServer.call(__MODULE__, {:lookup, namespace})
-  end
+  def lookup(namespace), do: GenServer.call(__MODULE__, {:lookup, namespace})
 
   @impl true
   def init(_opts) do
-    ensure_table()
+    table = ensure_table()
 
     {bindings, monitors} =
-      @table
+      table
       |> :ets.tab2list()
       |> Enum.reduce({%{}, %{}}, fn
         {namespace, token, instance, owner}, {bindings, monitors} ->
@@ -87,7 +81,7 @@ defmodule Jido.Instance.NamespaceRegistry do
         {token, state} = claim_binding(state, namespace, instance, owner)
         {:reply, {:ok, token}, state}
 
-      %{instance: ^instance, owner: current_owner} when is_pid(current_owner) ->
+      %{instance: ^instance} ->
         {:reply, {:ok, :existing}, state}
 
       %{owner: current_owner} ->
@@ -99,7 +93,7 @@ defmodule Jido.Instance.NamespaceRegistry do
     case Map.get(state.bindings, namespace) do
       %{token: ^token, instance: ^instance} = binding ->
         old_monitor = binding.monitor
-        Process.demonitor(old_monitor, [:flush])
+        Process.demonitor(old_monitor)
         monitor = Process.monitor(owner)
         binding = %{binding | owner: owner, monitor: monitor}
         put_binding(namespace, binding)
@@ -114,18 +108,15 @@ defmodule Jido.Instance.NamespaceRegistry do
                |> Map.put(monitor, namespace)
          }}
 
-      %{owner: current_owner} ->
-        {:reply, {:error, already_bound(namespace, current_owner)}, state}
-
-      nil ->
-        {:reply, {:error, already_bound(namespace, nil)}, state}
+      binding ->
+        {:reply, {:error, already_bound(namespace, binding && binding.owner)}, state}
     end
   end
 
   def handle_call({:release, token}, _from, state) do
     case Enum.find(state.bindings, fn {_namespace, binding} -> binding.token == token end) do
       {namespace, binding} ->
-        Process.demonitor(binding.monitor, [:flush])
+        Process.demonitor(binding.monitor)
         {:reply, :ok, delete_binding(state, namespace, binding.monitor)}
 
       nil ->
@@ -138,12 +129,13 @@ defmodule Jido.Instance.NamespaceRegistry do
       %{instance: ^instance, owner: ^owner} ->
         {:reply, :ok, state}
 
-      %{owner: current_owner} ->
-        {:reply, {:error, already_bound(namespace, current_owner)}, state}
-
-      nil ->
-        {_token, state} = claim_binding(state, namespace, instance, owner)
-        {:reply, :ok, state}
+      binding ->
+        if binding do
+          {:reply, {:error, already_bound(namespace, binding.owner)}, state}
+        else
+          {_token, state} = claim_binding(state, namespace, instance, owner)
+          {:reply, :ok, state}
+        end
     end
   end
 
@@ -172,9 +164,9 @@ defmodule Jido.Instance.NamespaceRegistry do
 
   @impl true
   def handle_info({:DOWN, monitor, :process, _pid, _reason}, state) do
-    case Map.get(state.monitors, monitor) do
-      nil -> {:noreply, state}
-      namespace -> {:noreply, delete_binding(state, namespace, monitor)}
+    case Map.fetch(state.monitors, monitor) do
+      :error -> {:noreply, state}
+      {:ok, namespace} -> {:noreply, delete_binding(state, namespace, monitor)}
     end
   end
 
@@ -202,15 +194,8 @@ defmodule Jido.Instance.NamespaceRegistry do
     }
   end
 
-  defp put_binding(namespace, binding) do
-    true =
-      :ets.insert(
-        @table,
-        {namespace, binding.token, binding.instance, binding.owner}
-      )
-
-    :ok
-  end
+  defp put_binding(namespace, binding),
+    do: :ets.insert(@table, {namespace, binding.token, binding.instance, binding.owner})
 
   defp ensure_table do
     case :ets.whereis(@table) do
@@ -218,20 +203,14 @@ defmodule Jido.Instance.NamespaceRegistry do
         [parent | _ancestors] = Process.get(:"$ancestors")
         heir = if is_pid(parent), do: parent, else: Process.whereis(parent)
 
-        _table =
-          :ets.new(@table, [
-            :named_table,
-            :set,
-            :public,
-            {:heir, heir, :namespace_registry},
-            read_concurrency: true,
-            write_concurrency: true
-          ])
+        :ets.new(@table, [
+          :named_table,
+          :public,
+          {:heir, heir, :namespace_registry}
+        ])
 
-        :ok
-
-      _table ->
-        :ok
+      table ->
+        table
     end
   end
 

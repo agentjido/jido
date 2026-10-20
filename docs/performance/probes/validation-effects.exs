@@ -25,20 +25,24 @@ defmodule JidoCoreEffects.Reset do
 end
 
 {:ok, specs} = Jido.Plugin.Normalizer.normalize_all([JidoCoreEffects.Owned])
+
 probe_agent =
   Jido.Agent.new!(name: "core_effects_owned", plugins: [JidoCoreEffects.Owned])
   |> Map.put(:id, "core-effects-owned")
   |> Map.put(:state, %{owned: 1})
 
 probe_signal = Jido.Signal.new!("probe.owned", %{}, source: "/probe")
+
 {:ok, %{owned: 2}, []} =
   Jido.Agent.Plugin.Pipeline.run(
     {:ok, %{owned: 1}, []},
     probe_agent,
     probe_signal,
     %{},
-    Jido.Agent.Plugin.specs(specs)
+    Jido.Agent.Plugin.specs(specs),
+    %{emits: nil}
   )
+
 IO.puts("Round 25: unchanged reducer output still transforms owned state from 1 to 2")
 
 {:ok, supervisor} = Jido.start_link(name: JidoCoreEffects)

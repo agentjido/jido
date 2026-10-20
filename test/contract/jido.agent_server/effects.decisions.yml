@@ -1,0 +1,29 @@
+- id: effects-boundary
+  date: 2026-10-19
+  decision: Use jido.agent_server.effects for complete Directive admission, post-commit ordering, effect task settlement, Signal preparation, built-in effect dispatch, and safe post-commit error reporting.
+  driver: Pure evaluation returns Directives, but only the live AgentServer can own their external execution.
+  approved_by: User-approved Jido V3 component map
+
+- id: effects-code-seam
+  date: 2026-10-19
+  decision: Move effect decisions and runtime Agent Directive dispatch from Jido.AgentServer and Jido.AgentServer.RuntimeDirectives into Jido.AgentServer.Effects. Keep phase transitions, timers, task startup, and replies in the gen_statem owner.
+  driver: One effect engine must own validation and dispatch without making a second state machine.
+  approved_by: Component hardening pass
+
+- id: effects-mutation-profile
+  date: 2026-10-19
+  decision: Mutate Jido.AgentServer.Effects and Jido.Dispatch.Preparation. Keep Jido.AgentServer out of this focused profile while it remains the shared state-machine owner for core, effects, Plugin runtime, composition, and durable work.
+  driver: The focused profile must test the extracted effect decisions without overlapping every remaining AgentServer component.
+  approved_by: Component hardening pass
+
+- id: effects-obligation-migration
+  date: 2026-10-19
+  decision: Replace old AgentServer I9, I32, and I39 through I48 with effects I1 through I9. Move the admission and dispatch part of old I102 to effects I10, and narrow old I102 to runtime child lifetime behavior for later composition extraction.
+  driver: Every moved promise needs one final owner while the compound runtime child promise is split without duplicate ownership.
+  approved_by: Component hardening pass
+
+- id: process-start-owner
+  date: 2026-10-19
+  decision: Move old AgentServer I49 to effects I11 instead of the earlier planned Plugin runtime group.
+  driver: ProcessStart is a built-in post-commit effect. It does not use a Plugin callback or Plugin-owned runtime root.
+  approved_by: Component hardening pass

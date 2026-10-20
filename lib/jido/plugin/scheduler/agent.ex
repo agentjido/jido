@@ -1,31 +1,26 @@
 defmodule Jido.Plugin.Scheduler.Agent do
-  @moduledoc "Owns recurring schedules and pending occurrences in Agent state."
+  @moduledoc "Owns recurring schedule definitions in Agent state."
   @behaviour Jido.Plugin
 
   alias Jido.Plugin.Scheduler
-  alias Jido.Plugin.Scheduler.{Acknowledge, Cancel, Cron, Durable, Occurrence, Queue, Schedule}
+  alias Jido.Plugin.Scheduler.{Cancel, Cron, Schedule}
   alias Jido.Signal
 
   @timer_max 4_294_967_295
-  @delivery_timeout_max div(@timer_max - 100, 2)
-  @cron_spec_schema Zoi.object(%{
-                      cron_expression: Zoi.string(),
-                      message: Zoi.struct(Signal),
-                      timezone: Zoi.string(),
-                      generation:
-                        Zoi.integer() |> Zoi.min(0) |> Zoi.max(2_147_483_647) |> Zoi.optional(),
-                      delivery: Zoi.literal(:durable) |> Zoi.optional(),
-                      pending: Zoi.struct(Signal) |> Zoi.nullable() |> Zoi.optional(),
-                      last_scheduled_at:
-                        Zoi.string()
-                        |> Zoi.refine({Occurrence, :validate_utc, []})
-                        |> Zoi.nullable()
-                        |> Zoi.optional()
-                    })
+  @cron_spec_schema Zoi.object(
+                      %{
+                        cron_expression: Zoi.string(),
+                        message: Zoi.struct(Signal),
+                        timezone: Zoi.string(),
+                        generation:
+                          Zoi.integer() |> Zoi.min(0) |> Zoi.max(2_147_483_647) |> Zoi.optional()
+                      },
+                      unrecognized_keys: :error
+                    )
   @state_schema Zoi.object(%{
                   cron:
                     Zoi.map(Zoi.any(), @cron_spec_schema,
-                      description: "Durable recurring schedule definitions"
+                      description: "Recurring schedule definitions"
                     )
                     |> Zoi.refine({Scheduler, :validate_cron_state, []})
                 })
@@ -33,49 +28,44 @@ defmodule Jido.Plugin.Scheduler.Agent do
 
   @impl true
   def state_spec(opts) do
-    validate_timer_option!(opts, :delivery_interval, 100, @timer_max)
-    validate_timer_option!(opts, :delivery_timeout, 5_000, @delivery_timeout_max)
+    reject_delivery_options!(opts)
     validate_timer_option!(opts, :retry_delay_ms, 1_000, @timer_max)
     validate_time_scale_option!(opts)
     {:scheduler, @state_schema}
   end
 
   @impl true
-  def directives(_opts), do: [Schedule, Cron, Cancel, Queue, Acknowledge]
+  def directives(_opts), do: [Schedule, Cron, Cancel]
 
   @impl true
   def reduce(reduction, _opts), do: apply_directives(reduction.plugin_state, reduction.directives)
 
   @doc "Applies validated Scheduler Directives to the owned state field."
   def apply_directives(state, directives) do
-    Enum.reduce_while(directives, {:ok, state}, fn
-      %Cron{} = directive, {:ok, state} ->
-        spec =
-          Scheduler.build_cron_spec(
-            directive.cron,
-            directive.signal,
-            directive.timezone,
-            directive.generation,
-            directive.delivery
-          )
+    Enum.reduce_while(directives, {:ok, state}, &apply_directive/2)
+  end
 
-        case Durable.replace(Map.get(state.cron, directive.job_id), spec) do
-          {:ok, spec} -> {:cont, {:ok, put_in(state, [:cron, directive.job_id], spec)}}
-          error -> {:halt, error}
-        end
+  defp apply_directive(%Cron{} = directive, {:ok, state}) do
+    spec =
+      Scheduler.build_cron_spec(
+        directive.cron,
+        directive.signal,
+        directive.timezone,
+        directive.generation
+      )
 
-      %Cancel{job_id: job_id}, {:ok, state} ->
-        {:cont, {:ok, update_in(state, [:cron], &Map.delete(&1, job_id))}}
+    {:cont, {:ok, put_in(state, [:cron, directive.job_id], spec)}}
+  end
 
-      %module{} = directive, {:ok, state} when module in [Queue, Acknowledge] ->
-        case Durable.update(state, directive) do
-          {:ok, state} -> {:cont, {:ok, state}}
-          error -> {:halt, error}
-        end
+  defp apply_directive(%Cancel{job_id: job_id}, {:ok, state}),
+    do: {:cont, {:ok, update_in(state, [:cron], &Map.delete(&1, job_id))}}
 
-      _other, {:ok, state} ->
-        {:cont, {:ok, state}}
-    end)
+  defp apply_directive(_other, {:ok, state}), do: {:cont, {:ok, state}}
+
+  defp reject_delivery_options!(opts) do
+    if Enum.any?([:delivery_interval, :delivery_timeout], &Keyword.has_key?(opts, &1)) do
+      raise ArgumentError, "Scheduler delivery options are not supported"
+    end
   end
 
   defp validate_timer_option!(opts, name, default, maximum) do

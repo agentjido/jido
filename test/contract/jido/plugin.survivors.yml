@@ -1,0 +1,287 @@
+- at: lib/jido/plugin.ex:206:66
+  operator: return_nil
+  mutation: "`Jido.AgentServer.Plugin.state(init, timeout)` → `nil`"
+  sort: unpromised
+  reason: This function reads live Plugin state through AgentServer. The generic Plugin contract excludes live process execution; jido.agent_server.plugin_runtime owns this behavior.
+
+- at: lib/jido/plugin.ex:206:30
+  operator: integer_shift
+  mutation: "`5000` → `5001`"
+  sort: unpromised
+  reason: This function reads live Plugin state through AgentServer. The generic Plugin contract excludes live process execution; jido.agent_server.plugin_runtime owns this behavior.
+
+- at: lib/jido/plugin.ex:206:30
+  operator: integer_shift
+  mutation: "`5000` → `4999`"
+  sort: unpromised
+  reason: This function reads live Plugin state through AgentServer. The generic Plugin contract excludes live process execution; jido.agent_server.plugin_runtime owns this behavior.
+
+- at: lib/jido/plugin/codec.ex:82:25
+  operator: string_empty
+  mutation: "`\"Unknown authoring document type or version\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured error kind and details. It does not fix human-readable error prose.
+
+- at: lib/jido/plugin/manifest.ex:66:15
+  operator: string_empty
+  mutation: "`\"Plugin manifest or declaration options are invalid\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured error kind and details. It does not fix human-readable error prose.
+
+- at: lib/jido/plugin/manifest.ex:72:45
+  operator: string_empty
+  mutation: "`\"Plugin package module is invalid\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured error kind and details. It does not fix human-readable error prose.
+
+- at: lib/jido/plugin/manifest.ex:75:39
+  operator: string_empty
+  mutation: "`\"Plugin package version must be positive\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured error kind and details. It does not fix human-readable error prose.
+
+- at: lib/jido/plugin/manifest.ex:87:17
+  operator: string_empty
+  mutation: "`\"Plugin callbacks must belong to the Plugin module\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured error kind and details. It does not fix human-readable error prose.
+
+- at: lib/jido/plugin/manifest.ex:118:17
+  operator: string_empty
+  mutation: "`\"Plugin option mapping has an unknown owner\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured error kind and details. It does not fix human-readable error prose.
+
+- at: lib/jido/plugin/manifest.ex:129:17
+  operator: string_empty
+  mutation: "`\"Plugin option mapping names an unselected facet\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured error kind and details. It does not fix human-readable error prose.
+
+- at: lib/jido/plugin/manifest.ex:134:17
+  operator: string_empty
+  mutation: "`\"Plugin declaration contains unassigned options\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured error kind and details. It does not fix human-readable error prose.
+
+- at: lib/jido/plugin/manifest.ex:150:17
+  operator: string_empty
+  mutation: "`\"Plugin declaration options must be static data\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured error kind and details. It does not fix human-readable error prose.
+
+- at: lib/jido/plugin/normalizer.ex:27:32
+  operator: string_empty
+  mutation: "`\"Agent Plugins must be a list\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured error kind and details. It does not fix human-readable error prose.
+
+- at: lib/jido/plugin/normalizer.ex:51:32
+  operator: string_empty
+  mutation: "`\"Agent Plugins must be a list\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured error kind and details. It does not fix human-readable error prose.
+
+- at: lib/jido/plugin/normalizer.ex:66:11
+  operator: string_empty
+  mutation: "`\"Agent Plugin declarations cannot mix normalized specs and declarations\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured error kind and details. It does not fix human-readable error prose.
+
+- at: lib/jido/plugin/normalizer.ex:99:30
+  operator: string_empty
+  mutation: "`\"Agent Plugin options must be a keyword list\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured error kind and details. It does not fix human-readable error prose.
+
+- at: lib/jido/plugin/normalizer.ex:107:32
+  operator: string_empty
+  mutation: "`\"Invalid Agent Plugin declaration\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured error kind and details. It does not fix human-readable error prose.
+
+- at: lib/jido/plugin/normalizer.ex:130:32
+  operator: string_empty
+  mutation: "`\"Plugin manifest package module does not match\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured error kind and details. It does not fix human-readable error prose.
+
+- at: lib/jido/plugin/normalizer.ex:200:32
+  operator: string_empty
+  mutation: "`\"Persistence Plugin facet must define dump/3 and load/3\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured error kind and details. It does not fix human-readable error prose.
+
+- at: lib/jido/plugin/normalizer.ex:209:32
+  operator: string_empty
+  mutation: "`\"Plugin must define both quiesce/2 and resume/2\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured error kind and details. It does not fix human-readable error prose.
+
+- at: lib/jido/plugin/normalizer.ex:214:32
+  operator: string_empty
+  mutation: "`\"Persistence Plugin facet requires a stateful Agent facet\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured error kind and details. It does not fix human-readable error prose.
+
+- at: lib/jido/plugin/normalizer.ex:220:32
+  operator: string_empty
+  mutation: "`\"Agent Server Plugin dispatch requires Agent-owned Directives\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured error kind and details. It does not fix human-readable error prose.
+
+- at: lib/jido/plugin/normalizer.ex:228:11
+  operator: string_empty
+  mutation: "`\"Agent Plugin Directives must reduce state or dispatch runtime work\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured error kind and details. It does not fix human-readable error prose.
+
+- at: lib/jido/plugin/normalizer.ex:256:30
+  operator: string_empty
+  mutation: "`\"Plugin must use Jido.Plugin\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured error kind and details. It does not fix human-readable error prose.
+
+- at: lib/jido/plugin/normalizer.ex:292:14
+  operator: string_empty
+  mutation: "`\"Agent Server Plugin option validation failed\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured error kind and details. It does not fix human-readable error prose.
+
+- at: lib/jido/plugin/normalizer.ex:302:13
+  operator: string_empty
+  mutation: "`\"Agent Server Plugin validate_options/1 returned an invalid result\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured error kind and details. It does not fix human-readable error prose.
+
+- at: lib/jido/plugin/normalizer.ex:317:30
+  operator: string_empty
+  mutation: "`\"Plugin facet defines no capability\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured error kind and details. It does not fix human-readable error prose.
+
+- at: lib/jido/plugin/normalizer.ex:331:9
+  operator: string_empty
+  mutation: "`\"Agent Plugin state_spec/1 failed\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured error kind and details. It does not fix human-readable error prose.
+
+- at: lib/jido/plugin/normalizer.ex:346:28
+  operator: string_empty
+  mutation: "`\"Plugin-owned Agent state key must not be nil\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured error kind and details. It does not fix human-readable error prose.
+
+- at: lib/jido/plugin/normalizer.ex:353:28
+  operator: string_empty
+  mutation: "`\"Plugin-owned Agent state key is reserved\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured error kind and details. It does not fix human-readable error prose.
+
+- at: lib/jido/plugin/normalizer.ex:362:30
+  operator: string_empty
+  mutation: "`\"Plugin-owned Agent state schema must be a Zoi schema\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured error kind and details. It does not fix human-readable error prose.
+
+- at: lib/jido/plugin/normalizer.ex:372:34
+  operator: string_empty
+  mutation: "`\"Plugin-owned Agent state schema must contain static data\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured error kind and details. It does not fix human-readable error prose.
+
+- at: lib/jido/plugin/normalizer.ex:382:28
+  operator: string_empty
+  mutation: "`\"Agent Plugin state_spec/1 returned an invalid value\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured error kind and details. It does not fix human-readable error prose.
+
+- at: lib/jido/plugin/normalizer.ex:396:11
+  operator: string_empty
+  mutation: "`\"Agent Plugin directives/1 failed\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured error kind and details. It does not fix human-readable error prose.
+
+- at: lib/jido/plugin/normalizer.ex:413:77
+  operator: integer_shift
+  mutation: "`0` → `1`"
+  sort: equivalent
+  reason: Elixir struct modules export both __struct__/0 and __struct__/1, so this arity change does not change the accepted Directive struct modules.
+
+- at: lib/jido/plugin/normalizer.ex:428:23
+  operator: clause_removal
+  mutation: "`cond unloaded != nil ->` → `(removed)`"
+  sort: equivalent
+  reason: Without this early branch, an unloaded module still fails Directive validator discovery with the same structured Plugin and Directive identity.
+
+- at: lib/jido/plugin/normalizer.ex:417:32
+  operator: string_empty
+  mutation: "`\"Agent Plugin Directive modules must be atoms\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured error kind and details. It does not fix human-readable error prose.
+
+- at: lib/jido/plugin/normalizer.ex:423:32
+  operator: string_empty
+  mutation: "`\"Agent Plugin Directive modules must be unique\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured error kind and details. It does not fix human-readable error prose.
+
+- at: lib/jido/plugin/normalizer.ex:429:32
+  operator: string_empty
+  mutation: "`\"Agent Plugin Directive modules must be loaded\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured error kind and details. It does not fix human-readable error prose.
+
+- at: lib/jido/plugin/normalizer.ex:435:32
+  operator: string_empty
+  mutation: "`\"Agent Plugin Directive modules must define a struct\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured error kind and details. It does not fix human-readable error prose.
+
+- at: lib/jido/plugin/normalizer.ex:441:32
+  operator: string_empty
+  mutation: "`\"Agent Plugin cannot own a built-in Directive\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured error kind and details. It does not fix human-readable error prose.
+
+- at: lib/jido/plugin/normalizer.ex:451:28
+  operator: string_empty
+  mutation: "`\"Agent Plugin directives/1 must return a list\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured error kind and details. It does not fix human-readable error prose.
+
+- at: lib/jido/plugin/normalizer.ex:464:11
+  operator: string_empty
+  mutation: "`\"Agent Plugin Directive validation belongs to the Directive module\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured error kind and details. It does not fix human-readable error prose.
+
+- at: lib/jido/plugin/normalizer.ex:469:32
+  operator: string_empty
+  mutation: "`\"Agent Plugin state middleware must define reduce/2\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured error kind and details. It does not fix human-readable error prose.
+
+- at: lib/jido/plugin/normalizer.ex:475:32
+  operator: string_empty
+  mutation: "`\"Agent Plugin Directive must define validate/1\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured error kind and details. It does not fix human-readable error prose.
+
+- at: lib/jido/plugin/normalizer.ex:493:35
+  operator: string_empty
+  mutation: "`\"Agent Plugin modules must be unique\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured error kind and details. It does not fix human-readable error prose.
+
+- at: lib/jido/plugin/normalizer.ex:499:40
+  operator: string_empty
+  mutation: "`\"Plugin-owned Agent state keys must be unique\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured error kind and details. It does not fix human-readable error prose.
+
+- at: lib/jido/plugin/normalizer.ex:545:32
+  operator: string_empty
+  mutation: "`\"Agent Plugin could not be loaded\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured error kind and details. It does not fix human-readable error prose.

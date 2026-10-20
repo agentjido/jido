@@ -1,6 +1,8 @@
 defmodule Jido.Plugin.Scheduler.Cancel do
   @moduledoc "Cancels one recurring Signal schedule."
 
+  alias Jido.Plugin.Scheduler
+
   @schema Zoi.struct(
             __MODULE__,
             %{job_id: Zoi.any(description: "Agent-local job id")},
@@ -17,7 +19,7 @@ defmodule Jido.Plugin.Scheduler.Cancel do
   @doc "Validates one recurring schedule cancellation."
   def validate(%__MODULE__{} = directive) do
     with {:ok, directive} <- Zoi.parse(@schema, Map.from_struct(directive)),
-         :ok <- Jido.Plugin.Scheduler.validate_durable_id(directive.job_id) do
+         :ok <- Scheduler.validate_job_id(directive.job_id) do
       {:ok, directive}
     end
   end

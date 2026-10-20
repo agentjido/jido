@@ -133,6 +133,8 @@ defmodule Jido.Agent do
   end
 
   @doc "Builds a Signal for a declared helper. It does not select or run a handler."
+  @spec input_signal(definition(), String.t(), map(), keyword() | map()) ::
+          {:ok, Signal.t()} | {:error, term()}
   def input_signal(definition, type, data, opts \\ []) do
     with {:ok, opts} <-
            Validation.options(opts, [:source, :id, :time, :subject, :datacontenttype]),
@@ -140,6 +142,17 @@ defmodule Jido.Agent do
          :ok <- Jido.Agent.Error.at(Jido.Agent.Data.nonempty(source), :source),
          :ok <- Jido.Agent.Data.plain_map(data) do
       Jido.Signal.new(type, data, Map.put(opts, :source, source))
+    end
+  end
+
+  @doc "Builds a Signal for a declared helper or raises for an invalid Signal input."
+  @spec input_signal!(definition(), String.t(), map(), keyword() | map()) ::
+          Signal.t() | no_return()
+  def input_signal!(definition, type, data, opts \\ []) do
+    case input_signal(definition, type, data, opts) do
+      {:ok, signal} -> signal
+      {:error, %{__exception__: true} = error} -> raise error
+      {:error, reason} -> raise ArgumentError, "invalid input Signal: #{inspect(reason)}"
     end
   end
 

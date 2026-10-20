@@ -1,0 +1,23 @@
+- id: agent-contract-hardening
+  date: 2026-10-19
+  decision: Keep the Covenant component on Jido.Agent value, authoring, direct command, and composition code. Remove persistence, AgentServer, Scheduler provider, and shared codec or Plugin ownership claims.
+  driver: The obligation set and mutation profile must follow current code ownership and current public APIs.
+  approved_by: User-requested hardening pass
+
+- id: reset-agent-mutation-evidence
+  date: 2026-10-19
+  decision: Remove the historical survivor ledger and do not claim a current full mutation result until the hardened profile completes.
+  driver: The historical full run used an older source shape, and many saved source locations no longer exist.
+  approved_by: User-requested hardening pass
+
+- id: agent-contract-review-shape
+  date: 2026-10-19
+  decision: Renumber the 30 active Agent obligations as I1 through I30 and remove the retired Topology Covenant files.
+  driver: The review surface must contain only current Agent-owned promises and must not retain identifier gaps or retired component evidence.
+  approved_by: User request to drop Topology obligations and clean the Agent obligations
+
+- id: transfer-pure-evaluation
+  date: 2026-10-19
+  decision: Retire the direct-command promises in jido.agent and transfer them to jido.agent_evaluation. Keep the cmd entry point as an Agent facade and keep definition edit semantics with jido.agent.
+  driver: Pure candidate production must not share Covenant ownership with Agent authoring or live AgentServer execution.
+  approved_by: Approved Jido V3 Covenant component map

@@ -14,8 +14,8 @@ defmodule Jido.Agent.Plugin do
 
   alias Jido.Agent
   alias Jido.Agent.Plugin.{Preparation, Spec}
-  alias Jido.Plugin.Input
   alias Jido.Plugin.Error, as: PluginError
+  alias Jido.Plugin.Input
   alias Jido.Plugin.Normalizer
   alias Jido.Signal
 
@@ -24,8 +24,7 @@ defmodule Jido.Agent.Plugin do
   @doc false
   @spec compose_schema(Zoi.schema(), [Jido.Plugin.declaration()] | [Jido.Plugin.Spec.t()]) ::
           {:ok, Zoi.schema()} | {:error, term()}
-  def compose_schema(%Zoi.Types.Map{fields: fields} = domain_schema, declarations)
-      when is_list(fields) do
+  def compose_schema(%Zoi.Types.Map{} = domain_schema, declarations) do
     with {:ok, specs} <- Normalizer.normalize_all(declarations),
          do: compose_schema_from_specs(domain_schema, specs)
   end
@@ -34,8 +33,7 @@ defmodule Jido.Agent.Plugin do
 
   # Callers pass the specifications from the current validation result.
   @doc false
-  def compose_schema_from_specs(%Zoi.Types.Map{fields: fields} = domain_schema, plugin_specs)
-      when is_list(fields) do
+  def compose_schema_from_specs(%Zoi.Types.Map{fields: fields} = domain_schema, plugin_specs) do
     agent_specs = specs(plugin_specs)
 
     with :ok <- state_key_conflicts(fields, agent_specs) do
@@ -69,7 +67,7 @@ defmodule Jido.Agent.Plugin do
   @doc false
   @spec prepare(Agent.instance(), Signal.t(), [Jido.Plugin.Spec.t()] | [Spec.t()]) ::
           {:ok, %{optional(module()) => Input.t()}} | {:error, term()}
-  def prepare(%Agent{} = agent, %Signal{} = signal, plugin_specs) when is_list(plugin_specs) do
+  def prepare(%Agent{} = agent, %Signal{} = signal, plugin_specs) do
     plugin_specs
     |> specs()
     |> Enum.reduce_while({:ok, %{}}, fn spec, {:ok, inputs} ->

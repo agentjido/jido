@@ -88,7 +88,7 @@ defmodule Jido.AgentServer.TopologyRuntime do
           for member <- members, index <- 1..member.count do
             tag = tag(member.name, index)
             declaration = Enum.find(agent.topology.agents, &(&1.name == member.name))
-            default = if data.persistence in [nil, false], do: nil, else: "initial"
+            default = if data.persistence, do: "initial"
             identity = Map.get(declaration, :identities, %{}) |> Map.get(index, default)
 
             {tag,
@@ -148,7 +148,7 @@ defmodule Jido.AgentServer.TopologyRuntime do
   end
 
   defp member_persistence(%{persistence: persistence}, _agent) when persistence in [nil, false],
-    do: {:ok, [persistence: false]}
+    do: {:ok, []}
 
   defp member_persistence(data, agent) do
     options = [instance: data.jido, partition: data.partition]
@@ -159,8 +159,8 @@ defmodule Jido.AgentServer.TopologyRuntime do
            agent.id,
            options
          ) do
-      {:ok, _, _} -> {:ok, [persistence: data.persistence, persistence_mode: :restore]}
-      {:error, :not_found} -> {:ok, [persistence: data.persistence, persistence_mode: :create]}
+      {:ok, _, _} -> {:ok, [persistence_mode: :restore]}
+      {:error, :not_found} -> {:ok, [persistence_mode: :create]}
       error -> error
     end
   end
@@ -190,8 +190,8 @@ defmodule Jido.AgentServer.TopologyRuntime do
     |> Enum.sort_by(fn {_, member} -> member.slot end)
     |> Enum.flat_map(fn {tag, _member} ->
       case Map.get(live, tag) do
-        pid when is_pid(pid) -> [pid]
-        _ -> []
+        nil -> []
+        pid -> [pid]
       end
     end)
   end
@@ -199,9 +199,9 @@ defmodule Jido.AgentServer.TopologyRuntime do
   def owner_send(nil, _), do: {:error, :owner_not_found}
 
   def owner_send(parent, signal) do
-    case ServerSupervisor.worker(parent.activation) do
-      pid when is_pid(pid) -> Server.cast(pid, signal)
-      _ -> {:error, :owner_not_found}
+    case ServerSupervisor.live_worker(parent.activation) do
+      nil -> {:error, :owner_not_found}
+      pid -> Server.cast(pid, signal)
     end
   end
 
@@ -269,7 +269,6 @@ defmodule Jido.AgentServer.TopologyRuntime do
   defp topology_parent?(nil), do: false
   defp topology_parent?(parent), do: Map.has_key?(plans(parent.state), parent.tag)
   defp tag(name, index), do: "$topology/#{name}/#{index}"
-  defp plans(nil), do: %{}
 
   defp plans(state) do
     case :ets.lookup(state, :topology_members) do
@@ -278,10 +277,7 @@ defmodule Jido.AgentServer.TopologyRuntime do
     end
   end
 
-  defp put_plans(nil, _), do: :ok
   defp put_plans(state, plans), do: :ets.insert(state, {:topology_members, plans})
-
-  defp children(nil), do: %{}
 
   defp children(state) do
     Map.new(
@@ -295,10 +291,8 @@ defmodule Jido.AgentServer.TopologyRuntime do
 
   defp reduce(values, fun) do
     Enum.reduce_while(values, :ok, fn value, :ok ->
-      case fun.(value) do
-        :ok -> {:cont, :ok}
-        error -> {:halt, error}
-      end
+      result = fun.(value)
+      {if(result == :ok, do: :cont, else: :halt), result}
     end)
   end
 end

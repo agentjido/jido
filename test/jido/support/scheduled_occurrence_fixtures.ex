@@ -1,93 +1,3 @@
-defmodule JidoTest.ScheduledOccurrenceFixtures.Example.Arm do
-  @moduledoc "Creates a new durable schedule generation."
-
-  use Jido.Action,
-    name: "example_arm_durable_occurrences",
-    schema: Zoi.object(%{job_id: Zoi.string() |> Zoi.min(1), cron: Zoi.string()})
-
-  @impl true
-  def run(input, %{agent_state: state}) do
-    generation = state.generation + 1
-
-    tick =
-      Jido.Signal.new!(
-        "examples.runtime.schedule.tick",
-        %{job_id: input.job_id, generation: generation},
-        source: "/examples/runtime/durable_schedule"
-      )
-
-    cron =
-      Jido.Plugin.Scheduler.cron(input.job_id, input.cron, tick,
-        generation: generation,
-        delivery: :durable
-      )
-
-    {:ok, %{state | generation: generation}, [cron]}
-  end
-end
-
-defmodule JidoTest.ScheduledOccurrenceFixtures.Example.Capture do
-  @moduledoc "Admits one current occurrence and acknowledges it with the result."
-
-  use Jido.Action, name: "example_capture_durable_occurrence"
-
-  alias Jido.Plugin.Scheduler
-
-  @impl true
-  def run(input, %{agent_state: state, signal: signal}) do
-    with :ok <- Scheduler.admit_occurrence(state.scheduler, signal),
-         {:ok, occurrence} <- Scheduler.occurrence(signal) do
-      tick = %{signal_id: signal.id, data: input, occurrence: occurrence}
-      {:ok, %{state | ticks: state.ticks ++ [tick]}, [Scheduler.acknowledge(occurrence.id)]}
-    end
-  end
-end
-
-defmodule JidoTest.ScheduledOccurrenceFixtures.Example.Cancel do
-  @moduledoc "Cancels one durable schedule."
-
-  use Jido.Action,
-    name: "example_cancel_occurrences",
-    schema: Zoi.object(%{job_id: Zoi.string() |> Zoi.min(1)})
-
-  @impl true
-  def run(input, %{agent_state: state}),
-    do: {:ok, state, [Jido.Plugin.Scheduler.cancel(input.job_id)]}
-end
-
-defmodule JidoTest.ScheduledOccurrenceFixtures.Example do
-  @moduledoc """
-  An Agent saves each due schedule occurrence before it starts the work.
-
-  Start the Agent with persistence and restore enabled for crash recovery. The
-  Scheduler keeps one pending occurrence per job and retries it until the
-  result Turn acknowledges it. The recorded tick list is only a small example
-  diagnostic, so long-running applications need a bounded storage policy.
-  """
-
-  use Jido.Agent, name: "example_durable_schedule"
-
-  agent do
-    schema Zoi.object(%{
-             generation: Zoi.integer() |> Zoi.default(0),
-             ticks: Zoi.list(Zoi.map()) |> Zoi.default([])
-           })
-
-    plugin Jido.Plugin.Scheduler
-  end
-
-  routes do
-    signal_source "/examples/runtime/durable_schedule"
-
-    route "examples.runtime.schedule.arm", __MODULE__.Arm, as: :arm_schedule
-
-    route "examples.runtime.schedule.cancel", __MODULE__.Cancel, as: :cancel_schedule
-
-    route "jido.scheduler.enqueue", Jido.Plugin.Scheduler.Enqueue
-    route "examples.runtime.schedule.tick", __MODULE__.Capture
-  end
-end
-
 defmodule JidoTest.ScheduledOccurrenceFixtures.Clock do
   @moduledoc false
   @behaviour SchedEx.TimeScale
@@ -103,30 +13,12 @@ defmodule JidoTest.ScheduledOccurrenceFixtures.Clock do
   def speedup, do: 20
 end
 
-defmodule JidoTest.ScheduledOccurrenceFixtures.DurableAgent do
-  @moduledoc false
-  alias JidoTest.ScheduledOccurrenceFixtures.Example, as: ScheduledOccurrenceRecovery
-  use Jido.Agent, name: "durable_occurrence_probe"
-
-  agent do
-    schema ScheduledOccurrenceRecovery.definition().schema
-
-    plugin Jido.Plugin.Scheduler,
-      config: %{time_scale: JidoTest.ScheduledOccurrenceFixtures.Clock, delivery_interval: 25}
-  end
-
-  routes do
-    route "jido.scheduler.enqueue", Jido.Plugin.Scheduler.Enqueue
-    route "examples.runtime.schedule.arm", ScheduledOccurrenceRecovery.Arm
-    route "examples.runtime.schedule.tick", ScheduledOccurrenceRecovery.Capture
-    route "examples.runtime.schedule.cancel", ScheduledOccurrenceRecovery.Cancel
-  end
-end
-
 defmodule JidoTest.ScheduledOccurrenceFixtures.FastRuntimeAgent do
   @moduledoc false
 
+  alias Jido.Plugin.Scheduler
   alias JidoTest.AgentRuntimeFixtures.{Record, ReturnDirective, Tick}
+  alias JidoTest.ScheduledOccurrenceFixtures.Clock
 
   use Jido.Agent, name: "fast_runtime_agent"
 
@@ -136,8 +28,7 @@ defmodule JidoTest.ScheduledOccurrenceFixtures.FastRuntimeAgent do
              ticks: Zoi.integer() |> Zoi.default(0)
            })
 
-    plugin Jido.Plugin.Scheduler,
-      config: %{time_scale: JidoTest.ScheduledOccurrenceFixtures.Clock}
+    plugin Scheduler, config: %{time_scale: Clock}
   end
 
   routes do
@@ -149,6 +40,11 @@ end
 
 defmodule JidoTest.ScheduledOccurrenceFixtures.TimedAgent do
   @moduledoc false
+
+  alias Jido.Plugin.Scheduler
+  alias Jido.Signal
+  alias JidoTest.ScheduledOccurrenceFixtures.Clock
+
   use Jido.Agent, name: "timed_occurrence_probe"
 
   agent do
@@ -157,8 +53,7 @@ defmodule JidoTest.ScheduledOccurrenceFixtures.TimedAgent do
              ticks: Zoi.list(Zoi.map()) |> Zoi.default([])
            })
 
-    plugin Jido.Plugin.Scheduler,
-      config: %{time_scale: JidoTest.ScheduledOccurrenceFixtures.Clock}
+    plugin Scheduler, config: %{time_scale: Clock}
   end
 
   routes do
@@ -171,14 +66,14 @@ defmodule JidoTest.ScheduledOccurrenceFixtures.TimedAgent do
         generation = context.agent_state.generation + 1
 
         tick =
-          Jido.Signal.new!(
+          Signal.new!(
             "test.schedule.tick",
             %{job_id: input.job_id, generation: generation},
             source: "/test/scheduled_occurrences"
           )
 
         directive =
-          Jido.Plugin.Scheduler.cron(input.job_id, input.cron, tick, generation: generation)
+          Scheduler.cron(input.job_id, input.cron, tick, generation: generation)
 
         {:ok, %{context.agent_state | generation: generation}, [directive]}
       end
@@ -186,7 +81,7 @@ defmodule JidoTest.ScheduledOccurrenceFixtures.TimedAgent do
 
     route "test.schedule.tick" do
       action input, context: context do
-        with {:ok, occurrence} <- Jido.Plugin.Scheduler.occurrence(context.signal) do
+        with {:ok, occurrence} <- Scheduler.occurrence(context.signal) do
           tick = %{signal_id: context.signal.id, data: input, occurrence: occurrence}
           {:ok, %{context.agent_state | ticks: context.agent_state.ticks ++ [tick]}}
         end

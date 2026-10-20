@@ -1,0 +1,262 @@
+# Nested Agents
+
+## Overview
+
+You want one Agent to run a team: a lead and a group of workers, sized by the
+parent's state. In Jido, you declare that team in a `topology` block and the
+Agent Server starts and supervises it.
+
+This is where you'll end up:
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+topology do
+  agent :lead, Nested.Worker, initial_state: %{team: "lead"}
+
+  agent :workers, Nested.Worker do
+    count state(:size)
+    initial_state %{team: state(:name)}
+  end
+end
+```
+
+This Livebook shows you how to declare members, bind counts and initial state
+to the parent's state, check the plan without a process, and inspect the live
+members. The terms are defined in
+[Composition Vocabulary](composition-vocabulary.md).
+
+## Install
+
+```elixir
+Mix.install([{:jido, "~> 3.0.0-beta.2"}])
+```
+
+## Define A Member
+
+A member is an ordinary Agent. It needs nothing special to run in a team.
+
+```elixir
+defmodule Nested.Worker do
+  use Jido.Agent, name: "worker"
+
+  agent do
+    schema(
+      Zoi.object(%{
+        team: Zoi.string() |> Zoi.default("none"),
+        done: Zoi.integer() |> Zoi.default(0)
+      })
+    )
+  end
+
+  routes do
+    signal_source("/guides/nested-agents")
+
+    route "task.run", as: :run do
+      action _input, name: "run_task", schema: Zoi.object(%{}), context: context do
+        {:ok, %{context.agent_state | done: context.agent_state.done + 1}}
+      end
+    end
+  end
+end
+```
+
+## Declare The Team
+
+```elixir
+defmodule Nested.Team do
+  use Jido.Agent, name: "team"
+
+  agent do
+    schema(
+      Zoi.object(%{
+        name: Zoi.string() |> Zoi.default("alpha"),
+        size: Zoi.integer() |> Zoi.default(2)
+      })
+    )
+  end
+
+  topology do
+    agent :lead, Nested.Worker, initial_state: %{team: "lead"}
+
+    agent :workers, Nested.Worker do
+      count state(:size)
+      initial_state %{team: state(:name)}
+    end
+  end
+end
+```
+
+Each `agent` entry declares one member:
+
+- `:lead` has the default count of `1` and a literal initial state.
+- `:workers` reads its count from the parent's `size` field and copies the
+  parent's `name` into every worker.
+
+`state/1` is a state binding. It refers to a field of the parent's committed
+state. Jido resolves it when the parent has an instance.
+
+Jido checks the topology when the module compiles. These fail the build:
+
+- `state(:missing)` for a field the parent schema doesn't have;
+- an initial state that doesn't match the member's schema;
+- a member whose definition contains itself.
+
+## Read The Plan
+
+The topology is part of the definition, as plain data:
+
+```elixir
+Nested.Team.definition().topology.agents
+|> Enum.map(&{&1.name, &1.count})
+```
+
+You get `[lead: 1, workers: %{key: :size, kind: :state}]`. The definition has
+no state, so the `:workers` count is still a binding.
+
+`Jido.Agent.Topology.bind/2` resolves bindings against a state map. It starts
+nothing.
+
+```elixir
+team = Nested.Team.instantiate!(id: "team-1")
+{:ok, members} = Jido.Agent.Topology.bind(team, team.state)
+
+Enum.map(members, &{&1.name, &1.count, &1.state})
+```
+
+You get:
+
+```text
+[{:lead, 1, %{done: 0, team: "lead"}},
+ {:workers, 2, %{done: 0, team: "alpha"}}]
+```
+
+Each member's state is complete: the member schema's defaults fill `done`.
+
+Other state produces another team:
+
+```elixir
+beta = Nested.Team.instantiate!(id: "team-2", state: %{name: "beta", size: 3})
+{:ok, members} = Jido.Agent.Topology.bind(beta, beta.state)
+
+Enum.map(members, &{&1.name, &1.count, &1.state})
+```
+
+You get `:workers` with a count of `3` and `team: "beta"` in each slot.
+
+A bound count must resolve to a positive integer. Jido checks this when you
+create the instance:
+
+```elixir
+{:error, error} = Nested.Team.instantiate(id: "team-3", state: %{size: 0})
+
+Exception.message(error)
+```
+
+The message is `"Expected a positive integer"`.
+
+## Start The Team
+
+```elixir
+{:ok, _jido} = Jido.start()
+{:ok, server} = Jido.start_agent(Nested.Team, id: "team-1")
+:ok = Jido.AgentServer.await_ready(server)
+```
+
+The Server binds the topology against the instance state and starts one Agent
+Server per slot under its own activation.
+
+Call `await_ready/2` before you use members. `start_agent/2` can return before
+every slot is ready.
+
+## Inspect The Children
+
+`Jido.AgentServer.children/2` returns every child of the parent, keyed by tag:
+
+```elixir
+server
+|> Jido.AgentServer.children()
+|> Map.keys()
+|> Enum.sort()
+```
+
+You get `["$topology/lead/1", "$topology/workers/1", "$topology/workers/2"]`.
+
+Each value is `%{pid: pid, activation: root, placement: :owned}`. `:owned`
+means the slot runs under the parent's activation and stops with the parent.
+
+## Find Members By Name
+
+`Jido.AgentServer.members/3` returns the PIDs for one member, in slot order:
+
+```elixir
+workers = Jido.AgentServer.members(server, :workers)
+
+Enum.map(workers, fn pid ->
+  agent = Jido.AgentServer.agent(pid)
+  {agent.id, agent.state}
+end)
+```
+
+You get:
+
+```text
+[{"team-1/$topology/workers/1", %{done: 0, team: "alpha"}},
+ {"team-1/$topology/workers/2", %{done: 0, team: "alpha"}}]
+```
+
+A member ID is the parent ID plus the slot tag. Members are registered in the
+instance Registry, so `Jido.whereis_agent/1` finds them by ID:
+
+```elixir
+Jido.whereis_agent("team-1/$topology/workers/1") == hd(workers)
+```
+
+You get `true`.
+
+## Call One Member
+
+Each slot is a full Agent Server:
+
+```elixir
+run = Nested.Worker.run_signal!()
+{:ok, worker, []} = Jido.AgentServer.call(hd(workers), run)
+
+{worker.state, Jido.AgentServer.status(server).state_version}
+```
+
+You get `{%{done: 1, team: "alpha"}, 0}`. The worker committed revision 1 of
+its own state. The parent's revision is still `0`. State never merges across
+the team.
+
+## Stop The Team
+
+Stopping the parent stops its activation and every owned slot:
+
+```elixir
+:ok = Jido.stop_agent("team-1")
+
+Enum.map(workers, &Process.alive?/1)
+```
+
+You get `[false, false]`.
+
+```elixir
+:ok = Jido.stop()
+```
+
+## Summary
+
+- A `topology` block declares members as definition data. It starts nothing.
+- `count` and `initial_state` take literals or `state/1` bindings.
+- `Jido.Agent.Topology.bind/2` resolves bindings without a process.
+- The Server starts one Agent Server per slot under its activation.
+- `children/2` lists slots by tag. `members/3` returns PIDs by name.
+- Each member owns its own state and revision.
+
+## Next
+
+- [Connect Agent Outputs](connect-agent-outputs.livemd) to route Signals
+  between members.
+- [Change Live Composition](change-live-composition.md) to resize and replace
+  members on a running team.

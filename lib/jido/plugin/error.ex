@@ -26,9 +26,8 @@ defmodule Jido.Plugin.Error do
     {:error, Error.validation_error(message, kind: :config, details: details)}
   end
 
-  def execution(message, package, facet, details) do
+  def execution(message, package, _facet, details) do
     details = Map.put(details, :plugin, package)
-    details = if facet == package, do: details, else: Map.put(details, :facet, facet)
 
     Error.execution_error(message,
       details: details

@@ -16,7 +16,6 @@ defmodule Jido.Telemetry.Semantic do
   @admission_values ~w(deadline_expired overloaded)a
   @persistence_values ~w(commit activate stop hibernate thaw manual topology)a
   @topology_values ~w(activate repair update place cleanup)a
-  @scheduler_values ~w(idle delivered state_read_error timeout task_error delivery_error invalid_result)a
 
   @signed_measurements [:system_time, :monotonic_time]
   @count_measurements ~w(count duration state_version state_version_before state_version_after directive_count directive_index directive_completed directive_failed directive_skipped queue_depth queue_limit wait_duration expected_revision revision_before revision_after target_revision component_count ready_count failed_count epoch)a
@@ -218,9 +217,6 @@ defmodule Jido.Telemetry.Semantic do
 
   defp normalize_field({:topology_operation, value}, acc) when value in @topology_values,
     do: Map.put(acc, :topology_operation, value)
-
-  defp normalize_field({:scheduler_outcome, value}, acc) when value in @scheduler_values,
-    do: Map.put(acc, :scheduler_outcome, value)
 
   defp normalize_field({:component_kind, value}, acc)
        when is_atom(value) and not is_nil(value),

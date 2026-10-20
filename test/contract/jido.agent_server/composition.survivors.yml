@@ -1,0 +1,131 @@
+- at: lib/jido/agent_server/composition_runtime.ex:54:22
+  operator: statement_removal
+  mutation: "`Supervisor.release(context.state, tag, token)` → `(removed)`"
+  sort: evaluation-gap
+  reason: A deterministic check would have to make activation startup exit after the parent reserves the tag but before start_activation/2 returns. Normal startup errors return values and already prove release behavior.
+
+- at: lib/jido/agent_server/composition_runtime.ex:108:16
+  operator: integer_shift
+  mutation: "`0` → `1`"
+  sort: unpromised
+  reason: The contract requires serialized adoption and a safe busy result. It does not fix the private global-lock retry count.
+
+- at: lib/jido/agent_server/composition_runtime.ex:140:22
+  operator: statement_removal
+  mutation: "`Supervisor.release(context.state, tag, token)` → `(removed)`"
+  sort: evaluation-gap
+  reason: A deterministic check would have to stop an adoptable child after tag reservation and during its private attach call. Returned attach failures already prove release behavior.
+
+- at: lib/jido/agent_server/composition_runtime.ex:172:7
+  operator: boolean_flip
+  mutation: "`true` → `false`"
+  sort: evaluation-gap
+  reason: This branch rejects a pre-existing corrupt parent cycle that does not contain the proposed child. Public adoption is serialized and cannot create that graph, so a check needs private relationship injection.
+
+- at: lib/jido/agent_server/topology_bus.ex:42:17
+  operator: clause_removal
+  mutation: "`case error ->` → `(removed)`"
+  sort: evaluation-gap
+  reason: The activation owns a unique child ID and supplies a valid child specification. Reaching this defensive Supervisor error needs an injected Supervisor failure.
+
+- at: lib/jido/agent_server/topology_bus.ex:51:7
+  operator: string_empty
+  mutation: "`\"$agent/\"` → `\"\"`"
+  sort: unpromised
+  reason: The Bus name is an opaque private identifier. The contract fixes its instance, partition, Agent, and declaration isolation, not this text prefix.
+
+- at: lib/jido/agent_server/topology_bus.ex:53:20
+  operator: boolean_flip
+  mutation: "`false` → `true`"
+  sort: unpromised
+  reason: Base64 padding is an internal Bus-name encoding choice and does not change Bus ownership or routing.
+
+- at: lib/jido/agent_server/topology_bus.ex:75:17
+  operator: clause_removal
+  mutation: "`case error ->` → `(removed)`"
+  sort: evaluation-gap
+  reason: A live owned Bus accepts the validated Signal and returns success. Reaching this defensive dependency-error branch needs a Bus failure during the publish call.
+
+- at: lib/jido/agent_server/topology_runtime.ex:37:47
+  operator: string_empty
+  mutation: "`\"initial\"` → `\"\"`"
+  sort: unpromised
+  reason: The contract requires a stable initial slot identity and a new identity for a new lifetime. It does not expose the initial identity token.
+
+- at: lib/jido/agent_server/topology_runtime.ex:38:69
+  operator: integer_shift
+  mutation: "`16` → `17`"
+  sort: unpromised
+  reason: The contract requires a new opaque slot identity. It does not fix the random input byte count.
+
+- at: lib/jido/agent_server/topology_runtime.ex:38:69
+  operator: integer_shift
+  mutation: "`16` → `15`"
+  sort: unpromised
+  reason: The contract requires a new opaque slot identity. It does not fix the random input byte count.
+
+- at: lib/jido/agent_server/topology_runtime.ex:38:83
+  operator: boolean_flip
+  mutation: "`false` → `true`"
+  sort: unpromised
+  reason: Base64 padding is an internal slot-identity encoding choice and does not change identity stability or lifetime separation.
+
+- at: lib/jido/agent_server/topology_runtime.ex:72:13
+  operator: string_empty
+  mutation: "`\"Runtime supports Agent and declared local Bus endpoints\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured unsupported_runtime_endpoint code and path, not its human-readable prose.
+
+- at: lib/jido/agent_server/topology_runtime.ex:80:42
+  operator: logical_swap
+  mutation: "`and` → `or`"
+  sort: equivalent
+  reason: The mutation can only request an extra reconciliation. Reconciliation retains matching member processes and Buses, so accepted state and live resources stay the same.
+
+- at: lib/jido/agent_server/topology_runtime.ex:91:23
+  operator: condition_negate
+  mutation: "`if data.persistence` → `if !(data.persistence)`"
+  sort: unpromised
+  reason: This fallback applies only when an accepted declaration has no slot identity. Both the base Agent ID and the initial-suffixed ID are stable; the contract does not fix this private fallback form.
+
+- at: lib/jido/agent_server/topology_runtime.ex:91:48
+  operator: string_empty
+  mutation: "`\"initial\"` → `\"\"`"
+  sort: unpromised
+  reason: This is the opaque fallback identity for a persistent declaration that has no accepted identity map. The contract does not expose its literal value.
+
+- at: lib/jido/agent_server/topology_runtime.ex:150:85
+  operator: element_removal
+  mutation: "`nil` → `(removed)`"
+  sort: equivalent
+  reason: AgentServer normalizes the absence of a persistence adapter to false. Valid runtime data does not reach this guard with nil.
+
+- at: lib/jido/agent_server/topology_runtime.ex:164:13
+  operator: clause_removal
+  mutation: "`case error ->` → `(removed)`"
+  sort: equivalent
+  reason: An adapter error and the removed-clause exception both fail resource reconciliation after the accepted checkpoint. Neither path reopens admission or undoes that checkpoint.
+
+- at: lib/jido/agent_server/topology_runtime.ex:163:38
+  operator: element_removal
+  mutation: "`persistence_mode: :create` → `(removed)`"
+  sort: equivalent
+  reason: A new child AgentServer defaults to create mode when no saved record exists. The explicit option and its absence produce the same missing-member startup.
+
+- at: lib/jido/agent_server/topology_runtime.ex:193:13
+  operator: clause_removal
+  mutation: "`case nil ->` → `(removed)`"
+  sort: evaluation-gap
+  reason: This branch filters a member plan whose activation disappears between the live-child snapshot and lookup. A deterministic check needs control of that private recovery race.
+
+- at: lib/jido/agent_server/topology_runtime.ex:258:15
+  operator: element_removal
+  mutation: "`kind: :bus` → `(removed)`"
+  sort: equivalent
+  reason: Runtime validation permits only Agent and declared Bus endpoints. Earlier delivery clauses consume all Agent targets, so every accepted target that reaches this final clause is a Bus.
+
+- at: lib/jido/agent_server/topology_runtime.ex:269:35
+  operator: return_nil
+  mutation: "`false` → `nil`"
+  sort: equivalent
+  reason: Both values are false in the only cond that consumes topology_parent?/1, and neither value is returned through the public API.

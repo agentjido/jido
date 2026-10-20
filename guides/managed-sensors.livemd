@@ -1,154 +1,323 @@
-# Manage Sensors
+# Managed Sensors
 
-This Livebook starts and stops one supervised input process through
-`Jido.Plugin.SensorManager`.
+## Overview
 
-## Install Jido
+A sensor is a process that watches something outside the Agent, such as a
+thermometer, a directory, or a price feed, and sends what it sees to the
+Agent as Signals. `Jido.Plugin.SensorManager` lets an Agent own its sensors.
+An Action returns which sensors should run, and the manager starts and stops
+processes to match:
+
+<!-- livebook:{"force_markdown":true} -->
 
 ```elixir
-Mix.install([
-  {:jido, path: Path.expand("..", __DIR__)}
-])
+{:ok, state, [Jido.Plugin.SensorManager.start({:thermometer, "lab"}, MyApp.Thermometer, %{room: "lab"})]}
 ```
 
-## Register A Local Observer
+The list of desired sensors is Agent state. It commits with the Turn, so you
+can test it with `cmd/2`. Sensors run under the Agent's activation: they
+restart with it and stop with it.
+
+In this Livebook you write a thermometer sensor, start and stop it from an
+Action, and watch its readings arrive as Turns.
+
+Run the cells from top to bottom.
+
+## Install
 
 ```elixir
-if Process.whereis(:sensor_guide_observer) do
-  Process.unregister(:sensor_guide_observer)
+Mix.install([{:jido, "~> 3.0.0-beta.2"}])
+```
+
+## Wait Helper
+
+This helper polls a condition every 20 ms until it returns `{:ok, value}` or
+3 seconds pass.
+
+```elixir
+defmodule SensorGuide.Wait do
+  def until(fun, timeout \\ 3_000) do
+    deadline = System.monotonic_time(:millisecond) + timeout
+    loop(fun, deadline)
+  end
+
+  defp loop(fun, deadline) do
+    case fun.() do
+      {:ok, value} ->
+        {:ok, value}
+
+      _not_yet ->
+        if System.monotonic_time(:millisecond) >= deadline do
+          :timeout
+        else
+          Process.sleep(20)
+          loop(fun, deadline)
+        end
+    end
+  end
 end
-
-true = Process.register(self(), :sensor_guide_observer)
 ```
 
-The name is only for this local example. Application sensors should get stable
-configuration through their normal application boundary.
+## Write A Sensor
 
-## Define A Sensor
+A sensor is an OTP child process. It must:
+
+- define `child_spec/1` (`use GenServer` provides one);
+- accept one `Jido.Plugin.SensorManager.Init` struct when it starts; and
+- send input with `Jido.AgentServer.cast(init.agent_server, signal)`.
+
+This thermometer sends a fake reading every `interval_ms` ms:
 
 ```elixir
-defmodule SensorGuide.Probe do
+defmodule SensorGuide.Thermometer do
   use GenServer
 
-  def start_link(%Jido.Plugin.SensorManager.Init{} = init) do
-    GenServer.start_link(__MODULE__, init)
+  alias Jido.Plugin.SensorManager.Init
+
+  def start_link(%Init{} = init), do: GenServer.start_link(__MODULE__, init)
+
+  @impl true
+  def init(%Init{} = init) do
+    send(self(), :read)
+    {:ok, %{init: init, reading: 0}}
   end
 
-  @impl GenServer
-  def init(init) do
+  @impl true
+  def handle_info(:read, state) do
+    reading = state.reading + 1
+
     signal =
       Jido.Signal.new!(
-        "sensor.ready",
-        %{observer: init.config.observer},
-        source: "/guides/sensor"
+        "temperature.reading",
+        %{room: state.init.config.room, celsius: 20 + reading},
+        source: "/sensors/thermometer"
       )
 
-    :ok = Jido.AgentServer.cast(init.agent_server, signal)
-    {:ok, init}
+    Jido.AgentServer.cast(state.init.agent_server, signal)
+    Process.send_after(self(), :read, state.init.config.interval_ms)
+    {:noreply, %{state | reading: reading}}
   end
 end
 ```
 
-## Declare The Agent
+The `Init` struct fields:
+
+| Field | Value |
+| --- | --- |
+| `agent_server` | PID of the owning Agent Server. |
+| `agent_id` | ID of the owning Agent. |
+| `tag` | This sensor's tag. |
+| `module` | This sensor's module. |
+| `config` | The config map passed to `start/3`. |
+| `jido`, `partition` | The Agent's Jido instance and partition, when set. |
+
+The sensor only reports readings. The Agent's routes decide what a reading
+means.
+
+## Define The Agent
+
+The building Agent starts and stops one thermometer per room and stores the
+latest reading for each:
 
 ```elixir
-defmodule SensorGuide.Agent do
-  use Jido.Agent, name: "sensor_guide_agent"
+defmodule SensorGuide.Building do
+  use Jido.Agent, name: "building"
 
   agent do
-    schema(Zoi.object(%{inputs: Zoi.integer() |> Zoi.default(0)}))
+    schema(Zoi.object(%{readings: Zoi.map() |> Zoi.default(%{})}))
     plugin(Jido.Plugin.SensorManager)
   end
 
   routes do
-    signal_source("/guides/sensor")
+    signal_source("/guides/managed-sensors")
 
-    route "sensor.start", as: :start_probe do
-      action %{observer: observer},
-        name: "sensor_guide_start",
-        schema: Zoi.object(%{observer: Zoi.atom()}),
-        context: context do
-        directive =
-          Jido.Plugin.SensorManager.start(
-            :probe,
-            SensorGuide.Probe,
-            %{observer: observer}
-          )
-
-        {:ok, context.agent_state, [directive]}
+    route "sensor.watch", as: :watch do
+      action %{room: room}, schema: Zoi.object(%{room: Zoi.string()}), context: context do
+        {:ok, context.agent_state,
+         [
+           Jido.Plugin.SensorManager.start(
+             {:thermometer, room},
+             SensorGuide.Thermometer,
+             %{room: room, interval_ms: 100}
+           )
+         ]}
       end
     end
 
-    route "sensor.stop", as: :stop_probe do
-      action _input, name: "sensor_guide_stop", context: context do
-        {:ok, context.agent_state, [Jido.Plugin.SensorManager.stop(:probe)]}
+    route "sensor.unwatch", as: :unwatch do
+      action %{room: room}, schema: Zoi.object(%{room: Zoi.string()}), context: context do
+        {:ok, context.agent_state, [Jido.Plugin.SensorManager.stop({:thermometer, room})]}
       end
     end
 
-    route "sensor.ready" do
-      action %{observer: observer},
-        name: "sensor_guide_ready",
-        schema: Zoi.object(%{observer: Zoi.atom()}),
+    route "temperature.reading" do
+      action %{room: room, celsius: celsius},
+        schema: Zoi.object(%{room: Zoi.string(), celsius: Zoi.integer()}),
         context: context do
-        count = context.agent_state.inputs + 1
-        send(observer, {:sensor_guide_input, count})
-        {:ok, %{context.agent_state | inputs: count}}
+        readings = Map.put(context.agent_state.readings, room, celsius)
+        {:ok, %{context.agent_state | readings: readings}}
       end
     end
   end
 end
 ```
 
-## Start And Stop The Sensor
+The tag `{:thermometer, room}` identifies one sensor. Tags and config are
+stored in Agent state, so they must be portable data: no PIDs, references, or
+functions.
+
+## Test The Decision
+
+The Plugin adds a `sensors` field. Run the watch Signal with `cmd/2` to see
+the change without starting a process:
+
+```elixir
+agent = SensorGuide.Building.instantiate!(id: "plan")
+watch = SensorGuide.Building.watch_signal!(%{room: "lab"})
+{:ok, candidate, [directive]} = SensorGuide.Building.cmd(agent, watch)
+
+{agent.state.sensors, candidate.state.sensors, directive.__struct__}
+```
+
+The result is:
+
+```text
+{%{desired: %{}},
+ %{desired: %{{:thermometer, "lab"} => %{module: SensorGuide.Thermometer,
+                                         config: %{room: "lab", interval_ms: 100}}}},
+ Jido.Plugin.SensorManager.Start}
+```
+
+No process started. The candidate lists one desired thermometer.
+
+## Start The Building
 
 ```elixir
 {:ok, _jido} = Jido.start()
+{:ok, building} = Jido.start_agent(SensorGuide.Building, id: "building")
 
-{:ok, agent} =
-  Jido.start_agent(
-    SensorGuide.Agent,
-    id: "sensor-agent"
-  )
-
-{:ok, _committed} =
-  with {:ok, signal} <- SensorGuide.Agent.start_probe_signal(%{observer: :sensor_guide_observer}) do
-    Jido.AgentServer.call(agent, signal, [])
-  end
-
-receive do
-  {:sensor_guide_input, count} -> count
-after
-  5_000 -> raise "Sensor input did not arrive"
-end
-
-{:ok, _committed} =
-  with {:ok, signal} <- SensorGuide.Agent.stop_probe_signal(%{}) do
-    Jido.AgentServer.call(agent, signal, [])
-  end
-
-:idle =
-  Enum.reduce_while(1..100, :directing, fn _, _phase ->
-    case Jido.AgentServer.status(agent).phase do
-      :idle ->
-        {:halt, :idle}
-
-      phase ->
-        Process.sleep(10)
-        {:cont, phase}
-    end
-  end)
+Jido.AgentServer.await_ready(building)
 ```
 
-The desired sensor set is in a portable Plugin-owned Agent field. The Sensor
-Manager runtime
-owns the PIDs and restarts the sensor while its tag remains desired.
+The result is `:ok`. The manager's supervisor is running with no sensors.
+
+## Start A Sensor
+
+Send the same Signal to the live Agent:
+
+```elixir
+{:ok, committed, _directives} = Jido.AgentServer.call(building, watch)
+
+Map.keys(committed.state.sensors.desired)
+```
+
+The result is `[thermometer: "lab"]`: one tag, `{:thermometer, "lab"}`,
+which Elixir prints as a keyword list.
+
+The Server commits the new desired set first. Then the manager handles the
+`Start` Directive: it starts each desired sensor that isn't running and stops
+each running sensor that isn't desired.
+
+Wait for readings:
+
+```elixir
+SensorGuide.Wait.until(fn ->
+  case Jido.AgentServer.agent(building).state.readings do
+    %{"lab" => celsius} when celsius >= 22 -> {:ok, :reading}
+    _ -> :wait
+  end
+end)
+```
+
+The result is `{:ok, :reading}`. Each reading is cast to the Agent, routed,
+and committed by a normal Turn.
+
+## Stop A Sensor
+
+```elixir
+unwatch = SensorGuide.Building.unwatch_signal!(%{room: "lab"})
+{:ok, committed, _directives} = Jido.AgentServer.call(building, unwatch)
+
+committed.state.sensors
+```
+
+The result is `%{desired: %{}}`. After the commit, the manager stops the lab
+thermometer, and readings stop changing:
+
+```elixir
+Process.sleep(150)
+before = Jido.AgentServer.agent(building).state.readings["lab"]
+Process.sleep(300)
+
+before == Jido.AgentServer.agent(building).state.readings["lab"]
+```
+
+The result is `true`. The last reading stays in state.
+
+## Replace A Sensor
+
+Calling `start/3` with a tag that is already running:
+
+- with a different module or config, stops the old process and starts a new
+  one;
+- with the same module and config, leaves the running process alone.
+
+You can return the same `start/3` Directive on every Turn without restarting
+the sensor.
+
+## Restarts
+
+The manager supervises sensors inside the Agent's activation:
+
+| Event | Result |
+| --- | --- |
+| A sensor crashes | The manager restarts it at once while its tag is desired. |
+| A sensor fails to start | The manager retries after `retry_delay_ms`. |
+| The Agent Server crashes | The activation restarts, and the manager starts every sensor in `sensors.desired`. |
+| The Agent stops | Every sensor stops. |
+
+A crash restart has no backoff and no limit. Sensors run as `:temporary`
+children, and the manager restarts them itself when it sees the exit, so no
+supervisor restart limit applies. A sensor that crashes right after it starts
+restarts in a loop. Guard against this inside the sensor, for example by
+catching errors in `handle_info/2`.
+
+Each reconcile carries the revision that produced it. The manager skips any
+revision at or below the last one it applied, so a delayed retry can't
+replace a newer sensor set.
+
+A restarted sensor starts with fresh process state. The thermometer's
+`reading` counter resets to 0. Keep anything a sensor must remember in the
+Agent, by sending it as a Signal, or in an external store.
+
+## Plugin Options
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `retry_delay_ms` | `1_000` | Delay before retrying a failed reconcile. Integer from 1 to 4,294,967,295. |
+
+An invalid value fails Agent startup before any sensor starts.
 
 ## Stop The Example
 
 ```elixir
-:ok = Jido.stop_agent(agent)
+:ok = Jido.stop_agent("building")
 :ok = Jido.stop()
-Process.unregister(:sensor_guide_observer)
 ```
 
-See [Plugin Runtimes](plugin-runtimes.livemd) for restart and readiness rules.
+## Summary
+
+- A sensor is an OTP child that casts Signals to its Agent.
+- `SensorManager.start/3` and `stop/1` are Directives. They change the
+  desired set, and the manager starts or stops processes after commit.
+- `agent.state.sensors.desired` holds the desired set, so `cmd/2` can test it.
+- Sensors restart while desired, recover with the Agent, and stop with it.
+- Sensor process state doesn't survive a restart. Agent state does.
+
+## Next
+
+- [Supervised Resources](plugin-supervised-resources.livemd): build a Plugin
+  with its own supervised runtime.
+- [Custom Directives](plugin-custom-directives.livemd): Directives that act
+  after commit, like `Start` and `Stop`.
+- [Signal Bus](signal-bus-plugin.livemd): receive Signals from other Agents.

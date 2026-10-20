@@ -1,0 +1,23 @@
+- id: plugin-runtime-boundary
+  date: 2026-10-19
+  decision: Use jido.agent_server.plugin_runtime for generic live Plugin roots, readiness, admission, post-commit callbacks, owned Directive dispatch, callback ownership, and live runtime replacement.
+  driver: jido.plugin defines the generic extension surface, while AgentServer owns the live OTP and commit boundaries that execute it.
+  approved_by: User-approved Jido V3 component map
+
+- id: plugin-runtime-code-seam
+  date: 2026-10-19
+  decision: Move Plugin startup, readiness, owned-state selection, admission, configuration pause and rebuild, commit construction, and Directive dispatch from Jido.AgentServer and its nested CompositionRuntime into Jido.AgentServer.Plugin. Keep phase transitions, deadlines, task startup, and replies in the gen_statem owner.
+  driver: Plugin-specific decisions need one owner without creating a second state machine.
+  approved_by: Component hardening pass
+
+- id: plugin-runtime-mutation-profile
+  date: 2026-10-19
+  decision: Mutate Jido.AgentServer.Plugin and Jido.AgentServer.Plugin.Callbacks. Keep Jido.AgentServer and Jido.AgentServer.Supervisor out of this focused profile because they remain shared state-machine and activation owners.
+  driver: The focused profile must test Plugin decisions without overlapping the remaining AgentServer components.
+  approved_by: Component hardening pass
+
+- id: plugin-runtime-obligation-migration
+  date: 2026-10-19
+  decision: Replace old AgentServer I50 through I62 with plugin_runtime I1 through I11. Make outbound Plugin preparation explicit as I8. Move the Plugin callback and runtime-replacement promises from old I97 to plugin_runtime I12, and narrow old I97 to the composition handoff.
+  driver: Every live Plugin promise needs one final owner while the accepted Plugin-data change remains a composition concern.
+  approved_by: Component hardening pass

@@ -1,0 +1,339 @@
+# Durable Turns and Flows
+
+## Overview
+
+An approval can take an hour or a week. With persistence on, a routed Flow is
+a durable Turn: the Server saves its acceptance, checkpoints each step, and
+saves its open waits. The Turn survives hibernation and a crashed worker, and
+it resumes with the same Turn ID.
+
+This Livebook runs an expense Flow that waits for an approve or reject Signal,
+with a timer as the fallback. It completes one approval, recovers one Turn
+after a crash, cancels it, and carries a third Turn through hibernation.
+
+Run the cells from top to bottom.
+
+## Install
+
+```elixir
+Mix.install([{:jido, "~> 3.0.0-beta.2"}])
+```
+
+## The Flow
+
+```elixir
+defmodule Expense.Approval do
+  use Jido.Flow,
+    name: "approval",
+    schema: Zoi.object(%{request_id: Zoi.string()})
+
+  flow do
+    step "request", request <- input() do
+      {:ok, request}
+    end
+
+    selection "decision" do
+      needs ["request"]
+      await "approved", event: "expense.approve", match: %{request_id: result("request", :request_id)}
+      await "rejected", event: "expense.reject", match: %{request_id: result("request", :request_id)}
+      timer "expired", after_ms: 3_600_000
+    end
+
+    step "finish", values <- %{request: result("request"), decision: result("decision")} do
+      {:ok, %{request_id: values.request.request_id, status: values.decision.selected}}
+    end
+
+    output result("finish")
+  end
+end
+```
+
+`selection` opens one wait with three options. The first to arrive wins: an
+`expense.approve` or `expense.reject` Signal whose `request_id` matches, or
+the timer after one hour. `result("decision").selected` is the winning
+option's name.
+
+The Flow's output becomes the next Agent state:
+
+```elixir
+defmodule Expense.Agent do
+  use Jido.Agent, name: "expense"
+
+  agent do
+    schema(
+      Zoi.object(%{
+        request_id: Zoi.string() |> Zoi.default(""),
+        status: Zoi.string() |> Zoi.default("idle")
+      })
+    )
+  end
+
+  routes do
+    signal_source("/guides/durable-turns")
+    route "expense.submit", Expense.Approval, as: :submit
+  end
+end
+
+defmodule Expense.Jido do
+  use Jido,
+    otp_app: :guides,
+    namespace: "guides/durable-turns",
+    persistence: {Jido.Persistence.ETS, table: :guide_turns}
+end
+
+{:ok, _sup} = Expense.Jido.start_link()
+```
+
+The result is `{:ok, pid}` for the instance supervisor.
+
+## Start the Agent
+
+```elixir
+{:ok, server} =
+  Expense.Jido.start_agent(Expense.Agent,
+    id: "expenses",
+    persistence: :inherit,
+    turn_timeout: :infinity
+  )
+
+:ok = Jido.AgentServer.await_ready(server)
+```
+
+The result is `:ok`.
+
+`turn_timeout:` covers the whole Turn, wait time included. The default is
+60,000 ms, so a Flow that waits longer than a minute fails with
+`{:error, :turn_timeout}` and saves a `:failed` receipt. Set it to the longest
+wait you allow, or to `:infinity` and let a Flow `timer` own expiry.
+
+The next cells poll `status/2` with a bounded loop:
+
+```elixir
+poll = fn server, ready? ->
+  Enum.reduce_while(1..300, nil, fn _, _ ->
+    status = Jido.AgentServer.status(server)
+    if ready?.(status), do: {:halt, status}, else: (Process.sleep(10); {:cont, status})
+  end)
+end
+```
+
+## Accept and Wait
+
+```elixir
+submit = Expense.Agent.submit_signal!(%{request_id: "r-42"})
+pending = Jido.AgentServer.submit(server, submit)
+
+status = poll.(server, &(&1.waits != []))
+[wait] = status.waits
+
+%{
+  durable_turn: status.durable_turn.status,
+  stage: status.active.stage,
+  worker_pid: status.active.worker_pid,
+  state_version: status.state_version,
+  options: Enum.map(wait.options, & &1.name)
+}
+```
+
+The result is:
+
+```text
+%{durable_turn: :running, stage: :waiting, worker_pid: nil,
+  state_version: 1, options: ["approved", "rejected", "expired"]}
+```
+
+The Server saved acceptance with the Agent record, which moved the revision
+from 0 to 1. The `request` step ran and its checkpoint was confirmed. The Flow
+is now suspended: no worker process runs, and the state is still
+`%{request_id: "", status: "idle"}`.
+
+Each wait in `status.waits` has an `id`, its `path` in the Flow, `opened_at`,
+and `options`. Each option has `name`, `event`, `match`, and `deadline`. The
+timer's `deadline` is an absolute time in ms, so it does not restart after a
+recovery.
+
+## Deliver a Signal
+
+`deliver_wait/4` sends a Signal to one open wait. A Signal that matches no
+option is rejected:
+
+```elixir
+wrong = Jido.Signal.new!("expense.approve", %{request_id: "r-99"}, source: "/manager")
+Jido.AgentServer.deliver_wait(server, wait.id, wrong)
+```
+
+The result is `{:error, %Jido.Action.Error.ConfigurationError{}}` with
+`message: "wait host rejected operation"` and
+`details: %{reason: :unmatched_input}`.
+
+A matching Signal is accepted:
+
+```elixir
+approve = Jido.Signal.new!("expense.approve", %{request_id: "r-42"}, source: "/manager")
+:ok = Jido.AgentServer.deliver_wait(server, wait.id, approve)
+
+Jido.AgentServer.await(pending)
+```
+
+The result is `{:ok, agent, []}` with
+`agent.state == %{request_id: "r-42", status: "approved"}`.
+
+`:ok` from `deliver_wait/4` confirms the Signal was saved, not that the Flow
+finished. The Server then saved the selection, ran `finish`, and saved the
+new state and a `:completed` receipt in one write at revision 2.
+
+| Error | Cause |
+| --- | --- |
+| `:unmatched_input` | No option matches the event and `match:`. |
+| `:stale_target` | The wait ID is not open. |
+| `:conflicting_input_id` | A different Signal reused this Signal ID. |
+| `:input_limit` | The wait holds 1,024 inputs. |
+| `{:error, :not_waiting}` | No Flow is suspended on this Agent. |
+
+A caller timeout does not cancel a delivery. Retry with the same Signal and
+wait ID; the Signal ID makes the retry safe.
+
+While a Flow waits, other state-changing Turns queue behind it. Reads,
+`status/2`, `deliver_wait/4`, and `cancel_turn/3` stay available.
+
+## Recover After a Crash
+
+Start a second request and kill the Server while it waits:
+
+```elixir
+submit = Expense.Agent.submit_signal!(%{request_id: "r-43"})
+lost = Jido.AgentServer.submit(server, submit)
+
+status = poll.(server, &(&1.waits != []))
+turn_id = status.durable_turn.id
+[wait] = status.waits
+
+Process.exit(server, :kill)
+
+recovered =
+  Enum.reduce_while(1..300, nil, fn _, _ ->
+    case Expense.Jido.whereis_agent("expenses") do
+      pid when is_pid(pid) and pid != server -> {:halt, pid}
+      _ -> Process.sleep(10); {:cont, nil}
+    end
+  end)
+
+:ok = Jido.AgentServer.await_ready(recovered)
+status = poll.(recovered, &(&1.waits != []))
+
+{status.durable_turn.id == turn_id, hd(status.waits).id == wait.id}
+```
+
+The result is `{true, true}`. The activation restarted the Server, which
+reloaded storage and restored the same Turn and the same open wait. The
+`request` step did not run again.
+
+The caller's handle did not survive:
+
+```elixir
+Jido.AgentServer.await(lost, 100)
+```
+
+The result is `{:error, %Jido.Error.ExecutionError{}}` with
+`message: "Agent server stopped before the turn replied"` and
+`details: %{reason: :killed}`. Pending handles and caller mailboxes are not
+durable. Read the outcome from `status/2` or from the Agent state.
+
+### Step Checkpoints
+
+The Server confirms each step's checkpoint before the next step starts. A step
+that was running when the Server died runs again from its start. Steps that
+confirmed do not. Code inside an interrupted step can repeat its I/O, so make
+external calls idempotent. [Recovery Limits](recovery-and-effect-limits.md)
+covers patterns.
+
+## Cancel a Turn
+
+```elixir
+:ok = Jido.AgentServer.cancel_turn(recovered, turn_id)
+
+status = Jido.AgentServer.status(recovered)
+{status.durable_turn.status, status.waits, status.last_outcome.committed?, status.state_version}
+```
+
+The result is `{:cancelled, [], false, 4}`. Cancellation saved a terminal
+receipt before it stopped the work. Acceptance of `r-43` wrote revision 3 and
+the receipt wrote revision 4, but the state is unchanged at
+`%{request_id: "r-42", status: "approved"}`. The Server logs a warning that
+the recovered Turn failed, because it has no caller left to reply to.
+
+A late Signal for the cancelled wait returns `{:error, :not_waiting}`.
+
+## Hibernate a Wait
+
+A suspended Flow can hibernate without finishing:
+
+```elixir
+submit = Expense.Agent.submit_signal!(%{request_id: "r-44"})
+_pending = Jido.AgentServer.submit(recovered, submit)
+
+[wait] = poll.(recovered, &(&1.waits != [])).waits
+:ok = Expense.Jido.hibernate(recovered)
+
+{:ok, thawed} = Expense.Jido.thaw(Expense.Agent, "expenses", turn_timeout: :infinity)
+:ok = Jido.AgentServer.await_ready(thawed)
+
+hd(poll.(thawed, &(&1.waits != [])).waits).id == wait.id
+```
+
+The result is `true`. The wait and its timer deadline came back from storage.
+Deliver the decision to the new activation:
+
+```elixir
+reject = Jido.Signal.new!("expense.reject", %{request_id: "r-44"}, source: "/manager")
+:ok = Jido.AgentServer.deliver_wait(thawed, wait.id, reject)
+
+poll.(thawed, &(&1.durable_turn.status == :completed and &1.active == nil))
+Jido.AgentServer.agent(thawed).state
+```
+
+The result is `%{request_id: "r-44", status: "rejected"}`. The poll checks
+`active == nil` too: `durable_turn.status` can read `:completed` a moment
+before the Server publishes the committed state.
+
+## Portable Inputs
+
+A durable Turn stores what it needs to resume. These values must be portable:
+maps, lists, strings, numbers, booleans, and `nil`.
+
+- **Caller `context:`.** Stored in the receipt.
+- **Plugin inputs.** The results of `prepare/2` and `admit/3`.
+- **Flow inputs and step results.** Stored in graph checkpoints.
+
+A PID in the caller context fails before the Turn starts:
+
+```elixir
+submit = Expense.Agent.submit_signal!(%{request_id: "r-45"})
+Jido.AgentServer.call(thawed, submit, context: %{reply_to: self()})
+```
+
+The result is `{:error, [:server_turn, :context, :reply_to]}`, the path to the
+value that is not portable. No acceptance was saved.
+
+Flow and Action code must stay compatible while a Turn is pending. Recovery
+runs the current module against the saved graph.
+[Checkpoints and Upgrades](checkpoints-and-data-upgrades.md) covers changes to
+pending work.
+
+## Stop the Example
+
+```elixir
+:ok = Expense.Jido.stop_agent("expenses")
+:ok = Jido.stop(Expense.Jido)
+```
+
+A normal stop keeps pending work for the next activation.
+
+## Next
+
+- [Durability Model](durability-model.md) – what is saved and what is never
+  replayed.
+- [Recovery Limits](recovery-and-effect-limits.md) – I/O, effects, and
+  duplicate Signals.
+- [Revisions and Conflicts](durable-revisions-and-conflicts.md) – how
+  revisions protect each write.

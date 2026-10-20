@@ -1,0 +1,2863 @@
+{
+  "apps": {
+    "jido": {
+      "active": 100,
+      "coverage": 1.0,
+      "covered": 100
+    },
+    "jido.agent_server": {
+      "active": 66,
+      "coverage": 1.0,
+      "covered": 66
+    },
+    "jido.plugin": {
+      "active": 34,
+      "coverage": 1.0,
+      "covered": 34
+    }
+  },
+  "components": {
+    "jido.agent": {
+      "active": 21,
+      "app": "jido",
+      "coverage": 1.0,
+      "covered": 21,
+      "form": "light",
+      "obligations": {
+        "jido.agent.I1": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 1,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test independent Map and DSL declarations produce the same canonical Agent"
+          ]
+        },
+        "jido.agent.I10": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 1,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test Plugin state has one owner and domain updates use shallow replacement"
+          ]
+        },
+        "jido.agent.I11": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 1,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test Plugin state has one owner and domain updates use shallow replacement"
+          ]
+        },
+        "jido.agent.I12": {
+          "failing": 0,
+          "kind": "ordering",
+          "passing": 0,
+          "status": "retired",
+          "testable": false,
+          "tests": []
+        },
+        "jido.agent.I13": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 0,
+          "status": "retired",
+          "testable": false,
+          "tests": []
+        },
+        "jido.agent.I14": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 0,
+          "status": "retired",
+          "testable": false,
+          "tests": []
+        },
+        "jido.agent.I15": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 0,
+          "status": "retired",
+          "testable": false,
+          "tests": []
+        },
+        "jido.agent.I16": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 0,
+          "status": "retired",
+          "testable": false,
+          "tests": []
+        },
+        "jido.agent.I17": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 0,
+          "status": "retired",
+          "testable": false,
+          "tests": []
+        },
+        "jido.agent.I18": {
+          "failing": 0,
+          "kind": "ordering",
+          "passing": 0,
+          "status": "retired",
+          "testable": false,
+          "tests": []
+        },
+        "jido.agent.I19": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 0,
+          "status": "retired",
+          "testable": false,
+          "tests": []
+        },
+        "jido.agent.I2": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 1,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test definitions are neutral and instances need explicit identity and complete stored state"
+          ]
+        },
+        "jido.agent.I20": {
+          "failing": 0,
+          "kind": "persisted_format",
+          "passing": 1,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test the trusted JSON codec retains the complete definition and instance"
+          ]
+        },
+        "jido.agent.I21": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 1,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test Signal helpers preserve input and give tuple and raising forms"
+          ]
+        },
+        "jido.agent.I22": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 1,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test invalid definitions return structured paths and bang forms raise the same error"
+          ]
+        },
+        "jido.agent.I23": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 1,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test invalid definitions return structured paths and bang forms raise the same error"
+          ]
+        },
+        "jido.agent.I24": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 1,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test the public API has one constructor and validation path"
+          ]
+        },
+        "jido.agent.I25": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 1,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test one Agent owns immediate named members and logical output connections"
+          ]
+        },
+        "jido.agent.I26": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 2,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test route edits have strict identities and the Diff reports net changes",
+            "test the final graph resolves after the batch and removals do not cascade"
+          ]
+        },
+        "jido.agent.I27": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 4,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test counted destinations need broadcast after the complete batch",
+            "test route edits have strict identities and the Diff reports net changes",
+            "test strict noun_verb edits preserve order and replace omitted fields with defaults",
+            "test the final graph resolves after the batch and removals do not cascade"
+          ]
+        },
+        "jido.agent.I28": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 3,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test binding copies one state value without replacing the authored references",
+            "test counted destinations need broadcast after the complete batch",
+            "test the final graph resolves after the batch and removals do not cascade"
+          ]
+        },
+        "jido.agent.I29": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 2,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test Plugin changes preserve state and require explicit migration and disposal",
+            "test an affected Plugin cannot change configuration and run its owned directives in one batch"
+          ]
+        },
+        "jido.agent.I3": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 1,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test definitions are neutral and instances need explicit identity and complete stored state"
+          ]
+        },
+        "jido.agent.I30": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 1,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test binding copies one state value without replacing the authored references"
+          ]
+        },
+        "jido.agent.I4": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 1,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test duplicate declarations fail and instance reuse preserves order and exact values"
+          ]
+        },
+        "jido.agent.I5": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 1,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test duplicate declarations fail and instance reuse preserves order and exact values"
+          ]
+        },
+        "jido.agent.I6": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 0,
+          "status": "retired",
+          "testable": false,
+          "tests": []
+        },
+        "jido.agent.I7": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 1,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test definitions are neutral and instances need explicit identity and complete stored state"
+          ]
+        },
+        "jido.agent.I8": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 1,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test initialization uses Zoi defaults and preserves supplied values"
+          ]
+        },
+        "jido.agent.I9": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 1,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test definitions are neutral and instances need explicit identity and complete stored state"
+          ]
+        }
+      }
+    },
+    "jido.agent_evaluation": {
+      "active": 10,
+      "app": "jido",
+      "coverage": 1.0,
+      "covered": 10,
+      "form": "light",
+      "obligations": {
+        "jido.agent_evaluation.I1": {
+          "failing": 0,
+          "kind": "ordering",
+          "passing": 4,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test Turn validation normalizes input and rejects source substitution",
+            "test failure does not undo Action work and malformed routing remains structured",
+            "test pass-through and transform routes produce one Signal without rerouting",
+            "test the first declared matching route selects one target and merges defaults shallowly"
+          ]
+        },
+        "jido.agent_evaluation.I10": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 1,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test the AgentServer handoff keeps evaluation stages closed"
+          ]
+        },
+        "jido.agent_evaluation.I2": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 3,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test Turn validation normalizes input and rejects source substitution",
+            "test map, duplicate keyword and nil input use the original source Signal",
+            "test the first declared matching route selects one target and merges defaults shallowly"
+          ]
+        },
+        "jido.agent_evaluation.I3": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 1,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test reserved context fails and valid caller context and execution options are retained"
+          ]
+        },
+        "jido.agent_evaluation.I4": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 3,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test Action contracts are read again after code reload",
+            "test pass-through and transform routes produce one Signal without rerouting",
+            "test the first declared matching route selects one target and merges defaults shallowly"
+          ]
+        },
+        "jido.agent_evaluation.I5": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 2,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test failure does not undo Action work and malformed routing remains structured",
+            "test success requires complete valid state and failure preserves the next command"
+          ]
+        },
+        "jido.agent_evaluation.I6": {
+          "failing": 0,
+          "kind": "ordering",
+          "passing": 2,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test Plugin preparation and reduction preserve declaration order and state ownership",
+            "test Plugin rejections retain application reasons and callback faults retain causes"
+          ]
+        },
+        "jido.agent_evaluation.I7": {
+          "failing": 0,
+          "kind": "ordering",
+          "passing": 3,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test emission requests normalize once and obey the selected route contract",
+            "test owned custom directives validate before reduction and retain order",
+            "test the complete Directive batch builds one candidate without dispatch"
+          ]
+        },
+        "jido.agent_evaluation.I8": {
+          "failing": 0,
+          "kind": "ordering",
+          "passing": 3,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test Plugin preparation and reduction preserve declaration order and state ownership",
+            "test Plugin rejections retain application reasons and callback faults retain causes",
+            "test owned custom directives validate before reduction and retain order"
+          ]
+        },
+        "jido.agent_evaluation.I9": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 3,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test emission requests normalize once and obey the selected route contract",
+            "test failure does not undo Action work and malformed routing remains structured",
+            "test the complete Directive batch builds one candidate without dispatch"
+          ]
+        }
+      }
+    },
+    "jido.agent_server": {
+      "active": 37,
+      "app": "jido",
+      "coverage": 1.0,
+      "covered": 37,
+      "form": "light",
+      "obligations": {
+        "jido.agent_server.I1": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 4,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test named startup and maximum finite waits remain usable",
+            "test rejects an unrelated process under a former Runner name",
+            "test selected instance startup accepts a partition",
+            "test starts with a complete instance and rejects invalid startup"
+          ]
+        },
+        "jido.agent_server.I10": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 1,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test submit returns before completion, await timeout retains reply, owner cannot transfer it"
+          ]
+        },
+        "jido.agent_server.I11": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 2,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test call timeout stops waiting but accepted work can still commit",
+            "test cancellation wait timeout does not revoke cleanup; repeated requests share it"
+          ]
+        },
+        "jido.agent_server.I12": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 2,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test abandon also discards an already queued reply",
+            "test abandon removes monitors and prevents late replies without cancelling work"
+          ]
+        },
+        "jido.agent_server.I13": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 1,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test cast commits, failure preserves state, and a full queue drops excess casts"
+          ]
+        },
+        "jido.agent_server.I14": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 3,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test cast commits, failure preserves state, and a full queue drops excess casts",
+            "test queue capacity counts postponed turns and excludes active work",
+            "test unlimited admission accepts multiple queued turns and nil context"
+          ]
+        },
+        "jido.agent_server.I15": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 2,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test admission deadlines reject clocks from another node",
+            "test expired work never executes; active work outlives its admission budget"
+          ]
+        },
+        "jido.agent_server.I16": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 3,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test direct and nested owned requests fail, while external monitored caller remains valid",
+            "test ownership detection has a fixed local ancestry limit",
+            "test ownership is recorded before Action or Flow execution can call back during startup"
+          ]
+        },
+        "jido.agent_server.I17": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 8,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test Action and Flow timeouts stop work in preparation, execution, and validation",
+            "test a 90-day Turn rearms bounded timers without changing its deadline",
+            "test built-in timeout is 60 seconds; global setting is read only at startup",
+            "test delayed timer cannot permit commit when cleanup result was queued first",
+            "test first abort reason wins while cleanup is blocked",
+            "test startup abort fences in-flight Worker creation before queued work",
+            "test successful candidate cannot commit after its deadline expires during cleanup",
+            "test zero timeout cannot commit; infinity permits a blocked turn"
+          ]
+        },
+        "jido.agent_server.I18": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 6,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test cancellation preserves state at each lifecycle stage and permits later work",
+            "test cancellation wait timeout does not revoke cleanup; repeated requests share it",
+            "test completion and cancellation races commit at most once and release execution",
+            "test first abort reason wins while cleanup is blocked",
+            "test stale IDs and late messages cannot affect a newer turn",
+            "test startup abort fences in-flight Worker creation before queued work"
+          ]
+        },
+        "jido.agent_server.I19": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 2,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test cancellation preserves state at each lifecycle stage and permits later work",
+            "test stale IDs and late messages cannot affect a newer turn"
+          ]
+        },
+        "jido.agent_server.I2": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 7,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test a 90-day Turn rearms bounded timers without changing its deadline",
+            "test built-in timeout is 60 seconds; global setting is read only at startup",
+            "test configuration rejects typos and invalid values; explicit settings bypass unused defaults",
+            "test named startup and maximum finite waits remain usable",
+            "test request options, reserved context, and finite wait ranges are validated",
+            "test runtime settings reject duplicate option keys before startup",
+            "test startup and instance-default errors identify the invalid runtime option"
+          ]
+        },
+        "jido.agent_server.I20": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 4,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test Action and Flow errors and invalid candidates preserve the complete instance",
+            "test Action and Flow turns serialize and each starts from the preceding commit",
+            "test completion and cancellation races commit at most once and release execution",
+            "test successful candidate cannot commit after its deadline expires during cleanup"
+          ]
+        },
+        "jido.agent_server.I21": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 6,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test Action and Flow timeouts stop work in preparation, execution, and validation",
+            "test cancellation preserves state at each lifecycle stage and permits later work",
+            "test cancellation wait timeout does not revoke cleanup; repeated requests share it",
+            "test first abort reason wins while cleanup is blocked",
+            "test startup abort fences in-flight Worker creation before queued work",
+            "test successful candidate cannot commit after its deadline expires during cleanup"
+          ]
+        },
+        "jido.agent_server.I22": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 2,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test explicit stop and abrupt server death stop owned execution",
+            "test explicit stop confirms that the server is down"
+          ]
+        },
+        "jido.agent_server.I23": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 3,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test Runner loss stops an idle activation",
+            "test lost Worker or lifecycle task stops the activation and queued work",
+            "test unconfirmed cleanup stops activation without starting queued work"
+          ]
+        },
+        "jido.agent_server.I24": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 1,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test stale IDs and late messages cannot affect a newer turn"
+          ]
+        },
+        "jido.agent_server.I25": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 2,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test Action and Flow errors reach callers but raw input and errors do not enter runtime logs",
+            "test hook exceptions do not disclose raw values or prevent cleanup"
+          ]
+        },
+        "jido.agent_server.I26": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 2,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test invalid execution, policy, and history settings fail before startup",
+            "test supported execution and failure-policy boundaries validate"
+          ]
+        },
+        "jido.agent_server.I27": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 5,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test cancel during backoff removes pending retry work",
+            "test execution policy defaults and hook adapters preserve their exact values",
+            "test exhausted attempts do not commit and outer timeout stops retry backoff",
+            "test per-node timeout stops the Action without using the outer turn deadline",
+            "test retryable Action and Flow failures respect attempts and backoff; other errors run once"
+          ]
+        },
+        "jido.agent_server.I28": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 4,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test execution policy defaults and hook adapters preserve their exact values",
+            "test hook exceptions do not disclose raw values or prevent cleanup",
+            "test parallel Flow nodes run together and user hooks compose with owned execution",
+            "test per-node timeout stops the Action without using the outer turn deadline"
+          ]
+        },
+        "jido.agent_server.I29": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 7,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test committed directive count is observed",
+            "test events follow commit order and trace reaches native Action tasks without raw values",
+            "test failure, validation, cancellation, and deadline each produce one uncommitted outcome",
+            "test history is opt-in, bounded, chronological, and contains only terminal summaries",
+            "test killed policy task retains the original terminal error and emits one outcome",
+            "test lost Worker emits one indeterminate outcome and no commit",
+            "test terminal duration cannot be negative"
+          ]
+        },
+        "jido.agent_server.I3": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 1,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test invalid Signals are rejected by all submission APIs without state loss"
+          ]
+        },
+        "jido.agent_server.I30": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 2,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test failure policy selection distinguishes failures, cancellation, and error reports",
+            "test stop and consecutive error threshold preserve the original error reply"
+          ]
+        },
+        "jido.agent_server.I31": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 4,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test a callback result queued before its timer cannot bypass the elapsed deadline",
+            "test bounded callbacks keep reads available and cannot start reentrant work",
+            "test callback timeout, raise, and invalid decision stop safely with the original error",
+            "test killed policy task retains the original terminal error and emits one outcome"
+          ]
+        },
+        "jido.agent_server.I33": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 3,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test committed directive count is observed",
+            "test events follow commit order and trace reaches native Action tasks without raw values",
+            "test lost Worker emits one indeterminate outcome and no commit"
+          ]
+        },
+        "jido.agent_server.I34": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 1,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test history is opt-in, bounded, chronological, and contains only terminal summaries"
+          ]
+        },
+        "jido.agent_server.I4": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 3,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test reads stay committed and status excludes private context during execution",
+            "test request options, reserved context, and finite wait ranges are validated",
+            "test unlimited admission accepts multiple queued turns and nil context"
+          ]
+        },
+        "jido.agent_server.I5": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 2,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test cancellation wait timeout does not revoke cleanup; repeated requests share it",
+            "test reads stay committed and status excludes private context during execution"
+          ]
+        },
+        "jido.agent_server.I6": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 1,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test Action and Flow turns serialize and each starts from the preceding commit"
+          ]
+        },
+        "jido.agent_server.I7": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 4,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test Action and Flow turns serialize and each starts from the preceding commit",
+            "test completion and cancellation races commit at most once and release execution",
+            "test reads stay committed and status excludes private context during execution",
+            "test successful unchanged state increments revision and returns the committed directive batch"
+          ]
+        },
+        "jido.agent_server.I8": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 1,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test Action and Flow errors and invalid candidates preserve the complete instance"
+          ]
+        },
+        "jido.agent_server.I84": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 1,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test quiesce rejects queued turns, keeps reads, and does not replay on resume"
+          ]
+        },
+        "jido.agent_server.I85": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 3,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test cancel policy waits for an accepted durable commit",
+            "test cancel quiesce confirms pre-commit cleanup without changing state",
+            "test quiescence waits for post-commit effects"
+          ]
+        },
+        "jido.agent_server.I86": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 2,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test timeout leaves admission closed until settled and rejects concurrent controls",
+            "test unresponsive servers cannot leave control callers waiting forever"
+          ]
+        },
+        "jido.agent_server.I87": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 2,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test owned callbacks and nested tasks reject synchronous control",
+            "test storage callbacks cannot synchronously control their owner"
+          ]
+        },
+        "jido.agent_server.I94": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 3,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test idle settings inherit instance defaults with startup override",
+            "test initializing workers reject controls before readiness",
+            "test validates control and idle settings and keeps default expiry disabled"
+          ]
+        }
+      }
+    },
+    "jido.agent_server.activation": {
+      "active": 11,
+      "app": "jido.agent_server",
+      "coverage": 1.0,
+      "covered": 11,
+      "form": "light",
+      "obligations": {
+        "jido.agent_server.activation.I1": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 6,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test complete activation replacement drops its local checkpoint",
+            "test failed parent attachment stops the provisional activation",
+            "test instance startup owns one activation in each exact partition",
+            "test static supervision has stable identities and does not restart an explicit stop",
+            "test the activation root owns the request worker and uses standard OTP child types",
+            "test the activation table and lifetime cell have one stable shape"
+          ]
+        },
+        "jido.agent_server.activation.I10": {
+          "failing": 0,
+          "kind": "ordering",
+          "passing": 3,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test an attached owner prevents idle stop and owner loss starts the budget",
+            "test the idle budget starts after active work and effects settle",
+            "test touch resets idle time and a stale expiry is inert"
+          ]
+        },
+        "jido.agent_server.activation.I11": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 5,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test a child record replaces only its matching reservation",
+            "test child reservations are fenced by caller and token",
+            "test the owned child supervisor is one idempotent supervisor",
+            "test worker recovery drops owned child records with their private supervisor",
+            "test worker recovery keeps independent child records"
+          ]
+        },
+        "jido.agent_server.activation.I2": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 10,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test a replaced guard seeds live Registry claims",
+            "test an isolated guard follows Registry loss and keeps existing claims",
+            "test equal identities are isolated by instance",
+            "test instance startup owns one activation in each exact partition",
+            "test loss of the instance Registry or registration guard stops the owner",
+            "test recovery stops an orphan before it reuses the Agent identity",
+            "test startup rejects invalid instance ownership",
+            "test the Registry worker retries a bounded name conflict",
+            "test the registration guard is idempotent and releases a dead owner",
+            "test the registration guard reports unavailability"
+          ]
+        },
+        "jido.agent_server.activation.I3": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 1,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test fixed instance defaults are consumed once and explicit values win"
+          ]
+        },
+        "jido.agent_server.activation.I4": {
+          "failing": 0,
+          "kind": "ordering",
+          "passing": 5,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test Plugin reconstruction uses restored state and revision before Ref admission opens",
+            "test loss of the instance Registry or registration guard stops the owner",
+            "test required roots recover as one group before readiness is published",
+            "test supported OTP names resolve only a live AgentServer",
+            "test worker loss during a resolved call returns unavailable without replay"
+          ]
+        },
+        "jido.agent_server.activation.I5": {
+          "failing": 0,
+          "kind": "ordering",
+          "passing": 8,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test a crash before publication restores the prior commit and stops active execution",
+            "test execution cleanup keeps failed ownership records",
+            "test missing execution ownership is explicit and forget removes a record",
+            "test recovery keeps admission closed until the old execution scope stops",
+            "test recovery stops the activation when cleanup exceeds the readiness budget",
+            "test required roots recover as one group before readiness is published",
+            "test restart intensity stops the complete activation",
+            "test worker loss during a resolved call returns unavailable without replay"
+          ]
+        },
+        "jido.agent_server.activation.I6": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 3,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test a published commit survives a lost caller reply without replay",
+            "test recovery preserves commit during hooks and directives without replay",
+            "test unchanged success publishes once and failures never replace the checkpoint"
+          ]
+        },
+        "jido.agent_server.activation.I7": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 4,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test Plugin reconstruction uses restored state and revision before Ref admission opens",
+            "test complete activation replacement drops its local checkpoint",
+            "test local checkpoints preserve schema-permitted local state without serialization callbacks",
+            "test missing corrupt and incompatible checkpoints stop recovery without fresh state"
+          ]
+        },
+        "jido.agent_server.activation.I8": {
+          "failing": 0,
+          "kind": "ordering",
+          "passing": 5,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test a crash before publication restores the prior commit and stops active execution",
+            "test a published commit survives a lost caller reply without replay",
+            "test checkpoint conflict or loss cannot report success or run effects",
+            "test recovery preserves commit during hooks and directives without replay",
+            "test unchanged success publishes once and failures never replace the checkpoint"
+          ]
+        },
+        "jido.agent_server.activation.I9": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 5,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test an attached owner prevents idle stop and owner loss starts the budget",
+            "test closed admission and owners survive worker recovery without control replay",
+            "test interrupted quiesce recovers closed after execution cleanup",
+            "test owner attachment is idempotent and detach releases its monitor",
+            "test owner loss handling does not consume the Runner lifecycle monitor"
+          ]
+        }
+      }
+    },
+    "jido.agent_server.composition": {
+      "active": 9,
+      "app": "jido.agent_server",
+      "coverage": 1.0,
+      "covered": 9,
+      "form": "light",
+      "obligations": {
+        "jido.agent_server.composition.I1": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 4,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test bare workers cannot own child activations",
+            "test child restart refreshes inspection and a stopped tag can be reused",
+            "test owned children and nested Plugin trees stop with the complete parent activation",
+            "test whole child root replacement refreshes the tracked activation"
+          ]
+        },
+        "jido.agent_server.composition.I2": {
+          "failing": 0,
+          "kind": "ordering",
+          "passing": 3,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test independent children keep their Plugins after parent shutdown",
+            "test parent stop, orphan Signal, and adoption use activation lifetime",
+            "test pending orphan delivery rejects adoption and keeps its deadline"
+          ]
+        },
+        "jido.agent_server.composition.I3": {
+          "failing": 0,
+          "kind": "ordering",
+          "passing": 10,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test a queued orphan dispatch result cannot bypass its actual deadline",
+            "test adoption can resume after the orphan delivery completes",
+            "test adoption rejects a bare worker before changing ownership",
+            "test adoption rejects live parents, cross-instance children, self-adoption, and cycles",
+            "test ancestor failure during adoption rejects an uncertain relationship",
+            "test concurrent adoption cannot create a parent cycle",
+            "test orphan dispatch failure or timeout stops its owned task and activation",
+            "test parent stop, orphan Signal, and adoption use activation lifetime",
+            "test pending orphan delivery rejects adoption and keeps its deadline",
+            "test whole root replacement removes lost adoption and permits tag reuse"
+          ]
+        },
+        "jido.agent_server.composition.I4": {
+          "failing": 0,
+          "kind": "ordering",
+          "passing": 10,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test a dead startup caller cannot attach an old child after its tag is reused",
+            "test adoption rejects a bare worker before changing ownership",
+            "test child restart refreshes inspection and a stopped tag can be reused",
+            "test concurrent callers cannot claim the same tag",
+            "test direct child stop also releases its parent tag and root monitor",
+            "test failed child operations release caller monitors as well as tag reservations",
+            "test failed worker lookup stops the new activation and releases the child tag",
+            "test invalid lifetimes, duplicate tags, and failed starts leave no child ownership",
+            "test whole child root replacement refreshes the tracked activation",
+            "test whole root replacement removes lost adoption and permits tag reuse"
+          ]
+        },
+        "jido.agent_server.composition.I5": {
+          "failing": 0,
+          "kind": "ordering",
+          "passing": 6,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test a bare worker rejects composition changes before committing",
+            "test a declared Bus does not make another provider endpoint executable",
+            "test an accepted Plugin declaration is committed before runtime handoff",
+            "test route mutations commit as data and a failed batch keeps the revision",
+            "test runtime validation rejects provider endpoints that have no live implementation",
+            "test topology mutations start accepted members"
+          ]
+        },
+        "jido.agent_server.composition.I6": {
+          "failing": 0,
+          "kind": "ordering",
+          "passing": 6,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test durable member identities retain only the same accepted slots",
+            "test persistent members restore by their accepted slot identity",
+            "test startup binds initial inputs and a state-only commit resizes the topology",
+            "test the next Turn waits until the accepted topology is ready",
+            "test topology count changes keep unchanged processes and connection edits keep all processes",
+            "test topology mutations start accepted members"
+          ]
+        },
+        "jido.agent_server.composition.I7": {
+          "failing": 0,
+          "kind": "ordering",
+          "passing": 3,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test a post-commit topology startup failure keeps the accepted checkpoint",
+            "test persistent members restore by their accepted slot identity",
+            "test replacement stops only the changed member and recovery rebuilds the accepted topology"
+          ]
+        },
+        "jido.agent_server.composition.I8": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 7,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test accepted connections route outputs through counted agents and back to the root",
+            "test declared local buses route outputs and stop with the supervisor",
+            "test outputs from a mutation Turn use the accepted connections",
+            "test removing an accepted Bus declaration stops its complete local resource",
+            "test root fallback, manual child delivery, and stale targets have explicit results",
+            "test topology connections take priority over default dispatch",
+            "test topology mutations start accepted members"
+          ]
+        },
+        "jido.agent_server.composition.I9": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 1,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test permanent runtime agents restart and temporary agents release their names"
+          ]
+        }
+      }
+    },
+    "jido.agent_server.durable": {
+      "active": 12,
+      "app": "jido.agent_server",
+      "coverage": 1.0,
+      "covered": 12,
+      "form": "light",
+      "obligations": {
+        "jido.agent_server.durable.I1": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 3,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test non-default partitions create independent durable records",
+            "test persistent control requires explicit valid persistence settings",
+            "test runtime configuration is explicit and persistence can inherit the instance adapter"
+          ]
+        },
+        "jido.agent_server.durable.I10": {
+          "failing": 0,
+          "kind": "ordering",
+          "passing": 2,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test failed automatic save closes admission without automatic retries",
+            "test idle hibernate uses the same save-and-stop boundary"
+          ]
+        },
+        "jido.agent_server.durable.I11": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 2,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test snapshots pair the accepted definition and state with their revision",
+            "test startup snapshots reject provisional state"
+          ]
+        },
+        "jido.agent_server.durable.I12": {
+          "failing": 0,
+          "kind": "ordering",
+          "passing": 4,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test an explicit upgrade changes schema and routes without using the source definition",
+            "test durable and local recovery retain a live upgrade",
+            "test invalid upgrades preserve the complete accepted Agent and revision",
+            "test live upgrades serialize with Turns and preserve the previous snapshot until commit"
+          ]
+        },
+        "jido.agent_server.durable.I2": {
+          "failing": 0,
+          "kind": "ordering",
+          "passing": 4,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test durable mode survives worker state and activation root replacement",
+            "test non-default partitions create independent durable records",
+            "test required save precedes publication; reads and caller waits stay independent",
+            "test restore missing record fails; create cannot replace an existing record"
+          ]
+        },
+        "jido.agent_server.durable.I3": {
+          "failing": 0,
+          "kind": "ordering",
+          "passing": 12,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test Plugin recovery waits for the durable checkpoint before it reads initialization data",
+            "test Plugins do not start until the saved record passes validation",
+            "test bounded load and read faults never fall back to fresh state",
+            "test new activation restores Agent revision and Plugin state before resources start",
+            "test restore missing record fails; create cannot replace an existing record",
+            "test restore rejects corrupt definition before readiness",
+            "test restore rejects corrupt format before readiness",
+            "test restore rejects corrupt identity before readiness",
+            "test restore rejects corrupt revision before readiness",
+            "test restore rejects corrupt state before readiness",
+            "test restore rejects corrupt version before readiness",
+            "test worker death after durable write restores stored commit without replay"
+          ]
+        },
+        "jido.agent_server.durable.I4": {
+          "failing": 0,
+          "kind": "ordering",
+          "passing": 4,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test Plugin recovery waits for the durable checkpoint before it reads initialization data",
+            "test Plugins do not start until the saved record passes validation",
+            "test new activation restores Agent revision and Plugin state before resources start",
+            "test uncertain write runs no hooks or directives and restore does not replay them"
+          ]
+        },
+        "jido.agent_server.durable.I5": {
+          "failing": 0,
+          "kind": "ordering",
+          "passing": 2,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test expected revision rejects a record behind the live revision",
+            "test required save precedes publication; reads and caller waits stay independent"
+          ]
+        },
+        "jido.agent_server.durable.I6": {
+          "failing": 0,
+          "kind": "ordering",
+          "passing": 12,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test expected revision rejects a record behind the live revision",
+            "test late successful write is indeterminate even when its reply precedes the timer",
+            "test local publication failure after durable save stops and permits explicit restore",
+            "test lost storage task ends the activation and releases queued callers",
+            "test required save precedes publication; reads and caller waits stay independent",
+            "test required write adapter exit stops the activation without success",
+            "test required write conflict stops the activation without success",
+            "test required write invalid result stops the activation without success",
+            "test required write rejection stops the activation without success",
+            "test required write unknown stops the activation without success",
+            "test save timeout stops and confirms the storage task and activation",
+            "test uncertain write runs no hooks or directives and restore does not replay them"
+          ]
+        },
+        "jido.agent_server.durable.I7": {
+          "failing": 0,
+          "kind": "ordering",
+          "passing": 3,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test durable mode survives worker state and activation root replacement",
+            "test local publication failure after durable save stops and permits explicit restore",
+            "test worker death after durable write restores stored commit without replay"
+          ]
+        },
+        "jido.agent_server.durable.I8": {
+          "failing": 0,
+          "kind": "persisted_format",
+          "passing": 3,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test custom Agent checkpoint conversion protects portable records",
+            "test durable save rejects local handles without changing local state rules",
+            "test nonportable initial state fails create without saving a record"
+          ]
+        },
+        "jido.agent_server.durable.I9": {
+          "failing": 0,
+          "kind": "ordering",
+          "passing": 9,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test hibernate rejects queued turns and keeps reads during save",
+            "test hibernate saves settled revision, confirms activation exit, and restores",
+            "test hibernate success waits for Plugin shutdown and root DOWN",
+            "test known save rejection retains live state and restores prior admission",
+            "test loss of the save task keeps the Agent live and blocked",
+            "test save budget is bounded by persistence_timeout",
+            "test save deadline kills owned task and leaves a live blocked Agent",
+            "test uncertain or conflicting save blocks resume and survives recovery",
+            "test worker death during save retains blocked admission"
+          ]
+        }
+      }
+    },
+    "jido.agent_server.durable_turn": {
+      "active": 11,
+      "app": "jido.agent_server",
+      "coverage": 1.0,
+      "covered": 11,
+      "form": "light",
+      "obligations": {
+        "jido.agent_server.durable_turn.I1": {
+          "failing": 0,
+          "kind": "ordering",
+          "passing": 7,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test Flow acceptance keeps only the complete portable recovery receipt",
+            "test Flow acceptance propagates instruction resolution failure",
+            "test Flow acceptance reports input validation phase and rejects Action instructions",
+            "test a rejected acceptance save starts no Action",
+            "test nonportable command context is rejected before execution",
+            "test recovery resolves the saved input_write before the reply",
+            "test recovery resolves the saved intent_write before the reply"
+          ]
+        },
+        "jido.agent_server.durable_turn.I10": {
+          "failing": 0,
+          "kind": "ordering",
+          "passing": 5,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test a 90-day saved deadline survives AgentServer loss",
+            "test a Flow holds the Turn while reads and cancellation stay available",
+            "test an expired saved Turn does not receive a new timeout budget",
+            "test cancellation during Worker startup closes its scope before the next Turn",
+            "test cancellation saves a terminal receipt and rejects late wait input"
+          ]
+        },
+        "jido.agent_server.durable_turn.I11": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 4,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test ordinary AgentServer execution rejects waits before Actions and rejects host spoofing",
+            "test ordinary IDs and invalid instance names have no execution store",
+            "test the production host supplies a current clock and durable validation",
+            "test without persistence an interrupted Flow is not restored"
+          ]
+        },
+        "jido.agent_server.durable_turn.I2": {
+          "failing": 0,
+          "kind": "persisted_format",
+          "passing": 6,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test an unchanged workflow transition preserves the saved graph",
+            "test checkpoint keys use the stable unpadded v1 encoding",
+            "test execution identity isolates partitions, Agents, and command IDs",
+            "test initial input and graph checkpoints share one conditional byte record",
+            "test old runtime cleanup cannot remove the replacement owner's registration",
+            "test ordinary IDs and invalid instance names have no execution store"
+          ]
+        },
+        "jido.agent_server.durable_turn.I3": {
+          "failing": 0,
+          "kind": "ordering",
+          "passing": 6,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test a 90-day saved deadline survives AgentServer loss",
+            "test a data Flow has a fingerprint without a module callback",
+            "test changed Flow code fails readiness without dispatch",
+            "test corrupt graph data fails recovery instead of starting a new Flow",
+            "test only a running receipt requires Flow reconstruction",
+            "test the fingerprint covers loaded Flow and Action code"
+          ]
+        },
+        "jido.agent_server.durable_turn.I4": {
+          "failing": 0,
+          "kind": "ordering",
+          "passing": 6,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test a rejected step checkpoint cannot dispatch the next Action",
+            "test activation loss resumes the current Turn at step 6",
+            "test recovery resolves the saved input_write before the reply",
+            "test recovery resolves the saved intent_write before the reply",
+            "test server loss resumes the current Turn at step 6",
+            "test worker loss resumes the current Turn at step 6"
+          ]
+        },
+        "jido.agent_server.durable_turn.I5": {
+          "failing": 0,
+          "kind": "ordering",
+          "passing": 6,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test AgentServer loss restores a pending wait without rerunning Actions",
+            "test activation loss resumes the current Turn at step 6",
+            "test recovery resolves the saved input_write before the reply",
+            "test recovery resolves the saved intent_write before the reply",
+            "test server loss resumes the current Turn at step 6",
+            "test worker loss resumes the current Turn at step 6"
+          ]
+        },
+        "jido.agent_server.durable_turn.I6": {
+          "failing": 0,
+          "kind": "ordering",
+          "passing": 8,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test AgentServer loss restores a pending wait without rerunning Actions",
+            "test a Flow holds the Turn while reads and cancellation stay available",
+            "test hibernation conflict preserves the pending graph and enforces safe admission",
+            "test hibernation lost preserves the pending graph and enforces safe admission",
+            "test hibernation reject preserves the pending graph and enforces safe admission",
+            "test hibernation restores the same wait and deadline without repeating completed steps",
+            "test one Turn releases its Worker, keeps reads and queued Turns, and accepts a Signal",
+            "test quiesce can finish its accepted Turn through addressed wait input"
+          ]
+        },
+        "jido.agent_server.durable_turn.I7": {
+          "failing": 0,
+          "kind": "ordering",
+          "passing": 15,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test acceptance conflict stops before downstream work and restores authoritative data",
+            "test acceptance lost stops before downstream work and restores authoritative data",
+            "test acceptance reject stops before downstream work and restores authoritative data",
+            "test accepted input survives replay, with equal retries inert and conflicting IDs rejected",
+            "test every wait input field has an exact boundary",
+            "test one Turn releases its Worker, keeps reads and queued Turns, and accepts a Signal",
+            "test quiesce can finish its accepted Turn through addressed wait input",
+            "test resolution conflict stops before downstream work and restores authoritative data",
+            "test resolution lost stops before downstream work and restores authoritative data",
+            "test resolution reject stops before downstream work and restores authoritative data",
+            "test saved input IDs make retries inert while a later wait remains pending",
+            "test the host rejects stale, unmatched, malformed, and non-portable input",
+            "test the input limit rejects new receipts but permits equal retries",
+            "test unmarked input-shaped facts are not wait receipts",
+            "test wait delivery rejects an execution marker with no saved graph"
+          ]
+        },
+        "jido.agent_server.durable_turn.I8": {
+          "failing": 0,
+          "kind": "ordering",
+          "passing": 12,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test a 90-day timer rearms bounded wakes without resetting the saved deadline",
+            "test a timer resumes the same Flow without a decision Signal",
+            "test acceptance conflict stops before downstream work and restores authoritative data",
+            "test acceptance lost stops before downstream work and restores authoritative data",
+            "test acceptance reject stops before downstream work and restores authoritative data",
+            "test accepted input survives replay, with equal retries inert and conflicting IDs rejected",
+            "test an invalid receipt stops resolution before a later wait",
+            "test clock rollback cannot put a later accepted event before an earlier event",
+            "test invalid saved candidates stop wait resolution",
+            "test resolution conflict stops before downstream work and restores authoritative data",
+            "test resolution lost stops before downstream work and restores authoritative data",
+            "test resolution reject stops before downstream work and restores authoritative data"
+          ]
+        },
+        "jido.agent_server.durable_turn.I9": {
+          "failing": 0,
+          "kind": "ordering",
+          "passing": 6,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test Flow mutation Directives commit with state and restore without reapplying",
+            "test a saved completion does not replay post-commit hooks",
+            "test a stored completion is recovered after the commit reply is lost",
+            "test bad_output failure saves a terminal Turn without changing Agent state",
+            "test effects failure saves a terminal Turn without changing Agent state",
+            "test successful Flow commits once before the next Turn"
+          ]
+        }
+      }
+    },
+    "jido.agent_server.effects": {
+      "active": 11,
+      "app": "jido.agent_server",
+      "coverage": 1.0,
+      "covered": 11,
+      "form": "light",
+      "obligations": {
+        "jido.agent_server.effects.I1": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 5,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test a Plugin-owned state Directive does not need a runtime handler",
+            "test a state-only Plugin Directive completes without a runtime handler",
+            "test batch limits admit the exact boundary and zero admits only an empty batch",
+            "test instance and directive options fail before starting invalid processes",
+            "test the full batch is rejected before commit or any dispatch"
+          ]
+        },
+        "jido.agent_server.effects.I10": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 3,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test runtime directives reject remote placement and bad options before commit",
+            "test runtime directives start, send to, reply from, and stop an Agent",
+            "test runtime target admission rejects missing activation and topology-owned names"
+          ]
+        },
+        "jido.agent_server.effects.I11": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 2,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test ProcessStart accepts OTP info and ignore results and reports start failure",
+            "test ProcessStart validates before commit and starts an independent instance process"
+          ]
+        },
+        "jido.agent_server.effects.I2": {
+          "failing": 0,
+          "kind": "ordering",
+          "passing": 3,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test a state-only Plugin Directive completes without a runtime handler",
+            "test commit replies before effects finish, reads stay live, and queued work waits",
+            "test explicit Signal directives dispatch in order with the turn trace and causation"
+          ]
+        },
+        "jido.agent_server.effects.I3": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 2,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test a dispatch failure preserves its commit and stops the remaining batch",
+            "test returned error, exception, and invalid result stop a batch without reversing commit"
+          ]
+        },
+        "jido.agent_server.effects.I4": {
+          "failing": 0,
+          "kind": "ordering",
+          "passing": 4,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test a late effect result cannot bypass its deadline even when queued first",
+            "test effect deadline kills owned work before queued turns and preserves the commit",
+            "test instance and directive options fail before starting invalid processes",
+            "test the exact effect deadline is expired"
+          ]
+        },
+        "jido.agent_server.effects.I5": {
+          "failing": 0,
+          "kind": "ordering",
+          "passing": 3,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test commit replies before effects finish, reads stay live, and queued work waits",
+            "test explicit stop and owner death stop active directive tasks",
+            "test lost effect task stops the activation after commit with one safe effect outcome"
+          ]
+        },
+        "jido.agent_server.effects.I6": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 6,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test Bus targets inherit their instance and retain an explicit foreign scope",
+            "test Signal preparation receives the complete Turn and instance context",
+            "test default dispatch and explicit override carry causation",
+            "test dispatch preparation propagates causation and keeps safe fallbacks",
+            "test explicit Signal directives dispatch in order with the turn trace and causation",
+            "test nil Emit defaults to self after commit"
+          ]
+        },
+        "jido.agent_server.effects.I7": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 2,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test nil Emit defaults to self after commit",
+            "test self cast acceptance does not promise admission or delivery"
+          ]
+        },
+        "jido.agent_server.effects.I8": {
+          "failing": 0,
+          "kind": "ordering",
+          "passing": 1,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test ServerStop must be last and exits only after commit"
+          ]
+        },
+        "jido.agent_server.effects.I9": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 7,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test Bus targets inherit their instance and retain an explicit foreign scope",
+            "test error Signals contain only summaries and cannot start an emission loop",
+            "test error reporting keeps a safe Signal when no trace can be propagated",
+            "test failed error Signal delivery stops after the turn error reply",
+            "test reported error Signals contain the committed failure summary",
+            "test reported error applies failure policy after commit and stops the batch",
+            "test reported errors can stop the activation after its success reply"
+          ]
+        }
+      }
+    },
+    "jido.agent_server.plugin_runtime": {
+      "active": 12,
+      "app": "jido.agent_server",
+      "coverage": 1.0,
+      "covered": 12,
+      "form": "light",
+      "obligations": {
+        "jido.agent_server.plugin_runtime.I1": {
+          "failing": 0,
+          "kind": "ordering",
+          "passing": 26,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test a Plugin supervisor recovers its own leaf without restarting its Agent",
+            "test a bare worker cannot start a runtime Plugin",
+            "test a required Plugin cannot borrow a named root outside its activation",
+            "test a root start result with info reaches readiness and supplies the live runtime ref",
+            "test all roots start before readiness, with scoped immutable Init and no handles in state",
+            "test an ignored required Plugin root cannot publish readiness",
+            "test blocked named Supervisor startup stops owned descendants and preserves a shared link",
+            "test child specifications accept one permanent root and retain structured failures",
+            "test instance lookup advertises readiness only after all Plugin checks",
+            "test owner death after readiness stops both Plugin roots",
+            "test owner death settles a bounded start and recovers the required root",
+            "test owner death shuts down an established Supervisor tree while another root starts",
+            "test owner death stops Plugin roots that trap exits",
+            "test owner loss during child start stops the provisional process",
+            "test readiness deadline stops startup tasks and all provisional roots",
+            "test readiness timeout stops established Plugin roots that trap exits",
+            "test root loss settles a bounded sibling start before group recovery",
+            "test root loss stops another Plugin root that traps exits",
+            "test runtime root loss stops the activation and the other root",
+            "test runtime selection rejects unsafe changes and selects only a dispatch owner",
+            "test startup and readiness errors stop every provisional root",
+            "test startup timeout closes admission and cleans a bounded exit-trapping start",
+            "test startup timeout stops a blocked Supervisor root and its exit-trapping descendant",
+            "test startup timeout stops an established exit-trapping root while its sibling starts",
+            "test stop confirms root death before returning when kill delivery is pending",
+            "test the readiness budget closes admission while bounded child startup settles"
+          ]
+        },
+        "jido.agent_server.plugin_runtime.I10": {
+          "failing": 0,
+          "kind": "ordering",
+          "passing": 1,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test Plugin dispatch failure stops the batch and preserves the successful commit"
+          ]
+        },
+        "jido.agent_server.plugin_runtime.I11": {
+          "failing": 0,
+          "kind": "ordering",
+          "passing": 5,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test callbacks finish linked child work before returning and releasing the next turn",
+            "test hook timeout stops linked child work while its callback is active",
+            "test invalid batches and failed turns do not notify Plugins",
+            "test owned hooks and Plugin dispatch reject synchronous turn requests",
+            "test server shutdown stops a blocked commit hook"
+          ]
+        },
+        "jido.agent_server.plugin_runtime.I12": {
+          "failing": 0,
+          "kind": "ordering",
+          "passing": 6,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test cancelled preparation resumes the root without publishing a candidate",
+            "test one commit replaces every changed runtime root",
+            "test replacement notifies unchanged Plugins and later commits use the new root",
+            "test runtime roots rebuild from committed state and stop after removal",
+            "test runtime selection rejects unsafe changes and selects only a dispatch owner",
+            "test unsafe changes fail before commit and failed pause resumes the root"
+          ]
+        },
+        "jido.agent_server.plugin_runtime.I2": {
+          "failing": 0,
+          "kind": "ordering",
+          "passing": 5,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test a readiness callback cannot wait for its own readiness",
+            "test a root start result with info reaches readiness and supplies the live runtime ref",
+            "test all roots start before readiness, with scoped immutable Init and no handles in state",
+            "test caller readiness timeout does not cancel bootstrap",
+            "test instance lookup advertises readiness only after all Plugin checks"
+          ]
+        },
+        "jido.agent_server.plugin_runtime.I3": {
+          "failing": 0,
+          "kind": "ordering",
+          "passing": 9,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test a delayed readiness result cannot pass the startup deadline",
+            "test blocked named Supervisor startup stops owned descendants and preserves a shared link",
+            "test invalid readiness or default dispatch options fail before startup",
+            "test readiness deadline stops startup tasks and all provisional roots",
+            "test readiness timeout stops established Plugin roots that trap exits",
+            "test startup timeout closes admission and cleans a bounded exit-trapping start",
+            "test startup timeout stops a blocked Supervisor root and its exit-trapping descendant",
+            "test startup timeout stops an established exit-trapping root while its sibling starts",
+            "test the readiness budget closes admission while bounded child startup settles"
+          ]
+        },
+        "jido.agent_server.plugin_runtime.I4": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 5,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test Plugins without runtime roots can still admit transient input",
+            "test a root start result with info reaches readiness and supplies the live runtime ref",
+            "test callback adapters preserve explicit errors and report invalid or raised results",
+            "test live admission follows declaration order and keeps pure and runtime inputs separate",
+            "test rejected, invalid, or raised admission never executes or commits"
+          ]
+        },
+        "jido.agent_server.plugin_runtime.I5": {
+          "failing": 0,
+          "kind": "ordering",
+          "passing": 3,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test live admission cannot synchronously submit its own turn",
+            "test live admission follows declaration order and keeps pure and runtime inputs separate",
+            "test live admission is bounded by turn timeout and permits cancellation and reads"
+          ]
+        },
+        "jido.agent_server.plugin_runtime.I6": {
+          "failing": 0,
+          "kind": "ordering",
+          "passing": 9,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test Jido.Plugin.AfterCommitTest.AgentPackage can combine a commit hook with other callbacks",
+            "test Jido.Plugin.AfterCommitTest.Manifest can combine a commit hook with other callbacks",
+            "test Jido.Plugin.AfterCommitTest.PersistencePackage can combine a commit hook with other callbacks",
+            "test a commit-only Server facet needs no runtime or Agent facet",
+            "test bare Plugin markers cannot take Server commit authority",
+            "test callback adapters preserve explicit errors and report invalid or raised results",
+            "test callbacks receive the live runtime root",
+            "test commit options stay within the selected owner facet",
+            "test hooks run after commit in declaration order, even without directives"
+          ]
+        },
+        "jido.agent_server.plugin_runtime.I7": {
+          "failing": 0,
+          "kind": "ordering",
+          "passing": 7,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test a delayed hook result cannot bypass the deadline",
+            "test commit timeout is finite and supports instance defaults",
+            "test directive budget starts after hooks finish and stale hook timers are ignored",
+            "test hook budget stops blocked work and preserves commit before queue replay",
+            "test hook failures stop later hooks and effects without changing turn success",
+            "test hook timeout stops linked child work while its callback is active",
+            "test instance commit budget is inherited and explicit startup overrides it"
+          ]
+        },
+        "jido.agent_server.plugin_runtime.I8": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 3,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test outbound callbacks run in reverse order with their own state, root, and options",
+            "test outbound preparation preserves explicit errors and rejects callback faults",
+            "test outbound preparation transforms after tracing and rejects before delivery"
+          ]
+        },
+        "jido.agent_server.plugin_runtime.I9": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 4,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test callback adapters preserve explicit errors and report invalid or raised results",
+            "test callbacks receive the live runtime root",
+            "test owned directives use Plugin dispatch after all hooks with a narrow committed context",
+            "test runtime selection rejects unsafe changes and selects only a dispatch owner"
+          ]
+        }
+      }
+    },
+    "jido.instance": {
+      "active": 8,
+      "app": "jido",
+      "coverage": 1.0,
+      "covered": 8,
+      "form": "light",
+      "obligations": {
+        "jido.instance.I1": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 10,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test Jido supervisor can be used as a child spec",
+            "test Jido supervisor requires :name option",
+            "test instance module exposes configuration and a child specification",
+            "test instance module keeps its module name when runtime options include another name",
+            "test instance options fail before a child starts",
+            "test instance options reject removed observation groups",
+            "test invalid application instance configuration reaches the final validator",
+            "test runtime debug options override application configuration",
+            "test validation errors retain the rejected field",
+            "test validation keeps exact defaults and accepts all boundary values"
+          ]
+        },
+        "jido.instance.I2": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 13,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test Jido supervisor can be used as a child spec",
+            "test Jido supervisor starts AgentSupervisor (DynamicSupervisor) as child",
+            "test Jido supervisor starts Registry as child",
+            "test Jido supervisor starts TaskSupervisor as child",
+            "test Jido supervisor starts a Jido instance supervisor",
+            "test a later start keeps the first namespace and persistence options",
+            "test default instance helpers cover runtime names",
+            "test idempotent convenience startup keeps an existing namespace binding",
+            "test instance module exposes configuration and a child specification",
+            "test replacement waits for the old Flow runner before starting its children",
+            "test script startup and shutdown are idempotent",
+            "test starts the Agent runtime supervision tree",
+            "test works as a child in another Supervisor"
+          ]
+        },
+        "jido.instance.I3": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 11,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test a durable Ref survives rebinding its namespace to another local instance",
+            "test a failed instance start releases its namespace claim",
+            "test a namespace is exact, local, and unique while its instance is live",
+            "test an existing claim can bind after the previous binding is gone",
+            "test an unrelated process monitor message does not stop the registry",
+            "test binding requires the matching claim and follows the bound owner",
+            "test claims are exact, idempotent for one instance, and releasable",
+            "test idempotent convenience startup keeps an existing namespace binding",
+            "test namespace bindings survive a namespace registry worker restart",
+            "test rebinding and release remove obsolete owner monitors",
+            "test restart restores live bindings and removes stale or released bindings"
+          ]
+        },
+        "jido.instance.I4": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 8,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test a later start keeps the first namespace and persistence options",
+            "test a plain instance persistence default survives a runtime store worker restart",
+            "test an inline instance keeps its Redis persistence function",
+            "test application and start options replace the declared persistence default",
+            "test default debug helpers set and clear the default instance overrides",
+            "test hibernate and thaw work through an instance module",
+            "test runtime debug options override application configuration",
+            "test validation keeps exact defaults and accepts all boundary values"
+          ]
+        },
+        "jido.instance.I5": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 8,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test PID stop and hibernate require the exact explicit partition",
+            "test hibernate and thaw use the default instance when no instance is given",
+            "test hibernate and thaw work through an instance module",
+            "test instance Agent APIs start, find, list, count, and stop Agents",
+            "test partitioned Agent checkpoints use separate keys",
+            "test partitions isolate equal Agent ids",
+            "test start_agent accepts a module and options for the default instance",
+            "test start_agent uses the default instance when no instance is given"
+          ]
+        },
+        "jido.instance.I6": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 6,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test Ref construction rejects invalid IDs and unknown options",
+            "test Ref startup rejects conflicting identity options before starting an Agent",
+            "test a Ref-first operation requires a stable instance namespace",
+            "test a durable Ref survives rebinding its namespace to another local instance",
+            "test a process label identifies each live server for one Agent Ref",
+            "test the Ref facade resolves each operation and preserves direct Server results"
+          ]
+        },
+        "jido.instance.I7": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 2,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test Ref resolution distinguishes recovery and Registry loss",
+            "test the Ref facade resolves each operation and preserves direct Server results"
+          ]
+        },
+        "jido.instance.I8": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 8,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test Ref Plugin reads keep the selected Plugin",
+            "test Ref routing forwards context and explicit caller waits",
+            "test Ref runtime controls preserve their Server results and reject a missing activation",
+            "test Ref stop forwards the reason and caller timeout",
+            "test a durable Ref survives rebinding its namespace to another local instance",
+            "test a generated instance exposes the complete Ref-first API",
+            "test a generated instance exposes the same Ref-first facade",
+            "test the Ref facade resolves each operation and preserves direct Server results"
+          ]
+        }
+      }
+    },
+    "jido.persistence": {
+      "active": 15,
+      "app": "jido",
+      "coverage": 1.0,
+      "covered": 15,
+      "form": "light",
+      "obligations": {
+        "jido.persistence.I1": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 10,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test Store entry points reject malformed configurations, keys, options, and bytes",
+            "test contains all adapter validator failure modes",
+            "test disabled, missing, and malformed sources fail at the configuration boundary",
+            "test missing namespaces and removed write gates fail before storage access",
+            "test module and live instance sources resolve one selected adapter",
+            "test normalizes module, tuple, and disabled adapter declarations",
+            "test opens only byte adapters with atomic compare-and-swap",
+            "test rejects adapters without atomic writes before use",
+            "test requires keyword options and supports optional adapter validation",
+            "test validates adapter declarations"
+          ]
+        },
+        "jido.persistence.I10": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 6,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test Plugin conversion context is exact and bound to its owner",
+            "test Plugin load preserves nullable values and absent optional fields",
+            "test Plugin load rejects incomplete or invalid stored output",
+            "test a missing Plugin-owned field cannot write a record",
+            "test load callback faults and invalid values cannot restore an Agent",
+            "test the Persistence facet converts only its paired owned state"
+          ]
+        },
+        "jido.persistence.I11": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 10,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test Plugin load rejects incomplete or invalid stored output",
+            "test a changed source module cannot change saved fields or select new callbacks",
+            "test a matching envelope cannot hide a different Agent ID in the checkpoint",
+            "test a missing Plugin-owned field cannot write a record",
+            "test complete custom checkpoints bypass Plugin slice conversion",
+            "test custom snapshots reject malformed data and changed converted identity",
+            "test custom state conversion cannot replace the accepted definition",
+            "test dump callback faults and invalid values cannot write a record",
+            "test load callback faults and invalid values cannot restore an Agent",
+            "test snapshot and record callbacks receive only their bounded context"
+          ]
+        },
+        "jido.persistence.I12": {
+          "failing": 0,
+          "kind": "ordering",
+          "passing": 12,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test a valid record retains the requested Agent ID, state, and revision",
+            "test durable Turn data has one exact portable record shape",
+            "test failed storage reads cannot become writes",
+            "test identity setup preserves adapter call order and exact stored bytes",
+            "test malformed token reads and read failures do not write",
+            "test missing namespaces and removed write gates fail before storage access",
+            "test nested portable values survive a save and load",
+            "test outer definition and record changes fail closed without a replacement write",
+            "test public operations reject invalid Agent and identity input",
+            "test revision checks accept only one valid predecessor",
+            "test snapshot and record callbacks receive only their bounded context",
+            "test state and changed definition share one storage revision; conflicts retain bytes"
+          ]
+        },
+        "jido.persistence.I13": {
+          "failing": 0,
+          "kind": "ordering",
+          "passing": 5,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test a delete race preserves a newer active revision",
+            "test failed storage reads cannot become writes",
+            "test identity setup preserves adapter call order and exact stored bytes",
+            "test logical deletion writes compact tombstones and fences delayed writers",
+            "test validated token reads drive save and tombstone writes"
+          ]
+        },
+        "jido.persistence.I14": {
+          "failing": 0,
+          "kind": "security",
+          "passing": 5,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test a changed token rejects the old candidate even when bytes match",
+            "test a token stays out of restore output and semantic telemetry",
+            "test opaque tokens are not replaced with equal bytes",
+            "test store telemetry omits keys, bytes, tokens, and options",
+            "test validated token reads drive save and tombstone writes"
+          ]
+        },
+        "jido.persistence.I15": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 1,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test built-in adapters obey the required binary get and CAS contract"
+          ]
+        },
+        "jido.persistence.I2": {
+          "failing": 0,
+          "kind": "persisted_format",
+          "passing": 7,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test a matching envelope cannot hide a different Agent ID in the checkpoint",
+            "test a mismatched record envelope is rejected",
+            "test a valid record retains the requested Agent ID, state, and revision",
+            "test identity setup preserves adapter call order and exact stored bytes",
+            "test identity validation preserves scope-first error order and exact key sets",
+            "test missing namespaces and removed write gates fail before storage access",
+            "test the key contains only the exact Ref tuple"
+          ]
+        },
+        "jido.persistence.I3": {
+          "failing": 0,
+          "kind": "persisted_format",
+          "passing": 6,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test Store entry points reject malformed configurations, keys, options, and bytes",
+            "test byte reads keep exact-byte conditions and stale writes conflict",
+            "test failed storage reads cannot become writes",
+            "test invalid reads and callback faults return errors",
+            "test malformed token reads and read failures do not write",
+            "test opaque tokens are not replaced with equal bytes"
+          ]
+        },
+        "jido.persistence.I4": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 4,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test Store entry points reject malformed configurations, keys, options, and bytes",
+            "test bad write conditions are rejected before an adapter call",
+            "test byte reads keep exact-byte conditions and stale writes conflict",
+            "test write outcomes distinguish rejection, unknown commit, and callback faults"
+          ]
+        },
+        "jido.persistence.I5": {
+          "failing": 0,
+          "kind": "persisted_format",
+          "passing": 10,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test a mismatched record envelope is rejected",
+            "test durable Turn data has one exact portable record shape",
+            "test format three records remain readable during adapter cutover",
+            "test identity setup preserves adapter call order and exact stored bytes",
+            "test identity validation preserves scope-first error order and exact key sets",
+            "test load rejects a nested process handle supplied by storage",
+            "test load rejects every prohibited term class supplied by storage",
+            "test old record formats fail without changing stored bytes",
+            "test outer definition and record changes fail closed without a replacement write",
+            "test stored envelopes reject invalid fields without changing their bytes"
+          ]
+        },
+        "jido.persistence.I6": {
+          "failing": 0,
+          "kind": "persisted_format",
+          "passing": 11,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test a changed source module cannot change saved fields or select new callbacks",
+            "test a matching envelope cannot hide a different Agent ID in the checkpoint",
+            "test a stale source schema does not replace saved schema or routes",
+            "test complete mutated definition and state round trip without a source module",
+            "test custom snapshots reject malformed data and changed converted identity",
+            "test custom state conversion cannot replace the accepted definition",
+            "test nested portable values survive a save and load",
+            "test saved fields are authoritative even if source provenance is unavailable",
+            "test snapshot and record callbacks receive only their bounded context",
+            "test snapshot boundaries reject malformed values and context",
+            "test snapshot envelope and final state are checked"
+          ]
+        },
+        "jido.persistence.I7": {
+          "failing": 0,
+          "kind": "persisted_format",
+          "passing": 6,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test Flow snapshots retain their declared executable dependencies",
+            "test a missing reference manifest entry cannot bypass code checks",
+            "test changed and unavailable code return reference errors",
+            "test schema refinements are code references and tuple defaults remain data",
+            "test transform MFA handlers retain their callback module",
+            "test upgrade runs before old code resolution and validates only target references"
+          ]
+        },
+        "jido.persistence.I8": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 3,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test upgrade passes context and accepts the exact empty-Directive result",
+            "test upgrade rejects identity changes, invalid state, directives, and invalid results",
+            "test upgrade runs before old code resolution and validates only target references"
+          ]
+        },
+        "jido.persistence.I9": {
+          "failing": 0,
+          "kind": "persisted_format",
+          "passing": 7,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test default persistence rejects a nested improper list without raising",
+            "test default persistence rejects a process handle accepted by live state",
+            "test dump callback faults and invalid values cannot write a record",
+            "test load rejects a nested process handle supplied by storage",
+            "test load rejects every prohibited term class supplied by storage",
+            "test nested portable values survive a save and load",
+            "test snapshot boundaries reject malformed values and context"
+          ]
+        }
+      }
+    },
+    "jido.plugin": {
+      "active": 9,
+      "app": "jido",
+      "coverage": 1.0,
+      "covered": 9,
+      "form": "light",
+      "obligations": {
+        "jido.plugin.I1": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 4,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test callbacks retain capability and pairing checks",
+            "test normalization rejects mismatched metadata and invalid callback combinations",
+            "test old role and facet selectors are rejected",
+            "test one declaration exposes stable identity and exact callback owners"
+          ]
+        },
+        "jido.plugin.I2": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 6,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test a complete declaration produces narrow owner Specs",
+            "test arbitrary helper names do not select runtime capabilities",
+            "test documented callbacks select their owners without role declarations",
+            "test manifest accessors retain owner order and restrict mapped options",
+            "test normalization rejects mismatched metadata and invalid callback combinations",
+            "test one declaration exposes stable identity and exact callback owners"
+          ]
+        },
+        "jido.plugin.I3": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 4,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test a complete declaration produces narrow owner Specs",
+            "test invalid manifest identities and versions return configuration errors",
+            "test manifest accessors retain owner order and restrict mapped options",
+            "test manifest option mappings reject duplicate keys and unassigned options"
+          ]
+        },
+        "jido.plugin.I4": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 4,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test declarations normalize once and retain order and exact options",
+            "test normalization rejects malformed, mixed, repeated, and unloaded declarations",
+            "test normalization rejects mismatched metadata and invalid callback combinations",
+            "test stored specs without a manifest are rejected"
+          ]
+        },
+        "jido.plugin.I5": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 7,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test Agent callback declarations require safe state and Directive ownership",
+            "test Directive lookup returns only the Plugin that declared the type",
+            "test Directive ownership remains unique across Plugins",
+            "test callbacks retain capability and pairing checks",
+            "test normalization rejects mismatched metadata and invalid callback combinations",
+            "test paired callbacks and owned values are required",
+            "test removed callback forms and dynamic state schemas are rejected"
+          ]
+        },
+        "jido.plugin.I6": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 5,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test a complete declaration produces narrow owner Specs",
+            "test callbacks retain capability and pairing checks",
+            "test normalization rejects mismatched metadata and invalid callback combinations",
+            "test option validation preserves explicit errors and contains faults",
+            "test paired callbacks and owned values are required"
+          ]
+        },
+        "jido.plugin.I7": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 3,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test option validation preserves explicit errors and contains faults",
+            "test package metadata exceptions are contained at the normalization boundary",
+            "test state and Directive callbacks preserve explicit errors"
+          ]
+        },
+        "jido.plugin.I8": {
+          "failing": 0,
+          "kind": "persisted_format",
+          "passing": 2,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test decode rejects malformed, unknown, and unregistered documents",
+            "test the document contains only a registered Plugin declaration"
+          ]
+        },
+        "jido.plugin.I9": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 3,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test input and runtime context values keep their narrow fields separate",
+            "test schema accepts the complete narrow outbound context",
+            "test schema supplies transient defaults and rejects invalid identity fields"
+          ]
+        }
+      }
+    },
+    "jido.plugin.audit": {
+      "active": 4,
+      "app": "jido.plugin",
+      "coverage": 1.0,
+      "covered": 4,
+      "form": "light",
+      "obligations": {
+        "jido.plugin.audit.I1": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 1,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test record construction preserves present options and generates absent values"
+          ]
+        },
+        "jido.plugin.audit.I2": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 2,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test Record validation rejects every non-portable record location",
+            "test Record validation requires its declared value shapes"
+          ]
+        },
+        "jido.plugin.audit.I3": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 1,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test the Plugin declares one default field, one Directive, and a positive limit"
+          ]
+        },
+        "jido.plugin.audit.I4": {
+          "failing": 0,
+          "kind": "ordering",
+          "passing": 2,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test bounded updates retain the newest records in original order",
+            "test reduction selects only Audit Records and applies the same bound"
+          ]
+        }
+      }
+    },
+    "jido.plugin.bus": {
+      "active": 8,
+      "app": "jido.plugin",
+      "coverage": 1.0,
+      "covered": 8,
+      "form": "light",
+      "obligations": {
+        "jido.plugin.bus.I1": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 1,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test Bus declarations produce one named endpoint and stable references"
+          ]
+        },
+        "jido.plugin.bus.I2": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 2,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test Manager applies ownership defaults and stops its Bus with the Agent",
+            "test one Agent can own a Bus and consume normal Signals from it"
+          ]
+        },
+        "jido.plugin.bus.I3": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 2,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test Client applies defaults and rejects each invalid owned option",
+            "test initial subscription fails when the selected Bus is absent"
+          ]
+        },
+        "jido.plugin.bus.I4": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 3,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test Client ignores foreign lifecycle and durable delivery messages",
+            "test Client reconnect timer attaches to a replacement Bus",
+            "test readiness reconnects to a replacement and ignores stale work"
+          ]
+        },
+        "jido.plugin.bus.I5": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 2,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test Client casts normal subscribed Signals to its AgentServer",
+            "test one Agent can own a Bus and consume normal Signals from it"
+          ]
+        },
+        "jido.plugin.bus.I6": {
+          "failing": 0,
+          "kind": "ordering",
+          "passing": 2,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test Client ignores foreign lifecycle and durable delivery messages",
+            "test durable delivery waits for each committed Turn before it advances"
+          ]
+        },
+        "jido.plugin.bus.I7": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 3,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test durable acknowledgement retries and stale retry work stays inert",
+            "test durable delivery retries a failed Agent Turn",
+            "test durable subscription reattaches after Client runtime replacement"
+          ]
+        },
+        "jido.plugin.bus.I8": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 4,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test Bus loss stops its pending delivery worker",
+            "test Client ignores foreign lifecycle and durable delivery messages",
+            "test Client runtime death stops its pending delivery worker",
+            "test delivery-worker failure retries without stopping the Client runtime"
+          ]
+        }
+      }
+    },
+    "jido.plugin.heartbeat": {
+      "active": 5,
+      "app": "jido.plugin",
+      "coverage": 1.0,
+      "covered": 5,
+      "form": "light",
+      "obligations": {
+        "jido.plugin.heartbeat.I1": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 1,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test configuration applies defaults and accepts all custom values"
+          ]
+        },
+        "jido.plugin.heartbeat.I2": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 1,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test configuration and runtime startup reject each invalid option"
+          ]
+        },
+        "jido.plugin.heartbeat.I3": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 1,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test the Plugin declares and starts one linked runtime child"
+          ]
+        },
+        "jido.plugin.heartbeat.I4": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 1,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test automatic default ticks keep data and source and use fresh IDs"
+          ]
+        },
+        "jido.plugin.heartbeat.I5": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 1,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test custom ticks keep type, data, and source and use fresh IDs"
+          ]
+        }
+      }
+    },
+    "jido.plugin.scheduler": {
+      "active": 9,
+      "app": "jido.plugin",
+      "coverage": 1.0,
+      "covered": 9,
+      "form": "light",
+      "obligations": {
+        "jido.plugin.scheduler.I1": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 1,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test Scheduler state contains recurring definitions and applies changes in order"
+          ]
+        },
+        "jido.plugin.scheduler.I2": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 3,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test cron definitions reject nested nonportable values and reserved metadata",
+            "test invalid and retired Scheduler inputs fail before state can change",
+            "test saved definitions with retired delivery fields fail validation"
+          ]
+        },
+        "jido.plugin.scheduler.I3": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 2,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test static authoring normalizes timing and verifies accepted inputs",
+            "test static authoring rejects mixed timing and live Signal template data"
+          ]
+        },
+        "jido.plugin.scheduler.I4": {
+          "failing": 0,
+          "kind": "ordering",
+          "passing": 2,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test one-shot timers deliver one fresh traced Signal and ignore stale tokens",
+            "test runtime termination cancels one-shot and recurring timers"
+          ]
+        },
+        "jido.plugin.scheduler.I5": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 4,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test plain recurring ticks stay untagged and use fresh Signal IDs",
+            "test reconciliation replaces a dead matching job before its DOWN message",
+            "test recurring reconciliation retains equal jobs and fences stale versions and ticks",
+            "test runtime termination cancels one-shot and recurring timers"
+          ]
+        },
+        "jido.plugin.scheduler.I6": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 5,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test equal occurrence coordinates produce one stable ID and preserve Signal values",
+            "test every occurrence coordinate can change the logical ID",
+            "test missing, partial, and malformed occurrence metadata return errors",
+            "test plain recurring ticks stay untagged and use fresh Signal IDs",
+            "test recurring reconciliation retains equal jobs and fences stale versions and ticks"
+          ]
+        },
+        "jido.plugin.scheduler.I7": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 4,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test Agent restore recreates a future timer with the same generation",
+            "test Scheduler runtime and cron job replacement restore committed definitions",
+            "test initial reconciliation restores future jobs and keeps exhausted jobs dormant",
+            "test job exits become dormant, disappear, or retry from the latest definition"
+          ]
+        },
+        "jido.plugin.scheduler.I8": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 4,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test failed cron activation retries, ignores stale work, and recovers",
+            "test invalid runtime clocks fail activation and own one retry timer",
+            "test job exits become dormant, disappear, or retry from the latest definition",
+            "test startup preserves state failures and server calls contain runtime loss"
+          ]
+        },
+        "jido.plugin.scheduler.I9": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 5,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test configuration accepts only bounded retry delays and valid time scales",
+            "test initial reconciliation restores future jobs and keeps exhausted jobs dormant",
+            "test startup preserves state failures and server calls contain runtime loss",
+            "test the Plugin declares one runtime child and reports readiness after reconciliation",
+            "test wall-clock waits round upward, recheck time, and permit cancellation"
+          ]
+        }
+      }
+    },
+    "jido.plugin.sensor_manager": {
+      "active": 8,
+      "app": "jido.plugin",
+      "coverage": 1.0,
+      "covered": 8,
+      "form": "light",
+      "obligations": {
+        "jido.plugin.sensor_manager.I1": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 2,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test Directive validation rejects each invalid owned value at its path",
+            "test constructors and schemas define valid portable sensor Directives"
+          ]
+        },
+        "jido.plugin.sensor_manager.I2": {
+          "failing": 0,
+          "kind": "ordering",
+          "passing": 1,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test the Plugin reduces Start and Stop Directives in their given order"
+          ]
+        },
+        "jido.plugin.sensor_manager.I3": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 1,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test retry configuration, runtime ownership, and sensor Init are bounded"
+          ]
+        },
+        "jido.plugin.sensor_manager.I4": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 1,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test reconciliation reuses exact sensors and changes only a newer differing tag"
+          ]
+        },
+        "jido.plugin.sensor_manager.I5": {
+          "failing": 0,
+          "kind": "ordering",
+          "passing": 2,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test newer success cancels failed reconciliation and its stale retry",
+            "test restoration records its revision before it accepts live reconciliation"
+          ]
+        },
+        "jido.plugin.sensor_manager.I6": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 2,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test failed starts and restarts retry without a new Directive",
+            "test sensor and internal supervisor failure restore the desired set"
+          ]
+        },
+        "jido.plugin.sensor_manager.I7": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 2,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test failed starts and restarts retry without a new Directive",
+            "test newer success cancels failed reconciliation and its stale retry"
+          ]
+        },
+        "jido.plugin.sensor_manager.I8": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 3,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test Server callbacks contain an unavailable runtime exit",
+            "test failed starts and restarts retry without a new Directive",
+            "test invalid child specifications fail without damaging the runtime"
+          ]
+        }
+      }
+    }
+  },
+  "covenant": "0.2.0",
+  "totals": {
+    "active": 200,
+    "coverage": 1.0,
+    "covered": 200
+  }
+}

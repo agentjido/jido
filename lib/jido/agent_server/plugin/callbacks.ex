@@ -5,7 +5,6 @@ defmodule Jido.AgentServer.Plugin.Callbacks do
   alias Jido.AgentServer.Plugin.{Admission, Commit, Spec}
   alias Jido.Plugin.{DirectiveContext, Init, Input, SignalContext}
   alias Jido.Plugin.Error, as: PluginError
-  alias Jido.Plugin.Normalizer
 
   @doc false
   @spec commit_specs([Jido.Plugin.Spec.t()]) :: [Jido.Plugin.Spec.t()]
@@ -16,9 +15,8 @@ defmodule Jido.AgentServer.Plugin.Callbacks do
   def after_commit(
         %{agent_server: %Spec{} = spec},
         runtime_ref,
-        %Commit{plugin: package} = commit
-      )
-      when package == spec.package do
+        %Commit{} = commit
+      ) do
     PluginError.safe_apply(
       spec.package,
       spec.module,
@@ -33,32 +31,16 @@ defmodule Jido.AgentServer.Plugin.Callbacks do
   end
 
   @doc false
-  @spec admission_specs([Jido.Plugin.Spec.t()]) :: [Jido.Plugin.Spec.t()]
-  def admission_specs(specs), do: callback_specs(specs, :admit, 3)
-
-  @doc false
-  @spec dispatch_specs([Jido.Plugin.Spec.t()]) :: [Jido.Plugin.Spec.t()]
-  def dispatch_specs(specs), do: callback_specs(specs, :prepare_dispatch, 4)
-
-  @doc false
-  @spec admit(Command.t(), [Jido.Plugin.Spec.t()], %{optional(module()) => term() | nil}) ::
-          {:ok, Command.t()} | {:error, term()}
-  def admit(%Command{} = command, specs, runtime_refs)
-      when is_list(specs) and is_map(runtime_refs) do
-    admit(command, specs, runtime_refs, 0)
-  end
-
-  @doc false
   @spec admit(
           Command.t(),
           [Jido.Plugin.Spec.t()],
           %{optional(module()) => term() | nil},
           non_neg_integer()
         ) :: {:ok, Command.t()} | {:error, term()}
-  def admit(%Command{} = command, specs, runtime_refs, state_version)
-      when is_list(specs) and is_map(runtime_refs) and is_integer(state_version) and
-             state_version >= 0 do
-    Enum.reduce_while(specs, {:ok, command}, fn plugin_spec, {:ok, current} ->
+  def admit(%Command{} = command, specs, runtime_refs, state_version) do
+    specs
+    |> callback_specs(:admit, 3)
+    |> Enum.reduce_while({:ok, command}, fn plugin_spec, {:ok, current} ->
       case admit_one(
              current,
              plugin_spec,
@@ -79,9 +61,9 @@ defmodule Jido.AgentServer.Plugin.Callbacks do
           SignalContext.t(),
           map()
         ) :: {:ok, Jido.Signal.t()} | {:error, term()}
-  def prepare_dispatch(%Jido.Signal{} = signal, specs, runtime_refs, context, agent_state)
-      when is_list(specs) and is_map(runtime_refs) and is_map(agent_state) do
+  def prepare_dispatch(%Jido.Signal{} = signal, specs, runtime_refs, context, agent_state) do
     specs
+    |> callback_specs(:prepare_dispatch, 4)
     |> Enum.reverse()
     |> Enum.reduce_while({:ok, signal}, fn plugin_spec, {:ok, current} ->
       plugin_context = %{
@@ -99,26 +81,6 @@ defmodule Jido.AgentServer.Plugin.Callbacks do
         {:error, _reason} = error -> {:halt, error}
       end
     end)
-  end
-
-  @doc false
-  @spec child_specs(Init.t(), [Jido.Plugin.declaration()] | [Jido.Plugin.Spec.t()]) ::
-          {:ok, [Supervisor.child_spec()]} | {:error, term()}
-  def child_specs(%Init{} = init, declarations) do
-    with {:ok, specs} <- Normalizer.normalize_all(declarations) do
-      specs
-      |> Enum.reduce_while({:ok, []}, fn plugin_spec, {:ok, child_specs} ->
-        case child_spec(init, plugin_spec) do
-          :none -> {:cont, {:ok, child_specs}}
-          {:ok, child_spec} -> {:cont, {:ok, [child_spec | child_specs]}}
-          {:error, reason} -> {:halt, {:error, reason}}
-        end
-      end)
-      |> case do
-        {:ok, child_specs} -> {:ok, Enum.reverse(child_specs)}
-        error -> error
-      end
-    end
   end
 
   @doc false
@@ -163,71 +125,57 @@ defmodule Jido.AgentServer.Plugin.Callbacks do
     end
   end
 
-  defp admit_one(command, %{agent_server: nil}, _runtime_ref, _state_version),
-    do: {:ok, command}
-
   defp admit_one(
          command,
          %{agent_server: %Spec{} = spec} = plugin_spec,
          runtime_ref,
          state_version
        ) do
-    if function_exported?(spec.module, :admit, 3) do
-      package_input = Map.get(command.plugin_inputs, spec.package, %Input{})
+    package_input = Map.get(command.plugin_inputs, spec.package, %Input{})
 
-      admission = %Admission{
-        plugin: spec.package,
-        agent_id: command.agent.id,
-        agent_module: command.agent.module,
-        signal: command.signal,
-        caller_context: command.context,
-        plugin_state: owned_state(command.agent.state, plugin_spec),
-        prepared_input: package_input.prepared,
-        state_version: state_version
-      }
+    admission = %Admission{
+      plugin: spec.package,
+      agent_id: command.agent.id,
+      agent_module: command.agent.module,
+      signal: command.signal,
+      caller_context: command.context,
+      plugin_state: owned_state(command.agent.state, plugin_spec),
+      prepared_input: package_input.prepared,
+      state_version: state_version
+    }
 
-      PluginError.safe_apply(
-        spec.package,
-        spec.module,
-        :admit,
-        [runtime_ref, admission, spec.options],
-        "Agent Server Plugin admission failed"
-      )
-      |> validate_runtime_input(command, spec)
-    else
-      {:ok, command}
-    end
+    PluginError.safe_apply(
+      spec.package,
+      spec.module,
+      :admit,
+      [runtime_ref, admission, spec.options],
+      "Agent Server Plugin admission failed"
+    )
+    |> validate_runtime_input(command, spec)
   end
 
-  defp prepare_dispatch_one(signal, %{agent_server: nil}, _runtime_ref, _context),
-    do: {:ok, signal}
-
   defp prepare_dispatch_one(signal, %{agent_server: %Spec{} = spec}, runtime_ref, context) do
-    if function_exported?(spec.module, :prepare_dispatch, 4) do
-      PluginError.safe_apply(
-        spec.package,
-        spec.module,
-        :prepare_dispatch,
-        [runtime_ref, signal, context, spec.options],
-        "Agent Server Plugin outbound Signal preparation failed"
-      )
-      |> case do
-        {:ok, %Jido.Signal{} = prepared} ->
-          validate_signal(prepared, spec)
+    PluginError.safe_apply(
+      spec.package,
+      spec.module,
+      :prepare_dispatch,
+      [runtime_ref, signal, context, spec.options],
+      "Agent Server Plugin outbound Signal preparation failed"
+    )
+    |> case do
+      {:ok, %Jido.Signal{} = prepared} ->
+        validate_signal(prepared, spec)
 
-        {:error, _reason} = error ->
-          error
+      {:error, _reason} = error ->
+        error
 
-        result ->
-          PluginError.invalid_callback(
-            "Agent Server Plugin prepare_dispatch/4 returned an invalid result",
-            spec.package,
-            spec.module,
-            %{result: result}
-          )
-      end
-    else
-      {:ok, signal}
+      result ->
+        PluginError.invalid_callback(
+          "Agent Server Plugin prepare_dispatch/4 returned an invalid result",
+          spec.package,
+          spec.module,
+          %{result: result}
+        )
     end
   end
 
@@ -351,13 +299,10 @@ defmodule Jido.AgentServer.Plugin.Callbacks do
     PluginError.invalid_callback(message, spec.package, spec.module, %{result: result})
   end
 
-  defp callback?(%{agent_server: %Spec{} = spec}, function, arity),
-    do: function_exported?(spec.module, function, arity)
-
-  defp callback?(_plugin_spec, _function, _arity), do: false
-
   defp callback_specs(specs, function, arity) do
-    Enum.filter(specs, &callback?(&1, function, arity))
+    for %{agent_server: %Spec{} = spec} = plugin_spec <- specs,
+        function_exported?(spec.module, function, arity),
+        do: plugin_spec
   end
 
   defp owned_state(_agent_state, %{agent: %{state_key: nil}}), do: nil

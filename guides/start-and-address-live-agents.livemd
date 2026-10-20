@@ -1,0 +1,270 @@
+# Start and Address Agents
+
+## Overview
+
+A live Agent runs under a Jido instance, and you need to find it again later:
+by ID, by tenant partition, or through a stable reference that doesn't depend
+on a process ID. This Livebook starts Agents under an application-owned
+instance and addresses them each way.
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+{:ok, ref} = Guides.Jido.agent_ref("acme-2")
+{:ok, _pid} = Guides.Jido.start_agent_ref(ref, Guides.Counter)
+{:ok, agent, []} = Guides.Jido.call(ref, signal)
+```
+
+Run the cells from top to bottom.
+
+## Install
+
+```elixir
+Mix.install([{:jido, "~> 3.0.0-beta.2"}])
+```
+
+## Define a Counter
+
+```elixir
+defmodule Guides.Counter do
+  use Jido.Agent, name: "counter"
+
+  agent do
+    schema(Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}))
+  end
+
+  routes do
+    signal_source("/guides/start-and-address")
+
+    route "counter.increment", as: :increment, defaults: %{amount: 1} do
+      action %{amount: amount},
+        name: "increment",
+        schema: Zoi.object(%{amount: Zoi.integer()}),
+        context: context do
+        {:ok, %{context.agent_state | count: context.agent_state.count + amount}}
+      end
+    end
+  end
+end
+```
+
+## Define an Instance
+
+An application defines its own Jido instance with `use Jido`. The
+`namespace:` is a stable, nonempty string that stable Refs and persistence
+use. One namespace binds to one live instance per node.
+
+```elixir
+defmodule Guides.Jido do
+  use Jido, otp_app: :guides, namespace: "guides/agents"
+end
+
+{:ok, _sup} = Guides.Jido.start_link()
+Guides.Jido.namespace()
+```
+
+The result is `"guides/agents"`. In an application you add `Guides.Jido` to
+your supervision tree instead of calling `start_link/0`:
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+children = [Guides.Jido]
+```
+
+`Jido.start_link/1` accepts these options:
+
+| Option | Default | Purpose |
+| --- | --- | --- |
+| `:name` | required | The instance name. `use Jido` sets it to the module. |
+| `:namespace` | `nil` | Required for stable Refs and persistence. |
+| `:max_tasks` | `1_000` | Task Supervisor child limit, or `:infinity`. |
+| `:persistence` | `nil` | Default persistence adapter for this instance's Agents. |
+| `:agent_server` | `[]` | Default Agent Server options, such as `turn_timeout:`. |
+| `:debug` | `nil` | `false`, `true`, or `:verbose` semantic log detail. |
+
+Unknown keys fail with `"Jido instance options contain unknown keys"`.
+`use Jido` also reads `config :guides, Guides.Jido, ...`. Explicit options
+override that config.
+
+## Start by ID
+
+`start_agent/2` takes a module or an instance plus options. Pass `id:`.
+
+```elixir
+{:ok, acme} = Guides.Jido.start_agent(Guides.Counter, id: "acme-1")
+Guides.Jido.whereis_agent("acme-1") == acme
+```
+
+The result is `true`.
+
+> #### Pass an ID {: .warning}
+>
+> `start_agent/2` without `id:` returns
+> `{:error, %Jido.Agent.Error{code: :invalid_string, path: [:id]}}`.
+> The function documentation says an omitted ID is generated. In beta.2 it
+> isn't.
+
+A live ID is unique within its instance and partition. A second start returns
+the running process and changes nothing:
+
+```elixir
+Guides.Jido.start_agent(Guides.Counter, id: "acme-1")
+```
+
+The result is `{:error, {:already_started, pid}}` with the same PID as
+`acme`.
+
+Start options are the Agent Server options from
+[Admission and Deadlines](agent-server-admission.md) plus `:id`, `:state`, and
+`:partition`. An unknown key fails with `"unknown startup options"`.
+
+## Start an Instance Value
+
+You can also start an Agent value you already built. The Server keeps its ID
+and state:
+
+```elixir
+{:ok, preset} = Guides.Counter.instantiate(id: "preset-1", state: %{count: 9})
+{:ok, preset_pid} = Guides.Jido.start_agent(preset)
+
+Jido.AgentServer.agent(preset_pid).state.count
+```
+
+The result is `9`. An instance value rejects `id:` and `state:` overrides
+with `"Jido compatibility input is invalid"`.
+
+## Partition by Tenant
+
+A partition scopes IDs. The same ID can run once per partition:
+
+```elixir
+{:ok, tenant_b} =
+  Guides.Jido.start_agent(Guides.Counter, id: "acme-1", partition: "tenant-b")
+
+{
+  tenant_b != acme,
+  Guides.Jido.whereis_agent("acme-1") == acme,
+  Guides.Jido.whereis_agent("acme-1", partition: "tenant-b") == tenant_b
+}
+```
+
+The result is `{true, true, true}`. Lookups, listing, and counts default to
+the unpartitioned scope:
+
+```elixir
+{Guides.Jido.list_agents(), Guides.Jido.agent_count(partition: "tenant-b")}
+```
+
+The result is a list with the `"acme-1"` and `"preset-1"` entries, and `1`.
+`list_agents/1` returns `{id, pid}` pairs in no fixed order. `whereis_agent/2`
+returns a PID or `nil`.
+
+## Address With a Ref
+
+A PID changes on every restart. A `Jido.Agent.Ref` is the stable identity
+`{namespace, partition, id}`. It holds no PID, node, or module, and it isn't
+a credential.
+
+```elixir
+{:ok, ref} = Guides.Jido.agent_ref("acme-2")
+ref
+```
+
+The result is
+`%Jido.Agent.Ref{id: "acme-2", namespace: "guides/agents", partition: nil}`.
+Pass `partition:` to `agent_ref/2` for a partitioned Ref. An instance without
+a namespace returns `{:error, %Jido.Error.ValidationError{}}` with
+`details.code: :jido_namespace_required`.
+
+Resolve the Ref, start an Agent for it, and resolve it again:
+
+```elixir
+before = Guides.Jido.resolve_agent(ref)
+{:ok, acme_2} = Guides.Jido.start_agent_ref(ref, Guides.Counter)
+
+{before, Guides.Jido.resolve_agent(ref) == {:ok, acme_2}}
+```
+
+The result is `{{:error, :not_found}, true}`. `resolve_agent/1` returns:
+
+| Result | Meaning |
+| --- | --- |
+| `{:ok, pid}` | A ready local Agent Server. |
+| `{:error, :not_found}` | No live registration. |
+| `{:error, :recovering}` | Registered, not ready yet. |
+| `{:error, :unavailable}` | The Registry can't be read. |
+
+Ref functions resolve the Ref on every call. They don't retry or replay:
+
+```elixir
+signal = Guides.Counter.increment_signal!(%{amount: 3})
+{:ok, agent, []} = Guides.Jido.call(ref, signal)
+
+{agent.state.count, Guides.Jido.agent(ref).state.count}
+```
+
+The result is `{3, 3}`. The instance module also has Ref forms of `cast/2`,
+`submit/3`, `status/2`, `cancel/2`, `attach_ref/3`, `touch_ref/1`,
+`hibernate_ref/2`, and `stop_agent_ref/3`.
+
+A Ref converts to a portable map for storage or messages:
+
+```elixir
+Jido.Agent.Ref.to_map(ref)
+```
+
+The result is
+`{:ok, %{"id" => "acme-2", "namespace" => "guides/agents", "partition" => nil, "version" => 1}}`.
+
+## Lower-Level Starts
+
+`Jido.start_agent/2` calls `Jido.AgentServer.start/1`. Use the lower-level
+forms when you need them:
+
+| Function | Supervised by | Use it when |
+| --- | --- | --- |
+| `Jido.start_agent/2` | The instance's DynamicSupervisor | The normal case. |
+| `Jido.AgentServer.start/1` | Same | You already have options with `agent:` and `jido:`. |
+| `Jido.AgentServer.child_spec/1` | Your supervisor | The Agent belongs in your own tree. |
+| `Jido.AgentServer.start_link/1` | Linked to the caller | A bare worker with no Plugins, topology, or persistence. |
+
+`child_spec/1` returns a `:transient` supervisor spec for the activation:
+
+```elixir
+{:ok, owned} = Guides.Counter.instantiate(id: "owned-1")
+spec = Jido.AgentServer.child_spec(agent: owned, jido: Guides.Jido)
+{:ok, app_sup} = Supervisor.start_link([spec], strategy: :one_for_one)
+
+{spec.restart, is_pid(Guides.Jido.whereis_agent("owned-1"))}
+```
+
+The result is `{:transient, true}`. The Agent registers in the instance even
+though your supervisor owns it.
+
+`start/1` without `jido:` fails with `"start requires a Jido instance"`.
+`start_link/1` without `jido:` or `runner:` fails with
+`"expected a named Runic Runner in :runner"`, and it rejects runtime Plugins,
+topology, and persistence with
+`"runtime Plugins require a supervisor; use child_spec/1 or start/1"`.
+
+## Stop the Example
+
+```elixir
+:ok = Supervisor.stop(app_sup)
+:ok = Guides.Jido.stop_agent_ref(ref)
+:ok = Guides.Jido.stop_agent("acme-1")
+:ok = Guides.Jido.stop_agent("acme-1", partition: "tenant-b")
+:ok = Guides.Jido.stop_agent("preset-1")
+:ok = Jido.stop(Guides.Jido)
+```
+
+Each call returns `:ok`. `stop_agent/2` with an unknown ID returns
+`{:error, :not_found}`.
+
+## Next
+
+- [Call, Cast, and Await](send-signals-to-live-agents.livemd) for every way to
+  send a Signal.
+- [Instances and Tenants](configuration-and-tenant-isolation.md) for
+  configuration and isolation between instances.

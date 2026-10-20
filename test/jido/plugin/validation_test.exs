@@ -299,7 +299,7 @@ defmodule Jido.Plugin.ValidationTest do
     assert {:ok, [{OptionValidator, ^original_opts}]} =
              Jido.Plugin.Normalizer.canonical_declarations([spec])
 
-    assert {:ok, []} = Jido.AgentServer.Plugin.Callbacks.child_specs(init, [spec])
+    assert :none = Jido.AgentServer.Plugin.Callbacks.child_spec(init, spec)
     refute_received {:callback, _, _}
   end
 
@@ -550,7 +550,8 @@ defmodule Jido.Plugin.ValidationTest do
                  agent,
                  source,
                  %{},
-                 Jido.Agent.Plugin.specs(specs)
+                 Jido.Agent.Plugin.specs(specs),
+                 %{emits: nil}
                )
 
       assert error.message == message
@@ -564,19 +565,11 @@ defmodule Jido.Plugin.ValidationTest do
                agent,
                source,
                %{},
-               Jido.Agent.Plugin.specs(specs)
+               Jido.Agent.Plugin.specs(specs),
+               %{emits: nil}
              )
 
     assert Plugin.directive_owner(specs, :unknown) == nil
-
-    assert {:error, :failed} =
-             Jido.Agent.Plugin.Pipeline.run(
-               {:error, :failed},
-               agent,
-               source,
-               %{},
-               Jido.Agent.Plugin.specs(specs)
-             )
 
     assert {:ok, %Effect{}} = Jido.Agent.Directive.validate(%Effect{})
   end
@@ -649,7 +642,8 @@ defmodule Jido.Plugin.ValidationTest do
     assert_receive {:DOWN, ^ref, :process, ^pid, _}
     init = %Init{agent_server: pid, agent_id: "agent", module: ThrowingChild}
     assert {:error, {:agent_server_unavailable, _}} = Plugin.state(init)
-    assert {:error, error} = Jido.AgentServer.Plugin.Callbacks.child_specs(init, [ThrowingChild])
+    assert {:ok, [spec]} = Jido.Plugin.Normalizer.normalize_all([ThrowingChild])
+    assert {:error, error} = Jido.AgentServer.Plugin.Callbacks.child_spec(init, spec)
     assert error.message == "Agent Server Plugin child_spec/1 failed"
     assert error.details.kind == :throw
     assert error.details.reason == :bad_child_spec

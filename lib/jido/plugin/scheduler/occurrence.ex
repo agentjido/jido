@@ -13,7 +13,7 @@ defmodule Jido.Plugin.Scheduler.Occurrence do
   alias Jido.Signal
 
   @attributes ["jidooccurrenceid", "jidoschedulegen", "jidoscheduledat"]
-  @reserved @attributes ++ ["jidodurabletick"]
+  @reserved @attributes
   @schema Zoi.struct(
             __MODULE__,
             %{
@@ -54,9 +54,8 @@ defmodule Jido.Plugin.Scheduler.Occurrence do
     utc = instant |> DateTime.from_unix!(:microsecond) |> DateTime.to_iso8601()
 
     with {:ok, signal} <- Signal.put_context(signal, "jidooccurrenceid", id),
-         {:ok, signal} <- Signal.put_context(signal, "jidoschedulegen", generation),
-         {:ok, signal} <- Signal.put_context(signal, "jidoscheduledat", utc) do
-      {:ok, signal}
+         {:ok, signal} <- Signal.put_context(signal, "jidoschedulegen", generation) do
+      Signal.put_context(signal, "jidoscheduledat", utc)
     end
   end
 

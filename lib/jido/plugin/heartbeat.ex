@@ -19,8 +19,8 @@ defmodule Jido.Plugin.Heartbeat do
   use Jido.Plugin
 
   alias Jido.Plugin.Heartbeat.Runtime
-  alias Jido.Plugin.Init
   alias Jido.Plugin.Heartbeat.Signal.Tick
+  alias Jido.Plugin.Init
   alias Jido.Signal
 
   @default_interval 5_000

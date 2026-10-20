@@ -3,7 +3,7 @@ defmodule JidoCoreBench.DataCases do
   alias JidoCoreBench.Fixtures, as: F
 
   def workloads do
-    codec_cases() ++ audit_cases() ++ record_cases() ++ other_cases()
+    codec_cases() ++ audit_cases() ++ record_cases() ++ telemetry_cases()
   end
 
   defp codec_cases do
@@ -101,24 +101,8 @@ defmodule JidoCoreBench.DataCases do
     fixed_time ++ [default_time]
   end
 
-  defp other_cases do
-    merges =
-      for n <- [1, 1_000], empty <- [true, false] do
-        left = Map.new(1..n, &{&1, %{left: &1, common: 0}})
-        right = if empty, do: %{}, else: Map.new(1..n, &{&1, %{right: &1, common: 1}})
-
-        expected =
-          if empty, do: left, else: Map.new(1..n, &{&1, %{left: &1, right: &1, common: 1}})
-
-        F.checked(
-          "state/merge/#{n}/empty_#{empty}",
-          fn _ -> {left, right} end,
-          fn {a, b} -> Jido.Util.DeepMerge.merge(a, b) end,
-          &F.equal!(&1, expected)
-        )
-      end
-
-    spans =
+  defp telemetry_cases do
+    [
       F.checked(
         "telemetry/span",
         fn _ -> nil end,
@@ -127,7 +111,6 @@ defmodule JidoCoreBench.DataCases do
         end,
         &F.equal!(&1, :ok)
       )
-
-    merges ++ [spans]
+    ]
   end
 end

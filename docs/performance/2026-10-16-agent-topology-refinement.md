@@ -160,5 +160,5 @@ Local raw evidence is ignored under `tmp/covenant/next-reductions/`:
 `benchmark-commands.json`, `bench-*-{baseline,candidate}/report.json`,
 `bench-*-comparison.md`, `authoring-memory-summary.json`, `*-mutants.json`,
 `mutation-commands.json`, `semantic-probes.json`, and `ledger-rebase.json`.
-The [Topology Covenant record](../../test/contracts/jido/topology.baseline.md#final-local-reductions--2026-10-16)
-lists exact mutation sites and operators.
+The retired Topology Covenant evidence was removed during the 2026-10-19 Agent
+contract cleanup.

@@ -1,0 +1,17 @@
+- id: instance-boundary
+  date: 2026-10-19
+  decision: Use jido.instance for instance configuration, supervision identity, namespaces, lifecycle selection, and stable Ref routing.
+  driver: These rules select and locate a runtime. They do not define AgentServer Turn behavior or persistence record meaning.
+  approved_by: User-approved Jido V3 component map
+
+- id: instance-mutation-profile
+  date: 2026-10-19
+  decision: Mutate Jido.Instance.Options, Jido.Instance.NamespaceRegistry, and Jido.Instance.RefFacade. Do not mutate the shared Jido facade in this component.
+  driver: Jido contains public entry points for several future components. Selecting the complete module would make the instance mutation profile broader than its obligations. Public facade behavior remains covered by contract tests.
+  approved_by: Component hardening pass
+
+- id: instance-agent-server-migration
+  date: 2026-10-19
+  decision: Move stable Ref identity and routing from jido.agent_server I70 and I71 to jido.instance I6 through I8. Keep activation ownership, runtime-default consumption, and activation uniqueness in narrowed AgentServer obligations I36, I38, and I69.
+  driver: Ref selection belongs to the instance boundary. AgentServer still owns the selected activation and its runtime behavior.
+  approved_by: Component hardening pass

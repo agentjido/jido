@@ -4,7 +4,7 @@ defmodule Jido.Telemetry do
 
   AgentServer emits Turn spans and lifecycle, commit, Directive, effects, and
   settlement point events under `[:jido, :agent_server]`. Persistence emits
-  operation spans. Scheduler delivery is a point event.
+  operation spans.
 
   Turn stop and settlement report the evaluation and commit result. Effects
   can finish later. The effects stop event reports their bounded result; an
@@ -49,8 +49,7 @@ defmodule Jido.Telemetry do
     {[:jido, :agent_server, :directives, :returned], []},
     {[:jido, :agent_server, :effects, :start], []},
     {[:jido, :agent_server, :effects, :stop], [:status, :stage]},
-    {[:jido, :agent_server, :turn, :settled], [:status, :stage]},
-    {[:jido, :scheduler, :delivery], [:scheduler_outcome]}
+    {[:jido, :agent_server, :turn, :settled], [:status, :stage]}
   ]
 
   @typedoc "A Jido telemetry event name."
@@ -66,9 +65,9 @@ defmodule Jido.Telemetry do
   Returns metric definitions for the Jido semantic event catalog.
 
   Turn stop and persistence span endings have count and duration metrics.
-  Lifecycle, commit, returned Directives, effects, settlement, and Scheduler
-  delivery have counters only. Point events do not measure duration. Each
-  counter counts events, not the number of Directives in an event.
+  Lifecycle, commit, returned Directives, effects, and settlement have counters
+  only. Point events do not measure duration. Each counter counts events, not
+  the number of Directives in an event.
 
   Tags use bounded status, stage, and operation values. They do not contain
   Agent, Signal, Turn, trace, module, or error IDs.

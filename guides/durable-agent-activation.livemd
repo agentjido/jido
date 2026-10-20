@@ -1,0 +1,249 @@
+# Durable Activation
+
+## Overview
+
+A durable Agent does not need a live process. Its record is the Agent; an
+activation is one Server that runs it for a while. This Livebook moves one
+Agent between stored and live: create, hibernate, activate, delete. It
+addresses the Agent by a Ref, so no step depends on a PID.
+
+| Operation | Stored record | Live process |
+| --- | --- | --- |
+| `start_agent_ref/3` with `:inherit` | Creates revision 0 | Starts |
+| `hibernate_ref/2` | Saves the current revision | Stops |
+| `activate_agent/3` | Loads the latest revision | Starts |
+| `stop_agent_ref/1` | Unchanged | Stops |
+| `delete_agent/3` | Writes a tombstone | Must be stopped |
+
+Run the cells from top to bottom.
+
+## Install
+
+```elixir
+Mix.install([{:jido, "~> 3.0.0-beta.2"}])
+```
+
+## Setup
+
+```elixir
+defmodule Activation.Add do
+  use Jido.Action,
+    name: "add",
+    schema: Zoi.object(%{amount: Zoi.integer()})
+
+  @impl true
+  def run(%{amount: amount}, %{agent_state: state}) do
+    {:ok, %{state | count: state.count + amount}}
+  end
+end
+
+defmodule Activation.Account do
+  use Jido.Agent, name: "account"
+
+  agent do
+    schema(Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}))
+  end
+
+  routes do
+    signal_source("/guides/activation")
+    route "account.add", Activation.Add, as: :add, defaults: %{amount: 1}
+  end
+end
+
+defmodule Activation.Jido do
+  use Jido,
+    otp_app: :guides,
+    namespace: "guides/activation",
+    persistence: {Jido.Persistence.ETS, table: :guide_activation}
+end
+
+{:ok, _sup} = Activation.Jido.start_link()
+```
+
+The result is `{:ok, pid}` for the instance supervisor.
+[Make an Agent Durable](make-an-agent-durable.livemd) explains each option.
+
+## Address by Ref
+
+A Ref names one stored Agent: namespace, partition, and ID.
+
+```elixir
+{:ok, ref} = Activation.Jido.agent_ref("acct-7", partition: "tenant-a")
+```
+
+The result is
+`{:ok, %Jido.Agent.Ref{id: "acct-7", namespace: "guides/activation", partition: "tenant-a"}}`.
+The namespace comes from the instance. `partition:` is optional and separates
+tenants that reuse IDs.
+
+## Create
+
+```elixir
+{:ok, pid} = Activation.Jido.start_agent_ref(ref, Activation.Account, persistence: :inherit)
+:ok = Jido.AgentServer.await_ready(pid)
+
+signal = Activation.Account.add_signal!(%{amount: 3})
+{:ok, agent, []} = Activation.Jido.call(ref, signal)
+
+{agent.state, Activation.Jido.status(ref).state_version}
+```
+
+The result is `{%{count: 3}, 1}`. `call/3`, `status/2`, and `agent/2` accept
+the Ref and resolve it to the live Server.
+
+## Hibernate
+
+```elixir
+:ok = Activation.Jido.hibernate_ref(ref)
+
+{Activation.Jido.resolve_agent(ref), Activation.Jido.call(ref, signal)}
+```
+
+The result is `{{:error, :not_found}, {:error, :not_found}}`. The record holds
+revision 1 and no process runs.
+
+Hibernate is three steps:
+
+1. **Quiesce.** Close admission and reject queued Turns with `:quiesced`. By
+   default the active Turn finishes; `active: :cancel` cancels its pre-commit
+   work.
+2. **Save.** Write the Agent at its current revision. The revision does not
+   change.
+3. **Stop.** Confirm that the activation exited.
+
+`timeout:` limits the whole control (default 5,000 ms). The save uses the
+smaller of that budget and `persistence_timeout:`. `hibernate/2` takes a PID
+and the same options.
+
+## Activate
+
+```elixir
+{:ok, pid} = Activation.Jido.activate_agent(ref, Activation.Account)
+:ok = Jido.AgentServer.await_ready(pid)
+
+{Activation.Jido.agent(ref).state, Activation.Jido.status(ref).state_version}
+```
+
+The result is `{%{count: 3}, 1}`. `activate_agent/3` is `thaw/3` for a Ref:
+it starts with `persistence: :inherit` and `persistence_mode: :restore`.
+
+Restore reads the record, checks it against the Agent module and version, then
+starts Plugin runtimes. No Turn replays. No Directive runs again.
+
+Activating a Ref that is already live returns
+`{:error, {:already_started, pid}}`. The instance Registry allows one
+activation per Ref on this node.
+
+## Delete
+
+Deletion requires a stopped Agent:
+
+```elixir
+Activation.Jido.delete_agent(ref, Activation.Account)
+```
+
+The result is `{:error, :agent_running}`. Stop it first:
+
+```elixir
+:ok = Activation.Jido.stop_agent_ref(ref)
+:ok = Activation.Jido.delete_agent(ref, Activation.Account)
+
+Jido.Persistence.load_agent(Activation.Jido, Activation.Account, "acct-7", partition: "tenant-a")
+```
+
+The result is `{:error, :deleted}`. The adapter keeps a tombstone in place of
+the record. The tombstone blocks both directions:
+
+```elixir
+{:ok, pid} = Activation.Jido.activate_agent(ref, Activation.Account)
+
+try do
+  Jido.AgentServer.await_ready(pid)
+catch
+  :exit, {reason, _call} -> reason
+end
+```
+
+The result is `{:shutdown, :deleted}`. A `:create` start on the same Ref exits
+with `{:shutdown, :conflict}`. A deleted ID is not reused; pick a new one.
+
+## Failed Hibernate
+
+Hibernate needs persistence. Try it on an Agent without it:
+
+```elixir
+{:ok, plain} = Activation.Jido.start_agent(Activation.Account, id: "plain")
+:ok = Jido.AgentServer.await_ready(plain)
+
+Jido.AgentServer.hibernate(plain)
+```
+
+The result is
+`{:error, %{reason: :persistence_not_configured, resumable?: true}}`. The Agent
+is still live and accepts Turns.
+
+| `resumable?` | Meaning | What to do |
+| --- | --- | --- |
+| `true` | Nothing was written. Admission is open again. | Retry, or keep the Agent live. |
+| `false` | A conflict, or a write with an unknown outcome. Admission stays closed. | Stop the activation and restore from storage. |
+
+`resume/2` refuses to reopen an activation after an uncertain save. Restoring
+reads storage and uses whatever revision it holds.
+
+## Idle Hibernation
+
+`idle_timeout:` starts when the Agent is ready, idle, and has no attached
+owners. A Turn or `touch/1` resets it; reads do not.
+
+```elixir
+{:ok, idle} =
+  Activation.Jido.start_agent(Activation.Account,
+    id: "idle-1",
+    persistence: :inherit,
+    idle_timeout: 100,
+    idle_policy: :hibernate
+  )
+
+monitor = Process.monitor(idle)
+:ok = Jido.AgentServer.await_ready(idle)
+{:ok, _agent, []} = Jido.AgentServer.call(idle, signal)
+
+receive do
+  {:DOWN, ^monitor, :process, _pid, reason} -> reason
+after
+  2_000 -> :still_running
+end
+```
+
+The result is `{:shutdown, :hibernate}`. The Agent saved and stopped about
+100 ms after its last Turn.
+
+```elixir
+{:ok, stored} = Jido.Persistence.load_agent(Activation.Jido, Activation.Account, "idle-1")
+stored.state
+```
+
+The result is `%{count: 3}`.
+
+| `idle_policy:` | On idle |
+| --- | --- |
+| `:stop` (default) | Stops. No extra save. |
+| `:hibernate` | Saves, then stops. Requires persistence. |
+
+`idle_timeout:` defaults to `:infinity`. Bring an idle Agent back with
+`activate_agent/3` or `thaw/3` when its next Signal arrives.
+
+## Stop the Example
+
+```elixir
+:ok = Activation.Jido.stop_agent("plain")
+:ok = Jido.stop(Activation.Jido)
+```
+
+## Next
+
+- [Durable Turns and Flows](durable-turns-and-flows.livemd) – Flow Turns
+  that survive hibernation and restarts.
+- [Durability Model](durability-model.md) – what each record holds.
+- [Recovery Limits](recovery-and-effect-limits.md) – what restore does not
+  replay.

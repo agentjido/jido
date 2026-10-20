@@ -1,0 +1,17 @@
+- id: bundled-audit-boundary
+  date: 2026-10-19
+  decision: Give record construction, record validation, Audit state declaration, and bounded ordered reduction to jido.plugin.audit.
+  driver: These rules are bundled Audit product behavior, not generic Plugin SDK behavior.
+  approved_by: Approved Jido V3 Covenant component map
+
+- id: audit-consumer-boundary
+  date: 2026-10-19
+  decision: Keep Agent evaluation atomicity, AgentServer commit timing, generic Plugin callback handling, and persistence outside jido.plugin.audit.
+  driver: The Audit reducer returns one owned state value and does not control the consumer that commits it.
+  approved_by: Approved Jido V3 Covenant component map
+
+- id: audit-mutation-profile
+  date: 2026-10-19
+  decision: Mutate Jido.Plugin.Audit and Jido.Plugin.Audit.Record only.
+  driver: These two modules contain all Audit-specific decisions. Generic Plugin and Agent consumers have separate component owners.
+  approved_by: User-requested component hardening pass

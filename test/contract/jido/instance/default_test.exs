@@ -1,0 +1,145 @@
+Code.require_file("support.ex", __DIR__)
+
+defmodule Jido.InstanceHelpersTest do
+  use JidoTest.Case, async: false
+  use Covenant.Case, component: "jido.instance", async: false
+
+  setup :ensure_namespace_registry
+
+  alias Jido.AgentServer
+
+  defp ensure_namespace_registry(context),
+    do: JidoTest.InstanceContractSupport.ensure_namespace_registry(context)
+
+  defmodule DefaultAgent do
+    use Jido.Agent, name: "default_instance_agent"
+  end
+
+  setup do
+    on_exit(&stop_default_instance/0)
+    :ok
+  end
+
+  defp stop_default_instance do
+    Jido.stop()
+  catch
+    :exit, _reason -> :ok
+  end
+
+  @tag obligation: "jido.instance.I2"
+  test "script startup and shutdown are idempotent", %{jido: jido} do
+    name = Module.concat(jido, Script)
+    on_exit(fn -> Jido.stop(name) end)
+    assert {:ok, pid} = Jido.start(name: name)
+    assert {:ok, ^pid} = Jido.start(name: name)
+    ref = Process.monitor(pid)
+    assert :ok = Jido.stop(name)
+    assert_receive {:DOWN, ^ref, :process, ^pid, :normal}
+    assert :ok = Jido.stop(name)
+  end
+
+  @tag obligation: ["jido.instance.I2", "jido.instance.I4"]
+  test "a later start keeps the first namespace and persistence options", %{jido: jido} do
+    name = Module.concat(jido, FirstOptions)
+    first_namespace = "jido/test/first-options/#{unique_id()}"
+    later_namespace = "jido/test/later-options/#{unique_id()}"
+    first_persistence = {Jido.Persistence.ETS, table: Module.concat(jido, FirstStore)}
+    later_persistence = {Jido.Persistence.ETS, table: Module.concat(jido, LaterStore)}
+
+    pid =
+      start_supervised!(%{
+        id: name,
+        start:
+          {Jido, :start,
+           [[name: name, namespace: first_namespace, persistence: first_persistence]]},
+        type: :supervisor
+      })
+
+    assert {:ok, ^pid} =
+             Jido.start(name: name, namespace: later_namespace, persistence: later_persistence)
+
+    assert Jido.namespace(name) == first_namespace
+    assert Jido.instance_persistence(name) == first_persistence
+    assert Jido.Instance.NamespaceRegistry.lookup(later_namespace) == nil
+  end
+
+  @tag obligation: "jido.instance.I4"
+  test "default debug helpers set and clear the default instance overrides" do
+    instance = Jido.default_instance()
+    key = {:jido_debug, instance}
+    absent = make_ref()
+    previous = :persistent_term.get(key, absent)
+
+    on_exit(fn ->
+      if previous == absent,
+        do: :persistent_term.erase(key),
+        else: :persistent_term.put(key, previous)
+    end)
+
+    assert instance == Jido.Default
+    assert :ok = Jido.debug(:on)
+    assert Jido.debug() == :on
+    assert :ok = Jido.debug(:verbose)
+    assert Jido.Debug.override(instance, :semantic_log_mode) == :all
+    assert :ok = Jido.debug(:off)
+    assert Jido.debug() == :off
+  end
+
+  @tag obligation: "jido.instance.I5"
+  test "start_agent uses the default instance when no instance is given" do
+    assert {:ok, _jido} = Jido.start()
+
+    agent = DefaultAgent.instantiate!(id: unique_id("default-agent"))
+    agent_id = agent.id
+    assert {:ok, server} = Jido.start_agent(agent)
+    assert %Jido.Agent{id: ^agent_id} = AgentServer.agent(server)
+    assert Jido.whereis_agent(agent_id) == server
+    assert Jido.list_agents() == [{agent_id, server}]
+    assert Jido.agent_count() == 1
+    assert :ok = Jido.stop_agent(agent_id)
+    assert Jido.whereis_agent(agent_id) == nil
+  end
+
+  @tag obligation: "jido.instance.I5"
+  test "start_agent accepts a module and options for the default instance" do
+    assert {:ok, _jido} = Jido.start()
+
+    id = unique_id("default-agent-options")
+    assert {:ok, server} = Jido.start_agent(DefaultAgent, id: id)
+    assert %Jido.Agent{id: ^id} = AgentServer.agent(server)
+  end
+
+  @tag obligation: "jido.instance.I2"
+  test "default instance helpers cover runtime names" do
+    assert Jido.registry_name() == Jido.registry_name(Jido.default_instance())
+    assert Jido.agent_supervisor_name() == Jido.agent_supervisor_name(Jido.default_instance())
+    assert Jido.task_supervisor_name() == Jido.task_supervisor_name(Jido.default_instance())
+    assert Jido.runtime_store_name() == Jido.runtime_store_name(Jido.default_instance())
+
+    assert {:ok, _jido} = Jido.start()
+  end
+
+  @tag obligation: "jido.instance.I5"
+  test "hibernate and thaw use the default instance when no instance is given" do
+    assert {:ok, _jido} = Jido.start(namespace: "default-persistence-test")
+
+    table = :"default_lifecycle_#{System.unique_integer([:positive])}"
+    persistence = {Jido.Persistence.ETS, table: table}
+
+    on_exit(fn ->
+      if :ets.whereis(table) != :undefined, do: :ets.delete(table)
+    end)
+
+    id = unique_id("default-persisted-agent")
+    agent = DefaultAgent.instantiate!(id: id)
+
+    assert {:ok, server} = Jido.start_agent(agent, persistence: persistence)
+    assert :ok = AgentServer.await_ready(server)
+    assert :ok = Jido.hibernate(server)
+    assert Jido.whereis_agent(id) == nil
+
+    assert {:ok, restored_server} = Jido.thaw(DefaultAgent, id, persistence: persistence)
+    assert :ok = AgentServer.await_ready(restored_server)
+    assert %Jido.Agent{id: ^id} = AgentServer.agent(restored_server)
+  end
+end

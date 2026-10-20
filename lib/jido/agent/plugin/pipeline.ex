@@ -5,24 +5,22 @@ defmodule Jido.Agent.Plugin.Pipeline do
   alias Jido.Agent.Plugin
   alias Jido.Agent.Plugin.{Reduction, Spec}
   alias Jido.Error
-  alias Jido.Plugin.Input
   alias Jido.Plugin.Error, as: PluginError
+  alias Jido.Plugin.Input
   alias Jido.Signal
 
   @type result :: {:ok, map(), [struct()]} | {:error, term()}
 
   @doc false
   @spec run(
-          result(),
+          {:ok, map(), [struct()]},
           Agent.instance(),
           Signal.t(),
           %{optional(module()) => Input.t()},
           [Spec.t()],
-          map() | nil
+          map()
         ) ::
           result()
-  def run(result, agent, signal, plugin_inputs, specs, route \\ nil)
-
   def run(
         {:ok, state, directives},
         %Agent{} = agent,
@@ -30,8 +28,7 @@ defmodule Jido.Agent.Plugin.Pipeline do
         plugin_inputs,
         specs,
         route
-      )
-      when is_map(state) and is_map(plugin_inputs) and is_list(directives) and is_list(specs) do
+      ) do
     with :ok <- protect_owned_state(state, agent.state, specs),
          {:ok, directives} <- validate_directives(directives, specs),
          :ok <- Jido.Agent.Contract.check_emissions(route, directives),
@@ -47,8 +44,6 @@ defmodule Jido.Agent.Plugin.Pipeline do
       {:ok, state, directives}
     end
   end
-
-  def run({:error, _reason} = error, _agent, _signal, _plugin_inputs, _specs, _route), do: error
 
   defp protect_owned_state(state, original_state, specs) do
     changed =

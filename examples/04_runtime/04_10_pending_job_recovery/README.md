@@ -37,4 +37,4 @@ runtime service must be supplied again when a retry needs a non-default client.
 - [Local job runtime](job_runtime.ex)
 - [Tests](../../../test/examples/04_runtime/04_10_pending_job_recovery/pending_job_recovery_test.exs)
 
-Previous: [Causal Trace](../04_08_causal_trace/README.md) | Next: [Durable Scheduling](../04_11_durable_scheduling/README.md)
+Previous: [Causal Trace](../04_08_causal_trace/README.md) | Next: [Stable Reference](../04_12_stable_reference/README.md)

@@ -1,0 +1,281 @@
+# Call, Cast, and Await
+
+## Overview
+
+You have a running Agent and a Signal to send. Jido gives you three ways to
+send it, and each one confirms something different. This Livebook sends
+Signals with `call/3`, `cast/3`, and `submit/3` plus `await/2`, and shows what
+each result means when the work is slow or fails.
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+{:ok, agent, directives} = Jido.AgentServer.call(server, signal)   # waits for commit
+:ok = Jido.AgentServer.cast(server, signal)                        # sent, nothing more
+pending = Jido.AgentServer.submit(server, signal)                  # send now
+{:ok, agent, directives} = Jido.AgentServer.await(pending)         # collect later
+```
+
+Run the cells from top to bottom.
+
+## Install
+
+```elixir
+Mix.install([{:jido, "~> 3.0.0-beta.2"}])
+```
+
+## A Worker Agent
+
+The `job.run` route sleeps for `ms` milliseconds, then appends the job name
+to `done`. The sleep stands in for slow work.
+
+```elixir
+defmodule Guides.Worker do
+  use Jido.Agent, name: "worker"
+
+  agent do
+    schema(Zoi.object(%{done: Zoi.list(Zoi.string()) |> Zoi.default([])}))
+  end
+
+  routes do
+    signal_source("/guides/call-cast-await")
+
+    route "job.run", as: :run do
+      action %{name: name, ms: ms},
+        name: "run_job",
+        schema: Zoi.object(%{name: Zoi.string(), ms: Zoi.integer() |> Zoi.default(0)}),
+        context: context do
+        Process.sleep(ms)
+        {:ok, %{context.agent_state | done: context.agent_state.done ++ [name]}}
+      end
+    end
+  end
+end
+
+defmodule Guides.Wait do
+  def until(fun, timeout \\ 3_000) do
+    deadline = System.monotonic_time(:millisecond) + timeout
+    loop(fun, deadline)
+  end
+
+  defp loop(fun, deadline) do
+    cond do
+      fun.() -> :ok
+      System.monotonic_time(:millisecond) > deadline -> :timeout
+      true -> Process.sleep(10) && loop(fun, deadline)
+    end
+  end
+end
+
+{:ok, _} = Jido.start()
+{:ok, worker} = Jido.start_agent(Guides.Worker, id: "worker-1")
+```
+
+`Guides.Wait.until/2` polls a condition every 10 ms for up to 3 seconds.
+The last line returns `{:ok, pid}`.
+
+## What Each Confirms
+
+| Function | Returns | Confirms |
+| --- | --- | --- |
+| `call/3` | `{:ok, agent, directives}` or `{:error, reason}` | The Turn committed, or failed before commit. |
+| `cast/3` | `:ok` or `{:error, reason}` | The message was sent. Not admission, commit, or delivery. |
+| `submit/3` | A pending handle or `{:error, reason}` | The request was sent. Not that it started. |
+| `await/2` | The same result as `call/3` | Same as `call/3`. |
+
+None of them confirms that Directives finished. A successful reply means the
+Server committed. Directives run after the reply.
+
+## Call
+
+`call/3` runs one Turn and waits for the result. The third argument is a
+timeout in milliseconds or a keyword list.
+
+```elixir
+job = Guides.Worker.run_signal!(%{name: "a"})
+{:ok, agent, []} = Jido.AgentServer.call(worker, job, context: %{request_id: "req-1"})
+
+agent.state.done
+```
+
+The result is `["a"]`. The Action received `request_id: "req-1"` in its
+context.
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `timeout:` | `5_000` | How long you wait for the reply. |
+| `admission_timeout:` | `5_000` | How long the Turn can wait in the queue before it starts. `:infinity` disables it. |
+| `context:` | `%{}` | Caller data for the Action context. A map, keyword list, or `nil`. |
+
+Context isn't stored in Agent state or in the Signal. The Agent command keys
+are reserved:
+
+```elixir
+Jido.AgentServer.call(worker, job, context: %{agent_state: %{}})
+```
+
+The result is `{:error, %Jido.Error.ValidationError{}}` with the message
+`"Agent command context contains reserved keys"` and
+`details: %{keys: [:agent_state]}`. `:turn_id` and `:trace_context` fail with
+`":turn_id and :trace_context are reserved"`. An unknown option fails with
+`"invalid turn options"`.
+
+A Turn that fails before commit returns its error, and state doesn't change:
+
+```elixir
+unknown = Jido.Signal.new!("job.missing", %{}, source: "/guides/call-cast-await")
+{:error, error} = Jido.AgentServer.call(worker, unknown)
+
+{error.code, Jido.AgentServer.agent(worker).state.done}
+```
+
+The result is `{:unmatched_input, ["a"]}`.
+
+## A Timeout Isn't a Cancel
+
+`timeout:` limits how long you wait. It doesn't stop the Turn. When it
+expires, the caller exits, as with any OTP call:
+
+```elixir
+slow = Guides.Worker.run_signal!(%{name: "slow", ms: 300})
+
+result =
+  try do
+    Jido.AgentServer.call(worker, slow, timeout: 50)
+  catch
+    :exit, {reason, _call} -> {:exit, reason}
+  end
+
+:ok = Guides.Wait.until(fn -> "slow" in Jido.AgentServer.agent(worker).state.done end)
+{result, Jido.AgentServer.agent(worker).state.done}
+```
+
+The result is `{{:exit, :timeout}, ["a", "slow"]}`. The caller gave up after
+50 ms. The Turn committed anyway. To stop pre-commit work, use
+`Jido.AgentServer.cancel/2`; see
+[Admission and Deadlines](agent-server-admission.md).
+
+## Admission Deadlines
+
+The Server runs one Turn at a time. `admission_timeout:` limits how long your
+Turn waits behind others before it starts. Queue a slow job with a cast, then
+call with a 50 ms admission deadline:
+
+```elixir
+slow_2 = Guides.Worker.run_signal!(%{name: "slow-2", ms: 300})
+behind = Guides.Worker.run_signal!(%{name: "behind"})
+
+:ok = Jido.AgentServer.cast(worker, slow_2)
+admission = Jido.AgentServer.call(worker, behind, admission_timeout: 50, timeout: 2_000)
+
+:ok = Guides.Wait.until(fn -> "slow-2" in Jido.AgentServer.agent(worker).state.done end)
+{admission, Jido.AgentServer.agent(worker).state.done}
+```
+
+The result is `{{:error, :admission_timeout}, ["a", "slow", "slow-2"]}`. The
+`behind` job never ran. A finite admission deadline requires a caller on the
+Server's node.
+
+## Cast
+
+`cast/3` sends the Signal and returns. It accepts only `context:`. It has no
+admission deadline.
+
+```elixir
+:ok = Jido.AgentServer.cast(worker, unknown)
+:ok = Guides.Wait.until(fn -> Jido.AgentServer.status(worker).last_outcome.signal_id == unknown.id end)
+
+Map.take(Jido.AgentServer.status(worker).last_outcome, [:status, :stage, :committed?])
+```
+
+The result is `%{status: :failed, stage: :preparing, committed?: false}`. The
+cast returned `:ok` even though the Turn failed. The Server logs
+`AgentServer cast turn failed` with the Turn ID. Read `status/2` when you
+need the outcome of a cast.
+
+`cast/3` validates before sending. A value that isn't a Signal returns
+`{:error, %Jido.Error.ValidationError{message: "Agent command must contain a Jido.Signal"}}`.
+When the queue reaches `max_postponed_signals:` (default 1,000), the Server
+drops further casts and logs each one.
+
+## Submit and Await
+
+`submit/3` sends the Turn and returns a handle at once. `await/2` collects the
+result later, from the same process. `submit/3` accepts `context:` and
+`admission_timeout:`.
+
+```elixir
+job = Guides.Worker.run_signal!(%{name: "submitted", ms: 200})
+pending = Jido.AgentServer.submit(worker, job)
+
+first = Jido.AgentServer.await(pending, 10)
+{:ok, agent, []} = Jido.AgentServer.await(pending, 2_000)
+
+{first, List.last(agent.state.done)}
+```
+
+The result is `{{:error, :timeout}, "submitted"}`. An `await/2` timeout
+returns `{:error, :timeout}` without losing the reply. Call it again to keep
+waiting. The default wait is 5,000 ms.
+
+The handle belongs to the submitting process:
+
+```elixir
+Task.async(fn -> Jido.AgentServer.await(pending, 10) end) |> Task.await()
+```
+
+The result is `{:error, %Jido.Error.ValidationError{}}` with the message
+`"await must run in the process that submitted the turn"`.
+
+Rules for a handle:
+
+- You collect a result once. Don't await a handle after you collect it.
+- The handle isn't durable and can't move to another process.
+- `abandon/1` discards the reply and returns `:ok`. It doesn't cancel the
+  Turn.
+- If the Server stops before replying, `await/2` returns
+  `{:error, %Jido.Error.ExecutionError{}}` with
+  `"Agent server stopped before the turn replied"`.
+
+```elixir
+job = Guides.Worker.run_signal!(%{name: "abandoned"})
+:ok = Jido.AgentServer.abandon(Jido.AgentServer.submit(worker, job))
+:ok = Guides.Wait.until(fn -> "abandoned" in Jido.AgentServer.agent(worker).state.done end)
+
+List.last(Jido.AgentServer.agent(worker).state.done)
+```
+
+The result is `"abandoned"`. The Turn ran after you abandoned its reply.
+
+## Send Through a Ref
+
+An instance module built with `use Jido` and a `namespace:` has Ref forms:
+`call/3`, `cast/2`, `submit/3`, and `await/2`. Each call resolves the Ref to
+the current process. The Ref form of `cast/2` takes no options.
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+{:ok, ref} = MyApp.Jido.agent_ref("worker-1")
+{:ok, agent, []} = MyApp.Jido.call(ref, job, timeout: 1_000)
+pending = MyApp.Jido.submit(ref, job)
+{:ok, agent, []} = MyApp.Jido.await(pending)
+```
+
+When the Ref doesn't resolve, these return `{:error, :not_found}` or
+`{:error, :recovering}`. See
+[Start and Address Agents](start-and-address-live-agents.livemd).
+
+## Stop the Example
+
+```elixir
+:ok = Jido.stop_agent(worker)
+:ok = Jido.stop()
+```
+
+## Next
+
+- [Admission and Deadlines](agent-server-admission.md) for queue limits,
+  cancellation, and error policy.
+- [Inspect Activations](inspect-and-control-activations.livemd) for
+  `status/2` and Turn history.

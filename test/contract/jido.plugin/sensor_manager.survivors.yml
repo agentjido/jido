@@ -1,0 +1,77 @@
+- at: lib/jido/plugin/sensor_manager/init.ex:7:50
+  operator: string_empty
+  mutation: "`\"Owning Agent Server process\"` → `\"\"`"
+  sort: unpromised
+  reason: The contract fixes the Init field and value propagation. It does not fix schema description prose.
+
+- at: lib/jido/plugin/sensor_manager/init.ex:8:49
+  operator: string_empty
+  mutation: "`\"Owning Agent identifier\"` → `\"\"`"
+  sort: unpromised
+  reason: The contract fixes the Init field and value propagation. It does not fix schema description prose.
+
+- at: lib/jido/plugin/sensor_manager/init.ex:9:41
+  operator: string_empty
+  mutation: "`\"Stable sensor tag\"` → `\"\"`"
+  sort: unpromised
+  reason: The contract fixes the Init field and value propagation. It does not fix schema description prose.
+
+- at: lib/jido/plugin/sensor_manager/init.ex:10:47
+  operator: string_empty
+  mutation: "`\"Sensor module\"` → `\"\"`"
+  sort: unpromised
+  reason: The contract fixes the Init field and value propagation. It does not fix schema description prose.
+
+- at: lib/jido/plugin/sensor_manager/init.ex:11:44
+  operator: string_empty
+  mutation: "`\"Portable sensor configuration\"` → `\"\"`"
+  sort: unpromised
+  reason: The contract fixes the Init field and value propagation. It does not fix schema description prose.
+
+- at: lib/jido/plugin/sensor_manager/init.ex:12:43
+  operator: string_empty
+  mutation: "`\"Optional Jido instance\"` → `\"\"`"
+  sort: unpromised
+  reason: The contract fixes the optional Jido value and its propagation. It does not fix schema description prose.
+
+- at: lib/jido/plugin/sensor_manager/init.ex:13:47
+  operator: string_empty
+  mutation: "`\"Optional Agent partition\"` → `\"\"`"
+  sort: unpromised
+  reason: The contract fixes the optional partition value and its propagation. It does not fix schema description prose.
+
+- at: lib/jido/plugin/sensor_manager/server.ex:47:55
+  operator: integer_shift
+  mutation: "`5000` → `5001`"
+  sort: unpromised
+  reason: The contract fixes explicit timeout forwarding and runtime fault containment. It does not fix the internal default wait budget.
+
+- at: lib/jido/plugin/sensor_manager/server.ex:47:55
+  operator: integer_shift
+  mutation: "`5000` → `4999`"
+  sort: unpromised
+  reason: The contract fixes explicit timeout forwarding and runtime fault containment. It does not fix the internal default wait budget.
+
+- at: lib/jido/plugin/sensor_manager/start.ex:9:41
+  operator: string_empty
+  mutation: "`\"Stable sensor tag\"` → `\"\"`"
+  sort: unpromised
+  reason: The contract fixes the Start field and validation rule. It does not fix schema description prose.
+
+- at: lib/jido/plugin/sensor_manager/start.ex:10:47
+  operator: string_empty
+  mutation: "`\"Sensor OTP module\"` → `\"\"`"
+  sort: unpromised
+  reason: The contract fixes the Start field and validation rule. It does not fix schema description prose.
+
+- at: lib/jido/plugin/sensor_manager/start.ex:11:44
+  operator: string_empty
+  mutation: "`\"Portable sensor configuration\"` → `\"\"`"
+  sort: unpromised
+  reason: The contract fixes the Start field and validation rule. It does not fix schema description prose.
+
+- at: lib/jido/plugin/sensor_manager/stop.ex:8:41
+  operator: string_empty
+  mutation: "`\"Stable sensor tag\"` → `\"\"`"
+  sort: unpromised
+  reason: The contract fixes the Stop field and validation rule. It does not fix schema description prose.

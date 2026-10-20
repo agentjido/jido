@@ -6,12 +6,10 @@ defmodule Jido.Instance.RefFacade do
   alias Jido.AgentServer
   alias Jido.Error
 
-  @default_timeout 5_000
-
   @doc false
   @spec build_ref(atom(), String.t(), keyword()) ::
           {:ok, Ref.t()} | {:error, Error.ValidationError.t()}
-  def build_ref(instance, id, opts \\ [])
+  def build_ref(instance, id, opts)
 
   def build_ref(instance, id, opts) when is_atom(instance) and is_binary(id) do
     with :ok <- validate_keyword(opts),
@@ -26,8 +24,8 @@ defmodule Jido.Instance.RefFacade do
 
   @doc false
   @spec resolve(atom(), Ref.t()) :: {:ok, pid()} | {:error, term()}
-  def resolve(instance, %Ref{} = ref) when is_atom(instance) do
-    with {:ok, pid, _runtime} <- resolve_target(instance, ref), do: {:ok, pid}
+  def resolve(instance, %Ref{} = ref) do
+    resolve_target(instance, ref)
   end
 
   defp resolve_target(instance, ref) do
@@ -49,8 +47,8 @@ defmodule Jido.Instance.RefFacade do
 
   defp runtime_target(pid, status) do
     case {status, :proc_lib.translate_initial_call(pid)} do
-      {:ready, {runtime, :init, 1}} when runtime == AgentServer ->
-        {:ok, pid, runtime}
+      {:ready, {AgentServer, :init, 1}} ->
+        {:ok, pid}
 
       {:starting, {AgentServer, :init, 1}} ->
         {:error, :recovering}
@@ -61,7 +59,7 @@ defmodule Jido.Instance.RefFacade do
   end
 
   @doc false
-  def start_agent(instance, %Ref{} = ref, agent, opts \\ []) when is_atom(instance) do
+  def start_agent(instance, %Ref{} = ref, agent, opts) do
     with {:ok, ref} <- Ref.validate(ref),
          :ok <- require_matching_namespace(instance, ref.namespace),
          {:ok, opts} <- ref_options(ref, opts) do
@@ -70,8 +68,7 @@ defmodule Jido.Instance.RefFacade do
   end
 
   @doc false
-  def activate_agent(instance, %Ref{} = ref, agent_module, opts \\ [])
-      when is_atom(instance) and is_atom(agent_module) do
+  def activate_agent(instance, %Ref{} = ref, agent_module, opts) do
     with {:ok, ref} <- Ref.validate(ref),
          :ok <- require_matching_namespace(instance, ref.namespace),
          {:ok, opts} <- ref_options(ref, opts) do
@@ -80,7 +77,7 @@ defmodule Jido.Instance.RefFacade do
   end
 
   @doc false
-  def call(instance, %Ref{} = ref, signal, timeout_or_opts \\ @default_timeout) do
+  def call(instance, %Ref{} = ref, signal, timeout_or_opts) do
     with_server(instance, ref, :call, [signal, timeout_or_opts])
   end
 
@@ -95,18 +92,17 @@ defmodule Jido.Instance.RefFacade do
   end
 
   @doc false
-  def stop(instance, %Ref{} = ref, reason \\ :shutdown, timeout \\ @default_timeout) do
+  def stop(instance, %Ref{} = ref, reason, timeout) do
     with_server(instance, ref, :stop, [reason, timeout])
   end
 
   @doc false
-  def hibernate(instance, %Ref{} = ref, opts \\ []) do
+  def hibernate(instance, %Ref{} = ref, opts) do
     with_server(instance, ref, :hibernate, [opts])
   end
 
   @doc false
-  def delete(instance, %Ref{} = ref, agent_module, opts \\ [])
-      when is_atom(instance) and is_atom(agent_module) do
+  def delete(instance, %Ref{} = ref, agent_module, opts) do
     with {:ok, ref} <- Ref.validate(ref),
          :ok <- require_matching_namespace(instance, ref.namespace),
          :ok <- validate_keyword(opts),
@@ -128,22 +124,22 @@ defmodule Jido.Instance.RefFacade do
   end
 
   @doc false
-  def cancel(instance, %Ref{} = ref, timeout \\ @default_timeout) do
+  def cancel(instance, %Ref{} = ref, timeout) do
     with_server(instance, ref, :cancel, [timeout])
   end
 
   @doc false
-  def cancel_turn(instance, %Ref{} = ref, turn_id, timeout \\ @default_timeout) do
+  def cancel_turn(instance, %Ref{} = ref, turn_id, timeout) do
     with_server(instance, ref, :cancel_turn, [turn_id, timeout])
   end
 
   @doc false
-  def attach(instance, %Ref{} = ref, owner_pid \\ self(), timeout \\ @default_timeout) do
+  def attach(instance, %Ref{} = ref, owner_pid, timeout) do
     with_server(instance, ref, :attach, [owner_pid, timeout])
   end
 
   @doc false
-  def detach(instance, %Ref{} = ref, owner_pid \\ self(), timeout \\ @default_timeout) do
+  def detach(instance, %Ref{} = ref, owner_pid, timeout) do
     with_server(instance, ref, :detach, [owner_pid, timeout])
   end
 
@@ -153,35 +149,33 @@ defmodule Jido.Instance.RefFacade do
   end
 
   @doc false
-  def agent(instance, %Ref{} = ref, timeout \\ @default_timeout) do
+  def agent(instance, %Ref{} = ref, timeout) do
     with_server(instance, ref, :agent, [timeout])
   end
 
   @doc false
-  def plugin_state(instance, %Ref{} = ref, plugin, timeout \\ @default_timeout) do
+  def plugin_state(instance, %Ref{} = ref, plugin, timeout) do
     with_server(instance, ref, :plugin_state, [plugin, timeout])
   end
 
   @doc false
-  def status(instance, %Ref{} = ref, timeout \\ @default_timeout) do
+  def status(instance, %Ref{} = ref, timeout) do
     with_server(instance, ref, :status, [timeout])
   end
 
   @doc false
-  def children(instance, %Ref{} = ref, timeout \\ @default_timeout) do
+  def children(instance, %Ref{} = ref, timeout) do
     with_server(instance, ref, :children, [timeout])
   end
 
   @doc false
-  def await_ready(instance, %Ref{} = ref, timeout \\ @default_timeout) do
+  def await_ready(instance, %Ref{} = ref, timeout) do
     with_server(instance, ref, :await_ready, [timeout])
   end
 
   defp with_server(instance, ref, operation, args) do
-    with {:ok, pid, runtime} <- resolve_target(instance, ref) do
-      if function_exported?(runtime, operation, length(args) + 1),
-        do: invoke(runtime, operation, [pid | args]),
-        else: {:error, {:unsupported_runtime_operation, operation}}
+    with {:ok, pid} <- resolve_target(instance, ref) do
+      invoke(AgentServer, operation, [pid | args])
     end
   end
 

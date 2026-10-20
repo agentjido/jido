@@ -1,0 +1,390 @@
+# Heartbeats and Schedules
+
+## Overview
+
+An Agent runs a Turn only when a Signal arrives. For timed work, such as
+polling every 5 seconds, a report at the top of each hour, or a reminder in
+10 minutes, two built-in Plugins produce those Signals for you:
+
+- `Jido.Plugin.Heartbeat` sends one fixed Signal on a fixed interval.
+- `Jido.Plugin.Scheduler` turns Directives returned by Actions into one-shot
+  and recurring Signals.
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+# A Signal every second, configured once:
+plugin(Jido.Plugin.Heartbeat, config: %{interval: 1_000, signal_type: "monitor.beat"})
+
+# A Signal decided at runtime, returned from an Action:
+{:ok, state, [Jido.Plugin.Scheduler.cron("report", "0 * * * *", tick)]}
+```
+
+A timer firing is an ordinary Signal. It runs a normal Turn through your
+routes.
+
+Run the cells from top to bottom. Some cells wait up to 5 seconds for real
+timers.
+
+## Install
+
+```elixir
+Mix.install([{:jido, "~> 3.0.0-beta.2"}])
+```
+
+## Wait Helper
+
+This helper polls a condition every 20 ms until it returns `{:ok, value}` or
+the timeout passes.
+
+```elixir
+defmodule ScheduleGuide.Wait do
+  def until(fun, timeout \\ 3_000) do
+    deadline = System.monotonic_time(:millisecond) + timeout
+    loop(fun, deadline)
+  end
+
+  defp loop(fun, deadline) do
+    case fun.() do
+      {:ok, value} ->
+        {:ok, value}
+
+      _not_yet ->
+        if System.monotonic_time(:millisecond) >= deadline do
+          :timeout
+        else
+          Process.sleep(20)
+          loop(fun, deadline)
+        end
+    end
+  end
+end
+```
+
+## Add A Heartbeat
+
+The Heartbeat Plugin runs a process that casts a Signal to its Agent every
+`interval` ms. Route the Signal type like any other.
+
+```elixir
+defmodule ScheduleGuide.Monitor do
+  use Jido.Agent, name: "monitor"
+
+  agent do
+    schema(Zoi.object(%{beats: Zoi.integer() |> Zoi.default(0)}))
+    plugin(Jido.Plugin.Heartbeat, config: %{interval: 100, signal_type: "monitor.beat"})
+  end
+
+  routes do
+    signal_source("/guides/heartbeats")
+
+    route "monitor.beat" do
+      action _input, schema: Zoi.object(%{}), context: context do
+        {:ok, %{context.agent_state | beats: context.agent_state.beats + 1}}
+      end
+    end
+  end
+end
+```
+
+Start it and wait for three beats:
+
+```elixir
+{:ok, _jido} = Jido.start()
+{:ok, monitor} = Jido.start_agent(ScheduleGuide.Monitor, id: "monitor")
+
+ScheduleGuide.Wait.until(fn ->
+  beats = Jido.AgentServer.agent(monitor).state.beats
+  if beats >= 3, do: {:ok, :beating}, else: :wait
+end)
+```
+
+The result is `{:ok, :beating}`. Each beat ran a full Turn and committed.
+
+```elixir
+:ok = Jido.stop_agent("monitor")
+```
+
+The heartbeat process stops with the Agent.
+
+### Heartbeat Options
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `interval` | `5_000` | Milliseconds between Signals. Positive integer. |
+| `signal_type` | `"jido.agent.heartbeat"` | Type of each Signal. |
+| `signal_data` | `%{}` | Data for each Signal. A plain map. |
+| `source` | `"/plugin/heartbeat"` | Source of each Signal. |
+
+Add a route for the heartbeat type. Without one, every tick fails its Turn
+and logs an error.
+
+Ticks are casts. While a Turn runs, ticks wait in the Agent's queue. If a
+Turn takes longer than `interval`, ticks pile up until the queue reaches
+`max_postponed_signals` (default 1,000) and the Server drops the rest. Set
+`interval` longer than your slowest handler.
+
+## Add The Scheduler
+
+A heartbeat is fixed when the Agent starts. With the Scheduler, Actions
+decide what to schedule while the Agent runs. Three Directives cover it:
+`schedule/2`, `cron/4`, and `cancel/1`.
+
+```elixir
+defmodule ScheduleGuide.Reminders do
+  use Jido.Agent, name: "reminders"
+
+  agent do
+    schema(
+      Zoi.object(%{
+        reminders: Zoi.list(Zoi.string()) |> Zoi.default([]),
+        reports: Zoi.integer() |> Zoi.default(0),
+        last_occurrence: Zoi.string() |> Zoi.nullable() |> Zoi.default(nil)
+      })
+    )
+
+    plugin(Jido.Plugin.Scheduler)
+  end
+
+  routes do
+    signal_source("/guides/schedules")
+
+    route "reminder.request", as: :request do
+      action %{text: text, delay_ms: delay},
+        schema: Zoi.object(%{text: Zoi.string(), delay_ms: Zoi.integer() |> Zoi.min(0)}),
+        context: context do
+        due = Jido.Signal.new!("reminder.due", %{text: text}, source: "/guides/schedules")
+        {:ok, context.agent_state, [Jido.Plugin.Scheduler.schedule(delay, due)]}
+      end
+    end
+
+    route "reminder.due" do
+      action %{text: text}, schema: Zoi.object(%{text: Zoi.string()}), context: context do
+        {:ok, %{context.agent_state | reminders: context.agent_state.reminders ++ [text]}}
+      end
+    end
+
+    route "report.start", as: :start_reports do
+      action _input, schema: Zoi.object(%{}), context: context do
+        tick = Jido.Signal.new!("report.tick", %{}, source: "/guides/schedules")
+
+        {:ok, context.agent_state,
+         [Jido.Plugin.Scheduler.cron("report", "* * * * * * *", tick, generation: 1)]}
+      end
+    end
+
+    route "report.stop", as: :stop_reports do
+      action _input, schema: Zoi.object(%{}), context: context do
+        {:ok, context.agent_state, [Jido.Plugin.Scheduler.cancel("report")]}
+      end
+    end
+
+    route "report.tick" do
+      action _input, schema: Zoi.object(%{}), context: context do
+        {:ok, occurrence} = Jido.Plugin.Scheduler.occurrence(context.signal)
+        state = context.agent_state
+
+        {:ok, %{state | reports: state.reports + 1, last_occurrence: occurrence.scheduled_at}}
+      end
+    end
+  end
+end
+```
+
+The Scheduler adds a `scheduler` field to Agent state:
+
+```elixir
+{:ok, reminders} = Jido.start_agent(ScheduleGuide.Reminders, id: "reminders")
+:ok = Jido.AgentServer.await_ready(reminders)
+
+Jido.AgentServer.agent(reminders).state.scheduler
+```
+
+The result is `%{cron: %{}}`: no recurring schedules yet.
+
+## One-Shot Signals
+
+`schedule/2` sends one Signal after a delay in milliseconds:
+
+```elixir
+request = ScheduleGuide.Reminders.request_signal!(%{text: "stretch", delay_ms: 200})
+{:ok, committed, directives} = Jido.AgentServer.call(reminders, request)
+
+{committed.state.reminders, committed.state.scheduler, Enum.map(directives, & &1.__struct__)}
+```
+
+The result is `{[], %{cron: %{}}, [Jido.Plugin.Scheduler.Schedule]}`. The
+reminder hasn't fired, and the one-shot isn't in the `scheduler` field. It
+exists only in the Scheduler's process.
+
+```elixir
+ScheduleGuide.Wait.until(fn ->
+  case Jido.AgentServer.agent(reminders).state.reminders do
+    [] -> :wait
+    reminders -> {:ok, reminders}
+  end
+end)
+```
+
+The result is `{:ok, ["stretch"]}`. The delayed Signal ran its own Turn.
+
+## Recurring Signals
+
+`cron/4` creates or replaces a recurring schedule under a job ID.
+`"* * * * * * *"` is the seven-field form with a seconds field, and fires
+every second. Five-field expressions such as `"0 * * * *"` also work.
+
+```elixir
+start = ScheduleGuide.Reminders.start_reports_signal!()
+{:ok, committed, _directives} = Jido.AgentServer.call(reminders, start)
+
+committed.state.scheduler.cron["report"]
+|> Map.delete(:message)
+```
+
+The result is:
+
+```text
+%{generation: 1, cron_expression: "* * * * * * *", timezone: "Etc/UTC"}
+```
+
+The entry also stores the tick Signal under `message`. Recurring schedules
+are Agent state: they commit with the Turn that created them and restore with
+the Agent.
+
+Wait for two ticks:
+
+```elixir
+ScheduleGuide.Wait.until(
+  fn ->
+    state = Jido.AgentServer.agent(reminders).state
+    if state.reports >= 2, do: {:ok, state.reports}, else: :wait
+  end,
+  5_000
+)
+```
+
+The result is `{:ok, 2}`.
+
+`cron/4` options:
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `timezone` | `"Etc/UTC"` | Time zone for evaluating the expression. |
+| `generation` | `nil` | Adds occurrence metadata to each tick. |
+
+## Occurrence IDs
+
+Each tick has a new Signal ID, so the Signal ID can't tell you which
+scheduled slot a tick belongs to. With `generation:` set, each tick carries
+occurrence metadata, and `Scheduler.occurrence/1` reads it:
+
+```elixir
+Jido.AgentServer.agent(reminders).state.last_occurrence
+```
+
+The result is the scheduled UTC instant of the last tick, such as
+`"2026-10-20T01:52:41.000000Z"`.
+
+The occurrence also has an `id`, derived from the Jido instance, Agent ID,
+partition, job ID, generation, and scheduled instant. The same slot always
+produces the same ID on any node. Use it as an idempotency key, for example
+to skip a report you already sent for that hour.
+
+Increase the generation when you replace or recreate a schedule, so old and
+new slots never share IDs. The occurrence ID only identifies a slot: it
+doesn't save, acknowledge, or redeliver ticks.
+
+## Cancel A Schedule
+
+```elixir
+stop = ScheduleGuide.Reminders.stop_reports_signal!()
+{:ok, committed, _directives} = Jido.AgentServer.call(reminders, stop)
+
+committed.state.scheduler
+```
+
+The result is `%{cron: %{}}`. After the commit, the Scheduler stops the job:
+
+```elixir
+before = Jido.AgentServer.agent(reminders).state.reports
+Process.sleep(1_500)
+
+{before, Jido.AgentServer.agent(reminders).state.reports}
+```
+
+Both numbers in the result are the same: no ticks arrived after the cancel.
+
+## Test Without A Clock
+
+The Scheduler updates its `scheduler` field in its reducer, so `cmd/3` shows
+the change without starting a timer:
+
+```elixir
+agent = ScheduleGuide.Reminders.instantiate!(id: "pure")
+start = ScheduleGuide.Reminders.start_reports_signal!()
+{:ok, candidate, [directive]} = ScheduleGuide.Reminders.cmd(agent, start)
+
+{Map.keys(candidate.state.scheduler.cron), directive.job_id}
+```
+
+The result is `{["report"], "report"}`. You can test what an Action schedules
+with no live Server.
+
+## Restart Behavior
+
+| | One-shot `schedule/2` | Recurring `cron/4` |
+| --- | --- | --- |
+| Stored in Agent state | No | Yes, in `scheduler.cron` |
+| Survives a worker crash | No | Yes, from the activation checkpoint |
+| Survives an Agent restart | No | Only with persistence |
+| Missed slots replayed | Not applicable | No |
+
+When the Scheduler starts, it reads `scheduler.cron` and recreates each
+timer. A slot that passes while the Scheduler is down is skipped. A pending
+one-shot is lost if its process stops.
+
+If a reminder must fire, store it in your own Agent state and check for due
+items from a recurring schedule, or use an external job system.
+
+## Scheduler Options
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `retry_delay_ms` | `1_000` | Delay before retrying a recurring job that failed to start. |
+| `time_scale` | `SchedEx.IdentityTimeScale` | A `SchedEx.TimeScale` module, for controlled time in tests. |
+
+A valid cron expression with no future slot, such as one for a past year,
+stays in state as a dormant job. Cancel or replace it like any other job.
+
+## Static Schedules
+
+`Jido.Plugin.Scheduler.DSL` adds a `schedules` section with `every:` and
+`cron:` entries. In this release it validates and stores schedule data in the
+definition, but it doesn't start timers. For running timers, use the
+Scheduler Plugin and its Directives.
+
+## Stop The Example
+
+```elixir
+:ok = Jido.stop_agent("reminders")
+:ok = Jido.stop()
+```
+
+## Summary
+
+- A timer firing is a Signal, and it runs a normal Turn.
+- `Heartbeat` sends a fixed Signal on a fixed interval.
+- `Scheduler` runs `schedule/2`, `cron/4`, and `cancel/1` Directives after
+  commit.
+- Recurring schedules are Agent state. One-shots aren't.
+- `generation:` gives each cron slot a stable occurrence ID.
+
+## Next
+
+- [Managed Sensors](managed-sensors.livemd): processes that watch external
+  sources and send Signals to the Agent.
+- [Custom Directives](plugin-custom-directives.livemd): build a Plugin with
+  its own Directives, like the Scheduler.
+- [Plugin Persistence](plugin-persistence-and-live-changes.md): how the
+  `scheduler` field is saved and restored.

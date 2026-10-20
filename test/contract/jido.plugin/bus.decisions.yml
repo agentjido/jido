@@ -1,0 +1,23 @@
+- id: bundled-bus-boundary
+  date: 2026-10-19
+  decision: Give local Bus declaration, Bus ownership, subscription, reconnect, delivery, and acknowledgement to jido.plugin.bus.
+  driver: These rules are bundled Bus Plugin behavior, not generic Plugin SDK behavior.
+  approved_by: Approved Jido V3 Covenant component map
+
+- id: signal-bus-dependency-boundary
+  date: 2026-10-19
+  decision: Keep Signal Bus routing, storage, replay, cursor, and subscription internals in jido_signal.
+  driver: The bundled Plugin is a consumer of the public Signal Bus contract and must not redefine it.
+  approved_by: Approved Jido V3 Covenant component map
+
+- id: durable-client-acknowledgement
+  date: 2026-10-19
+  decision: A durable Client acknowledges one record only after its Agent Turn commits and retries delivery or acknowledgement failures.
+  driver: The Plugin owns the bridge between a Bus record and an Agent Turn.
+  approved_by: Existing supported Bus Client behavior
+
+- id: bus-mutation-profile
+  date: 2026-10-19
+  decision: Mutate only the Jido.Plugin.Bus module root and its behavior-bearing helpers.
+  driver: These modules contain the bundled Plugin's declaration, ownership, subscription, reconnect, delivery, and acknowledgement decisions.
+  approved_by: User-requested component hardening pass
