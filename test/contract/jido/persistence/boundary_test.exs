@@ -104,6 +104,7 @@ defmodule Jido.Persistence.BoundaryTest do
           kind: :unknown,
           checkpoint: nil,
           checkpoint: %URI{},
+          vsn: nil,
           vsn: 0,
           vsn: "1",
           rev: -1
@@ -119,12 +120,24 @@ defmodule Jido.Persistence.BoundaryTest do
 
     assert Record.decode(nil) == {:error, :invalid_persistence_record}
 
+    atom_name = "jido_persistence_unknown_#{System.unique_integer([:positive])}"
+    encoded_atom = <<131, 118, byte_size(atom_name)::16, atom_name::binary>>
+    assert Record.decode(encoded_atom) == {:error, :invalid_persistence_record}
+
     assert Record.validate(nil, ref, Basic) == {:error, {:invalid_persistence_record, :shape}}
 
     assert Record.validate(%{record | fmt: 2}, ref, Basic) ==
              {:error, {:invalid_persistence_record, :fmt}}
 
     assert Record.kind(%{format: 99}) == :unknown
+    assert Record.kind(%{fmt: 4, kind: :active}) == :active
+    assert Record.kind(%{format: 3, kind: :tombstone}) == :tombstone
+    assert Record.kind(%{kind: :active}) == :unknown
+    assert Record.kind(%{fmt: 4, kind: :unknown}) == :unknown
+    assert Record.kind(%{fmt: 3, kind: :active}) == :unknown
+
+    assert Record.require_active(%{}) == {:error, {:invalid_persistence_record, :kind}}
+    assert Record.require_active_for_write(%{}) == {:error, {:invalid_persistence_record, :kind}}
   end
 
   @tag obligation: ["jido.persistence.I5", "jido.persistence.I12"]
@@ -150,6 +163,9 @@ defmodule Jido.Persistence.BoundaryTest do
       assert record.server_turn === candidate
       assert :ok = Record.validate(record, ref, Basic)
     end
+
+    assert {:ok, _record} =
+             Record.build_active(c.agent, ref, 0, checkpoint, %{turn | id: "x"})
 
     invalid = [
       %{turn | id: ""},
@@ -473,13 +489,18 @@ defmodule Jido.Persistence.BoundaryTest do
     assert {:error, :checkpoint_rejected} =
              Checkpoint.checkpoint(agent, %{mode: :error})
 
-    assert {:error, %Jido.Agent.Error{code: :invalid_snapshot_state}} =
+    assert {:error,
+            %Jido.Agent.Error{
+              code: :invalid_snapshot_state,
+              path: [:agent, :state],
+              details: %{result: :invalid}
+            }} =
              Checkpoint.checkpoint(agent, %{mode: :invalid})
 
     assert {:error, :restore_rejected} =
              Checkpoint.restore(ContextAgent, direct, %{mode: :error})
 
-    assert {:error, %Jido.Agent.Error{code: :invalid_snapshot_state}} =
+    assert {:error, %Jido.Agent.Error{code: :invalid_snapshot_state, path: [:agent, :state]}} =
              Checkpoint.restore(ContextAgent, direct, %{mode: :invalid})
 
     assert {:ok, snapshot} = Persistence.snapshot(agent, context: public_context)
@@ -529,10 +550,12 @@ defmodule Jido.Persistence.BoundaryTest do
     custom = Custom.instantiate!(id: "custom")
     {:ok, snapshot} = Persistence.snapshot(custom)
 
+    assert {:error, %Jido.Agent.Error{code: :invalid_snapshot_state, path: [:agent, :state]}} =
+             Persistence.restore(%{snapshot | agent: %{snapshot.agent | state: %{id: "other"}}})
+
     for changed <- [
           %{snapshot | agent: %{snapshot.agent | state: nil}},
           %{snapshot | agent: %{snapshot.agent | state: %URI{}}},
-          %{snapshot | agent: %{snapshot.agent | state: %{id: "other"}}},
           %{snapshot | agent: %{snapshot.agent | vsn: -1}},
           Map.put(snapshot, :unknown, true)
         ] do

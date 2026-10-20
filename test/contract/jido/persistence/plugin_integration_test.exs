@@ -177,6 +177,9 @@ defmodule JidoTest.Persistence.PluginIntegrationTest do
 
     assert {:ok, "sealed:3"} = PersistencePlugin.dump(spec, 3, dump_context)
 
+    assert %Jido.Persistence.Plugin.Context{record_format: 1} =
+             PersistencePlugin.context(spec, :dump, 1, :contract)
+
     for changed <- [
           %{dump_context | plugin: String},
           %{dump_context | plugin_vsn: 5}
@@ -192,9 +195,26 @@ defmodule JidoTest.Persistence.PluginIntegrationTest do
               }} = PersistencePlugin.dump(spec, 3, changed)
     end
 
-    assert_raise FunctionClauseError, fn ->
-      apply(PersistencePlugin, :dump, [spec, 3, %{dump_context | direction: :load}])
-    end
+    load_context = %{dump_context | direction: :load}
+
+    assert {:error,
+            %Jido.Error.ValidationError{
+              details: %{direction: :dump, context: ^load_context}
+            }} = PersistencePlugin.dump(spec, 3, load_context)
+
+    assert {:error,
+            %Jido.Error.ValidationError{
+              details: %{direction: :load, context: ^dump_context}
+            }} = PersistencePlugin.load(spec, "sealed:3", dump_context)
+
+    assert {:error,
+            %Jido.Error.ExecutionError{
+              details: %{
+                callback: :load,
+                path: [:plugin_state, Package],
+                plugin: Package
+              }
+            }} = PersistencePlugin.load(spec, self(), load_context)
 
     for {direction, record_format} <- [{:other, 4}, {:dump, 0}, {:dump, -1}] do
       assert_raise FunctionClauseError, fn ->
@@ -234,10 +254,12 @@ defmodule JidoTest.Persistence.PluginIntegrationTest do
 
   @tag obligation: ["jido.persistence.I9", "jido.persistence.I11"]
   test "dump callback faults and invalid values cannot write a record", c do
-    for {fault, code} <- [
-          raise: :plugin_callback_failed,
-          wrong_return: :plugin_invalid_callback_result,
-          non_portable: :non_portable_term
+    for {fault, code, expected_details} <- [
+          {:raise, :plugin_callback_failed, %{callback: :dump, plugin: Package}},
+          {:wrong_return, :plugin_invalid_callback_result,
+           %{callback: :dump, plugin: Package, result: :invalid}},
+          {:non_portable, :non_portable_term,
+           %{callback: :dump, path: [:plugin_state, Package], plugin: Package}}
         ] do
       agent = owned_agent("dump-#{fault}")
 
@@ -251,6 +273,7 @@ defmodule JidoTest.Persistence.PluginIntegrationTest do
                Persistence.save_agent(c.persistence, agent, namespace: "persistence-test")
 
       assert Jido.Error.code(error) == code
+      assert Map.take(error.details, Map.keys(expected_details)) == expected_details
 
       assert {:error, :not_found} = ETS.get(key, opts)
     end
@@ -260,11 +283,12 @@ defmodule JidoTest.Persistence.PluginIntegrationTest do
 
   @tag obligation: ["jido.persistence.I10", "jido.persistence.I11"]
   test "load callback faults and invalid values cannot restore an Agent", c do
-    for {fault, code} <- [
-          raise: :plugin_callback_failed,
-          wrong_return: :plugin_invalid_callback_result,
-          non_portable: :plugin_invalid_callback_result,
-          invalid_state: :plugin_invalid_callback_result
+    for {fault, code, expected_details} <- [
+          {:raise, :plugin_callback_failed, %{callback: :load, plugin: Package}},
+          {:wrong_return, :plugin_invalid_callback_result,
+           %{callback: :load, plugin: Package, result: :invalid}},
+          {:non_portable, :plugin_invalid_callback_result, %{plugin: Package}},
+          {:invalid_state, :plugin_invalid_callback_result, %{plugin: Package}}
         ] do
       agent = owned_agent("load-#{fault}")
       assert :ok = Persistence.save_agent(c.persistence, agent, namespace: "persistence-test")
@@ -276,6 +300,10 @@ defmodule JidoTest.Persistence.PluginIntegrationTest do
                )
 
       assert Jido.Error.code(error) == code
+      assert Map.take(error.details, Map.keys(expected_details)) == expected_details
+
+      if fault in [:non_portable, :invalid_state],
+        do: assert(Map.has_key?(error.details, :errors))
 
       Process.delete({PersistenceFacet, :load_fault})
 
@@ -293,10 +321,21 @@ defmodule JidoTest.Persistence.PluginIntegrationTest do
     key = Persistence.agent_key(Jido.Agent.Ref.new!(namespace: "persistence-test", id: agent.id))
     {ETS, opts} = c.persistence
 
-    assert {:error, _reason} =
+    assert {:error, %Jido.Agent.Error{code: :incomplete_state, path: [:state]}} =
              Persistence.save_agent(c.persistence, incomplete, namespace: "persistence-test")
 
     assert {:error, :not_found} = ETS.get(key, opts)
+
+    assert :ok = Persistence.save_agent(c.persistence, agent, namespace: "persistence-test")
+    assert {:ok, bytes} = ETS.get(key, opts)
+    record = :erlang.binary_to_term(bytes, [:safe])
+    stored = update_in(record.checkpoint.agent.state, &Map.delete(&1, :owned))
+    assert :ok = ETS.put(key, :erlang.term_to_binary(stored), opts)
+
+    assert {:error, {:invalid_persistence_record, :plugin_state}} =
+             Persistence.load_agent(c.persistence, agent.module, agent.id,
+               namespace: "persistence-test"
+             )
   end
 
   @tag obligation: "jido.persistence.I10"

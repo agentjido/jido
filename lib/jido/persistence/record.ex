@@ -181,13 +181,8 @@ defmodule Jido.Persistence.Record do
       else: invalid(if(Map.has_key?(record, :fmt), do: :rev, else: :revision))
   end
 
-  defp validate_kind_fields(record) do
-    case kind(record) do
-      :active -> validate_active(record)
-      :tombstone -> :ok
-      :unknown -> invalid(:kind)
-    end
-  end
+  defp validate_kind_fields(%{kind: :active} = record), do: validate_active(record)
+  defp validate_kind_fields(%{kind: :tombstone}), do: :ok
 
   defp validate_active(record) do
     with :ok <- validate_checkpoint(record),
@@ -227,7 +222,6 @@ defmodule Jido.Persistence.Record do
 
   defp validate_agent_vsn(record) do
     case agent_vsn(record) do
-      nil -> :ok
       vsn when is_integer(vsn) and vsn > 0 -> :ok
       _ -> invalid(if(Map.has_key?(record, :fmt), do: :vsn, else: :agent_vsn))
     end

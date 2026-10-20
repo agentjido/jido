@@ -16,6 +16,40 @@ defmodule Jido.Persistence.SnapshotTest do
     def run(%{snapshot: _snapshot}, %{mode: :error}), do: {:error, :upgrade_rejected}
   end
 
+  defmodule RuntimeSupport do
+    def marker, do: :runtime_support
+  end
+
+  defmodule RuntimePlugin do
+    use Jido.Plugin
+
+    def state_spec(_opts), do: {:runtime_owned, Zoi.integer() |> Zoi.default(0)}
+    def runtime_support, do: Jido.Persistence.SnapshotTest.RuntimeSupport
+  end
+
+  defmodule InputCheck do
+    def valid(_value, _opts), do: :ok
+  end
+
+  defmodule OutputCheck do
+    def valid(_value, _opts), do: :ok
+  end
+
+  defmodule SchemaAction do
+    use Jido.Action,
+      name: "persistence_schema_action",
+      schema:
+        Zoi.object(%{
+          input: Zoi.any() |> Zoi.refine({Jido.Persistence.SnapshotTest.InputCheck, :valid, []})
+        }),
+      output_schema:
+        Zoi.object(%{
+          output: Zoi.any() |> Zoi.refine({Jido.Persistence.SnapshotTest.OutputCheck, :valid, []})
+        })
+
+    def run(input, _context), do: {:ok, %{output: input.input}}
+  end
+
   @tag obligation: "jido.persistence.I6"
   test "complete mutated definition and state round trip without a source module" do
     assert {:ok, agent, _} =
@@ -60,14 +94,27 @@ defmodule Jido.Persistence.SnapshotTest do
   test "changed and unavailable code return reference errors" do
     assert {:ok, snapshot} = Persistence.snapshot(F.agent())
     changed = put_in(snapshot.references[F.Work], <<0::128>>)
-    assert {:error, %{code: :changed_reference}} = Persistence.restore(changed)
+
+    assert {:error,
+            %Jido.Agent.Error{
+              code: :changed_reference,
+              path: [0, :references],
+              details: %{module: F.Work}
+            }} = Persistence.restore(changed)
 
     missing = %{
       snapshot
       | references: Map.put(snapshot.references, MissingSnapshotCode, <<0::128>>)
     }
 
-    assert {:error, %{code: :unavailable_reference}} = Persistence.restore(missing)
+    assert {:error,
+            %Jido.Agent.Error{
+              code: :unavailable_reference,
+              path: path,
+              details: %{module: MissingSnapshotCode}
+            }} = Persistence.restore(missing)
+
+    assert List.last(path) == :references
   end
 
   @tag obligation: "jido.persistence.I6"
@@ -87,6 +134,50 @@ defmodule Jido.Persistence.SnapshotTest do
     end
 
     assert {:error, _} = Persistence.snapshot(%{F.agent() | state: %{count: "bad"}})
+
+    invalid_references = %{snapshot | references: %{"not-an-atom" => <<0::128>>}}
+
+    assert {:error, %Jido.Agent.Error{code: :invalid_snapshot}} =
+             Jido.Persistence.Snapshot.envelope(invalid_references)
+  end
+
+  @tag obligation: "jido.persistence.I7"
+  test "Plugin runtime and Action schemas retain all executable references" do
+    plugin_agent =
+      Agent.define!(%{
+        name: "runtime_reference_snapshot",
+        extensions: [
+          %{
+            id: RuntimePlugin.id(),
+            provider: RuntimePlugin,
+            vsn: RuntimePlugin.vsn(),
+            data: %{}
+          }
+        ]
+      })
+      |> Agent.instantiate!(id: "runtime-reference")
+
+    assert {:ok, plugin_snapshot} = Persistence.snapshot(plugin_agent)
+
+    assert plugin_snapshot.references == %{
+             RuntimePlugin => RuntimePlugin.module_info(:md5),
+             RuntimeSupport => RuntimeSupport.module_info(:md5)
+           }
+
+    action_agent =
+      Agent.define!(%{
+        name: "action_schema_reference_snapshot",
+        routes: [%{path: "schema", handler: %{kind: :action, target: SchemaAction}}]
+      })
+      |> Agent.instantiate!(id: "action-schema-reference")
+
+    assert {:ok, action_snapshot} = Persistence.snapshot(action_agent)
+
+    assert action_snapshot.references == %{
+             SchemaAction => SchemaAction.module_info(:md5),
+             InputCheck => InputCheck.module_info(:md5),
+             OutputCheck => OutputCheck.module_info(:md5)
+           }
   end
 
   @tag obligation: ["jido.persistence.I7", "jido.persistence.I8"]
@@ -117,9 +208,22 @@ defmodule Jido.Persistence.SnapshotTest do
   test "upgrade rejects identity changes, invalid state, directives, and invalid results" do
     assert {:ok, snapshot} = Persistence.snapshot(F.agent())
 
-    for mode <- [:identity, :origin, :state, :directive, :result, :extra, :nonportable, :raise] do
+    for mode <- [:state, :nonportable, :raise] do
       assert {:error, _} = Persistence.upgrade(snapshot, F.BadUpgrade, context: %{mode: mode})
     end
+
+    for mode <- [:identity, :origin] do
+      assert {:error, %Jido.Agent.Error{code: :upgrade_identity, path: [:agent]}} =
+               Persistence.upgrade(snapshot, F.BadUpgrade, context: %{mode: mode})
+    end
+
+    for mode <- [:directive, :result, :extra] do
+      assert {:error, %Jido.Agent.Error{code: :invalid_upgrade_result}} =
+               Persistence.upgrade(snapshot, F.BadUpgrade, context: %{mode: mode})
+    end
+
+    assert {:error, %Jido.Agent.Error{code: :invalid_upgrade}} =
+             Persistence.upgrade(snapshot, F.Flow)
 
     assert {:ok, restored} = Persistence.restore(snapshot)
     assert restored === F.agent()

@@ -12,7 +12,7 @@ defmodule Jido.Persistence.Plugin do
 
   @doc false
   @spec dump(Jido.Plugin.Spec.t(), term(), Context.t()) :: {:ok, term()} | {:error, term()}
-  def dump(%{persistence: %Spec{} = spec}, value, %Context{direction: :dump} = context) do
+  def dump(%{persistence: %Spec{} = spec}, value, %Context{} = context) do
     with {:ok, context} <- Context.validate(context),
          :ok <- validate_context(context, spec, :dump),
          result <-
@@ -34,7 +34,7 @@ defmodule Jido.Persistence.Plugin do
   def load(
         %{agent: %{state_schema: state_schema}, persistence: %Spec{} = spec},
         value,
-        %Context{direction: :load} = context
+        %Context{} = context
       ) do
     with {:ok, context} <- Context.validate(context),
          :ok <- validate_context(context, spec, :load),

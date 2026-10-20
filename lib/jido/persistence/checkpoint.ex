@@ -32,7 +32,7 @@ defmodule Jido.Persistence.Checkpoint do
              {:ok, converted} <- convert_plugin_value(spec, value, context, direction) do
           {:cont, {:ok, Map.put(current, key, converted)}}
         else
-          :error -> {:halt, missing_plugin_state(direction, key)}
+          :error -> {:halt, {:error, {:invalid_persistence_record, :plugin_state}}}
           {:error, _reason} = error -> {:halt, error}
         end
 
@@ -47,12 +47,6 @@ defmodule Jido.Persistence.Checkpoint do
   defp convert_plugin_value(spec, value, context, :load),
     do: PersistencePlugin.load(spec, value, context)
 
-  defp missing_plugin_state(:dump, key),
-    do: {:error, {:invalid_checkpoint, {:missing_plugin_state, key}}}
-
-  defp missing_plugin_state(:load, _key),
-    do: {:error, {:invalid_persistence_record, :plugin_state}}
-
   @doc false
   def restore_agent(record, agent_module, agent_id, instance) do
     with {:ok, agent} <-
@@ -62,7 +56,7 @@ defmodule Jido.Persistence.Checkpoint do
              restore_context(record, instance),
              converter(:load, Record.format(record), :restore)
            ),
-         :ok <- validate_restored_identity(agent, agent_module, agent_id),
+         :ok <- validate_restored_id(agent, agent_id),
          true <- agent.vsn == Record.agent_vsn(record) do
       {:ok, agent}
     else
@@ -80,9 +74,9 @@ defmodule Jido.Persistence.Checkpoint do
     )
   end
 
-  defp validate_restored_identity(%Agent{module: module, id: id}, module, id), do: :ok
+  defp validate_restored_id(%Agent{id: id}, id), do: :ok
 
-  defp validate_restored_identity(_agent, _module, _id),
+  defp validate_restored_id(_agent, _id),
     do: {:error, {:invalid_persistence_record, :checkpoint_identity}}
 
   defp restore_context(record, instance) do
