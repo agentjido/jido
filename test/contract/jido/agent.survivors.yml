@@ -1,0 +1,611 @@
+- at: lib/jido/agent.ex:29:47
+  operator: integer_shift
+  mutation: "`1` → `2`"
+  sort: unpromised
+  reason: The public constructors set the canonical version in Jido.Agent.Validation. The raw Zoi struct-schema default is not a public authoring boundary.
+
+- at: lib/jido/agent.ex:29:47
+  operator: integer_shift
+  mutation: "`1` → `0`"
+  sort: unpromised
+  reason: The public constructors set the canonical version in Jido.Agent.Validation. The raw Zoi struct-schema default is not a public authoring boundary.
+
+- at: lib/jido/agent.ex:88:26
+  operator: guard_removal
+  mutation: "`when is_atom(module)` → `(no guard)`"
+  sort: unpromised
+  reason: The function accepts an Agent module. A non-atom top-level source is outside the documented input type.
+
+- at: lib/jido/agent.ex:125:11
+  operator: string_empty
+  mutation: "`\"Provider runtime support has no Plugin adapter\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured result and required data. It does not fix human-readable error prose.
+
+- at: lib/jido/agent.ex:150:18
+  operator: element_removal
+  mutation: "`__exception__: true` → `(removed)`"
+  sort: equivalent
+  reason: Every error returned by input_signal/4 is an exception struct. Removing this repeated pattern key does not change which error is raised.
+
+- at: lib/jido/agent.ex:218:60
+  operator: guard_removal
+  mutation: "`when is_list(opts)` → `(no guard)`"
+  sort: equivalent
+  reason: Keyword.keyword?/1 returns false for non-lists, so the first clause returns the same structured error as the fallback clause.
+
+- at: lib/jido/agent.ex:221:21
+  operator: string_empty
+  mutation: "`\"Agent.cmd/3 options must be a keyword list\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured result and required data. It does not fix human-readable error prose.
+
+- at: lib/jido/agent.ex:221:69
+  operator: element_removal
+  mutation: "`opts: opts` → `(removed)`"
+  sort: unpromised
+  reason: The contract requires rejection of a non-keyword option list. It does not require the rejected option value in error details.
+
+- at: lib/jido/agent.ex:225:9
+  operator: return_nil
+  mutation: "`invalid(\"Agent.cmd/3 options must be a keyword list\", %{opt…` → `nil`"
+  sort: unpromised
+  reason: A non-list cmd option value is outside the documented keyword input type.
+
+- at: lib/jido/agent.ex:225:17
+  operator: string_empty
+  mutation: "`\"Agent.cmd/3 options must be a keyword list\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured result and required data. It does not fix human-readable error prose.
+
+- at: lib/jido/agent.ex:225:65
+  operator: element_removal
+  mutation: "`opts: opts` → `(removed)`"
+  sort: unpromised
+  reason: A non-list cmd option value is outside the documented keyword input type, including its diagnostic details.
+
+- at: lib/jido/agent.ex:230:25
+  operator: string_empty
+  mutation: "`\"Agent.set/2 attributes must be a map or keyword list\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured result and required data. It does not fix human-readable error prose.
+
+- at: lib/jido/agent.ex:230:83
+  operator: element_removal
+  mutation: "`attrs: attrs` → `(removed)`"
+  sort: unpromised
+  reason: The contract requires a structured error for invalid supported attributes. It does not fix the rejected value in error details.
+
+- at: lib/jido/agent.ex:248:15
+  operator: clause_removal
+  mutation: "`case _schema ->` → `(removed)`"
+  sort: dead-code
+  reason: A valid Agent instance has the canonical Zoi object schema. Constructor validation rejects another schema before set/2 can receive the instance.
+
+- at: lib/jido/agent.ex:243:35
+  operator: string_empty
+  mutation: "`\"Agent.set/2 accepts only domain state keys\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured result and required data. It does not fix human-readable error prose.
+
+- at: lib/jido/agent.ex:244:25
+  operator: element_removal
+  mutation: "`keys: invalid_keys` → `(removed)`"
+  sort: unpromised
+  reason: The contract requires rejection of non-domain keys. It does not fix the diagnostic details map.
+
+- at: lib/jido/agent.ex:249:41
+  operator: string_empty
+  mutation: "`\"Agent domain schema must be a Zoi object\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured result and required data. It does not fix human-readable error prose.
+
+- at: lib/jido/agent/authoring.ex:7:25
+  operator: guard_removal
+  mutation: "`when is_binary(key)` → `(no guard)`"
+  sort: unpromised
+  reason: Authoring key identity accepts atom and binary keys. Other key types are outside this helper contract.
+
+- at: lib/jido/agent/authoring.ex:12:34
+  operator: clause_removal
+  mutation: "`case :error when is_list(value) ->` → `(removed)`"
+  sort: log-only
+  reason: This mutation only selects the other nonempty human-readable authoring error message. The structured error result is unchanged.
+
+- at: lib/jido/agent/authoring.ex:12:14
+  operator: guard_removal
+  mutation: "`when is_list(value)` → `(no guard)`"
+  sort: log-only
+  reason: This mutation only selects a different nonempty human-readable authoring error message. The structured error result is unchanged.
+
+- at: lib/jido/agent/authoring.ex:21:35
+  operator: guard_removal
+  mutation: "`when is_list(value)` → `(no guard)`"
+  sort: equivalent
+  reason: Keyword.keyword?/1 returns false for non-lists, so unsupported values still return :error through this clause.
+
+- at: lib/jido/agent/codec.ex:59:58
+  operator: string_empty
+  mutation: "`\"Invalid Agent definition JSON\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured result and required data. It does not fix human-readable error prose.
+
+- at: lib/jido/agent/codec.ex:69:43
+  operator: string_empty
+  mutation: "`\"Unknown Agent definition document type or version\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured result and required data. It does not fix human-readable error prose.
+
+- at: lib/jido/agent/codec.ex:81:27
+  operator: guard_removal
+  mutation: "`when is_atom(module)` → `(no guard)`"
+  sort: unpromised
+  reason: Codec definition sources are Agent values, plain maps, or modules. Other top-level values are outside the documented input type.
+
+- at: lib/jido/agent/codec.ex:84:45
+  operator: string_empty
+  mutation: "`\"Expected an Agent definition, instance, or module\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured result and required data. It does not fix human-readable error prose.
+
+- at: lib/jido/agent/codec.ex:166:8
+  operator: guard_removal
+  mutation: "`when kind in [:action, :flow, :transform]` → `(no guard)`"
+  sort: dead-code
+  reason: Agent validation admits only action, flow, transform, and pass-through route handlers before encoding.
+
+- at: lib/jido/agent/codec.ex:171:25
+  operator: element_removal
+  mutation: "`kind: :pass_through` → `(removed)`"
+  sort: dead-code
+  reason: Agent validation canonicalizes route handlers before encoding. No other map can reach the pass-through encoder clause.
+
+- at: lib/jido/agent/codec.ex:175:15
+  operator: return_nil
+  mutation: "`Error.fail(:invalid_handler, [], \"Agent definition contains…` → `nil`"
+  sort: dead-code
+  reason: Agent validation rejects an invalid route handler before encode_fields/2 calls this fallback.
+
+- at: lib/jido/agent/codec.ex:175:42
+  operator: string_empty
+  mutation: "`\"Agent definition contains an invalid route handler\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured result and required data. It does not fix human-readable error prose.
+
+- at: lib/jido/agent/codec.ex:190:43
+  operator: string_empty
+  mutation: "`\"Invalid Agent definition route handler\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured result and required data. It does not fix human-readable error prose.
+
+- at: lib/jido/agent/codec.ex:200:15
+  operator: return_nil
+  mutation: "`Error.fail(:invalid_topology, [], \"Agent definition contain…` → `nil`"
+  sort: dead-code
+  reason: Agent validation requires the canonical topology shape before encode_fields/2 calls this fallback.
+
+- at: lib/jido/agent/codec.ex:200:43
+  operator: string_empty
+  mutation: "`\"Agent definition contains an invalid topology\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured result and required data. It does not fix human-readable error prose.
+
+- at: lib/jido/agent/codec.ex:259:51
+  operator: guard_removal
+  mutation: "`when is_atom(module)` → `(no guard)`"
+  sort: dead-code
+  reason: Validated topology members contain a canonical Agent definition or an Agent module before encoding.
+
+- at: lib/jido/agent/codec.ex:263:15
+  operator: return_nil
+  mutation: "`Error.fail(:invalid_definition, [], \"Invalid nested Agent d…` → `nil`"
+  sort: dead-code
+  reason: Validated topology members cannot reach the invalid nested-definition encoder fallback.
+
+- at: lib/jido/agent/codec.ex:263:45
+  operator: string_empty
+  mutation: "`\"Invalid nested Agent definition\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured result and required data. It does not fix human-readable error prose.
+
+- at: lib/jido/agent/codec.ex:299:64
+  operator: string_empty
+  mutation: "`\"Invalid Agent delivery value\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured result and required data. It does not fix human-readable error prose.
+
+- at: lib/jido/agent/codec.ex:354:42
+  operator: string_empty
+  mutation: "`\"Agent Registry has no identifier for a value\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured result and required data. It does not fix human-readable error prose.
+
+- at: lib/jido/agent/codec.ex:355:9
+  operator: element_removal
+  mutation: "`kinds: kinds` → `(removed)`"
+  sort: unpromised
+  reason: The contract requires an unknown-reference error. It does not fix the attempted Registry kinds in diagnostic details.
+
+- at: lib/jido/agent/codec.ex:366:53
+  operator: string_empty
+  mutation: "`\"Agent Registry reference has the wrong kind\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured result and required data. It does not fix human-readable error prose.
+
+- at: lib/jido/agent/codec.ex:370:43
+  operator: string_empty
+  mutation: "`\"Invalid Agent Registry reference\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured result and required data. It does not fix human-readable error prose.
+
+- at: lib/jido/agent/codec.ex:375:47
+  operator: string_empty
+  mutation: "`\"Invalid Agent reference\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured result and required data. It does not fix human-readable error prose.
+
+- at: lib/jido/agent/codec.ex:386:37
+  operator: guard_removal
+  mutation: "`when is_list(values)` → `(no guard)`"
+  sort: dead-code
+  reason: Validated Agent routes, topology collections, and extensions are proper lists before encoding.
+
+- at: lib/jido/agent/codec.ex:390:15
+  operator: return_nil
+  mutation: "`Error.fail(:invalid_list, [], \"Expected a proper Agent defi…` → `nil`"
+  sort: dead-code
+  reason: Validated Agent routes, topology collections, and extensions cannot reach the non-list encoder fallback.
+
+- at: lib/jido/agent/codec.ex:390:39
+  operator: string_empty
+  mutation: "`\"Expected a proper Agent definition list\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured result and required data. It does not fix human-readable error prose.
+
+- at: lib/jido/agent/codec.ex:392:37
+  operator: guard_removal
+  mutation: "`when is_list(values)` → `(no guard)`"
+  sort: equivalent
+  reason: Authoring.traverse/2 rejects a non-list or improper list, so malformed decoded collections still fail.
+
+- at: lib/jido/agent/codec.ex:396:43
+  operator: string_empty
+  mutation: "`\"Expected an Agent definition list\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured result and required data. It does not fix human-readable error prose.
+
+- at: lib/jido/agent/codec.ex:401:47
+  operator: string_empty
+  mutation: "`\"Unknown or missing Agent document fields\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured result and required data. It does not fix human-readable error prose.
+
+- at: lib/jido/agent/codec.ex:405:43
+  operator: string_empty
+  mutation: "`\"Agent document object must be a map\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured result and required data. It does not fix human-readable error prose.
+
+- at: lib/jido/agent/codec.ex:412:47
+  operator: string_empty
+  mutation: "`\"Unknown or missing Agent document fields\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured result and required data. It does not fix human-readable error prose.
+
+- at: lib/jido/agent/codec.ex:416:43
+  operator: string_empty
+  mutation: "`\"Agent document object must be a map\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured result and required data. It does not fix human-readable error prose.
+
+- at: lib/jido/agent/data.ex:118:53
+  operator: logical_swap
+  mutation: "`and` → `or`"
+  sort: equivalent
+  reason: Accepted state schemas cannot convert a map to a scalar or a scalar to a map. Both sides are maps whenever this recursive clause is needed.
+
+- at: lib/jido/agent/diff.ex:54:7
+  operator: guard_removal
+  mutation: "`when field in [:agents, :routes, :connections, :extensions]` → `(no guard)`"
+  sort: unpromised
+  reason: Diff.changed?/2 accepts only its documented field names. Another field name is outside the public input type.
+
+- at: lib/jido/agent/directive.ex:97:32
+  operator: guard_removal
+  mutation: "`when is_atom(module)` → `(no guard)`"
+  sort: unpromised
+  reason: built_in_module?/1 accepts a module atom. Other values are outside its documented input type.
+
+- at: lib/jido/agent/directive.ex:102:26
+  operator: guard_removal
+  mutation: "`when is_atom(module)` → `(no guard)`"
+  sort: unpromised
+  reason: validator?/1 accepts a module atom. Other values are outside its documented input type.
+
+- at: lib/jido/agent/directive.ex:121:34
+  operator: string_empty
+  mutation: "`\"Agent Signal Directive requires a Jido.Signal\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured result and required data. It does not fix human-readable error prose.
+
+- at: lib/jido/agent/directive.ex:148:40
+  operator: string_empty
+  mutation: "`\"Agent Directive validation changed its type\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured result and required data. It does not fix human-readable error prose.
+
+- at: lib/jido/agent/directive.ex:157:40
+  operator: string_empty
+  mutation: "`\"Agent Directive validate/1 returned an invalid result\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured result and required data. It does not fix human-readable error prose.
+
+- at: lib/jido/agent/directive.ex:164:37
+  operator: string_empty
+  mutation: "`\"Agent Directive validation failed\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured result and required data. It does not fix human-readable error prose.
+
+- at: lib/jido/agent/directive.ex:170:37
+  operator: string_empty
+  mutation: "`\"Agent Directive validation failed\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured result and required data. It does not fix human-readable error prose.
+
+- at: lib/jido/agent/directive.ex:178:34
+  operator: string_empty
+  mutation: "`\"Unknown Agent Directive\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured result and required data. It does not fix human-readable error prose.
+
+- at: lib/jido/agent/directive.ex:286:35
+  operator: logical_swap
+  mutation: "`and` → `or`"
+  sort: equivalent
+  reason: Keyword.validate!/2 also rejects duplicate keyword options. The public constructor therefore raises for the same inputs.
+
+- at: lib/jido/agent/directive.ex:287:32
+  operator: string_empty
+  mutation: "`\"Expected unique keyword options\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured result and required data. It does not fix human-readable error prose.
+
+- at: lib/jido/agent/directive/emit.ex:7:44
+  operator: string_empty
+  mutation: "`\"Signal to dispatch\"` → `\"\"`"
+  sort: log-only
+  reason: This schema description is documentation metadata. The contract does not fix descriptive prose.
+
+- at: lib/jido/agent/directive/emit.ex:9:38
+  operator: string_empty
+  mutation: "`\"Optional Signal dispatch configuration\"` → `\"\"`"
+  sort: log-only
+  reason: This schema description is documentation metadata. The contract does not fix descriptive prose.
+
+- at: lib/jido/agent/extension.ex:63:64
+  operator: element_removal
+  mutation: "`nil` → `(removed)`"
+  sort: equivalent
+  reason: nil cannot pass the required provider callback and identity checks, so it returns the same invalid-provider result.
+
+- at: lib/jido/agent/extension.ex:63:69
+  operator: element_removal
+  mutation: "`true` → `(removed)`"
+  sort: equivalent
+  reason: true cannot pass the required provider callback and identity checks, so it returns the same invalid-provider result.
+
+- at: lib/jido/agent/extension.ex:63:75
+  operator: element_removal
+  mutation: "`false` → `(removed)`"
+  sort: equivalent
+  reason: false cannot pass the required provider callback and identity checks, so it returns the same invalid-provider result.
+
+- at: lib/jido/agent/extension.ex:63:69
+  operator: boolean_flip
+  mutation: "`true` → `false`"
+  sort: equivalent
+  reason: The changed literal lets true reach the provider checks, which reject it with the same invalid-provider result.
+
+- at: lib/jido/agent/extension.ex:63:75
+  operator: boolean_flip
+  mutation: "`false` → `true`"
+  sort: equivalent
+  reason: The changed literal lets false reach the provider checks, which reject it with the same invalid-provider result.
+
+- at: lib/jido/agent/extension.ex:106:44
+  operator: string_empty
+  mutation: "`\"Provider ID or version does not match its contract\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured result and required data. It does not fix human-readable error prose.
+
+- at: lib/jido/agent/extension.ex:157:45
+  operator: string_empty
+  mutation: "`\"Provider cannot replace agent endpoints\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured result and required data. It does not fix human-readable error prose.
+
+- at: lib/jido/agent/mutation.ex:69:58
+  operator: string_empty
+  mutation: "`\"Expected an Agent mutation Directive\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured result and required data. It does not fix human-readable error prose.
+
+- at: lib/jido/agent/mutation.ex:408:62
+  operator: string_empty
+  mutation: "`\"Agent mutation failed\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured result and required data. It does not fix human-readable error prose.
+
+- at: lib/jido/agent/topology.ex:31:57
+  operator: string_empty
+  mutation: "`\"Expected an Agent definition or module\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured result and required data. It does not fix human-readable error prose.
+
+- at: lib/jido/agent/topology.ex:49:64
+  operator: string_empty
+  mutation: "`\"Expected positive slots and IDs\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured result and required data. It does not fix human-readable error prose.
+
+- at: lib/jido/agent/topology.ex:53:59
+  operator: string_empty
+  mutation: "`\"Expected a member identity Map\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured result and required data. It does not fix human-readable error prose.
+
+- at: lib/jido/agent/topology.ex:86:43
+  operator: string_empty
+  mutation: "`\"The :root name belongs to the enclosing agent\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured result and required data. It does not fix human-readable error prose.
+
+- at: lib/jido/agent/topology.ex:97:48
+  operator: string_empty
+  mutation: "`\"Parent state field does not exist\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured result and required data. It does not fix human-readable error prose.
+
+- at: lib/jido/agent/topology.ex:125:37
+  operator: boolean_flip
+  mutation: "`true` → `false`"
+  sort: equivalent
+  reason: The later initial-state check resolves the same related member with the default enabled. Skipping the earlier repeated resolution does not change the result.
+
+- at: lib/jido/agent/topology.ex:136:50
+  operator: string_empty
+  mutation: "`\"Expected an Agent definition or module\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured result and required data. It does not fix human-readable error prose.
+
+- at: lib/jido/agent/topology.ex:138:28
+  operator: element_removal
+  mutation: "`id: nil` → `(removed)`"
+  sort: dead-code
+  reason: Member normalization rejects a definition with instance identity before related/2 receives the canonical definition.
+
+- at: lib/jido/agent/topology.ex:138:37
+  operator: element_removal
+  mutation: "`state: nil` → `(removed)`"
+  sort: dead-code
+  reason: Member normalization rejects a definition with instance state before related/2 receives the canonical definition.
+
+- at: lib/jido/agent/topology.ex:144:22
+  operator: clause_removal
+  mutation: "`cond module in seen ->` → `(removed)`"
+  sort: timeout
+  reason: Removing the cycle stop causes unbounded recursive member validation. The cycle contract test reaches the per-mutant timeout.
+
+- at: lib/jido/agent/topology.ex:145:56
+  operator: string_empty
+  mutation: "`\"Member containment cannot be cyclic\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured result and required data. It does not fix human-readable error prose.
+
+- at: lib/jido/agent/topology.ex:153:57
+  operator: string_empty
+  mutation: "`\"Member definition is not available\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured result and required data. It does not fix human-readable error prose.
+
+- at: lib/jido/agent/topology.ex:170:24
+  operator: element_removal
+  mutation: "`kind: :state` → `(removed)`"
+  sort: equivalent
+  reason: The broader temporary Map match still validates every known nested value before it relaxes the parent schema.
+
+- at: lib/jido/agent/topology.ex:176:30
+  operator: return_nil
+  mutation: "`false` → `nil`"
+  sort: equivalent
+  reason: nil and false are both false values for every contains_ref?/1 caller.
+
+- at: lib/jido/agent/topology.ex:176:30
+  operator: boolean_flip
+  mutation: "`false` → `true`"
+  sort: equivalent
+  reason: Treating every leaf as symbolic validates that leaf first, then relaxes only the temporary parent schema. The accepted values do not change.
+
+- at: lib/jido/agent/topology.ex:187:8
+  operator: guard_removal
+  mutation: "`when is_list(fields) and is_map(state) and not is_struct(state)` → `(no guard)`"
+  sort: equivalent
+  reason: A Zoi object supplies list fields, and member normalization supplies a plain Map state before this private clause.
+
+- at: lib/jido/agent/topology.ex:187:47
+  operator: logical_swap
+  mutation: "`and` → `or`"
+  sort: equivalent
+  reason: A Zoi object supplies list fields, and member normalization supplies a plain Map state before this private clause.
+
+- at: lib/jido/agent/topology.ex:187:29
+  operator: logical_swap
+  mutation: "`and` → `or`"
+  sort: equivalent
+  reason: A Zoi object supplies list fields, and member normalization supplies a plain Map state before this private clause.
+
+- at: lib/jido/agent/topology.ex:210:70
+  operator: guard_removal
+  mutation: "`when is_list(value)` → `(no guard)`"
+  sort: equivalent
+  reason: Data.parse_value/2 rejects a non-list array value before the recursive list traversal runs.
+
+- at: lib/jido/agent/topology.ex:235:49
+  operator: string_empty
+  mutation: "`\"Unknown agent endpoint\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured result and required data. It does not fix human-readable error prose.
+
+- at: lib/jido/agent/topology.ex:246:11
+  operator: string_empty
+  mutation: "`\"Endpoint is not declared by a selected provider\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured result and required data. It does not fix human-readable error prose.
+
+- at: lib/jido/agent/topology.ex:251:37
+  operator: return_nil
+  mutation: "`Error.fail(:invalid_endpoint, [], \"Expected a typed endpoin…` → `nil`"
+  sort: dead-code
+  reason: Connection normalization requires both endpoints to be typed plain Maps before endpoint resolution.
+
+- at: lib/jido/agent/topology.ex:251:65
+  operator: string_empty
+  mutation: "`\"Expected a typed endpoint Map\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured result and required data. It does not fix human-readable error prose.
+
+- at: lib/jido/agent/topology.ex:263:11
+  operator: string_empty
+  mutation: "`\"A counted destination requires explicit :broadcast\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured result and required data. It does not fix human-readable error prose.
+
+- at: lib/jido/agent/topology.ex:269:50
+  operator: string_empty
+  mutation: "`\"Expected :single or :broadcast\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured result and required data. It does not fix human-readable error prose.
+
+- at: lib/jido/agent/topology.ex:321:43
+  operator: string_empty
+  mutation: "`\"Destination does not accept the connection type\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured result and required data. It does not fix human-readable error prose.
+
+- at: lib/jido/agent/topology.ex:356:11
+  operator: string_empty
+  mutation: "`\"Source contracts do not permit this connection type\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured result and required data. It does not fix human-readable error prose.
+
+- at: lib/jido/agent/topology.ex:391:54
+  operator: string_empty
+  mutation: "`\"State reference has no value\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured result and required data. It does not fix human-readable error prose.
+
+- at: lib/jido/agent/validation.ex:105:46
+  operator: string_empty
+  mutation: "`\"Expected a definition with nil id and state\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured result and required data. It does not fix human-readable error prose.
