@@ -24,6 +24,8 @@ this scaffold.
 | `jido.plugin.sensor_manager` | Active | `test/contract/jido.plugin/sensor_manager/` |
 | `jido.agent` | Active | `test/contract/jido/agent/` |
 | `jido.agent_evaluation` | Active | `test/contract/jido/agent_evaluation/` |
+| `jido.signal_action` | Active | `test/contract/jido/signal_action/` |
+| `jido.discovery` | Active | `test/contract/jido/discovery/` |
 | `jido.persistence` | Active | `test/contract/jido/persistence/` |
 | `jido.agent_server` | Active | `test/contract/jido/agent_server/` |
 | `jido.agent_server.activation` | Active | `test/contract/jido/agent_server/activation/` |
@@ -49,8 +51,8 @@ this scaffold.
 | `jido.agent_server.durable_turn` | Active | Durable Flow progress, waits, and receipts | `test/contract/jido/agent_server/durable_turn/` |
 | `jido.persistence` | Active | Records, snapshots, adapters, storage operations, and revisions | `test/contract/jido/persistence/` |
 | `jido.plugin` | Active | Generic Plugin SDK and callback contracts | `test/contract/jido/plugin/` |
-| `jido.signal_action` | Planned | Jido integration values for Signals and Actions | `test/contract/jido/signal_action/` |
-| `jido.discovery` | Planned | Read-only Action discovery | `test/contract/jido/discovery/` |
+| `jido.signal_action` | Active | Jido integration values for Signals and Actions | `test/contract/jido/signal_action/` |
+| `jido.discovery` | Active | Read-only Action discovery | `test/contract/jido/discovery/` |
 | `jido.telemetry` | Planned | Telemetry, metrics, tracing, logs, and Debug support | `test/contract/jido/telemetry/` |
 | `jido.error` | Planned | Shared error taxonomy and stable common codes | `test/contract/jido/error/` |
 | `jido.plugin.audit` | Active | Bundled Audit Plugin behavior | `test/contract/jido.plugin/audit/` |

@@ -15,3 +15,15 @@
   decision: Mutate only Jido.SignalAction in this component profile.
   driver: Agent DSL macros already belong to jido.agent, and the Action and Signal packages own their lower-level behavior.
   approved_by: Component hardening pass
+
+- id: activate-signal-action-component
+  date: 2026-10-20
+  decision: Activate jido.signal_action with 7 obligations, 10 focused tests, and one survivor ledger with no unclassified mutant.
+  driver: The focused contract now owns the complete Jido integration boundary between Action declarations and Signal values.
+  approved_by: Component hardening pass
+
+- id: signal-action-full-mutation-check
+  date: 2026-10-20
+  decision: Accept the full 112-mutant profile with 78 killed, 3 classified survivors, 31 invalid compile-time mutations, and no timeout.
+  driver: Every behavior-changing valid mutant is killed, and the only survivors change human-readable error prose that the contract does not fix.
+  approved_by: Component hardening pass

@@ -26,6 +26,10 @@ test/contract/
     agent/
     agent_evaluation.obligations.md
     agent_evaluation/
+    discovery.obligations.md
+    discovery.decisions.yml
+    discovery.survivors.yml
+    discovery/
     agent_server.obligations.md
     agent_server/
       activation/
@@ -42,6 +46,10 @@ test/contract/
     persistence/
     plugin.obligations.md
     plugin/
+    signal_action.obligations.md
+    signal_action.decisions.yml
+    signal_action.survivors.yml
+    signal_action/
   jido.plugin/
     audit.obligations.md
     audit/
@@ -138,6 +146,17 @@ portable Agent records and snapshots, Plugin-owned state conversion,
 revisions, tombstones, and built-in adapter conformance. It does not own live
 AgentServer recovery, commit publication, durable Flow progress, or
 backend-specific maintenance.
+
+`jido.signal_action` owns the combined Action and Signal declaration, shared
+input validation and conversion, input Signal construction, optional output
+Signal contracts, reply validation, and reply correlation. It does not own
+Action execution, Signal routing or dispatch, Agent route authoring, or
+AgentServer commit timing.
+
+`jido.discovery` owns the read-only Action catalog, scan sources, Action
+admission, diagnostics, stable lookup indexes, filtering, paging, and complete
+refresh replacement. It does not own Action execution, permission policy,
+application allowlists, or Agent route discovery.
 
 ## Gates
 

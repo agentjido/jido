@@ -120,9 +120,9 @@ defmodule JidoTest.SignalAction.ContractTest do
   @tag obligation: "jido.signal_action.I1"
   test "one module is one native Action and input Signal contract" do
     assert SignalAction.defined?(CreateThread)
-    refute SignalAction.defined?(Request)
-    refute SignalAction.defined?(:missing)
-    refute SignalAction.defined?(%{})
+    assert SignalAction.defined?(Request) == false
+    assert SignalAction.defined?(:missing) == false
+    assert SignalAction.defined?(%{}) == false
     assert {:ok, %{kind: :action, target: CreateThread}} = Jido.Instruction.resolve(CreateThread)
     assert CreateThread.name() == "create_thread"
     assert CreateThread.description() == "Create a named thread"

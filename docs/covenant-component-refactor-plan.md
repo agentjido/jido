@@ -47,9 +47,12 @@ obligation file and passing tagged contract tests.
 | Component | State | Active obligations | Mutation target modules | Main problem |
 | --- | --- | ---: | ---: | --- |
 | `jido.instance` | Active | 8 | 3 | The instance and Ref selection boundary is focused. |
-| `jido.plugin` | Active | 9 | 6 | The generic boundary is focused and uses no bundled Plugin fixture. |
+| `jido.plugin` | Active | 8 | 5 | The generic boundary is focused and uses no bundled Plugin fixture. |
 | `jido.agent` | Active | 21 | 20 | The model and authoring boundary is focused. |
 | `jido.agent_evaluation` | Active | 10 | 5 | Pure evaluation has a separate owner. |
+| `jido.signal_action` | Active | 7 | 1 | The combined Action and Signal value boundary is focused. |
+| `jido.discovery` | Active | 5 | 1 | Read-only Action inventory has a separate owner. |
+| `jido.persistence` | Active | 15 | 10 | Shared records, snapshots, adapters, and storage operations have a separate owner. |
 | `jido.agent_server` | Active | 37 | 1 | Core request, Turn, control, and observation behavior has a focused decision owner. |
 | `jido.agent_server.activation` | Active | 11 | 3 | The local activation and recovery boundary is focused. |
 | `jido.agent_server.effects` | Active | 11 | 2 | Post-commit effect admission, dispatch, and settlement have a separate owner. |
@@ -873,6 +876,33 @@ Completed for supporting component `jido.persistence`:
       separate owners.
 - [x] Regenerated complete Covenant coverage.
 - [x] Completed the full mutation profile with no unclassified mutant or
+      timeout.
+
+Completed for supporting component `jido.signal_action`:
+
+- [x] Added 7 obligations and 10 focused contract tests.
+- [x] Kept Action execution, Signal routing, Agent route authoring, and
+      AgentServer commit timing with their separate owners.
+- [x] Added the non-overlapping `Jido.SignalAction` mutation profile.
+- [x] Removed duplicate reply validation and moved Agent route type lowering
+      to the Agent DSL owner.
+- [x] Regenerated complete Covenant coverage.
+- [x] Completed the full 112-mutant profile with 78 killed mutants,
+      3 classified message-only survivors, 31 invalid mutations, and no
+      timeout.
+
+Completed for supporting component `jido.discovery`:
+
+- [x] Added 5 obligations and 7 focused contract tests.
+- [x] Kept Agent route discovery and product permission policy with their
+      separate owners.
+- [x] Added the non-overlapping `Jido.Discovery` mutation profile.
+- [x] Removed duplicate lookup and Instruction checks, unused slug-collision
+      policy, and a stale guide reference.
+- [x] Reduced production Discovery code by 13 lines.
+- [x] Regenerated complete Covenant coverage.
+- [x] Completed the full 128-mutant profile with 126 killed mutants,
+      2 classified logging-only survivors, no invalid mutation, and no
       timeout.
 
 After the final migration:

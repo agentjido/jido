@@ -4,6 +4,7 @@ defmodule Jido.AgentServer.DurableTurn do
   alias __MODULE__.{CheckpointStore, WaitHost}
   alias Runic.Runner
   alias Jido.Exec.Waits
+  alias Jido.Flow.Definition
 
   def instruction(prepared),
     do: Jido.Instruction.resolve(prepared.turn.executable, prepared.turn.input, prepared.context)
@@ -262,11 +263,13 @@ defmodule Jido.AgentServer.DurableTurn do
     end
   end
 
-  defp versions({:flow, %Jido.Flow{} = flow}, acc),
-    do:
-      Enum.reduce(Jido.Flow.Registry.entries(flow), acc, fn {_, entry}, acc ->
-        versions(entry, acc)
-      end)
+  defp versions({:flow, %Jido.Flow{} = flow}, acc) do
+    for {_name, node} <- flow.components,
+        {_role, instruction, _params} <- Definition.calls(node),
+        reduce: acc do
+      acc -> versions({instruction.kind, instruction.target}, acc)
+    end
+  end
 
   defp versions(_, acc), do: acc
 end

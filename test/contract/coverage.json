@@ -1,9 +1,9 @@
 {
   "apps": {
     "jido": {
-      "active": 99,
+      "active": 111,
       "coverage": 1.0,
-      "covered": 99
+      "covered": 111
     },
     "jido.agent_server": {
       "active": 66,
@@ -1906,6 +1906,68 @@
         }
       }
     },
+    "jido.discovery": {
+      "active": 5,
+      "app": "jido",
+      "coverage": 1.0,
+      "covered": 5,
+      "form": "light",
+      "obligations": {
+        "jido.discovery.I1": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 2,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test defines a temporary startup Task and contains build failure",
+            "test reports explicit empty reads before its first successful build"
+          ]
+        },
+        "jido.discovery.I2": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 3,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test combines configured and explicit modules and replaces stale entries",
+            "test rejects invalid scan sources without replacing the current catalog",
+            "test uses loaded applications by default and supports one application"
+          ]
+        },
+        "jido.discovery.I3": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 1,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test builds one deterministic Action catalog without executing discovered work"
+          ]
+        },
+        "jido.discovery.I4": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 1,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test builds one deterministic Action catalog without executing discovered work"
+          ]
+        },
+        "jido.discovery.I5": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 1,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test filters and pages Action metadata"
+          ]
+        }
+      }
+    },
     "jido.instance": {
       "active": 8,
       "app": "jido",
@@ -2845,12 +2907,103 @@
           ]
         }
       }
+    },
+    "jido.signal_action": {
+      "active": 7,
+      "app": "jido",
+      "coverage": 1.0,
+      "covered": 7,
+      "form": "light",
+      "obligations": {
+        "jido.signal_action.I1": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 3,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test input construction and Action parameters share one schema",
+            "test invalid definitions stop compilation",
+            "test one module is one native Action and input Signal contract"
+          ]
+        },
+        "jido.signal_action.I2": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 4,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test existing Signal definitions supply both envelope contracts",
+            "test input and output reject tuple forms",
+            "test input and output require full Signal type strings",
+            "test invalid definitions stop compilation"
+          ]
+        },
+        "jido.signal_action.I3": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 3,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test a reply rejects a wrong request contract or missing output definition",
+            "test existing Signal definitions supply both envelope contracts",
+            "test invalid definitions stop compilation"
+          ]
+        },
+        "jido.signal_action.I4": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 4,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test constructors own type, data, and dataschema and validate the envelope",
+            "test existing Signal definitions supply both envelope contracts",
+            "test input construction and Action parameters share one schema",
+            "test input construction applies declared defaults and coercion"
+          ]
+        },
+        "jido.signal_action.I5": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 1,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test constructors own type, data, and dataschema and validate the envelope"
+          ]
+        },
+        "jido.signal_action.I6": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 3,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test a reply rejects a wrong request contract or missing output definition",
+            "test existing Signal definitions supply both envelope contracts",
+            "test reply builds a fresh completion Signal with request correlation"
+          ]
+        },
+        "jido.signal_action.I7": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 1,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test reply builds a fresh completion Signal with request correlation"
+          ]
+        }
+      }
     }
   },
   "covenant": "0.2.0",
   "totals": {
-    "active": 199,
+    "active": 211,
     "coverage": 1.0,
-    "covered": 199
+    "covered": 211
   }
 }

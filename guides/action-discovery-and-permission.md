@@ -62,8 +62,8 @@ Jido.Discovery.get_action_by_slug("hoedKUB-BfkpkxeW")
 `name:` and `description:` are case-sensitive substring matches.
 `application:` is exact. Results are sorted by name.
 
-For the input schema, call the Action module. `to_json/0` returns a map with
-string keys, including `"description"` and `"input_schema"` as JSON Schema.
+For the input schema, call the Action module. Discovery returns inventory
+metadata only.
 
 ## Scope the Scan
 

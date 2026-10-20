@@ -99,7 +99,7 @@ defmodule Jido.Discovery do
 
   @doc "Returns a discovered Action for a module."
   @spec get_action(module()) :: action_metadata() | nil
-  def get_action(module) when is_atom(module) do
+  def get_action(module) do
     case catalog() do
       {:ok, catalog} -> Map.get(catalog.actions_by_module, module)
       {:error, :not_initialized} -> nil
@@ -108,7 +108,7 @@ defmodule Jido.Discovery do
 
   @doc "Returns a discovered Action for a catalog slug."
   @spec get_action_by_slug(String.t()) :: action_metadata() | nil
-  def get_action_by_slug(slug) when is_binary(slug) do
+  def get_action_by_slug(slug) do
     case catalog() do
       {:ok, catalog} -> Map.get(catalog.actions_by_slug, slug)
       {:error, :not_initialized} -> nil
@@ -224,17 +224,15 @@ defmodule Jido.Discovery do
     actions = Enum.sort_by(actions, &{&1.name, Atom.to_string(&1.module)})
     diagnostics = Enum.sort_by(diagnostics, &Atom.to_string(&1.module))
 
-    with :ok <- validate_unique_slugs(actions) do
-      {:ok,
-       %{
-         version: @catalog_version,
-         built_at: DateTime.utc_now(),
-         actions: actions,
-         diagnostics: diagnostics,
-         actions_by_module: Map.new(actions, &{&1.module, &1}),
-         actions_by_slug: Map.new(actions, &{&1.slug, &1})
-       }}
-    end
+    {:ok,
+     %{
+       version: @catalog_version,
+       built_at: DateTime.utc_now(),
+       actions: actions,
+       diagnostics: diagnostics,
+       actions_by_module: Map.new(actions, &{&1.module, &1}),
+       actions_by_slug: Map.new(actions, &{&1.slug, &1})
+     }}
   end
 
   defp discover_action(module) do
@@ -261,14 +259,10 @@ defmodule Jido.Discovery do
   end
 
   defp validate_action(module) do
-    with {:ok, %Instruction{kind: :action, target: ^module} = executable} <-
-           Instruction.resolve(module),
+    with {:ok, executable} <- Instruction.resolve(module),
          :ok <- Instruction.validate(executable),
          {:ok, metadata} <- action_metadata(module) do
       {:ok, metadata}
-    else
-      {:ok, %Instruction{}} -> :skip
-      {:error, error} -> {:error, error}
     end
   end
 
@@ -298,22 +292,15 @@ defmodule Jido.Discovery do
     module
     |> Atom.to_string()
     |> then(&:crypto.hash(:sha256, &1))
-    |> Base.url_encode64(padding: false)
+    |> Base.url_encode64()
     |> binary_part(0, 16)
-  end
-
-  defp validate_unique_slugs(actions) do
-    case Enum.find(Enum.group_by(actions, & &1.slug), fn {_slug, items} -> length(items) > 1 end) do
-      nil -> :ok
-      {slug, items} -> {:error, {:duplicate_action_slug, slug, Enum.map(items, & &1.module)}}
-    end
   end
 
   defp filter_and_paginate(actions, opts) do
     name = Keyword.get(opts, :name)
     description = Keyword.get(opts, :description)
     application = Keyword.get(opts, :application)
-    offset = Keyword.get(opts, :offset, 0)
+    offset = Keyword.get(opts, :offset)
     limit = Keyword.get(opts, :limit)
 
     actions
@@ -334,7 +321,7 @@ defmodule Jido.Discovery do
   defp matches?(_value, nil), do: true
   defp matches?(value, expected), do: value == expected
 
-  defp valid_offset(offset) when is_integer(offset) and offset >= 0, do: offset
+  defp valid_offset(offset) when is_integer(offset), do: max(offset, 0)
   defp valid_offset(_offset), do: 0
 
   defp maybe_limit(actions, limit) when is_integer(limit) and limit >= 0,
