@@ -1,5 +1,5 @@
 defmodule JidoTest.ErrorTest do
-  use ExUnit.Case, async: true
+  use Covenant.Case, component: "jido.error", async: true
 
   alias Jido.Error
 
@@ -8,6 +8,7 @@ defmodule JidoTest.ErrorTest do
   end
 
   describe "validation_error/2" do
+    @describetag obligation: "jido.error.I1"
     test "creates a validation error with message" do
       error = Error.validation_error("Invalid input")
 
@@ -40,6 +41,7 @@ defmodule JidoTest.ErrorTest do
   end
 
   describe "execution_error/2" do
+    @describetag obligation: "jido.error.I1"
     test "creates an execution error" do
       error = Error.execution_error("Execution failed")
 
@@ -75,6 +77,7 @@ defmodule JidoTest.ErrorTest do
   end
 
   describe "routing_error/2" do
+    @describetag obligation: "jido.error.I1"
     test "creates a routing error" do
       error = Error.routing_error("Route not found", target: :agent_1)
 
@@ -85,6 +88,7 @@ defmodule JidoTest.ErrorTest do
   end
 
   describe "timeout_error/2" do
+    @describetag obligation: "jido.error.I1"
     test "creates a timeout error" do
       error = Error.timeout_error("Operation timed out", timeout: 5000)
 
@@ -95,6 +99,7 @@ defmodule JidoTest.ErrorTest do
   end
 
   describe "compensation_error/2" do
+    @describetag obligation: "jido.error.I1"
     test "creates a compensation error for successful compensation" do
       original = Error.execution_error("Original failure")
 
@@ -114,11 +119,7 @@ defmodule JidoTest.ErrorTest do
     test "creates a compensation error for failed compensation" do
       original = Error.execution_error("Original failure")
 
-      error =
-        Error.compensation_error("Compensation failed",
-          original_error: original,
-          compensated: false
-        )
+      error = Error.compensation_error("Compensation failed", original_error: original)
 
       assert error.compensated == false
       assert error.original_error == original
@@ -126,6 +127,7 @@ defmodule JidoTest.ErrorTest do
   end
 
   describe "internal_error/2" do
+    @describetag obligation: "jido.error.I1"
     test "creates an internal error" do
       error = Error.internal_error("Unexpected error")
 
@@ -141,6 +143,7 @@ defmodule JidoTest.ErrorTest do
   end
 
   describe "stable program codes" do
+    @describetag obligation: ["jido.error.I2", "jido.error.I3"]
     test "publishes one closed Jido-owned code registry" do
       expected = [
         :non_portable_term,
@@ -160,6 +163,9 @@ defmodule JidoTest.ErrorTest do
         :agent_exec_callback_timeout,
         :agent_exec_callback_task_failed,
         :agent_turn_timeout,
+        :missing_env,
+        :invalid_env,
+        :invalid_config,
         :jido_instance_invalid_config,
         :jido_namespace_already_bound,
         :jido_namespace_required,
@@ -179,6 +185,7 @@ defmodule JidoTest.ErrorTest do
       assert Error.code({:error, error}) == :agent_callback_failed
       assert Error.code(%{code: :plugin_callback_failed}) == :plugin_callback_failed
       assert Error.code(%{details: %{code: :unknown}}) == nil
+      assert Error.code(%{code: :unknown}) == nil
       assert Error.code(:agent_callback_failed) == nil
     end
 
@@ -196,6 +203,7 @@ defmodule JidoTest.ErrorTest do
   end
 
   describe "to_map/1" do
+    @describetag obligation: ["jido.error.I3", "jido.error.I4", "jido.error.I5"]
     @to_map_cases [
       # {description, error_expr, expected_type}
       {"validation error with field", Error.validation_error("Invalid", field: :email),
@@ -236,13 +244,33 @@ defmodule JidoTest.ErrorTest do
 
     test "converts compensation error to map" do
       original = Error.execution_error("Original")
-      error = Error.compensation_error("Compensated", original_error: original, compensated: true)
+
+      error =
+        Error.compensation_error("Compensated",
+          original_error: original,
+          compensated: true,
+          result: %{refund: true}
+        )
+
       result = Error.to_map(error)
 
       assert result.type == :compensation_error
       assert result.details.compensated == true
+      assert result.details.result == %{refund: true}
       assert result.details.original_error.type == :execution_error
       assert result.details.original_error.message == "Original"
+    end
+
+    test "keeps each error module's public fields in details" do
+      assert Error.to_map(Error.execution_error("Failed", phase: :planning)).details == %{
+               phase: :planning
+             }
+
+      assert Error.to_map(Error.routing_error("No route", target: :worker)).details == %{
+               target: :worker
+             }
+
+      assert Error.to_map(Error.timeout_error("Late", timeout: 25)).details == %{timeout: 25}
     end
 
     test "sanitizes nested details for public transport payloads" do
@@ -313,6 +341,19 @@ defmodule JidoTest.ErrorTest do
       assert Error.to_map(non_retryable_error).retryable? == false
       assert Error.retryable?({:error, :timeout}) == true
       assert Error.retryable?({:error, %{type: :validation_error}}) == false
+
+      for key <- [:retry, :retryable, :retryable?, "retry", "retryable", "retryable?"],
+          value <- [true, false] do
+        assert Error.retryable?(%{key => value}) == value
+        assert Error.retryable?(%{details: %{key => value}}) == value
+      end
+
+      assert Error.retryable?(%{reason: %{retry: false}}) == false
+      assert Error.retryable?(%{"reason" => %{"retry" => false}}) == false
+
+      for value <- [:yes, 1, nil] do
+        assert Error.retryable?(%{retryable?: value})
+      end
     end
 
     test "keeps retry defaults and detail hints for each Jido error struct" do
@@ -331,7 +372,37 @@ defmodule JidoTest.ErrorTest do
       end
     end
 
-    test "recognizes known string types from public payloads" do
+    test "recognizes the complete public type vocabulary" do
+      types = [
+        :validation_error,
+        :invalid_action,
+        :config_error,
+        :planning_error,
+        :execution_error,
+        :routing_error,
+        :timeout,
+        :compensation_error,
+        :internal
+      ]
+
+      for type <- types,
+          payload <- [
+            %{type: type, message: "failure"},
+            %{type: Atom.to_string(type), message: "failure"},
+            %{"type" => type, "message" => "failure"},
+            %{"type" => " :#{type} ", "message" => "failure"}
+          ] do
+        assert Error.to_map(payload).type == type
+      end
+
+      for type <- [:validation_error, :invalid_action, :config_error] do
+        refute Error.retryable?(%{type: type})
+      end
+
+      for type <- [:planning_error, :execution_error, :routing_error, :timeout, :internal] do
+        assert Error.retryable?(%{type: type})
+      end
+
       payload = %{
         "type" => "validation_error",
         "message" => "Invalid",
@@ -340,15 +411,27 @@ defmodule JidoTest.ErrorTest do
 
       result = Error.to_map(payload)
 
-      assert result.type == :validation_error
-      assert result.message == "Invalid"
       assert result.details["password"] == "[REDACTED]"
-      assert result.retryable? == false
+      refute result.retryable?
 
       assert Error.retryable?(%{
                "type" => "execution_error",
                "details" => %{"retryable" => false}
              }) == false
+    end
+
+    test "invalid type values fail closed to internal" do
+      for payload <- [%{type: 1}, %{"type" => []}, %{type: nil}, %{"type" => %{}}] do
+        projection = Error.to_map(payload)
+        assert projection.type == :internal
+        assert projection.retryable?
+      end
+
+      assert Error.to_map(%{"message" => "visible"}).message == "visible"
+
+      for type <- ["validation_error", "invalid_action", "config_error"] do
+        assert Error.retryable?(%{type: type}) == false
+      end
     end
 
     test "handles unknown struct" do
@@ -360,6 +443,7 @@ defmodule JidoTest.ErrorTest do
   end
 
   describe "Splode interop" do
+    @describetag obligation: ["jido.error.I1", "jido.error.I6"]
     test "to_error/1 keeps Jido validation errors typed and classified" do
       error = Error.validation_error("Invalid", field: :email)
       converted = Error.to_error(error)
@@ -393,19 +477,6 @@ defmodule JidoTest.ErrorTest do
       assert class_error.class == :internal
       assert [%Error.Internal.UnknownError{} = wrapped] = class_error.errors
       assert wrapped.message == "plain failure"
-    end
-  end
-
-  describe "extract_message/1" do
-    test "extracts message from various structures" do
-      assert Error.extract_message(%{message: %{message: "Nested"}}) == "Nested"
-      assert Error.extract_message(%{message: "Direct"}) == "Direct"
-      assert Error.extract_message(%{message: nil}) == ""
-
-      inner = struct(Error.InternalError, message: "Struct message", details: %{})
-      assert Error.extract_message(%{message: inner}) == "Struct message"
-
-      assert Error.extract_message("plain string") =~ "plain string"
     end
   end
 end

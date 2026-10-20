@@ -137,6 +137,9 @@ defmodule Jido.Error do
           | :agent_exec_callback_timeout
           | :agent_exec_callback_task_failed
           | :agent_turn_timeout
+          | :missing_env
+          | :invalid_env
+          | :invalid_config
           | :jido_instance_invalid_config
           | :jido_namespace_already_bound
           | :jido_namespace_required
@@ -160,6 +163,9 @@ defmodule Jido.Error do
     :agent_exec_callback_timeout,
     :agent_exec_callback_task_failed,
     :agent_turn_timeout,
+    :missing_env,
+    :invalid_env,
+    :invalid_config,
     :jido_instance_invalid_config,
     :jido_namespace_already_bound,
     :jido_namespace_required,
@@ -549,8 +555,6 @@ defmodule Jido.Error do
   @transport_max_depth 4
   @transport_max_items 20
   @transport_max_string 512
-  @transport_inspect_limit 50
-  @transport_printable_limit 200
   @non_retryable_error_type_strings ~w[
     validation_error
     invalid_action
@@ -564,8 +568,7 @@ defmodule Jido.Error do
     "execution_error" => :execution_error,
     "routing_error" => :routing_error,
     "timeout" => :timeout,
-    "compensation_error" => :compensation_error,
-    "internal" => :internal
+    "compensation_error" => :compensation_error
   }
   @redacted "[REDACTED]"
   @omitted "[OMITTED]"
@@ -614,45 +617,8 @@ defmodule Jido.Error do
   @spec retryable?(term()) :: boolean()
   def retryable?({:error, reason, _effects}), do: retryable?(reason)
   def retryable?({:error, reason}), do: retryable?(reason)
-  def retryable?(%{retryable?: value}) when is_boolean(value), do: value
-  def retryable?(%{retryable: value}) when is_boolean(value), do: value
-  def retryable?(%{"retryable" => value}) when is_boolean(value), do: value
-  def retryable?(%{"retryable?" => value}) when is_boolean(value), do: value
-
-  def retryable?(%{type: type} = error) when is_atom(type),
-    do: retryable_hint(Map.get(error, :details, error), default_retryable_for_type?(type))
-
-  def retryable?(%{type: type} = error) when is_binary(type),
-    do: retryable_hint(Map.get(error, :details, error), default_retryable_for_type?(type))
-
-  def retryable?(%{"type" => type} = error) when is_atom(type),
-    do: retryable_hint(Map.get(error, "details", error), default_retryable_for_type?(type))
-
-  def retryable?(%{"type" => type} = error) when is_binary(type),
-    do: retryable_hint(Map.get(error, "details", error), default_retryable_for_type?(type))
-
-  def retryable?(%{details: details} = error),
-    do: retryable_hint(details, default_retryable?(error))
-
-  def retryable?(%{"details" => details} = error),
-    do: retryable_hint(details, default_retryable?(error))
-
-  def retryable?(reason) when is_atom(reason), do: default_retryable?(reason)
-  def retryable?(_reason), do: true
-
-  @doc """
-  Extracts the message string from a nested error structure.
-  """
-  @spec extract_message(any()) :: String.t()
-  def extract_message(error) do
-    case error do
-      %{message: %{message: inner}} when is_binary(inner) -> inner
-      %{message: nil} -> ""
-      %{message: msg} when is_binary(msg) -> msg
-      %{message: msg} when is_struct(msg) -> Map.get(msg, :message, inspect(msg))
-      _ -> inspect(error)
-    end
-  end
+  def retryable?(%{} = error), do: retryable_hint(error, default_retryable?(error))
+  def retryable?(reason), do: default_retryable?(reason)
 
   defp public_message(error) when is_exception(error), do: safe_exception_message(error)
 
@@ -809,9 +775,8 @@ defmodule Jido.Error do
 
   defp transport_list_kind([], kind), do: kind
 
-  defp transport_list_kind([{key, _value} | tail], :key_value)
-       when is_atom(key) or is_binary(key),
-       do: transport_list_kind(tail, :key_value)
+  defp transport_list_kind([{_key, _value} | tail], :key_value),
+    do: transport_list_kind(tail, :key_value)
 
   defp transport_list_kind([_head | tail], _kind), do: transport_list_kind(tail, :list)
   defp transport_list_kind(_tail, _kind), do: :improper
@@ -826,7 +791,7 @@ defmodule Jido.Error do
   end
 
   defp normalized_key(key) when is_atom(key), do: key |> Atom.to_string() |> String.downcase()
-  defp normalized_key(key) when is_binary(key), do: String.downcase(key)
+  defp normalized_key(key), do: String.downcase(key)
 
   defp compact_key(key), do: String.replace(key, ~r/[^a-z0-9]+/, "")
 
@@ -845,29 +810,20 @@ defmodule Jido.Error do
     _kind, _reason -> safe_inspect(error)
   end
 
-  defp sanitize_utf8(value) when is_binary(value), do: String.replace_invalid(value)
+  defp sanitize_utf8(value), do: String.replace_invalid(value)
 
   defp safe_inspect(value) do
-    value
-    |> inspect(limit: @transport_inspect_limit, printable_limit: @transport_printable_limit)
-    |> truncate_string()
-  rescue
-    _ -> inspect_fallback(value)
+    inspected =
+      inspect(value, limit: @transport_max_items, printable_limit: @transport_max_string)
+
+    if String.starts_with?(inspected, "#Inspect.Error<"),
+      do: "#Inspect.Error",
+      else: truncate_string(inspected)
   catch
-    _kind, _reason -> inspect_fallback(value)
+    _kind, _reason -> "#Inspect.Error"
   end
 
-  defp inspect_fallback(value) do
-    module =
-      case value do
-        %{__struct__: struct} when is_atom(struct) -> inspect(struct)
-        _ -> value |> :erlang.term_to_binary() |> byte_size() |> then(&"#{&1} bytes")
-      end
-
-    "#Inspect.Error<#{module}>"
-  end
-
-  defp truncate_string(value, max_chars \\ @transport_max_string) when is_binary(value) do
+  defp truncate_string(value, max_chars \\ @transport_max_string) do
     value = sanitize_utf8(value)
 
     if String.length(value) > max_chars do
@@ -884,8 +840,6 @@ defmodule Jido.Error do
     end
   end
 
-  defp extract_retry_hint(%{details: details}), do: extract_retry_hint(details)
-
   defp extract_retry_hint(%{} = map) do
     cond do
       is_boolean(Map.get(map, :retry)) -> Map.get(map, :retry)
@@ -894,13 +848,15 @@ defmodule Jido.Error do
       is_boolean(Map.get(map, "retryable")) -> Map.get(map, "retryable")
       is_boolean(Map.get(map, :retryable?)) -> Map.get(map, :retryable?)
       is_boolean(Map.get(map, "retryable?")) -> Map.get(map, "retryable?")
+      Map.has_key?(map, :details) -> extract_retry_hint(Map.get(map, :details))
+      Map.has_key?(map, "details") -> extract_retry_hint(Map.get(map, "details"))
       Map.has_key?(map, :reason) -> extract_retry_hint(Map.get(map, :reason))
       Map.has_key?(map, "reason") -> extract_retry_hint(Map.get(map, "reason"))
       true -> nil
     end
   end
 
-  defp extract_retry_hint(keyword) when is_list(keyword) do
+  defp extract_retry_hint(keyword) do
     if Keyword.keyword?(keyword) do
       cond do
         is_boolean(Keyword.get(keyword, :retry)) -> Keyword.get(keyword, :retry)
@@ -910,8 +866,6 @@ defmodule Jido.Error do
       end
     end
   end
-
-  defp extract_retry_hint(_term), do: nil
 
   defp default_retryable?(type) when is_atom(type), do: default_retryable_for_type?(type)
   defp default_retryable?(error), do: error |> unified_type() |> default_retryable_for_type?()

@@ -26,6 +26,7 @@ this scaffold.
 | `jido.agent_evaluation` | Active | `test/contract/jido/agent_evaluation/` |
 | `jido.signal_action` | Active | `test/contract/jido/signal_action/` |
 | `jido.discovery` | Active | `test/contract/jido/discovery/` |
+| `jido.telemetry` | Active | `test/contract/jido/telemetry/` |
 | `jido.persistence` | Active | `test/contract/jido/persistence/` |
 | `jido.agent_server` | Active | `test/contract/jido/agent_server/` |
 | `jido.agent_server.activation` | Active | `test/contract/jido/agent_server/activation/` |
@@ -53,7 +54,7 @@ this scaffold.
 | `jido.plugin` | Active | Generic Plugin SDK and callback contracts | `test/contract/jido/plugin/` |
 | `jido.signal_action` | Active | Jido integration values for Signals and Actions | `test/contract/jido/signal_action/` |
 | `jido.discovery` | Active | Read-only Action discovery | `test/contract/jido/discovery/` |
-| `jido.telemetry` | Planned | Telemetry, metrics, tracing, logs, and Debug support | `test/contract/jido/telemetry/` |
+| `jido.telemetry` | Active | Telemetry, metrics, tracing, logs, and Debug support | `test/contract/jido/telemetry/` |
 | `jido.error` | Planned | Shared error taxonomy and stable common codes | `test/contract/jido/error/` |
 | `jido.plugin.audit` | Active | Bundled Audit Plugin behavior | `test/contract/jido.plugin/audit/` |
 | `jido.plugin.bus` | Active | Bundled Bus Plugin behavior | `test/contract/jido.plugin/bus/` |

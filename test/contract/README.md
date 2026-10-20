@@ -50,6 +50,10 @@ test/contract/
     signal_action.decisions.yml
     signal_action.survivors.yml
     signal_action/
+    telemetry.obligations.md
+    telemetry.decisions.yml
+    telemetry.survivors.yml
+    telemetry/
   jido.plugin/
     audit.obligations.md
     audit/
@@ -157,6 +161,12 @@ AgentServer commit timing.
 admission, diagnostics, stable lookup indexes, filtering, paging, and complete
 refresh replacement. It does not own Action execution, permission policy,
 application allowlists, or Agent route discovery.
+
+`jido.telemetry` owns the fixed metric catalog, semantic event lifecycle, safe
+fields, bounded logs, per-instance Debug overrides, W3C trace context, and
+optional OpenTelemetry mapping. It does not own the runtime or persistence
+operations that emit events, reporter configuration, OpenTelemetry SDK startup,
+sampling, export, or durable audit records.
 
 ## Gates
 

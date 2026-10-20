@@ -1,0 +1,29 @@
+- id: error-component-boundary
+  date: 2026-10-20
+  decision: Use jido.error for the shared taxonomy, constructors, common-code registry, retry classification, and bounded version-1 projection.
+  driver: These rules are common across Jido domains, while each domain keeps ownership of its error values and failure conversions.
+  approved_by: Approved Jido V3 Covenant component map
+
+- id: error-test-ownership
+  date: 2026-10-20
+  decision: Move the shared constructor, projection, transport, and normalization suites to test/contract/jido/error and remove their duplicate cases.
+  driver: One focused suite makes the shared boundary visible without claiming Agent, Plugin, runtime, or persistence failure policy.
+  approved_by: Component hardening pass
+
+- id: error-mutation-profile
+  date: 2026-10-20
+  decision: Mutate only Jido.Error in the jido.error profile.
+  driver: Jido.Error owns the shared behavior in one production module. Domain error helpers remain in their domain profiles.
+  approved_by: Component hardening pass
+
+- id: register-config-error-codes
+  date: 2026-10-20
+  decision: Add missing_env, invalid_env, and invalid_config to the common-code registry.
+  driver: Jido.Config already emits these Jido-owned details.code values, so the prior 21-code registry was not complete.
+  approved_by: Component hardening pass
+
+- id: remove-unused-message-extractor
+  date: 2026-10-20
+  decision: Remove Jido.Error.extract_message/1 and its self-only tests.
+  driver: No production code, guide, example, or sibling V3 package uses the helper, and to_map/1 owns public message rendering.
+  approved_by: Component hardening pass

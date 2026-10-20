@@ -1,5 +1,7 @@
-defmodule JidoTest.ErrorTransportTest do
-  use ExUnit.Case, async: true
+defmodule JidoTest.Error.TransportTest do
+  use Covenant.Case, component: "jido.error", async: true
+
+  @moduletag obligation: ["jido.error.I4", "jido.error.I6"]
   alias Jido.Error
 
   defmodule BadInspect do
@@ -229,6 +231,8 @@ defmodule JidoTest.ErrorTransportTest do
                "123" => "visible"
              }
 
+      pair_list = Error.execution_error("Failed", details: %{nested: [{123, "visible"}]})
+      assert Error.to_map(pair_list).details.nested == %{"123" => "visible"}
       assert Jason.encode!(Error.to_map(error))
     end
 
@@ -252,7 +256,7 @@ defmodule JidoTest.ErrorTransportTest do
     end
   end
 
-  describe "transport boundaries from current main" do
+  describe "transport boundaries" do
     test "preserves field names and indexes in validation paths" do
       for path <- [[:name], ["name"], [:users, 0, :name], ["users", 19, "name"]] do
         details = %{errors: [%{code: :required, message: "is required", path: path}]}
@@ -325,6 +329,10 @@ defmodule JidoTest.ErrorTransportTest do
         )
 
       assert String.valid?(result.details.message)
+
+      assert result.details.exception.type ==
+               "JidoTest.Error.TransportTest.InvalidMessageError"
+
       assert String.valid?(result.details.exception.message)
 
       assert Enum.all?(Map.keys(result.details), fn key ->
@@ -348,6 +356,11 @@ defmodule JidoTest.ErrorTransportTest do
         assert String.valid?(result.message)
         assert Map.keys(result) |> Enum.sort() == [:details, :message, :retryable?, :type]
         assert Jason.encode!(result)
+
+        key_projection =
+          Error.to_map(Error.execution_error("Failed", details: %{nested: %{error => "visible"}}))
+
+        assert key_projection.details.nested == %{"#Inspect.Error" => "visible"}
       end
     end
 
@@ -378,11 +391,34 @@ defmodule JidoTest.ErrorTransportTest do
       end
     end
 
+    test "uses exact text truncation boundaries and keeps the first character" do
+      exact = "a" <> String.duplicate("x", 511)
+      over = exact <> "y"
+
+      exact_result = Error.to_map(%{message: exact, details: %{value: exact}})
+      over_result = Error.to_map(%{message: over, details: %{value: over}})
+
+      assert exact_result.message == exact
+      assert exact_result.details.value == exact
+      assert over_result.message == exact <> "...(truncated)"
+      assert over_result.details.value == exact <> "...(truncated)"
+    end
+
     test "still stops containers and opaque terms at the depth limit" do
       values = [%{value: "hidden"}, ["hidden"], %BadInspect{token: "hidden"}, {:value, "hidden"}]
       error = Error.execution_error("Failed", details: %{a: %{b: %{c: values}}})
 
       assert Error.to_map(error).details.a.b.c == List.duplicate("[DEPTH_LIMIT]", 4)
+    end
+
+    test "tuple traversal consumes one depth level" do
+      error =
+        Error.execution_error("Failed",
+          details: %{a: %{b: %{c: {:tag, :value, %{hidden: true}}}}}
+        )
+
+      assert Error.to_map(error).details.a.b.c ==
+               inspect({:tag, :value, "[DEPTH_LIMIT]"})
     end
 
     test "still redacts and truncates values at the depth limit" do

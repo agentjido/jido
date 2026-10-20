@@ -15,3 +15,15 @@
   decision: Mutate Jido.Debug, Jido.Telemetry, its three helper modules, and Jido.Tracing.Context and Trace in one non-overlapping profile.
   driver: These seven modules contain the component's behavior and are not targets of another active Covenant profile.
   approved_by: Component hardening pass
+
+- id: activate-telemetry-component
+  date: 2026-10-20
+  decision: Activate jido.telemetry with 8 obligations, 86 focused tests, and one survivor ledger with no unclassified mutant.
+  driver: The contract tests now own the complete observation boundary, and the seven production modules are 44 lines smaller than the pre-component checkpoint.
+  approved_by: Component hardening pass
+
+- id: telemetry-full-mutation-check
+  date: 2026-10-20
+  decision: Accept the full 714-mutant profile with 657 killed, 16 classified equivalent survivors, 41 invalid mutations, no timeout, and a 97.6 percent score.
+  driver: Every valid behavior-changing mutant is killed, and every surviving mutant is classified at its current source location.
+  approved_by: Component hardening pass

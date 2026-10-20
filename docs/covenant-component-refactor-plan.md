@@ -905,6 +905,19 @@ Completed for supporting component `jido.discovery`:
       2 classified logging-only survivors, no invalid mutation, and no
       timeout.
 
+Completed for supporting component `jido.telemetry`:
+
+- [x] Added 8 obligations and 7 focused contract test files with 86 tests.
+- [x] Kept observed runtime operations, reporter configuration, SDK startup,
+      sampling, export, and durable audit with their separate owners.
+- [x] Added one non-overlapping profile for the 7 Telemetry, Debug, and tracing
+      modules.
+- [x] Reduced the component production modules by 44 lines.
+- [x] Regenerated complete Covenant coverage.
+- [x] Completed the full 714-mutant profile with 657 killed mutants,
+      16 classified equivalent survivors, 41 invalid mutations, and no
+      timeout.
+
 After the final migration:
 
 - [x] Keep only core turn-state obligations in `jido.agent_server`.
