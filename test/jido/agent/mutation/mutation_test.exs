@@ -132,6 +132,18 @@ defmodule Jido.Agent.MutationTest do
              ])
 
     assert removed.topology == %{agents: [], connections: []}
+
+    unavailable = Module.concat(__MODULE__, UnavailableAction)
+
+    assert {:ok, without_transient_route, _} =
+             Agent.mutate(F.agent(), [
+               Directive.routes_set([
+                 %{path: "transient", handler: %{kind: :action, target: unavailable}}
+               ]),
+               Directive.route_remove("transient")
+             ])
+
+    assert without_transient_route.routes == []
   end
 
   @tag obligation: "jido.agent.I27"

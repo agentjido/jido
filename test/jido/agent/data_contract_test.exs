@@ -75,6 +75,14 @@ defmodule Jido.Agent.DataContractTest do
       :state_conversion
     )
 
+    assert_error(
+      Data.parse_value(
+        Zoi.object(%{nested: Zoi.object(%{value: Zoi.integer(coerce: true)})}),
+        %{nested: %{value: "1"}}
+      ),
+      :state_conversion
+    )
+
     assert {:error, %Error{code: :invalid_state, message: message, details: %{issues: issues}}} =
              Data.parse_value(Zoi.integer(), "bad")
 

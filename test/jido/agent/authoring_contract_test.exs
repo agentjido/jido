@@ -17,6 +17,16 @@ defmodule Jido.Agent.AuthoringContractTest do
     def runtime_support, do: Module.concat(__MODULE__, MissingAdapter)
   end
 
+  defmodule InvalidRuntime do
+    use Jido.Agent.Extension, id: "test.agent.invalid_runtime"
+    def runtime_support, do: String
+  end
+
+  defmodule ValidRuntime do
+    use Jido.Agent.Extension, id: "test.agent.valid_runtime"
+    def runtime_support, do: JidoTest.AgentContract.Stateless
+  end
+
   @tag obligation: ["jido.agent.I4", "jido.agent.I7", "jido.agent.I11"]
   test "Map authoring and instance options reject ambiguous duplicates" do
     assert {:error, %{code: :invalid_map}} = Agent.define(name: "first", name: "last")
@@ -122,8 +132,9 @@ defmodule Jido.Agent.AuthoringContractTest do
   @tag obligation: ["jido.agent.I2", "jido.agent.I7", "jido.agent.I24"]
   test "definition and instance predicates accept only their exact value shapes" do
     definition = Agent.define!(%{name: "predicate"})
-    instance = Agent.instantiate!(definition, id: "one")
+    instance = Agent.instantiate!(definition, id: "x")
 
+    assert definition.vsn === 1
     assert Agent.definition?(definition) === true
     assert Agent.instance?(definition) === false
     assert Agent.definition?(instance) === false
@@ -145,10 +156,16 @@ defmodule Jido.Agent.AuthoringContractTest do
     for value <- [%{definition | id: "one"}, %{definition | state: %{}}, %{}, nil] do
       assert Agent.definition?(value) === false
     end
+
+    assert {:error,
+            %Jido.Error.ValidationError{
+              message: "Agent.set/2 requires an instance",
+              details: %{id: nil, state: nil}
+            }} = Agent.set(definition, %{})
   end
 
   @tag obligation: "jido.agent.I10"
-  test "runtime Plugin projection skips passive providers and rejects missing adapters" do
+  test "runtime Plugin projection accepts only available Plugin adapters" do
     passive = %{
       id: NoRuntime.id(),
       provider: NoRuntime,
@@ -160,21 +177,36 @@ defmodule Jido.Agent.AuthoringContractTest do
     assert Agent.runtime_plugins(definition) === []
     assert Agent.validate_runtime_support(definition) === :ok
 
-    missing = %{
-      id: MissingRuntime.id(),
-      provider: MissingRuntime,
-      vsn: MissingRuntime.vsn(),
+    valid = %{
+      id: ValidRuntime.id(),
+      provider: ValidRuntime,
+      vsn: ValidRuntime.vsn(),
       data: %{}
     }
 
-    invalid = Agent.define!(%{name: "missing", extensions: [missing]})
+    supported = Agent.define!(%{name: "supported", extensions: [valid]})
 
-    assert {:error,
-            %Agent.Error{
-              code: :runtime_support_not_available,
-              path: [:extensions],
-              details: %{provider: MissingRuntime}
-            }} = Agent.validate_runtime_support(invalid)
+    assert Agent.runtime_plugins(supported) === [{JidoTest.AgentContract.Stateless, []}]
+    assert Agent.validate_runtime_support(supported) === :ok
+
+    for provider <- [MissingRuntime, InvalidRuntime] do
+      contribution = %{
+        id: provider.id(),
+        provider: provider,
+        vsn: provider.vsn(),
+        data: %{}
+      }
+
+      invalid = Agent.define!(%{name: "invalid", extensions: [contribution]})
+      assert Agent.runtime_plugins(invalid) === []
+
+      assert {:error,
+              %Agent.Error{
+                code: :runtime_support_not_available,
+                path: [:extensions],
+                details: %{provider: ^provider}
+              }} = Agent.validate_runtime_support(invalid)
+    end
   end
 
   @tag obligation: "jido.agent.I21"

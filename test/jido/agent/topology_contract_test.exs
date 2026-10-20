@@ -24,7 +24,51 @@ defmodule Jido.Agent.TopologyContractTest do
   defmodule Ports do
     use Jido.Agent.Extension, id: "test.topology.ports"
     def endpoint_kinds, do: [:port]
-    def endpoints(_data), do: [%{kind: :port, name: :in}, %{kind: :port, name: :out}]
+
+    def endpoints(_data),
+      do: [
+        %{kind: :port, name: :in},
+        %{kind: :port, name: :out},
+        %{kind: :port, name: :root}
+      ]
+  end
+
+  defmodule StructuredChild do
+    use Jido.Agent, name: "topology_contract_structured_child"
+
+    agent do
+      schema Zoi.object(%{
+               settings: Zoi.object(%{label: Zoi.string(), enabled: Zoi.boolean()}),
+               metadata: Zoi.map(),
+               labels: Zoi.list(Zoi.string())
+             })
+    end
+  end
+
+  defmodule CycleA do
+    def definition do
+      %{
+        name: "topology_cycle_a",
+        topology: %{
+          agents: [
+            %{name: :cycle_b, definition: Jido.Agent.TopologyContractTest.CycleB}
+          ]
+        }
+      }
+    end
+  end
+
+  defmodule CycleB do
+    def definition do
+      %{
+        name: "topology_cycle_b",
+        topology: %{
+          agents: [
+            %{name: :cycle_a, definition: Jido.Agent.TopologyContractTest.CycleA}
+          ]
+        }
+      }
+    end
   end
 
   defp endpoint(name), do: %{kind: :agent, name: name}
@@ -105,6 +149,32 @@ defmodule Jido.Agent.TopologyContractTest do
 
     assert {:error, %Agent.Error{code: :unresolved_definition}} =
              Topology.normalize(topology, parent, [])
+
+    loaded = %{topology | agents: [%{name: :offline, definition: String}]}
+
+    assert {:error, %Agent.Error{code: :unresolved_definition, details: %{module: String}}} =
+             Topology.normalize(loaded, parent, [])
+
+    cyclic = %{topology | agents: [%{name: :cycle, definition: CycleA}]}
+
+    assert {:error, %Agent.Error{code: :recursive_membership, details: %{module: CycleA}}} =
+             Topology.normalize(cyclic, parent, [])
+
+    assert {:error, %Agent.Error{}} =
+             Topology.normalize(
+               %{
+                 agents: [
+                   %{
+                     name: :bad_count,
+                     definition: Child,
+                     count: %{kind: :wrong, key: :count}
+                   }
+                 ],
+                 connections: []
+               },
+               parent,
+               []
+             )
 
     for definition <- [nil, true, false, 1, "agent", []] do
       assert {:error, %Agent.Error{code: :invalid_member}} =
@@ -215,12 +285,18 @@ defmodule Jido.Agent.TopologyContractTest do
               from: endpoint(:root),
               to: %{kind: :port, name: :in},
               delivery: :single
+            },
+            %{
+              path: "work.one",
+              from: %{kind: :port, name: :root},
+              to: endpoint(:child),
+              delivery: :single
             }
           ]
         }
       })
 
-    assert {:ok, [%{status: :unchecked}, %{status: :compatible}]} =
+    assert {:ok, [%{status: :unchecked}, %{status: :compatible}, %{status: :unchecked}]} =
              Topology.checks(definition)
 
     assert {:error, %Agent.Error{code: :unknown_endpoint}} =
@@ -338,5 +414,66 @@ defmodule Jido.Agent.TopologyContractTest do
               path: [:topology, :agents, 0],
               details: %{key: :copies}
             }} = Topology.bind(definition, %{value: "seed"})
+  end
+
+  @tag obligation: ["jido.agent.I28", "jido.agent.I30"]
+  test "authoring validates nested initial values and exact parent references" do
+    assert {:error, %Agent.Error{}} =
+             Agent.define(%{
+               name: "invalid_nested_initial",
+               topology: %{
+                 agents: [
+                   %{
+                     name: :child,
+                     definition: StructuredChild,
+                     initial_state: %{
+                       settings: %{label: "literal", enabled: "invalid"},
+                       metadata: %{},
+                       labels: []
+                     }
+                   }
+                 ]
+               }
+             })
+
+    assert {:error, %Agent.Error{code: :unknown_state_field, details: %{key: :missing}}} =
+             Agent.define(%{
+               name: "unknown_parent_reference",
+               topology: %{
+                 agents: [
+                   %{name: :child, definition: Child, count: Topology.state(:missing)}
+                 ]
+               }
+             })
+
+    definition =
+      Agent.define!(%{
+        name: "nested_parent_references",
+        schema: Zoi.object(%{label: Zoi.string()}),
+        topology: %{
+          agents: [
+            %{
+              name: :child,
+              definition: StructuredChild,
+              initial_state: %{
+                settings: %{label: Topology.state(:label), enabled: true},
+                metadata: %{key: :literal},
+                labels: ["literal", Topology.state(:label)]
+              }
+            }
+          ]
+        }
+      })
+
+    assert {:ok,
+            [
+              %{
+                state: %{
+                  settings: %{label: "bound", enabled: true},
+                  metadata: %{key: :literal},
+                  labels: ["literal", "bound"]
+                }
+              }
+            ]} = Topology.bind(definition, %{label: "bound"})
   end
 end

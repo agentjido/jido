@@ -190,6 +190,10 @@ The reported percentage is obligation coverage, not code coverage.
 Run mutation analysis at an explicit component review checkpoint:
 
 ```sh
-MIX_ENV=test mix covenant.mutate jido.agent --macros --jobs 4 --seed 0 \
+MIX_ENV=test mix covenant.mutate jido.agent --jobs 4 --seed 0 \
   --timeout 5000 --max-runtime 3600000
 ```
+
+The Agent profile checks runtime and value modules. It does not mutate Spark
+DSL declaration macros because invalid macro AST can stop the Elixir verifier
+outside the test process. The authoring suite checks the generated DSL output.

@@ -221,10 +221,14 @@ defmodule Jido.Agent.CodecTest do
     [member] = document["definition"]["topology"]["agents"]
     [connection] = document["definition"]["topology"]["connections"]
     [extension] = document["definition"]["extensions"]
+    schema = document["definition"]["schema"]
 
     invalid = [
       Map.put(document, "type", "unknown"),
+      Map.put(document, "version", 2),
       Map.delete(document, "version"),
+      put_in(document, ["definition", "schema"], Map.put(schema, "$type", "unknown")),
+      put_in(document, ["definition", "schema"], Map.put(schema, "extra", true)),
       put_in(document, ["definition", "routes"], false),
       put_in(document, ["definition", "routes"], [%{"path" => "child.single"}]),
       put_in(document, ["definition", "routes"], [%{route | "handler" => %{"kind" => "bad"}}]),
@@ -236,13 +240,18 @@ defmodule Jido.Agent.CodecTest do
       ]),
       put_in(document, ["definition", "topology"], false),
       put_in(document, ["definition", "topology", "agents"], false),
+      put_in(document, ["definition", "topology", "agents"], [false]),
       put_in(
         document,
         ["definition", "topology", "agents"],
         [Map.delete(member, "name")]
       ),
+      put_in(document, ["definition", "topology", "agents"], [Map.put(member, "extra", true)]),
       put_in(document, ["definition", "topology", "agents"], [
         %{member | "definition" => 1}
+      ]),
+      put_in(document, ["definition", "topology", "agents"], [
+        %{member | "definition" => Map.put(member["definition"], "$type", "unknown")}
       ]),
       put_in(document, ["definition", "topology", "agents"], [
         %{member | "definition" => Map.put(member["definition"], "extra", true)}
@@ -269,7 +278,10 @@ defmodule Jido.Agent.CodecTest do
     assert byte_size(over_limit) == 8_388_609
     assert {:error, %{code: :invalid_document}} = Codec.from_json(at_limit, registry)
 
-    for json <- [nil, "{", over_limit] do
+    assert {:error, %{code: :invalid_json, message: "Expected a JSON string of at most 8 MiB"}} =
+             Codec.from_json(over_limit, registry)
+
+    for json <- [nil, "{"] do
       assert {:error, _} = Codec.from_json(json, registry)
     end
   end

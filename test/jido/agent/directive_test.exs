@@ -235,6 +235,10 @@ defmodule Jido.Agent.DirectiveContractTest do
 
     assert %{options: [], initial: {:value, nil}} =
              Directive.plugin_add(JidoTest.AgentContract.First, [], initial: nil)
+
+    assert_raise ArgumentError, fn ->
+      Directive.plugin_add(JidoTest.AgentContract.First, [], initial: 1, initial: 2)
+    end
   end
 end
 

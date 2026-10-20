@@ -99,15 +99,11 @@ defmodule Jido.Agent do
   @doc "Returns runtime Plugin declarations from provider contributions."
   def runtime_plugins(%__MODULE__{extensions: entries}) do
     Enum.flat_map(entries, fn entry ->
-      case entry.provider.runtime_support() do
-        :none ->
-          []
+      module = entry.provider.runtime_support()
 
-        module ->
-          if Code.ensure_loaded?(module) and function_exported?(module, :__jido_plugin__, 0),
-            do: [{module, Enum.sort(entry.data)}],
-            else: []
-      end
+      if Code.ensure_loaded?(module) and function_exported?(module, :__jido_plugin__, 0),
+        do: [{module, Enum.sort(entry.data)}],
+        else: []
     end)
   end
 
