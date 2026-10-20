@@ -42,7 +42,7 @@ adapters, durable business delivery, delivery replay, or acknowledgement.
 ### jido.plugin.scheduler.I3 — Static schedule authoring
 
 - **scope:** `Jido.Plugin.Scheduler.DSL`, `Jido.Plugin.Scheduler.DSL.Schedule`
-- **must:** Normalize one interval or cron timing form, apply the UTC timezone default, reject duplicate names and live Signal template values, and require a matching Agent input route.
+- **must:** Accept either schedule DSL entities or Plugin data but not both, normalize exactly one interval or cron timing form, default omitted schedules and Signal data to empty collections, apply the UTC timezone default, reject duplicate names and live Signal template values, and require a matching Agent input route with a schedule-scoped error.
 - **kind:** functional
 - **status:** active
 

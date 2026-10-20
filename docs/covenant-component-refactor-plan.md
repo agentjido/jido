@@ -684,10 +684,10 @@ Scheduler last.
 - [x] Add `jido.plugin.sensor_manager`.
 - [x] Add `jido.plugin.bus`.
 - [x] Add `jido.plugin.scheduler` after Phase 3.
-- [ ] For each component, select only its module root and behavior-bearing
+- [x] For each component, select only its module root and behavior-bearing
       helpers for mutation.
-- [ ] Keep generic callback failures in `jido.plugin` or the live consumer.
-- [ ] Keep external `jido_signal` Bus behavior outside `jido.plugin.bus`.
+- [x] Keep generic callback failures in `jido.plugin` or the live consumer.
+- [x] Keep external `jido_signal` Bus behavior outside `jido.plugin.bus`.
 
 Exit condition: each bundled Plugin can change without changing generic Plugin
 obligations.
@@ -1030,6 +1030,22 @@ Completed for bundled component `jido.plugin.bus`:
       contract failure.
 - [x] Completed the full 193-mutant profile with 172 killed mutants,
       7 classified survivors, 14 invalid mutations, no timeout, and no
+      unsorted mutant.
+
+Completed for bundled component `jido.plugin.scheduler`:
+
+- [x] Kept 9 obligations and 24 focused contract tests for definitions,
+      static authoring, timer ownership, reconciliation, occurrence identity,
+      recovery, retry, clocks, and readiness.
+- [x] Added the two static DSL modules to the non-overlapping eleven-module
+      profile because obligation I3 owns their declaration and lowering.
+- [x] Added one compile-time entity-target invariant so an invalid Spark
+      declaration fails synchronously instead of terminating the mutation
+      worker.
+- [x] Refined I3 to prove one authoring source, defaults, exact timing forms,
+      UTC defaulting, and schedule-scoped route errors.
+- [x] Completed the full 476-mutant profile with 381 killed mutants,
+      67 classified survivors, 28 invalid mutations, no timeout, and no
       unsorted mutant.
 
 After the final migration:

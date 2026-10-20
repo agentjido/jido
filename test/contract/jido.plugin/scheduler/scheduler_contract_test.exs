@@ -6,6 +6,7 @@ defmodule JidoTest.Contract.PluginSchedulerTest do
   alias Jido.Plugin.Scheduler
   alias Jido.Plugin.Scheduler.{DSL, Occurrence, WallClock}
   alias Jido.Signal
+  alias Spark.Dsl.{Entity, Extension, Section}
 
   @scope {ExampleJido, "agent-1", "tenant-1"}
   @instant ~U[2030-01-01 00:00:01Z]
@@ -177,41 +178,127 @@ defmodule JidoTest.Contract.PluginSchedulerTest do
 
   @tag obligation: "jido.plugin.scheduler.I3"
   test "static authoring normalizes timing and verifies accepted inputs" do
-    interval = %{
-      name: :review,
-      timing: %{kind: :every, milliseconds: 60_000},
-      signal: %{type: "work.request", data: %{}}
-    }
+    assert [%Section{name: :schedules, entities: [%Entity{} = entity]}] = DSL.sections()
+    assert entity.name == :schedule
+    assert entity.target == DSL.Schedule
+    assert entity.args == [:name]
 
-    cron = %{
-      name: :refresh,
-      timing: %{kind: :cron, expression: "*/5 * * * *"},
-      signal: %{type: "work.request", data: %{value: "refresh"}}
-    }
+    assert entity.schema == [
+             name: [type: :atom, required: true],
+             every: [type: :pos_integer],
+             cron: [type: :string],
+             timezone: [type: :string],
+             signal: [type: :any, required: true]
+           ]
 
-    assert {:ok, data} = DSL.normalize(%{schedules: [interval, cron]})
-    assert Enum.at(data.schedules, 1).timing.timezone == "Etc/UTC"
+    schedules = [
+      %DSL.Schedule{
+        name: :review,
+        every: 60_000,
+        signal: %{type: "work.request", data: %{}}
+      },
+      %DSL.Schedule{
+        name: :refresh,
+        cron: "*/5 * * * *",
+        signal: %{type: "work.request", data: %{value: "refresh"}}
+      }
+    ]
+
+    section = %{Extension.default_section_config() | entities: schedules}
+    dsl = %{[:schedules] => section}
+
+    assert {:ok, lowered} = DSL.lower(dsl, %{})
+
+    assert lowered == %{
+             schedules: [
+               %{
+                 name: :review,
+                 timing: %{kind: :every, milliseconds: 60_000},
+                 signal: %{type: "work.request", data: %{}}
+               },
+               %{
+                 name: :refresh,
+                 timing: %{
+                   kind: :cron,
+                   expression: "*/5 * * * *",
+                   timezone: "Etc/UTC"
+                 },
+                 signal: %{type: "work.request", data: %{value: "refresh"}}
+               }
+             ]
+           }
+
+    assert {:ok, data} = DSL.normalize(lowered)
     assert {:ok, definition} = define(data, [pass("work.request")])
     assert :ok = DSL.verify(data, definition)
     assert {:ok, ^data} = DSL.lower(%{}, data)
+    assert {:error, %Error{code: :ambiguous_config}} = DSL.lower(dsl, data)
+    assert {:ok, %{schedules: []}} = DSL.normalize(%{})
+
+    assert {:ok, defaulted} =
+             DSL.normalize(%{
+               schedules: [
+                 %{
+                   name: :defaulted,
+                   timing: %{kind: :cron, expression: "* * * * *"},
+                   signal: %{type: "work.request"}
+                 }
+               ]
+             })
+
+    assert [defaulted_schedule] = defaulted.schedules
+    assert defaulted_schedule.timing.timezone == "Etc/UTC"
+    assert defaulted_schedule.signal.data == %{}
+
+    [interval | _] = data.schedules
 
     assert {:error, %Error{code: :duplicate}} =
              DSL.normalize(%{schedules: [interval, interval]})
 
-    assert {:error, %Error{code: :schedule_input}} = define(data)
+    assert {:error,
+            %Error{
+              code: :schedule_input,
+              path: [:extensions, 0, 0, :schedules, :review],
+              details: %{type: "work.request", definition: "scheduler-contract"}
+            }} = define(data)
   end
 
   @tag obligation: "jido.plugin.scheduler.I3"
   test "static authoring rejects mixed timing and live Signal template data" do
+    for schedule <- [
+          %DSL.Schedule{name: :missing, signal: %{type: "work.request"}},
+          %DSL.Schedule{
+            name: :mixed,
+            every: 1,
+            cron: "* * * * *",
+            signal: %{type: "work.request"}
+          },
+          %DSL.Schedule{
+            name: :zoned_interval,
+            every: 1,
+            timezone: "Etc/UTC",
+            signal: %{type: "work.request"}
+          }
+        ] do
+      section = %{Extension.default_section_config() | entities: [schedule]}
+
+      assert {:error, %Error{code: :schedule_timing}} =
+               DSL.lower(%{[:schedules] => section}, %{})
+    end
+
     base = %{
       name: :review,
       timing: %{kind: :every, milliseconds: 60_000},
       signal: %{type: "work.request", data: %{}}
     }
 
+    assert {:error, %Error{code: :schedule_timing}} =
+             DSL.normalize(%{schedules: [%{base | timing: :manual}]})
+
     for invalid <- [
           %{base | timing: %{kind: :every, milliseconds: 0}},
           %{base | timing: %{kind: :every, milliseconds: 1, timezone: "Etc/UTC"}},
+          %{base | timing: %{expression: "* * * * *"}},
           %{base | timing: %{kind: :cron, expression: "not cron"}},
           %{base | timing: %{kind: :cron, expression: "* * * * *", timezone: "No/SuchZone"}},
           %{base | signal: %{type: "work.*"}},

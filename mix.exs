@@ -368,7 +368,7 @@ defmodule Jido.MixProject do
       {:jido_action, path: "../jido_action", override: true},
       {:jido_signal, "~> 3.0.0-beta.5"},
       # AgentServer owns native Runic Runners and Worker cleanup.
-      {:runic, "~> 0.1.0-alpha.12"},
+      {:runic, "~> 0.1.0-alpha.12", override: true},
 
       # Jido Deps
       {:zoi, "~> 0.18.11"},

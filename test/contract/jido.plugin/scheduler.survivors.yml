@@ -130,6 +130,66 @@
   sort: unpromised
   reason: The hidden schema accessor is not a public Scheduler operation; Directive validation remains the promised surface.
 
+- at: lib/jido/plugin/scheduler/dsl.ex:34:43
+  operator: string_empty
+  mutation: '`"Use schedule DSL or Plugin data, not both"` → `""`'
+  sort: unpromised
+  reason: The contract fixes rejection of mixed authoring sources, not its explanatory text.
+
+- at: lib/jido/plugin/scheduler/dsl.ex:55:11
+  operator: string_empty
+  mutation: '`"Use one interval or cron; timezone is valid only with cron"` → `""`'
+  sort: unpromised
+  reason: The contract fixes timing rejection, not its explanatory text.
+
+- at: lib/jido/plugin/scheduler/dsl.ex:79:42
+  operator: string_empty
+  mutation: '`"Schedule needs an interval or cron"` → `""`'
+  sort: unpromised
+  reason: The contract fixes timing rejection, not its explanatory text.
+
+- at: lib/jido/plugin/scheduler/dsl.ex:118:39
+  operator: string_empty
+  mutation: '`"Invalid cron expression"` → `""`'
+  sort: unpromised
+  reason: The contract fixes invalid cron rejection, not its explanatory text.
+
+- at: lib/jido/plugin/scheduler/dsl.ex:118:68
+  operator: element_removal
+  mutation: '`reason: reason` → `(removed)`'
+  sort: unpromised
+  reason: Parser-specific diagnostic metadata is not part of the Scheduler authoring contract.
+
+- at: lib/jido/plugin/scheduler/dsl.ex:122:56
+  operator: string_empty
+  mutation: '`"Expected interval or cron timing"` → `""`'
+  sort: unpromised
+  reason: The contract fixes timing rejection, not its explanatory text.
+
+- at: lib/jido/plugin/scheduler/dsl.ex:130:43
+  operator: string_empty
+  mutation: '`"Unknown timezone"` → `""`'
+  sort: unpromised
+  reason: The contract fixes unknown timezone rejection, not its explanatory text.
+
+- at: lib/jido/plugin/scheduler/dsl.ex:130:65
+  operator: element_removal
+  mutation: '`timezone: zone` → `(removed)`'
+  sort: unpromised
+  reason: Timezone diagnostic metadata is not part of the Scheduler authoring contract.
+
+- at: lib/jido/plugin/scheduler/dsl.ex:130:81
+  operator: element_removal
+  mutation: '`reason: reason` → `(removed)`'
+  sort: unpromised
+  reason: Timezone-library diagnostic metadata is not part of the Scheduler authoring contract.
+
+- at: lib/jido/plugin/scheduler/dsl.ex:157:11
+  operator: string_empty
+  mutation: '`"Scheduled Signal has no input route"` → `""`'
+  sort: unpromised
+  reason: The contract fixes the schedule path and missing Signal type, not its explanatory text.
+
 - at: lib/jido/plugin/scheduler/occurrence.ex:31:19
   operator: return_nil
   mutation: '`@schema` → `nil`'
