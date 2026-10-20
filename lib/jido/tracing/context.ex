@@ -29,11 +29,7 @@ defmodule Jido.Tracing.Context do
 
         parent ->
           attach_open_telemetry_parent(parent)
-
-          case Trace.child_of(parent, Map.get(parent, :causation_id)) do
-            {:error, :invalid_trace_context} -> Trace.new_root()
-            child -> child
-          end
+          Trace.child_of(parent, Map.get(parent, :causation_id))
       end
 
     put(trace)
@@ -106,10 +102,7 @@ defmodule Jido.Tracing.Context do
   end
 
   defp attach_open_telemetry_parent(trace) do
-    case OpenTelemetry.restore_trace_context(trace) do
-      nil -> :ok
-      restore_context -> Process.put(@otel_restore_key, restore_context)
-    end
+    Process.put(@otel_restore_key, OpenTelemetry.restore_trace_context(trace))
 
     :ok
   end

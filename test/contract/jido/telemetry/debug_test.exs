@@ -1,5 +1,7 @@
 defmodule JidoTest.DebugTest do
-  use ExUnit.Case, async: false
+  use Covenant.Case, component: "jido.telemetry", async: false
+
+  @moduletag obligation: "jido.telemetry.I4"
 
   alias Jido.Debug
 
@@ -43,6 +45,14 @@ defmodule JidoTest.DebugTest do
     test "enable :off disables" do
       Debug.enable(@test_instance, :on)
       assert :ok = Debug.enable(@test_instance, :off)
+      assert Debug.level(@test_instance) == :off
+    end
+
+    test "rejects an unsupported level" do
+      assert_raise FunctionClauseError, fn ->
+        apply(Debug, :enable, [@test_instance, :invalid])
+      end
+
       assert Debug.level(@test_instance) == :off
     end
   end

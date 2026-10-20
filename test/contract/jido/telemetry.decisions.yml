@@ -1,0 +1,17 @@
+- id: telemetry-component-boundary
+  date: 2026-10-20
+  decision: Use jido.telemetry for metrics, semantic events, safe fields, bounded logs, Debug overrides, W3C trace context, and optional OpenTelemetry mapping.
+  driver: These values and adapters form one best-effort observation boundary, separate from the runtime and persistence operations that they observe.
+  approved_by: Approved Jido V3 Covenant component map
+
+- id: telemetry-test-ownership
+  date: 2026-10-20
+  decision: Move Telemetry, Debug, and tracing unit suites to test/contract/jido/telemetry while keeping the real SDK exporter suite under test/system.
+  driver: The focused contract proves component decisions. The system suite proves integration with a supervised SDK and AgentServer.
+  approved_by: Component hardening pass
+
+- id: telemetry-mutation-profile
+  date: 2026-10-20
+  decision: Mutate Jido.Debug, Jido.Telemetry, its three helper modules, and Jido.Tracing.Context and Trace in one non-overlapping profile.
+  driver: These seven modules contain the component's behavior and are not targets of another active Covenant profile.
+  approved_by: Component hardening pass

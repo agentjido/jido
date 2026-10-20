@@ -37,8 +37,7 @@ defmodule Jido.Telemetry.Semantic do
   def schema_version, do: @schema_version
 
   @doc false
-  def start(prefix, metadata, measurements \\ %{}, opts \\ [])
-      when is_list(prefix) and is_map(metadata) and is_map(measurements) and is_list(opts) do
+  def start(prefix, metadata, measurements \\ %{}, opts \\ []) do
     at = System.monotonic_time()
     trace = Map.take(metadata, @trace_carrier_keys)
     log_scope = log_scope(metadata)
@@ -55,7 +54,7 @@ defmodule Jido.Telemetry.Semantic do
       metadata: metadata,
       trace: trace,
       at: at,
-      terminal_guard: :atomics.new(1, signed: false),
+      terminal_guard: :atomics.new(1, []),
       log_scope: log_scope,
       otel: otel
     }
@@ -80,8 +79,7 @@ defmodule Jido.Telemetry.Semantic do
         metadata,
         measurements,
         ending
-      )
-      when ending in [:stop, :exception] do
+      ) do
     if claim_terminal?(span) do
       duration = max(System.monotonic_time() - started, 0)
       measurements = measurements |> normalize_measurements() |> Map.put(:duration, duration)
@@ -96,8 +94,7 @@ defmodule Jido.Telemetry.Semantic do
   end
 
   @doc false
-  def point(event, metadata, measurements \\ %{}, opts \\ [])
-      when is_list(event) and is_map(metadata) and is_map(measurements) and is_list(opts) do
+  def point(event, metadata, measurements \\ %{}, opts \\ []) do
     at = System.monotonic_time()
 
     measurements =
@@ -114,8 +111,7 @@ defmodule Jido.Telemetry.Semantic do
   end
 
   @doc false
-  def with_span(prefix, metadata, start_measurements, fun, result_measurements \\ fn _ -> %{} end)
-      when is_function(fun, 0) and is_function(result_measurements, 1) do
+  def with_span(prefix, metadata, start_measurements, fun, result_measurements \\ fn _ -> %{} end) do
     span = start(prefix, metadata, start_measurements)
 
     try do
@@ -154,8 +150,6 @@ defmodule Jido.Telemetry.Semantic do
 
     %{error_type: public.type, retryable?: public.retryable?}
     |> maybe_put(:error_code, Error.code(reason))
-  catch
-    _, _ -> %{error_type: :internal, retryable?: false}
   end
 
   @doc false
@@ -251,8 +245,6 @@ defmodule Jido.Telemetry.Semantic do
 
   defp claim_terminal?(%{terminal_guard: guard}),
     do: :atomics.compare_exchange(guard, 1, 0, 1) == :ok
-
-  defp claim_terminal?(_span), do: true
 
   defp emit_normalized(event, measurements, metadata, nil) do
     :telemetry.execute(event, measurements, metadata)

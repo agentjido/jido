@@ -32,7 +32,7 @@ defmodule Jido.Telemetry.OpenTelemetry do
   def trace_context(nil), do: nil
 
   def trace_context(%Span{span_ctx: span_ctx}) do
-    if enabled?() and call(:otel_span, :is_valid, [span_ctx]) do
+    if call(:otel_span, :is_valid, [span_ctx]) do
       context = call(:otel_tracer, :set_current_span, [call(:otel_ctx, :new, []), span_ctx])
 
       context
@@ -45,8 +45,7 @@ defmodule Jido.Telemetry.OpenTelemetry do
 
   @doc false
   @spec start([atom()], map(), map(), keyword()) :: Span.t() | nil
-  def start(prefix, metadata, measurements, opts \\ [])
-      when is_list(prefix) and is_map(metadata) and is_map(measurements) and is_list(opts) do
+  def start(prefix, metadata, measurements, opts \\ []) do
     if enabled?() do
       current_context = call(:otel_ctx, :get_current, [])
       parent_context = parent_context(opts, current_context)
@@ -61,7 +60,6 @@ defmodule Jido.Telemetry.OpenTelemetry do
           span_name(prefix, metadata),
           %{
             attributes: attributes(metadata, measurements),
-            kind: :internal,
             start_time: started_at
           }
         ])
@@ -72,7 +70,7 @@ defmodule Jido.Telemetry.OpenTelemetry do
         span_ctx: span_ctx,
         restore_context: restore_context,
         started_by: self(),
-        terminal_guard: :atomics.new(1, signed: false)
+        terminal_guard: :atomics.new(1, [])
       }
     end
   catch
@@ -83,9 +81,7 @@ defmodule Jido.Telemetry.OpenTelemetry do
   @spec finish(Span.t() | nil, :stop | :exception, map(), map(), integer()) :: :ok
   def finish(nil, _ending, _metadata, _measurements, _ended_at), do: :ok
 
-  def finish(%Span{} = span, ending, metadata, measurements, ended_at)
-      when ending in [:stop, :exception] and is_map(metadata) and is_map(measurements) and
-             is_integer(ended_at) do
+  def finish(%Span{} = span, ending, metadata, measurements, ended_at) do
     if claim_terminal?(span) do
       attrs = attributes(metadata, measurements) |> maybe_put_error_type(metadata)
 
@@ -106,15 +102,13 @@ defmodule Jido.Telemetry.OpenTelemetry do
 
   @doc false
   @spec point([atom()], map(), map(), keyword()) :: :ok
-  def point(event, metadata, measurements, opts \\ [])
-      when is_list(event) and is_map(metadata) and is_map(measurements) and is_list(opts) do
+  def point(event, metadata, measurements, opts \\ []) do
     if enabled?() do
       at = Keyword.get_lazy(opts, :at, fn -> call(:opentelemetry, :timestamp, []) end)
       parent_context = parent_context(opts, call(:otel_ctx, :get_current, []))
 
       start_opts = %{
         attributes: attributes(metadata, measurements) |> maybe_put_error_type(metadata),
-        kind: :internal,
         start_time: at
       }
 
@@ -147,7 +141,7 @@ defmodule Jido.Telemetry.OpenTelemetry do
 
   @doc false
   @spec context_from_trace(map() | nil) :: term() | nil
-  def context_from_trace(trace) when is_map(trace) do
+  def context_from_trace(trace) do
     if enabled?() do
       case trace_carrier(trace) do
         [] ->
@@ -165,13 +159,11 @@ defmodule Jido.Telemetry.OpenTelemetry do
     _, _ -> nil
   end
 
-  def context_from_trace(_trace), do: nil
-
   @doc false
   @spec with_context(term() | nil, (-> result)) :: result when result: term()
-  def with_context(nil, fun) when is_function(fun, 0), do: fun.()
+  def with_context(nil, fun), do: fun.()
 
-  def with_context(context, fun) when is_function(fun, 0) do
+  def with_context(context, fun) do
     restore_context = call(:otel_ctx, :attach, [context])
 
     try do
@@ -207,7 +199,7 @@ defmodule Jido.Telemetry.OpenTelemetry do
 
   defp configured? do
     config = Application.get_env(:jido, :opentelemetry, [])
-    config_value(config, :enabled, true) != false
+    config_value(config, :enabled) != false
   end
 
   defp tracer, do: call(:opentelemetry, :get_application_tracer, [__MODULE__])
@@ -218,9 +210,6 @@ defmodule Jido.Telemetry.OpenTelemetry do
 
   defp parent_context(opts, current) do
     case Keyword.get(opts, :parent_span) do
-      %{otel: %Span{span_ctx: span_ctx}} ->
-        call(:otel_tracer, :set_current_span, [current, span_ctx])
-
       %Span{span_ctx: span_ctx} ->
         call(:otel_tracer, :set_current_span, [current, span_ctx])
 
@@ -234,10 +223,10 @@ defmodule Jido.Telemetry.OpenTelemetry do
 
     segments =
       case {List.last(prefix), operation(metadata)} do
-        {:lifecycle, operation} when is_atom(operation) ->
+        {:lifecycle, operation} when not is_nil(operation) ->
           segments ++ [Atom.to_string(operation)]
 
-        {:operation, operation} when is_atom(operation) ->
+        {:operation, operation} when not is_nil(operation) ->
           List.replace_at(segments, -1, Atom.to_string(operation))
 
         _other ->
@@ -255,9 +244,6 @@ defmodule Jido.Telemetry.OpenTelemetry do
     metadata
     |> Map.merge(Map.drop(measurements, @ignored_measurements))
     |> Enum.reduce(%{}, fn
-      {_key, nil}, acc ->
-        acc
-
       {key, value}, acc when is_atom(key) ->
         case attribute_value(value) do
           nil -> acc
@@ -308,7 +294,7 @@ defmodule Jido.Telemetry.OpenTelemetry do
   defp error_type(_metadata), do: nil
 
   defp maybe_set_error_status(span_ctx, metadata) do
-    if error_type(metadata), do: call(:otel_span, :set_status, [span_ctx, :error]), else: false
+    if error_type(metadata), do: call(:otel_span, :set_status, [span_ctx, :error])
   end
 
   defp maybe_record_exception(span_ctx, :exception, metadata) do
@@ -415,9 +401,7 @@ defmodule Jido.Telemetry.OpenTelemetry do
 
   defp call(module, function, arguments), do: apply(module, function, arguments)
 
-  defp config_value(config, key, default) when is_list(config),
-    do: Keyword.get(config, key, default)
-
-  defp config_value(config, key, default) when is_map(config), do: Map.get(config, key, default)
-  defp config_value(_config, _key, default), do: default
+  defp config_value(config, key) when is_list(config), do: Keyword.get(config, key)
+  defp config_value(config, key) when is_map(config), do: Map.get(config, key)
+  defp config_value(_config, _key), do: nil
 end

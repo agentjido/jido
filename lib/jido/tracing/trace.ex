@@ -61,14 +61,12 @@ defmodule Jido.Tracing.Trace do
 
   @doc false
   @spec telemetry_context(term()) :: map()
-  def telemetry_context(trace) when is_map(trace) do
+  def telemetry_context(trace) do
     case to_signal_trace(trace) do
       {:ok, _w3c} -> Map.take(trace, @telemetry_keys)
       {:error, :invalid_trace_context} -> %{}
     end
   end
-
-  def telemetry_context(_trace), do: %{}
 
   @doc false
   @spec context_names() :: [String.t()]

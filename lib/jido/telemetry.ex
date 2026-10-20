@@ -35,6 +35,7 @@ defmodule Jido.Telemetry do
 
   @semantic_handler_id "jido-semantic-logger"
   @log_scope_key {:jido, :semantic_log_scope}
+  @log_modes [:off, :errors, :interesting, :all]
 
   @span_metrics [
     {[:jido, :agent_server, :turn], [:stop], [:status, :stage]},
@@ -166,7 +167,7 @@ defmodule Jido.Telemetry do
           nil
       end
 
-    if instance_mode in [:off, :errors, :interesting, :all],
+    if instance_mode in @log_modes,
       do: instance_mode,
       else: configured_semantic_log_mode()
   end
@@ -175,7 +176,7 @@ defmodule Jido.Telemetry do
     config = Application.get_env(:jido, :telemetry, [])
 
     case config_value(config, :semantic_log_mode) do
-      mode when mode in [:off, :errors, :interesting, :all] -> mode
+      mode when mode in @log_modes -> mode
       _other -> :off
     end
   end
@@ -196,7 +197,9 @@ defmodule Jido.Telemetry do
 
   defp slow_semantic?(measurements) do
     duration = Map.get(measurements, :duration, 0)
-    native_to_ms(duration) >= semantic_slow_threshold_ms()
+
+    System.convert_time_unit(duration, :native, :microsecond) / 1_000 >=
+      semantic_slow_threshold_ms()
   end
 
   defp semantic_slow_threshold_ms do
@@ -216,17 +219,10 @@ defmodule Jido.Telemetry do
   end
 
   defp format_value(value) when is_binary(value), do: truncate(value, 128)
-  defp format_value(value) when is_atom(value) or is_number(value), do: to_string(value)
-  defp format_value(value), do: value |> inspect(limit: 10, printable_limit: 128) |> truncate(128)
+  defp format_value(value), do: to_string(value)
 
   defp truncate(value, max) when byte_size(value) <= max, do: value
   defp truncate(value, max), do: String.slice(value, 0, max - 3) <> "..."
-
-  defp native_to_ms(value) when is_integer(value) do
-    System.convert_time_unit(value, :native, :microsecond) / 1_000
-  end
-
-  defp native_to_ms(_value), do: 0
 
   defp config_value(config, key) when is_list(config), do: Keyword.get(config, key)
   defp config_value(config, key) when is_map(config), do: Map.get(config, key)

@@ -1,5 +1,5 @@
-defmodule JidoTest.TelemetryTest do
-  use ExUnit.Case, async: false
+defmodule JidoTest.Telemetry.ApiTest do
+  use Covenant.Case, component: "jido.telemetry", async: false
 
   import ExUnit.CaptureLog
 
@@ -24,6 +24,7 @@ defmodule JidoTest.TelemetryTest do
     :ok
   end
 
+  @tag obligation: ["jido.telemetry.I1", "jido.telemetry.I7"]
   test "the public API is metrics and OpenTelemetry status" do
     assert function_exported?(Telemetry, :metrics, 0)
     assert function_exported?(Telemetry, :open_telemetry?, 0)
@@ -31,36 +32,39 @@ defmodule JidoTest.TelemetryTest do
     refute Code.ensure_loaded?(Jido.Telemetry.Formatter)
   end
 
+  @tag obligation: "jido.telemetry.I1"
   test "default metrics use semantic events and fixed vocabulary tags" do
     metrics = Telemetry.metrics()
     names = Enum.map(metrics, & &1.name)
 
     spans = [
-      {[:jido, :agent_server, :turn], [:stop]},
-      {[:jido, :persistence, :operation], [:stop, :exception]}
+      {[:jido, :agent_server, :turn], [:stop], [:status, :stage]},
+      {[:jido, :persistence, :operation], [:stop, :exception],
+       [:operation, :status, :persistence_reason]}
     ]
 
     points = [
-      [:jido, :agent_server, :lifecycle, :start],
-      [:jido, :agent_server, :lifecycle, :stop],
-      [:jido, :agent_server, :commit],
-      [:jido, :agent_server, :directives, :returned],
-      [:jido, :agent_server, :effects, :start],
-      [:jido, :agent_server, :effects, :stop],
-      [:jido, :agent_server, :turn, :settled]
+      {[:jido, :agent_server, :lifecycle, :start], []},
+      {[:jido, :agent_server, :lifecycle, :stop], []},
+      {[:jido, :agent_server, :commit], [:status]},
+      {[:jido, :agent_server, :directives, :returned], []},
+      {[:jido, :agent_server, :effects, :start], []},
+      {[:jido, :agent_server, :effects, :stop], [:status, :stage]},
+      {[:jido, :agent_server, :turn, :settled], [:status, :stage]}
     ]
 
     assert length(names) == 13
     assert length(Enum.uniq(names)) == length(names)
 
-    for {prefix, endings} <- spans, ending <- endings, kind <- [:count, :duration] do
+    for {prefix, endings, tags} <- spans, ending <- endings, kind <- [:count, :duration] do
       metric = Enum.find(metrics, &(&1.name == prefix ++ [ending, kind]))
       assert metric.event_name == prefix ++ [ending]
+      assert metric.tags == tags
       if kind == :duration, do: assert(metric.unit == :millisecond)
     end
 
-    for event <- points do
-      assert %Elixir.Telemetry.Metrics.Counter{event_name: ^event} =
+    for {event, tags} <- points do
+      assert %Elixir.Telemetry.Metrics.Counter{event_name: ^event, tags: ^tags} =
                Enum.find(metrics, &(&1.name == event ++ [:count]))
 
       refute Enum.any?(metrics, &(&1.name == event ++ [:duration]))
@@ -79,6 +83,32 @@ defmodule JidoTest.TelemetryTest do
     end
   end
 
+  @tag obligation: ["jido.telemetry.I1", "jido.telemetry.I4"]
+  test "the default semantic handler attaches once and handles its catalog" do
+    id = "jido-semantic-logger"
+    :telemetry.detach(id)
+    on_exit(&Telemetry.attach_default_handler/0)
+    Application.put_env(:jido, :telemetry, semantic_log_mode: :all)
+
+    assert :ok = Telemetry.attach_default_handler()
+    attached = Enum.count(:telemetry.list_handlers([]), &(&1.id == id))
+    assert attached > 0
+    assert :ok = Telemetry.attach_default_handler()
+    assert Enum.count(:telemetry.list_handlers([]), &(&1.id == id)) == attached
+
+    log =
+      capture_log(fn ->
+        :telemetry.execute(
+          [:jido, :agent_server, :commit],
+          %{state_version_after: 1},
+          %{status: :ok}
+        )
+      end)
+
+    assert log =~ "[debug] [jido.semantic] event=agent_server.commit"
+  end
+
+  @tag obligation: ["jido.telemetry.I2", "jido.telemetry.I4"]
   test "semantic logger supports all four modes and removes private values" do
     event = [:jido, :persistence, :operation, :stop]
     measurements = %{duration: native_ms(2), revision_after: 2, private_count: 99}
@@ -105,9 +135,65 @@ defmodule JidoTest.TelemetryTest do
         Telemetry.handle_semantic_event(event, measurements, %{metadata | status: :conflict}, nil)
       end)
 
+    assert log =~ "[warning]"
     assert log =~ "status=conflict"
   end
 
+  @tag obligation: ["jido.telemetry.I2", "jido.telemetry.I4", "jido.telemetry.I8"]
+  test "semantic log configuration and formatting fail closed at exact bounds" do
+    event = [:jido, :persistence, :operation, :stop]
+    long_id = String.duplicate("a", 129)
+    kept_id = String.duplicate("a", 125) <> "..."
+
+    Application.put_env(:jido, :telemetry, %{
+      semantic_log_mode: :interesting,
+      semantic_slow_threshold_ms: 2
+    })
+
+    log =
+      capture_log(fn ->
+        assert :ok =
+                 Telemetry.handle_semantic_event(
+                   event,
+                   %{duration: native_ms(2)},
+                   %{agent_id: long_id, operation: :load, status: :ok},
+                   nil
+                 )
+      end)
+
+    assert log =~ "agent_id=#{kept_id} duration="
+    assert log =~ " operation=load"
+    refute log =~ long_id
+
+    for config <- [
+          %{semantic_log_mode: :interesting, semantic_slow_threshold_ms: 3},
+          [semantic_log_mode: :invalid, semantic_slow_threshold_ms: -1],
+          :invalid
+        ] do
+      Application.put_env(:jido, :telemetry, config)
+
+      assert capture_log(fn ->
+               assert :ok =
+                        Telemetry.handle_semantic_event(
+                          event,
+                          %{duration: native_ms(2)},
+                          %{status: :ok},
+                          nil
+                        )
+             end) == ""
+    end
+
+    Application.put_env(:jido, :telemetry, semantic_log_mode: :errors)
+
+    assert capture_log(fn ->
+             assert :ok = Telemetry.handle_semantic_event(event, %{}, %{}, nil)
+           end) == ""
+
+    Application.put_env(:jido, :telemetry, semantic_log_mode: :all)
+    assert Telemetry.handle_semantic_event(:invalid, :invalid, :invalid, nil) == :ok
+  end
+
+  @tag obligation: "jido.telemetry.I4"
   test "effects failure is a semantic error log" do
     Application.put_env(:jido, :telemetry, semantic_log_mode: :errors)
 
@@ -124,6 +210,7 @@ defmodule JidoTest.TelemetryTest do
     assert log =~ "status=error"
   end
 
+  @tag obligation: "jido.telemetry.I4"
   test "per-instance debug mode takes priority over global semantic logging" do
     instance = :telemetry_debug_instance
     event = [:jido, :agent_server, :turn, :stop]
@@ -137,6 +224,7 @@ defmodule JidoTest.TelemetryTest do
     assert log =~ "event=agent_server.turn.stop"
   end
 
+  @tag obligation: ["jido.telemetry.I2", "jido.telemetry.I3"]
   test "semantic emission is independent of consumer configuration" do
     Application.put_env(:jido, :telemetry, semantic_log_mode: :off)
 

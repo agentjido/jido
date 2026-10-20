@@ -1,5 +1,7 @@
 defmodule JidoTest.Tracing.TraceTest do
-  use ExUnit.Case, async: true
+  use Covenant.Case, component: "jido.telemetry", async: true
+
+  @moduletag obligation: "jido.telemetry.I5"
 
   alias Jido.Signal
   alias Jido.Signal.Trace, as: SignalTrace
@@ -33,6 +35,18 @@ defmodule JidoTest.Tracing.TraceTest do
     assert child.parent_span_id == parent.span_id
     assert child.causation_id == "signal-1"
     assert child.trace_flags == "01"
+    assert child.tracestate == "vendor=value"
+  end
+
+  test "map carriers default flags and retain tracestate without traceparent" do
+    root = Trace.new_root()
+    carrier = %{trace_id: root.trace_id, span_id: root.span_id, tracestate: "vendor=value"}
+
+    child = Trace.child_of(carrier, nil)
+
+    assert child.trace_id == root.trace_id
+    assert child.parent_span_id == root.span_id
+    assert child.trace_flags == "00"
     assert child.tracestate == "vendor=value"
   end
 

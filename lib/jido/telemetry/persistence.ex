@@ -29,7 +29,6 @@ defmodule Jido.Telemetry.Persistence do
       agent_id: agent_id,
       agent_module: agent_module,
       jido_instance: instance,
-      partition: partition,
       adapter_module: adapter_module(source),
       persistence_reason: Keyword.get(opts, :reason, :manual)
     }
@@ -52,11 +51,9 @@ defmodule Jido.Telemetry.Persistence do
 
   defp result_measurements(_result, _operation, _opts), do: %{}
 
-  defp safe_options(opts) when is_list(opts) do
+  defp safe_options(opts) do
     if Keyword.keyword?(opts), do: opts, else: []
   end
-
-  defp safe_options(_opts), do: []
 
   defp instance(source) when is_atom(source) and not is_nil(source) do
     cond do

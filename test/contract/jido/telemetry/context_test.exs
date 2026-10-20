@@ -1,5 +1,7 @@
-defmodule Jido.Tracing.ContextTest do
-  use ExUnit.Case, async: true
+defmodule JidoTest.Telemetry.ContextTest do
+  use Covenant.Case, component: "jido.telemetry", async: true
+
+  @moduletag obligation: ["jido.telemetry.I5", "jido.telemetry.I6"]
 
   alias Jido.Signal
   alias Jido.Tracing.{Context, Trace}
@@ -79,8 +81,20 @@ defmodule Jido.Tracing.ContextTest do
   end
 
   test "clear removes the current context" do
-    Context.put(Trace.new_root())
+    assert :ok = Context.put(Trace.new_root())
     assert :ok = Context.clear()
     assert Context.get() == nil
+  end
+
+  test "context input functions reject unsupported values" do
+    assert_raise FunctionClauseError, fn -> apply(Context, :put, [:invalid]) end
+
+    assert_raise FunctionClauseError, fn ->
+      apply(Context, :with_context, [:invalid, fn -> :ok end])
+    end
+
+    assert_raise FunctionClauseError, fn ->
+      apply(Context, :with_context, [nil, :not_a_function])
+    end
   end
 end

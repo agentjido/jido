@@ -1,5 +1,7 @@
 defmodule JidoTest.Telemetry.OpenTelemetryTest do
-  use ExUnit.Case, async: false
+  use Covenant.Case, component: "jido.telemetry", async: false
+
+  @moduletag obligation: ["jido.telemetry.I7", "jido.telemetry.I8"]
 
   alias Jido.Signal
   alias Jido.Telemetry.OpenTelemetry
@@ -133,6 +135,21 @@ defmodule JidoTest.Telemetry.OpenTelemetryTest do
     assert_receive {:otel_end, ^ids, timestamp}
     assert timestamp == opts.start_time
     refute :otel_span.is_valid(:otel_tracer.current_span_ctx())
+
+    assert :ok =
+             OpenTelemetry.point(
+               [:jido, :failed_point],
+               %{status: :error, error_type: :timeout},
+               %{count: 2}
+             )
+
+    assert_receive {:otel_start, failed_point, _parent, "jido.failed_point", failed_opts}
+    assert failed_opts.attributes["jido.status"] == "error"
+    assert failed_opts.attributes["jido.count"] == 2
+    assert failed_opts.attributes["error.type"] == "timeout"
+    failed_ids = TestTracer.ids(failed_point)
+    assert_receive {:otel_status, ^failed_ids, :error}
+    assert_receive {:otel_end, ^failed_ids, _timestamp}
   end
 
   test "missing carriers do not install context and callback faults restore the caller context" do
@@ -218,6 +235,7 @@ defmodule JidoTest.Telemetry.OpenTelemetryTest do
     refute :otel_span.is_valid(parent)
     assert TestTracer.ids(otel_span) == TestTracer.ids(span.otel.span_ctx)
     assert start_opts.kind == :internal
+    assert start_opts.start_time == span.at
     assert start_opts.attributes["jido.agent.id"] == "agent-1"
     assert start_opts.attributes["jido.stage"] == "evaluate"
     assert start_opts.attributes["jido.state.version"] == 3
@@ -233,10 +251,32 @@ defmodule JidoTest.Telemetry.OpenTelemetryTest do
     assert final_attributes["jido.stage"] == "commit"
     assert final_attributes["jido.state.version.after"] == 4
     assert_receive {:otel_end, ^span_ids, ended_at} when is_integer(ended_at)
+    assert ended_at >= span.at
     refute_received {:otel_status, ^span_ids, _status}
 
     assert :ok = Semantic.finish(span, %{status: :error})
     refute_received {:otel_end, ^span_ids, _timestamp}
+  end
+
+  test "a direct bridge span ends once" do
+    span = OpenTelemetry.start([:jido, :once], %{}, %{}, start_time: 10)
+    assert_receive {:otel_start, otel_span, _parent, "jido.once", %{start_time: 10}}
+    ids = TestTracer.ids(otel_span)
+
+    assert :ok = OpenTelemetry.finish(span, :stop, %{status: :ok}, %{}, 20)
+    assert_receive {:otel_end, ^ids, 20}
+    assert :ok = OpenTelemetry.finish(span, :exception, %{status: :error}, %{}, 30)
+    refute_receive {:otel_end, ^ids, 30}
+  end
+
+  test "cancelled spans do not set OpenTelemetry error status" do
+    span = OpenTelemetry.start([:jido, :cancelled], %{}, %{})
+    assert_receive {:otel_start, otel_span, _parent, "jido.cancelled", _opts}
+    ids = TestTracer.ids(otel_span)
+
+    assert :ok = OpenTelemetry.finish(span, :stop, %{status: :cancelled}, %{}, 20)
+    assert_receive {:otel_end, ^ids, 20}
+    refute_received {:otel_status, ^ids, :error}
   end
 
   test "exceptions set error status without recording raw exception data" do
@@ -317,6 +357,7 @@ defmodule JidoTest.Telemetry.OpenTelemetryTest do
     assert outer.trace.trace_id == outer_ids.hex_trace_id
     assert outer.trace.span_id == outer_ids.hex_span_id
     assert outer.trace.parent_span_id == incoming.span_id
+    assert outer.trace.tracestate == "vendor=value"
     Context.put(outer.trace)
 
     captured = Context.capture()
@@ -344,6 +385,8 @@ defmodule JidoTest.Telemetry.OpenTelemetryTest do
 
     Semantic.finish(outer, %{status: :ok, stage: :commit})
     assert_receive {:otel_end, ^outer_ids, _timestamp}
+    Context.clear()
+    refute :otel_span.is_valid(:otel_tracer.current_span_ctx())
   end
 
   test "an untraced Signal lets the SDK make the root sampling decision" do
