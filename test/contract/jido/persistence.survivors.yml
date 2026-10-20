@@ -1,3 +1,9 @@
+- at: lib/jido/agent/callback.ex:15:33
+  operator: string_empty
+  mutation: "`\"Agent callback failed\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the error category and structured callback details. It does not fix human-readable error prose.
+
 - at: lib/jido/persistence.ex:248:29
   operator: string_empty
   mutation: "`\"Persistence input is invalid\"` → `\"\"`"

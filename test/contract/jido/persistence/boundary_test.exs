@@ -47,6 +47,9 @@ defmodule Jido.Persistence.BoundaryTest do
       case context[:mode] do
         :error -> {:error, :checkpoint_rejected}
         :invalid -> :invalid
+        :raise -> raise "checkpoint failed"
+        :throw -> throw(:checkpoint_failed)
+        :exit -> exit(:checkpoint_failed)
         _ -> {:ok, %{id: agent.id}}
       end
     end
@@ -57,6 +60,9 @@ defmodule Jido.Persistence.BoundaryTest do
       case context[:mode] do
         :error -> {:error, :restore_rejected}
         :invalid -> :invalid
+        :raise -> raise "restore failed"
+        :throw -> throw(:restore_failed)
+        :exit -> exit(:restore_failed)
         _ -> instantiate(id: id)
       end
     end
@@ -550,6 +556,50 @@ defmodule Jido.Persistence.BoundaryTest do
                       revision: 2,
                       reason: :restore
                     }}
+  end
+
+  @tag obligation: "jido.persistence.I11"
+  test "snapshot callbacks contain failures with stable diagnostic details" do
+    agent = ContextAgent.instantiate!(id: "callback-failure")
+    assert {:ok, checkpoint} = Checkpoint.checkpoint(agent)
+
+    failures = [
+      {:raise, :error, %RuntimeError{message: "checkpoint failed"}},
+      {:throw, :throw, :checkpoint_failed},
+      {:exit, :exit, :checkpoint_failed}
+    ]
+
+    for {mode, kind, reason} <- failures do
+      assert {:error, %Jido.Error.ExecutionError{details: details}} =
+               Checkpoint.checkpoint(agent, %{mode: mode})
+
+      assert details == %{
+               code: :agent_callback_failed,
+               module: ContextAgent,
+               callback: :checkpoint,
+               kind: kind,
+               reason: reason
+             }
+    end
+
+    failures = [
+      {:raise, :error, %RuntimeError{message: "restore failed"}},
+      {:throw, :throw, :restore_failed},
+      {:exit, :exit, :restore_failed}
+    ]
+
+    for {mode, kind, reason} <- failures do
+      assert {:error, %Jido.Error.ExecutionError{details: details}} =
+               Checkpoint.restore(ContextAgent, checkpoint, %{mode: mode})
+
+      assert details == %{
+               code: :agent_callback_failed,
+               module: ContextAgent,
+               callback: :restore,
+               kind: kind,
+               reason: reason
+             }
+    end
   end
 
   @tag obligation: ["jido.persistence.I6", "jido.persistence.I11"]

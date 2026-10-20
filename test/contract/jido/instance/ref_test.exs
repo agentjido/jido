@@ -372,6 +372,9 @@ defmodule JidoTest.InstanceRefTest do
     assert {:error, %Error.ValidationError{}} =
              Jido.call(instance, ref, signal(1), timeout: -1)
 
+    assert {:error, %Error.ValidationError{}} =
+             Jido.submit(instance, ref, signal(1), unknown: true)
+
     pending =
       Jido.submit(instance, ref, signal(1), context: %{observer: self(), gate: true})
 

@@ -16,6 +16,12 @@
   sort: evaluation-gap
   reason: ETS access protection is fixed when the application creates the table, before the mutation worker installs a mutant; restart tests therefore retain the original public table.
 
+- at: lib/jido/instance/namespace_registry.ex:209:11
+  operator: element_removal
+  mutation: "`{:heir, heir, :namespace_registry}` → `(removed)`"
+  sort: evaluation-gap
+  reason: The table heir is fixed when the application creates the table, before the mutation worker installs a mutant; restart tests therefore retain the original heir.
+
 - at: lib/jido/instance/namespace_registry.ex:218:28
   operator: string_empty
   mutation: "`\"Jido instance namespace is already bound\"` → `\"\"`"

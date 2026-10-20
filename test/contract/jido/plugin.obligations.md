@@ -1,10 +1,14 @@
 ---
 modules:
   - Jido.Plugin
+  - Jido.Plugin.DirectiveContext
+  - Jido.Plugin.Init
+  - Jido.Plugin.Input
   - Jido.Plugin.Manifest
   - Jido.Plugin.Normalizer
-  - Jido.Plugin.Input
   - Jido.Plugin.Error
+  - Jido.Plugin.SignalContext
+  - Jido.Plugin.Spec
 ---
 
 ## Purpose

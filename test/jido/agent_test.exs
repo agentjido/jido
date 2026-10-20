@@ -4,7 +4,6 @@ defmodule Jido.AgentTest do
   alias Jido.Agent
   alias Jido.Agent.Command
   alias Jido.Agent.Turn
-  alias Jido.Error
   alias Jido.Signal
 
   alias JidoTest.AgentFixtures.{
@@ -125,32 +124,6 @@ defmodule Jido.AgentTest do
       state = Map.update!(checkpoint.state, :history, &(&1 ++ [context.restored_by]))
       instantiate(id: checkpoint.id, state: state)
     end
-  end
-
-  defmodule FaultyPersistenceAgent do
-    @moduledoc false
-
-    use Jido.Agent, name: "faulty_persistence_agent"
-
-    @impl Jido.Agent
-    def checkpoint(_agent, %{result: result}), do: result
-
-    def checkpoint(_agent, %{failure: :raise}), do: raise("checkpoint failed")
-    def checkpoint(_agent, %{failure: :throw}), do: throw(:checkpoint_failed)
-    def checkpoint(_agent, %{failure: :exit}), do: exit(:checkpoint_failed)
-
-    def checkpoint(agent, context),
-      do: Jido.Persistence.AgentCheckpoint.default_checkpoint(agent, context)
-
-    @impl Jido.Agent
-    def restore(_checkpoint, %{result: result}), do: result
-
-    def restore(_checkpoint, %{failure: :raise}), do: raise("restore failed")
-    def restore(_checkpoint, %{failure: :throw}), do: throw(:restore_failed)
-    def restore(_checkpoint, %{failure: :exit}), do: exit(:restore_failed)
-
-    def restore(checkpoint, context),
-      do: Jido.Persistence.AgentCheckpoint.default_restore(__MODULE__, checkpoint, context)
   end
 
   defp build(attrs) when is_list(attrs) do
@@ -918,102 +891,6 @@ defmodule Jido.AgentTest do
           ] do
         assert {:error, %{__exception__: true}} = Jido.Persistence.restore(invalid)
       end
-    end
-
-    test "contains callback failures and invalid return contracts" do
-      agent = FaultyPersistenceAgent.instantiate!(id: "faulty-1")
-      assert {:ok, checkpoint} = Jido.Persistence.AgentCheckpoint.checkpoint(agent)
-
-      returned_error = Error.execution_error("Application failure", details: %{code: :foreign})
-
-      assert {:error, :application_failure} =
-               Jido.Persistence.AgentCheckpoint.checkpoint(agent, %{
-                 result: {:error, :application_failure}
-               })
-
-      assert {:error, ^returned_error} =
-               Jido.Persistence.AgentCheckpoint.checkpoint(agent, %{
-                 result: {:error, returned_error}
-               })
-
-      assert {:error, %{__exception__: true} = error} =
-               Jido.Persistence.AgentCheckpoint.checkpoint(agent, %{result: :invalid})
-
-      assert error.code == :invalid_snapshot_state
-
-      assert {:error, %{__exception__: true}} =
-               Jido.Persistence.AgentCheckpoint.checkpoint(agent, %{result: {:ok, :not_a_map}})
-
-      assert {:error,
-              %Jido.Error.ExecutionError{
-                details: %{callback: :checkpoint, kind: :error, reason: %RuntimeError{}}
-              } = error} =
-               Jido.Persistence.AgentCheckpoint.checkpoint(agent, %{failure: :raise})
-
-      assert Error.code(error) == :agent_callback_failed
-
-      assert {:error,
-              %Jido.Error.ExecutionError{
-                details: %{callback: :checkpoint, kind: :exit, reason: :checkpoint_failed}
-              } = error} =
-               Jido.Persistence.AgentCheckpoint.checkpoint(agent, %{failure: :exit})
-
-      assert Error.code(error) == :agent_callback_failed
-
-      assert {:error,
-              %Jido.Error.ExecutionError{
-                details: %{callback: :checkpoint, kind: :throw, reason: :checkpoint_failed}
-              } = error} =
-               Jido.Persistence.AgentCheckpoint.checkpoint(agent, %{failure: :throw})
-
-      assert Error.code(error) == :agent_callback_failed
-
-      assert {:error, %{__exception__: true} = error} =
-               Jido.Persistence.AgentCheckpoint.restore(FaultyPersistenceAgent, checkpoint, %{
-                 result: :invalid
-               })
-
-      assert error.code == :invalid_snapshot_state
-
-      assert {:error, %{__exception__: true}} =
-               Jido.Persistence.AgentCheckpoint.restore(FaultyPersistenceAgent, checkpoint, %{
-                 result: {:ok, :not_an_agent}
-               })
-
-      assert {:error, %Jido.Agent.Error{code: :invalid_snapshot_state}} =
-               Jido.Persistence.AgentCheckpoint.restore(FaultyPersistenceAgent, checkpoint, %{
-                 result: {:ok, CounterAgent.instantiate!(id: "other-agent")}
-               })
-
-      assert {:error,
-              %Jido.Error.ExecutionError{
-                details: %{callback: :restore, kind: :error, reason: %RuntimeError{}}
-              } = error} =
-               Jido.Persistence.AgentCheckpoint.restore(FaultyPersistenceAgent, checkpoint, %{
-                 failure: :raise
-               })
-
-      assert Error.code(error) == :agent_callback_failed
-
-      assert {:error,
-              %Jido.Error.ExecutionError{
-                details: %{callback: :restore, kind: :throw, reason: :restore_failed}
-              } = error} =
-               Jido.Persistence.AgentCheckpoint.restore(FaultyPersistenceAgent, checkpoint, %{
-                 failure: :throw
-               })
-
-      assert Error.code(error) == :agent_callback_failed
-
-      assert {:error,
-              %Jido.Error.ExecutionError{
-                details: %{callback: :restore, kind: :exit, reason: :restore_failed}
-              } = error} =
-               Jido.Persistence.AgentCheckpoint.restore(FaultyPersistenceAgent, checkpoint, %{
-                 failure: :exit
-               })
-
-      assert Error.code(error) == :agent_callback_failed
     end
   end
 end

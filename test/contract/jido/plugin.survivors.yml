@@ -16,12 +16,6 @@
   sort: unpromised
   reason: This function reads live Plugin state through AgentServer. The generic Plugin contract excludes live process execution; jido.agent_server.plugin_runtime owns this behavior.
 
-- at: lib/jido/plugin/codec.ex:82:25
-  operator: string_empty
-  mutation: "`\"Unknown authoring document type or version\"` → `\"\"`"
-  sort: log-only
-  reason: The contract fixes the structured error kind and details. It does not fix human-readable error prose.
-
 - at: lib/jido/plugin/manifest.ex:66:15
   operator: string_empty
   mutation: "`\"Plugin manifest or declaration options are invalid\"` → `\"\"`"

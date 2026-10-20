@@ -49,13 +49,13 @@ obligation file and passing tagged contract tests.
 | --- | --- | ---: | ---: | --- |
 | `jido.instance` | Active | 8 | 3 | The instance and Ref selection boundary is focused. |
 | `jido.plugin` | Active | 8 | 5 | The generic boundary is focused and uses no bundled Plugin fixture. |
-| `jido.agent` | Active | 21 | 20 | The model and authoring boundary is focused. |
-| `jido.agent_evaluation` | Active | 10 | 5 | Pure evaluation has a separate owner. |
+| `jido.agent` | Active | 21 | 13 | The model and authoring boundary is focused. |
+| `jido.agent_evaluation` | Active | 10 | 6 | Pure evaluation has a separate owner. |
 | `jido.signal_action` | Active | 7 | 1 | The combined Action and Signal value boundary is focused. |
 | `jido.discovery` | Active | 5 | 1 | Read-only Action inventory has a separate owner. |
 | `jido.telemetry` | Active | 8 | 7 | Best-effort observation has a separate owner. |
 | `jido.error` | Active | 6 | 1 | Shared taxonomy, projection, and retry classification have a separate owner. |
-| `jido.persistence` | Active | 15 | 10 | Shared records, snapshots, adapters, and storage operations have a separate owner. |
+| `jido.persistence` | Active | 15 | 11 | Shared records, snapshots, adapters, and storage operations have a separate owner. |
 | `jido.agent_server` | Active | 37 | 1 | Core request, Turn, control, and observation behavior has a focused decision owner. |
 | `jido.agent_server.activation` | Active | 11 | 3 | The local activation and recovery boundary is focused. |
 | `jido.agent_server.effects` | Active | 11 | 2 | Post-commit effect admission, dispatch, and settlement have a separate owner. |
@@ -224,7 +224,6 @@ Owns:
 - Generic callback result forms.
 - Directive type ownership declarations.
 - Generic initialization and context values.
-- Plugin document encoding and decoding.
 - Safe callback fault conversion.
 
 Target modules:
@@ -233,7 +232,6 @@ Target modules:
 - `Jido.Plugin.Manifest`
 - `Jido.Plugin.Normalizer`
 - `Jido.Plugin.Spec`
-- `Jido.Plugin.Codec`
 - `Jido.Plugin.Input`
 - `Jido.Plugin.Init`
 - `Jido.Plugin.SignalContext`
@@ -870,16 +868,55 @@ Completed for `jido.agent_server`:
       3 invalid mutants, no survivor, and no timeout.
 - [x] Recorded the public coordinator and focused decision-owner split.
 
+Completed for supporting component `jido.instance`:
+
+- [x] Kept 8 obligations focused on instance configuration, supervision,
+      namespace ownership, lifecycle selection, and stable Ref routing.
+- [x] Kept one non-overlapping three-module mutation profile and 55 focused
+      contract tests.
+- [x] Replaced a timed-out `submit/4` options mutation with an immediate
+      contract failure and retained four documented first-boot ETS limits.
+- [x] Completed the full 247-mutant profile with 224 killed mutants,
+      18 classified survivors, 5 invalid mutations, no timeout, and no
+      unsorted mutant.
+
+Completed for supporting component `jido.agent`:
+
+- [x] Kept 21 obligations focused on Agent data, authoring, validation,
+      topology, edits, deferred configuration, and shared Registry behavior.
+- [x] Reduced the mutation profile to 13 behavior-owning modules and moved
+      route evaluation and checkpoint callback containment to their owners.
+- [x] Aligned 148 contract tests with the component boundary and regenerated
+      complete Covenant coverage.
+- [x] Completed the full 1,534-mutant profile with 1,364 killed mutants,
+      101 classified survivors, 1 classified timeout, 68 invalid mutations,
+      and no unsorted mutant.
+
+Completed for supporting component `jido.agent_evaluation`:
+
+- [x] Kept 10 obligations focused on route selection, Plugin preparation,
+      execution, candidate validation, reduction, and returned Directives.
+- [x] Added `Jido.Agent.Route` to the six-module mutation profile and kept
+      Agent authoring normalization with `jido.agent`.
+- [x] Aligned 14 contract tests with the component boundary and regenerated
+      complete Covenant coverage.
+- [x] Completed the full 364-mutant profile with 233 killed mutants,
+      84 classified survivors, 47 invalid mutations, no timeout, and no
+      unsorted mutant.
+
 Completed for supporting component `jido.persistence`:
 
 - [x] Added 15 obligations and 11 focused contract test files.
-- [x] Added a non-overlapping ten-module mutation profile for shared
+- [x] Added a non-overlapping eleven-module mutation profile for shared
       persistence behavior.
 - [x] Kept backend-specific behavior and live recovery policy with their
       separate owners.
-- [x] Regenerated complete Covenant coverage.
-- [x] Completed the full mutation profile with no unclassified mutant or
-      timeout.
+- [x] Moved Agent checkpoint callback failure tests from the broad Agent suite
+      into the persistence boundary and reduced the test code by 67 lines.
+- [x] Regenerated complete Covenant coverage across all 225 obligations.
+- [x] Completed the full 708-mutant profile with 627 killed mutants,
+      30 classified survivors, 51 invalid mutations, no timeout, and no
+      unsorted mutant.
 
 Completed for supporting component `jido.signal_action`:
 
