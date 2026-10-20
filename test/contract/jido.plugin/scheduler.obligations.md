@@ -4,6 +4,8 @@ modules:
   - Jido.Plugin.Scheduler.Agent
   - Jido.Plugin.Scheduler.Cancel
   - Jido.Plugin.Scheduler.Cron
+  - Jido.Plugin.Scheduler.DSL
+  - Jido.Plugin.Scheduler.DSL.Schedule
   - Jido.Plugin.Scheduler.Occurrence
   - Jido.Plugin.Scheduler.Runtime
   - Jido.Plugin.Scheduler.Schedule

@@ -2792,13 +2792,14 @@
         "jido.plugin.I4": {
           "failing": 0,
           "kind": "functional",
-          "passing": 4,
+          "passing": 5,
           "status": "active",
           "testable": true,
           "tests": [
             "test declarations normalize once and retain order and exact options",
             "test normalization rejects malformed, mixed, repeated, and unloaded declarations",
             "test normalization rejects mismatched metadata and invalid callback combinations",
+            "test stored specs require a module and options",
             "test stored specs without a manifest are rejected"
           ]
         },
@@ -2847,11 +2848,13 @@
         "jido.plugin.I9": {
           "failing": 0,
           "kind": "functional",
-          "passing": 3,
+          "passing": 5,
           "status": "active",
           "testable": true,
           "tests": [
-            "test input and runtime context values keep their narrow fields separate",
+            "test directive schema preserves its complete narrow value",
+            "test initialization schema preserves its complete narrow value",
+            "test input keeps prepared and runtime values separate",
             "test schema accepts the complete narrow outbound context",
             "test schema supplies transient defaults and rejects invalid identity fields"
           ]

@@ -73,6 +73,16 @@ defmodule Jido.Plugin.BoundaryTest do
     assert {:ok, [^spec]} = Jido.Plugin.Normalizer.normalize_all([spec])
   end
 
+  @tag obligation: "jido.plugin.I4"
+  test "stored specs require a module and options" do
+    for source <- [
+          "%Jido.Plugin.Spec{options: []}",
+          "%Jido.Plugin.Spec{module: String}"
+        ] do
+      assert_raise ArgumentError, fn -> Code.eval_string(source) end
+    end
+  end
+
   @tag obligation: ["jido.plugin.I2", "jido.plugin.I3"]
   test "manifest accessors retain owner order and restrict mapped options" do
     manifest = %Manifest{

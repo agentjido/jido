@@ -48,7 +48,7 @@ obligation file and passing tagged contract tests.
 | Component | State | Active obligations | Mutation target modules | Main problem |
 | --- | --- | ---: | ---: | --- |
 | `jido.instance` | Active | 8 | 3 | The instance and Ref selection boundary is focused. |
-| `jido.plugin` | Active | 8 | 5 | The generic boundary is focused and uses no bundled Plugin fixture. |
+| `jido.plugin` | Active | 8 | 9 | The generic boundary is focused and uses no bundled Plugin fixture. |
 | `jido.agent` | Active | 21 | 13 | The model and authoring boundary is focused. |
 | `jido.agent_evaluation` | Active | 10 | 6 | Pure evaluation has a separate owner. |
 | `jido.signal_action` | Active | 7 | 1 | The combined Action and Signal value boundary is focused. |
@@ -66,7 +66,7 @@ obligation file and passing tagged contract tests.
 | `jido.plugin.audit` | Active | 4 | 2 | The bundled Audit Plugin is independent. |
 | `jido.plugin.bus` | Active | 8 | 8 | The bundled Bus Plugin is independent. |
 | `jido.plugin.heartbeat` | Active | 5 | 3 | The bundled Heartbeat Plugin is independent. |
-| `jido.plugin.scheduler` | Active | 9 | 9 | The bundled Scheduler Plugin excludes durable business delivery. |
+| `jido.plugin.scheduler` | Active | 9 | 11 | The bundled Scheduler Plugin excludes durable business delivery. |
 | `jido.plugin.sensor_manager` | Active | 8 | 8 | The bundled SensorManager Plugin is independent. |
 
 The package has about 168 `Jido.*` modules. A module does not need a Covenant
@@ -89,7 +89,7 @@ The current top-level directory therefore contains two different kinds of
 code:
 
 - Generic interface modules such as `Jido.Plugin`, `Manifest`, `Normalizer`,
-  `Codec`, `Init`, and callback context values.
+  `Init`, and callback context values.
 - Bundled implementations such as Audit, Bus, Heartbeat, Scheduler, and
   SensorManager.
 
@@ -880,6 +880,19 @@ Completed for supporting component `jido.instance`:
       18 classified survivors, 5 invalid mutations, no timeout, and no
       unsorted mutant.
 
+Completed for supporting component `jido.plugin`:
+
+- [x] Kept 8 obligations focused on generic Plugin declaration, manifests,
+      normalization, callback shapes, fault conversion, and narrow values.
+- [x] Expanded the mutation profile to all 9 generic behavior and value
+      modules without adding a bundled Plugin implementation.
+- [x] Aligned 27 contract tests with complete context fields, defaults,
+      version bounds, and required normalized Spec keys.
+- [x] Regenerated complete Covenant coverage across all 225 obligations.
+- [x] Completed the full 565-mutant profile with 422 killed mutants,
+      74 classified survivors, 69 invalid mutations, no timeout, and no
+      unsorted mutant.
+
 Completed for supporting component `jido.agent`:
 
 - [x] Kept 21 obligations focused on Agent data, authoring, validation,
@@ -972,6 +985,52 @@ Completed for supporting component `jido.error`:
 - [x] Regenerated complete Covenant coverage.
 - [x] Completed the full 301-mutant profile with 288 killed mutants,
       13 invalid mutations, no survivor, and no timeout.
+
+Completed for bundled component `jido.plugin.audit`:
+
+- [x] Kept 4 obligations and 6 focused contract tests for portable record
+      construction, declaration, bounded retention, ordering, and filtering.
+- [x] Kept the non-overlapping two-module mutation profile.
+- [x] Confirmed that no generic Plugin, Agent evaluation, commit, or
+      persistence behavior remains in this component.
+- [x] Completed the full 61-mutant profile with 46 killed mutants,
+      9 classified survivors, 6 invalid mutations, no timeout, and no
+      unsorted mutant.
+
+Completed for bundled component `jido.plugin.heartbeat`:
+
+- [x] Kept 5 obligations and 5 focused contract tests for timer options,
+      runtime ownership, and fresh default and custom tick Signals.
+- [x] Kept the non-overlapping three-module profile; the declarative Tick
+      Signal module has no mutable body.
+- [x] Confirmed that each contract test has a unique mutation kill.
+- [x] Completed the full 49-mutant profile with all 49 mutants killed and no
+      survivor, invalid mutation, or timeout.
+
+Completed for bundled component `jido.plugin.sensor_manager`:
+
+- [x] Kept 8 obligations and 11 focused contract tests for portable desired
+      state, exact reconciliation, revision fencing, recovery, retry, and
+      runtime failure containment.
+- [x] Kept the non-overlapping eight-module mutation profile.
+- [x] Confirmed that sensor implementation behavior and generic Plugin timing
+      remain outside this component.
+- [x] Completed the full 192-mutant profile with 158 killed mutants,
+      13 classified survivors, 21 invalid mutations, no timeout, and no
+      unsorted mutant.
+
+Completed for bundled component `jido.plugin.bus`:
+
+- [x] Kept 8 obligations and 16 focused contract tests for local declaration,
+      Bus ownership, subscription, reconnect, delivery, acknowledgement,
+      retry, reattachment, and worker lifetime.
+- [x] Kept Signal Bus routing, storage, replay, cursor, and subscription
+      internals outside this package-owned component.
+- [x] Replaced a timed-out pending-worker cleanup mutation with a direct
+      contract failure.
+- [x] Completed the full 193-mutant profile with 172 killed mutants,
+      7 classified survivors, 14 invalid mutations, no timeout, and no
+      unsorted mutant.
 
 After the final migration:
 

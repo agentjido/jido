@@ -483,7 +483,7 @@ defmodule JidoTest.Contract.PluginBusTest do
     monitor = Process.monitor(bus)
     assert :ok = stop_supervised(:pending_bus)
     assert_receive {:DOWN, ^monitor, :process, ^bus, :shutdown}, 2_000
-    assert_receive {:DOWN, ^delivery_ref, :process, ^delivery, _reason}, 2_000
+    assert_receive {:DOWN, ^delivery_ref, :process, ^delivery, _reason}, 500
 
     eventually(fn ->
       match?(%{connection: nil, pending: nil}, :sys.get_state(runtime))
