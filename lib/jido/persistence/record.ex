@@ -64,7 +64,7 @@ defmodule Jido.Persistence.Record do
 
   @doc false
   @spec decode(term()) :: {:ok, term()} | {:error, :invalid_persistence_record}
-  def decode(value) when is_binary(value) do
+  def decode(value) do
     # Load the trusted envelope fields before safe decoding on a cold node.
     _ = Code.ensure_loaded?(Jido.Persistence.Snapshot)
     _ = Code.ensure_loaded?(Jido.Signal)
@@ -72,8 +72,6 @@ defmodule Jido.Persistence.Record do
   rescue
     ArgumentError -> {:error, :invalid_persistence_record}
   end
-
-  def decode(_value), do: {:error, :invalid_persistence_record}
 
   @doc false
   @spec validate(term(), Ref.t(), module()) :: :ok | {:error, term()}
@@ -182,7 +180,7 @@ defmodule Jido.Persistence.Record do
   end
 
   defp validate_kind_fields(%{kind: :active} = record), do: validate_active(record)
-  defp validate_kind_fields(%{kind: :tombstone}), do: :ok
+  defp validate_kind_fields(_record), do: :ok
 
   defp validate_active(record) do
     with :ok <- validate_checkpoint(record),

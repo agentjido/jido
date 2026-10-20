@@ -47,12 +47,17 @@ defmodule Jido.Persistence.Source do
     end
   end
 
-  defp resolve_instance_config(jido) when is_atom(jido) and not is_nil(jido) do
+  defp resolve_instance_config(jido) do
     config =
       cond do
-        live_instance?(jido) -> Jido.instance_persistence(jido)
-        function_exported?(jido, :__jido_persistence__, 0) -> jido.__jido_persistence__()
-        true -> nil
+        live_instance?(jido) ->
+          Jido.instance_persistence(jido)
+
+        is_atom(jido) and function_exported?(jido, :__jido_persistence__, 0) ->
+          jido.__jido_persistence__()
+
+        true ->
+          nil
       end
 
     config
@@ -61,8 +66,6 @@ defmodule Jido.Persistence.Source do
   rescue
     error -> {:error, {:invalid_persistence_config, error}}
   end
-
-  defp resolve_instance_config(_jido), do: {:ok, nil}
 
   defp live_instance?(source) when is_atom(source) and not is_nil(source) do
     is_pid(Process.whereis(source)) and

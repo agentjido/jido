@@ -48,6 +48,8 @@ defmodule JidoTest.Persistence.SourceTest do
     assert {:ok, nil} = Jido.Persistence.resolve_config(nil, nil)
     assert {:ok, nil} = Jido.Persistence.resolve_config(false, ConfiguredSource)
     assert {:ok, nil} = Jido.Persistence.resolve_config(:inherit, nil)
+    assert {:ok, nil} = Jido.Persistence.resolve_config(:inherit, String)
+    assert {:ok, nil} = Jido.Persistence.resolve_config(:inherit, 123)
     assert {:ok, nil} = Jido.Persistence.resolve_config(:inherit, DisabledSource)
     assert {:error, :persistence_not_configured} = Source.resolve(nil, [])
 

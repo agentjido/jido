@@ -27,6 +27,10 @@ defmodule Jido.Persistence.SnapshotTest do
     def runtime_support, do: Jido.Persistence.SnapshotTest.RuntimeSupport
   end
 
+  defmodule StaticExtension do
+    use Jido.Agent.Extension, id: "persistence.static_extension"
+  end
+
   defmodule InputCheck do
     def valid(_value, _opts), do: :ok
   end
@@ -48,6 +52,13 @@ defmodule Jido.Persistence.SnapshotTest do
         })
 
     def run(input, _context), do: {:ok, %{output: input.input}}
+  end
+
+  defmodule ActionWithFlowFunction do
+    use Jido.Action, name: "persistence_action_with_flow_function"
+
+    def run(input, _context), do: {:ok, input}
+    def flow, do: JidoTest.AgentEvolutionFixtures.Flow.flow()
   end
 
   @tag obligation: "jido.persistence.I6"
@@ -152,6 +163,12 @@ defmodule Jido.Persistence.SnapshotTest do
             provider: RuntimePlugin,
             vsn: RuntimePlugin.vsn(),
             data: %{}
+          },
+          %{
+            id: StaticExtension.id(),
+            provider: StaticExtension,
+            vsn: StaticExtension.vsn(),
+            data: %{}
           }
         ]
       })
@@ -161,7 +178,8 @@ defmodule Jido.Persistence.SnapshotTest do
 
     assert plugin_snapshot.references == %{
              RuntimePlugin => RuntimePlugin.module_info(:md5),
-             RuntimeSupport => RuntimeSupport.module_info(:md5)
+             RuntimeSupport => RuntimeSupport.module_info(:md5),
+             StaticExtension => StaticExtension.module_info(:md5)
            }
 
     action_agent =
@@ -177,6 +195,22 @@ defmodule Jido.Persistence.SnapshotTest do
              SchemaAction => SchemaAction.module_info(:md5),
              InputCheck => InputCheck.module_info(:md5),
              OutputCheck => OutputCheck.module_info(:md5)
+           }
+  end
+
+  @tag obligation: "jido.persistence.I7"
+  test "an Action route does not treat an unrelated flow function as executable code" do
+    agent =
+      Agent.define!(%{
+        name: "action_with_flow_function_snapshot",
+        routes: [%{path: "action", handler: %{kind: :action, target: ActionWithFlowFunction}}]
+      })
+      |> Agent.instantiate!(id: "action-with-flow-function")
+
+    assert {:ok, snapshot} = Persistence.snapshot(agent)
+
+    assert snapshot.references == %{
+             ActionWithFlowFunction => ActionWithFlowFunction.module_info(:md5)
            }
   end
 
@@ -280,6 +314,11 @@ defmodule Jido.Persistence.SnapshotTest do
     assert {:error, %{code: :snapshot_references}} =
              Persistence.restore(%{snapshot | references: %{}})
 
+    extra = put_in(snapshot.references[String], String.module_info(:md5))
+
+    assert {:error, %Jido.Agent.Error{code: :snapshot_references, path: [:references]}} =
+             Persistence.restore(extra)
+
     assert {:error, _} = Persistence.snapshot(Agent.definition(F.agent()))
   end
 
@@ -299,6 +338,34 @@ defmodule Jido.Persistence.SnapshotTest do
              Persistence.restore(missing, context: %{observer: self()})
 
     refute_received :restored
+  end
+
+  @tag obligation: ["jido.persistence.I7", "jido.persistence.I11"]
+  test "missing saved declarations stop custom restore before its callback" do
+    original = F.Custom.instantiate!(id: "custom-order", state: %{count: 4})
+    assert {:ok, action, _} = Agent.mutate(original, [D.route_add("action", F.Work)])
+
+    assert {:ok, transform, _} =
+             Agent.mutate(original, [
+               D.route_add("transform", %{
+                 kind: :transform,
+                 target: {F.Transform, :run, 1}
+               })
+             ])
+
+    for {agent, missing} <- [
+          {original, F.Custom},
+          {action, F.Work},
+          {transform, F.Transform}
+        ] do
+      assert {:ok, snapshot} = Persistence.snapshot(agent)
+      snapshot = %{snapshot | references: Map.delete(snapshot.references, missing)}
+
+      assert {:error, %Jido.Agent.Error{code: :snapshot_references, path: [:references]}} =
+               Persistence.restore(snapshot, context: %{observer: self()})
+
+      refute_received :restored
+    end
   end
 
   @tag obligation: "jido.persistence.I7"

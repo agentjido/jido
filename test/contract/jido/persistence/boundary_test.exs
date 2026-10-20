@@ -129,11 +129,18 @@ defmodule Jido.Persistence.BoundaryTest do
     assert Record.validate(%{record | fmt: 2}, ref, Basic) ==
              {:error, {:invalid_persistence_record, :fmt}}
 
+    for vsn <- [nil, 0, "1"] do
+      assert Record.validate(%{record | vsn: vsn}, ref, Basic) ==
+               {:error, {:invalid_persistence_record, :vsn}}
+    end
+
     assert Record.kind(%{format: 99}) == :unknown
     assert Record.kind(%{fmt: 4, kind: :active}) == :active
     assert Record.kind(%{format: 3, kind: :tombstone}) == :tombstone
     assert Record.kind(%{kind: :active}) == :unknown
     assert Record.kind(%{fmt: 4, kind: :unknown}) == :unknown
+    assert Record.kind(%{fmt: 4, kind: :future}) == :unknown
+    assert Record.kind(%{format: 3, kind: :future}) == :unknown
     assert Record.kind(%{fmt: 3, kind: :active}) == :unknown
 
     assert Record.require_active(%{}) == {:error, {:invalid_persistence_record, :kind}}

@@ -112,7 +112,7 @@ defmodule Jido.Persistence.Snapshot do
   defp load_state(%{state_format: :default, agent: agent}, _context, convert),
     do: convert.(agent, agent.state)
 
-  defp load_state(%{state_format: :custom, agent: saved}, context, _convert) do
+  defp load_state(%{agent: saved}, context, _convert) do
     with true <- callback?(saved.module, :restore),
          {:ok, %Agent{id: id, state: state}} <-
            Agent.Callback.invoke(saved.module, :restore, [saved.state, context]),
@@ -132,9 +132,7 @@ defmodule Jido.Persistence.Snapshot do
   end
 
   defp callback?(module, callback),
-    do:
-      is_atom(module) and not is_nil(module) and Code.ensure_loaded?(module) and
-        function_exported?(module, callback, 2)
+    do: Code.ensure_loaded?(module) and function_exported?(module, callback, 2)
 
   defp code_modules(agent, state_format \\ :default) do
     handlers =
@@ -159,7 +157,7 @@ defmodule Jido.Persistence.Snapshot do
 
   # Check saved declarations before any code-dependent state converter runs.
   defp required_references(snapshot) do
-    required = MapSet.new(saved_modules(snapshot.agent, snapshot.state_format))
+    required = MapSet.new(saved_modules(snapshot.agent))
 
     if MapSet.subset?(required, MapSet.new(Map.keys(snapshot.references))),
       do: :ok,
@@ -171,7 +169,7 @@ defmodule Jido.Persistence.Snapshot do
         )
   end
 
-  defp saved_modules(agent, state_format \\ :default) do
+  defp saved_modules(agent) do
     handlers =
       Enum.flat_map(agent.routes, fn
         %{handler: %{target: {module, _, _}}} -> [module]
@@ -180,9 +178,8 @@ defmodule Jido.Persistence.Snapshot do
       end)
 
     providers = Enum.map(agent.extensions, & &1.provider)
-    custom = if state_format == :custom, do: [agent.module], else: []
     nested = Enum.flat_map(agent.topology.agents, &saved_modules(&1.definition))
-    handlers ++ providers ++ custom ++ nested ++ schema_modules(agent.schema)
+    handlers ++ providers ++ nested ++ schema_modules(agent.schema)
   end
 
   # Flow calls and executable schema refinements are declared code references.
@@ -308,9 +305,6 @@ defmodule Jido.Persistence.Snapshot do
   end
 
   defp upgrade_result({:ok, %{snapshot: snapshot} = output}) when map_size(output) == 1,
-    do: {:ok, snapshot}
-
-  defp upgrade_result({:ok, %{snapshot: snapshot} = output, []}) when map_size(output) == 1,
     do: {:ok, snapshot}
 
   defp upgrade_result({:error, _} = error), do: error
