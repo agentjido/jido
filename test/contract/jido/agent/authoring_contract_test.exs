@@ -126,11 +126,13 @@ defmodule JidoTest.Contract.AgentAuthoringTest do
   end
 
   @tag obligation: "jido.agent.I20"
-  test "the trusted JSON codec retains the complete definition and instance" do
+  test "the trusted JSON codec returns the portable definition" do
     for value <- [Leaf.definition(), Leaf.instantiate!(id: "json")] do
-      assert {:ok, _, registry} = Agent.Codec.encode(value)
+      registry = JidoTest.AgentRegistry.for(value)
+      assert {:ok, _document} = Agent.Codec.encode(value, registry)
       assert {:ok, json} = Agent.to_json(value, registry)
-      assert {:ok, ^value} = Agent.from_json(json, registry)
+      expected = Agent.definition(value)
+      assert {:ok, ^expected} = Agent.from_json(json, registry)
     end
 
     assert {:error, _} = Agent.from_json("{}", %{})

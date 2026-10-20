@@ -47,7 +47,8 @@ defmodule JidoTest.Authoring.Agents.DurableTest do
         }
       })
 
-    assert {:ok, _document, registry} = Agent.Codec.encode(definition)
+    registry = JidoTest.AgentRegistry.for(definition)
+    assert {:ok, _document} = Agent.Codec.encode(definition, registry)
     assert {:ok, json} = Agent.to_json(definition, registry)
     assert {:ok, ^definition} = Agent.from_json(json, registry)
   end

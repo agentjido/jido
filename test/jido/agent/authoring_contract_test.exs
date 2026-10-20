@@ -3,7 +3,6 @@ defmodule Jido.Agent.AuthoringContractTest do
   alias Jido.Agent
   alias Jido.Agent.Command
   alias Jido.AgentServer.Directive, as: Runtime
-  alias Jido.Codec.Registry
   alias JidoTest.AgentFixtures.Add
 
   defmodule Factory do
@@ -49,7 +48,7 @@ defmodule Jido.Agent.AuthoringContractTest do
     assert definition.module == Factory
   end
 
-  test "Registry derivation retains exact distinct values without duplicate entries" do
+  test "portable definitions reject arbitrary values and obsolete Registry kinds" do
     definition =
       Agent.define!(%{
         name: "registry",
@@ -57,19 +56,12 @@ defmodule Jido.Agent.AuthoringContractTest do
         routes: [route(Add, %{by: 1})]
       })
 
-    assert {:ok, document, registry} = Agent.Codec.encode(definition)
-    assert {:ok, ^definition} = Agent.Codec.decode(document, registry)
-    values = Map.values(registry.entries)
-    assert Enum.count(values, &(&1 === {:atom, :repeat})) == 1
-    assert {:value, %URI{port: 1}} in values
-    assert Enum.any?(values, &(&1 === {:value, %URI{port: 1.0}}))
+    assert {:error, %Jido.Authoring.Value.Error{reason: :value}} =
+             Agent.Codec.encode(definition, JidoTest.AgentRegistry.for(definition))
 
-    assert {:error, _} =
-             Registry.identifier(
-               Registry.new!(%{"integer" => {:value, %URI{port: 1}}}),
-               :value,
-               %URI{port: 1.0}
-             )
+    for entry <- [{:value, %URI{}}, {:route_match, &is_map/1}] do
+      assert {:error, _error} = Jido.Agent.Codec.Registry.new(%{"obsolete" => entry})
+    end
   end
 
   defp route(target, defaults),

@@ -4,7 +4,7 @@ defmodule Jido.Agent.SchedulerCodecTest do
   alias Jido.Agent
   alias Jido.Agent.Codec
   alias Jido.AgentServer, as: Server
-  alias Jido.Codec.Registry
+  alias Jido.Authoring.Registry
   alias Jido.Plugin.Scheduler
 
   defmodule QueueTick do
@@ -69,34 +69,33 @@ defmodule Jido.Agent.SchedulerCodecTest do
     assert {:ok, json} = Agent.to_json(definition, registry)
     missing_plugin = Map.delete(registry.entries, "plugins/scheduler/v1")
 
-    assert {:error, %{details: %{id: "plugins/scheduler/v1", kind: :plugin}}} =
+    assert {:error, %{details: %{identifier: "plugins/scheduler/v1", kind: :plugin}}} =
              Agent.from_json(json, missing_plugin)
   end
 
-  test "a complete imported instance retains Plugin state and options" do
+  test "an imported instance becomes a definition and retains Plugin options" do
     definition = definition(:action)
     instance = Agent.instantiate!(definition, id: "stored-agent", state: %{count: 4})
     assert {:ok, json} = Agent.to_json(instance, registry(definition))
-    assert {:ok, ^instance} = Agent.from_json(json, registry(definition))
-    assert {:ok, document, temporary} = Codec.encode(instance)
-    assert {:ok, ^instance} = Codec.decode(document, temporary)
+    assert {:ok, ^definition} = Agent.from_json(json, registry(definition))
+    assert {:ok, document} = Codec.encode(instance, registry(definition))
+    assert {:ok, ^definition} = Codec.decode(document, registry(definition))
   end
 
   test "import validates Scheduler options before startup" do
     definition = definition(:action)
     registry = registry(definition)
     assert {:ok, document} = Codec.encode(definition, registry)
-    [extension] = document["agent"]["extensions"]
-    data_key = %{"$type" => "symbol", "name" => "data"}
-    option_key = %{"$type" => "reference", "kind" => "atom", "id" => "atoms/retry-delay"}
-    invalid_options = %{"$type" => "map", "entries" => [[option_key, 0]]}
+    [extension] = document["definition"]["extensions"]
+    option_key = %{"$type" => "atom", "id" => "atoms/retry-delay"}
 
-    entries =
-      Enum.map(extension["entries"], fn [key, value] ->
-        [key, if(key == data_key, do: invalid_options, else: value)]
-      end)
+    invalid_options = %{
+      "$type" => "map",
+      "entries" => [%{"key" => option_key, "value" => 0}]
+    }
 
-    document = put_in(document, ["agent", "extensions"], [%{extension | "entries" => entries}])
+    document =
+      put_in(document, ["definition", "extensions"], [%{extension | "data" => invalid_options}])
 
     assert {:error, %{details: %{plugin: Scheduler}}} =
              Agent.from_json(Jason.encode!(document), registry)

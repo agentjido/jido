@@ -384,13 +384,6 @@ defmodule Jido.Plugin.FacetsTest do
 
     assert local.manifest.vsn == separate.manifest.vsn
     assert local.options == separate.options
-
-    for package <- [Package, LocalPackage] do
-      assert {:ok, document, registry} = Jido.Plugin.Codec.encode({package, options()})
-      assert {:ok, {^package, decoded}} = Jido.Plugin.Codec.decode(document, registry)
-      assert decoded == options()
-      assert Map.keys(document) |> Enum.sort() == ~w(module options type version)
-    end
   end
 
   test "Plugin callbacks can delegate to ordinary helpers" do

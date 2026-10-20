@@ -3,7 +3,7 @@ defmodule Jido.Agent.ViewTest do
 
   alias Jido.Agent
   alias Jido.Agent.View
-  alias Jido.Codec.{Data, Registry}
+  alias Jido.Authoring.{Document, Registry}
   alias JidoTest.AgentFixtures.{Add, CounterAgent}
 
   defp registry do
@@ -56,7 +56,7 @@ defmodule Jido.Agent.ViewTest do
              }
            }
 
-    assert :ok = Data.check_document(view)
+    assert :ok = Document.check(view)
     refute inspect(view) =~ "do not expose"
     refute inspect(view) =~ inspect(Add)
     refute Map.has_key?(view, "metadata")
@@ -105,14 +105,8 @@ defmodule Jido.Agent.ViewTest do
     assert %{"total" => 2, "truncated" => true, "items" => [_]} = view["operations"]
   end
 
-  test "projection requires stable identifiers for every exposed code value" do
+  test "projection requires identifiers for every exposed code value" do
     definition = CounterAgent.definition()
-    assert {:ok, _document, temporary} = Agent.Codec.encode(definition)
-
-    assert {:error, %Jido.Error.ValidationError{message: message}} =
-             View.project(definition, temporary)
-
-    assert message =~ "stable Registry"
 
     stable_without_action =
       Registry.new!(%{
@@ -120,8 +114,7 @@ defmodule Jido.Agent.ViewTest do
         "schemas/counter/v1" => {:schema, CounterAgent.definition().schema}
       })
 
-    assert {:error, %Jido.Error.ValidationError{message: message}} =
-             View.project(definition, stable_without_action)
+    assert {:error, %{message: message}} = View.project(definition, stable_without_action)
 
     assert message =~ "no identifier"
   end

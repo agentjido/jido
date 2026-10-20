@@ -2,6 +2,7 @@ defmodule Jido.Agent.SerializationContractTest do
   use JidoTest.Case, async: true
 
   alias Jido.Agent.Codec
+  alias Jido.Authoring.Registry
   alias Jido.Persistence
   alias JidoTest.Persistence.CheckpointIdentityProbe, as: Probe
   alias JidoTest.Persistence.ProbeStore, as: Store
@@ -40,9 +41,16 @@ defmodule Jido.Agent.SerializationContractTest do
              Persistence.load_agent(store, Probe, agent.id, namespace: "persistence-test")
   end
 
-  test "authoring JSON preserves the full Agent through a trusted Registry" do
+  test "authoring JSON preserves the Agent definition through a trusted Registry" do
     definition = Probe.definition()
-    assert {:ok, document, registry} = Codec.encode(definition)
+
+    registry =
+      Registry.new!(%{
+        "agents/probe/v1" => {:agent, Probe},
+        "schemas/probe/v1" => {:schema, definition.schema}
+      })
+
+    assert {:ok, document} = Codec.encode(definition, registry)
     assert {:ok, ^definition} = Codec.decode(document, registry)
     assert {:error, _} = Codec.decode(document, %{})
     assert {:error, _} = Codec.decode(%{}, registry)

@@ -3,7 +3,7 @@ defmodule JidoTest.Examples.Plugins.DSLTest do
   @moduletag :example
   alias Jido.Agent, as: CoreAgent
   alias Jido.AgentServer, as: Server
-  alias Jido.Codec.Registry
+  alias Jido.Authoring.Registry
   alias Jido.Examples.Plugins.DSL.{Agent, Thresholds}
 
   test "Plugin syntax lowers to portable data and adds owned state", %{jido: jido} do

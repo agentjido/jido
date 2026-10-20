@@ -8,7 +8,7 @@ defmodule Jido.Agent.View do
   Agent state, metadata, schema values, Plugin options, route defaults, or
   route match functions.
 
-  The caller must supply a stable `Jido.Codec.Registry`. The view uses stable
+  The caller must supply a `Jido.Authoring.Registry`. The view uses stable
   Registry identifiers for the Agent type and included route targets. It does
   not expose modules or create identifiers from module names.
 
@@ -17,7 +17,8 @@ defmodule Jido.Agent.View do
 
   alias Jido.Agent
   alias Jido.Agent.Authoring
-  alias Jido.Codec.{Data, Registry}
+  alias Jido.Agent.Codec.Registry, as: AgentRegistry
+  alias Jido.Authoring.{Document, Registry}
 
   @default_operation_limit 100
   @maximum_operation_limit 500
@@ -38,14 +39,13 @@ defmodule Jido.Agent.View do
          :ok <- Authoring.keys(opts, [:operation_limit]),
          {:ok, limit} <-
            limit(Map.get(opts, :operation_limit, @default_operation_limit)),
-         {:ok, registry} <- Registry.new(registry),
-         :ok <- Registry.require_stable(registry),
+         {:ok, registry} <- AgentRegistry.new(registry),
          {:ok, agent} <- definition(source),
          {:ok, agent_type_id} <- agent_type_id(agent.module, registry),
          {:ok, schema_id} <- Registry.identifier(registry, :schema, agent.schema),
          {:ok, operations} <- operations(agent.routes, registry, limit),
          view <- build(agent, agent_type_id, schema_id, operations),
-         :ok <- Data.check_document(view) do
+         :ok <- Document.check(view) do
       {:ok, view}
     end
   end

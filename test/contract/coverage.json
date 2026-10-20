@@ -1,9 +1,9 @@
 {
   "apps": {
     "jido": {
-      "active": 100,
+      "active": 99,
       "coverage": 1.0,
-      "covered": 100
+      "covered": 99
     },
     "jido.agent_server": {
       "active": 66,
@@ -135,7 +135,7 @@
           "status": "active",
           "testable": true,
           "tests": [
-            "test the trusted JSON codec retains the complete definition and instance"
+            "test the trusted JSON codec returns the portable definition"
           ]
         },
         "jido.agent.I21": {
@@ -2097,7 +2097,7 @@
         "jido.persistence.I11": {
           "failing": 0,
           "kind": "functional",
-          "passing": 10,
+          "passing": 11,
           "status": "active",
           "testable": true,
           "tests": [
@@ -2110,6 +2110,7 @@
             "test custom state conversion cannot replace the accepted definition",
             "test dump callback faults and invalid values cannot write a record",
             "test load callback faults and invalid values cannot restore an Agent",
+            "test missing saved declarations stop custom restore before its callback",
             "test snapshot and record callbacks receive only their bounded context"
           ]
         },
@@ -2258,13 +2259,16 @@
         "jido.persistence.I7": {
           "failing": 0,
           "kind": "persisted_format",
-          "passing": 6,
+          "passing": 9,
           "status": "active",
           "testable": true,
           "tests": [
             "test Flow snapshots retain their declared executable dependencies",
+            "test Plugin runtime and Action schemas retain all executable references",
             "test a missing reference manifest entry cannot bypass code checks",
+            "test an Action route does not treat an unrelated flow function as executable code",
             "test changed and unavailable code return reference errors",
+            "test missing saved declarations stop custom restore before its callback",
             "test schema refinements are code references and tuple defaults remain data",
             "test transform MFA handlers retain their callback module",
             "test upgrade runs before old code resolution and validates only target references"
@@ -2301,10 +2305,10 @@
       }
     },
     "jido.plugin": {
-      "active": 9,
+      "active": 8,
       "app": "jido",
       "coverage": 1.0,
-      "covered": 9,
+      "covered": 8,
       "form": "light",
       "obligations": {
         "jido.plugin.I1": {
@@ -2401,17 +2405,6 @@
             "test option validation preserves explicit errors and contains faults",
             "test package metadata exceptions are contained at the normalization boundary",
             "test state and Directive callbacks preserve explicit errors"
-          ]
-        },
-        "jido.plugin.I8": {
-          "failing": 0,
-          "kind": "persisted_format",
-          "passing": 2,
-          "status": "active",
-          "testable": true,
-          "tests": [
-            "test decode rejects malformed, unknown, and unregistered documents",
-            "test the document contains only a registered Plugin declaration"
           ]
         },
         "jido.plugin.I9": {
@@ -2856,8 +2849,8 @@
   },
   "covenant": "0.2.0",
   "totals": {
-    "active": 200,
+    "active": 199,
     "coverage": 1.0,
-    "covered": 200
+    "covered": 199
   }
 }

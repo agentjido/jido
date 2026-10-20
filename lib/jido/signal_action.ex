@@ -124,21 +124,11 @@ defmodule Jido.SignalAction do
   def reply(module, request, data, opts \\ []) do
     with {:ok, request} <- request(module, request),
          {:ok, definition} <- output(module),
-         :ok <- plain_output(data),
          {:ok, data} <- module.validate_output(data),
          {:ok, signal} <- __build__(definition, data, opts),
          {:ok, signal} <- correlate(signal, request) do
       {:ok, signal}
     end
-  end
-
-  @doc false
-  def route_type!(module, env) do
-    Code.ensure_compiled!(module)
-
-    if defined?(module),
-      do: Macro.compile_apply(module, :type, [], env),
-      else: raise(ArgumentError, "Module route requires a Jido.SignalAction")
   end
 
   @doc false
@@ -193,7 +183,7 @@ defmodule Jido.SignalAction do
     end
   end
 
-  defp definition!(module, env) when is_atom(module) and module not in [nil, true, false] do
+  defp definition!(module, env) when is_atom(module) do
     ensure_compiled!(module, env)
     fields = [:type, :schema, :dataschema, :default_source, :datacontenttype]
 
@@ -254,11 +244,6 @@ defmodule Jido.SignalAction do
       definition -> {:ok, definition}
     end
   end
-
-  defp plain_output(data) when is_map(data) and not is_struct(data), do: :ok
-
-  defp plain_output(_data),
-    do: {:error, Error.validation_error("Output Signal data must be a plain map", field: :data)}
 
   defp correlate(signal, request) do
     with {:ok, _request, trace} <- Signal.Trace.ensure(request),

@@ -185,7 +185,7 @@ not restore or claim the retired standalone `jido.topology` component.
 ### jido.agent.I20 — Agent document envelope
 
 - **scope:** `Jido.Agent.Codec`, `Jido.Agent.to_json/2`, `Jido.Agent.from_json/2`
-- **must:** Round-trip valid definitions and instances through a trusted Registry, and reject a malformed Agent document.
+- **must:** Write a portable definition through a trusted Registry, omit instance ID and state, read through `Jido.Agent.define/1`, and reject a malformed or unsupported Agent document.
 - **kind:** persisted-format
 - **status:** active
 

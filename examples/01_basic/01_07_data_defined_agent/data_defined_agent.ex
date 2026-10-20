@@ -3,7 +3,7 @@ defmodule Jido.Examples.DataDefinedAgent do
 
   alias Jido.Agent
   alias Jido.Agent.Codec
-  alias Jido.Codec.Registry
+  alias Jido.Authoring.Registry
   alias Jido.Plugin.Scheduler
 
   defmodule Add do

@@ -154,7 +154,8 @@ defmodule JidoTest.System.AuthoringLoad do
         routes: [%{path: "load.run", handler: %{kind: :action, target: Run}}]
       })
 
-    {:ok, document, registry} = AgentCodec.encode(definition)
+    registry = JidoTest.AgentRegistry.for(definition)
+    {:ok, document} = AgentCodec.encode(definition, registry)
     {:ok, ^definition} = AgentCodec.decode(json_copy(document), registry)
     state = %{count: round, payload: payload}
     id = "load-#{index}-#{round}"

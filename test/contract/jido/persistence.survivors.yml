@@ -1,0 +1,173 @@
+- at: lib/jido/persistence.ex:248:29
+  operator: string_empty
+  mutation: "`\"Persistence input is invalid\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the error category and structured data. It does not fix human-readable error prose.
+
+- at: lib/jido/persistence/adapter_ops.ex:79:27
+  operator: string_empty
+  mutation: "`\"Persistence adapter returned an invalid result\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the error category and structured data. It does not fix human-readable error prose.
+
+- at: lib/jido/persistence/adapter_ops.ex:89:27
+  operator: string_empty
+  mutation: "`\"Persistence adapter operation failed\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the error category and structured data. It does not fix human-readable error prose.
+
+- at: lib/jido/persistence/agent_checkpoint.ex:14:49
+  operator: string_empty
+  mutation: "`\"Expected an Agent instance and context Map\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the error category and structured data. It does not fix human-readable error prose.
+
+- at: lib/jido/persistence/agent_checkpoint.ex:27:13
+  operator: string_empty
+  mutation: "`\"Saved Agent origin differs from the requested origin\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the error category and structured data. It does not fix human-readable error prose.
+
+- at: lib/jido/persistence/plugin.ex:24:14
+  operator: string_empty
+  mutation: "`\"Persistence Plugin dump/3 failed\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the error category and structured data. It does not fix human-readable error prose.
+
+- at: lib/jido/persistence/plugin.ex:48:14
+  operator: string_empty
+  mutation: "`\"Persistence Plugin load/3 failed\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the error category and structured data. It does not fix human-readable error prose.
+
+- at: lib/jido/persistence/plugin.ex:74:7
+  operator: string_empty
+  mutation: "`\"Persistence Plugin callback returned an invalid result\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the error category and structured data. It does not fix human-readable error prose.
+
+- at: lib/jido/persistence/plugin.ex:88:11
+  operator: string_empty
+  mutation: "`\"Persistence Plugin storage value is not portable\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the error category and structured data. It does not fix human-readable error prose.
+
+- at: lib/jido/persistence/plugin.ex:103:11
+  operator: string_empty
+  mutation: "`\"Persistence Plugin loaded invalid owned state\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the error category and structured data. It does not fix human-readable error prose.
+
+- at: lib/jido/persistence/plugin.ex:119:28
+  operator: string_empty
+  mutation: "`\"Persistence Plugin context does not match its owner\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the error category and structured data. It does not fix human-readable error prose.
+
+- at: lib/jido/persistence/record.ex:235:33
+  operator: string_empty
+  mutation: "`\"Persistence record contains a non-portable term\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the error category and structured data. It does not fix human-readable error prose.
+
+- at: lib/jido/persistence/snapshot.ex:48:11
+  operator: string_empty
+  mutation: "`\"Snapshot reference manifest is incomplete\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the error category and structured data. It does not fix human-readable error prose.
+
+- at: lib/jido/persistence/snapshot.ex:55:48
+  operator: string_empty
+  mutation: "`\"Snapshot references are invalid\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the error category and structured data. It does not fix human-readable error prose.
+
+- at: lib/jido/persistence/snapshot.ex:55:85
+  operator: element_removal
+  mutation: "`cause: error` → `(removed)`"
+  sort: unpromised
+  reason: The rescue path keeps the exception only as diagnostic detail. The persistence contract fixes the invalid-snapshot code and path, not this best-effort cause value.
+
+- at: lib/jido/persistence/snapshot.ex:75:46
+  operator: string_empty
+  mutation: "`\"Invalid Agent snapshot\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the error category and structured data. It does not fix human-readable error prose.
+
+- at: lib/jido/persistence/snapshot.ex:103:13
+  operator: string_empty
+  mutation: "`\"Checkpoint callback must return {:ok, Map} or {:error, reason}\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the error category and structured data. It does not fix human-readable error prose.
+
+- at: lib/jido/persistence/snapshot.ex:129:11
+  operator: string_empty
+  mutation: "`\"Custom restore must retain the saved identity\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the error category and structured data. It does not fix human-readable error prose.
+
+- at: lib/jido/persistence/snapshot.ex:168:11
+  operator: string_empty
+  mutation: "`\"Snapshot reference manifest is incomplete\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the error category and structured data. It does not fix human-readable error prose.
+
+- at: lib/jido/persistence/snapshot.ex:176:39
+  operator: clause_removal
+  mutation: "`fn %{handler: %{target: module}} ->` → `(removed)`"
+  sort: equivalent
+  reason: The exact code-module manifest check runs before state restore and rejects the same missing Action or Flow module. This early pass only checks the saved declaration before generated executable metadata is read.
+
+- at: lib/jido/persistence/snapshot.ex:175:51
+  operator: element_removal
+  mutation: "`module` → `(removed)`"
+  sort: equivalent
+  reason: The exact code-module manifest check runs before state restore and rejects the same missing transform module. This early pass only checks the saved declaration before generated executable metadata is read.
+
+- at: lib/jido/persistence/snapshot.ex:176:43
+  operator: element_removal
+  mutation: "`module` → `(removed)`"
+  sort: equivalent
+  reason: The exact code-module manifest check runs before state restore and rejects the same missing Action or Flow module. This early pass only checks the saved declaration before generated executable metadata is read.
+
+- at: lib/jido/persistence/snapshot.ex:243:59
+  operator: string_empty
+  mutation: "`\"Snapshot code is unavailable\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the error category and structured data. It does not fix human-readable error prose.
+
+- at: lib/jido/persistence/snapshot.ex:258:22
+  operator: string_empty
+  mutation: "`\"Snapshot code changed; use an explicit upgrade Action\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the error category and structured data. It does not fix human-readable error prose.
+
+- at: lib/jido/persistence/snapshot.ex:272:46
+  operator: string_empty
+  mutation: "`\"Snapshot contains a non-portable value\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the error category and structured data. It does not fix human-readable error prose.
+
+- at: lib/jido/persistence/snapshot.ex:292:11
+  operator: string_empty
+  mutation: "`\"Upgrade must preserve Agent id and origin module\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the error category and structured data. It does not fix human-readable error prose.
+
+- at: lib/jido/persistence/snapshot.ex:302:11
+  operator: string_empty
+  mutation: "`\"Upgrade requires an Action and a complete snapshot result\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the error category and structured data. It does not fix human-readable error prose.
+
+- at: lib/jido/persistence/snapshot.ex:317:9
+  operator: string_empty
+  mutation: "`\"Upgrade must return one snapshot and no Directives\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the error category and structured data. It does not fix human-readable error prose.
+
+- at: lib/jido/persistence/source.ex:75:37
+  operator: return_nil
+  mutation: "`false` → `nil`"
+  sort: equivalent
+  reason: Both values are falsey, and live_instance?/1 is used only as a condition. No caller returns the predicate value.

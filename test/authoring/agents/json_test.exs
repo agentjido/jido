@@ -5,20 +5,21 @@ defmodule Jido.Agent.JSONTest do
   @moduletag :authoring
   alias Jido.Agent
   alias Jido.Agent.Codec
-  alias Jido.Codec.Registry
+  alias Jido.Authoring.Registry
   alias JidoTest.ComposableAgent.{Minimal, Named, Team, PluginState}
 
-  test "Map, struct and DSL definitions and complete instances round trip exactly" do
+  test "Map, struct, DSL, and instance sources produce the same definition" do
     for module <- [Minimal, Named, Team, PluginState] do
       definition = module.definition()
       instance = Agent.instantiate!(definition, id: "json-1")
+      registry = JidoTest.AgentRegistry.for(definition)
 
       for value <- [definition, Agent.define!(Map.from_struct(definition)), instance] do
-        assert {:ok, document, registry} = Codec.encode(value)
+        assert {:ok, document} = Codec.encode(value, registry)
         assert {:ok, json} = Agent.to_json(value, registry)
         assert Jason.decode!(json) == document
-        assert {:ok, ^value} = Agent.from_json(json, registry)
-        assert {:ok, ^value} = Codec.decode(document, registry)
+        assert {:ok, ^definition} = Agent.from_json(json, registry)
+        assert {:ok, ^definition} = Codec.decode(document, registry)
       end
     end
   end
@@ -37,35 +38,31 @@ defmodule Jido.Agent.JSONTest do
     assert {:ok, json} = Agent.to_json(instance, registry)
     assert json =~ "state/v1"
     refute json =~ "Zoi.Types"
-    assert {:ok, ^instance} = Agent.from_json(json, registry)
+    assert {:ok, ^definition} = Agent.from_json(json, registry)
     assert {:error, _} = Agent.from_json(json, %{})
     assert {:error, _} = Agent.to_json(instance, %{})
   end
 
-  test "import rejects unknown symbols, references, fields, versions and invalid state" do
+  test "import rejects unknown references, fields, versions, and invalid definitions" do
     instance = Agent.instantiate!(Minimal, id: "json-1")
-    {:ok, document, registry} = Codec.encode(instance)
+    registry = JidoTest.AgentRegistry.for(instance)
+    {:ok, document} = Codec.encode(instance, registry)
 
     invalid = [
       Map.put(document, "version", 99),
       Map.put(document, "unexpected", true),
-      put_in(document, ["agent", "module"], %{
+      put_in(document, ["definition", "module"], %{
         "$type" => "reference",
         "kind" => "agent",
         "id" => "untrusted"
       }),
-      put_in(document, ["agent", "module"], %{
+      put_in(document, ["definition", "module"], %{
         "$type" => "reference",
         "kind" => "source_code",
         "id" => "untrusted"
       }),
-      put_in(document, ["agent", "name"], %{
-        "$type" => "symbol",
-        "name" => "unknown_do_not_create_atom"
-      }),
-      put_in(document, ["agent", "id"], ""),
-      put_in(document, ["agent", "state"], nil),
-      put_in(document, ["agent", "module"], %{
+      put_in(document, ["definition", "name"], 42),
+      put_in(document, ["definition", "module"], %{
         "$type" => "reference",
         "kind" => "schema",
         "id" => "unknown"
@@ -79,11 +76,14 @@ defmodule Jido.Agent.JSONTest do
   end
 
   test "unknown JSON names do not create atoms" do
-    {:ok, document, registry} = Codec.encode(Minimal)
+    registry = JidoTest.AgentRegistry.for(Minimal)
+    {:ok, document} = Codec.encode(Minimal, registry)
     names = for n <- 1..50, do: "untrusted_agent_atom_#{System.unique_integer([:positive])}_#{n}"
 
     for name <- names do
-      invalid = put_in(document, ["agent", "name"], %{"$type" => "symbol", "name" => name})
+      invalid =
+        put_in(document, ["definition", "metadata"], %{"$type" => "atom", "id" => name})
+
       assert {:error, _} = Agent.from_json(Jason.encode!(invalid), registry)
     end
 
@@ -91,16 +91,24 @@ defmodule Jido.Agent.JSONTest do
     for name <- names, do: assert_raise(ArgumentError, fn -> String.to_existing_atom(name) end)
   end
 
-  test "duplicate decoded keys, oversized documents and live registry values are rejected" do
-    {:ok, document, registry} = Codec.encode(Minimal)
-    map = %{"$type" => "map", "entries" => [["same", 1], ["same", 2]]}
-    assert {:error, _} = Codec.decode(put_in(document, ["agent", "metadata"], map), registry)
+  test "duplicate decoded keys, oversized documents, and obsolete Registry kinds are rejected" do
+    registry = JidoTest.AgentRegistry.for(Minimal)
+    {:ok, document} = Codec.encode(Minimal, registry)
+
+    map = %{
+      "$type" => "map",
+      "entries" => [
+        %{"key" => "same", "value" => 1},
+        %{"key" => "same", "value" => 2}
+      ]
+    }
+
+    assert {:error, _} =
+             Codec.decode(put_in(document, ["definition", "metadata"], map), registry)
+
     assert {:error, _} = Agent.from_json(String.duplicate(" ", 8_388_609), registry)
 
     assert {:error, _} =
-             Registry.new(%{
-               "bad" => {:value, %URI{path: inspect(self())}},
-               "live" => {:atom, self()}
-             })
+             Jido.Agent.Codec.Registry.new(%{"bad" => {:value, %URI{path: "/bad"}}})
   end
 end

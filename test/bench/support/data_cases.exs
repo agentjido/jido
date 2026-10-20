@@ -12,7 +12,8 @@ defmodule JidoCoreBench.DataCases do
         "codec/#{op}/#{size}",
         fn _ ->
           a = F.definition(size)
-          {:ok, doc, registry} = Jido.Agent.Codec.encode(a)
+          registry = JidoTest.AgentRegistry.for(a)
+          {:ok, doc} = Jido.Agent.Codec.encode(a, registry)
           {a, JSON.decode!(JSON.encode!(doc)), registry}
         end,
         fn {a, doc, r} ->
@@ -23,7 +24,7 @@ defmodule JidoCoreBench.DataCases do
         end,
         fn {:ok, result} ->
           case op do
-            :encode -> F.equal!(length(result["agent"]["routes"]), size)
+            :encode -> F.equal!(length(result["definition"]["routes"]), size)
             :decode -> F.equal!(result, F.definition(size))
           end
         end

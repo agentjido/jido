@@ -864,6 +864,17 @@ Completed for `jido.agent_server`:
       3 invalid mutants, no survivor, and no timeout.
 - [x] Recorded the public coordinator and focused decision-owner split.
 
+Completed for supporting component `jido.persistence`:
+
+- [x] Added 15 obligations and 11 focused contract test files.
+- [x] Added a non-overlapping ten-module mutation profile for shared
+      persistence behavior.
+- [x] Kept backend-specific behavior and live recovery policy with their
+      separate owners.
+- [x] Regenerated complete Covenant coverage.
+- [x] Completed the full mutation profile with no unclassified mutant or
+      timeout.
+
 After the final migration:
 
 - [x] Keep only core turn-state obligations in `jido.agent_server`.

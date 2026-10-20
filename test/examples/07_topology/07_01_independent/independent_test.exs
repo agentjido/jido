@@ -9,7 +9,7 @@ defmodule JidoTest.Examples.Topology.IndependentTest do
   test "a JSON definition starts the same declared members", %{jido: jido} do
     definition = Jido.Examples.Topology.Independent.definition()
     registry = Independent.registry()
-    assert Jido.Codec.Registry.stable?(registry)
+    assert %Jido.Authoring.Registry{} = registry
     assert {:ok, document} = Jido.Agent.Codec.encode(definition, registry)
 
     assert {:ok, decoded} =

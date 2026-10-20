@@ -36,6 +36,10 @@ test/contract/
       plugin_runtime/
     instance.obligations.md
     instance/
+    persistence.obligations.md
+    persistence.decisions.yml
+    persistence.survivors.yml
+    persistence/
     plugin.obligations.md
     plugin/
   jido.plugin/
@@ -128,6 +132,12 @@ checkpoints, wait input receipts, wait resolution, Worker suspension, and
 recovery of one persistent Flow execution. It does not own Agent record
 formats, general Agent commits, transient Turn execution, or post-commit
 effects.
+
+`jido.persistence` owns adapter configuration, stable durable identity,
+portable Agent records and snapshots, Plugin-owned state conversion,
+revisions, tombstones, and built-in adapter conformance. It does not own live
+AgentServer recovery, commit publication, durable Flow progress, or
+backend-specific maintenance.
 
 ## Gates
 

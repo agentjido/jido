@@ -6,7 +6,7 @@ defmodule JidoTest.Property.ContractsTest do
 
   alias Jido.Agent
   alias Jido.Agent.Codec
-  alias Jido.Codec.Registry
+  alias Jido.Authoring.Registry
   alias Jido.Error
   alias Jido.Signal
   alias JidoTest.Property.Fuzz
@@ -312,36 +312,7 @@ defmodule JidoTest.Property.ContractsTest do
     schema = Zoi.object(%{count: Zoi.integer()})
     attrs = %{name: "property_definition", schema: schema, metadata: metadata}
 
-    expected = %{
-      "type" => "jido.agent",
-      "version" => 1,
-      "agent" => %{
-        "id" => nil,
-        "state" => nil,
-        "module" => nil,
-        "vsn" => 1,
-        "name" => "property_definition",
-        "description" => nil,
-        "signal_source" => nil,
-        "schema" => %{"$type" => "reference", "kind" => "schema", "id" => "schema/core"},
-        "extensions" => [],
-        "routes" => [],
-        "topology" => %{
-          "$type" => "map",
-          "entries" => [
-            [%{"$type" => "symbol", "name" => "agents"}, []],
-            [%{"$type" => "symbol", "name" => "connections"}, []]
-          ]
-        },
-        "metadata" => %{
-          "$type" => "map",
-          "entries" => for({key, value} <- Enum.sort(metadata), do: [key, value])
-        }
-      }
-    }
-
-    registry =
-      Registry.new!(%{"agent/core" => {:agent, Agent}, "schema/core" => {:schema, schema}})
+    registry = Registry.new!(%{"schema/core" => {:schema, schema}})
 
     {:ok, definition} = Agent.define(attrs)
     original = definition
@@ -373,23 +344,13 @@ defmodule JidoTest.Property.ContractsTest do
           assert {:error, %{__exception__: true}} =
                    Codec.encode(%{source | state: %{count: "invalid"}}, registry)
         else
-          expected =
-            if mode == "instance",
-              do:
-                put_in(
-                  expected["agent"],
-                  Map.merge(expected["agent"], %{
-                    "id" => "property-instance",
-                    "state" => %{
-                      "$type" => "map",
-                      "entries" => [[%{"$type" => "symbol", "name" => "count"}, input["count"]]]
-                    }
-                  })
-                ),
-              else: expected
+          assert {:ok, document} = Codec.encode(source, registry)
+          assert document["type"] == "jido.agent.definition"
+          refute Map.has_key?(document["definition"], "id")
+          refute Map.has_key?(document["definition"], "state")
 
-          assert {:ok, ^expected} = Codec.encode(source, registry)
-          assert {:ok, ^source} = Codec.decode(JSON.decode!(JSON.encode!(expected)), registry)
+          assert {:ok, ^definition} =
+                   Codec.decode(JSON.decode!(JSON.encode!(document)), registry)
         end
 
         assert definition.id == nil and definition.state == nil

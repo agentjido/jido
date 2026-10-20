@@ -1,7 +1,7 @@
-defmodule Jido.SignalActionTest do
-  use ExUnit.Case, async: true
+defmodule JidoTest.SignalAction.ContractTest do
+  use Covenant.Case, component: "jido.signal_action", async: true
 
-  alias Jido.{Exec, Signal, SignalAction}
+  alias Jido.{Signal, SignalAction}
 
   defmodule CreateThread do
     use Jido.SignalAction,
@@ -19,15 +19,7 @@ defmodule Jido.SignalActionTest do
       ]
 
     @impl Jido.Action
-    def run(data, context) do
-      if probe = context[:probe], do: send(probe, {:created, data})
-
-      case data["name"] do
-        "fail" -> {:error, :unavailable}
-        "invalid" -> {:ok, %{"id" => 42}}
-        _ -> {:ok, %{"id" => "thread-1"}, Map.get(context, :effects, [])}
-      end
-    end
+    def run(_data, _context), do: {:ok, %{"id" => "thread-1"}}
   end
 
   defmodule Request do
@@ -57,33 +49,6 @@ defmodule Jido.SignalActionTest do
 
     @impl Jido.Action
     def run(_data, _context), do: {:ok, %{id: "thread-2"}}
-  end
-
-  defmodule ChatAction do
-    defmacro __using__(opts) do
-      quote do
-        use Jido.SignalAction,
-            unquote(opts) ++
-              [
-                input: Jido.SignalActionTest.Request,
-                output: Zoi.object(%{id: Zoi.string()})
-              ]
-
-        @impl Jido.Action
-        def run(data, %{client: client}), do: client.create_thread(data)
-      end
-    end
-  end
-
-  defmodule ChatCreateThread do
-    use ChatAction,
-      name: "chat_create_thread",
-      description: "Create a thread through a domain wrapper",
-      vsn: 1
-  end
-
-  defmodule Client do
-    def create_thread(%{name: "General"}), do: {:ok, %{id: "thread-5"}}
   end
 
   defmodule DataOutput do
@@ -130,7 +95,30 @@ defmodule Jido.SignalActionTest do
     def run(_data, _context), do: {:ok, %{id: "thread-4"}}
   end
 
-  test "one module is a native Action and an input Signal definition" do
+  defmodule ConvertedInput do
+    use Jido.SignalAction,
+      name: "converted_input",
+      description: "Convert and default input data",
+      vsn: 1,
+      input: [
+        type: "converted.input",
+        default_source: "/input",
+        schema:
+          Zoi.object(
+            %{
+              name: Zoi.string(),
+              count: Zoi.integer(coerce: true) |> Zoi.default(1)
+            },
+            coerce: true
+          )
+      ]
+
+    @impl Jido.Action
+    def run(data, _context), do: {:ok, data}
+  end
+
+  @tag obligation: "jido.signal_action.I1"
+  test "one module is one native Action and input Signal contract" do
     assert SignalAction.defined?(CreateThread)
     refute SignalAction.defined?(Request)
     refute SignalAction.defined?(:missing)
@@ -147,38 +135,25 @@ defmodule Jido.SignalActionTest do
     assert CreateThread.dataschema() == nil
   end
 
-  test "input and Action parameters use the same schema and keep string keys" do
+  @tag obligation: ["jido.signal_action.I1", "jido.signal_action.I4"]
+  test "input construction and Action parameters share one schema" do
     data = %{"room_id" => "room-1", "name" => "General"}
     assert {:ok, request} = CreateThread.new(data, source: "/caller")
     assert request.data == data
     assert {:ok, ^data} = CreateThread.validate_params(data)
-    assert {:ok, %{"id" => "thread-1"}} = Exec.run(CreateThread, request.data)
 
     invalid = Map.put(data, "extra", true)
     assert {:error, [_ | _]} = CreateThread.new(invalid, source: "/caller")
-    assert {:error, %Jido.Action.Error.InvalidInputError{}} = Exec.run(CreateThread, invalid)
   end
 
-  test "native execution checks both schemas and keeps error and effect results" do
-    data = %{"room_id" => "room-1", "name" => "invalid"}
-    assert {:error, %Jido.Action.Error.InvalidInputError{}} = Exec.run(CreateThread, data)
-
-    assert {:error, %Jido.Action.Error.ExecutionFailureError{details: %{reason: :unavailable}}} =
-             Exec.run(CreateThread, %{data | "name" => "fail"})
-
-    assert {:ok, %{"id" => "thread-1"}, [:deferred]} =
-             Exec.run(CreateThread, %{"room_id" => "room-1", "name" => "General"}, %{
-               effects: [:deferred]
-             })
-  end
-
+  @tag obligation: ["jido.signal_action.I6", "jido.signal_action.I7"]
   test "reply builds a fresh completion Signal with request correlation" do
     request =
       CreateThread.new!(%{"room_id" => "room-1", "name" => "General"}, source: "/caller")
 
     {:ok, request, trace} = Signal.Trace.ensure(request, tracestate: "vendor=value")
     {:ok, request} = Signal.put_context(request, "jidocausationid", "earlier-request")
-    {:ok, data} = Exec.run(CreateThread, request.data)
+    data = %{"id" => "thread-1"}
 
     assert {:ok, reply} = CreateThread.reply(request, data, source: "/chat", id: request.id)
     assert reply.type == "chat.thread.created"
@@ -195,33 +170,30 @@ defmodule Jido.SignalActionTest do
     assert {:error, _} = CreateThread.reply(request, Signal.new!("other", %{}, source: "/x"))
   end
 
-  test "existing Signal definitions supply data and envelope contracts" do
+  @tag obligation: [
+         "jido.signal_action.I2",
+         "jido.signal_action.I3",
+         "jido.signal_action.I4",
+         "jido.signal_action.I6"
+       ]
+  test "existing Signal definitions supply both envelope contracts" do
     assert ExistingSignals.schema() == Request.schema()
     assert ExistingSignals.output_schema() == Completed.schema()
     assert ExistingSignals.vsn() == 2
+    assert ExistingSignals.default_source() == "/caller"
+    assert ExistingSignals.datacontenttype() == "application/json"
     assert {:ok, request} = ExistingSignals.new(%{name: "General"})
     assert request.source == "/caller"
     assert request.datacontenttype == "application/json"
     assert request.dataschema == "urn:chat:create:1"
-    assert {:ok, result} = Exec.run(ExistingSignals, request.data)
-    assert {:ok, reply} = ExistingSignals.reply(request, result)
+    assert {:ok, reply} = ExistingSignals.reply(request, %{id: "thread-2"})
     assert reply.type == "existing.created"
     assert reply.source == "/chat"
     assert reply.dataschema == "urn:chat:created:1"
     assert Signal.Trace.get(reply)
   end
 
-  test "a domain wrapper supplies the Signal contract and the native callback" do
-    request = ChatCreateThread.new!(%{name: "General"})
-    assert request.type == Request.type()
-    assert ChatCreateThread.schema() == Request.schema()
-
-    assert {:ok, %{id: "thread-5"}} =
-             Exec.run(ChatCreateThread, request.data, %{client: Client})
-
-    assert ChatCreateThread.__signal_action__().output == nil
-  end
-
+  @tag obligation: ["jido.signal_action.I4", "jido.signal_action.I5"]
   test "constructors own type, data, and dataschema and validate the envelope" do
     assert {:ok, request} =
              ExistingSignals.new(%{name: "General"}, %{
@@ -240,11 +212,25 @@ defmodule Jido.SignalActionTest do
     assert {:error, _} = ExistingSignals.new(%{name: "General"}, :invalid)
     assert_raise Zoi.ParseError, fn -> ExistingSignals.new!(%{name: 42}) end
 
+    assert {:ok, expected} = ExistingSignals.new(%{name: "General"}, id: "fixed")
+    assert ExistingSignals.new!(%{name: "General"}, id: "fixed") == expected
+
     assert_raise ArgumentError, fn ->
       ExistingSignals.new!(%{name: "ok"}, source: "bad source")
     end
   end
 
+  @tag obligation: "jido.signal_action.I4"
+  test "input construction applies declared defaults and coercion" do
+    assert {:ok, signal} = ConvertedInput.new(%{"name" => "test", "count" => "2"})
+    assert signal.source == "/input"
+    assert signal.data == %{name: "test", count: 2}
+
+    assert {:ok, defaulted} = ConvertedInput.new(%{"name" => "test"})
+    assert defaulted.data == %{name: "test", count: 1}
+  end
+
+  @tag obligation: ["jido.signal_action.I3", "jido.signal_action.I6"]
   test "a reply rejects a wrong request contract or missing output definition" do
     request = ExistingSignals.new!(%{name: "General"})
 
@@ -257,13 +243,11 @@ defmodule Jido.SignalActionTest do
       assert {:error, _} = ExistingSignals.reply(invalid, %{id: "thread-2"})
     end
 
-    assert {:ok, %{id: "thread-3"}} = Exec.run(DataOutput, %{name: "General"})
-
     assert {:error, %{message: "Action has no output Signal"}} =
              DataOutput.reply(DataOutput.new!(%{name: "General"}, source: "/caller"), %{id: "x"})
 
     assert NoOutput.output_schema() == []
-    assert {:ok, %{}} = Exec.run(NoOutput, %{})
+    assert NoOutput.__signal_action__().output == nil
 
     request = ExplicitOutput.new!(%{}, source: "/caller")
     assert request.dataschema == "urn:chat:explicit-request:1"
@@ -275,6 +259,7 @@ defmodule Jido.SignalActionTest do
     assert explicit.dataschema == "urn:chat:explicit:1"
   end
 
+  @tag obligation: "jido.signal_action.I2"
   test "input and output reject tuple forms" do
     for field <- [:input, :output],
         tuple <- [~s|{"test.run", Zoi.object(%{})}|, ~s|{:completed, Zoi.object(%{})}|] do
@@ -289,6 +274,7 @@ defmodule Jido.SignalActionTest do
     end
   end
 
+  @tag obligation: "jido.signal_action.I2"
   test "input and output require full Signal type strings" do
     for field <- [:input, :output], type <- [":completed", ":failed", ":custom", "42"] do
       definition = "[type: #{type}, schema: Zoi.object(%{})]"
@@ -306,6 +292,7 @@ defmodule Jido.SignalActionTest do
     end
   end
 
+  @tag obligation: ["jido.signal_action.I1", "jido.signal_action.I2", "jido.signal_action.I3"]
   test "invalid definitions stop compilation" do
     input = ~s|[type: "test.run", schema: Zoi.object(%{})]|
     base = ~s|name: "test", description: "Test action", vsn: 1, input: #{input}|

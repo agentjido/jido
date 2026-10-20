@@ -96,7 +96,7 @@ defmodule Jido.Agent.DSL.RouteMacros do
         if via in [nil, true, false],
           do: error!(caller, ":via requires an Action or Flow module")
 
-        type = quote do: Jido.SignalAction.route_type!(unquote(path), __ENV__)
+        type = quote do: Jido.Agent.DSL.RouteMacros.__signal_action_type__(unquote(path), __ENV__)
         {type, via, options}
 
       _ ->
@@ -105,6 +105,15 @@ defmodule Jido.Agent.DSL.RouteMacros do
 
         {path, target, options}
     end
+  end
+
+  @doc false
+  def __signal_action_type__(module, env) do
+    Code.ensure_compiled!(module)
+
+    if Jido.SignalAction.defined?(module),
+      do: Macro.compile_apply(module, :type, [], env),
+      else: raise(ArgumentError, "Module route requires a Jido.SignalAction")
   end
 
   defp handler(_path, nil, nil, _caller), do: {nil, quote(do: %{kind: :pass_through})}

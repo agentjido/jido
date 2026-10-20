@@ -1,0 +1,17 @@
+- id: signal-action-component-boundary
+  date: 2026-10-20
+  decision: Use jido.signal_action for the combined Action and Signal declaration, input Signal construction, and correlated output Signal construction.
+  driver: Jido owns this integration value, while jido_action and jido_signal own their execution, routing, serialization, and transport internals.
+  approved_by: Approved Jido V3 Covenant component map
+
+- id: signal-action-test-ownership
+  date: 2026-10-20
+  decision: Move the core SignalAction suite to test/contract/jido/signal_action. Keep Agent route lowering with Agent authoring tests and live commit behavior with AgentServer integration tests.
+  driver: One contract test must not claim Action execution, Agent route evaluation, or AgentServer effect timing.
+  approved_by: Component hardening pass
+
+- id: signal-action-mutation-profile
+  date: 2026-10-20
+  decision: Mutate only Jido.SignalAction in this component profile.
+  driver: Agent DSL macros already belong to jido.agent, and the Action and Signal packages own their lower-level behavior.
+  approved_by: Component hardening pass

@@ -156,13 +156,13 @@ defmodule Jido.Agent do
     end
   end
 
-  @doc "Exports an Agent definition or instance as a JSON string."
+  @doc "Exports the portable definition of an Agent source as a JSON string."
   def to_json(agent, registry) do
     with {:ok, document} <- Jido.Agent.Codec.encode(agent, registry),
          do: Jason.encode(document)
   end
 
-  @doc "Imports a JSON string through a trusted Registry and validates the Agent."
+  @doc "Imports a portable definition through a trusted Registry."
   def from_json(json, registry), do: Jido.Agent.Codec.from_json(json, registry)
 
   @doc false

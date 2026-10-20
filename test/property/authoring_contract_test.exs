@@ -126,7 +126,8 @@ defmodule JidoTest.Property.AuthoringContractTest do
           definition = apply(module, :definition, [])
           assert definition === declaration
           assert definition.id == nil and definition.state == nil
-          assert {:ok, document, registry} = Codec.encode(definition)
+          registry = JidoTest.AgentRegistry.for(definition)
+          assert {:ok, document} = Codec.encode(definition, registry)
           assert {:ok, ^document} = Codec.encode(declaration, registry)
           assert {:ok, ^definition} = Codec.decode(JSON.decode!(JSON.encode!(document)), registry)
 
@@ -136,8 +137,9 @@ defmodule JidoTest.Property.AuthoringContractTest do
             ])
 
           assert Agent.definition(original) === declaration
-          assert {:ok, encoded_instance, instance_registry} = Codec.encode(original)
-          assert {:ok, ^original} = Codec.decode(encoded_instance, instance_registry)
+          assert {:ok, encoded_instance} = Codec.encode(original, registry)
+          assert encoded_instance == document
+          assert {:ok, ^definition} = Codec.decode(encoded_instance, registry)
 
           {current, _model, _history} =
             Enum.reduce(input["history"], {original, input["initial"], []}, fn delta,

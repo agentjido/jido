@@ -1,98 +1,42 @@
 {
-  "agent": {
+  "definition": {
     "description": null,
     "extensions": [
       {
-        "$type": "map",
-        "entries": [
-          [
-            {
-              "$type": "symbol",
-              "name": "data"
-            },
-            {
-              "$type": "map",
-              "entries": []
-            }
-          ],
-          [
-            {
-              "$type": "symbol",
-              "name": "id"
-            },
-            "Elixir.Jido.Examples.DataDefinedAgent.CountTurns"
-          ],
-          [
-            {
-              "$type": "symbol",
-              "name": "provider"
-            },
-            {
-              "$type": "reference",
-              "id": "plugins/count-turns/v1",
-              "kind": "plugin"
-            }
-          ],
-          [
-            {
-              "$type": "symbol",
-              "name": "vsn"
-            },
-            1
-          ]
-        ]
+        "data": {
+          "$type": "map",
+          "entries": []
+        },
+        "id": "Elixir.Jido.Examples.DataDefinedAgent.CountTurns",
+        "provider": {
+          "$type": "reference",
+          "id": "plugins/count-turns/v1",
+          "kind": "plugin"
+        },
+        "vsn": 1
       },
       {
-        "$type": "map",
-        "entries": [
-          [
+        "data": {
+          "$type": "map",
+          "entries": [
             {
-              "$type": "symbol",
-              "name": "data"
-            },
-            {
-              "$type": "map",
-              "entries": [
-                [
-                  {
-                    "$type": "reference",
-                    "id": "atoms/retry-delay",
-                    "kind": "atom"
-                  },
-                  25
-                ]
-              ]
+              "key": {
+                "$type": "atom",
+                "id": "atoms/retry-delay"
+              },
+              "value": 25
             }
-          ],
-          [
-            {
-              "$type": "symbol",
-              "name": "id"
-            },
-            "Elixir.Jido.Plugin.Scheduler"
-          ],
-          [
-            {
-              "$type": "symbol",
-              "name": "provider"
-            },
-            {
-              "$type": "reference",
-              "id": "plugins/scheduler/v1",
-              "kind": "plugin"
-            }
-          ],
-          [
-            {
-              "$type": "symbol",
-              "name": "vsn"
-            },
-            1
           ]
-        ]
+        },
+        "id": "Elixir.Jido.Plugin.Scheduler",
+        "provider": {
+          "$type": "reference",
+          "id": "plugins/scheduler/v1",
+          "kind": "plugin"
+        },
+        "vsn": 1
       }
     ],
-    "id": null,
     "metadata": {
       "$type": "map",
       "entries": []
@@ -101,140 +45,38 @@
     "name": "basic_data_defined_agent",
     "routes": [
       {
-        "$type": "map",
-        "entries": [
-          [
-            {
-              "$type": "symbol",
-              "name": "as"
-            },
-            null
-          ],
-          [
-            {
-              "$type": "symbol",
-              "name": "defaults"
-            },
-            {
-              "$type": "map",
-              "entries": []
-            }
-          ],
-          [
-            {
-              "$type": "symbol",
-              "name": "emits"
-            },
-            null
-          ],
-          [
-            {
-              "$type": "symbol",
-              "name": "handler"
-            },
-            {
-              "$type": "map",
-              "entries": [
-                [
-                  {
-                    "$type": "symbol",
-                    "name": "kind"
-                  },
-                  {
-                    "$type": "symbol",
-                    "name": "action"
-                  }
-                ],
-                [
-                  {
-                    "$type": "symbol",
-                    "name": "target"
-                  },
-                  {
-                    "$type": "reference",
-                    "id": "actions/add/v1",
-                    "kind": "action"
-                  }
-                ]
-              ]
-            }
-          ],
-          [
-            {
-              "$type": "symbol",
-              "name": "path"
-            },
-            "examples.basic.data_defined.add"
-          ]
-        ]
+        "as": null,
+        "defaults": {
+          "$type": "map",
+          "entries": []
+        },
+        "emits": null,
+        "handler": {
+          "kind": "action",
+          "target": {
+            "$type": "reference",
+            "id": "actions/add/v1",
+            "kind": "action"
+          }
+        },
+        "path": "examples.basic.data_defined.add"
       },
       {
-        "$type": "map",
-        "entries": [
-          [
-            {
-              "$type": "symbol",
-              "name": "as"
-            },
-            null
-          ],
-          [
-            {
-              "$type": "symbol",
-              "name": "defaults"
-            },
-            {
-              "$type": "map",
-              "entries": []
-            }
-          ],
-          [
-            {
-              "$type": "symbol",
-              "name": "emits"
-            },
-            null
-          ],
-          [
-            {
-              "$type": "symbol",
-              "name": "handler"
-            },
-            {
-              "$type": "map",
-              "entries": [
-                [
-                  {
-                    "$type": "symbol",
-                    "name": "kind"
-                  },
-                  {
-                    "$type": "symbol",
-                    "name": "action"
-                  }
-                ],
-                [
-                  {
-                    "$type": "symbol",
-                    "name": "target"
-                  },
-                  {
-                    "$type": "reference",
-                    "id": "actions/schedule/v1",
-                    "kind": "action"
-                  }
-                ]
-              ]
-            }
-          ],
-          [
-            {
-              "$type": "symbol",
-              "name": "path"
-            },
-            "examples.basic.data_defined.schedule"
-          ]
-        ]
+        "as": null,
+        "defaults": {
+          "$type": "map",
+          "entries": []
+        },
+        "emits": null,
+        "handler": {
+          "kind": "action",
+          "target": {
+            "$type": "reference",
+            "id": "actions/schedule/v1",
+            "kind": "action"
+          }
+        },
+        "path": "examples.basic.data_defined.schedule"
       }
     ],
     "schema": {
@@ -243,28 +85,12 @@
       "kind": "schema"
     },
     "signal_source": null,
-    "state": null,
     "topology": {
-      "$type": "map",
-      "entries": [
-        [
-          {
-            "$type": "symbol",
-            "name": "agents"
-          },
-          []
-        ],
-        [
-          {
-            "$type": "symbol",
-            "name": "connections"
-          },
-          []
-        ]
-      ]
+      "agents": [],
+      "connections": []
     },
     "vsn": 1
   },
-  "type": "jido.agent",
+  "type": "jido.agent.definition",
   "version": 1
 }

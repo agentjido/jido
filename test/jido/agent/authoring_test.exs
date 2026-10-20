@@ -3,7 +3,6 @@ defmodule JidoTest.Agent.AuthoringTest do
 
   alias Jido.Agent
   alias Jido.Agent.Codec
-  alias Jido.Codec.Registry
 
   setup do
     # Spark records source locations only when debug information is enabled.
@@ -226,8 +225,6 @@ defmodule JidoTest.Agent.AuthoringTest do
     assert Counter.schema() == Agent.schema(definition)
     assert Counter.instantiate!(id: "defined").state == %{count: 0, turns: 0}
     refute function_exported?(UnexposedCounter, :add_signal, 1)
-    assert {:ok, document, registry} = Codec.encode(definition)
-    assert {:ok, ^definition} = Codec.decode(document, registry)
   end
 
   test "generated Signal helpers have tuple and raising forms" do
@@ -439,10 +436,12 @@ defmodule JidoTest.Agent.AuthoringTest do
     assert {:error, _} = Agent.instantiate(%{}, [])
   end
 
-  test "wildcard routes and static structs survive the Codec" do
+  test "wildcard routes work and static structs are not portable authoring values" do
     definition = RawCounter.definition()
-    assert {:ok, document, registry} = Codec.encode(definition)
-    assert {:ok, ^definition} = Codec.decode(JSON.decode!(JSON.encode!(document)), registry)
+
+    assert {:error, %Jido.Authoring.Value.Error{reason: :value}} =
+             Codec.encode(definition, JidoTest.AgentRegistry.for(definition))
+
     refute function_exported?(RawCounter, :raw_signal, 1)
 
     agent = Agent.instantiate!(definition, id: "raw")
@@ -455,7 +454,9 @@ defmodule JidoTest.Agent.AuthoringTest do
 
     signal = Jido.Signal.new!("raw.add", %{amount: -1}, source: "/test")
     assert {:ok, %{state: %{count: -1}}, []} = Agent.cmd(agent, signal)
-    assert {:error, _} = Registry.new(%{"runtime" => {:value, %{~D[2026-09-03] | day: self()}}})
+
+    assert {:error, _} =
+             Jido.Agent.Codec.Registry.new(%{"runtime" => {:value, ~D[2026-09-03]}})
   end
 
   test "Codec rejects incomplete instance shapes before it derives a definition" do
@@ -469,7 +470,7 @@ defmodule JidoTest.Agent.AuthoringTest do
           %{definition | id: "instance", state: %URI{}},
           %{definition | id: "instance", state: []}
         ] do
-      assert {:error, _error} = Codec.encode(malformed)
+      assert {:error, _error} = Codec.encode(malformed, %{})
     end
   end
 

@@ -24,6 +24,7 @@ this scaffold.
 | `jido.plugin.sensor_manager` | Active | `test/contract/jido.plugin/sensor_manager/` |
 | `jido.agent` | Active | `test/contract/jido/agent/` |
 | `jido.agent_evaluation` | Active | `test/contract/jido/agent_evaluation/` |
+| `jido.persistence` | Active | `test/contract/jido/persistence/` |
 | `jido.agent_server` | Active | `test/contract/jido/agent_server/` |
 | `jido.agent_server.activation` | Active | `test/contract/jido/agent_server/activation/` |
 | `jido.agent_server.effects` | Active | `test/contract/jido/agent_server/effects/` |
@@ -46,7 +47,7 @@ this scaffold.
 | `jido.agent_server.composition` | Active | Runtime child and connection resources | `test/contract/jido/agent_server/composition/` |
 | `jido.agent_server.durable` | Active | Persistence-backed AgentServer state coordination | `test/contract/jido/agent_server/durable/` |
 | `jido.agent_server.durable_turn` | Active | Durable Flow progress, waits, and receipts | `test/contract/jido/agent_server/durable_turn/` |
-| `jido.persistence` | Planned | Records, snapshots, adapters, storage operations, and revisions | `test/contract/jido/persistence/` |
+| `jido.persistence` | Active | Records, snapshots, adapters, storage operations, and revisions | `test/contract/jido/persistence/` |
 | `jido.plugin` | Active | Generic Plugin SDK and callback contracts | `test/contract/jido/plugin/` |
 | `jido.signal_action` | Planned | Jido integration values for Signals and Actions | `test/contract/jido/signal_action/` |
 | `jido.discovery` | Planned | Read-only Action discovery | `test/contract/jido/discovery/` |

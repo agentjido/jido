@@ -25,7 +25,7 @@ defmodule JidoTest.Examples.Basic.DataDefinedAgentTest do
   test "an imported Scheduler declaration starts its runtime and delivers a later command", %{
     jido: jido
   } do
-    assert Jido.Codec.Registry.stable?(Example.registry())
+    assert %Jido.Authoring.Registry{} = Example.registry()
     assert {:ok, definition} = Example.from_json(Example.fixture_json())
     assert definition.id == nil
     assert definition.state == nil
@@ -66,14 +66,14 @@ defmodule JidoTest.Examples.Basic.DataDefinedAgentTest do
     assert {:error, _} = Codec.decode(document, %{})
   end
 
-  test "instance JSON includes committed state while definition JSON has no identity" do
+  test "instance JSON writes only the portable definition" do
     assert {:ok, definition} = Example.from_json(Example.fixture_json())
     assert definition.id == nil and definition.state == nil
     instance = Agent.instantiate!(definition, id: "stored-counter")
     assert {:ok, changed, []} = Agent.cmd(instance, Example.signal!(3))
     assert {:ok, document} = Codec.encode(changed, Example.registry())
     assert {:ok, restored} = Example.from_json(Jason.encode!(document))
-    assert restored == changed
-    assert restored.state.count == 3
+    assert restored == definition
+    assert restored.id == nil and restored.state == nil
   end
 end

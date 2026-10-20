@@ -28,7 +28,7 @@ defmodule Jido.Examples.Plugins.DSL.Agent do
   def registry do
     definition = definition()
 
-    Jido.Codec.Registry.new!(%{
+    Jido.Authoring.Registry.new!(%{
       "agents/thresholds/v1" => {:agent, __MODULE__},
       "schemas/thresholds/v1" => {:schema, definition.schema},
       "actions/threshold-add/v1" => {:action, hd(definition.routes).handler.target},
@@ -37,6 +37,7 @@ defmodule Jido.Examples.Plugins.DSL.Agent do
       "atoms/on" => {:atom, :on},
       "atoms/thresholds" => {:atom, :thresholds},
       "atoms/at" => {:atom, :at},
+      "atoms/name" => {:atom, :name},
       "atoms/first" => {:atom, :first},
       "atoms/third" => {:atom, :third}
     })

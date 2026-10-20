@@ -123,7 +123,8 @@ defmodule Jido.Agent.SignalActionTest do
 
   test "module routes use the same public definition and Codec contracts" do
     definition = Counter.definition()
-    assert {:ok, document, registry} = Agent.Codec.encode(definition)
+    registry = JidoTest.AgentRegistry.for(definition)
+    assert {:ok, document} = Agent.Codec.encode(definition, registry)
     assert {:ok, ^definition} = Agent.Codec.decode(JSON.decode!(JSON.encode!(document)), registry)
   end
 

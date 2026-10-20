@@ -3,7 +3,6 @@ modules:
   - Jido.Plugin
   - Jido.Plugin.Manifest
   - Jido.Plugin.Normalizer
-  - Jido.Plugin.Codec
   - Jido.Plugin.Input
   - Jido.Plugin.Error
 ---
@@ -70,14 +69,6 @@ consumer runs a callback or what a bundled Plugin does.
 - **must:** Convert callback raises, throws, and exits to Plugin-scoped execution errors with the package, callback, and original failure data. Preserve an explicit callback error when the callback result shape is unambiguous. Treat `{:error, schema}` from `state_spec/1` as state owned under the valid `:error` key. Reject an invalid callback result with a structured Plugin error.
 - **why:** A declaration fault must not escape as an unrelated process failure.
 - **kind:** functional
-- **status:** active
-
-### jido.plugin.I8 — Plugin document codec
-
-- **scope:** `Jido.Plugin.Codec`
-- **must:** Encode only the Plugin module and static options through a trusted Registry. Use the current bounded document type and version. Decode to the canonical module-and-options declaration without starting runtime work. Reject malformed, unknown-version, unregistered, or invalid Plugin documents.
-- **why:** Agent documents need a portable Plugin declaration, not live state or process data.
-- **kind:** persisted-format
 - **status:** active
 
 ### jido.plugin.I9 — Generic Plugin context values

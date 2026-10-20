@@ -2,13 +2,16 @@
 
 To store Agent definitions in a database, or show them in a UI, you need a
 format that doesn't let stored data choose which modules your code runs.
-`Jido.Agent.Codec` encodes Agents as JSON documents that refer to modules and
-atoms only through a Registry you own. `Jido.Agent.View` produces a read-only
-summary that is safe to hand to a client.
+`Jido.Agent.Codec` encodes portable Agent definitions. The document refers to
+modules, schemas, and data atoms only through a Registry you own.
+`Jido.Agent.View` produces a read-only summary for a client.
 
 ```elixir
 {:ok, json} = Jido.Agent.to_json(agent, registry)
-{:ok, ^agent} = Jido.Agent.from_json(json, registry)
+{:ok, definition} = Jido.Agent.from_json(json, registry)
+
+definition == Jido.Agent.definition(agent)
+# => true
 
 {:ok, view} = Jido.Agent.View.project(agent, registry)
 view["operations"]["total"]
@@ -51,12 +54,12 @@ of these survive JSON. Converting `"actions/add"` back to `Doc.Add` is a
 security boundary: if the conversion trusts the document, whoever edits the
 document controls which code runs.
 
-A `Jido.Codec.Registry` maps stable string IDs to `{kind, value}` pairs.
+A `Jido.Authoring.Registry` maps stable string IDs to `{kind, value}` pairs.
 Documents can only refer to those IDs.
 
 ```elixir
 registry =
-  Jido.Codec.Registry.new!(%{
+  Jido.Authoring.Registry.new!(%{
     "agents/counter" => {:agent, Doc.Counter},
     "actions/add" => {:action, Doc.Add},
     "schemas/counter-state" => {:schema, Doc.Counter.definition().schema},
@@ -65,17 +68,17 @@ registry =
   })
 ```
 
-Kinds are `:agent`, `:action`, `:flow`, `:plugin`, `:schema`, `:atom`,
-`:value`, `:extension`, `:transform`, and `:route_match`. Each value can have
-only one ID.
+The Agent codec accepts `:agent`, `:action`, `:flow`, `:plugin`, `:extension`,
+`:transform`, `:schema`, and `:atom`. Each typed value can have only one write
+ID. A read alias can point directly to one write ID.
 
 Register:
 
 - the Agent module and every Action or Flow target;
 - the state schema;
-- every Plugin module; and
+- every extension or Plugin provider module; and
 - atoms used as data: `as:` helper names, keys in `defaults`, and keys in
-  state.
+  metadata, extension data, and topology data.
 
 Jido already knows its structural names, such as `path`, `handler`, and
 `kind`. Keep the Registry in code, review changes to it, and never build it
@@ -83,30 +86,35 @@ from stored data.
 
 ## Export
 
-`Jido.Agent.to_json/2` encodes a definition or an instance as a JSON string.
-`Jido.Agent.Codec.encode/2` returns the same document as a map.
+`Jido.Agent.to_json/2` encodes the definition of a source as a JSON string.
+`Jido.Agent.Codec.encode/2` returns the same document as a map. The source can
+be a definition, an Agent module, or an instance.
 
 ```elixir
 agent = Doc.Counter.instantiate!(id: "counter-1", state: %{count: 7})
 {:ok, json} = Jido.Agent.to_json(agent, registry)
 ```
 
-The document has `"type" => "jido.agent"`, `"version" => 1`, and an `"agent"`
-object with every Agent field. Module references look like this:
+The document has `"type" => "jido.agent.definition"`, `"version" => 1`, and a
+`"definition"` object. Module references look like this:
 
 ```json
 {"$type": "reference", "kind": "action", "id": "actions/add"}
 ```
 
-Maps are stored as entry lists, so atom and string keys stay distinct. An
-instance document includes `id` and `state`. A definition document has
-`null` for both.
+Maps are stored as entry lists, so atom and string keys stay distinct. The
+document never contains Agent `id` or `state`. An instance and its definition
+produce the same document.
+
+Portable data can contain JSON scalar values, proper lists, maps, and atoms
+that have `:atom` Registry entries. It cannot contain tuples, structs, live
+values, or invalid UTF-8 strings.
 
 If a value isn't registered, export fails:
 
 ```text
 {:error, %Jido.Agent.Error{code: :unknown_reference,
-                           message: "Registry has no identifier for Agent data"}}
+                           message: "Agent Registry has no identifier for a value"}}
 ```
 
 The error doesn't say which value is missing. Compare the Agent's modules,
@@ -114,19 +122,19 @@ schema, and atom keys against the Registry.
 
 ## Import
 
-`Jido.Agent.from_json/2` decodes through the same Registry, then runs full
-Agent validation.
+`Jido.Agent.from_json/2` decodes through the same Registry. It then calls
+`Jido.Agent.define/1` to validate the complete definition.
 
 ```elixir
-{:ok, restored} = Jido.Agent.from_json(json, registry)
+{:ok, definition} = Jido.Agent.from_json(json, registry)
 
-{restored == agent, restored.state}
-# => {true, %{count: 7}}
+definition == Doc.Counter.definition()
+# => true
 ```
 
-The round trip is exact. Import returns a value: it doesn't start a process,
-start Plugin runtimes, or resume work. Pass the value to `Jido.start_agent/2`
-to run it.
+Import returns a definition. It does not start a process, start Plugin
+runtimes, restore state, or resume work. Instantiate the definition before you
+start it.
 
 ## Import Failures
 
@@ -134,32 +142,32 @@ Import fails closed. Each case returns an error and no Agent:
 
 | Problem | Error message |
 | --- | --- |
-| An ID not in the Registry, or with the wrong kind | `"Unknown or mismatched Registry identifier"` |
-| An unknown document `type` or `version` | `"Unknown Agent document type or version"` |
-| Malformed JSON | `"Invalid Agent JSON"` |
+| An ID not in the Registry | `"unknown authoring Registry identifier"` |
+| An ID with the wrong kind | `"authoring Registry identifier has the wrong entry kind"` |
+| An unknown document `type` or `version` | `"Unknown Agent definition document type or version"` |
+| Malformed JSON | `"Invalid Agent definition JSON"` |
 | Not a string, or larger than 8 MiB | `"Expected a JSON string of at most 8 MiB"` |
 | A well-formed document with an invalid Agent | The normal `Jido.Agent` validation error |
 
 Replace `"actions/add"` with `"actions/delete_everything"` in the JSON and
-import fails with `"Unknown or mismatched Registry identifier"`. No module
+import fails with `"unknown authoring Registry identifier"`. No module
 lookup happens. Imported documents get the same validation as a DSL module:
-fields, routes, Plugins, schema, and complete state.
+fields, routes, extensions, and schema.
 
 ## Test Round Trips
 
-In tests, `Jido.Agent.Codec.encode/1` derives a temporary Registry:
+Tests must also supply an explicit Registry:
 
 ```elixir
-{:ok, document, temporary} = Jido.Agent.Codec.encode(Doc.Counter.definition())
-{:ok, decoded} = Jido.Agent.Codec.decode(JSON.decode!(JSON.encode!(document)), temporary)
+{:ok, document} = Jido.Agent.Codec.encode(Doc.Counter.definition(), registry)
+{:ok, decoded} = Jido.Agent.Codec.decode(JSON.decode!(JSON.encode!(document)), registry)
 
 decoded == Doc.Counter.definition()
 # => true
 ```
 
-Derived IDs such as `"agent/0"` and `"action/2"` depend on traversal order and
-change when your code changes. Use the temporary Registry to check that a
-definition encodes. Don't store documents made with it.
+There is no generated Registry for Agent documents. This keeps every written
+ID under application control.
 
 ## Safe Views
 
@@ -200,7 +208,7 @@ the first two.
 
 | Rule | Detail |
 | --- | --- |
-| Stable Registry | A temporary Registry fails with `"This operation requires a stable Registry"`. |
+| Trusted Registry | Every exposed code value and schema needs an application-owned ID. |
 | Bounded size | `operation_limit:` caps the route list. Default 100, maximum 500. When it cuts the list, `"total"` keeps the real count and `"truncated"` is `true`. |
 | No process | `project/3` reads data. It never contacts an Agent process. |
 
@@ -208,9 +216,8 @@ the first two.
 
 | Format | Contains | Use it for |
 | --- | --- | --- |
-| Agent document (`Jido.Agent.Codec`) | A complete definition or instance | Storing and loading Agents. |
+| Agent definition document (`Jido.Agent.Codec`) | Portable authoring data without ID or state | Storing and loading Agent definitions. |
 | Agent View (`Jido.Agent.View`) | Public definition data and route summaries | Display and discovery. |
-| Plugin document (`Jido.Plugin.Codec`) | One Plugin and its options | Storing a Plugin declaration. |
 | Agent checkpoint | Portable identity and live state | Persistence and recovery. |
 
 Checkpoints are covered in the Build Durable Systems guides.

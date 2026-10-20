@@ -38,7 +38,8 @@ defmodule JidoTest.Authoring.Agents.BoundariesTest do
 
   test "JSON round trips require the supplied Registry" do
     definition = Agent.define!(%{name: "no_json"})
-    assert {:ok, document, registry} = Agent.Codec.encode(definition)
+    registry = JidoTest.AgentRegistry.for(definition)
+    assert {:ok, document} = Agent.Codec.encode(definition, registry)
     assert {:ok, ^definition} = Agent.Codec.decode(document, registry)
     assert {:error, _} = Agent.Codec.decode(document, %{})
   end

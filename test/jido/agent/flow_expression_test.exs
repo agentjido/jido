@@ -79,7 +79,8 @@ defmodule Jido.Agent.FlowExpressionTest do
           ]
         })
 
-      assert {:ok, document, registry} = Codec.encode(definition)
+      registry = JidoTest.AgentRegistry.for(definition)
+      assert {:ok, document} = Codec.encode(definition, registry)
       assert {:ok, decoded} = Codec.decode(JSON.decode!(JSON.encode!(document)), registry)
       assert decoded == definition
       instance = Agent.instantiate!(decoded, id: Jido.Signal.ID.generate!(), state: %{count: 10})

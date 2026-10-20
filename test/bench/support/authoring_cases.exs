@@ -1,6 +1,7 @@
 defmodule JidoCoreBench.AuthoringCases do
   @moduledoc false
   alias Jido.Agent.Codec
+  alias Jido.Authoring.Registry
   alias JidoCoreBench.Fixtures, as: F
 
   def workloads(sizes) do
@@ -26,7 +27,8 @@ defmodule JidoCoreBench.AuthoringCases do
         "authoring/codec/routes_#{size}/#{operation}",
         fn _ ->
           definition = F.definition(size, JidoCoreBench.Add, [JidoCoreBench.PreparePlugin])
-          {:ok, document, registry} = Codec.encode(definition)
+          registry = JidoTest.AgentRegistry.for(definition)
+          {:ok, document} = Codec.encode(definition, registry)
           %{definition: definition, document: document, registry: registry}
         end,
         fn prepared ->
@@ -58,40 +60,32 @@ defmodule JidoCoreBench.AuthoringCases do
   end
 
   defp registry_cases do
-    for size <- [1, 256], shape <- [:flat, :nested], operation <- [:derive, :encode] do
+    for size <- [1, 256], shape <- [:flat, :nested], operation <- [:resolve, :identifier] do
       F.checked(
         "authoring/registry/#{size}/#{shape}/#{operation}",
         fn _ ->
-          values = for n <- 1..size, do: %URI{host: "host-#{n}", port: n}
+          entries =
+            Map.new(1..size, fn index ->
+              value = if shape == :nested, do: %{index: index}, else: index
+              {"data/#{index}", {:data, value}}
+            end)
 
-          data =
-            if shape == :nested, do: Enum.map(values, &%{value: {:item, [&1, &1]}}), else: values
-
-          definition = %{F.definition() | metadata: %{items: data}}
-          {:ok, document, registry} = Codec.encode(definition)
-          {definition, document, registry}
+          registry = Registry.new!(entries)
+          value = if shape == :nested, do: %{index: size}, else: size
+          {registry, "data/#{size}", value}
         end,
-        fn {definition, _document, _registry} ->
+        fn {registry, identifier, value} ->
           case operation do
-            :derive ->
-              with {:ok, _, registry} <- Codec.encode(definition), do: {:ok, registry}
-
-            :encode ->
-              Codec.encode(definition)
+            :resolve -> Registry.resolve(registry, identifier, :data)
+            :identifier -> Registry.identifier(registry, :data, value)
           end
         end,
-        fn result -> F.equal!(elem(result, 0), :ok) end
-      )
-      |> Map.put(:verify, fn {definition, document, registry}, result ->
-        case operation do
-          :derive ->
-            F.equal!(result, {:ok, registry})
-
-          :encode ->
-            F.equal!(result, {:ok, document, registry})
-            F.equal!(Codec.decode(document, registry), {:ok, definition})
+        fn result ->
+          value = if shape == :nested, do: %{index: size}, else: size
+          expected = if operation == :resolve, do: value, else: "data/#{size}"
+          F.equal!(result, {:ok, expected})
         end
-      end)
+      )
     end
   end
 end

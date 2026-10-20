@@ -223,10 +223,7 @@ defmodule Jido.MixProject do
           Jido.SignalAction
         ],
         "Authoring Codecs": [
-          Jido.Codec.Registry,
-          Jido.Agent.Codec,
-          Jido.Plugin.Codec,
-          Jido.Topology.Codec
+          Jido.Agent.Codec
         ],
         "Agent Directives": [
           Jido.Agent.Directive,
@@ -368,7 +365,7 @@ defmodule Jido.MixProject do
     [
       # Jido Ecosystem
       # Keep the published V3 packages together.
-      {:jido_action, "~> 3.0.0-beta.21"},
+      {:jido_action, path: "../jido_action", override: true},
       {:jido_signal, "~> 3.0.0-beta.5"},
       # AgentServer owns native Runic Runners and Worker cleanup.
       {:runic, "~> 0.1.0-alpha.12"},

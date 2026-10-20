@@ -379,18 +379,6 @@ defmodule Jido.Plugin.ValidationTest do
     refute_received {:callback, _, _}
   end
 
-  test "Plugin Codec encodes a declaration after one normalization" do
-    original_opts = [validation_result: :ok]
-
-    assert {:ok, document, _registry} = Plugin.Codec.encode({OptionValidator, original_opts})
-    assert document["type"] == "jido.plugin"
-
-    assert_received {:callback, :validate_options, ^original_opts}
-    assert_received {:callback, :state_spec, ^original_opts}
-    assert_received {:callback, :directives, ^original_opts}
-    refute_received {:callback, _, _}
-  end
-
   test "false cannot be a Directive module" do
     assert {:error, %{__exception__: true}} =
              Jido.Plugin.Normalizer.normalize_all([{Configurable, directives: [false]}])

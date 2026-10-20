@@ -21,7 +21,7 @@ The suite checks:
 - Shared provider registration, static data, DSL sections, and endpoint ownership.
 - Scheduling, Signal Bus, and Plugin-owned state contributions.
 - Shared Zoi validation, metadata, complete instances, and invalid declarations.
-- Exact JSON round trips for Map and DSL definitions and complete instances.
+- Portable JSON definitions from Map, DSL, and instance sources.
 - Trusted JSON references, invalid documents, duplicate keys, size limits, and atom safety.
 
 Fixtures and the source compiler are in `../support/agents/composable_*.exs`.
