@@ -1,6 +1,7 @@
-defmodule Jido.Agent.DirectiveTest do
-  use ExUnit.Case, async: true
+defmodule Jido.Agent.DirectiveContractTest do
+  use Covenant.Case, component: "jido.agent", async: true
   alias Jido.Agent.Directive
+  alias Jido.AgentServer.Directive, as: Runtime
   alias Jido.Signal
 
   defmodule PlainDirective do
@@ -25,6 +26,36 @@ defmodule Jido.Agent.DirectiveTest do
     def validate(_value), do: {:error, :wrong_type}
   end
 
+  defmodule ChangedType do
+    use Jido.Agent.Directive
+    defstruct []
+    def validate(%__MODULE__{}), do: {:ok, %PlainDirective{}}
+  end
+
+  defmodule InvalidResult do
+    use Jido.Agent.Directive
+    defstruct []
+    def validate(%__MODULE__{}), do: :invalid
+  end
+
+  defmodule Raises do
+    use Jido.Agent.Directive
+    defstruct []
+    def validate(%__MODULE__{}), do: raise("validation fault")
+  end
+
+  defmodule Throws do
+    use Jido.Agent.Directive
+    defstruct []
+    def validate(%__MODULE__{}), do: throw(:validation_fault)
+  end
+
+  defmodule SignalField do
+    use Jido.Agent.Directive
+    defstruct [:signal]
+  end
+
+  @tag obligation: "jido.agent.I27"
   test "custom Directives can use the behavior before their struct is defined" do
     plain = %PlainDirective{value: 1}
     assert {:ok, ^plain} = PlainDirective.validate(plain)
@@ -42,28 +73,175 @@ defmodule Jido.Agent.DirectiveTest do
     end
   end
 
+  @tag obligation: "jido.agent.I27"
   test "custom Directives can override the default validator" do
     assert {:error, :custom_validation} = Directive.validate(%OverrideDirective{value: 1})
     assert {:error, :wrong_type} = OverrideDirective.validate(:invalid)
   end
 
-  test "built-in validation checks runtime error and process requests" do
-    process = Jido.AgentServer.Directive.process_start({Elixir.Agent, fn -> 0 end})
-    refute Map.has_key?(process, :tag)
+  @tag obligation: "jido.agent.I27"
+  test "built-in identity and validation cover runtime and definition Directives" do
+    signal = Signal.new!("event", %{}, source: "/test")
 
-    for directive <- [
-          Jido.AgentServer.Directive.error_report(:failed, :action),
-          process
-        ] do
-      assert Directive.built_in?(directive)
+    directives = [
+      Directive.emit(signal),
+      Runtime.owner_send(signal),
+      Runtime.agent_send(:child, signal),
+      Runtime.agent_start(JidoTest.AgentFixtures.CounterAgent, :child),
+      Runtime.agent_stop(:child),
+      Runtime.error_report(:failed, :action),
+      Runtime.process_start({Elixir.Agent, fn -> 0 end}),
+      Runtime.server_stop(),
+      Directive.agent_add(:child, JidoTest.AgentFixtures.CounterAgent),
+      Directive.agent_remove(:child),
+      Directive.route_add("event"),
+      Directive.route_remove("event"),
+      Directive.connection_add("event", from: :root, to: :child),
+      Directive.connection_remove("event", from: :root, to: :child),
+      Directive.plugin_add(JidoTest.AgentContract.Stateless)
+    ]
+
+    for directive <- directives do
+      assert Directive.built_in?(directive) === true
+      assert Directive.built_in_module?(directive.__struct__) === true
+      assert Directive.validator?(directive.__struct__) === true
       assert {:ok, ^directive} = Directive.validate(directive)
     end
 
-    refute Directive.built_in?(:unknown)
+    assert Directive.built_in?(:unknown) === false
+    assert Directive.built_in?(%PlainDirective{}) === false
+    assert Directive.validator?(PlainDirective) === true
 
-    assert {:error, %Jido.Error.ValidationError{message: "Unknown Agent Directive"}} =
+    assert {:error, %Jido.Error.ValidationError{details: %{directive: :unknown}}} =
              Directive.validate(:unknown)
   end
+
+  @tag obligation: "jido.agent.I27"
+  test "Signal Directives require and normalize one complete Signal" do
+    signal = Signal.new!("agent.outbound", %{value: 1}, source: "/agent")
+
+    for malformed <- [
+          %{signal | id: ""},
+          %{signal | source: ""},
+          %{signal | type: ""},
+          %{signal | specversion: "2.0"},
+          %{signal | extensions: %URI{host: "example.com"}},
+          %{signal | extensions: %{"Bad_Key" => "value"}},
+          %{signal | extensions: %{"invalid" => self()}}
+        ],
+        directive <- [
+          Directive.emit(malformed),
+          Runtime.owner_send(malformed),
+          Runtime.agent_send(:child, malformed)
+        ] do
+      assert {:error, _reason} = Directive.validate(directive)
+    end
+
+    for directive <- [
+          Directive.emit(signal),
+          Runtime.owner_send(signal),
+          Runtime.agent_send(:child, signal)
+        ] do
+      assert {:ok, ^directive} = Directive.validate(directive)
+    end
+
+    for directive <- [
+          %Directive.Emit{signal: %{}},
+          %{Runtime.owner_send(signal) | signal: %{}},
+          %{Runtime.agent_send(:child, signal) | signal: %{}}
+        ] do
+      assert {:error, %Jido.Error.ValidationError{details: %{directive: ^directive}}} =
+               Directive.validate(directive)
+    end
+  end
+
+  @tag obligation: "jido.agent.I27"
+  test "custom Directive validation contains changed types, invalid results, and faults" do
+    custom = %SignalField{signal: Signal.new!("event", %{}, source: "/test")}
+    assert {:ok, ^custom} = Directive.validate(custom)
+
+    assert {:error,
+            %Jido.Error.ValidationError{
+              details: %{expected: ChangedType, actual: PlainDirective}
+            }} = Directive.validate(%ChangedType{})
+
+    assert {:error,
+            %Jido.Error.ValidationError{
+              details: %{directive: InvalidResult, result: :invalid}
+            }} = Directive.validate(%InvalidResult{})
+
+    assert {:error,
+            %Jido.Error.ExecutionError{
+              details: %{directive: Raises, error: %RuntimeError{message: "validation fault"}}
+            }} = Directive.validate(%Raises{})
+
+    assert {:error,
+            %Jido.Error.ExecutionError{
+              details: %{directive: Throws, kind: :throw, reason: :validation_fault}
+            }} = Directive.validate(%Throws{})
+  end
+
+  @tag obligation: ["jido.agent.I27", "jido.agent.I29"]
+  test "Directive constructors preserve every supported option and explicit nil" do
+    signal = Signal.new!("event", %{}, source: "/test")
+    assert Directive.emit("event", %{}) === %{kind: :emit, type: "event", data: %{}}
+
+    assert Directive.emit(signal, :dispatch) === %Directive.Emit{
+             signal: signal,
+             dispatch: :dispatch
+           }
+
+    assert {:error, _} = Directive.emit("event.*", %{})
+    assert {:error, _} = Directive.emit("event", [])
+
+    assert %{count: 2, initial_state: %{count: 1}} =
+             Directive.agent_add(:child, JidoTest.AgentFixtures.CounterAgent,
+               count: 2,
+               initial_state: %{count: 1}
+             )
+
+    assert %{count: 3, initial_state: %{count: 2}} =
+             Directive.agent_replace(:child, JidoTest.AgentFixtures.CounterAgent,
+               count: 3,
+               initial_state: %{count: 2}
+             )
+
+    assert %{as: :run, defaults: %{amount: 1}, emits: ["done"]} =
+             Directive.route_add("run", JidoTest.AgentContract.Add,
+               as: :run,
+               defaults: %{amount: 1},
+               emits: ["done"]
+             )
+
+    assert %{as: :next, defaults: %{amount: 2}, emits: []} =
+             Directive.route_replace("run", JidoTest.AgentContract.Add,
+               as: :next,
+               defaults: %{amount: 2},
+               emits: []
+             )
+
+    assert %{from: :root, to: :child} =
+             Directive.connection_remove("run", from: :root, to: :child)
+
+    assert %{delivery: :broadcast} =
+             Directive.connection_replace("run",
+               from: :root,
+               to: :child,
+               delivery: :broadcast
+             )
+
+    assert %{options: [start: 1], initial: :default} =
+             Directive.plugin_add(JidoTest.AgentContract.First, start: 1)
+
+    assert %{options: [], initial: {:value, nil}} =
+             Directive.plugin_add(JidoTest.AgentContract.First, [], initial: nil)
+  end
+end
+
+defmodule Jido.AgentServer.DirectiveTest do
+  use ExUnit.Case, async: true
+
+  alias Jido.Agent.Directive
 
   test "child start validation rejects unsupported lifecycle options and malformed targets" do
     assert :ok = Jido.AgentServer.Directive.validate_restart_policy(:temporary)
@@ -87,35 +265,6 @@ defmodule Jido.Agent.DirectiveTest do
 
     assert {:error, _} =
              Directive.validate(Jido.AgentServer.Directive.agent_start(invalid, :child))
-  end
-
-  test "Signal Directives validate the complete outbound envelope" do
-    signal = Signal.new!("agent.outbound", %{value: 1}, source: "/agent")
-
-    for malformed <- [
-          %{signal | id: ""},
-          %{signal | source: ""},
-          %{signal | type: ""},
-          %{signal | specversion: "2.0"},
-          %{signal | extensions: %URI{host: "example.com"}},
-          %{signal | extensions: %{"Bad_Key" => "value"}},
-          %{signal | extensions: %{"invalid" => self()}}
-        ],
-        directive <- [
-          Directive.emit(malformed),
-          Jido.AgentServer.Directive.owner_send(malformed),
-          Jido.AgentServer.Directive.agent_send(:child, malformed)
-        ] do
-      assert {:error, _reason} = Directive.validate(directive)
-    end
-
-    for directive <- [
-          Directive.emit(signal),
-          Jido.AgentServer.Directive.owner_send(signal),
-          Jido.AgentServer.Directive.agent_send(:child, signal)
-        ] do
-      assert {:ok, ^directive} = Directive.validate(directive)
-    end
   end
 
   test "child helpers reject option typos and ambiguous or malformed containers" do

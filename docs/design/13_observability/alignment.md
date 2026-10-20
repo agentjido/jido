@@ -18,7 +18,7 @@
 
 | ID | Decision | Result |
 | --- | --- | --- |
-| `OBS-DEC-001` | Use the nine semantic families in the design. | Agent, admission, persistence, local Topology, and Scheduler owners emit them. |
+| `OBS-DEC-001` | Use the semantic families in the design. | AgentServer and persistence owners emit them. |
 | `OBS-DEC-002` | Project Agent Ref as `agent_namespace`, `agent_partition`, and `agent_id`. | Namespaced Agent events include all applicable Ref fields. |
 | `OBS-DEC-003` | Use lifecycle operations `activate`, `stop`, `hibernate`, and `thaw`. | Record creation and deletion remain persistence operations. |
 | `OBS-DEC-004` | Use the bounded status and stage vocabularies. | Private evaluator and Plugin callback stages stay internal. |
@@ -32,10 +32,9 @@
 | Owner | Semantic boundary | Implementation |
 | --- | --- | --- |
 | Shared | Schema, metadata, measurements, result class, error code, and safe emission | `Jido.Telemetry.Semantic` |
-| Agent Server | Lifecycle, Turn, commit, Directive, settlement, and admission rejection | `Jido.Telemetry.Agent` and `Jido.AgentServer` |
+| AgentServer | Lifecycle, Turn, commit, returned Directives, effects, and settlement | `Jido.AgentServer` through `Jido.Telemetry.Semantic` |
 | Persistence | Load, compare-and-swap, delete, storage reason, and revisions | `Jido.Telemetry.Persistence` and `Jido.Persistence` |
-| Local Topology | Activation, repair, cleanup, readiness counts, and failure counts | `Jido.Telemetry.Topology` and `Jido.Topology.Controller.Runtime` |
-| Scheduler | Durable-delivery outcome | `Jido.Plugin.Scheduler.Runtime` through `Jido.Telemetry.Semantic` |
+| Persistence Store | Direct Store operation spans | `Jido.Persistence.Store` through `Jido.Telemetry.Semantic` |
 | Signal | Complete portable W3C trace carrier | Public `Jido.Signal.Trace`; private Jido runtime integration |
 | Task owner | Explicit process-local trace attach and restore | Private Jido runtime integration at Jido-owned Task starts |
 | Default consumers | Semantic metrics and bounded logger | `Jido.Telemetry` |
@@ -46,15 +45,14 @@
 
 | Family | Operations or terminal facts | Status and measurement rule |
 | --- | --- | --- |
-| Lifecycle | `activate`, `stop`, `hibernate`, `thaw` | Span status plus native duration |
+| Lifecycle | AgentServer start and stop | Point event time |
 | Turn result | Live commit or pre-commit failure | Public status, public stage, revisions, and Directive count |
-| Commit | One commit attempt | Status and native duration; the persistence span owns storage revisions |
-| Directive | One post-commit attempt | Status, Directive index, and native duration |
+| Commit | One successful commit | Status and revisions; the persistence span owns storage revisions |
+| Returned Directives | One committed Directive list | Directive count |
+| Effects | One post-commit batch | Status, stage, and Directive counts |
 | Settlement | One bounded terminal result | Public status and stage, commit flag, revisions, Directive summary, and total duration |
-| Admission | `deadline_expired` or `overloaded` | Rejected status with queue depth and finite limit |
 | Persistence | `load`, `compare_and_swap`, `delete` | `ok`, `error`, `conflict`, `indeterminate`, `not_found`, or `rejected`; revisions are measurements |
-| Local Topology | `activate`, `repair`, `cleanup` | `ok` or `error`; component, ready, and failed counts are measurements |
-| Scheduler | One durable-delivery check | Bounded outcome with count measurement |
+| Persistence Store | Direct Store operations | Bounded operation, adapter, status, and duration |
 
 A returned failure emits `:stop`. An escaping error, throw, or exit emits
 `:exception`. A handler fault is contained. Abrupt process or VM loss can omit
@@ -95,8 +93,8 @@ semantic contract does not change the exact error projection version 1.
 ## Default consumer alignment
 
 `Jido.Telemetry.metrics/0` returns count and duration coverage for both normal
-and exception span endings. It also covers settlement, admission rejection,
-and Scheduler delivery. Its tags use only fixed
+and exception span endings. It also covers lifecycle, commit, returned
+Directives, effects, and settlement point events. Its tags use only fixed
 operation, status, stage, reason, and component vocabularies.
 
 The semantic logger reads `semantic_log_mode` from `config :jido, :telemetry`:
@@ -104,7 +102,7 @@ The semantic logger reads `semantic_log_mode` from `config :jido, :telemetry`:
 | Mode | Terminal facts logged |
 | --- | --- |
 | `:off` | None |
-| `:errors` | Non-OK stops, exceptions, and rejected admission |
+| `:errors` | Non-OK terminal facts and exceptions |
 | `:interesting` | Error facts and operations over `semantic_slow_threshold_ms` |
 | `:all` | Every terminal semantic fact |
 
@@ -126,43 +124,13 @@ SDK tracer, this path is a no-op.
 - `Jido.Signal.Trace` is the public W3C carrier. Jido trace integration stays private.
 - Bounded debug history remains available through Agent Server and Ref APIs.
 
-## Requirement evidence
+## Current Covenant evidence
 
-| Requirements | Evidence | State |
-| --- | --- | --- |
-| `OBS-REQ-001` to `OBS-REQ-005` | Shared catalog, owner modules, direct-evaluation and handler-failure tests | `Proven` |
-| `OBS-REQ-006` to `OBS-REQ-017` | Agent lifecycle, live-result, Directive, settlement, fault, hibernate, and thaw tests | `Proven` |
-| `OBS-REQ-018` | Call, cast, overload, deadline, count, and privacy tests | `Proven` |
-| `OBS-REQ-019`, `OBS-REQ-025` | Persistence operation, status, revision, and privacy tests | `Proven` |
-| `OBS-REQ-020`, `OBS-REQ-026` | Topology activation, repair, cleanup, status, and count tests | `Proven` |
-| `OBS-REQ-021` | Distributed control plane remains external and optional | `Owner-deferred` |
-| `OBS-REQ-022` to `OBS-REQ-024` | Shared time normalization and Agent measurement tests | `Proven` |
-| `OBS-REQ-027` to `OBS-REQ-032` | Ref projection, causal trace, known-node, and explicit Task context tests | `Proven for Core-owned paths` |
-| `OBS-REQ-033` to `OBS-REQ-036` | Shared allowlist, error code, size, UTF-8, and private-data tests | `Proven` |
-| `OBS-REQ-037` to `OBS-REQ-040` | Semantic metric-tag and four-mode logger tests | `Proven` |
-| `OBS-REQ-041` to `OBS-REQ-043` | Emission and consumer-failure containment tests and no-authority review | `Proven` |
-| `OBS-REQ-044` to `OBS-REQ-048`, `OBS-REQ-055` | API-only tracer tests cover safe mapping, span end, settlement link, W3C extraction and injection, Task transfer, disabled mode, and no SDK ownership. A clean no-optional-dependency build covers absence. | `Proven` |
-| `OBS-REQ-049` to `OBS-REQ-051` | Schema version 1 and explicit pre-release V3 removal | `Proven` |
-| `OBS-REQ-052` to `OBS-REQ-054`, `OBS-REQ-056` to `OBS-REQ-058` | Focused catalog, privacy, correlation, Scheduler, disabled-consumer, and optional-integration tests | `Proven` |
+The active `jido.telemetry` contract owns eight obligations. Its seven focused
+test files contain 86 tests. The complete Covenant gate covers all eight
+obligations.
 
-## Verification record
-
-Focused semantic, OpenTelemetry, causal trace, debug, Scheduler, and
-instance-option tests pass. All 21 executable Livebooks pass. ExDoc builds with
-warnings treated as errors. The dirty worktree has separate code and example
-changes, so their package verification stays outside this documentation record.
-
-## Completion criteria
-
-- [x] All nine semantic families have an owner and exact event shape.
-- [x] Lifecycle includes activate, stop, hibernate, and thaw.
-- [x] Admission, persistence, and local Topology gaps are closed.
-- [x] Every semantic event has schema version 1 and bounded safe data.
-- [x] Agent Ref identity has proof and duplicate identity fields are absent.
-- [x] Live result and settlement remain separate.
-- [x] Jido-owned observed Tasks attach and restore trace context.
-- [x] Default metrics use semantic events and low-cardinality tags.
-- [x] The semantic logger supports four safe modes.
-- [x] OpenTelemetry API mapping is optional and infrastructure stays with the host.
-- [x] Legacy `Jido.Observe`, Agent Server telemetry, and legacy metrics are removed.
-- [x] Public guides, examples, and module text use the selected contract.
+The full mutation profile has 714 mutants: 657 killed, 16 classified
+equivalent survivors, 41 invalid mutations, and no timeout. The separate real
+OpenTelemetry SDK suite has four passing tests. The package documentation build
+also passes with warnings treated as errors.

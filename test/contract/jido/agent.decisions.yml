@@ -21,3 +21,15 @@
   decision: Retire the direct-command promises in jido.agent and transfer them to jido.agent_evaluation. Keep the cmd entry point as an Agent facade and keep definition edit semantics with jido.agent.
   driver: Pure candidate production must not share Covenant ownership with Agent authoring or live AgentServer execution.
   approved_by: Approved Jido V3 Covenant component map
+
+- id: agent-mutation-runtime-profile
+  date: 2026-10-20
+  decision: Mutate Agent runtime and value modules without the Spark DSL declaration modules. Check generated DSL output through the Agent contract tests and the authoring suite.
+  driver: Invalid mutations inside Spark DSL declarations terminate Elixir's parallel verifier outside the test process, so Covenant cannot classify or restore those mutants. The stable runtime profile still checks the code that validates and lowers the generated values.
+  approved_by: Final hardening audit
+
+- id: transfer-route-and-checkpoint-callbacks
+  date: 2026-10-20
+  decision: Move Jido.Agent.Route mutation ownership to jido.agent_evaluation and Jido.Agent.Callback mutation ownership to jido.persistence.
+  driver: Route selection is pure evaluation behavior. Agent callback containment is used only by persistence checkpoint and restore callbacks. Their mutation profiles must follow those code paths.
+  approved_by: Final hardening audit

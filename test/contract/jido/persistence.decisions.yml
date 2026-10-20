@@ -39,3 +39,9 @@
   decision: Accept the full 700-mutant profile with 620 killed, 29 classified survivors, 51 invalid compile-time mutations, and no timeout.
   driver: Every valid survivor is classified at its current source location, and every behavior-changing valid mutant is killed by the 71 focused tests.
   approved_by: Component hardening pass
+
+- id: checkpoint-callback-mutation-ownership
+  date: 2026-10-20
+  decision: Add Jido.Agent.Callback to this mutation profile.
+  driver: The module is used only to contain Agent checkpoint and restore callback faults in persistence snapshots.
+  approved_by: Final hardening audit

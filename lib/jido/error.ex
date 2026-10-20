@@ -555,11 +555,6 @@ defmodule Jido.Error do
   @transport_max_depth 4
   @transport_max_items 20
   @transport_max_string 512
-  @non_retryable_error_type_strings ~w[
-    validation_error
-    invalid_action
-    config_error
-  ]
   @known_error_type_strings %{
     "validation_error" => :validation_error,
     "invalid_action" => :invalid_action,
@@ -873,9 +868,6 @@ defmodule Jido.Error do
   defp default_retryable_for_type?(type)
        when type in [:validation_error, :invalid_action, :config_error],
        do: false
-
-  defp default_retryable_for_type?(type) when is_binary(type),
-    do: normalize_type_string(type) not in @non_retryable_error_type_strings
 
   defp default_retryable_for_type?(_type), do: true
 

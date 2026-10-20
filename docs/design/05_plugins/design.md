@@ -388,8 +388,8 @@ business occurrences before delivery.
 
 `PLG-REQ-076`: Retired. The durable retry duplicate-handling contract is removed.
 
-These retirements state the selected target. The current code still implements
-the removed feature until GAP-023's code cleanup is complete.
+These retirements state the selected target. The current code and focused
+Scheduler contract implement the removal.
 
 ## Non-goals
 

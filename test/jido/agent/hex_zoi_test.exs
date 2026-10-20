@@ -1,8 +1,9 @@
 defmodule Jido.Agent.HexZoiTest do
-  use ExUnit.Case, async: true
+  use Covenant.Case, component: "jido.agent", async: true
 
   alias Jido.Agent
 
+  @tag obligation: ["jido.agent.I8", "jido.agent.I9"]
   test "container defaults are checked during creation and never filled in stored state" do
     for container <- [
           Zoi.list(Zoi.object(%{count: Zoi.integer() |> Zoi.default(1)})),
@@ -19,6 +20,7 @@ defmodule Jido.Agent.HexZoiTest do
     end
   end
 
+  @tag obligation: ["jido.agent.I8", "jido.agent.I9"]
   test "discriminated union defaults cannot bypass validation" do
     for default <- [1, "invalid"] do
       union =
@@ -40,6 +42,7 @@ defmodule Jido.Agent.HexZoiTest do
     end
   end
 
+  @tag obligation: ["jido.agent.I8", "jido.agent.I9"]
   test "keyword defaults are checked with Hex Zoi" do
     for default <- [1, "invalid"] do
       definition =

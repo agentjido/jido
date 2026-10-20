@@ -189,7 +189,7 @@ defmodule JidoTest.AgentServer.Durable.EvolutionTest do
              Agent.mutate(initial, [D.plugin_add(ReadyPlugin, observer: observer)])
 
     startup = Task.async(fn -> Jido.start_agent(c.jido, initial) end)
-    assert_receive {:snapshot_ready_gate, gate, server}
+    assert_receive {:snapshot_ready_gate, gate, server}, 1_000
 
     try do
       assert {:error, :not_ready} = Server.snapshot(server)

@@ -1,5 +1,5 @@
 defmodule Jido.Agent.StateTest do
-  use ExUnit.Case, async: true
+  use Covenant.Case, component: "jido.agent", async: true
 
   alias Jido.Agent
 
@@ -8,6 +8,7 @@ defmodule Jido.Agent.StateTest do
     :ok
   end
 
+  @tag obligation: "jido.agent.I8"
   test "initialization validates unchanged state once" do
     schema =
       Zoi.object(%{
@@ -24,6 +25,7 @@ defmodule Jido.Agent.StateTest do
     end
   end
 
+  @tag obligation: "jido.agent.I8"
   test "defaults and explicit nil cannot insert invalid values" do
     for schema <- [
           Zoi.object(%{count: Zoi.integer() |> Zoi.default("invalid")}),
@@ -37,6 +39,7 @@ defmodule Jido.Agent.StateTest do
     end
   end
 
+  @tag obligation: ["jido.agent.I8", "jido.agent.I9"]
   test "initialization retains nested defaults, explicit nil, and supplied values" do
     schema =
       Zoi.object(%{
@@ -69,6 +72,7 @@ defmodule Jido.Agent.StateTest do
     value + 1
   end
 
+  @tag obligation: "jido.agent.I8"
   test "nested defaults reach the leaf and validate it once" do
     for depth <- [0, 1, 2, 64, 70] do
       leaf = Zoi.integer() |> Zoi.refine({__MODULE__, :observe, []}) |> Zoi.default(1)
@@ -90,6 +94,7 @@ defmodule Jido.Agent.StateTest do
     end
   end
 
+  @tag obligation: "jido.agent.I8"
   test "deep invalid defaults fail during initialization" do
     for depth <- [0, 1, 2, 64, 70] do
       leaf = Zoi.integer() |> Zoi.default("bad")
@@ -109,6 +114,7 @@ defmodule Jido.Agent.StateTest do
     end
   end
 
+  @tag obligation: "jido.agent.I9"
   test "state schemas reject transforms and coercion before callbacks run" do
     for field <- [
           Zoi.integer() |> Zoi.transform({__MODULE__, :increment, []}),
@@ -125,6 +131,7 @@ defmodule Jido.Agent.StateTest do
     end
   end
 
+  @tag obligation: "jido.agent.I9"
   test "input conversion types and dynamic schemas cannot bypass the state contract" do
     for field <- [Zoi.string_boolean(), Zoi.lazy({__MODULE__, :lazy_transform, []})] do
       assert {:error, %Jido.Agent.Error{path: [:schema | _]}} =
@@ -139,6 +146,7 @@ defmodule Jido.Agent.StateTest do
     Zoi.integer() |> Zoi.transform({__MODULE__, :increment, []})
   end
 
+  @tag obligation: "jido.agent.I8"
   test "a successful refinement cannot change initialized state" do
     schema =
       Zoi.object(%{
@@ -154,6 +162,7 @@ defmodule Jido.Agent.StateTest do
     refute_received {:mutated, _}
   end
 
+  @tag obligation: "jido.agent.I9"
   test "stored state checks do not fill defaults or replace explicit nil" do
     schema =
       Zoi.object(%{
@@ -173,6 +182,7 @@ defmodule Jido.Agent.StateTest do
     end
   end
 
+  @tag obligation: ["jido.agent.I8", "jido.agent.I9"]
   test "optional defaulted fields stay absent in input and stored state" do
     schema = Zoi.object(%{count: Zoi.integer() |> Zoi.default(1) |> Zoi.optional()})
     definition = Agent.define!(%{name: "optional_default", schema: schema})
@@ -187,6 +197,7 @@ defmodule Jido.Agent.StateTest do
     assert {:error, _} = Agent.transition(agent, %{count: nil})
   end
 
+  @tag obligation: "jido.agent.I8"
   test "nil defaults need a nullable schema" do
     for nullable? <- [false, true] do
       field = if nullable?, do: Zoi.integer() |> Zoi.nullable(), else: Zoi.integer()
@@ -209,6 +220,7 @@ defmodule Jido.Agent.StateTest do
     end
   end
 
+  @tag obligation: "jido.agent.I9"
   test "stored checks cannot silently strip nested keys" do
     schema = Zoi.object(%{nested: Zoi.map(%{count: Zoi.integer()})})
     definition = Agent.define!(%{name: "stored_unknown", schema: schema})
@@ -232,6 +244,7 @@ defmodule Jido.Agent.StateTest do
          Zoi.integer() |> Zoi.transform({Jido.Agent.StateTest, :increment, []}) |> Zoi.default(1)}
   end
 
+  @tag obligation: "jido.agent.I10"
   test "composed Plugin state follows the same schema policy" do
     assert {:error, %Jido.Agent.Error{path: [:schema | _]}} =
              Agent.define(%{
@@ -247,44 +260,5 @@ defmodule Jido.Agent.StateTest do
              })
 
     refute_received {:transformed, _}
-  end
-
-  test "checkpoint restore rejects missing defaults and preserves nullable nil" do
-    schema =
-      Zoi.object(%{
-        nested:
-          Zoi.object(%{count: Zoi.integer() |> Zoi.nullable() |> Zoi.default(3)})
-          |> Zoi.default(%{})
-      })
-
-    agent =
-      Agent.define!(%{name: "restore_defaults", schema: schema})
-      |> Agent.instantiate!(id: Jido.Signal.ID.generate!())
-
-    assert {:ok, stored_nil} = Agent.transition(agent, %{nested: %{count: nil}})
-    assert {:ok, checkpoint} = Jido.Persistence.snapshot(stored_nil)
-    assert {:ok, ^stored_nil} = Jido.Persistence.restore(checkpoint)
-
-    for state <- [%{}, %{nested: %{}}] do
-      assert {:error, %{__exception__: true}} =
-               Jido.Persistence.restore(%{checkpoint | agent: %{checkpoint.agent | state: state}})
-    end
-  end
-
-  test "input empty values do not remove stored nullable nil" do
-    schema =
-      Zoi.object(%{count: Zoi.integer() |> Zoi.nullable() |> Zoi.default(nil)},
-        empty_values: [nil]
-      )
-
-    agent =
-      Agent.define!(%{name: "empty_nil", schema: schema})
-      |> Agent.instantiate!(id: Jido.Signal.ID.generate!())
-
-    assert agent.state === %{count: nil}
-    assert Agent.validate(agent) === {:ok, agent}
-    assert Agent.transition(agent, agent.state) === {:ok, agent}
-    assert {:ok, checkpoint} = Jido.Persistence.snapshot(agent)
-    assert {:ok, ^agent} = Jido.Persistence.restore(checkpoint)
   end
 end

@@ -333,22 +333,20 @@ defmodule Jido.Agent.Mutation do
     _, _ -> error(:plugin_migration_failed)
   end
 
-  def changed_plugins(before, after_agent, _directives \\ []) do
+  def changed_plugins(before, after_agent, directives \\ []) do
     old = Map.new(Jido.Agent.runtime_plugins(before))
     new = Map.new(Jido.Agent.runtime_plugins(after_agent))
+    configured = for %Directive.PluginConfigure{module: module} <- directives, do: module
 
     (Map.keys(old) ++ Map.keys(new))
     |> Enum.uniq()
     |> Enum.filter(&(Map.fetch(old, &1) != Map.fetch(new, &1)))
+    |> Kernel.++(configured)
+    |> Enum.uniq()
   end
 
   def validate_effects(before, after_agent, directives) do
-    explicit =
-      for %{__struct__: kind, module: module} <- directives,
-          kind in [Directive.PluginAdd, Directive.PluginConfigure, Directive.PluginRemove],
-          do: module
-
-    changed = changed_plugins(before, after_agent) ++ explicit
+    changed = changed_plugins(before, after_agent, directives)
 
     with {:ok, old} <- Normalizer.normalize_all(Jido.Agent.runtime_plugins(before)),
          {:ok, new} <- Normalizer.normalize_all(Jido.Agent.runtime_plugins(after_agent)) do

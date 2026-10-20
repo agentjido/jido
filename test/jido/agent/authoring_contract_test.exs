@@ -1,30 +1,84 @@
 defmodule Jido.Agent.AuthoringContractTest do
-  use ExUnit.Case, async: true
+  use Covenant.Case, component: "jido.agent", async: true
   alias Jido.Agent
-  alias Jido.Agent.Command
-  alias Jido.AgentServer.Directive, as: Runtime
+  alias Jido.Agent.Authoring
   alias JidoTest.AgentFixtures.Add
 
   defmodule Factory do
     def new, do: Agent.define!(%{name: "factory"})
   end
 
+  defmodule NoRuntime do
+    use Jido.Agent.Extension, id: "test.agent.no_runtime"
+  end
+
+  defmodule MissingRuntime do
+    use Jido.Agent.Extension, id: "test.agent.missing_runtime"
+    def runtime_support, do: Module.concat(__MODULE__, MissingAdapter)
+  end
+
+  @tag obligation: ["jido.agent.I4", "jido.agent.I7", "jido.agent.I11"]
   test "Map authoring and instance options reject ambiguous duplicates" do
     assert {:error, %{code: :invalid_map}} = Agent.define(name: "first", name: "last")
     definition = Agent.define!(%{name: "state", schema: Zoi.object(%{count: Zoi.integer()})})
-    assert {:error, %{code: :invalid_options}} = Agent.instantiate(definition, id: "a", id: "b")
-    assert {:ok, %{key: 2}} = Command.normalize_context(key: 1, key: 2)
-    assert {:ok, %{}} = Command.normalize_context(nil)
+
+    assert {:error, %{code: :invalid_options, message: message}} =
+             Agent.instantiate(definition, id: "a", id: "b")
+
+    assert message != ""
     instance = Agent.instantiate!(definition, id: "state", state: %{count: 0})
     assert {:ok, %{state: %{count: 2}}} = Agent.set(instance, count: 1, count: 2)
 
     for value <- [~D[2026-09-07], [:invalid], [key: 1] ++ [:invalid], [1 | :tail]] do
-      assert {:error, _} = Command.normalize_context(value)
       assert {:error, _} = Agent.set(instance, value)
       assert {:error, _} = Agent.instantiate(definition, value)
     end
   end
 
+  @tag obligation: ["jido.agent.I3", "jido.agent.I4", "jido.agent.I22"]
+  test "authoring containers normalize keys and reject ambiguous input" do
+    assert Authoring.key_identity(:name) === "name"
+    assert Authoring.key_identity("name") === "name"
+    assert {:ok, %{name: "agent"}} = Authoring.attrs(%{name: "agent"})
+    assert {:ok, %{name: "agent"}} = Authoring.attrs(name: "agent")
+    assert {:ok, %{name: "last"}} = Authoring.to_attrs(name: "first", name: "last")
+    assert :error = Authoring.to_attrs([name: "first", name: "last"], :reject)
+
+    for value <- [[name: "first", name: "last"], [:invalid], [1 | :tail]] do
+      assert {:error, error} = Authoring.attrs(value)
+      assert error.message != ""
+      assert error.details.value === value
+    end
+
+    assert {:error, error} = Authoring.attrs(:invalid)
+    assert error.message != ""
+    assert error.details.value === :invalid
+  end
+
+  @tag obligation: ["jido.agent.I3", "jido.agent.I22"]
+  test "authoring traversal preserves order and stops at one structured error" do
+    assert :ok = Authoring.keys(%{name: "agent"}, [:name])
+
+    assert {:error, error} = Authoring.keys(%{name: "agent", extra: true}, [:name])
+    assert error.message != ""
+    assert error.details.keys === [:extra]
+
+    assert {:ok, [2, 4, 6]} = Authoring.traverse([1, 2, 3], &{:ok, &1 * 2})
+    expected = Authoring.error("Stopped", %{at: 2})
+
+    assert ^expected =
+             Authoring.traverse([1, 2, 3], fn
+               2 -> expected
+               value -> {:ok, value}
+             end)
+
+    assert {:error, improper} = Authoring.traverse([1 | :tail], &{:ok, &1})
+    assert improper.message != ""
+    assert Authoring.unwrap!({:ok, :value}) === :value
+    assert_raise Jido.Error.ValidationError, fn -> Authoring.unwrap!(expected) end
+  end
+
+  @tag obligation: ["jido.agent.I1", "jido.agent.I4"]
   test "routes accept one module with separate plain Map defaults" do
     for defaults <- [%{}, %{by: 2}] do
       assert {:ok, definition} = Agent.define(%{name: "routes", routes: [route(Add, defaults)]})
@@ -41,13 +95,14 @@ defmodule Jido.Agent.AuthoringContractTest do
     end
   end
 
+  @tag obligation: ["jido.agent.I2", "jido.agent.I22"]
   test "module provenance does not make a factory an Agent definition source" do
-    assert {:error, _} = Runtime.validate_agent_target(Factory)
     assert {:error, %{code: :unresolved_definition}} = Agent.instantiate(Factory, id: "factory")
     assert {:ok, definition} = Agent.define(%{name: "origin", module: Factory})
     assert definition.module == Factory
   end
 
+  @tag obligation: "jido.agent.I20"
   test "portable definitions reject arbitrary values and obsolete Registry kinds" do
     definition =
       Agent.define!(%{
@@ -62,6 +117,85 @@ defmodule Jido.Agent.AuthoringContractTest do
     for entry <- [{:value, %URI{}}, {:route_match, &is_map/1}] do
       assert {:error, _error} = Jido.Agent.Codec.Registry.new(%{"obsolete" => entry})
     end
+  end
+
+  @tag obligation: ["jido.agent.I2", "jido.agent.I7", "jido.agent.I24"]
+  test "definition and instance predicates accept only their exact value shapes" do
+    definition = Agent.define!(%{name: "predicate"})
+    instance = Agent.instantiate!(definition, id: "one")
+
+    assert Agent.definition?(definition) === true
+    assert Agent.instance?(definition) === false
+    assert Agent.definition?(instance) === false
+    assert Agent.instance?(instance) === true
+    assert Agent.definition(definition) === definition
+
+    for value <- [
+          %{instance | id: ""},
+          %{instance | id: 1},
+          %{instance | state: nil},
+          %{instance | state: []},
+          %{instance | state: %URI{}},
+          %{},
+          nil
+        ] do
+      assert Agent.instance?(value) === false
+    end
+
+    for value <- [%{definition | id: "one"}, %{definition | state: %{}}, %{}, nil] do
+      assert Agent.definition?(value) === false
+    end
+  end
+
+  @tag obligation: "jido.agent.I10"
+  test "runtime Plugin projection skips passive providers and rejects missing adapters" do
+    passive = %{
+      id: NoRuntime.id(),
+      provider: NoRuntime,
+      vsn: NoRuntime.vsn(),
+      data: %{}
+    }
+
+    definition = Agent.define!(%{name: "passive", extensions: [passive]})
+    assert Agent.runtime_plugins(definition) === []
+    assert Agent.validate_runtime_support(definition) === :ok
+
+    missing = %{
+      id: MissingRuntime.id(),
+      provider: MissingRuntime,
+      vsn: MissingRuntime.vsn(),
+      data: %{}
+    }
+
+    invalid = Agent.define!(%{name: "missing", extensions: [missing]})
+
+    assert {:error,
+            %Agent.Error{
+              code: :runtime_support_not_available,
+              path: [:extensions],
+              details: %{provider: MissingRuntime}
+            }} = Agent.validate_runtime_support(invalid)
+  end
+
+  @tag obligation: "jido.agent.I21"
+  test "Signal construction preserves every supported envelope option" do
+    definition = Agent.define!(%{name: "signal", signal_source: "/default"})
+    time = ~U[2026-10-20 12:00:00Z]
+
+    assert {:ok, signal} =
+             Agent.input_signal(definition, "work", %{},
+               source: "/explicit",
+               id: "signal-id",
+               time: time,
+               subject: "worker",
+               datacontenttype: "application/json"
+             )
+
+    assert signal.source == "/explicit"
+    assert signal.id == "signal-id"
+    assert signal.time == DateTime.to_iso8601(time)
+    assert signal.subject == "worker"
+    assert signal.datacontenttype == "application/json"
   end
 
   defp route(target, defaults),

@@ -29,7 +29,6 @@ design with an explicit contract change. This cycle preserves the v3 contracts.
 | 32 | `Registry.identifier/3` compares values with `==`. A Registry holding `{:value, %URI{port: 1}}` resolves a query for `%URI{port: 1.0}` to the same ID. A reverse map uses exact key equality and misses that query. `Registry.new/1` accepts the input. A local runtime probe confirmed both results. | Reject a direct reverse-map replacement. It changes accepted numeric-equivalent lookups. Numeric normalization or an indexed fallback would be a separate design. |
 | 44 | `AgentServer.handle_event/4` matches `[directive \| rest]`. `continue_directives/3` passes that same `rest` tail into the next internal event. It does not append, reverse, or rebuild the remaining directive list. The reply-action append joins at most one reply with one continuation event. | Reject continuation-list copy removal; no full tail copy is present in this path. |
 | 46 | `SpanCtx.tracer_module` already stores the selected tracer across start, stop, and exception callbacks. Failure mode is read on failure, so a runtime configuration change during a span can change warn/strict handling. Caching that value at start changes this behavior. | Reject further configuration caching across the span. The duplicate start work is a separate Round 45 idea. |
-| 48 | Durable scheduler state stores `pending` and `last_scheduled_at`. Admission compares the complete pending payload; acknowledgement finds the occurrence ID; queueing uses the last time to suppress repeats, including after acknowledgement. `Delivery.deliver/3` already creates its fresh Signal only in the delivery task. No retry attempt Signal is retained in durable state. | Reject removal of these progress fields. They are recovery and duplicate-control data, not stored transient delivery data. |
 
 Round 32 probe on Elixir 1.20.3 / OTP 29:
 
@@ -64,10 +63,6 @@ These checks used runtime `763e351e`.
 | ---: | --- | --- |
 | 21 | `Runner.Prepared.plugin_specs` stores the specs returned by preparation. Finish passes the same specs to state protection, directive validation, and state updates. The live Server already passes its prepared specs to `Runner.prepare/4`, which uses `Plugin.prepare_specs/2`. Definition/schema validation still has its own normalization; the measured composition-reuse trial is recorded in Round 22. | Reject another specs cache around command prepare/finish. That reuse already exists. Keep fresh definition validation at its boundaries. |
 | 27 | Command routing calls `agent.module.handle_signal/2`. The existing `CustomRoutingAgent` test has no declared routes but returns a Turn for `custom.add`, changes input, and rejects other Signals. A router cached from Server startup routes cannot represent that callback behavior. | Reject substituting a startup router for the live routing boundary. Custom callbacks must remain authoritative. Round 28 tests an optimization inside the existing default handler instead. |
-
-Round 48 tested the separate task-capture cost and was accepted. See
-[the measured report](round-48-scheduler-capture.md). The earlier finding about
-required durable progress fields still holds.
 
 ## Executable descriptor checks
 

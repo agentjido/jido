@@ -1,9 +1,9 @@
 {
   "apps": {
     "jido": {
-      "active": 119,
+      "active": 125,
       "coverage": 1.0,
-      "covered": 119
+      "covered": 125
     },
     "jido.agent_server": {
       "active": 66,
@@ -27,30 +27,76 @@
         "jido.agent.I1": {
           "failing": 0,
           "kind": "functional",
-          "passing": 1,
+          "passing": 8,
           "status": "active",
           "testable": true,
           "tests": [
-            "test independent Map and DSL declarations produce the same canonical Agent"
+            "test DSL lowering and Map data produce the same contribution once",
+            "test DSL, independent Map, and mutations normalize to the same definition",
+            "test Map and DSL definitions initialize the same complete state with static Zoi schemas",
+            "test Map, struct and DSL have exact field equality for independent declarations",
+            "test Plugin declarations do not depend on section order and equal Map provider data",
+            "test Plugin discovery uses aliases declared after use and does not depend on section order",
+            "test Team and standalone Alice fixtures validate without handler execution",
+            "test a bare route is pass-through and needs no Agent block or source",
+            "test compile-time route loops produce distinct callable transform references",
+            "test defaults are shallow Action or Flow parameters, not state or signal mutation",
+            "test durable Flow routes need no Plugin or extra Agent state",
+            "test extensions and Plugins use one registration and configuration model",
+            "test full DSL lowers without Spark metadata and direct Map revalidation changes no field",
+            "test full extension DSL data equals an independently written Map in provider order",
+            "test independent Map and DSL declarations produce the same canonical Agent",
+            "test inline lowering preserves the exact Map contract around opaque compiled references",
+            "test inline routes accept guarded callback clauses",
+            "test inline routes compile ordinary Actions with access to private helpers",
+            "test inline transforms retain the complete envelope and support guarded clauses",
+            "test metadata preserves atom, string, mixed keys and static values in Map and DSL",
+            "test minimal DSL lowers to the exact canonical Map, including all defaults",
+            "test named Action, Flow and bare route DSL lowers to the exact independently written Map",
+            "test recompilation verifies the new schema of an Action defined later in the same file",
+            "test routes accept one module with separate plain Map defaults",
+            "test runtime Plugins and Spark extensions use one stored contribution format",
+            "test short and block schedule DSL lower to the exact same Map",
+            "test source provenance does not override directly authored definition fields",
+            "test the DSL compiles without a variable and matches Map authoring",
+            "test the definition stores ordered routes and Plugin contributions",
+            "test three forms preserve nil, false, zero and nested state defaults without coercion"
           ]
         },
         "jido.agent.I10": {
           "failing": 0,
           "kind": "functional",
-          "passing": 1,
+          "passing": 8,
           "status": "active",
           "testable": true,
           "tests": [
-            "test Plugin state has one owner and domain updates use shallow replacement"
+            "test DSL lowering and Map data produce the same contribution once",
+            "test Plugin declarations do not depend on section order and equal Map provider data",
+            "test Plugin discovery uses aliases declared after use and does not depend on section order",
+            "test Plugin ownership conflicts remain structured validation errors",
+            "test Plugin schema callbacks receive their current config",
+            "test Plugin schema conflicts fail before instance construction",
+            "test Plugin state has one owner and domain updates use shallow replacement",
+            "test bus extension contributes ownership and connection endpoints only",
+            "test composed Plugin state follows the same schema policy",
+            "test duplicate IDs, providers and section ownership are rejected for Maps and DSL",
+            "test durable Flow routes need no Plugin or extra Agent state",
+            "test extensions and Plugins use one registration and configuration model",
+            "test full extension DSL data equals an independently written Map in provider order",
+            "test normalization and verification reject invalid provider data",
+            "test provider identity and core namespaces are unique",
+            "test runtime Plugins and Spark extensions use one stored contribution format",
+            "test the definition stores ordered routes and Plugin contributions"
           ]
         },
         "jido.agent.I11": {
           "failing": 0,
           "kind": "functional",
-          "passing": 1,
+          "passing": 2,
           "status": "active",
           "testable": true,
           "tests": [
+            "test Map authoring and instance options reject ambiguous duplicates",
             "test Plugin state has one owner and domain updates use shallow replacement"
           ]
         },
@@ -121,41 +167,91 @@
         "jido.agent.I2": {
           "failing": 0,
           "kind": "functional",
-          "passing": 1,
+          "passing": 4,
           "status": "active",
           "testable": true,
           "tests": [
-            "test definitions are neutral and instances need explicit identity and complete stored state"
+            "test definitions and instances use the same struct and differ only in identity and state",
+            "test definitions are neutral and instances need explicit identity and complete stored state",
+            "test module provenance does not make a factory an Agent definition source",
+            "test neutral definitions use explicit canonical defaults",
+            "test partial identity and state combinations are invalid",
+            "test unknown fields and instance data fail before provider callbacks",
+            "test unknown fields, instance fields and live values cannot enter a definition"
           ]
         },
         "jido.agent.I20": {
           "failing": 0,
           "kind": "persisted_format",
-          "passing": 1,
+          "passing": 7,
           "status": "active",
           "testable": true,
           "tests": [
-            "test the trusted JSON codec returns the portable definition"
+            "test Codec rejects incomplete instance shapes before it derives a definition",
+            "test Codec rejects the old Agent envelope",
+            "test Codec retains route defaults and writes definitions only",
+            "test Codec validates the current executable kind",
+            "test JSON round trips require the supplied Registry",
+            "test Map, struct, DSL, and instance sources produce the same definition",
+            "test application Registry references are explicit and can differ from module names",
+            "test duplicate decoded keys, oversized documents, and obsolete Registry kinds are rejected",
+            "test import rejects unknown references, fields, versions, and invalid definitions",
+            "test mutated definitions and instances retain exact JSON round trips",
+            "test portable definitions reject arbitrary values and obsolete Registry kinds",
+            "test saved member slot identities survive Agent JSON encoding",
+            "test the trusted JSON codec returns the portable definition",
+            "test unknown JSON names do not create atoms",
+            "test wildcard routes work and static structs are not portable authoring values"
           ]
         },
         "jido.agent.I21": {
           "failing": 0,
           "kind": "functional",
-          "passing": 1,
+          "passing": 9,
           "status": "active",
           "testable": true,
           "tests": [
-            "test Signal helpers preserve input and give tuple and raising forms"
+            "test Signal helpers preserve input and give tuple and raising forms",
+            "test an inline route without as needs no source and generates no helper",
+            "test constructors reject non-map input and invalid envelope options",
+            "test generated Signal helpers have tuple and raising forms",
+            "test generated constructors preserve omitted and explicit input and fresh Signal IDs",
+            "test helper construction preserves input and uses an explicit source",
+            "test helpers construct the exact input Signal and require an explicit source",
+            "test inline routes compile ordinary Actions with access to private helpers",
+            "test map inputs retain keys that overlap helper option names",
+            "test map inputs support optional list and keyword fields without ambiguity",
+            "test removed route options and invalid helpers fail at declaration"
           ]
         },
         "jido.agent.I22": {
           "failing": 0,
           "kind": "functional",
-          "passing": 1,
+          "passing": 14,
           "status": "active",
           "testable": true,
           "tests": [
-            "test invalid definitions return structured paths and bang forms raise the same error"
+            "test Map and struct report the same error path and DSL rejects the same declaration",
+            "test Spark rejects invalid schema and identity options with a field path",
+            "test a provider must implement the current contribution contract",
+            "test an unchanged Agent checks a reloaded Action contract",
+            "test bus wiring rejects missing providers, unknown buses, bus chains and publication broadcast",
+            "test configuration throws and exits remain structured errors with their causes",
+            "test constructors reject non-map input and invalid envelope options",
+            "test definition and instance resolution preserve configuration exceptions",
+            "test field validation follows one fixed order",
+            "test invalid configuration retains its validation error",
+            "test invalid definitions return structured paths and bang forms raise the same error",
+            "test malformed route collections return errors in direct forms",
+            "test metadata rejects structs, non-Map values and live values",
+            "test module provenance does not make a factory an Agent definition source",
+            "test normalization and verification reject invalid provider data",
+            "test provider identity, version, fields and selected provider are checked",
+            "test recompilation verifies the new schema of an Action defined later in the same file",
+            "test related-definition failures stop the compiler instead of becoming Spark warnings",
+            "test removed route options and invalid helpers fail at declaration",
+            "test schedule DSL rejects missing or competing timing forms",
+            "test schedules validate timing, cron, template and accepted inputs in Map authoring"
           ]
         },
         "jido.agent.I23": {
@@ -165,6 +261,7 @@
           "status": "active",
           "testable": true,
           "tests": [
+            "test Map and struct report the same error path and DSL rejects the same declaration",
             "test invalid definitions return structured paths and bang forms raise the same error"
           ]
         },
@@ -175,6 +272,7 @@
           "status": "active",
           "testable": true,
           "tests": [
+            "test composition exposes data operations without the old runtime graph API",
             "test the public API has one constructor and validation path"
           ]
         },
@@ -185,64 +283,136 @@
           "status": "active",
           "testable": true,
           "tests": [
-            "test one Agent owns immediate named members and logical output connections"
+            "test Team and standalone Alice fixtures validate without handler execution",
+            "test a team replaces a leaf through the same routes and explicit root outputs",
+            "test bus extension contributes ownership and connection endpoints only",
+            "test composition exposes data operations without the old runtime graph API",
+            "test connections select all explicit matches, preserve order and never reroute inputs",
+            "test members reject duplicate names, root, missing fields, invalid counts and child state",
+            "test one Agent owns immediate named members and logical output connections",
+            "test related-definition failures stop the compiler instead of becoming Spark warnings",
+            "test removed core forms cannot enter a definition",
+            "test topology binds copied inputs and counts without creating another composition unit"
           ]
         },
         "jido.agent.I26": {
           "failing": 0,
           "kind": "functional",
-          "passing": 2,
+          "passing": 8,
           "status": "active",
           "testable": true,
           "tests": [
+            "test DSL, independent Map, and mutations normalize to the same definition",
+            "test cancelled edits and set-to-original produce an empty Diff",
+            "test invalid state, malformed batches, and runtime work fail without a candidate",
+            "test malformed set values cannot crash later edits",
+            "test mutated definitions and instances retain exact JSON round trips",
+            "test only the final graph must resolve and removals do not cascade",
+            "test operation preconditions fail with an index and preserve the source",
             "test route edits have strict identities and the Diff reports net changes",
+            "test state validation does not fill missing nested defaults during a transition",
             "test the final graph resolves after the batch and removals do not cascade"
           ]
         },
         "jido.agent.I27": {
           "failing": 0,
           "kind": "functional",
-          "passing": 4,
+          "passing": 22,
           "status": "active",
           "testable": true,
           "tests": [
+            "test DSL, independent Map, and mutations normalize to the same definition",
+            "test Diff reports exact final values and order for each collection and state",
+            "test Diff reports top-level definition changes made by a full upgrade",
+            "test Flow and module handler updates run through the same route boundary",
+            "test agent CRUD preserves order and replacement resets omitted fields",
+            "test cancelled edits and set-to-original produce an empty Diff",
+            "test connection CRUD uses endpoint/path identity and replacement defaults",
             "test counted destinations need broadcast after the complete batch",
+            "test current route contract survives removal and the next input uses the new routes",
+            "test custom Directives can override the default validator",
+            "test custom Directives can use the behavior before their struct is defined",
+            "test malformed set values cannot crash later edits",
+            "test mutations do not create helper functions",
+            "test operation preconditions fail with an index and preserve the source",
+            "test route add accepts executable modules and all descriptor forms",
             "test route edits have strict identities and the Diff reports net changes",
+            "test route reorder changes first-match selection and rejects incomplete permutations",
+            "test route update shallow replaces defaults and route replacement fills defaults",
+            "test routes_set preserves order and rejects invalid contracts and helper collisions",
+            "test runtime constructors have a separate noun_verb API",
             "test strict noun_verb edits preserve order and replace omitted fields with defaults",
-            "test the final graph resolves after the batch and removals do not cascade"
+            "test the final graph resolves after the batch and removals do not cascade",
+            "test unknown fields and identity edits fail instead of adding hidden data"
           ]
         },
         "jido.agent.I28": {
           "failing": 0,
           "kind": "functional",
-          "passing": 3,
+          "passing": 6,
           "status": "active",
           "testable": true,
           "tests": [
             "test binding copies one state value without replacing the authored references",
+            "test bus wiring rejects missing providers, unknown buses, bus chains and publication broadcast",
+            "test connection proofs distinguish incompatible contracts from unknown outputs",
+            "test connections require known immediate endpoints and explicit counted delivery",
+            "test connections select all explicit matches, preserve order and never reroute inputs",
             "test counted destinations need broadcast after the complete batch",
-            "test the final graph resolves after the batch and removals do not cascade"
+            "test members reject duplicate names, root, missing fields, invalid counts and child state",
+            "test only the final graph must resolve and removals do not cascade",
+            "test removing an accepted input checks existing connections at the final boundary",
+            "test the final graph resolves after the batch and removals do not cascade",
+            "test topology replacement rejects duplicate connection identities with different delivery"
           ]
         },
         "jido.agent.I29": {
           "failing": 0,
           "kind": "functional",
-          "passing": 2,
+          "passing": 5,
           "status": "active",
           "testable": true,
           "tests": [
             "test Plugin changes preserve state and require explicit migration and disposal",
-            "test an affected Plugin cannot change configuration and run its owned directives in one batch"
+            "test Plugin changes reject owned directives even when configuration edits cancel",
+            "test Plugin state initialization, configuration, migration, and removal stay explicit",
+            "test an affected Plugin cannot change configuration and run its owned directives in one batch",
+            "test definition Plugin edits add no state and remove needs no state discard"
           ]
         },
         "jido.agent.I3": {
           "failing": 0,
           "kind": "functional",
-          "passing": 1,
+          "passing": 7,
           "status": "active",
           "testable": true,
           "tests": [
-            "test definitions are neutral and instances need explicit identity and complete stored state"
+            "test DSL compile rejects conflicting handlers, old targets and duplicate core fields",
+            "test Map authoring never accepts the compiler's pending executable kind",
+            "test Spark rejects invalid schema and identity options with a field path",
+            "test block metadata accepts mixed keys and rejects structs with a DSL error",
+            "test definitions are neutral and instances need explicit identity and complete stored state",
+            "test duplicate IDs, providers and section ownership are rejected for Maps and DSL",
+            "test field validation follows one fixed order",
+            "test invalid and duplicate emission contracts fail during authoring",
+            "test invalid definition field description is rejected",
+            "test invalid definition field extensions is rejected",
+            "test invalid definition field metadata is rejected",
+            "test invalid definition field module is rejected",
+            "test invalid definition field name is rejected",
+            "test invalid definition field routes is rejected",
+            "test invalid definition field signal_source is rejected",
+            "test invalid definition field topology is rejected",
+            "test invalid definition field vsn is rejected",
+            "test metadata rejects structs, non-Map values and live values",
+            "test neutral definitions use explicit canonical defaults",
+            "test provider identity, version, fields and selected provider are checked",
+            "test removed core forms cannot enter a definition",
+            "test route target kinds are checked against the Action contract",
+            "test schedules validate timing, cron, template and accepted inputs in Map authoring",
+            "test unknown fields and instance data fail before provider callbacks",
+            "test unknown fields, instance fields and live values cannot enter a definition",
+            "test unknown nil keys fail in every authoring boundary"
           ]
         },
         "jido.agent.I30": {
@@ -252,17 +422,28 @@
           "status": "active",
           "testable": true,
           "tests": [
-            "test binding copies one state value without replacing the authored references"
+            "test a team replaces a leaf through the same routes and explicit root outputs",
+            "test binding copies one state value without replacing the authored references",
+            "test construction binds child input but preserves the complete authored definition",
+            "test nested literal inputs are checked even beside a symbolic state reference",
+            "test topology binds copied inputs and counts without creating another composition unit"
           ]
         },
         "jido.agent.I4": {
           "failing": 0,
           "kind": "functional",
-          "passing": 1,
+          "passing": 5,
           "status": "active",
           "testable": true,
           "tests": [
-            "test duplicate declarations fail and instance reuse preserves order and exact values"
+            "test DSL compile rejects conflicting handlers, old targets and duplicate core fields",
+            "test Map authoring and instance options reject ambiguous duplicates",
+            "test duplicate declarations fail and instance reuse preserves order and exact values",
+            "test duplicate paths and helpers are errors, and helpers cannot use wildcards",
+            "test input selection is exact unless a wildcard is explicit; declaration order wins",
+            "test malformed route collections return errors in direct forms",
+            "test removed route options and invalid helpers fail at declaration",
+            "test routes accept one module with separate plain Map defaults"
           ]
         },
         "jido.agent.I5": {
@@ -272,7 +453,11 @@
           "status": "active",
           "testable": true,
           "tests": [
-            "test duplicate declarations fail and instance reuse preserves order and exact values"
+            "test Map and DSL definitions initialize the same complete state with static Zoi schemas",
+            "test construction binds child input but preserves the complete authored definition",
+            "test definitions and instances use the same struct and differ only in identity and state",
+            "test duplicate declarations fail and instance reuse preserves order and exact values",
+            "test full DSL lowers without Spark metadata and direct Map revalidation changes no field"
           ]
         },
         "jido.agent.I6": {
@@ -286,31 +471,63 @@
         "jido.agent.I7": {
           "failing": 0,
           "kind": "functional",
-          "passing": 1,
+          "passing": 3,
           "status": "active",
           "testable": true,
           "tests": [
-            "test definitions are neutral and instances need explicit identity and complete stored state"
+            "test Map authoring and instance options reject ambiguous duplicates",
+            "test definitions and instances use the same struct and differ only in identity and state",
+            "test definitions are neutral and instances need explicit identity and complete stored state",
+            "test partial identity and state combinations are invalid",
+            "test unknown nil keys fail in every authoring boundary"
           ]
         },
         "jido.agent.I8": {
           "failing": 0,
           "kind": "functional",
-          "passing": 1,
+          "passing": 12,
           "status": "active",
           "testable": true,
           "tests": [
-            "test initialization uses Zoi defaults and preserves supplied values"
+            "test Map and DSL definitions initialize the same complete state with static Zoi schemas",
+            "test a successful refinement cannot change initialized state",
+            "test container defaults are checked during creation and never filled in stored state",
+            "test deep invalid defaults fail during initialization",
+            "test defaults and explicit nil cannot insert invalid values",
+            "test discriminated union defaults cannot bypass validation",
+            "test initialization retains nested defaults, explicit nil, and supplied values",
+            "test initialization uses Zoi defaults and preserves supplied values",
+            "test initialization validates unchanged state once",
+            "test keyword defaults are checked with Hex Zoi",
+            "test nested defaults reach the leaf and validate it once",
+            "test nil defaults need a nullable schema",
+            "test optional defaulted fields stay absent in input and stored state",
+            "test state initialization adds defaults without converting supplied values",
+            "test state schema must be static and cannot coerce or transform values",
+            "test stored state validation cannot insert missing defaults",
+            "test three forms preserve nil, false, zero and nested state defaults without coercion"
           ]
         },
         "jido.agent.I9": {
           "failing": 0,
           "kind": "functional",
-          "passing": 1,
+          "passing": 10,
           "status": "active",
           "testable": true,
           "tests": [
-            "test definitions are neutral and instances need explicit identity and complete stored state"
+            "test Map and DSL definitions initialize the same complete state with static Zoi schemas",
+            "test container defaults are checked during creation and never filled in stored state",
+            "test definitions are neutral and instances need explicit identity and complete stored state",
+            "test discriminated union defaults cannot bypass validation",
+            "test initialization retains nested defaults, explicit nil, and supplied values",
+            "test input conversion types and dynamic schemas cannot bypass the state contract",
+            "test keyword defaults are checked with Hex Zoi",
+            "test optional defaulted fields stay absent in input and stored state",
+            "test state schema must be static and cannot coerce or transform values",
+            "test state schemas reject transforms and coercion before callbacks run",
+            "test stored checks cannot silently strip nested keys",
+            "test stored state checks do not fill defaults or replace explicit nil",
+            "test stored state validation cannot insert missing defaults"
           ]
         }
       }
@@ -1968,6 +2185,206 @@
         }
       }
     },
+    "jido.error": {
+      "active": 6,
+      "app": "jido",
+      "coverage": 1.0,
+      "covered": 6,
+      "form": "light",
+      "obligations": {
+        "jido.error.I1": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 20,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test Splode interop to_class/1 handles unknown values without raising",
+            "test Splode interop to_class/1 wraps typed errors in the corresponding class",
+            "test Splode interop to_error/1 keeps Jido validation errors typed and classified",
+            "test Splode interop to_error/1 preserves unknown error message for plain values",
+            "test all error modules normalize malformed details to an empty map",
+            "test compensation_error/2 creates a compensation error for failed compensation",
+            "test compensation_error/2 creates a compensation error for successful compensation",
+            "test constructors accept map options and keep their owned fields",
+            "test execution_error/2 creates an execution error",
+            "test execution_error/2 creates an execution error with details",
+            "test execution_error/2 creates an execution error with planning phase",
+            "test execution_error/2 stores unknown keyword opts in details",
+            "test internal_error/2 creates an internal error",
+            "test internal_error/2 creates an internal error with details",
+            "test routing_error/2 creates a routing error",
+            "test timeout_error/2 creates a timeout error",
+            "test validation_error/2 creates a validation error for action (convenience)",
+            "test validation_error/2 creates a validation error with explicit kind and subject",
+            "test validation_error/2 creates a validation error with field (infers kind: :input)",
+            "test validation_error/2 creates a validation error with message"
+          ]
+        },
+        "jido.error.I2": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 3,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test stable program codes extracts registered codes without making messages part of the contract",
+            "test stable program codes keeps the exact version 1 projection shape and nests its program code",
+            "test stable program codes publishes one closed Jido-owned code registry"
+          ]
+        },
+        "jido.error.I3": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 25,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test projects Agent authoring errors by their shared meaning",
+            "test projects adjacent Action errors without changing their ownership",
+            "test projects adjacent Signal errors without changing their ownership",
+            "test stable program codes extracts registered codes without making messages part of the contract",
+            "test stable program codes keeps the exact version 1 projection shape and nests its program code",
+            "test stable program codes publishes one closed Jido-owned code registry",
+            "test to_map/1 converts compensation error to map",
+            "test to_map/1 converts execution error to map with type execution_error",
+            "test to_map/1 converts execution error with phase: :planning to map with type planning_error",
+            "test to_map/1 converts internal error to map with type internal",
+            "test to_map/1 converts routing error to map with type routing_error",
+            "test to_map/1 converts timeout error to map with type timeout",
+            "test to_map/1 converts validation error to public map without stacktrace",
+            "test to_map/1 converts validation error with field to map with type validation_error",
+            "test to_map/1 converts validation error with kind: :action to map with type invalid_action",
+            "test to_map/1 converts validation error with kind: :config to map with type config_error",
+            "test to_map/1 derives retryability from type and structured hints",
+            "test to_map/1 handles foreign exceptions without leaking stacktraces",
+            "test to_map/1 handles unknown struct",
+            "test to_map/1 invalid type values fail closed to internal",
+            "test to_map/1 keeps each error module's public fields in details",
+            "test to_map/1 keeps retry defaults and detail hints for each Jido error struct",
+            "test to_map/1 recognizes the complete public type vocabulary",
+            "test to_map/1 sanitizes nested details for public transport payloads",
+            "test unknown values use the exact defensive internal projection"
+          ]
+        },
+        "jido.error.I4": {
+          "failing": 0,
+          "kind": "security",
+          "passing": 42,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test to_map/1 converts compensation error to map",
+            "test to_map/1 converts execution error to map with type execution_error",
+            "test to_map/1 converts execution error with phase: :planning to map with type planning_error",
+            "test to_map/1 converts internal error to map with type internal",
+            "test to_map/1 converts routing error to map with type routing_error",
+            "test to_map/1 converts timeout error to map with type timeout",
+            "test to_map/1 converts validation error to public map without stacktrace",
+            "test to_map/1 converts validation error with field to map with type validation_error",
+            "test to_map/1 converts validation error with kind: :action to map with type invalid_action",
+            "test to_map/1 converts validation error with kind: :config to map with type config_error",
+            "test to_map/1 derives retryability from type and structured hints",
+            "test to_map/1 handles foreign exceptions without leaking stacktraces",
+            "test to_map/1 handles unknown struct",
+            "test to_map/1 invalid type values fail closed to internal",
+            "test to_map/1 keeps each error module's public fields in details",
+            "test to_map/1 keeps retry defaults and detail hints for each Jido error struct",
+            "test to_map/1 recognizes the complete public type vocabulary",
+            "test to_map/1 sanitizes nested details for public transport payloads",
+            "test transport boundaries bounds long invalid binaries and redacts them under sensitive keys",
+            "test transport boundaries canonicalizes known and unknown atom and string error types",
+            "test transport boundaries contains exception message and inspection failures",
+            "test transport boundaries keeps invalid binary leaves safe for JSON transport",
+            "test transport boundaries preserves field names and indexes in validation paths",
+            "test transport boundaries preserves real Zoi validation paths through execution and JSON transport",
+            "test transport boundaries preserves scalar leaves at the container depth limit",
+            "test transport boundaries sanitizes invalid UTF-8 in direct, nested, and exception messages",
+            "test transport boundaries still bounds validation error counts and path lengths",
+            "test transport boundaries still redacts and truncates values at the depth limit",
+            "test transport boundaries still stops containers and opaque terms at the depth limit",
+            "test transport boundaries tuple traversal consumes one depth level",
+            "test transport boundaries uses exact text truncation boundaries and keeps the first character",
+            "test transport key policy bounds long string keys after applying the full key policy",
+            "test transport key policy improper nested lists have a bounded JSON-safe fallback without leaking details",
+            "test transport key policy keeps key handling for invalid binaries and non-string map keys",
+            "test transport key policy list classification checks beyond the output limit and keeps empty lists",
+            "test transport key policy normalizes absent, scalar and opaque details for JSON transport",
+            "test transport key policy omits stacktrace variants and keeps ordinary keys visible",
+            "test transport key policy redaction takes priority over stacktrace omission",
+            "test transport key policy redacts sensitive keys in maps and key-value lists without changing key names",
+            "test transport key policy retry hints survive transport wrappers and take priority over type defaults",
+            "test transport key policy tuple and mixed-list details retain key redaction",
+            "test transport key policy unknown errors sanitize stored reasons before making a message"
+          ]
+        },
+        "jido.error.I5": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 18,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test to_map/1 converts compensation error to map",
+            "test to_map/1 converts execution error to map with type execution_error",
+            "test to_map/1 converts execution error with phase: :planning to map with type planning_error",
+            "test to_map/1 converts internal error to map with type internal",
+            "test to_map/1 converts routing error to map with type routing_error",
+            "test to_map/1 converts timeout error to map with type timeout",
+            "test to_map/1 converts validation error to public map without stacktrace",
+            "test to_map/1 converts validation error with field to map with type validation_error",
+            "test to_map/1 converts validation error with kind: :action to map with type invalid_action",
+            "test to_map/1 converts validation error with kind: :config to map with type config_error",
+            "test to_map/1 derives retryability from type and structured hints",
+            "test to_map/1 handles foreign exceptions without leaking stacktraces",
+            "test to_map/1 handles unknown struct",
+            "test to_map/1 invalid type values fail closed to internal",
+            "test to_map/1 keeps each error module's public fields in details",
+            "test to_map/1 keeps retry defaults and detail hints for each Jido error struct",
+            "test to_map/1 recognizes the complete public type vocabulary",
+            "test to_map/1 sanitizes nested details for public transport payloads"
+          ]
+        },
+        "jido.error.I6": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 29,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test Splode interop to_class/1 handles unknown values without raising",
+            "test Splode interop to_class/1 wraps typed errors in the corresponding class",
+            "test Splode interop to_error/1 keeps Jido validation errors typed and classified",
+            "test Splode interop to_error/1 preserves unknown error message for plain values",
+            "test transport boundaries bounds long invalid binaries and redacts them under sensitive keys",
+            "test transport boundaries canonicalizes known and unknown atom and string error types",
+            "test transport boundaries contains exception message and inspection failures",
+            "test transport boundaries keeps invalid binary leaves safe for JSON transport",
+            "test transport boundaries preserves field names and indexes in validation paths",
+            "test transport boundaries preserves real Zoi validation paths through execution and JSON transport",
+            "test transport boundaries preserves scalar leaves at the container depth limit",
+            "test transport boundaries sanitizes invalid UTF-8 in direct, nested, and exception messages",
+            "test transport boundaries still bounds validation error counts and path lengths",
+            "test transport boundaries still redacts and truncates values at the depth limit",
+            "test transport boundaries still stops containers and opaque terms at the depth limit",
+            "test transport boundaries tuple traversal consumes one depth level",
+            "test transport boundaries uses exact text truncation boundaries and keeps the first character",
+            "test transport key policy bounds long string keys after applying the full key policy",
+            "test transport key policy improper nested lists have a bounded JSON-safe fallback without leaking details",
+            "test transport key policy keeps key handling for invalid binaries and non-string map keys",
+            "test transport key policy list classification checks beyond the output limit and keeps empty lists",
+            "test transport key policy normalizes absent, scalar and opaque details for JSON transport",
+            "test transport key policy omits stacktrace variants and keeps ordinary keys visible",
+            "test transport key policy redaction takes priority over stacktrace omission",
+            "test transport key policy redacts sensitive keys in maps and key-value lists without changing key names",
+            "test transport key policy retry hints survive transport wrappers and take priority over type defaults",
+            "test transport key policy tuple and mixed-list details retain key redaction",
+            "test transport key policy unknown errors sanitize stored reasons before making a message",
+            "test unknown values use the exact defensive internal projection"
+          ]
+        }
+      }
+    },
     "jido.instance": {
       "active": 8,
       "app": "jido",
@@ -3222,8 +3639,8 @@
   },
   "covenant": "0.2.0",
   "totals": {
-    "active": 219,
+    "active": 225,
     "coverage": 1.0,
-    "covered": 219
+    "covered": 225
   }
 }

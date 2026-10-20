@@ -1,6 +1,6 @@
 # Covenant component register
 
-Status: Approved scaffold; component extraction in progress
+Status: Approved map; all components active; final hardening in progress
 
 This register defines the approved Covenant component boundaries for Jido V3.
 All component IDs start with `jido.`. Durable behavior stays under the
@@ -27,6 +27,7 @@ this scaffold.
 | `jido.signal_action` | Active | `test/contract/jido/signal_action/` |
 | `jido.discovery` | Active | `test/contract/jido/discovery/` |
 | `jido.telemetry` | Active | `test/contract/jido/telemetry/` |
+| `jido.error` | Active | `test/contract/jido/error/` |
 | `jido.persistence` | Active | `test/contract/jido/persistence/` |
 | `jido.agent_server` | Active | `test/contract/jido/agent_server/` |
 | `jido.agent_server.activation` | Active | `test/contract/jido/agent_server/activation/` |
@@ -55,7 +56,7 @@ this scaffold.
 | `jido.signal_action` | Active | Jido integration values for Signals and Actions | `test/contract/jido/signal_action/` |
 | `jido.discovery` | Active | Read-only Action discovery | `test/contract/jido/discovery/` |
 | `jido.telemetry` | Active | Telemetry, metrics, tracing, logs, and Debug support | `test/contract/jido/telemetry/` |
-| `jido.error` | Planned | Shared error taxonomy and stable common codes | `test/contract/jido/error/` |
+| `jido.error` | Active | Shared error taxonomy and stable common codes | `test/contract/jido/error/` |
 | `jido.plugin.audit` | Active | Bundled Audit Plugin behavior | `test/contract/jido.plugin/audit/` |
 | `jido.plugin.bus` | Active | Bundled Bus Plugin behavior | `test/contract/jido.plugin/bus/` |
 | `jido.plugin.heartbeat` | Active | Bundled Heartbeat Plugin behavior | `test/contract/jido.plugin/heartbeat/` |

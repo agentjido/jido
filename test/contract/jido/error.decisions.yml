@@ -27,3 +27,21 @@
   decision: Remove Jido.Error.extract_message/1 and its self-only tests.
   driver: No production code, guide, example, or sibling V3 package uses the helper, and to_map/1 owns public message rendering.
   approved_by: Component hardening pass
+
+- id: contain-inspect-failures
+  date: 2026-10-20
+  decision: Collapse raised, thrown, exited, and returned Inspect failures to the fixed #Inspect.Error marker.
+  driver: The default Inspect.Error text can include a local stacktrace and source path, which are not safe public transport data.
+  approved_by: Component hardening pass
+
+- id: activate-error-component
+  date: 2026-10-20
+  decision: Activate jido.error with 6 obligations and 69 focused tests in 3 files, with no survivor ledger.
+  driver: The focused suite owns the complete shared boundary. Jido.Error is 54 lines smaller than the pre-component checkpoint, and the three focused test files are 99 lines smaller than the replaced tests.
+  approved_by: Component hardening pass
+
+- id: error-full-mutation-check
+  date: 2026-10-20
+  decision: Accept the full 301-mutant profile with 288 killed mutants, 13 invalid mutations, no survivor, no timeout, and a 100.0 percent score.
+  driver: Every valid mutant is killed by the 69 focused tests, and dead retry-classification code was removed instead of classified.
+  approved_by: Component hardening pass

@@ -32,7 +32,16 @@ revalidation registers the other three existing codes:
 | `:plugin_state_owner_violation` | Agent Plugin | An executable changes a Plugin-owned state key. |
 
 The names and failure locations do not change. `Jido.Error.code/1` now reads
-them. The closed registry contains 21 codes.
+them. Config also emitted three existing Jido-owned codes that were not in the
+closed registry. The error-component hardening pass registered them:
+
+| Existing code | Owner | Trigger |
+| --- | --- | --- |
+| `:missing_env` | Config | A required environment variable is absent. |
+| `:invalid_env` | Config | An environment variable reference has an invalid name. |
+| `:invalid_config` | Config | A configuration value is not a valid keyword list. |
+
+The closed registry contains 24 codes.
 
 ## Selected contract
 
@@ -105,7 +114,7 @@ No raw control was removed or changed by this seam.
 
 | Requirement group | Evidence | State |
 | --- | --- | --- |
-| `ERR-REQ-001` to `ERR-REQ-005` | Error module, class, composition, and 21-code registry tests | `Proven` |
+| `ERR-REQ-001` to `ERR-REQ-005` | Error module, class, composition, and 24-code registry tests | `Proven` |
 | `ERR-REQ-006` to `ERR-REQ-010` | Agent, Plugin, Persistence, Exec, Topology Plugin, and callback-fault tests | `Proven` |
 | `ERR-REQ-011` | Runtime owner crash-policy and supervisor tests | `Proven` for current owned invariants |
 | `ERR-REQ-012`, `ERR-REQ-013` | Persistence lifecycle, write-result, and authority-loss tests | `Proven` |
@@ -156,7 +165,7 @@ No raw control was removed or changed by this seam.
 ## Completion criteria
 
 - [x] Five classes and six Jido error modules match source.
-- [x] Every Jido-owned literal in `details.code` is in the 21-code registry.
+- [x] Every Jido-owned literal in `details.code` is in the 24-code registry.
 - [x] The three previously unregistered owner codes have real-path tests.
 - [x] Callback-returned errors remain exact.
 - [x] Callback invalid output, fault, task loss, and owned timeout have owner

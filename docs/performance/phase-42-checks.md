@@ -4,10 +4,8 @@ The cycle has 42 completed decisions: eleven accepted fixes, eight measured
 rejections, and 23 source or contract rejections. Eight rounds remain, including
 the final 50-pair combined run.
 
-[Round 48](round-48-scheduler-capture.md) removes the complete runtime map from
-the scheduler delivery task function. Five pairs showed 88% less time for a
-large map and 78% less for a large list, with lower sampled process peaks.
-Separate actual-function copy probes confirmed the cause. Round 29 rejected
+The former Round 48 report measured a Scheduler business-delivery task that is
+no longer in Jido core. That obsolete report was removed. Round 29 rejected
 unconditional target validation caching because a later descriptor can fail.
 
 ## Checks

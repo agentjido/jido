@@ -45,7 +45,7 @@ V2 research uses primary source from the pinned local Git tag. Links point to th
 | [GAP-020](#gap-020) | 05 Plugins | Document correction | Permit reconstructed local values after Plugin load | Corrected under selected live/durable policy |
 | [GAP-021](#gap-021) | 05 Plugins | Resolved API decision | Keep the required after_commit/3 failure boundary | Settled: user selected the current V3 hook contract |
 | [GAP-022](#gap-022) | 05 Plugins | Document correction | Give Scheduler requirements an actual definition and owner | Corrected in Plugin design and delivery ledger |
-| [GAP-023](#gap-023) | 05 Plugins | Code change selected | Remove core Scheduler durable delivery | Settled: removal selected; code cleanup pending |
+| [GAP-023](#gap-023) | 05 Plugins | Code change selected | Remove core Scheduler durable delivery | Complete |
 | [GAP-024](#gap-024) | 05 Plugins | Migration decision | Document SensorManager instead of the removed V2 Sensor API | Open |
 | [GAP-025](#gap-025) | 05 Plugins | Document correction | Add a concise inventory of built-in capability contracts | Open |
 | [GAP-026](#gap-026) | 06 Commit and effects | Document correction | Correct settlement when a Turn has no Directives | Corrected in commit design and alignment |
@@ -480,7 +480,7 @@ The [Jido integration issue](https://github.com/agentjido/jido/issues/389) is co
 
 **Design before review:** Topic 05 said PLG-REQ-061–076 belonged to Scheduler but did not define them. Delivery marked the entire 001–076 range required. The owner design and Plugin ledger row now distinguish defined active IDs, retired IDs, and numeric holes.
 
-**Current V3:** Scheduler is a concrete Plugin with owned portable cron state, runtime timers, generation metadata, pending durable occurrences, and commit-time acknowledgements.
+**Current V3:** Scheduler is a concrete Plugin with owned portable cron definitions, runtime timers, and optional generation and occurrence metadata. It has no pending business-delivery queue or commit-time acknowledgement.
 
 **V2 approach:** V2 Jido.Scheduler owned live cron jobs and durable schedule manifests. It had no equivalent current pending-occurrence acknowledgement contract.
 
@@ -492,19 +492,19 @@ The [Jido integration issue](https://github.com/agentjido/jido/issues/389) is co
 
 ### GAP-023: Remove core Scheduler durable delivery
 
-**Type:** Code change selected. **State:** Settled: removal selected; code cleanup pending.
+**Type:** Code change selected. **State:** Complete.
 
 **Design before review:** Generic recoverable-work requirements did not specify the current Scheduler policy, control route, timing options, or dormant schedules. The Plugin design now records an explicit target that removes pending business delivery from core Scheduler.
 
-**Current V3:** One-shot schedules are transient. Durable recurring delivery keeps one pending occurrence per job, skips other slots, acknowledges with the business commit, and needs Agent persistence for loss recovery. Enqueue is a trusted, unauthenticated internal route. delivery_interval, delivery_timeout, retry_delay_ms, and time_scale have bounded contracts; a cron expression with no future slot is dormant.
+**Current V3:** One-shot schedules are transient. Recurring definitions can persist with Agent state, and the live runtime recreates future timers after restore. Missed occurrences are not replayed. The Scheduler has no business-delivery queue, retry worker, enqueue route, or acknowledgement Directive. Retired delivery fields and options fail validation. A cron expression with no future slot is dormant.
 
 **V2 approach:** V2 persisted cron definitions through Persist and separately rejected non-durable message values. Timers were runtime state. It did not provide current occurrence IDs, durable pending delivery, acknowledgement, or these Plugin options.
 
 **User decision:** On 2026-10-01, the user rejected the extra delivery contract beyond OTP and selected removal of core Scheduler durable delivery. Keep OTP timers and mailbox delivery, restore saved recurring definitions for future ticks, and make no replay promise for missed occurrences. Remove saved pending business occurrences, delivery retries, enqueue controls, and business acknowledgement. No replacement durable-delivery package was requested.
 
-**Reconciliation:** The target and code-removal scope are recorded in the Plugin design/alignment. Remove delivery-only APIs, helpers, pending fields, runtime workers/options, and their guide/example/test support. Preserve ordinary one-shot delivery, future recurring timers, saved definitions, and optional occurrence metadata, which does not itself provide retry. Check how older durable-delivery definitions are handled during restore. Existing source still implements the rejected feature; no implementation or fresh test run has been completed in this review. Generic application recovery contracts remain conditional and do not require this bundled Scheduler feature. GAP-028 still owns custom-checkpoint responsibility for other explicit recovery capabilities.
+**Reconciliation:** The source, guides, fixtures, and tests removed delivery-only APIs, helpers, pending fields, workers, and options. Ordinary one-shot delivery, future recurring timers, saved definitions, and optional occurrence metadata remain. Saved definitions with retired delivery fields fail validation. The focused `jido.plugin.scheduler` contract and mutation profile prove the selected boundary. Generic application recovery contracts remain conditional and do not require this bundled Scheduler feature. GAP-028 still owns custom-checkpoint responsibility for other explicit recovery capabilities.
 
-**Evidence:** [lib/jido/plugin/scheduler.ex:9](/Users/mhostetler/Source/Jido/proj_jido_core/jido/lib/jido/plugin/scheduler.ex:9); [lib/jido/plugin/scheduler.ex:36](/Users/mhostetler/Source/Jido/proj_jido_core/jido/lib/jido/plugin/scheduler.ex:36); [lib/jido/plugin/scheduler/wall_clock.ex:1](/Users/mhostetler/Source/Jido/proj_jido_core/jido/lib/jido/plugin/scheduler/wall_clock.ex:1); [test/jido/plugin/scheduler/occurrence_recovery_test.exs:1](/Users/mhostetler/Source/Jido/proj_jido_core/jido/test/jido/plugin/scheduler/occurrence_recovery_test.exs:1); [lib/jido/scheduler.ex:2](https://github.com/agentjido/jido/blob/69f3b40506ce3ea1a2c80b255b737d6c3a453cf2/lib/jido/scheduler.ex#L2).
+**Evidence:** [lib/jido/plugin/scheduler.ex](/Users/mhostetler/Source/Jido/proj_jido_core/jido/lib/jido/plugin/scheduler.ex); [lib/jido/plugin/scheduler/agent.ex](/Users/mhostetler/Source/Jido/proj_jido_core/jido/lib/jido/plugin/scheduler/agent.ex); [lib/jido/plugin/scheduler/runtime.ex](/Users/mhostetler/Source/Jido/proj_jido_core/jido/lib/jido/plugin/scheduler/runtime.ex); [test/contract/jido.plugin/scheduler/scheduler_contract_test.exs](/Users/mhostetler/Source/Jido/proj_jido_core/jido/test/contract/jido.plugin/scheduler/scheduler_contract_test.exs); [test/contract/jido.plugin/scheduler/runtime_contract_test.exs](/Users/mhostetler/Source/Jido/proj_jido_core/jido/test/contract/jido.plugin/scheduler/runtime_contract_test.exs).
 
 <a id="gap-024"></a>
 
@@ -1362,7 +1362,7 @@ Module-absence checks used the complete V2.3.3 `lib/` tree plus symbol searches.
 - The previous review ran 95 focused tests with zero failures. Those are previous results, not a new test run in this task.
 - The prior release sync saved 2,342 tests, zero failures, two existing skips, and 93.5% coverage, plus passing CI/floor results. Those are historical exact-source evidence; this analysis did not rerun the full suite, services, package build, or CI.
 - Evidence links identify source paths/lines and the pinned V2 commit. Automated checks validate entry IDs, requirement counts, local link existence/line bounds, V2 link targets, and the final Git diff. They do not prove every runtime path or external service.
-- The initial analysis added this report and its Pending approval index row. The subsequent voice review records selected decisions in the corresponding entries and updates the affected topic documents. GAP-006, GAP-007, and GAP-008 are recorded in the Agent design and alignment. GAP-009, GAP-010, and GAP-012 are recorded in the authoring documents; GAP-011/013 are corrected in the owner design, and GAP-014 evidence paths are corrected. GAP-015/016 are recorded in the identity design and alignment. GAP-018 and GAP-021 are recorded in Plugin documents, with GAP-019/020 corrections. GAP-026/038/039 are corrected in the commit and Server documents under the selected hook contract. GAP-022 is corrected in the Plugin design and delivery ledger; GAP-023 records required Scheduler durable-delivery removal, which remains a code change to complete. Other gaps remain as stated; complete document approval has not been inferred.
+- The initial analysis added this report and its Pending approval index row. The subsequent voice review records selected decisions in the corresponding entries and updates the affected topic documents. GAP-006, GAP-007, and GAP-008 are recorded in the Agent design and alignment. GAP-009, GAP-010, and GAP-012 are recorded in the authoring documents; GAP-011/013 are corrected in the owner design, and GAP-014 evidence paths are corrected. GAP-015/016 are recorded in the identity design and alignment. GAP-018 and GAP-021 are recorded in Plugin documents, with GAP-019/020 corrections. GAP-026/038/039 are corrected in the commit and Server documents under the selected hook contract. GAP-022 is corrected in the Plugin design and delivery ledger. GAP-023 is implemented and verified by the focused Scheduler contract. Other gaps remain as stated; complete document approval has not been inferred.
 
 ## Suggested discussion order
 

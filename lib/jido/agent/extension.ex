@@ -61,19 +61,7 @@ defmodule Jido.Agent.Extension do
   end
 
   def provider(module) when is_atom(module) and module not in [nil, true, false] do
-    callbacks = [
-      id: 0,
-      vsn: 0,
-      sections: 0,
-      lower: 2,
-      normalize: 1,
-      verify: 2,
-      runtime_support: 0,
-      authoring_imports: 0,
-      endpoint_kinds: 0,
-      endpoints: 1,
-      verify_connection: 2
-    ]
+    callbacks = [{:sections, 0} | __MODULE__.behaviour_info(:callbacks)]
 
     if match?({:module, _}, Code.ensure_compiled(module)) and
          Enum.all?(callbacks, fn {f, a} -> function_exported?(module, f, a) end) do

@@ -1,7 +1,7 @@
 # Covenant component refactor plan
 
 Date: 2026-10-19
-Status: Approved component scaffold; component extraction in progress
+Status: All approved components active; final hardening in progress
 Target: `agentjido/jido`, branch `release/v3`
 
 ## Purpose
@@ -11,9 +11,10 @@ Plugin interface from each bundled Plugin. Split the current AgentServer
 contract into smaller runtime components. Give durable Agent state and durable
 Flow progress separate owners.
 
-This plan does not approve a public API change. It does not authorize runtime
-code changes. The first implementation pass must preserve current supported
-behavior unless a listed removal has separate approval.
+This plan does not approve an unrelated public API change. The hardening pass
+can remove unused code and can refine runtime code when a component contract
+or its tests prove the need. Other supported behavior stays unchanged unless a
+listed removal has separate approval.
 
 The approved component register is in
 [`test/contract/COMPONENTS.md`](../test/contract/COMPONENTS.md). This plan
@@ -52,6 +53,8 @@ obligation file and passing tagged contract tests.
 | `jido.agent_evaluation` | Active | 10 | 5 | Pure evaluation has a separate owner. |
 | `jido.signal_action` | Active | 7 | 1 | The combined Action and Signal value boundary is focused. |
 | `jido.discovery` | Active | 5 | 1 | Read-only Action inventory has a separate owner. |
+| `jido.telemetry` | Active | 8 | 7 | Best-effort observation has a separate owner. |
+| `jido.error` | Active | 6 | 1 | Shared taxonomy, projection, and retry classification have a separate owner. |
 | `jido.persistence` | Active | 15 | 10 | Shared records, snapshots, adapters, and storage operations have a separate owner. |
 | `jido.agent_server` | Active | 37 | 1 | Core request, Turn, control, and observation behavior has a focused decision owner. |
 | `jido.agent_server.activation` | Active | 11 | 3 | The local activation and recovery boundary is focused. |
@@ -95,10 +98,10 @@ generic interface document an owner of one bundled product. The code and tests
 already show that Scheduler, Bus, SensorManager, Heartbeat, and Audit can change
 independently.
 
-The selected design also requires removal of Scheduler durable business
-delivery. The current source still contains `Scheduler.Durable`, `Delivery`,
-`Enqueue`, `Queue`, `Acknowledge`, and related tests. Do not make those removed
-features part of the new Scheduler Covenant.
+The selected design required removal of Scheduler durable business delivery.
+The source and focused tests no longer contain `Scheduler.Durable`,
+`Delivery`, `Enqueue`, `Queue`, `Acknowledge`, or their business-delivery
+behavior. The Scheduler Covenant keeps those features retired.
 
 ### Current AgentServer shape
 
@@ -917,6 +920,21 @@ Completed for supporting component `jido.telemetry`:
 - [x] Completed the full 714-mutant profile with 657 killed mutants,
       16 classified equivalent survivors, 41 invalid mutations, and no
       timeout.
+
+Completed for supporting component `jido.error`:
+
+- [x] Added 6 obligations and 3 focused contract test files with 69 tests.
+- [x] Kept Agent and Plugin errors, domain failure conversion,
+      adjacent-package errors, and runtime retry policy with their separate
+      owners.
+- [x] Added the non-overlapping `Jido.Error` mutation profile.
+- [x] Registered the 3 existing Config codes, removed the unused message
+      extractor, removed dead retry-classification code, and contained Inspect
+      failures without local stacktrace leakage.
+- [x] Reduced `Jido.Error` by 54 lines and the focused tests by 99 lines.
+- [x] Regenerated complete Covenant coverage.
+- [x] Completed the full 301-mutant profile with 288 killed mutants,
+      13 invalid mutations, no survivor, and no timeout.
 
 After the final migration:
 

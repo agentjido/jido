@@ -1,9 +1,51 @@
 defmodule Jido.Agent.MutationTest do
-  use ExUnit.Case, async: true
+  use Covenant.Case, component: "jido.agent", async: true
   alias Jido.Agent
-  alias Jido.Agent.{Diff, Directive, Error, Route}
+  alias Jido.Agent.{Diff, Directive, Error, Mutation, Route}
   alias JidoTest.AgentEvolutionFixtures, as: F
 
+  defmodule InvalidMigrations do
+    def invalid(_value), do: :invalid
+  end
+
+  defmodule PassiveExtension do
+    use Jido.Agent.Extension, id: "test.mutation.passive"
+  end
+
+  @tag obligation: "jido.agent.I27"
+  test "the mutation Directive set is closed and exact" do
+    modules = [
+      Directive.AgentAdd,
+      Directive.AgentUpdate,
+      Directive.AgentReplace,
+      Directive.AgentRemove,
+      Directive.RouteAdd,
+      Directive.RouteUpdate,
+      Directive.RouteReplace,
+      Directive.RouteRemove,
+      Directive.RoutesSet,
+      Directive.RoutesReorder,
+      Directive.ConnectionAdd,
+      Directive.ConnectionUpdate,
+      Directive.ConnectionReplace,
+      Directive.ConnectionRemove,
+      Directive.TopologySet,
+      Directive.PluginAdd,
+      Directive.PluginConfigure,
+      Directive.PluginRemove
+    ]
+
+    assert Mutation.modules() === modules
+
+    for module <- modules do
+      assert Mutation.mutation?(struct(module)) === true
+    end
+
+    assert Mutation.mutation?(:invalid) === false
+    assert Mutation.mutation?(%Jido.Agent.Directive.Emit{signal: nil}) === false
+  end
+
+  @tag obligation: "jido.agent.I27"
   test "agent CRUD preserves order and replacement resets omitted fields" do
     original = F.agent()
 
@@ -25,6 +67,7 @@ defmodule Jido.Agent.MutationTest do
     assert [%{name: :a}] = diff.agents.removed
   end
 
+  @tag obligation: ["jido.agent.I26", "jido.agent.I27"]
   test "operation preconditions fail with an index and preserve the source" do
     original = F.agent()
 
@@ -38,9 +81,26 @@ defmodule Jido.Agent.MutationTest do
       assert index == length(changes) - 1
     end
 
+    assert {:error,
+            %Error{
+              code: :not_found,
+              path: [:directives, 0],
+              details: %{collection: :agents, key: :missing}
+            }} = Agent.mutate(original, [Directive.agent_remove(:missing)])
+
+    assert {:ok, with_agent, _} = Agent.mutate(original, [Directive.agent_add(:a, F.Worker)])
+
+    assert {:error,
+            %Error{
+              code: :already_exists,
+              path: [:directives, 0],
+              details: %{collection: :agents, key: :a}
+            }} = Agent.mutate(with_agent, [Directive.agent_add(:a, F.Worker)])
+
     assert original == F.agent()
   end
 
+  @tag obligation: "jido.agent.I27"
   test "unknown fields and identity edits fail instead of adding hidden data" do
     for d <- [
           Directive.agent_update(:a, %{name: :b}),
@@ -54,6 +114,7 @@ defmodule Jido.Agent.MutationTest do
     assert_raise ArgumentError, fn -> Directive.route_add("work", F.Work, typo: true) end
   end
 
+  @tag obligation: ["jido.agent.I26", "jido.agent.I28"]
   test "only the final graph must resolve and removals do not cascade" do
     assert {:ok, added, _} =
              Agent.mutate(F.agent(), [
@@ -73,6 +134,7 @@ defmodule Jido.Agent.MutationTest do
     assert removed.topology == %{agents: [], connections: []}
   end
 
+  @tag obligation: "jido.agent.I27"
   test "connection CRUD uses endpoint/path identity and replacement defaults" do
     assert {:ok, agent, _} =
              Agent.mutate(F.agent(), [
@@ -97,8 +159,20 @@ defmodule Jido.Agent.MutationTest do
 
     assert {:error, _} =
              Agent.mutate(agent, [Directive.connection_remove("absent", from: :root, to: :a)])
+
+    root = %{kind: :agent, name: :root}
+    child = %{kind: :agent, name: :explicit}
+
+    assert {:ok, explicit, _} =
+             Agent.mutate(F.agent(), [
+               Directive.agent_add(:explicit, F.Worker),
+               Directive.connection_add("work", from: root, to: child)
+             ])
+
+    assert [%{from: ^root, to: ^child}] = explicit.topology.connections
   end
 
+  @tag obligation: "jido.agent.I27"
   test "route add accepts executable modules and all descriptor forms" do
     assert {:ok, agent, _} =
              Agent.mutate(F.agent(), [
@@ -115,6 +189,7 @@ defmodule Jido.Agent.MutationTest do
     assert {:ok, %{handler: %{kind: :pass_through}}} = Route.select(agent, "pass")
   end
 
+  @tag obligation: "jido.agent.I27"
   test "route update shallow replaces defaults and route replacement fills defaults" do
     assert {:ok, agent, _} =
              Agent.mutate(F.agent(), [
@@ -127,8 +202,19 @@ defmodule Jido.Agent.MutationTest do
     assert hd(replaced.routes).defaults == %{}
     assert {:ok, empty, _} = Agent.mutate(replaced, [Directive.route_remove("run")])
     assert empty.routes == []
+
+    assert {:ok, updated, _} =
+             Agent.mutate(F.agent(), [
+               Directive.route_update("run", %{as: :run_work, emits: ["work.done"]}),
+               Directive.agent_add(:worker, F.Worker),
+               Directive.agent_update(:worker, %{definition: F.Worker})
+             ])
+
+    assert [%{as: :run_work, emits: ["work.done"]}] = updated.routes
+    assert [%{definition: F.Worker}] = updated.topology.agents
   end
 
+  @tag obligation: "jido.agent.I27"
   test "route reorder changes first-match selection and rejects incomplete permutations" do
     assert {:ok, broad, _} =
              Agent.mutate(F.agent(), [
@@ -150,6 +236,7 @@ defmodule Jido.Agent.MutationTest do
     end
   end
 
+  @tag obligation: "jido.agent.I27"
   test "routes_set preserves order and rejects invalid contracts and helper collisions" do
     assert {:ok, agent, _} = Agent.mutate(F.agent(), [Directive.routes_set([])])
     assert agent.routes == []
@@ -168,6 +255,7 @@ defmodule Jido.Agent.MutationTest do
     end
   end
 
+  @tag obligation: "jido.agent.I28"
   test "removing an accepted input checks existing connections at the final boundary" do
     root =
       Agent.define!(%{name: "root", routes: [%{path: "work", handler: %{kind: :pass_through}}]})
@@ -189,6 +277,7 @@ defmodule Jido.Agent.MutationTest do
              ])
   end
 
+  @tag obligation: ["jido.agent.I26", "jido.agent.I27"]
   test "cancelled edits and set-to-original produce an empty Diff" do
     original = F.agent()
 
@@ -206,13 +295,18 @@ defmodule Jido.Agent.MutationTest do
     assert Diff.empty?(diff)
   end
 
+  @tag obligation: "jido.agent.I29"
   test "Plugin state initialization, configuration, migration, and removal stay explicit" do
     assert {:ok, added, _} = Agent.mutate(F.agent(), [Directive.plugin_add(F.Counter)])
     assert added.state == %{count: 0, counter: 3}
     assert {:ok, configured, _} = Agent.mutate(added, [Directive.plugin_configure(F.Counter, [])])
     assert configured.state == added.state
-    assert {:error, _} = Agent.mutate(added, [Directive.plugin_remove(F.Counter)])
-    assert {:error, _} = Agent.mutate(added, [Directive.plugin_configure(F.Counter, key: :other)])
+
+    assert {:error, %Error{code: :plugin_state_discard_required, details: %{plugin: F.Counter}}} =
+             Agent.mutate(added, [Directive.plugin_remove(F.Counter)])
+
+    assert {:error, %Error{code: :plugin_migration_required, details: %{plugin: F.Counter}}} =
+             Agent.mutate(added, [Directive.plugin_configure(F.Counter, key: :other)])
 
     assert {:ok, migrated, _} =
              Agent.mutate(added, [
@@ -228,8 +322,101 @@ defmodule Jido.Agent.MutationTest do
 
     assert removed.state == F.agent().state
     assert removed.extensions == []
+
+    assert {:ok, explicit, _} =
+             Agent.mutate(F.agent(), [Directive.plugin_add(F.Counter, [], initial: 9)])
+
+    assert explicit.state.counter == 9
+
+    assert {:ok, stateless, _} =
+             Agent.mutate(F.agent(), [Directive.plugin_add(JidoTest.AgentContract.Stateless)])
+
+    assert stateless.state === F.agent().state
+
+    for migrate <- [
+          {F.Migrations, :add, :invalid},
+          {F.Migrations, "add", []},
+          {"module", :add, []}
+        ] do
+      assert {:error, %Error{code: :invalid_plugin_change}} =
+               Agent.mutate(added, [Directive.plugin_configure(F.Counter, [], migrate: migrate)])
+    end
+
+    assert {:error, %Error{code: :invalid_plugin_migration}} =
+             Agent.mutate(added, [
+               Directive.plugin_configure(F.Counter, [],
+                 migrate: {InvalidMigrations, :invalid, []}
+               )
+             ])
   end
 
+  @tag obligation: "jido.agent.I29"
+  test "Plugin edit errors identify the Plugin and retain passive contributions" do
+    assert {:error, %Error{code: :plugin_not_found, details: %{plugin: F.Counter}}} =
+             Agent.mutate(F.agent(), [Directive.plugin_configure(F.Counter, [])])
+
+    assert {:ok, added, _} = Agent.mutate(F.agent(), [Directive.plugin_add(F.Counter)])
+
+    assert {:error, %Error{code: :plugin_exists, details: %{plugin: F.Counter}}} =
+             Agent.mutate(added, [Directive.plugin_add(F.Counter)])
+
+    conflict =
+      Agent.define!(%{
+        name: "plugin_conflict",
+        schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(1)})
+      })
+      |> Agent.instantiate!(id: "plugin-conflict")
+
+    assert {:error, %Error{code: :plugin_state_conflict, details: %{key: :count}}} =
+             Agent.mutate(conflict, [
+               Directive.plugin_add(F.Counter, key: :count)
+             ])
+
+    passive = %{
+      id: PassiveExtension.id(),
+      provider: PassiveExtension,
+      vsn: PassiveExtension.vsn(),
+      data: %{}
+    }
+
+    source =
+      Agent.define!(%{name: "passive", extensions: [passive]})
+      |> Agent.instantiate!(id: "passive")
+
+    assert {:ok, next, _} = Agent.mutate(source, [Directive.plugin_add(F.Counter)])
+    assert hd(next.extensions) === passive
+  end
+
+  @tag obligation: "jido.agent.I29"
+  test "changed Plugin detection compares declarations in both directions" do
+    before = F.agent()
+    assert {:ok, after_agent, _} = Agent.mutate(before, [Directive.plugin_add(F.Counter)])
+
+    assert Mutation.changed_plugins(before, after_agent) === [F.Counter]
+    assert Mutation.changed_plugins(after_agent, before) === [F.Counter]
+    assert Mutation.changed_plugins(after_agent, after_agent) === []
+
+    assert Mutation.changed_plugins(
+             after_agent,
+             after_agent,
+             [Directive.plugin_configure(F.Counter, [])]
+           ) === [F.Counter]
+
+    assert {:error, %Error{code: :plugin_change_with_owned_directive}} =
+             Mutation.validate_effects(
+               before,
+               after_agent,
+               [Directive.plugin_add(F.Counter), %F.Owned{}]
+             )
+
+    assert {:error, %Error{code: :plugin_change_with_owned_directive}} =
+             Agent.cmd(
+               after_agent,
+               F.signal([Directive.plugin_remove(F.Counter, state: :discard), %F.Owned{}])
+             )
+  end
+
+  @tag obligation: "jido.agent.I26"
   test "invalid state, malformed batches, and runtime work fail without a candidate" do
     for changes <- [
           nil,
@@ -244,6 +431,7 @@ defmodule Jido.Agent.MutationTest do
     assert {:error, _} = Agent.mutate(%{F.agent() | state: %{count: "bad"}}, [])
   end
 
+  @tag obligation: "jido.agent.I27"
   test "current route contract survives removal and the next input uses the new routes" do
     original = F.agent()
     remove = Directive.route_remove("run")
@@ -252,6 +440,7 @@ defmodule Jido.Agent.MutationTest do
     assert original.routes != []
   end
 
+  @tag obligation: "jido.agent.I27"
   test "mutations do not create helper functions" do
     assert {:ok, _, _} =
              Agent.mutate(F.agent(), [Directive.route_add("dynamic", F.Work, as: :dynamic)])

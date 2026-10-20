@@ -57,23 +57,22 @@ and separates the retired IDs.
 | --- | --- | --- |
 | One module with callback-derived capability groups | Plugin declaration | Selected; current implementation retained |
 | Required after-commit notification | Plugin and live commit | Selected; design and dependent timing corrected |
-| Scheduler durable delivery removal | Core Scheduler | Selected; source, tests, and guide cleanup pending |
+| Scheduler durable delivery removal | Core Scheduler | Complete; source, tests, fixtures, and guides use the timer-only contract |
 | Scheduler requirement ownership | Plugin design and delivery ledger | Corrected; retained and retired IDs are explicit |
 | Bundled Plugin migration | Plugin packages | Complete |
 | Identity and Secure Signal use package inputs without Signal replacement. | Examples | Fixed |
 
-## Ordered follow-up
+## Completed implementation
 
-1. Keep each Plugin in one module with optional owner callbacks.
-   Ordinary internal delegation is permitted; separate authoring facets are removed.
-2. Keep custom Directive validation on its Directive module.
-3. Remove Scheduler durable delivery and its public enqueue/acknowledgement
-   API, owned pending fields, and delivery-only options. Clean up affected
-   guides, examples, fixtures, and tests. Preserve one-shot delivery, future
-   recurring timers, saved recurring definitions, and optional occurrence metadata.
-4. Verify the saved-definition boundary before removing pending-delivery fields
-   from checkpoint compatibility. Record how old delivery-mode definitions are handled.
-5. Run appropriate package format, compile, and test checks after code removal.
+1. Each Plugin uses one module with optional owner callbacks. Ordinary internal
+   delegation remains permitted; separate authoring facets are removed.
+2. Custom Directive validation stays on its Directive module.
+3. Scheduler durable delivery, enqueue and acknowledgement APIs, pending
+   business fields, and delivery-only options are removed. One-shot delivery,
+   future recurring timers, saved recurring definitions, and optional
+   occurrence metadata remain.
+4. Saved definitions that contain retired delivery fields fail validation.
+5. Focused Scheduler contract and mutation checks pass after the removal.
 
 The removal scope includes `Scheduler.Durable`, `Delivery`, `Enqueue`,
 `Signal.Enqueue`, `Queue`, and `Acknowledge`; `delivery: :durable`,

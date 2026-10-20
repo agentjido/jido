@@ -78,7 +78,7 @@ checks the complete record again as defense in depth.
 
 ## Evidence
 
-- Error tests prove the 21-code registry, code lookup, class behavior, and the
+- Error tests prove the 24-code registry, code lookup, class behavior, and the
   exact version-1 projection.
 - Agent and Plugin tests prove the added checkpoint, definition, and state-owner
   codes on their real failure paths.

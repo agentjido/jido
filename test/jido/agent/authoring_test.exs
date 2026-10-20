@@ -1,5 +1,5 @@
 defmodule JidoTest.Agent.AuthoringTest do
-  use ExUnit.Case, async: false
+  use Covenant.Case, component: "jido.agent", async: false
 
   alias Jido.Agent
   alias Jido.Agent.Codec
@@ -210,6 +210,7 @@ defmodule JidoTest.Agent.AuthoringTest do
     defp add(count, amount, multiplier), do: count + amount * multiplier
   end
 
+  @tag obligation: ["jido.agent.I1", "jido.agent.I10"]
   test "the definition stores ordered routes and Plugin contributions" do
     definition = Counter.definition()
     assert definition.module == Counter
@@ -227,6 +228,7 @@ defmodule JidoTest.Agent.AuthoringTest do
     refute function_exported?(UnexposedCounter, :add_signal, 1)
   end
 
+  @tag obligation: "jido.agent.I21"
   test "generated Signal helpers have tuple and raising forms" do
     module = JidoTest.AuthoringDocsAgent
     {:docs_v1, _, _, _, _, _, docs} = Code.fetch_docs(module)
@@ -256,6 +258,7 @@ defmodule JidoTest.Agent.AuthoringTest do
     end
   end
 
+  @tag obligation: ["jido.agent.I3", "jido.agent.I22"]
   test "Spark rejects invalid schema and identity options with a field path" do
     assert_raise Spark.Error.DslError, ~r/schema/, fn ->
       compile_agent("", "", "agent do\n schema nil\n end")
@@ -268,6 +271,7 @@ defmodule JidoTest.Agent.AuthoringTest do
     end
   end
 
+  @tag obligation: ["jido.agent.I4", "jido.agent.I21", "jido.agent.I22"]
   test "removed route options and invalid helpers fail at declaration" do
     for option <- ["priority: 1", "match: fn _ -> true end", "params: %{}"] do
       assert_raise CompileError, ~r/Unknown route options/, fn ->
@@ -288,6 +292,7 @@ defmodule JidoTest.Agent.AuthoringTest do
     end
   end
 
+  @tag obligation: "jido.agent.I1"
   test "a bare route is pass-through and needs no Agent block or source" do
     compiled =
       compile_isolated("""
@@ -306,6 +311,7 @@ defmodule JidoTest.Agent.AuthoringTest do
     assert {:error, %{code: :unmatched_input}} = Agent.Route.select(module.definition(), "other")
   end
 
+  @tag obligation: "jido.agent.I3"
   test "block metadata accepts mixed keys and rejects structs with a DSL error" do
     compiled =
       compile_agent("", "", """
@@ -330,6 +336,7 @@ defmodule JidoTest.Agent.AuthoringTest do
     end
   end
 
+  @tag obligation: ["jido.agent.I1", "jido.agent.I21"]
   test "inline routes compile ordinary Actions with access to private helpers" do
     target = InlineCounter.route_action!("inline.add")
 
@@ -347,6 +354,7 @@ defmodule JidoTest.Agent.AuthoringTest do
     assert candidate.state.count == 6
   end
 
+  @tag obligation: "jido.agent.I1"
   test "inline routes accept guarded callback clauses" do
     compiled =
       compile_agent(
@@ -384,6 +392,7 @@ defmodule JidoTest.Agent.AuthoringTest do
              module.cmd(module.instantiate!(id: Jido.Signal.ID.generate!()), other)
   end
 
+  @tag obligation: "jido.agent.I21"
   test "generated constructors preserve omitted and explicit input and fresh Signal IDs" do
     assert {:ok, %{data: %{}} = first} = Counter.add_signal(%{})
     assert {:ok, %{data: %{amount: 0}} = second} = Counter.add_signal(%{amount: 0})
@@ -405,6 +414,7 @@ defmodule JidoTest.Agent.AuthoringTest do
              Counter.cmd(Counter.instantiate!(id: Jido.Signal.ID.generate!()), signal)
   end
 
+  @tag obligation: "jido.agent.I21"
   test "map inputs retain keys that overlap helper option names" do
     input = %{server: 1, opts: 2, _: 3, _private: 4, "user-id": 5, amount: 6, amount_or_opts: 7}
     assert {:ok, signal} = NamedAgent.compose_signal(input, id: "named")
@@ -412,6 +422,7 @@ defmodule JidoTest.Agent.AuthoringTest do
     assert signal.id == "named"
   end
 
+  @tag obligation: ["jido.agent.I21", "jido.agent.I22"]
   test "constructors reject non-map input and invalid envelope options" do
     for input <- [nil, [], [amount: 1], 1, ~D[2026-09-03]] do
       assert {:error, %{__exception__: true}} = Counter.add_signal(input)
@@ -436,6 +447,7 @@ defmodule JidoTest.Agent.AuthoringTest do
     assert {:error, _} = Agent.instantiate(%{}, [])
   end
 
+  @tag obligation: "jido.agent.I20"
   test "wildcard routes work and static structs are not portable authoring values" do
     definition = RawCounter.definition()
 
@@ -459,6 +471,7 @@ defmodule JidoTest.Agent.AuthoringTest do
              Jido.Agent.Codec.Registry.new(%{"runtime" => {:value, ~D[2026-09-03]}})
   end
 
+  @tag obligation: "jido.agent.I20"
   test "Codec rejects incomplete instance shapes before it derives a definition" do
     definition = Counter.definition()
 
@@ -474,6 +487,7 @@ defmodule JidoTest.Agent.AuthoringTest do
     end
   end
 
+  @tag obligation: ["jido.agent.I4", "jido.agent.I22"]
   test "malformed route collections return errors in direct forms" do
     route = {"direct.add", Add}
 
@@ -496,6 +510,7 @@ defmodule JidoTest.Agent.AuthoringTest do
     assert [%{handler: %{target: Add}, defaults: %{amount: 2}}] = built.routes
   end
 
+  @tag obligation: "jido.agent.I21"
   test "map inputs support optional list and keyword fields without ambiguity" do
     compiled =
       compile_agent("route \"test.list\", ListInputs, as: :list")
@@ -510,6 +525,7 @@ defmodule JidoTest.Agent.AuthoringTest do
     end
   end
 
+  @tag obligation: "jido.agent.I21"
   test "an inline route without as needs no source and generates no helper" do
     compiled =
       compile_agent(
@@ -536,6 +552,7 @@ defmodule JidoTest.Agent.AuthoringTest do
              module.cmd(module.instantiate!(id: Jido.Signal.ID.generate!()), signal)
   end
 
+  @tag obligation: ["jido.agent.I1", "jido.agent.I22"]
   test "recompilation verifies the new schema of an Action defined later in the same file" do
     module = Module.concat(JidoTest, "ReloadedAgent#{System.unique_integer([:positive])}")
 
@@ -574,6 +591,7 @@ defmodule JidoTest.Agent.AuthoringTest do
     end)
   end
 
+  @tag obligation: "jido.agent.I22"
   test "an unchanged Agent checks a reloaded Action contract" do
     module = Module.concat(JidoTest, "ActionReload#{System.unique_integer([:positive])}")
     action = Module.concat(module, Action)

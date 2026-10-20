@@ -166,9 +166,9 @@ struct. It does not add `PersistenceError` or `RuntimeError`.
 
 ### Stable code registry
 
-This 21-code registry is closed for this alignment. A later owner can add a code only
-with a requirement, tests, and a dependent-document update. A code is never
-reused for a different meaning.
+This 24-code registry is closed for this alignment. A later owner can add a
+code only with a requirement, tests, and a dependent-document update. A code
+is never reused for a different meaning.
 
 | Code | Error class | Owner and trigger |
 | --- | --- | --- |
@@ -189,6 +189,9 @@ reused for a different meaning.
 | `:agent_exec_callback_timeout` | `:timeout` | An Exec adapter callback reaches its operation limit. |
 | `:agent_exec_callback_task_failed` | `:execution` | The owned Exec adapter process cannot start or exits. |
 | `:agent_turn_timeout` | `:timeout` | Active pre-commit Turn work reaches the Agent Server Turn limit. |
+| `:missing_env` | `:invalid` | Config cannot find a required environment variable. |
+| `:invalid_env` | `:invalid` | Config receives an invalid environment variable name. |
+| `:invalid_config` | `:invalid` | Config receives an invalid configuration list. |
 | `:jido_instance_invalid_config` | `:invalid` | Instance configuration or Ref facade options fail validation. |
 | `:jido_namespace_already_bound` | `:invalid` | Another live local instance owns the exact namespace. |
 | `:jido_namespace_required` | `:invalid` | A Ref-first operation targets an instance with no namespace. |

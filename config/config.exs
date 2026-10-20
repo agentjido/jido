@@ -5,7 +5,7 @@ if config_env() in [:dev, :test] do
   config :covenant,
     root: ".",
     contracts_dir: "test/contract",
-    test_paths: ["test/contract"],
+    test_paths: ["test/contract", "test/jido/agent"],
     sibling_dir: false
 end
 

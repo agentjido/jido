@@ -56,7 +56,6 @@ defmodule Jido.Agent.Validation do
            Error.at(Topology.normalize(definition.topology, definition, opts), :topology),
          definition = %{definition | topology: topology},
          :ok <- verify_extensions(extensions, definition, related?),
-         :ok <- struct_fields(definition),
          :ok <- plugin_schema(definition, related? and Keyword.get(opts, :plugin_schema?, true)) do
       {:ok, struct!(Jido.Agent, definition)}
     else
@@ -82,18 +81,6 @@ defmodule Jido.Agent.Validation do
 
   defp verify_extensions(_, _, false), do: :ok
 
-  defp struct_fields(fields) do
-    case Jido.Schema.validate(Jido.Agent.__schema__(), struct!(Jido.Agent, fields)) do
-      :ok ->
-        :ok
-
-      {:error, issues} ->
-        Error.fail(:invalid_agent, [], "Agent fields do not match the Zoi schema", %{
-          issues: issues
-        })
-    end
-  end
-
   defp plugin_schema(fields, true) do
     with {:ok, _schema} <- state_schema(struct!(Jido.Agent, fields)), do: :ok
   end
@@ -106,7 +93,7 @@ defmodule Jido.Agent.Validation do
 
   def validate_definition(value, opts \\ [])
 
-  def validate_definition(%Jido.Agent{id: nil, state: nil} = value, opts) do
+  def validate_definition(%Jido.Agent{} = value, opts) do
     with {:ok, normalized} <- define(value, opts) do
       if normalized === value,
         do: {:ok, value},

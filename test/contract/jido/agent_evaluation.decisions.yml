@@ -21,3 +21,9 @@
   decision: Require Plugin Pipeline evaluation to start with one successful executable result and one selected route. Remove its error pass-through and missing-route forms, redundant internal list guards, and the unused Runner conversion of Signal routing errors.
   driver: Public entry points validate options, Signals, Agent definitions, and executable results before these internal functions run. The extra paths had no production caller and weakened the component boundary.
   approved_by: User-requested trim and hardening pass
+
+- id: route-mutation-ownership
+  date: 2026-10-20
+  decision: Add Jido.Agent.Route to this mutation profile.
+  driver: First-match route selection, default input merging, and executable parameter checks are evaluation behavior, not Agent definition ownership.
+  approved_by: Final hardening audit

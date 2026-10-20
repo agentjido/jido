@@ -1,5 +1,5 @@
 defmodule Jido.Agent.ValidationResolutionTest do
-  use ExUnit.Case, async: true
+  use Covenant.Case, component: "jido.agent", async: true
 
   alias Jido.Agent.Validation
 
@@ -19,6 +19,7 @@ defmodule Jido.Agent.ValidationResolutionTest do
     def definition, do: nil
   end
 
+  @tag obligation: "jido.agent.I22"
   test "definition and instance resolution preserve configuration exceptions" do
     for resolve <- [&Validation.resolve/1, &Jido.Agent.instantiate(&1, [])] do
       assert {:error, error} = resolve.(BrokenConfig)
@@ -32,6 +33,7 @@ defmodule Jido.Agent.ValidationResolutionTest do
     end
   end
 
+  @tag obligation: "jido.agent.I22"
   test "configuration throws and exits remain structured errors with their causes" do
     for {module, kind} <- [{ThrownConfig, :throw}, {ExitedConfig, :exit}] do
       assert {:error, error} = Validation.resolve(module)
@@ -39,8 +41,40 @@ defmodule Jido.Agent.ValidationResolutionTest do
     end
   end
 
+  @tag obligation: "jido.agent.I22"
   test "invalid configuration retains its validation error" do
     assert {:error, error} = Validation.resolve(InvalidConfig)
     assert error.code == :definition_required
+  end
+
+  @tag obligation: "jido.agent.I22"
+  test "loaded Agent module detection requires the definition callback" do
+    assert Validation.loaded_agent_module?(BrokenConfig) === true
+    assert Validation.loaded_agent_module?(String) === false
+  end
+
+  @tag obligation: "jido.agent.I22"
+  test "resolution separates invalid values from unavailable modules" do
+    for value <- [nil, true, false, "module"] do
+      assert {:error,
+              %Jido.Agent.Error{
+                code: :definition_required,
+                message: message,
+                details: %{}
+              }} = Validation.resolve(value)
+
+      assert message != ""
+    end
+
+    missing = Module.concat(__MODULE__, Missing)
+
+    assert {:error,
+            %Jido.Agent.Error{
+              code: :unresolved_definition,
+              message: message,
+              details: %{module: ^missing}
+            }} = Validation.resolve(missing)
+
+    assert message != ""
   end
 end

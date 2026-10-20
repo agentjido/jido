@@ -4,9 +4,8 @@
 
 ## Briefing
 
-Jido now uses one semantic event catalog for Agent lifecycle, Turn result,
-commit, Directive work, Turn settlement, admission rejection, persistence,
-the static local Topology Controller, and Scheduler delivery.
+Jido now uses one semantic event catalog for AgentServer lifecycle, Turn
+result, commit, Directive work, effects, Turn settlement, and persistence.
 
 Every semantic event has `schema_version: 1`. The event boundary keeps only
 approved scalar metadata. It omits state, payloads, raw errors, records,
@@ -20,15 +19,14 @@ not change the command result, durable result, or public Turn Outcome.
 
 | Family | Event | Meaning |
 | --- | --- | --- |
-| Agent lifecycle | `[:jido, :agent, :lifecycle, event]` | Activation, stop, hibernate, or thaw |
-| Agent Turn result | `[:jido, :agent, :turn, event]` | Admission to live result or pre-commit failure |
-| Agent commit | `[:jido, :agent, :commit, event]` | One commit attempt, including required persistence |
-| Agent Directive | `[:jido, :agent, :directive, event]` | One post-commit Directive attempt |
-| Turn settlement | `[:jido, :agent, :turn, :settled]` | One bounded terminal result |
-| Admission rejection | `[:jido, :agent, :admission, :rejected]` | Deadline or overload rejection before a Turn |
+| AgentServer lifecycle | `[:jido, :agent_server, :lifecycle, :start | :stop]` | One live activation boundary |
+| AgentServer Turn | `[:jido, :agent_server, :turn, event]` | Turn start to live result or pre-commit failure |
+| AgentServer commit | `[:jido, :agent_server, :commit]` | One successful commit fact |
+| Returned Directives | `[:jido, :agent_server, :directives, :returned]` | Count returned at commit |
+| AgentServer effects | `[:jido, :agent_server, :effects, :start | :stop]` | One post-commit effects batch |
+| Turn settlement | `[:jido, :agent_server, :turn, :settled]` | One bounded terminal result |
 | Persistence | `[:jido, :persistence, :operation, event]` | Load, compare-and-swap, or delete |
-| Local Topology | `[:jido, :topology, :operation, event]` | Activation, repair, or cleanup |
-| Scheduler delivery | `[:jido, :scheduler, :delivery]` | One bounded durable-delivery outcome |
+| Persistence Store | `[:jido, :persistence, :store, event]` | One direct Store operation |
 
 For a span, `event` is `:start`, `:stop`, or `:exception`. A returned failure
 uses `:stop`. A fault that escapes the observed boundary uses `:exception`.
@@ -71,11 +69,10 @@ resources, and vendor configuration.
 
 ## Evidence
 
-- Agent lifecycle tests prove Ref projection, hibernate, thaw, live result,
-  settlement, rejection, privacy, and failure isolation.
+- AgentServer tests prove lifecycle, live result, commit, returned Directive,
+  effects, settlement, privacy, and failure isolation facts.
 - Persistence tests prove load, compare-and-swap, conflict, delete, status,
   revision, and privacy facts.
-- Topology tests prove activation, repair, cleanup, status, counts, and privacy.
 - Telemetry tests prove schema normalization, stable error codes, semantic
   metrics, and four log modes.
 - OpenTelemetry tests prove the optional API mapping, safe attributes, links,

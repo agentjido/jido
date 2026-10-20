@@ -50,7 +50,7 @@
   operator: element_removal
   mutation: "`schema: schema` → `(removed)`"
   sort: unpromised
-  reason: Rejected authoring schema diagnostics belong to jido.agent_model_and_authoring, not jido.agent_evaluation.
+  reason: Rejected authoring schema diagnostics belong to jido.agent, not jido.agent_evaluation.
 
 - at: lib/jido/agent/plugin.ex:63:13
   operator: clause_removal
@@ -92,13 +92,13 @@
   operator: element_removal
   mutation: "`plugin: spec.package` → `(removed)`"
   sort: unpromised
-  reason: Plugin state-key conflict diagnostics belong to jido.agent_model_and_authoring, not jido.agent_evaluation.
+  reason: Plugin state-key conflict diagnostics belong to jido.agent, not jido.agent_evaluation.
 
 - at: lib/jido/agent/plugin.ex:159:11
   operator: element_removal
   mutation: "`state_key: spec.state_key` → `(removed)`"
   sort: unpromised
-  reason: Plugin state-key conflict diagnostics belong to jido.agent_model_and_authoring, not jido.agent_evaluation.
+  reason: Plugin state-key conflict diagnostics belong to jido.agent, not jido.agent_evaluation.
 
 - at: lib/jido/agent/plugin/pipeline.ex:60:10
   operator: string_empty

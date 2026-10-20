@@ -30,6 +30,9 @@ test/contract/
     discovery.decisions.yml
     discovery.survivors.yml
     discovery/
+    error.obligations.md
+    error.decisions.yml
+    error/
     agent_server.obligations.md
     agent_server/
       activation/
@@ -167,6 +170,11 @@ fields, bounded logs, per-instance Debug overrides, W3C trace context, and
 optional OpenTelemetry mapping. It does not own the runtime or persistence
 operations that emit events, reporter configuration, OpenTelemetry SDK startup,
 sampling, export, or durable audit records.
+
+`jido.error` owns the shared taxonomy, constructors, common-code registry,
+retry classification, and bounded version-1 projection. It does not own Agent
+or Plugin errors, domain failure conversion, adjacent-package error types, or
+runtime retry and recovery policy.
 
 ## Gates
 
