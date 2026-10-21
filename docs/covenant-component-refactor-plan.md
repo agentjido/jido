@@ -1,7 +1,7 @@
 # Covenant component refactor plan
 
-Date: 2026-10-19
-Status: All approved components active; final hardening in progress
+Date: 2026-10-20
+Status: Complete
 Target: `agentjido/jido`, branch `release/v3`
 
 ## Purpose
@@ -70,7 +70,7 @@ obligation file and passing tagged contract tests.
 | `jido.plugin.sensor_manager` | Active | 8 | 8 | The bundled SensorManager Plugin is independent. |
 
 The package has about 168 `Jido.*` modules. A module does not need a Covenant
-owner only because it exists. However, major public runtime areas now have no
+owner only because it exists. All major public runtime areas now have an
 independent Covenant owner.
 
 ### Current generic Plugin shape
@@ -152,8 +152,8 @@ The code has three different recovery contracts:
    accepted wait inputs preserve Flow progress. This is not the same value as
    the Agent record revision.
 
-The current AgentServer Covenant covers the first two inside one component. It
-does not give durable Turn progress a complete independent contract.
+The current AgentServer Covenant gives each shape a separate component and an
+independent contract.
 
 ## Approved component map
 
@@ -309,9 +309,10 @@ Core AgentServer result, 2026-10-20:
   invalid, and none survive or time out. The valid-mutant score is 100%.
 - The public coordinator and focused core owner total 3,585 production lines,
   131 fewer than the 3,716-line coordinator before the final extraction.
-- The complete Covenant gate passes 547 tests and all 185 active obligations.
-- The package suite and coverage run pass 1,267 tests with 577 exclusions.
-  Package-only line coverage is 94.1%, above the 90% gate.
+- The complete Covenant gate passes 1,029 tests and all 225 active
+  obligations across 21 components.
+- The package suite and coverage run pass 1,301 tests with 577 exclusions.
+  Package-only line coverage is 96.0%, above the 90% gate.
 
 ### `jido.agent_server.activation`
 
@@ -335,28 +336,28 @@ The active mutation profile includes `Jido.AgentServer.Supervisor`,
 `RegistrationGuard`, and `RegistryWorker`. Data-only child specifications do
 not need mutation targets.
 
-Activation result, 2026-10-19:
+Activation result, 2026-10-20:
 
 - 11 active obligations replace the 15 retired activation obligations.
-- 44 focused tests cover startup, registration, readiness, local recovery,
+- 45 focused tests cover startup, registration, readiness, local recovery,
   control records, idle behavior, and activation-owned child records.
-- The focused profile checks 209 mutants: 186 are killed, 17 are sorted, 6 are
-  invalid, and none time out.
+- The full profile checks 215 mutants: 192 are killed, 17 classified survivors
+  remain, 6 are invalid, and none time out. No survivor is unsorted.
 - Plugin-root startup moved from `Jido.AgentServer.Supervisor` to
   `Jido.AgentServer.Plugin`; persistent lifetime helpers moved to
   `Jido.AgentServer.Durable`.
 - The changed AgentServer owner files total four fewer production lines than
   their pre-extraction versions.
 
-Effects result, 2026-10-19:
+Effects result, 2026-10-20:
 
 - 11 active obligations replace the 13 retired effect obligations. Old I102
   now keeps only runtime child lifetime behavior for composition.
-- 32 focused tests cover complete admission, commit and reply order, failures,
+- 34 focused tests cover complete admission, commit and reply order, failures,
   deadlines, ownership, Signal dispatch, safe error reports, runtime Agent
   Directives, and independent process start.
-- The focused profile checks 167 mutants: 135 are killed, 4 equivalent
-  survivors are sorted, 28 are invalid, and none time out.
+- The full profile checks 167 mutants: 136 are killed, 3 equivalent survivors
+  remain, 28 are invalid, and none time out. No survivor is unsorted.
 - Effect decisions and runtime Agent Directive work moved from the main server
   and the removed RuntimeDirectives module into Jido.AgentServer.Effects.
   Plugin Directive owner selection stays with Jido.AgentServer.Plugin.
@@ -404,15 +405,15 @@ Owns:
 Target modules are `Jido.AgentServer.Plugin.*` and extracted live Plugin
 coordination code. Bundled Plugin internals are excluded.
 
-Plugin runtime result, 2026-10-19:
+Plugin runtime result, 2026-10-20:
 
 - 12 active obligations replace old AgentServer obligations I50-I62 and the
   Plugin-runtime part of I97.
 - 65 focused tests cover runtime roots, readiness, live admission, commit
   callbacks, outbound Signal preparation, Directive dispatch, callback
   ownership, and safe live replacement.
-- The focused profile checks 229 mutants: 159 are killed, 31 are sorted, 39 are
-  invalid, and none time out. No survivor is unsorted.
+- The full profile checks 229 mutants: 159 are killed, 31 classified survivors
+  remain, 39 are invalid, and none time out. No survivor is unsorted.
 - Live Plugin coordination moved from the main state machine into
   `Jido.AgentServer.Plugin` and `Jido.AgentServer.Plugin.Callbacks`. The main
   state machine retains phase changes, timers, task startup, and replies.
@@ -448,8 +449,8 @@ Composition result, 2026-10-20:
 - 41 focused tests cover child ownership, adoption, accepted composition,
   member recovery, readiness, connection delivery, local Buses, and runtime
   child restart policy.
-- The focused profile checks 300 mutants: 260 are killed, 22 are sorted, 18
-  are invalid, and none time out. No survivor is unsorted.
+- The full profile checks 300 mutants: 260 are killed, 22 classified survivors
+  remain, 18 are invalid, and none time out. No survivor is unsorted.
 - Child behavior moved from the main state machine into
   `Jido.AgentServer.CompositionRuntime`. Topology reconciliation remains in
   `TopologyRuntime`, and local Bus ownership remains in `TopologyBus`.
@@ -495,8 +496,8 @@ Durable result, 2026-10-20:
 - 48 focused tests cover configuration, create, restore, required commit,
   authority loss, portability, hibernation, idle hibernation, snapshots, and
   upgrades.
-- The focused profile checks 72 mutants: 64 are killed and 8 are sorted. None
-  are invalid, timed out, or unsorted.
+- The full profile checks 72 mutants: 64 are killed and 8 classified survivors
+  remain. None are invalid, timed out, or unsorted.
 - Durable decisions moved into `Jido.AgentServer.Durable`. Pending Flow receipt
   validation moved to the existing `Jido.AgentServer.DurableTurn` owner.
 - The three changed production files total 20 fewer lines than before this
@@ -541,13 +542,14 @@ Durable Turn result, 2026-10-20:
 - 61 focused tests cover the three internal durable Turn modules.
 - `CheckpointStore` and `WaitHost` moved under
   `Jido.AgentServer.DurableTurn` without compatibility delegates.
-- The four changed production files total 4 fewer lines than before this
+- The four changed production files total 5 fewer lines than before this
   extraction.
-- The exact mutation run tested 239 mutants: 218 were killed, 13 were sorted,
-  8 were invalid, and none timed out or remained unsorted. The score is 94.4%.
-- The full Covenant gate passes 539 tests and all 185 active obligations.
-- The package file set passes 1,257 tests with 573 exclusions. Core package
-  line coverage remains 94.1%.
+- The full mutation run tested 238 mutants: 217 were killed, 13 classified
+  survivors remain, 8 were invalid, and none timed out or remained unsorted.
+  The score is 94.3%.
+- The full Covenant gate passes 1,029 tests and all 225 active obligations.
+- The package file set passes 1,301 tests with 577 exclusions. Core package
+  line coverage is 96.0%.
 
 ## Current AgentServer obligation migration
 
@@ -556,7 +558,7 @@ owners control different results.
 
 | Current obligation area | Approved owner | Required action |
 | --- | --- | --- |
-| I1-I8, I10-I31, I34 | `jido.agent_server` | Retain core request, Turn, cancellation, failure, and observation timing rules. Split safe metadata shape to observability if needed. |
+| I1-I8, I10-I31, I33-I34 | `jido.agent_server` | Retain core request, Turn, cancellation, failure, and observation timing rules. Split safe metadata shape to observability if needed. |
 | I9, I32, I39-I49 | `jido.agent_server.effects` | Moved and retired. Effects I1-I11 own batch admission, reply timing, dispatch, deadlines, post-commit failure, runtime Agent Directive handoff, and independent process start. |
 | I35-I38, I63-I64, I69, I72-I76, I88-I90 | `jido.agent_server.activation` | Moved and retired. Replacement activation obligations I1-I11 own identity, selected-instance ownership, fixed defaults, readiness, recovery, local checkpoints, control, idle behavior, and activation child records. |
 | I70-I71 | `jido.instance` | Already moved stable Ref identity and Ref routing to `jido.instance.I6-I8`. |
@@ -631,13 +633,13 @@ Exit condition: the boundary map and removal scope have user approval.
 
 ### Phase 1: create a migration ledger
 
-- [ ] Add one row for every current `jido.agent_server` obligation.
-- [ ] Give each row one target component and target obligation ID.
-- [ ] Mark compound obligations that must split.
-- [ ] Map each existing contract test to the target obligation.
-- [ ] Map each behavior-bearing module to one mutation profile.
-- [ ] List modules that remain unit-test-only and state why.
-- [ ] List public functions whose owner changes but whose API does not change.
+- [x] Add one row for every current `jido.agent_server` obligation.
+- [x] Give each row one target component and target obligation ID.
+- [x] Mark compound obligations that must split.
+- [x] Map each existing contract test to the target obligation.
+- [x] Map each behavior-bearing module to one mutation profile.
+- [x] List modules that remain unit-test-only and state why.
+- [x] List public functions whose owner changes but whose API does not change.
 
 Exit condition: no current obligation, contract test, or behavior-bearing
 runtime module is unassigned.
@@ -729,10 +731,10 @@ behavior-bearing modules and no duplicate implementation.
 
 ### Phase 7: separate activation from core Turn work
 
-- [ ] Isolate activation startup, readiness, registration, worker replacement,
+- [x] Isolate activation startup, readiness, registration, worker replacement,
       local checkpoint, and recovery policy.
-- [ ] Keep `Jido.AgentServer` focused on the active Turn state machine.
-- [ ] Move activation-owned metadata access behind the activation owner.
+- [x] Keep `Jido.AgentServer` focused on the active Turn state machine.
+- [x] Move activation-owned metadata access behind the activation owner.
 - [x] Keep local checkpoint data free of portable or durable claims.
 - [x] Preserve one-for-all recovery and cleanup barriers.
 - [x] Preserve current public PID and name behavior.
@@ -791,13 +793,13 @@ Activate one component per change:
 
 For each activation:
 
-- [ ] Add the obligation file and focused contract tests.
-- [ ] Add the non-overlapping mutation module profile.
-- [ ] Map each replaced current `jido.agent_server` obligation to its final
+- [x] Add the obligation file and focused contract tests.
+- [x] Add the non-overlapping mutation module profile.
+- [x] Map each replaced current `jido.agent_server` obligation to its final
       owner. Retire only the obligations that move to another component.
-- [ ] Regenerate Covenant coverage.
-- [ ] Run one mutation-profile resolution check.
-- [ ] Record that the check is focused unless the full profile completed.
+- [x] Regenerate Covenant coverage.
+- [x] Run one mutation-profile resolution check.
+- [x] Record that the check is focused unless the full profile completed.
 
 Completed for `jido.agent_server.activation`:
 
@@ -806,8 +808,8 @@ Completed for `jido.agent_server.activation`:
 - [x] Mapped and retired old obligations I35-I38, I63-I64, I69, I72-I76, and
       I88-I90.
 - [x] Regenerated complete Covenant coverage.
-- [x] Completed the focused mutation check with no unsorted survivor.
-- [x] Recorded the check as component-focused.
+- [x] Completed the full 215-mutant profile with no unsorted survivor.
+- [x] Recorded the check as a full component result.
 
 Completed for `jido.agent_server.effects`:
 
@@ -816,8 +818,8 @@ Completed for `jido.agent_server.effects`:
 - [x] Mapped and retired old obligations I9, I32, and I39-I49. Split the
       effect part from old I102 and kept its child-lifetime part active.
 - [x] Regenerated complete Covenant coverage.
-- [x] Completed the focused mutation check with no unsorted survivor.
-- [x] Recorded the check as component-focused.
+- [x] Completed the full 167-mutant profile with no unsorted survivor.
+- [x] Recorded the check as a full component result.
 
 Completed for `jido.agent_server.plugin_runtime`:
 
@@ -826,8 +828,8 @@ Completed for `jido.agent_server.plugin_runtime`:
 - [x] Mapped and retired old obligations I50-I62 and the Plugin-runtime part of
       I97.
 - [x] Regenerated complete Covenant coverage.
-- [x] Completed the focused mutation check with no unsorted survivor.
-- [x] Recorded the check as component-focused.
+- [x] Completed the full 229-mutant profile with no unsorted survivor.
+- [x] Recorded the check as a full component result.
 
 Completed for `jido.agent_server.composition`:
 
@@ -835,8 +837,8 @@ Completed for `jido.agent_server.composition`:
 - [x] Added a non-overlapping three-module mutation profile.
 - [x] Mapped and retired old obligations I65-I68, I95-I99, and I102.
 - [x] Regenerated complete Covenant coverage.
-- [x] Completed the focused mutation check with no unsorted survivor.
-- [x] Recorded the check as component-focused.
+- [x] Completed the full 300-mutant profile with no unsorted survivor.
+- [x] Recorded the check as a full component result.
 
 Completed for `jido.agent_server.durable`:
 
@@ -844,8 +846,8 @@ Completed for `jido.agent_server.durable`:
 - [x] Added a non-overlapping one-module mutation profile.
 - [x] Mapped and retired old obligations I77-I83, I91-I93, I100, and I101.
 - [x] Regenerated complete Covenant coverage.
-- [x] Completed the focused mutation check with no unsorted survivor.
-- [x] Recorded the check as component-focused.
+- [x] Completed the full 72-mutant profile with no unsorted survivor.
+- [x] Recorded the check as a full component result.
 
 Completed for `jido.agent_server.durable_turn`:
 
@@ -854,8 +856,8 @@ Completed for `jido.agent_server.durable_turn`:
 - [x] Defined new obligations because the root contract had no complete
       durable Flow obligation range to retire.
 - [x] Regenerated complete Covenant coverage.
-- [x] Completed the focused mutation check with no unsorted survivor.
-- [x] Recorded the check as component-focused.
+- [x] Completed the full 238-mutant profile with no unsorted survivor.
+- [x] Recorded the check as a full component result.
 
 Completed for `jido.agent_server`:
 
@@ -863,7 +865,7 @@ Completed for `jido.agent_server`:
       AgentServer subcomponents.
 - [x] Added eight focused contract test files with 75 tests.
 - [x] Added the non-overlapping `Jido.AgentServer.Core` mutation profile.
-- [x] Regenerated complete Covenant coverage: 547 tests and 185 obligations.
+- [x] Regenerated complete Covenant coverage: 1,029 tests and 225 obligations.
 - [x] Completed the full component mutation profile: 360 killed valid mutants,
       3 invalid mutants, no survivor, and no timeout.
 - [x] Recorded the public coordinator and focused decision-owner split.
@@ -1061,16 +1063,28 @@ component owner.
 
 ### Phase 11: final hardening pass
 
-- [ ] Search for stale component IDs, module names, and deleted Scheduler APIs.
-- [ ] Remove unused fixtures, helpers, test-only compatibility paths, and
+- [x] Search for stale component IDs, module names, and deleted Scheduler APIs.
+- [x] Remove unused fixtures, helpers, test-only compatibility paths, and
       duplicate validation.
 - [x] Confirm that production code has not grown without an approved reason.
-- [ ] Run format, warning-free compile, strict Credo, contract tests, authoring
+- [x] Run format, warning-free compile, strict Credo, contract tests, authoring
       tests, full package tests, property tests, and documentation build.
 - [x] Run focused mutation checks for every new profile.
-- [ ] Run full mutation analysis only after all profiles and source locations
+- [x] Run full mutation analysis only after all profiles and source locations
       are stable.
 - [x] Publish no full mutation score from an old source shape.
+
+Final verification, 2026-10-20:
+
+- Formatting, warning-free compilation, strict Credo, and documentation build
+  pass.
+- The complete Covenant gate passes 1,029 tests and 225 of 225 active
+  obligations across 21 components.
+- The package suite passes 1,301 tests with 577 exclusions. The separate
+  authoring and property suites pass 73 and 41 tests.
+- Package-only line coverage is 96.0%, above the 90% gate.
+- All active component mutation profiles have no unsorted survivor or timeout.
+- Production code in the final hardening diff removes two lines and adds none.
 
 Exit condition: component ownership, tests, module profiles, and documentation
 all describe the same code.

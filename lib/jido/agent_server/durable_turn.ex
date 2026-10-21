@@ -270,6 +270,4 @@ defmodule Jido.AgentServer.DurableTurn do
       acc -> versions({instruction.kind, instruction.target}, acc)
     end
   end
-
-  defp versions(_, acc), do: acc
 end

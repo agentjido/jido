@@ -52,6 +52,17 @@ defmodule JidoTest.AgentServer.ActivationRootTest do
       do: %{id: __MODULE__, start: {Tree, :start_link, [init]}, type: :supervisor}
   end
 
+  defmodule EmptyActivation do
+    use Supervisor
+
+    def start_link(observer), do: Supervisor.start_link(__MODULE__, observer)
+
+    def init(observer) do
+      send(observer, {:empty_activation, self()})
+      Supervisor.init([], strategy: :one_for_one)
+    end
+  end
+
   setup do
     name = Module.concat(__MODULE__, "Observer#{System.unique_integer([:positive])}")
     Process.register(self(), name)
@@ -135,6 +146,18 @@ defmodule JidoTest.AgentServer.ActivationRootTest do
       |> Enum.filter(fn table -> :ets.info(table, :name) == Server.Supervisor end)
 
     assert leaked == []
+  end
+
+  @tag obligation: "jido.agent_server.activation.I1"
+  test "an activation without a live request worker is stopped" do
+    {:ok, supervisor} = DynamicSupervisor.start_link(strategy: :one_for_one)
+
+    assert {:error, :worker_unavailable} =
+             Server.Supervisor.start_activation(supervisor, {EmptyActivation, self()})
+
+    assert_receive {:empty_activation, root}
+    refute Process.alive?(root)
+    assert DynamicSupervisor.which_children(supervisor) == []
   end
 
   @tag obligation: ["jido.agent_server.activation.I4", "jido.agent_server.activation.I5"]

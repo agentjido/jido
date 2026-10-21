@@ -1,64 +1,64 @@
-- at: lib/jido/agent_server/durable_turn.ex:36:24
+- at: lib/jido/agent_server/durable_turn.ex:37:24
   operator: integer_shift
   mutation: "`0` → `1`"
   sort: unpromised
   reason: The contract preserves the saved absolute expiry and does not fix the one-millisecond clamp used while converting a monotonic deadline to wall-clock time.
 
-- at: lib/jido/agent_server/durable_turn.ex:36:24
+- at: lib/jido/agent_server/durable_turn.ex:37:24
   operator: integer_shift
   mutation: "`0` → `-1`"
   sort: unpromised
   reason: The contract preserves the saved absolute expiry and does not fix the one-millisecond clamp used while converting a monotonic deadline to wall-clock time.
 
-- at: lib/jido/agent_server/durable_turn.ex:90:7
+- at: lib/jido/agent_server/durable_turn.ex:91:7
   operator: element_removal
   mutation: "`scheduler_policies: [default: policy]` → `(removed)`"
   sort: unpromised
   reason: Exact retry and scheduler policy behavior belongs to jido.agent_server.I27. This component promises durable progress and recovery, not the root execution-policy surface.
 
-- at: lib/jido/agent_server/durable_turn.ex:90:28
+- at: lib/jido/agent_server/durable_turn.ex:91:28
   operator: element_removal
   mutation: "`{:default, policy}` → `(removed)`"
   sort: unpromised
   reason: Exact retry and scheduler policy behavior belongs to jido.agent_server.I27. This component promises durable progress and recovery, not the root execution-policy surface.
 
-- at: lib/jido/agent_server/durable_turn.ex:98:11
+- at: lib/jido/agent_server/durable_turn.ex:99:11
   operator: condition_negate
   mutation: "`if user_failed` → `if !(user_failed)`"
   sort: unpromised
   reason: User Worker hook behavior belongs to jido.agent_server.I28. This component proves the internal durable progress hook bundle but does not duplicate the root user-hook contract.
 
-- at: lib/jido/agent_server/durable_turn.ex:102:11
+- at: lib/jido/agent_server/durable_turn.ex:103:11
   operator: condition_negate
   mutation: "`if user_idle` → `if !(user_idle)`"
   sort: unpromised
   reason: User Worker hook behavior belongs to jido.agent_server.I28. This component proves the internal durable progress hook bundle but does not duplicate the root user-hook contract.
 
-- at: lib/jido/agent_server/durable_turn.ex:118:82
+- at: lib/jido/agent_server/durable_turn.ex:119:82
   operator: comparison_swap
   mutation: "`!=` → `==`"
   sort: unpromised
   reason: The contract requires a saved waiting Flow to release its Worker. It does not require recovery to avoid a private transient resume before the same graph suspends again.
 
-- at: lib/jido/agent_server/durable_turn.ex:182:25
+- at: lib/jido/agent_server/durable_turn.ex:183:25
   operator: clause_removal
   mutation: "`case {:error, :busy} ->` → `(removed)`"
   sort: evaluation-gap
   reason: The branch absorbs a Runic step race. Public durable advances are serialized, so a deterministic test cannot force Runner.step/2 to return busy without replacing the dependency boundary.
 
-- at: lib/jido/agent_server/durable_turn.ex:197:15
+- at: lib/jido/agent_server/durable_turn.ex:198:15
   operator: clause_removal
   mutation: "`case error ->` → `(removed)`"
   sort: evaluation-gap
   reason: Reaching this defensive branch requires an injected Runic step failure outside its documented results. Public execution covers normal, busy, quiescent, and stopped admission results.
 
-- at: lib/jido/agent_server/durable_turn.ex:203:65
+- at: lib/jido/agent_server/durable_turn.ex:204:65
   operator: boolean_flip
   mutation: "`false` → `true`"
   sort: unpromised
   reason: The required graph checkpoint is complete before suspension. The contract does not expose whether Runic writes the same graph a second time while stopping the Worker.
 
-- at: lib/jido/agent_server/durable_turn.ex:252:63
+- at: lib/jido/agent_server/durable_turn.ex:253:63
   operator: element_removal
   mutation: "`:deterministic` → `(removed)`"
   sort: equivalent

@@ -9,6 +9,7 @@ defmodule JidoTest.AgentServer.Effects.SignalsTest do
   alias Jido.Agent.Directive
   alias Jido.AgentServer, as: Server
   alias Jido.AgentServer.Directive.{ErrorReport, ServerStop}
+  alias Jido.AgentServer.Effects
   alias Jido.Signal.Bus
   alias Jido.Tracing.Trace
   alias JidoTest.AgentServer.Fixtures, as: F
@@ -74,6 +75,8 @@ defmodule JidoTest.AgentServer.Effects.SignalsTest do
 
   @tag obligation: "jido.agent_server.effects.I8"
   test "ServerStop must be last and exits only after commit", c do
+    assert Effects.run(%ServerStop{reason: :done}, nil, %{}) == {:stop, :done}
+
     server = F.start(c)
     ref = Process.monitor(server)
 
@@ -91,6 +94,9 @@ defmodule JidoTest.AgentServer.Effects.SignalsTest do
 
   @tag obligation: "jido.agent_server.effects.I9"
   test "reported error applies failure policy after commit and stops the batch", c do
+    assert Effects.run(%ErrorReport{error: "private error"}, nil, %{}) ==
+             {:reported_error, {:reported_error, nil, "private error"}}
+
     observer = self()
 
     server =
@@ -227,6 +233,15 @@ defmodule JidoTest.AgentServer.Effects.SignalsTest do
     server = F.start(c, error_policy: {:emit_signal, {:pid, target: target}})
     send(target, :stop)
     F.down(target)
+
+    assert Effects.report_error(
+             %{status: :failed},
+             "agent",
+             nil,
+             {:pid, target: target},
+             nil
+           ) == {:stop, :error_signal_failed}
+
     ref = Process.monitor(server)
     assert {:error, error} = Server.call(server, F.signal(%{mode: :fail}))
     assert inspect(error) =~ "SERVER2_PRIVATE_ERROR"

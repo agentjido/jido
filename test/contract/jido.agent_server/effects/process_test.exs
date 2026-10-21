@@ -7,6 +7,7 @@ defmodule JidoTest.AgentServer.Effects.ProcessTest do
   import JidoTest.Eventually
   alias Jido.AgentServer, as: Server
   alias Jido.AgentServer.Directive.ProcessStart
+  alias Jido.AgentServer.Effects
   alias JidoTest.AgentServer.Fixtures, as: F
 
   defmodule InfoChild do
@@ -85,6 +86,10 @@ defmodule JidoTest.AgentServer.Effects.ProcessTest do
   @tag obligation: "jido.agent_server.effects.I11"
   test "ProcessStart accepts OTP info and ignore results and reports start failure", c do
     server = F.start(c, jido: c.jido, runner: Jido.exec_runner_name(c.jido))
+    failed = %{id: make_ref(), start: {FailedChild, :start_link, []}}
+
+    assert Effects.run(%ProcessStart{child_spec: failed}, nil, %{jido: c.jido}) ==
+             {:error, :spawn_process_failed}
 
     info = %{id: make_ref(), start: {InfoChild, :start_link, [self()]}}
     assert {:ok, _, _} = Server.call(server, batch([%ProcessStart{child_spec: info}]))
@@ -108,7 +113,6 @@ defmodule JidoTest.AgentServer.Effects.ProcessTest do
       )
     )
 
-    failed = %{id: make_ref(), start: {FailedChild, :start_link, []}}
     assert {:ok, _, _} = Server.call(server, batch([%ProcessStart{child_spec: failed}]))
 
     assert_eventually(

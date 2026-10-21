@@ -1075,10 +1075,11 @@
         "jido.agent_server.activation.I1": {
           "failing": 0,
           "kind": "functional",
-          "passing": 6,
+          "passing": 7,
           "status": "active",
           "testable": true,
           "tests": [
+            "test an activation without a live request worker is stopped",
             "test complete activation replacement drops its local checkpoint",
             "test failed parent attachment stops the provisional activation",
             "test instance startup owns one activation in each exact partition",
@@ -1793,12 +1794,13 @@
         "jido.agent_server.effects.I3": {
           "failing": 0,
           "kind": "functional",
-          "passing": 2,
+          "passing": 3,
           "status": "active",
           "testable": true,
           "tests": [
             "test a dispatch failure preserves its commit and stops the remaining batch",
-            "test returned error, exception, and invalid result stop a batch without reversing commit"
+            "test returned error, exception, and invalid result stop a batch without reversing commit",
+            "test terminal effect results settle without losing their value"
           ]
         },
         "jido.agent_server.effects.I4": {
@@ -1829,7 +1831,7 @@
         "jido.agent_server.effects.I6": {
           "failing": 0,
           "kind": "functional",
-          "passing": 6,
+          "passing": 7,
           "status": "active",
           "testable": true,
           "tests": [
@@ -1838,7 +1840,8 @@
             "test default dispatch and explicit override carry causation",
             "test dispatch preparation propagates causation and keeps safe fallbacks",
             "test explicit Signal directives dispatch in order with the turn trace and causation",
-            "test nil Emit defaults to self after commit"
+            "test nil Emit defaults to self after commit",
+            "test outbound dispatch returns the transport result"
           ]
         },
         "jido.agent_server.effects.I7": {

@@ -1,9 +1,3 @@
-- at: lib/jido/agent_server/effects.ex:97:9
-  operator: clause_removal
-  mutation: "`case _ ->` → `(removed)`"
-  sort: equivalent
-  reason: An unaccepted DynamicSupervisor result and a missing fallback clause both leave run/3 through its catch boundary and produce the same safe failed effect result. The raw start reason is not published.
-
 - at: lib/jido/agent_server/effects.ex:153:11
   operator: clause_removal
   mutation: "`case _ ->` → `(removed)`"
