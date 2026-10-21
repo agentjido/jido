@@ -222,9 +222,6 @@ defmodule Jido.MixProject do
           Jido.Agent.Extension,
           Jido.SignalAction
         ],
-        "Authoring Codecs": [
-          Jido.Agent.Codec
-        ],
         "Agent Directives": [
           Jido.Agent.Directive,
           Jido.Agent.Directive.Emit,
@@ -247,8 +244,7 @@ defmodule Jido.MixProject do
           Jido.Plugin.SignalContext
         ],
         "Plugin Contracts": [
-          Jido.Plugin,
-          Jido.Plugin.Manifest
+          Jido.Plugin
         ],
         "Built-In Plugins": [
           Jido.Plugin.Audit,

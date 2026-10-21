@@ -97,9 +97,10 @@ agent do
 end
 ```
 
-`plugin` needs a source file, and a Livebook cell doesn't have one. This
-notebook uses `extensions:`, which attaches the same Plugin with no options.
-`admit/3` then falls back to `["mallory"]`.
+This notebook uses `extensions:`, which attaches the Plugin with no options.
+Use `plugin GuidePlugins.Ledger, config: %{...}` when it needs Agent-specific
+config. Both forms work in a Livebook cell. `admit/3` falls back to
+`["mallory"]` here.
 
 ```elixir
 defmodule GuidePlugins.Counter do

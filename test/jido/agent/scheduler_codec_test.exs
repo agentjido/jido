@@ -2,7 +2,6 @@ defmodule Jido.Agent.SchedulerCodecTest do
   use JidoTest.Case, async: true
 
   alias Jido.Agent
-  alias Jido.Agent.Codec
   alias Jido.AgentServer, as: Server
   alias Jido.Authoring.Registry
   alias Jido.Plugin.Scheduler
@@ -34,9 +33,9 @@ defmodule Jido.Agent.SchedulerCodecTest do
     test "an imported #{kind} route dispatches through the Scheduler Plugin", %{jido: jido} do
       definition = definition(unquote(kind))
       registry = registry(definition)
-      assert {:ok, json} = Agent.to_json(definition, registry)
-      assert json =~ "plugins/scheduler/v1"
-      assert {:ok, ^definition} = Agent.from_json(json, registry)
+      assert {:ok, json} = JidoTest.AgentRegistry.encode_json(definition, registry)
+      assert json =~ "plugins/scheduler"
+      assert {:ok, ^definition} = JidoTest.AgentRegistry.decode_json(json, registry)
       assert definition.id == nil
       assert definition.state == nil
 
@@ -66,28 +65,33 @@ defmodule Jido.Agent.SchedulerCodecTest do
   test "import requires the trusted Scheduler reference" do
     definition = definition(:action)
     registry = registry(definition)
-    assert {:ok, json} = Agent.to_json(definition, registry)
-    missing_plugin = Map.delete(registry.entries, "plugins/scheduler/v1")
+    assert {:ok, json} = JidoTest.AgentRegistry.encode_json(definition, registry)
+    missing_plugin = Map.delete(registry.entries, {"plugins/scheduler", 1})
 
-    assert {:error, %{details: %{identifier: "plugins/scheduler/v1", kind: :plugin}}} =
-             Agent.from_json(json, missing_plugin)
+    assert {:error,
+            [
+              %Jido.Authoring.Issue{
+                details: %{identifier: "plugins/scheduler", kind: :plugin}
+              }
+            ]} =
+             JidoTest.AgentRegistry.decode_json(json, missing_plugin)
   end
 
   test "an imported instance becomes a definition and retains Plugin options" do
     definition = definition(:action)
     instance = Agent.instantiate!(definition, id: "stored-agent", state: %{count: 4})
-    assert {:ok, json} = Agent.to_json(instance, registry(definition))
-    assert {:ok, ^definition} = Agent.from_json(json, registry(definition))
-    assert {:ok, document} = Codec.encode(instance, registry(definition))
-    assert {:ok, ^definition} = Codec.decode(document, registry(definition))
+    assert {:ok, json} = JidoTest.AgentRegistry.encode_json(instance, registry(definition))
+    assert {:ok, ^definition} = JidoTest.AgentRegistry.decode_json(json, registry(definition))
+    assert {:ok, document} = JidoTest.AgentRegistry.encode(instance, registry(definition))
+    assert {:ok, ^definition} = JidoTest.AgentRegistry.decode(document, registry(definition))
   end
 
   test "import validates Scheduler options before startup" do
     definition = definition(:action)
     registry = registry(definition)
-    assert {:ok, document} = Codec.encode(definition, registry)
+    assert {:ok, document} = JidoTest.AgentRegistry.encode(definition, registry)
     [extension] = document["definition"]["extensions"]
-    option_key = %{"$type" => "atom", "id" => "atoms/retry-delay"}
+    option_key = %{"$type" => "atom", "id" => "atoms/retry-delay", "vsn" => 1}
 
     invalid_options = %{
       "$type" => "map",
@@ -97,8 +101,13 @@ defmodule Jido.Agent.SchedulerCodecTest do
     document =
       put_in(document, ["definition", "extensions"], [%{extension | "data" => invalid_options}])
 
-    assert {:error, %{details: %{plugin: Scheduler}}} =
-             Agent.from_json(Jason.encode!(document), registry)
+    assert {:error,
+            [
+              %Jido.Authoring.Issue{
+                code: :invalid_document,
+                message: "Agent Plugin state_spec/1 failed"
+              }
+            ]} = JidoTest.AgentRegistry.decode_json(Jason.encode!(document), registry)
   end
 
   defp definition(kind) do
@@ -124,15 +133,15 @@ defmodule Jido.Agent.SchedulerCodecTest do
 
   defp registry(definition) do
     Registry.new!(%{
-      "schemas/counter/v1" => {:schema, definition.schema},
-      "actions/queue/v1" => {:action, QueueTick},
-      "flows/queue/v1" => {:flow, QueueFlow},
-      "actions/tick/v1" => {:action, Tick},
-      "plugins/scheduler/v1" => {:plugin, Scheduler},
-      "atoms/retry-delay" => {:atom, :retry_delay_ms},
-      "atoms/count" => {:atom, :count},
-      "atoms/scheduler" => {:atom, :scheduler},
-      "atoms/cron" => {:atom, :cron}
+      {"schemas/counter", 1} => {:schema, definition.schema},
+      {"actions/queue", 1} => {:action, QueueTick},
+      {"flows/queue", 1} => {:flow, QueueFlow},
+      {"actions/tick", 1} => {:action, Tick},
+      {"plugins/scheduler", 1} => {:plugin, Scheduler},
+      {"atoms/retry-delay", 1} => {:atom, :retry_delay_ms},
+      {"atoms/count", 1} => {:atom, :count},
+      {"atoms/scheduler", 1} => {:atom, :scheduler},
+      {"atoms/cron", 1} => {:atom, :cron}
     })
   end
 end

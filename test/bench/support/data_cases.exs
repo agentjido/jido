@@ -13,13 +13,13 @@ defmodule JidoCoreBench.DataCases do
         fn _ ->
           a = F.definition(size)
           registry = JidoTest.AgentRegistry.for(a)
-          {:ok, doc} = Jido.Agent.Codec.encode(a, registry)
+          {:ok, doc} = JidoTest.AgentRegistry.encode(a, registry)
           {a, JSON.decode!(JSON.encode!(doc)), registry}
         end,
         fn {a, doc, r} ->
           case op do
-            :encode -> Jido.Agent.Codec.encode(a, r)
-            :decode -> Jido.Agent.Codec.decode(doc, r)
+            :encode -> JidoTest.AgentRegistry.encode(a, r)
+            :decode -> JidoTest.AgentRegistry.decode(doc, r)
           end
         end,
         fn {:ok, result} ->

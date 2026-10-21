@@ -2,7 +2,6 @@ defmodule JidoTest.Agent.AuthoringTest do
   use Covenant.Case, component: "jido.agent", async: false
 
   alias Jido.Agent
-  alias Jido.Agent.Codec
 
   setup do
     # Spark records source locations only when debug information is enabled.
@@ -451,8 +450,8 @@ defmodule JidoTest.Agent.AuthoringTest do
   test "wildcard routes work and static structs are not portable authoring values" do
     definition = RawCounter.definition()
 
-    assert {:error, %Jido.Authoring.Value.Error{reason: :value}} =
-             Codec.encode(definition, JidoTest.AgentRegistry.for(definition))
+    assert {:error, %Jido.Authoring.Error.InvalidError{code: :value}} =
+             JidoTest.AgentRegistry.encode(definition, JidoTest.AgentRegistry.for(definition))
 
     refute function_exported?(RawCounter, :raw_signal, 1)
 
@@ -468,7 +467,7 @@ defmodule JidoTest.Agent.AuthoringTest do
     assert {:ok, %{state: %{count: -1}}, []} = Agent.cmd(agent, signal)
 
     assert {:error, _} =
-             Jido.Agent.Codec.Registry.new(%{"runtime" => {:value, ~D[2026-09-03]}})
+             Jido.Authoring.Registry.new(%{"runtime" => {:value, ~D[2026-09-03]}})
   end
 
   @tag obligation: "jido.agent.I20"
@@ -483,7 +482,7 @@ defmodule JidoTest.Agent.AuthoringTest do
           %{definition | id: "instance", state: %URI{}},
           %{definition | id: "instance", state: []}
         ] do
-      assert {:error, _error} = Codec.encode(malformed, %{})
+      assert {:error, _error} = JidoTest.AgentRegistry.encode(malformed, %{})
     end
   end
 

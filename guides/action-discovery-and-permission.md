@@ -1,129 +1,98 @@
-# Action Discovery
+# Authoring Discovery and Permission
 
-`Jido.Discovery` builds a read-only catalog of the Action modules in your
-release. Use it to list Actions in an admin screen, look one up by a stable
-slug, or build a tool picker. It doesn't decide who can run an Action. This
-guide shows the catalog, how to scope it, and how to keep a separate
-allowlist for Agents and models.
+`Jido.Discovery` is owned by `jido_action`. It builds one immutable
+`Jido.Authoring.Registry` for Actions, Flows, Agents, extensions, Plugins,
+schemas, atoms, and document codecs.
 
-```elixir
-Jido.Discovery.list_actions(name: "order")
-# => [
-#      %{module: MyApp.Actions.LookupOrder, name: "lookup_order",
-#        description: "Reads one order by ID", application: :my_app,
-#        slug: "f5sthSdyusIigAKA"},
-#      %{module: MyApp.Actions.RefundOrder, name: "refund_order",
-#        description: "Refunds one order", application: :my_app,
-#        slug: "hoedKUB-BfkpkxeW"}
-#    ]
-```
-
-## The Catalog
-
-Jido starts one temporary task at application start. The task scans the
-module lists of the configured applications, keeps each module that has a
-valid Action contract, and stores the result in `:persistent_term`. Reads
-don't call Action code.
-
-The first build takes time. Until it finishes, `catalog/0` returns
-`{:error, :not_initialized}`, `list_actions/1` returns `[]`, and the lookups
-return `nil`. Check `ready?/0` before you depend on the result:
+`jido_action` refreshes this Registry in one temporary startup task. The task
+scans all loaded OTP applications, including packages such as `jido_chat` and
+`jido_connect` when they are present. An application can refresh it with an
+explicit application list:
 
 ```elixir
-Jido.Discovery.ready?()
-# => true
-
-{:ok, built_at} = Jido.Discovery.last_updated()
+:ok = Jido.Discovery.refresh(applications: [:jido_action, :jido, :my_app])
 ```
 
-Each entry holds:
+Use `Jido.Discovery.ready?/0` when application startup work needs the catalog.
+If the initial scan fails, it stays false and `Jido.Discovery.registry/0`
+raises with the scan reason.
 
-| Key | Value |
-| --- | --- |
-| `module` | The Action module. |
-| `name` | The Action's `name:`. |
-| `description` | The Action's `description:`, or `nil`. |
-| `application` | The OTP application that owns the module, or `nil`. |
-| `slug` | 16 URL-safe characters derived from the module name. Stable across releases while the module name stays the same. |
-
-Inline `action` blocks in routes are part of their Agent. Discovery skips
-them.
-
-## Query
+Use stable `id:` and `vsn:` values for definitions that can appear in stored
+documents:
 
 ```elixir
-Jido.Discovery.list_actions(description: "Refunds")
-Jido.Discovery.list_actions(application: :my_app, offset: 20, limit: 20)
+defmodule MyApp.Actions.LookupOrder do
+  use Jido.Action,
+    id: "my_app/actions/lookup-order",
+    vsn: 1,
+    name: "lookup_order"
 
-Jido.Discovery.get_action(MyApp.Actions.RefundOrder)
-Jido.Discovery.get_action_by_slug("hoedKUB-BfkpkxeW")
+  def run(params, _context), do: {:ok, params}
+end
+
+defmodule MyApp.SupportAgent do
+  use Jido.Agent,
+    id: "my_app/agents/support",
+    name: "support_agent"
+end
 ```
 
-`name:` and `description:` are case-sensitive substring matches.
-`application:` is exact. Results are sorted by name.
-
-For the input schema, call the Action module. Discovery returns inventory
-metadata only.
-
-## Scope the Scan
-
-By default Discovery scans every loaded application, including Jido and your
-dependencies. Limit it to the applications that own your Actions:
+Agent extensions and Plugins publish the same manifest:
 
 ```elixir
-# config/config.exs
-config :jido, Jido.Discovery,
-  applications: [:my_app],
-  modules: [MyApp.Scripts.Backfill]
+defmodule MyApp.Labels do
+  use Jido.Agent.Extension, id: "my_app/extensions/labels", vsn: 1
+end
+
+defmodule MyApp.Audit do
+  use Jido.Plugin, id: "my_app/plugins/audit", vsn: 1
+  def state_spec(_opts), do: :none
+end
 ```
 
-`modules:` adds Actions that aren't in a listed application. Set
-`applications: []` to scan only `modules:`.
-
-> #### Set an allowlist {: .warning}
->
-> The default scan includes Jido's internal Actions. It can also report
-> diagnostics for modules that fail to load, such as Hex modules under
-> `mix`. An `applications:` list keeps the catalog to your own code and
-> makes the first build faster.
-
-`refresh/1` rebuilds and replaces the whole catalog. It takes the same
-options:
+## Query the Registry
 
 ```elixir
-:ok = Jido.Discovery.refresh(applications: [:my_app])
+Jido.Discovery.list(:action)
+Jido.Discovery.list(:agent)
+Jido.Discovery.list(:plugin)
 
-Jido.Discovery.refresh(applications: [:nope])
-# => {:error, {:application_not_loaded, :nope}}
+Jido.Discovery.get("my_app/actions/lookup-order", 1)
+Jido.Discovery.get_by_target(:agent, MyApp.SupportAgent)
 ```
 
-A failed refresh keeps the previous catalog. `catalog/0` returns the full
-map, with `diagnostics` for modules that looked like Actions but failed
-validation.
+Each entry includes its stable ID, version, kind, target, provider, and owning
+application. Actions, Flows, and Agents can also include display text.
 
-## Not Permission
+The Registry uses `{id, vsn}` references in Elixir:
 
-The catalog lists what exists in the release. Any code that holds a module
-name can run that Action, whether or not it is in the catalog. Don't use the
-catalog to decide what a user, tenant, Agent, or model is allowed to call.
+```elixir
+registry = Jido.Discovery.registry()
 
-Jido gives you two places to set that limit.
+{:ok, MyApp.Actions.LookupOrder} =
+  Jido.Authoring.Registry.resolve(
+    registry,
+    {"my_app/actions/lookup-order", 1},
+    :action
+  )
+```
 
-### Agent Routes
+Stored JSON keeps the same version:
 
-An Agent runs only the Actions and Flows bound in its routes. A Signal
-selects a route by type. It can't name an Action module. A type with no
-route fails the Turn with `"No route accepts this Signal type"`.
+```json
+{
+  "id": "my_app/actions/lookup-order",
+  "vsn": 1
+}
+```
 
-Keep each route narrow, and use `emits:` to limit the Signal types a route
-can emit. The route table is the Agent's complete list of operations. See
-[Routes and Handlers](build-agent-routes.livemd).
+## Discovery Is Not Permission
 
-### Your Allowlist
+Discovery lists trusted code that is present in the release. It does not give
+a user, tenant, Agent, or model permission to run that code.
 
-When a model or a client picks an Action by name, look it up in a list you
-own. Keep the list in code or in your database, keyed by role, tenant, or
-Agent:
+Agent routes define the operations that one Agent can select. Products must
+keep a separate allowlist when a user or model can select an Action directly.
 
 ```elixir
 defmodule MyApp.Tools do
@@ -133,34 +102,9 @@ defmodule MyApp.Tools do
   }
 
   def for_role(role), do: Map.get(@allowed, role, [])
-
-  def run(role, name, params) do
-    case Enum.find(for_role(role), &(&1.name() == name)) do
-      nil -> {:error, :not_allowed}
-      action -> Jido.Exec.run(action, params)
-    end
-  end
 end
-
-MyApp.Tools.run("support", "refund_order", %{order_id: "o-1"})
-# => {:error, :not_allowed}
-
-MyApp.Tools.run("billing", "refund_order", %{order_id: "o-1"})
-# => {:ok, %{order_id: "o-1", refunded: true}}
 ```
 
-Give the model only the tool descriptions from `for_role/1`, and check the
-name again when the model calls it. The model's request is input. Treat it
-like any other client data.
-
-Use the catalog to build the admin screen where someone edits that list.
-Store module names or slugs, and resolve them back with `get_action/1` or
-`get_action_by_slug/1`. A `nil` result means the Action no longer exists in
-the release.
-
-## Next
-
-- [Routes and Handlers](build-agent-routes.livemd) – bind Actions to Signal
-  types.
-- [Instances and Tenants](configuration-and-tenant-isolation.md) – what the
-  shared catalog means for multi-tenant systems.
+Do not build a Registry from stored input. Define trusted manifests in code,
+review changes to them, and use stored data only to select existing Registry
+entries.

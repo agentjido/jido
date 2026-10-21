@@ -24,20 +24,26 @@ defmodule Jido.Agent do
             id: Zoi.string() |> Zoi.nullable() |> Zoi.default(nil),
             state: Zoi.map() |> Zoi.nullable() |> Zoi.default(nil),
             module: Zoi.atom() |> Zoi.nullable() |> Zoi.default(nil),
-            name: Zoi.string(),
+            name: Zoi.string() |> Zoi.min(1),
             description: Zoi.string() |> Zoi.nullable() |> Zoi.default(nil),
-            vsn: Zoi.integer() |> Zoi.default(1),
-            schema: Zoi.any(),
+            vsn: Zoi.integer() |> Zoi.min(1) |> Zoi.default(1),
+            schema: Zoi.any() |> Zoi.default(Zoi.object(%{})),
             metadata: Zoi.map() |> Zoi.default(%{}),
-            signal_source: Zoi.string() |> Zoi.nullable() |> Zoi.default(nil),
+            signal_source: Zoi.string() |> Zoi.min(1) |> Zoi.nullable() |> Zoi.default(nil),
             routes: Zoi.list(Zoi.any()) |> Zoi.default([]),
-            topology: Zoi.map(),
+            topology: Zoi.map() |> Zoi.default(%{}),
             extensions: Zoi.list(Zoi.any()) |> Zoi.default([])
           })
+  @defaults Map.new(Zoi.Struct.struct_fields(@schema), fn
+              {key, value} -> {key, value}
+              key -> {key, nil}
+            end)
   @enforce_keys Zoi.Struct.enforce_keys(@schema)
   defstruct Zoi.Struct.struct_fields(@schema)
   @doc false
   def __schema__, do: @schema
+  @doc false
+  def __defaults__, do: @defaults
 
   @doc "Returns the state schema, including Plugin-owned fields."
   def schema(%__MODULE__{} = agent),
@@ -47,10 +53,11 @@ defmodule Jido.Agent do
   @type instance :: %__MODULE__{id: String.t(), state: map()}
 
   defmacro __using__(opts) do
-    opts = Jido.Agent.DSL.Discovery.options!(opts, __CALLER__)
+    opts = options!(opts, __CALLER__)
+    opts = Keyword.put_new(opts, :id, Atom.to_string(__CALLER__.module))
 
     imports =
-      Enum.flat_map(opts[:extensions], fn provider ->
+      Enum.flat_map(Keyword.get(opts, :extensions, []), fn provider ->
         if function_exported?(provider, :authoring_imports, 0),
           do: provider.authoring_imports(),
           else: []
@@ -63,6 +70,19 @@ defmodule Jido.Agent do
       import Jido.Agent.Directive, only: [emit: 1, emit: 2]
       import Jido.Config, only: [env: 1]
       unquote_splicing(Enum.map(imports, fn module -> quote do: import(unquote(module)) end))
+    end
+  end
+
+  @doc false
+  def options!(quoted, caller) do
+    {opts, _binding} = Code.eval_quoted(quoted, [], caller)
+
+    unless Keyword.keyword?(opts) and Enum.uniq(Keyword.keys(opts)) == Keyword.keys(opts),
+      do: raise(ArgumentError, "Agent requires unique keyword options")
+
+    case Jido.Agent.Extension.providers(Keyword.get(opts, :extensions, [])) do
+      {:ok, _providers} -> opts
+      {:error, error} -> raise error
     end
   end
 
@@ -151,15 +171,6 @@ defmodule Jido.Agent do
       {:error, reason} -> raise ArgumentError, "invalid input Signal: #{inspect(reason)}"
     end
   end
-
-  @doc "Exports the portable definition of an Agent source as a JSON string."
-  def to_json(agent, registry) do
-    with {:ok, document} <- Jido.Agent.Codec.encode(agent, registry),
-         do: Jason.encode(document)
-  end
-
-  @doc "Imports a portable definition through a trusted Registry."
-  def from_json(json, registry), do: Jido.Agent.Codec.from_json(json, registry)
 
   @doc false
   @spec transition(instance(), term()) :: {:ok, instance()} | {:error, Exception.t()}

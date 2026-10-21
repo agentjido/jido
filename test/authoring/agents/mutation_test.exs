@@ -56,11 +56,11 @@ defmodule Jido.Agent.MutationAuthoringTest do
 
     for value <- [agent, Agent.definition(agent)] do
       registry = JidoTest.AgentRegistry.for(value)
-      assert {:ok, document} = Agent.Codec.encode(value, registry)
+      assert {:ok, document} = JidoTest.AgentRegistry.encode(value, registry)
       expected = Agent.definition(value)
-      assert {:ok, ^expected} = Agent.Codec.decode(document, registry)
-      assert {:ok, json} = Agent.to_json(value, registry)
-      assert {:ok, ^expected} = Agent.from_json(json, registry)
+      assert {:ok, ^expected} = JidoTest.AgentRegistry.decode(document, registry)
+      assert {:ok, json} = JidoTest.AgentRegistry.encode_json(value, registry)
+      assert {:ok, ^expected} = JidoTest.AgentRegistry.decode_json(json, registry)
     end
   end
 end

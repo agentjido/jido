@@ -1,8 +1,6 @@
 defmodule Jido.Agent.SignalActionTest do
   use ExUnit.Case, async: true
 
-  alias Jido.Agent
-
   defmodule CreateThread do
     use Jido.SignalAction,
       name: "routed_create_thread",
@@ -124,8 +122,10 @@ defmodule Jido.Agent.SignalActionTest do
   test "module routes use the same public definition and Codec contracts" do
     definition = Counter.definition()
     registry = JidoTest.AgentRegistry.for(definition)
-    assert {:ok, document} = Agent.Codec.encode(definition, registry)
-    assert {:ok, ^definition} = Agent.Codec.decode(JSON.decode!(JSON.encode!(document)), registry)
+    assert {:ok, document} = JidoTest.AgentRegistry.encode(definition, registry)
+
+    assert {:ok, ^definition} =
+             JidoTest.AgentRegistry.decode(JSON.decode!(JSON.encode!(document)), registry)
   end
 
   test "invalid module routes fail at declaration" do

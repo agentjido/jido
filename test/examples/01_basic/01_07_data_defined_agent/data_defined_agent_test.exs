@@ -3,14 +3,16 @@ defmodule JidoTest.Examples.Basic.DataDefinedAgentTest do
   @moduletag :example
 
   alias Jido.Agent
-  alias Jido.Agent.Codec
   alias Jido.AgentServer, as: Server
   alias Jido.Examples.DataDefinedAgent, as: Example
   alias Jido.Plugin.Scheduler
 
   test "data and JSON definitions use the same direct and live contract", %{jido: jido} do
     {document, registry} = Example.encode()
-    assert {:ok, definition} = Codec.decode(Jason.decode!(Jason.encode!(document)), registry)
+
+    assert {:ok, definition} =
+             JidoTest.AgentRegistry.decode(Jason.decode!(Jason.encode!(document)), registry)
+
     assert definition == Example.definition()
     direct = Agent.instantiate!(definition, id: unique_id("direct"))
     live = Agent.instantiate!(definition, id: unique_id("live"))
@@ -58,12 +60,13 @@ defmodule JidoTest.Examples.Basic.DataDefinedAgentTest do
     {document, registry} = Example.encode()
     missing_scheduler = Map.delete(registry.entries, "plugins/scheduler/v1")
 
-    assert {:error, _} = Agent.from_json(Jason.encode!(document), missing_scheduler)
+    assert {:error, _} =
+             JidoTest.AgentRegistry.decode_json(Jason.encode!(document), missing_scheduler)
   end
 
   test "a document cannot resolve references outside its trusted Registry" do
     {document, _registry} = Example.encode()
-    assert {:error, _} = Codec.decode(document, %{})
+    assert {:error, _} = JidoTest.AgentRegistry.decode(document, %{})
   end
 
   test "instance JSON writes only the portable definition" do
@@ -71,7 +74,7 @@ defmodule JidoTest.Examples.Basic.DataDefinedAgentTest do
     assert definition.id == nil and definition.state == nil
     instance = Agent.instantiate!(definition, id: "stored-counter")
     assert {:ok, changed, []} = Agent.cmd(instance, Example.signal!(3))
-    assert {:ok, document} = Codec.encode(changed, Example.registry())
+    assert {:ok, document} = JidoTest.AgentRegistry.encode(changed, Example.registry())
     assert {:ok, restored} = Example.from_json(Jason.encode!(document))
     assert restored == definition
     assert restored.id == nil and restored.state == nil

@@ -272,9 +272,9 @@ The Directive must have an owner. `Typed.Quoting` claims it in
 `"Agent Directive has no owner"`. [Custom Directives](plugin-custom-directives.livemd)
 covers ownership and dispatch.
 
-`Typed.QuotingCart` lists the Plugin in `extensions:` because a Livebook cell
-has no source file. In a project file you can write `plugin(Typed.Quoting)`
-inside the `agent` block instead.
+`Typed.QuotingCart` lists the Plugin in `extensions:` because it needs no
+Agent-specific config. You can write `plugin(Typed.Quoting)` inside the
+`agent` block instead, including in a Livebook cell.
 
 ## Run It Live
 

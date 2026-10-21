@@ -154,7 +154,7 @@ defmodule JidoTest.ComposableAgent.Audit do
 end
 
 defmodule JidoTest.ComposableAgent.PluginFirst do
-  use Jido.Agent, name: "plugin"
+  use Jido.Agent, name: "plugin", extensions: [JidoTest.ComposableAgent.Audit]
 
   agent do
     plugin JidoTest.ComposableAgent.Audit, config: %{enabled: false}
@@ -166,7 +166,7 @@ defmodule JidoTest.ComposableAgent.PluginFirst do
 end
 
 defmodule JidoTest.ComposableAgent.PluginLast do
-  use Jido.Agent, name: "plugin"
+  use Jido.Agent, name: "plugin", extensions: [JidoTest.ComposableAgent.Audit]
 
   audit do
     label("example")
@@ -241,7 +241,7 @@ defmodule JidoTest.ComposableAgent.ScheduleBlock do
 end
 
 defmodule JidoTest.ComposableAgent.PluginAlias do
-  use Jido.Agent, name: "plugin"
+  use Jido.Agent, name: "plugin", extensions: [JidoTest.ComposableAgent.Audit]
   alias JidoTest.ComposableAgent.{Audit, Action}
 
   audit do

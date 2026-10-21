@@ -47,8 +47,6 @@ defmodule Jido.Agent.AuthoringContractTest do
 
   @tag obligation: ["jido.agent.I3", "jido.agent.I4", "jido.agent.I22"]
   test "authoring containers normalize keys and reject ambiguous input" do
-    assert Authoring.key_identity(:name) === "name"
-    assert Authoring.key_identity("name") === "name"
     assert {:ok, %{name: "agent"}} = Authoring.attrs(%{name: "agent"})
     assert {:ok, %{name: "agent"}} = Authoring.attrs(name: "agent")
     assert {:ok, %{name: "last"}} = Authoring.to_attrs(name: "first", name: "last")
@@ -84,8 +82,6 @@ defmodule Jido.Agent.AuthoringContractTest do
 
     assert {:error, improper} = Authoring.traverse([1 | :tail], &{:ok, &1})
     assert improper.message != ""
-    assert Authoring.unwrap!({:ok, :value}) === :value
-    assert_raise Jido.Error.ValidationError, fn -> Authoring.unwrap!(expected) end
   end
 
   @tag obligation: ["jido.agent.I1", "jido.agent.I4"]
@@ -121,11 +117,11 @@ defmodule Jido.Agent.AuthoringContractTest do
         routes: [route(Add, %{by: 1})]
       })
 
-    assert {:error, %Jido.Authoring.Value.Error{reason: :value}} =
-             Agent.Codec.encode(definition, JidoTest.AgentRegistry.for(definition))
+    assert {:error, %Jido.Authoring.Error.InvalidError{code: :value}} =
+             JidoTest.AgentRegistry.encode(definition, JidoTest.AgentRegistry.for(definition))
 
     for entry <- [{:value, %URI{}}, {:route_match, &is_map/1}] do
-      assert {:error, _error} = Jido.Agent.Codec.Registry.new(%{"obsolete" => entry})
+      assert {:error, _error} = Jido.Authoring.Registry.new(%{"obsolete" => entry})
     end
   end
 

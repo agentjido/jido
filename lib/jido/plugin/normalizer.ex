@@ -364,7 +364,7 @@ defmodule Jido.Plugin.Normalizer do
         schema: schema
       })
     else
-      case Jido.Authoring.Config.validate_static_data(schema) do
+      case Jido.Authoring.validate_static(schema) do
         :ok ->
           {:ok, {key, schema}}
 
@@ -372,7 +372,7 @@ defmodule Jido.Plugin.Normalizer do
           PluginError.validation("Plugin-owned Agent state schema must contain static data", %{
             plugin: package,
             state_key: key,
-            reason: reason
+            reason: Exception.message(reason)
           })
       end
     end

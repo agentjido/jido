@@ -64,13 +64,13 @@ defmodule JidoCoreBench.EdgeCases do
         "codec/generated/#{n}",
         fn _ -> F.definition(n) end,
         fn definition ->
-          Jido.Agent.Codec.encode(definition, JidoTest.AgentRegistry.for(definition))
+          JidoTest.AgentRegistry.encode(definition, JidoTest.AgentRegistry.for(definition))
         end,
         fn {:ok, document} -> F.equal!(length(document["definition"]["routes"]), n) end
       )
       |> Map.put(:verify, fn definition, {:ok, document} ->
         registry = JidoTest.AgentRegistry.for(definition)
-        F.equal!(Jido.Agent.Codec.decode(document, registry), {:ok, definition})
+        F.equal!(JidoTest.AgentRegistry.decode(document, registry), {:ok, definition})
       end)
     end
   end

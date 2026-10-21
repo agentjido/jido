@@ -20,11 +20,19 @@ defmodule Jido.Agent.Extension do
   @callback verify_connection(map(), map()) :: :ok | {:error, term()}
 
   defmacro __using__(opts) do
+    kind = Keyword.get(opts, :kind, :extension)
+
     quote do
       @behaviour Jido.Agent.Extension
       use Spark.Dsl.Extension, sections: unquote(Keyword.get(opts, :sections, []))
       def id, do: unquote(Keyword.fetch!(opts, :id))
       def vsn, do: unquote(Keyword.get(opts, :vsn, 1))
+
+      @doc false
+      def __jido_authoring__ do
+        %{id: id(), kind: unquote(kind), vsn: vsn(), target: __MODULE__}
+      end
+
       def lower(_dsl, config), do: {:ok, config}
 
       def normalize(data) do

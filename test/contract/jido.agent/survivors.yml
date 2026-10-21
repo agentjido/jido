@@ -216,7 +216,7 @@
 
 - at: lib/jido/agent/codec.ex:354:42
   operator: string_empty
-  mutation: "`\"Agent Registry has no identifier for a value\"` → `\"\"`"
+  mutation: "`\"Agent Registry has no reference for a value\"` → `\"\"`"
   sort: log-only
   reason: The contract fixes the structured result and required data. It does not fix human-readable error prose.
 

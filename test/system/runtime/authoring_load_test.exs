@@ -5,7 +5,6 @@ defmodule JidoTest.System.AuthoringLoad do
   @moduletag timeout: 120_000
 
   alias Jido.Agent
-  alias Jido.Agent.Codec, as: AgentCodec
 
   @workers 4
   @payload_bytes 131_072
@@ -155,8 +154,8 @@ defmodule JidoTest.System.AuthoringLoad do
       })
 
     registry = JidoTest.AgentRegistry.for(definition)
-    {:ok, document} = AgentCodec.encode(definition, registry)
-    {:ok, ^definition} = AgentCodec.decode(json_copy(document), registry)
+    {:ok, document} = JidoTest.AgentRegistry.encode(definition, registry)
+    {:ok, ^definition} = JidoTest.AgentRegistry.decode(json_copy(document), registry)
     state = %{count: round, payload: payload}
     id = "load-#{index}-#{round}"
     {:ok, agent} = Agent.instantiate(definition, id: id, state: state)

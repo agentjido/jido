@@ -148,9 +148,9 @@ Rules for the child spec:
 
 ## Define the Agent
 
-This notebook attaches the Plugin with `extensions:` because a Livebook cell
-has no source file for `plugin` discovery. In application code, write
-`plugin GuidePlugins.Dedupe` in the `agent` block.
+This notebook attaches the Plugin with `extensions:` because it needs no
+Agent-specific config. You can instead write `plugin GuidePlugins.Dedupe` in
+the `agent` block. Both forms work in a Livebook cell.
 
 ```elixir
 defmodule GuidePlugins.Inbox do

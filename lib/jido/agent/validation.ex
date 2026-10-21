@@ -30,21 +30,7 @@ defmodule Jido.Agent.Validation do
   def define(input, opts) do
     related? = Keyword.get(opts, :related?, true)
 
-    defaults = %{
-      id: nil,
-      state: nil,
-      module: nil,
-      description: nil,
-      vsn: 1,
-      schema: Zoi.object(%{}),
-      metadata: %{},
-      signal_source: nil,
-      routes: [],
-      topology: %{},
-      extensions: []
-    }
-
-    with {:ok, definition} <- Data.fields(input, @fields, defaults),
+    with {:ok, definition} <- Data.fields(input, @fields, Jido.Agent.__defaults__()),
          :ok <- fields(definition),
          {:ok, extensions} <- Error.at(Extension.normalize(definition.extensions), :extensions),
          {:ok, routes} <-

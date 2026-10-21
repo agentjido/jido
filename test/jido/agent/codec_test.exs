@@ -1,7 +1,6 @@
 defmodule Jido.Agent.CodecTest do
   use Covenant.Case, component: "jido.agent", async: true
   alias Jido.Agent
-  alias Jido.Agent.Codec
   alias Jido.Authoring.Registry
   alias JidoTest.AgentContract, as: F
   alias JidoTest.AgentFixtures.Add
@@ -60,20 +59,28 @@ defmodule Jido.Agent.CodecTest do
       registry = registry(definition, Add)
 
       for value <- [definition, Agent.instantiate!(definition, id: "encoded")] do
-        assert {:ok, document} = Codec.encode(value, registry)
+        assert {:ok, document} = JidoTest.AgentRegistry.encode(value, registry)
         assert document["type"] == "jido.agent.definition"
         refute Map.has_key?(document["definition"], "id")
         refute Map.has_key?(document["definition"], "state")
 
         expected = Agent.definition(value)
-        assert {:ok, ^expected} = Codec.decode(JSON.decode!(JSON.encode!(document)), registry)
+
+        assert {:ok, ^expected} =
+                 JidoTest.AgentRegistry.decode(JSON.decode!(JSON.encode!(document)), registry)
       end
 
       [route] = definition.routes
 
       for invalid <- [false, 1, "invalid", [], {1, 2}, %URI{}] do
-        assert {:error, %{path: [:routes, 0, :defaults]}} =
-                 Codec.encode(%{definition | routes: [%{route | defaults: invalid}]}, registry)
+        assert {:error,
+                %Jido.Authoring.Error.InvalidError{
+                  details: %{path: [:routes, 0, :defaults]}
+                }} =
+                 JidoTest.AgentRegistry.encode(
+                   %{definition | routes: [%{route | defaults: invalid}]},
+                   registry
+                 )
       end
     end
   end
@@ -89,8 +96,12 @@ defmodule Jido.Agent.CodecTest do
     registry = registry(definition, ChangingTarget)
     Process.put({ChangingTarget, :kind}, :flow)
 
-    for result <- [Codec.encode(definition, registry)] do
-      assert {:error, %{code: :invalid_executable, path: [:routes, 0, :handler]}} = result
+    for result <- [JidoTest.AgentRegistry.encode(definition, registry)] do
+      assert {:error,
+              %Jido.Authoring.Error.InvalidError{
+                code: :invalid_executable,
+                details: %{path: [:routes, 0, :handler]}
+              }} = result
     end
   end
 
@@ -100,7 +111,10 @@ defmodule Jido.Agent.CodecTest do
     registry = registry(definition, nil)
 
     assert {:error, _error} =
-             Codec.decode(%{"type" => "jido.agent", "version" => 1, "agent" => %{}}, registry)
+             JidoTest.AgentRegistry.decode(
+               %{"type" => "jido.agent", "version" => 1, "agent" => %{}},
+               registry
+             )
   end
 
   @tag obligation: "jido.agent.I20"
@@ -169,23 +183,120 @@ defmodule Jido.Agent.CodecTest do
       })
 
     registry = JidoTest.AgentRegistry.for(definition)
-    assert {:ok, document} = Codec.encode(definition, registry)
-    assert {:ok, ^definition} = Codec.decode(JSON.decode!(JSON.encode!(document)), registry)
-    assert {:ok, ^document} = Codec.encode(Map.from_struct(definition), registry)
-    assert {:ok, child_document} = Codec.encode(Child, JidoTest.AgentRegistry.for(Child))
+    assert {:ok, document} = JidoTest.AgentRegistry.encode(definition, registry)
+    assert Map.keys(document["definition"]["schema"]) |> Enum.sort() == ["id", "vsn"]
+
+    assert [provider] =
+             Enum.map(document["definition"]["extensions"], & &1["provider"])
+
+    assert Map.keys(provider) |> Enum.sort() == ["id", "vsn"]
+
+    assert {:ok, ^definition} =
+             JidoTest.AgentRegistry.decode(JSON.decode!(JSON.encode!(document)), registry)
+
+    assert {:ok, ^document} = JidoTest.AgentRegistry.encode(Map.from_struct(definition), registry)
+
+    assert {:ok, child_document} =
+             JidoTest.AgentRegistry.encode(Child, JidoTest.AgentRegistry.for(Child))
+
     assert child_document["definition"]["module"] != nil
 
     plugin_registry =
       registry.entries
       |> Map.new(fn
-        {id, {:extension, F.First}} -> {id, {:plugin, F.First}}
+        {reference, {:extension, F.First}} -> {reference, {:plugin, F.First}}
         entry -> entry
       end)
       |> Registry.new!()
 
-    assert {:ok, plugin_document} = Codec.encode(definition, plugin_registry)
-    assert {:ok, ^definition} = Codec.decode(plugin_document, plugin_registry)
-    assert {:error, %{code: :unknown_reference}} = Codec.encode(definition, %{})
+    assert {:ok, plugin_document} = JidoTest.AgentRegistry.encode(definition, plugin_registry)
+    assert {:ok, ^definition} = JidoTest.AgentRegistry.decode(plugin_document, plugin_registry)
+    assert {:error, %{code: :unknown_reference}} = JidoTest.AgentRegistry.encode(definition, %{})
+  end
+
+  @tag obligation: "jido.agent.I20"
+  test "Codec reports Agent validation paths as JSON paths" do
+    definition =
+      Agent.define!(%{
+        name: "path_check",
+        routes: [%{path: "work", handler: %{kind: :action, target: Work}}]
+      })
+
+    registry = registry(definition, Work)
+    {:ok, document} = JidoTest.AgentRegistry.encode(definition, registry)
+
+    assert {:error,
+            [
+              %Jido.Authoring.Issue{
+                code: :invalid_string,
+                path: ["definition", "name"]
+              }
+            ]} =
+             JidoTest.AgentRegistry.decode(put_in(document, ["definition", "name"], 42), registry)
+
+    schema = Map.delete(document["definition"]["schema"], "id")
+
+    assert {:error,
+            [
+              %Jido.Authoring.Issue{
+                code: :reference,
+                path: ["definition", "schema", "id"]
+              }
+            ]} =
+             JidoTest.AgentRegistry.decode(
+               put_in(document, ["definition", "schema"], schema),
+               registry
+             )
+
+    [route] = document["definition"]["routes"]
+    target = Map.delete(route["handler"]["target"], "id")
+
+    assert {:error,
+            [
+              %Jido.Authoring.Issue{
+                code: :reference,
+                path: ["definition", "routes", 0, "handler", "target", "id"]
+              }
+            ]} =
+             JidoTest.AgentRegistry.decode(
+               put_in(document, ["definition", "routes"], [
+                 put_in(route, ["handler", "target"], target)
+               ]),
+               registry
+             )
+
+    assert {:error,
+            [
+              %Jido.Authoring.Issue{
+                code: :tag,
+                path: ["definition", "metadata", "entries", 0, "value"]
+              }
+            ]} =
+             JidoTest.AgentRegistry.decode(
+               put_in(document, ["definition", "metadata"], %{
+                 "$type" => "map",
+                 "entries" => [
+                   %{"key" => "nested", "value" => %{"$type" => "unknown"}}
+                 ]
+               }),
+               registry
+             )
+
+    assert {:error,
+            [
+              %Jido.Authoring.Issue{
+                code: :reference,
+                path: ["definition", "metadata", "id"]
+              }
+            ]} =
+             JidoTest.AgentRegistry.decode(
+               put_in(document, ["definition", "metadata"], %{
+                 "$type" => "atom",
+                 "id" => "missing",
+                 "vsn" => 1
+               }),
+               registry
+             )
   end
 
   @tag obligation: "jido.agent.I20"
@@ -215,7 +326,7 @@ defmodule Jido.Agent.CodecTest do
       })
 
     registry = JidoTest.AgentRegistry.for(definition)
-    {:ok, document} = Codec.encode(definition, registry)
+    {:ok, document} = JidoTest.AgentRegistry.encode(definition, registry)
 
     [route] = document["definition"]["routes"]
     [member] = document["definition"]["topology"]["agents"]
@@ -225,8 +336,8 @@ defmodule Jido.Agent.CodecTest do
 
     invalid = [
       Map.put(document, "type", "unknown"),
-      Map.put(document, "version", 2),
-      Map.delete(document, "version"),
+      Map.put(document, "vsn", 2),
+      Map.delete(document, "vsn"),
       put_in(document, ["definition", "schema"], Map.put(schema, "$type", "unknown")),
       put_in(document, ["definition", "schema"], Map.put(schema, "extra", true)),
       put_in(document, ["definition", "routes"], false),
@@ -264,36 +375,44 @@ defmodule Jido.Agent.CodecTest do
       put_in(document, ["definition", "extensions"], [Map.put(extension, "extra", true)]),
       put_in(document, ["definition", "extensions"], [false]),
       put_in(document, ["definition", "extensions"], [
-        %{extension | "provider" => %{"$type" => "reference"}}
+        %{extension | "provider" => %{"id" => "missing"}}
       ])
     ]
 
-    for value <- invalid, do: assert({:error, _} = Codec.decode(value, registry))
+    for value <- invalid, do: assert({:error, _} = JidoTest.AgentRegistry.decode(value, registry))
 
-    for source <- [nil, [], %URI{}], do: assert({:error, _} = Codec.encode(source, registry))
+    for source <- [nil, [], %URI{}],
+        do: assert({:error, _} = JidoTest.AgentRegistry.encode(source, registry))
 
     at_limit = Jason.encode!(String.duplicate("x", 8_388_606))
     over_limit = Jason.encode!(String.duplicate("x", 8_388_607))
     assert byte_size(at_limit) == 8_388_608
     assert byte_size(over_limit) == 8_388_609
-    assert {:error, %{code: :invalid_document}} = Codec.from_json(at_limit, registry)
 
-    assert {:error, %{code: :invalid_json, message: "Expected a JSON string of at most 8 MiB"}} =
-             Codec.from_json(over_limit, registry)
+    assert {:error, [%Jido.Authoring.Issue{code: :invalid_document}]} =
+             JidoTest.AgentRegistry.decode_json(at_limit, registry)
+
+    assert {:error,
+            [
+              %Jido.Authoring.Issue{
+                code: :invalid_json,
+                details: %{maximum_bytes: 8_388_608}
+              }
+            ]} = JidoTest.AgentRegistry.decode_json(over_limit, registry)
 
     for json <- [nil, "{"] do
-      assert {:error, _} = Codec.from_json(json, registry)
+      assert {:error, _} = JidoTest.AgentRegistry.decode_json(json, registry)
     end
   end
 
   defp registry(definition, target) do
     entries = %{
-      "schemas/agent/v1" => {:schema, definition.schema},
-      "atoms/by" => {:atom, :by}
+      {"schemas/agent", 1} => {:schema, definition.schema},
+      {"atoms/by", 1} => {:atom, :by}
     }
 
     entries =
-      if target, do: Map.put(entries, "actions/target/v1", {:action, target}), else: entries
+      if target, do: Map.put(entries, {"actions/target", 1}, {:action, target}), else: entries
 
     Registry.new!(entries)
   end

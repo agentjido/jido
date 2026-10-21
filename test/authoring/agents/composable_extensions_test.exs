@@ -14,6 +14,7 @@ defmodule Jido.AgentExtensionsAuthoringTest do
   alias JidoTest.ComposableAgent.{
     Action,
     Audit,
+    OwnedPlugin,
     PluginFirst,
     PluginLast,
     ScheduleShort,
@@ -155,12 +156,15 @@ defmodule Jido.AgentExtensionsAuthoringTest do
       assert {:error, %Error{}} = Agent.define(%{name: "bad", extensions: entries})
     end
 
-    assert_raise Error, fn ->
+    module =
       Compiler.compile(
         "agent do plugin JidoTest.ComposableAgent.Audit,config: %{label: \"test\"} end",
-        "name: \"bad\",extensions: [JidoTest.ComposableAgent.Audit]"
+        "name: \"configured\",extensions: [JidoTest.ComposableAgent.Audit]"
       )
-    end
+
+    assert module.definition().extensions == [
+             contribution(Audit, %{label: "test", enabled: true})
+           ]
 
     assert_raise Error, fn ->
       Compiler.compile(
@@ -358,10 +362,20 @@ defmodule Jido.AgentExtensionsAuthoringTest do
     end
   end
 
-  test "Plugin discovery uses aliases declared after use and does not depend on section order" do
+  test "explicit custom syntax does not depend on section order" do
     definition = JidoTest.ComposableAgent.PluginAlias.definition()
     assert definition.extensions == PluginLast.definition().extensions
     assert hd(definition.routes).handler == %{kind: :action, target: Action}
+  end
+
+  test "generated Agents use plugin declarations without source discovery" do
+    module =
+      Compiler.compile(
+        "agent do plugin JidoTest.ComposableAgent.OwnedPlugin, config: %{initial: 3} end",
+        "name: \"generated_plugin\""
+      )
+
+    assert module.definition().extensions == [contribution(OwnedPlugin, %{initial: 3})]
   end
 
   test "Team and standalone Alice fixtures validate without handler execution" do

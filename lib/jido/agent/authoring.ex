@@ -3,9 +3,6 @@ defmodule Jido.Agent.Authoring do
 
   alias Jido.Error
 
-  def key_identity(key) when is_atom(key), do: Atom.to_string(key)
-  def key_identity(key) when is_binary(key), do: key
-
   def attrs(value) do
     case to_attrs(value, :reject) do
       {:ok, attrs} -> {:ok, attrs}
@@ -45,18 +42,6 @@ defmodule Jido.Agent.Authoring do
   end
 
   defp traverse(_tail, _fun, _acc), do: error("Expected a proper list")
-
-  def check_each(values, fun) do
-    Enum.reduce_while(values, :ok, fn value, :ok ->
-      case fun.(value) do
-        :ok -> {:cont, :ok}
-        {:error, _} = error -> {:halt, error}
-      end
-    end)
-  end
-
-  def unwrap!({:ok, value}), do: value
-  def unwrap!({:error, error}), do: raise(error)
 
   def error(message, details \\ %{}),
     do: {:error, Error.validation_error(message, kind: :config, details: details)}

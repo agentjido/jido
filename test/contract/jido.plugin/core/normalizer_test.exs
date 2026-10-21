@@ -169,7 +169,7 @@ defmodule JidoTest.PluginContract.NormalizerTest do
   test "one declaration exposes stable identity and exact callback owners" do
     assert Configurable.id() == "contract.configurable"
     assert Configurable.vsn() == 4
-    assert {:ok, manifest} = Plugin.manifest(Configurable)
+    assert {:ok, [%{manifest: manifest}]} = Normalizer.normalize_all([Configurable])
     assert manifest.module == Configurable
     assert manifest.vsn == 4
     assert manifest.agent == Configurable

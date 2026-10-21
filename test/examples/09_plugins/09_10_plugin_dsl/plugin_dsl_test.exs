@@ -30,13 +30,15 @@ defmodule JidoTest.Examples.Plugins.DSLTest do
   test "JSON import selects the trusted Plugin and preserves the same DSL data", %{jido: jido} do
     definition = Agent.definition()
     registry = Agent.registry()
-    assert {:ok, document} = CoreAgent.Codec.encode(definition, registry)
-    assert {:ok, imported} = CoreAgent.from_json(Jason.encode!(document), registry)
+    assert {:ok, document} = JidoTest.AgentRegistry.encode(definition, registry)
+    assert {:ok, imported} = JidoTest.AgentRegistry.decode_json(Jason.encode!(document), registry)
     assert imported == definition
     {:ok, server} = JidoTest.ExampleRuntime.start_agent(jido, imported, id: unique_id())
     {:ok, signal} = Agent.add_signal(%{amount: 1})
     assert {:ok, %{state: %{count: 1, reached: [:first]}}, []} = Server.call(server, signal)
-    assert {:error, _} = CoreAgent.from_json(Jason.encode!(document), Registry.new!(%{}))
+
+    assert {:error, _} =
+             JidoTest.AgentRegistry.decode_json(Jason.encode!(document), Registry.new!(%{}))
   end
 
   test "map authors use the same validation as DSL authors" do

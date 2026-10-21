@@ -27,8 +27,21 @@ defmodule JidoTest.Examples.Workflow.SequentialFlowTest do
                output: Ref.result("finish")
              })
 
-    assert {:ok, document, registry} = Codec.encode(flow)
-    assert {:ok, decoded} = Codec.decode(JSON.decode!(JSON.encode!(document)), registry)
+    registry =
+      Jido.Authoring.Registry.new!(%{
+        {"actions/double", 1} => {:action, Example.Pipeline.step_action("double")},
+        {"actions/finish", 1} => {:action, Example.Finish},
+        {"schemas/input", 1} => {:schema, flow.schema},
+        {"schemas/output", 1} => {:schema, flow.output_schema},
+        {"atoms/amount", 1} => {:atom, :amount},
+        {"atoms/failure", 1} => {:atom, :failure},
+        {"atoms/none", 1} => {:atom, :none},
+        {"atoms/value", 1} => {:atom, :value}
+      })
+
+    opts = [registry: registry, codec: Codec]
+    assert {:ok, document} = Jido.Authoring.encode(flow, opts)
+    assert {:ok, decoded} = Jido.Authoring.decode(JSON.decode!(JSON.encode!(document)), opts)
     assert decoded == flow
 
     context = %{agent_state: %{label: "kept"}}

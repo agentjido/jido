@@ -10,10 +10,10 @@ defmodule JidoTest.Examples.Topology.IndependentTest do
     definition = Jido.Examples.Topology.Independent.definition()
     registry = Independent.registry()
     assert %Jido.Authoring.Registry{} = registry
-    assert {:ok, document} = Jido.Agent.Codec.encode(definition, registry)
+    assert {:ok, document} = JidoTest.AgentRegistry.encode(definition, registry)
 
     assert {:ok, decoded} =
-             Jido.Agent.Codec.decode(Jason.decode!(Jason.encode!(document)), registry)
+             JidoTest.AgentRegistry.decode(Jason.decode!(Jason.encode!(document)), registry)
 
     assert decoded == definition
     server = start_topology(jido, decoded)

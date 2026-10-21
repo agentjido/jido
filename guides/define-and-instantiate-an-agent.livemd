@@ -91,10 +91,10 @@ end
 
 A bad route, schema, or Plugin fails the build.
 
-In a project source file, you can also write `plugin(Define.Visits)` inside
-the `agent` block, and pass options with `config:`. That form finds Plugins by
-reading the module's source file. A Livebook cell has no source file, so this
-Livebook uses `extensions:`.
+You can also write `plugin(Define.Visits)` inside the `agent` block and pass
+options with `config:`. This works in source files, generated modules, and
+Livebook cells. Use `extensions:` when a provider adds custom Spark sections,
+or when it needs no config.
 
 ## The Definition
 

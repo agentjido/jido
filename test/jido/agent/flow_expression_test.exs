@@ -2,7 +2,6 @@ defmodule Jido.Agent.FlowExpressionTest do
   use JidoTest.Case, async: true
 
   alias Jido.Agent
-  alias Jido.Agent.Codec
   alias Jido.Flow.Ref
 
   defmodule Amount do
@@ -60,10 +59,21 @@ defmodule Jido.Agent.FlowExpressionTest do
     assert %Jido.Expr{} = flow.output.count
     assert {:ok, %Runic.Workflow{}} = Jido.Exec.compile(flow)
 
-    assert {:ok, flow_document, flow_registry} = Jido.Flow.Codec.encode(flow)
+    flow_registry =
+      Jido.Authoring.Registry.new!(%{
+        {"actions/amount", 1} => {:action, Amount},
+        {"schemas/input", 1} => {:schema, flow.schema},
+        {"schemas/output", 1} => {:schema, flow.output_schema},
+        {"atoms/amount", 1} => {:atom, :amount},
+        {"atoms/agent-state", 1} => {:atom, :agent_state},
+        {"atoms/count", 1} => {:atom, :count}
+      })
+
+    flow_opts = [registry: flow_registry, codec: Jido.Flow.Codec]
+    assert {:ok, flow_document} = Jido.Authoring.encode(flow, flow_opts)
 
     assert {:ok, ^flow} =
-             Jido.Flow.Codec.decode(JSON.decode!(JSON.encode!(flow_document)), flow_registry)
+             Jido.Authoring.decode(JSON.decode!(JSON.encode!(flow_document)), flow_opts)
 
     for target <- [Add] do
       definition =
@@ -80,8 +90,11 @@ defmodule Jido.Agent.FlowExpressionTest do
         })
 
       registry = JidoTest.AgentRegistry.for(definition)
-      assert {:ok, document} = Codec.encode(definition, registry)
-      assert {:ok, decoded} = Codec.decode(JSON.decode!(JSON.encode!(document)), registry)
+      assert {:ok, document} = JidoTest.AgentRegistry.encode(definition, registry)
+
+      assert {:ok, decoded} =
+               JidoTest.AgentRegistry.decode(JSON.decode!(JSON.encode!(document)), registry)
+
       assert decoded == definition
       instance = Agent.instantiate!(decoded, id: Jido.Signal.ID.generate!(), state: %{count: 10})
 

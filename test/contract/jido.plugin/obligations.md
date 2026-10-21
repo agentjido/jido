@@ -21,7 +21,7 @@ consumer runs a callback or what a bundled Plugin does.
 
 ### jido.plugin.I1 — Plugin declaration and identity
 
-- **scope:** `use Jido.Plugin`, `Jido.Plugin.manifest/1`
+- **scope:** `use Jido.Plugin`, `Jido.Plugin.Normalizer.normalize_all/1`
 - **must:** Define one Plugin module with a stable ID, positive version, static manifest, and optional Agent, AgentServer, and persistence callback groups. Reject unknown or removed role and facet selectors. Require the Plugin behavior and generated marker.
 - **why:** A Plugin declaration must have one current source of identity and capability metadata.
 - **kind:** functional

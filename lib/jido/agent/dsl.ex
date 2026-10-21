@@ -6,10 +6,10 @@ defmodule Jido.Agent.DSL do
   use Spark.Dsl,
     default_extensions: [extensions: [Jido.Agent.DSL.Extension, Jido.Agent.DSL.Topology]],
     opt_schema: [
+      id: [type: :string, required: true],
       name: [type: :string, required: true],
       description: [type: :string],
-      vsn: [type: :pos_integer, default: 1],
-      plugin_providers: [type: {:list, :atom}, default: []]
+      vsn: [type: :pos_integer, default: 1]
     ]
 
   @impl true
@@ -42,6 +42,18 @@ defmodule Jido.Agent.DSL do
       @behaviour Jido.Agent
       def vsn, do: @agent_definition.vsn
       def schema, do: Jido.Agent.schema(definition())
+
+      @doc false
+      def __jido_authoring__ do
+        %{
+          id: unquote(opts[:id]),
+          kind: :agent,
+          vsn: vsn(),
+          target: __MODULE__,
+          name: @agent_definition.name,
+          description: @agent_definition.description
+        }
+      end
 
       def route_action!(path),
         do: Jido.Action.Inline.target!(__MODULE__, host: Jido.Agent, route: path, role: :action)
@@ -79,15 +91,15 @@ defmodule Jido.Agent.DSL do
   end
 
   def build!(dsl, opts, module) do
-    providers =
+    extensions =
       E.get_persisted(dsl, :spark_extensions, [])
       |> Enum.reject(&(&1 in [Jido.Agent.DSL.Extension, Jido.Agent.DSL.Topology]))
 
     plugins = E.get_entities(dsl, [:__agent__])
+    providers = Enum.uniq(extensions ++ Enum.map(plugins, & &1.provider))
 
     result =
       with :ok <- Jido.Agent.Data.unique(plugins, & &1.provider),
-           :ok <- plugin_registration(plugins, opts[:plugin_providers]),
            {:ok, entries} <-
              Extension.lower(providers, dsl, Map.new(plugins, &{&1.provider, &1.config})) do
         input =
@@ -121,18 +133,5 @@ defmodule Jido.Agent.DSL do
           path: error.path,
           message: Exception.message(error)
     end
-  end
-
-  defp plugin_registration(plugins, discovered) do
-    actual = Enum.map(plugins, & &1.provider)
-
-    if actual == discovered,
-      do: :ok,
-      else:
-        Error.fail(
-          :plugin_discovery,
-          [:agent],
-          "Plugin DSL discovery needs a source file with literal provider aliases; use extensions: for generated modules"
-        )
   end
 end

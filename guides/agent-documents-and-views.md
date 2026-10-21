@@ -2,13 +2,13 @@
 
 To store Agent definitions in a database, or show them in a UI, you need a
 format that doesn't let stored data choose which modules your code runs.
-`Jido.Agent.Codec` encodes portable Agent definitions. The document refers to
+`Jido.Authoring` encodes portable Agent definitions. The document refers to
 modules, schemas, and data atoms only through a Registry you own.
 `Jido.Agent.View` produces a read-only summary for a client.
 
 ```elixir
-{:ok, json} = Jido.Agent.to_json(agent, registry)
-{:ok, definition} = Jido.Agent.from_json(json, registry)
+{:ok, json} = Jido.Authoring.encode_json(agent)
+{:ok, definition} = Jido.Authoring.decode_json(json)
 
 definition == Jido.Agent.definition(agent)
 # => true
@@ -54,23 +54,25 @@ of these survive JSON. Converting `"actions/add"` back to `Doc.Add` is a
 security boundary: if the conversion trusts the document, whoever edits the
 document controls which code runs.
 
-A `Jido.Authoring.Registry` maps stable string IDs to `{kind, value}` pairs.
-Documents can only refer to those IDs.
+A `Jido.Authoring.Registry` maps stable `{id, vsn}` keys to `{kind, value}`
+pairs. Documents can only refer to those exact references.
 
 ```elixir
 registry =
   Jido.Authoring.Registry.new!(%{
-    "agents/counter" => {:agent, Doc.Counter},
-    "actions/add" => {:action, Doc.Add},
-    "schemas/counter-state" => {:schema, Doc.Counter.definition().schema},
-    "atoms/add" => {:atom, :add},
-    "atoms/amount" => {:atom, :amount}
+    {"agents/counter", 1} => {:agent, Doc.Counter},
+    {"actions/add", 1} => {:action, Doc.Add},
+    {"schemas/counter-state", 1} => {:schema, Doc.Counter.definition().schema},
+    {"atoms/add", 1} => {:atom, :add},
+    {"atoms/amount", 1} => {:atom, :amount}
   })
+
+authoring_opts = [registry: registry, codec: Jido.Agent.Codec]
 ```
 
 The Agent codec accepts `:agent`, `:action`, `:flow`, `:plugin`, `:extension`,
-`:transform`, `:schema`, and `:atom`. Each typed value can have only one write
-ID. A read alias can point directly to one write ID.
+`:transform`, `:schema`, and `:atom`. Each typed value has one canonical
+reference.
 
 Register:
 
@@ -86,20 +88,22 @@ from stored data.
 
 ## Export
 
-`Jido.Agent.to_json/2` encodes the definition of a source as a JSON string.
-`Jido.Agent.Codec.encode/2` returns the same document as a map. The source can
-be a definition, an Agent module, or an instance.
+`Jido.Authoring.encode_json/2` encodes the definition of a source as a JSON
+string. `Jido.Authoring.encode/2` returns the same document as a map. The source
+can be a definition, an Agent module, or an instance. Discovery supplies the
+Registry and codec by default. Use `authoring_opts` with a manually built
+Registry.
 
 ```elixir
 agent = Doc.Counter.instantiate!(id: "counter-1", state: %{count: 7})
-{:ok, json} = Jido.Agent.to_json(agent, registry)
+{:ok, json} = Jido.Authoring.encode_json(agent, authoring_opts)
 ```
 
-The document has `"type" => "jido.agent.definition"`, `"version" => 1`, and a
+The document has `"type" => "jido.agent.definition"`, `"vsn" => 1`, and a
 `"definition"` object. Module references look like this:
 
 ```json
-{"$type": "reference", "kind": "action", "id": "actions/add"}
+{"id": "actions/add", "vsn": 1}
 ```
 
 Maps are stored as entry lists, so atom and string keys stay distinct. The
@@ -113,8 +117,7 @@ values, or invalid UTF-8 strings.
 If a value isn't registered, export fails:
 
 ```text
-{:error, %Jido.Agent.Error{code: :unknown_reference,
-                           message: "Agent Registry has no identifier for a value"}}
+{:error, %Jido.Authoring.Error.InvalidError{code: :unknown_reference}}
 ```
 
 The error doesn't say which value is missing. Compare the Agent's modules,
@@ -122,11 +125,11 @@ schema, and atom keys against the Registry.
 
 ## Import
 
-`Jido.Agent.from_json/2` decodes through the same Registry. It then calls
+`Jido.Authoring.decode_json/2` decodes through the same Registry. It then calls
 `Jido.Agent.define/1` to validate the complete definition.
 
 ```elixir
-{:ok, definition} = Jido.Agent.from_json(json, registry)
+{:ok, definition} = Jido.Authoring.decode_json(json, authoring_opts)
 
 definition == Doc.Counter.definition()
 # => true
@@ -142,15 +145,15 @@ Import fails closed. Each case returns an error and no Agent:
 
 | Problem | Error message |
 | --- | --- |
-| An ID not in the Registry | `"unknown authoring Registry identifier"` |
-| An ID with the wrong kind | `"authoring Registry identifier has the wrong entry kind"` |
-| An unknown document `type` or `version` | `"Unknown Agent definition document type or version"` |
-| Malformed JSON | `"Invalid Agent definition JSON"` |
-| Not a string, or larger than 8 MiB | `"Expected a JSON string of at most 8 MiB"` |
+| An ID not in the Registry | `:reference` Authoring issue |
+| An ID with the wrong kind | `:reference` Authoring issue |
+| An unknown document `type` or `vsn` | `:unsupported_document` Authoring issue |
+| Malformed JSON | `:invalid_json` Authoring issue |
+| Not a string, or larger than 8 MiB | `:invalid_json` Authoring issue |
 | A well-formed document with an invalid Agent | The normal `Jido.Agent` validation error |
 
 Replace `"actions/add"` with `"actions/delete_everything"` in the JSON and
-import fails with `"unknown authoring Registry identifier"`. No module
+import fails with a Registry reference issue. No module
 lookup happens. Imported documents get the same validation as a DSL module:
 fields, routes, extensions, and schema.
 
@@ -159,8 +162,10 @@ fields, routes, extensions, and schema.
 Tests must also supply an explicit Registry:
 
 ```elixir
-{:ok, document} = Jido.Agent.Codec.encode(Doc.Counter.definition(), registry)
-{:ok, decoded} = Jido.Agent.Codec.decode(JSON.decode!(JSON.encode!(document)), registry)
+{:ok, document} = Jido.Authoring.encode(Doc.Counter.definition(), authoring_opts)
+
+{:ok, decoded} =
+  Jido.Authoring.decode(JSON.decode!(JSON.encode!(document)), authoring_opts)
 
 decoded == Doc.Counter.definition()
 # => true
@@ -181,19 +186,19 @@ APIs, and catalogs:
 ```elixir
 %{
   "type" => "jido.agent.view",
-  "version" => 1,
+  "vsn" => 1,
   "id" => "counter-1",
   "name" => "counter",
   "description" => "Counts things",
   "definition_vsn" => 1,
-  "agent_type_id" => "agents/counter",
-  "schema_id" => "schemas/counter-state",
+  "agent_type" => %{"id" => "agents/counter", "vsn" => 1},
+  "schema" => %{"id" => "schemas/counter-state", "vsn" => 1},
   "operations" => %{
     "items" => [
       %{"signal_type" => "counter.add", "kind" => "action",
-        "target_id" => "actions/add", "emits" => []},
+        "target" => %{"id" => "actions/add", "vsn" => 1}, "emits" => []},
       %{"signal_type" => "counter.echo", "kind" => "pass_through",
-        "target_id" => nil, "emits" => ["counter.echo"]}
+        "target" => nil, "emits" => ["counter.echo"]}
     ],
     "total" => 2,
     "truncated" => false
@@ -216,7 +221,7 @@ the first two.
 
 | Format | Contains | Use it for |
 | --- | --- | --- |
-| Agent definition document (`Jido.Agent.Codec`) | Portable authoring data without ID or state | Storing and loading Agent definitions. |
+| Agent definition document (`Jido.Authoring`) | Portable authoring data without ID or state | Storing and loading Agent definitions. |
 | Agent View (`Jido.Agent.View`) | Public definition data and route summaries | Display and discovery. |
 | Agent checkpoint | Portable identity and live state | Persistence and recovery. |
 

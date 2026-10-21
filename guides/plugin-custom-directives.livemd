@@ -135,8 +135,8 @@ end
 
 ## Define the Agent
 
-The notebook attaches the Plugin with `extensions:`, because a Livebook cell
-has no source file for `plugin` discovery.
+The notebook attaches the Plugin with `extensions:` because it needs no
+Agent-specific config. A `plugin` declaration also works in a Livebook cell.
 
 ```elixir
 defmodule GuidePlugins.Orders do

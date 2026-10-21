@@ -42,6 +42,15 @@ defmodule JidoTest.Contract.AgentAuthoringTest do
 
     assert from_map === Leaf.definition()
     assert {:ok, ^from_map} = Zoi.parse(Agent.__schema__(), from_map)
+
+    assert {:error, _issues} =
+             Zoi.parse(Agent.__schema__(), %{from_map | name: "", vsn: 0})
+
+    defaults = Agent.__defaults__()
+    assert defaults.name == nil
+    assert defaults.vsn == 1
+    assert defaults.schema == Zoi.object(%{})
+    assert defaults.topology == %{}
   end
 
   @tag obligation: ["jido.agent.I2", "jido.agent.I3", "jido.agent.I7", "jido.agent.I9"]
@@ -129,13 +138,13 @@ defmodule JidoTest.Contract.AgentAuthoringTest do
   test "the trusted JSON codec returns the portable definition" do
     for value <- [Leaf.definition(), Leaf.instantiate!(id: "json")] do
       registry = JidoTest.AgentRegistry.for(value)
-      assert {:ok, _document} = Agent.Codec.encode(value, registry)
-      assert {:ok, json} = Agent.to_json(value, registry)
+      assert {:ok, _document} = JidoTest.AgentRegistry.encode(value, registry)
+      assert {:ok, json} = JidoTest.AgentRegistry.encode_json(value, registry)
       expected = Agent.definition(value)
-      assert {:ok, ^expected} = Agent.from_json(json, registry)
+      assert {:ok, ^expected} = JidoTest.AgentRegistry.decode_json(json, registry)
     end
 
-    assert {:error, _} = Agent.from_json("{}", %{})
+    assert {:error, _} = JidoTest.AgentRegistry.decode_json("{}", %{})
   end
 
   @tag obligation: "jido.agent.I21"

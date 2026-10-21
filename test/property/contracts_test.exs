@@ -5,7 +5,6 @@ defmodule JidoTest.Property.ContractsTest do
   use ExUnit.Case, async: true
 
   alias Jido.Agent
-  alias Jido.Agent.Codec
   alias Jido.Authoring.Registry
   alias Jido.Error
   alias Jido.Signal
@@ -312,7 +311,7 @@ defmodule JidoTest.Property.ContractsTest do
     schema = Zoi.object(%{count: Zoi.integer()})
     attrs = %{name: "property_definition", schema: schema, metadata: metadata}
 
-    registry = Registry.new!(%{"schema/core" => {:schema, schema}})
+    registry = Registry.new!(%{{"schema/core", 1} => {:schema, schema}})
 
     {:ok, definition} = Agent.define(attrs)
     original = definition
@@ -324,11 +323,14 @@ defmodule JidoTest.Property.ContractsTest do
 
       "incomplete_id" ->
         assert {:error, %{__exception__: true}} =
-                 Codec.encode(%{definition | state: %{count: input["count"]}}, registry)
+                 JidoTest.AgentRegistry.encode(
+                   %{definition | state: %{count: input["count"]}},
+                   registry
+                 )
 
       "incomplete_state" ->
         assert {:error, %{__exception__: true}} =
-                 Codec.encode(%{definition | id: "missing-state"}, registry)
+                 JidoTest.AgentRegistry.encode(%{definition | id: "missing-state"}, registry)
 
       _ ->
         source =
@@ -342,15 +344,15 @@ defmodule JidoTest.Property.ContractsTest do
 
         if mode == "invalid_live_state" do
           assert {:error, %{__exception__: true}} =
-                   Codec.encode(%{source | state: %{count: "invalid"}}, registry)
+                   JidoTest.AgentRegistry.encode(%{source | state: %{count: "invalid"}}, registry)
         else
-          assert {:ok, document} = Codec.encode(source, registry)
+          assert {:ok, document} = JidoTest.AgentRegistry.encode(source, registry)
           assert document["type"] == "jido.agent.definition"
           refute Map.has_key?(document["definition"], "id")
           refute Map.has_key?(document["definition"], "state")
 
           assert {:ok, ^definition} =
-                   Codec.decode(JSON.decode!(JSON.encode!(document)), registry)
+                   JidoTest.AgentRegistry.decode(JSON.decode!(JSON.encode!(document)), registry)
         end
 
         assert definition.id == nil and definition.state == nil

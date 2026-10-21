@@ -6,7 +6,6 @@ defmodule JidoTest.Property.AuthoringContractTest do
   use ExUnit.Case, async: true
 
   alias Jido.Agent
-  alias Jido.Agent.Codec
   alias JidoTest.Property.{Authoring, Fuzz}
 
   @cases ~w(AGT-001/dsl-neutral AGT-001/inline-history AGT-001/fixture-cleanup)
@@ -127,9 +126,11 @@ defmodule JidoTest.Property.AuthoringContractTest do
           assert definition === declaration
           assert definition.id == nil and definition.state == nil
           registry = JidoTest.AgentRegistry.for(definition)
-          assert {:ok, document} = Codec.encode(definition, registry)
-          assert {:ok, ^document} = Codec.encode(declaration, registry)
-          assert {:ok, ^definition} = Codec.decode(JSON.decode!(JSON.encode!(document)), registry)
+          assert {:ok, document} = JidoTest.AgentRegistry.encode(definition, registry)
+          assert {:ok, ^document} = JidoTest.AgentRegistry.encode(declaration, registry)
+
+          assert {:ok, ^definition} =
+                   JidoTest.AgentRegistry.decode(JSON.decode!(JSON.encode!(document)), registry)
 
           original =
             apply(module, :instantiate!, [
@@ -137,9 +138,9 @@ defmodule JidoTest.Property.AuthoringContractTest do
             ])
 
           assert Agent.definition(original) === declaration
-          assert {:ok, encoded_instance} = Codec.encode(original, registry)
+          assert {:ok, encoded_instance} = JidoTest.AgentRegistry.encode(original, registry)
           assert encoded_instance == document
-          assert {:ok, ^definition} = Codec.decode(encoded_instance, registry)
+          assert {:ok, ^definition} = JidoTest.AgentRegistry.decode(encoded_instance, registry)
 
           {current, _model, _history} =
             Enum.reduce(input["history"], {original, input["initial"], []}, fn delta,

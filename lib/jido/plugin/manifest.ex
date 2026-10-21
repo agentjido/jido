@@ -1,11 +1,5 @@
 defmodule Jido.Plugin.Manifest do
-  @moduledoc """
-  Static callback metadata for one Plugin package.
-
-  A manifest contains module identities, a positive package version, and an
-  optional mapping from common declaration options to each callback owner. It contains
-  no callback, process, Turn, persistence record, or Topology plan data.
-  """
+  @moduledoc false
 
   alias Jido.Error
 
@@ -142,12 +136,14 @@ defmodule Jido.Plugin.Manifest do
     do: invalid("Plugin option mapping must be a map", %{option_keys: option_keys})
 
   defp validate_static_options(options) do
-    case Jido.Authoring.Config.validate_static_data(options) do
+    case Jido.Authoring.validate_static(options) do
       :ok ->
         :ok
 
       {:error, reason} ->
-        invalid("Plugin declaration options must be static data", %{reason: reason})
+        invalid("Plugin declaration options must be static data", %{
+          reason: Exception.message(reason)
+        })
     end
   end
 

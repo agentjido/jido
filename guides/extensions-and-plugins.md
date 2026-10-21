@@ -134,13 +134,11 @@ context.plugin_inputs[MyApp.Throttle]
 
 `cmd/3` runs `prepare/2` but not `admit/3`, so `runtime` is `nil` there.
 
-> #### `plugin` needs a source file {: .warning}
->
-> Jido finds `plugin` declarations by reading the module's source file.
-> Livebook cells and generated modules have none, and compilation fails with
-> "Plugin DSL discovery needs a source file with literal provider aliases".
-> There, use `use Jido.Agent, extensions: [MyApp.Throttle]`. That form
-> passes no config.
+The `plugin` declaration is the source of the Plugin provider and its config.
+It works in source files, generated modules, and Livebook cells. Add a provider
+to `extensions:` only when it adds custom Spark sections that must be available
+before the Agent body is parsed. An Extension with no `plugin` declaration gets
+an empty config.
 
 A Plugin's contribution `id` defaults to the module name as a string,
 `"Elixir.MyApp.Throttle"`. Set `id:` in `use Jido.Plugin` for a stable name,
@@ -148,14 +146,8 @@ and `vsn:` for its version (default `1`).
 
 ## Callback Owners
 
-Jido groups Plugin callbacks by who calls them. `Jido.Plugin.manifest/1`
-shows which groups a Plugin enabled:
-
-```elixir
-{:ok, manifest} = Jido.Plugin.manifest({MyApp.Throttle, [label: "x", limit: 1]})
-{manifest.agent, manifest.agent_server, manifest.persistence}
-# => {MyApp.Throttle, MyApp.Throttle, nil}
-```
+Jido groups Plugin callbacks by who calls them. It selects the groups from the
+callbacks that the Plugin implements.
 
 | Callback | Owner | Invoked when |
 | --- | --- | --- |
@@ -180,12 +172,7 @@ owner sees only its keys. For `MyApp.Throttle`, Agent callbacks receive
 `[label: "support"]` and Agent Server callbacks receive `[limit: 10]`.
 
 `validate_options/1` checks the Agent Server options. An invalid value fails
-normalization with the reason you return:
-
-```elixir
-Jido.Plugin.manifest({MyApp.Throttle, [label: "x", limit: 0]})
-# => {:error, :invalid_limit}
-```
+Agent definition validation with the reason you return.
 
 ## Shape Rules
 

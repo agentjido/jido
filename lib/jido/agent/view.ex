@@ -17,7 +17,6 @@ defmodule Jido.Agent.View do
 
   alias Jido.Agent
   alias Jido.Agent.Authoring
-  alias Jido.Agent.Codec.Registry, as: AgentRegistry
   alias Jido.Authoring.{Document, Registry}
 
   @default_operation_limit 100
@@ -39,19 +38,19 @@ defmodule Jido.Agent.View do
          :ok <- Authoring.keys(opts, [:operation_limit]),
          {:ok, limit} <-
            limit(Map.get(opts, :operation_limit, @default_operation_limit)),
-         {:ok, registry} <- AgentRegistry.new(registry),
+         {:ok, registry} <- Registry.new(registry),
          {:ok, agent} <- definition(source),
-         {:ok, agent_type_id} <- agent_type_id(agent.module, registry),
-         {:ok, schema_id} <- Registry.identifier(registry, :schema, agent.schema),
+         {:ok, agent_type} <- agent_type(agent.module, registry),
+         {:ok, schema} <- Registry.encode_reference(registry, :schema, agent.schema),
          {:ok, operations} <- operations(agent.routes, registry, limit),
-         view <- build(agent, agent_type_id, schema_id, operations),
+         view <- build(agent, agent_type, schema, operations),
          :ok <- Document.check(view) do
       {:ok, view}
     end
   end
 
-  defp agent_type_id(nil, _registry), do: {:ok, nil}
-  defp agent_type_id(module, registry), do: Registry.identifier(registry, :agent, module)
+  defp agent_type(nil, _registry), do: {:ok, nil}
+  defp agent_type(module, registry), do: Registry.encode_reference(registry, :agent, module)
 
   defp definition(%Agent{} = agent) do
     Agent.validate(agent)
@@ -76,32 +75,32 @@ defmodule Jido.Agent.View do
   end
 
   defp operation(route, registry) do
-    with {:ok, target_id} <- target_id(route.handler, registry) do
+    with {:ok, target} <- target(route.handler, registry) do
       {:ok,
        %{
          "signal_type" => route.path,
          "kind" => Atom.to_string(route.handler.kind),
-         "target_id" => target_id,
+         "target" => target,
          "emits" => route.emits
        }}
     end
   end
 
-  defp target_id(%{kind: kind, target: target}, registry) when kind in [:action, :flow],
-    do: Registry.identifier(registry, kind, target)
+  defp target(%{kind: kind, target: target}, registry) when kind in [:action, :flow],
+    do: Registry.encode_reference(registry, kind, target)
 
-  defp target_id(_, _), do: {:ok, nil}
+  defp target(_, _), do: {:ok, nil}
 
-  defp build(agent, agent_type_id, schema_id, operations) do
+  defp build(agent, agent_type, schema, operations) do
     %{
       "type" => "jido.agent.view",
-      "version" => 1,
+      "vsn" => 1,
       "id" => agent.id,
       "name" => agent.name,
       "description" => agent.description,
       "definition_vsn" => agent.vsn,
-      "agent_type_id" => agent_type_id,
-      "schema_id" => schema_id,
+      "agent_type" => agent_type,
+      "schema" => schema,
       "operations" => operations
     }
   end

@@ -2,7 +2,6 @@ defmodule Jido.Examples.DataDefinedAgent do
   @moduledoc "Builds, encodes, and runs one neutral Agent definition."
 
   alias Jido.Agent
-  alias Jido.Agent.Codec
   alias Jido.Authoring.Registry
   alias Jido.Plugin.Scheduler
 
@@ -80,7 +79,10 @@ defmodule Jido.Examples.DataDefinedAgent do
   @doc "Encodes one validated definition with stable application references."
   def encode do
     registry = registry()
-    {:ok, document} = Codec.encode(definition(), registry)
+
+    {:ok, document} =
+      Jido.Authoring.encode(definition(), registry: registry, codec: Jido.Agent.Codec)
+
     {document, registry}
   end
 
@@ -88,7 +90,9 @@ defmodule Jido.Examples.DataDefinedAgent do
   def fixture_json, do: File.read!(Path.join(__DIR__, "fixtures/agent.json"))
 
   @doc "Imports the JSON document without starting an Agent or its Plugins."
-  def from_json(json), do: Agent.from_json(json, registry())
+  def from_json(json) do
+    Jido.Authoring.decode_json(json, registry: registry(), codec: Jido.Agent.Codec)
+  end
 
   @doc "Builds a request to deliver a count command after the current Turn."
   def schedule_signal!(delay_ms) do

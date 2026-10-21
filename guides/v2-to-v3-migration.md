@@ -438,14 +438,14 @@ See [Durability Model](durability-model.md),
 
 ## Discovery
 
-`Jido.Discovery` now lists Actions only. `list_actions/1`, `get_action/1`, and
-`get_action_by_slug/1` remain. `list_sensors/1`, `list_agents/1`,
-`list_plugins/1`, `list_demos/1`, and their `get_*_by_slug/1` functions are
+`Jido.Discovery` is now the shared Authoring Registry from `jido_action`.
+Use `list/0`, `list/1`, `get/2`, and `get_by_target/2`. Agent modules,
+extensions, and Plugins publish the same versioned manifests as Actions and
+Flows. The old catalog, slug, filter, paging, and timestamp functions are
 removed.
 
-Discovery finds Actions. It doesn't grant permission to run them. Keep an
-explicit allowlist in your application. See
-[Action Discovery](action-discovery-and-permission.md).
+Discovery does not grant permission to run code. Keep an explicit allowlist
+in your application. See [Authoring Discovery and Permission](action-discovery-and-permission.md).
 
 ## Removed Modules
 

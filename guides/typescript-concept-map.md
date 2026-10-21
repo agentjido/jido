@@ -149,7 +149,7 @@ every Turn but can't replace the Signal or the selected route.
 | In TypeScript | In Jido | Where it breaks | Guide |
 | --- | --- | --- | --- |
 | The Node REPL | `iex -S mix` | `recompile/0` reloads changed modules without a restart. | [Getting Started](getting-started.livemd) |
-| A notebook | Livebook | The `plugin` DSL needs a source file and fails in a cell. Use `use Jido.Agent, extensions: [...]`, which passes no config. | [Extensions or Plugins](extensions-and-plugins.md) |
+| A notebook | Livebook | `plugin` works in a cell. Use `extensions: [...]` when a provider adds custom Spark sections or needs no config. | [Extensions or Plugins](extensions-and-plugins.md) |
 | `tsc --noEmit` | `mix compile --warnings-as-errors` | You write no type annotations. The compiler infers types and warns on violations it can prove. Jido checks route targets and Plugin shapes at compile time. Zoi checks data at runtime. | [Types and Validation](types-and-validation.md) |
 | A stricter type checker | Dialyzer (`mix dialyzer`) | It reports only errors it can prove. The first run builds a PLT and takes minutes. | [Types and Validation](types-and-validation.md) |
 | A linter and formatter | Credo (`mix credo`) and `mix format` | `mix format` ships with Elixir. Credo is a dev dependency. | [mix format](https://hexdocs.pm/mix/Mix.Tasks.Format.html) |

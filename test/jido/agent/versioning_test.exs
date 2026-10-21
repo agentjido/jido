@@ -2,7 +2,6 @@ defmodule Jido.Agent.VersioningTest do
   use ExUnit.Case, async: true
 
   alias Jido.Agent
-  alias Jido.Agent.Codec
 
   defmodule DefaultVersionAgent do
     use Jido.Agent, name: "default_version_agent"
@@ -73,12 +72,12 @@ defmodule Jido.Agent.VersioningTest do
           Agent.define!(%{name: "data", vsn: 8})
         ] do
       registry = JidoTest.AgentRegistry.for(value)
-      assert {:ok, document} = Codec.encode(value, registry)
-      assert document["version"] == 1
+      assert {:ok, document} = JidoTest.AgentRegistry.encode(value, registry)
+      assert document["vsn"] == 1
       assert document["definition"]["vsn"] == value.vsn
       expected = Agent.definition(value)
-      assert {:ok, ^expected} = Codec.decode(document, registry)
-      assert {:error, _} = Codec.decode(%{document | "version" => 99}, registry)
+      assert {:ok, ^expected} = JidoTest.AgentRegistry.decode(document, registry)
+      assert {:error, _} = JidoTest.AgentRegistry.decode(%{document | "vsn" => 99}, registry)
     end
   end
 

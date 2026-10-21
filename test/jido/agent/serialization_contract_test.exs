@@ -1,7 +1,6 @@
 defmodule Jido.Agent.SerializationContractTest do
   use JidoTest.Case, async: true
 
-  alias Jido.Agent.Codec
   alias Jido.Authoring.Registry
   alias Jido.Persistence
   alias JidoTest.Persistence.CheckpointIdentityProbe, as: Probe
@@ -46,13 +45,13 @@ defmodule Jido.Agent.SerializationContractTest do
 
     registry =
       Registry.new!(%{
-        "agents/probe/v1" => {:agent, Probe},
-        "schemas/probe/v1" => {:schema, definition.schema}
+        {"agents/probe", 1} => {:agent, Probe},
+        {"schemas/probe", 1} => {:schema, definition.schema}
       })
 
-    assert {:ok, document} = Codec.encode(definition, registry)
-    assert {:ok, ^definition} = Codec.decode(document, registry)
-    assert {:error, _} = Codec.decode(document, %{})
-    assert {:error, _} = Codec.decode(%{}, registry)
+    assert {:ok, document} = JidoTest.AgentRegistry.encode(definition, registry)
+    assert {:ok, ^definition} = JidoTest.AgentRegistry.decode(document, registry)
+    assert {:error, _} = JidoTest.AgentRegistry.decode(document, %{})
+    assert {:error, _} = JidoTest.AgentRegistry.decode(%{}, registry)
   end
 end

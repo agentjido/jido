@@ -1,6 +1,5 @@
 defmodule JidoCoreBench.AuthoringCases do
   @moduledoc false
-  alias Jido.Agent.Codec
   alias Jido.Authoring.Registry
   alias JidoCoreBench.Fixtures, as: F
 
@@ -28,19 +27,20 @@ defmodule JidoCoreBench.AuthoringCases do
         fn _ ->
           definition = F.definition(size, JidoCoreBench.Add, [JidoCoreBench.PreparePlugin])
           registry = JidoTest.AgentRegistry.for(definition)
-          {:ok, document} = Codec.encode(definition, registry)
+          {:ok, document} = JidoTest.AgentRegistry.encode(definition, registry)
           %{definition: definition, document: document, registry: registry}
         end,
         fn prepared ->
           case operation do
             :encode ->
-              Codec.encode(prepared.definition, prepared.registry)
+              JidoTest.AgentRegistry.encode(prepared.definition, prepared.registry)
 
             :decode ->
-              Codec.decode(prepared.document, prepared.registry)
+              JidoTest.AgentRegistry.decode(prepared.document, prepared.registry)
 
             :decode_instance ->
-              with {:ok, definition} <- Codec.decode(prepared.document, prepared.registry),
+              with {:ok, definition} <-
+                     JidoTest.AgentRegistry.decode(prepared.document, prepared.registry),
                    do: Jido.Agent.instantiate(definition, id: "decoded")
           end
         end,
@@ -60,24 +60,24 @@ defmodule JidoCoreBench.AuthoringCases do
   end
 
   defp registry_cases do
-    for size <- [1, 256], shape <- [:flat, :nested], operation <- [:resolve, :identifier] do
+    for size <- [1, 256], shape <- [:flat, :nested], operation <- [:resolve, :reference] do
       F.checked(
         "authoring/registry/#{size}/#{shape}/#{operation}",
         fn _ ->
           entries =
             Map.new(1..size, fn index ->
               value = if shape == :nested, do: %{index: index}, else: index
-              {"data/#{index}", {:data, value}}
+              {{"data/#{index}", 1}, {:data, value}}
             end)
 
           registry = Registry.new!(entries)
           value = if shape == :nested, do: %{index: size}, else: size
-          {registry, "data/#{size}", value}
+          {registry, {"data/#{size}", 1}, value}
         end,
         fn {registry, identifier, value} ->
           case operation do
             :resolve -> Registry.resolve(registry, identifier, :data)
-            :identifier -> Registry.identifier(registry, :data, value)
+            :reference -> Registry.reference(registry, :data, value)
           end
         end,
         fn result ->

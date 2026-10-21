@@ -2,7 +2,22 @@ defmodule JidoTest.AgentRegistry do
   @moduledoc false
 
   alias Jido.Agent
+  alias Jido.Authoring
   alias Jido.Authoring.Registry
+
+  @codec Jido.Agent.Codec
+
+  def encode(source, registry),
+    do: Authoring.encode(source, registry: registry, codec: @codec)
+
+  def decode(document, registry),
+    do: Authoring.decode(document, registry: registry, codec: @codec)
+
+  def encode_json(source, registry),
+    do: Authoring.encode_json(source, registry: registry, codec: @codec)
+
+  def decode_json(json, registry),
+    do: Authoring.decode_json(json, registry: registry, codec: @codec)
 
   def for(source) do
     definition = Agent.definition(source)
@@ -13,7 +28,7 @@ defmodule JidoTest.AgentRegistry do
     |> Enum.sort_by(fn {kind, value} -> {kind, :erlang.term_to_binary(value)} end)
     |> Enum.with_index(1)
     |> Map.new(fn {{kind, value}, index} ->
-      {"#{kind}/test-#{index}", {kind, value}}
+      {{"#{kind}/test-#{index}", 1}, {kind, value}}
     end)
     |> Registry.new!()
   end

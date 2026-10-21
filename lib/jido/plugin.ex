@@ -47,7 +47,7 @@ defmodule Jido.Plugin do
   for the configuration commit; unchanged Plugins keep their normal hooks.
   """
 
-  alias Jido.Plugin.{Init, Manifest, Normalizer}
+  alias Jido.Plugin.Init
 
   @type declaration :: module() | {module(), keyword()}
   @type state_spec :: :none | {atom(), Zoi.schema()}
@@ -137,6 +137,7 @@ defmodule Jido.Plugin do
       use Jido.Agent.Extension,
         id: unquote(Keyword.get(opts, :id, Atom.to_string(__CALLER__.module))),
         vsn: unquote(Keyword.get(opts, :vsn, 1)),
+        kind: :plugin,
         sections: unquote(Keyword.get(opts, :sections, []))
 
       def runtime_support, do: __MODULE__
@@ -180,12 +181,6 @@ defmodule Jido.Plugin do
         )
       end
     end
-  end
-
-  @doc "Normalizes one declaration and returns its static manifest."
-  @spec manifest(declaration()) :: {:ok, Manifest.t()} | {:error, term()}
-  def manifest(declaration) do
-    with {:ok, [spec]} <- Normalizer.normalize_all([declaration]), do: {:ok, spec.manifest}
   end
 
   @doc false

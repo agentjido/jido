@@ -42,22 +42,14 @@ defmodule Jido.Agent.Data do
       else: Error.fail(:duplicate, [], "Duplicate declaration", %{values: keys})
   end
 
-  def static(value)
-      when is_function(value) or is_pid(value) or is_port(value) or is_reference(value),
-      do: Error.fail(:live_value, [], "Authoring data cannot contain live values")
+  def static(value) do
+    case Jido.Authoring.validate_static(value) do
+      :ok ->
+        :ok
 
-  def static(%{__struct__: _} = value), do: static(Map.from_struct(value))
-
-  def static(value) when is_map(value),
-    do: static_items(Enum.flat_map(value, fn {k, v} -> [k, v] end))
-
-  def static(value) when is_tuple(value), do: static_items(Tuple.to_list(value))
-  def static(value) when is_list(value), do: static_items(value)
-  def static(_), do: :ok
-
-  defp static_items(values) do
-    with {:ok, _} <- list(values, fn value -> with :ok <- static(value), do: {:ok, value} end),
-         do: :ok
+      {:error, _reason} ->
+        Error.fail(:live_value, [], "Authoring data cannot contain live values")
+    end
   end
 
   def schema(%Zoi.Types.Map{fields: fields} = schema) when is_list(fields),

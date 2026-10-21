@@ -8,11 +8,11 @@ defmodule Jido.Agent.ViewTest do
 
   defp registry do
     Registry.new!(%{
-      "agents/counter/v1" => {:agent, CounterAgent},
-      "agents/core/v1" => {:agent, Agent},
-      "schemas/counter/v1" => {:schema, CounterAgent.definition().schema},
-      "schemas/empty/v1" => {:schema, Zoi.object(%{})},
-      "actions/add/v1" => {:action, Add}
+      {"agents/counter", 1} => {:agent, CounterAgent},
+      {"agents/core", 1} => {:agent, Agent},
+      {"schemas/counter", 1} => {:schema, CounterAgent.definition().schema},
+      {"schemas/empty", 1} => {:schema, Zoi.object(%{})},
+      {"actions/add", 1} => {:action, Add}
     })
   end
 
@@ -35,19 +35,19 @@ defmodule Jido.Agent.ViewTest do
 
     assert view == %{
              "type" => "jido.agent.view",
-             "version" => 1,
+             "vsn" => 1,
              "id" => nil,
              "name" => "data_counter",
              "description" => "A stored counter",
              "definition_vsn" => 1,
-             "agent_type_id" => nil,
-             "schema_id" => "schemas/empty/v1",
+             "agent_type" => nil,
+             "schema" => %{"id" => "schemas/empty", "vsn" => 1},
              "operations" => %{
                "items" => [
                  %{
                    "signal_type" => "counter.add",
                    "kind" => "action",
-                   "target_id" => "actions/add/v1",
+                   "target" => %{"id" => "actions/add", "vsn" => 1},
                    "emits" => nil
                  }
                ],
@@ -110,12 +110,12 @@ defmodule Jido.Agent.ViewTest do
 
     stable_without_action =
       Registry.new!(%{
-        "agents/counter/v1" => {:agent, CounterAgent},
-        "schemas/counter/v1" => {:schema, CounterAgent.definition().schema}
+        {"agents/counter", 1} => {:agent, CounterAgent},
+        {"schemas/counter", 1} => {:schema, CounterAgent.definition().schema}
       })
 
     assert {:error, %{message: message}} = View.project(definition, stable_without_action)
 
-    assert message =~ "no identifier"
+    assert message =~ "no reference"
   end
 end
