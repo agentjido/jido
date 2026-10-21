@@ -12,10 +12,15 @@ not active until its obligation file and tagged tests pass together.
 
 ## Layout
 
-Covenant uses `<app>/<component>.*` for contract records. Executable tests live
-under the production namespace path. AgentServer subcomponent records use
-`jido.agent_server/<component>.*`; their tests use
-`jido/agent_server/<component>/`.
+Covenant requires `<app>/<component>.*` for top-level contract records. The
+`jido/` folder is therefore the record index for top-level components. It does
+not contain executable test folders.
+
+Executable tests use one dotted folder for each top-level component. A
+component with child components keeps those children in plain subfolders. Its
+own tests use `core/`. This keeps `jido.agent_server` and `jido.plugin` as one
+tree each and prevents an overlapping `jido/agent_server` or `jido/plugin`
+test tree.
 
 ```text
 test/contract/
@@ -23,41 +28,34 @@ test/contract/
   coverage.json
   jido/
     agent.obligations.md
-    agent/
     agent_evaluation.obligations.md
-    agent_evaluation/
     discovery.obligations.md
     discovery.decisions.yml
     discovery.survivors.yml
-    discovery/
     error.obligations.md
     error.decisions.yml
-    error/
     agent_server.obligations.md
-    agent_server/
-      activation/
-      composition/
-      durable/
-      durable_turn/
-      effects/
-      plugin_runtime/
     instance.obligations.md
-    instance/
     persistence.obligations.md
     persistence.decisions.yml
     persistence.survivors.yml
-    persistence/
     plugin.obligations.md
-    plugin/
     signal_action.obligations.md
     signal_action.decisions.yml
     signal_action.survivors.yml
-    signal_action/
     telemetry.obligations.md
     telemetry.decisions.yml
     telemetry.survivors.yml
-    telemetry/
+  jido.agent/
+  jido.agent_evaluation/
+  jido.discovery/
+  jido.error/
+  jido.instance/
+  jido.persistence/
+  jido.signal_action/
+  jido.telemetry/
   jido.plugin/
+    core/
     audit.obligations.md
     audit/
     bus.obligations.md
@@ -69,24 +67,33 @@ test/contract/
     sensor_manager.obligations.md
     sensor_manager/
   jido.agent_server/
+    README.md
+    support.ex
+    core/
     activation.obligations.md
     activation.decisions.yml
     activation.survivors.yml
+    activation/
     composition.obligations.md
     composition.decisions.yml
     composition.survivors.yml
+    composition/
     durable.obligations.md
     durable.decisions.yml
     durable.survivors.yml
+    durable/
     durable_turn.obligations.md
     durable_turn.decisions.yml
     durable_turn.survivors.yml
+    durable_turn/
     effects.obligations.md
     effects.decisions.yml
     effects.survivors.yml
+    effects/
     plugin_runtime.obligations.md
     plugin_runtime.decisions.yml
     plugin_runtime.survivors.yml
+    plugin_runtime/
 ```
 
 The matching `*.decisions.yml` and `*.survivors.yml` files stay beside each

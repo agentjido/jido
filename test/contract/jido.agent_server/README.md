@@ -8,7 +8,7 @@ composition, durable Agent state, and durable Flow Turn components.
 Run the focused suite or the complete Covenant gate from the `jido` repository:
 
 ```sh
-mix test test/contract/jido/agent_server --seed 0
+mix test test/contract/jido.agent_server --seed 0
 mix test.contract
 ```
 
@@ -24,9 +24,9 @@ rules remain in `jido.agent`. Persistence records and adapters keep their own
 ownership. Durable Agent state and durable Flow progress have separate owners.
 
 The obligation register is
-[`agent_server.obligations.md`](../agent_server.obligations.md).
+[`agent_server.obligations.md`](../jido/agent_server.obligations.md).
 Current scope decisions are in
-[`agent_server.decisions.yml`](../agent_server.decisions.yml).
+[`agent_server.decisions.yml`](../jido/agent_server.decisions.yml).
 
 The root mutation profile targets `Jido.AgentServer.Core`. Public tests cover
 the shared `Jido.AgentServer` state-machine coordinator. Each AgentServer

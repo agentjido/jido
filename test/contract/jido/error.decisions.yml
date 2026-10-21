@@ -6,7 +6,7 @@
 
 - id: error-test-ownership
   date: 2026-10-20
-  decision: Move the shared constructor, projection, transport, and normalization suites to test/contract/jido/error and remove their duplicate cases.
+  decision: Move the shared constructor, projection, transport, and normalization suites to test/contract/jido.error and remove their duplicate cases.
   driver: One focused suite makes the shared boundary visible without claiming Agent, Plugin, runtime, or persistence failure policy.
   approved_by: Component hardening pass
 

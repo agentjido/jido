@@ -6,7 +6,7 @@
 
 - id: discovery-test-ownership
   date: 2026-10-20
-  decision: Move the complete Jido.Discovery suite to test/contract/jido/discovery and keep Jido.Agent.DSL.Discovery with jido.agent.
+  decision: Move the complete Jido.Discovery suite to test/contract/jido.discovery and keep Jido.Agent.DSL.Discovery with jido.agent.
   driver: The two modules use the word discovery for different values and must not share one contract owner.
   approved_by: Component hardening pass
 

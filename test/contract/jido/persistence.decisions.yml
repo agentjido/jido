@@ -6,7 +6,7 @@
 
 - id: persistence-test-ownership
   date: 2026-10-20
-  decision: Move shared persistence contract tests to test/contract/jido/persistence. Keep one-backend tests in test/jido/persistence. Keep live recovery and durable commit tests in the AgentServer durable components.
+  decision: Move shared persistence contract tests to test/contract/jido.persistence. Keep one-backend tests in test/jido/persistence. Keep live recovery and durable commit tests in the AgentServer durable components.
   driver: A shared contract must not claim backend implementation details or runtime recovery policy.
   approved_by: Component hardening pass
 

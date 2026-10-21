@@ -648,7 +648,7 @@ runtime module is unassigned.
       callback groups, callback results, Codec behavior, and error containment.
 - [x] Use generic test Plugins. Do not use Scheduler, Bus, SensorManager,
       Heartbeat, or Audit as generic contract fixtures.
-- [x] Create focused contract tests under `test/contract/jido/plugin/`.
+- [x] Create focused contract tests under `test/contract/jido.plugin/core/`.
 - [x] Move Agent preparation and reduction obligations to
       `jido.agent_evaluation`.
 - [x] Keep live callback timing in the future Plugin runtime component.

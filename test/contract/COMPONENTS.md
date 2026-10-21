@@ -15,48 +15,48 @@ this scaffold.
 
 | Component | State | Current contract area |
 | --- | --- | --- |
-| `jido.instance` | Active | `test/contract/jido/instance/` |
-| `jido.plugin` | Active | `test/contract/jido/plugin/` |
+| `jido.instance` | Active | `test/contract/jido.instance/` |
+| `jido.plugin` | Active | `test/contract/jido.plugin/core/` |
 | `jido.plugin.audit` | Active | `test/contract/jido.plugin/audit/` |
 | `jido.plugin.bus` | Active | `test/contract/jido.plugin/bus/` |
 | `jido.plugin.heartbeat` | Active | `test/contract/jido.plugin/heartbeat/` |
 | `jido.plugin.scheduler` | Active | `test/contract/jido.plugin/scheduler/` |
 | `jido.plugin.sensor_manager` | Active | `test/contract/jido.plugin/sensor_manager/` |
-| `jido.agent` | Active | `test/contract/jido/agent/` |
-| `jido.agent_evaluation` | Active | `test/contract/jido/agent_evaluation/` |
-| `jido.signal_action` | Active | `test/contract/jido/signal_action/` |
-| `jido.discovery` | Active | `test/contract/jido/discovery/` |
-| `jido.telemetry` | Active | `test/contract/jido/telemetry/` |
-| `jido.error` | Active | `test/contract/jido/error/` |
-| `jido.persistence` | Active | `test/contract/jido/persistence/` |
-| `jido.agent_server` | Active | `test/contract/jido/agent_server/` |
-| `jido.agent_server.activation` | Active | `test/contract/jido/agent_server/activation/` |
-| `jido.agent_server.effects` | Active | `test/contract/jido/agent_server/effects/` |
-| `jido.agent_server.plugin_runtime` | Active | `test/contract/jido/agent_server/plugin_runtime/` |
-| `jido.agent_server.composition` | Active | `test/contract/jido/agent_server/composition/` |
-| `jido.agent_server.durable` | Active | `test/contract/jido/agent_server/durable/` |
-| `jido.agent_server.durable_turn` | Active | `test/contract/jido/agent_server/durable_turn/` |
+| `jido.agent` | Active | `test/contract/jido.agent/` |
+| `jido.agent_evaluation` | Active | `test/contract/jido.agent_evaluation/` |
+| `jido.signal_action` | Active | `test/contract/jido.signal_action/` |
+| `jido.discovery` | Active | `test/contract/jido.discovery/` |
+| `jido.telemetry` | Active | `test/contract/jido.telemetry/` |
+| `jido.error` | Active | `test/contract/jido.error/` |
+| `jido.persistence` | Active | `test/contract/jido.persistence/` |
+| `jido.agent_server` | Active | `test/contract/jido.agent_server/core/` |
+| `jido.agent_server.activation` | Active | `test/contract/jido.agent_server/activation/` |
+| `jido.agent_server.effects` | Active | `test/contract/jido.agent_server/effects/` |
+| `jido.agent_server.plugin_runtime` | Active | `test/contract/jido.agent_server/plugin_runtime/` |
+| `jido.agent_server.composition` | Active | `test/contract/jido.agent_server/composition/` |
+| `jido.agent_server.durable` | Active | `test/contract/jido.agent_server/durable/` |
+| `jido.agent_server.durable_turn` | Active | `test/contract/jido.agent_server/durable_turn/` |
 
 ## Approved final components
 
 | Component | State | Purpose | Planned contract area |
 | --- | --- | --- | --- |
-| `jido.instance` | Active | Jido instance supervision, namespace, options, and Ref routing | `test/contract/jido/instance/` |
-| `jido.agent` | Active, to refine | Agent model, authoring, validation, logical topology, and edits | `test/contract/jido/agent/` |
-| `jido.agent_evaluation` | Active | Pure Agent evaluation and candidate production | `test/contract/jido/agent_evaluation/` |
-| `jido.agent_server` | Active | Core transient serialized Turn worker | `test/contract/jido/agent_server/core/` |
-| `jido.agent_server.activation` | Active | Activation root, readiness, identity, and local recovery | `test/contract/jido/agent_server/activation/` |
-| `jido.agent_server.effects` | Active | Ordered post-commit effects | `test/contract/jido/agent_server/effects/` |
-| `jido.agent_server.plugin_runtime` | Active | Live generic Plugin hosting | `test/contract/jido/agent_server/plugin_runtime/` |
-| `jido.agent_server.composition` | Active | Runtime child and connection resources | `test/contract/jido/agent_server/composition/` |
-| `jido.agent_server.durable` | Active | Persistence-backed AgentServer state coordination | `test/contract/jido/agent_server/durable/` |
-| `jido.agent_server.durable_turn` | Active | Durable Flow progress, waits, and receipts | `test/contract/jido/agent_server/durable_turn/` |
-| `jido.persistence` | Active | Records, snapshots, adapters, storage operations, and revisions | `test/contract/jido/persistence/` |
-| `jido.plugin` | Active | Generic Plugin SDK and callback contracts | `test/contract/jido/plugin/` |
-| `jido.signal_action` | Active | Jido integration values for Signals and Actions | `test/contract/jido/signal_action/` |
-| `jido.discovery` | Active | Read-only Action discovery | `test/contract/jido/discovery/` |
-| `jido.telemetry` | Active | Telemetry, metrics, tracing, logs, and Debug support | `test/contract/jido/telemetry/` |
-| `jido.error` | Active | Shared error taxonomy and stable common codes | `test/contract/jido/error/` |
+| `jido.instance` | Active | Jido instance supervision, namespace, options, and Ref routing | `test/contract/jido.instance/` |
+| `jido.agent` | Active, to refine | Agent model, authoring, validation, logical topology, and edits | `test/contract/jido.agent/` |
+| `jido.agent_evaluation` | Active | Pure Agent evaluation and candidate production | `test/contract/jido.agent_evaluation/` |
+| `jido.agent_server` | Active | Core transient serialized Turn worker | `test/contract/jido.agent_server/core/` |
+| `jido.agent_server.activation` | Active | Activation root, readiness, identity, and local recovery | `test/contract/jido.agent_server/activation/` |
+| `jido.agent_server.effects` | Active | Ordered post-commit effects | `test/contract/jido.agent_server/effects/` |
+| `jido.agent_server.plugin_runtime` | Active | Live generic Plugin hosting | `test/contract/jido.agent_server/plugin_runtime/` |
+| `jido.agent_server.composition` | Active | Runtime child and connection resources | `test/contract/jido.agent_server/composition/` |
+| `jido.agent_server.durable` | Active | Persistence-backed AgentServer state coordination | `test/contract/jido.agent_server/durable/` |
+| `jido.agent_server.durable_turn` | Active | Durable Flow progress, waits, and receipts | `test/contract/jido.agent_server/durable_turn/` |
+| `jido.persistence` | Active | Records, snapshots, adapters, storage operations, and revisions | `test/contract/jido.persistence/` |
+| `jido.plugin` | Active | Generic Plugin SDK and callback contracts | `test/contract/jido.plugin/core/` |
+| `jido.signal_action` | Active | Jido integration values for Signals and Actions | `test/contract/jido.signal_action/` |
+| `jido.discovery` | Active | Read-only Action discovery | `test/contract/jido.discovery/` |
+| `jido.telemetry` | Active | Telemetry, metrics, tracing, logs, and Debug support | `test/contract/jido.telemetry/` |
+| `jido.error` | Active | Shared error taxonomy and stable common codes | `test/contract/jido.error/` |
 | `jido.plugin.audit` | Active | Bundled Audit Plugin behavior | `test/contract/jido.plugin/audit/` |
 | `jido.plugin.bus` | Active | Bundled Bus Plugin behavior | `test/contract/jido.plugin/bus/` |
 | `jido.plugin.heartbeat` | Active | Bundled Heartbeat Plugin behavior | `test/contract/jido.plugin/heartbeat/` |
