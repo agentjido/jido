@@ -12,42 +12,26 @@ not active until its obligation file and tagged tests pass together.
 
 ## Layout
 
-Covenant requires `<app>/<component>.*` for top-level contract records. The
-`jido/` folder is therefore the record index for top-level components. It does
-not contain executable test folders.
-
-Executable tests use one dotted folder for each top-level component. A
-component with child components keeps those children in plain subfolders. Its
-own tests use `core/`. This keeps `jido.agent_server` and `jido.plugin` as one
-tree each and prevents an overlapping `jido/agent_server` or `jido/plugin`
-test tree.
+Each component uses one directory. The directory name is the component ID.
+Each directory contains `obligations.md`, `decisions.yml`, and, when needed,
+`survivors.yml`. Tests stay in the same directory. A component with child
+components keeps each child in a plain subdirectory. The parent component can
+keep its tests in `core/`.
 
 ```text
 test/contract/
   COMPONENTS.md
   coverage.json
-  jido/
-    agent.obligations.md
-    agent_evaluation.obligations.md
-    discovery.obligations.md
-    discovery.decisions.yml
-    discovery.survivors.yml
-    error.obligations.md
-    error.decisions.yml
-    agent_server.obligations.md
-    instance.obligations.md
-    persistence.obligations.md
-    persistence.decisions.yml
-    persistence.survivors.yml
-    plugin.obligations.md
-    signal_action.obligations.md
-    signal_action.decisions.yml
-    signal_action.survivors.yml
-    telemetry.obligations.md
-    telemetry.decisions.yml
-    telemetry.survivors.yml
   jido.agent/
+    obligations.md
+    decisions.yml
+    survivors.yml
+    *_test.exs
   jido.agent_evaluation/
+    obligations.md
+    decisions.yml
+    survivors.yml
+    *_test.exs
   jido.discovery/
   jido.error/
   jido.instance/
@@ -55,49 +39,36 @@ test/contract/
   jido.signal_action/
   jido.telemetry/
   jido.plugin/
+    obligations.md
+    decisions.yml
+    survivors.yml
     core/
-    audit.obligations.md
     audit/
-    bus.obligations.md
+      obligations.md
+      decisions.yml
+      survivors.yml
     bus/
-    heartbeat.obligations.md
     heartbeat/
-    scheduler.obligations.md
     scheduler/
-    sensor_manager.obligations.md
     sensor_manager/
   jido.agent_server/
     README.md
     support.ex
+    obligations.md
+    decisions.yml
     core/
-    activation.obligations.md
-    activation.decisions.yml
-    activation.survivors.yml
     activation/
-    composition.obligations.md
-    composition.decisions.yml
-    composition.survivors.yml
+      obligations.md
+      decisions.yml
+      survivors.yml
     composition/
-    durable.obligations.md
-    durable.decisions.yml
-    durable.survivors.yml
     durable/
-    durable_turn.obligations.md
-    durable_turn.decisions.yml
-    durable_turn.survivors.yml
     durable_turn/
-    effects.obligations.md
-    effects.decisions.yml
-    effects.survivors.yml
     effects/
-    plugin_runtime.obligations.md
-    plugin_runtime.decisions.yml
-    plugin_runtime.survivors.yml
     plugin_runtime/
 ```
 
-The matching `*.decisions.yml` and `*.survivors.yml` files stay beside each
-obligation file.
+The same record names apply to all component directories.
 
 ## Active boundaries
 

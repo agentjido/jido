@@ -23,10 +23,8 @@ These components do not claim distributed behavior. Agent value and authoring
 rules remain in `jido.agent`. Persistence records and adapters keep their own
 ownership. Durable Agent state and durable Flow progress have separate owners.
 
-The obligation register is
-[`agent_server.obligations.md`](../jido/agent_server.obligations.md).
-Current scope decisions are in
-[`agent_server.decisions.yml`](../jido/agent_server.decisions.yml).
+The obligation register is [`obligations.md`](obligations.md). Current scope
+decisions are in [`decisions.yml`](decisions.yml).
 
 The root mutation profile targets `Jido.AgentServer.Core`. Public tests cover
 the shared `Jido.AgentServer` state-machine coordinator. Each AgentServer

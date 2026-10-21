@@ -385,7 +385,11 @@ defmodule Jido.MixProject do
       {:ecto_sql, "~> 3.14", optional: true},
 
       # Development & Test Dependencies
-      {:covenant, "~> 0.2.0", only: [:dev, :test], runtime: false},
+      {:covenant,
+       github: "mikehostetler/covenant",
+       branch: "feat/component-directories",
+       only: [:dev, :test],
+       runtime: false},
       {:ecto_sqlite3, "~> 0.24.1", only: :test},
       {:postgrex, "~> 0.19 or ~> 1.0", only: :test},
       {:opentelemetry, "~> 1.0", only: :test, runtime: false},

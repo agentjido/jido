@@ -7,7 +7,7 @@ All component IDs start with `jido.`. Durable behavior stays under the
 `jido.agent_server` boundary.
 
 A planned row is not an active Covenant component. A component becomes active
-only when it has an `*.obligations.md` file and passing tests with its
+only when it has an `obligations.md` file and passing tests with its
 obligation tags. Do not add mutation profiles or obligation files as part of
 this scaffold.
 
