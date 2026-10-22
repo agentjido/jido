@@ -1,5 +1,5 @@
 defmodule Jido.Plugin.SensorManager.Agent do
-  @moduledoc "Owns the desired sensor field in complete Agent state."
+  @moduledoc false
   @behaviour Jido.Plugin
 
   alias Jido.Plugin.SensorManager.{Start, Stop}

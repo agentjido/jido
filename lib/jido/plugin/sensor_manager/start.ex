@@ -13,14 +13,17 @@ defmodule Jido.Plugin.SensorManager.Start do
             coerce: true
           )
 
+  @typedoc "A Directive that adds or replaces one managed sensor."
   @type t :: unquote(Zoi.type_spec(@schema))
   @enforce_keys Zoi.Struct.enforce_keys(@schema)
   defstruct Zoi.Struct.struct_fields(@schema)
 
   @doc false
+  @spec schema() :: Zoi.schema()
   def schema, do: @schema
 
   @doc "Validates one portable desired sensor declaration."
+  @spec validate(t()) :: {:ok, t()} | {:error, term()}
   def validate(%__MODULE__{} = directive) do
     with {:ok, directive} <- Zoi.parse(@schema, Map.from_struct(directive)),
          :ok <- SensorManager.validate_tag(directive.tag),

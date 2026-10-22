@@ -1,10 +1,12 @@
 defmodule Jido.Plugin.SensorManager.Server do
-  @moduledoc "Owns supervised sensor reconciliation after Agent commits."
+  @moduledoc false
   @behaviour Jido.Plugin
 
   alias Jido.Plugin.{DirectiveContext, Init}
   alias Jido.Plugin.SensorManager
   alias Jido.Plugin.SensorManager.Runtime
+
+  @runtime_timeout 5_000
 
   @impl true
   def validate_options(opts) do
@@ -25,16 +27,20 @@ defmodule Jido.Plugin.SensorManager.Server do
   end
 
   @impl true
-  def dispatch(runtime, _directive, %DirectiveContext{} = context, opts) do
-    timeout = timeout(opts)
-    Runtime.reconcile(runtime, context.plugin_state.desired, context.state_version, timeout)
+  def dispatch(runtime, _directive, %DirectiveContext{} = context, _opts) do
+    Runtime.reconcile(
+      runtime,
+      context.plugin_state.desired,
+      context.state_version,
+      @runtime_timeout
+    )
   catch
     :exit, reason -> {:error, {:sensor_manager_runtime_unavailable, reason}}
   end
 
   @impl true
-  def await_ready(runtime, opts) do
-    Runtime.await_ready(runtime, timeout(opts))
+  def await_ready(runtime, _opts) do
+    Runtime.await_ready(runtime, @runtime_timeout)
   catch
     :exit, reason -> {:error, {:sensor_manager_runtime_unavailable, reason}}
   end
@@ -43,6 +49,4 @@ defmodule Jido.Plugin.SensorManager.Server do
   def child_spec(%Init{} = init) do
     Supervisor.child_spec({Runtime, init}, id: SensorManager)
   end
-
-  defp timeout(opts), do: Keyword.get(opts, :timeout, 5_000)
 end

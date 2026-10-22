@@ -16,7 +16,10 @@ defmodule Jido.Plugin.SensorManager do
   before a sensor process starts.
   """
 
-  use Jido.Plugin
+  use Jido.Plugin, option_keys: [agent_server: [:retry_delay_ms]]
+
+  @typedoc "One Sensor Manager Plugin option."
+  @type option :: {:retry_delay_ms, 1..4_294_967_295}
 
   @impl true
   defdelegate state_spec(opts), to: Jido.Plugin.SensorManager.Agent

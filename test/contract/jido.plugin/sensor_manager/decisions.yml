@@ -15,3 +15,9 @@
   decision: Mutate only the Jido.Plugin.SensorManager module root and its behavior-bearing helpers.
   driver: These modules contain the bundled Plugin's desired-state, reconciliation, retry, and fencing decisions.
   approved_by: User-requested component hardening pass
+
+- id: sensor-manager-public-api
+  date: 2026-10-22
+  decision: Expose only the SensorManager constructors and option type, Start and Stop Directive validation, and the sensor-facing Init value. Keep Agent state, runtime, controller, and server modules internal, and add no custom DSL.
+  driver: Applications need to declare desired sensors and implement sensor children, but runtime reconciliation details are not an application contract.
+  approved_by: User-requested component review

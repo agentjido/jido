@@ -40,17 +40,17 @@
   sort: unpromised
   reason: The contract fixes the optional partition value and its propagation. It does not fix schema description prose.
 
-- at: lib/jido/plugin/sensor_manager/server.ex:47:55
+- at: lib/jido/plugin/sensor_manager/server.ex:9:20
   operator: integer_shift
   mutation: "`5000` → `5001`"
   sort: unpromised
-  reason: The contract fixes explicit timeout forwarding and runtime fault containment. It does not fix the internal default wait budget.
+  reason: The contract fixes runtime fault containment. It does not fix the internal wait budget.
 
-- at: lib/jido/plugin/sensor_manager/server.ex:47:55
+- at: lib/jido/plugin/sensor_manager/server.ex:9:20
   operator: integer_shift
   mutation: "`5000` → `4999`"
   sort: unpromised
-  reason: The contract fixes explicit timeout forwarding and runtime fault containment. It does not fix the internal default wait budget.
+  reason: The contract fixes runtime fault containment. It does not fix the internal wait budget.
 
 - at: lib/jido/plugin/sensor_manager/start.ex:9:41
   operator: string_empty

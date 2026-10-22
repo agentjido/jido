@@ -21,12 +21,17 @@ The component does not own a sensor module's behavior, generic Plugin callback
 timing, AgentServer commit atomicity, or Signal processing by the receiving
 Agent.
 
+The public boundary is `Jido.Plugin.SensorManager`, its `Start` and `Stop`
+Directives, and the sensor-facing `Init` value. Agent state, runtime,
+controller, and server modules are internal. Sensor Manager uses the standard
+Plugin configuration and adds no custom DSL section.
+
 ## Obligations
 
 ### jido.plugin.sensor_manager.I1 — Portable sensor Directives
 
 - **scope:** `Jido.Plugin.SensorManager.start/3`, `Jido.Plugin.SensorManager.stop/1`, `Jido.Plugin.SensorManager.Start.validate/1`, `Jido.Plugin.SensorManager.Stop.validate/1`
-- **must:** Construct Start and Stop Directives and accept only a non-nil portable tag, a loaded sensor module with `child_spec/1`, and portable map configuration.
+- **must:** Expose typed Start and Stop constructors and validation. Accept only a non-nil portable tag, a loaded sensor module with `child_spec/1`, and portable map configuration. Expose no other documented Sensor Manager functions.
 - **kind:** functional
 - **status:** active
 
@@ -37,10 +42,10 @@ Agent.
 - **kind:** ordering
 - **status:** active
 
-### jido.plugin.sensor_manager.I3 — Runtime configuration and ownership
+### jido.plugin.sensor_manager.I3 — Runtime configuration and sensor input
 
-- **scope:** `Jido.Plugin.SensorManager.Server.validate_options/1`, `Jido.Plugin.SensorManager.Server.child_spec/1`, `Jido.Plugin.SensorManager.Init`
-- **must:** Accept only a retry delay from 1 through 4,294,967,295 milliseconds, declare one permanent SensorManager runtime child, and give each sensor the documented Init value.
+- **scope:** `Jido.Plugin.SensorManager`, `Jido.Plugin.SensorManager.Server`, `Jido.Plugin.SensorManager.Init`
+- **must:** Own exactly the AgentServer option `retry_delay_ms`, add no custom DSL section, reject unknown or duplicate Plugin options, and accept only a delay from 1 through 4,294,967,295 milliseconds. Declare one permanent Sensor Manager runtime child and expose the typed Init value given to each sensor.
 - **kind:** functional
 - **status:** active
 

@@ -3230,11 +3230,12 @@
         "jido.plugin.sensor_manager.I1": {
           "failing": 0,
           "kind": "functional",
-          "passing": 2,
+          "passing": 3,
           "status": "active",
           "testable": true,
           "tests": [
             "test Directive validation rejects each invalid owned value at its path",
+            "test Sensor Manager exposes only its constructors, Directives, option, and sensor Init",
             "test constructors and schemas define valid portable sensor Directives"
           ]
         },
@@ -3251,11 +3252,12 @@
         "jido.plugin.sensor_manager.I3": {
           "failing": 0,
           "kind": "functional",
-          "passing": 1,
+          "passing": 2,
           "status": "active",
           "testable": true,
           "tests": [
-            "test retry configuration, runtime ownership, and sensor Init are bounded"
+            "test Plugin configuration, runtime ownership, and sensor Init are bounded",
+            "test Sensor Manager exposes only its constructors, Directives, option, and sensor Init"
           ]
         },
         "jido.plugin.sensor_manager.I4": {

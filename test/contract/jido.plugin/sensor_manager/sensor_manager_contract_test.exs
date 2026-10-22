@@ -7,6 +7,7 @@ defmodule JidoTest.Contract.PluginSensorManagerTest do
   alias Jido.AgentServer
   alias Jido.Plugin.DirectiveContext
   alias Jido.Plugin.Init, as: PluginInit
+  alias Jido.Plugin.Normalizer
   alias Jido.Plugin.SensorManager
   alias Jido.Plugin.SensorManager.Agent, as: SensorState
   alias Jido.Plugin.SensorManager.Init, as: SensorInit
@@ -72,6 +73,8 @@ defmodule JidoTest.Contract.PluginSensorManagerTest do
        %{path: [:tag, 1, 0]}},
       {SensorManager.start(:source, String), "Sensor must define child_spec/1",
        %{sensor: String}},
+      {SensorManager.start(:source, __MODULE__.MissingSensor), "Sensor must define child_spec/1",
+       %{sensor: __MODULE__.MissingSensor}},
       {SensorManager.start(:source, F.ControlledSensor, %{pid: self()}),
        "Sensor config must contain portable data", %{path: [:config, :pid]}},
       {SensorManager.start(:source, F.ControlledSensor, %{nested: [%{bits: <<5::3>>}]}),
@@ -86,6 +89,10 @@ defmodule JidoTest.Contract.PluginSensorManagerTest do
                 details: ^details
               }} = Directive.validate(directive)
     end
+
+    assert {:error, _reason} =
+             SensorManager.start(:source, F.ControlledSensor, [])
+             |> Directive.validate()
   end
 
   @tag obligation: "jido.plugin.sensor_manager.I2"
@@ -125,12 +132,26 @@ defmodule JidoTest.Contract.PluginSensorManagerTest do
   end
 
   @tag obligation: "jido.plugin.sensor_manager.I3"
-  test "retry configuration, runtime ownership, and sensor Init are bounded" do
+  test "Plugin configuration, runtime ownership, and sensor Init are bounded" do
+    assert %{
+             option_keys: %{
+               agent_server: [:retry_delay_ms]
+             }
+           } = SensorManager.__jido_plugin__()
+
+    assert SensorManager.sections() == []
+
     for delay <- [1, 1_000, 4_294_967_295] do
-      assert :ok = Server.validate_options(retry_delay_ms: delay)
+      options = [retry_delay_ms: delay]
+      assert :ok = SensorManager.validate_options(options)
+
+      assert {:ok, [spec]} = Normalizer.normalize_all([{SensorManager, options}])
+      assert spec.agent.options == []
+      assert spec.agent_server.options == options
     end
 
-    assert :ok = Server.validate_options([])
+    assert :ok = SensorManager.validate_options([])
+    assert {:ok, [_spec]} = Normalizer.normalize_all([SensorManager])
 
     for delay <- [-1, 0, 1.5, :manual, 4_294_967_296] do
       assert {:error,
@@ -138,7 +159,12 @@ defmodule JidoTest.Contract.PluginSensorManagerTest do
                 message: "Sensor Manager retry delay is invalid",
                 kind: :config,
                 details: %{retry_delay_ms: ^delay}
-              }} = Server.validate_options(retry_delay_ms: delay)
+              }} = SensorManager.validate_options(retry_delay_ms: delay)
+    end
+
+    for options <- [[unknown: true], [retry_delay_ms: 1, retry_delay_ms: 2]] do
+      assert {:error, %Jido.Error.ValidationError{}} =
+               Normalizer.normalize_all([{SensorManager, options}])
     end
 
     init = %PluginInit{

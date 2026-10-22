@@ -15,6 +15,7 @@ defmodule Jido.Plugin.SensorManager.Init do
             coerce: true
           )
 
+  @typedoc "Initialization data passed to one managed sensor."
   @type t :: unquote(Zoi.type_spec(@schema))
   @enforce_keys Zoi.Struct.enforce_keys(@schema)
   defstruct Zoi.Struct.struct_fields(@schema)
