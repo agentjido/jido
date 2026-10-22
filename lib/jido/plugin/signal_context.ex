@@ -26,7 +26,8 @@ defmodule Jido.Plugin.SignalContext do
               jido: Zoi.atom(description: "Optional Jido instance") |> Zoi.optional(),
               partition: Zoi.any(description: "Optional Agent partition") |> Zoi.optional()
             },
-            coerce: true
+            coerce: true,
+            unrecognized_keys: :error
           )
 
   @type t :: unquote(Zoi.type_spec(@schema))

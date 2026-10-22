@@ -28,9 +28,15 @@ defmodule Jido.Plugin.Init do
                 |> Zoi.default(0),
               jido: Zoi.atom(description: "Optional Jido instance") |> Zoi.optional(),
               partition: Zoi.any(description: "Optional Agent partition") |> Zoi.optional(),
-              options: Zoi.keyword(Zoi.any(), description: "Plugin options") |> Zoi.default([])
+              options:
+                Zoi.list(
+                  Zoi.tuple({Zoi.atom(), Zoi.any()}),
+                  description: "Plugin options"
+                )
+                |> Zoi.default([])
             },
-            coerce: true
+            coerce: true,
+            unrecognized_keys: :error
           )
 
   @type t :: unquote(Zoi.type_spec(@schema))

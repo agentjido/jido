@@ -266,7 +266,8 @@ defmodule Jido.MixProject do
           Jido.Plugin.SignalContext
         ],
         "Plugin Contracts": [
-          Jido.Plugin
+          Jido.Plugin,
+          Jido.Plugin.Input
         ],
         "Built-In Plugins": [
           Jido.Plugin.Audit,

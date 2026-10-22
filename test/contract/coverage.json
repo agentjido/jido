@@ -1,9 +1,9 @@
 {
   "apps": {
     "jido": {
-      "active": 122,
+      "active": 123,
       "coverage": 1.0,
-      "covered": 122
+      "covered": 123
     },
     "jido.agent_server": {
       "active": 66,
@@ -2659,29 +2659,33 @@
       }
     },
     "jido.plugin": {
-      "active": 8,
+      "active": 9,
       "app": "jido",
       "coverage": 1.0,
-      "covered": 8,
+      "covered": 9,
       "form": "light",
       "obligations": {
         "jido.plugin.I1": {
           "failing": 0,
           "kind": "functional",
-          "passing": 4,
+          "passing": 8,
           "status": "active",
           "testable": true,
           "tests": [
+            "test all supported use options retain their exact metadata",
             "test callbacks retain capability and pairing checks",
             "test normalization rejects mismatched metadata and invalid callback combinations",
             "test old role and facet selectors are rejected",
-            "test one declaration exposes stable identity and exact callback owners"
+            "test one declaration exposes stable identity and exact callback owners",
+            "test runtime support must keep the Plugin identity and contain metadata faults",
+            "test the documented Plugin API contains only the public authoring and context surface",
+            "test use options reject duplicate and malformed declaration metadata"
           ]
         },
         "jido.plugin.I2": {
           "failing": 0,
           "kind": "functional",
-          "passing": 6,
+          "passing": 7,
           "status": "active",
           "testable": true,
           "tests": [
@@ -2690,32 +2694,41 @@
             "test documented callbacks select their owners without role declarations",
             "test manifest accessors retain owner order and restrict mapped options",
             "test normalization rejects mismatched metadata and invalid callback combinations",
-            "test one declaration exposes stable identity and exact callback owners"
+            "test one declaration exposes stable identity and exact callback owners",
+            "test the Plugin behavior has one closed optional callback surface"
           ]
         },
         "jido.plugin.I3": {
           "failing": 0,
           "kind": "functional",
-          "passing": 4,
+          "passing": 8,
           "status": "active",
           "testable": true,
           "tests": [
             "test a complete declaration produces narrow owner Specs",
+            "test all supported use options retain their exact metadata",
             "test invalid manifest identities and versions return configuration errors",
             "test manifest accessors retain owner order and restrict mapped options",
-            "test manifest option mappings reject duplicate keys and unassigned options"
+            "test manifest option mappings reject duplicate keys and unassigned options",
+            "test reused Specs are checked without running declaration callbacks",
+            "test reused complete Specs require exact owner values",
+            "test use options reject duplicate and malformed declaration metadata"
           ]
         },
         "jido.plugin.I4": {
           "failing": 0,
           "kind": "functional",
-          "passing": 5,
+          "passing": 9,
           "status": "active",
           "testable": true,
           "tests": [
             "test declarations normalize once and retain order and exact options",
+            "test invalid reused Specs identify the failed aggregate or owner",
             "test normalization rejects malformed, mixed, repeated, and unloaded declarations",
             "test normalization rejects mismatched metadata and invalid callback combinations",
+            "test reused Specs are checked without running declaration callbacks",
+            "test reused Specs reject invalid module atoms before loading",
+            "test reused complete Specs require exact owner values",
             "test stored specs require a module and options",
             "test stored specs without a manifest are rejected"
           ]
@@ -2739,7 +2752,7 @@
         "jido.plugin.I6": {
           "failing": 0,
           "kind": "functional",
-          "passing": 5,
+          "passing": 6,
           "status": "active",
           "testable": true,
           "tests": [
@@ -2747,25 +2760,38 @@
             "test callbacks retain capability and pairing checks",
             "test normalization rejects mismatched metadata and invalid callback combinations",
             "test option validation preserves explicit errors and contains faults",
-            "test paired callbacks and owned values are required"
+            "test paired callbacks and owned values are required",
+            "test reused complete Specs require exact owner values"
           ]
         },
         "jido.plugin.I7": {
           "failing": 0,
           "kind": "functional",
-          "passing": 3,
+          "passing": 4,
           "status": "active",
           "testable": true,
           "tests": [
             "test option validation preserves explicit errors and contains faults",
             "test package metadata exceptions are contained at the normalization boundary",
+            "test runtime support must keep the Plugin identity and contain metadata faults",
             "test state and Directive callbacks preserve explicit errors"
+          ]
+        },
+        "jido.plugin.I8": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 2,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test the Plugin behavior has one closed optional callback surface",
+            "test the documented Plugin API contains only the public authoring and context surface"
           ]
         },
         "jido.plugin.I9": {
           "failing": 0,
           "kind": "functional",
-          "passing": 5,
+          "passing": 6,
           "status": "active",
           "testable": true,
           "tests": [
@@ -2773,7 +2799,8 @@
             "test initialization schema preserves its complete narrow value",
             "test input keeps prepared and runtime values separate",
             "test schema accepts the complete narrow outbound context",
-            "test schema supplies transient defaults and rejects invalid identity fields"
+            "test schema supplies transient defaults and rejects invalid identity fields",
+            "test the documented Plugin API contains only the public authoring and context surface"
           ]
         }
       }
@@ -3527,8 +3554,8 @@
   },
   "covenant": "0.2.0",
   "totals": {
-    "active": 222,
+    "active": 223,
     "coverage": 1.0,
-    "covered": 222
+    "covered": 223
   }
 }

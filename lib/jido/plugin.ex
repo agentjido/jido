@@ -115,23 +115,15 @@ defmodule Jido.Plugin do
     persistence: [dump: 3, load: 3]
   ]
   @optional_callbacks Enum.flat_map(@owner_callbacks, &elem(&1, 1))
+  @use_options [:vsn, :option_keys, :id, :sections]
 
   @doc false
   def owner_callbacks, do: @owner_callbacks
 
   @doc "Defines a Plugin. Implement only the callbacks it needs."
   defmacro __using__(opts) do
-    unless is_list(opts) and Keyword.keyword?(opts) do
-      raise ArgumentError, "use Jido.Plugin options must be a keyword list"
-    end
-
-    unknown = Keyword.keys(opts) -- [:vsn, :option_keys, :id, :sections]
-
-    if unknown != [] do
-      raise ArgumentError,
-            "use Jido.Plugin does not accept options #{inspect(unknown)}; " <>
-              "define callbacks in the Plugin module without roles or facet selectors"
-    end
+    opts = validate_use_options!(opts)
+    option_keys = normalize_option_keys!(Keyword.get(opts, :option_keys, []))
 
     quote location: :keep do
       use Jido.Agent.Extension,
@@ -155,7 +147,7 @@ defmodule Jido.Plugin do
       @behaviour Jido.Plugin
       @before_compile Jido.Plugin
       @jido_plugin_vsn unquote(Keyword.get(opts, :vsn, 1))
-      @jido_plugin_option_keys Map.new(unquote(Keyword.get(opts, :option_keys, [])))
+      @jido_plugin_option_keys unquote(Macro.escape(option_keys))
     end
   end
 
@@ -184,6 +176,7 @@ defmodule Jido.Plugin do
   end
 
   @doc false
+  @spec directive_owner([Jido.Plugin.Spec.t()], struct()) :: Jido.Plugin.Spec.t() | nil
   def directive_owner(specs, %{__struct__: directive_module}) when is_list(specs) do
     Enum.find(specs, fn
       %{agent: %Jido.Agent.Plugin.Spec{directive_modules: modules}} ->
@@ -199,4 +192,58 @@ defmodule Jido.Plugin do
   @doc "Gets the current state owned by one Plugin runtime."
   @spec state(Init.t(), timeout()) :: {:ok, term()} | {:error, term()}
   def state(init, timeout \\ 5_000), do: Jido.AgentServer.Plugin.state(init, timeout)
+
+  defp validate_use_options!(opts) do
+    unless Keyword.keyword?(opts) do
+      raise ArgumentError, "use Jido.Plugin options must be a keyword list"
+    end
+
+    keys = Keyword.keys(opts)
+
+    if Enum.uniq(keys) != keys do
+      raise ArgumentError, "use Jido.Plugin options must be unique"
+    end
+
+    unknown = keys -- @use_options
+
+    if unknown != [] do
+      raise ArgumentError,
+            "use Jido.Plugin does not accept options #{inspect(unknown)}; " <>
+              "define callbacks in the Plugin module without roles or facet selectors"
+    end
+
+    opts
+  end
+
+  defp normalize_option_keys!(value) do
+    if Keyword.keyword?(value) do
+      owners = Keyword.keys(value)
+
+      if Enum.uniq(owners) != owners do
+        raise ArgumentError, "use Jido.Plugin option owners must be unique"
+      end
+
+      validate_option_keys!(value, value)
+    else
+      invalid_option_keys!(value)
+    end
+  end
+
+  defp validate_option_keys!(entries, source) do
+    owners = Keyword.keys(@owner_callbacks)
+
+    valid? =
+      Enum.all?(entries, fn {owner, keys} ->
+        owner in owners and is_list(keys) and Enum.all?(keys, &is_atom/1) and
+          Enum.uniq(keys) == keys
+      end)
+
+    if valid?, do: Map.new(entries), else: invalid_option_keys!(source)
+  end
+
+  defp invalid_option_keys!(value) do
+    raise ArgumentError,
+          "use Jido.Plugin option_keys must map each callback owner to unique atom keys; " <>
+            "got: #{inspect(value)}"
+  end
 end

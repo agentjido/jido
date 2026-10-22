@@ -14,15 +14,22 @@ modules:
 ## Purpose
 
 Protect the generic Plugin declaration and callback contract. This component
-defines valid Plugin metadata and callback shapes. It does not define when a
-consumer runs a callback or what a bundled Plugin does.
+defines valid Plugin metadata, callback shapes, and narrow handoff values. Its
+public modules are `Jido.Plugin`, `Jido.Plugin.Input`, `Jido.Plugin.Init`,
+`Jido.Plugin.SignalContext`, and `Jido.Plugin.DirectiveContext`. Manifest,
+normalization, aggregate Spec, and error helpers are internal.
+
+`Jido.Plugin.state/2` is the public convenience facade for a running Plugin.
+The `jido.agent_server.plugin_runtime` component owns its live behavior. This
+component does not define when a consumer runs a callback or what a bundled
+Plugin does.
 
 ## Obligations
 
 ### jido.plugin.I1 — Plugin declaration and identity
 
 - **scope:** `use Jido.Plugin`, `Jido.Plugin.Normalizer.normalize_all/1`
-- **must:** Define one Plugin module with a stable ID, positive version, static manifest, and optional Agent, AgentServer, and persistence callback groups. Reject unknown or removed role and facet selectors. Require the Plugin behavior and generated marker.
+- **must:** Define one Plugin module with a nonempty stable ID, positive version, static authoring and Plugin markers, and optional Agent, AgentServer, and persistence callback groups. Reject duplicate or unknown use options and malformed callback-option mappings. Reject removed role and facet selectors. Require both the Plugin and Agent Extension behaviors.
 - **why:** A Plugin declaration must have one current source of identity and capability metadata.
 - **kind:** functional
 - **status:** active
@@ -38,7 +45,7 @@ consumer runs a callback or what a bundled Plugin does.
 ### jido.plugin.I3 — Manifest and option validation
 
 - **scope:** `Jido.Plugin.Manifest.validate/2`, `Jido.Plugin.Manifest.options_for/3`
-- **must:** Require a valid module, positive version, at least one selected owner, and a valid owner-to-option-key map. Keep keys unique, assign every declared option when a map is present, reject mappings to unselected or unknown owners, and require static option data. Give each owner only its assigned options.
+- **must:** Require a valid module, positive version, at least one selected owner, and a valid owner-to-option-key map. Keep declaration option keys and each owner's mapped keys unique. Assign every declared option when a map is present, reject mappings to unselected or unknown owners, and require static option data. Give each owner only its assigned options.
 - **why:** Each consumer must receive a stable and isolated configuration view.
 - **kind:** functional
 - **status:** active
@@ -46,7 +53,7 @@ consumer runs a callback or what a bundled Plugin does.
 ### jido.plugin.I4 — Declaration normalization
 
 - **scope:** `Jido.Plugin.Normalizer.normalize_all/1`, `canonical_declarations/1`, `declarations/1`
-- **must:** Accept Plugin modules, module-and-keyword declarations, or a complete list of normalized Specs. Preserve declaration order and exact common options. Reject malformed declarations, unloaded modules, incomplete Specs, mixed Specs and declarations, repeated Plugin modules, and mismatched marker metadata. Reusing a normalized Spec must not run declaration callbacks again.
+- **must:** Accept Plugin modules, module-and-keyword declarations, or a complete list of normalized Specs. Preserve declaration order and exact common options. Reject malformed declarations, unloaded modules, incomplete or inconsistent Specs, mixed Specs and declarations, repeated Plugin modules, and mismatched marker metadata. Reusing a normalized Spec must recheck its static structure without running declaration callbacks again.
 - **why:** Authoring and runtime consumers need one canonical Plugin declaration without repeated callback work.
 - **kind:** functional
 - **status:** active
@@ -75,10 +82,18 @@ consumer runs a callback or what a bundled Plugin does.
 - **kind:** functional
 - **status:** active
 
+### jido.plugin.I8 — Public API boundary
+
+- **scope:** documented modules and functions in the generic Plugin contract
+- **must:** Keep `use Jido.Plugin`, `Jido.Plugin.state/2`, the Input struct, and the three context schemas public. Keep Manifest, Normalizer, aggregate Spec, and error helpers internal. Keep the callback list closed and optional. Do not move live runtime behavior into this component.
+- **why:** Users need one small stable authoring surface while consumers keep ownership of execution.
+- **kind:** functional
+- **status:** active
+
 ### jido.plugin.I9 — Generic Plugin context values
 
 - **scope:** `Jido.Plugin.Input`, `Jido.Plugin.Init`, `Jido.Plugin.SignalContext`, `Jido.Plugin.DirectiveContext`
-- **must:** Keep prepared and runtime input separate. Validate runtime initialization and narrow Signal and Directive contexts with their required identity, Signal, version, owned-state, option, instance, and partition fields. Supply only documented empty defaults. Do not place live handles or complete Agent values in these generic structs.
+- **must:** Keep prepared and runtime input separate. Validate exact runtime initialization and narrow Signal and Directive contexts with their required identity, Signal, version, owned-state, option, instance, and partition fields. Supply only documented empty defaults. Permit the owning AgentServer PID only in Init and transient handles only in runtime input and Turn context. Do not place complete Agent values in these generic structs.
 - **why:** Consumers need narrow handoff values that do not create a second Agent state or leak full runtime ownership.
 - **kind:** functional
 - **status:** active

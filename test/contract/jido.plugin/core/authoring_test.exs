@@ -63,6 +63,38 @@ defmodule Jido.Plugin.AuthoringTest do
     def handle_call(_request, _from, state), do: {:reply, :ok, state}
   end
 
+  defmodule EmptyId do
+    use Jido.Plugin, id: ""
+    def state_spec(_opts), do: :none
+  end
+
+  defmodule OneCharacterId do
+    use Jido.Plugin, id: "x"
+    def state_spec(_opts), do: :none
+  end
+
+  defmodule SupportedOptions do
+    use Jido.Plugin,
+      id: "contract.supported-options",
+      vsn: 2,
+      option_keys: [agent: [:limit]],
+      sections: []
+
+    def state_spec(_opts), do: :none
+  end
+
+  defmodule InvalidRuntimeSupport do
+    use Jido.Plugin
+    def state_spec(_opts), do: :none
+    def runtime_support, do: String
+  end
+
+  defmodule RaisingRuntimeSupport do
+    use Jido.Plugin
+    def state_spec(_opts), do: :none
+    def runtime_support, do: raise(ArgumentError, "runtime support is unavailable")
+  end
+
   @tag obligation: "jido.plugin.I1"
   test "old role and facet selectors are rejected" do
     for options <- [
@@ -84,6 +116,101 @@ defmodule Jido.Plugin.AuthoringTest do
         """)
       end
     end
+  end
+
+  @tag obligation: ["jido.plugin.I1", "jido.plugin.I3"]
+  test "use options reject duplicate and malformed declaration metadata" do
+    invalid_options = [
+      "id: \"one\", id: \"two\"",
+      "option_keys: [agent: [:one], agent: [:two]]",
+      "option_keys: [agent: [:one, :one]]",
+      "option_keys: [unknown: []]",
+      "option_keys: :invalid",
+      "[:invalid]",
+      "%{id: \"invalid\"}"
+    ]
+
+    for {options, index} <- Enum.with_index(invalid_options) do
+      module = Module.concat(__MODULE__, "InvalidOptions#{index}")
+
+      assert_raise ArgumentError, fn ->
+        Code.compile_string("""
+        defmodule #{inspect(module)} do
+          use Jido.Plugin, #{options}
+        end
+        """)
+      end
+    end
+
+    assert {:error,
+            %{
+              message: "Plugin authoring identity is invalid",
+              details: %{
+                plugin: EmptyId,
+                id: "",
+                vsn: 1,
+                manifest_vsn: 1,
+                runtime_support: EmptyId,
+                authoring: %{id: "", kind: :plugin, target: EmptyId, vsn: 1}
+              }
+            }} =
+             Normalizer.normalize_all([EmptyId])
+  end
+
+  @tag obligation: ["jido.plugin.I1", "jido.plugin.I3"]
+  test "all supported use options retain their exact metadata" do
+    assert SupportedOptions.id() == "contract.supported-options"
+    assert SupportedOptions.vsn() == 2
+
+    assert %{option_keys: %{agent: [:limit]}} = SupportedOptions.__jido_plugin__()
+
+    assert {:ok, [spec]} = Normalizer.normalize_all([{SupportedOptions, limit: 1}])
+    assert spec.options === [limit: 1]
+    assert spec.agent.options === [limit: 1]
+
+    assert {:ok, [%{module: OneCharacterId}]} = Normalizer.normalize_all([OneCharacterId])
+
+    module = Module.concat(__MODULE__, "DynamicSupported#{System.unique_integer([:positive])}")
+
+    Code.compile_quoted(
+      quote do
+        defmodule unquote(module) do
+          use Jido.Plugin,
+            id: "contract.dynamic-supported",
+            vsn: 2,
+            option_keys: [agent: [:limit]],
+            sections: []
+
+          def state_spec(_opts), do: :none
+        end
+      end
+    )
+
+    assert module.id() == "contract.dynamic-supported"
+    assert module.vsn() == 2
+    assert %{option_keys: %{agent: [:limit]}} = module.__jido_plugin__()
+  end
+
+  @tag obligation: ["jido.plugin.I1", "jido.plugin.I7"]
+  test "runtime support must keep the Plugin identity and contain metadata faults" do
+    assert {:error,
+            %{
+              message: "Plugin authoring identity is invalid",
+              details: %{
+                plugin: InvalidRuntimeSupport,
+                runtime_support: String
+              }
+            }} = Normalizer.normalize_all([InvalidRuntimeSupport])
+
+    assert {:error,
+            %Jido.Error.ExecutionError{
+              message: "Plugin authoring metadata failed",
+              details: %{
+                plugin: RaisingRuntimeSupport,
+                callback: :runtime_support,
+                error: %ArgumentError{}
+              }
+            }} = Normalizer.normalize_all([RaisingRuntimeSupport])
   end
 
   @tag obligation: ["jido.plugin.I1", "jido.plugin.I5", "jido.plugin.I6"]

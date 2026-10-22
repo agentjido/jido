@@ -36,6 +36,10 @@ defmodule Jido.Plugin.Manifest do
   @spec options_for(t(), owner(), keyword()) :: keyword()
   def options_for(%__MODULE__{option_keys: option_keys}, owner, options)
       when owner in @owners and is_list(options) do
+    if not Keyword.keyword?(options) do
+      raise ArgumentError, "Plugin declaration options must be a keyword list"
+    end
+
     case {map_size(option_keys), Map.fetch(option_keys, owner)} do
       {0, _result} -> options
       {_size, {:ok, keys}} -> Keyword.take(options, keys)
@@ -45,24 +49,24 @@ defmodule Jido.Plugin.Manifest do
 
   @doc "Validates static manifest metadata and common declaration options."
   @spec validate(t(), keyword()) :: {:ok, t()} | {:error, Error.ValidationError.t()}
-  def validate(%__MODULE__{} = manifest, options) when is_list(options) do
+  def validate(%__MODULE__{} = manifest, options) do
     with :ok <- validate_module(manifest.module),
+         true <- Keyword.keyword?(options),
          :ok <- validate_vsn(manifest.vsn),
          :ok <- validate_facets(manifest),
          :ok <- validate_option_keys(manifest, options),
          :ok <- validate_static_options(options) do
       {:ok, manifest}
+    else
+      false -> invalid_manifest(manifest, options)
+      {:error, _reason} = error -> error
     end
   end
 
   def validate(manifest, options),
-    do:
-      invalid("Plugin manifest or declaration options are invalid", %{
-        manifest: manifest,
-        options: options
-      })
+    do: invalid_manifest(manifest, options)
 
-  defp validate_module(module) when is_atom(module) and not is_nil(module), do: :ok
+  defp validate_module(module) when is_atom(module) and module not in [nil, true, false], do: :ok
   defp validate_module(module), do: invalid("Plugin package module is invalid", %{module: module})
 
   defp validate_vsn(vsn) when is_integer(vsn) and vsn > 0, do: :ok
@@ -91,6 +95,8 @@ defmodule Jido.Plugin.Manifest do
   defp validate_option_keys(%__MODULE__{option_keys: option_keys} = manifest, options)
        when is_map(option_keys) do
     owner_keys = Map.keys(option_keys)
+    option_keys_in_order = Keyword.keys(options)
+    duplicate_options = duplicate_keys(option_keys_in_order)
 
     invalid_owner = Enum.find(owner_keys, &(&1 not in @owners))
 
@@ -108,6 +114,9 @@ defmodule Jido.Plugin.Manifest do
     unassigned = options |> Keyword.keys() |> Enum.reject(&MapSet.member?(assigned, &1))
 
     cond do
+      duplicate_options != [] ->
+        invalid("Plugin declaration options must be unique", %{options: duplicate_options})
+
       not is_nil(invalid_owner) ->
         invalid("Plugin option mapping has an unknown owner", %{
           owner: invalid_owner,
@@ -145,6 +154,21 @@ defmodule Jido.Plugin.Manifest do
           reason: Exception.message(reason)
         })
     end
+  end
+
+  defp duplicate_keys(keys) do
+    frequencies = Enum.frequencies(keys)
+
+    keys
+    |> Enum.filter(&(Map.fetch!(frequencies, &1) > 1))
+    |> Enum.uniq()
+  end
+
+  defp invalid_manifest(manifest, options) do
+    invalid("Plugin manifest or declaration options are invalid", %{
+      manifest: manifest,
+      options: options
+    })
   end
 
   defp invalid(message, details) do

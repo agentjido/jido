@@ -57,6 +57,20 @@ defmodule Jido.Plugin.BoundaryTest do
     def state_spec(_opts), do: :none
   end
 
+  defmodule ForgedPackage do
+    @behaviour Jido.Plugin
+    def __jido_plugin__, do: %Manifest{module: __MODULE__, agent: __MODULE__}
+    def state_spec(_opts), do: :none
+  end
+
+  defmodule ExtensionOnly do
+    use Jido.Agent.Extension, id: "contract.extension-only", kind: :plugin
+
+    def runtime_support, do: __MODULE__
+    def __jido_plugin__, do: %Manifest{module: __MODULE__, agent: __MODULE__}
+    def state_spec(_opts), do: :none
+  end
+
   defmodule RuntimePackage do
     use Jido.Plugin
     def admit(_runtime, _admission, opts), do: {:ok, opts}
@@ -113,6 +127,8 @@ defmodule Jido.Plugin.BoundaryTest do
       apply(Manifest, :options_for, [manifest, :agent, %{}])
     end
 
+    assert_raise ArgumentError, fn -> Manifest.options_for(manifest, :agent, [:invalid]) end
+
     assert_raise ArgumentError, fn -> struct!(Manifest, []) end
   end
 
@@ -122,6 +138,8 @@ defmodule Jido.Plugin.BoundaryTest do
 
     for {field, value, details} <- [
           {:module, nil, %{module: nil}},
+          {:module, true, %{module: true}},
+          {:module, false, %{module: false}},
           {:module, "plugin", %{module: "plugin"}},
           {:vsn, 0, %{vsn: 0}},
           {:vsn, "1", %{vsn: "1"}},
@@ -173,6 +191,15 @@ defmodule Jido.Plugin.BoundaryTest do
 
     assert {:error, %{details: %{reason: _reason}}} =
              Manifest.validate(manifest, result: self())
+
+    assert {:error,
+            %{
+              message: "Plugin declaration options must be unique",
+              details: %{options: [:result]}
+            }} = Manifest.validate(manifest, result: :first, result: :second)
+
+    assert {:error, %{details: %{manifest: ^manifest, options: [:invalid]}}} =
+             Manifest.validate(manifest, [:invalid])
   end
 
   @tag obligation: [
@@ -199,7 +226,7 @@ defmodule Jido.Plugin.BoundaryTest do
             }} =
              Jido.Plugin.Normalizer.normalize_all([TamperedMetadata])
 
-    for package <- [CallbackOnly, MarkerOnly, String] do
+    for package <- [CallbackOnly, MarkerOnly, ForgedPackage, ExtensionOnly, String] do
       assert {:error, %{details: %{plugin: ^package}}} =
                Jido.Plugin.Normalizer.normalize_all([package])
     end

@@ -224,6 +224,111 @@ defmodule JidoTest.PluginContract.NormalizerTest do
     assert [first.module, second.module] == [Configurable, DistinctStateOwner]
   end
 
+  @tag obligation: ["jido.plugin.I3", "jido.plugin.I4"]
+  test "reused Specs are checked without running declaration callbacks" do
+    assert {:ok, [spec]} = Normalizer.normalize_all([{Configurable, validation: :ok}])
+    assert_received {:callback, :state_spec, []}
+    assert_received {:callback, :directives, []}
+    assert_received {:callback, :validate_options, [validation: :ok]}
+
+    invalid_specs = [
+      %{spec | options: [:invalid]},
+      %{spec | options: %{validation: :ok}},
+      %{spec | manifest: %{spec.manifest | module: OtherOwner}},
+      %{spec | agent: :invalid},
+      %{spec | agent: nil},
+      %{spec | agent: %{spec.agent | package: OtherOwner}},
+      %{spec | agent: %{spec.agent | module: OtherOwner}},
+      %{spec | agent: %{spec.agent | options: [state_spec: :none]}},
+      %{spec | agent: %{spec.agent | state_key: nil}},
+      %{spec | agent: %{spec.agent | state_schema: nil}},
+      %{spec | agent: %{spec.agent | directive_modules: [String]}},
+      %{spec | agent_server: :invalid},
+      %{spec | agent_server: nil},
+      %{spec | agent_server: %{spec.agent_server | package: OtherOwner}},
+      %{spec | agent_server: %{spec.agent_server | module: OtherOwner}},
+      %{spec | agent_server: %{spec.agent_server | options: []}},
+      %{spec | agent_server: %{spec.agent_server | dispatch?: true}},
+      %{spec | agent_server: %{spec.agent_server | runtime?: true}}
+    ]
+
+    for invalid <- invalid_specs do
+      assert {:error, %Jido.Error.ValidationError{}} = Normalizer.normalize_all([invalid])
+      assert {:error, %Jido.Error.ValidationError{}} = Normalizer.declarations([invalid])
+    end
+
+    refute_received {:callback, _, _}
+  end
+
+  @tag obligation: "jido.plugin.I4"
+  test "invalid reused Specs identify the failed aggregate or owner" do
+    assert {:ok, [spec]} = Normalizer.normalize_all([{Configurable, validation: :ok}])
+
+    invalid_spec = %{spec | options: %{validation: :ok}}
+
+    assert {:error,
+            %Jido.Error.ValidationError{
+              details: %{plugin: Configurable, spec: ^invalid_spec}
+            }} = Normalizer.normalize_all([invalid_spec])
+
+    invalid_owner = %{spec.agent | package: OtherOwner}
+    invalid_spec = %{spec | agent: invalid_owner}
+
+    assert {:error,
+            %Jido.Error.ValidationError{
+              details: %{
+                plugin: Configurable,
+                owner: :agent,
+                spec: ^invalid_owner
+              }
+            }} = Normalizer.normalize_all([invalid_spec])
+  end
+
+  @tag obligation: ["jido.plugin.I3", "jido.plugin.I4", "jido.plugin.I6"]
+  test "reused complete Specs require exact owner values" do
+    options = [agent_option: 1, server_option: 2, persistence_option: 3]
+    assert {:ok, [spec]} = Normalizer.normalize_all([{Full, options}])
+    assert {:ok, [^spec]} = Normalizer.normalize_all([spec])
+
+    invalid_specs = [
+      %{spec | options: Keyword.put(options, :agent_option, 1.0)},
+      %{spec | agent: %{spec.agent | options: [agent_option: 1.0]}},
+      %{spec | persistence: nil},
+      %{spec | persistence: :invalid},
+      %{spec | persistence: %{spec.persistence | package: OtherOwner}},
+      %{spec | persistence: %{spec.persistence | module: OtherOwner}},
+      %{spec | persistence: %{spec.persistence | options: [persistence_option: 3.0]}},
+      %{spec | persistence: %{spec.persistence | vsn: 4}}
+    ]
+
+    for invalid <- invalid_specs do
+      assert {:error, %Jido.Error.ValidationError{}} = Normalizer.normalize_all([invalid])
+    end
+
+    assert {:ok, [server_only]} = Normalizer.normalize_all([ServerOnly])
+    assert {:ok, [^server_only]} = Normalizer.normalize_all([server_only])
+
+    assert {:ok, [agent_only]} = Normalizer.normalize_all([DistinctStateOwner])
+    assert {:ok, [^agent_only]} = Normalizer.normalize_all([agent_only])
+
+    assert {:ok, [stateless_agent]} =
+             Normalizer.normalize_all([{StateResult, result: :none}])
+
+    assert {:ok, [^stateless_agent]} = Normalizer.normalize_all([stateless_agent])
+  end
+
+  @tag obligation: "jido.plugin.I4"
+  test "reused Specs reject invalid module atoms before loading" do
+    assert {:ok, [spec]} = Normalizer.normalize_all([{Configurable, validation: :ok}])
+
+    for module <- [nil, true, false] do
+      invalid = %{spec | module: module, manifest: %{spec.manifest | module: module}}
+
+      assert {:error, %{details: %{plugin: ^module, reason: :invalid_module}}} =
+               Normalizer.normalize_all([invalid])
+    end
+  end
+
   @tag obligation: "jido.plugin.I4"
   test "normalization rejects malformed, mixed, repeated, and unloaded declarations" do
     assert {:ok, [spec]} = Normalizer.normalize_all([{Configurable, validation: :ok}])
@@ -235,6 +340,14 @@ defmodule JidoTest.PluginContract.NormalizerTest do
              Normalizer.declarations(:not_a_list)
 
     assert {:error, %{details: %{plugin: 42}}} = Normalizer.normalize_all([42])
+
+    for declaration <- [nil, true, false, {nil, []}, {true, []}, {false, []}] do
+      assert {:error, %{details: %{plugin: ^declaration}}} =
+               Normalizer.normalize_all([declaration])
+
+      assert {:error, %{details: %{plugin: ^declaration}}} =
+               Normalizer.declarations([declaration])
+    end
 
     assert {:error, %{details: %{plugin: Configurable, options: [:invalid]}}} =
              Normalizer.normalize_all([{Configurable, [:invalid]}])
@@ -257,6 +370,9 @@ defmodule JidoTest.PluginContract.NormalizerTest do
 
     assert {:error, %{details: %{plugin: {"not-a-module", []}}}} =
              Normalizer.normalize_all([{"not-a-module", []}])
+
+    assert {:error, %{message: "Plugin declaration options must be unique"}} =
+             Normalizer.normalize_all([{Configurable, validation: :ok, validation: :ok}])
   end
 
   @tag obligation: ["jido.plugin.I2", "jido.plugin.I3", "jido.plugin.I6"]

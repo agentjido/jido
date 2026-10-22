@@ -23,6 +23,8 @@ defmodule Jido.Plugin.SignalContextTest do
 
     assert {:ok, %SignalContext{} = context} = Zoi.parse(SignalContext.schema(), attrs)
     assert Map.from_struct(context) == attrs
+
+    assert {:error, _reason} = Zoi.parse(SignalContext.schema(), Map.put(attrs, :extra, true))
   end
 
   @tag obligation: "jido.plugin.I9"
@@ -84,6 +86,8 @@ defmodule Jido.Plugin.SignalContextTest do
     end
 
     assert {:error, _reason} = Zoi.parse(Init.schema(), %{attrs | state_version: -1})
+    assert {:error, _reason} = Zoi.parse(Init.schema(), Map.put(attrs, :extra, true))
+    assert {:error, _reason} = Zoi.parse(Init.schema(), %{attrs | options: [:invalid]})
   end
 
   @tag obligation: "jido.plugin.I9"
@@ -125,5 +129,8 @@ defmodule Jido.Plugin.SignalContextTest do
     end
 
     assert {:error, _reason} = Zoi.parse(DirectiveContext.schema(), %{attrs | state_version: -1})
+
+    assert {:error, _reason} =
+             Zoi.parse(DirectiveContext.schema(), Map.put(attrs, :extra, true))
   end
 end

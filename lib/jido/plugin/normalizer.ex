@@ -55,11 +55,7 @@ defmodule Jido.Plugin.Normalizer do
 
     cond do
       declarations == [] ->
-        if Enum.all?(values, &match?(%Spec{manifest: %Manifest{}}, &1)) do
-          {:ok, values}
-        else
-          PluginError.validation("Plugin specs require a manifest", %{specs: values})
-        end
+        validate_normalized_specs(values)
 
       specs != [] ->
         PluginError.validation(
@@ -70,6 +66,144 @@ defmodule Jido.Plugin.Normalizer do
       true ->
         normalize_declarations(declarations, prepare)
     end
+  end
+
+  defp validate_normalized_specs(specs) do
+    if Enum.all?(specs, &match?(%Spec{manifest: %Manifest{}}, &1)) do
+      specs
+      |> Enum.reduce_while({:ok, []}, fn spec, {:ok, validated} ->
+        case validate_normalized_spec(spec) do
+          :ok -> {:cont, {:ok, [spec | validated]}}
+          {:error, _reason} = error -> {:halt, error}
+        end
+      end)
+      |> case do
+        {:ok, validated} -> {:ok, Enum.reverse(validated)}
+        {:error, _reason} = error -> error
+      end
+    else
+      PluginError.validation("Plugin specs require a manifest", %{specs: specs})
+    end
+  end
+
+  defp validate_normalized_spec(
+         %Spec{module: module, options: options, manifest: %Manifest{} = manifest} = spec
+       ) do
+    with :ok <- ensure_loaded(module),
+         true <- Keyword.keyword?(options),
+         true <- manifest.module === module,
+         {:ok, ^manifest} <- Manifest.validate(manifest, options),
+         :ok <- validate_package_callbacks(manifest),
+         :ok <- validate_authoring_identity(manifest),
+         :ok <- validate_normalized_agent(spec.agent, manifest, options),
+         :ok <- validate_normalized_server(spec.agent_server, manifest, options),
+         :ok <- validate_normalized_persistence(spec.persistence, manifest, options),
+         :ok <- validate_pair(module, spec.agent, spec.agent_server, spec.persistence) do
+      :ok
+    else
+      false -> invalid_normalized_spec(spec)
+      {:error, _reason} = error -> error
+    end
+  end
+
+  defp validate_normalized_agent(nil, %Manifest{agent: nil}, _options), do: :ok
+
+  defp validate_normalized_agent(
+         %AgentSpec{} = agent,
+         %Manifest{agent: facet} = manifest,
+         options
+       ) do
+    expected_options = Manifest.options_for(manifest, :agent, options)
+
+    declared_state =
+      case {agent.state_key, agent.state_schema} do
+        {nil, nil} -> :none
+        state_spec -> state_spec
+      end
+
+    with true <- agent.package === manifest.module,
+         true <- agent.module === facet,
+         true <- agent.options === expected_options,
+         {:ok, {_state_key, _state_schema}} <-
+           validate_state_spec(declared_state, manifest.module, facet),
+         {:ok, _directive_modules} <-
+           validate_directive_modules(agent.directive_modules, manifest.module, facet),
+         :ok <-
+           validate_agent_contract(
+             manifest.module,
+             facet,
+             agent.state_key,
+             agent.directive_modules
+           ) do
+      :ok
+    else
+      false -> invalid_normalized_owner(manifest.module, :agent, agent)
+      {:error, _reason} = error -> error
+    end
+  end
+
+  defp validate_normalized_agent(agent, manifest, _options),
+    do: invalid_normalized_owner(manifest.module, :agent, agent)
+
+  defp validate_normalized_server(nil, %Manifest{agent_server: nil}, _options), do: :ok
+
+  defp validate_normalized_server(
+         %ServerSpec{} = server,
+         %Manifest{agent_server: facet} = manifest,
+         options
+       ) do
+    expected_options = Manifest.options_for(manifest, :agent_server, options)
+
+    with true <- server.package === manifest.module,
+         true <- server.module === facet,
+         true <- server.options === expected_options,
+         true <- server.dispatch? === function_exported?(facet, :dispatch, 4),
+         true <- server.runtime? === function_exported?(facet, :child_spec, 1),
+         :ok <- facet_has_capability(facet, :agent_server) do
+      :ok
+    else
+      false -> invalid_normalized_owner(manifest.module, :agent_server, server)
+      {:error, _reason} = error -> error
+    end
+  end
+
+  defp validate_normalized_server(server, manifest, _options),
+    do: invalid_normalized_owner(manifest.module, :agent_server, server)
+
+  defp validate_normalized_persistence(nil, %Manifest{persistence: nil}, _options), do: :ok
+
+  defp validate_normalized_persistence(
+         %PersistenceSpec{} = persistence,
+         %Manifest{persistence: facet} = manifest,
+         options
+       ) do
+    expected_options = Manifest.options_for(manifest, :persistence, options)
+
+    if persistence.package === manifest.module and persistence.module === facet and
+         persistence.options === expected_options and persistence.vsn === manifest.vsn and
+         function_exported?(facet, :dump, 3) and function_exported?(facet, :load, 3) do
+      :ok
+    else
+      invalid_normalized_owner(manifest.module, :persistence, persistence)
+    end
+  end
+
+  defp validate_normalized_persistence(persistence, manifest, _options),
+    do: invalid_normalized_owner(manifest.module, :persistence, persistence)
+
+  defp invalid_normalized_spec(spec) do
+    PluginError.validation("Normalized Plugin spec is invalid", %{
+      plugin: spec.module,
+      spec: spec
+    })
+  end
+
+  defp invalid_normalized_owner(plugin, owner, value) do
+    PluginError.validation("Normalized Plugin owner spec is invalid", %{
+      plugin: plugin,
+      owner: owner,
+      spec: value
+    })
   end
 
   defp normalize_declarations(declarations, prepare) do
@@ -90,9 +224,11 @@ defmodule Jido.Plugin.Normalizer do
     with {:ok, {module, options}} <- declaration(value), do: build_spec(module, options)
   end
 
-  defp declaration(module) when is_atom(module), do: {:ok, {module, []}}
+  defp declaration(module) when is_atom(module) and module not in [nil, true, false],
+    do: {:ok, {module, []}}
 
-  defp declaration({module, options}) when is_atom(module) and is_list(options) do
+  defp declaration({module, options})
+       when is_atom(module) and module not in [nil, true, false] and is_list(options) do
     if Keyword.keyword?(options) do
       {:ok, {module, options}}
     else
@@ -117,9 +253,10 @@ defmodule Jido.Plugin.Normalizer do
   end
 
   defp build_manifest_spec(module, options, %Manifest{} = manifest) do
-    with true <- manifest.module == module,
+    with true <- manifest.module === module,
          {:ok, manifest} <- Manifest.validate(manifest, options),
          :ok <- validate_package_callbacks(manifest),
+         :ok <- validate_authoring_identity(manifest),
          {:ok, agent} <- build_agent_spec(manifest, options),
          {:ok, server} <- build_server_spec(manifest, options),
          {:ok, persistence} <- build_persistence_spec(manifest, options),
@@ -276,6 +413,46 @@ defmodule Jido.Plugin.Normalizer do
 
       true ->
         :ok
+    end
+  end
+
+  defp validate_authoring_identity(%Manifest{module: module, vsn: manifest_vsn}) do
+    with true <- Jido.Agent.Extension in behaviours(module),
+         {:ok, id} <- read_authoring_value(module, :id),
+         {:ok, vsn} <- read_authoring_value(module, :vsn),
+         {:ok, runtime_support} <- read_authoring_value(module, :runtime_support),
+         {:ok, authoring} <- read_authoring_value(module, :__jido_authoring__) do
+      expected = %{id: id, kind: :plugin, target: module, vsn: vsn}
+
+      if is_binary(id) and byte_size(id) > 0 and vsn === manifest_vsn and
+           runtime_support === module and authoring === expected do
+        :ok
+      else
+        PluginError.validation("Plugin authoring identity is invalid", %{
+          plugin: module,
+          id: id,
+          vsn: vsn,
+          manifest_vsn: manifest_vsn,
+          runtime_support: runtime_support,
+          authoring: authoring
+        })
+      end
+    else
+      false -> invalid_package(module)
+      {:error, _reason} = error -> error
+    end
+  end
+
+  defp read_authoring_value(module, function) do
+    case PluginError.safe_apply(
+           module,
+           module,
+           function,
+           [],
+           "Plugin authoring metadata failed"
+         ) do
+      {:error, _reason} = error -> error
+      value -> {:ok, value}
     end
   end
 
@@ -536,7 +713,7 @@ defmodule Jido.Plugin.Normalizer do
     |> List.flatten()
   end
 
-  defp ensure_loaded(module) do
+  defp ensure_loaded(module) when is_atom(module) and module not in [nil, true, false] do
     case Code.ensure_loaded(module) do
       {:module, ^module} ->
         :ok
@@ -547,6 +724,13 @@ defmodule Jido.Plugin.Normalizer do
           reason: reason
         })
     end
+  end
+
+  defp ensure_loaded(module) do
+    PluginError.validation("Agent Plugin could not be loaded", %{
+      plugin: module,
+      reason: :invalid_module
+    })
   end
 
   defp has_any?(module, callbacks) do
