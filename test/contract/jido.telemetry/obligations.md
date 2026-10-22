@@ -1,6 +1,5 @@
 ---
 modules:
-  - Jido.Debug
   - Jido.Telemetry
   - Jido.Telemetry.Semantic
   - Jido.Telemetry.OpenTelemetry
@@ -47,7 +46,7 @@ durable audit records.
 
 ### jido.telemetry.I4 — Bounded logs and instance debug overrides
 
-- **scope:** default semantic handler, log configuration, `Jido.Debug`
+- **scope:** default semantic handler, log configuration, per-instance Telemetry debug state
 - **must:** Attach the default semantic log handler idempotently. Keep logging off by default. Support errors, interesting, and all modes with normalized fields. Escape caller-controlled C0 and C1 controls and Unicode line separators, keep each binary value on one physical line, and limit its rendered value to 128 bytes. Let a valid per-instance debug level override the global log mode only for events in that instance scope. Keep debug state isolated by instance and treat absent or malformed state as off.
 - **kind:** functional
 - **status:** active

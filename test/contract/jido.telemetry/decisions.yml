@@ -45,3 +45,9 @@
   decision: Accept the current full profile with 779 mutants, 719 killed mutants, 16 reviewed equivalent survivors, 44 invalid mutations, no timeout, and no unclassified survivor.
   driver: The component review needs current mutation evidence after the boundary, public API, Covenant, containment, and log-safety changes.
   approved_by: Component review pass
+
+- id: telemetry-debug-ownership
+  date: 2026-10-22
+  decision: Fold per-instance semantic log control into Jido.Telemetry and remove the internal Jido.Debug module while retaining the Jido and generated instance debug facades.
+  driver: Debug now changes only semantic Telemetry log mode. A separate state module no longer owns an independent observation concern.
+  approved_by: Jido V3 API review

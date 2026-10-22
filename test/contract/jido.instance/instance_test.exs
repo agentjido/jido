@@ -110,7 +110,7 @@ defmodule JidoTest.InstanceTest do
 
     on_exit(fn ->
       Application.delete_env(:jido_test_instance, TestInstance)
-      Jido.Debug.reset(TestInstance)
+      Jido.Telemetry.set_debug(TestInstance, :off)
       stop_test_instance()
     end)
 

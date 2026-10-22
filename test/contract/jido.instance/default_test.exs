@@ -80,7 +80,7 @@ defmodule Jido.InstanceHelpersTest do
     assert :ok = Jido.debug(:on)
     assert Jido.debug() == :on
     assert :ok = Jido.debug(:verbose)
-    assert Jido.Debug.override(instance, :semantic_log_mode) == :all
+    assert Jido.Telemetry.debug_status(instance).overrides.semantic_log_mode == :all
     assert :ok = Jido.debug(:off)
     assert Jido.debug() == :off
   end

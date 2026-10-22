@@ -1,9 +1,9 @@
-defmodule JidoTest.DebugTest do
+defmodule JidoTest.TelemetryDebugTest do
   use Covenant.Case, component: "jido.telemetry", async: false
 
   @moduletag obligation: "jido.telemetry.I4"
 
-  alias Jido.Debug
+  alias Jido.Telemetry
 
   @test_instance :"jido_debug_test_#{System.unique_integer([:positive])}"
 
@@ -14,12 +14,12 @@ defmodule JidoTest.DebugTest do
     on_exit(fn ->
       restore_env(:jido_test, @test_instance, instance_config)
       restore_env(:jido, :telemetry, telemetry)
-      Debug.reset(@test_instance)
+      Telemetry.set_debug(@test_instance, :off)
     end)
 
     Application.delete_env(:jido_test, @test_instance)
     Application.delete_env(:jido, :telemetry)
-    Debug.reset(@test_instance)
+    Telemetry.set_debug(@test_instance, :off)
 
     :ok
   end
@@ -27,102 +27,102 @@ defmodule JidoTest.DebugTest do
   defp restore_env(app, key, {:ok, value}), do: Application.put_env(app, key, value)
   defp restore_env(app, key, :error), do: Application.delete_env(app, key)
 
-  describe "enable/2 and level/1" do
+  describe "set_debug/2 and debug_level/1" do
     test "default level is :off" do
-      assert Debug.level(@test_instance) == :off
+      assert Telemetry.debug_level(@test_instance) == :off
     end
 
-    test "enable :on sets level" do
-      assert :ok = Debug.enable(@test_instance, :on)
-      assert Debug.level(@test_instance) == :on
+    test "setting :on sets level" do
+      assert :ok = Telemetry.set_debug(@test_instance, :on)
+      assert Telemetry.debug_level(@test_instance) == :on
     end
 
-    test "enable :verbose sets level" do
-      assert :ok = Debug.enable(@test_instance, :verbose)
-      assert Debug.level(@test_instance) == :verbose
+    test "setting :verbose sets level" do
+      assert :ok = Telemetry.set_debug(@test_instance, :verbose)
+      assert Telemetry.debug_level(@test_instance) == :verbose
     end
 
-    test "enable :off disables" do
-      Debug.enable(@test_instance, :on)
-      assert :ok = Debug.enable(@test_instance, :off)
-      assert Debug.level(@test_instance) == :off
+    test "setting :off disables" do
+      Telemetry.set_debug(@test_instance, :on)
+      assert :ok = Telemetry.set_debug(@test_instance, :off)
+      assert Telemetry.debug_level(@test_instance) == :off
     end
 
     test "rejects an unsupported level" do
       assert_raise FunctionClauseError, fn ->
-        apply(Debug, :enable, [@test_instance, :invalid])
+        apply(Telemetry, :set_debug, [@test_instance, :invalid])
       end
 
-      assert Debug.level(@test_instance) == :off
+      assert Telemetry.debug_level(@test_instance) == :off
     end
   end
 
-  describe "enabled?/1" do
+  describe "enabled state" do
     test "false when off" do
-      refute Debug.enabled?(@test_instance)
+      assert Telemetry.debug_level(@test_instance) == :off
     end
 
     test "true when on" do
-      Debug.enable(@test_instance, :on)
-      assert Debug.enabled?(@test_instance)
+      Telemetry.set_debug(@test_instance, :on)
+      assert Telemetry.debug_level(@test_instance) != :off
     end
 
     test "true when verbose" do
-      Debug.enable(@test_instance, :verbose)
-      assert Debug.enabled?(@test_instance)
+      Telemetry.set_debug(@test_instance, :verbose)
+      assert Telemetry.debug_level(@test_instance) != :off
     end
   end
 
-  describe "disable/1" do
+  describe "disable through set_debug/2" do
     test "disables debug mode" do
-      Debug.enable(@test_instance, :on)
-      assert :ok = Debug.disable(@test_instance)
-      assert Debug.level(@test_instance) == :off
+      Telemetry.set_debug(@test_instance, :on)
+      assert :ok = Telemetry.set_debug(@test_instance, :off)
+      assert Telemetry.debug_level(@test_instance) == :off
     end
 
     test "idempotent - can disable when already off" do
-      assert :ok = Debug.disable(@test_instance)
+      assert :ok = Telemetry.set_debug(@test_instance, :off)
     end
   end
 
-  describe "override/2" do
+  describe "debug_status/1 overrides" do
     test "returns nil when debug is off" do
-      assert Debug.override(@test_instance, :semantic_log_mode) == nil
+      assert Map.get(Telemetry.debug_status(@test_instance).overrides, :semantic_log_mode) == nil
     end
 
     test "returns override when :on" do
-      Debug.enable(@test_instance, :on)
-      assert Debug.override(@test_instance, :semantic_log_mode) == :interesting
+      Telemetry.set_debug(@test_instance, :on)
+      assert Telemetry.debug_status(@test_instance).overrides.semantic_log_mode == :interesting
     end
 
     test "returns override when :verbose" do
-      Debug.enable(@test_instance, :verbose)
-      assert Debug.override(@test_instance, :semantic_log_mode) == :all
+      Telemetry.set_debug(@test_instance, :verbose)
+      assert Telemetry.debug_status(@test_instance).overrides.semantic_log_mode == :all
     end
 
     test "returns nil for unknown override key" do
-      Debug.enable(@test_instance, :on)
-      assert Debug.override(@test_instance, :nonexistent_key) == nil
+      Telemetry.set_debug(@test_instance, :on)
+      assert Map.get(Telemetry.debug_status(@test_instance).overrides, :nonexistent_key) == nil
     end
   end
 
-  describe "reset/1" do
+  describe "reset through set_debug/2" do
     test "resets to :off" do
-      Debug.enable(@test_instance, :verbose)
-      assert :ok = Debug.reset(@test_instance)
-      assert Debug.level(@test_instance) == :off
+      Telemetry.set_debug(@test_instance, :verbose)
+      assert :ok = Telemetry.set_debug(@test_instance, :off)
+      assert Telemetry.debug_level(@test_instance) == :off
     end
   end
 
-  describe "status/1" do
+  describe "debug_status/1" do
     test "returns off status when disabled" do
-      status = Debug.status(@test_instance)
+      status = Telemetry.debug_status(@test_instance)
       assert status == %{level: :off, overrides: %{}}
     end
 
     test "returns status map when enabled" do
-      Debug.enable(@test_instance, :on)
-      status = Debug.status(@test_instance)
+      Telemetry.set_debug(@test_instance, :on)
+      status = Telemetry.debug_status(@test_instance)
       assert status.level == :on
       assert is_map(status.overrides)
       assert status.overrides.semantic_log_mode == :interesting
@@ -132,34 +132,32 @@ defmodule JidoTest.DebugTest do
       for state <- [:invalid, %{}, %{level: :invalid}, %{level: :on, overrides: :invalid}] do
         :persistent_term.put({:jido_debug, @test_instance}, state)
 
-        assert Debug.level(@test_instance) == :off
-        refute Debug.enabled?(@test_instance)
-        assert Debug.override(@test_instance, :semantic_log_mode) == nil
-        assert Debug.status(@test_instance) == %{level: :off, overrides: %{}}
+        assert Telemetry.debug_level(@test_instance) == :off
+        assert Telemetry.debug_status(@test_instance) == %{level: :off, overrides: %{}}
       end
     end
   end
 
-  describe "configure/2" do
+  describe "configure_debug/2" do
     test "enables true as normal debug" do
-      Debug.configure(@test_instance, true)
-      assert Debug.level(@test_instance) == :on
+      Telemetry.configure_debug(@test_instance, true)
+      assert Telemetry.debug_level(@test_instance) == :on
     end
 
     test "enables :verbose" do
-      Debug.configure(@test_instance, :verbose)
-      assert Debug.level(@test_instance) == :verbose
+      Telemetry.configure_debug(@test_instance, :verbose)
+      assert Telemetry.debug_level(@test_instance) == :verbose
     end
 
     test "keeps debug off for false" do
-      Debug.configure(@test_instance, false)
-      assert Debug.level(@test_instance) == :off
+      Telemetry.configure_debug(@test_instance, false)
+      assert Telemetry.debug_level(@test_instance) == :off
     end
 
     test "disables a stale override when debug is absent" do
-      Debug.enable(@test_instance, :on)
-      Debug.configure(@test_instance, nil)
-      assert Debug.level(@test_instance) == :off
+      Telemetry.set_debug(@test_instance, :on)
+      Telemetry.configure_debug(@test_instance, nil)
+      assert Telemetry.debug_level(@test_instance) == :off
     end
   end
 
@@ -169,19 +167,19 @@ defmodule JidoTest.DebugTest do
       instance_b = :"jido_debug_test_b_#{System.unique_integer([:positive])}"
 
       on_exit(fn ->
-        Debug.reset(instance_a)
-        Debug.reset(instance_b)
+        Telemetry.set_debug(instance_a, :off)
+        Telemetry.set_debug(instance_b, :off)
       end)
 
-      Debug.enable(instance_a, :on)
-      Debug.enable(instance_b, :verbose)
+      Telemetry.set_debug(instance_a, :on)
+      Telemetry.set_debug(instance_b, :verbose)
 
-      assert Debug.level(instance_a) == :on
-      assert Debug.level(instance_b) == :verbose
+      assert Telemetry.debug_level(instance_a) == :on
+      assert Telemetry.debug_level(instance_b) == :verbose
 
-      Debug.disable(instance_a)
-      assert Debug.level(instance_a) == :off
-      assert Debug.level(instance_b) == :verbose
+      Telemetry.set_debug(instance_a, :off)
+      assert Telemetry.debug_level(instance_a) == :off
+      assert Telemetry.debug_level(instance_b) == :verbose
     end
   end
 end

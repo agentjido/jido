@@ -30,12 +30,14 @@ defmodule Jido.Telemetry do
 
   require Logger
 
-  alias Jido.Debug
   alias Jido.Telemetry.{OpenTelemetry, Semantic}
 
   @semantic_handler_id "jido-semantic-logger"
   @log_scope_key {:jido, :semantic_log_scope}
   @log_modes [:off, :errors, :interesting, :all]
+  @debug_key :jido_debug
+  @debug_on_overrides %{semantic_log_mode: :interesting}
+  @debug_verbose_overrides %{semantic_log_mode: :all}
 
   @span_metrics [
     {[:jido, :agent_server, :turn], [:stop], [:status, :stage]},
@@ -61,6 +63,9 @@ defmodule Jido.Telemetry do
 
   @typedoc "A Jido telemetry metadata map."
   @type metadata :: %{atom() => term()}
+
+  @typedoc false
+  @type debug_level :: :off | :on | :verbose
 
   @doc """
   Returns metric definitions for the Jido semantic event catalog.
@@ -96,6 +101,48 @@ defmodule Jido.Telemetry do
   """
   @spec open_telemetry?() :: boolean()
   def open_telemetry?, do: OpenTelemetry.enabled?()
+
+  @doc false
+  @spec set_debug(atom(), debug_level()) :: :ok
+  def set_debug(instance, level \\ :on)
+
+  def set_debug(instance, :off), do: clear_debug(instance)
+
+  def set_debug(instance, level) when level in [:on, :verbose] do
+    :persistent_term.put(
+      {@debug_key, instance},
+      %{level: level, overrides: debug_overrides(level)}
+    )
+
+    :ok
+  end
+
+  @doc false
+  @spec debug_level(atom()) :: debug_level()
+  def debug_level(instance), do: debug_status(instance).level
+
+  @doc false
+  @spec debug_status(atom()) :: map()
+  def debug_status(instance) do
+    case :persistent_term.get({@debug_key, instance}, nil) do
+      %{level: level, overrides: overrides} = state
+      when level in [:on, :verbose] and is_map(overrides) ->
+        state
+
+      _invalid ->
+        %{level: :off, overrides: %{}}
+    end
+  end
+
+  @doc false
+  @spec configure_debug(atom(), term()) :: :ok
+  def configure_debug(instance, debug) do
+    case debug do
+      true -> set_debug(instance, :on)
+      :verbose -> set_debug(instance, :verbose)
+      _other -> clear_debug(instance)
+    end
+  end
 
   @doc false
   @spec attach_default_handler() :: :ok
@@ -158,11 +205,23 @@ defmodule Jido.Telemetry do
   end
 
   defp semantic_log_mode do
-    instance_mode = Debug.override(Process.get(@log_scope_key), :semantic_log_mode)
+    instance_mode = debug_override(Process.get(@log_scope_key), :semantic_log_mode)
 
     if instance_mode in @log_modes,
       do: instance_mode,
       else: configured_semantic_log_mode()
+  end
+
+  defp debug_override(instance, key), do: Map.get(debug_status(instance).overrides, key)
+
+  defp debug_overrides(:on), do: @debug_on_overrides
+  defp debug_overrides(:verbose), do: @debug_verbose_overrides
+
+  defp clear_debug(instance) do
+    :persistent_term.erase({@debug_key, instance})
+    :ok
+  rescue
+    ArgumentError -> :ok
   end
 
   defp configured_semantic_log_mode do

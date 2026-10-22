@@ -370,14 +370,14 @@ defmodule Jido do
 
       """
       @spec debug() :: Jido.debug_level()
-      def debug, do: Jido.Debug.level(__MODULE__)
+      def debug, do: Jido.Telemetry.debug_level(__MODULE__)
 
       @spec debug(Jido.debug_level()) :: :ok
-      def debug(level) when is_atom(level), do: Jido.Debug.enable(__MODULE__, level)
+      def debug(level) when is_atom(level), do: Jido.Telemetry.set_debug(__MODULE__, level)
 
       @doc "Returns the semantic log override for this Jido instance."
       @spec debug_status() :: map()
-      def debug_status, do: Jido.Debug.status(__MODULE__)
+      def debug_status, do: Jido.Telemetry.debug_status(__MODULE__)
     end
   end
 
@@ -443,10 +443,10 @@ defmodule Jido do
   Read that buffer with `Jido.AgentServer.history/1`.
   """
   @spec debug() :: debug_level()
-  def debug, do: Jido.Debug.level(@default_instance)
+  def debug, do: Jido.Telemetry.debug_level(@default_instance)
 
   @spec debug(debug_level()) :: :ok
-  def debug(level) when is_atom(level), do: Jido.Debug.enable(@default_instance, level)
+  def debug(level) when is_atom(level), do: Jido.Telemetry.set_debug(@default_instance, level)
 
   @doc """
   Start the default Jido instance for scripts and Livebook.
@@ -600,7 +600,7 @@ defmodule Jido do
 
     with :ok <-
            NamespaceRegistry.bind(claim, Keyword.get(opts, :namespace), name, self()) do
-      Jido.Debug.configure(name, opts[:debug])
+      Jido.Telemetry.configure_debug(name, opts[:debug])
 
       :ok = Jido.RuntimeStore.ensure_table(runtime_store)
 

@@ -3,7 +3,6 @@ defmodule JidoTest.Telemetry.ApiTest do
 
   import ExUnit.CaptureLog
 
-  alias Jido.Debug
   alias Jido.Telemetry
   alias Jido.Telemetry.Semantic
 
@@ -336,8 +335,8 @@ defmodule JidoTest.Telemetry.ApiTest do
     event = [:jido, :agent_server, :turn, :stop]
     metadata = %{jido_instance: instance, status: :ok, stage: :commit}
     Application.put_env(:jido, :telemetry, semantic_log_mode: :off)
-    Debug.enable(instance, :verbose)
-    on_exit(fn -> Debug.reset(instance) end)
+    Telemetry.set_debug(instance, :verbose)
+    on_exit(fn -> Telemetry.set_debug(instance, :off) end)
 
     log = capture_log(fn -> Semantic.point(event, metadata) end)
 
@@ -348,8 +347,8 @@ defmodule JidoTest.Telemetry.ApiTest do
   test "non-instance values cannot select a debug override" do
     invalid_instance = "not-an-instance"
     Application.put_env(:jido, :telemetry, semantic_log_mode: :off)
-    Debug.enable(invalid_instance, :verbose)
-    on_exit(fn -> Debug.reset(invalid_instance) end)
+    Telemetry.set_debug(invalid_instance, :verbose)
+    on_exit(fn -> Telemetry.set_debug(invalid_instance, :off) end)
 
     log =
       capture_log(fn ->

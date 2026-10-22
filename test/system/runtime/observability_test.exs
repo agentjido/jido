@@ -76,8 +76,8 @@ defmodule JidoTest.System.ObservabilityTest do
       )
 
     reporter = Metrics.start!(c.namespace, counters ++ [gauge])
-    :ok = Jido.Debug.enable(c.jido, :verbose)
-    on_exit(fn -> Jido.Debug.disable(c.jido) end)
+    :ok = Jido.Telemetry.set_debug(c.jido, :verbose)
+    on_exit(fn -> Jido.Telemetry.set_debug(c.jido, :off) end)
     server = start_agent(c, module: ControlledAgent)
     secret = "private-signal-payload-#{unique_id()}"
     signal = ControlledAgent.signal(7, secret: secret)

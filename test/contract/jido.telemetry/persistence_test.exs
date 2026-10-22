@@ -3,7 +3,7 @@ defmodule JidoTest.Telemetry.PersistenceTest do
 
   import ExUnit.CaptureLog
 
-  alias Jido.Debug
+  alias Jido.Telemetry
   alias Jido.Telemetry.Persistence
 
   defmodule InstanceSource do
@@ -146,10 +146,10 @@ defmodule JidoTest.Telemetry.PersistenceTest do
   @tag obligation: ["jido.telemetry.I3", "jido.telemetry.I4"]
   test "an inferred instance source applies only its own debug override" do
     Application.put_env(:jido, :telemetry, semantic_log_mode: :off)
-    Debug.enable(InstanceSource, :on)
+    Telemetry.set_debug(InstanceSource, :on)
 
     on_exit(fn ->
-      Debug.reset(InstanceSource)
+      Telemetry.set_debug(InstanceSource, :off)
       Application.delete_env(:jido, :telemetry)
     end)
 
@@ -174,10 +174,10 @@ defmodule JidoTest.Telemetry.PersistenceTest do
     start_supervised!({Jido, name: instance, namespace: namespace})
 
     Application.put_env(:jido, :telemetry, semantic_log_mode: :off)
-    Debug.enable(instance, :on)
+    Telemetry.set_debug(instance, :on)
 
     on_exit(fn ->
-      Debug.reset(instance)
+      Telemetry.set_debug(instance, :off)
       Application.delete_env(:jido, :telemetry)
     end)
 
@@ -204,10 +204,10 @@ defmodule JidoTest.Telemetry.PersistenceTest do
     pid = spawn(fn -> receive do: (:stop -> :ok) end)
     Process.register(pid, source)
     Application.put_env(:jido, :telemetry, semantic_log_mode: :off)
-    Debug.enable(source, :on)
+    Telemetry.set_debug(source, :on)
 
     on_exit(fn ->
-      Debug.reset(source)
+      Telemetry.set_debug(source, :off)
       Application.delete_env(:jido, :telemetry)
       send(pid, :stop)
     end)
