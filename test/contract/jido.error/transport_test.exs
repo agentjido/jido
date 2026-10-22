@@ -15,6 +15,16 @@ defmodule JidoTest.Error.TransportTest do
     def message(_error), do: "invalid" <> <<255>>
   end
 
+  defmodule MessageProbeError do
+    defexception [:probe, message: "private-marker-9387"]
+
+    @impl true
+    def message(error) do
+      send(error.probe, :message_rendered)
+      error.message
+    end
+  end
+
   defmodule ValidationAction do
     use Jido.Action,
       name: "error_transport_validation",
@@ -174,6 +184,17 @@ defmodule JidoTest.Error.TransportTest do
       assert Error.retryable?(%{details: %{details: %{unknown: true}}})
       assert Error.retryable?(%{details: [unknown: true]})
       assert Error.retryable?(%{details: [:unknown]})
+
+      for key <- [:details, "details", :reason, "reason"] do
+        within_limit =
+          Enum.reduce(1..3, %{retryable?: false}, fn _, nested -> %{key => nested} end)
+
+        outside_limit =
+          Enum.reduce(1..4, %{retryable?: false}, fn _, nested -> %{key => nested} end)
+
+        refute Error.retryable?(within_limit)
+        assert Error.retryable?(outside_limit)
+      end
     end
 
     test "redacts sensitive keys in maps and key-value lists without changing key names" do
@@ -362,6 +383,42 @@ defmodule JidoTest.Error.TransportTest do
 
         assert key_projection.details.nested == %{"#Inspect.Error" => "visible"}
       end
+    end
+
+    test "bounds nested public messages and compensation causes before rendering them" do
+      for key <- [:message, "message"] do
+        within_limit = Enum.reduce(1..4, "visible", fn _, message -> %{key => message} end)
+        outside_limit = Enum.reduce(1..5, "hidden", fn _, message -> %{key => message} end)
+
+        non_message =
+          Enum.reduce(1..4, %{visible: 42}, fn _, message -> %{key => message} end)
+
+        assert Error.to_map(%{message: within_limit}).message == "visible"
+        assert Error.to_map(%{message: outside_limit}).message == "[DEPTH_LIMIT]"
+        assert Error.to_map(%{message: non_message}).message =~ "visible"
+      end
+
+      within_cause_limit =
+        Enum.reduce(1..2, %MessageProbeError{probe: self()}, fn n, cause ->
+          Error.compensation_error("within #{n}", original_error: cause)
+        end)
+
+      Error.to_map(within_cause_limit)
+      assert_received :message_rendered
+
+      outside_cause_limit =
+        Enum.reduce(1..3, %MessageProbeError{probe: self()}, fn n, cause ->
+          Error.compensation_error("outside #{n}", original_error: cause)
+        end)
+
+      projection = Error.to_map(outside_cause_limit)
+
+      refute_received :message_rendered
+
+      assert projection.details.original_error.details.original_error.details.original_error ==
+               "[DEPTH_LIMIT]"
+
+      refute Jason.encode!(projection) =~ "private-marker-9387"
     end
 
     test "canonicalizes known and unknown atom and string error types" do

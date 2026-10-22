@@ -2126,7 +2126,7 @@
         "jido.error.I4": {
           "failing": 0,
           "kind": "security",
-          "passing": 42,
+          "passing": 43,
           "status": "active",
           "testable": true,
           "tests": [
@@ -2149,6 +2149,7 @@
             "test to_map/1 recognizes the complete public type vocabulary",
             "test to_map/1 sanitizes nested details for public transport payloads",
             "test transport boundaries bounds long invalid binaries and redacts them under sensitive keys",
+            "test transport boundaries bounds nested public messages and compensation causes before rendering them",
             "test transport boundaries canonicalizes known and unknown atom and string error types",
             "test transport boundaries contains exception message and inspection failures",
             "test transport boundaries keeps invalid binary leaves safe for JSON transport",
@@ -2204,7 +2205,7 @@
         "jido.error.I6": {
           "failing": 0,
           "kind": "functional",
-          "passing": 29,
+          "passing": 30,
           "status": "active",
           "testable": true,
           "tests": [
@@ -2213,6 +2214,7 @@
             "test Splode interop to_error/1 keeps Jido validation errors typed and classified",
             "test Splode interop to_error/1 preserves unknown error message for plain values",
             "test transport boundaries bounds long invalid binaries and redacts them under sensitive keys",
+            "test transport boundaries bounds nested public messages and compensation causes before rendering them",
             "test transport boundaries canonicalizes known and unknown atom and string error types",
             "test transport boundaries contains exception message and inspection failures",
             "test transport boundaries keeps invalid binary leaves safe for JSON transport",

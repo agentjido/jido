@@ -145,6 +145,26 @@ defmodule Jido.Error do
           | :jido_namespace_required
           | :jido_namespace_mismatch
 
+  @typedoc "The normalized type in a version-1 public error projection."
+  @type public_type ::
+          :validation_error
+          | :invalid_action
+          | :config_error
+          | :planning_error
+          | :execution_error
+          | :routing_error
+          | :timeout
+          | :compensation_error
+          | :internal
+
+  @typedoc "The exact version-1 public error projection."
+  @type projection :: %{
+          required(:type) => public_type(),
+          required(:message) => String.t(),
+          required(:details) => map(),
+          required(:retryable?) => boolean()
+        }
+
   @stable_codes [
     :non_portable_term,
     :invalid_checkpoint,
@@ -543,6 +563,7 @@ defmodule Jido.Error do
 
   @doc "Returns the registered Jido program code carried by an error."
   @spec code(term()) :: code() | nil
+  def code({:error, reason, _effects}), do: code(reason)
   def code({:error, reason}), do: code(reason)
   def code(%{details: %{code: code}}) when code in @stable_codes, do: code
   def code(%{code: code}) when code in @stable_codes, do: code
@@ -553,6 +574,7 @@ defmodule Jido.Error do
   def stable_codes, do: @stable_codes
 
   @transport_max_depth 4
+  @transport_max_causes 2
   @transport_max_items 20
   @transport_max_string 512
   @known_error_type_strings %{
@@ -589,16 +611,19 @@ defmodule Jido.Error do
   #{@transport_max_items} entries per map or list. Scalar leaves are kept at the
   depth limit, so validation paths retain field names and list indexes. Strings
   are limited to #{@transport_max_string} characters plus a truncation suffix.
+  Nested compensation errors include at most #{@transport_max_causes} causes.
   Invalid UTF-8 binaries use bounded inspection.
   Improper lists use `[IMPROPER LIST]` without inspecting their sensitive data.
   Deeper containers and opaque terms are replaced with `#{@depth_limit}`.
   """
-  @spec to_map(any()) :: map()
-  def to_map(error) do
+  @spec to_map(any()) :: projection()
+  def to_map(error), do: project(error, @transport_max_causes)
+
+  defp project(error, remaining_causes) do
     %{
       type: unified_type(error),
       message: public_message(error),
-      details: public_details(error),
+      details: public_details(error, remaining_causes),
       retryable?: retryable?(error)
     }
   end
@@ -607,7 +632,8 @@ defmodule Jido.Error do
   Returns whether an error is safe to retry by default.
 
   Explicit `:retry`, `:retryable`, and `:retryable?` boolean hints in structured
-  details override the default classification.
+  details override the default classification. Nested hint lookup uses the
+  public transport depth limit.
   """
   @spec retryable?(term()) :: boolean()
   def retryable?({:error, reason, _effects}), do: retryable?(reason)
@@ -621,7 +647,7 @@ defmodule Jido.Error do
   defp public_message(%{"message" => message}), do: transport_string(message)
   defp public_message(error), do: error |> sanitize_transport() |> safe_inspect()
 
-  defp public_details(%ValidationError{} = error) do
+  defp public_details(%ValidationError{} = error, _remaining_causes) do
     error.details
     |> sanitize_details()
     |> merge_public_fields(%{
@@ -630,40 +656,41 @@ defmodule Jido.Error do
     })
   end
 
-  defp public_details(%ExecutionError{} = error) do
+  defp public_details(%ExecutionError{} = error, _remaining_causes) do
     error.details
     |> sanitize_details()
     |> merge_public_fields(%{phase: error.phase})
   end
 
-  defp public_details(%RoutingError{} = error) do
+  defp public_details(%RoutingError{} = error, _remaining_causes) do
     error.details
     |> sanitize_details()
     |> merge_public_fields(%{target: error.target})
   end
 
-  defp public_details(%TimeoutError{} = error) do
+  defp public_details(%TimeoutError{} = error, _remaining_causes) do
     error.details
     |> sanitize_details()
     |> merge_public_fields(%{timeout: error.timeout})
   end
 
-  defp public_details(%CompensationError{} = error) do
+  defp public_details(%CompensationError{} = error, remaining_causes) do
     error.details
     |> sanitize_details()
     |> merge_public_fields(%{
-      original_error: maybe_error_map(error.original_error),
+      original_error: maybe_error_map(error.original_error, remaining_causes),
       compensated: error.compensated,
       result: error.result
     })
   end
 
-  defp public_details(%{details: details}), do: sanitize_details(details)
-  defp public_details(%{"details" => details}), do: sanitize_details(details)
-  defp public_details(_error), do: %{}
+  defp public_details(%{details: details}, _remaining_causes), do: sanitize_details(details)
+  defp public_details(%{"details" => details}, _remaining_causes), do: sanitize_details(details)
+  defp public_details(_error, _remaining_causes), do: %{}
 
-  defp maybe_error_map(nil), do: nil
-  defp maybe_error_map(error), do: to_map(error)
+  defp maybe_error_map(nil, _remaining_causes), do: nil
+  defp maybe_error_map(_error, 0), do: @depth_limit
+  defp maybe_error_map(error, remaining_causes), do: project(error, remaining_causes - 1)
 
   defp sanitize_details(details) when is_map(details), do: sanitize_transport(details)
   defp sanitize_details(details) when details in [nil, []], do: %{}
@@ -790,10 +817,14 @@ defmodule Jido.Error do
 
   defp compact_key(key), do: String.replace(key, ~r/[^a-z0-9]+/, "")
 
-  defp transport_string(value) when is_binary(value), do: truncate_string(value)
+  defp transport_string(value), do: transport_string(value, @transport_max_depth)
 
-  defp transport_string(%{message: message}), do: transport_string(message)
-  defp transport_string(value), do: value |> sanitize_transport() |> safe_inspect()
+  defp transport_string(value, _depth) when is_binary(value), do: truncate_string(value)
+  defp transport_string(%{message: _message}, 0), do: @depth_limit
+  defp transport_string(%{"message" => _message}, 0), do: @depth_limit
+  defp transport_string(%{message: message}, depth), do: transport_string(message, depth - 1)
+  defp transport_string(%{"message" => message}, depth), do: transport_string(message, depth - 1)
+  defp transport_string(value, _depth), do: value |> sanitize_transport() |> safe_inspect()
 
   defp safe_exception_message(error) do
     error
@@ -829,13 +860,15 @@ defmodule Jido.Error do
   end
 
   defp retryable_hint(term, default) do
-    case extract_retry_hint(term) do
+    case extract_retry_hint(term, @transport_max_depth) do
       value when is_boolean(value) -> value
       _ -> default
     end
   end
 
-  defp extract_retry_hint(%{} = map) do
+  defp extract_retry_hint(_term, 0), do: nil
+
+  defp extract_retry_hint(%{} = map, depth) do
     cond do
       is_boolean(Map.get(map, :retry)) -> Map.get(map, :retry)
       is_boolean(Map.get(map, "retry")) -> Map.get(map, "retry")
@@ -843,15 +876,15 @@ defmodule Jido.Error do
       is_boolean(Map.get(map, "retryable")) -> Map.get(map, "retryable")
       is_boolean(Map.get(map, :retryable?)) -> Map.get(map, :retryable?)
       is_boolean(Map.get(map, "retryable?")) -> Map.get(map, "retryable?")
-      Map.has_key?(map, :details) -> extract_retry_hint(Map.get(map, :details))
-      Map.has_key?(map, "details") -> extract_retry_hint(Map.get(map, "details"))
-      Map.has_key?(map, :reason) -> extract_retry_hint(Map.get(map, :reason))
-      Map.has_key?(map, "reason") -> extract_retry_hint(Map.get(map, "reason"))
+      Map.has_key?(map, :details) -> extract_retry_hint(Map.get(map, :details), depth - 1)
+      Map.has_key?(map, "details") -> extract_retry_hint(Map.get(map, "details"), depth - 1)
+      Map.has_key?(map, :reason) -> extract_retry_hint(Map.get(map, :reason), depth - 1)
+      Map.has_key?(map, "reason") -> extract_retry_hint(Map.get(map, "reason"), depth - 1)
       true -> nil
     end
   end
 
-  defp extract_retry_hint(keyword) do
+  defp extract_retry_hint(keyword, _depth) do
     if Keyword.keyword?(keyword) do
       cond do
         is_boolean(Keyword.get(keyword, :retry)) -> Keyword.get(keyword, :retry)

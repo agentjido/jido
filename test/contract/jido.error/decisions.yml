@@ -45,3 +45,21 @@
   decision: Accept the full 301-mutant profile with 288 killed mutants, 13 invalid mutations, no survivor, no timeout, and a 100.0 percent score.
   driver: Every valid mutant is killed by the 69 focused tests, and dead retry-classification code was removed instead of classified.
   approved_by: Component hardening pass
+
+- id: error-public-api-review
+  date: 2026-10-22
+  decision: Keep the six public error modules, their constructors, Splode interoperability, `code/1`, `stable_codes/0`, `to_map/1`, and `retryable?/1`. Add named types for the exact version-1 projection and its public type vocabulary. Keep no DSL in this component.
+  driver: Error creation and projection need a small typed API. Domain conversion and runtime recovery policy remain with their owning components.
+  approved_by: User-requested component review
+
+- id: error-bounded-traversal-review
+  date: 2026-10-22
+  decision: Apply the public traversal bound before evaluating nested message maps, compensation causes, and retry hints. Extract stable codes from both supported error-result tuple shapes.
+  driver: Output limits must also limit recursive public processing, and code lookup must match the error result shapes used by Action execution.
+  approved_by: User-requested component review
+
+- id: error-component-mutation-review
+  date: 2026-10-22
+  decision: Accept the full 344-mutant profile with 330 killed mutants, 14 invalid mutations, no survivor, no timeout, and a 100.0 percent score.
+  driver: Exact inside-limit and outside-limit tests now protect message, compensation-cause, and retry-hint traversal.
+  approved_by: User-requested component review

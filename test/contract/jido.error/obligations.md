@@ -24,7 +24,7 @@ retry and recovery policy.
 ### jido.error.I2 — Closed common-code registry
 
 - **scope:** `stable_codes/0`, `code/1`
-- **must:** Publish the exact registered Jido-owned codes without duplicates. Read only a registered code from an error, an error tuple, or a version-1 projection. Return nil for messages, raw atoms, adjacent-package codes, and unknown values.
+- **must:** Publish the exact registered Jido-owned codes without duplicates. Read only a registered code from an error, a two- or three-element error result, or a version-1 projection. Return nil for messages, raw atoms, adjacent-package codes, and unknown values.
 - **kind:** functional
 - **status:** active
 
@@ -38,14 +38,14 @@ retry and recovery policy.
 ### jido.error.I4 — Bounded safe transport
 
 - **scope:** public messages and details
-- **must:** Bound container depth, collection size, text, and keys. Redact sensitive-key values, omit stacktrace-key values, contain improper lists and opaque terms, repair invalid UTF-8, and produce JSON-encodable values without exposing rejected private data.
+- **must:** Bound container depth, nested message and compensation-cause traversal, collection size, text, and keys. Redact sensitive-key values, omit stacktrace-key values, contain improper lists and opaque terms, repair invalid UTF-8, and produce JSON-encodable values without exposing rejected private data.
 - **kind:** security
 - **status:** active
 
 ### jido.error.I5 — Stable retry classification
 
 - **scope:** `retryable?/1`, projection retry flag
-- **must:** Treat validation, invalid-action, and configuration failures as non-retryable by default and all other or unknown failures as retryable. Let an explicit Boolean retry, retryable, or retryable? detail override the default through supported maps, keyword details, and error tuple wrappers.
+- **must:** Treat validation, invalid-action, and configuration failures as non-retryable by default and all other or unknown failures as retryable. Let an explicit Boolean retry, retryable, or retryable? detail override the default through supported maps, keyword details, and error tuple wrappers. Bound nested hint lookup to the public traversal depth.
 - **kind:** functional
 - **status:** active
 

@@ -183,6 +183,7 @@ defmodule JidoTest.ErrorTest do
 
       assert Error.code(error) == :agent_callback_failed
       assert Error.code({:error, error}) == :agent_callback_failed
+      assert Error.code({:error, error, [:effect]}) == :agent_callback_failed
       assert Error.code(%{code: :plugin_callback_failed}) == :plugin_callback_failed
       assert Error.code(%{details: %{code: :unknown}}) == nil
       assert Error.code(%{code: :unknown}) == nil
