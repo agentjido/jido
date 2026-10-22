@@ -27,3 +27,9 @@
   decision: Move old AgentServer I49 to effects I11 instead of the earlier planned Plugin runtime group.
   driver: ProcessStart is a built-in post-commit effect. It does not use a Plugin callback or Plugin-owned runtime root.
   approved_by: Component hardening pass
+
+- id: effects-public-api
+  date: 2026-10-22
+  decision: Make Jido.AgentServer.Directive and its built-in result records the documented public effects API. Keep Jido.AgentServer.Effects, dispatch preparation, schema access, and validation hooks internal. Supersede effects-mutation-profile by adding the public Directive modules to the component mutation profile.
+  driver: Agent code must request post-commit work without depending on effect-engine internals, and the Covenant must enforce that boundary.
+  approved_by: Component hardening pass

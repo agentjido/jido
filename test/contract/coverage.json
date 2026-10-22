@@ -6,9 +6,9 @@
       "covered": 124
     },
     "jido.agent_server": {
-      "active": 67,
+      "active": 68,
       "coverage": 1.0,
-      "covered": 67
+      "covered": 68
     },
     "jido.plugin": {
       "active": 34,
@@ -1717,10 +1717,10 @@
       }
     },
     "jido.agent_server.effects": {
-      "active": 11,
+      "active": 12,
       "app": "jido.agent_server",
       "coverage": 1.0,
-      "covered": 11,
+      "covered": 12,
       "form": "light",
       "obligations": {
         "jido.agent_server.effects.I1": {
@@ -1740,10 +1740,11 @@
         "jido.agent_server.effects.I10": {
           "failing": 0,
           "kind": "functional",
-          "passing": 3,
+          "passing": 4,
           "status": "active",
           "testable": true,
           "tests": [
+            "test hidden validation hooks protect runtime Directive inputs before commit",
             "test runtime directives reject remote placement and bad options before commit",
             "test runtime directives start, send to, reply from, and stop an Agent",
             "test runtime target admission rejects missing activation and topology-owned names"
@@ -1758,6 +1759,18 @@
           "tests": [
             "test ProcessStart accepts OTP info and ignore results and reports start failure",
             "test ProcessStart validates before commit and starts an independent instance process"
+          ]
+        },
+        "jido.agent_server.effects.I12": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 3,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test hidden validation hooks protect runtime Directive inputs before commit",
+            "test runtime Directive constructors keep closed unique options and stable results",
+            "test the documented runtime Directive API and public types are exact"
           ]
         },
         "jido.agent_server.effects.I2": {
@@ -3577,8 +3590,8 @@
   },
   "covenant": "0.2.0",
   "totals": {
-    "active": 225,
+    "active": 226,
     "coverage": 1.0,
-    "covered": 225
+    "covered": 226
   }
 }

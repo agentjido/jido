@@ -10,6 +10,7 @@ defmodule Jido.AgentServer.Directive.AgentStop do
             coerce: true
           )
 
+  @typedoc "A request to stop and untrack one child Agent."
   @type t :: unquote(Zoi.type_spec(@schema))
   @enforce_keys Zoi.Struct.enforce_keys(@schema)
   defstruct Zoi.Struct.struct_fields(@schema)

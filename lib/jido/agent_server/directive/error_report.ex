@@ -10,6 +10,7 @@ defmodule Jido.AgentServer.Directive.ErrorReport do
             coerce: true
           )
 
+  @typedoc "A request to apply the AgentServer error policy after commit."
   @type t :: unquote(Zoi.type_spec(@schema))
   @enforce_keys Zoi.Struct.enforce_keys(@schema)
   defstruct Zoi.Struct.struct_fields(@schema)

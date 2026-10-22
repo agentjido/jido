@@ -13,6 +13,7 @@ defmodule Jido.AgentServer.Directive do
   alias Jido.AgentServer.Directive.ProcessStart
   alias Jido.AgentServer.Directive.ServerStop
   alias Jido.AgentServer.Directive.AgentStop
+  alias Jido.Signal
 
   @restart_policies [:permanent, :temporary, :transient]
   @unsupported_agent_start_opts [
@@ -30,6 +31,41 @@ defmodule Jido.AgentServer.Directive do
     :state_version
   ]
 
+  @typedoc "A built-in runtime Directive that AgentServer runs after commit."
+  @type t ::
+          Emit.t()
+          | AgentSend.t()
+          | AgentStart.t()
+          | AgentStop.t()
+          | ErrorReport.t()
+          | OwnerSend.t()
+          | ProcessStart.t()
+          | ServerStop.t()
+
+  @typedoc "An OTP restart policy for an Agent started by a runtime Directive."
+  @type restart_policy :: :permanent | :temporary | :transient
+
+  @typedoc "An option for `signal_send/3`."
+  @type signal_send_option ::
+          {:delivery_mode, Jido.Signal.Dispatch.PidAdapter.delivery_mode()}
+          | {:timeout, 1..4_294_967_295}
+          | {:message_format, Jido.Signal.Dispatch.PidAdapter.message_format()}
+
+  @typedoc "An option for `agent_start/3`."
+  @type agent_start_option ::
+          {:node, node() | nil}
+          | {:opts, map() | keyword()}
+          | {:meta, map() | keyword()}
+          | {:restart, restart_policy()}
+
+  @doc """
+  Builds an Emit Directive that sends one Signal to a local process.
+
+  Options are `:delivery_mode`, `:timeout`, and `:message_format`. Unknown or
+  duplicate options raise `ArgumentError`. The Signal and dispatch target are
+  validated before the Agent commit.
+  """
+  @spec signal_send(Signal.t(), pid(), [signal_send_option()]) :: Emit.t()
   def signal_send(signal, pid, opts \\ []) when is_pid(pid),
     do: %Emit{
       signal: signal,
@@ -38,11 +74,31 @@ defmodule Jido.AgentServer.Directive do
          Keyword.put(options(opts, [:delivery_mode, :timeout, :message_format]), :target, pid)}
     }
 
+  @doc "Builds a Directive that sends one Signal to the owning Agent."
+  @spec owner_send(Signal.t()) :: OwnerSend.t()
   def owner_send(signal), do: %OwnerSend{signal: signal}
+
+  @doc "Builds a Directive that sends one Signal to a tracked child Agent."
+  @spec agent_send(atom() | String.t(), Signal.t()) :: AgentSend.t()
   def agent_send(name, signal), do: %AgentSend{name: name, signal: signal}
+
+  @doc "Builds a Directive that applies the AgentServer error policy after commit."
+  @spec error_report(term(), atom() | nil) :: ErrorReport.t()
   def error_report(error, context \\ nil), do: %ErrorReport{error: error, context: context}
+
+  @doc "Builds a Directive that starts one independent OTP child under the Jido instance."
+  @spec process_start(Supervisor.child_spec()) :: ProcessStart.t()
   def process_start(child_spec), do: %ProcessStart{child_spec: child_spec}
 
+  @doc """
+  Builds a Directive that starts and tracks one local Agent.
+
+  Options are `:node`, `:opts`, `:meta`, and `:restart`. The `:opts` and `:meta`
+  values can be plain maps or unique keyword lists. Unknown or duplicate
+  options raise `ArgumentError`.
+  """
+  @spec agent_start(Jido.Agent.t() | module(), atom() | String.t(), [agent_start_option()]) ::
+          AgentStart.t()
   def agent_start(agent, name, opts \\ []) do
     opts = options(opts, [:node, :opts, :meta, :restart])
 
@@ -56,7 +112,12 @@ defmodule Jido.AgentServer.Directive do
     }
   end
 
+  @doc "Builds a Directive that stops and untracks one child Agent."
+  @spec agent_stop(atom() | String.t(), term()) :: AgentStop.t()
   def agent_stop(name, reason \\ :normal), do: %AgentStop{name: name, reason: reason}
+
+  @doc "Builds a terminal Directive that stops the AgentServer after commit."
+  @spec server_stop(term()) :: ServerStop.t()
   def server_stop(reason \\ :normal), do: %ServerStop{reason: reason}
 
   @doc false

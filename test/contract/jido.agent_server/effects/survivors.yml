@@ -15,3 +15,129 @@
   mutation: "`runner: config.runner` → `(removed)`"
   sort: equivalent
   reason: This call is an early validation pass. An explicit child Runner remains in options and takes precedence. Otherwise activation_options selects the same Runner from the selected Jido instance before spawn_child reapplies the live parent context.
+
+- at: lib/jido/agent_server/directive.ex:69:44
+  operator: guard_removal
+  mutation: "`when is_pid(pid)` → `(no guard)`"
+  sort: unpromised
+  reason: signal_send accepts a PID. Other target types are outside its documented input type and are rejected by live dispatch validation.
+
+- at: lib/jido/agent_server/directive.ex:166:35
+  operator: logical_swap
+  mutation: "`and` → `or`"
+  sort: equivalent
+  reason: Both forms accept unique keyword options and raise ArgumentError for malformed, duplicate, or unknown options. Keyword.validate! supplies the same rejection when the private precheck differs.
+
+- at: lib/jido/agent_server/directive.ex:167:32
+  operator: string_empty
+  mutation: "`\"Expected unique keyword options\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes ArgumentError for malformed or duplicate options, not exact human-readable error prose.
+
+- at: lib/jido/agent_server/directive.ex:175:38
+  operator: string_empty
+  mutation: "`\"#{key} must be a plain Map or unique keyword list\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes ArgumentError for an invalid nested option container, not exact human-readable error prose.
+
+- at: lib/jido/agent_server/directive/agent_send.ex:7:42
+  operator: string_empty
+  mutation: "`\"Agent name\"` → `\"\"`"
+  sort: log-only
+  reason: The hidden schema description does not change validation, the public type, or the Directive result.
+
+- at: lib/jido/agent_server/directive/agent_send.ex:8:44
+  operator: string_empty
+  mutation: "`\"Signal to send to the child\"` → `\"\"`"
+  sort: log-only
+  reason: The hidden schema description does not change validation, the public type, or the Directive result.
+
+- at: lib/jido/agent_server/directive/agent_start.ex:13:43
+  operator: string_empty
+  mutation: "`\"Agent module or Agent value\"` → `\"\"`"
+  sort: log-only
+  reason: The hidden schema description does not change validation, the public type, or the Directive result.
+
+- at: lib/jido/agent_server/directive/agent_start.ex:14:42
+  operator: string_empty
+  mutation: "`\"Agent name\"` → `\"\"`"
+  sort: log-only
+  reason: The hidden schema description does not change validation, the public type, or the Directive result.
+
+- at: lib/jido/agent_server/directive/agent_start.ex:16:39
+  operator: string_empty
+  mutation: "`\"Target Erlang node; nil selects the local node\"` → `\"\"`"
+  sort: log-only
+  reason: The hidden schema description does not change validation, the public type, or the Directive result.
+
+- at: lib/jido/agent_server/directive/agent_start.ex:19:38
+  operator: string_empty
+  mutation: "`\"AgentServer options\"` → `\"\"`"
+  sort: log-only
+  reason: The hidden schema description does not change validation, the public type, or the Directive result.
+
+- at: lib/jido/agent_server/directive/agent_start.ex:22:42
+  operator: string_empty
+  mutation: "`\"Relationship metadata\"` → `\"\"`"
+  sort: log-only
+  reason: The hidden schema description does not change validation, the public type, or the Directive result.
+
+- at: lib/jido/agent_server/directive/agent_start.ex:24:39
+  operator: string_empty
+  mutation: "`\"OTP restart policy\"` → `\"\"`"
+  sort: log-only
+  reason: The hidden schema description does not change validation, the public type, or the Directive result.
+
+- at: lib/jido/agent_server/directive/agent_stop.ex:7:42
+  operator: string_empty
+  mutation: "`\"Agent name\"` → `\"\"`"
+  sort: log-only
+  reason: The hidden schema description does not change validation, the public type, or the Directive result.
+
+- at: lib/jido/agent_server/directive/agent_stop.ex:8:44
+  operator: string_empty
+  mutation: "`\"Stop reason\"` → `\"\"`"
+  sort: log-only
+  reason: The hidden schema description does not change validation, the public type, or the Directive result.
+
+- at: lib/jido/agent_server/directive/error_report.ex:7:43
+  operator: string_empty
+  mutation: "`\"Error value\"` → `\"\"`"
+  sort: log-only
+  reason: The hidden schema description does not change validation, the public type, or the Directive result.
+
+- at: lib/jido/agent_server/directive/error_report.ex:8:46
+  operator: string_empty
+  mutation: "`\"Optional error context\"` → `\"\"`"
+  sort: log-only
+  reason: The hidden schema description does not change validation, the public type, or the Directive result.
+
+- at: lib/jido/agent_server/directive/owner_send.ex:6:44
+  operator: string_empty
+  mutation: "`\"Signal to send to the parent\"` → `\"\"`"
+  sort: log-only
+  reason: The hidden schema description does not change validation, the public type, or the Directive result.
+
+- at: lib/jido/agent_server/directive/process_start.ex:6:48
+  operator: string_empty
+  mutation: "`\"OTP child specification\"` → `\"\"`"
+  sort: log-only
+  reason: The hidden schema description does not change validation, the public type, or the Directive result.
+
+- at: lib/jido/agent_server/directive/server_stop.ex:6:44
+  operator: string_empty
+  mutation: "`\"Stop reason\"` → `\"\"`"
+  sort: log-only
+  reason: The hidden schema description does not change validation, the public type, or the Directive result.
+
+- at: lib/jido/agent_server/directive.ex:139:15
+  operator: clause_removal
+  mutation: "`case [:node] ->` → `(removed)`"
+  sort: equivalent
+  reason: The generic unsupported-option clause still rejects opts.node with a nonempty error. Only the private diagnostic text differs.
+
+- at: lib/jido/agent_server/directive.ex:139:8
+  operator: element_removal
+  mutation: "`:node` → `(removed)`"
+  sort: equivalent
+  reason: The generic unsupported-option clause still rejects opts.node with a nonempty error. Only the private diagnostic text differs.

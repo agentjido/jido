@@ -1,5 +1,13 @@
 ---
 modules:
+  - Jido.AgentServer.Directive
+  - Jido.AgentServer.Directive.AgentSend
+  - Jido.AgentServer.Directive.AgentStart
+  - Jido.AgentServer.Directive.AgentStop
+  - Jido.AgentServer.Directive.ErrorReport
+  - Jido.AgentServer.Directive.OwnerSend
+  - Jido.AgentServer.Directive.ProcessStart
+  - Jido.AgentServer.Directive.ServerStop
   - Jido.AgentServer.Effects
   - Jido.Dispatch.Preparation
 ---
@@ -12,6 +20,10 @@ the batch in order, and records a safe effect result.
 
 This component does not own pure Agent evaluation, the commit itself, Plugin
 root lifetime, child restart behavior, durable storage, or Signal transport.
+
+The documented `Jido.AgentServer.Directive` constructors and their result
+records are the public boundary. The effect engine and dispatch preparation
+are internal. This component has no DSL.
 
 ## Obligations
 
@@ -100,5 +112,13 @@ root lifetime, child restart behavior, durable storage, or Signal transport.
 - **scope:** `Jido.AgentServer.Directive.ProcessStart`
 - **must:** Require a Jido instance and a valid OTP child specification before commit. After commit, start the process under the selected instance supervisor. Accept normal OTP start and ignore results, report start failure as an effect failure, and do not claim AgentServer ownership of the process lifetime.
 - **why:** Application process startup is an effect, but its lifetime belongs to the instance supervisor.
+- **kind:** functional
+- **status:** active
+
+### jido.agent_server.effects.I12 — Public runtime Directive API
+
+- **scope:** `Jido.AgentServer.Directive` and its built-in result records
+- **must:** Document and type only the supported constructors, option sets, restart policies, and result records. Reject unknown or duplicate constructor options. Keep validation hooks and record schemas hidden. Keep `Jido.AgentServer.Effects` and `Jido.Dispatch.Preparation` internal. Do not add an effects DSL.
+- **why:** Agent code needs one stable way to request post-commit work without depending on the effect engine.
 - **kind:** functional
 - **status:** active

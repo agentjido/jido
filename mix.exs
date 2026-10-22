@@ -247,6 +247,7 @@ defmodule Jido.MixProject do
           Jido.Agent.Directive.RoutesReorder,
           Jido.Agent.Directive.RoutesSet,
           Jido.Agent.Directive.TopologySet,
+          Jido.AgentServer.Directive,
           Jido.AgentServer.Directive.AgentSend,
           Jido.AgentServer.Directive.OwnerSend,
           Jido.AgentServer.Directive.ErrorReport,
