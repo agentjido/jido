@@ -18,14 +18,14 @@ authoring, or AgentServer commit timing.
 ### jido.signal_action.I1 — One combined declaration
 
 - **scope:** `use Jido.SignalAction`, generated metadata functions
-- **must:** Define one native Action and one input Signal definition in the same module. Require a name, non-blank description, positive version, and input contract. Reject duplicate or unknown declaration options. Expose the same input schema through Action parameter and Signal data validation.
+- **must:** Define one native Action and one input Signal definition in the same module. Require a name, non-blank description, positive version, and input contract. Reject duplicate or unknown declaration options. Expose the same input schema through Action parameter and Signal data validation, and keep the declared version in the native Action metadata.
 - **kind:** functional
 - **status:** active
 
 ### jido.signal_action.I2 — Static Signal definition forms
 
 - **scope:** `use Jido.SignalAction`, input and output declarations
-- **must:** Accept an inline Signal keyword declaration or a compiled Signal definition module. Require a full string type and static map-shaped schema. Reject tuple forms, unavailable or incomplete modules, and invalid Signal declarations at compile time.
+- **must:** Accept an inline Signal keyword declaration or a compiled module with the canonical Signal definition marker. Require a full string type and static map-shaped schema. Reject tuple forms, unavailable, lookalike, or incomplete modules, and invalid Signal declarations at compile time.
 - **kind:** functional
 - **status:** active
 
@@ -53,7 +53,7 @@ authoring, or AgentServer commit timing.
 ### jido.signal_action.I6 — Validated reply construction
 
 - **scope:** generated `reply/3`, `Jido.SignalAction.reply/4`
-- **must:** Require a valid request Signal that matches the input type and data-schema contract, one declared output Signal, and output data accepted by its required map-shaped schema. Build the declared output Signal with valid caller options and perform no dispatch.
+- **must:** Require a SignalAction module, a valid request Signal whose type, schema URI, and data match the input contract, one declared output Signal, and ordinary map data accepted directly by its required schema. Do not accept an Action output envelope in place of Signal data. Build the declared output Signal with valid caller options and perform no dispatch.
 - **kind:** functional
 - **status:** active
 

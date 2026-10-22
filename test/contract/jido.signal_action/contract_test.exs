@@ -117,6 +117,14 @@ defmodule JidoTest.SignalAction.ContractTest do
     def run(data, _context), do: {:ok, data}
   end
 
+  defmodule SignalLookalike do
+    def type, do: "lookalike.input"
+    def schema, do: Zoi.object(%{})
+    def dataschema, do: nil
+    def default_source, do: nil
+    def datacontenttype, do: nil
+  end
+
   @tag obligation: "jido.signal_action.I1"
   test "one module is one native Action and input Signal contract" do
     assert SignalAction.defined?(CreateThread)
@@ -133,6 +141,8 @@ defmodule JidoTest.SignalAction.ContractTest do
     assert CreateThread.default_source() == nil
     assert CreateThread.datacontenttype() == nil
     assert CreateThread.dataschema() == nil
+    assert ExistingSignals.__jido_authoring__().vsn == ExistingSignals.vsn()
+    assert ExistingSignals.authoring_contract()["vsn"] == ExistingSignals.vsn()
   end
 
   @tag obligation: ["jido.signal_action.I1", "jido.signal_action.I4"]
@@ -155,7 +165,19 @@ defmodule JidoTest.SignalAction.ContractTest do
     {:ok, request} = Signal.put_context(request, "jidocausationid", "earlier-request")
     data = %{"id" => "thread-1"}
 
-    assert {:ok, reply} = CreateThread.reply(request, data, source: "/chat", id: request.id)
+    spoof = Signal.new!("spoof", %{}, source: "/spoof")
+    {:ok, spoof, spoof_trace} = Signal.Trace.ensure(spoof, tracestate: "spoof=value")
+    refute spoof_trace == trace
+
+    extensions = Map.put(spoof.extensions, "jidocausationid", "spoofed-request")
+
+    assert {:ok, reply} =
+             CreateThread.reply(request, data,
+               source: "/chat",
+               id: request.id,
+               extensions: extensions
+             )
+
     assert reply.type == "chat.thread.created"
     assert reply.source == "/chat"
     assert reply.data == data
@@ -167,6 +189,10 @@ defmodule JidoTest.SignalAction.ContractTest do
     assert {:ok, second} = CreateThread.reply(request, data, source: "/chat")
     refute second.id == reply.id
     assert {:error, _} = CreateThread.reply(request, %{"id" => 42}, source: "/chat")
+
+    assert {:error, _} =
+             CreateThread.reply(request, Jido.Action.Output.raw(data), source: "/chat")
+
     assert {:error, _} = CreateThread.reply(request, Signal.new!("other", %{}, source: "/x"))
   end
 
@@ -238,10 +264,13 @@ defmodule JidoTest.SignalAction.ContractTest do
           nil,
           %{request | type: "other"},
           %{request | dataschema: "urn:other"},
+          %{request | data: %{name: 42}},
           %{request | source: "bad source"}
         ] do
       assert {:error, _} = ExistingSignals.reply(invalid, %{id: "thread-2"})
     end
+
+    assert {:error, _} = SignalAction.reply(Request, request, %{id: "thread-2"})
 
     assert {:error, %{message: "Action has no output Signal"}} =
              DataOutput.reply(DataOutput.new!(%{name: "General"}, source: "/caller"), %{id: "x"})
@@ -293,6 +322,52 @@ defmodule JidoTest.SignalAction.ContractTest do
   end
 
   @tag obligation: ["jido.signal_action.I1", "jido.signal_action.I2", "jido.signal_action.I3"]
+  test "successful declarations compile complete inline and module contracts" do
+    inline =
+      compile_action("""
+      name: "compiled_inline",
+      description: "Compile an inline contract",
+      vsn: 3,
+      input: [
+        type: "compiled.inline.request",
+        schema: Zoi.object(%{name: Zoi.string()}),
+        default_source: "/inline"
+      ],
+      output: [
+        type: "compiled.inline.reply",
+        schema: Zoi.object(%{id: Zoi.string()}),
+        default_source: "/reply"
+      ]
+      """)
+
+    assert inline.name() == "compiled_inline"
+    assert inline.description() == "Compile an inline contract"
+    assert inline.vsn() == 3
+    assert inline.type() == "compiled.inline.request"
+    assert inline.default_source() == "/inline"
+    assert inline.__signal_action__().input == inline.__signal_definition__()
+    assert inline.__signal_action__().output.type == "compiled.inline.reply"
+    assert inline.__jido_authoring__().vsn == 3
+
+    module_definitions =
+      compile_action("""
+      name: "compiled_modules",
+      description: "Compile module contracts",
+      vsn: 4,
+      input: #{inspect(Request)},
+      output: #{inspect(Completed)}
+      """)
+
+    assert module_definitions.vsn() == 4
+    assert module_definitions.type() == Request.type()
+    assert module_definitions.schema() == Request.schema()
+    assert module_definitions.dataschema() == Request.dataschema()
+    assert module_definitions.default_source() == Request.default_source()
+    assert module_definitions.datacontenttype() == Request.datacontenttype()
+    assert module_definitions.__signal_action__().output.type == Completed.type()
+  end
+
+  @tag obligation: ["jido.signal_action.I1", "jido.signal_action.I2", "jido.signal_action.I3"]
   test "invalid definitions stop compilation" do
     input = ~s|[type: "test.run", schema: Zoi.object(%{})]|
     base = ~s|name: "test", description: "Test action", vsn: 1, input: #{input}|
@@ -310,6 +385,7 @@ defmodule JidoTest.SignalAction.ContractTest do
           {base <> ~s|, name: "duplicate"|, ~r/unique keyword/},
           {String.replace(base, input, "42"), ~r/Expected/},
           {String.replace(base, input, "String"), ~r/Signal definition/},
+          {String.replace(base, input, inspect(SignalLookalike)), ~r/Signal definition/},
           {base <> ~s|, output: [type: "result", schema: Zoi.string()]|, ~r/map-shaped/},
           {String.replace(base, "Zoi.object(%{})", "Zoi.string()"), ~r/map-shaped/},
           {String.replace(
@@ -331,5 +407,7 @@ defmodule JidoTest.SignalAction.ContractTest do
       def run(data, _context), do: {:ok, data}
     end
     """)
+
+    module
   end
 end

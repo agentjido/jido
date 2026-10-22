@@ -181,8 +181,9 @@ The result is `{"cart.quote.ready", %{total_cents: 1350}, false, true}`. The
 reply has its own `id`, keeps the request's trace, and records the request
 `id` as its causation.
 
-`reply/3` validates the reply data against `output:` and rejects a request of
-the wrong type:
+`reply/3` validates the request data and the direct result map against their
+contracts. It rejects an Action output envelope and a request of the wrong
+type:
 
 ```elixir
 {:error, wrong_request} = Typed.PriceQuote.reply(signal, result)

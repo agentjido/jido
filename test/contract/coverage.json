@@ -3201,38 +3201,41 @@
         "jido.signal_action.I1": {
           "failing": 0,
           "kind": "functional",
-          "passing": 3,
+          "passing": 4,
           "status": "active",
           "testable": true,
           "tests": [
             "test input construction and Action parameters share one schema",
             "test invalid definitions stop compilation",
-            "test one module is one native Action and input Signal contract"
+            "test one module is one native Action and input Signal contract",
+            "test successful declarations compile complete inline and module contracts"
           ]
         },
         "jido.signal_action.I2": {
           "failing": 0,
           "kind": "functional",
-          "passing": 4,
+          "passing": 5,
           "status": "active",
           "testable": true,
           "tests": [
             "test existing Signal definitions supply both envelope contracts",
             "test input and output reject tuple forms",
             "test input and output require full Signal type strings",
-            "test invalid definitions stop compilation"
+            "test invalid definitions stop compilation",
+            "test successful declarations compile complete inline and module contracts"
           ]
         },
         "jido.signal_action.I3": {
           "failing": 0,
           "kind": "functional",
-          "passing": 3,
+          "passing": 4,
           "status": "active",
           "testable": true,
           "tests": [
             "test a reply rejects a wrong request contract or missing output definition",
             "test existing Signal definitions supply both envelope contracts",
-            "test invalid definitions stop compilation"
+            "test invalid definitions stop compilation",
+            "test successful declarations compile complete inline and module contracts"
           ]
         },
         "jido.signal_action.I4": {

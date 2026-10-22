@@ -27,3 +27,27 @@
   decision: Accept the full 112-mutant profile with 78 killed, 3 classified survivors, 31 invalid compile-time mutations, and no timeout.
   driver: Every behavior-changing valid mutant is killed, and the only survivors change human-readable error prose that the contract does not fix.
   approved_by: Component hardening pass
+
+- id: signal-action-declaration-review
+  date: 2026-10-22
+  decision: Keep `use Jido.SignalAction` as the only declaration DSL. Accept inline Signal keyword definitions and modules with the canonical Signal marker. Keep tuple forms unsupported, and use the declared SignalAction version as the native Action authoring version.
+  driver: One static declaration must define the same input contract and version for Signal construction, Action execution, and authoring discovery.
+  approved_by: User-requested component review
+
+- id: signal-action-public-api-review
+  date: 2026-10-22
+  decision: Keep the generated metadata accessors, `validate_data/1`, `new/2`, `new!/2`, and `reply/3` as the public module API. Keep `Jido.SignalAction.defined?/1` and `reply/4` as integration functions. Treat the compile and build helpers as hidden macro support.
+  driver: The existing API is small and separates declaration, construction, and execution without adding another routing or dispatch surface.
+  approved_by: User-requested component review
+
+- id: signal-action-reply-boundary-review
+  date: 2026-10-22
+  decision: Validate a reply request as both a Signal envelope and SignalAction input. Validate direct result data with the declared output Signal schema, and reject Action output envelopes.
+  driver: Action output envelopes are execution values. They are not Signal data and must not bypass the output Signal contract.
+  approved_by: User-requested component review
+
+- id: signal-action-component-mutation-review
+  date: 2026-10-22
+  decision: Accept the full 93-mutant profile with 90 killed mutants, 3 classified survivors, no invalid mutation, no timeout, and no unsorted mutant.
+  driver: Dynamic declaration tests now exercise both successful DSL forms. The only survivors change human-readable error prose without changing error categories or structured data.
+  approved_by: User-requested component review

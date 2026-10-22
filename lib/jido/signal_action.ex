@@ -26,12 +26,14 @@ defmodule Jido.SignalAction do
   `output` also accepts a normal Action output schema. An omitted output keeps
   the normal Action output contract.
 
-  `new/2` builds a validated input Signal. `reply/3` checks output data and
-  builds a new Signal. A reply keeps the request trace and uses the request ID
-  as its causation ID. The caller supplies the source when the Signal
-  definition has no default source. These functions do not dispatch Signals.
-  Errors keep the normal Action error contract. There is no automatic failure
-  Signal.
+  `new/2` builds a validated input Signal. `reply/3` checks the request against
+  the input contract, checks direct result data against the output contract,
+  and builds a new Signal. Pass the result map itself, not a
+  `Jido.Action.Output` envelope. A reply keeps the request trace and uses the
+  request ID as its causation ID. The caller supplies the source when the
+  Signal definition has no default source. These functions do not dispatch
+  Signals. Errors keep the normal Action error contract. There is no automatic
+  failure Signal.
 
   ## Agent routes
 
@@ -61,9 +63,11 @@ defmodule Jido.SignalAction do
       def vsn, do: @signal_action.vsn
 
       @doc false
+      @spec __signal_action__() :: map()
       def __signal_action__, do: @signal_action
 
       @doc false
+      @spec __signal_definition__() :: map()
       def __signal_definition__, do: @signal_action.input
 
       @doc "Returns the input Signal type."
@@ -87,7 +91,8 @@ defmodule Jido.SignalAction do
       def validate_data(data), do: Zoi.parse(schema(), data)
 
       @doc "Builds an input Signal without execution or dispatch."
-      @spec new(term(), keyword() | map()) :: {:ok, Jido.Signal.t()} | {:error, term()}
+      @spec new(term(), keyword() | map()) ::
+              {:ok, Jido.Signal.t()} | {:error, [Zoi.Error.t()] | String.t()}
       def new(data \\ %{}, opts \\ []) do
         with {:ok, data} <- validate_data(data),
              do: Jido.SignalAction.__build__(@signal_action.input, data, opts)
@@ -103,7 +108,7 @@ defmodule Jido.SignalAction do
         end
       end
 
-      @doc "Builds a correlated output Signal without dispatch."
+      @doc "Builds a correlated output Signal from direct result data without dispatch."
       @spec reply(Jido.Signal.t(), map(), keyword() | map()) ::
               {:ok, Jido.Signal.t()} | {:error, term()}
       def reply(request, data, opts \\ []),
@@ -118,13 +123,14 @@ defmodule Jido.SignalAction do
 
   def defined?(_value), do: false
 
-  @doc "Builds a validated output Signal and preserves request correlation."
+  @doc "Builds a validated output Signal from direct result data and preserves correlation."
   @spec reply(module(), Signal.t(), map(), keyword() | map()) ::
           {:ok, Signal.t()} | {:error, term()}
   def reply(module, request, data, opts \\ []) do
-    with {:ok, request} <- request(module, request),
+    with :ok <- require_signal_action(module),
+         {:ok, request} <- request(module, request),
          {:ok, definition} <- output(module),
-         {:ok, data} <- module.validate_output(data),
+         {:ok, data} <- Zoi.parse(definition.schema, data),
          {:ok, signal} <- __build__(definition, data, opts),
          {:ok, signal} <- correlate(signal, request) do
       {:ok, signal}
@@ -132,6 +138,7 @@ defmodule Jido.SignalAction do
   end
 
   @doc false
+  @spec __compile__!(term(), Macro.Env.t()) :: map() | no_return()
   def __compile__!(opts, env) do
     unless Keyword.keyword?(opts) and Enum.uniq(Keyword.keys(opts)) == Keyword.keys(opts),
       do: compile_error!(env, "SignalAction requires unique keyword options")
@@ -146,9 +153,6 @@ defmodule Jido.SignalAction do
 
     vsn = opts[:vsn]
 
-    unless is_integer(vsn) and vsn > 0,
-      do: compile_error!(env, "SignalAction :vsn must be a positive integer")
-
     unless is_binary(opts[:description]) and String.trim(opts[:description]) != "",
       do: compile_error!(env, "SignalAction :description must be a non-blank string")
 
@@ -162,6 +166,7 @@ defmodule Jido.SignalAction do
       action: [
         name: opts[:name],
         description: opts[:description],
+        vsn: vsn,
         schema: input.schema,
         output_schema: output_schema
       ]
@@ -169,6 +174,8 @@ defmodule Jido.SignalAction do
   end
 
   @doc false
+  @spec __build__(map(), term(), keyword() | map()) ::
+          {:ok, Signal.t()} | {:error, String.t()}
   def __build__(definition, data, opts) do
     defaults =
       %{"source" => definition.default_source, "datacontenttype" => definition.datacontenttype}
@@ -187,7 +194,7 @@ defmodule Jido.SignalAction do
     ensure_compiled!(module, env)
     fields = [:type, :schema, :dataschema, :default_source, :datacontenttype]
 
-    if Enum.all?(fields, &function_exported?(module, &1, 0)) do
+    if Signal.defined?(module) and Enum.all?(fields, &function_exported?(module, &1, 0)) do
       fields
       |> Enum.map(&{&1, Macro.compile_apply(module, &1, [], env)})
       |> Enum.reject(fn {_key, value} -> is_nil(value) end)
@@ -224,14 +231,15 @@ defmodule Jido.SignalAction do
 
   defp request(module, %Signal{} = request) do
     with {:ok, request} <- Zoi.parse(Signal.schema(), request) do
-      if request.type == module.type() and request.dataschema == module.dataschema(),
-        do: {:ok, request},
-        else:
-          {:error,
-           Error.validation_error("Request does not match the input Signal definition",
-             field: :signal,
-             subject: module
-           )}
+      if request.type == module.type() and request.dataschema == module.dataschema() do
+        with {:ok, _data} <- module.validate_data(request.data), do: {:ok, request}
+      else
+        {:error,
+         Error.validation_error("Request does not match the input Signal definition",
+           field: :signal,
+           subject: module
+         )}
+      end
     end
   end
 
@@ -243,6 +251,12 @@ defmodule Jido.SignalAction do
       nil -> {:error, Error.validation_error("Action has no output Signal", subject: module)}
       definition -> {:ok, definition}
     end
+  end
+
+  defp require_signal_action(module) do
+    if defined?(module),
+      do: :ok,
+      else: {:error, Error.validation_error("Expected a SignalAction module", subject: module)}
   end
 
   defp correlate(signal, request) do
