@@ -6,9 +6,9 @@
       "covered": 124
     },
     "jido.agent_server": {
-      "active": 66,
+      "active": 67,
       "coverage": 1.0,
-      "covered": 66
+      "covered": 67
     },
     "jido.plugin": {
       "active": 34,
@@ -1034,16 +1034,16 @@
       }
     },
     "jido.agent_server.activation": {
-      "active": 11,
+      "active": 12,
       "app": "jido.agent_server",
       "coverage": 1.0,
-      "covered": 11,
+      "covered": 12,
       "form": "light",
       "obligations": {
         "jido.agent_server.activation.I1": {
           "failing": 0,
           "kind": "functional",
-          "passing": 7,
+          "passing": 8,
           "status": "active",
           "testable": true,
           "tests": [
@@ -1053,7 +1053,8 @@
             "test instance startup owns one activation in each exact partition",
             "test static supervision has stable identities and does not restart an explicit stop",
             "test the activation root owns the request worker and uses standard OTP child types",
-            "test the activation table and lifetime cell have one stable shape"
+            "test the activation table and lifetime cell have one stable shape",
+            "test worker discovery is safe and lookup options are closed"
           ]
         },
         "jido.agent_server.activation.I10": {
@@ -1080,6 +1081,17 @@
             "test the owned child supervisor is one idempotent supervisor",
             "test worker recovery drops owned child records with their private supervisor",
             "test worker recovery keeps independent child records"
+          ]
+        },
+        "jido.agent_server.activation.I12": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 2,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test activation operations stay on the public AgentServer facade",
+            "test worker discovery is safe and lookup options are closed"
           ]
         },
         "jido.agent_server.activation.I2": {
@@ -1114,7 +1126,7 @@
         "jido.agent_server.activation.I4": {
           "failing": 0,
           "kind": "ordering",
-          "passing": 5,
+          "passing": 6,
           "status": "active",
           "testable": true,
           "tests": [
@@ -1122,6 +1134,7 @@
             "test loss of the instance Registry or registration guard stops the owner",
             "test required roots recover as one group before readiness is published",
             "test supported OTP names resolve only a live AgentServer",
+            "test worker discovery is safe and lookup options are closed",
             "test worker loss during a resolved call returns unavailable without replay"
           ]
         },
@@ -3564,8 +3577,8 @@
   },
   "covenant": "0.2.0",
   "totals": {
-    "active": 224,
+    "active": 225,
     "coverage": 1.0,
-    "covered": 224
+    "covered": 225
   }
 }

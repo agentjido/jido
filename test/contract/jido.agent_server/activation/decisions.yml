@@ -32,3 +32,9 @@
     with I10; and the activation-record parts of I64 and I75 with I11.
   driver: The replacement keeps every retired activation promise under one explicit final owner without copying compound old obligations.
   approved_by: Component hardening pass
+
+- id: activation-public-api
+  date: 2026-10-22
+  decision: Keep activation operations on Jido.AgentServer. Add worker/1 as the safe inverse of activation/1, and keep Supervisor, RegistrationGuard, RegistryWorker, activation records, and registration keys internal.
+  driver: Static OTP supervision returns the activation root, but users need the request endpoint without depending on the activation owner module.
+  approved_by: Component hardening pass

@@ -27,7 +27,17 @@ defmodule Jido.AgentServer do
   require Logger
 
   alias Jido.Agent
-  alias Jido.AgentServer.{CompositionRuntime, Core, Durable, Effects, Plugin, TopologyRuntime}
+
+  alias Jido.AgentServer.{
+    CompositionRuntime,
+    Core,
+    Durable,
+    Effects,
+    Plugin,
+    RegistrationGuard,
+    TopologyRuntime
+  }
+
   alias Jido.AgentServer.Supervisor, as: ServerSupervisor
   alias Jido.Dispatch.Preparation, as: DispatchPreparation
   alias Jido.Agent.Command
@@ -109,11 +119,13 @@ defmodule Jido.AgentServer do
   @spec whereis(atom(), String.t(), keyword()) :: pid() | nil
   def whereis(jido, id, opts \\ []) do
     with true <- is_atom(jido) and not is_nil(jido) and is_binary(id),
-         true <-
-           is_list(opts) and Keyword.keyword?(opts) and Keyword.keys(opts) -- [:partition] == [],
+         true <- Core.unique_keyword?(opts) and Keyword.keys(opts) -- [:partition] == [],
          true <- valid_partition?(opts[:partition]),
          [{pid, :ready}] <-
-           Registry.lookup(Jido.registry_name(jido), registry_key(id, opts[:partition])),
+           Registry.lookup(
+             Jido.registry_name(jido),
+             RegistrationGuard.registry_key(id, opts[:partition])
+           ),
          true <- alive?(pid) do
       pid
     else
@@ -253,7 +265,6 @@ defmodule Jido.AgentServer do
 
   defp valid_partition?(nil), do: true
   defp valid_partition?(value), do: is_binary(value) and byte_size(value) > 0
-  defp registry_key(id, partition), do: {:agent, Jido.partition_key(id, partition)}
 
   defp valid_name?(nil), do: true
   defp valid_name?(name) when is_atom(name), do: true
@@ -690,9 +701,9 @@ defmodule Jido.AgentServer do
 
       jido ->
         registry = Jido.registry_name(jido)
-        key = registry_key(id, opts[:partition])
+        key = RegistrationGuard.registry_key(id, opts[:partition])
 
-        with :ok <- Jido.AgentServer.RegistrationGuard.claim(jido, key, self(), opts[:activation]),
+        with :ok <- RegistrationGuard.claim(jido, key, self(), opts[:activation]),
              :ok <- register_ready(registry, key) do
           {:ok,
            Map.new(
@@ -821,7 +832,7 @@ defmodule Jido.AgentServer do
   defp mark_ready(data) do
     Registry.update_value(
       Jido.registry_name(data.jido),
-      registry_key(data.agent.id, data.partition),
+      RegistrationGuard.registry_key(data.agent.id, data.partition),
       fn _ -> :ready end
     )
 
@@ -892,7 +903,12 @@ defmodule Jido.AgentServer do
   end
 
   @doc "Returns the activation supervisor PID, or nil for a bare worker."
+  @spec activation(server()) :: pid() | nil
   def activation(server), do: :gen_statem.call(server, :activation)
+
+  @doc "Returns the live request worker for an activation root, or nil when unavailable."
+  @spec worker(pid()) :: pid() | nil
+  def worker(activation), do: ServerSupervisor.live_worker(activation)
 
   defp public_parent(nil), do: nil
   defp public_parent(parent), do: Map.drop(parent, [:monitor, :state, :token, :dispatch])

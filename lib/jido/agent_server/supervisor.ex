@@ -1,12 +1,5 @@
 defmodule Jido.AgentServer.Supervisor do
-  @moduledoc """
-  The OTP root for an AgentServer and its private resources.
-
-  `start_link/1` returns `{:ok, supervisor}`. `worker/1` returns the request
-  endpoint. Use `AgentServer.child_spec/1` in an application supervisor.
-  Required Plugin roots and the server recover together with `:one_for_all`.
-  A Plugin supervisor controls recovery inside its own tree.
-  """
+  @moduledoc false
   use Supervisor
   alias Jido.AgentServer, as: Server
   alias Runic.Runner

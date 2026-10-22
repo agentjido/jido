@@ -39,7 +39,8 @@ defmodule JidoTest.AgentServer.ApiTest do
              {:function, :submit, 3},
              {:function, :touch, 1},
              {:function, :upgrade, 3},
-             {:function, :whereis, 3}
+             {:function, :whereis, 3},
+             {:function, :worker, 1}
            ]
 
     assert documented_types(AgentServer) == [

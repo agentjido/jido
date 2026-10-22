@@ -14,6 +14,9 @@ runtime records that must survive worker replacement.
 This component does not own Turn evaluation, Plugin callback rules, durable
 storage, Ref routing, or child-composition behavior.
 
+Activation has no separate DSL. Its public operations stay on
+`Jido.AgentServer`; the OTP root and registration processes are internal.
+
 ## Obligations
 
 ### jido.agent_server.activation.I1 — Activation root identity and lifetime
@@ -43,7 +46,7 @@ storage, Ref routing, or child-composition behavior.
 ### jido.agent_server.activation.I4 — Registration and readiness publication
 
 - **scope:** `Jido.AgentServer.start_link/1`, `Jido.AgentServer.await_ready/2`, `Jido.AgentServer.alive?/1`
-- **must:** Support valid local, global, and via OTP names without treating an unrelated process as an AgentServer. Publish an instance registration as starting until worker cleanup, state restore, and required Plugin readiness finish. Publish ready only after all startup gates pass. Keep reads available while starting and reject admitted work as not ready. A caller readiness timeout must not cancel startup.
+- **must:** Support valid local, global, and via OTP names without treating an unrelated process as an AgentServer. Reject duplicate or unknown lookup options. Publish an instance registration as starting until worker cleanup, state restore, and required Plugin readiness finish. Publish ready only after all startup gates pass. Keep reads available while starting and reject admitted work as not ready. A caller readiness timeout must not cancel startup.
 - **why:** Lookup must not expose an activation as ready before it can accept work.
 - **kind:** ordering
 - **status:** active
@@ -101,5 +104,13 @@ storage, Ref routing, or child-composition behavior.
 - **scope:** `Jido.AgentServer.Supervisor`
 - **must:** Keep child tag reservations and relationship records in the activation table, outside Agent state and local checkpoints. Fence replacement by reservation token. Remove owned child records when the worker recovery group starts again because the owned DynamicSupervisor and its children have stopped. Keep child behavior and adoption rules in `jido.agent_server.composition`.
 - **why:** Recovery must not retain a record for a stopped activation-owned child.
+- **kind:** functional
+- **status:** active
+
+### jido.agent_server.activation.I12 — Public activation API
+
+- **scope:** activation operations on `Jido.AgentServer`
+- **must:** Keep child specifications, supervised and bare startup, lookup, liveness, readiness, worker-to-root lookup, and root-to-worker lookup on the one public AgentServer facade. Return nil when a root has no live worker. Keep `Supervisor`, `RegistrationGuard`, `RegistryWorker`, ETS records, and registration keys internal. Do not add an activation DSL.
+- **why:** Users need one stable process boundary without depending on activation implementation modules.
 - **kind:** functional
 - **status:** active

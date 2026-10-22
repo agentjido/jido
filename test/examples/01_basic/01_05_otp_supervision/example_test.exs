@@ -22,7 +22,7 @@ defmodule Jido.Examples.OTPSupervisionTest do
              {Runtime, infrastructure, :supervisor, [Jido]}
            ] = Supervisor.which_children(application)
 
-    server = ServerSupervisor.worker(activation)
+    server = Server.worker(activation)
     assert Process.whereis(Runtime) == infrastructure
     assert :ok = Server.await_ready(server)
     assert Runtime.whereis_agent("otp-counter") == server
@@ -54,7 +54,7 @@ defmodule Jido.Examples.OTPSupervisionTest do
              List.keyfind(Supervisor.which_children(application), :counter, 0)
 
     assert {:ok, new_activation} = Supervisor.restart_child(application, :counter)
-    resumed = ServerSupervisor.worker(new_activation)
+    resumed = Server.worker(new_activation)
     assert :ok = Server.await_ready(resumed)
     assert Server.agent(resumed).state.count == 0
 

@@ -58,43 +58,43 @@
   sort: unpromised
   reason: The sleep paces a private retry loop. The contract fixes the bounded result, not its internal backoff policy.
 
-- at: lib/jido/agent_server/supervisor.ex:55:9
+- at: lib/jido/agent_server/supervisor.ex:48:9
   operator: element_removal
   mutation: "`shutdown: 10000` → `(removed)`"
   sort: unpromised
   reason: The contract requires complete activation shutdown and cleanup. It does not fix this child shutdown budget instead of the OTP default.
 
-- at: lib/jido/agent_server/supervisor.ex:55:19
+- at: lib/jido/agent_server/supervisor.ex:48:19
   operator: integer_shift
   mutation: "`10000` → `10001`"
   sort: unpromised
   reason: The contract requires complete activation shutdown and cleanup, not the exact child shutdown budget.
 
-- at: lib/jido/agent_server/supervisor.ex:55:19
+- at: lib/jido/agent_server/supervisor.ex:48:19
   operator: integer_shift
   mutation: "`10000` → `9999`"
   sort: unpromised
   reason: The contract requires complete activation shutdown and cleanup, not the exact child shutdown budget.
 
-- at: lib/jido/agent_server/supervisor.ex:63:20
+- at: lib/jido/agent_server/supervisor.ex:56:20
   operator: integer_shift
   mutation: "`5` → `6`"
   sort: unpromised
   reason: The contract requires bounded restart intensity and activation stop after exhaustion, not the exact OTP restart window.
 
-- at: lib/jido/agent_server/supervisor.ex:63:20
+- at: lib/jido/agent_server/supervisor.ex:56:20
   operator: integer_shift
   mutation: "`5` → `4`"
   sort: unpromised
   reason: The contract requires bounded restart intensity and activation stop after exhaustion, not the exact OTP restart window.
 
-- at: lib/jido/agent_server/supervisor.ex:79:35
+- at: lib/jido/agent_server/supervisor.ex:72:35
   operator: integer_shift
   mutation: "`0` → `1`"
   sort: unpromised
   reason: This value seeds persistent bootstrap before durable restore. Persistent revision coordination belongs to jido.agent_server.durable, not activation.
 
-- at: lib/jido/agent_server/supervisor.ex:79:35
+- at: lib/jido/agent_server/supervisor.ex:72:35
   operator: integer_shift
   mutation: "`0` → `-1`"
   sort: unpromised
