@@ -77,12 +77,11 @@ defmodule Jido.Agent.SelectionTest do
       agent = Agent.instantiate!(definition, id: Jido.Signal.ID.generate!())
       source = signal(type, data)
 
-      assert {:ok, turn} = Runner.prepare_default_turn(source, agent)
+      assert {:ok, prepared} = Runner.prepare(agent, source, [])
+      turn = prepared.turn
       assert turn.executable == target
       assert turn.input == input
       assert turn.source_signal == source
-      assert {:ok, prepared} = Runner.prepare(agent, source, [])
-      assert prepared.turn == turn
 
       assert {:ok, direct, []} = Agent.cmd(agent, source, context: %{observer: self()})
       assert_receive {:executed, ^input, ^source}
@@ -130,7 +129,7 @@ defmodule Jido.Agent.SelectionTest do
         source = signal("selection.action", data)
 
         for result <- [
-              Runner.prepare_default_turn(source, agent),
+              Runner.prepare(agent, source, []),
               Agent.cmd(agent, source, context: %{observer: self()}),
               Server.call(server, source, context: %{observer: self()})
             ] do

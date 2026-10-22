@@ -27,3 +27,21 @@
   decision: Add Jido.Agent.Route to this mutation profile.
   driver: First-match route selection, default input merging, and executable parameter checks are evaluation behavior, not Agent definition ownership.
   approved_by: Final hardening audit
+
+- id: evaluation-dsl-boundary-review
+  date: 2026-10-22
+  decision: Keep no DSL in jido.agent_evaluation. Consume only the canonical routes and Plugin declarations produced by jido.agent.
+  driver: Evaluation must not create a second authoring surface or repeat the Agent DSL contract.
+  approved_by: User-requested component review
+
+- id: evaluation-public-surface-review
+  date: 2026-10-22
+  decision: Keep Jido.Agent.cmd/2,3 as the public evaluation facade and the staged Runner handoff private. Remove the unused prepare_default_turn/2 test helper, document the direct evaluation contract on cmd/3, and require all supported caller-context forms and reserved keys in Covenant.
+  driver: A test-only selection entry point widened the internal surface, while the public command options were enforced but not fully stated by the component contract.
+  approved_by: User-requested component review
+
+- id: evaluation-full-mutation-review
+  date: 2026-10-22
+  decision: Accept the current full jido.agent_evaluation profile with 366 mutants, 232 killed mutants, 87 reviewed survivors, 47 invalid mutations, no timeout, and no unsorted mutant.
+  driver: The component review needs current mutation evidence after the boundary, public API, Covenant, and edge-case changes.
+  approved_by: User-requested component review

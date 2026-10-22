@@ -17,7 +17,8 @@ reduction, and returns an ordered Directive batch.
 
 The component does not own Agent authoring, live AgentServer timing or process
 state, Directive dispatch, persistence, or executable internals from
-`jido_action`.
+`jido_action`. It has no authoring DSL. It consumes the canonical routes and
+Plugin declarations that `jido.agent` produces.
 
 ## Obligations
 
@@ -38,7 +39,7 @@ state, Directive dispatch, persistence, or executable internals from
 ### jido.agent_evaluation.I3 — Protected execution context
 
 - **scope:** `Jido.Agent.cmd/3`, `Jido.Agent.Runner`
-- **must:** Reject reserved caller context keys, preserve other caller values, add the current Agent and Signal values, and pass execution options to the executor.
+- **must:** Accept map, keyword-last-value, and nil caller context. Reject other context and all reserved caller keys. Preserve other caller values, add the current Agent and Signal values, and pass the remaining execution options to the executor.
 - **kind:** functional
 - **status:** active
 

@@ -185,7 +185,7 @@ defmodule JidoCoreBench.Fixtures do
             Runner.prepare(p.agent, p.signal, Keyword.put(exec_opts(), :context, p.context))
 
           :route ->
-            Runner.prepare_default_turn(p.signal, p.agent)
+            Jido.Agent.Route.select(p.agent, p.signal.type)
 
           :cmd ->
             CoreAgent.cmd(p.agent, p.signal, Keyword.put(exec_opts(), :context, p.context))
@@ -215,7 +215,7 @@ defmodule JidoCoreBench.Fixtures do
             )
 
           :route ->
-            {:ok, %Jido.Agent.Turn{executable: executable, input: %{}}} = result
+            {:ok, %{handler: %{target: executable}}} = result
             equal!(executable, target)
 
           :snapshot ->

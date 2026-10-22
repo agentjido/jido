@@ -294,12 +294,24 @@ defmodule Jido.Agent do
   @doc """
   Runs one complete Turn through `Jido.Exec.run/4` without an AgentServer.
 
-  Returns the next Agent value and validated Directives. It does not dispatch
-  those Directives, save state, resume work, or deduplicate inputs.
+  Route selection uses the first matching declared route. Signal data can be a
+  map, a keyword list, or `nil`. Route defaults are merged once, and Signal
+  data has precedence.
+
+  The `:context` option can be a map, a keyword list, or `nil`. It is merged
+  with the current `:agent_id`, `:agent_state`, `:agent_topology`,
+  `:plugin_inputs`, and `:signal` values. Callers cannot replace reserved
+  context values. All other options pass to `Jido.Exec.run/4`.
+
+  Returns one complete next Agent value and an ordered batch of validated
+  Directives. It does not dispatch those Directives, save state, resume work,
+  or deduplicate inputs. A failure returns no candidate and does not change the
+  source Agent.
 
   This function runs pure Agent Plugin preparation. It does not run live Agent
   Server Plugin admission, runtime work, replay protection, or outbound Signal
-  preparation.
+  preparation. The evaluation boundary is pure, but the selected Action or
+  Flow still runs its own application code and can cause its own side effects.
   """
   @spec cmd(instance(), Signal.t(), keyword()) ::
           {:ok, instance(), [struct()]} | {:error, term()}

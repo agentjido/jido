@@ -337,10 +337,12 @@ defmodule Jido.AgentTest do
     signal = Signal.new!(type: "counter.add", source: "/test", data: %{by: 2, label: "one"})
 
     assert {:ok,
-            %Turn{
-              executable: Add,
-              input: %{by: 2, label: "one"}
-            }} = Jido.Agent.Runner.prepare_default_turn(signal, agent)
+            %Jido.Agent.Runner.Prepared{
+              turn: %Turn{
+                executable: Add,
+                input: %{by: 2, label: "one"}
+              }
+            }} = Jido.Agent.Runner.prepare(agent, signal, [])
   end
 
   test "selects the first executable when one Signal resolves to several" do
@@ -354,8 +356,10 @@ defmodule Jido.AgentTest do
 
     signal = Signal.new!(type: "counter.add", source: "/test", data: %{})
 
-    assert {:ok, %Turn{executable: Add, source_signal: ^signal}} =
-             Jido.Agent.Runner.prepare_default_turn(signal, agent)
+    assert {:ok,
+            %Jido.Agent.Runner.Prepared{
+              turn: %Turn{executable: Add, source_signal: ^signal}
+            }} = Jido.Agent.Runner.prepare(agent, signal, [])
   end
 
   test "replaces and validates the complete Agent state" do
@@ -601,11 +605,12 @@ defmodule Jido.AgentTest do
       [route] = agent.routes
 
       for path <- ["counter.add", "counter.*", "counter.**", "**"] do
-        assert {:ok, %Turn{executable: Add, input: input}} =
-                 Jido.Agent.Runner.prepare_default_turn(signal, %{
-                   agent
-                   | routes: [%{route | path: path, defaults: %{by: 9}}]
-                 })
+        routed = %{agent | routes: [%{route | path: path, defaults: %{by: 9}}]}
+
+        assert {:ok,
+                %Jido.Agent.Runner.Prepared{
+                  turn: %Turn{executable: Add, input: input}
+                }} = Jido.Agent.Runner.prepare(routed, signal, [])
 
         assert input === signal.data
       end
@@ -630,7 +635,7 @@ defmodule Jido.AgentTest do
 
       for type <- ["counter.unknown", nil, :invalid] do
         signal = %{Signal.new!("counter.add", %{}, source: "/test") | type: type}
-        assert {:error, _} = Jido.Agent.Runner.prepare_default_turn(signal, agent)
+        assert {:error, _} = Jido.Agent.Runner.prepare(agent, signal, [])
         assert {:error, _} = Agent.cmd(agent, signal)
       end
     end

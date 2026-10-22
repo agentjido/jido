@@ -89,12 +89,6 @@ defmodule Jido.Agent.Runner do
           {:ok, Agent.instance(), [struct()]} | {:error, stage(), term()}
   def finish_for_server(%Prepared{} = prepared, result), do: do_finish(prepared, result)
 
-  @doc false
-  @spec prepare_default_turn(Signal.t(), Agent.instance()) :: {:ok, Turn.t()} | {:error, term()}
-  def prepare_default_turn(%Signal{} = signal, %Agent{} = agent) do
-    select(agent, signal)
-  end
-
   defp prepare_direct(agent, signal, opts) do
     {caller_context, exec_opts} = Keyword.pop(opts, :context, %{})
 

@@ -31,11 +31,13 @@ defmodule JidoTest.Contract.AgentEvaluationTest do
     signal = F.signal(%{amount: 7, nested: %{a: 9}})
 
     assert {:ok,
-            %Turn{
-              executable: F.Return,
-              input: %{amount: 7, nested: %{a: 9}},
-              source_signal: ^signal
-            }} = Runner.prepare_default_turn(signal, source)
+            %Runner.Prepared{
+              turn: %Turn{
+                executable: F.Return,
+                input: %{amount: 7, nested: %{a: 9}},
+                source_signal: ^signal
+              }
+            }} = Runner.prepare(source, signal, [])
 
     assert {:ok, ^source, []} = Agent.cmd(source, signal, context: %{observer: self()})
     assert_receive {:executed, %{amount: 7, nested: %{a: 9}}, %{signal: ^signal}}
@@ -83,11 +85,33 @@ defmodule JidoTest.Contract.AgentEvaluationTest do
   test "reserved context fails and valid caller context and execution options are retained" do
     source = F.instance()
 
-    for key <- [:agent_id, :agent_state, :agent_topology, :plugin_inputs, :signal] do
+    for key <- [
+          :agent_id,
+          :agent_state,
+          :agent_topology,
+          :plugin_inputs,
+          :signal,
+          :__jido_exec_durable__,
+          :__jido_wait_host__,
+          :__jido_wait_result__
+        ] do
       assert {:error, _} = Agent.cmd(source, F.signal(), context: %{key => :forged})
     end
 
     signal = F.signal()
+
+    assert {:ok, ^source, []} = Agent.cmd(source, signal, context: nil)
+
+    assert {:ok, ^source, []} =
+             Agent.cmd(source, signal, context: [observer: self(), request: 1, request: 2])
+
+    assert_receive {:executed, %{}, keyword_context}
+    assert keyword_context.request == 2
+
+    for context <- [:invalid, "bad", [1, 2], %URI{}] do
+      assert {:error, %Jido.Error.ValidationError{}} =
+               Agent.cmd(source, signal, context: context)
+    end
 
     assert {:ok, ^source, []} =
              Agent.cmd(source, signal,
