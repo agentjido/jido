@@ -1,9 +1,5 @@
 defmodule Jido.Persistence.Snapshot do
-  @moduledoc """
-  A complete saved Agent value. Schemas and nested definitions are captured as
-  data. Code fingerprints identify the retained implementations it requires.
-  The source Agent module is provenance and is never used to rebuild fields.
-  """
+  @moduledoc false
   alias Jido.Agent
   alias Jido.Agent.{Data, Error}
   alias Jido.PortableTerm
@@ -55,7 +51,7 @@ defmodule Jido.Persistence.Snapshot do
     error -> Error.fail(:invalid_snapshot, [], "Snapshot references are invalid", %{cause: error})
   end
 
-  @doc "Validates saved data without resolving old executable references."
+  @doc false
   def envelope(snapshot) do
     with {:ok, _} <- Data.fields(snapshot, @keys),
          true <- Map.keys(snapshot) |> Enum.sort() == Enum.sort(@keys),
@@ -76,7 +72,7 @@ defmodule Jido.Persistence.Snapshot do
     end
   end
 
-  @doc "Captures nested definition values without changing the source Agent."
+  @doc false
   def freeze(%Agent{} = agent) do
     with {:ok, agents} <-
            Data.list(agent.topology.agents, fn member ->

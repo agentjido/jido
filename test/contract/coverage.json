@@ -2406,7 +2406,7 @@
         "jido.persistence.I1": {
           "failing": 0,
           "kind": "functional",
-          "passing": 10,
+          "passing": 12,
           "status": "active",
           "testable": true,
           "tests": [
@@ -2419,13 +2419,15 @@
             "test opens only byte adapters with atomic compare-and-swap",
             "test rejects adapters without atomic writes before use",
             "test requires keyword options and supports optional adapter validation",
+            "test the Adapter behavior has one required read and atomic write contract",
+            "test the documented public API excludes persistence implementation helpers",
             "test validates adapter declarations"
           ]
         },
         "jido.persistence.I10": {
           "failing": 0,
           "kind": "functional",
-          "passing": 6,
+          "passing": 8,
           "status": "active",
           "testable": true,
           "tests": [
@@ -2434,13 +2436,15 @@
             "test Plugin load rejects incomplete or invalid stored output",
             "test a missing Plugin-owned field cannot write a record",
             "test load callback faults and invalid values cannot restore an Agent",
-            "test the Persistence facet converts only its paired owned state"
+            "test the Persistence facet converts only its paired owned state",
+            "test the documented public API excludes persistence implementation helpers",
+            "test the public Plugin context accepts only its exact bounded shape"
           ]
         },
         "jido.persistence.I11": {
           "failing": 0,
           "kind": "functional",
-          "passing": 12,
+          "passing": 13,
           "status": "active",
           "testable": true,
           "tests": [
@@ -2455,13 +2459,14 @@
             "test load callback faults and invalid values cannot restore an Agent",
             "test missing saved declarations stop custom restore before its callback",
             "test snapshot and record callbacks receive only their bounded context",
-            "test snapshot callbacks contain failures with stable diagnostic details"
+            "test snapshot callbacks contain failures with stable diagnostic details",
+            "test the public Plugin context accepts only its exact bounded shape"
           ]
         },
         "jido.persistence.I12": {
           "failing": 0,
           "kind": "ordering",
-          "passing": 12,
+          "passing": 14,
           "status": "active",
           "testable": true,
           "tests": [
@@ -2472,11 +2477,13 @@
             "test malformed token reads and read failures do not write",
             "test missing namespaces and removed write gates fail before storage access",
             "test nested portable values survive a save and load",
+            "test operation options reject malformed, duplicate, and unsupported keys before storage",
             "test outer definition and record changes fail closed without a replacement write",
             "test public operations reject invalid Agent and identity input",
             "test revision checks accept only one valid predecessor",
             "test snapshot and record callbacks receive only their bounded context",
-            "test state and changed definition share one storage revision; conflicts retain bytes"
+            "test state and changed definition share one storage revision; conflicts retain bytes",
+            "test the documented public API excludes persistence implementation helpers"
           ]
         },
         "jido.persistence.I13": {
@@ -2536,7 +2543,7 @@
         "jido.persistence.I3": {
           "failing": 0,
           "kind": "persisted_format",
-          "passing": 6,
+          "passing": 7,
           "status": "active",
           "testable": true,
           "tests": [
@@ -2545,19 +2552,21 @@
             "test failed storage reads cannot become writes",
             "test invalid reads and callback faults return errors",
             "test malformed token reads and read failures do not write",
-            "test opaque tokens are not replaced with equal bytes"
+            "test opaque tokens are not replaced with equal bytes",
+            "test the Adapter behavior has one required read and atomic write contract"
           ]
         },
         "jido.persistence.I4": {
           "failing": 0,
           "kind": "functional",
-          "passing": 4,
+          "passing": 5,
           "status": "active",
           "testable": true,
           "tests": [
             "test Store entry points reject malformed configurations, keys, options, and bytes",
             "test bad write conditions are rejected before an adapter call",
             "test byte reads keep exact-byte conditions and stale writes conflict",
+            "test the Adapter behavior has one required read and atomic write contract",
             "test write outcomes distinguish rejection, unknown commit, and callback faults"
           ]
         },
@@ -2583,7 +2592,7 @@
         "jido.persistence.I6": {
           "failing": 0,
           "kind": "persisted_format",
-          "passing": 11,
+          "passing": 12,
           "status": "active",
           "testable": true,
           "tests": [
@@ -2597,7 +2606,8 @@
             "test saved fields are authoritative even if source provenance is unavailable",
             "test snapshot and record callbacks receive only their bounded context",
             "test snapshot boundaries reject malformed values and context",
-            "test snapshot envelope and final state are checked"
+            "test snapshot envelope and final state are checked",
+            "test the documented public API excludes persistence implementation helpers"
           ]
         },
         "jido.persistence.I7": {
@@ -2633,16 +2643,22 @@
         "jido.persistence.I9": {
           "failing": 0,
           "kind": "persisted_format",
-          "passing": 7,
+          "passing": 13,
           "status": "active",
           "testable": true,
           "tests": [
+            "test binary path segments keep at most their first 64 bytes",
+            "test collection validation keeps deterministic order and the first invalid list item",
             "test default persistence rejects a nested improper list without raising",
             "test default persistence rejects a process handle accepted by live state",
+            "test diagnostic paths have fixed segment and depth bounds",
             "test dump callback faults and invalid values cannot write a record",
+            "test integer path segments keep only the exact bounded range",
             "test load rejects a nested process handle supplied by storage",
             "test load rejects every prohibited term class supplied by storage",
+            "test map validation reports the first invalid key or value with its exact path",
             "test nested portable values survive a save and load",
+            "test portable validation rejects every local runtime value",
             "test snapshot boundaries reject malformed values and context"
           ]
         }

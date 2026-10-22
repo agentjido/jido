@@ -29,15 +29,15 @@
   approved_by: Component hardening pass
 
 - id: activate-persistence-component
-  date: 2026-10-20
-  decision: Activate jido.persistence with 15 obligations, 71 focused tests, and one survivor ledger with no unclassified mutant.
+  date: 2026-10-22
+  decision: Activate jido.persistence with 15 obligations, 82 focused tests, and one survivor ledger with no unclassified mutant.
   driver: The contract tests now own the complete shared persistence boundary, and the mutation profile has no unexplained survivor.
   approved_by: Component hardening pass
 
 - id: persistence-full-mutation-check
-  date: 2026-10-20
-  decision: Accept the full 700-mutant profile with 620 killed, 29 classified survivors, 51 invalid compile-time mutations, and no timeout.
-  driver: Every valid survivor is classified at its current source location, and every behavior-changing valid mutant is killed by the 71 focused tests.
+  date: 2026-10-22
+  decision: Accept the full 831-mutant profile with 743 killed, 37 classified survivors, 51 invalid compile-time mutations, and no timeout.
+  driver: Every valid survivor is classified at its current source location, and every behavior-changing valid mutant is killed by the 82 focused tests.
   approved_by: Component hardening pass
 
 - id: checkpoint-callback-mutation-ownership

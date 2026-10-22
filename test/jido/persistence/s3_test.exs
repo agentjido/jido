@@ -2,10 +2,15 @@ defmodule JidoTest.Persistence.S3Test do
   use ExUnit.Case, async: true
 
   alias Jido.Persistence.S3
+  alias JidoTest.Persistence.S3Client
 
   setup do
     store = start_supervised!({Elixir.Agent, fn -> %{} end})
-    %{store: store, opts: [bucket: "jido-test", prefix: "case/", request_fn: client(store)]}
+
+    %{
+      store: store,
+      opts: [bucket: "jido-test", prefix: "case/", request_fn: S3Client.new(store)]
+    }
   end
 
   test "binary key mapping, checksums, token CAS, and byte CAS", c do
@@ -305,69 +310,6 @@ defmodule JidoTest.Persistence.S3Test do
 
       for {pid, ref} <- refs do
         assert_receive {:DOWN, ^ref, :process, ^pid, _reason}, 1_000
-      end
-    end
-  end
-
-  defp client(store) do
-    fn request ->
-      case request.method do
-        :get ->
-          Elixir.Agent.get(store, fn values ->
-            case Map.get(values, request.key) do
-              nil ->
-                {:ok, %{status: 404, code: "NoSuchKey"}}
-
-              {body, etag} ->
-                checksum = :crypto.hash(:sha256, body) |> Base.encode64()
-
-                {:ok,
-                 %{
-                   status: 200,
-                   body: body,
-                   headers: %{"ETag" => etag, "x-amz-checksum-sha256" => checksum}
-                 }}
-            end
-          end)
-
-        :put ->
-          Elixir.Agent.get_and_update(store, fn values ->
-            current = Map.get(values, request.key)
-            headers = request.headers
-
-            condition =
-              cond do
-                Map.get(headers, "if-none-match") == "*" ->
-                  current == nil
-
-                is_binary(Map.get(headers, "if-match")) ->
-                  current != nil and elem(current, 1) == headers["if-match"]
-
-                true ->
-                  true
-              end
-
-            cond do
-              current == nil and Map.has_key?(headers, "if-match") ->
-                {{:ok, %{status: 404, code: "NoSuchKey"}}, values}
-
-              not condition ->
-                {{:ok, %{status: 412, code: "PreconditionFailed"}}, values}
-
-              headers["x-amz-checksum-sha256"] !=
-                  :crypto.hash(:sha256, request.body) |> Base.encode64() ->
-                {{:ok, %{status: 400, code: "BadDigest"}}, values}
-
-              true ->
-                etag = "etag-#{System.unique_integer([:positive])}"
-                {{:ok, %{status: 200}}, Map.put(values, request.key, {request.body, etag})}
-            end
-          end)
-
-        :delete ->
-          Elixir.Agent.get_and_update(store, fn values ->
-            {{:ok, %{status: 204}}, Map.delete(values, request.key)}
-          end)
       end
     end
   end

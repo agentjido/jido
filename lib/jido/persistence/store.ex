@@ -22,14 +22,15 @@ defmodule Jido.Persistence.Store do
   keys, values, tokens, or adapter options.
   """
 
-  alias Jido.Persistence.AdapterOps
+  alias Jido.Persistence.{Adapter, AdapterOps}
   alias Jido.Telemetry.Semantic
 
   @type config :: {module(), keyword()}
-  @type condition :: :not_found | binary() | {:token, nonempty_binary()}
+  @type declaration :: module() | config() | nil | false
+  @type condition :: Adapter.condition()
 
   @doc "Validates a byte adapter and returns its normalized configuration."
-  @spec open(module() | config()) :: {:ok, config()} | {:error, term()}
+  @spec open(declaration()) :: {:ok, config()} | {:error, term()}
   def open(config) do
     with {:ok, {adapter, opts} = normalized} <- normalize_result(config),
          :ok <- validate_adapter(adapter, opts) do

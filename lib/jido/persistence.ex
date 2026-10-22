@@ -56,9 +56,23 @@ defmodule Jido.Persistence do
   alias Jido.Telemetry.Persistence, as: PersistenceTelemetry
   alias Jido.PortableTerm
 
+  @identity_options [:instance, :namespace, :partition]
+  @create_options @identity_options ++ [:reason, :revision, :server_turn]
+  @save_options @create_options ++ [:expected_revision]
+
+  @typedoc "A direct persistence adapter declaration."
   @type adapter_config :: {module(), keyword()} | module() | nil | false
 
+  @typedoc "A portable snapshot returned by `snapshot/2`."
+  @type snapshot :: %{
+          required(:format) => pos_integer(),
+          required(:agent) => Agent.t(),
+          required(:references) => %{module() => binary()},
+          required(:state_format) => :default | :custom
+        }
+
   @doc "Captures the complete Agent as portable data without writing storage."
+  @spec snapshot(Agent.t(), keyword()) :: {:ok, snapshot()} | {:error, term()}
   def snapshot(agent, opts \\ []) do
     with {:ok, opts} <- Jido.Agent.Validation.options(opts, [:context]),
          :ok <- Jido.Agent.Data.plain_map(Map.get(opts, :context, %{})),
@@ -72,6 +86,7 @@ defmodule Jido.Persistence do
   end
 
   @doc "Restores saved definition and state without consulting the source definition."
+  @spec restore(snapshot(), keyword()) :: {:ok, Agent.t()} | {:error, term()}
   def restore(snapshot, opts \\ []) do
     with {:ok, opts} <- Jido.Agent.Validation.options(opts, [:context]),
          :ok <- Jido.Agent.Data.plain_map(Map.get(opts, :context, %{})),
@@ -79,6 +94,7 @@ defmodule Jido.Persistence do
   end
 
   @doc "Runs an explicit data upgrade Action before resolving saved code references."
+  @spec upgrade(snapshot(), term(), keyword()) :: {:ok, Agent.t()} | {:error, term()}
   def upgrade(snapshot, action, opts \\ []) do
     with {:ok, opts} <- Jido.Agent.Validation.options(opts, [:context]),
          context = Map.get(opts, :context, %{}),
@@ -92,7 +108,7 @@ defmodule Jido.Persistence do
            )
   end
 
-  @doc "Normalizes an adapter declaration."
+  @doc false
   @spec normalize_adapter(adapter_config()) :: {module(), keyword()} | nil
   defdelegate normalize_adapter(config), to: Source
 
@@ -128,6 +144,10 @@ defmodule Jido.Persistence do
   The Server always supplies its current revision as `:expected_revision`.
   A failed check does not replace the stored record. A tombstone preserves the
   revision barrier after logical deletion. This check is not a writer lease.
+
+  The public options are `:instance`, `:namespace`, `:partition`, `:reason`,
+  `:revision`, and `:expected_revision`. `:server_turn` is reserved for the
+  AgentServer durable record. Unknown and duplicate options return an error.
   """
   @spec save_agent(adapter_config() | atom(), Agent.t(), keyword()) ::
           :ok | {:error, term()}
@@ -136,7 +156,7 @@ defmodule Jido.Persistence do
   def save_agent(source, %Agent{} = agent, opts) do
     PersistenceTelemetry.observe(:compare_and_swap, source, agent.module, agent.id, opts, fn ->
       AdapterOps.protect(:compare_and_swap, fn ->
-        with :ok <- Source.validate_operation_options(opts),
+        with :ok <- Source.validate_operation_options(opts, @save_options),
              {:ok, {adapter, adapter_opts}, instance} <- Source.resolve(source, opts),
              {:ok, ref} <- Identity.resolve(instance, agent.id, opts),
              {:ok, record} <- build_record(agent, instance, opts, ref),
@@ -166,7 +186,7 @@ defmodule Jido.Persistence do
   def create_agent(source, %Agent{} = agent, opts \\ []) do
     PersistenceTelemetry.observe(:compare_and_swap, source, agent.module, agent.id, opts, fn ->
       AdapterOps.protect(:compare_and_swap, fn ->
-        with :ok <- Source.validate_operation_options(opts),
+        with :ok <- Source.validate_operation_options(opts, @create_options),
              {:ok, {adapter, adapter_opts}, instance} <- Source.resolve(source, opts),
              :ok <- validate_initial_revision(opts),
              {:ok, ref} <- Identity.resolve(instance, agent.id, opts),
@@ -186,7 +206,12 @@ defmodule Jido.Persistence do
     end)
   end
 
-  @doc "Loads and restores one Agent value."
+  @doc """
+  Loads and restores one Agent value.
+
+  Use `:instance`, `:namespace`, and `:partition` to select its durable identity.
+  Unknown and duplicate options return an error.
+  """
   @spec load_agent(adapter_config() | atom(), module(), String.t(), keyword()) ::
           {:ok, Agent.t()} | {:error, term()}
   def load_agent(source, agent_module, agent_id, opts \\ [])
@@ -202,7 +227,14 @@ defmodule Jido.Persistence do
   def load_agent(_source, agent_module, agent_id, _opts),
     do: invalid_public_input(:load_agent, %{agent_module: agent_module, agent_id: agent_id})
 
-  @doc false
+  @doc """
+  Loads and restores one Agent value with its stored revision.
+
+  Use the returned revision as `:expected_revision` for a later direct
+  `save_agent/3` call. The namespace and partition options identify the same
+  durable record as `load_agent/4`. The accepted options are `:instance`,
+  `:namespace`, and `:partition`. Unknown and duplicate options return an error.
+  """
   @spec load_agent_with_revision(adapter_config() | atom(), module(), String.t(), keyword()) ::
           {:ok, Agent.t(), non_neg_integer()} | {:error, term()}
   def load_agent_with_revision(source, agent_module, agent_id, opts \\ [])
@@ -222,7 +254,12 @@ defmodule Jido.Persistence do
         agent_id: agent_id
       })
 
-  @doc "Logically deletes one Agent record with a compare-and-swap tombstone."
+  @doc """
+  Logically deletes one Agent record with a compare-and-swap tombstone.
+
+  Use `:instance`, `:namespace`, and `:partition` to select its durable identity.
+  Unknown and duplicate options return an error.
+  """
   @spec delete_agent(adapter_config() | atom(), module(), String.t(), keyword()) ::
           :ok | {:error, term()}
   def delete_agent(source, agent_module, agent_id, opts \\ [])
@@ -231,7 +268,7 @@ defmodule Jido.Persistence do
       when is_atom(agent_module) and is_binary(agent_id) do
     PersistenceTelemetry.observe(:delete, source, agent_module, agent_id, opts, fn ->
       AdapterOps.protect(:delete, fn ->
-        with :ok <- Source.validate_operation_options(opts),
+        with :ok <- Source.validate_operation_options(opts, @identity_options),
              {:ok, {adapter, adapter_opts}, instance} <- Source.resolve(source, opts),
              {:ok, ref} <- Identity.resolve(instance, agent_id, opts) do
           delete_current(adapter, adapter_opts, ref, agent_module)
@@ -260,7 +297,7 @@ defmodule Jido.Persistence do
   def load_agent_with_server_turn(source, agent_module, agent_id, opts) do
     PersistenceTelemetry.observe(:load, source, agent_module, agent_id, opts, fn ->
       AdapterOps.protect(:get, fn ->
-        with :ok <- Source.validate_operation_options(opts),
+        with :ok <- Source.validate_operation_options(opts, @identity_options),
              {:ok, {adapter, adapter_opts}, instance} <- Source.resolve(source, opts),
              {:ok, ref} <- Identity.resolve(instance, agent_id, opts),
              {:ok, value, _condition} <-

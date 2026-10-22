@@ -12,6 +12,7 @@ defmodule Jido.Persistence.Adapter do
   @type value :: binary()
   @type token :: nonempty_binary()
   @type options :: keyword()
+  @type condition :: :not_found | value() | {:token, token()}
 
   @doc "Validates adapter options before an operation starts."
   @callback validate_options(options()) :: :ok | {:error, term()}
@@ -52,7 +53,7 @@ defmodule Jido.Persistence.Adapter do
   The shared Store requires this callback. `put/3` remains an unconditional
   byte operation for explicit storage maintenance.
   """
-  @callback compare_and_swap(key(), :not_found | value() | {:token, token()}, value(), options()) ::
+  @callback compare_and_swap(key(), condition(), value(), options()) ::
               :ok | {:error, term()}
 
   @doc "Physically deletes one value for explicit maintenance."

@@ -1,12 +1,15 @@
 ---
 modules:
   - Jido.Agent.Callback
+  - Jido.PortableTerm
   - Jido.Persistence
+  - Jido.Persistence.Adapter
   - Jido.Persistence.AdapterOps
   - Jido.Persistence.AgentCheckpoint
   - Jido.Persistence.Checkpoint
   - Jido.Persistence.Identity
   - Jido.Persistence.Plugin
+  - Jido.Persistence.Plugin.Context
   - Jido.Persistence.Record
   - Jido.Persistence.Snapshot
   - Jido.Persistence.Source
@@ -16,8 +19,13 @@ modules:
 ## Purpose
 
 Protect portable Agent records and the shared storage boundary. This component
-owns adapter configuration, durable identity, record data, snapshots, Plugin
-state conversion, revisions, and logical deletion.
+owns adapter configuration, durable identity, portable-term validation, record
+data, snapshots, Plugin state conversion, revisions, and logical deletion.
+
+The supported public boundary is `Jido.Persistence`,
+`Jido.Persistence.Adapter`, `Jido.Persistence.Store`,
+`Jido.Persistence.Plugin.Context`, and the bundled adapter modules. Snapshot,
+record, identity, callback, and adapter-operation modules are internal.
 
 It does not own live AgentServer recovery, commit publication, durable Flow
 progress, or the private behavior of one storage backend.
@@ -112,10 +120,10 @@ progress, or the private behavior of one storage backend.
 - **kind:** functional
 - **status:** active
 
-### jido.persistence.I12 — Create, load, and revision rules
+### jido.persistence.I12 — Operation options and revision rules
 
-- **scope:** `create_agent/3`, `save_agent/3`, `load_agent_with_revision/4`
-- **must:** Create only revision zero and only when the key is absent. Load one active record with its stored revision. Save one complete Agent and optional durable Turn at the requested nonnegative revision. Enforce an expected revision when supplied. A failed read or validation must not become a write.
+- **scope:** `create_agent/3`, `save_agent/3`, `load_agent/4`, `load_agent_with_revision/4`
+- **must:** Reject malformed, duplicate, and operation-unsupported options before storage access. Create only revision zero and only when the key is absent. Load one active record, with its stored revision when requested. Save one complete Agent and optional durable Turn at the requested nonnegative revision. Enforce an expected revision when supplied. A failed read or validation must not become a write.
 - **why:** Each successful write needs one clear predecessor.
 - **kind:** ordering
 - **status:** active

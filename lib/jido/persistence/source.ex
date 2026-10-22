@@ -3,6 +3,16 @@ defmodule Jido.Persistence.Source do
 
   alias Jido.Persistence.Store
 
+  @operation_options [
+    :expected_revision,
+    :instance,
+    :namespace,
+    :partition,
+    :reason,
+    :revision,
+    :server_turn
+  ]
+
   defdelegate normalize_adapter(config), to: Store
 
   def resolve_config(:inherit, jido), do: resolve_instance_config(jido)
@@ -34,7 +44,8 @@ defmodule Jido.Persistence.Source do
     end
   end
 
-  def validate_operation_options(opts) do
+  @spec validate_operation_options(term(), [atom()]) :: :ok | {:error, term()}
+  def validate_operation_options(opts, allowed \\ @operation_options) do
     cond do
       not Keyword.keyword?(opts) ->
         {:error, {:invalid_persistence_options, opts}}
@@ -43,8 +54,30 @@ defmodule Jido.Persistence.Source do
         {:error, {:unsupported_persistence_option, :write_authority}}
 
       true ->
+        validate_option_keys(Keyword.keys(opts), allowed)
+    end
+  end
+
+  defp validate_option_keys(keys, allowed) do
+    duplicate_keys = keys |> Enum.frequencies() |> duplicate_keys(keys)
+    unsupported_keys = keys |> Enum.reject(&(&1 in allowed)) |> Enum.uniq()
+
+    cond do
+      duplicate_keys != [] ->
+        {:error, {:invalid_persistence_options, {:duplicate_options, duplicate_keys}}}
+
+      unsupported_keys != [] ->
+        {:error, {:unsupported_persistence_options, unsupported_keys}}
+
+      true ->
         :ok
     end
+  end
+
+  defp duplicate_keys(frequencies, keys) do
+    keys
+    |> Enum.filter(&(Map.fetch!(frequencies, &1) > 1))
+    |> Enum.uniq()
   end
 
   defp resolve_instance_config(jido) do

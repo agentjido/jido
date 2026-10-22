@@ -177,6 +177,22 @@ defmodule Jido.Persistence.BoundaryTest do
       assert :ok = Record.validate(record, ref, Basic)
     end
 
+    assert :ok =
+             Persistence.save_agent(c.store, c.agent,
+               namespace: ref.namespace,
+               server_turn: turn
+             )
+
+    assert {:ok, restored, 0, ^turn} =
+             Persistence.load_agent_with_server_turn(
+               c.store,
+               Basic,
+               c.agent.id,
+               namespace: ref.namespace
+             )
+
+    assert restored == c.agent
+
     assert {:ok, _record} =
              Record.build_active(c.agent, ref, 0, checkpoint, %{turn | id: "x"})
 
@@ -403,6 +419,50 @@ defmodule Jido.Persistence.BoundaryTest do
 
       assert {:error, {:unsupported_persistence_option, :write_authority}} =
                call.(namespace: "valid", write_authority: nil)
+    end
+  end
+
+  @tag obligation: "jido.persistence.I12"
+  test "operation options reject malformed, duplicate, and unsupported keys before storage", c do
+    store = {ReadAdapter, read: fn _ -> flunk("unexpected storage read") end}
+
+    assert {:error, {:unsupported_persistence_options, [:revsion]}} =
+             Persistence.save_agent(store, c.agent,
+               namespace: "valid",
+               revsion: 1
+             )
+
+    assert {:error, {:unsupported_persistence_options, [:expected_revision]}} =
+             Persistence.create_agent(store, c.agent,
+               namespace: "valid",
+               expected_revision: 0
+             )
+
+    assert {:error, {:unsupported_persistence_options, [:revision]}} =
+             Persistence.load_agent(store, Basic, c.agent.id,
+               namespace: "valid",
+               revision: 1
+             )
+
+    assert {:error, {:unsupported_persistence_options, [:expected_revision]}} =
+             Persistence.delete_agent(store, Basic, c.agent.id,
+               namespace: "valid",
+               expected_revision: 0
+             )
+
+    assert {:error, {:invalid_persistence_options, {:duplicate_options, [:namespace]}}} =
+             Persistence.save_agent(store, c.agent,
+               namespace: "one",
+               namespace: "two"
+             )
+
+    for call <- [
+          &Persistence.save_agent(store, c.agent, &1),
+          &Persistence.create_agent(store, c.agent, &1),
+          &Persistence.load_agent(store, Basic, c.agent.id, &1),
+          &Persistence.delete_agent(store, Basic, c.agent.id, &1)
+        ] do
+      assert {:error, {:invalid_persistence_options, [:not_keyword]}} = call.([:not_keyword])
     end
   end
 

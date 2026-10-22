@@ -65,5 +65,26 @@ defmodule JidoTest.Persistence.SourceTest do
 
     assert {:error, {:unsupported_persistence_option, :write_authority}} =
              Source.validate_operation_options(write_authority: :removed)
+
+    assert {:error, {:unsupported_persistence_options, [:unknown]}} =
+             Source.validate_operation_options(unknown: true)
+
+    assert {:error, {:invalid_persistence_options, {:duplicate_options, [:namespace]}}} =
+             Source.validate_operation_options(namespace: "one", namespace: "two")
+
+    assert {:error, {:unsupported_persistence_options, [:revision]}} =
+             Source.validate_operation_options([revision: 1], [:namespace])
+
+    for option <- [
+          :expected_revision,
+          :instance,
+          :namespace,
+          :partition,
+          :reason,
+          :revision,
+          :server_turn
+        ] do
+      assert :ok = Source.validate_operation_options([{option, :value}])
+    end
   end
 end

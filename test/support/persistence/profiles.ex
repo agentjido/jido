@@ -66,4 +66,37 @@ defmodule JidoTest.Persistence.Profiles do
     |> Enum.map(& &1.adapter)
     |> MapSet.new()
   end
+
+  def active_adapter_modules do
+    @profiles
+    |> Map.values()
+    |> Enum.filter(&(&1.status == :active))
+    |> Enum.map(& &1.adapter)
+    |> MapSet.new()
+  end
+
+  def discovered_adapter_modules do
+    :jido
+    |> Application.spec(:modules)
+    |> Enum.filter(&public_persistence_module?/1)
+    |> Enum.filter(&persistence_adapter?/1)
+    |> MapSet.new()
+  end
+
+  defp public_persistence_module?(module) do
+    case module |> Atom.to_string() |> String.split(".") do
+      ["Elixir", "Jido", "Persistence", _name] -> true
+      _other -> false
+    end
+  end
+
+  defp persistence_adapter?(module) do
+    case Code.ensure_loaded(module) do
+      {:module, ^module} ->
+        Jido.Persistence.Adapter in List.wrap(module.module_info(:attributes)[:behaviour])
+
+      {:error, _reason} ->
+        false
+    end
+  end
 end

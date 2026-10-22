@@ -8,9 +8,13 @@ defmodule Jido.PortableTerm do
   @type path :: [term()]
 
   @spec validate(term(), atom() | path()) :: :ok | {:error, path()}
-  def validate(term, root) when is_atom(root), do: validate(term, [root])
+  def validate(term, root) when is_atom(root), do: validate_root(term, [root])
 
-  def validate(term, root) when is_list(root) do
+  def validate(term, root) when is_list(root), do: validate_root(term, root)
+
+  def validate(_term, _root), do: {:error, []}
+
+  defp validate_root(term, root) do
     path =
       root
       |> Enum.take(@max_path_segments)
