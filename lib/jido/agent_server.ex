@@ -18,7 +18,10 @@ defmodule Jido.AgentServer do
 
   @behaviour :gen_statem
 
+  @typedoc "A local AgentServer PID or registered OTP server name."
   @type server :: :gen_statem.server_ref()
+
+  @typedoc "The result of one accepted Agent Turn."
   @type signal_result :: {:ok, Jido.Agent.instance(), [struct()]} | {:error, term()}
 
   require Logger
@@ -58,9 +61,11 @@ defmodule Jido.AgentServer do
     def exists?(_id, _state), do: false
   end
 
+  @typedoc "An owner-bound handle for one submitted Turn result."
   @opaque pending :: %Pending{request_id: :gen_statem.request_id(), owner: pid()}
 
   @doc "Returns a child specification for OTP supervision."
+  @spec child_spec(keyword()) :: Supervisor.child_spec()
   def child_spec(opts) do
     agent = Keyword.fetch!(opts, :agent)
 
@@ -74,6 +79,7 @@ defmodule Jido.AgentServer do
   end
 
   @doc "Starts a registered AgentServer under the selected Jido instance supervisor."
+  @spec start(keyword()) :: Supervisor.on_start_child()
   def start(opts) when is_list(opts) do
     if Keyword.keyword?(opts) and not is_nil(opts[:jido]) do
       with {:ok, opts} <- runtime_options(opts),
@@ -100,6 +106,7 @@ defmodule Jido.AgentServer do
   def start(_), do: invalid_options("options must be a keyword list")
 
   @doc "Looks up an AgentServer in one instance and partition. Returns nil when absent."
+  @spec whereis(atom(), String.t(), keyword()) :: pid() | nil
   def whereis(jido, id, opts \\ []) do
     with true <- is_atom(jido) and not is_nil(jido) and is_binary(id),
          true <-
@@ -117,6 +124,7 @@ defmodule Jido.AgentServer do
   end
 
   @doc "Returns true for a live local AgentServer PID or OTP name."
+  @spec alive?(server()) :: boolean()
   def alive?(server) do
     case GenServer.whereis(server) do
       pid when is_pid(pid) and node(pid) == node() ->
@@ -190,9 +198,14 @@ defmodule Jido.AgentServer do
   defp normalize_stop_reason(reason), do: {:shutdown, reason}
 
   defp runtime_options(opts) do
-    with {:ok, opts} <- instance_options(opts),
-         {:ok, opts} <- Core.with_turn_timeout(opts),
-         do: {:ok, Keyword.merge(Core.runtime_defaults(), opts)}
+    with true <- Core.unique_keyword?(opts),
+         {:ok, opts} <- instance_options(opts),
+         {:ok, opts} <- Core.with_turn_timeout(opts) do
+      {:ok, Keyword.merge(Core.runtime_defaults(), opts)}
+    else
+      false -> invalid_options("startup option keys must be unique")
+      error -> error
+    end
   end
 
   defp instance_options(opts) do
@@ -253,8 +266,7 @@ defmodule Jido.AgentServer do
 
   @doc false
   def validate_defaults(opts) do
-    if is_list(opts) and Keyword.keyword?(opts) and
-         Keyword.keys(opts) -- Core.runtime_keys() == [] do
+    if Core.unique_keyword?(opts) and Keyword.keys(opts) -- Core.runtime_keys() == [] do
       validate_runtime(Keyword.merge(Core.runtime_defaults(), opts))
     else
       invalid_options("invalid instance AgentServer defaults")
@@ -344,7 +356,7 @@ defmodule Jido.AgentServer do
   defp invalid_options(message), do: Core.invalid_options(message)
 
   @doc "Stops the server and its active turn through OTP termination."
-  @spec stop(:gen_statem.server_ref(), term(), timeout()) :: :ok
+  @spec stop(server(), term(), timeout()) :: :ok | {:error, term()}
   def stop(server, reason \\ :shutdown, timeout \\ 5_000) do
     deadline =
       if timeout == :infinity, do: :infinity, else: System.monotonic_time(:millisecond) + timeout
@@ -395,7 +407,7 @@ defmodule Jido.AgentServer do
   OTP calls; it does not undo cancellation.
   Calls from owned work return `{:error, :reentrant_turn}`.
   """
-  @spec cancel(:gen_statem.server_ref(), timeout()) :: :ok | {:error, term()}
+  @spec cancel(server(), timeout()) :: :ok | {:error, term()}
   def cancel(server, timeout \\ 5_000), do: cancel_request(server, :active, timeout)
 
   @doc """
@@ -403,7 +415,7 @@ defmodule Jido.AgentServer do
   `{:error, :stale_turn}`. An idle server returns `{:error, :not_running}`.
   Successful cancellation confirms cleanup, as with `cancel/2`.
   """
-  @spec cancel_turn(:gen_statem.server_ref(), String.t(), timeout()) :: :ok | {:error, term()}
+  @spec cancel_turn(server(), String.t(), timeout()) :: :ok | {:error, term()}
   def cancel_turn(server, turn_id, timeout \\ 5_000) when is_binary(turn_id),
     do: cancel_request(server, turn_id, timeout)
 
@@ -421,9 +433,11 @@ defmodule Jido.AgentServer do
   server settles. Owned callbacks cannot
   call this synchronous control.
   """
+  @spec quiesce(server(), keyword()) :: :ok | {:error, term()}
   def quiesce(server, opts \\ []), do: control_request(server, :quiesce, opts)
 
   @doc "Opens admission after quiescence. An uncertain hibernation save forbids resume."
+  @spec resume(server(), timeout()) :: :ok | {:error, term()}
   def resume(server, timeout \\ 5_000) do
     with :ok <- Core.validate_wait(timeout), do: :gen_statem.call(server, :resume, timeout)
   end
@@ -437,6 +451,7 @@ defmodule Jido.AgentServer do
   live Agent closed and forbids resume. Required turn writes still follow their
   separate fail-stop contract.
   """
+  @spec hibernate(server(), keyword()) :: :ok | {:error, term()}
   def hibernate(server, opts \\ []) do
     with {:ok, _active, _timeout} <- Core.control_options(opts),
          target when is_pid(target) <- :gen_statem.call(server, :stop_target) do
@@ -475,10 +490,12 @@ defmodule Jido.AgentServer do
   end
 
   @doc "Attaches one owner. Repeated attachment is idempotent and prevents idle expiry."
+  @spec attach(server(), pid(), timeout()) :: :ok | {:error, term()}
   def attach(server, owner \\ self(), timeout \\ 5_000),
     do: owner_request(server, :attach, owner, timeout)
 
   @doc "Detaches one owner. The last detach starts a new idle budget."
+  @spec detach(server(), pid(), timeout()) :: :ok | {:error, term()}
   def detach(server, owner \\ self(), timeout \\ 5_000),
     do: owner_request(server, :detach, owner, timeout)
 
@@ -489,15 +506,17 @@ defmodule Jido.AgentServer do
   end
 
   @doc "Restarts the idle budget. Does not open closed admission."
+  @spec touch(server()) :: :ok
   def touch(server), do: :gen_statem.call(server, :touch)
 
   @doc "Returns the saved Agent instance."
-  @spec agent(:gen_statem.server_ref(), timeout()) :: Agent.instance()
+  @spec agent(server(), timeout()) :: Agent.instance() | {:error, term()}
   def agent(server, timeout \\ 5_000) do
     with :ok <- Core.validate_wait(timeout), do: :gen_statem.call(server, :agent, timeout)
   end
 
   @doc "Returns one committed Plugin-owned state field."
+  @spec plugin_state(server(), module(), timeout()) :: {:ok, term()} | {:error, term()}
   def plugin_state(server, plugin, timeout \\ 5_000) do
     with :ok <- Core.validate_wait(timeout),
          do: :gen_statem.call(server, {:plugin_state, plugin}, timeout)
@@ -513,8 +532,7 @@ defmodule Jido.AgentServer do
   map, keyword list, or nil. It is not stored in Agent state or Signal data.
   `:turn_id` and the Agent command context keys are reserved.
   """
-  @spec call(:gen_statem.server_ref(), Signal.t(), timeout() | keyword()) ::
-          {:ok, Agent.instance(), [struct()]} | {:error, term()}
+  @spec call(server(), Signal.t(), timeout() | keyword()) :: signal_result()
   def call(server, signal, timeout_or_opts \\ 5_000) do
     opts = if is_list(timeout_or_opts), do: timeout_or_opts, else: [timeout: timeout_or_opts]
 
@@ -537,7 +555,7 @@ defmodule Jido.AgentServer do
   this same process to collect the result. The handle hides the OTP request.
   Invalid options return an error before submission.
   """
-  @spec submit(:gen_statem.server_ref(), Signal.t(), keyword()) :: pending() | {:error, term()}
+  @spec submit(server(), Signal.t(), keyword()) :: pending() | {:error, term()}
   def submit(server, signal, opts \\ []) do
     with {:ok, signal} <- Command.normalize_signal(signal),
          {:ok, context} <- Core.turn_context(opts, [:context, :admission_timeout]),
@@ -555,7 +573,7 @@ defmodule Jido.AgentServer do
   Excess casts are dropped and logged when the postponed turn limit is reached.
   Casts have no admission deadline. Invalid options fail before sending.
   """
-  @spec cast(:gen_statem.server_ref(), Signal.t(), keyword()) :: :ok | {:error, term()}
+  @spec cast(server(), Signal.t(), keyword()) :: :ok | {:error, term()}
   def cast(server, signal, opts \\ []) do
     with {:ok, signal} <- Command.normalize_signal(signal),
          {:ok, context} <- Core.turn_context(opts, [:context]) do
@@ -574,8 +592,7 @@ defmodule Jido.AgentServer do
   be transferred to another process. Use `abandon/1` when its reply is no longer
   needed. Do not await a handle after collection or abandonment.
   """
-  @spec await(pending(), timeout()) ::
-          {:ok, Agent.instance(), [struct()]} | {:error, term()}
+  @spec await(pending(), timeout()) :: signal_result()
   def await(pending, timeout \\ 5_000)
 
   def await(%Pending{owner: owner, request_id: request_id}, timeout) when owner == self() do
@@ -614,7 +631,7 @@ defmodule Jido.AgentServer do
     do: invalid_options("abandon must run in the process that submitted the turn")
 
   @doc "Returns phase, identity, revision, queue counts, and a bounded active turn view."
-  @spec status(:gen_statem.server_ref(), timeout()) :: map()
+  @spec status(server(), timeout()) :: map() | {:error, term()}
   def status(server, timeout \\ 5_000) do
     with :ok <- Core.validate_wait(timeout), do: :gen_statem.call(server, :status, timeout)
   end
@@ -627,7 +644,7 @@ defmodule Jido.AgentServer do
   completion. A caller timeout does not cancel delivery. Retry the same Signal
   and wait ID. Delivery is available only while the Worker is suspended.
   """
-  @spec deliver_wait(:gen_statem.server_ref(), String.t(), Signal.t(), timeout()) ::
+  @spec deliver_wait(server(), String.t(), Signal.t(), timeout()) ::
           :ok | {:error, term()}
   def deliver_wait(server, wait_id, signal, timeout \\ 5_000)
 
@@ -642,12 +659,13 @@ defmodule Jido.AgentServer do
     do: invalid_options("wait input must be a Signal")
 
   @doc "Waits for Plugin startup and readiness. Caller timeout does not stop startup."
+  @spec await_ready(server(), timeout()) :: :ok | {:error, term()}
   def await_ready(server, timeout \\ 5_000) do
     with :ok <- Core.validate_wait(timeout), do: :gen_statem.call(server, :await_ready, timeout)
   end
 
   @doc "Returns terminal summaries in chronological order when debug is enabled."
-  @spec history(:gen_statem.server_ref()) :: [map()]
+  @spec history(server()) :: [map()]
   def history(server), do: :gen_statem.call(server, :history)
 
   @impl true

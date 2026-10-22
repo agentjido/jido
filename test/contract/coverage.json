@@ -1,9 +1,9 @@
 {
   "apps": {
     "jido": {
-      "active": 123,
+      "active": 124,
       "coverage": 1.0,
-      "covered": 123
+      "covered": 124
     },
     "jido.agent_server": {
       "active": 66,
@@ -572,10 +572,10 @@
       }
     },
     "jido.agent_server": {
-      "active": 37,
+      "active": 38,
       "app": "jido",
       "coverage": 1.0,
-      "covered": 37,
+      "covered": 38,
       "form": "light",
       "obligations": {
         "jido.agent_server.I1": {
@@ -1007,6 +1007,16 @@
           "tests": [
             "test owned callbacks and nested tasks reject synchronous control",
             "test storage callbacks cannot synchronously control their owner"
+          ]
+        },
+        "jido.agent_server.I9": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 1,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test the documented AgentServer facade and public types are exact"
           ]
         },
         "jido.agent_server.I94": {
@@ -3554,8 +3564,8 @@
   },
   "covenant": "0.2.0",
   "totals": {
-    "active": 223,
+    "active": 224,
     "coverage": 1.0,
-    "covered": 223
+    "covered": 224
   }
 }

@@ -76,6 +76,11 @@ defmodule JidoTest.AgentServer.StartupTest do
     assert {:error, %{message: "AgentServer application configuration must be a keyword list"}} =
              Server.start_link(agent: c.agent, runner: c.runner)
 
+    Application.put_env(:jido, Server, [:invalid])
+
+    assert {:error, %{message: "AgentServer application configuration must be a keyword list"}} =
+             Server.start_link(agent: c.agent, runner: c.runner)
+
     Application.put_env(:jido, Server, turn_timeout: 10, unknown: true)
 
     assert {:error, %{message: "unknown AgentServer application configuration options"}} =
@@ -174,15 +179,22 @@ defmodule JidoTest.AgentServer.StartupTest do
   @tag obligation: "jido.agent_server.I2"
   test "runtime settings reject duplicate option keys before startup", c do
     assert {:error, %{__exception__: true}} =
-             Server.validate_defaults(turn_timeout: 0, turn_timeout: :invalid)
+             Server.validate_defaults(turn_timeout: 0, turn_timeout: 0)
 
     assert {:error, %{__exception__: true}} =
              Server.start_link(
                agent: c.agent,
                runner: c.runner,
-               turn_timeout: 0,
-               turn_timeout: :invalid
+               turn_timeout: :infinity,
+               turn_timeout: :infinity
              )
+
+    previous = Application.fetch_env(:jido, Server)
+    on_exit(fn -> restore_config(previous) end)
+    Application.put_env(:jido, Server, turn_timeout: 10, turn_timeout: 10)
+
+    assert {:error, %{message: "AgentServer application configuration keys must be unique"}} =
+             Server.start_link(agent: c.agent, runner: c.runner)
   end
 
   @tag obligation: "jido.agent_server.I3"
@@ -231,6 +243,20 @@ defmodule JidoTest.AgentServer.StartupTest do
 
     assert {:error, %{message: "invalid turn options"}} =
              Server.call(server, F.signal(), [{:context, %{}} | :invalid])
+
+    assert {:error, %{message: "invalid turn options"}} =
+             Server.call(server, F.signal(), timeout: 5_000, timeout: 5_000)
+
+    assert {:error, %{message: "invalid turn options"}} =
+             Server.submit(
+               server,
+               F.signal(),
+               admission_timeout: 5_000,
+               admission_timeout: 5_000
+             )
+
+    assert {:error, %{message: "invalid turn options"}} =
+             Server.cast(server, F.signal(), context: %{}, context: %{})
 
     F.unchanged(server, c.agent)
   end

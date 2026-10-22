@@ -9,6 +9,11 @@ Protect the core `Jido.AgentServer` request, Turn, failure-policy, and runtime
 control behavior. Other AgentServer components own activation, effects, Plugin
 runtime, composition, durable state, and durable Flow progress.
 
+`Jido.AgentServer` is the single public runtime facade. This component owns the
+facade boundary and its core operations. Focused AgentServer components own the
+behavior of delegated facade operations. AgentServer has no separate DSL. Jido
+instance options and direct function options are its authoring surface.
+
 ## Obligations
 
 **Startup, requests, and turn lifecycle**
@@ -24,7 +29,7 @@ runtime, composition, durable state, and durable Flow progress.
 ### jido.agent_server.I2 — Runtime defaults
 
 - **scope:** `Jido.AgentServer.start_link/1`
-- **must:** Use a 60000 ms built-in turn timeout and the declared built-in runtime defaults. Read valid application turn_timeout defaults at startup; do not accept other application runtime defaults. Explicit values override unused application configuration. Reject unknown configuration keys and finite caller waits outside 0..4294967295. Accept non-negative integer Turn timeouts, including 90 days; arm bounded timer intervals without resetting the active or saved deadline. Name each invalid timeout field in its validation error.
+- **must:** Use a 60000 ms built-in turn timeout and the declared built-in runtime defaults. Read valid application turn_timeout defaults at startup; do not accept other application runtime defaults. Explicit values override unused application configuration. Require unique startup, instance-default, and application-configuration keys. Reject unknown configuration keys and finite caller waits outside 0..4294967295. Accept non-negative integer Turn timeouts, including 90 days; arm bounded timer intervals without resetting the active or saved deadline. Name each invalid timeout field in its validation error.
 - **why:** Configuration errors must be detected before work starts.
 - **kind:** functional
 - **status:** active
@@ -40,7 +45,7 @@ runtime, composition, durable state, and durable Flow progress.
 ### jido.agent_server.I4 — Transient context
 
 - **scope:** `Jido.AgentServer.call/3`, `Jido.AgentServer.submit/3`, `Jido.AgentServer.cast/3`
-- **must:** Pass supported map, keyword, or nil context to the turn. Reject unknown options and reserved keys. Keep transient values out of Agent state and Signal data.
+- **must:** Pass supported map, keyword, or nil context to the turn. Reject duplicate or unknown options and reserved keys. Keep transient values out of Agent state and Signal data.
 - **why:** Runtime input must not become domain state.
 - **kind:** functional
 - **status:** active
@@ -74,6 +79,14 @@ runtime, composition, durable state, and durable Flow progress.
 - **scope:** `Jido.AgentServer.call/3`, `Jido.AgentServer.submit/3`
 - **must:** Action or Flow failure, routing failure, or invalid candidate preserves the complete committed Agent and revision. Ordinary failure permits later work under the default policy.
 - **why:** Rejected work must not corrupt state.
+- **kind:** functional
+- **status:** active
+
+### jido.agent_server.I9 — Public API boundary
+
+- **scope:** documented `Jido.AgentServer` functions and types
+- **must:** Keep one exact documented facade for lifecycle, requests, control, observation, Plugin state, composition, and durability. Keep the owner-bound pending handle opaque. Keep `Core`, `Pending`, `Store`, state-machine callbacks, and owner implementation modules internal. Do not add a second AgentServer DSL or expose coordinator internals.
+- **why:** Users need one stable runtime entry point while focused components retain behavior ownership.
 - **kind:** functional
 - **status:** active
 
@@ -210,7 +223,7 @@ runtime, composition, durable state, and durable Flow progress.
 ### jido.agent_server.I26 — Policy validation
 
 - **scope:** `Jido.AgentServer.start_link/1`
-- **must:** Reject unknown execution keys, invalid timeouts, attempts, backoff, concurrency, hook arities, error policies, unbounded policy waits, and invalid history limits before startup.
+- **must:** Reject duplicate or unknown execution and hook keys, invalid timeouts, attempts, backoff, concurrency, hook arities, error policies, unbounded policy waits, and invalid history limits before startup.
 - **why:** Runtime policy must be valid before execution starts.
 - **kind:** functional
 - **status:** active
@@ -307,7 +320,7 @@ runtime, composition, durable state, and durable Flow progress.
 ### jido.agent_server.I94 — Control configuration
 
 - **scope:** `Jido.AgentServer`
-- **must:** Validate control options, finite control deadlines, owner PIDs, idle timeout, and idle policy before dependent work. Keep runtime changes in one file, preserve public authoring DSL, and keep unrelated runtime APIs unchanged.
+- **must:** Validate unique control option keys, finite control deadlines, owner PIDs, idle timeout, and idle policy before dependent work. Keep runtime changes in one file, preserve the direct option surface, and keep unrelated runtime APIs unchanged.
 - **why:** Control must preserve Agent state, ownership, and bounded process lifetime.
 - **kind:** functional
 - **status:** active

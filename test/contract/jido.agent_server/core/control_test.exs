@@ -171,6 +171,9 @@ defmodule JidoTest.AgentServer.ControlTest do
     assert {:error, %{message: "invalid control options"}} =
              Core.control_options([{:active, :finish} | :invalid])
 
+    assert {:error, %{message: "invalid control options"}} =
+             Core.control_options(active: :finish, active: :finish)
+
     assert Core.control_options([]) == {:ok, :finish, 5_000}
     assert Core.control_options(active: :cancel, timeout: 7) == {:ok, :cancel, 7}
     assert Core.control_wait(5_000) == 6_000

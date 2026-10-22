@@ -39,3 +39,9 @@
   decision: Activate jido.agent_server as the final core component with 37 obligations and eight focused test files. Keep all moved behavior under its approved AgentServer subcomponent.
   driver: The root contract now contains only core request, Turn, cancellation, failure-policy, control, and observation promises. Its full mutation profile has no surviving valid mutant.
   approved_by: Component hardening pass
+
+- id: agent-server-public-facade
+  date: 2026-10-22
+  decision: Keep Jido.AgentServer as the one documented runtime facade. Keep Core, Pending, Store, callbacks, and focused owner implementations internal. Treat direct function options and Jido instance defaults as the authoring surface; AgentServer has no separate DSL.
+  driver: The runtime needs one stable API without making the shared coordinator or its behavior owners public contracts.
+  approved_by: Component hardening pass

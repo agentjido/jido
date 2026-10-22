@@ -53,6 +53,11 @@ defmodule Jido.AgentServer.Core do
   def runtime_keys, do: @runtime_keys
   def startup_keys, do: @startup_keys
 
+  def unique_keyword?(value) do
+    is_list(value) and Keyword.keyword?(value) and
+      Keyword.keys(value) == Enum.uniq(Keyword.keys(value))
+  end
+
   def with_turn_timeout(opts) do
     if Keyword.has_key?(opts, :turn_timeout) do
       {:ok, opts}
@@ -62,6 +67,9 @@ defmodule Jido.AgentServer.Core do
       cond do
         not is_list(config) or not Keyword.keyword?(config) ->
           invalid_options("AgentServer application configuration must be a keyword list")
+
+        not unique_keyword?(config) ->
+          invalid_options("AgentServer application configuration keys must be unique")
 
         Keyword.keys(config) -- [:turn_timeout] != [] ->
           invalid_options("unknown AgentServer application configuration options")
@@ -116,8 +124,7 @@ defmodule Jido.AgentServer.Core do
     do: invalid_options("timeout must be in 0..#{@max_timeout} milliseconds or :infinity")
 
   def control_options(opts) do
-    if is_list(opts) and Keyword.keyword?(opts) and
-         Keyword.keys(opts) -- [:active, :timeout] == [] do
+    if unique_keyword?(opts) and Keyword.keys(opts) -- [:active, :timeout] == [] do
       active = Keyword.get(opts, :active, :finish)
       timeout = Keyword.get(opts, :timeout, 5_000)
 
@@ -132,7 +139,7 @@ defmodule Jido.AgentServer.Core do
   def control_wait(timeout), do: min(@max_timeout, timeout + 1_000)
 
   def turn_context(opts, allowed) do
-    if is_list(opts) and Keyword.keyword?(opts) and Keyword.keys(opts) -- allowed == [] do
+    if unique_keyword?(opts) and Keyword.keys(opts) -- allowed == [] do
       with {:ok, context} <- Command.normalize_context(Keyword.get(opts, :context)),
            :ok <- Command.validate_caller_context(context) do
         if Enum.any?([:turn_id, :trace_context], &Map.has_key?(context, &1)),
@@ -322,7 +329,7 @@ defmodule Jido.AgentServer.Core do
     do: {:error, Jido.Error.validation_error(message, kind: :config)}
 
   defp validate_exec(opts) do
-    if is_list(opts) and Keyword.keyword?(opts) and Keyword.keys(opts) -- @exec_keys == [] and
+    if unique_keyword?(opts) and Keyword.keys(opts) -- @exec_keys == [] and
          Enum.all?(opts, fn {key, value} -> valid_exec?(key, value) end),
        do: :ok,
        else: invalid_options("invalid exec_opts")
@@ -339,7 +346,7 @@ defmodule Jido.AgentServer.Core do
   defp valid_exec?(:backoff, value), do: value in [:none, :linear, :exponential, :jitter]
 
   defp valid_exec?(:hooks, hooks) do
-    is_list(hooks) and Keyword.keyword?(hooks) and
+    unique_keyword?(hooks) and
       Enum.all?(hooks, fn {key, fun} ->
         case Keyword.fetch(@hook_arities, key) do
           {:ok, arity} -> is_function(fun, arity)
