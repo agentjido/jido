@@ -15,3 +15,15 @@
   decision: Move stable Ref identity and routing from jido.agent_server I70 and I71 to jido.instance I6 through I8. Keep activation ownership, runtime-default consumption, and activation uniqueness in narrowed AgentServer obligations I36, I38, and I69.
   driver: Ref selection belongs to the instance boundary. AgentServer still owns the selected activation and its runtime behavior.
   approved_by: Component hardening pass
+
+- id: instance-definition-dsl
+  date: 2026-10-22
+  decision: Treat `use Jido` as the only instance declaration DSL. Validate its option names, uniqueness, and required `otp_app` key during macro expansion. Validate the merged option values before any child starts.
+  driver: Declaration syntax errors must fail at compilation, while caller module attributes and application runtime configuration must remain supported.
+  approved_by: Component hardening pass
+
+- id: instance-generated-api
+  date: 2026-10-22
+  decision: Remove the unused generated `__otp_app__/0` and `__jido_namespace__/0` functions. Keep `__jido_persistence__/0` as a hidden interoperability hook. Use `config/1`, `namespace/0`, and the typed lifecycle and Ref facades as the public generated API.
+  driver: The removed functions had no internal or sibling-package consumers and exposed declaration details that the supported runtime API already represents.
+  approved_by: Component hardening pass

@@ -131,6 +131,63 @@ defmodule JidoTest.InstanceTest do
   end
 
   @tag obligation: "jido.instance.I1"
+  test "use Jido rejects invalid definition options" do
+    cases = [
+      {"missing", ~s(namespace: "missing")},
+      {"unknown", ~s(otp_app: :jido, unknown: true)},
+      {"duplicate", ~s(otp_app: :jido, namespace: "first", namespace: "second")}
+    ]
+
+    for {label, options} <- cases do
+      module =
+        Module.concat(
+          __MODULE__,
+          :"InvalidDefinition#{label}#{System.unique_integer([:positive])}"
+        )
+
+      error =
+        assert_raise Jido.Error.ValidationError, fn ->
+          Code.compile_string("""
+          defmodule #{inspect(module)} do
+            use Jido, #{options}
+          end
+          """)
+        end
+
+      assert Jido.Error.code(error) == :jido_instance_invalid_config
+    end
+  end
+
+  @tag obligation: "jido.instance.I1"
+  test "use Jido accepts compile-time application and namespace attributes" do
+    module =
+      Module.concat(__MODULE__, :"AttributeDefinition#{System.unique_integer([:positive])}")
+
+    namespace = "jido/test/attribute-definition/#{System.unique_integer([:positive])}"
+
+    Code.compile_string("""
+    defmodule #{inspect(module)} do
+      @app :jido
+      @namespace #{inspect(namespace)}
+      use Jido, otp_app: @app, namespace: @namespace
+    end
+    """)
+
+    on_exit(fn -> unload_module(module) end)
+
+    assert %{start: {Jido, :start_link, [opts]}} = module.child_spec()
+    assert opts[:otp_app] == :jido
+    assert opts[:namespace] == namespace
+  end
+
+  @tag obligation: ["jido.instance.I1", "jido.instance.I4"]
+  test "generated modules expose only the required configuration hook" do
+    assert function_exported?(TestInstance, :__jido_persistence__, 0)
+    refute function_exported?(TestInstance, :__otp_app__, 0)
+    refute function_exported?(TestInstance, :__jido_namespace__, 0)
+  end
+
+  @tag obligation: "jido.instance.I1"
   test "instance module keeps its module name when runtime options include another name" do
     other_name = Module.concat(TestInstance, Other)
     spec = TestInstance.child_spec(name: other_name)

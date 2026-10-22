@@ -114,6 +114,7 @@ defmodule Jido do
         max_tasks: 2000
   """
   defmacro __using__(opts) do
+    opts = Options.validate_definition!(opts)
     otp_app = Keyword.fetch!(opts, :otp_app)
     persistence = Keyword.get(opts, :persistence)
     namespace = Keyword.get(opts, :namespace)
@@ -122,23 +123,17 @@ defmodule Jido do
       @otp_app unquote(otp_app)
 
       @doc false
-      @spec __otp_app__() :: unquote(otp_app)
-      def __otp_app__, do: @otp_app
-
-      @doc "Returns the optional persistence adapter for this Jido instance."
       @spec __jido_persistence__() :: {module(), keyword()} | nil
       def __jido_persistence__, do: Jido.Persistence.normalize_adapter(unquote(persistence))
 
-      @doc "Returns the configured stable namespace for this Jido instance."
-      @spec __jido_namespace__() :: String.t() | nil
-      def __jido_namespace__, do: unquote(namespace)
-
       @doc false
+      @spec child_spec(term()) :: Supervisor.child_spec()
       def child_spec(init_arg \\ []) do
         Jido.child_spec(__jido_instance_options__(init_arg))
       end
 
       @doc false
+      @spec start_link(term()) :: Supervisor.on_start()
       def start_link(init_arg \\ []) do
         Jido.start_link(__jido_instance_options__(init_arg))
       end
@@ -164,7 +159,7 @@ defmodule Jido do
           config(init_arg),
           __MODULE__,
           @otp_app,
-          __jido_namespace__(),
+          unquote(namespace),
           __jido_persistence__()
         )
       end
@@ -235,13 +230,17 @@ defmodule Jido do
       def cast(%Jido.Agent.Ref{} = ref, signal), do: Jido.cast(__MODULE__, ref, signal)
 
       @doc "Submits one AgentServer turn through a stable Agent Ref."
+      @spec submit(Jido.Agent.Ref.t(), Jido.Signal.t(), keyword()) ::
+              Jido.AgentServer.pending() | {:error, term()}
       def submit(%Jido.Agent.Ref{} = ref, signal, opts \\ []),
         do: Jido.submit(__MODULE__, ref, signal, opts)
 
       @doc "Collects an AgentServer pending reply in its submitting process."
+      @spec await(Jido.AgentServer.pending(), timeout()) :: Jido.AgentServer.signal_result()
       def await(pending, timeout \\ 5_000), do: Jido.await(pending, timeout)
 
       @doc "Discards an AgentServer pending reply without cancelling its turn."
+      @spec abandon(Jido.AgentServer.pending()) :: :ok | {:error, term()}
       def abandon(pending), do: Jido.abandon(pending)
 
       @doc "Stops the local Agent resolved by a stable Agent Ref."
@@ -326,11 +325,13 @@ defmodule Jido do
       # Compatible relationship and persistence API
 
       @doc "Persists and stops one live Agent Server."
+      @spec hibernate(Jido.AgentServer.server(), keyword()) :: :ok | {:error, term()}
       def hibernate(server, opts \\ []) do
         Jido.hibernate(__MODULE__, server, opts)
       end
 
       @doc "Restores and starts one persisted Agent."
+      @spec thaw(module(), String.t(), keyword()) :: DynamicSupervisor.on_start_child()
       def thaw(agent_module, agent_id, opts \\ []) do
         Jido.thaw(__MODULE__, agent_module, agent_id, opts)
       end
@@ -522,6 +523,7 @@ defmodule Jido do
 
       {:ok, pid} = Jido.start_link(name: MyApp.Jido)
   """
+  @spec start_link(term()) :: Supervisor.on_start()
   def start_link(opts) do
     with {:ok, opts} <- Options.validate(opts),
          :ok <- await_previous_children(Keyword.fetch!(opts, :name)),
@@ -577,6 +579,7 @@ defmodule Jido do
   end
 
   @doc false
+  @spec child_spec(term()) :: Supervisor.child_spec()
   def child_spec(opts) do
     opts = Options.validate!(opts)
     name = Keyword.fetch!(opts, :name)
@@ -771,13 +774,17 @@ defmodule Jido do
   def cast(instance, %Ref{} = ref, signal), do: RefFacade.cast(instance, ref, signal)
 
   @doc "Submits one AgentServer turn through a stable Agent Ref."
+  @spec submit(atom(), Ref.t(), Jido.Signal.t(), keyword()) ::
+          Jido.AgentServer.pending() | {:error, term()}
   def submit(instance, %Ref{} = ref, signal, opts \\ []),
     do: RefFacade.submit(instance, ref, signal, opts)
 
   @doc "Collects an AgentServer pending reply in its submitting process."
+  @spec await(Jido.AgentServer.pending(), timeout()) :: Jido.AgentServer.signal_result()
   defdelegate await(pending, timeout \\ 5_000), to: Jido.AgentServer
 
   @doc "Discards an AgentServer pending reply without cancelling its turn."
+  @spec abandon(Jido.AgentServer.pending()) :: :ok | {:error, term()}
   defdelegate abandon(pending), to: Jido.AgentServer
 
   @doc "Stops the local Agent resolved by a stable Agent Ref."

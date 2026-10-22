@@ -16,61 +16,73 @@
   sort: evaluation-gap
   reason: ETS access protection is fixed when the application creates the table, before the mutation worker installs a mutant; restart tests therefore retain the original public table.
 
-- at: lib/jido/instance/namespace_registry.ex:209:11
-  operator: element_removal
-  mutation: "`{:heir, heir, :namespace_registry}` → `(removed)`"
-  sort: evaluation-gap
-  reason: The table heir is fixed when the application creates the table, before the mutation worker installs a mutant; restart tests therefore retain the original heir.
-
 - at: lib/jido/instance/namespace_registry.ex:218:28
   operator: string_empty
   mutation: "`\"Jido instance namespace is already bound\"` → `\"\"`"
   sort: log-only
   reason: The contract fixes the structured error code, namespace, and owner. It does not fix human-readable error prose.
 
-- at: lib/jido/instance/options.ex:36:24
+- at: lib/jido/instance/options.ex:28:23
+  operator: string_empty
+  mutation: "`\"use Jido options must be a keyword list\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured instance configuration error and rejected definition value. It does not fix human-readable error prose.
+
+- at: lib/jido/instance/options.ex:55:24
   operator: string_empty
   mutation: "`\"Jido instance options must be a keyword list\"` → `\"\"`"
   sort: log-only
   reason: The contract fixes the structured instance configuration error and rejected value. It does not fix human-readable error prose.
 
-- at: lib/jido/instance/options.ex:53:23
+- at: lib/jido/instance/options.ex:78:23
   operator: string_empty
   mutation: "`\"Jido instance options contain unknown keys\"` → `\"\"`"
   sort: log-only
   reason: The contract fixes the structured instance configuration error and rejected keys. It does not fix human-readable error prose.
 
-- at: lib/jido/instance/options.ex:60:17
+- at: lib/jido/instance/options.ex:90:17
+  operator: string_empty
+  mutation: "`\"Jido instance options must contain unique keys\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured instance configuration error and duplicate keys. It does not fix human-readable error prose.
+
+- at: lib/jido/instance/options.ex:99:17
   operator: string_empty
   mutation: "`\"Jido instance name must be a non-nil atom\"` → `\"\"`"
   sort: log-only
   reason: The contract fixes the structured instance configuration error and rejected name. It does not fix human-readable error prose.
 
-- at: lib/jido/instance/options.ex:63:47
+- at: lib/jido/instance/options.ex:104:21
   operator: string_empty
-  mutation: "`\"otp_app must be an atom\"` → `\"\"`"
+  mutation: "`\"use Jido requires otp_app\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured instance configuration error and missing OTP application detail. It does not fix human-readable error prose.
+
+- at: lib/jido/instance/options.ex:111:33
+  operator: string_empty
+  mutation: "`\"otp_app must be a non-nil atom\"` → `\"\"`"
   sort: log-only
   reason: The contract fixes the structured instance configuration error and rejected OTP application. It does not fix human-readable error prose.
 
-- at: lib/jido/instance/options.ex:71:17
+- at: lib/jido/instance/options.ex:121:17
   operator: string_empty
   mutation: "`\"Jido instance namespace must be a nonempty binary\"` → `\"\"`"
   sort: log-only
   reason: The contract fixes the structured instance configuration error and rejected namespace. It does not fix human-readable error prose.
 
-- at: lib/jido/instance/options.ex:76:17
+- at: lib/jido/instance/options.ex:126:17
   operator: string_empty
   mutation: "`\"debug must be false, true, or :verbose\"` → `\"\"`"
   sort: log-only
   reason: The contract fixes the structured instance configuration error and rejected debug setting. It does not fix human-readable error prose.
 
-- at: lib/jido/instance/options.ex:82:17
+- at: lib/jido/instance/options.ex:132:17
   operator: string_empty
   mutation: "`\"max_tasks must be :infinity or a nonnegative integer\"` → `\"\"`"
   sort: log-only
   reason: The contract fixes the structured instance configuration error and rejected task limit. It does not fix human-readable error prose.
 
-- at: lib/jido/instance/options.ex:87:35
+- at: lib/jido/instance/options.ex:137:35
   operator: string_empty
   mutation: "`\"Jido instance persistence is invalid\"` → `\"\"`"
   sort: log-only
@@ -100,7 +112,13 @@
   sort: log-only
   reason: The contract fixes the namespace-required code and selected instance. It does not fix human-readable error prose.
 
-- at: lib/jido/instance/ref_facade.ex:251:23
+- at: lib/jido/instance/ref_facade.ex:251:19
+  operator: string_empty
+  mutation: "`\"Ref facade options must contain unique keys\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured Ref configuration error and duplicate keys. It does not fix human-readable error prose.
+
+- at: lib/jido/instance/ref_facade.ex:263:23
   operator: string_empty
   mutation: "`\"Agent Ref options have unknown keys\"` → `\"\"`"
   sort: log-only

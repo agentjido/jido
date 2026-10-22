@@ -44,6 +44,7 @@ defmodule JidoTest.InstanceOptionsTest do
       {:value, :invalid, :value, :invalid},
       {:unknown, [name: name, unknown: true], :keys, [:unknown]},
       {:name, [name: nil], :name, nil},
+      {:otp_app, [name: name, otp_app: nil], :otp_app, nil},
       {:otp_app, [name: name, otp_app: "jido"], :otp_app, "jido"},
       {:namespace, [name: name, namespace: ""], :namespace, ""},
       {:debug, [name: name, debug: :trace], :debug, :trace},
@@ -62,6 +63,50 @@ defmodule JidoTest.InstanceOptionsTest do
 
     assert Jido.Error.code(persistence_error) == :jido_instance_invalid_config
     assert Map.has_key?(persistence_error.details, :reason)
+  end
+
+  @tag obligation: "jido.instance.I1"
+  test "validation rejects duplicate option keys" do
+    name = unique_instance("duplicates")
+
+    assert {:error, error} = Options.validate(name: name, name: unique_instance("other"))
+    assert Jido.Error.code(error) == :jido_instance_invalid_config
+    assert error.details.keys == [:name]
+  end
+
+  @tag obligation: "jido.instance.I1"
+  test "definition validation rejects malformed, missing, unknown, and duplicate options" do
+    malformed =
+      assert_raise Jido.Error.ValidationError, fn ->
+        Options.validate_definition!(:invalid)
+      end
+
+    assert Jido.Error.code(malformed) == :jido_instance_invalid_config
+    assert malformed.details.value == :invalid
+
+    missing =
+      assert_raise Jido.Error.ValidationError, fn ->
+        Options.validate_definition!(namespace: "missing")
+      end
+
+    assert Jido.Error.code(missing) == :jido_instance_invalid_config
+    assert missing.details.otp_app == nil
+
+    unknown =
+      assert_raise Jido.Error.ValidationError, fn ->
+        Options.validate_definition!(otp_app: :jido, unknown: true)
+      end
+
+    assert Jido.Error.code(unknown) == :jido_instance_invalid_config
+    assert unknown.details.keys == [:unknown]
+
+    duplicate =
+      assert_raise Jido.Error.ValidationError, fn ->
+        Options.validate_definition!(otp_app: :jido, namespace: "first", namespace: "second")
+      end
+
+    assert Jido.Error.code(duplicate) == :jido_instance_invalid_config
+    assert duplicate.details.keys == [:namespace]
   end
 
   defp unique_instance(label) do

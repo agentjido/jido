@@ -12,15 +12,34 @@ defmodule Jido.Instance.Options do
     :otp_app,
     :persistence
   ]
+  @definition_keys [:namespace, :otp_app, :persistence]
   @default_max_tasks 1_000
+
+  @doc false
+  @spec validate_definition!(term()) :: keyword() | no_return()
+  def validate_definition!(opts) do
+    with true <- Keyword.keyword?(opts),
+         :ok <- validate_known_keys(opts, @definition_keys),
+         :ok <- validate_unique_keys(opts),
+         :ok <- require_otp_app(opts) do
+      opts
+    else
+      false ->
+        raise_invalid("use Jido options must be a keyword list", %{value: opts})
+
+      {:error, error} ->
+        raise error
+    end
+  end
 
   @doc false
   @spec validate(term()) :: {:ok, keyword()} | {:error, Error.ValidationError.t()}
   def validate(opts) do
     with true <- Keyword.keyword?(opts),
          :ok <- validate_known_keys(opts),
+         :ok <- validate_unique_keys(opts),
          :ok <- validate_name(Keyword.get(opts, :name)),
-         :ok <- validate_otp_app(Keyword.get(opts, :otp_app)),
+         :ok <- validate_otp_app(opts),
          :ok <- validate_namespace(Keyword.get(opts, :namespace)),
          :ok <- validate_debug(Keyword.get(opts, :debug)),
          :ok <- Jido.AgentServer.validate_defaults(Keyword.get(opts, :agent_server, [])),
@@ -47,10 +66,30 @@ defmodule Jido.Instance.Options do
     end
   end
 
-  defp validate_known_keys(opts) do
-    case Keyword.keys(opts) -- @allowed_keys do
+  defp validate_known_keys(opts, allowed_keys \\ @allowed_keys) do
+    unknown_keys =
+      opts
+      |> Keyword.keys()
+      |> Enum.reject(&(&1 in allowed_keys))
+      |> Enum.uniq()
+
+    case unknown_keys do
       [] -> :ok
       keys -> invalid("Jido instance options contain unknown keys", %{keys: keys})
+    end
+  end
+
+  defp validate_unique_keys(opts) do
+    keys = Keyword.keys(opts)
+
+    case keys -- Enum.uniq(keys) do
+      [] ->
+        :ok
+
+      duplicates ->
+        invalid("Jido instance options must contain unique keys", %{
+          keys: Enum.uniq(duplicates)
+        })
     end
   end
 
@@ -59,8 +98,19 @@ defmodule Jido.Instance.Options do
   defp validate_name(name),
     do: invalid("Jido instance name must be a non-nil atom", %{name: name})
 
-  defp validate_otp_app(otp_app) when is_atom(otp_app), do: :ok
-  defp validate_otp_app(otp_app), do: invalid("otp_app must be an atom", %{otp_app: otp_app})
+  defp require_otp_app(opts) do
+    if Keyword.has_key?(opts, :otp_app),
+      do: :ok,
+      else: invalid("use Jido requires otp_app", %{otp_app: nil})
+  end
+
+  defp validate_otp_app(opts) do
+    case Keyword.fetch(opts, :otp_app) do
+      :error -> :ok
+      {:ok, otp_app} when is_atom(otp_app) and not is_nil(otp_app) -> :ok
+      {:ok, otp_app} -> invalid("otp_app must be a non-nil atom", %{otp_app: otp_app})
+    end
+  end
 
   defp validate_namespace(nil), do: :ok
 
@@ -95,5 +145,10 @@ defmodule Jido.Instance.Options do
        subject: __MODULE__,
        details: Map.put(details, :code, :jido_instance_invalid_config)
      )}
+  end
+
+  defp raise_invalid(message, details) do
+    {:error, error} = invalid(message, details)
+    raise error
   end
 end

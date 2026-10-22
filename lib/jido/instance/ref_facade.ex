@@ -240,9 +240,21 @@ defmodule Jido.Instance.RefFacade do
   end
 
   defp validate_keyword(opts) do
-    if Keyword.keyword?(opts),
-      do: :ok,
-      else: invalid("Ref facade options must be a keyword list", %{value: opts})
+    if Keyword.keyword?(opts) do
+      keys = Keyword.keys(opts)
+
+      case keys -- Enum.uniq(keys) do
+        [] ->
+          :ok
+
+        duplicates ->
+          invalid("Ref facade options must contain unique keys", %{
+            keys: Enum.uniq(duplicates)
+          })
+      end
+    else
+      invalid("Ref facade options must be a keyword list", %{value: opts})
+    end
   end
 
   defp validate_ref_keys(opts) do

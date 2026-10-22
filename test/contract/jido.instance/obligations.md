@@ -9,16 +9,16 @@ modules:
 
 Protect Jido instance configuration, supervision identity, namespaces, Agent
 lifecycle selection, and stable Agent Ref routing. The public `Jido` and
-generated instance functions are facades for this component. AgentServer Turn
-behavior, persistence record meaning, and downstream operation results stay
-with their owning components.
+generated instance functions are its public facade. `use Jido` is its only
+declaration DSL. AgentServer Turn behavior, persistence record meaning, and
+downstream operation results stay with their owning components.
 
 ## Obligations
 
 ### jido.instance.I1 — Instance definition and validation
 
-- **scope:** `use Jido`, `Jido.child_spec/1`, `Jido.start_link/1`
-- **must:** Merge application configuration with runtime overrides, keep the generated module as the instance name, and validate the complete option set before any child starts. Reject non-keyword input, unknown keys, missing or invalid names, invalid namespaces, debug levels, Task limits, AgentServer defaults, and persistence sources with a structured instance configuration error.
+- **scope:** `use Jido`, generated instance `config/1`, `Jido.child_spec/1`, `Jido.start_link/1`
+- **must:** Accept only unique `otp_app`, `namespace`, and `persistence` declaration options and require `otp_app`. Merge application configuration with runtime overrides, keep the generated module as the instance name, and validate the complete option set before any child starts. Reject non-keyword input, duplicate or unknown keys, missing or invalid names, invalid OTP applications, namespaces, debug levels, Task limits, AgentServer defaults, and persistence sources with a structured instance configuration error.
 - **why:** An invalid instance must not create a partial runtime tree.
 - **kind:** functional
 - **status:** active
@@ -58,7 +58,7 @@ with their owning components.
 ### jido.instance.I6 — Stable Ref construction
 
 - **scope:** `Jido.agent_ref/3`, `Jido.start_agent_ref/4`, `Jido.activate_agent/4`
-- **must:** Build a Ref only from a live stable namespace, exact Agent ID, and optional partition. Keep process and storage data out of the Ref. Reject malformed Refs, unknown options, namespace mismatch, and startup identity conflicts before starting work. Preserve the same Ref identity when its namespace later binds to another local instance.
+- **must:** Build a Ref only from a live stable namespace, exact Agent ID, and optional partition. Keep process and storage data out of the Ref. Reject malformed Refs, duplicate or unknown options, namespace mismatch, and startup identity conflicts before starting work. Preserve the same Ref identity when its namespace later binds to another local instance.
 - **why:** Stable identity must not depend on one process or local instance name.
 - **kind:** functional
 - **status:** active

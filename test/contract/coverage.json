@@ -2251,20 +2251,25 @@
         "jido.instance.I1": {
           "failing": 0,
           "kind": "functional",
-          "passing": 10,
+          "passing": 15,
           "status": "active",
           "testable": true,
           "tests": [
             "test Jido supervisor can be used as a child spec",
             "test Jido supervisor requires :name option",
+            "test definition validation rejects malformed, missing, unknown, and duplicate options",
+            "test generated modules expose only the required configuration hook",
             "test instance module exposes configuration and a child specification",
             "test instance module keeps its module name when runtime options include another name",
             "test instance options fail before a child starts",
             "test instance options reject removed observation groups",
             "test invalid application instance configuration reaches the final validator",
             "test runtime debug options override application configuration",
+            "test use Jido accepts compile-time application and namespace attributes",
+            "test use Jido rejects invalid definition options",
             "test validation errors retain the rejected field",
-            "test validation keeps exact defaults and accepts all boundary values"
+            "test validation keeps exact defaults and accepts all boundary values",
+            "test validation rejects duplicate option keys"
           ]
         },
         "jido.instance.I2": {
@@ -2312,7 +2317,7 @@
         "jido.instance.I4": {
           "failing": 0,
           "kind": "functional",
-          "passing": 8,
+          "passing": 9,
           "status": "active",
           "testable": true,
           "tests": [
@@ -2321,6 +2326,7 @@
             "test an inline instance keeps its Redis persistence function",
             "test application and start options replace the declared persistence default",
             "test default debug helpers set and clear the default instance overrides",
+            "test generated modules expose only the required configuration hook",
             "test hibernate and thaw work through an instance module",
             "test runtime debug options override application configuration",
             "test validation keeps exact defaults and accepts all boundary values"

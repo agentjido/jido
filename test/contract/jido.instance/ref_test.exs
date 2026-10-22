@@ -490,6 +490,21 @@ defmodule JidoTest.InstanceRefTest do
                Jido.start_agent_ref(instance, ref, Counter, [{key, value}])
     end
 
+    for {operation, opts, duplicate} <- [
+          {:build, [partition: "west", partition: "east"], :partition},
+          {:start, [id: ref.id, id: "other"], :id}
+        ] do
+      result =
+        case operation do
+          :build -> Jido.agent_ref(instance, "counter", opts)
+          :start -> Jido.start_agent_ref(instance, ref, Counter, opts)
+        end
+
+      assert {:error, %Error.ValidationError{} = error} = result
+      assert Error.code(error) == :jido_instance_invalid_config
+      assert error.details.keys == [duplicate]
+    end
+
     for opts <- [:invalid, [:invalid], %{id: "counter"}] do
       assert {:error, %{message: "Ref facade options must be a keyword list"}} =
                Jido.agent_ref(instance, "counter", opts)
