@@ -17,7 +17,7 @@ or its tests prove the need. Other supported behavior stays unchanged unless a
 listed removal has separate approval.
 
 The approved component register is in
-[`test/contract/COMPONENTS.md`](../test/contract/COMPONENTS.md). This plan
+[`test/contract/README.md`](../test/contract/README.md). This plan
 does not activate a component. A component becomes active only when it has an
 obligation file and passing tagged contract tests.
 
@@ -52,7 +52,6 @@ obligation file and passing tagged contract tests.
 | `jido.agent` | Active | 21 | 13 | The model and authoring boundary is focused. |
 | `jido.agent_evaluation` | Active | 10 | 6 | Pure evaluation has a separate owner. |
 | `jido.signal_action` | Active | 7 | 1 | The combined Action and Signal value boundary is focused. |
-| `jido.discovery` | Active | 5 | 1 | Read-only Action inventory has a separate owner. |
 | `jido.telemetry` | Active | 8 | 7 | Best-effort observation has a separate owner. |
 | `jido.error` | Active | 6 | 1 | Shared taxonomy, projection, and retry classification have a separate owner. |
 | `jido.persistence` | Active | 15 | 11 | Shared records, snapshots, adapters, and storage operations have a separate owner. |
@@ -174,7 +173,6 @@ jido.agent_server
        -> jido.persistence
 
 jido.signal_action
-jido.discovery
 jido.telemetry
 jido.error
 
@@ -200,7 +198,6 @@ All component IDs start with `jido.`. Durable coordination stays under the
 | `jido.agent_evaluation` | Route selection, Agent Plugin preparation and reduction, Action and Flow execution, candidate validation, and returned Directives | OTP ownership, commit, dispatch, and persistence |
 | `jido.persistence` | Records, identities, snapshots, adapter contracts, storage operations, revision checks, and Plugin state conversion | Runtime recovery decisions |
 | `jido.signal_action` | Combined Signal and Action declaration, input conversion, and reply behavior | Signal routing and Action execution internals |
-| `jido.discovery` | Read-only Action catalog and lookup | Authorization and Action execution |
 | `jido.telemetry` | Events, safe metadata, metrics, tracing, logs, Debug support, and optional OpenTelemetry integration | Consumer behavior changes when observation fails |
 | `jido.error` | Shared error taxonomy and stable common error codes | `Jido.Agent.Error` and `Jido.Plugin.Error`, which stay with their domain owners |
 
@@ -946,7 +943,8 @@ Completed for supporting component `jido.signal_action`:
       3 classified message-only survivors, 31 invalid mutations, and no
       timeout.
 
-Completed for supporting component `jido.discovery`:
+Previously completed for supporting component `jido.discovery`, which the
+shared authoring refactor later removed:
 
 - [x] Added 5 obligations and 7 focused contract tests.
 - [x] Kept Agent route discovery and product permission policy with their

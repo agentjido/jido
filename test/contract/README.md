@@ -7,8 +7,66 @@ Earlier work put executable tests in `test/contract` and Covenant records in
 `test/contracts`. That split made one component use two roots. All Covenant
 files now use `test/contract`; do not recreate `test/contracts`.
 
-The component register is in [`COMPONENTS.md`](COMPONENTS.md). A planned row is
-not active until its obligation file and tagged tests pass together.
+## Component register
+
+Status: Approved map; all components active; final hardening in progress.
+
+This register defines the approved Covenant component boundaries for Jido V3.
+All component IDs start with `jido.`. Durable behavior stays under the
+`jido.agent_server` boundary.
+
+A component is active only when it has an `obligations.md` file and passing
+tests with its obligation tags.
+
+| Component | Purpose | Contract area |
+| --- | --- | --- |
+| `jido.instance` | Jido instance supervision, namespace, options, and Ref routing | `test/contract/jido.instance/` |
+| `jido.agent` | Agent model, authoring, validation, logical topology, and edits | `test/contract/jido.agent/` |
+| `jido.agent_evaluation` | Pure Agent evaluation and candidate production | `test/contract/jido.agent_evaluation/` |
+| `jido.agent_server` | Core transient serialized Turn worker | `test/contract/jido.agent_server/core/` |
+| `jido.agent_server.activation` | Activation root, readiness, identity, and local recovery | `test/contract/jido.agent_server/activation/` |
+| `jido.agent_server.effects` | Ordered post-commit effects | `test/contract/jido.agent_server/effects/` |
+| `jido.agent_server.plugin_runtime` | Live generic Plugin hosting | `test/contract/jido.agent_server/plugin_runtime/` |
+| `jido.agent_server.composition` | Runtime child and connection resources | `test/contract/jido.agent_server/composition/` |
+| `jido.agent_server.durable` | Persistence-backed AgentServer state coordination | `test/contract/jido.agent_server/durable/` |
+| `jido.agent_server.durable_turn` | Durable Flow progress, waits, and receipts | `test/contract/jido.agent_server/durable_turn/` |
+| `jido.persistence` | Records, snapshots, adapters, storage operations, and revisions | `test/contract/jido.persistence/` |
+| `jido.plugin` | Generic Plugin SDK and callback contracts | `test/contract/jido.plugin/core/` |
+| `jido.signal_action` | Jido integration values for Signals and Actions | `test/contract/jido.signal_action/` |
+| `jido.telemetry` | Telemetry, metrics, tracing, logs, and Debug support | `test/contract/jido.telemetry/` |
+| `jido.error` | Shared error taxonomy and stable common codes | `test/contract/jido.error/` |
+| `jido.plugin.audit` | Bundled Audit Plugin behavior | `test/contract/jido.plugin/audit/` |
+| `jido.plugin.bus` | Bundled Bus Plugin behavior | `test/contract/jido.plugin/bus/` |
+| `jido.plugin.heartbeat` | Bundled Heartbeat Plugin behavior | `test/contract/jido.plugin/heartbeat/` |
+| `jido.plugin.scheduler` | Bundled Scheduler Plugin behavior | `test/contract/jido.plugin/scheduler/` |
+| `jido.plugin.sensor_manager` | Bundled SensorManager Plugin behavior | `test/contract/jido.plugin/sensor_manager/` |
+
+### Dependency rules
+
+- `jido.agent_server` uses `jido.agent_evaluation` and its AgentServer
+  subcomponents.
+- `jido.agent_server.activation` uses `jido.instance`.
+- `jido.agent_server.durable` and `jido.agent_server.durable_turn` use
+  `jido.persistence`.
+- Each `jido.plugin.*` bundled component uses `jido.plugin`.
+- `jido.agent_evaluation` uses `jido.agent` and `jido.plugin`.
+- `jido.telemetry` is best effort. An observation failure must not change
+  consumer behavior.
+- `jido_action` and `jido_signal` own their execution, routing, and transport
+  internals. Jido Covenant components do not claim those rules.
+
+### Component change rules
+
+1. Define obligations from supported behavior.
+2. Move or split existing tagged tests. Do not copy complete suites.
+3. Select behavior-bearing mutation targets with no unexplained overlap.
+4. Activate a new component and retire the replaced obligation in the same
+   change.
+5. Keep production code line count neutral or lower during extraction.
+
+See
+[`docs/covenant-component-refactor-plan.md`](../../docs/covenant-component-refactor-plan.md)
+for the completed refactor sequence and its evidence.
 
 ## Layout
 
@@ -20,7 +78,7 @@ keep its tests in `core/`.
 
 ```text
 test/contract/
-  COMPONENTS.md
+  README.md
   coverage.json
   jido.agent/
     obligations.md
@@ -32,7 +90,6 @@ test/contract/
     decisions.yml
     survivors.yml
     *_test.exs
-  jido.discovery/
   jido.error/
   jido.instance/
   jido.persistence/
@@ -137,11 +194,6 @@ input validation and conversion, input Signal construction, optional output
 Signal contracts, reply validation, and reply correlation. It does not own
 Action execution, Signal routing or dispatch, Agent route authoring, or
 AgentServer commit timing.
-
-`jido.discovery` owns the read-only Action catalog, scan sources, Action
-admission, diagnostics, stable lookup indexes, filtering, paging, and complete
-refresh replacement. It does not own Action execution, permission policy,
-application allowlists, or Agent route discovery.
 
 `jido.telemetry` owns the fixed metric catalog, semantic event lifecycle, safe
 fields, bounded logs, per-instance Debug overrides, W3C trace context, and

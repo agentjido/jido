@@ -1,9 +1,9 @@
 {
   "apps": {
     "jido": {
-      "active": 125,
+      "active": 120,
       "coverage": 1.0,
-      "covered": 125
+      "covered": 120
     },
     "jido.agent_server": {
       "active": 66,
@@ -162,7 +162,7 @@
         "jido.agent.I20": {
           "failing": 0,
           "kind": "persisted_format",
-          "passing": 9,
+          "passing": 10,
           "status": "active",
           "testable": true,
           "tests": [
@@ -170,6 +170,7 @@
             "test Codec rejects incomplete instance shapes before it derives a definition",
             "test Codec rejects malformed values at each document boundary",
             "test Codec rejects the old Agent envelope",
+            "test Codec reports Agent validation paths as JSON paths",
             "test Codec retains route defaults and writes definitions only",
             "test Codec validates the current executable kind",
             "test portable definitions reject arbitrary values and obsolete Registry kinds",
@@ -2083,68 +2084,6 @@
         }
       }
     },
-    "jido.discovery": {
-      "active": 5,
-      "app": "jido",
-      "coverage": 1.0,
-      "covered": 5,
-      "form": "light",
-      "obligations": {
-        "jido.discovery.I1": {
-          "failing": 0,
-          "kind": "functional",
-          "passing": 2,
-          "status": "active",
-          "testable": true,
-          "tests": [
-            "test defines a temporary startup Task and contains build failure",
-            "test reports explicit empty reads before its first successful build"
-          ]
-        },
-        "jido.discovery.I2": {
-          "failing": 0,
-          "kind": "functional",
-          "passing": 3,
-          "status": "active",
-          "testable": true,
-          "tests": [
-            "test combines configured and explicit modules and replaces stale entries",
-            "test rejects invalid scan sources without replacing the current catalog",
-            "test uses loaded applications by default and supports one application"
-          ]
-        },
-        "jido.discovery.I3": {
-          "failing": 0,
-          "kind": "functional",
-          "passing": 1,
-          "status": "active",
-          "testable": true,
-          "tests": [
-            "test builds one deterministic Action catalog without executing discovered work"
-          ]
-        },
-        "jido.discovery.I4": {
-          "failing": 0,
-          "kind": "functional",
-          "passing": 1,
-          "status": "active",
-          "testable": true,
-          "tests": [
-            "test builds one deterministic Action catalog without executing discovered work"
-          ]
-        },
-        "jido.discovery.I5": {
-          "failing": 0,
-          "kind": "functional",
-          "passing": 1,
-          "status": "active",
-          "testable": true,
-          "tests": [
-            "test filters and pages Action metadata"
-          ]
-        }
-      }
-    },
     "jido.error": {
       "active": 6,
       "app": "jido",
@@ -3603,8 +3542,8 @@
   },
   "covenant": "0.2.0",
   "totals": {
-    "active": 225,
+    "active": 220,
     "coverage": 1.0,
-    "covered": 225
+    "covered": 220
   }
 }
