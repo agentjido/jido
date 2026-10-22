@@ -12,6 +12,11 @@ owns the saved Turn receipt, Runic workflow checkpoints, wait input receipts,
 and recovery of that execution. It does not own Agent record formats, general
 Agent commits, transient Turn execution, or post-commit effects.
 
+The public boundary is `Jido.AgentServer.deliver_wait/4` together with the
+existing AgentServer Turn, status, and cancellation APIs. The three
+`Jido.AgentServer.DurableTurn` modules are internal. Flow and wait definition
+belong to `jido_action`; this component adds no DSL.
+
 ## Obligations
 
 ### jido.agent_server.durable_turn.I1 — Saved Flow acceptance
@@ -94,10 +99,10 @@ Agent commits, transient Turn execution, or post-commit effects.
 - **kind:** ordering
 - **status:** active
 
-### jido.agent_server.durable_turn.I11 — Durable capability boundary
+### jido.agent_server.durable_turn.I11 — Durable capability and public boundary
 
-- **scope:** durable and transient Flow execution
-- **must:** Enable workflow recovery and waits only when persistence is configured. Reject waits on ordinary AgentServer execution before Actions start and reject caller attempts to supply internal durable-host context. Do not restore an interrupted transient Flow or save execution graphs for ordinary Action Turns.
+- **scope:** durable and transient Flow execution; `Jido.AgentServer.deliver_wait/4`
+- **must:** Keep wait delivery on the documented AgentServer facade with a typed, non-empty wait ID, a Signal, and a validated caller timeout. Keep durable-turn coordination modules internal and add no core DSL. Enable workflow recovery and waits only when persistence is configured. Reject waits on ordinary AgentServer execution before Actions start and reject caller attempts to supply internal durable-host context. Do not restore an interrupted transient Flow or save execution graphs for ordinary Action Turns.
 - **why:** Durable behavior must be explicit and must not be created by input data.
 - **kind:** functional
 - **status:** active

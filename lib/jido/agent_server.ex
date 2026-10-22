@@ -57,6 +57,9 @@ defmodule Jido.AgentServer do
   @typedoc "One option for a serialized snapshot upgrade."
   @type upgrade_option :: {:context, map()} | {:timeout, timeout()}
 
+  @typedoc "A non-empty stable ID for one open Flow wait."
+  @type wait_id :: String.t()
+
   require Logger
 
   alias Jido.Agent
@@ -683,17 +686,19 @@ defmodule Jido.AgentServer do
   @doc """
   Saves a Signal as input to an open durable Flow wait. This is not a new Turn.
 
-  Use the wait ID from `status/2`. Signal `id` identifies a retry, `type` selects
-  the event, and `data` is the payload. `:ok` confirms saved acceptance, not
-  completion. A caller timeout does not cancel delivery. Retry the same Signal
-  and wait ID. Delivery is available only while the Worker is suspended.
+  Use the non-empty wait ID from `status/2`. Signal `id` identifies a retry,
+  `type` selects the event, and `data` must be a portable plain Map payload.
+  `:ok` confirms saved acceptance, not completion. A caller timeout does not
+  cancel delivery. Retry the same Signal and wait ID. Delivery is available
+  only while the Worker is suspended.
   """
-  @spec deliver_wait(server(), String.t(), Signal.t(), timeout()) ::
+  @spec deliver_wait(server(), wait_id(), Signal.t(), timeout()) ::
           :ok | {:error, term()}
   def deliver_wait(server, wait_id, signal, timeout \\ 5_000)
 
   def deliver_wait(server, wait_id, %Signal{} = signal, timeout) do
-    with :ok <- Core.validate_wait(timeout) do
+    with :ok <- validate_wait_id(wait_id),
+         :ok <- Core.validate_wait(timeout) do
       input = %{id: signal.id, event: signal.type, payload: signal.data, wait_id: wait_id}
       :gen_statem.call(server, {:wait_input, input}, timeout)
     end
@@ -701,6 +706,9 @@ defmodule Jido.AgentServer do
 
   def deliver_wait(_server, _wait_id, _signal, _timeout),
     do: invalid_options("wait input must be a Signal")
+
+  defp validate_wait_id(wait_id) when is_binary(wait_id) and byte_size(wait_id) > 0, do: :ok
+  defp validate_wait_id(_wait_id), do: invalid_options("wait ID must be a non-empty string")
 
   @doc "Waits for Plugin startup and readiness. Caller timeout does not stop startup."
   @spec await_ready(server(), timeout()) :: :ok | {:error, term()}

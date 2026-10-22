@@ -1589,13 +1589,15 @@
         "jido.agent_server.durable_turn.I11": {
           "failing": 0,
           "kind": "functional",
-          "passing": 4,
+          "passing": 6,
           "status": "active",
           "testable": true,
           "tests": [
             "test ordinary AgentServer execution rejects waits before Actions and rejects host spoofing",
             "test ordinary IDs and invalid instance names have no execution store",
             "test the production host supplies a current clock and durable validation",
+            "test wait IDs are non-empty strings and fail before server access",
+            "test wait delivery stays on the typed AgentServer facade",
             "test without persistence an interrupted Flow is not restored"
           ]
         },
