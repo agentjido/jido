@@ -23,11 +23,13 @@ defmodule Jido.Plugin.Scheduler.Occurrence do
             },
             coerce: true
           )
+  @typedoc "Validated identity metadata for one recurring schedule occurrence."
   @type t :: unquote(Zoi.type_spec(@schema))
   @enforce_keys Zoi.Struct.enforce_keys(@schema)
   defstruct Zoi.Struct.struct_fields(@schema)
 
   @doc "Returns the occurrence metadata schema."
+  @spec schema() :: Zoi.schema()
   def schema, do: @schema
 
   @doc false

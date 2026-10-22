@@ -22,6 +22,12 @@
   driver: Scheduler owns timer production. Durable replay belongs to an explicit delivery or application-state design.
   approved_by: Approved Jido V3 Covenant component map
 
+- id: scheduler-public-api
+  date: 2026-10-22
+  decision: Expose Scheduler constructors, validated Directive types, occurrence data, and the separate static-authoring DSL. Keep Agent state, server, runtime, wall-clock, and DSL entity modules internal. Assign retry and clock options only to the AgentServer owner.
+  driver: Timer options configure the live runtime. They do not configure the owned Agent state schema.
+  approved_by: Component hardening pass
+
 - id: scheduler-mutation-profile
   date: 2026-10-19
   decision: Mutate the Scheduler root, Directive definitions, occurrence identity, runtime, server, and clock helpers. Verify the Spark DSL with contract and authoring tests instead of AST mutation.

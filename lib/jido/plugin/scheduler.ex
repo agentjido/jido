@@ -36,7 +36,7 @@ defmodule Jido.Plugin.Scheduler do
   state is not saved in the Agent checkpoint.
   """
 
-  use Jido.Plugin
+  use Jido.Plugin, option_keys: [agent_server: [:retry_delay_ms, :time_scale]]
 
   @impl true
   defdelegate state_spec(opts), to: Jido.Plugin.Scheduler.Agent
@@ -46,6 +46,9 @@ defmodule Jido.Plugin.Scheduler do
 
   @impl true
   defdelegate reduce(reduction, opts), to: Jido.Plugin.Scheduler.Agent
+
+  @impl true
+  def validate_options(opts), do: validate_runtime_options(opts)
 
   @impl true
   defdelegate dispatch(runtime, directive, context, opts), to: Jido.Plugin.Scheduler.Server
@@ -69,17 +72,27 @@ defmodule Jido.Plugin.Scheduler do
   alias Jido.Signal
 
   @default_timezone "Etc/UTC"
+  @timer_max 4_294_967_295
+  @cron_option_keys [:timezone, :generation]
+
+  @typedoc "One Scheduler Plugin option."
+  @type option ::
+          {:retry_delay_ms, 1..4_294_967_295}
+          | {:time_scale, module()}
+
+  @typedoc "One recurring schedule constructor option."
+  @type cron_option ::
+          {:timezone, String.t() | nil}
+          | {:generation, 0..2_147_483_647 | nil}
 
   @doc "Creates one delayed Signal Directive."
   @spec schedule(non_neg_integer(), Signal.t()) :: Schedule.t()
   def schedule(delay_ms, signal), do: %Schedule{delay_ms: delay_ms, signal: signal}
 
   @doc "Creates one recurring Signal Directive."
-  @spec cron(term(), String.t(), Signal.t(), keyword()) :: Cron.t()
+  @spec cron(term(), String.t(), Signal.t(), [cron_option()]) :: Cron.t()
   def cron(job_id, cron, signal, opts \\ []) do
-    if Keyword.has_key?(opts, :delivery) do
-      raise ArgumentError, "Scheduler delivery is not supported"
-    end
+    validate_cron_options!(opts)
 
     %Cron{
       job_id: job_id,
@@ -97,6 +110,15 @@ defmodule Jido.Plugin.Scheduler do
   @doc "Creates one recurring schedule cancellation Directive."
   @spec cancel(term()) :: Cancel.t()
   def cancel(job_id), do: %Cancel{job_id: job_id}
+
+  @doc false
+  @spec validate_runtime_options(keyword()) ::
+          :ok | {:error, Jido.Error.ValidationError.t()}
+  def validate_runtime_options(opts) do
+    with :ok <- validate_retry_delay(Keyword.fetch(opts, :retry_delay_ms)),
+         :ok <- validate_time_scale(Keyword.fetch(opts, :time_scale)),
+         do: :ok
+  end
 
   @doc false
   def validate_cron_state(cron, _opts) do
@@ -197,5 +219,67 @@ defmodule Jido.Plugin.Scheduler do
     if PortableTerm.valid?(id),
       do: :ok,
       else: {:error, {:invalid_job_id, :nonportable_term}}
+  end
+
+  defp validate_cron_options!(opts) do
+    unless Keyword.keyword?(opts) do
+      raise ArgumentError, "Scheduler cron options must be a keyword list"
+    end
+
+    keys = Keyword.keys(opts)
+    duplicate? = Enum.uniq(keys) != keys
+    unknown = keys -- @cron_option_keys
+
+    cond do
+      :delivery in keys ->
+        raise ArgumentError, "Scheduler delivery is not supported"
+
+      duplicate? ->
+        raise ArgumentError, "Scheduler cron options must be unique"
+
+      unknown != [] ->
+        raise ArgumentError, "Scheduler cron does not accept options #{inspect(unknown)}"
+
+      true ->
+        :ok
+    end
+  end
+
+  defp validate_retry_delay(:error), do: :ok
+
+  defp validate_retry_delay({:ok, value})
+       when is_integer(value) and value in 1..@timer_max,
+       do: :ok
+
+  defp validate_retry_delay({:ok, value}) do
+    invalid_option("Scheduler retry_delay_ms is invalid", %{
+      option: :retry_delay_ms,
+      value: value,
+      range: 1..@timer_max
+    })
+  end
+
+  defp validate_time_scale(:error), do: :ok
+
+  defp validate_time_scale({:ok, time_scale}) do
+    valid? =
+      is_atom(time_scale) and not is_nil(time_scale) and Code.ensure_loaded?(time_scale) and
+        Enum.all?(SchedEx.TimeScale.behaviour_info(:callbacks), fn {callback, arity} ->
+          function_exported?(time_scale, callback, arity)
+        end)
+
+    if valid? do
+      :ok
+    else
+      invalid_option("Scheduler time_scale is invalid", %{
+        option: :time_scale,
+        value: time_scale,
+        callbacks: SchedEx.TimeScale.behaviour_info(:callbacks)
+      })
+    end
+  end
+
+  defp invalid_option(message, details) do
+    {:error, Jido.Error.validation_error(message, kind: :config, details: details)}
   end
 end

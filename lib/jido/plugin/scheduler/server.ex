@@ -1,5 +1,5 @@
 defmodule Jido.Plugin.Scheduler.Server do
-  @moduledoc "Owns timers and readiness after Scheduler commits."
+  @moduledoc false
   @behaviour Jido.Plugin
 
   alias Jido.Plugin.{DirectiveContext, Init}

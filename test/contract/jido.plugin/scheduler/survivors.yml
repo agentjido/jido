@@ -1,86 +1,62 @@
-- at: lib/jido/plugin/scheduler.ex:111:28
+- at: lib/jido/plugin/scheduler.ex:133:28
   operator: string_empty
   mutation: '`"invalid cron state for #{inspect(job_id)}: #{inspect(reaso…` → `""`'
   sort: unpromised
   reason: The contract fixes the invalid saved-state result, not its explanatory text.
 
-- at: lib/jido/plugin/scheduler.ex:129:7
+- at: lib/jido/plugin/scheduler.ex:151:7
   operator: guard_removal
   mutation: '`when is_binary(cron_expression) and (is_nil(timezone) or is_bina…` → `(no guard)`'
   sort: unpromised
   reason: This hidden builder receives values after Directive or saved-state validation; direct invalid calls are outside the contract.
 
-- at: lib/jido/plugin/scheduler.ex:129:39
+- at: lib/jido/plugin/scheduler.ex:151:39
   operator: logical_swap
   mutation: '`and` → `or`'
   sort: unpromised
   reason: This hidden builder receives values after Directive or saved-state validation; direct invalid calls are outside the contract.
 
-- at: lib/jido/plugin/scheduler.ex:160:55
+- at: lib/jido/plugin/scheduler.ex:182:55
   operator: comparison_swap
   mutation: '`>` → `>=`'
   sort: unpromised
   reason: The contract fixes accepted five-, six-, and seven-field rules, not the parser mode used only for syntax validation.
 
-- at: lib/jido/plugin/scheduler.ex:160:57
+- at: lib/jido/plugin/scheduler.ex:182:57
   operator: integer_shift
   mutation: '`5` → `6`'
   sort: unpromised
   reason: The contract fixes accepted five-, six-, and seven-field rules, not the parser mode used only for syntax validation.
 
-- at: lib/jido/plugin/scheduler.ex:160:57
+- at: lib/jido/plugin/scheduler.ex:182:57
   operator: integer_shift
   mutation: '`5` → `4`'
   sort: unpromised
   reason: The contract fixes accepted five-, six-, and seven-field rules, not the parser mode used only for syntax validation.
 
-- at: lib/jido/plugin/scheduler.ex:187:43
+- at: lib/jido/plugin/scheduler.ex:209:43
   operator: guard_removal
   mutation: '`when is_binary(timezone)` → `(no guard)`'
   sort: equivalent
   reason: The caller has already accepted only nil or binary timezone values before normalization.
 
-- at: lib/jido/plugin/scheduler/agent.ex:23:36
-  operator: string_empty
-  mutation: '`"Recurring schedule definitions"` → `""`'
-  sort: unpromised
-  reason: Schema description prose is not part of the Scheduler behavior contract.
-
-- at: lib/jido/plugin/scheduler/agent.ex:32:51
-  operator: integer_shift
-  mutation: '`1000` → `1001`'
-  sort: equivalent
-  reason: This default is validated but not stored; both values satisfy the same positive bounded rule.
-
-- at: lib/jido/plugin/scheduler/agent.ex:32:51
-  operator: integer_shift
-  mutation: '`1000` → `999`'
-  sort: equivalent
-  reason: This default is validated but not stored; both values satisfy the same positive bounded rule.
-
-- at: lib/jido/plugin/scheduler/agent.ex:75:28
-  operator: string_empty
-  mutation: '`"Scheduler #{name} must be an integer from 1 to #{maximum}"` → `""`'
-  sort: unpromised
-  reason: The contract fixes rejection of an invalid timer value, not the exception prose.
-
-- at: lib/jido/plugin/scheduler/agent.ex:83:54
+- at: lib/jido/plugin/scheduler.ex:266:54
   operator: logical_swap
   mutation: '`and` → `or`'
   sort: equivalent
   reason: A loaded module with all required callbacks also satisfies the adjacent atom and non-nil checks.
 
-- at: lib/jido/plugin/scheduler/agent.ex:83:27
+- at: lib/jido/plugin/scheduler.ex:266:27
   operator: logical_swap
   mutation: '`and` → `or`'
   sort: equivalent
   reason: A value that reaches the loaded-module and callback checks cannot make this swap accept an invalid time scale.
 
-- at: lib/jido/plugin/scheduler/agent.ex:90:13
+- at: lib/jido/plugin/scheduler/agent.ex:22:36
   operator: string_empty
-  mutation: '`"Scheduler time_scale must be a loaded module with now/1 and speedup/0 callbacks"` → `""`'
+  mutation: '`"Recurring schedule definitions"` → `""`'
   sort: unpromised
-  reason: The contract fixes rejection of an invalid time scale, not the exception prose.
+  reason: Schema description prose is not part of the Scheduler behavior contract.
 
 - at: lib/jido/plugin/scheduler/cancel.ex:8:44
   operator: string_empty
@@ -88,7 +64,7 @@
   sort: unpromised
   reason: Schema description prose is not part of the Scheduler behavior contract.
 
-- at: lib/jido/plugin/scheduler/cancel.ex:17:19
+- at: lib/jido/plugin/scheduler/cancel.ex:18:19
   operator: return_nil
   mutation: '`@schema` → `nil`'
   sort: unpromised
@@ -124,7 +100,7 @@
   sort: unpromised
   reason: Schema description prose is not part of the Scheduler behavior contract.
 
-- at: lib/jido/plugin/scheduler/cron.ex:31:19
+- at: lib/jido/plugin/scheduler/cron.ex:32:19
   operator: return_nil
   mutation: '`@schema` → `nil`'
   sort: unpromised
@@ -166,49 +142,61 @@
   sort: unpromised
   reason: The contract fixes timing rejection, not its explanatory text.
 
-- at: lib/jido/plugin/scheduler/dsl.ex:130:43
+- at: lib/jido/plugin/scheduler/dsl.ex:124:73
+  operator: comparison_swap
+  mutation: '`>` → `>=`'
+  sort: equivalent
+  reason: The mutation accepts the same contracted five-, six-, and seven-field cron forms.
+
+- at: lib/jido/plugin/scheduler/dsl.ex:124:75
+  operator: integer_shift
+  mutation: '`5` → `6`'
+  sort: equivalent
+  reason: The mutation accepts the same contracted five-, six-, and seven-field cron forms.
+
+- at: lib/jido/plugin/scheduler/dsl.ex:124:75
+  operator: integer_shift
+  mutation: '`5` → `4`'
+  sort: equivalent
+  reason: The mutation accepts the same contracted five-, six-, and seven-field cron forms.
+
+- at: lib/jido/plugin/scheduler/dsl.ex:132:43
   operator: string_empty
   mutation: '`"Unknown timezone"` → `""`'
   sort: unpromised
   reason: The contract fixes unknown timezone rejection, not its explanatory text.
 
-- at: lib/jido/plugin/scheduler/dsl.ex:130:65
+- at: lib/jido/plugin/scheduler/dsl.ex:132:65
   operator: element_removal
   mutation: '`timezone: zone` → `(removed)`'
   sort: unpromised
   reason: Timezone diagnostic metadata is not part of the Scheduler authoring contract.
 
-- at: lib/jido/plugin/scheduler/dsl.ex:130:81
+- at: lib/jido/plugin/scheduler/dsl.ex:132:81
   operator: element_removal
   mutation: '`reason: reason` → `(removed)`'
   sort: unpromised
   reason: Timezone-library diagnostic metadata is not part of the Scheduler authoring contract.
 
-- at: lib/jido/plugin/scheduler/dsl.ex:157:11
+- at: lib/jido/plugin/scheduler/dsl.ex:159:11
   operator: string_empty
   mutation: '`"Scheduled Signal has no input route"` → `""`'
   sort: unpromised
   reason: The contract fixes the schedule path and missing Signal type, not its explanatory text.
 
-- at: lib/jido/plugin/scheduler/occurrence.ex:31:19
-  operator: return_nil
-  mutation: '`@schema` → `nil`'
-  sort: unpromised
-  reason: The hidden schema accessor is not a public Scheduler operation; occurrence decoding remains the promised surface.
-
-- at: lib/jido/plugin/scheduler/occurrence.ex:37:21
+- at: lib/jido/plugin/scheduler/occurrence.ex:39:21
   operator: string_empty
   mutation: '`"scheduled_at must be a UTC timestamp"` → `""`'
   sort: unpromised
   reason: The contract fixes rejection of non-UTC timestamps, not validation prose.
 
-- at: lib/jido/plugin/scheduler/occurrence.ex:52:50
+- at: lib/jido/plugin/scheduler/occurrence.ex:54:50
   operator: element_removal
   mutation: '`:deterministic` → `(removed)`'
   sort: equivalent
   reason: The supported Erlang runtime emits the same tested occurrence bytes with or without this option for the contracted coordinates.
 
-- at: lib/jido/plugin/scheduler/occurrence.ex:52:66
+- at: lib/jido/plugin/scheduler/occurrence.ex:54:66
   operator: element_removal
   mutation: '`{:minor_version, 2}` → `(removed)`'
   sort: equivalent
@@ -370,7 +358,7 @@
   sort: unpromised
   reason: Schema description prose is not part of the Scheduler behavior contract.
 
-- at: lib/jido/plugin/scheduler/schedule.ex:18:19
+- at: lib/jido/plugin/scheduler/schedule.ex:19:19
   operator: return_nil
   mutation: '`@schema` → `nil`'
   sort: unpromised

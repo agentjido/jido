@@ -23,26 +23,32 @@ validation.
 The component does not own generic Plugin callbacks, Agent work, persistence
 adapters, durable business delivery, delivery replay, or acknowledgement.
 
+The public boundary is `Jido.Plugin.Scheduler`, its `Schedule`, `Cron`, and
+`Cancel` Directives, `Occurrence` data, and the separate static-authoring
+`DSL`. Agent state, runtime, server, wall-clock, and DSL entity modules are
+internal. The runtime Plugin uses the standard Plugin configuration and adds
+no custom DSL section.
+
 ## Obligations
 
 ### jido.plugin.scheduler.I1 — Owned schedule state
 
 - **scope:** `Jido.Plugin.Scheduler`, `Jido.Plugin.Scheduler.Agent`, `Jido.Plugin.Scheduler.Schedule`, `Jido.Plugin.Scheduler.Cron`, `Jido.Plugin.Scheduler.Cancel`
-- **must:** Keep only recurring definitions in the owned Agent state, apply valid Cron and Cancel Directives in list order, and keep one-shot timers out of Agent state.
+- **must:** Expose constructors and validated types for Schedule, Cron, and Cancel Directives. Keep only recurring definitions in the owned Agent state, apply valid Cron and Cancel Directives in list order, and keep one-shot timers out of Agent state.
 - **kind:** functional
 - **status:** active
 
 ### jido.plugin.scheduler.I2 — Input and compatibility boundary
 
 - **scope:** `Jido.Plugin.Scheduler`, `Jido.Plugin.Scheduler.Agent`, `Jido.Plugin.Scheduler.Schedule`, `Jido.Plugin.Scheduler.Cron`, `Jido.Plugin.Scheduler.Cancel`
-- **must:** Reject invalid delays, cron rules, timezones, generations, nonportable definitions, removed delivery options, and saved definitions with retired delivery fields. Expose no Scheduler delivery, enqueue, queue, admission, or acknowledgement API.
+- **must:** Accept only `timezone` and `generation` as unique `cron/4` options. Reject invalid delays, cron rules, timezones, generations, nonportable definitions, unknown or duplicate constructor options, removed delivery options, and saved definitions with retired delivery fields. Expose no Scheduler delivery, enqueue, queue, admission, or acknowledgement API.
 - **kind:** functional
 - **status:** active
 
 ### jido.plugin.scheduler.I3 — Static schedule authoring
 
 - **scope:** `Jido.Plugin.Scheduler.DSL`, `Jido.Plugin.Scheduler.DSL.Schedule`
-- **must:** Accept either schedule DSL entities or Plugin data but not both, normalize exactly one interval or cron timing form, default omitted schedules and Signal data to empty collections, apply the UTC timezone default, reject duplicate names and live Signal template values, and require a matching Agent input route with a schedule-scoped error.
+- **must:** Accept either schedule DSL entities or Plugin data but not both, normalize exactly one interval or five-, six-, or seven-field cron timing form, default omitted schedules and Signal data to empty collections, apply the UTC timezone default, reject duplicate names and live Signal template values, and require a matching Agent input route with a schedule-scoped error.
 - **kind:** functional
 - **status:** active
 
@@ -84,6 +90,6 @@ adapters, durable business delivery, delivery replay, or acknowledgement.
 ### jido.plugin.scheduler.I9 — Clock and readiness rules
 
 - **scope:** `Jido.Plugin.Scheduler.Agent`, `Jido.Plugin.Scheduler.Runtime`, `Jido.Plugin.Scheduler.Server`, `Jido.Plugin.Scheduler.WallClock`
-- **must:** Accept only a valid time-scale module and bounded positive retry delay, wait for each positive wall-clock remainder with upward millisecond rounding, permit shutdown cancellation, and report readiness only after initial reconciliation.
+- **must:** Own exactly the AgentServer options `retry_delay_ms` and `time_scale`, reject unknown or duplicate Plugin options, and accept only a valid time-scale module and bounded positive retry delay. Wait for each positive wall-clock remainder with upward millisecond rounding, permit shutdown cancellation, and report readiness only after initial reconciliation.
 - **kind:** functional
 - **status:** active

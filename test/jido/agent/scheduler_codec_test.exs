@@ -105,7 +105,7 @@ defmodule Jido.Agent.SchedulerCodecTest do
             [
               %Jido.Authoring.Issue{
                 code: :invalid_document,
-                message: "Agent Plugin state_spec/1 failed"
+                message: "Scheduler retry_delay_ms is invalid"
               }
             ]} = JidoTest.AgentRegistry.decode_json(Jason.encode!(document), registry)
   end

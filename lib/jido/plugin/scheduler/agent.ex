@@ -1,12 +1,11 @@
 defmodule Jido.Plugin.Scheduler.Agent do
-  @moduledoc "Owns recurring schedule definitions in Agent state."
+  @moduledoc false
   @behaviour Jido.Plugin
 
   alias Jido.Plugin.Scheduler
   alias Jido.Plugin.Scheduler.{Cancel, Cron, Schedule}
   alias Jido.Signal
 
-  @timer_max 4_294_967_295
   @cron_spec_schema Zoi.object(
                       %{
                         cron_expression: Zoi.string(),
@@ -27,12 +26,7 @@ defmodule Jido.Plugin.Scheduler.Agent do
                 |> Zoi.default(%{cron: %{}})
 
   @impl true
-  def state_spec(opts) do
-    reject_delivery_options!(opts)
-    validate_timer_option!(opts, :retry_delay_ms, 1_000, @timer_max)
-    validate_time_scale_option!(opts)
-    {:scheduler, @state_schema}
-  end
+  def state_spec(_opts), do: {:scheduler, @state_schema}
 
   @impl true
   def directives(_opts), do: [Schedule, Cron, Cancel]
@@ -61,33 +55,4 @@ defmodule Jido.Plugin.Scheduler.Agent do
     do: {:cont, {:ok, update_in(state, [:cron], &Map.delete(&1, job_id))}}
 
   defp apply_directive(_other, {:ok, state}), do: {:cont, {:ok, state}}
-
-  defp reject_delivery_options!(opts) do
-    if Enum.any?([:delivery_interval, :delivery_timeout], &Keyword.has_key?(opts, &1)) do
-      raise ArgumentError, "Scheduler delivery options are not supported"
-    end
-  end
-
-  defp validate_timer_option!(opts, name, default, maximum) do
-    value = Keyword.get(opts, name, default)
-
-    unless is_integer(value) and value in 1..maximum do
-      raise ArgumentError, "Scheduler #{name} must be an integer from 1 to #{maximum}"
-    end
-  end
-
-  defp validate_time_scale_option!(opts) do
-    time_scale = Keyword.get(opts, :time_scale, SchedEx.IdentityTimeScale)
-
-    valid? =
-      is_atom(time_scale) and not is_nil(time_scale) and Code.ensure_loaded?(time_scale) and
-        Enum.all?(SchedEx.TimeScale.behaviour_info(:callbacks), fn {callback, arity} ->
-          function_exported?(time_scale, callback, arity)
-        end)
-
-    unless valid? do
-      raise ArgumentError,
-            "Scheduler time_scale must be a loaded module with now/1 and speedup/0 callbacks"
-    end
-  end
 end

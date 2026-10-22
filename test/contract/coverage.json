@@ -3106,20 +3106,22 @@
         "jido.plugin.scheduler.I1": {
           "failing": 0,
           "kind": "functional",
-          "passing": 1,
+          "passing": 2,
           "status": "active",
           "testable": true,
           "tests": [
+            "test Scheduler exposes only its constructors, Directives, DSL, and occurrence data",
             "test Scheduler state contains recurring definitions and applies changes in order"
           ]
         },
         "jido.plugin.scheduler.I2": {
           "failing": 0,
           "kind": "functional",
-          "passing": 3,
+          "passing": 4,
           "status": "active",
           "testable": true,
           "tests": [
+            "test Scheduler exposes only its constructors, Directives, DSL, and occurrence data",
             "test cron definitions reject nested nonportable values and reserved metadata",
             "test invalid and retired Scheduler inputs fail before state can change",
             "test saved definitions with retired delivery fields fail validation"
@@ -3128,10 +3130,11 @@
         "jido.plugin.scheduler.I3": {
           "failing": 0,
           "kind": "functional",
-          "passing": 2,
+          "passing": 3,
           "status": "active",
           "testable": true,
           "tests": [
+            "test Scheduler exposes only its constructors, Directives, DSL, and occurrence data",
             "test static authoring normalizes timing and verifies accepted inputs",
             "test static authoring rejects mixed timing and live Signal template data"
           ]
@@ -3163,10 +3166,11 @@
         "jido.plugin.scheduler.I6": {
           "failing": 0,
           "kind": "functional",
-          "passing": 5,
+          "passing": 6,
           "status": "active",
           "testable": true,
           "tests": [
+            "test Scheduler exposes only its constructors, Directives, DSL, and occurrence data",
             "test equal occurrence coordinates produce one stable ID and preserve Signal values",
             "test every occurrence coordinate can change the logical ID",
             "test missing, partial, and malformed occurrence metadata return errors",

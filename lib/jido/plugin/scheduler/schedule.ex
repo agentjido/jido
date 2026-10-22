@@ -10,6 +10,7 @@ defmodule Jido.Plugin.Scheduler.Schedule do
             coerce: true
           )
 
+  @typedoc "A delayed Signal Directive."
   @type t :: unquote(Zoi.type_spec(@schema))
   @enforce_keys Zoi.Struct.enforce_keys(@schema)
   defstruct Zoi.Struct.struct_fields(@schema)
@@ -18,6 +19,7 @@ defmodule Jido.Plugin.Scheduler.Schedule do
   def schema, do: @schema
 
   @doc "Validates one delayed Signal request."
+  @spec validate(t()) :: {:ok, t()} | {:error, term()}
   def validate(%__MODULE__{} = directive),
     do: Zoi.parse(@schema, Map.from_struct(directive))
 end

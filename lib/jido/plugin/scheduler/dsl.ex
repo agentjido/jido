@@ -107,7 +107,7 @@ defmodule Jido.Plugin.Scheduler.DSL do
            Data.fields(value, [:kind, :expression, :timezone], %{timezone: "Etc/UTC"}),
          :ok <- Data.nonempty(value[:expression]),
          :ok <- Data.nonempty(value.timezone),
-         {:ok, _} <- Parser.parse(value.expression),
+         {:ok, _} <- Parser.parse(value.expression, extended_cron?(value.expression)),
          :ok <- timezone(value.timezone) do
       {:ok, value}
     else
@@ -120,6 +120,8 @@ defmodule Jido.Plugin.Scheduler.DSL do
   end
 
   defp timing(_), do: Error.fail(:schedule_timing, [], "Expected interval or cron timing")
+
+  defp extended_cron?(expression), do: length(String.split(expression)) > 5
 
   defp timezone(zone) do
     case DateTime.shift_zone(~U[2000-01-01 00:00:00Z], zone) do

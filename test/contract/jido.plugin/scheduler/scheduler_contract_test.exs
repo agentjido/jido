@@ -5,6 +5,7 @@ defmodule JidoTest.Contract.PluginSchedulerTest do
   alias Jido.Agent.Error
   alias Jido.Plugin.Scheduler
   alias Jido.Plugin.Scheduler.{DSL, Occurrence, WallClock}
+  alias Jido.Plugin.Normalizer
   alias Jido.Signal
   alias Spark.Dsl.{Entity, Extension, Section}
 
@@ -25,6 +26,8 @@ defmodule JidoTest.Contract.PluginSchedulerTest do
 
   @tag obligation: "jido.plugin.scheduler.I1"
   test "Scheduler state contains recurring definitions and applies changes in order" do
+    assert Scheduler.sections() == []
+
     signal = tick()
     schedule = Scheduler.schedule(10, signal)
     cron = Scheduler.cron(:heartbeat, "* * * * *", signal, generation: 3)
@@ -99,10 +102,29 @@ defmodule JidoTest.Contract.PluginSchedulerTest do
       Scheduler.cron(:removed, "* * * * *", signal, delivery: :durable)
     end
 
-    for option <- [[delivery_interval: 100], [delivery_timeout: 5_000]] do
-      assert_raise ArgumentError, "Scheduler delivery options are not supported", fn ->
-        Scheduler.Agent.state_spec(option)
-      end
+    assert_raise ArgumentError, "Scheduler cron options must be a keyword list", fn ->
+      apply(Scheduler, :cron, [:invalid_options, "* * * * *", signal, %{}])
+    end
+
+    assert_raise ArgumentError, "Scheduler cron does not accept options [:unknown]", fn ->
+      Scheduler.cron(:invalid_options, "* * * * *", signal, unknown: true)
+    end
+
+    assert_raise ArgumentError, "Scheduler cron options must be unique", fn ->
+      Scheduler.cron(:invalid_options, "* * * * *", signal,
+        timezone: "Etc/UTC",
+        timezone: "America/Chicago"
+      )
+    end
+
+    for options <- [
+          [delivery_interval: 100],
+          [delivery_timeout: 5_000],
+          [retry_delay_ms: 1, retry_delay_ms: 2],
+          [timeout: 5_000]
+        ] do
+      assert {:error, %Jido.Error.ValidationError{}} =
+               Normalizer.normalize_all([{Scheduler, options}])
     end
 
     refute function_exported?(Scheduler, :admit_occurrence, 2)
@@ -250,6 +272,19 @@ defmodule JidoTest.Contract.PluginSchedulerTest do
     assert defaulted_schedule.timing.timezone == "Etc/UTC"
     assert defaulted_schedule.signal.data == %{}
 
+    for expression <- ["* * * * *", "* * * * * *", "* * * * * * *"] do
+      assert {:ok, %{schedules: [%{timing: %{expression: ^expression}}]}} =
+               DSL.normalize(%{
+                 schedules: [
+                   %{
+                     name: :extended,
+                     timing: %{kind: :cron, expression: expression},
+                     signal: %{type: "work.request"}
+                   }
+                 ]
+               })
+    end
+
     [interval | _] = data.schedules
 
     assert {:error, %Error{code: :duplicate}} =
@@ -318,6 +353,7 @@ defmodule JidoTest.Contract.PluginSchedulerTest do
     assert {:ok, first} = Occurrence.attach(first, @scope, "job-1", 1, @instant)
     assert {:ok, second} = Occurrence.attach(second, @scope, "job-1", 1, @instant)
     assert {:ok, %Occurrence{} = occurrence} = Scheduler.occurrence(first)
+    assert {:ok, ^occurrence} = Zoi.parse(Occurrence.schema(), Map.from_struct(occurrence))
     assert {:ok, ^occurrence} = Scheduler.occurrence(second)
     assert occurrence.id == "occ_JEa_q126OmcNwQorAlhQjtFbE93wjJ-qFlReVurgnHg"
     assert first.data == %{value: 7}
@@ -388,23 +424,34 @@ defmodule JidoTest.Contract.PluginSchedulerTest do
   test "configuration accepts only bounded retry delays and valid time scales" do
     assert {:scheduler, _schema} = Scheduler.Agent.state_spec([])
 
-    assert {:scheduler, _schema} =
-             Scheduler.Agent.state_spec(
-               retry_delay_ms: 1,
-               time_scale: SchedEx.IdentityTimeScale
-             )
+    assert %{
+             option_keys: %{
+               agent_server: [:retry_delay_ms, :time_scale]
+             }
+           } = Scheduler.__jido_plugin__()
 
-    assert {:scheduler, _schema} =
-             Scheduler.Agent.state_spec(
-               retry_delay_ms: 4_294_967_295,
-               time_scale: SchedEx.IdentityTimeScale
-             )
+    for options <- [
+          [],
+          [retry_delay_ms: 1, time_scale: SchedEx.IdentityTimeScale],
+          [retry_delay_ms: 4_294_967_295, time_scale: SchedEx.IdentityTimeScale]
+        ] do
+      assert :ok = Scheduler.validate_options(options)
+      assert {:ok, [_spec]} = Normalizer.normalize_all([{Scheduler, options}])
+    end
 
     for delay <- [0, -1, 1.5, :manual, 4_294_967_296] do
-      assert_raise ArgumentError, fn ->
-        Scheduler.Agent.state_spec(retry_delay_ms: delay)
-      end
+      assert {:error,
+              %Jido.Error.ValidationError{
+                message: "Scheduler retry_delay_ms is invalid",
+                details: %{
+                  option: :retry_delay_ms,
+                  value: ^delay,
+                  range: 1..4_294_967_295
+                }
+              }} = Scheduler.validate_options(retry_delay_ms: delay)
     end
+
+    callbacks = SchedEx.TimeScale.behaviour_info(:callbacks)
 
     for time_scale <- [
           nil,
@@ -413,9 +460,15 @@ defmodule JidoTest.Contract.PluginSchedulerTest do
           __MODULE__.MissingNowTimeScale,
           __MODULE__.MissingSpeedupTimeScale
         ] do
-      assert_raise ArgumentError, fn ->
-        Scheduler.Agent.state_spec(time_scale: time_scale)
-      end
+      assert {:error,
+              %Jido.Error.ValidationError{
+                message: "Scheduler time_scale is invalid",
+                details: %{
+                  option: :time_scale,
+                  value: ^time_scale,
+                  callbacks: ^callbacks
+                }
+              }} = Scheduler.validate_options(time_scale: time_scale)
     end
   end
 
