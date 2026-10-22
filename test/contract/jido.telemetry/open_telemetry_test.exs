@@ -216,6 +216,41 @@ defmodule JidoTest.Telemetry.OpenTelemetryTest do
     assert OpenTelemetry.current_context() == before
   end
 
+  test "malformed semantic bridge options retain exact event times" do
+    prefix = [:jido, :malformed_options]
+    point_event = prefix ++ [:point]
+    handler = {__MODULE__, make_ref()}
+
+    :ok =
+      :telemetry.attach(
+        handler,
+        point_event,
+        fn _event, measurements, _metadata, owner ->
+          send(owner, {:semantic_point, measurements})
+        end,
+        self()
+      )
+
+    on_exit(fn -> :telemetry.detach(handler) end)
+
+    span = Semantic.start(prefix, %{}, %{}, :invalid)
+    assert_receive {:otel_start, _otel_span, _parent, "jido.malformed_options", start_opts}
+    assert start_opts.start_time == span.at
+    assert :ok = Semantic.finish(span, %{status: :ok})
+    span_ids = TestTracer.ids(span.otel.span_ctx)
+    assert_receive {:otel_end, ^span_ids, _ended_at}
+
+    assert :ok = Semantic.point(point_event, %{}, %{}, :invalid)
+
+    assert_receive {:otel_start, point_span, _parent, "jido.malformed_options.point", point_opts}
+    assert_receive {:otel_end, point_ids, point_end}
+    assert point_ids == TestTracer.ids(point_span)
+    assert point_end == point_opts.start_time
+
+    assert_receive {:semantic_point, %{monotonic_time: event_time}}
+    assert point_opts.start_time == event_time
+  end
+
   test "exception event and status failures still end spans and restore context" do
     for callback <- [:add_event, :set_status] do
       assert :opentelemetry.set_default_tracer({TestTracer, %{owner: self(), fail: callback}})

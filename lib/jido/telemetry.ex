@@ -215,11 +215,63 @@ defmodule Jido.Telemetry do
     |> Enum.map_join(" ", fn {key, value} -> "#{key}=#{format_value(value)}" end)
   end
 
-  defp format_value(value) when is_binary(value), do: truncate(value, 128)
+  defp format_value(value) when is_binary(value) do
+    value
+    |> escape_log_value()
+    |> truncate(128)
+  end
+
   defp format_value(value), do: to_string(value)
 
   defp truncate(value, max) when byte_size(value) <= max, do: value
-  defp truncate(value, max), do: String.slice(value, 0, max - 3) <> "..."
+
+  defp truncate(value, max) do
+    value
+    |> binary_prefix(max - 3)
+    |> Kernel.<>("...")
+  end
+
+  defp binary_prefix(value, max_bytes) do
+    value
+    |> String.codepoints()
+    |> Enum.reduce_while({[], 0}, fn codepoint, {acc, size} ->
+      next_size = size + byte_size(codepoint)
+
+      if next_size <= max_bytes,
+        do: {:cont, {[codepoint | acc], next_size}},
+        else: {:halt, {acc, size}}
+    end)
+    |> elem(0)
+    |> Enum.reverse()
+    |> IO.iodata_to_binary()
+  end
+
+  defp escape_log_value(value) do
+    for <<codepoint::utf8 <- value>>, into: "" do
+      case codepoint do
+        ?\\ ->
+          "\\\\"
+
+        ?\r ->
+          "\\r"
+
+        ?\n ->
+          "\\n"
+
+        ?\t ->
+          "\\t"
+
+        codepoint when codepoint < 32 or codepoint in 127..159 ->
+          "\\u{" <> Integer.to_string(codepoint, 16) <> "}"
+
+        codepoint when codepoint in [0x2028, 0x2029] ->
+          "\\u" <> Integer.to_string(codepoint, 16)
+
+        codepoint ->
+          <<codepoint::utf8>>
+      end
+    end
+  end
 
   defp config_value(config, key) when is_list(config), do: Keyword.get(config, key)
   defp config_value(config, key) when is_map(config), do: Map.get(config, key)

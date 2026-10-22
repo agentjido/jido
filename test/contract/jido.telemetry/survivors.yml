@@ -28,7 +28,7 @@
   sort: equivalent
   reason: Missing duration either returns false or raises inside the contained semantic handler. Both paths return ok without a log.
 
-- at: lib/jido/telemetry.ex:225:34
+- at: lib/jido/telemetry.ex:277:34
   operator: guard_removal
   mutation: "`when is_map(config)` → `(no guard)`"
   sort: equivalent
@@ -82,14 +82,14 @@
   sort: equivalent
   reason: Semantic measurement normalization converts both nil and an empty map to the same empty measurement map.
 
-- at: lib/jido/telemetry/semantic.ex:67:36
+- at: lib/jido/telemetry/semantic.ex:68:36
   operator: integer_shift
   mutation: "`1` → `2`"
   sort: equivalent
   reason: The semantic terminal guard uses only atomics slot 1. An unused second slot cannot change span behavior.
 
-- at: lib/jido/telemetry/semantic.ex:273:48
+- at: lib/jido/telemetry/semantic.ex:301:48
   operator: integer_shift
   mutation: "`1` → `2`"
   sort: equivalent
-  reason: The terminal claim reads and updates only atomics slot 1. An unused second slot cannot change the one-terminal-event rule.
+  reason: The terminal marker can be any nonzero integer. Changing it from 1 to 2 still lets only the first compare-and-exchange claim succeed.

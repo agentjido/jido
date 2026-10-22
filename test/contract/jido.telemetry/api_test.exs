@@ -207,6 +207,63 @@ defmodule JidoTest.Telemetry.ApiTest do
     assert Telemetry.handle_semantic_event(:invalid, :invalid, :invalid, nil) == :ok
   end
 
+  @tag obligation: ["jido.telemetry.I2", "jido.telemetry.I4", "jido.telemetry.I8"]
+  test "semantic log strings stay on one line and within the byte limit" do
+    Application.put_env(:jido, :telemetry, semantic_log_mode: :all)
+    event = [:jido, :agent_server, :turn, :stop]
+    unsafe_id = "agent\nforged\rvalue\t\\tail\v"
+
+    log =
+      capture_log(fn ->
+        Telemetry.handle_semantic_event(event, %{}, %{agent_id: unsafe_id, status: :ok}, nil)
+      end)
+
+    assert log =~ "agent_id=agent\\nforged\\rvalue\\t\\\\tail\\u{B}"
+    refute log =~ "agent\nforged"
+
+    unicode_id = String.duplicate("😀", 64)
+
+    unicode_log =
+      capture_log(fn ->
+        Telemetry.handle_semantic_event(event, %{}, %{agent_id: unicode_id, status: :ok}, nil)
+      end)
+
+    assert [_, logged_id] = Regex.run(~r/agent_id=(\S+)/u, unicode_log)
+    assert byte_size(logged_id) <= 128
+    assert String.valid?(logged_id)
+    assert String.ends_with?(logged_id, "...")
+
+    boundaries = [
+      {31, "\\u{1F}"},
+      {32, " "},
+      {33, "!"},
+      {126, "~"},
+      {127, "\\u{7F}"},
+      {128, "\\u{80}"},
+      {158, "\\u{9E}"},
+      {159, "\\u{9F}"},
+      {160, <<160::utf8>>},
+      {0x2027, <<0x2027::utf8>>},
+      {0x2028, "\\u2028"},
+      {0x2029, "\\u2029"},
+      {0x202A, <<0x202A::utf8>>}
+    ]
+
+    for {codepoint, rendered} <- boundaries do
+      boundary_log =
+        capture_log(fn ->
+          Telemetry.handle_semantic_event(
+            event,
+            %{},
+            %{agent_id: "x" <> <<codepoint::utf8>>, status: :ok},
+            nil
+          )
+        end)
+
+      assert boundary_log =~ "agent_id=x#{rendered} schema_version=1"
+    end
+  end
+
   @tag obligation: "jido.telemetry.I4"
   test "interesting logging uses exact duration and threshold boundaries" do
     event = [:jido, :persistence, :operation, :stop]

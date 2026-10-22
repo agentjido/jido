@@ -27,3 +27,21 @@
   decision: Accept the full 714-mutant profile with 657 killed, 16 classified equivalent survivors, 41 invalid mutations, no timeout, and a 97.6 percent score.
   driver: Every valid behavior-changing mutant is killed, and every surviving mutant is classified at its current source location.
   approved_by: Component hardening pass
+
+- id: telemetry-public-boundary-review
+  date: 2026-10-22
+  decision: Keep metrics/0 and open_telemetry?/0 as the public Jido.Telemetry API, expose debug control through Jido instance facades, and keep semantic emission, trace context, persistence observation, and the OpenTelemetry bridge internal. This component has no DSL.
+  driver: Applications consume metric definitions and status, while runtime-owned emitters need one private normalized observation path. Event production remains with the runtime and persistence components that own the observed work.
+  approved_by: Component review pass
+
+- id: telemetry-containment-review
+  date: 2026-10-22
+  decision: Treat malformed semantic metadata, options, and event prefixes as absent observation data; contain result-measurement callback faults; and escape line controls and byte-bound caller-controlled log strings.
+  driver: Best-effort observation must not prevent work, replace its result, or let an identifier create an unbounded or forged log line.
+  approved_by: Component review pass
+
+- id: telemetry-component-mutation-review
+  date: 2026-10-22
+  decision: Accept the current full profile with 779 mutants, 719 killed mutants, 16 reviewed equivalent survivors, 44 invalid mutations, no timeout, and no unclassified survivor.
+  driver: The component review needs current mutation evidence after the boundary, public API, Covenant, containment, and log-safety changes.
+  approved_by: Component review pass

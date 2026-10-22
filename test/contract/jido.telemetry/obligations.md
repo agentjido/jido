@@ -11,9 +11,12 @@ modules:
 
 ## Purpose
 
-Protect Jido observation values and adapters. This component owns the fixed
-metric catalog, semantic event lifecycle, safe fields, bounded logs, instance
-debug overrides, W3C trace context, and optional OpenTelemetry mapping.
+Protect Jido observation values and adapters. Its public observation API is
+`Jido.Telemetry.metrics/0`, `Jido.Telemetry.open_telemetry?/0`, and the
+instance `debug/0` and `debug/1` facades. This component owns the fixed metric
+catalog, internal semantic event lifecycle, safe fields, bounded logs, instance
+debug overrides, W3C trace context, and optional OpenTelemetry mapping. It has
+no DSL.
 
 It does not own the AgentServer or persistence operations that emit events,
 host reporter configuration, OpenTelemetry SDK startup, sampling, export, or
@@ -31,21 +34,21 @@ durable audit records.
 ### jido.telemetry.I2 — Safe semantic fields
 
 - **scope:** semantic metadata and measurement normalization
-- **must:** Publish schema version 1 and only approved scalar metadata and integer measurements. Bound identifier sizes and fixed vocabularies. Drop private values, invalid UTF-8, raw errors, state, payloads, unsupported numbers, and unknown fields before Telemetry, logs, or tracing can observe them.
+- **must:** Publish schema version 1 and only approved scalar metadata and integer measurements. Bound identifier sizes and fixed vocabularies. Drop private values, invalid UTF-8, raw errors, state, payloads, unsupported numbers, unknown fields, and malformed observation input before Telemetry, logs, or tracing can observe them.
 - **kind:** security
 - **status:** active
 
 ### jido.telemetry.I3 — One semantic operation lifecycle
 
 - **scope:** semantic spans, points, result classification, persistence observation
-- **must:** Emit start and at most one terminal event for each span. Include nonnegative duration, classify supported return results without their payloads, return the observed result unchanged, and re-raise an observed fault after one exception event. Emit point events with event time. Persistence observation must add only safe identity, operation, reason, and revision fields.
+- **must:** Emit start and at most one terminal event for each valid span name. Include nonnegative duration, classify supported return results without their payloads, return the observed result unchanged, and re-raise an observed fault after one exception event. A failing result-measurement projection must not change that result. Emit point events with event time. Persistence observation must add only safe identity, operation, reason, and revision fields.
 - **kind:** ordering
 - **status:** active
 
 ### jido.telemetry.I4 — Bounded logs and instance debug overrides
 
 - **scope:** default semantic handler, log configuration, `Jido.Debug`
-- **must:** Attach the default semantic log handler idempotently. Keep logging off by default. Support errors, interesting, and all modes with bounded normalized fields. Let a valid per-instance debug level override the global log mode only for events in that instance scope. Keep debug state isolated by instance and treat absent or malformed state as off.
+- **must:** Attach the default semantic log handler idempotently. Keep logging off by default. Support errors, interesting, and all modes with normalized fields. Escape caller-controlled C0 and C1 controls and Unicode line separators, keep each binary value on one physical line, and limit its rendered value to 128 bytes. Let a valid per-instance debug level override the global log mode only for events in that instance scope. Keep debug state isolated by instance and treat absent or malformed state as off.
 - **kind:** functional
 - **status:** active
 
@@ -73,6 +76,6 @@ durable audit records.
 ### jido.telemetry.I8 — Observation failure containment
 
 - **scope:** semantic emission, logging, trace adapters, and optional bridge callbacks
-- **must:** Contain logging, Telemetry handler, malformed configuration, carrier, event-name, and OpenTelemetry callback faults. Observation failure must not change the observed result, suppress the semantic event when the optional bridge fails, or leak an installed context.
+- **must:** Contain logging, Telemetry handler, malformed configuration, metadata, options, carrier, event-name, result-measurement callback, and OpenTelemetry callback faults. Observation failure must not change the observed result, suppress a valid semantic event when the optional bridge fails, or leak an installed context.
 - **kind:** functional
 - **status:** active

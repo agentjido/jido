@@ -418,6 +418,51 @@ defmodule JidoTest.Telemetry.SemanticTest do
     refute Enum.any?(:telemetry.list_handlers(event), &(&1.id == handler))
   end
 
+  @tag obligation: ["jido.telemetry.I3", "jido.telemetry.I8"]
+  test "malformed observation inputs and measurement callbacks cannot change work" do
+    malformed = Semantic.start(:invalid, :invalid, :invalid, :invalid)
+
+    assert malformed.metadata == %{schema_version: 1}
+    assert :ok = Semantic.finish(malformed, :invalid, :invalid)
+    assert :ok = Semantic.point(:invalid, :invalid, :invalid, :invalid)
+    assert :ok = Semantic.point(nil, :invalid, :invalid, :invalid)
+
+    prefix = [:jido, :contained, :operation]
+    start_event = prefix ++ [:start]
+    stop_event = prefix ++ [:stop]
+    handler = {__MODULE__, make_ref()}
+
+    :ok =
+      :telemetry.attach_many(
+        handler,
+        [start_event, stop_event],
+        fn event, measurements, metadata, owner ->
+          send(owner, {:contained_event, event, measurements, metadata})
+        end,
+        self()
+      )
+
+    on_exit(fn -> :telemetry.detach(handler) end)
+
+    assert :observed =
+             Semantic.with_span(
+               prefix,
+               %{},
+               %{},
+               fn -> :observed end,
+               fn _result -> throw(:measurement_fault) end
+             )
+
+    assert_receive {:contained_event, ^start_event, _, %{schema_version: 1}}
+
+    assert_receive {:contained_event, ^stop_event, %{duration: duration}, %{status: :ok}}
+
+    assert duration >= 0
+
+    assert :unchanged =
+             Semantic.with_span(prefix, %{}, %{}, fn -> :unchanged end, :invalid_callback)
+  end
+
   defp restore_env(app, key, {:ok, value}), do: Application.put_env(app, key, value)
   defp restore_env(app, key, :error), do: Application.delete_env(app, key)
 end

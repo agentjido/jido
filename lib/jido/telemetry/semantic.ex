@@ -47,12 +47,13 @@ defmodule Jido.Telemetry.Semantic do
   @doc false
   def start(prefix, metadata, measurements \\ %{}, opts \\ []) do
     at = System.monotonic_time()
+    metadata = safe_metadata(metadata)
     trace = Map.take(metadata, @trace_carrier_keys)
     log_scope = log_scope(metadata)
     metadata = metadata |> Map.drop(@trace_carrier_keys) |> normalize_metadata()
     measurements = normalize_measurements(measurements)
 
-    otel = OpenTelemetry.start(prefix, metadata, measurements, Keyword.put(opts, :start_time, at))
+    otel = OpenTelemetry.start(prefix, metadata, measurements, put_option(opts, :start_time, at))
     trace = Map.merge(valid_trace(trace) || %{}, OpenTelemetry.trace_context(otel) || %{})
     trace = if map_size(trace) == 0, do: nil, else: trace
 
@@ -70,7 +71,7 @@ defmodule Jido.Telemetry.Semantic do
     }
 
     emit_normalized(
-      prefix ++ [:start],
+      event_name(prefix, :start),
       measurements
       |> Map.merge(%{monotonic_time: at, system_time: System.system_time()}),
       metadata,
@@ -97,7 +98,13 @@ defmodule Jido.Telemetry.Semantic do
       ended_at = started + duration
 
       OpenTelemetry.finish(Map.get(span, :otel), ending, metadata, measurements, ended_at)
-      emit_normalized(prefix ++ [ending], measurements, metadata, Map.get(span, :log_scope))
+
+      emit_normalized(
+        event_name(prefix, ending),
+        measurements,
+        metadata,
+        Map.get(span, :log_scope)
+      )
     end
 
     :ok
@@ -116,7 +123,7 @@ defmodule Jido.Telemetry.Semantic do
     log_scope = log_scope(metadata)
     metadata = normalize_metadata(metadata)
 
-    OpenTelemetry.point(event, metadata, measurements, Keyword.put(opts, :at, at))
+    OpenTelemetry.point(event, metadata, measurements, put_option(opts, :at, at))
     emit_normalized(event, measurements, metadata, log_scope)
   end
 
@@ -126,7 +133,7 @@ defmodule Jido.Telemetry.Semantic do
 
     try do
       result = fun.()
-      finish(span, result_metadata(result), result_measurements.(result))
+      finish(span, result_metadata(result), safe_result_measurements(result_measurements, result))
       result
     catch
       kind, reason ->
@@ -245,6 +252,27 @@ defmodule Jido.Telemetry.Semantic do
   defp maybe_put(map, _key, nil), do: map
   defp maybe_put(map, key, value), do: Map.put(map, key, value)
 
+  defp safe_metadata(metadata) when is_map(metadata), do: metadata
+  defp safe_metadata(_metadata), do: %{}
+
+  defp put_option(opts, key, value) do
+    if Keyword.keyword?(opts), do: Keyword.put(opts, key, value), else: [{key, value}]
+  end
+
+  defp safe_result_measurements(fun, result) do
+    fun.(result)
+  rescue
+    _error -> %{}
+  catch
+    _kind, _reason -> %{}
+  end
+
+  defp event_name(prefix, ending) when is_list(prefix) and is_atom(ending) do
+    if Enum.all?(prefix, &is_atom/1), do: prefix ++ [ending]
+  end
+
+  defp event_name(_prefix, _ending), do: nil
+
   defp log_scope(%{jido_instance: instance}) when is_atom(instance),
     do: instance
 
@@ -271,6 +299,8 @@ defmodule Jido.Telemetry.Semantic do
 
   defp claim_terminal?(%{terminal_guard: guard}),
     do: :atomics.compare_exchange(guard, 1, 0, 1) == :ok
+
+  defp emit_normalized(nil, _measurements, _metadata, _log_scope), do: :ok
 
   defp emit_normalized(event, measurements, metadata, nil) do
     :telemetry.execute(event, measurements, metadata)
