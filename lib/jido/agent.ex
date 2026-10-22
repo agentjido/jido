@@ -16,7 +16,11 @@ defmodule Jido.Agent do
   alias Jido.Error
 
   @type t :: %__MODULE__{}
+
+  @doc "Writes one custom portable checkpoint payload for this Agent module."
   @callback checkpoint(instance(), map()) :: {:ok, map()} | {:error, term()}
+
+  @doc "Restores one Agent instance from a custom portable checkpoint payload."
   @callback restore(map(), map()) :: {:ok, instance()} | {:error, term()}
   @optional_callbacks checkpoint: 2, restore: 2
 
@@ -46,12 +50,14 @@ defmodule Jido.Agent do
   def __defaults__, do: @defaults
 
   @doc "Returns the state schema, including Plugin-owned fields."
+  @spec schema(t()) :: Zoi.schema()
   def schema(%__MODULE__{} = agent),
     do: Validation.state_schema(agent) |> Jido.Agent.Error.unwrap!()
 
   @type definition :: %__MODULE__{id: nil, state: nil}
   @type instance :: %__MODULE__{id: String.t(), state: map()}
 
+  @doc "Defines a compiled Agent module with the Agent DSL."
   defmacro __using__(opts) do
     opts = options!(opts, __CALLER__)
     opts = Keyword.put_new(opts, :id, Atom.to_string(__CALLER__.module))
@@ -86,37 +92,52 @@ defmodule Jido.Agent do
     end
   end
 
+  @doc "Builds and validates a neutral Agent definition from a plain map."
+  @spec define(map()) :: {:ok, definition()} | {:error, term()}
   def define(map), do: Validation.define(map)
+
+  @doc "Builds one neutral Agent definition or raises its validation error."
+  @spec define!(map()) :: definition() | no_return()
   def define!(map), do: map |> define() |> Jido.Agent.Error.unwrap!()
 
   @doc "Validates a definition or instance, including schema, routes, and provider data."
+  @spec validate(term()) :: {:ok, t()} | {:error, term()}
   def validate(value), do: Validation.validate(value)
 
   @doc "Checks definition shape only. Use validate/1 to check the field values."
+  @spec definition?(term()) :: boolean()
   def definition?(%__MODULE__{id: nil, state: nil}), do: true
   def definition?(_), do: false
 
   @doc "Checks instance shape only. Use validate/1 to check complete state and definition data."
+  @spec instance?(term()) :: boolean()
   def instance?(%__MODULE__{id: id, state: state})
       when is_binary(id) and byte_size(id) > 0 and is_map(state) and not is_struct(state),
       do: true
 
   def instance?(_), do: false
 
+  @doc "Returns the neutral definition for an Agent value or compiled Agent module."
+  @spec definition(t() | module()) :: definition()
   def definition(%__MODULE__{} = value), do: %{value | id: nil, state: nil}
 
   def definition(module) when is_atom(module),
     do: module |> Validation.resolve() |> Jido.Agent.Error.unwrap!()
 
+  @doc "Builds and validates one Agent instance from a definition or compiled Agent module."
+  @spec instantiate(definition() | module(), keyword() | map()) ::
+          {:ok, instance()} | {:error, term()}
   def instantiate(source, opts \\ []), do: Validation.instantiate(source, opts)
 
+  @doc "Builds one Agent instance or raises its validation error."
+  @spec instantiate!(definition() | module(), keyword() | map()) :: instance() | no_return()
   def instantiate!(source, opts \\ []),
     do: source |> instantiate(opts) |> Jido.Agent.Error.unwrap!()
 
   @doc "Applies ordered data mutations and returns the candidate and its final Diff."
   def mutate(%__MODULE__{} = agent, directives), do: Jido.Agent.Mutation.apply(agent, directives)
 
-  @doc "Returns runtime Plugin declarations from provider contributions."
+  @doc false
   def runtime_plugins(%__MODULE__{extensions: entries}) do
     Enum.flat_map(entries, fn entry ->
       module = entry.provider.runtime_support()
@@ -148,7 +169,7 @@ defmodule Jido.Agent do
       else: :ok
   end
 
-  @doc "Builds a Signal for a declared helper. It does not select or run a handler."
+  @doc false
   @spec input_signal(definition(), String.t(), map(), keyword() | map()) ::
           {:ok, Signal.t()} | {:error, term()}
   def input_signal(definition, type, data, opts \\ []) do
@@ -161,7 +182,7 @@ defmodule Jido.Agent do
     end
   end
 
-  @doc "Builds a Signal for a declared helper or raises for an invalid Signal input."
+  @doc false
   @spec input_signal!(definition(), String.t(), map(), keyword() | map()) ::
           Signal.t() | no_return()
   def input_signal!(definition, type, data, opts \\ []) do

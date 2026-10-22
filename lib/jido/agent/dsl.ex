@@ -40,7 +40,13 @@ defmodule Jido.Agent.DSL do
                           __MODULE__
                         )
       @behaviour Jido.Agent
+
+      @doc "Returns this Agent definition version."
+      @spec vsn() :: pos_integer()
       def vsn, do: @agent_definition.vsn
+
+      @doc "Returns the complete state schema, including Plugin-owned fields."
+      @spec schema() :: Zoi.schema()
       def schema, do: Jido.Agent.schema(definition())
 
       @doc false
@@ -55,12 +61,27 @@ defmodule Jido.Agent.DSL do
         }
       end
 
+      @doc "Returns the compiled Action target for one inline route or raises when none exists."
+      @spec route_action!(String.t()) :: module() | no_return()
       def route_action!(path),
         do: Jido.Action.Inline.target!(__MODULE__, host: Jido.Agent, route: path, role: :action)
 
+      @doc "Runs one pure Agent Turn. It does not commit state or dispatch Directives."
+      @spec cmd(Jido.Agent.instance(), Jido.Signal.t(), keyword()) ::
+              {:ok, Jido.Agent.instance(), [struct()]} | {:error, term()}
       def cmd(agent, signal, opts \\ []), do: Jido.Agent.cmd(agent, signal, opts)
+
+      @doc "Returns this module's validated neutral Agent definition."
+      @spec definition() :: Jido.Agent.definition()
       def definition, do: Jido.Agent.DSL.definition!(@agent_definition)
+
+      @doc "Builds and validates one instance of this Agent."
+      @spec instantiate(keyword() | map()) ::
+              {:ok, Jido.Agent.instance()} | {:error, term()}
       def instantiate(opts \\ []), do: Jido.Agent.instantiate(__MODULE__, opts)
+
+      @doc "Builds one instance of this Agent or raises its validation error."
+      @spec instantiate!(keyword() | map()) :: Jido.Agent.instance() | no_return()
       def instantiate!(opts \\ []), do: Jido.Agent.instantiate!(__MODULE__, opts)
       unquote(helpers)
       @after_verify {Jido.Agent.DSL, :verify!}

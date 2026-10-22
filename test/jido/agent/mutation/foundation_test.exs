@@ -80,10 +80,9 @@ defmodule Jido.Agent.MutationFoundationTest do
   end
 
   @tag obligation: "jido.agent.I27"
-  test "Flow and module handler updates run through the same route boundary" do
+  test "Flow and module handler updates use the same route value" do
     assert {:ok, agent, _} = Agent.mutate(F.agent(), [D.route_update("run", %{handler: F.Flow})])
     assert hd(agent.routes).handler == %{kind: :flow, target: F.Flow}
-    assert {:ok, ^agent, []} = Agent.cmd(agent, F.signal([]))
   end
 
   @tag obligation: ["jido.agent.I26", "jido.agent.I30"]
@@ -121,22 +120,6 @@ defmodule Jido.Agent.MutationFoundationTest do
         ] do
       assert {:error, _} = Agent.mutate(F.agent(), batch)
     end
-  end
-
-  @tag obligation: "jido.agent.I29"
-  test "Plugin changes reject owned directives even when configuration edits cancel" do
-    assert {:ok, agent, _} = Agent.mutate(F.agent(), [D.plugin_add(F.Counter)])
-    batch = [D.plugin_configure(F.Counter, []), %F.Owned{}]
-
-    assert {:error, %{code: :plugin_change_with_owned_directive}} =
-             Agent.cmd(agent, F.signal(batch))
-
-    assert agent.state.counter == 3
-
-    assert {:error, :migration_failed} =
-             Agent.mutate(agent, [
-               D.plugin_configure(F.Counter, [], migrate: {F.Migrations, :fail, []})
-             ])
   end
 
   @tag obligation: "jido.agent.I26"

@@ -80,7 +80,7 @@ state, Directive dispatch, persistence, or executable internals from
 ### jido.agent_evaluation.I9 — Atomic pure result
 
 - **scope:** `Jido.Agent.cmd/3`, `Jido.Agent.Runner`
-- **must:** Apply executable state and accepted definition changes to one candidate and return the validated Directive batch without dispatch. A later validation failure does not change the source or undo work that the executable already performed.
+- **must:** Apply executable state and accepted definition changes to one candidate and return the validated Directive batch without dispatch. Reject a batch that changes a Plugin declaration and runs a Directive owned by that Plugin. A later validation failure does not change the source or undo work that the executable already performed.
 - **kind:** functional
 - **status:** active
 

@@ -13,15 +13,21 @@ modules:
   - Jido.Agent.Mutation
   - Jido.Agent.Topology
   - Jido.Agent.Validation
+  - Jido.Agent.View
 ---
 
 ## Purpose
 
-Protect the current `Jido.Agent.*` value, authoring, validation, and composition
-boundaries. The component follows code ownership. It does not claim pure Agent
-evaluation, the AgentServer lifecycle, Directive dispatch, persistence records
-and stores, Scheduler provider internals, or shared Registry and Plugin
-internals.
+Protect the Agent-specific value and authoring boundary. This component owns
+canonical Agent definitions and instances, state schemas, the Agent DSL,
+logical topology, extension contributions, definition mutation and Diff data,
+the Agent document codec adapter, and safe Agent views.
+
+The component follows behavior ownership. It does not claim shared Authoring,
+Registry, Document, Value, or Discovery behavior from `jido_action`. It also
+does not claim pure Agent evaluation, AgentServer commands and lifecycle,
+Agent references and process addressing, Directive dispatch, persistence, or
+bundled Plugin runtime behavior.
 
 Public functions use their documented input types. Wrong top-level Elixir types
 can raise a function-clause error. Supported inputs return the structured results
@@ -73,13 +79,6 @@ not restore or claim the retired standalone `jido.topology` component.
 - **kind:** functional
 - **status:** active
 
-### jido.agent.I6 — Current Action contract
-
-- **scope:** `Jido.Agent.cmd/3`, `Jido.Agent.instantiate/2`
-- **must:** Retired. `jido.agent_evaluation.I4` owns current executable contract evaluation.
-- **kind:** functional
-- **status:** retired
-
 ### jido.agent.I7 — Instance identity and options
 
 - **scope:** `Jido.Agent.instantiate/2`
@@ -115,70 +114,12 @@ not restore or claim the retired standalone `jido.topology` component.
 - **kind:** functional
 - **status:** active
 
-**Retired direct commands**
-
-### jido.agent.I12 — One route selection
-
-- **scope:** `Jido.Agent.Route.select/2`, `Jido.Agent.cmd/3`
-- **must:** Retired. `jido.agent_evaluation.I1` owns fixed route selection.
-- **kind:** ordering
-- **status:** retired
-
-### jido.agent.I13 — Route input precedence
-
-- **scope:** `Jido.Agent.cmd/3`
-- **must:** Retired. `jido.agent_evaluation.I1` and `jido.agent_evaluation.I2` own source binding and route input.
-- **kind:** functional
-- **status:** retired
-
-### jido.agent.I14 — Signal input normalization
-
-- **scope:** `Jido.Agent.cmd/3`, `Jido.Agent.Turn.new/2`
-- **must:** Retired. `jido.agent_evaluation.I2` owns Signal input normalization.
-- **kind:** functional
-- **status:** retired
-
-### jido.agent.I15 — Context and execution options
-
-- **scope:** `Jido.Agent.cmd/3`
-- **must:** Retired. `jido.agent_evaluation.I3` owns execution context and options.
-- **kind:** functional
-- **status:** retired
-
-### jido.agent.I16 — Complete command success
-
-- **scope:** `Jido.Agent.cmd/3`
-- **must:** Retired. `jido.agent_evaluation.I5`, `jido.agent_evaluation.I7`, and `jido.agent_evaluation.I9` own candidate and Directive results.
-- **kind:** functional
-- **status:** retired
-
-### jido.agent.I17 — Command failure isolation
-
-- **scope:** `Jido.Agent.cmd/3`
-- **must:** Retired. `jido.agent_evaluation.I5` owns evaluation failure isolation.
-- **kind:** functional
-- **status:** retired
-
-### jido.agent.I18 — Plugin execution order
-
-- **scope:** `Jido.Agent.cmd/3`
-- **must:** Retired. `jido.agent_evaluation.I6` and `jido.agent_evaluation.I8` own pure Agent Plugin execution.
-- **kind:** ordering
-- **status:** retired
-
-### jido.agent.I19 — Direct effect boundary
-
-- **scope:** `Jido.Agent.cmd/3`
-- **must:** Retired. `jido.agent_evaluation.I9` owns the pure result and effect boundary.
-- **kind:** functional
-- **status:** retired
-
 **Documents and public surface**
 
-### jido.agent.I20 — Agent document envelope
+### jido.agent.I20 — Agent document adapter
 
 - **scope:** `Jido.Authoring.encode/2`, `Jido.Authoring.decode/2`, `Jido.Authoring.encode_json/2`, `Jido.Authoring.decode_json/2`, `Jido.Agent.Codec`
-- **must:** Write a portable definition through a trusted Registry, omit instance ID and state, read through `Jido.Agent.define/1`, and reject a malformed or unsupported Agent document.
+- **must:** Register the Agent document type with shared Authoring. Write a portable Agent definition through a trusted Registry, omit instance ID and state, read through `Jido.Agent.define/1`, and reject a malformed or unsupported Agent document. Shared document, Registry, JSON, and portable-value rules remain owned by `jido_action`.
 - **kind:** persisted-format
 - **status:** active
 
@@ -206,7 +147,21 @@ not restore or claim the retired standalone `jido.topology` component.
 ### jido.agent.I24 — Public Agent entry points
 
 - **scope:** `Jido.Agent`
-- **must:** Keep define, instantiate, validate, schema, mutate, and cmd. Do not restore removed new, validate_instance, complete_schema, handle_signal, checkpoint, or restore wrappers.
+- **must:** Keep `use Jido.Agent`, `schema/1`, `define/1`, `define!/1`, `validate/1`, `definition?/1`, `instance?/1`, `definition/1`, `instantiate/1,2`, `instantiate!/1,2`, `mutate/2`, `set/2`, and `cmd/2,3` as the documented Agent facade. Keep runtime projection, direct Signal-helper support, raw schema data, and transition functions hidden. Do not restore removed `new`, `validate_instance`, `complete_schema`, `handle_signal`, `checkpoint`, or `restore` wrappers.
+- **kind:** functional
+- **status:** active
+
+### jido.agent.I31 — Safe Agent views
+
+- **scope:** `Jido.Agent.View.project/3`
+- **must:** Project a module, definition, or instance as one bounded JSON-safe summary. Expose code and schema values only through trusted Registry references. Do not expose Agent state, metadata, Plugin options, route defaults, or raw modules. Do not start or contact an Agent process.
+- **kind:** security
+- **status:** active
+
+### jido.agent.I32 — Generated Agent module facade
+
+- **scope:** `Jido.Agent.__using__/1`, generated Agent modules
+- **must:** Generate documented `vsn/0`, `schema/0`, `definition/0`, `instantiate/0,1`, `instantiate!/0,1`, `cmd/2,3`, and `route_action!/1` functions that delegate to the canonical Agent boundaries. Keep compiler authoring metadata hidden. `route_action!/1` returns the compiled Action target for an inline route and raises when the path has no inline Action.
 - **kind:** functional
 - **status:** active
 
@@ -242,8 +197,8 @@ not restore or claim the retired standalone `jido.topology` component.
 
 ### jido.agent.I29 — Plugin declaration edits
 
-- **scope:** `Jido.Agent.cmd/3`, `Jido.Agent.Directive`
-- **must:** Initialize new Plugin state, preserve compatible state, require explicit disposal or migration, and reject an affected Plugin Directive in the same change batch.
+- **scope:** `Jido.Agent.mutate/2`, `Jido.Agent.Directive`
+- **must:** Initialize new Plugin state, preserve compatible state, and require explicit disposal or migration when a Plugin declaration changes.
 - **kind:** functional
 - **status:** active
 

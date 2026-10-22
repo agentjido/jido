@@ -1,9 +1,9 @@
 {
   "apps": {
     "jido": {
-      "active": 120,
+      "active": 122,
       "coverage": 1.0,
-      "covered": 120
+      "covered": 122
     },
     "jido.agent_server": {
       "active": 66,
@@ -18,10 +18,10 @@
   },
   "components": {
     "jido.agent": {
-      "active": 21,
+      "active": 23,
       "app": "jido",
       "coverage": 1.0,
-      "covered": 21,
+      "covered": 23,
       "form": "light",
       "obligations": {
         "jido.agent.I1": {
@@ -78,70 +78,6 @@
             "test Map authoring and instance options reject ambiguous duplicates",
             "test Plugin state has one owner and domain updates use shallow replacement"
           ]
-        },
-        "jido.agent.I12": {
-          "failing": 0,
-          "kind": "ordering",
-          "passing": 0,
-          "status": "retired",
-          "testable": false,
-          "tests": []
-        },
-        "jido.agent.I13": {
-          "failing": 0,
-          "kind": "functional",
-          "passing": 0,
-          "status": "retired",
-          "testable": false,
-          "tests": []
-        },
-        "jido.agent.I14": {
-          "failing": 0,
-          "kind": "functional",
-          "passing": 0,
-          "status": "retired",
-          "testable": false,
-          "tests": []
-        },
-        "jido.agent.I15": {
-          "failing": 0,
-          "kind": "functional",
-          "passing": 0,
-          "status": "retired",
-          "testable": false,
-          "tests": []
-        },
-        "jido.agent.I16": {
-          "failing": 0,
-          "kind": "functional",
-          "passing": 0,
-          "status": "retired",
-          "testable": false,
-          "tests": []
-        },
-        "jido.agent.I17": {
-          "failing": 0,
-          "kind": "functional",
-          "passing": 0,
-          "status": "retired",
-          "testable": false,
-          "tests": []
-        },
-        "jido.agent.I18": {
-          "failing": 0,
-          "kind": "ordering",
-          "passing": 0,
-          "status": "retired",
-          "testable": false,
-          "tests": []
-        },
-        "jido.agent.I19": {
-          "failing": 0,
-          "kind": "functional",
-          "passing": 0,
-          "status": "retired",
-          "testable": false,
-          "tests": []
         },
         "jido.agent.I2": {
           "failing": 0,
@@ -255,7 +191,7 @@
           "testable": true,
           "tests": [
             "test definition and instance predicates accept only their exact value shapes",
-            "test the public API has one constructor and validation path"
+            "test the documented Agent facade has one constructor and validation path"
           ]
         },
         "jido.agent.I25": {
@@ -300,14 +236,13 @@
             "test Diff reports exact final values and order for each collection and state",
             "test Diff reports top-level definition changes made by a full upgrade",
             "test Directive constructors preserve every supported option and explicit nil",
-            "test Flow and module handler updates run through the same route boundary",
+            "test Flow and module handler updates use the same route value",
             "test Signal Directives require and normalize one complete Signal",
             "test agent CRUD preserves order and replacement resets omitted fields",
             "test built-in identity and validation cover runtime and definition Directives",
             "test cancelled edits and set-to-original produce an empty Diff",
             "test connection CRUD uses endpoint/path identity and replacement defaults",
             "test counted destinations need broadcast after the complete batch",
-            "test current route contract survives removal and the next input uses the new routes",
             "test custom Directive validation contains changed types, invalid results, and faults",
             "test custom Directives can override the default validator",
             "test custom Directives can use the behavior before their struct is defined",
@@ -316,6 +251,7 @@
             "test operation preconditions fail with an index and preserve the source",
             "test route add accepts executable modules and all descriptor forms",
             "test route edits have strict identities and the Diff reports net changes",
+            "test route removal changes the candidate and leaves the source unchanged",
             "test route reorder changes first-match selection and rejects incomplete permutations",
             "test route update shallow replaces defaults and route replacement fills defaults",
             "test routes_set preserves order and rejects invalid contracts and helper collisions",
@@ -349,16 +285,14 @@
         "jido.agent.I29": {
           "failing": 0,
           "kind": "functional",
-          "passing": 9,
+          "passing": 7,
           "status": "active",
           "testable": true,
           "tests": [
             "test Directive constructors preserve every supported option and explicit nil",
             "test Plugin changes preserve state and require explicit migration and disposal",
-            "test Plugin changes reject owned directives even when configuration edits cancel",
             "test Plugin edit errors identify the Plugin and retain passive contributions",
             "test Plugin state initialization, configuration, migration, and removal stay explicit",
-            "test an affected Plugin cannot change configuration and run its owned directives in one batch",
             "test changed Plugin detection compares declarations in both directions",
             "test definition Plugin edits add no state and remove needs no state discard",
             "test internal definition passes can defer Plugin schema validation"
@@ -397,6 +331,30 @@
             "test composition preserves a valid state when no definition edit exists"
           ]
         },
+        "jido.agent.I31": {
+          "failing": 0,
+          "kind": "security",
+          "passing": 5,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test an instance exposes identity but not state",
+            "test compiled and data Agent definitions use one JSON view contract",
+            "test operation limits also bound Registry resolution work",
+            "test operation output is bounded and reports truncation",
+            "test projection requires identifiers for every exposed code value"
+          ]
+        },
+        "jido.agent.I32": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 1,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test generated Agent modules expose one documented facade"
+          ]
+        },
         "jido.agent.I4": {
           "failing": 0,
           "kind": "functional",
@@ -421,14 +379,6 @@
           "tests": [
             "test duplicate declarations fail and instance reuse preserves order and exact values"
           ]
-        },
-        "jido.agent.I6": {
-          "failing": 0,
-          "kind": "functional",
-          "passing": 0,
-          "status": "retired",
-          "testable": false,
-          "tests": []
         },
         "jido.agent.I7": {
           "failing": 0,
@@ -603,12 +553,13 @@
         "jido.agent_evaluation.I9": {
           "failing": 0,
           "kind": "functional",
-          "passing": 3,
+          "passing": 4,
           "status": "active",
           "testable": true,
           "tests": [
             "test emission requests normalize once and obey the selected route contract",
             "test failure does not undo Action work and malformed routing remains structured",
+            "test one batch cannot change a Plugin and run its owned Directive",
             "test the complete Directive batch builds one candidate without dispatch"
           ]
         }
@@ -3542,8 +3493,8 @@
   },
   "covenant": "0.2.0",
   "totals": {
-    "active": 220,
+    "active": 222,
     "coverage": 1.0,
-    "covered": 220
+    "covered": 222
   }
 }

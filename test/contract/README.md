@@ -137,9 +137,12 @@ behavior have separate owners.
 occurrence identity, clock rules, and future-timer recovery. It does not own
 durable business delivery or acknowledgement.
 
-`jido.agent` owns Agent values, authoring, validation, and logical composition.
-It does not own AgentServer lifecycle, Directive dispatch, persistence stores,
-or bundled Plugin behavior.
+`jido.agent` owns Agent definitions and instances, state schemas, the Agent
+DSL, logical topology, extension contributions, definition mutation and Diff
+data, the Agent document codec adapter, and safe Agent views. It uses shared
+Authoring, Registry, Document, Value, and Discovery behavior from
+`jido_action`. It does not own pure evaluation, Agent references, AgentServer
+lifecycle, Directive dispatch, persistence, or bundled Plugin runtime behavior.
 
 `jido.agent_evaluation` owns pure route selection, executable evaluation,
 candidate validation, Plugin preparation and reduction, and returned

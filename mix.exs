@@ -212,19 +212,41 @@ defmodule Jido.MixProject do
       groups_for_modules: [
         "Agent Contracts": [
           Jido.Agent,
+          Jido.Agent.Diff,
           Jido.Agent.Plugin,
+          Jido.Agent.Plugin.Preparation,
+          Jido.Agent.Plugin.Reduction,
           Jido.Agent.Ref,
           Jido.Agent.Command,
           Jido.Agent.Turn,
-          Jido.Agent.Turn.Outcome
+          Jido.Agent.View
         ],
         "Agent Authoring": [
           Jido.Agent.Extension,
+          Jido.Agent.Topology,
           Jido.SignalAction
         ],
         "Agent Directives": [
           Jido.Agent.Directive,
+          Jido.Agent.Directive.AgentAdd,
+          Jido.Agent.Directive.AgentRemove,
+          Jido.Agent.Directive.AgentReplace,
+          Jido.Agent.Directive.AgentUpdate,
+          Jido.Agent.Directive.ConnectionAdd,
+          Jido.Agent.Directive.ConnectionRemove,
+          Jido.Agent.Directive.ConnectionReplace,
+          Jido.Agent.Directive.ConnectionUpdate,
           Jido.Agent.Directive.Emit,
+          Jido.Agent.Directive.PluginAdd,
+          Jido.Agent.Directive.PluginConfigure,
+          Jido.Agent.Directive.PluginRemove,
+          Jido.Agent.Directive.RouteAdd,
+          Jido.Agent.Directive.RouteRemove,
+          Jido.Agent.Directive.RouteReplace,
+          Jido.Agent.Directive.RouteUpdate,
+          Jido.Agent.Directive.RoutesReorder,
+          Jido.Agent.Directive.RoutesSet,
+          Jido.Agent.Directive.TopologySet,
           Jido.AgentServer.Directive.AgentSend,
           Jido.AgentServer.Directive.OwnerSend,
           Jido.AgentServer.Directive.ErrorReport,
@@ -264,19 +286,6 @@ defmodule Jido.MixProject do
           Jido.Plugin.SensorManager.Start,
           Jido.Plugin.SensorManager.Stop
         ],
-        Topology: [
-          Jido.Topology,
-          Jido.Topology.Controller,
-          Jido.Topology.Extension,
-          Jido.Topology.Instance,
-          Jido.Topology.Plan,
-          Jido.Topology.Plugin,
-          Jido.Topology.Plugin.Context,
-          Jido.Topology.Plugin.Contribution,
-          Jido.Topology.Ref,
-          Jido.Topology.Reference,
-          Jido.Topology.Signal
-        ],
         "Persistence And History": [
           Jido.Persistence,
           Jido.Persistence.Adapter,
@@ -294,6 +303,7 @@ defmodule Jido.MixProject do
         ],
         Observability: [Jido.Telemetry],
         Errors: [
+          Jido.Agent.Error,
           Jido.Error,
           Jido.Error.CompensationError,
           Jido.Error.ExecutionError,

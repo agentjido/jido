@@ -29,6 +29,29 @@ defmodule JidoTest.Contract.AgentAuthoringTest do
     end
   end
 
+  defmodule InlineLeaf do
+    use Jido.Agent, name: "contract_inline_leaf"
+
+    routes do
+      signal_source "/contract"
+
+      route "work.inline", as: :work do
+        action _input, context: context do
+          {:ok, context.agent_state}
+        end
+      end
+    end
+  end
+
+  defp docs(module) do
+    {:docs_v1, _annotation, :elixir, _format, _module_doc, _metadata, entries} =
+      Code.fetch_docs(module)
+
+    Map.new(entries, fn {{kind, name, arity}, _annotation, _signatures, doc, _metadata} ->
+      {{kind, name, arity}, doc}
+    end)
+  end
+
   @tag obligation: "jido.agent.I1"
   test "independent Map and DSL declarations produce the same canonical Agent" do
     from_map =
@@ -175,17 +198,59 @@ defmodule JidoTest.Contract.AgentAuthoringTest do
   end
 
   @tag obligation: "jido.agent.I24"
-  test "the public API has one constructor and validation path" do
+  test "the documented Agent facade has one constructor and validation path" do
     for {name, arity} <- [
+          schema: 1,
           define: 1,
           define!: 1,
-          instantiate: 2,
-          instantiate!: 2,
           validate: 1,
-          schema: 1,
-          mutate: 2
+          definition?: 1,
+          instance?: 1,
+          definition: 1,
+          instantiate: 1,
+          instantiate: 2,
+          instantiate!: 1,
+          instantiate!: 2,
+          mutate: 2,
+          set: 2,
+          cmd: 2,
+          cmd: 3
         ] do
       assert function_exported?(Agent, name, arity)
+    end
+
+    api_docs = docs(Agent)
+
+    for key <- [
+          {:macro, :__using__, 1},
+          {:function, :schema, 1},
+          {:function, :define, 1},
+          {:function, :define!, 1},
+          {:function, :validate, 1},
+          {:function, :definition?, 1},
+          {:function, :instance?, 1},
+          {:function, :definition, 1},
+          {:function, :instantiate, 2},
+          {:function, :instantiate!, 2},
+          {:function, :mutate, 2},
+          {:function, :set, 2},
+          {:function, :cmd, 3}
+        ] do
+      assert is_map(Map.fetch!(api_docs, key))
+    end
+
+    for key <- [
+          {:function, :__schema__, 0},
+          {:function, :__defaults__, 0},
+          {:function, :options!, 2},
+          {:function, :runtime_plugins, 1},
+          {:function, :validate_runtime_support, 1},
+          {:function, :input_signal, 4},
+          {:function, :input_signal!, 4},
+          {:function, :transition, 2},
+          {:function, :transition_validated, 3}
+        ] do
+      assert Map.fetch!(api_docs, key) == :hidden
     end
 
     for {name, arity} <- [
@@ -199,6 +264,36 @@ defmodule JidoTest.Contract.AgentAuthoringTest do
         ] do
       refute function_exported?(Agent, name, arity)
     end
+  end
+
+  @tag obligation: "jido.agent.I32"
+  test "generated Agent modules expose one documented facade" do
+    for {name, arity} <- [
+          vsn: 0,
+          schema: 0,
+          definition: 0,
+          instantiate: 0,
+          instantiate: 1,
+          instantiate!: 0,
+          instantiate!: 1,
+          cmd: 2,
+          cmd: 3,
+          route_action!: 1
+        ] do
+      assert function_exported?(InlineLeaf, name, arity)
+    end
+
+    assert InlineLeaf.vsn() == InlineLeaf.definition().vsn
+    assert InlineLeaf.schema() == Agent.schema(InlineLeaf.definition())
+    assert {:ok, %Agent{module: InlineLeaf}} = InlineLeaf.instantiate(id: "generated-api")
+    assert InlineLeaf.instantiate!(id: "generated-api-bang").module == InlineLeaf
+
+    target = InlineLeaf.route_action!("work.inline")
+
+    assert {:ok, %Jido.Instruction{kind: :action, target: ^target}} =
+             Jido.Instruction.resolve(target)
+
+    assert_raise ArgumentError, fn -> InlineLeaf.route_action!("missing") end
   end
 
   @tag obligation: "jido.agent.I25"

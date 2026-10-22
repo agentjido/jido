@@ -185,6 +185,36 @@ defmodule JidoTest.Contract.AgentEvaluationTest do
     refute_received {:signal, _}
   end
 
+  @tag obligation: "jido.agent_evaluation.I9"
+  test "one batch cannot change a Plugin and run its owned Directive" do
+    assert {:error, _reason} =
+             Agent.cmd(
+               F.instance(),
+               F.signal(%{
+                 directives: [Directive.plugin_add(F.Effects), %F.Effect{value: 1}]
+               })
+             )
+
+    assert {:ok, owned, _} =
+             Agent.cmd(
+               F.instance(),
+               F.signal(%{directives: [Directive.plugin_add(F.Effects)]})
+             )
+
+    assert {:error, %{code: :plugin_change_with_owned_directive}} =
+             Agent.cmd(
+               owned,
+               F.signal(%{
+                 directives: [Directive.plugin_configure(F.Effects, []), %F.Effect{value: 1}]
+               })
+             )
+
+    assert {:ok, next, [%F.Effect{}]} =
+             Agent.cmd(owned, F.signal(%{directives: [%F.Effect{value: 1}]}))
+
+    assert next.state.effects == 1
+  end
+
   @tag obligation: ["jido.agent_evaluation.I7", "jido.agent_evaluation.I9"]
   test "emission requests normalize once and obey the selected route contract" do
     allowed =

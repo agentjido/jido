@@ -87,7 +87,7 @@ defmodule Jido.Agent.Directive do
 
   @mutation_modules Jido.Agent.Mutation.modules()
 
-  @doc "Returns true when the value is a built-in Agent Directive."
+  @doc false
   @spec built_in?(term()) :: boolean()
   def built_in?(%{__struct__: module}), do: module in @built_ins or module in @mutation_modules
   def built_in?(_value), do: false
@@ -200,6 +200,7 @@ defmodule Jido.Agent.Directive do
   @doc "Replaces the complete topology data."
   def topology_set(topology), do: %__MODULE__.TopologySet{topology: topology}
 
+  @doc "Adds one named logical Agent member."
   def agent_add(name, definition, opts \\ []),
     do:
       struct!(
@@ -207,8 +208,10 @@ defmodule Jido.Agent.Directive do
         mutation_options(opts, [:count, :initial_state]) ++ [name: name, definition: definition]
       )
 
+  @doc "Updates selected fields of one named logical Agent member."
   def agent_update(name, changes), do: %__MODULE__.AgentUpdate{name: name, changes: changes}
 
+  @doc "Replaces one named logical Agent member."
   def agent_replace(name, definition, opts \\ []),
     do:
       struct!(
@@ -216,8 +219,10 @@ defmodule Jido.Agent.Directive do
         mutation_options(opts, [:count, :initial_state]) ++ [name: name, definition: definition]
       )
 
+  @doc "Removes one named logical Agent member."
   def agent_remove(name), do: %__MODULE__.AgentRemove{name: name}
 
+  @doc "Adds one Agent route."
   def route_add(path, handler \\ %{kind: :pass_through}, opts \\ []),
     do:
       struct!(
@@ -225,8 +230,10 @@ defmodule Jido.Agent.Directive do
         mutation_options(opts, [:as, :defaults, :emits]) ++ [path: path, handler: handler]
       )
 
+  @doc "Updates selected fields of one Agent route."
   def route_update(path, changes), do: %__MODULE__.RouteUpdate{path: path, changes: changes}
 
+  @doc "Replaces one Agent route."
   def route_replace(path, handler, opts \\ []),
     do:
       struct!(
@@ -234,10 +241,16 @@ defmodule Jido.Agent.Directive do
         mutation_options(opts, [:as, :defaults, :emits]) ++ [path: path, handler: handler]
       )
 
+  @doc "Removes one Agent route."
   def route_remove(path), do: %__MODULE__.RouteRemove{path: path}
+
+  @doc "Sets the complete order of the current Agent routes."
   def routes_reorder(paths), do: %__MODULE__.RoutesReorder{paths: paths}
+
+  @doc "Replaces the complete Agent route list."
   def routes_set(routes), do: %__MODULE__.RoutesSet{routes: routes}
 
+  @doc "Adds one logical output connection."
   def connection_add(path, opts),
     do:
       struct!(
@@ -245,6 +258,7 @@ defmodule Jido.Agent.Directive do
         mutation_options(opts, [:from, :to, :delivery]) ++ [path: path]
       )
 
+  @doc "Updates the delivery fields of one logical output connection."
   def connection_update(path, opts),
     do:
       struct!(
@@ -252,6 +266,7 @@ defmodule Jido.Agent.Directive do
         mutation_options(opts, [:from, :to, :changes]) ++ [path: path]
       )
 
+  @doc "Replaces one logical output connection."
   def connection_replace(path, opts),
     do:
       struct!(
@@ -259,9 +274,11 @@ defmodule Jido.Agent.Directive do
         mutation_options(opts, [:from, :to, :delivery]) ++ [path: path]
       )
 
+  @doc "Removes one logical output connection."
   def connection_remove(path, opts),
     do: struct!(__MODULE__.ConnectionRemove, mutation_options(opts, [:from, :to]) ++ [path: path])
 
+  @doc "Adds one runtime Plugin declaration and initializes its owned state."
   def plugin_add(module, options \\ [], opts \\ []) do
     opts = mutation_options(opts, [:initial])
 
@@ -272,6 +289,7 @@ defmodule Jido.Agent.Directive do
     }
   end
 
+  @doc "Changes one runtime Plugin declaration with an optional state migration."
   def plugin_configure(module, options, opts \\ []),
     do: %PluginConfigure{
       module: module,
@@ -279,6 +297,7 @@ defmodule Jido.Agent.Directive do
       migrate: mutation_options(opts, [:migrate])[:migrate]
     }
 
+  @doc "Removes one runtime Plugin declaration with an explicit state policy."
   def plugin_remove(module, opts \\ []),
     do: %PluginRemove{module: module, state: mutation_options(opts, [:state])[:state]}
 

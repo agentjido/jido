@@ -28,7 +28,7 @@ defmodule JidoTest.Contract.AgentCompositionChangesTest do
     def add(value, n), do: {:ok, value + n}
   end
 
-  defp cmd(agent, changes), do: Agent.cmd(agent, F.signal(%{directives: changes}))
+  defp mutate(agent, changes), do: Agent.mutate(agent, changes)
 
   @tag obligation: "jido.agent.I27"
   test "strict noun_verb edits preserve order and replace omitted fields with defaults" do
@@ -41,7 +41,7 @@ defmodule JidoTest.Contract.AgentCompositionChangesTest do
       Directive.agent_replace(:a, Worker)
     ]
 
-    assert {:ok, next, ^changes} = cmd(source, changes)
+    assert {:ok, next, _diff} = mutate(source, changes)
     assert Enum.map(next.topology.agents, & &1.name) == [:a, :b]
     assert hd(next.topology.agents).count == 1
 
@@ -51,7 +51,7 @@ defmodule JidoTest.Contract.AgentCompositionChangesTest do
           [Directive.agent_update(:a, %{name: :renamed})],
           [Directive.agent_add(:a, Worker), Directive.agent_remove(:a)]
         ] do
-      assert {:error, _} = cmd(next, changes)
+      assert {:error, _} = mutate(next, changes)
     end
 
     assert source.topology == %{agents: [], connections: []}
@@ -62,15 +62,16 @@ defmodule JidoTest.Contract.AgentCompositionChangesTest do
     source = F.instance()
 
     assert {:ok, next, _} =
-             cmd(source, [
+             mutate(source, [
                Directive.connection_add("test.run", from: :root, to: :worker),
                Directive.agent_add(:worker, Worker)
              ])
 
-    assert {:error, %{code: :unknown_endpoint}} = cmd(next, [Directive.agent_remove(:worker)])
+    assert {:error, %{code: :unknown_endpoint}} =
+             mutate(next, [Directive.agent_remove(:worker)])
 
     assert {:ok, empty, _} =
-             cmd(next, [
+             mutate(next, [
                Directive.agent_remove(:worker),
                Directive.connection_remove("test.run", from: :root, to: :worker)
              ])
@@ -78,14 +79,14 @@ defmodule JidoTest.Contract.AgentCompositionChangesTest do
     assert empty.topology == source.topology
 
     for field <- [:groups, :resources, :relationships, :imports, :exports, :topologies] do
-      assert {:error, _} = cmd(source, [Directive.topology_set(%{field => []})])
+      assert {:error, _} = mutate(source, [Directive.topology_set(%{field => []})])
     end
   end
 
   @tag obligation: ["jido.agent.I27", "jido.agent.I28"]
   test "counted destinations need broadcast after the complete batch" do
     assert {:ok, next, _} =
-             cmd(F.instance(), [
+             mutate(F.instance(), [
                Directive.connection_add("test.run",
                  from: :root,
                  to: :worker,
@@ -95,7 +96,7 @@ defmodule JidoTest.Contract.AgentCompositionChangesTest do
              ])
 
     assert {:error, %{code: :counted_delivery}} =
-             cmd(next, [
+             mutate(next, [
                Directive.connection_update("test.run",
                  from: :root,
                  to: :worker,
@@ -131,16 +132,19 @@ defmodule JidoTest.Contract.AgentCompositionChangesTest do
   @tag obligation: "jido.agent.I29"
   test "Plugin changes preserve state and require explicit migration and disposal" do
     source = F.instance()
-    assert {:ok, added, _} = cmd(source, [Directive.plugin_add(Counter)])
+    assert {:ok, added, _} = mutate(source, [Directive.plugin_add(Counter)])
     assert added.state.counter == 3
-    assert {:ok, configured, _} = cmd(added, [Directive.plugin_configure(Counter, start: 99)])
+
+    assert {:ok, configured, _} =
+             mutate(added, [Directive.plugin_configure(Counter, start: 99)])
+
     assert configured.state.counter == 3
-    assert {:error, _} = cmd(added, [Directive.plugin_remove(Counter)])
-    assert {:error, _} = cmd(added, [Directive.plugin_add(Counter)])
-    assert {:error, _} = cmd(added, [Directive.plugin_configure(Counter, key: :renamed)])
+    assert {:error, _} = mutate(added, [Directive.plugin_remove(Counter)])
+    assert {:error, _} = mutate(added, [Directive.plugin_add(Counter)])
+    assert {:error, _} = mutate(added, [Directive.plugin_configure(Counter, key: :renamed)])
 
     assert {:ok, migrated, _} =
-             cmd(added, [
+             mutate(added, [
                Directive.plugin_configure(Counter, [key: :renamed],
                  migrate: {Migrations, :add, [2]}
                )
@@ -148,7 +152,10 @@ defmodule JidoTest.Contract.AgentCompositionChangesTest do
 
     assert migrated.state.renamed == 5
     refute Map.has_key?(migrated.state, :counter)
-    assert {:ok, removed, _} = cmd(migrated, [Directive.plugin_remove(Counter, state: :discard)])
+
+    assert {:ok, removed, _} =
+             mutate(migrated, [Directive.plugin_remove(Counter, state: :discard)])
+
     assert removed.state === source.state
     assert Agent.runtime_plugins(removed) == []
   end
@@ -165,20 +172,8 @@ defmodule JidoTest.Contract.AgentCompositionChangesTest do
     source = Agent.instantiate!(definition, id: "bound", state: %{count: 2})
     assert {:ok, [%{name: :workers, count: 2}]} = Topology.bind(source, source.state)
     assert source.topology === definition.topology
-    assert {:ok, changed, []} = Agent.cmd(source, F.signal(%{output: %{source.state | count: 4}}))
+    assert {:ok, changed} = Agent.set(source, count: 4)
     assert changed.topology === source.topology
     assert {:ok, [%{count: 4}]} = Topology.bind(changed, changed.state)
-  end
-
-  @tag obligation: "jido.agent.I29"
-  test "an affected Plugin cannot change configuration and run its owned directives in one batch" do
-    assert {:error, _} = cmd(F.instance(), [Directive.plugin_add(F.Effects), %F.Effect{value: 1}])
-    assert {:ok, owned, _} = cmd(F.instance(), [Directive.plugin_add(F.Effects)])
-
-    assert {:error, _} =
-             cmd(owned, [Directive.plugin_configure(F.Effects, []), %F.Effect{value: 1}])
-
-    assert {:ok, next, [%F.Effect{}]} = cmd(owned, [%F.Effect{value: 1}])
-    assert next.state.effects == 1
   end
 end

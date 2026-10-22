@@ -413,19 +413,6 @@ defmodule Jido.Agent.MutationTest do
              after_agent,
              [Directive.plugin_configure(F.Counter, [])]
            ) === [F.Counter]
-
-    assert {:error, %Error{code: :plugin_change_with_owned_directive}} =
-             Mutation.validate_effects(
-               before,
-               after_agent,
-               [Directive.plugin_add(F.Counter), %F.Owned{}]
-             )
-
-    assert {:error, %Error{code: :plugin_change_with_owned_directive}} =
-             Agent.cmd(
-               after_agent,
-               F.signal([Directive.plugin_remove(F.Counter, state: :discard), %F.Owned{}])
-             )
   end
 
   @tag obligation: "jido.agent.I26"
@@ -444,11 +431,11 @@ defmodule Jido.Agent.MutationTest do
   end
 
   @tag obligation: "jido.agent.I27"
-  test "current route contract survives removal and the next input uses the new routes" do
+  test "route removal changes the candidate and leaves the source unchanged" do
     original = F.agent()
     remove = Directive.route_remove("run")
-    assert {:ok, next, [^remove]} = Agent.cmd(original, F.signal([remove]))
-    assert {:error, %Error{code: :unmatched_input}} = Agent.cmd(next, F.signal([]))
+    assert {:ok, next, _diff} = Agent.mutate(original, [remove])
+    assert next.routes == []
     assert original.routes != []
   end
 

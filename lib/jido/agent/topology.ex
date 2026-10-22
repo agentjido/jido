@@ -2,12 +2,16 @@ defmodule Jido.Agent.Topology do
   @moduledoc "Logical members and output connections. These declarations do not start processes."
   alias Jido.Agent.{Data, Error, Extension, Route, Validation}
 
+  @doc "Creates a symbolic reference to one parent Agent state field."
   def state(key), do: %{kind: :state, key: key}
+
+  @doc false
   def empty?(%{agents: [], connections: []}), do: true
   def empty?(_), do: false
 
   # These checks have no enclosing Agent. Full reference and contract checks
   # run when the complete candidate Agent is validated.
+  @doc false
   def validate(value) do
     with {:ok, value} <-
            Data.fields(value, [:agents, :connections], %{agents: [], connections: []}),
@@ -17,6 +21,7 @@ defmodule Jido.Agent.Topology do
          do: {:ok, %{agents: agents, connections: connections}}
   end
 
+  @doc false
   def entry(:agent, value) do
     with {:ok, value} <-
            Data.fields(value, [:name, :definition, :count, :initial_state, :identities], %{
@@ -52,6 +57,7 @@ defmodule Jido.Agent.Topology do
   defp identities(_),
     do: Error.fail(:invalid_member_identity, :identities, "Expected a member identity Map")
 
+  @doc false
   def normalize(value, parent, opts) do
     with {:ok, topology} <-
            Data.fields(value, [:agents, :connections], %{agents: [], connections: []}),

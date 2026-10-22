@@ -1,5 +1,5 @@
-defmodule Jido.Agent.ViewTest do
-  use ExUnit.Case, async: true
+defmodule JidoTest.Contract.AgentViewTest do
+  use Covenant.Case, component: "jido.agent", async: true
 
   alias Jido.Agent
   alias Jido.Agent.View
@@ -16,6 +16,7 @@ defmodule Jido.Agent.ViewTest do
     })
   end
 
+  @tag obligation: "jido.agent.I31"
   test "compiled and data Agent definitions use one JSON view contract" do
     assert {:ok, compiled} = View.project(CounterAgent, registry())
     assert {:ok, from_definition} = View.project(CounterAgent.definition(), registry())
@@ -62,6 +63,7 @@ defmodule Jido.Agent.ViewTest do
     refute Map.has_key?(view, "metadata")
   end
 
+  @tag obligation: "jido.agent.I31"
   test "an instance exposes identity but not state" do
     instance = CounterAgent.instantiate!(id: "alice", state: %{count: 4})
 
@@ -70,6 +72,7 @@ defmodule Jido.Agent.ViewTest do
     refute Map.has_key?(view, "state")
   end
 
+  @tag obligation: "jido.agent.I31"
   test "operation output is bounded and reports truncation" do
     definition =
       Agent.define!(%{
@@ -88,6 +91,7 @@ defmodule Jido.Agent.ViewTest do
              View.project(definition, registry(), operation_limit: 501)
   end
 
+  @tag obligation: "jido.agent.I31"
   test "operation limits also bound Registry resolution work" do
     definition =
       Agent.define!(%{
@@ -105,6 +109,7 @@ defmodule Jido.Agent.ViewTest do
     assert %{"total" => 2, "truncated" => true, "items" => [_]} = view["operations"]
   end
 
+  @tag obligation: "jido.agent.I31"
   test "projection requires identifiers for every exposed code value" do
     definition = CounterAgent.definition()
 
@@ -115,7 +120,6 @@ defmodule Jido.Agent.ViewTest do
       })
 
     assert {:error, %{message: message}} = View.project(definition, stable_without_action)
-
     assert message =~ "no reference"
   end
 end

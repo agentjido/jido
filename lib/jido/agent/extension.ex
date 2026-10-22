@@ -8,17 +8,38 @@ defmodule Jido.Agent.Extension do
   `runtime_support/0` is descriptive; Agent does not activate it.
   """
   alias Jido.Agent.{Data, Error}
+
+  @doc "Returns the stable authoring ID for this provider."
   @callback id() :: String.t()
+
+  @doc "Returns the positive authoring version for this provider."
   @callback vsn() :: pos_integer()
+
+  @doc "Lowers provider DSL and explicit Plugin configuration into provider data."
   @callback lower(map(), map()) :: {:ok, map()} | {:error, term()}
+
+  @doc "Normalizes provider data from any authoring path."
   @callback normalize(map()) :: {:ok, map()} | {:error, term()}
+
+  @doc "Checks provider data against the complete Agent definition."
   @callback verify(map(), map()) :: :ok | {:error, term()}
+
+  @doc "Names the optional runtime Plugin adapter for this provider."
   @callback runtime_support() :: :none | module()
+
+  @doc "Returns the logical endpoint kinds owned by this provider."
   @callback endpoint_kinds() :: [atom()]
+
+  @doc "Returns the logical endpoints contributed by normalized provider data."
   @callback endpoints(map()) :: [map()]
+
+  @doc "Returns modules that `use Jido.Agent` imports for this provider."
   @callback authoring_imports() :: [module()]
+
+  @doc "Checks one logical connection that references provider endpoints."
   @callback verify_connection(map(), map()) :: :ok | {:error, term()}
 
+  @doc "Defines one Agent authoring provider and its default callbacks."
   defmacro __using__(opts) do
     kind = Keyword.get(opts, :kind, :extension)
 
@@ -59,6 +80,7 @@ defmodule Jido.Agent.Extension do
     end
   end
 
+  @doc false
   def providers(providers) do
     with {:ok, providers} <- Data.list(providers, &provider/1),
          :ok <- Data.unique(providers, & &1),
@@ -68,6 +90,7 @@ defmodule Jido.Agent.Extension do
     end
   end
 
+  @doc false
   def provider(module) when is_atom(module) and module not in [nil, true, false] do
     callbacks = [{:sections, 0} | __MODULE__.behaviour_info(:callbacks)]
 
@@ -89,6 +112,7 @@ defmodule Jido.Agent.Extension do
   def provider(value),
     do: Error.fail(:invalid_provider, [], "Expected a provider module", %{provider: value})
 
+  @doc false
   def normalize(entries) do
     with {:ok, entries} <- Data.list(entries, &entry/1),
          {:ok, _} <- providers(Enum.map(entries, & &1.provider)),
@@ -114,6 +138,7 @@ defmodule Jido.Agent.Extension do
         Error.fail(:provider_identity, [], "Provider ID or version does not match its contract")
   end
 
+  @doc false
   def lower(providers, dsl, plugins) do
     with :ok <- Data.plain_map(dsl),
          :ok <- Data.plain_map(plugins),
@@ -129,6 +154,7 @@ defmodule Jido.Agent.Extension do
     end
   end
 
+  @doc false
   def verify(entries, definition) do
     with {:ok, _} <-
            Data.list(entries, fn entry ->
@@ -137,8 +163,10 @@ defmodule Jido.Agent.Extension do
          do: :ok
   end
 
+  @doc false
   def endpoints(entries), do: Enum.flat_map(entries, & &1.provider.endpoints(&1.data))
 
+  @doc false
   def verify_connection(entries, connection) do
     with {:ok, _} <-
            Data.list(entries, fn entry ->
