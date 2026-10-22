@@ -1,8 +1,14 @@
 - id: bundled-bus-boundary
   date: 2026-10-19
-  decision: Give local Bus declaration, Bus ownership, subscription, reconnect, delivery, and acknowledgement to jido.plugin.bus.
+  decision: Give local Bus declaration, Bus ownership, subscription, reconnect, delivery, and acknowledgement to jido.plugin.bus. Expose Manager, Client, and DSL. Keep their server and runtime modules internal.
   driver: These rules are bundled Bus Plugin behavior, not generic Plugin SDK behavior.
   approved_by: Approved Jido V3 Covenant component map
+
+- id: bus-public-api
+  date: 2026-10-22
+  decision: Keep Client options closed, typed, and owned by the AgentServer Plugin facet. Keep signal_bus as the only Bus-specific DSL and preserve direct data parity. Forward Manager options to the public jido_signal Bus boundary.
+  driver: The core Plugin owns its bridge configuration but must not duplicate Signal Bus routing or storage contracts.
+  approved_by: Component hardening pass
 
 - id: signal-bus-dependency-boundary
   date: 2026-10-19

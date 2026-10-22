@@ -19,16 +19,19 @@ defmodule JidoTest.AgentServerAssertions do
     end
   end
 
-  def replacement(activation, previous) do
-    JidoTest.Eventually.eventually(fn ->
-      case AgentServer.Supervisor.worker(activation) do
-        pid when is_pid(pid) and pid != previous ->
-          if AgentServer.await_ready(pid) == :ok, do: pid
+  def replacement(activation, previous, opts \\ []) do
+    JidoTest.Eventually.eventually(
+      fn ->
+        case AgentServer.Supervisor.worker(activation) do
+          pid when is_pid(pid) and pid != previous ->
+            if AgentServer.await_ready(pid) == :ok, do: pid
 
-        _ ->
-          nil
-      end
-    end)
+          _ ->
+            nil
+        end
+      end,
+      opts
+    )
   end
 
   def start_agent(instance, agent, opts \\ []) do

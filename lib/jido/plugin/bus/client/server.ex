@@ -1,5 +1,5 @@
 defmodule Jido.Plugin.Bus.Client.Server do
-  @moduledoc "Owns one Bus subscription runtime for the Client package."
+  @moduledoc false
   @behaviour Jido.Plugin
 
   alias Jido.Plugin.Bus.Client

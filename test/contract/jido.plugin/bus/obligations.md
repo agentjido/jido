@@ -21,12 +21,17 @@ The component does not own Signal Bus routing, storage, replay, cursor, or
 subscription internals. It also does not own generic Plugin callback timing or
 the work that a receiving Agent performs.
 
+The public boundary is `Jido.Plugin.Bus.Manager`, `Jido.Plugin.Bus.Client`,
+and `Jido.Plugin.Bus.DSL`. Their server and runtime modules are internal. The
+`signal_bus` section owns local endpoint declaration. Manager and Client use
+the standard Agent Plugin DSL and add no other DSL.
+
 ## Obligations
 
 ### jido.plugin.bus.I1 — Local Bus declaration
 
 - **scope:** `Jido.Plugin.Bus.DSL`, `Jido.Plugin.Bus.DSL.References`
-- **must:** Declare exactly one named local Bus, expose its endpoint, construct stable Bus references, reject Bus-to-Bus connections, and require single delivery when a connection publishes to a Bus.
+- **must:** Declare exactly one `signal_bus` section with a required atom name, provide direct data parity, expose its endpoint, construct stable Bus references, reject Bus-to-Bus connections, and require single delivery when a connection publishes to a Bus.
 - **kind:** functional
 - **status:** active
 
@@ -40,7 +45,7 @@ the work that a receiving Agent performs.
 ### jido.plugin.bus.I3 — Client configuration and subscription
 
 - **scope:** `Jido.Plugin.Bus.Client`, `Jido.Plugin.Bus.Client.Runtime`, `Jido.Plugin.Bus.Client.Server`
-- **must:** Apply the Client defaults, reject invalid owned options, subscribe with the selected scope and durable options, and fail initial subscription when the selected Bus is absent.
+- **must:** Accept only the typed AgentServer-owned `bus`, `durable`, `jido`, `path`, `retry_delay_ms`, `start_from`, and `timeout` options. Apply Client defaults, reject invalid scope and durable replay positions before subscription, subscribe with the selected scope and durable options, and fail initial subscription when the selected Bus is absent. Keep Signal Bus path, cursor, and subscription validation in `jido_signal`.
 - **kind:** functional
 - **status:** active
 

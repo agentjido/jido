@@ -1,5 +1,6 @@
 defmodule Jido.Plugin.Bus.DSL.References do
   @moduledoc false
+  @spec bus(atom()) :: %{kind: :bus, name: atom()}
   def bus(name), do: %{kind: :bus, name: name}
 end
 

@@ -10,6 +10,7 @@ defmodule JidoTest.Contract.PluginBusTest do
   alias Jido.Plugin.Bus.DSL.References
   alias Jido.Plugin.Bus.Manager
   alias Jido.Plugin.Init
+  alias Jido.Plugin.Normalizer
   alias Jido.Signal.Bus
   alias Jido.Signal.Bus.RecordedSignal
   alias JidoTest.Plugin.BusFixtures, as: F
@@ -139,6 +140,20 @@ defmodule JidoTest.Contract.PluginBusTest do
 
   @tag obligation: "jido.plugin.bus.I3"
   test "Client applies defaults and rejects each invalid owned option", %{jido: jido} do
+    assert %{
+             option_keys: %{
+               agent_server: [
+                 :bus,
+                 :durable,
+                 :jido,
+                 :path,
+                 :retry_delay_ms,
+                 :start_from,
+                 :timeout
+               ]
+             }
+           } = Client.__jido_plugin__()
+
     bus = start_supervised!({Bus, name: :client_config_bus, jido: jido})
     init = plugin_init(jido, bus: :client_config_bus)
     client = start_supervised!({Runtime, init})
@@ -166,6 +181,12 @@ defmodule JidoTest.Contract.PluginBusTest do
     assert boundary.config.timeout == 1
     assert :ok = Runtime.terminate(:normal, boundary)
 
+    nil_scope_init = plugin_init(jido, bus: :input, jido: nil)
+    task = Task.async(fn -> Runtime.init(nil_scope_init) end)
+    assert {:ok, nil_scope, {:continue, :subscribe}} = Task.await(task)
+    assert nil_scope.config.lookup_opts == []
+    assert :ok = Runtime.terminate(:normal, nil_scope)
+
     invalid = [
       {[], {:missing_bus_option, :bus}},
       {[bus: :input, path: ""], {:invalid_bus_path, ""}},
@@ -173,6 +194,9 @@ defmodule JidoTest.Contract.PluginBusTest do
       {[bus: :input, durable: ""], {:invalid_durable_id, ""}},
       {[bus: :input, durable: :consumer], {:invalid_durable_id, :consumer}},
       {[bus: :input, start_from: :origin], {:requires_option, :start_from, :durable}},
+      {[bus: :input, jido: "scope"], {:invalid_jido_scope, "scope"}},
+      {[bus: :input, durable: "consumer", start_from: -1], {:invalid_start_from, -1}},
+      {[bus: :input, durable: "consumer", start_from: :later], {:invalid_start_from, :later}},
       {[bus: :input, retry_delay_ms: 0], {:invalid_retry_delay, 0}},
       {[bus: :input, retry_delay_ms: :soon], {:invalid_retry_delay, :soon}},
       {[bus: :input, timeout: 0], {:invalid_timeout, 0}},
@@ -181,6 +205,20 @@ defmodule JidoTest.Contract.PluginBusTest do
 
     for {options, reason} <- invalid do
       assert {:error, ^reason} = Runtime.start_link(plugin_init(jido, options))
+    end
+
+    for start_from <- [:origin, :current, 0] do
+      init = plugin_init(jido, bus: :input, durable: "consumer", start_from: start_from)
+      task = Task.async(fn -> Runtime.init(init) end)
+      assert {:ok, state, {:continue, :subscribe}} = Task.await(task)
+      assert state.config.start_from == start_from
+      assert :ok = Runtime.terminate(:normal, state)
+    end
+
+    assert {:ok, [_spec]} = Normalizer.normalize_all([{Client, [bus: :input]}])
+
+    for opts <- [[bus: :input, unknown: true], [bus: :input, bus: :other]] do
+      assert {:error, _reason} = Normalizer.normalize_all([{Client, opts}])
     end
   end
 
@@ -447,24 +485,27 @@ defmodule JidoTest.Contract.PluginBusTest do
     bus = start_supervised!({Bus, name: :plugin_bus, jido: jido})
     assert {:ok, [_record]} = Bus.publish(bus, [signal("bus.input", %{value: 3})])
     {:ok, agent} = start_agent(jido, F.DurableAgent, "durable-reattach")
-    eventually(fn -> Server.agent(agent).state.values == [3] end)
+    eventually(fn -> Server.agent(agent).state.values == [3] end, timeout: 2_000)
 
     runtime = client_runtime(agent)
     root = Server.activation(agent)
     Process.exit(runtime, :kill)
-    agent = JidoTest.AgentServerAssertions.replacement(root, agent)
+    agent = JidoTest.AgentServerAssertions.replacement(root, agent, timeout: 2_000)
 
     replacement =
-      eventually(fn ->
-        case client_runtime(agent) do
-          pid when is_pid(pid) and pid != runtime -> pid
-          _pid -> nil
-        end
-      end)
+      eventually(
+        fn ->
+          case client_runtime(agent) do
+            pid when is_pid(pid) and pid != runtime -> pid
+            _pid -> nil
+          end
+        end,
+        timeout: 2_000
+      )
 
     assert Process.alive?(replacement)
     assert {:ok, [_record]} = Bus.publish(bus, [signal("bus.input", %{value: 4})])
-    eventually(fn -> Server.agent(agent).state.values == [3, 4] end)
+    eventually(fn -> Server.agent(agent).state.values == [3, 4] end, timeout: 2_000)
   end
 
   @tag obligation: "jido.plugin.bus.I8"

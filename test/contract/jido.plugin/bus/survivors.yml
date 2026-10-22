@@ -10,31 +10,31 @@
   sort: unpromised
   reason: The contract fixes explicit timeout forwarding and structured runtime failure. It does not fix the internal default readiness wait budget.
 
-- at: lib/jido/plugin/bus/dsl.ex:21:43
+- at: lib/jido/plugin/bus/dsl.ex:22:43
   operator: string_empty
   mutation: "`\"Use Signal bus DSL or Plugin data, not both\"` → `\"\"`"
   sort: unpromised
   reason: The contract fixes the ambiguous-configuration error code. It does not fix its explanatory prose.
 
-- at: lib/jido/plugin/bus/dsl.ex:30:35
+- at: lib/jido/plugin/bus/dsl.ex:31:35
   operator: string_empty
   mutation: "`\"Signal bus needs an explicit local name\"` → `\"\"`"
   sort: unpromised
   reason: The contract fixes the missing-name error code. It does not fix its explanatory prose.
 
-- at: lib/jido/plugin/bus/dsl.ex:40:46
+- at: lib/jido/plugin/bus/dsl.ex:41:46
   operator: string_empty
   mutation: "`\"This provider declares exactly one local bus\"` → `\"\"`"
   sort: unpromised
   reason: The contract fixes the one-Bus rule and error code. It does not fix its explanatory prose.
 
-- at: lib/jido/plugin/bus/dsl.ex:57:37
+- at: lib/jido/plugin/bus/dsl.ex:58:37
   operator: string_empty
   mutation: "`\"Bus-to-bus connections are not supported\"` → `\"\"`"
   sort: unpromised
   reason: The contract fixes the rejected connection shape and error code. It does not fix its explanatory prose.
 
-- at: lib/jido/plugin/bus/dsl.ex:60:46
+- at: lib/jido/plugin/bus/dsl.ex:61:46
   operator: string_empty
   mutation: "`\"Publication to a bus uses :single delivery\"` → `\"\"`"
   sort: unpromised

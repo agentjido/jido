@@ -2941,11 +2941,12 @@
         "jido.plugin.bus.I1": {
           "failing": 0,
           "kind": "functional",
-          "passing": 1,
+          "passing": 2,
           "status": "active",
           "testable": true,
           "tests": [
-            "test Bus declarations produce one named endpoint and stable references"
+            "test Bus declarations produce one named endpoint and stable references",
+            "test Bus exposes only its Plugins, DSL, and Client option types"
           ]
         },
         "jido.plugin.bus.I2": {
@@ -2962,10 +2963,11 @@
         "jido.plugin.bus.I3": {
           "failing": 0,
           "kind": "functional",
-          "passing": 2,
+          "passing": 3,
           "status": "active",
           "testable": true,
           "tests": [
+            "test Bus exposes only its Plugins, DSL, and Client option types",
             "test Client applies defaults and rejects each invalid owned option",
             "test initial subscription fails when the selected Bus is absent"
           ]
@@ -2973,10 +2975,11 @@
         "jido.plugin.bus.I4": {
           "failing": 0,
           "kind": "functional",
-          "passing": 3,
+          "passing": 4,
           "status": "active",
           "testable": true,
           "tests": [
+            "test Bus exposes only its Plugins, DSL, and Client option types",
             "test Client ignores foreign lifecycle and durable delivery messages",
             "test Client reconnect timer attaches to a replacement Bus",
             "test readiness reconnects to a replacement and ignores stale work"

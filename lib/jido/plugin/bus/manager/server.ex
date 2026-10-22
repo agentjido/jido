@@ -1,5 +1,5 @@
 defmodule Jido.Plugin.Bus.Manager.Server do
-  @moduledoc "Owns one local Signal Bus for the Manager package."
+  @moduledoc false
   @behaviour Jido.Plugin
 
   alias Jido.Plugin.Bus.Manager

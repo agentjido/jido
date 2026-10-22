@@ -243,6 +243,7 @@ defmodule Jido.Plugin.Bus.Client.Runtime do
     }
 
     with :ok <- validate_bus(config.bus),
+         :ok <- validate_scope(scope),
          :ok <- validate_path(config.path),
          :ok <- validate_durable(config.durable),
          :ok <- validate_start_from(config.start_from, config.durable),
@@ -254,6 +255,10 @@ defmodule Jido.Plugin.Bus.Client.Runtime do
 
   defp validate_bus(nil), do: {:error, {:missing_bus_option, :bus}}
   defp validate_bus(_bus), do: :ok
+
+  defp validate_scope(nil), do: :ok
+  defp validate_scope(scope) when is_atom(scope), do: :ok
+  defp validate_scope(scope), do: {:error, {:invalid_jido_scope, scope}}
 
   defp validate_path(path) when is_binary(path) and path != "", do: :ok
   defp validate_path(path), do: {:error, {:invalid_bus_path, path}}
@@ -267,7 +272,16 @@ defmodule Jido.Plugin.Bus.Client.Runtime do
   defp validate_start_from(_start_from, nil),
     do: {:error, {:requires_option, :start_from, :durable}}
 
-  defp validate_start_from(_start_from, _durable), do: :ok
+  defp validate_start_from(start_from, _durable)
+       when start_from in [:origin, :current],
+       do: :ok
+
+  defp validate_start_from(start_from, _durable)
+       when is_integer(start_from) and start_from >= 0,
+       do: :ok
+
+  defp validate_start_from(start_from, _durable),
+    do: {:error, {:invalid_start_from, start_from}}
 
   defp validate_positive(value, _error) when is_integer(value) and value > 0, do: :ok
   defp validate_positive(value, error), do: {:error, {error, value}}

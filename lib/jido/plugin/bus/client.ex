@@ -16,7 +16,25 @@ defmodule Jido.Plugin.Bus.Client do
       ]
   """
 
-  use Jido.Plugin
+  use Jido.Plugin,
+    option_keys: [
+      agent_server: [:bus, :durable, :jido, :path, :retry_delay_ms, :start_from, :timeout]
+    ]
+
+  alias Jido.Signal.Bus
+
+  @typedoc "A durable subscription starting position."
+  @type start_position :: :origin | :current | non_neg_integer()
+
+  @typedoc "One Client Plugin option."
+  @type option ::
+          {:bus, Bus.server()}
+          | {:durable, Bus.durable_id() | nil}
+          | {:jido, atom() | nil}
+          | {:path, Bus.path()}
+          | {:retry_delay_ms, pos_integer()}
+          | {:start_from, start_position() | nil}
+          | {:timeout, pos_integer()}
 
   @impl true
   defdelegate await_ready(runtime, opts), to: Jido.Plugin.Bus.Client.Server
