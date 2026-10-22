@@ -50,7 +50,9 @@ defmodule JidoTest.AgentServer.ApiTest do
              {:type, :child_tag, 0},
              {:type, :pending, 0},
              {:type, :server, 0},
-             {:type, :signal_result, 0}
+             {:type, :signal_result, 0},
+             {:type, :snapshot, 0},
+             {:type, :upgrade_option, 0}
            ]
 
     assert public_module?(AgentServer)

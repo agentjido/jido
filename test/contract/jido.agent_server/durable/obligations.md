@@ -10,6 +10,10 @@ the points where a live Agent becomes durable or is rebuilt from durable state.
 It does not own persistence record formats, local activation checkpoints,
 Plugin callback rules, or durable Flow progress.
 
+The public boundary is `Jido.AgentServer.hibernate/2`, `snapshot/2`, and
+`upgrade/3`. `Jido.AgentServer.Durable` is internal. Persistence configuration
+uses AgentServer options; this component has no DSL.
+
 ## Obligations
 
 ### jido.agent_server.durable.I1 — Explicit durable configuration
@@ -106,4 +110,12 @@ Plugin callback rules, or durable Flow progress.
 - **must:** Serialize an explicit snapshot upgrade Action with Turns. Run portable snapshot conversion and upgrade outside the server. Reject malformed results and returned Directives. Hand the restored target to composition validation, then use the normal revision, durable save, local checkpoint, and reconciliation boundaries. Preserve the accepted Agent and revision on rejection and restore an accepted durable upgrade after recovery.
 - **why:** A definition upgrade must use the same accepted-state boundaries as other work.
 - **kind:** ordering
+- **status:** active
+
+### jido.agent_server.durable.I13 — Public durable API
+
+- **scope:** `Jido.AgentServer.hibernate/2`, `snapshot/2`, `upgrade/3`
+- **must:** Keep the exact durable operations on the documented `Jido.AgentServer` facade. Document and type atomic snapshots, upgrade options, results, and errors. Keep durable coordination internal. Do not add a durable DSL or expose adapter coordination.
+- **why:** Users need one stable durable boundary without access to storage orchestration internals.
+- **kind:** functional
 - **status:** active

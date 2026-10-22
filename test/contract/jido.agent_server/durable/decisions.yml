@@ -21,3 +21,9 @@
   decision: Mutate only Jido.AgentServer.Durable in the focused profile. Keep Jido.AgentServer, Jido.Persistence, the activation Supervisor, and DurableTurn out of this profile.
   driver: The focused profile must test extracted durable decisions without overlapping core, persistence, activation, or durable Flow owners.
   approved_by: Component hardening pass
+
+- id: durable-public-api
+  date: 2026-10-22
+  decision: Keep hibernate, atomic snapshot, and snapshot upgrade operations on Jido.AgentServer. Type snapshot and upgrade inputs. Keep Durable internal and keep persistence configuration as AgentServer options rather than a DSL.
+  driver: Durable coordination needs one public facade without exposing adapter or state-machine internals.
+  approved_by: Component hardening pass

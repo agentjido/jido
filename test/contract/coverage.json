@@ -6,9 +6,9 @@
       "covered": 124
     },
     "jido.agent_server": {
-      "active": 70,
+      "active": 71,
       "coverage": 1.0,
-      "covered": 70
+      "covered": 71
     },
     "jido.plugin": {
       "active": 34,
@@ -1361,10 +1361,10 @@
       }
     },
     "jido.agent_server.durable": {
-      "active": 12,
+      "active": 13,
       "app": "jido.agent_server",
       "coverage": 1.0,
-      "covered": 12,
+      "covered": 13,
       "form": "light",
       "obligations": {
         "jido.agent_server.durable.I1": {
@@ -1404,14 +1404,26 @@
         "jido.agent_server.durable.I12": {
           "failing": 0,
           "kind": "ordering",
-          "passing": 4,
+          "passing": 5,
           "status": "active",
           "testable": true,
           "tests": [
             "test an explicit upgrade changes schema and routes without using the source definition",
             "test durable and local recovery retain a live upgrade",
             "test invalid upgrades preserve the complete accepted Agent and revision",
-            "test live upgrades serialize with Turns and preserve the previous snapshot until commit"
+            "test live upgrades serialize with Turns and preserve the previous snapshot until commit",
+            "test upgrade options are closed and accept the documented Map form"
+          ]
+        },
+        "jido.agent_server.durable.I13": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 2,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test durable operations stay on the typed AgentServer facade",
+            "test upgrade options are closed and accept the documented Map form"
           ]
         },
         "jido.agent_server.durable.I2": {
@@ -3613,8 +3625,8 @@
   },
   "covenant": "0.2.0",
   "totals": {
-    "active": 228,
+    "active": 229,
     "coverage": 1.0,
-    "covered": 228
+    "covered": 229
   }
 }

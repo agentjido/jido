@@ -51,6 +51,12 @@ defmodule Jido.AgentServer do
           | {:restart, Supervisor.restart()}
           | {:meta, map()}
 
+  @typedoc "One committed Agent and revision read in the same server event."
+  @type snapshot :: %{agent: Jido.Agent.instance(), state_version: non_neg_integer()}
+
+  @typedoc "One option for a serialized snapshot upgrade."
+  @type upgrade_option :: {:context, map()} | {:timeout, timeout()}
+
   require Logger
 
   alias Jido.Agent
@@ -889,11 +895,20 @@ defmodule Jido.AgentServer do
     do: invalid_options("expected a complete child Agent instance")
 
   @doc "Returns one committed Agent and revision from the same server event."
+  @spec snapshot(server(), timeout()) :: snapshot() | {:error, term()}
   def snapshot(server, timeout \\ 5_000) do
     with :ok <- Core.validate_wait(timeout), do: :gen_statem.call(server, :snapshot, timeout)
   end
 
-  @doc "Runs a snapshot upgrade Action through the serial commit boundary."
+  @doc """
+  Runs a snapshot upgrade Action through the serial commit boundary.
+
+  Options can be a unique keyword list or plain Map. They are `context:` with
+  a plain Map and `timeout:` with a valid wait timeout. A successful upgrade
+  returns the accepted Agent with no Directives.
+  """
+  @spec upgrade(server(), term(), map() | [upgrade_option()]) ::
+          {:ok, Agent.instance(), []} | {:error, term()}
   def upgrade(server, action, opts \\ []) do
     with {:ok, options} <- Jido.Agent.Validation.options(opts, [:context, :timeout]),
          context = Map.get(options, :context, %{}),

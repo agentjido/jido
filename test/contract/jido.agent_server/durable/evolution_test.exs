@@ -139,6 +139,29 @@ defmodule JidoTest.AgentServer.Durable.EvolutionTest do
     assert Server.snapshot(server) == initial
   end
 
+  @tag obligation: [
+         "jido.agent_server.durable.I12",
+         "jido.agent_server.durable.I13"
+       ]
+  test "upgrade options are closed and accept the documented Map form", c do
+    server = start(c)
+    initial = Server.snapshot(server)
+
+    for opts <- [
+          [unknown: true],
+          [context: %{}, context: %{}],
+          [context: self()],
+          [timeout: -1],
+          :invalid
+        ] do
+      assert {:error, _} = Server.upgrade(server, Upgrade, opts)
+      assert Server.snapshot(server) == initial
+    end
+
+    assert {:ok, upgraded, []} = Server.upgrade(server, Upgrade, %{context: %{}})
+    assert upgraded.vsn == 2
+  end
+
   @tag obligation: "jido.agent_server.durable.I12"
   test "durable and local recovery retain a live upgrade", c do
     initial = %{E.agent() | id: unique_id("upgrade-recovery")}
