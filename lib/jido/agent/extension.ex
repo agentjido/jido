@@ -8,6 +8,7 @@ defmodule Jido.Agent.Extension do
   `runtime_support/0` is descriptive; Agent does not activate it.
   """
   alias Jido.Agent.{Data, Error}
+  alias Jido.Authoring.{Registry, Value}
 
   @doc "Returns the stable authoring ID for this provider."
   @callback id() :: String.t()
@@ -39,6 +40,16 @@ defmodule Jido.Agent.Extension do
   @doc "Checks one logical connection that references provider endpoints."
   @callback verify_connection(map(), map()) :: :ok | {:error, term()}
 
+  @doc "Encodes normalized provider data for an Agent authoring document."
+  @callback encode_authoring_data(map(), Registry.t()) ::
+              {:ok, term()} | {:error, term()}
+
+  @doc "Decodes provider data from an Agent authoring document."
+  @callback decode_authoring_data(term(), Registry.t()) ::
+              {:ok, term()} | {:error, term()}
+
+  @optional_callbacks encode_authoring_data: 2, decode_authoring_data: 2
+
   @doc "Defines one Agent authoring provider and its default callbacks."
   defmacro __using__(opts) do
     kind = Keyword.get(opts, :kind, :extension)
@@ -69,6 +80,12 @@ defmodule Jido.Agent.Extension do
       def endpoints(_data), do: []
       def verify_connection(_data, _connection), do: :ok
 
+      def encode_authoring_data(data, registry),
+        do: Jido.Authoring.Value.encode(data, registry)
+
+      def decode_authoring_data(data, registry),
+        do: Jido.Authoring.Value.decode(data, registry)
+
       defoverridable lower: 2,
                      normalize: 1,
                      verify: 2,
@@ -76,8 +93,24 @@ defmodule Jido.Agent.Extension do
                      authoring_imports: 0,
                      endpoint_kinds: 0,
                      endpoints: 1,
-                     verify_connection: 2
+                     verify_connection: 2,
+                     encode_authoring_data: 2,
+                     decode_authoring_data: 2
     end
+  end
+
+  @doc false
+  @spec encode_authoring_data(module(), map(), Registry.t()) ::
+          {:ok, term()} | {:error, term()}
+  def encode_authoring_data(provider, data, %Registry{} = registry) do
+    authoring_data(provider, :encode_authoring_data, data, registry, &Value.encode/2)
+  end
+
+  @doc false
+  @spec decode_authoring_data(module(), term(), Registry.t()) ::
+          {:ok, term()} | {:error, term()}
+  def decode_authoring_data(provider, data, %Registry{} = registry) do
+    authoring_data(provider, :decode_authoring_data, data, registry, &Value.decode/2)
   end
 
   @doc false
@@ -92,7 +125,10 @@ defmodule Jido.Agent.Extension do
 
   @doc false
   def provider(module) when is_atom(module) and module not in [nil, true, false] do
-    callbacks = [{:sections, 0} | __MODULE__.behaviour_info(:callbacks)]
+    required_callbacks =
+      __MODULE__.behaviour_info(:callbacks) -- __MODULE__.behaviour_info(:optional_callbacks)
+
+    callbacks = [{:sections, 0} | required_callbacks]
 
     if match?({:module, _}, Code.ensure_compiled(module)) and
          Enum.all?(callbacks, fn {f, a} -> function_exported?(module, f, a) end) do
@@ -195,6 +231,45 @@ defmodule Jido.Agent.Extension do
       true ->
         with :ok <- Data.unique(sections, & &1), do: Data.unique(kinds, & &1)
     end
+  end
+
+  defp authoring_data(provider, callback, data, registry, fallback) do
+    result =
+      if function_exported?(provider, callback, 2),
+        do: apply(provider, callback, [data, registry]),
+        else: fallback.(data, registry)
+
+    case result do
+      {:ok, _value} = success ->
+        success
+
+      {:error, _error} = error ->
+        error
+
+      other ->
+        Error.fail(
+          :provider_authoring_data,
+          [],
+          "Provider authoring callback returned an invalid value",
+          %{provider: provider, callback: callback, value: other}
+        )
+    end
+  rescue
+    exception ->
+      Error.fail(
+        :provider_authoring_data,
+        [],
+        "Provider authoring callback failed",
+        %{provider: provider, callback: callback, reason: Exception.message(exception)}
+      )
+  catch
+    kind, reason ->
+      Error.fail(
+        :provider_authoring_data,
+        [],
+        "Provider authoring callback failed",
+        %{provider: provider, callback: callback, failure_kind: kind, reason: inspect(reason)}
+      )
   end
 
   defp result({:error, %Error{}} = error), do: error

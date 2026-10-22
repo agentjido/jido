@@ -83,6 +83,40 @@ definition. Keep them deterministic: no processes, no Actions, no I/O.
 | `normalize/1` | Any authoring path validates the entry: DSL, `Jido.Agent.define/1`, or the Codec. |
 | `verify/2` | Jido checks the entry against the complete definition. |
 
+### Store Typed Authoring Data
+
+The Agent Codec must make Extension data safe for JSON. The default Extension
+implementation uses `Jido.Authoring.Value`. This works for maps, lists, strings,
+numbers, booleans, and other supported values.
+
+Override `encode_authoring_data/2` and `decode_authoring_data/2` when the data
+contains typed references. For example, a Plugin can store an Action, a Flow,
+or a schema. Use the trusted `Jido.Authoring.Registry` that Jido passes to each
+callback:
+
+```elixir
+@impl Jido.Agent.Extension
+def encode_authoring_data(%{action: action}, registry) do
+  with {:ok, reference} <-
+         Jido.Authoring.Registry.encode_reference(registry, :action, action) do
+    {:ok, %{"action" => reference}}
+  end
+end
+
+@impl Jido.Agent.Extension
+def decode_authoring_data(%{"action" => reference}, registry) do
+  with {:ok, action} <-
+         Jido.Authoring.Registry.decode_reference(registry, reference, :action) do
+    {:ok, %{action: action}}
+  end
+end
+```
+
+Jido resolves the Extension provider through the Registry before it calls the
+decoder. The Registry must also contain each referenced Action, Flow, or schema.
+Do not create atoms or modules from JSON input. Keep both callbacks deterministic
+and free of runtime work.
+
 ## Write a Plugin
 
 A Plugin implements any of the `Jido.Plugin` callbacks. Jido reads which

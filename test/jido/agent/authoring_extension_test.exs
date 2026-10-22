@@ -138,10 +138,15 @@ defmodule JidoTest.Agent.AuthoringExtensionTest do
                verify: 2,
                runtime_support: 0,
                authoring_imports: 0,
+               encode_authoring_data: 2,
+               decode_authoring_data: 2,
                endpoint_kinds: 0,
                endpoints: 1,
                verify_connection: 2
              )
+
+    assert Enum.sort(Extension.behaviour_info(:optional_callbacks)) ==
+             Enum.sort(encode_authoring_data: 2, decode_authoring_data: 2)
 
     for value <- [NoSections, String, nil, true, false, 1, "module", %{}] do
       assert {:error,

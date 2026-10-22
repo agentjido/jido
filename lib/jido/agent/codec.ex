@@ -2,7 +2,7 @@ defmodule Jido.Agent.Codec do
   @moduledoc false
 
   alias Jido.Agent
-  alias Jido.Agent.{Authoring, Error}
+  alias Jido.Agent.{Authoring, Error, Extension}
   alias Jido.Authoring.{Issue, Registry, Value}
 
   @fields ~w(module name description vsn schema metadata signal_source routes topology extensions)a
@@ -284,7 +284,8 @@ defmodule Jido.Agent.Codec do
   defp encode_extension(extension, registry) do
     with {:ok, provider} <-
            encode_reference(extension.provider, registry, [:extension, :plugin]),
-         {:ok, data} <- Value.encode(extension.data, registry) do
+         {:ok, data} <-
+           Extension.encode_authoring_data(extension.provider, extension.data, registry) do
       {:ok,
        %{
          "id" => extension.id,
@@ -306,7 +307,11 @@ defmodule Jido.Agent.Codec do
              ),
              ["provider"]
            ),
-         {:ok, data} <- at(Value.decode(extension["data"], registry), ["data"]) do
+         {:ok, data} <-
+           at(
+             Extension.decode_authoring_data(provider, extension["data"], registry),
+             ["data"]
+           ) do
       {:ok,
        %{
          id: extension["id"],

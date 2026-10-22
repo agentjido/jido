@@ -12,6 +12,31 @@ defmodule Jido.AuthoringIntegrationTest do
     def state_spec(_opts), do: :none
   end
 
+  defmodule ReferencedAction do
+    use Jido.Action, name: "referenced_action"
+    def run(_params, _context), do: {:ok, %{}}
+  end
+
+  defmodule ReferencedExtension do
+    use Jido.Agent.Extension, id: "tests/extensions/referenced"
+
+    @impl Jido.Agent.Extension
+    def encode_authoring_data(%{target: target}, registry) do
+      with {:ok, reference} <- Registry.encode_reference(registry, :action, target),
+           do: {:ok, %{"target" => reference}}
+    end
+
+    @impl Jido.Agent.Extension
+    def decode_authoring_data(%{"target" => reference} = data, registry)
+        when map_size(data) == 1 do
+      with {:ok, target} <- Registry.decode_reference(registry, reference, :action),
+           do: {:ok, %{target: target}}
+    end
+
+    def decode_authoring_data(_data, _registry),
+      do: Jido.Agent.Error.fail(:invalid_data, [], "Invalid referenced extension data")
+  end
+
   defmodule Agent do
     use Jido.Agent, id: "tests/agents/sample", name: "sample_agent"
   end
@@ -69,6 +94,46 @@ defmodule Jido.AuthoringIntegrationTest do
 
     assert Registry.codec(Jido.Discovery.registry(), "jido.agent.definition", 1) ==
              {:ok, Jido.Agent.Codec}
+  end
+
+  test "an extension can encode and decode typed Registry references" do
+    definition =
+      Jido.Agent.define!(%{
+        name: "referenced_extension_agent",
+        extensions: [
+          %{
+            id: ReferencedExtension.id(),
+            provider: ReferencedExtension,
+            vsn: ReferencedExtension.vsn(),
+            data: %{target: ReferencedAction}
+          }
+        ]
+      })
+
+    registry =
+      Registry.new!(%{
+        {"tests/schemas/referenced-extension-agent", 1} => {:schema, definition.schema},
+        {"tests/extensions/referenced", 1} => {:extension, ReferencedExtension},
+        {"tests/actions/referenced", 1} => {:action, ReferencedAction}
+      })
+
+    assert {:ok, document} =
+             Jido.Authoring.encode(definition, registry: registry, codec: Jido.Agent.Codec)
+
+    assert get_in(document, ["definition", "extensions", Access.at(0), "data"]) == %{
+             "target" => %{"id" => "tests/actions/referenced", "vsn" => 1}
+           }
+
+    assert {:ok, ^definition} =
+             Jido.Authoring.decode(document, registry: registry, codec: Jido.Agent.Codec)
+
+    restricted =
+      registry.entries
+      |> Map.delete({"tests/actions/referenced", 1})
+      |> Registry.new!()
+
+    assert {:error, _issues} =
+             Jido.Authoring.decode(document, registry: restricted, codec: Jido.Agent.Codec)
   end
 
   test "legacy Agent and Plugin authoring facades are not exported" do
