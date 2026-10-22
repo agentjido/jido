@@ -24,6 +24,33 @@ defmodule Jido.AgentServer do
   @typedoc "The result of one accepted Agent Turn."
   @type signal_result :: {:ok, Jido.Agent.instance(), [struct()]} | {:error, term()}
 
+  @typedoc "A unique atom or string that identifies one child relationship."
+  @type child_tag :: atom() | String.t()
+
+  @typedoc "One live child worker and its complete activation."
+  @type child_info :: %{
+          pid: pid(),
+          activation: pid(),
+          placement: :owned | :independent
+        }
+
+  @typedoc "One option for a new child relationship and AgentServer."
+  @type child_option ::
+          {:placement, :owned | :independent}
+          | {:on_parent_exit, :stop | :continue | :emit_orphan}
+          | {:orphan_dispatch, Jido.Signal.Dispatch.dispatch_configs()}
+          | {:restart, Supervisor.restart()}
+          | {:server_options, keyword()}
+          | {:meta, map()}
+
+  @typedoc "One option for adopting an existing independent child."
+  @type adoption_option ::
+          {:placement, :independent}
+          | {:on_parent_exit, :stop | :continue | :emit_orphan}
+          | {:orphan_dispatch, Jido.Signal.Dispatch.dispatch_configs()}
+          | {:restart, Supervisor.restart()}
+          | {:meta, map()}
+
   require Logger
 
   alias Jido.Agent
@@ -843,9 +870,15 @@ defmodule Jido.AgentServer do
   Starts a tagged local child Agent. The default `placement: :owned` puts its
   activation under the parent. `:independent` uses the instance supervisor.
   Independent children accept `on_parent_exit: :stop | :continue | :emit_orphan`.
-  The last policy requires `orphan_dispatch:`. Parent means activation lifetime,
-  not one server PID. A caller timeout does not cancel supervised startup.
+  The last policy requires `orphan_dispatch:`. `restart:` defaults to
+  `:transient`. `server_options:` can set AgentServer runtime options, but
+  cannot replace the Agent identity, OTP name, instance, partition, or Runner.
+  `meta:` must be a plain Map and is returned in the child's parent status.
+  Parent means activation lifetime, not one server PID. A caller timeout does
+  not cancel supervised startup.
   """
+  @spec spawn_child(server(), Agent.instance(), child_tag(), [child_option()]) ::
+          {:ok, pid()} | {:error, term()}
   def spawn_child(server, agent, tag, opts \\ [])
 
   def spawn_child(server, %Agent{} = agent, tag, opts) do
@@ -872,6 +905,8 @@ defmodule Jido.AgentServer do
   end
 
   @doc "Returns live tagged children with separate worker and activation PIDs."
+  @spec children(server(), timeout()) ::
+          %{optional(child_tag()) => child_info()} | {:error, term()}
   def children(server, timeout \\ 5_000) do
     with :ok <- Core.validate_wait(timeout) do
       context = :gen_statem.call(server, :child_context, timeout)
@@ -880,6 +915,7 @@ defmodule Jido.AgentServer do
   end
 
   @doc "Returns live topology members in slot order. Await readiness before use."
+  @spec members(server(), atom(), timeout()) :: [pid()] | {:error, term()}
   def members(server, name, timeout \\ 5_000) do
     with :ok <- Core.validate_wait(timeout),
          do: :gen_statem.call(server, {:topology_members, name}, timeout)
@@ -889,6 +925,7 @@ defmodule Jido.AgentServer do
   Stops the complete tagged child activation and confirms its shutdown.
   Removing a permanent entry uses OTP supervisor shutdown.
   """
+  @spec stop_child(server(), child_tag(), term()) :: :ok | {:error, term()}
   def stop_child(server, tag, reason \\ :shutdown) do
     CompositionRuntime.stop_child(server, tag, reason)
   end
@@ -896,8 +933,11 @@ defmodule Jido.AgentServer do
   @doc """
   Attaches an independent orphan to a new logical parent in the same instance
   and partition. Rejects bare workers, unavailable ancestry, and adoption while
-  an orphan notification is pending.
+  an orphan notification is pending. Accepts relationship options only; it does
+  not reconfigure the existing child AgentServer.
   """
+  @spec adopt_child(server(), server(), child_tag(), [adoption_option()]) ::
+          :ok | {:error, term()}
   def adopt_child(server, child, tag, opts \\ []) do
     CompositionRuntime.adopt_child(server, child, tag, opts)
   end

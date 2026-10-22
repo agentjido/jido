@@ -11,6 +11,11 @@ Protect live child and connection resources that follow accepted Agent data.
 This component does not own pure topology data validation, Turn evaluation,
 Plugin callback behavior, effect ordering, or durable storage.
 
+The public boundary is the child and member API on `Jido.AgentServer`.
+`CompositionRuntime`, `TopologyRuntime`, and `TopologyBus` are internal. The
+logical topology and Bus declarations belong to the `Jido.Agent` DSL; this
+runtime component has no separate DSL.
+
 ## Obligations
 
 ### jido.agent_server.composition.I1 — Owned child activations
@@ -40,7 +45,7 @@ Plugin callback behavior, effect ordering, or durable storage.
 ### jido.agent_server.composition.I4 — Child admission and cleanup
 
 - **scope:** child start, stop, and adoption
-- **must:** Validate the complete child, unique tag, placement, restart policy, parent-loss policy, server options, instance, and orphan dispatch before ownership changes. Reserve each tag once. Release reservations, caller monitors, roots, and terminal child records after failure or confirmed stop. A dead startup caller cannot attach an old child after tag reuse. If a new root has no live worker, stop it and return worker_unavailable.
+- **must:** Validate the complete child, unique tag, placement, restart policy, parent-loss policy, server options, relationship metadata, instance, and orphan dispatch before ownership changes. Child server options accept runtime settings only and cannot replace identity or ownership. Adoption cannot reconfigure the existing child server. Reserve each tag once. Release reservations, caller monitors, roots, and terminal child records after failure or confirmed stop. A dead startup caller cannot attach an old child after tag reuse. If a new root has no live worker, stop it and return worker_unavailable.
 - **why:** Failed or concurrent child operations must not leak ownership.
 - **kind:** ordering
 - **status:** active
@@ -82,5 +87,13 @@ Plugin callback behavior, effect ordering, or durable storage.
 - **scope:** runtime Agent start and stop Directives
 - **must:** Restart permanent runtime Agents after worker stop. Remove a permanent supervisor entry after explicit stop. Do not restart temporary runtime Agents, and release their names and child tags after stop so a later start can reuse them.
 - **why:** Runtime child lifetime is a composition rule, not an effect-delivery rule.
+- **kind:** functional
+- **status:** active
+
+### jido.agent_server.composition.I10 — Public composition API
+
+- **scope:** `Jido.AgentServer.spawn_child/4`, `children/2`, `members/3`, `stop_child/3`, `adopt_child/4`
+- **must:** Keep the exact composition operations on the documented `Jido.AgentServer` facade. Document and type child tags, live child records, spawn options, adoption options, results, and errors. Keep composition runtime modules internal. Do not add a second runtime DSL.
+- **why:** Users need one stable composition boundary without access to resource-hosting internals.
 - **kind:** functional
 - **status:** active

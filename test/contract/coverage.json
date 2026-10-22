@@ -6,9 +6,9 @@
       "covered": 124
     },
     "jido.agent_server": {
-      "active": 69,
+      "active": 70,
       "coverage": 1.0,
-      "covered": 69
+      "covered": 70
     },
     "jido.plugin": {
       "active": 34,
@@ -1211,10 +1211,10 @@
       }
     },
     "jido.agent_server.composition": {
-      "active": 9,
+      "active": 10,
       "app": "jido.agent_server",
       "coverage": 1.0,
-      "covered": 9,
+      "covered": 10,
       "form": "light",
       "obligations": {
         "jido.agent_server.composition.I1": {
@@ -1228,6 +1228,16 @@
             "test child restart refreshes inspection and a stopped tag can be reused",
             "test owned children and nested Plugin trees stop with the complete parent activation",
             "test whole child root replacement refreshes the tracked activation"
+          ]
+        },
+        "jido.agent_server.composition.I10": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 1,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test composition stays on the typed AgentServer facade"
           ]
         },
         "jido.agent_server.composition.I2": {
@@ -3456,36 +3466,36 @@
             "test a live instance source supplies its namespace and debug scope",
             "test a partial process pair is not an instance debug scope",
             "test an inferred instance source applies only its own debug override",
-            "test configure/2 disables a stale override when debug is absent",
-            "test configure/2 enables :verbose",
-            "test configure/2 enables true as normal debug",
-            "test configure/2 keeps debug off for false",
-            "test disable/1 disables debug mode",
-            "test disable/1 idempotent - can disable when already off",
+            "test configure_debug/2 disables a stale override when debug is absent",
+            "test configure_debug/2 enables :verbose",
+            "test configure_debug/2 enables true as normal debug",
+            "test configure_debug/2 keeps debug off for false",
+            "test debug_status/1 malformed runtime state uses the disabled defaults",
+            "test debug_status/1 overrides returns nil for unknown override key",
+            "test debug_status/1 overrides returns nil when debug is off",
+            "test debug_status/1 overrides returns override when :on",
+            "test debug_status/1 overrides returns override when :verbose",
+            "test debug_status/1 returns off status when disabled",
+            "test debug_status/1 returns status map when enabled",
+            "test disable through set_debug/2 disables debug mode",
+            "test disable through set_debug/2 idempotent - can disable when already off",
             "test effects failure is a semantic error log",
-            "test enable/2 and level/1 default level is :off",
-            "test enable/2 and level/1 enable :off disables",
-            "test enable/2 and level/1 enable :on sets level",
-            "test enable/2 and level/1 enable :verbose sets level",
-            "test enable/2 and level/1 rejects an unsupported level",
-            "test enabled?/1 false when off",
-            "test enabled?/1 true when on",
-            "test enabled?/1 true when verbose",
+            "test enabled state false when off",
+            "test enabled state true when on",
+            "test enabled state true when verbose",
             "test interesting logging uses exact duration and threshold boundaries",
             "test non-instance values cannot select a debug override",
-            "test override/2 returns nil for unknown override key",
-            "test override/2 returns nil when debug is off",
-            "test override/2 returns override when :on",
-            "test override/2 returns override when :verbose",
             "test per-instance debug mode takes priority over global semantic logging",
             "test per-instance isolation debug state is isolated between instances",
-            "test reset/1 resets to :off",
+            "test reset through set_debug/2 resets to :off",
             "test semantic log configuration and formatting fail closed at exact bounds",
             "test semantic log strings stay on one line and within the byte limit",
             "test semantic logger supports all four modes and removes private values",
-            "test status/1 malformed runtime state uses the disabled defaults",
-            "test status/1 returns off status when disabled",
-            "test status/1 returns status map when enabled",
+            "test set_debug/2 and debug_level/1 default level is :off",
+            "test set_debug/2 and debug_level/1 rejects an unsupported level",
+            "test set_debug/2 and debug_level/1 setting :off disables",
+            "test set_debug/2 and debug_level/1 setting :on sets level",
+            "test set_debug/2 and debug_level/1 setting :verbose sets level",
             "test the default semantic handler attaches once and handles its catalog"
           ]
         },
@@ -3603,8 +3613,8 @@
   },
   "covenant": "0.2.0",
   "totals": {
-    "active": 227,
+    "active": 228,
     "coverage": 1.0,
-    "covered": 227
+    "covered": 228
   }
 }

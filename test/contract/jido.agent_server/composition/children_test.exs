@@ -250,6 +250,13 @@ defmodule JidoTest.AgentServer.Composition.ChildrenTest do
           {[on_parent_exit: :wrong], :invalid_parent_policy},
           {[restart: :wrong], :invalid_restart_policy},
           {[server_options: %{}], :invalid_child_options},
+          {[server_options: [jido: c.jido]], :invalid_child_options},
+          {[server_options: [agent: agent("ignored")]], :invalid_child_options},
+          {[server_options: [name: :ignored]], :invalid_child_options},
+          {[server_options: [turn_timeout: 1, turn_timeout: 2]], :invalid_child_options},
+          {[server_options: [unknown: true]], :invalid_child_options},
+          {[meta: :not_a_map], :invalid_child_options},
+          {[meta: %URI{}], :invalid_child_options},
           {[typo: true], :invalid_child_options},
           {[placement: :owned, placement: :independent], :invalid_child_options}
         ] do
@@ -317,6 +324,9 @@ defmodule JidoTest.AgentServer.Composition.ChildrenTest do
              {:error, :invalid_child_options}
 
     assert Server.adopt_child(parent, attached, :invalid, placement: :owned) ==
+             {:error, :invalid_child_options}
+
+    assert Server.adopt_child(parent, attached, :invalid, server_options: [turn_timeout: 1]) ==
              {:error, :invalid_child_options}
 
     dead = spawn(fn -> :ok end)

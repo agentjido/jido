@@ -21,3 +21,9 @@
   decision: Mutate CompositionRuntime, TopologyRuntime, and TopologyBus. Do not mutate the shared AgentServer state machine or Supervisor in this focused profile.
   driver: The focused profile must test composition decisions without overlapping core Turn and activation owners.
   approved_by: Component hardening pass
+
+- id: composition-public-api
+  date: 2026-10-22
+  decision: Keep child and topology-member operations on Jido.AgentServer. Type their child records and option boundaries. Keep CompositionRuntime, TopologyRuntime, and TopologyBus internal, and keep the logical topology DSL in Jido.Agent.
+  driver: Runtime composition needs one public facade without exposing OTP resource owners or creating a second DSL.
+  approved_by: Component hardening pass

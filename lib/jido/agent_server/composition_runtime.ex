@@ -3,9 +3,10 @@ defmodule Jido.AgentServer.CompositionRuntime do
 
   alias Jido.Agent.{Mutation, Topology}
   alias Jido.AgentServer, as: Server
-  alias Jido.AgentServer.{Effects, Plugin, Supervisor, TopologyRuntime}
+  alias Jido.AgentServer.{Core, Effects, Plugin, Supervisor, TopologyRuntime}
 
   @child_options ~w(placement on_parent_exit orphan_dispatch restart server_options meta)a
+  @adoption_options ~w(placement on_parent_exit orphan_dispatch restart meta)a
 
   def check(data, candidate, directives) do
     changed = Mutation.changed_plugins(data.agent, candidate, directives)
@@ -25,7 +26,7 @@ defmodule Jido.AgentServer.CompositionRuntime do
     token = make_ref()
 
     with {:ok, _agent} <- Jido.Agent.Validation.validate_instance(agent),
-         {:ok, context, parent} <- child_options(server, tag, opts, token),
+         {:ok, context, parent} <- child_options(server, tag, opts, token, @child_options),
          :ok <- :gen_statem.call(server, {:reserve_child, tag, token}) do
       try do
         supervisor = child_supervisor(context, parent.placement)
@@ -98,7 +99,8 @@ defmodule Jido.AgentServer.CompositionRuntime do
       token = make_ref()
       opts = Keyword.put(opts, :placement, :independent)
 
-      with {:ok, context, parent} <- child_options(server, tag, opts, token) do
+      with {:ok, context, parent} <-
+             child_options(server, tag, opts, token, @adoption_options) do
         lock = {{__MODULE__, :adoption, context.jido, context.partition}, self()}
 
         case :global.trans(
@@ -182,12 +184,14 @@ defmodule Jido.AgentServer.CompositionRuntime do
     :exit, _ -> {:error, :ancestor_unavailable}
   end
 
-  defp child_options(server, tag, opts, token) do
-    if unique_options?(opts) and Keyword.keys(opts) -- @child_options == [] do
+  defp child_options(server, tag, opts, token, allowed) do
+    if unique_options?(opts) and Keyword.keys(opts) -- allowed == [] do
       context = :gen_statem.call(server, :child_context)
       placement = Keyword.get(opts, :placement, :owned)
       policy = Keyword.get(opts, :on_parent_exit, :stop)
       dispatch = opts[:orphan_dispatch]
+      server_options = Keyword.get(opts, :server_options, [])
+      meta = Keyword.get(opts, :meta, %{})
 
       cond do
         is_nil(context.activation) ->
@@ -196,7 +200,10 @@ defmodule Jido.AgentServer.CompositionRuntime do
         Server.Directive.validate_restart_policy(Keyword.get(opts, :restart, :transient)) != :ok ->
           {:error, :invalid_restart_policy}
 
-        not Keyword.keyword?(Keyword.get(opts, :server_options, [])) ->
+        not valid_server_options?(server_options) ->
+          {:error, :invalid_child_options}
+
+        not is_map(meta) or is_struct(meta) ->
           {:error, :invalid_child_options}
 
         not (is_atom(tag) or is_binary(tag)) or is_nil(tag) ->
@@ -222,7 +229,7 @@ defmodule Jido.AgentServer.CompositionRuntime do
           {:ok, context,
            %{
              restart: Keyword.get(opts, :restart, :transient),
-             meta: Keyword.get(opts, :meta, %{}),
+             meta: meta,
              activation: context.activation,
              state: context.state,
              token: token,
@@ -243,5 +250,9 @@ defmodule Jido.AgentServer.CompositionRuntime do
   defp unique_options?(opts) do
     Keyword.keyword?(opts) and
       length(Keyword.keys(opts)) == length(Enum.uniq(Keyword.keys(opts)))
+  end
+
+  defp valid_server_options?(opts) do
+    Core.unique_keyword?(opts) and Keyword.keys(opts) -- Core.runtime_keys() == []
   end
 end

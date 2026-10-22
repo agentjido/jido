@@ -44,6 +44,10 @@ defmodule JidoTest.AgentServer.ApiTest do
            ]
 
     assert documented_types(AgentServer) == [
+             {:type, :adoption_option, 0},
+             {:type, :child_info, 0},
+             {:type, :child_option, 0},
+             {:type, :child_tag, 0},
              {:type, :pending, 0},
              {:type, :server, 0},
              {:type, :signal_result, 0}

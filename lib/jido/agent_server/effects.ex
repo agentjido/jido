@@ -193,12 +193,12 @@ defmodule Jido.AgentServer.Effects do
   defp validate_start(directive, config) do
     with :ok <- validate_runtime_target(directive.name, config),
          :ok <- local_node(directive.node),
-         {:ok, _agent, options} <- prepare_start(directive, config.agent.id),
+         {:ok, agent, options} <- prepare_start(directive, config.agent.id),
          {:ok, _} <-
            Server.activation_options(
              Keyword.merge(
                [jido: config.jido, partition: config.partition, runner: config.runner],
-               options
+               Keyword.put(options, :agent, agent)
              )
            ) do
       :ok
@@ -229,12 +229,12 @@ defmodule Jido.AgentServer.Effects do
       %Agent{} = agent ->
         if Keyword.has_key?(opts, :id) or Keyword.has_key?(opts, :state),
           do: {:error, :instance_options_conflict},
-          else: {:ok, agent, Keyword.put(options, :agent, agent)}
+          else: {:ok, agent, options}
 
       definition ->
         with {:ok, definition} <- Agent.Validation.resolve(definition),
              {:ok, agent} <- Agent.instantiate(definition, id: id, state: state),
-             do: {:ok, agent, Keyword.put(options, :agent, agent)}
+             do: {:ok, agent, options}
     end
   end
 

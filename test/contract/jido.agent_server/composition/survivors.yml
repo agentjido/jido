@@ -1,22 +1,22 @@
-- at: lib/jido/agent_server/composition_runtime.ex:54:22
+- at: lib/jido/agent_server/composition_runtime.ex:55:22
   operator: statement_removal
   mutation: "`Supervisor.release(context.state, tag, token)` → `(removed)`"
   sort: evaluation-gap
   reason: A deterministic check would have to make activation startup exit after the parent reserves the tag but before start_activation/2 returns. Normal startup errors return values and already prove release behavior.
 
-- at: lib/jido/agent_server/composition_runtime.ex:108:16
+- at: lib/jido/agent_server/composition_runtime.ex:110:16
   operator: integer_shift
   mutation: "`0` → `1`"
   sort: unpromised
   reason: The contract requires serialized adoption and a safe busy result. It does not fix the private global-lock retry count.
 
-- at: lib/jido/agent_server/composition_runtime.ex:140:22
+- at: lib/jido/agent_server/composition_runtime.ex:142:22
   operator: statement_removal
   mutation: "`Supervisor.release(context.state, tag, token)` → `(removed)`"
   sort: evaluation-gap
   reason: A deterministic check would have to stop an adoptable child after tag reservation and during its private attach call. Returned attach failures already prove release behavior.
 
-- at: lib/jido/agent_server/composition_runtime.ex:172:7
+- at: lib/jido/agent_server/composition_runtime.ex:174:7
   operator: boolean_flip
   mutation: "`true` → `false`"
   sort: evaluation-gap
