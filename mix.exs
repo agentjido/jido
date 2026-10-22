@@ -371,8 +371,8 @@ defmodule Jido.MixProject do
   defp deps do
     [
       # Jido Ecosystem
-      # Keep the published V3 packages together.
-      {:jido_action, "~> 3.0.0-beta.22", override: true},
+      # Use the sibling package for the shared lower-layer contracts.
+      {:jido_action, path: "../jido_action", override: true},
       {:jido_signal, "~> 3.0.0-beta.5"},
       # AgentServer owns native Runic Runners and Worker cleanup.
       {:runic, "~> 0.1.0-alpha.12", override: true},

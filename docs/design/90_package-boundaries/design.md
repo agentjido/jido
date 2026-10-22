@@ -15,9 +15,9 @@ evidence.
   public boundary rules, compatibility rules, and cross-package release gates.
 - Out of scope: exact public value fields, callback signatures, storage record
   formats, lifecycle state machines, error codes, and implementation plans.
-- Lower-layer owners: `jido_action` owns Actions, Instructions, Flows, and
-  in-memory execution. `jido_signal` owns Signals, serialization, routing,
-  dispatch, and the local Signal bus.
+- Lower-layer owners: `jido_action` owns Actions, Instructions, Flows,
+  in-memory execution, and shared portable-term validation. `jido_signal` owns
+  Signals, serialization, routing, dispatch, and the local Signal bus.
 - Application owner: the developer owns application architecture, external
   clients, domain policy, deployment, and operational policy.
 
@@ -25,7 +25,7 @@ evidence.
 
 | Owner | Target responsibility | Excluded responsibility |
 | --- | --- | --- |
-| `jido_action` | Actions, Instructions, Flows, executable validation, in-memory execution, execution timeout, and execution telemetry | Agent state commit, durable orchestration, Agent lifecycle, and transport |
+| `jido_action` | Actions, Instructions, Flows, executable validation, in-memory execution, execution timeout, execution telemetry, and shared portable-term validation | Agent state commit, durable orchestration, Agent lifecycle, and transport |
 | `jido_signal` | Signal envelope, serialization, ordered route matching, dispatch adapters, and local Signal bus | Agent Turn selection, Agent commit, placement, and durable Agent state |
 | `jido` | Agent meaning, Turn use of lower-layer contracts, Plugin composition, candidate assembly, live commit, Directives, local Agent Server and instance runtime, persistence record meaning, static local Topology, public errors, and semantic Agent observation | General workflow recovery, cluster policy, transport gateways, AI-provider policy, browser sessions, and application architecture |
 | Integration packages | Focused capabilities such as AI policy, browser automation, storage providers, recovery services, placement policy, and transport | Changes to Jido semantics or private Jido access |

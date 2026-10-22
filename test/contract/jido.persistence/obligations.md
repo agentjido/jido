@@ -1,7 +1,6 @@
 ---
 modules:
   - Jido.Agent.Callback
-  - Jido.PortableTerm
   - Jido.Persistence
   - Jido.Persistence.Adapter
   - Jido.Persistence.AdapterOps
@@ -19,8 +18,9 @@ modules:
 ## Purpose
 
 Protect portable Agent records and the shared storage boundary. This component
-owns adapter configuration, durable identity, portable-term validation, record
-data, snapshots, Plugin state conversion, revisions, and logical deletion.
+owns adapter configuration, durable identity, record data, snapshots, Plugin
+state conversion, revisions, and logical deletion. It uses the strict
+`Jido.PortableTerm` contract from `jido_action`.
 
 The supported public boundary is `Jido.Persistence`,
 `Jido.Persistence.Adapter`, `Jido.Persistence.Store`,
@@ -99,7 +99,7 @@ progress, or the private behavior of one storage backend.
 ### jido.persistence.I9 — Portable term boundary
 
 - **scope:** snapshots, records, and converted Plugin state
-- **must:** Accept nested portable values. Reject processes, ports, references, functions, improper lists, non-byte-aligned bitstrings, and other local runtime values. Return a bounded path to the rejected value and do not write invalid data.
+- **must:** Use the public `Jido.PortableTerm` contract from `jido_action`. Accept nested portable values. Reject processes, ports, references, functions, improper lists, non-byte-aligned bitstrings, and other local runtime values. Return a bounded path to the rejected value and do not write invalid data.
 - **why:** Durable data must be safe to move to another BEAM instance.
 - **kind:** persisted-format
 - **status:** active

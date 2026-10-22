@@ -2643,22 +2643,16 @@
         "jido.persistence.I9": {
           "failing": 0,
           "kind": "persisted_format",
-          "passing": 13,
+          "passing": 7,
           "status": "active",
           "testable": true,
           "tests": [
-            "test binary path segments keep at most their first 64 bytes",
-            "test collection validation keeps deterministic order and the first invalid list item",
             "test default persistence rejects a nested improper list without raising",
             "test default persistence rejects a process handle accepted by live state",
-            "test diagnostic paths have fixed segment and depth bounds",
             "test dump callback faults and invalid values cannot write a record",
-            "test integer path segments keep only the exact bounded range",
             "test load rejects a nested process handle supplied by storage",
             "test load rejects every prohibited term class supplied by storage",
-            "test map validation reports the first invalid key or value with its exact path",
             "test nested portable values survive a save and load",
-            "test portable validation rejects every local runtime value",
             "test snapshot boundaries reject malformed values and context"
           ]
         }
