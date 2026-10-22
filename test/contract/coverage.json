@@ -6,9 +6,9 @@
       "covered": 124
     },
     "jido.agent_server": {
-      "active": 68,
+      "active": 69,
       "coverage": 1.0,
-      "covered": 68
+      "covered": 69
     },
     "jido.plugin": {
       "active": 34,
@@ -1878,10 +1878,10 @@
       }
     },
     "jido.agent_server.plugin_runtime": {
-      "active": 12,
+      "active": 13,
       "app": "jido.agent_server",
       "coverage": 1.0,
-      "covered": 12,
+      "covered": 13,
       "form": "light",
       "obligations": {
         "jido.agent_server.plugin_runtime.I1": {
@@ -1958,6 +1958,17 @@
             "test unsafe changes fail before commit and failed pause resumes the root"
           ]
         },
+        "jido.agent_server.plugin_runtime.I13": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 2,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test public callback records keep their exact read-only fields",
+            "test the live Plugin API exposes only the state facade and callback records"
+          ]
+        },
         "jido.agent_server.plugin_runtime.I2": {
           "failing": 0,
           "kind": "ordering",
@@ -1993,7 +2004,7 @@
         "jido.agent_server.plugin_runtime.I4": {
           "failing": 0,
           "kind": "functional",
-          "passing": 5,
+          "passing": 6,
           "status": "active",
           "testable": true,
           "tests": [
@@ -2001,6 +2012,7 @@
             "test a root start result with info reaches readiness and supplies the live runtime ref",
             "test callback adapters preserve explicit errors and report invalid or raised results",
             "test live admission follows declaration order and keeps pure and runtime inputs separate",
+            "test public callback records keep their exact read-only fields",
             "test rejected, invalid, or raised admission never executes or commits"
           ]
         },
@@ -2019,7 +2031,7 @@
         "jido.agent_server.plugin_runtime.I6": {
           "failing": 0,
           "kind": "ordering",
-          "passing": 9,
+          "passing": 10,
           "status": "active",
           "testable": true,
           "tests": [
@@ -2031,7 +2043,8 @@
             "test callback adapters preserve explicit errors and report invalid or raised results",
             "test callbacks receive the live runtime root",
             "test commit options stay within the selected owner facet",
-            "test hooks run after commit in declaration order, even without directives"
+            "test hooks run after commit in declaration order, even without directives",
+            "test public callback records keep their exact read-only fields"
           ]
         },
         "jido.agent_server.plugin_runtime.I7": {
@@ -3590,8 +3603,8 @@
   },
   "covenant": "0.2.0",
   "totals": {
-    "active": 226,
+    "active": 227,
     "coverage": 1.0,
-    "covered": 226
+    "covered": 227
   }
 }

@@ -261,14 +261,15 @@ defmodule Jido.MixProject do
           Jido.AgentServer,
           Jido.AgentServer.Signal.Error,
           Jido.AgentServer.DirectiveContext,
-          Jido.AgentServer.Plugin,
           Jido.Plugin.DirectiveContext,
           Jido.Plugin.Init,
           Jido.Plugin.SignalContext
         ],
         "Plugin Contracts": [
           Jido.Plugin,
-          Jido.Plugin.Input
+          Jido.Plugin.Input,
+          Jido.AgentServer.Plugin.Admission,
+          Jido.AgentServer.Plugin.Commit
         ],
         "Built-In Plugins": [
           Jido.Plugin.Audit,

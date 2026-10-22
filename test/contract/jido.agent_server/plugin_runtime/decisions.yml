@@ -21,3 +21,9 @@
   decision: Replace old AgentServer I50 through I62 with plugin_runtime I1 through I11. Make outbound Plugin preparation explicit as I8. Move the Plugin callback and runtime-replacement promises from old I97 to plugin_runtime I12, and narrow old I97 to the composition handoff.
   driver: Every live Plugin promise needs one final owner while the accepted Plugin-data change remains a composition concern.
   approved_by: Component hardening pass
+
+- id: plugin-runtime-public-api
+  date: 2026-10-22
+  decision: Keep Plugin-owned state reads on Jido.Plugin.state/2. Make Admission and Commit the typed public callback records. Keep Jido.AgentServer.Plugin, Callbacks, and Spec internal. Supersede plugin-runtime-mutation-profile by adding all Plugin-runtime-owned records to the component profile.
+  driver: Plugin authors need stable callback inputs without a second state facade or access to hosting internals.
+  approved_by: Component hardening pass

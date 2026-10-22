@@ -1,7 +1,10 @@
 ---
 modules:
   - Jido.AgentServer.Plugin
+  - Jido.AgentServer.Plugin.Admission
   - Jido.AgentServer.Plugin.Callbacks
+  - Jido.AgentServer.Plugin.Commit
+  - Jido.AgentServer.Plugin.Spec
 ---
 
 ## Purpose
@@ -10,6 +13,10 @@ Protect generic live Plugin hosting inside one AgentServer activation. The
 component owns runtime roots and Plugin callbacks. It does not own Plugin
 authoring, bundled Plugin behavior, Agent evaluation, state-machine phases, or
 general effect execution.
+
+The public boundary is `Jido.Plugin.state/2` plus the read-only `Admission`
+and `Commit` callback records. Plugin hosting, callback adapters, and normalized
+runtime specifications are internal. This component has no DSL.
 
 ## Obligations
 
@@ -107,4 +114,12 @@ general effect execution.
 - **must:** Require existing autonomous roots that change to implement idempotent `quiesce/2` and `resume/2`. Quiesce affected roots before commit. Resume them after rejection, cancellation, or failed preparation. After commit, stop affected roots and rebuild them from the accepted owned state and revision before admission opens. Notify unchanged Plugins in declaration order and do not notify a replaced root for the replacement commit.
 - **why:** Accepted Plugin data must be the authority for its live runtime without overlapping old and new generations.
 - **kind:** ordering
+- **status:** active
+
+### jido.agent_server.plugin_runtime.I13 — Public live Plugin API
+
+- **scope:** `Jido.Plugin.state/2`, `Jido.AgentServer.Plugin.Admission`, `Jido.AgentServer.Plugin.Commit`
+- **must:** Keep Plugin-owned state reads on the `Jido.Plugin` facade. Document and type the exact read-only admission and commit callback records. Keep `Jido.AgentServer.Plugin`, callback adapters, and normalized runtime specifications internal. Do not add a Plugin-runtime DSL.
+- **why:** Plugin authors need stable callback data and one state-read facade without depending on hosting internals.
+- **kind:** functional
 - **status:** active

@@ -1,98 +1,116 @@
-- at: lib/jido/agent_server/plugin.ex:22:76
+- at: lib/jido/agent_server/plugin.ex:11:76
   operator: integer_shift
   mutation: "`5000` → `5001`"
   sort: unpromised
   reason: The contract keeps Plugin state reads available but does not fix this internal call timeout to the exact millisecond.
 
-- at: lib/jido/agent_server/plugin.ex:22:76
+- at: lib/jido/agent_server/plugin.ex:11:76
   operator: integer_shift
   mutation: "`5000` → `4999`"
   sort: unpromised
   reason: The contract keeps Plugin state reads available but does not fix this internal call timeout to the exact millisecond.
 
-- at: lib/jido/agent_server/plugin.ex:45:12
+- at: lib/jido/agent_server/plugin.ex:34:12
   operator: string_empty
   mutation: "`\"Plugin changes require quiesce and resume callbacks\"` → `\"\"`"
   sort: log-only
   reason: The contract fixes the structured quiescence error code, path, and Plugin identity, not its human-readable prose.
 
-- at: lib/jido/agent_server/plugin.ex:64:15
+- at: lib/jido/agent_server/plugin.ex:53:15
   operator: clause_removal
   mutation: "`case _ ->` → `(removed)`"
   sort: equivalent
   reason: The outer bootstrap catch maps the resulting CaseClauseError to the same plugin_start_failed result.
 
-- at: lib/jido/agent_server/plugin.ex:67:11
+- at: lib/jido/agent_server/plugin.ex:56:11
   operator: clause_removal
   mutation: "`case _ ->` → `(removed)`"
   sort: unpromised
   reason: Both paths reject startup and clean provisional roots. The contract does not expose the internal invalid_plugin_child_spec versus plugin_start_failed shutdown label.
 
-- at: lib/jido/agent_server/plugin.ex:118:13
+- at: lib/jido/agent_server/plugin.ex:107:13
   operator: string_empty
   mutation: "`\"Plugin configuration boundary failed\"` → `\"\"`"
   sort: log-only
   reason: The contract fixes safe callback failure and recovery, not the safe_apply diagnostic prose.
 
-- at: lib/jido/agent_server/plugin.ex:190:35
+- at: lib/jido/agent_server/plugin.ex:179:35
   operator: clause_removal
   mutation: "`case {:error, :plugin_not_found} ->` → `(removed)`"
   sort: unpromised
   reason: Both race paths fail the stale root start. The contract does not fix whether this private race returns ignore or exits before bootstrap rejects it.
 
-- at: lib/jido/agent_server/plugin.ex:207:25
+- at: lib/jido/agent_server/plugin.ex:196:25
   operator: guard_removal
   mutation: "`when is_pid(pid)` → `(no guard)`"
   sort: equivalent
   reason: OTP permits the three-element successful Supervisor start result only with a pid in this position.
 
-- at: lib/jido/agent_server/plugin.ex:212:27
+- at: lib/jido/agent_server/plugin.ex:201:27
   operator: guard_removal
   mutation: "`when is_pid(pid)` → `(no guard)`"
   sort: equivalent
   reason: The preceding Supervisor already_started result guarantees that pid is a pid before this child lookup.
 
-- at: lib/jido/agent_server/plugin.ex:213:13
+- at: lib/jido/agent_server/plugin.ex:202:13
   operator: clause_removal
   mutation: "`case _ ->` → `(removed)`"
   sort: equivalent
   reason: A child mismatch returns the original start error with this clause and becomes the same plugin_start_failed bootstrap result without it.
 
-- at: lib/jido/agent_server/plugin.ex:219:13
+- at: lib/jido/agent_server/plugin.ex:208:13
   operator: clause_removal
   mutation: "`case error ->` → `(removed)`"
   sort: equivalent
   reason: The sole production caller maps a returned Supervisor error and the removed-clause exception to the same plugin_start_failed bootstrap result.
 
-- at: lib/jido/agent_server/plugin.ex:228:11
+- at: lib/jido/agent_server/plugin.ex:217:11
   operator: clause_removal
   mutation: "`case _ ->` → `(removed)`"
   sort: unpromised
   reason: Both paths reject bootstrap. The contract does not expose the internal plugin_not_ready versus plugin_start_failed shutdown label.
 
-- at: lib/jido/agent_server/plugin.ex:236:27
+- at: lib/jido/agent_server/plugin.ex:225:27
   operator: integer_shift
   mutation: "`5000` → `5001`"
   sort: unpromised
   reason: Live configuration callbacks must be bounded, but the contract does not fix this private control budget to the exact millisecond.
 
-- at: lib/jido/agent_server/plugin.ex:236:27
+- at: lib/jido/agent_server/plugin.ex:225:27
   operator: integer_shift
   mutation: "`5000` → `4999`"
   sort: unpromised
   reason: Live configuration callbacks must be bounded, but the contract does not fix this private control budget to the exact millisecond.
 
-- at: lib/jido/agent_server/plugin.ex:238:9
+- at: lib/jido/agent_server/plugin.ex:227:9
   operator: clause_removal
   mutation: "`case _ ->` → `(removed)`"
   sort: evaluation-gap
   reason: This clause converts a blocked control callback into a safe timeout result. Exercising it requires more than the mutation runner's five-second per-test limit.
 
-- at: lib/jido/agent_server/plugin.ex:246:15
+- at: lib/jido/agent_server/plugin.ex:235:15
   operator: clause_removal
   mutation: "`case error ->` → `(removed)`"
   sort: equivalent
   reason: Under the activation's exclusive Supervisor ownership, terminate followed by delete cannot reach this error path; not-found termination is handled separately.
+
+- at: lib/jido/agent_server/plugin/spec.ex:4:18
+  operator: element_removal
+  mutation: "`:package` → `(removed)`"
+  sort: unpromised
+  reason: Spec is internal and is built only by Plugin normalization, which always supplies package, module, and options. Direct incomplete construction is not supported.
+
+- at: lib/jido/agent_server/plugin/spec.ex:4:28
+  operator: element_removal
+  mutation: "`:module` → `(removed)`"
+  sort: unpromised
+  reason: Spec is internal and is built only by Plugin normalization, which always supplies package, module, and options. Direct incomplete construction is not supported.
+
+- at: lib/jido/agent_server/plugin/spec.ex:4:37
+  operator: element_removal
+  mutation: "`:options` → `(removed)`"
+  sort: unpromised
+  reason: Spec is internal and is built only by Plugin normalization, which always supplies package, module, and options. Direct incomplete construction is not supported.
 
 - at: lib/jido/agent_server/plugin/callbacks.ex:25:7
   operator: string_empty

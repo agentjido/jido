@@ -13,6 +13,7 @@ defmodule Jido.AgentServer.Plugin.Commit do
   @enforce_keys [:plugin, :turn_id, :agent_id, :agent_module, :plugin_state, :state_version]
   defstruct @enforce_keys ++ [jido: nil, partition: nil]
 
+  @typedoc "Read-only context for one successful Turn commit notification."
   @type t :: %__MODULE__{
           plugin: module(),
           turn_id: String.t(),

@@ -19,6 +19,7 @@ defmodule Jido.AgentServer.Plugin.Admission do
   ]
   defstruct @enforce_keys
 
+  @typedoc "Read-only input for one live Plugin admission callback."
   @type t :: %__MODULE__{
           plugin: module(),
           agent_id: String.t(),
