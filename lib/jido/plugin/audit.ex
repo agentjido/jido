@@ -12,14 +12,27 @@ defmodule Jido.Plugin.Audit do
       plugins: [{Jido.Plugin.Audit, max_entries: 1_000}]
   """
 
-  use Jido.Plugin
+  use Jido.Plugin, option_keys: [agent: [:max_entries]]
 
   alias Jido.Plugin.Audit.Record
   alias Jido.Signal.ID
 
+  @typedoc "One Audit Plugin option."
+  @type plugin_option :: {:max_entries, pos_integer()}
+
+  @typedoc "One option for constructing an Audit Record."
+  @type record_option ::
+          {:id, String.t() | nil}
+          | {:at, non_neg_integer() | nil}
+          | {:metadata, map()}
+
+  @record_option_keys [:id, :at, :metadata]
+
   @doc "Creates one domain audit Directive."
-  @spec record(term(), atom(), keyword()) :: Record.t()
+  @spec record(term(), atom(), [record_option()]) :: Record.t()
   def record(event, outcome, opts \\ []) do
+    opts = record_options!(opts)
+
     %Record{
       id: Keyword.get_lazy(opts, :id, &ID.generate!/0),
       at: Keyword.get_lazy(opts, :at, fn -> System.system_time(:millisecond) end),
@@ -48,7 +61,8 @@ defmodule Jido.Plugin.Audit do
     apply_records(reduction.plugin_state, records, opts)
   end
 
-  @doc "Applies validated domain records to the bounded audit field."
+  @doc false
+  @spec apply_records(map(), [Record.t()], [plugin_option()]) :: {:ok, map()}
   def apply_records(state, [], opts) do
     max_entries = max_entries!(opts)
     count = length(state.records)
@@ -82,6 +96,20 @@ defmodule Jido.Plugin.Audit do
       value ->
         raise ArgumentError,
               "Audit max_entries must be a positive integer, got: #{inspect(value)}"
+    end
+  end
+
+  defp record_options!(opts) do
+    if Keyword.keyword?(opts) do
+      keys = Keyword.keys(opts)
+      invalid = keys -- @record_option_keys
+
+      case invalid do
+        [] -> opts
+        keys -> raise ArgumentError, "Audit record does not accept option keys: #{inspect(keys)}"
+      end
+    else
+      raise ArgumentError, "Audit record options must be a keyword list"
     end
   end
 end

@@ -13,14 +13,17 @@ defmodule Jido.Plugin.Audit.Record do
             coerce: true
           )
 
+  @typedoc "A validated portable domain audit record."
   @type t :: unquote(Zoi.type_spec(@schema))
   @enforce_keys Zoi.Struct.enforce_keys(@schema)
   defstruct Zoi.Struct.struct_fields(@schema)
 
   @doc false
+  @spec schema() :: Zoi.schema()
   def schema, do: @schema
 
   @doc "Validates one portable audit record."
+  @spec validate(term()) :: {:ok, t()} | {:error, term()}
   def validate(%__MODULE__{} = record) do
     with {:ok, record} <- Zoi.parse(@schema, Map.from_struct(record)),
          true <- Jido.Signal.ID.valid?(record.id) do
@@ -35,6 +38,10 @@ defmodule Jido.Plugin.Audit.Record do
       {:error, _reason} = error ->
         error
     end
+  end
+
+  def validate(_record) do
+    invalid("Expected an Audit Record", %{expected: __MODULE__})
   end
 
   defp invalid(message, details) do

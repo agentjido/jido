@@ -1,10 +1,10 @@
-- at: lib/jido/plugin/audit.ex:56:14
+- at: lib/jido/plugin/audit.ex:70:14
   operator: comparison_swap
   mutation: "`<=` → `<`"
   sort: equivalent
   reason: At equality the alternate branch drops zero records and returns the same state value. The current branch avoids that unnecessary list operation.
 
-- at: lib/jido/plugin/audit.ex:68:25
+- at: lib/jido/plugin/audit.ex:82:25
   operator: comparison_swap
   mutation: "`>=` → `>`"
   sort: equivalent
@@ -40,14 +40,32 @@
   sort: unpromised
   reason: The contract fixes the Record field and validation rule. It does not fix schema description prose.
 
-- at: lib/jido/plugin/audit/record.ex:29:35
+- at: lib/jido/plugin/audit/record.ex:32:35
   operator: string_empty
   mutation: "`\"Audit record must contain portable data\"` → `\"\"`"
   sort: log-only
   reason: The contract fixes the structured configuration error and rejected path. It does not fix human-readable error prose.
 
-- at: lib/jido/plugin/audit/record.ex:33:17
+- at: lib/jido/plugin/audit/record.ex:36:17
   operator: string_empty
   mutation: "`\"Audit record id must be a UUID7\"` → `\"\"`"
   sort: log-only
   reason: The contract fixes the structured configuration error and rejected ID. It does not fix human-readable error prose.
+
+- at: lib/jido/plugin/audit.ex:109:38
+  operator: string_empty
+  mutation: "`\"Audit record does not accept option keys: \#{inspect(keys)}\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the closed option boundary and raised ArgumentError. It does not fix human-readable error prose.
+
+- at: lib/jido/plugin/audit.ex:112:28
+  operator: string_empty
+  mutation: "`\"Audit record options must be a keyword list\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the keyword-list boundary and raised ArgumentError. It does not fix human-readable error prose.
+
+- at: lib/jido/plugin/audit/record.ex:44:13
+  operator: string_empty
+  mutation: "`\"Expected an Audit Record\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured rejection of non-record input. It does not fix human-readable error prose.

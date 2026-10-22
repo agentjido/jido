@@ -5,6 +5,7 @@ defmodule JidoTest.Contract.PluginAuditTest do
   alias Jido.Agent.Plugin.Reduction
   alias Jido.Plugin.Audit
   alias Jido.Plugin.Audit.Record
+  alias Jido.Plugin.Normalizer
 
   defp reduction(plugin_state, directives) do
     %Reduction{
@@ -48,6 +49,16 @@ defmodule JidoTest.Contract.PluginAuditTest do
     assert generated.event == {:saved, 1}
     assert generated.outcome == :accepted
     assert generated.metadata == %{}
+
+    for opts <- [
+          [unknown: true],
+          [id: id, id: id],
+          %{id: id},
+          [1],
+          [{:id, id} | :invalid]
+        ] do
+      assert_raise ArgumentError, fn -> Audit.record(:saved, :accepted, opts) end
+    end
   end
 
   @tag obligation: "jido.plugin.audit.I2"
@@ -61,6 +72,11 @@ defmodule JidoTest.Contract.PluginAuditTest do
 
     assert {:error, %Jido.Error.ValidationError{details: %{id: "not-a-uuid7"}}} =
              Record.validate(invalid_id)
+
+    for invalid <- [nil, %{}] do
+      assert {:error, %Jido.Error.ValidationError{details: %{expected: Record}}} =
+               Record.validate(invalid)
+    end
 
     for invalid <- [
           %{record | id: nil},
@@ -89,6 +105,7 @@ defmodule JidoTest.Contract.PluginAuditTest do
 
   @tag obligation: "jido.plugin.audit.I3"
   test "the Plugin declares one default field, one Directive, and a positive limit" do
+    assert %{option_keys: %{agent: [:max_entries]}} = Audit.__jido_plugin__()
     assert {:audit, schema} = Audit.state_spec([])
     assert schema.meta.default == {:value, %{records: []}}
     assert {:ok, %{records: []}} = Jido.Schema.parse(schema, %{}, :initialize)
@@ -99,6 +116,12 @@ defmodule JidoTest.Contract.PluginAuditTest do
       assert_raise ArgumentError, ~r/Audit max_entries must be a positive integer/, fn ->
         Audit.state_spec(max_entries: invalid)
       end
+    end
+
+    assert {:ok, [_spec]} = Normalizer.normalize_all([{Audit, [max_entries: 1]}])
+
+    for opts <- [[unknown: true], [max_entries: 1, max_entries: 2]] do
+      assert {:error, _reason} = Normalizer.normalize_all([{Audit, opts}])
     end
   end
 

@@ -2888,20 +2888,22 @@
         "jido.plugin.audit.I1": {
           "failing": 0,
           "kind": "functional",
-          "passing": 1,
+          "passing": 2,
           "status": "active",
           "testable": true,
           "tests": [
+            "test Audit exposes only record construction and Record validation",
             "test record construction preserves present options and generates absent values"
           ]
         },
         "jido.plugin.audit.I2": {
           "failing": 0,
           "kind": "functional",
-          "passing": 2,
+          "passing": 3,
           "status": "active",
           "testable": true,
           "tests": [
+            "test Audit exposes only record construction and Record validation",
             "test Record validation rejects every non-portable record location",
             "test Record validation requires its declared value shapes"
           ]

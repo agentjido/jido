@@ -1,8 +1,14 @@
 - id: bundled-audit-boundary
   date: 2026-10-19
-  decision: Give record construction, record validation, Audit state declaration, and bounded ordered reduction to jido.plugin.audit.
+  decision: Give record construction, record validation, Audit state declaration, and bounded ordered reduction to jido.plugin.audit. Expose record construction and Record validation. Keep bounded state reduction as Plugin callback work.
   driver: These rules are bundled Audit product behavior, not generic Plugin SDK behavior.
   approved_by: Approved Jido V3 Covenant component map
+
+- id: audit-public-api
+  date: 2026-10-22
+  decision: Keep record options and the Agent-owned max_entries option closed and typed. Use the standard Agent Plugin declaration and add no Audit-specific DSL.
+  driver: Audit needs a small domain-record API and one Plugin option, not a separate configuration surface.
+  approved_by: Component hardening pass
 
 - id: audit-consumer-boundary
   date: 2026-10-19
