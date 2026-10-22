@@ -2,8 +2,8 @@ defmodule Jido.Plugin.Heartbeat do
   @moduledoc """
   Sends a periodic Signal to its Agent.
 
-  This is a small example of an input Plugin. The Plugin runtime owns the
-  timer. Each tick enters the Agent through its normal Signal mailbox.
+  This input Plugin owns one timer runtime. Each tick enters the Agent through
+  its normal Signal mailbox.
 
   The default message uses `Jido.Plugin.Heartbeat.Signal.Tick`. Set
   `:signal_type` to send an application-defined Signal type instead.
@@ -16,7 +16,8 @@ defmodule Jido.Plugin.Heartbeat do
       ]
   """
 
-  use Jido.Plugin
+  use Jido.Plugin,
+    option_keys: [agent_server: [:interval, :signal_type, :signal_data, :source]]
 
   alias Jido.Plugin.Heartbeat.Runtime
   alias Jido.Plugin.Heartbeat.Signal.Tick
@@ -24,6 +25,13 @@ defmodule Jido.Plugin.Heartbeat do
   alias Jido.Signal
 
   @default_interval 5_000
+
+  @typedoc "One Heartbeat Plugin option."
+  @type option ::
+          {:interval, pos_integer()}
+          | {:signal_type, String.t()}
+          | {:signal_data, map()}
+          | {:source, String.t()}
 
   @impl true
   def validate_options(opts) do

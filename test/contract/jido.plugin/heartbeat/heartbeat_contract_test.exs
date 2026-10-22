@@ -5,6 +5,7 @@ defmodule JidoTest.Contract.PluginHeartbeatTest do
   alias Jido.Plugin.Heartbeat.Runtime
   alias Jido.Plugin.Heartbeat.Signal.Tick
   alias Jido.Plugin.Init
+  alias Jido.Plugin.Normalizer
 
   defp init(options) do
     %Init{
@@ -24,6 +25,14 @@ defmodule JidoTest.Contract.PluginHeartbeatTest do
 
   @tag obligation: "jido.plugin.heartbeat.I1"
   test "configuration applies defaults and accepts all custom values" do
+    assert %{
+             option_keys: %{
+               agent_server: [:interval, :signal_type, :signal_data, :source]
+             }
+           } = Heartbeat.__jido_plugin__()
+
+    assert Heartbeat.sections() == []
+
     assert {:ok,
             %{
               interval: 5_000,
@@ -48,6 +57,7 @@ defmodule JidoTest.Contract.PluginHeartbeatTest do
             }} = Heartbeat.configuration(options)
 
     assert :ok = Heartbeat.validate_options(options)
+    assert {:ok, [_spec]} = Normalizer.normalize_all([{Heartbeat, options}])
   end
 
   @tag obligation: "jido.plugin.heartbeat.I2"
@@ -77,6 +87,11 @@ defmodule JidoTest.Contract.PluginHeartbeatTest do
               }} = Heartbeat.validate_options(options)
 
       assert {:error, ^reason} = Runtime.start_link(init(options))
+    end
+
+    for options <- [[unknown: true], [interval: 1, interval: 2]] do
+      assert {:error, %Jido.Error.ValidationError{}} =
+               Normalizer.normalize_all([{Heartbeat, options}])
     end
   end
 

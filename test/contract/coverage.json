@@ -3044,10 +3044,11 @@
         "jido.plugin.heartbeat.I1": {
           "failing": 0,
           "kind": "functional",
-          "passing": 1,
+          "passing": 2,
           "status": "active",
           "testable": true,
           "tests": [
+            "test Heartbeat exposes only its Plugin option type and default Tick Signal",
             "test configuration applies defaults and accepts all custom values"
           ]
         },
@@ -3064,20 +3065,22 @@
         "jido.plugin.heartbeat.I3": {
           "failing": 0,
           "kind": "functional",
-          "passing": 1,
+          "passing": 2,
           "status": "active",
           "testable": true,
           "tests": [
+            "test Heartbeat exposes only its Plugin option type and default Tick Signal",
             "test the Plugin declares and starts one linked runtime child"
           ]
         },
         "jido.plugin.heartbeat.I4": {
           "failing": 0,
           "kind": "functional",
-          "passing": 1,
+          "passing": 2,
           "status": "active",
           "testable": true,
           "tests": [
+            "test Heartbeat exposes only its Plugin option type and default Tick Signal",
             "test automatic default ticks keep data and source and use fresh IDs"
           ]
         },

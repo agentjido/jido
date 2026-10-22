@@ -10,6 +10,12 @@
   driver: The Heartbeat runtime sends a Signal through the public AgentServer boundary and does not control the consumer.
   approved_by: Approved Jido V3 Covenant component map
 
+- id: heartbeat-public-api
+  date: 2026-10-22
+  decision: Expose the Heartbeat Plugin and its default Tick Signal. Keep configuration and timer runtime details internal. Use only the standard Plugin configuration DSL and close its four AgentServer-owned options.
+  driver: Users need one stable Plugin declaration and one stable default Signal definition, not timer process controls.
+  approved_by: Component hardening pass
+
 - id: heartbeat-mutation-profile
   date: 2026-10-19
   decision: Mutate Jido.Plugin.Heartbeat, Jido.Plugin.Heartbeat.Runtime, and Jido.Plugin.Heartbeat.Signal.Tick only.
