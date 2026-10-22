@@ -57,6 +57,22 @@ defmodule JidoTest.Contract.AgentCompositionChangesTest do
     assert source.topology == %{agents: [], connections: []}
   end
 
+  @tag obligation: "jido.agent.I27"
+  test "composition applies definition mutations and rejects duplicate Directive options" do
+    source = F.instance()
+
+    assert {:ok, next} =
+             Jido.Agent.Composition.apply(source, source.state, [
+               Directive.route_add("other")
+             ])
+
+    assert Enum.map(next.routes, & &1.path) == ["test.run", "other"]
+
+    assert_raise ArgumentError, ~r/unique keyword options/, fn ->
+      Directive.agent_add(:worker, Worker, count: 1, count: 2)
+    end
+  end
+
   @tag obligation: ["jido.agent.I26", "jido.agent.I27", "jido.agent.I28"]
   test "the final graph resolves after the batch and removals do not cascade" do
     source = F.instance()

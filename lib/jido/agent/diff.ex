@@ -11,6 +11,7 @@ defmodule Jido.Agent.Diff do
   @type t :: %__MODULE__{}
 
   @doc "Compares canonical Agent values; order and cancelled edits remain unambiguous."
+  @spec between(Jido.Agent.t(), Jido.Agent.t()) :: t()
   def between(before, after_agent) do
     %__MODULE__{
       fields:
@@ -39,6 +40,7 @@ defmodule Jido.Agent.Diff do
   end
 
   @doc "True when neither data nor declaration order changed."
+  @spec empty?(t()) :: boolean()
   def empty?(%__MODULE__{} = diff) do
     not Enum.any?(
       [:fields, :state, :agents, :routes, :connections, :extensions],
@@ -47,6 +49,8 @@ defmodule Jido.Agent.Diff do
   end
 
   @doc "True when one collection or the state changed."
+  @spec changed?(t(), :fields | :state | :agents | :routes | :connections | :extensions) ::
+          boolean()
   def changed?(%__MODULE__{fields: fields}, :fields), do: fields != %{}
   def changed?(%__MODULE__{state: state}, :state), do: state != nil
 

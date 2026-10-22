@@ -2,6 +2,8 @@ defmodule Jido.Agent.Route do
   @moduledoc "Pure route normalization and selection. Selection does not run a handler."
   alias Jido.Agent.{Data, Error}
 
+  @helper_name ~r/\A[a-z][a-z0-9_]*\z/
+
   def normalize(value, related? \\ true) do
     with {:ok, route} <-
            Data.fields(value, [:path, :as, :defaults, :handler, :emits], %{
@@ -95,11 +97,23 @@ defmodule Jido.Agent.Route do
   defp helper(%{as: nil}), do: :ok
 
   defp helper(route) do
-    with :ok <- Error.at(Data.name(route.as), :as) do
+    with :ok <- Error.at(Data.name(route.as), :as),
+         :ok <- Error.at(helper_name(route.as), :as) do
       if Data.wildcard?(route.path),
         do: Error.fail(:wildcard_helper, :as, "A helper requires an exact input type"),
         else: :ok
     end
+  end
+
+  defp helper_name(value) do
+    if Regex.match?(@helper_name, Atom.to_string(value)),
+      do: :ok,
+      else:
+        Error.fail(
+          :invalid_helper_name,
+          [],
+          "A helper name must start with a lowercase letter and contain only lowercase letters, digits, and underscores"
+        )
   end
 
   defp defaults(%{kind: kind}, defaults)

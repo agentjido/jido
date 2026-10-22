@@ -198,9 +198,12 @@ defmodule Jido.Agent.Directive do
   def emit(%Signal{} = signal, dispatch), do: %Emit{signal: signal, dispatch: dispatch}
 
   @doc "Replaces the complete topology data."
+  @spec topology_set(map()) :: __MODULE__.TopologySet.t()
   def topology_set(topology), do: %__MODULE__.TopologySet{topology: topology}
 
   @doc "Adds one named logical Agent member."
+  @spec agent_add(atom(), Jido.Agent.definition() | module(), keyword()) ::
+          __MODULE__.AgentAdd.t()
   def agent_add(name, definition, opts \\ []),
     do:
       struct!(
@@ -209,9 +212,12 @@ defmodule Jido.Agent.Directive do
       )
 
   @doc "Updates selected fields of one named logical Agent member."
+  @spec agent_update(atom(), map()) :: __MODULE__.AgentUpdate.t()
   def agent_update(name, changes), do: %__MODULE__.AgentUpdate{name: name, changes: changes}
 
   @doc "Replaces one named logical Agent member."
+  @spec agent_replace(atom(), Jido.Agent.definition() | module(), keyword()) ::
+          __MODULE__.AgentReplace.t()
   def agent_replace(name, definition, opts \\ []),
     do:
       struct!(
@@ -220,9 +226,11 @@ defmodule Jido.Agent.Directive do
       )
 
   @doc "Removes one named logical Agent member."
+  @spec agent_remove(atom()) :: __MODULE__.AgentRemove.t()
   def agent_remove(name), do: %__MODULE__.AgentRemove{name: name}
 
   @doc "Adds one Agent route."
+  @spec route_add(String.t(), map(), keyword()) :: __MODULE__.RouteAdd.t()
   def route_add(path, handler \\ %{kind: :pass_through}, opts \\ []),
     do:
       struct!(
@@ -231,9 +239,11 @@ defmodule Jido.Agent.Directive do
       )
 
   @doc "Updates selected fields of one Agent route."
+  @spec route_update(String.t(), map()) :: __MODULE__.RouteUpdate.t()
   def route_update(path, changes), do: %__MODULE__.RouteUpdate{path: path, changes: changes}
 
   @doc "Replaces one Agent route."
+  @spec route_replace(String.t(), map(), keyword()) :: __MODULE__.RouteReplace.t()
   def route_replace(path, handler, opts \\ []),
     do:
       struct!(
@@ -242,15 +252,19 @@ defmodule Jido.Agent.Directive do
       )
 
   @doc "Removes one Agent route."
+  @spec route_remove(String.t()) :: __MODULE__.RouteRemove.t()
   def route_remove(path), do: %__MODULE__.RouteRemove{path: path}
 
   @doc "Sets the complete order of the current Agent routes."
+  @spec routes_reorder([String.t()]) :: __MODULE__.RoutesReorder.t()
   def routes_reorder(paths), do: %__MODULE__.RoutesReorder{paths: paths}
 
   @doc "Replaces the complete Agent route list."
+  @spec routes_set([map()]) :: __MODULE__.RoutesSet.t()
   def routes_set(routes), do: %__MODULE__.RoutesSet{routes: routes}
 
   @doc "Adds one logical output connection."
+  @spec connection_add(String.t(), keyword()) :: __MODULE__.ConnectionAdd.t()
   def connection_add(path, opts),
     do:
       struct!(
@@ -259,6 +273,7 @@ defmodule Jido.Agent.Directive do
       )
 
   @doc "Updates the delivery fields of one logical output connection."
+  @spec connection_update(String.t(), keyword()) :: __MODULE__.ConnectionUpdate.t()
   def connection_update(path, opts),
     do:
       struct!(
@@ -267,6 +282,7 @@ defmodule Jido.Agent.Directive do
       )
 
   @doc "Replaces one logical output connection."
+  @spec connection_replace(String.t(), keyword()) :: __MODULE__.ConnectionReplace.t()
   def connection_replace(path, opts),
     do:
       struct!(
@@ -275,10 +291,12 @@ defmodule Jido.Agent.Directive do
       )
 
   @doc "Removes one logical output connection."
+  @spec connection_remove(String.t(), keyword()) :: __MODULE__.ConnectionRemove.t()
   def connection_remove(path, opts),
     do: struct!(__MODULE__.ConnectionRemove, mutation_options(opts, [:from, :to]) ++ [path: path])
 
   @doc "Adds one runtime Plugin declaration and initializes its owned state."
+  @spec plugin_add(module(), keyword(), keyword()) :: PluginAdd.t()
   def plugin_add(module, options \\ [], opts \\ []) do
     opts = mutation_options(opts, [:initial])
 
@@ -290,6 +308,7 @@ defmodule Jido.Agent.Directive do
   end
 
   @doc "Changes one runtime Plugin declaration with an optional state migration."
+  @spec plugin_configure(module(), keyword(), keyword()) :: PluginConfigure.t()
   def plugin_configure(module, options, opts \\ []),
     do: %PluginConfigure{
       module: module,
@@ -298,6 +317,7 @@ defmodule Jido.Agent.Directive do
     }
 
   @doc "Removes one runtime Plugin declaration with an explicit state policy."
+  @spec plugin_remove(module(), keyword()) :: PluginRemove.t()
   def plugin_remove(module, opts \\ []),
     do: %PluginRemove{module: module, state: mutation_options(opts, [:state])[:state]}
 

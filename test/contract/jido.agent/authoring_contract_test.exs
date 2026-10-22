@@ -43,6 +43,44 @@ defmodule JidoTest.Contract.AgentAuthoringTest do
     end
   end
 
+  defmodule Child do
+    use Jido.Agent, name: "contract_child"
+
+    routes do
+      route "work.request"
+    end
+  end
+
+  defmodule CompleteDsl do
+    use Jido.Agent,
+      id: "tests/agents/complete-dsl",
+      name: "contract_complete_dsl",
+      description: "Complete core DSL shape",
+      vsn: 2
+
+    agent do
+      schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+      metadata %{domain: "contracts"}
+      plugin JidoTest.AgentContract.First, config: %{initial: 3}
+    end
+
+    routes do
+      signal_source "/contract/complete"
+
+      route "work.request", JidoTest.AgentContract.Return,
+        as: :work,
+        defaults: %{mode: :ok}
+    end
+
+    topology do
+      agent :workers, Child, count: 2
+
+      connections do
+        connect "work.request", from: :root, to: :workers, delivery: :broadcast
+      end
+    end
+  end
+
   defp docs(module) do
     {:docs_v1, _annotation, :elixir, _format, _module_doc, _metadata, entries} =
       Code.fetch_docs(module)
@@ -74,6 +112,40 @@ defmodule JidoTest.Contract.AgentAuthoringTest do
     assert defaults.vsn == 1
     assert defaults.schema == Zoi.object(%{})
     assert defaults.topology == %{}
+
+    complete =
+      Agent.define!(%{
+        module: CompleteDsl,
+        name: "contract_complete_dsl",
+        description: "Complete core DSL shape",
+        vsn: 2,
+        schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}),
+        metadata: %{domain: "contracts"},
+        signal_source: "/contract/complete",
+        routes: [
+          %{
+            path: "work.request",
+            handler: %{kind: :action, target: F.Return},
+            as: :work,
+            defaults: %{mode: :ok}
+          }
+        ],
+        topology: %{
+          agents: [%{name: :workers, definition: Child, count: 2}],
+          connections: [
+            %{
+              path: "work.request",
+              from: %{kind: :agent, name: :root},
+              to: %{kind: :agent, name: :workers},
+              delivery: :broadcast
+            }
+          ]
+        },
+        extensions: [F.contribution(F.First, %{initial: 3})]
+      })
+
+    assert complete === CompleteDsl.definition()
+    assert CompleteDsl.__jido_authoring__().id == "tests/agents/complete-dsl"
   end
 
   @tag obligation: ["jido.agent.I2", "jido.agent.I3", "jido.agent.I7", "jido.agent.I9"]
@@ -100,11 +172,53 @@ defmodule JidoTest.Contract.AgentAuthoringTest do
     definition = Leaf.definition()
     route = hd(definition.routes)
     assert {:error, _} = Agent.define(%{definition | routes: [route, route]})
+
+    assert {:error, %Agent.Error{code: :duplicate, path: [:routes]}} =
+             Agent.define(%{
+               definition
+               | routes: [route, %{route | path: "work.other", as: route.as}]
+             })
+
+    for name <- [:Bad, :_private, :"bad name", :"bad-name", :bad!] do
+      assert {:error,
+              %Agent.Error{
+                code: :invalid_helper_name,
+                path: [:routes, 0, :as]
+              }} = Agent.define(%{definition | routes: [%{route | as: name}]})
+    end
+
     assert {:error, _} = Agent.define(name: "keywords_are_not_maps")
     left = Leaf.instantiate!(id: "left", state: %{count: 1})
     right = Leaf.instantiate!(id: "right", state: %{count: 2})
     assert Agent.definition(left) === Agent.definition(right)
     assert Leaf.definition() === definition
+  end
+
+  @tag obligation: ["jido.agent.I3", "jido.agent.I4"]
+  test "the DSL rejects invalid identity, repeated core declarations, and unsafe helpers" do
+    assert_raise Jido.Authoring.Registry.Error, ~r/Registry identifier/, fn ->
+      F.with_agent("", fn _module -> :ok end, ~s(, id: "bad id"))
+    end
+
+    for body <- [
+          "agent do end\nagent do end",
+          "routes do end\nroutes do end",
+          "topology do end\ntopology do end",
+          "agent do schema Zoi.object(%{}); schema Zoi.object(%{}) end"
+        ] do
+      assert_raise CompileError, fn -> F.with_agent(body, fn _module -> :ok end) end
+    end
+
+    assert_raise Spark.Error.DslError, ~r/helper name/, fn ->
+      F.with_agent(
+        ~s(routes do route "work.request", as: :"bad name" end),
+        fn _module -> :ok end
+      )
+    end
+
+    assert_raise ArgumentError, ~r/unique keyword options/, fn ->
+      F.with_agent("", fn _module -> :ok end, ~s(, name: "duplicate"))
+    end
   end
 
   @tag obligation: "jido.agent.I8"
@@ -159,6 +273,12 @@ defmodule JidoTest.Contract.AgentAuthoringTest do
 
   @tag obligation: "jido.agent.I20"
   test "the trusted JSON codec returns the portable definition" do
+    assert Jido.Agent.Codec.__jido_authoring_codec__() == %{
+             type: "jido.agent.definition",
+             vsn: 1,
+             encoder: Jido.Agent
+           }
+
     for value <- [Leaf.definition(), Leaf.instantiate!(id: "json")] do
       registry = JidoTest.AgentRegistry.for(value)
       assert {:ok, _document} = JidoTest.AgentRegistry.encode(value, registry)
@@ -220,6 +340,7 @@ defmodule JidoTest.Contract.AgentAuthoringTest do
     end
 
     api_docs = docs(Agent)
+    assert {:ok, specs} = Code.Typespec.fetch_specs(Agent)
 
     for key <- [
           {:macro, :__using__, 1},
@@ -237,6 +358,23 @@ defmodule JidoTest.Contract.AgentAuthoringTest do
           {:function, :cmd, 3}
         ] do
       assert is_map(Map.fetch!(api_docs, key))
+    end
+
+    for key <- [
+          schema: 1,
+          define: 1,
+          define!: 1,
+          validate: 1,
+          definition?: 1,
+          instance?: 1,
+          definition: 1,
+          instantiate: 2,
+          instantiate!: 2,
+          mutate: 2,
+          set: 2,
+          cmd: 3
+        ] do
+      assert List.keymember?(specs, key, 0)
     end
 
     for key <- [

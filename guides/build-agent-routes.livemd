@@ -166,7 +166,7 @@ Inline `action` blocks compile to Action modules, so they report `:action`.
 | --- | --- |
 | path | An exact Signal type, or a pattern with `*` or `**`. Unique in the Agent. |
 | handler | A module, one `action` or `transform` block, or nothing (pass-through). |
-| `as:` | Generates `<name>_signal/2` and `<name>_signal!/2`. Exact paths only. |
+| `as:` | Generates `<name>_signal/2` and `<name>_signal!/2`. Use a lowercase name made from letters, digits, and underscores. Exact paths only. |
 | `defaults:` | Input values under the Signal data. Action and Flow routes only. |
 | `emits:` | The Signal types the route may emit. Omit it to leave the route unchecked. |
 

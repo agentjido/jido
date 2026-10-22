@@ -2,7 +2,23 @@ defmodule Jido.Agent.Topology do
   @moduledoc "Logical members and output connections. These declarations do not start processes."
   alias Jido.Agent.{Data, Error, Extension, Route, Validation}
 
+  @type state_reference :: %{kind: :state, key: atom()}
+  @type endpoint :: map()
+  @type connection :: map()
+  @type check :: %{
+          connection: connection(),
+          status: :compatible | :unchecked,
+          reason: nil | :wildcard_coverage | :unknown_outputs
+        }
+  @type bound_member :: %{
+          name: atom(),
+          definition: Jido.Agent.definition(),
+          count: pos_integer(),
+          state: map()
+        }
+
   @doc "Creates a symbolic reference to one parent Agent state field."
+  @spec state(atom()) :: state_reference()
   def state(key), do: %{kind: :state, key: key}
 
   @doc false
@@ -283,6 +299,7 @@ defmodule Jido.Agent.Topology do
   end
 
   @doc "Reports connection proofs. Unknown contracts remain :unchecked."
+  @spec checks(Jido.Agent.t(), keyword()) :: {:ok, [check()]} | {:error, term()}
   def checks(definition, opts \\ []) do
     Data.list(definition.topology.connections, fn connection ->
       check(connection, definition, opts)
@@ -366,6 +383,8 @@ defmodule Jido.Agent.Topology do
   end
 
   @doc "Selects all declared output connections for one logical source and type."
+  @spec connections_for(Jido.Agent.t(), endpoint(), String.t()) ::
+          {:ok, [connection()]} | {:error, term()}
   def connections_for(definition, from, type) do
     with :ok <- Data.exact(type) do
       {:ok,
@@ -376,6 +395,7 @@ defmodule Jido.Agent.Topology do
   end
 
   @doc "Binds member inputs from one parent state snapshot. It starts no processes."
+  @spec bind(Jido.Agent.t(), map()) :: {:ok, [bound_member()]} | {:error, term()}
   def bind(definition, state) do
     Data.list(definition.topology.agents, fn member ->
       with {:ok, child} <- related(member.definition, []),

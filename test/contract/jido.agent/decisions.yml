@@ -28,6 +28,18 @@
   driver: Public functions must be documented and protected by Covenant without presenting internal coordination helpers as user APIs.
   approved_by: User-approved component review
 
+- id: agent-dsl-review
+  date: 2026-10-22
+  decision: Keep the optional agent, routes, and topology sections and their current lowering model. Require stable authoring IDs at Agent compilation, restrict generated Signal helper bases to safe lowercase names, document the complete core DSL on use Jido.Agent, and make DSL-to-Map parity explicit in the Covenant.
+  driver: The DSL structure is sound, but its public contract was spread across guides and accepted identifiers that could fail later or create impractical generated functions.
+  approved_by: User-requested full component review
+
+- id: agent-full-mutation-review
+  date: 2026-10-22
+  decision: Accept the current full jido.agent mutation profile with 1,381 killed mutants, 154 reviewed survivors, 1 reviewed timeout, and 79 invalid mutants. Keep 155 survivor annotations for behavior that is equivalent, diagnostic-only, unreachable at the supported boundary, or not promised by this Covenant.
+  driver: The component review needs current mutation evidence after the boundary, public API, DSL, and Covenant changes.
+  approved_by: User-requested full component review
+
 - id: agent-mutation-runtime-profile
   date: 2026-10-20
   decision: Mutate Agent runtime and value modules without the Spark DSL declaration modules. Check generated DSL output through the Agent contract tests and the authoring suite.

@@ -5,6 +5,7 @@ defmodule JidoTest.Contract.AgentViewTest do
   alias Jido.Agent.View
   alias Jido.Authoring.{Document, Registry}
   alias JidoTest.AgentFixtures.{Add, CounterAgent}
+  alias JidoTest.AgentContract, as: F
 
   defp registry do
     Registry.new!(%{
@@ -12,9 +13,12 @@ defmodule JidoTest.Contract.AgentViewTest do
       {"agents/core", 1} => {:agent, Agent},
       {"schemas/counter", 1} => {:schema, CounterAgent.definition().schema},
       {"schemas/empty", 1} => {:schema, Zoi.object(%{})},
-      {"actions/add", 1} => {:action, Add}
+      {"actions/add", 1} => {:action, Add},
+      {"flows/contract", 1} => {:flow, F.Flow}
     })
   end
+
+  def transform(value), do: value
 
   @tag obligation: "jido.agent.I31"
   test "compiled and data Agent definitions use one JSON view contract" do
@@ -89,6 +93,64 @@ defmodule JidoTest.Contract.AgentViewTest do
 
     assert {:error, %{__exception__: true}} =
              View.project(definition, registry(), operation_limit: 501)
+  end
+
+  @tag obligation: "jido.agent.I31"
+  test "operation limits keep their documented default and inclusive bounds" do
+    routes =
+      for index <- 1..501 do
+        %{path: "operation.#{index}", handler: %{kind: :pass_through}}
+      end
+
+    definition = Agent.define!(%{name: "view_limits", routes: routes})
+
+    assert {:ok, default_view} = View.project(definition, registry())
+    assert length(default_view["operations"]["items"]) == 100
+
+    assert {:ok, zero_view} = View.project(definition, registry(), operation_limit: 0)
+    assert zero_view["operations"]["items"] == []
+
+    assert {:ok, maximum_view} = View.project(definition, registry(), operation_limit: 500)
+    assert length(maximum_view["operations"]["items"]) == 500
+
+    for invalid <- [-1, 501] do
+      assert {:error, %{message: message}} =
+               View.project(definition, registry(), operation_limit: invalid)
+
+      assert is_binary(message) and message != ""
+    end
+
+    exact = Agent.define!(%{name: "exact_limit", routes: Enum.take(routes, 2)})
+    assert {:ok, exact_view} = View.project(exact, registry(), operation_limit: 2)
+    refute exact_view["operations"]["truncated"]
+  end
+
+  @tag obligation: "jido.agent.I31"
+  test "operation summaries expose only Action and Flow Registry targets" do
+    definition =
+      Agent.define!(%{
+        name: "view_handlers",
+        routes: [
+          %{path: "flow.run", handler: %{kind: :flow, target: F.Flow}},
+          %{
+            path: "transform.run",
+            handler: %{kind: :transform, target: {__MODULE__, :transform, 1}}
+          },
+          %{path: "pass.run", handler: %{kind: :pass_through}}
+        ]
+      })
+
+    assert {:ok, view} = View.project(definition, registry())
+    [flow, transform, pass] = view["operations"]["items"]
+    assert flow["target"] == %{"id" => "flows/contract", "vsn" => 1}
+    assert transform["target"] == nil
+    assert pass["target"] == nil
+  end
+
+  @tag obligation: "jido.agent.I31"
+  test "unsupported view sources return a structured nonempty error" do
+    assert {:error, %{details: %{}, message: message}} = View.project(nil, registry())
+    assert is_binary(message) and message != ""
   end
 
   @tag obligation: "jido.agent.I31"

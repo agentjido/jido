@@ -82,12 +82,17 @@ end
 
 | Option | Where | Rule |
 | --- | --- | --- |
+| `id` | `use Jido.Agent` | Stable authoring Registry ID. Defaults to the module name. |
 | `name` | `use Jido.Agent` | Required non-empty string. |
 | `description` | `use Jido.Agent` | Optional string. |
 | `vsn` | `use Jido.Agent` | Positive integer. Default `1`. |
 | `schema` | `agent` | A static Zoi object for domain state. |
 | `extensions` | `use Jido.Agent` | Plugin and Extension modules with no options. |
 | `metadata` | `agent` | A plain map of static data. |
+
+Use an explicit `id` when the Agent can appear in a stored document. It must
+use the shared authoring identifier format and remain stable when Elixir module
+names change.
 
 A bad route, schema, or Plugin fails the build.
 

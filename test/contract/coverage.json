@@ -229,7 +229,7 @@
         "jido.agent.I27": {
           "failing": 0,
           "kind": "functional",
-          "passing": 27,
+          "passing": 28,
           "status": "active",
           "testable": true,
           "tests": [
@@ -241,6 +241,7 @@
             "test agent CRUD preserves order and replacement resets omitted fields",
             "test built-in identity and validation cover runtime and definition Directives",
             "test cancelled edits and set-to-original produce an empty Diff",
+            "test composition applies definition mutations and rejects duplicate Directive options",
             "test connection CRUD uses endpoint/path identity and replacement defaults",
             "test counted destinations need broadcast after the complete batch",
             "test custom Directive validation contains changed types, invalid results, and faults",
@@ -301,7 +302,7 @@
         "jido.agent.I3": {
           "failing": 0,
           "kind": "functional",
-          "passing": 11,
+          "passing": 12,
           "status": "active",
           "testable": true,
           "tests": [
@@ -314,6 +315,7 @@
             "test field validation follows one fixed order",
             "test neutral definitions use explicit canonical defaults",
             "test scalar authoring validators keep their exact boundaries",
+            "test the DSL rejects invalid identity, repeated core declarations, and unsafe helpers",
             "test unknown fields and instance data fail before provider callbacks",
             "test unknown nil keys fail in every authoring boundary"
           ]
@@ -334,15 +336,18 @@
         "jido.agent.I31": {
           "failing": 0,
           "kind": "security",
-          "passing": 5,
+          "passing": 8,
           "status": "active",
           "testable": true,
           "tests": [
             "test an instance exposes identity but not state",
             "test compiled and data Agent definitions use one JSON view contract",
             "test operation limits also bound Registry resolution work",
+            "test operation limits keep their documented default and inclusive bounds",
             "test operation output is bounded and reports truncation",
-            "test projection requires identifiers for every exposed code value"
+            "test operation summaries expose only Action and Flow Registry targets",
+            "test projection requires identifiers for every exposed code value",
+            "test unsupported view sources return a structured nonempty error"
           ]
         },
         "jido.agent.I32": {
@@ -358,7 +363,7 @@
         "jido.agent.I4": {
           "failing": 0,
           "kind": "functional",
-          "passing": 6,
+          "passing": 7,
           "status": "active",
           "testable": true,
           "tests": [
@@ -367,7 +372,8 @@
             "test duplicate declarations fail and instance reuse preserves order and exact values",
             "test malformed route collections return errors in direct forms",
             "test removed route options and invalid helpers fail at declaration",
-            "test routes accept one module with separate plain Map defaults"
+            "test routes accept one module with separate plain Map defaults",
+            "test the DSL rejects invalid identity, repeated core declarations, and unsafe helpers"
           ]
         },
         "jido.agent.I5": {

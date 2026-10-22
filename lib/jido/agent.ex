@@ -57,10 +57,61 @@ defmodule Jido.Agent do
   @type definition :: %__MODULE__{id: nil, state: nil}
   @type instance :: %__MODULE__{id: String.t(), state: map()}
 
-  @doc "Defines a compiled Agent module with the Agent DSL."
+  @doc """
+  Defines a compiled Agent module with the Agent DSL.
+
+  ## Options
+
+  - `:id` is the stable authoring Registry ID. It defaults to the module name.
+  - `:name` is the required Agent name.
+  - `:description` is optional display text.
+  - `:vsn` is the positive definition version. It defaults to `1`.
+  - `:extensions` lists the Extension or Plugin providers that add authoring
+    sections or need an empty configuration.
+
+  ## Core DSL
+
+  Each optional core section can occur once:
+
+      use Jido.Agent, id: "my_app/counter", name: "counter", vsn: 1
+
+      agent do
+        schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+        metadata %{domain: "counters"}
+        plugin MyApp.Plugin, config: %{mode: :strict}
+      end
+
+      routes do
+        signal_source "/my_app/counter"
+        route "counter.add", MyApp.Add, as: :add, defaults: %{amount: 1}
+      end
+
+      topology do
+        agent :workers, MyApp.Worker, count: 2
+
+        connections do
+          connect "work.ready", from: :workers, to: :root
+        end
+      end
+
+  The `agent` section accepts `schema`, `metadata`, and `plugin`. The `routes`
+  section accepts `signal_source` and ordered `route` declarations. A route can
+  use an Action or Flow module, an inline `action` or `transform`, a
+  `Jido.SignalAction` module, or no handler for pass-through. Route options are
+  `:as`, `:defaults`, `:emits`, and `:via`; `:via` is only for a
+  `Jido.SignalAction` route. An `:as` value must start with a lowercase letter
+  and contain only lowercase letters, digits, and underscores.
+
+  The `topology` section accepts named `agent` members and a `connections`
+  section with `connect` declarations. `state/1` creates a reference to one
+  parent state field. Selected providers can add their own sections and
+  imports.
+
+  Compilation lowers this DSL to the same canonical value that `define/1`
+  builds from a map.
+  """
   defmacro __using__(opts) do
     opts = options!(opts, __CALLER__)
-    opts = Keyword.put_new(opts, :id, Atom.to_string(__CALLER__.module))
 
     imports =
       Enum.flat_map(Keyword.get(opts, :extensions, []), fn provider ->
@@ -86,8 +137,13 @@ defmodule Jido.Agent do
     unless Keyword.keyword?(opts) and Enum.uniq(Keyword.keys(opts)) == Keyword.keys(opts),
       do: raise(ArgumentError, "Agent requires unique keyword options")
 
-    case Jido.Agent.Extension.providers(Keyword.get(opts, :extensions, [])) do
-      {:ok, _providers} -> opts
+    opts = Keyword.put_new(opts, :id, Atom.to_string(caller.module))
+
+    with :ok <- Jido.Authoring.Registry.validate_identifier(opts[:id]),
+         {:ok, _providers} <-
+           Jido.Agent.Extension.providers(Keyword.get(opts, :extensions, [])) do
+      opts
+    else
       {:error, error} -> raise error
     end
   end
@@ -135,6 +191,8 @@ defmodule Jido.Agent do
     do: source |> instantiate(opts) |> Jido.Agent.Error.unwrap!()
 
   @doc "Applies ordered data mutations and returns the candidate and its final Diff."
+  @spec mutate(t(), [Jido.Agent.Directive.t()]) ::
+          {:ok, t(), Jido.Agent.Diff.t()} | {:error, term()}
   def mutate(%__MODULE__{} = agent, directives), do: Jido.Agent.Mutation.apply(agent, directives)
 
   @doc false

@@ -44,10 +44,10 @@ not restore or claim the retired standalone `jido.topology` component.
 
 **Definitions and instances**
 
-### jido.agent.I1 — Equivalent declarations
+### jido.agent.I1 — Canonical DSL parity
 
 - **scope:** `Jido.Agent.define/1`, `Jido.Agent.__using__/1`
-- **must:** Equivalent Map and DSL declarations produce equal canonical Agent definitions.
+- **must:** The optional, single-use `agent`, `routes`, and `topology` sections lower state schema, metadata, provider configuration, ordered routes, logical members, and connections into the same canonical Agent definition as an equivalent Map declaration. Selected providers can add non-core sections without replacing a core section.
 - **kind:** functional
 - **status:** active
 
@@ -60,15 +60,15 @@ not restore or claim the retired standalone `jido.topology` component.
 
 ### jido.agent.I3 — Declaration guards
 
-- **scope:** `Jido.Agent.define/1`
-- **must:** Definition construction rejects unknown fields and non-positive versions.
+- **scope:** `Jido.Agent.define/1`, `Jido.Agent.__using__/1`
+- **must:** Definition construction rejects unknown fields or use options, invalid stable authoring IDs, non-positive versions, invalid schemas, and repeated core sections or fields.
 - **kind:** functional
 - **status:** active
 
-### jido.agent.I4 — Duplicate route policy
+### jido.agent.I4 — Route declaration policy
 
-- **scope:** `Jido.Agent.define/1`
-- **must:** Map authoring rejects duplicate route paths and rejects keyword declarations in place of a plain Map.
+- **scope:** `Jido.Agent.define/1`, `Jido.Agent.__using__/1`
+- **must:** Authoring rejects duplicate route paths or helper names. A generated helper requires an exact route and a lowercase atom that starts with a letter and contains only letters, digits, and underscores. Map authoring rejects keyword declarations in place of a plain Map.
 - **kind:** functional
 - **status:** active
 
@@ -147,7 +147,7 @@ not restore or claim the retired standalone `jido.topology` component.
 ### jido.agent.I24 — Public Agent entry points
 
 - **scope:** `Jido.Agent`
-- **must:** Keep `use Jido.Agent`, `schema/1`, `define/1`, `define!/1`, `validate/1`, `definition?/1`, `instance?/1`, `definition/1`, `instantiate/1,2`, `instantiate!/1,2`, `mutate/2`, `set/2`, and `cmd/2,3` as the documented Agent facade. Keep runtime projection, direct Signal-helper support, raw schema data, and transition functions hidden. Do not restore removed `new`, `validate_instance`, `complete_schema`, `handle_signal`, `checkpoint`, or `restore` wrappers.
+- **must:** Keep `use Jido.Agent`, `schema/1`, `define/1`, `define!/1`, `validate/1`, `definition?/1`, `instance?/1`, `definition/1`, `instantiate/1,2`, `instantiate!/1,2`, `mutate/2`, `set/2`, and `cmd/2,3` as the documented and typed Agent facade. Keep runtime projection, direct Signal-helper support, raw schema data, and transition functions hidden. Do not restore removed `new`, `validate_instance`, `complete_schema`, `handle_signal`, `checkpoint`, or `restore` wrappers.
 - **kind:** functional
 - **status:** active
 
