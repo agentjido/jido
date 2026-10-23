@@ -9,11 +9,9 @@ defmodule Jido.Examples.Topology.DirectConnections do
   routes do
     signal_source "/examples/topology/direct_connections"
 
-    route "examples.topology.pipeline.request",
-      as: :request,
-      emits: ["examples.topology.pipeline.request"]
+    forward "examples.topology.pipeline.request", to: agent(:worker)
 
-    route "examples.topology.pipeline.receipt", as: :receipt, emits: [] do
+    route "examples.topology.pipeline.receipt", as: :receipt do
       action %{value: value}, schema: Zoi.object(%{value: Zoi.integer()}), context: context do
         {:ok, %{context.agent_state | completed: context.agent_state.completed + value}}
       end
@@ -25,7 +23,6 @@ defmodule Jido.Examples.Topology.DirectConnections do
     agent :sink, Jido.Examples.Topology.PipelineSink
 
     connections do
-      connect "examples.topology.pipeline.request", from: :root, to: :worker
       connect "examples.topology.pipeline.completed", from: :worker, to: :sink
       connect "examples.topology.pipeline.receipt", from: :sink, to: :root
     end

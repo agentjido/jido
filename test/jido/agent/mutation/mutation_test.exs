@@ -185,20 +185,24 @@ defmodule Jido.Agent.MutationTest do
   end
 
   @tag obligation: "jido.agent.I27"
-  test "route add accepts executable modules and all descriptor forms" do
+  test "route add accepts executable, transform, and forward forms" do
     assert {:ok, agent, _} =
              Agent.mutate(F.agent(), [
+               Directive.agent_add(:worker, F.Worker),
                Directive.route_add("action", F.Work, defaults: %{amount: 1}),
                Directive.route_add("transform", %{
                  kind: :transform,
                  target: {F.Transform, :run, 1}
                }),
-               Directive.route_add("pass")
+               Directive.route_add("forward", %{
+                 kind: :forward,
+                 target: %{kind: :agent, name: :worker}
+               })
              ])
 
     assert {:ok, %{handler: %{kind: :action}}} = Route.select(agent, "action")
     assert {:ok, %{handler: %{kind: :transform}}} = Route.select(agent, "transform")
-    assert {:ok, %{handler: %{kind: :pass_through}}} = Route.select(agent, "pass")
+    assert {:ok, %{handler: %{kind: :forward}}} = Route.select(agent, "forward")
   end
 
   @tag obligation: "jido.agent.I27"
@@ -217,12 +221,12 @@ defmodule Jido.Agent.MutationTest do
 
     assert {:ok, updated, _} =
              Agent.mutate(F.agent(), [
-               Directive.route_update("run", %{as: :run_work, emits: ["work.done"]}),
+               Directive.route_update("run", %{as: :run_work}),
                Directive.agent_add(:worker, F.Worker),
                Directive.agent_update(:worker, %{definition: F.Worker})
              ])
 
-    assert [%{as: :run_work, emits: ["work.done"]}] = updated.routes
+    assert [%{as: :run_work}] = updated.routes
     assert [%{definition: F.Worker}] = updated.topology.agents
   end
 
@@ -230,7 +234,7 @@ defmodule Jido.Agent.MutationTest do
   test "route reorder changes first-match selection and rejects incomplete permutations" do
     assert {:ok, broad, _} =
              Agent.mutate(F.agent(), [
-               Directive.route_add("event.**"),
+               Directive.route_add("event.**", F.Work),
                Directive.route_add("event.one", F.Work)
              ])
 
@@ -255,22 +259,28 @@ defmodule Jido.Agent.MutationTest do
 
     for edits <- [
           [Directive.route_add("bad", %{kind: :pass_through}, defaults: %{x: 1})],
-          [Directive.route_add("bad", %{kind: :pass_through}, emits: [])],
+          [Directive.route_add("bad", %{kind: :pass_through})],
           [Directive.route_add("bad.*", F.Work, as: :bad)],
           [
             Directive.route_add("a", F.Work, as: :same),
             Directive.route_add("b", F.Work, as: :same)
-          ],
-          [Directive.route_add("run")]
+          ]
         ] do
       assert {:error, _} = Agent.mutate(F.agent(), edits)
+    end
+
+    assert_raise ArgumentError, fn ->
+      Directive.route_add("bad", F.Work, unknown: true)
     end
   end
 
   @tag obligation: "jido.agent.I28"
   test "removing an accepted input checks existing connections at the final boundary" do
     root =
-      Agent.define!(%{name: "root", routes: [%{path: "work", handler: %{kind: :pass_through}}]})
+      Agent.define!(%{
+        name: "root",
+        routes: [%{path: "work", handler: %{kind: :action, target: F.Work}}]
+      })
       |> Agent.instantiate!(id: "root")
 
     assert {:ok, agent, _} =

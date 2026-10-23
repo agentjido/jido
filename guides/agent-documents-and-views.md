@@ -41,8 +41,8 @@ defmodule Doc.Counter do
 
   routes do
     signal_source("/guides/documents")
-    route "counter.add", Doc.Add, as: :add, defaults: %{amount: 1}, emits: []
-    route "counter.echo", emits: ["counter.echo"]
+    route "counter.add", Doc.Add, as: :add, defaults: %{amount: 1}
+    forward "counter.forward", to: parent()
   end
 end
 ```
@@ -196,9 +196,9 @@ APIs, and catalogs:
   "operations" => %{
     "items" => [
       %{"signal_type" => "counter.add", "kind" => "action",
-        "target" => %{"id" => "actions/add", "vsn" => 1}, "emits" => []},
-      %{"signal_type" => "counter.echo", "kind" => "pass_through",
-        "target" => nil, "emits" => ["counter.echo"]}
+        "target" => %{"id" => "actions/add", "vsn" => 1}},
+      %{"signal_type" => "counter.forward", "kind" => "forward",
+        "target" => %{"kind" => "parent"}}
     ],
     "total" => 2,
     "truncated" => false

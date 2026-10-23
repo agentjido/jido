@@ -7,7 +7,7 @@ defmodule Jido.Examples.Topology.ConnectionChanges do
   routes do
     signal_source "/examples/topology/connection_changes"
 
-    route "examples.topology.connections.redirect", as: :redirect, emits: [@work] do
+    route "examples.topology.connections.redirect", as: :redirect do
       action %{value: value}, schema: Zoi.object(%{value: Zoi.integer()}), context: context do
         signal =
           Jido.Signal.new!("examples.topology.cell.work", %{value: value},
@@ -23,7 +23,7 @@ defmodule Jido.Examples.Topology.ConnectionChanges do
       end
     end
 
-    route "examples.topology.connections.fanout", as: :fanout, emits: [] do
+    route "examples.topology.connections.fanout", as: :fanout do
       action _input, context: context do
         {:ok, context.agent_state,
          [
@@ -42,7 +42,11 @@ defmodule Jido.Examples.Topology.ConnectionChanges do
       end
     end
 
-    route @work, as: :work, emits: [@work]
+    route @work, as: :work do
+      transform signal do
+        {:ok, signal}
+      end
+    end
   end
 
   topology do

@@ -15,7 +15,7 @@ mix test test/examples/10_persistence --include example --seed 0
 
 The research suite contains the peer-based external fencing evidence for the
 missing cluster-exclusive ownership contract.
-Use the [testing guide](../../guides/testing.md) for full acceptance and coverage
+Use the [testing guide](../../guides/test-jido-systems.livemd) for full acceptance and coverage
 commands. Detailed stable contracts stay in focused core tests.
 
 The [catalog checks](catalog_test.exs) verify counts, section indexes, matching

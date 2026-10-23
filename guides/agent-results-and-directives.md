@@ -87,6 +87,22 @@ topology connections, then the owning topology, then `default_dispatch:`,
 and finally back to the Agent itself. [Life of a Signal](signal-to-effects.md)
 covers this order and the loop it can cause.
 
+## Reply To The Current Request
+
+`Reply` is separate from `Emit`. It sends one correlated response to the
+caller that submitted the current request. Build the response Signal with the
+SignalAction that owns its input and output contracts, then wrap it:
+
+```elixir
+with {:ok, response} <- MyApp.PriceQuote.reply(request, result) do
+  {:ok, state, [Jido.Agent.Directive.reply(response)]}
+end
+```
+
+The response must use the current request ID as its causation ID. One Turn can
+return at most one `Reply`. The Agent Server sends it only after the state
+commits. Pure `cmd/3` returns the Directive as data and sends nothing.
+
 ## Runtime Directives
 
 `Jido.AgentServer.Directive` builds the other built-in runtime requests:
@@ -95,7 +111,7 @@ covers this order and the loop it can cause.
 | --- | --- |
 | `signal_send(signal, pid)` | An `Emit` with `{:pid, target: pid}` dispatch. |
 | `agent_send(name, signal)` | Send a Signal to a tracked child Agent. |
-| `owner_send(signal)` | Send a Signal to the owning Agent. |
+| `parent_send(signal)` | Send a Signal to the parent Agent. |
 | `agent_start(agent, name, opts \\ [])` | Start a tracked child Agent. |
 | `agent_stop(name, reason \\ :normal)` | Stop a tracked child Agent. |
 | `process_start(child_spec)` | Start a process under the Jido instance. It can outlive the Server. |
@@ -184,7 +200,8 @@ Directives run.
 | The third element isn't a proper list | `"Action returned an invalid effects list"` |
 | A list item isn't a Directive | `"Agent executable returned an invalid Directive"` |
 | A custom Directive has no owner | `"Agent Directive has no owner"` |
-| An emitted type isn't in the route's `emits:` | `"Signal type is outside the route contract"` |
+| A Reply has the wrong causation ID | `"Agent Reply Directive must match the current request"` |
+| A Turn returns more than one Reply | `"Agent turn can return only one Reply Directive"` |
 | More Directives than `max_directives_per_turn:` (default 1,000) | The live Server rejects the Turn. |
 
 For your own failures, return a structured error such as

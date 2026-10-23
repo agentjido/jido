@@ -12,7 +12,7 @@ defmodule Jido.Agent.MutationFoundationTest do
     assert {:ok, after_agent, diff} =
              Agent.mutate(before, [
                D.route_replace("run", F.Flow, defaults: %{amount: 2}),
-               D.route_add("new"),
+               D.route_add("new", F.Work),
                D.agent_add(:a, F.Worker),
                D.connection_add("work", from: :root, to: :a),
                D.plugin_add(F.Counter)
@@ -150,7 +150,7 @@ defmodule Jido.Agent.MutationFoundationTest do
           R.process_start({Elixir.Agent, fn -> 0 end}),
           R.error_report(:failed),
           R.signal_send(signal, self(), timeout: 100),
-          R.owner_send(signal),
+          R.parent_send(signal),
           R.agent_send(:worker, signal)
         ] do
       assert {:ok, ^directive} = D.validate(directive)

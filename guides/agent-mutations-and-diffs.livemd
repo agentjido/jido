@@ -153,7 +153,7 @@ The result is `{["greet.wave", "greet.hello", "greet.learn"], [{%{}, %{name: "wo
 
 | Constructor | Effect |
 | --- | --- |
-| `route_update(path, changes)` | Merges `handler`, `as`, `defaults`, or `emits` into one route. |
+| `route_update(path, changes)` | Merges `handler`, `as`, or `defaults` into one route. |
 | `route_replace(path, handler, opts)` | Replaces the whole route. |
 | `routes_reorder(paths)` | Sets the order. Must name every path exactly once. |
 

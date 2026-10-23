@@ -1,24 +1,17 @@
-# Connect Agent Outputs
+# Forward Signals Between Agents
 
 ## Overview
 
-Your team members emit Signals, and something has to decide who receives
-them. In Jido, members emit without naming a receiver, and the parent's
-topology routes each Signal with `connect` entries:
-
-<!-- livebook:{"force_markdown":true} -->
+Use `forward` when one input Signal must go to one named child Agent or to the
+current parent Agent.
 
 ```elixir
-connections do
-  connect "order.placed", from: :root, to: :checker
-  connect "order.checked", from: :checker, to: :root
-end
+forward "work.request", to: agent(:worker)
+forward "work.completed", to: parent()
 ```
 
-This Livebook builds a shop that sends orders to a checker and gets results
-back. Then it shows how Jido checks connections before anything runs,
-explicit sends with `agent_send/2` and `owner_send/1`, fan-out to a counted
-member, and routing through a topology bus.
+Forwarding is part of the route definition. It is not an `Emit` fallback and
+does not depend on a channel or a connection search.
 
 ## Install
 
@@ -26,410 +19,128 @@ member, and routing through a topology bus.
 Mix.install([{:jido, "~> 3.0.0-beta.2"}])
 ```
 
-## Define The Checker
-
-Each route declares `emits:`, the Signal types it can send. Jido uses these
-lists to check the wiring.
+## Define the Worker
 
 ```elixir
-defmodule Pipe.Checker do
-  use Jido.Agent, name: "checker"
+defmodule Forward.Work do
+  use Jido.Action, name: "forward_work"
+
+  @impl true
+  def run(_input, %{agent_state: state}) do
+    {:ok, %{state | completed: state.completed + 1}}
+  end
+end
+
+defmodule Forward.Worker do
+  use Jido.Agent, name: "forward_worker"
 
   agent do
-    schema(Zoi.object(%{checked: Zoi.integer() |> Zoi.default(0)}))
+    schema(Zoi.object(%{completed: Zoi.integer() |> Zoi.default(0)}))
   end
 
   routes do
-    signal_source("/guides/connect")
-
-    route "order.placed", emits: ["order.checked"] do
-      action %{total: total},
-        name: "check_order",
-        schema: Zoi.object(%{total: Zoi.integer()}),
-        context: context do
-        {:ok, %{context.agent_state | checked: context.agent_state.checked + 1},
-         [emit("order.checked", %{total: total, approved: total < 1_000})]}
-      end
-    end
-
-    route "checker.ping", emits: ["order.audit"] do
-      action _input, name: "ping", schema: Zoi.object(%{}), context: context do
-        audit = Jido.Signal.new!("order.audit", %{}, source: "/guides/connect")
-        {:ok, context.agent_state, [Jido.AgentServer.Directive.owner_send(audit)]}
-      end
-    end
-
-    route "checker.stray", emits: ["order.stray"] do
-      action _input, name: "stray", schema: Zoi.object(%{}), context: context do
-        {:ok, context.agent_state, [emit("order.stray", %{})]}
-      end
-    end
+    route "work.request", Forward.Work
+    forward "work.completed", to: parent()
   end
 end
 ```
 
-The checker approves orders under 1,000. The `ping` and `stray` routes are
-used later in this Livebook.
+`work.request` runs an Action. `work.completed` does no local work. It sends
+the input Signal to the current parent after commit.
 
-## Wire The Shop
+## Define the Parent
 
 ```elixir
-defmodule Pipe.Shop do
-  use Jido.Agent, name: "shop"
+defmodule Forward.Team do
+  use Jido.Agent, name: "forward_team"
 
   agent do
-    schema(
-      Zoi.object(%{
-        approved: Zoi.integer() |> Zoi.default(0),
-        rejected: Zoi.integer() |> Zoi.default(0),
-        audits: Zoi.integer() |> Zoi.default(0)
-      })
-    )
+    schema(Zoi.object(%{completed: Zoi.integer() |> Zoi.default(0)}))
   end
 
   routes do
-    signal_source("/guides/connect")
-
-    route "order.placed", as: :place, emits: ["order.placed"]
-
-    route "order.checked", emits: [] do
-      action %{approved: approved},
-        name: "record",
-        schema: Zoi.object(%{approved: Zoi.boolean()}),
-        context: context do
-        state = context.agent_state
-
-        if approved,
-          do: {:ok, %{state | approved: state.approved + 1}},
-          else: {:ok, %{state | rejected: state.rejected + 1}}
-      end
-    end
-
-    route "order.audit", emits: [] do
-      action _input, name: "audit", schema: Zoi.object(%{}), context: context do
-        {:ok, %{context.agent_state | audits: context.agent_state.audits + 1}}
-      end
-    end
-
-    route "shop.ping", as: :ping, emits: ["checker.ping"] do
-      action _input, name: "shop_ping", schema: Zoi.object(%{}), context: context do
-        ping = Jido.Signal.new!("checker.ping", %{}, source: "/guides/connect")
-        {:ok, context.agent_state, [Jido.AgentServer.Directive.agent_send(:checker, ping)]}
-      end
-    end
+    forward "work.request", to: agent(:worker)
+    route "work.completed", Forward.Work
   end
 
   topology do
-    agent :checker, Pipe.Checker
-
-    connections do
-      connect "order.placed", from: :root, to: :checker
-      connect "order.checked", from: :checker, to: :root
-    end
+    agent :worker, Forward.Worker
   end
 end
 ```
 
-- `route "order.placed", as: :place, emits: ["order.placed"]` has no handler.
-  It's a pass-through route: the shop emits the Signal unchanged.
-- `:root` is the shop itself. `:checker` is the member.
-- Each `connect` takes a Signal type, a source, and a destination.
+The name in `agent(:worker)` must exist in the same topology. Jido rejects an
+unknown name when it validates the definition.
 
-## Check The Wiring
+## Portable Definition Data
 
-`Jido.Agent.Topology.checks/1` reports what Jido can prove about each
-connection:
+Forward targets contain only tagged maps and atoms:
 
 ```elixir
-{:ok, checks} = Jido.Agent.Topology.checks(Pipe.Shop.definition())
+team = Forward.Team.definition()
+worker = Forward.Worker.definition()
 
-Enum.map(checks, &{&1.connection.path, &1.status})
+{hd(team.routes).handler, List.last(worker.routes).handler}
 ```
 
-You get `[{"order.placed", :compatible}, {"order.checked", :compatible}]`.
+The result is:
 
-| Status | Meaning |
+```elixir
+{
+  %{kind: :forward, target: %{kind: :agent, name: :worker}},
+  %{kind: :forward, target: %{kind: :parent}}
+}
+```
+
+The definition contains no PID, registry entry, transport, or dispatch
+configuration. Documents and views encode the same target tags.
+
+## Runtime Rules
+
+A successful child forward produces an `AgentSend` runtime Directive. A
+successful parent forward produces a `ParentSend` runtime Directive. The
+Agent Server runs the Directive after it commits the current Turn.
+
+Forward has these fixed rules:
+
+- `agent(name)` sends only to that declared Agent member;
+- `parent()` sends only to the current parent Agent;
+- there are no channel targets;
+- there is no topology fallback;
+- there is no `default_dispatch:` fallback; and
+- there is no self-dispatch fallback.
+
+An unknown member makes the definition invalid. An unavailable member returns
+`:agent_not_found`. A missing parent returns `:parent_not_found`.
+
+## Forward and Emit
+
+`forward` and `Emit` have different purposes.
+
+| Form | Purpose |
 | --- | --- |
-| `:compatible` | The source's `emits:` includes the type, and the destination has a route for it. |
-| `:unchecked` | The source has no `emits:` contract. Jido allows the connection. |
+| `forward "type", to: agent(:worker)` | Route the current input to one declared Agent. |
+| `forward "type", to: parent()` | Route the current input to the current parent. |
+| `emit(signal)` | Publish a new outbound Signal as a generic effect. |
+| `reply(signal)` | Return one correlated response to the current requester. |
 
-Jido rejects a connection it can disprove. The checker has no route for
-`order.refunded`:
+Routes do not declare output type lists. Connection checks confirm that a
+destination accepts a Signal type, but output production stays `:unchecked`.
 
-```elixir
-shop = Pipe.Shop.instantiate!(id: "shop-1")
-change = Jido.Agent.Directive.connection_add("order.refunded", from: :root, to: :checker)
-{:error, error} = Jido.Agent.mutate(shop, [change])
+## Direct Runtime Sends
 
-{error.code, error.message}
-```
-
-You get `{:unaccepted_type, "Destination does not accept the connection type"}`.
-A `connect` with the same problem in the DSL fails when the module compiles.
-
-## Evaluate Purely
-
-`cmd/2` returns the shop's decision. It doesn't follow connections:
+An Action can request the same direct delivery after commit:
 
 ```elixir
-place = Pipe.Shop.place_signal!(%{total: 250})
-{:ok, candidate, directives} = Pipe.Shop.cmd(shop, place)
-
-{candidate.state, Enum.map(directives, & &1.signal.type)}
+Jido.AgentServer.Directive.agent_send(:worker, signal)
+Jido.AgentServer.Directive.parent_send(signal)
 ```
 
-You get `{%{approved: 0, rejected: 0, audits: 0}, ["order.placed"]}`: one
-`Emit` Directive and no delivery.
-
-## Run It Live
-
-```elixir
-{:ok, _jido} = Jido.start()
-{:ok, server} = Jido.start_agent(Pipe.Shop, id: "shop-1")
-:ok = Jido.AgentServer.await_ready(server)
-```
-
-Place an order for 250 and one for 5,000:
-
-```elixir
-{:ok, _shop, [_emit]} = Jido.AgentServer.call(server, place)
-
-large = Pipe.Shop.place_signal!(%{total: 5_000})
-{:ok, _shop, [_emit]} = Jido.AgentServer.call(server, large)
-
-Process.sleep(200)
-Jido.AgentServer.agent(server).state
-```
-
-You get `%{approved: 1, rejected: 1, audits: 0}`.
-
-Each order takes four steps:
-
-1. The shop commits and emits `order.placed`.
-2. The connection casts it to the checker.
-3. The checker commits and emits `order.checked`.
-4. The connection casts it to the shop, and the shop commits again.
-
-Connections deliver with casts after each commit. `call/3` returns after the
-shop's first commit, so this cell waits 200 ms before it reads the result.
-
-```elixir
-[checker] = Jido.AgentServer.members(server, :checker)
-
-Jido.AgentServer.agent(checker).state
-```
-
-You get `%{checked: 2}`.
-
-## Send Explicitly
-
-Use a Directive when an Action must pick the receiver:
-
-| Directive | Sends to |
-| --- | --- |
-| `Jido.AgentServer.Directive.agent_send(name, signal)` | A member or tagged child of this Agent. A counted member receives it in every slot. |
-| `Jido.AgentServer.Directive.owner_send(signal)` | The Agent that owns this one. |
-
-`shop.ping` sends `checker.ping` to `:checker`. The checker replies to its
-owner with `order.audit`:
-
-```elixir
-ping = Pipe.Shop.ping_signal!()
-{:ok, _shop, [_send]} = Jido.AgentServer.call(server, ping)
-
-Process.sleep(200)
-Jido.AgentServer.agent(server).state.audits
-```
-
-You get `1`.
-
-The route's `emits:` list covers `Emit`, `AgentSend`, and `OwnerSend`. If
-`shop.ping` didn't list `"checker.ping"`, its Turn would fail with
-`"Signal type is outside the route contract"`.
-
-## Unconnected Outputs
-
-A topology member's emitted Signal goes only where its owner's connections
-send it. With no matching connection, Jido drops it. The checker's `stray`
-route emits `order.stray`, and no connection routes that type:
-
-```elixir
-stray = Jido.Signal.new!("checker.stray", %{}, source: "/guides/connect")
-{:ok, _checker, [_emit]} = Jido.AgentServer.call(checker, stray)
-
-Process.sleep(200)
-
-{Jido.AgentServer.status(checker).last_effect_outcome.status,
- Jido.AgentServer.status(server).state_version}
-```
-
-You get `{:succeeded, 6}`. The checker's effect reports success, and the
-shop's revision is still 6: two orders, two results, one ping, one audit.
-Jido logs nothing for the dropped Signal.
-
-To catch a missing `connect`, declare `emits:` on member routes and read
-`Jido.Agent.Topology.checks/1`.
-
-## Fan Out To A Group
-
-A connection to a counted member needs `delivery: :broadcast`, which sends
-the Signal to every slot. The default, `:single`, is valid only when the
-destination has a count of 1.
-
-```elixir
-defmodule Fan.Worker do
-  use Jido.Agent, name: "fan_worker"
-
-  agent do
-    schema(Zoi.object(%{seen: Zoi.integer() |> Zoi.default(0)}))
-  end
-
-  routes do
-    signal_source("/guides/connect")
-
-    route "job.posted", emits: [] do
-      action _input, name: "see_job", schema: Zoi.object(%{}), context: context do
-        {:ok, %{context.agent_state | seen: context.agent_state.seen + 1}}
-      end
-    end
-  end
-end
-
-defmodule Fan.Direct do
-  use Jido.Agent, name: "direct"
-
-  routes do
-    signal_source("/guides/connect")
-    route "job.posted", as: :post, emits: ["job.posted"]
-  end
-
-  topology do
-    agent :workers, Fan.Worker, count: 2
-
-    connections do
-      connect "job.posted", from: :root, to: :workers, delivery: :broadcast
-    end
-  end
-end
-```
-
-Changing that connection to `:single` fails:
-
-```elixir
-direct = Fan.Direct.instantiate!(id: "direct-1")
-
-change =
-  Jido.Agent.Directive.connection_update("job.posted",
-    from: :root,
-    to: :workers,
-    changes: %{delivery: :single}
-  )
-
-{:error, error} = Jido.Agent.mutate(direct, [change])
-error.code
-```
-
-You get `:counted_delivery`.
-
-Run it:
-
-```elixir
-{:ok, direct_server} = Jido.start_agent(Fan.Direct, id: "direct-1")
-:ok = Jido.AgentServer.await_ready(direct_server)
-
-post = Fan.Direct.post_signal!()
-{:ok, _direct, [_emit]} = Jido.AgentServer.call(direct_server, post)
-
-Process.sleep(200)
-
-direct_server
-|> Jido.AgentServer.members(:workers)
-|> Enum.map(&Jido.AgentServer.agent(&1).state.seen)
-```
-
-You get `[1, 1]`.
-
-## Route Through A Bus
-
-A topology bus sits between publishers and subscribers. Add the
-`Jido.Plugin.Bus.DSL` extension, declare a `signal_bus`, and use `bus(:name)`
-as a connection endpoint:
-
-```elixir
-defmodule Fan.Board do
-  use Jido.Agent, name: "board", extensions: [Jido.Plugin.Bus.DSL]
-
-  routes do
-    signal_source("/guides/connect")
-    route "job.posted", as: :post, emits: ["job.posted"]
-  end
-
-  signal_bus do
-    name :jobs
-  end
-
-  topology do
-    agent :workers, Fan.Worker, count: 3
-
-    connections do
-      connect "job.posted", from: :root, to: bus(:jobs)
-      connect "job.posted", from: bus(:jobs), to: :workers, delivery: :broadcast
-    end
-  end
-end
-```
-
-The bus runs under the board's activation and stops with it.
-
-```elixir
-{:ok, board} = Jido.start_agent(Fan.Board, id: "board-1")
-:ok = Jido.AgentServer.await_ready(board)
-
-post = Fan.Board.post_signal!()
-{:ok, _board, [_emit]} = Jido.AgentServer.call(board, post)
-
-Process.sleep(300)
-
-board
-|> Jido.AgentServer.members(:workers)
-|> Enum.map(&Jido.AgentServer.agent(&1).state.seen)
-```
-
-You get `[1, 1, 1]`.
-
-Bus rules:
-
-- A connection to a bus uses `:single` delivery.
-- A bus can't connect to another bus.
-- Each `signal_bus` block declares one local bus.
-
-For a bus shared by Agents that aren't in one topology, see
-[Signal Bus](signal-bus-plugin.livemd).
-
-## Stop The Example
-
-```elixir
-:ok = Jido.stop_agent("shop-1")
-:ok = Jido.stop_agent("direct-1")
-:ok = Jido.stop_agent("board-1")
-:ok = Jido.stop()
-```
-
-## Summary
-
-- `connect` routes one Signal type from one endpoint to another. `:root` is
-  the parent.
-- Route `emits:` lists let Jido mark connections `:compatible` or reject
-  them before anything runs.
-- Connections deliver with casts after commit. Each hop is its own Turn.
-- `agent_send/2` and `owner_send/1` pick the receiver explicitly. `emits:`
-  covers them too.
-- A member output with no matching connection is dropped without a log.
-- Counted members need `:broadcast`. A topology bus sits between publishers
-  and subscribers.
+Use a `forward` route when the complete handler is a direct send. Use a
+runtime Directive when an Action also changes state or builds a new Signal.
 
 ## Next
 
-- [Change Live Composition](change-live-composition.md) to rewire a running
-  team.
-- [Composition Vocabulary](composition-vocabulary.md) for the terms used here.
+- [Routes and Handlers](build-agent-routes.livemd) explains all route forms.
+- [State and Directives](agent-results-and-directives.md) compares `Reply`,
+  `Emit`, and runtime sends.

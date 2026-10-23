@@ -40,13 +40,14 @@ defmodule Jido.SignalAction do
       routes do
         route MyApp.CreateThread
         # Or use a handler that returns work for execution after commit:
-        # route MyApp.CreateThread, via: MyApp.ExecuteAfterCommit
+        # route MyApp.CreateThread, MyApp.ExecuteAfterCommit
       end
 
   A module route uses the input Signal type and selects the Action. It has the
   same state and directive contract as an ordinary Action route. Use `reply/3`
-  when a handler must turn result data into a Signal. `via:` selects the given
-  handler instead. It does not run the SignalAction or change commit timing.
+  when a handler must turn result data into a Signal. The two-module form
+  selects the second module as the handler. It does not run the SignalAction or
+  change commit timing.
   """
 
   alias Jido.{Error, Signal}

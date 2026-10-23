@@ -55,6 +55,18 @@ defmodule Jido.Agent.DirectiveContractTest do
     defstruct [:signal]
   end
 
+  defmodule ReplyAction do
+    use Jido.SignalAction,
+      name: "directive_reply_action",
+      description: "Build a test reply",
+      vsn: 1,
+      input: [type: "request", schema: Zoi.object(%{})],
+      output: [type: "response", schema: Zoi.object(%{value: Zoi.integer()})]
+
+    @impl Jido.Action
+    def run(_data, _context), do: {:ok, %{value: 1}}
+  end
+
   @tag obligation: "jido.agent.I27"
   test "custom Directives can use the behavior before their struct is defined" do
     plain = %PlainDirective{value: 1}
@@ -82,10 +94,13 @@ defmodule Jido.Agent.DirectiveContractTest do
   @tag obligation: "jido.agent.I27"
   test "built-in identity and validation cover runtime and definition Directives" do
     signal = Signal.new!("event", %{}, source: "/test")
+    request = ReplyAction.new!(%{}, source: "/test")
+    {:ok, reply} = ReplyAction.reply(request, %{value: 1}, source: "/test")
 
     directives = [
       Directive.emit(signal),
-      Runtime.owner_send(signal),
+      Directive.reply(reply),
+      Runtime.parent_send(signal),
       Runtime.agent_send(:child, signal),
       Runtime.agent_start(JidoTest.AgentFixtures.CounterAgent, :child),
       Runtime.agent_stop(:child),
@@ -94,7 +109,7 @@ defmodule Jido.Agent.DirectiveContractTest do
       Runtime.server_stop(),
       Directive.agent_add(:child, JidoTest.AgentFixtures.CounterAgent),
       Directive.agent_remove(:child),
-      Directive.route_add("event"),
+      Directive.route_add("event", JidoTest.AgentContract.Add),
       Directive.route_remove("event"),
       Directive.connection_add("event", from: :root, to: :child),
       Directive.connection_remove("event", from: :root, to: :child),
@@ -119,6 +134,7 @@ defmodule Jido.Agent.DirectiveContractTest do
   @tag obligation: "jido.agent.I27"
   test "Signal Directives require and normalize one complete Signal" do
     signal = Signal.new!("agent.outbound", %{value: 1}, source: "/agent")
+    {:ok, reply} = Signal.put_context(signal, "jidocausationid", "request-id")
 
     for malformed <- [
           %{signal | id: ""},
@@ -131,7 +147,7 @@ defmodule Jido.Agent.DirectiveContractTest do
         ],
         directive <- [
           Directive.emit(malformed),
-          Runtime.owner_send(malformed),
+          Runtime.parent_send(malformed),
           Runtime.agent_send(:child, malformed)
         ] do
       assert {:error, _reason} = Directive.validate(directive)
@@ -139,20 +155,47 @@ defmodule Jido.Agent.DirectiveContractTest do
 
     for directive <- [
           Directive.emit(signal),
-          Runtime.owner_send(signal),
+          Runtime.parent_send(signal),
           Runtime.agent_send(:child, signal)
         ] do
       assert {:ok, ^directive} = Directive.validate(directive)
     end
 
+    assert {:ok, %Directive.Reply{signal: ^reply}} =
+             reply |> Directive.reply() |> Directive.validate()
+
+    assert {:error, %Jido.Error.ValidationError{}} =
+             signal |> Directive.reply() |> Directive.validate()
+
     for directive <- [
           %Directive.Emit{signal: %{}},
-          %{Runtime.owner_send(signal) | signal: %{}},
+          %Directive.Reply{signal: %{}},
+          %{Runtime.parent_send(signal) | signal: %{}},
           %{Runtime.agent_send(:child, signal) | signal: %{}}
         ] do
       assert {:error, %Jido.Error.ValidationError{details: %{directive: ^directive}}} =
                Directive.validate(directive)
     end
+  end
+
+  @tag obligation: "jido.agent.I27"
+  test "AgentServer validates Reply against the current requester" do
+    signal = Signal.new!("response", %{}, source: "/test")
+    {:ok, signal} = Signal.put_context(signal, "jidocausationid", "request-id")
+
+    config = %{
+      directive_handler: fn _directive, _context -> :ok end,
+      max_directives_per_turn: 10
+    }
+
+    assert {:error, :requester_not_found} =
+             Jido.AgentServer.Effects.validate_batch([Directive.reply(signal)], config)
+
+    assert :ok =
+             Jido.AgentServer.Effects.validate_batch(
+               [Directive.reply(signal)],
+               Map.put(config, :requester, self())
+             )
   end
 
   @tag obligation: "jido.agent.I27"
@@ -184,12 +227,15 @@ defmodule Jido.Agent.DirectiveContractTest do
   @tag obligation: ["jido.agent.I27", "jido.agent.I29"]
   test "Directive constructors preserve every supported option and explicit nil" do
     signal = Signal.new!("event", %{}, source: "/test")
+    {:ok, reply} = Signal.put_context(signal, "jidocausationid", "request-id")
     assert Directive.emit("event", %{}) === %{kind: :emit, type: "event", data: %{}}
 
     assert Directive.emit(signal, :dispatch) === %Directive.Emit{
              signal: signal,
              dispatch: :dispatch
            }
+
+    assert Directive.reply(reply) === %Directive.Reply{signal: reply}
 
     assert {:error, _} = Directive.emit("event.*", %{})
     assert {:error, _} = Directive.emit("event", [])
@@ -206,18 +252,16 @@ defmodule Jido.Agent.DirectiveContractTest do
                initial_state: %{count: 2}
              )
 
-    assert %{as: :run, defaults: %{amount: 1}, emits: ["done"]} =
+    assert %{as: :run, defaults: %{amount: 1}} =
              Directive.route_add("run", JidoTest.AgentContract.Add,
                as: :run,
-               defaults: %{amount: 1},
-               emits: ["done"]
+               defaults: %{amount: 1}
              )
 
-    assert %{as: :next, defaults: %{amount: 2}, emits: []} =
+    assert %{as: :next, defaults: %{amount: 2}} =
              Directive.route_replace("run", JidoTest.AgentContract.Add,
                as: :next,
-               defaults: %{amount: 2},
-               emits: []
+               defaults: %{amount: 2}
              )
 
     assert %{from: :root, to: :child} =

@@ -10,7 +10,7 @@ defmodule JidoTest.AgentServer.EffectsApiTest do
     AgentStart,
     AgentStop,
     ErrorReport,
-    OwnerSend,
+    ParentSend,
     ProcessStart,
     ServerStop
   }
@@ -20,7 +20,7 @@ defmodule JidoTest.AgentServer.EffectsApiTest do
   alias Jido.Signal
   alias JidoTest.AgentEvolutionFixtures, as: E
 
-  @records [AgentSend, AgentStart, AgentStop, ErrorReport, OwnerSend, ProcessStart, ServerStop]
+  @records [AgentSend, AgentStart, AgentStop, ErrorReport, ParentSend, ProcessStart, ServerStop]
 
   @tag obligation: "jido.agent_server.effects.I12"
   test "the documented runtime Directive API and public types are exact" do
@@ -29,7 +29,7 @@ defmodule JidoTest.AgentServer.EffectsApiTest do
              {:function, :agent_start, 3},
              {:function, :agent_stop, 2},
              {:function, :error_report, 2},
-             {:function, :owner_send, 1},
+             {:function, :parent_send, 1},
              {:function, :process_start, 1},
              {:function, :server_stop, 1},
              {:function, :signal_send, 3}
@@ -71,7 +71,7 @@ defmodule JidoTest.AgentServer.EffectsApiTest do
     assert dispatch[:timeout] == 100
     assert dispatch[:message_format] == formatter
     assert %AgentSend{name: :child, signal: ^signal} = Directive.agent_send(:child, signal)
-    assert %OwnerSend{signal: ^signal} = Directive.owner_send(signal)
+    assert %ParentSend{signal: ^signal} = Directive.parent_send(signal)
 
     assert %ErrorReport{error: :failed, context: :turn} =
              Directive.error_report(:failed, :turn)
@@ -117,6 +117,9 @@ defmodule JidoTest.AgentServer.EffectsApiTest do
       assert {:ok, ^directive} = AgentDirective.validate(directive)
       assert :ok = Directive.validate_restart_policy(policy)
     end
+
+    stop = Directive.server_stop()
+    assert {:ok, ^stop} = AgentDirective.validate(stop)
 
     assert {:error, message} = Directive.validate_restart_policy(:invalid)
     assert message != ""

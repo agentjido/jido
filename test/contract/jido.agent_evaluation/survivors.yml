@@ -1,32 +1,26 @@
-- at: lib/jido/agent/contract.ex:42:19
+- at: lib/jido/agent/contract.ex:29:19
   operator: element_removal
   mutation: "`kind: :emit` → `(removed)`"
   sort: equivalent
   reason: The only caller enters this private clause after directives/2 has already matched kind as emit. Data.fields/2 also checks that no other fields are present.
 
-- at: lib/jido/agent/contract.ex:48:19
+- at: lib/jido/agent/contract.ex:35:19
   operator: element_removal
   mutation: "`kind: :emit` → `(removed)`"
   sort: equivalent
   reason: The only caller enters this private clause after directives/2 has already matched kind as emit. Data.fields/2 also checks that no other fields are present.
 
-- at: lib/jido/agent/contract.ex:58:44
+- at: lib/jido/agent/contract.ex:45:44
   operator: string_empty
   mutation: "`\"Expected a registered emission directive\"` → `\"\"`"
   sort: log-only
   reason: The contract fixes the structured error code and path. It does not fix human-readable error prose.
 
-- at: lib/jido/agent/contract.ex:66:41
+- at: lib/jido/agent/contract.ex:53:41
   operator: string_empty
   mutation: "`\"Invalid Signal envelope\"` → `\"\"`"
   sort: log-only
   reason: The contract fixes the structured error code, path, and issues. It does not fix human-readable error prose.
-
-- at: lib/jido/agent/contract.ex:83:20
-  operator: string_empty
-  mutation: "`\"Signal type is outside the route contract\"` → `\"\"`"
-  sort: log-only
-  reason: The contract fixes the structured error code, path, Signal type, and route. It does not fix human-readable error prose.
 
 - at: lib/jido/agent/plugin.ex:32:50
   operator: return_nil
@@ -106,35 +100,401 @@
   sort: log-only
   reason: The contract fixes the stable error code and changed keys. It does not fix human-readable error prose.
 
-- at: lib/jido/agent/plugin/pipeline.ex:79:34
+- at: lib/jido/agent/plugin/pipeline.ex:87:34
   operator: string_empty
   mutation: "`\"Agent executable returned an invalid Directive\"` → `\"\"`"
   sort: log-only
   reason: The contract fixes the callback code and rejected Directive. It does not fix human-readable error prose.
 
-- at: lib/jido/agent/plugin/pipeline.ex:103:35
+- at: lib/jido/agent/plugin/pipeline.ex:113:35
+  operator: string_empty
+  mutation: "`\"Agent Reply Directive must match the current request\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the request, causation, and Reply IDs. It does not fix human-readable error prose.
+
+- at: lib/jido/agent/plugin/pipeline.ex:124:33
+  operator: string_empty
+  mutation: "`\"Agent turn can return only one Reply Directive\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the rejected Reply count. It does not fix human-readable error prose.
+
+- at: lib/jido/agent/plugin/pipeline.ex:140:35
   operator: string_empty
   mutation: "`\"Agent Directive has no owner\"` → `\"\"`"
   sort: log-only
   reason: The contract fixes the rejected Directive. It does not fix human-readable error prose.
 
-- at: lib/jido/agent/plugin/pipeline.ex:172:9
+- at: lib/jido/agent/plugin/pipeline.ex:209:9
   operator: string_empty
   mutation: "`\"Agent Plugin reduction failed\"` → `\"\"`"
   sort: log-only
   reason: The contract fixes the callback, Plugin identity, and retained cause. It does not fix human-readable error prose.
 
-- at: lib/jido/agent/plugin/pipeline.ex:187:11
+- at: lib/jido/agent/plugin/pipeline.ex:224:11
   operator: string_empty
   mutation: "`\"Plugin-owned Agent state field is invalid\"` → `\"\"`"
   sort: log-only
   reason: The contract fixes the invalid callback code and schema issues. It does not fix human-readable error prose.
 
-- at: lib/jido/agent/plugin/pipeline.ex:199:7
+- at: lib/jido/agent/plugin/pipeline.ex:236:7
   operator: string_empty
   mutation: "`\"Agent Plugin reduce/2 returned an invalid result\"` → `\"\"`"
   sort: log-only
   reason: The contract fixes the invalid callback code and result. It does not fix human-readable error prose.
+
+- at: lib/jido/agent/route.ex:7:36
+  operator: boolean_flip
+  mutation: "`true` → `false`"
+  sort: unpromised
+  reason: This branch validates Route authoring data. jido.agent_evaluation starts with validated routes and does not own Route normalization behavior.
+
+- at: lib/jido/agent/route.ex:23:26
+  operator: guard_removal
+  mutation: "`when is_atom(target) and target not in [nil, true, false]` → `(no guard)`"
+  sort: unpromised
+  reason: This branch validates Route authoring data. jido.agent_evaluation starts with validated routes and does not own Route normalization behavior.
+
+- at: lib/jido/agent/route.ex:23:47
+  operator: logical_swap
+  mutation: "`and` → `or`"
+  sort: unpromised
+  reason: This branch validates Route authoring data. jido.agent_evaluation starts with validated routes and does not own Route normalization behavior.
+
+- at: lib/jido/agent/route.ex:23:66
+  operator: element_removal
+  mutation: "`nil` → `(removed)`"
+  sort: unpromised
+  reason: This branch validates Route authoring data. jido.agent_evaluation starts with validated routes and does not own Route normalization behavior.
+
+- at: lib/jido/agent/route.ex:23:71
+  operator: element_removal
+  mutation: "`true` → `(removed)`"
+  sort: unpromised
+  reason: This branch validates Route authoring data. jido.agent_evaluation starts with validated routes and does not own Route normalization behavior.
+
+- at: lib/jido/agent/route.ex:23:77
+  operator: element_removal
+  mutation: "`false` → `(removed)`"
+  sort: unpromised
+  reason: This branch validates Route authoring data. jido.agent_evaluation starts with validated routes and does not own Route normalization behavior.
+
+- at: lib/jido/agent/route.ex:23:71
+  operator: boolean_flip
+  mutation: "`true` → `false`"
+  sort: unpromised
+  reason: This branch validates Route authoring data. jido.agent_evaluation starts with validated routes and does not own Route normalization behavior.
+
+- at: lib/jido/agent/route.ex:23:77
+  operator: boolean_flip
+  mutation: "`false` → `true`"
+  sort: unpromised
+  reason: This branch validates Route authoring data. jido.agent_evaluation starts with validated routes and does not own Route normalization behavior.
+
+- at: lib/jido/agent/route.ex:29:45
+  operator: string_empty
+  mutation: "`\"Expected an Action or Flow module\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured result where evaluation uses it. It does not fix human-readable error prose.
+
+- at: lib/jido/agent/route.ex:30:11
+  operator: element_removal
+  mutation: "`target: target` → `(removed)`"
+  sort: unpromised
+  reason: This branch validates Route authoring data. jido.agent_evaluation starts with validated routes and does not own Route normalization behavior.
+
+- at: lib/jido/agent/route.ex:31:11
+  operator: element_removal
+  mutation: "`reason: reason` → `(removed)`"
+  sort: unpromised
+  reason: This branch validates Route authoring data. jido.agent_evaluation starts with validated routes and does not own Route normalization behavior.
+
+- at: lib/jido/agent/route.ex:37:15
+  operator: return_nil
+  mutation: "`Error.fail(:invalid_executable, [], \"Expected an executable…` → `nil`"
+  sort: unpromised
+  reason: This branch validates Route authoring data. jido.agent_evaluation starts with validated routes and does not own Route normalization behavior.
+
+- at: lib/jido/agent/route.ex:37:45
+  operator: string_empty
+  mutation: "`\"Expected an executable module\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured result where evaluation uses it. It does not fix human-readable error prose.
+
+- at: lib/jido/agent/route.ex:37:80
+  operator: element_removal
+  mutation: "`target: value` → `(removed)`"
+  sort: unpromised
+  reason: This branch validates Route authoring data. jido.agent_evaluation starts with validated routes and does not own Route normalization behavior.
+
+- at: lib/jido/agent/route.ex:40:18
+  operator: element_removal
+  mutation: "`kind: :executable` → `(removed)`"
+  sort: unpromised
+  reason: This private clause accepts an internal Spark Route draft. Public Map authoring does not accept this handler kind, and evaluation starts with a validated Route.
+
+- at: lib/jido/agent/route.ex:56:7
+  operator: condition_negate
+  mutation: "`if related?` → `if !(related?)`"
+  sort: unpromised
+  reason: This branch validates Route authoring data. jido.agent_evaluation starts with validated routes and does not own Route normalization behavior.
+
+- at: lib/jido/agent/route.ex:61:48
+  operator: string_empty
+  mutation: "`\"Executable kind does not match the declared kind\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured result where evaluation uses it. It does not fix human-readable error prose.
+
+- at: lib/jido/agent/route.ex:69:18
+  operator: element_removal
+  mutation: "`kind: :transform` → `(removed)`"
+  sort: unpromised
+  reason: This branch validates Route authoring data. jido.agent_evaluation starts with validated routes and does not own Route normalization behavior.
+
+- at: lib/jido/agent/route.ex:84:11
+  operator: clause_removal
+  mutation: "`case _ ->` → `(removed)`"
+  sort: unpromised
+  reason: This branch validates Route authoring data. jido.agent_evaluation starts with validated routes and does not own Route normalization behavior.
+
+- at: lib/jido/agent/route.ex:73:9
+  operator: guard_removal
+  mutation: "`when is_atom(module) and is_atom(fun) and module not in [nil, tr…` → `(no guard)`"
+  sort: unpromised
+  reason: This branch validates Route authoring data. jido.agent_evaluation starts with validated routes and does not own Route normalization behavior.
+
+- at: lib/jido/agent/route.ex:73:47
+  operator: logical_swap
+  mutation: "`and` → `or`"
+  sort: unpromised
+  reason: This branch validates Route authoring data. jido.agent_evaluation starts with validated routes and does not own Route normalization behavior.
+
+- at: lib/jido/agent/route.ex:73:30
+  operator: logical_swap
+  mutation: "`and` → `or`"
+  sort: unpromised
+  reason: This branch validates Route authoring data. jido.agent_evaluation starts with validated routes and does not own Route normalization behavior.
+
+- at: lib/jido/agent/route.ex:73:66
+  operator: element_removal
+  mutation: "`nil` → `(removed)`"
+  sort: unpromised
+  reason: This branch validates Route authoring data. jido.agent_evaluation starts with validated routes and does not own Route normalization behavior.
+
+- at: lib/jido/agent/route.ex:73:71
+  operator: element_removal
+  mutation: "`true` → `(removed)`"
+  sort: unpromised
+  reason: This branch validates Route authoring data. jido.agent_evaluation starts with validated routes and does not own Route normalization behavior.
+
+- at: lib/jido/agent/route.ex:73:77
+  operator: element_removal
+  mutation: "`false` → `(removed)`"
+  sort: unpromised
+  reason: This branch validates Route authoring data. jido.agent_evaluation starts with validated routes and does not own Route normalization behavior.
+
+- at: lib/jido/agent/route.ex:73:71
+  operator: boolean_flip
+  mutation: "`true` → `false`"
+  sort: unpromised
+  reason: This branch validates Route authoring data. jido.agent_evaluation starts with validated routes and does not own Route normalization behavior.
+
+- at: lib/jido/agent/route.ex:73:77
+  operator: boolean_flip
+  mutation: "`false` → `true`"
+  sort: unpromised
+  reason: This branch validates Route authoring data. jido.agent_evaluation starts with validated routes and does not own Route normalization behavior.
+
+- at: lib/jido/agent/route.ex:74:59
+  operator: logical_swap
+  mutation: "`and` → `or`"
+  sort: unpromised
+  reason: This branch validates Route authoring data. jido.agent_evaluation starts with validated routes and does not own Route normalization behavior.
+
+- at: lib/jido/agent/route.ex:80:17
+  operator: string_empty
+  mutation: "`\"Transform must reference a public function of arity one\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured result where evaluation uses it. It does not fix human-readable error prose.
+
+- at: lib/jido/agent/route.ex:81:19
+  operator: element_removal
+  mutation: "`target: value.target` → `(removed)`"
+  sort: unpromised
+  reason: This branch validates Route authoring data. jido.agent_evaluation starts with validated routes and does not own Route normalization behavior.
+
+- at: lib/jido/agent/route.ex:85:46
+  operator: string_empty
+  mutation: "`\"Transform requires {module, function, 1}\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured result where evaluation uses it. It does not fix human-readable error prose.
+
+- at: lib/jido/agent/route.ex:92:13
+  operator: return_nil
+  mutation: "`Error.fail( :invalid_handler, [], \"Expected one Action, Flo…` → `nil`"
+  sort: unpromised
+  reason: This branch validates Route authoring data. jido.agent_evaluation starts with validated routes and does not own Route normalization behavior.
+
+- at: lib/jido/agent/route.ex:95:9
+  operator: string_empty
+  mutation: "`\"Expected one Action, Flow, transform, or forward handler\"` → `\"\"`"
+  sort: log-only
+  reason: Human-readable Route authoring error prose is not part of the evaluation contract.
+
+- at: lib/jido/agent/route.ex:98:17
+  operator: element_removal
+  mutation: "`as: nil` → `(removed)`"
+  sort: unpromised
+  reason: This branch validates Route authoring data. jido.agent_evaluation starts with validated routes and does not own Route normalization behavior.
+
+- at: lib/jido/agent/route.ex:101:5
+  operator: return_nil
+  mutation: "`with :ok <- Error.at(Data.name(route.as), :as), :ok <- Erro…` → `nil`"
+  sort: unpromised
+  reason: This branch validates Route authoring data. jido.agent_evaluation starts with validated routes and does not own Route normalization behavior.
+
+- at: lib/jido/agent/route.ex:103:7
+  operator: condition_negate
+  mutation: "`if Data.wildcard?(route.path)` → `if !(Data.wildcard?(route.path))`"
+  sort: unpromised
+  reason: This branch validates Route authoring data. jido.agent_evaluation starts with validated routes and does not own Route normalization behavior.
+
+- at: lib/jido/agent/route.ex:104:47
+  operator: string_empty
+  mutation: "`\"A helper requires an exact input type\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured result where evaluation uses it. It does not fix human-readable error prose.
+
+- at: lib/jido/agent/route.ex:110:5
+  operator: return_nil
+  mutation: "`if Regex.match?(@helper_name, Atom.to_string(value)) do :ok…` → `nil`"
+  sort: unpromised
+  reason: Helper-name validation belongs to Agent authoring. Evaluation starts with a canonical route and does not use the helper name.
+
+- at: lib/jido/agent/route.ex:110:5
+  operator: condition_negate
+  mutation: "`if Regex.match?(@helper_name, Atom.to_string(value))` → `if !(Regex.match?(@helper_name, Atom.to_string(value)))`"
+  sort: unpromised
+  reason: Helper-name validation belongs to Agent authoring. Evaluation starts with a canonical route and does not use the helper name.
+
+- at: lib/jido/agent/route.ex:116:11
+  operator: string_empty
+  mutation: "`\"A helper name must start with a lowercase letter and contain only lowercase letters, digits, and underscores\"` → `\"\"`"
+  sort: log-only
+  reason: Human-readable Agent authoring error prose is outside the evaluation contract.
+
+- at: lib/jido/agent/route.ex:122:18
+  operator: return_nil
+  mutation: "`Error.fail(:invalid_defaults, :defaults, \"Only Action and F…` → `nil`"
+  sort: unpromised
+  reason: This branch validates Route authoring data. jido.agent_evaluation starts with validated routes and does not own Route normalization behavior.
+
+- at: lib/jido/agent/route.ex:121:22
+  operator: element_removal
+  mutation: "`:transform` → `(removed)`"
+  sort: unpromised
+  reason: This branch validates Route authoring data. jido.agent_evaluation starts with validated routes and does not own Route normalization behavior.
+
+- at: lib/jido/agent/route.ex:121:34
+  operator: element_removal
+  mutation: "`:forward` → `(removed)`"
+  sort: unpromised
+  reason: This branch rejects defaults on a forward Route during authoring. Route authoring validation belongs to jido.agent, not jido.agent_evaluation.
+
+- at: lib/jido/agent/route.ex:121:69
+  operator: integer_shift
+  mutation: "`0` → `1`"
+  sort: unpromised
+  reason: This branch validates Route authoring data. jido.agent_evaluation starts with validated routes and does not own Route normalization behavior.
+
+- at: lib/jido/agent/route.ex:122:53
+  operator: string_empty
+  mutation: "`\"Only Action and Flow routes accept defaults\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured result where evaluation uses it. It does not fix human-readable error prose.
+
+- at: lib/jido/agent/route.ex:130:43
+  operator: string_empty
+  mutation: "`\"Forward cannot target the current Agent\"` → `\"\"`"
+  sort: log-only
+  reason: Human-readable forward-target authoring error prose is not part of the evaluation contract.
+
+- at: lib/jido/agent/route.ex:135:25
+  operator: element_removal
+  mutation: "`kind: :parent` → `(removed)`"
+  sort: equivalent
+  reason: The caller has already matched the target as parent, and Data.fields/2 still requires the one kind field. Removing the repeated value match cannot change a validated forward target.
+
+- at: lib/jido/agent/route.ex:138:15
+  operator: return_nil
+  mutation: "`Error.fail(:invalid_forward_target, [], \"Forward requires a…` → `nil`"
+  sort: unpromised
+  reason: This branch rejects an invalid forward target during Route authoring. Evaluation starts with a validated forward target.
+
+- at: lib/jido/agent/route.ex:138:49
+  operator: string_empty
+  mutation: "`\"Forward requires agent(name) or parent()\"` → `\"\"`"
+  sort: log-only
+  reason: Human-readable forward-target authoring error prose is not part of the evaluation contract.
+
+- at: lib/jido/agent/route.ex:142:28
+  operator: guard_removal
+  mutation: "`when is_list(routes)` → `(no guard)`"
+  sort: equivalent
+  reason: The evaluation pipeline gets the route list from a validated Agent definition. Removing this private list guard does not change a supported evaluation input.
+
+- at: lib/jido/agent/route.ex:146:41
+  operator: element_removal
+  mutation: "`:routes` → `(removed)`"
+  sort: unpromised
+  reason: The evaluation contract requires an unmatched-route failure. It does not fix this diagnostic path or detail field.
+
+- at: lib/jido/agent/route.ex:146:51
+  operator: string_empty
+  mutation: "`\"No route accepts this Signal type\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured result where evaluation uses it. It does not fix human-readable error prose.
+
+- at: lib/jido/agent/route.ex:147:13
+  operator: element_removal
+  mutation: "`type: type` → `(removed)`"
+  sort: unpromised
+  reason: The evaluation contract requires an unmatched-route failure. It does not fix this diagnostic path or detail field.
+
+- at: lib/jido/agent/route.ex:156:67
+  operator: guard_removal
+  mutation: "`when kind in [:action, :flow]` → `(no guard)`"
+  sort: equivalent
+  reason: The Runner calls params/2 only for normalized Action and Flow routes. Transform and pass-through routes use SignalHandler.
+
+- at: lib/jido/agent/route.ex:161:15
+  operator: return_nil
+  mutation: "`Error.fail(:invalid_handler, [:handler], \"Only Action and F…` → `nil`"
+  sort: dead-code
+  reason: No supported evaluation path calls params/2 for a non-Action and non-Flow handler.
+
+- at: lib/jido/agent/route.ex:161:39
+  operator: element_removal
+  mutation: "`:handler` → `(removed)`"
+  sort: dead-code
+  reason: No supported evaluation path calls params/2 for a non-Action and non-Flow handler.
+
+- at: lib/jido/agent/route.ex:161:50
+  operator: string_empty
+  mutation: "`\"Only Action and Flow routes have parameters\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the structured result where evaluation uses it. It does not fix human-readable error prose.
+
+- at: lib/jido/agent/runner.ex:189:66
+  operator: element_removal
+  mutation: "`route: route` → `(removed)`"
+  sort: unpromised
+  reason: The selected Route stored in an internal Turn is not part of the pure evaluation result contract. The contract fixes the executable, input, source Signal, candidate Agent, and Directives.
+
+- at: lib/jido/agent/runner.ex:196:14
+  operator: element_removal
+  mutation: "`route: route` → `(removed)`"
+  sort: unpromised
+  reason: The selected Route stored in an internal Turn is not part of the pure evaluation result contract. The contract fixes the handler, source Signal, candidate Agent, and Directives.
 
 - at: lib/jido/agent/runner.ex:224:28
   operator: string_empty
@@ -154,368 +514,26 @@
   sort: log-only
   reason: The contract fixes the executable callback code and rejected output. It does not fix human-readable error prose.
 
-- at: lib/jido/agent/turn/signal_handler.ex:16:17
+- at: lib/jido/agent/turn/signal_handler.ex:20:17
   operator: element_removal
   mutation: "`kind: :transform` → `(removed)`"
   sort: equivalent
   reason: Route normalization permits this target tuple only for a transform handler. Action and Flow handlers do not use SignalHandler, and pass-through handlers have no target.
 
-- at: lib/jido/agent/turn/signal_handler.ex:28:11
+- at: lib/jido/agent/turn/signal_handler.ex:32:11
   operator: string_empty
   mutation: "`\"Transform must return {:ok, Signal} or {:error, reason}\"` → `\"\"`"
   sort: log-only
   reason: The contract fixes the invalid-result code. It does not fix human-readable error prose.
 
-- at: lib/jido/agent/route.ex:7:36
-  operator: boolean_flip
-  mutation: "`true` → `false`"
-  sort: unpromised
-  reason: This branch validates Route authoring data. jido.agent_evaluation starts with validated routes and does not own Route normalization behavior.
-
-- at: lib/jido/agent/route.ex:25:26
-  operator: guard_removal
-  mutation: "`when is_atom(target) and target not in [nil, true, false]` → `(no guard)`"
-  sort: unpromised
-  reason: This branch validates Route authoring data. jido.agent_evaluation starts with validated routes and does not own Route normalization behavior.
-
-- at: lib/jido/agent/route.ex:25:47
-  operator: logical_swap
-  mutation: "`and` → `or`"
-  sort: unpromised
-  reason: This branch validates Route authoring data. jido.agent_evaluation starts with validated routes and does not own Route normalization behavior.
-
-- at: lib/jido/agent/route.ex:25:66
+- at: lib/jido/agent/turn/signal_handler.ex:37:18
   operator: element_removal
-  mutation: "`nil` → `(removed)`"
-  sort: unpromised
-  reason: This branch validates Route authoring data. jido.agent_evaluation starts with validated routes and does not own Route normalization behavior.
-
-- at: lib/jido/agent/route.ex:25:71
-  operator: element_removal
-  mutation: "`true` → `(removed)`"
-  sort: unpromised
-  reason: This branch validates Route authoring data. jido.agent_evaluation starts with validated routes and does not own Route normalization behavior.
-
-- at: lib/jido/agent/route.ex:25:77
-  operator: element_removal
-  mutation: "`false` → `(removed)`"
-  sort: unpromised
-  reason: This branch validates Route authoring data. jido.agent_evaluation starts with validated routes and does not own Route normalization behavior.
-
-- at: lib/jido/agent/route.ex:25:71
-  operator: boolean_flip
-  mutation: "`true` → `false`"
-  sort: unpromised
-  reason: This branch validates Route authoring data. jido.agent_evaluation starts with validated routes and does not own Route normalization behavior.
-
-- at: lib/jido/agent/route.ex:25:77
-  operator: boolean_flip
-  mutation: "`false` → `true`"
-  sort: unpromised
-  reason: This branch validates Route authoring data. jido.agent_evaluation starts with validated routes and does not own Route normalization behavior.
-
-- at: lib/jido/agent/route.ex:31:45
-  operator: string_empty
-  mutation: "`\"Expected an Action or Flow module\"` → `\"\"`"
-  sort: log-only
-  reason: The contract fixes the structured result where evaluation uses it. It does not fix human-readable error prose.
-
-- at: lib/jido/agent/route.ex:32:11
-  operator: element_removal
-  mutation: "`target: target` → `(removed)`"
-  sort: unpromised
-  reason: This branch validates Route authoring data. jido.agent_evaluation starts with validated routes and does not own Route normalization behavior.
-
-- at: lib/jido/agent/route.ex:33:11
-  operator: element_removal
-  mutation: "`reason: reason` → `(removed)`"
-  sort: unpromised
-  reason: This branch validates Route authoring data. jido.agent_evaluation starts with validated routes and does not own Route normalization behavior.
-
-- at: lib/jido/agent/route.ex:39:15
-  operator: return_nil
-  mutation: "`Error.fail(:invalid_executable, [], \"Expected an executable…` → `nil`"
-  sort: unpromised
-  reason: This branch validates Route authoring data. jido.agent_evaluation starts with validated routes and does not own Route normalization behavior.
-
-- at: lib/jido/agent/route.ex:39:45
-  operator: string_empty
-  mutation: "`\"Expected an executable module\"` → `\"\"`"
-  sort: log-only
-  reason: The contract fixes the structured result where evaluation uses it. It does not fix human-readable error prose.
-
-- at: lib/jido/agent/route.ex:39:80
-  operator: element_removal
-  mutation: "`target: value` → `(removed)`"
-  sort: unpromised
-  reason: This branch validates Route authoring data. jido.agent_evaluation starts with validated routes and does not own Route normalization behavior.
-
-- at: lib/jido/agent/route.ex:55:7
-  operator: condition_negate
-  mutation: "`if related?` → `if !(related?)`"
-  sort: unpromised
-  reason: This branch validates Route authoring data. jido.agent_evaluation starts with validated routes and does not own Route normalization behavior.
-
-- at: lib/jido/agent/route.ex:60:48
-  operator: string_empty
-  mutation: "`\"Executable kind does not match the declared kind\"` → `\"\"`"
-  sort: log-only
-  reason: The contract fixes the structured result where evaluation uses it. It does not fix human-readable error prose.
-
-- at: lib/jido/agent/route.ex:68:18
-  operator: element_removal
-  mutation: "`kind: :transform` → `(removed)`"
-  sort: unpromised
-  reason: This branch validates Route authoring data. jido.agent_evaluation starts with validated routes and does not own Route normalization behavior.
-
-- at: lib/jido/agent/route.ex:83:11
-  operator: clause_removal
-  mutation: "`case _ ->` → `(removed)`"
-  sort: unpromised
-  reason: This branch validates Route authoring data. jido.agent_evaluation starts with validated routes and does not own Route normalization behavior.
-
-- at: lib/jido/agent/route.ex:72:9
-  operator: guard_removal
-  mutation: "`when is_atom(module) and is_atom(fun) and module not in [nil, tr…` → `(no guard)`"
-  sort: unpromised
-  reason: This branch validates Route authoring data. jido.agent_evaluation starts with validated routes and does not own Route normalization behavior.
-
-- at: lib/jido/agent/route.ex:72:47
-  operator: logical_swap
-  mutation: "`and` → `or`"
-  sort: unpromised
-  reason: This branch validates Route authoring data. jido.agent_evaluation starts with validated routes and does not own Route normalization behavior.
-
-- at: lib/jido/agent/route.ex:72:30
-  operator: logical_swap
-  mutation: "`and` → `or`"
-  sort: unpromised
-  reason: This branch validates Route authoring data. jido.agent_evaluation starts with validated routes and does not own Route normalization behavior.
-
-- at: lib/jido/agent/route.ex:72:66
-  operator: element_removal
-  mutation: "`nil` → `(removed)`"
-  sort: unpromised
-  reason: This branch validates Route authoring data. jido.agent_evaluation starts with validated routes and does not own Route normalization behavior.
-
-- at: lib/jido/agent/route.ex:72:71
-  operator: element_removal
-  mutation: "`true` → `(removed)`"
-  sort: unpromised
-  reason: This branch validates Route authoring data. jido.agent_evaluation starts with validated routes and does not own Route normalization behavior.
-
-- at: lib/jido/agent/route.ex:72:77
-  operator: element_removal
-  mutation: "`false` → `(removed)`"
-  sort: unpromised
-  reason: This branch validates Route authoring data. jido.agent_evaluation starts with validated routes and does not own Route normalization behavior.
-
-- at: lib/jido/agent/route.ex:72:71
-  operator: boolean_flip
-  mutation: "`true` → `false`"
-  sort: unpromised
-  reason: This branch validates Route authoring data. jido.agent_evaluation starts with validated routes and does not own Route normalization behavior.
-
-- at: lib/jido/agent/route.ex:72:77
-  operator: boolean_flip
-  mutation: "`false` → `true`"
-  sort: unpromised
-  reason: This branch validates Route authoring data. jido.agent_evaluation starts with validated routes and does not own Route normalization behavior.
-
-- at: lib/jido/agent/route.ex:73:59
-  operator: logical_swap
-  mutation: "`and` → `or`"
-  sort: unpromised
-  reason: This branch validates Route authoring data. jido.agent_evaluation starts with validated routes and does not own Route normalization behavior.
-
-- at: lib/jido/agent/route.ex:79:17
-  operator: string_empty
-  mutation: "`\"Transform must reference a public function of arity one\"` → `\"\"`"
-  sort: log-only
-  reason: The contract fixes the structured result where evaluation uses it. It does not fix human-readable error prose.
-
-- at: lib/jido/agent/route.ex:80:19
-  operator: element_removal
-  mutation: "`target: value.target` → `(removed)`"
-  sort: unpromised
-  reason: This branch validates Route authoring data. jido.agent_evaluation starts with validated routes and does not own Route normalization behavior.
-
-- at: lib/jido/agent/route.ex:84:46
-  operator: string_empty
-  mutation: "`\"Transform requires {module, function, 1}\"` → `\"\"`"
-  sort: log-only
-  reason: The contract fixes the structured result where evaluation uses it. It does not fix human-readable error prose.
-
-- at: lib/jido/agent/route.ex:91:13
-  operator: return_nil
-  mutation: "`Error.fail( :invalid_handler, [], \"Expected one Action, Flo…` → `nil`"
-  sort: unpromised
-  reason: This branch validates Route authoring data. jido.agent_evaluation starts with validated routes and does not own Route normalization behavior.
-
-- at: lib/jido/agent/route.ex:94:9
-  operator: string_empty
-  mutation: "`\"Expected one Action, Flow, transform, or pass-through handler\"` → `\"\"`"
-  sort: log-only
-  reason: The contract fixes the structured result where evaluation uses it. It does not fix human-readable error prose.
-
-- at: lib/jido/agent/route.ex:97:17
-  operator: element_removal
-  mutation: "`as: nil` → `(removed)`"
-  sort: unpromised
-  reason: This branch validates Route authoring data. jido.agent_evaluation starts with validated routes and does not own Route normalization behavior.
-
-- at: lib/jido/agent/route.ex:100:5
-  operator: return_nil
-  mutation: "`with :ok <- Error.at(Data.name(route.as), :as), :ok <- Erro…` → `nil`"
-  sort: unpromised
-  reason: This branch validates Route authoring data. jido.agent_evaluation starts with validated routes and does not own Route normalization behavior.
-
-- at: lib/jido/agent/route.ex:102:7
-  operator: condition_negate
-  mutation: "`if Data.wildcard?(route.path)` → `if !(Data.wildcard?(route.path))`"
-  sort: unpromised
-  reason: This branch validates Route authoring data. jido.agent_evaluation starts with validated routes and does not own Route normalization behavior.
-
-- at: lib/jido/agent/route.ex:103:47
-  operator: string_empty
-  mutation: "`\"A helper requires an exact input type\"` → `\"\"`"
-  sort: log-only
-  reason: The contract fixes the structured result where evaluation uses it. It does not fix human-readable error prose.
-
-- at: lib/jido/agent/route.ex:109:5
-  operator: return_nil
-  mutation: "`if Regex.match?(@helper_name, Atom.to_string(value)) do :ok…` → `nil`"
-  sort: unpromised
-  reason: Helper-name validation belongs to Agent authoring. Evaluation starts with a canonical route and does not use the helper name.
-
-- at: lib/jido/agent/route.ex:109:5
-  operator: condition_negate
-  mutation: "`if Regex.match?(@helper_name, Atom.to_string(value))` → `if !(Regex.match?(@helper_name, Atom.to_string(value)))`"
-  sort: unpromised
-  reason: Helper-name validation belongs to Agent authoring. Evaluation starts with a canonical route and does not use the helper name.
-
-- at: lib/jido/agent/route.ex:115:11
-  operator: string_empty
-  mutation: "`\"A helper name must start with a lowercase letter and contain only lowercase letters, digits, and underscores\"` → `\"\"`"
-  sort: log-only
-  reason: Human-readable Agent authoring error prose is outside the evaluation contract.
-
-- at: lib/jido/agent/route.ex:121:18
-  operator: return_nil
-  mutation: "`Error.fail(:invalid_defaults, :defaults, \"Only Action and F…` → `nil`"
-  sort: unpromised
-  reason: This branch validates Route authoring data. jido.agent_evaluation starts with validated routes and does not own Route normalization behavior.
-
-- at: lib/jido/agent/route.ex:120:22
-  operator: element_removal
-  mutation: "`:transform` → `(removed)`"
-  sort: unpromised
-  reason: This branch validates Route authoring data. jido.agent_evaluation starts with validated routes and does not own Route normalization behavior.
-
-- at: lib/jido/agent/route.ex:120:34
-  operator: element_removal
-  mutation: "`:pass_through` → `(removed)`"
-  sort: unpromised
-  reason: This branch validates Route authoring data. jido.agent_evaluation starts with validated routes and does not own Route normalization behavior.
-
-- at: lib/jido/agent/route.ex:120:74
-  operator: integer_shift
-  mutation: "`0` → `1`"
-  sort: unpromised
-  reason: This branch validates Route authoring data. jido.agent_evaluation starts with validated routes and does not own Route normalization behavior.
-
-- at: lib/jido/agent/route.ex:121:53
-  operator: string_empty
-  mutation: "`\"Only Action and Flow routes accept defaults\"` → `\"\"`"
-  sort: log-only
-  reason: The contract fixes the structured result where evaluation uses it. It does not fix human-readable error prose.
-
-- at: lib/jido/agent/route.ex:135:70
-  operator: clause_removal
-  mutation: "`cond handler.kind in [:transform, :pass_through] and values == [] ->` → `(removed)`"
-  sort: unpromised
-  reason: This branch validates Route authoring data. jido.agent_evaluation starts with validated routes and does not own Route normalization behavior.
-
-- at: lib/jido/agent/route.ex:138:88
-  operator: clause_removal
-  mutation: "`cond handler.kind == :pass_through and (Data.wildcard?(path) or … ->` → `(removed)`"
-  sort: unpromised
-  reason: This branch validates Route authoring data. jido.agent_evaluation starts with validated routes and does not own Route normalization behavior.
-
-- at: lib/jido/agent/route.ex:135:26
-  operator: element_removal
-  mutation: "`:transform` → `(removed)`"
-  sort: unpromised
-  reason: This branch validates Route authoring data. jido.agent_evaluation starts with validated routes and does not own Route normalization behavior.
-
-- at: lib/jido/agent/route.ex:135:38
-  operator: element_removal
-  mutation: "`:pass_through` → `(removed)`"
-  sort: unpromised
-  reason: This branch validates Route authoring data. jido.agent_evaluation starts with validated routes and does not own Route normalization behavior.
-
-- at: lib/jido/agent/route.ex:136:48
-  operator: string_empty
-  mutation: "`\"This handler produces one output Signal\"` → `\"\"`"
-  sort: log-only
-  reason: The contract fixes the structured result where evaluation uses it. It does not fix human-readable error prose.
-
-- at: lib/jido/agent/route.ex:138:65
-  operator: logical_swap
-  mutation: "`or` → `and`"
-  sort: unpromised
-  reason: This branch validates Route authoring data. jido.agent_evaluation starts with validated routes and does not own Route normalization behavior.
-
-- at: lib/jido/agent/route.ex:142:13
-  operator: string_empty
-  mutation: "`\"A pass-through contract must include its unchanged exact input type\"` → `\"\"`"
-  sort: log-only
-  reason: The contract fixes the structured result where evaluation uses it. It does not fix human-readable error prose.
-
-- at: lib/jido/agent/route.ex:153:28
-  operator: guard_removal
-  mutation: "`when is_list(routes)` → `(no guard)`"
+  mutation: "`kind: :agent` → `(removed)`"
   sort: equivalent
-  reason: The evaluation pipeline gets the route list from a validated Agent definition. Removing this private list guard does not change a supported evaluation input.
+  reason: Route normalization permits this private clause only for an agent forward target. Removing the repeated kind match does not change a validated target.
 
-- at: lib/jido/agent/route.ex:157:41
+- at: lib/jido/agent/turn/signal_handler.ex:40:18
   operator: element_removal
-  mutation: "`:routes` → `(removed)`"
-  sort: unpromised
-  reason: The evaluation contract requires an unmatched-route failure. It does not fix this diagnostic path or detail field.
-
-- at: lib/jido/agent/route.ex:157:51
-  operator: string_empty
-  mutation: "`\"No route accepts this Signal type\"` → `\"\"`"
-  sort: log-only
-  reason: The contract fixes the structured result where evaluation uses it. It does not fix human-readable error prose.
-
-- at: lib/jido/agent/route.ex:158:13
-  operator: element_removal
-  mutation: "`type: type` → `(removed)`"
-  sort: unpromised
-  reason: The evaluation contract requires an unmatched-route failure. It does not fix this diagnostic path or detail field.
-
-- at: lib/jido/agent/route.ex:167:67
-  operator: guard_removal
-  mutation: "`when kind in [:action, :flow]` → `(no guard)`"
+  mutation: "`kind: :parent` → `(removed)`"
   sort: equivalent
-  reason: The Runner calls params/2 only for normalized Action and Flow routes. Transform and pass-through routes use SignalHandler.
-
-- at: lib/jido/agent/route.ex:172:15
-  operator: return_nil
-  mutation: "`Error.fail(:invalid_handler, [:handler], \"Only Action and F…` → `nil`"
-  sort: dead-code
-  reason: No supported evaluation path calls params/2 for a non-Action and non-Flow handler.
-
-- at: lib/jido/agent/route.ex:172:39
-  operator: element_removal
-  mutation: "`:handler` → `(removed)`"
-  sort: dead-code
-  reason: No supported evaluation path calls params/2 for a non-Action and non-Flow handler.
-
-- at: lib/jido/agent/route.ex:172:50
-  operator: string_empty
-  mutation: "`\"Only Action and Flow routes have parameters\"` → `\"\"`"
-  sort: log-only
-  reason: The contract fixes the structured result where evaluation uses it. It does not fix human-readable error prose.
+  reason: Route normalization permits this private clause only for a parent forward target. The earlier agent clause still handles agent targets, so removing this repeated kind match does not change a validated target.

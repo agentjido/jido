@@ -48,7 +48,7 @@ defmodule Jido.Examples.TypedSignalsTest do
     assert reply.extensions["jidocausationid"] == request.id
   end
 
-  test "via route returns the owned Directive after pure evaluation" do
+  test "two-module route returns one correlated Reply after pure evaluation" do
     agent =
       Typed.QuotingCart.instantiate!(
         id: "typed-guide-quoting-cart",
@@ -57,9 +57,11 @@ defmodule Jido.Examples.TypedSignalsTest do
 
     request = Typed.PriceQuote.new!(%{items: agent.state.items})
 
-    assert {:ok, accepted, [%Typed.RequestQuote{request: ^request}]} =
+    assert {:ok, accepted, [%Jido.Agent.Directive.Reply{signal: response}]} =
              Typed.QuotingCart.cmd(agent, request)
 
     assert accepted.state.quotes == 1
+    assert response.type == "cart.quote.ready"
+    assert response.extensions["jidocausationid"] == request.id
   end
 end

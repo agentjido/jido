@@ -125,14 +125,13 @@ defmodule Jido.Agent.Codec do
          "path" => route.path,
          "as" => helper,
          "defaults" => defaults,
-         "handler" => handler,
-         "emits" => route.emits
+         "handler" => handler
        }}
     end
   end
 
   defp decode_route(route, registry) do
-    with :ok <- object(route, ~w(path as defaults handler emits)),
+    with :ok <- object(route, ~w(path as defaults handler)),
          {:ok, helper} <- at(Value.decode(route["as"], registry), ["as"]),
          {:ok, defaults} <- at(Value.decode(route["defaults"], registry), ["defaults"]),
          {:ok, handler} <- at(decode_handler(route["handler"], registry), ["handler"]) do
@@ -141,8 +140,7 @@ defmodule Jido.Agent.Codec do
          path: route["path"],
          as: helper,
          defaults: defaults,
-         handler: handler,
-         emits: route["emits"]
+         handler: handler
        }}
     end
   end
@@ -153,8 +151,13 @@ defmodule Jido.Agent.Codec do
          do: {:ok, %{"kind" => Atom.to_string(kind), "target" => target}}
   end
 
-  defp encode_handler(%{kind: :pass_through}, _registry),
-    do: {:ok, %{"kind" => "pass_through"}}
+  defp encode_handler(%{kind: :forward, target: %{kind: :parent}}, _registry),
+    do: {:ok, %{"kind" => "forward", "target" => %{"kind" => "parent"}}}
+
+  defp encode_handler(%{kind: :forward, target: %{kind: :agent, name: name}}, registry) do
+    with {:ok, name} <- Value.encode(name, registry),
+         do: {:ok, %{"kind" => "forward", "target" => %{"kind" => "agent", "name" => name}}}
+  end
 
   defp encode_handler(_handler, _registry),
     do: Error.fail(:invalid_handler, [], "Agent definition contains an invalid route handler")
@@ -167,9 +170,22 @@ defmodule Jido.Agent.Codec do
          do: {:ok, %{kind: kind, target: target}}
   end
 
-  defp decode_handler(%{"kind" => "pass_through"} = handler, _registry)
-       when map_size(handler) == 1,
-       do: {:ok, %{kind: :pass_through}}
+  defp decode_handler(
+         %{"kind" => "forward", "target" => %{"kind" => "parent"} = target} = handler,
+         _registry
+       )
+       when map_size(handler) == 2 and map_size(target) == 1,
+       do: {:ok, %{kind: :forward, target: %{kind: :parent}}}
+
+  defp decode_handler(
+         %{"kind" => "forward", "target" => %{"kind" => "agent", "name" => name} = target} =
+           handler,
+         registry
+       )
+       when map_size(handler) == 2 and map_size(target) == 2 do
+    with {:ok, name} <- at(Value.decode(name, registry), ["target", "name"]),
+         do: {:ok, %{kind: :forward, target: %{kind: :agent, name: name}}}
+  end
 
   defp decode_handler(_handler, _registry),
     do: Error.fail(:invalid_document, [], "Invalid Agent definition route handler")

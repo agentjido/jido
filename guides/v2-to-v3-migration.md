@@ -187,7 +187,7 @@ Jido checks routes in declaration order and runs the first match. A Signal with
 no route fails with `"No route accepts this Signal type"`.
 
 V3 adds handlers that V2 didn't have: inline `action` blocks, Flow routes,
-transforms, and pass-through routes. See
+transforms, and explicit forwards to named children or the parent. See
 [Routes and Handlers](build-agent-routes.livemd) and
 [Typed Signals](typed-signal-actions.livemd).
 
@@ -317,7 +317,7 @@ See [Extensions or Plugins](extensions-and-plugins.md),
 | --- | --- |
 | `emit(signal, dispatch)` | `Jido.Agent.Directive.emit/2`; also `emit("type", data)` |
 | `emit_to_pid(signal, pid)` | `Jido.AgentServer.Directive.signal_send(signal, pid, opts)` |
-| `emit_to_parent(agent, signal)` | `Jido.AgentServer.Directive.owner_send(signal)` |
+| `emit_to_parent(agent, signal)` | `Jido.AgentServer.Directive.parent_send(signal)` |
 | `error(error, context)` | `Jido.AgentServer.Directive.error_report(error, context)` |
 | `spawn(child_spec, tag)` | `Jido.AgentServer.Directive.process_start(child_spec)` |
 | `spawn_agent(agent, tag, opts)` | `Jido.AgentServer.Directive.agent_start(agent, name, opts)`, or a topology member |

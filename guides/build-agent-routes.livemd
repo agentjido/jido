@@ -2,33 +2,20 @@
 
 ## Overview
 
-Routes decide what an Agent does with each Signal. They form one ordered
-table: Jido checks it top to bottom, takes the first route whose path
-matches the Signal type, and runs that route's handler. One Signal, one
-handler.
-
-This Livebook builds an order Agent whose route table looks like this:
+Routes decide what an Agent does with each Signal. Jido reads routes in
+declaration order and runs the first matching handler. Each route has an
+explicit handler or an explicit forward destination.
 
 ```text
-order.create     -> Routes.Record          Action module
-order.note       -> inline action          Action defined in the route
-order.checkout   -> Routes.Checkout        Flow
-order.ship       -> inline action          emits only "shipping.requested"
-partner.order    -> transform              rewrites to "order.create"
-audit.ping       -> pass-through           re-emits the Signal unchanged
-order.*          -> Routes.Record          one-segment wildcard
-**               -> Routes.Record          catch-all
+order.create      -> Routes.Record          Action
+order.checkout    -> Routes.Checkout        Flow
+partner.order     -> inline transform       Signal rewrite
+work.request      -> agent(:worker)         forward
+work.completed    -> parent()               forward
 ```
 
-You'll run a Signal through each kind of handler, then cover wildcards,
-defaults, emission contracts, and the mistakes Jido rejects at compile time.
-
-| Handler | Runs | Changes state |
-| --- | --- | --- |
-| Action | One `Jido.Action` module or inline `action` block | Yes |
-| Flow | One `Jido.Flow` | Yes |
-| Transform | A function from Signal to Signal | No |
-| Pass-through | Nothing | No |
+There is no bare string route. A string path must name an Action, a Flow, an
+inline handler, or use `forward`.
 
 ## Install
 
@@ -36,31 +23,28 @@ defaults, emission contracts, and the mistakes Jido rejects at compile time.
 Mix.install([{:jido, "~> 3.0.0-beta.2"}])
 ```
 
-## Supporting Modules
-
-One Action records which handler ran. A Flow computes an order total in three
-steps and finishes with an Action that writes it to state.
+## Actions and Flows
 
 ```elixir
 defmodule Routes.Record do
   use Jido.Action,
     name: "record",
-    schema: Zoi.object(%{handler: Zoi.string()})
+    schema: Zoi.object(%{label: Zoi.string()})
 
   @impl true
-  def run(%{handler: handler}, %{agent_state: state}) do
-    {:ok, %{state | last: handler}}
+  def run(%{label: label}, %{agent_state: state}) do
+    {:ok, %{state | last: label}}
   end
 end
 
 defmodule Routes.Total do
   use Jido.Action,
     name: "total",
-    schema: Zoi.object(%{subtotal: Zoi.integer(), tax: Zoi.integer()})
+    schema: Zoi.object(%{price: Zoi.integer(), quantity: Zoi.integer()})
 
   @impl true
-  def run(%{subtotal: subtotal, tax: tax}, %{agent_state: state}) do
-    {:ok, %{state | total: subtotal + tax}}
+  def run(%{price: price, quantity: quantity}, %{agent_state: state}) do
+    {:ok, %{state | total: price * quantity}}
   end
 end
 
@@ -70,25 +54,16 @@ defmodule Routes.Checkout do
     schema: Zoi.object(%{price: Zoi.integer(), quantity: Zoi.integer()})
 
   flow do
-    step "subtotal", [price <- input(:price), quantity <- input(:quantity)] do
-      {:ok, %{value: price * quantity}}
-    end
-
-    step "tax", subtotal <- result("subtotal", :value) do
-      {:ok, %{value: div(subtotal, 10)}}
-    end
-
     step "total",
       action: Routes.Total,
-      params: %{subtotal: result("subtotal", :value), tax: result("tax", :value)}
+      params: %{price: input(:price), quantity: input(:quantity)}
 
     output result("total")
   end
 end
 ```
 
-A Flow on an Agent route must output the complete next Agent state.
-`Routes.Total` reads `context.agent_state`, so its result is the whole state.
+An Action or Flow route must return the complete next Agent state.
 
 ## The Route Table
 
@@ -109,7 +84,11 @@ defmodule Routes.Orders do
   routes do
     signal_source("/guides/routes")
 
-    route "order.create", Routes.Record, as: :create, defaults: %{handler: "create"}
+    route "order.create", Routes.Record,
+      as: :create,
+      defaults: %{label: "created"}
+
+    route "order.checkout", Routes.Checkout, as: :checkout
 
     route "order.note", as: :note do
       action %{text: text},
@@ -119,232 +98,111 @@ defmodule Routes.Orders do
       end
     end
 
-    route "order.checkout", Routes.Checkout, as: :checkout
-
-    route "order.ship", as: :ship, emits: ["shipping.requested"] do
-      action _input, schema: Zoi.object(%{}), context: context do
-        {:ok, context.agent_state,
-         [emit("shipping.requested", %{last: context.agent_state.last})]}
-      end
-    end
-
-    route "order.leak", as: :leak, emits: ["shipping.requested"] do
-      action _input, schema: Zoi.object(%{}), context: context do
-        {:ok, context.agent_state, [emit("billing.charged", %{})]}
-      end
-    end
-
-    route "partner.order", as: :partner, emits: ["order.create"] do
+    route "partner.order", as: :partner do
       transform %Jido.Signal{data: %{ref: ref}} = signal when is_binary(ref) do
-        {:ok, %{signal | type: "order.create", data: %{handler: "partner:" <> ref}}}
+        {:ok, %{signal | type: "order.create", data: %{label: "partner:" <> ref}}}
       end
     end
 
-    route "audit.ping", as: :ping, emits: ["audit.ping"]
-
-    route "order.*", Routes.Record, defaults: %{handler: "order wildcard"}
-    route "**", Routes.Record, defaults: %{handler: "fallback"}
+    route "order.*", Routes.Record, defaults: %{label: "wildcard"}
   end
 end
-
-agent = Routes.Orders.instantiate!(id: "orders-1")
-
-Enum.map(Routes.Orders.definition().routes, &{&1.path, &1.handler.kind})
 ```
-
-The result lists each route in declaration order:
-
-```text
-[{"order.create", :action}, {"order.note", :action}, {"order.checkout", :flow},
- {"order.ship", :action}, {"order.leak", :action}, {"partner.order", :transform},
- {"audit.ping", :pass_through}, {"order.*", :action}, {"**", :action}]
-```
-
-Inline `action` blocks compile to Action modules, so they report `:action`.
 
 | Route part | Rule |
 | --- | --- |
-| path | An exact Signal type, or a pattern with `*` or `**`. Unique in the Agent. |
-| handler | A module, one `action` or `transform` block, or nothing (pass-through). |
-| `as:` | Generates `<name>_signal/2` and `<name>_signal!/2`. Use a lowercase name made from letters, digits, and underscores. Exact paths only. |
-| `defaults:` | Input values under the Signal data. Action and Flow routes only. |
-| `emits:` | The Signal types the route may emit. Omit it to leave the route unchecked. |
+| path | An exact Signal type, or a pattern with `*` or `**`. It must be unique in the Agent. |
+| handler | An Action, a Flow, one inline `action`, or one inline `transform`. |
+| `as:` | Generates `<name>_signal/2` and `<name>_signal!/2`. Exact paths only. |
+| `defaults:` | Adds missing Action or Flow input values. Signal data wins. |
 
-## Action Modules
+## SignalAction Routes
 
-The Signal data becomes the Action's input.
+A SignalAction can own the path and the handler:
 
 ```elixir
-signal = Routes.Orders.create_signal!(%{handler: "mine"})
-{:ok, candidate, []} = Routes.Orders.cmd(agent, signal)
-
-candidate.state.last
+route MyApp.Ask
 ```
 
-The result is `"mine"`.
-
-## Inline Actions
-
-An inline block is a full Action with its own schema. The first argument is a
-pattern over the validated input. `context:` binds the Turn context. `emit/1,2`
-is imported in every Agent module.
+The input Signal type from `MyApp.Ask` becomes the route path. To use its
+Signal type with a different handler, use the two-module form:
 
 ```elixir
-signal = Routes.Orders.note_signal!(%{text: "fragile"})
-{:ok, candidate, []} = Routes.Orders.cmd(agent, signal)
-
-candidate.state.notes
+route MyApp.Ask, MyApp.Turn
 ```
 
-The result is `["fragile"]`. Move the block to a module when a second Agent
-needs it or it grows past a few lines.
+This form runs `MyApp.Turn`. It does not run `MyApp.Ask` first.
 
-## Flows
+## Explicit Forwarding
 
-A Flow route runs every step in one Turn and commits once.
-
-```elixir
-signal = Routes.Orders.checkout_signal!(%{price: 250, quantity: 4})
-{:ok, candidate, []} = Routes.Orders.cmd(agent, signal)
-
-candidate.state.total
-```
-
-The result is `1100`: a subtotal of 1,000 plus 100 tax. If any step fails,
-the Turn fails and no state changes. The
-[Jido Action Flow guide](https://hexdocs.pm/jido_action/flows.html) covers
-the Flow language.
-
-## Transforms
-
-A transform translates an inbound Signal into one outbound Signal. It runs no
-Action and leaves state unchanged. It returns `{:ok, signal}` or
-`{:error, reason}`.
+Use `forward` when a route only sends the input Signal to another Agent:
 
 ```elixir
-signal = Routes.Orders.partner_signal!(%{ref: "A-17"})
-{:ok, candidate, [emit]} = Routes.Orders.cmd(agent, signal)
-
-{candidate == agent, emit.signal.type, emit.signal.data}
-```
-
-The result is `{true, "order.create", %{handler: "partner:A-17"}}`: no state
-change and one `Emit` Directive.
-
-`%{signal | ...}` keeps every other envelope field, including `id`. Build a
-new Signal with `Jido.Signal.new/3` when the output needs its own `id`.
-
-A Signal that doesn't match the transform's pattern fails the Turn:
-
-```elixir
-signal = Routes.Orders.partner_signal!(%{ref: 17})
-{:error, error} = Routes.Orders.cmd(agent, signal)
-
-{error.code, Exception.message(error)}
-```
-
-The result is `{:transform_input, "Signal does not match a transform clause"}`.
-To accept several shapes, write `transform do ... end` with one `->` clause
-per shape.
-
-## Pass-Through
-
-A route with no handler emits the incoming Signal unchanged.
-
-```elixir
-signal = Routes.Orders.ping_signal!(%{n: 1})
-{:ok, candidate, [emit]} = Routes.Orders.cmd(agent, signal)
-
-{candidate == agent, emit.signal.type, emit.signal.id == signal.id}
-```
-
-The result is `{true, "audit.ping", true}`. If a pass-through route declares
-`emits:`, the list must include its own exact path. Parent Agents use
-pass-through to forward Signals to members; see
-[Connect Agent Outputs](connect-agent-outputs.livemd).
-
-## Wildcards And Order
-
-`*` matches exactly one segment. `**` matches any number of segments. The
-first matching route wins, so put exact routes first and catch-alls last.
-
-```elixir
-for type <- ["order.cancel", "order.cancel.bulk", "user.login"] do
-  signal = Jido.Signal.new!(type, %{}, source: "/guides/routes")
-  {:ok, candidate, []} = Routes.Orders.cmd(agent, signal)
-  {type, candidate.state.last}
+routes do
+  forward "work.request", to: agent(:worker)
+  forward "work.completed", to: parent()
 end
 ```
 
-The result is:
-
-```text
-[{"order.cancel", "order wildcard"},
- {"order.cancel.bulk", "fallback"},
- {"user.login", "fallback"}]
-```
-
-`order.cancel.bulk` has two segments after `order`, so `order.*` doesn't match
-it. Without the `**` route, an unknown type fails its Turn with
-`"No route accepts this Signal type"`. Leave the catch-all out unless you want
-every unknown Signal handled.
-
-## Defaults And Helpers
-
-Route `defaults:` fill input the Signal data leaves out. Signal data wins on
-equal keys. The merge is shallow: a nested map in the data replaces the
-default map.
+`agent(:worker)` must name a member in the same Agent definition. `parent()`
+means the current runtime parent. Forward targets are portable data:
 
 ```elixir
-signal = Routes.Orders.create_signal!()
-{:ok, candidate, []} = Routes.Orders.cmd(agent, signal)
-
-candidate.state.last
+%{kind: :forward, target: %{kind: :agent, name: :worker}}
+%{kind: :forward, target: %{kind: :parent}}
 ```
 
-The result is `"create"`, from the route default.
+A forward does not use a channel, a topology connection, `default_dispatch:`,
+or self-dispatch. If the named Agent or parent is not available, the Turn
+returns a clear error.
 
-`as: :create` generated `create_signal!(data \\ %{}, opts \\ [])`. It builds a
-Signal and runs nothing. It raises when the data isn't a plain map or an
-option is invalid. `create_signal/2` takes the same arguments and returns
-`{:ok, signal}` or `{:error, reason}`. Neither validates the data against the
-Action schema; the Turn does that. `opts` accepts `:source`, `:id`, `:time`, `:subject`,
-and `:datacontenttype`. The default source is the Agent's `signal_source`.
+## Transforms
 
-## Emission Contracts
-
-With `emits:`, Jido checks every `Emit`, `AgentSend`, and `OwnerSend` the
-route returns against the list, on every Turn.
+A transform returns one changed Signal and does not change Agent state. Jido
+normalizes the result to an `Emit` Directive.
 
 ```elixir
-ship = Routes.Orders.ship_signal!()
-{:ok, _candidate, [emit]} = Routes.Orders.cmd(agent, ship)
+signal = Routes.Orders.partner_signal!(%{ref: "A-17"})
+{:ok, candidate, [emit]} = Routes.Orders.cmd(
+  Routes.Orders.instantiate!(id: "orders-1"),
+  signal
+)
 
-leak = Routes.Orders.leak_signal!()
-{:error, error} = Routes.Orders.cmd(agent, leak)
-
-{emit.signal.type, error.code, Exception.message(error)}
+{candidate.state.last, emit.signal.type}
 ```
 
-The result is
-`{"shipping.requested", :undeclared_emission, "Signal type is outside the route contract"}`.
-The `leak` route emitted `billing.charged`, so its whole Turn failed.
+The result is `{"", "order.create"}`. The new Signal starts a separate Turn
+when a live Agent Server dispatches it.
+
+## Wildcards and Order
+
+`*` matches one segment. `**` matches any number of segments. The first match
+wins, so put exact paths before wildcard paths.
+
+## Defaults and Helpers
+
+`defaults:` performs a shallow merge under Signal data. `as: :create`
+generates `create_signal/2` and `create_signal!/2`. These functions build a
+Signal and do not run a Turn.
 
 ## Compile-Time Errors
 
-These fail the build with a `Spark.Error.DslError`:
+Jido rejects:
 
+- a string route without a handler;
 - two routes with the same path;
-- `as:` on a wildcard path, or one helper name used twice;
-- `defaults:` on a transform or pass-through route;
-- a pass-through `emits:` list without the route's own path.
-
-A target module together with a `do` block, or a block with more than one
-`action` or `transform`, fails with a `CompileError`.
+- `as:` on a wildcard path;
+- the same helper name on two routes;
+- `defaults:` on a transform or forward;
+- a target module together with an inline block;
+- more than one inline handler; and
+- old route options such as `via:`.
 
 ## Next
 
-- [Typed Signals](typed-signal-actions.livemd) gives one route a validated
-  input Signal and an optional typed reply.
-- [State and Directives](agent-results-and-directives.md) covers everything a
-  handler can return.
+- [Typed Signals](typed-signal-actions.livemd) explains typed input and reply
+  Signals.
+- [Connect Agent Outputs](connect-agent-outputs.livemd) explains explicit
+  forwarding.
+- [State and Directives](agent-results-and-directives.md) covers handler
+  results, `Reply`, and `Emit`.

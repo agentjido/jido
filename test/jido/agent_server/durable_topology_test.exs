@@ -119,11 +119,12 @@ defmodule JidoTest.AgentServer.DurableTopologyTest do
     assert_receive {:durable_barrier, :step_6, action}, 5_000
     monitor = Process.monitor(action)
 
-    assert {:ok, _, [_, _]} =
+    assert {:ok, _, [_, _, _]} =
              Server.call(
                root,
                signal("mutate", %{
                  directives: [
+                   D.route_remove("request"),
                    D.connection_remove("request",
                      from: %{kind: :agent, name: :root},
                      to: %{kind: :agent, name: :worker}

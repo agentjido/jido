@@ -46,7 +46,7 @@ Plugin declarations that `jido.agent` produces.
 ### jido.agent_evaluation.I4 — Current handler contract
 
 - **scope:** `Jido.Agent.cmd/3`, `Jido.Agent.Runner`
-- **must:** Run the selected Action or Flow against its current contract, including after code reload. Pass-through returns the unchanged Signal. Transform returns one Signal without routing it again.
+- **must:** Run the selected Action or Flow against its current contract, including after code reload. Transform returns one Signal without routing it again. Forward returns the unchanged Signal in one explicit AgentSend or ParentSend Directive.
 - **kind:** functional
 - **status:** active
 
@@ -67,7 +67,7 @@ Plugin declarations that `jido.agent` produces.
 ### jido.agent_evaluation.I7 — Ordered Directive validation
 
 - **scope:** `Jido.Agent.Plugin.Pipeline.run/6`
-- **must:** Validate the complete Directive batch in order before Plugin reduction. Accept built-in Directives and declared Plugin-owned Directives only.
+- **must:** Validate the complete Directive batch in order before Plugin reduction. Accept built-in Directives and declared Plugin-owned Directives only. Accept no more than one Reply, and require its causation ID to match the current source Signal ID.
 - **kind:** ordering
 - **status:** active
 

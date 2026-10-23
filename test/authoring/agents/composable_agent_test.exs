@@ -9,8 +9,8 @@ defmodule Jido.AgentAuthoringTest do
   alias JidoTest.ComposableAgent.{Action, Flow, Minimal, Named, Team, Worker}
   alias JidoTest.ComposableAgent.Compiler
 
-  defp route(path, handler \\ %{kind: :pass_through}, opts \\ []) do
-    Map.merge(%{path: path, as: nil, defaults: %{}, handler: handler, emits: nil}, Map.new(opts))
+  defp route(path, handler \\ %{kind: :action, target: Action}, opts \\ []) do
+    Map.merge(%{path: path, as: nil, defaults: %{}, handler: handler}, Map.new(opts))
   end
 
   defp canonical(overrides \\ %{}) do
@@ -51,7 +51,7 @@ defmodule Jido.AgentAuthoringTest do
         }),
       routes: [
         route("work.request"),
-        route("work.done", %{kind: :action, target: Action}, emits: [])
+        route("work.done", %{kind: :action, target: Action})
       ],
       topology: topology
     })
@@ -74,7 +74,7 @@ defmodule Jido.AgentAuthoringTest do
     assert Agent.define!(expected) === expected
   end
 
-  test "named Action, Flow and bare route DSL lowers to the exact independently written Map" do
+  test "named Action and Flow DSL lower to the exact independently written Map" do
     expected =
       canonical(%{
         module: Named,
@@ -87,11 +87,10 @@ defmodule Jido.AgentAuthoringTest do
         routes: [
           route("work.request", %{kind: :action, target: Action},
             as: :work,
-            defaults: %{value: "default"},
-            emits: ["work.done"]
+            defaults: %{value: "default"}
           ),
-          route("plan.request", %{kind: :flow, target: Flow}, emits: []),
-          route("pass.request", %{kind: :pass_through}, as: :pass),
+          route("plan.request", %{kind: :flow, target: Flow}),
+          route("pass.request", %{kind: :action, target: Action}, as: :pass),
           route("work.*", %{kind: :action, target: Action})
         ]
       })
@@ -118,31 +117,23 @@ defmodule Jido.AgentAuthoringTest do
     end
 
     expected_routes = [
-      route("work.request", %{kind: :pass_through}, as: :request),
-      route("plan.request", %{kind: :pass_through}, as: :plan),
-      route("work.done", %{kind: :action, target: Action},
-        defaults: %{value: "done"},
-        emits: ["team.done"]
-      ),
-      route("flow.request", %{kind: :flow, target: Flow}, emits: []),
+      route("work.request", %{kind: :action, target: Action}, as: :request),
+      route("plan.request", %{kind: :action, target: Action}, as: :plan),
+      route("work.done", %{kind: :action, target: Action}, defaults: %{value: "done"}),
+      route("flow.request", %{kind: :flow, target: Flow}),
       route(
         "external.request",
-        %{kind: :transform, target: Map.fetch!(targets, "external.request")},
-        emits: ["work.request"]
+        %{kind: :transform, target: Map.fetch!(targets, "external.request")}
       ),
       route(
         "external.clauses",
-        %{kind: :transform, target: Map.fetch!(targets, "external.clauses")},
-        emits: ["work.request"]
+        %{kind: :transform, target: Map.fetch!(targets, "external.clauses")}
       ),
-      route("inline.request", %{kind: :action, target: inline.("inline.request")}, emits: []),
-      route("inline.emit", %{kind: :action, target: inline.("inline.emit")},
-        emits: ["team.done"]
-      ),
+      route("inline.request", %{kind: :action, target: inline.("inline.request")}),
+      route("inline.emit", %{kind: :action, target: inline.("inline.emit")}),
       route(
         "partial.request",
-        %{kind: :transform, target: Map.fetch!(targets, "partial.request")},
-        emits: ["work.request"]
+        %{kind: :transform, target: Map.fetch!(targets, "partial.request")}
       ),
       route("unknown.request", %{kind: :action, target: Action})
     ]
@@ -193,7 +184,7 @@ defmodule Jido.AgentAuthoringTest do
 
     assert Enum.all?(
              definition.routes,
-             &(Map.keys(&1) |> Enum.sort() == Enum.sort([:path, :handler, :as, :defaults, :emits]))
+             &(Map.keys(&1) |> Enum.sort() == Enum.sort([:path, :handler, :as, :defaults]))
            )
 
     assert [%Jido.Agent.DSL.Entry{__spark_metadata__: metadata} | _] =
@@ -310,10 +301,10 @@ defmodule Jido.AgentAuthoringTest do
           [route("work.request"), route("work.request")],
           [route("work.*"), route("work.*")],
           [
-            route("work.one", %{kind: :pass_through}, as: :work),
-            route("work.two", %{kind: :pass_through}, as: :work)
+            route("work.one", %{kind: :action, target: Action}, as: :work),
+            route("work.two", %{kind: :action, target: Action}, as: :work)
           ],
-          [route("work.*", %{kind: :pass_through}, as: :work)]
+          [route("work.*", %{kind: :action, target: Action}, as: :work)]
         ] do
       assert {:error, %Error{}} = Agent.define(%{name: "bad", routes: routes})
     end
@@ -362,7 +353,7 @@ defmodule Jido.AgentAuthoringTest do
              {:ok, %{nested: %{one: 3}}}
 
     for handler <- [
-          %{kind: :pass_through},
+          %{kind: :forward, target: %{kind: :parent}},
           %{kind: :transform, target: {JidoTest.ComposableAgent.Adapter, :normalize, 1}}
         ] do
       assert {:error, %Error{code: :invalid_defaults}} =
@@ -384,8 +375,6 @@ defmodule Jido.AgentAuthoringTest do
 
     assert {:ok, %Jido.Signal{type: "work.request"}} =
              Agent.input_signal(definition, "work.request", %{}, source: "/provided")
-
-    assert Named.definition().routes |> hd() |> Map.fetch!(:emits) == ["work.done"]
   end
 
   test "inline transforms retain the complete envelope and support guarded clauses" do
@@ -406,25 +395,18 @@ defmodule Jido.AgentAuthoringTest do
     assert {:ok, ^transformed} = apply(module, fun, [%{signal | data: %{value: "hello"}}])
   end
 
-  test "invalid and duplicate emission contracts fail during authoring" do
-    for emits <- [["work.*"], [""], ["work.done", "work.done"], "work.done", [:work_done]] do
-      assert {:error, %Error{}} =
-               Agent.define(%{
-                 name: "bad",
-                 routes: [route("work.request", %{kind: :action, target: Action}, emits: emits)]
-               })
-    end
+  test "unknown route fields and handler kinds fail during authoring" do
+    assert {:error, %Error{code: :unknown_fields}} =
+             Agent.define(%{
+               name: "bad",
+               routes: [Map.put(route("work.request"), :unknown, true)]
+             })
 
-    for {path, handler, emits} <- [
-          {"work.request", %{kind: :pass_through}, []},
-          {"work.request", %{kind: :pass_through}, ["other.type"]},
-          {"work.*", %{kind: :pass_through}, ["work.request"]},
-          {"work.request",
-           %{kind: :transform, target: {JidoTest.ComposableAgent.Adapter, :normalize, 1}}, []}
-        ] do
-      assert {:error, %Error{}} =
-               Agent.define(%{name: "bad", routes: [route(path, handler, emits: emits)]})
-    end
+    assert {:error, %Error{code: :invalid_handler}} =
+             Agent.define(%{
+               name: "bad",
+               routes: [route("work.request", %{kind: :pass_through})]
+             })
   end
 
   test "topology binds copied inputs and counts without creating another composition unit" do
@@ -476,7 +458,11 @@ defmodule Jido.AgentAuthoringTest do
     assert Topology.connections_for(definition, agent(:worker), "work.request") == {:ok, []}
     assert Enum.map(definition.topology.connections, & &1.path) == ["work.request", "work.*"]
 
-    assert {:ok, [%{status: :compatible}, %{status: :unchecked, reason: :wildcard_coverage}]} =
+    assert {:ok,
+            [
+              %{status: :unchecked, reason: :unknown_outputs},
+              %{status: :unchecked, reason: :wildcard_coverage}
+            ]} =
              Topology.checks(definition)
 
     assert {:error, %Error{code: :duplicate}} =
@@ -514,23 +500,13 @@ defmodule Jido.AgentAuthoringTest do
              })
   end
 
-  test "connection proofs distinguish incompatible contracts from unknown outputs" do
+  test "connection proofs reject unavailable inputs and mark outputs as unchecked" do
     assert {:error, %Error{code: :unaccepted_type}} =
              composed(%{agents: [member()], connections: [edge("unknown.type", :root, :worker)]})
 
-    restricted = Worker.definition() |> put_in([Access.key(:routes), Access.at(1), :emits], [])
-
-    assert {:error, %Error{code: :unproduced_type}} =
-             composed(%{
-               agents: [member(%{definition: restricted})],
-               connections: [edge("work.request", :worker, :worker)]
-             })
-
-    child = restricted |> put_in([Access.key(:routes), Access.at(0), :emits], nil)
-
     assert {:ok, definition} =
              composed(%{
-               agents: [member(%{definition: child})],
+               agents: [member()],
                connections: [edge("work.request", :worker, :worker)]
              })
 
@@ -539,7 +515,8 @@ defmodule Jido.AgentAuthoringTest do
     assert {:ok, definition} =
              composed(%{agents: [member()], connections: [edge("work.done", :worker, :root)]})
 
-    assert {:ok, [%{status: :compatible}]} = Topology.checks(definition)
+    assert {:ok, [%{status: :unchecked, reason: :unknown_outputs}]} =
+             Topology.checks(definition)
   end
 
   test "a team replaces a leaf through the same routes and explicit root outputs" do
@@ -561,16 +538,8 @@ defmodule Jido.AgentAuthoringTest do
 
     assert leaf_parent.topology.connections === team_parent.topology.connections
     assert {:ok, proofs} = Topology.checks(team_parent)
-    assert Enum.all?(proofs, &(&1.status == :compatible))
+    assert Enum.all?(proofs, &(&1.status == :unchecked))
     assert {:ok, _} = Agent.instantiate(team_parent, id: "outer")
-
-    consuming =
-      inner
-      |> put_in([Access.key(:routes), Access.at(1), :handler], %{kind: :action, target: Action})
-      |> put_in([Access.key(:routes), Access.at(1), :emits], [])
-
-    assert {:error, %Error{code: :unproduced_type}} =
-             composed(%{agents: [member(%{definition: consuming})], connections: wires})
 
     without_input = %{inner | routes: [hd(inner.routes)]}
     assert {:error, %Error{code: :unaccepted_type}} = Agent.define(without_input)
@@ -680,7 +649,7 @@ defmodule Jido.AgentAuthoringTest do
     for {body, message} <- [
           {"topology do agent :worker, JidoTest.ComposableAgent.NoSuchAgent end",
            "Member definition is not available"},
-          {"routes do route \"missing.type\" end\ntopology do agent :worker, JidoTest.ComposableAgent.Worker; connections do connect \"missing.type\", from: :root,to: :worker end end",
+          {"routes do route \"missing.type\", JidoTest.ComposableAgent.Action end\ntopology do agent :worker, JidoTest.ComposableAgent.Worker; connections do connect \"missing.type\", from: :root,to: :worker end end",
            "Destination does not accept"}
         ] do
       {pid, monitor} = spawn_monitor(fn -> Compiler.compile(body) end)

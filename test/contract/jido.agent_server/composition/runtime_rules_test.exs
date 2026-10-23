@@ -159,17 +159,17 @@ defmodule JidoTest.AgentServer.Composition.RuntimeRulesTest do
     assert_eventually(Server.agent(child).state.count == 1)
 
     parent = Server.status(child).parent
-    assert :ok = TopologyRuntime.owner_send(parent, F.signal())
+    assert :ok = TopologyRuntime.parent_send(parent, F.signal())
     assert_eventually(Server.agent(server).state.count == 2)
 
     assert {:error, :agent_not_found} = TopologyRuntime.send_agent(state, :missing, F.signal())
-    assert {:error, :owner_not_found} = TopologyRuntime.owner_send(nil, F.signal())
+    assert {:error, :parent_not_found} = TopologyRuntime.parent_send(nil, F.signal())
     assert :ok = TopologyRuntime.member_output(%{activation_state: state}, :missing, F.signal())
     assert {:error, :bus_not_ready} = TopologyBus.publish(state, :missing, F.signal())
 
     root = parent.activation
     assert :ok = Server.stop(server)
     F.down(root)
-    assert {:error, :owner_not_found} = TopologyRuntime.owner_send(parent, F.signal())
+    assert {:error, :parent_not_found} = TopologyRuntime.parent_send(parent, F.signal())
   end
 end

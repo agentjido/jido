@@ -21,7 +21,7 @@ defmodule Jido.Agent.APITest do
     routes do
       signal_source "/counter"
 
-      route "increment", as: :increment, emits: ["updated"] do
+      route "increment", as: :increment do
         action %{amount: amount}, context: context do
           count = context.agent_state.count + amount
           {:ok, %{context.agent_state | count: count}, [emit("updated", %{count: count})]}

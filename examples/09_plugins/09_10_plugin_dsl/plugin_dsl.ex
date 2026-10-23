@@ -29,17 +29,17 @@ defmodule Jido.Examples.Plugins.DSL.Agent do
     definition = definition()
 
     Jido.Authoring.Registry.new!(%{
-      "agents/thresholds/v1" => {:agent, __MODULE__},
-      "schemas/thresholds/v1" => {:schema, definition.schema},
-      "actions/threshold-add/v1" => {:action, hd(definition.routes).handler.target},
-      "plugins/thresholds/v1" => {:plugin, Jido.Examples.Plugins.DSL.Thresholds},
-      "atoms/add" => {:atom, :add},
-      "atoms/on" => {:atom, :on},
-      "atoms/thresholds" => {:atom, :thresholds},
-      "atoms/at" => {:atom, :at},
-      "atoms/name" => {:atom, :name},
-      "atoms/first" => {:atom, :first},
-      "atoms/third" => {:atom, :third}
+      {"agents/thresholds", 1} => {:agent, __MODULE__},
+      {"schemas/thresholds", 1} => {:schema, definition.schema},
+      {"actions/threshold-add", 1} => {:action, hd(definition.routes).handler.target},
+      {"plugins/thresholds", 1} => {:plugin, Jido.Examples.Plugins.DSL.Thresholds},
+      {"atoms/add", 1} => {:atom, :add},
+      {"atoms/on", 1} => {:atom, :on},
+      {"atoms/thresholds", 1} => {:atom, :thresholds},
+      {"atoms/at", 1} => {:atom, :at},
+      {"atoms/name", 1} => {:atom, :name},
+      {"atoms/first", 1} => {:atom, :first},
+      {"atoms/third", 1} => {:atom, :third}
     })
   end
 end

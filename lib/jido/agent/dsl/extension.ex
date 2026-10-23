@@ -12,7 +12,6 @@ defmodule Jido.Agent.DSL.Entry do
     :to,
     :__spark_metadata__,
     defaults: %{},
-    emits: nil,
     count: 1,
     initial_state: %{},
     delivery: :single
@@ -42,8 +41,7 @@ defmodule Jido.Agent.DSL.Extension do
       path: [type: :string, required: true],
       handler: [type: :any, required: true],
       as: [type: :atom],
-      defaults: [type: :any, default: %{}],
-      emits: [type: :any]
+      defaults: [type: :any, default: %{}]
     ]
   }
   @routes %Spark.Dsl.Section{

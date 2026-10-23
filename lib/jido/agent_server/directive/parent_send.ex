@@ -1,5 +1,7 @@
-defmodule Jido.AgentServer.Directive.OwnerSend do
-  @moduledoc "Sends one Signal to the owning Agent activation."
+defmodule Jido.AgentServer.Directive.ParentSend do
+  @moduledoc """
+  Sends one Signal to the current parent Agent after commit.
+  """
 
   @schema Zoi.struct(
             __MODULE__,
@@ -7,7 +9,7 @@ defmodule Jido.AgentServer.Directive.OwnerSend do
             coerce: true
           )
 
-  @typedoc "A request to send one Signal to the owning Agent."
+  @typedoc "A request to send one Signal to the current parent Agent."
   @type t :: unquote(Zoi.type_spec(@schema))
   @enforce_keys Zoi.Struct.enforce_keys(@schema)
   defstruct Zoi.Struct.struct_fields(@schema)

@@ -65,14 +65,14 @@ defmodule Jido.Examples.DataDefinedAgent do
   @doc "Returns the application-owned references required by the stored document."
   def registry do
     Registry.new!(%{
-      "schemas/counter/v1" => {:schema, definition().schema},
-      "actions/add/v1" => {:action, Add},
-      "actions/schedule/v1" => {:action, ScheduleTick},
-      "plugins/count-turns/v1" => {:plugin, CountTurns},
-      "plugins/scheduler/v1" => {:plugin, Scheduler},
-      "atoms/retry-delay" => {:atom, :retry_delay_ms},
-      "atoms/turns" => {:atom, :turns},
-      "atoms/scheduler" => {:atom, :scheduler}
+      {"schemas/counter", 1} => {:schema, definition().schema},
+      {"actions/add", 1} => {:action, Add},
+      {"actions/schedule", 1} => {:action, ScheduleTick},
+      {"plugins/count-turns", 1} => {:plugin, CountTurns},
+      {"plugins/scheduler", 1} => {:plugin, Scheduler},
+      {"atoms/retry-delay", 1} => {:atom, :retry_delay_ms},
+      {"atoms/turns", 1} => {:atom, :turns},
+      {"atoms/scheduler", 1} => {:atom, :scheduler}
     })
   end
 

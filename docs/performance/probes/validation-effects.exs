@@ -40,7 +40,7 @@ probe_signal = Jido.Signal.new!("probe.owned", %{}, source: "/probe")
     probe_signal,
     %{},
     Jido.Agent.Plugin.specs(specs),
-    %{emits: nil}
+    %{}
   )
 
 IO.puts("Round 25: unchanged reducer output still transforms owned state from 1 to 2")

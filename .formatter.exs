@@ -7,6 +7,7 @@ agent_locals = [
   route: 1,
   route: 2,
   route: 3,
+  forward: 2,
   plugin: 1,
   plugin: 2,
   schema: 1,

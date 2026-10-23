@@ -313,12 +313,12 @@ defmodule Jido.Agent.Topology do
         {:ok, %{connection: connection, status: :unchecked, reason: :wildcard_coverage}}
       else
         with :ok <- accepted(destination, connection.path),
-             {:ok, status} <- produced(source, connection.path) do
+             :ok <- produced(source, connection.path) do
           {:ok,
            %{
              connection: connection,
-             status: status,
-             reason: if(status == :unchecked, do: :unknown_outputs, else: nil)
+             status: :unchecked,
+             reason: :unknown_outputs
            }}
         end
       end
@@ -348,39 +348,8 @@ defmodule Jido.Agent.Topology do
     end
   end
 
-  defp produced(:provider, _), do: {:ok, :unchecked}
-
-  defp produced(source, type) do
-    {types, unknown?} =
-      Enum.reduce(source.routes, {[], false}, fn route, {types, unknown?} ->
-        cond do
-          route.handler.kind == :pass_through and not Data.wildcard?(route.path) ->
-            {[route.path | types], unknown?}
-
-          route.emits == nil ->
-            {types, true}
-
-          true ->
-            {route.emits ++ types, unknown?}
-        end
-      end)
-
-    cond do
-      type in types ->
-        {:ok, :compatible}
-
-      unknown? ->
-        {:ok, :unchecked}
-
-      true ->
-        Error.fail(
-          :unproduced_type,
-          :from,
-          "Source contracts do not permit this connection type",
-          %{type: type, definition: source.name}
-        )
-    end
-  end
+  defp produced(:provider, _), do: :ok
+  defp produced(_source, _type), do: :ok
 
   @doc "Selects all declared output connections for one logical source and type."
   @spec connections_for(Jido.Agent.t(), endpoint(), String.t()) ::
@@ -403,6 +372,7 @@ defmodule Jido.Agent.Topology do
            :ok <- Error.at(Data.positive(count), :count),
            {:ok, initial} <- resolve_ref(member.initial_state, state),
            {:ok, schema} <- Jido.Agent.Validation.state_schema(child),
+           initial = Map.merge(child.initial_state, initial),
            {:ok, child_state} <- Error.at(Data.initialize(schema, initial), :initial_state),
            {:ok, _} <- bind(child, child_state) do
         {:ok, %{name: member.name, definition: child, count: count, state: child_state}}

@@ -17,6 +17,6 @@ tags are opaque. The [shared assertions](../support/agent_topology_assertions.ex
 contain only test setup and shutdown observation. Detailed recovery and
 runtime fault contracts stay in the AgentServer core contract tests.
 
-- `07_11`: direct output pipeline, pass-through/transform routes, exact contracts, and cleanup.
+- `07_11`: direct output pipeline, explicit forward/transform routes, and cleanup.
 - `07_12`: connection edits retain processes; File-backed thaw restores changed routing.
 - `07_09`: state-bound resize and two full File-backed hibernate/thaw cycles retain the portable topology snapshot and revision.

@@ -14,9 +14,9 @@ mix test test/authoring/agents --include authoring --seed 0
 The suite checks:
 
 - Exact equality across independent Maps, Agent structs, and Spark DSL, including defaults and order.
-- Action and Flow descriptors, inline Actions, transforms, and pass-through.
+- Action and Flow descriptors, inline Actions, transforms, and explicit forwards.
 - First-match input selection and explicit output connections.
-- Optional emission contracts and complete supplied result batches.
+- Portable forward targets and complete supplied result batches.
 - Immediate members, counted delivery, copied state inputs, and contract checks.
 - Shared provider registration, static data, DSL sections, and endpoint ownership.
 - Scheduling, Signal Bus, and Plugin-owned state contributions.

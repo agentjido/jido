@@ -2,27 +2,15 @@
 
 ## Overview
 
-When the code that builds a Signal and the Action that handles it define the
-data separately, they drift apart: the sender sends `qty`, the Action expects
-`quantity`, and the Turn fails at runtime. `Jido.SignalAction` puts both in
-one module. One schema validates the Signal data and the Action input.
+`Jido.SignalAction` defines a Signal input contract and an Action in one
+module. It can also define an output Signal contract for correlated replies.
 
-With a SignalAction, the sender and the route use the same module:
-
-```text
-{:ok, signal} = Typed.AddItem.new(%{sku: "tea"})   # validated Signal
-route Typed.AddItem                                # route path = "cart.item.add"
-```
-
-This Livebook builds a cart Agent with one typed route. Then it adds a typed
-quote request whose reply is built after the Agent commits.
-
-| A SignalAction gives you | Through |
+| Capability | API |
 | --- | --- |
-| Input contract | `type/0`, `new/2`, `new!/2`, `validate_data/1` |
-| Action | `run/2`, validated by `Jido.Exec` |
-| Typed reply | `reply/3`, when the module declares `output:` |
-| Route | `route MySignalAction`, with the path from the input type |
+| Input Signal | `type/0`, `new/2`, `new!/2`, `validate_data/1` |
+| Action | `run/2` |
+| Output Signal | `reply/3` |
+| Route | `route MySignalAction` |
 
 ## Install
 
@@ -30,11 +18,7 @@ quote request whose reply is built after the Agent commits.
 Mix.install([{:jido, "~> 3.0.0-beta.2"}])
 ```
 
-## Define A SignalAction
-
-A SignalAction needs `name`, a non-blank `description`, a positive `vsn`, and
-`input:` with the Signal `type` and `schema`. `input:` also accepts
-`default_source`, `dataschema`, and `datacontenttype`.
+## Define a Direct SignalAction
 
 ```elixir
 defmodule Typed.AddItem do
@@ -59,36 +43,17 @@ defmodule Typed.AddItem do
 end
 ```
 
-The input schema is also the Action's parameter schema, so `run/2` receives
-exactly the data that passed Signal validation.
-
-## Build Input Signals
-
-`new/2` validates data and builds the Signal. It runs nothing.
+`new/2` validates input data and builds a Signal. It runs no Action:
 
 ```elixir
 {:ok, signal} = Typed.AddItem.new(%{sku: "tea"})
-
 {signal.type, signal.source, signal.data}
 ```
 
-The result is `{"cart.item.add", "/guides/typed", %{quantity: 1, sku: "tea"}}`.
-The schema default set `quantity`, and `default_source` set the source.
+The result is
+`{"cart.item.add", "/guides/typed", %{quantity: 1, sku: "tea"}}`.
 
-Invalid data returns the Zoi issues and builds no Signal:
-
-```elixir
-{:error, issues} = Typed.AddItem.new(%{sku: 1})
-
-Enum.map(issues, & &1.message)
-```
-
-The result is `["invalid type: expected string"]`. `new!/2` raises instead.
-
-## Route By Module
-
-Name the module in `route`. The path comes from the input type, so the route
-and the Signal can't disagree.
+## Route by Module
 
 ```elixir
 defmodule Typed.Cart do
@@ -108,39 +73,22 @@ defmodule Typed.Cart do
     route Typed.AddItem, as: :add_item
   end
 end
+```
 
+The route path comes from `Typed.AddItem.type/0`. The SignalAction is also the
+handler. A direct Agent route must return the complete next Agent state.
+
+```elixir
 agent = Typed.Cart.instantiate!(id: "cart-1")
 {:ok, candidate, []} = Typed.Cart.cmd(agent, signal)
-
 candidate.state
 ```
 
 The result is `%{items: %{"tea" => 1}, quotes: 0}`.
 
-A module route accepts `as:` and `defaults:`. The generated helper builds the
-same Signal type:
+## Define a Reply Contract
 
-```elixir
-more = Typed.Cart.add_item_signal!(%{sku: "tea", quantity: 2})
-{:ok, candidate, []} = Typed.Cart.cmd(candidate, more)
-
-{more.type, candidate.state.items}
-```
-
-The result is `{"cart.item.add", %{"tea" => 3}}`.
-
-> #### Direct routes and `output:` {: .warning}
->
-> On a direct module route, `run/2` returns the complete Agent state, and
-> `Jido.Exec` validates that return value against the Action's output schema.
-> If the SignalAction declares `output:`, Jido checks your Agent state against
-> the reply schema and every Turn fails. Leave `output:` off SignalActions
-> that you route to directly. Route reply-producing SignalActions with `via:`,
-> shown below.
-
-## Typed Replies
-
-A SignalAction with `output:` turns a result into a validated reply Signal.
+Use `output:` when a SignalAction owns the output Signal shape:
 
 ```elixir
 defmodule Typed.PriceQuote do
@@ -166,81 +114,43 @@ defmodule Typed.PriceQuote do
 end
 ```
 
-Run it with `Jido.Exec.run/4` and build the reply with `reply/3`:
+`reply/3` owns output Signal construction and validation:
 
 ```elixir
 request = Typed.PriceQuote.new!(%{items: %{"tea" => 3}})
 {:ok, result} = Jido.Exec.run(Typed.PriceQuote, request.data)
-{:ok, reply} = Typed.PriceQuote.reply(request, result)
+{:ok, response} = Typed.PriceQuote.reply(request, result)
 
-{reply.type, reply.data, reply.id == request.id,
- reply.extensions["jidocausationid"] == request.id}
+{response.type, response.data,
+ response.extensions["jidocausationid"] == request.id}
 ```
 
-The result is `{"cart.quote.ready", %{total_cents: 1350}, false, true}`. The
-reply has its own `id`, keeps the request's trace, and records the request
-`id` as its causation.
+The result is
+`{"cart.quote.ready", %{total_cents: 1350}, true}`. The response has a new
+ID, keeps the request trace, and uses the request ID as its causation ID.
 
-`reply/3` validates the request data and the direct result map against their
-contracts. It rejects an Action output envelope and a request of the wrong
-type:
+## Use a Different Turn Handler
+
+A SignalAction with an output contract normally computes reply data, not an
+Agent state. Use the two-module route form when another Action handles the
+Agent Turn:
 
 ```elixir
-{:error, wrong_request} = Typed.PriceQuote.reply(signal, result)
-
-Exception.message(wrong_request)
-```
-
-The result is `"Request does not match the input Signal definition"`.
-`new/2` and `reply/3` build Signals. Neither one sends anything.
-
-## Route With via:
-
-To have an Agent accept a quote request, commit a state change, and only
-then compute and send the reply, route the request with `via:`:
-
-```text
-route Typed.PriceQuote, via: Typed.AcceptQuote
-```
-
-The path stays `"cart.quote.request"`, but the route runs `Typed.AcceptQuote`,
-a normal Agent Action. It counts the request and returns a Directive that
-carries it. A Plugin owns that Directive and runs the SignalAction after
-commit.
-
-```elixir
-defmodule Typed.RequestQuote do
-  defstruct [:request]
-  use Jido.Agent.Directive
-end
-
 defmodule Typed.AcceptQuote do
   use Jido.Action, name: "accept_quote", schema: Zoi.object(%{items: Zoi.any()})
 
   @impl true
   def run(_params, %{agent_state: state, signal: request}) do
-    {:ok, %{state | quotes: state.quotes + 1}, [%Typed.RequestQuote{request: request}]}
-  end
-end
-
-defmodule Typed.Quoting do
-  use Jido.Plugin
-
-  @impl true
-  def directives(_opts), do: [Typed.RequestQuote]
-
-  @impl true
-  def dispatch(_runtime, %Typed.RequestQuote{request: request}, context, _opts) do
     with {:ok, result} <- Jido.Exec.run(Typed.PriceQuote, request.data),
-         {:ok, reply} <- Typed.PriceQuote.reply(request, result) do
-      send(context.turn_context.reply_to, {:quote, reply})
-      :ok
+         {:ok, response} <- Typed.PriceQuote.reply(request, result) do
+      {:ok, %{state | quotes: state.quotes + 1},
+       [Jido.Agent.Directive.reply(response)]}
     end
   end
 end
 
 defmodule Typed.QuotingCart do
-  use Jido.Agent, name: "quoting_cart", extensions: [Typed.Quoting]
+  use Jido.Agent, name: "quoting_cart"
 
   agent do
     schema(
@@ -254,57 +164,51 @@ defmodule Typed.QuotingCart do
   routes do
     signal_source("/guides/typed")
     route Typed.AddItem, as: :add_item
-    route Typed.PriceQuote, via: Typed.AcceptQuote, as: :request_quote
+    route Typed.PriceQuote, Typed.AcceptQuote, as: :request_quote
   end
 end
-
-quoting = Typed.QuotingCart.instantiate!(id: "cart-2", state: %{items: %{"tea" => 3}})
-{:ok, accepted, [directive]} = Typed.QuotingCart.cmd(quoting, request)
-
-{accepted.state.quotes, directive.__struct__}
 ```
 
-The result is `{1, Typed.RequestQuote}`. `cmd/2` counted the request and
-returned the Directive. It priced nothing, because pure evaluation never runs
-Directives.
+The path still comes from `Typed.PriceQuote.type/0`, but the Turn runs
+`Typed.AcceptQuote`. The SignalAction is not run automatically.
 
-The Directive must have an owner. `Typed.Quoting` claims it in
-`directives/1`. Without an owning Plugin, the Turn fails with
-`"Agent Directive has no owner"`. [Custom Directives](plugin-custom-directives.livemd)
-covers ownership and dispatch.
+## Reply Rules
 
-`Typed.QuotingCart` lists the Plugin in `extensions:` because it needs no
-Agent-specific config. You can write `plugin(Typed.Quoting)` inside the
-`agent` block instead, including in a Livebook cell.
+`Jido.Agent.Directive.reply/1` is separate from `emit/1`:
+
+- a Reply is one response to the current requester;
+- `Typed.PriceQuote.reply/3` builds and validates the response Signal;
+- the response causation ID must equal the current request ID;
+- one Turn can return at most one Reply;
+- `cmd/3` returns the Reply as data and sends nothing; and
+- a live Agent Server sends the Reply only after commit.
 
 ## Run It Live
 
-Start the Agent and send the request. `reply_to:` in the caller context tells
-the Plugin where to send the reply.
-
 ```elixir
+quoting =
+  Typed.QuotingCart.instantiate!(
+    id: "cart-2",
+    state: %{items: %{"tea" => 3}}
+  )
+
 {:ok, _jido} = Jido.start()
 {:ok, cart} = Jido.start_agent(quoting)
 :ok = Jido.AgentServer.await_ready(cart)
 
-{:ok, committed, [_directive]} =
-  Jido.AgentServer.call(cart, request, context: %{reply_to: self()})
+{:ok, committed, [_reply]} = Jido.AgentServer.call(cart, request)
 
-reply =
+response =
   receive do
-    {:quote, reply} -> {reply.type, reply.data}
+    %Jido.Signal{} = response -> {response.type, response.data}
   after
     1_000 -> :no_reply
   end
 
-{committed.state.quotes, reply}
+{committed.state.quotes, response}
 ```
 
-The result is `{1, {"cart.quote.ready", %{total_cents: 1350}}}`.
-
-The Server committed `quotes: 1` and replied to your call before the Plugin
-priced the cart. If pricing fails, the committed state stays, and the failure
-appears in `Jido.AgentServer.status/2` under `last_effect_outcome`.
+The state commits before the response Signal is sent.
 
 ```elixir
 :ok = Jido.stop_agent(cart)
@@ -313,18 +217,14 @@ appears in `Jido.AgentServer.status/2` under `last_effect_outcome`.
 
 ## Summary
 
-- One SignalAction defines the input Signal, the Action, and an optional
-  typed reply.
-- `route MySignalAction` takes its path from the input type.
-- Direct routes return complete Agent state: leave `output:` off them.
-- `reply/3` builds a validated reply carrying the request's trace and
+- `route MySignalAction` uses the SignalAction as the handler.
+- `route MySignalAction, MyTurn` uses its Signal type and runs `MyTurn`.
+- `SignalAction.reply/3` owns response construction, validation, trace, and
   causation.
-- `via:` commits the state change first and defers the typed work to an owned
-  Directive.
+- `Jido.Agent.Directive.reply/1` requests one post-commit response.
 
 ## Next
 
-- [State and Directives](agent-results-and-directives.md) lists every result
-  shape and Directive.
-- [Custom Directives](plugin-custom-directives.livemd) covers Directive
-  ownership and dispatch.
+- [Routes and Handlers](build-agent-routes.livemd) explains every route form.
+- [State and Directives](agent-results-and-directives.md) compares `Reply`
+  with `Emit` and forwarding.

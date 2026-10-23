@@ -6,18 +6,16 @@ defmodule Jido.Agent.Route do
 
   def normalize(value, related? \\ true) do
     with {:ok, route} <-
-           Data.fields(value, [:path, :as, :defaults, :handler, :emits], %{
+           Data.fields(value, [:path, :as, :defaults, :handler], %{
              as: nil,
-             defaults: %{},
-             emits: nil
+             defaults: %{}
            }),
          :ok <- Error.at(Data.path(route[:path]), :path),
          :ok <- helper(route),
          :ok <- Error.at(Data.plain_map(route.defaults), :defaults),
          :ok <- Error.at(Data.static(route.defaults), :defaults),
          {:ok, handler} <- Error.at(handler(route[:handler], related?), :handler),
-         :ok <- defaults(handler, route.defaults),
-         :ok <- emissions(route.emits, handler, route.path) do
+         :ok <- defaults(handler, route.defaults) do
       {:ok, Map.put(route, :handler, handler)}
     end
   end
@@ -45,8 +43,11 @@ defmodule Jido.Agent.Route do
          do: {:ok, value}
   end
 
-  defp handler(%{kind: :pass_through} = value, _related?) do
-    Data.fields(value, [:kind])
+  defp handler(%{kind: :forward} = value, _related?) do
+    with {:ok, value} <- Data.fields(value, [:kind, :target]),
+         {:ok, target} <- forward_target(value[:target]) do
+      {:ok, %{value | target: target}}
+    end
   end
 
   defp handler(%{kind: kind} = value, related?) when kind in [:action, :flow] do
@@ -91,7 +92,7 @@ defmodule Jido.Agent.Route do
       Error.fail(
         :invalid_handler,
         [],
-        "Expected one Action, Flow, transform, or pass-through handler"
+        "Expected one Action, Flow, transform, or forward handler"
       )
 
   defp helper(%{as: nil}), do: :ok
@@ -117,36 +118,24 @@ defmodule Jido.Agent.Route do
   end
 
   defp defaults(%{kind: kind}, defaults)
-       when kind in [:transform, :pass_through] and map_size(defaults) > 0,
+       when kind in [:transform, :forward] and map_size(defaults) > 0,
        do: Error.fail(:invalid_defaults, :defaults, "Only Action and Flow routes accept defaults")
 
   defp defaults(_, _), do: :ok
 
-  defp emissions(nil, _, _), do: :ok
-
-  defp emissions(values, handler, path) do
-    with {:ok, _} <-
-           Error.at(
-             Data.list(values, fn type -> with :ok <- Data.exact(type), do: {:ok, type} end),
-             :emits
-           ),
-         :ok <- Error.at(Data.unique(values, & &1), :emits) do
-      cond do
-        handler.kind in [:transform, :pass_through] and values == [] ->
-          Error.fail(:empty_emissions, :emits, "This handler produces one output Signal")
-
-        handler.kind == :pass_through and (Data.wildcard?(path) or path not in values) ->
-          Error.fail(
-            :pass_through_contract,
-            :emits,
-            "A pass-through contract must include its unchanged exact input type"
-          )
-
-        true ->
-          :ok
-      end
+  defp forward_target(%{kind: :agent} = target) do
+    with {:ok, target} <- Data.fields(target, [:kind, :name]),
+         :ok <- Data.name(target[:name]) do
+      if target.name == :root,
+        do: Error.fail(:self_forward, [], "Forward cannot target the current Agent"),
+        else: {:ok, target}
     end
   end
+
+  defp forward_target(%{kind: :parent} = target), do: Data.fields(target, [:kind])
+
+  defp forward_target(_target),
+    do: Error.fail(:invalid_forward_target, [], "Forward requires agent(name) or parent()")
 
   def select(%{routes: routes}, type), do: select(routes, type)
 

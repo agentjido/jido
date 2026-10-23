@@ -135,7 +135,7 @@ defmodule Jido.Agent.DSL do
             routes:
               Enum.map(
                 E.get_entities(dsl, [:__routes__]),
-                &Map.take(&1, [:path, :handler, :as, :defaults, :emits])
+                &Map.take(&1, [:path, :handler, :as, :defaults])
               ),
             topology: Jido.Agent.DSL.Topology.lower(dsl),
             extensions: entries

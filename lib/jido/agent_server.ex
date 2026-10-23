@@ -71,6 +71,7 @@ defmodule Jido.AgentServer do
     Effects,
     Plugin,
     RegistrationGuard,
+    ReplyGate,
     TopologyRuntime
   }
 
@@ -86,9 +87,9 @@ defmodule Jido.AgentServer do
 
   defmodule Pending do
     @moduledoc false
-    @enforce_keys [:request_id, :owner]
+    @enforce_keys [:request_id, :owner, :reply_gate]
     @derive {Inspect, only: []}
-    defstruct [:request_id, :owner]
+    defstruct [:request_id, :owner, :reply_gate]
   end
 
   defmodule Store do
@@ -108,7 +109,11 @@ defmodule Jido.AgentServer do
   end
 
   @typedoc "An owner-bound handle for one submitted Turn result."
-  @opaque pending :: %Pending{request_id: :gen_statem.request_id(), owner: pid()}
+  @opaque pending :: %Pending{
+            request_id: :gen_statem.request_id(),
+            owner: pid(),
+            reply_gate: pid()
+          }
 
   @doc "Returns a child specification for OTP supervision."
   @spec child_spec(keyword()) :: Supervisor.child_spec()
@@ -588,7 +593,19 @@ defmodule Jido.AgentServer do
          timeout = Keyword.get(opts, :timeout, 5_000),
          :ok <- Core.validate_wait(timeout),
          {:ok, deadline} <- Core.admission_deadline(opts) do
-      :gen_statem.call(server, turn_event(signal, context, deadline), timeout)
+      reply_gate = ReplyGate.start(self(), server)
+
+      try do
+        result =
+          :gen_statem.call(server, turn_event(signal, context, deadline, reply_gate), timeout)
+
+        :ok = ReplyGate.open(reply_gate)
+        result
+      catch
+        kind, reason ->
+          ReplyGate.abandon(reply_gate)
+          :erlang.raise(kind, reason, __STACKTRACE__)
+      end
     end
   end
 
@@ -607,9 +624,13 @@ defmodule Jido.AgentServer do
     with {:ok, signal} <- Command.normalize_signal(signal),
          {:ok, context} <- Core.turn_context(opts, [:context, :admission_timeout]),
          {:ok, deadline} <- Core.admission_deadline(opts) do
+      reply_gate = ReplyGate.start(self(), server)
+
       %Pending{
-        request_id: :gen_statem.send_request(server, turn_event(signal, context, deadline)),
-        owner: self()
+        request_id:
+          :gen_statem.send_request(server, turn_event(signal, context, deadline, reply_gate)),
+        owner: self(),
+        reply_gate: reply_gate
       }
     end
   end
@@ -624,11 +645,12 @@ defmodule Jido.AgentServer do
   def cast(server, signal, opts \\ []) do
     with {:ok, signal} <- Command.normalize_signal(signal),
          {:ok, context} <- Core.turn_context(opts, [:context]) do
-      :gen_statem.cast(server, turn_event(signal, context, :infinity))
+      :gen_statem.cast(server, turn_event(signal, context, :infinity, nil))
     end
   end
 
-  defp turn_event(signal, context, deadline), do: {:turn, make_ref(), signal, context, deadline}
+  defp turn_event(signal, context, deadline, reply_gate),
+    do: {:turn, make_ref(), signal, context, deadline, reply_gate}
 
   @doc """
   Waits for a submitted turn and returns the same turn result as `call/3`.
@@ -642,16 +664,20 @@ defmodule Jido.AgentServer do
   @spec await(pending(), timeout()) :: signal_result()
   def await(pending, timeout \\ 5_000)
 
-  def await(%Pending{owner: owner, request_id: request_id}, timeout) when owner == self() do
+  def await(%Pending{owner: owner, request_id: request_id, reply_gate: reply_gate}, timeout)
+      when owner == self() do
     with :ok <- Core.validate_wait(timeout) do
       case :gen_statem.wait_response(request_id, timeout) do
         {:reply, result} ->
+          ReplyGate.open(reply_gate)
           result
 
         :timeout ->
           {:error, :timeout}
 
         {:error, {reason, _server}} ->
+          ReplyGate.abandon(reply_gate)
+
           {:error,
            Jido.Error.execution_error("Agent server stopped before the turn replied", %{
              reason: reason
@@ -669,7 +695,9 @@ defmodule Jido.AgentServer do
   Discards an already queued reply too. Do not await this handle again.
   """
   @spec abandon(pending()) :: :ok | {:error, term()}
-  def abandon(%Pending{owner: owner, request_id: request_id}) when owner == self() do
+  def abandon(%Pending{owner: owner, request_id: request_id, reply_gate: reply_gate})
+      when owner == self() do
+    ReplyGate.abandon(reply_gate)
     _response = :gen_statem.receive_response(request_id, 0)
     :ok
   end
@@ -1329,9 +1357,9 @@ defmodule Jido.AgentServer do
     {:keep_state_and_data, reply(from, result)}
   end
 
-  def handle_event(type, {:turn, _token, _signal, _context, _deadline}, phase, data)
+  def handle_event(type, {:turn, _token, _signal, _context, _deadline, reply_gate}, phase, data)
       when phase in [:restoring, :initializing],
-      do: reject_turn(type, :not_ready, data)
+      do: reject_turn(type, :not_ready, data, reply_gate)
 
   def handle_event({:call, from}, {:cancel, _id}, phase, _data)
       when phase in [:restoring, :initializing],
@@ -1524,15 +1552,23 @@ defmodule Jido.AgentServer do
     end
   end
 
-  def handle_event(type, {:turn, token, _signal, _context, _deadline}, _phase, data)
+  def handle_event(type, {:turn, token, _signal, _context, _deadline, reply_gate}, _phase, data)
       when data.admission_mode != :open do
     queued? = MapSet.member?(data.postponed, token)
     data = %{data | postponed: MapSet.delete(data.postponed, token)}
-    replies = if queued?, do: [], else: turn_rejection(type, :quiesced, data)
+
+    replies =
+      if queued? do
+        []
+      else
+        ReplyGate.done(reply_gate)
+        turn_rejection(type, :quiesced, data)
+      end
+
     {:keep_state, data, replies ++ [{:next_event, :internal, :control_progress}]}
   end
 
-  def handle_event(type, {:turn, token, signal, context, deadline}, :idle, data)
+  def handle_event(type, {:turn, token, signal, context, deadline, reply_gate}, :idle, data)
       when type == :cast or (is_tuple(type) and elem(type, 0) == :call) do
     data = %{
       data
@@ -1541,12 +1577,12 @@ defmodule Jido.AgentServer do
     }
 
     case Core.admission_status(deadline) do
-      :ok -> start_turn(type, signal, context, data)
-      {:error, reason} -> reject_turn(type, reason, data)
+      :ok -> start_turn(type, signal, context, data, :turn, reply_gate)
+      {:error, reason} -> reject_turn(type, reason, data, reply_gate)
     end
   end
 
-  def handle_event(type, {:turn, token, _signal, _context, deadline}, phase, data)
+  def handle_event(type, {:turn, token, _signal, _context, deadline, reply_gate}, phase, data)
       when phase in [
              :preparing,
              :starting,
@@ -1568,14 +1604,19 @@ defmodule Jido.AgentServer do
 
     case admission do
       {:error, reason} ->
-        reject_turn(type, reason, %{
-          data
-          | postponed: MapSet.delete(data.postponed, token),
-            queued_from: Map.delete(data.queued_from, token)
-        })
+        reject_turn(
+          type,
+          reason,
+          %{
+            data
+            | postponed: MapSet.delete(data.postponed, token),
+              queued_from: Map.delete(data.queued_from, token)
+          },
+          reply_gate
+        )
 
       :ok ->
-        postpone_turn(type, token, data)
+        postpone_turn(type, token, data, reply_gate)
     end
   end
 
@@ -1625,7 +1666,8 @@ defmodule Jido.AgentServer do
     runner = data.runner
 
     config =
-      Map.take(data, [
+      data
+      |> Map.take([
         :directive_handler,
         :max_directives_per_turn,
         :default_dispatch,
@@ -1639,6 +1681,7 @@ defmodule Jido.AgentServer do
         :runner,
         :partition
       ])
+      |> Map.put(:requester, active.requester)
 
     operation(:settle, data, fn -> settle_worker(runner, active, config) end)
   end
@@ -1917,7 +1960,7 @@ defmodule Jido.AgentServer do
     :ok
   end
 
-  defp start_turn(type, signal, context, data, mode \\ :turn) do
+  defp start_turn(type, signal, context, data, mode, reply_gate \\ nil) do
     data = cancel_idle(data)
 
     from =
@@ -1953,6 +1996,7 @@ defmodule Jido.AgentServer do
 
     active = %{
       from: from,
+      requester: reply_gate,
       span: span,
       signal_type: signal.type,
       outcome: nil,
@@ -2413,6 +2457,10 @@ defmodule Jido.AgentServer do
         data = %{data | error_count: data.error_count + 1}
         apply_failure_policy(put_in(data.active.result, {:error, error}))
 
+      {:reply, signal} ->
+        ReplyGate.deliver(data.active.requester, signal)
+        next_effect(update_in(data.active.effect_index, &(&1 + 1)))
+
       :continue ->
         next_effect(update_in(data.active.effect_index, &(&1 + 1)))
 
@@ -2593,7 +2641,7 @@ defmodule Jido.AgentServer do
     {:stop_and_reply, {:shutdown, :execution_lifecycle_failed}, replies, data}
   end
 
-  defp postpone_turn(type, token, data) do
+  defp postpone_turn(type, token, data, reply_gate \\ nil) do
     case Core.queue_decision(data.postponed, token, data.max_postponed_signals) do
       :duplicate ->
         {:keep_state_and_data, [:postpone]}
@@ -2602,7 +2650,8 @@ defmodule Jido.AgentServer do
         reject_turn(
           type,
           {:overloaded, %{limit: data.max_postponed_signals, postponed: count}},
-          data
+          data,
+          reply_gate
         )
 
       :accept ->
@@ -2616,8 +2665,10 @@ defmodule Jido.AgentServer do
     end
   end
 
-  defp reject_turn(type, reason, data),
-    do: {:keep_state, data, turn_rejection(type, reason, data)}
+  defp reject_turn(type, reason, data, reply_gate \\ nil) do
+    ReplyGate.done(reply_gate)
+    {:keep_state, data, turn_rejection(type, reason, data)}
+  end
 
   defp turn_rejection(:cast, reason, data) do
     Logger.warning("AgentServer cast dropped", agent_id: data.agent.id, reason: reason)
@@ -2892,7 +2943,8 @@ defmodule Jido.AgentServer do
           plugin_refs: data.plugin_refs,
           source_signal: active.source_signal,
           effective_signal: active.prepared.signal,
-          turn_context: active.turn_context
+          turn_context: active.turn_context,
+          requester: active.requester
         }
 
         operation(:effect, data, fn ->
@@ -2932,6 +2984,7 @@ defmodule Jido.AgentServer do
   defp finish_effects(data, status) do
     Process.cancel_timer(data.active.effect_timer)
     data = record_effects(data, status)
+    ReplyGate.done(data.active.requester)
     TraceContext.clear()
     idle_transition(%{data | active: nil})
   end
@@ -3033,6 +3086,7 @@ defmodule Jido.AgentServer do
   defp complete_terminal(data, decision) do
     if data.active.policy_timer, do: Process.cancel_timer(data.active.policy_timer)
     replies = reply(data.active.from, data.active.result) ++ cancel_replies(data.active, :ok)
+    ReplyGate.done(data.active.requester)
     TraceContext.clear()
     next = %{data | active: nil}
 

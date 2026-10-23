@@ -150,12 +150,12 @@ Full documentation is on [HexDocs](https://hexdocs.pm/jido). Start with:
 - Agent definitions from the `agent`/`routes` DSL, plain maps with optional
   static initial state through `Jido.Agent.define/1`, or portable definition
   JSON through `Jido.Authoring`. All three run the same validation.
-- Routes to Actions, Flows, transforms, and pass-through handlers, matched in
-  declaration order with exact types or `*` wildcards.
+- Routes to Actions, Flows, transforms, and explicit forward targets, matched
+  in declaration order with exact types or `*` wildcards.
 - Generated Signal constructors from `as:` and typed Signals with
   `Jido.SignalAction`.
-- Built-in Directives to emit Signals, send to other Agents, start and stop
-  Agents and processes, and stop the Server.
+- Built-in Directives to reply, emit Signals, send to other Agents, start and
+  stop Agents and processes, and stop the Server.
 - Nested Agents with counts and state bindings, connected by declared
   Signal routes.
 - Plugins that prepare input, own a state field, supervise runtime resources,

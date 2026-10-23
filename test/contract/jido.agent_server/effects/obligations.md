@@ -1,14 +1,16 @@
 ---
 modules:
+  - Jido.Agent.Directive.Reply
   - Jido.AgentServer.Directive
   - Jido.AgentServer.Directive.AgentSend
   - Jido.AgentServer.Directive.AgentStart
   - Jido.AgentServer.Directive.AgentStop
   - Jido.AgentServer.Directive.ErrorReport
-  - Jido.AgentServer.Directive.OwnerSend
+  - Jido.AgentServer.Directive.ParentSend
   - Jido.AgentServer.Directive.ProcessStart
   - Jido.AgentServer.Directive.ServerStop
   - Jido.AgentServer.Effects
+  - Jido.AgentServer.ReplyGate
   - Jido.Dispatch.Preparation
 ---
 
@@ -101,8 +103,8 @@ are internal. This component has no DSL.
 
 ### jido.agent_server.effects.I10 — Runtime Agent Directive handoff
 
-- **scope:** `Jido.AgentServer.Directive.AgentStart`, `AgentStop`, `AgentSend`, `OwnerSend`
-- **must:** Validate local Agent targets, start options, placement, and owner presence before commit. Reject remote start before commit. After commit, start or stop the named runtime Agent, send a Signal to it, or send a Signal to its owner in Directive order.
+- **scope:** `Jido.AgentServer.Directive.AgentStart`, `AgentStop`, `AgentSend`, `ParentSend`
+- **must:** Validate local Agent targets, start options, placement, and parent presence before commit. Reject remote start before commit. After commit, start or stop the named runtime Agent, send a Signal to it, or send a Signal to its parent in Directive order.
 - **why:** Runtime Agent requests need one admitted post-commit dispatch boundary.
 - **kind:** functional
 - **status:** active
@@ -121,4 +123,12 @@ are internal. This component has no DSL.
 - **must:** Document and type only the supported constructors, option sets, restart policies, and result records. Reject unknown or duplicate constructor options. Keep validation hooks and record schemas hidden. Keep `Jido.AgentServer.Effects` and `Jido.Dispatch.Preparation` internal. Do not add an effects DSL.
 - **why:** Agent code needs one stable way to request post-commit work without depending on the effect engine.
 - **kind:** functional
+- **status:** active
+
+### jido.agent_server.effects.I13 — Request-owned Reply delivery
+
+- **scope:** `Jido.Agent.Directive.Reply`, `Jido.AgentServer.call/3`, `Jido.AgentServer.submit/3`, `Jido.AgentServer.await/2`, `Jido.AgentServer.abandon/1`
+- **must:** Accept one correlated Reply only for a call or submission with a current request owner. Reject Reply from a cast before commit. Run Reply in Directive order after commit and deliver the unchanged Signal only to that request owner. Hold Reply Signals until the owner collects the turn result. An await timeout keeps them for a later await. Abandonment or a call timeout drops buffered and future Reply Signals without cancelling accepted work. Do not run Reply after an earlier effect fails.
+- **why:** An application reply and its turn result must have the same owner and disposal lifetime.
+- **kind:** ordering
 - **status:** active

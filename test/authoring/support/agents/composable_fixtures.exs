@@ -25,8 +25,8 @@ defmodule JidoTest.ComposableAgent.Worker do
 
   routes do
     signal_source "/worker"
-    route "work.request", JidoTest.ComposableAgent.Action, emits: ["work.done"]
-    route "plan.request", JidoTest.ComposableAgent.Flow, emits: ["work.request"]
+    route "work.request", JidoTest.ComposableAgent.Action
+    route "plan.request", JidoTest.ComposableAgent.Flow
   end
 end
 
@@ -51,22 +51,20 @@ defmodule JidoTest.ComposableAgent.Team do
 
   routes do
     signal_source "/team"
-    route "work.request", as: :request
-    route "plan.request", as: :plan
+    route "work.request", JidoTest.ComposableAgent.Action, as: :request
+    route "plan.request", JidoTest.ComposableAgent.Action, as: :plan
 
-    route "work.done", JidoTest.ComposableAgent.Action,
-      defaults: %{value: "done"},
-      emits: ["team.done"]
+    route "work.done", JidoTest.ComposableAgent.Action, defaults: %{value: "done"}
 
-    route "flow.request", JidoTest.ComposableAgent.Flow, emits: []
+    route "flow.request", JidoTest.ComposableAgent.Flow
 
-    route "external.request", emits: ["work.request"] do
+    route "external.request" do
       transform signal do
         {:ok, %{signal | type: "work.request"}}
       end
     end
 
-    route "external.clauses", emits: ["work.request"] do
+    route "external.clauses" do
       transform do
         %Jido.Signal{data: %{value: value}} = signal when is_binary(value) ->
           {:ok, %{signal | type: "work.request", data: %{value: String.trim(value)}}}
@@ -79,19 +77,19 @@ defmodule JidoTest.ComposableAgent.Team do
       end
     end
 
-    route "inline.request", emits: [] do
+    route "inline.request" do
       action %{value: _value}, schema: Zoi.object(%{value: Zoi.string()}), context: context do
         {:ok, context.agent_state}
       end
     end
 
-    route "inline.emit", emits: ["team.done"] do
+    route "inline.emit" do
       action _params, context: context do
         {:ok, context.agent_state, [emit("team.done", %{})]}
       end
     end
 
-    route "partial.request", emits: ["work.request"] do
+    route "partial.request" do
       transform %Jido.Signal{data: %{value: value}} = signal when is_binary(value) do
         {:ok, %{signal | type: "work.request"}}
       end
@@ -194,11 +192,10 @@ defmodule JidoTest.ComposableAgent.Named do
 
     route "work.request", JidoTest.ComposableAgent.Action,
       as: :work,
-      defaults: %{value: "default"},
-      emits: ["work.done"]
+      defaults: %{value: "default"}
 
-    route "plan.request", JidoTest.ComposableAgent.Flow, emits: []
-    route "pass.request", as: :pass
+    route "plan.request", JidoTest.ComposableAgent.Flow
+    route "pass.request", JidoTest.ComposableAgent.Action, as: :pass
     route "work.*", JidoTest.ComposableAgent.Action
   end
 end
@@ -207,7 +204,7 @@ defmodule JidoTest.ComposableAgent.ScheduleShort do
   use Jido.Agent, name: "schedule", extensions: [Jido.Plugin.Scheduler.DSL]
 
   routes do
-    route("work.request")
+    route("work.request", JidoTest.ComposableAgent.Action)
   end
 
   schedules do
@@ -223,7 +220,7 @@ defmodule JidoTest.ComposableAgent.ScheduleBlock do
   use Jido.Agent, name: "schedule", extensions: [Jido.Plugin.Scheduler.DSL]
 
   routes do
-    route("work.request")
+    route("work.request", JidoTest.ComposableAgent.Action)
   end
 
   schedules do

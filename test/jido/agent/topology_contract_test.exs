@@ -16,8 +16,8 @@ defmodule Jido.Agent.TopologyContractTest do
     end
 
     routes do
-      route "work.one"
-      route "work.two"
+      route "work.one", JidoTest.AgentContract.Return
+      route "work.two", JidoTest.AgentContract.Return
     end
   end
 
@@ -187,11 +187,11 @@ defmodule Jido.Agent.TopologyContractTest do
   end
 
   @tag obligation: "jido.agent.I28"
-  test "connection checks return exact compatible, unchecked, and rejected proofs" do
+  test "connection checks return unchecked and rejected proofs" do
     base =
       Agent.define!(%{
         name: "topology_checks",
-        routes: [%{path: "work.one", handler: %{kind: :pass_through}}],
+        routes: [%{path: "work.one", handler: %{kind: :action, target: F.Return}}],
         topology: %{agents: [%{name: :child, definition: Child}]}
       })
 
@@ -201,8 +201,8 @@ defmodule Jido.Agent.TopologyContractTest do
             [
               %{
                 connection: %{path: "work.one"},
-                status: :compatible,
-                reason: nil
+                status: :unchecked,
+                reason: :unknown_outputs
               }
             ]} = Topology.checks(compatible)
 
@@ -240,26 +240,6 @@ defmodule Jido.Agent.TopologyContractTest do
               code: :unaccepted_type,
               details: %{type: "missing", definition: "topology_contract_child"}
             }} = Topology.checks(bad_destination)
-
-    closed_source =
-      Agent.define!(%{
-        name: "closed_source",
-        routes: [
-          %{path: "work.one", handler: %{kind: :action, target: F.Return}, emits: []}
-        ],
-        topology: %{agents: [%{name: :child, definition: Child}]}
-      })
-
-    unproduced = %{
-      closed_source
-      | topology: %{closed_source.topology | connections: [edge("work.one", :child)]}
-    }
-
-    assert {:error,
-            %Agent.Error{
-              code: :unproduced_type,
-              details: %{type: "work.one", definition: "closed_source"}
-            }} = Topology.checks(unproduced)
   end
 
   @tag obligation: "jido.agent.I28"
@@ -269,7 +249,7 @@ defmodule Jido.Agent.TopologyContractTest do
     definition =
       Agent.define!(%{
         name: "provider_endpoints",
-        routes: [%{path: "work.one", handler: %{kind: :pass_through}}],
+        routes: [%{path: "work.one", handler: %{kind: :action, target: F.Return}}],
         extensions: [contribution],
         topology: %{
           agents: [%{name: :child, definition: Child}],
@@ -296,7 +276,7 @@ defmodule Jido.Agent.TopologyContractTest do
         }
       })
 
-    assert {:ok, [%{status: :unchecked}, %{status: :compatible}, %{status: :unchecked}]} =
+    assert {:ok, [%{status: :unchecked}, %{status: :unchecked}, %{status: :unchecked}]} =
              Topology.checks(definition)
 
     assert {:error, %Agent.Error{code: :unknown_endpoint}} =
@@ -320,7 +300,7 @@ defmodule Jido.Agent.TopologyContractTest do
   test "invalid endpoint and delivery values fail at the final topology boundary" do
     base = %{
       name: "invalid_connections",
-      routes: [%{path: "work.one", handler: %{kind: :pass_through}}],
+      routes: [%{path: "work.one", handler: %{kind: :action, target: F.Return}}],
       topology: %{agents: [%{name: :child, definition: Child}]}
     }
 
@@ -342,7 +322,7 @@ defmodule Jido.Agent.TopologyContractTest do
     base =
       Agent.define!(%{
         name: "connection_selection",
-        routes: [%{path: "work.*", handler: %{kind: :pass_through}}],
+        routes: [%{path: "work.*", handler: %{kind: :action, target: F.Return}}],
         topology: %{
           agents: [
             %{name: :one, definition: Child},
@@ -414,6 +394,39 @@ defmodule Jido.Agent.TopologyContractTest do
               path: [:topology, :agents, 0],
               details: %{key: :copies}
             }} = Topology.bind(definition, %{value: "seed"})
+  end
+
+  @tag obligation: "jido.agent.I30"
+  test "binding starts with the child definition initial state and applies member overrides" do
+    initialized_child =
+      Agent.define!(%{
+        name: "topology_contract_initialized_child",
+        schema:
+          Zoi.object(%{
+            count: Zoi.integer() |> Zoi.default(0),
+            label: Zoi.string() |> Zoi.default("schema")
+          }),
+        initial_state: %{count: 4, label: "definition"}
+      })
+
+    definition =
+      Agent.define!(%{
+        name: "topology_definition_initial_state",
+        topology: %{
+          agents: [
+            %{name: :default, definition: initialized_child},
+            %{
+              name: :overridden,
+              definition: initialized_child,
+              initial_state: %{label: "member"}
+            }
+          ]
+        }
+      })
+
+    assert {:ok, [default, overridden]} = Topology.bind(definition, %{})
+    assert default.state == %{count: 4, label: "definition"}
+    assert overridden.state == %{count: 4, label: "member"}
   end
 
   @tag obligation: ["jido.agent.I28", "jido.agent.I30"]

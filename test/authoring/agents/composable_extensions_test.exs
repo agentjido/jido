@@ -55,7 +55,7 @@ defmodule Jido.AgentExtensionsAuthoringTest do
     Agent.define(%{name: "extended", routes: routes, extensions: [contribution(provider, data)]})
   end
 
-  defp pass(type), do: %{path: type, handler: %{kind: :pass_through}}
+  defp action(type), do: %{path: type, handler: %{kind: :action, target: Action}}
 
   test "full extension DSL data equals an independently written Map in provider order" do
     expected = [
@@ -81,7 +81,7 @@ defmodule Jido.AgentExtensionsAuthoringTest do
     assert {:ok, from_map} =
              Agent.define(%{
                name: "extended",
-               routes: [pass("plan.request"), pass("work.request")],
+               routes: [action("plan.request"), action("work.request")],
                extensions: expected
              })
 
@@ -110,7 +110,7 @@ defmodule Jido.AgentExtensionsAuthoringTest do
     }
 
     assert short.extensions === [contribution(Scheduling, expected)]
-    assert {:ok, from_map} = define(Scheduling, expected, [pass("work.request")])
+    assert {:ok, from_map} = define(Scheduling, expected, [action("work.request")])
     assert from_map.extensions === short.extensions
   end
 
@@ -217,32 +217,32 @@ defmodule Jido.AgentExtensionsAuthoringTest do
         ] do
       assert {:error, %Error{}} =
                define(Scheduling, %{schedules: [%{valid | timing: timing}]}, [
-                 pass("work.request")
+                 action("work.request")
                ])
     end
 
     assert {:error, %Error{code: :duplicate}} =
-             define(Scheduling, %{schedules: [valid, valid]}, [pass("work.request")])
+             define(Scheduling, %{schedules: [valid, valid]}, [action("work.request")])
 
     assert {:error, %Error{code: :schedule_input}} = define(Scheduling, %{schedules: [valid]})
 
     assert {:error, %Error{}} =
              define(Scheduling, %{schedules: [%{valid | signal: %{type: "work.*"}}]}, [
-               pass("work.request")
+               action("work.request")
              ])
 
     assert {:error, %Error{}} =
              define(
                Scheduling,
                %{schedules: [%{valid | signal: %{type: "work.request", id: "live"}}]},
-               [pass("work.request")]
+               [action("work.request")]
              )
 
     assert {:ok, definition} =
              define(
                Scheduling,
                %{schedules: [%{valid | timing: %{kind: :cron, expression: "* * * * *"}}]},
-               [pass("work.request")]
+               [action("work.request")]
              )
 
     assert hd(hd(definition.extensions).data.schedules).timing.timezone == "Etc/UTC"
@@ -256,7 +256,7 @@ defmodule Jido.AgentExtensionsAuthoringTest do
         ] do
       assert_raise Spark.Error.DslError, fn ->
         Compiler.compile(
-          "routes do route \"work.request\" end\nschedules do #{block} end",
+          "routes do route \"work.request\", JidoTest.ComposableAgent.Action end\nschedules do #{block} end",
           "name: \"bad\",extensions: [Jido.Plugin.Scheduler.DSL]"
         )
       end
@@ -389,13 +389,12 @@ defmodule Jido.AgentExtensionsAuthoringTest do
 
       assert Enum.all?(
                definition.routes,
-               &(&1.handler.kind in [:action, :flow, :transform, :pass_through])
+               &(&1.handler.kind in [:action, :flow, :transform, :forward])
              )
     end
 
     alice = JidoTest.ComposableAgent.Definitions.Alice.definition()
     assert alice.topology == %{agents: [], connections: []}
-    assert hd(alice.routes).emits == ["alice.greeting.produced"]
   end
 
   test "runtime Plugins and Spark extensions use one stored contribution format" do

@@ -45,9 +45,9 @@ route table as the command boundary.
 - [Source](route_selection.ex)
 - [Tests](../../../test/examples/01_basic/01_06_route_selection/route_selection_test.exs)
 
-Pass-through and transform routes are shown in
+Forward and transform routes are shown in
 [Direct Connections](../../07_topology/07_11_direct_connections/README.md).
-They emit Signals rather than changing domain state. Routes select the first
-match; output connections select all matching edges.
+They produce explicit Directives rather than changing domain state. Routes
+select the first match; output connections select all matching edges.
 
 Previous: [Typed Command Agent](../01_02_typed_command_agent/README.md) | Next: [Plugin State Agent](../01_03_plugin_state_agent/README.md)

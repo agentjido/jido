@@ -7,14 +7,19 @@ defmodule JidoTest.Examples.Topology.DirectConnectionsTest do
 
   test "outputs travel root to worker to sink to root in separate commits", %{jido: jido} do
     server = start_topology(jido, Example)
-    assert {:ok, signal} = Example.request_signal(%{value: 3})
+
+    signal =
+      Jido.Signal.new!("examples.topology.pipeline.request", %{value: 3},
+        source: "/examples/topology/direct_connections"
+      )
+
     assert {:ok, unchanged, [_]} = Server.call(server, signal)
     assert unchanged.state.completed == 0
     eventually(fn -> Server.agent(server).state.completed == 6 end)
     assert Server.snapshot(server).state_version == 2
     assert Enum.all?(members(server), &(Server.snapshot(&1).state_version == 1))
     assert {:ok, checks} = Jido.Agent.Topology.checks(Example.definition())
-    assert Enum.all?(checks, &(&1.status == :compatible))
+    assert Enum.all?(checks, &(&1.status == :unchecked))
     stop_topology(server)
     assert Jido.agent_count(jido) == 0
   end
@@ -30,6 +35,6 @@ defmodule JidoTest.Examples.Topology.DirectConnectionsTest do
                )
              ])
 
-    assert length(definition.topology.connections) == 3
+    assert length(definition.topology.connections) == 2
   end
 end

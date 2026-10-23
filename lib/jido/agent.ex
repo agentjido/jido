@@ -98,11 +98,17 @@ defmodule Jido.Agent do
 
   The `agent` section accepts `schema`, `metadata`, and `plugin`. The `routes`
   section accepts `signal_source` and ordered `route` declarations. A route can
-  use an Action or Flow module, an inline `action` or `transform`, a
-  `Jido.SignalAction` module, or no handler for pass-through. Route options are
-  `:as`, `:defaults`, `:emits`, and `:via`; `:via` is only for a
-  `Jido.SignalAction` route. An `:as` value must start with a lowercase letter
-  and contain only lowercase letters, digits, and underscores.
+  use an Action or Flow module, an inline `action` or `transform`, or a
+  `Jido.SignalAction` module. `route SignalAction, Handler` uses the
+  SignalAction input type with another Action or Flow. A string route must have
+  a handler. Route options are `:as` and `:defaults`. An `:as` value must start
+  with a lowercase letter and contain only lowercase letters, digits, and
+  underscores.
+
+  `forward "work.request", to: agent(:worker)` forwards the unchanged Signal
+  to one declared Agent member. `forward "work.completed", to: parent()`
+  forwards it to the current parent Agent. Forward destinations are portable
+  definition data. They do not contain process or transport values.
 
   The `topology` section accepts named `agent` members and a `connections`
   section with `connect` declarations. `state/1` creates a reference to one

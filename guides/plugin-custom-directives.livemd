@@ -130,7 +130,7 @@ end
   `Jido.Plugin.DirectiveContext`: Turn ID, Agent ID, source Signal, committed
   revision, this Plugin's committed state, and the caller's Turn context.
 - `prepare_dispatch/4` sees every outbound Signal from `Emit`, `AgentSend`,
-  and `OwnerSend`, with a `Jido.Plugin.SignalContext` that includes the
+  and `ParentSend`, with a `Jido.Plugin.SignalContext` that includes the
   target.
 
 ## Define the Agent

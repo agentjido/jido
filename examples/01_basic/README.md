@@ -25,4 +25,4 @@ The examples use deterministic local processes. They need no credentials or
 network access. Durable recovery, external services, and multi-agent systems
 belong to later sections.
 
-See [all examples](../README.md), [the matching test guide](../../test/examples/01_basic/README.md), and [migration guidance](../../guides/migration.md).
+See [all examples](../README.md), [the matching test guide](../../test/examples/01_basic/README.md), and [migration guidance](../../guides/v2-to-v3-migration.md).

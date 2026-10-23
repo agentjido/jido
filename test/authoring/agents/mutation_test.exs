@@ -9,8 +9,8 @@ defmodule Jido.Agent.MutationAuthoringTest do
     use Jido.Agent, name: "equivalent"
 
     routes do
-      route "first"
-      route "second", JidoTest.AgentEvolutionFixtures.Work, defaults: %{value: 1}, emits: []
+      route "first", JidoTest.AgentEvolutionFixtures.Work
+      route "second", JidoTest.AgentEvolutionFixtures.Work, defaults: %{value: 1}
     end
 
     topology do
@@ -26,12 +26,11 @@ defmodule Jido.Agent.MutationAuthoringTest do
         name: "equivalent",
         module: Authored,
         routes: [
-          %{path: "first", handler: %{kind: :pass_through}},
+          %{path: "first", handler: %{kind: :action, target: F.Work}},
           %{
             path: "second",
             handler: %{kind: :action, target: F.Work},
-            defaults: %{value: 1},
-            emits: []
+            defaults: %{value: 1}
           }
         ],
         topology: %{agents: [%{name: :worker, definition: F.Worker}], connections: []}
@@ -41,8 +40,8 @@ defmodule Jido.Agent.MutationAuthoringTest do
 
     assert {:ok, mutated, _} =
              Agent.mutate(empty, [
-               D.route_add("first"),
-               D.route_add("second", F.Work, defaults: %{value: 1}, emits: []),
+               D.route_add("first", F.Work),
+               D.route_add("second", F.Work, defaults: %{value: 1}),
                D.agent_add(:worker, F.Worker)
              ])
 
@@ -52,7 +51,7 @@ defmodule Jido.Agent.MutationAuthoringTest do
 
   test "mutated definitions and instances retain exact JSON round trips" do
     assert {:ok, agent, _} =
-             Agent.mutate(F.agent(), [D.route_add("new"), D.agent_add(:worker, F.Worker)])
+             Agent.mutate(F.agent(), [D.route_add("new", F.Work), D.agent_add(:worker, F.Worker)])
 
     for value <- [agent, Agent.definition(agent)] do
       registry = JidoTest.AgentRegistry.for(value)

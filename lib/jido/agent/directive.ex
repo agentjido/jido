@@ -27,7 +27,7 @@ defmodule Jido.Agent.Directive do
   it needs another validation rule.
   """
 
-  alias __MODULE__.Emit
+  alias __MODULE__.{Emit, Reply}
   alias Jido.AgentServer.Directive, as: Runtime
 
   alias Jido.AgentServer.Directive.{
@@ -35,7 +35,7 @@ defmodule Jido.Agent.Directive do
     AgentStart,
     AgentStop,
     ErrorReport,
-    OwnerSend,
+    ParentSend,
     ProcessStart,
     ServerStop
   }
@@ -76,11 +76,12 @@ defmodule Jido.Agent.Directive do
 
   @built_ins [
     Emit,
+    Reply,
     AgentSend,
     AgentStart,
     AgentStop,
     ErrorReport,
-    OwnerSend,
+    ParentSend,
     ProcessStart,
     ServerStop
   ]
@@ -105,18 +106,21 @@ defmodule Jido.Agent.Directive do
   @doc "Validates one built-in or custom Agent Directive."
   @spec validate(struct()) :: {:ok, struct()} | {:error, term()}
   def validate(%{__struct__: module, signal: %Signal{} = signal} = directive)
-      when module in [Emit, OwnerSend, AgentSend] do
+      when module in [Emit, Reply, ParentSend, AgentSend] do
     with {:ok, signal} <- Zoi.parse(Signal.schema(), signal),
-         {:ok, extensions} <- SignalContext.normalize(signal.extensions) do
-      directive
-      |> Map.from_struct()
-      |> Map.put(:signal, %{signal | extensions: extensions})
-      |> then(&Zoi.parse(module.schema(), &1))
+         {:ok, extensions} <- SignalContext.normalize(signal.extensions),
+         {:ok, directive} <-
+           directive
+           |> Map.from_struct()
+           |> Map.put(:signal, %{signal | extensions: extensions})
+           |> then(&Zoi.parse(module.schema(), &1)),
+         :ok <- validate_reply_causation(directive) do
+      {:ok, directive}
     end
   end
 
   def validate(%{__struct__: module} = directive)
-      when module in [Emit, OwnerSend, AgentSend] do
+      when module in [Emit, Reply, ParentSend, AgentSend] do
     {:error,
      Jido.Error.validation_error("Agent Signal Directive requires a Jido.Signal",
        details: %{directive: directive}
@@ -197,6 +201,10 @@ defmodule Jido.Agent.Directive do
 
   def emit(%Signal{} = signal, dispatch), do: %Emit{signal: signal, dispatch: dispatch}
 
+  @doc "Creates one correlated response request. It does not dispatch the Signal."
+  @spec reply(Signal.t()) :: Reply.t()
+  def reply(%Signal{} = signal), do: %Reply{signal: signal}
+
   @doc "Replaces the complete topology data."
   @spec topology_set(map()) :: __MODULE__.TopologySet.t()
   def topology_set(topology), do: %__MODULE__.TopologySet{topology: topology}
@@ -231,11 +239,11 @@ defmodule Jido.Agent.Directive do
 
   @doc "Adds one Agent route."
   @spec route_add(String.t(), map(), keyword()) :: __MODULE__.RouteAdd.t()
-  def route_add(path, handler \\ %{kind: :pass_through}, opts \\ []),
+  def route_add(path, handler, opts \\ []),
     do:
       struct!(
         __MODULE__.RouteAdd,
-        mutation_options(opts, [:as, :defaults, :emits]) ++ [path: path, handler: handler]
+        mutation_options(opts, [:as, :defaults]) ++ [path: path, handler: handler]
       )
 
   @doc "Updates selected fields of one Agent route."
@@ -248,7 +256,7 @@ defmodule Jido.Agent.Directive do
     do:
       struct!(
         __MODULE__.RouteReplace,
-        mutation_options(opts, [:as, :defaults, :emits]) ++ [path: path, handler: handler]
+        mutation_options(opts, [:as, :defaults]) ++ [path: path, handler: handler]
       )
 
   @doc "Removes one Agent route."
@@ -327,4 +335,19 @@ defmodule Jido.Agent.Directive do
 
     Keyword.validate!(opts, allowed)
   end
+
+  defp validate_reply_causation(%Reply{signal: signal} = directive) do
+    case Signal.get_context(signal, "jidocausationid") do
+      value when is_binary(value) and value != "" ->
+        :ok
+
+      _value ->
+        {:error,
+         Jido.Error.validation_error("Agent Reply Directive requires Signal causation",
+           details: %{directive: directive}
+         )}
+    end
+  end
+
+  defp validate_reply_causation(_directive), do: :ok
 end

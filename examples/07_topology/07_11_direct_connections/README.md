@@ -4,9 +4,9 @@ Explicit outputs form a local root → worker → sink → root pipeline.
 
 ## What you will learn
 
-- How connections route outputs between named Agents.
-- How pass-through and transform routes emit Signals without an Action.
-- How `emits` and destination routes permit exact connection checks.
+- How an explicit forward sends the request to a named Agent.
+- How connections route new outputs between named Agents.
+- How a transform creates a receipt Signal without an Action.
 
 ## Read the code
 
@@ -25,21 +25,20 @@ Expected result: the request commits at the root, the worker doubles its value, 
 
 ```elixir
 connections do
-  connect "examples.topology.pipeline.request", from: :root, to: :worker
   connect "examples.topology.pipeline.completed", from: :worker, to: :sink
   connect "examples.topology.pipeline.receipt", from: :sink, to: :root
 end
 ```
 
-An Action emits with `Jido.Agent.Directive.emit/1`. A pass-through route emits
-the unchanged Signal. A transform route returns `{:ok, signal}` or an error.
-Accepting input in an ordinary Action does not automatically emit output.
+The root uses `forward "examples.topology.pipeline.request", to: agent(:worker)`.
+An Action emits with `Jido.Agent.Directive.emit/1`. A transform route returns
+`{:ok, signal}` or an error. Accepting input in an ordinary Action does not
+automatically emit output.
 
 Routes select the first matching handler. Connections select all matching
 edges for the logical source and output type. Use distinct request and result
-types to avoid an unintended cycle. Exact contracts can be `:compatible`;
-wildcards or unknown output contracts can remain `:unchecked`. This is not a
-proof that every runtime payload is accepted.
+types to avoid an unintended cycle. Jido checks that destinations accept the
+Signal type. Output production remains `:unchecked`.
 
 The root call confirms its own commit. Every destination commits a separate
 Turn. Delivery uses best-effort casts; there is no pipeline transaction or

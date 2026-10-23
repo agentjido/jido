@@ -195,7 +195,7 @@ callbacks that the Plugin implements.
 | `await_ready/2` | Agent Server | After all runtime roots start, before the first Turn. |
 | `after_commit/3` | Agent Server | After each commit, before Directives. |
 | `dispatch/4` | Agent Server | After commit, once per owned Directive. |
-| `prepare_dispatch/4` | Agent Server | Before each outbound Signal from `Emit`, `AgentSend`, or `OwnerSend`. |
+| `prepare_dispatch/4` | Agent Server | Before each outbound Signal from `Emit`, `AgentSend`, or `ParentSend`. |
 | `quiesce/2`, `resume/2` | Agent Server | Around a live change to this Plugin. |
 | `dump/3`, `load/3` | Persistence | When owned state is saved and restored. |
 

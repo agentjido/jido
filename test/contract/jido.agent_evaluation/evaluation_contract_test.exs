@@ -2,7 +2,12 @@ defmodule JidoTest.Contract.AgentEvaluationTest do
   use Covenant.Case, component: "jido.agent_evaluation", async: true
   alias Jido.Agent
   alias Jido.Agent.{Command, Directive, Runner, Turn}
+  alias Jido.Signal
   alias JidoTest.AgentContract, as: F
+
+  defmodule ForwardChild do
+    use Jido.Agent, name: "evaluation_forward_child"
+  end
 
   defp route(path, target, opts \\ []),
     do: Map.merge(%{path: path, handler: %{kind: :action, target: target}}, Map.new(opts))
@@ -196,7 +201,7 @@ defmodule JidoTest.Contract.AgentEvaluationTest do
     assert {:error, _} =
              Agent.cmd(source, F.signal(%{directives: [%Directive.Emit{signal: :invalid}]}))
 
-    change = Directive.route_add("next")
+    change = Directive.route_add("next", F.Return)
     output = %{source.state | count: 2}
 
     assert {:ok, candidate, [^change]} =
@@ -207,6 +212,39 @@ defmodule JidoTest.Contract.AgentEvaluationTest do
     assert source.state.count == 0
 
     refute_received {:signal, _}
+  end
+
+  @tag obligation: "jido.agent_evaluation.I7"
+  test "one Reply must identify the current request as its cause" do
+    source = F.instance()
+    request = F.signal()
+    output = F.signal(%{}, "reply.done")
+    {:ok, correlated} = Signal.put_context(output, "jidocausationid", request.id)
+    reply = Directive.reply(correlated)
+
+    assert {:ok, ^source, [^reply]} =
+             Agent.cmd(source, %{request | data: %{directives: [reply]}})
+
+    {:ok, wrong} = Signal.put_context(output, "jidocausationid", "other-request")
+
+    assert {:error,
+            %Jido.Error.ValidationError{
+              details: %{
+                request_id: request_id,
+                causation_id: "other-request",
+                reply_id: reply_id
+              }
+            }} =
+             Agent.cmd(source, %{
+               request
+               | data: %{directives: [Directive.reply(wrong)]}
+             })
+
+    assert request_id == request.id
+    assert reply_id == wrong.id
+
+    assert {:error, %Jido.Error.ValidationError{details: %{count: 2}}} =
+             Agent.cmd(source, %{request | data: %{directives: [reply, reply]}})
   end
 
   @tag obligation: "jido.agent_evaluation.I9"
@@ -240,15 +278,8 @@ defmodule JidoTest.Contract.AgentEvaluationTest do
   end
 
   @tag obligation: ["jido.agent_evaluation.I7", "jido.agent_evaluation.I9"]
-  test "emission requests normalize once and obey the selected route contract" do
-    allowed =
-      F.instance(
-        signal_source: "/contract",
-        routes: [route("test.run", F.Return, emits: ["effect.allowed"])]
-      )
-
-    denied =
-      F.instance(signal_source: "/contract", routes: [route("test.run", F.Return, emits: [])])
+  test "emission requests normalize once without a route output contract" do
+    source = F.instance(signal_source: "/contract")
 
     signal = F.signal(%{value: 1}, "effect.allowed")
 
@@ -256,34 +287,26 @@ defmodule JidoTest.Contract.AgentEvaluationTest do
       Directive.emit("effect.allowed", %{value: 1}),
       %{kind: :emit, signal: signal},
       Directive.emit(signal),
-      Jido.AgentServer.Directive.owner_send(signal),
+      Jido.AgentServer.Directive.parent_send(signal),
       Jido.AgentServer.Directive.agent_send(:child, signal)
     ]
 
     for request <- requests do
-      assert {:ok, _, [_]} = Agent.cmd(allowed, F.signal(%{directives: [request]}))
-
-      assert {:error,
-              %Agent.Error{
-                code: :undeclared_emission,
-                path: [0, :emits],
-                details: %{type: "effect.allowed", route: "test.run"}
-              }} =
-               Agent.cmd(denied, F.signal(%{directives: [request]}))
+      assert {:ok, _, [_]} = Agent.cmd(source, F.signal(%{directives: [request]}))
     end
 
     assert {:ok, _, [%Directive.Emit{signal: output}]} =
              Agent.cmd(
-               allowed,
+               source,
                F.signal(%{directives: [Directive.emit("effect.allowed", %{value: 1})]})
              )
 
     assert output.type == "effect.allowed"
-    assert output.source == allowed.signal_source
+    assert output.source == source.signal_source
     assert output.data == %{value: 1}
 
     assert {:ok, _, [%Directive.RouteAdd{}]} =
-             Agent.cmd(denied, F.signal(%{directives: [Directive.route_add("next")]}))
+             Agent.cmd(source, F.signal(%{directives: [Directive.route_add("next", F.Return)]}))
 
     for {request, code} <- [
           {%{kind: :emit, type: "effect.allowed", data: %{}, unknown: true}, :unknown_fields},
@@ -291,7 +314,7 @@ defmodule JidoTest.Contract.AgentEvaluationTest do
           {%{kind: :emit, signal: %{type: "effect.allowed"}}, :invalid_directive}
         ] do
       assert {:error, %Agent.Error{code: ^code, path: [0]}} =
-               Agent.cmd(allowed, F.signal(%{directives: [request]}))
+               Agent.cmd(source, F.signal(%{directives: [request]}))
     end
 
     for request <- [%{signal: signal}, %{type: "effect.allowed", data: %{}}] do
@@ -302,14 +325,14 @@ defmodule JidoTest.Contract.AgentEvaluationTest do
                   callback: :execute,
                   directive: ^request
                 }
-              }} = Agent.cmd(allowed, F.signal(%{directives: [request]}))
+              }} = Agent.cmd(source, F.signal(%{directives: [request]}))
     end
 
     invalid_signal = %{signal | type: nil}
 
     assert {:error, %Agent.Error{code: :invalid_signal, path: [0], details: %{issues: issues}}} =
              Agent.cmd(
-               allowed,
+               source,
                F.signal(%{directives: [%{kind: :emit, signal: invalid_signal}]})
              )
 
@@ -317,25 +340,15 @@ defmodule JidoTest.Contract.AgentEvaluationTest do
   end
 
   @tag obligation: ["jido.agent_evaluation.I1", "jido.agent_evaluation.I4"]
-  test "pass-through and transform routes produce one Signal without rerouting" do
+  test "transform routes produce one Signal without rerouting" do
     input = F.signal(%{value: 1})
-
-    pass =
-      F.instance(
-        routes: [
-          %{path: "test.run", handler: %{kind: :pass_through}, emits: ["test.run"]}
-        ]
-      )
-
-    assert {:ok, ^pass, [%Directive.Emit{signal: ^input}]} = Agent.cmd(pass, input)
 
     transform =
       F.instance(
         routes: [
           %{
             path: "test.run",
-            handler: %{kind: :transform, target: {__MODULE__, :transform, 1}},
-            emits: ["effect.transformed"]
+            handler: %{kind: :transform, target: {__MODULE__, :transform, 1}}
           },
           route("effect.transformed", F.Add)
         ]
@@ -372,6 +385,38 @@ defmodule JidoTest.Contract.AgentEvaluationTest do
                  } = error
       end
     end
+  end
+
+  @tag obligation: ["jido.agent_evaluation.I1", "jido.agent_evaluation.I4"]
+  test "forward routes return the unchanged Signal in one explicit Directive" do
+    signal = F.signal()
+
+    parent =
+      F.instance(
+        routes: [
+          %{
+            path: "test.run",
+            handler: %{kind: :forward, target: %{kind: :parent}}
+          }
+        ]
+      )
+
+    assert {:ok, ^parent, [%Jido.AgentServer.Directive.ParentSend{signal: ^signal}]} =
+             Agent.cmd(parent, signal)
+
+    child =
+      F.instance(
+        routes: [
+          %{
+            path: "test.run",
+            handler: %{kind: :forward, target: %{kind: :agent, name: :worker}}
+          }
+        ],
+        topology: %{agents: [%{name: :worker, definition: ForwardChild}]}
+      )
+
+    assert {:ok, ^child, [%Jido.AgentServer.Directive.AgentSend{name: :worker, signal: ^signal}]} =
+             Agent.cmd(child, signal)
   end
 
   @tag obligation: ["jido.agent_evaluation.I1", "jido.agent_evaluation.I2"]

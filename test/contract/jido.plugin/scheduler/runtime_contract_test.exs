@@ -98,7 +98,7 @@ defmodule JidoTest.Contract.PluginSchedulerRuntimeTest do
         :gen_statem.reply(from, {:ok, %{cron: cron}})
         scheduler_agent(test_pid, cron)
 
-      {:"$gen_cast", {:turn, _ref, signal, %{}, :infinity}} ->
+      {:"$gen_cast", {:turn, _ref, signal, %{}, :infinity, nil}} ->
         send(test_pid, {:scheduler_agent_cast, signal})
         scheduler_agent(test_pid, cron)
     end
@@ -128,7 +128,7 @@ defmodule JidoTest.Contract.PluginSchedulerRuntimeTest do
 
     assert_receive {:deliver, token, traced}
     assert {:noreply, delivered_state} = Runtime.handle_info({:deliver, token, traced}, armed)
-    assert_receive {:"$gen_cast", {:turn, _ref, delivered, %{}, :infinity}}
+    assert_receive {:"$gen_cast", {:turn, _ref, delivered, %{}, :infinity, nil}}
     refute delivered.id == delayed.id
     assert delivered.type == delayed.type
     assert delivered.data == delayed.data
@@ -140,7 +140,7 @@ defmodule JidoTest.Contract.PluginSchedulerRuntimeTest do
     assert {:noreply, ^delivered_state} =
              Runtime.handle_info({:deliver, token, traced}, delivered_state)
 
-    refute_received {:"$gen_cast", {:turn, _ref, _signal, %{}, :infinity}}
+    refute_received {:"$gen_cast", {:turn, _ref, _signal, %{}, :infinity, nil}}
   end
 
   @tag obligation: ["jido.plugin.scheduler.I4", "jido.plugin.scheduler.I5"]
@@ -195,10 +195,10 @@ defmodule JidoTest.Contract.PluginSchedulerRuntimeTest do
     assert {:noreply, ^same} =
              Runtime.handle_info({:cron_tick, :job, make_ref(), @instant}, same)
 
-    refute_received {:"$gen_cast", {:turn, _ref, _signal, %{}, :infinity}}
+    refute_received {:"$gen_cast", {:turn, _ref, _signal, %{}, :infinity, nil}}
 
     assert {:noreply, ^same} = Runtime.handle_info({:cron_tick, :job, token, @instant}, same)
-    assert_receive {:"$gen_cast", {:turn, _ref, signal, %{}, :infinity}}
+    assert_receive {:"$gen_cast", {:turn, _ref, signal, %{}, :infinity, nil}}
     assert signal.type == "test.tick"
     refute signal.id == first.message.id
     assert {:ok, occurrence} = Scheduler.occurrence(signal)
@@ -229,12 +229,12 @@ defmodule JidoTest.Contract.PluginSchedulerRuntimeTest do
       assert {:noreply, ^current} =
                Runtime.handle_info({:cron_tick, :plain, token, @instant}, current)
 
-      assert_receive {:"$gen_cast", {:turn, _ref, first, %{}, :infinity}}
+      assert_receive {:"$gen_cast", {:turn, _ref, first, %{}, :infinity, nil}}
 
       assert {:noreply, ^current} =
                Runtime.handle_info({:cron_tick, :plain, token, @instant}, current)
 
-      assert_receive {:"$gen_cast", {:turn, _ref, second, %{}, :infinity}}
+      assert_receive {:"$gen_cast", {:turn, _ref, second, %{}, :infinity, nil}}
       refute first.id == second.id
       assert {:error, :not_found} = Scheduler.occurrence(first)
       assert {:error, :not_found} = Scheduler.occurrence(second)

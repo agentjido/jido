@@ -172,7 +172,7 @@ defmodule JidoTest.Contract.PluginBusTest do
 
     assert :ok = Runtime.terminate(:normal, :sys.get_state(client))
     assert {:ok, [_record]} = Bus.publish(bus, [signal("bus.input", %{})])
-    refute_receive {:"$gen_cast", {:turn, _token, _signal, _context, _timeout}}, 50
+    refute_receive {:"$gen_cast", {:turn, _token, _signal, _context, _timeout, nil}}, 50
 
     boundary_init = plugin_init(jido, bus: :input, retry_delay_ms: 1, timeout: 1)
     task = Task.async(fn -> Runtime.init(boundary_init) end)

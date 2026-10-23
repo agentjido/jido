@@ -33,3 +33,15 @@
   decision: Make Jido.AgentServer.Directive and its built-in result records the documented public effects API. Keep Jido.AgentServer.Effects, dispatch preparation, schema access, and validation hooks internal. Supersede effects-mutation-profile by adding the public Directive modules to the component mutation profile.
   driver: Agent code must request post-commit work without depending on effect-engine internals, and the Covenant must enforce that boundary.
   approved_by: Component hardening pass
+
+- id: request-owned-reply-delivery
+  date: 2026-10-23
+  decision: Treat Reply as a post-commit effect with the same owner and disposal lifetime as its call or pending submission. Hold Reply Signals behind an internal request gate until the owner collects the turn result.
+  driver: Direct PID delivery lets abandoned submissions receive late application replies and separates one request into two incompatible lifetimes.
+  approved_by: User-requested Reply contract review
+
+- id: request-owned-reply-mutation-review
+  date: 2026-10-23
+  decision: Accept the effects mutation profile with 353 mutants, 283 killed mutants, 31 reviewed survivors, 39 invalid mutations, no timeout, and no unsorted mutant.
+  driver: Direct ReplyGate tests now verify buffer order, open and abandon changes, owner and server monitoring, the exact Reply effect result, and completion without integration-test timeouts.
+  approved_by: User-requested Reply mutation review

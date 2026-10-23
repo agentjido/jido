@@ -5,9 +5,9 @@ defmodule Jido.AgentServer.Directive do
   Topology edits belong to `Jido.Agent.Directive`. These records request
   runtime work after commit. Activation ownership is fixed at startup.
   """
-  alias Jido.Agent.Directive.Emit
+  alias Jido.Agent.Directive.{Emit, Reply}
   alias Jido.AgentServer.Directive.AgentSend
-  alias Jido.AgentServer.Directive.OwnerSend
+  alias Jido.AgentServer.Directive.ParentSend
   alias Jido.AgentServer.Directive.ErrorReport
   alias Jido.AgentServer.Directive.AgentStart
   alias Jido.AgentServer.Directive.ProcessStart
@@ -34,11 +34,12 @@ defmodule Jido.AgentServer.Directive do
   @typedoc "A built-in runtime Directive that AgentServer runs after commit."
   @type t ::
           Emit.t()
+          | Reply.t()
           | AgentSend.t()
           | AgentStart.t()
           | AgentStop.t()
           | ErrorReport.t()
-          | OwnerSend.t()
+          | ParentSend.t()
           | ProcessStart.t()
           | ServerStop.t()
 
@@ -74,9 +75,9 @@ defmodule Jido.AgentServer.Directive do
          Keyword.put(options(opts, [:delivery_mode, :timeout, :message_format]), :target, pid)}
     }
 
-  @doc "Builds a Directive that sends one Signal to the owning Agent."
-  @spec owner_send(Signal.t()) :: OwnerSend.t()
-  def owner_send(signal), do: %OwnerSend{signal: signal}
+  @doc "Builds a Directive that sends one Signal to the parent Agent."
+  @spec parent_send(Signal.t()) :: ParentSend.t()
+  def parent_send(signal), do: %ParentSend{signal: signal}
 
   @doc "Builds a Directive that sends one Signal to a tracked child Agent."
   @spec agent_send(atom() | String.t(), Signal.t()) :: AgentSend.t()

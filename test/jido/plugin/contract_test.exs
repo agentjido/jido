@@ -697,7 +697,7 @@ defmodule Jido.Plugin.ContractTest do
                  signal,
                  %{},
                  Jido.Agent.Plugin.specs(specs),
-                 %{emits: nil}
+                 %{}
                )
 
       assert error.message == "Agent executable changed Plugin-owned state"

@@ -1,6 +1,8 @@
 defmodule Jido.Agent.DSL.Macros do
   @moduledoc false
   defmacro agent(do: block), do: section(:agent, :__agent__, block, __CALLER__)
+  defmacro agent(name), do: quote(do: %{kind: :agent, name: unquote(name)})
+  defmacro parent, do: quote(do: %{kind: :parent})
   defmacro routes(do: block), do: section(:routes, :__routes__, block, __CALLER__)
   defmacro topology(do: block), do: section(:topology, :__topology__, block, __CALLER__)
 
@@ -68,11 +70,24 @@ defmodule Jido.Agent.DSL.RouteMacros do
   defmacro route(path, target, options, block),
     do: build(path, target, options ++ block, __CALLER__)
 
+  defmacro forward(path, options) do
+    unless Keyword.keyword?(options) and Enum.uniq(Keyword.keys(options)) == Keyword.keys(options),
+      do: error!(__CALLER__, "Forward requires unique keyword options")
+
+    case options do
+      [to: target] ->
+        build_forward(path, target, __CALLER__)
+
+      _ ->
+        error!(__CALLER__, "Forward requires only one explicit :to destination")
+    end
+  end
+
   defp build(path, target, options, caller) do
     unless Keyword.keyword?(options) and Enum.uniq(Keyword.keys(options)) == Keyword.keys(options),
       do: error!(caller, "Route requires unique keyword options")
 
-    unknown = Keyword.keys(options) -- [:as, :defaults, :emits, :do, :via]
+    unknown = Keyword.keys(options) -- [:as, :defaults, :do]
     if unknown != [], do: error!(caller, "Unknown route options: #{inspect(unknown)}")
     {path, target, options} = signal_action_route(path, target, options, caller)
     {body, options} = Keyword.pop(options, :do)
@@ -88,21 +103,14 @@ defmodule Jido.Agent.DSL.RouteMacros do
   defp signal_action_route(path, target, options, caller) do
     case Macro.expand(path, caller) do
       module when is_atom(module) and module not in [nil, true, false] ->
-        if target != nil or Keyword.has_key?(options, :do),
-          do: error!(caller, "A SignalAction route accepts :via instead of a target or block")
+        if Keyword.has_key?(options, :do),
+          do: error!(caller, "A SignalAction route does not accept an inline handler")
 
-        {via, options} = Keyword.pop(options, :via, path)
-
-        if via in [nil, true, false],
-          do: error!(caller, ":via requires an Action or Flow module")
-
+        target = if target, do: validate_signal_action_target!(target, caller), else: path
         type = quote do: Jido.Agent.DSL.RouteMacros.__signal_action_type__(unquote(path), __ENV__)
-        {type, via, options}
+        {type, target, options}
 
       _ ->
-        if Keyword.has_key?(options, :via),
-          do: error!(caller, ":via requires a SignalAction module route")
-
         {path, target, options}
     end
   end
@@ -116,7 +124,17 @@ defmodule Jido.Agent.DSL.RouteMacros do
       else: raise(ArgumentError, "Module route requires a Jido.SignalAction")
   end
 
-  defp handler(_path, nil, nil, _caller), do: {nil, quote(do: %{kind: :pass_through})}
+  defp validate_signal_action_target!(target, caller) do
+    module = Macro.expand(target, caller)
+
+    case Jido.Agent.Route.executable(module) do
+      {:ok, _handler} -> target
+      {:error, error} -> error!(caller, Exception.message(error))
+    end
+  end
+
+  defp handler(_path, nil, nil, caller),
+    do: error!(caller, "A string route requires an Action, Flow, or inline handler")
 
   defp handler(_path, target, nil, _caller) do
     {nil, quote(do: %{kind: :executable, target: unquote(target)})}
@@ -144,6 +162,15 @@ defmodule Jido.Agent.DSL.RouteMacros do
     end
   end
 
+  defp build_forward(path, target, caller) do
+    handler = quote(do: %{kind: :forward, target: unquote(target)})
+
+    quote line: caller.line do
+      require unquote(@entity)
+      unquote(@entity).__route__(unquote(path), unquote(handler), [])
+    end
+  end
+
   defp inline(path, args, caller) do
     parsed =
       case args do
@@ -168,7 +195,9 @@ defmodule Jido.Agent.DSL.RouteMacros do
     compiled =
       Inline.compile!(identity, parsed, caller,
         default_name: path,
-        remove_imports: [{__MODULE__, [route: 1, route: 2, route: 3, route: 4]}]
+        remove_imports: [
+          {__MODULE__, [route: 1, route: 2, route: 3, route: 4, forward: 2]}
+        ]
       )
 
     {compiled.declaration_ast, quote(do: %{kind: :action, target: unquote(compiled.target_ast)})}

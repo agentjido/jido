@@ -7,6 +7,7 @@ defmodule JidoTest.Contract.PluginSchedulerTest do
   alias Jido.Plugin.Scheduler.{DSL, Occurrence, WallClock}
   alias Jido.Plugin.Normalizer
   alias Jido.Signal
+  alias JidoTest.AgentContract, as: F
   alias Spark.Dsl.{Entity, Extension, Section}
 
   @scope {ExampleJido, "agent-1", "tenant-1"}
@@ -22,7 +23,7 @@ defmodule JidoTest.Contract.PluginSchedulerTest do
     Agent.define(%{name: "scheduler-contract", routes: routes, extensions: [contribution(data)]})
   end
 
-  defp pass(type), do: %{path: type, handler: %{kind: :pass_through}}
+  defp action(type), do: %{path: type, handler: %{kind: :action, target: F.Return}}
 
   @tag obligation: "jido.plugin.scheduler.I1"
   test "Scheduler state contains recurring definitions and applies changes in order" do
@@ -251,7 +252,7 @@ defmodule JidoTest.Contract.PluginSchedulerTest do
            }
 
     assert {:ok, data} = DSL.normalize(lowered)
-    assert {:ok, definition} = define(data, [pass("work.request")])
+    assert {:ok, definition} = define(data, [action("work.request")])
     assert :ok = DSL.verify(data, definition)
     assert {:ok, ^data} = DSL.lower(%{}, data)
     assert {:error, %Error{code: :ambiguous_config}} = DSL.lower(dsl, data)

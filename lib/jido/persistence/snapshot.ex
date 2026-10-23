@@ -133,9 +133,14 @@ defmodule Jido.Persistence.Snapshot do
   defp code_modules(agent, state_format \\ :default) do
     handlers =
       Enum.flat_map(agent.routes, fn
-        %{handler: %{target: {module, _, _}}} -> [module]
-        %{handler: %{kind: kind, target: module}} -> executable_modules(module, kind, [])
-        _ -> []
+        %{handler: %{kind: :transform, target: {module, _, _}}} ->
+          [module]
+
+        %{handler: %{kind: kind, target: module}} when kind in [:action, :flow] ->
+          executable_modules(module, kind, [])
+
+        _ ->
+          []
       end)
 
     providers =
@@ -168,8 +173,8 @@ defmodule Jido.Persistence.Snapshot do
   defp saved_modules(agent) do
     handlers =
       Enum.flat_map(agent.routes, fn
-        %{handler: %{target: {module, _, _}}} -> [module]
-        %{handler: %{target: module}} -> [module]
+        %{handler: %{kind: :transform, target: {module, _, _}}} -> [module]
+        %{handler: %{kind: kind, target: module}} when kind in [:action, :flow] -> [module]
         _ -> []
       end)
 

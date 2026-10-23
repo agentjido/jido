@@ -13,7 +13,7 @@ defmodule Jido.Agent.AuthoringPortTest do
     routes do
       signal_source "/authoring-port"
 
-      route "counter.increment", as: :increment, emits: [] do
+      route "counter.increment", as: :increment do
         action %{amount: amount}, context: context do
           {:ok, %{context.agent_state | count: context.agent_state.count + amount}}
         end

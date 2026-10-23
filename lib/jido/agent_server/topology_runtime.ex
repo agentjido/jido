@@ -196,11 +196,11 @@ defmodule Jido.AgentServer.TopologyRuntime do
     end)
   end
 
-  def owner_send(nil, _), do: {:error, :owner_not_found}
+  def parent_send(nil, _), do: {:error, :parent_not_found}
 
-  def owner_send(parent, signal) do
+  def parent_send(parent, signal) do
     case ServerSupervisor.live_worker(parent.activation) do
-      nil -> {:error, :owner_not_found}
+      nil -> {:error, :parent_not_found}
       pid -> Server.cast(pid, signal)
     end
   end

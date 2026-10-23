@@ -30,12 +30,15 @@ defmodule Jido.Agent.FormatConsistencyTest do
     )
   end
 
-  defp pass(path, opts \\ []) do
+  defp route(path, handler, opts \\ []) do
     Map.merge(
-      %{path: path, as: nil, defaults: %{}, emits: nil, handler: %{kind: :pass_through}},
+      %{path: path, as: nil, defaults: %{}, handler: handler},
       Map.new(opts)
     )
   end
+
+  defp action(path, opts \\ []),
+    do: route(path, %{kind: :action, target: Action}, opts)
 
   test "Map, struct and DSL have exact field equality for independent declarations" do
     cases = [
@@ -50,19 +53,16 @@ defmodule Jido.Agent.FormatConsistencyTest do
              count: Zoi.integer() |> Zoi.default(0)
            })
        }},
-      {~s(routes do signal_source "/formats"; route "work.request", as: :work; route "work.*" end),
+      {~s(routes do signal_source "/formats"; route "work.request", #{inspect(Action)}, as: :work; route "work.*", #{inspect(Action)} end),
        %{
          signal_source: "/formats",
-         routes: [pass("work.request", as: :work), pass("work.*")]
+         routes: [action("work.request", as: :work), action("work.*")]
        }},
-      {"routes do route \"work.request\", #{inspect(Action)}, defaults: %{value: \"fallback\"}, emits: [\"work.done\"]; route \"plan.request\", #{inspect(Flow)}, emits: [] end",
+      {"routes do route \"work.request\", #{inspect(Action)}, defaults: %{value: \"fallback\"}; route \"plan.request\", #{inspect(Flow)} end",
        %{
          routes: [
-           %{
-             pass("work.request", defaults: %{value: "fallback"}, emits: ["work.done"])
-             | handler: %{kind: :action, target: Action}
-           },
-           %{pass("plan.request", emits: []) | handler: %{kind: :flow, target: Flow}}
+           action("work.request", defaults: %{value: "fallback"}),
+           route("plan.request", %{kind: :flow, target: Flow})
          ]
        }},
       {"topology do agent :worker, #{inspect(Worker)}, count: 2, initial_state: %{value: \"copied\"} end",
@@ -151,12 +151,10 @@ defmodule Jido.Agent.FormatConsistencyTest do
 
   test "Map and struct report the same error path and DSL rejects the same declaration" do
     cases = [
-      {%{routes: [pass("work.request"), pass("work.request")]},
-       ~s(routes do route "work.request"; route "work.request" end)},
-      {%{routes: [pass("one", as: :same), pass("two", as: :same)], signal_source: "/test"},
-       ~s(routes do signal_source "/test"; route "one", as: :same; route "two", as: :same end)},
-      {%{routes: [pass("work.request", emits: ["work.*"])]},
-       ~s(routes do route "work.request", emits: ["work.*"] end)},
+      {%{routes: [action("work.request"), action("work.request")]},
+       ~s(routes do route "work.request", #{inspect(Action)}; route "work.request", #{inspect(Action)} end)},
+      {%{routes: [action("one", as: :same), action("two", as: :same)], signal_source: "/test"},
+       ~s(routes do signal_source "/test"; route "one", #{inspect(Action)}, as: :same; route "two", #{inspect(Action)}, as: :same end)},
       {%{topology: %{agents: [%{name: :worker, definition: Worker, count: 0}], connections: []}},
        "topology do agent :worker, #{inspect(Worker)}, count: 0 end"}
     ]

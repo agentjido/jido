@@ -2,6 +2,7 @@ defmodule Jido.Agent.Plugin.Pipeline do
   @moduledoc false
 
   alias Jido.Agent
+  alias Jido.Agent.Directive.Reply
   alias Jido.Agent.Plugin
   alias Jido.Agent.Plugin.{Reduction, Spec}
   alias Jido.Error
@@ -27,11 +28,10 @@ defmodule Jido.Agent.Plugin.Pipeline do
         %Signal{} = signal,
         plugin_inputs,
         specs,
-        route
+        _route
       ) do
     with :ok <- protect_owned_state(state, agent.state, specs),
-         {:ok, directives} <- validate_directives(directives, specs),
-         :ok <- Jido.Agent.Contract.check_emissions(route, directives),
+         {:ok, directives} <- validate_directives(directives, specs, signal),
          {:ok, state} <-
            reduce_owned_state(
              state,
@@ -65,8 +65,16 @@ defmodule Jido.Agent.Plugin.Pipeline do
     end
   end
 
-  defp validate_directives(directives, specs) do
-    Enum.reduce_while(directives, {:ok, []}, fn
+  defp validate_directives(directives, specs, signal) do
+    with {:ok, directives} <- validate_each_directive(directives, specs),
+         :ok <- validate_replies(directives, signal) do
+      {:ok, directives}
+    end
+  end
+
+  defp validate_each_directive(directives, specs) do
+    directives
+    |> Enum.reduce_while({:ok, []}, fn
       %{__struct__: _module} = directive, {:ok, acc} ->
         case validate_directive(directive, specs) do
           {:ok, validated} -> {:cont, {:ok, [validated | acc]}}
@@ -87,6 +95,35 @@ defmodule Jido.Agent.Plugin.Pipeline do
     |> case do
       {:ok, validated} -> {:ok, Enum.reverse(validated)}
       error -> error
+    end
+  end
+
+  defp validate_replies(directives, signal) do
+    replies = Enum.filter(directives, &match?(%Reply{}, &1))
+
+    case replies do
+      [] ->
+        :ok
+
+      [%Reply{signal: reply}] ->
+        if Signal.get_context(reply, "jidocausationid") == signal.id do
+          :ok
+        else
+          {:error,
+           Error.validation_error("Agent Reply Directive must match the current request",
+             details: %{
+               request_id: signal.id,
+               causation_id: Signal.get_context(reply, "jidocausationid"),
+               reply_id: reply.id
+             }
+           )}
+        end
+
+      _replies ->
+        {:error,
+         Error.validation_error("Agent turn can return only one Reply Directive",
+           details: %{count: length(replies)}
+         )}
     end
   end
 

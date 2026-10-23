@@ -109,7 +109,7 @@ instance options and direct function options are its authoring surface.
 ### jido.agent_server.I12 — Reply disposal
 
 - **scope:** `Jido.AgentServer.abandon/1`
-- **must:** Only the submitting process can discard a pending reply. Remove its monitor, discard a queued reply, and prevent late replies without cancelling the turn.
+- **must:** Only the submitting process can discard a pending reply. Remove its monitor, discard a queued turn result and buffered Reply Signals, and prevent late turn results and Reply Signals without cancelling the turn.
 - **why:** Unwanted replies must not retain Agent values in the caller mailbox.
 - **kind:** functional
 - **status:** active

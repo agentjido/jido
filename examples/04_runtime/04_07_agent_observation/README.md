@@ -52,6 +52,6 @@ for the commit and `[:jido, :agent_server, :effects, :stop]` for delivery failur
 and persistence duration summaries. Lifecycle, commit, effects, and settlement
 are point events with counters only. `turn.settled` records the commit result;
 `effects.stop` can report a later failure without undoing it. See the
-[metric guide](../../../guides/telemetry-tracing-and-logs.md).
+[metric guide](../../../guides/observe-agent-turns.livemd).
 
 Previous: [Runtime Inspection](../04_05_runtime_inspection/README.md) | Next: [Causal Trace](../04_08_causal_trace/README.md)

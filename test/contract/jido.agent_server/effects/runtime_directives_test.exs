@@ -32,7 +32,7 @@ defmodule JidoTest.AgentServer.Effects.RuntimeDirectivesTest do
 
     settled(server)
     assert_eventually(length(Server.agent(worker).routes) == 2)
-    assert {:ok, _, _} = turn(worker, [R.owner_send(E.signal([D.route_add("reply", E.Work)]))])
+    assert {:ok, _, _} = turn(worker, [R.parent_send(E.signal([D.route_add("reply", E.Work)]))])
     settled(worker)
     assert_eventually(length(Server.agent(server).routes) == 2)
     assert {:ok, _, _} = turn(server, [R.agent_stop(:worker)])
@@ -53,7 +53,7 @@ defmodule JidoTest.AgentServer.Effects.RuntimeDirectivesTest do
           R.agent_start(E.Worker, :worker, opts: %{agent: E.agent()}),
           R.agent_start(E.Worker, nil),
           R.agent_start(E.Worker, "$topology/worker"),
-          R.owner_send(E.signal([]))
+          R.parent_send(E.signal([]))
         ] do
       assert {:error, _} = turn(server, [D.route_add("never", E.Work), directive])
       assert Server.snapshot(server) == initial

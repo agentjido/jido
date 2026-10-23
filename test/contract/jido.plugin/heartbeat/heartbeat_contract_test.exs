@@ -17,7 +17,7 @@ defmodule JidoTest.Contract.PluginHeartbeatTest do
   end
 
   defp receive_tick(timeout \\ 500) do
-    assert_receive {:"$gen_cast", {:turn, _token, %Jido.Signal{} = signal, %{}, :infinity}},
+    assert_receive {:"$gen_cast", {:turn, _token, %Jido.Signal{} = signal, %{}, :infinity, nil}},
                    timeout
 
     signal

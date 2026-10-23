@@ -12,7 +12,7 @@ defmodule Jido.Examples.Topology.Swarm do
   routes do
     signal_source "/examples/topology/bus_swarm"
 
-    route "examples.topology.cell.work", as: :work, emits: ["examples.topology.cell.work"] do
+    route "examples.topology.cell.work", as: :work do
       action %{value: _value},
         schema: Zoi.object(%{value: Zoi.integer()}),
         context: context do

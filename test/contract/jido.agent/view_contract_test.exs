@@ -52,8 +52,7 @@ defmodule JidoTest.Contract.AgentViewTest do
                  %{
                    "signal_type" => "counter.add",
                    "kind" => "action",
-                   "target" => %{"id" => "actions/add", "vsn" => 1},
-                   "emits" => nil
+                   "target" => %{"id" => "actions/add", "vsn" => 1}
                  }
                ],
                "total" => 1,
@@ -99,7 +98,7 @@ defmodule JidoTest.Contract.AgentViewTest do
   test "operation limits keep their documented default and inclusive bounds" do
     routes =
       for index <- 1..501 do
-        %{path: "operation.#{index}", handler: %{kind: :pass_through}}
+        %{path: "operation.#{index}", handler: %{kind: :action, target: Add}}
       end
 
     definition = Agent.define!(%{name: "view_limits", routes: routes})
@@ -126,7 +125,7 @@ defmodule JidoTest.Contract.AgentViewTest do
   end
 
   @tag obligation: "jido.agent.I31"
-  test "operation summaries expose only Action and Flow Registry targets" do
+  test "operation summaries expose Action, Flow, transform, and forward targets" do
     definition =
       Agent.define!(%{
         name: "view_handlers",
@@ -136,15 +135,15 @@ defmodule JidoTest.Contract.AgentViewTest do
             path: "transform.run",
             handler: %{kind: :transform, target: {__MODULE__, :transform, 1}}
           },
-          %{path: "pass.run", handler: %{kind: :pass_through}}
+          %{path: "forward.run", handler: %{kind: :forward, target: %{kind: :parent}}}
         ]
       })
 
     assert {:ok, view} = View.project(definition, registry())
-    [flow, transform, pass] = view["operations"]["items"]
+    [flow, transform, forward] = view["operations"]["items"]
     assert flow["target"] == %{"id" => "flows/contract", "vsn" => 1}
     assert transform["target"] == nil
-    assert pass["target"] == nil
+    assert forward["target"] == %{"kind" => "parent"}
   end
 
   @tag obligation: "jido.agent.I31"

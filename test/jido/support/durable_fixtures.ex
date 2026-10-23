@@ -221,7 +221,7 @@ defmodule JidoTest.DurableFixtures do
     use Jido.Agent, name: "durable_probe_team"
 
     routes do
-      route "request"
+      forward "request", to: agent(:worker)
 
       route "mutate" do
         action input, context: context do

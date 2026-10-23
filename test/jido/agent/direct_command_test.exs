@@ -46,7 +46,7 @@ defmodule Jido.Agent.DirectCommandTest do
 
     routes do
       signal_source "/direct"
-      route "work", Jido.Agent.DirectCommandTest.Update, emits: []
+      route "work", Jido.Agent.DirectCommandTest.Update
     end
   end
 
@@ -131,7 +131,7 @@ defmodule Jido.Agent.DirectCommandTest do
           count: Zoi.integer() |> Zoi.default(0),
           label: Zoi.string() |> Zoi.default("same")
         }),
-      routes: [action("work", emits: [])],
+      routes: [action("work")],
       topology: %{agents: [], connections: []}
     }
 
@@ -316,6 +316,26 @@ defmodule Jido.Agent.DirectCommandTest do
     refute_received ^output
   end
 
+  test "one Reply is correlated to the current request" do
+    before = instance([action("work")])
+    request = signal("work")
+    output = signal("work.reply")
+    {:ok, correlated} = Signal.put_context(output, "jidocausationid", request.id)
+    reply = Directive.reply(correlated)
+
+    assert {:ok, after_agent, [^reply]} =
+             Agent.cmd(before, %{request | data: %{directives: [reply]}})
+
+    assert after_agent.state.count == 1
+
+    {:ok, wrong} = Signal.put_context(output, "jidocausationid", "other-request")
+
+    for directives <- [[Directive.reply(wrong)], [reply, reply]] do
+      assert {:error, %Jido.Error.ValidationError{}} =
+               Agent.cmd(before, %{request | data: %{directives: directives}})
+    end
+  end
+
   test "repeated direct commands have no deduplication or durable state" do
     before = instance()
     input = signal()
@@ -330,5 +350,30 @@ defmodule Jido.Agent.DirectCommandTest do
     assert {:error, _} = Agent.cmd(Agent.definition(before), signal())
     assert {:error, _} = Agent.cmd(before, signal(), context: %{agent_state: %{count: 999}})
     assert {:error, _} = Agent.cmd(before, signal(), [:not_keyword])
+  end
+end
+
+defmodule Jido.Agent.ReplyDirectiveRuntimeTest do
+  use JidoTest.Case, async: true
+
+  alias Jido.Agent.DirectCommandTest.Leaf
+  alias Jido.Agent.Directive
+  alias Jido.AgentServer
+  alias Jido.Signal
+
+  test "live runtime delivers Reply to the current requester after commit", %{
+    jido: jido
+  } do
+    {:ok, server} = JidoTest.AgentServerAssertions.start_agent(jido, Leaf)
+    request = Signal.new!("work", %{}, source: "/test")
+    output = Signal.new!("work.reply", %{}, source: "/direct")
+    {:ok, output} = Signal.put_context(output, "jidocausationid", request.id)
+    reply = Directive.reply(output)
+    request = %{request | data: %{directives: [reply]}}
+
+    assert {:ok, committed, [^reply]} = AgentServer.call(server, request)
+    assert_receive ^output
+    assert AgentServer.status(server).state_version == 1
+    assert AgentServer.agent(server) == committed
   end
 end

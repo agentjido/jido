@@ -80,14 +80,19 @@ defmodule Jido.Agent.View do
        %{
          "signal_type" => route.path,
          "kind" => Atom.to_string(route.handler.kind),
-         "target" => target,
-         "emits" => route.emits
+         "target" => target
        }}
     end
   end
 
   defp target(%{kind: kind, target: target}, registry) when kind in [:action, :flow],
     do: Registry.encode_reference(registry, kind, target)
+
+  defp target(%{kind: :forward, target: %{kind: :agent, name: name}}, _registry),
+    do: {:ok, %{"kind" => "agent", "name" => Atom.to_string(name)}}
+
+  defp target(%{kind: :forward, target: %{kind: :parent}}, _registry),
+    do: {:ok, %{"kind" => "parent"}}
 
   defp target(_, _), do: {:ok, nil}
 

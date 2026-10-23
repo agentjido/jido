@@ -188,7 +188,7 @@ defmodule Jido.Agent.Mutation do
     allowed =
       case collection do
         :agents -> [:definition, :count, :initial_state]
-        :routes -> [:handler, :as, :defaults, :emits]
+        :routes -> [:handler, :as, :defaults]
         :connections -> [:delivery]
       end
 

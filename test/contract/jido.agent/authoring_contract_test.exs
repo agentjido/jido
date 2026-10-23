@@ -12,7 +12,7 @@ defmodule JidoTest.Contract.AgentAuthoringTest do
 
     routes do
       signal_source "/contract"
-      route "work.request", as: :work
+      route "work.request", JidoTest.AgentContract.Return, as: :work
     end
   end
 
@@ -47,7 +47,7 @@ defmodule JidoTest.Contract.AgentAuthoringTest do
     use Jido.Agent, name: "contract_child"
 
     routes do
-      route "work.request"
+      route "work.request", JidoTest.AgentContract.Return
     end
   end
 
@@ -98,7 +98,9 @@ defmodule JidoTest.Contract.AgentAuthoringTest do
         module: Leaf,
         schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}),
         signal_source: "/contract",
-        routes: [%{path: "work.request", as: :work, handler: %{kind: :pass_through}}]
+        routes: [
+          %{path: "work.request", as: :work, handler: %{kind: :action, target: F.Return}}
+        ]
       })
 
     assert from_map === Leaf.definition()
@@ -244,7 +246,7 @@ defmodule JidoTest.Contract.AgentAuthoringTest do
 
     assert_raise Spark.Error.DslError, ~r/helper name/, fn ->
       F.with_agent(
-        ~s(routes do route "work.request", as: :"bad name" end),
+        ~s(routes do route "work.request", JidoTest.AgentContract.Return, as: :"bad name" end),
         fn _module -> :ok end
       )
     end
@@ -481,7 +483,9 @@ defmodule JidoTest.Contract.AgentAuthoringTest do
                )
              ])
 
-    assert {:ok, [%{status: :compatible}]} = Agent.Topology.checks(team)
+    assert {:ok, [%{status: :unchecked, reason: :unknown_outputs}]} =
+             Agent.Topology.checks(team)
+
     assert {:error, _} = Agent.mutate(team, [Agent.Directive.agent_add(:root, Leaf)])
 
     assert {:error, _} =

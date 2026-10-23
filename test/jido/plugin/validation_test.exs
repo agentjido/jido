@@ -539,7 +539,7 @@ defmodule Jido.Plugin.ValidationTest do
                  source,
                  %{},
                  Jido.Agent.Plugin.specs(specs),
-                 %{emits: nil}
+                 %{}
                )
 
       assert error.message == message
@@ -554,7 +554,7 @@ defmodule Jido.Plugin.ValidationTest do
                source,
                %{},
                Jido.Agent.Plugin.specs(specs),
-               %{emits: nil}
+               %{}
              )
 
     assert Plugin.directive_owner(specs, :unknown) == nil

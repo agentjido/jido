@@ -3,7 +3,7 @@ defmodule Jido.Examples.Topology.PipelineSink do
   use Jido.Agent, name: "topology_pipeline_sink"
 
   routes do
-    route "examples.topology.pipeline.completed", emits: ["examples.topology.pipeline.receipt"] do
+    route "examples.topology.pipeline.completed" do
       transform %Jido.Signal{data: %{value: value}} do
         Jido.Signal.new("examples.topology.pipeline.receipt", %{value: value},
           source: "/examples/topology/pipeline_sink"

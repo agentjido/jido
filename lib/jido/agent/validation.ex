@@ -42,6 +42,7 @@ defmodule Jido.Agent.Validation do
          {:ok, topology} <-
            Error.at(Topology.normalize(definition.topology, definition, opts), :topology),
          definition = %{definition | topology: topology},
+         :ok <- forward_targets(definition),
          :ok <- verify_extensions(extensions, definition, related?),
          :ok <- plugin_schema(definition, related? and Keyword.get(opts, :plugin_schema?, true)) do
       {:ok, struct!(Jido.Agent, definition)}
@@ -200,4 +201,28 @@ defmodule Jido.Agent.Validation do
 
   defp source(nil), do: :ok
   defp source(value), do: Error.at(Data.nonempty(value), :signal_source)
+
+  defp forward_targets(definition) do
+    names = MapSet.new(definition.topology.agents, & &1.name)
+
+    definition.routes
+    |> Enum.with_index()
+    |> Enum.reduce_while(:ok, fn
+      {%{handler: %{kind: :forward, target: %{kind: :agent, name: name}}}, index}, :ok ->
+        if MapSet.member?(names, name) do
+          {:cont, :ok}
+        else
+          {:halt,
+           Error.fail(
+             :unknown_forward_target,
+             [:routes, index, :handler, :target],
+             "Forward target is not a declared Agent member",
+             %{name: name}
+           )}
+        end
+
+      {_route, _index}, :ok ->
+        {:cont, :ok}
+    end)
+  end
 end

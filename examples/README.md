@@ -1,6 +1,6 @@
 # Jido V3 examples
 
-The stable catalog has 76 executable examples in 10 groups. Original
+The stable catalog has 75 executable examples in 10 groups. Original
 example numbers stay unchanged. Stable examples teach the current local runtime
 contract; research entries state unsupported behavior.
 
@@ -12,7 +12,7 @@ The [durable Flow proposals](11_durable/README.md#proposed-lessons) reserve
 | 01_basic | 8 | [Source](01_basic/README.md), [tests](../test/examples/01_basic/README.md) |
 | 02_workflow | 9 | [Source](02_workflow/README.md), [tests](../test/examples/02_workflow/README.md) |
 | 03_llm | 6 | [Source](03_llm/README.md), [tests](../test/examples/03_llm/README.md) |
-| 04_runtime | 16 | [Source](04_runtime/README.md), [tests](../test/examples/04_runtime/README.md) |
+| 04_runtime | 15 | [Source](04_runtime/README.md), [tests](../test/examples/04_runtime/README.md) |
 | 05_multi_agent | 3 | [Source](05_multi_agent/README.md), [tests](../test/examples/05_multi_agent/README.md) |
 | 07_topology | 6 | [Source](07_topology/README.md), [tests](../test/examples/07_topology/README.md) |
 | 08_applications | 5 | [Source](08_applications/README.md), [tests](../test/examples/08_applications/README.md) |
@@ -53,4 +53,4 @@ Use the tests as executable evidence; a passing suite does not replace the
 coverage register or each lesson’s stated limits.
 
 The Hex package excludes examples and tests. Production compiles `lib/` only.
-See [testing](../guides/testing.md) for test categories and optional services.
+See [testing](../guides/test-jido-systems.livemd) for test categories and optional services.

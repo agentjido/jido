@@ -6,6 +6,11 @@ defmodule JidoTest.Authoring.Agents.BoundariesTest do
   alias Jido.Agent
   alias JidoTest.ComposableAgent.Compiler
 
+  defmodule Work do
+    use Jido.Action, name: "authoring_boundary_work"
+    def run(input, _context), do: {:ok, input}
+  end
+
   test "removed core forms cannot enter a definition" do
     for attrs <- [
           %{plugins: []},
@@ -23,7 +28,7 @@ defmodule JidoTest.Authoring.Agents.BoundariesTest do
   test "helper construction preserves input and uses an explicit source" do
     module =
       Compiler.compile(
-        "routes do\nsignal_source \"/boundary\"\nroute \"work.request\", as: :work\nend"
+        "routes do\nsignal_source \"/boundary\"\nroute \"work.request\", #{inspect(Work)}, as: :work\nend"
       )
 
     assert {:ok, first} = module.work_signal(%{items: []})

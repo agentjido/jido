@@ -2,10 +2,10 @@ defmodule Jido.AgentServer.Effects do
   @moduledoc false
 
   alias Jido.Agent
-  alias Jido.Agent.Directive.Emit
+  alias Jido.Agent.Directive.{Emit, Reply}
   alias Jido.Agent.Mutation
   alias Jido.AgentServer, as: Server
-  alias Jido.AgentServer.Directive.{AgentSend, AgentStart, AgentStop, OwnerSend}
+  alias Jido.AgentServer.Directive.{AgentSend, AgentStart, AgentStop, ParentSend}
   alias Jido.AgentServer.Directive.{ErrorReport, ProcessStart, ServerStop}
   alias Jido.AgentServer.TopologyRuntime
   alias Jido.Dispatch.Preparation, as: DispatchPreparation
@@ -55,6 +55,7 @@ defmodule Jido.AgentServer.Effects do
 
   def settle(_active, {:stop, reason}, _now), do: {:stop, reason}
   def settle(_active, {:reported_error, error}, _now), do: {:reported_error, error}
+  def settle(_active, {:reply, signal}, _now), do: {:reply, signal}
   def settle(_active, :ok, _now), do: :continue
   def settle(_active, _result, _now), do: :failed
 
@@ -79,9 +80,11 @@ defmodule Jido.AgentServer.Effects do
          do: TopologyRuntime.send_agent(context.activation_state, name, signal)
   end
 
-  defp do_run(%OwnerSend{signal: signal}, _handler, context) do
-    with {:ok, signal} <- prepare_outbound(signal, :owner, context),
-         do: TopologyRuntime.owner_send(context.parent, signal)
+  defp do_run(%Reply{signal: signal}, _handler, _context), do: {:reply, signal}
+
+  defp do_run(%ParentSend{signal: signal}, _handler, context) do
+    with {:ok, signal} <- prepare_outbound(signal, :parent, context),
+         do: TopologyRuntime.parent_send(context.parent, signal)
   end
 
   defp do_run(%ServerStop{reason: reason}, _handler, _context), do: {:stop, reason}
@@ -133,12 +136,18 @@ defmodule Jido.AgentServer.Effects do
   defp validate(%Emit{dispatch: dispatch}, config),
     do: validate_dispatch(dispatch || config.default_dispatch)
 
+  defp validate(%Reply{}, %{requester: requester}) when is_pid(requester) do
+    if Process.alive?(requester), do: :ok, else: {:error, :requester_not_found}
+  end
+
+  defp validate(%Reply{}, _config), do: {:error, :requester_not_found}
+
   defp validate(%AgentStart{} = directive, config), do: validate_start(directive, config)
 
   defp validate(%AgentStop{name: name}, config), do: validate_runtime_target(name, config)
   defp validate(%AgentSend{name: name}, config), do: validate_target(name, config)
-  defp validate(%OwnerSend{}, %{parent: nil}), do: {:error, :owner_not_found}
-  defp validate(%OwnerSend{}, _), do: :ok
+  defp validate(%ParentSend{}, %{parent: nil}), do: {:error, :parent_not_found}
+  defp validate(%ParentSend{}, _), do: :ok
   defp validate(%ServerStop{}, _), do: :ok
   defp validate(%ErrorReport{}, _), do: :ok
 

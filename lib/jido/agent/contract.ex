@@ -1,6 +1,6 @@
 defmodule Jido.Agent.Contract do
   @moduledoc """
-  Normalizes and checks Agent emission contracts.
+  Normalizes Agent emission requests.
 
   `directives/2` builds Signal envelopes for runtime emission requests.
   No function in this module dispatches a Signal or invokes a handler.
@@ -25,19 +25,6 @@ defmodule Jido.Agent.Contract do
 
   defp envelope(%{type: type, data: data}, definition),
     do: Jido.Signal.new(type, data, source: definition.signal_source)
-
-  @doc false
-  def check_emissions(route, directives) do
-    emissions =
-      Enum.filter(directives, fn
-        %Jido.Agent.Directive.Emit{} -> true
-        %Jido.AgentServer.Directive.OwnerSend{} -> true
-        %Jido.AgentServer.Directive.AgentSend{} -> true
-        _ -> false
-      end)
-
-    allowed(route, emissions)
-  end
 
   defp emission(%{kind: :emit, signal: %Jido.Signal{} = signal} = request, _definition) do
     with {:ok, _} <- Data.fields(request, [:kind, :signal]),
@@ -65,25 +52,5 @@ defmodule Jido.Agent.Contract do
       {:error, issues} ->
         Error.fail(:invalid_signal, [], "Invalid Signal envelope", %{issues: issues})
     end
-  end
-
-  defp allowed(%{emits: nil}, _), do: :ok
-
-  defp allowed(route, emissions) do
-    with {:ok, _} <-
-           Data.list(emissions, fn emission ->
-             type = emission.signal.type
-
-             if type in route.emits,
-               do: {:ok, emission},
-               else:
-                 Error.fail(
-                   :undeclared_emission,
-                   [:emits],
-                   "Signal type is outside the route contract",
-                   %{type: type, route: route.path}
-                 )
-           end),
-         do: :ok
   end
 end

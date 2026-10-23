@@ -82,7 +82,7 @@ defmodule Jido.Agent.SignalActionTest do
 
     routes do
       signal_source "/chat"
-      route CreateThread, via: Execute, as: :create_thread
+      route CreateThread, Execute, as: :create_thread
     end
   end
 
@@ -104,7 +104,7 @@ defmodule Jido.Agent.SignalActionTest do
              Counter.cmd(Counter.instantiate!(id: "counter"), signal)
   end
 
-  test "via selects its handler and direct commands do not execute deferred work" do
+  test "the two-module form selects its handler without deferred work" do
     request = CreateThread.new!(%{name: "General"}, source: "/caller")
     assert [route] = Deferred.definition().routes
     assert route.path == CreateThread.type()
@@ -132,11 +132,12 @@ defmodule Jido.Agent.SignalActionTest do
     for {route, error, message} <- [
           {"route String", ArgumentError, ~r/requires a Jido.SignalAction/},
           {"route MissingSignalAction", ArgumentError, ~r/could not load module/},
-          {"route #{inspect(CreateThread)}, via: nil", CompileError, ~r/:via requires/},
-          {"route \"chat.create\", via: String", CompileError, ~r/:via requires/},
-          {"route #{inspect(CreateThread)}, String", CompileError, ~r/accepts :via/},
+          {"route #{inspect(CreateThread)}, via: nil", CompileError, ~r/Unknown route options/},
+          {"route \"chat.create\", via: String", CompileError, ~r/Unknown route options/},
+          {"route #{inspect(CreateThread)}, String", CompileError,
+           ~r/Expected an Action or Flow module/},
           {"route #{inspect(CreateThread)} do transform signal do {:ok, signal} end end",
-           CompileError, ~r/accepts :via/}
+           CompileError, ~r/does not accept an inline handler/}
         ] do
       assert_raise error, message, fn ->
         module = Module.concat(__MODULE__, "Invalid#{System.unique_integer([:positive])}")

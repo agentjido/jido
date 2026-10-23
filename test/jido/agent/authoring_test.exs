@@ -292,13 +292,17 @@ defmodule JidoTest.Agent.AuthoringTest do
   end
 
   @tag obligation: "jido.agent.I1"
-  test "a bare route is pass-through and needs no Agent block or source" do
+  test "a string route requires a handler and forward lowers to portable data" do
+    assert_raise CompileError, ~r/string route requires/, fn ->
+      compile_agent("route \"test.pass\"")
+    end
+
     compiled =
       compile_isolated("""
       defmodule JidoTest.BareAgent#{System.unique_integer([:positive])} do
         use Jido.Agent, name: "bare"
         routes do
-          route "test.pass"
+          forward "test.pass", to: parent()
         end
       end
       """)
@@ -306,7 +310,9 @@ defmodule JidoTest.Agent.AuthoringTest do
     {module, _} =
       Enum.find(compiled, fn {module, _} -> function_exported?(module, :definition, 0) end)
 
-    assert [%{handler: %{kind: :pass_through}}] = module.definition().routes
+    assert [%{handler: %{kind: :forward, target: %{kind: :parent}}}] =
+             module.definition().routes
+
     assert {:error, %{code: :unmatched_input}} = Agent.Route.select(module.definition(), "other")
   end
 

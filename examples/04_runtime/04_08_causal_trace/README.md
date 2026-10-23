@@ -4,7 +4,7 @@ A parent and two child Agents keep one trace across work and result Signals.
 
 ## What you will learn
 
-- How `agent_start`, `agent_send`, and `owner_send` retain causal metadata.
+- How `agent_start`, `agent_send`, and `parent_send` retain causal metadata.
 - How an external collector correlates work without changing business Signals.
 
 ## Read the code

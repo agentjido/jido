@@ -22,19 +22,17 @@ defmodule JidoTest.ComposableAgent.Definitions.Team do
   routes do
     signal_source "/research/team"
 
-    route "research.query.set", as: :set_query, defaults: %{query: ""}, emits: [] do
+    route "research.query.set", as: :set_query, defaults: %{query: ""} do
       action %{query: query}, schema: Zoi.object(%{query: Zoi.string()}), context: context do
         {:ok, %{context.agent_state | query: query}}
       end
     end
 
-    route "research.report.record", RecordReport,
-      as: :record_report,
-      emits: ["research.report.recorded"]
+    route "research.report.record", RecordReport, as: :record_report
 
-    route "research.report.prepared", RecordReport, emits: ["research.report.recorded"]
+    route "research.report.prepared", RecordReport
 
-    route "external.research.request", as: :request_work, emits: ["research.work.request"] do
+    route "external.research.request", as: :request_work do
       transform(signal) do
         case signal.data do
           %{"prompt" => prompt} when is_binary(prompt) ->
@@ -46,9 +44,7 @@ defmodule JidoTest.ComposableAgent.Definitions.Team do
       end
     end
 
-    route "external.research.prompted",
-      as: :request_work_from_prompt,
-      emits: ["research.work.request"] do
+    route "external.research.prompted", as: :request_work_from_prompt do
       transform do
         %Jido.Signal{data: %{"prompt" => prompt}} = signal when is_binary(prompt) ->
           {:ok, %{signal | type: "research.work.request", data: %{query: String.trim(prompt)}}}
@@ -61,8 +57,8 @@ defmodule JidoTest.ComposableAgent.Definitions.Team do
       end
     end
 
-    route "research.work.request", as: :request_internal_work
-    route "research.plan.request", as: :request_plan
+    forward "research.work.request", to: agent(:researchers)
+    forward "research.plan.request", to: agent(:planner)
   end
 
   schedules do
@@ -134,7 +130,7 @@ defmodule JidoTest.ComposableAgent.Definitions.Team.Worker do
   routes do
     signal_source "/research/worker"
 
-    route "research.work.request", emits: ["research.report.prepared"] do
+    route "research.work.request" do
       action %{query: query}, schema: Zoi.object(%{query: Zoi.string()}), context: context do
         next_state = %{context.agent_state | query: query, status: "completed"}
         report = "Research findings for: #{query}"
@@ -142,7 +138,7 @@ defmodule JidoTest.ComposableAgent.Definitions.Team.Worker do
       end
     end
 
-    route "research.plan.request", emits: ["research.work.request"] do
+    route "research.plan.request" do
       action %{query: query}, schema: Zoi.object(%{query: Zoi.string()}), context: context do
         next_state = %{context.agent_state | query: query, status: "planned"}
         {:ok, next_state, [emit("research.work.request", %{query: query})]}

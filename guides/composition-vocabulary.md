@@ -16,7 +16,7 @@ defmodule MyApp.Worker do
 
   routes do
     signal_source("/my_app/worker")
-    route "task.run", MyApp.RunTask, emits: ["task.done"]
+    route "task.run", MyApp.RunTask
   end
 end
 
@@ -85,7 +85,6 @@ process. The right column exists only after `Jido.start_agent/2`.
 | State binding | A `state/1` reference to a field of the parent's committed state. | `state(:size)`, `state(:name)` |
 | Connection | A Signal type, a source, a destination, and a delivery mode. | `"task.done"` from `:workers` to `:root` |
 | Delivery | `:single` (default) or `:broadcast`. A counted member needs `:broadcast` as a destination. | `:single` |
-| Emission contract | A route's `emits:` list. Jido uses it to check connections, `agent_send/2`, and `owner_send/1`. | `emits: ["task.done"]` on the worker route |
 | Bus | A local Signal bus declared with `Jido.Plugin.Bus.DSL`, used as the endpoint `bus(:name)`. | Not declared here |
 
 A member's definition can have its own topology, so teams nest. Each level

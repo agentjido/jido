@@ -45,3 +45,9 @@
   decision: Accept the current full jido.agent_evaluation profile with 366 mutants, 232 killed mutants, 87 reviewed survivors, 47 invalid mutations, no timeout, and no unsorted mutant.
   driver: The component review needs current mutation evidence after the boundary, public API, Covenant, and edge-case changes.
   approved_by: User-requested component review
+
+- id: explicit-route-output
+  date: 2026-10-23
+  decision: Remove route output declarations and implicit pass-through. Use Emit for dispatch, transform for one changed Signal, and forward for one unchanged Signal sent to a named Agent or parent.
+  driver: Route selection does not know the Signals that an Action or Flow can produce. Explicit Directives make each output destination visible.
+  approved_by: User-requested route contract review

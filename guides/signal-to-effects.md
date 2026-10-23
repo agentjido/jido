@@ -70,11 +70,11 @@ receives it in its context map. It isn't stored in state or in the Signal.
 | Action | A `Jido.Action` module or an inline `action` block | Yes |
 | Flow | A `Jido.Flow` module | Yes |
 | Transform | A function from Signal to one output Signal | No |
-| Pass-through | Nothing. Emits the unchanged Signal. | No |
+| Forward | Sends the input Signal to one named child or the parent. | No |
 
 For Action and Flow routes, the input is the route `defaults:` merged with the
-Signal data. Signal data wins on equal keys. Transform and pass-through routes
-return one `Emit` Directive and don't accept `defaults:`.
+Signal data. Signal data wins on equal keys. A transform returns one `Emit`.
+A forward returns one `AgentSend` or `ParentSend`. Neither accepts `defaults:`.
 
 ## Execution
 
@@ -118,9 +118,8 @@ Jido checks the result as one batch:
 2. The handler must not change a Plugin-owned state field.
 3. Each Directive must be built in, define `validate/1`, or be owned by a
    Plugin.
-4. If the route sets `emits:`, every emitted type must be in that list.
-5. Each Plugin with `reduce/2` updates its own field.
-6. Topology, route, and Plugin Directives edit the candidate's definition.
+4. Each Plugin with `reduce/2` updates its own field.
+5. Topology, route, and Plugin Directives edit the candidate's definition.
 
 `max_directives_per_turn:` caps the batch at 1,000 by default.
 
@@ -204,8 +203,9 @@ the source Signal's trace and causation.
 | Directive | Effect |
 | --- | --- |
 | `Jido.Agent.Directive.Emit` | Dispatches one Signal. |
+| `Jido.Agent.Directive.Reply` | Sends one correlated response to the current requester. |
 | `Jido.AgentServer.Directive.AgentSend` | Sends a Signal to another Agent. |
-| `Jido.AgentServer.Directive.OwnerSend` | Sends a Signal to the owning Agent. |
+| `Jido.AgentServer.Directive.ParentSend` | Sends a Signal to the parent Agent. |
 | `Jido.AgentServer.Directive.AgentStart` | Starts an Agent. |
 | `Jido.AgentServer.Directive.AgentStop` | Stops an Agent. |
 | `Jido.AgentServer.Directive.ProcessStart` | Starts a process under the instance. It can outlive the Server. |

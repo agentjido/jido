@@ -65,7 +65,7 @@ defmodule Jido.Persistence.SnapshotTest do
   test "complete mutated definition and state round trip without a source module" do
     assert {:ok, agent, _} =
              Agent.mutate(F.agent(), [
-               D.route_add("extra"),
+               D.route_add("extra", F.Work),
                D.agent_add(:worker, F.Worker),
                D.plugin_add(F.Counter)
              ])
@@ -84,6 +84,21 @@ defmodule Jido.Persistence.SnapshotTest do
     assert restored.extensions === agent.extensions
     assert restored.topology.agents |> hd() |> Map.fetch!(:definition) == F.Worker.definition()
     assert agent.topology.agents |> hd() |> Map.fetch!(:definition) == F.Worker
+  end
+
+  @tag obligation: "jido.persistence.I6"
+  test "portable forward targets are not treated as code references" do
+    assert {:ok, agent, _} =
+             Agent.mutate(F.agent(), [
+               D.route_add("send.parent", %{
+                 kind: :forward,
+                 target: %{kind: :parent}
+               })
+             ])
+
+    assert {:ok, snapshot} = Persistence.snapshot(agent)
+    assert Enum.all?(Map.keys(snapshot.references), &is_atom/1)
+    assert {:ok, ^agent} = Persistence.restore(snapshot)
   end
 
   @tag obligation: "jido.persistence.I6"
@@ -288,7 +303,10 @@ defmodule Jido.Persistence.SnapshotTest do
     opts = [namespace: "evolution"]
     agent = %{F.agent() | id: "snapshot-#{System.unique_integer([:positive])}"}
     assert :ok = Persistence.create_agent(store, agent, opts)
-    assert {:ok, next, _} = Agent.mutate(agent, [D.route_add("new"), D.plugin_add(F.Counter)])
+
+    assert {:ok, next, _} =
+             Agent.mutate(agent, [D.route_add("new", F.Work), D.plugin_add(F.Counter)])
+
     assert :ok = Persistence.save_agent(store, next, opts ++ [expected_revision: 0, revision: 1])
 
     assert {:ok, ^next, 1} =
@@ -325,7 +343,7 @@ defmodule Jido.Persistence.SnapshotTest do
   @tag obligation: ["jido.persistence.I6", "jido.persistence.I11"]
   test "custom state conversion cannot replace the accepted definition" do
     original = F.Custom.instantiate!(id: "custom", state: %{count: 4})
-    assert {:ok, agent, _} = Agent.mutate(original, [D.route_add("saved")])
+    assert {:ok, agent, _} = Agent.mutate(original, [D.route_add("saved", F.Work)])
     assert {:ok, snapshot} = Persistence.snapshot(agent)
     assert snapshot.state_format == :custom
     assert snapshot.agent.state == %{id: "custom", saved: 4}

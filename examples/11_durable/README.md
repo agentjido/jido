@@ -90,7 +90,7 @@ mix test test/examples/11_durable --include example --seed 0 --warnings-as-error
 ```
 
 Child BEAM tests need local sockets and `kill`. No credentials or external service
-are required. See the [lifecycle guide](../../guides/agent-server-lifecycle.md) and
+are required. See the [lifecycle guide](../../guides/agent-activation-control.md) and
 [Core tests](../../test/contract/jido.agent_server/durable_turn/runtime_test.exs).
 
 Previous: [Persistence](../10_persistence/README.md) | Next: [Saved Agent State](11_01_saved_agent/README.md)

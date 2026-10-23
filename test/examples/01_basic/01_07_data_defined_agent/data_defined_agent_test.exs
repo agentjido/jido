@@ -58,7 +58,7 @@ defmodule JidoTest.Examples.Basic.DataDefinedAgentTest do
 
   test "Scheduler configuration must have an allowed Plugin reference" do
     {document, registry} = Example.encode()
-    missing_scheduler = Map.delete(registry.entries, "plugins/scheduler/v1")
+    missing_scheduler = Map.delete(registry.entries, {"plugins/scheduler", 1})
 
     assert {:error, _} =
              JidoTest.AgentRegistry.decode_json(Jason.encode!(document), missing_scheduler)

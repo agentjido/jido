@@ -9,9 +9,8 @@
         },
         "id": "Elixir.Jido.Examples.DataDefinedAgent.CountTurns",
         "provider": {
-          "$type": "reference",
-          "id": "plugins/count-turns/v1",
-          "kind": "plugin"
+          "id": "plugins/count-turns",
+          "vsn": 1
         },
         "vsn": 1
       },
@@ -22,7 +21,8 @@
             {
               "key": {
                 "$type": "atom",
-                "id": "atoms/retry-delay"
+                "id": "atoms/retry-delay",
+                "vsn": 1
               },
               "value": 25
             }
@@ -30,13 +30,16 @@
         },
         "id": "Elixir.Jido.Plugin.Scheduler",
         "provider": {
-          "$type": "reference",
-          "id": "plugins/scheduler/v1",
-          "kind": "plugin"
+          "id": "plugins/scheduler",
+          "vsn": 1
         },
         "vsn": 1
       }
     ],
+    "initial_state": {
+      "$type": "map",
+      "entries": []
+    },
     "metadata": {
       "$type": "map",
       "entries": []
@@ -50,13 +53,11 @@
           "$type": "map",
           "entries": []
         },
-        "emits": null,
         "handler": {
           "kind": "action",
           "target": {
-            "$type": "reference",
-            "id": "actions/add/v1",
-            "kind": "action"
+            "id": "actions/add",
+            "vsn": 1
           }
         },
         "path": "examples.basic.data_defined.add"
@@ -67,22 +68,19 @@
           "$type": "map",
           "entries": []
         },
-        "emits": null,
         "handler": {
           "kind": "action",
           "target": {
-            "$type": "reference",
-            "id": "actions/schedule/v1",
-            "kind": "action"
+            "id": "actions/schedule",
+            "vsn": 1
           }
         },
         "path": "examples.basic.data_defined.schedule"
       }
     ],
     "schema": {
-      "$type": "reference",
-      "id": "schemas/counter/v1",
-      "kind": "schema"
+      "id": "schemas/counter",
+      "vsn": 1
     },
     "signal_source": null,
     "topology": {
@@ -92,5 +90,5 @@
     "vsn": 1
   },
   "type": "jido.agent.definition",
-  "version": 1
+  "vsn": 1
 }

@@ -12,7 +12,7 @@ defmodule JidoTest.AgentEvolutionFixtures do
     end
 
     routes do
-      route "work"
+      route "work", JidoTest.AgentEvolutionFixtures.Work
     end
   end
 

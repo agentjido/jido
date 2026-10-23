@@ -27,8 +27,8 @@ defmodule Jido.Agent.CodecTest do
     end
 
     routes do
-      route "child.single"
-      route "child.broadcast"
+      route "child.single", Jido.Agent.CodecTest.Work
+      route "child.broadcast", Jido.Agent.CodecTest.Work
     end
   end
 
@@ -122,7 +122,7 @@ defmodule Jido.Agent.CodecTest do
     nested =
       Agent.define!(%{
         name: "nested",
-        routes: [%{path: "child.single", handler: %{kind: :pass_through}}]
+        routes: [%{path: "child.single", handler: %{kind: :action, target: Work}}]
       })
 
     definition =
@@ -137,16 +137,14 @@ defmodule Jido.Agent.CodecTest do
         routes: [
           %{
             path: "child.single",
-            handler: %{kind: :action, target: Work},
-            emits: ["child.single"]
+            handler: %{kind: :action, target: Work}
           },
-          %{path: "flow.run", handler: %{kind: :flow, target: WorkFlow}, emits: []},
+          %{path: "flow.run", handler: %{kind: :flow, target: WorkFlow}},
           %{
             path: "transform.run",
-            handler: %{kind: :transform, target: {__MODULE__, :transform, 1}},
-            emits: ["transform.run"]
+            handler: %{kind: :transform, target: {__MODULE__, :transform, 1}}
           },
-          %{path: "child.broadcast", handler: %{kind: :pass_through}}
+          %{path: "child.broadcast", handler: %{kind: :forward, target: %{kind: :parent}}}
         ],
         topology: %{
           agents: [
@@ -316,7 +314,7 @@ defmodule Jido.Agent.CodecTest do
       Agent.define!(%{
         name: "nested_shape",
         schema: Zoi.object(%{value: Zoi.string() |> Zoi.default("default")}),
-        routes: [%{path: "child.single", handler: %{kind: :pass_through}}]
+        routes: [%{path: "child.single", handler: %{kind: :action, target: Work}}]
       })
 
     definition =
@@ -354,12 +352,13 @@ defmodule Jido.Agent.CodecTest do
       put_in(document, ["definition", "initial_state"], false),
       put_in(document, ["definition", "routes"], false),
       put_in(document, ["definition", "routes"], [%{"path" => "child.single"}]),
+      put_in(document, ["definition", "routes"], [Map.put(route, "unknown", true)]),
       put_in(document, ["definition", "routes"], [%{route | "handler" => %{"kind" => "bad"}}]),
       put_in(document, ["definition", "routes"], [
         %{route | "handler" => Map.put(route["handler"], "extra", true)}
       ]),
       put_in(document, ["definition", "routes"], [
-        %{route | "handler" => %{"kind" => "pass_through", "extra" => true}}
+        %{route | "handler" => %{"kind" => "forward", "extra" => true}}
       ]),
       put_in(document, ["definition", "topology"], false),
       put_in(document, ["definition", "topology", "agents"], false),
