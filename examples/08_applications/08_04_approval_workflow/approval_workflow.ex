@@ -12,7 +12,7 @@ defmodule Jido.Examples.ApprovalWorkflow do
     name: "examples_flight_booking",
     description: "Runs a structured flight search and approval process"
 
-  agent do
+  state do
     schema Zoi.object(%{
              trip_constraints: Zoi.map() |> Zoi.default(%{}),
              search_revision: Zoi.integer() |> Zoi.min(0) |> Zoi.default(0),
@@ -36,7 +36,9 @@ defmodule Jido.Examples.ApprovalWorkflow do
              booking_id: Zoi.string() |> Zoi.default(""),
              last_error: Zoi.string() |> Zoi.default("")
            })
+  end
 
+  plugins do
     plugin Jido.Examples.ApprovalWorkflow.BookingPlugin
   end
 

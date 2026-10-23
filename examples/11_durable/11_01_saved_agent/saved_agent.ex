@@ -2,7 +2,7 @@ defmodule Jido.Examples.Durable.SavedAgent do
   @moduledoc "A report request remains committed after the entire BEAM stops."
   use Jido.Agent, name: "durable_saved_agent"
 
-  agent do
+  state do
     schema Zoi.object(%{
              report_id: Zoi.string() |> Zoi.default(""),
              topic: Zoi.string() |> Zoi.default(""),

@@ -10,7 +10,7 @@ defmodule Jido.Examples.StableReference do
   alias Jido.Agent.Ref
   alias Jido.Signal
 
-  agent do
+  state do
     schema Zoi.object(%{messages: Zoi.list(Zoi.string()) |> Zoi.default([])})
   end
 

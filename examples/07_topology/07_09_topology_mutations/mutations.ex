@@ -5,7 +5,7 @@ defmodule Jido.Examples.Topology.Mutations do
   alias Jido.Agent.Directive, as: D
   alias Jido.Examples.Topology.Cell
 
-  agent do
+  state do
     schema Zoi.object(%{worker_count: Zoi.integer() |> Zoi.min(1) |> Zoi.default(2)})
   end
 

@@ -184,7 +184,7 @@ end
 defmodule MyApp.Orders do
   use Jido.Agent, name: "orders"
 
-  agent do
+  state do
     schema(
       Zoi.object(%{
         orders: Zoi.map() |> Zoi.default(%{}),

@@ -91,13 +91,6 @@ Keep focused public-contract, compiler, and generated-helper tests in
 failure races and distributed lifecycle tests in the existing runtime suites.
 Authoring execution tests check that each form produces the expected live system.
 
-## Confirmed fixes
-
-Both block DSLs rejected string metadata keys that other authoring forms
-accepted. They also failed with a protocol error for a struct used as metadata.
-Each DSL now uses its own core metadata validator. The Topology validator still
-rejects runtime values; the Agent and Topology contracts remain separate.
-
 ## Limits
 
 This is a fixed regression corpus, not yet a full burn-in tool. It does not

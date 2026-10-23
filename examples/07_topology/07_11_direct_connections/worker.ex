@@ -2,7 +2,7 @@ defmodule Jido.Examples.Topology.PipelineWorker do
   @moduledoc "Commits the work result and explicitly emits completion."
   use Jido.Agent, name: "topology_pipeline_worker"
 
-  agent do
+  state do
     schema Zoi.object(%{total: Zoi.integer() |> Zoi.default(0)})
   end
 

@@ -8,7 +8,7 @@ defmodule Jido.Agent.TopologyContractTest do
   defmodule Child do
     use Jido.Agent, name: "topology_contract_child"
 
-    agent do
+    state do
       schema Zoi.object(%{
                value: Zoi.string() |> Zoi.default("default"),
                items: Zoi.list(Zoi.string()) |> Zoi.default([])
@@ -36,7 +36,7 @@ defmodule Jido.Agent.TopologyContractTest do
   defmodule StructuredChild do
     use Jido.Agent, name: "topology_contract_structured_child"
 
-    agent do
+    state do
       schema Zoi.object(%{
                settings: Zoi.object(%{label: Zoi.string(), enabled: Zoi.boolean()}),
                metadata: Zoi.map(),
@@ -397,7 +397,7 @@ defmodule Jido.Agent.TopologyContractTest do
   end
 
   @tag obligation: "jido.agent.I30"
-  test "binding starts with the child definition initial state and applies member overrides" do
+  test "binding returns member overrides without instantiating the child" do
     initialized_child =
       Agent.define!(%{
         name: "topology_contract_initialized_child",
@@ -425,8 +425,8 @@ defmodule Jido.Agent.TopologyContractTest do
       })
 
     assert {:ok, [default, overridden]} = Topology.bind(definition, %{})
-    assert default.state == %{count: 4, label: "definition"}
-    assert overridden.state == %{count: 4, label: "member"}
+    assert default.state == %{}
+    assert overridden.state == %{label: "member"}
   end
 
   @tag obligation: ["jido.agent.I28", "jido.agent.I30"]

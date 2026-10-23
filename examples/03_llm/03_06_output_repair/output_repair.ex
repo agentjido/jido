@@ -3,7 +3,7 @@ defmodule Jido.Examples.OutputRepair do
 
   use Jido.Agent, name: "examples_llm_output_repair"
 
-  agent do
+  state do
     schema Zoi.object(%{
              answer: Zoi.string() |> Zoi.default(""),
              attempts: Zoi.integer() |> Zoi.min(0) |> Zoi.default(0)

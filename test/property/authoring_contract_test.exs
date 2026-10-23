@@ -74,7 +74,7 @@ defmodule JidoTest.Property.AuthoringContractTest do
     source = """
     defmodule #{inspect(module)} do
       use Jido.Agent, name: "property_authored_history"
-      agent do
+      state do
         schema Zoi.object(%{value: Zoi.integer(), history: Zoi.list(Zoi.integer())})
       end
       routes do

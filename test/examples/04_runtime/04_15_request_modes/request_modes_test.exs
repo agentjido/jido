@@ -16,7 +16,7 @@ defmodule JidoTest.Examples.Runtime.RequestModesBlockingAgent do
   @moduledoc false
   use Jido.Agent, name: "test_runtime_request_modes_blocking_agent"
 
-  agent do
+  state do
     schema Zoi.object(%{history: Zoi.list(Zoi.string()) |> Zoi.default([])})
   end
 

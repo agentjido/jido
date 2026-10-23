@@ -81,7 +81,7 @@ defmodule JidoTest.AgentFixtures.CounterAgent do
 
   use Jido.Agent, name: "counter_agent", description: "A module-authored Agent"
 
-  agent do
+  state do
     schema Zoi.object(%{
              count: Zoi.integer() |> Zoi.default(0),
              history: Zoi.list(Zoi.string()) |> Zoi.default([])

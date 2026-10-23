@@ -2,9 +2,9 @@ defmodule Jido.AgentServer.Directive.AgentStart do
   @moduledoc """
   Starts and tracks one local Agent under its owner's OTP supervisor.
 
-  `opts` accepts instance `id` and initial `state`, plus AgentServer options.
-  A complete Agent instance supplies its own identity and state. Remote nodes
-  are rejected before commit. `restart` selects the OTP restart policy.
+  `opts` accepts instance `id` and initial `state`, plus AgentServer options. A
+  complete Agent instance supplies its own identity and state. Remote nodes are
+  rejected before commit. `restart` selects the OTP restart policy.
   """
 
   @schema Zoi.struct(

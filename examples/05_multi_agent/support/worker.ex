@@ -3,7 +3,7 @@ defmodule Jido.Examples.Worker do
 
   use Jido.Agent, name: "example_worker"
 
-  agent do
+  state do
     schema Zoi.object(%{completed: Zoi.list(Zoi.map()) |> Zoi.default([])})
   end
 

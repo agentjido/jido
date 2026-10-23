@@ -35,6 +35,9 @@ defmodule Jido.Agent.AuthoringContractTest do
     assert {:error, %{code: :invalid_options, message: message}} =
              Agent.instantiate(definition, id: "a", id: "b")
 
+    assert {:error, %{code: :unknown_fields}} =
+             Agent.instantiate(definition, id: "state", input: %{})
+
     assert message != ""
     instance = Agent.instantiate!(definition, id: "state", state: %{count: 0})
     assert {:ok, %{state: %{count: 2}}} = Agent.set(instance, count: 1, count: 2)

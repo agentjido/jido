@@ -24,7 +24,7 @@ defmodule JidoTest.Authoring.Agents.AuthoringTest do
     ]
 
     for {source, schema, supplied, expected} <- cases do
-      module = Compiler.compile("agent do schema #{source} end")
+      module = Compiler.compile("state do schema #{source} end")
       from_map = Agent.define!(%{module: module, name: "generated", schema: schema})
       assert module.definition() === from_map
       assert Map.from_struct(module.definition()) === Map.from_struct(from_map)

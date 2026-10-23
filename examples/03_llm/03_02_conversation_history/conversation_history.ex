@@ -3,7 +3,7 @@ defmodule Jido.Examples.ConversationHistory do
 
   use Jido.Agent, name: "examples_llm_conversation_history"
 
-  agent do
+  state do
     schema Zoi.object(%{
              messages: Zoi.list(Zoi.map()) |> Zoi.default([]),
              processed_ids: Zoi.list(Zoi.string()) |> Zoi.default([])

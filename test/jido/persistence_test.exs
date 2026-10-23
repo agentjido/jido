@@ -28,12 +28,18 @@ defmodule JidoTest.PersistenceTest do
   defmodule CheckpointAgent do
     use Jido.Agent, name: "checkpoint_contract"
 
-    agent do
+    state do
       schema Zoi.object(%{reply: Zoi.any()})
     end
 
     @impl true
     def checkpoint(agent, _context), do: agent.state.reply
+  end
+
+  defmodule RestoreAgent do
+    use Jido.Agent, name: "restore_initializer"
+    def initialize(%{create: true}, _context), do: {:ok, %{}}
+    def initialize(_, _context), do: raise("initialize/2 ran during restore")
   end
 
   test "instance sources use their live namespace and honor explicit overrides" do
@@ -583,18 +589,18 @@ defmodule JidoTest.PersistenceTest do
   test "explicit restore loads an existing record", %{jido: jido} do
     persistence = adapter(:automatic_restore)
     id = unique_id("automatic-restore")
-    agent = RuntimeAgent.instantiate!(id: id, state: %{events: [:saved]})
+    agent = RestoreAgent.instantiate!(id: id, state: %{create: true})
 
     assert :ok = Persistence.save_agent(persistence, agent, instance: jido, revision: 3)
 
     assert {:ok, pid} =
-             JidoTest.AgentServerAssertions.start_agent(jido, RuntimeAgent,
+             JidoTest.AgentServerAssertions.start_agent(jido, RestoreAgent,
                id: id,
                persistence: persistence,
                persistence_mode: :restore
              )
 
-    assert Server.agent(pid).state.events == [:saved]
+    assert Server.agent(pid) == agent
     assert %{state_version: 3} = JidoTest.AgentServerAssertions.committed(pid)
   end
 

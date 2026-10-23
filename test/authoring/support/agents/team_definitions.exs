@@ -2,6 +2,7 @@ defmodule JidoTest.ComposableAgent.Definitions.Team do
   use Jido.Agent,
     name: "research_team",
     description: "Coordinates research and records a report",
+    metadata: %{purpose: "research"},
     extensions: [
       Jido.Plugin.Scheduler.DSL,
       Jido.Plugin.Bus.DSL
@@ -9,14 +10,12 @@ defmodule JidoTest.ComposableAgent.Definitions.Team do
 
   alias __MODULE__.{RecordReport, Worker}
 
-  agent do
+  state do
     schema Zoi.object(%{
              query: Zoi.string() |> Zoi.default(""),
              workers: Zoi.integer() |> Zoi.default(2),
              report: Zoi.string() |> Zoi.default("")
            })
-
-    metadata %{purpose: "research"}
   end
 
   routes do
@@ -120,7 +119,7 @@ end
 defmodule JidoTest.ComposableAgent.Definitions.Team.Worker do
   use Jido.Agent, name: "research_worker"
 
-  agent do
+  state do
     schema Zoi.object(%{
              query: Zoi.string() |> Zoi.default(""),
              status: Zoi.string() |> Zoi.default("idle")

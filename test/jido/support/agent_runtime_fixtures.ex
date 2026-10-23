@@ -40,12 +40,14 @@ defmodule JidoTest.AgentRuntimeFixtures.RuntimeAgent do
 
   use Jido.Agent, name: "runtime_agent"
 
-  agent do
+  state do
     schema Zoi.object(%{
              events: Zoi.list(Zoi.any()) |> Zoi.default([]),
              ticks: Zoi.integer() |> Zoi.default(0)
            })
+  end
 
+  plugins do
     plugin Jido.Plugin.Scheduler
   end
 

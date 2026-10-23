@@ -11,7 +11,7 @@ defmodule Jido.Examples.Persistence.PersistentAgent do
     name: "examples_persistent_agent",
     description: "Creates, commits, and restores one persistent Agent"
 
-  agent do
+  state do
     schema Zoi.object(%{
              count: Zoi.integer() |> Zoi.default(0),
              handled_signal_ids: Zoi.list(Zoi.string()) |> Zoi.default([]),

@@ -21,7 +21,7 @@ defmodule Jido.Agent.FlowExpressionTest do
   defmodule Counter do
     use Jido.Agent, name: "expression_counter"
 
-    agent do
+    state do
       schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
     end
 

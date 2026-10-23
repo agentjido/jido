@@ -59,7 +59,7 @@ The Flow's output becomes the next Agent state:
 defmodule Expense.Agent do
   use Jido.Agent, name: "expense"
 
-  agent do
+  state do
     schema(
       Zoi.object(%{
         request_id: Zoi.string() |> Zoi.default(""),

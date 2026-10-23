@@ -71,7 +71,7 @@ An Action or Flow route must return the complete next Agent state.
 defmodule Routes.Orders do
   use Jido.Agent, name: "orders"
 
-  agent do
+  state do
     schema(
       Zoi.object(%{
         last: Zoi.string() |> Zoi.default(""),

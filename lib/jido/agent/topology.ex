@@ -189,14 +189,6 @@ defmodule Jido.Agent.Topology do
     end
   end
 
-  defp contains_ref?(%{kind: :state}), do: true
-
-  defp contains_ref?(value) when is_map(value) and not is_struct(value),
-    do: Enum.any?(value, fn {_, v} -> contains_ref?(v) end)
-
-  defp contains_ref?(value) when is_list(value), do: Enum.any?(value, &contains_ref?/1)
-  defp contains_ref?(_), do: false
-
   defp partial_initial(schema, state) do
     partial_value(schema, state) |> Error.at(:initial_state)
   end
@@ -205,28 +197,17 @@ defmodule Jido.Agent.Topology do
   # parts and check the complete value again when an instance binds the input.
   defp partial_value(_schema, %{kind: :state}), do: :ok
 
-  defp partial_value(%Zoi.Types.Map{fields: fields} = schema, state)
+  defp partial_value(%Zoi.Types.Map{fields: fields}, state)
        when is_list(fields) and is_map(state) and not is_struct(state) do
-    with {:ok, fields} <-
-           Data.list(fields, fn {key, type} ->
-             case Map.fetch(state, key) do
-               {:ok, value} ->
-                 if contains_ref?(value) do
-                   with :ok <- Error.at(partial_value(type, value), key),
-                        do: {:ok, {key, Zoi.any()}}
-                 else
-                   {:ok, {key, type}}
-                 end
+    known = Map.new(fields)
 
-               :error ->
-                 {:ok, {key, type}}
-             end
-           end) do
-      case Data.initialize(%{schema | fields: fields}, state) do
-        {:ok, _} -> :ok
-        error -> error
-      end
-    end
+    with {:ok, _} <- Data.fields(state, Map.keys(known)),
+         {:ok, _} <-
+           Data.list(Map.to_list(state), fn {key, value} ->
+             with :ok <- Error.at(partial_value(Map.fetch!(known, key), value), key),
+                  do: {:ok, {key, value}}
+           end),
+         do: :ok
   end
 
   defp partial_value(%Zoi.Types.Array{inner: inner} = schema, value) when is_list(value) do
@@ -372,10 +353,8 @@ defmodule Jido.Agent.Topology do
            :ok <- Error.at(Data.positive(count), :count),
            {:ok, initial} <- resolve_ref(member.initial_state, state),
            {:ok, schema} <- Jido.Agent.Validation.state_schema(child),
-           initial = Map.merge(child.initial_state, initial),
-           {:ok, child_state} <- Error.at(Data.initialize(schema, initial), :initial_state),
-           {:ok, _} <- bind(child, child_state) do
-        {:ok, %{name: member.name, definition: child, count: count, state: child_state}}
+           :ok <- partial_initial(schema, initial) do
+        {:ok, %{name: member.name, definition: child, count: count, state: initial}}
       end
     end)
     |> Error.at([:topology, :agents])

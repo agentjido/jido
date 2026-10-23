@@ -7,8 +7,8 @@
 Current Jido supports Agent modules with DSL blocks, direct map or keyword
 configuration, and Codec documents. These forms use the canonical Agent
 constructor. The user intentionally removed Builder. Module definitions use
-blocks for schema, metadata, Plugins, and routes. Standalone module options
-are limited to name, description, vsn, and extensions.
+separate state, Plugin, and route blocks. Identity and metadata use module
+options.
 
 An exposed route declares a helper name with `as:`. The generated helper
 builds a Signal from a plain input map and optional envelope settings.
@@ -32,7 +32,7 @@ identity and state. This review does not approve the complete topic documents.
 
 | Area | Contract |
 | --- | --- |
-| Module authoring | Keep DSL blocks and the four allowed module options. |
+| Module authoring | Keep separate state, Plugin, and route blocks. |
 | Route helpers | Keep named Signal constructors with map input; execution remains explicit. |
 | Direct data | Keep map and keyword definition construction. |
 | Builder | Removed by explicit user decision; older references need cleanup. |

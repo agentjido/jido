@@ -27,7 +27,7 @@ defmodule Jido.Examples.AgentExtension do
       name: "basic_agent_extension",
       extensions: [Labels]
 
-    agent do
+    state do
       schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
     end
 

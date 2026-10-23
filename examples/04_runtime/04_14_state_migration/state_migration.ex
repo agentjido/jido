@@ -42,7 +42,7 @@ defmodule Jido.Examples.StateMigration do
 
   use Jido.Agent, name: "runtime_wallet", vsn: 1
 
-  agent do
+  state do
     schema Zoi.object(%{
              wallet:
                Zoi.object(%{format: Zoi.literal(1), balance: Zoi.integer()})

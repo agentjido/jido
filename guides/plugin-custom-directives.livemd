@@ -144,7 +144,7 @@ defmodule GuidePlugins.Orders do
     name: "orders",
     extensions: [GuidePlugins.Notifier]
 
-  agent do
+  state do
     schema(Zoi.object(%{placed: Zoi.list(Zoi.string()) |> Zoi.default([])}))
   end
 

@@ -59,7 +59,7 @@ defmodule JidoTest.InstanceRefTest do
   defmodule Counter do
     use Jido.Agent, name: "instance_ref_counter"
 
-    agent do
+    state do
       schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
     end
 
@@ -71,7 +71,7 @@ defmodule JidoTest.InstanceRefTest do
   defmodule RenamedCounter do
     use Jido.Agent, name: "instance_ref_renamed_counter"
 
-    agent do
+    state do
       schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
     end
 

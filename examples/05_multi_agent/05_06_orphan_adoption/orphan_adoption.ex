@@ -2,7 +2,7 @@ defmodule Jido.Examples.OrphanAdoption.Child do
   @moduledoc "A worker that can survive its owner's activation."
   use Jido.Agent, name: "multi_agent_orphan_adoption_child"
 
-  agent do
+  state do
     schema Zoi.object(%{total: Zoi.integer() |> Zoi.default(0)})
   end
 
@@ -22,7 +22,7 @@ defmodule Jido.Examples.OrphanAdoption.Parent do
   alias Jido.AgentServer, as: Server
   alias Jido.Examples.OrphanAdoption.Child
 
-  agent do
+  state do
     schema Zoi.object(%{forwarded: Zoi.integer() |> Zoi.default(0)})
   end
 

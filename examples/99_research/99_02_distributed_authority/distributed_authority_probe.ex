@@ -10,7 +10,7 @@ defmodule Jido.Examples.DistributedAuthorityProbe do
   """
   use Jido.Agent, name: "research_distributed_authority"
 
-  agent do
+  state do
     schema Zoi.object(%{value: Zoi.integer() |> Zoi.default(0)})
   end
 

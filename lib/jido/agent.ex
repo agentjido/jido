@@ -23,7 +23,12 @@ defmodule Jido.Agent do
 
   @doc "Restores one Agent instance from a custom portable checkpoint payload."
   @callback restore(map(), map()) :: {:ok, instance()} | {:error, term()}
-  @optional_callbacks checkpoint: 2, restore: 2
+
+  @doc "Transforms the candidate state for a new Agent instance."
+  @callback initialize(state :: map(), context :: map()) ::
+              {:ok, map()} | {:error, term()}
+
+  @optional_callbacks checkpoint: 2, restore: 2, initialize: 2
 
   @schema Zoi.struct(__MODULE__, %{
             id: Zoi.string() |> Zoi.nullable() |> Zoi.default(nil),
@@ -68,6 +73,7 @@ defmodule Jido.Agent do
   - `:name` is the required Agent name.
   - `:description` is optional display text.
   - `:vsn` is the positive definition version. It defaults to `1`.
+  - `:metadata` is optional static definition data. It defaults to an empty Map.
   - `:extensions` lists the Extension or Plugin providers that add authoring
     sections or need an empty configuration.
 
@@ -75,11 +81,15 @@ defmodule Jido.Agent do
 
   Each optional core section can occur once:
 
-      use Jido.Agent, id: "my_app/counter", name: "counter", vsn: 1
+      use Jido.Agent, id: "my_app/counter", name: "counter", vsn: 1,
+        metadata: %{domain: "counters"}
 
-      agent do
+      state do
         schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
-        metadata %{domain: "counters"}
+        initial_state %{count: 0}
+      end
+
+      plugins do
         plugin MyApp.Plugin, config: %{mode: :strict}
       end
 
@@ -96,8 +106,9 @@ defmodule Jido.Agent do
         end
       end
 
-  The `agent` section accepts `schema`, `metadata`, and `plugin`. The `routes`
-  section accepts `signal_source` and ordered `route` declarations. A route can
+  The `state` section accepts `schema` and `initial_state`. The `plugins` section
+  accepts ordered `plugin` declarations. The `routes` section accepts
+  `signal_source` and ordered `route` declarations. A route can
   use an Action or Flow module, an inline `action` or `transform`, or a
   `Jido.SignalAction` module. `route SignalAction, Handler` uses the
   SignalAction input type with another Action or Flow. A string route must have
@@ -159,9 +170,7 @@ defmodule Jido.Agent do
   @doc """
   Builds and validates a neutral Agent definition from a plain Map.
 
-  The optional `initial_state` field must be a plain, static Map. During
-  instantiation, explicit `state` values replace matching top-level fields in
-  `initial_state`. The state schema then adds defaults and validates the result.
+  The optional `initial_state` field must be a plain, static Map.
   """
   @spec define(map()) :: {:ok, definition()} | {:error, term()}
   def define(map), do: Validation.define(map)
@@ -197,8 +206,10 @@ defmodule Jido.Agent do
   @doc """
   Builds and validates one Agent instance from a definition or compiled Agent module.
 
-  Explicit `state` values replace matching top-level `initial_state` fields.
-  The state schema then adds defaults and validates the complete state.
+  Explicit `state` values replace matching declared `initial_state` fields.
+  The Agent module's optional `initialize/2` callback transforms that candidate
+  with a Jido-owned context. The state schema then adds defaults and validates
+  the complete state.
   """
   @spec instantiate(definition() | module(), keyword() | map()) ::
           {:ok, instance()} | {:error, term()}

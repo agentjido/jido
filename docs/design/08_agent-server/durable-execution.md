@@ -181,11 +181,11 @@ defmodule MyApp.ResearchAgent do
   use Jido.Agent,
     name: "research_agent",
     vsn: 2,
+    metadata: %{domain: "research"},
     extensions: [Jido.AI.DSL]
 
-  agent do
+  state do
     schema(MyApp.ResearchState.schema())
-    metadata(%{domain: "research"})
   end
 
   ai do

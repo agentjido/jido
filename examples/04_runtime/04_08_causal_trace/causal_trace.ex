@@ -9,7 +9,7 @@ defmodule Jido.Examples.CausalTrace do
 
   use Jido.Agent, name: "example_causal_parent"
 
-  agent do
+  state do
     schema Zoi.object(%{
              request_id: Zoi.string() |> Zoi.default(""),
              results: Zoi.map() |> Zoi.default(%{}),

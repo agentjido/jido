@@ -57,7 +57,7 @@ defmodule Jido.Plugin.StateRuntimeTest do
   defmodule DataAgent do
     use Jido.Agent, name: "plugin_data_agent"
 
-    agent do
+    plugins do
       plugin Credits
     end
 

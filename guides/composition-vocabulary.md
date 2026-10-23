@@ -10,7 +10,7 @@ Agents guides can use them without explanation.
 defmodule MyApp.Worker do
   use Jido.Agent, name: "worker"
 
-  agent do
+  state do
     schema(Zoi.object(%{team: Zoi.string() |> Zoi.default("none")}))
   end
 
@@ -23,7 +23,7 @@ end
 defmodule MyApp.Team do
   use Jido.Agent, name: "team"
 
-  agent do
+  state do
     schema(
       Zoi.object(%{
         name: Zoi.string() |> Zoi.default("alpha"),

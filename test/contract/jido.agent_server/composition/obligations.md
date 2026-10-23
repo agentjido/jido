@@ -61,7 +61,7 @@ runtime component has no separate DSL.
 ### jido.agent_server.composition.I6 — Member reconciliation and readiness
 
 - **scope:** accepted topology agent declarations
-- **must:** Bind member counts and initial state from the accepted parent state. Preserve stable slot identities for unchanged persistent members, and assign a new identity when a removed or changed slot starts a new lifetime. Keep unchanged member processes, replace changed members, stop removed members, and start missing members under the owning activation. Keep admission closed until every required member is ready.
+- **must:** Bind member counts and initial state from the accepted parent state. Initialize a member once when reconciliation creates it, with its final child identity and topology context. Restore a saved member without initialization. Preserve stable slot identities for unchanged persistent members, and assign a new identity when a removed or changed slot starts a new lifetime. Keep unchanged member processes, replace changed members, stop removed members, and start missing members under the owning activation. Keep admission closed until every required member is ready.
 - **why:** Live members must match one accepted composition revision before later Turns run.
 - **kind:** ordering
 - **status:** active

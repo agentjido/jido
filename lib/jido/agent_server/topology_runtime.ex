@@ -50,10 +50,13 @@ defmodule Jido.AgentServer.TopologyRuntime do
   defp previous_members(nil), do: {:ok, []}
   defp previous_members(agent), do: Topology.bind(agent, agent.state)
 
-  def validate(agent) do
+  def validate(%Agent{} = agent) do
     with :ok <- Agent.validate_runtime_support(agent),
-         {:ok, members} <- Topology.bind(agent, agent.state),
-         :ok <- reduce(members, &validate(%{&1.definition | state: &1.state})) do
+         :ok <-
+           reduce(agent.topology.agents, fn member ->
+             with {:ok, child} <- Agent.Validation.resolve(member.definition),
+                  do: validate(child)
+           end) do
       supported? =
         Enum.all?(agent.topology.connections, fn edge ->
           Enum.all?([edge.from, edge.to], fn
@@ -130,13 +133,7 @@ defmodule Jido.AgentServer.TopologyRuntime do
         id = data.agent.id <> "/" <> tag
         id = if member.identity, do: id <> "/" <> member.identity, else: id
 
-        agent =
-          Agent.instantiate!(member.definition,
-            id: id,
-            state: member.state
-          )
-
-        with {:ok, persistence} <- member_persistence(data, agent),
+        with {:ok, agent, persistence} <- member_agent(data, member, id),
              {:ok, worker} <-
                Server.spawn_child(data.owner, agent, tag,
                  restart: :permanent,
@@ -147,22 +144,40 @@ defmodule Jido.AgentServer.TopologyRuntime do
     end)
   end
 
-  defp member_persistence(%{persistence: persistence}, _agent) when persistence in [nil, false],
-    do: {:ok, []}
+  defp member_agent(%{persistence: persistence} = data, member, id)
+       when persistence in [nil, false] do
+    with {:ok, agent} <- instantiate_member(data, member, id), do: {:ok, agent, []}
+  end
 
-  defp member_persistence(data, agent) do
+  defp member_agent(data, member, id) do
     options = [instance: data.jido, partition: data.partition]
 
     case Jido.Persistence.load_agent_with_revision(
            data.persistence,
-           agent.module,
-           agent.id,
+           member.definition.module,
+           id,
            options
          ) do
-      {:ok, _, _} -> {:ok, [persistence_mode: :restore]}
-      {:error, :not_found} -> {:ok, [persistence_mode: :create]}
-      error -> error
+      {:ok, saved, _revision} ->
+        {:ok, saved, [persistence_mode: :restore]}
+
+      {:error, :not_found} ->
+        with {:ok, agent} <- instantiate_member(data, member, id),
+             do: {:ok, agent, [persistence_mode: :create]}
+
+      error ->
+        error
     end
+  end
+
+  defp instantiate_member(data, member, id) do
+    context = %{parent_id: data.agent.id, member: member.name, slot: member.slot}
+
+    Agent.Validation.instantiate(
+      member.definition,
+      [id: id, state: member.state],
+      context
+    )
   end
 
   def send_agent(state, name, signal) do

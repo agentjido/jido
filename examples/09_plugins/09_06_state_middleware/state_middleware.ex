@@ -58,8 +58,11 @@ defmodule Jido.Examples.Plugins.StateMiddleware.Agent do
   @moduledoc "Changes domain state while a Plugin reduces its separate owned field."
   use Jido.Agent, name: "plugin_state_middleware_agent"
 
-  agent do
+  state do
     schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+  end
+
+  plugins do
     plugin Jido.Examples.Plugins.StateMiddleware.Plugin
   end
 

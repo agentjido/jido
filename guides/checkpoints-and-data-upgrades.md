@@ -37,7 +37,7 @@ end
 defmodule MyApp.Wallet do
   use Jido.Agent, name: "wallet", vsn: 1
 
-  agent do
+  state do
     schema(Zoi.object(%{balance: Zoi.integer() |> Zoi.default(0)}))
   end
 
@@ -100,7 +100,7 @@ instead of the full state. Use it to drop caches or to store a compact shape:
 defmodule MyApp.Session do
   use Jido.Agent, name: "session"
 
-  agent do
+  state do
     schema(
       Zoi.object(%{
         user: Zoi.string() |> Zoi.default(""),

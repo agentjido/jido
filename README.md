@@ -61,7 +61,7 @@ Declare an Agent with a state schema and one route:
 defmodule MyApp.Counter do
   use Jido.Agent, name: "counter"
 
-  agent do
+  state do
     schema(Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}))
   end
 
@@ -147,7 +147,7 @@ Full documentation is on [HexDocs](https://hexdocs.pm/jido). Start with:
 
 ## Features
 
-- Agent definitions from the `agent`/`routes` DSL, plain maps with optional
+- Agent definitions from the `state`/`plugins`/`routes` DSL, plain maps with optional
   static initial state through `Jido.Agent.define/1`, or portable definition
   JSON through `Jido.Authoring`. All three run the same validation.
 - Routes to Actions, Flows, transforms, and explicit forward targets, matched

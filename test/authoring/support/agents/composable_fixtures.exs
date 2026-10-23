@@ -19,7 +19,7 @@ end
 defmodule JidoTest.ComposableAgent.Worker do
   use Jido.Agent, name: "worker"
 
-  agent do
+  state do
     schema Zoi.object(%{value: Zoi.string() |> Zoi.default("")})
   end
 
@@ -35,18 +35,17 @@ defmodule JidoTest.ComposableAgent.Team do
     name: "team",
     description: "Test team",
     vsn: 2,
+    metadata: %{label: "team"},
     extensions: [
       Jido.Plugin.Scheduler.DSL,
       Jido.Plugin.Bus.DSL
     ]
 
-  agent do
+  state do
     schema Zoi.object(%{
              value: Zoi.string() |> Zoi.default("input"),
              workers: Zoi.integer() |> Zoi.default(2)
            })
-
-    metadata %{label: "team"}
   end
 
   routes do
@@ -154,7 +153,7 @@ end
 defmodule JidoTest.ComposableAgent.PluginFirst do
   use Jido.Agent, name: "plugin", extensions: [JidoTest.ComposableAgent.Audit]
 
-  agent do
+  plugins do
     plugin JidoTest.ComposableAgent.Audit, config: %{enabled: false}
   end
 
@@ -170,7 +169,7 @@ defmodule JidoTest.ComposableAgent.PluginLast do
     label("example")
   end
 
-  agent do
+  plugins do
     plugin JidoTest.ComposableAgent.Audit, config: %{enabled: false}
   end
 end
@@ -180,11 +179,14 @@ defmodule JidoTest.ComposableAgent.Minimal do
 end
 
 defmodule JidoTest.ComposableAgent.Named do
-  use Jido.Agent, name: "named", description: "Named executables", vsn: 3
+  use Jido.Agent,
+    name: "named",
+    description: "Named executables",
+    vsn: 3,
+    metadata: %{label: "named"}
 
-  agent do
+  state do
     schema Zoi.object(%{value: Zoi.string() |> Zoi.default("initial")})
-    metadata %{label: "named"}
   end
 
   routes do
@@ -245,7 +247,7 @@ defmodule JidoTest.ComposableAgent.PluginAlias do
     label("example")
   end
 
-  agent do
+  plugins do
     plugin Audit, config: %{enabled: false}
   end
 
@@ -273,8 +275,11 @@ end
 defmodule JidoTest.ComposableAgent.PluginState do
   use Jido.Agent, name: "plugin_state"
 
-  agent do
+  state do
     schema Zoi.object(%{value: Zoi.string() |> Zoi.default("domain")})
+  end
+
+  plugins do
     plugin JidoTest.ComposableAgent.OwnedPlugin, config: %{initial: 3}
   end
 end

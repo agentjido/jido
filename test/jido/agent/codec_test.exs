@@ -22,7 +22,7 @@ defmodule Jido.Agent.CodecTest do
   defmodule Child do
     use Jido.Agent, name: "codec_child"
 
-    agent do
+    state do
       schema Zoi.object(%{value: Zoi.string() |> Zoi.default("default")})
     end
 

@@ -3,7 +3,7 @@ defmodule Jido.Examples.DefinitionChanges do
   use Jido.Agent, name: "runtime_definition_changes"
   alias Jido.Agent.Directive, as: D
 
-  agent do
+  state do
     schema Zoi.object(%{selected: Zoi.string() |> Zoi.default("")})
   end
 

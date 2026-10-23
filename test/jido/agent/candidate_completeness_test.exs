@@ -19,7 +19,7 @@ defmodule JidoTest.Agent.CandidateCompletenessTest do
   defmodule Counter do
     use Jido.Agent, name: "candidate_completeness_counter"
 
-    agent do
+    state do
       schema Zoi.object(%{
                count: Zoi.integer() |> Zoi.default(0),
                history: Zoi.list(Zoi.string()) |> Zoi.default([]),

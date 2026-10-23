@@ -2,7 +2,7 @@ defmodule JidoTest.Persistence.CheckpointIdentityProbe do
   @moduledoc false
   use Jido.Agent, name: "test_checkpoint_identity"
 
-  agent do
+  state do
     schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
   end
 
@@ -22,7 +22,7 @@ defmodule JidoTest.Persistence.CheckpointPortabilityProbe do
   @moduledoc false
   use Jido.Agent, name: "test_checkpoint_portability"
 
-  agent do
+  state do
     schema Zoi.object(%{payload: Zoi.map() |> Zoi.default(%{})})
   end
 
@@ -43,7 +43,7 @@ defmodule JidoTest.Persistence.IndeterminateWriteProbe do
   @moduledoc false
   use Jido.Agent, name: "test_indeterminate_write"
 
-  agent do
+  state do
     schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
   end
 

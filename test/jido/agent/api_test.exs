@@ -13,8 +13,11 @@ defmodule Jido.Agent.APITest do
   defmodule Counter do
     use Jido.Agent, name: "api_counter"
 
-    agent do
+    state do
       schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+    end
+
+    plugins do
       plugin Jido.Agent.APITest.Audit
     end
 

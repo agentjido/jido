@@ -3,9 +3,48 @@ defmodule Jido.Agent.StateTest do
 
   alias Jido.Agent
 
+  defmodule InitializingAgent do
+    use Jido.Agent, name: "initializing_agent"
+
+    state do
+      schema Zoi.object(%{
+               value: Zoi.integer(),
+               initialized_for: Zoi.string(),
+               defaulted: Zoi.boolean() |> Zoi.default(false)
+             })
+
+      initial_state %{value: 1, transient: true}
+    end
+
+    @impl Jido.Agent
+    def initialize(%{reject: true}, _context), do: {:error, :rejected}
+
+    def initialize(state, %{id: id}),
+      do:
+        {:ok,
+         state
+         |> Map.delete(:transient)
+         |> Map.update!(:value, &(&1 + 1))
+         |> Map.put(:initialized_for, id)}
+  end
+
   def observe(value, _opts) do
     send(self(), {:validated, value})
     :ok
+  end
+
+  @tag obligation: ["jido.agent.I6", "jido.agent.I8"]
+  test "the callback transforms declared and explicit state before schema defaults" do
+    definition = InitializingAgent.definition()
+    assert definition.initial_state == %{value: 1, transient: true}
+    initialized = InitializingAgent.instantiate!(id: "initialized")
+    assert initialized.state == %{value: 2, initialized_for: "initialized", defaulted: false}
+    overridden = InitializingAgent.instantiate!(id: "overridden", state: %{value: 3})
+    assert overridden.state == %{value: 4, initialized_for: "overridden", defaulted: false}
+    assert {:ok, ^overridden} = Agent.validate(overridden)
+
+    assert {:error, %Agent.Error{code: :initialize_failed, details: %{reason: :rejected}}} =
+             InitializingAgent.instantiate(id: "error", state: %{reject: true})
   end
 
   @tag obligation: "jido.agent.I8"

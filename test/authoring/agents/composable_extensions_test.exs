@@ -127,7 +127,9 @@ defmodule Jido.AgentExtensionsAuthoringTest do
   end
 
   test "extensions and Plugins use one registration and configuration model" do
-    module = Compiler.compile("agent do plugin #{inspect(BehaviorOnly)},config: %{value: 42} end")
+    module =
+      Compiler.compile("plugins do plugin #{inspect(BehaviorOnly)},config: %{value: 42} end")
+
     assert module.definition().extensions === [contribution(BehaviorOnly, %{value: 42})]
     assert {:ok, from_map} = define(BehaviorOnly, %{value: 42})
     assert from_map.extensions === module.definition().extensions
@@ -158,7 +160,7 @@ defmodule Jido.AgentExtensionsAuthoringTest do
 
     module =
       Compiler.compile(
-        "agent do plugin JidoTest.ComposableAgent.Audit,config: %{label: \"test\"} end",
+        "plugins do plugin JidoTest.ComposableAgent.Audit,config: %{label: \"test\"} end",
         "name: \"configured\",extensions: [JidoTest.ComposableAgent.Audit]"
       )
 
@@ -371,7 +373,7 @@ defmodule Jido.AgentExtensionsAuthoringTest do
   test "generated Agents use plugin declarations without source discovery" do
     module =
       Compiler.compile(
-        "agent do plugin JidoTest.ComposableAgent.OwnedPlugin, config: %{initial: 3} end",
+        "plugins do plugin JidoTest.ComposableAgent.OwnedPlugin, config: %{initial: 3} end",
         "name: \"generated_plugin\""
       )
 

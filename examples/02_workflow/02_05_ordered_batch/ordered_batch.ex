@@ -2,7 +2,7 @@ defmodule Jido.Examples.OrderedBatch do
   @moduledoc "One batch fixture for Map order, error policy, empty input, and serial Reduce."
   use Jido.Agent, name: "workflow_batch_agent"
 
-  agent do
+  state do
     schema Zoi.object(%{items: Zoi.list(Zoi.map()) |> Zoi.default([])})
   end
 

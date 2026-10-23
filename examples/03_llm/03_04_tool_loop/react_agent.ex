@@ -11,7 +11,7 @@ defmodule Jido.Examples.ReActAgent do
     name: "examples_llm_react_agent",
     description: "Runs one bounded model and tool loop"
 
-  agent do
+  state do
     schema Zoi.object(%{
              messages: Zoi.list(Zoi.map()) |> Zoi.default([]),
              last_answer: Zoi.string() |> Zoi.default(""),

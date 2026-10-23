@@ -3,12 +3,14 @@ defmodule JidoTest.Examples.Runtime.BusDeliveryFixture do
 
   use Jido.Agent, name: "test_bus_delivery"
 
-  agent do
+  state do
     schema Zoi.object(%{
              seen: Zoi.list(Zoi.string()) |> Zoi.default([]),
              values: Zoi.list(Zoi.integer()) |> Zoi.default([])
            })
+  end
 
+  plugins do
     plugin(Jido.Plugin.Bus.Manager, config: %{name: :example_commands})
 
     plugin(Jido.Plugin.Bus.Client,

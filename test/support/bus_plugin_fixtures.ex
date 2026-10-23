@@ -44,8 +44,11 @@ defmodule JidoTest.Plugin.BusFixtures do
     @moduledoc false
     use Jido.Agent, name: "bus_plugin_agent"
 
-    agent do
+    state do
       schema Zoi.object(%{values: Zoi.list(Zoi.integer()) |> Zoi.default([])})
+    end
+
+    plugins do
       plugin Jido.Plugin.Bus.Client, config: %{bus: :plugin_bus, path: "bus.**"}
     end
 
@@ -58,9 +61,11 @@ defmodule JidoTest.Plugin.BusFixtures do
     @moduledoc false
     use Jido.Agent, name: "durable_bus_plugin_agent"
 
-    agent do
+    state do
       schema Zoi.object(%{values: Zoi.list(Zoi.integer()) |> Zoi.default([])})
+    end
 
+    plugins do
       plugin Jido.Plugin.Bus.Client,
         config: %{
           bus: :plugin_bus,
@@ -81,9 +86,11 @@ defmodule JidoTest.Plugin.BusFixtures do
     @moduledoc false
     use Jido.Agent, name: "durable_blocking_bus_plugin_agent"
 
-    agent do
+    state do
       schema Zoi.object(%{values: Zoi.list(Zoi.integer()) |> Zoi.default([])})
+    end
 
+    plugins do
       plugin Jido.Plugin.Bus.Client,
         config: %{
           bus: :plugin_bus,
@@ -103,7 +110,7 @@ defmodule JidoTest.Plugin.BusFixtures do
     @moduledoc false
     use Jido.Agent, name: "bus_manager_agent"
 
-    agent do
+    plugins do
       plugin Jido.Plugin.Bus.Manager
     end
   end
@@ -112,8 +119,11 @@ defmodule JidoTest.Plugin.BusFixtures do
     @moduledoc false
     use Jido.Agent, name: "owned_bus_agent"
 
-    agent do
+    state do
       schema Zoi.object(%{values: Zoi.list(Zoi.integer()) |> Zoi.default([])})
+    end
+
+    plugins do
       plugin Jido.Plugin.Bus.Manager, config: %{name: :owned_plugin_bus}
 
       plugin Jido.Plugin.Bus.Client,

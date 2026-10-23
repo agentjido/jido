@@ -3,7 +3,7 @@ defmodule Jido.Examples.Persistence.HibernateAndThaw do
 
   use Jido.Agent, name: "examples_hibernate_and_thaw"
 
-  agent do
+  state do
     schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
   end
 

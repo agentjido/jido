@@ -29,9 +29,9 @@
   approved_by: User-approved component review
 
 - id: agent-dsl-review
-  date: 2026-10-22
-  decision: Keep the optional agent, routes, and topology sections and their current lowering model. Require stable authoring IDs at Agent compilation, restrict generated Signal helper bases to safe lowercase names, document the complete core DSL on use Jido.Agent, and make DSL-to-Map parity explicit in the Covenant.
-  driver: The DSL structure is sound, but its public contract was spread across guides and accepted identifiers that could fail later or create impractical generated functions.
+  date: 2026-10-23
+  decision: Replace the agent section with separate state and plugins sections. Keep routes and topology sections. Put static metadata in use Jido.Agent options. Use initial_state in every authoring form. Let initialize/2 transform the merged initial and explicit state. Require stable authoring IDs at Agent compilation, restrict generated Signal helper bases to safe lowercase names, document the complete core DSL on use Jido.Agent, and make DSL-to-Map parity explicit in the Covenant.
+  driver: The agent section mixed unrelated concerns. The refined DSL keeps state, Plugins, routes, and topology explicit. One state candidate avoids a separate initialization-input channel and unclear precedence.
   approved_by: User-requested full component review
 
 - id: agent-full-mutation-review

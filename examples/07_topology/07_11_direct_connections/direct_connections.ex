@@ -2,7 +2,7 @@ defmodule Jido.Examples.Topology.DirectConnections do
   @moduledoc "Explicit outputs connect a root, a worker, and a receipt Agent."
   use Jido.Agent, name: "topology_direct_connections"
 
-  agent do
+  state do
     schema Zoi.object(%{completed: Zoi.integer() |> Zoi.default(0)})
   end
 

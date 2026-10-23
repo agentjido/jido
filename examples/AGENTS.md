@@ -38,7 +38,7 @@ Use the Agent DSL as the normal form for a static Agent definition:
 ```elixir
 use Jido.Agent, name: "example_agent"
 
-agent do
+state do
   schema Zoi.object(%{})
 end
 

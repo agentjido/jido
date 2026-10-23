@@ -8,7 +8,7 @@ defmodule Jido.Examples.TurnObservation do
 
   use Jido.Agent, name: "example_turn_observation"
 
-  agent do
+  state do
     schema Zoi.object(%{
              value: Zoi.integer() |> Zoi.default(0),
              secret: Zoi.string() |> Zoi.default("private-agent-state")

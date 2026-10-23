@@ -2,7 +2,7 @@ defmodule Jido.Examples.DurableDelete do
   @moduledoc "A deleted order challenged by a delayed writer from its initial revision."
   use Jido.Agent, name: "examples_durable_delete"
 
-  agent do
+  state do
     schema Zoi.object(%{status: Zoi.string() |> Zoi.default("open")})
   end
 

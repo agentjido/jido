@@ -11,8 +11,11 @@ defmodule Jido.Examples.RecoverableDelivery do
 
   alias Jido.Examples.RecoverableDelivery.{Confirm, Deliver, MemorySink, Output}
 
-  agent do
+  state do
     schema Zoi.object(%{value: Zoi.integer() |> Zoi.default(0)})
+  end
+
+  plugins do
     plugin Output, config: %{sink: MemorySink}
   end
 

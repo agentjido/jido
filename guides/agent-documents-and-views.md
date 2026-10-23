@@ -35,7 +35,7 @@ end
 defmodule Doc.Counter do
   use Jido.Agent, name: "counter", description: "Counts things"
 
-  agent do
+  state do
     schema(Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}))
   end
 
@@ -107,8 +107,8 @@ The document has `"type" => "jido.agent.definition"`, `"vsn" => 1`, and a
 ```
 
 Maps are stored as entry lists, so atom and string keys stay distinct. The
-document never contains Agent `id` or `state`. An instance and its definition
-produce the same document.
+document never contains Agent `id` or `state`. Module callbacks are not encoded.
+An instance and its definition produce the same document.
 
 Portable data can contain JSON scalar values, proper lists, maps, and atoms
 that have `:atom` Registry entries. It cannot contain tuples, structs, live

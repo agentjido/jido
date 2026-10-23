@@ -2,7 +2,7 @@ defmodule Jido.Examples.EffectfulSteps do
   @moduledoc "Synchronous effects and transient clients in one Agent Turn."
   use Jido.Agent, name: "workflow_effectful_agent"
 
-  agent do
+  state do
     schema Zoi.object(%{
              key: Zoi.string() |> Zoi.default(""),
              result: Zoi.map() |> Zoi.default(%{})

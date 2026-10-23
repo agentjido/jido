@@ -4,7 +4,7 @@ defmodule Jido.Examples.TurnControl do
   """
   use Jido.Agent, name: "runtime_turn_control"
 
-  agent do
+  state do
     schema Zoi.object(%{completed: Zoi.list(Zoi.string()) |> Zoi.default([])})
   end
 

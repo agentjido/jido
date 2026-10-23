@@ -4,7 +4,7 @@ defmodule Jido.Examples.RequestModes do
   """
   use Jido.Agent, name: "runtime_request_modes"
 
-  agent do
+  state do
     schema Zoi.object(%{history: Zoi.list(Zoi.string()) |> Zoi.default([])})
   end
 

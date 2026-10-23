@@ -70,7 +70,7 @@ defmodule Jido.Agent.SchemaTest do
 
     use Jido.Agent, name: "schema_contract_plain"
 
-    agent do
+    state do
       schema Bounds.schema()
     end
 
@@ -84,8 +84,11 @@ defmodule Jido.Agent.SchemaTest do
 
     use Jido.Agent, name: "schema_contract_plugin"
 
-    agent do
+    state do
       schema Bounds.schema()
+    end
+
+    plugins do
       plugin OwnedState
     end
 

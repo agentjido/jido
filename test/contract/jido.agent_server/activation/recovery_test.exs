@@ -11,7 +11,7 @@ defmodule JidoTest.AgentServer.ActivationRecoveryTest do
   defmodule LocalAgent do
     use Jido.Agent, name: "server_local_checkpoint"
 
-    agent do
+    state do
       schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0), handle: Zoi.any()})
     end
 

@@ -37,7 +37,7 @@ the process in `to`.
 defmodule Guides.Counter do
   use Jido.Agent, name: "counter"
 
-  agent do
+  state do
     schema(Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}))
   end
 

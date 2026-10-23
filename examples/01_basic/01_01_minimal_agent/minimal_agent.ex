@@ -10,7 +10,7 @@ defmodule Jido.Examples.MinimalAgent do
     name: "examples_minimal_agent",
     description: "Counts increment Signals"
 
-  agent do
+  state do
     schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
   end
 

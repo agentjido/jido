@@ -2,7 +2,7 @@ defmodule Jido.Examples.ConditionalRoutes do
   @moduledoc "Explicit provider policy composed with ordered SDK Choice execution."
   use Jido.Agent, name: "workflow_routes_agent"
 
-  agent do
+  state do
     schema Zoi.object(%{
              route: Zoi.atom() |> Zoi.default(:none),
              result: Zoi.map() |> Zoi.default(%{})

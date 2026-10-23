@@ -29,7 +29,7 @@ defmodule JidoTest.Persistence.LiveStateTest do
   defmodule LocalAgent do
     use Jido.Agent, name: "local_state_agent"
 
-    agent do
+    state do
       schema Zoi.object(%{
                payload: Zoi.any() |> Zoi.default(<<>>),
                count: Zoi.integer() |> Zoi.default(0)
@@ -44,7 +44,7 @@ defmodule JidoTest.Persistence.LiveStateTest do
   defmodule CustomAgent do
     use Jido.Agent, name: "local_custom_checkpoint"
 
-    agent do
+    state do
       schema Zoi.object(%{
                payload: Zoi.any() |> Zoi.default(<<>>),
                count: Zoi.integer() |> Zoi.default(0)
@@ -97,12 +97,14 @@ defmodule JidoTest.Persistence.LiveStateTest do
   defmodule PluginAgent do
     use Jido.Agent, name: "local_plugin_checkpoint"
 
-    agent do
+    state do
       schema Zoi.object(%{
                payload: Zoi.any() |> Zoi.default(<<>>),
                count: Zoi.integer() |> Zoi.default(0)
              })
+    end
 
+    plugins do
       plugin Package
     end
 

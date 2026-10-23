@@ -12,7 +12,7 @@ defmodule Jido.Examples.ManagedJobs do
   alias Jido.Examples.ManagedJobs.{JobRunner, JobRuntime}
   alias Jido.Examples.ManagedJobs.JobRuntime.{Cancel, Submit}
 
-  agent do
+  state do
     schema Zoi.object(%{
              job_id: Zoi.string() |> Zoi.default(""),
              seen: Zoi.list(Zoi.string()) |> Zoi.default([]),
@@ -20,7 +20,9 @@ defmodule Jido.Examples.ManagedJobs do
                Zoi.enum([:idle, :running, :completed, :failed, :cancelled]) |> Zoi.default(:idle),
              result: Zoi.string() |> Zoi.default("")
            })
+  end
 
+  plugins do
     plugin JobRuntime
   end
 

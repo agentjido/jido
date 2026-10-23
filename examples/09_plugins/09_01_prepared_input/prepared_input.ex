@@ -26,14 +26,16 @@ defmodule Jido.Examples.Plugins.PreparedInput.Agent do
   @moduledoc "Uses portable data prepared from the unchanged source Signal."
   use Jido.Agent, name: "plugin_prepared_input_agent"
 
-  agent do
+  state do
     schema Zoi.object(%{
              accepted: Zoi.integer() |> Zoi.default(0),
              last_signal_id: Zoi.string() |> Zoi.default(""),
              last_subject: Zoi.string() |> Zoi.default(""),
              tenant: Zoi.string() |> Zoi.default("")
            })
+  end
 
+  plugins do
     plugin Jido.Examples.Plugins.PreparedInput.Plugin,
       config: %{subject_prefix: "tenant/"}
   end

@@ -2,7 +2,7 @@ defmodule Jido.Examples.NestedFlow do
   @moduledoc "Nested Flow contracts run within one Agent Turn and one commit."
   use Jido.Agent, name: "workflow_nested_agent"
 
-  agent do
+  state do
     schema Zoi.object(%{result: Zoi.map() |> Zoi.default(%{})})
   end
 

@@ -1,8 +1,16 @@
 defmodule Jido.Agent.DSL.Macros do
   @moduledoc false
-  defmacro agent(do: block), do: section(:agent, :__agent__, block, __CALLER__)
+  defmacro agent(do: _block) do
+    raise CompileError,
+      file: __CALLER__.file,
+      line: __CALLER__.line,
+      description: "agent do is not supported; use state do and plugins do"
+  end
+
   defmacro agent(name), do: quote(do: %{kind: :agent, name: unquote(name)})
   defmacro parent, do: quote(do: %{kind: :parent})
+  defmacro state(do: block), do: section(:state, :__state__, block, __CALLER__)
+  defmacro plugins(do: block), do: section(:plugins, :__plugins__, block, __CALLER__)
   defmacro routes(do: block), do: section(:routes, :__routes__, block, __CALLER__)
   defmacro topology(do: block), do: section(:topology, :__topology__, block, __CALLER__)
 
@@ -22,7 +30,7 @@ defmodule Jido.Agent.DSL.Macros do
 
     settings =
       case name do
-        :agent -> [:schema, :metadata]
+        :state -> [:schema, :initial_state]
         :routes -> [:signal_source]
         _ -> []
       end

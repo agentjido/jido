@@ -5,8 +5,11 @@ defmodule Jido.Examples.FlowDirectives do
 
   use Jido.Agent, name: "workflow_flow_directives_agent"
 
-  agent do
+  state do
     schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+  end
+
+  plugins do
     plugin Effects
   end
 

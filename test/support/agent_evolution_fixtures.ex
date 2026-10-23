@@ -7,7 +7,7 @@ defmodule JidoTest.AgentEvolutionFixtures do
   defmodule Worker do
     use Jido.Agent, name: "evolution_worker"
 
-    agent do
+    state do
       schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
     end
 
@@ -64,7 +64,7 @@ defmodule JidoTest.AgentEvolutionFixtures do
   defmodule Custom do
     use Jido.Agent, name: "evolution_custom"
 
-    agent do
+    state do
       schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
     end
 

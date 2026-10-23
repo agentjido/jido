@@ -34,9 +34,11 @@ defmodule JidoTest.Telemetry.OpenTelemetryTest do
   defmodule NotifyAgent do
     use Jido.Agent, name: "traced_notification_agent"
 
-    agent do
+    state do
       schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+    end
 
+    plugins do
       plugin NotifyPlugin
     end
 

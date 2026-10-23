@@ -13,7 +13,7 @@ defmodule JidoTest.Authoring.Agents.MetadataTest do
           %{"case" => "string", :case => "atom", :nested => %{enabled: false}},
           %{date: ~D[2026-09-13], tuple: {:ok, 1.0}}
         ] do
-      module = Compiler.compile("agent do metadata #{inspect(metadata)} end")
+      module = Compiler.compile("", "name: \"generated\", metadata: #{inspect(metadata)}")
       expected = Agent.define!(%{name: "generated", module: module, metadata: metadata})
       assert module.definition() === expected
       assert expected.metadata === metadata

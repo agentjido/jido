@@ -192,9 +192,11 @@ defmodule JidoTest.CommitProjection.Agent do
   @moduledoc false
   use Jido.Agent, name: "commit_projection_agent"
 
-  agent do
+  state do
     schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+  end
 
+  plugins do
     plugin JidoTest.CommitProjection.First,
       config: %{key: :first, sink: JidoTest.CommitProjection.Sink}
   end
@@ -209,9 +211,11 @@ defmodule JidoTest.CommitProjection.ProjectionAgent do
   @moduledoc false
   use Jido.Agent, name: "runtime_commit_projection_agent"
 
-  agent do
+  state do
     schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+  end
 
+  plugins do
     plugin JidoTest.CommitProjection.Projection,
       config: %{key: :projection, observer: JidoTest.CommitProjection.Observer}
   end
@@ -225,9 +229,11 @@ defmodule JidoTest.CommitProjection.TimeoutAgent do
   @moduledoc false
   use Jido.Agent, name: "timeout_commit_projection_agent"
 
-  agent do
+  state do
     schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+  end
 
+  plugins do
     plugin JidoTest.CommitProjection.First,
       config: %{
         key: :first,

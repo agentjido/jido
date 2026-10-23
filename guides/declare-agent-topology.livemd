@@ -40,7 +40,7 @@ A member is an ordinary Agent. It needs nothing special to run in a team.
 defmodule Nested.Worker do
   use Jido.Agent, name: "worker"
 
-  agent do
+  state do
     schema(
       Zoi.object(%{
         team: Zoi.string() |> Zoi.default("none"),
@@ -67,7 +67,7 @@ end
 defmodule Nested.Team do
   use Jido.Agent, name: "team"
 
-  agent do
+  state do
     schema(
       Zoi.object(%{
         name: Zoi.string() |> Zoi.default("alpha"),

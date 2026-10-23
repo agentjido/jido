@@ -297,6 +297,9 @@ defmodule Jido.AgentServer.DirectiveTest do
     assert message =~ "restart must be one of"
     assert :ok = Jido.AgentServer.Directive.validate_agent_start_opts(%{id: "child"})
 
+    assert {:error, "AgentStart does not support initialization input"} =
+             Jido.AgentServer.Directive.validate_agent_start_opts(%{input: %{}})
+
     assert {:error, message} =
              Jido.AgentServer.Directive.validate_agent_start_opts(%{
                restore: :required,

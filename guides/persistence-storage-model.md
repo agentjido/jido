@@ -11,7 +11,7 @@ The examples use this Agent and the ETS adapter:
 defmodule StorageGuide.Counter do
   use Jido.Agent, name: "counter"
 
-  agent do
+  state do
     schema(Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}))
   end
 

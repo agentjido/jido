@@ -49,8 +49,11 @@ end
 defmodule MyApp.Tagged do
   use Jido.Agent, name: "tagged"
 
-  agent do
+  state do
     schema(Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}))
+  end
+
+  plugins do
     plugin MyApp.Tags
   end
 end
@@ -174,7 +177,7 @@ defmodule MyApp.Cached do
   use Jido.Agent, name: "cached"
   alias Jido.Agent.Directive, as: D
 
-  agent do
+  state do
     schema(Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}))
   end
 

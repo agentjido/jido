@@ -134,7 +134,7 @@ defmodule JidoTest.AgentServer.DurableTurn.WaitIntegrationTest do
   defmodule Agent do
     use Jido.Agent, name: "core_wait_agent"
 
-    agent do
+    state do
       schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
     end
 

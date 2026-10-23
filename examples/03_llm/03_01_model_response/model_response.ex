@@ -3,7 +3,7 @@ defmodule Jido.Examples.ModelResponse do
 
   use Jido.Agent, name: "examples_llm_model_response"
 
-  agent do
+  state do
     schema Zoi.object(%{answer: Zoi.string() |> Zoi.default("")})
   end
 

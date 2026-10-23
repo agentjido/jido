@@ -16,9 +16,11 @@ defmodule Jido.Plugin.HeartbeatIntegrationTest do
   defmodule Agent do
     use Jido.Agent, name: "plugin_heartbeat_integration_agent"
 
-    agent do
+    state do
       schema Zoi.object(%{heartbeats: Zoi.list(Zoi.any()) |> Zoi.default([])})
+    end
 
+    plugins do
       plugin(Heartbeat,
         config: %{
           interval: 10,

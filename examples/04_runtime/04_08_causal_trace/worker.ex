@@ -3,7 +3,7 @@ defmodule Jido.Examples.CausalTrace.Worker do
 
   use Jido.Agent, name: "example_causal_worker"
 
-  agent do
+  state do
     schema Zoi.object(%{value: Zoi.integer() |> Zoi.default(0)})
   end
 

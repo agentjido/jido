@@ -71,7 +71,7 @@ defmodule JidoTest.Agent.AuthoringTest do
   defmodule PreparedCounter do
     use Jido.Agent, name: "prepared_counter"
 
-    agent do
+    state do
       schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
     end
 
@@ -88,11 +88,10 @@ defmodule JidoTest.Agent.AuthoringTest do
   end
 
   defmodule RawCounter do
-    use Jido.Agent, name: "raw_counter"
+    use Jido.Agent, name: "raw_counter", metadata: %{day: ~D[2026-09-03]}
 
-    agent do
+    state do
       schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
-      metadata %{day: ~D[2026-09-03]}
     end
 
     routes do
@@ -137,9 +136,6 @@ defmodule JidoTest.Agent.AuthoringTest do
   defmodule NamedAgent do
     use Jido.Agent, name: "named_agent"
 
-    agent do
-    end
-
     routes do
       signal_source "/named"
 
@@ -148,11 +144,17 @@ defmodule JidoTest.Agent.AuthoringTest do
   end
 
   defmodule Counter do
-    use Jido.Agent, name: "authoring_counter", description: "All authoring forms", vsn: 7
+    use Jido.Agent,
+      name: "authoring_counter",
+      description: "All authoring forms",
+      vsn: 7,
+      metadata: %{owner: :test, nested: {:tag, <<255>>}}
 
-    agent do
+    state do
       schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
-      metadata %{owner: :test, nested: {:tag, <<255>>}}
+    end
+
+    plugins do
       plugin CountTurns, config: %{initial: 0}
       plugin PassThrough, config: %{label: :second}
     end
@@ -166,11 +168,17 @@ defmodule JidoTest.Agent.AuthoringTest do
   end
 
   defmodule UnexposedCounter do
-    use Jido.Agent, name: "authoring_counter", description: "All authoring forms", vsn: 7
+    use Jido.Agent,
+      name: "authoring_counter",
+      description: "All authoring forms",
+      vsn: 7,
+      metadata: %{owner: :test, nested: {:tag, <<255>>}}
 
-    agent do
+    state do
       schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
-      metadata %{owner: :test, nested: {:tag, <<255>>}}
+    end
+
+    plugins do
       plugin CountTurns, config: %{initial: 0}
       plugin PassThrough, config: %{label: :second}
     end
@@ -184,7 +192,7 @@ defmodule JidoTest.Agent.AuthoringTest do
   defmodule InlineCounter do
     use Jido.Agent, name: "inline_authoring_counter"
 
-    agent do
+    state do
       schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
     end
 
@@ -260,10 +268,10 @@ defmodule JidoTest.Agent.AuthoringTest do
   @tag obligation: ["jido.agent.I3", "jido.agent.I22"]
   test "Spark rejects invalid schema and identity options with a field path" do
     assert_raise Spark.Error.DslError, ~r/schema/, fn ->
-      compile_agent("", "", "agent do\n schema nil\n end")
+      compile_agent("", "", "state do\n schema nil\n end")
     end
 
-    for option <- ["schema: Zoi.object(%{})", "metadata: %{}", "plugins: []", "routes: []"] do
+    for option <- ["schema: Zoi.object(%{})", "plugins: []", "routes: []"] do
       assert_raise Spark.Options.ValidationError, ~r/unknown options/, fn ->
         compile_agent("", ", #{option}")
       end
@@ -317,13 +325,8 @@ defmodule JidoTest.Agent.AuthoringTest do
   end
 
   @tag obligation: "jido.agent.I3"
-  test "block metadata accepts mixed keys and rejects structs with a DSL error" do
-    compiled =
-      compile_agent("", "", """
-      agent do
-        metadata %{"owner" => "string", :owner => :atom}
-      end
-      """)
+  test "use metadata accepts mixed keys and rejects structs with a DSL error" do
+    compiled = compile_agent("", ~s(, metadata: %{"owner" => "string", :owner => :atom}))
 
     {module, _bytecode} =
       Enum.find(compiled, fn {module, _bytecode} ->
@@ -333,11 +336,7 @@ defmodule JidoTest.Agent.AuthoringTest do
     assert module.definition().metadata === %{"owner" => "string", :owner => :atom}
 
     assert_raise Spark.Error.DslError, ~r/metadata/, fn ->
-      compile_agent("", "", """
-      agent do
-        metadata ~D[2026-09-13]
-      end
-      """)
+      compile_agent("", ", metadata: ~D[2026-09-13]")
     end
   end
 
@@ -376,7 +375,7 @@ defmodule JidoTest.Agent.AuthoringTest do
         """,
         "",
         """
-        agent do
+        state do
           schema Zoi.object(%{result: Zoi.atom() |> Zoi.default(:unset)})
         end
         """
@@ -567,7 +566,7 @@ defmodule JidoTest.Agent.AuthoringTest do
         defmodule #{inspect(module)} do
           use Jido.Agent, name: "reloaded"
 
-          agent do
+          state do
             schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
           end
 
@@ -604,8 +603,6 @@ defmodule JidoTest.Agent.AuthoringTest do
     compile_isolated("""
     defmodule #{inspect(module)} do
       use Jido.Agent, name: "action_reload"
-      agent do
-      end
       routes do
         route "reload.run", #{inspect(action)}
       end
@@ -629,14 +626,12 @@ defmodule JidoTest.Agent.AuthoringTest do
   defp compile_agent(routes, opts \\ "", extra \\ "", source? \\ true) do
     name = "JidoTest.GeneratedAgent#{System.unique_integer([:positive])}"
     source = if source?, do: "signal_source \"/test\"", else: ""
-    agent = if String.contains?(extra, "agent do"), do: "", else: "agent do\nend"
 
     compile_isolated("""
     defmodule #{name} do
         alias JidoTest.Agent.AuthoringTest.Add, warn: false
         alias JidoTest.Agent.AuthoringTest.ListInputs, warn: false
       use Jido.Agent, name: "compiled"#{opts}
-      #{agent}
       #{extra}
       routes do
         #{source}

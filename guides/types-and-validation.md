@@ -59,7 +59,7 @@ The same shape as a Jido Agent state schema:
 defmodule Types.Profile do
   use Jido.Agent, name: "profile"
 
-  agent do
+  state do
     schema(
       Zoi.object(%{
         name: Zoi.string() |> Zoi.min(1) |> Zoi.default("Anonymous"),
@@ -146,7 +146,7 @@ end
 defmodule Types.Person do
   use Jido.Agent, name: "person"
 
-  agent do
+  state do
     schema(Zoi.object(%{age: Zoi.integer() |> Zoi.min(0) |> Zoi.optional()}))
   end
 
@@ -220,7 +220,7 @@ Each route has its own input schema:
 defmodule Types.Counter do
   use Jido.Agent, name: "counter"
 
-  agent do
+  state do
     schema(Zoi.object(%{count: Zoi.integer() |> Zoi.min(0) |> Zoi.default(0)}))
   end
 
@@ -273,7 +273,7 @@ with function clauses:
 defmodule Types.Job do
   use Jido.Agent, name: "job"
 
-  agent do
+  state do
     schema(
       Zoi.object(%{
         status:
@@ -414,7 +414,7 @@ end
 defmodule Types.Cart do
   use Jido.Agent, name: "cart"
 
-  agent do
+  state do
     schema(Zoi.object(%{items: Zoi.map(Zoi.string(), Zoi.integer()) |> Zoi.default(%{})}))
   end
 

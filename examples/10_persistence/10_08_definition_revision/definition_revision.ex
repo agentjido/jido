@@ -23,7 +23,7 @@ defmodule Jido.Examples.DefinitionRevision do
 
   use Jido.Agent, name: "examples_versioned_cart", vsn: 1
 
-  agent do
+  state do
     schema Zoi.object(%{total: Zoi.integer() |> Zoi.default(0)})
   end
 

@@ -30,8 +30,11 @@ defmodule JidoTest.System.MigrationAgent do
   @moduledoc false
   use Jido.Agent, name: "system_migration_agent"
 
-  agent do
+  state do
     schema Zoi.object(%{value: Zoi.integer() |> Zoi.default(0)})
+  end
+
+  plugins do
     plugin JidoTest.System.MigrationAgent.Plugin
   end
 

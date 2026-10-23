@@ -12,7 +12,7 @@ Two Plugins connect an Agent to `Jido.Signal.Bus`:
 <!-- livebook:{"force_markdown":true} -->
 
 ```elixir
-agent do
+plugins do
   plugin(Jido.Plugin.Bus.Manager, config: %{name: :orders})
   plugin(Jido.Plugin.Bus.Client, config: %{bus: :orders, path: "order.**"})
 end
@@ -95,14 +95,16 @@ before the Client subscribes.
 defmodule BusGuide.Ledger do
   use Jido.Agent, name: "ledger"
 
-  agent do
+  state do
     schema(
       Zoi.object(%{
         orders: Zoi.list(Zoi.string()) |> Zoi.default([]),
         seen: Zoi.list(Zoi.string()) |> Zoi.default([])
       })
     )
+  end
 
+  plugins do
     plugin(Jido.Plugin.Bus.Manager, config: %{name: :orders})
 
     plugin(Jido.Plugin.Bus.Client,
@@ -195,7 +197,7 @@ end
 defmodule BusGuide.Checkout do
   use Jido.Agent, name: "checkout"
 
-  agent do
+  state do
     schema(Zoi.object(%{placed: Zoi.integer() |> Zoi.default(0)}))
   end
 
@@ -255,14 +257,16 @@ ID. With `durable:` set, the Client:
 defmodule BusGuide.Archive do
   use Jido.Agent, name: "archive"
 
-  agent do
+  state do
     schema(
       Zoi.object(%{
         orders: Zoi.list(Zoi.string()) |> Zoi.default([]),
         seen: Zoi.list(Zoi.string()) |> Zoi.default([])
       })
     )
+  end
 
+  plugins do
     plugin(Jido.Plugin.Bus.Client,
       config: %{
         bus: :orders,

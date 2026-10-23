@@ -52,7 +52,7 @@ defmodule MyApp.Support do
     name: "support",
     extensions: [MyApp.Labels]
 
-  agent do
+  state do
     schema(Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}))
   end
 
@@ -143,14 +143,17 @@ defmodule MyApp.Throttle do
 end
 ```
 
-Declare it in the `agent` block and pass options with `config:`:
+Declare it in the `plugins` block and pass options with `config:`:
 
 ```elixir
 defmodule MyApp.SupportDesk do
   use Jido.Agent, name: "support_desk"
 
-  agent do
+  state do
     schema(Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}))
+  end
+
+  plugins do
     plugin MyApp.Throttle, config: %{label: "support", limit: 10}
   end
 end

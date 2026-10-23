@@ -2,7 +2,7 @@ defmodule Jido.Examples.Topology.Cell do
   @moduledoc "A small Agent for topology startup, ownership, and Bus examples."
   use Jido.Agent, name: "topology_cell"
 
-  agent do
+  state do
     schema Zoi.object(%{
              label: Zoi.string() |> Zoi.default("cell"),
              received: Zoi.integer() |> Zoi.default(0),

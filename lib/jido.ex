@@ -875,10 +875,12 @@ defmodule Jido do
   calling process must own that link.
 
   Options must be a keyword list. An omitted `:id` generates a new identity;
-  an explicit ID must be a nonempty string. An existing Agent instance keeps
-  its ID and state and rejects instance overrides. A live ID is unique within
-  its instance and partition. Starting a duplicate returns an error and leaves
-  the existing Agent unchanged.
+  an explicit ID must be a nonempty string. `:state` replaces matching
+  declared initial-state fields before the Agent module's optional
+  `initialize/2` callback runs. An existing Agent instance keeps its ID and
+  state and rejects instance overrides. A live ID is unique within its instance
+  and partition. Starting a duplicate returns an error and leaves the existing
+  Agent unchanged.
 
   This is the standard example startup API. Domain command functions can stay
   in the Agent module; they do not need a matching startup wrapper.
@@ -905,7 +907,7 @@ defmodule Jido do
     if is_list(opts) and Keyword.keyword?(opts) do
       {instance_opts, runtime_opts} = Keyword.split(opts, [:id, :state])
 
-      with {:ok, agent} <- startup_agent(agent, instance_opts) do
+      with {:ok, agent} <- startup_agent(agent, instance_opts, runtime_opts) do
         runtime_opts
         |> Keyword.merge(agent: agent, jido: instance)
         |> Jido.AgentServer.start()
@@ -1147,13 +1149,22 @@ defmodule Jido do
     start_agent(instance, agent_module, opts)
   end
 
-  defp startup_agent(%Jido.Agent{id: id} = agent, opts) when is_binary(id) do
+  defp startup_agent(%Jido.Agent{id: id} = agent, opts, _runtime_opts) when is_binary(id) do
     if Keyword.delete(opts, :id) == [] and Keyword.get(opts, :id, id) == id,
-      do: Jido.Agent.Validation.validate_instance(agent),
+      do: {:ok, agent},
       else: invalid_compat_input(:start_agent, %{opts: opts})
   end
 
-  defp startup_agent(source, opts), do: Jido.Agent.instantiate(source, opts)
+  defp startup_agent(source, opts, runtime_opts) do
+    if runtime_opts[:persistence_mode] == :restore do
+      with {:ok, definition} <- Jido.Agent.Validation.resolve(source),
+           {:ok, opts} <- Jido.Agent.Validation.options(opts, [:id]),
+           :ok <- Jido.Agent.Data.nonempty(opts[:id]),
+           do: {:ok, %{definition | id: opts.id}}
+    else
+      Jido.Agent.instantiate(source, opts)
+    end
+  end
 
   defp owned_agent_server(instance, server, opts) do
     with true <- not is_nil(instance),

@@ -6,7 +6,7 @@ defmodule JidoTest.Contract.AgentAuthoringTest do
   defmodule Leaf do
     use Jido.Agent, name: "contract_leaf"
 
-    agent do
+    state do
       schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
     end
 
@@ -19,7 +19,7 @@ defmodule JidoTest.Contract.AgentAuthoringTest do
   defmodule TypedLeaf do
     use Jido.Agent, name: "contract_typed_leaf"
 
-    agent do
+    state do
       schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
     end
 
@@ -56,11 +56,15 @@ defmodule JidoTest.Contract.AgentAuthoringTest do
       id: "tests/agents/complete-dsl",
       name: "contract_complete_dsl",
       description: "Complete core DSL shape",
-      vsn: 2
+      vsn: 2,
+      metadata: %{domain: "contracts"}
 
-    agent do
+    state do
       schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
-      metadata %{domain: "contracts"}
+      initial_state %{count: 2}
+    end
+
+    plugins do
       plugin JidoTest.AgentContract.First, config: %{initial: 3}
     end
 
@@ -122,6 +126,7 @@ defmodule JidoTest.Contract.AgentAuthoringTest do
         description: "Complete core DSL shape",
         vsn: 2,
         schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}),
+        initial_state: %{count: 2},
         metadata: %{domain: "contracts"},
         signal_source: "/contract/complete",
         routes: [
@@ -236,10 +241,14 @@ defmodule JidoTest.Contract.AgentAuthoringTest do
     end
 
     for body <- [
-          "agent do end\nagent do end",
+          "agent do end",
+          "state do initial %{} end",
+          "state do end\nstate do end",
+          "plugins do end\nplugins do end",
           "routes do end\nroutes do end",
           "topology do end\ntopology do end",
-          "agent do schema Zoi.object(%{}); schema Zoi.object(%{}) end"
+          "state do schema Zoi.object(%{}); schema Zoi.object(%{}) end",
+          "state do initial_state %{}; initial_state %{} end"
         ] do
       assert_raise CompileError, fn -> F.with_agent(body, fn _module -> :ok end) end
     end

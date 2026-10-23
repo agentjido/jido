@@ -2,7 +2,7 @@ defmodule Jido.Examples.BoundedIteration do
   @moduledoc "Local repair state is separate from the Agent's committed state."
   use Jido.Agent, name: "workflow_iteration_agent"
 
-  agent do
+  state do
     schema Zoi.object(%{result: Zoi.map() |> Zoi.default(%{})})
   end
 

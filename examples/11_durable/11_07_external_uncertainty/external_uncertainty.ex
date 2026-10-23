@@ -2,7 +2,7 @@ defmodule Jido.Examples.Durable.ExternalUncertainty do
   @moduledoc "Reuses an operation ID when a provider call runs again after recovery."
   use Jido.Agent, name: "durable_external_uncertainty"
 
-  agent do
+  state do
     schema Zoi.object(%{
              operation_id: Zoi.string() |> Zoi.default(""),
              report: Zoi.string() |> Zoi.default(""),

@@ -70,7 +70,7 @@ that return mutation Directives:
 defmodule Crew.Worker do
   use Jido.Agent, name: "crew_worker"
 
-  agent do
+  state do
     schema(
       Zoi.object(%{
         role: Zoi.string() |> Zoi.default("worker"),
@@ -94,7 +94,7 @@ defmodule Crew.Lead do
   use Jido.Agent, name: "crew"
   alias Jido.Agent.Directive, as: D
 
-  agent do
+  state do
     schema(Zoi.object(%{size: Zoi.integer() |> Zoi.default(2)}))
   end
 

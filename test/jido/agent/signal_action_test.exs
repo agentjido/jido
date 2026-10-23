@@ -62,7 +62,7 @@ defmodule Jido.Agent.SignalActionTest do
   defmodule Counter do
     use Jido.Agent, name: "signal_action_counter"
 
-    agent do
+    state do
       schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
     end
 
@@ -75,8 +75,11 @@ defmodule Jido.Agent.SignalActionTest do
   defmodule Deferred do
     use Jido.Agent, name: "deferred_signal_action"
 
-    agent do
+    state do
       schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+    end
+
+    plugins do
       plugin Jido.Agent.SignalActionTest.Delivery
     end
 
@@ -168,8 +171,8 @@ defmodule Jido.Agent.SignalActionRuntimeTest do
     assert {:ok, %{state: %{count: 1}}, _} =
              AgentServer.call(server, request, context: %{probe: self()})
 
-    assert_receive {:created_thread, 1}
-    assert_receive {:completed_thread, 1, ^request, reply}
+    assert_receive {:created_thread, 1}, 1_000
+    assert_receive {:completed_thread, 1, ^request, reply}, 1_000
     assert reply.type == "chat.thread.created"
     assert reply.data == %{id: "thread-1"}
     assert Signal.get_context(reply, "jidocausationid") == request.id

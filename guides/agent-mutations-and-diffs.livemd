@@ -70,7 +70,7 @@ end
 defmodule Mut.Greeter do
   use Jido.Agent, name: "greeter"
 
-  agent do
+  state do
     schema(Zoi.object(%{last: Zoi.string() |> Zoi.default("")}))
   end
 

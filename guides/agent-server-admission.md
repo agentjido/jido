@@ -27,7 +27,7 @@ error, and `emits` returns that many `emit/2` Directives.
 defmodule MyApp.Worker do
   use Jido.Agent, name: "worker"
 
-  agent do
+  state do
     schema(Zoi.object(%{done: Zoi.list(Zoi.string()) |> Zoi.default([])}))
   end
 

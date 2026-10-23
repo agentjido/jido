@@ -17,7 +17,7 @@ These changes break the most V2 code. Fix them first.
 | V2 | V3 |
 | --- | --- |
 | `MyAgent.new(opts)` returns an Agent | `MyAgent.instantiate(opts)` returns `{:ok, agent}`; `instantiate!/1` raises |
-| `schema: [count: [type: :integer]]` in `use Jido.Agent` | `schema(Zoi.object(...))` inside an `agent do` block |
+| `schema: [count: [type: :integer]]` in `use Jido.Agent` | `schema(Zoi.object(...))` inside a `state do` block |
 | `signal_routes: [{"type", Action}]` | `route "type", Action` inside a `routes do` block |
 | `cmd(agent, Action)` or `cmd(agent, {Action, params})` | `cmd(agent, signal)`; only a `%Jido.Signal{}` is accepted |
 | `{agent, directives} = cmd(...)` | `{:ok, candidate, directives}` or `{:error, reason}` |
@@ -75,16 +75,16 @@ end
 agent = MyApp.Counter.new(id: "counter-1")
 ```
 
-V3 takes only `name`, `description`, `vsn`, and `extensions` as `use` options.
-The schema goes in an `agent` block and must be a static Zoi schema. Routes go
-in a `routes` block.
+V3 takes `id`, `name`, `description`, `vsn`, `metadata`, and `extensions` as
+`use` options. The schema goes in a `state` block and must be a static Zoi
+schema. Routes go in a `routes` block.
 
 ```elixir
 # V3
 defmodule MyApp.Counter do
   use Jido.Agent, name: "counter"
 
-  agent do
+  state do
     schema(
       Zoi.object(%{
         count: Zoi.integer() |> Zoi.default(0),
@@ -114,7 +114,7 @@ a Plugin runtime. `Jido.Agent.define/1` builds a definition from a plain map. It
 doesn't accept a keyword list.
 
 `category`, `tags`, and `max_state_size` aren't V3 Agent options. Put
-descriptive data in `metadata` inside the `agent` block.
+descriptive data in the `metadata:` option to `use Jido.Agent`.
 
 See [Define an Agent](define-and-instantiate-an-agent.livemd).
 
@@ -284,7 +284,7 @@ defmodule MyApp.TurnCounter do
 end
 ```
 
-Declare it in the Agent's `agent` block with `plugin MyApp.TurnCounter` or
+Declare it in the Agent's `plugins` block with `plugin MyApp.TurnCounter` or
 `plugin MyApp.TurnCounter, config: %{...}`. After one successful command the
 state includes `turns: 1`.
 
@@ -484,7 +484,7 @@ shapes explicitly.
 - [ ] Dependencies updated; `jido_action` and `jido_signal` ported with their
       own guides.
 - [ ] Every `new/1` replaced with `instantiate/1` or `instantiate!/1`.
-- [ ] Every schema converted to Zoi inside `agent do`.
+- [ ] Every schema converted to Zoi inside `state do`.
 - [ ] Every `signal_routes` entry moved to `routes do`.
 - [ ] Every `cmd` call sends a Signal and matches a three-element result.
 - [ ] Every Agent Action returns complete state.

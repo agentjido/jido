@@ -7,8 +7,8 @@
 On 2026-10-01, the user selected the current V3 block form under
 AUTH-REQ-009/063
 ([GAP-009](/Users/mhostetler/Source/Jido/proj_jido_core/jido/docs/design/GAP_ANALYSIS.md#gap-009)).
-Standalone module options are limited to `name`, `description`, `vsn`, and
-`extensions`. Schema, metadata, Plugins, and routes belong in DSL blocks.
+Identity, metadata, and extensions use module options. State, Plugins, and
+routes belong in separate DSL blocks.
 Direct map/keyword construction is still supported. Combined Topology
 hosting has a separate configuration path.
 
@@ -161,8 +161,8 @@ A skipped test is not passing evidence.
   are supported and end at Agent validation.
 - `AUTH-RB-002`: Neutral definitions and instances are separate. Authoring
   Codec data does not store ID or state.
-- `AUTH-RB-003`: Spark can declare schema, metadata, ordered Plugins, ordered
-  routes, inline Actions, Signal source, and explicit interfaces.
+- `AUTH-RB-003`: Spark can declare state, ordered Plugins, ordered routes,
+  inline Actions, Signal source, and explicit interfaces.
 - `AUTH-RB-004`: `definition/0` is the canonical module definition.
   `__agent_config__/0` can contain pre-normalized compiler data.
 - `AUTH-RB-005`: Inline Actions compile to normal `jido_action` Action modules.

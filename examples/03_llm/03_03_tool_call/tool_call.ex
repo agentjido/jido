@@ -3,7 +3,7 @@ defmodule Jido.Examples.ToolCall do
 
   use Jido.Agent, name: "examples_llm_tool_call"
 
-  agent do
+  state do
     schema Zoi.object(%{
              answer: Zoi.string() |> Zoi.default(""),
              tool_results: Zoi.list(Zoi.map()) |> Zoi.default([])

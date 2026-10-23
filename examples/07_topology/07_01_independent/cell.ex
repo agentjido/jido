@@ -2,14 +2,16 @@ defmodule Jido.Examples.Topology.Independent.Cell do
   @moduledoc "A small Agent for topology startup, ownership, and Bus examples."
   use Jido.Agent, name: "topology_independent_cell"
 
-  agent do
-    plugin Jido.Plugin.Scheduler, config: %{retry_delay_ms: 25}
-
+  state do
     schema Zoi.object(%{
              label: Zoi.string() |> Zoi.default("cell"),
              received: Zoi.integer() |> Zoi.default(0),
              total: Zoi.integer() |> Zoi.default(0)
            })
+  end
+
+  plugins do
+    plugin Jido.Plugin.Scheduler, config: %{retry_delay_ms: 25}
   end
 
   routes do

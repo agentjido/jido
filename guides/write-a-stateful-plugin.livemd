@@ -86,13 +86,16 @@ None of them can return a replacement Signal, route, context, or Agent.
 
 ## Attach It
 
-In application code, declare the Plugin in the `agent` block:
+In application code, declare the Plugin in the `plugins` block:
 
 <!-- livebook:{"force_markdown":true} -->
 
 ```elixir
-agent do
+state do
   schema(Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}))
+end
+
+plugins do
   plugin GuidePlugins.Ledger, config: %{blocked: ["mallory", "eve"]}
 end
 ```
@@ -108,7 +111,7 @@ defmodule GuidePlugins.Counter do
     name: "ledgered_counter",
     extensions: [GuidePlugins.Ledger]
 
-  agent do
+  state do
     schema(Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}))
   end
 

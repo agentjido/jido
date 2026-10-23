@@ -2,7 +2,7 @@ defmodule Jido.Examples.ParallelJoin do
   @moduledoc "Two independent Flow branches join before one Agent commit."
   use Jido.Agent, name: "workflow_parallel_agent"
 
-  agent do
+  state do
     schema Zoi.object(%{result: Zoi.map() |> Zoi.default(%{})})
   end
 

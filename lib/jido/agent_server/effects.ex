@@ -200,18 +200,33 @@ defmodule Jido.AgentServer.Effects do
   end
 
   defp validate_start(directive, config) do
+    opts = Map.to_list(directive.opts)
+
     with :ok <- validate_runtime_target(directive.name, config),
          :ok <- local_node(directive.node),
-         {:ok, agent, options} <- prepare_start(directive, config.agent.id),
-         {:ok, _} <-
-           Server.activation_options(
-             Keyword.merge(
-               [jido: config.jido, partition: config.partition, runner: config.runner],
-               Keyword.put(options, :agent, agent)
-             )
-           ) do
+         :ok <- validate_start_source(directive.agent, opts),
+         :ok <-
+           opts
+           |> Keyword.drop([:id, :state, :name])
+           |> Keyword.put_new(:persistence, false)
+           |> Server.validate_defaults() do
       :ok
     end
+  end
+
+  defp validate_start_source(%Agent{} = agent, opts) do
+    if Enum.any?([:id, :state], &Keyword.has_key?(opts, &1)),
+      do: {:error, :instance_options_conflict},
+      else:
+        with(
+          {:ok, agent} <- Agent.Validation.validate_instance(agent),
+          do: Agent.validate_runtime_support(agent)
+        )
+  end
+
+  defp validate_start_source(definition, _opts) do
+    with {:ok, definition} <- Agent.Validation.resolve(definition),
+         do: Agent.validate_runtime_support(definition)
   end
 
   defp local_node(target) when target in [nil, node()], do: :ok
@@ -236,7 +251,7 @@ defmodule Jido.AgentServer.Effects do
 
     case directive.agent do
       %Agent{} = agent ->
-        if Keyword.has_key?(opts, :id) or Keyword.has_key?(opts, :state),
+        if Keyword.take(opts, [:id, :state]) != [],
           do: {:error, :instance_options_conflict},
           else: {:ok, agent, options}
 

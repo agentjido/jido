@@ -48,7 +48,7 @@ end
 defmodule Guides.Helper do
   use Jido.Agent, name: "helper"
 
-  agent do
+  state do
     schema(Zoi.object(%{jobs: Zoi.integer() |> Zoi.default(0)}))
   end
 end
@@ -56,7 +56,7 @@ end
 defmodule Guides.Notes do
   use Jido.Agent, name: "notes", extensions: [Guides.Tally]
 
-  agent do
+  state do
     schema(Zoi.object(%{notes: Zoi.list(Zoi.string()) |> Zoi.default([])}))
   end
 

@@ -10,7 +10,7 @@ defmodule Jido.Agent.VersioningTest do
   defmodule VersionedAgent do
     use Jido.Agent, name: "versioned_agent", vsn: 3
 
-    agent do
+    state do
       schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
     end
   end
@@ -18,7 +18,7 @@ defmodule Jido.Agent.VersioningTest do
   defmodule CustomCheckpointAgent do
     use Jido.Agent, name: "custom_checkpoint_version_agent", vsn: 4
 
-    agent do
+    state do
       schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
     end
 
@@ -30,11 +30,10 @@ defmodule Jido.Agent.VersioningTest do
   end
 
   defmodule NumericDefinitionAgent do
-    use Jido.Agent, name: "numeric_definition_agent"
+    use Jido.Agent, name: "numeric_definition_agent", metadata: %{ratio: 1}
 
-    agent do
+    state do
       schema Zoi.object(%{count: Zoi.number() |> Zoi.default(1)})
-      metadata %{ratio: 1}
     end
   end
 

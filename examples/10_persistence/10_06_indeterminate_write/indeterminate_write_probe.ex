@@ -7,7 +7,7 @@ defmodule Jido.Examples.Persistence.IndeterminateWrite do
   """
   use Jido.Agent, name: "examples_indeterminate_write"
 
-  agent do
+  state do
     schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
   end
 

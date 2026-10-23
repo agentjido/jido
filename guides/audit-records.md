@@ -54,8 +54,11 @@ end
 defmodule MyApp.Account do
   use Jido.Agent, name: "account"
 
-  agent do
+  state do
     schema(Zoi.object(%{balance: Zoi.integer() |> Zoi.default(100)}))
+  end
+
+  plugins do
     plugin(Jido.Plugin.Audit, config: %{max_entries: 3})
   end
 

@@ -18,7 +18,7 @@ defmodule JidoTest.System.ControlledAgent do
   @moduledoc false
   use Jido.Agent, name: "system_controlled_agent"
 
-  agent do
+  state do
     schema Zoi.object(%{value: Zoi.integer() |> Zoi.default(0)})
   end
 

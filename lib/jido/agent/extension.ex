@@ -221,7 +221,7 @@ defmodule Jido.Agent.Extension do
     cond do
       Enum.any?(
         sections,
-        &(&1 in [:agent, :routes, :topology, :__agent__, :__routes__, :__topology__])
+        &(&1 in ~w(agent state plugins routes topology __state__ __plugins__ __routes__ __topology__)a)
       ) ->
         Error.fail(:namespace_conflict, [], "Provider cannot replace a core section")
 

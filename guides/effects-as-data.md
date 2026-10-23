@@ -57,7 +57,7 @@ interpreter is the Agent Server:
 defmodule Guides.Signup do
   use Jido.Agent, name: "signup"
 
-  agent do
+  state do
     schema(Zoi.object(%{users: Zoi.list(Zoi.string()) |> Zoi.default([])}))
   end
 

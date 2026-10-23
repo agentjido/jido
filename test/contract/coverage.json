@@ -45,7 +45,7 @@
         "jido.agent.I10": {
           "failing": 0,
           "kind": "functional",
-          "passing": 17,
+          "passing": 20,
           "status": "active",
           "testable": true,
           "tests": [
@@ -53,17 +53,20 @@
             "test Plugin ownership conflicts remain structured validation errors",
             "test Plugin schema callbacks receive their current config",
             "test Plugin state has one owner and domain updates use shallow replacement",
-            "test __agent__ is a reserved provider section",
+            "test __plugins__ is a reserved provider section",
             "test __routes__ is a reserved provider section",
+            "test __state__ is a reserved provider section",
             "test __topology__ is a reserved provider section",
             "test agent is a reserved provider section",
             "test composed Plugin state follows the same schema policy",
             "test lowering and endpoint projection return the complete contribution",
             "test normalization and verification reject invalid provider data",
+            "test plugins is a reserved provider section",
             "test provider identity and core namespaces are unique",
             "test provider validation uses the complete contribution behavior",
             "test routes is a reserved provider section",
             "test runtime Plugin projection accepts only available Plugin adapters",
+            "test state is a reserved provider section",
             "test the definition stores ordered routes and Plugin contributions",
             "test topology is a reserved provider section"
           ]
@@ -311,7 +314,6 @@
             "test Spark rejects invalid schema and identity options with a field path",
             "test authoring containers normalize keys and reject ambiguous input",
             "test authoring traversal preserves order and stops at one structured error",
-            "test block metadata accepts mixed keys and rejects structs with a DSL error",
             "test collection errors retain the failed field, declaration, and index",
             "test definitions are neutral and instances need explicit identity and complete stored state",
             "test field validation follows one fixed order",
@@ -320,7 +322,8 @@
             "test scalar authoring validators keep their exact boundaries",
             "test the DSL rejects invalid identity, repeated core declarations, and unsafe helpers",
             "test unknown fields and instance data fail before provider callbacks",
-            "test unknown nil keys fail in every authoring boundary"
+            "test unknown nil keys fail in every authoring boundary",
+            "test use metadata accepts mixed keys and rejects structs with a DSL error"
           ]
         },
         "jido.agent.I30": {
@@ -333,7 +336,7 @@
             "test authoring validates nested initial values and exact parent references",
             "test binding copies one state value without replacing the authored references",
             "test binding resolves nested state references and returns complete child values",
-            "test binding starts with the child definition initial state and applies member overrides",
+            "test binding returns member overrides without instantiating the child",
             "test composition preserves a valid state when no definition edit exists"
           ]
         },
@@ -394,13 +397,14 @@
         "jido.agent.I6": {
           "failing": 0,
           "kind": "functional",
-          "passing": 3,
+          "passing": 4,
           "status": "active",
           "testable": true,
           "tests": [
             "test a Map definition can provide reusable initial state",
             "test initial state can be partial and the merged state uses one schema validation",
-            "test initial state must be a plain static Map"
+            "test initial state must be a plain static Map",
+            "test the callback transforms declared and explicit state before schema defaults"
           ]
         },
         "jido.agent.I7": {
@@ -421,7 +425,7 @@
         "jido.agent.I8": {
           "failing": 0,
           "kind": "functional",
-          "passing": 15,
+          "passing": 16,
           "status": "active",
           "testable": true,
           "tests": [
@@ -439,7 +443,8 @@
             "test keyword defaults are checked with Hex Zoi",
             "test nested defaults reach the leaf and validate it once",
             "test nil defaults need a nullable schema",
-            "test optional defaulted fields stay absent in input and stored state"
+            "test optional defaulted fields stay absent in input and stored state",
+            "test the callback transforms declared and explicit state before schema defaults"
           ]
         },
         "jido.agent.I9": {

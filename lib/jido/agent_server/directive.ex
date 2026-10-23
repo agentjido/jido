@@ -18,6 +18,7 @@ defmodule Jido.AgentServer.Directive do
   @restart_policies [:permanent, :temporary, :transient]
   @unsupported_agent_start_opts [
     :agent,
+    :input,
     :jido,
     :partition,
     :runner,
@@ -137,6 +138,7 @@ defmodule Jido.AgentServer.Directive do
 
     case unsupported do
       [] -> :ok
+      [:input] -> {:error, "AgentStart does not support initialization input"}
       [:node] -> {:error, "Use AgentStart.node for placement, not opts.node"}
       keys -> {:error, "AgentStart does not support lifecycle options #{inspect(keys)}"}
     end

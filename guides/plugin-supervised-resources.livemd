@@ -150,7 +150,7 @@ Rules for the child spec:
 
 This notebook attaches the Plugin with `extensions:` because it needs no
 Agent-specific config. You can instead write `plugin GuidePlugins.Dedupe` in
-the `agent` block. Both forms work in a Livebook cell.
+the `plugins` block. Both forms work in a Livebook cell.
 
 ```elixir
 defmodule GuidePlugins.Inbox do
@@ -158,7 +158,7 @@ defmodule GuidePlugins.Inbox do
     name: "inbox",
     extensions: [GuidePlugins.Dedupe]
 
-  agent do
+  state do
     schema(Zoi.object(%{messages: Zoi.list(Zoi.string()) |> Zoi.default([])}))
   end
 

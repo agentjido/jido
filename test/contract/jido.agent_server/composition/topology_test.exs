@@ -304,7 +304,8 @@ defmodule JidoTest.AgentServer.Composition.TopologyTest do
 
     child = Server.children(server)["$topology/workers/1"].pid
     child_id = Server.agent(child).id
-    assert String.starts_with?(child_id, accepted.id <> "/$topology/workers/1/")
+    [%{identities: %{1 => identity}}] = accepted.topology.agents
+    assert child_id == accepted.id <> "/$topology/workers/1/" <> identity
     assert {:ok, child_agent, []} = Server.call(child, F.signal())
     assert child_agent.state.count == 1
 

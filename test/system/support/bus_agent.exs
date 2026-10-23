@@ -2,9 +2,11 @@ defmodule JidoTest.System.BusAgent do
   @moduledoc false
   use Jido.Agent, name: "system_bus_agent"
 
-  agent do
+  state do
     schema Zoi.object(%{value: Zoi.integer() |> Zoi.default(0)})
+  end
 
+  plugins do
     plugin(Jido.Plugin.Bus.Client, config: %{bus: :system_bus, path: "system.work"})
   end
 

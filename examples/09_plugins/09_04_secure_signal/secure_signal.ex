@@ -2,12 +2,14 @@ defmodule Jido.Examples.Plugins.SecureSignal.Agent do
   @moduledoc "Verifies and decrypts secure input, then encrypts and signs its correlated reply."
   use Jido.Agent, name: "application_secure_signal_agent"
 
-  agent do
+  state do
     schema Zoi.object(%{
              accepted: Zoi.integer() |> Zoi.default(0),
              peer: Zoi.string() |> Zoi.default("")
            })
+  end
 
+  plugins do
     plugin Jido.Examples.Plugins.SecureSignal.Identity.Plugin,
       config: %{
         trusted_public_key: elem(Jido.Examples.Plugins.Crypto.peer_key_pair(), 0)

@@ -15,7 +15,7 @@ defmodule Jido.Examples.RouteSelection do
 
   alias __MODULE__.Record
 
-  agent do
+  state do
     schema Zoi.object(%{handler: Zoi.string() |> Zoi.default("")})
   end
 
@@ -46,7 +46,7 @@ defmodule Jido.Examples.RouteSelection.Strict do
   @moduledoc "Has no fallback route, so unmatched input returns an unmatched_input error."
   use Jido.Agent, name: "basic_strict_route_selection"
 
-  agent do
+  state do
     schema Zoi.object(%{handled: Zoi.boolean() |> Zoi.default(false)})
   end
 

@@ -2,7 +2,7 @@ defmodule Jido.Examples.Durable.SavedCompletion do
   @moduledoc "Saves the report and the completed Turn in one persistence write."
   use Jido.Agent, name: "durable_saved_completion"
 
-  agent do
+  state do
     schema Zoi.object(%{
              report: Zoi.string() |> Zoi.default(""),
              completed: Zoi.integer() |> Zoi.default(0)

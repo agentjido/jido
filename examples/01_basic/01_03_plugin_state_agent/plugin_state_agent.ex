@@ -9,8 +9,11 @@ defmodule Jido.Examples.PluginStateAgent do
 
   use Jido.Agent, name: "basic_sdk_plugin_state"
 
-  agent do
+  state do
     schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+  end
+
+  plugins do
     plugin Jido.Examples.PluginStateAgent.CountTurns
   end
 

@@ -60,9 +60,10 @@ defmodule Define.Profile do
     name: "profile",
     description: "Owns one display profile",
     vsn: 2,
+    metadata: %{domain: "profiles"},
     extensions: [Define.Visits]
 
-  agent do
+  state do
     schema(
       Zoi.object(%{
         name: Zoi.string() |> Zoi.default("Anonymous"),
@@ -70,8 +71,11 @@ defmodule Define.Profile do
       })
     )
 
-    metadata(%{domain: "profiles"})
+    initial_state %{name: "Guest"}
   end
+
+  @impl Jido.Agent
+  def initialize(state, _context), do: {:ok, Map.update(state, :tags, [], &Enum.uniq/1)}
 
   routes do
     signal_source("/guides/define")
@@ -86,9 +90,11 @@ end
 | `name` | `use Jido.Agent` | Required non-empty string. |
 | `description` | `use Jido.Agent` | Optional string. |
 | `vsn` | `use Jido.Agent` | Positive integer. Default `1`. |
-| `schema` | `agent` | A static Zoi object for domain state. |
+| `schema` | `state` | A static Zoi object for domain state. |
+| `initial_state` | `state` | An optional plain, static Map. |
 | `extensions` | `use Jido.Agent` | Plugin and Extension modules with no options. |
-| `metadata` | `agent` | A plain map of static data. |
+| `metadata` | `use Jido.Agent` | A plain map of static data. |
+| `plugin` | `plugins` | An ordered Plugin declaration with optional `config:`. |
 
 Use an explicit `id` when the Agent can appear in a stored document. It must
 use the shared authoring identifier format and remain stable when Elixir module
@@ -96,10 +102,10 @@ names change.
 
 A bad route, schema, or Plugin fails the build.
 
-You can also write `plugin(Define.Visits)` inside the `agent` block and pass
-options with `config:`. This works in source files, generated modules, and
-Livebook cells. Use `extensions:` when a provider adds custom Spark sections,
-or when it needs no config.
+You can also write `plugin(Define.Visits)` inside `plugins do` and pass options
+with `config:`. This works in source files, generated modules, and Livebook
+cells. Use `extensions:` when a provider adds custom Spark sections, or when it
+needs no config.
 
 ## The Definition
 
@@ -140,12 +146,16 @@ agent = Define.Profile.instantiate!(id: "profile-1")
 {agent.state, Jido.Agent.instance?(agent)}
 ```
 
-The result is `{%{name: "Anonymous", tags: [], visits: 0}, true}`. The
+The result is `{%{name: "Guest", tags: [], visits: 0}, true}`. The
 `visits` field comes from the Plugin, not from your schema.
 
-Pass `state:` to set initial values. For a Map definition, these values replace
-matching top-level fields in `initial_state`. Fields you leave out get their
-schema defaults:
+For a new instance, Jido merges `initial_state` with explicit `state:` values.
+It then calls optional `initialize/2` with that candidate and a context that
+contains `id`, `parent_id`, `member`, and a 1-based `slot`. The callback returns
+the complete candidate as `{:ok, state}` or stops creation with
+`{:error, reason}`. Jido then adds schema defaults and validates the state.
+
+Pass `state:` to set initial values:
 
 ```elixir
 agent2 = Define.Profile.instantiate!(id: "profile-2", state: %{name: "Ada", tags: ["admin"]})
@@ -155,8 +165,8 @@ agent2.state
 
 The result is `%{name: "Ada", tags: ["admin"], visits: 0}`.
 
-`instantiate/1` returns `{:ok, agent}` or `{:error, %Jido.Agent.Error{}}`.
-It rejects wrong types, unknown keys, and a missing `id`:
+`instantiate/1` returns `{:ok, agent}` or `{:error, reason}`. Validation errors
+use `%Jido.Agent.Error{}`. It rejects wrong types, unknown keys, and a missing `id`:
 
 ```elixir
 {:error, wrong_type} = Define.Profile.instantiate(id: "p3", state: %{name: 42})

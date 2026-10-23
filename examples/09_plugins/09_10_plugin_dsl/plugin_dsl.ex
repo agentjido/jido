@@ -4,7 +4,7 @@ defmodule Jido.Examples.Plugins.DSL.Agent do
     name: "plugin_dsl_agent",
     extensions: [Jido.Examples.Plugins.DSL.Thresholds]
 
-  agent do
+  state do
     schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
   end
 

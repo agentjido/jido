@@ -12,7 +12,7 @@ defmodule Jido.Examples.PendingJobRecovery do
   alias Jido.Examples.PendingJobRecovery.{JobRunner, JobRuntime}
   alias Jido.Examples.PendingJobRecovery.JobRuntime.{Cancel, Submit}
 
-  agent do
+  state do
     schema Zoi.object(%{
              job_id: Zoi.string() |> Zoi.default(""),
              value: Zoi.integer() |> Zoi.default(0),
@@ -25,7 +25,9 @@ defmodule Jido.Examples.PendingJobRecovery do
              seen: Zoi.list(Zoi.string()) |> Zoi.default([]),
              result: Zoi.string() |> Zoi.default("")
            })
+  end
 
+  plugins do
     plugin JobRuntime
   end
 

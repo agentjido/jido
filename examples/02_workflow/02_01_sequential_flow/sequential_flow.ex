@@ -2,7 +2,7 @@ defmodule Jido.Examples.SequentialFlow do
   @moduledoc "A typed Flow produces one complete candidate; the Server commits it once."
   use Jido.Agent, name: "workflow_sequential_agent"
 
-  agent do
+  state do
     schema Zoi.object(%{
              value: Zoi.integer() |> Zoi.min(0) |> Zoi.max(100) |> Zoi.default(0),
              label: Zoi.string() |> Zoi.default("kept")

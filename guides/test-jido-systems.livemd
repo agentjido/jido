@@ -43,7 +43,7 @@ defmodule Shop.Counter do
     name: "shop_counter",
     extensions: [Shop.TurnCount]
 
-  agent do
+  state do
     schema(Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}))
   end
 

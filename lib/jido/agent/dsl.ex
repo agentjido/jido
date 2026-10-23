@@ -9,7 +9,8 @@ defmodule Jido.Agent.DSL do
       id: [type: :string, required: true],
       name: [type: :string, required: true],
       description: [type: :string],
-      vsn: [type: :pos_integer, default: 1]
+      vsn: [type: :pos_integer, default: 1],
+      metadata: [type: :any]
     ]
 
   @impl true
@@ -116,7 +117,7 @@ defmodule Jido.Agent.DSL do
       E.get_persisted(dsl, :spark_extensions, [])
       |> Enum.reject(&(&1 in [Jido.Agent.DSL.Extension, Jido.Agent.DSL.Topology]))
 
-    plugins = E.get_entities(dsl, [:__agent__])
+    plugins = E.get_entities(dsl, [:__plugins__])
     providers = Enum.uniq(extensions ++ Enum.map(plugins, & &1.provider))
 
     result =
@@ -125,12 +126,12 @@ defmodule Jido.Agent.DSL do
              Extension.lower(providers, dsl, Map.new(plugins, &{&1.provider, &1.config})) do
         input =
           opts
-          |> Keyword.take([:name, :description, :vsn])
+          |> Keyword.take([:name, :description, :vsn, :metadata])
           |> Map.new()
           |> Map.merge(%{
             module: module,
-            schema: E.get_opt(dsl, [:__agent__], :schema, Zoi.object(%{})),
-            metadata: E.get_opt(dsl, [:__agent__], :metadata, %{}),
+            schema: E.get_opt(dsl, [:__state__], :schema, Zoi.object(%{})),
+            initial_state: E.get_opt(dsl, [:__state__], :initial_state, %{}),
             signal_source: E.get_opt(dsl, [:__routes__], :signal_source),
             routes:
               Enum.map(

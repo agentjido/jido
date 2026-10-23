@@ -135,7 +135,7 @@ defmodule Jido.AgentServer do
     if Keyword.keyword?(opts) and not is_nil(opts[:jido]) do
       with {:ok, opts} <- runtime_options(opts),
            :ok <- validate_options(opts),
-           {:ok, _agent} <- Jido.Agent.Validation.validate_instance(opts[:agent]) do
+           {:ok, _agent} <- validate_start_agent(opts) do
         case ServerSupervisor.start_activation(
                Jido.agent_supervisor_name(opts[:jido]),
                child_spec(opts)
@@ -225,7 +225,7 @@ defmodule Jido.AgentServer do
     if Keyword.keyword?(opts) do
       with {:ok, opts} <- runtime_options(opts),
            :ok <- validate_options(opts),
-           {:ok, agent} <- Jido.Agent.Validation.validate_instance(Keyword.fetch!(opts, :agent)),
+           {:ok, agent} <- validate_start_agent(opts),
            :ok <- Agent.validate_runtime_support(agent),
            do: {:ok, Keyword.put(opts, :agent, agent)}
     else
@@ -234,6 +234,17 @@ defmodule Jido.AgentServer do
   end
 
   def activation_options(_), do: invalid_options("options must be a keyword list")
+
+  defp validate_start_agent(opts) do
+    agent = Keyword.fetch!(opts, :agent)
+
+    if opts[:persistence_mode] == :restore and match?(%Agent{state: nil}, agent) do
+      with {:ok, _} <- Jido.Agent.Validation.validate_definition(Agent.definition(agent)),
+           do: {:ok, agent}
+    else
+      Jido.Agent.Validation.validate_instance(agent)
+    end
+  end
 
   @doc false
   def start_worker(opts, activation) do
@@ -1679,7 +1690,8 @@ defmodule Jido.AgentServer do
         :activation_state,
         :parent,
         :runner,
-        :partition
+        :partition,
+        :persistence
       ])
       |> Map.put(:requester, active.requester)
 
@@ -2061,6 +2073,7 @@ defmodule Jido.AgentServer do
         operation(:upgrade, %{data | active: active}, fn ->
           with {:ok, candidate} <- Durable.upgrade(agent, action, context),
                {:ok, candidate} <- Jido.Agent.Composition.bind(candidate),
+               {:ok, candidate} <- identify_topology(data, candidate),
                :ok <- CompositionRuntime.check(data, candidate, []) do
             {:ok, candidate, []}
           end
@@ -2597,6 +2610,7 @@ defmodule Jido.AgentServer do
 
       {:ok, candidate, directives} ->
         with {:ok, candidate} <- Jido.Agent.Composition.bind(candidate),
+             {:ok, candidate} <- identify_topology(config, candidate),
              :ok <- CompositionRuntime.check(config, candidate, directives),
              :ok <- Effects.validate_batch(directives, %{config | agent: candidate}) do
           {:ok, candidate, directives}
@@ -2694,12 +2708,9 @@ defmodule Jido.AgentServer do
     durable_write(:durable_terminal, data, data.agent, receipt)
   end
 
-  defp finish(%{active: active} = data, {:ok, candidate, directives})
+  defp finish(%{active: active} = data, {:ok, _candidate, _directives} = result)
        when not is_map_key(active, :configuration_checked) do
-    case identify_topology(data, candidate) do
-      {:ok, candidate} -> configure_commit(data, active, {:ok, candidate, directives})
-      {:error, reason} -> finish(data, {:error, reason})
-    end
+    configure_commit(data, active, result)
   end
 
   defp finish(%{active: %{paused_plugins: [_ | _] = paused}} = data, {:error, _} = result) do

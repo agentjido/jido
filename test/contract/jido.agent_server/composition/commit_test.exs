@@ -15,9 +15,14 @@ defmodule JidoTest.AgentServer.Composition.CommitTest do
   defmodule Worker do
     use Jido.Agent, name: "composition_runtime_worker"
 
-    agent do
-      schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+    state do
+      schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0), context: Zoi.map()})
+      initial_state %{count: 1}
     end
+
+    @impl Jido.Agent
+    def initialize(state, context),
+      do: {:ok, state |> Map.put(:count, 2) |> Map.put(:context, context)}
 
     routes do
       route "work", JidoTest.AgentServer.Fixtures.Work
@@ -66,6 +71,10 @@ defmodule JidoTest.AgentServer.Composition.CommitTest do
     assert Server.agent(server).topology == candidate.topology
     assert Server.status(server).state_version == 1
     assert map_size(Server.children(server)) == 1
+
+    [%{pid: child}] = Map.values(Server.children(server))
+    assert %{id: id, state: %{count: 2, context: context}} = Server.agent(child)
+    assert context == %{id: id, parent_id: "composed", member: :worker, slot: 1}
   end
 
   @tag obligation: "jido.agent_server.composition.I5"

@@ -35,15 +35,16 @@ defmodule Jido.AgentTest do
   defmodule AuthoredAgent do
     @moduledoc false
 
-    use Jido.Agent, name: "authored_agent", description: "Exercises the generated Agent API"
+    use Jido.Agent,
+      name: "authored_agent",
+      description: "Exercises the generated Agent API",
+      metadata: %{category: "test", tags: ["agent", "immutable"], vsn: "1.0.0"}
 
-    agent do
+    state do
       schema Zoi.object(%{
                count: Zoi.integer() |> Zoi.default(0),
                history: Zoi.list(Zoi.string()) |> Zoi.default([])
              })
-
-      metadata %{category: "test", tags: ["agent", "immutable"], vsn: "1.0.0"}
     end
 
     routes do
@@ -56,7 +57,7 @@ defmodule Jido.AgentTest do
 
     use Jido.Agent, name: "custom_routing_agent"
 
-    agent do
+    state do
       schema Zoi.object(%{
                count: Zoi.integer() |> Zoi.default(0),
                history: Zoi.list(Zoi.string()) |> Zoi.default([])
@@ -107,7 +108,7 @@ defmodule Jido.AgentTest do
 
     use Jido.Agent, name: "callback_persistence_agent"
 
-    agent do
+    state do
       schema Zoi.object(%{
                count: Zoi.integer() |> Zoi.default(0),
                history: Zoi.list(Zoi.string()) |> Zoi.default([])

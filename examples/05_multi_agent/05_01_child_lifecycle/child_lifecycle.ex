@@ -3,7 +3,7 @@ defmodule Jido.Examples.ChildLifecycle do
 
   use Jido.Agent, name: "example_child_lifecycle"
 
-  agent do
+  state do
     schema Zoi.object(%{desired: Zoi.list(Zoi.string()) |> Zoi.default([])})
   end
 

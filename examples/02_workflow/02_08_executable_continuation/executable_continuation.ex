@@ -2,7 +2,7 @@ defmodule Jido.Examples.ExecutableContinuation do
   @moduledoc "One Turn owns Dispatch selection and bounded Flow execution."
   use Jido.Agent, name: "workflow_continuation_agent"
 
-  agent do
+  state do
     schema Zoi.object(%{
              value: Zoi.integer() |> Zoi.default(0),
              request: Zoi.string() |> Zoi.default("")

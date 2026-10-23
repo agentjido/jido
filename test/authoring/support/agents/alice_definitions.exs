@@ -3,7 +3,7 @@ defmodule JidoTest.ComposableAgent.Definitions.Alice do
     name: "alice",
     description: "Accepts a greeting request and emits a greeting"
 
-  agent do
+  state do
     schema Zoi.object(%{
              greetings: Zoi.integer() |> Zoi.default(0)
            })

@@ -5,12 +5,14 @@ defmodule Jido.Examples.Applications.Inbox.Agent do
   alias Jido.Examples.Applications.Inbox.Sensor
   alias Jido.Plugin.SensorManager
 
-  agent do
+  state do
     schema Zoi.object(%{
              accepted: Zoi.integer() |> Zoi.default(0),
              seen: Zoi.list(Zoi.string()) |> Zoi.default([])
            })
+  end
 
+  plugins do
     plugin SensorManager, config: %{retry_delay_ms: 10}
   end
 

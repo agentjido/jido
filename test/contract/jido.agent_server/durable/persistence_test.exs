@@ -97,7 +97,7 @@ defmodule JidoTest.AgentServer.Durable.PersistenceTest do
   defmodule LocalAgent do
     use Jido.Agent, name: "server_durable_local_agent"
 
-    agent do
+    state do
       schema Zoi.object(%{handle: Zoi.any() |> Zoi.default(nil)})
     end
 
@@ -109,7 +109,7 @@ defmodule JidoTest.AgentServer.Durable.PersistenceTest do
   defmodule CustomAgent do
     use Jido.Agent, name: "server_durable_custom_agent"
 
-    agent do
+    state do
       schema Zoi.object(%{handle: Zoi.any() |> Zoi.default(nil)})
     end
 

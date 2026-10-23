@@ -26,8 +26,11 @@ defmodule Jido.Examples.Heartbeat do
     @moduledoc "Receives the default Heartbeat Signal."
     use Jido.Agent, name: "runtime_heartbeat_default_agent"
 
-    agent do
+    state do
       schema Zoi.object(%{events: Zoi.list(Zoi.map()) |> Zoi.default([])})
+    end
+
+    plugins do
       plugin Heartbeat, config: %{interval: 60_000, signal_data: %{kind: "default"}}
     end
 
@@ -40,9 +43,11 @@ defmodule Jido.Examples.Heartbeat do
     @moduledoc "Receives one application-defined Heartbeat Signal."
     use Jido.Agent, name: "runtime_heartbeat_custom_agent"
 
-    agent do
+    state do
       schema Zoi.object(%{events: Zoi.list(Zoi.map()) |> Zoi.default([])})
+    end
 
+    plugins do
       plugin Heartbeat,
         config: %{
           interval: 60_000,

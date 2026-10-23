@@ -30,7 +30,7 @@ defmodule Jido.Examples.TypedCommandAgent do
 
   use Jido.Agent, name: "basic_sdk_typed_commands"
 
-  agent do
+  state do
     schema Contract.schema()
   end
 

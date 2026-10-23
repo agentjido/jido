@@ -63,9 +63,12 @@ defmodule JidoTest.Agent.AuthoringExtensionTest do
 
   for {section, suffix} <- [
         agent: "CoreAgent",
+        state: "CoreState",
+        plugins: "CorePlugins",
         routes: "CoreRoutes",
         topology: "CoreTopology",
-        __agent__: "CorePrivateAgent",
+        __state__: "CorePrivateState",
+        __plugins__: "CorePrivatePlugins",
         __routes__: "CorePrivateRoutes",
         __topology__: "CorePrivateTopology"
       ] do
@@ -107,9 +110,12 @@ defmodule JidoTest.Agent.AuthoringExtensionTest do
 
   for {section, suffix} <- [
         agent: "CoreAgent",
+        state: "CoreState",
+        plugins: "CorePlugins",
         routes: "CoreRoutes",
         topology: "CoreTopology",
-        __agent__: "CorePrivateAgent",
+        __state__: "CorePrivateState",
+        __plugins__: "CorePrivatePlugins",
         __routes__: "CorePrivateRoutes",
         __topology__: "CorePrivateTopology"
       ] do

@@ -156,7 +156,7 @@ defmodule JidoTest.Property.FuzzSupportTest do
     source = """
     defmodule #{inspect(module)} do
       use Jido.Agent, name: "property_inline_cleanup"
-      agent do
+      state do
         schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
       end
       routes do

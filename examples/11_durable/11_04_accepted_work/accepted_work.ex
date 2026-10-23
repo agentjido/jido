@@ -2,7 +2,7 @@ defmodule Jido.Examples.Durable.AcceptedWork do
   @moduledoc "Runs one report Flow as the current durable Turn."
   use Jido.Agent, name: "durable_accepted_work"
 
-  agent do
+  state do
     schema Zoi.object(%{report: Zoi.string() |> Zoi.default("")})
   end
 

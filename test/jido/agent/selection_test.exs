@@ -40,7 +40,7 @@ defmodule Jido.Agent.SelectionTest do
   defmodule RoutedAgent do
     use Jido.Agent, name: "selection_routed"
 
-    agent do
+    state do
       schema Zoi.object(%{
                input: Zoi.map() |> Zoi.default(%{}),
                calls: Zoi.integer() |> Zoi.default(0)

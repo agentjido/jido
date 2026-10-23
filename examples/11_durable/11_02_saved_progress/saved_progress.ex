@@ -27,7 +27,7 @@ defmodule Jido.Examples.Durable.SavedProgress.Agent do
   @moduledoc "Runs the ten-step Flow as one serial AgentServer Turn."
   use Jido.Agent, name: "durable_saved_progress_agent"
 
-  agent do
+  state do
     schema Zoi.object(%{value: Zoi.integer() |> Zoi.default(0)})
   end
 

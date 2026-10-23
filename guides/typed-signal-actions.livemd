@@ -59,7 +59,7 @@ The result is
 defmodule Typed.Cart do
   use Jido.Agent, name: "cart"
 
-  agent do
+  state do
     schema(
       Zoi.object(%{
         items: Zoi.map(Zoi.string(), Zoi.integer()) |> Zoi.default(%{}),
@@ -152,7 +152,7 @@ end
 defmodule Typed.QuotingCart do
   use Jido.Agent, name: "quoting_cart"
 
-  agent do
+  state do
     schema(
       Zoi.object(%{
         items: Zoi.map(Zoi.string(), Zoi.integer()) |> Zoi.default(%{}),

@@ -2,7 +2,7 @@ defmodule Jido.Examples.Durable.DurableWait do
   @moduledoc "Runs one durable approval Flow that releases its Worker while it waits."
   use Jido.Agent, name: "durable_approval_wait"
 
-  agent do
+  state do
     schema Zoi.object(%{
              request_id: Zoi.string() |> Zoi.default(""),
              status: Zoi.enum([:idle, :approved, :expired, :cancelled]) |> Zoi.default(:idle)

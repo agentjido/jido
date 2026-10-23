@@ -4,7 +4,7 @@ defmodule Jido.Examples.FailureOutcome do
   """
   use Jido.Agent, name: "runtime_failure_outcome"
 
-  agent do
+  state do
     schema Zoi.object(%{accepted: Zoi.list(Zoi.string()) |> Zoi.default([])})
   end
 

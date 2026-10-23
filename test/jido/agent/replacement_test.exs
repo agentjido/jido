@@ -13,7 +13,7 @@ defmodule JidoTest.Agent.ReplacementTest do
   defmodule Configured do
     use Jido.Agent, name: "agent_replacement_configured"
 
-    agent do
+    state do
       schema Zoi.object(%{config: Zoi.map() |> Zoi.default(%{})})
     end
 

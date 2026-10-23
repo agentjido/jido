@@ -4,7 +4,7 @@ defmodule Jido.Examples.Applications.PurposeLoop.Agent do
 
   alias Jido.Examples.Applications.PurposeLoop.State
 
-  agent do
+  state do
     schema Zoi.object(%{
              purpose: Zoi.string() |> Zoi.default(""),
              phase:
@@ -24,7 +24,9 @@ defmodule Jido.Examples.Applications.PurposeLoop.Agent do
              work_delay_ms: Zoi.integer() |> Zoi.default(20),
              idle_delay_ms: Zoi.integer() |> Zoi.default(100)
            })
+  end
 
+  plugins do
     plugin Jido.Plugin.Scheduler
   end
 

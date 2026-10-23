@@ -1,6 +1,6 @@
 defmodule Jido.Agent.Validation do
   @moduledoc false
-  alias Jido.Agent.{Data, Error, Extension, Route, Topology}
+  alias Jido.Agent.{Callback, Data, Error, Extension, Route, Topology}
 
   @fields [
     :id,
@@ -96,21 +96,47 @@ defmodule Jido.Agent.Validation do
     with {:ok, agent, _specs, _schema} <- validate_instance_with_plugins(value), do: {:ok, agent}
   end
 
-  def instantiate(source, opts) do
+  def instantiate(source, opts),
+    do: instantiate(source, opts, %{parent_id: nil, member: nil, slot: nil})
+
+  def instantiate(source, opts, parent_context) do
     with {:ok, definition} <- resolve(source),
          {:ok, opts} <- options(opts, [:id, :state]),
          :ok <- Error.at(Data.nonempty(opts[:id]), :id),
+         state = Map.get(opts, :state, %{}),
+         :ok <- Error.at(Data.plain_map(state), :state),
          {:ok, schema} <- Jido.Agent.Validation.state_schema(definition),
-         {:ok, state} <-
-           Error.at(merge_state(definition.initial_state, Map.get(opts, :state, %{})), :state),
+         context = Map.put(parent_context, :id, opts.id),
+         state = Map.merge(definition.initial_state, state),
+         {:ok, state} <- initialize(definition, state, context),
          {:ok, state} <- Error.at(Data.initialize(schema, state), :state),
          {:ok, _} <- Topology.bind(definition, state),
          do: {:ok, %{definition | id: opts.id, state: state}}
   end
 
-  defp merge_state(initial_state, state) do
-    with :ok <- Data.plain_map(state), do: {:ok, Map.merge(initial_state, state)}
+  defp initialize(%{module: module}, state, context) do
+    if module not in [nil, true, false] and Code.ensure_loaded?(module) and
+         function_exported?(module, :initialize, 2) do
+      case Callback.invoke(module, :initialize, [state, context]) do
+        {:ok, state} ->
+          with :ok <- Error.at(Data.plain_map(state), :initialize), do: {:ok, state}
+
+        {:error, %{__exception__: true}} = error ->
+          error
+
+        {:error, reason} ->
+          initialize_error(%{reason: reason})
+
+        result ->
+          initialize_error(%{result: result})
+      end
+    else
+      {:ok, state}
+    end
   end
+
+  defp initialize_error(details),
+    do: Error.fail(:initialize_failed, [:initialize], "Agent initialize/2 failed", details)
 
   def resolve(%Jido.Agent{} = definition), do: validate_definition(definition)
 

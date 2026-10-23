@@ -84,7 +84,7 @@ end
 defmodule MyApp.Counter do
   use Jido.Agent, name: "counter"
 
-  agent do
+  state do
     schema(Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}))
   end
 
@@ -340,8 +340,11 @@ delivers a Signal that runs a normal Turn:
 defmodule MyApp.Reminders do
   use Jido.Agent, name: "reminders"
 
-  agent do
+  state do
     schema(Zoi.object(%{sent: Zoi.list(Zoi.string()) |> Zoi.default([])}))
+  end
+
+  plugins do
     plugin(Jido.Plugin.Scheduler)
   end
 

@@ -2,12 +2,14 @@ defmodule Jido.Examples.Applications.Subscription.Agent do
   @moduledoc "Stores desired subscriptions in Plugin state and rebuilds runtime state after restart."
   use Jido.Agent, name: "application_subscription_agent"
 
-  agent do
+  state do
     schema Zoi.object(%{
              changes: Zoi.integer() |> Zoi.default(0),
              events: Zoi.list(Zoi.map()) |> Zoi.default([])
            })
+  end
 
+  plugins do
     plugin Jido.Examples.Applications.Subscription.Plugin
   end
 

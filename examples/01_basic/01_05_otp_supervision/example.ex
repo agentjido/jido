@@ -2,11 +2,14 @@ defmodule Jido.Examples.OTPSupervision.Counter do
   @moduledoc "A counter placed directly in an application supervision tree."
   use Jido.Agent, name: "otp_supervision_counter"
 
-  agent do
+  state do
     schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
 
     # This standard Plugin makes Agent-owned runtime cleanup visible in the
     # process tree. This example does not schedule work.
+  end
+
+  plugins do
     plugin Jido.Plugin.Scheduler
   end
 

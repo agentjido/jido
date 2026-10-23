@@ -3,7 +3,7 @@ defmodule Jido.Examples.CorrelatedRequests do
 
   use Jido.Agent, name: "example_correlated_requests"
 
-  agent do
+  state do
     schema Zoi.object(%{
              request_id: Zoi.string() |> Zoi.default(""),
              status:

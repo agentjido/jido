@@ -47,7 +47,7 @@ not restore or claim the retired standalone `jido.topology` component.
 ### jido.agent.I1 — Canonical DSL parity
 
 - **scope:** `Jido.Agent.define/1`, `Jido.Agent.__using__/1`
-- **must:** The optional, single-use `agent`, `routes`, and `topology` sections lower state schema, metadata, provider configuration, ordered routes, logical members, and connections into the same canonical Agent definition as an equivalent Map declaration. Selected providers can add non-core sections without replacing a core section.
+- **must:** The optional, single-use `state`, `plugins`, `routes`, and `topology` sections lower state schema, declared initial state, provider configuration, ordered routes, logical members, and connections into the same canonical Agent definition as an equivalent Map declaration. `use Jido.Agent` owns static metadata. Selected providers can add non-core sections without replacing a core section. The removed `agent do` block is invalid.
 - **kind:** functional
 - **status:** active
 
@@ -82,21 +82,21 @@ not restore or claim the retired standalone `jido.topology` component.
 ### jido.agent.I6 — Declared initial state
 
 - **scope:** `Jido.Agent.define/1`, `Jido.Agent.instantiate/2`
-- **must:** A Map definition can contain one plain, static initial-state Map. Instantiation makes a shallow merge in which explicit state replaces declared top-level fields. It then applies schema defaults and validates the complete result. The source definition stays unchanged.
+- **must:** A Map definition or `state do` section can declare one plain, static `initial_state` Map. The DSL and Map forms lower to the same field. The source definition stays unchanged.
 - **kind:** functional
 - **status:** active
 
 ### jido.agent.I7 — Instance identity and options
 
 - **scope:** `Jido.Agent.instantiate/2`
-- **must:** Instantiation requires a nonempty string identity and accepts only identity and state options.
+- **must:** Instantiation requires a nonempty string identity and accepts only identity and state options. State must be a plain Map.
 - **kind:** functional
 - **status:** active
 
 ### jido.agent.I8 — Initialization defaults
 
 - **scope:** `Jido.Agent.instantiate/2`
-- **must:** Initialization applies declared initial state, then explicit state, then Zoi defaults. It preserves valid false, zero, and empty values.
+- **must:** For a new instance, initialization merges explicit state over declared initial state and passes that candidate to the Agent module's optional `initialize/2` callback with Jido-owned identity and topology context. The callback returns the complete candidate as `{:ok, state}` or stops creation with `{:error, reason}`. Zoi then adds defaults and validates the result. Invalid results and callback failures stop creation. Validation and restore do not run the callback. Initialization preserves valid false, zero, and empty values.
 - **kind:** functional
 - **status:** active
 
@@ -126,7 +126,7 @@ not restore or claim the retired standalone `jido.topology` component.
 ### jido.agent.I20 — Agent document adapter
 
 - **scope:** `Jido.Authoring.encode/2`, `Jido.Authoring.decode/2`, `Jido.Authoring.encode_json/2`, `Jido.Authoring.decode_json/2`, `Jido.Agent.Codec`
-- **must:** Register the Agent document type with shared Authoring. Write a portable Agent definition, including declared initial state, through a trusted Registry. Omit instance ID and state, read through `Jido.Agent.define/1`, and reject a malformed or unsupported Agent document. Read a version 1 document that omits initial state as an empty initial-state Map. Shared document, Registry, JSON, and portable-value rules remain owned by `jido_action`.
+- **must:** Register the Agent document type with shared Authoring. Write a portable Agent definition, including declared initial state, through a trusted Registry. Omit instance ID, instance state, and the module-owned `initialize/2` callback. Read through `Jido.Agent.define/1`, and reject a malformed or unsupported Agent document. Read a version 1 document that omits initial state as an empty initial-state Map. Shared document, Registry, JSON, and portable-value rules remain owned by `jido_action`.
 - **kind:** persisted-format
 - **status:** active
 

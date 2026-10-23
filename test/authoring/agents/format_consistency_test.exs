@@ -43,9 +43,8 @@ defmodule Jido.Agent.FormatConsistencyTest do
   test "Map, struct and DSL have exact field equality for independent declarations" do
     cases = [
       {"", %{}},
-      {~s(agent do metadata %{label: "formats"} end),
-       %{description: "example", vsn: 3, metadata: %{label: "formats"}}},
-      {~s"agent do schema Zoi.object(%{flag: Zoi.boolean() |> Zoi.default(false), count: Zoi.integer() |> Zoi.default(0)}) end",
+      {"", %{description: "example", vsn: 3, metadata: %{label: "formats"}}},
+      {~s"state do schema Zoi.object(%{flag: Zoi.boolean() |> Zoi.default(false), count: Zoi.integer() |> Zoi.default(0)}) end",
        %{
          schema:
            Zoi.object(%{
@@ -74,7 +73,7 @@ defmodule Jido.Agent.FormatConsistencyTest do
            connections: []
          }
        }},
-      {"agent do plugin #{inspect(Audit)}, config: %{label: \"formats\", enabled: false} end",
+      {"plugins do plugin #{inspect(Audit)}, config: %{label: \"formats\", enabled: false} end",
        %{
          extensions: [
            %{id: Audit.id(), provider: Audit, vsn: 1, data: %{label: "formats", enabled: false}}
@@ -86,7 +85,7 @@ defmodule Jido.Agent.FormatConsistencyTest do
       opts =
         ~s(name: "formats") <>
           if(Map.has_key?(fields, :description),
-            do: ~s(, description: "example", vsn: 3),
+            do: ~s(, description: "example", vsn: 3, metadata: %{label: "formats"}),
             else: ""
           )
 
@@ -114,7 +113,7 @@ defmodule Jido.Agent.FormatConsistencyTest do
     module =
       Compiler.compile(
         """
-        agent do
+        state do
           schema Zoi.object(%{
             flag: Zoi.boolean() |> Zoi.default(false),
             count: Zoi.integer() |> Zoi.default(0),

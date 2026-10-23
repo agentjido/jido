@@ -3,13 +3,15 @@ defmodule JidoTest.Examples.Runtime.InspectionFixture do
 
   use Jido.Agent, name: "test_runtime_inspection"
 
-  agent do
+  state do
     schema Zoi.object(%{
              status: Zoi.string() |> Zoi.default("idle"),
              secret_token: Zoi.string() |> Zoi.default("hidden"),
              result: Zoi.string() |> Zoi.default("")
            })
+  end
 
+  plugins do
     plugin Jido.Plugin.Scheduler
   end
 

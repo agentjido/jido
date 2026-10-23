@@ -10,8 +10,11 @@ defmodule Jido.Examples.DirectiveAgent do
 
   use Jido.Agent, name: "basic_sdk_directives"
 
-  agent do
+  state do
     schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+  end
+
+  plugins do
     plugin Effects
   end
 

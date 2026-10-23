@@ -97,12 +97,14 @@ defmodule Jido.Examples.Plugins.RuntimeAdmission.Agent do
   @moduledoc "Requires live Plugin admission before it accepts a command."
   use Jido.Agent, name: "plugin_runtime_admission_agent"
 
-  agent do
+  state do
     schema Zoi.object(%{
              accepted: Zoi.integer() |> Zoi.default(0),
              principal: Zoi.string() |> Zoi.default("")
            })
+  end
 
+  plugins do
     plugin Jido.Examples.Plugins.RuntimeAdmission.Plugin,
       config: %{tokens: [{"allow", "operator"}]}
   end

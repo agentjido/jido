@@ -43,7 +43,7 @@ end
 defmodule MyApp.Counter do
   use Jido.Agent, name: "counter", description: "Counts increments"
 
-  agent do
+  state do
     schema(Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}))
   end
 

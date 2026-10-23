@@ -193,7 +193,7 @@ defmodule JidoTest.DurableFixtures do
   defmodule Worker do
     use Jido.Agent, name: "durable_probe_agent"
 
-    agent do
+    state do
       schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
     end
 

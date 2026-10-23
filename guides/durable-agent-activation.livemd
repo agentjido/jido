@@ -40,7 +40,7 @@ end
 defmodule Activation.Account do
   use Jido.Agent, name: "account"
 
-  agent do
+  state do
     schema(Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}))
   end
 

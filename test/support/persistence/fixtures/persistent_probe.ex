@@ -3,7 +3,7 @@ defmodule JidoTest.Persistence.PersistentProbe do
 
   use Jido.Agent, name: "persistence_contract_probe"
 
-  agent do
+  state do
     schema Zoi.object(%{value: Zoi.integer() |> Zoi.default(0)})
   end
 

@@ -400,7 +400,7 @@ defmodule Jido.Plugin.ContractTest do
   defmodule InvalidStateAgent do
     use Jido.Agent, name: "invalid_state_agent"
 
-    agent do
+    state do
       schema Zoi.object(%{trace: Zoi.list(Zoi.string()) |> Zoi.default([])})
     end
 
@@ -412,9 +412,6 @@ defmodule Jido.Plugin.ContractTest do
   defmodule DirectiveAgent do
     use Jido.Agent, name: "directive_agent"
 
-    agent do
-    end
-
     routes do
       route "directive.stop", ReturnStop
     end
@@ -422,9 +419,6 @@ defmodule Jido.Plugin.ContractTest do
 
   defmodule FailingAgent do
     use Jido.Agent, name: "failing_agent"
-
-    agent do
-    end
 
     routes do
       route "failure.run", FailingAction
@@ -434,9 +428,11 @@ defmodule Jido.Plugin.ContractTest do
   defmodule OwnedStateAgent do
     use Jido.Agent, name: "owned_state_agent"
 
-    agent do
+    state do
       schema Zoi.object(%{trace: Zoi.list(Zoi.string()) |> Zoi.default([])})
+    end
 
+    plugins do
       plugin OwnedStatePlugin
     end
 
@@ -448,7 +444,7 @@ defmodule Jido.Plugin.ContractTest do
   defmodule NilOwnedStateAgent do
     use Jido.Agent, name: "nil_owned_state_agent"
 
-    agent do
+    plugins do
       plugin NilOwnedStatePlugin
     end
 
@@ -460,7 +456,7 @@ defmodule Jido.Plugin.ContractTest do
   defmodule ReplaceDirectiveTypeAgent do
     use Jido.Agent, name: "replace_directive_type_agent"
 
-    agent do
+    plugins do
       plugin ReplaceDirectiveTypePlugin
     end
 
@@ -472,7 +468,7 @@ defmodule Jido.Plugin.ContractTest do
   defmodule DirectiveReducerAgent do
     use Jido.Agent, name: "directive_reducer_agent"
 
-    agent do
+    plugins do
       plugin DirectiveReducerPlugin
       plugin ForeignDirectivePlugin
     end
@@ -485,7 +481,7 @@ defmodule Jido.Plugin.ContractTest do
   defmodule NormalizingDirectiveAgent do
     use Jido.Agent, name: "normalizing_directive_agent"
 
-    agent do
+    plugins do
       plugin NormalizingDirectivePlugin
     end
 

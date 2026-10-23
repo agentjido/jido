@@ -11,7 +11,7 @@ defmodule Jido.Examples.BurstBuncher do
     name: "examples_burst_buncher",
     description: "Collects ordered items and flushes stable batches"
 
-  agent do
+  state do
     schema Zoi.object(%{
              buffer: Zoi.list(Zoi.map()) |> Zoi.default([]),
              handled_item_ids: Zoi.list(Zoi.string()) |> Zoi.default([]),
@@ -21,7 +21,9 @@ defmodule Jido.Examples.BurstBuncher do
              next_batch_number: Zoi.integer() |> Zoi.min(1) |> Zoi.default(1),
              last_flush_reason: Zoi.enum([:size, :timeout]) |> Zoi.nullable() |> Zoi.default(nil)
            })
+  end
 
+  plugins do
     plugin Jido.Examples.BurstBuncher.Timer
   end
 

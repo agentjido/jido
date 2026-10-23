@@ -11,6 +11,15 @@ defmodule JidoTest.AgentServer.Effects.RuntimeDirectivesTest do
   alias Jido.AgentServer.Effects
   alias JidoTest.AgentEvolutionFixtures, as: E
 
+  defmodule Initializer do
+    use Jido.Agent, name: "effect_initializer"
+
+    def initialize(%{observer: observer}, _context) do
+      send(observer, :initialized)
+      {:ok, %{}}
+    end
+  end
+
   @tag obligation: "jido.agent_server.effects.I10"
   test "runtime directives start, send to, reply from, and stop an Agent", c do
     server = start(c, partition: "effects")
@@ -62,14 +71,16 @@ defmodule JidoTest.AgentServer.Effects.RuntimeDirectivesTest do
 
     assert {:ok, _, _} =
              turn(server, [
-               R.agent_start(E.Worker, :worker,
-                 opts: %{id: "explicit", state: %{count: 4}},
+               R.agent_start(Initializer, :worker,
+                 opts: %{id: "explicit", state: %{observer: self()}},
                  restart: :temporary
                )
              ])
 
     settled(server)
-    assert Server.agent(Server.children(server).worker.pid).state.count == 4
+    assert Server.agent(Server.children(server).worker.pid).id == "explicit"
+    assert_received :initialized
+    refute_received :initialized
 
     instance = %{E.agent() | id: unique_id("instance-options")}
 

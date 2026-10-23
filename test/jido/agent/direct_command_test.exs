@@ -37,7 +37,7 @@ defmodule Jido.Agent.DirectCommandTest do
   defmodule Leaf do
     use Jido.Agent, name: "direct"
 
-    agent do
+    state do
       schema Zoi.object(%{
                count: Zoi.integer() |> Zoi.default(0),
                label: Zoi.string() |> Zoi.default("same")

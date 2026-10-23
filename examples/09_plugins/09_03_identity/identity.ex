@@ -2,12 +2,14 @@ defmodule Jido.Examples.Plugins.Identity.Agent do
   @moduledoc "Verifies signed input before routing and signs emitted replies after execution."
   use Jido.Agent, name: "application_identity_agent"
 
-  agent do
+  state do
     schema Zoi.object(%{
              accepted: Zoi.integer() |> Zoi.default(0),
              last_public_key: Zoi.string() |> Zoi.default("")
            })
+  end
 
+  plugins do
     plugin Jido.Examples.Plugins.Identity.Plugin,
       config: %{
         trusted_public_key: elem(Jido.Examples.Plugins.Crypto.peer_key_pair(), 0)

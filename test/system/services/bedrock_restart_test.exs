@@ -16,7 +16,7 @@ defmodule JidoTest.System.Services.BedrockRestart do
   defmodule Counter do
     use Jido.Agent, name: "bedrock_persistence_counter"
 
-    agent do
+    state do
       schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
     end
   end

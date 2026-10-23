@@ -10,10 +10,10 @@ migration.
 
 ## Current review decisions
 
-On 2026-10-01, the user selected the current V3 block form
+On 2026-10-01, the user selected the V3 block form
 ([GAP-009](/Users/mhostetler/Source/Jido/proj_jido_core/jido/docs/design/GAP_ANALYSIS.md#gap-009)).
-Standalone `use Jido.Agent` accepts only `name`, `description`, `vsn`, and
-`extensions`. Schema, metadata, Plugins, and routes are declared in blocks.
+`use Jido.Agent` accepts identity, metadata, and extension options. State,
+Plugins, and routes are declared in separate blocks.
 Direct `Agent.new/1` still accepts map or keyword definition data. This
 decision concerns module configuration; it does not remove direct keyword
 data or decide the combined Topology hosting API.
@@ -121,16 +121,15 @@ authoring boundary shall require a plain map.
 ### Module and Spark authoring
 
 `AUTH-REQ-009`: When a module uses `Jido.Agent`, the Agent DSL compiler shall
-combine the allowed module identity and extension options with schema,
-metadata, Plugin, and route block fields into one core configuration.
+combine module identity, metadata, and extension options with state, Plugin,
+and route block fields into one core configuration.
 
 `AUTH-REQ-010`: Retired. Keyword declarations of schema, metadata, Plugins,
 and routes are no longer supported by standalone `use Jido.Agent`.
 AUTH-REQ-063 states the option rejection rule.
 
-`AUTH-REQ-063`: If standalone `use Jido.Agent` declares a keyword option
-outside `name`, `description`, `vsn`, and `extensions`, then the Agent DSL
-compiler shall reject the module at compile time.
+`AUTH-REQ-063`: If standalone `use Jido.Agent` declares an unsupported keyword
+option, then the Agent DSL compiler shall reject the module at compile time.
 
 `AUTH-REQ-011`: When a generated Agent module exposes `definition/0`, the
 generated function shall return the canonical validated neutral definition.
@@ -335,11 +334,12 @@ those values.
 
 ### Spark declaration contract
 
-`agent do` contains domain schema, metadata, and ordered Plugin declarations.
-`routes do` contains ordered route declarations and an optional Signal source
-for generated interfaces. A route can name one Action or Flow, contain one
-inline Action, or use one extension-owned target option. The route can contain
-`defaults`, `priority`, `match`, and one optional `as:` helper name.
+`state do` contains the domain `schema` and `initial_state`. `plugins do`
+contains ordered Plugin declarations. `routes do` contains ordered route
+declarations and an optional Signal source for generated interfaces. A route
+can name one Action or Flow, contain one inline Action, or use one
+extension-owned target option. The route can contain `defaults`, `priority`,
+`match`, and one optional `as:` helper name.
 
 Plugin `config` accepts a map or keyword list. Keyword order is retained. Map
 input uses a stable sorted order. The Plugin module is its identity and can

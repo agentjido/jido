@@ -34,7 +34,7 @@ end
 defmodule Forward.Worker do
   use Jido.Agent, name: "forward_worker"
 
-  agent do
+  state do
     schema(Zoi.object(%{completed: Zoi.integer() |> Zoi.default(0)}))
   end
 
@@ -54,7 +54,7 @@ the input Signal to the current parent after commit.
 defmodule Forward.Team do
   use Jido.Agent, name: "forward_team"
 
-  agent do
+  state do
     schema(Zoi.object(%{completed: Zoi.integer() |> Zoi.default(0)}))
   end
 

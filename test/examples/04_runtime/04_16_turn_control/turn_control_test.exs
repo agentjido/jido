@@ -16,7 +16,7 @@ defmodule JidoTest.Examples.Runtime.TurnControlBlockingAgent do
   @moduledoc false
   use Jido.Agent, name: "test_runtime_turn_control_blocking_agent"
 
-  agent do
+  state do
     schema Zoi.object(%{completed: Zoi.list(Zoi.string()) |> Zoi.default([])})
   end
 

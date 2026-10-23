@@ -638,8 +638,8 @@ defmodule Jido.AgentAuthoringTest do
           "routes do route \"work.request\", priority: 2 end",
           "routes do route \"work.request\", JidoTest.ComposableAgent.Action do transform signal do {:ok,signal} end end end",
           "routes do route \"work.request\" do action value do {:ok,value} end; transform signal do {:ok,signal} end end end",
-          "agent do schema Zoi.object(%{}); schema Zoi.object(%{}) end",
-          "agent do end; agent do end"
+          "state do schema Zoi.object(%{}); schema Zoi.object(%{}) end",
+          "state do end; state do end"
         ] do
       assert_raise CompileError, fn -> Compiler.compile(body) end
     end

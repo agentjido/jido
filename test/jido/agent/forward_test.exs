@@ -17,7 +17,7 @@ defmodule Jido.Agent.ForwardTest do
   defmodule Worker do
     use Jido.Agent, name: "forward_worker"
 
-    agent do
+    state do
       schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
     end
 
@@ -30,7 +30,7 @@ defmodule Jido.Agent.ForwardTest do
   defmodule Parent do
     use Jido.Agent, name: "forward_parent"
 
-    agent do
+    state do
       schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
     end
 
