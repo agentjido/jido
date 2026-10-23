@@ -173,6 +173,7 @@ defmodule JidoTest.CommitProjection.Update do
   @moduledoc false
   use Jido.Action,
     name: "commit_projection_update",
+    output_schema: Zoi.map(),
     schema:
       Zoi.object(%{amount: Zoi.integer(), directives: Zoi.list(Zoi.any()) |> Zoi.default([])})
 
@@ -184,7 +185,11 @@ end
 
 defmodule JidoTest.CommitProjection.Reject do
   @moduledoc false
-  use Jido.Action, name: "commit_projection_reject", schema: Zoi.object(%{})
+  use Jido.Action,
+    name: "commit_projection_reject",
+    schema: Zoi.object(%{}),
+    output_schema: Zoi.any()
+
   def run(_params, _context), do: {:error, :rejected}
 end
 
@@ -202,8 +207,13 @@ defmodule JidoTest.CommitProjection.Agent do
   end
 
   routes do
-    route "projection.update", JidoTest.CommitProjection.Update
-    route "projection.reject", JidoTest.CommitProjection.Reject
+    route "projection.update", JidoTest.CommitProjection.Update do
+      state(from: output())
+    end
+
+    route "projection.reject", JidoTest.CommitProjection.Reject do
+      state(:unchanged)
+    end
   end
 end
 
@@ -221,7 +231,9 @@ defmodule JidoTest.CommitProjection.ProjectionAgent do
   end
 
   routes do
-    route "projection.update", JidoTest.CommitProjection.Update
+    route "projection.update", JidoTest.CommitProjection.Update do
+      state(from: output())
+    end
   end
 end
 
@@ -244,6 +256,8 @@ defmodule JidoTest.CommitProjection.TimeoutAgent do
   end
 
   routes do
-    route "projection.update", JidoTest.CommitProjection.Update
+    route "projection.update", JidoTest.CommitProjection.Update do
+      state(from: output())
+    end
   end
 end

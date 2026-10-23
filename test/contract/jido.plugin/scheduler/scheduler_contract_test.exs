@@ -23,7 +23,12 @@ defmodule JidoTest.Contract.PluginSchedulerTest do
     Agent.define(%{name: "scheduler-contract", routes: routes, extensions: [contribution(data)]})
   end
 
-  defp action(type), do: %{path: type, handler: %{kind: :action, target: F.Return}}
+  defp action(type),
+    do: %{
+      path: type,
+      handler: %{kind: :action, target: F.Return},
+      state: %{source: :output, path: []}
+    }
 
   @tag obligation: "jido.plugin.scheduler.I1"
   test "Scheduler state contains recurring definitions and applies changes in order" do

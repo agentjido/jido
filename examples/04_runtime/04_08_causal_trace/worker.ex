@@ -18,7 +18,8 @@ defmodule Jido.Examples.CausalTrace.Worker do
             slot: Zoi.enum([:left, :right]),
             value: Zoi.integer()
           }),
-        context: context do
+        context: context,
+        output_schema: Zoi.map() do
         value = input.value * 2
 
         {:ok, result} =
@@ -31,6 +32,8 @@ defmodule Jido.Examples.CausalTrace.Worker do
         {:ok, %{context.agent_state | value: value},
          [Jido.AgentServer.Directive.parent_send(result)]}
       end
+
+      state(from: output())
     end
   end
 end

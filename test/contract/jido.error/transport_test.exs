@@ -32,7 +32,8 @@ defmodule JidoTest.Error.TransportTest do
         Zoi.object(%{
           name: Zoi.string(),
           users: Zoi.list(Zoi.object(%{name: Zoi.string()}))
-        })
+        }),
+      output_schema: Zoi.any()
 
     def run(params, _context), do: {:ok, params}
   end

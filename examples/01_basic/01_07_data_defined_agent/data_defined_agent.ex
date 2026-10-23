@@ -9,7 +9,8 @@ defmodule Jido.Examples.DataDefinedAgent do
     @moduledoc "Adds one validated amount to the current count."
     use Jido.Action,
       name: "basic_data_defined_add",
-      schema: Zoi.object(%{amount: Zoi.integer()})
+      schema: Zoi.object(%{amount: Zoi.integer()}),
+      output_schema: Zoi.map()
 
     def run(%{amount: amount}, %{agent_state: state}),
       do: {:ok, %{state | count: state.count + amount}}
@@ -19,7 +20,8 @@ defmodule Jido.Examples.DataDefinedAgent do
     @moduledoc "Requests a later count change through the Scheduler Plugin."
     use Jido.Action,
       name: "basic_data_defined_schedule",
-      schema: Zoi.object(%{delay_ms: Zoi.integer() |> Zoi.min(0)})
+      schema: Zoi.object(%{delay_ms: Zoi.integer() |> Zoi.min(0)}),
+      output_schema: Zoi.map()
 
     def run(%{delay_ms: delay_ms}, %{agent_state: state}) do
       tick = Jido.Examples.DataDefinedAgent.signal!(1)
@@ -53,10 +55,15 @@ defmodule Jido.Examples.DataDefinedAgent do
         }
       ],
       routes: [
-        %{path: "examples.basic.data_defined.add", handler: %{kind: :action, target: Add}},
+        %{
+          path: "examples.basic.data_defined.add",
+          handler: %{kind: :action, target: Add},
+          state: %{source: :output, path: []}
+        },
         %{
           path: "examples.basic.data_defined.schedule",
-          handler: %{kind: :action, target: ScheduleTick}
+          handler: %{kind: :action, target: ScheduleTick},
+          state: %{source: :output, path: []}
         }
       ]
     })

@@ -12,7 +12,9 @@ defmodule Jido.Examples.ConditionalRoutes do
   routes do
     signal_source "/workflow"
 
-    route "workflow.routes", Jido.Examples.ConditionalRoutes.Pipeline, as: :fetch
+    route "workflow.routes", Jido.Examples.ConditionalRoutes.Pipeline, as: :fetch do
+      state(from: output())
+    end
   end
 end
 
@@ -25,7 +27,8 @@ defmodule Jido.Examples.ConditionalRoutes.Select do
       Zoi.object(%{
         route: Zoi.enum([:primary, :second, :fallback, :reject]),
         value: Zoi.map() |> Zoi.optional()
-      })
+      }),
+    output_schema: Zoi.map()
 
   @impl true
   def run(input, context) do

@@ -7,7 +7,10 @@ defmodule JidoTest.Authoring.Agents.BoundariesTest do
   alias JidoTest.ComposableAgent.Compiler
 
   defmodule Work do
-    use Jido.Action, name: "authoring_boundary_work"
+    use Jido.Action,
+      name: "authoring_boundary_work",
+      output_schema: Zoi.any()
+
     def run(input, _context), do: {:ok, input}
   end
 
@@ -28,7 +31,7 @@ defmodule JidoTest.Authoring.Agents.BoundariesTest do
   test "helper construction preserves input and uses an explicit source" do
     module =
       Compiler.compile(
-        "routes do\nsignal_source \"/boundary\"\nroute \"work.request\", #{inspect(Work)}, as: :work\nend"
+        "routes do\nsignal_source \"/boundary\"\nroute \"work.request\", #{inspect(Work)}, as: :work do\nstate from: output()\nend\nend"
       )
 
     assert {:ok, first} = module.work_signal(%{items: []})

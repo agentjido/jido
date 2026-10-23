@@ -17,7 +17,8 @@ defmodule Jido.Examples.Persistence.IndeterminateWrite do
     route "examples.persistence.indeterminate_write.increment", as: :increment do
       action input,
         schema: Zoi.object(%{request_id: Zoi.string() |> Zoi.min(1), amount: Zoi.integer()}),
-        context: context do
+        context: context,
+        output_schema: Zoi.map() do
         next = %{context.agent_state | count: context.agent_state.count + input.amount}
 
         output =
@@ -34,6 +35,8 @@ defmodule Jido.Examples.Persistence.IndeterminateWrite do
 
         {:ok, next, directives}
       end
+
+      state(from: output())
     end
   end
 end

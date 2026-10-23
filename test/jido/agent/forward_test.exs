@@ -6,7 +6,7 @@ defmodule Jido.Agent.ForwardTest do
   alias Jido.Signal
 
   defmodule Increment do
-    use Jido.Action, name: "forward_increment"
+    use Jido.Action, name: "forward_increment", output_schema: Zoi.map()
 
     @impl true
     def run(_input, context) do
@@ -22,8 +22,13 @@ defmodule Jido.Agent.ForwardTest do
     end
 
     routes do
-      route "work.request", Increment
-      forward "work.completed", to: parent()
+      route "work.request", Increment do
+        state(from: output())
+      end
+
+      route "work.completed" do
+        forward(to: parent())
+      end
     end
   end
 
@@ -35,8 +40,13 @@ defmodule Jido.Agent.ForwardTest do
     end
 
     routes do
-      forward "work.request", to: agent(:worker)
-      route "work.completed", Increment
+      route "work.request" do
+        forward(to: agent(:worker))
+      end
+
+      route "work.completed", Increment do
+        state(from: output())
+      end
     end
 
     topology do

@@ -18,7 +18,8 @@ defmodule JidoTest.InstanceRefTest do
   defmodule Add do
     use Jido.Action,
       name: "instance_ref_add",
-      schema: Zoi.object(%{by: Zoi.integer()})
+      schema: Zoi.object(%{by: Zoi.integer()}),
+      output_schema: Zoi.any()
 
     @impl true
     def run(%{by: by}, context) do
@@ -64,7 +65,9 @@ defmodule JidoTest.InstanceRefTest do
     end
 
     routes do
-      route "counter.add", Add
+      route "counter.add", Add do
+        state(from: output())
+      end
     end
   end
 
@@ -76,7 +79,9 @@ defmodule JidoTest.InstanceRefTest do
     end
 
     routes do
-      route "counter.add", Add
+      route "counter.add", Add do
+        state(from: output())
+      end
     end
   end
 

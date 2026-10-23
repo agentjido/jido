@@ -72,9 +72,12 @@ defmodule MyApp.Counter do
       action %{amount: amount},
         name: "increment",
         schema: Zoi.object(%{amount: Zoi.integer()}),
+        output_schema: Zoi.object(%{count: Zoi.integer()}),
         context: context do
         {:ok, %{context.agent_state | count: context.agent_state.count + amount}}
       end
+
+      state from: output()
     end
   end
 end
@@ -152,8 +155,7 @@ Full documentation is on [HexDocs](https://hexdocs.pm/jido). Start with:
   JSON through `Jido.Authoring`. All three run the same validation.
 - Routes to Actions, Flows, transforms, and explicit forward targets, matched
   in declaration order with exact types or `*` wildcards.
-- Generated Signal constructors from `as:` and typed Signals with
-  `Jido.SignalAction`.
+- Generated Signal constructors from exact routes that use `as:`.
 - Built-in Directives to reply, emit Signals, send to other Agents, start and
   stop Agents and processes, and stop the Server.
 - Nested Agents with counts and state bindings, connected by declared
@@ -187,7 +189,7 @@ here to the calling process:
 
 ```elixir
 defmodule MyApp.Reset do
-  use Jido.Action, name: "reset", schema: Zoi.object(%{})
+  use Jido.Action, name: "reset", schema: Zoi.object(%{}), output_schema: Zoi.map()
 
   @impl true
   def run(_params, %{agent_state: state}) do
@@ -196,7 +198,11 @@ defmodule MyApp.Reset do
   end
 end
 
-# In the Agent: route "counter.reset", MyApp.Reset, as: :reset
+# In the Agent:
+#
+# route "counter.reset", MyApp.Reset, as: :reset do
+#   state from: output()
+# end
 
 {:ok, counter} =
   Jido.start_agent(MyApp.Counter, id: "counter-2", default_dispatch: {:pid, target: self()})

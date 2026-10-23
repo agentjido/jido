@@ -1,6 +1,8 @@
 defmodule JidoTest.System.ControlledWork do
   @moduledoc false
-  use Jido.Action, name: "system_controlled_work"
+  use Jido.Action,
+    name: "system_controlled_work",
+    output_schema: Zoi.any()
 
   def run(%{value: value} = params, context) do
     if gate = params[:gate] do
@@ -23,7 +25,9 @@ defmodule JidoTest.System.ControlledAgent do
   end
 
   routes do
-    route "system.work", JidoTest.System.ControlledWork
+    route "system.work", JidoTest.System.ControlledWork do
+      state(from: output())
+    end
   end
 
   def signal(value, opts \\ []) do

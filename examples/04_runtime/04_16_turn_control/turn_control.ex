@@ -14,9 +14,12 @@ defmodule Jido.Examples.TurnControl do
     route "examples.runtime.turn_control.complete", as: :complete do
       action %{name: name},
         schema: Zoi.object(%{name: Zoi.string() |> Zoi.min(1)}),
-        context: context do
+        context: context,
+        output_schema: Zoi.map() do
         {:ok, %{context.agent_state | completed: context.agent_state.completed ++ [name]}}
       end
+
+      state(from: output())
     end
   end
 end

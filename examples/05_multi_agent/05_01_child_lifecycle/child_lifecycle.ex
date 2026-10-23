@@ -17,7 +17,8 @@ defmodule Jido.Examples.ChildLifecycle do
             tag: Zoi.string() |> Zoi.min(1),
             restart: Zoi.enum([:temporary, :transient]) |> Zoi.default(:transient)
           }),
-        context: context do
+        context: context,
+        output_schema: Zoi.map() do
         if input.tag in context.agent_state.desired do
           {:error, Jido.Action.Error.validation_error("child tag is already in use")}
         else
@@ -31,12 +32,15 @@ defmodule Jido.Examples.ChildLifecycle do
           {:ok, candidate, [directive]}
         end
       end
+
+      state(from: output())
     end
 
     route "examples.multi_agent.children.stop", as: :stop_worker do
       action %{tag: tag},
         schema: Zoi.object(%{tag: Zoi.string() |> Zoi.min(1)}),
-        context: context do
+        context: context,
+        output_schema: Zoi.map() do
         candidate = %{
           context.agent_state
           | desired: List.delete(context.agent_state.desired, tag)
@@ -44,9 +48,16 @@ defmodule Jido.Examples.ChildLifecycle do
 
         {:ok, candidate, [Jido.AgentServer.Directive.agent_stop(tag)]}
       end
+
+      state(from: output())
     end
 
-    route "jido.agent.child.*", Jido.Examples.Support.KeepState
-    route "examples.multi_agent.worker.result", Jido.Examples.Support.KeepState
+    route "jido.agent.child.*", Jido.Examples.Support.KeepState do
+      state(from: output())
+    end
+
+    route "examples.multi_agent.worker.result", Jido.Examples.Support.KeepState do
+      state(from: output())
+    end
   end
 end

@@ -9,7 +9,9 @@ defmodule JidoTest.Authoring.Agents.DurableTest do
     use Jido.Agent, name: "authored_durable"
 
     routes do
-      route "request", F.Flow
+      route "request", F.Flow do
+        state(from: output())
+      end
     end
   end
 
@@ -19,7 +21,11 @@ defmodule JidoTest.Authoring.Agents.DurableTest do
         module: Authored,
         name: "authored_durable",
         routes: [
-          %{path: "request", handler: %{kind: :flow, target: F.Flow}}
+          %{
+            path: "request",
+            handler: %{kind: :flow, target: F.Flow},
+            state: %{source: :output, path: []}
+          }
         ]
       })
 

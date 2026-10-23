@@ -25,7 +25,8 @@ Mix.install([{:jido, "~> 3.0.0-beta.2"}])
 defmodule Expense.Approval do
   use Jido.Flow,
     name: "approval",
-    schema: Zoi.object(%{request_id: Zoi.string()})
+    schema: Zoi.object(%{request_id: Zoi.string()}),
+    output_schema: Zoi.map()
 
   flow do
     step "request", request <- input() do
@@ -70,7 +71,9 @@ defmodule Expense.Agent do
 
   routes do
     signal_source("/guides/durable-turns")
-    route "expense.submit", Expense.Approval, as: :submit
+    route "expense.submit", Expense.Approval, as: :submit do
+      state from: output()
+    end
   end
 end
 

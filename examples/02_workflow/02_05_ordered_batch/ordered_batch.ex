@@ -9,9 +9,13 @@ defmodule Jido.Examples.OrderedBatch do
   routes do
     signal_source "/workflow"
 
-    route "workflow.batch.collect", Jido.Examples.OrderedBatch.Collected, as: :collect_results
+    route "workflow.batch.collect", Jido.Examples.OrderedBatch.Collected, as: :collect_results do
+      state(from: output())
+    end
 
-    route "workflow.batch.strict", Jido.Examples.OrderedBatch.Strict, as: :convert_all
+    route "workflow.batch.strict", Jido.Examples.OrderedBatch.Strict, as: :convert_all do
+      state(from: output())
+    end
   end
 end
 
@@ -20,7 +24,8 @@ defmodule Jido.Examples.OrderedBatch.Convert do
 
   use Jido.Action,
     name: "workflow_batch_convert",
-    schema: Zoi.object(%{value: Zoi.integer(), index: Zoi.integer() |> Zoi.min(0)})
+    schema: Zoi.object(%{value: Zoi.integer(), index: Zoi.integer() |> Zoi.min(0)}),
+    output_schema: Zoi.map()
 
   @impl true
   def run(input, _context) do
@@ -51,7 +56,9 @@ end
 
 defmodule Jido.Examples.OrderedBatch.Append do
   @moduledoc false
-  use Jido.Action, name: "workflow_batch_append"
+  use Jido.Action,
+    name: "workflow_batch_append",
+    output_schema: Zoi.map()
 
   def run(%{items: items, item: item}, _context), do: {:ok, %{items: items ++ [item]}}
 end

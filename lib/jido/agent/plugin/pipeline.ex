@@ -18,8 +18,7 @@ defmodule Jido.Agent.Plugin.Pipeline do
           Agent.instance(),
           Signal.t(),
           %{optional(module()) => Input.t()},
-          [Spec.t()],
-          map()
+          [Spec.t()]
         ) ::
           result()
   def run(
@@ -27,8 +26,7 @@ defmodule Jido.Agent.Plugin.Pipeline do
         %Agent{} = agent,
         %Signal{} = signal,
         plugin_inputs,
-        specs,
-        _route
+        specs
       ) do
     with :ok <- protect_owned_state(state, agent.state, specs),
          {:ok, directives} <- validate_directives(directives, specs, signal),

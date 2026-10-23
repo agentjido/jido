@@ -5,7 +5,8 @@ defmodule Jido.Examples.RouteSelection do
     @moduledoc "Stores the selected handler name."
     use Jido.Action,
       name: "basic_route_selection_record",
-      schema: Zoi.object(%{handler: Zoi.string()})
+      schema: Zoi.object(%{handler: Zoi.string()}),
+      output_schema: Zoi.map()
 
     def run(%{handler: handler}, %{agent_state: state}),
       do: {:ok, %{state | handler: handler}}
@@ -25,11 +26,17 @@ defmodule Jido.Examples.RouteSelection do
     # The first matching route wins. Keep the fallback last.
     route "examples.basic.route_selection.order.create", Record,
       as: :create,
-      defaults: %{handler: "create"}
+      defaults: %{handler: "create"} do
+      state(from: output())
+    end
 
-    route "examples.basic.route_selection.order.*", Record, defaults: %{handler: "order"}
+    route "examples.basic.route_selection.order.*", Record, defaults: %{handler: "order"} do
+      state(from: output())
+    end
 
-    route "**", Record, defaults: %{handler: "fallback"}
+    route "**", Record, defaults: %{handler: "fallback"} do
+      state(from: output())
+    end
   end
 
   @doc "Builds one command Signal for this router."
@@ -54,9 +61,11 @@ defmodule Jido.Examples.RouteSelection.Strict do
     signal_source "/examples/basic/route_selection"
 
     route "examples.basic.route_selection.order.create" do
-      action _input, schema: Zoi.object(%{}), context: context do
+      action _input, schema: Zoi.object(%{}), context: context, output_schema: Zoi.map() do
         {:ok, %{context.agent_state | handled: true}}
       end
+
+      state(from: output())
     end
   end
 end

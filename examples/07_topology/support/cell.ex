@@ -16,7 +16,8 @@ defmodule Jido.Examples.Topology.Cell do
     route "examples.topology.cell.work", as: :work do
       action %{value: value},
         schema: Zoi.object(%{value: Zoi.integer()}),
-        context: context do
+        context: context,
+        output_schema: Zoi.map() do
         {:ok,
          %{
            context.agent_state
@@ -24,6 +25,8 @@ defmodule Jido.Examples.Topology.Cell do
              total: context.agent_state.total + value
          }}
       end
+
+      state(from: output())
     end
   end
 end

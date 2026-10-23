@@ -26,7 +26,10 @@ defmodule JidoTest.AgentServer.DurableTurn.PolicyTest do
     Code.compile_quoted(
       quote do
         defmodule unquote(module) do
-          use Jido.Action, name: "durable_fingerprint_action"
+          use Jido.Action,
+            name: "durable_fingerprint_action",
+            output_schema: Zoi.any()
+
           def run(input, _context), do: {:ok, Map.put(input, :version, unquote(version))}
         end
       end
@@ -37,7 +40,10 @@ defmodule JidoTest.AgentServer.DurableTurn.PolicyTest do
     Code.compile_quoted(
       quote do
         defmodule unquote(module) do
-          use Jido.Flow, name: "durable_fingerprint_flow"
+          use Jido.Flow,
+            name: "durable_fingerprint_flow",
+            output_schema: Zoi.any()
+
           def version, do: unquote(version)
 
           flow do

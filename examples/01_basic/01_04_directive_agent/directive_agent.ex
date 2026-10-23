@@ -28,7 +28,8 @@ defmodule Jido.Examples.DirectiveAgent do
             count: Zoi.integer(),
             batch: Zoi.enum([:valid, :invalid, :dispatch_failure])
           }),
-        context: context do
+        context: context,
+        output_schema: Zoi.map() do
         second =
           case batch do
             :valid -> %Record{label: "second"}
@@ -39,6 +40,8 @@ defmodule Jido.Examples.DirectiveAgent do
         {:ok, %{context.agent_state | count: count},
          [%Record{label: "first"}, second, %Record{label: "third"}]}
       end
+
+      state(from: output())
     end
   end
 end

@@ -1,6 +1,6 @@
 defmodule JidoTest.AgentRuntimeFixtures.ReturnDirective do
   @moduledoc false
-  use Jido.Action, name: "agent_return_directive"
+  use Jido.Action, name: "agent_return_directive", output_schema: Zoi.map()
 
   @impl Jido.Action
   def run(%{event: event} = params, context) do
@@ -12,7 +12,7 @@ end
 
 defmodule JidoTest.AgentRuntimeFixtures.Record do
   @moduledoc false
-  use Jido.Action, name: "agent_runtime_record"
+  use Jido.Action, name: "agent_runtime_record", output_schema: Zoi.map()
 
   @impl Jido.Action
   def run(params, context) do
@@ -24,7 +24,7 @@ end
 
 defmodule JidoTest.AgentRuntimeFixtures.Tick do
   @moduledoc false
-  use Jido.Action, name: "agent_runtime_tick"
+  use Jido.Action, name: "agent_runtime_tick", output_schema: Zoi.map()
 
   @impl Jido.Action
   def run(_params, context) do
@@ -52,11 +52,28 @@ defmodule JidoTest.AgentRuntimeFixtures.RuntimeAgent do
   end
 
   routes do
-    route "runtime.directive", ReturnDirective
-    route "runtime.record", Record
-    route "cron.tick", Tick
-    route "jido.agent.child.started", Record
-    route "jido.agent.child.exit", Record
-    route "jido.agent.orphaned", Record
+    route "runtime.directive", ReturnDirective do
+      state(from: output())
+    end
+
+    route "runtime.record", Record do
+      state(from: output())
+    end
+
+    route "cron.tick", Tick do
+      state(from: output())
+    end
+
+    route "jido.agent.child.started", Record do
+      state(from: output())
+    end
+
+    route "jido.agent.child.exit", Record do
+      state(from: output())
+    end
+
+    route "jido.agent.orphaned", Record do
+      state(from: output())
+    end
   end
 end

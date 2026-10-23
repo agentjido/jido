@@ -139,7 +139,8 @@ outbox of receipts to send, and emits each receipt with a stable ID:
 defmodule MyApp.PlaceOrder do
   use Jido.Action,
     name: "place_order",
-    schema: Zoi.object(%{order_id: Zoi.string(), total: Zoi.integer()})
+    schema: Zoi.object(%{order_id: Zoi.string(), total: Zoi.integer()}),
+    output_schema: Zoi.map()
 
   alias Jido.Agent.Directive
 
@@ -161,7 +162,7 @@ defmodule MyApp.PlaceOrder do
 end
 
 defmodule MyApp.ReceiptSent do
-  use Jido.Action, name: "receipt_sent", schema: Zoi.object(%{effect_id: Zoi.string()})
+  use Jido.Action, name: "receipt_sent", schema: Zoi.object(%{effect_id: Zoi.string()}), output_schema: Zoi.map()
 
   @impl true
   def run(%{effect_id: effect_id}, %{agent_state: state}),
@@ -169,7 +170,7 @@ defmodule MyApp.ReceiptSent do
 end
 
 defmodule MyApp.Redeliver do
-  use Jido.Action, name: "redeliver"
+  use Jido.Action, name: "redeliver", output_schema: Zoi.map()
 
   @impl true
   def run(_params, %{agent_state: state}) do
@@ -195,9 +196,15 @@ defmodule MyApp.Orders do
 
   routes do
     signal_source("/my_app/orders")
-    route "order.place", MyApp.PlaceOrder, as: :place
-    route "receipt.sent", MyApp.ReceiptSent, as: :receipt_sent
-    route "outbox.redeliver", MyApp.Redeliver, as: :redeliver
+    route "order.place", MyApp.PlaceOrder, as: :place do
+      state from: output()
+    end
+    route "receipt.sent", MyApp.ReceiptSent, as: :receipt_sent do
+      state from: output()
+    end
+    route "outbox.redeliver", MyApp.Redeliver, as: :redeliver do
+      state from: output()
+    end
   end
 end
 ```

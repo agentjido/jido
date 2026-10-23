@@ -113,7 +113,10 @@ defmodule Jido.Examples.Plugins.RuntimeAdmission.Agent do
     signal_source "/examples/plugins/runtime_admission"
 
     route "examples.plugins.runtime_admission.accept" do
-      action %{token: _token}, schema: Zoi.object(%{token: Zoi.string()}), context: context do
+      action %{token: _token},
+        schema: Zoi.object(%{token: Zoi.string()}),
+        context: context,
+        output_schema: Zoi.map() do
         case context.plugin_inputs[Jido.Examples.Plugins.RuntimeAdmission.Plugin] do
           %{
             prepared: %{token_present?: true},
@@ -131,6 +134,8 @@ defmodule Jido.Examples.Plugins.RuntimeAdmission.Agent do
             {:error, :live_runtime_required}
         end
       end
+
+      state(from: output())
     end
   end
 end

@@ -33,6 +33,9 @@ defmodule Jido.Examples.Durable.SavedProgress.Agent do
 
   routes do
     signal_source "/examples/durable/saved_progress"
-    route "examples.durable.saved_progress.run", Jido.Examples.Durable.SavedProgress, as: :run
+
+    route "examples.durable.saved_progress.run", Jido.Examples.Durable.SavedProgress, as: :run do
+      state(from: output())
+    end
   end
 end

@@ -466,8 +466,7 @@ defmodule Jido.Plugin.OrderingTest do
              agent,
              signal("plugin.reduce"),
              %{},
-             Jido.Agent.Plugin.specs(specs),
-             %{}
+             Jido.Agent.Plugin.specs(specs)
            ) ==
              {:error, :second_failed}
   end
@@ -498,8 +497,7 @@ defmodule Jido.Plugin.OrderingTest do
                agent,
                signal("plugin.reduce"),
                %{},
-               Jido.Agent.Plugin.specs(specs),
-               %{}
+               Jido.Agent.Plugin.specs(specs)
              )
 
     assert state.first_reduced == 1

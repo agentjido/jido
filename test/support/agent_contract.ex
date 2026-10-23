@@ -2,7 +2,7 @@ defmodule JidoTest.AgentContract do
   @moduledoc false
 
   defmodule Return do
-    use Jido.Action, name: "contract_return"
+    use Jido.Action, name: "contract_return", output_schema: Zoi.map()
 
     def run(input, context) do
       if observer = context[:observer], do: send(observer, {:executed, input, context})
@@ -18,14 +18,31 @@ defmodule JidoTest.AgentContract do
   defmodule Add do
     use Jido.Action,
       name: "contract_add",
-      schema: Zoi.object(%{amount: Zoi.integer()})
+      schema: Zoi.object(%{amount: Zoi.integer()}),
+      output_schema: Zoi.map()
 
     def run(%{amount: amount}, %{agent_state: state}),
       do: {:ok, %{state | count: state.count + amount}}
   end
 
+  defmodule Project do
+    use Jido.Action,
+      name: "contract_project",
+      output_schema:
+        Zoi.object(%{
+          state: Zoi.map(),
+          reply: Zoi.object(%{value: Zoi.integer()})
+        })
+
+    def run(_input, context),
+      do: {:ok, %{state: context.agent_state, reply: %{value: 1}}}
+  end
+
   defmodule Flow do
-    use Jido.Flow, name: "contract_flow", schema: Zoi.object(%{amount: Zoi.integer()})
+    use Jido.Flow,
+      name: "contract_flow",
+      schema: Zoi.object(%{amount: Zoi.integer()}),
+      output_schema: Zoi.map()
 
     flow do
       step "add", action: Add, params: %{amount: input(:amount)}
@@ -109,7 +126,13 @@ defmodule JidoTest.AgentContract do
         %{
           name: "contract",
           schema: schema(),
-          routes: [%{path: "test.run", handler: %{kind: :action, target: Return}}]
+          routes: [
+            %{
+              path: "test.run",
+              handler: %{kind: :action, target: Return},
+              state: %{source: :output, path: []}
+            }
+          ]
         },
         Map.new(attrs)
       )

@@ -44,7 +44,7 @@ defmodule Jido.Examples.Plugins.PreparedInput.Agent do
     signal_source "/examples/plugins/prepared_input"
 
     route "examples.plugins.prepared_input.accept" do
-      action _input, schema: Zoi.object(%{}), context: context do
+      action _input, schema: Zoi.object(%{}), context: context, output_schema: Zoi.map() do
         prepared = context.plugin_inputs[Jido.Examples.Plugins.PreparedInput.Plugin].prepared
 
         {:ok,
@@ -56,6 +56,8 @@ defmodule Jido.Examples.Plugins.PreparedInput.Agent do
              tenant: prepared.tenant
          }}
       end
+
+      state(from: output())
     end
   end
 end

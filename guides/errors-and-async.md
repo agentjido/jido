@@ -48,7 +48,7 @@ defmodule Guides.Counter do
       action %{amount: amount, ms: ms},
         name: "increment",
         schema: Zoi.object(%{amount: Zoi.integer(), ms: Zoi.integer() |> Zoi.default(0)}),
-        context: context do
+        output_schema: Zoi.map(), context: context do
         Process.sleep(ms)
         state = context.agent_state
 
@@ -59,14 +59,16 @@ defmodule Guides.Counter do
           {:ok, %{state | count: state.count + amount}}
         end
       end
+      state from: output()
     end
 
     route "counter.notify", as: :notify do
-      action %{to: to}, name: "notify", schema: Zoi.object(%{to: Zoi.any()}), context: context do
+      action %{to: to}, name: "notify", schema: Zoi.object(%{to: Zoi.any()}), output_schema: Zoi.map(), context: context do
         state = context.agent_state
         signal = Jido.Signal.new!("counter.changed", %{}, source: "/guides/errors-and-async")
         {:ok, %{state | count: state.count + 1}, [emit(signal, {:pid, target: to})]}
       end
+      state from: output()
     end
   end
 end

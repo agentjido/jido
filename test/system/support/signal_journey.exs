@@ -2,7 +2,8 @@ defmodule JidoTest.System.JourneyAction do
   @moduledoc false
   use Jido.Action,
     name: "system_journey_project",
-    schema: Zoi.object(%{effect_id: Zoi.string(), value: Zoi.integer()})
+    schema: Zoi.object(%{effect_id: Zoi.string(), value: Zoi.integer()}),
+    output_schema: Zoi.any()
 
   def run(input, _context), do: {:ok, input}
 end
@@ -11,7 +12,8 @@ defmodule JidoTest.System.JourneyFlow do
   @moduledoc false
   use Jido.Flow,
     name: "system_journey_flow",
-    schema: Zoi.object(%{"effect_id" => Zoi.string() |> Zoi.min(1), "value" => Zoi.integer()})
+    schema: Zoi.object(%{"effect_id" => Zoi.string() |> Zoi.min(1), "value" => Zoi.integer()}),
+    output_schema: Zoi.any()
 
   flow do
     step "double", params <- input() do
@@ -27,7 +29,9 @@ end
 
 defmodule JidoTest.System.JourneyCommit do
   @moduledoc false
-  use Jido.Action, name: "system_journey_commit"
+  use Jido.Action,
+    name: "system_journey_commit",
+    output_schema: Zoi.any()
 
   def run(input, context) do
     # A Flow returns data, not Agent directives. The outer Action translates
@@ -41,7 +45,9 @@ end
 
 defmodule JidoTest.System.JourneyConfirm do
   @moduledoc false
-  use Jido.Action, name: "system_journey_confirm"
+  use Jido.Action,
+    name: "system_journey_confirm",
+    output_schema: Zoi.any()
 
   def run(%{effect_id: id, value: value}, context) do
     directive = struct!(Jido.Examples.RecoverableDelivery.Confirm, effect_id: id, value: value)
@@ -83,11 +89,13 @@ for {name, durable} <- [{:NormalJourneyAgent, nil}, {:DurableJourneyAgent, "jour
         routes: [
           %{
             path: "system.journey",
-            handler: %{kind: :action, target: JidoTest.System.JourneyCommit}
+            handler: %{kind: :action, target: JidoTest.System.JourneyCommit},
+            state: %{source: :output, path: []}
           },
           %{
             path: "examples.persistence.delivery.confirm",
-            handler: %{kind: :action, target: JidoTest.System.JourneyConfirm}
+            handler: %{kind: :action, target: JidoTest.System.JourneyConfirm},
+            state: %{source: :output, path: []}
           }
         ]
       })

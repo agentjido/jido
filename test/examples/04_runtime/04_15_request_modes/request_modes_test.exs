@@ -2,7 +2,8 @@ defmodule JidoTest.Examples.Runtime.RequestModesBlockingAction do
   @moduledoc false
   use Jido.Action,
     name: "test_runtime_request_modes_blocking_action",
-    schema: Zoi.object(%{label: Zoi.string() |> Zoi.min(1)})
+    schema: Zoi.object(%{label: Zoi.string() |> Zoi.min(1)}),
+    output_schema: Zoi.any()
 
   alias JidoTest.Examples.RuntimeBarrier
 
@@ -24,7 +25,9 @@ defmodule JidoTest.Examples.Runtime.RequestModesBlockingAgent do
     signal_source "/test/examples/runtime/request_modes"
 
     route "test.examples.runtime.request_modes.record",
-          JidoTest.Examples.Runtime.RequestModesBlockingAction
+          JidoTest.Examples.Runtime.RequestModesBlockingAction do
+      state(from: output())
+    end
   end
 end
 

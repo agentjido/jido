@@ -24,7 +24,7 @@
 
 - id: agent-public-api-review
   date: 2026-10-22
-  decision: Define the documented Jido.Agent facade and generated Agent module facade explicitly. Keep runtime projection, direct Signal-helper support, compiler metadata, raw schema helpers, and transition functions exported only for internal package use. Retain route_action!/1 as the supported inline Action lookup.
+  decision: Define the documented Jido.Agent facade and generated Agent module facade explicitly. Keep runtime projection, direct Signal-helper support, compiler metadata, raw schema helpers, and transition functions exported only for internal package use. Use route_executable!/1 as the Action and Flow route lookup.
   driver: Public functions must be documented and protected by Covenant without presenting internal coordination helpers as user APIs.
   approved_by: User-approved component review
 

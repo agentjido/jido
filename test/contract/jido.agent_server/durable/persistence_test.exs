@@ -90,7 +90,10 @@ defmodule JidoTest.AgentServer.Durable.PersistenceTest do
   end
 
   defmodule LocalValue do
-    use Jido.Action, name: "server_durable_local_value"
+    use Jido.Action,
+      name: "server_durable_local_value",
+      output_schema: Zoi.any()
+
     def run(_, context), do: {:ok, %{context.agent_state | handle: self()}}
   end
 
@@ -102,7 +105,9 @@ defmodule JidoTest.AgentServer.Durable.PersistenceTest do
     end
 
     routes do
-      route "work", LocalValue
+      route "work", LocalValue do
+        state(from: output())
+      end
     end
   end
 
@@ -114,7 +119,9 @@ defmodule JidoTest.AgentServer.Durable.PersistenceTest do
     end
 
     routes do
-      route "work", LocalValue
+      route "work", LocalValue do
+        state(from: output())
+      end
     end
 
     @impl Jido.Agent
@@ -557,7 +564,13 @@ defmodule JidoTest.AgentServer.Durable.PersistenceTest do
           %{id: Plugin.id(), provider: Plugin, vsn: Plugin.vsn(), data: %{observer: c.observer}}
         ],
         schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}),
-        routes: [%{path: "work", handler: %{kind: :action, target: F.Work}}]
+        routes: [
+          %{
+            path: "work",
+            handler: %{kind: :action, target: F.Work},
+            state: %{source: :output, path: []}
+          }
+        ]
       })
 
     c = %{c | agent: Jido.Agent.instantiate!(definition, id: c.agent.id)}

@@ -27,7 +27,7 @@ The examples use this wallet:
 
 ```elixir
 defmodule MyApp.Deposit do
-  use Jido.Action, name: "deposit", schema: Zoi.object(%{amount: Zoi.integer()})
+  use Jido.Action, name: "deposit", schema: Zoi.object(%{amount: Zoi.integer()}), output_schema: Zoi.map()
 
   @impl true
   def run(%{amount: amount}, %{agent_state: state}),
@@ -43,7 +43,9 @@ defmodule MyApp.Wallet do
 
   routes do
     signal_source("/my_app/wallet")
-    route "wallet.deposit", MyApp.Deposit, as: :deposit
+    route "wallet.deposit", MyApp.Deposit, as: :deposit do
+      state from: output()
+    end
   end
 end
 ```
@@ -195,7 +197,7 @@ An upgrade Action receives `%{snapshot: snapshot}` and returns
 
 ```elixir
 defmodule MyApp.WalletV1ToV2 do
-  use Jido.Action, name: "wallet_v1_to_v2"
+  use Jido.Action, name: "wallet_v1_to_v2", output_schema: Zoi.map()
 
   def run(%{snapshot: %{agent: %{vsn: 1, state: %{balance: balance}}} = snapshot}, _context) do
     current = MyApp.Wallet.definition()

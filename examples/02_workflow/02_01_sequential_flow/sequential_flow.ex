@@ -12,7 +12,9 @@ defmodule Jido.Examples.SequentialFlow do
   routes do
     signal_source "/workflow"
 
-    route "workflow.sequential", Jido.Examples.SequentialFlow.Pipeline, as: :double_value
+    route "workflow.sequential", Jido.Examples.SequentialFlow.Pipeline, as: :double_value do
+      state(from: output())
+    end
   end
 end
 
@@ -25,7 +27,8 @@ defmodule Jido.Examples.SequentialFlow.Finish do
       Zoi.object(%{
         value: Zoi.integer(),
         failure: Zoi.enum([:none, :middle, :output, :candidate])
-      })
+      }),
+    output_schema: Zoi.map()
 
   @impl true
   def run(input, context) do

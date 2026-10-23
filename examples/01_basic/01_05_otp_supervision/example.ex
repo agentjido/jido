@@ -19,9 +19,12 @@ defmodule Jido.Examples.OTPSupervision.Counter do
     route "examples.basic.otp_supervision.increment", as: :increment, defaults: %{amount: 1} do
       action %{amount: amount},
         schema: Zoi.object(%{amount: Zoi.integer()}),
-        context: context do
+        context: context,
+        output_schema: Zoi.map() do
         {:ok, %{context.agent_state | count: context.agent_state.count + amount}}
       end
+
+      state(from: output())
     end
   end
 end

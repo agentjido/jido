@@ -11,12 +11,13 @@ defmodule Jido.Examples.DefinitionChanges do
     signal_source "/examples/runtime/definition_changes"
 
     route "examples.runtime.definition.install", as: :install do
-      action _input, context: context do
+      action _input, context: context, output_schema: Zoi.map() do
         {:ok, context.agent_state,
          [
            D.route_add(
              "examples.runtime.definition.work.exact",
-             Jido.Examples.DefinitionChanges.Exact
+             Jido.Examples.DefinitionChanges.Exact,
+             state: %{source: :output, path: []}
            ),
            D.routes_reorder([
              "examples.runtime.definition.install",
@@ -26,24 +27,33 @@ defmodule Jido.Examples.DefinitionChanges do
            ])
          ]}
       end
+
+      state(from: output())
     end
 
     route "examples.runtime.definition.remove", as: :remove do
-      action _input, context: context do
+      action _input, context: context, output_schema: Zoi.map() do
         {:ok, context.agent_state, [D.route_remove("examples.runtime.definition.work.exact")]}
       end
+
+      state(from: output())
     end
 
     route "examples.runtime.definition.work.*" do
-      action _input, context: context do
+      action _input, context: context, output_schema: Zoi.map() do
         {:ok, %{context.agent_state | selected: "wildcard"}}
       end
+
+      state(from: output())
     end
   end
 end
 
 defmodule Jido.Examples.DefinitionChanges.Exact do
   @moduledoc "A named Action gives the dynamically installed route a stable code reference."
-  use Jido.Action, name: "runtime_definition_exact"
+  use Jido.Action,
+    name: "runtime_definition_exact",
+    output_schema: Zoi.map()
+
   def run(_, context), do: {:ok, %{context.agent_state | selected: "exact"}}
 end

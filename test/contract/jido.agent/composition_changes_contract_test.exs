@@ -8,7 +8,9 @@ defmodule JidoTest.Contract.AgentCompositionChangesTest do
     use Jido.Agent, name: "composition_worker"
 
     routes do
-      route "test.run", F.Return
+      route "test.run", F.Return do
+        state(from: output())
+      end
     end
   end
 
@@ -63,7 +65,7 @@ defmodule JidoTest.Contract.AgentCompositionChangesTest do
 
     assert {:ok, next} =
              Jido.Agent.Composition.apply(source, source.state, [
-               Directive.route_add("other", F.Return)
+               Directive.route_add("other", F.Return, state: %{source: :output, path: []})
              ])
 
     assert Enum.map(next.routes, & &1.path) == ["test.run", "other"]
@@ -127,7 +129,7 @@ defmodule JidoTest.Contract.AgentCompositionChangesTest do
 
     assert {:ok, next, diff} =
              Agent.mutate(source, [
-               Directive.route_add("other", F.Return),
+               Directive.route_add("other", F.Return, state: %{source: :output, path: []}),
                Directive.route_update("test.run", %{defaults: %{amount: 2}}),
                Directive.routes_reorder(["other", "test.run"])
              ])
@@ -141,7 +143,7 @@ defmodule JidoTest.Contract.AgentCompositionChangesTest do
 
     assert {:ok, ^source, diff} =
              Agent.mutate(source, [
-               Directive.route_add("other", F.Return),
+               Directive.route_add("other", F.Return, state: %{source: :output, path: []}),
                Directive.route_remove("other")
              ])
 

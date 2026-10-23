@@ -2,7 +2,8 @@ defmodule JidoTest.PluginTestAction do
   @moduledoc false
   use Jido.Action,
     name: "plugin_test_action",
-    schema: []
+    schema: [],
+    output_schema: Zoi.any()
 
   def run(_params, _context), do: {:ok, %{}}
 end
@@ -11,7 +12,8 @@ defmodule JidoTest.PluginTestAnotherAction do
   @moduledoc false
   use Jido.Action,
     name: "plugin_test_another_action",
-    schema: Zoi.object(%{value: Zoi.integer() |> Zoi.default(0)})
+    schema: Zoi.object(%{value: Zoi.integer() |> Zoi.default(0)}),
+    output_schema: Zoi.any()
 
   def run(%{value: value}, _context), do: {:ok, %{value: value}}
 end

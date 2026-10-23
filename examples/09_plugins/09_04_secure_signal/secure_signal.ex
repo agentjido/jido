@@ -24,7 +24,8 @@ defmodule Jido.Examples.Plugins.SecureSignal.Agent do
     route "examples.plugins.secure_signal.request" do
       action %{"message_id" => message_id},
         schema: Zoi.object(%{"message_id" => Zoi.string() |> Zoi.min(1)}),
-        context: context do
+        context: context,
+        output_schema: Zoi.map() do
         secure = context.plugin_inputs[Jido.Examples.Plugins.SecureSignal.Plugin].runtime
 
         reply =
@@ -49,6 +50,8 @@ defmodule Jido.Examples.Plugins.SecureSignal.Agent do
 
         {:ok, next_state, [Jido.Agent.Directive.emit(reply)]}
       end
+
+      state(from: output())
     end
   end
 end

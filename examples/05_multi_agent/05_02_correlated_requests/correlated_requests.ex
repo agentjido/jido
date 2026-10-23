@@ -19,7 +19,8 @@ defmodule Jido.Examples.CorrelatedRequests do
     route "examples.multi_agent.requests.start", as: :request do
       action %{request_id: request_id, value: value},
         schema: Zoi.object(%{request_id: Zoi.string() |> Zoi.min(1), value: Zoi.integer()}),
-        context: context do
+        context: context,
+        output_schema: Zoi.map() do
         state = context.agent_state
 
         cond do
@@ -60,12 +61,15 @@ defmodule Jido.Examples.CorrelatedRequests do
             {:ok, candidate, directives}
         end
       end
+
+      state(from: output())
     end
 
     route "examples.multi_agent.requests.cancel", as: :cancel do
       action %{request_id: request_id},
         schema: Zoi.object(%{request_id: Zoi.string()}),
-        context: context do
+        context: context,
+        output_schema: Zoi.map() do
         state = context.agent_state
 
         if state.request_id == request_id and state.status == :waiting do
@@ -75,6 +79,8 @@ defmodule Jido.Examples.CorrelatedRequests do
           {:error, Jido.Action.Error.validation_error("request is not waiting")}
         end
       end
+
+      state(from: output())
     end
 
     route "examples.multi_agent.worker.result" do
@@ -86,7 +92,8 @@ defmodule Jido.Examples.CorrelatedRequests do
             tag: Zoi.string(),
             value: Zoi.integer()
           }),
-        context: context do
+        context: context,
+        output_schema: Zoi.map() do
         state = context.agent_state
 
         if input.request_id == state.request_id and input.job_id == state.request_id and
@@ -97,9 +104,13 @@ defmodule Jido.Examples.CorrelatedRequests do
           {:error, Jido.Action.Error.validation_error("result is stale or unrelated")}
         end
       end
+
+      state(from: output())
     end
 
-    route "jido.agent.child.started", Jido.Examples.Support.KeepState
+    route "jido.agent.child.started", Jido.Examples.Support.KeepState do
+      state(from: output())
+    end
 
     route "jido.agent.child.exit" do
       action input,
@@ -110,13 +121,16 @@ defmodule Jido.Examples.CorrelatedRequests do
             pid: Zoi.any(),
             reason: Zoi.any()
           }),
-        context: context do
+        context: context,
+        output_schema: Zoi.map() do
         state = context.agent_state
 
         if input.tag == state.request_id and state.status == :waiting,
           do: {:ok, %{state | status: :failed}},
           else: {:ok, state}
       end
+
+      state(from: output())
     end
   end
 end

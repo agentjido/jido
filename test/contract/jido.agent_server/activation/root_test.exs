@@ -77,7 +77,13 @@ defmodule JidoTest.AgentServer.ActivationRootTest do
         Enum.map(plugins, fn {provider, options} ->
           %{id: provider.id(), provider: provider, vsn: provider.vsn(), data: Map.new(options)}
         end),
-      routes: [%{path: "work", handler: %{kind: :action, target: F.Work}}]
+      routes: [
+        %{
+          path: "work",
+          handler: %{kind: :action, target: F.Work},
+          state: %{source: :output, path: []}
+        }
+      ]
     })
     |> Jido.Agent.instantiate!(id: id)
   end

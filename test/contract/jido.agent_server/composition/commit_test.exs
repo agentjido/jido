@@ -25,7 +25,9 @@ defmodule JidoTest.AgentServer.Composition.CommitTest do
       do: {:ok, state |> Map.put(:count, 2) |> Map.put(:context, context)}
 
     routes do
-      route "work", JidoTest.AgentServer.Fixtures.Work
+      route "work", JidoTest.AgentServer.Fixtures.Work do
+        state(from: output())
+      end
     end
   end
 
@@ -43,7 +45,12 @@ defmodule JidoTest.AgentServer.Composition.CommitTest do
   @tag obligation: "jido.agent_server.composition.I5"
   test "route mutations commit as data and a failed batch keeps the revision", c do
     server = F.start(%{c | agent: agent()})
-    directive = Directive.route_add("other", %{kind: :action, target: F.Work})
+
+    directive =
+      Directive.route_add("other", %{kind: :action, target: F.Work},
+        state: %{source: :output, path: []}
+      )
+
     assert {:ok, accepted, [^directive]} = turn(server, [directive])
     assert Enum.map(accepted.routes, & &1.path) == ["work", "other"]
     assert Server.status(server).state_version == 1

@@ -5,7 +5,9 @@ defmodule JidoTest.Agent.ReplacementTest do
   alias Jido.Signal
 
   defmodule Reset do
-    use Jido.Action, name: "agent_replacement_reset"
+    use Jido.Action,
+      name: "agent_replacement_reset",
+      output_schema: Zoi.any()
 
     def run(_params, context), do: {:ok, %{context.agent_state | config: %{}}}
   end
@@ -18,7 +20,9 @@ defmodule JidoTest.Agent.ReplacementTest do
     end
 
     routes do
-      route "config.reset", Reset
+      route "config.reset", Reset do
+        state(from: output())
+      end
     end
   end
 

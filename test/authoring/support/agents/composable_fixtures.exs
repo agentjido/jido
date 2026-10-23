@@ -1,10 +1,17 @@
 defmodule JidoTest.ComposableAgent.Action do
-  use Jido.Action, name: "agent_authoring_action", schema: Zoi.object(%{value: Zoi.string()})
+  use Jido.Action,
+    name: "agent_authoring_action",
+    schema: Zoi.object(%{value: Zoi.string()}),
+    output_schema: Zoi.map()
+
   def run(_, _), do: raise("Authoring must not run Actions")
 end
 
 defmodule JidoTest.ComposableAgent.Flow do
-  use Jido.Flow, name: "agent_authoring_flow", schema: Zoi.object(%{value: Zoi.string()})
+  use Jido.Flow,
+    name: "agent_authoring_flow",
+    schema: Zoi.object(%{value: Zoi.string()}),
+    output_schema: Zoi.map()
 
   flow do
     step "work", action: JidoTest.ComposableAgent.Action, params: %{value: input(:value)}
@@ -25,8 +32,14 @@ defmodule JidoTest.ComposableAgent.Worker do
 
   routes do
     signal_source "/worker"
-    route "work.request", JidoTest.ComposableAgent.Action
-    route "plan.request", JidoTest.ComposableAgent.Flow
+
+    route "work.request", JidoTest.ComposableAgent.Action do
+      state(from: output())
+    end
+
+    route "plan.request", JidoTest.ComposableAgent.Flow do
+      state(from: output())
+    end
   end
 end
 
@@ -50,12 +63,22 @@ defmodule JidoTest.ComposableAgent.Team do
 
   routes do
     signal_source "/team"
-    route "work.request", JidoTest.ComposableAgent.Action, as: :request
-    route "plan.request", JidoTest.ComposableAgent.Action, as: :plan
 
-    route "work.done", JidoTest.ComposableAgent.Action, defaults: %{value: "done"}
+    route "work.request", JidoTest.ComposableAgent.Action, as: :request do
+      state(from: output())
+    end
 
-    route "flow.request", JidoTest.ComposableAgent.Flow
+    route "plan.request", JidoTest.ComposableAgent.Action, as: :plan do
+      state(from: output())
+    end
+
+    route "work.done", JidoTest.ComposableAgent.Action, defaults: %{value: "done"} do
+      state(from: output())
+    end
+
+    route "flow.request", JidoTest.ComposableAgent.Flow do
+      state(from: output())
+    end
 
     route "external.request" do
       transform signal do
@@ -77,15 +100,22 @@ defmodule JidoTest.ComposableAgent.Team do
     end
 
     route "inline.request" do
-      action %{value: _value}, schema: Zoi.object(%{value: Zoi.string()}), context: context do
+      action %{value: _value},
+        schema: Zoi.object(%{value: Zoi.string()}),
+        output_schema: Zoi.map(),
+        context: context do
         {:ok, context.agent_state}
       end
+
+      state(from: output())
     end
 
     route "inline.emit" do
-      action _params, context: context do
+      action _params, output_schema: Zoi.map(), context: context do
         {:ok, context.agent_state, [emit("team.done", %{})]}
       end
+
+      state(from: output())
     end
 
     route "partial.request" do
@@ -94,7 +124,9 @@ defmodule JidoTest.ComposableAgent.Team do
       end
     end
 
-    route "unknown.request", JidoTest.ComposableAgent.Action
+    route "unknown.request", JidoTest.ComposableAgent.Action do
+      state(from: output())
+    end
   end
 
   schedules do
@@ -194,11 +226,21 @@ defmodule JidoTest.ComposableAgent.Named do
 
     route "work.request", JidoTest.ComposableAgent.Action,
       as: :work,
-      defaults: %{value: "default"}
+      defaults: %{value: "default"} do
+      state(from: output())
+    end
 
-    route "plan.request", JidoTest.ComposableAgent.Flow
-    route "pass.request", JidoTest.ComposableAgent.Action, as: :pass
-    route "work.*", JidoTest.ComposableAgent.Action
+    route "plan.request", JidoTest.ComposableAgent.Flow do
+      state(from: output())
+    end
+
+    route "pass.request", JidoTest.ComposableAgent.Action, as: :pass do
+      state(from: output())
+    end
+
+    route "work.*", JidoTest.ComposableAgent.Action do
+      state(from: output())
+    end
   end
 end
 
@@ -206,7 +248,9 @@ defmodule JidoTest.ComposableAgent.ScheduleShort do
   use Jido.Agent, name: "schedule", extensions: [Jido.Plugin.Scheduler.DSL]
 
   routes do
-    route("work.request", JidoTest.ComposableAgent.Action)
+    route "work.request", JidoTest.ComposableAgent.Action do
+      state(from: output())
+    end
   end
 
   schedules do
@@ -222,7 +266,9 @@ defmodule JidoTest.ComposableAgent.ScheduleBlock do
   use Jido.Agent, name: "schedule", extensions: [Jido.Plugin.Scheduler.DSL]
 
   routes do
-    route("work.request", JidoTest.ComposableAgent.Action)
+    route "work.request", JidoTest.ComposableAgent.Action do
+      state(from: output())
+    end
   end
 
   schedules do
@@ -252,7 +298,9 @@ defmodule JidoTest.ComposableAgent.PluginAlias do
   end
 
   routes do
-    route "work.request", Action
+    route "work.request", Action do
+      state(from: output())
+    end
   end
 end
 

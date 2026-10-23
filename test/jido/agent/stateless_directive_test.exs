@@ -59,7 +59,8 @@ defmodule Jido.Agent.StatelessDirectiveTest do
   defmodule Submit do
     use Jido.Action,
       name: "stateless_directive_submit",
-      schema: Zoi.object(%{kind: Zoi.enum([:reply, :block])})
+      schema: Zoi.object(%{kind: Zoi.enum([:reply, :block])}),
+      output_schema: Zoi.any()
 
     @impl true
     def run(%{kind: kind}, %{agent_state: state}),
@@ -69,7 +70,8 @@ defmodule Jido.Agent.StatelessDirectiveTest do
   defmodule Result do
     use Jido.Action,
       name: "stateless_directive_result",
-      schema: Zoi.object(%{value: Zoi.integer()})
+      schema: Zoi.object(%{value: Zoi.integer()}),
+      output_schema: Zoi.any()
 
     @impl true
     def run(%{value: value}, %{agent_state: state}), do: {:ok, %{state | value: value}}
@@ -87,8 +89,13 @@ defmodule Jido.Agent.StatelessDirectiveTest do
     end
 
     routes do
-      route "effect.submit", Submit
-      route "effect.result", Result
+      route "effect.submit", Submit do
+        state(from: output())
+      end
+
+      route "effect.result", Result do
+        state(from: output())
+      end
     end
   end
 

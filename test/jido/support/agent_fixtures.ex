@@ -57,7 +57,7 @@ end
 defmodule JidoTest.AgentFixtures.Add do
   @moduledoc false
 
-  use Jido.Action, name: "agent_server_add"
+  use Jido.Action, name: "agent_server_add", output_schema: Zoi.map()
 
   @impl Jido.Action
   def run(%{by: by, label: label} = params, context) do
@@ -89,14 +89,18 @@ defmodule JidoTest.AgentFixtures.CounterAgent do
   end
 
   routes do
-    route "counter.add", JidoTest.AgentFixtures.Add
+    route "counter.add", JidoTest.AgentFixtures.Add do
+      state(from: output())
+    end
   end
 end
 
 defmodule JidoTest.AgentFixtures.BlockingAdd do
   @moduledoc false
 
-  use Jido.Action, name: "agent_server_blocking_add"
+  use Jido.Action,
+    name: "agent_server_blocking_add",
+    output_schema: Zoi.any()
 
   alias JidoTest.AgentFixtures.Add
 
@@ -113,7 +117,9 @@ end
 defmodule JidoTest.AgentFixtures.ContinueToAdd do
   @moduledoc false
 
-  use Jido.Action, name: "agent_server_continue_to_add"
+  use Jido.Action,
+    name: "agent_server_continue_to_add",
+    output_schema: Zoi.any()
 
   alias JidoTest.AgentFixtures.Add
 
@@ -124,7 +130,9 @@ end
 defmodule JidoTest.AgentFixtures.ReentrantCall do
   @moduledoc false
 
-  use Jido.Action, name: "agent_server_reentrant_call"
+  use Jido.Action,
+    name: "agent_server_reentrant_call",
+    output_schema: Zoi.any()
 
   @impl Jido.Action
   def run(%{server: server, test_pid: test_pid}, context) do
@@ -138,7 +146,9 @@ end
 defmodule JidoTest.AgentFixtures.ObserveExecutionBoundary do
   @moduledoc false
 
-  use Jido.Action, name: "agent_server_observe_execution_boundary"
+  use Jido.Action,
+    name: "agent_server_observe_execution_boundary",
+    output_schema: Zoi.any()
 
   @impl Jido.Action
   def run(%{test_pid: test_pid} = params, context) do
@@ -150,7 +160,9 @@ end
 defmodule JidoTest.AgentFixtures.DispatchDecision do
   @moduledoc false
 
-  use Jido.Action, name: "agent_server_dispatch_decision"
+  use Jido.Action,
+    name: "agent_server_dispatch_decision",
+    output_schema: Zoi.any()
 
   @impl Jido.Action
   def run(params, _context), do: {:ok, params}
@@ -159,7 +171,9 @@ end
 defmodule JidoTest.AgentFixtures.DispatchExpander do
   @moduledoc false
 
-  use Jido.Action, name: "agent_server_dispatch_expander"
+  use Jido.Action,
+    name: "agent_server_dispatch_expander",
+    output_schema: Zoi.any()
 
   alias JidoTest.AgentFixtures.Add
 
@@ -170,7 +184,9 @@ end
 defmodule JidoTest.AgentFixtures.Fail do
   @moduledoc false
 
-  use Jido.Action, name: "agent_server_fail"
+  use Jido.Action,
+    name: "agent_server_fail",
+    output_schema: Zoi.any()
 
   @impl Jido.Action
   def run(_params, _context), do: {:error, :expected_failure}
@@ -179,7 +195,9 @@ end
 defmodule JidoTest.AgentFixtures.InvalidState do
   @moduledoc false
 
-  use Jido.Action, name: "agent_server_invalid_state"
+  use Jido.Action,
+    name: "agent_server_invalid_state",
+    output_schema: Zoi.any()
 
   @impl Jido.Action
   def run(_params, _context), do: {:ok, %{count: :invalid, history: []}}
@@ -195,7 +213,9 @@ end
 defmodule JidoTest.AgentFixtures.WithDirective do
   @moduledoc false
 
-  use Jido.Action, name: "agent_server_with_directive"
+  use Jido.Action,
+    name: "agent_server_with_directive",
+    output_schema: Zoi.any()
 
   alias JidoTest.AgentFixtures.{Add, TestDirective}
 

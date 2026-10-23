@@ -13,7 +13,9 @@ defmodule Jido.Examples.ToolCall do
   routes do
     signal_source "/examples/llm/tool_call"
 
-    route "examples.llm.tool_call.ask", Jido.Examples.ToolCall.Pipeline, as: :ask
+    route "examples.llm.tool_call.ask", Jido.Examples.ToolCall.Pipeline, as: :ask do
+      state(from: output())
+    end
   end
 end
 
@@ -24,7 +26,8 @@ defmodule Jido.Examples.ToolCall.Pipeline do
 
   use Jido.Flow,
     name: "examples_llm_single_tool_flow",
-    schema: Adapter.prompt_schema()
+    schema: Adapter.prompt_schema(),
+    output_schema: Zoi.map()
 
   flow do
     step "select",

@@ -1,6 +1,6 @@
 defmodule JidoTest.AgentEvolutionFixtures do
   defmodule Work do
-    use Jido.Action, name: "evolution_work"
+    use Jido.Action, name: "evolution_work", output_schema: Zoi.map()
     def run(input, context), do: {:ok, context.agent_state, Map.get(input, :directives, [])}
   end
 
@@ -12,12 +12,14 @@ defmodule JidoTest.AgentEvolutionFixtures do
     end
 
     routes do
-      route "work", JidoTest.AgentEvolutionFixtures.Work
+      route "work", JidoTest.AgentEvolutionFixtures.Work do
+        state(from: output())
+      end
     end
   end
 
   defmodule Flow do
-    use Jido.Flow, name: "evolution_flow"
+    use Jido.Flow, name: "evolution_flow", output_schema: Zoi.map()
 
     flow do
       step "work", action: JidoTest.AgentEvolutionFixtures.Work, params: input()
@@ -53,7 +55,9 @@ defmodule JidoTest.AgentEvolutionFixtures do
   end
 
   defmodule Upgrade do
-    use Jido.Action, name: "evolution_upgrade"
+    use Jido.Action,
+      name: "evolution_upgrade",
+      output_schema: Zoi.any()
 
     def run(%{snapshot: snapshot}, _) do
       agent = %{snapshot.agent | routes: [], state: %{count: 7}}
@@ -77,7 +81,9 @@ defmodule JidoTest.AgentEvolutionFixtures do
   end
 
   defmodule BadUpgrade do
-    use Jido.Action, name: "evolution_bad_upgrade"
+    use Jido.Action,
+      name: "evolution_bad_upgrade",
+      output_schema: Zoi.any()
 
     def run(%{snapshot: snapshot}, context) do
       case context.mode do
@@ -98,7 +104,13 @@ defmodule JidoTest.AgentEvolutionFixtures do
       name: "evolution",
       signal_source: "/evolution",
       schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}),
-      routes: [%{path: "run", handler: %{kind: :action, target: Work}}]
+      routes: [
+        %{
+          path: "run",
+          handler: %{kind: :action, target: Work},
+          state: %{source: :output, path: []}
+        }
+      ]
     })
     |> Jido.Agent.instantiate!(id: "evolution")
   end

@@ -16,7 +16,9 @@ defmodule JidoTest.AgentServer.ActivationRecoveryTest do
     end
 
     routes do
-      route "work", F.Work
+      route "work", F.Work do
+        state(from: output())
+      end
     end
 
     @impl Jido.Agent
@@ -119,7 +121,13 @@ defmodule JidoTest.AgentServer.ActivationRecoveryTest do
         extensions: [
           %{id: Plugin.id(), provider: Plugin, vsn: Plugin.vsn(), data: %{observer: c.observer}}
         ],
-        routes: [%{path: "work", handler: %{kind: :action, target: F.Work}}]
+        routes: [
+          %{
+            path: "work",
+            handler: %{kind: :action, target: F.Work},
+            state: %{source: :output, path: []}
+          }
+        ]
       })
       |> Agent.instantiate!(id: "recover-plugin")
 

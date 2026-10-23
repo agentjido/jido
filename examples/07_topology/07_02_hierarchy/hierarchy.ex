@@ -6,9 +6,11 @@ defmodule Jido.Examples.Topology.Hierarchy do
     signal_source "/examples/topology/hierarchy"
 
     route "examples.topology.hierarchy.team.remove", as: :team_remove do
-      action _input, schema: Zoi.object(%{}), context: context do
+      action _input, schema: Zoi.object(%{}), context: context, output_schema: Zoi.map() do
         {:ok, context.agent_state, [Jido.Agent.Directive.agent_remove(:team)]}
       end
+
+      state(from: output())
     end
   end
 

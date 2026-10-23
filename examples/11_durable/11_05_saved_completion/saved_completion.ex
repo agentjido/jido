@@ -13,7 +13,9 @@ defmodule Jido.Examples.Durable.SavedCompletion do
     signal_source "/examples/durable/saved_completion"
 
     route "examples.durable.saved_completion.request",
-          Jido.Examples.Durable.SavedCompletion.Report, as: :request
+          Jido.Examples.Durable.SavedCompletion.Report, as: :request do
+      state(from: output())
+    end
   end
 end
 

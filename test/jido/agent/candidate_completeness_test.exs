@@ -5,13 +5,17 @@ defmodule JidoTest.Agent.CandidateCompletenessTest do
   alias Jido.Signal
 
   defmodule Partial do
-    use Jido.Action, name: "candidate_completeness_partial"
+    use Jido.Action,
+      name: "candidate_completeness_partial",
+      output_schema: Zoi.any()
 
     def run(_params, _context), do: {:ok, %{count: 1}}
   end
 
   defmodule ClearOptional do
-    use Jido.Action, name: "candidate_completeness_clear_optional"
+    use Jido.Action,
+      name: "candidate_completeness_clear_optional",
+      output_schema: Zoi.any()
 
     def run(_params, _context), do: {:ok, %{count: 1, history: []}}
   end
@@ -28,8 +32,13 @@ defmodule JidoTest.Agent.CandidateCompletenessTest do
     end
 
     routes do
-      route "candidate.partial", Partial
-      route "candidate.clear", ClearOptional
+      route "candidate.partial", Partial do
+        state(from: output())
+      end
+
+      route "candidate.clear", ClearOptional do
+        state(from: output())
+      end
     end
   end
 

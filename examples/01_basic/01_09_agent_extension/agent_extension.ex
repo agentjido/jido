@@ -41,9 +41,12 @@ defmodule Jido.Examples.AgentExtension do
       route "examples.basic.agent_extension.add", as: :add do
         action %{amount: amount},
           schema: Zoi.object(%{amount: Zoi.integer()}),
-          context: context do
+          context: context,
+          output_schema: Zoi.map() do
           {:ok, %{context.agent_state | count: context.agent_state.count + amount}}
         end
+
+        state(from: output())
       end
     end
   end

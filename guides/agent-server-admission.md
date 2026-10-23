@@ -44,7 +44,7 @@ defmodule MyApp.Worker do
             fail: Zoi.boolean() |> Zoi.default(false),
             emits: Zoi.integer() |> Zoi.default(0)
           }),
-        context: context do
+        output_schema: Zoi.map(), context: context do
         Process.sleep(ms)
 
         if fail do
@@ -54,6 +54,7 @@ defmodule MyApp.Worker do
           {:ok, state, for(i <- 1..count//1, do: emit("job.note", %{i: i}))}
         end
       end
+      state from: output()
     end
   end
 end

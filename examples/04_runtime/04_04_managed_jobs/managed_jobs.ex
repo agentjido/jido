@@ -32,7 +32,8 @@ defmodule Jido.Examples.ManagedJobs do
     route "examples.runtime.jobs.start", as: :start_job do
       action input,
         schema: Zoi.object(%{job_id: Zoi.string() |> Zoi.min(1), value: Zoi.integer()}),
-        context: context do
+        context: context,
+        output_schema: Zoi.map() do
         state = context.agent_state
 
         if state.status == :running or input.job_id in state.seen do
@@ -51,12 +52,15 @@ defmodule Jido.Examples.ManagedJobs do
           end
         end
       end
+
+      state(from: output())
     end
 
     route "examples.runtime.jobs.cancel", as: :cancel_job do
       action %{job_id: job_id},
         schema: Zoi.object(%{job_id: Zoi.string()}),
-        context: context do
+        context: context,
+        output_schema: Zoi.map() do
         state = context.agent_state
 
         if state.job_id == job_id and state.status == :running do
@@ -65,6 +69,8 @@ defmodule Jido.Examples.ManagedJobs do
           {:error, Jido.Action.Error.validation_error("job is not running")}
         end
       end
+
+      state(from: output())
     end
 
     route "examples.runtime.jobs.settle", as: :settle do
@@ -75,7 +81,8 @@ defmodule Jido.Examples.ManagedJobs do
             status: Zoi.enum([:completed, :failed]),
             result: Zoi.string()
           }),
-        context: context do
+        context: context,
+        output_schema: Zoi.map() do
         state = context.agent_state
 
         if state.job_id == input.job_id and state.status == :running do
@@ -84,6 +91,8 @@ defmodule Jido.Examples.ManagedJobs do
           {:error, Jido.Action.Error.validation_error("job result is stale")}
         end
       end
+
+      state(from: output())
     end
   end
 end

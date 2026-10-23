@@ -135,7 +135,7 @@ defmodule SensorGuide.Building do
     signal_source("/guides/managed-sensors")
 
     route "sensor.watch", as: :watch do
-      action %{room: room}, schema: Zoi.object(%{room: Zoi.string()}), context: context do
+      action %{room: room}, schema: Zoi.object(%{room: Zoi.string()}), output_schema: Zoi.map(), context: context do
         {:ok, context.agent_state,
          [
            Jido.Plugin.SensorManager.start(
@@ -145,21 +145,24 @@ defmodule SensorGuide.Building do
            )
          ]}
       end
+      state from: output()
     end
 
     route "sensor.unwatch", as: :unwatch do
-      action %{room: room}, schema: Zoi.object(%{room: Zoi.string()}), context: context do
+      action %{room: room}, schema: Zoi.object(%{room: Zoi.string()}), output_schema: Zoi.map(), context: context do
         {:ok, context.agent_state, [Jido.Plugin.SensorManager.stop({:thermometer, room})]}
       end
+      state from: output()
     end
 
     route "temperature.reading" do
       action %{room: room, celsius: celsius},
         schema: Zoi.object(%{room: Zoi.string(), celsius: Zoi.integer()}),
-        context: context do
+        output_schema: Zoi.map(), context: context do
         readings = Map.put(context.agent_state.readings, room, celsius)
         {:ok, %{context.agent_state | readings: readings}}
       end
+      state from: output()
     end
   end
 end

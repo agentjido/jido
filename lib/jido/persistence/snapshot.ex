@@ -4,7 +4,7 @@ defmodule Jido.Persistence.Snapshot do
   alias Jido.Agent.{Data, Error}
   alias Jido.PortableTerm
 
-  @format 1
+  @format 2
   @keys [:format, :agent, :references, :state_format]
 
   @doc false
@@ -52,6 +52,15 @@ defmodule Jido.Persistence.Snapshot do
   end
 
   @doc false
+  def envelope(%{format: format}) when format != @format do
+    Error.fail(
+      :unsupported_snapshot_format,
+      [:format],
+      "Agent snapshot format is not supported",
+      %{format: format, supported_formats: [@format]}
+    )
+  end
+
   def envelope(snapshot) do
     with {:ok, _} <- Data.fields(snapshot, @keys),
          true <- Map.keys(snapshot) |> Enum.sort() == Enum.sort(@keys),

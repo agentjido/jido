@@ -76,7 +76,10 @@ defmodule Jido.Agent.StateIntersectionTest do
   end
 
   defmodule Keep do
-    use Jido.Action, name: "intersection_keep"
+    use Jido.Action,
+      name: "intersection_keep",
+      output_schema: Zoi.any()
+
     def run(_params, context), do: {:ok, context.agent_state}
   end
 
@@ -105,7 +108,13 @@ defmodule Jido.Agent.StateIntersectionTest do
       Agent.define!(%{
         name: "intersection_plugin",
         extensions: [%{id: Owned.id(), provider: Owned, vsn: Owned.vsn(), data: %{}}],
-        routes: [%{path: "intersection.reduce", handler: %{kind: :action, target: Keep}}]
+        routes: [
+          %{
+            path: "intersection.reduce",
+            handler: %{kind: :action, target: Keep},
+            state: %{source: :output, path: []}
+          }
+        ]
       })
 
     agent = Agent.instantiate!(definition, id: unique_id("intersection"))

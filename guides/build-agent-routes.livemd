@@ -29,7 +29,8 @@ Mix.install([{:jido, "~> 3.0.0-beta.2"}])
 defmodule Routes.Record do
   use Jido.Action,
     name: "record",
-    schema: Zoi.object(%{label: Zoi.string()})
+    schema: Zoi.object(%{label: Zoi.string()}),
+    output_schema: Zoi.map()
 
   @impl true
   def run(%{label: label}, %{agent_state: state}) do
@@ -40,7 +41,8 @@ end
 defmodule Routes.Total do
   use Jido.Action,
     name: "total",
-    schema: Zoi.object(%{price: Zoi.integer(), quantity: Zoi.integer()})
+    schema: Zoi.object(%{price: Zoi.integer(), quantity: Zoi.integer()}),
+    output_schema: Zoi.map()
 
   @impl true
   def run(%{price: price, quantity: quantity}, %{agent_state: state}) do
@@ -51,7 +53,8 @@ end
 defmodule Routes.Checkout do
   use Jido.Flow,
     name: "checkout",
-    schema: Zoi.object(%{price: Zoi.integer(), quantity: Zoi.integer()})
+    schema: Zoi.object(%{price: Zoi.integer(), quantity: Zoi.integer()}),
+    output_schema: Zoi.map()
 
   flow do
     step "total",
@@ -63,7 +66,7 @@ defmodule Routes.Checkout do
 end
 ```
 
-An Action or Flow route must return the complete next Agent state.
+An Action or Flow route selects its next state from validated executable output.
 
 ## The Route Table
 
@@ -86,16 +89,23 @@ defmodule Routes.Orders do
 
     route "order.create", Routes.Record,
       as: :create,
-      defaults: %{label: "created"}
+      defaults: %{label: "created"} do
+      state from: output()
+    end
 
-    route "order.checkout", Routes.Checkout, as: :checkout
+    route "order.checkout", Routes.Checkout, as: :checkout do
+      state from: output()
+    end
 
     route "order.note", as: :note do
       action %{text: text},
         schema: Zoi.object(%{text: Zoi.string()}),
+        output_schema: Zoi.map(),
         context: context do
         {:ok, %{context.agent_state | notes: [text | context.agent_state.notes]}}
       end
+
+      state from: output()
     end
 
     route "partner.order", as: :partner do
@@ -104,7 +114,9 @@ defmodule Routes.Orders do
       end
     end
 
-    route "order.*", Routes.Record, defaults: %{label: "wildcard"}
+    route "order.*", Routes.Record, defaults: %{label: "wildcard"} do
+      state from: output()
+    end
   end
 end
 ```
@@ -113,25 +125,26 @@ end
 | --- | --- |
 | path | An exact Signal type, or a pattern with `*` or `**`. It must be unique in the Agent. |
 | handler | An Action, a Flow, one inline `action`, or one inline `transform`. |
+| `state` | Selects the complete next state from executable output, or keeps it unchanged. |
+| `reply` | Selects reply data from executable output and builds one correlated reply. |
 | `as:` | Generates `<name>_signal/2` and `<name>_signal!/2`. Exact paths only. |
 | `defaults:` | Adds missing Action or Flow input values. Signal data wins. |
 
-## SignalAction Routes
+## State And Reply Mapping
 
-A SignalAction can own the path and the handler:
-
+An executable can return data for both state and a reply. The route selects
+each value from the validated output:
 ```elixir
-route MyApp.Ask
+route "price.quote", MyApp.BuildQuote do
+  state :unchanged
+  reply "price.quoted", from: output()
+end
 ```
 
-The input Signal type from `MyApp.Ask` becomes the route path. To use its
-Signal type with a different handler, use the two-module form:
-
-```elixir
-route MyApp.Ask, MyApp.Turn
-```
-
-This form runs `MyApp.Turn`. It does not run `MyApp.Ask` first.
+Use `output(:state)` and `output(:reply)` when the executable returns both
+values in one map. Every output selector requires a concrete `output_schema`
+on the Action or Flow. The route uses the ordinary Action input schema to
+validate the request data.
 
 ## Explicit Forwarding
 
@@ -139,8 +152,13 @@ Use `forward` when a route only sends the input Signal to another Agent:
 
 ```elixir
 routes do
-  forward "work.request", to: agent(:worker)
-  forward "work.completed", to: parent()
+  route "work.request" do
+    forward to: agent(:worker)
+  end
+
+  route "work.completed" do
+    forward to: parent()
+  end
 end
 ```
 
@@ -200,8 +218,6 @@ Jido rejects:
 
 ## Next
 
-- [Typed Signals](typed-signal-actions.livemd) explains typed input and reply
-  Signals.
 - [Connect Agent Outputs](connect-agent-outputs.livemd) explains explicit
   forwarding.
 - [State and Directives](agent-results-and-directives.md) covers handler

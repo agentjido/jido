@@ -46,7 +46,8 @@ defmodule GettingStarted.Increment do
   use Jido.Action,
     name: "increment",
     description: "Adds an amount to the counter",
-    schema: Zoi.object(%{amount: Zoi.integer()})
+    schema: Zoi.object(%{amount: Zoi.integer()}),
+    output_schema: Zoi.map()
 
   @impl true
   def run(%{amount: amount}, %{agent_state: state}) do
@@ -64,7 +65,8 @@ defmodule GettingStarted.Reset do
   use Jido.Action,
     name: "reset",
     description: "Sets the counter to zero and reports the previous value",
-    schema: Zoi.object(%{})
+    schema: Zoi.object(%{}),
+    output_schema: Zoi.map()
 
   @impl true
   def run(_params, %{agent_state: state}) do
@@ -93,9 +95,13 @@ defmodule GettingStarted.Counter do
 
     route "counter.increment", GettingStarted.Increment,
       as: :increment,
-      defaults: %{amount: 1}
+      defaults: %{amount: 1} do
+      state from: output()
+    end
 
-    route "counter.reset", GettingStarted.Reset, as: :reset
+    route "counter.reset", GettingStarted.Reset, as: :reset do
+      state from: output()
+    end
   end
 end
 ```

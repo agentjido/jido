@@ -83,10 +83,13 @@ defmodule JidoTest.Property.AuthoringContractTest do
           action %{delta: delta},
             name: "property_authored_add",
             schema: Zoi.object(%{delta: Zoi.integer()}),
+            output_schema: Zoi.map(),
             context: context do
             {:ok, %{value: context.agent_state.value + delta,
                     history: context.agent_state.history ++ [delta]}}
           end
+
+          state from: output()
         end
       end
     end
@@ -104,7 +107,7 @@ defmodule JidoTest.Property.AuthoringContractTest do
             end
 
           assert [target] = inline
-          assert apply(module, :route_action!, ["property.authored.add"]) == target
+          assert apply(module, :route_executable!, ["property.authored.add"]) == target
 
           declaration =
             Agent.define!(%{
@@ -117,7 +120,8 @@ defmodule JidoTest.Property.AuthoringContractTest do
                 %{
                   path: "property.authored.add",
                   as: :add,
-                  handler: %{kind: :action, target: target}
+                  handler: %{kind: :action, target: target},
+                  state: %{source: :output, path: []}
                 }
               ]
             })

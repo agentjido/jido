@@ -9,13 +9,17 @@ defmodule Jido.Examples.BoundedIteration do
   routes do
     signal_source "/workflow"
 
-    route "workflow.iteration", Jido.Examples.BoundedIteration.Pipeline, as: :repair
+    route "workflow.iteration", Jido.Examples.BoundedIteration.Pipeline, as: :repair do
+      state(from: output())
+    end
   end
 end
 
 defmodule Jido.Examples.BoundedIteration.Repair do
   @moduledoc false
-  use Jido.Action, name: "workflow_iteration_repair"
+  use Jido.Action,
+    name: "workflow_iteration_repair",
+    output_schema: Zoi.map()
 
   def run(%{current: current, repair_size: repair_size}, _context) do
     {:ok, %{current | missing: current.missing - repair_size, repairs: current.repairs + 1}}

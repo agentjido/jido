@@ -13,7 +13,8 @@ defmodule Jido.Examples.LLM.SearchTool do
         id: Zoi.string() |> Zoi.min(1),
         query: Zoi.string() |> Zoi.min(1),
         operation: Zoi.enum([:read])
-      })
+      }),
+    output_schema: Zoi.map()
 
   @impl true
   def run(input, context) do
@@ -67,7 +68,8 @@ defmodule Jido.Examples.LLM.FinishAnswer do
       Zoi.object(%{
         prompt: Zoi.string() |> Zoi.min(1),
         results: Zoi.list(Zoi.map())
-      })
+      }),
+    output_schema: Zoi.map()
 
   @impl true
   def run(input, context) do

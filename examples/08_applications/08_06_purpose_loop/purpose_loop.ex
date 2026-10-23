@@ -43,43 +43,58 @@ defmodule Jido.Examples.Applications.PurposeLoop.Agent do
             idle_delay_ms: Zoi.integer() |> Zoi.min(0) |> Zoi.optional(),
             budget: Zoi.integer() |> Zoi.min(0) |> Zoi.optional()
           }),
-        context: context do
+        context: context,
+        output_schema: Zoi.map() do
         State.start(input, context.agent_state)
       end
+
+      state(from: output())
     end
 
     route "examples.applications.purpose_loop.tick" do
       action input,
         schema: Zoi.object(%{generation: Zoi.integer(), sequence: Zoi.integer()}),
-        context: context do
+        context: context,
+        output_schema: Zoi.map() do
         State.tick(input, context.agent_state)
       end
+
+      state(from: output())
     end
 
     route "examples.applications.purpose_loop.enqueue" do
       action input,
         schema: Zoi.object(%{work: Zoi.list(Zoi.string())}),
-        context: context do
+        context: context,
+        output_schema: Zoi.map() do
         State.enqueue(input, context.agent_state)
       end
+
+      state(from: output())
     end
 
     route "examples.applications.purpose_loop.pause" do
-      action _input, context: context do
+      action _input, context: context, output_schema: Zoi.map() do
         State.pause(context.agent_state)
       end
+
+      state(from: output())
     end
 
     route "examples.applications.purpose_loop.resume" do
-      action _input, context: context do
+      action _input, context: context, output_schema: Zoi.map() do
         State.resume(context.agent_state)
       end
+
+      state(from: output())
     end
 
     route "examples.applications.purpose_loop.drain" do
-      action _input, context: context do
+      action _input, context: context, output_schema: Zoi.map() do
         State.drain(context.agent_state)
       end
+
+      state(from: output())
     end
   end
 end

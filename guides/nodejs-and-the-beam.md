@@ -73,7 +73,8 @@ state. The Agent Server runs one Turn at a time, so the lock goes away. With
 defmodule MyApp.Increment do
   use Jido.Action,
     name: "increment",
-    schema: Zoi.object(%{amount: Zoi.integer()})
+    schema: Zoi.object(%{amount: Zoi.integer()}),
+    output_schema: Zoi.map()
 
   @impl true
   def run(%{amount: amount}, %{agent_state: state}) do
@@ -90,7 +91,9 @@ defmodule MyApp.Counter do
 
   routes do
     signal_source("/my_app/counters")
-    route "counter.increment", MyApp.Increment, as: :increment, defaults: %{amount: 1}
+    route "counter.increment", MyApp.Increment, as: :increment, defaults: %{amount: 1} do
+      state from: output()
+    end
   end
 end
 
@@ -269,14 +272,16 @@ Jido handles two levels. An exception in an Action fails only that Turn:
 
 ```elixir
 defmodule MyApp.Fail do
-  use Jido.Action, name: "fail", schema: Zoi.object(%{})
+  use Jido.Action, name: "fail", schema: Zoi.object(%{}), output_schema: Zoi.map()
 
   @impl true
   def run(_params, _context), do: raise("card service returned nil")
 end
 
 # In MyApp.Counter's routes:
-#   route "counter.fail", MyApp.Fail, as: :fail
+#   route "counter.fail", MyApp.Fail, as: :fail do
+#     state :unchanged
+#   end
 
 pid = MyApp.Jido.whereis_agent("user-42")
 {:error, error} = Jido.AgentServer.call(pid, MyApp.Counter.fail_signal!())
@@ -354,16 +359,18 @@ defmodule MyApp.Reminders do
     route "reminder.request", as: :request do
       action %{text: text, delay_ms: delay},
         schema: Zoi.object(%{text: Zoi.string(), delay_ms: Zoi.integer()}),
-        context: context do
+        output_schema: Zoi.map(), context: context do
         due = Jido.Signal.new!("reminder.due", %{text: text}, source: "/my_app/reminders")
         {:ok, context.agent_state, [Jido.Plugin.Scheduler.schedule(delay, due)]}
       end
+      state from: output()
     end
 
     route "reminder.due" do
-      action %{text: text}, schema: Zoi.object(%{text: Zoi.string()}), context: context do
+      action %{text: text}, schema: Zoi.object(%{text: Zoi.string()}), output_schema: Zoi.map(), context: context do
         {:ok, %{context.agent_state | sent: [text | context.agent_state.sent]}}
       end
+      state from: output()
     end
   end
 end

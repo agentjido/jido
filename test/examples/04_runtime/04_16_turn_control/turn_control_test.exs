@@ -2,7 +2,8 @@ defmodule JidoTest.Examples.Runtime.TurnControlBlockingAction do
   @moduledoc false
   use Jido.Action,
     name: "test_runtime_turn_control_blocking_action",
-    schema: Zoi.object(%{name: Zoi.string() |> Zoi.min(1)})
+    schema: Zoi.object(%{name: Zoi.string() |> Zoi.min(1)}),
+    output_schema: Zoi.any()
 
   alias JidoTest.Examples.RuntimeBarrier
 
@@ -24,7 +25,9 @@ defmodule JidoTest.Examples.Runtime.TurnControlBlockingAgent do
     signal_source "/test/examples/runtime/turn_control"
 
     route "test.examples.runtime.turn_control.complete",
-          JidoTest.Examples.Runtime.TurnControlBlockingAction
+          JidoTest.Examples.Runtime.TurnControlBlockingAction do
+      state(from: output())
+    end
   end
 end
 

@@ -72,7 +72,7 @@ defmodule Jido.Agent.VersioningTest do
         ] do
       registry = JidoTest.AgentRegistry.for(value)
       assert {:ok, document} = JidoTest.AgentRegistry.encode(value, registry)
-      assert document["vsn"] == 1
+      assert document["vsn"] == 2
       assert document["definition"]["vsn"] == value.vsn
       expected = Agent.definition(value)
       assert {:ok, ^expected} = JidoTest.AgentRegistry.decode(document, registry)
@@ -84,7 +84,7 @@ defmodule Jido.Agent.VersioningTest do
     original = VersionedAgent.instantiate!(id: "accepted", state: %{count: 5})
     changed = %{original | metadata: %{changed: true}, vsn: 9}
     assert {:ok, snapshot} = Jido.Persistence.snapshot(changed)
-    assert snapshot.format == 1
+    assert snapshot.format == 2
     assert snapshot.agent === changed
     assert snapshot.state_format == :default
     assert {:ok, ^changed} = Jido.Persistence.restore(snapshot)

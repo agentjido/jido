@@ -5,7 +5,9 @@ defmodule Jido.Plugin.HeartbeatIntegrationTest do
   alias Jido.Plugin.Heartbeat
 
   defmodule RecordHeartbeat do
-    use Jido.Action, name: "plugin_record_heartbeat"
+    use Jido.Action,
+      name: "plugin_record_heartbeat",
+      output_schema: Zoi.any()
 
     @impl Jido.Action
     def run(params, context) do
@@ -31,7 +33,9 @@ defmodule Jido.Plugin.HeartbeatIntegrationTest do
     end
 
     routes do
-      route "plugin.heartbeat", RecordHeartbeat
+      route "plugin.heartbeat", RecordHeartbeat do
+        state(from: output())
+      end
     end
   end
 

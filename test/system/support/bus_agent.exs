@@ -11,6 +11,8 @@ defmodule JidoTest.System.BusAgent do
   end
 
   routes do
-    route "system.work", JidoTest.System.ControlledWork
+    route "system.work", JidoTest.System.ControlledWork do
+      state(from: output())
+    end
   end
 end

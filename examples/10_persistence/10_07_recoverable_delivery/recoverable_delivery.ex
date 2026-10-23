@@ -25,19 +25,25 @@ defmodule Jido.Examples.RecoverableDelivery do
     route "examples.persistence.delivery.record", as: :record_and_deliver do
       action %{effect_id: effect_id, value: value},
         schema: Zoi.object(%{effect_id: Zoi.string() |> Zoi.min(1), value: Zoi.integer()}),
-        context: context do
+        context: context,
+        output_schema: Zoi.map() do
         directive = struct!(Deliver, effect_id: effect_id, value: value)
         {:ok, %{context.agent_state | value: value}, [directive]}
       end
+
+      state(from: output())
     end
 
     route "examples.persistence.delivery.confirm", as: :confirm_delivery do
       action %{effect_id: effect_id, value: value},
         schema: Zoi.object(%{effect_id: Zoi.string() |> Zoi.min(1), value: Zoi.integer()}),
-        context: context do
+        context: context,
+        output_schema: Zoi.map() do
         confirmation = struct!(Confirm, effect_id: effect_id, value: value)
         {:ok, context.agent_state, [confirmation]}
       end
+
+      state(from: output())
     end
   end
 end

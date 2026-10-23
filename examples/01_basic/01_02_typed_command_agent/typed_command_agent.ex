@@ -49,20 +49,26 @@ defmodule Jido.Examples.TypedCommandAgent do
                 unrecognized_keys: :error
               )
           }),
-        context: context do
+        context: context,
+        output_schema: Zoi.map() do
         profile = Map.merge(context.agent_state.profile, patch)
         profile = %{profile | name: String.trim(profile.name)}
         {:ok, %{context.agent_state | profile: profile}}
       end
+
+      state(from: output())
     end
 
     route "basic.typed_command.set_count", as: :set_count do
       action %{count: count},
         schema: Zoi.object(%{count: Zoi.integer()}),
-        context: context do
+        context: context,
+        output_schema: Zoi.map() do
         # Complete Agent validation owns this bound check.
         {:ok, %{context.agent_state | count: count}}
       end
+
+      state(from: output())
     end
   end
 end

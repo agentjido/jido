@@ -95,7 +95,10 @@ defmodule Jido.Agent do
 
       routes do
         signal_source "/my_app/counter"
-        route "counter.add", MyApp.Add, as: :add, defaults: %{amount: 1}
+
+        route "counter.add", MyApp.Add, as: :add, defaults: %{amount: 1} do
+          state from: output()
+        end
       end
 
       topology do
@@ -109,17 +112,21 @@ defmodule Jido.Agent do
   The `state` section accepts `schema` and `initial_state`. The `plugins` section
   accepts ordered `plugin` declarations. The `routes` section accepts
   `signal_source` and ordered `route` declarations. A route can
-  use an Action or Flow module, an inline `action` or `transform`, or a
-  `Jido.SignalAction` module. `route SignalAction, Handler` uses the
-  SignalAction input type with another Action or Flow. A string route must have
-  a handler. Route options are `:as` and `:defaults`. An `:as` value must start
-  with a lowercase letter and contain only lowercase letters, digits, and
-  underscores.
+  use an Action or Flow module, an inline `action` or `flow`, a `transform`, or
+  a `forward`. An executable route must select the next state from its validated
+  output or declare `state :unchanged`. It can also select reply data from that
+  output. Route options are `:as` and `:defaults`. An `:as` value must start with
+  a lowercase letter and contain only lowercase letters, digits, and underscores.
 
-  `forward "work.request", to: agent(:worker)` forwards the unchanged Signal
-  to one declared Agent member. `forward "work.completed", to: parent()`
-  forwards it to the current parent Agent. Forward destinations are portable
-  definition data. They do not contain process or transport values.
+  A forward route uses a terminal handler in its route body:
+
+      route "work.request" do
+        forward to: agent(:worker)
+      end
+
+  Use `parent()` as the destination to forward the unchanged Signal to the
+  current parent Agent. Forward destinations are portable definition data.
+  They do not contain process or transport values.
 
   The `topology` section accepts named `agent` members and a `connections`
   section with `connect` declarations. `state/1` creates a reference to one
@@ -141,6 +148,7 @@ defmodule Jido.Agent do
 
     quote do
       use Jido.Action.Inline
+      use Jido.Flow.Inline
       use Jido.Agent.DSL, unquote(Macro.escape(opts))
       import Jido.Agent.DSL.Macros
       import Jido.Agent.Directive, only: [emit: 1, emit: 2]

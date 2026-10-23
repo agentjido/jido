@@ -137,7 +137,8 @@ checks a value that is already correct:
 defmodule Types.SetAge do
   use Jido.Action,
     name: "set_age",
-    schema: Zoi.object(%{age: Zoi.integer(coerce: true) |> Zoi.min(0)})
+    schema: Zoi.object(%{age: Zoi.integer(coerce: true) |> Zoi.min(0)}),
+    output_schema: Zoi.map()
 
   @impl true
   def run(%{age: age}, %{agent_state: state}), do: {:ok, Map.put(state, :age, age)}
@@ -152,7 +153,9 @@ defmodule Types.Person do
 
   routes do
     signal_source("/guides/types")
-    route "person.age.set", Types.SetAge, as: :set_age
+    route "person.age.set", Types.SetAge, as: :set_age do
+      state from: output()
+    end
   end
 end
 
@@ -230,15 +233,17 @@ defmodule Types.Counter do
     route "counter.increment", as: :increment do
       action %{amount: amount},
         schema: Zoi.object(%{amount: Zoi.integer() |> Zoi.min(1)}),
-        context: context do
+        output_schema: Zoi.map(), context: context do
         {:ok, %{context.agent_state | count: context.agent_state.count + amount}}
       end
+      state from: output()
     end
 
     route "counter.reset", as: :reset do
-      action _input, schema: Zoi.object(%{}), context: context do
+      action _input, schema: Zoi.object(%{}), output_schema: Zoi.map(), context: context do
         {:ok, %{context.agent_state | count: 0}}
       end
+      state from: output()
     end
   end
 end
@@ -311,7 +316,9 @@ defmodule MyApp.Counter do
   use Jido.Agent, name: "counter"
 
   routes do
-    route "counter.increment", MyApp.Increment
+    route "counter.increment", MyApp.Increment do
+      state from: output()
+    end
   end
 end
 
@@ -352,8 +359,8 @@ Some mistakes compile and fail at runtime:
 
 Generated helpers such as `increment_signal!/2` check only that the data is a
 map. They don't run the Action schema. `Types.Counter.increment_signal!(%{amount: 0})`
-returns a Signal, and its Turn fails. To validate data when you build the
-Signal, use a SignalAction and its `new/2`.
+returns a Signal, and its Turn fails. Validate untrusted input before Signal
+construction when the caller needs an earlier failure.
 
 ## Data at the Boundary
 
@@ -383,27 +390,24 @@ const AddItem = z.object({
 const input = AddItem.parse(JSON.parse(body).data);
 ```
 
-In Jido, a SignalAction with `coerce: true` on the object converts the known
-string keys to atoms. `coerce: true` on a field converts its value:
+In Jido, the Action input schema validates request data during the Turn.
+`coerce: true` on the object converts known string keys to atoms, and
+`coerce: true` on a field converts its value:
 
 ```elixir
 defmodule Types.AddItem do
-  use Jido.SignalAction,
+  use Jido.Action,
     name: "add_item",
     description: "Adds one item to the cart",
-    vsn: 1,
-    input: [
-      type: "cart.item.add",
-      default_source: "/guides/types",
-      schema:
-        Zoi.object(
-          %{
-            sku: Zoi.string(),
-            quantity: Zoi.integer(coerce: true) |> Zoi.min(1) |> Zoi.default(1)
-          },
-          coerce: true
-        )
-    ]
+    schema:
+      Zoi.object(
+        %{
+          sku: Zoi.string(),
+          quantity: Zoi.integer(coerce: true) |> Zoi.min(1) |> Zoi.default(1)
+        },
+        coerce: true
+      ),
+    output_schema: Zoi.map()
 
   @impl true
   def run(%{sku: sku, quantity: quantity}, %{agent_state: state}) do
@@ -420,7 +424,10 @@ defmodule Types.Cart do
 
   routes do
     signal_source("/guides/types")
-    route Types.AddItem, as: :add_item
+
+    route "cart.item.add", Types.AddItem, as: :add_item do
+      state from: output()
+    end
   end
 end
 
@@ -430,8 +437,8 @@ cart = Types.Cart.instantiate!(id: "cart-1")
 cart.state
 ```
 
-The result is `%{items: %{"tea" => 2}}`. `Types.AddItem.validate_data/1`
-gives `{:ok, %{quantity: 2, sku: "tea"}}` for the same wire data.
+The result is `%{items: %{"tea" => 2}}`. The Action receives
+`%{quantity: 2, sku: "tea"}` after input validation and coercion.
 
 The analogy breaks at keys. `JSON.parse` gives you property names that match
 your types. Elixir atoms and strings are different keys, and only a schema
@@ -442,8 +449,7 @@ client keys: the VM never frees atoms, and the atom table has a fixed limit.
 | --- | --- |
 | `Jido.Signal.new/3`, `deserialize/2` | No. Data stays as given. |
 | Route helpers, such as `add_item_signal!/2` | No. They check only for a map. |
-| SignalAction `new/2`, `validate_data/1` | Only where the schema sets `coerce: true` or `Zoi.transform/2`. |
-| Action input schema, during the Turn | Same as SignalAction. |
+| Action input schema, during the Turn | Only where the schema sets `coerce: true` or `Zoi.transform/2`. |
 | Agent state schema | Never. |
 
 Keep fixed fields as atom keys and data-driven keys as strings, like the
@@ -465,5 +471,5 @@ Use `%{"sku" => "tea"}` for Signal data that leaves the VM as JSON.
 
 - [Errors and Async](errors-and-async.md) covers error values and
   asynchronous work.
-- [Typed Signals](typed-signal-actions.livemd) covers SignalAction input and
-  typed replies.
+- [Routes and Handlers](build-agent-routes.livemd) covers Action input and
+  route-generated replies.

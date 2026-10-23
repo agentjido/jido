@@ -10,7 +10,7 @@ defmodule JidoTest.Examples.Research.RemoteStartTest do
       signal_source "/examples/research/remote"
 
       route "examples.research.remote.start", as: :start do
-        action _input, context: context do
+        action _input, context: context, output_schema: Zoi.any() do
           directive =
             Jido.AgentServer.Directive.agent_start(
               JidoTest.Examples.Research.RemoteStartTest.Owner,
@@ -20,6 +20,8 @@ defmodule JidoTest.Examples.Research.RemoteStartTest do
 
           {:ok, context.agent_state, [directive]}
         end
+
+        state(from: output())
       end
     end
   end

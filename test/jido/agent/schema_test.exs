@@ -75,7 +75,9 @@ defmodule Jido.Agent.SchemaTest do
     end
 
     routes do
-      route "counter.add", JidoTest.AgentFixtures.Add
+      route "counter.add", JidoTest.AgentFixtures.Add do
+        state(from: output())
+      end
     end
   end
 
@@ -93,7 +95,9 @@ defmodule Jido.Agent.SchemaTest do
     end
 
     routes do
-      route "counter.add", JidoTest.AgentFixtures.Add
+      route "counter.add", JidoTest.AgentFixtures.Add do
+        state(from: output())
+      end
     end
   end
 

@@ -168,7 +168,7 @@ not restore or claim the retired standalone `jido.topology` component.
 ### jido.agent.I32 — Generated Agent module facade
 
 - **scope:** `Jido.Agent.__using__/1`, generated Agent modules
-- **must:** Generate documented `vsn/0`, `schema/0`, `definition/0`, `instantiate/0,1`, `instantiate!/0,1`, `cmd/2,3`, and `route_action!/1` functions that delegate to the canonical Agent boundaries. Keep compiler authoring metadata hidden. `route_action!/1` returns the compiled Action target for an inline route and raises when the path has no inline Action.
+- **must:** Generate documented `vsn/0`, `schema/0`, `definition/0`, `instantiate/0,1`, `instantiate!/0,1`, `cmd/2,3`, and `route_executable!/1` functions that delegate to the canonical Agent boundaries. Keep compiler authoring metadata hidden. `route_executable!/1` returns the Action or Flow target for an exact executable route. It raises `ArgumentError` for a terminal handler or unknown path.
 - **kind:** functional
 - **status:** active
 

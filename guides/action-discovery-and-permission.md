@@ -25,7 +25,8 @@ defmodule MyApp.Actions.LookupOrder do
   use Jido.Action,
     id: "my_app/actions/lookup-order",
     vsn: 1,
-    name: "lookup_order"
+    name: "lookup_order",
+    output_schema: Zoi.map()
 
   def run(params, _context), do: {:ok, params}
 end

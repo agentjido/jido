@@ -4,6 +4,7 @@ defmodule Jido.Agent.Runner do
   alias Jido.Agent
   alias Jido.Agent.{Command, Composition, Mutation, Plugin, Turn, Validation}
   alias Jido.Agent.Plugin.Pipeline, as: PluginPipeline
+  alias Jido.AgentServer.Directive.ServerStop
   alias Jido.Error
   alias Jido.Signal
 
@@ -154,22 +155,23 @@ defmodule Jido.Agent.Runner do
     with {:ok, output, directives} <- at(:compose, normalize_exec_result(result)),
          {:ok, directives} <-
            at(:compose, Jido.Agent.Contract.directives(prepared.agent, directives)),
-         {:ok, output, directives} <-
+         {:ok, state, directives} <-
+           at(:compose, project_route_result(prepared, output, directives)),
+         {:ok, state, directives} <-
            at(
              :compose,
              PluginPipeline.run(
-               {:ok, output, directives},
+               {:ok, state, directives},
                prepared.agent,
                prepared.turn.source_signal,
                prepared.context.plugin_inputs,
-               prepared.plugin_specs,
-               prepared.turn.route
+               prepared.plugin_specs
              )
            ),
          result =
            if(Enum.any?(directives, &Mutation.mutation?/1),
-             do: Composition.apply(prepared.agent, output, directives),
-             else: Agent.transition_validated(prepared.agent, output, prepared.schema)
+             do: Composition.apply(prepared.agent, state, directives),
+             else: Agent.transition_validated(prepared.agent, state, prepared.schema)
            ),
          {:ok, agent} <- at(:validate, result) do
       {:ok, agent, directives}
@@ -177,34 +179,25 @@ defmodule Jido.Agent.Runner do
   end
 
   defp select(agent, signal) do
-    default_selection(agent, signal)
-    |> finish_selection(signal)
-  end
+    with {:ok, route} <- Jido.Agent.Route.select(agent, signal.type),
+         {:ok, turn} <-
+           (case route.handler do
+              %{kind: kind, target: target} when kind in [:action, :flow] ->
+                with {:ok, input} <- merge_route_input(route, signal),
+                     do: {:ok, %Turn{executable: target, input: input, route: route}}
 
-  defp default_selection(agent, signal) do
-    with {:ok, route} <- Jido.Agent.Route.select(agent, signal.type) do
-      case route.handler do
-        %{kind: kind, target: target} when kind in [:action, :flow] ->
-          with {:ok, input} <- merge_route_input(route, signal),
-               do: {:ok, %Turn{executable: target, input: input, route: route}}
-
-        handler ->
-          {:ok,
-           %Turn{
-             executable: Jido.Agent.Turn.SignalHandler,
-             input: %{handler: handler},
-             route: route
-           }}
-      end
+              handler ->
+                {:ok,
+                 %Turn{
+                   executable: Jido.Agent.Turn.SignalHandler,
+                   input: %{handler: handler},
+                   route: route
+                 }}
+            end),
+         {:ok, turn} <- Turn.bind_source(turn, signal) do
+      Turn.validate_selected(turn)
     end
   end
-
-  defp finish_selection({:ok, %Turn{} = turn}, signal) do
-    with {:ok, turn} <- Turn.bind_source(turn, signal),
-         do: Turn.validate_selected(turn)
-  end
-
-  defp finish_selection({:error, _reason} = error, _signal), do: error
 
   defp normalize_exec_result({:ok, output}), do: normalize_exec_result({:ok, output, []})
 
@@ -216,7 +209,13 @@ defmodule Jido.Agent.Runner do
            do: {:ok, output, values}
          )
 
-  defp normalize_exec_result({:ok, output, _directives}), do: invalid_state_output(output)
+  defp normalize_exec_result({:ok, output, _directives}) do
+    {:error,
+     Error.execution_error("Agent executable output must be a plain state map",
+       details: %{code: :agent_invalid_callback_result, callback: :execute, output: output}
+     )}
+  end
+
   defp normalize_exec_result({:error, reason}), do: {:error, reason}
 
   defp normalize_exec_result(result) do
@@ -224,6 +223,71 @@ defmodule Jido.Agent.Runner do
      Error.execution_error("Agent executable returned an invalid result",
        details: %{code: :agent_invalid_callback_result, callback: :execute, result: result}
      )}
+  end
+
+  defp project_route_result(%Prepared{} = prepared, output, directives) do
+    route = prepared.turn.route
+
+    with {:ok, state} <- project_state(route.state, output, prepared.agent.state),
+         :ok <- Jido.Agent.Error.at(Jido.Agent.Data.plain_map(state), :state),
+         {:ok, directives} <- project_reply(route.reply, output, directives, prepared) do
+      {:ok, state, directives}
+    end
+  end
+
+  defp project_state(:unchanged, _output, prepared_state), do: {:ok, prepared_state}
+
+  defp project_state(selector, output, _prepared_state),
+    do: select_output(selector, output, [:state])
+
+  defp project_reply(nil, _output, directives, _prepared), do: {:ok, directives}
+
+  defp project_reply(reply, output, directives, prepared) do
+    with {:ok, data} <- select_output(reply.from, output, [:reply, :from]),
+         {:ok, signal} <- build_reply_signal(reply.type, data, prepared) do
+      {:ok, insert_reply(directives, Jido.Agent.Directive.reply(signal))}
+    end
+  end
+
+  defp insert_reply(directives, reply) do
+    index = if match?(%ServerStop{}, List.last(directives)), do: -2, else: -1
+    List.insert_at(directives, index, reply)
+  end
+
+  defp select_output(%{source: :output, path: path}, output, mapping_path) do
+    path
+    |> Enum.with_index()
+    |> Enum.reduce_while({:ok, output}, fn {key, index}, {:ok, value} ->
+      case value do
+        %{^key => selected} ->
+          {:cont, {:ok, selected}}
+
+        _ ->
+          {:halt,
+           Jido.Agent.Error.fail(
+             :missing_output_field,
+             mapping_path ++ [:path, index],
+             "Selected output field is missing",
+             %{key: key}
+           )}
+      end
+    end)
+  end
+
+  defp build_reply_signal(type, data, %Prepared{} = prepared) do
+    with {:ok, signal} <- Signal.new(type, data, source: prepared.agent.signal_source),
+         {:ok, _request, trace} <- Signal.Trace.ensure(prepared.turn.source_signal),
+         {:ok, signal} <- Signal.Trace.put(signal, trace),
+         {:ok, signal} <-
+           Signal.put_context(signal, "jidocausationid", prepared.turn.source_signal.id) do
+      {:ok, signal}
+    else
+      {:error, reason} ->
+        {:error,
+         Error.execution_error("Agent route Reply Signal could not be built",
+           details: %{reason: reason, type: type}
+         )}
+    end
   end
 
   defp merge_route_input(route, %Signal{} = signal) do
@@ -238,13 +302,6 @@ defmodule Jido.Agent.Runner do
            details: %{signal_id: signal.id, data: signal.data}
          )}
     end
-  end
-
-  defp invalid_state_output(output) do
-    {:error,
-     Error.execution_error("Agent executable output must be a plain state map",
-       details: %{code: :agent_invalid_callback_result, callback: :execute, output: output}
-     )}
   end
 
   defp at(_stage, {:ok, _value} = result), do: result

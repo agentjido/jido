@@ -55,7 +55,12 @@ defmodule Jido.AgentExtensionsAuthoringTest do
     Agent.define(%{name: "extended", routes: routes, extensions: [contribution(provider, data)]})
   end
 
-  defp action(type), do: %{path: type, handler: %{kind: :action, target: Action}}
+  defp action(type),
+    do: %{
+      path: type,
+      handler: %{kind: :action, target: Action},
+      state: %{source: :output, path: []}
+    }
 
   test "full extension DSL data equals an independently written Map in provider order" do
     expected = [
@@ -258,7 +263,7 @@ defmodule Jido.AgentExtensionsAuthoringTest do
         ] do
       assert_raise Spark.Error.DslError, fn ->
         Compiler.compile(
-          "routes do route \"work.request\", JidoTest.ComposableAgent.Action end\nschedules do #{block} end",
+          "routes do route \"work.request\", JidoTest.ComposableAgent.Action do state from: output() end end\nschedules do #{block} end",
           "name: \"bad\",extensions: [Jido.Plugin.Scheduler.DSL]"
         )
       end

@@ -10,15 +10,22 @@ defmodule Jido.Examples.FailureOutcome do
 
   routes do
     signal_source "/examples/runtime/failure_outcome"
-    route "examples.runtime.failure_outcome.reject", __MODULE__.Reject, as: :reject
-    route "examples.runtime.failure_outcome.report", __MODULE__.Report, as: :report
+
+    route "examples.runtime.failure_outcome.reject", __MODULE__.Reject, as: :reject do
+      state(from: output())
+    end
+
+    route "examples.runtime.failure_outcome.report", __MODULE__.Report, as: :report do
+      state(from: output())
+    end
   end
 
   defmodule Reject do
     @moduledoc false
     use Jido.Action,
       name: "runtime_failure_outcome_reject",
-      schema: Zoi.object(%{reason: Zoi.string() |> Zoi.min(1)})
+      schema: Zoi.object(%{reason: Zoi.string() |> Zoi.min(1)}),
+      output_schema: Zoi.map()
 
     def run(%{reason: reason}, _context) do
       {:error, Jido.Error.execution_error("Request was rejected", details: %{reason: reason})}
@@ -29,7 +36,8 @@ defmodule Jido.Examples.FailureOutcome do
     @moduledoc false
     use Jido.Action,
       name: "runtime_failure_outcome_report",
-      schema: Zoi.object(%{name: Zoi.string() |> Zoi.min(1)})
+      schema: Zoi.object(%{name: Zoi.string() |> Zoi.min(1)}),
+      output_schema: Zoi.map()
 
     alias Jido.AgentServer.Directive
 

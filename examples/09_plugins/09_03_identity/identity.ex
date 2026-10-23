@@ -22,7 +22,8 @@ defmodule Jido.Examples.Plugins.Identity.Agent do
     route "examples.plugins.identity.challenge" do
       action %{"challenge" => challenge},
         schema: Zoi.object(%{"challenge" => Zoi.string() |> Zoi.min(1)}),
-        context: context do
+        context: context,
+        output_schema: Zoi.map() do
         reply =
           Jido.Signal.new!(
             "examples.plugins.identity.accepted",
@@ -42,6 +43,8 @@ defmodule Jido.Examples.Plugins.Identity.Agent do
 
         {:ok, next_state, [Jido.Agent.Directive.emit(reply)]}
       end
+
+      state(from: output())
     end
   end
 end

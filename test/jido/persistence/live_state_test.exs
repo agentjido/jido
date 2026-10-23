@@ -7,7 +7,9 @@ defmodule JidoTest.Persistence.LiveStateTest do
   alias Jido.Persistence.ETS
 
   defmodule Update do
-    use Jido.Action, name: "local_state_update"
+    use Jido.Action,
+      name: "local_state_update",
+      output_schema: Zoi.any()
 
     def run(input, context) do
       state = %{
@@ -37,7 +39,9 @@ defmodule JidoTest.Persistence.LiveStateTest do
     end
 
     routes do
-      route "local.update", Update
+      route "local.update", Update do
+        state(from: output())
+      end
     end
   end
 
@@ -52,7 +56,9 @@ defmodule JidoTest.Persistence.LiveStateTest do
     end
 
     routes do
-      route "local.update", Update
+      route "local.update", Update do
+        state(from: output())
+      end
     end
 
     def checkpoint(agent, _context) do
@@ -109,7 +115,9 @@ defmodule JidoTest.Persistence.LiveStateTest do
     end
 
     routes do
-      route "local.update", Update
+      route "local.update", Update do
+        state(from: output())
+      end
     end
   end
 

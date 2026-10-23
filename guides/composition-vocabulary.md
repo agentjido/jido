@@ -16,7 +16,9 @@ defmodule MyApp.Worker do
 
   routes do
     signal_source("/my_app/worker")
-    route "task.run", MyApp.RunTask
+    route "task.run", MyApp.RunTask do
+      state from: output()
+    end
   end
 end
 
@@ -34,7 +36,9 @@ defmodule MyApp.Team do
 
   routes do
     signal_source("/my_app/team")
-    route "task.done", MyApp.RecordDone
+    route "task.done", MyApp.RecordDone do
+      state from: output()
+    end
   end
 
   topology do

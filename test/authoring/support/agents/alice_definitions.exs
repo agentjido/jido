@@ -13,10 +13,15 @@ defmodule JidoTest.ComposableAgent.Definitions.Alice do
     signal_source "/alice"
 
     route "alice.greeting.requested", as: :greet do
-      action %{name: name}, schema: Zoi.object(%{name: Zoi.string()}), context: context do
+      action %{name: name},
+        schema: Zoi.object(%{name: Zoi.string()}),
+        context: context,
+        output_schema: Zoi.any() do
         next_state = %{context.agent_state | greetings: context.agent_state.greetings + 1}
         {:ok, next_state, [emit("alice.greeting.produced", %{message: "Hello, #{name}!"})]}
       end
+
+      state(from: output())
     end
   end
 end

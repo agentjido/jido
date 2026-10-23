@@ -9,7 +9,8 @@ defmodule Jido.Examples.Heartbeat do
     @moduledoc false
     use Jido.Action,
       name: "runtime_heartbeat_record",
-      schema: Zoi.object(%{kind: Zoi.string() |> Zoi.min(1)})
+      schema: Zoi.object(%{kind: Zoi.string() |> Zoi.min(1)}),
+      output_schema: Zoi.map()
 
     def run(input, context) do
       event = %{
@@ -35,7 +36,9 @@ defmodule Jido.Examples.Heartbeat do
     end
 
     routes do
-      route "jido.agent.heartbeat", Jido.Examples.Heartbeat.Record
+      route "jido.agent.heartbeat", Jido.Examples.Heartbeat.Record do
+        state(from: output())
+      end
     end
   end
 
@@ -58,7 +61,9 @@ defmodule Jido.Examples.Heartbeat do
     end
 
     routes do
-      route "examples.runtime.heartbeat.custom", Jido.Examples.Heartbeat.Record
+      route "examples.runtime.heartbeat.custom", Jido.Examples.Heartbeat.Record do
+        state(from: output())
+      end
     end
   end
 end

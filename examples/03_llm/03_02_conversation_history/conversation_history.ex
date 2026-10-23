@@ -20,7 +20,8 @@ defmodule Jido.Examples.ConversationHistory do
             message_id: Zoi.string() |> Zoi.min(1),
             text: Zoi.string() |> Zoi.min(1)
           }),
-        context: context do
+        context: context,
+        output_schema: Zoi.map() do
         alias Jido.Examples.LLM.Adapter
 
         state = context.agent_state
@@ -40,6 +41,8 @@ defmodule Jido.Examples.ConversationHistory do
           end
         end
       end
+
+      state(from: output())
     end
   end
 end

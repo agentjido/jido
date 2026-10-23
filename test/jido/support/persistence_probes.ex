@@ -53,6 +53,7 @@ defmodule JidoTest.Persistence.IndeterminateWriteProbe do
     route "test.persistence.indeterminate_write.increment", as: :increment do
       action input,
         schema: Zoi.object(%{request_id: Zoi.string() |> Zoi.min(1), amount: Zoi.integer()}),
+        output_schema: Zoi.map(),
         context: context do
         next = %{context.agent_state | count: context.agent_state.count + input.amount}
 
@@ -70,6 +71,8 @@ defmodule JidoTest.Persistence.IndeterminateWriteProbe do
 
         {:ok, next, directives}
       end
+
+      state(from: output())
     end
   end
 end

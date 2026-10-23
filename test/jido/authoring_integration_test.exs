@@ -13,7 +13,10 @@ defmodule Jido.AuthoringIntegrationTest do
   end
 
   defmodule ReferencedAction do
-    use Jido.Action, name: "referenced_action"
+    use Jido.Action,
+      name: "referenced_action",
+      output_schema: Zoi.any()
+
     def run(_params, _context), do: {:ok, %{}}
   end
 
@@ -80,19 +83,19 @@ defmodule Jido.AuthoringIntegrationTest do
     assert %{kind: :plugin, target: Plugin} =
              Registry.get(registry, "tests/plugins/sample", 3)
 
-    assert Registry.codec(registry, "jido.agent.definition", 1) ==
+    assert Registry.codec(registry, "jido.agent.definition", 2) ==
              {:ok, Jido.Agent.Codec}
 
     definition = Agent.definition()
     assert {:ok, document} = Jido.Authoring.encode(definition, registry: registry)
-    assert document["vsn"] == 1
+    assert document["vsn"] == 2
     assert {:ok, ^definition} = Jido.Authoring.decode(document, registry: registry)
   end
 
   test "the default scan includes core Jido when it is loaded" do
     assert :ok = Jido.Discovery.refresh()
 
-    assert Registry.codec(Jido.Discovery.registry(), "jido.agent.definition", 1) ==
+    assert Registry.codec(Jido.Discovery.registry(), "jido.agent.definition", 2) ==
              {:ok, Jido.Agent.Codec}
   end
 

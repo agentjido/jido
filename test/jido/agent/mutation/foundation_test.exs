@@ -11,8 +11,11 @@ defmodule Jido.Agent.MutationFoundationTest do
 
     assert {:ok, after_agent, diff} =
              Agent.mutate(before, [
-               D.route_replace("run", F.Flow, defaults: %{amount: 2}),
-               D.route_add("new", F.Work),
+               D.route_replace("run", F.Flow,
+                 defaults: %{amount: 2},
+                 state: %{source: :output, path: []}
+               ),
+               D.route_add("new", F.Work, state: %{source: :output, path: []}),
                D.agent_add(:a, F.Worker),
                D.connection_add("work", from: :root, to: :a),
                D.plugin_add(F.Counter)

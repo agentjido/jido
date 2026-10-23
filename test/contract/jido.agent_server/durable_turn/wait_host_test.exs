@@ -9,7 +9,9 @@ defmodule JidoTest.AgentServer.DurableTurn.WaitHostTest do
   alias Runic.Workflow.Events.FactProduced
 
   defmodule Approval do
-    use Jido.Flow, name: "host_policy_approval"
+    use Jido.Flow,
+      name: "host_policy_approval",
+      output_schema: Zoi.any()
 
     flow do
       selection "decision" do
@@ -22,7 +24,9 @@ defmodule JidoTest.AgentServer.DurableTurn.WaitHostTest do
   end
 
   defmodule ParallelWaits do
-    use Jido.Flow, name: "host_policy_parallel_waits"
+    use Jido.Flow,
+      name: "host_policy_parallel_waits",
+      output_schema: Zoi.any()
 
     flow do
       await "first", event: "first"

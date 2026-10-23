@@ -340,7 +340,8 @@ defmodule Jido.Plugin.ValidationTest do
         routes: [
           %{
             path: "observe",
-            handler: %{kind: :action, target: JidoTest.AgentFixtures.ObserveExecutionBoundary}
+            handler: %{kind: :action, target: JidoTest.AgentFixtures.ObserveExecutionBoundary},
+            state: %{source: :output, path: []}
           }
         ]
       })
@@ -538,8 +539,7 @@ defmodule Jido.Plugin.ValidationTest do
                  agent,
                  source,
                  %{},
-                 Jido.Agent.Plugin.specs(specs),
-                 %{}
+                 Jido.Agent.Plugin.specs(specs)
                )
 
       assert error.message == message
@@ -553,8 +553,7 @@ defmodule Jido.Plugin.ValidationTest do
                agent,
                source,
                %{},
-               Jido.Agent.Plugin.specs(specs),
-               %{}
+               Jido.Agent.Plugin.specs(specs)
              )
 
     assert Plugin.directive_owner(specs, :unknown) == nil

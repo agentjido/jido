@@ -3,7 +3,8 @@ defmodule Jido.Examples.ApprovalWorkflow.ValidateRequest do
 
   use Jido.Action,
     name: "examples_flight_booking_validate_request",
-    schema: Zoi.object(%{constraints: Zoi.map()})
+    schema: Zoi.object(%{constraints: Zoi.map()}),
+    output_schema: Zoi.map()
 
   alias Jido.Action.Error
 
@@ -29,7 +30,8 @@ defmodule Jido.Examples.ApprovalWorkflow.SearchFlights do
 
   use Jido.Action,
     name: "examples_flight_booking_search",
-    schema: Zoi.object(%{constraints: Zoi.map()})
+    schema: Zoi.object(%{constraints: Zoi.map()}),
+    output_schema: Zoi.map()
 
   alias Jido.Action.Error
 
@@ -59,7 +61,8 @@ defmodule Jido.Examples.ApprovalWorkflow.PrepareOptions do
       Zoi.object(%{
         constraints: Zoi.map(),
         options: Zoi.list(Zoi.map())
-      })
+      }),
+    output_schema: Zoi.map()
 
   alias Jido.Action.Error
 
@@ -102,7 +105,8 @@ defmodule Jido.Examples.ApprovalWorkflow.SearchFlow do
 
   use Jido.Flow,
     name: "examples_flight_booking_search_flow",
-    schema: Zoi.object(%{constraints: Zoi.map()})
+    schema: Zoi.object(%{constraints: Zoi.map()}),
+    output_schema: Zoi.map()
 
   flow do
     step "validate",

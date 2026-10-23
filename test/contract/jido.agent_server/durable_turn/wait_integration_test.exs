@@ -8,7 +8,8 @@ defmodule JidoTest.AgentServer.DurableTurn.WaitIntegrationTest do
   defmodule Approval do
     use Jido.Flow,
       name: "core_wait_approval",
-      schema: Zoi.object(%{request_id: Zoi.string()})
+      schema: Zoi.object(%{request_id: Zoi.string()}),
+      output_schema: Zoi.any()
 
     flow do
       step "before", input <- input() do
@@ -89,7 +90,9 @@ defmodule JidoTest.AgentServer.DurableTurn.WaitIntegrationTest do
   end
 
   defmodule ImmediateTimer do
-    use Jido.Flow, name: "core_wait_timer"
+    use Jido.Flow,
+      name: "core_wait_timer",
+      output_schema: Zoi.any()
 
     flow do
       timer("expired", after_ms: 0)
@@ -103,7 +106,9 @@ defmodule JidoTest.AgentServer.DurableTurn.WaitIntegrationTest do
   end
 
   defmodule LongTimer do
-    use Jido.Flow, name: "core_long_wait"
+    use Jido.Flow,
+      name: "core_long_wait",
+      output_schema: Zoi.any()
 
     flow do
       timer("delay", after_ms: 7_776_000_000)
@@ -117,7 +122,9 @@ defmodule JidoTest.AgentServer.DurableTurn.WaitIntegrationTest do
   end
 
   defmodule TwoWaits do
-    use Jido.Flow, name: "core_two_waits"
+    use Jido.Flow,
+      name: "core_two_waits",
+      output_schema: Zoi.any()
 
     flow do
       await("first", event: "first")
@@ -139,15 +146,28 @@ defmodule JidoTest.AgentServer.DurableTurn.WaitIntegrationTest do
     end
 
     routes do
-      route "request", Approval
-      route "timer", ImmediateTimer
-      route "long_timer", LongTimer
-      route "two_waits", JidoTest.AgentServer.DurableTurn.WaitIntegrationTest.TwoWaits
+      route "request", Approval do
+        state(from: output())
+      end
+
+      route "timer", ImmediateTimer do
+        state(from: output())
+      end
+
+      route "long_timer", LongTimer do
+        state(from: output())
+      end
+
+      route "two_waits", JidoTest.AgentServer.DurableTurn.WaitIntegrationTest.TwoWaits do
+        state(from: output())
+      end
 
       route "increment" do
-        action _input, context: context do
+        action _input, context: context, output_schema: Zoi.any() do
           {:ok, %{count: context.agent_state.count + 1}}
         end
+
+        state(from: output())
       end
     end
   end

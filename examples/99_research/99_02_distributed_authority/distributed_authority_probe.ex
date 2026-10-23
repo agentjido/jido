@@ -20,9 +20,12 @@ defmodule Jido.Examples.DistributedAuthorityProbe do
     route "examples.research.distributed_authority.record", as: :record do
       action %{value: value},
         schema: Zoi.object(%{value: Zoi.integer()}),
-        context: context do
+        context: context,
+        output_schema: Zoi.map() do
         {:ok, %{context.agent_state | value: value}}
       end
+
+      state(from: output())
     end
   end
 end

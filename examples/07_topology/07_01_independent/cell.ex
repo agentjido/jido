@@ -18,16 +18,22 @@ defmodule Jido.Examples.Topology.Independent.Cell do
     signal_source "/examples/topology/cell"
 
     route "examples.topology.cell.schedule", as: :schedule do
-      action %{value: value}, schema: Zoi.object(%{value: Zoi.integer()}), context: context do
+      action %{value: value},
+        schema: Zoi.object(%{value: Zoi.integer()}),
+        context: context,
+        output_schema: Zoi.map() do
         {:ok, signal} = Jido.Examples.Topology.Independent.Cell.work_signal(%{value: value})
         {:ok, context.agent_state, [Jido.Plugin.Scheduler.schedule(0, signal)]}
       end
+
+      state(from: output())
     end
 
     route "examples.topology.cell.work", as: :work do
       action %{value: value},
         schema: Zoi.object(%{value: Zoi.integer()}),
-        context: context do
+        context: context,
+        output_schema: Zoi.map() do
         {:ok,
          %{
            context.agent_state
@@ -35,6 +41,8 @@ defmodule Jido.Examples.Topology.Independent.Cell do
              total: context.agent_state.total + value
          }}
       end
+
+      state(from: output())
     end
   end
 end

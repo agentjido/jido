@@ -13,7 +13,9 @@ defmodule JidoTest.System.AuthoringLoad do
   @deadline 60_000
 
   defmodule Run do
-    use Jido.Action, name: "authoring_load_run"
+    use Jido.Action,
+      name: "authoring_load_run",
+      output_schema: Zoi.any()
 
     @impl true
     def run(_params, context), do: {:ok, context.agent_state}
@@ -150,7 +152,13 @@ defmodule JidoTest.System.AuthoringLoad do
           }),
         extensions: [%{id: Owned.id(), provider: Owned, vsn: Owned.vsn(), data: %{}}],
         metadata: %{payload: payload},
-        routes: [%{path: "load.run", handler: %{kind: :action, target: Run}}]
+        routes: [
+          %{
+            path: "load.run",
+            handler: %{kind: :action, target: Run},
+            state: %{source: :output, path: []}
+          }
+        ]
       })
 
     registry = JidoTest.AgentRegistry.for(definition)

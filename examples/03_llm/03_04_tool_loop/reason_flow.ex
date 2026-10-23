@@ -5,7 +5,8 @@ defmodule Jido.Examples.ReActAgent.CallModel do
 
   use Jido.Action,
     name: "examples_llm_react_call_model",
-    schema: Contracts.turn_input()
+    schema: Contracts.turn_input(),
+    output_schema: Zoi.map()
 
   alias Jido.Action.Error
 
@@ -61,7 +62,8 @@ defmodule Jido.Examples.ReActAgent.RouteModelDecision do
 
   use Jido.Action,
     name: "examples_llm_react_route_model_decision",
-    schema: Jido.Examples.ReActAgent.Contracts.decision()
+    schema: Jido.Examples.ReActAgent.Contracts.decision(),
+    output_schema: Zoi.map()
 
   @impl true
   def run(%{kind: :tool} = input, _context) do
@@ -78,7 +80,8 @@ defmodule Jido.Examples.ReActAgent.RunTool do
 
   use Jido.Action,
     name: "examples_llm_react_run_tool",
-    schema: Jido.Examples.ReActAgent.Contracts.tool_decision()
+    schema: Jido.Examples.ReActAgent.Contracts.tool_decision(),
+    output_schema: Zoi.map()
 
   @impl true
   def run(input, context) do
@@ -114,7 +117,8 @@ defmodule Jido.Examples.ReActAgent.CommitAnswer do
 
   use Jido.Action,
     name: "examples_llm_react_commit_answer",
-    schema: Jido.Examples.ReActAgent.Contracts.answer_decision()
+    schema: Jido.Examples.ReActAgent.Contracts.answer_decision(),
+    output_schema: Zoi.map()
 
   @impl true
   def run(%{answer: answer, messages: messages}, %{agent_state: agent_state}) do
@@ -133,7 +137,8 @@ defmodule Jido.Examples.ReActAgent.ReasonFlow do
 
   use Jido.Flow,
     name: "examples_llm_react_reason_flow",
-    schema: Jido.Examples.ReActAgent.Contracts.turn_input()
+    schema: Jido.Examples.ReActAgent.Contracts.turn_input(),
+    output_schema: Zoi.map()
 
   flow do
     dispatch "reason",
@@ -155,7 +160,8 @@ defmodule Jido.Examples.ReActAgent.ToolRound do
   @moduledoc "Runs one tool, then passes its transcript to the next model call."
   use Jido.Flow,
     name: "examples_llm_react_tool_round",
-    schema: Jido.Examples.ReActAgent.Contracts.tool_decision()
+    schema: Jido.Examples.ReActAgent.Contracts.tool_decision(),
+    output_schema: Zoi.map()
 
   flow do
     step "tool", action: Jido.Examples.ReActAgent.RunTool, params: input()

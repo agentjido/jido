@@ -10,7 +10,17 @@ defmodule Jido.AgentAuthoringTest do
   alias JidoTest.ComposableAgent.Compiler
 
   defp route(path, handler \\ %{kind: :action, target: Action}, opts \\ []) do
-    Map.merge(%{path: path, as: nil, defaults: %{}, handler: handler}, Map.new(opts))
+    Map.merge(
+      %{
+        path: path,
+        as: nil,
+        defaults: %{},
+        handler: handler,
+        state: %{source: :output, path: []},
+        reply: nil
+      },
+      Map.new(opts)
+    )
   end
 
   defp canonical(overrides \\ %{}) do
@@ -123,17 +133,20 @@ defmodule Jido.AgentAuthoringTest do
       route("flow.request", %{kind: :flow, target: Flow}),
       route(
         "external.request",
-        %{kind: :transform, target: Map.fetch!(targets, "external.request")}
+        %{kind: :transform, target: Map.fetch!(targets, "external.request")},
+        state: :unchanged
       ),
       route(
         "external.clauses",
-        %{kind: :transform, target: Map.fetch!(targets, "external.clauses")}
+        %{kind: :transform, target: Map.fetch!(targets, "external.clauses")},
+        state: :unchanged
       ),
       route("inline.request", %{kind: :action, target: inline.("inline.request")}),
       route("inline.emit", %{kind: :action, target: inline.("inline.emit")}),
       route(
         "partial.request",
-        %{kind: :transform, target: Map.fetch!(targets, "partial.request")}
+        %{kind: :transform, target: Map.fetch!(targets, "partial.request")},
+        state: :unchanged
       ),
       route("unknown.request", %{kind: :action, target: Action})
     ]
@@ -184,7 +197,8 @@ defmodule Jido.AgentAuthoringTest do
 
     assert Enum.all?(
              definition.routes,
-             &(Map.keys(&1) |> Enum.sort() == Enum.sort([:path, :handler, :as, :defaults]))
+             &(Map.keys(&1) |> Enum.sort() ==
+                 Enum.sort([:path, :handler, :state, :reply, :as, :defaults]))
            )
 
     assert [%Jido.Agent.DSL.Entry{__spark_metadata__: metadata} | _] =
@@ -336,10 +350,14 @@ defmodule Jido.AgentAuthoringTest do
              Agent.define(%{
                name: "adapter",
                routes: [
-                 route("work.request", %{
-                   kind: :transform,
-                   target: {JidoTest.ComposableAgent.Adapter, :normalize, 1}
-                 })
+                 route(
+                   "work.request",
+                   %{
+                     kind: :transform,
+                     target: {JidoTest.ComposableAgent.Adapter, :normalize, 1}
+                   },
+                   state: :unchanged
+                 )
                ]
              })
   end
@@ -649,7 +667,7 @@ defmodule Jido.AgentAuthoringTest do
     for {body, message} <- [
           {"topology do agent :worker, JidoTest.ComposableAgent.NoSuchAgent end",
            "Member definition is not available"},
-          {"routes do route \"missing.type\", JidoTest.ComposableAgent.Action end\ntopology do agent :worker, JidoTest.ComposableAgent.Worker; connections do connect \"missing.type\", from: :root,to: :worker end end",
+          {"routes do route \"missing.type\", JidoTest.ComposableAgent.Action do state from: output() end end\ntopology do agent :worker, JidoTest.ComposableAgent.Worker; connections do connect \"missing.type\", from: :root,to: :worker end end",
            "Destination does not accept"}
         ] do
       {pid, monitor} = spawn_monitor(fn -> Compiler.compile(body) end)

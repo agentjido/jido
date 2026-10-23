@@ -9,7 +9,9 @@ defmodule Jido.Examples.ParallelJoin do
   routes do
     signal_source "/workflow"
 
-    route "workflow.parallel", Jido.Examples.ParallelJoin.Pipeline, as: :fetch_pair
+    route "workflow.parallel", Jido.Examples.ParallelJoin.Pipeline, as: :fetch_pair do
+      state(from: output())
+    end
   end
 end
 
@@ -23,7 +25,8 @@ defmodule Jido.Examples.ParallelJoin.Fetch do
         side: Zoi.enum([:left, :right]),
         value: Zoi.integer(),
         fail: Zoi.enum([:none, :left, :right])
-      })
+      }),
+    output_schema: Zoi.map()
 
   @impl true
   def run(input, context) do

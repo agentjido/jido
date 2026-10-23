@@ -1,6 +1,9 @@
 defmodule JidoCoreBench.Add do
   @moduledoc false
-  use Jido.Action, name: "core_bench_add"
+  use Jido.Action,
+    name: "core_bench_add",
+    output_schema: Zoi.any()
+
   @impl true
   def run(params, context) do
     JidoCoreBench.Fixtures.barrier(context)
@@ -11,7 +14,10 @@ end
 
 defmodule JidoCoreBench.Fail do
   @moduledoc false
-  use Jido.Action, name: "core_bench_fail"
+  use Jido.Action,
+    name: "core_bench_fail",
+    output_schema: Zoi.any()
+
   @impl true
   def run(_params, context) do
     JidoCoreBench.Fixtures.barrier(context)
@@ -20,7 +26,9 @@ defmodule JidoCoreBench.Fail do
 end
 
 defmodule JidoCoreBench.Flow do
-  use Jido.Flow, name: "core_bench_flow"
+  use Jido.Flow,
+    name: "core_bench_flow",
+    output_schema: Zoi.any()
 
   flow do
     step "first", action: JidoCoreBench.Add, params: %{}

@@ -163,9 +163,12 @@ DSL compiler shall reject the route.
 boundary shall store an ordinary executable Action target in the canonical
 route.
 
-`AUTH-REQ-020`: When `route_action!/1` receives an inline route path, the
-generated Agent module shall return the compiled Action target for reuse by
-direct data or Codec Registry entries.
+`AUTH-REQ-020`: When `route_executable!/1` receives an exact executable route
+path, the generated Agent module shall return its compiled Action or Flow
+target for reuse by direct data or Codec Registry entries.
+
+`AUTH-REQ-065`: If `route_executable!/1` receives a terminal handler path or
+an unknown path, then the generated Agent module shall raise `ArgumentError`.
 
 ### Generated Signal helpers
 
@@ -358,7 +361,10 @@ A named route declares its Signal helper directly:
 ```elixir
 routes do
   signal_source "/counter"
-  route "counter.add", MyApp.Add, as: :add
+
+  route "counter.add", MyApp.Add, as: :add do
+    state :unchanged
+  end
 end
 ```
 

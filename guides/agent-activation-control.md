@@ -53,9 +53,10 @@ defmodule MyApp.Counter do
     signal_source("/my_app/counter")
 
     route "counter.increment", as: :increment do
-      action %{}, name: "increment", schema: Zoi.object(%{}), context: context do
+      action %{}, name: "increment", schema: Zoi.object(%{}), output_schema: Zoi.map(), context: context do
         {:ok, %{context.agent_state | count: context.agent_state.count + 1}}
       end
+      state from: output()
     end
   end
 end

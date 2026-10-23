@@ -16,7 +16,8 @@ defmodule Jido.Examples.FencedInventory do
     route "examples.research.fenced_inventory.record", as: :record do
       action %{value: value},
         schema: Zoi.object(%{value: Zoi.integer()}),
-        context: context do
+        context: context,
+        output_schema: Zoi.map() do
         authority = context.plugin_inputs[Jido.Examples.FencedInventory.Gate].runtime
 
         with :ok <-
@@ -28,6 +29,8 @@ defmodule Jido.Examples.FencedInventory do
           {:ok, %{context.agent_state | value: value}}
         end
       end
+
+      state(from: output())
     end
   end
 end

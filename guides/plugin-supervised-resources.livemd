@@ -169,9 +169,10 @@ defmodule GuidePlugins.Inbox do
       action %{text: text},
         name: "receive",
         schema: Zoi.object(%{text: Zoi.string()}),
-        context: context do
+        output_schema: Zoi.map(), context: context do
         {:ok, %{context.agent_state | messages: context.agent_state.messages ++ [text]}}
       end
+      state from: output()
     end
   end
 end

@@ -3,7 +3,7 @@ defmodule JidoTest.Plugin.BusFixtures do
 
   defmodule RecordAction do
     @moduledoc false
-    use Jido.Action, name: "bus_plugin_record"
+    use Jido.Action, name: "bus_plugin_record", output_schema: Zoi.map()
 
     @impl Jido.Action
     def run(%{value: value}, context) do
@@ -13,7 +13,7 @@ defmodule JidoTest.Plugin.BusFixtures do
 
   defmodule RetryAction do
     @moduledoc false
-    use Jido.Action, name: "bus_plugin_retry"
+    use Jido.Action, name: "bus_plugin_retry", output_schema: Zoi.map()
 
     @impl Jido.Action
     def run(%{value: value}, context) do
@@ -27,7 +27,7 @@ defmodule JidoTest.Plugin.BusFixtures do
 
   defmodule BlockingRecordAction do
     @moduledoc false
-    use Jido.Action, name: "bus_plugin_blocking_record"
+    use Jido.Action, name: "bus_plugin_blocking_record", output_schema: Zoi.map()
 
     @impl Jido.Action
     def run(%{value: value, observer: observer, gate: gate}, context) do
@@ -53,7 +53,9 @@ defmodule JidoTest.Plugin.BusFixtures do
     end
 
     routes do
-      route "bus.input", JidoTest.Plugin.BusFixtures.RecordAction
+      route "bus.input", JidoTest.Plugin.BusFixtures.RecordAction do
+        state(from: output())
+      end
     end
   end
 
@@ -77,8 +79,13 @@ defmodule JidoTest.Plugin.BusFixtures do
     end
 
     routes do
-      route "bus.input", JidoTest.Plugin.BusFixtures.RecordAction
-      route "bus.retry", JidoTest.Plugin.BusFixtures.RetryAction
+      route "bus.input", JidoTest.Plugin.BusFixtures.RecordAction do
+        state(from: output())
+      end
+
+      route "bus.retry", JidoTest.Plugin.BusFixtures.RetryAction do
+        state(from: output())
+      end
     end
   end
 
@@ -102,7 +109,9 @@ defmodule JidoTest.Plugin.BusFixtures do
     end
 
     routes do
-      route "bus.block", JidoTest.Plugin.BusFixtures.BlockingRecordAction
+      route "bus.block", JidoTest.Plugin.BusFixtures.BlockingRecordAction do
+        state(from: output())
+      end
     end
   end
 
@@ -131,7 +140,9 @@ defmodule JidoTest.Plugin.BusFixtures do
     end
 
     routes do
-      route "bus.input", JidoTest.Plugin.BusFixtures.RecordAction
+      route "bus.input", JidoTest.Plugin.BusFixtures.RecordAction do
+        state(from: output())
+      end
     end
   end
 

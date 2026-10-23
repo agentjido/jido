@@ -72,11 +72,14 @@ defmodule Jido.Examples.Plugins.StateMiddleware.Agent do
     route "examples.plugins.state_middleware.add" do
       action %{amount: amount, label: label},
         schema: Zoi.object(%{amount: Zoi.integer(), label: Zoi.string() |> Zoi.min(1)}),
-        context: context do
+        context: context,
+        output_schema: Zoi.map() do
         next_state = %{context.agent_state | count: context.agent_state.count + amount}
         note = %Jido.Examples.Plugins.StateMiddleware.Note{label: label}
         {:ok, next_state, [note]}
       end
+
+      state(from: output())
     end
   end
 end

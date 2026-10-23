@@ -25,10 +25,12 @@ defmodule Jido.Agent.APITest do
       signal_source "/counter"
 
       route "increment", as: :increment do
-        action %{amount: amount}, context: context do
+        action %{amount: amount}, context: context, output_schema: Zoi.any() do
           count = context.agent_state.count + amount
           {:ok, %{context.agent_state | count: count}, [emit("updated", %{count: count})]}
         end
+
+        state(from: output())
       end
     end
   end

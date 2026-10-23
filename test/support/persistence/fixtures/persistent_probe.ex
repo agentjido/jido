@@ -13,20 +13,26 @@ defmodule JidoTest.Persistence.PersistentProbe do
     route "test.persistence.probe.set", as: :set do
       action %{value: value},
         schema: Zoi.object(%{value: Zoi.integer()}),
+        output_schema: Zoi.map(),
         context: _context do
         {:ok, %{value: value}}
       end
+
+      state(from: output())
     end
 
     route "test.persistence.probe.keep", as: :keep do
-      action _input, context: context do
+      action _input, output_schema: Zoi.map(), context: context do
         {:ok, context.agent_state}
       end
+
+      state(from: output())
     end
 
     route "test.persistence.probe.set_and_emit", as: :set_and_emit do
       action %{value: value},
         schema: Zoi.object(%{value: Zoi.integer()}),
+        output_schema: Zoi.map(),
         context: context do
         signal =
           Jido.Signal.new!(
@@ -44,6 +50,8 @@ defmodule JidoTest.Persistence.PersistentProbe do
 
         {:ok, %{value: value}, directives}
       end
+
+      state(from: output())
     end
   end
 end

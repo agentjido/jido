@@ -31,7 +31,8 @@ defmodule Jido.Examples.ScheduledCounter do
     route "examples.runtime.scheduled_counter.schedule_once", as: :schedule_once do
       action %{delay_ms: delay_ms},
         schema: Zoi.object(%{delay_ms: Zoi.integer() |> Zoi.min(0)}),
-        context: context do
+        context: context,
+        output_schema: Zoi.map() do
         tick =
           Jido.Signal.new!("examples.runtime.scheduled_counter.tick", %{source: :once},
             source: "/examples/runtime/scheduled_counter/timer"
@@ -42,6 +43,8 @@ defmodule Jido.Examples.ScheduledCounter do
         {:ok, %{state | schedule_requests: state.schedule_requests + 1},
          [Jido.Plugin.Scheduler.schedule(delay_ms, tick)]}
       end
+
+      state(from: output())
     end
 
     route "examples.runtime.scheduled_counter.enable_cron",
@@ -49,7 +52,8 @@ defmodule Jido.Examples.ScheduledCounter do
       defaults: %{expression: "* * * * * * *"} do
       action %{job_id: job_id, expression: expression},
         schema: Zoi.object(%{job_id: Zoi.any(), expression: Zoi.string()}),
-        context: context do
+        context: context,
+        output_schema: Zoi.map() do
         tick =
           Jido.Signal.new!("examples.runtime.scheduled_counter.tick", %{source: job_id},
             source: "/examples/runtime/scheduled_counter/cron"
@@ -58,21 +62,31 @@ defmodule Jido.Examples.ScheduledCounter do
         directive = Jido.Plugin.Scheduler.cron(job_id, expression, tick)
         {:ok, %{context.agent_state | cron_enabled: true}, [directive]}
       end
+
+      state(from: output())
     end
 
     route "examples.runtime.scheduled_counter.disable_cron", as: :disable_cron do
       action %{job_id: job_id},
         schema: Zoi.object(%{job_id: Zoi.any()}),
-        context: context do
+        context: context,
+        output_schema: Zoi.map() do
         directive = Jido.Plugin.Scheduler.cancel(job_id)
         {:ok, %{context.agent_state | cron_enabled: false}, [directive]}
       end
+
+      state(from: output())
     end
 
     route "examples.runtime.scheduled_counter.tick" do
-      action _input, schema: Zoi.object(%{source: Zoi.any()}), context: context do
+      action _input,
+        schema: Zoi.object(%{source: Zoi.any()}),
+        context: context,
+        output_schema: Zoi.map() do
         {:ok, %{context.agent_state | count: context.agent_state.count + 1}}
       end
+
+      state(from: output())
     end
   end
 end

@@ -8,7 +8,8 @@ defmodule Jido.Examples.ApprovalWorkflow.SelectFare do
         option_id: Zoi.string() |> Zoi.min(1),
         search_revision: Zoi.integer() |> Zoi.min(1),
         passenger_ref: Zoi.string() |> Zoi.min(1)
-      })
+      }),
+    output_schema: Zoi.map()
 
   alias Jido.Action.Error
 
@@ -51,7 +52,8 @@ defmodule Jido.Examples.ApprovalWorkflow.ApproveBooking do
 
   use Jido.Action,
     name: "examples_flight_booking_approve",
-    schema: Zoi.object(%{})
+    schema: Zoi.object(%{}),
+    output_schema: Zoi.map()
 
   alias Jido.Action.Error
   alias Jido.Examples.ApprovalWorkflow.BookingPlugin
@@ -103,7 +105,8 @@ defmodule Jido.Examples.ApprovalWorkflow.BookingSucceeded do
       Zoi.object(%{
         booking_key: Zoi.string() |> Zoi.min(1),
         booking_id: Zoi.string() |> Zoi.min(1)
-      })
+      }),
+    output_schema: Zoi.map()
 
   @impl true
   def run(%{booking_key: key, booking_id: booking_id}, %{
@@ -120,7 +123,8 @@ defmodule Jido.Examples.ApprovalWorkflow.BookingFailed do
 
   use Jido.Action,
     name: "examples_flight_booking_failed",
-    schema: Zoi.object(%{booking_key: Zoi.string() |> Zoi.min(1), reason: Zoi.string()})
+    schema: Zoi.object(%{booking_key: Zoi.string() |> Zoi.min(1), reason: Zoi.string()}),
+    output_schema: Zoi.map()
 
   @impl true
   def run(%{booking_key: key, reason: reason}, %{
@@ -137,7 +141,8 @@ defmodule Jido.Examples.ApprovalWorkflow.Cancel do
 
   use Jido.Action,
     name: "examples_flight_booking_cancel",
-    schema: Zoi.object(%{})
+    schema: Zoi.object(%{}),
+    output_schema: Zoi.map()
 
   alias Jido.Action.Error
 
@@ -156,7 +161,9 @@ defmodule Jido.Examples.ApprovalWorkflow.ApproveFlow do
   @moduledoc """
   Composes booking approval without losing its deferred booking request.
   """
-  use Jido.Flow, name: "examples_flight_booking_approve_flow"
+  use Jido.Flow,
+    name: "examples_flight_booking_approve_flow",
+    output_schema: Zoi.map()
 
   flow do
     step "approve",

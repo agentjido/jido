@@ -46,7 +46,9 @@ defmodule Jido.Plugin.StateRuntimeTest do
   end
 
   defmodule SpendCredits do
-    use Jido.Action, name: "plugin_spend_credits"
+    use Jido.Action,
+      name: "plugin_spend_credits",
+      output_schema: Zoi.any()
 
     @impl Jido.Action
     def run(%{amount: amount}, context) do
@@ -62,7 +64,9 @@ defmodule Jido.Plugin.StateRuntimeTest do
     end
 
     routes do
-      route "plugin.credits.spend", SpendCredits
+      route "plugin.credits.spend", SpendCredits do
+        state(from: output())
+      end
     end
   end
 

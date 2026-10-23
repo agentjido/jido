@@ -5,7 +5,9 @@ defmodule Jido.Agent.DirectCommandTest do
   alias Jido.Signal
 
   defmodule Update do
-    use Jido.Action, name: "direct_agent_update"
+    use Jido.Action,
+      name: "direct_agent_update",
+      output_schema: Zoi.any()
 
     def run(input, context) do
       if pid = Map.get(context, :probe), do: send(pid, {:ran, self(), context.signal, input})
@@ -46,17 +48,26 @@ defmodule Jido.Agent.DirectCommandTest do
 
     routes do
       signal_source "/direct"
-      route "work", Jido.Agent.DirectCommandTest.Update
+
+      route "work", Jido.Agent.DirectCommandTest.Update do
+        state(from: output())
+      end
     end
   end
 
   defmodule Finish do
-    use Jido.Action, name: "direct_agent_finish"
+    use Jido.Action,
+      name: "direct_agent_finish",
+      output_schema: Zoi.any()
+
     def run(state, _context), do: {:ok, %{state | count: state.count + 2}}
   end
 
   defmodule Flow do
-    use Jido.Flow, name: "direct_agent_flow", schema: Zoi.object(%{amount: Zoi.integer()})
+    use Jido.Flow,
+      name: "direct_agent_flow",
+      schema: Zoi.object(%{amount: Zoi.integer()}),
+      output_schema: Zoi.any()
 
     flow do
       step "update",
@@ -72,7 +83,9 @@ defmodule Jido.Agent.DirectCommandTest do
     use Jido.Agent, name: "direct_worker"
 
     routes do
-      route "work", Jido.Agent.DirectCommandTest.Update
+      route "work", Jido.Agent.DirectCommandTest.Update do
+        state(from: output())
+      end
     end
   end
 
@@ -96,7 +109,10 @@ defmodule Jido.Agent.DirectCommandTest do
   end
 
   defp route(path, handler, opts \\ []) do
-    Map.merge(%{path: path, handler: handler}, Map.new(opts))
+    Map.merge(
+      %{path: path, handler: handler, state: %{source: :output, path: []}},
+      Map.new(opts)
+    )
   end
 
   defp action(path \\ "work", opts \\ []),

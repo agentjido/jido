@@ -19,7 +19,8 @@ defmodule Jido.Examples.Worker do
             tag: Zoi.string() |> Zoi.min(1),
             value: Zoi.integer()
           }),
-        context: context do
+        context: context,
+        output_schema: Zoi.map() do
         result = Map.put(input, :value, input.value * 2)
 
         reply =
@@ -30,6 +31,8 @@ defmodule Jido.Examples.Worker do
         {:ok, %{completed: context.agent_state.completed ++ [result]},
          [Jido.AgentServer.Directive.parent_send(reply)]}
       end
+
+      state(from: output())
     end
   end
 end

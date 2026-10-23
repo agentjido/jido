@@ -12,7 +12,9 @@ defmodule JidoTest.AgentServer.Effects.ReplyTest do
   alias JidoTest.AgentServer.Fixtures, as: F
 
   defmodule Work do
-    use Jido.Action, name: "server_reply_contract_work"
+    use Jido.Action,
+      name: "server_reply_contract_work",
+      output_schema: Zoi.any()
 
     def run(input, context) do
       if input[:gate] do
@@ -32,7 +34,13 @@ defmodule JidoTest.AgentServer.Effects.ReplyTest do
         name: "server_reply_contract",
         schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}),
         extensions: Agent.definition(context.agent).extensions,
-        routes: [%{path: "reply", handler: %{kind: :action, target: Work}}]
+        routes: [
+          %{
+            path: "reply",
+            handler: %{kind: :action, target: Work},
+            state: %{source: :output, path: []}
+          }
+        ]
       })
       |> Agent.instantiate!(id: "server-reply-contract")
 

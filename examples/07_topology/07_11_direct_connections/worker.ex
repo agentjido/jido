@@ -8,7 +8,10 @@ defmodule Jido.Examples.Topology.PipelineWorker do
 
   routes do
     route "examples.topology.pipeline.request" do
-      action %{value: value}, schema: Zoi.object(%{value: Zoi.integer()}), context: context do
+      action %{value: value},
+        schema: Zoi.object(%{value: Zoi.integer()}),
+        context: context,
+        output_schema: Zoi.map() do
         output =
           Jido.Signal.new!("examples.topology.pipeline.completed", %{value: value * 2},
             source: "/examples/topology/pipeline_worker"
@@ -17,6 +20,8 @@ defmodule Jido.Examples.Topology.PipelineWorker do
         {:ok, %{context.agent_state | total: context.agent_state.total + value * 2},
          [Jido.Agent.Directive.emit(output)]}
       end
+
+      state(from: output())
     end
   end
 end

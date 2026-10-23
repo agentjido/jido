@@ -55,18 +55,6 @@ defmodule Jido.Agent.DirectiveContractTest do
     defstruct [:signal]
   end
 
-  defmodule ReplyAction do
-    use Jido.SignalAction,
-      name: "directive_reply_action",
-      description: "Build a test reply",
-      vsn: 1,
-      input: [type: "request", schema: Zoi.object(%{})],
-      output: [type: "response", schema: Zoi.object(%{value: Zoi.integer()})]
-
-    @impl Jido.Action
-    def run(_data, _context), do: {:ok, %{value: 1}}
-  end
-
   @tag obligation: "jido.agent.I27"
   test "custom Directives can use the behavior before their struct is defined" do
     plain = %PlainDirective{value: 1}
@@ -94,8 +82,9 @@ defmodule Jido.Agent.DirectiveContractTest do
   @tag obligation: "jido.agent.I27"
   test "built-in identity and validation cover runtime and definition Directives" do
     signal = Signal.new!("event", %{}, source: "/test")
-    request = ReplyAction.new!(%{}, source: "/test")
-    {:ok, reply} = ReplyAction.reply(request, %{value: 1}, source: "/test")
+    request = Signal.new!("request", %{}, source: "/test")
+    reply = Signal.new!("response", %{value: 1}, source: "/test")
+    {:ok, reply} = Signal.put_context(reply, "jidocausationid", request.id)
 
     directives = [
       Directive.emit(signal),
@@ -109,7 +98,9 @@ defmodule Jido.Agent.DirectiveContractTest do
       Runtime.server_stop(),
       Directive.agent_add(:child, JidoTest.AgentFixtures.CounterAgent),
       Directive.agent_remove(:child),
-      Directive.route_add("event", JidoTest.AgentContract.Add),
+      Directive.route_add("event", JidoTest.AgentContract.Add,
+        state: %{source: :output, path: []}
+      ),
       Directive.route_remove("event"),
       Directive.connection_add("event", from: :root, to: :child),
       Directive.connection_remove("event", from: :root, to: :child),

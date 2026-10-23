@@ -13,7 +13,8 @@ defmodule Jido.Examples.ModelResponse do
     route "examples.llm.model_response.generate", as: :generate do
       action input,
         schema: Jido.Examples.LLM.Adapter.prompt_schema(),
-        context: context do
+        context: context,
+        output_schema: Zoi.map() do
         alias Jido.Action.Error
         alias Jido.Examples.LLM.Adapter
 
@@ -34,6 +35,8 @@ defmodule Jido.Examples.ModelResponse do
           {:ok, %{answer: result.answer}}
         end
       end
+
+      state(from: output())
     end
   end
 end

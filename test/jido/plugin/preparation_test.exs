@@ -79,7 +79,8 @@ defmodule Jido.Plugin.PreparationTest do
   defmodule Capture do
     use Jido.Action,
       name: "plugin_preparation_capture",
-      schema: Zoi.object(%{value: Zoi.integer()})
+      schema: Zoi.object(%{value: Zoi.integer()}),
+      output_schema: Zoi.any()
 
     alias Jido.Plugin.PreparationTest.Package
 
@@ -188,7 +189,13 @@ defmodule Jido.Plugin.PreparationTest do
           prepared_signal_type: Zoi.string() |> Zoi.default(""),
           value: Zoi.integer() |> Zoi.default(0)
         }),
-      routes: [%{path: "prepare.run", handler: %{kind: :action, target: Capture}}],
+      routes: [
+        %{
+          path: "prepare.run",
+          handler: %{kind: :action, target: Capture},
+          state: %{source: :output, path: []}
+        }
+      ],
       extensions: [
         %{id: Package.id(), provider: Package, vsn: Package.vsn(), data: %{mode: mode}}
       ]

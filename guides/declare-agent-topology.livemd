@@ -53,9 +53,10 @@ defmodule Nested.Worker do
     signal_source("/guides/nested-agents")
 
     route "task.run", as: :run do
-      action _input, name: "run_task", schema: Zoi.object(%{}), context: context do
+      action _input, name: "run_task", schema: Zoi.object(%{}), output_schema: Zoi.map(), context: context do
         {:ok, %{context.agent_state | done: context.agent_state.done + 1}}
       end
+      state from: output()
     end
   end
 end

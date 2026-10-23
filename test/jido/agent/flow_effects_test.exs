@@ -43,7 +43,10 @@ defmodule Jido.Agent.FlowEffectsTest do
   end
 
   defmodule Approve do
-    use Jido.Action, name: "effect_approve_booking"
+    use Jido.Action,
+      name: "effect_approve_booking",
+      output_schema: Zoi.any()
+
     @impl true
     def run(params, context) do
       state = %{context.agent_state | status: Map.get(params, :status, :submitting)}
@@ -55,19 +58,27 @@ defmodule Jido.Agent.FlowEffectsTest do
   end
 
   defmodule StreamResult do
-    use Jido.Action, name: "stream_is_not_agent_state"
+    use Jido.Action,
+      name: "stream_is_not_agent_state",
+      output_schema: Zoi.any()
+
     @impl true
     def run(_, _), do: {:ok, Jido.Action.Output.stream(1..2), [%Submit{key: "stream"}]}
   end
 
   defmodule Fail do
-    use Jido.Action, name: "failed_booking_flow"
+    use Jido.Action,
+      name: "failed_booking_flow",
+      output_schema: Zoi.any()
+
     @impl true
     def run(_, _), do: {:error, :booking_rejected, [%Submit{key: "failed"}]}
   end
 
   defmodule Flow do
-    use Jido.Flow, name: "approve_booking_flow"
+    use Jido.Flow,
+      name: "approve_booking_flow",
+      output_schema: Zoi.any()
 
     flow do
       step "approve", action: Approve, params: input()
@@ -76,7 +87,9 @@ defmodule Jido.Agent.FlowEffectsTest do
   end
 
   defmodule FailedFlow do
-    use Jido.Flow, name: "failed_approve_booking_flow"
+    use Jido.Flow,
+      name: "failed_approve_booking_flow",
+      output_schema: Zoi.any()
 
     flow do
       step "approve", action: Approve, params: input()
@@ -86,7 +99,9 @@ defmodule Jido.Agent.FlowEffectsTest do
   end
 
   defmodule MultipleFlow do
-    use Jido.Flow, name: "multiple_approve_booking_flow"
+    use Jido.Flow,
+      name: "multiple_approve_booking_flow",
+      output_schema: Zoi.any()
 
     flow do
       step "z_first", action: Approve, params: %{key: "first"}
@@ -110,12 +125,29 @@ defmodule Jido.Agent.FlowEffectsTest do
     end
 
     routes do
-      route "approve.direct", Approve
-      route "approve.flow", Flow
-      route "approve.failed", FailedFlow
-      route "approve.error", Fail
-      route "approve.multiple", MultipleFlow
-      route "approve.stream", StreamResult
+      route "approve.direct", Approve do
+        state(from: output())
+      end
+
+      route "approve.flow", Flow do
+        state(from: output())
+      end
+
+      route "approve.failed", FailedFlow do
+        state(from: output())
+      end
+
+      route "approve.error", Fail do
+        state(from: output())
+      end
+
+      route "approve.multiple", MultipleFlow do
+        state(from: output())
+      end
+
+      route "approve.stream", StreamResult do
+        state(from: output())
+      end
     end
   end
 

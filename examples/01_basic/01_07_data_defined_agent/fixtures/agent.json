@@ -60,7 +60,9 @@
             "vsn": 1
           }
         },
-        "path": "examples.basic.data_defined.add"
+        "path": "examples.basic.data_defined.add",
+        "reply": null,
+        "state": {"source": "output", "path": []}
       },
       {
         "as": null,
@@ -75,7 +77,9 @@
             "vsn": 1
           }
         },
-        "path": "examples.basic.data_defined.schedule"
+        "path": "examples.basic.data_defined.schedule",
+        "reply": null,
+        "state": {"source": "output", "path": []}
       }
     ],
     "schema": {
@@ -90,5 +94,5 @@
     "vsn": 1
   },
   "type": "jido.agent.definition",
-  "vsn": 1
+  "vsn": 2
 }

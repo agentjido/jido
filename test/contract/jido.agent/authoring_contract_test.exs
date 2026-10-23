@@ -12,7 +12,10 @@ defmodule JidoTest.Contract.AgentAuthoringTest do
 
     routes do
       signal_source "/contract"
-      route "work.request", JidoTest.AgentContract.Return, as: :work
+
+      route "work.request", JidoTest.AgentContract.Return, as: :work do
+        state(from: output())
+      end
     end
   end
 
@@ -25,7 +28,10 @@ defmodule JidoTest.Contract.AgentAuthoringTest do
 
     routes do
       signal_source "/contract"
-      route "work.add", JidoTest.AgentContract.Add, as: :add
+
+      route "work.add", JidoTest.AgentContract.Add, as: :add do
+        state(from: output())
+      end
     end
   end
 
@@ -36,9 +42,11 @@ defmodule JidoTest.Contract.AgentAuthoringTest do
       signal_source "/contract"
 
       route "work.inline", as: :work do
-        action _input, context: context do
+        action _input, output_schema: Zoi.map(), context: context do
           {:ok, context.agent_state}
         end
+
+        state(from: output())
       end
     end
   end
@@ -47,7 +55,9 @@ defmodule JidoTest.Contract.AgentAuthoringTest do
     use Jido.Agent, name: "contract_child"
 
     routes do
-      route "work.request", JidoTest.AgentContract.Return
+      route "work.request", JidoTest.AgentContract.Return do
+        state(from: output())
+      end
     end
   end
 
@@ -73,7 +83,9 @@ defmodule JidoTest.Contract.AgentAuthoringTest do
 
       route "work.request", JidoTest.AgentContract.Return,
         as: :work,
-        defaults: %{mode: :ok}
+        defaults: %{mode: :ok} do
+        state(from: output())
+      end
     end
 
     topology do
@@ -81,6 +93,63 @@ defmodule JidoTest.Contract.AgentAuthoringTest do
 
       connections do
         connect "work.request", from: :root, to: :workers, delivery: :broadcast
+      end
+    end
+  end
+
+  defmodule RouteForms do
+    use Jido.Agent, name: "contract_route_forms"
+
+    state do
+      schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+    end
+
+    routes do
+      signal_source "/contract/routes"
+
+      route "route.action", JidoTest.AgentContract.Return do
+        state(:unchanged)
+        reply("route.action.reply", from: output())
+      end
+
+      route "route.flow", JidoTest.AgentContract.Flow do
+        state(from: output())
+      end
+
+      route "route.project", JidoTest.AgentContract.Project do
+        state(from: output(:state))
+        reply("route.project.reply", from: output([:reply, :value]))
+      end
+
+      route "route.inline_action" do
+        action input, output_schema: Zoi.map() do
+          {:ok, input}
+        end
+
+        state(from: output())
+      end
+
+      route "route.inline_flow" do
+        flow schema: Zoi.object(%{amount: Zoi.integer()}),
+             output_schema: Zoi.map() do
+          step "add",
+            action: JidoTest.AgentContract.Add,
+            params: %{amount: input(:amount)}
+
+          output result("add")
+        end
+
+        state(from: output())
+      end
+
+      route "route.forward" do
+        forward(to: parent())
+      end
+
+      route "route.transform" do
+        transform signal do
+          {:ok, %{signal | type: "route.action"}}
+        end
       end
     end
   end
@@ -103,7 +172,12 @@ defmodule JidoTest.Contract.AgentAuthoringTest do
         schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}),
         signal_source: "/contract",
         routes: [
-          %{path: "work.request", as: :work, handler: %{kind: :action, target: F.Return}}
+          %{
+            path: "work.request",
+            as: :work,
+            handler: %{kind: :action, target: F.Return},
+            state: %{source: :output, path: []}
+          }
         ]
       })
 
@@ -134,7 +208,8 @@ defmodule JidoTest.Contract.AgentAuthoringTest do
             path: "work.request",
             handler: %{kind: :action, target: F.Return},
             as: :work,
-            defaults: %{mode: :ok}
+            defaults: %{mode: :ok},
+            state: %{source: :output, path: []}
           }
         ],
         topology: %{
@@ -255,7 +330,13 @@ defmodule JidoTest.Contract.AgentAuthoringTest do
 
     assert_raise Spark.Error.DslError, ~r/helper name/, fn ->
       F.with_agent(
-        ~s(routes do route "work.request", JidoTest.AgentContract.Return, as: :"bad name" end),
+        """
+        routes do
+          route "work.request", JidoTest.AgentContract.Return, as: :"bad name" do
+            state from: output()
+          end
+        end
+        """,
         fn _module -> :ok end
       )
     end
@@ -319,7 +400,7 @@ defmodule JidoTest.Contract.AgentAuthoringTest do
   test "the trusted JSON codec returns the portable definition" do
     assert Jido.Agent.Codec.__jido_authoring_codec__() == %{
              type: "jido.agent.definition",
-             vsn: 1,
+             vsn: 2,
              encoder: Jido.Agent
            }
 
@@ -460,7 +541,7 @@ defmodule JidoTest.Contract.AgentAuthoringTest do
           instantiate!: 1,
           cmd: 2,
           cmd: 3,
-          route_action!: 1
+          route_executable!: 1
         ] do
       assert function_exported?(InlineLeaf, name, arity)
     end
@@ -470,12 +551,123 @@ defmodule JidoTest.Contract.AgentAuthoringTest do
     assert {:ok, %Agent{module: InlineLeaf}} = InlineLeaf.instantiate(id: "generated-api")
     assert InlineLeaf.instantiate!(id: "generated-api-bang").module == InlineLeaf
 
-    target = InlineLeaf.route_action!("work.inline")
+    target = InlineLeaf.route_executable!("work.inline")
 
     assert {:ok, %Jido.Instruction{kind: :action, target: ^target}} =
              Jido.Instruction.resolve(target)
 
-    assert_raise ArgumentError, fn -> InlineLeaf.route_action!("missing") end
+    assert_raise ArgumentError, fn -> InlineLeaf.route_executable!("missing") end
+  end
+
+  @tag obligation: "jido.agent.I32"
+  test "all route body forms lower to the canonical Map contract" do
+    routes = Map.new(RouteForms.definition().routes, &{&1.path, &1})
+    root = %{source: :output, path: []}
+
+    assert routes["route.action"] == %{
+             path: "route.action",
+             as: nil,
+             defaults: %{},
+             handler: %{kind: :action, target: F.Return},
+             state: :unchanged,
+             reply: %{type: "route.action.reply", from: root}
+           }
+
+    assert routes["route.flow"].handler == %{kind: :flow, target: F.Flow}
+    assert routes["route.flow"].state == root
+
+    assert routes["route.project"].state == %{source: :output, path: [:state]}
+
+    assert routes["route.project"].reply == %{
+             type: "route.project.reply",
+             from: %{source: :output, path: [:reply, :value]}
+           }
+
+    assert routes["route.inline_action"].handler.kind == :action
+    assert routes["route.inline_action"].state == root
+    assert routes["route.inline_flow"].handler.kind == :flow
+    assert routes["route.inline_flow"].state == root
+
+    assert routes["route.forward"] == %{
+             path: "route.forward",
+             as: nil,
+             defaults: %{},
+             handler: %{kind: :forward, target: %{kind: :parent}},
+             state: :unchanged,
+             reply: nil
+           }
+
+    assert routes["route.transform"].handler.kind == :transform
+    assert routes["route.transform"].state == :unchanged
+    assert routes["route.transform"].reply == nil
+    assert Agent.define!(Map.from_struct(RouteForms.definition())) == RouteForms.definition()
+  end
+
+  @tag obligation: "jido.agent.I32"
+  test "route_executable returns referenced and inline Action and Flow targets" do
+    for path <- [
+          "route.action",
+          "route.flow",
+          "route.project",
+          "route.inline_action",
+          "route.inline_flow"
+        ] do
+      route = Enum.find(RouteForms.definition().routes, &(&1.path == path))
+      assert RouteForms.route_executable!(path) == route.handler.target
+    end
+
+    assert RouteForms.route_executable!("route.inline_action") ==
+             Jido.Action.Inline.target!(RouteForms,
+               host: Jido.Agent,
+               route: "route.inline_action",
+               role: :action
+             )
+
+    assert RouteForms.route_executable!("route.inline_flow") ==
+             Jido.Flow.Inline.target!(RouteForms,
+               host: Jido.Agent,
+               route: "route.inline_flow",
+               role: :flow
+             )
+
+    refute function_exported?(RouteForms, :route_action!, 1)
+  end
+
+  @tag obligation: "jido.agent.I32"
+  test "an inline Flow route returns its exact projected state and directives" do
+    before = RouteForms.instantiate!(id: "inline-flow")
+    signal = Jido.Signal.new!("route.inline_flow", %{amount: 4}, source: "/test")
+
+    assert {:ok, after_agent, directives} = Agent.cmd(before, signal)
+    assert after_agent.state === %{count: 4}
+    assert directives === []
+  end
+
+  @tag obligation: "jido.agent.I32"
+  test "route_executable rejects terminal handlers and unknown paths" do
+    for path <- ["route.forward", "route.transform", "missing"] do
+      assert_raise ArgumentError, fn -> RouteForms.route_executable!(path) end
+    end
+  end
+
+  @tag obligation: "jido.agent.I32"
+  test "route bodies reject invalid role combinations" do
+    invalid = [
+      "routes do route \"bad\" do state :unchanged end end",
+      "routes do route \"bad\" do action input do {:ok, input} end; transform signal do {:ok, signal} end; state from: output() end end",
+      "routes do route \"bad\", F.Return do state from: output(); action _ do {:ok, %{}} end end end",
+      "routes do route \"bad\", F.Return do state :unchanged; state from: output() end end",
+      "routes do route \"bad\", F.Return do state :unchanged; reply \"one\", from: output(); reply \"two\", from: output() end end",
+      "routes do route \"bad\", F.Return do reply \"reply\", from: output() end end",
+      "routes do route \"bad\" do forward to: parent(); state :unchanged end end",
+      "routes do route \"bad\" do transform signal do {:ok, signal} end; reply \"reply\", from: output() end end",
+      "routes do route \"bad\" do flow output_schema: Zoi.map() do output result(\"missing\") end; state from: output() end end",
+      "routes do forward \"bad\", to: parent() end"
+    ]
+
+    for body <- invalid do
+      assert_raise CompileError, fn -> F.with_agent(body, fn _module -> :ok end) end
+    end
   end
 
   @tag obligation: "jido.agent.I25"

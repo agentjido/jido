@@ -25,7 +25,7 @@ The examples use this counter and an instance with the ETS adapter:
 
 ```elixir
 defmodule MyApp.Add do
-  use Jido.Action, name: "add", schema: Zoi.object(%{amount: Zoi.integer()})
+  use Jido.Action, name: "add", schema: Zoi.object(%{amount: Zoi.integer()}), output_schema: Zoi.map()
 
   @impl true
   def run(%{amount: amount}, %{agent_state: state}),
@@ -41,7 +41,9 @@ defmodule MyApp.Counter do
 
   routes do
     signal_source("/my_app/counter")
-    route "counter.add", MyApp.Add, as: :add, defaults: %{amount: 1}
+    route "counter.add", MyApp.Add, as: :add, defaults: %{amount: 1} do
+      state from: output()
+    end
   end
 end
 

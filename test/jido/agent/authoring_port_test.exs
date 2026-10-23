@@ -14,15 +14,19 @@ defmodule Jido.Agent.AuthoringPortTest do
       signal_source "/authoring-port"
 
       route "counter.increment", as: :increment do
-        action %{amount: amount}, context: context do
+        action %{amount: amount}, context: context, output_schema: Zoi.any() do
           {:ok, %{context.agent_state | count: context.agent_state.count + amount}}
         end
+
+        state(from: output())
       end
 
       route "counter.invalid" do
-        action _input do
+        action _input, output_schema: Zoi.any() do
           {:ok, %{count: "invalid"}}
         end
+
+        state(from: output())
       end
     end
   end

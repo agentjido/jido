@@ -21,7 +21,9 @@ defmodule Jido.Agent.TurnEvaluationTest do
     end
 
     routes do
-      route "source.*", Add, defaults: %{by: 1, label: "route"}
+      route "source.*", Add, defaults: %{by: 1, label: "route"} do
+        state(from: output())
+      end
     end
   end
 

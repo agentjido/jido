@@ -23,7 +23,8 @@ defmodule Jido.Examples.Persistence.PersistentAgent do
     route "examples.persistence.persistent_agent.increment" do
       action %{amount: amount},
         schema: Zoi.object(%{amount: Zoi.integer()}),
-        context: context do
+        context: context,
+        output_schema: Zoi.map() do
         state = context.agent_state
         signal_id = context.signal.id
 
@@ -40,6 +41,8 @@ defmodule Jido.Examples.Persistence.PersistentAgent do
            }}
         end
       end
+
+      state(from: output())
     end
   end
 

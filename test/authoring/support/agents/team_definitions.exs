@@ -22,14 +22,23 @@ defmodule JidoTest.ComposableAgent.Definitions.Team do
     signal_source "/research/team"
 
     route "research.query.set", as: :set_query, defaults: %{query: ""} do
-      action %{query: query}, schema: Zoi.object(%{query: Zoi.string()}), context: context do
+      action %{query: query},
+        schema: Zoi.object(%{query: Zoi.string()}),
+        context: context,
+        output_schema: Zoi.any() do
         {:ok, %{context.agent_state | query: query}}
       end
+
+      state(from: output())
     end
 
-    route "research.report.record", RecordReport, as: :record_report
+    route "research.report.record", RecordReport, as: :record_report do
+      state(from: output())
+    end
 
-    route "research.report.prepared", RecordReport
+    route "research.report.prepared", RecordReport do
+      state(from: output())
+    end
 
     route "external.research.request", as: :request_work do
       transform(signal) do
@@ -56,8 +65,13 @@ defmodule JidoTest.ComposableAgent.Definitions.Team do
       end
     end
 
-    forward "research.work.request", to: agent(:researchers)
-    forward "research.plan.request", to: agent(:planner)
+    route "research.work.request" do
+      forward(to: agent(:researchers))
+    end
+
+    route "research.plan.request" do
+      forward(to: agent(:planner))
+    end
   end
 
   schedules do
@@ -108,7 +122,8 @@ end
 defmodule JidoTest.ComposableAgent.Definitions.Team.RecordReport do
   use Jido.Action,
     name: "agent_record_report",
-    schema: Zoi.object(%{report: Zoi.string()})
+    schema: Zoi.object(%{report: Zoi.string()}),
+    output_schema: Zoi.any()
 
   def run(%{report: report}, %{agent_state: state}) do
     {:ok, %{state | report: report},
@@ -130,18 +145,28 @@ defmodule JidoTest.ComposableAgent.Definitions.Team.Worker do
     signal_source "/research/worker"
 
     route "research.work.request" do
-      action %{query: query}, schema: Zoi.object(%{query: Zoi.string()}), context: context do
+      action %{query: query},
+        schema: Zoi.object(%{query: Zoi.string()}),
+        context: context,
+        output_schema: Zoi.any() do
         next_state = %{context.agent_state | query: query, status: "completed"}
         report = "Research findings for: #{query}"
         {:ok, next_state, [emit("research.report.prepared", %{report: report})]}
       end
+
+      state(from: output())
     end
 
     route "research.plan.request" do
-      action %{query: query}, schema: Zoi.object(%{query: Zoi.string()}), context: context do
+      action %{query: query},
+        schema: Zoi.object(%{query: Zoi.string()}),
+        context: context,
+        output_schema: Zoi.any() do
         next_state = %{context.agent_state | query: query, status: "planned"}
         {:ok, next_state, [emit("research.work.request", %{query: query})]}
       end
+
+      state(from: output())
     end
   end
 end

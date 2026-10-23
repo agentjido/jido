@@ -51,7 +51,6 @@ obligation file and passing tagged contract tests.
 | `jido.plugin` | Active | 8 | 9 | The generic boundary is focused and uses no bundled Plugin fixture. |
 | `jido.agent` | Active | 21 | 13 | The model and authoring boundary is focused. |
 | `jido.agent_evaluation` | Active | 10 | 6 | Pure evaluation has a separate owner. |
-| `jido.signal_action` | Active | 7 | 1 | The combined Action and Signal value boundary is focused. |
 | `jido.telemetry` | Active | 8 | 7 | Best-effort observation has a separate owner. |
 | `jido.error` | Active | 6 | 1 | Shared taxonomy, projection, and retry classification have a separate owner. |
 | `jido.persistence` | Active | 15 | 11 | Shared records, snapshots, adapters, and storage operations have a separate owner. |
@@ -172,7 +171,6 @@ jido.agent_server
   -> jido.agent_server.durable_turn
        -> jido.persistence
 
-jido.signal_action
 jido.telemetry
 jido.error
 
@@ -197,7 +195,6 @@ All component IDs start with `jido.`. Durable coordination stays under the
 | `jido.agent` | Agent definitions and instances, authoring, validation, logical topology, edits, shared authoring Registry, and deferred configuration | OTP runtime behavior |
 | `jido.agent_evaluation` | Route selection, Agent Plugin preparation and reduction, Action and Flow execution, candidate validation, and returned Directives | OTP ownership, commit, dispatch, and persistence |
 | `jido.persistence` | Records, identities, snapshots, adapter contracts, storage operations, revision checks, and Plugin state conversion | Runtime recovery decisions |
-| `jido.signal_action` | Combined Signal and Action declaration, input conversion, and reply behavior | Signal routing and Action execution internals |
 | `jido.telemetry` | Events, safe metadata, metrics, tracing, logs, Debug support, and optional OpenTelemetry integration | Consumer behavior changes when observation fails |
 | `jido.error` | Shared error taxonomy and stable common error codes | `Jido.Agent.Error` and `Jido.Plugin.Error`, which stay with their domain owners |
 
@@ -929,19 +926,6 @@ Completed for supporting component `jido.persistence`:
 - [x] Completed the full 708-mutant profile with 627 killed mutants,
       30 classified survivors, 51 invalid mutations, no timeout, and no
       unsorted mutant.
-
-Completed for supporting component `jido.signal_action`:
-
-- [x] Added 7 obligations and 10 focused contract tests.
-- [x] Kept Action execution, Signal routing, Agent route authoring, and
-      AgentServer commit timing with their separate owners.
-- [x] Added the non-overlapping `Jido.SignalAction` mutation profile.
-- [x] Removed duplicate reply validation and moved Agent route type lowering
-      to the Agent DSL owner.
-- [x] Regenerated complete Covenant coverage.
-- [x] Completed the full 112-mutant profile with 78 killed mutants,
-      3 classified message-only survivors, 31 invalid mutations, and no
-      timeout.
 
 Previously completed for supporting component `jido.discovery`, which the
 shared authoring refactor later removed:

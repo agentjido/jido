@@ -25,7 +25,10 @@ The examples use this Agent:
 
 ```elixir
 defmodule Doc.Add do
-  use Jido.Action, name: "add", schema: Zoi.object(%{amount: Zoi.integer()})
+  use Jido.Action,
+    name: "add",
+    schema: Zoi.object(%{amount: Zoi.integer()}),
+    output_schema: Zoi.map()
 
   @impl true
   def run(%{amount: amount}, %{agent_state: state}),
@@ -41,8 +44,14 @@ defmodule Doc.Counter do
 
   routes do
     signal_source("/guides/documents")
-    route "counter.add", Doc.Add, as: :add, defaults: %{amount: 1}
-    forward "counter.forward", to: parent()
+
+    route "counter.add", Doc.Add, as: :add, defaults: %{amount: 1} do
+      state from: output()
+    end
+
+    route "counter.forward" do
+      forward to: parent()
+    end
   end
 end
 ```

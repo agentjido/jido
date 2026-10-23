@@ -155,13 +155,14 @@ defmodule GuidePlugins.Orders do
       action %{order_id: order_id, email: email},
         name: "place_order",
         schema: Zoi.object(%{order_id: Zoi.string(), email: Zoi.string()}),
-        context: context do
+        output_schema: Zoi.map(), context: context do
         {:ok, %{context.agent_state | placed: context.agent_state.placed ++ [order_id]},
          [
            %GuidePlugins.Notify{to: email, message: "Order #{order_id} confirmed"},
            emit("order.placed", %{order_id: order_id})
          ]}
       end
+      state from: output()
     end
   end
 end

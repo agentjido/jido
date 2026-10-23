@@ -71,10 +71,11 @@ defmodule Guides.Notes do
       action %{text: text, ms: ms},
         name: "add_note",
         schema: Zoi.object(%{text: Zoi.string(), ms: Zoi.integer() |> Zoi.default(0)}),
-        context: context do
+        output_schema: Zoi.map(), context: context do
         Process.sleep(ms)
         {:ok, %{context.agent_state | notes: context.agent_state.notes ++ [text]}}
       end
+      state from: output()
     end
   end
 end

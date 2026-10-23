@@ -37,7 +37,8 @@ defmodule Jido.Examples.PendingJobRecovery do
     route "examples.runtime.pending_jobs.request", as: :request_job do
       action input,
         schema: Zoi.object(%{job_id: Zoi.string() |> Zoi.min(1), value: Zoi.integer()}),
-        context: context do
+        context: context,
+        output_schema: Zoi.map() do
         state = context.agent_state
 
         if state.status in [:idle, :completed, :cancelled] and input.job_id not in state.seen do
@@ -56,6 +57,8 @@ defmodule Jido.Examples.PendingJobRecovery do
           {:error, Jido.Action.Error.validation_error("job is active or already used")}
         end
       end
+
+      state(from: output())
     end
 
     route "examples.runtime.pending_jobs.approve", as: :approve_job do
@@ -65,7 +68,8 @@ defmodule Jido.Examples.PendingJobRecovery do
             job_id: Zoi.string() |> Zoi.min(1),
             attempt_id: Zoi.string() |> Zoi.min(1)
           }),
-        context: context do
+        context: context,
+        output_schema: Zoi.map() do
         state = context.agent_state
 
         if state.status == :awaiting_approval and state.job_id == input.job_id do
@@ -76,6 +80,8 @@ defmodule Jido.Examples.PendingJobRecovery do
           {:error, Jido.Action.Error.validation_error("job is not awaiting approval")}
         end
       end
+
+      state(from: output())
     end
 
     route "examples.runtime.pending_jobs.retry", as: :retry_job do
@@ -85,7 +91,8 @@ defmodule Jido.Examples.PendingJobRecovery do
             job_id: Zoi.string() |> Zoi.min(1),
             attempt_id: Zoi.string() |> Zoi.min(1)
           }),
-        context: context do
+        context: context,
+        output_schema: Zoi.map() do
         state = context.agent_state
 
         if state.approved? and state.status in [:running, :failed] and
@@ -99,12 +106,15 @@ defmodule Jido.Examples.PendingJobRecovery do
           {:error, Jido.Action.Error.validation_error("job is not approved for retry")}
         end
       end
+
+      state(from: output())
     end
 
     route "examples.runtime.pending_jobs.cancel", as: :cancel_job do
       action %{job_id: job_id},
         schema: Zoi.object(%{job_id: Zoi.string()}),
-        context: context do
+        context: context,
+        output_schema: Zoi.map() do
         state = context.agent_state
 
         if state.job_id == job_id and
@@ -119,6 +129,8 @@ defmodule Jido.Examples.PendingJobRecovery do
           {:error, Jido.Action.Error.validation_error("job cannot be cancelled")}
         end
       end
+
+      state(from: output())
     end
 
     route "examples.runtime.jobs.settle", as: :settle_attempt do
@@ -129,7 +141,8 @@ defmodule Jido.Examples.PendingJobRecovery do
             status: Zoi.enum([:completed, :failed]),
             result: Zoi.string()
           }),
-        context: context do
+        context: context,
+        output_schema: Zoi.map() do
         state = context.agent_state
 
         if state.attempt_id == input.job_id and state.status == :running do
@@ -138,6 +151,8 @@ defmodule Jido.Examples.PendingJobRecovery do
           {:error, Jido.Action.Error.validation_error("attempt result is stale")}
         end
       end
+
+      state(from: output())
     end
   end
 

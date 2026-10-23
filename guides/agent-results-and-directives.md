@@ -9,7 +9,7 @@ A handler that changes state and requests one outbound Signal looks like this:
 
 ```elixir
 defmodule MyApp.Counter.Reset do
-  use Jido.Action, name: "reset", schema: Zoi.object(%{})
+  use Jido.Action, name: "reset", schema: Zoi.object(%{}), output_schema: Zoi.map()
 
   @impl true
   def run(_params, %{agent_state: state}) do
@@ -90,18 +90,24 @@ covers this order and the loop it can cause.
 ## Reply To The Current Request
 
 `Reply` is separate from `Emit`. It sends one correlated response to the
-caller that submitted the current request. Build the response Signal with the
-SignalAction that owns its input and output contracts, then wrap it:
+caller that submitted the current request. Declare the reply on the route and
+select its data from validated executable output:
 
+route "price.quote", MyApp.PriceQuote do
+  state :unchanged
+  reply "price.quoted", from: output()
 ```elixir
 with {:ok, response} <- MyApp.PriceQuote.reply(request, result) do
   {:ok, state, [Jido.Agent.Directive.reply(response)]}
 end
 ```
 
-The response must use the current request ID as its causation ID. One Turn can
-return at most one `Reply`. The Agent Server sends it only after the state
-commits. Pure `cmd/3` returns the Directive as data and sends nothing.
+Jido creates the response Signal with the Agent `signal_source`, preserves the
+request trace, and uses the request ID as its causation ID. One Turn can return
+at most one `Reply`. The Agent Server sends it only after state commits. Pure
+`cmd/3` returns the generated Directive as data and sends nothing. The low-level
+`Jido.Agent.Directive.reply/1` remains available for a complete correlated
+Signal.
 
 ## Runtime Directives
 

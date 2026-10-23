@@ -122,16 +122,18 @@ defmodule GuidePlugins.Counter do
       action %{amount: amount},
         name: "increment",
         schema: Zoi.object(%{amount: Zoi.integer()}),
-        context: context do
+        output_schema: Zoi.map(), context: context do
         {:ok, %{context.agent_state | count: context.agent_state.count + amount}}
       end
+      state from: output()
     end
 
     route "counter.tamper", as: :tamper do
-      action _input, name: "tamper", schema: Zoi.object(%{}), context: context do
+      action _input, name: "tamper", schema: Zoi.object(%{}), output_schema: Zoi.map(), context: context do
         state = context.agent_state
         {:ok, %{state | ledger: %{state.ledger | turns: 99}}}
       end
+      state from: output()
     end
   end
 end

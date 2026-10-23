@@ -4,6 +4,9 @@ defmodule JidoTest.AuthoringDocsAgent do
 
   routes do
     signal_source "/authoring-docs"
-    route "counter.increment", JidoTest.AgentFixtures.Add, as: :increment
+
+    route "counter.increment", JidoTest.AgentFixtures.Add, as: :increment do
+      state(from: output())
+    end
   end
 end

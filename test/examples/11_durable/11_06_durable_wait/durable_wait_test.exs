@@ -2,7 +2,8 @@ defmodule JidoTest.Examples.Durable.ImmediateApproval do
   @moduledoc false
   use Jido.Flow,
     name: "test_immediate_approval",
-    schema: Zoi.object(%{request_id: Zoi.string() |> Zoi.min(1)})
+    schema: Zoi.object(%{request_id: Zoi.string() |> Zoi.min(1)}),
+    output_schema: Zoi.any()
 
   alias Jido.Examples.Durable.DurableWait.Approval
 

@@ -82,9 +82,10 @@ defmodule ScheduleGuide.Monitor do
     signal_source("/guides/heartbeats")
 
     route "monitor.beat" do
-      action _input, schema: Zoi.object(%{}), context: context do
+      action _input, schema: Zoi.object(%{}), output_schema: Zoi.map(), context: context do
         {:ok, %{context.agent_state | beats: context.agent_state.beats + 1}}
       end
+      state from: output()
     end
   end
 end
@@ -157,40 +158,45 @@ defmodule ScheduleGuide.Reminders do
     route "reminder.request", as: :request do
       action %{text: text, delay_ms: delay},
         schema: Zoi.object(%{text: Zoi.string(), delay_ms: Zoi.integer() |> Zoi.min(0)}),
-        context: context do
+        output_schema: Zoi.map(), context: context do
         due = Jido.Signal.new!("reminder.due", %{text: text}, source: "/guides/schedules")
         {:ok, context.agent_state, [Jido.Plugin.Scheduler.schedule(delay, due)]}
       end
+      state from: output()
     end
 
     route "reminder.due" do
-      action %{text: text}, schema: Zoi.object(%{text: Zoi.string()}), context: context do
+      action %{text: text}, schema: Zoi.object(%{text: Zoi.string()}), output_schema: Zoi.map(), context: context do
         {:ok, %{context.agent_state | reminders: context.agent_state.reminders ++ [text]}}
       end
+      state from: output()
     end
 
     route "report.start", as: :start_reports do
-      action _input, schema: Zoi.object(%{}), context: context do
+      action _input, schema: Zoi.object(%{}), output_schema: Zoi.map(), context: context do
         tick = Jido.Signal.new!("report.tick", %{}, source: "/guides/schedules")
 
         {:ok, context.agent_state,
          [Jido.Plugin.Scheduler.cron("report", "* * * * * * *", tick, generation: 1)]}
       end
+      state from: output()
     end
 
     route "report.stop", as: :stop_reports do
-      action _input, schema: Zoi.object(%{}), context: context do
+      action _input, schema: Zoi.object(%{}), output_schema: Zoi.map(), context: context do
         {:ok, context.agent_state, [Jido.Plugin.Scheduler.cancel("report")]}
       end
+      state from: output()
     end
 
     route "report.tick" do
-      action _input, schema: Zoi.object(%{}), context: context do
+      action _input, schema: Zoi.object(%{}), output_schema: Zoi.map(), context: context do
         {:ok, occurrence} = Jido.Plugin.Scheduler.occurrence(context.signal)
         state = context.agent_state
 
         {:ok, %{state | reports: state.reports + 1, last_occurrence: occurrence.scheduled_at}}
       end
+      state from: output()
     end
   end
 end

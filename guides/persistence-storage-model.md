@@ -21,9 +21,10 @@ defmodule StorageGuide.Counter do
     route "counter.add", as: :add, defaults: %{amount: 1} do
       action %{amount: amount},
         schema: Zoi.object(%{amount: Zoi.integer()}),
-        context: context do
+        output_schema: Zoi.map(), context: context do
         {:ok, %{context.agent_state | count: context.agent_state.count + amount}}
       end
+      state from: output()
     end
   end
 end

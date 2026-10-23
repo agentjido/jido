@@ -30,7 +30,7 @@ connections do
 end
 ```
 
-The root uses `forward "examples.topology.pipeline.request", to: agent(:worker)`.
+The root uses a route body with `forward to: agent(:worker)`.
 An Action emits with `Jido.Agent.Directive.emit/1`. A transform route returns
 `{:ok, signal}` or an error. Accepting input in an ordinary Action does not
 automatically emit output.

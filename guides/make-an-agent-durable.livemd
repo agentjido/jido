@@ -25,7 +25,8 @@ Mix.install([{:jido, "~> 3.0.0-beta.2"}])
 defmodule Durable.Add do
   use Jido.Action,
     name: "add",
-    schema: Zoi.object(%{amount: Zoi.integer()})
+    schema: Zoi.object(%{amount: Zoi.integer()}),
+    output_schema: Zoi.map()
 
   @impl true
   def run(%{amount: amount}, %{agent_state: state}) do
@@ -42,7 +43,9 @@ defmodule Durable.Counter do
 
   routes do
     signal_source("/guides/durable")
-    route "counter.add", Durable.Add, as: :add, defaults: %{amount: 1}
+    route "counter.add", Durable.Add, as: :add, defaults: %{amount: 1} do
+      state from: output()
+    end
   end
 end
 ```

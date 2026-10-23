@@ -13,7 +13,9 @@ defmodule Jido.Examples.ParallelTools do
   routes do
     signal_source "/examples/llm/parallel_tools"
 
-    route "examples.llm.parallel_tools.plan", Jido.Examples.ParallelTools.Pipeline, as: :plan
+    route "examples.llm.parallel_tools.plan", Jido.Examples.ParallelTools.Pipeline, as: :plan do
+      state(from: output())
+    end
   end
 end
 
@@ -24,7 +26,8 @@ defmodule Jido.Examples.ParallelTools.Pipeline do
 
   use Jido.Flow,
     name: "examples_llm_parallel_tools_flow",
-    schema: Adapter.prompt_schema()
+    schema: Adapter.prompt_schema(),
+    output_schema: Zoi.map()
 
   flow do
     step "select",

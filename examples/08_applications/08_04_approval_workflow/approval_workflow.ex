@@ -46,19 +46,34 @@ defmodule Jido.Examples.ApprovalWorkflow do
     signal_source "/examples/flight_booking"
 
     route "examples.flight.request", Jido.Examples.ApprovalWorkflow.SearchFlow,
-      as: :search_flights
+      as: :search_flights do
+      state(from: output())
+    end
 
     route "examples.flight.preferences_updated", Jido.Examples.ApprovalWorkflow.SearchFlow,
-      as: :update_preferences
+      as: :update_preferences do
+      state(from: output())
+    end
 
-    route "examples.flight.select", Jido.Examples.ApprovalWorkflow.SelectFare, as: :select_fare
+    route "examples.flight.select", Jido.Examples.ApprovalWorkflow.SelectFare, as: :select_fare do
+      state(from: output())
+    end
 
     route "examples.flight.approve", Jido.Examples.ApprovalWorkflow.ApproveFlow,
-      as: :approve_booking
+      as: :approve_booking do
+      state(from: output())
+    end
 
-    route "examples.flight.cancel", Jido.Examples.ApprovalWorkflow.Cancel, as: :cancel
+    route "examples.flight.cancel", Jido.Examples.ApprovalWorkflow.Cancel, as: :cancel do
+      state(from: output())
+    end
 
-    route "examples.flight.booking_succeeded", Jido.Examples.ApprovalWorkflow.BookingSucceeded
-    route "examples.flight.booking_failed", Jido.Examples.ApprovalWorkflow.BookingFailed
+    route "examples.flight.booking_succeeded", Jido.Examples.ApprovalWorkflow.BookingSucceeded do
+      state(from: output())
+    end
+
+    route "examples.flight.booking_failed", Jido.Examples.ApprovalWorkflow.BookingFailed do
+      state(from: output())
+    end
   end
 end

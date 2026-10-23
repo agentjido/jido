@@ -28,7 +28,8 @@ defmodule Jido.Examples.CausalTrace do
             value: Zoi.integer(),
             node: Zoi.atom() |> Zoi.optional()
           }),
-        context: context do
+        context: context,
+        output_schema: Zoi.map() do
         alias Jido.AgentServer.Directive
         alias Jido.Examples.CausalTrace.Worker
 
@@ -56,6 +57,8 @@ defmodule Jido.Examples.CausalTrace do
           {:error, :request_already_started}
         end
       end
+
+      state(from: output())
     end
 
     route "examples.runtime.causal_trace.result", as: :collect_result do
@@ -66,7 +69,8 @@ defmodule Jido.Examples.CausalTrace do
             slot: Zoi.enum([:left, :right]),
             value: Zoi.integer()
           }),
-        context: context do
+        context: context,
+        output_schema: Zoi.map() do
         if input.request_id == context.agent_state.request_id do
           {:ok,
            %{
@@ -77,8 +81,12 @@ defmodule Jido.Examples.CausalTrace do
           {:error, :unrelated_result}
         end
       end
+
+      state(from: output())
     end
 
-    route "jido.agent.child.*", Jido.Examples.Support.KeepState
+    route "jido.agent.child.*", Jido.Examples.Support.KeepState do
+      state(from: output())
+    end
   end
 end

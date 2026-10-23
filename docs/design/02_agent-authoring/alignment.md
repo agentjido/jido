@@ -38,7 +38,7 @@ and [authoring tests](/Users/mhostetler/Source/Jido/proj_jido_core/jido/test/jid
 Current code already implements the selected API. No implementation change
 is required. References below to the older helper API belong to historical
 evidence and do not restore that API. The authoring design also corrects
-inline lookup to `route_action!/1` and retains only actual private compiler
+inline lookup to `route_executable!/1` and retains only actual private compiler
 metadata. Shared Codec evidence paths are corrected below. These document
 corrections implement GAP-011/013/014 without adding new APIs.
 
@@ -195,7 +195,7 @@ The dispositions below are approved for this seam.
 | --- | --- | --- | --- | --- |
 | `AUTH-GAP-001` | `AUTH-REQ-001` to `AUTH-REQ-008` | Agent validation and the mapped parity matrix | All common forms converge at the canonical definition for keyword-only and Spark-block fixtures. | `Implemented`; retain the contract |
 | `AUTH-GAP-002` | `AUTH-REQ-009` to `AUTH-REQ-015` | Agent module, compiler, versioning, and parity evidence | `definition/0` is canonical; private compiler data stays internal; approved Agent `vsn` rules are present. | `Implemented`; retain module authority |
-| `AUTH-GAP-003` | `AUTH-REQ-016` to `AUTH-REQ-020` | Inline macro and reuse tests | Inline Action behavior is implemented through the public `jido_action` contract. | `Implemented`; retain without a version claim |
+| `AUTH-GAP-003` | `AUTH-REQ-016` to `AUTH-REQ-020`, `AUTH-REQ-065` | Inline macro and reuse tests | Inline Action behavior is implemented through the public `jido_action` contract. | `Implemented`; retain without a version claim |
 | `AUTH-GAP-004` | `AUTH-REQ-021` to `AUTH-REQ-034` | Compiler, generator, interface, and exclusion evidence | Generated interfaces are module-only API and are absent from canonical and Codec data. | `Implemented`; retain the explicit exclusion |
 | `AUTH-GAP-005` | `AUTH-REQ-035` to `AUTH-REQ-039`, `AUTH-REQ-061` | Builder, versioning, specs, and parity tests | Builder reads `definition/0`, preserves `vsn`, order, first errors, and public specs. | `Implemented` |
 | `AUTH-GAP-006` | `AUTH-REQ-040` to `AUTH-REQ-049`, `AUTH-REQ-062` | Codec, Registry, versioning, portability, and state-transform tests | Version 2 preserves `vsn`; version 1 is rejected; instance encoding is definition-first; local closures stay valid but are not encodable. | `Implemented` |
@@ -246,7 +246,8 @@ It is not a separate implementation plan.
 ### Phase 1 — Lock the retained authoring contract
 
 - Requirements: `AUTH-REQ-001` to `AUTH-REQ-040`, `AUTH-REQ-049` to
-  `AUTH-REQ-052`, `AUTH-REQ-055`, and `AUTH-REQ-057` to `AUTH-REQ-061`.
+  `AUTH-REQ-052`, `AUTH-REQ-055`, `AUTH-REQ-057` to `AUTH-REQ-061`, and
+  `AUTH-REQ-065`.
 - Required outcome: public docs and tests state all supported forms, canonical
   parity, Spark and inline contracts, generated interfaces, Builder behavior,
   Codec separation, and extension validation.
@@ -322,7 +323,9 @@ It is not a separate implementation plan.
 | `AUTH-REQ-001` to `AUTH-REQ-008` | Agent validation, authoring contracts, and two-fixture parity matrix | Keep the mapped matrix in the core suite. | `Proven` |
 | `AUTH-REQ-009` to `AUTH-REQ-013` | Agent macro, DSL compiler, compile diagnostics, and canonical module parity | Keep private metadata out of public data. | `Proven` |
 | `AUTH-REQ-014` and `AUTH-REQ-015` | Versioning and parity tests | Keep default, explicit, invalid, direct, and behavior-only cases. | `Proven` |
-| `AUTH-REQ-016` to `AUTH-REQ-020` | Inline macro and reuse tests | Cross-package inline Action compatibility against release `jido_action` | `Proven` in current workspace |
+| `AUTH-REQ-016` to `AUTH-REQ-019` | Inline macro and reuse tests | Cross-package inline Action compatibility against release `jido_action` | `Proven` in current workspace |
+| `AUTH-REQ-020` | [Executable-route return test](/Users/mhostetler/Source/Jido/proj_jido_core/jido/test/contract/jido.agent/authoring_contract_test.exs:603) | Keep exact Action and Flow target return cases. | `Proven` in current workspace |
+| `AUTH-REQ-065` | [Terminal-handler and unknown-path rejection test](/Users/mhostetler/Source/Jido/proj_jido_core/jido/test/contract/jido.agent/authoring_contract_test.exs:633) | Keep both `ArgumentError` cases. | `Proven` in current workspace |
 | `AUTH-REQ-021` to `AUTH-REQ-034` | Compiler, generator, interface, docs, types, packaging, and diagnostic tests | Public API inventory and approved seam-12 error cases | `Proven` for current interface behavior |
 | `AUTH-REQ-035` to `AUTH-REQ-039`, `AUTH-REQ-061` | Builder code, public specs, target checks, versioning, and parity tests | Keep no-execution and first-error cases. | `Proven` |
 | `AUTH-REQ-040` | Serialization contract test | Keep authoring, checkpoint, and persistence format separation after revision work | `Proven` |

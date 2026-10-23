@@ -14,9 +14,12 @@ defmodule Jido.Examples.RequestModes do
     route "examples.runtime.request_modes.record", as: :record do
       action %{label: label},
         schema: Zoi.object(%{label: Zoi.string() |> Zoi.min(1)}),
-        context: context do
+        context: context,
+        output_schema: Zoi.map() do
         {:ok, %{context.agent_state | history: context.agent_state.history ++ [label]}}
       end
+
+      state(from: output())
     end
   end
 end

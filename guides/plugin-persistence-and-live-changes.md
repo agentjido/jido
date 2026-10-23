@@ -185,21 +185,24 @@ defmodule MyApp.Cached do
     signal_source("/my_app/cached")
 
     route "cache.install", as: :install do
-      action %{capacity: capacity}, schema: Zoi.object(%{capacity: Zoi.integer()}), context: ctx do
+      action %{capacity: capacity}, schema: Zoi.object(%{capacity: Zoi.integer()}), output_schema: Zoi.map(), context: ctx do
         {:ok, ctx.agent_state, [D.plugin_add(MyApp.Cache, capacity: capacity)]}
       end
+      state from: output()
     end
 
     route "cache.configure", as: :configure do
-      action %{capacity: capacity}, schema: Zoi.object(%{capacity: Zoi.integer()}), context: ctx do
+      action %{capacity: capacity}, schema: Zoi.object(%{capacity: Zoi.integer()}), output_schema: Zoi.map(), context: ctx do
         {:ok, ctx.agent_state, [D.plugin_configure(MyApp.Cache, capacity: capacity)]}
       end
+      state from: output()
     end
 
     route "cache.remove", as: :remove do
-      action _input, context: ctx do
+      action _input, output_schema: Zoi.map(), context: ctx do
         {:ok, ctx.agent_state, [D.plugin_remove(MyApp.Cache, state: :discard)]}
       end
+      state from: output()
     end
   end
 end

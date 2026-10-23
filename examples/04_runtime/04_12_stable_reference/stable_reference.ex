@@ -20,9 +20,12 @@ defmodule Jido.Examples.StableReference do
     route "examples.runtime.stable_reference.append", as: :append do
       action %{text: text},
         schema: Zoi.object(%{text: Zoi.string()}),
-        context: context do
+        context: context,
+        output_schema: Zoi.map() do
         {:ok, %{context.agent_state | messages: context.agent_state.messages ++ [text]}}
       end
+
+      state(from: output())
     end
   end
 

@@ -33,7 +33,8 @@ defmodule Jido.Examples.BusDelivery do
     route "examples.runtime.bus_delivery.record", as: :record do
       action %{value: value},
         schema: Zoi.object(%{value: Zoi.integer()}),
-        context: context do
+        context: context,
+        output_schema: Zoi.map() do
         state = context.agent_state
         signal_id = context.signal.id
 
@@ -45,6 +46,8 @@ defmodule Jido.Examples.BusDelivery do
           {:ok, %{state | seen: state.seen ++ [signal_id], values: state.values ++ [value]}}
         end
       end
+
+      state(from: output())
     end
   end
 end

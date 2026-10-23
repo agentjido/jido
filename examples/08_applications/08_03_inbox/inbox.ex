@@ -18,12 +18,16 @@ defmodule Jido.Examples.Applications.Inbox.Agent do
 
   routes do
     signal_source "/examples/applications/inbox"
-    route "examples.applications.inbox.sensor", __MODULE__.ManageSensor, as: :sensor
+
+    route "examples.applications.inbox.sensor", __MODULE__.ManageSensor, as: :sensor do
+      state(from: output())
+    end
 
     route "examples.applications.inbox.event", as: :event do
       action %{event_id: event_id},
         schema: Zoi.object(%{event_id: Zoi.string() |> Zoi.min(1)}),
-        context: context do
+        context: context,
+        output_schema: Zoi.map() do
         if event_id in context.agent_state.seen do
           {:ok, context.agent_state}
         else
@@ -35,6 +39,8 @@ defmodule Jido.Examples.Applications.Inbox.Agent do
            }}
         end
       end
+
+      state(from: output())
     end
   end
 
@@ -46,7 +52,8 @@ defmodule Jido.Examples.Applications.Inbox.Agent do
         Zoi.object(%{
           operation: Zoi.enum([:start, :stop]),
           tag: Zoi.string() |> Zoi.min(1)
-        })
+        }),
+      output_schema: Zoi.map()
 
     def run(%{operation: :start, tag: tag}, context) do
       directive =

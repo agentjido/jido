@@ -43,7 +43,8 @@ end
 defmodule Define.Rename do
   use Jido.Action,
     name: "rename",
-    schema: Zoi.object(%{name: Zoi.string()})
+    schema: Zoi.object(%{name: Zoi.string()}),
+    output_schema: Zoi.map()
 
   @impl true
   def run(%{name: name}, %{agent_state: state}) do
@@ -79,7 +80,9 @@ defmodule Define.Profile do
 
   routes do
     signal_source("/guides/define")
-    route "profile.rename", Define.Rename, as: :rename
+    route "profile.rename", Define.Rename, as: :rename do
+      state from: output()
+    end
   end
 end
 ```

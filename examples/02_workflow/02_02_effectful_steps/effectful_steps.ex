@@ -14,7 +14,9 @@ defmodule Jido.Examples.EffectfulSteps do
 
     route "workflow.effects", Jido.Examples.EffectfulSteps.Pipeline,
       as: :fetch_record,
-      defaults: %{allowed: true, expected_revision: "r1"}
+      defaults: %{allowed: true, expected_revision: "r1"} do
+      state(from: output())
+    end
   end
 end
 
@@ -28,7 +30,8 @@ defmodule Jido.Examples.EffectfulSteps.Read do
         key: Zoi.string() |> Zoi.min(1),
         allowed: Zoi.boolean(),
         expected_revision: Zoi.string()
-      })
+      }),
+    output_schema: Zoi.map()
 
   @impl true
   def run(%{key: key}, %{agent_state: %{key: key} = state}) do

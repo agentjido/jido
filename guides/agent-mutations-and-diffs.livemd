@@ -35,14 +35,14 @@ The `learn` route returns a Mutation Directive instead of changing state.
 alias Jido.Agent.Directive
 
 defmodule Mut.Greet do
-  use Jido.Action, name: "greet", schema: Zoi.object(%{name: Zoi.string()})
+  use Jido.Action, name: "greet", schema: Zoi.object(%{name: Zoi.string()}), output_schema: Zoi.map()
 
   @impl true
   def run(%{name: name}, %{agent_state: state}), do: {:ok, %{state | last: "hello " <> name}}
 end
 
 defmodule Mut.Wave do
-  use Jido.Action, name: "wave", schema: Zoi.object(%{})
+  use Jido.Action, name: "wave", schema: Zoi.object(%{}), output_schema: Zoi.map()
 
   @impl true
   def run(_params, %{agent_state: state}), do: {:ok, %{state | last: "wave"}}
@@ -59,7 +59,7 @@ defmodule Mut.Visits do
 end
 
 defmodule Mut.Learn do
-  use Jido.Action, name: "learn", schema: Zoi.object(%{path: Zoi.string()})
+  use Jido.Action, name: "learn", schema: Zoi.object(%{path: Zoi.string()}), output_schema: Zoi.map()
 
   @impl true
   def run(%{path: path}, %{agent_state: state}) do
@@ -76,8 +76,12 @@ defmodule Mut.Greeter do
 
   routes do
     signal_source("/guides/mutations")
-    route "greet.hello", Mut.Greet, as: :hello
-    route "greet.learn", Mut.Learn, as: :learn
+    route "greet.hello", Mut.Greet, as: :hello do
+      state from: output()
+    end
+    route "greet.learn", Mut.Learn, as: :learn do
+      state from: output()
+    end
   end
 end
 

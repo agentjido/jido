@@ -88,7 +88,13 @@ defmodule JidoTest.AgentServer.Composition.ChildrenTest do
             %{id: provider.id(), provider: provider, vsn: provider.vsn(), data: Map.new(options)}
           end
         ),
-      routes: [%{path: "work", handler: %{kind: :action, target: F.Work}}]
+      routes: [
+        %{
+          path: "work",
+          handler: %{kind: :action, target: F.Work},
+          state: %{source: :output, path: []}
+        }
+      ]
     })
     |> Jido.Agent.instantiate!(id: id)
   end

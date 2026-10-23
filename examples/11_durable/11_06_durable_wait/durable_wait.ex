@@ -13,7 +13,9 @@ defmodule Jido.Examples.Durable.DurableWait do
     signal_source "/examples/durable/wait"
 
     route "examples.durable.wait.request", Jido.Examples.Durable.DurableWait.Approval,
-      as: :request
+      as: :request do
+      state(from: output())
+    end
   end
 
   @doc "Builds a decision Signal. Deliver it with AgentServer.deliver_wait/4."
@@ -29,7 +31,8 @@ defmodule Jido.Examples.Durable.DurableWait.Approval do
   @moduledoc "Waits for approval, cancellation, or a one-hour deadline in the same Turn."
   use Jido.Flow,
     name: "durable_wait_approval",
-    schema: Zoi.object(%{request_id: Zoi.string() |> Zoi.min(1)})
+    schema: Zoi.object(%{request_id: Zoi.string() |> Zoi.min(1)}),
+    output_schema: Zoi.map()
 
   flow do
     step "request", request <- input(), inline: [context: context] do

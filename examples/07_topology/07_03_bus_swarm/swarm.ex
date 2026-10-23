@@ -15,10 +15,13 @@ defmodule Jido.Examples.Topology.Swarm do
     route "examples.topology.cell.work", as: :work do
       action %{value: _value},
         schema: Zoi.object(%{value: Zoi.integer()}),
-        context: context do
+        context: context,
+        output_schema: Zoi.map() do
         {:ok, %{context.agent_state | sent: context.agent_state.sent + 1},
          [Jido.Agent.Directive.emit(context.signal)]}
       end
+
+      state(from: output())
     end
   end
 

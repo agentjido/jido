@@ -38,14 +38,18 @@ defmodule Jido.Plugin.ContractTest do
   end
 
   defmodule InvalidStateAction do
-    use Jido.Action, name: "agent_plugin_invalid_state"
+    use Jido.Action,
+      name: "agent_plugin_invalid_state",
+      output_schema: Zoi.any()
 
     @impl Jido.Action
     def run(_params, _context), do: {:ok, %{trace: [:invalid]}}
   end
 
   defmodule ReturnStop do
-    use Jido.Action, name: "agent_plugin_stop_directive"
+    use Jido.Action,
+      name: "agent_plugin_stop_directive",
+      output_schema: Zoi.any()
 
     @impl Jido.Action
     def run(_params, context) do
@@ -54,7 +58,9 @@ defmodule Jido.Plugin.ContractTest do
   end
 
   defmodule FailingAction do
-    use Jido.Action, name: "agent_plugin_failure"
+    use Jido.Action,
+      name: "agent_plugin_failure",
+      output_schema: Zoi.any()
 
     @impl Jido.Action
     def run(_params, _context), do: {:error, :action_failed}
@@ -97,7 +103,9 @@ defmodule Jido.Plugin.ContractTest do
   end
 
   defmodule OverwriteOwnedState do
-    use Jido.Action, name: "agent_plugin_overwrite_owned_state"
+    use Jido.Action,
+      name: "agent_plugin_overwrite_owned_state",
+      output_schema: Zoi.any()
 
     @impl Jido.Action
     def run(_params, context) do
@@ -106,7 +114,9 @@ defmodule Jido.Plugin.ContractTest do
   end
 
   defmodule DeleteNilOwnedState do
-    use Jido.Action, name: "agent_plugin_delete_nil_owned_state"
+    use Jido.Action,
+      name: "agent_plugin_delete_nil_owned_state",
+      output_schema: Zoi.any()
 
     @impl Jido.Action
     def run(_params, context) do
@@ -120,7 +130,9 @@ defmodule Jido.Plugin.ContractTest do
   end
 
   defmodule ReturnOwnedDirective do
-    use Jido.Action, name: "agent_plugin_owned_directive"
+    use Jido.Action,
+      name: "agent_plugin_owned_directive",
+      output_schema: Zoi.any()
 
     @impl Jido.Action
     def run(_params, context) do
@@ -172,7 +184,9 @@ defmodule Jido.Plugin.ContractTest do
   end
 
   defmodule ReturnMixedDirectives do
-    use Jido.Action, name: "agent_plugin_mixed_directives"
+    use Jido.Action,
+      name: "agent_plugin_mixed_directives",
+      output_schema: Zoi.any()
 
     @impl Jido.Action
     def run(_params, context) do
@@ -252,7 +266,9 @@ defmodule Jido.Plugin.ContractTest do
   end
 
   defmodule ReturnNormalizedDirective do
-    use Jido.Action, name: "agent_plugin_normalized_directive"
+    use Jido.Action,
+      name: "agent_plugin_normalized_directive",
+      output_schema: Zoi.any()
 
     @impl Jido.Action
     def run(_params, context) do
@@ -405,7 +421,9 @@ defmodule Jido.Plugin.ContractTest do
     end
 
     routes do
-      route "invalid.run", InvalidStateAction
+      route "invalid.run", InvalidStateAction do
+        state(from: output())
+      end
     end
   end
 
@@ -413,7 +431,9 @@ defmodule Jido.Plugin.ContractTest do
     use Jido.Agent, name: "directive_agent"
 
     routes do
-      route "directive.stop", ReturnStop
+      route "directive.stop", ReturnStop do
+        state(from: output())
+      end
     end
   end
 
@@ -421,7 +441,9 @@ defmodule Jido.Plugin.ContractTest do
     use Jido.Agent, name: "failing_agent"
 
     routes do
-      route "failure.run", FailingAction
+      route "failure.run", FailingAction do
+        state(from: output())
+      end
     end
   end
 
@@ -437,7 +459,9 @@ defmodule Jido.Plugin.ContractTest do
     end
 
     routes do
-      route "owned.overwrite", OverwriteOwnedState
+      route "owned.overwrite", OverwriteOwnedState do
+        state(from: output())
+      end
     end
   end
 
@@ -449,7 +473,9 @@ defmodule Jido.Plugin.ContractTest do
     end
 
     routes do
-      route "owned.delete_nil", DeleteNilOwnedState
+      route "owned.delete_nil", DeleteNilOwnedState do
+        state(from: output())
+      end
     end
   end
 
@@ -461,7 +487,9 @@ defmodule Jido.Plugin.ContractTest do
     end
 
     routes do
-      route "directive.replace", ReturnOwnedDirective
+      route "directive.replace", ReturnOwnedDirective do
+        state(from: output())
+      end
     end
   end
 
@@ -474,7 +502,9 @@ defmodule Jido.Plugin.ContractTest do
     end
 
     routes do
-      route "directive.reduce", ReturnMixedDirectives
+      route "directive.reduce", ReturnMixedDirectives do
+        state(from: output())
+      end
     end
   end
 
@@ -486,7 +516,9 @@ defmodule Jido.Plugin.ContractTest do
     end
 
     routes do
-      route "directive.normalize", ReturnNormalizedDirective
+      route "directive.normalize", ReturnNormalizedDirective do
+        state(from: output())
+      end
     end
   end
 
@@ -692,8 +724,7 @@ defmodule Jido.Plugin.ContractTest do
                  agent,
                  signal,
                  %{},
-                 Jido.Agent.Plugin.specs(specs),
-                 %{}
+                 Jido.Agent.Plugin.specs(specs)
                )
 
       assert error.message == "Agent executable changed Plugin-owned state"

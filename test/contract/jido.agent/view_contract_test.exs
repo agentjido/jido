@@ -14,7 +14,9 @@ defmodule JidoTest.Contract.AgentViewTest do
       {"schemas/counter", 1} => {:schema, CounterAgent.definition().schema},
       {"schemas/empty", 1} => {:schema, Zoi.object(%{})},
       {"actions/add", 1} => {:action, Add},
-      {"flows/contract", 1} => {:flow, F.Flow}
+      {"flows/contract", 1} => {:flow, F.Flow},
+      {"transforms/view", 1} => {:transform, {__MODULE__, :transform, 1}},
+      {"atoms/add", 1} => {:atom, :add}
     })
   end
 
@@ -31,8 +33,19 @@ defmodule JidoTest.Contract.AgentViewTest do
         name: "data_counter",
         description: "A stored counter",
         metadata: %{"private" => "do not expose"},
+        signal_source: "/view",
         routes: [
-          %{path: "counter.add", handler: %{kind: :action, target: Add}, defaults: %{by: 3}}
+          %{
+            path: "counter.add",
+            handler: %{kind: :action, target: Add},
+            as: :add,
+            defaults: %{by: 3},
+            state: %{source: :output, path: []},
+            reply: %{
+              type: "counter.completed",
+              from: %{source: :output, path: []}
+            }
+          }
         ]
       })
 
@@ -40,7 +53,7 @@ defmodule JidoTest.Contract.AgentViewTest do
 
     assert view == %{
              "type" => "jido.agent.view",
-             "vsn" => 1,
+             "vsn" => 2,
              "id" => nil,
              "name" => "data_counter",
              "description" => "A stored counter",
@@ -50,9 +63,17 @@ defmodule JidoTest.Contract.AgentViewTest do
              "operations" => %{
                "items" => [
                  %{
-                   "signal_type" => "counter.add",
-                   "kind" => "action",
-                   "target" => %{"id" => "actions/add", "vsn" => 1}
+                   "path" => "counter.add",
+                   "as" => %{"$type" => "atom", "id" => "atoms/add", "vsn" => 1},
+                   "handler" => %{
+                     "kind" => "action",
+                     "target" => %{"id" => "actions/add", "vsn" => 1}
+                   },
+                   "state" => %{"source" => "output", "path" => []},
+                   "reply" => %{
+                     "type" => "counter.completed",
+                     "from" => %{"source" => "output", "path" => []}
+                   }
                  }
                ],
                "total" => 1,
@@ -64,6 +85,7 @@ defmodule JidoTest.Contract.AgentViewTest do
     refute inspect(view) =~ "do not expose"
     refute inspect(view) =~ inspect(Add)
     refute Map.has_key?(view, "metadata")
+    refute Enum.any?(view["operations"]["items"], &Map.has_key?(&1, "defaults"))
   end
 
   @tag obligation: "jido.agent.I31"
@@ -81,14 +103,22 @@ defmodule JidoTest.Contract.AgentViewTest do
       Agent.define!(%{
         name: "bounded",
         routes: [
-          %{path: "counter.one", handler: %{kind: :action, target: Add}},
-          %{path: "counter.two", handler: %{kind: :action, target: Add}}
+          %{
+            path: "counter.one",
+            handler: %{kind: :action, target: Add},
+            state: %{source: :output, path: []}
+          },
+          %{
+            path: "counter.two",
+            handler: %{kind: :action, target: Add},
+            state: %{source: :output, path: []}
+          }
         ]
       })
 
     assert {:ok, view} = View.project(definition, registry(), operation_limit: 1)
     assert %{"total" => 2, "truncated" => true, "items" => [item]} = view["operations"]
-    assert item["signal_type"] == "counter.one"
+    assert item["path"] == "counter.one"
 
     assert {:error, %{__exception__: true}} =
              View.project(definition, registry(), operation_limit: 501)
@@ -98,7 +128,11 @@ defmodule JidoTest.Contract.AgentViewTest do
   test "operation limits keep their documented default and inclusive bounds" do
     routes =
       for index <- 1..501 do
-        %{path: "operation.#{index}", handler: %{kind: :action, target: Add}}
+        %{
+          path: "operation.#{index}",
+          handler: %{kind: :action, target: Add},
+          state: %{source: :output, path: []}
+        }
       end
 
     definition = Agent.define!(%{name: "view_limits", routes: routes})
@@ -130,7 +164,11 @@ defmodule JidoTest.Contract.AgentViewTest do
       Agent.define!(%{
         name: "view_handlers",
         routes: [
-          %{path: "flow.run", handler: %{kind: :flow, target: F.Flow}},
+          %{
+            path: "flow.run",
+            handler: %{kind: :flow, target: F.Flow},
+            state: :unchanged
+          },
           %{
             path: "transform.run",
             handler: %{kind: :transform, target: {__MODULE__, :transform, 1}}
@@ -141,9 +179,17 @@ defmodule JidoTest.Contract.AgentViewTest do
 
     assert {:ok, view} = View.project(definition, registry())
     [flow, transform, forward] = view["operations"]["items"]
-    assert flow["target"] == %{"id" => "flows/contract", "vsn" => 1}
-    assert transform["target"] == nil
-    assert forward["target"] == %{"kind" => "parent"}
+    assert flow["handler"]["target"] == %{"id" => "flows/contract", "vsn" => 1}
+    assert flow["state"] == "unchanged"
+
+    assert transform["handler"]["target"] == %{
+             "id" => "transforms/view",
+             "vsn" => 1
+           }
+
+    assert transform["state"] == "unchanged"
+    assert forward["handler"]["target"] == %{"kind" => "parent"}
+    assert forward["state"] == "unchanged"
   end
 
   @tag obligation: "jido.agent.I31"
@@ -158,10 +204,15 @@ defmodule JidoTest.Contract.AgentViewTest do
       Agent.define!(%{
         name: "bounded_resolution",
         routes: [
-          %{path: "counter.one", handler: %{kind: :action, target: Add}},
+          %{
+            path: "counter.one",
+            handler: %{kind: :action, target: Add},
+            state: %{source: :output, path: []}
+          },
           %{
             path: "counter.two",
-            handler: %{kind: :action, target: JidoTest.TestActions.BasicAction}
+            handler: %{kind: :action, target: JidoTest.TestActions.BasicAction},
+            state: :unchanged
           }
         ]
       })

@@ -34,9 +34,17 @@ defmodule JidoTest.ScheduledOccurrenceFixtures.FastRuntimeAgent do
   end
 
   routes do
-    route "runtime.directive", ReturnDirective
-    route "runtime.record", Record
-    route "cron.tick", Tick
+    route "runtime.directive", ReturnDirective do
+      state(from: output())
+    end
+
+    route "runtime.record", Record do
+      state(from: output())
+    end
+
+    route "cron.tick", Tick do
+      state(from: output())
+    end
   end
 end
 
@@ -66,6 +74,7 @@ defmodule JidoTest.ScheduledOccurrenceFixtures.TimedAgent do
     route "test.schedule.arm", as: :arm_schedule do
       action input,
         schema: Zoi.object(%{job_id: Zoi.string() |> Zoi.min(1), cron: Zoi.string()}),
+        output_schema: Zoi.map(),
         context: context do
         generation = context.agent_state.generation + 1
 
@@ -81,15 +90,19 @@ defmodule JidoTest.ScheduledOccurrenceFixtures.TimedAgent do
 
         {:ok, %{context.agent_state | generation: generation}, [directive]}
       end
+
+      state(from: output())
     end
 
     route "test.schedule.tick" do
-      action input, context: context do
+      action input, output_schema: Zoi.map(), context: context do
         with {:ok, occurrence} <- Scheduler.occurrence(context.signal) do
           tick = %{signal_id: context.signal.id, data: input, occurrence: occurrence}
           {:ok, %{context.agent_state | ticks: context.agent_state.ticks ++ [tick]}}
         end
       end
+
+      state(from: output())
     end
   end
 end

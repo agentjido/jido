@@ -58,7 +58,7 @@ defmodule JidoTest.Plugin.SensorManagerFixtures do
   defmodule ManageAction do
     @moduledoc false
 
-    use Jido.Action, name: "sensor_manager_manage"
+    use Jido.Action, name: "sensor_manager_manage", output_schema: Zoi.map()
 
     alias Jido.Plugin.SensorManager
     alias JidoTest.Plugin.SensorManagerFixtures.EmittingSensor
@@ -77,7 +77,7 @@ defmodule JidoTest.Plugin.SensorManagerFixtures do
   defmodule ReadingAction do
     @moduledoc false
 
-    use Jido.Action, name: "sensor_manager_reading"
+    use Jido.Action, name: "sensor_manager_reading", output_schema: Zoi.map()
 
     @impl Jido.Action
     def run(%{value: value}, context) do
@@ -103,8 +103,13 @@ defmodule JidoTest.Plugin.SensorManagerFixtures do
     end
 
     routes do
-      route "sensor.manage", ManageAction
-      route "sensor.reading", ReadingAction
+      route "sensor.manage", ManageAction do
+        state(from: output())
+      end
+
+      route "sensor.reading", ReadingAction do
+        state(from: output())
+      end
     end
   end
 

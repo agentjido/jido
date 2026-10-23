@@ -5,7 +5,9 @@ defmodule Jido.Plugin.AuditIntegrationTest do
   alias Jido.Plugin.Audit
 
   defmodule RecordAction do
-    use Jido.Action, name: "audit_integration_record"
+    use Jido.Action,
+      name: "audit_integration_record",
+      output_schema: Zoi.any()
 
     @impl Jido.Action
     def run(%{event: event}, context) do
@@ -26,7 +28,9 @@ defmodule Jido.Plugin.AuditIntegrationTest do
     end
 
     routes do
-      route "audit.record", RecordAction
+      route "audit.record", RecordAction do
+        state(from: output())
+      end
     end
   end
 

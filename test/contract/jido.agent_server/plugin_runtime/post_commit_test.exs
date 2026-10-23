@@ -105,7 +105,13 @@ defmodule JidoTest.AgentServer.PluginRuntime.PostCommitTest do
           JidoTest.AgentContract.contribution(plugin, %{observer: __MODULE__, mode: mode}),
           JidoTest.AgentContract.contribution(Second, %{observer: __MODULE__, mode: second_mode})
         ],
-        routes: [%{path: "work", handler: %{kind: :action, target: F.Work}}]
+        routes: [
+          %{
+            path: "work",
+            handler: %{kind: :action, target: F.Work},
+            state: %{source: :output, path: []}
+          }
+        ]
       })
       |> Jido.Agent.instantiate!(id: "commit-plugins")
 

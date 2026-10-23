@@ -68,7 +68,7 @@ defmodule Guides.Signup do
       action %{email: email},
         name: "register",
         schema: Zoi.object(%{email: Zoi.string()}),
-        context: context do
+        output_schema: Zoi.map(), context: context do
         state = context.agent_state
 
         if email in state.users do
@@ -78,13 +78,14 @@ defmodule Guides.Signup do
            [emit("user.registered", %{email: email})]}
         end
       end
+      state from: output()
     end
 
     route "user.register_now", as: :register_now do
       action %{email: email, to: to},
         name: "register_now",
         schema: Zoi.object(%{email: Zoi.string(), to: Zoi.any()}),
-        context: context do
+        output_schema: Zoi.map(), context: context do
         send(to, {:welcome, email})
         state = context.agent_state
 
@@ -94,13 +95,15 @@ defmodule Guides.Signup do
           {:ok, %{state | users: [email | state.users]}}
         end
       end
+      state from: output()
     end
 
     route "user.audit", as: :audit do
-      action %{}, name: "audit", schema: Zoi.object(%{}), context: context do
+      action %{}, name: "audit", schema: Zoi.object(%{}), output_schema: Zoi.map(), context: context do
         {:ok, context.agent_state,
          [emit("user.audited", %{agent: context.agent_id, request: context.request_id})]}
       end
+      state from: output()
     end
   end
 end

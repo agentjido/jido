@@ -35,7 +35,8 @@ account.state
 defmodule MyApp.Withdraw do
   use Jido.Action,
     name: "withdraw",
-    schema: Zoi.object(%{amount: Zoi.integer() |> Zoi.min(1)})
+    schema: Zoi.object(%{amount: Zoi.integer() |> Zoi.min(1)}),
+    output_schema: Zoi.map()
 
   alias Jido.Plugin.Audit
 
@@ -64,7 +65,9 @@ defmodule MyApp.Account do
 
   routes do
     signal_source("/my_app/accounts")
-    route "account.withdraw", MyApp.Withdraw, as: :withdraw
+    route "account.withdraw", MyApp.Withdraw, as: :withdraw do
+      state from: output()
+    end
   end
 end
 ```

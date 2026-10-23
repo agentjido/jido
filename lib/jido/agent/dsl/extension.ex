@@ -3,6 +3,8 @@ defmodule Jido.Agent.DSL.Entry do
   defstruct [
     :path,
     :handler,
+    :state,
+    :reply,
     :as,
     :name,
     :provider,
@@ -43,6 +45,8 @@ defmodule Jido.Agent.DSL.Extension do
     schema: [
       path: [type: :string, required: true],
       handler: [type: :any, required: true],
+      state: [type: :any, required: true],
+      reply: [type: :any, default: nil],
       as: [type: :atom],
       defaults: [type: :any, default: %{}]
     ]

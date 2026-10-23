@@ -13,7 +13,9 @@ defmodule Jido.Examples.OutputRepair do
   routes do
     signal_source "/examples/llm/output_repair"
 
-    route "examples.llm.output_repair.answer", Jido.Examples.OutputRepair.Pipeline, as: :answer
+    route "examples.llm.output_repair.answer", Jido.Examples.OutputRepair.Pipeline, as: :answer do
+      state(from: output())
+    end
   end
 end
 
@@ -33,7 +35,8 @@ defmodule Jido.Examples.OutputRepair.Repair do
             missing: Zoi.integer() |> Zoi.min(0) |> Zoi.max(1),
             attempts: Zoi.integer() |> Zoi.min(0)
           })
-      })
+      }),
+    output_schema: Zoi.map()
 
   def run(%{repair: repair}, context) do
     with {:ok, raw} <-
@@ -75,7 +78,8 @@ defmodule Jido.Examples.OutputRepair.Pipeline do
 
   use Jido.Flow,
     name: "examples_llm_output_repair_flow",
-    schema: Adapter.prompt_schema()
+    schema: Adapter.prompt_schema(),
+    output_schema: Zoi.map()
 
   flow do
     iterate "repair" do

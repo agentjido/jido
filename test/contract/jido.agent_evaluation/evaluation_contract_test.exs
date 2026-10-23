@@ -10,7 +10,15 @@ defmodule JidoTest.Contract.AgentEvaluationTest do
   end
 
   defp route(path, target, opts \\ []),
-    do: Map.merge(%{path: path, handler: %{kind: :action, target: target}}, Map.new(opts))
+    do:
+      Map.merge(
+        %{
+          path: path,
+          handler: %{kind: :action, target: target},
+          state: %{source: :output, path: []}
+        },
+        Map.new(opts)
+      )
 
   def transform(%Jido.Signal{} = signal),
     do: {:ok, %{signal | type: "effect.transformed", data: %{value: 2}}}
@@ -50,7 +58,15 @@ defmodule JidoTest.Contract.AgentEvaluationTest do
     refute_received {:executed, _, _}
 
     flow_source =
-      F.instance(routes: [%{path: "test.run", handler: %{kind: :flow, target: F.Flow}}])
+      F.instance(
+        routes: [
+          %{
+            path: "test.run",
+            handler: %{kind: :flow, target: F.Flow},
+            state: %{source: :output, path: []}
+          }
+        ]
+      )
 
     assert {:ok, flow_candidate, []} = Agent.cmd(flow_source, F.signal(%{amount: 2}))
     assert flow_candidate.state.count == 2
@@ -201,7 +217,9 @@ defmodule JidoTest.Contract.AgentEvaluationTest do
     assert {:error, _} =
              Agent.cmd(source, F.signal(%{directives: [%Directive.Emit{signal: :invalid}]}))
 
-    change = Directive.route_add("next", F.Return)
+    change =
+      Directive.route_add("next", F.Return, state: %{source: :output, path: []})
+
     output = %{source.state | count: 2}
 
     assert {:ok, candidate, [^change]} =
@@ -306,7 +324,14 @@ defmodule JidoTest.Contract.AgentEvaluationTest do
     assert output.data == %{value: 1}
 
     assert {:ok, _, [%Directive.RouteAdd{}]} =
-             Agent.cmd(source, F.signal(%{directives: [Directive.route_add("next", F.Return)]}))
+             Agent.cmd(
+               source,
+               F.signal(%{
+                 directives: [
+                   Directive.route_add("next", F.Return, state: %{source: :output, path: []})
+                 ]
+               })
+             )
 
     for {request, code} <- [
           {%{kind: :emit, type: "effect.allowed", data: %{}, unknown: true}, :unknown_fields},
@@ -589,13 +614,15 @@ defmodule JidoTest.Contract.AgentEvaluationTest do
 
     source = """
     defmodule #{inspect(action)} do
-      use Jido.Action, name: "reload_action", schema: Zoi.object(%{value: Zoi.integer()})
+      use Jido.Action, name: "reload_action", schema: Zoi.object(%{value: Zoi.integer()}), output_schema: Zoi.map()
       def run(_, context), do: {:ok, context.agent_state}
     end
     defmodule #{inspect(host)} do
       use Jido.Agent, name: "reload_host"
       routes do
-        route "test.run", #{inspect(action)}
+        route "test.run", #{inspect(action)} do
+          state from: output()
+        end
       end
     end
     """
@@ -610,7 +637,7 @@ defmodule JidoTest.Contract.AgentEvaluationTest do
 
         Code.compile_string("""
         defmodule #{inspect(action)} do
-          use Jido.Action, name: "reload_action", schema: Zoi.object(%{value: Zoi.string()})
+          use Jido.Action, name: "reload_action", schema: Zoi.object(%{value: Zoi.string()}), output_schema: Zoi.map()
           def run(_, context), do: {:ok, context.agent_state}
         end
         """)

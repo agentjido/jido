@@ -7,10 +7,11 @@ match:
 
 ```elixir
 route "crew.reviewer.add", as: :add_reviewer do
-  action _input, name: "add_reviewer", schema: Zoi.object(%{}), context: context do
+  action _input, name: "add_reviewer", schema: Zoi.object(%{}), output_schema: Zoi.map(), context: context do
     {:ok, context.agent_state,
      [D.agent_add(:reviewer, Crew.Worker, initial_state: %{role: "reviewer"})]}
   end
+  state from: output()
 end
 ```
 
@@ -83,9 +84,10 @@ defmodule Crew.Worker do
     signal_source("/guides/change")
 
     route "task.run", as: :run do
-      action _input, name: "run", schema: Zoi.object(%{}), context: context do
+      action _input, name: "run", schema: Zoi.object(%{}), output_schema: Zoi.map(), context: context do
         {:ok, %{context.agent_state | done: context.agent_state.done + 1}}
       end
+      state from: output()
     end
   end
 end
@@ -103,36 +105,41 @@ defmodule Crew.Lead do
 
     route "crew.resize", as: :resize do
       action %{size: size}, name: "resize", schema: Zoi.object(%{size: Zoi.integer()}),
-        context: context do
+        output_schema: Zoi.map(), context: context do
         {:ok, %{context.agent_state | size: size}}
       end
+      state from: output()
     end
 
     route "crew.reviewer.add", as: :add_reviewer do
-      action _input, name: "add_reviewer", schema: Zoi.object(%{}), context: context do
+      action _input, name: "add_reviewer", schema: Zoi.object(%{}), output_schema: Zoi.map(), context: context do
         {:ok, context.agent_state,
          [D.agent_add(:reviewer, Crew.Worker, initial_state: %{role: "reviewer"})]}
       end
+      state from: output()
     end
 
     route "crew.reviewer.replace", as: :replace_reviewer do
-      action _input, name: "replace_reviewer", schema: Zoi.object(%{}), context: context do
+      action _input, name: "replace_reviewer", schema: Zoi.object(%{}), output_schema: Zoi.map(), context: context do
         {:ok, context.agent_state,
          [D.agent_replace(:reviewer, Crew.Worker, initial_state: %{role: "senior"})]}
       end
+      state from: output()
     end
 
     route "crew.reviewer.remove", as: :remove_reviewer do
-      action _input, name: "remove_reviewer", schema: Zoi.object(%{}), context: context do
+      action _input, name: "remove_reviewer", schema: Zoi.object(%{}), output_schema: Zoi.map(), context: context do
         {:ok, context.agent_state, [D.agent_remove(:reviewer)]}
       end
+      state from: output()
     end
 
     route "crew.workers.pin", as: :pin do
       action %{count: count}, name: "pin", schema: Zoi.object(%{count: Zoi.integer()}),
-        context: context do
+        output_schema: Zoi.map(), context: context do
         {:ok, context.agent_state, [D.agent_update(:workers, %{count: count})]}
       end
+      state from: output()
     end
   end
 

@@ -49,7 +49,13 @@ defmodule JidoTest.AgentServer.OutboundTest do
               data: %{observer: observer, reject: reject}
             }
           ],
-          routes: [%{path: "work", handler: %{kind: :action, target: F.Work}}]
+          routes: [
+            %{
+              path: "work",
+              handler: %{kind: :action, target: F.Work},
+              state: %{source: :output, path: []}
+            }
+          ]
         })
         |> Jido.Agent.instantiate!(id: "outbound-#{reject}")
 

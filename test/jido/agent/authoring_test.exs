@@ -18,14 +18,26 @@ defmodule JidoTest.Agent.AuthoringTest do
   defmodule Add do
     use Jido.Action,
       name: "authoring_add",
-      schema: Zoi.object(%{amount: Zoi.integer(), flag: Zoi.boolean() |> Zoi.default(false)})
+      schema: Zoi.object(%{amount: Zoi.integer(), flag: Zoi.boolean() |> Zoi.default(false)}),
+      output_schema: Zoi.any()
 
     def run(%{amount: amount}, %{agent_state: state}),
       do: {:ok, %{state | count: state.count + amount}}
   end
 
+  defmodule ProjectedOutput do
+    use Jido.Action,
+      name: "authoring_projected_output",
+      output_schema: Zoi.object(%{state: Zoi.map(), reply: Zoi.string()})
+
+    def run(_params, _context), do: {:ok, %{state: %{}, reply: "done"}}
+  end
+
   defmodule Flow do
-    use Jido.Flow, name: "authoring_flow", schema: Zoi.object(%{amount: Zoi.integer()})
+    use Jido.Flow,
+      name: "authoring_flow",
+      schema: Zoi.object(%{amount: Zoi.integer()}),
+      output_schema: Zoi.any()
 
     flow do
       step "add", action: Add, params: %{amount: input(:amount)}
@@ -78,7 +90,9 @@ defmodule JidoTest.Agent.AuthoringTest do
     routes do
       signal_source "/prepared"
 
-      route "prepared.add", Add, as: :add
+      route "prepared.add", Add, as: :add do
+        state(from: output())
+      end
     end
   end
 
@@ -95,9 +109,13 @@ defmodule JidoTest.Agent.AuthoringTest do
     end
 
     routes do
-      route "raw.*", Add
+      route "raw.*", Add do
+        state(from: output())
+      end
 
-      route "event.*", Add
+      route "event.*", Add do
+        state(from: output())
+      end
     end
   end
 
@@ -111,7 +129,8 @@ defmodule JidoTest.Agent.AuthoringTest do
           options: Zoi.keyword(value: Zoi.integer()) |> Zoi.optional(),
           empty: Zoi.literal([]) |> Zoi.optional(),
           anything: Zoi.any() |> Zoi.optional()
-        })
+        }),
+      output_schema: Zoi.any()
 
     def run(_params, %{agent_state: state}), do: {:ok, state}
   end
@@ -128,7 +147,8 @@ defmodule JidoTest.Agent.AuthoringTest do
           "user-id": Zoi.integer(),
           amount: Zoi.integer() |> Zoi.optional(),
           amount_or_opts: Zoi.integer() |> Zoi.optional()
-        })
+        }),
+      output_schema: Zoi.any()
 
     def run(input, _context), do: {:ok, input}
   end
@@ -139,7 +159,9 @@ defmodule JidoTest.Agent.AuthoringTest do
     routes do
       signal_source "/named"
 
-      route "named.inputs", NamedInputs, as: :compose
+      route "named.inputs", NamedInputs, as: :compose do
+        state(from: output())
+      end
     end
   end
 
@@ -162,8 +184,13 @@ defmodule JidoTest.Agent.AuthoringTest do
     routes do
       signal_source "/authoring"
 
-      route "authoring.add", Add, as: :add, defaults: %{amount: 1, flag: false}
-      route "authoring.flow", Flow, as: :flow_add, defaults: %{amount: 2}
+      route "authoring.add", Add, as: :add, defaults: %{amount: 1, flag: false} do
+        state(from: output())
+      end
+
+      route "authoring.flow", Flow, as: :flow_add, defaults: %{amount: 2} do
+        state(from: output())
+      end
     end
   end
 
@@ -184,8 +211,13 @@ defmodule JidoTest.Agent.AuthoringTest do
     end
 
     routes do
-      route "authoring.add", Add, defaults: %{amount: 1, flag: false}
-      route "authoring.flow", Flow, defaults: %{amount: 2}
+      route "authoring.add", Add, defaults: %{amount: 1, flag: false} do
+        state(from: output())
+      end
+
+      route "authoring.flow", Flow, defaults: %{amount: 2} do
+        state(from: output())
+      end
     end
   end
 
@@ -207,10 +239,13 @@ defmodule JidoTest.Agent.AuthoringTest do
               amount: Zoi.integer(),
               multiplier: Zoi.integer() |> Zoi.default(1)
             }),
-          context: context do
+          context: context,
+          output_schema: Zoi.any() do
           {:ok,
            %{context.agent_state | count: add(context.agent_state.count, amount, multiplier)}}
         end
+
+        state(from: output())
       end
     end
 
@@ -282,26 +317,26 @@ defmodule JidoTest.Agent.AuthoringTest do
   test "removed route options and invalid helpers fail at declaration" do
     for option <- ["priority: 1", "match: fn _ -> true end", "params: %{}"] do
       assert_raise CompileError, ~r/Unknown route options/, fn ->
-        compile_agent("route \"test.add\", Add, #{option}")
+        compile_agent("route \"test.add\", Add, #{option} do state from: output() end")
       end
     end
 
     for routes <- [
-          "route \"test.*\", Add, as: :add",
-          "route \"test.add\", Add, as: :add\nroute \"test.other\", Add, as: :add",
-          "route \"test.add\", Add\nroute \"test.add\", Add"
+          "route \"test.*\", Add, as: :add do state from: output() end",
+          "route \"test.add\", Add, as: :add do state from: output() end\nroute \"test.other\", Add, as: :add do state from: output() end",
+          "route \"test.add\", Add do state from: output() end\nroute \"test.add\", Add do state from: output() end"
         ] do
       assert_raise Spark.Error.DslError, fn -> compile_agent(routes) end
     end
 
     assert_raise CompileError, ~r/unique keyword/, fn ->
-      compile_agent("route \"test.add\", Add, as: :add, as: :other")
+      compile_agent("route \"test.add\", Add, as: :add, as: :other do state from: output() end")
     end
   end
 
   @tag obligation: "jido.agent.I1"
   test "a string route requires a handler and forward lowers to portable data" do
-    assert_raise CompileError, ~r/string route requires/, fn ->
+    assert_raise CompileError, ~r/requires exactly one handler/, fn ->
       compile_agent("route \"test.pass\"")
     end
 
@@ -310,7 +345,9 @@ defmodule JidoTest.Agent.AuthoringTest do
       defmodule JidoTest.BareAgent#{System.unique_integer([:positive])} do
         use Jido.Agent, name: "bare"
         routes do
-          forward "test.pass", to: parent()
+          route "test.pass" do
+            forward to: parent()
+          end
         end
       end
       """)
@@ -342,7 +379,7 @@ defmodule JidoTest.Agent.AuthoringTest do
 
   @tag obligation: ["jido.agent.I1", "jido.agent.I21"]
   test "inline routes compile ordinary Actions with access to private helpers" do
-    target = InlineCounter.route_action!("inline.add")
+    target = InlineCounter.route_executable!("inline.add")
 
     assert {:ok, %Jido.Instruction{kind: :action, target: ^target}} =
              Jido.Instruction.resolve(target)
@@ -364,13 +401,15 @@ defmodule JidoTest.Agent.AuthoringTest do
       compile_agent(
         """
         route "test.classify" do
-          action schema: Zoi.object(%{amount: Zoi.integer()}), context: context do
+          action schema: Zoi.object(%{amount: Zoi.integer()}), output_schema: Zoi.map(), context: context do
             %{amount: amount} when amount > 0 ->
               {:ok, %{context.agent_state | result: :positive}}
 
             _ ->
               {:ok, %{context.agent_state | result: :other}}
           end
+
+          state from: output()
         end
         """,
         "",
@@ -394,6 +433,41 @@ defmodule JidoTest.Agent.AuthoringTest do
 
     assert {:ok, %{state: %{result: :other}}, []} =
              module.cmd(module.instantiate!(id: Jido.Signal.ID.generate!()), other)
+  end
+
+  @tag obligation: ["jido.agent.I1", "jido.agent.I22"]
+  test "compiled Agents canonicalize string state selectors against atom output fields" do
+    compiled =
+      compile_agent("""
+      route "test.project", JidoTest.Agent.AuthoringTest.ProjectedOutput do
+        state from: output("state")
+      end
+      """)
+
+    {module, _bytecode} =
+      Enum.find(compiled, fn {compiled_module, _bytecode} ->
+        function_exported?(compiled_module, :definition, 0)
+      end)
+
+    assert [%{state: %{path: [:state]}}] = module.definition().routes
+  end
+
+  @tag obligation: ["jido.agent.I1", "jido.agent.I22"]
+  test "compiled Agents canonicalize string reply selectors against atom output fields" do
+    compiled =
+      compile_agent("""
+      route "test.project", JidoTest.Agent.AuthoringTest.ProjectedOutput do
+        state :unchanged
+        reply "test.project.done", from: output("reply")
+      end
+      """)
+
+    {module, _bytecode} =
+      Enum.find(compiled, fn {compiled_module, _bytecode} ->
+        function_exported?(compiled_module, :definition, 0)
+      end)
+
+    assert [%{reply: %{from: %{path: [:reply]}}}] = module.definition().routes
   end
 
   @tag obligation: "jido.agent.I21"
@@ -506,7 +580,8 @@ defmodule JidoTest.Agent.AuthoringTest do
                  %{
                    path: "tuple.add",
                    handler: %{kind: :action, target: Add},
-                   defaults: %{amount: 2}
+                   defaults: %{amount: 2},
+                   state: %{source: :output, path: []}
                  }
                ]
              })
@@ -517,7 +592,7 @@ defmodule JidoTest.Agent.AuthoringTest do
   @tag obligation: "jido.agent.I21"
   test "map inputs support optional list and keyword fields without ambiguity" do
     compiled =
-      compile_agent("route \"test.list\", ListInputs, as: :list")
+      compile_agent("route \"test.list\", ListInputs, as: :list do state from: output() end")
 
     {module, _} =
       Enum.find(compiled, fn {module, _} -> function_exported?(module, :list_signal, 1) end)
@@ -535,9 +610,11 @@ defmodule JidoTest.Agent.AuthoringTest do
       compile_agent(
         """
         route "test.add" do
-          action params do
+          action params, output_schema: Zoi.map() do
             {:ok, params}
           end
+
+          state from: output()
         end
         """,
         "",
@@ -572,14 +649,17 @@ defmodule JidoTest.Agent.AuthoringTest do
 
           routes do
             signal_source "/reloaded"
-            route "reloaded.add", #{inspect(module)}.Add, as: :add
+            route "reloaded.add", #{inspect(module)}.Add, as: :add do
+              state from: output()
+            end
           end
         end
 
         defmodule #{inspect(module)}.Add do
           use Jido.Action,
             name: "reloaded_add",
-            schema: Zoi.object(%{#{field}: Zoi.integer()})
+            schema: Zoi.object(%{#{field}: Zoi.integer()}),
+            output_schema: Zoi.map()
 
           def run(params, _context), do: {:ok, %{count: params.#{field}}}
         end
@@ -604,11 +684,13 @@ defmodule JidoTest.Agent.AuthoringTest do
     defmodule #{inspect(module)} do
       use Jido.Agent, name: "action_reload"
       routes do
-        route "reload.run", #{inspect(action)}
+        route "reload.run", #{inspect(action)} do
+          state from: output()
+        end
       end
     end
     defmodule #{inspect(action)} do
-      use Jido.Action, name: "reload_action"
+      use Jido.Action, name: "reload_action", output_schema: Zoi.map()
       def run(_params, _context), do: {:ok, %{}}
     end
     """)

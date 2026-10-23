@@ -37,7 +37,8 @@ defmodule Jido.Examples.BurstBuncher do
             item_id: Zoi.string() |> Zoi.min(1),
             item: Zoi.any()
           }),
-        context: context do
+        context: context,
+        output_schema: Zoi.map() do
         state = context.agent_state
 
         if input.item_id in state.handled_item_ids do
@@ -85,12 +86,15 @@ defmodule Jido.Examples.BurstBuncher do
           end
         end
       end
+
+      state(from: output())
     end
 
     route "examples.runtime.burst_buncher.flush", as: :flush do
       action %{generation: generation},
         schema: Zoi.object(%{generation: Zoi.integer() |> Zoi.min(0)}),
-        context: context do
+        context: context,
+        output_schema: Zoi.map() do
         state = context.agent_state
 
         if generation == state.timer_generation and state.buffer != [] do
@@ -117,6 +121,8 @@ defmodule Jido.Examples.BurstBuncher do
           {:ok, state}
         end
       end
+
+      state(from: output())
     end
   end
 

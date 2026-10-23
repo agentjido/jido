@@ -2,13 +2,18 @@ defmodule Jido.Examples.DefinitionRevision do
   @moduledoc "A saved definition retains its version and checks its executable references."
 
   defmodule Add do
-    use Jido.Action, name: "definition_revision_add"
+    use Jido.Action,
+      name: "definition_revision_add",
+      output_schema: Zoi.map()
+
     def run(_input, %{agent_state: state}), do: {:ok, %{total: state.total + 1}}
   end
 
   defmodule Upgrade do
     @moduledoc "Explicitly selects the current Action for an older snapshot."
-    use Jido.Action, name: "definition_revision_upgrade"
+    use Jido.Action,
+      name: "definition_revision_upgrade",
+      output_schema: Zoi.map()
 
     def run(%{snapshot: snapshot}, _context) do
       agent = %{
@@ -28,6 +33,8 @@ defmodule Jido.Examples.DefinitionRevision do
   end
 
   routes do
-    route "examples.persistence.definition_revision.add", Add, as: :add
+    route "examples.persistence.definition_revision.add", Add, as: :add do
+      state(from: output())
+    end
   end
 end

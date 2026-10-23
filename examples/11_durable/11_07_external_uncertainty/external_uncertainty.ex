@@ -14,7 +14,9 @@ defmodule Jido.Examples.Durable.ExternalUncertainty do
     signal_source "/examples/durable/external_uncertainty"
 
     route "examples.durable.external_uncertainty.publish",
-          Jido.Examples.Durable.ExternalUncertainty.Publish, as: :publish
+          Jido.Examples.Durable.ExternalUncertainty.Publish, as: :publish do
+      state(from: output())
+    end
   end
 end
 
@@ -27,7 +29,8 @@ defmodule Jido.Examples.Durable.ExternalUncertainty.Publish do
         operation_id: Zoi.string() |> Zoi.min(1),
         report: Zoi.string() |> Zoi.min(1),
         policy: Zoi.enum([:idempotent, :manual])
-      })
+      }),
+    output_schema: Zoi.map()
 
   flow do
     # AgentServer confirms this result before it starts the provider call.

@@ -15,15 +15,22 @@ defmodule Jido.Examples.FlowDirectives do
 
   routes do
     signal_source "/examples/workflow/flow_directives"
-    route "examples.workflow.flow_directives.run", __MODULE__.Success, as: :run
-    route "examples.workflow.flow_directives.fail", __MODULE__.Failure, as: :fail
+
+    route "examples.workflow.flow_directives.run", __MODULE__.Success, as: :run do
+      state(from: output())
+    end
+
+    route "examples.workflow.flow_directives.fail", __MODULE__.Failure, as: :fail do
+      state(from: output())
+    end
   end
 
   defmodule RecordStep do
     @moduledoc false
     use Jido.Action,
       name: "workflow_flow_directives_record_step",
-      schema: Zoi.object(%{label: Zoi.string() |> Zoi.min(1), count: Zoi.integer()})
+      schema: Zoi.object(%{label: Zoi.string() |> Zoi.min(1), count: Zoi.integer()}),
+      output_schema: Zoi.map()
 
     def run(input, context) do
       {:ok, %{context.agent_state | count: input.count}, [%Effects.Record{label: input.label}]}
@@ -32,7 +39,10 @@ defmodule Jido.Examples.FlowDirectives do
 
   defmodule Reject do
     @moduledoc false
-    use Jido.Action, name: "workflow_flow_directives_reject", schema: Zoi.object(%{})
+    use Jido.Action,
+      name: "workflow_flow_directives_reject",
+      schema: Zoi.object(%{}),
+      output_schema: Zoi.map()
 
     def run(_input, _context), do: {:error, :flow_rejected}
   end
