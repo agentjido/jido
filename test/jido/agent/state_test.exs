@@ -25,6 +25,35 @@ defmodule Jido.Agent.StateTest do
     end
   end
 
+  @tag obligation: ["jido.agent.I6", "jido.agent.I8"]
+  test "initial state can be partial and the merged state uses one schema validation" do
+    schema =
+      Zoi.object(%{
+        count: Zoi.integer() |> Zoi.refine({__MODULE__, :observe, []}),
+        enabled: Zoi.boolean() |> Zoi.default(true)
+      })
+
+    definition =
+      Agent.define!(%{
+        name: "partial_initial_state",
+        schema: schema,
+        initial_state: %{enabled: false}
+      })
+
+    assert {:ok, agent} =
+             Agent.instantiate(definition,
+               id: Jido.Signal.ID.generate!(),
+               state: %{count: 3}
+             )
+
+    assert agent.state === %{count: 3, enabled: false}
+    assert_received {:validated, 3}
+    refute_received {:validated, _}
+
+    invalid = %{definition | initial_state: %{enabled: "false"}}
+    assert {:error, %Jido.Agent.Error{path: [:state]}} = Agent.instantiate(invalid, id: "bad")
+  end
+
   @tag obligation: "jido.agent.I8"
   test "defaults and explicit nil cannot insert invalid values" do
     for schema <- [

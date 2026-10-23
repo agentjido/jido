@@ -36,6 +36,7 @@ defmodule JidoTest.AgentRegistry do
   defp references(%Agent{} = agent) do
     optional(:agent, agent.module) ++
       [{:schema, agent.schema}] ++
+      references(agent.initial_state) ++
       references(agent.metadata) ++
       Enum.flat_map(agent.routes, &route_references/1) ++
       topology_references(agent.topology) ++

@@ -2,6 +2,8 @@
 
 Use the implemented V3 Agent contract. A definition has no instance identity or
 state. Instantiate it before use. Send Signals to Actions or Flows.
+Map definitions can declare a plain, static `initial_state`. Explicit instance
+state replaces matching top-level fields before the schema applies defaults.
 Direct `Jido.Agent.cmd/3` returns `{:ok, candidate, directives}` or an error.
 A live `AgentServer.call/3` returns `{:ok, committed_agent}` or an error.
 

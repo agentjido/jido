@@ -131,6 +131,7 @@ defmodule Jido.Agent.CodecTest do
         description: "all portable fields",
         vsn: 3,
         schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}),
+        initial_state: %{count: 4},
         metadata: %{owner: :codec},
         signal_source: "/codec",
         routes: [
@@ -212,6 +213,16 @@ defmodule Jido.Agent.CodecTest do
     assert {:ok, plugin_document} = JidoTest.AgentRegistry.encode(definition, plugin_registry)
     assert {:ok, ^definition} = JidoTest.AgentRegistry.decode(plugin_document, plugin_registry)
     assert {:error, %{code: :unknown_reference}} = JidoTest.AgentRegistry.encode(definition, %{})
+  end
+
+  @tag obligation: "jido.agent.I20"
+  test "Codec reads a version 1 definition without initial state" do
+    definition = Agent.define!(%{name: "legacy_initial_state"})
+    registry = JidoTest.AgentRegistry.for(definition)
+    assert {:ok, document} = JidoTest.AgentRegistry.encode(definition, registry)
+    document = update_in(document["definition"], &Map.delete(&1, "initial_state"))
+
+    assert {:ok, ^definition} = JidoTest.AgentRegistry.decode(document, registry)
   end
 
   @tag obligation: "jido.agent.I20"
@@ -340,6 +351,7 @@ defmodule Jido.Agent.CodecTest do
       Map.delete(document, "vsn"),
       put_in(document, ["definition", "schema"], Map.put(schema, "$type", "unknown")),
       put_in(document, ["definition", "schema"], Map.put(schema, "extra", true)),
+      put_in(document, ["definition", "initial_state"], false),
       put_in(document, ["definition", "routes"], false),
       put_in(document, ["definition", "routes"], [%{"path" => "child.single"}]),
       put_in(document, ["definition", "routes"], [%{route | "handler" => %{"kind" => "bad"}}]),

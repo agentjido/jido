@@ -80,6 +80,7 @@ defmodule Jido.Agent.ValidationTest do
              description: nil,
              vsn: 1,
              schema: Zoi.object(%{}),
+             initial_state: %{},
              extensions: [],
              routes: [],
              signal_source: nil,
@@ -92,6 +93,14 @@ defmodule Jido.Agent.ValidationTest do
 
     for field <- [:name, :schema, :extensions, :routes, :metadata, :topology] do
       assert {:error, _} = Agent.define(Map.put(%{name: "defaults"}, field, nil))
+    end
+  end
+
+  @tag obligation: ["jido.agent.I3", "jido.agent.I6"]
+  test "initial state must be a plain static Map" do
+    for initial_state <- [nil, [], %URI{}, %{process: self()}] do
+      assert {:error, %Agent.Error{path: [:initial_state]}} =
+               Agent.define(%{name: "invalid_initial_state", initial_state: initial_state})
     end
   end
 

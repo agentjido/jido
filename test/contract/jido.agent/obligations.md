@@ -79,6 +79,13 @@ not restore or claim the retired standalone `jido.topology` component.
 - **kind:** functional
 - **status:** active
 
+### jido.agent.I6 — Declared initial state
+
+- **scope:** `Jido.Agent.define/1`, `Jido.Agent.instantiate/2`
+- **must:** A Map definition can contain one plain, static initial-state Map. Instantiation makes a shallow merge in which explicit state replaces declared top-level fields. It then applies schema defaults and validates the complete result. The source definition stays unchanged.
+- **kind:** functional
+- **status:** active
+
 ### jido.agent.I7 — Instance identity and options
 
 - **scope:** `Jido.Agent.instantiate/2`
@@ -89,7 +96,7 @@ not restore or claim the retired standalone `jido.topology` component.
 ### jido.agent.I8 — Initialization defaults
 
 - **scope:** `Jido.Agent.instantiate/2`
-- **must:** Initialization applies Zoi defaults and preserves valid false, zero, and empty values.
+- **must:** Initialization applies declared initial state, then explicit state, then Zoi defaults. It preserves valid false, zero, and empty values.
 - **kind:** functional
 - **status:** active
 
@@ -119,7 +126,7 @@ not restore or claim the retired standalone `jido.topology` component.
 ### jido.agent.I20 — Agent document adapter
 
 - **scope:** `Jido.Authoring.encode/2`, `Jido.Authoring.decode/2`, `Jido.Authoring.encode_json/2`, `Jido.Authoring.decode_json/2`, `Jido.Agent.Codec`
-- **must:** Register the Agent document type with shared Authoring. Write a portable Agent definition through a trusted Registry, omit instance ID and state, read through `Jido.Agent.define/1`, and reject a malformed or unsupported Agent document. Shared document, Registry, JSON, and portable-value rules remain owned by `jido_action`.
+- **must:** Register the Agent document type with shared Authoring. Write a portable Agent definition, including declared initial state, through a trusted Registry. Omit instance ID and state, read through `Jido.Agent.define/1`, and reject a malformed or unsupported Agent document. Read a version 1 document that omits initial state as an empty initial-state Map. Shared document, Registry, JSON, and portable-value rules remain owned by `jido_action`.
 - **kind:** persisted-format
 - **status:** active
 

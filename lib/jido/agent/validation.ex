@@ -10,6 +10,7 @@ defmodule Jido.Agent.Validation do
     :description,
     :vsn,
     :schema,
+    :initial_state,
     :metadata,
     :signal_source,
     :routes,
@@ -99,9 +100,15 @@ defmodule Jido.Agent.Validation do
          {:ok, opts} <- options(opts, [:id, :state]),
          :ok <- Error.at(Data.nonempty(opts[:id]), :id),
          {:ok, schema} <- Jido.Agent.Validation.state_schema(definition),
-         {:ok, state} <- Error.at(Data.initialize(schema, Map.get(opts, :state, %{})), :state),
+         {:ok, state} <-
+           Error.at(merge_state(definition.initial_state, Map.get(opts, :state, %{})), :state),
+         {:ok, state} <- Error.at(Data.initialize(schema, state), :state),
          {:ok, _} <- Topology.bind(definition, state),
          do: {:ok, %{definition | id: opts.id, state: state}}
+  end
+
+  defp merge_state(initial_state, state) do
+    with :ok <- Data.plain_map(state), do: {:ok, Map.merge(initial_state, state)}
   end
 
   def resolve(%Jido.Agent{} = definition), do: validate_definition(definition)
@@ -173,6 +180,8 @@ defmodule Jido.Agent.Validation do
          :ok <- optional_description(definition.description),
          :ok <- Error.at(Data.positive(definition.vsn), :vsn),
          :ok <- Error.at(Data.schema(definition.schema), :schema),
+         :ok <- Error.at(Data.plain_map(definition.initial_state), :initial_state),
+         :ok <- Error.at(Data.static(definition.initial_state), :initial_state),
          :ok <- Error.at(Data.plain_map(definition.metadata), :metadata),
          :ok <- Error.at(Data.static(definition.metadata), :metadata),
          :ok <- source(definition.signal_source),

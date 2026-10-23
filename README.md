@@ -147,9 +147,9 @@ Full documentation is on [HexDocs](https://hexdocs.pm/jido). Start with:
 
 ## Features
 
-- Agent definitions from the `agent`/`routes` DSL, plain maps with
-  `Jido.Agent.define/1`, or portable definition JSON through
-  `Jido.Authoring`. All three run the same validation.
+- Agent definitions from the `agent`/`routes` DSL, plain maps with optional
+  static initial state through `Jido.Agent.define/1`, or portable definition
+  JSON through `Jido.Authoring`. All three run the same validation.
 - Routes to Actions, Flows, transforms, and pass-through handlers, matched in
   declaration order with exact types or `*` wildcards.
 - Generated Signal constructors from `as:` and typed Signals with

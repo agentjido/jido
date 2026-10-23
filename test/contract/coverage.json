@@ -1,9 +1,9 @@
 {
   "apps": {
     "jido": {
-      "active": 124,
+      "active": 125,
       "coverage": 1.0,
-      "covered": 124
+      "covered": 125
     },
     "jido.agent_server": {
       "active": 71,
@@ -18,10 +18,10 @@
   },
   "components": {
     "jido.agent": {
-      "active": 23,
+      "active": 24,
       "app": "jido",
       "coverage": 1.0,
-      "covered": 23,
+      "covered": 24,
       "form": "light",
       "obligations": {
         "jido.agent.I1": {
@@ -98,11 +98,12 @@
         "jido.agent.I20": {
           "failing": 0,
           "kind": "persisted_format",
-          "passing": 10,
+          "passing": 11,
           "status": "active",
           "testable": true,
           "tests": [
             "test Codec preserves every portable Agent field and nested variant",
+            "test Codec reads a version 1 definition without initial state",
             "test Codec rejects incomplete instance shapes before it derives a definition",
             "test Codec rejects malformed values at each document boundary",
             "test Codec rejects the old Agent envelope",
@@ -302,7 +303,7 @@
         "jido.agent.I3": {
           "failing": 0,
           "kind": "functional",
-          "passing": 12,
+          "passing": 13,
           "status": "active",
           "testable": true,
           "tests": [
@@ -313,6 +314,7 @@
             "test collection errors retain the failed field, declaration, and index",
             "test definitions are neutral and instances need explicit identity and complete stored state",
             "test field validation follows one fixed order",
+            "test initial state must be a plain static Map",
             "test neutral definitions use explicit canonical defaults",
             "test scalar authoring validators keep their exact boundaries",
             "test the DSL rejects invalid identity, repeated core declarations, and unsafe helpers",
@@ -379,11 +381,24 @@
         "jido.agent.I5": {
           "failing": 0,
           "kind": "functional",
-          "passing": 1,
+          "passing": 2,
           "status": "active",
           "testable": true,
           "tests": [
+            "test a Map definition can provide reusable initial state",
             "test duplicate declarations fail and instance reuse preserves order and exact values"
+          ]
+        },
+        "jido.agent.I6": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 3,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test a Map definition can provide reusable initial state",
+            "test initial state can be partial and the merged state uses one schema validation",
+            "test initial state must be a plain static Map"
           ]
         },
         "jido.agent.I7": {
@@ -404,15 +419,17 @@
         "jido.agent.I8": {
           "failing": 0,
           "kind": "functional",
-          "passing": 13,
+          "passing": 15,
           "status": "active",
           "testable": true,
           "tests": [
+            "test a Map definition can provide reusable initial state",
             "test a successful refinement cannot change initialized state",
             "test container defaults are checked during creation and never filled in stored state",
             "test deep invalid defaults fail during initialization",
             "test defaults and explicit nil cannot insert invalid values",
             "test discriminated union defaults cannot bypass validation",
+            "test initial state can be partial and the merged state uses one schema validation",
             "test initialization cannot strip Map keys or convert list values",
             "test initialization retains nested defaults, explicit nil, and supplied values",
             "test initialization uses Zoi defaults and preserves supplied values",
@@ -3641,8 +3658,8 @@
   },
   "covenant": "0.2.0",
   "totals": {
-    "active": 229,
+    "active": 230,
     "coverage": 1.0,
-    "covered": 229
+    "covered": 230
   }
 }

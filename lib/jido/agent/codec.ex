@@ -5,8 +5,9 @@ defmodule Jido.Agent.Codec do
   alias Jido.Agent.{Authoring, Error, Extension}
   alias Jido.Authoring.{Issue, Registry, Value}
 
-  @fields ~w(module name description vsn schema metadata signal_source routes topology extensions)a
+  @fields ~w(module name description vsn schema initial_state metadata signal_source routes topology extensions)a
   @field_names Enum.map(@fields, &Atom.to_string/1)
+  @required_field_names @field_names -- ["initial_state"]
   @type document :: %{required(String.t()) => term()}
 
   @doc false
@@ -55,6 +56,7 @@ defmodule Jido.Agent.Codec do
   defp encode_fields(agent, registry) do
     with {:ok, module} <- optional_reference(agent.module, registry, [:agent]),
          {:ok, schema} <- encode_reference(agent.schema, registry, [:schema]),
+         {:ok, initial_state} <- Value.encode(agent.initial_state, registry),
          {:ok, metadata} <- Value.encode(agent.metadata, registry),
          {:ok, routes} <- encode_list(agent.routes, &encode_route(&1, registry)),
          {:ok, topology} <- encode_topology(agent.topology, registry),
@@ -66,6 +68,7 @@ defmodule Jido.Agent.Codec do
          "description" => agent.description,
          "vsn" => agent.vsn,
          "schema" => schema,
+         "initial_state" => initial_state,
          "metadata" => metadata,
          "signal_source" => agent.signal_source,
          "routes" => routes,
@@ -76,10 +79,11 @@ defmodule Jido.Agent.Codec do
   end
 
   defp decode_fields(fields, registry) do
-    with :ok <- object(fields, @field_names),
+    with :ok <- object(fields, @required_field_names, ["initial_state"]),
          {:ok, module} <- at(optional_resolve(fields["module"], registry, :agent), ["module"]),
          {:ok, schema} <-
            at(Registry.decode_reference(registry, fields["schema"], :schema), ["schema"]),
+         {:ok, initial_state} <- decode_initial_state(fields, registry),
          {:ok, metadata} <- at(Value.decode(fields["metadata"], registry), ["metadata"]),
          {:ok, routes} <-
            at(decode_list(fields["routes"], &decode_route(&1, registry)), ["routes"]),
@@ -96,6 +100,7 @@ defmodule Jido.Agent.Codec do
          description: fields["description"],
          vsn: fields["vsn"],
          schema: schema,
+         initial_state: initial_state,
          metadata: metadata,
          signal_source: fields["signal_source"],
          routes: routes,
@@ -103,6 +108,12 @@ defmodule Jido.Agent.Codec do
          extensions: extensions
        }}
     end
+  end
+
+  defp decode_initial_state(fields, registry) do
+    if Map.has_key?(fields, "initial_state"),
+      do: at(Value.decode(fields["initial_state"], registry), ["initial_state"]),
+      else: {:ok, %{}}
   end
 
   defp encode_route(route, registry) do

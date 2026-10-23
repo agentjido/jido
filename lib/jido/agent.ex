@@ -3,9 +3,10 @@ defmodule Jido.Agent do
   Author Agent definitions as Maps or with the Spark DSL.
 
   Definitions and instances use this struct. A definition has nil `id` and
-  `state`. An instance has a nonempty `id` and complete `state`, including
-  Plugin-owned fields. Authoring and instance construction do not start
-  processes or execute handlers. JSON uses trusted Registry references.
+  `state`. A Map definition can contain a static `initial_state`. An instance
+  has a nonempty `id` and complete `state`, including Plugin-owned fields.
+  Authoring and instance construction do not start processes or execute
+  handlers. JSON uses trusted Registry references.
 
   Routes select one handler in declaration order. Connections select recipients
   for outputs. Providers add explicit, validated data to `extensions`.
@@ -32,6 +33,7 @@ defmodule Jido.Agent do
             description: Zoi.string() |> Zoi.nullable() |> Zoi.default(nil),
             vsn: Zoi.integer() |> Zoi.min(1) |> Zoi.default(1),
             schema: Zoi.any() |> Zoi.default(Zoi.object(%{})),
+            initial_state: Zoi.map() |> Zoi.default(%{}),
             metadata: Zoi.map() |> Zoi.default(%{}),
             signal_source: Zoi.string() |> Zoi.min(1) |> Zoi.nullable() |> Zoi.default(nil),
             routes: Zoi.list(Zoi.any()) |> Zoi.default([]),
@@ -54,8 +56,8 @@ defmodule Jido.Agent do
   def schema(%__MODULE__{} = agent),
     do: Validation.state_schema(agent) |> Jido.Agent.Error.unwrap!()
 
-  @type definition :: %__MODULE__{id: nil, state: nil}
-  @type instance :: %__MODULE__{id: String.t(), state: map()}
+  @type definition :: %__MODULE__{id: nil, state: nil, initial_state: map()}
+  @type instance :: %__MODULE__{id: String.t(), state: map(), initial_state: map()}
 
   @doc """
   Defines a compiled Agent module with the Agent DSL.
@@ -148,7 +150,13 @@ defmodule Jido.Agent do
     end
   end
 
-  @doc "Builds and validates a neutral Agent definition from a plain map."
+  @doc """
+  Builds and validates a neutral Agent definition from a plain Map.
+
+  The optional `initial_state` field must be a plain, static Map. During
+  instantiation, explicit `state` values replace matching top-level fields in
+  `initial_state`. The state schema then adds defaults and validates the result.
+  """
   @spec define(map()) :: {:ok, definition()} | {:error, term()}
   def define(map), do: Validation.define(map)
 
@@ -180,7 +188,12 @@ defmodule Jido.Agent do
   def definition(module) when is_atom(module),
     do: module |> Validation.resolve() |> Jido.Agent.Error.unwrap!()
 
-  @doc "Builds and validates one Agent instance from a definition or compiled Agent module."
+  @doc """
+  Builds and validates one Agent instance from a definition or compiled Agent module.
+
+  Explicit `state` values replace matching top-level `initial_state` fields.
+  The state schema then adds defaults and validates the complete state.
+  """
   @spec instantiate(definition() | module(), keyword() | map()) ::
           {:ok, instance()} | {:error, term()}
   def instantiate(source, opts \\ []), do: Validation.instantiate(source, opts)

@@ -182,6 +182,7 @@ defmodule Jido.AgentTest do
              name: "counter",
              description: "Counts Signals",
              schema: agent_schema,
+             initial_state: %{},
              extensions: [],
              state: nil
            } = definition
@@ -203,6 +204,7 @@ defmodule Jido.AgentTest do
                :name,
                :description,
                :schema,
+               :initial_state,
                :extensions,
                :signal_source,
                :state,

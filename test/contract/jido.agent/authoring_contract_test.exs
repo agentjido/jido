@@ -194,6 +194,39 @@ defmodule JidoTest.Contract.AgentAuthoringTest do
     assert Leaf.definition() === definition
   end
 
+  @tag obligation: ["jido.agent.I5", "jido.agent.I6", "jido.agent.I8"]
+  test "a Map definition can provide reusable initial state" do
+    definition =
+      Agent.define!(%{
+        name: "map_initial_state",
+        schema:
+          Zoi.object(%{
+            count: Zoi.integer() |> Zoi.default(1),
+            label: Zoi.string() |> Zoi.default("schema"),
+            settings: Zoi.map() |> Zoi.default(%{source: :schema})
+          }),
+        initial_state: %{count: 2, settings: %{source: :definition}}
+      })
+
+    assert Agent.instantiate!(definition, id: "first").state === %{
+             count: 2,
+             label: "schema",
+             settings: %{source: :definition}
+           }
+
+    assert Agent.instantiate!(definition,
+             id: "second",
+             state: %{count: 0, settings: %{source: :caller}}
+           ).state === %{
+             count: 0,
+             label: "schema",
+             settings: %{source: :caller}
+           }
+
+    assert definition.initial_state === %{count: 2, settings: %{source: :definition}}
+    assert definition.id == nil and definition.state == nil
+  end
+
   @tag obligation: ["jido.agent.I3", "jido.agent.I4"]
   test "the DSL rejects invalid identity, repeated core declarations, and unsafe helpers" do
     assert_raise Jido.Authoring.Registry.Error, ~r/Registry identifier/, fn ->

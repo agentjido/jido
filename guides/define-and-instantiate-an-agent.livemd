@@ -115,6 +115,21 @@ definition = Define.Profile.definition()
 
 The result is `{"profile", 2, %{domain: "profiles"}, nil, true}`.
 
+A Map definition can contain reusable initial state:
+
+```elixir
+map_definition =
+  Jido.Agent.define!(%{
+    name: "map_profile",
+    schema: Zoi.object(%{name: Zoi.string() |> Zoi.default("Anonymous")}),
+    initial_state: %{name: "Guest"}
+  })
+
+map_definition.initial_state
+```
+
+The result is `%{name: "Guest"}`. The value must be a plain, static Map.
+
 ## Create An Instance
 
 `instantiate!/1` adds an `id` and builds state from the schema defaults.
@@ -128,7 +143,9 @@ agent = Define.Profile.instantiate!(id: "profile-1")
 The result is `{%{name: "Anonymous", tags: [], visits: 0}, true}`. The
 `visits` field comes from the Plugin, not from your schema.
 
-Pass `state:` to set initial values. Fields you leave out get their defaults:
+Pass `state:` to set initial values. For a Map definition, these values replace
+matching top-level fields in `initial_state`. Fields you leave out get their
+schema defaults:
 
 ```elixir
 agent2 = Define.Profile.instantiate!(id: "profile-2", state: %{name: "Ada", tags: ["admin"]})
