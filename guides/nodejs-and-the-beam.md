@@ -276,7 +276,9 @@ defmodule MyApp.Fail do
 end
 
 # In MyApp.Counter's routes:
-#   route "counter.fail", MyApp.Fail, as: :fail
+#   route "counter.fail", MyApp.Fail, as: :fail do
+#     state :unchanged
+#   end
 
 pid = MyApp.Jido.whereis_agent("user-42")
 {:error, error} = Jido.AgentServer.call(pid, MyApp.Counter.fail_signal!())
@@ -353,8 +355,7 @@ defmodule MyApp.Reminders do
 
     route "reminder.request", as: :request do
       action %{text: text, delay_ms: delay},
-        schema: Zoi.object(%{text: Zoi.string(), delay_ms: Zoi.integer()}),
-        context: context do
+        schema: Zoi.object(%{text: Zoi.string(), delay_ms: Zoi.integer()}), context: context do
         due = Jido.Signal.new!("reminder.due", %{text: text}, source: "/my_app/reminders")
         {:ok, context.agent_state, [Jido.Plugin.Scheduler.schedule(delay, due)]}
       end

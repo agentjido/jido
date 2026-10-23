@@ -7,12 +7,37 @@ defmodule JidoTest.AgentServer.Effects.ReplyGateTest do
   alias Jido.Signal
 
   @tag obligation: "jido.agent_server.effects.I13"
-  test "the Reply effect returns the exact Signal" do
+  test "the Reply effect adds correlation and does not use the fallback handler" do
     signal = Signal.new!("reply.gate", %{value: 1}, source: "/test/reply-gate")
     directive = Directive.reply(signal)
+    request_id = Signal.ID.generate!()
 
-    assert {:reply, ^signal} =
-             Effects.run(directive, fn _, _ -> flunk("Reply used the fallback handler") end, %{})
+    context = %{
+      agent: %{id: "reply-gate-agent", state: %{}},
+      turn_id: Signal.ID.generate!(),
+      signal_id: request_id,
+      state_version: 1,
+      plugin_specs: [],
+      plugin_refs: %{},
+      source_signal: signal,
+      effective_signal: signal,
+      turn_context: %{},
+      jido: nil,
+      partition: nil
+    }
+
+    result =
+      Jido.Tracing.Context.with_context(Jido.Tracing.Trace.new_root(), fn ->
+        Effects.run(directive, fn _, _ -> flunk("Reply used the fallback handler") end, context)
+      end)
+
+    assert {:reply, delivered} = result
+
+    assert Map.drop(Map.from_struct(delivered), [:extensions]) ==
+             Map.drop(Map.from_struct(signal), [:extensions])
+
+    assert Signal.get_context(delivered, "jidocausationid") == request_id
+    assert Signal.Trace.get(delivered) != nil
   end
 
   @tag obligation: "jido.agent_server.effects.I13"

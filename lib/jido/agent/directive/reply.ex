@@ -3,7 +3,8 @@ defmodule Jido.Agent.Directive.Reply do
   Represents one correlated Signal response to the current request.
 
   A Reply does not dispatch its Signal and does not contain a delivery address.
-  Use `Jido.SignalAction.reply/3` to build the validated, correlated Signal.
+  Agent routes can create a Reply from validated executable output. Callers that
+  build this low-level Directive must supply a complete correlated Signal.
   """
 
   @schema Zoi.struct(

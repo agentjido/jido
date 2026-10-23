@@ -47,7 +47,7 @@ not restore or claim the retired standalone `jido.topology` component.
 ### jido.agent.I1 — Canonical DSL parity
 
 - **scope:** `Jido.Agent.define/1`, `Jido.Agent.__using__/1`
-- **must:** The optional, single-use `state`, `plugins`, `routes`, and `topology` sections lower state schema, declared initial state, provider configuration, ordered routes, logical members, and connections into the same canonical Agent definition as an equivalent Map declaration. `use Jido.Agent` owns static metadata. Selected providers can add non-core sections without replacing a core section. The removed `agent do` block is invalid.
+- **must:** The optional, single-use `state`, `plugins`, `routes`, and `topology` sections lower state schema, declared initial state, provider configuration, ordered routes, logical members, and connections into the same canonical Agent definition as an equivalent Map declaration. `use Jido.Agent` owns static metadata. Selected providers can add non-core sections without replacing a core section.
 - **kind:** functional
 - **status:** active
 
@@ -68,7 +68,7 @@ not restore or claim the retired standalone `jido.topology` component.
 ### jido.agent.I4 — Route declaration policy
 
 - **scope:** `Jido.Agent.define/1`, `Jido.Agent.__using__/1`
-- **must:** Authoring rejects duplicate route paths or helper names. A generated helper requires an exact route and a lowercase atom that starts with a letter and contains only letters, digits, and underscores. Map authoring rejects keyword declarations in place of a plain Map.
+- **must:** Authoring rejects duplicate route paths or helper names. An Action or Flow route that omits `state` uses its complete validated output as the next state. An explicit route state can select another output path or keep the current state unchanged. A generated helper requires an exact route and a lowercase atom that starts with a letter and contains only letters, digits, and underscores. Map authoring rejects keyword declarations in place of a plain Map.
 - **kind:** functional
 - **status:** active
 
@@ -168,7 +168,7 @@ not restore or claim the retired standalone `jido.topology` component.
 ### jido.agent.I32 — Generated Agent module facade
 
 - **scope:** `Jido.Agent.__using__/1`, generated Agent modules
-- **must:** Generate documented `vsn/0`, `schema/0`, `definition/0`, `instantiate/0,1`, `instantiate!/0,1`, `cmd/2,3`, and `route_action!/1` functions that delegate to the canonical Agent boundaries. Keep compiler authoring metadata hidden. `route_action!/1` returns the compiled Action target for an inline route and raises when the path has no inline Action.
+- **must:** Generate documented `vsn/0`, `schema/0`, `definition/0`, `instantiate/0,1`, `instantiate!/0,1`, `cmd/2,3`, and `route_executable!/1` functions that delegate to the canonical Agent boundaries. Keep compiler authoring metadata hidden. `route_executable!/1` returns the Action or Flow target for an exact executable route. It raises `ArgumentError` for a terminal handler or unknown path.
 - **kind:** functional
 - **status:** active
 

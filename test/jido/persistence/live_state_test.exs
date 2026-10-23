@@ -7,7 +7,8 @@ defmodule JidoTest.Persistence.LiveStateTest do
   alias Jido.Persistence.ETS
 
   defmodule Update do
-    use Jido.Action, name: "local_state_update"
+    use Jido.Action,
+      name: "local_state_update"
 
     def run(input, context) do
       state = %{

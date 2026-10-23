@@ -14,7 +14,7 @@ defmodule JidoTest.Contract.PluginAuditTest do
       agent_module: __MODULE__,
       signal: Jido.Signal.new!("audit.contract", %{}, source: "/contract"),
       state_before: %{audit: plugin_state},
-      state: %{audit: plugin_state},
+      candidate_state: %{audit: plugin_state},
       plugin_state: plugin_state,
       prepared_input: nil,
       directives: directives

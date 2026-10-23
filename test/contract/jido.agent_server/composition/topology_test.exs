@@ -70,7 +70,8 @@ defmodule JidoTest.AgentServer.Composition.TopologyTest do
   end
 
   defmodule Reply do
-    use Jido.Action, name: "topology_reply"
+    use Jido.Action,
+      name: "topology_reply"
 
     def run(_, context) do
       signal = Jido.Signal.new!("received", %{amount: 1}, source: "/worker")
@@ -91,7 +92,8 @@ defmodule JidoTest.AgentServer.Composition.TopologyTest do
   end
 
   defmodule RemoveBus do
-    use Jido.Action, name: "remove_composition_bus"
+    use Jido.Action,
+      name: "remove_composition_bus"
 
     def run(%{snapshot: snapshot}, _) do
       agent = %{
@@ -109,7 +111,13 @@ defmodule JidoTest.AgentServer.Composition.TopologyTest do
     Agent.define!(%{
       name: "worker",
       schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}),
-      routes: [%{path: "work", handler: %{kind: :action, target: handler}}]
+      routes: [
+        %{
+          path: "work",
+          handler: %{kind: :action, target: handler},
+          state: %{source: :output, path: []}
+        }
+      ]
     })
   end
 
@@ -155,7 +163,13 @@ defmodule JidoTest.AgentServer.Composition.TopologyTest do
       Agent.define!(%{
         name: "bound",
         schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(1)}),
-        routes: [%{path: "work", handler: %{kind: :action, target: F.Work}}],
+        routes: [
+          %{
+            path: "work",
+            handler: %{kind: :action, target: F.Work},
+            state: %{source: :output, path: []}
+          }
+        ],
         topology: topology
       })
       |> Agent.instantiate!(id: unique_id("bound"))

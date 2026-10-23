@@ -1,6 +1,7 @@
 defmodule JidoTest.System.ControlledWork do
   @moduledoc false
-  use Jido.Action, name: "system_controlled_work"
+  use Jido.Action,
+    name: "system_controlled_work"
 
   def run(%{value: value} = params, context) do
     if gate = params[:gate] do

@@ -72,6 +72,7 @@ defmodule MyApp.Counter do
       action %{amount: amount},
         name: "increment",
         schema: Zoi.object(%{amount: Zoi.integer()}),
+        output_schema: Zoi.object(%{count: Zoi.integer()}),
         context: context do
         {:ok, %{context.agent_state | count: context.agent_state.count + amount}}
       end
@@ -114,6 +115,10 @@ raises when the data isn't a plain map or an option is invalid.
 Neither checks the data against the Action schema; the Turn does that. `defaults:` fills `amount` when the Signal data
 leaves it out.
 
+An Action or Flow route uses its complete output as the next Agent state by
+default. Use `state from: output(:field)` to select part of the output, or use
+`state :unchanged` to keep the current state.
+
 ## Why This Library?
 
 - **State is validated on every change.** An Action returns the complete next
@@ -152,8 +157,7 @@ Full documentation is on [HexDocs](https://hexdocs.pm/jido). Start with:
   JSON through `Jido.Authoring`. All three run the same validation.
 - Routes to Actions, Flows, transforms, and explicit forward targets, matched
   in declaration order with exact types or `*` wildcards.
-- Generated Signal constructors from `as:` and typed Signals with
-  `Jido.SignalAction`.
+- Generated Signal constructors from exact routes that use `as:`.
 - Built-in Directives to reply, emit Signals, send to other Agents, start and
   stop Agents and processes, and stop the Server.
 - Nested Agents with counts and state bindings, connected by declared
@@ -196,7 +200,9 @@ defmodule MyApp.Reset do
   end
 end
 
-# In the Agent: route "counter.reset", MyApp.Reset, as: :reset
+# In the Agent:
+#
+# route "counter.reset", MyApp.Reset, as: :reset
 
 {:ok, counter} =
   Jido.start_agent(MyApp.Counter, id: "counter-2", default_dispatch: {:pid, target: self()})

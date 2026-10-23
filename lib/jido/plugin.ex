@@ -60,7 +60,7 @@ defmodule Jido.Plugin do
   @callback validate_options(keyword()) :: :ok | {:error, term()}
   @callback admit(term() | nil, Jido.AgentServer.Plugin.Admission.t(), keyword()) ::
               {:ok, term()} | {:error, term()}
-  @callback prepare_dispatch(
+  @callback prepare_outbound(
               term() | nil,
               Jido.Signal.t(),
               Jido.Plugin.SignalContext.t(),
@@ -104,7 +104,7 @@ defmodule Jido.Plugin do
     agent_server: [
       validate_options: 1,
       admit: 3,
-      prepare_dispatch: 4,
+      prepare_outbound: 4,
       dispatch: 4,
       child_spec: 1,
       await_ready: 2,

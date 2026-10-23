@@ -167,7 +167,11 @@ defmodule Jido.Agent.Mutation do
 
   defp route_value(op, d) do
     handler = if is_atom(d.handler), do: %{kind: :executable, target: d.handler}, else: d.handler
-    {:edit, :routes, op, d.path, %{Map.from_struct(d) | handler: handler}}
+
+    value = %{Map.from_struct(d) | handler: handler}
+    value = if is_nil(value.state), do: Map.delete(value, :state), else: value
+
+    {:edit, :routes, op, d.path, value}
   end
 
   defp connection_value(op, d) do
@@ -188,7 +192,7 @@ defmodule Jido.Agent.Mutation do
     allowed =
       case collection do
         :agents -> [:definition, :count, :initial_state]
-        :routes -> [:handler, :as, :defaults]
+        :routes -> [:handler, :as, :defaults, :state, :reply]
         :connections -> [:delivery]
       end
 

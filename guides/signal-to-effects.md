@@ -188,7 +188,7 @@ An `Emit` Directive goes to the first of:
 4. the Server's `default_dispatch:` option; or
 5. the same Agent Server, as a cast.
 
-Plugins with `prepare_dispatch/4` can prepare the outbound Signal. It keeps
+Plugins with `prepare_outbound/4` can prepare the outbound Signal. It keeps
 the source Signal's trace and causation.
 
 > #### Emits default to the same Agent {: .warning}

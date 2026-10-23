@@ -10,7 +10,15 @@ defmodule JidoTest.Contract.AgentEvaluationTest do
   end
 
   defp route(path, target, opts \\ []),
-    do: Map.merge(%{path: path, handler: %{kind: :action, target: target}}, Map.new(opts))
+    do:
+      Map.merge(
+        %{
+          path: path,
+          handler: %{kind: :action, target: target},
+          state: %{source: :output, path: []}
+        },
+        Map.new(opts)
+      )
 
   def transform(%Jido.Signal{} = signal),
     do: {:ok, %{signal | type: "effect.transformed", data: %{value: 2}}}
@@ -50,7 +58,15 @@ defmodule JidoTest.Contract.AgentEvaluationTest do
     refute_received {:executed, _, _}
 
     flow_source =
-      F.instance(routes: [%{path: "test.run", handler: %{kind: :flow, target: F.Flow}}])
+      F.instance(
+        routes: [
+          %{
+            path: "test.run",
+            handler: %{kind: :flow, target: F.Flow},
+            state: %{source: :output, path: []}
+          }
+        ]
+      )
 
     assert {:ok, flow_candidate, []} = Agent.cmd(flow_source, F.signal(%{amount: 2}))
     assert flow_candidate.state.count == 2
@@ -201,7 +217,9 @@ defmodule JidoTest.Contract.AgentEvaluationTest do
     assert {:error, _} =
              Agent.cmd(source, F.signal(%{directives: [%Directive.Emit{signal: :invalid}]}))
 
-    change = Directive.route_add("next", F.Return)
+    change =
+      Directive.route_add("next", F.Return)
+
     output = %{source.state | count: 2}
 
     assert {:ok, candidate, [^change]} =
@@ -306,7 +324,14 @@ defmodule JidoTest.Contract.AgentEvaluationTest do
     assert output.data == %{value: 1}
 
     assert {:ok, _, [%Directive.RouteAdd{}]} =
-             Agent.cmd(source, F.signal(%{directives: [Directive.route_add("next", F.Return)]}))
+             Agent.cmd(
+               source,
+               F.signal(%{
+                 directives: [
+                   Directive.route_add("next", F.Return)
+                 ]
+               })
+             )
 
     for {request, code} <- [
           {%{kind: :emit, type: "effect.allowed", data: %{}, unknown: true}, :unknown_fields},
@@ -495,7 +520,7 @@ defmodule JidoTest.Contract.AgentEvaluationTest do
     assert_receive {:reduce, first}
     assert_receive {:reduce, second}
     assert first.state_before === source.state
-    assert second.state === %{source.state | first: 1}
+    assert second.candidate_state === %{source.state | first: 1}
 
     assert {:error,
             %Jido.Error.ExecutionError{

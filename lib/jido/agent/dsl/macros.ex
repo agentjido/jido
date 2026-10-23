@@ -1,12 +1,5 @@
 defmodule Jido.Agent.DSL.Macros do
   @moduledoc false
-  defmacro agent(do: _block) do
-    raise CompileError,
-      file: __CALLER__.file,
-      line: __CALLER__.line,
-      description: "agent do is not supported; use state do and plugins do"
-  end
-
   defmacro agent(name), do: quote(do: %{kind: :agent, name: unquote(name)})
   defmacro parent, do: quote(do: %{kind: :parent})
   defmacro state(do: block), do: section(:state, :__state__, block, __CALLER__)
@@ -15,18 +8,12 @@ defmodule Jido.Agent.DSL.Macros do
   defmacro topology(do: block), do: section(:topology, :__topology__, block, __CALLER__)
 
   defp section(name, internal, block, caller) do
-    attr = :agent_sections
-    declared = Module.get_attribute(caller.module, attr) || []
+    declared = Module.get_attribute(caller.module, :agent_sections) || []
 
     if name in declared,
-      do:
-        raise(CompileError,
-          file: caller.file,
-          line: caller.line,
-          description: "Agent section #{name} can be declared only once"
-        )
+      do: error!(caller, "Agent section #{name} can be declared only once")
 
-    Module.put_attribute(caller.module, attr, [name | declared])
+    Module.put_attribute(caller.module, :agent_sections, [name | declared])
 
     settings =
       case name do
@@ -35,31 +22,27 @@ defmodule Jido.Agent.DSL.Macros do
         _ -> []
       end
 
-    expressions =
-      case block do
-        {:__block__, _, items} -> items
-        item -> [item]
-      end
-
-    keys = for {key, _, _} <- expressions, key in settings, do: key
+    keys = for {key, _, _} <- expressions(block), key in settings, do: key
 
     if Enum.uniq(keys) != keys,
-      do:
-        raise(CompileError,
-          file: caller.file,
-          line: caller.line,
-          description: "Agent field can be declared only once"
-        )
+      do: error!(caller, "Agent field can be declared only once")
 
     quote do
       unquote(internal)(do: unquote(block))
     end
   end
+
+  def expressions({:__block__, _, items}), do: items
+  def expressions(item), do: [item]
+
+  defp error!(caller, message),
+    do: raise(CompileError, file: caller.file, line: caller.line, description: message)
 end
 
 defmodule Jido.Agent.DSL.RouteMacros do
   @moduledoc false
-  alias Jido.Action.Inline
+  alias Jido.Action.Inline, as: InlineAction
+  alias Jido.Flow.Inline, as: InlineFlow
 
   @entity Module.concat([
             Jido.Agent.DSL.Extension,
@@ -78,28 +61,15 @@ defmodule Jido.Agent.DSL.RouteMacros do
   defmacro route(path, target, options, block),
     do: build(path, target, options ++ block, __CALLER__)
 
-  defmacro forward(path, options) do
-    unless Keyword.keyword?(options) and Enum.uniq(Keyword.keys(options)) == Keyword.keys(options),
-      do: error!(__CALLER__, "Forward requires unique keyword options")
-
-    case options do
-      [to: target] ->
-        build_forward(path, target, __CALLER__)
-
-      _ ->
-        error!(__CALLER__, "Forward requires only one explicit :to destination")
-    end
-  end
-
   defp build(path, target, options, caller) do
     unless Keyword.keyword?(options) and Enum.uniq(Keyword.keys(options)) == Keyword.keys(options),
       do: error!(caller, "Route requires unique keyword options")
 
     unknown = Keyword.keys(options) -- [:as, :defaults, :do]
     if unknown != [], do: error!(caller, "Unknown route options: #{inspect(unknown)}")
-    {path, target, options} = signal_action_route(path, target, options, caller)
     {body, options} = Keyword.pop(options, :do)
-    {declaration, handler} = handler(path, target, body, caller)
+    {declaration, handler, state, reply} = route_body(path, target, body, caller)
+    options = options ++ [state: Macro.escape(state), reply: Macro.escape(reply)]
 
     quote line: caller.line do
       unquote(declaration)
@@ -108,107 +78,166 @@ defmodule Jido.Agent.DSL.RouteMacros do
     end
   end
 
-  defp signal_action_route(path, target, options, caller) do
-    case Macro.expand(path, caller) do
-      module when is_atom(module) and module not in [nil, true, false] ->
-        if Keyword.has_key?(options, :do),
-          do: error!(caller, "A SignalAction route does not accept an inline handler")
+  defp route_body(_path, nil, nil, caller),
+    do: error!(caller, "A route requires exactly one handler in its body")
 
-        target = if target, do: validate_signal_action_target!(target, caller), else: path
-        type = quote do: Jido.Agent.DSL.RouteMacros.__signal_action_type__(unquote(path), __ENV__)
-        {type, target, options}
+  defp route_body(_path, target, nil, _caller),
+    do: {nil, quote(do: %{kind: :executable, target: unquote(target)}), default_state(), nil}
 
-      _ ->
-        {path, target, options}
+  defp route_body(path, target, body, caller) do
+    roles = Enum.group_by(Jido.Agent.DSL.Macros.expressions(body), &role/1)
+
+    if Map.has_key?(roles, :unknown),
+      do: error!(caller, "A route body contains an unsupported declaration")
+
+    handlers = Map.get(roles, :handler, [])
+    mappings = Map.get(roles, :mapping, [])
+
+    case target do
+      nil -> inline_route_body(path, handlers, mappings, caller)
+      target -> referenced_route_body(target, handlers, mappings, caller)
     end
   end
 
-  @doc false
-  def __signal_action_type__(module, env) do
-    Code.ensure_compiled!(module)
+  defp role({name, _, _}) when name in [:action, :flow, :forward, :transform], do: :handler
+  defp role({name, _, _}) when name in [:state, :reply], do: :mapping
+  defp role(_expression), do: :unknown
 
-    if Jido.SignalAction.defined?(module),
-      do: Macro.compile_apply(module, :type, [], env),
-      else: raise(ArgumentError, "Module route requires a Jido.SignalAction")
+  defp referenced_route_body(target, [], mappings, caller) do
+    {state, reply} = executable_mappings(mappings, caller)
+    {nil, quote(do: %{kind: :executable, target: unquote(target)}), state, reply}
   end
 
-  defp validate_signal_action_target!(target, caller) do
-    module = Macro.expand(target, caller)
+  defp referenced_route_body(_target, _handlers, _mappings, caller),
+    do: error!(caller, "A positional target route body can contain only state and reply")
 
-    case Jido.Agent.Route.executable(module) do
-      {:ok, _handler} -> target
-      {:error, error} -> error!(caller, Exception.message(error))
-    end
-  end
+  defp inline_route_body(_path, handlers, _mappings, caller) when length(handlers) != 1,
+    do: error!(caller, "A route without a positional target requires exactly one handler")
 
-  defp handler(_path, nil, nil, caller),
-    do: error!(caller, "A string route requires an Action, Flow, or inline handler")
+  defp inline_route_body(path, [{kind, meta, args}], mappings, caller) do
+    caller = %{caller | line: Keyword.get(meta, :line, caller.line)}
+    terminal? = kind in [:forward, :transform]
+    if terminal?, do: terminal_mappings!(mappings, caller)
 
-  defp handler(_path, target, nil, _caller) do
-    {nil, quote(do: %{kind: :executable, target: unquote(target)})}
-  end
-
-  defp handler(_path, target, _body, caller) when not is_nil(target),
-    do: error!(caller, "A route cannot combine a target and an inline handler")
-
-  defp handler(path, nil, body, caller) do
-    expressions =
-      case body do
-        {:__block__, _, items} -> items
-        item -> [item]
+    {declaration, handler} =
+      case kind do
+        :action -> inline_action(path, args, caller)
+        :flow -> inline_flow(path, args, caller)
+        :transform -> transform(path, args, caller)
+        :forward -> {nil, forward_handler(args, caller)}
       end
 
-    case expressions do
-      [{:action, meta, args}] ->
-        inline(path, args, %{caller | line: Keyword.get(meta, :line, caller.line)})
+    {state, reply} =
+      if terminal?, do: {:unchanged, nil}, else: executable_mappings(mappings, caller)
 
-      [{:transform, meta, args}] ->
-        transform(path, args, %{caller | line: Keyword.get(meta, :line, caller.line)})
-
-      _ ->
-        error!(caller, "A route block requires exactly one action or transform")
-    end
+    {declaration, handler, state, reply}
   end
 
-  defp build_forward(path, target, caller) do
-    handler = quote(do: %{kind: :forward, target: unquote(target)})
+  defp executable_mappings(mappings, caller) do
+    states = for {:state, _, _} = state <- mappings, do: state
+    replies = for {:reply, _, _} = reply <- mappings, do: reply
 
-    quote line: caller.line do
-      require unquote(@entity)
-      unquote(@entity).__route__(unquote(path), unquote(handler), [])
-    end
+    if length(states) > 1,
+      do: error!(caller, "An Action or Flow route accepts at most one state declaration")
+
+    if length(replies) > 1,
+      do: error!(caller, "An Action or Flow route accepts at most one reply declaration")
+
+    state = if states == [], do: default_state(), else: parse_state(hd(states), caller)
+    {state, parse_reply(List.first(replies), caller)}
   end
 
-  defp inline(path, args, caller) do
-    parsed =
+  defp default_state, do: %{source: :output, path: []}
+
+  defp terminal_mappings!([], _caller), do: :ok
+
+  defp terminal_mappings!(_mappings, caller),
+    do: error!(caller, "A forward or transform route body can contain only its handler")
+
+  defp parse_state({:state, _meta, [:unchanged]}, _caller), do: :unchanged
+
+  defp parse_state({:state, _meta, [[from: selector]]}, caller),
+    do: parse_selector(selector, caller)
+
+  defp parse_state(_state, caller),
+    do: error!(caller, "State must be :unchanged or select from output")
+
+  defp parse_reply(nil, _caller), do: nil
+
+  defp parse_reply({:reply, _meta, [type, [from: selector]]}, caller) when is_binary(type) do
+    %{type: type, from: parse_selector(selector, caller)}
+  end
+
+  defp parse_reply(_reply, caller),
+    do: error!(caller, "Reply requires one literal Signal type and one output selector")
+
+  defp parse_selector({:output, _meta, []}, _caller), do: %{source: :output, path: []}
+
+  defp parse_selector({:output, _meta, [path]}, caller) do
+    path = if is_list(path), do: path, else: [path]
+
+    if Enum.all?(path, &(is_atom(&1) or is_binary(&1))),
+      do: %{source: :output, path: path},
+      else: error!(caller, "Output selector paths contain only literal atom or string fields")
+  end
+
+  defp parse_selector(_selector, caller),
+    do: error!(caller, "Result mappings require output() or output(path)")
+
+  defp forward_handler([[to: target]], _caller),
+    do: quote(do: %{kind: :forward, target: unquote(target)})
+
+  defp forward_handler(_args, caller),
+    do: error!(caller, "Forward requires only one explicit :to destination")
+
+  defp inline_action(path, args, caller) do
+    {pattern, options} =
       case args do
-        [opts] when is_list(opts) ->
-          Inline.parse_callback!(nil, opts, caller)
-
-        [opts, body] when is_list(opts) and is_list(body) ->
-          Inline.parse_callback!(nil, opts ++ body, caller)
-
-        [pattern, opts] when is_list(opts) ->
-          Inline.parse_callback!(pattern, opts, caller)
-
-        [pattern, opts, body] when is_list(opts) and is_list(body) ->
-          Inline.parse_callback!(pattern, opts ++ body, caller)
-
-        _ ->
-          error!(caller, "Invalid inline Action")
+        [opts] when is_list(opts) -> {nil, opts}
+        [opts, body] when is_list(opts) and is_list(body) -> {nil, opts ++ body}
+        [pattern, opts] when is_list(opts) -> {pattern, opts}
+        [pattern, opts, body] when is_list(opts) and is_list(body) -> {pattern, opts ++ body}
+        _ -> error!(caller, "Invalid inline Action")
       end
 
+    parsed = InlineAction.parse_callback!(pattern, options, caller)
     identity = quote do: [host: Jido.Agent, route: unquote(path), role: :action]
 
     compiled =
-      Inline.compile!(identity, parsed, caller,
+      InlineAction.compile!(identity, parsed, caller,
         default_name: path,
         remove_imports: [
-          {__MODULE__, [route: 1, route: 2, route: 3, route: 4, forward: 2]}
+          {__MODULE__, [route: 1, route: 2, route: 3, route: 4]}
         ]
       )
 
     {compiled.declaration_ast, quote(do: %{kind: :action, target: unquote(compiled.target_ast)})}
+  end
+
+  defp inline_flow(path, args, caller) do
+    {options, body} =
+      case args do
+        [options, [do: body]] when is_list(options) ->
+          {options, body}
+
+        [options] when is_list(options) ->
+          case Keyword.pop(options, :do) do
+            {nil, _options} -> error!(caller, "Inline Flow requires a body")
+            {body, options} -> {options, body}
+          end
+
+        _other ->
+          error!(caller, "Invalid inline Flow")
+      end
+
+    unless Keyword.keyword?(options) and Enum.uniq(Keyword.keys(options)) == Keyword.keys(options),
+      do: error!(caller, "Inline Flow requires unique keyword options")
+
+    options = Keyword.put_new(options, :name, path)
+    identity = quote do: [host: Jido.Agent, route: unquote(path), role: :flow]
+    compiled = InlineFlow.compile!(identity, options, body, caller)
+
+    {compiled.declaration_ast, quote(do: %{kind: :flow, target: unquote(compiled.target_ast)})}
   end
 
   defp transform(path, args, caller) do
@@ -287,17 +316,15 @@ defmodule Jido.Agent.DSL.RouteMacros do
      String.to_atom("__agent_transform_clauses_" <> suffix)}
   end
 
-  defp transform_clause(fun, {:when, meta, [pattern, guard]}, body, line) do
-    head = {:when, meta, [{fun, meta, [pattern]}, guard]}
+  defp transform_clause(fun, pattern, body, line) do
+    head =
+      case pattern do
+        {:when, meta, [pattern, guard]} -> {:when, meta, [{fun, meta, [pattern]}, guard]}
+        pattern -> {fun, [line: line, context: Elixir], [pattern]}
+      end
 
     quote line: line do
       defp unquote(head), do: unquote(body)
-    end
-  end
-
-  defp transform_clause(fun, pattern, body, line) do
-    quote line: line do
-      defp unquote(fun)(unquote(pattern)), do: unquote(body)
     end
   end
 

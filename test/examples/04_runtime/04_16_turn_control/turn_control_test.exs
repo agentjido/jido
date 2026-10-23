@@ -24,7 +24,8 @@ defmodule JidoTest.Examples.Runtime.TurnControlBlockingAgent do
     signal_source "/test/examples/runtime/turn_control"
 
     route "test.examples.runtime.turn_control.complete",
-          JidoTest.Examples.Runtime.TurnControlBlockingAction
+          JidoTest.Examples.Runtime.TurnControlBlockingAction do
+    end
   end
 end
 

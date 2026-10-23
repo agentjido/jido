@@ -33,7 +33,6 @@ defmodule Jido.MixProject do
      [
        {"guides/define-and-instantiate-an-agent.livemd", "Define an Agent"},
        {"guides/build-agent-routes.livemd", "Routes and Handlers"},
-       {"guides/typed-signal-actions.livemd", "Typed Signals"},
        {"guides/agent-results-and-directives.md", "State and Directives"},
        {"guides/agent-mutations-and-diffs.livemd", "Mutations and Diffs"},
        {"guides/agent-documents-and-views.md", "Documents and Views"}
@@ -223,8 +222,7 @@ defmodule Jido.MixProject do
         ],
         "Agent Authoring": [
           Jido.Agent.Extension,
-          Jido.Agent.Topology,
-          Jido.SignalAction
+          Jido.Agent.Topology
         ],
         "Agent Directives": [
           Jido.Agent.Directive,

@@ -84,7 +84,8 @@ defmodule JidoTest.Examples.Durable.ObservedAgent do
       Jido.Agent.Composition.apply(agent, agent.state, [
         Jido.Agent.Directive.route_replace(
           "examples.durable.saved_progress.run",
-          JidoTest.Examples.Durable.ObservedFlow
+          JidoTest.Examples.Durable.ObservedFlow,
+          state: %{source: :output, path: []}
         )
       ])
 
@@ -105,4 +106,5 @@ defmodule JidoTest.Examples.Durable.ObservedFlow do
   defdelegate validate_params(input), to: Jido.Examples.Durable.SavedProgress
   @impl true
   defdelegate validate_output(output), to: Jido.Examples.Durable.SavedProgress
+  defdelegate output_schema(), to: Jido.Examples.Durable.SavedProgress
 end

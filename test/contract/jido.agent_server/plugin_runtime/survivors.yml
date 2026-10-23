@@ -162,7 +162,7 @@
 
 - at: lib/jido/agent_server/plugin/callbacks.ex:174:11
   operator: string_empty
-  mutation: "`\"Agent Server Plugin prepare_dispatch/4 returned an invalid result\"` → `\"\"`"
+  mutation: "`\"Agent Server Plugin prepare_outbound/4 returned an invalid result\"` → `\"\"`"
   sort: log-only
   reason: The contract fixes invalid-result rejection and structured callback details, not human-readable prose.
 
@@ -174,7 +174,7 @@
 
 - at: lib/jido/agent_server/plugin/callbacks.ex:204:11
   operator: string_empty
-  mutation: "`\"Agent Server Plugin prepare_dispatch/4 returned an invalid Signal\"` → `\"\"`"
+  mutation: "`\"Agent Server Plugin prepare_outbound/4 returned an invalid Signal\"` → `\"\"`"
   sort: log-only
   reason: The contract fixes complete Signal validation and structured validation details, not human-readable prose.
 

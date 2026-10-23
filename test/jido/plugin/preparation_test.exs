@@ -55,7 +55,7 @@ defmodule Jido.Plugin.PreparationTest do
         _mode ->
           {:ok,
            %{
-             candidate_value: reduction.state.value,
+             candidate_value: reduction.candidate_state.value,
              prepared_state_value: reduction.prepared_input.state_value,
              previous_value: reduction.state_before.value
            }}
@@ -188,7 +188,13 @@ defmodule Jido.Plugin.PreparationTest do
           prepared_signal_type: Zoi.string() |> Zoi.default(""),
           value: Zoi.integer() |> Zoi.default(0)
         }),
-      routes: [%{path: "prepare.run", handler: %{kind: :action, target: Capture}}],
+      routes: [
+        %{
+          path: "prepare.run",
+          handler: %{kind: :action, target: Capture},
+          state: %{source: :output, path: []}
+        }
+      ],
       extensions: [
         %{id: Package.id(), provider: Package, vsn: Package.vsn(), data: %{mode: mode}}
       ]

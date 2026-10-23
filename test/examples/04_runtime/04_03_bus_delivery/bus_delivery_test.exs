@@ -27,28 +27,28 @@ defmodule JidoTest.Examples.Runtime.BusDeliveryFixture do
   routes do
     signal_source "/test/bus_delivery"
 
-    route("examples.runtime.bus_delivery.record",
-      as: :record,
-      do:
-        action(%{value: value}, schema: Zoi.object(%{value: Zoi.integer()}), context: context) do
-          context.plugin_inputs[JidoTest.FeatureObserver].runtime.on_delivery.(%{
-            value: value
-          })
+    route "examples.runtime.bus_delivery.record", as: :record do
+      action %{value: value},
+        schema: Zoi.object(%{value: Zoi.integer()}),
+        context: context do
+        context.plugin_inputs[JidoTest.FeatureObserver].runtime.on_delivery.(%{
+          value: value
+        })
 
-          state = context.agent_state
+        state = context.agent_state
 
-          if context.signal.id in state.seen do
-            {:ok, state}
-          else
-            {:ok,
-             %{
-               state
-               | seen: state.seen ++ [context.signal.id],
-                 values: state.values ++ [value]
-             }}
-          end
+        if context.signal.id in state.seen do
+          {:ok, state}
+        else
+          {:ok,
+           %{
+             state
+             | seen: state.seen ++ [context.signal.id],
+               values: state.values ++ [value]
+           }}
         end
-    )
+      end
+    end
   end
 end
 

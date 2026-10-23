@@ -5,7 +5,8 @@ defmodule Jido.Agent.StateBoundaryTest do
   alias Jido.AgentServer
 
   defmodule Replace do
-    use Jido.Action, name: "state_boundary_replace"
+    use Jido.Action,
+      name: "state_boundary_replace"
 
     def run(%{candidate: candidate}, _context),
       do: {:ok, candidate, [Jido.AgentServer.Directive.server_stop(:invalid_state_committed)]}
@@ -21,7 +22,13 @@ defmodule Jido.Agent.StateBoundaryTest do
       Agent.define!(%{
         name: "state_boundary",
         schema: schema,
-        routes: [%{path: "state.replace", handler: %{kind: :action, target: Replace}}]
+        routes: [
+          %{
+            path: "state.replace",
+            handler: %{kind: :action, target: Replace},
+            state: %{source: :output, path: []}
+          }
+        ]
       })
 
     agent = Agent.instantiate!(definition, id: unique_id("defaults"))
@@ -44,7 +51,9 @@ defmodule Jido.Agent.StateBoundaryTest do
   end
 
   defmodule Keep do
-    use Jido.Action, name: "state_boundary_keep"
+    use Jido.Action,
+      name: "state_boundary_keep"
+
     def run(_params, context), do: {:ok, context.agent_state}
   end
 
@@ -68,7 +77,13 @@ defmodule Jido.Agent.StateBoundaryTest do
         extensions: [
           %{id: OwnedState.id(), provider: OwnedState, vsn: OwnedState.vsn(), data: %{}}
         ],
-        routes: [%{path: "owned.reduce", handler: %{kind: :action, target: Keep}}]
+        routes: [
+          %{
+            path: "owned.reduce",
+            handler: %{kind: :action, target: Keep},
+            state: %{source: :output, path: []}
+          }
+        ]
       })
 
     agent = Agent.instantiate!(definition, id: unique_id("owned-defaults"))

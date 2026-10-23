@@ -5,7 +5,8 @@ defmodule Jido.Plugin.HeartbeatIntegrationTest do
   alias Jido.Plugin.Heartbeat
 
   defmodule RecordHeartbeat do
-    use Jido.Action, name: "plugin_record_heartbeat"
+    use Jido.Action,
+      name: "plugin_record_heartbeat"
 
     @impl Jido.Action
     def run(params, context) do

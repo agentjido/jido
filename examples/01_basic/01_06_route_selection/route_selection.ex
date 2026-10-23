@@ -25,7 +25,8 @@ defmodule Jido.Examples.RouteSelection do
     # The first matching route wins. Keep the fallback last.
     route "examples.basic.route_selection.order.create", Record,
       as: :create,
-      defaults: %{handler: "create"}
+      defaults: %{handler: "create"} do
+    end
 
     route "examples.basic.route_selection.order.*", Record, defaults: %{handler: "order"}
 

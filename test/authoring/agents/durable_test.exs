@@ -19,7 +19,11 @@ defmodule JidoTest.Authoring.Agents.DurableTest do
         module: Authored,
         name: "authored_durable",
         routes: [
-          %{path: "request", handler: %{kind: :flow, target: F.Flow}}
+          %{
+            path: "request",
+            handler: %{kind: :flow, target: F.Flow},
+            state: %{source: :output, path: []}
+          }
         ]
       })
 

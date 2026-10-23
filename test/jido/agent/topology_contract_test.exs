@@ -17,6 +17,7 @@ defmodule Jido.Agent.TopologyContractTest do
 
     routes do
       route "work.one", JidoTest.AgentContract.Return
+
       route "work.two", JidoTest.AgentContract.Return
     end
   end
@@ -191,7 +192,13 @@ defmodule Jido.Agent.TopologyContractTest do
     base =
       Agent.define!(%{
         name: "topology_checks",
-        routes: [%{path: "work.one", handler: %{kind: :action, target: F.Return}}],
+        routes: [
+          %{
+            path: "work.one",
+            handler: %{kind: :action, target: F.Return},
+            state: %{source: :output, path: []}
+          }
+        ],
         topology: %{agents: [%{name: :child, definition: Child}]}
       })
 
@@ -220,7 +227,13 @@ defmodule Jido.Agent.TopologyContractTest do
     unknown_source =
       Agent.define!(%{
         name: "unknown_source",
-        routes: [%{path: "work.one", handler: %{kind: :action, target: F.Return}}],
+        routes: [
+          %{
+            path: "work.one",
+            handler: %{kind: :action, target: F.Return},
+            state: %{source: :output, path: []}
+          }
+        ],
         topology: %{agents: [%{name: :child, definition: Child}]}
       })
 
@@ -249,7 +262,13 @@ defmodule Jido.Agent.TopologyContractTest do
     definition =
       Agent.define!(%{
         name: "provider_endpoints",
-        routes: [%{path: "work.one", handler: %{kind: :action, target: F.Return}}],
+        routes: [
+          %{
+            path: "work.one",
+            handler: %{kind: :action, target: F.Return},
+            state: %{source: :output, path: []}
+          }
+        ],
         extensions: [contribution],
         topology: %{
           agents: [%{name: :child, definition: Child}],
@@ -300,7 +319,13 @@ defmodule Jido.Agent.TopologyContractTest do
   test "invalid endpoint and delivery values fail at the final topology boundary" do
     base = %{
       name: "invalid_connections",
-      routes: [%{path: "work.one", handler: %{kind: :action, target: F.Return}}],
+      routes: [
+        %{
+          path: "work.one",
+          handler: %{kind: :action, target: F.Return},
+          state: %{source: :output, path: []}
+        }
+      ],
       topology: %{agents: [%{name: :child, definition: Child}]}
     }
 
@@ -322,7 +347,13 @@ defmodule Jido.Agent.TopologyContractTest do
     base =
       Agent.define!(%{
         name: "connection_selection",
-        routes: [%{path: "work.*", handler: %{kind: :action, target: F.Return}}],
+        routes: [
+          %{
+            path: "work.*",
+            handler: %{kind: :action, target: F.Return},
+            state: %{source: :output, path: []}
+          }
+        ],
         topology: %{
           agents: [
             %{name: :one, definition: Child},

@@ -31,8 +31,7 @@ defmodule Watch.Counter do
 
     route "counter.increment", as: :increment, defaults: %{amount: 1} do
       action %{amount: amount},
-        schema: Zoi.object(%{amount: Zoi.integer()}),
-        context: context do
+        schema: Zoi.object(%{amount: Zoi.integer()}), context: context do
         count = context.agent_state.count + amount
 
         {:ok, %{context.agent_state | count: count},

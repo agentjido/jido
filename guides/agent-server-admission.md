@@ -43,8 +43,7 @@ defmodule MyApp.Worker do
             ms: Zoi.integer() |> Zoi.default(0),
             fail: Zoi.boolean() |> Zoi.default(false),
             emits: Zoi.integer() |> Zoi.default(0)
-          }),
-        context: context do
+          }), context: context do
         Process.sleep(ms)
 
         if fail do

@@ -3,7 +3,8 @@ defmodule Jido.Examples.StateMigration do
 
   defmodule WalletV1ToV2 do
     @moduledoc "Converts a version 1 wallet snapshot to version 2."
-    use Jido.Action, name: "wallet_v1_to_v2"
+    use Jido.Action,
+      name: "wallet_v1_to_v2"
 
     @schema Zoi.object(%{
               wallet:

@@ -18,7 +18,7 @@ These changes break the most V2 code. Fix them first.
 | --- | --- |
 | `MyAgent.new(opts)` returns an Agent | `MyAgent.instantiate(opts)` returns `{:ok, agent}`; `instantiate!/1` raises |
 | `schema: [count: [type: :integer]]` in `use Jido.Agent` | `schema(Zoi.object(...))` inside a `state do` block |
-| `signal_routes: [{"type", Action}]` | `route "type", Action` inside a `routes do` block |
+| `signal_routes: [{"type", Action}]` | `route "type", Action, do: state(:unchanged)` inside a `routes do` block |
 | `cmd(agent, Action)` or `cmd(agent, {Action, params})` | `cmd(agent, signal)`; only a `%Jido.Signal{}` is accepted |
 | `{agent, directives} = cmd(...)` | `{:ok, candidate, directives}` or `{:error, reason}` |
 | Action returns a partial state map | Action returns the complete next state |
@@ -178,8 +178,8 @@ functions. V3 routes are declarations:
 
 | V2 `signal_routes` entry | V3 route |
 | --- | --- |
-| `{"user.created", MyAction}` | `route "user.created", MyAction` |
-| `{"payment.*", match_fun, MyAction, 10}` | `route "payment.*", MyAction`; put the check in the Action or a Plugin `admit/3` |
+| `{"user.created", MyAction}` | `route "user.created", MyAction, do: state(:unchanged)` |
+| `{"payment.*", match_fun, MyAction, 10}` | `route "payment.*", MyAction, do: state(:unchanged)`; put the check in the Action or a Plugin `admit/3` |
 | `signal_routes/1` callback | Removed; change routes with `route_add/3` and related Directives |
 | Plugin-supplied routes | Declare every route on the Agent |
 
@@ -188,8 +188,7 @@ no route fails with `"No route accepts this Signal type"`.
 
 V3 adds handlers that V2 didn't have: inline `action` blocks, Flow routes,
 transforms, and explicit forwards to named children or the parent. See
-[Routes and Handlers](build-agent-routes.livemd) and
-[Typed Signals](typed-signal-actions.livemd).
+[Routes and Handlers](build-agent-routes.livemd).
 
 ## Live Agents
 
@@ -297,7 +296,7 @@ state includes `turns: 1`.
 | `handle_signal/2` | `admit/3` can reject; it can't change the selected route |
 | `prepare_signal/2` | `prepare/2`; it adds input but can't change the Signal |
 | `prepare_action/3` | Removed; use the Action schema |
-| `prepare_emit/2` | `prepare_dispatch/4` |
+| `prepare_emit/2` | `prepare_outbound/4` |
 | `transform_result/3` | `reduce/2`, for the Plugin's own field only |
 | `child_spec(config)` | `child_spec(%Jido.Plugin.Init{})` |
 | `on_checkpoint/2`, `on_restore/2` | `dump/3` and `load/3` |

@@ -17,7 +17,8 @@ defmodule Jido.AgentTest do
   }
 
   defmodule TwoStepFlow do
-    use Jido.Flow, name: "agent_test_two_step"
+    use Jido.Flow,
+      name: "agent_test_two_step"
 
     flow do
       step "first",
@@ -94,7 +95,8 @@ defmodule Jido.AgentTest do
   defmodule WithStopDirective do
     @moduledoc false
 
-    use Jido.Action, name: "agent_with_stop_directive"
+    use Jido.Action,
+      name: "agent_with_stop_directive"
 
     @impl Jido.Action
     def run(%{label: label}, context) do
@@ -144,8 +146,15 @@ defmodule Jido.AgentTest do
                  target -> {target, %{}}
                end
 
-             with {:ok, handler} <- Agent.Route.executable(target),
-                  do: {:ok, %{path: path, handler: handler, defaults: defaults}}
+             with {:ok, handler} <- Agent.Route.executable(target) do
+               {:ok,
+                %{
+                  path: path,
+                  handler: handler,
+                  defaults: defaults,
+                  state: %{source: :output, path: []}
+                }}
+             end
            end),
          do: Agent.define(attrs |> Map.put(:routes, routes) |> Map.put_new(:module, Agent))
   end
@@ -189,7 +198,15 @@ defmodule Jido.AgentTest do
            } = definition
 
     assert agent_schema == schema()
-    assert [%{path: "counter.add", handler: %{kind: :action, target: Add}}] = definition.routes
+
+    assert [
+             %{
+               path: "counter.add",
+               handler: %{kind: :action, target: Add},
+               state: %{source: :output, path: []}
+             }
+           ] = definition.routes
+
     assert Agent.definition?(definition)
     refute Agent.instance?(definition)
     assert {:error, _} = Agent.validate(%{definition | name: nil})
@@ -294,7 +311,13 @@ defmodule Jido.AgentTest do
     assert CounterAgent.definition().description == "A module-authored Agent"
     assert CounterAgent.definition().schema == agent.schema
 
-    assert [%{path: "counter.add", handler: %{kind: :action, target: Add}}] =
+    assert [
+             %{
+               path: "counter.add",
+               handler: %{kind: :action, target: Add},
+               state: %{source: :output, path: []}
+             }
+           ] =
              CounterAgent.definition().routes
 
     assert CounterAgent.definition().extensions == []
@@ -511,7 +534,14 @@ defmodule Jido.AgentTest do
 
       refute function_exported?(Agent, :to_map, 1)
       assert agent.id == "mapped"
-      assert [%{path: "counter.add", handler: %{kind: :action, target: Add}}] = agent.routes
+
+      assert [
+               %{
+                 path: "counter.add",
+                 handler: %{kind: :action, target: Add},
+                 state: %{source: :output, path: []}
+               }
+             ] = agent.routes
     end
   end
 

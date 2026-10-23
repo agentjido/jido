@@ -24,18 +24,17 @@ defmodule Jido.Examples.Plugins.SecureSignal.Agent do
     route "examples.plugins.secure_signal.request" do
       action %{"message_id" => message_id},
         schema: Zoi.object(%{"message_id" => Zoi.string() |> Zoi.min(1)}),
+        output_schema:
+          Zoi.object(%{
+            state: Zoi.map(),
+            reply:
+              Zoi.object(%{
+                "message_id" => Zoi.string(),
+                "secure" => Zoi.map()
+              })
+          }),
         context: context do
         secure = context.plugin_inputs[Jido.Examples.Plugins.SecureSignal.Plugin].runtime
-
-        reply =
-          Jido.Signal.new!(
-            "examples.plugins.secure_signal.accepted",
-            %{
-              "message_id" => message_id,
-              "secure" => %{"receipt" => secure["secret"] <> ":accepted"}
-            },
-            source: "/examples/plugins/secure_signal/agent"
-          )
 
         next_state = %{
           context.agent_state
@@ -47,8 +46,18 @@ defmodule Jido.Examples.Plugins.SecureSignal.Agent do
               |> Base.encode16(case: :lower)
         }
 
-        {:ok, next_state, [Jido.Agent.Directive.emit(reply)]}
+        {:ok,
+         %{
+           state: next_state,
+           reply: %{
+             "message_id" => message_id,
+             "secure" => %{"receipt" => secure["secret"] <> ":accepted"}
+           }
+         }}
       end
+
+      state(from: output(:state))
+      reply("examples.plugins.secure_signal.accepted", from: output(:reply))
     end
   end
 end

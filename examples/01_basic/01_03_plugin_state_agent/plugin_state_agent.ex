@@ -29,9 +29,7 @@ defmodule Jido.Examples.PluginStateAgent do
     end
 
     route "basic.plugin_state.overwrite", as: :overwrite_plugin_state do
-      action _input,
-        schema: Zoi.object(%{}),
-        context: context do
+      action _input, schema: Zoi.object(%{}), context: context do
         {:ok, %{context.agent_state | turns: context.agent_state.turns + 1}}
       end
     end

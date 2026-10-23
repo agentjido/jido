@@ -220,13 +220,13 @@ defmodule MyApp.ResearchAgent do
   end
 
   routes do
-    route "research.requested", ai(:research), as: :research
-    route "research.plan.proposed", MyApp.AcceptResearchPlan
-    route "research.finding.proposed", MyApp.PublishFinding
-    route "research.approval.proposed", MyApp.RequestApproval
-    route "research.completed", MyApp.CompleteResearch
-    route "research.corrected", MyApp.CorrectResearch
-    route "research.approved", MyApp.ApproveResearch
+    route "research.requested", ai(:research), as: :research, do: state(:unchanged)
+    route "research.plan.proposed", MyApp.AcceptResearchPlan, do: state(:unchanged)
+    route "research.finding.proposed", MyApp.PublishFinding, do: state(:unchanged)
+    route "research.approval.proposed", MyApp.RequestApproval, do: state(:unchanged)
+    route "research.completed", MyApp.CompleteResearch, do: state(:unchanged)
+    route "research.corrected", MyApp.CorrectResearch, do: state(:unchanged)
+    route "research.approved", MyApp.ApproveResearch, do: state(:unchanged)
   end
 end
 ```

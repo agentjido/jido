@@ -31,7 +31,7 @@ Mix.install([{:jido, "~> 3.0.0-beta.2"}])
 | `validate/1` | Before commit, for every returned Directive | Accepts or rejects the Directive. |
 | `directives/1` | When Jido normalizes the Plugin | Claims Directive types for this Plugin. |
 | `dispatch/4` | After commit, once per owned Directive, in order | Performs the Directive. |
-| `prepare_dispatch/4` | Before each outbound Signal leaves | Adjusts the Signal. |
+| `prepare_outbound/4` | Before each outbound Signal leaves | Adjusts the Signal. |
 | `directive_handler:` | After commit, for owned Directives with no `dispatch/4` | Server-level fallback. |
 
 Each custom Directive type has exactly one owning Plugin. A Directive with no
@@ -118,7 +118,7 @@ defmodule GuidePlugins.Notifier do
   end
 
   @impl true
-  def prepare_dispatch(_outbox, signal, context, _opts) do
+  def prepare_outbound(_outbox, signal, context, _opts) do
     {:ok, %{signal | subject: "agents/" <> context.agent_id}}
   end
 end
@@ -129,8 +129,8 @@ end
 - `dispatch/4` receives the runtime PID, the validated Directive, and a
   `Jido.Plugin.DirectiveContext`: Turn ID, Agent ID, source Signal, committed
   revision, this Plugin's committed state, and the caller's Turn context.
-- `prepare_dispatch/4` sees every outbound Signal from `Emit`, `AgentSend`,
-  and `ParentSend`, with a `Jido.Plugin.SignalContext` that includes the
+- `prepare_outbound/4` sees every outbound Signal from `Reply`, `Emit`,
+  `AgentSend`, and `ParentSend`, with a `Jido.Plugin.SignalContext` that includes the
   target.
 
 ## Define the Agent
@@ -154,8 +154,7 @@ defmodule GuidePlugins.Orders do
     route "order.place", as: :place do
       action %{order_id: order_id, email: email},
         name: "place_order",
-        schema: Zoi.object(%{order_id: Zoi.string(), email: Zoi.string()}),
-        context: context do
+        schema: Zoi.object(%{order_id: Zoi.string(), email: Zoi.string()}), context: context do
         {:ok, %{context.agent_state | placed: context.agent_state.placed ++ [order_id]},
          [
            %GuidePlugins.Notify{to: email, message: "Order #{order_id} confirmed"},
@@ -225,7 +224,7 @@ committed.state.placed
 
 The result is `["A-100"]`. After the commit, the Server ran the Directives in
 order: `dispatch/4` delivered `Notify`, then `Emit` sent the Signal through
-`prepare_dispatch/4`.
+`prepare_outbound/4`.
 
 ```elixir
 GuidePlugins.Outbox.deliveries("orders-1")
@@ -289,7 +288,7 @@ precedence.
 - `directives/1` claims Directive types. Each type has one owner.
 - Jido validates every Directive before commit.
 - `dispatch/4` performs owned Directives after commit.
-- `prepare_dispatch/4` adjusts outbound Signals.
+- `prepare_outbound/4` adjusts outbound Signals.
 - `directive_handler:` runs owned Directives that have no dispatcher.
 
 ## Next

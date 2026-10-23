@@ -77,7 +77,13 @@ defmodule JidoTest.AgentServer.PluginRuntime.ConfigurationSupport do
     Agent.define!(%{
       name: "composed",
       schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}),
-      routes: [%{path: "work", handler: %{kind: :action, target: F.Work}}],
+      routes: [
+        %{
+          path: "work",
+          handler: %{kind: :action, target: F.Work},
+          state: %{source: :output, path: []}
+        }
+      ],
       topology: topology,
       extensions:
         Enum.map(plugins, fn declaration ->

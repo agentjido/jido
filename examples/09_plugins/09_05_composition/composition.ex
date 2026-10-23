@@ -21,7 +21,9 @@ defmodule Jido.Examples.Plugins.Composition.Agent do
     signal_source "/examples/plugins/composition"
 
     route "examples.plugins.composition.accept" do
-      action %{token: _token}, schema: Zoi.object(%{token: Zoi.string()}), context: context do
+      action %{token: _token},
+        schema: Zoi.object(%{token: Zoi.string()}),
+        context: context do
         tenant = context.plugin_inputs[Jido.Examples.Plugins.Composition.Tenant].prepared
 
         authorization =

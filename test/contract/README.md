@@ -32,7 +32,6 @@ tests with its obligation tags.
 | `jido.agent_server.durable_turn` | Durable Flow progress, waits, and receipts | `test/contract/jido.agent_server/durable_turn/` |
 | `jido.persistence` | Records, snapshots, adapters, storage operations, and revisions | `test/contract/jido.persistence/` |
 | `jido.plugin` | Generic Plugin SDK and callback contracts | `test/contract/jido.plugin/core/` |
-| `jido.signal_action` | Jido integration values for Signals and Actions | `test/contract/jido.signal_action/` |
 | `jido.telemetry` | Telemetry, metrics, tracing, logs, and Debug support | `test/contract/jido.telemetry/` |
 | `jido.error` | Shared error taxonomy and stable common codes | `test/contract/jido.error/` |
 | `jido.plugin.audit` | Bundled Audit Plugin behavior | `test/contract/jido.plugin/audit/` |
@@ -93,7 +92,6 @@ test/contract/
   jido.error/
   jido.instance/
   jido.persistence/
-  jido.signal_action/
   jido.telemetry/
   jido.plugin/
     obligations.md
@@ -191,12 +189,6 @@ portable Agent records and snapshots, Plugin-owned state conversion,
 revisions, tombstones, and built-in adapter conformance. It does not own live
 AgentServer recovery, commit publication, durable Flow progress, or
 backend-specific maintenance.
-
-`jido.signal_action` owns the combined Action and Signal declaration, shared
-input validation and conversion, input Signal construction, optional output
-Signal contracts, reply validation, and reply correlation. It does not own
-Action execution, Signal routing or dispatch, Agent route authoring, or
-AgentServer commit timing.
 
 `jido.telemetry` owns the fixed metric catalog, semantic event lifecycle, safe
 fields, bounded logs, per-instance Debug overrides, W3C trace context, and

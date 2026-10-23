@@ -7,7 +7,8 @@ defmodule Jido.Agent.SchedulerCodecTest do
   alias Jido.Plugin.Scheduler
 
   defmodule QueueTick do
-    use Jido.Action, name: "codec_queue_tick"
+    use Jido.Action,
+      name: "codec_queue_tick"
 
     def run(_, %{agent_state: state}) do
       tick = Jido.Signal.new!("codec.tick", %{}, source: "/test/codec")
@@ -16,7 +17,8 @@ defmodule Jido.Agent.SchedulerCodecTest do
   end
 
   defmodule QueueFlow do
-    use Jido.Flow, name: "codec_queue_flow"
+    use Jido.Flow,
+      name: "codec_queue_flow"
 
     flow do
       step "queue", action: QueueTick, params: %{}
@@ -25,7 +27,9 @@ defmodule Jido.Agent.SchedulerCodecTest do
   end
 
   defmodule Tick do
-    use Jido.Action, name: "codec_tick"
+    use Jido.Action,
+      name: "codec_tick"
+
     def run(_, %{agent_state: state}), do: {:ok, %{state | count: state.count + 1}}
   end
 
@@ -125,8 +129,16 @@ defmodule Jido.Agent.SchedulerCodecTest do
         }
       ],
       routes: [
-        %{path: "codec.queue", handler: %{kind: kind, target: target}},
-        %{path: "codec.tick", handler: %{kind: :action, target: Tick}}
+        %{
+          path: "codec.queue",
+          handler: %{kind: kind, target: target},
+          state: %{source: :output, path: []}
+        },
+        %{
+          path: "codec.tick",
+          handler: %{kind: :action, target: Tick},
+          state: %{source: :output, path: []}
+        }
       ]
     })
   end

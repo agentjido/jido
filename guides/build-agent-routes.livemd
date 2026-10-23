@@ -63,7 +63,8 @@ defmodule Routes.Checkout do
 end
 ```
 
-An Action or Flow route must return the complete next Agent state.
+An Action or Flow route uses its complete validated output as its next state by
+default.
 
 ## The Route Table
 
@@ -113,25 +114,27 @@ end
 | --- | --- |
 | path | An exact Signal type, or a pattern with `*` or `**`. It must be unique in the Agent. |
 | handler | An Action, a Flow, one inline `action`, or one inline `transform`. |
+| `state` | Optional. Selects another output path, or keeps the current state unchanged. |
+| `reply` | Selects reply data from executable output and builds one correlated reply. |
 | `as:` | Generates `<name>_signal/2` and `<name>_signal!/2`. Exact paths only. |
 | `defaults:` | Adds missing Action or Flow input values. Signal data wins. |
 
-## SignalAction Routes
+## State And Reply Mapping
 
-A SignalAction can own the path and the handler:
-
+The complete output becomes the next state when `state` is absent. An
+executable can return separate state and reply data. The route can select each
+value from the validated output:
 ```elixir
-route MyApp.Ask
+route "price.quote", MyApp.BuildQuote do
+  state :unchanged
+  reply "price.quoted", from: output()
+end
 ```
 
-The input Signal type from `MyApp.Ask` becomes the route path. To use its
-Signal type with a different handler, use the two-module form:
-
-```elixir
-route MyApp.Ask, MyApp.Turn
-```
-
-This form runs `MyApp.Turn`. It does not run `MyApp.Ask` first.
+Use `output(:state)` and `output(:reply)` when the executable returns both
+values in one map. `output()` works with the default `Zoi.map()` output schema.
+A nested selector requires an `output_schema` that declares its path. The route
+uses the ordinary Action input schema to validate the request data.
 
 ## Explicit Forwarding
 
@@ -139,8 +142,13 @@ Use `forward` when a route only sends the input Signal to another Agent:
 
 ```elixir
 routes do
-  forward "work.request", to: agent(:worker)
-  forward "work.completed", to: parent()
+  route "work.request" do
+    forward to: agent(:worker)
+  end
+
+  route "work.completed" do
+    forward to: parent()
+  end
 end
 ```
 
@@ -200,8 +208,6 @@ Jido rejects:
 
 ## Next
 
-- [Typed Signals](typed-signal-actions.livemd) explains typed input and reply
-  Signals.
 - [Connect Agent Outputs](connect-agent-outputs.livemd) explains explicit
   forwarding.
 - [State and Directives](agent-results-and-directives.md) covers handler

@@ -80,7 +80,7 @@ defmodule Jido.Examples.Plugins.DSL.Thresholds do
     if reduction.signal.type == opts[:on] do
       reached =
         for %{name: name, at: at} <- opts[:thresholds],
-            reduction.state.count >= at,
+            reduction.candidate_state.count >= at,
             name not in reduction.plugin_state,
             do: name
 

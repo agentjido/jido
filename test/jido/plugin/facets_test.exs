@@ -171,7 +171,8 @@ defmodule Jido.Plugin.FacetsTest do
 
   defmodule Record do
     @moduledoc false
-    use Jido.Action, name: "plugin_facet_record"
+    use Jido.Action,
+      name: "plugin_facet_record"
 
     def run(_input, context) do
       state = %{context.agent_state | visible: context.agent_state.visible + 1, seen: "facet"}
@@ -362,7 +363,8 @@ defmodule Jido.Plugin.FacetsTest do
 
   defmodule ReturnForeign do
     @moduledoc false
-    use Jido.Action, name: "plugin_facet_return_foreign"
+    use Jido.Action,
+      name: "plugin_facet_return_foreign"
 
     def run(_input, context), do: {:ok, context.agent_state, [%ForeignEffect{label: "foreign"}]}
   end
@@ -601,7 +603,13 @@ defmodule Jido.Plugin.FacetsTest do
       Agent.define!(%{
         name: "foreign_plugin_directive",
         schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}),
-        routes: [%{path: "facet.foreign", handler: %{kind: :action, target: ReturnForeign}}]
+        routes: [
+          %{
+            path: "facet.foreign",
+            handler: %{kind: :action, target: ReturnForeign},
+            state: %{source: :output, path: []}
+          }
+        ]
       })
       |> Agent.instantiate!(id: Jido.Signal.ID.generate!())
 
@@ -622,7 +630,13 @@ defmodule Jido.Plugin.FacetsTest do
       extensions: [
         %{id: package.id(), provider: package, vsn: package.vsn(), data: Map.new(options())}
       ],
-      routes: [%{path: "facet.run", handler: %{kind: :action, target: Record}}]
+      routes: [
+        %{
+          path: "facet.run",
+          handler: %{kind: :action, target: Record},
+          state: %{source: :output, path: []}
+        }
+      ]
     })
     |> Agent.instantiate!(id: Jido.Signal.ID.generate!())
   end

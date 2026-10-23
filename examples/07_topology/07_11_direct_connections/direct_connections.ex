@@ -9,10 +9,14 @@ defmodule Jido.Examples.Topology.DirectConnections do
   routes do
     signal_source "/examples/topology/direct_connections"
 
-    forward "examples.topology.pipeline.request", to: agent(:worker)
+    route "examples.topology.pipeline.request" do
+      forward(to: agent(:worker))
+    end
 
     route "examples.topology.pipeline.receipt", as: :receipt do
-      action %{value: value}, schema: Zoi.object(%{value: Zoi.integer()}), context: context do
+      action %{value: value},
+        schema: Zoi.object(%{value: Zoi.integer()}),
+        context: context do
         {:ok, %{context.agent_state | completed: context.agent_state.completed + value}}
       end
     end

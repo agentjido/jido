@@ -155,8 +155,7 @@ defmodule SensorGuide.Building do
 
     route "temperature.reading" do
       action %{room: room, celsius: celsius},
-        schema: Zoi.object(%{room: Zoi.string(), celsius: Zoi.integer()}),
-        context: context do
+        schema: Zoi.object(%{room: Zoi.string(), celsius: Zoi.integer()}), context: context do
         readings = Map.put(context.agent_state.readings, room, celsius)
         {:ok, %{context.agent_state | readings: readings}}
       end

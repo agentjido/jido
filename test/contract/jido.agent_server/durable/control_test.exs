@@ -204,7 +204,13 @@ defmodule JidoTest.AgentServer.Durable.ControlTest do
             data: %{observer: c.observer}
           }
         ],
-        routes: [%{path: "work", handler: %{kind: :action, target: F.Work}}]
+        routes: [
+          %{
+            path: "work",
+            handler: %{kind: :action, target: F.Work},
+            state: %{source: :output, path: []}
+          }
+        ]
       })
       |> Jido.Agent.instantiate!(id: Jido.Signal.ID.generate!())
 

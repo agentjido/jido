@@ -13,7 +13,9 @@ defmodule Jido.AuthoringIntegrationTest do
   end
 
   defmodule ReferencedAction do
-    use Jido.Action, name: "referenced_action"
+    use Jido.Action,
+      name: "referenced_action"
+
     def run(_params, _context), do: {:ok, %{}}
   end
 

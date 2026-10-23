@@ -44,7 +44,7 @@ defmodule JidoTest.PluginContract.ApiTest do
         {:dump, 3},
         {:load, 3},
         {:prepare, 2},
-        {:prepare_dispatch, 4},
+        {:prepare_outbound, 4},
         {:quiesce, 2},
         {:reduce, 2},
         {:resume, 2},

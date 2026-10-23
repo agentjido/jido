@@ -34,7 +34,7 @@ defmodule Jido.Examples.Plugins.SecureSignal.Identity.Plugin do
   end
 
   @impl Jido.Plugin
-  def prepare_dispatch(runtime, signal, %SignalContext{}, _opts),
+  def prepare_outbound(runtime, signal, %SignalContext{}, _opts),
     do: Runtime.sign(runtime, signal)
 
   @impl true

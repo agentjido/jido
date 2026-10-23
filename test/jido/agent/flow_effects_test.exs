@@ -43,7 +43,9 @@ defmodule Jido.Agent.FlowEffectsTest do
   end
 
   defmodule Approve do
-    use Jido.Action, name: "effect_approve_booking"
+    use Jido.Action,
+      name: "effect_approve_booking"
+
     @impl true
     def run(params, context) do
       state = %{context.agent_state | status: Map.get(params, :status, :submitting)}
@@ -55,19 +57,24 @@ defmodule Jido.Agent.FlowEffectsTest do
   end
 
   defmodule StreamResult do
-    use Jido.Action, name: "stream_is_not_agent_state"
+    use Jido.Action,
+      name: "stream_is_not_agent_state"
+
     @impl true
     def run(_, _), do: {:ok, Jido.Action.Output.stream(1..2), [%Submit{key: "stream"}]}
   end
 
   defmodule Fail do
-    use Jido.Action, name: "failed_booking_flow"
+    use Jido.Action,
+      name: "failed_booking_flow"
+
     @impl true
     def run(_, _), do: {:error, :booking_rejected, [%Submit{key: "failed"}]}
   end
 
   defmodule Flow do
-    use Jido.Flow, name: "approve_booking_flow"
+    use Jido.Flow,
+      name: "approve_booking_flow"
 
     flow do
       step "approve", action: Approve, params: input()
@@ -76,7 +83,8 @@ defmodule Jido.Agent.FlowEffectsTest do
   end
 
   defmodule FailedFlow do
-    use Jido.Flow, name: "failed_approve_booking_flow"
+    use Jido.Flow,
+      name: "failed_approve_booking_flow"
 
     flow do
       step "approve", action: Approve, params: input()
@@ -86,7 +94,8 @@ defmodule Jido.Agent.FlowEffectsTest do
   end
 
   defmodule MultipleFlow do
-    use Jido.Flow, name: "multiple_approve_booking_flow"
+    use Jido.Flow,
+      name: "multiple_approve_booking_flow"
 
     flow do
       step "z_first", action: Approve, params: %{key: "first"}
@@ -111,10 +120,15 @@ defmodule Jido.Agent.FlowEffectsTest do
 
     routes do
       route "approve.direct", Approve
+
       route "approve.flow", Flow
+
       route "approve.failed", FailedFlow
+
       route "approve.error", Fail
+
       route "approve.multiple", MultipleFlow
+
       route "approve.stream", StreamResult
     end
   end

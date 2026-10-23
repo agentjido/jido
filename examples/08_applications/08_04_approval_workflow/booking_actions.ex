@@ -156,7 +156,8 @@ defmodule Jido.Examples.ApprovalWorkflow.ApproveFlow do
   @moduledoc """
   Composes booking approval without losing its deferred booking request.
   """
-  use Jido.Flow, name: "examples_flight_booking_approve_flow"
+  use Jido.Flow,
+    name: "examples_flight_booking_approve_flow"
 
   flow do
     step "approve",

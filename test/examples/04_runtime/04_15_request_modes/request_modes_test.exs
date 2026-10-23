@@ -24,7 +24,8 @@ defmodule JidoTest.Examples.Runtime.RequestModesBlockingAgent do
     signal_source "/test/examples/runtime/request_modes"
 
     route "test.examples.runtime.request_modes.record",
-          JidoTest.Examples.Runtime.RequestModesBlockingAction
+          JidoTest.Examples.Runtime.RequestModesBlockingAction do
+    end
   end
 end
 

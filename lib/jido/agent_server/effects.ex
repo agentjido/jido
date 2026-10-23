@@ -80,7 +80,10 @@ defmodule Jido.AgentServer.Effects do
          do: TopologyRuntime.send_agent(context.activation_state, name, signal)
   end
 
-  defp do_run(%Reply{signal: signal}, _handler, _context), do: {:reply, signal}
+  defp do_run(%Reply{signal: signal}, _handler, context) do
+    with {:ok, signal} <- prepare_outbound(signal, :reply, context),
+         do: {:reply, signal}
+  end
 
   defp do_run(%ParentSend{signal: signal}, _handler, context) do
     with {:ok, signal} <- prepare_outbound(signal, :parent, context),
@@ -276,16 +279,39 @@ defmodule Jido.AgentServer.Effects do
       partition: context.partition
     }
 
-    with {:ok, signal} <- TraceContext.propagate_to(signal, context.signal_id),
-         do:
-           Jido.AgentServer.Plugin.Callbacks.prepare_dispatch(
-             signal,
+    with {:ok, correlated} <- TraceContext.propagate_to(signal, context.signal_id),
+         {:ok, prepared} <-
+           Jido.AgentServer.Plugin.Callbacks.prepare_outbound(
+             correlated,
              context.plugin_specs,
              context.plugin_refs,
              signal_context,
              context.agent.state
-           )
+           ),
+         :ok <- validate_outbound_correlation(target, correlated, prepared) do
+      {:ok, prepared}
+    end
   end
+
+  defp validate_outbound_correlation(:reply, correlated, prepared) do
+    before = {
+      correlated.id,
+      Signal.get_context(correlated, "jidocausationid"),
+      Signal.Trace.get(correlated)
+    }
+
+    after_preparation = {
+      prepared.id,
+      Signal.get_context(prepared, "jidocausationid"),
+      Signal.Trace.get(prepared)
+    }
+
+    if before == after_preparation,
+      do: :ok,
+      else: {:error, :invalid_reply_correlation}
+  end
+
+  defp validate_outbound_correlation(_target, _correlated, _prepared), do: :ok
 
   defp dispatch_outbound(signal, nil, context), do: TopologyRuntime.emit(context, signal)
 

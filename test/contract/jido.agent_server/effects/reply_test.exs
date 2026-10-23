@@ -9,10 +9,12 @@ defmodule JidoTest.AgentServer.Effects.ReplyTest do
   alias Jido.Agent.Directive
   alias Jido.AgentServer, as: Server
   alias Jido.Signal
+  alias Jido.Tracing.Trace
   alias JidoTest.AgentServer.Fixtures, as: F
 
   defmodule Work do
-    use Jido.Action, name: "server_reply_contract_work"
+    use Jido.Action,
+      name: "server_reply_contract_work"
 
     def run(input, context) do
       if input[:gate] do
@@ -32,7 +34,13 @@ defmodule JidoTest.AgentServer.Effects.ReplyTest do
         name: "server_reply_contract",
         schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}),
         extensions: Agent.definition(context.agent).extensions,
-        routes: [%{path: "reply", handler: %{kind: :action, target: Work}}]
+        routes: [
+          %{
+            path: "reply",
+            handler: %{kind: :action, target: Work},
+            state: %{source: :output, path: []}
+          }
+        ]
       })
       |> Agent.instantiate!(id: "server-reply-contract")
 
@@ -40,12 +48,12 @@ defmodule JidoTest.AgentServer.Effects.ReplyTest do
   end
 
   @tag obligation: "jido.agent_server.effects.I13"
-  test "call returns the commit and delivers the unchanged Reply Signal", c do
+  test "call returns the commit and delivers the correlated Reply Signal", c do
     server = F.start(c)
     {request, output, reply} = request()
 
     assert {:ok, %{state: %{count: 1}}, [^reply]} = Server.call(server, request)
-    assert_receive ^output, 1_000
+    assert_reply(output)
     assert_eventually(Server.status(server).phase == :idle)
     assert Server.status(server).last_effect_outcome.status == :succeeded
   end
@@ -57,9 +65,9 @@ defmodule JidoTest.AgentServer.Effects.ReplyTest do
     pending = Server.submit(server, request)
 
     assert_eventually(Server.status(server).phase == :idle)
-    refute_received ^output
+    refute_reply(output)
     assert {:ok, %{state: %{count: 1}}, [^reply]} = Server.await(pending)
-    assert_receive ^output, 1_000
+    assert_reply(output)
   end
 
   @tag obligation: "jido.agent_server.effects.I13"
@@ -72,9 +80,9 @@ defmodule JidoTest.AgentServer.Effects.ReplyTest do
     assert {:error, :timeout} = Server.await(pending, 0)
     send(action, :release)
     assert_eventually(Server.status(server).phase == :idle)
-    refute_received ^output
+    refute_reply(output)
     assert {:ok, %{state: %{count: 1}}, [^reply]} = Server.await(pending)
-    assert_receive ^output, 1_000
+    assert_reply(output)
   end
 
   @tag obligation: "jido.agent_server.effects.I13"
@@ -88,7 +96,7 @@ defmodule JidoTest.AgentServer.Effects.ReplyTest do
     send(action, :release)
     assert :ok = Server.quiesce(server)
     assert Server.agent(server).state.count == 1
-    refute_received ^output
+    refute_reply(output)
   end
 
   @tag obligation: "jido.agent_server.effects.I13"
@@ -100,7 +108,7 @@ defmodule JidoTest.AgentServer.Effects.ReplyTest do
     assert_eventually(Server.status(server).phase == :idle)
     assert :ok = Server.abandon(pending)
     assert Server.agent(server).state.count == 1
-    refute_received ^output
+    refute_reply(output)
   end
 
   @tag obligation: "jido.agent_server.effects.I13"
@@ -145,7 +153,7 @@ defmodule JidoTest.AgentServer.Effects.ReplyTest do
     assert :ok = Server.quiesce(server)
     assert Server.agent(server) == c.agent
     assert Server.status(server).state_version == 0
-    refute_received ^output
+    refute_reply(output)
   end
 
   @tag obligation: ["jido.agent_server.effects.I2", "jido.agent_server.effects.I13"]
@@ -157,9 +165,9 @@ defmodule JidoTest.AgentServer.Effects.ReplyTest do
 
     assert {:ok, _, [^gate, ^reply]} = Server.call(server, request)
     assert_receive {:reply_effect_waiting, effect}, 1_000
-    refute_received ^output
+    refute_reply(output)
     send(effect, :release)
-    assert_receive ^output, 1_000
+    assert_reply(output)
     assert_eventually(Server.status(server).phase == :idle)
 
     failed = F.start(c, directive_handler: &__MODULE__.effect/2)
@@ -169,7 +177,7 @@ defmodule JidoTest.AgentServer.Effects.ReplyTest do
     assert {:ok, _, [^failure, ^reply]} = Server.call(failed, request)
     assert_eventually(Server.status(failed).phase == :idle)
     assert Server.status(failed).last_effect_outcome.status == :failed
-    refute_received ^failed_output
+    refute_reply(failed_output)
   end
 
   def effect(%F.Effect{mode: :gate, observer: observer}, _context) do
@@ -191,5 +199,21 @@ defmodule JidoTest.AgentServer.Effects.ReplyTest do
     {:ok, output} = Signal.put_context(output, "jidocausationid", request.id)
     reply = Directive.reply(output)
     {%{request | data: %{request.data | directives: [reply]}}, output, reply}
+  end
+
+  defp assert_reply(expected) do
+    assert_receive %Signal{} = delivered, 1_000
+
+    assert Map.take(delivered, [:id, :type, :data, :source, :subject]) ==
+             Map.take(expected, [:id, :type, :data, :source, :subject])
+
+    causation_id = Signal.get_context(expected, "jidocausationid")
+    assert Signal.get_context(delivered, "jidocausationid") == causation_id
+    assert Trace.get(delivered).causation_id == causation_id
+  end
+
+  defp refute_reply(expected) do
+    id = expected.id
+    refute_received %Signal{id: ^id}
   end
 end

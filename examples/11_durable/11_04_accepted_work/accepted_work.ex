@@ -10,7 +10,8 @@ defmodule Jido.Examples.Durable.AcceptedWork do
     signal_source "/examples/durable/accepted_work"
 
     route "examples.durable.accepted_work.request", Jido.Examples.Durable.AcceptedWork.Report,
-      as: :request
+      as: :request do
+    end
   end
 end
 

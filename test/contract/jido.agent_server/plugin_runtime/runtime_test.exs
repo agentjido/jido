@@ -314,7 +314,13 @@ defmodule JidoTest.AgentServer.PluginRuntime.RuntimeTest do
         %{id: First.id(), provider: First, vsn: First.vsn(), data: Map.new(opts)},
         %{id: Second.id(), provider: Second, vsn: Second.vsn(), data: Map.new(second_opts)}
       ],
-      routes: [%{path: "work", handler: %{kind: :action, target: F.Work}}]
+      routes: [
+        %{
+          path: "work",
+          handler: %{kind: :action, target: F.Work},
+          state: %{source: :output, path: []}
+        }
+      ]
     })
     |> Jido.Agent.instantiate!(id: "server-live-instance")
   end
@@ -410,7 +416,13 @@ defmodule JidoTest.AgentServer.PluginRuntime.RuntimeTest do
         name: "required_plugin",
         schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}),
         extensions: [JidoTest.AgentContract.contribution(plugin)],
-        routes: [%{path: "work", handler: %{kind: :action, target: F.Work}}]
+        routes: [
+          %{
+            path: "work",
+            handler: %{kind: :action, target: F.Work},
+            state: %{source: :output, path: []}
+          }
+        ]
       })
       |> Jido.Agent.instantiate!(id: "required-plugin")
 
@@ -975,7 +987,13 @@ defmodule JidoTest.AgentServer.PluginRuntime.RuntimeTest do
             data: %{observer: observer}
           }
         ],
-        routes: [%{path: "work", handler: %{kind: :action, target: F.Work}}]
+        routes: [
+          %{
+            path: "work",
+            handler: %{kind: :action, target: F.Work},
+            state: %{source: :output, path: []}
+          }
+        ]
       })
       |> Jido.Agent.instantiate!(id: "stateless-live")
 

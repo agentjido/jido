@@ -55,7 +55,12 @@ defmodule Jido.AgentExtensionsAuthoringTest do
     Agent.define(%{name: "extended", routes: routes, extensions: [contribution(provider, data)]})
   end
 
-  defp action(type), do: %{path: type, handler: %{kind: :action, target: Action}}
+  defp action(type),
+    do: %{
+      path: type,
+      handler: %{kind: :action, target: Action},
+      state: %{source: :output, path: []}
+    }
 
   test "full extension DSL data equals an independently written Map in provider order" do
     expected = [

@@ -62,10 +62,23 @@ defmodule Jido.Agent.DSL do
         }
       end
 
-      @doc "Returns the compiled Action target for one inline route or raises when none exists."
-      @spec route_action!(String.t()) :: module() | no_return()
-      def route_action!(path),
-        do: Jido.Action.Inline.target!(__MODULE__, host: Jido.Agent, route: path, role: :action)
+      @doc "Returns the Action or Flow target for one exact executable route."
+      @spec route_executable!(String.t()) :: module() | no_return()
+      def route_executable!(path) do
+        case Enum.find(@agent_definition.routes, &(&1.path == path)) do
+          %{handler: %{kind: :executable, target: target}} ->
+            %{target: target} = Jido.Agent.Route.executable(target) |> Jido.Agent.Error.unwrap!()
+
+            target
+
+          %{handler: %{kind: kind, target: target}} when kind in [:action, :flow] ->
+            target
+
+          _route ->
+            raise ArgumentError,
+                  "unknown executable route in #{inspect(__MODULE__)}: #{inspect(path)}"
+        end
+      end
 
       @doc "Runs one pure Agent Turn. It does not commit state or dispatch Directives."
       @spec cmd(Jido.Agent.instance(), Jido.Signal.t(), keyword()) ::
@@ -109,7 +122,7 @@ defmodule Jido.Agent.DSL do
           route
       end)
 
-    draft |> Map.put(:routes, routes) |> Validation.define(related?: false) |> Error.unwrap!()
+    draft |> Map.put(:routes, routes) |> Validation.define(related?: true) |> Error.unwrap!()
   end
 
   def build!(dsl, opts, module) do
@@ -136,7 +149,7 @@ defmodule Jido.Agent.DSL do
             routes:
               Enum.map(
                 E.get_entities(dsl, [:__routes__]),
-                &Map.take(&1, [:path, :handler, :as, :defaults])
+                &Map.take(&1, [:path, :handler, :state, :reply, :as, :defaults])
               ),
             topology: Jido.Agent.DSL.Topology.lower(dsl),
             extensions: entries

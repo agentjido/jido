@@ -58,6 +58,7 @@ defmodule JidoTest.AgentRegistry do
     target =
       case handler do
         %{kind: kind, target: value} when kind in [:action, :flow, :transform] -> [{kind, value}]
+        %{kind: :forward, target: %{kind: :agent, name: name}} -> references(name)
         _handler -> []
       end
 

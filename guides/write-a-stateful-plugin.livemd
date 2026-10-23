@@ -30,7 +30,7 @@ Mix.install([{:jido, "~> 3.0.0-beta.2"}])
 | `state_spec/1` | When Jido composes the Agent state schema | `{key, zoi_schema}` for one owned field |
 | `prepare/2` | Before route selection, in `cmd/3` and on a live Server | `{:ok, input}` or `{:error, reason}` |
 | `admit/3` | After `prepare/2`, on a live Server only | `{:ok, runtime_input}` or `{:error, reason}` |
-| `reduce/2` | After the Action succeeds, before state validation | `{:ok, next_owned_value}` |
+| `reduce/2` | After Route state projection, before state validation | `{:ok, next_owned_value}` |
 
 ## Define the Plugin
 
@@ -79,8 +79,8 @@ Each callback receives a read-only struct:
   and this Plugin's owned value.
 - `Jido.AgentServer.Plugin.Admission`: the Signal, caller context, committed
   revision, owned value, and this Plugin's prepared input.
-- `Jido.Agent.Plugin.Reduction`: the state before the Turn, the candidate
-  state, the prepared input, and every validated Directive.
+- `Jido.Agent.Plugin.Reduction`: `state_before`, `candidate_state`, the
+  prepared input, and every validated Directive.
 
 None of them can return a replacement Signal, route, context, or Agent.
 
@@ -121,8 +121,7 @@ defmodule GuidePlugins.Counter do
     route "counter.increment", as: :increment, defaults: %{amount: 1} do
       action %{amount: amount},
         name: "increment",
-        schema: Zoi.object(%{amount: Zoi.integer()}),
-        context: context do
+        schema: Zoi.object(%{amount: Zoi.integer()}), context: context do
         {:ok, %{context.agent_state | count: context.agent_state.count + amount}}
       end
     end
@@ -242,7 +241,7 @@ changed nothing.
   `context.plugin_inputs[Plugin].prepared`.
 - `admit/3` runs live only. Its result is at
   `context.plugin_inputs[Plugin].runtime`.
-- `reduce/2` writes the owned field after the Action succeeds.
+- `reduce/2` writes the owned field after Route state projection.
 - Actions can read Plugin-owned state but can't change it.
 
 ## Next

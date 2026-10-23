@@ -51,7 +51,8 @@ end
 
 defmodule Jido.Examples.OrderedBatch.Append do
   @moduledoc false
-  use Jido.Action, name: "workflow_batch_append"
+  use Jido.Action,
+    name: "workflow_batch_append"
 
   def run(%{items: items, item: item}, _context), do: {:ok, %{items: items ++ [item]}}
 end

@@ -43,8 +43,7 @@ defmodule Guides.Worker do
     route "job.run", as: :run do
       action %{name: name, ms: ms},
         name: "run_job",
-        schema: Zoi.object(%{name: Zoi.string(), ms: Zoi.integer() |> Zoi.default(0)}),
-        context: context do
+        schema: Zoi.object(%{name: Zoi.string(), ms: Zoi.integer() |> Zoi.default(0)}), context: context do
         Process.sleep(ms)
         {:ok, %{context.agent_state | done: context.agent_state.done ++ [name]}}
       end

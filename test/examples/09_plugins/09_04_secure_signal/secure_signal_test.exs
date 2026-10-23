@@ -15,10 +15,7 @@ defmodule JidoTest.Examples.Plugins.SecureSignalTest do
     key = Crypto.secure_key()
 
     {:ok, agent_server} =
-      JidoTest.ExampleRuntime.start_agent(jido, Agent,
-        id: unique_id("secure-signal"),
-        default_dispatch: {:pid, target: self()}
-      )
+      JidoTest.ExampleRuntime.start_agent(jido, Agent, id: unique_id("secure-signal"))
 
     unsigned =
       Signal.new!(
@@ -36,7 +33,7 @@ defmodule JidoTest.Examples.Plugins.SecureSignalTest do
     assert committed.state.peer == Base.encode16(peer_public, case: :lower)
     refute Map.has_key?(committed.state, :secure)
 
-    assert_receive {:signal, %Signal{type: "examples.plugins.secure_signal.accepted"} = reply}
+    assert_receive %Signal{type: "examples.plugins.secure_signal.accepted"} = reply
 
     assert {:ok, _nonce} = Crypto.verify(reply, agent_public)
     assert Trace.get(reply).causation_id == signed.id

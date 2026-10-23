@@ -27,7 +27,8 @@ end
 
 defmodule JidoTest.System.JourneyCommit do
   @moduledoc false
-  use Jido.Action, name: "system_journey_commit"
+  use Jido.Action,
+    name: "system_journey_commit"
 
   def run(input, context) do
     # A Flow returns data, not Agent directives. The outer Action translates
@@ -41,7 +42,8 @@ end
 
 defmodule JidoTest.System.JourneyConfirm do
   @moduledoc false
-  use Jido.Action, name: "system_journey_confirm"
+  use Jido.Action,
+    name: "system_journey_confirm"
 
   def run(%{effect_id: id, value: value}, context) do
     directive = struct!(Jido.Examples.RecoverableDelivery.Confirm, effect_id: id, value: value)
@@ -83,11 +85,13 @@ for {name, durable} <- [{:NormalJourneyAgent, nil}, {:DurableJourneyAgent, "jour
         routes: [
           %{
             path: "system.journey",
-            handler: %{kind: :action, target: JidoTest.System.JourneyCommit}
+            handler: %{kind: :action, target: JidoTest.System.JourneyCommit},
+            state: %{source: :output, path: []}
           },
           %{
             path: "examples.persistence.delivery.confirm",
-            handler: %{kind: :action, target: JidoTest.System.JourneyConfirm}
+            handler: %{kind: :action, target: JidoTest.System.JourneyConfirm},
+            state: %{source: :output, path: []}
           }
         ]
       })

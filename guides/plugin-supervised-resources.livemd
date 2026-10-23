@@ -33,7 +33,7 @@ Mix.install([{:jido, "~> 3.0.0-beta.2"}])
 | `await_ready/2` | After every runtime root starts, in declaration order, before the first Turn | The runtime PID |
 | `admit/3` | Before each live Turn | The runtime PID first |
 | `after_commit/3` | After each commit, before Directives | The runtime PID first |
-| `dispatch/4`, `prepare_dispatch/4` | After commit | The runtime PID first |
+| `dispatch/4`, `prepare_outbound/4` | After commit | The runtime PID first |
 
 ## Define the Runtime
 
@@ -168,8 +168,7 @@ defmodule GuidePlugins.Inbox do
     route "inbox.receive", as: :receive do
       action %{text: text},
         name: "receive",
-        schema: Zoi.object(%{text: Zoi.string()}),
-        context: context do
+        schema: Zoi.object(%{text: Zoi.string()}), context: context do
         {:ok, %{context.agent_state | messages: context.agent_state.messages ++ [text]}}
       end
     end

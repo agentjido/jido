@@ -89,7 +89,8 @@ defmodule JidoTest.AgentServer.DurableTurn.WaitIntegrationTest do
   end
 
   defmodule ImmediateTimer do
-    use Jido.Flow, name: "core_wait_timer"
+    use Jido.Flow,
+      name: "core_wait_timer"
 
     flow do
       timer("expired", after_ms: 0)
@@ -103,7 +104,8 @@ defmodule JidoTest.AgentServer.DurableTurn.WaitIntegrationTest do
   end
 
   defmodule LongTimer do
-    use Jido.Flow, name: "core_long_wait"
+    use Jido.Flow,
+      name: "core_long_wait"
 
     flow do
       timer("delay", after_ms: 7_776_000_000)
@@ -117,7 +119,8 @@ defmodule JidoTest.AgentServer.DurableTurn.WaitIntegrationTest do
   end
 
   defmodule TwoWaits do
-    use Jido.Flow, name: "core_two_waits"
+    use Jido.Flow,
+      name: "core_two_waits"
 
     flow do
       await("first", event: "first")
@@ -140,8 +143,11 @@ defmodule JidoTest.AgentServer.DurableTurn.WaitIntegrationTest do
 
     routes do
       route "request", Approval
+
       route "timer", ImmediateTimer
+
       route "long_timer", LongTimer
+
       route "two_waits", JidoTest.AgentServer.DurableTurn.WaitIntegrationTest.TwoWaits
 
       route "increment" do

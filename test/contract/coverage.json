@@ -1,9 +1,9 @@
 {
   "apps": {
     "jido": {
-      "active": 125,
+      "active": 118,
       "coverage": 1.0,
-      "covered": 125
+      "covered": 118
     },
     "jido.agent_server": {
       "active": 72,
@@ -27,12 +27,14 @@
         "jido.agent.I1": {
           "failing": 0,
           "kind": "functional",
-          "passing": 9,
+          "passing": 11,
           "status": "active",
           "testable": true,
           "tests": [
             "test DSL lowering and Map data produce the same contribution once",
             "test a string route requires a handler and forward lowers to portable data",
+            "test compiled Agents canonicalize string reply selectors against atom output fields",
+            "test compiled Agents canonicalize string state selectors against atom output fields",
             "test independent Map and DSL declarations produce the same canonical Agent",
             "test inline routes accept guarded callback clauses",
             "test inline routes compile ordinary Actions with access to private helpers",
@@ -101,7 +103,7 @@
         "jido.agent.I20": {
           "failing": 0,
           "kind": "persisted_format",
-          "passing": 11,
+          "passing": 13,
           "status": "active",
           "testable": true,
           "tests": [
@@ -111,8 +113,10 @@
             "test Codec rejects malformed values at each document boundary",
             "test Codec rejects the old Agent envelope",
             "test Codec reports Agent validation paths as JSON paths",
+            "test Codec resolves selector strings through the output schema without creating atoms",
             "test Codec retains route defaults and writes definitions only",
             "test Codec validates the current executable kind",
+            "test Codec version 1 encodes selectors and rejects other versions",
             "test portable definitions reject arbitrary values and obsolete Registry kinds",
             "test the trusted JSON codec returns the portable definition",
             "test wildcard routes work and static structs are not portable authoring values"
@@ -141,7 +145,7 @@
         "jido.agent.I22": {
           "failing": 0,
           "kind": "functional",
-          "passing": 30,
+          "passing": 32,
           "status": "active",
           "testable": true,
           "tests": [
@@ -152,6 +156,8 @@
             "test authoring containers normalize keys and reject ambiguous input",
             "test authoring traversal preserves order and stops at one structured error",
             "test collection errors retain the failed field, declaration, and index",
+            "test compiled Agents canonicalize string reply selectors against atom output fields",
+            "test compiled Agents canonicalize string state selectors against atom output fields",
             "test configuration throws and exits remain structured errors with their causes",
             "test constructors reject non-map input and invalid envelope options",
             "test definition and instance resolution preserve configuration exceptions",
@@ -233,7 +239,7 @@
         "jido.agent.I27": {
           "failing": 0,
           "kind": "functional",
-          "passing": 29,
+          "passing": 30,
           "status": "active",
           "testable": true,
           "tests": [
@@ -257,6 +263,7 @@
             "test operation preconditions fail with an index and preserve the source",
             "test route add accepts executable, transform, and forward forms",
             "test route edits have strict identities and the Diff reports net changes",
+            "test route mutations retain mappings and reject stale mappings atomically",
             "test route removal changes the candidate and leaves the source unchanged",
             "test route reorder changes first-match selection and rejects incomplete permutations",
             "test route update shallow replaces defaults and route replacement fills defaults",
@@ -360,11 +367,16 @@
         "jido.agent.I32": {
           "failing": 0,
           "kind": "functional",
-          "passing": 1,
+          "passing": 6,
           "status": "active",
           "testable": true,
           "tests": [
-            "test generated Agent modules expose one documented facade"
+            "test all route body forms lower to the canonical Map contract",
+            "test an inline Flow route returns its exact projected state and directives",
+            "test generated Agent modules expose one documented facade",
+            "test route bodies reject invalid role combinations",
+            "test route_executable rejects terminal handlers and unknown paths",
+            "test route_executable returns referenced and inline Action and Flow targets"
           ]
         },
         "jido.agent.I4": {
@@ -2715,7 +2727,7 @@
         "jido.persistence.I6": {
           "failing": 0,
           "kind": "persisted_format",
-          "passing": 13,
+          "passing": 15,
           "status": "active",
           "testable": true,
           "tests": [
@@ -2731,13 +2743,15 @@
             "test snapshot and record callbacks receive only their bounded context",
             "test snapshot boundaries reject malformed values and context",
             "test snapshot envelope and final state are checked",
+            "test snapshot format 1 rejects other formats",
+            "test snapshot format 1 rejects the old route shape",
             "test the documented public API excludes persistence implementation helpers"
           ]
         },
         "jido.persistence.I7": {
           "failing": 0,
           "kind": "persisted_format",
-          "passing": 9,
+          "passing": 10,
           "status": "active",
           "testable": true,
           "tests": [
@@ -2748,6 +2762,7 @@
             "test changed and unavailable code return reference errors",
             "test missing saved declarations stop custom restore before its callback",
             "test schema refinements are code references and tuple defaults remain data",
+            "test snapshots retain generated inline Action and Flow references",
             "test transform MFA handlers retain their callback module",
             "test upgrade runs before old code resolution and validates only target references"
           ]
@@ -3368,100 +3383,6 @@
         }
       }
     },
-    "jido.signal_action": {
-      "active": 7,
-      "app": "jido",
-      "coverage": 1.0,
-      "covered": 7,
-      "form": "light",
-      "obligations": {
-        "jido.signal_action.I1": {
-          "failing": 0,
-          "kind": "functional",
-          "passing": 4,
-          "status": "active",
-          "testable": true,
-          "tests": [
-            "test input construction and Action parameters share one schema",
-            "test invalid definitions stop compilation",
-            "test one module is one native Action and input Signal contract",
-            "test successful declarations compile complete inline and module contracts"
-          ]
-        },
-        "jido.signal_action.I2": {
-          "failing": 0,
-          "kind": "functional",
-          "passing": 5,
-          "status": "active",
-          "testable": true,
-          "tests": [
-            "test existing Signal definitions supply both envelope contracts",
-            "test input and output reject tuple forms",
-            "test input and output require full Signal type strings",
-            "test invalid definitions stop compilation",
-            "test successful declarations compile complete inline and module contracts"
-          ]
-        },
-        "jido.signal_action.I3": {
-          "failing": 0,
-          "kind": "functional",
-          "passing": 4,
-          "status": "active",
-          "testable": true,
-          "tests": [
-            "test a reply rejects a wrong request contract or missing output definition",
-            "test existing Signal definitions supply both envelope contracts",
-            "test invalid definitions stop compilation",
-            "test successful declarations compile complete inline and module contracts"
-          ]
-        },
-        "jido.signal_action.I4": {
-          "failing": 0,
-          "kind": "functional",
-          "passing": 4,
-          "status": "active",
-          "testable": true,
-          "tests": [
-            "test constructors own type, data, and dataschema and validate the envelope",
-            "test existing Signal definitions supply both envelope contracts",
-            "test input construction and Action parameters share one schema",
-            "test input construction applies declared defaults and coercion"
-          ]
-        },
-        "jido.signal_action.I5": {
-          "failing": 0,
-          "kind": "functional",
-          "passing": 1,
-          "status": "active",
-          "testable": true,
-          "tests": [
-            "test constructors own type, data, and dataschema and validate the envelope"
-          ]
-        },
-        "jido.signal_action.I6": {
-          "failing": 0,
-          "kind": "functional",
-          "passing": 3,
-          "status": "active",
-          "testable": true,
-          "tests": [
-            "test a reply rejects a wrong request contract or missing output definition",
-            "test existing Signal definitions supply both envelope contracts",
-            "test reply builds a fresh completion Signal with request correlation"
-          ]
-        },
-        "jido.signal_action.I7": {
-          "failing": 0,
-          "kind": "functional",
-          "passing": 1,
-          "status": "active",
-          "testable": true,
-          "tests": [
-            "test reply builds a fresh completion Signal with request correlation"
-          ]
-        }
-      }
-    },
     "jido.telemetry": {
       "active": 8,
       "app": "jido",
@@ -3692,8 +3613,8 @@
   },
   "covenant": "0.2.0",
   "totals": {
-    "active": 231,
+    "active": 224,
     "coverage": 1.0,
-    "covered": 231
+    "covered": 224
   }
 }

@@ -7,7 +7,8 @@ defmodule Jido.Agent.SelectionTest do
   alias Jido.Tracing.Trace
 
   defmodule Record do
-    use Jido.Action, name: "selection_record"
+    use Jido.Action,
+      name: "selection_record"
 
     @impl true
     def run(input, context) do
@@ -20,7 +21,8 @@ defmodule Jido.Agent.SelectionTest do
   end
 
   defmodule RecordFlow do
-    use Jido.Flow, name: "selection_record_flow"
+    use Jido.Flow,
+      name: "selection_record_flow"
 
     flow do
       step "record", action: Record, params: input()
@@ -49,7 +51,10 @@ defmodule Jido.Agent.SelectionTest do
 
     routes do
       route "selection.action", Record, defaults: %{value: 7, settings: %{first: 1, second: 2}}
-      route "selection.flow", RecordFlow, defaults: %{value: 7, settings: %{first: 1, second: 2}}
+
+      route "selection.flow", RecordFlow,
+        defaults: %{value: 7, settings: %{first: 1, second: 2}} do
+      end
     end
   end
 
@@ -105,7 +110,11 @@ defmodule Jido.Agent.SelectionTest do
           routes: [
             %{
               path: "selection.empty",
-              handler: %{kind: if(target == RecordFlow, do: :flow, else: :action), target: target}
+              handler: %{
+                kind: if(target == RecordFlow, do: :flow, else: :action),
+                target: target
+              },
+              state: %{source: :output, path: []}
             }
           ]
         })
@@ -159,7 +168,8 @@ defmodule Jido.Agent.SelectionTest do
           %{
             path: "selection.validated",
             handler: %{kind: :action, target: ValidatedRecord},
-            defaults: %{value: 7}
+            defaults: %{value: 7},
+            state: %{source: :output, path: []}
           }
         ]
       })

@@ -16,7 +16,8 @@ defmodule Jido.Examples.DefinitionChanges do
          [
            D.route_add(
              "examples.runtime.definition.work.exact",
-             Jido.Examples.DefinitionChanges.Exact
+             Jido.Examples.DefinitionChanges.Exact,
+             state: %{source: :output, path: []}
            ),
            D.routes_reorder([
              "examples.runtime.definition.install",
@@ -44,6 +45,8 @@ end
 
 defmodule Jido.Examples.DefinitionChanges.Exact do
   @moduledoc "A named Action gives the dynamically installed route a stable code reference."
-  use Jido.Action, name: "runtime_definition_exact"
+  use Jido.Action,
+    name: "runtime_definition_exact"
+
   def run(_, context), do: {:ok, %{context.agent_state | selected: "exact"}}
 end

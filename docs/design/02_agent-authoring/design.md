@@ -163,9 +163,17 @@ DSL compiler shall reject the route.
 boundary shall store an ordinary executable Action target in the canonical
 route.
 
-`AUTH-REQ-020`: When `route_action!/1` receives an inline route path, the
-generated Agent module shall return the compiled Action target for reuse by
-direct data or Codec Registry entries.
+`AUTH-REQ-020`: When `route_executable!/1` receives an exact executable route
+path, the generated Agent module shall return its compiled Action or Flow
+target for reuse by direct data or Codec Registry entries.
+
+`AUTH-REQ-065`: If `route_executable!/1` receives a terminal handler path or
+an unknown path, then the generated Agent module shall raise `ArgumentError`.
+
+`AUTH-REQ-066`: When an Action or Flow route omits its state mapping, the Agent
+authoring boundary shall use the complete validated executable output as the
+next state. An explicit mapping can select another output path or keep the
+current state unchanged.
 
 ### Generated Signal helpers
 
@@ -262,8 +270,8 @@ shall resolve it directly to one canonical entry.
 Agent Codec shall return an authoring error without changing direct Agent
 validity.
 
-`AUTH-REQ-048`: When the Agent Codec processes a version-2 Agent document, it
-shall preserve the Agent `vsn`.
+`AUTH-REQ-048`: When the Agent Codec processes a version-1 Agent document, it
+shall preserve the Agent `vsn` and reject the prior route record shape.
 
 `AUTH-REQ-049`: The Plugin Codec shall encode one canonical Plugin declaration
 as module and options and shall exclude Plugin-owned state values and runtime data.
@@ -341,6 +349,10 @@ can name one Action or Flow, contain one inline Action, or use one
 extension-owned target option. The route can contain `defaults`, `priority`,
 `match`, and one optional `as:` helper name.
 
+An Action or Flow route uses its complete validated output as the next state by
+default. A `state` declaration overrides that default with another output path
+or `:unchanged`.
+
 Plugin `config` accepts a map or keyword list. Keyword order is retained. Map
 input uses a stable sorted order. The Plugin module is its identity and can
 appear once. Plugin labels are not part of the core syntax.
@@ -358,7 +370,10 @@ A named route declares its Signal helper directly:
 ```elixir
 routes do
   signal_source "/counter"
-  route "counter.add", MyApp.Add, as: :add
+
+  route "counter.add", MyApp.Add, as: :add do
+    state :unchanged
+  end
 end
 ```
 
@@ -400,9 +415,9 @@ versioned document. The Plugin Codec uses the same Registry and tagged record
 format. A generated Registry is for temporary transport and tests. Durable
 authoring data uses application-owned stable identifiers.
 
-Agent Codec reads and writes document version 2 with Agent `vsn`. It rejects
-version-1 documents. Encoding an instance uses its validated neutral
-definition only; instance ID and state do not affect the document.
+Agent Codec reads and writes document version 1 with Agent `vsn`. It accepts
+only the current route record shape. Encoding an instance uses its validated
+neutral definition only; instance ID and state do not affect the document.
 
 Registry entry kinds are `agent`, `action`, `flow`, `plugin`, `schema`,
 `route_match`, `atom`, and static struct `value`. Route predicates must be

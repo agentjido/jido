@@ -12,7 +12,12 @@ defmodule Jido.Agent.MutationServerTest do
     initial = %{F.agent() | id: unique_id("mutation")}
     assert {:ok, server} = Jido.start_agent(jido, initial)
     assert :ok = Server.await_ready(server)
-    edits = [D.route_add("next", F.Work), D.route_remove("run")]
+
+    edits = [
+      D.route_add("next", F.Work),
+      D.route_remove("run")
+    ]
+
     assert {:ok, candidate, ^edits} = Server.call(server, F.signal(edits))
     assert Server.agent(server) === candidate
     assert Enum.map(candidate.routes, & &1.path) == ["next"]
@@ -28,7 +33,13 @@ defmodule Jido.Agent.MutationServerTest do
     store = {Persistence.ETS, table: __MODULE__}
     assert {:ok, server} = Jido.start_agent(jido, initial, persistence: store)
     assert :ok = Server.await_ready(server)
-    edits = [D.route_add("next", F.Work), D.route_remove("run"), D.plugin_add(F.Counter)]
+
+    edits = [
+      D.route_add("next", F.Work),
+      D.route_remove("run"),
+      D.plugin_add(F.Counter)
+    ]
+
     assert {:ok, candidate, ^edits} = Server.call(server, F.signal(edits))
     assert :ok = Server.await_ready(server)
 

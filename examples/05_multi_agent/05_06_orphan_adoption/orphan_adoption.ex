@@ -8,7 +8,9 @@ defmodule Jido.Examples.OrphanAdoption.Child do
 
   routes do
     route "examples.multi_agent.orphan_adoption.work" do
-      action %{value: value}, schema: Zoi.object(%{value: Zoi.integer()}), context: context do
+      action %{value: value},
+        schema: Zoi.object(%{value: Zoi.integer()}),
+        context: context do
         {:ok, %{context.agent_state | total: context.agent_state.total + value}}
       end
     end
@@ -30,7 +32,9 @@ defmodule Jido.Examples.OrphanAdoption.Parent do
     signal_source "/examples/multi_agent/orphan_adoption"
 
     route "examples.multi_agent.orphan_adoption.forward", as: :forward do
-      action %{value: value}, schema: Zoi.object(%{value: Zoi.integer()}), context: context do
+      action %{value: value},
+        schema: Zoi.object(%{value: Zoi.integer()}),
+        context: context do
         signal =
           Jido.Signal.new!("examples.multi_agent.orphan_adoption.work", %{value: value},
             source: "/examples/multi_agent/orphan_adoption"

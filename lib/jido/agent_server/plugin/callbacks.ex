@@ -54,16 +54,16 @@ defmodule Jido.AgentServer.Plugin.Callbacks do
   end
 
   @doc false
-  @spec prepare_dispatch(
+  @spec prepare_outbound(
           Jido.Signal.t(),
           [Jido.Plugin.Spec.t()],
           %{optional(module()) => term() | nil},
           SignalContext.t(),
           map()
         ) :: {:ok, Jido.Signal.t()} | {:error, term()}
-  def prepare_dispatch(%Jido.Signal{} = signal, specs, runtime_refs, context, agent_state) do
+  def prepare_outbound(%Jido.Signal{} = signal, specs, runtime_refs, context, agent_state) do
     specs
-    |> callback_specs(:prepare_dispatch, 4)
+    |> callback_specs(:prepare_outbound, 4)
     |> Enum.reverse()
     |> Enum.reduce_while({:ok, signal}, fn plugin_spec, {:ok, current} ->
       plugin_context = %{
@@ -71,7 +71,7 @@ defmodule Jido.AgentServer.Plugin.Callbacks do
         | plugin_state: owned_state(agent_state, plugin_spec)
       }
 
-      case prepare_dispatch_one(
+      case prepare_outbound_one(
              current,
              plugin_spec,
              Map.get(runtime_refs, plugin_spec.module),
@@ -154,11 +154,11 @@ defmodule Jido.AgentServer.Plugin.Callbacks do
     |> validate_runtime_input(command, spec)
   end
 
-  defp prepare_dispatch_one(signal, %{agent_server: %Spec{} = spec}, runtime_ref, context) do
+  defp prepare_outbound_one(signal, %{agent_server: %Spec{} = spec}, runtime_ref, context) do
     PluginError.safe_apply(
       spec.package,
       spec.module,
-      :prepare_dispatch,
+      :prepare_outbound,
       [runtime_ref, signal, context, spec.options],
       "Agent Server Plugin outbound Signal preparation failed"
     )
@@ -171,7 +171,7 @@ defmodule Jido.AgentServer.Plugin.Callbacks do
 
       result ->
         PluginError.invalid_callback(
-          "Agent Server Plugin prepare_dispatch/4 returned an invalid result",
+          "Agent Server Plugin prepare_outbound/4 returned an invalid result",
           spec.package,
           spec.module,
           %{result: result}
@@ -201,7 +201,7 @@ defmodule Jido.AgentServer.Plugin.Callbacks do
 
       {:error, errors} ->
         PluginError.invalid_callback(
-          "Agent Server Plugin prepare_dispatch/4 returned an invalid Signal",
+          "Agent Server Plugin prepare_outbound/4 returned an invalid Signal",
           spec.package,
           spec.module,
           %{errors: errors}

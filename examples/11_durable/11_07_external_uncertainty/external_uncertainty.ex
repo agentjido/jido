@@ -14,7 +14,8 @@ defmodule Jido.Examples.Durable.ExternalUncertainty do
     signal_source "/examples/durable/external_uncertainty"
 
     route "examples.durable.external_uncertainty.publish",
-          Jido.Examples.Durable.ExternalUncertainty.Publish, as: :publish
+          Jido.Examples.Durable.ExternalUncertainty.Publish, as: :publish do
+    end
   end
 end
 

@@ -38,6 +38,7 @@ defmodule Jido.Agent.Validation do
            Error.at(Data.list(definition.routes, &Route.normalize(&1, related?)), :routes),
          :ok <- Error.at(Data.unique(routes, & &1.path), :routes),
          :ok <- Error.at(Data.unique(Enum.reject(routes, &is_nil(&1.as)), & &1.as), :routes),
+         :ok <- reply_source(routes, definition.signal_source, related?),
          definition = %{definition | routes: routes, extensions: extensions},
          {:ok, topology} <-
            Error.at(Topology.normalize(definition.topology, definition, opts), :topology),
@@ -74,6 +75,17 @@ defmodule Jido.Agent.Validation do
   end
 
   defp plugin_schema(_, false), do: :ok
+
+  defp reply_source(routes, signal_source, related?) do
+    if related? and is_nil(signal_source) and Enum.any?(routes, &(!is_nil(&1.reply))),
+      do:
+        Error.fail(
+          :reply_source_required,
+          [:signal_source],
+          "A reply route requires an Agent signal source"
+        ),
+      else: :ok
+  end
 
   def validate(%Jido.Agent{id: nil, state: nil} = value), do: validate_definition(value)
   def validate(%Jido.Agent{} = value), do: validate_instance(value)

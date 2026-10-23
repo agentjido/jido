@@ -206,7 +206,7 @@ defmodule Jido.Plugin.OrderingTest do
 
     def reduce(%Jido.Agent.Plugin.Reduction{} = reduction, _opts) do
       send(self(), {:reduction, reduction})
-      {:ok, reduction.state.first_reduced}
+      {:ok, reduction.candidate_state.first_reduced}
     end
   end
 
@@ -227,7 +227,7 @@ defmodule Jido.Plugin.OrderingTest do
     defdelegate state_spec(opts), to: Jido.Plugin.OrderingTest.FirstOutboundPlugin.Agent
 
     @impl true
-    defdelegate prepare_dispatch(runtime, signal, context, opts),
+    defdelegate prepare_outbound(runtime, signal, context, opts),
       to: Jido.Plugin.OrderingTest.FirstOutboundPlugin.Server
   end
 
@@ -242,7 +242,7 @@ defmodule Jido.Plugin.OrderingTest do
     @behaviour Jido.Plugin
 
     @impl true
-    def prepare_dispatch(runtime, signal, context, _opts) do
+    def prepare_outbound(runtime, signal, context, _opts) do
       send(self(), {:outbound, :first, runtime, context.plugin_state})
       {:ok, append_trace(signal, :first)}
     end
@@ -259,7 +259,7 @@ defmodule Jido.Plugin.OrderingTest do
     defdelegate state_spec(opts), to: Jido.Plugin.OrderingTest.SecondOutboundPlugin.Agent
 
     @impl true
-    defdelegate prepare_dispatch(runtime, signal, context, opts),
+    defdelegate prepare_outbound(runtime, signal, context, opts),
       to: Jido.Plugin.OrderingTest.SecondOutboundPlugin.Server
   end
 
@@ -274,7 +274,7 @@ defmodule Jido.Plugin.OrderingTest do
     @behaviour Jido.Plugin
 
     @impl true
-    def prepare_dispatch(runtime, signal, context, _opts) do
+    def prepare_outbound(runtime, signal, context, _opts) do
       send(self(), {:outbound, :second, runtime, context.plugin_state})
       {:ok, append_trace(signal, :second)}
     end
@@ -288,7 +288,7 @@ defmodule Jido.Plugin.OrderingTest do
     use Jido.Plugin
 
     @impl true
-    defdelegate prepare_dispatch(runtime, signal, context, opts),
+    defdelegate prepare_outbound(runtime, signal, context, opts),
       to: Jido.Plugin.OrderingTest.InvalidOutboundPlugin.Server
   end
 
@@ -296,7 +296,7 @@ defmodule Jido.Plugin.OrderingTest do
     @behaviour Jido.Plugin
 
     @impl true
-    def prepare_dispatch(_runtime, signal, _context, _opts) do
+    def prepare_outbound(_runtime, signal, _context, _opts) do
       send(self(), {:outbound, :invalid})
       {:ok, %{signal | source: "not a URI reference"}}
     end
@@ -306,7 +306,7 @@ defmodule Jido.Plugin.OrderingTest do
     use Jido.Plugin
 
     @impl true
-    defdelegate prepare_dispatch(runtime, signal, context, opts),
+    defdelegate prepare_outbound(runtime, signal, context, opts),
       to: Jido.Plugin.OrderingTest.MustNotRunOutboundPlugin.Server
   end
 
@@ -314,7 +314,7 @@ defmodule Jido.Plugin.OrderingTest do
     @behaviour Jido.Plugin
 
     @impl true
-    def prepare_dispatch(_runtime, signal, _context, _opts) do
+    def prepare_outbound(_runtime, signal, _context, _opts) do
       send(self(), {:outbound, :must_not_run})
       {:ok, signal}
     end
@@ -408,7 +408,7 @@ defmodule Jido.Plugin.OrderingTest do
       )
 
     assert {:ok, prepared} =
-             Jido.AgentServer.Plugin.Callbacks.prepare_dispatch(
+             Jido.AgentServer.Plugin.Callbacks.prepare_outbound(
                source,
                specs,
                %{FirstOutboundPlugin => :first_runtime, SecondOutboundPlugin => :second_runtime},
@@ -445,7 +445,7 @@ defmodule Jido.Plugin.OrderingTest do
       )
 
     assert {:error, error} =
-             Jido.AgentServer.Plugin.Callbacks.prepare_dispatch(source, specs, %{}, context, %{})
+             Jido.AgentServer.Plugin.Callbacks.prepare_outbound(source, specs, %{}, context, %{})
 
     assert error.details.plugin == InvalidOutboundPlugin
     assert_received {:outbound, :invalid}
@@ -466,8 +466,7 @@ defmodule Jido.Plugin.OrderingTest do
              agent,
              signal("plugin.reduce"),
              %{},
-             Jido.Agent.Plugin.specs(specs),
-             %{}
+             Jido.Agent.Plugin.specs(specs)
            ) ==
              {:error, :second_failed}
   end
@@ -498,8 +497,7 @@ defmodule Jido.Plugin.OrderingTest do
                agent,
                signal("plugin.reduce"),
                %{},
-               Jido.Agent.Plugin.specs(specs),
-               %{}
+               Jido.Agent.Plugin.specs(specs)
              )
 
     assert state.first_reduced == 1
@@ -508,7 +506,7 @@ defmodule Jido.Plugin.OrderingTest do
     assert reduction.agent_id == agent.id
     assert reduction.agent_module == agent.module
     assert reduction.state_before == agent.state
-    assert reduction.state.first_reduced == 1
+    assert reduction.candidate_state.first_reduced == 1
     assert reduction.state_before.first_reduced == 0
   end
 

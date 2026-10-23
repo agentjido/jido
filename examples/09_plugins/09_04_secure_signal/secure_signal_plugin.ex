@@ -14,7 +14,7 @@ defmodule Jido.Examples.Plugins.SecureSignal.Plugin do
   def admit(_runtime, _admission, _opts), do: {:error, :secure_data_required}
 
   @impl Jido.Plugin
-  def prepare_dispatch(
+  def prepare_outbound(
         runtime,
         %Jido.Signal{data: %{"secure" => plaintext}} = signal,
         %SignalContext{},
@@ -25,7 +25,7 @@ defmodule Jido.Examples.Plugins.SecureSignal.Plugin do
     end
   end
 
-  def prepare_dispatch(_runtime, signal, %SignalContext{}, _opts), do: {:ok, signal}
+  def prepare_outbound(_runtime, signal, %SignalContext{}, _opts), do: {:ok, signal}
 
   @impl true
   def child_spec(%Init{} = init), do: Supervisor.child_spec({Runtime, init}, id: __MODULE__)

@@ -25,7 +25,7 @@ defmodule JidoTest.Contract.PluginSensorManagerTest do
       agent_module: __MODULE__,
       signal: Jido.Signal.new!("sensor.contract", %{}, source: "/contract"),
       state_before: %{sensors: plugin_state},
-      state: %{sensors: plugin_state},
+      candidate_state: %{sensors: plugin_state},
       plugin_state: plugin_state,
       prepared_input: nil,
       directives: directives

@@ -5,12 +5,17 @@ defmodule Jido.Agent.FlowExpressionTest do
   alias Jido.Flow.Ref
 
   defmodule Amount do
-    use Jido.Action, name: "expression_amount", schema: Zoi.object(%{amount: Zoi.integer()})
+    use Jido.Action,
+      name: "expression_amount",
+      schema: Zoi.object(%{amount: Zoi.integer()})
+
     def run(input, _context), do: {:ok, input}
   end
 
   defmodule Add do
-    use Jido.Flow, name: "expression_add", schema: Zoi.object(%{amount: Zoi.integer()})
+    use Jido.Flow,
+      name: "expression_add",
+      schema: Zoi.object(%{amount: Zoi.integer()})
 
     flow do
       step "amount", action: Amount, params: %{amount: min(input(:amount), 5)}
@@ -84,7 +89,8 @@ defmodule Jido.Agent.FlowExpressionTest do
             %{
               path: "counter.add",
               handler: %{kind: :flow, target: target},
-              defaults: %{amount: 2}
+              defaults: %{amount: 2},
+              state: %{source: :output, path: []}
             }
           ]
         })
@@ -126,7 +132,8 @@ defmodule Jido.Agent.FlowExpressionTest do
             %{
               path: "counter.add",
               handler: %{kind: :flow, target: target},
-              defaults: %{amount: 2}
+              defaults: %{amount: 2},
+              state: %{source: :output, path: []}
             }
           ]
         })
@@ -146,7 +153,8 @@ defmodule Jido.Agent.FlowExpressionTest do
   end
 
   defmodule Invalid do
-    use Jido.Flow, name: "invalid_expression"
+    use Jido.Flow,
+      name: "invalid_expression"
 
     flow do
       step "amount", action: Amount, params: %{amount: 1}
@@ -159,7 +167,13 @@ defmodule Jido.Agent.FlowExpressionTest do
       Agent.define!(%{
         name: "invalid_expression",
         schema: Counter.definition().schema,
-        routes: [%{path: "counter.add", handler: %{kind: :flow, target: Invalid}}]
+        routes: [
+          %{
+            path: "counter.add",
+            handler: %{kind: :flow, target: Invalid},
+            state: %{source: :output, path: []}
+          }
+        ]
       })
 
     instance = Agent.instantiate!(definition, id: unique_id(), state: %{count: 10})
@@ -175,7 +189,13 @@ defmodule Jido.Agent.FlowExpressionTest do
     assert {:error, _} =
              Agent.define(%{
                definition
-               | routes: [%{path: "bad", handler: %{kind: :flow, target: Add.flow()}}]
+               | routes: [
+                   %{
+                     path: "bad",
+                     handler: %{kind: :flow, target: Add.flow()},
+                     state: %{source: :output, path: []}
+                   }
+                 ]
              })
   end
 end

@@ -5,7 +5,8 @@ defmodule Jido.Agent.DirectCommandTest do
   alias Jido.Signal
 
   defmodule Update do
-    use Jido.Action, name: "direct_agent_update"
+    use Jido.Action,
+      name: "direct_agent_update"
 
     def run(input, context) do
       if pid = Map.get(context, :probe), do: send(pid, {:ran, self(), context.signal, input})
@@ -46,17 +47,22 @@ defmodule Jido.Agent.DirectCommandTest do
 
     routes do
       signal_source "/direct"
+
       route "work", Jido.Agent.DirectCommandTest.Update
     end
   end
 
   defmodule Finish do
-    use Jido.Action, name: "direct_agent_finish"
+    use Jido.Action,
+      name: "direct_agent_finish"
+
     def run(state, _context), do: {:ok, %{state | count: state.count + 2}}
   end
 
   defmodule Flow do
-    use Jido.Flow, name: "direct_agent_flow", schema: Zoi.object(%{amount: Zoi.integer()})
+    use Jido.Flow,
+      name: "direct_agent_flow",
+      schema: Zoi.object(%{amount: Zoi.integer()})
 
     flow do
       step "update",
@@ -96,7 +102,10 @@ defmodule Jido.Agent.DirectCommandTest do
   end
 
   defp route(path, handler, opts \\ []) do
-    Map.merge(%{path: path, handler: handler}, Map.new(opts))
+    Map.merge(
+      %{path: path, handler: handler, state: %{source: :output, path: []}},
+      Map.new(opts)
+    )
   end
 
   defp action(path \\ "work", opts \\ []),
@@ -372,7 +381,10 @@ defmodule Jido.Agent.ReplyDirectiveRuntimeTest do
     request = %{request | data: %{directives: [reply]}}
 
     assert {:ok, committed, [^reply]} = AgentServer.call(server, request)
-    assert_receive ^output
+    assert_receive %Signal{id: output_id, type: "work.reply", data: %{}} = delivered
+    assert output_id == output.id
+    assert Signal.get_context(delivered, "jidocausationid") == request.id
+    assert Signal.Trace.get(delivered) != nil
     assert AgentServer.status(server).state_version == 1
     assert AgentServer.agent(server) == committed
   end

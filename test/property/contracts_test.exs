@@ -11,21 +11,24 @@ defmodule JidoTest.Property.ContractsTest do
   alias JidoTest.Property.Fuzz
 
   defmodule First do
-    use Jido.Action, name: "property_contract_first"
+    use Jido.Action,
+      name: "property_contract_first"
 
     def run(%{delta: delta}, %{agent_state: state}),
       do: {:ok, %{value: state.value + delta, selected: 1}}
   end
 
   defmodule Second do
-    use Jido.Action, name: "property_contract_second"
+    use Jido.Action,
+      name: "property_contract_second"
 
     def run(%{delta: delta}, %{agent_state: state}),
       do: {:ok, %{value: state.value + delta, selected: 2}}
   end
 
   defmodule RoutedFlow do
-    use Jido.Flow, name: "property_contract_flow"
+    use Jido.Flow,
+      name: "property_contract_flow"
 
     flow do
       step "second", action: Second, params: input()
@@ -34,7 +37,8 @@ defmodule JidoTest.Property.ContractsTest do
   end
 
   defmodule Candidate do
-    use Jido.Action, name: "property_contract_candidate"
+    use Jido.Action,
+      name: "property_contract_candidate"
 
     def run(%{mode: mode, value: value, effects: effects}, _context) do
       state = %{value: value, selected: 0}
@@ -74,7 +78,8 @@ defmodule JidoTest.Property.ContractsTest do
   end
 
   defmodule CandidateFlow do
-    use Jido.Flow, name: "property_candidate_flow"
+    use Jido.Flow,
+      name: "property_candidate_flow"
 
     flow do
       step "candidate", action: Candidate, params: input()
@@ -376,10 +381,20 @@ defmodule JidoTest.Property.ContractsTest do
           %{
             path: "property.exact",
             handler: %{kind: :action, target: First},
-            defaults: %{delta: 4}
+            defaults: %{delta: 4},
+            state: %{source: :output, path: []}
           },
-          %{path: "property.*", handler: %{kind: :action, target: Second}, defaults: %{delta: 9}},
-          %{path: "flow.run", handler: %{kind: :flow, target: RoutedFlow}}
+          %{
+            path: "property.*",
+            handler: %{kind: :action, target: Second},
+            defaults: %{delta: 9},
+            state: %{source: :output, path: []}
+          },
+          %{
+            path: "flow.run",
+            handler: %{kind: :flow, target: RoutedFlow},
+            state: %{source: :output, path: []}
+          }
         ]
       })
 
@@ -472,7 +487,8 @@ defmodule JidoTest.Property.ContractsTest do
         routes: [
           %{
             path: "candidate.run",
-            handler: %{kind: if(input["flow"], do: :flow, else: :action), target: target}
+            handler: %{kind: if(input["flow"], do: :flow, else: :action), target: target},
+            state: %{source: :output, path: []}
           }
         ]
       })

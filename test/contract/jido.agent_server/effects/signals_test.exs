@@ -17,7 +17,7 @@ defmodule JidoTest.AgentServer.Effects.SignalsTest do
   defmodule SignalContextPlugin do
     use Jido.Plugin
 
-    def prepare_dispatch(nil, signal, context, opts) do
+    def prepare_outbound(nil, signal, context, opts) do
       send(opts[:observer], {:dispatch_context, context})
       {:ok, signal}
     end

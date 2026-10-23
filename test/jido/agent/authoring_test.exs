@@ -24,8 +24,18 @@ defmodule JidoTest.Agent.AuthoringTest do
       do: {:ok, %{state | count: state.count + amount}}
   end
 
+  defmodule ProjectedOutput do
+    use Jido.Action,
+      name: "authoring_projected_output",
+      output_schema: Zoi.object(%{state: Zoi.map(), reply: Zoi.string()})
+
+    def run(_params, _context), do: {:ok, %{state: %{}, reply: "done"}}
+  end
+
   defmodule Flow do
-    use Jido.Flow, name: "authoring_flow", schema: Zoi.object(%{amount: Zoi.integer()})
+    use Jido.Flow,
+      name: "authoring_flow",
+      schema: Zoi.object(%{amount: Zoi.integer()})
 
     flow do
       step "add", action: Add, params: %{amount: input(:amount)}
@@ -163,6 +173,7 @@ defmodule JidoTest.Agent.AuthoringTest do
       signal_source "/authoring"
 
       route "authoring.add", Add, as: :add, defaults: %{amount: 1, flag: false}
+
       route "authoring.flow", Flow, as: :flow_add, defaults: %{amount: 2}
     end
   end
@@ -185,6 +196,7 @@ defmodule JidoTest.Agent.AuthoringTest do
 
     routes do
       route "authoring.add", Add, defaults: %{amount: 1, flag: false}
+
       route "authoring.flow", Flow, defaults: %{amount: 2}
     end
   end
@@ -301,7 +313,7 @@ defmodule JidoTest.Agent.AuthoringTest do
 
   @tag obligation: "jido.agent.I1"
   test "a string route requires a handler and forward lowers to portable data" do
-    assert_raise CompileError, ~r/string route requires/, fn ->
+    assert_raise CompileError, ~r/requires exactly one handler/, fn ->
       compile_agent("route \"test.pass\"")
     end
 
@@ -310,7 +322,9 @@ defmodule JidoTest.Agent.AuthoringTest do
       defmodule JidoTest.BareAgent#{System.unique_integer([:positive])} do
         use Jido.Agent, name: "bare"
         routes do
-          forward "test.pass", to: parent()
+          route "test.pass" do
+            forward to: parent()
+          end
         end
       end
       """)
@@ -342,7 +356,7 @@ defmodule JidoTest.Agent.AuthoringTest do
 
   @tag obligation: ["jido.agent.I1", "jido.agent.I21"]
   test "inline routes compile ordinary Actions with access to private helpers" do
-    target = InlineCounter.route_action!("inline.add")
+    target = InlineCounter.route_executable!("inline.add")
 
     assert {:ok, %Jido.Instruction{kind: :action, target: ^target}} =
              Jido.Instruction.resolve(target)
@@ -371,6 +385,7 @@ defmodule JidoTest.Agent.AuthoringTest do
             _ ->
               {:ok, %{context.agent_state | result: :other}}
           end
+
         end
         """,
         "",
@@ -394,6 +409,41 @@ defmodule JidoTest.Agent.AuthoringTest do
 
     assert {:ok, %{state: %{result: :other}}, []} =
              module.cmd(module.instantiate!(id: Jido.Signal.ID.generate!()), other)
+  end
+
+  @tag obligation: ["jido.agent.I1", "jido.agent.I22"]
+  test "compiled Agents canonicalize string state selectors against atom output fields" do
+    compiled =
+      compile_agent("""
+      route "test.project", JidoTest.Agent.AuthoringTest.ProjectedOutput do
+        state from: output("state")
+      end
+      """)
+
+    {module, _bytecode} =
+      Enum.find(compiled, fn {compiled_module, _bytecode} ->
+        function_exported?(compiled_module, :definition, 0)
+      end)
+
+    assert [%{state: %{path: [:state]}}] = module.definition().routes
+  end
+
+  @tag obligation: ["jido.agent.I1", "jido.agent.I22"]
+  test "compiled Agents canonicalize string reply selectors against atom output fields" do
+    compiled =
+      compile_agent("""
+      route "test.project", JidoTest.Agent.AuthoringTest.ProjectedOutput do
+        state :unchanged
+        reply "test.project.done", from: output("reply")
+      end
+      """)
+
+    {module, _bytecode} =
+      Enum.find(compiled, fn {compiled_module, _bytecode} ->
+        function_exported?(compiled_module, :definition, 0)
+      end)
+
+    assert [%{reply: %{from: %{path: [:reply]}}}] = module.definition().routes
   end
 
   @tag obligation: "jido.agent.I21"
@@ -506,7 +556,8 @@ defmodule JidoTest.Agent.AuthoringTest do
                  %{
                    path: "tuple.add",
                    handler: %{kind: :action, target: Add},
-                   defaults: %{amount: 2}
+                   defaults: %{amount: 2},
+                   state: %{source: :output, path: []}
                  }
                ]
              })
@@ -538,6 +589,7 @@ defmodule JidoTest.Agent.AuthoringTest do
           action params do
             {:ok, params}
           end
+
         end
         """,
         "",

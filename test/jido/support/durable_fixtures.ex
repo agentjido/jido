@@ -98,7 +98,9 @@ defmodule JidoTest.DurableFixtures do
   end
 
   defmodule BadOutput do
-    use Jido.Flow, name: "durable_bad_output", schema: Zoi.object(%{})
+    use Jido.Flow,
+      name: "durable_bad_output",
+      schema: Zoi.object(%{})
 
     flow do
       step "pid", _input <- input() do
@@ -110,7 +112,9 @@ defmodule JidoTest.DurableFixtures do
   end
 
   defmodule EffectsFlow do
-    use Jido.Flow, name: "durable_effects_flow", schema: Zoi.object(%{})
+    use Jido.Flow,
+      name: "durable_effects_flow",
+      schema: Zoi.object(%{})
 
     flow do
       step "effect", _input <- input() do
@@ -122,7 +126,9 @@ defmodule JidoTest.DurableFixtures do
   end
 
   defmodule TopologyFlow do
-    use Jido.Flow, name: "durable_topology_mutation", schema: Zoi.object(%{})
+    use Jido.Flow,
+      name: "durable_topology_mutation",
+      schema: Zoi.object(%{})
 
     flow do
       step "add_agent", _input <- input() do
@@ -199,8 +205,11 @@ defmodule JidoTest.DurableFixtures do
 
     routes do
       route "request", Flow
+
       route "bad_output", BadOutput
+
       route "effects", EffectsFlow
+
       route "topology", TopologyFlow
 
       route "increment" do
@@ -221,7 +230,9 @@ defmodule JidoTest.DurableFixtures do
     use Jido.Agent, name: "durable_probe_team"
 
     routes do
-      forward "request", to: agent(:worker)
+      route "request" do
+        forward(to: agent(:worker))
+      end
 
       route "mutate" do
         action input, context: context do

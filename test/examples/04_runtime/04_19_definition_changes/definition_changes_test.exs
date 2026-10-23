@@ -32,7 +32,9 @@ defmodule JidoTest.Examples.Runtime.DefinitionChangesTest do
 
     assert {:ok, ^agent, diff} =
              Agent.mutate(agent, [
-               Directive.route_add("temporary", Example.Exact),
+               Directive.route_add("temporary", Example.Exact,
+                 state: %{source: :output, path: []}
+               ),
                Directive.route_remove("temporary")
              ])
 

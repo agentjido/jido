@@ -23,7 +23,10 @@ defmodule Jido.Agent.ForwardTest do
 
     routes do
       route "work.request", Increment
-      forward "work.completed", to: parent()
+
+      route "work.completed" do
+        forward(to: parent())
+      end
     end
   end
 
@@ -35,7 +38,10 @@ defmodule Jido.Agent.ForwardTest do
     end
 
     routes do
-      forward "work.request", to: agent(:worker)
+      route "work.request" do
+        forward(to: agent(:worker))
+      end
+
       route "work.completed", Increment
     end
 

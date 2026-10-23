@@ -26,7 +26,6 @@
 
 - [x] **Livebook Markdown** — [Define an Agent](define-and-instantiate-an-agent.livemd)
 - [x] **Livebook Markdown** — [Routes and Handlers](build-agent-routes.livemd)
-- [x] **Livebook Markdown** — [Typed Signals](typed-signal-actions.livemd)
 - [x] **Markdown** — [State and Directives](agent-results-and-directives.md)
 - [x] **Livebook Markdown** — [Mutations and Diffs](agent-mutations-and-diffs.livemd)
 - [x] **Markdown** — [Documents and Views](agent-documents-and-views.md)

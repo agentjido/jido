@@ -92,7 +92,7 @@ defmodule JidoTest.PluginContract.NormalizerTest do
     def reduce(reduction, _opts), do: {:ok, reduction.plugin_state}
     def validate_options(_opts), do: :ok
     def admit(_runtime, _admission, opts), do: {:ok, opts}
-    def prepare_dispatch(_runtime, signal, _context, _opts), do: {:ok, signal}
+    def prepare_outbound(_runtime, signal, _context, _opts), do: {:ok, signal}
     def dispatch(_runtime, _directive, _context, _opts), do: :ok
     def child_spec(_init), do: %{id: __MODULE__, start: {Task, :start_link, [fn -> :ok end]}}
     def await_ready(_runtime, _opts), do: :ok
@@ -181,7 +181,7 @@ defmodule JidoTest.PluginContract.NormalizerTest do
              agent_server: [
                validate_options: 1,
                admit: 3,
-               prepare_dispatch: 4,
+               prepare_outbound: 4,
                dispatch: 4,
                child_spec: 1,
                await_ready: 2,

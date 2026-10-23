@@ -18,17 +18,14 @@ defmodule JidoTest.Examples.Runtime.InspectionFixture do
   routes do
     signal_source "/test/runtime_inspection"
 
-    route("test.runtime.inspect",
-      as: :record_result,
-      do:
-        action(%{result: result},
-          schema: Zoi.object(%{result: Zoi.string()}),
-          context: context
-        ) do
-          JidoTest.Examples.RuntimeBarrier.wait()
-          {:ok, %{context.agent_state | status: "complete", result: result}}
-        end
-    )
+    route "test.runtime.inspect", as: :record_result do
+      action %{result: result},
+        schema: Zoi.object(%{result: Zoi.string()}),
+        context: context do
+        JidoTest.Examples.RuntimeBarrier.wait()
+        {:ok, %{context.agent_state | status: "complete", result: result}}
+      end
+    end
   end
 end
 

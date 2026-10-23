@@ -13,7 +13,9 @@ defmodule Jido.Examples.Topology.Mutations do
     signal_source "/examples/topology/mutations"
 
     route "examples.topology.mutations.workers.add", as: :workers_add do
-      action %{count: count}, schema: Zoi.object(%{count: Zoi.integer()}), context: context do
+      action %{count: count},
+        schema: Zoi.object(%{count: Zoi.integer()}),
+        context: context do
         {:ok, %{context.agent_state | worker_count: count},
          [
            D.agent_add(:workers, Cell,
@@ -25,13 +27,17 @@ defmodule Jido.Examples.Topology.Mutations do
     end
 
     route "examples.topology.mutations.workers.bind", as: :workers_bind do
-      action %{count: count}, schema: Zoi.object(%{count: Zoi.integer()}), context: context do
+      action %{count: count},
+        schema: Zoi.object(%{count: Zoi.integer()}),
+        context: context do
         {:ok, %{context.agent_state | worker_count: count}}
       end
     end
 
     route "examples.topology.mutations.workers.resize", as: :workers_resize do
-      action %{count: count}, schema: Zoi.object(%{count: Zoi.integer()}), context: context do
+      action %{count: count},
+        schema: Zoi.object(%{count: Zoi.integer()}),
+        context: context do
         {:ok, context.agent_state, [D.agent_update(:workers, %{count: count})]}
       end
     end

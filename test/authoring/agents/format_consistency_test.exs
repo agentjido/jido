@@ -32,7 +32,14 @@ defmodule Jido.Agent.FormatConsistencyTest do
 
   defp route(path, handler, opts \\ []) do
     Map.merge(
-      %{path: path, as: nil, defaults: %{}, handler: handler},
+      %{
+        path: path,
+        as: nil,
+        defaults: %{},
+        handler: handler,
+        state: %{source: :output, path: []},
+        reply: nil
+      },
       Map.new(opts)
     )
   end
@@ -52,7 +59,7 @@ defmodule Jido.Agent.FormatConsistencyTest do
              count: Zoi.integer() |> Zoi.default(0)
            })
        }},
-      {~s(routes do signal_source "/formats"; route "work.request", #{inspect(Action)}, as: :work; route "work.*", #{inspect(Action)} end),
+      {~s|routes do signal_source "/formats"; route "work.request", #{inspect(Action)}, as: :work; route "work.*", #{inspect(Action)} end|,
        %{
          signal_source: "/formats",
          routes: [action("work.request", as: :work), action("work.*")]
@@ -151,9 +158,9 @@ defmodule Jido.Agent.FormatConsistencyTest do
   test "Map and struct report the same error path and DSL rejects the same declaration" do
     cases = [
       {%{routes: [action("work.request"), action("work.request")]},
-       ~s(routes do route "work.request", #{inspect(Action)}; route "work.request", #{inspect(Action)} end)},
+       ~s|routes do route "work.request", #{inspect(Action)}; route "work.request", #{inspect(Action)} end|},
       {%{routes: [action("one", as: :same), action("two", as: :same)], signal_source: "/test"},
-       ~s(routes do signal_source "/test"; route "one", #{inspect(Action)}, as: :same; route "two", #{inspect(Action)}, as: :same end)},
+       ~s|routes do signal_source "/test"; route "one", #{inspect(Action)}, as: :same; route "two", #{inspect(Action)}, as: :same end|},
       {%{topology: %{agents: [%{name: :worker, definition: Worker, count: 0}], connections: []}},
        "topology do agent :worker, #{inspect(Worker)}, count: 0 end"}
     ]

@@ -67,8 +67,7 @@ defmodule Guides.Signup do
     route "user.register", as: :register do
       action %{email: email},
         name: "register",
-        schema: Zoi.object(%{email: Zoi.string()}),
-        context: context do
+        schema: Zoi.object(%{email: Zoi.string()}), context: context do
         state = context.agent_state
 
         if email in state.users do
@@ -83,8 +82,7 @@ defmodule Guides.Signup do
     route "user.register_now", as: :register_now do
       action %{email: email, to: to},
         name: "register_now",
-        schema: Zoi.object(%{email: Zoi.string(), to: Zoi.any()}),
-        context: context do
+        schema: Zoi.object(%{email: Zoi.string(), to: Zoi.any()}), context: context do
         send(to, {:welcome, email})
         state = context.agent_state
 

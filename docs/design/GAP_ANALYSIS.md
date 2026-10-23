@@ -33,7 +33,7 @@ V2 research uses primary source from the pinned local Git tag. Links point to th
 | [GAP-008](#gap-008) | 01 Agent | Resolved API decision | Reject nonportable saved values after persistence conversion | Settled: user selected V3 durable rejection |
 | [GAP-009](#gap-009) | 02 Agent authoring | Resolved API decision | Keep V3 block configuration for module schemas, metadata, Plugins, and routes | Settled: user selected V3 blocks |
 | [GAP-010](#gap-010) | 02 Agent authoring | Resolved API decision | Keep named routes generating map-input Signal helpers | Settled: user explicitly selected the current helper API |
-| [GAP-011](#gap-011) | 02 Agent authoring | Document correction | Correct inline Action lookup to route_action!/1 | Corrected in authoring design |
+| [GAP-011](#gap-011) | 02 Agent authoring | Document correction | Correct executable route lookup | Corrected in authoring design |
 | [GAP-012](#gap-012) | 02 Agent authoring | Resolved API decision | Require plain maps for both route-default forms | Settled: user rejected the legacy struct exception |
 | [GAP-013](#gap-013) | 02 Agent authoring | Document correction | Remove obsolete compiler interface metadata | Corrected in authoring design |
 | [GAP-014](#gap-014) | 02 Agent authoring | Evidence update | Correct Codec and Registry evidence paths | Paths corrected; remaining Builder cleanup in GAP-001 |
@@ -281,17 +281,20 @@ The [Jido integration issue](https://github.com/agentjido/jido/issues/389) is co
 
 <a id="gap-011"></a>
 
-### GAP-011: Correct inline Action lookup to route_action!/1
+### GAP-011: Correct executable route lookup
 
 **Type:** Document correction. **State:** Corrected in the authoring design on 2026-10-01; complete document approval remains pending.
 
-**Design:** AUTH-REQ-020 and examples name route_action/1.
+**Design:** AUTH-REQ-020 defines the executable route lookup.
 
-**Current V3:** Generated modules expose route_action!/1 for inline Action lookup. The documented non-bang lookup does not exist.
+**Current V3:** Generated modules expose `route_executable!/1` for exact Action
+and Flow routes. Terminal handlers and unknown paths raise.
 
 **V2 approach:** V2 accepted Action modules and Instruction values, not this inline-route lookup API.
 
-**Reconciliation:** The authoring design now records the current API.  Document route_action!/1, its return and raise behavior, and supported reuse in direct data or Registry entries. Do not invent a tagged variant to match an old document.
+**Reconciliation:** The authoring design records `route_executable!/1`, its
+return and raise behavior, and supported reuse in direct data or Registry
+entries.
 
 **Evidence:** [docs/design/02_agent-authoring/design.md](/Users/mhostetler/Source/Jido/proj_jido_core/jido/docs/design/02_agent-authoring/design.md); [lib/jido/agent/definition.ex:70](/Users/mhostetler/Source/Jido/proj_jido_core/jido/lib/jido/agent/definition.ex:70); [lib/jido/agent.ex:30](https://github.com/agentjido/jido/blob/69f3b40506ce3ea1a2c80b255b737d6c3a453cf2/lib/jido/agent.ex#L30).
 
@@ -1300,7 +1303,7 @@ These are the main matching contracts found in the owner source. This table is n
 
 ## Requirement inventory and limits
 
-The inventory below lists every requirement declaration extracted from each owner `design.md`: **864 declarations**. It includes explicitly declared retired AGT-REQ-005/031/032/038, AUTH-REQ-010/026/027/029/031/032/059, PLG-REQ-017/069–076, and ERR-REQ-019. References and numeric ranges are not counted as declarations. TOP-REQ-002 and TURN-REQ-035 have no active declaration in these files; PLG numeric holes must not be filled by inference. PLG-REQ-061–076 were recovered from Git history during this review, with 069–076 explicitly retired under GAP-023.
+The inventory below lists every requirement declaration extracted from each owner `design.md`: **865 declarations**. It includes explicitly declared retired AGT-REQ-005/031/032/038, AUTH-REQ-010/026/027/029/031/032/059, PLG-REQ-017/069–076, and ERR-REQ-019. References and numeric ranges are not counted as declarations. TOP-REQ-002 and TURN-REQ-035 have no active declaration in these files; PLG numeric holes must not be filled by inference. PLG-REQ-061–076 were recovered from Git history during this review, with 069–076 explicitly retired under GAP-023.
 
 The inventory records where each requirement is defined; it does not claim that every stated requirement has a passing test. Review the matching-contract table and exception list together. Delivery, conditional migration, external provider, and pure application-callback requirements need their own evidence before release.
 
@@ -1308,7 +1311,7 @@ The inventory records where each requirement is defined; it does not claim that 
 | --- | --- | --- | --- |
 | [00_overview](/Users/mhostetler/Source/Jido/proj_jido_core/jido/docs/design/00_overview/design.md) | 66 | `OVR-REQ-001`–`OVR-REQ-066` | GAP-001–004, 021, 029–031, 058, 067–069 |
 | [01_agent](/Users/mhostetler/Source/Jido/proj_jido_core/jido/docs/design/01_agent/design.md) | 48 | `AGT-REQ-001`–`AGT-REQ-048` | GAP-001–002, 005–008, 028, 050–051 |
-| [02_agent-authoring](/Users/mhostetler/Source/Jido/proj_jido_core/jido/docs/design/02_agent-authoring/design.md) | 64 | `AUTH-REQ-001`–`AUTH-REQ-064` | GAP-001, 009–014 |
+| [02_agent-authoring](/Users/mhostetler/Source/Jido/proj_jido_core/jido/docs/design/02_agent-authoring/design.md) | 65 | `AUTH-REQ-001`–`AUTH-REQ-065` | GAP-001, 009–014 |
 | [03_agent-identity](/Users/mhostetler/Source/Jido/proj_jido_core/jido/docs/design/03_agent-identity/design.md) | 28 | `ID-REQ-001`–`ID-REQ-028` | GAP-015–016, 031, 049 |
 | [04_turn-evaluation](/Users/mhostetler/Source/Jido/proj_jido_core/jido/docs/design/04_turn-evaluation/design.md) | 43 | `TURN-REQ-001`–`TURN-REQ-034`, `TURN-REQ-036`–`TURN-REQ-044` | GAP-003, 007, 017–018 |
 | [05_plugins](/Users/mhostetler/Source/Jido/proj_jido_core/jido/docs/design/05_plugins/design.md) | 73 | `PLG-REQ-001`, `PLG-REQ-003`, `PLG-REQ-005`, `PLG-REQ-007`, `PLG-REQ-009`, `PLG-REQ-011`–`PLG-REQ-029`, `PLG-REQ-031`–`PLG-REQ-032`, `PLG-REQ-035`–`PLG-REQ-040`, `PLG-REQ-042`–`PLG-REQ-044`, `PLG-REQ-046`, `PLG-REQ-049`–`PLG-REQ-051`, `PLG-REQ-053`–`PLG-REQ-056`, `PLG-REQ-059`–`PLG-REQ-088` | GAP-002, 018–025 |

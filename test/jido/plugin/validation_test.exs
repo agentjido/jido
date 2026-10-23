@@ -34,7 +34,7 @@ defmodule Jido.Plugin.ValidationTest do
       to: Jido.Plugin.ValidationTest.Configurable.Server
 
     @impl true
-    defdelegate prepare_dispatch(runtime, signal, context, opts),
+    defdelegate prepare_outbound(runtime, signal, context, opts),
       to: Jido.Plugin.ValidationTest.Configurable.Server
   end
 
@@ -49,7 +49,7 @@ defmodule Jido.Plugin.ValidationTest do
     @behaviour Jido.Plugin
     def dispatch(_, _, _, _), do: :ok
 
-    def prepare_dispatch(_, signal, _, opts),
+    def prepare_outbound(_, signal, _, opts),
       do: Keyword.get(opts, :dispatch_result, {:ok, signal})
   end
 
@@ -340,7 +340,8 @@ defmodule Jido.Plugin.ValidationTest do
         routes: [
           %{
             path: "observe",
-            handler: %{kind: :action, target: JidoTest.AgentFixtures.ObserveExecutionBoundary}
+            handler: %{kind: :action, target: JidoTest.AgentFixtures.ObserveExecutionBoundary},
+            state: %{source: :output, path: []}
           }
         ]
       })
@@ -538,8 +539,7 @@ defmodule Jido.Plugin.ValidationTest do
                  agent,
                  source,
                  %{},
-                 Jido.Agent.Plugin.specs(specs),
-                 %{}
+                 Jido.Agent.Plugin.specs(specs)
                )
 
       assert error.message == message
@@ -553,8 +553,7 @@ defmodule Jido.Plugin.ValidationTest do
                agent,
                source,
                %{},
-               Jido.Agent.Plugin.specs(specs),
-               %{}
+               Jido.Agent.Plugin.specs(specs)
              )
 
     assert Plugin.directive_owner(specs, :unknown) == nil
@@ -580,7 +579,7 @@ defmodule Jido.Plugin.ValidationTest do
         Jido.Plugin.Normalizer.normalize_all([{Configurable, dispatch_result: result}])
 
       assert {:error, error} =
-               Jido.AgentServer.Plugin.Callbacks.prepare_dispatch(
+               Jido.AgentServer.Plugin.Callbacks.prepare_outbound(
                  outbound,
                  specs,
                  %{},
@@ -591,7 +590,7 @@ defmodule Jido.Plugin.ValidationTest do
       if result == :invalid,
         do:
           assert(
-            error.message == "Agent Server Plugin prepare_dispatch/4 returned an invalid result"
+            error.message == "Agent Server Plugin prepare_outbound/4 returned an invalid result"
           ),
         else: assert(error == :blocked)
     end
@@ -615,11 +614,11 @@ defmodule Jido.Plugin.ValidationTest do
       Jido.Plugin.Normalizer.normalize_all([{Configurable, dispatch_result: {:ok, invalid}}])
 
     assert {:error, %Jido.Error.ExecutionError{} = error} =
-             Jido.AgentServer.Plugin.Callbacks.prepare_dispatch(outbound, specs, %{}, context, %{
+             Jido.AgentServer.Plugin.Callbacks.prepare_outbound(outbound, specs, %{}, context, %{
                owned: 1
              })
 
-    assert error.message == "Agent Server Plugin prepare_dispatch/4 returned an invalid Signal"
+    assert error.message == "Agent Server Plugin prepare_outbound/4 returned an invalid Signal"
     assert error.details.plugin == Configurable
     assert [_error | _rest] = error.details.errors
   end

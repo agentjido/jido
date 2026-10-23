@@ -8,7 +8,9 @@ defmodule Jido.Examples.Topology.ConnectionChanges do
     signal_source "/examples/topology/connection_changes"
 
     route "examples.topology.connections.redirect", as: :redirect do
-      action %{value: value}, schema: Zoi.object(%{value: Zoi.integer()}), context: context do
+      action %{value: value},
+        schema: Zoi.object(%{value: Zoi.integer()}),
+        context: context do
         signal =
           Jido.Signal.new!("examples.topology.cell.work", %{value: value},
             source: "/examples/topology/connection_changes"

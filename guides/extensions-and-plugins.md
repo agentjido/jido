@@ -191,14 +191,14 @@ callbacks that the Plugin implements.
 | `state_spec/1` | Agent | Jido composes the Agent state schema. |
 | `directives/1` | Agent | Jido normalizes the Plugin, to claim Directive types. |
 | `prepare/2` | Agent | Before route selection, on every Turn, in `cmd/3` and on a live Server. |
-| `reduce/2` | Agent | After the Action or Flow succeeds, before state validation. |
+| `reduce/2` | Agent | After Route state projection, before state validation. |
 | `validate_options/1` | Agent Server | Every normalization: definition, startup, live change. |
 | `admit/3` | Agent Server | After `prepare/2`, live Server only. |
 | `child_spec/1` | Agent Server | The activation starts, recovers, or replaces the runtime. |
 | `await_ready/2` | Agent Server | After all runtime roots start, before the first Turn. |
 | `after_commit/3` | Agent Server | After each commit, before Directives. |
 | `dispatch/4` | Agent Server | After commit, once per owned Directive. |
-| `prepare_dispatch/4` | Agent Server | Before each outbound Signal from `Emit`, `AgentSend`, or `ParentSend`. |
+| `prepare_outbound/4` | Agent Server | Before each outbound Signal from `Reply`, `Emit`, `AgentSend`, or `ParentSend`. |
 | `quiesce/2`, `resume/2` | Agent Server | Around a live change to this Plugin. |
 | `dump/3`, `load/3` | Persistence | When owned state is saved and restored. |
 

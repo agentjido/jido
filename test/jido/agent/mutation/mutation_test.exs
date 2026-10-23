@@ -12,6 +12,22 @@ defmodule Jido.Agent.MutationTest do
     use Jido.Agent.Extension, id: "test.mutation.passive"
   end
 
+  defmodule MappedOutput do
+    use Jido.Action,
+      name: "mutation_mapped_output",
+      output_schema: Zoi.object(%{state: Zoi.map(), reply: Zoi.map()})
+
+    def run(_, context), do: {:ok, %{state: context.agent_state, reply: %{ok: true}}}
+  end
+
+  defmodule StateOnlyOutput do
+    use Jido.Action,
+      name: "mutation_state_only_output",
+      output_schema: Zoi.object(%{state: Zoi.map()})
+
+    def run(_, context), do: {:ok, %{state: context.agent_state}}
+  end
+
   @tag obligation: "jido.agent.I27"
   test "the mutation Directive set is closed and exact" do
     modules = [
@@ -138,7 +154,11 @@ defmodule Jido.Agent.MutationTest do
     assert {:ok, without_transient_route, _} =
              Agent.mutate(F.agent(), [
                Directive.routes_set([
-                 %{path: "transient", handler: %{kind: :action, target: unavailable}}
+                 %{
+                   path: "transient",
+                   handler: %{kind: :action, target: unavailable},
+                   state: %{source: :output, path: []}
+                 }
                ]),
                Directive.route_remove("transient")
              ])
@@ -189,7 +209,10 @@ defmodule Jido.Agent.MutationTest do
     assert {:ok, agent, _} =
              Agent.mutate(F.agent(), [
                Directive.agent_add(:worker, F.Worker),
-               Directive.route_add("action", F.Work, defaults: %{amount: 1}),
+               Directive.route_add("action", F.Work,
+                 defaults: %{amount: 1},
+                 state: %{source: :output, path: []}
+               ),
                Directive.route_add("transform", %{
                  kind: :transform,
                  target: {F.Transform, :run, 1}
@@ -214,7 +237,12 @@ defmodule Jido.Agent.MutationTest do
              ])
 
     assert hd(agent.routes).defaults == %{nested: %{one: 3}}
-    assert {:ok, replaced, _} = Agent.mutate(agent, [Directive.route_replace("run", F.Work)])
+
+    assert {:ok, replaced, _} =
+             Agent.mutate(agent, [
+               Directive.route_replace("run", F.Work)
+             ])
+
     assert hd(replaced.routes).defaults == %{}
     assert {:ok, empty, _} = Agent.mutate(replaced, [Directive.route_remove("run")])
     assert empty.routes == []
@@ -228,6 +256,58 @@ defmodule Jido.Agent.MutationTest do
 
     assert [%{as: :run_work}] = updated.routes
     assert [%{definition: F.Worker}] = updated.topology.agents
+  end
+
+  @tag obligation: "jido.agent.I27"
+  test "route mutations retain mappings and reject stale mappings atomically" do
+    state = %{source: :output, path: [:state]}
+    reply = %{type: "run.completed", from: %{source: :output, path: [:reply]}}
+
+    original =
+      Agent.define!(%{
+        name: "mapped_mutations",
+        signal_source: "/mutations",
+        schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}),
+        routes: [
+          %{
+            path: "run",
+            handler: %{kind: :action, target: MappedOutput},
+            state: state,
+            reply: reply
+          }
+        ]
+      })
+      |> Agent.instantiate!(id: "mapped-mutations")
+
+    assert {:ok, added, diff} =
+             Agent.mutate(original, [
+               Directive.route_add("other", MappedOutput, state: state, reply: reply)
+             ])
+
+    assert Enum.at(added.routes, 1).state == state
+    assert Enum.at(added.routes, 1).reply == reply
+    assert hd(diff.routes.added).reply == reply
+
+    assert {:ok, updated, _diff} =
+             Agent.mutate(added, [
+               Directive.route_update("other", %{state: :unchanged, reply: nil})
+             ])
+
+    assert %{state: :unchanged, reply: nil} = Enum.at(updated.routes, 1)
+
+    assert {:error, %Error{code: :unknown_output_field}} =
+             Agent.mutate(original, [
+               Directive.route_update("run", %{handler: StateOnlyOutput})
+             ])
+
+    assert hd(original.routes).handler.target == MappedOutput
+    assert hd(original.routes).reply == reply
+
+    assert {:ok, set, _diff} =
+             Agent.mutate(original, [Directive.routes_set(Enum.reverse(added.routes))])
+
+    assert Enum.map(set.routes, & &1.path) == ["other", "run"]
+    assert Enum.all?(set.routes, &(&1.reply == reply))
   end
 
   @tag obligation: "jido.agent.I27"
@@ -260,10 +340,21 @@ defmodule Jido.Agent.MutationTest do
     for edits <- [
           [Directive.route_add("bad", %{kind: :pass_through}, defaults: %{x: 1})],
           [Directive.route_add("bad", %{kind: :pass_through})],
-          [Directive.route_add("bad.*", F.Work, as: :bad)],
           [
-            Directive.route_add("a", F.Work, as: :same),
-            Directive.route_add("b", F.Work, as: :same)
+            Directive.route_add("bad.*", F.Work,
+              as: :bad,
+              state: %{source: :output, path: []}
+            )
+          ],
+          [
+            Directive.route_add("a", F.Work,
+              as: :same,
+              state: %{source: :output, path: []}
+            ),
+            Directive.route_add("b", F.Work,
+              as: :same,
+              state: %{source: :output, path: []}
+            )
           ]
         ] do
       assert {:error, _} = Agent.mutate(F.agent(), edits)
@@ -279,7 +370,13 @@ defmodule Jido.Agent.MutationTest do
     root =
       Agent.define!(%{
         name: "root",
-        routes: [%{path: "work", handler: %{kind: :action, target: F.Work}}]
+        routes: [
+          %{
+            path: "work",
+            handler: %{kind: :action, target: F.Work},
+            state: %{source: :output, path: []}
+          }
+        ]
       })
       |> Agent.instantiate!(id: "root")
 
@@ -452,7 +549,12 @@ defmodule Jido.Agent.MutationTest do
   @tag obligation: "jido.agent.I27"
   test "mutations do not create helper functions" do
     assert {:ok, _, _} =
-             Agent.mutate(F.agent(), [Directive.route_add("dynamic", F.Work, as: :dynamic)])
+             Agent.mutate(F.agent(), [
+               Directive.route_add("dynamic", F.Work,
+                 as: :dynamic,
+                 state: %{source: :output, path: []}
+               )
+             ])
 
     refute function_exported?(F.Worker, :dynamic_signal, 0)
   end

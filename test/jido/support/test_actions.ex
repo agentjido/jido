@@ -1,8 +1,6 @@
 defmodule JidoTest.PluginTestAction do
   @moduledoc false
-  use Jido.Action,
-    name: "plugin_test_action",
-    schema: []
+  use Jido.Action, name: "plugin_test_action"
 
   def run(_params, _context), do: {:ok, %{}}
 end

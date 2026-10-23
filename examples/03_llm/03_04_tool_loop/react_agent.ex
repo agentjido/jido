@@ -24,6 +24,7 @@ defmodule Jido.Examples.ReActAgent do
 
     route "examples.llm.tool_loop.ask", Jido.Examples.ReActAgent.ReasonFlow,
       as: :ask,
-      defaults: %{messages: [], new_turn?: true, max_steps: 8, steps_remaining: 8}
+      defaults: %{messages: [], new_turn?: true, max_steps: 8, steps_remaining: 8} do
+    end
   end
 end

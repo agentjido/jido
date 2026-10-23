@@ -156,8 +156,7 @@ defmodule ScheduleGuide.Reminders do
 
     route "reminder.request", as: :request do
       action %{text: text, delay_ms: delay},
-        schema: Zoi.object(%{text: Zoi.string(), delay_ms: Zoi.integer() |> Zoi.min(0)}),
-        context: context do
+        schema: Zoi.object(%{text: Zoi.string(), delay_ms: Zoi.integer() |> Zoi.min(0)}), context: context do
         due = Jido.Signal.new!("reminder.due", %{text: text}, source: "/guides/schedules")
         {:ok, context.agent_state, [Jido.Plugin.Scheduler.schedule(delay, due)]}
       end

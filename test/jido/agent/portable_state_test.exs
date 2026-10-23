@@ -5,7 +5,8 @@ defmodule Jido.Agent.PortableStateTest do
   alias Jido.Signal
 
   defmodule NonportableAction do
-    use Jido.Action, name: "nonportable_state_action"
+    use Jido.Action,
+      name: "nonportable_state_action"
 
     @impl Jido.Action
     def run(%{payload: value}, _context), do: {:ok, %{payload: value}}
@@ -105,7 +106,13 @@ defmodule Jido.Agent.PortableStateTest do
       Agent.define!(%{
         name: "local_transition",
         schema: Zoi.object(%{payload: Zoi.any()}),
-        routes: [%{path: "local.run", handler: %{kind: :action, target: NonportableAction}}]
+        routes: [
+          %{
+            path: "local.run",
+            handler: %{kind: :action, target: NonportableAction},
+            state: %{source: :output, path: []}
+          }
+        ]
       })
 
     agent =

@@ -5,7 +5,8 @@ defmodule Jido.Plugin.AuditIntegrationTest do
   alias Jido.Plugin.Audit
 
   defmodule RecordAction do
-    use Jido.Action, name: "audit_integration_record"
+    use Jido.Action,
+      name: "audit_integration_record"
 
     @impl Jido.Action
     def run(%{event: event}, context) do

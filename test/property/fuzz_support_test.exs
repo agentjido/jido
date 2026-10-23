@@ -164,6 +164,8 @@ defmodule JidoTest.Property.FuzzSupportTest do
           action %{}, schema: Zoi.object(%{}), context: context do
             {:ok, context.agent_state}
           end
+
+          state :unchanged
         end
       end
     end
@@ -172,7 +174,7 @@ defmodule JidoTest.Property.FuzzSupportTest do
     target =
       Authoring.with_compiled(
         source,
-        fn _ -> apply(module, :route_action!, ["property.inline"]) end,
+        fn _ -> apply(module, :route_executable!, ["property.inline"]) end,
         modules: [module]
       )
 

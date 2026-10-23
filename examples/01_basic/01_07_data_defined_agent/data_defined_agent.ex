@@ -53,7 +53,10 @@ defmodule Jido.Examples.DataDefinedAgent do
         }
       ],
       routes: [
-        %{path: "examples.basic.data_defined.add", handler: %{kind: :action, target: Add}},
+        %{
+          path: "examples.basic.data_defined.add",
+          handler: %{kind: :action, target: Add}
+        },
         %{
           path: "examples.basic.data_defined.schedule",
           handler: %{kind: :action, target: ScheduleTick}

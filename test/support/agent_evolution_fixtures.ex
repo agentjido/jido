@@ -53,7 +53,8 @@ defmodule JidoTest.AgentEvolutionFixtures do
   end
 
   defmodule Upgrade do
-    use Jido.Action, name: "evolution_upgrade"
+    use Jido.Action,
+      name: "evolution_upgrade"
 
     def run(%{snapshot: snapshot}, _) do
       agent = %{snapshot.agent | routes: [], state: %{count: 7}}
@@ -77,7 +78,8 @@ defmodule JidoTest.AgentEvolutionFixtures do
   end
 
   defmodule BadUpgrade do
-    use Jido.Action, name: "evolution_bad_upgrade"
+    use Jido.Action,
+      name: "evolution_bad_upgrade"
 
     def run(%{snapshot: snapshot}, context) do
       case context.mode do
@@ -98,7 +100,13 @@ defmodule JidoTest.AgentEvolutionFixtures do
       name: "evolution",
       signal_source: "/evolution",
       schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}),
-      routes: [%{path: "run", handler: %{kind: :action, target: Work}}]
+      routes: [
+        %{
+          path: "run",
+          handler: %{kind: :action, target: Work},
+          state: %{source: :output, path: []}
+        }
+      ]
     })
     |> Jido.Agent.instantiate!(id: "evolution")
   end

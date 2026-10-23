@@ -82,7 +82,7 @@ defmodule JidoTest.AgentServer.PluginRuntime.RulesTest do
     use Jido.Plugin
     def state_spec(_), do: {:first, Zoi.atom() |> Zoi.default(:first)}
 
-    def prepare_dispatch(runtime, signal, context, opts) do
+    def prepare_outbound(runtime, signal, context, opts) do
       send(self(), {:outbound, :first, runtime, context.plugin_state, opts[:marker]})
       {:ok, update_in(signal.data[:trace], &["first" | List.wrap(&1)])}
     end
@@ -92,7 +92,7 @@ defmodule JidoTest.AgentServer.PluginRuntime.RulesTest do
     use Jido.Plugin
     def state_spec(_), do: {:second, Zoi.atom() |> Zoi.default(:second)}
 
-    def prepare_dispatch(runtime, signal, context, opts) do
+    def prepare_outbound(runtime, signal, context, opts) do
       send(self(), {:outbound, :second, runtime, context.plugin_state, opts[:marker]})
 
       case opts[:mode] do
@@ -153,14 +153,14 @@ defmodule JidoTest.AgentServer.PluginRuntime.RulesTest do
     refs = %{FirstOutbound => :first_root, SecondOutbound => :second_root}
     state = %{first: :first_state, second: :second_state}
 
-    assert {:ok, prepared} = Callbacks.prepare_dispatch(signal, specs, refs, context, state)
+    assert {:ok, prepared} = Callbacks.prepare_outbound(signal, specs, refs, context, state)
     assert prepared.data.trace == ["first", "second"]
 
     assert_receive {:outbound, :second, :second_root, :second_state, :second_option}
     assert_receive {:outbound, :first, :first_root, :first_state, :first_option}
 
     assert {:ok, [rootless]} = Jido.Plugin.Normalizer.normalize_all([NoRuntime])
-    assert Callbacks.prepare_dispatch(signal, [rootless], %{}, context, %{}) == {:ok, signal}
+    assert Callbacks.prepare_outbound(signal, [rootless], %{}, context, %{}) == {:ok, signal}
   end
 
   @tag obligation: "jido.agent_server.plugin_runtime.I8"
@@ -182,7 +182,7 @@ defmodule JidoTest.AgentServer.PluginRuntime.RulesTest do
       assert {:ok, [spec]} =
                Jido.Plugin.Normalizer.normalize_all([{SecondOutbound, mode: mode}])
 
-      assert {:error, error} = Callbacks.prepare_dispatch(signal, [spec], %{}, context, %{})
+      assert {:error, error} = Callbacks.prepare_outbound(signal, [spec], %{}, context, %{})
       assert error == expected or error.details.code == expected
 
       if mode == :invalid,
@@ -193,15 +193,15 @@ defmodule JidoTest.AgentServer.PluginRuntime.RulesTest do
              Jido.Plugin.Normalizer.normalize_all([{SecondOutbound, mode: :invalid_signal}])
 
     assert {:error, invalid_signal} =
-             Callbacks.prepare_dispatch(signal, [spec], %{}, context, %{})
+             Callbacks.prepare_outbound(signal, [spec], %{}, context, %{})
 
     assert invalid_signal.details.plugin == SecondOutbound
     assert [_ | _] = invalid_signal.details.errors
 
     assert {:ok, [spec]} = Jido.Plugin.Normalizer.normalize_all([{SecondOutbound, mode: :raise}])
-    assert {:error, raised} = Callbacks.prepare_dispatch(signal, [spec], %{}, context, %{})
+    assert {:error, raised} = Callbacks.prepare_outbound(signal, [spec], %{}, context, %{})
     assert raised.details.code == :plugin_callback_failed
-    assert raised.details.callback == :prepare_dispatch
+    assert raised.details.callback == :prepare_outbound
   end
 
   @tag obligation: "jido.agent_server.plugin_runtime.I1"

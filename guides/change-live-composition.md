@@ -102,8 +102,7 @@ defmodule Crew.Lead do
     signal_source("/guides/change")
 
     route "crew.resize", as: :resize do
-      action %{size: size}, name: "resize", schema: Zoi.object(%{size: Zoi.integer()}),
-        context: context do
+      action %{size: size}, name: "resize", schema: Zoi.object(%{size: Zoi.integer()}), context: context do
         {:ok, %{context.agent_state | size: size}}
       end
     end
@@ -129,8 +128,7 @@ defmodule Crew.Lead do
     end
 
     route "crew.workers.pin", as: :pin do
-      action %{count: count}, name: "pin", schema: Zoi.object(%{count: Zoi.integer()}),
-        context: context do
+      action %{count: count}, name: "pin", schema: Zoi.object(%{count: Zoi.integer()}), context: context do
         {:ok, context.agent_state, [D.agent_update(:workers, %{count: count})]}
       end
     end

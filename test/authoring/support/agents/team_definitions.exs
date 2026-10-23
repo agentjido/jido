@@ -22,7 +22,9 @@ defmodule JidoTest.ComposableAgent.Definitions.Team do
     signal_source "/research/team"
 
     route "research.query.set", as: :set_query, defaults: %{query: ""} do
-      action %{query: query}, schema: Zoi.object(%{query: Zoi.string()}), context: context do
+      action %{query: query},
+        schema: Zoi.object(%{query: Zoi.string()}),
+        context: context do
         {:ok, %{context.agent_state | query: query}}
       end
     end
@@ -56,8 +58,13 @@ defmodule JidoTest.ComposableAgent.Definitions.Team do
       end
     end
 
-    forward "research.work.request", to: agent(:researchers)
-    forward "research.plan.request", to: agent(:planner)
+    route "research.work.request" do
+      forward(to: agent(:researchers))
+    end
+
+    route "research.plan.request" do
+      forward(to: agent(:planner))
+    end
   end
 
   schedules do
@@ -130,7 +137,9 @@ defmodule JidoTest.ComposableAgent.Definitions.Team.Worker do
     signal_source "/research/worker"
 
     route "research.work.request" do
-      action %{query: query}, schema: Zoi.object(%{query: Zoi.string()}), context: context do
+      action %{query: query},
+        schema: Zoi.object(%{query: Zoi.string()}),
+        context: context do
         next_state = %{context.agent_state | query: query, status: "completed"}
         report = "Research findings for: #{query}"
         {:ok, next_state, [emit("research.report.prepared", %{report: report})]}
@@ -138,7 +147,9 @@ defmodule JidoTest.ComposableAgent.Definitions.Team.Worker do
     end
 
     route "research.plan.request" do
-      action %{query: query}, schema: Zoi.object(%{query: Zoi.string()}), context: context do
+      action %{query: query},
+        schema: Zoi.object(%{query: Zoi.string()}),
+        context: context do
         next_state = %{context.agent_state | query: query, status: "planned"}
         {:ok, next_state, [emit("research.work.request", %{query: query})]}
       end

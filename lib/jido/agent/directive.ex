@@ -243,7 +243,7 @@ defmodule Jido.Agent.Directive do
     do:
       struct!(
         __MODULE__.RouteAdd,
-        mutation_options(opts, [:as, :defaults]) ++ [path: path, handler: handler]
+        mutation_options(opts, [:as, :defaults, :state, :reply]) ++ [path: path, handler: handler]
       )
 
   @doc "Updates selected fields of one Agent route."
@@ -256,7 +256,7 @@ defmodule Jido.Agent.Directive do
     do:
       struct!(
         __MODULE__.RouteReplace,
-        mutation_options(opts, [:as, :defaults]) ++ [path: path, handler: handler]
+        mutation_options(opts, [:as, :defaults, :state, :reply]) ++ [path: path, handler: handler]
       )
 
   @doc "Removes one Agent route."

@@ -7,7 +7,9 @@ defmodule JidoTest.Authoring.Agents.BoundariesTest do
   alias JidoTest.ComposableAgent.Compiler
 
   defmodule Work do
-    use Jido.Action, name: "authoring_boundary_work"
+    use Jido.Action,
+      name: "authoring_boundary_work"
+
     def run(input, _context), do: {:ok, input}
   end
 

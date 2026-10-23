@@ -13,7 +13,8 @@ defmodule Jido.Examples.Durable.DurableWait do
     signal_source "/examples/durable/wait"
 
     route "examples.durable.wait.request", Jido.Examples.Durable.DurableWait.Approval,
-      as: :request
+      as: :request do
+    end
   end
 
   @doc "Builds a decision Signal. Deliver it with AgentServer.deliver_wait/4."

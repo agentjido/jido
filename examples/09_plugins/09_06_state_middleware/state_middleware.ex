@@ -46,7 +46,7 @@ defmodule Jido.Examples.Plugins.StateMiddleware.Plugin do
 
     {:ok,
      %{
-       count_after: reduction.state.count,
+       count_after: reduction.candidate_state.count,
        count_before: reduction.prepared_input.count_before,
        label: label,
        turns: reduction.plugin_state.turns + 1

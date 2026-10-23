@@ -38,7 +38,7 @@ and [authoring tests](/Users/mhostetler/Source/Jido/proj_jido_core/jido/test/jid
 Current code already implements the selected API. No implementation change
 is required. References below to the older helper API belong to historical
 evidence and do not restore that API. The authoring design also corrects
-inline lookup to `route_action!/1` and retains only actual private compiler
+inline lookup to `route_executable!/1` and retains only actual private compiler
 metadata. Shared Codec evidence paths are corrected below. These document
 corrections implement GAP-011/013/014 without adding new APIs.
 
@@ -105,7 +105,7 @@ document approval.
 | `lib/jido/agent/dsl/generator.ex:4-29,81-159` | Generated helpers have docs and types for tagged Signal, bang Signal, and live-call roles. |
 | `lib/jido/agent/interface.ex:8-71` | Runtime packaging separates payload, Signal envelope, caller context, and timeout options. |
 | `lib/jido/agent/builder.ex` | Builder module input starts from canonical `definition/0`; staged input preserves `vsn`, order, and first error; all public entries have specs. |
-| `lib/jido/agent/codec.ex` | Codec reads and writes version 2 with `vsn`, rejects version 1, derives a neutral definition from definitions or instances, and encodes no live state. |
+| `lib/jido/agent/codec.ex` | Codec reads and writes version 1 with `vsn`, accepts only the current route record shape, derives a neutral definition from definitions or instances, and encodes no live state. |
 | `lib/jido/agent/codec.ex:103-147` | Route records store `defaults` and Registry identifiers. Codec reconstructs routes through the current plain-map defaults validator. |
 | `lib/jido/codec/data.ex:6-59,61-170` | Closed tagged data rejects runtime values and checks depth, node, collection, and string limits. |
 | `lib/jido/codec/registry.ex` | Registry validates typed entries, unique values, and direct aliases. Route predicates must be external unary captures. Its public entries have specs. |
@@ -126,7 +126,7 @@ document approval.
 | `test/jido/agent/codec_test.exs:29-76` | Codec round-trips all accepted default forms and stops at the first target error. |
 | `test/jido/agent/authoring_extension_test.exs:114-310` | Spark extension order, target claims, public data lowering into direct, Builder, and Codec forms, common validation, and error cases are covered. |
 | `test/jido/agent/serialization_contract_test.exs:9-43` | Agent authoring JSON and persistence records use separate namespaces and formats. |
-| `test/jido/agent/versioning_test.exs` | Generated defaults, explicit and invalid `vsn`, direct compatibility, Builder, Codec version 2, and Codec version-1 rejection are covered. |
+| `test/jido/agent/versioning_test.exs` | Generated defaults, explicit and invalid `vsn`, direct compatibility, Builder, and Codec version 1 are covered. |
 | `test/jido/agent/versioning_test.exs` and `test/examples/10_persistence/10_08_definition_revision/definition_revision_test.exs` | Core and stable acceptance controls prove revision-mismatch rejection after seam-01 work. |
 | `test/examples/01_basic/README.md:1-18` | The Basic suite has five focused fixtures. It does not contain a cross-form parity matrix. |
 
@@ -181,7 +181,7 @@ A skipped test is not passing evidence.
   ordinary Agent configuration. Builder and Codec have no extension-entity
   input. `Jido.Agent.Extension.lower/3` is the public pure data entry.
 - `AUTH-RB-012`: Definitions and Builder data preserve Agent `vsn`. Codec reads
-  and writes version 2 with `vsn` and rejects version 1.
+  and writes version 1 with `vsn` and rejects the prior route record shape.
 - `AUTH-RB-013`: Custom domain helpers remain ordinary Elixir functions.
   `define` is an explicit request for standard generated route helpers.
 - `AUTH-RB-014`: Codec instance input derives and validates the neutral
@@ -195,10 +195,10 @@ The dispositions below are approved for this seam.
 | --- | --- | --- | --- | --- |
 | `AUTH-GAP-001` | `AUTH-REQ-001` to `AUTH-REQ-008` | Agent validation and the mapped parity matrix | All common forms converge at the canonical definition for keyword-only and Spark-block fixtures. | `Implemented`; retain the contract |
 | `AUTH-GAP-002` | `AUTH-REQ-009` to `AUTH-REQ-015` | Agent module, compiler, versioning, and parity evidence | `definition/0` is canonical; private compiler data stays internal; approved Agent `vsn` rules are present. | `Implemented`; retain module authority |
-| `AUTH-GAP-003` | `AUTH-REQ-016` to `AUTH-REQ-020` | Inline macro and reuse tests | Inline Action behavior is implemented through the public `jido_action` contract. | `Implemented`; retain without a version claim |
+| `AUTH-GAP-003` | `AUTH-REQ-016` to `AUTH-REQ-020`, `AUTH-REQ-065` | Inline macro and reuse tests | Inline Action behavior is implemented through the public `jido_action` contract. | `Implemented`; retain without a version claim |
 | `AUTH-GAP-004` | `AUTH-REQ-021` to `AUTH-REQ-034` | Compiler, generator, interface, and exclusion evidence | Generated interfaces are module-only API and are absent from canonical and Codec data. | `Implemented`; retain the explicit exclusion |
 | `AUTH-GAP-005` | `AUTH-REQ-035` to `AUTH-REQ-039`, `AUTH-REQ-061` | Builder, versioning, specs, and parity tests | Builder reads `definition/0`, preserves `vsn`, order, first errors, and public specs. | `Implemented` |
-| `AUTH-GAP-006` | `AUTH-REQ-040` to `AUTH-REQ-049`, `AUTH-REQ-062` | Codec, Registry, versioning, portability, and state-transform tests | Version 2 preserves `vsn`; version 1 is rejected; instance encoding is definition-first; local closures stay valid but are not encodable. | `Implemented` |
+| `AUTH-GAP-006` | `AUTH-REQ-040` to `AUTH-REQ-049`, `AUTH-REQ-062` | Codec, Registry, versioning, portability, and state-transform tests | Version 1 preserves `vsn` and accepts only the current route record shape; instance encoding is definition-first; local closures stay valid but are not encodable. | `Implemented` |
 | `AUTH-GAP-007` | `AUTH-REQ-050` to `AUTH-REQ-054` | Extension docs, specs, Spark tests, and data parity test | One public pure lowerer feeds direct, Builder, and Codec authoring without storing source entities. | `Implemented` |
 | `AUTH-GAP-008` | `AUTH-REQ-055` | Compiler and recompilation test above | Later-module verification is implemented. | `Implemented`; retain |
 | `AUTH-GAP-009` | `AUTH-REQ-056` | Authoring functions return structured errors and public types are complete for the seam entries | Final stable codes and callback normalization depend on pending seam 12. | `Defer` exact error shape to seam 12 |
@@ -246,7 +246,8 @@ It is not a separate implementation plan.
 ### Phase 1 — Lock the retained authoring contract
 
 - Requirements: `AUTH-REQ-001` to `AUTH-REQ-040`, `AUTH-REQ-049` to
-  `AUTH-REQ-052`, `AUTH-REQ-055`, and `AUTH-REQ-057` to `AUTH-REQ-061`.
+  `AUTH-REQ-052`, `AUTH-REQ-055`, `AUTH-REQ-057` to `AUTH-REQ-061`, and
+  `AUTH-REQ-065`.
 - Required outcome: public docs and tests state all supported forms, canonical
   parity, Spark and inline contracts, generated interfaces, Builder behavior,
   Codec separation, and extension validation.
@@ -271,7 +272,7 @@ It is not a separate implementation plan.
 - Verification: default, explicit, invalid, Builder, map, Codec version, and
   round-trip tests.
 - Exit criteria: all applicable canonical definitions have the expected
-  revision and version-1 input is rejected.
+  revision and prior route record shapes are rejected.
 
 ### Phase 3 — Make Codec input and portability explicit
 
@@ -322,13 +323,16 @@ It is not a separate implementation plan.
 | `AUTH-REQ-001` to `AUTH-REQ-008` | Agent validation, authoring contracts, and two-fixture parity matrix | Keep the mapped matrix in the core suite. | `Proven` |
 | `AUTH-REQ-009` to `AUTH-REQ-013` | Agent macro, DSL compiler, compile diagnostics, and canonical module parity | Keep private metadata out of public data. | `Proven` |
 | `AUTH-REQ-014` and `AUTH-REQ-015` | Versioning and parity tests | Keep default, explicit, invalid, direct, and behavior-only cases. | `Proven` |
-| `AUTH-REQ-016` to `AUTH-REQ-020` | Inline macro and reuse tests | Cross-package inline Action compatibility against release `jido_action` | `Proven` in current workspace |
+| `AUTH-REQ-016` to `AUTH-REQ-019` | Inline macro and reuse tests | Cross-package inline Action compatibility against release `jido_action` | `Proven` in current workspace |
+| `AUTH-REQ-020` | [Executable-route return test](/Users/mhostetler/Source/Jido/proj_jido_core/jido/test/contract/jido.agent/authoring_contract_test.exs:603) | Keep exact Action and Flow target return cases. | `Proven` in current workspace |
+| `AUTH-REQ-065` | [Terminal-handler and unknown-path rejection test](/Users/mhostetler/Source/Jido/proj_jido_core/jido/test/contract/jido.agent/authoring_contract_test.exs:633) | Keep both `ArgumentError` cases. | `Proven` in current workspace |
+| `AUTH-REQ-066` | Map and DSL parity tests plus route normalization tests | Keep omitted-state, selected-path, and unchanged-state cases. | `Proven` in current workspace |
 | `AUTH-REQ-021` to `AUTH-REQ-034` | Compiler, generator, interface, docs, types, packaging, and diagnostic tests | Public API inventory and approved seam-12 error cases | `Proven` for current interface behavior |
 | `AUTH-REQ-035` to `AUTH-REQ-039`, `AUTH-REQ-061` | Builder code, public specs, target checks, versioning, and parity tests | Keep no-execution and first-error cases. | `Proven` |
 | `AUTH-REQ-040` | Serialization contract test | Keep authoring, checkpoint, and persistence format separation after revision work | `Proven` |
 | `AUTH-REQ-041`, `AUTH-REQ-042`, `AUTH-REQ-062` | Definition-first instance test with a non-idempotent state transform and static-field exclusions | Keep generated and trusted Registry paths. | `Proven` |
 | `AUTH-REQ-043` to `AUTH-REQ-047` | Codec, Data, Registry, alias, hostile-input, limit, and local-closure tests | Apply final seam-12 error code after approval. | `Proven` for behavior; shared code is deferred |
-| `AUTH-REQ-048` | Versioning and parity tests | Keep version-2 round trip and version-1 rejection fixtures. | `Proven` |
+| `AUTH-REQ-048` | Versioning and parity tests | Keep version-1 round trip and prior-route-shape rejection fixtures. | `Proven` |
 | `AUTH-REQ-049` | Plugin Codec tests | Preserve through Agent Codec version change | `Proven` |
 | `AUTH-REQ-050` to `AUTH-REQ-052` | Extension host, Spark fixture, and public data-entry tests | Keep order, claims, invalid-result, and common-validation cases. | `Proven` |
 | `AUTH-REQ-053` and `AUTH-REQ-054` | Public `lower/3` docs and spec plus direct, Builder, and Codec parity | Keep source entities out of Codec data. | `Proven` |
@@ -347,7 +351,7 @@ The remaining historical matrix still needs reconciliation with these decisions.
 | --- | --- |
 | Forms | Keep module, Spark, direct map and keyword, Builder, Codec, and neutral definitions. |
 | Module metadata | Keep double-underscore compiler functions private. Use `definition/0` for canonical data. |
-| Revision | Keep the implemented seam-01 `vsn` rules. Read and write only version-2 Agent Codec documents. |
+| Revision | Keep the implemented seam-01 `vsn` rules. Read and write only version-1 Agent Codec documents with the current route record shape. |
 | Inline Actions | Keep current syntax and `route_action/1`. Test against the intended `jido_action` release source. |
 | Interfaces | Keep generated names, arities, docs, types, packaging, and live delegation. Interface functions remain module-only. |
 | Builder | Keep the first-error and order rules. Module input reads `definition/0`; public fields and functions keep their specs. |

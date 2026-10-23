@@ -12,7 +12,8 @@ defmodule JidoTest.AgentServer.Durable.EvolutionTest do
   import JidoTest.Eventually
 
   defmodule Upgrade do
-    use Jido.Action, name: "server_live_upgrade"
+    use Jido.Action,
+      name: "server_live_upgrade"
 
     def run(%{snapshot: snapshot}, context) do
       if context[:observer],
@@ -31,7 +32,9 @@ defmodule JidoTest.AgentServer.Durable.EvolutionTest do
   end
 
   defmodule SchemaUpgrade do
-    use Jido.Action, name: "server_schema_upgrade"
+    use Jido.Action,
+      name: "server_schema_upgrade"
+
     @schema Zoi.object(%{total: Zoi.integer()})
 
     def run(%{snapshot: snapshot}, _) do
@@ -42,7 +45,13 @@ defmodule JidoTest.AgentServer.Durable.EvolutionTest do
         |> Map.merge(%{
           vsn: 2,
           schema: @schema,
-          routes: [%{path: "next", handler: %{kind: :action, target: E.Work}}]
+          routes: [
+            %{
+              path: "next",
+              handler: %{kind: :action, target: E.Work},
+              state: %{source: :output, path: []}
+            }
+          ]
         })
         |> Agent.define!()
         |> Agent.instantiate!(id: snapshot.agent.id, state: %{total: snapshot.agent.state.count})
@@ -81,7 +90,12 @@ defmodule JidoTest.AgentServer.Durable.EvolutionTest do
     server = start(c)
     initial = Server.snapshot(server)
     assert initial.state_version == 0
-    assert {:ok, accepted, _} = turn(server, [D.route_add("new", E.Work)])
+
+    assert {:ok, accepted, _} =
+             turn(server, [
+               D.route_add("new", E.Work)
+             ])
+
     assert %{agent: ^accepted, state_version: 1} = Server.snapshot(server)
     assert {:error, _} = turn(server, [D.route_remove("absent")])
     assert %{agent: ^accepted, state_version: 1} = Server.snapshot(server)
@@ -95,7 +109,13 @@ defmodule JidoTest.AgentServer.Durable.EvolutionTest do
       Agent.define!(%{
         name: "upgrade",
         schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}),
-        routes: [%{path: "work", handler: %{kind: :action, target: F.Work}}]
+        routes: [
+          %{
+            path: "work",
+            handler: %{kind: :action, target: F.Work},
+            state: %{source: :output, path: []}
+          }
+        ]
       })
       |> Agent.instantiate!(id: unique_id("upgrade"))
 

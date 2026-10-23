@@ -15,6 +15,7 @@ defmodule Jido.Examples.Durable.SavedAgent do
 
     route "examples.durable.saved_agent.request",
           Jido.Examples.Durable.SavedAgent.RequestReport,
-          as: :request
+          as: :request do
+    end
   end
 end

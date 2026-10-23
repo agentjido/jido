@@ -1,5 +1,5 @@
 defmodule Jido.Examples.Plugins.Identity.Agent do
-  @moduledoc "Verifies signed input before routing and signs emitted replies after execution."
+  @moduledoc "Verifies signed input before routing and signs replies after execution."
   use Jido.Agent, name: "application_identity_agent"
 
   state do
@@ -22,14 +22,12 @@ defmodule Jido.Examples.Plugins.Identity.Agent do
     route "examples.plugins.identity.challenge" do
       action %{"challenge" => challenge},
         schema: Zoi.object(%{"challenge" => Zoi.string() |> Zoi.min(1)}),
+        output_schema:
+          Zoi.object(%{
+            state: Zoi.map(),
+            reply: Zoi.object(%{"challenge" => Zoi.string()})
+          }),
         context: context do
-        reply =
-          Jido.Signal.new!(
-            "examples.plugins.identity.accepted",
-            %{"challenge" => challenge},
-            source: "/examples/plugins/identity/agent"
-          )
-
         next_state = %{
           context.agent_state
           | accepted: context.agent_state.accepted + 1,
@@ -40,8 +38,11 @@ defmodule Jido.Examples.Plugins.Identity.Agent do
               |> Base.encode16(case: :lower)
         }
 
-        {:ok, next_state, [Jido.Agent.Directive.emit(reply)]}
+        {:ok, %{state: next_state, reply: %{"challenge" => challenge}}}
       end
+
+      state(from: output(:state))
+      reply("examples.plugins.identity.accepted", from: output(:reply))
     end
   end
 end

@@ -78,8 +78,8 @@ runtime specifications are internal. This component has no DSL.
 
 ### jido.agent_server.plugin_runtime.I8 — Outbound Signal preparation
 
-- **scope:** `Jido.AgentServer.Plugin.Callbacks.prepare_dispatch/5`
-- **must:** Run declared outbound preparation callbacks in reverse declaration order before effect delivery. Give each callback its current root reference, owned committed state, Signal context, and owner options. Validate the complete Signal after every transform and stop at the first explicit error, exception, or invalid result. A Plugin without this callback leaves the Signal unchanged.
+- **scope:** `Jido.AgentServer.Plugin.Callbacks.prepare_outbound/5`
+- **must:** Run declared outbound preparation callbacks in reverse declaration order before `Reply`, `Emit`, `AgentSend`, or `ParentSend` delivery. Give each callback its current root reference, owned committed state, Signal context, and owner options. Validate the complete Signal after every transform and stop at the first explicit error, exception, or invalid result. A Plugin without this callback leaves the Signal unchanged. A `Reply` transform must keep its ID, causation, and trace.
 - **why:** Live Plugin transforms must preserve one valid outbound Signal and must not expose another Plugin's owned state.
 - **kind:** functional
 - **status:** active

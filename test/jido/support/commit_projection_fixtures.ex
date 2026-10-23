@@ -13,7 +13,7 @@ defmodule JidoTest.CommitProjection.AgentFacet do
   def directives(opts),
     do: if(opts[:key] == :first, do: [JidoTest.CommitProjection.Effect], else: [])
 
-  def reduce(reduction, _opts), do: {:ok, reduction.state.count}
+  def reduce(reduction, _opts), do: {:ok, reduction.candidate_state.count}
 end
 
 defmodule JidoTest.CommitProjection.ServerFacet do
@@ -184,7 +184,10 @@ end
 
 defmodule JidoTest.CommitProjection.Reject do
   @moduledoc false
-  use Jido.Action, name: "commit_projection_reject", schema: Zoi.object(%{})
+  use Jido.Action,
+    name: "commit_projection_reject",
+    schema: Zoi.object(%{})
+
   def run(_params, _context), do: {:error, :rejected}
 end
 
@@ -203,7 +206,10 @@ defmodule JidoTest.CommitProjection.Agent do
 
   routes do
     route "projection.update", JidoTest.CommitProjection.Update
-    route "projection.reject", JidoTest.CommitProjection.Reject
+
+    route "projection.reject", JidoTest.CommitProjection.Reject do
+      state(:unchanged)
+    end
   end
 end
 

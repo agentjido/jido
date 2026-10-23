@@ -11,7 +11,8 @@ defmodule JidoTest.AgentServer.ControlTest do
   alias JidoTest.Persistence.ProbeStore
 
   defmodule Probe do
-    use Jido.Action, name: "server_control_probe"
+    use Jido.Action,
+      name: "server_control_probe"
 
     def run(_, context) do
       server = context.server
@@ -137,7 +138,13 @@ defmodule JidoTest.AgentServer.ControlTest do
       Jido.Agent.define!(%{
         name: "control_probe",
         schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}),
-        routes: [%{path: "work", handler: %{kind: :action, target: Probe}}]
+        routes: [
+          %{
+            path: "work",
+            handler: %{kind: :action, target: Probe},
+            state: %{source: :output, path: []}
+          }
+        ]
       })
       |> Jido.Agent.instantiate!(id: Jido.Signal.ID.generate!())
 

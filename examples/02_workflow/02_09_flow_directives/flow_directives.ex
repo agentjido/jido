@@ -15,7 +15,9 @@ defmodule Jido.Examples.FlowDirectives do
 
   routes do
     signal_source "/examples/workflow/flow_directives"
+
     route "examples.workflow.flow_directives.run", __MODULE__.Success, as: :run
+
     route "examples.workflow.flow_directives.fail", __MODULE__.Failure, as: :fail
   end
 
@@ -32,7 +34,9 @@ defmodule Jido.Examples.FlowDirectives do
 
   defmodule Reject do
     @moduledoc false
-    use Jido.Action, name: "workflow_flow_directives_reject", schema: Zoi.object(%{})
+    use Jido.Action,
+      name: "workflow_flow_directives_reject",
+      schema: Zoi.object(%{})
 
     def run(_input, _context), do: {:error, :flow_rejected}
   end

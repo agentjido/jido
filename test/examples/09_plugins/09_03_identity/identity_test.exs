@@ -14,10 +14,7 @@ defmodule JidoTest.Examples.Plugins.IdentityTest do
     {agent_public, _agent_private} = Crypto.agent_key_pair()
 
     {:ok, agent_server} =
-      JidoTest.ExampleRuntime.start_agent(jido, Agent,
-        id: unique_id("identity"),
-        default_dispatch: {:pid, target: self()}
-      )
+      JidoTest.ExampleRuntime.start_agent(jido, Agent, id: unique_id("identity"))
 
     unsigned =
       Signal.new!(
@@ -30,7 +27,7 @@ defmodule JidoTest.Examples.Plugins.IdentityTest do
 
     direct = Agent.instantiate!(id: unique_id("identity-direct"))
 
-    assert {:ok, direct, [%Jido.Agent.Directive.Emit{}]} = Jido.Agent.cmd(direct, signed)
+    assert {:ok, direct, [%Jido.Agent.Directive.Reply{}]} = Jido.Agent.cmd(direct, signed)
     assert direct.state.accepted == 1
     assert direct.state.last_public_key == Base.encode16(peer_public, case: :lower)
 
@@ -38,7 +35,7 @@ defmodule JidoTest.Examples.Plugins.IdentityTest do
     assert committed.state.accepted == 1
     assert committed.state.last_public_key == Base.encode16(peer_public, case: :lower)
 
-    assert_receive {:signal, %Signal{type: "examples.plugins.identity.accepted"} = reply}
+    assert_receive %Signal{type: "examples.plugins.identity.accepted"} = reply
     assert {:ok, _nonce} = Crypto.verify(reply, agent_public)
     assert Trace.get(reply).causation_id == signed.id
 
@@ -64,7 +61,7 @@ defmodule JidoTest.Examples.Plugins.IdentityTest do
     assert Process.alive?(replacement_runtime)
     assert {:ok, committed, _directives} = Server.call(agent_server, signed)
     assert committed.state.accepted == 2
-    assert_receive {:signal, %Signal{type: "examples.plugins.identity.accepted"}}
+    assert_receive %Signal{type: "examples.plugins.identity.accepted"}
 
     invalid_route =
       Signal.new!(

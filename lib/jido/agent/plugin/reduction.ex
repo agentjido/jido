@@ -13,7 +13,7 @@ defmodule Jido.Agent.Plugin.Reduction do
     :agent_module,
     :signal,
     :state_before,
-    :state,
+    :candidate_state,
     :plugin_state,
     :prepared_input,
     :directives
@@ -26,7 +26,7 @@ defmodule Jido.Agent.Plugin.Reduction do
           agent_module: module(),
           signal: Jido.Signal.t(),
           state_before: map(),
-          state: map(),
+          candidate_state: map(),
           plugin_state: term(),
           prepared_input: term(),
           directives: [struct()]

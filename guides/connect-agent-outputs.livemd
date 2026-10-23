@@ -6,8 +6,13 @@ Use `forward` when one input Signal must go to one named child Agent or to the
 current parent Agent.
 
 ```elixir
-forward "work.request", to: agent(:worker)
-forward "work.completed", to: parent()
+route "work.request" do
+  forward to: agent(:worker)
+end
+
+route "work.completed" do
+  forward to: parent()
+end
 ```
 
 Forwarding is part of the route definition. It is not an `Emit` fallback and
@@ -40,7 +45,10 @@ defmodule Forward.Worker do
 
   routes do
     route "work.request", Forward.Work
-    forward "work.completed", to: parent()
+
+    route "work.completed" do
+      forward to: parent()
+    end
   end
 end
 ```
@@ -59,7 +67,10 @@ defmodule Forward.Team do
   end
 
   routes do
-    forward "work.request", to: agent(:worker)
+    route "work.request" do
+      forward to: agent(:worker)
+    end
+
     route "work.completed", Forward.Work
   end
 
@@ -119,8 +130,8 @@ An unknown member makes the definition invalid. An unavailable member returns
 
 | Form | Purpose |
 | --- | --- |
-| `forward "type", to: agent(:worker)` | Route the current input to one declared Agent. |
-| `forward "type", to: parent()` | Route the current input to the current parent. |
+| `route "type" do; forward to: agent(:worker); end` | Route the current input to one declared Agent. |
+| `route "type" do; forward to: parent(); end` | Route the current input to the current parent. |
 | `emit(signal)` | Publish a new outbound Signal as a generic effect. |
 | `reply(signal)` | Return one correlated response to the current requester. |
 

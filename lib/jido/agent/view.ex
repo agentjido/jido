@@ -4,7 +4,7 @@ defmodule Jido.Agent.View do
 
   The view is a plain JSON document. It has the same shape for a compiled
   Agent module, a neutral data definition, and an Agent instance. The view
-  includes public definition data and route summaries. It does not include
+  includes public definition data and public route values. It does not include
   Agent state, metadata, schema values, Plugin options, route defaults, or
   route match functions.
 
@@ -16,7 +16,7 @@ defmodule Jido.Agent.View do
   """
 
   alias Jido.Agent
-  alias Jido.Agent.Authoring
+  alias Jido.Agent.{Authoring, Codec}
   alias Jido.Authoring.{Document, Registry}
 
   @default_operation_limit 100
@@ -69,32 +69,22 @@ defmodule Jido.Agent.View do
     with {:ok, items} <-
            routes
            |> Enum.take(limit)
-           |> Authoring.traverse(&operation(&1, registry)) do
+           |> Authoring.traverse(&encode_route(&1, registry)) do
       {:ok, %{"items" => items, "total" => total, "truncated" => total > limit}}
     end
   end
 
-  defp operation(route, registry) do
-    with {:ok, target} <- target(route.handler, registry) do
-      {:ok,
-       %{
-         "signal_type" => route.path,
-         "kind" => Atom.to_string(route.handler.kind),
-         "target" => target
-       }}
-    end
+  defp encode_route(route, registry) do
+    # Route defaults control private runtime input. Do not resolve or expose them.
+    with {:ok, operation} <-
+           route
+           |> Map.put(:defaults, %{})
+           |> Codec.encode_route(registry, &encode_reference/3),
+         do: {:ok, Map.delete(operation, "defaults")}
   end
 
-  defp target(%{kind: kind, target: target}, registry) when kind in [:action, :flow],
+  defp encode_reference(target, registry, kind),
     do: Registry.encode_reference(registry, kind, target)
-
-  defp target(%{kind: :forward, target: %{kind: :agent, name: name}}, _registry),
-    do: {:ok, %{"kind" => "agent", "name" => Atom.to_string(name)}}
-
-  defp target(%{kind: :forward, target: %{kind: :parent}}, _registry),
-    do: {:ok, %{"kind" => "parent"}}
-
-  defp target(_, _), do: {:ok, nil}
 
   defp build(agent, agent_type, schema, operations) do
     %{

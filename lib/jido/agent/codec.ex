@@ -5,9 +5,6 @@ defmodule Jido.Agent.Codec do
   alias Jido.Agent.{Authoring, Error, Extension}
   alias Jido.Authoring.{Issue, Registry, Value}
 
-  @fields ~w(module name description vsn schema initial_state metadata signal_source routes topology extensions)a
-  @field_names Enum.map(@fields, &Atom.to_string/1)
-  @required_field_names @field_names -- ["initial_state"]
   @type document :: %{required(String.t()) => term()}
 
   @doc false
@@ -17,19 +14,15 @@ defmodule Jido.Agent.Codec do
   @doc false
   def encode_document(source, registry) do
     with {:ok, definition} <- definition(source),
-         {:ok, fields} <- encode_fields(definition, registry),
-         document = %{
-           "type" => "jido.agent.definition",
-           "vsn" => 1,
-           "definition" => fields
-         } do
-      {:ok, document}
+         {:ok, fields} <- encode_fields(definition, registry) do
+      {:ok, %{"type" => "jido.agent.definition", "vsn" => 1, "definition" => fields}}
     end
   end
 
   @doc false
   def decode_document(document, registry) do
     with :ok <- object(document, ~w(type vsn definition)),
+         :ok <- document_version(document),
          {:ok, fields} <- at(decode_fields(document["definition"], registry), ["definition"]),
          {:ok, agent} <- at(Agent.define(fields), ["definition"]) do
       {:ok, agent}
@@ -54,112 +47,134 @@ defmodule Jido.Agent.Codec do
     do: Error.fail(:invalid_definition, [], "Expected an Agent definition, instance, or module")
 
   defp encode_fields(agent, registry) do
-    with {:ok, module} <- optional_reference(agent.module, registry, [:agent]),
-         {:ok, schema} <- encode_reference(agent.schema, registry, [:schema]),
-         {:ok, initial_state} <- Value.encode(agent.initial_state, registry),
-         {:ok, metadata} <- Value.encode(agent.metadata, registry),
-         {:ok, routes} <- encode_list(agent.routes, &encode_route(&1, registry)),
-         {:ok, topology} <- encode_topology(agent.topology, registry),
-         {:ok, extensions} <- encode_list(agent.extensions, &encode_extension(&1, registry)) do
-      {:ok,
-       %{
-         "module" => module,
-         "name" => agent.name,
-         "description" => agent.description,
-         "vsn" => agent.vsn,
-         "schema" => schema,
-         "initial_state" => initial_state,
-         "metadata" => metadata,
-         "signal_source" => agent.signal_source,
-         "routes" => routes,
-         "topology" => topology,
-         "extensions" => extensions
-       }}
-    end
+    encode_map(agent,
+      module: &optional_reference(&1, registry, [:agent]),
+      schema: &encode_reference(&1, registry, [:schema]),
+      initial_state: &Value.encode(&1, registry),
+      metadata: &Value.encode(&1, registry),
+      routes: &encode_list(&1, fn route -> encode_route(route, registry) end),
+      topology: &encode_topology(&1, registry),
+      extensions: &encode_list(&1, fn extension -> encode_extension(extension, registry) end),
+      name: nil,
+      description: nil,
+      vsn: nil,
+      signal_source: nil
+    )
   end
 
   defp decode_fields(fields, registry) do
-    with :ok <- object(fields, @required_field_names, ["initial_state"]),
-         {:ok, module} <- at(optional_resolve(fields["module"], registry, :agent), ["module"]),
-         {:ok, schema} <-
-           at(Registry.decode_reference(registry, fields["schema"], :schema), ["schema"]),
-         {:ok, initial_state} <- decode_initial_state(fields, registry),
-         {:ok, metadata} <- at(Value.decode(fields["metadata"], registry), ["metadata"]),
-         {:ok, routes} <-
-           at(decode_list(fields["routes"], &decode_route(&1, registry)), ["routes"]),
-         {:ok, topology} <- at(decode_topology(fields["topology"], registry), ["topology"]),
-         {:ok, extensions} <-
-           at(
-             decode_list(fields["extensions"], &decode_extension(&1, registry)),
-             ["extensions"]
-           ) do
-      {:ok,
-       %{
-         module: module,
-         name: fields["name"],
-         description: fields["description"],
-         vsn: fields["vsn"],
-         schema: schema,
-         initial_state: initial_state,
-         metadata: metadata,
-         signal_source: fields["signal_source"],
-         routes: routes,
-         topology: topology,
-         extensions: extensions
-       }}
-    end
+    decode_map(
+      fields,
+      [
+        module: &optional_resolve(&1, registry, :agent),
+        schema: &Registry.decode_reference(registry, &1, :schema),
+        initial_state: fn value ->
+          if Map.has_key?(fields, "initial_state"),
+            do: Value.decode(value, registry),
+            else: {:ok, %{}}
+        end,
+        metadata: &Value.decode(&1, registry),
+        routes: &decode_list(&1, fn route -> decode_route(route, registry) end),
+        topology: &decode_topology(&1, registry),
+        extensions: &decode_list(&1, fn extension -> decode_extension(extension, registry) end),
+        name: nil,
+        description: nil,
+        vsn: nil,
+        signal_source: nil
+      ],
+      [:initial_state]
+    )
   end
 
-  defp decode_initial_state(fields, registry) do
-    if Map.has_key?(fields, "initial_state"),
-      do: at(Value.decode(fields["initial_state"], registry), ["initial_state"]),
-      else: {:ok, %{}}
-  end
-
-  defp encode_route(route, registry) do
-    with {:ok, helper} <- Value.encode(route.as, registry),
-         {:ok, defaults} <- Value.encode(route.defaults, registry),
-         {:ok, handler} <- encode_handler(route.handler, registry) do
-      {:ok,
-       %{
-         "path" => route.path,
-         "as" => helper,
-         "defaults" => defaults,
-         "handler" => handler
-       }}
-    end
+  @doc false
+  def encode_route(route, registry, reference \\ &encode_reference/3) do
+    encode_map(route,
+      as: &Value.encode(&1, registry),
+      defaults: &Value.encode(&1, registry),
+      handler: &encode_handler(&1, registry, reference),
+      state: &{:ok, encode_state(&1)},
+      reply: &{:ok, encode_reply(&1)},
+      path: nil
+    )
   end
 
   defp decode_route(route, registry) do
-    with :ok <- object(route, ~w(path as defaults handler)),
-         {:ok, helper} <- at(Value.decode(route["as"], registry), ["as"]),
-         {:ok, defaults} <- at(Value.decode(route["defaults"], registry), ["defaults"]),
-         {:ok, handler} <- at(decode_handler(route["handler"], registry), ["handler"]) do
-      {:ok,
-       %{
-         path: route["path"],
-         as: helper,
-         defaults: defaults,
-         handler: handler
-       }}
+    decode_map(route,
+      as: &Value.decode(&1, registry),
+      defaults: &Value.decode(&1, registry),
+      handler: &decode_handler(&1, registry),
+      state: &decode_state/1,
+      reply: &decode_reply/1,
+      path: nil
+    )
+  end
+
+  defp encode_state(:unchanged), do: "unchanged"
+  defp encode_state(selector), do: encode_selector(selector)
+
+  defp decode_state("unchanged"), do: {:ok, :unchanged}
+  defp decode_state(selector), do: decode_selector(selector)
+
+  defp encode_reply(nil), do: nil
+
+  defp encode_reply(%{type: type, from: from}),
+    do: %{"type" => type, "from" => encode_selector(from)}
+
+  defp decode_reply(nil), do: {:ok, nil}
+
+  defp decode_reply(reply) do
+    with :ok <- object(reply, ~w(type from)),
+         true <- is_binary(reply["type"]),
+         {:ok, from} <- at(decode_selector(reply["from"]), ["from"]) do
+      {:ok, %{type: reply["type"], from: from}}
+    else
+      false -> Error.fail(:invalid_document, ["type"], "Invalid Agent route reply type")
+      error -> error
     end
   end
 
-  defp encode_handler(%{kind: kind, target: target}, registry)
+  defp encode_selector(%{source: :output, path: path}),
+    do: %{"source" => "output", "path" => Enum.map(path, &to_string/1)}
+
+  defp decode_selector(selector) do
+    with :ok <- object(selector, ~w(source path)),
+         true <- selector["source"] == "output",
+         {:ok, path} <- decode_selector_path(selector["path"]) do
+      {:ok, %{source: :output, path: path}}
+    else
+      false -> Error.fail(:invalid_document, ["source"], "Invalid output selector source")
+      error -> error
+    end
+  end
+
+  defp decode_selector_path(path) when is_list(path) do
+    if Enum.all?(path, &is_binary/1),
+      do: {:ok, path},
+      else: Error.fail(:invalid_document, ["path"], "Output selector path keys must be strings")
+  end
+
+  defp decode_selector_path(_path),
+    do: Error.fail(:invalid_document, ["path"], "Output selector path must be a list")
+
+  defp encode_handler(%{kind: kind, target: target}, registry, reference)
        when kind in [:action, :flow, :transform] do
-    with {:ok, target} <- encode_reference(target, registry, kind),
+    with {:ok, target} <- reference.(target, registry, kind),
          do: {:ok, %{"kind" => Atom.to_string(kind), "target" => target}}
   end
 
-  defp encode_handler(%{kind: :forward, target: %{kind: :parent}}, _registry),
+  defp encode_handler(%{kind: :forward, target: %{kind: :parent}}, _registry, _reference),
     do: {:ok, %{"kind" => "forward", "target" => %{"kind" => "parent"}}}
 
-  defp encode_handler(%{kind: :forward, target: %{kind: :agent, name: name}}, registry) do
+  defp encode_handler(
+         %{kind: :forward, target: %{kind: :agent, name: name}},
+         registry,
+         _reference
+       ) do
     with {:ok, name} <- Value.encode(name, registry),
          do: {:ok, %{"kind" => "forward", "target" => %{"kind" => "agent", "name" => name}}}
   end
 
-  defp encode_handler(_handler, _registry),
+  defp encode_handler(_handler, _registry, _reference),
     do: Error.fail(:invalid_handler, [], "Agent definition contains an invalid route handler")
 
   defp decode_handler(%{"kind" => kind, "target" => target} = handler, registry)
@@ -201,62 +216,42 @@ defmodule Jido.Agent.Codec do
     do: Error.fail(:invalid_topology, [], "Agent definition contains an invalid topology")
 
   defp decode_topology(topology, registry) do
-    with :ok <- object(topology, ~w(agents connections)),
-         {:ok, agents} <-
-           at(decode_list(topology["agents"], &decode_member(&1, registry)), ["agents"]),
-         {:ok, connections} <-
-           at(
-             decode_list(topology["connections"], &decode_connection(&1, registry)),
-             ["connections"]
-           ) do
-      {:ok, %{agents: agents, connections: connections}}
-    end
+    decode_map(topology,
+      agents: &decode_list(&1, fn member -> decode_member(member, registry) end),
+      connections: &decode_list(&1, fn connection -> decode_connection(connection, registry) end)
+    )
   end
 
   defp encode_member(member, registry) do
-    with {:ok, name} <- Value.encode(member.name, registry),
-         {:ok, definition} <- encode_nested_definition(member.definition, registry),
-         {:ok, count} <- Value.encode(member.count, registry),
-         {:ok, initial_state} <- Value.encode(member.initial_state, registry) do
-      encoded = %{
-        "name" => name,
-        "definition" => definition,
-        "count" => count,
-        "initial_state" => initial_state
-      }
+    fields = [
+      name: &Value.encode(&1, registry),
+      definition: &encode_nested_definition(&1, registry),
+      count: &Value.encode(&1, registry),
+      initial_state: &Value.encode(&1, registry)
+    ]
 
-      if Map.has_key?(member, :identities) do
-        with {:ok, identities} <- Value.encode(member.identities, registry),
-             do: {:ok, Map.put(encoded, "identities", identities)}
-      else
-        {:ok, encoded}
-      end
-    end
+    fields =
+      if Map.has_key?(member, :identities),
+        do: fields ++ [identities: &Value.encode(&1, registry)],
+        else: fields
+
+    encode_map(member, fields)
   end
 
   defp decode_member(member, registry) do
-    with :ok <- object(member, ~w(name definition count initial_state), ~w(identities)),
-         {:ok, name} <- at(Value.decode(member["name"], registry), ["name"]),
-         {:ok, definition} <-
-           at(decode_nested_definition(member["definition"], registry), ["definition"]),
-         {:ok, count} <- at(Value.decode(member["count"], registry), ["count"]),
-         {:ok, initial_state} <-
-           at(Value.decode(member["initial_state"], registry), ["initial_state"]) do
-      decoded = %{
-        name: name,
-        definition: definition,
-        count: count,
-        initial_state: initial_state
-      }
+    fields = [
+      name: &Value.decode(&1, registry),
+      definition: &decode_nested_definition(&1, registry),
+      count: &Value.decode(&1, registry),
+      initial_state: &Value.decode(&1, registry)
+    ]
 
-      if Map.has_key?(member, "identities") do
-        with {:ok, identities} <-
-               at(Value.decode(member["identities"], registry), ["identities"]),
-             do: {:ok, Map.put(decoded, :identities, identities)}
-      else
-        {:ok, decoded}
-      end
-    end
+    fields =
+      if is_map(member) and Map.has_key?(member, "identities"),
+        do: fields ++ [identities: &Value.decode(&1, registry)],
+        else: fields
+
+    decode_map(member, fields)
   end
 
   defp encode_nested_definition(%Agent{} = definition, registry) do
@@ -283,25 +278,21 @@ defmodule Jido.Agent.Codec do
     do: Registry.decode_reference(registry, value, :agent)
 
   defp encode_connection(connection, registry) do
-    with {:ok, from} <- Value.encode(connection.from, registry),
-         {:ok, to} <- Value.encode(connection.to, registry) do
-      {:ok,
-       %{
-         "path" => connection.path,
-         "from" => from,
-         "to" => to,
-         "delivery" => Atom.to_string(connection.delivery)
-       }}
-    end
+    encode_map(connection,
+      from: &Value.encode(&1, registry),
+      to: &Value.encode(&1, registry),
+      path: nil,
+      delivery: &{:ok, Atom.to_string(&1)}
+    )
   end
 
   defp decode_connection(connection, registry) do
-    with :ok <- object(connection, ~w(path from to delivery)),
-         {:ok, from} <- at(Value.decode(connection["from"], registry), ["from"]),
-         {:ok, to} <- at(Value.decode(connection["to"], registry), ["to"]),
-         {:ok, delivery} <- at(delivery(connection["delivery"]), ["delivery"]) do
-      {:ok, %{path: connection["path"], from: from, to: to, delivery: delivery}}
-    end
+    decode_map(connection,
+      from: &Value.decode(&1, registry),
+      to: &Value.decode(&1, registry),
+      delivery: &delivery/1,
+      path: nil
+    )
   end
 
   defp delivery("single"), do: {:ok, :single}
@@ -309,43 +300,52 @@ defmodule Jido.Agent.Codec do
   defp delivery(_value), do: Error.fail(:invalid_document, [], "Invalid Agent delivery value")
 
   defp encode_extension(extension, registry) do
-    with {:ok, provider} <-
-           encode_reference(extension.provider, registry, [:extension, :plugin]),
-         {:ok, data} <-
-           Extension.encode_authoring_data(extension.provider, extension.data, registry) do
-      {:ok,
-       %{
-         "id" => extension.id,
-         "provider" => provider,
-         "vsn" => extension.vsn,
-         "data" => data
-       }}
-    end
+    encode_map(extension,
+      provider: &encode_reference(&1, registry, [:extension, :plugin]),
+      data: &Extension.encode_authoring_data(extension.provider, &1, registry),
+      id: nil,
+      vsn: nil
+    )
+  end
+
+  defp encode_map(value, fields), do: map_fields(value, fields, :encode)
+
+  defp decode_map(value, fields, optional \\ []) do
+    names = Enum.map(Keyword.keys(fields), &Atom.to_string/1)
+    optional = Enum.map(optional, &Atom.to_string/1)
+
+    with :ok <- object(value, names -- optional, optional),
+         do: map_fields(value, fields, :decode)
+  end
+
+  defp map_fields(value, fields, direction) do
+    with {:ok, entries} <-
+           Authoring.traverse(fields, fn {key, transform} ->
+             name = Atom.to_string(key)
+             input = Map.get(value, if(direction == :encode, do: key, else: name))
+             result = if transform, do: transform.(input), else: {:ok, input}
+             result = if direction == :decode, do: at(result, [name]), else: result
+
+             with {:ok, output} <- result,
+                  do: {:ok, {if(direction == :encode, do: name, else: key), output}}
+           end),
+         do: {:ok, Map.new(entries)}
   end
 
   defp decode_extension(extension, registry) do
-    with :ok <- object(extension, ~w(id provider vsn data)),
-         {:ok, provider} <-
-           at(
-             Registry.decode_reference(
-               registry,
-               extension["provider"],
-               [:extension, :plugin]
-             ),
-             ["provider"]
+    with {:ok, extension} <-
+           decode_map(extension,
+             provider: &Registry.decode_reference(registry, &1, [:extension, :plugin]),
+             data: nil,
+             id: nil,
+             vsn: nil
            ),
          {:ok, data} <-
            at(
-             Extension.decode_authoring_data(provider, extension["data"], registry),
+             Extension.decode_authoring_data(extension.provider, extension.data, registry),
              ["data"]
            ) do
-      {:ok,
-       %{
-         id: extension["id"],
-         provider: provider,
-         vsn: extension["vsn"],
-         data: data
-       }}
+      {:ok, %{extension | data: data}}
     end
   end
 
@@ -386,14 +386,7 @@ defmodule Jido.Agent.Codec do
   defp decode_list(_values, _decoder),
     do: Error.fail(:invalid_document, [], "Expected an Agent definition list")
 
-  defp object(value, fields) when is_map(value) and not is_struct(value) do
-    if Enum.sort(Map.keys(value)) == Enum.sort(fields),
-      do: :ok,
-      else: Error.fail(:invalid_document, [], "Unknown or missing Agent document fields")
-  end
-
-  defp object(_value, _fields),
-    do: Error.fail(:invalid_document, [], "Agent document object must be a map")
+  defp object(value, required, optional \\ [])
 
   defp object(value, required, optional) when is_map(value) and not is_struct(value) do
     keys = Map.keys(value)
@@ -405,6 +398,17 @@ defmodule Jido.Agent.Codec do
 
   defp object(_value, _required, _optional),
     do: Error.fail(:invalid_document, [], "Agent document object must be a map")
+
+  defp document_version(%{"type" => "jido.agent.definition", "vsn" => 1}), do: :ok
+
+  defp document_version(%{"vsn" => version}) do
+    Error.fail(
+      :unsupported_document,
+      ["vsn"],
+      "Agent definition document version is not supported",
+      %{vsn: version, supported_vsns: [1]}
+    )
+  end
 
   defp authoring_issue(%Issue{} = issue), do: issue
 
@@ -432,33 +436,29 @@ defmodule Jido.Agent.Codec do
         details: error.details
       )
 
-  defp authoring_issue(error), do: authoring_issue(error, [])
-
-  defp authoring_issue(error, prefix) do
-    details = if is_map(error) and is_map(Map.get(error, :details)), do: error.details, else: %{}
-
-    path =
-      if is_map(error),
-        do: prefix ++ Enum.map(Map.get(error, :path, []), &json_path_segment/1),
-        else: prefix
-
-    code =
-      if is_map(error), do: Map.get(error, :code) || :invalid_document, else: :invalid_document
+  defp authoring_issue(error) do
+    fields = if is_map(error), do: error, else: %{}
+    details = if is_map(Map.get(fields, :details)), do: fields.details, else: %{}
 
     message =
-      if is_map(error) and Map.get(error, :__exception__),
+      if Map.get(fields, :__exception__),
         do: Exception.message(error),
         else: inspect(error)
 
-    Issue.new(code, path, message, details: details)
+    Issue.new(
+      Map.get(fields, :code) || :invalid_document,
+      Enum.map(Map.get(fields, :path, []), &json_path_segment/1),
+      message,
+      details: details
+    )
   end
 
-  defp at({:error, error}, path),
-    do: {:error, prefix_issue(authoring_issue(error), path)}
+  defp at({:error, error}, path) do
+    issue = authoring_issue(error)
+    {:error, %{issue | path: path ++ issue.path}}
+  end
 
   defp at(result, _path), do: result
-
-  defp prefix_issue(%Issue{} = issue, path), do: %{issue | path: path ++ issue.path}
 
   defp json_path_segment(segment) when is_atom(segment), do: Atom.to_string(segment)
   defp json_path_segment(segment), do: segment

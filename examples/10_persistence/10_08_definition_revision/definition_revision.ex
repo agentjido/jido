@@ -2,13 +2,16 @@ defmodule Jido.Examples.DefinitionRevision do
   @moduledoc "A saved definition retains its version and checks its executable references."
 
   defmodule Add do
-    use Jido.Action, name: "definition_revision_add"
+    use Jido.Action,
+      name: "definition_revision_add"
+
     def run(_input, %{agent_state: state}), do: {:ok, %{total: state.total + 1}}
   end
 
   defmodule Upgrade do
     @moduledoc "Explicitly selects the current Action for an older snapshot."
-    use Jido.Action, name: "definition_revision_upgrade"
+    use Jido.Action,
+      name: "definition_revision_upgrade"
 
     def run(%{snapshot: snapshot}, _context) do
       agent = %{

@@ -47,8 +47,7 @@ defmodule Guides.Counter do
     route "counter.increment", as: :increment do
       action %{amount: amount, ms: ms},
         name: "increment",
-        schema: Zoi.object(%{amount: Zoi.integer(), ms: Zoi.integer() |> Zoi.default(0)}),
-        context: context do
+        schema: Zoi.object(%{amount: Zoi.integer(), ms: Zoi.integer() |> Zoi.default(0)}), context: context do
         Process.sleep(ms)
         state = context.agent_state
 

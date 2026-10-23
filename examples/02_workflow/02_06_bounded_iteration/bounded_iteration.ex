@@ -15,7 +15,8 @@ end
 
 defmodule Jido.Examples.BoundedIteration.Repair do
   @moduledoc false
-  use Jido.Action, name: "workflow_iteration_repair"
+  use Jido.Action,
+    name: "workflow_iteration_repair"
 
   def run(%{current: current, repair_size: repair_size}, _context) do
     {:ok, %{current | missing: current.missing - repair_size, repairs: current.repairs + 1}}

@@ -75,7 +75,8 @@ defmodule JidoTest.AgentServer.Fixtures do
     alias Jido.Action.Error, as: ActionError
     alias JidoTest.AgentServer.Fixtures
 
-    use Jido.Action, name: "server_contract_work"
+    use Jido.Action,
+      name: "server_contract_work"
 
     def run(input, context) do
       if context[:observer] do
@@ -151,7 +152,8 @@ defmodule JidoTest.AgentServer.Fixtures do
 
   defmodule Flow do
     @moduledoc false
-    use Jido.Flow, name: "server_contract_flow"
+    use Jido.Flow,
+      name: "server_contract_flow"
 
     flow do
       step "work", action: Work, params: input()
@@ -161,7 +163,8 @@ defmodule JidoTest.AgentServer.Fixtures do
 
   defmodule Parallel do
     @moduledoc false
-    use Jido.Flow, name: "server_contract_parallel"
+    use Jido.Flow,
+      name: "server_contract_parallel"
 
     flow do
       step "left", action: Work, params: input()
@@ -203,9 +206,21 @@ defmodule JidoTest.AgentServer.Fixtures do
       schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}),
       extensions: [%{id: Gate.id(), provider: Gate, vsn: Gate.vsn(), data: %{}}],
       routes: [
-        %{path: "work", handler: %{kind: :action, target: Work}},
-        %{path: "flow", handler: %{kind: :flow, target: Flow}},
-        %{path: "parallel", handler: %{kind: :flow, target: Parallel}}
+        %{
+          path: "work",
+          handler: %{kind: :action, target: Work},
+          state: %{source: :output, path: []}
+        },
+        %{
+          path: "flow",
+          handler: %{kind: :flow, target: Flow},
+          state: %{source: :output, path: []}
+        },
+        %{
+          path: "parallel",
+          handler: %{kind: :flow, target: Parallel},
+          state: %{source: :output, path: []}
+        }
       ]
     })
     |> Jido.Agent.instantiate!(id: "server-contract-instance")

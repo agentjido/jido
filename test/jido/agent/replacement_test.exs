@@ -5,7 +5,8 @@ defmodule JidoTest.Agent.ReplacementTest do
   alias Jido.Signal
 
   defmodule Reset do
-    use Jido.Action, name: "agent_replacement_reset"
+    use Jido.Action,
+      name: "agent_replacement_reset"
 
     def run(_params, context), do: {:ok, %{context.agent_state | config: %{}}}
   end

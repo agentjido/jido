@@ -230,5 +230,10 @@ defmodule Jido.Agent.AuthoringContractTest do
   end
 
   defp route(target, defaults),
-    do: %{path: "counter.add", handler: %{kind: :action, target: target}, defaults: defaults}
+    do: %{
+      path: "counter.add",
+      handler: %{kind: :action, target: target},
+      defaults: defaults,
+      state: %{source: :output, path: []}
+    }
 end

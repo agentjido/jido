@@ -46,7 +46,8 @@ defmodule Jido.Plugin.StateRuntimeTest do
   end
 
   defmodule SpendCredits do
-    use Jido.Action, name: "plugin_spend_credits"
+    use Jido.Action,
+      name: "plugin_spend_credits"
 
     @impl Jido.Action
     def run(%{amount: amount}, context) do

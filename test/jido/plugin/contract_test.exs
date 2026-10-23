@@ -38,14 +38,16 @@ defmodule Jido.Plugin.ContractTest do
   end
 
   defmodule InvalidStateAction do
-    use Jido.Action, name: "agent_plugin_invalid_state"
+    use Jido.Action,
+      name: "agent_plugin_invalid_state"
 
     @impl Jido.Action
     def run(_params, _context), do: {:ok, %{trace: [:invalid]}}
   end
 
   defmodule ReturnStop do
-    use Jido.Action, name: "agent_plugin_stop_directive"
+    use Jido.Action,
+      name: "agent_plugin_stop_directive"
 
     @impl Jido.Action
     def run(_params, context) do
@@ -54,7 +56,8 @@ defmodule Jido.Plugin.ContractTest do
   end
 
   defmodule FailingAction do
-    use Jido.Action, name: "agent_plugin_failure"
+    use Jido.Action,
+      name: "agent_plugin_failure"
 
     @impl Jido.Action
     def run(_params, _context), do: {:error, :action_failed}
@@ -97,7 +100,8 @@ defmodule Jido.Plugin.ContractTest do
   end
 
   defmodule OverwriteOwnedState do
-    use Jido.Action, name: "agent_plugin_overwrite_owned_state"
+    use Jido.Action,
+      name: "agent_plugin_overwrite_owned_state"
 
     @impl Jido.Action
     def run(_params, context) do
@@ -106,7 +110,8 @@ defmodule Jido.Plugin.ContractTest do
   end
 
   defmodule DeleteNilOwnedState do
-    use Jido.Action, name: "agent_plugin_delete_nil_owned_state"
+    use Jido.Action,
+      name: "agent_plugin_delete_nil_owned_state"
 
     @impl Jido.Action
     def run(_params, context) do
@@ -120,7 +125,8 @@ defmodule Jido.Plugin.ContractTest do
   end
 
   defmodule ReturnOwnedDirective do
-    use Jido.Action, name: "agent_plugin_owned_directive"
+    use Jido.Action,
+      name: "agent_plugin_owned_directive"
 
     @impl Jido.Action
     def run(_params, context) do
@@ -172,7 +178,8 @@ defmodule Jido.Plugin.ContractTest do
   end
 
   defmodule ReturnMixedDirectives do
-    use Jido.Action, name: "agent_plugin_mixed_directives"
+    use Jido.Action,
+      name: "agent_plugin_mixed_directives"
 
     @impl Jido.Action
     def run(_params, context) do
@@ -252,7 +259,8 @@ defmodule Jido.Plugin.ContractTest do
   end
 
   defmodule ReturnNormalizedDirective do
-    use Jido.Action, name: "agent_plugin_normalized_directive"
+    use Jido.Action,
+      name: "agent_plugin_normalized_directive"
 
     @impl Jido.Action
     def run(_params, context) do
@@ -692,8 +700,7 @@ defmodule Jido.Plugin.ContractTest do
                  agent,
                  signal,
                  %{},
-                 Jido.Agent.Plugin.specs(specs),
-                 %{}
+                 Jido.Agent.Plugin.specs(specs)
                )
 
       assert error.message == "Agent executable changed Plugin-owned state"

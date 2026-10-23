@@ -6,7 +6,8 @@ defmodule Jido.Persistence.SnapshotTest do
   alias JidoTest.AgentEvolutionFixtures, as: F
 
   defmodule ContextUpgrade do
-    use Jido.Action, name: "persistence_context_upgrade"
+    use Jido.Action,
+      name: "persistence_context_upgrade"
 
     def run(%{snapshot: snapshot}, %{observer: observer, mode: :ok}) do
       send(observer, :upgrade_context)
@@ -55,10 +56,34 @@ defmodule Jido.Persistence.SnapshotTest do
   end
 
   defmodule ActionWithFlowFunction do
-    use Jido.Action, name: "persistence_action_with_flow_function"
+    use Jido.Action,
+      name: "persistence_action_with_flow_function"
 
     def run(input, _context), do: {:ok, input}
     def flow, do: JidoTest.AgentEvolutionFixtures.Flow.flow()
+  end
+
+  defmodule InlineAgent do
+    use Jido.Agent, name: "snapshot_inline_agent"
+
+    state do
+      schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+    end
+
+    routes do
+      route "inline.action" do
+        action _params, context: context do
+          {:ok, context.agent_state}
+        end
+      end
+
+      route "inline.flow" do
+        flow do
+          step "work", action: JidoTest.AgentEvolutionFixtures.Work, params: %{}
+          output result("work")
+        end
+      end
+    end
   end
 
   @tag obligation: "jido.persistence.I6"
@@ -167,6 +192,29 @@ defmodule Jido.Persistence.SnapshotTest do
              Jido.Persistence.Snapshot.envelope(invalid_references)
   end
 
+  @tag obligation: "jido.persistence.I6"
+  test "snapshot format 1 rejects other formats" do
+    assert {:ok, snapshot} = Persistence.snapshot(F.agent())
+
+    assert {:error,
+            %Jido.Agent.Error{
+              code: :unsupported_snapshot_format,
+              path: [:format],
+              details: %{format: 2, supported_formats: [1]}
+            }} = Persistence.restore(%{snapshot | format: 2})
+  end
+
+  @tag obligation: "jido.persistence.I6"
+  test "snapshot format 1 rejects the old route shape" do
+    assert {:ok, snapshot} = Persistence.snapshot(F.agent())
+
+    [route | routes] = snapshot.agent.routes
+    old_agent = %{snapshot.agent | routes: [Map.drop(route, [:state, :reply]) | routes]}
+
+    assert {:error, %Jido.Agent.Error{code: :not_canonical}} =
+             Persistence.restore(%{snapshot | agent: old_agent})
+  end
+
   @tag obligation: "jido.persistence.I7"
   test "Plugin runtime and Action schemas retain all executable references" do
     plugin_agent =
@@ -200,7 +248,13 @@ defmodule Jido.Persistence.SnapshotTest do
     action_agent =
       Agent.define!(%{
         name: "action_schema_reference_snapshot",
-        routes: [%{path: "schema", handler: %{kind: :action, target: SchemaAction}}]
+        routes: [
+          %{
+            path: "schema",
+            handler: %{kind: :action, target: SchemaAction},
+            state: %{source: :output, path: []}
+          }
+        ]
       })
       |> Agent.instantiate!(id: "action-schema-reference")
 
@@ -218,7 +272,13 @@ defmodule Jido.Persistence.SnapshotTest do
     agent =
       Agent.define!(%{
         name: "action_with_flow_function_snapshot",
-        routes: [%{path: "action", handler: %{kind: :action, target: ActionWithFlowFunction}}]
+        routes: [
+          %{
+            path: "action",
+            handler: %{kind: :action, target: ActionWithFlowFunction},
+            state: :unchanged
+          }
+        ]
       })
       |> Agent.instantiate!(id: "action-with-flow-function")
 
@@ -305,7 +365,10 @@ defmodule Jido.Persistence.SnapshotTest do
     assert :ok = Persistence.create_agent(store, agent, opts)
 
     assert {:ok, next, _} =
-             Agent.mutate(agent, [D.route_add("new", F.Work), D.plugin_add(F.Counter)])
+             Agent.mutate(agent, [
+               D.route_add("new", F.Work),
+               D.plugin_add(F.Counter)
+             ])
 
     assert :ok = Persistence.save_agent(store, next, opts ++ [expected_revision: 0, revision: 1])
 
@@ -343,7 +406,12 @@ defmodule Jido.Persistence.SnapshotTest do
   @tag obligation: ["jido.persistence.I6", "jido.persistence.I11"]
   test "custom state conversion cannot replace the accepted definition" do
     original = F.Custom.instantiate!(id: "custom", state: %{count: 4})
-    assert {:ok, agent, _} = Agent.mutate(original, [D.route_add("saved", F.Work)])
+
+    assert {:ok, agent, _} =
+             Agent.mutate(original, [
+               D.route_add("saved", F.Work)
+             ])
+
     assert {:ok, snapshot} = Persistence.snapshot(agent)
     assert snapshot.state_format == :custom
     assert snapshot.agent.state == %{id: "custom", saved: 4}
@@ -361,7 +429,11 @@ defmodule Jido.Persistence.SnapshotTest do
   @tag obligation: ["jido.persistence.I7", "jido.persistence.I11"]
   test "missing saved declarations stop custom restore before its callback" do
     original = F.Custom.instantiate!(id: "custom-order", state: %{count: 4})
-    assert {:ok, action, _} = Agent.mutate(original, [D.route_add("action", F.Work)])
+
+    assert {:ok, action, _} =
+             Agent.mutate(original, [
+               D.route_add("action", F.Work)
+             ])
 
     assert {:ok, transform, _} =
              Agent.mutate(original, [
@@ -388,7 +460,11 @@ defmodule Jido.Persistence.SnapshotTest do
 
   @tag obligation: "jido.persistence.I7"
   test "Flow snapshots retain their declared executable dependencies" do
-    assert {:ok, agent, _} = Agent.mutate(F.agent(), [D.route_replace("run", F.Flow)])
+    assert {:ok, agent, _} =
+             Agent.mutate(F.agent(), [
+               D.route_replace("run", F.Flow)
+             ])
+
     assert {:ok, snapshot} = Persistence.snapshot(agent)
     assert snapshot.references[F.Flow] == F.Flow.module_info(:md5)
     assert snapshot.references[F.Work] == F.Work.module_info(:md5)
@@ -396,6 +472,20 @@ defmodule Jido.Persistence.SnapshotTest do
 
     assert {:error, %{code: :changed_reference}} =
              Persistence.restore(put_in(snapshot.references[F.Work], <<0::128>>))
+  end
+
+  @tag obligation: "jido.persistence.I7"
+  test "snapshots retain generated inline Action and Flow references" do
+    action = InlineAgent.route_executable!("inline.action")
+    flow = InlineAgent.route_executable!("inline.flow")
+    agent = InlineAgent.instantiate!(id: "inline-snapshot")
+
+    assert function_exported?(action, :__jido_inline_action__, 0)
+    assert function_exported?(flow, :__jido_inline_flow__, 0)
+    assert {:ok, snapshot} = Persistence.snapshot(agent)
+    assert snapshot.references[action] == action.module_info(:md5)
+    assert snapshot.references[flow] == flow.module_info(:md5)
+    assert {:ok, ^agent} = Persistence.restore(snapshot)
   end
 
   @tag obligation: "jido.persistence.I7"

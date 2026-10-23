@@ -13,7 +13,8 @@ defmodule Jido.Examples.ExecutableContinuation do
     signal_source "/workflow"
 
     route "workflow.continuation", Jido.Examples.ExecutableContinuation.Pipeline,
-      as: :add_repeatedly
+      as: :add_repeatedly do
+    end
   end
 end
 
@@ -58,7 +59,8 @@ end
 
 defmodule Jido.Examples.ExecutableContinuation.Finish do
   @moduledoc false
-  use Jido.Action, name: "workflow_continuation_finish"
+  use Jido.Action,
+    name: "workflow_continuation_finish"
 
   def run(input, context),
     do: {:ok, %{value: input.value, request: Map.get(context, :request, "none")}}
@@ -66,7 +68,8 @@ end
 
 defmodule Jido.Examples.ExecutableContinuation.Repeat do
   @moduledoc "The selected Flow permits at most three additions before one terminal result."
-  use Jido.Flow, name: "workflow_continuation_repeat"
+  use Jido.Flow,
+    name: "workflow_continuation_repeat"
 
   flow do
     iterate "add" do
@@ -90,7 +93,8 @@ end
 
 defmodule Jido.Examples.ExecutableContinuation.Decision do
   @moduledoc false
-  use Jido.Action, name: "workflow_continuation_decision"
+  use Jido.Action,
+    name: "workflow_continuation_decision"
 
   def run(input, _context), do: {:ok, input}
 end
