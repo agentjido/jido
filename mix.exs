@@ -373,8 +373,11 @@ defmodule Jido.MixProject do
   defp deps do
     [
       # Jido Ecosystem
-      # Use the sibling package for the shared lower-layer contracts.
-      {:jido_action, path: "../jido_action", override: true},
+      # Use the tested release/v3 Action contract until its next Hex release.
+      {:jido_action,
+       github: "agentjido/jido_action",
+       ref: "ae7266893c9eb47b10a4c2f711bdc517abf269ac",
+       override: true},
       {:jido_signal, "~> 3.0.0-beta.5"},
       # AgentServer owns native Runic Runners and Worker cleanup.
       {:runic, "~> 0.1.0-alpha.12", override: true},

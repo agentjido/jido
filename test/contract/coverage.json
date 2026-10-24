@@ -1849,12 +1849,12 @@
             "test abandon drops buffered and future Reply Signals without cancelling the turn",
             "test abandon drops buffered and future signals before or after done",
             "test an await timeout keeps a later Reply for the same pending request",
-            "test call returns the commit and delivers the unchanged Reply Signal",
+            "test call returns the commit and delivers the correlated Reply Signal",
             "test cast rejects Reply before commit because it has no request owner",
             "test done waits for a buffered owner and leaves no request monitor message",
             "test owner and server monitors close the gate at the correct boundary",
             "test submit holds Reply Signals until the owner collects the turn result",
-            "test the Reply effect returns the exact Signal",
+            "test the Reply effect adds correlation and does not use the fallback handler",
             "test the gate buffers in order, opens once, and then delivers directly"
           ]
         },
@@ -2152,10 +2152,12 @@
         "jido.agent_server.plugin_runtime.I8": {
           "failing": 0,
           "kind": "functional",
-          "passing": 3,
+          "passing": 5,
           "status": "active",
           "testable": true,
           "tests": [
+            "test Reply preparation cannot change correlation data",
+            "test Reply preparation uses the reply target after correlation is present",
             "test outbound callbacks run in reverse order with their own state, root, and options",
             "test outbound preparation preserves explicit errors and rejects callback faults",
             "test outbound preparation transforms after tracing and rejects before delivery"

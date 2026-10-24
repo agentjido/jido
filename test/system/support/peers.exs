@@ -229,6 +229,8 @@ defmodule JidoTest.System.Peers do
   @moduledoc false
   import ExUnit.Assertions
 
+  @call_timeout 20_000
+
   def start!(cookie, on_exit) do
     {:ok, peer, peer_node} =
       :peer.start(%{
@@ -249,9 +251,9 @@ defmodule JidoTest.System.Peers do
       })
 
     on_exit.(fn -> if Process.alive?(peer), do: stop(peer) end)
-    :ok = :peer.call(peer, :code, :add_paths, [:code.get_path()])
-    {:ok, _} = :peer.call(peer, Application, :ensure_all_started, [:jido])
-    :peer.call(peer, Code, :require_file, [__ENV__.file])
+    :ok = :peer.call(peer, :code, :add_paths, [:code.get_path()], @call_timeout)
+    {:ok, _} = :peer.call(peer, Application, :ensure_all_started, [:jido], @call_timeout)
+    :peer.call(peer, Code, :require_file, [__ENV__.file], @call_timeout)
     {peer, peer_node}
   end
 

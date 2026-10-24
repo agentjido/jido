@@ -31,7 +31,7 @@ defmodule JidoCoreBench.CodecCases do
   defp check(:ok, shape) when shape in [:scalar, :nested], do: :ok
 
   defp check({:error, %Jido.Authoring.Document.Error{reason: reason}}, shape) do
-    expected = if shape == :deep, do: :depth, else: :collection
+    expected = %{deep: :depth, improper: :list}[shape] || :collection
     F.equal!(reason, expected)
   end
 end

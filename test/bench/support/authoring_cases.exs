@@ -82,7 +82,7 @@ defmodule JidoCoreBench.AuthoringCases do
         end,
         fn result ->
           value = if shape == :nested, do: %{index: size}, else: size
-          expected = if operation == :resolve, do: value, else: "data/#{size}"
+          expected = if operation == :resolve, do: value, else: {"data/#{size}", 1}
           F.equal!(result, {:ok, expected})
         end
       )
