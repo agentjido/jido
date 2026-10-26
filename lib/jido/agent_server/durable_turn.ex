@@ -19,6 +19,7 @@ defmodule Jido.AgentServer.DurableTurn do
            context:
              Map.drop(prepared.context, [
                :agent_id,
+               :agent_module,
                :agent_signal_source,
                :agent_state,
                :agent_topology,

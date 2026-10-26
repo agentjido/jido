@@ -2099,7 +2099,14 @@ defmodule Jido.AgentServer do
     span =
       Semantic.start(
         [:jido, :agent_server, :turn],
-        Map.merge(trace, %{agent_id: agent.id, turn_id: turn_id, signal_id: signal.id})
+        Map.merge(trace, %{
+          agent_id: agent.id,
+          agent_module: agent.module,
+          agent_name: agent.name,
+          signal_type: signal.type,
+          turn_id: turn_id,
+          signal_id: signal.id
+        })
       )
 
     TraceContext.put(span.trace)

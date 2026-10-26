@@ -171,6 +171,7 @@ defmodule Jido.Agent.Runner do
     context =
       Map.merge(caller_context, %{
         agent_id: agent.id,
+        agent_module: agent.module,
         agent_signal_source: agent.signal_source,
         agent_state: agent.state,
         agent_topology: agent.topology,

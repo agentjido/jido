@@ -118,6 +118,7 @@ defmodule Jido.Agent.Command do
       Enum.filter(
         [
           :agent_id,
+          :agent_module,
           :agent_signal_source,
           :agent_state,
           :agent_topology,

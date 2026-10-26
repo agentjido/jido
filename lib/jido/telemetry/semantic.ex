@@ -201,6 +201,9 @@ defmodule Jido.Telemetry.Semantic do
   defp normalize_field({:agent_partition, value}, acc),
     do: put_bounded_string(acc, :agent_partition, value, 128)
 
+  defp normalize_field({:agent_name, value}, acc),
+    do: put_bounded_string(acc, :agent_name, value, 256)
+
   defp normalize_field({key, value}, acc)
        when key in @module_keys and is_atom(value) and not is_nil(value),
        do: Map.put(acc, key, value)
