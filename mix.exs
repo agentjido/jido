@@ -373,10 +373,10 @@ defmodule Jido.MixProject do
   defp deps do
     [
       # Jido Ecosystem
-      # Use the tested release/v3 Action contract until its next Hex release.
+      # Keep the reviewed Invoke and Handoff contract fixed until its Hex release.
       {:jido_action,
        github: "agentjido/jido_action",
-       ref: "ae7266893c9eb47b10a4c2f711bdc517abf269ac",
+       ref: "b7604eaab7dbf78b27aa8c7fec8091b9d0ca2aa9",
        override: true},
       {:jido_signal, "~> 3.0.0-beta.5"},
       # AgentServer owns native Runic Runners and Worker cleanup.

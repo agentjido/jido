@@ -15,7 +15,7 @@ claims remain limited. See [jido_action #305](https://github.com/agentjido/jido_
 - Wait twice in Iterate; a delayed reply for occurrence one must not satisfy two.
 - Keep separate identities for Map items, including equal input values.
 - Restore a nested Flow wait without repeating completed parent or sibling work.
-- Restore a wait in a Dispatch-selected Flow.
+- Restore a wait in an Invoke-selected Flow.
 - Cancel the parent Turn and remove descendant waits and timers.
 - Preserve saved partial results; test parallel recovery separately from serial cases.
 - Reject unsupported compositions before any external work starts.

@@ -3,7 +3,7 @@ defmodule JidoTest.AgentFixtures do
 
   alias Jido.Flow
   alias Jido.Flow.Ref
-  alias __MODULE__.{Add, DispatchDecision, DispatchExpander}
+  alias __MODULE__.{Add, InvokeDecision, InvokeExpander}
 
   def two_step_flow do
     Flow.new!(%{
@@ -33,13 +33,13 @@ defmodule JidoTest.AgentFixtures do
     })
   end
 
-  def dispatch_flow do
-    dispatch =
+  def invoke_flow do
+    invoke =
       %{
-        kind: :dispatch,
-        name: "dispatch",
-        decision: DispatchDecision,
-        expander: DispatchExpander,
+        kind: :invoke,
+        name: "invoke",
+        decision: InvokeDecision,
+        expander: InvokeExpander,
         params: %{
           by: Ref.input(:by),
           label: Ref.input(:label)
@@ -47,9 +47,9 @@ defmodule JidoTest.AgentFixtures do
       }
 
     Flow.new!(%{
-      name: "agent_server_dispatch_flow",
-      components: [dispatch],
-      output: Ref.result("dispatch")
+      name: "agent_server_invoke_flow",
+      components: [invoke],
+      output: Ref.result("invoke")
     })
   end
 end
@@ -151,21 +151,21 @@ defmodule JidoTest.AgentFixtures.ObserveExecutionBoundary do
   end
 end
 
-defmodule JidoTest.AgentFixtures.DispatchDecision do
+defmodule JidoTest.AgentFixtures.InvokeDecision do
   @moduledoc false
 
   use Jido.Action,
-    name: "agent_server_dispatch_decision"
+    name: "agent_server_invoke_decision"
 
   @impl Jido.Action
   def run(params, _context), do: {:ok, params}
 end
 
-defmodule JidoTest.AgentFixtures.DispatchExpander do
+defmodule JidoTest.AgentFixtures.InvokeExpander do
   @moduledoc false
 
   use Jido.Action,
-    name: "agent_server_dispatch_expander"
+    name: "agent_server_invoke_expander"
 
   alias JidoTest.AgentFixtures.Add
 

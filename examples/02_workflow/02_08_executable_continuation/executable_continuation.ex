@@ -1,5 +1,5 @@
 defmodule Jido.Examples.ExecutableContinuation do
-  @moduledoc "One Turn owns Dispatch selection and bounded Flow execution."
+  @moduledoc "One Turn owns Invoke selection and bounded Flow execution."
   use Jido.Agent, name: "workflow_continuation_agent"
 
   state do
@@ -100,7 +100,7 @@ defmodule Jido.Examples.ExecutableContinuation.Decision do
 end
 
 defmodule Jido.Examples.ExecutableContinuation.Pipeline do
-  @moduledoc "Terminal Dispatch selects an Action or bounded Flow in the same Exec call."
+  @moduledoc "Invoke selects an Action or bounded Flow in the same Exec call."
   use Jido.Flow,
     name: "workflow_continuation",
     schema:
@@ -108,10 +108,11 @@ defmodule Jido.Examples.ExecutableContinuation.Pipeline do
     output_schema: Zoi.object(%{value: Zoi.integer() |> Zoi.min(0), request: Zoi.string()})
 
   flow do
-    dispatch "next",
+    invoke("next",
       decision: Jido.Examples.ExecutableContinuation.Decision,
       expander: Jido.Examples.ExecutableContinuation.Expand,
       params: input()
+    )
 
     output result("next")
   end

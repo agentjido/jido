@@ -81,13 +81,13 @@ Plugin declarations that `jido.agent` produces.
 ### jido.agent_evaluation.I9 — Atomic pure result
 
 - **scope:** `Jido.Agent.cmd/3`, `Jido.Agent.Runner`
-- **must:** Apply executable state and accepted definition changes to one candidate and return the validated Directive batch without dispatch. Reject a batch that changes a Plugin declaration and runs a Directive owned by that Plugin. A later validation failure does not change the source or undo work that the executable already performed.
+- **must:** Apply executable state and accepted definition changes to one candidate and return the validated Directive batch without dispatch. Return a terminal Flow Handoff as the validated candidate, successor Instruction, and Directive batch without running the successor. Reject a batch that changes a Plugin declaration and runs a Directive owned by that Plugin. A later validation failure does not change the source or undo work that the executable already performed.
 - **kind:** functional
 - **status:** active
 
-### jido.agent_evaluation.I10 — Closed AgentServer handoff
+### jido.agent_evaluation.I10 — Closed AgentServer evaluation
 
 - **scope:** `Jido.Agent.Runner.prepare_for_server/4`, `Jido.Agent.Runner.finish_for_server/2`
-- **must:** Prepare and finish the same pure evaluation for an accepted AgentServer Command. Return route, input, composition, and candidate validation failures with their closed stage and do not run live process behavior.
+- **must:** Prepare and finish the same pure evaluation for an accepted AgentServer Command. Prepare a Handoff successor from its exact Instruction with empty input, the unchanged source Signal, and explicit output-state projection. Return route, input, composition, and candidate validation failures with their closed stage and do not run live process behavior.
 - **kind:** functional
 - **status:** active

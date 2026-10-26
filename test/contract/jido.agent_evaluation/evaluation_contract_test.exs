@@ -9,6 +9,28 @@ defmodule JidoTest.Contract.AgentEvaluationTest do
     use Jido.Agent, name: "evaluation_forward_child"
   end
 
+  defmodule HandoffTarget do
+    use Jido.Action,
+      name: "evaluation_handoff_target",
+      schema: Zoi.object(%{count: Zoi.integer()})
+
+    def run(_input, _context), do: raise("Agent.cmd/3 must not run a Handoff successor")
+  end
+
+  defmodule HandoffSelector do
+    use Jido.Action, name: "evaluation_handoff_selector"
+    def run(%{count: count}, _context), do: {:handoff, %{count: count + 1}, HandoffTarget}
+  end
+
+  defmodule HandoffFlow do
+    use Jido.Flow, name: "evaluation_handoff_flow"
+
+    flow do
+      handoff("next", selector: HandoffSelector, params: %{count: input(:count)})
+      output result("next")
+    end
+  end
+
   defp route(path, target, opts \\ []),
     do:
       Map.merge(
@@ -444,6 +466,24 @@ defmodule JidoTest.Contract.AgentEvaluationTest do
              Agent.cmd(child, signal)
   end
 
+  @tag obligation: "jido.agent_evaluation.I9"
+  test "Agent.cmd returns a terminal Handoff without running its successor" do
+    source =
+      F.instance(
+        routes: [
+          %{
+            path: "test.run",
+            handler: %{kind: :flow, target: HandoffFlow},
+            state: %{source: :output, path: []}
+          }
+        ]
+      )
+
+    assert {:handoff, ^source,
+            %Jido.Instruction{target: HandoffTarget, kind: :action, params: %{count: 5}}, []} =
+             Agent.cmd(source, F.signal(%{count: 4}))
+  end
+
   @tag obligation: ["jido.agent_evaluation.I1", "jido.agent_evaluation.I2"]
   test "Turn validation normalizes input and rejects source substitution" do
     source = F.signal()
@@ -459,7 +499,7 @@ defmodule JidoTest.Contract.AgentEvaluationTest do
   end
 
   @tag obligation: "jido.agent_evaluation.I10"
-  test "the AgentServer handoff keeps evaluation stages closed" do
+  test "the AgentServer evaluation boundary keeps stages closed" do
     source = F.signal()
     agent = F.instance()
     {:ok, specs} = Jido.Plugin.Normalizer.normalize_all(Agent.runtime_plugins(agent))
@@ -499,6 +539,43 @@ defmodule JidoTest.Contract.AgentEvaluationTest do
 
     assert {:error, :route, %Agent.Error{code: :unmatched_input}} =
              Runner.prepare_for_server(command, unrouted, [], specs)
+  end
+
+  @tag obligation: ["jido.agent_evaluation.I9", "jido.agent_evaluation.I10"]
+  test "the AgentServer Handoff boundary keeps the successor Turn and candidate complete" do
+    agent = F.instance()
+    signal = F.signal(%{count: 1})
+    {:ok, command} = Command.new(agent, signal, %{caller: :retained})
+    {:ok, specs} = Jido.Plugin.Normalizer.normalize_all(Agent.runtime_plugins(agent))
+    instruction = Jido.Instruction.new!(target: HandoffTarget, params: %{count: 2})
+
+    assert {:ok,
+            %Runner.Prepared{
+              agent: ^agent,
+              signal: ^signal,
+              turn: %Turn{
+                executable: ^instruction,
+                input: %{},
+                route: %{state: %{source: :output, path: []}, reply: nil},
+                source_signal: ^signal
+              },
+              context: %{caller: :retained, signal: ^signal},
+              exec_opts: [timeout: 10]
+            } = prepared} =
+             Runner.prepare_handoff_for_server(
+               command,
+               signal,
+               instruction,
+               [timeout: 10],
+               specs
+             )
+
+    change = Directive.route_add("next", F.Return)
+
+    assert {:handoff, candidate, ^instruction, [^change]} =
+             Runner.finish_for_server(prepared, {:handoff, instruction, [change]})
+
+    assert Enum.map(candidate.routes, & &1.path) == ["test.run", "next"]
   end
 
   @tag obligation: ["jido.agent_evaluation.I6", "jido.agent_evaluation.I8"]

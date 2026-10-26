@@ -76,17 +76,20 @@ time. Issue text and old sketches are not authoritative API definitions.
       PIDs, references, timer handles, runtime callbacks, or credentials.
 - [ ] Cancellation and stale event/wake behavior.
 - [ ] Retry attempt budget and next retry deadline across recovery.
-- [ ] Explicit handoff result for a new Turn, if included. Ordinary Dispatch
-      must keep its current same-execution meaning.
-- [ ] Supported combinations of waits with Map, Iterate, nested Flow, and Dispatch.
+- [x] Explicit Handoff result and durable AgentServer successor chain. Invoke
+      keeps its same-execution meaning.
+- [ ] Supported combinations of waits with Map, Iterate, nested Flow, and Invoke.
 
 Confirmed upstream limits: normal `Jido.Exec.run/4` and `start/6` return
 `details.reason: :unsupported_host` and `capability: :waits`. Timer, event,
-selection, nested Flow, and Dispatch recovery have test-driver evidence.
+selection, nested Flow, and Invoke recovery have test-driver evidence.
 Map and Iterate do not accept waiting Flow bodies. The production transition API does not include Signal transport. AgentServer
 provides addressed input and releases stopped Workers. Saved input and resolution
-counts are bounded; there is no graph-history compaction or byte limit. Terminal handoff is a public `{:handoff, instruction, effects}` result;
-AgentServer still needs atomic successor acceptance and queue-order tests.
+counts are bounded; there is no graph-history compaction or byte limit. Terminal
+Handoff is a public `{:handoff, instruction, effects}` execution result.
+AgentServer saves successor acceptance with the predecessor commit, runs
+predecessor effects, saves release, and starts the successor from the mailbox
+tail. Contract tests cover recovery, cancellation, and queue order.
 The open checklist items require production contracts and consumer evidence.
 
 Do not infer that all issues ship together. Implement only the examples whose

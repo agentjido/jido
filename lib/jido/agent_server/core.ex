@@ -266,7 +266,7 @@ defmodule Jido.AgentServer.Core do
   def next_error_count(_status, count), do: count
 
   def outcome(active, state_version, status, stage, committed, count) do
-    %{
+    outcome = %{
       turn_id: active.turn_id,
       signal_id: active.signal_id,
       status: status,
@@ -285,6 +285,18 @@ defmodule Jido.AgentServer.Core do
           0
         )
     }
+
+    handoff_chain? =
+      case active do
+        %{chain_order: order} when order > 0 -> true
+        _ -> match?({:handoff, _, %Jido.Instruction{}, _}, Map.get(active, :result))
+      end
+
+    if handoff_chain? do
+      Map.merge(outcome, %{chain_id: active.chain_id, chain_order: active.chain_order})
+    else
+      outcome
+    end
   end
 
   def retain_history(history, _outcome, false, _limit), do: history

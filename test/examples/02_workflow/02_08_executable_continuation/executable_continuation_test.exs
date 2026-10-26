@@ -3,7 +3,7 @@ defmodule JidoTest.Examples.Workflow.ExecutableContinuationTest do
 
   alias Jido.Examples.ExecutableContinuation, as: Example
 
-  test "Dispatch selects a Flow that shares context and commits one terminal result", %{
+  test "Invoke selects a Flow that shares context and commits one terminal result", %{
     jido: jido
   } do
     server = start_agent!(jido, Example)

@@ -95,6 +95,11 @@ candidate.state.count
 `cmd/2` returns a candidate Agent and a list of Directives. `agent` is
 unchanged. No process starts and nothing is saved.
 
+A Flow can end with Handoff. In that case, `cmd/2` returns
+`{:handoff, candidate, instruction, directives}`. It validates the candidate,
+instruction, and Directive batch. It does not run the successor. A live
+AgentServer runs the successor as a new Turn.
+
 Run the same value as a live process:
 
 ```elixir

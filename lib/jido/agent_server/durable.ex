@@ -30,6 +30,7 @@ defmodule Jido.AgentServer.Durable do
          {:ok, config} <- Jido.Persistence.resolve_config(data.persistence, data.jido),
          {:ok, agent, revision, turn} <- load(config, data.agent, mode, options(data)),
          {:ok, agent} <- Jido.Agent.Validation.validate_instance(agent),
+         {:ok, revision, turn} <- settle_unreleased_handoff(data, config, agent, revision, turn),
          :ok <- DurableTurn.validate_restore(agent, turn) do
       {:ok, agent, revision, config, turn}
     end
@@ -93,6 +94,20 @@ defmodule Jido.AgentServer.Durable do
 
   defp load(config, agent, :restore, opts),
     do: Jido.Persistence.load_agent_with_server_turn(config, agent.module, agent.id, opts)
+
+  # An accepted Handoff proves that the predecessor commit is durable. It does
+  # not prove that predecessor effects finished. Recovery must not replay those
+  # effects or start the successor across that uncertain boundary.
+  defp settle_unreleased_handoff(data, config, agent, revision, %{status: :accepted} = turn) do
+    failed = %{turn | status: :failed}
+    runtime = %{data | persistence: config}
+
+    with :ok <- save(runtime, agent, revision + 1, revision, failed),
+         do: {:ok, revision + 1, failed}
+  end
+
+  defp settle_unreleased_handoff(_data, _config, _agent, revision, turn),
+    do: {:ok, revision, turn}
 
   defp options(data), do: [instance: data.jido, partition: data.partition]
   defp enabled?(source), do: source not in [nil, false]

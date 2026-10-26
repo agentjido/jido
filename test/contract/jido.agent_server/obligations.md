@@ -53,7 +53,7 @@ instance options and direct function options are its authoring surface.
 ### jido.agent_server.I5 — Responsive committed reads
 
 - **scope:** `Jido.AgentServer.agent/1`, `Jido.AgentServer.status/1`
-- **must:** Return committed state and a bounded status while a turn or cleanup is active. Report Agent identity, active turn and Signal IDs, starting revision, stage, and queue counts. Separate reads are not atomic.
+- **must:** Return committed state and a bounded status while a turn or cleanup is active. Report Agent identity, active turn and Signal IDs, starting revision, stage, and queue counts. Report handoff_pending while a released successor owns the next Turn. Separate reads are not atomic.
 - **why:** Inspection must remain available without exposing input or internal request handles.
 - **kind:** functional
 - **status:** active
@@ -157,7 +157,7 @@ instance options and direct function options are its authoring surface.
 ### jido.agent_server.I18 — Cancellation
 
 - **scope:** `Jido.AgentServer.cancel/2`
-- **must:** Stop active owned work, preserve committed state and revision, and return ok only after cleanup. The turn receives cancelled. Idle cancellation and cancellation after commit during effects or after terminal cleanup during failure policy return not_running. Repeated cancellation shares cleanup; the first abort reason wins.
+- **must:** Stop active owned work, preserve committed state and revision, and return ok only after cleanup. The turn receives cancelled. Idle cancellation and cancellation after commit during effects or after terminal cleanup during failure policy return not_running. A Handoff chain is the narrow exception: after its predecessor commits, cancellation owns the chain until the successor settles and must prevent a not-yet-started successor. Repeated cancellation shares cleanup; the first abort reason wins.
 - **why:** Cancellation must have a confirmed ownership boundary.
 - **kind:** functional
 - **status:** active

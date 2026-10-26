@@ -144,13 +144,14 @@ active-Flow migration, parallel waits, and exactly-once external effects are def
 
 - [#302](https://github.com/agentjido/jido_action/issues/302): timer, await,
   selection, repeated wait identity, and execution-host capabilities.
-- [#303](https://github.com/agentjido/jido_action/issues/303): explicit Dispatch
-  handoff into a new Turn with a fresh graph; ordinary Dispatch keeps its meaning.
+- [#303](https://github.com/agentjido/jido_action/issues/303): explicit Handoff
+  into a new Turn with a fresh graph; Invoke keeps its same-execution meaning.
 - [#304](https://github.com/agentjido/jido_action/issues/304): audit saved retry
   budgets and backoff before adding new retry APIs.
 - [#305](https://github.com/agentjido/jido_action/issues/305): recovery evidence
-  for repeated, nested, Map, and Dispatch-selected waits.
+  for repeated, nested, Map, and Invoke-selected waits.
 
-These are proposals, not implemented features. Core examples 11_15–11_19 record
-rollover, retry recovery, stable Turn receipts, composed recovery, and failed
-work recovery. Keep core implementation on hold until contract review.
+These files include implemented boundaries and remaining proposals. The core
+Handoff chain in 11_15 is implemented. Retry recovery, stable Turn receipt
+lookup, composed recovery, and failed-work recovery remain proposals until
+their contracts have executable evidence.

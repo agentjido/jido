@@ -37,7 +37,9 @@ defmodule Jido.Agent.Runner do
 
   @doc false
   @spec run(Agent.instance(), Signal.t(), keyword()) ::
-          {:ok, Agent.instance(), [struct()]} | {:error, term()}
+          {:ok, Agent.instance(), [struct()]}
+          | {:handoff, Agent.instance(), Jido.Instruction.t(), [struct()]}
+          | {:error, term()}
   def run(%Agent{} = agent, %Signal{} = signal, opts) do
     with {:ok, prepared} <- prepare(agent, signal, opts),
          result <-
@@ -86,8 +88,49 @@ defmodule Jido.Agent.Runner do
   end
 
   @doc false
+  @spec prepare_handoff_for_server(
+          Command.t(),
+          Signal.t(),
+          Jido.Instruction.t(),
+          keyword(),
+          [Jido.Plugin.Spec.t()]
+        ) :: {:ok, Prepared.t()} | {:error, stage(), term()}
+  def prepare_handoff_for_server(
+        %Command{} = command,
+        %Signal{} = source_signal,
+        %Jido.Instruction{} = instruction,
+        exec_opts,
+        plugin_specs
+      ) do
+    turn = %Turn{
+      executable: instruction,
+      route: %{state: %{source: :output, path: []}, reply: nil},
+      source_signal: source_signal
+    }
+
+    with :ok <- at(:input, Command.validate_caller_context(command.context)),
+         {:ok, turn} <- at(:route, Turn.validate_selected(turn)),
+         {:ok, schema} <-
+           at(:input, Plugin.compose_schema_from_specs(command.agent.schema, plugin_specs)) do
+      {:ok,
+       prepared(
+         command.agent,
+         schema,
+         command.signal,
+         turn,
+         command.context,
+         exec_opts,
+         command.plugin_inputs,
+         Plugin.specs(plugin_specs)
+       )}
+    end
+  end
+
+  @doc false
   @spec finish_for_server(Prepared.t(), term()) ::
-          {:ok, Agent.instance(), [struct()]} | {:error, stage(), term()}
+          {:ok, Agent.instance(), [struct()]}
+          | {:handoff, Agent.instance(), Jido.Instruction.t(), [struct()]}
+          | {:error, stage(), term()}
   def finish_for_server(%Prepared{} = prepared, result), do: do_finish(prepared, result)
 
   defp prepare_direct(agent, signal, opts) do
@@ -149,6 +192,33 @@ defmodule Jido.Agent.Runner do
     prepared
     |> do_finish(result)
     |> unstage()
+  end
+
+  defp do_finish(
+         %Prepared{} = prepared,
+         {:handoff, %Jido.Instruction{} = instruction, directives}
+       ) do
+    with {:ok, directives} <-
+           at(:compose, Jido.Agent.Contract.directives(prepared.agent, directives)),
+         {:ok, state, directives} <-
+           at(
+             :compose,
+             PluginPipeline.run(
+               {:ok, prepared.agent.state, directives},
+               prepared.agent,
+               prepared.turn.source_signal,
+               prepared.context.plugin_inputs,
+               prepared.plugin_specs
+             )
+           ),
+         result =
+           if(Enum.any?(directives, &Mutation.mutation?/1),
+             do: Composition.apply(prepared.agent, state, directives),
+             else: Agent.transition_validated(prepared.agent, state, prepared.schema)
+           ),
+         {:ok, agent} <- at(:validate, result) do
+      {:handoff, agent, instruction, directives}
+    end
   end
 
   defp do_finish(%Prepared{} = prepared, result) do

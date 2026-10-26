@@ -7,6 +7,67 @@ defmodule JidoTest.AgentServer.LifecycleTest do
   alias Jido.AgentServer, as: Server
   alias JidoTest.AgentServer.Fixtures, as: F
 
+  defmodule HandoffEffect do
+    use Jido.Agent.Directive
+    defstruct [:observer]
+  end
+
+  defmodule HandoffPlugin do
+    use Jido.Plugin
+    def directives(_opts), do: [HandoffEffect]
+
+    def dispatch(_runtime, %HandoffEffect{observer: observer}, _context, _opts) do
+      send(observer, {:handoff_effect, self()})
+      receive do: (:release -> :ok)
+    end
+  end
+
+  defmodule HandoffBefore do
+    use Jido.Action, name: "lifecycle_handoff_before"
+
+    def run(%{count: count}, context),
+      do: {:ok, %{count: count}, [%HandoffEffect{observer: context.observer}]}
+  end
+
+  defmodule HandoffTarget do
+    use Jido.Action,
+      name: "lifecycle_handoff_target",
+      schema: Zoi.object(%{count: Zoi.integer()})
+
+    def run(%{count: count}, _context), do: {:ok, %{count: count + 1}}
+  end
+
+  defmodule HandoffSelector do
+    use Jido.Action, name: "lifecycle_handoff_selector"
+    def run(input, _context), do: {:handoff, input, HandoffTarget}
+  end
+
+  defmodule HandoffFlow do
+    use Jido.Flow, name: "lifecycle_handoff_flow"
+
+    flow do
+      step "before", action: HandoffBefore, params: %{count: input(:count)}
+      handoff("next", selector: HandoffSelector, params: result("before"))
+      output result("next")
+    end
+  end
+
+  defmodule HandoffAgent do
+    use Jido.Agent, name: "lifecycle_handoff_agent"
+
+    state do
+      schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+    end
+
+    plugins do
+      plugin HandoffPlugin
+    end
+
+    routes do
+      route "handoff", HandoffFlow
+    end
+  end
+
   setup do
     F.setup_runtime()
   end
@@ -81,6 +142,22 @@ defmodule JidoTest.AgentServer.LifecycleTest do
       assert {:ok, %{state: %{count: 1}}, []} = Server.call(server, F.signal())
       Server.stop(server)
     end
+  end
+
+  @tag obligation: "jido.agent_server.I18"
+  test "cancellation owns a Handoff chain after predecessor commit", c do
+    {:ok, server} = Jido.start_agent(c.jido, HandoffAgent, id: unique_id("handoff-cancel"))
+    assert :ok = Server.await_ready(server)
+
+    request = Jido.Signal.new!("handoff", %{count: 2}, source: "/test")
+    pending = Server.submit(server, request, context: %{observer: self()})
+    assert_receive {:handoff_effect, effect}, 1_000
+    effect_monitor = Process.monitor(effect)
+
+    assert :ok = Server.cancel(server)
+    assert {:error, :cancelled} = Server.await(pending)
+    assert_receive {:DOWN, ^effect_monitor, :process, ^effect, _reason}, 1_000
+    assert Process.alive?(server)
   end
 
   @tag obligation: ["jido.agent_server.I18", "jido.agent_server.I19", "jido.agent_server.I24"]

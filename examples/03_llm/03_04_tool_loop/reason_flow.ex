@@ -129,14 +129,14 @@ defmodule Jido.Examples.ReActAgent.CommitAnswer do
 end
 
 defmodule Jido.Examples.ReActAgent.ReasonFlow do
-  @moduledoc "Dispatch selects an answer Action or the next bounded tool round."
+  @moduledoc "Invoke selects an answer Action or the next bounded tool round."
 
   use Jido.Flow,
     name: "examples_llm_react_reason_flow",
     schema: Jido.Examples.ReActAgent.Contracts.turn_input()
 
   flow do
-    dispatch "reason",
+    invoke("reason",
       decision: Jido.Examples.ReActAgent.CallModel,
       expander: Jido.Examples.ReActAgent.RouteModelDecision,
       params: %{
@@ -146,6 +146,7 @@ defmodule Jido.Examples.ReActAgent.ReasonFlow do
         max_steps: input(:max_steps),
         steps_remaining: input(:steps_remaining)
       }
+    )
 
     output result("reason")
   end

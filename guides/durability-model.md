@@ -29,12 +29,12 @@ Agent from that record.
 | The committed Agent: domain state, Plugin-owned state, definition, topology | Caller handles: `call/3` waits, `submit/3` Pending values |
 | The revision of that record | Queued Signals that have not started |
 | A tombstone after `delete_agent` | Caller `context:` of ordinary Turns |
-| An accepted Flow Turn: its graph, open waits, and timer deadlines | Post-commit hooks and Directive effects |
+| An accepted Flow Turn: its graph, open waits, timer deadlines, and released Handoff successor | Post-commit hooks and Directive effects |
 | The terminal receipt of a Flow Turn | Plugin runtime processes and their memory |
 | | Owners, admission state, and idle timers |
 
 Durable data is committed data. Work in progress is durable only for routed
-Flows.
+Flows and for a successor that a durable Flow releases through Handoff.
 
 ## Turning It On
 
@@ -80,7 +80,8 @@ One record per Agent, keyed by the exact Ref `{namespace, partition, id}`:
   they were at commit. Restore does not rebuild them from the current module.
 - **Revision.** A non-negative integer equal to the Server's `state_version`.
 - **Flow receipt.** For a durable Flow Turn, its Turn ID, status, and portable
-  context.
+  context. A Handoff receipt also holds the successor instruction and chain
+  identity.
 
 Every value must be portable data: maps, lists, strings, numbers, booleans,
 `nil`, and atoms the codec accepts. PIDs, references, and functions are
@@ -102,6 +103,9 @@ atomic snapshot of the whole family.
 | A Flow step completes | A graph checkpoint, before the next step starts | unchanged |
 | A Flow Turn completes | The candidate and the terminal receipt in one write | +1 |
 | A Flow Turn fails or is cancelled | A terminal receipt with unchanged state | +1 |
+| A Flow returns Handoff | The predecessor candidate and accepted successor intent in one write | +1 |
+| Predecessor effects finish | The released successor intent with unchanged Agent state | +1 |
+| A Handoff successor completes, fails, or is cancelled | The successor terminal receipt | +1 |
 | `hibernate/2` | The current Agent at its current revision | unchanged |
 | `delete_agent/3` | A tombstone | barrier kept |
 
@@ -145,11 +149,37 @@ full cycle.
 Direct Action routes keep the ordinary contract: one write at commit, no
 acceptance record, no step checkpoints.
 
+### Durable Handoff
+
+A terminal Flow Handoff closes one Turn and gives its instruction to a new
+Turn. The chain keeps one `chain_id`. Each successor gets a new Turn ID, an
+increased `chain_order`, and a new `turn_timeout:` budget.
+
+The Server saves the predecessor candidate and the accepted successor intent
+in one revision. It then runs the predecessor Plugin commit hooks and
+Directives. Only after they finish does it prepare and admit the successor.
+The Server saves the intent as `:released`, enters `:handoff_pending`, and
+starts the successor from the mailbox tail. New Turns stay behind it.
+
+Recovery does not repeat predecessor effects. An `:accepted` intent becomes a
+failed terminal receipt because the effect result is not known. A `:released`
+intent starts the same successor Turn again. An Action successor starts again
+from its beginning. A Flow successor uses its durable checkpoints after its
+own acceptance.
+
+`status/2` reports the current Handoff receipt in `durable_turn`. It includes
+`id`, `status`, `chain_id`, and `chain_order`. Before successor start, the
+public phase is `:handoff_pending`. Cancellation by `:active`, predecessor
+Turn ID, or successor Turn ID closes the chain and saves a terminal receipt.
+When debug history is enabled, each Handoff chain entry also includes its
+`chain_id` and `chain_order`. Ordinary Turn history keeps its existing shape.
+
 ## What Jido Never Replays
 
-- **Post-commit work.** Plugin `after_commit/3` hooks and Directives run once,
-  after the reply. If the activation dies mid-batch, recovery does not run them
-  again.
+- **Post-commit work.** Plugin `after_commit/3` hooks and Directives run once.
+  Ordinary Turns reply before this work. A Handoff runs predecessor work before
+  the successor and before the final reply. If the activation dies mid-batch,
+  recovery does not run the batch again.
 - **Caller replies.** A Pending handle or `call/3` wait dies with the Server.
   The caller gets an exit or `{:error, ...}`, even when the Turn committed.
 - **Duplicate Signals.** A repeated Signal is a new Turn. Jido does not

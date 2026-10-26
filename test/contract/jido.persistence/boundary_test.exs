@@ -38,6 +38,11 @@ defmodule Jido.Persistence.BoundaryTest do
     def restore(%{id: id}, _context), do: instantiate(id: id)
   end
 
+  defmodule ReceiptAction do
+    use Jido.Action, name: "persistence_receipt_action"
+    def run(input, _context), do: {:ok, input}
+  end
+
   defmodule ContextAgent do
     use Jido.Agent, name: "persistence_context_boundary"
 
@@ -210,6 +215,82 @@ defmodule Jido.Persistence.BoundaryTest do
     ]
 
     for candidate <- invalid do
+      assert {:error, {:invalid_persistence_record, :server_turn}} =
+               Record.build_active(c.agent, ref, 0, checkpoint, candidate)
+    end
+
+    instruction = Jido.Instruction.new!(target: ReceiptAction, params: %{})
+
+    accepted = %{
+      id: "successor-1",
+      status: :accepted,
+      signal: signal,
+      context: %{},
+      fingerprint: "fingerprint",
+      instruction: instruction,
+      chain_id: "chain-1",
+      chain_order: 1,
+      predecessor_id: "turn-1"
+    }
+
+    accepted_candidates =
+      Enum.map([:accepted, :failed, :cancelled], &%{accepted | status: &1}) ++
+        [
+          %{accepted | id: "x"},
+          %{accepted | chain_id: "x"},
+          %{accepted | predecessor_id: "x"}
+        ]
+
+    for candidate <- accepted_candidates do
+      assert {:ok, record} = Record.build_active(c.agent, ref, 0, checkpoint, candidate)
+      assert record.server_turn === candidate
+    end
+
+    released =
+      accepted
+      |> Map.merge(%{
+        status: :released,
+        admitted_signal: signal,
+        plugin_inputs: %{},
+        expires_at: :infinity
+      })
+
+    released_candidates =
+      Enum.map([:released, :completed, :failed, :cancelled], &%{released | status: &1}) ++
+        [
+          %{released | id: "x"},
+          %{released | chain_id: "x"},
+          %{released | predecessor_id: "x"}
+        ]
+
+    for candidate <- released_candidates do
+      assert {:ok, record} = Record.build_active(c.agent, ref, 0, checkpoint, candidate)
+      assert record.server_turn === candidate
+    end
+
+    for candidate <- [
+          %{accepted | id: ""},
+          %{accepted | id: 1},
+          %{accepted | status: :released},
+          accepted |> Map.delete(:signal) |> Map.put(:other, true),
+          %{accepted | instruction: %{}},
+          %{accepted | chain_id: ""},
+          %{accepted | chain_order: 0},
+          %{accepted | predecessor_id: ""},
+          Map.put(accepted, :extra, true),
+          %{released | id: ""},
+          %{released | id: 1},
+          %{released | status: :accepted},
+          released |> Map.delete(:signal) |> Map.put(:other, true),
+          %{released | admitted_signal: %{}},
+          %{released | plugin_inputs: []},
+          %{released | chain_id: ""},
+          %{released | chain_order: 0},
+          %{released | predecessor_id: ""},
+          Map.delete(released, :instruction),
+          released |> Map.delete(:instruction) |> Map.put(:other, true),
+          Map.put(released, :extra, true)
+        ] do
       assert {:error, {:invalid_persistence_record, :server_turn}} =
                Record.build_active(c.agent, ref, 0, checkpoint, candidate)
     end

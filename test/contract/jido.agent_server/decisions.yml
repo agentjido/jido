@@ -34,6 +34,12 @@
   driver: Mutating the shared coordinator repeats activation, effects, Plugin runtime, composition, durable state, and durable Flow behavior. Core now owns the request, admission, execution-policy, ownership, queue, terminal-summary, and failure-policy decisions that belong only to this component.
   approved_by: Component hardening pass
 
+- id: agent-server-handoff-mutation-exception
+  date: 2026-10-26
+  decision: Keep Jido.AgentServer.Core as the root mutation target, and target Jido.AgentServer itself in the focused jido.agent_server.handoff component.
+  driver: Handoff queue, reply, timeout, cancellation, and persistence ordering live in the shared coordinator and cannot be evaluated through the durable_turn module alone.
+  approved_by: Handoff hardening audit
+
 - id: agent-server-final-boundary
   date: 2026-10-20
   decision: Activate jido.agent_server as the final core component with 37 obligations and eight focused test files. Keep all moved behavior under its approved AgentServer subcomponent.

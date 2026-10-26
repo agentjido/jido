@@ -343,7 +343,8 @@ defmodule Jido.Agent do
   Returns one complete next Agent value and an ordered batch of validated
   Directives. It does not dispatch those Directives, save state, resume work,
   or deduplicate inputs. A failure returns no candidate and does not change the
-  source Agent.
+  source Agent. A terminal Flow Handoff returns `{:handoff, candidate,
+  instruction, directives}`. It validates but does not run the successor.
 
   This function runs pure Agent Plugin preparation. It does not run live Agent
   Server Plugin admission, runtime work, replay protection, or outbound Signal
@@ -351,7 +352,9 @@ defmodule Jido.Agent do
   Flow still runs its own application code and can cause its own side effects.
   """
   @spec cmd(instance(), Signal.t(), keyword()) ::
-          {:ok, instance(), [struct()]} | {:error, term()}
+          {:ok, instance(), [struct()]}
+          | {:handoff, instance(), Jido.Instruction.t(), [struct()]}
+          | {:error, term()}
   def cmd(agent, signal, opts \\ [])
 
   def cmd(%__MODULE__{} = agent, %Signal{} = signal, opts) when is_list(opts) do

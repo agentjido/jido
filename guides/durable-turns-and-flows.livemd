@@ -247,6 +247,32 @@ confirmed do not. Code inside an interrupted step can repeat its I/O, so make
 external calls idempotent. [Recovery Limits](recovery-and-effect-limits.md)
 covers patterns.
 
+### Handoff Chains
+
+A terminal `handoff` node returns one successor instruction. The Server
+commits the predecessor and the accepted successor intent together. It then
+runs predecessor Plugin commit hooks and Directives. After that work succeeds,
+the Server prepares and admits the successor, saves its receipt as
+`:released`, and starts it as a new Turn.
+
+The chain keeps one `chain_id`. Each successor has a new Turn ID, an increased
+`chain_order`, and a new `turn_timeout:` budget. During the mailbox boundary,
+`status/2` reports `phase: :handoff_pending`. New Turns stay behind the
+successor.
+
+Recovery starts only a `:released` successor. If recovery finds an
+`:accepted` successor, it saves it as failed. Jido cannot know whether the
+predecessor effects finished, and it does not repeat them. A released Action
+successor starts again from its beginning. A released Flow successor resumes
+through the normal durable Flow boundary.
+
+Cancellation can use the active Turn ID, the predecessor Turn ID, or the
+successor Turn ID. Before successor start, cancellation saves a terminal
+receipt and does not start the successor.
+
+With debug history enabled, each Handoff chain entry includes its `chain_id`
+and `chain_order`. Ordinary Turn history keeps its existing shape.
+
 ## Cancel a Turn
 
 ```elixir

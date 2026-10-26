@@ -94,6 +94,14 @@ The value is `:erlang.term_to_binary/1` of a map. Jido decodes it with
 | `checkpoint` | The Agent snapshot (active records only) |
 | `server_turn` | Optional Turn data written by the Server (active records only) |
 
+`server_turn` uses one exact receipt shape. A durable Flow receipt stores its
+Turn ID, Signals, portable context, Plugin input, definition fingerprint,
+status, and expiry. A Handoff receipt also stores the successor instruction,
+chain ID, chain order, and predecessor Turn ID. An accepted Handoff has no
+admitted Signal or Plugin input. A released Handoff adds those fields and the
+successor expiry. See [Durability Model](durability-model.md#durable-handoff)
+for release and recovery rules.
+
 Decoding the row from the example:
 
 ```elixir

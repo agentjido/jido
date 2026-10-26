@@ -52,9 +52,70 @@ defmodule Jido.AgentServer.DurableTurn do
          do: {:ok, prepared}
   end
 
+  def accept_handoff(data, %Jido.Instruction{} = instruction) do
+    receipt = %{
+      id: data.active.handoff_id,
+      signal: data.active.source_signal,
+      context: data.active.turn_context,
+      fingerprint: instruction_fingerprint(instruction),
+      status: :accepted,
+      instruction: instruction,
+      chain_id: data.active.chain_id,
+      chain_order: data.active.chain_order + 1,
+      predecessor_id: data.active.turn_id
+    }
+
+    if data.persistence in [nil, false] do
+      {:ok, receipt}
+    else
+      with :ok <- Jido.PortableTerm.validate(receipt, :server_turn), do: {:ok, receipt}
+    end
+  end
+
+  def release_handoff(data, receipt, prepared) do
+    released =
+      receipt
+      |> Map.put(:status, :released)
+      |> Map.put(:expires_at, expires_at(data.active))
+      |> Map.put(:admitted_signal, prepared.signal)
+      |> Map.put(:plugin_inputs, prepared.context.plugin_inputs)
+
+    if data.persistence in [nil, false] do
+      {:ok, released}
+    else
+      with :ok <- Jido.PortableTerm.validate(released, :server_turn), do: {:ok, released}
+    end
+  end
+
+  def restore_handoff(agent, receipt, context, specs) do
+    with {:ok, command} <-
+           Jido.Agent.Command.new_trusted_agent(agent, receipt.admitted_signal, context),
+         command = %{command | plugin_inputs: receipt.plugin_inputs},
+         {:ok, prepared} <-
+           Jido.Agent.Runner.prepare_handoff_for_server(
+             command,
+             receipt.signal,
+             receipt.instruction,
+             [],
+             specs
+           ),
+         true <- instruction_fingerprint(receipt.instruction) == receipt.fingerprint do
+      {:ok, prepared}
+    else
+      false -> {:error, :execution_definition_changed}
+      error -> error
+    end
+  end
+
   def validate_restore(agent, %{status: :running} = receipt) do
     with {:ok, specs} <- Jido.Plugin.Normalizer.normalize_all(Jido.Agent.runtime_plugins(agent)),
          {:ok, _} <- restore(agent, receipt, receipt.context, specs),
+         do: :ok
+  end
+
+  def validate_restore(agent, %{status: :released} = receipt) do
+    with {:ok, specs} <- Jido.Plugin.Normalizer.normalize_all(Jido.Agent.runtime_plugins(agent)),
+         {:ok, _} <- restore_handoff(agent, receipt, receipt.context, specs),
          do: :ok
   end
 
@@ -244,6 +305,24 @@ defmodule Jido.AgentServer.DurableTurn do
       Jido.Exec.Validation.input(instruction.target, instruction.params, %{
         phase: :flow_input
       })
+
+  defp expires_at(%{deadline: :infinity}), do: :infinity
+
+  defp expires_at(%{deadline: deadline}) do
+    System.system_time(:millisecond) +
+      max(0, deadline - System.monotonic_time(:millisecond))
+  end
+
+  defp instruction_fingerprint(%Jido.Instruction{kind: :flow, target: target}),
+    do: fingerprint(target)
+
+  defp instruction_fingerprint(%Jido.Instruction{kind: :action, target: target}) do
+    :sha256
+    |> :crypto.hash(
+      :erlang.term_to_binary({:action, target, target.module_info(:md5)}, [:deterministic])
+    )
+    |> Base.encode16(case: :lower)
+  end
 
   def fingerprint(target) do
     flow = if is_atom(target), do: target.flow(), else: target

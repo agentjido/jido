@@ -31,19 +31,18 @@ partial Turn.
 
 ## Server Phases
 
-`Jido.AgentServer` is a `:gen_statem`. `status/2` reports its current phase:
+`Jido.AgentServer` is a `:gen_statem`. `status/2` reports one public phase:
 
 | Phase | Meaning |
 | --- | --- |
-| `:initializing`, `:restoring` | Starting, or loading saved state. |
+| `:initializing` | Starting, or loading saved state. |
 | `:idle` | Ready for the next Signal. |
-| `:preparing` | Plugins prepare input. The Server selects a route. |
-| `:starting`, `:running` | The Action or Flow runs. |
+| `:running` | Preparing, starting, running, saving, effects, or policy work is active. |
 | `:waiting` | A durable Flow waits for external input. |
-| `:saving` | Writing the candidate to storage. |
-| `:effects` | Commit hooks and Directives run. |
-| `:policy` | The error policy runs after a failed Turn. |
-| `:hibernating` | Saving before a stop. |
+| `:handoff_pending` | The predecessor is complete and the released successor owns the next Turn. |
+
+During active work, `status.active.stage` reports the detailed internal state,
+such as `:preparing`, `:saving`, or `:effects`.
 
 While a Turn runs, the Server postpones new Turns. `max_postponed_signals:`
 caps that queue at 1,000 by default. Past the cap, the Server drops extra casts

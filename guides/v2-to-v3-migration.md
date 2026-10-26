@@ -20,7 +20,7 @@ These changes break the most V2 code. Fix them first.
 | `schema: [count: [type: :integer]]` in `use Jido.Agent` | `schema(Zoi.object(...))` inside a `state do` block |
 | `signal_routes: [{"type", Action}]` | `route "type", Action, do: state(:unchanged)` inside a `routes do` block |
 | `cmd(agent, Action)` or `cmd(agent, {Action, params})` | `cmd(agent, signal)`; only a `%Jido.Signal{}` is accepted |
-| `{agent, directives} = cmd(...)` | `{:ok, candidate, directives}` or `{:error, reason}` |
+| `{agent, directives} = cmd(...)` | `{:ok, candidate, directives}`, `{:handoff, candidate, instruction, directives}`, or `{:error, reason}` |
 | Action returns a partial state map | Action returns the complete next state |
 | `{:ok, agent} = AgentServer.call(server, signal)` | `{:ok, agent, directives} = AgentServer.call(server, signal)` |
 | `AgentServer.call("agent-id", signal)` | Pass a PID or a Ref; a string ID raises `FunctionClauseError` |
@@ -140,6 +140,11 @@ signal = MyApp.Counter.increment_signal!(%{amount: 2})
 
 Failures return `{:error, reason}`. V2 code that matched a two-element tuple and
 checked for an error Directive must match `{:error, reason}` instead.
+
+A Flow can return a terminal Handoff. Direct `cmd/3` returns
+`{:handoff, candidate, instruction, directives}` and does not run the
+successor. `AgentServer.call/3` runs the successor as a new Turn and returns
+the final normal success or error result.
 
 ### Return complete state
 
@@ -485,7 +490,8 @@ shapes explicitly.
 - [ ] Every `new/1` replaced with `instantiate/1` or `instantiate!/1`.
 - [ ] Every schema converted to Zoi inside `state do`.
 - [ ] Every `signal_routes` entry moved to `routes do`.
-- [ ] Every `cmd` call sends a Signal and matches a three-element result.
+- [ ] Every `cmd` call sends a Signal and matches a normal three-element result,
+      a four-element Handoff result, or an error.
 - [ ] Every Agent Action returns complete state.
 - [ ] Every `AgentServer.call` match updated to `{:ok, agent, directives}`, and
       no call passes a string ID.
