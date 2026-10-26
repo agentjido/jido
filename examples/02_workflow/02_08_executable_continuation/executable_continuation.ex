@@ -108,11 +108,10 @@ defmodule Jido.Examples.ExecutableContinuation.Pipeline do
     output_schema: Zoi.object(%{value: Zoi.integer() |> Zoi.min(0), request: Zoi.string()})
 
   flow do
-    invoke("next",
+    invoke "next",
       decision: Jido.Examples.ExecutableContinuation.Decision,
       expander: Jido.Examples.ExecutableContinuation.Expand,
       params: input()
-    )
 
     output result("next")
   end

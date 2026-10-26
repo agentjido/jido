@@ -33,10 +33,19 @@ agent_locals = [
   on: 1
 ]
 
+# Keep the public Flow control declarations stable even when the dependency
+# formatter is not available to a downstream consumer.
+flow_locals = [
+  invoke: 2,
+  handoff: 2
+]
+
+jido_locals = agent_locals ++ flow_locals
+
 # Used by "mix format"
 [
   import_deps: [:jido_action],
-  locals_without_parens: agent_locals,
-  export: [locals_without_parens: agent_locals],
+  locals_without_parens: jido_locals,
+  export: [locals_without_parens: jido_locals],
   inputs: ["{mix,.formatter,.credo}.exs", "{config,lib,examples,test}/**/*.{ex,exs}"]
 ]

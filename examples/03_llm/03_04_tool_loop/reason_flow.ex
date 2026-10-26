@@ -136,7 +136,7 @@ defmodule Jido.Examples.ReActAgent.ReasonFlow do
     schema: Jido.Examples.ReActAgent.Contracts.turn_input()
 
   flow do
-    invoke("reason",
+    invoke "reason",
       decision: Jido.Examples.ReActAgent.CallModel,
       expander: Jido.Examples.ReActAgent.RouteModelDecision,
       params: %{
@@ -146,7 +146,6 @@ defmodule Jido.Examples.ReActAgent.ReasonFlow do
         max_steps: input(:max_steps),
         steps_remaining: input(:steps_remaining)
       }
-    )
 
     output result("reason")
   end

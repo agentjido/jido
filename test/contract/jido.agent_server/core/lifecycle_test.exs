@@ -47,7 +47,7 @@ defmodule JidoTest.AgentServer.LifecycleTest do
 
     flow do
       step "before", action: HandoffBefore, params: %{count: input(:count)}
-      handoff("next", selector: HandoffSelector, params: result("before"))
+      handoff "next", selector: HandoffSelector, params: result("before")
       output result("next")
     end
   end

@@ -260,7 +260,7 @@ defmodule JidoTest.AgentServer.HandoffTest do
     use Jido.Flow, name: "agent_server_handoff_flow"
 
     flow do
-      handoff("next", selector: Select, params: %{count: input(:count)})
+      handoff "next", selector: Select, params: %{count: input(:count)}
       output result("next")
     end
   end
@@ -273,7 +273,7 @@ defmodule JidoTest.AgentServer.HandoffTest do
         action: Before,
         params: %{count: input(:count), effect_mode: :notify}
 
-      handoff("next", selector: Select, params: result("before"))
+      handoff "next", selector: Select, params: result("before")
       output result("next")
     end
   end
@@ -286,7 +286,7 @@ defmodule JidoTest.AgentServer.HandoffTest do
         action: Before,
         params: %{count: input(:count), effect_mode: :block}
 
-      handoff("next", selector: SelectBlocking, params: result("before"))
+      handoff "next", selector: SelectBlocking, params: result("before")
       output result("next")
     end
   end
@@ -296,7 +296,7 @@ defmodule JidoTest.AgentServer.HandoffTest do
 
     flow do
       step "before", action: BeforeReply, params: %{count: input(:count)}
-      handoff("next", selector: Select, params: result("before"))
+      handoff "next", selector: Select, params: result("before")
       output result("next")
     end
   end
@@ -306,7 +306,7 @@ defmodule JidoTest.AgentServer.HandoffTest do
 
     flow do
       step "before", action: BeforePluginChange, params: %{count: input(:count)}
-      handoff("next", selector: SelectBlocking, params: result("before"))
+      handoff "next", selector: SelectBlocking, params: result("before")
       output result("next")
     end
   end
@@ -319,7 +319,7 @@ defmodule JidoTest.AgentServer.HandoffTest do
         action: Before,
         params: %{count: input(:count), effect_mode: :fail}
 
-      handoff("next", selector: Select, params: result("before"))
+      handoff "next", selector: Select, params: result("before")
       output result("next")
     end
   end
@@ -328,7 +328,7 @@ defmodule JidoTest.AgentServer.HandoffTest do
     use Jido.Flow, name: "agent_server_error_handoff_flow"
 
     flow do
-      handoff("next", selector: SelectError, params: %{count: input(:count)})
+      handoff "next", selector: SelectError, params: %{count: input(:count)}
       output result("next")
     end
   end
@@ -337,7 +337,7 @@ defmodule JidoTest.AgentServer.HandoffTest do
     use Jido.Flow, name: "agent_server_invalid_handoff_flow"
 
     flow do
-      handoff("next", selector: SelectInvalid, params: %{count: input(:count)})
+      handoff "next", selector: SelectInvalid, params: %{count: input(:count)}
       output result("next")
     end
   end
@@ -346,7 +346,7 @@ defmodule JidoTest.AgentServer.HandoffTest do
     use Jido.Flow, name: "agent_server_error_flow_handoff_flow"
 
     flow do
-      handoff("next", selector: SelectErrorFlow, params: %{count: input(:count)})
+      handoff "next", selector: SelectErrorFlow, params: %{count: input(:count)}
       output result("next")
     end
   end
@@ -378,7 +378,7 @@ defmodule JidoTest.AgentServer.HandoffTest do
     use Jido.Flow, name: "agent_server_middle_handoff_flow"
 
     flow do
-      handoff("next", selector: Select, params: %{count: input(:count)})
+      handoff "next", selector: Select, params: %{count: input(:count)}
       output result("next")
     end
   end
@@ -392,7 +392,7 @@ defmodule JidoTest.AgentServer.HandoffTest do
     use Jido.Flow, name: "agent_server_chained_handoff_flow"
 
     flow do
-      handoff("next", selector: SelectMiddle, params: %{count: input(:count)})
+      handoff "next", selector: SelectMiddle, params: %{count: input(:count)}
       output result("next")
     end
   end
@@ -401,7 +401,7 @@ defmodule JidoTest.AgentServer.HandoffTest do
     use Jido.Flow, name: "agent_server_blocking_handoff_flow"
 
     flow do
-      handoff("next", selector: SelectBlocking, params: %{count: input(:count)})
+      handoff "next", selector: SelectBlocking, params: %{count: input(:count)}
       output result("next")
     end
   end
@@ -410,7 +410,7 @@ defmodule JidoTest.AgentServer.HandoffTest do
     use Jido.Flow, name: "agent_server_blocking_flow_successor_handoff"
 
     flow do
-      handoff("next", selector: SelectBlockingFlow, params: %{count: input(:count)})
+      handoff "next", selector: SelectBlockingFlow, params: %{count: input(:count)}
       output result("next")
     end
   end

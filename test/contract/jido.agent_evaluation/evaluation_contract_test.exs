@@ -26,7 +26,7 @@ defmodule JidoTest.Contract.AgentEvaluationTest do
     use Jido.Flow, name: "evaluation_handoff_flow"
 
     flow do
-      handoff("next", selector: HandoffSelector, params: %{count: input(:count)})
+      handoff "next", selector: HandoffSelector, params: %{count: input(:count)}
       output result("next")
     end
   end
