@@ -3,6 +3,7 @@ defmodule Jido.Agent.APITest do
   alias Jido.Agent
   alias Jido.Agent.Directive
   alias Jido.Persistence
+  alias Jido.Signal
 
   defmodule Audit do
     use Jido.Plugin, id: "test.api.audit"
@@ -70,6 +71,27 @@ defmodule Jido.Agent.APITest do
     assert output.type == "updated" and output.source == "/counter"
     assert instance.state === %{count: 0, turns: 0}
     assert after_agent.extensions === instance.extensions
+  end
+
+  test "build_signal uses the Agent source and correlates the source Signal" do
+    source = Signal.new!("request", %{}, source: "/caller")
+    {:ok, source, trace} = Signal.Trace.ensure(source)
+
+    assert {:ok, output} =
+             Agent.build_signal(
+               %{agent_signal_source: "/counter", signal: source},
+               "progress",
+               %{step: 1}
+             )
+
+    assert output.type == "progress"
+    assert output.data == %{step: 1}
+    assert output.source == "/counter"
+    assert Signal.get_context(output, "jidocausationid") == source.id
+    assert Signal.Trace.get(output) == trace
+
+    assert {:error, %Jido.Error.ValidationError{}} =
+             Agent.build_signal(%{}, "progress", %{step: 1})
   end
 
   test "persistence saves and loads the Agent value explicitly, including Plugin state" do

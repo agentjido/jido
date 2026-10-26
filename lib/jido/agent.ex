@@ -13,6 +13,7 @@ defmodule Jido.Agent do
   """
   alias Jido.Agent.{Data, Validation}
   alias Jido.Agent.Runner
+  alias Jido.Dispatch.Preparation
   alias Jido.Signal
   alias Jido.Error
 
@@ -288,6 +289,28 @@ defmodule Jido.Agent do
     end
   end
 
+  @doc "Builds one Agent-owned Signal from an Action context without dispatching it."
+  @spec build_signal(map(), String.t(), map()) :: {:ok, Signal.t()} | {:error, term()}
+  def build_signal(
+        %{agent_signal_source: signal_source, signal: %Signal{} = source_signal},
+        type,
+        data
+      ) do
+    with {:ok, signal} <- Signal.new(type, data, source: signal_source),
+         {:ok, _source_signal, trace} <- Signal.Trace.ensure(source_signal),
+         {:ok, signal} <- Signal.Trace.put(signal, trace),
+         {:ok, signal} <- Signal.put_context(signal, "jidocausationid", source_signal.id) do
+      {:ok, Preparation.propagate(signal, source_signal)}
+    end
+  end
+
+  def build_signal(_context, _type, _data) do
+    {:error,
+     Error.validation_error("Agent Signal construction requires an Agent Action context",
+       details: %{required_keys: [:agent_signal_source, :signal]}
+     )}
+  end
+
   @doc false
   @spec transition(instance(), term()) :: {:ok, instance()} | {:error, Exception.t()}
   def transition(%__MODULE__{} = agent, next_state) do
@@ -336,9 +359,9 @@ defmodule Jido.Agent do
   data has precedence.
 
   The `:context` option can be a map, a keyword list, or `nil`. It is merged
-  with the current `:agent_id`, `:agent_state`, `:agent_topology`,
-  `:plugin_inputs`, and `:signal` values. Callers cannot replace reserved
-  context values. All other options pass to `Jido.Exec.run/4`.
+  with the current `:agent_id`, `:agent_signal_source`, `:agent_state`,
+  `:agent_topology`, `:plugin_inputs`, and `:signal` values. Callers cannot
+  replace reserved context values. All other options pass to `Jido.Exec.run/4`.
 
   Returns one complete next Agent value and an ordered batch of validated
   Directives. It does not dispatch those Directives, save state, resume work,

@@ -239,12 +239,12 @@ failures that exit the caller instead.
 ## Supplied Dependencies
 
 An Action doesn't import a global client or read module state. It gets what
-it needs from its arguments: the params, and a context map with five reserved
+it needs from its arguments: the params, and a context map with six reserved
 keys plus your caller data.
 
 | Source | Reaches the Action as |
 | --- | --- |
-| The Agent | `agent_id`, `agent_state`, `agent_topology` |
+| The Agent | `agent_id`, `agent_signal_source`, `agent_state`, `agent_topology` |
 | The Signal | `signal`, and its data as params |
 | Plugins | `plugin_inputs[Plugin].prepared` from `prepare/2`, `plugin_inputs[Plugin].runtime` from `admit/3` |
 | The caller | Any key you pass in `context:` |

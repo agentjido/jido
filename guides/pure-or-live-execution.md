@@ -60,8 +60,8 @@ GettingStarted.Counter.cmd(agent, signal,
 ```
 
 The Action receives `request_id` next to the reserved keys `agent_id`,
-`agent_state`, `agent_topology`, `plugin_inputs`, and `signal`. Passing a
-reserved key in `context:` returns an error.
+`agent_signal_source`, `agent_state`, `agent_topology`, `plugin_inputs`, and
+`signal`. Passing a reserved key in `context:` returns an error.
 
 ### I/O Still Runs
 

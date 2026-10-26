@@ -79,11 +79,12 @@ A forward returns one `AgentSend` or `ParentSend`. Neither accepts `defaults:`.
 ## Execution
 
 Jido runs the handler through `Jido.Exec.run/4`. The context holds your
-caller context plus five reserved keys:
+caller context plus six reserved keys:
 
 | Key | Value |
 | --- | --- |
 | `agent_id` | The instance ID. |
+| `agent_signal_source` | The Agent's declared Signal source. |
 | `agent_state` | The committed state at the start of the Turn. |
 | `agent_topology` | Declared child Agents and connections. |
 | `plugin_inputs` | Prepared and runtime input per Plugin. |

@@ -130,6 +130,7 @@ defmodule JidoTest.Contract.AgentEvaluationTest do
 
     for key <- [
           :agent_id,
+          :agent_signal_source,
           :agent_state,
           :agent_topology,
           :plugin_inputs,
@@ -170,6 +171,7 @@ defmodule JidoTest.Contract.AgentEvaluationTest do
     state = context.agent_state
     assert state === source.state
     assert context.agent_id == source.id
+    assert context.agent_signal_source == source.signal_source
     assert context.agent_topology === source.topology
     assert context.plugin_inputs == %{}
 
