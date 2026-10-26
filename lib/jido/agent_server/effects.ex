@@ -139,6 +139,11 @@ defmodule Jido.AgentServer.Effects do
   defp validate(%Emit{dispatch: dispatch}, config),
     do: validate_dispatch(dispatch || config.default_dispatch)
 
+  # A durable turn can outlive its caller. The turn must still commit its state
+  # after it resumes. ReplyGate.deliver/2 safely drops a reply when its gate is
+  # nil or no longer alive, so the reply remains an ephemeral effect.
+  defp validate(%Reply{}, %{durable: true}), do: :ok
+
   defp validate(%Reply{}, %{requester: requester}) when is_pid(requester) do
     if Process.alive?(requester), do: :ok, else: {:error, :requester_not_found}
   end

@@ -187,6 +187,12 @@ defmodule Jido.Agent.DirectiveContractTest do
                [Directive.reply(signal)],
                Map.put(config, :requester, self())
              )
+
+    assert :ok =
+             Jido.AgentServer.Effects.validate_batch(
+               [Directive.reply(signal)],
+               Map.merge(config, %{durable: true, requester: nil})
+             )
   end
 
   @tag obligation: "jido.agent.I27"

@@ -1693,7 +1693,7 @@ defmodule Jido.AgentServer do
         :partition,
         :persistence
       ])
-      |> Map.put(:requester, active.requester)
+      |> Map.merge(%{requester: active.requester, durable: active.durable})
 
     operation(:settle, data, fn -> settle_worker(runner, active, config) end)
   end
