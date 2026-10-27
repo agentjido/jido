@@ -47,19 +47,23 @@ defmodule Jido.Agent.Codec do
     do: Error.fail(:invalid_definition, [], "Expected an Agent definition, instance, or module")
 
   defp encode_fields(agent, registry) do
-    encode_map(agent,
-      module: &optional_reference(&1, registry, [:agent]),
-      schema: &encode_reference(&1, registry, [:schema]),
-      initial_state: &Value.encode(&1, registry),
-      metadata: &Value.encode(&1, registry),
-      routes: &encode_list(&1, fn route -> encode_route(route, registry) end),
-      topology: &encode_topology(&1, registry),
-      extensions: &encode_list(&1, fn extension -> encode_extension(extension, registry) end),
-      name: nil,
-      description: nil,
-      vsn: nil,
-      signal_source: nil
-    )
+    with {:ok, routes} <- Extension.stored_routes(agent.extensions, agent.routes) do
+      agent = %{agent | routes: routes}
+
+      encode_map(agent,
+        module: &optional_reference(&1, registry, [:agent]),
+        schema: &encode_reference(&1, registry, [:schema]),
+        initial_state: &Value.encode(&1, registry),
+        metadata: &Value.encode(&1, registry),
+        routes: &encode_list(&1, fn route -> encode_route(route, registry) end),
+        topology: &encode_topology(&1, registry),
+        extensions: &encode_list(&1, fn extension -> encode_extension(extension, registry) end),
+        name: nil,
+        description: nil,
+        vsn: nil,
+        signal_source: nil
+      )
+    end
   end
 
   defp decode_fields(fields, registry) do

@@ -37,6 +37,17 @@ defmodule Jido.AuthoringIntegrationTest do
 
     def decode_authoring_data(_data, _registry),
       do: Jido.Agent.Error.fail(:invalid_data, [], "Invalid referenced extension data")
+
+    @impl Jido.Agent.Extension
+    def derive_routes(%{target: target}) do
+      [
+        %{
+          path: "referenced.request",
+          handler: %{kind: :action, target: target},
+          state: %{source: :output, path: []}
+        }
+      ]
+    end
   end
 
   defmodule Agent do
@@ -102,6 +113,13 @@ defmodule Jido.AuthoringIntegrationTest do
     definition =
       Jido.Agent.define!(%{
         name: "referenced_extension_agent",
+        routes: [
+          %{
+            path: "manual.request",
+            handler: %{kind: :action, target: ReferencedAction},
+            state: %{source: :output, path: []}
+          }
+        ],
         extensions: [
           %{
             id: ReferencedExtension.id(),
@@ -125,6 +143,11 @@ defmodule Jido.AuthoringIntegrationTest do
     assert get_in(document, ["definition", "extensions", Access.at(0), "data"]) == %{
              "target" => %{"id" => "tests/actions/referenced", "vsn" => 1}
            }
+
+    assert [%{"path" => "manual.request"}] = document["definition"]["routes"]
+
+    assert [%{path: "manual.request"}, %{path: "referenced.request"}] =
+             definition.routes
 
     assert {:ok, ^definition} =
              Jido.Authoring.decode(document, registry: registry, codec: Jido.Agent.Codec)

@@ -34,8 +34,11 @@ defmodule Jido.Agent.Validation do
     with {:ok, definition} <- Data.fields(input, @fields, Jido.Agent.__defaults__()),
          :ok <- fields(definition),
          {:ok, extensions} <- Error.at(Extension.normalize(definition.extensions), :extensions),
+         {:ok, route_contributions} <-
+           Error.at(Extension.route_contributions(extensions), :extensions),
          {:ok, routes} <-
            Error.at(Data.list(definition.routes, &Route.normalize(&1, related?)), :routes),
+         {:ok, routes} <- materialize_routes(routes, route_contributions, related?),
          :ok <- Error.at(Data.unique(routes, & &1.path), :routes),
          :ok <- Error.at(Data.unique(Enum.reject(routes, &is_nil(&1.as)), & &1.as), :routes),
          :ok <- reply_source(routes, definition.signal_source, related?),
@@ -69,6 +72,53 @@ defmodule Jido.Agent.Validation do
     do: Error.at(Extension.verify(extensions, definition), :extensions)
 
   defp verify_extensions(_, _, false), do: :ok
+
+  defp materialize_routes(routes, contributions, related?) do
+    contributions
+    |> Enum.reduce_while({:ok, routes, MapSet.new()}, fn contribution,
+                                                         {:ok, routes, owned_paths} ->
+      route_path = [
+        :extensions,
+        contribution.extension_index,
+        :routes,
+        contribution.index
+      ]
+
+      case Error.at(Route.normalize(contribution.route, related?), route_path) do
+        {:ok, route} ->
+          merge_contributed_route(routes, owned_paths, route, contribution.provider)
+
+        {:error, _error} = error ->
+          {:halt, error}
+      end
+    end)
+    |> case do
+      {:ok, routes, _owned_paths} -> {:ok, routes}
+      {:error, _error} = error -> error
+    end
+  end
+
+  defp merge_contributed_route(routes, owned_paths, route, provider) do
+    case Enum.find_index(routes, &(&1.path == route.path)) do
+      nil ->
+        {:cont, {:ok, routes ++ [route], MapSet.put(owned_paths, route.path)}}
+
+      index ->
+        existing = Enum.at(routes, index)
+
+        if existing === route and not MapSet.member?(owned_paths, route.path) do
+          {:cont, {:ok, routes, MapSet.put(owned_paths, route.path)}}
+        else
+          {:halt,
+           Error.fail(
+             :extension_route_conflict,
+             [:routes, index],
+             "Extension route conflicts with another Agent route",
+             %{path: route.path, provider: provider}
+           )}
+        end
+    end
+  end
 
   defp plugin_schema(fields, true) do
     with {:ok, _schema} <- state_schema(struct!(Jido.Agent, fields)), do: :ok

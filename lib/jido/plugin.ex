@@ -25,6 +25,8 @@ defmodule Jido.Plugin do
   Map definitions store the same data once in the `extensions` contribution list.
   A Plugin uses the Agent provider contract and can add Spark sections. Set `id`
   to give the provider a stable name and `vsn` to set its version (default 1).
+  Agent provider callbacks such as `Jido.Agent.Extension.derive_routes/1` are
+  authoring callbacks. They are not runtime callbacks in this Plugin behavior.
   Runtime callbacks receive config as keyword options. The optional `option_keys`
   mapping can restrict those options by owner.
 

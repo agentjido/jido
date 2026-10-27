@@ -46,6 +46,37 @@ defmodule JidoTest.Agent.AuthoringExtensionTest do
     def endpoints(data), do: [Map.fetch!(data, :endpoint)]
   end
 
+  defmodule RouteTarget do
+    use Jido.Action, name: "extension_route_target"
+    def run(params, _context), do: {:ok, params}
+  end
+
+  defmodule OtherRouteTarget do
+    use Jido.Action, name: "other_extension_route_target"
+    def run(params, _context), do: {:ok, params}
+  end
+
+  defmodule Routed do
+    use Jido.Agent.Extension, id: "test.routed"
+
+    @impl Jido.Agent.Extension
+    def normalize(%{target: target}), do: {:ok, %{target: target}}
+
+    @impl Jido.Agent.Extension
+    def derive_routes(%{target: target}) do
+      [
+        %{
+          path: "extension.request",
+          as: :extension,
+          defaults: %{},
+          handler: %{kind: :action, target: target},
+          state: %{source: :output, path: []},
+          reply: nil
+        }
+      ]
+    end
+  end
+
   defmodule NoSections do
     @behaviour Jido.Agent.Extension
 
@@ -146,13 +177,18 @@ defmodule JidoTest.Agent.AuthoringExtensionTest do
                authoring_imports: 0,
                encode_authoring_data: 2,
                decode_authoring_data: 2,
+               derive_routes: 1,
                endpoint_kinds: 0,
                endpoints: 1,
                verify_connection: 2
              )
 
     assert Enum.sort(Extension.behaviour_info(:optional_callbacks)) ==
-             Enum.sort(encode_authoring_data: 2, decode_authoring_data: 2)
+             Enum.sort(
+               encode_authoring_data: 2,
+               decode_authoring_data: 2,
+               derive_routes: 1
+             )
 
     for value <- [NoSections, String, nil, true, false, 1, "module", %{}] do
       assert {:error,
@@ -177,6 +213,85 @@ defmodule JidoTest.Agent.AuthoringExtensionTest do
 
     endpoint = %{kind: :boundary, name: :output}
     assert Extension.endpoints([contribution(Boundary, %{endpoint: endpoint})]) === [endpoint]
+  end
+
+  @tag obligation: ["jido.agent.I10", "jido.agent.I22"]
+  test "an extension contributes one exact route through Map authoring" do
+    entry = contribution(Routed, %{target: RouteTarget})
+
+    assert {:ok, definition} =
+             Agent.define(%{name: "routed", signal_source: "/routed", extensions: [entry]})
+
+    assert [route] = definition.routes
+    assert route.path == "extension.request"
+    assert route.handler == %{kind: :action, target: RouteTarget}
+
+    assert {:ok, same} =
+             definition
+             |> Map.from_struct()
+             |> Agent.define()
+
+    assert same == definition
+  end
+
+  @tag obligation: ["jido.agent.I10", "jido.agent.I22"]
+  test "stored route projection requires every derived route" do
+    entry = contribution(Routed, %{target: RouteTarget})
+
+    assert {:error,
+            %Agent.Error{
+              code: :missing_derived_route,
+              path: [:extensions, 0, :routes, 0],
+              details: %{path: "extension.request", provider: Routed}
+            }} = Extension.stored_routes([entry], [])
+  end
+
+  @tag obligation: ["jido.agent.I10", "jido.agent.I22"]
+  test "an extension route cannot conflict with a stored route" do
+    entry = contribution(Routed, %{target: RouteTarget})
+
+    conflicting = %{
+      path: "extension.request",
+      handler: %{kind: :action, target: OtherRouteTarget},
+      state: %{source: :output, path: []}
+    }
+
+    assert {:error,
+            %Agent.Error{
+              code: :extension_route_conflict,
+              path: [:routes, 0],
+              details: %{path: "extension.request", provider: Routed}
+            }} =
+             Agent.define(%{
+               name: "routed",
+               signal_source: "/routed",
+               routes: [conflicting],
+               extensions: [entry]
+             })
+  end
+
+  @tag obligation: ["jido.agent.I10", "jido.agent.I22"]
+  test "an extension can contribute only exact routes" do
+    wildcard = Module.concat(__MODULE__, "Wildcard#{System.unique_integer([:positive])}")
+    id = "test.wildcard.#{System.unique_integer([:positive])}"
+
+    Module.create(
+      wildcard,
+      quote do
+        use Jido.Agent.Extension, id: unquote(id)
+        @impl Jido.Agent.Extension
+        def derive_routes(_data), do: [%{path: "extension.*"}]
+      end,
+      Macro.Env.location(__ENV__)
+    )
+
+    entry = contribution(wildcard, %{})
+
+    assert {:error,
+            %Agent.Error{
+              code: :wildcard_type,
+              path: [:extensions, 0, :routes, 0, :path]
+            }} = Agent.define(%{name: "wildcard", extensions: [entry]})
   end
 
   @tag obligation: ["jido.agent.I10", "jido.agent.I22"]
