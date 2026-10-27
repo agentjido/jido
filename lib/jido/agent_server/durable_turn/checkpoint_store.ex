@@ -2,6 +2,9 @@ defmodule Jido.AgentServer.DurableTurn.CheckpointStore do
   @moduledoc false
   alias Jido.Persistence.{AdapterOps, Store}
   alias Jido.Exec.Frame.Delta
+  alias Jido.Exec.Waits
+  alias Jido.AgentServer.DurableTurn.JoinCompletedRef
+  alias Runic.Workflow.{Batch, Fact, FactRef, FactResolver, Rehydration}
 
   @prefix "jido:execution:"
   @fact_tag :jido_fact_value
@@ -51,7 +54,7 @@ defmodule Jido.AgentServer.DurableTurn.CheckpointStore do
       batches
       |> Enum.reverse()
       |> Enum.concat()
-      |> hydrate_join_values(id, jido)
+      |> reference_join_values()
     else
       false -> {:error, :not_found}
       error -> error
@@ -70,7 +73,7 @@ defmodule Jido.AgentServer.DurableTurn.CheckpointStore do
 
   def load_fact({:jido_execution, _, _, _, _} = id, hash, jido) do
     with {:ok, config} <- config(jido, id),
-         {:ok, value, _depth} <- load_fact_value(config, id, hash, MapSet.new()) do
+         {:ok, value, _depth} <- load_fact_value(config, id, hash, %{}) do
       {:ok, value}
     end
   end
@@ -94,30 +97,21 @@ defmodule Jido.AgentServer.DurableTurn.CheckpointStore do
     end
   end
 
-  defp hydrate_join_values(events, id, jido) do
-    Enum.reduce_while(events, {:ok, []}, fn
-      %Runic.Workflow.Events.JoinCompleted{result_value: nil} = event, {:ok, hydrated} ->
-        case load_fact(id, event.result_fact_hash, jido) do
-          {:ok, value} -> {:cont, {:ok, [%{event | result_value: value} | hydrated]}}
-          {:error, _reason} = error -> {:halt, error}
-        end
+  defp reference_join_values(events),
+    do:
+      {:ok,
+       Enum.map(events, fn
+         %Runic.Workflow.Events.JoinCompleted{result_value: nil} = event ->
+           JoinCompletedRef.from_event(event)
 
-      event, {:ok, hydrated} ->
-        {:cont, {:ok, [event | hydrated]}}
-    end)
-    |> case do
-      {:ok, hydrated} -> {:ok, Enum.reverse(hydrated)}
-      {:error, _reason} = error -> error
-    end
-  end
+         event ->
+           event
+       end)}
 
   def update_workflow(jido, id, transition) do
     case stream(id, jido) do
       {:ok, events} ->
-        with {:ok, hydrated} <- hydrate_events(events, id, jido) do
-          workflow =
-            hydrated |> Runic.Workflow.from_events() |> Runic.Workflow.enable_event_emission()
-
+        with {:ok, workflow} <- rehydrate_frontier(events, id, jido) do
           case transition.(workflow) do
             {:ok, ^workflow} ->
               {:ok, workflow}
@@ -142,21 +136,39 @@ defmodule Jido.AgentServer.DurableTurn.CheckpointStore do
     end
   end
 
-  defp hydrate_events(events, id, jido) do
-    Enum.reduce_while(events, {:ok, []}, fn
-      %Runic.Workflow.Events.FactProduced{value: nil} = event, {:ok, hydrated} ->
-        case load_fact(id, event.hash, jido) do
-          {:ok, value} -> {:cont, {:ok, [%{event | value: value} | hydrated]}}
-          {:error, _reason} = error -> {:halt, error}
-        end
+  defp rehydrate_frontier(events, id, jido) do
+    workflow = Runic.Workflow.from_events(events, nil, fact_mode: :ref)
 
-      event, {:ok, hydrated} ->
-        {:cont, {:ok, [event | hydrated]}}
-    end)
-    |> case do
-      {:ok, hydrated} -> {:ok, Enum.reverse(hydrated)}
-      {:error, _reason} = error -> error
+    required =
+      if Batch.present?(workflow) do
+        for {hash, %FactRef{}} <- workflow.graph.vertices, into: MapSet.new(), do: hash
+      else
+        Rehydration.classify(workflow).hot
+      end
+
+    resolver = FactResolver.new({Jido.AgentServer.Store, {id, jido}})
+    {workflow, resolver} = Rehydration.resolve_hot(workflow, required, resolver)
+    wait_inputs = wait_input_hashes(workflow)
+    required = MapSet.union(required, wait_inputs)
+    {workflow, _resolver} = Rehydration.resolve_hot(workflow, wait_inputs, resolver)
+
+    if Enum.all?(required, &match?(%Fact{}, Map.get(workflow.graph.vertices, &1))) do
+      {:ok, Runic.Workflow.enable_event_emission(workflow)}
+    else
+      {:error, :invalid_execution_checkpoint}
     end
+  end
+
+  defp wait_input_hashes(workflow) do
+    pending_ids = workflow |> Waits.pending() |> MapSet.new(& &1.id)
+
+    for %Fact{
+          meta: %{jido_wait_record: true},
+          value: %{type: :jido_wait_request, id: id, input_id: input_id}
+        } <- Runic.Workflow.facts(workflow),
+        MapSet.member?(pending_ids, id),
+        into: MapSet.new(),
+        do: input_id
   end
 
   defp persist_events(id, events, jido) do
@@ -239,7 +251,7 @@ defmodule Jido.AgentServer.DurableTurn.CheckpointStore do
   end
 
   defp accept_existing_fact(config, id, hash, value) do
-    with {:ok, stored, _depth} <- load_fact_value(config, id, hash, MapSet.new()),
+    with {:ok, stored, _depth} <- load_fact_value(config, id, hash, %{}),
          true <- stored === value do
       record_fact_hash(config, id, hash)
     else
@@ -251,7 +263,7 @@ defmodule Jido.AgentServer.DurableTurn.CheckpointStore do
   defp fact_record(_config, _id, nil, value), do: {:ok, full_fact_record(value)}
 
   defp fact_record(config, id, base_hash, value) do
-    with {:ok, base, depth} <- load_fact_value(config, id, base_hash, MapSet.new()) do
+    with {:ok, base, depth} <- load_fact_value(config, id, base_hash, %{}) do
       full = full_fact_record(value)
 
       case Delta.encode(base, value) do
@@ -272,12 +284,12 @@ defmodule Jido.AgentServer.DurableTurn.CheckpointStore do
     do: {@fact_tag, @fact_version, 0, fact_digest(value), :full, value}
 
   defp load_fact_value(config, id, hash, seen) do
-    if MapSet.member?(seen, hash) do
+    if Map.has_key?(seen, hash) do
       {:error, :invalid_execution_checkpoint}
     else
       with {:ok, bytes, _condition} <- Store.read(config, fact_key(id, hash)),
            {:ok, record} <- decode(bytes) do
-        decode_fact_record(config, id, record, MapSet.put(seen, hash))
+        decode_fact_record(config, id, record, Map.put(seen, hash, true))
       end
     end
   end

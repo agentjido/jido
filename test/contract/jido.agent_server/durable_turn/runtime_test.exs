@@ -222,6 +222,14 @@ defmodule JidoTest.AgentServer.DurableTurn.RuntimeTest do
 
     restored = replacement(c, id, server)
     assert_receive {:durable_barrier, :step_6, _}, 5_000
+
+    assert {:ok, restored_workflow} =
+             Runic.Runner.get_workflow(Jido.exec_runner_name(c.jido), execution_id)
+
+    restored_vertices = Map.values(restored_workflow.graph.vertices)
+    assert Enum.any?(restored_vertices, &is_struct(&1, Runic.Workflow.FactRef))
+    assert Enum.any?(restored_vertices, &is_struct(&1, Runic.Workflow.Fact))
+
     F.Probe.release()
     eventually(fn -> Server.agent(restored).state == %{count: 10} end)
     assert F.Probe.records() == Enum.to_list(1..6) ++ Enum.to_list(6..10)

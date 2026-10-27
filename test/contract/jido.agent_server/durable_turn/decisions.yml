@@ -27,3 +27,9 @@
   decision: Store Runic produced fact values and Join completion results in the execution-scoped fact store. Store a full value at the start of each bounded chain, then store a reference to the prior fact plus a structural frame delta only when the complete delta record is smaller. Rebuild and verify the exact runtime value on load.
   driver: Cumulative Jido Flow frames repeat the same input, results, and branch state in each durable fact. Exact fact references remove that repeated storage without changing runtime frame values or durable execution order.
   approved_by: User-requested fact-referenced frame delta refactor
+
+- id: durable-turn-frontier-hydration
+  date: 2026-10-27
+  decision: Replay durable workflow structure with Runic FactRef values and load only the hot facts that the active frontier and pending reactions need. Add each open Jido wait input to the hot set because wait resolution runs before the Runner restarts. Represent detached Join completion results with an internal replay event that creates a FactRef. Use full fact hydration for native Batch workflows until Runic supports hybrid Batch recovery.
+  driver: Long-running workflow history must not force every stored fact value into memory during each recovery or wait transition.
+  approved_by: User-requested frontier fact hydration

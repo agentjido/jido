@@ -1655,18 +1655,28 @@
         "jido.agent_server.durable_turn.I2": {
           "failing": 0,
           "kind": "persisted_format",
-          "passing": 8,
+          "passing": 18,
           "status": "active",
           "testable": true,
           "tests": [
             "test Runic appends each event batch once and streams committed events in order",
+            "test accepts concurrent idempotent writes for one fact",
             "test an unchanged workflow transition preserves the saved graph",
             "test checkpoint keys use the stable unpadded encoding",
             "test execution identity isolates partitions, Agents, and command IDs",
+            "test fact deltas cut a live durable Turn below one quarter of full fact snapshots",
             "test old runtime cleanup cannot remove or collect a replacement owner's checkpoint",
             "test ordinary IDs have no execution store",
+            "test rejects a conflicting value for one fact identity",
+            "test rejects a fact value that does not match its stored digest",
             "test rejects an invalid batch count",
-            "test repairs a tail chunk before the next append"
+            "test repairs a tail chunk before the next append",
+            "test retries a concurrent fact index update",
+            "test stores a JoinCompleted result as a fact reference",
+            "test stores cumulative frame facts as bounded references and restores exact values",
+            "test workflow transitions fully hydrate a native Batch",
+            "test workflow transitions hydrate the active frontier and keep history as references",
+            "test workflow transitions reject a missing frontier fact"
           ]
         },
         "jido.agent_server.durable_turn.I3": {
@@ -1702,12 +1712,13 @@
         "jido.agent_server.durable_turn.I5": {
           "failing": 0,
           "kind": "ordering",
-          "passing": 6,
+          "passing": 7,
           "status": "active",
           "testable": true,
           "tests": [
             "test AgentServer loss restores a pending wait without rerunning Actions",
             "test activation loss resumes the current Turn at step 6",
+            "test fact deltas cut a live durable Turn below one quarter of full fact snapshots",
             "test recovery resolves the saved input_write before the reply",
             "test recovery resolves the saved intent_write before the reply",
             "test server loss resumes the current Turn at step 6",

@@ -3,7 +3,34 @@ defmodule JidoTest.AgentServer.DurableTurn.CheckpointStoreTest do
   use Covenant.Case, component: "jido.agent_server.durable_turn", async: true
 
   alias Jido.AgentServer.DurableTurn.CheckpointStore, as: Store
+  alias Jido.AgentServer.DurableTurn.JoinCompletedRef
   alias JidoTest.DurableFixtures, as: F
+
+  defmodule Increment do
+    use Jido.Action, name: "checkpoint_hydration_increment"
+
+    @impl true
+    def run(%{value: value}, _context), do: {:ok, %{value: value + 1}}
+  end
+
+  defmodule HydrationFlow do
+    use Jido.Flow, name: "checkpoint_hydration_flow"
+
+    flow do
+      step "one", action: Increment, params: %{value: input(:value)}
+      step "two", action: Increment, params: %{value: result("one", :value)}
+      output result("two")
+    end
+  end
+
+  defmodule BatchFlow do
+    use Jido.Flow, name: "checkpoint_batch_flow"
+
+    flow do
+      map "items", collection: input(:items), action: Increment, params: %{value: item()}
+      output %{items: result("items")}
+    end
+  end
 
   defmodule Bytes do
     @behaviour Jido.Persistence.Adapter
@@ -257,7 +284,18 @@ defmodule JidoTest.AgentServer.DurableTurn.CheckpointStoreTest do
       end)
 
     assert [%{event | result_value: nil}] == stored_events
-    assert {:ok, [^event]} = Store.stream(c.id, c.jido)
+
+    assert {:ok,
+            [
+              %JoinCompletedRef{
+                join_hash: :join,
+                result_fact_hash: :joined,
+                result_ancestry: {:join, :parent},
+                contribution_fact_hashes: [:left, :right],
+                weight: 2
+              }
+            ]} = Store.stream(c.id, c.jido)
+
     assert {:ok, ^value} = Store.load_fact(c.id, :joined, c.jido)
   end
 
@@ -332,6 +370,117 @@ defmodule JidoTest.AgentServer.DurableTurn.CheckpointStoreTest do
     assert Enum.to_list(events) == log
   end
 
+  @tag obligation: "jido.agent_server.durable_turn.I2"
+  test "workflow transitions hydrate the active frontier and keep history as references", c do
+    {:ok, workflow} = Jido.Exec.compile(HydrationFlow)
+
+    executed =
+      workflow
+      |> Runic.Workflow.enable_event_emission()
+      |> Runic.Workflow.react_until_satisfied(Jido.Exec.Frame.new(%{value: 0}))
+
+    events =
+      (Runic.Workflow.build_log(executed) ++ Enum.reverse(executed.uncommitted_events))
+      |> Enum.map(fn
+        %Runic.Workflow.Events.FactProduced{} = event ->
+          assert :ok = Store.save_fact(c.id, event.hash, event.value, c.jido)
+          %{event | value: nil}
+
+        event ->
+          event
+      end)
+
+    assert {:ok, _batch_count} = Store.append(c.id, events, c.jido)
+
+    assert {:ok, restored} =
+             Store.update_workflow(c.jido, c.id, fn current -> {:ok, current} end)
+
+    vertices = Map.values(restored.graph.vertices)
+    assert Enum.any?(vertices, &is_struct(&1, Runic.Workflow.FactRef))
+    assert Enum.any?(vertices, &is_struct(&1, Runic.Workflow.Fact))
+    assert Jido.Exec.result(restored) == {:ok, %{value: 2}}
+  end
+
+  @tag obligation: "jido.agent_server.durable_turn.I2"
+  test "workflow transitions fully hydrate a native Batch", c do
+    {:ok, workflow} = Jido.Exec.compile(BatchFlow)
+
+    executed =
+      workflow
+      |> Runic.Workflow.enable_event_emission()
+      |> Runic.Workflow.react_until_satisfied(Jido.Exec.Frame.new(%{items: [1, 2]}))
+
+    events =
+      (Runic.Workflow.build_log(executed) ++ Enum.reverse(executed.uncommitted_events))
+      |> Enum.map(fn
+        %Runic.Workflow.Events.FactProduced{} = event ->
+          assert :ok = Store.save_fact(c.id, event.hash, event.value, c.jido)
+          %{event | value: nil}
+
+        event ->
+          event
+      end)
+
+    assert {:ok, _batch_count} = Store.append(c.id, events, c.jido)
+
+    assert {:ok, restored} =
+             Store.update_workflow(c.jido, c.id, fn current -> {:ok, current} end)
+
+    refute Enum.any?(restored.graph.vertices, fn {_hash, vertex} ->
+             is_struct(vertex, Runic.Workflow.FactRef)
+           end)
+
+    assert Jido.Exec.result(restored) ==
+             {:ok, %{items: [%{value: 2}, %{value: 3}]}}
+  end
+
+  @tag obligation: "jido.agent_server.durable_turn.I2"
+  test "workflow transitions reject a missing frontier fact", c do
+    {:ok, workflow} = Jido.Exec.compile(HydrationFlow)
+
+    executed =
+      workflow
+      |> Runic.Workflow.enable_event_emission()
+      |> Runic.Workflow.react_until_satisfied(Jido.Exec.Frame.new(%{value: 0}))
+
+    events = Runic.Workflow.build_log(executed) ++ Enum.reverse(executed.uncommitted_events)
+
+    detached =
+      Enum.map(events, fn
+        %Runic.Workflow.Events.FactProduced{} = event -> %{event | value: nil}
+        event -> event
+      end)
+
+    required =
+      detached
+      |> Runic.Workflow.from_events(nil, fact_mode: :ref)
+      |> Runic.Workflow.Rehydration.classify()
+      |> Map.fetch!(:hot)
+
+    missing =
+      Enum.find(required, fn required_hash ->
+        Enum.any?(events, &(event_hash(&1) == required_hash))
+      end)
+
+    assert missing
+
+    Enum.each(events, fn
+      %Runic.Workflow.Events.FactProduced{hash: ^missing} ->
+        :ok
+
+      %Runic.Workflow.Events.FactProduced{} = event ->
+        assert :ok = Store.save_fact(c.id, event.hash, event.value, c.jido)
+
+      _event ->
+        :ok
+    end)
+
+    assert {:ok, _batch_count} = Store.append(c.id, detached, c.jido)
+
+    assert {:error, :invalid_execution_checkpoint} =
+             Store.update_workflow(c.jido, c.id, fn current -> {:ok, current} end)
+  end
+
   @tag obligation: "jido.agent_server.durable_turn.I7"
   test "wait delivery rejects an execution with no saved graph", c do
     data = %{jido: c.jido, active: %{worker_id: c.id}}
@@ -391,6 +540,9 @@ defmodule JidoTest.AgentServer.DurableTurn.CheckpointStoreTest do
 
   defp identity(init, id),
     do: {:jido_execution, Jido.namespace(init.jido), init.partition, init.agent_id, id}
+
+  defp event_hash(%Runic.Workflow.Events.FactProduced{hash: hash}), do: hash
+  defp event_hash(_event), do: nil
 
   defp large_session do
     %{

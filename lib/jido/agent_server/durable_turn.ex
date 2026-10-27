@@ -133,6 +133,7 @@ defmodule Jido.AgentServer.DurableTurn do
       owner: owner,
       dispatch_mode: :manual,
       checkpoint_strategy: :manual,
+      rehydration: :hybrid,
       scheduler_policies: [{:default, policy}],
       hooks:
         hooks
@@ -179,6 +180,16 @@ defmodule Jido.AgentServer.DurableTurn do
 
   defp resume_or_start(runner, id, workflow, instruction, options, activation_state) do
     case Runner.resume(runner, id, options) do
+      {:error, {:unsupported_batch_rehydration, :hybrid}} ->
+        resume_or_start(
+          runner,
+          id,
+          workflow,
+          instruction,
+          Keyword.put(options, :rehydration, :full),
+          activation_state
+        )
+
       {:error, :not_found} ->
         with {:ok, input} <- validate_input(instruction),
              {:ok, worker} <-

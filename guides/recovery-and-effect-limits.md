@@ -123,6 +123,12 @@ when the crash happened has no checkpoint, so it runs again. Make each step
 safe to repeat. [Durable Turns and Flows](durable-turns-and-flows.livemd)
 covers waits, timers, and compatibility.
 
+Jido stores durable fact values outside the workflow event log. During
+recovery, it loads the facts that the active frontier and pending reactions
+need. Historical facts stay as Runic `FactRef` values and load only if later
+work needs them. Native Batch workflows load all facts until Runic supports
+hybrid Batch recovery.
+
 ## No Exactly-Once
 
 Jido gives you exactly one committed revision per successful Turn. It
