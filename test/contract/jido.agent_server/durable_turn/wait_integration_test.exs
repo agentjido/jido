@@ -34,15 +34,24 @@ defmodule JidoTest.AgentServer.DurableTurn.WaitIntegrationTest do
   defmodule Fault do
     use GenServer
     def start_link(owner), do: GenServer.start_link(__MODULE__, owner, name: __MODULE__)
-    def init(owner), do: {:ok, {owner, nil}}
+    def init(owner), do: {:ok, %{owner: owner, armed: nil, pending: nil}}
     def arm(stage, mode), do: GenServer.call(__MODULE__, {:arm, stage, mode})
     def check(stage), do: GenServer.call(__MODULE__, {:check, stage})
-    def handle_call({:arm, stage, mode}, _, {owner, _}), do: {:reply, :ok, {owner, {stage, mode}}}
+    def mark(stage), do: GenServer.call(__MODULE__, {:mark, stage})
+    def take_marked(default), do: GenServer.call(__MODULE__, {:take_marked, default})
 
-    def handle_call({:check, stage}, _, {owner, {stage, mode}}),
-      do: {:reply, mode, {owner, nil}}
+    def handle_call({:arm, stage, mode}, _, state),
+      do: {:reply, :ok, %{state | armed: {stage, mode}}}
+
+    def handle_call({:check, stage}, _, %{armed: {stage, mode}} = state),
+      do: {:reply, mode, %{state | armed: nil}}
 
     def handle_call({:check, _}, _, state), do: {:reply, :pass, state}
+    def handle_call({:mark, :other}, _, state), do: {:reply, :ok, state}
+    def handle_call({:mark, stage}, _, state), do: {:reply, :ok, %{state | pending: stage}}
+
+    def handle_call({:take_marked, default}, _, state),
+      do: {:reply, state.pending || default, %{state | pending: nil}}
   end
 
   defmodule FaultStorage do
@@ -52,16 +61,19 @@ defmodule JidoTest.AgentServer.DurableTurn.WaitIntegrationTest do
     def compare_and_swap(key, expected, bytes, opts) do
       stage =
         case :erlang.binary_to_term(bytes) do
-          %{fmt: 1, log: log} when is_list(log) ->
+          {:jido_fact_value, 1, _depth, _digest, _base, payload} ->
+            :ok = Fault.mark(fact_stage(payload))
+            :other
+
+          [_ | _] = events ->
             types =
-              for %Runic.Workflow.Fact{value: %{type: type}} <-
-                    Runic.Workflow.from_events(log) |> Runic.Workflow.facts(),
+              for %Runic.Workflow.Events.FactProduced{value: %{type: type}} <- events,
                   do: type
 
             cond do
               :jido_wait_resolution in types -> :resolution
               :jido_wait_input in types -> :acceptance
-              true -> :other
+              true -> Fault.take_marked(:other)
             end
 
           %{server_turn: %{status: :running}} ->
@@ -86,6 +98,32 @@ defmodule JidoTest.AgentServer.DurableTurn.WaitIntegrationTest do
           Jido.Persistence.File.compare_and_swap(key, expected, bytes, opts)
       end
     end
+
+    defp fact_stage(payload) do
+      cond do
+        contains?(payload, :jido_wait_resolution) -> :resolution
+        contains?(payload, :jido_wait_input) -> :acceptance
+        true -> :other
+      end
+    end
+
+    defp contains?(value, expected) when value == expected, do: true
+
+    defp contains?(value, expected) when is_map(value) do
+      Enum.any?(Map.to_list(value), fn {key, item} ->
+        contains?(key, expected) or contains?(item, expected)
+      end)
+    end
+
+    defp contains?(value, expected) when is_tuple(value) do
+      value |> Tuple.to_list() |> Enum.any?(&contains?(&1, expected))
+    end
+
+    defp contains?(value, expected) when is_list(value) do
+      if List.improper?(value), do: false, else: Enum.any?(value, &contains?(&1, expected))
+    end
+
+    defp contains?(_value, _expected), do: false
   end
 
   defmodule ImmediateTimer do

@@ -74,7 +74,11 @@ defmodule JidoTest.DurableFixtures do
   defmodule Flow do
     use Jido.Flow,
       name: "durable_probe_flow",
-      schema: Zoi.object(%{value: Zoi.integer()}),
+      schema:
+        Zoi.object(%{
+          value: Zoi.integer(),
+          blob: Zoi.string() |> Zoi.optional()
+        }),
       output_schema: Zoi.object(%{count: Zoi.integer()})
 
     flow do
@@ -152,7 +156,7 @@ defmodule JidoTest.DurableFixtures do
 
     defp corrupt(bytes, result) do
       case :erlang.binary_to_term(bytes) do
-        %{fmt: 1, log: log} when is_list(log) -> {:ok, :erlang.term_to_binary(%{fmt: 99})}
+        [_ | _] -> {:ok, :erlang.term_to_binary(:invalid)}
         _ -> result
       end
     end
@@ -172,15 +176,20 @@ defmodule JidoTest.DurableFixtures do
         case record do
           %{server_turn: %{status: :completed}} -> :completion_write
           %{rev: 1} -> :intent_write
-          %{fmt: 1, log: nil} -> :checkpoint_create
-          %{fmt: 1, log: log} when is_list(log) -> :input_write
+          [_ | _] = events -> event_write(events)
           _ -> :other
         end
 
       with :ok <- Probe.checkpoint(),
            :ok <- Jido.Persistence.File.compare_and_swap(key, expected, value, opts) do
-        Probe.gate({kind, Map.get(record, :agent_module)})
+        Probe.gate({kind, if(is_map(record), do: Map.get(record, :agent_module))})
       end
+    end
+
+    defp event_write(events) do
+      if Enum.any?(events, &match?(%Runic.Workflow.Events.FactProduced{}, &1)),
+        do: :input_write,
+        else: :other
     end
   end
 

@@ -47,7 +47,7 @@
         "jido.agent.I10": {
           "failing": 0,
           "kind": "functional",
-          "passing": 20,
+          "passing": 24,
           "status": "active",
           "testable": true,
           "tests": [
@@ -60,6 +60,9 @@
             "test __state__ is a reserved provider section",
             "test __topology__ is a reserved provider section",
             "test agent is a reserved provider section",
+            "test an extension can contribute only exact routes",
+            "test an extension contributes one exact route through Map authoring",
+            "test an extension route cannot conflict with a stored route",
             "test composed Plugin state follows the same schema policy",
             "test lowering and endpoint projection return the complete contribution",
             "test normalization and verification reject invalid provider data",
@@ -69,6 +72,7 @@
             "test routes is a reserved provider section",
             "test runtime Plugin projection accepts only available Plugin adapters",
             "test state is a reserved provider section",
+            "test stored route projection requires every derived route",
             "test the definition stores ordered routes and Plugin contributions",
             "test topology is a reserved provider section"
           ]
@@ -145,13 +149,16 @@
         "jido.agent.I22": {
           "failing": 0,
           "kind": "functional",
-          "passing": 32,
+          "passing": 36,
           "status": "active",
           "testable": true,
           "tests": [
             "test Signal paths reject malformed values with their source",
             "test Spark rejects invalid schema and identity options with a field path",
             "test a provider must implement the current contribution contract",
+            "test an extension can contribute only exact routes",
+            "test an extension contributes one exact route through Map authoring",
+            "test an extension route cannot conflict with a stored route",
             "test an unchanged Agent checks a reloaded Action contract",
             "test authoring containers normalize keys and reject ambiguous input",
             "test authoring traversal preserves order and stops at one structured error",
@@ -179,6 +186,7 @@
             "test scalar authoring validators keep their exact boundaries",
             "test state schemas reject malformed fields and every conversion type",
             "test static authoring checks include Map keys",
+            "test stored route projection requires every derived route",
             "test stored-state failures distinguish conversion from missing data",
             "test validation distinguishes definitions, instances, and unsupported values"
           ]
@@ -1637,7 +1645,7 @@
           "testable": true,
           "tests": [
             "test ordinary AgentServer execution rejects waits before Actions and rejects host spoofing",
-            "test ordinary IDs and invalid instance names have no execution store",
+            "test ordinary IDs have no execution store",
             "test the production host supplies a current clock and durable validation",
             "test wait IDs are non-empty strings and fail before server access",
             "test wait delivery stays on the typed AgentServer facade",
@@ -1647,16 +1655,18 @@
         "jido.agent_server.durable_turn.I2": {
           "failing": 0,
           "kind": "persisted_format",
-          "passing": 6,
+          "passing": 8,
           "status": "active",
           "testable": true,
           "tests": [
+            "test Runic appends each event batch once and streams committed events in order",
             "test an unchanged workflow transition preserves the saved graph",
-            "test checkpoint keys use the stable unpadded v1 encoding",
+            "test checkpoint keys use the stable unpadded encoding",
             "test execution identity isolates partitions, Agents, and command IDs",
-            "test initial input and graph checkpoints share one conditional byte record",
-            "test old runtime cleanup cannot remove the replacement owner's registration",
-            "test ordinary IDs and invalid instance names have no execution store"
+            "test old runtime cleanup cannot remove or collect a replacement owner's checkpoint",
+            "test ordinary IDs have no execution store",
+            "test rejects an invalid batch count",
+            "test repairs a tail chunk before the next append"
           ]
         },
         "jido.agent_server.durable_turn.I3": {
@@ -1742,7 +1752,7 @@
             "test the host rejects stale, unmatched, malformed, and non-portable input",
             "test the input limit rejects new receipts but permits equal retries",
             "test unmarked input-shaped facts are not wait receipts",
-            "test wait delivery rejects an execution marker with no saved graph"
+            "test wait delivery rejects an execution with no saved graph"
           ]
         },
         "jido.agent_server.durable_turn.I8": {
@@ -1769,7 +1779,7 @@
         "jido.agent_server.durable_turn.I9": {
           "failing": 0,
           "kind": "ordering",
-          "passing": 6,
+          "passing": 8,
           "status": "active",
           "testable": true,
           "tests": [
@@ -1778,7 +1788,9 @@
             "test a stored completion is recovered after the commit reply is lost",
             "test bad_output failure saves a terminal Turn without changing Agent state",
             "test effects failure saves a terminal Turn without changing Agent state",
-            "test successful Flow commits once before the next Turn"
+            "test successful Flow commits once before the next Turn",
+            "test terminal Flow cleanup removes its execution checkpoint",
+            "test terminal cleanup unregisters immediately and deletes asynchronously"
           ]
         }
       }

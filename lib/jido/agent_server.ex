@@ -99,13 +99,26 @@ defmodule Jido.AgentServer do
     @impl true
     def init_store(opts), do: {:ok, Keyword.get(opts, :jido)}
     @impl true
-    defdelegate save(id, log, state), to: Jido.AgentServer.DurableTurn.CheckpointStore
+    def for_workflow(id, jido), do: {id, jido}
     @impl true
-    defdelegate load(id, state), to: Jido.AgentServer.DurableTurn.CheckpointStore
+    def save(_id, _log, _state), do: :ok
     @impl true
-    def list(_state), do: {:ok, []}
+    def load(_id, _state), do: {:error, :not_found}
     @impl true
-    def exists?(_id, _state), do: false
+    def append(id, events, {id, jido}),
+      do: Jido.AgentServer.DurableTurn.CheckpointStore.append(id, events, jido)
+
+    @impl true
+    def stream(id, {id, jido}),
+      do: Jido.AgentServer.DurableTurn.CheckpointStore.stream(id, jido)
+
+    @impl true
+    def save_fact(hash, value, {id, jido}),
+      do: Jido.AgentServer.DurableTurn.CheckpointStore.save_fact(id, hash, value, jido)
+
+    @impl true
+    def load_fact(hash, {id, jido}),
+      do: Jido.AgentServer.DurableTurn.CheckpointStore.load_fact(id, hash, jido)
   end
 
   @typedoc "An owner-bound handle for one submitted Turn result."
@@ -2558,10 +2571,6 @@ defmodule Jido.AgentServer do
     ServerSupervisor.forget_execution(data.activation_state)
     if data.active.worker_ref, do: Process.demonitor(data.active.worker_ref, [:flush])
 
-    if data.active.durable,
-      do:
-        Jido.AgentServer.DurableTurn.CheckpointStore.unregister(data.jido, data.active.worker_id)
-
     data = data |> put_in([:active, :worker], nil) |> put_in([:active, :worker_ref], nil)
 
     cond do
@@ -3083,6 +3092,10 @@ defmodule Jido.AgentServer do
   end
 
   defp finish_result(data, result) do
+    if data.active.durable and
+         (data.active.durable_finalized or data.server_turn.status == :completed),
+       do: DurableTurn.CheckpointStore.collect(data.jido, data.active.worker_id)
+
     {next, status, stage, count} =
       case result do
         result when elem(result, 0) in [:ok, :handoff] ->

@@ -21,3 +21,9 @@
   decision: Mutate DurableTurn, DurableTurn.CheckpointStore, and DurableTurn.WaitHost. Do not mutate the shared AgentServer state machine in this focused profile.
   driver: The focused profile must test durable Flow decisions without overlapping the core Turn and durable Agent components.
   approved_by: Component hardening pass
+
+- id: durable-turn-fact-deltas
+  date: 2026-10-27
+  decision: Store Runic produced fact values and Join completion results in the execution-scoped fact store. Store a full value at the start of each bounded chain, then store a reference to the prior fact plus a structural frame delta only when the complete delta record is smaller. Rebuild and verify the exact runtime value on load.
+  driver: Cumulative Jido Flow frames repeat the same input, results, and branch state in each durable fact. Exact fact references remove that repeated storage without changing runtime frame values or durable execution order.
+  approved_by: User-requested fact-referenced frame delta refactor

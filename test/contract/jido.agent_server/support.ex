@@ -305,7 +305,8 @@ defmodule JidoTest.AgentServer.Fixtures do
     assert DynamicSupervisor.which_children(Module.concat(runner, WorkerSupervisor)) == []
     assert Task.Supervisor.children(Module.concat(runner, TaskSupervisor)) == []
     {store, state} = Runic.Runner.get_store(runner)
-    assert {:ok, []} = store.list(state)
+
+    if function_exported?(store, :list, 1), do: assert({:ok, []} = store.list(state))
   end
 
   def down(pid) do

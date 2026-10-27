@@ -32,6 +32,7 @@ defmodule JidoTest.InstanceOptionsTest do
 
       assert validated[:max_tasks] == max_tasks
       assert validated[:debug] == debug
+
       assert validated[:agent_server] == [turn_timeout: 10]
     end
   end

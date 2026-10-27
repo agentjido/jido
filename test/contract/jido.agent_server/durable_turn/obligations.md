@@ -30,7 +30,7 @@ belong to `jido_action`; this component adds no DSL.
 ### jido.agent_server.durable_turn.I2 — Isolated execution checkpoint
 
 - **scope:** durable workflow checkpoint storage
-- **must:** Derive execution identity from instance namespace, partition, Agent ID, and Turn ID. Keep one conditionally written record for the initial marker and Runic event log. Make creation idempotent, reject corrupt records, isolate identities, and prevent cleanup by an old owner from removing a replacement owner's registration.
+- **must:** Derive execution identity from instance namespace, partition, Agent ID, and Turn ID. Append each ordered Runic event batch once behind a conditional batch count. Store produced fact values and Join completion results under that execution identity. Use bounded fact-referenced frame deltas only when they are smaller than full values, and rebuild the exact value during recovery. Keep a fact manifest for collection. Recover a stored tail batch if its count update was interrupted. Reject corrupt records, isolate identities, and prevent cleanup by an old owner from removing a replacement owner's registration.
 - **why:** Each durable Flow needs one fenced checkpoint authority.
 - **kind:** persisted-format
 - **status:** active
@@ -83,10 +83,10 @@ belong to `jido_action`; this component adds no DSL.
 - **kind:** ordering
 - **status:** active
 
-### jido.agent_server.durable_turn.I9 — Terminal Flow receipt
+### jido.agent_server.durable_turn.I9 — Terminal Flow receipt and collection
 
 - **scope:** durable Flow completion and failure
-- **must:** Save completed, failed, or cancelled Turn status with the complete Agent revision before a terminal reply or later Turn starts. Commit a successful Flow once. Preserve Agent state on failure. Restore a confirmed completion without rerunning Actions, Plugin commit hooks, or returned Directives.
+- **must:** Save completed, failed, or cancelled Turn status with the complete Agent revision before a terminal reply or later Turn starts. Commit a successful Flow once. Preserve Agent state on failure. Restore a confirmed completion without rerunning Actions, Plugin commit hooks, or returned Directives. Delete the separate execution checkpoint only after the terminal Agent revision is durable. A failed physical delete must not change the terminal Turn result.
 - **why:** Terminal recovery must distinguish completed work from work that still needs execution.
 - **kind:** ordering
 - **status:** active

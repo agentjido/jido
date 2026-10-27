@@ -373,14 +373,11 @@ defmodule Jido.MixProject do
   defp deps do
     [
       # Jido Ecosystem
-      # Keep the reviewed Invoke and Handoff contract fixed until its Hex release.
-      {:jido_action,
-       github: "agentjido/jido_action",
-       ref: "b7604eaab7dbf78b27aa8c7fec8091b9d0ca2aa9",
-       override: true},
+      # Local integration work spans Jido Action and Runic.
+      {:jido_action, path: "../jido_action", override: true},
       {:jido_signal, "~> 3.0.0-beta.5"},
       # AgentServer owns native Runic Runners and Worker cleanup.
-      {:runic, "~> 0.1.0-alpha.12", override: true},
+      {:runic, path: "../runic", override: true},
 
       # Jido Deps
       {:zoi, "~> 0.18.11"},

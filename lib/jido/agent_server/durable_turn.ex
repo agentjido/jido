@@ -31,13 +31,7 @@ defmodule Jido.AgentServer.DurableTurn do
            plugin_inputs: prepared.context.plugin_inputs,
            fingerprint: fingerprint(instruction.target),
            status: :running,
-           expires_at:
-             if(data.turn_timeout == :infinity,
-               do: :infinity,
-               else:
-                 System.system_time(:millisecond) +
-                   max(0, data.active.deadline - System.monotonic_time(:millisecond))
-             )
+           expires_at: expires_at(data.active)
          },
          :ok <- Jido.PortableTerm.validate(receipt, :server_turn) do
       {:ok, receipt}
@@ -67,11 +61,7 @@ defmodule Jido.AgentServer.DurableTurn do
       predecessor_id: data.active.turn_id
     }
 
-    if data.persistence in [nil, false] do
-      {:ok, receipt}
-    else
-      with :ok <- Jido.PortableTerm.validate(receipt, :server_turn), do: {:ok, receipt}
-    end
+    validate_receipt(data, receipt)
   end
 
   def release_handoff(data, receipt, prepared) do
@@ -82,11 +72,7 @@ defmodule Jido.AgentServer.DurableTurn do
       |> Map.put(:admitted_signal, prepared.signal)
       |> Map.put(:plugin_inputs, prepared.context.plugin_inputs)
 
-    if data.persistence in [nil, false] do
-      {:ok, released}
-    else
-      with :ok <- Jido.PortableTerm.validate(released, :server_turn), do: {:ok, released}
-    end
+    validate_receipt(data, released)
   end
 
   def restore_handoff(agent, receipt, context, specs) do
@@ -109,15 +95,13 @@ defmodule Jido.AgentServer.DurableTurn do
     end
   end
 
-  def validate_restore(agent, %{status: :running} = receipt) do
+  def validate_restore(agent, %{status: status} = receipt) when status in [:running, :released] do
     with {:ok, specs} <- Jido.Plugin.Normalizer.normalize_all(Jido.Agent.runtime_plugins(agent)),
-         {:ok, _} <- restore(agent, receipt, receipt.context, specs),
-         do: :ok
-  end
-
-  def validate_restore(agent, %{status: :released} = receipt) do
-    with {:ok, specs} <- Jido.Plugin.Normalizer.normalize_all(Jido.Agent.runtime_plugins(agent)),
-         {:ok, _} <- restore_handoff(agent, receipt, receipt.context, specs),
+         {:ok, _prepared} <-
+           if(status == :running,
+             do: restore(agent, receipt, receipt.context, specs),
+             else: restore_handoff(agent, receipt, receipt.context, specs)
+           ),
          do: :ok
   end
 
@@ -134,10 +118,8 @@ defmodule Jido.AgentServer.DurableTurn do
 
   def identity(data),
     do:
-      CheckpointStore.identity(
-        %{jido: data.jido, partition: data.partition, agent_id: data.agent.id},
-        data.active.turn_id
-      )
+      {:jido_execution, Jido.namespace(data.jido), data.partition, data.agent.id,
+       data.active.turn_id}
 
   def start(data, owner, hooks, policy) do
     id = identity(data)
@@ -172,7 +154,6 @@ defmodule Jido.AgentServer.DurableTurn do
          {:ok, instruction} <- instruction(data.active.prepared),
          {:ok, workflow} <- Jido.Exec.compile(%{instruction | context: %{}}),
          :ok <- CheckpointStore.register(data.jido, id, data.persistence, owner),
-         :ok <- CheckpointStore.create(data.jido, id),
          {:ok, saved} <-
            CheckpointStore.update_workflow(data.jido, id, &WaitHost.resolve(&1, now())),
          options =
@@ -313,6 +294,14 @@ defmodule Jido.AgentServer.DurableTurn do
   defp expires_at(%{deadline: deadline}) do
     System.system_time(:millisecond) +
       max(0, deadline - System.monotonic_time(:millisecond))
+  end
+
+  defp validate_receipt(%{persistence: persistence}, receipt)
+       when persistence in [nil, false],
+       do: {:ok, receipt}
+
+  defp validate_receipt(_data, receipt) do
+    with :ok <- Jido.PortableTerm.validate(receipt, :server_turn), do: {:ok, receipt}
   end
 
   defp instruction_fingerprint(%Jido.Instruction{kind: :flow, target: target}),
