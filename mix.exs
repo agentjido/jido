@@ -220,7 +220,7 @@ defmodule Jido.MixProject do
           Jido.Agent.Turn,
           Jido.Agent.View
         ],
-        "Agent Authoring": [Jido.Agent.Topology],
+        "Agent Authoring": [Jido.Agent.Options, Jido.Agent.Topology],
         "Agent Directives": [
           Jido.Agent.Directive,
           Jido.Agent.Directive.AgentAdd,

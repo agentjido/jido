@@ -11,7 +11,7 @@ defmodule Jido.Agent do
   Routes select one handler in declaration order. Connections select recipients
   for outputs. Plugins add explicit, validated data to `plugins`.
   """
-  alias Jido.Agent.{Data, Validation}
+  alias Jido.Agent.{Data, Options, Validation}
   alias Jido.Agent.Plugin.Declaration
   alias Jido.Agent.Runner
   alias Jido.Dispatch.Preparation
@@ -151,23 +151,18 @@ defmodule Jido.Agent do
   end
 
   @doc false
-  def options!(quoted, caller) do
-    {opts, _binding} = Code.eval_quoted(quoted, [], caller)
+  def options!(quoted_options, caller) do
+    options = Options.prepare!(quoted_options, caller)
 
-    unless Keyword.keyword?(opts) and Enum.uniq(Keyword.keys(opts)) == Keyword.keys(opts),
-      do: raise(ArgumentError, "Agent requires unique keyword options")
+    case Declaration.normalize(Keyword.get(options, :plugins, [])) do
+      {:ok, declarations} ->
+        options
+        |> Keyword.delete(:plugins)
+        |> Keyword.put(:plugin_providers, Enum.map(declarations, & &1.provider))
+        |> Keyword.put(:plugin_declarations, declarations)
 
-    opts = Keyword.put_new(opts, :id, Atom.to_string(caller.module))
-
-    with :ok <- Jido.Authoring.Registry.validate_identifier(opts[:id]),
-         {:ok, declarations} <-
-           Declaration.normalize(Keyword.get(opts, :plugins, [])) do
-      opts
-      |> Keyword.delete(:plugins)
-      |> Keyword.put(:plugin_providers, Enum.map(declarations, & &1.provider))
-      |> Keyword.put(:plugin_declarations, declarations)
-    else
-      {:error, error} -> raise error
+      {:error, error} ->
+        raise error
     end
   end
 
