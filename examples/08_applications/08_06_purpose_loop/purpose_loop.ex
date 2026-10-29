@@ -1,6 +1,6 @@
 defmodule Jido.Examples.Applications.PurposeLoop.Agent do
   @moduledoc "Runs bounded scheduled work and supports pause, resume, and drain controls."
-  use Jido.Agent, name: "application_purpose_loop_agent"
+  use Jido.Agent, name: "application_purpose_loop_agent", plugins: [Jido.Plugin.Scheduler]
 
   alias Jido.Examples.Applications.PurposeLoop.State
 
@@ -24,10 +24,6 @@ defmodule Jido.Examples.Applications.PurposeLoop.Agent do
              work_delay_ms: Zoi.integer() |> Zoi.default(20),
              idle_delay_ms: Zoi.integer() |> Zoi.default(100)
            })
-  end
-
-  plugins do
-    plugin Jido.Plugin.Scheduler
   end
 
   routes do

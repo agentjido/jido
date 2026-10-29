@@ -85,7 +85,7 @@ defmodule JidoTest.AgentServer.PluginRuntime.ConfigurationSupport do
         }
       ],
       topology: topology,
-      extensions:
+      plugins:
         Enum.map(plugins, fn declaration ->
           {provider, options} =
             case declaration do

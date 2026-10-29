@@ -7,14 +7,14 @@ threshold state.
 ## What you will learn
 
 - Add a Spark section and a named entity through `use Jido.Plugin`.
-- Use `extensions: [Thresholds]` to import the `thresholds` section into an Agent.
-- Lower DSL syntax to one portable, versioned contribution in `Agent.extensions`.
+- Use `plugins: [Thresholds]` to import the `thresholds` section into an Agent.
+- Lower DSL syntax to one portable, versioned contribution in `Agent.plugins`.
 - Apply the same normalization and route checks to DSL, Map, and JSON input.
 - Reduce only the Plugin-owned field after an Action returns a complete candidate.
 
 ## Read the code
 
-Start with [the Agent](plugin_dsl.ex). Its declarations are the main extension
+Start with [the Agent](plugin_dsl.ex). Its declarations are the main Plugin
 point:
 
 ```elixir

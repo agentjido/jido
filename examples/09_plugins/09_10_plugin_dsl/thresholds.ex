@@ -20,7 +20,7 @@ defmodule Jido.Examples.Plugins.DSL.Thresholds do
   }
   use Jido.Plugin, id: "examples.thresholds", vsn: 1, sections: [@section]
 
-  @impl Jido.Agent.Extension
+  @impl true
   def lower(dsl, config) do
     entries = DSL.get_entities(dsl, [:thresholds])
 
@@ -57,7 +57,7 @@ defmodule Jido.Examples.Plugins.DSL.Thresholds do
                    unrecognized_keys: :error
                  )
 
-  @impl Jido.Agent.Extension
+  @impl true
   def normalize(data) do
     with {:ok, data} <- Zoi.parse(@config_schema, data) do
       names = Enum.map(data.thresholds, & &1.name)
@@ -65,7 +65,7 @@ defmodule Jido.Examples.Plugins.DSL.Thresholds do
     end
   end
 
-  @impl Jido.Agent.Extension
+  @impl true
   def verify(data, definition) do
     if Enum.any?(definition.routes, &(&1.path == data.on)),
       do: :ok,

@@ -1,20 +1,17 @@
 defmodule Jido.Examples.Plugins.Composition.Agent do
   @moduledoc "Combines one pure input Plugin with one live input Plugin."
-  use Jido.Agent, name: "plugin_composition_agent"
+  use Jido.Agent,
+    name: "plugin_composition_agent",
+    plugins: [
+      {Jido.Examples.Plugins.Composition.Tenant, %{subject_prefix: "tenant/"}},
+      {Jido.Examples.Plugins.Composition.Authorization, %{tokens: [{"allow", "operator"}]}}
+    ]
 
   state do
     schema Zoi.object(%{
              accepted: Zoi.integer() |> Zoi.default(0),
              owner: Zoi.string() |> Zoi.default("")
            })
-  end
-
-  plugins do
-    plugin Jido.Examples.Plugins.Composition.Tenant,
-      config: %{subject_prefix: "tenant/"}
-
-    plugin Jido.Examples.Plugins.Composition.Authorization,
-      config: %{tokens: [{"allow", "operator"}]}
   end
 
   routes do

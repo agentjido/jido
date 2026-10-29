@@ -1,6 +1,8 @@
 defmodule Jido.Examples.Applications.Inbox.Agent do
   @moduledoc "Accepts unique events from a managed, tagged input sensor."
-  use Jido.Agent, name: "application_inbox_agent"
+  use Jido.Agent,
+    name: "application_inbox_agent",
+    plugins: [{Jido.Plugin.SensorManager, %{retry_delay_ms: 10}}]
 
   alias Jido.Examples.Applications.Inbox.Sensor
   alias Jido.Plugin.SensorManager
@@ -10,10 +12,6 @@ defmodule Jido.Examples.Applications.Inbox.Agent do
              accepted: Zoi.integer() |> Zoi.default(0),
              seen: Zoi.list(Zoi.string()) |> Zoi.default([])
            })
-  end
-
-  plugins do
-    plugin SensorManager, config: %{retry_delay_ms: 10}
   end
 
   routes do

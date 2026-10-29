@@ -40,7 +40,7 @@ defmodule JidoTest.AgentRegistry do
       references(agent.metadata) ++
       Enum.flat_map(agent.routes, &route_references/1) ++
       topology_references(agent.topology) ++
-      Enum.flat_map(agent.extensions, &extension_references/1)
+      Enum.flat_map(agent.plugins, &plugin_references/1)
   end
 
   defp references(value) when is_atom(value) and value not in [nil, true, false],
@@ -84,8 +84,8 @@ defmodule JidoTest.AgentRegistry do
       end)
   end
 
-  defp extension_references(extension) do
-    [{:extension, extension.provider}] ++ references(extension.data)
+  defp plugin_references(plugin) do
+    [{:plugin, plugin.provider}] ++ references(plugin.data)
   end
 
   defp optional(_kind, nil), do: []

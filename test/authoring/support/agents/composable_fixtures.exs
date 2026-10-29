@@ -43,7 +43,7 @@ defmodule JidoTest.ComposableAgent.Team do
     description: "Test team",
     vsn: 2,
     metadata: %{label: "team"},
-    extensions: [
+    plugins: [
       Jido.Plugin.Scheduler.DSL,
       Jido.Plugin.Bus.DSL
     ]
@@ -145,28 +145,28 @@ defmodule JidoTest.ComposableAgent.Team do
 end
 
 defmodule JidoTest.ComposableAgent.Audit do
+  alias Jido.Agent.Data
+  alias Spark.Dsl.Extension, as: SparkExtension
+
   @section %Spark.Dsl.Section{name: :audit, schema: [label: [type: :string, required: true]]}
-  use Jido.Agent.Extension, id: "test.audit", sections: [@section]
-  def runtime_support, do: __MODULE__
+  use Jido.Plugin, id: "test.audit", sections: [@section]
 
   def lower(dsl, config) do
-    label = Spark.Dsl.Extension.get_opt(dsl, [:audit], :label)
+    label = SparkExtension.get_opt(dsl, [:audit], :label)
     if label, do: {:ok, Map.put(config, :label, label)}, else: {:ok, config}
   end
 
   def normalize(data) do
-    with {:ok, data} <- Jido.Agent.Data.fields(data, [:label, :enabled], %{enabled: true}),
-         :ok <- Jido.Agent.Data.nonempty(data[:label]),
+    with {:ok, data} <- Data.fields(data, [:label, :enabled], %{enabled: true}),
+         :ok <- Data.nonempty(data[:label]),
          do: {:ok, data}
   end
 end
 
 defmodule JidoTest.ComposableAgent.PluginFirst do
-  use Jido.Agent, name: "plugin", extensions: [JidoTest.ComposableAgent.Audit]
-
-  plugins do
-    plugin JidoTest.ComposableAgent.Audit, config: %{enabled: false}
-  end
+  use Jido.Agent,
+    name: "plugin",
+    plugins: [{JidoTest.ComposableAgent.Audit, %{enabled: false}}]
 
   audit do
     label("example")
@@ -174,14 +174,12 @@ defmodule JidoTest.ComposableAgent.PluginFirst do
 end
 
 defmodule JidoTest.ComposableAgent.PluginLast do
-  use Jido.Agent, name: "plugin", extensions: [JidoTest.ComposableAgent.Audit]
+  use Jido.Agent,
+    name: "plugin",
+    plugins: [{JidoTest.ComposableAgent.Audit, %{enabled: false}}]
 
   audit do
     label("example")
-  end
-
-  plugins do
-    plugin JidoTest.ComposableAgent.Audit, config: %{enabled: false}
   end
 end
 
@@ -217,7 +215,7 @@ defmodule JidoTest.ComposableAgent.Named do
 end
 
 defmodule JidoTest.ComposableAgent.ScheduleShort do
-  use Jido.Agent, name: "schedule", extensions: [Jido.Plugin.Scheduler.DSL]
+  use Jido.Agent, name: "schedule", plugins: [Jido.Plugin.Scheduler.DSL]
 
   routes do
     route "work.request", JidoTest.ComposableAgent.Action
@@ -233,7 +231,7 @@ defmodule JidoTest.ComposableAgent.ScheduleShort do
 end
 
 defmodule JidoTest.ComposableAgent.ScheduleBlock do
-  use Jido.Agent, name: "schedule", extensions: [Jido.Plugin.Scheduler.DSL]
+  use Jido.Agent, name: "schedule", plugins: [Jido.Plugin.Scheduler.DSL]
 
   routes do
     route "work.request", JidoTest.ComposableAgent.Action
@@ -254,15 +252,14 @@ defmodule JidoTest.ComposableAgent.ScheduleBlock do
 end
 
 defmodule JidoTest.ComposableAgent.PluginAlias do
-  use Jido.Agent, name: "plugin", extensions: [JidoTest.ComposableAgent.Audit]
-  alias JidoTest.ComposableAgent.{Audit, Action}
+  use Jido.Agent,
+    name: "plugin",
+    plugins: [{JidoTest.ComposableAgent.Audit, %{enabled: false}}]
+
+  alias JidoTest.ComposableAgent.Action
 
   audit do
     label("example")
-  end
-
-  plugins do
-    plugin Audit, config: %{enabled: false}
   end
 
   routes do
@@ -287,13 +284,11 @@ defmodule JidoTest.ComposableAgent.ConflictingPlugin do
 end
 
 defmodule JidoTest.ComposableAgent.PluginState do
-  use Jido.Agent, name: "plugin_state"
+  use Jido.Agent,
+    name: "plugin_state",
+    plugins: [{JidoTest.ComposableAgent.OwnedPlugin, %{initial: 3}}]
 
   state do
     schema Zoi.object(%{value: Zoi.string() |> Zoi.default("domain")})
-  end
-
-  plugins do
-    plugin JidoTest.ComposableAgent.OwnedPlugin, config: %{initial: 3}
   end
 end

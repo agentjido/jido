@@ -1,6 +1,6 @@
 defmodule Jido.Examples.Topology.Swarm do
   @moduledoc "A declared local Bus broadcasts each work output to three members."
-  use Jido.Agent, name: "topology_bus_swarm", extensions: [Jido.Plugin.Bus.DSL]
+  use Jido.Agent, name: "topology_bus_swarm", plugins: [Jido.Plugin.Bus.DSL]
 
   state do
     schema Zoi.object(%{

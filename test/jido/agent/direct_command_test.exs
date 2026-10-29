@@ -93,7 +93,7 @@ defmodule Jido.Agent.DirectCommandTest do
   end
 
   defmodule Label do
-    use Jido.Agent.Extension, id: "test.direct.label"
+    use Jido.Plugin, id: "test.direct.label"
   end
 
   defmodule UnknownDirective do
@@ -121,7 +121,7 @@ defmodule Jido.Agent.DirectCommandTest do
           label: Zoi.string() |> Zoi.default("same")
         }),
       routes: routes,
-      extensions: extensions
+      plugins: extensions
     })
     |> Agent.instantiate!(id: "direct-1")
   end
@@ -238,7 +238,7 @@ defmodule Jido.Agent.DirectCommandTest do
     add = Directive.plugin_add(Owned)
     assert {:ok, added, [^add]} = Agent.cmd(before, signal("work", %{directives: [add]}))
     assert added.state.owned == 0
-    assert length(added.extensions) == 1
+    assert length(added.plugins) == 1
 
     assert {:ok, removed, [_]} =
              Agent.cmd(
@@ -247,8 +247,8 @@ defmodule Jido.Agent.DirectCommandTest do
              )
 
     refute Map.has_key?(removed.state, :owned)
-    assert removed.extensions == []
-    assert before.extensions == []
+    assert removed.plugins == []
+    assert before.plugins == []
   end
 
   test "Plugin edits preserve extension data and declaration order" do
@@ -256,7 +256,7 @@ defmodule Jido.Agent.DirectCommandTest do
     before = instance([action()], [owned(), label])
     configure = Directive.plugin_configure(Owned, [])
     assert {:ok, after_agent, [_]} = Agent.cmd(before, signal("work", %{directives: [configure]}))
-    assert after_agent.extensions === before.extensions
+    assert after_agent.plugins === before.plugins
 
     assert {:ok, removed, [_]} =
              Agent.cmd(
@@ -264,7 +264,7 @@ defmodule Jido.Agent.DirectCommandTest do
                signal("work", %{directives: [Directive.plugin_remove(Owned, state: :discard)]})
              )
 
-    assert removed.extensions === [label]
+    assert removed.plugins === [label]
   end
 
   test "Scheduler owns its Directives and changes schedule state, not definition data" do
@@ -299,7 +299,7 @@ defmodule Jido.Agent.DirectCommandTest do
              Agent.cmd(replaced, signal("work", %{amount: 0, directives: [cancel]}))
 
     assert removed.state === before.state
-    assert removed.extensions === before.extensions
+    assert removed.plugins === before.plugins
   end
 
   test "a Scheduler one-shot is returned as runtime work and does not edit schedule state" do

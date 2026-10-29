@@ -20,17 +20,13 @@ defmodule JidoTest.ScheduledOccurrenceFixtures.FastRuntimeAgent do
   alias JidoTest.AgentRuntimeFixtures.{Record, ReturnDirective, Tick}
   alias JidoTest.ScheduledOccurrenceFixtures.Clock
 
-  use Jido.Agent, name: "fast_runtime_agent"
+  use Jido.Agent, name: "fast_runtime_agent", plugins: [{Scheduler, %{time_scale: Clock}}]
 
   state do
     schema Zoi.object(%{
              events: Zoi.list(Zoi.any()) |> Zoi.default([]),
              ticks: Zoi.integer() |> Zoi.default(0)
            })
-  end
-
-  plugins do
-    plugin Scheduler, config: %{time_scale: Clock}
   end
 
   routes do
@@ -47,17 +43,13 @@ defmodule JidoTest.ScheduledOccurrenceFixtures.TimedAgent do
   alias Jido.Signal
   alias JidoTest.ScheduledOccurrenceFixtures.Clock
 
-  use Jido.Agent, name: "timed_occurrence_probe"
+  use Jido.Agent, name: "timed_occurrence_probe", plugins: [{Scheduler, %{time_scale: Clock}}]
 
   state do
     schema Zoi.object(%{
              generation: Zoi.integer() |> Zoi.default(0),
              ticks: Zoi.list(Zoi.map()) |> Zoi.default([])
            })
-  end
-
-  plugins do
-    plugin Scheduler, config: %{time_scale: Clock}
   end
 
   routes do

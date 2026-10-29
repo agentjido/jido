@@ -3,7 +3,7 @@ defmodule JidoTest.ComposableAgent.Definitions.Team do
     name: "research_team",
     description: "Coordinates research and records a report",
     metadata: %{purpose: "research"},
-    extensions: [
+    plugins: [
       Jido.Plugin.Scheduler.DSL,
       Jido.Plugin.Bus.DSL
     ]

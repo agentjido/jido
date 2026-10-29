@@ -76,17 +76,16 @@ registry =
 authoring_opts = [registry: registry, codec: Jido.Agent.Codec]
 ```
 
-The Agent codec accepts `:agent`, `:action`, `:flow`, `:plugin`, `:extension`,
-`:transform`, `:schema`, and `:atom`. Each typed value has one canonical
-reference.
+The Agent codec accepts `:agent`, `:action`, `:flow`, `:plugin`, `:transform`,
+`:schema`, and `:atom`. Each typed value has one canonical reference.
 
 Register:
 
 - the Agent module and every Action or Flow target;
 - the state schema;
-- every extension or Plugin provider module; and
+- every Plugin provider module; and
 - atoms used as data: `as:` helper names, keys in `defaults`, and keys in
-  metadata, extension data, and topology data.
+  metadata, Plugin data, and topology data.
 
 Jido already knows its structural names, such as `path`, `handler`, and
 `kind`. Keep the Registry in code, review changes to it, and never build it
@@ -161,7 +160,7 @@ Import fails closed. Each case returns an error and no Agent:
 Replace `"actions/add"` with `"actions/delete_everything"` in the JSON and
 import fails with a Registry reference issue. No module
 lookup happens. Imported documents get the same validation as a DSL module:
-fields, routes, extensions, and schema.
+fields, routes, Plugins, and schema.
 
 ## Test Round Trips
 

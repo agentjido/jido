@@ -81,7 +81,7 @@ defmodule Jido.Agent.Topology do
          :ok <- Error.at(Data.unique(agents, & &1.name), :agents),
          {:ok, connections} <-
            Error.at(
-             Data.list(topology.connections, &connection(&1, agents, parent.extensions)),
+             Data.list(topology.connections, &connection(&1, agents, parent.plugins)),
              :connections
            ),
          :ok <- Error.at(Data.unique(connections, &{&1.from, &1.to, &1.path}), :connections),
@@ -221,13 +221,13 @@ defmodule Jido.Agent.Topology do
     with {:ok, _} <- Data.parse_value(schema, value), do: :ok
   end
 
-  defp connection(value, agents, extensions) do
+  defp connection(value, agents, plugins) do
     with {:ok, connection} <- entry(:connect, value),
-         {:ok, from} <- Error.at(endpoint(connection[:from], agents, extensions), :from),
-         {:ok, to} <- Error.at(endpoint(connection[:to], agents, extensions), :to),
+         {:ok, from} <- Error.at(endpoint(connection[:from], agents, plugins), :from),
+         {:ok, to} <- Error.at(endpoint(connection[:to], agents, plugins), :to),
          connection = %{connection | from: from, to: to},
          :ok <- delivery(connection, agents),
-         :ok <- Extension.verify_connection(extensions, connection),
+         :ok <- Extension.verify_connection(plugins, connection),
          do: {:ok, connection}
   end
 
@@ -239,8 +239,8 @@ defmodule Jido.Agent.Topology do
     end
   end
 
-  defp endpoint(%{} = value, _agents, extensions) do
-    if value in Extension.endpoints(extensions),
+  defp endpoint(%{} = value, _agents, plugins) do
+    if value in Extension.endpoints(plugins),
       do: {:ok, value},
       else:
         Error.fail(

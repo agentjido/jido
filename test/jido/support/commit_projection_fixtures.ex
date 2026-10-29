@@ -193,15 +193,14 @@ end
 
 defmodule JidoTest.CommitProjection.Agent do
   @moduledoc false
-  use Jido.Agent, name: "commit_projection_agent"
+  use Jido.Agent,
+    name: "commit_projection_agent",
+    plugins: [
+      {JidoTest.CommitProjection.First, %{key: :first, sink: JidoTest.CommitProjection.Sink}}
+    ]
 
   state do
     schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
-  end
-
-  plugins do
-    plugin JidoTest.CommitProjection.First,
-      config: %{key: :first, sink: JidoTest.CommitProjection.Sink}
   end
 
   routes do
@@ -215,15 +214,15 @@ end
 
 defmodule JidoTest.CommitProjection.ProjectionAgent do
   @moduledoc false
-  use Jido.Agent, name: "runtime_commit_projection_agent"
+  use Jido.Agent,
+    name: "runtime_commit_projection_agent",
+    plugins: [
+      {JidoTest.CommitProjection.Projection,
+       %{key: :projection, observer: JidoTest.CommitProjection.Observer}}
+    ]
 
   state do
     schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
-  end
-
-  plugins do
-    plugin JidoTest.CommitProjection.Projection,
-      config: %{key: :projection, observer: JidoTest.CommitProjection.Observer}
   end
 
   routes do
@@ -233,20 +232,20 @@ end
 
 defmodule JidoTest.CommitProjection.TimeoutAgent do
   @moduledoc false
-  use Jido.Agent, name: "timeout_commit_projection_agent"
+  use Jido.Agent,
+    name: "timeout_commit_projection_agent",
+    plugins: [
+      {JidoTest.CommitProjection.First,
+       %{
+         key: :first,
+         sink: JidoTest.CommitProjection.Sink,
+         observer: JidoTest.CommitProjection.Observer,
+         gate: "timeout"
+       }}
+    ]
 
   state do
     schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
-  end
-
-  plugins do
-    plugin JidoTest.CommitProjection.First,
-      config: %{
-        key: :first,
-        sink: JidoTest.CommitProjection.Sink,
-        observer: JidoTest.CommitProjection.Observer,
-        gate: "timeout"
-      }
   end
 
   routes do

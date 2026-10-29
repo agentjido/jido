@@ -416,14 +416,10 @@ defmodule JidoTest.AgentServer.HandoffTest do
   end
 
   defmodule Agent do
-    use Jido.Agent, name: "agent_server_handoff_agent"
+    use Jido.Agent, name: "agent_server_handoff_agent", plugins: [EffectPlugin]
 
     state do
       schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
-    end
-
-    plugins do
-      plugin EffectPlugin
     end
 
     routes do
@@ -444,14 +440,10 @@ defmodule JidoTest.AgentServer.HandoffTest do
   end
 
   defmodule PlainAgent do
-    use Jido.Agent, name: "agent_server_plain_handoff_agent"
+    use Jido.Agent, name: "agent_server_plain_handoff_agent", plugins: [EffectOnlyPlugin]
 
     state do
       schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
-    end
-
-    plugins do
-      plugin EffectOnlyPlugin
     end
 
     routes do

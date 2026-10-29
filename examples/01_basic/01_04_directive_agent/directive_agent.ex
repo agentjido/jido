@@ -8,14 +8,10 @@ defmodule Jido.Examples.DirectiveAgent do
 
   alias Jido.Examples.DirectiveAgent.{Effects, Record}
 
-  use Jido.Agent, name: "basic_sdk_directives"
+  use Jido.Agent, name: "basic_sdk_directives", plugins: [Effects]
 
   state do
     schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
-  end
-
-  plugins do
-    plugin Effects
   end
 
   routes do

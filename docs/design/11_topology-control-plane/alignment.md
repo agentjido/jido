@@ -8,7 +8,7 @@
 - Design selected and implemented: 2026-09-10.
 - Alignment state: `Implemented` for the Jido core seam.
 - Compatibility state: V3-only. Topology DSL sections now have one canonical
-  location, and the Codec reads only the current version-2 document.
+  location, and the Agent Codec reads only document version 1.
 - External state: distributed control-plane functions are deferred to an
   application or focused integration package. They do not block Jido V3 core.
 - Follow-on work: seam 12 owns the final error inventory, seam 13 owns public
@@ -147,7 +147,7 @@ Jido core and are not core release blockers.
 
 | Area | Decision |
 | --- | --- |
-| Static authoring | Keep module DSL, direct values, Builder, Codec version 2, composition, and authoring extensions. Use only the root `agent`, `routes`, and `topology` shape. |
+| Static authoring | Keep module DSL, direct values, Agent Codec version 1, composition, and Plugin authoring. Use only the root `agent`, `routes`, and `topology` shape. |
 | Source definition | Keep it free of generated contribution entries. Store expansion only in the Plan. |
 | Plugin declarations | Keep module and `{module, options}` forms and their order. |
 | Plan | Add Topology facet expansion to normal instance and direct Plan construction. |

@@ -42,14 +42,12 @@ defmodule JidoTest.Plugin.BusFixtures do
 
   defmodule ClientAgent do
     @moduledoc false
-    use Jido.Agent, name: "bus_plugin_agent"
+    use Jido.Agent,
+      name: "bus_plugin_agent",
+      plugins: [{Jido.Plugin.Bus.Client, %{bus: :plugin_bus, path: "bus.**"}}]
 
     state do
       schema Zoi.object(%{values: Zoi.list(Zoi.integer()) |> Zoi.default([])})
-    end
-
-    plugins do
-      plugin Jido.Plugin.Bus.Client, config: %{bus: :plugin_bus, path: "bus.**"}
     end
 
     routes do
@@ -59,21 +57,21 @@ defmodule JidoTest.Plugin.BusFixtures do
 
   defmodule DurableAgent do
     @moduledoc false
-    use Jido.Agent, name: "durable_bus_plugin_agent"
+    use Jido.Agent,
+      name: "durable_bus_plugin_agent",
+      plugins: [
+        {Jido.Plugin.Bus.Client,
+         %{
+           bus: :plugin_bus,
+           path: "bus.**",
+           durable: "durable-bus-agent",
+           start_from: :origin,
+           retry_delay_ms: 10
+         }}
+      ]
 
     state do
       schema Zoi.object(%{values: Zoi.list(Zoi.integer()) |> Zoi.default([])})
-    end
-
-    plugins do
-      plugin Jido.Plugin.Bus.Client,
-        config: %{
-          bus: :plugin_bus,
-          path: "bus.**",
-          durable: "durable-bus-agent",
-          start_from: :origin,
-          retry_delay_ms: 10
-        }
     end
 
     routes do
@@ -84,21 +82,21 @@ defmodule JidoTest.Plugin.BusFixtures do
 
   defmodule DurableBlockingAgent do
     @moduledoc false
-    use Jido.Agent, name: "durable_blocking_bus_plugin_agent"
+    use Jido.Agent,
+      name: "durable_blocking_bus_plugin_agent",
+      plugins: [
+        {Jido.Plugin.Bus.Client,
+         %{
+           bus: :plugin_bus,
+           path: "bus.**",
+           durable: "durable-bus-barrier",
+           start_from: :origin,
+           retry_delay_ms: 10
+         }}
+      ]
 
     state do
       schema Zoi.object(%{values: Zoi.list(Zoi.integer()) |> Zoi.default([])})
-    end
-
-    plugins do
-      plugin Jido.Plugin.Bus.Client,
-        config: %{
-          bus: :plugin_bus,
-          path: "bus.**",
-          durable: "durable-bus-barrier",
-          start_from: :origin,
-          retry_delay_ms: 10
-        }
     end
 
     routes do
@@ -108,26 +106,20 @@ defmodule JidoTest.Plugin.BusFixtures do
 
   defmodule ManagerAgent do
     @moduledoc false
-    use Jido.Agent, name: "bus_manager_agent"
-
-    plugins do
-      plugin Jido.Plugin.Bus.Manager
-    end
+    use Jido.Agent, name: "bus_manager_agent", plugins: [Jido.Plugin.Bus.Manager]
   end
 
   defmodule OwnedBusAgent do
     @moduledoc false
-    use Jido.Agent, name: "owned_bus_agent"
+    use Jido.Agent,
+      name: "owned_bus_agent",
+      plugins: [
+        {Jido.Plugin.Bus.Manager, %{name: :owned_plugin_bus}},
+        {Jido.Plugin.Bus.Client, %{bus: :owned_plugin_bus, path: "bus.**", retry_delay_ms: 10}}
+      ]
 
     state do
       schema Zoi.object(%{values: Zoi.list(Zoi.integer()) |> Zoi.default([])})
-    end
-
-    plugins do
-      plugin Jido.Plugin.Bus.Manager, config: %{name: :owned_plugin_bus}
-
-      plugin Jido.Plugin.Bus.Client,
-        config: %{bus: :owned_plugin_bus, path: "bus.**", retry_delay_ms: 10}
     end
 
     routes do

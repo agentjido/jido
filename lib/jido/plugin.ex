@@ -22,12 +22,12 @@ defmodule Jido.Plugin do
   Agent Server callbacks admit live input, manage a supervised runtime, and
   run work after commit. Persistence callbacks convert the owned state value.
 
-  Configure a Plugin in the Agent DSL with `plugin MyApp.Counter, config: %{}`.
-  Map definitions store the same data once in the `extensions` contribution list.
-  A Plugin uses the Agent provider contract and can add Spark sections. Set `id`
+  Configure a Plugin with `plugins: [{MyApp.Counter, %{}}]`.
+  Map definitions store the same data once in the `plugins` contribution list.
+  A Plugin can add Spark sections and imports. Set `id`
   to give the provider a stable name and `vsn` to set its version (default 1).
-  Agent provider callbacks such as `Jido.Agent.Extension.derive_routes/1` are
-  authoring callbacks. They are not runtime callbacks in this Plugin behavior.
+  Provider callbacks are authoring callbacks. They are not runtime callbacks
+  in this Plugin behavior.
   Runtime callbacks receive config as keyword options. The optional `option_keys`
   mapping can restrict those options by owner.
 
@@ -52,7 +52,7 @@ defmodule Jido.Plugin do
 
   alias Jido.Plugin.Init
 
-  @type declaration :: module() | {module(), keyword()}
+  @type declaration :: module() | {module(), map()}
   @type state_spec :: :none | {atom(), Zoi.schema()}
 
   @callback prepare(Jido.Agent.Plugin.Preparation.t(), keyword()) ::
@@ -120,7 +120,7 @@ defmodule Jido.Plugin do
     persistence: [dump: 3, load: 3]
   ]
   @optional_callbacks Enum.flat_map(@owner_callbacks, &elem(&1, 1))
-  @use_options [:vsn, :option_keys, :id, :sections]
+  @use_options [:vsn, :option_keys, :id, :sections, :imports]
 
   @doc false
   def owner_callbacks, do: @owner_callbacks
@@ -134,10 +134,8 @@ defmodule Jido.Plugin do
       use Jido.Agent.Extension,
         id: unquote(Keyword.get(opts, :id, Atom.to_string(__CALLER__.module))),
         vsn: unquote(Keyword.get(opts, :vsn, 1)),
-        kind: :plugin,
-        sections: unquote(Keyword.get(opts, :sections, []))
-
-      def runtime_support, do: __MODULE__
+        sections: unquote(Keyword.get(opts, :sections, [])),
+        imports: unquote(Keyword.get(opts, :imports, []))
 
       def normalize(data) do
         with :ok <- Jido.Agent.Data.plain_map(data),
@@ -148,7 +146,7 @@ defmodule Jido.Plugin do
       # Agent schema composition validates Plugin contracts once per boundary.
       def verify(_data, _definition), do: :ok
 
-      defoverridable runtime_support: 0, normalize: 1, verify: 2
+      defoverridable normalize: 1, verify: 2
       @behaviour Jido.Plugin
       @before_compile Jido.Plugin
       @jido_plugin_vsn unquote(Keyword.get(opts, :vsn, 1))
@@ -164,19 +162,25 @@ defmodule Jido.Plugin do
         {owner, if(selected, do: env.module)}
       end
 
-    quote do
-      @doc false
-      def __jido_plugin__ do
-        struct!(
-          Jido.Plugin.Manifest,
-          unquote(owners) ++
-            [
-              module: __MODULE__,
-              vsn: @jido_plugin_vsn,
-              option_keys: @jido_plugin_option_keys
-            ]
-        )
+    runtime? = Enum.any?(owners, fn {_owner, module} -> not is_nil(module) end)
+
+    if runtime? do
+      quote do
+        @doc false
+        def __jido_plugin__ do
+          struct!(
+            Jido.Plugin.Manifest,
+            unquote(owners) ++
+              [
+                module: __MODULE__,
+                vsn: @jido_plugin_vsn,
+                option_keys: @jido_plugin_option_keys
+              ]
+          )
+        end
       end
+    else
+      quote do: :ok
     end
   end
 

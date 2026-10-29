@@ -1,13 +1,9 @@
 defmodule Jido.Examples.FencedInventory do
   @moduledoc "Checks external ownership before inventory work and fenced effects."
-  use Jido.Agent, name: "research_fenced_inventory"
+  use Jido.Agent, name: "research_fenced_inventory", plugins: [Jido.Examples.FencedInventory.Gate]
 
   state do
     schema Zoi.object(%{value: Zoi.integer() |> Zoi.default(0)})
-  end
-
-  plugins do
-    plugin Jido.Examples.FencedInventory.Gate
   end
 
   routes do

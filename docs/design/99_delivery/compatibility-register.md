@@ -17,7 +17,7 @@ or removed V3 API.
 | Four Plugin facets | Added | Use `Jido.Agent.Plugin`, `Jido.AgentServer.Plugin`, `Jido.Persistence.Plugin`, and `Jido.Topology.Plugin`. One `Jido.Plugin` package composes them. |
 | Agent Ref and instance facade | Added | Ref-first functions exist beside supported ID, PID, name, and partition functions. |
 | Turn routing | Changed from an earlier beta | Pure Plugin preparation runs first but cannot change the Signal. The first target for the unchanged source Signal wins. |
-| Durable records | Added and versioned | Compatible unnamed keys use outer format 2. Namespaced Ref keys use outer format 3. Supported V3 outer format-1 active records remain readable. |
+| Durable records | Breaking replacement | Stable Ref keys use one exact outer format 1 shape. Earlier keys, records, and snapshots require offline conversion. |
 | Bedrock persistence | Included; beta.1 exception | The adapter uses Bedrock KV 0.7 transactions. Strict cluster startup and MinIO-backed snapshot recovery are unverified. Do not claim the adapter is durability-ready. |
 | Agent Server activation | Strengthened | Initial durable creation completes before public readiness. A required write error removes write authority and stops the activation. |
 | Agent Server upgrade | Added | `upgrade/2` and `upgrade/3` serialize a zero-arity operation at idle. Definition replacement validates complete migrated state, preserves identity and Plugin declarations, and advances one checkpoint revision. |
@@ -31,11 +31,10 @@ or removed V3 API.
 - Jido does not read V2 storage records automatically.
 - A V2 import must run old-code decoding, application conversion, and a new V3
   write. V2 and V3 writers must use separate keys.
-- A lone compatible V3 key can be read. A simultaneous compatible and stable
-  key for one Ref fails closed. Jido does not move data across keys automatically.
-- Older code cannot read a namespaced format-3 record. Downgrade after the first
-  such write is unsupported. Restore a pre-cutover backup and reconcile external
-  work if rollback is needed.
+- V3 reads one stable Ref key and one exact format-1 record shape. Earlier keys
+  and record shapes require offline conversion.
+- Older code might not read the current record shape. Restore a pre-cutover
+  backup and reconcile external work if rollback is needed.
 - A failed state commit keeps the prior committed Agent state. Jido cannot undo
   external I/O that an Action or Flow completed before that failure.
 

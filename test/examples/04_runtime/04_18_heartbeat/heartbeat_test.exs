@@ -47,7 +47,7 @@ defmodule JidoTest.Examples.Runtime.HeartbeatTest do
              Agent.define(%{
                name: "runtime_heartbeat_invalid",
                schema: Zoi.object(%{}),
-               extensions: [
+               plugins: [
                  %{
                    id: Heartbeat.id(),
                    provider: Heartbeat,

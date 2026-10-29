@@ -3,7 +3,7 @@ defmodule JidoTest.Persistence.RecordLifecycleTest do
   use Covenant.Case, component: "jido.persistence", async: false
 
   alias Jido.Persistence
-  alias Jido.Persistence.{ETS, Record}
+  alias Jido.Persistence.ETS
   alias JidoTest.AgentRuntimeFixtures.RuntimeAgent
 
   defmodule BarrierAdapter do
@@ -50,7 +50,7 @@ defmodule JidoTest.Persistence.RecordLifecycleTest do
     assert {:ok, bytes} = ETS.get(key, opts)
 
     assert :erlang.binary_to_term(bytes, [:safe]) == %{
-             fmt: 4,
+             fmt: 1,
              kind: :tombstone,
              namespace: Jido.namespace(jido),
              agent_module: RuntimeAgent,
@@ -74,7 +74,7 @@ defmodule JidoTest.Persistence.RecordLifecycleTest do
 
     assert {:ok, missing_bytes} = ETS.get(missing_key, opts)
 
-    assert %{fmt: 4, kind: :tombstone, rev: 0} =
+    assert %{fmt: 1, kind: :tombstone, rev: 0} =
              :erlang.binary_to_term(missing_bytes, [:safe])
   end
 
@@ -117,7 +117,7 @@ defmodule JidoTest.Persistence.RecordLifecycleTest do
     assert {:ok, checkpoint} = Jido.Persistence.snapshot(agent)
     key = Persistence.agent_key(Jido.Agent.Ref.new!(namespace: "persistence-test", id: agent.id))
 
-    for format <- [1, 2] do
+    for format <- [1, 2, 3, 4] do
       record = %{
         format: format,
         kind: if(format == 1, do: :agent, else: :active),
@@ -132,73 +132,24 @@ defmodule JidoTest.Persistence.RecordLifecycleTest do
       bytes = :erlang.term_to_binary(record)
       assert :ok = ETS.put(key, bytes, opts)
 
-      assert {:error, {:invalid_persistence_record, :format}} =
+      assert {:error, {:invalid_persistence_record, :fmt}} =
                Persistence.load_agent(persistence, RuntimeAgent, agent.id,
                  namespace: "persistence-test"
                )
 
-      assert {:error, {:invalid_persistence_record, :format}} =
+      assert {:error, {:invalid_persistence_record, :fmt}} =
                Persistence.save_agent(persistence, agent,
                  namespace: "persistence-test",
                  revision: 8
                )
 
-      assert {:error, {:invalid_persistence_record, :format}} =
+      assert {:error, {:invalid_persistence_record, :fmt}} =
                Persistence.delete_agent(persistence, RuntimeAgent, agent.id,
                  namespace: "persistence-test"
                )
 
       assert {:ok, ^bytes} = ETS.get(key, opts)
     end
-  end
-
-  @tag obligation: "jido.persistence.I5"
-  test "format three records remain readable during adapter cutover" do
-    {ETS, opts} = persistence = persistence(:format_three)
-    agent = RuntimeAgent.instantiate!(id: unique_id("format-three"))
-    namespace = "persistence-test"
-    ref = Jido.Agent.Ref.new!(namespace: namespace, id: agent.id)
-    key = Persistence.agent_key(ref)
-    assert {:ok, checkpoint} = Persistence.snapshot(agent)
-
-    active = %{
-      format: 3,
-      kind: :active,
-      namespace: namespace,
-      agent_module: RuntimeAgent,
-      agent_id: agent.id,
-      partition: nil,
-      revision: 3,
-      agent_vsn: agent.vsn,
-      checkpoint: checkpoint
-    }
-
-    active_bytes = :erlang.term_to_binary(active)
-    assert :ok = ETS.put(key, active_bytes, opts)
-
-    assert {:ok, ^agent, 3} =
-             Persistence.load_agent_with_revision(persistence, RuntimeAgent, agent.id,
-               namespace: namespace
-             )
-
-    assert {:ok, ^active_bytes} = ETS.get(key, opts)
-    assert Record.kind(active) == :active
-    assert Record.format(active) == 3
-    assert Record.revision(active) == 3
-    assert Record.agent_vsn(active) == agent.vsn
-
-    tombstone = Map.drop(active, [:agent_vsn, :checkpoint]) |> Map.put(:kind, :tombstone)
-    tombstone_bytes = :erlang.term_to_binary(tombstone)
-    assert :ok = ETS.put(key, tombstone_bytes, opts)
-
-    assert {:error, :deleted} =
-             Persistence.load_agent(persistence, RuntimeAgent, agent.id, namespace: namespace)
-
-    assert :ok =
-             Persistence.delete_agent(persistence, RuntimeAgent, agent.id, namespace: namespace)
-
-    assert {:ok, ^tombstone_bytes} = ETS.get(key, opts)
-    assert Record.kind(tombstone) == :tombstone
   end
 
   @tag obligation: ["jido.persistence.I5", "jido.persistence.I12"]

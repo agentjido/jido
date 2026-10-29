@@ -38,17 +38,13 @@ defmodule JidoTest.AgentRuntimeFixtures.RuntimeAgent do
 
   alias JidoTest.AgentRuntimeFixtures.{Record, ReturnDirective, Tick}
 
-  use Jido.Agent, name: "runtime_agent"
+  use Jido.Agent, name: "runtime_agent", plugins: [Jido.Plugin.Scheduler]
 
   state do
     schema Zoi.object(%{
              events: Zoi.list(Zoi.any()) |> Zoi.default([]),
              ticks: Zoi.integer() |> Zoi.default(0)
            })
-  end
-
-  plugins do
-    plugin Jido.Plugin.Scheduler
   end
 
   routes do

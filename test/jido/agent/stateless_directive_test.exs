@@ -76,14 +76,10 @@ defmodule Jido.Agent.StatelessDirectiveTest do
   end
 
   defmodule Agent do
-    use Jido.Agent, name: "stateless_directive_agent"
+    use Jido.Agent, name: "stateless_directive_agent", plugins: [Effects]
 
     state do
       schema Zoi.object(%{value: Zoi.integer() |> Zoi.default(0)})
-    end
-
-    plugins do
-      plugin Effects
     end
 
     routes do

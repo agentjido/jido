@@ -53,14 +53,10 @@ defmodule JidoTest.AgentServer.LifecycleTest do
   end
 
   defmodule HandoffAgent do
-    use Jido.Agent, name: "lifecycle_handoff_agent"
+    use Jido.Agent, name: "lifecycle_handoff_agent", plugins: [HandoffPlugin]
 
     state do
       schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
-    end
-
-    plugins do
-      plugin HandoffPlugin
     end
 
     routes do

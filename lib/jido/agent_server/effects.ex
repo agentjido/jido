@@ -225,16 +225,11 @@ defmodule Jido.AgentServer.Effects do
   defp validate_start_source(%Agent{} = agent, opts) do
     if Enum.any?([:id, :state], &Keyword.has_key?(opts, &1)),
       do: {:error, :instance_options_conflict},
-      else:
-        with(
-          {:ok, agent} <- Agent.Validation.validate_instance(agent),
-          do: Agent.validate_runtime_support(agent)
-        )
+      else: with({:ok, _agent} <- Agent.Validation.validate_instance(agent), do: :ok)
   end
 
   defp validate_start_source(definition, _opts) do
-    with {:ok, definition} <- Agent.Validation.resolve(definition),
-         do: Agent.validate_runtime_support(definition)
+    with {:ok, _definition} <- Agent.Validation.resolve(definition), do: :ok
   end
 
   defp local_node(target) when target in [nil, node()], do: :ok

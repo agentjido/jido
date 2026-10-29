@@ -14,7 +14,7 @@ defmodule JidoTest.AgentServer.Composition.RuntimeRulesTest do
   import JidoTest.Eventually
 
   defmodule QueueProvider do
-    use Jido.Agent.Extension, id: "composition.queue"
+    use Jido.Plugin, id: "composition.queue"
     def endpoint_kinds, do: [:queue]
     def endpoints(data), do: [%{kind: :queue, name: data.name}]
   end
@@ -71,7 +71,7 @@ defmodule JidoTest.AgentServer.Composition.RuntimeRulesTest do
           name: "unsupported_runtime_endpoint",
           schema: E.agent().schema,
           routes: E.agent().routes,
-          extensions: [queue],
+          plugins: [queue],
           topology: %{
             agents: [],
             connections: [%{path: "**", from: from, to: to}]
@@ -83,7 +83,7 @@ defmodule JidoTest.AgentServer.Composition.RuntimeRulesTest do
                TopologyRuntime.validate(agent)
     end
 
-    assert TopologyRuntime.buses(%{E.agent() | extensions: [queue]}) == []
+    assert TopologyRuntime.buses(%{E.agent() | plugins: [queue]}) == []
   end
 
   @tag obligation: "jido.agent_server.composition.I5"
@@ -96,7 +96,7 @@ defmodule JidoTest.AgentServer.Composition.RuntimeRulesTest do
         name: "runtime_endpoint_kind",
         schema: E.agent().schema,
         routes: E.agent().routes,
-        extensions: [queue, bus],
+        plugins: [queue, bus],
         topology: %{
           agents: [],
           connections: [
@@ -113,7 +113,7 @@ defmodule JidoTest.AgentServer.Composition.RuntimeRulesTest do
     assert {:error, %{code: :unsupported_runtime_endpoint}} = TopologyRuntime.validate(agent)
 
     plain = E.agent()
-    with_bus = %{plain | extensions: [bus]}
+    with_bus = %{plain | plugins: [bus]}
     assert TopologyRuntime.changed?(Diff.between(plain, with_bus), plain, with_bus)
 
     assert {:error, :activation_required} =

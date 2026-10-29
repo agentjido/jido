@@ -15,7 +15,7 @@ defmodule Jido.Agent.Validation do
     :signal_source,
     :routes,
     :topology,
-    :extensions
+    :plugins
   ]
 
   def state_schema(%Jido.Agent{} = agent) do
@@ -33,21 +33,21 @@ defmodule Jido.Agent.Validation do
 
     with {:ok, definition} <- Data.fields(input, @fields, Jido.Agent.__defaults__()),
          :ok <- fields(definition),
-         {:ok, extensions} <- Error.at(Extension.normalize(definition.extensions), :extensions),
+         {:ok, plugins} <- Error.at(Extension.normalize(definition.plugins), :plugins),
          {:ok, route_contributions} <-
-           Error.at(Extension.route_contributions(extensions), :extensions),
+           Error.at(Extension.route_contributions(plugins), :plugins),
          {:ok, routes} <-
            Error.at(Data.list(definition.routes, &Route.normalize(&1, related?)), :routes),
          {:ok, routes} <- materialize_routes(routes, route_contributions, related?),
-         :ok <- Error.at(Plugin.validate_route_contract(routes, extensions), :routes),
+         :ok <- Error.at(Plugin.validate_route_contract(routes, plugins), :routes),
          :ok <- Error.at(Data.unique(Enum.reject(routes, &is_nil(&1.as)), & &1.as), :routes),
          :ok <- reply_source(routes, definition.signal_source, related?),
-         definition = %{definition | routes: routes, extensions: extensions},
+         definition = %{definition | routes: routes, plugins: plugins},
          {:ok, topology} <-
            Error.at(Topology.normalize(definition.topology, definition, opts), :topology),
          definition = %{definition | topology: topology},
          :ok <- forward_targets(definition),
-         :ok <- verify_extensions(extensions, definition, related?),
+         :ok <- verify_plugins(plugins, definition, related?),
          :ok <- plugin_schema(definition, related? and Keyword.get(opts, :plugin_schema?, true)) do
       {:ok, struct!(Jido.Agent, definition)}
     else
@@ -68,18 +68,18 @@ defmodule Jido.Agent.Validation do
     end
   end
 
-  defp verify_extensions(extensions, definition, true),
-    do: Error.at(Extension.verify(extensions, definition), :extensions)
+  defp verify_plugins(plugins, definition, true),
+    do: Error.at(Extension.verify(plugins, definition), :plugins)
 
-  defp verify_extensions(_, _, false), do: :ok
+  defp verify_plugins(_, _, false), do: :ok
 
   defp materialize_routes(routes, contributions, related?) do
     contributions
     |> Enum.reduce_while({:ok, routes, MapSet.new()}, fn contribution,
                                                          {:ok, routes, owned_paths} ->
       route_path = [
-        :extensions,
-        contribution.extension_index,
+        :plugins,
+        contribution.plugin_index,
         :routes,
         contribution.index
       ]
@@ -111,9 +111,9 @@ defmodule Jido.Agent.Validation do
         else
           {:halt,
            Error.fail(
-             :extension_route_conflict,
+             :plugin_route_conflict,
              [:routes, index],
-             "Extension route conflicts with another Agent route",
+             "Plugin route conflicts with another Agent route",
              %{path: route.path, provider: provider}
            )}
         end

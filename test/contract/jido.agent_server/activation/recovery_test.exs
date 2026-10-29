@@ -116,7 +116,7 @@ defmodule JidoTest.AgentServer.ActivationRecoveryTest do
       Agent.define!(%{
         name: "recover_plugin",
         schema: c.agent.schema,
-        extensions: [
+        plugins: [
           %{id: Plugin.id(), provider: Plugin, vsn: Plugin.vsn(), data: %{observer: c.observer}}
         ],
         routes: [
@@ -238,8 +238,8 @@ defmodule JidoTest.AgentServer.ActivationRecoveryTest do
         if mode == :hook,
           do: %{
             c.agent
-            | extensions:
-                c.agent.extensions ++
+            | plugins:
+                c.agent.plugins ++
                   [JidoTest.AgentContract.contribution(CommitPlugin, %{observer: c.observer})]
           },
           else: c.agent

@@ -148,15 +148,14 @@ Rules for the child spec:
 
 ## Define the Agent
 
-This notebook attaches the Plugin with `extensions:` because it needs no
-Agent-specific config. You can instead write `plugin GuidePlugins.Dedupe` in
-the `plugins` block. Both forms work in a Livebook cell.
+This notebook declares the Plugin without Agent-specific config. The same
+`plugins:` form works in a Livebook cell.
 
 ```elixir
 defmodule GuidePlugins.Inbox do
   use Jido.Agent,
     name: "inbox",
-    extensions: [GuidePlugins.Dedupe]
+    plugins: [GuidePlugins.Dedupe]
 
   state do
     schema(Zoi.object(%{messages: Zoi.list(Zoi.string()) |> Zoi.default([])}))

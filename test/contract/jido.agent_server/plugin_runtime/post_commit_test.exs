@@ -101,7 +101,7 @@ defmodule JidoTest.AgentServer.PluginRuntime.PostCommitTest do
       Jido.Agent.define!(%{
         name: "commit_plugins",
         schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}),
-        extensions: [
+        plugins: [
           JidoTest.AgentContract.contribution(plugin, %{observer: __MODULE__, mode: mode}),
           JidoTest.AgentContract.contribution(Second, %{observer: __MODULE__, mode: second_mode})
         ],

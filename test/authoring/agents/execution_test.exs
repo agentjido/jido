@@ -15,7 +15,7 @@ defmodule JidoTest.Authoring.Agents.ExecutionTest do
     assert workers.count == 3
     assert workers.definition === Worker.definition()
     assert instance.topology === definition.topology
-    assert instance.extensions === definition.extensions
+    assert instance.plugins === definition.plugins
   end
 
   test "composition exposes data operations without the old runtime graph API" do

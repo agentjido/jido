@@ -330,7 +330,7 @@ defmodule JidoTest.InstanceRefTest do
     agent =
       Jido.Agent.define!(%{
         name: "instance_ref_recovering",
-        extensions: [
+        plugins: [
           %{
             id: ReadyPlugin.id(),
             provider: ReadyPlugin,
@@ -410,7 +410,7 @@ defmodule JidoTest.InstanceRefTest do
     agent =
       Jido.Agent.define!(%{
         name: "instance_ref_plugin_state",
-        extensions: [
+        plugins: [
           %{id: StatePlugin.id(), provider: StatePlugin, vsn: StatePlugin.vsn(), data: %{}}
         ]
       })

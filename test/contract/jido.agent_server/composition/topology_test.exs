@@ -98,8 +98,7 @@ defmodule JidoTest.AgentServer.Composition.TopologyTest do
     def run(%{snapshot: snapshot}, _) do
       agent = %{
         snapshot.agent
-        | extensions:
-            Enum.reject(snapshot.agent.extensions, &(&1.provider == Jido.Plugin.Bus.DSL)),
+        | plugins: Enum.reject(snapshot.agent.plugins, &(&1.provider == Jido.Plugin.Bus.DSL)),
           topology: %{snapshot.agent.topology | connections: []}
       }
 
@@ -133,7 +132,7 @@ defmodule JidoTest.AgentServer.Composition.TopologyTest do
       name: "bus",
       schema: E.agent().schema,
       routes: E.agent().routes,
-      extensions: [bus],
+      plugins: [bus],
       topology: %{
         agents: [%{name: :worker, definition: worker()}],
         connections: [

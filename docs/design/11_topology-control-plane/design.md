@@ -446,8 +446,8 @@ starts an Agent on another node.
 `TOP-REQ-094`: The Controller shall expose the effective node for one planned
 Agent through `agent_node/3`.
 
-`TOP-REQ-095`: The Topology Codec shall encode and decode only the current V3
-version-2 document format.
+`TOP-REQ-095`: Topology data in an Agent document shall encode and decode only
+the current Agent document version-1 format.
 
 `TOP-REQ-096`: The Topology startup contract shall treat readiness as all
 planned components ready and shall not expose a readiness policy option.

@@ -51,18 +51,13 @@ defmodule Jido.Agent.ValidationTest do
     def state_spec(_opts), do: {:owned, Zoi.integer(coerce: true)}
   end
 
-  defmodule InvalidSchemaProvider do
-    use Jido.Agent.Extension, id: "test.invalid_schema_provider"
-    def runtime_support, do: InvalidSchemaPlugin
-  end
-
   @tag obligation: "jido.agent.I10"
   test "Plugin ownership conflicts remain structured validation errors" do
     assert {:error, %Jido.Error.ValidationError{} = reason} =
              Agent.define(%{
                name: "conflict",
                schema: Zoi.object(%{owned: Zoi.integer()}),
-               extensions: [entry(StatePlugin)]
+               plugins: [entry(StatePlugin)]
              })
 
     assert Exception.message(reason) =~ "conflicts"
@@ -81,7 +76,7 @@ defmodule Jido.Agent.ValidationTest do
              vsn: 1,
              schema: Zoi.object(%{}),
              initial_state: %{},
-             extensions: [],
+             plugins: [],
              routes: [],
              signal_source: nil,
              topology: %{agents: [], connections: []},
@@ -91,7 +86,7 @@ defmodule Jido.Agent.ValidationTest do
     assert Agent.define(%{name: "defaults", id: nil, state: nil, description: nil}) ==
              {:ok, definition}
 
-    for field <- [:name, :schema, :extensions, :routes, :metadata, :topology] do
+    for field <- [:name, :schema, :plugins, :routes, :metadata, :topology] do
       assert {:error, _} = Agent.define(Map.put(%{name: "defaults"}, field, nil))
     end
   end
@@ -106,7 +101,7 @@ defmodule Jido.Agent.ValidationTest do
 
   @tag obligation: ["jido.agent.I2", "jido.agent.I3"]
   test "unknown fields and instance data fail before provider callbacks" do
-    attrs = %{name: nil, id: "instance", state: %{}, extensions: [entry(CallbackPlugin)]}
+    attrs = %{name: nil, id: "instance", state: %{}, plugins: [entry(CallbackPlugin)]}
     assert {:error, %{code: :unknown_fields}} = Agent.define(Map.put(attrs, :extra, true))
     assert {:error, %{code: :definition_required}} = Agent.define(attrs)
     refute_received {:callback, _, _}
@@ -114,7 +109,7 @@ defmodule Jido.Agent.ValidationTest do
 
   @tag obligation: ["jido.agent.I3", "jido.agent.I7"]
   test "unknown nil keys fail in every authoring boundary" do
-    attrs = %{nil => :unexpected, name: "nil_key", extensions: [entry(CallbackPlugin)]}
+    attrs = %{nil => :unexpected, name: "nil_key", plugins: [entry(CallbackPlugin)]}
 
     for input <- [attrs, Enum.to_list(attrs)] do
       assert {:error, _} = Agent.define(input)
@@ -157,7 +152,7 @@ defmodule Jido.Agent.ValidationTest do
     assert {:ok, definition} =
              Agent.define(%{
                name: "callbacks",
-               extensions: [entry(CallbackPlugin, %{label: :first})]
+               plugins: [entry(CallbackPlugin, %{label: :first})]
              })
 
     assert Agent.runtime_plugins(definition) == [{CallbackPlugin, [label: :first]}]
@@ -176,7 +171,7 @@ defmodule Jido.Agent.ValidationTest do
 
   @tag obligation: ["jido.agent.I26", "jido.agent.I29"]
   test "internal definition passes can defer Plugin schema validation" do
-    attrs = %{name: "deferred", extensions: [entry(InvalidSchemaProvider)]}
+    attrs = %{name: "deferred", plugins: [entry(InvalidSchemaPlugin)]}
 
     assert {:error, _} = Validation.define(attrs)
     assert {:ok, _} = Validation.define(attrs, related?: false)

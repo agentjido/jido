@@ -61,7 +61,7 @@ defmodule Define.Profile do
     description: "Owns one display profile",
     vsn: 2,
     metadata: %{domain: "profiles"},
-    extensions: [Define.Visits]
+    plugins: [Define.Visits]
 
   state do
     schema(
@@ -86,15 +86,14 @@ end
 
 | Option | Where | Rule |
 | --- | --- | --- |
-| `id` | `use Jido.Agent` | Stable authoring Registry ID. Defaults to the module name. |
 | `name` | `use Jido.Agent` | Required non-empty string. |
 | `description` | `use Jido.Agent` | Optional string. |
+| `id` | `use Jido.Agent` | Stable authoring Registry ID. Defaults to the module name. |
 | `vsn` | `use Jido.Agent` | Positive integer. Default `1`. |
+| `metadata` | `use Jido.Agent` | A plain map of static data. |
+| `plugins` | `use Jido.Agent` | Ordered Plugin modules or `{Plugin, config}` tuples. Put this option last. |
 | `schema` | `state` | A static Zoi object for domain state. |
 | `initial_state` | `state` | An optional plain, static Map. |
-| `extensions` | `use Jido.Agent` | Plugin and Extension modules with no options. |
-| `metadata` | `use Jido.Agent` | A plain map of static data. |
-| `plugin` | `plugins` | An ordered Plugin declaration with optional `config:`. |
 
 Use an explicit `id` when the Agent can appear in a stored document. It must
 use the shared authoring identifier format and remain stable when Elixir module
@@ -102,10 +101,9 @@ names change.
 
 A bad route, schema, or Plugin fails the build.
 
-You can also write `plugin(Define.Visits)` inside `plugins do` and pass options
-with `config:`. This works in source files, generated modules, and Livebook
-cells. Use `extensions:` when a provider adds custom Spark sections, or when it
-needs no config.
+Use `{Define.Visits, %{key: value}}` when a Plugin needs Agent-specific config.
+The same `plugins:` form works in source files, generated modules, and Livebook
+cells. A declared Plugin can add custom Spark sections and imports.
 
 ## The Definition
 

@@ -31,7 +31,7 @@ tests are valid evidence, but they do not each represent a new Jido capability.
 | Application supervision and runtime replacement | `jido` | Focused example | [Source](01_basic/01_05_otp_supervision/application.ex), [test](../test/examples/01_basic/01_05_otp_supervision/example_test.exs) |
 | Route declaration order and fallback | `jido` | Focused example | [Source](01_basic/01_06_route_selection/route_selection.ex), [test](../test/examples/01_basic/01_06_route_selection/route_selection_test.exs) |
 | Data-defined Agent and trusted Codec | `jido` | Focused example | [Source](01_basic/01_07_data_defined_agent/data_defined_agent.ex), [test](../test/examples/01_basic/01_07_data_defined_agent/data_defined_agent_test.exs) |
-| Agent authoring extension lowering | `jido` | Focused example | [Source](01_basic/01_09_agent_extension/agent_extension.ex), [test](../test/examples/01_basic/01_09_agent_extension/agent_extension_test.exs) |
+| Agent authoring Plugin lowering | `jido` | Focused example | [Source](01_basic/01_09_authoring_plugin/authoring_plugin.ex), [test](../test/examples/01_basic/01_09_authoring_plugin/authoring_plugin_test.exs) |
 
 ## Flow integration contracts
 

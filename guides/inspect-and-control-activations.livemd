@@ -54,7 +54,7 @@ defmodule Guides.Helper do
 end
 
 defmodule Guides.Notes do
-  use Jido.Agent, name: "notes", extensions: [Guides.Tally]
+  use Jido.Agent, name: "notes", plugins: [Guides.Tally]
 
   state do
     schema(Zoi.object(%{notes: Zoi.list(Zoi.string()) |> Zoi.default([])}))

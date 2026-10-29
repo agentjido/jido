@@ -7,8 +7,8 @@
 On 2026-10-01, the user selected the current V3 block form under
 AUTH-REQ-009/063
 ([GAP-009](/Users/mhostetler/Source/Jido/proj_jido_core/jido/docs/design/GAP_ANALYSIS.md#gap-009)).
-Identity, metadata, and extensions use module options. State, Plugins, and
-routes belong in separate DSL blocks.
+Identity, metadata, and ordered Plugins use module options. State and routes
+belong in core DSL blocks. Selected Plugins can add custom sections.
 Direct map/keyword construction is still supported. Combined Topology
 hosting has a separate configuration path.
 
@@ -81,10 +81,10 @@ document approval.
 
 - [Jido V3 vision](../VISION.md): requires supported authoring forms to produce
   one normalized Agent definition and keeps developer composition explicit.
-- [Overview design](../00_overview/design.md): keeps DSL, direct data, Builder,
-  Codec, neutral definitions, and authoring extensions during migration.
-- [Package-boundary design](../90_package-boundaries/design.md): keeps static
-  authoring extensions separate from Plugins and runtime hooks.
+- [Overview design](../00_overview/design.md): keeps DSL, direct data, Codec,
+  neutral definitions, and Plugin authoring during migration.
+- [Package-boundary design](../90_package-boundaries/design.md): uses one
+  Plugin contract for authoring-only and runtime capabilities.
 - [Errors and contracts design](../12_errors-and-contracts/design.md): supplies
   pending authoring failure and bang-function rules.
 - [Agent design](../01_agent/design.md): owns the two Agent forms and the
@@ -99,7 +99,7 @@ document approval.
 | `lib/jido/agent.ex:182-188,259-307` | `definition/0` uses the canonical constructor. Direct definitions and module instances have separate public entries. |
 | `lib/jido/agent/validation.ex` | One definition key set and constructor normalize static data, preserve `vsn`, compose Plugins, normalize routes, and limit instance overrides. |
 | `lib/jido/agent/authoring.ex:28-79,107-110` | Route forms use `defaults`. Explicit defaults require a plain map. The target tuple also requires a plain map; structs are rejected. |
-| `lib/jido/agent/dsl/compiler.ex:7-71,104-108` | The compiler combines forms, lowers extensions, records private interface metadata, generates functions, and verifies the canonical definition after compile. |
+| `lib/jido/agent/dsl.ex` | The compiler combines forms, lowers declared Plugins, generates functions, and verifies the canonical definition after compile. |
 | `lib/jido/agent/dsl/compiler.ex:145-278` | Interface compilation checks exact routes, uniqueness, Signal source, argument order, schema fields, and function conflicts. |
 | `lib/jido/agent/dsl/macros.ex:27-71,104-135` | A route has one named or extension target, or one inline Action. Inline syntax compiles through `Jido.Action.Inline`. |
 | `lib/jido/agent/dsl/generator.ex:4-29,81-159` | Generated helpers have docs and types for tagged Signal, bang Signal, and live-call roles. |
@@ -110,7 +110,7 @@ document approval.
 | `lib/jido/codec/data.ex:6-59,61-170` | Closed tagged data rejects runtime values and checks depth, node, collection, and string limits. |
 | `lib/jido/codec/registry.ex` | Registry validates typed entries, unique values, and direct aliases. Route predicates must be external unary captures. Its public entries have specs. |
 | `lib/jido/plugin/codec.ex` | Plugin Codec stores canonical module and options through the same Registry, excludes runtime data, and has public specs. |
-| `lib/jido/agent/extension.ex` | Documented `lower/3` runs pure lowerers in declaration order and returns ordinary core Agent authoring data. |
+| `lib/jido/agent/extension.ex` | The hidden contribution layer runs Plugin lowerers in declaration order and returns ordinary core Agent authoring data. |
 
 ### Tests and examples
 
@@ -177,9 +177,9 @@ A skipped test is not passing evidence.
   Registry accepts only external unary captures for route predicates.
 - `AUTH-RB-010`: Explicit route defaults require a plain map. The legacy target
   tuple also requires a plain map; Codec does not restore the struct exception.
-- `AUTH-RB-011`: Agent extensions lower Spark entities in declaration order to
-  ordinary Agent configuration. Builder and Codec have no extension-entity
-  input. `Jido.Agent.Extension.lower/3` is the public pure data entry.
+- `AUTH-RB-011`: Agent Plugins lower Spark data in declaration order to one
+  canonical Plugin contribution list. Builder and Codec do not store Spark
+  source entities.
 - `AUTH-RB-012`: Definitions and Builder data preserve Agent `vsn`. Codec reads
   and writes version 1 with `vsn` and rejects the prior route record shape.
 - `AUTH-RB-013`: Custom domain helpers remain ordinary Elixir functions.
@@ -358,7 +358,7 @@ The remaining historical matrix still needs reconciliation with these decisions.
 | Codec instances | Keep instance input and static definition-first encoding. Do not parse or encode live ID or state. |
 | Route predicates | Keep valid direct predicates. Codec requires trusted Registry identifiers and external unary captures. |
 | Route defaults | Require plain maps in explicit and tuple forms. Preserve V3 fallback input semantics; GAP-012 removes the struct exception. |
-| Extensions | Keep Spark host behavior and public pure `lower/3`. Do not store extension entities in Codec data. |
+| Plugins | Keep Spark host behavior and pure Plugin lowering. Store only canonical Plugin contributions in Codec data. |
 | Errors | Adopt approved seam-12 codes by boundary. Do not expose private compiler or Registry data in error output. |
 | Cross-package versions | Do not name a stale `jido_action` version. Test the declared release-compatible package set. |
 
@@ -373,7 +373,7 @@ The remaining historical matrix still needs reconciliation with these decisions.
 | `AUTH-BLK-005` | `Approved implementation` | 02 Agent authoring | Parity applies to canonical definitions, not module functions or source syntax. | No action. |
 | `AUTH-BLK-006` | `Approved implementation` | 02 Agent authoring | Codec keeps instance input and uses definition-first static encoding. | No action. |
 | `AUTH-BLK-007` | `Approved authoring contract` | 02 Agent authoring and `jido_signal` | Direct Router predicates can exceed the Codec portable subset. | Confirm the release-compatible `jido_signal` package retains the required predicate behavior. |
-| `AUTH-BLK-008` | `Approved implementation` | 02 Agent authoring | Data extensions lower before Builder or Codec and do not enter documents. | No action. |
+| `AUTH-BLK-008` | `Approved implementation` | 02 Agent authoring | Plugin DSL data lowers before Codec output; only canonical Plugin contributions enter documents. | No action. |
 | `AUTH-BLK-009` | `Resolved for authoring` | 04 Turn evaluation and `jido_action` | The approved Overview says Agent `vsn` does not pin loaded Action or Flow code. | Seam 04 retains the V3 non-guarantee. |
 
 ## Completion criteria

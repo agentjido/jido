@@ -94,7 +94,7 @@ defmodule Jido.Agent.SchedulerCodecTest do
     definition = definition(:action)
     registry = registry(definition)
     assert {:ok, document} = JidoTest.AgentRegistry.encode(definition, registry)
-    [extension] = document["definition"]["extensions"]
+    [plugin] = document["definition"]["plugins"]
     option_key = %{"$type" => "atom", "id" => "atoms/retry-delay", "vsn" => 1}
 
     invalid_options = %{
@@ -103,7 +103,7 @@ defmodule Jido.Agent.SchedulerCodecTest do
     }
 
     document =
-      put_in(document, ["definition", "extensions"], [%{extension | "data" => invalid_options}])
+      put_in(document, ["definition", "plugins"], [%{plugin | "data" => invalid_options}])
 
     assert {:error,
             [
@@ -120,7 +120,7 @@ defmodule Jido.Agent.SchedulerCodecTest do
     Agent.define!(%{
       name: "json_scheduler",
       schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}),
-      extensions: [
+      plugins: [
         %{
           id: Scheduler.id(),
           provider: Scheduler,

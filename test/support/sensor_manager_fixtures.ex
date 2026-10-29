@@ -89,17 +89,15 @@ defmodule JidoTest.Plugin.SensorManagerFixtures do
   defmodule Agent do
     @moduledoc false
 
-    use Jido.Agent, name: "sensor_manager_contract_agent"
+    use Jido.Agent,
+      name: "sensor_manager_contract_agent",
+      plugins: [{Jido.Plugin.SensorManager, %{retry_delay_ms: 10}}]
 
     alias Jido.Plugin.SensorManager
     alias JidoTest.Plugin.SensorManagerFixtures.{ManageAction, ReadingAction}
 
     state do
       schema Zoi.object(%{readings: Zoi.list(Zoi.integer()) |> Zoi.default([])})
-    end
-
-    plugins do
-      plugin SensorManager, config: %{retry_delay_ms: 10}
     end
 
     routes do

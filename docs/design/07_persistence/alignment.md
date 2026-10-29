@@ -11,16 +11,14 @@
   commit authority rule are present.
 - Alignment state: `Implemented, including stable namespaced identity`.
 
-Persistence now owns a version-2 active-or-tombstone record, a closed binary
+Persistence now owns a format-1 active-or-tombstone record, a closed binary
 CAS boundary, revision-zero creation, definition checks, and default-checkpoint
 Plugin conversion. The Agent Server confirms initial creation after Plugin
 readiness and before its start call succeeds. Every required write error still
 removes the activation's write authority.
 
-Unnamed operations retain the compatible instance-module, Agent-module,
-partition, and ID key. Namespaced operations use a stable Ref key and record
-format 3. They read a lone legacy key and reject a legacy-plus-Ref collision.
-They do not rewrite data across keys automatically.
+Operations use the stable Ref key and exact record format 1. Earlier record
+keys and shapes are not read or rewritten automatically.
 
 This execution state is not approval of every requirement in the target
 design.
@@ -113,16 +111,16 @@ record validation and before Agent restore. The facet cannot see an adapter,
 record key, complete Agent state, process, or commit result.
 
 A complete custom Agent checkpoint bypasses Plugin slice conversion. Its
-wrapped plain-map payload stays opaque to Persistence. Legacy outer format-1
-active records remain readable through their earlier restore path.
+wrapped plain-map payload stays opaque to Persistence. Earlier record and
+snapshot shapes require offline conversion.
 
 ## Canonical source
 
 | Source | Implemented contract |
 | --- | --- |
 | `lib/jido/persistence.ex` | Source resolution, key ownership, create, load, save, logical delete, revision rules, result classification, and adapter fault containment. |
-| `lib/jido/persistence/record.ex` | Exact version-2 active and tombstone shapes, legacy format-1 validation, safe decoding, identity checks, and portability. |
-| `lib/jido/persistence/checkpoint.ex` | Agent checkpoint order, bounded Plugin owned-slice dump and load, and custom-checkpoint bypass. |
+| `lib/jido/persistence/record.ex` | Exact format-1 active and tombstone shapes, safe decoding, identity checks, and portability. |
+| `lib/jido/persistence/snapshot.ex` | Complete Agent snapshots, bounded Plugin owned-slice dump and load, code-reference checks, and custom-checkpoint bypass. |
 | `lib/jido/persistence/adapter.ex` | Required binary get and CAS contract plus optional compatible maintenance callbacks. |
 | `lib/jido/agent_server.ex` | Restore selection, revision-zero create after Plugin readiness, durable commit, and authority loss after write failure. |
 | `lib/jido/agent_server/state.ex` | Explicit initial-persistence phase for new, restored, and nonpersistent activations. |
@@ -137,7 +135,7 @@ active records remain readable through their earlier restore path.
 
 | Evidence | Result |
 | --- | --- |
-| `test/jido/persistence/record_lifecycle_test.exs` | Exact version-2 shapes, revision-zero startup, restore policies, active and missing delete, delayed-writer fencing, delete-versus-commit race, legacy reads, definition checks, and fail-closed future records. |
+| `test/jido/persistence/record_lifecycle_test.exs` | Exact format-1 shapes, revision-zero startup, restore policies, active and missing delete, delayed-writer fencing, delete-versus-commit race, old-shape rejection, definition checks, and fail-closed future records. |
 | `test/jido/persistence/plugin_integration_test.exs` | Default checkpoints convert only the paired owned state. Complete custom checkpoints bypass conversion. |
 | `test/jido/persistence/adapter_conformance_test.exs` | ETS, File, Redis, Ecto, and Bedrock pass one required binary get and exact-byte CAS suite, including concurrent winners. |
 | `test/jido/persistence/bedrock_test.exs` | Bedrock option, limit, exact-byte, conflict, and indeterminate-result branches pass with a deterministic transaction repo. |
@@ -163,8 +161,8 @@ active records remain readable through their earlier restore path.
 | `PERS-REQ-022` | `Proven` | Seam 06 and current recovery tests show authority loss after every required write error. |
 | `PERS-REQ-023` to `PERS-REQ-028` | `Proven with seam 08 publication` | Initial CAS and Plugin cleanup pass. Public Registry lookup stays hidden until the entry is `:ready`. |
 | `PERS-REQ-029` to `PERS-REQ-038` | `Proven` | Outer validation, restored identity, definition revision, tombstones, races, and safe decoding pass. |
-| `PERS-REQ-039` | `Proven` | Legacy outer format-1 active records load. |
-| `PERS-REQ-040`, `PERS-REQ-041` | `Proven by seam 09` | Namespaced operations use the Ref key, dual-read a lone legacy key, and reject a dual-key collision before a write. |
+| `PERS-REQ-039` | `Proven` | Exact format-1 records load and earlier shapes fail closed. |
+| `PERS-REQ-040`, `PERS-REQ-041` | `Proven by seam 09` | Durable operations use one stable Ref key and require offline conversion for earlier keys. |
 | `PERS-REQ-042` to `PERS-REQ-044` | `Proven` | Custom callback payloads stay opaque. Default Plugin owned-slice conversion is bounded. |
 | `PERS-REQ-045` to `PERS-REQ-049` | `Proven` | Restore, commit order, failure stop, hibernate, and runtime reconstruction have focused evidence. |
 | `PERS-REQ-050` | `Single-Agent contract proven; Topology integration remains with seams 10 and 11` | Persistence exposes no multi-record transaction claim. |
@@ -175,15 +173,9 @@ active records remain readable through their earlier restore path.
 - Public module-and-ID Persistence functions remain available.
 - Existing instance defaults, per-Agent overrides, partitions, hibernate, and
   thaw remain available.
-- Outer format-1 active records remain readable. Compatible unnamed writes use
-  format 2. New namespaced writes use format 3.
-- Older code cannot load format-2 records, but its fail-closed record check also
-  prevents it from overwriting a format-2 tombstone through normal save.
-- A namespaced operation probes the stable and compatible keys. A lone legacy
-  key remains on that key. Both keys cause a collision error. The adapter
-  cannot atomically rewrite two keys, so Jido does not rewrite automatically.
-  An older release cannot read format 3. Downgrade after the first namespaced
-  write is unsupported.
+- Reads and writes use one exact outer format 1 shape.
+- Earlier record shapes require offline conversion before this version starts.
+- Unknown formats fail closed and normal writes do not replace them.
 - `put/3` and `delete/2` remain optional maintenance callbacks. Normal durable
   lifecycle code uses only get and CAS.
 - Ecto applications must add Ecto SQL and a supported driver, supervise their
@@ -215,7 +207,7 @@ active records remain readable through their earlier restore path.
 ## Completion gate for this seam
 
 - [x] Binary get and exact-byte CAS are the required runtime adapter boundary.
-- [x] New writes use exact version-2 active or tombstone records.
+- [x] New writes use exact format-1 active or tombstone records.
 - [x] Revision-zero creation completes before the start call succeeds.
 - [x] Active restore, live commit, hibernate, and thaw preserve state revision.
 - [x] Every required write error removes activation authority.

@@ -4,13 +4,18 @@ defmodule Jido.Agent.DSL do
   alias Spark.Dsl.Extension, as: E
 
   use Spark.Dsl,
-    default_extensions: [extensions: [Jido.Agent.DSL.Extension, Jido.Agent.DSL.Topology]],
+    many_extension_kinds: [:plugin_providers],
+    untyped_extensions?: false,
+    default_extensions: [
+      plugin_providers: [Jido.Agent.DSL.Extension, Jido.Agent.DSL.Topology]
+    ],
     opt_schema: [
       id: [type: :string, required: true],
       name: [type: :string, required: true],
       description: [type: :string],
       vsn: [type: :pos_integer, default: 1],
-      metadata: [type: :any]
+      metadata: [type: :any],
+      plugin_declarations: [type: :any, default: []]
     ]
 
   @impl true
@@ -127,17 +132,8 @@ defmodule Jido.Agent.DSL do
   end
 
   def build!(dsl, opts, module) do
-    extensions =
-      E.get_persisted(dsl, :spark_extensions, [])
-      |> Enum.reject(&(&1 in [Jido.Agent.DSL.Extension, Jido.Agent.DSL.Topology]))
-
-    plugins = E.get_entities(dsl, [:__plugins__])
-    providers = Enum.uniq(extensions ++ Enum.map(plugins, & &1.provider))
-
     result =
-      with :ok <- Jido.Agent.Data.unique(plugins, & &1.provider),
-           {:ok, entries} <-
-             Extension.lower(providers, dsl, Map.new(plugins, &{&1.provider, &1.config})) do
+      with {:ok, entries} <- Extension.lower(opts[:plugin_declarations], dsl) do
         input =
           opts
           |> Keyword.take([:name, :description, :vsn, :metadata])
@@ -153,7 +149,7 @@ defmodule Jido.Agent.DSL do
                 &Map.take(&1, [:path, :handler, :state, :reply, :as, :defaults])
               ),
             topology: Jido.Agent.DSL.Topology.lower(dsl),
-            extensions: entries
+            plugins: entries
           })
 
         Validation.define(input, related?: false)

@@ -315,7 +315,7 @@ defmodule Jido.Agent.CodecTest do
             }
           ]
         },
-        extensions: [F.contribution(F.First, %{initial: 2})]
+        plugins: [F.contribution(F.First, %{initial: 2})]
       })
 
     registry = JidoTest.AgentRegistry.for(definition)
@@ -323,7 +323,7 @@ defmodule Jido.Agent.CodecTest do
     assert Map.keys(document["definition"]["schema"]) |> Enum.sort() == ["id", "vsn"]
 
     assert [provider] =
-             Enum.map(document["definition"]["extensions"], & &1["provider"])
+             Enum.map(document["definition"]["plugins"], & &1["provider"])
 
     assert Map.keys(provider) |> Enum.sort() == ["id", "vsn"]
 
@@ -337,13 +337,7 @@ defmodule Jido.Agent.CodecTest do
 
     assert child_document["definition"]["module"] != nil
 
-    plugin_registry =
-      registry.entries
-      |> Map.new(fn
-        {reference, {:extension, F.First}} -> {reference, {:plugin, F.First}}
-        entry -> entry
-      end)
-      |> Registry.new!()
+    plugin_registry = Registry.new!(registry.entries)
 
     assert {:ok, plugin_document} = JidoTest.AgentRegistry.encode(definition, plugin_registry)
     assert {:ok, ^definition} = JidoTest.AgentRegistry.decode(plugin_document, plugin_registry)
@@ -486,7 +480,7 @@ defmodule Jido.Agent.CodecTest do
             }
           ]
         },
-        extensions: [F.contribution(F.First)]
+        plugins: [F.contribution(F.First)]
       })
 
     registry = JidoTest.AgentRegistry.for(definition)
@@ -495,7 +489,7 @@ defmodule Jido.Agent.CodecTest do
     [route] = document["definition"]["routes"]
     [member] = document["definition"]["topology"]["agents"]
     [connection] = document["definition"]["topology"]["connections"]
-    [extension] = document["definition"]["extensions"]
+    [plugin] = document["definition"]["plugins"]
     schema = document["definition"]["schema"]
 
     invalid = [
@@ -538,10 +532,13 @@ defmodule Jido.Agent.CodecTest do
         ["definition", "topology", "connections"],
         [%{connection | "delivery" => "multicast"}]
       ),
-      put_in(document, ["definition", "extensions"], [Map.put(extension, "extra", true)]),
-      put_in(document, ["definition", "extensions"], [false]),
-      put_in(document, ["definition", "extensions"], [
-        %{extension | "provider" => %{"id" => "missing"}}
+      update_in(document, ["definition"], fn fields ->
+        fields |> Map.delete("plugins") |> Map.put("extensions", fields["plugins"])
+      end),
+      put_in(document, ["definition", "plugins"], [Map.put(plugin, "extra", true)]),
+      put_in(document, ["definition", "plugins"], [false]),
+      put_in(document, ["definition", "plugins"], [
+        %{plugin | "provider" => %{"id" => "missing"}}
       ])
     ]
 

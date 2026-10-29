@@ -16,14 +16,10 @@ defmodule Jido.Plugin.AuditIntegrationTest do
   end
 
   defmodule Agent do
-    use Jido.Agent, name: "audit_integration_agent"
+    use Jido.Agent, name: "audit_integration_agent", plugins: [{Audit, %{max_entries: 2}}]
 
     state do
       schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
-    end
-
-    plugins do
-      plugin Audit, config: %{max_entries: 2}
     end
 
     routes do

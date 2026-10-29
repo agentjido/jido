@@ -87,8 +87,8 @@ The revalidation confirms these seam-90 rules:
   stay public.
 - `Jido.AgentServer.ChildInfo`, `Jido.AgentServer.ParentRef`, and
   `Jido.RuntimeStore` stay internal.
-- Public authoring extensions return canonical Agent or Topology data. Their
-  private normalization types do not become public.
+- Public Agent Plugins and Topology extensions return canonical authoring data.
+  Their private normalization types do not become public.
 - Adjacent `jido_action` and `jido_signal` errors keep their package owner.
 
 ## Raw protocol controls

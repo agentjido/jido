@@ -9,9 +9,10 @@ defmodule Jido.Plugin.Bus.DSL do
   alias Jido.Agent.{Data, Error}
   alias Spark.Dsl.Extension, as: E
   @section %Spark.Dsl.Section{name: :signal_bus, schema: [name: [type: :atom, required: true]]}
-  use Jido.Agent.Extension, id: "jido.signal_bus", sections: [@section]
-  @impl Jido.Agent.Extension
-  def authoring_imports, do: [Jido.Plugin.Bus.DSL.References]
+  use Jido.Plugin,
+    id: "jido.signal_bus",
+    sections: [@section],
+    imports: [Jido.Plugin.Bus.DSL.References]
 
   @impl Jido.Agent.Extension
   def lower(dsl, config) do

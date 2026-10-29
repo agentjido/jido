@@ -70,14 +70,13 @@ defmodule JidoTest.Persistence.PluginIntegrationTest do
   end
 
   defmodule CustomCheckpointAgent do
-    use Jido.Agent, name: "persistence_custom_checkpoint", vsn: 2
+    use Jido.Agent,
+      name: "persistence_custom_checkpoint",
+      vsn: 2,
+      plugins: [{Package, %{prefix: "sealed:"}}]
 
     state do
       schema Zoi.object(%{value: Zoi.integer() |> Zoi.default(0)})
-    end
-
-    plugins do
-      plugin Package, config: %{prefix: "sealed:"}
     end
 
     @impl Jido.Agent
@@ -124,7 +123,7 @@ defmodule JidoTest.Persistence.PluginIntegrationTest do
       Agent.define!(%{
         name: "persistence_plugin_integration",
         schema: Zoi.object(%{visible: Zoi.integer() |> Zoi.default(1)}),
-        extensions: [
+        plugins: [
           %{id: Package.id(), provider: Package, vsn: Package.vsn(), data: Map.new(options)}
         ]
       })
@@ -140,7 +139,7 @@ defmodule JidoTest.Persistence.PluginIntegrationTest do
     assert_receive {:dump, 12, dump_context}
     assert dump_context.plugin == Package
     assert dump_context.plugin_vsn == 4
-    assert dump_context.record_format == 4
+    assert dump_context.record_format == 1
     assert dump_context.direction == :dump
     assert dump_context.reason == :test
 
@@ -168,12 +167,12 @@ defmodule JidoTest.Persistence.PluginIntegrationTest do
     options = [prefix: "sealed:"]
     assert {:ok, [spec]} = Jido.Plugin.Normalizer.normalize_all([{Package, options}])
 
-    dump_context = PersistencePlugin.context(spec, :dump, 4, :contract)
+    dump_context = PersistencePlugin.context(spec, :dump, 1, :contract)
 
     assert %Jido.Persistence.Plugin.Context{
              plugin: Package,
              plugin_vsn: 4,
-             record_format: 4,
+             record_format: 1,
              direction: :dump,
              reason: :contract
            } = dump_context
@@ -346,7 +345,7 @@ defmodule JidoTest.Persistence.PluginIntegrationTest do
     agent =
       Agent.define!(%{
         name: "stored_plugin_state",
-        extensions: [
+        plugins: [
           %{
             id: StoredStatePackage.id(),
             provider: StoredStatePackage,
@@ -371,7 +370,7 @@ defmodule JidoTest.Persistence.PluginIntegrationTest do
     agent =
       Agent.define!(%{
         name: "invalid_loaded_state",
-        extensions: [
+        plugins: [
           %{
             id: StoredStatePackage.id(),
             provider: StoredStatePackage,
@@ -407,7 +406,7 @@ defmodule JidoTest.Persistence.PluginIntegrationTest do
     Agent.define!(%{
       name: "persistence_plugin_faults",
       schema: Zoi.object(%{visible: Zoi.integer() |> Zoi.default(1)}),
-      extensions: [
+      plugins: [
         %{id: Package.id(), provider: Package, vsn: Package.vsn(), data: %{prefix: "sealed:"}}
       ]
     })

@@ -434,14 +434,10 @@ defmodule Jido.Plugin.ContractTest do
   end
 
   defmodule OwnedStateAgent do
-    use Jido.Agent, name: "owned_state_agent"
+    use Jido.Agent, name: "owned_state_agent", plugins: [OwnedStatePlugin]
 
     state do
       schema Zoi.object(%{trace: Zoi.list(Zoi.string()) |> Zoi.default([])})
-    end
-
-    plugins do
-      plugin OwnedStatePlugin
     end
 
     routes do
@@ -450,11 +446,7 @@ defmodule Jido.Plugin.ContractTest do
   end
 
   defmodule NilOwnedStateAgent do
-    use Jido.Agent, name: "nil_owned_state_agent"
-
-    plugins do
-      plugin NilOwnedStatePlugin
-    end
+    use Jido.Agent, name: "nil_owned_state_agent", plugins: [NilOwnedStatePlugin]
 
     routes do
       route "owned.delete_nil", DeleteNilOwnedState
@@ -462,11 +454,7 @@ defmodule Jido.Plugin.ContractTest do
   end
 
   defmodule ReplaceDirectiveTypeAgent do
-    use Jido.Agent, name: "replace_directive_type_agent"
-
-    plugins do
-      plugin ReplaceDirectiveTypePlugin
-    end
+    use Jido.Agent, name: "replace_directive_type_agent", plugins: [ReplaceDirectiveTypePlugin]
 
     routes do
       route "directive.replace", ReturnOwnedDirective
@@ -474,12 +462,9 @@ defmodule Jido.Plugin.ContractTest do
   end
 
   defmodule DirectiveReducerAgent do
-    use Jido.Agent, name: "directive_reducer_agent"
-
-    plugins do
-      plugin DirectiveReducerPlugin
-      plugin ForeignDirectivePlugin
-    end
+    use Jido.Agent,
+      name: "directive_reducer_agent",
+      plugins: [DirectiveReducerPlugin, ForeignDirectivePlugin]
 
     routes do
       route "directive.reduce", ReturnMixedDirectives
@@ -487,11 +472,7 @@ defmodule Jido.Plugin.ContractTest do
   end
 
   defmodule NormalizingDirectiveAgent do
-    use Jido.Agent, name: "normalizing_directive_agent"
-
-    plugins do
-      plugin NormalizingDirectivePlugin
-    end
+    use Jido.Agent, name: "normalizing_directive_agent", plugins: [NormalizingDirectivePlugin]
 
     routes do
       route "directive.normalize", ReturnNormalizedDirective
@@ -731,7 +712,7 @@ defmodule Jido.Plugin.ContractTest do
              Jido.Agent.define(%{
                name: "conflicting_state_agent",
                schema: Zoi.object(%{owned: Zoi.map()}),
-               extensions: [
+               plugins: [
                  %{
                    id: OwnedStatePlugin.id(),
                    provider: OwnedStatePlugin,

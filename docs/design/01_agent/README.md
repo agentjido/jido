@@ -52,9 +52,9 @@ boundaries. The contract and its implementation evidence were approved on
    default for existing `use Jido.Agent` modules and allow unversioned direct
    definitions.
    Effect: module authors get a compatible restore gate.
-3. **Checkpoint format:** Use version 2 for generated, direct, behavior-only,
-   and custom checkpoints. Do not read version-1 checkpoints or raw custom
-   payloads. Effect: restore has one format and a clear module revision gate.
+3. **Snapshot format:** Use exact format 1 for generated, direct, behavior-only,
+   and custom Agent snapshots. Do not read earlier Agent or snapshot shapes.
+   Effect: restore has one format and a clear definition revision gate.
 4. **Portable state:** Add early state checks after a compatibility audit
    and use the error contract from seam 12.
    Effect: direct, live, and persistent paths accept the same portable state.

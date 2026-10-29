@@ -7,14 +7,12 @@ defmodule Jido.Examples.PluginStateAgent do
   paths preserve the prior Agent state.
   """
 
-  use Jido.Agent, name: "basic_sdk_plugin_state"
+  use Jido.Agent,
+    name: "basic_sdk_plugin_state",
+    plugins: [Jido.Examples.PluginStateAgent.CountTurns]
 
   state do
     schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
-  end
-
-  plugins do
-    plugin Jido.Examples.PluginStateAgent.CountTurns
   end
 
   routes do

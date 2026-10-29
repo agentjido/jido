@@ -109,7 +109,7 @@ defmodule JidoCoreBench.AgentServerCases do
           end
 
         a =
-          Jido.Agent.instantiate!(%{definition | extensions: F.contributions(plugins)},
+          Jido.Agent.instantiate!(%{definition | plugins: F.contributions(plugins)},
             id: "#{prefix}-#{i}"
           )
 

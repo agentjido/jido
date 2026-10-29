@@ -7,9 +7,11 @@ defmodule Jido.Examples.ManagedJobs do
   pending-job recovery example when an application must recover lost work.
   """
 
-  use Jido.Agent, name: "example_managed_jobs"
+  use Jido.Agent,
+    name: "example_managed_jobs",
+    plugins: [Jido.Examples.ManagedJobs.JobRuntime]
 
-  alias Jido.Examples.ManagedJobs.{JobRunner, JobRuntime}
+  alias Jido.Examples.ManagedJobs.JobRunner
   alias Jido.Examples.ManagedJobs.JobRuntime.{Cancel, Submit}
 
   state do
@@ -20,10 +22,6 @@ defmodule Jido.Examples.ManagedJobs do
                Zoi.enum([:idle, :running, :completed, :failed, :cancelled]) |> Zoi.default(:idle),
              result: Zoi.string() |> Zoi.default("")
            })
-  end
-
-  plugins do
-    plugin JobRuntime
   end
 
   routes do

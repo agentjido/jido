@@ -23,7 +23,7 @@ defmodule Jido.Agent.TopologyContractTest do
   end
 
   defmodule Ports do
-    use Jido.Agent.Extension, id: "test.topology.ports"
+    use Jido.Plugin, id: "test.topology.ports"
     def endpoint_kinds, do: [:port]
 
     def endpoints(_data),
@@ -269,7 +269,7 @@ defmodule Jido.Agent.TopologyContractTest do
             state: %{source: :output, path: []}
           }
         ],
-        extensions: [contribution],
+        plugins: [contribution],
         topology: %{
           agents: [%{name: :child, definition: Child}],
           connections: [

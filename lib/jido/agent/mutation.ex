@@ -380,14 +380,14 @@ defmodule Jido.Agent.Mutation do
            end),
          replacements = Map.new(added, &{&1.provider, &1}),
          retained =
-           Enum.flat_map(agent.extensions, fn entry ->
+           Enum.flat_map(agent.plugins, fn entry ->
              if entry.provider in old_modules,
                do: List.wrap(Map.get(replacements, entry.provider)),
                else: [entry]
            end),
          appended = Enum.reject(added, &(&1.provider in old_modules)),
          {:ok, entries} <- Jido.Agent.Extension.normalize(retained ++ appended),
-         do: {:ok, %{agent | extensions: entries}}
+         do: {:ok, %{agent | plugins: entries}}
   end
 
   defp normalize_routes(agent) do

@@ -62,7 +62,7 @@ change runtime behavior.
 | `lib/jido/agent_server/plugin_lifecycle.ex:110-198` | Plugin wrappers use the Jido Agent Dynamic Supervisor and remain outside Agent state. |
 | `lib/jido/agent_server/options.ex:11-64` | Agent Server options include an optional per-Agent persistence source and current map-based runtime options. |
 | `lib/jido/persistence.ex:1-16` | Persistence owns record keys, encoding, validation, and adapter fault containment. |
-| `lib/jido/persistence.ex` | Persistence uses atomic revision checks, compatible version-2 keys and records, stable namespaced Ref keys and version-3 records, dual-key collision checks, and CAS tombstones. |
+| `lib/jido/persistence.ex` | Persistence uses atomic revision checks, one stable Ref key, exact format-1 records, fail-closed old-shape rejection, and CAS tombstones. |
 | `lib/jido/persistence/record.ex` | Records are exact maps. Safe decoding, outer identity, shape, revision, and portability checks fail closed. |
 | `lib/jido/persistence/adapter.ex:1-46` | Adapters store bytes and provide atomic compare-and-swap. They do not own lifecycle policy. |
 | `lib/jido.ex:8-48` | Jido exposes immutable Agent and direct-command concepts and public PID-based instance examples. |
@@ -465,7 +465,7 @@ No deprecation or removal is approved in this seam.
 | Agent Ref | Ref-first APIs now exist beside current ID and PID APIs. Do not remove current handles in V3 without a separate deprecation decision. |
 | Definition revision | Preserve revision through DSL, direct data, Builder, Codec, checkpoints, and restore. Define behavior for old checkpoints before enforcement. |
 | Custom checkpoints | Keep complete Agent `checkpoint/2` and `restore/2`. A Persistence facet cannot silently override their meaning. |
-| Durable records | Compatible keys use format 2. Stable Ref keys use format 3. A lone legacy key remains readable, dual keys fail closed, automatic cross-key rewrite is not supported, and downgrade after a stable write is unsupported. |
+| Durable records | Stable Ref keys use exact format 1. Earlier keys and record shapes require offline conversion. Unknown formats fail closed. |
 | Write errors | Removing write authority after confirmed failures changes current error-policy behavior. Define stop or terminal non-writing behavior and automatic-restart reload rules. |
 | Persistence adapters | Keep the binary adapter and atomic compare-and-swap contract. New lifecycle meaning stays above the adapter. |
 | Plugin runtime Init | Keep the implemented coherent state and version input. Keep the current public state-pull recovery path during migration. |

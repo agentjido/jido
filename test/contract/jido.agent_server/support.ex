@@ -204,7 +204,7 @@ defmodule JidoTest.AgentServer.Fixtures do
     Jido.Agent.define!(%{
       name: "server_contract",
       schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}),
-      extensions: [%{id: Gate.id(), provider: Gate, vsn: Gate.vsn(), data: %{}}],
+      plugins: [%{id: Gate.id(), provider: Gate, vsn: Gate.vsn(), data: %{}}],
       routes: [
         %{
           path: "work",

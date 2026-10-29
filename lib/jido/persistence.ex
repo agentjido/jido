@@ -39,13 +39,13 @@ defmodule Jido.Persistence do
   conversion and keep their opaque callback contract.
 
   Each durable Agent uses one exact `{namespace, partition, id}` Ref key and
-  record format 4. Supply `:namespace`, or use the namespace of a live Jido
+  record format 1. Supply `:namespace`, or use the namespace of a live Jido
   `:instance`. The Agent module is checked in the record, but is not part of
   its key. `:instance` also supplies checkpoint callback context.
 
-  New writes use record format 4 with a complete snapshot format 1 payload.
-  Earlier checkpoint payloads require explicit conversion before this version
-  starts. The record reader retains format 3 keys for adapter cutover only.
+  Reads and writes use record format 1 with a complete snapshot format 1
+  payload. Earlier record and snapshot shapes require conversion outside Jido
+  before this version starts.
   Restore does not rebuild a saved definition from the current source module.
   """
 

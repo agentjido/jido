@@ -22,10 +22,8 @@ placement service, or topology control plane.
 - `Jido.Instance.RefFacade` validates a complete Ref, checks the instance
   namespace, resolves the current local Server, and delegates through public
   Agent Server functions.
-- `Jido.Persistence` uses stable namespaced keys and record format 3 for new
-  namespaced records.
-- Legacy and stable persistence keys have explicit dual-read and collision
-  rules. Jido does not do an unsafe automatic cross-key rewrite.
+- `Jido.Persistence` uses stable namespaced keys and exact record format 1.
+- Earlier persistence keys and record shapes require offline conversion.
 
 ## Boundaries
 

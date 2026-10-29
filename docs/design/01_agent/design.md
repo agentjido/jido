@@ -212,36 +212,35 @@ Agent authoring boundary shall preserve that value.
 module-owned Agent, it shall first verify that the validated neutral Agent
 definition is strictly equal to the current generated module definition.
 
-`AGT-REQ-031`: Retired for V3. The Agent boundary does not write version-1
-checkpoints.
+`AGT-REQ-031`: The persistence boundary shall write Agent snapshots in exact
+format 1.
 
-`AGT-REQ-032`: Retired for V3. The Agent boundary does not read version-1
-checkpoints.
+`AGT-REQ-032`: The persistence boundary shall read only exact snapshot format 1
+and shall reject earlier Agent and snapshot shapes.
 
-`AGT-REQ-033`: When the default checkpoint boundary writes a versioned
-module-owned Agent, it shall write a version-2 plain map with `version`, `kind`,
-`agent_module`, `vsn`, `id`, and combined `state` fields.
+`AGT-REQ-033`: When the default snapshot boundary writes an Agent, it shall
+write a plain map with `format`, complete `agent`, `references`, and
+`state_format` fields. The complete Agent contains its `vsn`, ID, definition,
+and combined state.
 
-`AGT-REQ-034`: When restore reads a default version-2 checkpoint, the Agent
-boundary shall reject an Agent module or `vsn` mismatch before it accepts
-saved state.
+`AGT-REQ-034`: When restore reads a default format-1 snapshot, the Agent
+boundary shall verify code references and validate the complete saved Agent
+before it accepts saved state.
 
 `AGT-REQ-035`: While complete custom checkpoint and restore callbacks remain
 supported, their callback boundary shall keep the documented opaque plain-map
 payload contract.
 
 `AGT-REQ-040`: When a custom checkpoint callback returns a new payload, the
-public Agent boundary shall wrap it in a version-2 core-owned plain-map
-envelope with `version`, `kind`, `agent_module`, `vsn`, and `payload` fields.
-Restore shall compare the saved module and revision before it passes the opaque
-payload to the callback.
+public persistence boundary shall store it in the same format-1 snapshot with
+`state_format: :custom`. Restore shall verify saved code references before it
+passes the opaque payload to the callback.
 
 `AGT-REQ-044`: Where an Agent module does not define `checkpoint/2`, the Agent
-boundary shall use the core version-2 checkpoint behavior.
+boundary shall use the core format-1 snapshot behavior.
 
 `AGT-REQ-045`: Where an Agent module does not define `restore/2`, the Agent
-boundary shall use the core version-2 restore behavior for a default
-checkpoint.
+boundary shall use the core format-1 restore behavior for a default snapshot.
 
 `AGT-REQ-041`: While direct and behavior-only Agent definitions remain valid
 in memory, the Agent boundary shall not apply state portability rules to their
@@ -303,25 +302,20 @@ Elixir protocol control.
 portable definition document and the checkpoint boundary for identity and live
 state. Read public struct fields directly for local inspection.
 
-The current generated-module checkpoint is this version-2 plain map:
+The current snapshot is this format-1 plain map:
 
 ```elixir
 %{
-  version: 2,
-  kind: :agent,
-  agent_module: MyApp.Agent,
-  vsn: 3,
-  id: "agent-1",
-  state: complete_combined_state
+  format: 1,
+  agent: %Jido.Agent{id: "agent-1", vsn: 3, state: complete_combined_state},
+  references: %{MyApp.Agent => code_fingerprint},
+  state_format: :default
 }
 ```
 
-It does not copy the static definition into the checkpoint and does not add a
-public Checkpoint struct. Direct and behavior-only definitions use version 2
-and add an embedded `definition` field when the full checkpoint is portable.
-An explicitly unversioned direct definition can use a generated module as its
-behavior while the direct value owns its changed static definition. Version-1
-checkpoints are not read or written.
+It stores the accepted complete Agent and does not add a public Snapshot struct.
+Direct and behavior-only definitions use the same format when the complete
+snapshot is portable. Earlier Agent and snapshot shapes are not read.
 
 A custom callback returns an opaque map. The public Agent boundary writes this
 core-owned envelope:
@@ -373,7 +367,7 @@ These approved guarantees apply to dependent seams.
 | 03 Agent identity | An instance keeps its current nonempty ID; this seam does not define Agent Ref, namespace, or location. |
 | 04 Turn evaluation | Direct evaluation accepts one prepared Turn and returns one candidate Agent and Directive list; route order remains owned by seam 04. |
 | 05 Plugins | Plugin-owned fields stay in the combined state map with unique keys and separate write authority; facet details remain owned by seam 05. |
-| 07 Persistence | Agent checkpoints use version 2 with Agent `vsn`; record fields remain owned by seam 07. |
+| 07 Persistence | Agent snapshots use format 1 with Agent `vsn`; record fields remain owned by seam 07. |
 | 08 Agent Server | Live evaluation uses the same candidate assembly; commit and state version remain outside the Agent value. |
 | 12 Errors and contracts | Agent operations adopt approved errors and early portable-state checks without inventing interim error shapes. |
 
@@ -383,9 +377,9 @@ These approved guarantees apply to dependent seams.
 | --- | --- | --- | --- |
 | `AGT-DEC-001` | Which current Agent contracts remain? | Keep both forms, combined state, direct `cmd/3`, Builder, Codec, custom routing, and checkpoint callbacks. | No current supported path is removed. |
 | `AGT-DEC-002` | How does Agent `vsn` start? | Default generated modules to `vsn: 1`; allow `nil` only for direct and behavior-only compatibility forms. | Existing module source stays valid. |
-| `AGT-DEC-003` | How does checkpoint creation prove module ownership? | Compare the validated neutral instance definition with the current generated module definition by strict term equality before a version-2 write. | Mutated static data cannot claim the module revision. |
-| `AGT-DEC-004` | Which default checkpoint format does V3 use? | Use one version-2 plain map with `vsn`; embed the definition only for direct and behavior-only forms. | Restore gets a revision gate without a forced public struct or a legacy reader. |
+| `AGT-DEC-003` | How does snapshot creation prove code identity? | Save fingerprints for every referenced module and verify them before restore. | Restore fails when referenced code changed or is unavailable. |
+| `AGT-DEC-004` | Which default snapshot format does V3 use? | Use one exact format-1 plain map that contains the complete accepted Agent. | Restore keeps the accepted definition without a public struct or a legacy reader. |
 | `AGT-DEC-005` | Where does state portability run? | Run it at every Agent state acceptance point and keep persistence validation. | Direct and persistent Agents use one state rule. |
 | `AGT-DEC-006` | Does this seam add state accessor APIs? | No. Keep struct access, `set/2`, and the private complete transition boundary. | The seam does not add an unproved public abstraction. |
-| `AGT-DEC-007` | How does a custom checkpoint carry module revision? | Wrap each opaque callback map in a core-owned version-2 module and `vsn` envelope. | Custom callbacks retain payload ownership and restore gets an early revision gate. |
+| `AGT-DEC-007` | How does a custom checkpoint carry code identity? | Use the same format-1 snapshot and mark the state payload as custom. | Custom callbacks retain payload ownership and restore verifies referenced code first. |
 | `AGT-DEC-008` | Which direct definitions use the default durable format? | Keep every valid direct definition in memory, but permit the embedded default checkpoint only when its full map is portable. | Runtime authoring stays flexible and durable writes fail with a typed path instead of hidden serialization risk. |

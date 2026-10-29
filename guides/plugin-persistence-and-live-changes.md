@@ -47,15 +47,14 @@ defmodule MyApp.Tags do
 end
 
 defmodule MyApp.Tagged do
-  use Jido.Agent, name: "tagged"
+  use Jido.Agent,
+    name: "tagged",
+    plugins: [MyApp.Tags]
 
   state do
     schema(Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}))
   end
 
-  plugins do
-    plugin MyApp.Tags
-  end
 end
 
 agent = MyApp.Tagged.instantiate!(id: "a-1", state: %{count: 1, tags: ["red", "blue"]})
@@ -122,7 +121,7 @@ With `option_keys:`, it sees only the Agent Server keys:
 use Jido.Plugin, option_keys: [agent: [:label], agent_server: [:capacity]]
 ```
 
-See [Extensions or Plugins](extensions-and-plugins.md).
+See [Agent Plugins](agent-plugins.md).
 
 ## Change Plugins Live
 

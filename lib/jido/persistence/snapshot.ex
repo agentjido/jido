@@ -152,13 +152,7 @@ defmodule Jido.Persistence.Snapshot do
           []
       end)
 
-    providers =
-      Enum.flat_map(agent.extensions, fn entry ->
-        case entry.provider.runtime_support() do
-          :none -> [entry.provider]
-          module -> [entry.provider, module]
-        end
-      end)
+    providers = Enum.map(agent.plugins, & &1.provider)
 
     custom = if state_format == :custom, do: [agent.module], else: []
     nested = Enum.flat_map(agent.topology.agents, &code_modules(&1.definition))
@@ -187,7 +181,7 @@ defmodule Jido.Persistence.Snapshot do
         _ -> []
       end)
 
-    providers = Enum.map(agent.extensions, & &1.provider)
+    providers = Enum.map(agent.plugins, & &1.provider)
     nested = Enum.flat_map(agent.topology.agents, &saved_modules(&1.definition))
     handlers ++ providers ++ nested ++ schema_modules(agent.schema)
   end

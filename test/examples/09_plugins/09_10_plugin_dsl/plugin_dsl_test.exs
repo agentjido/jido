@@ -10,7 +10,7 @@ defmodule JidoTest.Examples.Plugins.DSLTest do
     definition = Agent.definition()
 
     assert [%{id: "examples.thresholds", provider: Thresholds, vsn: 1, data: data}] =
-             definition.extensions
+             definition.plugins
 
     assert data == %{
              on: "examples.plugins.dsl.add",
@@ -43,18 +43,18 @@ defmodule JidoTest.Examples.Plugins.DSLTest do
 
   test "map authors use the same validation as DSL authors" do
     definition = Agent.definition()
-    [contribution] = definition.extensions
+    [contribution] = definition.plugins
     raw = Map.from_struct(definition)
     assert {:ok, ^definition} = CoreAgent.define(raw)
     bad = put_in(contribution.data.thresholds, [%{name: :first, at: 0}])
-    assert {:error, _} = CoreAgent.define(%{raw | extensions: [bad]})
+    assert {:error, _} = CoreAgent.define(%{raw | plugins: [bad]})
     missing = put_in(contribution.data.on, "examples.plugins.dsl.missing")
-    assert {:error, _} = CoreAgent.define(%{raw | extensions: [missing]})
+    assert {:error, _} = CoreAgent.define(%{raw | plugins: [missing]})
 
     duplicate =
       put_in(contribution.data.thresholds, [%{name: :first, at: 1}, %{name: :first, at: 3}])
 
-    assert {:error, _} = CoreAgent.define(%{raw | extensions: [duplicate]})
-    assert {:error, _} = CoreAgent.define(%{raw | extensions: [%{contribution | vsn: 99}]})
+    assert {:error, _} = CoreAgent.define(%{raw | plugins: [duplicate]})
+    assert {:error, _} = CoreAgent.define(%{raw | plugins: [%{contribution | vsn: 99}]})
   end
 end

@@ -81,11 +81,11 @@ Use one namespace per tenant or environment. See
 ## The Record
 
 The value is `:erlang.term_to_binary/1` of a map. Jido decodes it with
-`:erlang.binary_to_term(bytes, [:safe])`. Record format 4 holds:
+`:erlang.binary_to_term(bytes, [:safe])`. Record format 1 holds:
 
 | Field | Value |
 | --- | --- |
-| `fmt` | `4` |
+| `fmt` | `1` |
 | `kind` | `:active` or `:tombstone` |
 | `namespace`, `partition`, `agent_id` | The identity from the key |
 | `agent_module` | The module that wrote the record |
@@ -109,15 +109,14 @@ Decoding the row from the example:
 record = :erlang.binary_to_term(bytes)
 
 Map.take(record, [:fmt, :kind, :namespace, :agent_id, :partition, :rev])
-# => %{fmt: 4, kind: :active, namespace: "storage-guide",
+# => %{fmt: 1, kind: :active, namespace: "storage-guide",
 #      agent_id: "counter-1", partition: nil, rev: 1}
 ```
 
 A record with missing or wrong fields fails to load with
 `{:error, {:invalid_persistence_record, reason}}`, such as `:shape` or
-`:agent_module`. Format 3 records, with `format`,
-`revision` and `agent_vsn` fields, still load so older data survives a
-cutover.
+`:agent_module`. Earlier record shapes do not load. Convert stored data before
+this Jido version starts when an application must keep it.
 
 ## Snapshots
 

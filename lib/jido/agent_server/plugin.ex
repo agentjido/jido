@@ -30,7 +30,7 @@ defmodule Jido.AgentServer.Plugin do
         {:halt,
          Error.fail(
            :plugin_quiescence_required,
-           [:extensions],
+           [:plugins],
            "Plugin changes require quiesce and resume callbacks",
            %{plugin: spec.module}
          )}

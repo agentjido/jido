@@ -60,7 +60,7 @@ defmodule JidoTest.Contract.PluginBusTest do
     assert {:error, %Error{code: :bus_name}} = DSL.lower(%{}, %{})
 
     assert References.bus(:events) == %{kind: :bus, name: :events}
-    assert DSL.authoring_imports() == [References]
+    assert DSL.module_imports() == [References]
     assert DSL.endpoint_kinds() == [:bus]
     assert {:ok, ^expected} = DSL.normalize(expected)
     assert DSL.endpoints(expected) == [%{kind: :bus, name: :events}]

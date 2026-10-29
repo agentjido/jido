@@ -46,7 +46,7 @@ defmodule Jido.MixProject do
      ]},
     {"Build Plugins",
      [
-       {"guides/extensions-and-plugins.md", "Extensions or Plugins"},
+       {"guides/agent-plugins.md", "Agent Plugins"},
        {"guides/write-a-stateful-plugin.livemd", "Stateful Plugins"},
        {"guides/plugin-supervised-resources.livemd", "Supervised Resources"},
        {"guides/plugin-custom-directives.livemd", "Custom Directives"},
@@ -220,10 +220,7 @@ defmodule Jido.MixProject do
           Jido.Agent.Turn,
           Jido.Agent.View
         ],
-        "Agent Authoring": [
-          Jido.Agent.Extension,
-          Jido.Agent.Topology
-        ],
+        "Agent Authoring": [Jido.Agent.Topology],
         "Agent Directives": [
           Jido.Agent.Directive,
           Jido.Agent.Directive.AgentAdd,

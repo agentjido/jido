@@ -24,14 +24,12 @@ defmodule Jido.Examples.Heartbeat do
 
   defmodule DefaultAgent do
     @moduledoc "Receives the default Heartbeat Signal."
-    use Jido.Agent, name: "runtime_heartbeat_default_agent"
+    use Jido.Agent,
+      name: "runtime_heartbeat_default_agent",
+      plugins: [{Heartbeat, %{interval: 60_000, signal_data: %{kind: "default"}}}]
 
     state do
       schema Zoi.object(%{events: Zoi.list(Zoi.map()) |> Zoi.default([])})
-    end
-
-    plugins do
-      plugin Heartbeat, config: %{interval: 60_000, signal_data: %{kind: "default"}}
     end
 
     routes do
@@ -41,20 +39,20 @@ defmodule Jido.Examples.Heartbeat do
 
   defmodule CustomAgent do
     @moduledoc "Receives one application-defined Heartbeat Signal."
-    use Jido.Agent, name: "runtime_heartbeat_custom_agent"
+    use Jido.Agent,
+      name: "runtime_heartbeat_custom_agent",
+      plugins: [
+        {Heartbeat,
+         %{
+           interval: 60_000,
+           signal_type: "examples.runtime.heartbeat.custom",
+           signal_data: %{kind: "custom"},
+           source: "/examples/runtime/heartbeat"
+         }}
+      ]
 
     state do
       schema Zoi.object(%{events: Zoi.list(Zoi.map()) |> Zoi.default([])})
-    end
-
-    plugins do
-      plugin Heartbeat,
-        config: %{
-          interval: 60_000,
-          signal_type: "examples.runtime.heartbeat.custom",
-          signal_data: %{kind: "custom"},
-          source: "/examples/runtime/heartbeat"
-        }
     end
 
     routes do

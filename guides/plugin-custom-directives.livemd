@@ -135,14 +135,14 @@ end
 
 ## Define the Agent
 
-The notebook attaches the Plugin with `extensions:` because it needs no
-Agent-specific config. A `plugin` declaration also works in a Livebook cell.
+The notebook declares the Plugin without Agent-specific config. The same
+`plugins:` form works in a Livebook cell.
 
 ```elixir
 defmodule GuidePlugins.Orders do
   use Jido.Agent,
     name: "orders",
-    extensions: [GuidePlugins.Notifier]
+    plugins: [GuidePlugins.Notifier]
 
   state do
     schema(Zoi.object(%{placed: Zoi.list(Zoi.string()) |> Zoi.default([])}))

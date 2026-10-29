@@ -317,7 +317,7 @@ defmodule Jido.Agent.StateTest do
     assert {:error, %Jido.Agent.Error{path: [:schema | _]}} =
              Agent.define(%{
                name: "plugin_transform",
-               extensions: [
+               plugins: [
                  %{
                    id: TransformPlugin.id(),
                    provider: TransformPlugin,

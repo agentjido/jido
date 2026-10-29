@@ -5,7 +5,7 @@ defmodule Jido.Agent.Diff do
             agents: @empty,
             routes: @empty,
             connections: @empty,
-            extensions: @empty,
+            plugins: @empty,
             state: nil
 
   @type t :: %__MODULE__{}
@@ -17,7 +17,7 @@ defmodule Jido.Agent.Diff do
       fields:
         for(
           {field, value} <- Map.from_struct(after_agent),
-          field not in [:state, :routes, :topology, :extensions],
+          field not in [:state, :routes, :topology, :plugins],
           Map.fetch!(before, field) !== value,
           into: %{},
           do: {field, %{before: Map.fetch!(before, field), after: value}}
@@ -30,7 +30,7 @@ defmodule Jido.Agent.Diff do
           after_agent.topology.connections,
           &{&1.from, &1.to, &1.path}
         ),
-      extensions: collection(before.extensions, after_agent.extensions, & &1.provider),
+      plugins: collection(before.plugins, after_agent.plugins, & &1.provider),
       state:
         if(before.state === after_agent.state,
           do: nil,
@@ -43,19 +43,19 @@ defmodule Jido.Agent.Diff do
   @spec empty?(t()) :: boolean()
   def empty?(%__MODULE__{} = diff) do
     not Enum.any?(
-      [:fields, :state, :agents, :routes, :connections, :extensions],
+      [:fields, :state, :agents, :routes, :connections, :plugins],
       &changed?(diff, &1)
     )
   end
 
   @doc "True when one collection or the state changed."
-  @spec changed?(t(), :fields | :state | :agents | :routes | :connections | :extensions) ::
+  @spec changed?(t(), :fields | :state | :agents | :routes | :connections | :plugins) ::
           boolean()
   def changed?(%__MODULE__{fields: fields}, :fields), do: fields != %{}
   def changed?(%__MODULE__{state: state}, :state), do: state != nil
 
   def changed?(%__MODULE__{} = diff, field)
-      when field in [:agents, :routes, :connections, :extensions] do
+      when field in [:agents, :routes, :connections, :plugins] do
     c = Map.fetch!(diff, field)
     c.added != [] or c.removed != [] or c.updated != [] or c.order.before != c.order.after
   end

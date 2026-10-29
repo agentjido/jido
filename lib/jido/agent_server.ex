@@ -239,7 +239,6 @@ defmodule Jido.AgentServer do
       with {:ok, opts} <- runtime_options(opts),
            :ok <- validate_options(opts),
            {:ok, agent} <- validate_start_agent(opts),
-           :ok <- Agent.validate_runtime_support(agent),
            do: {:ok, Keyword.put(opts, :agent, agent)}
     else
       invalid_options("options must be a keyword list")

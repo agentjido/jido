@@ -1,10 +1,10 @@
-defmodule Jido.Plugin.FSMDurableTest do
+defmodule Jido.Agent.Plugin.FSMDurableTest do
   use JidoTest.Case, async: false
 
   @moduletag :tmp_dir
 
+  alias Jido.Agent.Plugin.FSM
   alias Jido.AgentServer, as: Server
-  alias Jido.Plugin.FSM
 
   defmodule Approval do
     use Jido.Flow,
@@ -29,7 +29,7 @@ defmodule Jido.Plugin.FSMDurableTest do
   defmodule Agent do
     use Jido.Agent,
       name: "fsm_durable_agent",
-      extensions: [FSM]
+      plugins: [{FSM, %{definition_vsn: 1}}]
 
     state do
       schema(
@@ -75,7 +75,7 @@ defmodule Jido.Plugin.FSMDurableTest do
 
     assert Server.agent(server).state == %{
              status: :idle,
-             fsm: %{version: 1, current: :idle}
+             fsm: %{definition_vsn: 1, current: :idle}
            }
 
     approval =
@@ -85,6 +85,6 @@ defmodule Jido.Plugin.FSMDurableTest do
 
     assert {:ok, completed, []} = Server.await(pending)
     assert completed.state.status == :approved
-    assert completed.state.fsm == %{version: 1, current: :ready}
+    assert completed.state.fsm == %{definition_vsn: 1, current: :ready}
   end
 end

@@ -209,7 +209,7 @@ defmodule JidoTest.AgentServer.Durable.PersistenceTest do
 
     {:ok, definition} =
       Jido.Agent.define(
-        Map.put(Map.from_struct(definition), :extensions, [
+        Map.put(Map.from_struct(definition), :plugins, [
           JidoTest.AgentContract.contribution(Plugin, %{observer: c.observer})
         ])
       )
@@ -239,7 +239,7 @@ defmodule JidoTest.AgentServer.Durable.PersistenceTest do
       Jido.Agent.define!(%{
         name: "durable_plugin_recovery",
         schema: c.agent.schema,
-        extensions: [
+        plugins: [
           %{id: Plugin.id(), provider: Plugin, vsn: Plugin.vsn(), data: %{observer: c.observer}}
         ],
         routes: c.agent.routes
@@ -439,7 +439,7 @@ defmodule JidoTest.AgentServer.Durable.PersistenceTest do
     definition =
       Jido.Agent.define!(%{
         name: "durable_plugin_order",
-        extensions: [
+        plugins: [
           %{id: Plugin.id(), provider: Plugin, vsn: Plugin.vsn(), data: %{observer: c.observer}}
         ]
       })
@@ -555,7 +555,7 @@ defmodule JidoTest.AgentServer.Durable.PersistenceTest do
     definition =
       Jido.Agent.define!(%{
         name: "durable_no_replay",
-        extensions: [
+        plugins: [
           %{id: Plugin.id(), provider: Plugin, vsn: Plugin.vsn(), data: %{observer: c.observer}}
         ],
         schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}),

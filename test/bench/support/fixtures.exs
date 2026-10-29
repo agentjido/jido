@@ -99,7 +99,7 @@ defmodule JidoCoreBench.Fixtures do
     CoreAgent.define!(%{
       name: "core_bench",
       schema: @schema,
-      extensions: contributions(plugins),
+      plugins: contributions(plugins),
       routes:
         for(
           n <- 1..count,

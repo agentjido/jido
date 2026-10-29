@@ -24,7 +24,7 @@ identity and state. This review does not approve the complete topic documents.
 
 - Owner: the Agent authoring boundary.
 - Owns: module blocks, inline route Actions, Signal helpers, Codecs, trusted
-  Registry use, normalization, and static extension lowering.
+  Registry use, normalization, and authoring-only Plugin lowering.
 - Adjacent owners: Agent values belong to topic 01; execution belongs to
   jido_action; Signal behavior belongs to jido_signal; live calls belong to 08.
 

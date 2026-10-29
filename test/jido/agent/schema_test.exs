@@ -82,14 +82,10 @@ defmodule Jido.Agent.SchemaTest do
   defmodule PluginAgent do
     @moduledoc false
 
-    use Jido.Agent, name: "schema_contract_plugin"
+    use Jido.Agent, name: "schema_contract_plugin", plugins: [OwnedState]
 
     state do
       schema Bounds.schema()
-    end
-
-    plugins do
-      plugin OwnedState
     end
 
     routes do
@@ -98,7 +94,7 @@ defmodule Jido.Agent.SchemaTest do
   end
 
   test "composition preserves required Plugin fields and the root rule" do
-    definition = %{PlainAgent.definition() | extensions: [contribution(RequiredState)]}
+    definition = %{PlainAgent.definition() | plugins: [contribution(RequiredState)]}
 
     assert {:error, %Jido.Agent.Error{details: %{issues: errors}}} =
              Jido.Agent.instantiate(definition, id: Jido.Signal.ID.generate!())
@@ -123,7 +119,7 @@ defmodule Jido.Agent.SchemaTest do
   test "validation composes the current Plugin options and domain schema on each call" do
     definition = %{
       PlainAgent.definition()
-      | extensions: [contribution(ConfiguredState, %{minimum: 0})]
+      | plugins: [contribution(ConfiguredState, %{minimum: 0})]
     }
 
     assert {:ok, agent} =
@@ -134,7 +130,7 @@ defmodule Jido.Agent.SchemaTest do
 
     assert {:ok, ^agent} = Jido.Agent.validate(agent)
 
-    changed = %{agent | extensions: [contribution(ConfiguredState, %{minimum: 1})]}
+    changed = %{agent | plugins: [contribution(ConfiguredState, %{minimum: 1})]}
     assert {:error, %{__exception__: true}} = Jido.Agent.validate(changed)
 
     changed = %{changed | state: %{changed.state | owned: 1}}

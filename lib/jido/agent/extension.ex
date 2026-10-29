@@ -1,12 +1,5 @@
 defmodule Jido.Agent.Extension do
-  @moduledoc """
-  One contribution contract for Extensions and Plugins.
-
-  `lower/2` reads Spark declarations and explicit Plugin config. `normalize/1`
-  validates both Map and DSL data. `verify/2` checks references after core
-  normalization. These callbacks must be deterministic and must not run work.
-  `runtime_support/0` is descriptive; Agent does not activate it.
-  """
+  @moduledoc false
   alias Jido.Agent.{Data, Error, Route}
   alias Jido.Authoring.{Registry, Value}
 
@@ -25,17 +18,11 @@ defmodule Jido.Agent.Extension do
   @doc "Checks provider data against the complete Agent definition."
   @callback verify(map(), map()) :: :ok | {:error, term()}
 
-  @doc "Names the optional runtime Plugin adapter for this provider."
-  @callback runtime_support() :: :none | module()
-
   @doc "Returns the logical endpoint kinds owned by this provider."
   @callback endpoint_kinds() :: [atom()]
 
   @doc "Returns the logical endpoints contributed by normalized provider data."
   @callback endpoints(map()) :: [map()]
-
-  @doc "Returns modules that `use Jido.Agent` imports for this provider."
-  @callback authoring_imports() :: [module()]
 
   @doc "Derives exact Agent routes from normalized provider data."
   @callback derive_routes(map()) :: [map()]
@@ -55,17 +42,18 @@ defmodule Jido.Agent.Extension do
 
   @doc "Defines one Agent authoring provider and its default callbacks."
   defmacro __using__(opts) do
-    kind = Keyword.get(opts, :kind, :extension)
-
     quote do
       @behaviour Jido.Agent.Extension
-      use Spark.Dsl.Extension, sections: unquote(Keyword.get(opts, :sections, []))
+      use Spark.Dsl.Extension,
+        sections: unquote(Keyword.get(opts, :sections, [])),
+        imports: unquote(Keyword.get(opts, :imports, []))
+
       def id, do: unquote(Keyword.fetch!(opts, :id))
       def vsn, do: unquote(Keyword.get(opts, :vsn, 1))
 
       @doc false
       def __jido_authoring__ do
-        %{id: id(), kind: unquote(kind), vsn: vsn(), target: __MODULE__}
+        %{id: id(), kind: :plugin, vsn: vsn(), target: __MODULE__}
       end
 
       def lower(_dsl, config), do: {:ok, config}
@@ -77,8 +65,6 @@ defmodule Jido.Agent.Extension do
       end
 
       def verify(_data, _definition), do: :ok
-      def runtime_support, do: :none
-      def authoring_imports, do: []
       def derive_routes(_data), do: []
       def endpoint_kinds, do: []
       def endpoints(_data), do: []
@@ -93,8 +79,6 @@ defmodule Jido.Agent.Extension do
       defoverridable lower: 2,
                      normalize: 1,
                      verify: 2,
-                     runtime_support: 0,
-                     authoring_imports: 0,
                      derive_routes: 1,
                      endpoint_kinds: 0,
                      endpoints: 1,
@@ -133,12 +117,13 @@ defmodule Jido.Agent.Extension do
     required_callbacks =
       __MODULE__.behaviour_info(:callbacks) -- __MODULE__.behaviour_info(:optional_callbacks)
 
-    callbacks = [{:sections, 0} | required_callbacks]
+    callbacks = [{:sections, 0}, {:__jido_authoring__, 0} | required_callbacks]
 
     if match?({:module, _}, Code.ensure_compiled(module)) and
          Enum.all?(callbacks, fn {f, a} -> function_exported?(module, f, a) end) do
       with :ok <- Data.nonempty(module.id()),
            :ok <- Data.positive(module.vsn()),
+           :ok <- plugin(module),
            do: {:ok, module}
     else
       Error.fail(
@@ -152,6 +137,28 @@ defmodule Jido.Agent.Extension do
 
   def provider(value),
     do: Error.fail(:invalid_provider, [], "Expected a provider module", %{provider: value})
+
+  defp plugin(module) do
+    authoring = module.__jido_authoring__()
+    expected = %{id: module.id(), kind: :plugin, target: module, vsn: module.vsn()}
+
+    if Jido.Plugin in behaviours(module) and authoring === expected do
+      :ok
+    else
+      Error.fail(
+        :invalid_plugin,
+        [],
+        "Agent plugins must use Jido.Plugin",
+        %{plugin: module}
+      )
+    end
+  end
+
+  defp behaviours(module) do
+    module.module_info(:attributes)
+    |> Keyword.get_values(:behaviour)
+    |> List.flatten()
+  end
 
   @doc false
   def normalize(entries) do
@@ -180,13 +187,17 @@ defmodule Jido.Agent.Extension do
   end
 
   @doc false
-  def lower(providers, dsl, plugins) do
+  def lower(declarations, dsl) do
     with :ok <- Data.plain_map(dsl),
-         :ok <- Data.plain_map(plugins),
-         {:ok, providers} <- providers(providers) do
-      Data.list(providers, fn provider ->
-        config = Map.get(plugins, provider, %{})
-
+         {:ok, declarations} <-
+           Data.list(declarations, fn declaration ->
+             with {:ok, declaration} <- Data.fields(declaration, [:provider, :config]),
+                  {:ok, provider} <- provider(declaration[:provider]),
+                  :ok <- Data.plain_map(declaration[:config]) do
+               {:ok, %{provider: provider, config: declaration.config}}
+             end
+           end) do
+      Data.list(declarations, fn %{provider: provider, config: config} ->
         with :ok <- Data.plain_map(config),
              {:ok, data} <- result(provider.lower(dsl, config)) do
           {:ok, %{id: provider.id(), provider: provider, vsn: provider.vsn(), data: data}}
@@ -233,8 +244,8 @@ defmodule Jido.Agent.Extension do
       {:ok,
        groups
        |> Enum.with_index()
-       |> Enum.flat_map(fn {routes, extension_index} ->
-         Enum.map(routes, &Map.put(&1, :extension_index, extension_index))
+       |> Enum.flat_map(fn {routes, plugin_index} ->
+         Enum.map(routes, &Map.put(&1, :plugin_index, plugin_index))
        end)}
     end
   end
@@ -262,7 +273,7 @@ defmodule Jido.Agent.Extension do
            Error.fail(
              :missing_derived_route,
              route_path(contribution),
-             "Agent definition is missing a route derived by an extension",
+             "Agent definition is missing a route derived by a Plugin",
              %{path: contribution.route.path, provider: contribution.provider}
            )}
 
@@ -273,7 +284,7 @@ defmodule Jido.Agent.Extension do
   end
 
   defp route_path(contribution) do
-    [:extensions, contribution.extension_index, :routes, contribution.index]
+    [:plugins, contribution.plugin_index, :routes, contribution.index]
   end
 
   @doc false
@@ -298,7 +309,7 @@ defmodule Jido.Agent.Extension do
     cond do
       Enum.any?(
         sections,
-        &(&1 in ~w(agent state plugins routes topology __state__ __plugins__ __routes__ __topology__)a)
+        &(&1 in ~w(agent state routes topology __state__ __routes__ __topology__)a)
       ) ->
         Error.fail(:namespace_conflict, [], "Provider cannot replace a core section")
 

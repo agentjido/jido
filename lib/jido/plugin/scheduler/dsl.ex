@@ -23,7 +23,7 @@ defmodule Jido.Plugin.Scheduler.DSL do
   }
   Jido.Plugin.Scheduler.DSL.Schedule = @schedule.target
   @section %Spark.Dsl.Section{name: :schedules, entities: [@schedule]}
-  use Jido.Agent.Extension, id: "jido.scheduling", sections: [@section]
+  use Jido.Plugin, id: "jido.scheduling", sections: [@section]
 
   @impl Jido.Agent.Extension
   def lower(dsl, config) do

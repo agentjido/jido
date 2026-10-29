@@ -56,11 +56,7 @@ defmodule Jido.Plugin.StateRuntimeTest do
   end
 
   defmodule DataAgent do
-    use Jido.Agent, name: "plugin_data_agent"
-
-    plugins do
-      plugin Credits
-    end
+    use Jido.Agent, name: "plugin_data_agent", plugins: [Credits]
 
     routes do
       route "plugin.credits.spend", SpendCredits

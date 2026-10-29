@@ -119,7 +119,7 @@ defmodule JidoTest.AgentServer.PluginRuntime.RulesTest do
 
     assert {:error, error} = Plugin.validate_changes([unsafe], [UnsafeRuntime])
     assert error.code == :plugin_quiescence_required
-    assert error.path == [:extensions]
+    assert error.path == [:plugins]
     assert error.details.plugin == UnsafeRuntime
 
     assert Plugin.directive_owner([rootless], %Effect{}) == nil

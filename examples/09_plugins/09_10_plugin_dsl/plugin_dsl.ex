@@ -2,7 +2,7 @@ defmodule Jido.Examples.Plugins.DSL.Agent do
   @moduledoc "Uses a Plugin to add a threshold language to the Agent DSL."
   use Jido.Agent,
     name: "plugin_dsl_agent",
-    extensions: [Jido.Examples.Plugins.DSL.Thresholds]
+    plugins: [Jido.Examples.Plugins.DSL.Thresholds]
 
   state do
     schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})

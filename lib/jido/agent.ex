@@ -9,13 +9,14 @@ defmodule Jido.Agent do
   handlers. JSON uses trusted Registry references.
 
   Routes select one handler in declaration order. Connections select recipients
-  for outputs. Providers add explicit, validated data to `extensions`.
+  for outputs. Plugins add explicit, validated data to `plugins`.
   """
   alias Jido.Agent.{Data, Validation}
+  alias Jido.Agent.Plugin.Declaration
   alias Jido.Agent.Runner
   alias Jido.Dispatch.Preparation
-  alias Jido.Signal
   alias Jido.Error
+  alias Jido.Signal
 
   @type t :: %__MODULE__{}
 
@@ -44,7 +45,7 @@ defmodule Jido.Agent do
             signal_source: Zoi.string() |> Zoi.min(1) |> Zoi.nullable() |> Zoi.default(nil),
             routes: Zoi.list(Zoi.any()) |> Zoi.default([]),
             topology: Zoi.map() |> Zoi.default(%{}),
-            extensions: Zoi.list(Zoi.any()) |> Zoi.default([])
+            plugins: Zoi.list(Zoi.any()) |> Zoi.default([])
           })
   @defaults Map.new(Zoi.Struct.struct_fields(@schema), fn
               {key, value} -> {key, value}
@@ -70,28 +71,28 @@ defmodule Jido.Agent do
 
   ## Options
 
-  - `:id` is the stable authoring Registry ID. It defaults to the module name.
   - `:name` is the required Agent name.
   - `:description` is optional display text.
+  - `:id` is the stable authoring Registry ID. It defaults to the module name.
   - `:vsn` is the positive definition version. It defaults to `1`.
   - `:metadata` is optional static definition data. It defaults to an empty Map.
-  - `:extensions` lists the Extension or Plugin providers that add authoring
-    sections or need an empty configuration.
+  - `:plugins` lists ordered Plugin modules or `{Plugin, config}` tuples. A
+    Plugin config is a static Map with atom keys.
 
   ## Core DSL
 
   Each optional core section can occur once:
 
-      use Jido.Agent, id: "my_app/counter", name: "counter", vsn: 1,
-        metadata: %{domain: "counters"}
+      use Jido.Agent,
+        name: "counter",
+        id: "my_app/counter",
+        vsn: 1,
+        metadata: %{domain: "counters"},
+        plugins: [{MyApp.Plugin, %{mode: :strict}}]
 
       state do
         schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
         initial_state %{count: 0}
-      end
-
-      plugins do
-        plugin MyApp.Plugin, config: %{mode: :strict}
       end
 
       routes do
@@ -108,8 +109,8 @@ defmodule Jido.Agent do
         end
       end
 
-  The `state` section accepts `schema` and `initial_state`. The `plugins` section
-  accepts ordered `plugin` declarations. The `routes` section accepts
+  The `state` section accepts `schema` and `initial_state`. The `plugins` option
+  accepts ordered Plugin declarations. The `routes` section accepts
   `signal_source` and ordered `route` declarations. A route can
   use an Action or Flow module, an inline `action` or `flow`, a `transform`, or
   a `forward`. An executable route uses its complete validated output as the
@@ -139,13 +140,6 @@ defmodule Jido.Agent do
   defmacro __using__(opts) do
     opts = options!(opts, __CALLER__)
 
-    imports =
-      Enum.flat_map(Keyword.get(opts, :extensions, []), fn provider ->
-        if function_exported?(provider, :authoring_imports, 0),
-          do: provider.authoring_imports(),
-          else: []
-      end)
-
     quote do
       use Jido.Action.Inline
       use Jido.Flow.Inline
@@ -153,7 +147,6 @@ defmodule Jido.Agent do
       import Jido.Agent.DSL.Macros
       import Jido.Agent.Directive, only: [emit: 1, emit: 2]
       import Jido.Config, only: [env: 1]
-      unquote_splicing(Enum.map(imports, fn module -> quote do: import(unquote(module)) end))
     end
   end
 
@@ -167,9 +160,12 @@ defmodule Jido.Agent do
     opts = Keyword.put_new(opts, :id, Atom.to_string(caller.module))
 
     with :ok <- Jido.Authoring.Registry.validate_identifier(opts[:id]),
-         {:ok, _providers} <-
-           Jido.Agent.Extension.providers(Keyword.get(opts, :extensions, [])) do
+         {:ok, declarations} <-
+           Declaration.normalize(Keyword.get(opts, :plugins, [])) do
       opts
+      |> Keyword.delete(:plugins)
+      |> Keyword.put(:plugin_providers, Enum.map(declarations, & &1.provider))
+      |> Keyword.put(:plugin_declarations, declarations)
     else
       {:error, error} -> raise error
     end
@@ -234,35 +230,10 @@ defmodule Jido.Agent do
   def mutate(%__MODULE__{} = agent, directives), do: Jido.Agent.Mutation.apply(agent, directives)
 
   @doc false
-  def runtime_plugins(%__MODULE__{extensions: entries}) do
-    Enum.flat_map(entries, fn entry ->
-      module = entry.provider.runtime_support()
-
-      if Code.ensure_loaded?(module) and function_exported?(module, :__jido_plugin__, 0),
-        do: [{module, Enum.sort(entry.data)}],
-        else: []
-    end)
-  end
-
-  @doc false
-  def validate_runtime_support(%__MODULE__{extensions: entries}) do
-    unknown =
-      Enum.find(entries, fn entry ->
-        module = entry.provider.runtime_support()
-
-        module != :none and
-          not (Code.ensure_loaded?(module) and function_exported?(module, :__jido_plugin__, 0))
-      end)
-
-    if unknown,
-      do:
-        Jido.Agent.Error.fail(
-          :runtime_support_not_available,
-          [:extensions],
-          "Provider runtime support has no Plugin adapter",
-          %{provider: unknown.provider}
-        ),
-      else: :ok
+  def runtime_plugins(%__MODULE__{plugins: entries}) do
+    for %{provider: module, data: data} <- entries,
+        Code.ensure_loaded?(module) and function_exported?(module, :__jido_plugin__, 0),
+        do: {module, Enum.sort(data)}
   end
 
   @doc false

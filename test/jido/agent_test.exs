@@ -193,7 +193,7 @@ defmodule Jido.AgentTest do
              description: "Counts Signals",
              schema: agent_schema,
              initial_state: %{},
-             extensions: [],
+             plugins: [],
              state: nil
            } = definition
 
@@ -223,7 +223,7 @@ defmodule Jido.AgentTest do
                :description,
                :schema,
                :initial_state,
-               :extensions,
+               :plugins,
                :signal_source,
                :state,
                :topology,
@@ -320,7 +320,7 @@ defmodule Jido.AgentTest do
            ] =
              CounterAgent.definition().routes
 
-    assert CounterAgent.definition().extensions == []
+    assert CounterAgent.definition().plugins == []
     assert Agent.definition(agent) == definition
 
     assert {:ok, %Agent{module: CounterAgent}} =

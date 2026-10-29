@@ -4,7 +4,7 @@ defmodule Jido.AuthoringIntegrationTest do
   alias Jido.Authoring.Registry
 
   defmodule Extension do
-    use Jido.Agent.Extension, id: "tests/extensions/sample", vsn: 2
+    use Jido.Plugin, id: "tests/plugins/authoring", vsn: 2
   end
 
   defmodule Plugin do
@@ -20,7 +20,7 @@ defmodule Jido.AuthoringIntegrationTest do
   end
 
   defmodule ReferencedExtension do
-    use Jido.Agent.Extension, id: "tests/extensions/referenced"
+    use Jido.Plugin, id: "tests/plugins/referenced"
 
     @impl Jido.Agent.Extension
     def encode_authoring_data(%{target: target}, registry) do
@@ -51,7 +51,7 @@ defmodule Jido.AuthoringIntegrationTest do
   end
 
   defmodule Agent do
-    use Jido.Agent, id: "tests/agents/sample", name: "sample_agent"
+    use Jido.Agent, name: "sample_agent", id: "tests/agents/sample"
   end
 
   defmodule Vocabulary do
@@ -75,7 +75,7 @@ defmodule Jido.AuthoringIntegrationTest do
     end)
   end
 
-  test "Agent extensions and Plugins use the shared Authoring Registry" do
+  test "Agent Plugins use the shared Authoring Registry" do
     assert :ok =
              Jido.Discovery.refresh(
                applications: [],
@@ -87,8 +87,8 @@ defmodule Jido.AuthoringIntegrationTest do
     assert %{kind: :agent, target: Agent} =
              Registry.get(registry, "tests/agents/sample", 1)
 
-    assert %{kind: :extension, target: Extension} =
-             Registry.get(registry, "tests/extensions/sample", 2)
+    assert %{kind: :plugin, target: Extension} =
+             Registry.get(registry, "tests/plugins/authoring", 2)
 
     assert %{kind: :plugin, target: Plugin} =
              Registry.get(registry, "tests/plugins/sample", 3)
@@ -120,7 +120,7 @@ defmodule Jido.AuthoringIntegrationTest do
             state: %{source: :output, path: []}
           }
         ],
-        extensions: [
+        plugins: [
           %{
             id: ReferencedExtension.id(),
             provider: ReferencedExtension,
@@ -133,14 +133,14 @@ defmodule Jido.AuthoringIntegrationTest do
     registry =
       Registry.new!(%{
         {"tests/schemas/referenced-extension-agent", 1} => {:schema, definition.schema},
-        {"tests/extensions/referenced", 1} => {:extension, ReferencedExtension},
+        {"tests/plugins/referenced", 1} => {:plugin, ReferencedExtension},
         {"tests/actions/referenced", 1} => {:action, ReferencedAction}
       })
 
     assert {:ok, document} =
              Jido.Authoring.encode(definition, registry: registry, codec: Jido.Agent.Codec)
 
-    assert get_in(document, ["definition", "extensions", Access.at(0), "data"]) == %{
+    assert get_in(document, ["definition", "plugins", Access.at(0), "data"]) == %{
              "target" => %{"id" => "tests/actions/referenced", "vsn" => 1}
            }
 

@@ -32,16 +32,17 @@ end
 
 defmodule MyApp.SupportAgent do
   use Jido.Agent,
-    id: "my_app/agents/support",
-    name: "support_agent"
+    name: "support_agent",
+    id: "my_app/agents/support"
 end
 ```
 
-Agent extensions and Plugins publish the same manifest:
+Agents and runtime Plugins publish authoring manifests. An authoring-only
+Plugin publishes only authoring metadata:
 
 ```elixir
 defmodule MyApp.Labels do
-  use Jido.Agent.Extension, id: "my_app/extensions/labels", vsn: 1
+  use Jido.Plugin, id: "my_app/plugins/labels", vsn: 1
 end
 
 defmodule MyApp.Audit do

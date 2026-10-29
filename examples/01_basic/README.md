@@ -13,7 +13,7 @@ Numbers are stable IDs; the table gives the reading order.
 | 01_04 | [Directive Agent](01_04_directive_agent/README.md) | Whole-batch validation and ordered post-commit effects |
 | 01_05 | [OTP supervision](01_05_otp_supervision/README.md) | Activation supervisor tree, worker restart, local checkpoints, and shutdown |
 | 01_07 | [Data-defined Agent](01_07_data_defined_agent/README.md) | Neutral definitions, trusted Codec Registry, and Plugin documents |
-| 01_09 | [Agent Extension](01_09_agent_extension/README.md) | Static DSL declarations stored as validated, versioned contributions |
+| 01_09 | [Authoring Plugin](01_09_authoring_plugin/README.md) | Static Plugin declarations stored as validated, versioned contributions |
 
 Run the section from the `jido` repository root:
 

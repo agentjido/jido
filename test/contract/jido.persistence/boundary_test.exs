@@ -146,11 +146,11 @@ defmodule Jido.Persistence.BoundaryTest do
     end
 
     assert Record.kind(%{format: 99}) == :unknown
-    assert Record.kind(%{fmt: 4, kind: :active}) == :active
-    assert Record.kind(%{format: 3, kind: :tombstone}) == :tombstone
+    assert Record.kind(%{fmt: 1, kind: :active}) == :active
+    assert Record.kind(%{fmt: 1, kind: :tombstone}) == :tombstone
     assert Record.kind(%{kind: :active}) == :unknown
-    assert Record.kind(%{fmt: 4, kind: :unknown}) == :unknown
-    assert Record.kind(%{fmt: 4, kind: :future}) == :unknown
+    assert Record.kind(%{fmt: 1, kind: :unknown}) == :unknown
+    assert Record.kind(%{fmt: 1, kind: :future}) == :unknown
     assert Record.kind(%{format: 3, kind: :future}) == :unknown
     assert Record.kind(%{fmt: 3, kind: :active}) == :unknown
 
@@ -324,7 +324,7 @@ defmodule Jido.Persistence.BoundaryTest do
       for key <- Map.keys(record) do
         field =
           case key do
-            :fmt -> :format
+            :fmt -> :fmt
             :kind -> :kind
             _ -> :shape
           end
@@ -362,7 +362,7 @@ defmodule Jido.Persistence.BoundaryTest do
 
     record =
       %{
-        fmt: 4,
+        fmt: 1,
         namespace: namespace,
         kind: :active,
         agent_module: Basic,

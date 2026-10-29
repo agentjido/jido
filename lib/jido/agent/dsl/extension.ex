@@ -24,19 +24,9 @@ defmodule Jido.Agent.DSL.Extension do
   @moduledoc false
   alias Jido.Agent.DSL.Entry
 
-  @plugin %Spark.Dsl.Entity{
-    name: :plugin,
-    target: Entry,
-    args: [:provider],
-    schema: [provider: [type: :atom, required: true], config: [type: :any, default: %{}]]
-  }
   @state %Spark.Dsl.Section{
     name: :__state__,
     schema: [schema: [type: :any], initial_state: [type: :any, default: %{}]]
-  }
-  @plugins %Spark.Dsl.Section{
-    name: :__plugins__,
-    entities: [@plugin]
   }
   @route %Spark.Dsl.Entity{
     name: :__route__,
@@ -57,5 +47,5 @@ defmodule Jido.Agent.DSL.Extension do
     entities: [@route],
     schema: [signal_source: [type: :string]]
   }
-  use Spark.Dsl.Extension, sections: [@state, @plugins, @routes]
+  use Spark.Dsl.Extension, sections: [@state, @routes]
 end

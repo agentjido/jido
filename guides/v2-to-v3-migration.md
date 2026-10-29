@@ -75,9 +75,9 @@ end
 agent = MyApp.Counter.new(id: "counter-1")
 ```
 
-V3 takes `id`, `name`, `description`, `vsn`, `metadata`, and `extensions` as
-`use` options. The schema goes in a `state` block and must be a static Zoi
-schema. Routes go in a `routes` block.
+V3 takes `name`, `description`, `id`, `vsn`, `metadata`, and `plugins` as
+`use` options. Put `plugins` last. The schema goes in a `state` block and must
+be a static Zoi schema. Routes go in a `routes` block.
 
 ```elixir
 # V3
@@ -310,7 +310,7 @@ V3 also adds `directives/1`, `dispatch/4`, `after_commit/3`, `await_ready/2`,
 `validate_options/1`, `quiesce/2`, and `resume/2`. An Action that changes a
 Plugin-owned field fails with `"Agent executable changed Plugin-owned state"`.
 
-See [Extensions or Plugins](extensions-and-plugins.md),
+See [Agent Plugins](agent-plugins.md),
 [Stateful Plugins](write-a-stateful-plugin.livemd),
 [Supervised Resources](plugin-supervised-resources.livemd), and
 [Plugin Persistence](plugin-persistence-and-live-changes.md).
@@ -443,10 +443,9 @@ See [Durability Model](durability-model.md),
 ## Discovery
 
 `Jido.Discovery` is now the shared Authoring Registry from `jido_action`.
-Use `list/0`, `list/1`, `get/2`, and `get_by_target/2`. Agent modules,
-extensions, and Plugins publish the same versioned manifests as Actions and
-Flows. The old catalog, slug, filter, paging, and timestamp functions are
-removed.
+Use `list/0`, `list/1`, `get/2`, and `get_by_target/2`. Agent modules and
+Plugins publish the same versioned manifests as Actions and Flows. The old
+catalog, slug, filter, paging, and timestamp functions are removed.
 
 Discovery does not grant permission to run code. Keep an explicit allowlist
 in your application. See [Authoring Discovery and Permission](action-discovery-and-permission.md).

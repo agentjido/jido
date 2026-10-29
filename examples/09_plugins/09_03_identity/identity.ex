@@ -1,19 +1,19 @@
 defmodule Jido.Examples.Plugins.Identity.Agent do
   @moduledoc "Verifies signed input before routing and signs replies after execution."
-  use Jido.Agent, name: "application_identity_agent"
+  alias Jido.Examples.Plugins.Crypto
+  alias Jido.Examples.Plugins.Identity.Plugin
+
+  use Jido.Agent,
+    name: "application_identity_agent",
+    plugins: [
+      {Plugin, %{trusted_public_key: elem(Crypto.peer_key_pair(), 0)}}
+    ]
 
   state do
     schema Zoi.object(%{
              accepted: Zoi.integer() |> Zoi.default(0),
              last_public_key: Zoi.string() |> Zoi.default("")
            })
-  end
-
-  plugins do
-    plugin Jido.Examples.Plugins.Identity.Plugin,
-      config: %{
-        trusted_public_key: elem(Jido.Examples.Plugins.Crypto.peer_key_pair(), 0)
-      }
   end
 
   routes do
@@ -32,7 +32,7 @@ defmodule Jido.Examples.Plugins.Identity.Agent do
           context.agent_state
           | accepted: context.agent_state.accepted + 1,
             last_public_key:
-              context.plugin_inputs[Jido.Examples.Plugins.Identity.Plugin]
+              context.plugin_inputs[Plugin]
               |> Map.fetch!(:prepared)
               |> Map.fetch!(:public_key)
               |> Base.encode16(case: :lower)

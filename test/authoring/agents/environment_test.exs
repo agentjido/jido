@@ -5,14 +5,16 @@ defmodule JidoTest.Authoring.Agents.EnvironmentTest do
   alias Jido.Agent
 
   defmodule Settings do
+    alias Spark.Dsl.Extension, as: SparkExtension
+
     @section %Spark.Dsl.Section{
       name: :settings,
       schema: [values: [type: :any, required: true]]
     }
-    use Jido.Agent.Extension, id: "test.environment", sections: [@section]
+    use Jido.Plugin, id: "test.environment", sections: [@section]
 
     def lower(dsl, _config),
-      do: {:ok, Spark.Dsl.Extension.get_opt(dsl, [:settings], :values)}
+      do: {:ok, SparkExtension.get_opt(dsl, [:settings], :values)}
   end
 
   test "the DSL compiles without a variable and matches Map authoring" do
@@ -29,7 +31,7 @@ defmodule JidoTest.Authoring.Agents.EnvironmentTest do
 
     Code.compile_string("""
     defmodule #{inspect(module)} do
-      use Jido.Agent, name: "environment", extensions: [#{inspect(Settings)}]
+      use Jido.Agent, name: "environment", plugins: [#{inspect(Settings)}]
 
       settings do
         values %{credentials: %{token: env(#{inspect(name)})}, rooms: [env(#{inspect(name)})]}
@@ -43,7 +45,7 @@ defmodule JidoTest.Authoring.Agents.EnvironmentTest do
       Agent.define!(%{
         name: "environment",
         module: module,
-        extensions: [%{id: Settings.id(), provider: Settings, vsn: 1, data: data}]
+        plugins: [%{id: Settings.id(), provider: Settings, vsn: 1, data: data}]
       })
 
     assert module.definition() === definition
@@ -52,7 +54,7 @@ defmodule JidoTest.Authoring.Agents.EnvironmentTest do
       System.put_env(name, expected)
       assert module.definition() === definition
 
-      assert Jido.Config.resolve(hd(definition.extensions).data) ==
+      assert Jido.Config.resolve(hd(definition.plugins).data) ==
                {:ok, %{credentials: %{token: expected}, rooms: [expected]}}
     end
 

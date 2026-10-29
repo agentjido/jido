@@ -73,14 +73,19 @@ Welcome to the Jido contributor's guide! We're excited that you're interested in
    - Use `snake_case` for functions and variables
    - Use `PascalCase` for module names
 
-2. **Documentation**
+2. **Agent options**
+   - Put `use Jido.Agent` options in this order: `name`, `description`, `id`,
+     `vsn`, `metadata`, and `plugins`.
+   - Put `plugins` last when the declaration has other options.
+
+3. **Documentation**
    - Add `@moduledoc` to every module
    - Document all public functions with `@doc`
    - Include examples when helpful
    - Keep guides up-to-date in the `guides/` directory
    - Use doctests for simple examples
 
-3. **Type Specifications**
+4. **Type Specifications**
    ```elixir
    @type validation_error :: :invalid_name | :invalid_status
    

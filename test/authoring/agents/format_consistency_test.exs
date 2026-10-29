@@ -23,7 +23,7 @@ defmodule Jido.Agent.FormatConsistencyTest do
           signal_source: nil,
           routes: [],
           topology: %{agents: [], connections: []},
-          extensions: []
+          plugins: []
         },
         fields
       )
@@ -80,9 +80,9 @@ defmodule Jido.Agent.FormatConsistencyTest do
            connections: []
          }
        }},
-      {"plugins do plugin #{inspect(Audit)}, config: %{label: \"formats\", enabled: false} end",
+      {"",
        %{
-         extensions: [
+         plugins: [
            %{id: Audit.id(), provider: Audit, vsn: 1, data: %{label: "formats", enabled: false}}
          ]
        }}
@@ -93,6 +93,10 @@ defmodule Jido.Agent.FormatConsistencyTest do
         ~s(name: "formats") <>
           if(Map.has_key?(fields, :description),
             do: ~s(, description: "example", vsn: 3, metadata: %{label: "formats"}),
+            else: ""
+          ) <>
+          if(Map.has_key?(fields, :plugins),
+            do: ~s(, plugins: [{#{inspect(Audit)}, %{label: "formats", enabled: false}}]),
             else: ""
           )
 

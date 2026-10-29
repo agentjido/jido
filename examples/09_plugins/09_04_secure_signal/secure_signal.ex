@@ -1,21 +1,21 @@
 defmodule Jido.Examples.Plugins.SecureSignal.Agent do
   @moduledoc "Verifies and decrypts secure input, then encrypts and signs its correlated reply."
-  use Jido.Agent, name: "application_secure_signal_agent"
+  alias Jido.Examples.Plugins.Crypto
+  alias Jido.Examples.Plugins.SecureSignal.Identity.Plugin, as: IdentityPlugin
+  alias Jido.Examples.Plugins.SecureSignal.Plugin, as: SecureSignalPlugin
+
+  use Jido.Agent,
+    name: "application_secure_signal_agent",
+    plugins: [
+      {IdentityPlugin, %{trusted_public_key: elem(Crypto.peer_key_pair(), 0)}},
+      SecureSignalPlugin
+    ]
 
   state do
     schema Zoi.object(%{
              accepted: Zoi.integer() |> Zoi.default(0),
              peer: Zoi.string() |> Zoi.default("")
            })
-  end
-
-  plugins do
-    plugin Jido.Examples.Plugins.SecureSignal.Identity.Plugin,
-      config: %{
-        trusted_public_key: elem(Jido.Examples.Plugins.Crypto.peer_key_pair(), 0)
-      }
-
-    plugin Jido.Examples.Plugins.SecureSignal.Plugin
   end
 
   routes do
@@ -34,13 +34,13 @@ defmodule Jido.Examples.Plugins.SecureSignal.Agent do
               })
           }),
         context: context do
-        secure = context.plugin_inputs[Jido.Examples.Plugins.SecureSignal.Plugin].runtime
+        secure = context.plugin_inputs[SecureSignalPlugin].runtime
 
         next_state = %{
           context.agent_state
           | accepted: context.agent_state.accepted + 1,
             peer:
-              context.plugin_inputs[Jido.Examples.Plugins.SecureSignal.Identity.Plugin]
+              context.plugin_inputs[IdentityPlugin]
               |> Map.fetch!(:prepared)
               |> Map.fetch!(:public_key)
               |> Base.encode16(case: :lower)

@@ -98,9 +98,10 @@ application configuration.
 `OVR-REQ-004`: When Jido uses `jido_action` or `jido_signal`, the Jido core
 library shall interact with them only through their public contracts.
 
-`OVR-REQ-005`: The Jido core library shall keep Plugin packages, Plugin facets,
-adapters, authoring extensions, Directive handlers, and observation handlers as
-separate extension categories.
+`OVR-REQ-005`: The Jido core library shall keep Agent Plugins, adapters,
+Topology authoring extensions, Directive handlers, and observation handlers as
+separate extension categories. One Agent Plugin can own authoring-only and
+runtime capabilities.
 
 ### Agent definition, identity, and restore
 
@@ -469,7 +470,7 @@ reverse the decision. It identifies work that the owner seam must complete.
 | `OVR-DEC-001` | Prepare isolated package inputs, then select the first Router match from the unchanged source Signal. | Revised 2026-09-10 | Preparation cannot change routing data. Route-changing Plugins must use package input instead. |
 | `OVR-DEC-002` | Restore the latest in-instance runtime checkpoint and state version after an abnormal nonpersistent restart. | Approved | Abnormal same-instance restart preserves the latest committed state. |
 | `OVR-DEC-003` | Add stable Agent Ref in V3 beside supported ID and PID APIs. | Approved | Seams 03, 07, 09, and 10 need a staged identity migration. |
-| `OVR-DEC-004` | Use `vsn` as the positive module-owned definition revision. Store it on the immutable Agent definition, copy it to instances, and preserve it through all authoring forms. Generated modules default to `1`; compatible unversioned direct forms can use `nil`. | Approved | V3 Agent checkpoints store the revision and accept only format version 2. It does not belong to Agent Ref and does not pin loaded BEAM code. |
+| `OVR-DEC-004` | Use `vsn` as the positive module-owned definition revision. Store it on the immutable Agent definition, copy it to instances, and preserve it through all authoring forms. Generated modules default to `1`; compatible unversioned direct forms can use `nil`. | Approved | V3 Agent snapshots store the revision and accept only format 1. It does not belong to Agent Ref and does not pin loaded BEAM code. |
 | `OVR-DEC-005` | Separate Plugin responsibilities by their Agent, Agent Server, Persistence, and Topology owners. | Approved direction; detailed model deferred | Seam 05 must later define the smallest coherent declaration, callback, and composition model. The exact four-facet model is not approved. |
 | `OVR-DEC-006` | Keep complete Agent `checkpoint/2` and `restore/2` callbacks until Persistence composition is explicit. | Approved | No Plugin contract can silently replace custom checkpoint meaning. |
 | `OVR-DEC-007` | Require initial active records, loss of write authority after every write error, and tombstones. | Approved | Seams 07 and 08 must define failure, retention, purge, reactivation, and restart rules. |

@@ -1,27 +1,25 @@
 defmodule JidoTest.Examples.Runtime.BusDeliveryFixture do
   @moduledoc false
 
-  use Jido.Agent, name: "test_bus_delivery"
+  use Jido.Agent,
+    name: "test_bus_delivery",
+    plugins: [
+      {Jido.Plugin.Bus.Manager, %{name: :example_commands}},
+      {Jido.Plugin.Bus.Client,
+       %{
+         bus: :example_commands,
+         path: "examples.runtime.bus_delivery.**",
+         durable: "test-consumer",
+         start_from: :origin,
+         retry_delay_ms: 10
+       }}
+    ]
 
   state do
     schema Zoi.object(%{
              seen: Zoi.list(Zoi.string()) |> Zoi.default([]),
              values: Zoi.list(Zoi.integer()) |> Zoi.default([])
            })
-  end
-
-  plugins do
-    plugin(Jido.Plugin.Bus.Manager, config: %{name: :example_commands})
-
-    plugin(Jido.Plugin.Bus.Client,
-      config: %{
-        bus: :example_commands,
-        path: "examples.runtime.bus_delivery.**",
-        durable: "test-consumer",
-        start_from: :origin,
-        retry_delay_ms: 10
-      }
-    )
   end
 
   routes do

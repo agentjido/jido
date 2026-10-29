@@ -15,20 +15,15 @@ defmodule Jido.Plugin.HeartbeatIntegrationTest do
   end
 
   defmodule Agent do
-    use Jido.Agent, name: "plugin_heartbeat_integration_agent"
+    use Jido.Agent,
+      name: "plugin_heartbeat_integration_agent",
+      plugins: [
+        {Heartbeat,
+         %{interval: 10, signal_type: "plugin.heartbeat", signal_data: %{source: :plugin}}}
+      ]
 
     state do
       schema Zoi.object(%{heartbeats: Zoi.list(Zoi.any()) |> Zoi.default([])})
-    end
-
-    plugins do
-      plugin(Heartbeat,
-        config: %{
-          interval: 10,
-          signal_type: "plugin.heartbeat",
-          signal_data: %{source: :plugin}
-        }
-      )
     end
 
     routes do

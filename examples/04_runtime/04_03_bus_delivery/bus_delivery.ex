@@ -5,26 +5,25 @@ defmodule Jido.Examples.BusDelivery do
   The Bus and its cursor are local memory; this does not prove disk durability.
   The Agent owns the Bus Manager before it starts the durable Client.
   """
-  use Jido.Agent, name: "example_bus_delivery"
+  use Jido.Agent,
+    name: "example_bus_delivery",
+    plugins: [
+      {Jido.Plugin.Bus.Manager, %{name: :example_commands}},
+      {Jido.Plugin.Bus.Client,
+       %{
+         bus: :example_commands,
+         path: "examples.runtime.bus_delivery.**",
+         durable: "example-consumer",
+         start_from: :origin,
+         retry_delay_ms: 10
+       }}
+    ]
 
   state do
     schema Zoi.object(%{
              seen: Zoi.list(Zoi.string()) |> Zoi.default([]),
              values: Zoi.list(Zoi.integer()) |> Zoi.default([])
            })
-  end
-
-  plugins do
-    plugin Jido.Plugin.Bus.Manager, config: %{name: :example_commands}
-
-    plugin Jido.Plugin.Bus.Client,
-      config: %{
-        bus: :example_commands,
-        path: "examples.runtime.bus_delivery.**",
-        durable: "example-consumer",
-        start_from: :origin,
-        retry_delay_ms: 10
-      }
   end
 
   routes do

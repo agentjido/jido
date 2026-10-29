@@ -8,14 +8,15 @@ defmodule JidoTest.MalformedPublicInputsTest do
   alias Jido.Signal
   alias JidoTest.AgentFixtures.Add
 
-  test "extension lowering rejects improper lists and non-map config" do
-    for {extensions, config, entities} <- [
-          {[String | :invalid], %{}, %{}},
-          {[], %{}, [1 | :invalid]},
-          {[], nil, %{}},
-          {[], %URI{}, %{}}
+  test "Plugin lowering rejects improper declarations and invalid DSL data" do
+    for {declarations, dsl} <- [
+          {[String | :invalid], %{}},
+          {[%{provider: String, config: %{}}], %{}},
+          {[%{provider: Jido.Plugin.Audit, config: nil}], %{}},
+          {[], nil},
+          {[], %URI{}}
         ] do
-      assert {:error, %{__exception__: true}} = Extension.lower(extensions, config, entities)
+      assert {:error, %{__exception__: true}} = Extension.lower(declarations, dsl)
     end
   end
 

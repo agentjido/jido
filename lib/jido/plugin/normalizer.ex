@@ -423,12 +423,11 @@ defmodule Jido.Plugin.Normalizer do
     with true <- Jido.Agent.Extension in behaviours(module),
          {:ok, id} <- read_authoring_value(module, :id),
          {:ok, vsn} <- read_authoring_value(module, :vsn),
-         {:ok, runtime_support} <- read_authoring_value(module, :runtime_support),
          {:ok, authoring} <- read_authoring_value(module, :__jido_authoring__) do
       expected = %{id: id, kind: :plugin, target: module, vsn: vsn}
 
       if is_binary(id) and byte_size(id) > 0 and vsn === manifest_vsn and
-           runtime_support === module and authoring === expected do
+           authoring === expected do
         :ok
       else
         PluginError.validation("Plugin authoring identity is invalid", %{
@@ -436,7 +435,6 @@ defmodule Jido.Plugin.Normalizer do
           id: id,
           vsn: vsn,
           manifest_vsn: manifest_vsn,
-          runtime_support: runtime_support,
           authoring: authoring
         })
       end

@@ -86,30 +86,25 @@ None of them can return a replacement Signal, route, context, or Agent.
 
 ## Attach It
 
-In application code, declare the Plugin in the `plugins` block:
+In application code, declare the Plugin in the top-level `plugins:` option:
 
 <!-- livebook:{"force_markdown":true} -->
 
 ```elixir
-state do
-  schema(Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}))
-end
-
-plugins do
-  plugin GuidePlugins.Ledger, config: %{blocked: ["mallory", "eve"]}
-end
+use Jido.Agent,
+  name: "ledgered_counter",
+  plugins: [{GuidePlugins.Ledger, %{blocked: ["mallory", "eve"]}}]
 ```
 
-This notebook uses `extensions:`, which attaches the Plugin with no options.
-Use `plugin GuidePlugins.Ledger, config: %{...}` when it needs Agent-specific
-config. Both forms work in a Livebook cell. `admit/3` falls back to
-`["mallory"]` here.
+This notebook declares the Plugin with no config. Use
+`{GuidePlugins.Ledger, %{...}}` when it needs Agent-specific config. Both forms
+work in a Livebook cell. `admit/3` falls back to `["mallory"]` here.
 
 ```elixir
 defmodule GuidePlugins.Counter do
   use Jido.Agent,
     name: "ledgered_counter",
-    extensions: [GuidePlugins.Ledger]
+    plugins: [GuidePlugins.Ledger]
 
   state do
     schema(Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}))

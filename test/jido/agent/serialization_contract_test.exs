@@ -15,7 +15,7 @@ defmodule Jido.Agent.SerializationContractTest do
     assert "jido:agent:v1:" <> _identity = key
     assert {:ok, bytes} = Store.get(key, opts)
     record = :erlang.binary_to_term(bytes, [:safe])
-    assert record.fmt == 4
+    assert record.fmt == 1
     assert record.kind == :active
     assert record.vsn == Probe.vsn()
     assert record.agent_id == agent.id

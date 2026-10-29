@@ -1,13 +1,11 @@
 defmodule Jido.Examples.Applications.Audit.Agent do
   @moduledoc "Commits domain and built-in Audit Plugin state in one Turn."
-  use Jido.Agent, name: "application_audit_agent"
+  use Jido.Agent,
+    name: "application_audit_agent",
+    plugins: [{Jido.Plugin.Audit, %{max_entries: 2}}]
 
   state do
     schema Zoi.object(%{successes: Zoi.integer() |> Zoi.default(0)})
-  end
-
-  plugins do
-    plugin Jido.Plugin.Audit, config: %{max_entries: 2}
   end
 
   routes do

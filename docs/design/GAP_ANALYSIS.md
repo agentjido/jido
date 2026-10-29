@@ -51,7 +51,7 @@ V2 research uses primary source from the pinned local Git tag. Links point to th
 | [GAP-026](#gap-026) | 06 Commit and effects | Document correction | Correct settlement when a Turn has no Directives | Corrected in commit design and alignment |
 | [GAP-027](#gap-027) | 06 Commit and effects | Document correction | Limit nondurable checkpoint requirements to named instances | Open |
 | [GAP-028](#gap-028) | 06 Commit and effects | API decision | Resolve recoverable work with opaque custom checkpoints | Open |
-| [GAP-029](#gap-029) | 07 Persistence | Migration decision | Replace format-1/2 read promises with format-3-only behavior | Open |
+| [GAP-029](#gap-029) | 07 Persistence | Migration decision | Use one new-only format-1 record shape | Settled: breaking replacement selected |
 | [GAP-030](#gap-030) | 07 Persistence | Migration decision | Confirm stable namespace as a durable Agent prerequisite | Open |
 | [GAP-031](#gap-031) | 07 Persistence | Migration decision | Remove unsupported dual-key reads and collision gates | Open |
 | [GAP-032](#gap-032) | 07 Persistence | Document correction | Document opaque conditional-write tokens | Open |
@@ -251,13 +251,19 @@ The [Jido integration issue](https://github.com/agentjido/jido/issues/389) is co
 
 **Design:** AUTH-REQ-009/010 and the supported-form table promise combined keyword and Spark block configuration.
 
-**Current V3:** Standalone use Jido.Agent accepts name, description, vsn, and extensions. Schema, routes, Plugins, and metadata belong in blocks. Combined Topology hosting uses its own configuration path.
+**Current V3:** Standalone `use Jido.Agent` accepts `name`, `description`, `id`,
+`vsn`, `metadata`, and ordered `plugins`. Schema and routes belong in core
+blocks. Selected Plugins can add their own Spark sections and imports.
 
 **V2 approach:** V2 module authoring used use Jido.Agent keyword configuration, including schema, plugins, and strategy. It had no equivalent current Spark Agent block contract.
 
-**Decision:** Keep the V3 block form for standalone module schema, metadata, Plugins, and routes. Keep only name, description, vsn, and extensions as module options. Direct map/keyword Agent.new/1 construction remains supported. Combined Topology hosting retains its separate configuration path.
+**Decision:** Superseded on 2026-10-29. Keep blocks for schema and routes. Use
+one top-level `plugins:` option for Plugin modules or `{Plugin, config}` tuples.
+Do not expose a separate Agent Extension option or Plugin block.
 
-**Reconciliation:** The API question is closed. Current code already implements the selected form. The authoring design and alignment record AUTH-REQ-009/063 and retire the obsolete mixed-form duplicate rule AUTH-REQ-010. V2 keyword module examples still need migration to blocks; direct keyword data must not be removed as a side effect.
+**Reconciliation:** The current release implements the superseding Plugin-only
+form. Stored Agent documents and snapshots use `plugins` without a compatibility
+migration.
 
 **Evidence:** [docs/design/02_agent-authoring/design.md](/Users/mhostetler/Source/Jido/proj_jido_core/jido/docs/design/02_agent-authoring/design.md); [lib/jido/agent/dsl/compiler.ex:66](/Users/mhostetler/Source/Jido/proj_jido_core/jido/lib/jido/agent/dsl/compiler.ex:66); [test/jido/agent/authoring_test.exs:722](/Users/mhostetler/Source/Jido/proj_jido_core/jido/test/jido/agent/authoring_test.exs:722); [lib/jido/agent.ex:71](https://github.com/agentjido/jido/blob/69f3b40506ce3ea1a2c80b255b737d6c3a453cf2/lib/jido/agent.ex#L71).
 
@@ -597,17 +603,22 @@ entries.
 
 <a id="gap-029"></a>
 
-### GAP-029: Replace format-1/2 read promises with format-3-only behavior
+### GAP-029: Use one new-only format-1 record shape
 
-**Type:** Migration decision. **State:** Open.
+**Type:** Migration decision. **State:** Settled on 2026-10-29.
 
-**Design:** PERS-REQ-039 and cross-seam inventories promise legacy outer records. Overview and delivery say unnamed format 2 and older format 1 remain readable.
+**Design:** Earlier PERS-REQ-039 and cross-seam inventories promised legacy
+outer records. The selected contract now uses one new-only format-1 shape.
 
-**Current V3:** Persistence.Record accepts and writes outer format 3 only. Agent checkpoint envelopes independently use version 2. Other Store record owners can have different formats.
+**Current V3:** `Persistence.Record` accepts and writes one exact outer format
+1 shape. Agent snapshots independently use format 1. Other Store record owners
+can have different formats.
 
 **V2 approach:** V2 stored version-1 checkpoint maps through Jido.Persist and Jido.Storage. Its format is not a V3 outer format-1 record. There is no direct compatible current reader.
 
-**Reconciliation:** Confirm format-3-only support and retire old live-read promises. Define an offline migration and unsupported downgrade boundary. Keep Agent checkpoint version, outer Agent record format, and Topology record format separate.
+**Reconciliation:** Retire old live-read promises. Earlier records and snapshots
+require conversion outside Jido before startup. Keep Agent snapshot format,
+outer Agent record format, and Topology record format separate.
 
 **Evidence:** [docs/design/07_persistence/design.md:210](/Users/mhostetler/Source/Jido/proj_jido_core/jido/docs/design/07_persistence/design.md:210); [lib/jido/persistence/record.ex:1](/Users/mhostetler/Source/Jido/proj_jido_core/jido/lib/jido/persistence/record.ex:1); [lib/jido/agent/checkpoint.ex:11](/Users/mhostetler/Source/Jido/proj_jido_core/jido/lib/jido/agent/checkpoint.ex:11); [lib/jido/persist.ex:388](https://github.com/agentjido/jido/blob/69f3b40506ce3ea1a2c80b255b737d6c3a453cf2/lib/jido/persist.ex#L388).
 
@@ -639,7 +650,9 @@ entries.
 
 **V2 approach:** V2 used only module-dependent checkpoint keys. It did not implement a Ref cutover or collision gate. Separate V2 decoding/conversion is necessary.
 
-**Reconciliation:** Remove these current-runtime promises if format-3-only is retained. Document offline import with separate keys and backup-based rollback. Do not label an absent migration reader implemented.
+**Reconciliation:** Remove the old dual-read promises. Document offline import
+with separate keys and backup-based rollback. The new-only format-1 reader does
+not include a migration path.
 
 **Evidence:** [docs/design/03_agent-identity/design.md](/Users/mhostetler/Source/Jido/proj_jido_core/jido/docs/design/03_agent-identity/design.md); [docs/design/07_persistence/design.md:213](/Users/mhostetler/Source/Jido/proj_jido_core/jido/docs/design/07_persistence/design.md:213); [lib/jido/persistence/identity.ex:1](/Users/mhostetler/Source/Jido/proj_jido_core/jido/lib/jido/persistence/identity.ex:1); [docs/design/99_delivery/compatibility-register.md:34](/Users/mhostetler/Source/Jido/proj_jido_core/jido/docs/design/99_delivery/compatibility-register.md:34); [lib/jido/persist.ex:629](https://github.com/agentjido/jido/blob/69f3b40506ce3ea1a2c80b255b737d6c3a453cf2/lib/jido/persist.ex#L629).
 
@@ -671,7 +684,9 @@ entries.
 
 **V2 approach:** V2 Jido.Storage combined semantic checkpoint storage and Thread journals. It had no record-neutral validated byte Store.
 
-**Reconciliation:** Document Store in topic 07 and register its raw results in topic 12. Assign record meaning to each consumer. Do not impose Agent format 3 or namespace rules on every Store consumer.
+**Reconciliation:** Document Store in topic 07 and register its raw results in
+topic 12. Assign record meaning to each consumer. Do not impose the Agent
+format-1 record or namespace rules on every Store consumer.
 
 **Evidence:** [lib/jido/persistence/store.ex:3](/Users/mhostetler/Source/Jido/proj_jido_core/jido/lib/jido/persistence/store.ex:3); [lib/jido/topology/controller/target_store.ex:5](/Users/mhostetler/Source/Jido/proj_jido_core/jido/lib/jido/topology/controller/target_store.ex:5); [lib/jido/storage.ex:3](https://github.com/agentjido/jido/blob/69f3b40506ce3ea1a2c80b255b737d6c3a453cf2/lib/jido/storage.ex#L3).
 
@@ -919,7 +934,9 @@ entries.
 
 **Design:** Design declares TOP-REQ-077–101 for root authoring, lifecycle Signals, placement, Codec, resources, and lifecycle Signal modules. Alignment and delivery ranges stop earlier.
 
-**Current V3:** The current code implements those local additions, including Codec version 2, all-components-ready startup, resource ownership, exact node selection, and custom lifecycle Signal modules.
+**Current V3:** The current code implements those local additions inside Agent
+document version 1, including all-components-ready startup, resource ownership,
+exact node selection, and custom lifecycle Signal modules.
 
 **V2 approach:** V2 Pod used its own module keyword topology and runtime/mutation model. It had no equivalent current Codec, root blocks, or lifecycle module family.
 

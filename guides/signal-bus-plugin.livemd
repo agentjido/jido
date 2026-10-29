@@ -12,10 +12,10 @@ Two Plugins connect an Agent to `Jido.Signal.Bus`:
 <!-- livebook:{"force_markdown":true} -->
 
 ```elixir
-plugins do
-  plugin(Jido.Plugin.Bus.Manager, config: %{name: :orders})
-  plugin(Jido.Plugin.Bus.Client, config: %{bus: :orders, path: "order.**"})
-end
+plugins: [
+  {Jido.Plugin.Bus.Manager, %{name: :orders}},
+  {Jido.Plugin.Bus.Client, %{bus: :orders, path: "order.**"}}
+]
 ```
 
 `Bus.Manager` starts a bus and ties its lifetime to the Agent. `Bus.Client`
@@ -93,7 +93,12 @@ before the Client subscribes.
 
 ```elixir
 defmodule BusGuide.Ledger do
-  use Jido.Agent, name: "ledger"
+  use Jido.Agent,
+    name: "ledger",
+    plugins: [
+      {Jido.Plugin.Bus.Manager, %{name: :orders}},
+      {Jido.Plugin.Bus.Client, %{bus: :orders, path: "order.**", retry_delay_ms: 50}}
+    ]
 
   state do
     schema(
@@ -101,14 +106,6 @@ defmodule BusGuide.Ledger do
         orders: Zoi.list(Zoi.string()) |> Zoi.default([]),
         seen: Zoi.list(Zoi.string()) |> Zoi.default([])
       })
-    )
-  end
-
-  plugins do
-    plugin(Jido.Plugin.Bus.Manager, config: %{name: :orders})
-
-    plugin(Jido.Plugin.Bus.Client,
-      config: %{bus: :orders, path: "order.**", retry_delay_ms: 50}
     )
   end
 
@@ -255,7 +252,18 @@ ID. With `durable:` set, the Client:
 
 ```elixir
 defmodule BusGuide.Archive do
-  use Jido.Agent, name: "archive"
+  use Jido.Agent,
+    name: "archive",
+    plugins: [
+      {Jido.Plugin.Bus.Client,
+       %{
+         bus: :orders,
+         path: "order.**",
+         durable: "order-archive",
+         start_from: :origin,
+         retry_delay_ms: 50
+       }}
+    ]
 
   state do
     schema(
@@ -263,18 +271,6 @@ defmodule BusGuide.Archive do
         orders: Zoi.list(Zoi.string()) |> Zoi.default([]),
         seen: Zoi.list(Zoi.string()) |> Zoi.default([])
       })
-    )
-  end
-
-  plugins do
-    plugin(Jido.Plugin.Bus.Client,
-      config: %{
-        bus: :orders,
-        path: "order.**",
-        durable: "order-archive",
-        start_from: :origin,
-        retry_delay_ms: 50
-      }
     )
   end
 

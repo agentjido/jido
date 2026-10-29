@@ -130,7 +130,7 @@ defmodule Jido.Agent.RouteProjectionTest do
       signal_source: "/agent/route-projection",
       schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}),
       routes: routes,
-      extensions: extensions
+      plugins: extensions
     })
     |> Agent.instantiate!(id: Jido.Signal.ID.generate!())
   end

@@ -6,10 +6,9 @@ defmodule Jido.Persistence.Record do
   alias Jido.Error
   alias Jido.PortableTerm
 
-  @format_version 4
+  @format_version 1
   @common_keys [:fmt, :kind, :namespace, :agent_module, :agent_id, :partition, :rev]
   @active_keys @common_keys ++ [:vsn, :checkpoint]
-  @legacy_keys [:format, :kind, :namespace, :agent_module, :agent_id, :partition, :revision]
 
   def format_version, do: @format_version
 
@@ -90,16 +89,15 @@ defmodule Jido.Persistence.Record do
   @doc false
   @spec kind(map()) :: :active | :tombstone | :unknown
   def kind(%{fmt: @format_version, kind: kind}) when kind in [:active, :tombstone], do: kind
-  def kind(%{format: 3, kind: kind}) when kind in [:active, :tombstone], do: kind
   def kind(_record), do: :unknown
 
   @doc false
   @spec format(map()) :: term()
-  def format(record), do: Map.get(record, :fmt, Map.get(record, :format))
+  def format(record), do: Map.get(record, :fmt)
 
   @doc false
   @spec revision(map()) :: term()
-  def revision(record), do: Map.get(record, :rev, Map.get(record, :revision))
+  def revision(record), do: Map.get(record, :rev)
 
   @doc false
   @spec checkpoint(map()) :: term()
@@ -107,7 +105,7 @@ defmodule Jido.Persistence.Record do
 
   @doc false
   @spec agent_vsn(map()) :: term()
-  def agent_vsn(record), do: Map.get(record, :vsn, Map.get(record, :agent_vsn))
+  def agent_vsn(record), do: Map.get(record, :vsn)
 
   def require_active(record) do
     case kind(record) do
@@ -126,13 +124,8 @@ defmodule Jido.Persistence.Record do
   end
 
   defp validate_format_and_kind(record) do
-    valid_format? =
-      if Map.has_key?(record, :fmt),
-        do: record.fmt == @format_version,
-        else: Map.get(record, :format) == 3
-
     cond do
-      not valid_format? -> invalid(if(Map.has_key?(record, :fmt), do: :fmt, else: :format))
+      Map.get(record, :fmt) != @format_version -> invalid(:fmt)
       Map.get(record, :kind) not in [:active, :tombstone] -> invalid(:kind)
       true -> :ok
     end
@@ -148,12 +141,7 @@ defmodule Jido.Persistence.Record do
         )
       )
 
-  defp validate_exact_shape(%{fmt: _} = record), do: exact_keys(record, @common_keys)
-
-  defp validate_exact_shape(%{kind: :active} = record),
-    do: exact_keys(record, @legacy_keys ++ [:agent_vsn, :checkpoint])
-
-  defp validate_exact_shape(record), do: exact_keys(record, @legacy_keys)
+  defp validate_exact_shape(record), do: exact_keys(record, @common_keys)
 
   defp exact_keys(record, keys) do
     if map_size(record) == length(keys) and Enum.all?(keys, &Map.has_key?(record, &1)),
@@ -176,7 +164,7 @@ defmodule Jido.Persistence.Record do
 
     if is_integer(revision) and revision >= 0,
       do: :ok,
-      else: invalid(if(Map.has_key?(record, :fmt), do: :rev, else: :revision))
+      else: invalid(:rev)
   end
 
   defp validate_kind_fields(%{kind: :active} = record), do: validate_active(record)
@@ -267,7 +255,7 @@ defmodule Jido.Persistence.Record do
   defp validate_agent_vsn(record) do
     case agent_vsn(record) do
       vsn when is_integer(vsn) and vsn > 0 -> :ok
-      _ -> invalid(if(Map.has_key?(record, :fmt), do: :vsn, else: :agent_vsn))
+      _ -> invalid(:vsn)
     end
   end
 

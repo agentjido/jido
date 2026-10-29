@@ -7,16 +7,17 @@ defmodule Jido.Examples.RecoverableDelivery do
   Ordinary Directives have no automatic replay guarantee.
   """
 
-  use Jido.Agent, name: "example_recoverable_delivery"
+  use Jido.Agent,
+    name: "example_recoverable_delivery",
+    plugins: [
+      {Jido.Examples.RecoverableDelivery.Output,
+       %{sink: Jido.Examples.RecoverableDelivery.MemorySink}}
+    ]
 
-  alias Jido.Examples.RecoverableDelivery.{Confirm, Deliver, MemorySink, Output}
+  alias Jido.Examples.RecoverableDelivery.{Confirm, Deliver}
 
   state do
     schema Zoi.object(%{value: Zoi.integer() |> Zoi.default(0)})
-  end
-
-  plugins do
-    plugin Output, config: %{sink: MemorySink}
   end
 
   routes do

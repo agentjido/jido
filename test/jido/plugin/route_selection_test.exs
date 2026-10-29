@@ -72,7 +72,7 @@ defmodule Jido.Plugin.RouteSelectionTest do
   defmodule StatefulAgent do
     use Jido.Agent,
       name: "plugin_stateful_route_selector",
-      extensions: [StatefulSelector]
+      plugins: [StatefulSelector]
 
     state do
       schema Zoi.object(%{selected: Zoi.atom() |> Zoi.default(:none)})
@@ -89,7 +89,7 @@ defmodule Jido.Plugin.RouteSelectionTest do
   defmodule DefaultAgent do
     use Jido.Agent,
       name: "plugin_default_route_selector",
-      extensions: [DefaultSelector]
+      plugins: [DefaultSelector]
 
     state do
       schema Zoi.object(%{selected: Zoi.atom() |> Zoi.default(:none)})
@@ -106,7 +106,7 @@ defmodule Jido.Plugin.RouteSelectionTest do
   defmodule MissingAgent do
     use Jido.Agent,
       name: "plugin_missing_route_selector",
-      extensions: [MissingSelector]
+      plugins: [MissingSelector]
 
     state do
       schema Zoi.object(%{selected: Zoi.atom() |> Zoi.default(:none)})
@@ -138,7 +138,7 @@ defmodule Jido.Plugin.RouteSelectionTest do
   defmodule WildcardAgent do
     use Jido.Agent,
       name: "plugin_wildcard_route_selector",
-      extensions: [WildcardSelector]
+      plugins: [WildcardSelector]
 
     state do
       schema Zoi.object(%{selected: Zoi.atom() |> Zoi.default(:none)})
@@ -217,7 +217,7 @@ defmodule Jido.Plugin.RouteSelectionTest do
     assert {:error, error} =
              Agent.define(%{
                name: "multiple_route_selectors",
-               extensions: [extension(StatefulSelector), extension(DefaultSelector)]
+               plugins: [extension(StatefulSelector), extension(DefaultSelector)]
              })
 
     assert error.message == "Only one Agent Plugin can select routes"
@@ -227,7 +227,7 @@ defmodule Jido.Plugin.RouteSelectionTest do
     assert {:error, error} =
              Agent.define(%{
                name: "missing_route_alias",
-               extensions: [extension(DefaultSelector)],
+               plugins: [extension(DefaultSelector)],
                routes: [
                  route("same", nil),
                  route("same", :named)

@@ -309,7 +309,7 @@ defmodule JidoTest.AgentServer.PluginRuntime.RuntimeTest do
     Jido.Agent.define!(%{
       name: "server_live_plugins",
       schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}),
-      extensions: [
+      plugins: [
         %{id: F.Gate.id(), provider: F.Gate, vsn: F.Gate.vsn(), data: %{}},
         %{id: First.id(), provider: First, vsn: First.vsn(), data: Map.new(opts)},
         %{id: Second.id(), provider: Second, vsn: Second.vsn(), data: Map.new(second_opts)}
@@ -337,7 +337,7 @@ defmodule JidoTest.AgentServer.PluginRuntime.RuntimeTest do
     Jido.Agent.define!(%{
       name: "server_trapping_plugins",
       schema: Zoi.object(%{}),
-      extensions: [
+      plugins: [
         %{
           id: TrappingFirst.id(),
           provider: TrappingFirst,
@@ -361,7 +361,7 @@ defmodule JidoTest.AgentServer.PluginRuntime.RuntimeTest do
     Jido.Agent.define!(%{
       name: "server_supervisor_plugins",
       schema: Zoi.object(%{}),
-      extensions: [
+      plugins: [
         %{
           id: SupervisorPlugin.id(),
           provider: SupervisorPlugin,
@@ -415,7 +415,7 @@ defmodule JidoTest.AgentServer.PluginRuntime.RuntimeTest do
       Jido.Agent.define!(%{
         name: "required_plugin",
         schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}),
-        extensions: [JidoTest.AgentContract.contribution(plugin)],
+        plugins: [JidoTest.AgentContract.contribution(plugin)],
         routes: [
           %{
             path: "work",
@@ -979,7 +979,7 @@ defmodule JidoTest.AgentServer.PluginRuntime.RuntimeTest do
       Jido.Agent.define!(%{
         name: "stateless_live_plugin",
         schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}),
-        extensions: [
+        plugins: [
           %{
             id: AdmissionOnly.id(),
             provider: AdmissionOnly,

@@ -125,7 +125,7 @@ The result is:
 ```
 
 A Diff has one entry for each collection: `routes`, `agents`, `connections`,
-and `extensions` (Plugins). Each entry has `added`, `removed`, `updated` (with
+and `plugins`. Each entry has `added`, `removed`, `updated` (with
 `before` and `after`), and `order` on both sides. The Diff also records
 changed top-level `fields`, and `state` is either `%{before: _, after: _}` or
 `nil`.
@@ -204,7 +204,7 @@ an owned field adds that field with its schema default:
 ```elixir
 {:ok, counted, diff} = Jido.Agent.mutate(agent, [Directive.plugin_add(Mut.Visits)])
 
-{counted.state, Jido.Agent.Diff.changed?(diff, :extensions), diff.state}
+{counted.state, Jido.Agent.Diff.changed?(diff, :plugins), diff.state}
 ```
 
 The result is:

@@ -1,8 +1,9 @@
-defmodule Jido.Examples.AgentExtension do
-  @moduledoc "Defines one static Agent contribution provider."
+defmodule Jido.Examples.AuthoringPlugin do
+  @moduledoc "Defines one authoring-only Plugin."
 
   defmodule Labels do
     @moduledoc "Stores a validated owner label in its own Agent contribution."
+    alias Spark.Dsl.Extension, as: SparkExtension
 
     @section %Spark.Dsl.Section{
       name: :labels,
@@ -10,22 +11,22 @@ defmodule Jido.Examples.AgentExtension do
     }
     @schema Zoi.object(%{owner: Zoi.string() |> Zoi.min(1)}, unrecognized_keys: :error)
 
-    use Jido.Agent.Extension, id: "examples.labels", vsn: 1, sections: [@section]
+    use Jido.Plugin, id: "examples.labels", vsn: 1, sections: [@section]
 
-    @impl Jido.Agent.Extension
+    @impl true
     def lower(dsl, config) do
-      {:ok, Map.put(config, :owner, Spark.Dsl.Extension.get_opt(dsl, [:labels], :owner))}
+      {:ok, Map.put(config, :owner, SparkExtension.get_opt(dsl, [:labels], :owner))}
     end
 
-    @impl Jido.Agent.Extension
+    @impl true
     def normalize(data), do: Zoi.parse(@schema, data)
   end
 
   defmodule Agent do
-    @moduledoc "Keeps extension data separate from core metadata and Agent state."
+    @moduledoc "Keeps Plugin data separate from core metadata and Agent state."
     use Jido.Agent,
-      name: "basic_agent_extension",
-      extensions: [Labels]
+      name: "basic_authoring_plugin",
+      plugins: [Labels]
 
     state do
       schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
@@ -36,9 +37,9 @@ defmodule Jido.Examples.AgentExtension do
     end
 
     routes do
-      signal_source "/examples/basic/agent_extension"
+      signal_source "/examples/basic/authoring_plugin"
 
-      route "examples.basic.agent_extension.add", as: :add do
+      route "examples.basic.authoring_plugin.add", as: :add do
         action %{amount: amount},
           schema: Zoi.object(%{amount: Zoi.integer()}),
           context: context do

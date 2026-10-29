@@ -56,7 +56,7 @@ are ready.
 | `lib/jido/agent.ex:94-132,370-423` | Agent modules can define complete checkpoint and restore callbacks. |
 | `lib/jido/agent/builder.ex:1-18` | Builder creates Agent definitions through the canonical constructor. |
 | `lib/jido/agent/codec.ex:1-25` | Codec owns versioned static authoring documents, not Agent checkpoints or effect journals. |
-| `lib/jido/agent/extension.ex:1-23` | An Agent authoring extension lowers static syntax to canonical configuration and cannot add another runtime. |
+| `lib/jido/agent/extension.ex` | The hidden contribution layer lowers Plugin syntax to canonical configuration. Authoring-only Plugins add no runtime. |
 | `lib/jido/topology/extension.ex:1-27` | A Topology authoring extension is static lowering and cannot bypass normal activation or validation. |
 | `lib/jido/plugin.ex:1-24,67-102` | One Plugin can own Agent state, pure callbacks, Directives, dispatch, and one runtime root. Runtime dispatch occurs after commit and gets no complete private Server state. |
 | `lib/jido/plugin/spec.ex`; `lib/jido/agent_server/{child_info,parent_ref}.ex`; `lib/jido/runtime_store.ex` | Plugin normalization, child tracking, parent tracking, and the instance Runtime Store are internal support modules. Public declarations, contexts, maps, relationship functions, and instance helpers remain the extension boundary. |
@@ -80,7 +80,7 @@ are ready.
 
 | Evidence path | Behavior proved |
 | --- | --- |
-| `test/jido/agent/authoring_extension_test.exs:111-149,214-268` | Agent extensions lower to ordinary definitions, share the runtime and Codec, preserve order, and fail on unclaimed or invalid output. |
+| `test/jido/agent/authoring_extension_test.exs` | Agent Plugins lower to ordinary definitions, share the Codec, preserve order, and fail on invalid output. |
 | `test/jido/topology/authoring_extension_test.exs:137-288` | Topology extensions lower through the common authoring contract and reject invalid or unclaimed output. |
 | `test/jido/plugin/contract_test.exs:490-670` | Plugin preparation order, owned Directive filtering, state ownership, and executable write protection are proved. |
 | `test/jido/agent_server/directive_execution_test.exs:27-184,254-350` | Directive validation precedes commit, dispatch follows commit, and later failure preserves committed state. |
@@ -141,8 +141,8 @@ did not rerun runtime tests.
   one state key, typed Directives, post-commit dispatch, and one runtime root.
 - `Jido.Persistence.Adapter` is a byte-store contract. Jido owns record meaning
   and storage-result handling.
-- Agent and Topology extensions lower static DSL declarations to canonical
-  values. They do not create a separate runtime.
+- Agent Plugins and Topology extensions lower static DSL declarations to
+  canonical values. Authoring-only Plugins do not create a runtime.
 - A Directive is typed post-commit work. It is not middleware and has no
   general crash-recovery guarantee.
 - The Scheduler Plugin is one capability-specific recovery pattern. Its
@@ -152,8 +152,8 @@ did not rerun runtime tests.
 
 ### Supported public APIs
 
-- Direct and DSL Agent authoring, Builder, Codec, custom routing, Agent
-  authoring extensions, and complete checkpoint callbacks are supported.
+- Direct and DSL Agent authoring, Codec, custom routing, Agent authoring
+  Plugins, and complete checkpoint callbacks are supported.
 - Instance lifecycle helpers and public PID-based Agent Server operations are
   both supported.
 - Registry, Agent Supervisor, Task Supervisor, and Runtime Store name helpers
@@ -326,7 +326,7 @@ Owner seams can create detailed plans when their contracts are ready.
 | `PKG-REQ-009` | `../jido_signal/lib/jido_signal.ex:1-49`; Router, Dispatch, and Bus module evidence | Cross-package owner check for every public Signal integration. | `Proven` for current owner |
 | `PKG-REQ-010` | Core Plugin facet and lifecycle tests | None | `Proven` |
 | `PKG-REQ-011` | Public adapter modules and owner documentation | None for retained providers | `Proven` |
-| `PKG-REQ-012` | Agent and Topology extension modules and tests in the evidence tables | Authoring extension contract tests. | `Proven` in core |
+| `PKG-REQ-012` | Agent Plugin and Topology extension modules and tests in the evidence tables | Authoring contract tests. | `Proven` in core |
 | `PKG-REQ-013` and `PKG-REQ-014` | Directive, Scheduler, recoverable-delivery, and ownership tests | None | `Proven` |
 | `PKG-REQ-015` | Semantic owner modules and handler-failure tests | Preserve failure isolation for every event family. | `Proven` in core |
 | `PKG-REQ-016` and `PKG-REQ-017` | Four explicit owner facets and the public-value inventory | None | `Proven` |
@@ -355,7 +355,7 @@ No deprecation or removal is approved in this seam.
 | Agent Ref | Add a new identity and facade beside ID and PID APIs. Define key conversion, collisions, mixed-version behavior, and rollback before storage identity changes. |
 | PID Agent Server API | Keep public command, request, cancellation, state, and readiness functions until a replacement is available and a later deprecation is approved. |
 | Generated names | Keep current helpers. Classify them as application composition or observation APIs, not required ecosystem internals. |
-| Authoring | Keep DSL and direct forms, Builder, Codec, Agent and Topology extensions, custom routing, and complete checkpoint callbacks. |
+| Authoring | Keep DSL and direct forms, Codec, Agent Plugins, Topology extensions, custom routing, and complete checkpoint callbacks. |
 | Plugins and Directives | Keep current declarations, callbacks, owned state, runtime, and post-commit dispatch. Owner seams define any facet or runtime-init migration. |
 | Persistence adapter | Require binary get and compare-and-swap. Keep put and delete as optional storage maintenance operations. |
 | Persistence selection | Keep instance defaults and per-Agent override or disablement until the authority model and transition are approved. |

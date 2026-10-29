@@ -83,18 +83,6 @@ defmodule Jido.Plugin.AuthoringTest do
     def state_spec(_opts), do: :none
   end
 
-  defmodule InvalidRuntimeSupport do
-    use Jido.Plugin
-    def state_spec(_opts), do: :none
-    def runtime_support, do: String
-  end
-
-  defmodule RaisingRuntimeSupport do
-    use Jido.Plugin
-    def state_spec(_opts), do: :none
-    def runtime_support, do: raise(ArgumentError, "runtime support is unavailable")
-  end
-
   @tag obligation: "jido.plugin.I1"
   test "old role and facet selectors are rejected" do
     for options <- [
@@ -150,7 +138,6 @@ defmodule Jido.Plugin.AuthoringTest do
                 id: "",
                 vsn: 1,
                 manifest_vsn: 1,
-                runtime_support: EmptyId,
                 authoring: %{id: "", kind: :plugin, target: EmptyId, vsn: 1}
               }
             }} =
@@ -192,25 +179,10 @@ defmodule Jido.Plugin.AuthoringTest do
   end
 
   @tag obligation: ["jido.plugin.I1", "jido.plugin.I7"]
-  test "runtime support must keep the Plugin identity and contain metadata faults" do
-    assert {:error,
-            %{
-              message: "Plugin authoring identity is invalid",
-              details: %{
-                plugin: InvalidRuntimeSupport,
-                runtime_support: String
-              }
-            }} = Normalizer.normalize_all([InvalidRuntimeSupport])
+  test "runtime manifests are derived from Plugin callbacks" do
+    refute function_exported?(Empty, :__jido_plugin__, 0)
 
-    assert {:error,
-            %Jido.Error.ExecutionError{
-              message: "Plugin authoring metadata failed",
-              details: %{
-                plugin: RaisingRuntimeSupport,
-                callback: :runtime_support,
-                error: %ArgumentError{}
-              }
-            }} = Normalizer.normalize_all([RaisingRuntimeSupport])
+    assert function_exported?(Combined, :__jido_plugin__, 0)
   end
 
   @tag obligation: ["jido.plugin.I1", "jido.plugin.I5", "jido.plugin.I6"]

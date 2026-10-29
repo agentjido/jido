@@ -25,26 +25,25 @@ defmodule Jido.AgentExtensionsAuthoringTest do
   alias JidoTest.ComposableAgent.Compiler
 
   defmodule BehaviorOnly do
-    use Jido.Agent.Extension, id: "test.behavior"
-    def runtime_support, do: __MODULE__
+    use Jido.Plugin, id: "test.behavior"
   end
 
   defmodule DuplicateID do
-    use Jido.Agent.Extension, id: "test.audit"
+    use Jido.Plugin, id: "test.audit"
   end
 
   defmodule ConflictingSection do
     @section %Spark.Dsl.Section{name: :audit}
-    use Jido.Agent.Extension, id: "test.conflict", sections: [@section]
+    use Jido.Plugin, id: "test.conflict", sections: [@section]
   end
 
   defmodule CoreConflict do
     @section %Spark.Dsl.Section{name: :routes}
-    use Jido.Agent.Extension, id: "test.core_conflict", sections: [@section]
+    use Jido.Plugin, id: "test.core_conflict", sections: [@section]
   end
 
   defmodule CoreEndpointConflict do
-    use Jido.Agent.Extension, id: "test.endpoint_conflict"
+    use Jido.Plugin, id: "test.endpoint_conflict"
     def endpoint_kinds, do: [:agent]
   end
 
@@ -52,7 +51,7 @@ defmodule Jido.AgentExtensionsAuthoringTest do
     do: %{id: provider.id(), provider: provider, vsn: provider.vsn(), data: data}
 
   defp define(provider, data, routes \\ []) do
-    Agent.define(%{name: "extended", routes: routes, extensions: [contribution(provider, data)]})
+    Agent.define(%{name: "extended", routes: routes, plugins: [contribution(provider, data)]})
   end
 
   defp action(type),
@@ -81,16 +80,16 @@ defmodule Jido.AgentExtensionsAuthoringTest do
       contribution(SignalBus, %{buses: [%{name: :events}]})
     ]
 
-    assert Team.definition().extensions === expected
+    assert Team.definition().plugins === expected
 
     assert {:ok, from_map} =
              Agent.define(%{
                name: "extended",
                routes: [action("plan.request"), action("work.request")],
-               extensions: expected
+               plugins: expected
              })
 
-    assert from_map.extensions === expected
+    assert from_map.plugins === expected
     assert from_map.topology == %{agents: [], connections: []}
   end
 
@@ -114,38 +113,41 @@ defmodule Jido.AgentExtensionsAuthoringTest do
       ]
     }
 
-    assert short.extensions === [contribution(Scheduling, expected)]
+    assert short.plugins === [contribution(Scheduling, expected)]
     assert {:ok, from_map} = define(Scheduling, expected, [action("work.request")])
-    assert from_map.extensions === short.extensions
+    assert from_map.plugins === short.plugins
   end
 
   test "Plugin declarations do not depend on section order and equal Map provider data" do
     left = PluginFirst.definition()
     right = PluginLast.definition()
     assert Map.delete(left, :module) === Map.delete(right, :module)
-    assert left.extensions === [contribution(Audit, %{label: "example", enabled: false})]
+    assert left.plugins === [contribution(Audit, %{label: "example", enabled: false})]
     assert {:ok, from_map} = define(Audit, %{label: "example", enabled: false})
-    assert from_map.extensions === left.extensions
-    assert Audit.runtime_support() == Audit
+    assert from_map.plugins === left.plugins
+    refute function_exported?(Audit, :__jido_plugin__, 0)
     assert left.schema === Zoi.object(%{})
     assert left.routes == [] and left.topology == %{agents: [], connections: []}
   end
 
-  test "extensions and Plugins use one registration and configuration model" do
+  test "Plugins use one registration and configuration model" do
     module =
-      Compiler.compile("plugins do plugin #{inspect(BehaviorOnly)},config: %{value: 42} end")
+      Compiler.compile(
+        "",
+        "name: \"generated\", plugins: [{#{inspect(BehaviorOnly)}, %{value: 42}}]"
+      )
 
-    assert module.definition().extensions === [contribution(BehaviorOnly, %{value: 42})]
+    assert module.definition().plugins === [contribution(BehaviorOnly, %{value: 42})]
     assert {:ok, from_map} = define(BehaviorOnly, %{value: 42})
-    assert from_map.extensions === module.definition().extensions
+    assert from_map.plugins === module.definition().plugins
 
     module =
       Compiler.compile(
         "audit do label \"example\" end",
-        "name: \"extended\",extensions: [JidoTest.ComposableAgent.Audit]"
+        "name: \"extended\",plugins: [JidoTest.ComposableAgent.Audit]"
       )
 
-    assert module.definition().extensions == [
+    assert module.definition().plugins == [
              contribution(Audit, %{label: "example", enabled: true})
            ]
   end
@@ -160,23 +162,23 @@ defmodule Jido.AgentExtensionsAuthoringTest do
           [contribution(CoreConflict, %{})],
           [contribution(CoreEndpointConflict, %{})]
         ] do
-      assert {:error, %Error{}} = Agent.define(%{name: "bad", extensions: entries})
+      assert {:error, %Error{}} = Agent.define(%{name: "bad", plugins: entries})
     end
 
     module =
       Compiler.compile(
-        "plugins do plugin JidoTest.ComposableAgent.Audit,config: %{label: \"test\"} end",
-        "name: \"configured\",extensions: [JidoTest.ComposableAgent.Audit]"
+        "",
+        "name: \"configured\", plugins: [{JidoTest.ComposableAgent.Audit, %{label: \"test\"}}]"
       )
 
-    assert module.definition().extensions == [
+    assert module.definition().plugins == [
              contribution(Audit, %{label: "test", enabled: true})
            ]
 
     assert_raise Error, fn ->
       Compiler.compile(
         "",
-        "name: \"bad\",extensions: [JidoTest.ComposableAgent.Audit,JidoTest.ComposableAgent.Audit]"
+        "name: \"bad\",plugins: [JidoTest.ComposableAgent.Audit,JidoTest.ComposableAgent.Audit]"
       )
     end
   end
@@ -192,11 +194,11 @@ defmodule Jido.AgentExtensionsAuthoringTest do
           Map.put(entry, :state, %{}),
           %{entry | data: %{unknown: true}}
         ] do
-      assert {:error, %Error{}} = Agent.define(%{name: "bad", extensions: [invalid]})
+      assert {:error, %Error{}} = Agent.define(%{name: "bad", plugins: [invalid]})
     end
 
     assert {:error, %Error{}} =
-             Agent.define(%{name: "bad", extensions: %{Audit => %{label: "old_format"}}})
+             Agent.define(%{name: "bad", plugins: %{Audit => %{label: "old_format"}}})
 
     diagnostic =
       ExUnit.CaptureIO.capture_io(:stderr, fn ->
@@ -252,7 +254,7 @@ defmodule Jido.AgentExtensionsAuthoringTest do
                [action("work.request")]
              )
 
-    assert hd(hd(definition.extensions).data.schedules).timing.timezone == "Etc/UTC"
+    assert hd(hd(definition.plugins).data.schedules).timing.timezone == "Etc/UTC"
   end
 
   test "schedule DSL rejects missing or competing timing forms" do
@@ -264,7 +266,7 @@ defmodule Jido.AgentExtensionsAuthoringTest do
       assert_raise Spark.Error.DslError, fn ->
         Compiler.compile(
           "routes do route \"work.request\", JidoTest.ComposableAgent.Action end\nschedules do #{block} end",
-          "name: \"bad\",extensions: [Jido.Plugin.Scheduler.DSL]"
+          "name: \"bad\",plugins: [Jido.Plugin.Scheduler.DSL]"
         )
       end
     end
@@ -329,7 +331,7 @@ defmodule Jido.AgentExtensionsAuthoringTest do
              }
            ]
 
-    assert JidoTest.ComposableAgent.Worker.definition().extensions == []
+    assert JidoTest.ComposableAgent.Worker.definition().plugins == []
     assert {:ok, empty} = define(SignalBus, %{buses: [%{name: :events}]})
     assert empty.routes == [] and empty.topology == %{agents: [], connections: []}
 
@@ -347,7 +349,7 @@ defmodule Jido.AgentExtensionsAuthoringTest do
     assert {:error, %Error{code: :unknown_endpoint}} =
              Agent.define(%{
                definition
-               | extensions: Enum.reject(definition.extensions, &(&1.provider == SignalBus))
+               | plugins: Enum.reject(definition.plugins, &(&1.provider == SignalBus))
              })
 
     for edge <- [
@@ -371,18 +373,18 @@ defmodule Jido.AgentExtensionsAuthoringTest do
 
   test "explicit custom syntax does not depend on section order" do
     definition = JidoTest.ComposableAgent.PluginAlias.definition()
-    assert definition.extensions == PluginLast.definition().extensions
+    assert definition.plugins == PluginLast.definition().plugins
     assert hd(definition.routes).handler == %{kind: :action, target: Action}
   end
 
   test "generated Agents use plugin declarations without source discovery" do
     module =
       Compiler.compile(
-        "plugins do plugin JidoTest.ComposableAgent.OwnedPlugin, config: %{initial: 3} end",
-        "name: \"generated_plugin\""
+        "",
+        "name: \"generated_plugin\", plugins: [{JidoTest.ComposableAgent.OwnedPlugin, %{initial: 3}}]"
       )
 
-    assert module.definition().extensions == [contribution(OwnedPlugin, %{initial: 3})]
+    assert module.definition().plugins == [contribution(OwnedPlugin, %{initial: 3})]
   end
 
   test "Team and standalone Alice fixtures validate without handler execution" do
@@ -412,17 +414,17 @@ defmodule Jido.AgentExtensionsAuthoringTest do
         name: "plugin_state",
         module: PluginState,
         schema: Zoi.object(%{value: Zoi.string() |> Zoi.default("domain")}),
-        extensions: [contribution(OwnedPlugin, %{initial: 3})]
+        plugins: [contribution(OwnedPlugin, %{initial: 3})]
       })
 
     assert PluginState.definition() === expected
     assert PluginState.definition() |> Map.from_struct() === expected |> Map.from_struct()
-    refute Map.has_key?(expected, :plugins)
+    assert expected.plugins == [contribution(OwnedPlugin, %{initial: 3})]
     refute Map.has_key?(expected, :schedules)
     assert Agent.runtime_plugins(expected) === [{OwnedPlugin, [initial: 3]}]
     assert {:ok, instance} = Agent.instantiate(expected, id: "one")
     assert instance.state === %{value: "domain", owned: 3}
-    assert instance.extensions === expected.extensions
+    assert instance.plugins === expected.plugins
     assert Agent.definition(instance) === expected
     assert {:ok, ^instance} = Agent.validate(instance)
     assert {:error, _} = Agent.validate(%{instance | state: %{value: "domain"}})
@@ -437,13 +439,13 @@ defmodule Jido.AgentExtensionsAuthoringTest do
              Agent.define(%{
                name: "conflict",
                schema: Zoi.object(%{owned: Zoi.string()}),
-               extensions: [entry]
+               plugins: [entry]
              })
 
     assert {:error, _} =
              Agent.define(%{
                name: "conflict",
-               extensions: [entry, contribution(ConflictingPlugin, %{})]
+               plugins: [entry, contribution(ConflictingPlugin, %{})]
              })
   end
 end

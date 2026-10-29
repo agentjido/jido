@@ -43,7 +43,7 @@ defmodule Jido.Examples.DataDefinedAgent do
     Agent.define!(%{
       name: "basic_data_defined_agent",
       schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}),
-      extensions: [
+      plugins: [
         %{id: CountTurns.id(), provider: CountTurns, vsn: CountTurns.vsn(), data: %{}},
         %{
           id: Scheduler.id(),

@@ -149,7 +149,7 @@ defmodule JidoTest.System.AuthoringLoad do
             count: Zoi.integer() |> Zoi.default(0),
             payload: Zoi.string() |> Zoi.default("")
           }),
-        extensions: [%{id: Owned.id(), provider: Owned, vsn: Owned.vsn(), data: %{}}],
+        plugins: [%{id: Owned.id(), provider: Owned, vsn: Owned.vsn(), data: %{}}],
         metadata: %{payload: payload},
         routes: [
           %{

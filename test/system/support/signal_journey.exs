@@ -63,7 +63,7 @@ for {name, durable} <- [{:NormalJourneyAgent, nil}, {:DurableJourneyAgent, "jour
         name: @name,
         module: __MODULE__,
         schema: @schema,
-        extensions: [
+        plugins: [
           %{
             id: Jido.Examples.RecoverableDelivery.Output.id(),
             provider: Jido.Examples.RecoverableDelivery.Output,

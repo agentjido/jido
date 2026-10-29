@@ -64,9 +64,9 @@ defmodule JidoTest.RecoverableDeliveryAgent do
     %{
       definition
       | module: __MODULE__,
-        extensions:
+        plugins:
           Enum.map(
-            definition.extensions,
+            definition.plugins,
             &%{&1 | data: %{sink: JidoTest.RecoverableDeliverySink}}
           )
     }

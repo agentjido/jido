@@ -90,12 +90,12 @@ every Turn but can't replace the Signal or the selected route.
 
 | In TypeScript | In Jido | Where it breaks | Guide |
 | --- | --- | --- | --- |
-| Middleware `(req, next)` that enriches a request | `prepare/2` | Plugins run in declaration order. Output goes to `context.plugin_inputs[Plugin].prepared`. It can't change the Signal, the caller context, or the route. | [Extensions or Plugins](extensions-and-plugins.md) |
-| Auth or rate-limit middleware that rejects a request | `admit/3` | Runs on a live Server only. `cmd/3` skips it, so test it live. | [Extensions or Plugins](extensions-and-plugins.md) |
+| Middleware `(req, next)` that enriches a request | `prepare/2` | Plugins run in declaration order. Output goes to `context.plugin_inputs[Plugin].prepared`. It can't change the Signal, the caller context, or the route. | [Agent Plugins](agent-plugins.md) |
+| Auth or rate-limit middleware that rejects a request | `admit/3` | Runs on a live Server only. `cmd/3` skips it, so test it live. | [Agent Plugins](agent-plugins.md) |
 | Middleware with its own counter | `state_spec/1` and `reduce/2` | Each Plugin owns one state field. An Action that changes that field fails the Turn. | [Stateful Plugins](write-a-stateful-plugin.livemd) |
-| A response-finished hook | `after_commit/3` | Runs after commit and after the `call/3` reply. A failing hook stops later hooks and all Directives. The commit stands. | [Extensions or Plugins](extensions-and-plugins.md) |
-| A decorator that attaches metadata | An Extension: `use Jido.Agent.Extension` | Data only. No Extension code runs during a Turn. | [Extensions or Plugins](extensions-and-plugins.md) |
-| Middleware that holds a connection pool | `child_spec/1` | Starts one supervised runtime per Agent activation, not one per app. | [Extensions or Plugins](extensions-and-plugins.md) |
+| A response-finished hook | `after_commit/3` | Runs after commit and after the `call/3` reply. A failing hook stops later hooks and all Directives. The commit stands. | [Agent Plugins](agent-plugins.md) |
+| A decorator that attaches metadata | An authoring-only Plugin: `use Jido.Plugin` | Data only. No Plugin code runs during a Turn. | [Agent Plugins](agent-plugins.md) |
+| Middleware that holds a connection pool | `child_spec/1` | Starts one supervised runtime per Agent activation, not one per app. | [Agent Plugins](agent-plugins.md) |
 
 ## Events
 
@@ -149,7 +149,7 @@ every Turn but can't replace the Signal or the selected route.
 | In TypeScript | In Jido | Where it breaks | Guide |
 | --- | --- | --- | --- |
 | The Node REPL | `iex -S mix` | `recompile/0` reloads changed modules without a restart. | [Getting Started](getting-started.livemd) |
-| A notebook | Livebook | `plugin` works in a cell. Use `extensions: [...]` when a provider adds custom Spark sections or needs no config. | [Extensions or Plugins](extensions-and-plugins.md) |
+| A notebook | Livebook | Declare Plugins in the top-level `plugins:` Agent option. | [Agent Plugins](agent-plugins.md) |
 | `tsc --noEmit` | `mix compile --warnings-as-errors` | You write no type annotations. The compiler infers types and warns on violations it can prove. Jido checks route targets and Plugin shapes at compile time. Zoi checks data at runtime. | [Types and Validation](types-and-validation.md) |
 | A stricter type checker | Dialyzer (`mix dialyzer`) | It reports only errors it can prove. The first run builds a PLT and takes minutes. | [Types and Validation](types-and-validation.md) |
 | A linter and formatter | Credo (`mix credo`) and `mix format` | `mix format` ships with Elixir. Credo is a dev dependency. | [mix format](https://hexdocs.pm/mix/Mix.Tasks.Format.html) |

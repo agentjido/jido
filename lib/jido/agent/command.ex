@@ -61,13 +61,6 @@ defmodule Jido.Agent.Command do
   def validate(value), do: invalid("Expected a Jido.Agent.Command value", %{value: value})
 
   @doc false
-  @spec put_plugin_input(t(), module(), term()) :: t()
-  def put_plugin_input(%__MODULE__{} = command, plugin, input)
-      when is_atom(plugin) and not is_nil(plugin) do
-    put_plugin_runtime_input(command, plugin, input)
-  end
-
-  @doc false
   @spec put_plugin_runtime_input(t(), module(), term()) :: t()
   def put_plugin_runtime_input(%__MODULE__{} = command, plugin, input)
       when is_atom(plugin) and not is_nil(plugin) do

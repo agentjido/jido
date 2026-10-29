@@ -114,8 +114,8 @@ defmodule Jido.Agent.Plugin do
 
   @doc false
   @spec validate_route_contract([map()], [map()]) :: :ok | {:error, term()}
-  def validate_route_contract(routes, extensions) do
-    case route_selector_modules(extensions) do
+  def validate_route_contract(routes, plugins) do
+    case route_selector_modules(plugins) do
       [] ->
         validate_routes_without_selector(routes)
 
@@ -296,15 +296,10 @@ defmodule Jido.Agent.Plugin do
     )
   end
 
-  defp route_selector_modules(extensions) do
-    Enum.flat_map(extensions, fn entry ->
-      module = entry.provider.runtime_support()
-
-      if module != :none and Code.ensure_loaded?(module) and
-           function_exported?(module, :select_route, 2),
-         do: [module],
-         else: []
-    end)
+  defp route_selector_modules(plugins) do
+    for %{provider: module} <- plugins,
+        Code.ensure_loaded?(module) and function_exported?(module, :select_route, 2),
+        do: module
   end
 
   defp validate_duplicate_route_aliases(routes) do

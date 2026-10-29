@@ -7,9 +7,11 @@ defmodule Jido.Examples.PendingJobRecovery do
   still exists. A running record does not prove that a task is still alive.
   """
 
-  use Jido.Agent, name: "example_pending_job_recovery"
+  use Jido.Agent,
+    name: "example_pending_job_recovery",
+    plugins: [Jido.Examples.PendingJobRecovery.JobRuntime]
 
-  alias Jido.Examples.PendingJobRecovery.{JobRunner, JobRuntime}
+  alias Jido.Examples.PendingJobRecovery.JobRunner
   alias Jido.Examples.PendingJobRecovery.JobRuntime.{Cancel, Submit}
 
   state do
@@ -25,10 +27,6 @@ defmodule Jido.Examples.PendingJobRecovery do
              seen: Zoi.list(Zoi.string()) |> Zoi.default([]),
              result: Zoi.string() |> Zoi.default("")
            })
-  end
-
-  plugins do
-    plugin JobRuntime
   end
 
   routes do

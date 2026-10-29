@@ -40,7 +40,7 @@ defmodule Jido.ConfigRuntimeTest do
     agent =
       Agent.define!(%{
         name: "environment_runtime",
-        extensions: [%{id: Connection.id(), provider: Connection, vsn: 1, data: data}]
+        plugins: [%{id: Connection.id(), provider: Connection, vsn: 1, data: data}]
       })
       |> Agent.instantiate!(id: unique_id("environment"))
 

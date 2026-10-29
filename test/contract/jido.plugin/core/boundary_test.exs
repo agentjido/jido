@@ -64,11 +64,7 @@ defmodule Jido.Plugin.BoundaryTest do
   end
 
   defmodule ExtensionOnly do
-    use Jido.Agent.Extension, id: "contract.extension-only", kind: :plugin
-
-    def runtime_support, do: __MODULE__
-    def __jido_plugin__, do: %Manifest{module: __MODULE__, agent: __MODULE__}
-    def state_spec(_opts), do: :none
+    use Jido.Plugin, id: "contract.authoring-only"
   end
 
   defmodule RuntimePackage do
@@ -213,7 +209,7 @@ defmodule Jido.Plugin.BoundaryTest do
     assert {:error, %{details: %{plugin: MismatchedPackage, manifest: OwnedState}}} =
              Jido.Plugin.Normalizer.normalize_all([MismatchedPackage])
 
-    assert {:error, %{message: "Plugin must define at least one callback"}} =
+    assert {:error, %{message: "Plugin must use Jido.Plugin"}} =
              Jido.Plugin.Normalizer.normalize_all([Empty])
 
     assert {:error, %{message: "Agent Plugin reduce/2 requires state_spec/1"}} =

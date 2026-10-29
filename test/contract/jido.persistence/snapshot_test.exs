@@ -17,19 +17,14 @@ defmodule Jido.Persistence.SnapshotTest do
     def run(%{snapshot: _snapshot}, %{mode: :error}), do: {:error, :upgrade_rejected}
   end
 
-  defmodule RuntimeSupport do
-    def marker, do: :runtime_support
-  end
-
   defmodule RuntimePlugin do
     use Jido.Plugin
 
     def state_spec(_opts), do: {:runtime_owned, Zoi.integer() |> Zoi.default(0)}
-    def runtime_support, do: Jido.Persistence.SnapshotTest.RuntimeSupport
   end
 
   defmodule StaticExtension do
-    use Jido.Agent.Extension, id: "persistence.static_extension"
+    use Jido.Plugin, id: "persistence.static_extension"
   end
 
   defmodule InputCheck do
@@ -106,7 +101,7 @@ defmodule Jido.Persistence.SnapshotTest do
     assert {:ok, restored} = Persistence.restore(snapshot)
     assert restored.routes === agent.routes
     assert restored.state === agent.state
-    assert restored.extensions === agent.extensions
+    assert restored.plugins === agent.plugins
     assert restored.topology.agents |> hd() |> Map.fetch!(:definition) == F.Worker.definition()
     assert agent.topology.agents |> hd() |> Map.fetch!(:definition) == F.Worker
   end
@@ -220,7 +215,7 @@ defmodule Jido.Persistence.SnapshotTest do
     plugin_agent =
       Agent.define!(%{
         name: "runtime_reference_snapshot",
-        extensions: [
+        plugins: [
           %{
             id: RuntimePlugin.id(),
             provider: RuntimePlugin,
@@ -241,7 +236,6 @@ defmodule Jido.Persistence.SnapshotTest do
 
     assert plugin_snapshot.references == %{
              RuntimePlugin => RuntimePlugin.module_info(:md5),
-             RuntimeSupport => RuntimeSupport.module_info(:md5),
              StaticExtension => StaticExtension.module_info(:md5)
            }
 

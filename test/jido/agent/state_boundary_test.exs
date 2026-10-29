@@ -74,7 +74,7 @@ defmodule Jido.Agent.StateBoundaryTest do
     definition =
       Agent.define!(%{
         name: "owned_defaults",
-        extensions: [
+        plugins: [
           %{id: OwnedState.id(), provider: OwnedState, vsn: OwnedState.vsn(), data: %{}}
         ],
         routes: [

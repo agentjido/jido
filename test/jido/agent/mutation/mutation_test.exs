@@ -9,7 +9,7 @@ defmodule Jido.Agent.MutationTest do
   end
 
   defmodule PassiveExtension do
-    use Jido.Agent.Extension, id: "test.mutation.passive"
+    use Jido.Plugin, id: "test.mutation.passive"
   end
 
   defmodule MappedOutput do
@@ -440,7 +440,7 @@ defmodule Jido.Agent.MutationTest do
              Agent.mutate(migrated, [Directive.plugin_remove(F.Counter, state: :discard)])
 
     assert removed.state == F.agent().state
-    assert removed.extensions == []
+    assert removed.plugins == []
 
     assert {:ok, explicit, _} =
              Agent.mutate(F.agent(), [Directive.plugin_add(F.Counter, [], initial: 9)])
@@ -499,11 +499,11 @@ defmodule Jido.Agent.MutationTest do
     }
 
     source =
-      Agent.define!(%{name: "passive", extensions: [passive]})
+      Agent.define!(%{name: "passive", plugins: [passive]})
       |> Agent.instantiate!(id: "passive")
 
     assert {:ok, next, _} = Agent.mutate(source, [Directive.plugin_add(F.Counter)])
-    assert hd(next.extensions) === passive
+    assert hd(next.plugins) === passive
   end
 
   @tag obligation: "jido.agent.I29"

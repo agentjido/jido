@@ -25,13 +25,13 @@ defmodule Jido.Agent.MutationFoundationTest do
     assert diff.fields == %{}
     assert diff.agents.added == after_agent.topology.agents
     assert diff.connections.added == after_agent.topology.connections
-    assert diff.extensions.added == after_agent.extensions
+    assert diff.plugins.added == after_agent.plugins
     assert diff.state == %{before: before.state, after: after_agent.state}
     assert Diff.changed?(diff, :state)
     assert Diff.changed?(diff, :agents)
     assert Diff.changed?(diff, :routes)
     assert Diff.changed?(diff, :connections)
-    assert Diff.changed?(diff, :extensions)
+    assert Diff.changed?(diff, :plugins)
     assert Diff.empty?(%Diff{})
     assert Diff.empty?(Diff.between(before, before))
 
@@ -45,7 +45,7 @@ defmodule Jido.Agent.MutationFoundationTest do
                updated: [],
                order: %{before: [], after: []}
              },
-             extensions: %{
+             plugins: %{
                added: [],
                removed: [],
                updated: [],
@@ -63,8 +63,7 @@ defmodule Jido.Agent.MutationFoundationTest do
           {:agents, collection_change.(:added, [%{name: :one}])},
           {:routes, collection_change.(:removed, [%{path: "one"}])},
           {:connections, collection_change.(:updated, [%{before: 1, after: 2}])},
-          {:extensions,
-           collection_change.(:order, %{before: [NoRuntime], after: [MissingRuntime]})}
+          {:plugins, collection_change.(:order, %{before: [NoRuntime], after: [MissingRuntime]})}
         ] do
       refute Diff.empty?(Map.put(struct(Diff), field, value))
     end

@@ -43,7 +43,7 @@ starts an instance child.
 | Complete Ref validation, local resolution, and public Agent Server delegation | `Jido.Instance.RefFacade` |
 | Generated and root Ref-first API families | `Jido` |
 | Namespace input to Agent Server persistence and activation preflight | `Jido.AgentServer` and `Jido.Topology.Controller.Activation` |
-| Stable namespaced key and record format 3 | `Jido.Persistence` and `Jido.Persistence.Record` |
+| Stable namespaced key and record format 1 | `Jido.Persistence` and `Jido.Persistence.Record` |
 | Package-level namespace binder, but no global Jido instance | `Jido.Application` |
 
 The public Ref-first family has these entries:
@@ -65,10 +65,9 @@ ID and PID functions. A Ref-first function returns
 
 ## Persistence identity and migration
 
-Unnamed instances keep the legacy key and record format 2. A namespaced write
-uses a stable key derived from `{namespace, partition, id}` and record format 3.
-The Agent module and local instance atom are not part of the new key. The
-record still stores the Agent module and validates it during restore.
+Persistence uses a stable key derived from `{namespace, partition, id}` and
+record format 1. The Agent module and local instance atom are not part of the
+key. The record stores the Agent module and validates it during restore.
 
 For a namespaced operation, Jido probes both the stable Ref key and the
 compatible legacy key:
@@ -90,9 +89,8 @@ Compatible keys also contain the Agent module, and the adapter has no key-list
 contract. Core cannot discover a second legacy module key that would collapse
 to the same Ref. The application must inventory that case before cutover.
 
-An older runtime cannot read format 3 or the stable Ref key. Downgrade after a
-first namespaced write is not supported. Probe-before-write also does not make
-concurrent old and new releases safe across two keys.
+Earlier record shapes require offline conversion. Concurrent old and new
+writers are not supported.
 
 Durable delete is logical. `delete_agent` refuses a live local Server and then
 uses the seam-07 compare-and-swap tombstone contract. Physical purge stays an

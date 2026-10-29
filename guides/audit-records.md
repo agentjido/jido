@@ -52,14 +52,12 @@ defmodule MyApp.Withdraw do
 end
 
 defmodule MyApp.Account do
-  use Jido.Agent, name: "account"
+  use Jido.Agent,
+    name: "account",
+    plugins: [{Jido.Plugin.Audit, %{max_entries: 3}}]
 
   state do
     schema(Zoi.object(%{balance: Zoi.integer() |> Zoi.default(100)}))
-  end
-
-  plugins do
-    plugin(Jido.Plugin.Audit, config: %{max_entries: 3})
   end
 
   routes do

@@ -9,7 +9,6 @@ modules:
   - Jido.Agent.Directive
   - Jido.Agent.Directive.Emit
   - Jido.Agent.Error
-  - Jido.Agent.Extension
   - Jido.Agent.Mutation
   - Jido.Agent.Topology
   - Jido.Agent.Validation
@@ -20,7 +19,7 @@ modules:
 
 Protect the Agent-specific value and authoring boundary. This component owns
 canonical Agent definitions and instances, state schemas, the Agent DSL,
-logical topology, extension contributions, definition mutation and Diff data,
+logical topology, Plugin contributions, definition mutation and Diff data,
 the Agent document codec adapter, and safe Agent views.
 
 The component follows behavior ownership. It does not claim shared Authoring,

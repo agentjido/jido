@@ -106,7 +106,7 @@ defmodule Jido.Agent.StateIntersectionTest do
     definition =
       Agent.define!(%{
         name: "intersection_plugin",
-        extensions: [%{id: Owned.id(), provider: Owned, vsn: Owned.vsn(), data: %{}}],
+        plugins: [%{id: Owned.id(), provider: Owned, vsn: Owned.vsn(), data: %{}}],
         routes: [
           %{
             path: "intersection.reduce",

@@ -9,22 +9,12 @@ defmodule Jido.Agent.AuthoringContractTest do
   end
 
   defmodule NoRuntime do
-    use Jido.Agent.Extension, id: "test.agent.no_runtime"
-  end
-
-  defmodule MissingRuntime do
-    use Jido.Agent.Extension, id: "test.agent.missing_runtime"
-    def runtime_support, do: Module.concat(__MODULE__, MissingAdapter)
-  end
-
-  defmodule InvalidRuntime do
-    use Jido.Agent.Extension, id: "test.agent.invalid_runtime"
-    def runtime_support, do: String
+    use Jido.Plugin, id: "test.agent.no_runtime"
   end
 
   defmodule ValidRuntime do
-    use Jido.Agent.Extension, id: "test.agent.valid_runtime"
-    def runtime_support, do: JidoTest.AgentContract.Stateless
+    use Jido.Plugin, id: "test.agent.valid_runtime"
+    def state_spec(_opts), do: :none
   end
 
   @tag obligation: ["jido.agent.I4", "jido.agent.I7", "jido.agent.I11"]
@@ -164,7 +154,7 @@ defmodule Jido.Agent.AuthoringContractTest do
   end
 
   @tag obligation: "jido.agent.I10"
-  test "runtime Plugin projection accepts only available Plugin adapters" do
+  test "runtime Plugin projection skips authoring-only Plugins" do
     passive = %{
       id: NoRuntime.id(),
       provider: NoRuntime,
@@ -172,9 +162,8 @@ defmodule Jido.Agent.AuthoringContractTest do
       data: %{}
     }
 
-    definition = Agent.define!(%{name: "passive", extensions: [passive]})
+    definition = Agent.define!(%{name: "passive", plugins: [passive]})
     assert Agent.runtime_plugins(definition) === []
-    assert Agent.validate_runtime_support(definition) === :ok
 
     valid = %{
       id: ValidRuntime.id(),
@@ -183,29 +172,9 @@ defmodule Jido.Agent.AuthoringContractTest do
       data: %{}
     }
 
-    supported = Agent.define!(%{name: "supported", extensions: [valid]})
+    supported = Agent.define!(%{name: "supported", plugins: [valid]})
 
-    assert Agent.runtime_plugins(supported) === [{JidoTest.AgentContract.Stateless, []}]
-    assert Agent.validate_runtime_support(supported) === :ok
-
-    for provider <- [MissingRuntime, InvalidRuntime] do
-      contribution = %{
-        id: provider.id(),
-        provider: provider,
-        vsn: provider.vsn(),
-        data: %{}
-      }
-
-      invalid = Agent.define!(%{name: "invalid", extensions: [contribution]})
-      assert Agent.runtime_plugins(invalid) === []
-
-      assert {:error,
-              %Agent.Error{
-                code: :runtime_support_not_available,
-                path: [:extensions],
-                details: %{provider: ^provider}
-              }} = Agent.validate_runtime_support(invalid)
-    end
+    assert Agent.runtime_plugins(supported) === [{ValidRuntime, []}]
   end
 
   @tag obligation: "jido.agent.I21"

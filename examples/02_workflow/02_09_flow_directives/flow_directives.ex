@@ -3,14 +3,10 @@ defmodule Jido.Examples.FlowDirectives do
 
   alias Jido.Examples.FlowDirectives.Effects
 
-  use Jido.Agent, name: "workflow_flow_directives_agent"
+  use Jido.Agent, name: "workflow_flow_directives_agent", plugins: [Effects]
 
   state do
     schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
-  end
-
-  plugins do
-    plugin Effects
   end
 
   routes do

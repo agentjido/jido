@@ -39,7 +39,7 @@ defmodule Jido.AgentAuthoringTest do
           signal_source: nil,
           routes: [],
           topology: %{agents: [], connections: []},
-          extensions: []
+          plugins: []
         },
         overrides
       )
@@ -169,7 +169,7 @@ defmodule Jido.AgentAuthoringTest do
 
     # Provider data and the topology each have a complete, independent literal
     # Map assertion in the extension suite. This comparison isolates core data.
-    actual = %{definition | extensions: [], topology: %{agents: [], connections: []}}
+    actual = %{definition | plugins: [], topology: %{agents: [], connections: []}}
     assert actual === expected
     assert Agent.define!(expected) === expected
     assert Enum.uniq(Map.values(targets)) |> length() == 3
@@ -226,7 +226,7 @@ defmodule Jido.AgentAuthoringTest do
         metadata: [],
         routes: %{},
         topology: nil,
-        extensions: %{}
+        plugins: %{}
       ] do
     test "invalid definition field #{field} is rejected" do
       assert {:error, %Error{}} =

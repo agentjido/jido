@@ -74,7 +74,7 @@ The type/data form needs an exact type, a plain map of static data, and a
 `signal_source` on the Agent. Without them the Turn fails with
 `"Agent executable returned an invalid Directive"`.
 
-Use a full Signal when you need to set `subject`, `source`, or extensions:
+Use a full Signal when you need to set `subject`, `source`, or Signal extensions:
 
 ```elixir
 signal = Jido.Signal.new!("count.full", %{count: 3}, source: "/billing", subject: "acct-7")

@@ -113,6 +113,20 @@ defmodule Jido.Agent.VersioningTest do
     end
   end
 
+  test "snapshot format 1 rejects the old Agent struct shape" do
+    agent = NumericDefinitionAgent.instantiate!(id: "old-shape")
+    assert {:ok, snapshot} = Jido.Persistence.snapshot(agent)
+
+    old_agent =
+      snapshot.agent
+      |> Map.from_struct()
+      |> Map.delete(:plugins)
+      |> Map.put(:extensions, [])
+      |> Map.put(:__struct__, Jido.Agent)
+
+    assert {:error, _error} = Jido.Persistence.restore(%{snapshot | agent: old_agent})
+  end
+
   test "custom callbacks convert state under the same saved definition" do
     agent = CustomCheckpointAgent.instantiate!(id: "custom", state: %{count: 9})
     assert {:ok, snapshot} = Jido.Persistence.snapshot(agent)

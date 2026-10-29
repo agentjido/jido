@@ -478,7 +478,7 @@ defmodule Jido.Plugin.OrderingTest do
     agent =
       Jido.Agent.define!(%{
         name: "ordered_reducer_agent",
-        extensions:
+        plugins:
           Enum.map(declarations, fn declaration ->
             {provider, options} =
               case declaration do

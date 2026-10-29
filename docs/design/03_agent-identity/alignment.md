@@ -70,9 +70,9 @@ file defines outcomes and gates. It is not an implementation plan.
   supervisors. Each owns a Registry. A partition can be any term.
 - `lib/jido/agent_server.ex:295-310,2983-2986,3039`: registered Server names
   use Agent ID and optional partition in one selected Registry.
-- `lib/jido/persistence.ex` and `lib/jido/persistence/record.ex`: unnamed
-  operations keep compatible keys. Namespaced operations use the complete Ref
-  key and format-3 records, with dual-read and collision rules.
+- `lib/jido/persistence.ex` and `lib/jido/persistence/record.ex`: durable
+  operations use the complete Ref key and exact format-1 records. Earlier keys
+  and record shapes require offline conversion.
 - `lib/jido/agent.ex:370-423,521-543`: the default checkpoint carries Agent
   module and ID. Restore rejects a module or ID mismatch.
 - `lib/jido/agent_server/runtime_checkpoint.ex:8-50` and
@@ -137,7 +137,7 @@ file defines outcomes and gates. It is not an implementation plan.
 | `ID-GAP-002` | `ID-REQ-006`, `ID-REQ-015`, `ID-REQ-017` | Exact namespace binding and durable rebind tests | Stable namespace stays independent of module, Supervisor name, and PID. | `Aligned by seam 09` |
 | `ID-GAP-003` | `ID-REQ-003`, `ID-REQ-016`, `ID-REQ-026` | Partition is `term()` and tests use `:blue` | The target Ref uses `nil` or a nonempty binary string. | `Change, staged` |
 | `ID-GAP-004` | `ID-REQ-014`, `ID-REQ-018` | Ref facade startup and lookup tests | The facade validates the complete Ref and maps it to the compatible local Registry key only after the namespace check. | `Aligned by seam 09` |
-| `ID-GAP-005` | `ID-REQ-019`, `ID-REQ-020`, `ID-REQ-027`, `ID-REQ-028` | Stable Ref key, format-3 records, module validation, legacy read, and dual-key collision tests | Automatic cross-key rewrite is unsafe with the adapter contract and is not done. Downgrade after a new format-3 write is unsupported. | `Aligned with explicit migration limits` |
+| `ID-GAP-005` | `ID-REQ-019`, `ID-REQ-020`, `ID-REQ-027`, `ID-REQ-028` | Stable Ref key, exact format-1 records, module validation, and old-shape rejection | Automatic cross-key rewrite is unsafe with the adapter contract and is not done. Earlier keys and shapes require offline conversion. | `Aligned with explicit migration limits` |
 | `ID-GAP-006` | `ID-REQ-021`, `ID-REQ-023`, `ID-REQ-024` | Parent and child delivery uses saved IDs and PIDs | Delivery does not carry one Ref and a changed PID can make a saved handle stale. | `Change`; seams 08 and 10 own resolution |
 | `ID-GAP-007` | `ID-REQ-022` | Remote spawn carries node, Jido atom, ID, partition, parent PID, and request reference | Stable identity and requested location have no separate public values. | `Change`; do not change placement policy here |
 | `ID-GAP-008` | `ID-REQ-025`, `ID-REQ-026` | Public ID, PID, generated-name, and term-partition APIs are active and tested | A direct replacement would break supported behavior. | `Retain` during additive migration |
@@ -244,12 +244,12 @@ Create the implementation plan later, after the design is approved.
 | `ID-REQ-014` | Ref startup rejects an ID or partition conflict | None | `Proven` |
 | `ID-REQ-015` to `ID-REQ-017` | Ref value tests plus namespace, partition, and instance rebind tests | None | `Proven` |
 | `ID-REQ-018` | Ref facade lookup, replacement PID, missing PID, and wrong namespace tests | None | `Proven for local lookup` |
-| `ID-REQ-019` and `ID-REQ-020` | Stable Ref keys and format-3 records keep Agent module and revision outside key identity | None | `Proven` |
+| `ID-REQ-019` and `ID-REQ-020` | Stable Ref keys and exact format-1 records keep Agent module and revision outside key identity | None | `Proven` |
 | `ID-REQ-021` | Current child and Signal boundaries keep compatible ID, partition, and PID handles | A future transport must use exact Ref delivery after PID replacement. | `Deferred external transport` |
 | `ID-REQ-022` | Explicit known-node placement remains separate from Ref identity | A future placement owner must prove Ref preservation. | `Deferred external placement` |
 | `ID-REQ-023` and `ID-REQ-024` | Ref facade resolves a replaceable local PID and never changes the Ref | None | `Proven locally` |
 | `ID-REQ-025` and `ID-REQ-026` | Current APIs and atom-partition tests | Compatibility inventory and release gates beside Ref-first APIs | `Proven` |
-| `ID-REQ-027` and `ID-REQ-028` | Dual-read and dual-key collision tests plus explicit no-rewrite and unsupported-downgrade rules | None | `Proven` |
+| `ID-REQ-027` and `ID-REQ-028` | Old-key and old-shape rejection tests plus explicit offline-conversion rules | None | `Proven` |
 
 ## Migration and compatibility
 
@@ -262,8 +262,8 @@ No removal or deprecation is approved in this seam.
 | PID and generated names | Keep them as documented runtime controls. Do not use them as durable identity. |
 | Partitions | Keep current term-valued options. Require explicit conversion and collision checks before a value enters the binary-string Ref field. |
 | Jido instances | Keep current atom and module names. Add namespace binding without making current names durable identity. |
-| Persistence | Keep a lone legacy record readable. Use the stable Ref key for a new namespaced record. Reject dual-key collisions. Do not rewrite across keys automatically. Downgrade after a stable write is unsupported. |
-| Checkpoints | Keep Agent module and definition data as restore data. Add the exact Ref only through the approved Agent and persistence format migration. |
+| Persistence | Read and write only the stable Ref key and the exact format-1 record. Reject old keys, old shapes, and key collisions. Convert old stored data offline before use. |
+| Checkpoints | Keep Agent module and definition data as restore data. Store the exact Ref in the format-1 Agent record. |
 | Relationships and delivery | Keep owned-child and direct PID behavior while Ref targets and handle refresh get proof. |
 | Remote placement | Keep explicit node requests. Node stays separate from Ref. |
 | Cluster authority | Current compare-and-swap remains conflict detection. This seam adds no exclusive-owner claim. |

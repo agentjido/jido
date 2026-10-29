@@ -1,6 +1,9 @@
 # Compiled Agent behavior and durable execution implementation plan
 
-Status: Pending approval. Revised 2026-10-15. Documentation only.
+Status: Superseded for the current release on 2026-10-29. Documentation only.
+
+The current release keeps new-only persistence record format 1 and Agent
+snapshot format 1. It does not implement the record migration proposed below.
 
 The contract is in the
 [durable execution design](../design/08_agent-server/durable-execution.md).
@@ -78,8 +81,8 @@ Review contracts in this order:
    domain state and canonical lowering across authoring forms.
 3. Turn, Plugin, and commit: seams 04, 05, and 06. Retain one selected
    executable, Plugin field ownership, validation, and required hook order.
-4. Persistence and AgentServer: seams 07 and 08. Review format 4, runtime
-   envelope format 2, one writer, and report/continuation atomicity.
+4. Persistence and AgentServer: seams 07 and 08. Keep the current exact
+   format-1 boundaries. Review any future runtime envelope as a separate break.
 5. Instance and observation: seams 09 and 13. Distinguish progress, stored
    reports, commit receipts, and completed executions.
 
@@ -139,7 +142,7 @@ Exit evidence: focused existing execution, context, Plugin, cancellation, and
 failure-contract tests pass. `DUR-T13` proves cleanup. Existing behavior changes
 are listed separately from the new durable protocol.
 
-## Phase 2 - Define durable values and record migration
+## Phase 2 - Define durable values without a record migration
 
 Package: Core. Primary files: persistence record and storage modules; new
 typed values under execution and command namespaces.
@@ -147,10 +150,10 @@ typed values under execution and command namespaces.
 1. Define static Zoi schemas for execution Ref, target descriptor, behavior
    binding, segment intent, report, commit receipt, input receipt, semantic
    wait, terminal outcome, artifact envelope, and runtime envelope.
-2. Add format 4 with independent record revision and state version. Use
-   runtime envelope format 2. Migrate format 3 by CAS before durable admission.
-   Reject unknown versions. Do not claim that the earlier proposed format 4
-   or envelope format 1 was deployed.
+2. Do not add an in-place record migration. The current release reads and
+   writes exact persistence record format 1 and Agent snapshot format 1.
+   Reject unknown formats. A future runtime envelope needs a separate reviewed
+   breaking shape.
 3. Store encoded Flow documents and plan artifacts by exact document digest
    inside the runtime envelope. Record registry, catalog, compiler, behavior,
    and deployment versions. Reject unavailable versions before dispatch.

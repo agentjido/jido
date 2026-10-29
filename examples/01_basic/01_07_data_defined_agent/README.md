@@ -33,7 +33,7 @@ Registry or a missing Scheduler reference fails.
 
 A document requires installed, trusted Plugin and Action code. It does not
 install code or start a process. This example declares the runtime Plugin in
-`extensions`; the separate static `Jido.Plugin.Scheduler.DSL` provider only
+`plugins`; the separate authoring-only `Jido.Plugin.Scheduler.DSL` Plugin
 describes schedules. A one-shot timer is not durable and can be lost on restart.
 Definition JSON has no instance ID or state. Complete instance JSON can also
 store validated state and identity; the tests prove this round trip. A
@@ -49,7 +49,7 @@ full DSL, data, and JSON format matrix.
 - [Authoring tests](../../../test/authoring/agents/json_test.exs)
 - [Scheduler import tests](../../../test/jido/agent/scheduler_codec_test.exs)
 
-Previous: [OTP supervision](../01_05_otp_supervision/README.md) | Next: [Agent Extension](../01_09_agent_extension/README.md)
+Previous: [OTP supervision](../01_05_otp_supervision/README.md) | Next: [Authoring Plugin](../01_09_authoring_plugin/README.md)
 
 The [saved input document](fixtures/agent.json) is checked in. The Scheduler
 startup test reads it directly with `registry/0`; it does not first encode a

@@ -195,7 +195,7 @@ defmodule Jido.Plugin.PreparationTest do
           state: %{source: :output, path: []}
         }
       ],
-      extensions: [
+      plugins: [
         %{id: Package.id(), provider: Package, vsn: Package.vsn(), data: %{mode: mode}}
       ]
     })

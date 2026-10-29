@@ -207,15 +207,14 @@ external-term decoding and reject malformed input as an invalid record.
 module, revision, checkpoint shape, or portable-value result, then the
 Persistence boundary shall fail closed without writing storage.
 
-`PERS-REQ-039`: While legacy format-1 records are supported, the Persistence
-boundary shall keep their current Agent restore path readable.
+`PERS-REQ-039`: The Persistence boundary shall read and write one exact
+format-1 record shape. Earlier record shapes shall fail closed.
 
-`PERS-REQ-040`: When durable identity moves to Agent Ref, the Persistence
-boundary shall detect a legacy-key and Ref-key collision before it writes a new
-record.
+`PERS-REQ-040`: Durable identity shall use the stable Agent Ref key. Earlier
+key shapes shall not be read or rewritten automatically.
 
-`PERS-REQ-041`: While legacy keys remain supported, the Persistence boundary
-shall provide a documented dual-read, rewrite, rollback, and removal gate.
+`PERS-REQ-041`: Applications that must retain earlier records shall convert
+them outside this Jido version before it starts.
 
 `PERS-REQ-042`: While complete custom Agent checkpoint callbacks remain
 supported, the Persistence boundary shall preserve their plain-map output and
@@ -331,7 +330,7 @@ These guarantees apply only after the related requirements are approved.
 | `PERS-DEC-003` | Use active records and compact tombstones only. | `Implemented` | Hibernate remains a process operation. |
 | `PERS-DEC-004` | Every required write error, including conflict, removes write authority. | `Implemented` | The failed activation cannot admit another Turn. |
 | `PERS-DEC-005` | Confirm revision-zero creation after Plugin readiness and before the start call succeeds. | `Implemented`; stricter Registry publication stays with seam 08 | Initial state survives later activation loss subject to adapter guarantees. |
-| `PERS-DEC-006` | Keep compatible unnamed keys and add collision-safe stable Ref keys for namespaced operations. | `Implemented by seam 09` | A lone legacy key stays readable. Both keys fail closed. There is no automatic rewrite. |
-| `PERS-DEC-007` | Write version-2 records for compatible unnamed keys and version-3 records for stable Ref keys. Read legacy format 1. | `Implemented` | New lifecycle meaning is explicit and old active records remain readable. |
+| `PERS-DEC-006` | Use one stable Ref key for durable Agent identity. | `Implemented by seam 09` | Earlier keys require offline conversion and are not read automatically. |
+| `PERS-DEC-007` | Read and write one exact format-1 record shape. | `Implemented` | Earlier record shapes fail closed and require offline conversion. |
 | `PERS-DEC-008` | Keep complete custom callbacks and bypass Plugin slice conversion for them. | `Implemented` | Current custom callbacks remain valid. |
 | `PERS-DEC-009` | Add Ecto and Bedrock through the binary adapter boundary. | `Implemented` | Ecto stores exact bytes in a host-owned table. Bedrock `0.7.x` uses exact-byte transactional CAS, zero-retry write classification, and host-owned durability configuration. Neither adapter owns Agent record meaning. |

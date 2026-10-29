@@ -407,7 +407,7 @@ defmodule Jido.Plugin.FacetsTest do
                Jido.Agent.define(%{
                  name: "conflict",
                  schema: Zoi.object(%{facet_count: Zoi.integer()}),
-                 extensions: [
+                 plugins: [
                    %{
                      id: package.id(),
                      provider: package,
@@ -627,7 +627,7 @@ defmodule Jido.Plugin.FacetsTest do
           visible: Zoi.integer() |> Zoi.default(2),
           seen: Zoi.string() |> Zoi.default("")
         }),
-      extensions: [
+      plugins: [
         %{id: package.id(), provider: package, vsn: package.vsn(), data: Map.new(options())}
       ],
       routes: [

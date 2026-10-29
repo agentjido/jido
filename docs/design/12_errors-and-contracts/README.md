@@ -61,8 +61,8 @@ checks the complete record again as defense in depth.
 - Topology definitions, instances, plans, Plugin contexts and contributions,
   Controller status, readiness, repair, and lookup results belong to the
   Topology owner.
-- Authoring extensions are public modules and canonical data boundaries. Their
-  private normalization data is not public.
+- Agent Plugins and Topology extensions are public canonical-data boundaries.
+  Their private normalization data is not public.
 
 ## Compatibility
 

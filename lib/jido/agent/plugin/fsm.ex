@@ -1,4 +1,4 @@
-defmodule Jido.Plugin.FSM do
+defmodule Jido.Agent.Plugin.FSM do
   @moduledoc """
   Adds deterministic finite-state route control to one Agent.
 
@@ -7,11 +7,11 @@ defmodule Jido.Plugin.FSM do
   ownership of execution and output projection. The Plugin advances its state
   only after that execution succeeds.
 
-  Declare the Plugin as an Agent extension to use its authoring section:
+  Declare the Plugin once to use its authoring section:
 
       use Jido.Agent,
         name: "setup_guide",
-        extensions: [Jido.Plugin.FSM]
+        plugins: [{Jido.Agent.Plugin.FSM, %{definition_vsn: 1}}]
 
       state_machine do
         initial :idle
@@ -28,11 +28,11 @@ defmodule Jido.Plugin.FSM do
   """
 
   alias Jido.Agent.{Data, Error}
+  alias Jido.Agent.Plugin.FSM.Transition
   alias Jido.Agent.Plugin.{Preparation, Reduction, RouteSelection}
-  alias Jido.Plugin.FSM.Transition
   alias Spark.Dsl.Extension, as: SparkExtension
 
-  @default_version 1
+  @default_definition_vsn 1
 
   @transition %Spark.Dsl.Entity{
     name: :transition,
@@ -50,7 +50,6 @@ defmodule Jido.Plugin.FSM do
     name: :state_machine,
     entities: [@transition],
     schema: [
-      version: [type: :pos_integer, default: @default_version],
       initial: [type: :atom, required: true],
       terminal: [type: {:wrap_list, :atom}, default: []]
     ]
@@ -68,36 +67,42 @@ defmodule Jido.Plugin.FSM do
           to: machine_state()
         }
   @type config :: %{
-          version: pos_integer(),
+          definition_vsn: pos_integer(),
           initial: machine_state(),
           terminal: [machine_state()],
           transitions: [transition()]
         }
-  @type owned_state :: %{version: pos_integer(), current: machine_state()}
+  @type owned_state :: %{definition_vsn: pos_integer(), current: machine_state()}
 
   @impl Jido.Agent.Extension
   def lower(dsl, config) do
     transitions = SparkExtension.get_entities(dsl, [:state_machine])
     initial = SparkExtension.get_opt(dsl, [:state_machine], :initial)
     terminal = SparkExtension.get_opt(dsl, [:state_machine], :terminal, [])
-    version = SparkExtension.get_opt(dsl, [:state_machine], :version, @default_version)
     dsl? = not is_nil(initial) or terminal != [] or transitions != []
 
-    cond do
-      config != %{} and dsl? ->
-        Error.fail(:ambiguous_config, [], "Use state_machine DSL or Plugin data, not both")
+    dsl_data =
+      if dsl? do
+        %{
+          initial: initial,
+          terminal: terminal,
+          transitions: Enum.map(transitions, &transition_data/1)
+        }
+      else
+        %{}
+      end
 
-      config != %{} ->
-        {:ok, config}
+    duplicate_fields = Map.keys(config) |> Enum.filter(&Map.has_key?(dsl_data, &1)) |> Enum.sort()
 
-      true ->
-        {:ok,
-         %{
-           version: version,
-           initial: initial,
-           terminal: terminal,
-           transitions: Enum.map(transitions, &transition_data/1)
-         }}
+    if duplicate_fields == [] do
+      {:ok, Map.merge(config, dsl_data)}
+    else
+      Error.fail(
+        :ambiguous_config,
+        [],
+        "Plugin configuration and state_machine DSL define the same fields",
+        %{fields: duplicate_fields}
+      )
     end
   end
 
@@ -106,10 +111,10 @@ defmodule Jido.Plugin.FSM do
     with {:ok, value} <-
            Data.fields(
              value,
-             [:version, :initial, :terminal, :transitions],
-             %{version: @default_version, terminal: [], transitions: []}
+             [:definition_vsn, :initial, :terminal, :transitions],
+             %{definition_vsn: @default_definition_vsn, terminal: [], transitions: []}
            ),
-         :ok <- Error.at(Data.positive(value[:version]), :version),
+         :ok <- Error.at(Data.positive(value[:definition_vsn]), :definition_vsn),
          :ok <- Error.at(Data.name(value[:initial]), :initial),
          {:ok, terminal} <-
            Error.at(Data.list(value.terminal, &state/1), :terminal),
@@ -121,7 +126,7 @@ defmodule Jido.Plugin.FSM do
          :ok <- reachable(value.initial, terminal, transitions) do
       {:ok,
        %{
-         version: value.version,
+         definition_vsn: value.definition_vsn,
          initial: value.initial,
          terminal: terminal,
          transitions: transitions
@@ -166,10 +171,10 @@ defmodule Jido.Plugin.FSM do
 
     schema =
       Zoi.object(%{
-        version: Zoi.enum([config.version]) |> Zoi.default(config.version),
+        definition_vsn: Zoi.enum([config.definition_vsn]) |> Zoi.default(config.definition_vsn),
         current: Zoi.enum(states) |> Zoi.default(config.initial)
       })
-      |> Zoi.default(%{version: config.version, current: config.initial})
+      |> Zoi.default(%{definition_vsn: config.definition_vsn, current: config.initial})
 
     {:fsm, schema}
   end
@@ -178,14 +183,12 @@ defmodule Jido.Plugin.FSM do
   def prepare(%Preparation{} = preparation, opts) do
     config = config(opts)
 
-    with :ok <- state_version(preparation.plugin_state, config),
-         {:ok, decision} <-
-           resolve_transition(
-             preparation.plugin_state.current,
-             preparation.route_candidates,
-             config
-           ) do
-      {:ok, decision}
+    with :ok <- definition_vsn_matches(preparation.plugin_state, config) do
+      resolve_transition(
+        preparation.plugin_state.current,
+        preparation.route_candidates,
+        config
+      )
     end
   end
 
@@ -313,15 +316,19 @@ defmodule Jido.Plugin.FSM do
     if MapSet.equal?(next, reached), do: reached, else: walk_states(next, transitions)
   end
 
-  defp state_version(%{version: version}, %{version: version}), do: :ok
+  defp definition_vsn_matches(
+         %{definition_vsn: definition_vsn},
+         %{definition_vsn: definition_vsn}
+       ),
+       do: :ok
 
-  defp state_version(state, config) do
+  defp definition_vsn_matches(state, config) do
     {:error,
-     Jido.Error.execution_error("FSM state version does not match its definition",
+     Jido.Error.execution_error("FSM definition version does not match its state",
        details: %{
          code: :fsm_version_mismatch,
-         state_version: Map.get(state, :version),
-         definition_version: config.version
+         state_definition_vsn: Map.get(state, :definition_vsn),
+         definition_vsn: config.definition_vsn
        }
      )}
   end

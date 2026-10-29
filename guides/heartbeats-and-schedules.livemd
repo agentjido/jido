@@ -68,14 +68,12 @@ The Heartbeat Plugin runs a process that casts a Signal to its Agent every
 
 ```elixir
 defmodule ScheduleGuide.Monitor do
-  use Jido.Agent, name: "monitor"
+  use Jido.Agent,
+    name: "monitor",
+    plugins: [{Jido.Plugin.Heartbeat, %{interval: 100, signal_type: "monitor.beat"}}]
 
   state do
     schema(Zoi.object(%{beats: Zoi.integer() |> Zoi.default(0)}))
-  end
-
-  plugins do
-    plugin(Jido.Plugin.Heartbeat, config: %{interval: 100, signal_type: "monitor.beat"})
   end
 
   routes do
@@ -135,7 +133,9 @@ decide what to schedule while the Agent runs. Three Directives cover it:
 
 ```elixir
 defmodule ScheduleGuide.Reminders do
-  use Jido.Agent, name: "reminders"
+  use Jido.Agent,
+    name: "reminders",
+    plugins: [Jido.Plugin.Scheduler]
 
   state do
     schema(
@@ -145,10 +145,6 @@ defmodule ScheduleGuide.Reminders do
         last_occurrence: Zoi.string() |> Zoi.nullable() |> Zoi.default(nil)
       })
     )
-  end
-
-  plugins do
-    plugin(Jido.Plugin.Scheduler)
   end
 
   routes do

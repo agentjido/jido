@@ -73,7 +73,7 @@ defmodule JidoTest.AgentServer.ActivationRootTest do
     Jido.Agent.define!(%{
       name: "activation_root_contract",
       schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}),
-      extensions:
+      plugins:
         Enum.map(plugins, fn {provider, options} ->
           %{id: provider.id(), provider: provider, vsn: provider.vsn(), data: Map.new(options)}
         end),

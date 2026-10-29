@@ -67,7 +67,7 @@ progress, or the private behavior of one storage backend.
 ### jido.persistence.I5 — Exact record envelope
 
 - **scope:** `Jido.Persistence.Record`
-- **must:** Write the current exact active or tombstone record shape. Validate format, kind, identity, nonnegative revision, Agent version, optional durable Turn data, checkpoint shape, and portability in a fixed order. Read the supported legacy format without changing stored bytes. Reject other formats and extra or missing fields.
+- **must:** Read and write the exact format-1 active or tombstone record shape. Validate format, kind, identity, nonnegative revision, Agent version, optional durable Turn data, checkpoint shape, and portability in a fixed order. Reject earlier formats and extra or missing fields without changing stored bytes.
 - **why:** Record data must have one strict and forward-safe boundary.
 - **kind:** persisted-format
 - **status:** active

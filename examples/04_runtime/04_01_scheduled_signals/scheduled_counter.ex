@@ -11,7 +11,8 @@ defmodule Jido.Examples.ScheduledCounter do
 
   use Jido.Agent,
     name: "examples_scheduled_counter",
-    description: "Changes Scheduler runtime state with Action Directives"
+    description: "Changes Scheduler runtime state with Action Directives",
+    plugins: [Jido.Plugin.Scheduler]
 
   state do
     schema Zoi.object(%{
@@ -19,10 +20,6 @@ defmodule Jido.Examples.ScheduledCounter do
              schedule_requests: Zoi.integer() |> Zoi.min(0) |> Zoi.default(0),
              cron_enabled: Zoi.boolean() |> Zoi.default(false)
            })
-  end
-
-  plugins do
-    plugin Jido.Plugin.Scheduler
   end
 
   routes do

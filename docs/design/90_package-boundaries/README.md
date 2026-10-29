@@ -38,7 +38,7 @@ revalidation against this seam when they next change.
 | --- | --- | --- |
 | Dependency direction | Jido uses `jido_action` and `jido_signal`. The lower packages do not depend on Jido. | Keep both packages below Jido and use only their public contracts. |
 | Core scope | Jido owns immutable Agents, Plugins, Directives, Agent Server, persistence policy, local instances, static Topology, and observation. | Keep Jido a complete local Agent runtime, not an application platform. |
-| Extension types | Actions, Signals, Plugins, adapters, authoring extensions, Directives, Telemetry, and application wrappers all have public entry points. | Keep each category distinct and select it by authority and lifecycle need. |
+| Extension types | Actions, Signals, Agent Plugins, Topology extensions, adapters, Directives, Telemetry, and application wrappers all have public entry points. | Keep each category distinct and select it by authority and lifecycle need. |
 | Runtime APIs | Instance lifecycle helpers, Ref-first instance functions, and public PID-based Agent Server commands coexist. Generated-name helpers are public. | Preserve them until a separate staged migration has proof. |
 | Persistence | Jido owns compatible and stable Ref record meaning. Byte adapters provide compare-and-swap. An Agent can override instance persistence. | Keep the adapter contract and the explicit legacy collision and no-automatic-rewrite rules. |
 | Ecosystem scope | AI V3 uses sibling Jido packages. Browser still declares V2 Jido dependencies. Durable, cluster, and fabric package APIs are not proved here. | Require one tested V3 package set before an integration package claims compatibility. |
@@ -61,8 +61,8 @@ The user approved these decisions on 2026-09-09.
 1. **Core Bright Line:** Approve Jido as the local Agent coordination layer
    above `jido_action` and `jido_signal`.
 2. **Extension selection:** Approve ordinary composition as the default, with
-   Plugins, adapters, authoring extensions, Directives, and Telemetry used only
-   for their defined authority.
+   Agent Plugins, Topology extensions, adapters, Directives, and Telemetry used
+   only for their defined authority.
 3. **Compatibility:** Keep all current supported package APIs until an owner
    seam approves and proves a staged migration.
 4. **Storage ownership:** Keep record meaning and lifecycle policy in Jido.

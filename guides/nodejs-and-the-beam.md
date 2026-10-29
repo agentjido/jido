@@ -340,14 +340,12 @@ delivers a Signal that runs a normal Turn:
 
 ```elixir
 defmodule MyApp.Reminders do
-  use Jido.Agent, name: "reminders"
+  use Jido.Agent,
+    name: "reminders",
+    plugins: [Jido.Plugin.Scheduler]
 
   state do
     schema(Zoi.object(%{sent: Zoi.list(Zoi.string()) |> Zoi.default([])}))
-  end
-
-  plugins do
-    plugin(Jido.Plugin.Scheduler)
   end
 
   routes do

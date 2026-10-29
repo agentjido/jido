@@ -3,7 +3,6 @@ defmodule Jido.Agent.DSL.Macros do
   defmacro agent(name), do: quote(do: %{kind: :agent, name: unquote(name)})
   defmacro parent, do: quote(do: %{kind: :parent})
   defmacro state(do: block), do: section(:state, :__state__, block, __CALLER__)
-  defmacro plugins(do: block), do: section(:plugins, :__plugins__, block, __CALLER__)
   defmacro routes(do: block), do: section(:routes, :__routes__, block, __CALLER__)
   defmacro topology(do: block), do: section(:topology, :__topology__, block, __CALLER__)
 

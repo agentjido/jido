@@ -41,7 +41,7 @@ end
 defmodule Shop.Counter do
   use Jido.Agent,
     name: "shop_counter",
-    extensions: [Shop.TurnCount]
+    plugins: [Shop.TurnCount]
 
   state do
     schema(Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}))

@@ -41,7 +41,7 @@ defmodule JidoTest.Examples.Plugins.RuntimeAdmissionTest do
 
       definition = %{
         Agent.definition()
-        | extensions: [
+        | plugins: [
             %{id: Plugin.id(), provider: Plugin, vsn: Plugin.vsn(), data: %{tokens: tokens}}
           ]
       }

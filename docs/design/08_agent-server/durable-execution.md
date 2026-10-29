@@ -1,4 +1,7 @@
 > Pending approval. Design proposal, 2026-10-15. No implementation is included.
+> The earlier record migration proposal in this document is superseded. The current
+> local release uses new-only persistence record format 1 and Agent snapshot
+> format 1. It does not read or migrate earlier shapes.
 
 # Durable Agents, compiled behavior, and execution commits
 
@@ -98,7 +101,7 @@ checkout at the date above. They are not claims that the new design exists.
 | Current evidence | Consequence |
 | --- | --- |
 | [`Agent.Ref`](../../../lib/jido/agent/ref.ex) has namespace, partition, and id | Use that Ref as logical identity; keep PIDs out of durable identity |
-| [`Persistence.Record`](../../../lib/jido/persistence/record.ex) uses exact format 3 keys | Add an explicit format migration; extra fields cannot be appended silently |
+| [`Persistence.Record`](../../../lib/jido/persistence/record.ex) uses exact format 1 keys | Keep new-only format 1; extra fields cannot be appended silently |
 | [`Persistence.Store`](../../../lib/jido/persistence/store.ex) provides single-key byte CAS | Keep the Agent checkpoint and its work intent in one record |
 | [`Storage`](../../../lib/jido/agent_server/storage.ex) saves the Agent and one revision | Separate record revision from domain state version |
 | [`Turn`](../../../lib/jido/agent_server/turn.ex) replies at commit, before required hooks and Directives | Preserve that result boundary and hook order |
@@ -182,7 +185,7 @@ defmodule MyApp.ResearchAgent do
     name: "research_agent",
     vsn: 2,
     metadata: %{domain: "research"},
-    extensions: [Jido.AI.DSL]
+    plugins: [Jido.AI.DSL]
 
   state do
     schema(MyApp.ResearchState.schema())
@@ -325,14 +328,14 @@ a named limit or a separate API proposal for review.
 
 ## Durable record model
 
-### 1. Agent record, format 4
+### 1. Proposed next Agent record, not selected
 
 Keep the current Agent key derived from the Ref. Keep the existing Agent
 checkpoint format inside the record. Add the following fields to active records:
 
 ```elixir
 %{
-  format: 4,
+  format: :proposed,
   kind: :active,
   namespace: namespace,
   partition: partition,
@@ -368,8 +371,8 @@ same Ref. Tombstones retain the incarnation and record revision.
 One CAS can contain a new checkpoint, a command receipt, a report receipt, and
 a next-segment intent. There is no transaction across the Agent key and the
 Runic key. The stored intent and report receipt are the recovery link between
-those writes. Runtime envelope format 2 is proposed; no deployed format 4 or
-format 1 envelope is claimed by this document.
+those writes. This proposed runtime envelope is not part of current record
+format 1.
 
 The runtime envelope is Core-owned data. Custom Agent checkpoint callbacks
 cannot omit it. Agent domain state still contains the application's meaning,
@@ -1133,13 +1136,10 @@ the known workflow id after startup settles, including owner death during
 startup. It has no domain state or recovery policy. Its lifetime and cleanup
 races are a prerequisite test gate, not a reason to change Action.
 
-Format 3 reads migrate to format 4 with `state_version = revision`, an empty
-runtime envelope, and a new incarnation saved by CAS before new work starts.
-Unknown formats fail closed. Older binaries cannot write format 4. Offline
-`save_agent`, tombstone, restore, upgrade, and hibernate paths need explicit
-runtime-envelope handling. A plain snapshot save cannot erase pending work.
-Public persistence `revision` remains the storage revision; expose
-`state_version` separately and document the former equality change.
+The current release does not migrate older record shapes. It reads and writes
+exact record format 1 and rejects unknown formats. Any future runtime envelope
+must use a separately reviewed breaking shape. A plain snapshot save cannot
+erase pending work in such a future design.
 
 ## Proposed requirements and acceptance mapping
 
@@ -1208,7 +1208,8 @@ group in the implementation plan. No group below is claimed as implemented.
 
 ## Review decisions and proof gates
 
-Recommended decisions are the narrow Core ownership exception, format 4,
+Recommended decisions are the narrow Core ownership exception, a future
+breaking record shape,
 commit-confirmed receipts, explicit semantic commit points, runtime Flow
 documents, per-key admission, and manual construction with confirmed checkpoint
 gates. The segment path is the first implementation target. A native Runic

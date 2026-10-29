@@ -20,7 +20,7 @@ defmodule JidoTest.Contract.PluginSchedulerTest do
   end
 
   defp define(data, routes \\ []) do
-    Agent.define(%{name: "scheduler-contract", routes: routes, extensions: [contribution(data)]})
+    Agent.define(%{name: "scheduler-contract", routes: routes, plugins: [contribution(data)]})
   end
 
   defp action(type),
@@ -299,7 +299,7 @@ defmodule JidoTest.Contract.PluginSchedulerTest do
     assert {:error,
             %Error{
               code: :schedule_input,
-              path: [:extensions, 0, 0, :schedules, :review],
+              path: [:plugins, 0, 0, :schedules, :review],
               details: %{type: "work.request", definition: "scheduler-contract"}
             }} = define(data)
   end

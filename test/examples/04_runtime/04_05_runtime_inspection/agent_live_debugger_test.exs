@@ -1,7 +1,7 @@
 defmodule JidoTest.Examples.Runtime.InspectionFixture do
   @moduledoc false
 
-  use Jido.Agent, name: "test_runtime_inspection"
+  use Jido.Agent, name: "test_runtime_inspection", plugins: [Jido.Plugin.Scheduler]
 
   state do
     schema Zoi.object(%{
@@ -9,10 +9,6 @@ defmodule JidoTest.Examples.Runtime.InspectionFixture do
              secret_token: Zoi.string() |> Zoi.default("hidden"),
              result: Zoi.string() |> Zoi.default("")
            })
-  end
-
-  plugins do
-    plugin Jido.Plugin.Scheduler
   end
 
   routes do

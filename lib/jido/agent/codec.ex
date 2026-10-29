@@ -47,7 +47,7 @@ defmodule Jido.Agent.Codec do
     do: Error.fail(:invalid_definition, [], "Expected an Agent definition, instance, or module")
 
   defp encode_fields(agent, registry) do
-    with {:ok, routes} <- Extension.stored_routes(agent.extensions, agent.routes) do
+    with {:ok, routes} <- Extension.stored_routes(agent.plugins, agent.routes) do
       agent = %{agent | routes: routes}
 
       encode_map(agent,
@@ -57,7 +57,7 @@ defmodule Jido.Agent.Codec do
         metadata: &Value.encode(&1, registry),
         routes: &encode_list(&1, fn route -> encode_route(route, registry) end),
         topology: &encode_topology(&1, registry),
-        extensions: &encode_list(&1, fn extension -> encode_extension(extension, registry) end),
+        plugins: &encode_list(&1, fn plugin -> encode_plugin(plugin, registry) end),
         name: nil,
         description: nil,
         vsn: nil,
@@ -80,7 +80,7 @@ defmodule Jido.Agent.Codec do
         metadata: &Value.decode(&1, registry),
         routes: &decode_list(&1, fn route -> decode_route(route, registry) end),
         topology: &decode_topology(&1, registry),
-        extensions: &decode_list(&1, fn extension -> decode_extension(extension, registry) end),
+        plugins: &decode_list(&1, fn plugin -> decode_plugin(plugin, registry) end),
         name: nil,
         description: nil,
         vsn: nil,
@@ -303,10 +303,10 @@ defmodule Jido.Agent.Codec do
   defp delivery("broadcast"), do: {:ok, :broadcast}
   defp delivery(_value), do: Error.fail(:invalid_document, [], "Invalid Agent delivery value")
 
-  defp encode_extension(extension, registry) do
-    encode_map(extension,
-      provider: &encode_reference(&1, registry, [:extension, :plugin]),
-      data: &Extension.encode_authoring_data(extension.provider, &1, registry),
+  defp encode_plugin(plugin, registry) do
+    encode_map(plugin,
+      provider: &encode_reference(&1, registry, :plugin),
+      data: &Extension.encode_authoring_data(plugin.provider, &1, registry),
       id: nil,
       vsn: nil
     )
@@ -336,20 +336,20 @@ defmodule Jido.Agent.Codec do
          do: {:ok, Map.new(entries)}
   end
 
-  defp decode_extension(extension, registry) do
-    with {:ok, extension} <-
-           decode_map(extension,
-             provider: &Registry.decode_reference(registry, &1, [:extension, :plugin]),
+  defp decode_plugin(plugin, registry) do
+    with {:ok, plugin} <-
+           decode_map(plugin,
+             provider: &Registry.decode_reference(registry, &1, :plugin),
              data: nil,
              id: nil,
              vsn: nil
            ),
          {:ok, data} <-
            at(
-             Extension.decode_authoring_data(extension.provider, extension.data, registry),
+             Extension.decode_authoring_data(plugin.provider, plugin.data, registry),
              ["data"]
            ) do
-      {:ok, %{extension | data: data}}
+      {:ok, %{plugin | data: data}}
     end
   end
 

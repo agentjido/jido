@@ -121,14 +121,12 @@ latest reading for each:
 
 ```elixir
 defmodule SensorGuide.Building do
-  use Jido.Agent, name: "building"
+  use Jido.Agent,
+    name: "building",
+    plugins: [Jido.Plugin.SensorManager]
 
   state do
     schema(Zoi.object(%{readings: Zoi.map() |> Zoi.default(%{})}))
-  end
-
-  plugins do
-    plugin(Jido.Plugin.SensorManager)
   end
 
   routes do

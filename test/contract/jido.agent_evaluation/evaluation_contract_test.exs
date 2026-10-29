@@ -584,7 +584,7 @@ defmodule JidoTest.Contract.AgentEvaluationTest do
   test "Plugin preparation and reduction preserve declaration order and state ownership" do
     source =
       F.instance(
-        extensions: Enum.map([F.First, F.Second, F.Stateless, F.PreparedOnly], &F.contribution/1)
+        plugins: Enum.map([F.First, F.Second, F.Stateless, F.PreparedOnly], &F.contribution/1)
       )
 
     signal = F.signal()
@@ -613,7 +613,7 @@ defmodule JidoTest.Contract.AgentEvaluationTest do
           {%{prepare: :reject}, :plugin_rejection},
           {%{reduce: :reject}, :reduction_rejection}
         ] do
-      source = F.instance(extensions: [F.contribution(F.First, opts)])
+      source = F.instance(plugins: [F.contribution(F.First, opts)])
       assert {:error, ^reason} = Agent.cmd(source, F.signal())
     end
 
@@ -625,7 +625,7 @@ defmodule JidoTest.Contract.AgentEvaluationTest do
           {%{reduce: :wrong_type}, :plugin_invalid_callback_result, nil},
           {%{prepare: :nonportable}, :non_portable_term, nil}
         ] do
-      source = F.instance(extensions: [F.contribution(F.First, opts)])
+      source = F.instance(plugins: [F.contribution(F.First, opts)])
 
       assert {:error, %Jido.Error.ExecutionError{details: details}} =
                Agent.cmd(source, F.signal())
@@ -655,7 +655,7 @@ defmodule JidoTest.Contract.AgentEvaluationTest do
 
   @tag obligation: ["jido.agent_evaluation.I7", "jido.agent_evaluation.I8"]
   test "owned custom directives validate before reduction and retain order" do
-    source = F.instance(extensions: [F.contribution(F.Effects)])
+    source = F.instance(plugins: [F.contribution(F.Effects)])
     directives = [%F.Effect{value: 7}, Directive.emit(F.signal()), %F.Effect{value: 9}]
     assert {:ok, candidate, ^directives} = Agent.cmd(source, F.signal(%{directives: directives}))
     assert candidate.state.effects == 16

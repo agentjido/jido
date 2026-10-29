@@ -3,7 +3,8 @@ defmodule Jido.Examples.AgentLiveDebugger do
 
   use Jido.Agent,
     name: "examples_agent_live_debugger",
-    description: "Provides public state for a safe debugger snapshot"
+    description: "Provides public state for a safe debugger snapshot",
+    plugins: [Jido.Plugin.Scheduler]
 
   state do
     schema Zoi.object(%{
@@ -11,10 +12,6 @@ defmodule Jido.Examples.AgentLiveDebugger do
              secret_token: Zoi.string() |> Zoi.default("hidden"),
              result: Zoi.string() |> Zoi.default("")
            })
-  end
-
-  plugins do
-    plugin Jido.Plugin.Scheduler
   end
 
   routes do

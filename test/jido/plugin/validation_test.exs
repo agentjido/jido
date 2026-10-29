@@ -171,7 +171,7 @@ defmodule Jido.Plugin.ValidationTest do
                Jido.Agent.define(%{
                  name: "bad_plugin_state_schema",
                  schema: Zoi.object(%{}),
-                 extensions: [
+                 plugins: [
                    %{
                      id: FailingStateSpec.id(),
                      provider: FailingStateSpec,
@@ -191,7 +191,7 @@ defmodule Jido.Plugin.ValidationTest do
              Jido.Agent.define(%{
                name: "returned_plugin_state_error",
                schema: Zoi.object(%{}),
-               extensions: [
+               plugins: [
                  %{
                    id: FailingStateSpec.id(),
                    provider: FailingStateSpec,
@@ -209,7 +209,7 @@ defmodule Jido.Plugin.ValidationTest do
              Jido.Agent.define(%{
                name: "error_field_plugin",
                schema: Zoi.object(%{}),
-               extensions: [
+               plugins: [
                  %{
                    id: Configurable.id(),
                    provider: Configurable,
@@ -225,7 +225,7 @@ defmodule Jido.Plugin.ValidationTest do
 
   test "invalid Plugin declarations fail with a specific contract error" do
     for {declaration, fragment} <- [
-          {Empty, "must define at least one callback"},
+          {Empty, "must use Jido.Plugin"},
           {{Configurable, [:invalid]}, "options must be a keyword list"},
           {42, "Invalid Agent Plugin declaration"},
           {JidoTest.MissingPlugin, "could not be loaded"},
@@ -264,7 +264,7 @@ defmodule Jido.Plugin.ValidationTest do
              Jido.Agent.define(%{
                name: "invalid_plugin_schema",
                schema: Zoi.object(%{}),
-               extensions: [
+               plugins: [
                  %{
                    id: Configurable.id(),
                    provider: Configurable,
@@ -312,7 +312,7 @@ defmodule Jido.Plugin.ValidationTest do
 
     agent = %{
       agent
-      | extensions: [
+      | plugins: [
           %{
             id: OptionValidator.id(),
             provider: OptionValidator,
@@ -351,7 +351,7 @@ defmodule Jido.Plugin.ValidationTest do
 
     agent = %{
       agent
-      | extensions: [
+      | plugins: [
           %{
             id: OptionValidator.id(),
             provider: OptionValidator,

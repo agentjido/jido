@@ -96,17 +96,13 @@ defmodule JidoTest.Persistence.LiveStateTest do
   end
 
   defmodule PluginAgent do
-    use Jido.Agent, name: "local_plugin_checkpoint"
+    use Jido.Agent, name: "local_plugin_checkpoint", plugins: [Package]
 
     state do
       schema Zoi.object(%{
                payload: Zoi.any() |> Zoi.default(<<>>),
                count: Zoi.integer() |> Zoi.default(0)
              })
-    end
-
-    plugins do
-      plugin Package
     end
 
     routes do
@@ -179,12 +175,12 @@ defmodule JidoTest.Persistence.LiveStateTest do
           PluginAgent.definition(),
           Agent.define!(%{
             name: "embedded_local_plugin",
-            extensions: [%{id: Package.id(), provider: Package, vsn: Package.vsn(), data: %{}}]
+            plugins: [%{id: Package.id(), provider: Package, vsn: Package.vsn(), data: %{}}]
           }),
           Agent.define!(%{
             name: "embedded_generated_plugin",
             module: PluginAgent,
-            extensions: [%{id: Package.id(), provider: Package, vsn: Package.vsn(), data: %{}}]
+            plugins: [%{id: Package.id(), provider: Package, vsn: Package.vsn(), data: %{}}]
           })
         ] do
       agent = Agent.instantiate!(definition, id: unique_id(), state: %{owned: %{bits: <<5::3>>}})

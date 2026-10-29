@@ -12,14 +12,10 @@ defmodule Jido.Agent.APITest do
   end
 
   defmodule Counter do
-    use Jido.Agent, name: "api_counter"
+    use Jido.Agent, name: "api_counter", plugins: [Jido.Agent.APITest.Audit]
 
     state do
       schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
-    end
-
-    plugins do
-      plugin Jido.Agent.APITest.Audit
     end
 
     routes do
@@ -70,7 +66,7 @@ defmodule Jido.Agent.APITest do
     assert after_agent.state === %{count: 2, turns: 1}
     assert output.type == "updated" and output.source == "/counter"
     assert instance.state === %{count: 0, turns: 0}
-    assert after_agent.extensions === instance.extensions
+    assert after_agent.plugins === instance.plugins
   end
 
   test "build_signal uses the Agent source and correlates the source Signal" do

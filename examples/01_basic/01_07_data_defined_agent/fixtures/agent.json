@@ -1,7 +1,7 @@
 {
   "definition": {
     "description": null,
-    "extensions": [
+    "plugins": [
       {
         "data": {
           "$type": "map",

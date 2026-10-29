@@ -14,7 +14,7 @@ the `:example` tag through the shared
 | 01_05 | [OTP supervision](../../../examples/01_basic/01_05_otp_supervision/README.md) | [Test](01_05_otp_supervision/example_test.exs) |
 | 01_06 | [Route Selection](../../../examples/01_basic/01_06_route_selection/README.md) | [Test](01_06_route_selection/route_selection_test.exs) |
 | 01_07 | [Data-defined Agent](../../../examples/01_basic/01_07_data_defined_agent/README.md) | [Test](01_07_data_defined_agent/data_defined_agent_test.exs) |
-| 01_09 | [Agent Extension](../../../examples/01_basic/01_09_agent_extension/README.md) | [Test](01_09_agent_extension/agent_extension_test.exs) |
+| 01_09 | [Authoring Plugin](../../../examples/01_basic/01_09_authoring_plugin/README.md) | [Test](01_09_authoring_plugin/authoring_plugin_test.exs) |
 
 Run the section from the `jido` repository root:
 

@@ -51,8 +51,7 @@ defmodule Jido.AgentServer.TopologyRuntime do
   defp previous_members(agent), do: Topology.bind(agent, agent.state)
 
   def validate(%Agent{} = agent) do
-    with :ok <- Agent.validate_runtime_support(agent),
-         :ok <-
+    with :ok <-
            reduce(agent.topology.agents, fn member ->
              with {:ok, child} <- Agent.Validation.resolve(member.definition),
                   do: validate(child)
@@ -276,7 +275,7 @@ defmodule Jido.AgentServer.TopologyRuntime do
   end
 
   def buses(agent) do
-    for %{provider: Jido.Plugin.Bus.DSL, data: %{buses: buses}} <- agent.extensions,
+    for %{provider: Jido.Plugin.Bus.DSL, data: %{buses: buses}} <- agent.plugins,
         bus <- buses,
         do: bus.name
   end

@@ -4,14 +4,16 @@ defmodule JidoTest.Agent.AuthoringExtensionTest do
   alias Jido.Agent.Extension
 
   defmodule Labels do
+    alias Spark.Dsl.Extension, as: SparkExtension
+
     @section %Spark.Dsl.Section{
       name: :labels,
       schema: [value: [type: :string, required: true]]
     }
-    use Jido.Agent.Extension, id: "test.labels", sections: [@section]
+    use Jido.Plugin, id: "test.labels", sections: [@section]
 
     def lower(dsl, config) do
-      {:ok, Map.put(config, :label, Spark.Dsl.Extension.get_opt(dsl, [:labels], :value))}
+      {:ok, Map.put(config, :label, SparkExtension.get_opt(dsl, [:labels], :value))}
     end
 
     def normalize(data), do: Jido.Agent.Data.fields(data, [:label])
@@ -20,7 +22,7 @@ defmodule JidoTest.Agent.AuthoringExtensionTest do
   end
 
   defmodule Host do
-    use Jido.Agent, name: "labels", extensions: [Labels]
+    use Jido.Agent, name: "labels", plugins: [Labels]
 
     labels do
       value("accepted")
@@ -28,16 +30,16 @@ defmodule JidoTest.Agent.AuthoringExtensionTest do
   end
 
   defmodule DuplicateID do
-    use Jido.Agent.Extension, id: "test.labels"
+    use Jido.Plugin, id: "test.labels"
   end
 
   defmodule CoreEndpoint do
-    use Jido.Agent.Extension, id: "test.core_endpoint"
+    use Jido.Plugin, id: "test.core_endpoint"
     def endpoint_kinds, do: [:agent]
   end
 
   defmodule Boundary do
-    use Jido.Agent.Extension, id: "test.boundary", vsn: 7
+    use Jido.Plugin, id: "test.boundary", vsn: 7
 
     def lower(dsl, config), do: {:ok, %{dsl: dsl, config: config}}
     def normalize(%{reject: reason}), do: {:error, reason}
@@ -57,7 +59,7 @@ defmodule JidoTest.Agent.AuthoringExtensionTest do
   end
 
   defmodule Routed do
-    use Jido.Agent.Extension, id: "test.routed"
+    use Jido.Plugin, id: "test.routed"
 
     @impl Jido.Agent.Extension
     def normalize(%{target: target}), do: {:ok, %{target: target}}
@@ -85,8 +87,6 @@ defmodule JidoTest.Agent.AuthoringExtensionTest do
     def lower(_dsl, config), do: {:ok, config}
     def normalize(data), do: {:ok, data}
     def verify(_data, _definition), do: :ok
-    def runtime_support, do: :none
-    def authoring_imports, do: []
     def endpoint_kinds, do: []
     def endpoints(_data), do: []
     def verify_connection(_data, _connection), do: :ok
@@ -95,11 +95,9 @@ defmodule JidoTest.Agent.AuthoringExtensionTest do
   for {section, suffix} <- [
         agent: "CoreAgent",
         state: "CoreState",
-        plugins: "CorePlugins",
         routes: "CoreRoutes",
         topology: "CoreTopology",
         __state__: "CorePrivateState",
-        __plugins__: "CorePrivatePlugins",
         __routes__: "CorePrivateRoutes",
         __topology__: "CorePrivateTopology"
       ] do
@@ -110,7 +108,7 @@ defmodule JidoTest.Agent.AuthoringExtensionTest do
       module,
       quote do
         @section %Spark.Dsl.Section{name: unquote(section)}
-        use Jido.Agent.Extension, id: unquote(id), sections: [@section]
+        use Jido.Plugin, id: unquote(id), sections: [@section]
       end,
       Macro.Env.location(__ENV__)
     )
@@ -122,14 +120,14 @@ defmodule JidoTest.Agent.AuthoringExtensionTest do
   @tag obligation: ["jido.agent.I1", "jido.agent.I10"]
   test "DSL lowering and Map data produce the same contribution once" do
     entry = contribution(Labels, %{label: "accepted"})
-    assert Host.definition().extensions === [entry]
+    assert Host.definition().plugins === [entry]
 
     assert {:ok, definition} =
-             Agent.define(%{name: "labels", module: Host, extensions: [entry]})
+             Agent.define(%{name: "labels", module: Host, plugins: [entry]})
 
     assert definition === Host.definition()
     assert Agent.runtime_plugins(definition) == []
-    assert Labels.runtime_support() == :none
+    refute function_exported?(Labels, :__jido_plugin__, 0)
   end
 
   @tag obligation: "jido.agent.I10"
@@ -142,11 +140,9 @@ defmodule JidoTest.Agent.AuthoringExtensionTest do
   for {section, suffix} <- [
         agent: "CoreAgent",
         state: "CoreState",
-        plugins: "CorePlugins",
         routes: "CoreRoutes",
         topology: "CoreTopology",
         __state__: "CorePrivateState",
-        __plugins__: "CorePrivatePlugins",
         __routes__: "CorePrivateRoutes",
         __topology__: "CorePrivateTopology"
       ] do
@@ -173,8 +169,6 @@ defmodule JidoTest.Agent.AuthoringExtensionTest do
                lower: 2,
                normalize: 1,
                verify: 2,
-               runtime_support: 0,
-               authoring_imports: 0,
                encode_authoring_data: 2,
                decode_authoring_data: 2,
                derive_routes: 1,
@@ -209,18 +203,19 @@ defmodule JidoTest.Agent.AuthoringExtensionTest do
     data = %{dsl: dsl, config: config}
     entry = contribution(Boundary, data)
 
-    assert {:ok, [^entry]} = Extension.lower([Boundary], dsl, %{Boundary => config})
+    assert {:ok, [^entry]} =
+             Extension.lower([%{provider: Boundary, config: config}], dsl)
 
     endpoint = %{kind: :boundary, name: :output}
     assert Extension.endpoints([contribution(Boundary, %{endpoint: endpoint})]) === [endpoint]
   end
 
   @tag obligation: ["jido.agent.I10", "jido.agent.I22"]
-  test "an extension contributes one exact route through Map authoring" do
+  test "a Plugin contributes one exact route through Map authoring" do
     entry = contribution(Routed, %{target: RouteTarget})
 
     assert {:ok, definition} =
-             Agent.define(%{name: "routed", signal_source: "/routed", extensions: [entry]})
+             Agent.define(%{name: "routed", signal_source: "/routed", plugins: [entry]})
 
     assert [route] = definition.routes
     assert route.path == "extension.request"
@@ -241,13 +236,13 @@ defmodule JidoTest.Agent.AuthoringExtensionTest do
     assert {:error,
             %Agent.Error{
               code: :missing_derived_route,
-              path: [:extensions, 0, :routes, 0],
+              path: [:plugins, 0, :routes, 0],
               details: %{path: "extension.request", provider: Routed}
             }} = Extension.stored_routes([entry], [])
   end
 
   @tag obligation: ["jido.agent.I10", "jido.agent.I22"]
-  test "an extension route cannot conflict with a stored route" do
+  test "a Plugin route cannot conflict with a stored route" do
     entry = contribution(Routed, %{target: RouteTarget})
 
     conflicting = %{
@@ -258,7 +253,7 @@ defmodule JidoTest.Agent.AuthoringExtensionTest do
 
     assert {:error,
             %Agent.Error{
-              code: :extension_route_conflict,
+              code: :plugin_route_conflict,
               path: [:routes, 0],
               details: %{path: "extension.request", provider: Routed}
             }} =
@@ -266,19 +261,19 @@ defmodule JidoTest.Agent.AuthoringExtensionTest do
                name: "routed",
                signal_source: "/routed",
                routes: [conflicting],
-               extensions: [entry]
+               plugins: [entry]
              })
   end
 
   @tag obligation: ["jido.agent.I10", "jido.agent.I22"]
-  test "an extension can contribute only exact routes" do
+  test "a Plugin can contribute only exact routes" do
     wildcard = Module.concat(__MODULE__, "Wildcard#{System.unique_integer([:positive])}")
     id = "test.wildcard.#{System.unique_integer([:positive])}"
 
     Module.create(
       wildcard,
       quote do
-        use Jido.Agent.Extension, id: unquote(id)
+        use Jido.Plugin, id: unquote(id)
         @impl Jido.Agent.Extension
         def derive_routes(_data), do: [%{path: "extension.*"}]
       end,
@@ -290,8 +285,8 @@ defmodule JidoTest.Agent.AuthoringExtensionTest do
     assert {:error,
             %Agent.Error{
               code: :wildcard_type,
-              path: [:extensions, 0, :routes, 0, :path]
-            }} = Agent.define(%{name: "wildcard", extensions: [entry]})
+              path: [:plugins, 0, :routes, 0, :path]
+            }} = Agent.define(%{name: "wildcard", plugins: [entry]})
   end
 
   @tag obligation: ["jido.agent.I10", "jido.agent.I22"]
@@ -302,8 +297,8 @@ defmodule JidoTest.Agent.AuthoringExtensionTest do
           contribution(Labels, %{label: self()}),
           %{contribution(Labels, %{label: "valid"}) | vsn: 99}
         ] do
-      assert {:error, %Agent.Error{path: [:extensions | _]}} =
-               Agent.define(%{name: "labels", extensions: [entry]})
+      assert {:error, %Agent.Error{path: [:plugins | _]}} =
+               Agent.define(%{name: "labels", plugins: [entry]})
     end
 
     rejected = contribution(Boundary, %{reject: :bad_data})

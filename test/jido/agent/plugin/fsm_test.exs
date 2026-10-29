@@ -1,9 +1,10 @@
-defmodule Jido.Plugin.FSMTest do
+defmodule Jido.Agent.Plugin.FSMTest do
   use ExUnit.Case, async: true
 
   alias Jido.Agent
+  alias Jido.Agent.Directive
+  alias Jido.Agent.Plugin.FSM
   alias Jido.Persistence
-  alias Jido.Plugin.FSM
 
   defmodule Mark do
     use Jido.Action,
@@ -42,7 +43,7 @@ defmodule Jido.Plugin.FSMTest do
   defmodule Guide do
     use Jido.Agent,
       name: "fsm_guide",
-      extensions: [FSM]
+      plugins: [{FSM, %{definition_vsn: 1}}]
 
     state do
       schema Zoi.object(%{log: Zoi.list(Zoi.atom()) |> Zoi.default([])})
@@ -77,7 +78,7 @@ defmodule Jido.Plugin.FSMTest do
   defmodule FailingGuide do
     use Jido.Agent,
       name: "fsm_failing_guide",
-      extensions: [FSM]
+      plugins: [{FSM, %{definition_vsn: 1}}]
 
     state do
       schema Zoi.object(%{log: Zoi.list(Zoi.atom()) |> Zoi.default([])})
@@ -98,7 +99,7 @@ defmodule Jido.Plugin.FSMTest do
   defmodule FlowGuide do
     use Jido.Agent,
       name: "fsm_flow_guide",
-      extensions: [FSM]
+      plugins: [{FSM, %{definition_vsn: 1}}]
 
     state do
       schema Zoi.object(%{log: Zoi.list(Zoi.atom()) |> Zoi.default([])})
@@ -117,7 +118,7 @@ defmodule Jido.Plugin.FSMTest do
   end
 
   test "the DSL lowers to one canonical Plugin representation" do
-    [entry] = Guide.definition().extensions
+    [entry] = Guide.definition().plugins
 
     assert entry.provider == FSM
     assert entry.data == machine_data()
@@ -128,26 +129,26 @@ defmodule Jido.Plugin.FSMTest do
         schema: Zoi.object(%{log: Zoi.list(Zoi.atom()) |> Zoi.default([])}),
         signal_source: "/plugin/fsm/map",
         routes: Guide.definition().routes,
-        extensions: [fsm_extension(Map.delete(machine_data(), :version))]
+        plugins: [fsm_extension(Map.delete(machine_data(), :definition_vsn))]
       })
 
-    assert [map_entry] = map_definition.extensions
+    assert [map_entry] = map_definition.plugins
     assert map_entry.data == entry.data
   end
 
   test "Action success advances FSM state after normal state projection" do
     agent = Guide.instantiate!(id: "guide")
-    assert agent.state.fsm == %{version: 1, current: :idle}
+    assert agent.state.fsm == %{definition_vsn: 1, current: :idle}
 
     signal = Jido.Signal.new!("advance", %{}, source: agent.signal_source)
 
     assert {:ok, running, []} = Agent.cmd(agent, signal)
     assert running.state.log == [:started]
-    assert running.state.fsm == %{version: 1, current: :running}
+    assert running.state.fsm == %{definition_vsn: 1, current: :running}
 
     assert {:ok, ready, []} = Agent.cmd(running, signal)
     assert ready.state.log == [:started, :finished]
-    assert ready.state.fsm == %{version: 1, current: :ready}
+    assert ready.state.fsm == %{definition_vsn: 1, current: :ready}
 
     assert {:error, error} = Agent.cmd(ready, signal)
     assert error.details.code == :invalid_fsm_transition
@@ -168,7 +169,7 @@ defmodule Jido.Plugin.FSMTest do
     signal = Jido.Signal.new!("fail", %{}, source: agent.signal_source)
 
     assert {:error, _reason} = Agent.cmd(agent, signal)
-    assert agent.state.fsm == %{version: 1, current: :idle}
+    assert agent.state.fsm == %{definition_vsn: 1, current: :idle}
   end
 
   test "Flow success advances FSM state only after Flow completion" do
@@ -177,7 +178,7 @@ defmodule Jido.Plugin.FSMTest do
 
     assert {:ok, ready, []} = Agent.cmd(agent, signal)
     assert ready.state.log == [:flow]
-    assert ready.state.fsm == %{version: 1, current: :ready}
+    assert ready.state.fsm == %{definition_vsn: 1, current: :ready}
   end
 
   test "FSM state restores through Agent persistence" do
@@ -199,7 +200,7 @@ defmodule Jido.Plugin.FSMTest do
     assert {:ok, restored, 1} =
              Persistence.load_agent_with_revision(source, Guide, id, namespace: "fsm")
 
-    assert restored.state.fsm == %{version: 1, current: :running}
+    assert restored.state.fsm == %{definition_vsn: 1, current: :running}
     assert :ok = Persistence.delete_agent(source, Guide, id, namespace: "fsm")
   end
 
@@ -218,16 +219,16 @@ defmodule Jido.Plugin.FSMTest do
 
     assert {:error, remove_error} =
              Agent.mutate(agent, [
-               Jido.Agent.Directive.plugin_remove(FSM, state: :discard)
+               Directive.plugin_remove(FSM, state: :discard)
              ])
 
     assert remove_error.code == :duplicate
 
     assert {:error, add_error} =
-             Agent.mutate(agent, [Jido.Agent.Directive.plugin_add(OtherSelector)])
+             Agent.mutate(agent, [Directive.plugin_add(OtherSelector)])
 
     assert add_error.message == "Only one Agent Plugin can select routes"
-    assert agent.state.fsm == %{version: 1, current: :idle}
+    assert agent.state.fsm == %{definition_vsn: 1, current: :idle}
   end
 
   test "invalid graphs fail during normalization" do
@@ -266,7 +267,7 @@ defmodule Jido.Plugin.FSMTest do
              Agent.define(%{
                name: "unknown_fsm_route",
                routes: [route("known", :known, Mark)],
-               extensions: [
+               plugins: [
                  fsm_extension(%{
                    initial: :idle,
                    terminal: [:ready],
@@ -292,7 +293,7 @@ defmodule Jido.Plugin.FSMTest do
                    reply: nil
                  }
                ],
-               extensions: [
+               plugins: [
                  fsm_extension(%{
                    initial: :idle,
                    terminal: [:ready],
@@ -310,7 +311,7 @@ defmodule Jido.Plugin.FSMTest do
 
   defp machine_data do
     %{
-      version: 1,
+      definition_vsn: 1,
       initial: :idle,
       terminal: [:ready],
       transitions: [

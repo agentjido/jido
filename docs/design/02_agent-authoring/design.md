@@ -12,8 +12,9 @@ migration.
 
 On 2026-10-01, the user selected the V3 block form
 ([GAP-009](/Users/mhostetler/Source/Jido/proj_jido_core/jido/docs/design/GAP_ANALYSIS.md#gap-009)).
-`use Jido.Agent` accepts identity, metadata, and extension options. State,
-Plugins, and routes are declared in separate blocks.
+`use Jido.Agent` accepts identity, metadata, and one ordered `plugins:` option.
+State and routes use core blocks. A selected Plugin can add its own sections
+and imports.
 Direct `Agent.new/1` still accepts map or keyword definition data. This
 decision concerns module configuration; it does not remove direct keyword
 data or decide the combined Topology hosting API.
@@ -42,8 +43,8 @@ Action input and did not implement this default merge.
 - Owner: the `Jido.Agent` authoring boundary.
 - In scope: module and Spark authoring, inline route Actions, direct map and
   keyword input, Builder, Agent and Plugin Codecs, trusted Registry use,
-  generated interfaces, normalization, validation timing, and static Agent
-  extensions.
+  generated interfaces, normalization, validation timing, and authoring-only
+  Plugins.
 - Out of scope: Agent value field meaning, Action and Flow execution, Router
   precedence, Plugin runtime behavior, Agent checkpoint format, restore,
   commit, persistence records, Agent identity, and Agent Server lifecycle.
@@ -82,9 +83,9 @@ make the direct definition invalid. When Codec receives an instance, it derives
 and validates the neutral definition. It does not parse or encode live identity
 or state.
 
-`Jido.Agent.Extension.lower/3` is the public pure data-lowering entry. It runs
-static extension lowerers in declaration order and returns ordinary core Agent
-configuration for direct, Builder, or Codec authoring.
+Each `Jido.Plugin` can implement pure authoring callbacks. Jido runs Plugin
+lowerers in declaration order and stores one canonical Plugin contribution
+list for module, map, or Codec authoring.
 
 ## Requirements
 
@@ -121,12 +122,12 @@ authoring boundary shall require a plain map.
 ### Module and Spark authoring
 
 `AUTH-REQ-009`: When a module uses `Jido.Agent`, the Agent DSL compiler shall
-combine module identity, metadata, and extension options with state, Plugin,
-and route block fields into one core configuration.
+combine module identity, metadata, and ordered Plugin declarations with state,
+Plugin-owned section data, and route fields into one core configuration.
 
-`AUTH-REQ-010`: Retired. Keyword declarations of schema, metadata, Plugins,
-and routes are no longer supported by standalone `use Jido.Agent`.
-AUTH-REQ-063 states the option rejection rule.
+`AUTH-REQ-010`: Retired. Schema and routes are not `use Jido.Agent` options.
+Plugins use the top-level `plugins:` option. AUTH-REQ-063 states the option
+rejection rule.
 
 `AUTH-REQ-063`: If standalone `use Jido.Agent` declares an unsupported keyword
 option, then the Agent DSL compiler shall reject the module at compile time.
@@ -276,25 +277,24 @@ shall preserve the Agent `vsn` and reject the prior route record shape.
 `AUTH-REQ-049`: The Plugin Codec shall encode one canonical Plugin declaration
 as module and options and shall exclude Plugin-owned state values and runtime data.
 
-### Authoring extensions and validation
+### Plugin authoring and validation
 
-`AUTH-REQ-050`: When an Agent authoring extension lowers declarations, the
-extension host shall run each lowerer in declaration order as a pure static
+`AUTH-REQ-050`: When an Agent Plugin lowers declarations, the Plugin host shall
+run each lowerer in declaration order as a pure static
 operation.
 
-`AUTH-REQ-051`: If two extensions claim one route target option, an extension
-leaves an entity unclaimed, or a lowerer returns an invalid result, then the
-extension host shall reject the authored definition.
+`AUTH-REQ-051`: If two Plugins claim one route target option, a Plugin leaves
+an entity unclaimed, or a lowerer returns an invalid result, then the Plugin
+host shall reject the authored definition.
 
-`AUTH-REQ-052`: When extension lowering completes, the Agent authoring boundary
+`AUTH-REQ-052`: When Plugin lowering completes, the Agent authoring boundary
 shall apply the common Agent definition validation.
 
-`AUTH-REQ-053`: The Agent extension boundary shall provide one documented pure
-data-lowering entry that can be used before direct, Builder, or Codec
-authoring.
+`AUTH-REQ-053`: Each selected Plugin shall lower its module config and optional
+custom Spark section data through one pure authoring callback.
 
 `AUTH-REQ-054`: The Agent Builder and Codec shall accept core configuration
-after extension lowering and shall not store Spark extension entities.
+after Plugin lowering and shall not store Spark source entities.
 
 `AUTH-REQ-055`: When module compilation can depend on an executable module
 declared later in the same source, the Agent DSL compiler shall complete the
@@ -342,9 +342,10 @@ those values.
 
 ### Spark declaration contract
 
-`state do` contains the domain `schema` and `initial_state`. `plugins do`
-contains ordered Plugin declarations. `routes do` contains ordered route
-declarations and an optional Signal source for generated interfaces. A route
+`state do` contains the domain `schema` and `initial_state`. The top-level
+`plugins:` option contains ordered Plugin modules or `{Plugin, config}` tuples.
+`routes do` contains ordered route declarations and an optional Signal source
+for generated interfaces. A route
 can name one Action or Flow, contain one inline Action, or use one
 extension-owned target option. The route can contain `defaults`, `priority`,
 `match`, and one optional `as:` helper name.
@@ -353,9 +354,8 @@ An Action or Flow route uses its complete validated output as the next state by
 default. A `state` declaration overrides that default with another output path
 or `:unchanged`.
 
-Plugin `config` accepts a map or keyword list. Keyword order is retained. Map
-input uses a stable sorted order. The Plugin module is its identity and can
-appear once. Plugin labels are not part of the core syntax.
+Plugin config is a static map with atom keys. The Plugin module is its identity
+and can appear once. Plugin labels are not part of the core syntax.
 
 An inline Action receives the complete prepared input map and uses the public
 inline Action callback grammar. It is suitable for a small Action owned by one
@@ -400,13 +400,12 @@ compiler data.
 returns an instance. Builder does not run Actions, start processes, or lower
 Spark entities.
 
-### Extension data contract
+### Plugin authoring data contract
 
-`Jido.Agent.Extension.lower/3` accepts an ordered extension module list, one
-plain core configuration map, and a list of static extension entities. It
-returns a lowered core configuration map or a structured authoring error. The
-caller then supplies the map to direct, Builder, or Codec authoring. The
-function runs no Action, Flow, process, or external service operation.
+Each Plugin `lower/2` callback receives the Spark configuration and its static
+config map. It returns one Plugin data map or a structured authoring error.
+Jido stores the normalized result in the canonical Plugin contribution list.
+The callback runs no Action, Flow, process, or external service operation.
 
 ### Codec and Registry contract
 
@@ -450,7 +449,7 @@ bypass common Agent validation.
   functions, compiler metadata, or source syntax.
 - `AUTH-INV-003`: Authoring preserves Plugin and route declaration order.
 - `AUTH-INV-004`: Inline Actions become ordinary `jido_action` executables.
-- `AUTH-INV-005`: Builder and extension lowering do not execute runtime work.
+- `AUTH-INV-005`: Builder and Plugin lowering do not execute runtime work.
 - `AUTH-INV-006`: Codec documents contain static authoring data and are not
   checkpoints or persistence records.
 - `AUTH-INV-007`: Stored strings do not create atoms, modules, functions, or
@@ -473,9 +472,9 @@ These approved guarantees apply to dependent seams.
 | 05 Plugins | All forms preserve ordered canonical Plugin declarations; this seam does not define Plugin runtime authority. |
 | 07 Persistence | Codec data is not checkpoint data. Revision propagation does not define restore policy. |
 | 08 Agent Server | Generated live helpers delegate to the public call boundary and do not redefine live results or timeout meaning. |
-| 11 Topology control plane | Static authoring extensions lower before activation and do not add runtime authority. |
+| 11 Topology control plane | Authoring-only Plugins lower before activation and do not add runtime authority. |
 | 12 Errors and contracts | Authoring failures use the approved public error and bang rules. |
-| 90 Package boundaries | Inline Actions, Signals, Plugins, authoring extensions, and ordinary wrappers keep separate package owners. |
+| 90 Package boundaries | Inline Actions, Signals, Plugins, and ordinary wrappers keep separate package owners. |
 | 99 Delivery | Supported forms remain until a separate staged migration has replacement proof. |
 
 ## Approved design decisions
@@ -487,6 +486,6 @@ These approved guarantees apply to dependent seams.
 | `AUTH-DEC-003` | What is the module authority? | Make `definition/0` canonical and keep `__agent_config__/0` private compiler data. | Keyword declarations do not need to be canonical inside private metadata. |
 | `AUTH-DEC-004` | Can Codec encode an Agent instance? | Yes. Derive and validate its neutral definition, then encode only static data. | Current instance calls stay supported without repeated state parsing. |
 | `AUTH-DEC-005` | Must every valid definition be encodable? | No. Codec supports the Registry-resolvable static subset. | Runtime closures stay valid for direct use and fail clearly at Codec. |
-| `AUTH-DEC-006` | How do data users apply extensions? | Publish the pure lowerer; Builder and Codec consume lowered core data only. | Extension syntax does not enter the document format or runtime. |
+| `AUTH-DEC-006` | How do data users apply Plugin authoring data? | Use canonical Plugin contributions; Builder and Codec consume lowered data only. | Spark source syntax does not enter the document format or runtime. |
 | `AUTH-DEC-007` | How does Agent `vsn` enter authoring? | Apply the approved seam-01 default and preservation rules to all applicable forms. | Generated modules default to `1`; direct compatibility forms can use `nil`; this seam does not redefine checkpoint or restore policy. |
 | `AUTH-DEC-008` | Do route defaults accept structs? | No. Require plain maps for explicit and tuple forms. | The user selected the current V3 rule in GAP-012; the old struct exception is removed. |

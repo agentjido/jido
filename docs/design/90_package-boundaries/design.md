@@ -93,7 +93,8 @@ Each category grants different authority.
 | Define, route, serialize, or deliver an event | Signal contract | Implement in `jido_signal` |
 | Add a reusable capability at an Agent or Agent Server lifecycle point | Plugin | Use declared Plugin-owned fields, callbacks, Directives, and optional runtime only |
 | Replace one external infrastructure operation | Adapter | Implement the narrow adapter owned by that package |
-| Add static DSL syntax | Authoring extension | Lower to the canonical Agent or Topology value before runtime |
+| Add static Agent DSL syntax | Plugin authoring | Lower to the canonical Agent value before runtime; add no runtime unless runtime callbacks exist |
+| Add static Topology DSL syntax | Topology authoring extension | Lower to the canonical Topology value before runtime |
 | Request runtime-owned work after commit | Directive | Return a typed Directive through the Turn result |
 | Observe runtime behavior | Telemetry handler | Consume bounded events without execution authority |
 
@@ -101,10 +102,11 @@ The package that owns a contract also owns its adapter behavior. A
 `Jido.Persistence.Adapter`, a `Jido.Signal.Dispatch.Adapter`, and a browser
 adapter are separate contracts. Jido does not define one universal adapter.
 
-A Plugin is not an adapter, middleware layer, authoring extension, Action,
-Directive, or Telemetry handler. A Provider is not a generic hook. If a future
-instance infrastructure boundary uses the term Provider, its design must name
-one fixed lifecycle and one fixed authority.
+A Plugin is not an adapter, middleware layer, Action, Directive, or Telemetry
+handler. It can own Agent authoring sections and runtime callbacks in one
+module. Authoring-only Plugins do not get a runtime manifest. A Provider is not
+a generic hook. If a future instance infrastructure boundary uses the term
+Provider, its design must name one fixed lifecycle and one fixed authority.
 
 ## Public boundary rules
 
@@ -135,9 +137,9 @@ boundaries. Public instance name helpers do not make an internal process or
 store API public.
 
 Current supported APIs stay available unless an owner seam approves a staged
-migration. This rule covers direct and DSL Agent authoring, Builder, Codec,
-Agent and Topology authoring extensions, custom routing, complete checkpoint
-callbacks, Plugins, Directives, `spawn_fun`, owned children, explicit known-node
+migration. This rule covers direct and DSL Agent authoring, Codec, Agent
+Plugins, Topology authoring extensions, custom routing, complete checkpoint
+callbacks, Directives, `spawn_fun`, owned children, explicit known-node
 child placement, public PID-based Agent Server operations, Jido instance
 lifecycle and name helpers, per-Agent persistence selection, persistence
 adapters, static local Topology, semantic telemetry, optional OpenTelemetry API
@@ -204,9 +206,9 @@ contract.
 `PKG-REQ-011`: When an external service replaces one infrastructure operation,
 the integration shall use the narrow adapter owned by that package.
 
-`PKG-REQ-012`: When an extension adds Agent or Topology syntax, the authoring
-extension shall lower its declarations to the canonical value before runtime
-activation.
+`PKG-REQ-012`: When a Plugin adds Agent syntax, or a Topology extension adds
+Topology syntax, the authoring provider shall lower its declarations to the
+canonical value before runtime activation.
 
 `PKG-REQ-013`: When a Turn returns runtime-owned work, the Jido runtime shall
 interpret its typed Directives only after the related live commit.
@@ -315,8 +317,9 @@ proposal and not as available behavior.
   `jido_action` and `jido_signal` to Jido to focused integrations to the host
   application.
 - `PKG-INV-002`: One contract has one package owner.
-- `PKG-INV-003`: Actions, Signals, Plugins, adapters, authoring extensions,
-  Directives, Telemetry, and ordinary composition grant different authority.
+- `PKG-INV-003`: Actions, Signals, Agent Plugins, Topology authoring
+  extensions, adapters, Directives, Telemetry, and ordinary composition grant
+  different authority.
 - `PKG-INV-004`: An ecosystem package does not depend on private Jido state,
   messages, or generated runtime names.
 - `PKG-INV-005`: An extension cannot bypass candidate evaluation, live commit,
@@ -336,9 +339,9 @@ contracts and implementation evidence can remain open.
 | Consumer seam or package | Guaranteed boundary |
 | --- | --- |
 | 01 Agent and 04 Turn evaluation | Jido consumes public Action and Signal contracts and keeps candidate assembly in Jido. |
-| 02 Agent authoring and 11 Topology control plane | Authoring extensions lower to canonical values and do not add a runtime. |
+| 02 Agent authoring and 11 Topology control plane | Agent Plugins and Topology extensions lower to canonical values. Authoring-only Plugins add no runtime. |
 | 03 Agent identity | PID, runtime name, and durable identity stay separate; current APIs remain during migration. |
-| 05 Plugins | Plugins remain a lifecycle capability, not a universal extension type. |
+| 05 Plugins | Plugins own Agent authoring and lifecycle capabilities, not unrelated adapter or execution contracts. |
 | 06 Commit and effects | Actions can perform I/O before commit; runtime-owned Directives run after commit. |
 | 07 Persistence and 09 Jido instance | Jido owns record meaning; adapters own byte storage; external clients stay application-owned. |
 | 10 Runtime topology | Static local Topology and explicit known-node children stay in core; cluster policy stays outside. |

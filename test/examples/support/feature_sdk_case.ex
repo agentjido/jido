@@ -19,7 +19,7 @@ defmodule JidoTest.FeatureSDKCase do
       |> Map.from_struct()
       |> Map.drop([:id, :state])
       |> Map.update!(
-        :extensions,
+        :plugins,
         &(&1 ++
             [
               %{

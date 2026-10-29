@@ -55,7 +55,7 @@ defmodule JidoTest.AgentServer.OutboundTest do
         Jido.Agent.define!(%{
           name: "outbound_plugin",
           schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}),
-          extensions: [
+          plugins: [
             %{
               id: Outbound.id(),
               provider: Outbound,
@@ -148,7 +148,7 @@ defmodule JidoTest.AgentServer.OutboundTest do
     Jido.Agent.define!(%{
       name: "outbound_reply_plugin",
       schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}),
-      extensions: [
+      plugins: [
         %{
           id: Outbound.id(),
           provider: Outbound,

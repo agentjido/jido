@@ -15,7 +15,6 @@ defmodule JidoTest.Authoring.Agents.BoundariesTest do
 
   test "removed core forms cannot enter a definition" do
     for attrs <- [
-          %{plugins: []},
           %{schedules: []},
           %{kind: :definition},
           %{definition: %{name: "nested"}},

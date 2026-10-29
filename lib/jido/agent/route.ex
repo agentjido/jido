@@ -283,11 +283,6 @@ defmodule Jido.Agent.Route do
   def select(routes, type) when is_list(routes) do
     with {:ok, candidates} <- matching(routes, type) do
       case candidates do
-        nil ->
-          Error.fail(:unmatched_input, [:routes], "No route accepts this Signal type", %{
-            type: type
-          })
-
         [] ->
           Error.fail(:unmatched_input, [:routes], "No route accepts this Signal type", %{
             type: type

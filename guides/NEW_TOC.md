@@ -39,7 +39,7 @@
 
 ### Build Plugins
 
-- [x] **Markdown** — [Extensions or Plugins](extensions-and-plugins.md)
+- [x] **Markdown** — [Agent Plugins](agent-plugins.md)
 - [x] **Livebook Markdown** — [Stateful Plugins](write-a-stateful-plugin.livemd)
 - [x] **Livebook Markdown** — [Supervised Resources](plugin-supervised-resources.livemd)
 - [x] **Livebook Markdown** — [Custom Directives](plugin-custom-directives.livemd)

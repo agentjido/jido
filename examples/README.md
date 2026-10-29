@@ -23,7 +23,7 @@ The [durable Flow proposals](11_durable/README.md#proposed-lessons) reserve
 ## Choose a path
 
 - **Start here:** [Minimal Agent](01_basic/01_01_minimal_agent/README.md), [typed input](01_basic/01_02_typed_command_agent/README.md), [route selection](01_basic/01_06_route_selection/README.md), [owned state](01_basic/01_03_plugin_state_agent/README.md), then [request modes](04_runtime/04_15_request_modes/README.md).
-- **Author from data:** [saved JSON and Scheduler](01_basic/01_07_data_defined_agent/README.md), [static extension](01_basic/01_09_agent_extension/README.md), [Plugin DSL structure](09_plugins/09_10_plugin_dsl/README.md), then [JSON topology](07_topology/07_01_independent/README.md).
+- **Author from data:** [saved JSON and Scheduler](01_basic/01_07_data_defined_agent/README.md), [authoring Plugin](01_basic/01_09_authoring_plugin/README.md), [Plugin DSL structure](09_plugins/09_10_plugin_dsl/README.md), then [JSON topology](07_topology/07_01_independent/README.md).
 - **Recover work:** [persistent Agent](10_persistence/10_01_persistent_agent/README.md), [hibernate and thaw](10_persistence/10_02_hibernate_and_thaw/README.md), [saved Flow progress](11_durable/11_02_saved_progress/README.md), then [durable approval waits](11_durable/11_06_durable_wait/README.md).
 
 Use [dynamic child lifecycle](05_multi_agent/05_01_child_lifecycle/README.md)

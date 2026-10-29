@@ -158,15 +158,11 @@ defmodule JidoTest.Agent.AuthoringTest do
       name: "authoring_counter",
       description: "All authoring forms",
       vsn: 7,
-      metadata: %{owner: :test, nested: {:tag, <<255>>}}
+      metadata: %{owner: :test, nested: {:tag, <<255>>}},
+      plugins: [{CountTurns, %{initial: 0}}, {PassThrough, %{label: :second}}]
 
     state do
       schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
-    end
-
-    plugins do
-      plugin CountTurns, config: %{initial: 0}
-      plugin PassThrough, config: %{label: :second}
     end
 
     routes do
@@ -183,15 +179,11 @@ defmodule JidoTest.Agent.AuthoringTest do
       name: "authoring_counter",
       description: "All authoring forms",
       vsn: 7,
-      metadata: %{owner: :test, nested: {:tag, <<255>>}}
+      metadata: %{owner: :test, nested: {:tag, <<255>>}},
+      plugins: [{CountTurns, %{initial: 0}}, {PassThrough, %{label: :second}}]
 
     state do
       schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
-    end
-
-    plugins do
-      plugin CountTurns, config: %{initial: 0}
-      plugin PassThrough, config: %{label: :second}
     end
 
     routes do
@@ -241,7 +233,7 @@ defmodule JidoTest.Agent.AuthoringTest do
              {PassThrough, [label: :second]}
            ]
 
-    assert Enum.map(definition.extensions, & &1.provider) == [CountTurns, PassThrough]
+    assert Enum.map(definition.plugins, & &1.provider) == [CountTurns, PassThrough]
     assert Counter.schema() == Agent.schema(definition)
     assert Counter.instantiate!(id: "defined").state == %{count: 0, turns: 0}
     refute function_exported?(UnexposedCounter, :add_signal, 1)
@@ -283,7 +275,7 @@ defmodule JidoTest.Agent.AuthoringTest do
       compile_agent("", "", "state do\n schema nil\n end")
     end
 
-    for option <- ["schema: Zoi.object(%{})", "plugins: []", "routes: []"] do
+    for option <- ["schema: Zoi.object(%{})", "routes: []"] do
       assert_raise Spark.Options.ValidationError, ~r/unknown options/, fn ->
         compile_agent("", ", #{option}")
       end

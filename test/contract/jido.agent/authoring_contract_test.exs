@@ -55,19 +55,16 @@ defmodule JidoTest.Contract.AgentAuthoringTest do
 
   defmodule CompleteDsl do
     use Jido.Agent,
-      id: "tests/agents/complete-dsl",
       name: "contract_complete_dsl",
       description: "Complete core DSL shape",
+      id: "tests/agents/complete-dsl",
       vsn: 2,
-      metadata: %{domain: "contracts"}
+      metadata: %{domain: "contracts"},
+      plugins: [{JidoTest.AgentContract.First, %{initial: 3}}]
 
     state do
       schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
       initial_state %{count: 2}
-    end
-
-    plugins do
-      plugin JidoTest.AgentContract.First, config: %{initial: 3}
     end
 
     routes do
@@ -204,7 +201,7 @@ defmodule JidoTest.Contract.AgentAuthoringTest do
             }
           ]
         },
-        extensions: [F.contribution(F.First, %{initial: 3})]
+        plugins: [F.contribution(F.First, %{initial: 3})]
       })
 
     assert complete === CompleteDsl.definition()
@@ -350,7 +347,7 @@ defmodule JidoTest.Contract.AgentAuthoringTest do
 
   @tag obligation: ["jido.agent.I10", "jido.agent.I11"]
   test "Plugin state has one owner and domain updates use shallow replacement" do
-    definition = F.definition(extensions: [F.contribution(F.First)])
+    definition = F.definition(plugins: [F.contribution(F.First)])
     agent = Agent.instantiate!(definition, id: "plugin")
     assert agent.state.first == 0
     assert {:ok, state} = Zoi.parse(Agent.schema(agent), agent.state)
@@ -364,13 +361,13 @@ defmodule JidoTest.Contract.AgentAuthoringTest do
              Agent.define(%{
                name: "collision",
                schema: Zoi.object(%{first: Zoi.integer()}),
-               extensions: [F.contribution(F.First)]
+               plugins: [F.contribution(F.First)]
              })
 
     assert {:error, _} =
              Agent.define(%{
                definition
-               | extensions: definition.extensions ++ definition.extensions
+               | plugins: definition.plugins ++ definition.plugins
              })
   end
 
@@ -485,7 +482,6 @@ defmodule JidoTest.Contract.AgentAuthoringTest do
           {:function, :__defaults__, 0},
           {:function, :options!, 2},
           {:function, :runtime_plugins, 1},
-          {:function, :validate_runtime_support, 1},
           {:function, :input_signal, 4},
           {:function, :input_signal!, 4},
           {:function, :transition, 2},

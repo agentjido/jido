@@ -105,17 +105,13 @@ defmodule Jido.Agent.FlowEffectsTest do
   end
 
   defmodule BookingAgent do
-    use Jido.Agent, name: "flow_effect_booking_agent"
+    use Jido.Agent, name: "flow_effect_booking_agent", plugins: [Plugin]
 
     state do
       schema Zoi.object(%{
                status:
                  Zoi.enum([:awaiting_approval, :submitting]) |> Zoi.default(:awaiting_approval)
              })
-    end
-
-    plugins do
-      plugin Plugin
     end
 
     routes do

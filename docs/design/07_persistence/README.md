@@ -11,12 +11,11 @@ revisions, logical deletion, checkpoint integration, and storage-result
 classification. Adapters own binary `get/2` and exact-byte
 `compare_and_swap/4` operations.
 
-Compatible unnamed writes use exact version-2 active or tombstone records. New
-namespaced writes use exact version-3 active or tombstone records. A persistent Agent
-Server confirms a create-only revision-zero write after Plugin readiness and
-before its start call succeeds. Normal delete writes a compact CAS tombstone,
-so a delayed writer cannot recreate the deleted record lifetime. Every required
-write error stops the current activation.
+Durable writes use one stable Ref key and exact format-1 active or tombstone
+records. A persistent Agent Server confirms a create-only revision-zero write
+after Plugin readiness and before its start call succeeds. Normal delete writes
+a compact CAS tombstone, so a delayed writer cannot recreate the deleted record
+lifetime. Every required write error stops the current activation.
 
 Default Agent checkpoints run each declared Persistence Plugin facet on only
 its paired owned-state value. Complete custom Agent checkpoints bypass that
