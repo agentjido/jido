@@ -177,7 +177,7 @@ defmodule JidoTest.PluginContract.NormalizerTest do
     assert manifest.persistence == nil
 
     assert Plugin.owner_callbacks() == [
-             agent: [prepare: 2, state_spec: 1, directives: 1, reduce: 2],
+             agent: [prepare: 2, select_route: 2, state_spec: 1, directives: 1, reduce: 2],
              agent_server: [
                validate_options: 1,
                admit: 3,

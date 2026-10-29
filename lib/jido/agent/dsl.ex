@@ -17,7 +17,8 @@ defmodule Jido.Agent.DSL do
   def handle_before_compile(opts) do
     helpers =
       quote unquote: false do
-        for route <- @agent_definition.routes, route.as != nil do
+        for route <- @agent_definition.routes,
+            route.as != nil and not Jido.Agent.Data.wildcard?(route.path) do
           helper = String.to_atom(Atom.to_string(route.as) <> "_signal")
           bang_helper = String.to_atom(Atom.to_string(route.as) <> "_signal!")
 

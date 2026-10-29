@@ -3,11 +3,20 @@ defmodule Jido.Agent.Plugin.Preparation do
   Read-only input for one pure Agent Plugin preparation callback.
 
   A callback can inspect the source Signal, Agent identity, complete Agent
-  state, and its owned state. It returns one package-owned value. The contract
-  has no return path for a replacement Signal, caller context, route, or Agent.
+  state, its owned state, and all ordered routes that match the Signal. It
+  returns one package-owned value. The contract has no return path for a
+  replacement Signal, caller context, route, or Agent.
   """
 
-  @enforce_keys [:plugin, :agent_id, :agent_module, :agent_state, :signal, :plugin_state]
+  @enforce_keys [
+    :plugin,
+    :agent_id,
+    :agent_module,
+    :agent_state,
+    :signal,
+    :plugin_state,
+    :route_candidates
+  ]
   defstruct @enforce_keys
 
   @type t :: %__MODULE__{
@@ -16,6 +25,7 @@ defmodule Jido.Agent.Plugin.Preparation do
           agent_module: module(),
           agent_state: map(),
           signal: Jido.Signal.t(),
-          plugin_state: term()
+          plugin_state: term(),
+          route_candidates: [map()]
         }
 end

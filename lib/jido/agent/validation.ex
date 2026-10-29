@@ -1,6 +1,6 @@
 defmodule Jido.Agent.Validation do
   @moduledoc false
-  alias Jido.Agent.{Callback, Data, Error, Extension, Route, Topology}
+  alias Jido.Agent.{Callback, Data, Error, Extension, Plugin, Route, Topology}
 
   @fields [
     :id,
@@ -39,7 +39,7 @@ defmodule Jido.Agent.Validation do
          {:ok, routes} <-
            Error.at(Data.list(definition.routes, &Route.normalize(&1, related?)), :routes),
          {:ok, routes} <- materialize_routes(routes, route_contributions, related?),
-         :ok <- Error.at(Data.unique(routes, & &1.path), :routes),
+         :ok <- Error.at(Plugin.validate_route_contract(routes, extensions), :routes),
          :ok <- Error.at(Data.unique(Enum.reject(routes, &is_nil(&1.as)), & &1.as), :routes),
          :ok <- reply_source(routes, definition.signal_source, related?),
          definition = %{definition | routes: routes, extensions: extensions},

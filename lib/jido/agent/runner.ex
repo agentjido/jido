@@ -69,8 +69,19 @@ defmodule Jido.Agent.Runner do
         exec_opts,
         plugin_specs
       ) do
+    agent_specs = Plugin.specs(plugin_specs)
+
     with :ok <- at(:input, Command.validate_caller_context(command.context)),
-         {:ok, turn} <- at(:route, select(command.agent, source_signal)),
+         {:ok, turn} <-
+           at(
+             :route,
+             select(
+               command.agent,
+               source_signal,
+               command.plugin_inputs,
+               agent_specs
+             )
+           ),
          {:ok, schema} <-
            at(:input, Plugin.compose_schema_from_specs(command.agent.schema, plugin_specs)) do
       {:ok,
@@ -82,7 +93,7 @@ defmodule Jido.Agent.Runner do
          command.context,
          exec_opts,
          command.plugin_inputs,
-         Plugin.specs(plugin_specs)
+         agent_specs
        )}
     end
   end
@@ -143,7 +154,8 @@ defmodule Jido.Agent.Runner do
          {:ok, signal} <- at(:input, Command.normalize_signal(signal)),
          plugin_specs = Plugin.specs(specs),
          {:ok, plugin_inputs} <- at(:prepare, Plugin.prepare(agent, signal, plugin_specs)),
-         {:ok, turn} <- at(:route, select(agent, signal)) do
+         {:ok, turn} <-
+           at(:route, select(agent, signal, plugin_inputs, plugin_specs)) do
       {:ok,
        prepared(
          agent,
@@ -250,8 +262,8 @@ defmodule Jido.Agent.Runner do
     end
   end
 
-  defp select(agent, signal) do
-    with {:ok, route} <- Jido.Agent.Route.select(agent, signal.type),
+  defp select(agent, signal, plugin_inputs, plugin_specs) do
+    with {:ok, route} <- Plugin.select_route(agent, signal, plugin_inputs, plugin_specs),
          {:ok, turn} <-
            (case route.handler do
               %{kind: kind, target: target} when kind in [:action, :flow] ->

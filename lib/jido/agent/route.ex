@@ -89,11 +89,7 @@ defmodule Jido.Agent.Route do
 
   defp helper(route) do
     with :ok <- Error.at(Data.name(route.as), :as),
-         :ok <- Error.at(helper_name(route.as), :as) do
-      if Data.wildcard?(route.path),
-        do: Error.fail(:wildcard_helper, :as, "A helper requires an exact input type"),
-        else: :ok
-    end
+         do: Error.at(helper_name(route.as), :as)
   end
 
   defp helper_name(value) do
@@ -285,16 +281,30 @@ defmodule Jido.Agent.Route do
   def select(%{routes: routes}, type), do: select(routes, type)
 
   def select(routes, type) when is_list(routes) do
-    with :ok <- Data.exact(type) do
-      case Enum.find(routes, &Data.matches?(type, &1.path)) do
+    with {:ok, candidates} <- matching(routes, type) do
+      case candidates do
         nil ->
           Error.fail(:unmatched_input, [:routes], "No route accepts this Signal type", %{
             type: type
           })
 
-        route ->
+        [] ->
+          Error.fail(:unmatched_input, [:routes], "No route accepts this Signal type", %{
+            type: type
+          })
+
+        [route | _rest] ->
           {:ok, route}
       end
+    end
+  end
+
+  @doc false
+  def matching(%{routes: routes}, type), do: matching(routes, type)
+
+  def matching(routes, type) when is_list(routes) do
+    with :ok <- Data.exact(type) do
+      {:ok, Enum.filter(routes, &Data.matches?(type, &1.path))}
     end
   end
 

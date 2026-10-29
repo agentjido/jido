@@ -18,7 +18,8 @@ defmodule Jido.Plugin.Normalizer do
     with {:ok, specs} <- normalize_specs(declarations, &normalize/1),
          :ok <- unique_packages(specs),
          :ok <- unique_state_keys(specs),
-         :ok <- unique_directives(specs) do
+         :ok <- unique_directives(specs),
+         :ok <- unique_route_selector(specs) do
       {:ok, specs}
     end
   end
@@ -124,6 +125,7 @@ defmodule Jido.Plugin.Normalizer do
     with true <- agent.package === manifest.module,
          true <- agent.module === facet,
          true <- agent.options === expected_options,
+         true <- agent.route_selector? === function_exported?(facet, :select_route, 2),
          {:ok, {_state_key, _state_schema}} <-
            validate_state_spec(declared_state, manifest.module, facet),
          {:ok, _directive_modules} <-
@@ -295,7 +297,8 @@ defmodule Jido.Plugin.Normalizer do
          options: options,
          state_key: state_key,
          state_schema: state_schema,
-         directive_modules: directive_modules
+         directive_modules: directive_modules,
+         route_selector?: function_exported?(facet, :select_route, 2)
        }}
     end
   end
@@ -685,6 +688,27 @@ defmodule Jido.Plugin.Normalizer do
       end
     end)
     |> unique_by(&elem(&1, 0), "Agent Plugin Directive ownership must be unique", :directive)
+  end
+
+  defp unique_route_selector(specs) do
+    selectors =
+      Enum.filter(specs, fn
+        %{agent: %AgentSpec{route_selector?: true}} -> true
+        _spec -> false
+      end)
+
+    case selectors do
+      [] ->
+        :ok
+
+      [_selector] ->
+        :ok
+
+      _selectors ->
+        PluginError.validation("Only one Agent Plugin can select routes", %{
+          plugins: Enum.map(selectors, & &1.module)
+        })
+    end
   end
 
   defp unique_by(values, key_fun, message, detail_key) do

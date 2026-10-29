@@ -17,7 +17,8 @@ defmodule Jido.Plugin do
   modules are required. A large Plugin can delegate work to ordinary modules.
 
   Core keeps callback ownership and execution order. Agent callbacks prepare
-  portable input and reduce one owned field in the complete Agent state.
+  portable input, optionally select one declared matching route, and reduce one
+  owned field in the complete Agent state.
   Agent Server callbacks admit live input, manage a supervised runtime, and
   run work after commit. Persistence callbacks convert the owned state value.
 
@@ -56,6 +57,8 @@ defmodule Jido.Plugin do
 
   @callback prepare(Jido.Agent.Plugin.Preparation.t(), keyword()) ::
               {:ok, term()} | {:error, term()}
+  @callback select_route(Jido.Agent.Plugin.RouteSelection.t(), keyword()) ::
+              :default | {:ok, atom()} | {:error, term()}
   @callback state_spec(keyword()) :: state_spec() | {:error, term()}
   @callback directives(keyword()) :: [module()] | {:error, term()}
   @callback reduce(Jido.Agent.Plugin.Reduction.t(), keyword()) :: {:ok, term()} | {:error, term()}
@@ -102,7 +105,7 @@ defmodule Jido.Plugin do
               {:ok, term()} | {:error, term()}
 
   @owner_callbacks [
-    agent: [prepare: 2, state_spec: 1, directives: 1, reduce: 2],
+    agent: [prepare: 2, select_route: 2, state_spec: 1, directives: 1, reduce: 2],
     agent_server: [
       validate_options: 1,
       admit: 3,
