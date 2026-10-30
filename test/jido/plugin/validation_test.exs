@@ -125,6 +125,16 @@ defmodule Jido.Plugin.ValidationTest do
     end
   end
 
+  defmodule RuntimeDeliveryAdapter do
+    @behaviour Jido.Plugin.Scheduler.DeliveryAdapter
+
+    @impl true
+    def reconcile(_context, _desired), do: :ok
+
+    @impl true
+    def schedule(_context, _delay_ms, _signal), do: :ok
+  end
+
   defmodule FailingDirectives do
     use Jido.Plugin
 
@@ -301,6 +311,48 @@ defmodule Jido.Plugin.ValidationTest do
 
     assert :none = Jido.AgentServer.Plugin.Callbacks.child_spec(init, spec)
     refute_received {:callback, _, _}
+  end
+
+  test "runtime options change only mapped AgentServer facet options" do
+    declaration = {Jido.Plugin.Scheduler, [retry_delay_ms: 10]}
+
+    assert {:ok, [spec]} =
+             Jido.Plugin.Normalizer.normalize_runtime(
+               [declaration],
+               [
+                 {Empty, [ignored: true]},
+                 {Jido.Plugin.Scheduler, [delivery_adapter: RuntimeDeliveryAdapter]}
+               ]
+             )
+
+    assert spec.options == [retry_delay_ms: 10]
+    assert spec.agent.options == []
+
+    assert spec.agent_server.options == [
+             retry_delay_ms: 10,
+             delivery_adapter: RuntimeDeliveryAdapter
+           ]
+
+    assert {:error, error} =
+             Jido.Plugin.Normalizer.normalize_runtime(
+               [{Jido.Plugin.Audit, [max_entries: 5]}],
+               [{Jido.Plugin.Audit, [max_entries: 10]}]
+             )
+
+    assert error.message ==
+             "Plugin runtime options can contain only AgentServer-owned options"
+
+    assert error.details.invalid_keys == [:max_entries]
+
+    for runtime_options <- [
+          :invalid,
+          [{OptionValidator, :invalid}],
+          [{OptionValidator, []}, {OptionValidator, []}],
+          [{OptionValidator, [marker: :first, marker: :second]}]
+        ] do
+      assert {:error, %{__exception__: true}} =
+               Jido.Plugin.Normalizer.normalize_runtime([declaration], runtime_options)
+    end
   end
 
   test "direct preparation validates Plugin declarations once" do

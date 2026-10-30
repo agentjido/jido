@@ -7,6 +7,7 @@ defmodule JidoTest.AgentServer.StartupTest do
   alias Jido.AgentServer, as: Server
   alias Jido.AgentServer.Core
   alias JidoTest.AgentServer.Fixtures, as: F
+  alias JidoTest.ScheduledOccurrenceFixtures.FastRuntimeAgent
 
   setup do
     F.setup_runtime()
@@ -174,6 +175,22 @@ defmodule JidoTest.AgentServer.StartupTest do
 
     assert :ok = Server.validate_defaults(debug_max_events: 1)
     assert :ok = Server.validate_defaults(debug_max_events: 10_000)
+    assert :ok = Server.validate_defaults(persistence: :inherit, idle_policy: :hibernate)
+
+    assert {:error, %{__exception__: true}} =
+             Server.validate_defaults(plugin_runtime_options: :invalid)
+
+    scheduler_agent =
+      FastRuntimeAgent.instantiate!(id: "invalid-runtime-options")
+
+    assert {:error, %{message: "Scheduler delivery_adapter is invalid"}} =
+             Server.activation_options(
+               agent: scheduler_agent,
+               runner: c.runner,
+               plugin_runtime_options: [
+                 {Jido.Plugin.Scheduler, [delivery_adapter: String]}
+               ]
+             )
   end
 
   @tag obligation: "jido.agent_server.I2"

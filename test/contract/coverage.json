@@ -3259,7 +3259,7 @@
           "status": "active",
           "testable": true,
           "tests": [
-            "test Scheduler exposes only its constructors, Directives, DSL, and occurrence data",
+            "test Scheduler exposes its durable delivery helpers and authoring API",
             "test Scheduler state contains recurring definitions and applies changes in order"
           ]
         },
@@ -3270,7 +3270,7 @@
           "status": "active",
           "testable": true,
           "tests": [
-            "test Scheduler exposes only its constructors, Directives, DSL, and occurrence data",
+            "test Scheduler exposes its durable delivery helpers and authoring API",
             "test cron definitions reject nested nonportable values and reserved metadata",
             "test invalid and retired Scheduler inputs fail before state can change",
             "test saved definitions with retired delivery fields fail validation"
@@ -3283,7 +3283,7 @@
           "status": "active",
           "testable": true,
           "tests": [
-            "test Scheduler exposes only its constructors, Directives, DSL, and occurrence data",
+            "test Scheduler exposes its durable delivery helpers and authoring API",
             "test static authoring normalizes timing and verifies accepted inputs",
             "test static authoring rejects mixed timing and live Signal template data"
           ]
@@ -3291,10 +3291,11 @@
         "jido.plugin.scheduler.I4": {
           "failing": 0,
           "kind": "ordering",
-          "passing": 2,
+          "passing": 3,
           "status": "active",
           "testable": true,
           "tests": [
+            "test an external delivery adapter replaces all local delivery timers",
             "test one-shot timers deliver one fresh traced Signal and ignore stale tokens",
             "test runtime termination cancels one-shot and recurring timers"
           ]
@@ -3302,10 +3303,11 @@
         "jido.plugin.scheduler.I5": {
           "failing": 0,
           "kind": "functional",
-          "passing": 4,
+          "passing": 5,
           "status": "active",
           "testable": true,
           "tests": [
+            "test an external delivery adapter replaces all local delivery timers",
             "test plain recurring ticks stay untagged and use fresh Signal IDs",
             "test reconciliation replaces a dead matching job before its DOWN message",
             "test recurring reconciliation retains equal jobs and fences stale versions and ticks",
@@ -3315,11 +3317,12 @@
         "jido.plugin.scheduler.I6": {
           "failing": 0,
           "kind": "functional",
-          "passing": 6,
+          "passing": 7,
           "status": "active",
           "testable": true,
           "tests": [
-            "test Scheduler exposes only its constructors, Directives, DSL, and occurrence data",
+            "test Scheduler exposes its durable delivery helpers and authoring API",
+            "test cron rules and occurrence identity are available to durable hosts",
             "test equal occurrence coordinates produce one stable ID and preserve Signal values",
             "test every occurrence coordinate can change the logical ID",
             "test missing, partial, and malformed occurrence metadata return errors",
@@ -3343,10 +3346,12 @@
         "jido.plugin.scheduler.I8": {
           "failing": 0,
           "kind": "functional",
-          "passing": 4,
+          "passing": 6,
           "status": "active",
           "testable": true,
           "tests": [
+            "test external delayed delivery contains invalid results and adapter failures",
+            "test external reconciliation retries the latest committed definitions",
             "test failed cron activation retries, ignores stale work, and recovers",
             "test invalid runtime clocks fail activation and own one retry timer",
             "test job exits become dormant, disappear, or retry from the latest definition",

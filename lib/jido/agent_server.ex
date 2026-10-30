@@ -146,9 +146,7 @@ defmodule Jido.AgentServer do
   @spec start(keyword()) :: Supervisor.on_start_child()
   def start(opts) when is_list(opts) do
     if Keyword.keyword?(opts) and not is_nil(opts[:jido]) do
-      with {:ok, opts} <- runtime_options(opts),
-           :ok <- validate_options(opts),
-           {:ok, _agent} <- validate_start_agent(opts) do
+      with {:ok, opts} <- activation_options(opts) do
         case ServerSupervisor.start_activation(
                Jido.agent_supervisor_name(opts[:jido]),
                child_spec(opts)
@@ -219,7 +217,10 @@ defmodule Jido.AgentServer do
   def start_link(opts) when is_list(opts) do
     with {:ok, opts} <- activation_options(opts),
          {:ok, specs} <-
-           Jido.Plugin.Normalizer.normalize_all(Jido.Agent.runtime_plugins(opts[:agent])) do
+           Jido.Plugin.Normalizer.normalize_runtime(
+             Jido.Agent.runtime_plugins(opts[:agent]),
+             opts[:plugin_runtime_options]
+           ) do
       if not Jido.Agent.Topology.empty?(opts[:agent].topology) or
            TopologyRuntime.buses(opts[:agent]) != [] or
            opts[:persistence] not in [nil, false] or
@@ -239,6 +240,11 @@ defmodule Jido.AgentServer do
       with {:ok, opts} <- runtime_options(opts),
            :ok <- validate_options(opts),
            {:ok, agent} <- validate_start_agent(opts),
+           {:ok, _specs} <-
+             Jido.Plugin.Normalizer.normalize_runtime(
+               Jido.Agent.runtime_plugins(agent),
+               opts[:plugin_runtime_options]
+             ),
            do: {:ok, Keyword.put(opts, :agent, agent)}
     else
       invalid_options("options must be a keyword list")
@@ -368,7 +374,8 @@ defmodule Jido.AgentServer do
         invalid_options("Runner is not running")
 
       true ->
-        with :ok <- validate_runner(Keyword.fetch!(opts, :runner), opts[:jido]),
+        with :ok <- validate_activation_scope(opts),
+             :ok <- validate_runner(Keyword.fetch!(opts, :runner), opts[:jido]),
              do: validate_runtime(opts)
     end
   end
@@ -393,6 +400,12 @@ defmodule Jido.AgentServer do
              :default_dispatch
            ),
          do: :ok
+  end
+
+  defp validate_activation_scope(opts) do
+    if opts[:persistence] not in [nil, false] and is_nil(opts[:jido]),
+      do: invalid_options("persistence requires a Jido instance with a stable namespace"),
+      else: :ok
   end
 
   defp validate_runner(runner, _jido) do
@@ -825,7 +838,11 @@ defmodule Jido.AgentServer do
   defp init_registered(agent, runner, opts, monitors) do
     Semantic.point([:jido, :agent_server, :lifecycle, :start], %{agent_id: agent.id})
 
-    {:ok, specs} = Jido.Plugin.Normalizer.normalize_all(Jido.Agent.runtime_plugins(agent))
+    {:ok, specs} =
+      Jido.Plugin.Normalizer.normalize_runtime(
+        Jido.Agent.runtime_plugins(agent),
+        opts[:plugin_runtime_options]
+      )
 
     data =
       Map.merge(Map.new(Core.runtime_keys(), &{&1, Keyword.fetch!(opts, &1)}), %{
@@ -872,7 +889,11 @@ defmodule Jido.AgentServer do
   defp initialize_plugins(data) do
     case Jido.Agent.Composition.bind(data.agent) do
       {:ok, agent} ->
-        {:ok, specs} = Jido.Plugin.Normalizer.normalize_all(Jido.Agent.runtime_plugins(agent))
+        {:ok, specs} =
+          Jido.Plugin.Normalizer.normalize_runtime(
+            Jido.Agent.runtime_plugins(agent),
+            data.plugin_runtime_options
+          )
 
         if data.activation_state,
           do: Durable.restore(data.activation_state, agent, data.state_version)
@@ -2010,7 +2031,12 @@ defmodule Jido.AgentServer do
          %{bootstrap: %{kind: :persistence}} = data
        ) do
     Durable.restore(data.activation_state, agent, revision)
-    {:ok, specs} = Jido.Plugin.Normalizer.normalize_all(Jido.Agent.runtime_plugins(agent))
+
+    {:ok, specs} =
+      Jido.Plugin.Normalizer.normalize_runtime(
+        Jido.Agent.runtime_plugins(agent),
+        data.plugin_runtime_options
+      )
 
     data = %{
       data
@@ -3101,7 +3127,10 @@ defmodule Jido.AgentServer do
           {candidate, directives} = success_candidate_and_directives(result)
 
           {:ok, specs} =
-            Jido.Plugin.Normalizer.normalize_all(Jido.Agent.runtime_plugins(candidate))
+            Jido.Plugin.Normalizer.normalize_runtime(
+              Jido.Agent.runtime_plugins(candidate),
+              data.plugin_runtime_options
+            )
 
           active =
             Map.merge(data.active, %{

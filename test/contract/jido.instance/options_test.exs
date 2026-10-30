@@ -35,6 +35,17 @@ defmodule JidoTest.InstanceOptionsTest do
 
       assert validated[:agent_server] == [turn_timeout: 10]
     end
+
+    durable_defaults = [persistence: :inherit, idle_policy: :hibernate]
+
+    assert {:ok, validated} =
+             Options.validate(
+               name: name,
+               persistence: Jido.Persistence.ETS,
+               agent_server: durable_defaults
+             )
+
+    assert validated[:agent_server] == durable_defaults
   end
 
   @tag obligation: "jido.instance.I1"
@@ -64,6 +75,15 @@ defmodule JidoTest.InstanceOptionsTest do
 
     assert Jido.Error.code(persistence_error) == :jido_instance_invalid_config
     assert Map.has_key?(persistence_error.details, :reason)
+
+    assert {:error, inheritance_error} =
+             Options.validate(
+               name: name,
+               agent_server: [persistence: :inherit, idle_policy: :hibernate]
+             )
+
+    assert Jido.Error.code(inheritance_error) == :jido_instance_invalid_config
+    assert inheritance_error.details.persistence == nil
   end
 
   @tag obligation: "jido.instance.I1"

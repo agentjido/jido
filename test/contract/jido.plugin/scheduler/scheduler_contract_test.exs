@@ -13,6 +13,16 @@ defmodule JidoTest.Contract.PluginSchedulerTest do
   @scope {ExampleJido, "agent-1", "tenant-1"}
   @instant ~U[2030-01-01 00:00:01Z]
 
+  defmodule DeliveryAdapter do
+    @behaviour Jido.Plugin.Scheduler.DeliveryAdapter
+
+    @impl true
+    def reconcile(_context, _desired), do: :ok
+
+    @impl true
+    def schedule(_context, _delay_ms, _signal), do: :ok
+  end
+
   defp tick, do: Signal.new!("test.tick", %{value: 7}, source: "/test")
 
   defp contribution(data) do
@@ -432,12 +442,13 @@ defmodule JidoTest.Contract.PluginSchedulerTest do
 
     assert %{
              option_keys: %{
-               agent_server: [:retry_delay_ms, :time_scale]
+               agent_server: [:delivery_adapter, :retry_delay_ms, :time_scale]
              }
            } = Scheduler.__jido_plugin__()
 
     for options <- [
           [],
+          [delivery_adapter: DeliveryAdapter],
           [retry_delay_ms: 1, time_scale: SchedEx.IdentityTimeScale],
           [retry_delay_ms: 4_294_967_295, time_scale: SchedEx.IdentityTimeScale]
         ] do
@@ -476,6 +487,96 @@ defmodule JidoTest.Contract.PluginSchedulerTest do
                 }
               }} = Scheduler.validate_options(time_scale: time_scale)
     end
+
+    for adapter <- [nil, String, __MODULE__.MissingDeliveryAdapter] do
+      assert {:error,
+              %Jido.Error.ValidationError{
+                message: "Scheduler delivery_adapter is invalid",
+                details: %{
+                  option: :delivery_adapter,
+                  value: ^adapter,
+                  callbacks: [reconcile: 2, schedule: 3]
+                }
+              }} = Scheduler.validate_options(delivery_adapter: adapter)
+    end
+  end
+
+  @tag obligation: "jido.plugin.scheduler.I6"
+  test "cron rules and occurrence identity are available to durable hosts" do
+    assert {:ok, ~U[2030-01-01 00:00:01Z]} =
+             Scheduler.next_occurrence("* * * * * * *", "Etc/UTC", ~U[2030-01-01 00:00:00Z])
+
+    assert {:ok, ~U[2030-01-01 00:00:02Z]} =
+             Scheduler.next_occurrence(
+               "* * * * * * *",
+               "Etc/UTC",
+               ~U[2030-01-01 00:00:01.000001Z]
+             )
+
+    assert {:error, _reason} =
+             Scheduler.next_occurrence("not cron", "Etc/UTC", ~U[2030-01-01 00:00:00Z])
+
+    assert {:error, :invalid_cron_boundary} =
+             Scheduler.next_occurrence("@reboot", "Etc/UTC", ~U[2030-01-01 00:00:00Z])
+
+    assert {:error, :invalid_cron_boundary} =
+             Scheduler.next_occurrence("* * * * *", "Etc/UTC", :not_a_datetime)
+
+    assert {:ok, first} =
+             Scheduler.occurrence_signal(
+               tick(),
+               {ExampleJido, "agent-1", nil},
+               "job-1",
+               3,
+               ~U[2030-01-01 00:00:01Z]
+             )
+
+    assert {:ok, second} =
+             Scheduler.occurrence_signal(
+               tick(),
+               {ExampleJido, "agent-1", nil},
+               "job-1",
+               3,
+               ~U[2030-01-01 00:00:01Z]
+             )
+
+    assert {:ok, first_occurrence} = Scheduler.occurrence(first)
+    assert {:ok, second_occurrence} = Scheduler.occurrence(second)
+    assert first_occurrence.id == second_occurrence.id
+    refute first.id == second.id
+
+    assert {:ok, default_generation} =
+             Scheduler.occurrence_signal(
+               tick(),
+               {ExampleJido, "agent-1", nil},
+               "legacy-job",
+               nil,
+               ~U[2030-01-01 00:00:01Z]
+             )
+
+    assert {:ok, %Occurrence{generation: 0}} = Scheduler.occurrence(default_generation)
+
+    for invalid_generation <- [-1, 2_147_483_648, "3"] do
+      assert {:error, :invalid_schedule_occurrence} =
+               Scheduler.occurrence_signal(
+                 tick(),
+                 {ExampleJido, "agent-1", nil},
+                 "job-1",
+                 invalid_generation,
+                 ~U[2030-01-01 00:00:01Z]
+               )
+    end
+
+    {:ok, reserved} = Signal.put_context(tick(), "jidooccurrenceid", "reserved")
+
+    assert {:error, :reserved_occurrence_metadata} =
+             Scheduler.occurrence_signal(
+               reserved,
+               {ExampleJido, "agent-1", nil},
+               "job-1",
+               3,
+               ~U[2030-01-01 00:00:01Z]
+             )
   end
 
   @tag obligation: "jido.plugin.scheduler.I9"

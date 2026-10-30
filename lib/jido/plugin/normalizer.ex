@@ -28,6 +28,35 @@ defmodule Jido.Plugin.Normalizer do
     do: PluginError.validation("Agent Plugins must be a list", %{plugins: value})
 
   @doc false
+  @spec normalize_runtime([Jido.Plugin.declaration()] | [Spec.t()], keyword()) ::
+          {:ok, [Spec.t()]} | {:error, term()}
+  def normalize_runtime(declarations, runtime_options) do
+    with :ok <- validate_runtime_options(runtime_options),
+         {:ok, specs} <- normalize_all(declarations),
+         do: bind_runtime_options(specs, runtime_options)
+  end
+
+  @doc false
+  @spec validate_runtime_options(term()) :: :ok | {:error, term()}
+  def validate_runtime_options(runtime_options) do
+    valid? =
+      Keyword.keyword?(runtime_options) and
+        Keyword.keys(runtime_options) == Enum.uniq(Keyword.keys(runtime_options)) and
+        Enum.all?(runtime_options, fn {plugin, options} ->
+          is_atom(plugin) and plugin not in [nil, true, false] and
+            Keyword.keyword?(options) and
+            Keyword.keys(options) == Enum.uniq(Keyword.keys(options))
+        end)
+
+    if valid?,
+      do: :ok,
+      else:
+        PluginError.validation("Plugin runtime options are invalid", %{
+          runtime_options: runtime_options
+        })
+  end
+
+  @doc false
   @spec canonical_declarations([Jido.Plugin.declaration()] | [Spec.t()]) ::
           {:ok, [{module(), keyword()}]} | {:error, term()}
   def canonical_declarations(declarations) do
@@ -50,6 +79,67 @@ defmodule Jido.Plugin.Normalizer do
 
   def declarations(values),
     do: PluginError.validation("Agent Plugins must be a list", %{plugins: values})
+
+  defp bind_runtime_options(specs, runtime_options) do
+    specs
+    |> Enum.reduce_while({:ok, []}, fn spec, {:ok, bound} ->
+      case bind_runtime_spec(spec, runtime_options) do
+        {:ok, spec} -> {:cont, {:ok, [spec | bound]}}
+        {:error, _reason} = error -> {:halt, error}
+      end
+    end)
+    |> case do
+      {:ok, specs} -> {:ok, Enum.reverse(specs)}
+      {:error, _reason} = error -> error
+    end
+  end
+
+  defp bind_runtime_spec(%Spec{module: module} = spec, runtime_options) do
+    case Keyword.fetch(runtime_options, module) do
+      :error ->
+        {:ok, spec}
+
+      {:ok, []} ->
+        {:ok, spec}
+
+      {:ok, options} ->
+        with :ok <- validate_runtime_option_keys(spec.manifest, options),
+             %ServerSpec{} = server <- spec.agent_server,
+             merged = Keyword.merge(server.options, options),
+             :ok <- validate_server_options(server.package, server.module, merged) do
+          {:ok, %{spec | agent_server: %{server | options: merged}}}
+        else
+          nil -> invalid_runtime_options(module, Keyword.keys(options), [])
+          {:error, _reason} = error -> error
+        end
+    end
+  end
+
+  defp validate_runtime_option_keys(%Manifest{} = manifest, options) do
+    server_keys = Map.get(manifest.option_keys, :agent_server, [])
+
+    other_keys =
+      manifest.option_keys
+      |> Map.take([:agent, :persistence])
+      |> Map.values()
+      |> List.flatten()
+
+    allowed = server_keys -- other_keys
+    invalid = Keyword.keys(options) -- allowed
+
+    if invalid == [] do
+      :ok
+    else
+      invalid_runtime_options(manifest.module, invalid, allowed)
+    end
+  end
+
+  defp invalid_runtime_options(plugin, invalid_keys, allowed) do
+    PluginError.validation(
+      "Plugin runtime options can contain only AgentServer-owned options",
+      %{plugin: plugin, invalid_keys: invalid_keys, allowed: allowed}
+    )
+  end
 
   defp normalize_specs(values, prepare) do
     {specs, declarations} = Enum.split_with(values, &match?(%Spec{}, &1))

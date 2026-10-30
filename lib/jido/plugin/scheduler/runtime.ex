@@ -6,7 +6,7 @@ defmodule Jido.Plugin.Scheduler.Runtime do
   alias Jido.AgentServer, as: Server
   alias Jido.Plugin.{DirectiveContext, Init}
   alias Jido.Plugin.Scheduler
-  alias Jido.Plugin.Scheduler.{Cancel, Cron, Occurrence, Schedule, WallClock}
+  alias Jido.Plugin.Scheduler.{Cancel, Cron, Schedule, WallClock}
   alias Jido.Signal
   alias Jido.Tracing.Trace
 
@@ -22,6 +22,7 @@ defmodule Jido.Plugin.Scheduler.Runtime do
       partition: init.partition,
       jido: init.jido,
       options: init.options,
+      state_version: init.state_version,
       cron_jobs: %{},
       dormant_cron: %{},
       desired_cron: %{},
@@ -37,9 +38,9 @@ defmodule Jido.Plugin.Scheduler.Runtime do
   @impl true
   def handle_continue(:reconcile_agent, runtime) do
     with {:ok, desired} <- current_plugin_state(runtime),
-         {:ok, runtime} <- reconcile_cron(runtime, Map.get(desired, :cron, %{})) do
+         {:ok, runtime} <- reconcile_delivery(runtime, Map.get(desired, :cron, %{})) do
       notify(runtime, {:scheduler_plugin_ready, self()})
-      {:noreply, runtime}
+      {:noreply, %{runtime | last_reconciled_version: runtime.state_version}}
     else
       {:error, reason} ->
         {:stop, {:scheduler_boot_failed, reason}, runtime}
@@ -52,11 +53,25 @@ defmodule Jido.Plugin.Scheduler.Runtime do
   @impl true
   def handle_call(:await_ready, _from, runtime), do: {:reply, :ok, runtime}
 
-  def handle_call({:directive, %Schedule{} = directive, context}, _from, runtime) do
+  def handle_call(
+        {:directive, %Schedule{} = directive, %DirectiveContext{} = context},
+        _from,
+        runtime
+      ) do
+    runtime = %{runtime | state_version: context.state_version}
     signal = scheduled_signal(directive.signal, context)
-    token = make_ref()
-    timer = Process.send_after(self(), {:deliver, token, signal}, directive.delay_ms)
-    {:reply, :ok, %{runtime | timers: Map.put(runtime.timers, token, timer)}}
+
+    case delivery_adapter(runtime) do
+      nil ->
+        token = make_ref()
+        timer = Process.send_after(self(), {:deliver, token, signal}, directive.delay_ms)
+        {:reply, :ok, %{runtime | timers: Map.put(runtime.timers, token, timer)}}
+
+      adapter ->
+        result = external_schedule(adapter, runtime, context, directive.delay_ms, signal)
+
+        {:reply, result, runtime}
+    end
   end
 
   def handle_call({:directive, directive, %DirectiveContext{} = context}, _from, runtime)
@@ -64,9 +79,10 @@ defmodule Jido.Plugin.Scheduler.Runtime do
     if stale_state_version?(runtime.last_reconciled_version, context.state_version) do
       {:reply, :ok, runtime}
     else
+      runtime = %{runtime | state_version: context.state_version}
       desired = Map.get(context.plugin_state, :cron, %{})
 
-      case reconcile_cron(runtime, desired) do
+      case reconcile_delivery(runtime, desired) do
         {:ok, runtime} ->
           runtime =
             runtime
@@ -128,7 +144,7 @@ defmodule Jido.Plugin.Scheduler.Runtime do
       ) do
     runtime = %{runtime | retry_timer: nil, retry_token: nil}
 
-    case reconcile_cron(runtime, runtime.desired_cron) do
+    case reconcile_delivery(runtime, runtime.desired_cron) do
       {:ok, runtime} ->
         notify(runtime, {:scheduler_retry_succeeded, state_version})
         {:noreply, %{runtime | last_reconciled_version: state_version}}
@@ -175,6 +191,27 @@ defmodule Jido.Plugin.Scheduler.Runtime do
           {:halt, {:error, {:cron_activation_failed, job_id, reason}, runtime}}
       end
     end)
+  end
+
+  defp reconcile_delivery(runtime, desired) when is_map(desired) do
+    runtime = %{runtime | desired_cron: desired}
+
+    case delivery_adapter(runtime) do
+      nil ->
+        reconcile_cron(runtime, desired)
+
+      adapter ->
+        case adapter_call(adapter, :reconcile, [delivery_context(runtime), desired]) do
+          :ok ->
+            {:ok, stop_local_delivery(runtime)}
+
+          {:error, reason} ->
+            {:error, {:external_reconcile_failed, reason}, runtime}
+
+          other ->
+            {:error, {:external_reconcile_invalid_result, other}, runtime}
+        end
+    end
   end
 
   defp ensure_cron_job(runtime, job_id, spec) do
@@ -336,7 +373,7 @@ defmodule Jido.Plugin.Scheduler.Runtime do
   defp cron_tick(_spec, signal, _scope, _job, nil, _time), do: fresh_signal(signal)
 
   defp cron_tick(_spec, signal, scope, job, generation, time) do
-    {:ok, tick} = Occurrence.attach(fresh_signal(signal), scope, job, generation, time)
+    {:ok, tick} = Scheduler.occurrence_signal(signal, scope, job, generation, time)
     tick
   end
 
@@ -368,8 +405,6 @@ defmodule Jido.Plugin.Scheduler.Runtime do
   defp scheduled_signal(%Signal{} = signal, %DirectiveContext{effective_signal: source}),
     do: propagate(signal, source)
 
-  defp scheduled_signal(%Signal{} = signal, _context), do: signal
-
   defp propagate(%Signal{} = signal, %Signal{} = source) do
     case Trace.get(source) do
       %{trace_id: _trace_id, span_id: _span_id} = trace ->
@@ -388,6 +423,46 @@ defmodule Jido.Plugin.Scheduler.Runtime do
     |> Signal.to_map()
     |> Map.delete("id")
     |> Signal.new!()
+  end
+
+  defp delivery_adapter(runtime), do: Keyword.get(runtime.options, :delivery_adapter)
+
+  defp external_schedule(adapter, runtime, context, delay_ms, signal) do
+    case adapter_call(adapter, :schedule, [delivery_context(runtime, context), delay_ms, signal]) do
+      :ok -> :ok
+      {:error, reason} -> {:error, {:external_schedule_failed, reason}}
+      other -> {:error, {:external_schedule_invalid_result, other}}
+    end
+  end
+
+  defp stop_local_delivery(runtime) do
+    Enum.each(runtime.cron_jobs, fn {_id, tracked} -> cancel_tracked_cron(tracked) end)
+    Enum.each(runtime.timers, fn {_token, timer} -> :erlang.cancel_timer(timer) end)
+    %{runtime | cron_jobs: %{}, dormant_cron: %{}, timers: %{}}
+  end
+
+  defp delivery_context(runtime, context \\ nil) do
+    %{
+      agent_id: runtime.agent_id,
+      jido: runtime.jido,
+      partition: runtime.partition,
+      scope: {runtime.jido, runtime.agent_id, runtime.partition},
+      state_version: context_state_version(context, runtime.state_version),
+      turn_id: context_turn_id(context)
+    }
+  end
+
+  defp context_state_version(%DirectiveContext{state_version: version}, _default), do: version
+  defp context_state_version(_context, default), do: default
+  defp context_turn_id(%DirectiveContext{turn_id: turn_id}), do: turn_id
+  defp context_turn_id(_context), do: nil
+
+  defp adapter_call(adapter, function, arguments) do
+    apply(adapter, function, arguments)
+  rescue
+    exception -> {:error, {:adapter_exception, Exception.message(exception)}}
+  catch
+    kind, reason -> {:error, {:adapter_failure, kind, reason}}
   end
 
   defp notify(runtime, message) do

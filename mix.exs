@@ -278,6 +278,7 @@ defmodule Jido.MixProject do
           Jido.Plugin.Scheduler,
           Jido.Plugin.Scheduler.Cancel,
           Jido.Plugin.Scheduler.Cron,
+          Jido.Plugin.Scheduler.DeliveryAdapter,
           Jido.Plugin.Scheduler.Occurrence,
           Jido.Plugin.Scheduler.Schedule,
           Jido.Plugin.SensorManager,

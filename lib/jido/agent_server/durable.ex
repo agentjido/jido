@@ -7,9 +7,6 @@ defmodule Jido.AgentServer.Durable do
 
   def validate_runtime(opts) do
     cond do
-      enabled?(opts[:persistence]) and is_nil(opts[:jido]) ->
-        invalid("persistence requires a Jido instance with a stable namespace")
-
       not (is_integer(opts[:persistence_timeout]) and
                opts[:persistence_timeout] in 0..@max_timeout) ->
         invalid("invalid persistence_timeout")

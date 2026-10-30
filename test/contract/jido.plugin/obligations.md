@@ -52,8 +52,8 @@ Plugin does.
 
 ### jido.plugin.I4 — Declaration normalization
 
-- **scope:** `Jido.Plugin.Normalizer.normalize_all/1`, `canonical_declarations/1`, `declarations/1`
-- **must:** Accept Plugin modules, module-and-keyword declarations, or a complete list of normalized Specs. Preserve declaration order and exact common options. Reject malformed declarations, unloaded modules, incomplete or inconsistent Specs, mixed Specs and declarations, repeated Plugin modules, and mismatched marker metadata. Reusing a normalized Spec must recheck its static structure without running declaration callbacks again.
+- **scope:** `Jido.Plugin.Normalizer.normalize_all/1`, `normalize_runtime/2`, `canonical_declarations/1`, `declarations/1`
+- **must:** Accept Plugin modules, module-and-keyword declarations, or a complete list of normalized Specs. Preserve declaration order and exact common options. Reject malformed declarations, unloaded modules, incomplete or inconsistent Specs, mixed Specs and declarations, repeated Plugin modules, and mismatched marker metadata. Reusing a normalized Spec must recheck its static structure without running declaration callbacks again. Runtime options must be unique Plugin-to-keyword entries. They can merge only into exclusive AgentServer facet options of a matching declared Plugin. They must pass normal AgentServer Plugin option validation. They must not change the common Plugin declaration, the Agent facet, or the persistence facet.
 - **why:** Authoring and runtime consumers need one canonical Plugin declaration without repeated callback work.
 - **kind:** functional
 - **status:** active

@@ -126,6 +126,26 @@ context.plugin_inputs[MyApp.Throttle]
 `Jido.Agent.cmd/3` runs `prepare/2`. It does not run `admit/3`, so the runtime
 input is `nil` for a pure command.
 
+## Set Host Runtime Options
+
+Keep host adapters out of an Agent definition. Set them in the Jido instance
+`agent_server:` configuration:
+
+```elixir
+config :my_app, MyApp.Jido,
+  agent_server: [
+    plugin_runtime_options: [
+      {Jido.Plugin.Scheduler, delivery_adapter: MyApp.ScheduleAdapter}
+    ]
+  ]
+```
+
+The Plugin must map each accepted key only to its `:agent_server` owner. Jido
+merges these values into the Agent Server facet after it validates the stored
+Plugin declaration. It does not change the Agent definition, Agent options, or
+persistence options. Jido ignores an entry when an Agent does not use that
+Plugin.
+
 ## Runtime Callback Owners
 
 Jido groups runtime callbacks by the component that calls them.

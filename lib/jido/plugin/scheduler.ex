@@ -34,9 +34,37 @@ defmodule Jido.Plugin.Scheduler do
   result must be a positive number, and `now/1` must return a `DateTime`. It
   affects recurring schedules only. The default uses current time. Runtime clock
   state is not saved in the Agent checkpoint.
+
+  The optional `:delivery_adapter` moves delayed and recurring delivery to an
+  external host. The Scheduler still owns definitions, cron calculation,
+  generations, and occurrence metadata. With this option, the AgentServer
+  starts no local schedule delivery timers. The adapter owns persistence,
+  leases, delivery, and acknowledgement.
+
+  An application can install one adapter for its AgentServer instances:
+
+      agent_server: [
+        plugin_runtime_options: [
+          {Jido.Plugin.Scheduler, delivery_adapter: MyApp.ScheduleAdapter}
+        ]
+      ]
+
+  Runtime options can change only options owned by the AgentServer Plugin
+  facet. They do not change the Agent definition or persistence Plugin options.
+
+  Durable delivery uses generation `0` when a saved recurring definition has
+  no generation. Local delivery keeps the old untagged Signal behavior for such
+  definitions.
+
+  Recurring definitions become durable when `reconcile/2` succeeds. A delayed
+  one-shot Signal becomes durable when `schedule/3` succeeds. A process failure
+  before either callback succeeds can lose the new schedule. A host that needs
+  atomic Agent commits and schedule storage must add an outbox at its storage
+  boundary.
   """
 
-  use Jido.Plugin, option_keys: [agent_server: [:retry_delay_ms, :time_scale]]
+  use Jido.Plugin,
+    option_keys: [agent_server: [:delivery_adapter, :retry_delay_ms, :time_scale]]
 
   @impl true
   defdelegate state_spec(opts), to: Jido.Plugin.Scheduler.Agent
@@ -64,6 +92,7 @@ defmodule Jido.Plugin.Scheduler do
 
   alias Jido.Plugin.Scheduler.{
     Cancel,
+    CronRules,
     Cron,
     Occurrence,
     Schedule
@@ -79,6 +108,7 @@ defmodule Jido.Plugin.Scheduler do
   @type option ::
           {:retry_delay_ms, 1..4_294_967_295}
           | {:time_scale, module()}
+          | {:delivery_adapter, module()}
 
   @typedoc "One recurring schedule constructor option."
   @type cron_option ::
@@ -107,6 +137,35 @@ defmodule Jido.Plugin.Scheduler do
   @spec occurrence(Signal.t()) :: {:ok, Occurrence.t()} | {:error, term()}
   defdelegate occurrence(signal), to: Occurrence, as: :from_signal
 
+  @doc "Returns the next UTC occurrence after one UTC instant."
+  @spec next_occurrence(String.t(), String.t(), DateTime.t()) ::
+          {:ok, DateTime.t()} | {:error, term()}
+  defdelegate next_occurrence(expression, timezone, after_time), to: CronRules
+
+  @doc "Builds one fresh recurring occurrence Signal."
+  @spec occurrence_signal(Signal.t(), term(), term(), non_neg_integer() | nil, DateTime.t()) ::
+          {:ok, Signal.t()} | {:error, term()}
+  def occurrence_signal(%Signal{} = signal, scope, job_id, nil, %DateTime{} = scheduled_at),
+    do: occurrence_signal(signal, scope, job_id, 0, scheduled_at)
+
+  def occurrence_signal(
+        %Signal{} = signal,
+        scope,
+        job_id,
+        generation,
+        %DateTime{} = scheduled_at
+      )
+      when is_integer(generation) and generation in 0..2_147_483_647 do
+    with :ok <- validate_occurrence_scope(scope),
+         :ok <- validate_job_id(job_id),
+         :ok <- Occurrence.validate_template(signal) do
+      Occurrence.attach(fresh_signal(signal), scope, job_id, generation, scheduled_at)
+    end
+  end
+
+  def occurrence_signal(_signal, _scope, _job_id, _generation, _scheduled_at),
+    do: {:error, :invalid_schedule_occurrence}
+
   @doc "Creates one recurring schedule cancellation Directive."
   @spec cancel(term()) :: Cancel.t()
   def cancel(job_id), do: %Cancel{job_id: job_id}
@@ -117,6 +176,7 @@ defmodule Jido.Plugin.Scheduler do
   def validate_runtime_options(opts) do
     with :ok <- validate_retry_delay(Keyword.fetch(opts, :retry_delay_ms)),
          :ok <- validate_time_scale(Keyword.fetch(opts, :time_scale)),
+         :ok <- validate_delivery_adapter(Keyword.fetch(opts, :delivery_adapter)),
          do: :ok
   end
 
@@ -279,7 +339,34 @@ defmodule Jido.Plugin.Scheduler do
     end
   end
 
+  defp validate_delivery_adapter(:error), do: :ok
+
+  defp validate_delivery_adapter({:ok, adapter}) do
+    valid? =
+      is_atom(adapter) and adapter not in [nil, true, false] and
+        Code.ensure_loaded?(adapter) and
+        function_exported?(adapter, :reconcile, 2) and
+        function_exported?(adapter, :schedule, 3)
+
+    if valid? do
+      :ok
+    else
+      invalid_option("Scheduler delivery_adapter is invalid", %{
+        option: :delivery_adapter,
+        value: adapter,
+        callbacks: [reconcile: 2, schedule: 3]
+      })
+    end
+  end
+
   defp invalid_option(message, details) do
     {:error, Jido.Error.validation_error(message, kind: :config, details: details)}
+  end
+
+  defp fresh_signal(%Signal{} = signal) do
+    signal
+    |> Signal.to_map()
+    |> Map.delete("id")
+    |> Signal.new!()
   end
 end

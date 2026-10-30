@@ -20,7 +20,8 @@ defmodule Jido.AgentServer.Core do
     persistence_mode: :create,
     persistence_timeout: 5_000,
     idle_timeout: :infinity,
-    idle_policy: :stop
+    idle_policy: :stop,
+    plugin_runtime_options: []
   ]
   @runtime_keys Keyword.keys(@runtime_defaults)
   @startup_keys @runtime_keys ++ [:agent, :name, :runner, :jido, :partition]
@@ -97,6 +98,8 @@ defmodule Jido.AgentServer.Core do
          :ok <- validate_timeout(opts, :error_policy_timeout),
          :ok <- validate_limit(opts, :max_postponed_signals),
          :ok <- validate_setting(is_boolean(opts[:debug]), :debug),
+         :ok <-
+           Jido.Plugin.Normalizer.validate_runtime_options(opts[:plugin_runtime_options]),
          do:
            validate_setting(
              is_integer(opts[:debug_max_events]) and opts[:debug_max_events] in 1..10_000,

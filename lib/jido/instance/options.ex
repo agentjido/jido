@@ -35,6 +35,8 @@ defmodule Jido.Instance.Options do
   @doc false
   @spec validate(term()) :: {:ok, keyword()} | {:error, Error.ValidationError.t()}
   def validate(opts) do
+    agent_server = if Keyword.keyword?(opts), do: Keyword.get(opts, :agent_server, []), else: []
+
     with true <- Keyword.keyword?(opts),
          :ok <- validate_known_keys(opts),
          :ok <- validate_unique_keys(opts),
@@ -42,9 +44,10 @@ defmodule Jido.Instance.Options do
          :ok <- validate_otp_app(opts),
          :ok <- validate_namespace(Keyword.get(opts, :namespace)),
          :ok <- validate_debug(Keyword.get(opts, :debug)),
-         :ok <- Jido.AgentServer.validate_defaults(Keyword.get(opts, :agent_server, [])),
+         :ok <- Jido.AgentServer.validate_defaults(agent_server),
          :ok <- validate_max_tasks(Keyword.get(opts, :max_tasks, @default_max_tasks)),
-         {:ok, persistence} <- validate_persistence(Keyword.get(opts, :persistence)) do
+         {:ok, persistence} <- validate_persistence(Keyword.get(opts, :persistence)),
+         :ok <- validate_inherited_persistence(agent_server, persistence) do
       validated =
         opts
         |> Keyword.put_new(:max_tasks, @default_max_tasks)
@@ -137,6 +140,18 @@ defmodule Jido.Instance.Options do
       {:error, reason} -> invalid("Jido instance persistence is invalid", %{reason: reason})
     end
   end
+
+  defp validate_inherited_persistence(agent_server, nil) do
+    if Keyword.get(agent_server, :persistence) == :inherit do
+      invalid("AgentServer cannot inherit missing Jido instance persistence", %{
+        persistence: nil
+      })
+    else
+      :ok
+    end
+  end
+
+  defp validate_inherited_persistence(_agent_server, _persistence), do: :ok
 
   defp invalid(message, details) do
     {:error,

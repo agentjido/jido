@@ -2,7 +2,7 @@ defmodule JidoTest.Contract.PluginSchedulerApiTest do
   use Covenant.Case, component: "jido.plugin.scheduler", async: true
 
   alias Jido.Plugin.Scheduler
-  alias Jido.Plugin.Scheduler.{Cancel, Cron, DSL, Occurrence, Schedule}
+  alias Jido.Plugin.Scheduler.{Cancel, Cron, DeliveryAdapter, DSL, Occurrence, Schedule}
 
   @tag obligation: [
          "jido.plugin.scheduler.I1",
@@ -10,12 +10,14 @@ defmodule JidoTest.Contract.PluginSchedulerApiTest do
          "jido.plugin.scheduler.I3",
          "jido.plugin.scheduler.I6"
        ]
-  test "Scheduler exposes only its constructors, Directives, DSL, and occurrence data" do
+  test "Scheduler exposes its durable delivery helpers and authoring API" do
     assert_public(Scheduler,
       api: [
         {:function, :cancel, 1},
         {:function, :cron, 4},
+        {:function, :next_occurrence, 3},
         {:function, :occurrence, 1},
+        {:function, :occurrence_signal, 5},
         {:function, :schedule, 2}
       ],
       types: [{:type, :cron_option, 0}, {:type, :option, 0}]
@@ -32,8 +34,18 @@ defmodule JidoTest.Contract.PluginSchedulerApiTest do
 
     assert_public(DSL, api: [], types: [])
 
+    assert_public(DeliveryAdapter,
+      api: [],
+      types: [
+        {:type, :context, 0},
+        {:type, :recurring_definition, 0},
+        {:type, :recurring_definitions, 0}
+      ]
+    )
+
     for module <- [
           Scheduler.Agent,
+          Scheduler.CronRules,
           Scheduler.DSL.Schedule,
           Scheduler.Runtime,
           Scheduler.Server,

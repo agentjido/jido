@@ -41,6 +41,31 @@ defmodule JidoTest.Contract.PluginSchedulerRuntimeTest do
     def speedup, do: raise("clock unavailable")
   end
 
+  defmodule DeliveryAdapter do
+    @behaviour Jido.Plugin.Scheduler.DeliveryAdapter
+
+    @impl true
+    def reconcile(context, desired) do
+      send(Process.get(:scheduler_delivery_test), {:adapter_reconcile, context, desired})
+      result(:reconcile)
+    end
+
+    @impl true
+    def schedule(context, delay_ms, signal) do
+      send(Process.get(:scheduler_delivery_test), {:adapter_schedule, context, delay_ms, signal})
+      result(:schedule)
+    end
+
+    defp result(callback) do
+      case Process.get({:scheduler_delivery_result, callback}, :ok) do
+        :raise -> raise "adapter #{callback} failed"
+        :throw -> throw({:adapter_failed, callback})
+        :exit -> exit({:adapter_failed, callback})
+        result -> result
+      end
+    end
+  end
+
   defmodule ThrowingTimeScale do
     def now(_timezone), do: throw(:clock_unavailable)
     def speedup, do: 1
@@ -141,6 +166,122 @@ defmodule JidoTest.Contract.PluginSchedulerRuntimeTest do
              Runtime.handle_info({:deliver, token, traced}, delivered_state)
 
     refute_received {:"$gen_cast", {:turn, _ref, _signal, %{}, :infinity, nil}}
+  end
+
+  @tag obligation: ["jido.plugin.scheduler.I4", "jido.plugin.scheduler.I5"]
+  test "an external delivery adapter replaces all local delivery timers" do
+    Process.put(:scheduler_delivery_test, self())
+    on_exit(fn -> Process.delete(:scheduler_delivery_test) end)
+    runtime = runtime(delivery_adapter: DeliveryAdapter)
+    desired = %{job: spec("* * * * *", 7)}
+
+    assert {:reply, :ok, reconciled} = reconcile(runtime, desired, 1)
+    assert reconciled.cron_jobs == %{}
+    assert reconciled.timers == %{}
+
+    assert_receive {:adapter_reconcile, context, ^desired}
+    assert context.agent_id == runtime.agent_id
+    assert context.scope == {runtime.jido, runtime.agent_id, runtime.partition}
+
+    delayed = tick("test.external.delayed")
+
+    assert {:reply, :ok, unchanged} =
+             Runtime.handle_call(
+               {:directive, Scheduler.schedule(25, delayed),
+                context(runtime, %{cron: desired}, 2)},
+               {self(), make_ref()},
+               reconciled
+             )
+
+    assert unchanged.timers == %{}
+    assert unchanged.state_version == 2
+
+    assert_receive {:adapter_schedule, schedule_context, 25, scheduled}
+    assert schedule_context.state_version == 2
+    assert scheduled.type == delayed.type
+    refute_receive {:deliver, _token, _signal}
+  end
+
+  @tag obligation: "jido.plugin.scheduler.I8"
+  test "external reconciliation retries the latest committed definitions" do
+    Process.put(:scheduler_delivery_test, self())
+    Process.put({:scheduler_delivery_result, :reconcile}, {:error, :offline})
+
+    on_exit(fn ->
+      Process.delete(:scheduler_delivery_test)
+      Process.delete({:scheduler_delivery_result, :reconcile})
+    end)
+
+    runtime = runtime(delivery_adapter: DeliveryAdapter)
+    desired = %{latest: spec("*/5 * * * *", 12)}
+
+    assert {:reply, {:error, {:external_reconcile_failed, :offline}}, failed} =
+             reconcile(runtime, desired, 9)
+
+    assert failed.desired_cron == desired
+    assert failed.state_version == 9
+    assert failed.last_reconciled_version == 9
+    assert is_reference(failed.retry_token)
+    assert_receive {:adapter_reconcile, first_context, ^desired}
+    assert first_context.state_version == 9
+
+    Process.put({:scheduler_delivery_result, :reconcile}, :ok)
+    Process.cancel_timer(failed.retry_timer)
+
+    assert {:noreply, recovered} =
+             Runtime.handle_info(
+               {:retry_reconcile, failed.retry_token, failed.last_reconciled_version},
+               failed
+             )
+
+    assert_receive {:adapter_reconcile, retry_context, ^desired}
+    assert retry_context.state_version == 9
+    assert recovered.desired_cron == desired
+    assert recovered.last_reconciled_version == 9
+    assert recovered.retry_timer == nil
+    assert recovered.retry_token == nil
+  end
+
+  @tag obligation: "jido.plugin.scheduler.I8"
+  test "external delayed delivery contains invalid results and adapter failures" do
+    Process.put(:scheduler_delivery_test, self())
+
+    on_exit(fn ->
+      Process.delete(:scheduler_delivery_test)
+      Process.delete({:scheduler_delivery_result, :schedule})
+    end)
+
+    runtime = runtime(delivery_adapter: DeliveryAdapter)
+    directive = Scheduler.schedule(25, tick("test.external.failure"))
+    directive_context = context(runtime, %{cron: %{}}, 4)
+
+    Process.put({:scheduler_delivery_result, :schedule}, :invalid)
+
+    assert {:reply, {:error, {:external_schedule_invalid_result, :invalid}}, invalid_state} =
+             Runtime.handle_call(
+               {:directive, directive, directive_context},
+               {self(), make_ref()},
+               runtime
+             )
+
+    assert invalid_state.timers == %{}
+    assert invalid_state.state_version == 4
+    assert_receive {:adapter_schedule, _context, 25, _signal}
+
+    Process.put({:scheduler_delivery_result, :schedule}, :raise)
+
+    assert {:reply,
+            {:error,
+             {:external_schedule_failed, {:adapter_exception, "adapter schedule failed"}}},
+            raised_state} =
+             Runtime.handle_call(
+               {:directive, directive, directive_context},
+               {self(), make_ref()},
+               invalid_state
+             )
+
+    assert raised_state.timers == %{}
+    assert_receive {:adapter_schedule, _context, 25, _signal}
   end
 
   @tag obligation: ["jido.plugin.scheduler.I4", "jido.plugin.scheduler.I5"]
