@@ -46,24 +46,33 @@ defmodule Jido.Authoring.RuntimeCodecTest do
   end
 
   setup do
-    {:ok, manifests} =
-      Jido.Authoring.Manifest.validate(Echo, Echo.__jido_authoring__())
+    previous = :persistent_term.get({Jido.Discovery, :registry}, :not_initialized)
 
-    codecs =
-      [CaptureCodec, CrashingCodec, InvalidSuccessCodec, IssueCodec, Jido.Flow.Codec]
-      |> Enum.map(fn module ->
-        {:ok, metadata} = Jido.Authoring.Codec.metadata(module)
-        Map.put(metadata, :module, module)
-      end)
+    on_exit(fn ->
+      if previous == :not_initialized,
+        do: :persistent_term.erase({Jido.Discovery, :registry}),
+        else: :persistent_term.put({Jido.Discovery, :registry}, previous)
+    end)
 
-    {:ok, registry} = Jido.Authoring.Registry.new_discovered(manifests, codecs)
-    %{registry: registry}
+    :ok =
+      Jido.Discovery.refresh(
+        applications: [],
+        modules: [
+          CaptureCodec,
+          CrashingCodec,
+          InvalidSuccessCodec,
+          IssueCodec,
+          Echo,
+          Jido.Flow.Codec
+        ]
+      )
+
+    %{registry: Jido.Discovery.registry()}
   end
 
   test "encodes and decodes a Flow", %{registry: registry} do
     flow = flow()
     assert {:ok, document} = Jido.Authoring.encode(flow, registry: registry)
-    refute Map.has_key?(document, "vsn")
     assert {:ok, json} = Jido.Authoring.encode_json(flow, registry: registry)
     assert Jason.decode!(json) == document
 
@@ -95,11 +104,17 @@ defmodule Jido.Authoring.RuntimeCodecTest do
              )
   end
 
-  test "rejects a version on an unversioned Flow document", %{registry: registry} do
+  test "reports a missing version without a repair system", %{registry: registry} do
     {:ok, document} = Jido.Authoring.encode(flow(), registry: registry)
 
-    assert {:error, [%Issue{code: :unsupported_document, path: ["type"]}]} =
-             Jido.Authoring.decode(Map.put(document, "vsn", 1), registry: registry)
+    assert {:error,
+            [
+              %Issue{
+                code: :missing_document_vsn,
+                path: ["vsn"],
+                details: %{supported_vsns: [2]}
+              }
+            ]} = Jido.Authoring.decode(Map.delete(document, "vsn"), registry: registry)
   end
 
   test "contains codec failures and invalid returns", %{registry: registry} do
@@ -225,8 +240,7 @@ defmodule Jido.Authoring.RuntimeCodecTest do
   test "rejects malformed envelopes", %{registry: registry} do
     cases = [
       {fn -> Jido.Authoring.decode_json("{", registry: registry) end, :invalid_json},
-      {fn -> Jido.Authoring.decode(%{"vsn" => 1}, registry: registry) end,
-       :missing_document_type},
+      {fn -> Jido.Authoring.decode(%{"vsn" => 1}, registry: registry) end, :missing_document_type},
       {fn -> Jido.Authoring.decode([], registry: registry) end, :invalid_document},
       {fn ->
          Jido.Authoring.decode(%{"type" => "jido.flow", "vsn" => 0}, registry: registry)
@@ -241,7 +255,7 @@ defmodule Jido.Authoring.RuntimeCodecTest do
   defp flow do
     Flow.new!(%{
       name: "runtime_json",
-      forms: %{"echo" => {Echo, %{"message" => "hello"}}},
+      components: [%{name: "echo", kind: :step, action: Echo, params: %{"message" => "hello"}}],
       output: Ref.result("echo")
     })
   end

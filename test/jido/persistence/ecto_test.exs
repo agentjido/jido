@@ -1,0 +1,242 @@
+defmodule JidoTest.Persistence.EctoTest do
+  use ExUnit.Case, async: false
+
+  alias Jido.Persistence
+  alias Jido.Persistence.Ecto, as: EctoPersistence
+  alias Jido.Persistence.Ecto.Migration
+  alias Jido.Persistence.Ecto.Record
+  alias JidoTest.AgentRuntimeFixtures.RuntimeAgent
+  alias JidoTest.Persistence.{EctoRepo, EctoSupport}
+
+  defmodule MissingRecord do
+    use Ecto.Schema
+
+    @primary_key {:key, :binary, autogenerate: false}
+    schema "missing_jido_persistence_records" do
+      field(:value, :binary)
+      field(:write_token, :binary)
+    end
+  end
+
+  defmodule ConstrainedRecord do
+    use Ecto.Schema
+
+    @primary_key {:key, :binary, autogenerate: false}
+    schema "constrained_jido_persistence_records" do
+      field(:value, :binary)
+      field(:write_token, :binary)
+    end
+  end
+
+  defmodule InvalidRecord do
+    use Ecto.Schema
+
+    @primary_key {:key, :string, autogenerate: false}
+    schema "invalid_jido_persistence_records" do
+      field(:value, :binary)
+      field(:write_token, :binary)
+    end
+  end
+
+  defmodule UnsupportedRepo do
+    def __adapter__, do: __MODULE__.Adapter
+  end
+
+  defmodule FaultRepo do
+    def __adapter__, do: Process.get({__MODULE__, :adapter}, fn -> Ecto.Adapters.SQLite3 end).()
+    def get(_schema, _key, opts), do: reply(opts)
+    def insert_all(_schema, _records, opts), do: reply(opts)
+    def update_all(_query, _updates, opts), do: reply(opts)
+    def delete_all(_query, opts), do: reply(opts)
+    defp reply(opts), do: Keyword.fetch!(opts, :reply).()
+  end
+
+  defmodule FaultSchema do
+    def __schema__(_field), do: Process.get({__MODULE__, :failure}).()
+  end
+
+  setup_all do
+    path = EctoSupport.database_path(:integration)
+    start_supervised!({EctoRepo, EctoSupport.repo_start_options(path)})
+    EctoSupport.migrate!()
+    on_exit(fn -> EctoSupport.remove_database(path) end)
+    {:ok, opts: [repo: EctoRepo]}
+  end
+
+  test "publishes a versioned migration contract" do
+    assert Migration.current_version() == 1
+
+    for opts <- [[version: 0], [version: 2], [table: "records"], [prefix: :tenant], [unknown: 1]] do
+      assert_raise ArgumentError, fn -> Migration.up(opts) end
+    end
+
+    assert_raise ArgumentError, fn -> Migration.up(:invalid) end
+  end
+
+  test "stores, replaces, and deletes exact bytes", %{opts: opts} do
+    key = <<0, 255, 1>>
+    first = <<255, 0, 2>>
+    second = <<3, 0, 254>>
+
+    assert {:error, :not_found} = EctoPersistence.get(key, opts)
+    assert :ok = EctoPersistence.put(key, first, opts)
+    assert {:ok, ^first} = EctoPersistence.get(key, opts)
+
+    first_record = EctoRepo.get!(Record, key)
+    assert first_record.value == first
+    assert byte_size(first_record.write_token) == 16
+
+    assert :ok = EctoPersistence.put(key, second, opts)
+    assert {:ok, ^second} = EctoPersistence.get(key, opts)
+
+    second_record = EctoRepo.get!(Record, key)
+    assert second_record.write_token != first_record.write_token
+
+    assert :ok = EctoPersistence.delete(key, opts)
+    assert :ok = EctoPersistence.delete(key, opts)
+    assert {:error, :not_found} = EctoPersistence.get(key, opts)
+  end
+
+  test "a same-value CAS succeeds and a conflict changes no row", %{opts: opts} do
+    key = "same-value-cas"
+    value = <<0, 1, 0, 255>>
+
+    assert :ok = EctoPersistence.compare_and_swap(key, :not_found, value, opts)
+    first_token = EctoRepo.get!(Record, key).write_token
+
+    assert :ok = EctoPersistence.compare_and_swap(key, value, value, opts)
+    second_token = EctoRepo.get!(Record, key).write_token
+    assert second_token != first_token
+
+    assert {:error, :conflict} =
+             EctoPersistence.compare_and_swap(key, <<99>>, <<2>>, opts)
+
+    assert %{value: ^value, write_token: ^second_token} = EctoRepo.get!(Record, key)
+  end
+
+  test "works through the complete Jido persistence boundary", %{opts: opts} do
+    store = {EctoPersistence, opts}
+    agent = RuntimeAgent.instantiate!(id: "ecto-agent", state: %{events: [:saved], ticks: 2})
+
+    assert :ok =
+             Persistence.save_agent(store, agent,
+               namespace: "ecto-test",
+               instance: __MODULE__,
+               revision: 4
+             )
+
+    assert {:ok, ^agent, 4} =
+             Persistence.load_agent_with_revision(store, RuntimeAgent, agent.id,
+               namespace: "ecto-test",
+               instance: __MODULE__
+             )
+
+    assert :ok =
+             Persistence.delete_agent(store, RuntimeAgent, agent.id,
+               namespace: "ecto-test",
+               instance: __MODULE__
+             )
+
+    assert {:error, :deleted} =
+             Persistence.load_agent(store, RuntimeAgent, agent.id,
+               namespace: "ecto-test",
+               instance: __MODULE__
+             )
+  end
+
+  test "validates the repo, schema, and repository options", %{opts: opts} do
+    assert :ok = EctoPersistence.validate_options(opts)
+
+    assert {:ok, {EctoPersistence, ^opts}} =
+             Persistence.resolve_config({EctoPersistence, opts}, nil)
+
+    for invalid <- [
+          [],
+          [repo: UnsupportedRepo],
+          [repo: EctoRepo, schema: InvalidRecord],
+          [repo: EctoRepo, repo_options: :invalid],
+          [repo: EctoRepo, repo_options: [on_conflict: :nothing]],
+          [repo: EctoRepo, unknown: true],
+          [:not_keyword]
+        ] do
+      assert {:error, _reason} = EctoPersistence.validate_options(invalid)
+    end
+  end
+
+  test "classifies database failures during CAS as indeterminate", %{opts: opts} do
+    missing_opts = Keyword.put(opts, :schema, MissingRecord)
+
+    assert {:error, {:ecto, _, _message}} = EctoPersistence.get("key", missing_opts)
+
+    assert {:error, {:indeterminate, {:ecto, _, _message}}} =
+             EctoPersistence.compare_and_swap("key", :not_found, "value", missing_opts)
+  end
+
+  test "does not classify an unrelated unique constraint as a key conflict", %{opts: opts} do
+    constrained_opts = Keyword.put(opts, :schema, ConstrainedRecord)
+
+    assert :ok =
+             EctoPersistence.compare_and_swap("first-key", :not_found, "value", constrained_opts)
+
+    assert {:error, {:indeterminate, {:ecto, _, _message}}} =
+             EctoPersistence.compare_and_swap(
+               "second-key",
+               :not_found,
+               "value",
+               constrained_opts
+             )
+  end
+
+  test "unexpected repository replies remain errors and CAS results remain indeterminate" do
+    opts = [repo: FaultRepo, repo_options: [reply: fn -> :unexpected end]]
+    error = {:invalid_ecto_result, :unexpected}
+    assert {:error, ^error} = EctoPersistence.get("key", opts)
+    assert {:error, ^error} = EctoPersistence.put("key", "value", opts)
+    assert {:error, ^error} = EctoPersistence.delete("key", opts)
+
+    for expected <- [:not_found, "old"] do
+      assert {:error, {:indeterminate, ^error}} =
+               EctoPersistence.compare_and_swap("key", expected, "value", opts)
+    end
+  end
+
+  test "repository throws and exits do not escape and cannot confirm a write" do
+    for {kind, callback} <- [throw: fn -> throw(:offline) end, exit: fn -> exit(:offline) end] do
+      opts = [repo: FaultRepo, repo_options: [reply: callback]]
+      assert {:error, {:ecto, ^kind, :offline}} = EctoPersistence.get("key", opts)
+
+      for expected <- [:not_found, "old"] do
+        assert {:error, {:indeterminate, {:ecto, ^kind, :offline}}} =
+                 EctoPersistence.compare_and_swap("key", expected, "value", opts)
+      end
+    end
+  end
+
+  test "configuration callback faults and non-module schemas return validation errors" do
+    assert {:error, _} = EctoPersistence.validate_options(repo: __MODULE__.Missing)
+
+    assert {:error, ":schema must be an Ecto schema module"} =
+             EctoPersistence.validate_options(repo: FaultRepo, schema: "schema")
+
+    assert_raise ArgumentError, ~r/requires a :repo module/, fn ->
+      EctoPersistence.get("key", [])
+    end
+
+    for {callback, detail} <- [
+          {fn -> raise "invalid config" end, "invalid config"},
+          {fn -> throw(:invalid_config) end, "{:throw, :invalid_config}"}
+        ] do
+      Process.put({FaultRepo, :adapter}, callback)
+      assert {:error, message} = EctoPersistence.validate_options(repo: FaultRepo)
+      assert message == ":repo validation failed: " <> detail
+      Process.delete({FaultRepo, :adapter})
+
+      Process.put({FaultSchema, :failure}, callback)
+
+      assert {:error, message} =
+               EctoPersistence.validate_options(repo: FaultRepo, schema: FaultSchema)
+
+      assert message == ":schema validation failed: " <> detail
+    end
+  end
+end

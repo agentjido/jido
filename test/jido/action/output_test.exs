@@ -1,5 +1,5 @@
 defmodule JidoActionTest.Action.OutputTest do
-  use ExUnit.Case, async: true
+  use Covenant.Case, component: "jido_action.output", async: true
 
   alias Jido.Action.Output
 
@@ -39,6 +39,9 @@ defmodule JidoActionTest.Action.OutputTest do
 
       assert %Output{kind: :opaque, value: {:external, :resource}, meta: %{}} =
                Output.opaque({:external, :resource})
+
+      assert %Output{kind: :preserve, value: %{value: 1}, meta: %{source: :test}} =
+               Output.preserve(%{value: 1}, meta: %{source: :test})
     end
 
     @tag obligation: "jido_action.output.I1"

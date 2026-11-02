@@ -1,170 +1,268 @@
 defmodule Jido.Flow do
+  field_docs =
+    for entity <- hd(Jido.Flow.DSL.Schema.sections()).entities do
+      children = for {_, children} <- entity.entities, child <- children, do: {child, "####"}
+
+      for {entry, heading} <- [{entity, "###"} | children] do
+        name = entry.name |> to_string() |> String.trim("_") |> String.capitalize()
+
+        [
+          "#{heading} #{name}\n\n#{entry.describe}\n\n",
+          Spark.Options.docs(Keyword.delete(entry.schema, :__source__))
+        ]
+      end
+    end
+
   @moduledoc """
-  Defines one canonical composed Action program.
+  Defines the canonical Jido Flow data artifact and compile-time module DSL.
 
-  A Flow contains named forms, explicit control dependencies, one output
-  expression, and derived scheduling data. A Step is the form for one
-  Instruction. The closed Flow form set contains Map, Reduce, Choice, Parallel,
-  Iterate, Invoke, and Wait. A
-  Flow graph contains only named forms. Dynamic items, branches, iterations,
-  retries, and waits belong to execution state. The graph and semantic
-  identity are derived from canonical source data. Codecs do not store them.
+  A Flow is a declarative control program. Small call records identify its
+  targets and parameter expressions. Actions provide its executable behavior.
 
-  A module that uses `Jido.Flow` exposes one ready-to-run Flow through
-  `flow/0`.
+  A Flow contains named canonical components and one required output
+  expression. Execution is delegated through `Jido.Exec`.
+
+  Generated Flow modules share the `Jido.Action` module contract for metadata,
+  schemas, validation, and JSON-safe module descriptions. They retain a Flow
+  target kind. `Jido.Exec` compiles them to native Runic graphs. The generated
+  `run/2` function is a convenience call to Exec.
+
+  Flow has three supported authoring inputs:
+
+  * the compile-time Flow module DSL;
+  * map-based data definitions through `new/1`; and
+  * versioned stored JSON documents through `Jido.Authoring`.
+
+  Use the Flow module DSL as the primary developer authoring surface:
+
+      defmodule MyApp.ProcessOrder do
+        use Jido.Flow, name: "process_order"
+
+        flow do
+          step "load",
+            action: MyApp.LoadOrder,
+            params: %{id: input(:id)}
+
+          step "save",
+            action: MyApp.SaveOrder,
+            params: %{order: result("load")}
+
+          output result("save")
+        end
+      end
+
+  A compile-time extension can add macros that expand to normal Flow
+  declarations. Configure extensions as a static module list:
+
+      use Jido.Flow,
+        name: "process_order",
+        extensions: [MyApp.Flows.Helpers]
+
+  Define each extension with `Jido.Flow.Extension`. Extensions change only
+  module DSL source authoring. Data definitions and Codec do not load
+  extensions. The compiled result remains one canonical Flow value.
+
+  For a small operation, bind data and write an inline Step body:
+
+      defmodule MyApp.Greeting do
+        use Jido.Flow, name: "greeting"
+
+        flow do
+          step "greet", name <- input(:name) do
+            {:ok, %{message: "Hello, " <> name <> "!"}}
+          end
+
+          output result("greet")
+        end
+      end
+
+  Every Flow authoring form requires an explicit, non-nil `output`. In the
+  module DSL, it must be the final declaration.
+
+  A binding source accepts direct Flow references or data, but not Flow
+  operations. The body is normal Elixir in the owning module's function scope.
+  Put calculations in that body. Use `ctx <- context()` to bind context as a
+  parameter. Use a binding list for two or more inputs, a sole map pattern
+  for complete params, or `[]` for no input. Use one binding argument. Put
+  pattern selection in a `case` expression inside the body; top-level clause
+  bodies are not supported.
+
+  Use `inline:` to set the Action name, description, schemas, or
+  `context: ctx`. Keep `needs:` and `meta:` at the Step level. Flow supports
+  inline Actions for Step and for named Action calls inside Parallel. Map,
+  Reduce, Choice targets, Iterate, Invoke, and Handoff use Action modules. All
+  targets use normal Exec validation and result rules. See
+  [Inline Actions](inline-actions.md).
+
+  After the owner compiles, `MyApp.Greeting.step_action("greet")` returns its
+  Action target for map-based definitions or trusted Registry reuse.
+  It does not copy parameters, dependencies, or metadata. Map-based definitions and stored
+  JSON do not accept body code, anonymous functions, or MFA targets.
+
+  `step_action/1` stays Step-only, including explicit Action-backed Steps but
+  excluding Subflows. `context: ctx` binds the current callback context; it
+  does not retain the original Flow context in the target's parameters.
+
+  Deploy the owning module and generated Action BEAM files together. A body
+  edit can retain the same target and semantic graph identity; graph identity
+  does not identify a deployed code version.
+
+  Result references create data dependencies. `needs:` keeps only explicit
+  author control order. Source order does not create a dependency. The Spark
+  compiler keeps source locations outside the canonical Flow value.
+
+  Use `Jido.Authoring.encode/2` and `Jido.Authoring.decode/2` with a trusted
+  `Jido.Authoring.Registry` for database or transport storage.
+
+  Flow modules also accept `id:` and `vsn:` options for runtime authoring
+  discovery. Use an explicit stable ID for any Flow referenced by stored JSON.
+
+  A Flow module returns one stable canonical value from `flow/0` for the life
+  of the loaded module version. Each validation, compilation, or execution
+  operation materializes it once. Put changing runtime data in Flow input or
+  context.
+
+  Flow modules provide their definition through `flow/0`. The generated
+  `run/2` delegates to `Jido.Exec` with default options.
+
+  A Choice is one Flow component. It evaluates data-only conditions in authored
+  order, runs the first matching target, and uses a required routing fallback
+  when no option matches.
+
+  Flow collects the optional effect list from every successful executed
+  component and returns it with its final output. The third success element
+  must be a proper list. Failed execution returns no effect list. Effect order
+  uses canonical dependency order, then component name. Nested Flows occupy
+  their parent position; collections use input or iteration order.
+
+  ## DSL field reference
+
+  These fields describe the module DSL, not map definitions or stored JSON.
+  Positional arguments are identified below. Choice, Parallel, and Iterate
+  require field blocks; their nested declarations have their own references.
+  Step and named Action declarations inside Parallel support inline Action
+  bodies. The field types, required flags, and defaults come from the Spark
+  schemas; Jido also validates graph and cross-field rules.
+
+  #{IO.iodata_to_binary(field_docs)}
   """
 
-  alias Jido.Action.Output
-  alias Jido.Flow.{Config, Error, Form, Graph, Limits, Value}
-  alias Jido.Flow.Identity.Hash
-  alias Jido.Validation
+  alias Jido.Flow.Error
+  alias Jido.Flow.DSL.ModuleCompiler
+  alias Jido.Flow.Definition
+  alias Jido.Flow.Identity
 
-  @fields [:name, :description, :schema, :output_schema, :forms, :needs, :output]
-  @config_fields [:name, :description, :schema, :output_schema]
+  @schema Zoi.struct(
+            __MODULE__,
+            %{
+              name: Zoi.string(description: "Flow name"),
+              description: Zoi.string(description: "Flow description") |> Zoi.optional(),
+              schema: Zoi.any(description: "Flow input schema") |> Zoi.default(Zoi.map()),
+              output_schema: Zoi.any(description: "Flow output schema") |> Zoi.default(Zoi.map()),
+              components: Zoi.map(description: "Canonical named Flow component graph") |> Zoi.default(%{}),
+              output: Zoi.any(description: "Declared output expression")
+            },
+            coerce: true
+          )
 
-  @typedoc "A stable source location for module DSL diagnostics."
-  @type source_location :: %{optional(:file) => String.t(), optional(:line) => pos_integer()}
-  @typedoc "Source locations keyed by canonical authoring path."
-  @type source_map :: %{optional([term()]) => source_location()}
-  @typedoc "Direct incoming dependencies for one named form."
-  @type dependency_info :: %{data: [String.t()], control: [String.t()]}
-  @typedoc "One canonical Flow form."
-  @type form ::
-          Jido.Flow.Call.t()
-          | Jido.Flow.Form.Map.t()
-          | Jido.Flow.Form.Reduce.t()
-          | Jido.Flow.Form.Choice.t()
-          | Jido.Flow.Form.Parallel.t()
-          | Jido.Flow.Form.Iterate.t()
-          | Jido.Flow.Form.Invoke.t()
-          | Jido.Flow.Form.Wait.t()
-  @typedoc "The deterministic semantic identity of one Flow."
-  @type identity :: %{algorithm: :sha256, digest: String.t(), uuid: String.t()}
-  @typedoc "One canonical Flow definition."
-  @type t :: %__MODULE__{
-          name: String.t(),
-          description: String.t() | nil,
-          schema: Jido.Action.schema(),
-          output_schema: Jido.Action.schema(),
-          forms: %{required(String.t()) => form()},
-          needs: %{optional(String.t()) => [String.t()]},
-          output: Value.t(),
-          graph: Graph.t(),
-          identity: identity()
+  @type t :: unquote(Zoi.type_spec(@schema))
+  @type dependency_info :: %{
+          needs: [String.t()],
+          references: [String.t()],
+          effective: [String.t()]
         }
+  @type source_location :: %{optional(:file) => String.t(), optional(:line) => pos_integer()}
+  @type source_map :: %{optional([term()]) => source_location()}
 
-  @enforce_keys [:name, :forms, :output, :graph, :identity]
-  defstruct name: nil,
-            description: nil,
-            schema: [],
-            output_schema: [],
-            forms: %{},
-            needs: %{},
-            output: nil,
-            graph: nil,
-            identity: nil
+  @enforce_keys Zoi.Struct.enforce_keys(@schema)
+  defstruct Zoi.Struct.struct_fields(@schema)
 
-  @doc false
-  @spec __jido_kind__() :: :flow
-  def __jido_kind__, do: :flow
-
-  @doc "Returns the canonical Flow owned by a Flow module."
+  @doc "Returns the stable canonical Flow value owned by a Flow module."
   @callback flow() :: t()
 
-  @doc "Validates Flow input parameters without running work."
+  @doc "Validates Flow input parameters without running Flow work."
   @callback validate_params(term()) :: {:ok, map()} | {:error, term()}
 
-  @doc "Validates a normal Flow output or explicit output envelope."
+  @doc "Validates normal Flow output or an explicit output envelope."
   @callback validate_output(map() | Jido.Action.Output.t()) ::
               {:ok, map() | Jido.Action.Output.t()} | {:error, term()}
 
-  @doc false
-  @spec validate_params_for(term(), module()) :: {:ok, map()} | {:error, term()}
-  def validate_params_for(params, module) do
-    validate_map(
-      module.schema(),
-      params,
-      %{context: "Flow", module: module},
-      "Flow validation must return a map"
-    )
-  end
-
-  @doc false
-  @spec validate_output_for(map() | Output.t(), module()) ::
-          {:ok, map() | Output.t()} | {:error, term()}
-  def validate_output_for(%Output{} = output, module) do
-    case Output.validate(output) do
-      {:ok, output} ->
-        {:ok, output}
-
-      {:error, error} ->
-        {:error,
-         Error.validation_error(Exception.message(error), %{
-           context: "Flow output",
-           module: module
-         })}
-    end
-  end
-
-  def validate_output_for(output, module) do
-    validate_map(
-      module.output_schema(),
-      output,
-      %{context: "Flow output", module: module},
-      "Flow output validation must return a map"
-    )
-  end
-
   defmacro __using__(opts_ast) do
     quote do
-      use Jido.Flow.DSL.ModuleCompiler, unquote(opts_ast)
+      use unquote(ModuleCompiler), unquote(opts_ast)
     end
   end
 
-  @doc "Builds and validates one canonical Flow from map data."
+  @doc false
+  defmacro __before_compile__(env), do: ModuleCompiler.before_compile(env)
+
+  @doc """
+  Validates partial, portable input defaults for one Flow module.
+
+  This function validates only supplied fields. It does not add schema
+  defaults or require fields that each Flow call must supply. String field
+  names resolve to the canonical keys from a field-based object schema.
+  """
+  @spec normalize_defaults(term(), module()) ::
+          {:ok, map()} | {:error, Error.InvalidDefinitionError.t()}
+  def normalize_defaults(defaults, target), do: Jido.Flow.Defaults.normalize(defaults, target)
+
+  @doc """
+  Encodes partial Flow defaults as JSON data after schema validation.
+
+  Atom map keys and atom values become strings. The result contains no module
+  references and does not need an authoring Registry.
+  """
+  @spec encode_defaults(term(), module()) ::
+          {:ok, map()} | {:error, Error.InvalidDefinitionError.t()}
+  def encode_defaults(defaults, target), do: Jido.Flow.Defaults.encode(defaults, target)
+
+  @doc """
+  Decodes JSON Flow defaults with the selected Flow input schema.
+
+  String field names resolve to the canonical schema keys. Schema coercion
+  restores supported atom values and other canonical values.
+  """
+  @spec decode_defaults(term(), module()) ::
+          {:ok, map()} | {:error, Error.InvalidDefinitionError.t()}
+  def decode_defaults(defaults, target), do: Jido.Flow.Defaults.decode(defaults, target)
+
+  @doc """
+  Builds and validates one canonical Flow value from a data definition.
+
+  Components use a `kind` of `:step`, `:subflow`, `:choice`, `:map`,
+  `:parallel`, `:reduce`, `:iterate`, `:invoke`, `:handoff`, `:timer`, `:await`, or
+  `:selection`. Action targets use `action` and `params`; Subflow targets use
+  `flow` and `params`. Parallel uses an ordered `actions` list of named Action
+  calls. Invoke uses module targets in `decision` and `expander`, with
+  `params` for the decision. Handoff uses a `selector` module and `params`.
+  Validation is inert.
+  See the [data guide](flow-data.md) for component fields.
+  """
   @spec new(map()) :: {:ok, t()} | {:error, Exception.t()}
-  def new(attrs) when is_map(attrs) and not is_struct(attrs), do: build(attrs)
+  def new(attrs) when is_map(attrs) and not is_struct(attrs) do
+    with {:ok, attrs} <- Definition.validate(attrs) do
+      {:ok, struct!(__MODULE__, attrs)}
+    end
+  end
 
-  def new(value), do: invalid_subject(value)
+  def new(value), do: invalid_flow_subject(value)
 
-  @doc "Builds one canonical Flow or raises its validation error."
+  @doc "Builds one canonical Flow value or raises its validation error."
   @spec new!(map()) :: t() | no_return()
   def new!(attrs) do
     case new(attrs) do
       {:ok, flow} -> flow
-      {:error, error} -> raise error
+      {:error, error} when is_exception(error) -> raise error
     end
   end
 
-  @doc "Validates the exact canonical Flow structure without running work."
-  @spec validate(t()) :: {:ok, t()} | {:error, Exception.t()}
-  def validate(%__MODULE__{} = flow) do
-    case flow |> source_attrs() |> build() do
-      {:ok, ^flow} ->
-        {:ok, flow}
+  @doc """
+  Converts a Flow artifact to its deterministic semantic map.
 
-      {:ok, canonical} ->
-        {:error,
-         Error.validation_error("Flow is not canonical", %{
-           reason: :non_canonical,
-           canonical: canonical
-         })}
-
-      error ->
-        error
-    end
-  end
-
-  def validate(value), do: invalid_subject(value)
-
-  @doc "Returns direct data and control dependencies for each named form."
-  @spec dependencies(t()) :: {:ok, %{String.t() => dependency_info()}} | {:error, Exception.t()}
-  def dependencies(%__MODULE__{graph: %Graph{dependencies: dependencies}}),
-    do: {:ok, dependencies}
-
-  def dependencies(value), do: invalid_subject(value)
-
-  @doc "Returns a map view of the canonical Flow."
+  Components use deterministic dependency order, then component name. Use
+  `Jido.Authoring` for database storage.
+  """
   @spec to_map(t()) :: map()
   def to_map(%__MODULE__{} = flow) do
     %{
@@ -172,264 +270,107 @@ defmodule Jido.Flow do
       description: flow.description,
       schema: flow.schema,
       output_schema: flow.output_schema,
-      forms: flow.forms,
-      needs: flow.needs,
-      output: Value.to_map(flow.output)
+      components: Definition.to_map(flow.components),
+      output: Jido.Flow.Value.to_map(flow.output)
     }
   end
 
-  @doc "Returns stable inspection data for a canonical Flow."
-  @spec explain(t()) :: {:ok, map()} | {:error, Exception.t()}
+  defp invalid_flow_subject(value) do
+    Definition.invalid_subject(value)
+  end
+
+  @doc """
+  Returns explicit, reference, and effective dependencies for each component.
+  """
+  @spec dependencies(t()) ::
+          {:ok, %{String.t() => dependency_info()}}
+          | {:error, Error.InvalidDefinitionError.t()}
+  def dependencies(%__MODULE__{} = flow) do
+    with {:ok, flow} <- validate(flow) do
+      {:ok, dependency_map(flow)}
+    end
+  end
+
+  def dependencies(value), do: invalid_flow_subject(value)
+
+  @doc """
+  Returns the versioned canonical inspection data for a Flow.
+  """
+  @spec explain(t()) :: {:ok, map()} | {:error, Error.InvalidDefinitionError.t()}
   def explain(%__MODULE__{} = flow) do
-    {:ok,
-     flow
-     |> to_map()
-     |> Map.merge(%{
-       kind: :flow,
-       dependencies: flow.graph.dependencies,
-       identity: flow.identity
-     })}
-  end
-
-  def explain(value), do: invalid_subject(value)
-
-  @doc "Returns the deterministic SHA-256 and UUIDv8 identity for a Flow."
-  @spec semantic_identity(t()) :: {:ok, identity()} | {:error, Exception.t()}
-  def semantic_identity(%__MODULE__{identity: identity}), do: {:ok, identity}
-
-  def semantic_identity(value), do: invalid_subject(value)
-
-  defp validate_map(schema, value, details, message) do
-    case Validation.open_validate(schema, value, details) do
-      {:ok, validated} when is_map(validated) ->
-        {:ok, validated}
-
-      {:ok, validated} ->
-        {:error, Error.validation_error(message, Map.put(details, :value, validated))}
-
-      {:error, %Validation.Error{} = error} ->
-        {:error, Error.validation_error(error.message, error.details)}
-
-      {:error, reason} ->
-        {:error, reason}
+    with {:ok, flow} <- validate(flow) do
+      {:ok,
+       %{
+         version: 1,
+         kind: :flow,
+         name: flow.name,
+         description: flow.description,
+         schema: flow.schema,
+         output_schema: flow.output_schema,
+         components: Definition.to_map(flow.components),
+         dependencies: dependency_map(flow),
+         output: Jido.Flow.Value.to_map(flow.output),
+         identity: Identity.for_flow(flow)
+       }}
     end
   end
 
-  defp build(attrs) do
-    with :ok <- validate_fields(attrs),
-         {:ok, config} <- validate_config(attrs),
-         {:ok, forms} <- normalize_forms(Map.get(attrs, :forms)),
-         {:ok, needs} <- normalize_needs(Map.get(attrs, :needs, %{})),
-         {:ok, output} <- normalize_output(attrs),
-         {:ok, graph} <- Graph.build(forms, needs),
-         :ok <- validate_output_refs(output, forms) do
-      flow =
-        struct!(
-          __MODULE__,
-          Map.merge(config, %{
-            forms: forms,
-            needs: needs,
-            output: output,
-            graph: graph,
-            identity: nil
-          })
-        )
+  def explain(value), do: invalid_flow_subject(value)
 
-      identity = flow |> Form.identity_data() |> Hash.identity()
-      flow = %{flow | identity: identity}
-
-      {:ok, flow}
+  @doc """
+  Returns the deterministic SHA-256 and UUIDv8 identity for a Flow.
+  """
+  @spec semantic_identity(t()) ::
+          {:ok, map()} | {:error, Error.InvalidDefinitionError.t()}
+  def semantic_identity(%__MODULE__{} = flow) do
+    with {:ok, flow} <- validate(flow) do
+      {:ok, Identity.for_flow(flow)}
     end
   end
 
-  defp validate_fields(attrs) do
-    case Map.keys(attrs) -- @fields do
-      [] ->
-        :ok
+  def semantic_identity(value), do: invalid_flow_subject(value)
 
-      fields ->
-        {:error,
-         Error.validation_error("Flow contains unknown fields", %{
-           reason: :unknown_fields,
-           fields: Enum.sort(fields)
-         })}
+  @doc """
+  Validates the exact canonical Flow structure.
+
+  This function checks schemas, components, expressions, references,
+  dependencies, and graph cycles. It is inert: it does not load or check
+  Action targets. `Jido.Exec.compile/2` checks executable target contracts.
+  """
+  @spec validate(t()) :: {:ok, t()} | {:error, Exception.t()}
+  def validate(%__MODULE__{} = flow) do
+    with {:ok, attrs} <- Definition.validate_canonical(Map.from_struct(flow)) do
+      {:ok, struct!(__MODULE__, attrs)}
     end
   end
 
-  defp validate_config(attrs) do
-    attrs
-    |> Map.take(@config_fields)
-    |> Config.validate()
-  end
+  def validate(value), do: invalid_flow_subject(value)
 
-  defp normalize_forms(nil),
-    do: {:error, Error.validation_error("Flow forms are required", %{reason: :forms_required})}
+  @doc false
+  @spec __validate_config__(map()) :: {:ok, map()} | {:error, Exception.t()}
+  def __validate_config__(attrs), do: Definition.validate_config(attrs)
 
-  defp normalize_forms(forms) when is_map(forms) and not is_struct(forms) do
-    with :ok <- Limits.collection(forms, :forms),
-         :ok <- require_forms(forms) do
-      forms
-      |> Enum.sort_by(&elem(&1, 0))
-      |> Enum.reduce_while({:ok, %{}}, fn {raw_id, raw_form}, {:ok, result} ->
-        with {:ok, id} <- normalize_name(raw_id, [:forms, raw_id]),
-             :ok <- unique_name(result, id, [:forms, raw_id]),
-             {:ok, form} <- normalize_form(raw_form, id) do
-          {:cont, {:ok, Map.put(result, id, form)}}
-        else
-          {:error, error} -> {:halt, {:error, error}}
-        end
-      end)
-    end
-  end
+  defp dependency_map(flow) do
+    Map.new(flow.components, fn {name, node} ->
+      needs = Definition.needs(node)
+      references = Definition.reference_dependencies(node)
 
-  defp normalize_forms(value),
-    do:
-      {:error,
-       Error.validation_error("Flow forms must be a map", %{reason: :forms, value: value})}
-
-  defp require_forms(forms) when map_size(forms) > 0, do: :ok
-
-  defp require_forms(_forms),
-    do:
-      {:error,
-       Error.validation_error("Flow must contain at least one form", %{reason: :empty_forms})}
-
-  defp normalize_form(value, id) do
-    case Form.normalize(value) do
-      {:ok, form} -> {:ok, form}
-      {:error, error} -> {:error, Error.prefix_path(error, [:forms, id])}
-    end
-  end
-
-  defp normalize_needs(needs) when is_map(needs) and not is_struct(needs) do
-    needs
-    |> Enum.sort_by(&elem(&1, 0))
-    |> Enum.reduce_while({:ok, %{}}, fn {raw_id, raw_sources}, {:ok, result} ->
-      with {:ok, id} <- normalize_name(raw_id, [:needs, raw_id]),
-           :ok <- unique_name(result, id, [:needs, raw_id]),
-           {:ok, sources} <- normalize_need_sources(raw_sources, id) do
-        result = if sources == [], do: result, else: Map.put(result, id, sources)
-        {:cont, {:ok, result}}
-      else
-        {:error, error} -> {:halt, {:error, error}}
-      end
+      {name,
+       %{
+         needs: needs,
+         references: references,
+         effective: Enum.sort(Enum.uniq(needs ++ references))
+       }}
     end)
   end
+end
 
-  defp normalize_needs(value),
-    do:
-      {:error,
-       Error.validation_error("Flow needs must be a map", %{reason: :needs, value: value})}
-
-  defp normalize_need_sources(sources, id) when is_list(sources) do
-    if List.improper?(sources) do
-      {:error,
-       Error.validation_error("Flow form needs must be a proper list", %{
-         reason: :needs,
-         path: [:needs, id]
-       })}
-    else
-      sources
-      |> Enum.reduce_while({:ok, []}, fn source, {:ok, result} ->
-        case normalize_name(source, [:needs, id]) do
-          {:ok, source} -> {:cont, {:ok, [source | result]}}
-          {:error, error} -> {:halt, {:error, error}}
-        end
-      end)
-      |> case do
-        {:ok, result} -> {:ok, result |> Enum.uniq() |> Enum.sort()}
-        error -> error
-      end
-    end
+defimpl Runic.Identity.Projectable, for: Jido.Flow do
+  def identity_document(flow) do
+    %{
+      kind: :jido_flow,
+      version: 1,
+      digest: Jido.Flow.Identity.semantic_digest(flow)
+    }
   end
-
-  defp normalize_need_sources(value, id) do
-    {:error,
-     Error.validation_error("Flow form needs must be a list", %{
-       reason: :needs,
-       path: [:needs, id],
-       value: value
-     })}
-  end
-
-  defp normalize_output(attrs) do
-    case Map.fetch(attrs, :output) do
-      {:ok, nil} ->
-        {:error,
-         Error.validation_error("Flow output is required", %{
-           reason: :output_required,
-           path: [:output]
-         })}
-
-      {:ok, output} ->
-        case Value.prepare(output) do
-          {:ok, output} -> {:ok, output}
-          {:error, error} -> {:error, Error.prefix_path(error, [:output])}
-        end
-
-      :error ->
-        {:error,
-         Error.validation_error("Flow output is required", %{
-           reason: :output_required,
-           path: [:output]
-         })}
-    end
-  end
-
-  defp validate_output_refs(output, forms) do
-    ids = MapSet.new(Map.keys(forms))
-
-    case Enum.find(Value.result_refs(output), &(not MapSet.member?(ids, &1))) do
-      nil ->
-        :ok
-
-      id ->
-        {:error,
-         Error.validation_error("Flow output references an unknown form", %{
-           reason: :unknown_output_reference,
-           step: id,
-           path: [:output]
-         })}
-    end
-  end
-
-  defp normalize_name(name, path) when is_atom(name) and name not in [nil, true, false],
-    do: normalize_name(Atom.to_string(name), path)
-
-  defp normalize_name(name, path) when is_binary(name) do
-    case Config.validate_name(name, subject: "Flow form") do
-      :ok -> {:ok, name}
-      {:error, message} -> {:error, Error.validation_error(message, %{path: path})}
-    end
-  end
-
-  defp normalize_name(name, path),
-    do:
-      {:error,
-       Error.validation_error("Flow form name must be a string or atom", %{
-         path: path,
-         value: name
-       })}
-
-  defp unique_name(values, id, path) do
-    if Map.has_key?(values, id) do
-      {:error,
-       Error.validation_error("Flow contains a duplicate normalized form name", %{
-         reason: :duplicate_form,
-         form: id,
-         path: path
-       })}
-    else
-      :ok
-    end
-  end
-
-  defp source_attrs(%__MODULE__{} = flow) do
-    flow
-    |> Map.from_struct()
-    |> Map.take(@fields)
-  end
-
-  defp invalid_subject(value),
-    do: {:error, Error.validation_error("expected a Jido.Flow", %{value: value})}
 end

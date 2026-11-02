@@ -205,8 +205,7 @@ defmodule Jido.Signal.Trace do
       :ok
     else
       _invalid ->
-        {:error,
-         "tracestate must contain at most 32 unique, valid W3C list-members and 512 bytes"}
+        {:error, "tracestate must contain at most 32 unique, valid W3C list-members and 512 bytes"}
     end
   end
 
@@ -250,8 +249,7 @@ defmodule Jido.Signal.Trace do
     if is_binary(value) and value != zero and Regex.match?(pattern, value) do
       :ok
     else
-      {:error,
-       "#{name} must be #{byte_size(zero)} lower-case hexadecimal characters and not all zero"}
+      {:error, "#{name} must be #{byte_size(zero)} lower-case hexadecimal characters and not all zero"}
     end
   end
 

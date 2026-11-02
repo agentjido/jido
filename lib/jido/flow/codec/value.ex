@@ -5,7 +5,7 @@ defmodule Jido.Flow.Codec.Value do
   alias Jido.Authoring.Value.Error, as: AuthoringValueError
   alias Jido.Expr
   alias Jido.Flow.{Error, Ref, Value}
-  alias Jido.Flow.Codec.Limits
+  alias Jido.Flow.Codec.{Limits, Paths}
 
   @doc false
   @spec encode_expression(term(), Jido.Authoring.Registry.t(), non_neg_integer()) ::
@@ -14,8 +14,7 @@ defmodule Jido.Flow.Codec.Value do
     with :ok <- Limits.depth(depth),
          {:ok, operands} <-
            encode_list(expression.operands, registry, depth + 1, &encode_expression/3) do
-      {:ok,
-       %{"$expr" => %{"operator" => Atom.to_string(expression.operator), "operands" => operands}}}
+      {:ok, %{"$expr" => %{"operator" => Atom.to_string(expression.operator), "operands" => operands}}}
     end
   end
 
@@ -26,7 +25,7 @@ defmodule Jido.Flow.Codec.Value do
        %{
          "$ref" => %{
            "source" => Atom.to_string(ref.source),
-           "step" => ref.step,
+           "component" => ref.component,
            "path" => path
          }
        }}
@@ -98,23 +97,25 @@ defmodule Jido.Flow.Codec.Value do
   end
 
   @doc false
-  @spec decode(term(), Jido.Authoring.Registry.t(), list(), :expression | :data) ::
-          {:ok, term()} | {:error, [Exception.t()]}
-  def decode(value, registry, stored, mode \\ :expression),
-    do: decode(value, registry, stored, mode, 0)
+  @spec decode(term(), Jido.Authoring.Registry.t(), list(), list(), :expression | :data) ::
+          {:ok, term(), Paths.t()} | {:error, [Exception.t()]}
+  def decode(value, registry, stored, canonical, mode \\ :expression),
+    do: decode(value, registry, stored, canonical, mode, 0)
 
-  defp decode(value, _registry, _stored, _mode, _depth)
+  defp decode(value, _registry, stored, canonical, _mode, _depth)
        when is_nil(value) or is_boolean(value) or is_number(value) or is_binary(value),
-       do: {:ok, value}
+       do: {:ok, value, %{canonical => stored}}
 
-  defp decode(values, registry, stored, mode, depth) when is_list(values) do
+  defp decode(values, registry, stored, canonical, mode, depth) when is_list(values) do
     case Limits.depth(depth) do
       :ok ->
         sequence(
           values,
           fn value, index ->
-            decode(value, registry, stored ++ [index], mode, depth + 1)
-          end
+            decode(value, registry, stored ++ [index], canonical ++ [index], mode, depth + 1)
+          end,
+          canonical,
+          stored
         )
 
       {:error, error} ->
@@ -122,13 +123,13 @@ defmodule Jido.Flow.Codec.Value do
     end
   end
 
-  defp decode(%{"$type" => "atom"} = record, registry, stored, _mode, _depth) do
+  defp decode(%{"$type" => "atom"} = record, registry, stored, canonical, _mode, _depth) do
     errors = unknown(record, ["$type", "id", "vsn"], stored)
     atom_record = Map.take(record, ["$type", "id", "vsn"])
 
     case AuthoringValue.decode(atom_record, registry) |> authoring_result() do
       {:ok, atom} when errors == [] ->
-        {:ok, atom}
+        {:ok, atom, %{canonical => stored}}
 
       {:ok, _} ->
         {:error, errors}
@@ -143,21 +144,21 @@ defmodule Jido.Flow.Codec.Value do
     end
   end
 
-  defp decode(%{"$type" => "map"} = record, registry, stored, mode, depth) do
+  defp decode(%{"$type" => "map"} = record, registry, stored, canonical, mode, depth) do
     errors = unknown(record, ["$type", "entries"], stored)
 
     case Map.get(record, "entries") do
       entries when is_list(entries) ->
-        {map, errors} =
+        {map, paths, errors} =
           entries
           |> Enum.with_index()
-          |> Enum.reduce({%{}, Enum.reverse(errors)}, fn {entry, index}, {map, errors} ->
+          |> Enum.reduce({%{}, %{canonical => stored}, Enum.reverse(errors)}, fn {entry, index}, {map, paths, errors} ->
             entry_path = stored ++ ["entries", index]
 
-            case decode_entry(entry, registry, entry_path, mode, depth) do
-              {:ok, {key, value}} ->
+            case decode_entry(entry, registry, entry_path, canonical, mode, depth) do
+              {:ok, {key, value}, nested_paths} ->
                 if Map.has_key?(map, key) do
-                  {map,
+                  {map, paths,
                    [
                      Error.validation_error("stored map contains a duplicate key", %{
                        path: entry_path ++ ["key"]
@@ -165,15 +166,15 @@ defmodule Jido.Flow.Codec.Value do
                      | errors
                    ]}
                 else
-                  {Map.put(map, key, value), errors}
+                  {Map.put(map, key, value), Map.merge(paths, nested_paths), errors}
                 end
 
               {:error, nested} ->
-                {map, Enum.reverse(nested, errors)}
+                {map, paths, Enum.reverse(nested, errors)}
             end
           end)
 
-        if errors == [], do: {:ok, map}, else: {:error, Enum.reverse(errors)}
+        if errors == [], do: {:ok, map, paths}, else: {:error, Enum.reverse(errors)}
 
       _ ->
         {:error,
@@ -186,11 +187,11 @@ defmodule Jido.Flow.Codec.Value do
     end
   end
 
-  defp decode(%{"$ref" => record} = outer, registry, stored, :expression, depth)
+  defp decode(%{"$ref" => record} = outer, registry, stored, canonical, :expression, depth)
        when is_map(record) and not is_struct(record) do
     errors =
       unknown(outer, ["$ref"], stored) ++
-        unknown(record, ["source", "step", "path"], stored ++ ["$ref"])
+        unknown(record, ["source", "component", "path"], stored ++ ["$ref"])
 
     source = Enum.find(Ref.sources(), &(Atom.to_string(&1) == Map.get(record, "source")))
 
@@ -206,13 +207,13 @@ defmodule Jido.Flow.Codec.Value do
             ]
 
     errors =
-      if is_nil(Map.get(record, "step")) or is_binary(Map.get(record, "step")),
+      if is_nil(Map.get(record, "component")) or is_binary(Map.get(record, "component")),
         do: errors,
         else:
           errors ++
             [
-              Error.validation_error("stored reference Step must be a string", %{
-                path: stored ++ ["$ref", "step"]
+              Error.validation_error("stored reference component must be a string", %{
+                path: stored ++ ["$ref", "component"]
               })
             ]
 
@@ -226,17 +227,21 @@ defmodule Jido.Flow.Codec.Value do
                 value,
                 registry,
                 stored ++ ["$ref", "path", index],
+                canonical ++ [:path, index],
                 :data,
                 depth + 1
               )
-            end
+            end,
+            canonical ++ [:path],
+            stored ++ ["$ref", "path"]
           )
 
         case result do
-          {:ok, path} when errors == [] ->
-            {:ok, %Ref{source: source, step: Map.get(record, "step"), path: path}}
+          {:ok, path, paths} when errors == [] ->
+            {:ok, %Ref{source: source, component: Map.get(record, "component"), path: path},
+             Map.put(paths, canonical, stored)}
 
-          {:ok, _path} ->
+          {:ok, _, _} ->
             {:error, errors}
 
           {:error, nested} ->
@@ -254,7 +259,7 @@ defmodule Jido.Flow.Codec.Value do
     end
   end
 
-  defp decode(%{"$expr" => record} = outer, registry, stored, :expression, depth)
+  defp decode(%{"$expr" => record} = outer, registry, stored, canonical, :expression, depth)
        when is_map(record) and not is_struct(record) do
     errors =
       unknown(outer, ["$expr"], stored) ++
@@ -285,15 +290,19 @@ defmodule Jido.Flow.Codec.Value do
                    value,
                    registry,
                    stored ++ ["$expr", "operands", index],
+                   canonical ++ [:operands, index],
                    :expression,
                    depth + 1
                  )
-               end
+               end,
+               canonical ++ [:operands],
+               stored ++ ["$expr", "operands"]
              ) do
-          {:ok, operands} when errors == [] ->
-            {:ok, %Expr{operator: elem(operator, 0), operands: operands}}
+          {:ok, operands, paths} when errors == [] ->
+            {:ok, %Expr{operator: elem(operator, 0), operands: operands},
+             Map.put(paths, canonical, stored ++ ["$expr"])}
 
-          {:ok, _operands} ->
+          {:ok, _, _} ->
             {:error, errors}
 
           {:error, nested} ->
@@ -311,27 +320,26 @@ defmodule Jido.Flow.Codec.Value do
     end
   end
 
-  defp decode(_value, _registry, stored, _mode, _depth),
-    do:
-      {:error,
-       [Error.validation_error("stored Flow data has an invalid tagged value", %{path: stored})]}
+  defp decode(_value, _registry, stored, _canonical, _mode, _depth),
+    do: {:error, [Error.validation_error("stored Flow data has an invalid tagged value", %{path: stored})]}
 
   defp decode_entry(
          %{"key" => key, "value" => value} = entry,
          registry,
          stored,
+         canonical,
          mode,
          depth
        ) do
     errors = unknown(entry, ["key", "value"], stored)
 
-    case decode(key, registry, stored ++ ["key"], :data, depth + 1) do
-      {:ok, key} ->
+    case decode(key, registry, stored ++ ["key"], [], :data, depth + 1) do
+      {:ok, key, _paths} ->
         case Value.validate_key(key) do
           :ok ->
-            case decode(value, registry, stored ++ ["value"], mode, depth + 1) do
-              {:ok, value} when errors == [] -> {:ok, {key, value}}
-              {:ok, _value} -> {:error, errors}
+            case decode(value, registry, stored ++ ["value"], canonical ++ [key], mode, depth + 1) do
+              {:ok, value, paths} when errors == [] -> {:ok, {key, value}, paths}
+              {:ok, _, _} -> {:error, errors}
               {:error, nested} -> {:error, errors ++ nested}
             end
 
@@ -344,23 +352,21 @@ defmodule Jido.Flow.Codec.Value do
     end
   end
 
-  defp decode_entry(_entry, _registry, stored, _mode, _depth),
-    do:
-      {:error,
-       [Error.validation_error("stored map entry must contain a key and value", %{path: stored})]}
+  defp decode_entry(_entry, _registry, stored, _canonical, _mode, _depth),
+    do: {:error, [Error.validation_error("stored map entry must contain a key and value", %{path: stored})]}
 
-  defp sequence(values, decoder) do
-    {values, errors} =
+  defp sequence(values, decoder, canonical, stored) do
+    {values, paths, errors} =
       values
       |> Enum.with_index()
-      |> Enum.reduce({[], []}, fn {value, index}, {values, errors} ->
+      |> Enum.reduce({[], %{canonical => stored}, []}, fn {value, index}, {values, paths, errors} ->
         case decoder.(value, index) do
-          {:ok, value} -> {[value | values], errors}
-          {:error, nested} -> {values, Enum.reverse(nested, errors)}
+          {:ok, value, nested_paths} -> {[value | values], Map.merge(paths, nested_paths), errors}
+          {:error, nested} -> {values, paths, Enum.reverse(nested, errors)}
         end
       end)
 
-    if errors == [], do: {:ok, Enum.reverse(values)}, else: {:error, Enum.reverse(errors)}
+    if errors == [], do: {:ok, Enum.reverse(values), paths}, else: {:error, Enum.reverse(errors)}
   end
 
   defp unknown(record, fields, stored) do

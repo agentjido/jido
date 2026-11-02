@@ -44,15 +44,6 @@ defmodule Jido.Authoring.Codec do
       else: {:error, {:invalid_metadata, metadata}}
   end
 
-  defp validate_metadata(%{type: type} = metadata)
-       when is_binary(type) and byte_size(type) in 1..255 and not is_map_key(metadata, :vsn) do
-    encoder = Map.get(metadata, :encoder)
-
-    if String.valid?(type) and (is_nil(encoder) or valid_module?(encoder)),
-      do: {:ok, %{type: type, encoder: encoder}},
-      else: {:error, {:invalid_metadata, metadata}}
-  end
-
   defp validate_metadata(metadata), do: {:error, {:invalid_metadata, metadata}}
 
   defp supports?(module, :decode, _metadata),

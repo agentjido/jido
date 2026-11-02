@@ -1,5 +1,5 @@
 defmodule Jido.Authoring.PortableDocumentTest do
-  use ExUnit.Case, async: true
+  use Covenant.Case, component: "jido_action.authoring", async: true
 
   @moduletag obligation: [
                "jido_action.authoring.I1",

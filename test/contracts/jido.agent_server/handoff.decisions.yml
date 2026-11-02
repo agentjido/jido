@@ -1,0 +1,11 @@
+- id: handoff-coordinator-owner
+  date: 2026-10-26
+  decision: Use jido.agent_server.handoff for the live Handoff chain and its accepted and released durable receipts. Target Jido.AgentServer in this mutation profile because it contains the shared Handoff coordinator states and ordering.
+  driver: The durable_turn component owns persistent Flow progress and does not own transient AgentServer queue, reply, timeout, or cancellation behavior. Excluding the shared coordinator left the public Handoff chain outside mutation evaluation.
+  approved_by: Handoff hardening audit
+
+- id: handoff-supporting-seams
+  date: 2026-10-26
+  decision: Keep pure successor preparation in jido.agent_evaluation, Handoff receipt helpers in jido.agent_server.durable_turn, durable Agent writes in jido.agent_server.durable, and record shape validation in jido.persistence. Run explicit focused mutations for these changed modules in addition to the coordinator profile.
+  driver: Each helper keeps its established owner, while the Handoff component proves their combined public order through Jido.AgentServer.
+  approved_by: Handoff hardening audit

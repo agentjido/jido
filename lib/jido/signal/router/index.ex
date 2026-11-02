@@ -51,8 +51,7 @@ defmodule Jido.Signal.Router.Index do
     entries = Enum.reject(router.entries, &MapSet.member?(paths, &1.route.path))
 
     {exact_index, wildcard_index} =
-      Enum.reduce(paths, {router.exact_index, router.wildcard_index}, fn path,
-                                                                         {exact, wildcard} ->
+      Enum.reduce(paths, {router.exact_index, router.wildcard_index}, fn path, {exact, wildcard} ->
         if wildcard_path?(path) do
           {exact, delete_trie_path(wildcard, String.split(path, "."))}
         else
@@ -72,8 +71,7 @@ defmodule Jido.Signal.Router.Index do
 
     {exact_index, wildcard_index} =
       if wildcard_path?(path) do
-        {router.exact_index,
-         delete_trie_path(router.wildcard_index, String.split(path, "."), reject)}
+        {router.exact_index, delete_trie_path(router.wildcard_index, String.split(path, "."), reject)}
       else
         exact =
           case reject.(Map.get(router.exact_index, path, [])) do

@@ -9,7 +9,4 @@ defmodule Jido.Authoring.Limits do
 
   @doc false
   defmacro maximum_document_nodes, do: 100_000
-
-  @doc false
-  defmacro maximum_duration_ms, do: 31_536_000_000
 end

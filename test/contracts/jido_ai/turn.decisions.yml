@@ -1,0 +1,5 @@
+- id: turn-component-boundary
+  date: "2026-10-27"
+  decision: Keep common request setup, guards, attempt observations, terminal results, and request outcomes in jido_ai.turn.
+  driver: Every strategy must expose the same turn boundary without a hidden package-level runtime.
+  approved_by: User-requested initial Covenant scaffold

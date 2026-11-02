@@ -21,9 +21,7 @@ defmodule Jido.Signal.Dispatch.LoggerAdapterTest do
 
   test "validates Logger options through Dispatch" do
     assert {:ok, {:logger, opts}} =
-             Dispatch.validate_opts(
-               {:logger, level: :warning, structured: true, include_data: false}
-             )
+             Dispatch.validate_opts({:logger, level: :warning, structured: true, include_data: false})
 
     assert opts == [level: :warning, structured: true, include_data: false]
 

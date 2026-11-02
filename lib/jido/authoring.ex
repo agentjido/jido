@@ -11,7 +11,6 @@ defmodule Jido.Authoring do
   require Jido.Authoring.Limits
 
   @default_maximum_json_bytes 8_388_608
-  @default_registry_provider {Jido.Discovery, :registry, []}
   @maximum_depth Jido.Authoring.Limits.maximum_depth()
   @maximum_collection_size Jido.Authoring.Limits.maximum_collection_size()
   @maximum_document_nodes Jido.Authoring.Limits.maximum_document_nodes()
@@ -99,13 +98,11 @@ defmodule Jido.Authoring do
         "authoring document vsn must be a positive integer"
       )
 
-  defp route(%{"type" => type} = document, registry, codec)
-       when is_binary(type) and byte_size(type) in 1..255 do
-    run_codec(document, type, registry, codec)
+  defp route(%{"type" => type}, registry, _codec) when is_binary(type) do
+    issue(:missing_document_vsn, ["vsn"], "authoring document vsn is required", %{
+      supported_vsns: Registry.codec_vsns(registry, type)
+    })
   end
-
-  defp route(%{"type" => type}, _registry, _codec) when is_binary(type),
-    do: issue(:invalid_document_type, ["type"], "authoring document type is invalid")
 
   defp route(%{"type" => type}, _registry, _codec) when not is_binary(type),
     do: issue(:invalid_document_type, ["type"], "authoring document type must be a string")
@@ -138,42 +135,6 @@ defmodule Jido.Authoring do
       {:ok, %{type: ^type, vsn: ^vsn}} -> safe_decode(codec, document, registry)
       {:ok, _metadata} -> unsupported_document(type, vsn, [])
       {:error, error} -> {:error, [error]}
-    end
-  end
-
-  defp run_codec(document, type, registry, nil) do
-    case Registry.codec(registry, type) do
-      {:ok, codec} ->
-        safe_decode(codec, document, registry)
-
-      {:error, :unknown_codec} ->
-        case Registry.codec_vsns(registry, type) do
-          [] ->
-            unsupported_document(type)
-
-          supported ->
-            issue(:missing_document_vsn, ["vsn"], "authoring document vsn is required", %{
-              supported_vsns: supported
-            })
-        end
-    end
-  end
-
-  defp run_codec(document, type, registry, codec) when is_atom(codec) do
-    case codec_metadata(codec, :decode) do
-      {:ok, %{type: ^type} = metadata} when not is_map_key(metadata, :vsn) ->
-        safe_decode(codec, document, registry)
-
-      {:ok, %{type: ^type, vsn: vsn}} ->
-        issue(:missing_document_vsn, ["vsn"], "authoring document vsn is required", %{
-          supported_vsns: [vsn]
-        })
-
-      {:ok, _metadata} ->
-        unsupported_document(type)
-
-      {:error, error} ->
-        {:error, [error]}
     end
   end
 
@@ -270,11 +231,9 @@ defmodule Jido.Authoring do
         reason: reason
       })
 
-  defp encoded_document(%{"type" => type} = document, codec, maximum_bytes)
-       when is_binary(type) do
+  defp encoded_document(%{"type" => type, "vsn" => vsn} = document, codec, maximum_bytes) do
     with :ok <- Document.check_json(document, maximum_bytes),
-         {:ok, metadata} <- codec_metadata(codec, :encode),
-         true <- encoded_document_matches?(document, type, metadata) do
+         {:ok, %{type: ^type, vsn: ^vsn}} <- codec_metadata(codec, :encode) do
       :ok
     else
       {:error, %Document.Error{reason: :bytes, details: details}} ->
@@ -288,7 +247,7 @@ defmodule Jido.Authoring do
       {:error, %Document.Error{} = error} ->
         {:error, Error.invalid(:invalid_document, error.message, error.details)}
 
-      false ->
+      {:ok, _metadata} ->
         {:error,
          Error.invalid(
            :unsupported_document,
@@ -302,13 +261,6 @@ defmodule Jido.Authoring do
 
   defp encoded_document(_document, _codec, _maximum_bytes),
     do: {:error, Error.invalid(:invalid_document, "authoring codec returned an invalid document")}
-
-  defp encoded_document_matches?(%{"vsn" => vsn}, type, %{type: type, vsn: vsn}), do: true
-
-  defp encoded_document_matches?(document, type, %{type: type} = metadata),
-    do: not Map.has_key?(document, "vsn") and not Map.has_key?(metadata, :vsn)
-
-  defp encoded_document_matches?(_document, _type, _metadata), do: false
 
   defp encoder(value, registry, opts) do
     case opts[:codec] do
@@ -368,12 +320,6 @@ defmodule Jido.Authoring do
     })
   end
 
-  defp unsupported_document(type) do
-    issue(:unsupported_document, ["type"], "authoring document type is not supported", %{
-      type: type
-    })
-  end
-
   defp parse_json(json, maximum_bytes)
        when is_binary(json) and byte_size(json) <= maximum_bytes do
     case Jason.decode(json, strings: :copy, objects: :ordered_objects) do
@@ -415,8 +361,7 @@ defmodule Jido.Authoring do
         issue(:duplicate_key, path ++ [key], "JSON object contains a duplicate key", %{key: key})
 
       true ->
-        Enum.reduce_while(pairs, {:ok, %{}, remaining - 1}, fn {key, value},
-                                                               {:ok, result, left} ->
+        Enum.reduce_while(pairs, {:ok, %{}, remaining - 1}, fn {key, value}, {:ok, result, left} ->
           with {:ok, _key, left} <- plain_json(key, path, depth + 1, left),
                {:ok, value, left} <- plain_json(value, path ++ [key], depth + 1, left) do
             {:cont, {:ok, Map.put(result, key, value), left}}
@@ -486,31 +431,11 @@ defmodule Jido.Authoring do
   end
 
   defp registry!(opts) do
-    registry = Keyword.get_lazy(opts, :registry, &configured_registry/0)
-
-    case registry do
+    case Keyword.get(opts, :registry) do
+      nil -> Jido.Discovery.registry()
       %Registry{} = registry -> registry
       entries when is_map(entries) and not is_struct(entries) -> Registry.new!(entries)
       value -> raise ArgumentError, "authoring registry is invalid: #{inspect(value)}"
-    end
-  end
-
-  defp configured_registry do
-    provider =
-      :jido
-      |> Application.get_env(__MODULE__, [])
-      |> Keyword.get(:registry_provider, @default_registry_provider)
-
-    case provider do
-      {module, function, arguments}
-      when is_atom(module) and is_atom(function) and is_list(arguments) ->
-        apply(module, function, arguments)
-
-      provider when is_function(provider, 0) ->
-        provider.()
-
-      value ->
-        value
     end
   end
 

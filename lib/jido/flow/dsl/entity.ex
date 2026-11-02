@@ -8,6 +8,11 @@ defmodule Jido.Flow.DSL.Entity do
                      type: {:wrap_list, :string},
                      default: [],
                      doc: "Explicit control dependencies."
+                   ],
+                   meta: [
+                     type: {:map, :any, :any},
+                     default: %{},
+                     doc: "Non-semantic node metadata."
                    ]
                  ]
 
@@ -30,25 +35,6 @@ defmodule Jido.Flow.DSL.Entity do
     fields = if node?, do: @node_fields, else: @source
     schema = Keyword.fetch!(options, :schema) ++ fields
     struct!(Spark.Dsl.Entity, Keyword.merge(options, target: module, schema: schema))
-  end
-
-  @doc false
-  @spec policy_schema() :: keyword()
-  def policy_schema do
-    [
-      policy: [
-        type: :any,
-        doc: "The complete timeout and retry policy. Do not mix it with policy shorthands."
-      ],
-      timeout_ms: [
-        type: :pos_integer,
-        doc: "The maximum duration of one Action attempt in milliseconds."
-      ],
-      retry: [
-        type: :any,
-        doc: "Bounded retry settings with none, fixed, or exponential backoff."
-      ]
-    ]
   end
 
   @doc false

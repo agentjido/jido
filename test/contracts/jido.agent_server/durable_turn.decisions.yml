@@ -1,0 +1,35 @@
+- id: durable-turn-boundary
+  date: 2026-10-20
+  decision: Use jido.agent_server.durable_turn for accepted Flow receipts, Runic workflow checkpoints, wait input receipts, wait resolution, and recovery of persistent Flow execution.
+  driver: Agent durability owns complete Agent records, while durable Turn coordination owns progress inside one accepted Flow Turn.
+  approved_by: User-approved Jido V3 component map
+
+- id: durable-turn-code-seam
+  date: 2026-10-20
+  decision: Keep deliver_wait and durable-turn gen_statem transitions in Jido.AgentServer. Type and validate the public wait ID there. Keep Flow coordination in Jido.AgentServer.DurableTurn and keep CheckpointStore and WaitHost under its namespace without compatibility delegates. Keep Flow and wait definition in jido_action; do not add a core DSL.
+  driver: The storage and wait modules have no external production callers and are implementation parts of durable Flow coordination. The AgentServer facade is the stable runtime boundary.
+  approved_by: Component hardening pass
+
+- id: durable-turn-obligation-origin
+  date: 2026-10-20
+  decision: Define durable Turn obligations from current durable Flow, checkpoint, and wait behavior instead of moving credit from general AgentServer obligations.
+  driver: The root AgentServer contract did not have a complete durable Flow obligation range.
+  approved_by: Component hardening pass
+
+- id: durable-turn-mutation-profile
+  date: 2026-10-20
+  decision: Mutate DurableTurn, DurableTurn.CheckpointStore, and DurableTurn.WaitHost. Do not mutate the shared AgentServer state machine in this focused profile.
+  driver: The focused profile must test durable Flow decisions without overlapping the core Turn and durable Agent components.
+  approved_by: Component hardening pass
+
+- id: durable-turn-fact-deltas
+  date: 2026-10-27
+  decision: Store Runic produced fact values and Join completion results in the execution-scoped fact store. Store a full value at the start of each bounded chain, then store a reference to the prior fact plus a structural frame delta only when the complete delta record is smaller. Rebuild and verify the exact runtime value on load.
+  driver: Cumulative Jido Flow frames repeat the same input, results, and branch state in each durable fact. Exact fact references remove that repeated storage without changing runtime frame values or durable execution order.
+  approved_by: User-requested fact-referenced frame delta refactor
+
+- id: durable-turn-frontier-hydration
+  date: 2026-10-27
+  decision: Replay durable workflow structure with Runic FactRef values and load only the hot facts that the active frontier and pending reactions need. Add each open Jido wait input to the hot set because wait resolution runs before the Runner restarts. Represent detached Join completion results with an internal replay event that creates a FactRef. Use full fact hydration for native Batch workflows until Runic supports hybrid Batch recovery.
+  driver: Long-running workflow history must not force every stored fact value into memory during each recovery or wait transition.
+  approved_by: User-requested frontier fact hydration

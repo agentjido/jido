@@ -1,0 +1,74 @@
+defmodule JidoTest.Agent.CandidateCompletenessTest do
+  use JidoTest.Case, async: true
+
+  alias Jido.AgentServer, as: Server
+  alias Jido.Signal
+
+  defmodule Partial do
+    use Jido.Action,
+      name: "candidate_completeness_partial"
+
+    def run(_params, _context), do: {:ok, %{count: 1}}
+  end
+
+  defmodule ClearOptional do
+    use Jido.Action,
+      name: "candidate_completeness_clear_optional"
+
+    def run(_params, _context), do: {:ok, %{count: 1, history: []}}
+  end
+
+  defmodule Counter do
+    use Jido.Agent, name: "candidate_completeness_counter"
+
+    state do
+      schema Zoi.object(%{
+               count: Zoi.integer() |> Zoi.default(0),
+               history: Zoi.list(Zoi.string()) |> Zoi.default([]),
+               note: Zoi.string() |> Zoi.optional()
+             })
+    end
+
+    routes do
+      route "candidate.partial", Partial
+
+      route "candidate.clear", ClearOptional
+    end
+  end
+
+  test "direct and live Turns reject a candidate that omits a defaulted field", %{jido: jido} do
+    initial = Counter.instantiate!(id: unique_id("partial"), state: %{history: ["old"]})
+    signal = Signal.new!("candidate.partial", %{}, source: "/test")
+
+    assert {:error,
+            %Jido.Agent.Error{
+              code: :incomplete_state,
+              details: %{issues: [%Zoi.Error{path: [:history]}]}
+            }} =
+             Counter.cmd(initial, signal)
+
+    assert {:ok, server} = JidoTest.AgentServerAssertions.start_agent(jido, initial)
+    before = JidoTest.AgentServerAssertions.committed(server)
+
+    assert {:error,
+            %Jido.Agent.Error{
+              code: :incomplete_state,
+              details: %{issues: [%Zoi.Error{path: [:history]}]}
+            }} =
+             Server.call(server, signal)
+
+    assert JidoTest.AgentServerAssertions.committed(server) == before
+  end
+
+  test "a candidate can omit a field that has no default", %{jido: jido} do
+    initial = Counter.instantiate!(id: unique_id("optional"), state: %{note: "old"})
+    signal = Signal.new!("candidate.clear", %{}, source: "/test")
+
+    assert {:ok, direct, []} = Counter.cmd(initial, signal)
+    assert direct.state == %{count: 1, history: []}
+
+    assert {:ok, server} = JidoTest.AgentServerAssertions.start_agent(jido, initial)
+    assert {:ok, live, _} = Server.call(server, signal)
+    assert live.state == direct.state
+  end
+end

@@ -7,8 +7,8 @@ defmodule Jido.Action.Error do
   non-retryable execution error with no structured details.
 
   Errors are non-retryable by default. Set `details.retry` to `true` only when
-  another attempt is safe. An execution boundary can retry only when its
-  caller requests retry and `retryable?/1` returns `true`.
+  another attempt is safe. `Jido.Exec` retries a failed attempt only when the
+  caller sets `max_attempts` and `retryable?/1` returns `true`.
   """
 
   use Splode,

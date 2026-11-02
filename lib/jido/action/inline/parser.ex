@@ -160,8 +160,7 @@ defmodule Jido.Action.Inline.Parser do
     end
 
     {params, patterns, _names} =
-      Enum.reduce(bindings, {[], [], MapSet.new()}, fn {{:named, name}, pattern, source},
-                                                       {params, patterns, names} ->
+      Enum.reduce(bindings, {[], [], MapSet.new()}, fn {{:named, name}, pattern, source}, {params, patterns, names} ->
         if MapSet.member?(names, name) do
           error!(pattern, caller, "duplicate inline Action binding: #{inspect(name)}")
         end
@@ -169,8 +168,7 @@ defmodule Jido.Action.Inline.Parser do
         {[{name, source} | params], [{name, pattern} | patterns], MapSet.put(names, name)}
       end)
 
-    {{:%{}, [line: caller.line], Enum.reverse(params)},
-     {:%{}, [line: caller.line], Enum.reverse(patterns)}}
+    {{:%{}, [line: caller.line], Enum.reverse(params)}, {:%{}, [line: caller.line], Enum.reverse(patterns)}}
   end
 
   defp classify_body!(body, caller) do

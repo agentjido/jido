@@ -1,0 +1,9 @@
+- at: lib/jido_action/error.ex:261:47
+  operator: guard_removal
+  mutation: "`when is_list(details)` → `(no guard)`"
+  sort: equivalent
+  reason: >-
+    The preceding clause already preserves plain maps. Keyword.keyword?/1
+    returns false for every non-list and non-keyword input. Removing this
+    list guard therefore retains the empty-map result for unsupported
+    containers and the same Map.new/1 conversion for keyword lists.

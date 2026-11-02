@@ -1,0 +1,582 @@
+defmodule Jido.Agent.CodecTest do
+  use Covenant.Case, component: "jido.agent", async: true
+  alias Jido.Agent
+  alias Jido.Authoring.Registry
+  alias JidoTest.AgentContract, as: F
+  alias JidoTest.AgentFixtures.Add
+
+  defmodule Work do
+    use Jido.Action, name: "codec_work", schema: Zoi.object(%{})
+    def run(_, context), do: {:ok, context.agent_state}
+  end
+
+  defmodule WorkFlow do
+    use Jido.Flow, name: "codec_flow", schema: Zoi.object(%{})
+
+    flow do
+      step "work", action: Work, params: %{}
+      output result("work")
+    end
+  end
+
+  defmodule Child do
+    use Jido.Agent, name: "codec_child"
+
+    state do
+      schema Zoi.object(%{value: Zoi.string() |> Zoi.default("default")})
+    end
+
+    routes do
+      route "child.single", Jido.Agent.CodecTest.Work
+
+      route "child.broadcast", Jido.Agent.CodecTest.Work
+    end
+  end
+
+  def transform(signal), do: {:ok, signal}
+
+  defmodule ChangingTarget do
+    @behaviour Jido.Action
+    def __jido_authoring_kind__, do: Process.get({__MODULE__, :kind}, :action)
+    @impl true
+    def validate_params(value), do: {:ok, value}
+    @impl true
+    def validate_output(value), do: {:ok, value}
+    def output_schema, do: Zoi.map()
+    @impl true
+    def run(_, _), do: raise("encoding must not run Actions")
+  end
+
+  defmodule AmbiguousOutput do
+    use Jido.Action,
+      name: "codec_ambiguous_output",
+      output_schema: Zoi.object(%{:id => Zoi.integer(), "id" => Zoi.integer()})
+
+    def run(_, _), do: {:ok, %{"id" => 2, id: 1}}
+  end
+
+  @tag obligation: "jido.agent.I20"
+  test "Codec retains route defaults and writes definitions only" do
+    for defaults <- [%{}, %{by: 2}] do
+      definition =
+        Agent.define!(%{
+          name: "defaults",
+          routes: [
+            %{
+              path: "counter.add",
+              handler: %{kind: :action, target: Add},
+              defaults: defaults,
+              state: %{source: :output, path: []}
+            }
+          ]
+        })
+
+      registry = registry(definition, Add)
+
+      for value <- [definition, Agent.instantiate!(definition, id: "encoded")] do
+        assert {:ok, document} = JidoTest.AgentRegistry.encode(value, registry)
+        assert document["type"] == "jido.agent.definition"
+        refute Map.has_key?(document["definition"], "id")
+        refute Map.has_key?(document["definition"], "state")
+
+        expected = Agent.definition(value)
+
+        assert {:ok, ^expected} =
+                 JidoTest.AgentRegistry.decode(JSON.decode!(JSON.encode!(document)), registry)
+      end
+
+      [route] = definition.routes
+
+      for invalid <- [false, 1, "invalid", [], {1, 2}, %URI{}] do
+        assert {:error,
+                %Jido.Authoring.Error.InvalidError{
+                  details: %{path: [:routes, 0, :defaults]}
+                }} =
+                 JidoTest.AgentRegistry.encode(
+                   %{definition | routes: [%{route | defaults: invalid}]},
+                   registry
+                 )
+      end
+    end
+  end
+
+  @tag obligation: "jido.agent.I20"
+  test "Codec validates the current executable kind" do
+    definition =
+      Agent.define!(%{
+        name: "changing_target",
+        routes: [
+          %{
+            path: "counter.route",
+            handler: %{kind: :action, target: ChangingTarget},
+            state: %{source: :output, path: []}
+          }
+        ]
+      })
+
+    registry = registry(definition, ChangingTarget)
+    Process.put({ChangingTarget, :kind}, :flow)
+
+    for result <- [JidoTest.AgentRegistry.encode(definition, registry)] do
+      assert {:error,
+              %Jido.Authoring.Error.InvalidError{
+                code: :invalid_executable,
+                details: %{path: [:routes, 0, :handler]}
+              }} = result
+    end
+  end
+
+  @tag obligation: "jido.agent.I20"
+  test "Codec rejects the old Agent envelope" do
+    definition = Agent.define!(%{name: "new_document"})
+    registry = registry(definition, nil)
+
+    assert {:error, _error} =
+             JidoTest.AgentRegistry.decode(
+               %{"type" => "jido.agent", "version" => 1, "agent" => %{}},
+               registry
+             )
+  end
+
+  @tag obligation: "jido.agent.I20"
+  test "Codec version 1 encodes selectors and rejects other versions" do
+    definition =
+      Agent.define!(%{
+        name: "route_mappings",
+        signal_source: "/codec",
+        routes: [
+          %{
+            path: "work",
+            handler: %{kind: :action, target: F.Project},
+            state: %{source: :output, path: [:state]},
+            reply: %{
+              type: "work.completed",
+              from: %{source: :output, path: [:reply, :value]}
+            }
+          }
+        ]
+      })
+
+    registry = JidoTest.AgentRegistry.for(definition)
+    assert {:ok, document} = JidoTest.AgentRegistry.encode(definition, registry)
+    assert document["vsn"] == 1
+    [route] = document["definition"]["routes"]
+    assert route["state"] == %{"source" => "output", "path" => ["state"]}
+
+    assert route["reply"] == %{
+             "type" => "work.completed",
+             "from" => %{"source" => "output", "path" => ["reply", "value"]}
+           }
+
+    assert {:ok, ^definition} = JidoTest.AgentRegistry.decode(document, registry)
+
+    old_shape =
+      update_in(document, ["definition", "routes"], fn [route] ->
+        [Map.drop(route, ["state", "reply"])]
+      end)
+
+    assert {:error, [%Jido.Authoring.Issue{code: :invalid_document}]} =
+             JidoTest.AgentRegistry.decode(old_shape, registry)
+
+    unsupported = %{document | "vsn" => 2}
+
+    assert {:error, [%Jido.Authoring.Issue{code: :unsupported_document}]} =
+             JidoTest.AgentRegistry.decode(unsupported, registry)
+
+    assert {:error,
+            [
+              %Jido.Authoring.Issue{
+                code: :unsupported_document,
+                path: ["vsn"],
+                details: %{vsn: 2}
+              }
+            ]} = Jido.Agent.Codec.decode_document(unsupported, registry)
+  end
+
+  @tag obligation: "jido.agent.I20"
+  test "Codec resolves selector strings through the output schema without creating atoms" do
+    definition =
+      Agent.define!(%{
+        name: "safe_route_keys",
+        routes: [
+          %{
+            path: "work",
+            handler: %{kind: :action, target: AmbiguousOutput},
+            state: :unchanged
+          }
+        ]
+      })
+
+    registry = JidoTest.AgentRegistry.for(definition)
+    assert {:ok, document} = JidoTest.AgentRegistry.encode(definition, registry)
+    [route] = document["definition"]["routes"]
+
+    ambiguous =
+      put_in(document, ["definition", "routes"], [
+        %{route | "state" => %{"source" => "output", "path" => ["id"]}}
+      ])
+
+    assert {:error, [%Jido.Authoring.Issue{code: :ambiguous_output_field}]} =
+             JidoTest.AgentRegistry.decode(ambiguous, registry)
+
+    key = "codec_missing_#{System.unique_integer([:positive])}"
+    assert_raise ArgumentError, fn -> String.to_existing_atom(key) end
+
+    unknown =
+      put_in(document, ["definition", "routes"], [
+        %{route | "state" => %{"source" => "output", "path" => [key]}}
+      ])
+
+    assert {:error, _issues} = JidoTest.AgentRegistry.decode(unknown, registry)
+    assert_raise ArgumentError, fn -> String.to_existing_atom(key) end
+
+    unsafe =
+      put_in(document, ["definition", "routes"], [
+        %{route | "state" => %{"source" => "output", "path" => [1]}}
+      ])
+
+    assert {:error, [%Jido.Authoring.Issue{code: :invalid_document}]} =
+             JidoTest.AgentRegistry.decode(unsafe, registry)
+  end
+
+  @tag obligation: "jido.agent.I20"
+  test "Codec preserves every portable Agent field and nested variant" do
+    nested =
+      Agent.define!(%{
+        name: "nested",
+        routes: [
+          %{
+            path: "child.single",
+            handler: %{kind: :action, target: Work},
+            state: %{source: :output, path: []}
+          }
+        ]
+      })
+
+    definition =
+      Agent.define!(%{
+        name: "complete_codec",
+        description: "all portable fields",
+        vsn: 3,
+        schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}),
+        initial_state: %{count: 4},
+        metadata: %{owner: :codec},
+        signal_source: "/codec",
+        routes: [
+          %{
+            path: "child.single",
+            handler: %{kind: :action, target: Work},
+            state: %{source: :output, path: []},
+            reply: %{
+              type: "child.completed",
+              from: %{source: :output, path: []}
+            }
+          },
+          %{
+            path: "flow.run",
+            handler: %{kind: :flow, target: WorkFlow},
+            state: :unchanged
+          },
+          %{
+            path: "transform.run",
+            handler: %{kind: :transform, target: {__MODULE__, :transform, 1}}
+          },
+          %{path: "child.broadcast", handler: %{kind: :forward, target: %{kind: :parent}}}
+        ],
+        topology: %{
+          agents: [
+            %{
+              name: :literal,
+              definition: nested,
+              count: 1,
+              initial_state: %{},
+              identities: %{1 => "literal-1"}
+            },
+            %{
+              name: :module,
+              definition: Child,
+              count: 2,
+              initial_state: %{value: "seed"},
+              identities: %{1 => "module-1", 2 => "module-2"}
+            }
+          ],
+          connections: [
+            %{
+              path: "child.single",
+              from: %{kind: :agent, name: :root},
+              to: %{kind: :agent, name: :literal},
+              delivery: :single
+            },
+            %{
+              path: "child.broadcast",
+              from: %{kind: :agent, name: :root},
+              to: %{kind: :agent, name: :module},
+              delivery: :broadcast
+            }
+          ]
+        },
+        plugins: [F.contribution(F.First, %{initial: 2})]
+      })
+
+    registry = JidoTest.AgentRegistry.for(definition)
+    assert {:ok, document} = JidoTest.AgentRegistry.encode(definition, registry)
+    assert Map.keys(document["definition"]["schema"]) |> Enum.sort() == ["id", "vsn"]
+
+    assert [provider] =
+             Enum.map(document["definition"]["plugins"], & &1["provider"])
+
+    assert Map.keys(provider) |> Enum.sort() == ["id", "vsn"]
+
+    assert {:ok, ^definition} =
+             JidoTest.AgentRegistry.decode(JSON.decode!(JSON.encode!(document)), registry)
+
+    assert {:ok, ^document} = JidoTest.AgentRegistry.encode(Map.from_struct(definition), registry)
+
+    assert {:ok, child_document} =
+             JidoTest.AgentRegistry.encode(Child, JidoTest.AgentRegistry.for(Child))
+
+    assert child_document["definition"]["module"] != nil
+
+    plugin_registry = Registry.new!(registry.entries)
+
+    assert {:ok, plugin_document} = JidoTest.AgentRegistry.encode(definition, plugin_registry)
+    assert {:ok, ^definition} = JidoTest.AgentRegistry.decode(plugin_document, plugin_registry)
+    assert {:error, %{code: :unknown_reference}} = JidoTest.AgentRegistry.encode(definition, %{})
+  end
+
+  @tag obligation: "jido.agent.I20"
+  test "Codec reads a version 1 definition without initial state" do
+    definition = Agent.define!(%{name: "optional_initial_state"})
+    registry = JidoTest.AgentRegistry.for(definition)
+    assert {:ok, document} = JidoTest.AgentRegistry.encode(definition, registry)
+    document = update_in(document["definition"], &Map.delete(&1, "initial_state"))
+
+    assert {:ok, ^definition} = JidoTest.AgentRegistry.decode(document, registry)
+  end
+
+  @tag obligation: "jido.agent.I20"
+  test "Codec reports Agent validation paths as JSON paths" do
+    definition =
+      Agent.define!(%{
+        name: "path_check",
+        routes: [
+          %{
+            path: "work",
+            handler: %{kind: :action, target: Work},
+            state: %{source: :output, path: []}
+          }
+        ]
+      })
+
+    registry = registry(definition, Work)
+    {:ok, document} = JidoTest.AgentRegistry.encode(definition, registry)
+
+    assert {:error,
+            [
+              %Jido.Authoring.Issue{
+                code: :invalid_string,
+                path: ["definition", "name"]
+              }
+            ]} =
+             JidoTest.AgentRegistry.decode(put_in(document, ["definition", "name"], 42), registry)
+
+    schema = Map.delete(document["definition"]["schema"], "id")
+
+    assert {:error,
+            [
+              %Jido.Authoring.Issue{
+                code: :reference,
+                path: ["definition", "schema", "id"]
+              }
+            ]} =
+             JidoTest.AgentRegistry.decode(
+               put_in(document, ["definition", "schema"], schema),
+               registry
+             )
+
+    [route] = document["definition"]["routes"]
+    target = Map.delete(route["handler"]["target"], "id")
+
+    assert {:error,
+            [
+              %Jido.Authoring.Issue{
+                code: :reference,
+                path: ["definition", "routes", 0, "handler", "target", "id"]
+              }
+            ]} =
+             JidoTest.AgentRegistry.decode(
+               put_in(document, ["definition", "routes"], [
+                 put_in(route, ["handler", "target"], target)
+               ]),
+               registry
+             )
+
+    assert {:error,
+            [
+              %Jido.Authoring.Issue{
+                code: :tag,
+                path: ["definition", "metadata", "entries", 0, "value"]
+              }
+            ]} =
+             JidoTest.AgentRegistry.decode(
+               put_in(document, ["definition", "metadata"], %{
+                 "$type" => "map",
+                 "entries" => [
+                   %{"key" => "nested", "value" => %{"$type" => "unknown"}}
+                 ]
+               }),
+               registry
+             )
+
+    assert {:error,
+            [
+              %Jido.Authoring.Issue{
+                code: :reference,
+                path: ["definition", "metadata", "id"]
+              }
+            ]} =
+             JidoTest.AgentRegistry.decode(
+               put_in(document, ["definition", "metadata"], %{
+                 "$type" => "atom",
+                 "id" => "missing",
+                 "vsn" => 1
+               }),
+               registry
+             )
+  end
+
+  @tag obligation: "jido.agent.I20"
+  test "Codec rejects malformed values at each document boundary" do
+    child =
+      Agent.define!(%{
+        name: "nested_shape",
+        schema: Zoi.object(%{value: Zoi.string() |> Zoi.default("default")}),
+        routes: [
+          %{
+            path: "child.single",
+            handler: %{kind: :action, target: Work},
+            state: %{source: :output, path: []}
+          }
+        ]
+      })
+
+    definition =
+      Agent.define!(%{
+        name: "codec_shape",
+        routes: [
+          %{
+            path: "child.single",
+            handler: %{kind: :action, target: Work},
+            state: %{source: :output, path: []}
+          }
+        ],
+        topology: %{
+          agents: [%{name: :child, definition: child, initial_state: %{value: "seed"}}],
+          connections: [
+            %{
+              path: "child.single",
+              from: %{kind: :agent, name: :root},
+              to: %{kind: :agent, name: :child}
+            }
+          ]
+        },
+        plugins: [F.contribution(F.First)]
+      })
+
+    registry = JidoTest.AgentRegistry.for(definition)
+    {:ok, document} = JidoTest.AgentRegistry.encode(definition, registry)
+
+    [route] = document["definition"]["routes"]
+    [member] = document["definition"]["topology"]["agents"]
+    [connection] = document["definition"]["topology"]["connections"]
+    [plugin] = document["definition"]["plugins"]
+    schema = document["definition"]["schema"]
+
+    invalid = [
+      Map.put(document, "type", "unknown"),
+      Map.put(document, "vsn", 2),
+      Map.delete(document, "vsn"),
+      put_in(document, ["definition", "schema"], Map.put(schema, "$type", "unknown")),
+      put_in(document, ["definition", "schema"], Map.put(schema, "extra", true)),
+      put_in(document, ["definition", "initial_state"], false),
+      put_in(document, ["definition", "routes"], false),
+      put_in(document, ["definition", "routes"], [%{"path" => "child.single"}]),
+      put_in(document, ["definition", "routes"], [Map.put(route, "unknown", true)]),
+      put_in(document, ["definition", "routes"], [%{route | "handler" => %{"kind" => "bad"}}]),
+      put_in(document, ["definition", "routes"], [
+        %{route | "handler" => Map.put(route["handler"], "extra", true)}
+      ]),
+      put_in(document, ["definition", "routes"], [
+        %{route | "handler" => %{"kind" => "forward", "extra" => true}}
+      ]),
+      put_in(document, ["definition", "topology"], false),
+      put_in(document, ["definition", "topology", "agents"], false),
+      put_in(document, ["definition", "topology", "agents"], [false]),
+      put_in(
+        document,
+        ["definition", "topology", "agents"],
+        [Map.delete(member, "name")]
+      ),
+      put_in(document, ["definition", "topology", "agents"], [Map.put(member, "extra", true)]),
+      put_in(document, ["definition", "topology", "agents"], [
+        %{member | "definition" => 1}
+      ]),
+      put_in(document, ["definition", "topology", "agents"], [
+        %{member | "definition" => Map.put(member["definition"], "$type", "unknown")}
+      ]),
+      put_in(document, ["definition", "topology", "agents"], [
+        %{member | "definition" => Map.put(member["definition"], "extra", true)}
+      ]),
+      put_in(
+        document,
+        ["definition", "topology", "connections"],
+        [%{connection | "delivery" => "multicast"}]
+      ),
+      update_in(document, ["definition"], fn fields ->
+        fields |> Map.delete("plugins") |> Map.put("extensions", fields["plugins"])
+      end),
+      put_in(document, ["definition", "plugins"], [Map.put(plugin, "extra", true)]),
+      put_in(document, ["definition", "plugins"], [false]),
+      put_in(document, ["definition", "plugins"], [
+        %{plugin | "provider" => %{"id" => "missing"}}
+      ])
+    ]
+
+    for value <- invalid, do: assert({:error, _} = JidoTest.AgentRegistry.decode(value, registry))
+
+    for source <- [nil, [], %URI{}],
+        do: assert({:error, _} = JidoTest.AgentRegistry.encode(source, registry))
+
+    at_limit = Jason.encode!(String.duplicate("x", 8_388_606))
+    over_limit = Jason.encode!(String.duplicate("x", 8_388_607))
+    assert byte_size(at_limit) == 8_388_608
+    assert byte_size(over_limit) == 8_388_609
+
+    assert {:error, [%Jido.Authoring.Issue{code: :invalid_document}]} =
+             JidoTest.AgentRegistry.decode_json(at_limit, registry)
+
+    assert {:error,
+            [
+              %Jido.Authoring.Issue{
+                code: :invalid_json,
+                details: %{maximum_bytes: 8_388_608}
+              }
+            ]} = JidoTest.AgentRegistry.decode_json(over_limit, registry)
+
+    for json <- [nil, "{"] do
+      assert {:error, _} = JidoTest.AgentRegistry.decode_json(json, registry)
+    end
+  end
+
+  defp registry(definition, target) do
+    entries = %{
+      {"schemas/agent", 1} => {:schema, definition.schema},
+      {"atoms/by", 1} => {:atom, :by}
+    }
+
+    entries =
+      if target, do: Map.put(entries, {"actions/target", 1}, {:action, target}), else: entries
+
+    Registry.new!(entries)
+  end
+end

@@ -14,24 +14,13 @@ defmodule Jido.Flow.DSL.Step do
     Action settings in `inline:` and keep `needs` and `meta` at Step level.
     See [Steps And Output](flow-steps.html) and [Inline Actions](inline-actions.html).
     """,
-    schema:
-      [
-        name: [type: :string, required: true, doc: "The unique Step name. Pass it first."],
-        action: [type: :atom, required: true, doc: "The Action or Flow module to call."],
-        params: [
-          type: :quoted,
-          required: true,
-          doc: "An expression that supplies the target parameters."
-        ],
-        meta: [
-          type: {:map, :any, :any},
-          default: %{},
-          doc: "Non-semantic caller metadata for the Instruction."
-        ],
-        on_error: [
-          type: {:one_of, [:fail_fast, :collect_errors]},
-          default: :fail_fast,
-          doc: "Fails the Flow or returns a tagged Step outcome."
-        ]
-      ] ++ Jido.Flow.DSL.Entity.policy_schema()
+    schema: [
+      name: [type: :string, required: true, doc: "The unique Step name. Pass it first."],
+      action: [type: :atom, required: true, doc: "The Action or Flow module to call."],
+      params: [
+        type: :quoted,
+        required: true,
+        doc: "An expression that supplies the target parameters."
+      ]
+    ]
 end

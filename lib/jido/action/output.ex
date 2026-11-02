@@ -4,7 +4,7 @@ defmodule Jido.Action.Output do
 
   Normal Action success values are map-shaped and validated by the Action's
   `output_schema`. Use this envelope only when a successful Action must return
-  a raw, stream, batch, or opaque value intentionally.
+  a raw, stream, batch, opaque, or shape-preserved value intentionally.
 
       Jido.Action.Output.raw("complete")
       Jido.Action.Output.batch([%{id: 1}, %{id: 2}])
@@ -16,14 +16,13 @@ defmodule Jido.Action.Output do
       {:ok, Jido.Action.Output.stream(stream)}
       {:ok, Jido.Action.Output.stream(stream), requests}
 
-  `requests` is a proper list of effects for the caller. The output envelope
-  does not consume the stream or dispatch requests. Output metadata is data,
-  not effects.
+  `requests` is a proper list of effects for the caller. Exec does not consume
+  the stream or dispatch the requests. Output metadata is data, not effects.
   """
 
   alias Jido.Action.Error
 
-  @kinds [:raw, :stream, :batch, :opaque]
+  @kinds [:raw, :stream, :batch, :opaque, :preserve]
 
   @schema Zoi.struct(
             __MODULE__,
@@ -35,7 +34,7 @@ defmodule Jido.Action.Output do
             coerce: true
           )
 
-  @type kind :: :raw | :stream | :batch | :opaque
+  @type kind :: :raw | :stream | :batch | :opaque | :preserve
   @type t :: unquote(Zoi.type_spec(@schema))
 
   @enforce_keys Zoi.Struct.enforce_keys(@schema)
@@ -64,6 +63,12 @@ defmodule Jido.Action.Output do
   """
   @spec opaque(term(), keyword()) :: t()
   def opaque(value, opts \\ []), do: build!(:opaque, value, opts)
+
+  @doc """
+  Builds an output that applies the output schema and keeps its root shape.
+  """
+  @spec preserve(term(), keyword()) :: t()
+  def preserve(value, opts \\ []), do: build!(:preserve, value, opts)
 
   @doc false
   @spec validate(term()) :: {:ok, t()} | {:error, Error.InvalidInputError.t()}

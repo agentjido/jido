@@ -1,5 +1,5 @@
 defmodule Jido.Action.InlineTest do
-  use ExUnit.Case, async: false
+  use Covenant.Case, component: "jido_action.inline", async: false
 
   alias Jido.Action.Inline
 
@@ -114,14 +114,12 @@ defmodule Jido.Action.InlineTest do
     """)
 
     target = Inline.target!(owner, path("increment"))
-    assert target.schema() == []
-    assert target.output_schema() == []
+    assert %Zoi.Types.Map{} = target.schema()
+    assert %Zoi.Types.Map{} = target.output_schema()
     assert target.name() == "test_action"
 
-    assert {:ok, %Jido.Instruction{target: ^target} = instruction} =
-             Jido.Instruction.new(target: target)
-
-    assert {:ok, :action} = Jido.Instruction.target_kind(instruction)
+    assert {:ok, %Jido.Instruction{kind: :action, target: ^target}} =
+             Jido.Instruction.resolve(target)
 
     assert target.run(%{value: 2}, %{}) == {:ok, %{value: 3, owner: owner}}
   end
@@ -206,11 +204,9 @@ defmodule Jido.Action.InlineTest do
           {"params", [do: nil, unknown: 1], "unsupported inline Action option"},
           {"params", [do: nil, name: "first", name: "second"], "duplicate inline Action option"},
           {"params", [do: nil, context: quoted("_")], "context must be a named variable"},
-          {"params", [do: nil, context: quoted("%{value: value}")],
-           "context must be a named variable"},
+          {"params", [do: nil, context: quoted("%{value: value}")], "context must be a named variable"},
           {"params", [do: nil, context: quoted("params")], "context variable collides"},
-          {"%{nested: %{ctx: ctx}}", [do: nil, context: quoted("ctx")],
-           "context variable collides"}
+          {"%{nested: %{ctx: ctx}}", [do: nil, context: quoted("ctx")], "context variable collides"}
         ] do
       error =
         assert_raise CompileError, fn ->
@@ -282,14 +278,14 @@ defmodule Jido.Action.InlineTest do
     target = Inline.target!(owner, path("typed"))
     assert target.name() == "public_name"
     assert target.description() == "typed callback"
-    assert {:ok, %{value: 4, extra: true}} = target.validate_params(%{extra: true})
+    assert {:ok, %{value: 4}} = target.validate_params(%{extra: true})
     refute_received :typed_body
 
     assert {:error, %Jido.Action.Error.InvalidInputError{}} =
-             run_action(target, %{value: "bad"}, %{owner: self(), add: 1})
+             Jido.Exec.run(target, %{value: "bad"}, %{owner: self(), add: 1})
 
     refute_received :typed_body
-    assert run_action(target, %{}, %{owner: self(), add: 1}) == {:ok, %{value: 5}}
+    assert Jido.Exec.run(target, %{}, %{owner: self(), add: 1}) == {:ok, %{value: 5}}
     assert_received :typed_body
 
     assert {:error, %Jido.Action.Error.InvalidInputError{}} =
@@ -315,7 +311,7 @@ defmodule Jido.Action.InlineTest do
     assert target.name() == "expression"
     assert target.validate_params(%{value: 4}) == {:ok, %{value: 4}}
 
-    assert run_action(target, %{value: 4}, %{prefix: "new"}) ==
+    assert Jido.Exec.run(target, %{value: 4}, %{prefix: "new"}) ==
              {:ok, %{value: 4, prefix: "new"}}
   end
 
@@ -393,8 +389,8 @@ defmodule Jido.Action.InlineTest do
       [host: :test, choice: "first", option: "otherwise", role: :action],
       [host: :test, choice: "first", fallback: "otherwise", role: :action],
       [host: :test, choice: "second", option: "otherwise", role: :action],
-      [host: :test, declaration: "dispatch", role: :decision],
-      [host: :test, declaration: "dispatch", role: :expander],
+      [host: :test, declaration: "invoke", role: :decision],
+      [host: :test, declaration: "invoke", role: :expander],
       [host: Jido.Flow, step: "same", role: :action],
       [host: Jido.Actor, route: "same", role: :action],
       [host: :test, declaration: "1", role: :action],
@@ -580,8 +576,7 @@ defmodule Jido.Action.InlineTest do
 
     for {options, message} <- [
           {[identity: {__MODULE__, :identity}], "unsupported inline Action compiler: :identity"},
-          {[default_name: "one", default_name: "two"],
-           "duplicate inline Action compiler: :default_name"}
+          {[default_name: "one", default_name: "two"], "duplicate inline Action compiler: :default_name"}
         ] do
       error =
         assert_raise CompileError, fn ->
@@ -753,11 +748,11 @@ defmodule Jido.Action.InlineTest do
     assert_received :negative
     assert {:ok, %{value: 5.0}} = target.run(%{operand: 2}, context)
     assert_received :ok
-    assert {:ok, %{value: 5.0}} = run_action(target, %{operand: 2}, context)
+    assert {:ok, %{value: 5.0}} = Jido.Exec.run(target, %{operand: 2}, context)
     assert_received :ok
 
     assert {:error, %Jido.Action.Error.InvalidInputError{}} =
-             run_action(target, %{operand: "2"}, context)
+             Jido.Exec.run(target, %{operand: "2"}, context)
 
     refute_received :ok
   end
@@ -824,17 +819,12 @@ defmodule Jido.Action.InlineTest do
     mixed = {:__block__, [line: 40], [arrow, :ok]}
 
     for {mode, header, options, message} <- [
-          {:callback, quoted("%{operand: operand}"), [do: clauses],
-           "clause body cannot include a header pattern"},
+          {:callback, quoted("%{operand: operand}"), [do: clauses], "clause body cannot include a header pattern"},
           {:callback, nil, [do: mixed], "cannot mix clause heads with an expression body"},
-          {:callback, nil, [do: case_clauses("{1, 2} -> :ok")],
-           "named variable, `_`, or a map pattern"},
-          {:callback, nil, [do: case_clauses("_() -> :ok")],
-           "named variable, `_`, or a map pattern"},
-          {:bound, quoted("operand <- 1"), [do: case_clauses("%URI{} -> :ok")],
-           "struct patterns"},
-          {:callback, nil,
-           [do: case_clauses("%{ctx: ctx} -> :ok\n_ -> :other"), context: quoted("ctx")],
+          {:callback, nil, [do: case_clauses("{1, 2} -> :ok")], "named variable, `_`, or a map pattern"},
+          {:callback, nil, [do: case_clauses("_() -> :ok")], "named variable, `_`, or a map pattern"},
+          {:bound, quoted("operand <- 1"), [do: case_clauses("%URI{} -> :ok")], "struct patterns"},
+          {:callback, nil, [do: case_clauses("%{ctx: ctx} -> :ok\n_ -> :other"), context: quoted("ctx")],
            "context variable collides"},
           {:callback, nil, [do: case_clauses("%{value: ^expected} -> :ok")], "pinned variables"}
         ] do
@@ -859,7 +849,7 @@ defmodule Jido.Action.InlineTest do
 
     target = Inline.target!(owner, path("named"))
     assert target.name() == "explicit_name"
-    assert run_action(target, %{value: 1}) == {:ok, %{value: 1}}
+    assert Jido.Exec.run(target, %{value: 1}) == {:ok, %{value: 1}}
   end
 
   @tag obligation: "jido_action.inline.I1"
@@ -1032,18 +1022,6 @@ defmodule Jido.Action.InlineTest do
   end
 
   defp path(name), do: [host: :test, declaration: name, role: :action]
-
-  defp run_action(target, params, context \\ %{}) do
-    with {:ok, params} <- target.validate_params(params) do
-      case target.run(params, context) do
-        {:ok, output} ->
-          with {:ok, output} <- target.validate_output(output), do: {:ok, output}
-
-        {:error, _reason} = error ->
-          error
-      end
-    end
-  end
 
   defp env, do: %{__ENV__ | file: "inline_header.ex", line: 40}
 

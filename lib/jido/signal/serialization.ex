@@ -86,8 +86,7 @@ defmodule Jido.Signal.Serialization do
   end
 
   defp to_wire_data(value),
-    do:
-      {:error, {:invalid_signal, "expected a Signal or list of Signals, got: #{inspect(value)}"}}
+    do: {:error, {:invalid_signal, "expected a Signal or list of Signals, got: #{inspect(value)}"}}
 
   defp from_wire_data(data) when is_list(data) do
     data

@@ -416,8 +416,7 @@ defmodule Jido.Signal.BusTest do
 
     send(
       bus,
-      {:"$gen_call", {self(), call_ref},
-       {:subscribe, "replace.*", [durable: "replace", target: replacement]}}
+      {:"$gen_call", {self(), call_ref}, {:subscribe, "replace.*", [durable: "replace", target: replacement]}}
     )
 
     Process.exit(old_target, :kill)

@@ -67,15 +67,15 @@ defmodule Jido.Signal.Router.DSL do
 
   defp store_route(path, [match_or_target, target_or_priority], caller) do
     quote line: caller.line do
-      @__jido_signal_routes__ {{unquote(path), unquote(match_or_target),
-                                unquote(target_or_priority)}, unquote(caller.line)}
+      @__jido_signal_routes__ {{unquote(path), unquote(match_or_target), unquote(target_or_priority)},
+                               unquote(caller.line)}
     end
   end
 
   defp store_route(path, [match, target, priority], caller) do
     quote line: caller.line do
-      @__jido_signal_routes__ {{unquote(path), unquote(match), unquote(target),
-                                unquote(priority)}, unquote(caller.line)}
+      @__jido_signal_routes__ {{unquote(path), unquote(match), unquote(target), unquote(priority)},
+                               unquote(caller.line)}
     end
   end
 

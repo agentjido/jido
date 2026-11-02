@@ -10,8 +10,7 @@ defmodule Jido.Signal.CatalogTest do
       type: "example.message.received",
       default_source: "/messages",
       dataschema: "https://example.com/message/v1",
-      schema:
-        Zoi.object(%{"text" => Zoi.string(), "room" => Zoi.string()}, unrecognized_keys: :error)
+      schema: Zoi.object(%{"text" => Zoi.string(), "room" => Zoi.string()}, unrecognized_keys: :error)
   end
 
   defmodule MessageReceivedV2 do
@@ -58,8 +57,7 @@ defmodule Jido.Signal.CatalogTest do
     use Jido.Signal,
       type: "example.keys.coerced",
       default_source: "/test",
-      schema:
-        Zoi.object(%{"nested" => Zoi.object(%{value: Zoi.integer()}, coerce: true)}, coerce: true)
+      schema: Zoi.object(%{"nested" => Zoi.object(%{value: Zoi.integer()}, coerce: true)}, coerce: true)
   end
 
   defmodule BinaryData do

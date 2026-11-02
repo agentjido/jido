@@ -1,0 +1,5 @@
+- id: tools-component-boundary
+  date: "2026-10-27"
+  decision: Use one small tool component for static Actions, trusted dynamic sources, request selection, and bounded result projection.
+  driver: Tool capability and result shape are shared contracts that ReAct and external integrations must use without hidden indirection.
+  approved_by: User-requested initial Covenant scaffold

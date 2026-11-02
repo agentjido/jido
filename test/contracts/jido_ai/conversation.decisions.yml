@@ -1,0 +1,5 @@
+- id: conversation-component-boundary
+  date: "2026-10-27"
+  decision: Keep Session, Thread, entries, and ReqLLM conversation projection in one jido_ai.conversation component.
+  driver: These modules define one portable append-only record and one model-context view of that record.
+  approved_by: User-requested initial Covenant scaffold

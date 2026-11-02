@@ -53,11 +53,9 @@ defmodule Jido.Signal.Bus.InstanceIsolationTest do
     assert {:ok, [_record]} = Bus.publish(bus1, [signal("scope.first")])
     assert {:ok, [_record]} = Bus.publish(bus2, [signal("scope.second")])
 
-    assert_receive {:published,
-                    %{bus_name: ^bus_name, bus_jido: first, bus_registry: Jido.Signal.Registry}}
+    assert_receive {:published, %{bus_name: ^bus_name, bus_jido: first, bus_registry: Jido.Signal.Registry}}
 
-    assert_receive {:published,
-                    %{bus_name: ^bus_name, bus_jido: second, bus_registry: Jido.Signal.Registry}}
+    assert_receive {:published, %{bus_name: ^bus_name, bus_jido: second, bus_registry: Jido.Signal.Registry}}
 
     assert first == context.instance1
     assert second == context.instance2

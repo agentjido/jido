@@ -1,101 +1,110 @@
 defmodule Jido.Flow.GraphTest do
   use ExUnit.Case, async: true
 
-  alias Jido.Flow
   alias Jido.Flow.{Graph, Ref}
+  alias JidoActionTest.Fixtures.Actions.Add
 
-  defmodule Echo do
-    use Jido.Action, name: "flow_graph_echo"
+  test "dependency levels use longest paths and names break ties" do
+    components =
+      components([
+        {"z_root", []},
+        {"a_root", []},
+        {"z_middle", ["z_root"]},
+        {"a_middle", ["a_root"]},
+        {"a_final", ["z_root", "z_middle"]},
+        {"z_final", ["a_middle", "z_middle"]}
+      ])
 
-    @impl true
-    def run(params, _context), do: {:ok, params}
-  end
+    analysis = Graph.analyze(components)
 
-  defmodule Authored do
-    use Jido.Flow, name: "ready_flow"
-
-    flow do
-      step("echo", action: Echo, params: %{})
-      output(result("echo"))
-    end
-  end
-
-  test "builds one shallow graph over named forms" do
-    flow =
-      Flow.new!(%{
-        name: "shallow_graph",
-        forms: %{
-          load: Echo,
-          each: %{
-            type: :map,
-            collection: Ref.result(:load, :items),
-            action: Echo,
-            params: %{value: Ref.item()}
-          },
-          audit: Echo
-        },
-        needs: %{each: [:audit]},
-        output: Ref.result(:each)
-      })
-
-    assert %Graph{} = flow.graph
-    assert Map.keys(flow.graph.dependencies) == ["audit", "each", "load"]
-    assert flow.graph.dependencies["audit"] == %{data: [], control: []}
-    assert flow.graph.dependencies["load"] == %{data: [], control: []}
-
-    assert flow.graph.dependencies["each"] == %{
-             data: ["load"],
-             control: ["audit"]
+    assert Map.take(analysis, [:levels, :remaining]) == %{
+             levels: %{
+               "z_root" => 0,
+               "a_root" => 0,
+               "z_middle" => 1,
+               "a_middle" => 1,
+               "a_final" => 2,
+               "z_final" => 2
+             },
+             remaining: []
            }
 
-    assert Map.keys(Map.from_struct(flow.graph)) == [:dependencies]
-    refute function_exported?(Graph, :ready, 2)
-    refute Code.ensure_loaded?(Jido.Flow.Dependency)
-    refute Enum.any?(Map.keys(flow.graph.dependencies), &match?({_, _}, &1))
-    assert is_map(flow.identity)
-    assert flow.identity == Flow.semantic_identity(flow) |> elem(1)
+    assert analysis.dependencies["a_final"] == ["z_middle", "z_root"]
+    assert analysis.dependencies["z_final"] == ["a_middle", "z_middle"]
+    assert analysis.terminals == ["a_final", "z_final"]
+
+    assert Enum.map(analysis.ordered, &elem(&1, 0)) ==
+             ["a_root", "z_root", "a_middle", "z_middle", "a_final", "z_final"]
   end
 
-  test "uses the canonical Flow as the only Flow program" do
-    refute function_exported?(Flow, :compile, 1)
-    refute function_exported?(Flow, :compile!, 1)
-    refute function_exported?(Authored, :__jido_compiled__, 0)
-    refute Code.ensure_loaded?(Jido.Flow.Compiler)
-    refute Code.ensure_loaded?(Jido.Flow.Compiler.Fragment)
-    refute Code.ensure_loaded?(Jido.Flow.Compiled)
-    refute Code.ensure_loaded?(Jido.Flow.Compiled.Statement)
-    refute Code.ensure_loaded?(Jido.Flow.Identity)
-    refute Code.ensure_loaded?(Jido.Flow.Extensions)
-    refute Code.ensure_loaded?(Jido.Flow.Extensions.Builtin)
-    refute Code.ensure_loaded?(Jido.Flow.Extension)
+  test "reference and explicit dependencies on the same node count once" do
+    components = components([{"root", []}, {"child", ["root", "root"]}])
 
-    for form <- [
-          Jido.Flow.Form.Map,
-          Jido.Flow.Form.Reduce,
-          Jido.Flow.Form.Choice,
-          Jido.Flow.Form.Parallel,
-          Jido.Flow.Form.Iterate,
-          Jido.Flow.Form.Wait
-        ] do
-      assert Code.ensure_loaded?(form)
-    end
+    child = %{
+      components["child"]
+      | call: %{kind: :action, target: Add, params: %{value: Ref.result("root", :value)}}
+    }
+
+    analysis = Graph.analyze(Map.put(components, "child", child))
+
+    assert Map.take(analysis, [:levels, :remaining]) == %{
+             levels: %{"root" => 0, "child" => 1},
+             remaining: []
+           }
+
+    assert analysis.dependencies == %{"root" => [], "child" => ["root"]}
+    assert analysis.terminals == ["child"]
   end
 
-  test "cycle errors contain only forms that are in a cycle" do
-    assert {:error, error} =
-             Flow.new(%{
-               name: "exact_cycle_members",
-               forms: %{a: Echo, b: Echo, downstream: Echo, self: Echo},
-               needs: %{
-                 a: [:b],
-                 b: [:a],
-                 downstream: [:b],
-                 self: [:self]
-               },
-               output: Ref.result(:downstream)
-             })
+  test "cycles retain all blocked nodes and partial levels from acyclic ancestors" do
+    components =
+      components([
+        {"root", []},
+        {"branch", ["root"]},
+        {"one", ["two", "branch"]},
+        {"two", ["one"]},
+        {"blocked", ["one"]},
+        {"self", ["self"]},
+        {"self_child", ["self"]},
+        {"independent", []}
+      ])
 
-    assert error.details.reason == :cycle
-    assert error.details.forms == ["a", "b", "self"]
+    assert Map.take(Graph.analyze(components), [:levels, :remaining]) == %{
+             levels: %{"root" => 0, "branch" => 1, "one" => 2, "independent" => 0},
+             remaining: ["blocked", "one", "self", "self_child", "two"]
+           }
+  end
+
+  test "missing dependencies block descendants without becoming components" do
+    components = components([{"root", []}, {"child", ["missing", "root"]}, {"last", ["child"]}])
+
+    assert Map.take(Graph.analyze(components), [:levels, :remaining]) == %{
+             levels: %{"root" => 0, "child" => 1},
+             remaining: ["child", "last"]
+           }
+  end
+
+  test "empty graphs have no levels or blocked nodes" do
+    assert Graph.analyze(%{}) == %{
+             levels: %{},
+             remaining: [],
+             ordered: [],
+             dependencies: %{},
+             terminals: []
+           }
+
+    assert Graph.canonical_components(%{}) == []
+  end
+
+  defp components(edges) do
+    Map.new(edges, fn {name, needs} ->
+      {name,
+       %{
+         kind: :call,
+         needs: needs,
+         meta: %{},
+         call: %{kind: :action, target: Add, params: %{}}
+       }}
+    end)
   end
 end

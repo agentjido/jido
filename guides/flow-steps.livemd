@@ -1,0 +1,195 @@
+# Steps And Output
+
+## Overview
+
+A Step calls one Action. Its `params` value maps Flow data to the Action
+input. The Flow `output` builds the final result from component results.
+
+Run the cells from top to bottom.
+
+## Install The Package
+
+```elixir
+Mix.install([{:jido_action, "~> 3.0.0-beta.22"}])
+```
+
+## Write An Inline Body
+
+An inline Step binds Flow data in its header and runs normal Elixir in its
+body. The body returns an Action result. This example shows a single binding,
+binding lists, a sole map pattern, and the explicit no-input form `[]`.
+
+```elixir
+defmodule FlowSteps.Inline do
+  use Jido.Flow, name: "inline_steps"
+
+  flow do
+    step "ready", [] do
+      {:ok, %{ready: true}}
+    end
+
+    step "normalize", name <- input(:name), needs: "ready", meta: %{owner: "guide"} do
+      {:ok, %{name: String.trim(name)}}
+    end
+
+    step "greet", [name <- result("normalize", :name), prefix <- context(:prefix)] do
+      {:ok, %{message: prefix <> ", " <> name <> "!"}}
+    end
+
+    step "label", [name <- result("normalize", :name), city <- input(:city), ctx <- context()] do
+      {:ok, %{label: name <> " / " <> city, language: ctx.language}}
+    end
+
+    step "profile", %{name: name, active: true} <- input(:profile) do
+      {:ok, %{name: name}}
+    end
+
+    output %{
+      greeting: result("greet", :message),
+      label: result("label"),
+      profile: result("profile")
+    }
+  end
+end
+
+{:ok,
+ %{
+   greeting: "Hello, Ada!",
+   label: %{label: "Ada / London", language: "en"},
+   profile: %{name: "Ada"}
+ }} =
+  Jido.Exec.run(
+    FlowSteps.Inline,
+    %{name: " Ada ", city: "London", profile: %{name: "Ada", active: true}},
+    %{prefix: "Hello", language: "en"}
+  )
+```
+
+A named binding adds one atom key to the Action parameters. For example,
+`name <- input(:name)` supplies `%{name: ...}`. A sole map pattern receives its
+source as the complete parameter map. `[]` supplies `%{}`.
+
+Header rules:
+
+- Pass one binding argument: a single binding or a list. Two or more named
+  bindings need a list.
+- Step header options are `needs:`, `meta:`, and `inline:`.
+- Do not mix a map pattern with named bindings, and do not use more than one
+  map pattern.
+- Duplicate names, bare `_`, pins, guards, and top-level struct patterns are
+  not supported. Bind a value by name and match it inside the body instead.
+- The right side of `<-` accepts references and data only. It cannot call
+  functions, use `Jido.Expr` operations, or read another binding. Do that work
+  in the body.
+- Read context with an explicit binding such as `ctx <- context()`. There is
+  no implicit context variable.
+
+The body must return a map result, or a `Jido.Action.Output` value. A pattern
+mismatch in the header becomes a structured execution failure; it is not
+schema validation. A missing reference fails before the body runs.
+
+Use `inline:` to set the Action name, description, input and output schemas,
+or `context: ctx`. Keep `needs:` and `meta:` at the Step level. Keep a named
+Action when you need custom lifecycle hooks or a separate public module API.
+See [Inline Steps](inline-actions.md).
+
+## Define An Action
+
+```elixir
+defmodule FlowSteps.Echo do
+  use Jido.Action, name: "flow_steps_echo"
+
+  @impl true
+  def run(params, _context), do: {:ok, params}
+end
+```
+
+## Use Short Or Block Form
+
+A Step that calls a named Action can use the keyword form or the field-block
+form. Both forms, and the inline form above, produce the same kind of
+component.
+
+```elixir
+defmodule FlowSteps.Example do
+  use Jido.Flow, name: "flow_steps_example"
+
+  flow do
+    step "first",
+      action: FlowSteps.Echo,
+      params: %{value: input(:value)},
+      meta: %{owner: "guide"}
+
+    step "second" do
+      action FlowSteps.Echo
+      params %{value: result("first", :value), tag: :complete}
+      meta %{owner: "guide"}
+    end
+
+    output %{
+      first: result("first"),
+      second: result("second")
+    }
+  end
+end
+```
+
+```elixir
+{:ok, output} = Jido.Exec.run(FlowSteps.Example, %{value: 7})
+output
+```
+
+The result reference `result("first", :value)` makes `second` depend on
+`first`. Use `needs: "first"` only for control order that does not move data.
+
+## Step Fields
+
+| Field | Meaning |
+| --- | --- |
+| `name` | The unique component name. Pass it as the first argument. |
+| `action:` | An Action module, or a Flow module for a Subflow. |
+| `params:` | A Flow value that builds the Action input. |
+| `needs:` | Explicit control dependencies. |
+| `meta:` | Portable author metadata. It does not change execution. |
+
+A Step whose target implements `Jido.Flow` becomes a Subflow. See
+[Nested Flows](nested-flows.livemd). For the equivalent map definitions, see
+[Flow Data Definitions](flow-data.md).
+
+## Declare Output
+
+`output` is a Flow value, not an Action call. It must be the last declaration
+in the `flow` block, and it must not be `nil`.
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+output %{
+  value: result("second", :value),
+  source: :guide
+}
+```
+
+Flow output should be a map. A Flow module whose output is not a map compiles,
+but it fails at runtime in the `:flow_output` phase. When a Flow must return a
+raw, stream, batch, or other non-map value, return a `Jido.Action.Output`
+envelope.
+
+## What Each Component Returns
+
+A `result("name")` reference reads the value in this table:
+
+| Component | Result |
+| --- | --- |
+| `step` | The Action result. |
+| Subflow `step` | The child Flow output. |
+| `choice` | The result of the selected option's Action, or of the fallback. |
+| `map` | An ordered list of Action results. With `on_error: :collect_errors`, each entry is `%{status: :ok, value: result}` or `%{status: :error, error: %{type: type, message: message}}`. |
+| `reduce` | The final accumulator. |
+| `iterate` | `%{kind: :jido_flow_iterate_result, iterations: count, state: state, output: last_body_result}` |
+| `invoke` | The expander result, or the result of its continuation target. |
+| `handoff` | A validated successor Instruction and the predecessor effects. |
+
+An Action can also return deferred effect requests as
+`{:ok, output, requests}`. See
+[Outputs And Effects](action-effects.livemd).

@@ -1,5 +1,5 @@
 defmodule JidoActionTest.ActionTest do
-  use ExUnit.Case, async: true
+  use Covenant.Case, component: "jido_action.action", async: true
   import JidoActionTest.Case
   @moduletag obligation: "jido_action.action.I1"
 
@@ -19,10 +19,11 @@ defmodule JidoActionTest.ActionTest do
       assert fields |> field_keys() |> Enum.sort() == [:a, :b]
     end
 
-    test "creates a valid action with no schema" do
+    test "creates a valid action with default schemas" do
       assert NoSchema.name() == "add_two"
       assert NoSchema.description() == "Adds 2 to the input value"
-      assert NoSchema.schema() == []
+      assert %Zoi.Types.Map{} = NoSchema.schema()
+      assert %Zoi.Types.Map{} = NoSchema.output_schema()
     end
 
     test "exposes a JSON-safe Action description" do
@@ -47,7 +48,10 @@ defmodule JidoActionTest.ActionTest do
                }
              } = description
 
-      assert %{"input_schema" => nil, "output_schema" => nil} = NoSchema.authoring_contract()
+      assert %{
+               "input_schema" => %{"type" => "object"},
+               "output_schema" => %{"type" => "object"}
+             } = NoSchema.authoring_contract()
     end
 
     test "reports an Action schema without a JSON Schema representation" do
@@ -134,11 +138,9 @@ defmodule JidoActionTest.ActionTest do
 
       assert module.name() == "runtime_dynamic_options_action"
 
-      assert {:ok, %{value: 3, extra: "kept"}} =
-               module.validate_params(%{value: 3, extra: "kept"})
+      assert {:ok, %{value: 3}} = module.validate_params(%{value: 3, extra: "removed"})
 
-      assert {:ok, %{doubled: 6, extra: "kept"}} =
-               module.validate_output(%{doubled: 6, extra: "kept"})
+      assert {:ok, %{doubled: 6}} = module.validate_output(%{doubled: 6, extra: "removed"})
 
       assert {:ok, %{doubled: 6}} = module.run(%{value: 3}, %{})
     end
@@ -356,23 +358,23 @@ defmodule JidoActionTest.ActionTest do
     end
 
     test "rejects invalid action names" do
-      assert {:error, "Definition name cannot be blank."} = Config.validate_name("")
-      assert {:error, "Definition name cannot be blank."} = Config.validate_name(" \t\n")
-      assert {:error, "Definition name must be valid UTF-8."} = Config.validate_name(<<255>>)
+      assert {:error, "Action name cannot be blank."} = Config.validate_name("")
+      assert {:error, "Action name cannot be blank."} = Config.validate_name(" \t\n")
+      assert {:error, "Action name must be valid UTF-8."} = Config.validate_name(<<255>>)
 
-      assert {:error, "Definition name cannot exceed 256 bytes."} =
+      assert {:error, "Action name cannot exceed 256 bytes."} =
                Config.validate_name(String.duplicate("a", 257))
 
-      assert {:error, "Definition name must be a string."} = Config.validate_name(nil)
-      assert {:error, "Definition name must be a string."} = Config.validate_name(123)
-      assert {:error, "Definition name must be a string."} = Config.validate_name(:atom)
-      assert {:error, "Definition name must be a string."} = Config.validate_name(%{})
-      assert {:error, "Definition name must be a string."} = Config.validate_name([])
+      assert {:error, "Action name must be a string."} = Config.validate_name(nil)
+      assert {:error, "Action name must be a string."} = Config.validate_name(123)
+      assert {:error, "Action name must be a string."} = Config.validate_name(:atom)
+      assert {:error, "Action name must be a string."} = Config.validate_name(%{})
+      assert {:error, "Action name must be a string."} = Config.validate_name([])
     end
 
-    test "accepts empty schema sentinel and Zoi schemas" do
-      assert :ok = Config.validate_config_schema([])
+    test "accepts Zoi schemas and rejects empty lists" do
       assert :ok = Config.validate_config_schema(Zoi.object(%{value: Zoi.integer()}))
+      assert {:error, "must be a Zoi schema"} = Config.validate_config_schema([])
     end
 
     test "rejects non-Zoi schemas" do
@@ -508,8 +510,7 @@ defmodule JidoActionTest.ActionTest do
           quote do
             use Jido.Action,
               name: "observed_lazy_schema_action",
-              schema:
-                Zoi.lazy({JidoActionTest.ActionTest, :observed_lazy_schema, [unquote(parent)]})
+              schema: Zoi.lazy({JidoActionTest.ActionTest, :observed_lazy_schema, [unquote(parent)]})
           end
         )
       end
@@ -562,8 +563,7 @@ defmodule JidoActionTest.ActionTest do
       )
 
       assert {:ok, %{enabled: true}} = module.validate_params(%{"enabled" => "true"})
-      assert {:ok, %{enabled: false} = params} = module.validate_params(%{"enabled" => "false"})
-      assert {:ok, %{enabled: false}} = module.run(params, %{})
+      assert {:ok, %{enabled: false}} = Jido.Exec.run(module, %{"enabled" => "false"})
     end
 
     test "returns an input preparation error without schema validation" do
@@ -602,9 +602,9 @@ defmodule JidoActionTest.ActionTest do
       assert message =~ "expected integer"
     end
 
-    test "preserves unknown parameters after validation" do
+    test "uses the declared unknown-key policy" do
       assert {:ok, params} = FullAction.validate_params(%{a: 1, b: 2, trace_id: "trace-1"})
-      assert params == %{a: 1, b: 2, trace_id: "trace-1"}
+      assert params == %{a: 1, b: 2}
     end
 
     test "honors an explicit Zoi unknown-key policy" do
@@ -653,7 +653,7 @@ defmodule JidoActionTest.ActionTest do
         end
       )
 
-      assert {:ok, %{value: 42, extra: "kept"}} =
+      assert {:ok, %{value: 42}} =
                action_module.validate_params(%{value: 42, extra: "kept"})
     end
 
@@ -710,7 +710,7 @@ defmodule JidoActionTest.ActionTest do
 
       assert result.result == "test"
       assert result.length == 4
-      assert result.extra == "data"
+      refute Map.has_key?(result, :extra)
     end
 
     test "action with invalid output fails validation" do

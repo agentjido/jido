@@ -1,0 +1,31 @@
+# Output survivor classifications.
+
+- at: "lib/jido_action/output.ex:30:51"
+  operator: "string_empty"
+  mutation: "`\"Explicit output kind\"` → `\"\"`"
+  sort: "unpromised"
+  reason: "This private Zoi field description has no promised text. Output kind validation and the public envelope data remain unchanged."
+
+- at: "lib/jido_action/output.ex:31:43"
+  operator: "string_empty"
+  mutation: "`\"Explicit output value\"` → `\"\"`"
+  sort: "unpromised"
+  reason: "This private Zoi field description has no promised text. The public envelope value remains unchanged."
+
+- at: "lib/jido_action/output.ex:32:42"
+  operator: "string_empty"
+  mutation: "`\"Output metadata\"` → `\"\"`"
+  sort: "unpromised"
+  reason: "This private Zoi field description has no promised text. Public output metadata remains unchanged."
+
+- at: "lib/jido_action/output.ex:90:25"
+  operator: "guard_removal"
+  mutation: "`when is_list(opts)` → `(no guard)`"
+  sort: "equivalent"
+  reason: "Keyword.keyword?/1 is false for every non-list value. Without the list guard those inputs still raise the same ArgumentError before Keyword.pop/3."
+
+- at: "lib/jido_action/output.ex:131:34"
+  operator: "return_nil"
+  mutation: "`false` → `nil`"
+  sort: "equivalent"
+  reason: "This private predicate is used only as the condition of envelope validation. Both false and nil reject an improper list through the same error path."

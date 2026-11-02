@@ -1,5 +1,5 @@
 defmodule Jido.Authoring.RegistryTest do
-  use ExUnit.Case, async: true
+  use Covenant.Case, component: "jido_action.authoring", async: true
   @moduletag obligation: "jido_action.authoring.I1"
 
   alias Jido.Authoring.Registry
@@ -29,16 +29,6 @@ defmodule Jido.Authoring.RegistryTest do
 
     assert {:ok, ^discovered} = Registry.new(discovered)
     assert Registry.codec(discovered, "tests.codec", 1) == {:ok, __MODULE__}
-  end
-
-  test "stores an unversioned document codec" do
-    assert {:ok, registry} =
-             Registry.new_discovered([], [
-               %{type: "tests.codec", encoder: nil, module: __MODULE__}
-             ])
-
-    assert Registry.codec(registry, "tests.codec") == {:ok, __MODULE__}
-    assert Registry.codec_vsns(registry, "tests.codec") == []
   end
 
   test "uses vsn as part of every portable reference" do

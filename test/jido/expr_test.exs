@@ -1,5 +1,5 @@
 defmodule Jido.ExprTest do
-  use ExUnit.Case, async: true
+  use Covenant.Case, component: "jido_action.expression", async: true
 
   alias Jido.Expr
   import Jido.Expr, only: [expr: 1]

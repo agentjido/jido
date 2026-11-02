@@ -84,9 +84,7 @@ defmodule Jido.Signal.SanitizerTest do
         refute inspect(Sanitizer.sanitize(value, profile)) =~ secret
         refute Sanitizer.preview(value, profile, max_length: 10_000) =~ secret
 
-        refute inspect(
-                 Jido.Signal.Error.to_map(Jido.Signal.Error.validation_error("invalid", value))
-               ) =~ secret
+        refute inspect(Jido.Signal.Error.to_map(Jido.Signal.Error.validation_error("invalid", value))) =~ secret
       end
     end
 

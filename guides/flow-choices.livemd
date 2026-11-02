@@ -1,0 +1,192 @@
+# Choices And Conditions
+
+## Overview
+
+A Choice tests its options in the order you write them. It runs the Action of
+the first option whose condition is true. When no option matches, it runs the
+required `otherwise` fallback. The Choice result is the result of the Action
+that ran.
+
+Run the cells from top to bottom.
+
+## Install The Package
+
+```elixir
+Mix.install([{:jido_action, "~> 3.0.0-beta.22"}])
+```
+
+## Define A Routing Action
+
+```elixir
+defmodule FlowChoices.Route do
+  use Jido.Action, name: "flow_choices_route"
+
+  @impl true
+  def run(params, _context), do: {:ok, params}
+end
+```
+
+## Declare Ordered Options
+
+```elixir
+defmodule FlowChoices.Example do
+  use Jido.Flow, name: "flow_choices_example"
+
+  flow do
+    choice "route" do
+      option "urgent",
+        condition: input(:priority) >= 90,
+        action: FlowChoices.Route,
+        params: %{queue: :urgent, id: input(:id)}
+
+      option "priority",
+        condition: input(:priority) >= 50,
+        action: FlowChoices.Route,
+        params: %{queue: :priority, id: input(:id)}
+
+      otherwise action: FlowChoices.Route, params: %{queue: :standard, id: input(:id)}
+    end
+
+    output %{route: result("route")}
+  end
+end
+```
+
+![Choice route tests urgent before priority, then uses otherwise if neither matches](assets/flows/choice.svg)
+
+The rows show option order, not parallel branches. Only the selected Action
+runs. An Action failure fails the Choice; it does not select `otherwise`.
+
+```elixir
+{:ok, urgent} =
+  Jido.Exec.run(FlowChoices.Example, %{id: 1, priority: 100})
+
+{:ok, standard} =
+  Jido.Exec.run(FlowChoices.Example, %{id: 2, priority: 10})
+
+{urgent, standard}
+```
+
+A priority of 100 matches both options, but only `urgent` runs. Jido stops
+testing options after the first match. Only the selected Action runs.
+
+Result references in every option and in the fallback are static
+dependencies. The referenced components run before the Choice, even when the
+option that reads them is not selected. Put work that must stay lazy inside
+the selected Action.
+
+## Write Conditions
+
+A condition is a Boolean literal, a Boolean reference, or any `Jido.Expr`
+operation that evaluates to a Boolean. It can use comparisons, arithmetic,
+`in`, and chained `and`, `or`, and `not`:
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+input(:enabled) and not input(:blocked) and input(:score) * 2 >= 100
+```
+
+A condition cannot call application functions. Put complex or effectful
+decisions in an Action before the Choice, then test that Action's result.
+
+A condition that evaluates to `nil`, a number, or a string fails at runtime.
+Declare the field as a required `Zoi.boolean()` in the Flow input schema or the
+producing Action's output schema. See
+[Conditions And Missing Values](flow-expressions.md#conditions-and-missing-values)
+and the [complete operator list](flow-expressions.md#complete-operation-list).
+
+## Fallback Is Routing
+
+`otherwise` is required. It is the normal route when no option matches; it is
+not an error handler. If the selected Action fails, the Choice fails and the
+fallback does not run.
+
+Option and fallback targets must be Action modules. A Choice does not accept a
+Flow module as a target. Put the Action input in `params`.
+
+## Route An Expected Failure As Data
+
+Keep expected provider outcomes in your application's result contract. A
+small Action can convert one specific error to data that a Choice can test.
+Return other errors unchanged. Do not catch all exceptions, and do not use the
+fallback to recover from a failed target.
+
+This local provider has no external effects:
+
+```elixir
+defmodule FlowChoices.Provider do
+  def fetch(:missing),
+    do: {:error, Jido.Action.Error.validation_error("not found", code: :not_found)}
+
+  def fetch(:offline),
+    do: {:error, Jido.Action.Error.execution_error("offline", retry: true)}
+
+  def fetch(id), do: {:ok, %{id: id}}
+end
+
+defmodule FlowChoices.Fetch do
+  use Jido.Action, name: "flow_choices_fetch"
+
+  @impl true
+  def run(%{id: id}, _context) do
+    case FlowChoices.Provider.fetch(id) do
+      {:ok, value} ->
+        {:ok, %{status: :ok, value: value, error: nil}}
+
+      {:error, %Jido.Action.Error.InvalidInputError{details: %{code: :not_found}} = error} ->
+        {:ok, %{status: :error, value: nil, error: Jido.Flow.Error.to_map(error)}}
+
+      {:error, error} ->
+        {:error, error}
+    end
+  end
+end
+
+defmodule FlowChoices.ExpectedFailure do
+  use Jido.Flow, name: "flow_choices_expected_failure"
+
+  flow do
+    step "fetch", action: FlowChoices.Fetch, params: %{id: input(:id)}
+
+    choice "route" do
+      option "missing",
+        condition: result("fetch", :status) == :error,
+        action: FlowChoices.Route,
+        params: %{route: :missing, error: result("fetch", :error)}
+
+      otherwise action: FlowChoices.Route,
+                params: %{route: :found, value: result("fetch", :value)}
+    end
+
+    output result("route")
+  end
+end
+```
+
+```elixir
+{:ok, %{route: :found, value: %{id: 1}}} =
+  Jido.Exec.run(FlowChoices.ExpectedFailure, %{id: 1})
+
+{:ok, %{route: :missing, error: %{type: :validation_error, details: %{code: :not_found}}}} =
+  Jido.Exec.run(FlowChoices.ExpectedFailure, %{id: :missing})
+
+{:error, %Jido.Action.Error.ExecutionFailureError{}} =
+  Jido.Exec.run(FlowChoices.ExpectedFailure, %{id: :offline})
+```
+
+The wrapper keeps the expected error's type, message, details, and retry flag
+as data. The Flow treats it as a successful result. Add correlation data
+yourself when you need it. An unexpected error, such as `:offline`, still
+fails the Flow.
+
+If the provider is another Jido Action, do not call its `run/2` callback
+directly; that skips its validation. Run it through `Jido.Exec`, or move the
+shared operation to an ordinary function. Step and Choice have no
+`on_error: :capture` option.
+
+## Data Form
+
+In a map definition, a Choice is a component with `kind: :choice`, an ordered
+`options` list, and a `fallback` map. See
+[Flow Data Definitions](flow-data.md#choice).

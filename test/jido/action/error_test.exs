@@ -1,5 +1,5 @@
 defmodule JidoActionTest.Action.ErrorTest do
-  use ExUnit.Case, async: true
+  use Covenant.Case, component: "jido_action.errors", async: true
 
   alias Jido.Action.Error
   alias Jido.Action.Error.Internal.UnknownError

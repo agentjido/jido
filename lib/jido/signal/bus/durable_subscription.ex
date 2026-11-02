@@ -85,8 +85,7 @@ defmodule Jido.Signal.Bus.DurableSubscription do
   @doc false
   @spec load(term()) :: {:ok, map(), Router.t()} | {:error, term()}
   def load(definitions) when is_list(definitions) and is_integer(length(definitions)) do
-    Enum.reduce_while(definitions, {:ok, %{}, Router.new!()}, fn definition,
-                                                                 {:ok, subscriptions, router} ->
+    Enum.reduce_while(definitions, {:ok, %{}, Router.new!()}, fn definition, {:ok, subscriptions, router} ->
       with {:ok, subscriber} <- subscriber_from_definition(definition),
            false <- Map.has_key?(subscriptions, subscriber.id),
            {:ok, router} <- Router.add(router, {subscriber.path, subscriber.id}) do

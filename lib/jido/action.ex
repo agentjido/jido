@@ -22,10 +22,10 @@ defmodule Jido.Action do
 
   The generated `validate_params/1` and `validate_output/1` functions apply the
   declared schemas. An Action can implement `c:on_before_validate_params/1` to
-  prepare raw input before its schema runs. Direct object and struct root
-  schemas preserve unknown keys when their policy is `:strip`. Explicit strict
-  and typed policies stay in effect. Nested and wrapped schemas keep their
-  declared policy. See [Schemas And Validation](schemas-validation.md).
+  prepare raw input before its schema runs. Direct, nested, and wrapped schemas
+  keep their declared Zoi unknown-key policy. Parsed struct results become
+  plain maps at the Action boundary. See
+  [Schemas And Validation](schemas-validation.md).
 
   A direct `run/2` call runs in the calling process. It does not start a task
   or add validation. Validate both boundaries explicitly when you call
@@ -35,9 +35,9 @@ defmodule Jido.Action do
       {:ok, result} = MyAction.run(params, %{})
       {:ok, result} = MyAction.validate_output(result)
 
-  An execution boundary can add task isolation, input and output validation,
-  failure normalization, timeout, retry, and scheduling policy around this
-  callback.
+  Use `Jido.Exec.run/4` when you want the public validation and error boundary.
+  It validates input, calls the Action, validates normal output, and normalizes
+  failures.
 
   Every Action must implement `run/2`. A missing implementation stops compilation.
 
@@ -45,17 +45,19 @@ defmodule Jido.Action do
 
   `run/2` can be pure or can perform I/O. Keep one Action focused on one unit
   of work. The caller selects retry, timeout, scheduling, cancellation, and
-  persistence policy. Return an optional request list with
-  `{:ok, output, requests}`. The caller decides how to handle the requests.
+  persistence policy. Return an optional effect list with `{:ok, output, requests}`;
+  Exec carries the requests without dispatch. `Jido.Exec` enforces a requested
+  per-attempt timeout and owns process cleanup. It retries an Action only when
+  the caller sets `max_attempts` and the error is retryable.
   """
 
   alias Jido.Action.{Error, Output}
-  alias Jido.Validation
+  alias Jido.Exec.Validation
 
   @typedoc "A static Action input or output schema."
-  @type schema :: Zoi.schema() | []
+  @type schema :: Zoi.schema()
 
-  @typedoc "An ordered list of opaque effect requests for the caller."
+  @typedoc "An ordered list of opaque effect requests. Exec does not dispatch them."
   @type effects :: [term()]
 
   @typedoc "A successful output with optional deferred effect requests."
@@ -75,27 +77,18 @@ defmodule Jido.Action do
           {:ok, map()} | {:error, term()}
   def validate_params_for(params, module) do
     with {:ok, params} <- prepare_params(params, module) do
-      validate_map(
-        module.schema(),
-        params,
-        %{context: "Action", module: module},
-        "Action validation must return a map"
-      )
+      Validation.schema(module.schema(), params, %{context: "Action", module: module})
     end
   end
 
   @doc false
   @spec validate_output_for(map() | Output.t(), module()) ::
           {:ok, map() | Output.t()} | {:error, Error.InvalidInputError.t()}
-  def validate_output_for(%Output{} = output, _module), do: Output.validate(output)
-
   def validate_output_for(output, module) do
-    validate_map(
-      module.output_schema(),
-      output,
-      %{context: "Action output", module: module},
-      "Action output validation must return a map"
-    )
+    Validation.output_schema(module.output_schema(), output, %{
+      context: "Action output",
+      module: module
+    })
   end
 
   @doc """
@@ -110,8 +103,8 @@ defmodule Jido.Action do
   - `id` (optional) - The stable identifier used by runtime authoring discovery.
   - `vsn` (optional, default: `1`) - The positive authoring version.
   - `description` (optional) - A description of what the Action does.
-  - `schema` (optional, default: `[]`) - A Zoi schema for Action input.
-  - `output_schema` (optional, default: `[]`) - A Zoi schema for Action output.
+  - `schema` (optional, default: `Zoi.map()`) - A Zoi schema for Action input.
+  - `output_schema` (optional, default: `Zoi.map()`) - A Zoi schema for Action output.
 
   Schemas must be static module data. Use named MFA tuples for Zoi refinements,
   transforms, and other effects. Anonymous functions and lazy schemas are not
@@ -145,8 +138,9 @@ defmodule Jido.Action do
     quote location: :keep do
       alias Jido.Action
 
-      use Jido.Action.Compiler,
-        config: Jido.Action.Config.prepare!(unquote(opts_ast), __ENV__)
+      use Jido.Authoring.Compiler,
+        kind: :action,
+        config: Jido.Authoring.Config.prepare!(:action, unquote(opts_ast), __ENV__)
 
       @doc "Executes the Action with the given parameters and context."
       @impl Jido.Action
@@ -169,20 +163,26 @@ defmodule Jido.Action do
 
   - `{:ok, result}` where `result` is a map or a `Jido.Action.Output` value.
   - `{:ok, result, effects}` where `effects` is a proper list of effect requests.
-  - `{:continue, continuation_input, continuation_target}` asks the execution
-    boundary to continue with another target.
+  - `{:continue, continuation_input, continuation_target}` only from an Invoke
+    expander, where the target becomes the next executable. Exec rejects it
+    from a root Action and other Flow positions.
   - `{:error, reason}` where `reason` describes why the Action failed.
-  - `{:error, reason, effects}` returns a failure with request data.
+  - `{:error, reason, effects}` is accepted, but Exec discards the effects.
 
-  - `{:handoff, successor_input, successor_target}` asks the execution boundary
-    to transfer ownership to another target.
+  - `{:handoff, successor_input, successor_target}` only from a terminal Handoff
+    selector. Every execution host must handle the handoff result.
+    See [Dynamic Flows](dynamic-flows.md).
 
   Effects are optional for both maps and Output values. An empty list returns
-  the two-element success form. The execution boundary defines request order,
-  delivery, and failure rules.
+  the two-element success form. Exec carries each request as opaque data and
+  never dispatches it. Flow collects requests from every successful executed
+  component in canonical dependency order, then component name. Nested Flows
+  use their parent position; collections use input or iteration order.
+  Failed execution or output validation returns no effect list.
 
   The third success element is reserved for effect requests. Put metadata in
-  the result map or in `Jido.Action.Output` metadata.
+  the result map or in `Jido.Action.Output` metadata. A value that is not a
+  proper list fails with `:invalid_effects` in direct and Flow execution.
 
   A continuation does not resume this Action. Its input must be a map, not a
   `Jido.Action.Output` envelope. Put an output envelope in a map field when the
@@ -218,19 +218,4 @@ defmodule Jido.Action do
       {:ok, params}
     end
   end
-
-  defp validate_map(schema, value, details, message) do
-    with {:ok, validated} <- validation_result(Validation.open_validate(schema, value, details)) do
-      if is_map(validated) do
-        {:ok, validated}
-      else
-        {:error, Error.validation_error(message, Map.put(details, :value, validated))}
-      end
-    end
-  end
-
-  defp validation_result({:error, %Validation.Error{} = error}),
-    do: {:error, Error.validation_error(error.message, error.details)}
-
-  defp validation_result(result), do: result
 end

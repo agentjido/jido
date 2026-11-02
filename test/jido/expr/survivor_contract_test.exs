@@ -1,5 +1,5 @@
 defmodule Jido.Expr.SurvivorContractTest do
-  use ExUnit.Case, async: true
+  use Covenant.Case, component: "jido_action.expression", async: true
 
   alias Jido.Expr
 
@@ -143,12 +143,10 @@ defmodule Jido.Expr.SurvivorContractTest do
           {{:==, [], [[1 | 2], []]}, :improper_list, [:operands, 0, 1]},
           {quote(do: 1 == %{a: unknown()}), :unsupported_syntax, [:operands, 1, :a]},
           {quote(do: 1 == %{a: 1, a: 2}), :duplicate_key, [:operands, 1, :a]},
-          {{:==, [], [{:%{}, [], [invalid: 1, invalid: 2]}, nil]}, :duplicate_key,
-           [:operands, 0, :invalid]},
+          {{:==, [], [{:%{}, [], [invalid: 1, invalid: 2]}, nil]}, :duplicate_key, [:operands, 0, :invalid]},
           {{:==, [], [{:%{}, [], [nil]}, nil]}, :invalid_map_key, [:operands, 0]},
           {{:==, [], [%{1.5 => 1}, nil]}, :invalid_map_key, [:operands, 0]},
-          {{:==, [], [%Expr{operator: :unknown, operands: []}, nil]}, :unknown_operator,
-           [:operands, 0]}
+          {{:==, [], [%Expr{operator: :unknown, operands: []}, nil]}, :unknown_operator, [:operands, 0]}
         ] do
       assert {:error, %Expr.Error{reason: ^reason, path: ^path}} = Expr.parse(ast)
     end
@@ -405,8 +403,7 @@ defmodule Jido.Expr.SurvivorContractTest do
                Expr.normalize(value, normalize_leaf: callback)
     end
 
-    assert {:error,
-            %Expr.Error{reason: :unsupported_value, path: ^path, details: %{type: :struct}}} =
+    assert {:error, %Expr.Error{reason: :unsupported_value, path: ^path, details: %{type: :struct}}} =
              Expr.normalize(value)
 
     assert {:error,

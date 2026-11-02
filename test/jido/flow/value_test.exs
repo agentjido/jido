@@ -1,117 +1,75 @@
 defmodule Jido.Flow.ValueTest do
   use ExUnit.Case, async: true
 
+  alias Jido.Expr
   alias Jido.Flow.{Ref, Value}
 
-  test "normalizes nested references and returns result dependencies in tree order" do
-    expression = %{
-      first: Ref.result(:load, :value),
-      nested: [Jido.Expr.new!(:<, [Ref.result(:limit), 10]), Ref.result("load", :other)]
+  test "portable data validation accepts objects and reports exact nested paths" do
+    assert :ok = Value.validate_object(%{"owner" => "team", 1 => [:ready]})
+    assert :ok = Value.validate_data([nil, true, 1, 1.5, :ready, "text"])
+    assert {:error, _error} = Value.validate_object([])
+
+    for {value, message, path} <- [
+          {%{outer: [0, %{inner: self()}]}, "flow data contains an unsupported value", [:outer, 1, :inner]},
+          {%{outer: [0, %{nil: :value}]}, "flow data contains an unsupported map key", [:outer, 1]},
+          {%{outer: [0, <<255>>]}, "flow data strings must be valid UTF-8", [:outer, 1]},
+          {%{outer: [[self() | :tail]]}, "flow data must contain proper lists", [:outer, 0]}
+        ] do
+      assert {:error, error} = Value.validate_data(value)
+      assert error.message == message
+      assert error.details.path == path
+    end
+  end
+
+  test "portable map keys use the same rules in data and Flow values" do
+    for key <- ["name", 0, :name] do
+      assert :ok = Value.validate_key(key)
+      assert :ok = Value.validate_data(%{key => :value})
+      assert :ok = Value.validate(%{key => :value})
+    end
+
+    for key <- [-1, nil, 1.5, {:tuple}, <<255>>] do
+      assert {:error, key_error} = Value.validate_key(key)
+      assert {:error, data_error} = Value.validate_data(%{key => :value})
+      assert {:error, value_error} = Value.validate(%{key => :value})
+
+      assert data_error.message == key_error.message
+      assert value_error.message == key_error.message
+    end
+  end
+
+  test "Flow validation uses one traversal for expression paths and result references" do
+    value = %{
+      outer: [
+        Expr.new!(:+, [Ref.result(:first, :count), 1]),
+        Ref.result("second")
+      ]
     }
 
-    assert {:ok, normalized} = Value.prepare(expression)
-    assert normalized.first.step == "load"
-    assert Value.result_refs(normalized) == ["load", "limit", "load"]
-    assert Value.to_map(normalized) == normalized
+    assert {:ok, normalized} = Value.prepare(value)
+    assert Value.result_refs(normalized) == ["first", "second"]
+
+    invalid = %{outer: [Expr.new!(:+, [Ref.item(), 1])]}
+    assert {:error, error} = Value.validate(invalid, :flow)
+    assert error.details.path == [:outer, 0, :operands, 0]
   end
 
-  test "enforces reference scopes before a Flow is compiled" do
-    assert {:ok, %Ref{source: :item}} = Value.prepare(Ref.item(), :map)
-    assert {:ok, %Ref{source: :accumulator}} = Value.prepare(Ref.accumulator(), :reduce)
-    assert {:ok, %Ref{source: :state}} = Value.prepare(Ref.state(), :iterate_params)
-    assert {:ok, %Ref{source: :body_result}} = Value.prepare(Ref.body_result(), :iterate_update)
+  test "plain Flow data keeps its independent in-memory size contract" do
+    value = %{nested: Enum.reduce(1..129, 1, fn _, child -> [child] end)}
 
-    for {ref, scope} <- [
-          {Ref.item(), :flow},
-          {Ref.accumulator(), :map},
-          {Ref.state(), :reduce},
-          {Ref.body_result(), :iterate_params}
-        ] do
-      assert {:error, error} = Value.prepare(ref, scope)
-      assert error.message == "flow expression contains a scoped ref outside its valid scope"
-      assert error.details.scope == scope
-      assert error.details.ref_type == ref.source
+    assert :ok = Value.validate(value)
+    assert {:ok, ^value} = Value.normalize(value)
+  end
+
+  test "the complete Flow value tree has bounded depth and node counts" do
+    too_deep = Enum.reduce(1..257, 1, fn _, child -> [child] end)
+
+    for operation <- [&Value.normalize/1, &Value.validate/1] do
+      assert {:error, depth_error} = operation.(too_deep)
+      assert depth_error.details.reason == :max_depth
+
+      assert {:error, node_error} = operation.(List.duplicate(nil, 100_000))
+      assert node_error.details.reason == :max_nodes
     end
-  end
-
-  test "rejects invalid portable data with an exact nested path" do
-    assert {:error, error} = Value.validate_data(%{"items" => [1, {:tuple}]})
-    assert error.details.path == ["items", 1]
-    assert error.details.value_type == :tuple
-
-    assert {:error, error} = Value.validate_data([1 | :tail])
-    assert error.details.path == []
-
-    assert {:error, error} = Value.validate_key(-1)
-    assert error.details.key == -1
-
-    assert {:error, error} = Value.validate_object([])
-    assert error.message == "flow metadata must be a portable map"
-  end
-
-  test "enforces depth and integer size limits" do
-    nested = Enum.reduce(1..102, 0, fn _index, value -> [value] end)
-
-    assert {:error, depth_error} = Value.prepare(nested)
-    assert depth_error.details.reason == :max_depth
-
-    assert {:error, integer_error} = Value.prepare(:erlang.bsl(1, 4096))
-    assert integer_error.details.reason == :max_integer_bits
-  end
-
-  test "accepts only Boolean-compatible conditions" do
-    assert {:ok, true} = Value.condition(true, :flow)
-    assert {:ok, %Ref{}} = Value.condition(Ref.input(:enabled), :flow)
-
-    assert {:error, error} = Value.condition(1, :flow)
-    assert error.details.path == []
-  end
-
-  test "validates complete expressions and reports invalid nested values" do
-    expression = Jido.Expr.new!(:<, [Ref.input(:count), 10])
-
-    assert :ok = Value.validate(expression)
-
-    assert {:error, error} = Value.validate(%{"bad" => Date.utc_today()})
-    assert error.details.path == ["bad"]
-    assert error.details.expression == Date
-
-    assert {:error, error} = Value.validate(%{nil => 1})
-    assert error.details.path == []
-    assert error.details.key == nil
-
-    assert {:error, error} = Value.validate([1 | :tail])
-    assert error.details.reason == :improper_list
-  end
-
-  test "reports each unsupported portable data type" do
-    values = [
-      {fn -> :ok end, :function},
-      {self(), :pid},
-      {make_ref(), :reference},
-      {Date.utc_today(), {:struct, Date}},
-      {<<1::1>>, :other}
-    ]
-
-    for {value, type} <- values do
-      assert {:error, error} = Value.validate_data(value)
-      assert error.details.value_type == type
-    end
-
-    assert {:error, error} = Value.validate_data(<<255>>)
-    assert error.message == "flow data strings must be valid UTF-8"
-  end
-
-  test "reports invalid reference paths and shapes" do
-    invalid_path = %Ref{source: :input, step: nil, path: [{:bad}]}
-    invalid_shape = %Ref{source: :unknown, step: nil, path: []}
-
-    assert {:error, path_error} = Value.prepare(invalid_path)
-    assert path_error.message == "flow expression contains an invalid reference path"
-    assert path_error.details.segment == {:bad}
-
-    assert {:error, shape_error} = Value.prepare(invalid_shape)
-    assert shape_error.message == "flow expression contains an invalid reference"
-    assert shape_error.details.ref_type == :unknown
   end
 end

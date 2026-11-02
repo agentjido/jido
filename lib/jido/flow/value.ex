@@ -5,9 +5,8 @@ defmodule Jido.Flow.Value do
   A Flow value is portable literal data, a nested list or map of values, a
   `Jido.Flow.Ref`, or a `Jido.Expr` operation.
 
-  The complete value tree can contain up to 100 levels and 100,000 nodes.
-  Its cumulative binary data can contain up to 16 MiB. Each integer can
-  contain up to 4,096 bits.
+  The complete value tree can contain up to 256 levels and 100,000 nodes.
+  Each expression also uses the smaller standard limits from `Jido.Expr`.
   """
 
   alias Jido.Authoring.Config
@@ -16,10 +15,10 @@ defmodule Jido.Flow.Value do
   alias Jido.Flow.Ref
 
   @tree_options [
-    max_depth: 100,
+    max_depth: 256,
     max_nodes: 100_000,
-    max_binary_bytes: 16_777_216,
-    max_integer_bits: 4096
+    max_binary_bytes: 1_048_576_000,
+    max_integer_bits: 1_048_576
   ]
 
   @typedoc "A portable scalar value."
@@ -127,8 +126,8 @@ defmodule Jido.Flow.Value do
   @spec result_refs(term()) :: [String.t()]
   def result_refs(value) do
     reducer = fn
-      %Ref{source: :result, step: step}, _path, refs ->
-        {:cont, [step | refs]}
+      %Ref{source: :result, component: component}, _path, refs ->
+        {:cont, [component | refs]}
 
       _value, _path, refs ->
         {:cont, refs}
@@ -136,13 +135,8 @@ defmodule Jido.Flow.Value do
 
     case Expr.reduce(value, [], reducer, @tree_options) do
       {:ok, refs} -> Enum.reverse(refs)
-      {:error, error} -> raise_reduction_error(error)
+      {:error, _error} -> []
     end
-  end
-
-  defp raise_reduction_error(error) do
-    {:error, exception} = operation_result({:error, error}, [])
-    raise exception
   end
 
   defp validate_tree(expression, scope, validate_expressions?) do
@@ -290,9 +284,7 @@ defmodule Jido.Flow.Value do
   end
 
   defp validate_map_keys(map, path) do
-    map
-    |> Enum.sort_by(&elem(&1, 0))
-    |> Enum.reduce_while(:ok, fn {key, _value}, :ok ->
+    Enum.reduce_while(map, :ok, fn {key, _value}, :ok ->
       case validate_key(key, path) do
         :ok -> {:cont, :ok}
         {:error, error} -> {:halt, {:error, error}}
@@ -340,10 +332,10 @@ defmodule Jido.Flow.Value do
 
   defp validation_result({:error, _error} = error), do: error
 
-  defp normalize_leaf(%Ref{source: :result, step: step} = ref, path)
-       when (is_atom(step) and not is_nil(step)) or is_binary(step) do
-    case normalize_name(step) do
-      {:ok, step} -> {:ok, %{ref | step: step}}
+  defp normalize_leaf(%Ref{source: :result, component: component} = ref, path)
+       when (is_atom(component) and not is_nil(component)) or is_binary(component) do
+    case normalize_name(component) do
+      {:ok, component} -> {:ok, %{ref | component: component}}
       {:error, error} -> {:error, Error.prefix_path(error, path)}
     end
   end
@@ -356,14 +348,14 @@ defmodule Jido.Flow.Value do
   end
 
   defp normalize_name(name) when is_binary(name) do
-    case Config.validate_name(name, subject: "Flow Step") do
+    case Config.validate_name(name) do
       :ok -> {:ok, name}
       {:error, message} -> {:error, Error.validation_error(message)}
     end
   end
 
   defp normalize_name(_name) do
-    {:error, Error.validation_error("Flow Step name must be a non-empty string or atom")}
+    {:error, Error.validation_error("component name must be a non-empty string or atom")}
   end
 
   defp invalid_ref_error(type, path) do

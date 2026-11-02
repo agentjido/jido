@@ -8,14 +8,14 @@ defmodule Jido.Authoring.Registry do
 
   @maximum_entries 10_000
   @identifier_pattern ~r/\A[A-Za-z0-9][A-Za-z0-9._\/:@-]{0,254}\z/
-  @none_schema %{
-    id: "jido/schemas/none",
+  @map_schema %{
+    id: "jido/schemas/map",
     kind: :schema,
     vsn: 1,
-    target: [],
+    target: Zoi.map(),
     provider: __MODULE__,
-    name: "No schema",
-    description: "The empty Jido schema"
+    name: "Map schema",
+    description: "The default Jido map schema"
   }
 
   @type stable_id :: String.t()
@@ -35,7 +35,7 @@ defmodule Jido.Authoring.Registry do
         }
   @type codec :: %{
           required(:type) => String.t(),
-          optional(:vsn) => vsn(),
+          required(:vsn) => vsn(),
           required(:module) => module(),
           optional(:encoder) => module() | nil
         }
@@ -43,7 +43,7 @@ defmodule Jido.Authoring.Registry do
           entries: %{key() => entry()},
           references: %{{kind(), term()} => key()},
           manifests: [manifest()],
-          codecs: %{(String.t() | {String.t(), pos_integer()}) => module()},
+          codecs: %{{String.t(), pos_integer()} => module()},
           encoders: %{module() => module()},
           revision: String.t() | nil
         }
@@ -93,24 +93,22 @@ defmodule Jido.Authoring.Registry do
   @spec new_discovered([manifest()], [codec()]) :: {:ok, t()} | {:error, term()}
   def new_discovered(manifests, codecs) do
     manifests =
-      [@none_schema | manifests]
+      [@map_schema | manifests]
       |> Enum.sort_by(&{&1.id, &1.vsn, Atom.to_string(&1.kind), Atom.to_string(&1.provider)})
 
-    codecs =
-      Enum.sort_by(codecs, &{&1.type, Map.get(&1, :vsn, 0), Atom.to_string(&1.module)})
-
+    codecs = Enum.sort_by(codecs, &{&1.type, &1.vsn, Atom.to_string(&1.module)})
     entries = Map.new(manifests, &{{&1.id, &1.vsn}, {&1.kind, &1.target}})
 
     with :ok <- unique(manifests, &{&1.id, &1.vsn}, :duplicate_authoring_reference),
          :ok <- unique(manifests, &{&1.kind, &1.target}, :duplicate_authoring_target),
-         :ok <- unique(codecs, &codec_key/1, :duplicate_authoring_codec),
+         :ok <- unique(codecs, &{&1.type, &1.vsn}, :duplicate_authoring_codec),
          :ok <- unique_encoders(codecs),
          {:ok, registry} <- new(entries) do
       {:ok,
        %{
          registry
          | manifests: manifests,
-           codecs: Map.new(codecs, &{codec_key(&1), &1.module}),
+           codecs: Map.new(codecs, &{{&1.type, &1.vsn}, &1.module}),
            encoders:
              codecs
              |> Enum.reject(&is_nil(Map.get(&1, :encoder)))
@@ -217,15 +215,6 @@ defmodule Jido.Authoring.Registry do
   def encoder(%__MODULE__{}, _value), do: {:error, :unknown_encoder}
 
   @doc false
-  @spec codec(t(), String.t()) :: {:ok, module()} | {:error, :unknown_codec}
-  def codec(%__MODULE__{codecs: codecs}, type) do
-    case Map.fetch(codecs, type) do
-      {:ok, module} -> {:ok, module}
-      :error -> {:error, :unknown_codec}
-    end
-  end
-
-  @doc false
   @spec codec(t(), String.t(), vsn()) :: {:ok, module()} | {:error, :unknown_codec}
   def codec(%__MODULE__{codecs: codecs}, type, vsn) do
     case Map.fetch(codecs, {type, vsn}) do
@@ -239,10 +228,7 @@ defmodule Jido.Authoring.Registry do
   def codec_vsns(%__MODULE__{codecs: codecs}, type) do
     codecs
     |> Map.keys()
-    |> Enum.flat_map(fn
-      {entry_type, vsn} when entry_type == type -> [vsn]
-      _key -> []
-    end)
+    |> Enum.flat_map(fn {entry_type, vsn} -> if entry_type == type, do: [vsn], else: [] end)
     |> Enum.sort()
   end
 
@@ -400,9 +386,6 @@ defmodule Jido.Authoring.Registry do
     |> Enum.reject(&is_nil(Map.get(&1, :encoder)))
     |> unique(& &1.encoder, :duplicate_authoring_encoder)
   end
-
-  defp codec_key(%{type: type, vsn: vsn}), do: {type, vsn}
-  defp codec_key(%{type: type}), do: type
 
   defp revision(manifests, codecs) do
     {manifests, codecs}

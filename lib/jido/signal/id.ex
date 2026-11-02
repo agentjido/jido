@@ -87,10 +87,7 @@ defmodule Jido.Signal.ID do
     |> Base.decode16(case: :mixed)
   end
 
-  defp format_uuid(
-         <<a::binary-size(8), b::binary-size(4), c::binary-size(4), d::binary-size(4),
-           e::binary-size(12)>>
-       ) do
+  defp format_uuid(<<a::binary-size(8), b::binary-size(4), c::binary-size(4), d::binary-size(4), e::binary-size(12)>>) do
     Enum.join([a, b, c, d, e], "-")
   end
 end

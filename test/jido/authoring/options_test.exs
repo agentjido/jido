@@ -1,5 +1,5 @@
 defmodule Jido.Authoring.OptionsTest do
-  use ExUnit.Case, async: true
+  use Covenant.Case, component: "jido_action.inline", async: true
 
   alias Jido.Action.Inline
   alias Jido.Action.Inline.Parser
@@ -62,15 +62,8 @@ defmodule Jido.Authoring.OptionsTest do
   test "valid options still produce inline Action and Step declarations" do
     assert %Inline{} = Inline.parse_callback!({:params, [], nil}, [do: :ok], caller())
 
-    assert %{
-             action: %Inline{},
-             component_options: [needs: [], policy: [timeout_ms: 100]]
-           } =
-             InlineStep.parse!(
-               [],
-               [needs: [], policy: [timeout_ms: 100], inline: [name: "valid"], do: :ok],
-               caller()
-             )
+    assert %{action: %Inline{}, component_options: [needs: []]} =
+             InlineStep.parse!([], [needs: [], inline: [name: "valid"], do: :ok], caller())
 
     assert :ok =
              MacroSupport.validate_options!([action: String], caller(), "invalid", "Flow field")
@@ -78,16 +71,15 @@ defmodule Jido.Authoring.OptionsTest do
 
   defp callers do
     [
-      {&Parser.options!(&1, [:do], caller()), "inline Action option",
-       "inline Action options must be a keyword list", :do},
+      {&Parser.options!(&1, [:do], caller()), "inline Action option", "inline Action options must be a keyword list",
+       :do},
       {&MacroSupport.validate_options!(
          &1,
          caller(),
          "Flow declaration fields must be a keyword list",
          "Flow declaration field"
        ), "Flow declaration field", "Flow declaration fields must be a keyword list", :action},
-      {&InlineStep.parse!([], &1, caller()), "inline Step field",
-       "inline Step options must be a keyword list", :do},
+      {&InlineStep.parse!([], &1, caller()), "inline Step field", "inline Step options must be a keyword list", :do},
       {&InlineStep.parse!([], [do: :ok, inline: &1], caller()), "inline Step setting",
        "inline Step settings must be a keyword list", :name}
     ]

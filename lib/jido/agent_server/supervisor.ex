@@ -1,0 +1,264 @@
+defmodule Jido.AgentServer.Supervisor do
+  @moduledoc false
+  use Supervisor
+  alias Jido.AgentServer, as: Server
+  alias Runic.Runner
+
+  @doc false
+  def start_spec(opts, parent \\ nil),
+    do: {__MODULE__, :start_link, [opts, parent, :atomics.new(1, [])]}
+
+  def start_link(opts, parent \\ nil, lifetime \\ :atomics.new(1, [])) do
+    with {:ok, opts} <- Server.activation_options(opts) do
+      Supervisor.start_link(__MODULE__, {opts, parent, lifetime}) |> finish_start(parent)
+    end
+  end
+
+  defp finish_start({:ok, root} = result, parent) do
+    case record_child(parent, root) do
+      :ok ->
+        result
+
+      error ->
+        Supervisor.stop(root)
+        error
+    end
+  end
+
+  defp finish_start(error, _parent), do: error
+
+  @impl true
+  def init({opts, parent, lifetime}) do
+    state = :ets.new(__MODULE__, [:public])
+
+    :ets.insert(state, [
+      {:parent, parent},
+      {:checkpoint, opts[:agent], 0},
+      {:durable_lifetime, lifetime}
+    ])
+
+    opts = Keyword.put(opts, :activation_state, state)
+
+    children = [
+      %{
+        id: Server,
+        start: {__MODULE__, :start_worker, [opts, self()]},
+        restart: :transient,
+        significant: true,
+        shutdown: 10_000
+      }
+    ]
+
+    Supervisor.init(children,
+      strategy: :one_for_all,
+      auto_shutdown: :any_significant,
+      max_restarts: 3,
+      max_seconds: 5
+    )
+  end
+
+  # The checkpoint is the canonical Agent and revision, not a serialized
+  # runtime map. Local state rules apply; portable save/export is separate.
+  @doc false
+  def start_worker(opts, activation) do
+    state = Keyword.fetch!(opts, :activation_state)
+    # The recovery group has stopped its owned DynamicSupervisor. Its children
+    # are not checkpoints; keep only independent relationships across recovery.
+    :ets.match_delete(state, {{:child, :_}, %{placement: :owned}})
+
+    checkpoint =
+      if opts[:persistence] in [nil, false],
+        do: restore_checkpoint(state, opts[:agent]),
+        else: {:ok, opts[:agent], 0}
+
+    with {:ok, agent, revision} <- checkpoint,
+         opts = Keyword.merge(opts, agent: agent, state_version: revision),
+         {:ok, pid} <- Server.start_worker(opts, activation) do
+      :ets.insert(state, {:worker, pid})
+      {:ok, pid}
+    end
+  end
+
+  defp restore_checkpoint(state, initial) do
+    with [{:checkpoint, agent, revision}] <- :ets.lookup(state, :checkpoint),
+         true <- is_integer(revision) and revision >= 0,
+         {:ok, agent} <- Jido.Agent.Validation.validate_instance(agent),
+         true <- agent.id == initial.id,
+         true <- agent.module == initial.module do
+      {:ok, agent, revision}
+    else
+      _ -> {:error, :invalid_local_checkpoint}
+    end
+  end
+
+  @doc false
+  def publish_checkpoint(nil, _agent, _revision), do: :ok
+
+  def publish_checkpoint(state, agent, revision) do
+    match_spec = [
+      {{:checkpoint, :_, revision - 1}, [], [{:const, {:checkpoint, agent, revision}}]}
+    ]
+
+    case :ets.select_replace(state, match_spec) do
+      1 -> :ok
+      0 -> {:error, :checkpoint_conflict}
+    end
+  rescue
+    ArgumentError -> {:error, :checkpoint_unavailable}
+  end
+
+  def worker(activation) do
+    case List.keyfind(Supervisor.which_children(activation), Server, 0) do
+      {Server, pid, :worker, _} when is_pid(pid) -> pid
+      _ -> nil
+    end
+  end
+
+  @doc false
+  def start_activation(supervisor, spec) do
+    with {:ok, root} <- DynamicSupervisor.start_child(supervisor, spec) do
+      worker = live_worker(root)
+
+      if is_pid(worker) and Process.alive?(worker) do
+        {:ok, worker}
+      else
+        DynamicSupervisor.terminate_child(supervisor, root)
+        {:error, :worker_unavailable}
+      end
+    end
+  end
+
+  @doc false
+  def live_worker(root) do
+    if Process.alive?(root), do: worker(root)
+  catch
+    :exit, _ -> nil
+  end
+
+  def execution(nil), do: nil
+  def execution(state), do: :ets.lookup(state, :execution) |> List.first()
+
+  def remember_execution(nil, _runner, _id, _worker), do: :ok
+
+  def remember_execution(state, runner, id, worker) do
+    case Registry.lookup(Module.concat(runner, Registry), {Runic.TaskScope, worker}) do
+      [{scope, _}] ->
+        :ets.insert(state, {:execution, runner, id, scope})
+        :ok
+
+      [] ->
+        {:error, :ownership_scope_unavailable}
+    end
+  end
+
+  def forget_execution(nil), do: :ok
+
+  def forget_execution(state) do
+    :ets.delete(state, :execution)
+    :ok
+  end
+
+  def close_execution(state) do
+    case execution(state) do
+      nil ->
+        :ok
+
+      {:execution, runner, id, scope} = execution ->
+        # Owner DOWN and supervisor recovery have separate recipients. Keep
+        # admission closed until the old scope has stopped its native work,
+        # even when its Worker has already left the Runner registry.
+        result =
+          case Runner.lookup(runner, id) do
+            nil -> close_scope(scope)
+            _worker -> Runner.cancel(runner, id)
+          end
+
+        if result == :ok, do: :ets.delete_object(state, execution)
+        result
+    end
+  end
+
+  defp close_scope(scope) do
+    case Runic.TaskScope.confirm_close(scope) do
+      {:error, {:ownership_scope_failed, :noproc}} -> :ok
+      result -> result
+    end
+  end
+
+  def parent(state), do: :ets.lookup_element(state, :parent, 2)
+
+  def records(state), do: :ets.match_object(state, {{:child, :_}, :_})
+
+  def reserve(state, tag, token, caller) do
+    case :ets.lookup(state, {:child, tag}) do
+      [] -> :ok
+      [{_, %{root: _root}}] -> throw(:tag_in_use)
+      [{_, %{caller: owner}}] -> if Process.alive?(owner), do: throw(:tag_in_use)
+    end
+
+    :ets.insert(state, {{:child, tag}, %{token: token, caller: caller}})
+    :ok
+  catch
+    :tag_in_use -> {:error, :tag_in_use}
+  end
+
+  def release(state, tag, token) do
+    case :ets.lookup(state, {:child, tag}) do
+      [{_, %{token: ^token}}] ->
+        :ets.delete(state, {:child, tag})
+        [{:worker, owner}] = :ets.lookup(state, :worker)
+        send(owner, {:child_released, tag, token})
+
+      _ ->
+        :ok
+    end
+
+    :ok
+  rescue
+    ArgumentError -> :ok
+  end
+
+  def record_child(parent, root, restart? \\ true)
+  def record_child(nil, _root, _restart?), do: :ok
+
+  def record_child(parent, root, restart?) do
+    key = {:child, parent.tag}
+    restart = Map.get(parent, :restart, :transient)
+
+    record = %{
+      token: parent.token,
+      root: root,
+      restart?: restart? and restart != :temporary,
+      restart: restart,
+      placement: parent.placement
+    }
+
+    match_spec = [{{key, %{token: parent.token}}, [], [{:const, {key, record}}]}]
+
+    case :ets.select_replace(parent.state, match_spec) do
+      1 ->
+        [{:worker, owner}] = :ets.lookup(parent.state, :worker)
+        send(owner, {:child_registered, parent.tag, parent.token, root})
+        :ok
+
+      0 ->
+        {:error, :parent_changed}
+    end
+  rescue
+    ArgumentError ->
+      if Process.alive?(parent.activation), do: {:error, :parent_changed}, else: :ok
+  end
+
+  def child_supervisor(activation) do
+    spec = %{
+      id: :owned_agents,
+      start: {DynamicSupervisor, :start_link, [[]]},
+      type: :supervisor
+    }
+
+    case Supervisor.start_child(activation, spec) do
+      {:error, {:already_started, pid}} -> {:ok, pid}
+      result -> result
+    end
+  end
+end

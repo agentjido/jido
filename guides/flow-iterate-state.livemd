@@ -1,0 +1,147 @@
+# Iterate And State
+
+## Overview
+
+Iterate runs one Action as a bounded local state transition. It is one Flow
+component. At runtime it is a small native Runic loop: a start node, two
+Conditions, the body Action, and a finish node.
+
+It keeps a value called State between calls:
+
+1. `state` sets the initial State.
+2. Each call receives `params` built from the current State.
+3. `update` builds the next State from the call result.
+4. `repeat` or `while` decides when the loop stops.
+
+Run the cells from top to bottom.
+
+## Install The Package
+
+```elixir
+Mix.install([{:jido_action, "~> 3.0.0-beta.22"}])
+```
+
+## Define The Body Action
+
+```elixir
+defmodule FlowIterate.Increment do
+  use Jido.Action, name: "flow_iterate_increment"
+
+  @impl true
+  def run(%{count: count, index: index}, _context) do
+    {:ok, %{count: count + 1, index: index}}
+  end
+end
+```
+
+## Repeat A Fixed Count
+
+```elixir
+defmodule FlowIterate.RepeatThree do
+  use Jido.Flow, name: "flow_iterate_repeat_three"
+
+  flow do
+    iterate "counter" do
+      state Zoi.object(%{count: Zoi.integer()}), initial: %{count: 0}
+      action FlowIterate.Increment
+
+      params %{
+        count: state(:count),
+        index: iteration_index()
+      }
+
+      update %{count: body_result(:count)}
+      repeat 3
+    end
+
+    output %{counter: result("counter")}
+  end
+end
+```
+
+```elixir
+{:ok,
+ %{
+   counter: %{
+     kind: :jido_flow_iterate_result,
+     iterations: 3,
+     state: %{count: 3},
+     output: %{count: 3, index: 2}
+   }
+ }} = Jido.Exec.run(FlowIterate.RepeatThree)
+```
+
+The Iterate result contains the number of completed calls, the final State,
+and the latest body result. `output` is `nil` when the body never runs.
+
+## Continue While A Condition Is True
+
+`while` is checked before each call. If it is false for the initial State, the
+body does not run. A `while` loop must also set `max_iterations`, from 1
+through 10,000. If the condition is still true when the loop reaches that
+bound, the Iterate fails with a Flow execution error.
+
+```elixir
+defmodule FlowIterate.WhileBelowThree do
+  use Jido.Flow, name: "flow_iterate_while_below_three"
+
+  flow do
+    iterate "counter" do
+      state Zoi.object(%{count: Zoi.integer()}), initial: %{count: input(:start)}
+      action FlowIterate.Increment
+      params %{count: state(:count), index: iteration_index()}
+      update %{count: body_result(:count)}
+      while state(:count) < 3
+      max_iterations 10
+    end
+
+    output %{counter: result("counter")}
+  end
+end
+
+{:ok, %{counter: %{iterations: 3, state: %{count: 3}}}} =
+  Jido.Exec.run(FlowIterate.WhileBelowThree, %{start: 0})
+
+{:ok, %{counter: %{iterations: 0, state: %{count: 5}, output: nil}}} =
+  Jido.Exec.run(FlowIterate.WhileBelowThree, %{start: 5})
+```
+
+Use exactly one stop rule: `repeat n` alone, or `while` with
+`max_iterations`. `repeat` also accepts 1 through 10,000.
+
+A condition must evaluate to a Boolean. See
+[Conditions And Missing Values](flow-expressions.md#conditions-and-missing-values).
+
+## State And Update
+
+The `update` expression runs after each successful body call. Its value
+replaces the State; Jido does not merge it. If you omit `update`, the next
+State is the complete body result.
+
+The State schema, the first argument to `state`, validates the initial State
+and every replacement. Omit it to use `Zoi.map()`. State must be a map. The
+body Action's own schema validates its params.
+
+These references are valid in Iterate `params`, `update`, and `while`:
+
+- `state(path)`;
+- `iteration_index()`; and
+- `body_result(path)`.
+
+| Reference | Value |
+| --- | --- |
+| `state(path)` | The current State. |
+| `iteration_index()` | The zero-based index of the current call. In `while`, it equals the number of completed calls. |
+| `body_result(path)` | In `params` and `while`: `nil` before the first call, then the latest body result. In `update`: the result of the call that just finished. |
+
+The body target must be an Action module. A Flow module or inline body is not
+supported in the body slot.
+
+## Data Form
+
+In a map definition, Iterate uses `completion` instead of `while` or `repeat`.
+`completion` is a stop condition: the loop stops when it is true. A DSL
+`while condition` is the same as `completion: not condition`, and `repeat n` is
+the same as `completion: iteration_index() >= n` with `max_iterations: n`. In
+map definitions, `state.update` and `max_iterations` are required. See
+[Flow Data Definitions](flow-data.md#iterate).

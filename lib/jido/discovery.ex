@@ -19,13 +19,10 @@ defmodule Jido.Discovery do
 
   Inline Actions remain implementation details of their owner modules.
 
-  `jido` starts one asynchronous scan of all loaded applications. The
-  Discovery process starts immediately and completes the scan after application
-  startup continues. A caller that needs the Registry waits for the scan.
+  `jido` starts one asynchronous scan of all loaded applications. This
+  happens once when the consolidated package starts.
   Applications loaded after this scan can call `refresh/1`.
   """
-
-  use GenServer
 
   require Logger
 
@@ -33,28 +30,15 @@ defmodule Jido.Discovery do
 
   @registry_key {__MODULE__, :registry}
   @default_applications :loaded
-  @default_provider_timeout_ms 30_000
-  @option_keys [:applications, :modules, :provider_timeout_ms]
-  @server_option_keys [:name, :registry_key]
-
-  @doc false
-  @spec start_link(keyword()) :: GenServer.on_start()
-  def start_link(opts \\ []) do
-    {server_opts, discovery_opts} = Keyword.split(opts, @server_option_keys)
-    name = Keyword.get(server_opts, :name, __MODULE__)
-    registry_key = Keyword.get(server_opts, :registry_key, @registry_key)
-    genserver_opts = if name, do: [name: name], else: []
-
-    GenServer.start_link(__MODULE__, {discovery_opts, registry_key}, genserver_opts)
-  end
+  @option_keys [:applications, :modules]
 
   @doc false
   @spec child_spec(keyword()) :: Supervisor.child_spec()
   def child_spec(opts) do
     %{
       id: __MODULE__,
-      start: {__MODULE__, :start_link, [opts]},
-      restart: :permanent,
+      start: {Task, :start_link, [fn -> initialize_child(opts) end]},
+      restart: :temporary,
       type: :worker
     }
   end
@@ -63,18 +47,22 @@ defmodule Jido.Discovery do
   @spec ready?() :: boolean()
   def ready?, do: match?(%Registry{}, :persistent_term.get(@registry_key, :not_initialized))
 
-  @doc "Waits for and returns the current immutable runtime authoring Registry."
+  @doc "Returns the current immutable runtime authoring Registry."
   @spec registry() :: Registry.t()
   def registry do
     case :persistent_term.get(@registry_key, :not_initialized) do
-      :loading ->
-        __MODULE__ |> GenServer.call(:registry, :infinity) |> unwrap_registry()
-
       :not_initialized ->
-        raise_registry_not_initialized()
+        raise Jido.Authoring.Error.internal(
+                :registry_not_initialized,
+                "authoring Registry is not initialized"
+              )
 
       {:error, reason} ->
-        raise_registry_initialization_failed(reason)
+        raise Jido.Authoring.Error.internal(
+                :registry_initialization_failed,
+                "authoring Registry initialization failed: #{inspect(reason)}",
+                %{reason: reason}
+              )
 
       %Registry{} = registry ->
         registry
@@ -99,91 +87,29 @@ defmodule Jido.Discovery do
 
   @doc "Rebuilds and atomically replaces the complete authoring Registry."
   @spec refresh(keyword()) :: :ok | {:error, term()}
-  def refresh(opts \\ []), do: GenServer.call(__MODULE__, {:refresh, opts}, :infinity)
+  def refresh(opts \\ []) do
+    with {:ok, modules} <- discovery_modules(opts),
+         {:ok, registry} <- build_registry(modules) do
+      :persistent_term.put(@registry_key, registry)
+      :ok
+    end
+  end
 
   @doc false
   @spec initialize(keyword()) :: :ok | {:error, term()}
   def initialize(opts \\ []), do: refresh(opts)
 
-  @impl true
-  def init({opts, registry_key}) do
-    mark_loading(registry_key)
-    {:ok, %{opts: opts, registry_key: registry_key}, {:continue, :initialize}}
-  end
-
-  @impl true
-  def handle_continue(:initialize, state) do
-    case rebuild(state.opts, state.registry_key) do
+  defp initialize_child(opts) do
+    case initialize(opts) do
       :ok ->
-        {:noreply, state}
+        :ok
 
       {:error, reason} ->
+        unless match?(%Registry{}, :persistent_term.get(@registry_key, :not_initialized)),
+          do: :persistent_term.put(@registry_key, {:error, reason})
+
         Logger.warning("Jido Discovery did not refresh: #{inspect(reason)}")
-        {:noreply, state}
     end
-  end
-
-  @impl true
-  def handle_call(:registry, _from, state) do
-    {:reply, registry_result(state.registry_key), state}
-  end
-
-  def handle_call({:refresh, opts}, _from, state) do
-    {:reply, rebuild(opts, state.registry_key), state}
-  end
-
-  defp rebuild(opts, registry_key) do
-    previous = :persistent_term.get(registry_key, :not_initialized)
-    mark_loading(registry_key)
-
-    with {:ok, modules, provider_timeout_ms} <- discovery_modules(opts),
-         {:ok, registry} <- build_registry(modules, provider_timeout_ms) do
-      :persistent_term.put(registry_key, registry)
-      :ok
-    else
-      {:error, reason} = error ->
-        retain_registry_or_error(registry_key, previous, reason)
-        error
-    end
-  end
-
-  defp mark_loading(registry_key) do
-    unless match?(%Registry{}, :persistent_term.get(registry_key, :not_initialized)) do
-      :persistent_term.put(registry_key, :loading)
-    end
-  end
-
-  defp retain_registry_or_error(registry_key, %Registry{} = registry, _reason),
-    do: :persistent_term.put(registry_key, registry)
-
-  defp retain_registry_or_error(registry_key, _previous, reason),
-    do: :persistent_term.put(registry_key, {:error, reason})
-
-  defp registry_result(registry_key) do
-    case :persistent_term.get(registry_key, :not_initialized) do
-      %Registry{} = registry -> {:ok, registry}
-      {:error, reason} -> {:error, {:initialization_failed, reason}}
-    end
-  end
-
-  defp unwrap_registry({:ok, %Registry{} = registry}), do: registry
-
-  defp unwrap_registry({:error, {:initialization_failed, reason}}),
-    do: raise_registry_initialization_failed(reason)
-
-  defp raise_registry_not_initialized do
-    raise Jido.Authoring.Error.internal(
-            :registry_not_initialized,
-            "authoring Registry is not initialized"
-          )
-  end
-
-  defp raise_registry_initialization_failed(reason) do
-    raise Jido.Authoring.Error.internal(
-            :registry_initialization_failed,
-            "authoring Registry initialization failed: #{inspect(reason)}",
-            %{reason: reason}
-          )
   end
 
   defp discovery_modules(opts) do
@@ -192,7 +118,6 @@ defmodule Jido.Discovery do
          {:ok, applications} <- application_option(opts, config),
          {:ok, configured_modules} <- module_option(config),
          {:ok, option_modules} <- module_option(opts),
-         {:ok, provider_timeout_ms} <- provider_timeout_option(opts, config),
          {:ok, application_modules} <- modules_for_applications(applications) do
       modules =
         application_modules
@@ -201,7 +126,7 @@ defmodule Jido.Discovery do
         |> Enum.uniq()
         |> Enum.sort()
 
-      {:ok, modules, provider_timeout_ms}
+      {:ok, modules}
     end
   end
 
@@ -252,19 +177,6 @@ defmodule Jido.Discovery do
     end
   end
 
-  defp provider_timeout_option(opts, config) do
-    value =
-      Keyword.get(
-        opts,
-        :provider_timeout_ms,
-        Keyword.get(config, :provider_timeout_ms, @default_provider_timeout_ms)
-      )
-
-    if is_integer(value) and value > 0,
-      do: {:ok, value},
-      else: {:error, {:invalid_provider_timeout_ms, value}}
-  end
-
   defp validate_atoms(_name, []), do: {:ok, []}
 
   defp validate_atoms(name, values) do
@@ -296,10 +208,10 @@ defmodule Jido.Discovery do
     end)
   end
 
-  defp build_registry(modules, provider_timeout_ms) do
+  defp build_registry(modules) do
     with {:ok, {entries, codecs}} <-
            Enum.reduce_while(modules, {:ok, {[], []}}, fn module, {:ok, {entries, codecs}} ->
-             case discover_isolated(module, provider_timeout_ms) do
+             case discover(module) do
                {:ok, found_entries, found_codecs} ->
                  {:cont, {:ok, {found_entries ++ entries, found_codecs ++ codecs}}}
 
@@ -308,34 +220,6 @@ defmodule Jido.Discovery do
              end
            end) do
       Registry.new_discovered(entries, codecs)
-    end
-  end
-
-  defp discover_isolated(module, timeout_ms) do
-    owner = self()
-    result_tag = make_ref()
-
-    {pid, monitor} =
-      spawn_monitor(fn ->
-        send(owner, {result_tag, discover(module)})
-      end)
-
-    receive do
-      {^result_tag, result} ->
-        Process.demonitor(monitor, [:flush])
-        result
-
-      {:DOWN, ^monitor, :process, ^pid, reason} ->
-        {:error, {:authoring_provider_failed, module, reason}}
-    after
-      timeout_ms ->
-        Process.exit(pid, :kill)
-
-        receive do
-          {:DOWN, ^monitor, :process, ^pid, _reason} -> :ok
-        end
-
-        {:error, {:authoring_provider_timeout, module, timeout_ms}}
     end
   end
 

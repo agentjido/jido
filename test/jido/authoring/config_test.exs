@@ -1,8 +1,7 @@
 defmodule Jido.Authoring.ConfigTest do
-  use ExUnit.Case, async: false
+  use Covenant.Case, component: "jido_action.action", async: false
 
   alias Jido.Authoring.Config
-  alias Jido.Flow.Config, as: FlowConfig
   alias Jido.Flow.Error.InvalidDefinitionError
 
   def options do
@@ -16,7 +15,7 @@ defmodule Jido.Authoring.ConfigTest do
   end
 
   @tag obligation: "jido_action.action.I1"
-  test "Action and Flow keep omitted and nil schema defaults" do
+  test "Action and Flow default omitted and nil schemas to maps" do
     for kind <- [:action, :flow],
         options <- [
           "name: \"defaults\"",
@@ -25,14 +24,20 @@ defmodule Jido.Authoring.ConfigTest do
       module = compile_module(kind, options)
       assert module.name() == "defaults"
       assert module.description() == nil
-      assert module.schema() == []
-      assert module.output_schema() == []
-      assert module.authoring_contract()["input_schema"] == nil
-      assert module.authoring_contract()["output_schema"] == nil
+      assert %Zoi.Types.Map{} = module.schema()
+      assert %Zoi.Types.Map{} = module.output_schema()
+      assert %{"type" => "object"} = module.authoring_contract()["input_schema"]
+      assert %{"type" => "object"} = module.authoring_contract()["output_schema"]
     end
 
-    assert {:ok, %{name: "defaults", description: nil, schema: [], output_schema: []}} =
-             FlowConfig.validate(%{name: "defaults", schema: nil, output_schema: nil})
+    assert {:ok,
+            %{
+              name: "defaults",
+              description: nil,
+              schema: %Zoi.Types.Map{},
+              output_schema: %Zoi.Types.Map{}
+            }} =
+             Config.validate_flow(%{name: "defaults", schema: nil, output_schema: nil})
   end
 
   @tag obligation: "jido_action.action.I1"
@@ -53,6 +58,7 @@ defmodule Jido.Authoring.ConfigTest do
         options <- [
           "id: \"\", name: \"invalid\"",
           "id: \"bad id\", name: \"invalid\"",
+          "id: :invalid, name: \"invalid\"",
           "vsn: 0, name: \"invalid\""
         ] do
       assert_raise CompileError, fn -> compile_module(kind, options) end
@@ -80,9 +86,9 @@ defmodule Jido.Authoring.ConfigTest do
       {"[]", "flow name must be a string"},
       {":invalid", "flow configuration must be a map"},
       {"name: :invalid", "flow name must be a string"},
-      {"name: \"\"", "Flow name cannot be blank."},
-      {"name: <<255>>", "Flow name must be valid UTF-8."},
-      {"name: String.duplicate(\"a\", 257)", "Flow name cannot exceed 256 bytes."},
+      {"name: \"\"", "Action name cannot be blank."},
+      {"name: <<255>>", "Action name must be valid UTF-8."},
+      {"name: String.duplicate(\"a\", 257)", "Action name cannot exceed 256 bytes."},
       {"name: \"valid\", description: 2", "flow description must be a string"},
       {"name: \"valid\", description: <<255>>", "flow description must be valid UTF-8"},
       {"name: 2, schema: 2, extra: true", "unknown Flow configuration key: :extra"},
@@ -102,20 +108,10 @@ defmodule Jido.Authoring.ConfigTest do
   end
 
   @tag obligation: "jido_action.action.I2"
-  test "name validation identifies the owning definition" do
-    assert {:error, "Definition name cannot be blank."} = Config.validate_name("")
-
-    assert {:error, "Action name cannot be blank."} =
-             Config.validate_name("", subject: "Action")
-
-    assert {:error, "Flow form name cannot be blank."} =
-             Config.validate_name("", subject: "Flow form")
-  end
-
-  @tag obligation: "jido_action.action.I2"
   test "schema failures keep boundary formatting and static errors take Action priority" do
     for field <- [:schema, :output_schema] do
       for {source, reason} <- [
+            {"[]", "must be a Zoi schema"},
             {":invalid", "must be a Zoi schema"},
             {"Zoi.integer()", "must accept map-shaped data"},
             {"Zoi.object(%{value: Zoi.integer() |> Zoi.refine(fn _ -> :ok end)})",
@@ -157,16 +153,15 @@ defmodule Jido.Authoring.ConfigTest do
 
   @tag obligation: "jido_action.action.I2"
   test "Flow data retains field details and nil descriptions" do
-    assert {:ok, %{description: nil}} = FlowConfig.validate(%{name: "valid", description: nil})
+    assert {:ok, %{description: nil}} = Config.validate_flow(%{name: "valid", description: nil})
 
-    assert {:error,
-            %InvalidDefinitionError{message: "schema must be a Zoi schema", details: details}} =
-             FlowConfig.validate(%{name: "valid", schema: :invalid})
+    assert {:error, %InvalidDefinitionError{message: "schema must be a Zoi schema", details: details}} =
+             Config.validate_flow(%{name: "valid", schema: :invalid})
 
     assert details == %{field: "schema"}
 
     assert {:error, %InvalidDefinitionError{details: %{key: :extra}}} =
-             FlowConfig.validate(%{name: 2, extra: true})
+             Config.validate_flow(%{name: 2, extra: true})
 
     for {field, value} <- [name: nil, description: 2, schema: :invalid, output_schema: :invalid] do
       attrs = Map.put(%{name: "valid", components: [], output: %{}}, field, value)
@@ -210,21 +205,8 @@ defmodule Jido.Authoring.ConfigTest do
     assert_received {:schema_built, :input}
     assert_received {:schema_built, :output}
     assert target.validate_params(%{}) == {:ok, %{value: 1}}
-    assert target.__jido_kind__() == :action
+    assert target.__jido_authoring_kind__() == :action
     refute_received {:schema_built, _}
-  end
-
-  test "Flow modules return Flow validation errors" do
-    module =
-      compile_module(
-        :flow,
-        "name: \"validated_flow\", " <>
-          "schema: Zoi.object(%{value: Zoi.integer()}), " <>
-          "output_schema: Zoi.object(%{result: Zoi.integer()})"
-      )
-
-    assert {:error, %InvalidDefinitionError{}} = module.validate_params(%{value: "invalid"})
-    assert {:error, %InvalidDefinitionError{}} = module.validate_output(%{result: "invalid"})
   end
 
   defp compile_module(kind, options) do

@@ -1,0 +1,204 @@
+defmodule Jido.Plugin.PreparationTest do
+  use JidoTest.Case, async: true
+
+  alias Jido.AgentServer, as: Server
+
+  defmodule PrepareFacet do
+    @behaviour Jido.Plugin
+
+    alias Jido.Agent.Plugin.{Preparation, Reduction}
+
+    @impl true
+    def state_spec(_opts) do
+      {:observation,
+       Zoi.object(%{
+         candidate_value: Zoi.integer() |> Zoi.default(0),
+         prepared_state_value: Zoi.integer() |> Zoi.default(0),
+         previous_value: Zoi.integer() |> Zoi.default(0)
+       })
+       |> Zoi.default(%{
+         candidate_value: 0,
+         prepared_state_value: 0,
+         previous_value: 0
+       })}
+    end
+
+    @impl true
+    def prepare(%Preparation{} = preparation, opts) do
+      case Keyword.get(opts, :mode, :ok) do
+        mode when mode in [:ok, :invalid_reduction] ->
+          {:ok,
+           %{
+             agent_id: preparation.agent_id,
+             state_value: preparation.agent_state.value,
+             signal_id: preparation.signal.id,
+             signal_type: preparation.signal.type
+           }}
+
+        :reject ->
+          {:error, :denied}
+
+        :invalid ->
+          :invalid
+
+        :non_portable ->
+          {:ok, self()}
+      end
+    end
+
+    @impl true
+    def reduce(%Reduction{} = reduction, opts) do
+      case Keyword.get(opts, :mode, :ok) do
+        :invalid_reduction ->
+          {:ok, :invalid}
+
+        _mode ->
+          {:ok,
+           %{
+             candidate_value: reduction.candidate_state.value,
+             prepared_state_value: reduction.prepared_input.state_value,
+             previous_value: reduction.state_before.value
+           }}
+      end
+    end
+  end
+
+  defmodule Package do
+    use Jido.Plugin
+
+    @impl true
+    defdelegate state_spec(opts), to: Jido.Plugin.PreparationTest.PrepareFacet
+
+    @impl true
+    defdelegate prepare(preparation, opts), to: Jido.Plugin.PreparationTest.PrepareFacet
+
+    @impl true
+    defdelegate reduce(reduction, opts), to: Jido.Plugin.PreparationTest.PrepareFacet
+  end
+
+  defmodule Capture do
+    use Jido.Action,
+      name: "plugin_preparation_capture",
+      schema: Zoi.object(%{value: Zoi.integer()})
+
+    alias Jido.Plugin.PreparationTest.Package
+
+    @impl true
+    def run(%{value: value}, context) do
+      prepared = Map.fetch!(context.plugin_inputs, Package).prepared
+
+      {:ok,
+       %{
+         context.agent_state
+         | action_signal_id: context.signal.id,
+           prepared_agent_id: prepared.agent_id,
+           prepared_state_value: prepared.state_value,
+           prepared_signal_id: prepared.signal_id,
+           prepared_signal_type: prepared.signal_type,
+           value: value
+       }}
+    end
+  end
+
+  test "direct cmd provides one package-owned input without changing the Signal" do
+    agent = agent(:ok)
+    source = signal("prepare.run", %{value: 7})
+
+    assert {:ok, next, []} = Jido.Agent.cmd(agent, source)
+    assert next.state.value == 7
+    assert next.state.action_signal_id == source.id
+    assert next.state.prepared_signal_id == source.id
+    assert next.state.prepared_signal_type == source.type
+    assert next.state.prepared_agent_id == agent.id
+    assert next.state.prepared_state_value == 0
+
+    assert next.state.observation == %{
+             candidate_value: 7,
+             prepared_state_value: 0,
+             previous_value: 0
+           }
+  end
+
+  test "live execution uses the same pure preparation", %{jido: jido} do
+    agent = agent(:ok)
+    source = signal("prepare.run", %{value: 8})
+    {:ok, server} = JidoTest.AgentServerAssertions.start_agent(jido, agent)
+
+    assert {:ok, next, _} = Server.call(server, source)
+    assert next.state.value == 8
+    assert next.state.action_signal_id == source.id
+    assert next.state.prepared_signal_id == source.id
+    assert next.state.prepared_agent_id == agent.id
+    assert next.state.prepared_state_value == 0
+    assert next.state.observation.candidate_value == 8
+  end
+
+  test "reduce can read the prior and candidate state but returns only its owned field" do
+    source = signal("prepare.run", %{value: 9})
+
+    assert {:ok, next, []} = Jido.Agent.cmd(agent(:ok), source)
+    assert next.state.value == 9
+
+    assert next.state.observation == %{
+             candidate_value: 9,
+             prepared_state_value: 0,
+             previous_value: 0
+           }
+  end
+
+  test "reduce must return a valid value for its owned field" do
+    source = signal("prepare.run", %{value: 9})
+
+    assert {:error, error} = Jido.Agent.cmd(agent(:invalid_reduction), source)
+    assert error.message == "Plugin-owned Agent state field is invalid"
+  end
+
+  test "prepare can reject but cannot return a non-portable or invalid input" do
+    source = signal("prepare.run", %{value: 1})
+
+    assert {:error, :denied} = Jido.Agent.cmd(agent(:reject), source)
+
+    assert {:error, invalid} = Jido.Agent.cmd(agent(:invalid), source)
+    assert invalid.message == "Agent Plugin prepare/2 returned an invalid result"
+
+    assert {:error, non_portable} = Jido.Agent.cmd(agent(:non_portable), source)
+    assert non_portable.message == "Agent Plugin prepare/2 returned a non-portable input"
+    assert non_portable.details.code == :non_portable_term
+  end
+
+  test "caller context cannot supply plugin inputs" do
+    source = signal("prepare.run", %{value: 1})
+
+    assert {:error, error} =
+             Jido.Agent.cmd(agent(:ok), source, context: %{plugin_inputs: %{Package => :forged}})
+
+    assert error.message == "Agent command context contains reserved keys"
+    assert error.details.keys == [:plugin_inputs]
+  end
+
+  defp agent(mode) do
+    Jido.Agent.define!(%{
+      name: "plugin_preparation_agent",
+      schema:
+        Zoi.object(%{
+          action_signal_id: Zoi.string() |> Zoi.default(""),
+          prepared_agent_id: Zoi.string() |> Zoi.default(""),
+          prepared_state_value: Zoi.integer() |> Zoi.default(-1),
+          prepared_signal_id: Zoi.string() |> Zoi.default(""),
+          prepared_signal_type: Zoi.string() |> Zoi.default(""),
+          value: Zoi.integer() |> Zoi.default(0)
+        }),
+      routes: [
+        %{
+          path: "prepare.run",
+          handler: %{kind: :action, target: Capture},
+          state: %{source: :output, path: []}
+        }
+      ],
+      plugins: [
+        %{id: Package.id(), provider: Package, vsn: Package.vsn(), data: %{mode: mode}}
+      ]
+    })
+    |> Jido.Agent.instantiate!(id: unique_id("prepared"))
+  end
+end

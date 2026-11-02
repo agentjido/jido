@@ -3,29 +3,41 @@ defmodule Jido.Flow.DSL.InlineStep do
 
   alias Jido.Action.Inline
   alias Jido.Authoring.Options
-  alias Jido.Flow.DSL.{MacroSupport, ValueParser}
+  alias Jido.Flow.DSL.{ValueParser, MacroSupport}
 
   @action_fields [:name, :description, :schema, :output_schema, :context]
-  @step_fields [:needs, :meta, :policy, :timeout_ms, :retry, :on_error]
-  @pending_action :__jido_flow_pending_inline_step__
+  @component_fields [:needs, :meta]
+  @pending_action :__jido_flow_pending_inline_action__
+
+  @type parsed :: %{action: Inline.t(), component_options: keyword()}
 
   @doc false
-  @spec parse!(Macro.t(), keyword(), Macro.Env.t()) :: map() | no_return()
+  @spec parse!(Macro.t(), term(), Macro.Env.t()) :: parsed()
   def parse!(bindings, options, caller) do
-    validate_options!(options, caller)
+    parse!(bindings, options, caller, "inline Step", @component_fields)
+  end
+
+  @doc false
+  @spec parse_parallel_action!(Macro.t(), term(), Macro.Env.t()) :: parsed()
+  def parse_parallel_action!(bindings, options, caller) do
+    parse!(bindings, options, caller, "inline Parallel action", [])
+  end
+
+  defp parse!(bindings, options, caller, label, component_fields) do
+    validate_options!(options, caller, label, component_fields)
 
     case Keyword.get(options, :do) do
-      [{:->, metadata, _clauses} | _rest] ->
+      [{:->, metadata, _} | _] ->
         MacroSupport.compile_error!(
           %{caller | line: Keyword.get(metadata, :line, caller.line)},
-          "use case inside the inline Step body; top-level clause bodies are not supported"
+          "use case inside the #{label} body; top-level clause bodies are not supported"
         )
 
-      _other ->
+      _ ->
         :ok
     end
 
-    action_options = inline_options!(options, caller) ++ Keyword.take(options, [:do])
+    action_options = inline_options!(options, caller, label) ++ Keyword.take(options, [:do])
 
     parsed =
       try do
@@ -34,13 +46,12 @@ defmodule Jido.Flow.DSL.InlineStep do
         error in CompileError ->
           reraise %{
                     error
-                    | description:
-                        String.replace(error.description, "inline Action", "inline Step")
+                    | description: String.replace(error.description, "inline Action", label)
                   },
                   __STACKTRACE__
       end
 
-    validate_sources!(bindings, caller)
+    validate_sources!(bindings, caller, label)
 
     %{
       action: parsed,
@@ -49,33 +60,71 @@ defmodule Jido.Flow.DSL.InlineStep do
   end
 
   @doc false
-  @spec parse!(Macro.t(), keyword(), keyword(), Macro.Env.t()) :: map() | no_return()
+  @spec parse!(Macro.t(), Macro.t(), term(), Macro.Env.t()) :: parsed()
   def parse!(bindings, options, body_options, caller),
-    do: parse!(bindings, merge_options!(options, body_options, caller), caller)
+    do:
+      parse!(
+        bindings,
+        merge_options!(options, body_options, caller, "inline Step"),
+        caller
+      )
 
   @doc false
-  @spec defer!(list()) :: :ok
+  @spec parse_parallel_action!(Macro.t(), Macro.t(), term(), Macro.Env.t()) :: parsed()
+  def parse_parallel_action!(bindings, options, body_options, caller),
+    do:
+      parse_parallel_action!(
+        bindings,
+        merge_options!(options, body_options, caller, "inline Parallel action"),
+        caller
+      )
+
+  @doc false
+  @spec defer!([term()]) :: :ok
   def defer!(args) do
     caller = List.last(args)
     Module.put_attribute(caller.module, @pending_action, args)
   end
 
   @doc false
-  @spec emit!(Macro.Env.t()) :: term()
+  @spec emit!(Macro.Env.t()) :: tuple()
   def emit!(caller) do
     args = Module.delete_attribute(caller.module, @pending_action)
     apply(Inline.Compiler, :create_action!, args)
   end
 
   @doc false
-  @spec declaration_imports(Macro.Env.t()) :: [{module(), [{atom(), arity()}]}]
+  @spec declaration_imports(Macro.Env.t()) :: Inline.remove_imports()
   def declaration_imports(caller) do
     modules =
-      caller.functions
-      |> Keyword.keys()
-      |> Kernel.++(Keyword.keys(caller.macros))
-      |> Enum.uniq()
-      |> Enum.filter(&flow_declaration_module?/1)
+      [
+        Jido.Flow.DSL,
+        Spark.Dsl,
+        Jido.Flow.DSL.Extension,
+        Jido.Flow.DSL.Macros,
+        Jido.Flow.DSL.ParallelMacros,
+        Jido.Flow.DSL.ChoiceMacros,
+        Jido.Flow.DSL.IterateMacros
+      ] ++
+        for segments <- [
+              [],
+              ["Step"],
+              ["Map"],
+              ["Parallel"],
+              ["Parallel", "ParallelAction"],
+              ["Reduce"],
+              ["Choice"],
+              ["Choice", "Option"],
+              ["Choice", "Otherwise"],
+              ["Iterate"],
+              ["Iterate", "State"],
+              ["Invoke"],
+              ["Handoff"],
+              ["Output"]
+            ],
+            suffix <- [[], ["Options"]] do
+          Module.concat([Jido.Flow.DSL.Extension, "Flow"] ++ segments ++ suffix)
+        end
 
     for module <- modules,
         imports =
@@ -84,36 +133,49 @@ defmodule Jido.Flow.DSL.InlineStep do
         do: {module, Enum.uniq(imports)}
   end
 
-  defp flow_declaration_module?(Spark.Dsl), do: true
-
-  defp flow_declaration_module?(module) do
-    String.starts_with?(Atom.to_string(module), "Elixir.Jido.Flow.")
-  end
-
-  defp merge_options!(options, body_options, caller) do
-    validate_options!(options, caller)
-    validate_options!(body_options, caller)
-    options ++ body_options
-  end
-
-  defp validate_options!(options, caller) do
+  defp merge_options!(options, body_options, caller, label) do
     MacroSupport.validate_options!(
       options,
       caller,
-      "inline Step options must be a keyword list",
-      "inline Step field"
+      "#{label} options must be a keyword list",
+      "#{label} field"
     )
+
+    MacroSupport.validate_options!(
+      body_options,
+      caller,
+      "#{label} options must be a keyword list",
+      "#{label} field"
+    )
+
+    options ++ body_options
+  end
+
+  defp validate_options!(options, caller, label, component_fields) do
+    MacroSupport.validate_options!(
+      options,
+      caller,
+      "#{label} options must be a keyword list",
+      "#{label} field"
+    )
+
+    allowed = component_fields ++ [:inline, :do]
+
+    allowed_message =
+      if component_fields == [],
+        do: "; use only inline: and do:",
+        else: "; use only needs:, meta:, inline:, and do:"
 
     Options.allowed!(
       options,
-      @step_fields ++ [:inline, :do],
+      allowed,
       caller,
-      "inline Step field",
-      "; use only needs:, meta:, inline:, and do:"
+      "#{label} field",
+      allowed_message
     )
   end
 
-  defp inline_options!(options, caller) do
+  defp inline_options!(options, caller, label) do
     case Keyword.fetch(options, :inline) do
       :error ->
         []
@@ -122,24 +184,25 @@ defmodule Jido.Flow.DSL.InlineStep do
         MacroSupport.validate_options!(
           inline_options,
           caller,
-          "inline Step settings must be a keyword list",
-          "inline Step setting"
+          "#{label} settings must be a keyword list",
+          "#{label} setting"
         )
 
-        Options.allowed!(inline_options, @action_fields, caller, "inline Step setting")
+        Options.allowed!(inline_options, @action_fields, caller, "#{label} setting")
+
         inline_options
     end
   end
 
-  defp validate_sources!(bindings, caller) do
+  defp validate_sources!(bindings, caller, label) do
     for {:<-, _, [_pattern, source]} <- List.wrap(bindings) do
-      validate_source!(source, caller)
+      validate_source!(source, caller, label)
     end
 
     :ok
   end
 
-  defp validate_source!(source, caller) do
+  defp validate_source!(source, caller, label) do
     with {:ok, expression} <- ValueParser.parse(source),
          :ok <- reject_source_operations(expression) do
       :ok
@@ -147,22 +210,20 @@ defmodule Jido.Flow.DSL.InlineStep do
       {:error, error} ->
         line =
           case source do
-            {_form, metadata, _arguments} -> Keyword.get(metadata, :line, caller.line)
-            _other -> caller.line
+            {_, metadata, _} -> Keyword.get(metadata, :line, caller.line)
+            _ -> caller.line
           end
 
         MacroSupport.compile_error!(
           %{caller | line: line},
-          "inline Step binding source: #{error.message}"
+          "#{label} binding source: #{error.message}"
         )
     end
   end
 
   defp reject_source_operations(%Jido.Expr{}) do
     {:error,
-     Jido.Flow.Error.validation_error(
-       "Flow operations are not allowed; move the calculation into the inline body"
-     )}
+     Jido.Flow.Error.validation_error("Flow operations are not allowed; move the calculation into the inline body")}
   end
 
   defp reject_source_operations(map) when is_map(map) and not is_struct(map) do

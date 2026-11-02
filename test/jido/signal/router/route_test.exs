@@ -25,8 +25,7 @@ defmodule Jido.Signal.Router.RouteTest do
       assert {:ok, [%Route{path: "matched", match: ^match, target: :matched}]} =
                Router.normalize({"matched", match, :matched})
 
-      assert {:ok,
-              [%Route{path: "matched.priority", match: ^match, target: :matched, priority: 20}]} =
+      assert {:ok, [%Route{path: "matched.priority", match: ^match, target: :matched, priority: 20}]} =
                Router.normalize({"matched.priority", match, :matched, 20})
     end
 
@@ -72,8 +71,7 @@ defmodule Jido.Signal.Router.RouteTest do
       assert {:ok, [%Route{path: "matched", match: ^match, target: :matched}]} =
                Router.normalize({"matched", match, :matched})
 
-      assert {:ok,
-              [%Route{path: "matched.priority", match: ^match, target: :matched, priority: 20}]} =
+      assert {:ok, [%Route{path: "matched.priority", match: ^match, target: :matched, priority: 20}]} =
                Router.normalize({"matched.priority", match, :matched, 20})
     end
 
