@@ -1,4 +1,6 @@
 defmodule Jido.Plugin.Scheduler.Occurrence do
+  alias Jido.Joi
+
   @moduledoc """
   Identity for one logical recurring schedule occurrence.
 
@@ -14,22 +16,22 @@ defmodule Jido.Plugin.Scheduler.Occurrence do
 
   @attributes ["jidooccurrenceid", "jidoschedulegen", "jidoscheduledat"]
   @reserved @attributes
-  @schema Zoi.struct(
+  @schema Joi.struct(
             __MODULE__,
             %{
-              id: Zoi.string() |> Zoi.min(1),
-              generation: Zoi.integer() |> Zoi.min(0) |> Zoi.max(2_147_483_647),
-              scheduled_at: Zoi.string() |> Zoi.refine({__MODULE__, :validate_utc, []})
+              id: Joi.string() |> Joi.min(1),
+              generation: Joi.integer() |> Joi.min(0) |> Joi.max(2_147_483_647),
+              scheduled_at: Joi.string() |> Joi.refine({__MODULE__, :validate_utc, []})
             },
             coerce: true
           )
   @typedoc "Validated identity metadata for one recurring schedule occurrence."
-  @type t :: unquote(Zoi.type_spec(@schema))
-  @enforce_keys Zoi.Struct.enforce_keys(@schema)
-  defstruct Zoi.Struct.struct_fields(@schema)
+  @type t :: unquote(Joi.type_spec(@schema))
+  @enforce_keys Joi.Struct.enforce_keys(@schema)
+  defstruct Joi.Struct.struct_fields(@schema)
 
   @doc "Returns the occurrence metadata schema."
-  @spec schema() :: Zoi.schema()
+  @spec schema() :: Joi.schema()
   def schema, do: @schema
 
   @doc false
@@ -69,7 +71,7 @@ defmodule Jido.Plugin.Scheduler.Occurrence do
         {:error, :not_found}
 
       [id, generation, scheduled_at] ->
-        Zoi.parse(@schema, %{id: id, generation: generation, scheduled_at: scheduled_at})
+        Joi.parse(@schema, %{id: id, generation: generation, scheduled_at: scheduled_at})
     end
   end
 end

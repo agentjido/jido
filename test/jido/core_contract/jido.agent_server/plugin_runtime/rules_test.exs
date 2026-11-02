@@ -30,7 +30,7 @@ defmodule JidoTest.AgentServer.PluginRuntime.RulesTest do
 
   defmodule CallbackPlugin do
     use Jido.Plugin
-    def state_spec(_), do: {:owned, Zoi.integer() |> Zoi.default(0)}
+    def state_spec(_), do: {:owned, Jido.Joi.integer() |> Jido.Joi.default(0)}
     def directives(_), do: [Effect]
 
     def child_spec(%Init{options: opts}) do
@@ -80,7 +80,7 @@ defmodule JidoTest.AgentServer.PluginRuntime.RulesTest do
 
   defmodule FirstOutbound do
     use Jido.Plugin
-    def state_spec(_), do: {:first, Zoi.atom() |> Zoi.default(:first)}
+    def state_spec(_), do: {:first, Jido.Joi.atom() |> Jido.Joi.default(:first)}
 
     def prepare_outbound(runtime, signal, context, opts) do
       send(self(), {:outbound, :first, runtime, context.plugin_state, opts[:marker]})
@@ -90,7 +90,7 @@ defmodule JidoTest.AgentServer.PluginRuntime.RulesTest do
 
   defmodule SecondOutbound do
     use Jido.Plugin
-    def state_spec(_), do: {:second, Zoi.atom() |> Zoi.default(:second)}
+    def state_spec(_), do: {:second, Jido.Joi.atom() |> Jido.Joi.default(:second)}
 
     def prepare_outbound(runtime, signal, context, opts) do
       send(self(), {:outbound, :second, runtime, context.plugin_state, opts[:marker]})

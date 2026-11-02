@@ -16,7 +16,7 @@ defmodule JidoTest.AgentServer.Composition.CommitTest do
     use Jido.Agent, name: "composition_runtime_worker"
 
     state do
-      schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0), context: Zoi.map()})
+      schema Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0), context: Jido.Joi.map()})
       initial_state %{count: 1}
     end
 

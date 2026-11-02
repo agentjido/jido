@@ -1,4 +1,5 @@
 defmodule Jido.AI.Reasoning.Adaptive do
+  alias Jido.Joi
   @moduledoc "Selects one existing reasoning Flow with a small local heuristic."
 
   alias Jido.AI.Reasoning.Adaptive.Actions.{Expand, Select}
@@ -9,44 +10,44 @@ defmodule Jido.AI.Reasoning.Adaptive do
     name: "jido_ai_reasoning_adaptive",
     description: "A local decision followed by one normal reasoning Flow",
     schema:
-      Zoi.object(
+      Joi.object(
         %{
-          input: Zoi.union([Zoi.string(), Zoi.list(Zoi.map())]),
-          instructions: Zoi.string() |> Zoi.optional(),
-          model: Zoi.string() |> Zoi.optional(),
-          options: Zoi.map() |> Zoi.optional(),
+          input: Joi.union([Joi.string(), Joi.list(Joi.map())]),
+          instructions: Joi.string() |> Joi.optional(),
+          model: Joi.string() |> Joi.optional(),
+          options: Joi.map() |> Joi.optional(),
           prompt_cache:
-            Zoi.object(
+            Joi.object(
               %{
-                enabled: Zoi.boolean() |> Zoi.default(false),
-                ttl: Zoi.union([Zoi.string(), Zoi.integer(gte: 0)]) |> Zoi.optional()
+                enabled: Joi.boolean() |> Joi.default(false),
+                ttl: Joi.union([Joi.string(), Joi.integer(gte: 0)]) |> Joi.optional()
               },
               unrecognized_keys: :error
             )
-            |> Zoi.optional(),
+            |> Joi.optional(),
           context:
-            Zoi.object(
+            Joi.object(
               %{
-                max_messages: Zoi.integer(gte: 1, lte: 512) |> Zoi.default(64),
-                max_bytes: Zoi.integer(gte: 1_024, lte: 2_000_000) |> Zoi.default(200_000)
+                max_messages: Joi.integer(gte: 1, lte: 512) |> Joi.default(64),
+                max_bytes: Joi.integer(gte: 1_024, lte: 2_000_000) |> Joi.default(200_000)
               },
               unrecognized_keys: :error
             )
-            |> Zoi.optional(),
+            |> Joi.optional(),
           limits:
-            Zoi.object(
+            Joi.object(
               %{
-                elapsed_ms: Zoi.integer(gte: 1, lte: 3_600_000) |> Zoi.optional(),
-                input_tokens: Zoi.integer(gte: 1) |> Zoi.nullable() |> Zoi.optional(),
-                output_tokens: Zoi.integer(gte: 1) |> Zoi.nullable() |> Zoi.optional(),
-                total_tokens: Zoi.integer(gte: 1) |> Zoi.nullable() |> Zoi.optional(),
-                total_cost: Zoi.number(gte: 0) |> Zoi.nullable() |> Zoi.optional()
+                elapsed_ms: Joi.integer(gte: 1, lte: 3_600_000) |> Joi.optional(),
+                input_tokens: Joi.integer(gte: 1) |> Joi.nullable() |> Joi.optional(),
+                output_tokens: Joi.integer(gte: 1) |> Joi.nullable() |> Joi.optional(),
+                total_tokens: Joi.integer(gte: 1) |> Joi.nullable() |> Joi.optional(),
+                total_cost: Joi.number(gte: 0) |> Joi.nullable() |> Joi.optional()
               },
               unrecognized_keys: :preserve
             )
-            |> Zoi.optional(),
+            |> Joi.optional(),
           strategy:
-            Zoi.enum([
+            Joi.enum([
               :react,
               :chain_of_thought,
               :chain_of_draft,
@@ -55,12 +56,12 @@ defmodule Jido.AI.Reasoning.Adaptive do
               :graph_of_thoughts,
               :trm
             ])
-            |> Zoi.nullable()
-            |> Zoi.default(nil)
+            |> Joi.nullable()
+            |> Joi.default(nil)
         },
         unrecognized_keys: :preserve
       ),
-    output_schema: Zoi.object(%{state: Zoi.map(), response: Zoi.map()})
+    output_schema: Joi.object(%{state: Joi.map(), response: Joi.map()})
 
   flow do
     invoke "reason", decision: Select, expander: Expand, params: input()

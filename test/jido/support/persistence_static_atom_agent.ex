@@ -4,6 +4,6 @@ defmodule JidoTest.Persistence.StaticAtomAgent do
   use Jido.Agent, name: "persistence_static_atom_probe"
 
   state do
-    schema Zoi.object(%{jido_static_persistence_probe: Zoi.integer() |> Zoi.default(0)})
+    schema Jido.Joi.object(%{jido_static_persistence_probe: Jido.Joi.integer() |> Jido.Joi.default(0)})
   end
 end

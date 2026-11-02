@@ -9,7 +9,7 @@ defmodule JidoTest.PluginTestAnotherAction do
   @moduledoc false
   use Jido.Action,
     name: "plugin_test_another_action",
-    schema: Zoi.object(%{value: Zoi.integer() |> Zoi.default(0)})
+    schema: Jido.Joi.object(%{value: Jido.Joi.integer() |> Jido.Joi.default(0)})
 
   def run(%{value: value}, _context), do: {:ok, %{value: value}}
 end
@@ -31,7 +31,7 @@ defmodule JidoTest.TestActions do
     use Action,
       name: "basic_action",
       description: "A basic action for testing",
-      schema: Zoi.object(%{value: Zoi.integer()})
+      schema: Jido.Joi.object(%{value: Jido.Joi.integer()})
 
     def run(%{value: value}, _context) do
       {:ok, %{value: value}}

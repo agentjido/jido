@@ -7,7 +7,7 @@ defmodule Jido.Agent.AuthoringPortTest do
     use Jido.Agent, name: "authoring_port_leaf"
 
     state do
-      schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+      schema Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)})
     end
 
     routes do

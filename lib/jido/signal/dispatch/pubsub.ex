@@ -1,4 +1,6 @@
 defmodule Jido.Signal.Dispatch.PubSub do
+  alias Jido.Joi
+
   @moduledoc """
   An adapter for dispatching signals through Phoenix.PubSub.
 
@@ -49,13 +51,13 @@ defmodule Jido.Signal.Dispatch.PubSub do
 
   @behaviour Jido.Signal.Dispatch.Adapter
 
-  @options_schema Zoi.keyword(
+  @options_schema Joi.keyword(
                     [
                       target:
-                        Zoi.atom()
-                        |> Zoi.refine({__MODULE__, :not_nil?, []})
-                        |> Zoi.required(),
-                      topic: Zoi.string() |> Zoi.required()
+                        Joi.atom()
+                        |> Joi.refine({__MODULE__, :not_nil?, []})
+                        |> Joi.required(),
+                      topic: Joi.string() |> Joi.required()
                     ],
                     unrecognized_keys: :error
                   )

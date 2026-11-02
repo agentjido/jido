@@ -12,7 +12,7 @@ defmodule Jido.Agent.DirectiveContractTest do
   defmodule SchemaDirective do
     use Jido.Agent.Directive
 
-    @schema Zoi.struct(__MODULE__, %{value: Zoi.integer()}, coerce: true)
+    @schema Jido.Joi.struct(__MODULE__, %{value: Jido.Joi.integer()}, coerce: true)
     defstruct [:value]
     def schema, do: @schema
   end

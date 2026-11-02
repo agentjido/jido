@@ -87,7 +87,7 @@ defmodule Jido.Flow.CanonicalAuthoringTest.SparkMixedFlow do
     )
 
     iterate("loop") do
-      state(Zoi.map(), initial: %{count: 0})
+      state(Jido.Joi.map(), initial: %{count: 0})
       action(JidoActionTest.Fixtures.Actions.Add)
       params(%{value: state(:count), amount: 1})
       update(%{count: body_result(:value)})
@@ -518,7 +518,7 @@ defmodule Jido.Flow.CanonicalAuthoringTest do
                    name: "iterate",
                    action: Add,
                    params: %{},
-                   state: %{schema: Zoi.map(), initial: %{}, update: %{}},
+                   state: %{schema: Jido.Joi.map(), initial: %{}, update: %{}},
                    needs: ["root"],
                    completion: true,
                    max_iterations: 1
@@ -553,7 +553,7 @@ defmodule Jido.Flow.CanonicalAuthoringTest do
   test "map authoring rejects after for every component kind" do
     option = %{name: "yes", condition: true, action: Add, params: %{}}
     fallback = %{action: Add, params: %{}}
-    state = [schema: Zoi.map(), initial: %{}, update: %{}]
+    state = [schema: Jido.Joi.map(), initial: %{}, update: %{}]
 
     definitions = [
       %{

@@ -23,9 +23,9 @@ defmodule JidoTest.ScheduledOccurrenceFixtures.FastRuntimeAgent do
   use Jido.Agent, name: "fast_runtime_agent", plugins: [{Scheduler, %{time_scale: Clock}}]
 
   state do
-    schema Zoi.object(%{
-             events: Zoi.list(Zoi.any()) |> Zoi.default([]),
-             ticks: Zoi.integer() |> Zoi.default(0)
+    schema Jido.Joi.object(%{
+             events: Jido.Joi.list(Jido.Joi.any()) |> Jido.Joi.default([]),
+             ticks: Jido.Joi.integer() |> Jido.Joi.default(0)
            })
   end
 
@@ -46,9 +46,9 @@ defmodule JidoTest.ScheduledOccurrenceFixtures.TimedAgent do
   use Jido.Agent, name: "timed_occurrence_probe", plugins: [{Scheduler, %{time_scale: Clock}}]
 
   state do
-    schema Zoi.object(%{
-             generation: Zoi.integer() |> Zoi.default(0),
-             ticks: Zoi.list(Zoi.map()) |> Zoi.default([])
+    schema Jido.Joi.object(%{
+             generation: Jido.Joi.integer() |> Jido.Joi.default(0),
+             ticks: Jido.Joi.list(Jido.Joi.map()) |> Jido.Joi.default([])
            })
   end
 
@@ -57,7 +57,7 @@ defmodule JidoTest.ScheduledOccurrenceFixtures.TimedAgent do
 
     route "test.schedule.arm", as: :arm_schedule do
       action input,
-        schema: Zoi.object(%{job_id: Zoi.string() |> Zoi.min(1), cron: Zoi.string()}),
+        schema: Jido.Joi.object(%{job_id: Jido.Joi.string() |> Jido.Joi.min(1), cron: Jido.Joi.string()}),
         context: context do
         generation = context.agent_state.generation + 1
 

@@ -20,8 +20,8 @@ defmodule Jido.AI.OpenTelemetryTest do
       id: "jido.ai/test/traced-tool",
       name: "traced_tool",
       description: "Runs one traced tool operation.",
-      schema: Zoi.object(%{value: Zoi.integer()}),
-      output_schema: Zoi.object(%{value: Zoi.integer()})
+      schema: Jido.Joi.object(%{value: Jido.Joi.integer()}),
+      output_schema: Jido.Joi.object(%{value: Jido.Joi.integer()})
 
     @impl Jido.Action
     def run(%{value: value}, _context) do

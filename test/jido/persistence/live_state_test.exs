@@ -31,9 +31,9 @@ defmodule JidoTest.Persistence.LiveStateTest do
     use Jido.Agent, name: "local_state_agent"
 
     state do
-      schema Zoi.object(%{
-               payload: Zoi.any() |> Zoi.default(<<>>),
-               count: Zoi.integer() |> Zoi.default(0)
+      schema Jido.Joi.object(%{
+               payload: Jido.Joi.any() |> Jido.Joi.default(<<>>),
+               count: Jido.Joi.integer() |> Jido.Joi.default(0)
              })
     end
 
@@ -46,9 +46,9 @@ defmodule JidoTest.Persistence.LiveStateTest do
     use Jido.Agent, name: "local_custom_checkpoint"
 
     state do
-      schema Zoi.object(%{
-               payload: Zoi.any() |> Zoi.default(<<>>),
-               count: Zoi.integer() |> Zoi.default(0)
+      schema Jido.Joi.object(%{
+               payload: Jido.Joi.any() |> Jido.Joi.default(<<>>),
+               count: Jido.Joi.integer() |> Jido.Joi.default(0)
              })
     end
 
@@ -80,7 +80,7 @@ defmodule JidoTest.Persistence.LiveStateTest do
     use Jido.Plugin
 
     def state_spec(_opts),
-      do: {:owned, Zoi.object(%{bits: Zoi.any()}) |> Zoi.default(%{bits: <<>>})}
+      do: {:owned, Jido.Joi.object(%{bits: Jido.Joi.any()}) |> Jido.Joi.default(%{bits: <<>>})}
 
     def reduce(reduction, _opts),
       do: {:ok, Map.get(reduction.signal.data, :owned, reduction.plugin_state)}
@@ -99,9 +99,9 @@ defmodule JidoTest.Persistence.LiveStateTest do
     use Jido.Agent, name: "local_plugin_checkpoint", plugins: [Package]
 
     state do
-      schema Zoi.object(%{
-               payload: Zoi.any() |> Zoi.default(<<>>),
-               count: Zoi.integer() |> Zoi.default(0)
+      schema Jido.Joi.object(%{
+               payload: Jido.Joi.any() |> Jido.Joi.default(<<>>),
+               count: Jido.Joi.integer() |> Jido.Joi.default(0)
              })
     end
 

@@ -126,7 +126,7 @@ defmodule Jido.AgentExtensionsAuthoringTest do
     assert {:ok, from_map} = define(Audit, %{label: "example", enabled: false})
     assert from_map.plugins === left.plugins
     refute function_exported?(Audit, :__jido_plugin__, 0)
-    assert left.schema === Zoi.object(%{})
+    assert left.schema === Jido.Joi.object(%{})
     assert left.routes == [] and left.topology == %{agents: [], connections: []}
   end
 
@@ -413,7 +413,7 @@ defmodule Jido.AgentExtensionsAuthoringTest do
       Agent.define!(%{
         name: "plugin_state",
         module: PluginState,
-        schema: Zoi.object(%{value: Zoi.string() |> Zoi.default("domain")}),
+        schema: Jido.Joi.object(%{value: Jido.Joi.string() |> Jido.Joi.default("domain")}),
         plugins: [contribution(OwnedPlugin, %{initial: 3})]
       })
 
@@ -438,7 +438,7 @@ defmodule Jido.AgentExtensionsAuthoringTest do
     assert {:error, _} =
              Agent.define(%{
                name: "conflict",
-               schema: Zoi.object(%{owned: Zoi.string()}),
+               schema: Jido.Joi.object(%{owned: Jido.Joi.string()}),
                plugins: [entry]
              })
 

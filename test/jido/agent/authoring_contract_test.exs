@@ -20,7 +20,7 @@ defmodule Jido.Agent.AuthoringContractTest do
   @tag obligation: ["jido.agent.I4", "jido.agent.I7", "jido.agent.I11"]
   test "Map authoring and instance options reject ambiguous duplicates" do
     assert {:error, %{code: :invalid_map}} = Agent.define(name: "first", name: "last")
-    definition = Agent.define!(%{name: "state", schema: Zoi.object(%{count: Zoi.integer()})})
+    definition = Agent.define!(%{name: "state", schema: Jido.Joi.object(%{count: Jido.Joi.integer()})})
 
     assert {:error, %{code: :invalid_options, message: message}} =
              Agent.instantiate(definition, id: "a", id: "b")

@@ -1,4 +1,5 @@
 defmodule Jido.AI.Actions.Embed do
+  alias Jido.Joi
   @moduledoc "Generates one embedding or a batch of embeddings."
 
   alias Jido.AI.{InferenceClient, Usage}
@@ -9,12 +10,12 @@ defmodule Jido.AI.Actions.Embed do
     name: "jido_ai_embed",
     description: "Generate embeddings with ReqLLM",
     schema:
-      Zoi.object(%{
-        model: Zoi.string() |> Zoi.default("openai:text-embedding-3-small"),
-        input: Zoi.union([Zoi.string(), Zoi.list(Zoi.string())]),
-        options: Zoi.map() |> Zoi.default(%{})
+      Joi.object(%{
+        model: Joi.string() |> Joi.default("openai:text-embedding-3-small"),
+        input: Joi.union([Joi.string(), Joi.list(Joi.string())]),
+        options: Joi.map() |> Joi.default(%{})
       }),
-    output_schema: Zoi.map()
+    output_schema: Joi.map()
 
   @impl Jido.Action
   def run(%{model: model, input: input, options: options}, context) do

@@ -16,7 +16,7 @@ contract coverage.
 
 ### jido_action.action.I1 — Generated metadata describes the declared Action
 - **scope:** `Jido.Action.__using__/1`
-- **must:** Generate name/0, description/0, schema/0, output_schema/0, and authoring_contract/0 from the declared options. Preserve the static input and output schemas. Use `Zoi.map()` when schemas are absent. Reject non-Zoi schema values. Return JSON-safe descriptions and report schemas or metadata that cannot be represented as JSON. Retain the Action kind; shared Flow modules retain their Flow kind and cannot be selected as Actions. Generated validators use the declared schemas and input preparation callback. Tool description projection can fail when authoring_contract/0 is called even after successful compilation.
+- **must:** Generate name/0, description/0, schema/0, output_schema/0, and authoring_contract/0 from the declared options. Preserve the static input and output schemas. Use `Joi.map()` when schemas are absent. Reject non-Joi schema values. Return JSON-safe descriptions and report schemas or metadata that cannot be represented as JSON. Retain the Action kind; shared Flow modules retain their Flow kind and cannot be selected as Actions. Generated validators use the declared schemas and input preparation callback. Tool description projection can fail when authoring_contract/0 is called even after successful compilation.
 - **kind:** functional
 - **status:** active
 

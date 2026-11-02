@@ -9,11 +9,11 @@ defmodule Jido.Agent.SchemaTest do
     @moduledoc false
 
     def schema do
-      Zoi.object(%{
-        count: Zoi.integer() |> Zoi.default(0),
-        history: Zoi.list(Zoi.string()) |> Zoi.default([])
+      Jido.Joi.object(%{
+        count: Jido.Joi.integer() |> Jido.Joi.default(0),
+        history: Jido.Joi.list(Jido.Joi.string()) |> Jido.Joi.default([])
       })
-      |> Zoi.refine({__MODULE__, :within_bound, []})
+      |> Jido.Joi.refine({__MODULE__, :within_bound, []})
     end
 
     def within_bound(%{count: count}, _opts) when count <= 1, do: :ok
@@ -32,7 +32,7 @@ defmodule Jido.Agent.SchemaTest do
     @behaviour Jido.Plugin
 
     @impl true
-    def state_spec(_opts), do: {:owned, Zoi.integer() |> Zoi.default(0)}
+    def state_spec(_opts), do: {:owned, Jido.Joi.integer() |> Jido.Joi.default(0)}
   end
 
   defmodule RequiredState do
@@ -47,7 +47,7 @@ defmodule Jido.Agent.SchemaTest do
     @behaviour Jido.Plugin
 
     @impl true
-    def state_spec(_opts), do: {:owned, Zoi.integer()}
+    def state_spec(_opts), do: {:owned, Jido.Joi.integer()}
   end
 
   defmodule ConfiguredState do
@@ -62,7 +62,7 @@ defmodule Jido.Agent.SchemaTest do
     @behaviour Jido.Plugin
 
     @impl true
-    def state_spec(opts), do: {:owned, Zoi.integer() |> Zoi.min(Keyword.fetch!(opts, :minimum))}
+    def state_spec(opts), do: {:owned, Jido.Joi.integer() |> Jido.Joi.min(Keyword.fetch!(opts, :minimum))}
   end
 
   defmodule PlainAgent do
@@ -138,7 +138,7 @@ defmodule Jido.Agent.SchemaTest do
 
     changed = %{
       changed
-      | schema: Zoi.object(%{count: Zoi.string(), history: Zoi.list(Zoi.string())})
+      | schema: Jido.Joi.object(%{count: Jido.Joi.string(), history: Jido.Joi.list(Jido.Joi.string())})
     }
 
     assert {:error, %{__exception__: true}} = Jido.Agent.validate(changed)
@@ -151,10 +151,10 @@ defmodule Jido.Agent.SchemaTest do
     @tag agent_module: agent_module
     test "construction enforces the root refinement #{label}", %{agent_module: agent_module} do
       assert {:ok, %{count: 0, history: []}} =
-               Zoi.parse(agent_module.definition().schema, %{count: 0, history: []})
+               Jido.Joi.parse(agent_module.definition().schema, %{count: 0, history: []})
 
       assert {:error, [_ | _]} =
-               Zoi.parse(agent_module.definition().schema, %{count: 2, history: []})
+               Jido.Joi.parse(agent_module.definition().schema, %{count: 2, history: []})
 
       assert {:error, %{__exception__: true}} =
                agent_module.instantiate(id: "invalid", state: %{count: 2})

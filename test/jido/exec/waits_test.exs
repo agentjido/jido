@@ -224,7 +224,7 @@ defmodule Jido.Exec.WaitsTest do
 
     registry =
       Jido.Authoring.Registry.new!(%{
-        {"map", 1} => {:schema, Zoi.map()},
+        {"map", 1} => {:schema, Jido.Joi.map()},
         {"id", 1} => {:atom, :id}
       })
 

@@ -137,7 +137,7 @@ defmodule Jido.Flow.UnknownKeyValidationTest do
         output: %{}
       })
 
-    registry = Registry.new!(%{{"add", 1} => {:action, Add}, {"map", 1} => {:schema, Zoi.map()}})
+    registry = Registry.new!(%{{"add", 1} => {:action, Add}, {"map", 1} => {:schema, Jido.Joi.map()}})
     assert {:ok, document} = Codec.encode(flow, registry)
     refute Map.has_key?(document, "schema")
     refute Map.has_key?(document, "output_schema")

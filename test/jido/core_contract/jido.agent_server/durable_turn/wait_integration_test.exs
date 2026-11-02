@@ -8,7 +8,7 @@ defmodule JidoTest.AgentServer.DurableTurn.WaitIntegrationTest do
   defmodule Approval do
     use Jido.Flow,
       name: "core_wait_approval",
-      schema: Zoi.object(%{request_id: Zoi.string()})
+      schema: Jido.Joi.object(%{request_id: Jido.Joi.string()})
 
     flow do
       step "before", input <- input() do
@@ -176,7 +176,7 @@ defmodule JidoTest.AgentServer.DurableTurn.WaitIntegrationTest do
     use Jido.Agent, name: "core_wait_agent"
 
     state do
-      schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+      schema Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)})
     end
 
     routes do

@@ -46,14 +46,14 @@ defmodule Jido.Exec.HandoffTest do
   end
 
   defmodule Target do
-    use Jido.Action, name: "handoff_target", schema: Zoi.object(%{value: Zoi.integer()})
+    use Jido.Action, name: "handoff_target", schema: Jido.Joi.object(%{value: Jido.Joi.integer()})
     def run(_params, _context), do: raise("successor must run in a new Turn")
   end
 
   defmodule PortableTarget do
     use Jido.Action,
       name: "handoff_portable_target",
-      schema: Zoi.object(%{value: Zoi.integer(), resource: Zoi.any()})
+      schema: Jido.Joi.object(%{value: Jido.Joi.integer(), resource: Jido.Joi.any()})
 
     def run(_params, _context), do: raise("successor must run in a new Turn")
   end
@@ -260,7 +260,7 @@ defmodule Jido.Exec.HandoffTest do
 
     registry =
       Registry.new!(%{
-        {"map", 1} => {:schema, Zoi.map()},
+        {"map", 1} => {:schema, Jido.Joi.map()},
         {"decide", 1} => {:action, Decide},
         {"expand", 1} => {:action, Expand},
         {"value", 1} => {:atom, :value}

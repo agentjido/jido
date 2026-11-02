@@ -26,7 +26,7 @@ defmodule JidoTest.AgentServer.PluginRuntime.ConfigurationSupport do
 
   defmodule Cache do
     use Jido.Plugin
-    def state_spec(_), do: {:cache, Zoi.integer() |> Zoi.default(5)}
+    def state_spec(_), do: {:cache, Jido.Joi.integer() |> Jido.Joi.default(5)}
     def child_spec(init), do: %{id: __MODULE__, start: {Root, :start_link, [init]}}
 
     def quiesce(runtime, opts) do
@@ -57,7 +57,7 @@ defmodule JidoTest.AgentServer.PluginRuntime.ConfigurationSupport do
 
   defmodule CacheTwo do
     use Jido.Plugin
-    def state_spec(_), do: {:cache_two, Zoi.integer() |> Zoi.default(7)}
+    def state_spec(_), do: {:cache_two, Jido.Joi.integer() |> Jido.Joi.default(7)}
     def child_spec(init), do: %{id: __MODULE__, start: {Root, :start_link, [init]}}
 
     def quiesce(runtime, opts) do
@@ -76,7 +76,7 @@ defmodule JidoTest.AgentServer.PluginRuntime.ConfigurationSupport do
   def agent(topology \\ %{}, plugins \\ []) do
     Agent.define!(%{
       name: "composed",
-      schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}),
+      schema: Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)}),
       routes: [
         %{
           path: "work",

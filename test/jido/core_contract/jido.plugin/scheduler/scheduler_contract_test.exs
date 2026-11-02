@@ -164,12 +164,12 @@ defmodule JidoTest.Contract.PluginSchedulerTest do
 
     for generation <- [0, 2_147_483_647] do
       valid = Scheduler.build_cron_spec("* * * * *", tick(), nil, generation)
-      assert {:ok, _state} = Zoi.parse(schema, %{cron: %{boundary: valid}})
+      assert {:ok, _state} = Jido.Joi.parse(schema, %{cron: %{boundary: valid}})
     end
 
     for generation <- [-1, 2_147_483_648] do
       invalid = Scheduler.build_cron_spec("* * * * *", tick(), nil, generation)
-      assert {:error, _errors} = Zoi.parse(schema, %{cron: %{boundary: invalid}})
+      assert {:error, _errors} = Jido.Joi.parse(schema, %{cron: %{boundary: invalid}})
     end
 
     for retired <- [
@@ -178,7 +178,7 @@ defmodule JidoTest.Contract.PluginSchedulerTest do
           %{last_scheduled_at: nil}
         ] do
       state = %{cron: %{old: Map.merge(base, retired)}}
-      assert {:error, errors} = Zoi.parse(schema, state)
+      assert {:error, errors} = Jido.Joi.parse(schema, state)
       assert Enum.any?(errors, &(&1.code == :unrecognized_key))
     end
   end
@@ -365,7 +365,7 @@ defmodule JidoTest.Contract.PluginSchedulerTest do
     assert {:ok, first} = Occurrence.attach(first, @scope, "job-1", 1, @instant)
     assert {:ok, second} = Occurrence.attach(second, @scope, "job-1", 1, @instant)
     assert {:ok, %Occurrence{} = occurrence} = Scheduler.occurrence(first)
-    assert {:ok, ^occurrence} = Zoi.parse(Occurrence.schema(), Map.from_struct(occurrence))
+    assert {:ok, ^occurrence} = Jido.Joi.parse(Occurrence.schema(), Map.from_struct(occurrence))
     assert {:ok, ^occurrence} = Scheduler.occurrence(second)
     assert occurrence.id == "occ_JEa_q126OmcNwQorAlhQjtFbE93wjJ-qFlReVurgnHg"
     assert first.data == %{value: 7}

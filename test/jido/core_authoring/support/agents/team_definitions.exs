@@ -11,10 +11,10 @@ defmodule JidoTest.ComposableAgent.Definitions.Team do
   alias __MODULE__.{RecordReport, Worker}
 
   state do
-    schema Zoi.object(%{
-             query: Zoi.string() |> Zoi.default(""),
-             workers: Zoi.integer() |> Zoi.default(2),
-             report: Zoi.string() |> Zoi.default("")
+    schema Jido.Joi.object(%{
+             query: Jido.Joi.string() |> Jido.Joi.default(""),
+             workers: Jido.Joi.integer() |> Jido.Joi.default(2),
+             report: Jido.Joi.string() |> Jido.Joi.default("")
            })
   end
 
@@ -23,7 +23,7 @@ defmodule JidoTest.ComposableAgent.Definitions.Team do
 
     route "research.query.set", as: :set_query, defaults: %{query: ""} do
       action %{query: query},
-        schema: Zoi.object(%{query: Zoi.string()}),
+        schema: Jido.Joi.object(%{query: Jido.Joi.string()}),
         context: context do
         {:ok, %{context.agent_state | query: query}}
       end
@@ -115,7 +115,7 @@ end
 defmodule JidoTest.ComposableAgent.Definitions.Team.RecordReport do
   use Jido.Action,
     name: "agent_record_report",
-    schema: Zoi.object(%{report: Zoi.string()})
+    schema: Jido.Joi.object(%{report: Jido.Joi.string()})
 
   def run(%{report: report}, %{agent_state: state}) do
     {:ok, %{state | report: report}, [Jido.Agent.Directive.emit("research.report.recorded", %{report: report})]}
@@ -126,9 +126,9 @@ defmodule JidoTest.ComposableAgent.Definitions.Team.Worker do
   use Jido.Agent, name: "research_worker"
 
   state do
-    schema Zoi.object(%{
-             query: Zoi.string() |> Zoi.default(""),
-             status: Zoi.string() |> Zoi.default("idle")
+    schema Jido.Joi.object(%{
+             query: Jido.Joi.string() |> Jido.Joi.default(""),
+             status: Jido.Joi.string() |> Jido.Joi.default("idle")
            })
   end
 
@@ -137,7 +137,7 @@ defmodule JidoTest.ComposableAgent.Definitions.Team.Worker do
 
     route "research.work.request" do
       action %{query: query},
-        schema: Zoi.object(%{query: Zoi.string()}),
+        schema: Jido.Joi.object(%{query: Jido.Joi.string()}),
         context: context do
         next_state = %{context.agent_state | query: query, status: "completed"}
         report = "Research findings for: #{query}"
@@ -147,7 +147,7 @@ defmodule JidoTest.ComposableAgent.Definitions.Team.Worker do
 
     route "research.plan.request" do
       action %{query: query},
-        schema: Zoi.object(%{query: Zoi.string()}),
+        schema: Jido.Joi.object(%{query: Jido.Joi.string()}),
         context: context do
         next_state = %{context.agent_state | query: query, status: "planned"}
         {:ok, next_state, [emit("research.work.request", %{query: query})]}

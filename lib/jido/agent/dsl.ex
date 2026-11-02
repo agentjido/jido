@@ -1,4 +1,5 @@
 defmodule Jido.Agent.DSL do
+  alias Jido.Joi
   @moduledoc false
   alias Jido.Agent.{Error, Extension, Validation}
   alias Spark.Dsl.Extension, as: E
@@ -53,7 +54,7 @@ defmodule Jido.Agent.DSL do
       def vsn, do: @agent_definition.vsn
 
       @doc "Returns the complete state schema, including Plugin-owned fields."
-      @spec schema() :: Zoi.schema()
+      @spec schema() :: Joi.schema()
       def schema, do: Jido.Agent.schema(definition())
 
       @doc false
@@ -140,7 +141,7 @@ defmodule Jido.Agent.DSL do
           |> Map.new()
           |> Map.merge(%{
             module: module,
-            schema: E.get_opt(dsl, [:__state__], :schema, Zoi.object(%{})),
+            schema: E.get_opt(dsl, [:__state__], :schema, Joi.object(%{})),
             initial_state: E.get_opt(dsl, [:__state__], :initial_state, %{}),
             signal_source: E.get_opt(dsl, [:__routes__], :signal_source),
             routes:

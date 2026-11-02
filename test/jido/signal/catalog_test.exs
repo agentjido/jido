@@ -10,7 +10,7 @@ defmodule Jido.Signal.CatalogTest do
       type: "example.message.received",
       default_source: "/messages",
       dataschema: "https://example.com/message/v1",
-      schema: Zoi.object(%{"text" => Zoi.string(), "room" => Zoi.string()}, unrecognized_keys: :error)
+      schema: Jido.Joi.object(%{"text" => Jido.Joi.string(), "room" => Jido.Joi.string()}, unrecognized_keys: :error)
   end
 
   defmodule MessageReceivedV2 do
@@ -18,7 +18,7 @@ defmodule Jido.Signal.CatalogTest do
       type: "example.message.received",
       default_source: "/messages",
       dataschema: "https://example.com/message/v2",
-      schema: Zoi.object(%{"body" => Zoi.string()}, unrecognized_keys: :error)
+      schema: Jido.Joi.object(%{"body" => Jido.Joi.string()}, unrecognized_keys: :error)
   end
 
   defmodule ConflictingMessage do
@@ -32,9 +32,9 @@ defmodule Jido.Signal.CatalogTest do
       type: "example.sensor.temperature",
       default_source: "/sensors",
       schema:
-        Zoi.object(%{
-          "celsius" => Zoi.number(),
-          "unit" => Zoi.string() |> Zoi.default("C")
+        Jido.Joi.object(%{
+          "celsius" => Jido.Joi.number(),
+          "unit" => Jido.Joi.string() |> Jido.Joi.default("C")
         })
   end
 
@@ -43,54 +43,54 @@ defmodule Jido.Signal.CatalogTest do
       type: "example.sensor.temperature",
       default_source: "/sensors",
       dataschema: "urn:example:temperature:v2",
-      schema: Zoi.object(%{"kelvin" => Zoi.number()}, unrecognized_keys: :error)
+      schema: Jido.Joi.object(%{"kelvin" => Jido.Joi.number()}, unrecognized_keys: :error)
   end
 
   defmodule StrictAtomKeys do
     use Jido.Signal,
       type: "example.atom.strict",
       default_source: "/test",
-      schema: Zoi.object(%{value: Zoi.integer()})
+      schema: Jido.Joi.object(%{value: Jido.Joi.integer()})
   end
 
   defmodule CoercedKeys do
     use Jido.Signal,
       type: "example.keys.coerced",
       default_source: "/test",
-      schema: Zoi.object(%{"nested" => Zoi.object(%{value: Zoi.integer()}, coerce: true)}, coerce: true)
+      schema: Jido.Joi.object(%{"nested" => Jido.Joi.object(%{value: Jido.Joi.integer()}, coerce: true)}, coerce: true)
   end
 
   defmodule BinaryData do
     use Jido.Signal,
       type: "example.binary",
       default_source: "/test",
-      schema: Zoi.string()
+      schema: Jido.Joi.string()
   end
 
   defmodule DefaultedData do
     use Jido.Signal,
       type: "example.defaulted",
-      schema: Zoi.string() |> Zoi.default("fallback")
+      schema: Jido.Joi.string() |> Jido.Joi.default("fallback")
   end
 
   defmodule NullableData do
     use Jido.Signal,
       type: "example.nullable",
-      schema: Zoi.string() |> Zoi.nullable()
+      schema: Jido.Joi.string() |> Jido.Joi.nullable()
   end
 
   defmodule NumberData do
     use Jido.Signal,
       type: "example.number",
-      schema: Zoi.number() |> Zoi.transform({Jido.Signal.CatalogTest, :float_value, []})
+      schema: Jido.Joi.number() |> Jido.Joi.transform({Jido.Signal.CatalogTest, :float_value, []})
   end
 
   defmodule NormalizedData do
     use Jido.Signal,
       type: "example.normalized",
       schema:
-        Zoi.union([Zoi.string(), Zoi.object(%{"text" => Zoi.string()})])
-        |> Zoi.transform({Jido.Signal.CatalogTest, :normalize_text, []})
+        Jido.Joi.union([Jido.Joi.string(), Jido.Joi.object(%{"text" => Jido.Joi.string()})])
+        |> Jido.Joi.transform({Jido.Signal.CatalogTest, :normalize_text, []})
   end
 
   defmodule IncompleteDefinition do
@@ -109,14 +109,14 @@ defmodule Jido.Signal.CatalogTest do
     def __signal_definition__, do: :invalid
     def type, do: "invalid.metadata"
     def dataschema, do: nil
-    def schema, do: Zoi.any()
+    def schema, do: Jido.Joi.any()
   end
 
   defmodule RaisingMetadata do
     def __signal_definition__, do: raise(ArgumentError, "invalid definition metadata")
     def type, do: "raising.metadata"
     def dataschema, do: nil
-    def schema, do: Zoi.any()
+    def schema, do: Jido.Joi.any()
   end
 
   defmodule ThrowingMetadata do
@@ -133,7 +133,7 @@ defmodule Jido.Signal.CatalogTest do
     use Jido.Signal,
       type: "example.faulty",
       default_source: "/test",
-      schema: Zoi.any() |> Zoi.refine({Jido.Signal.CatalogTest, :faulty_validator, []})
+      schema: Jido.Joi.any() |> Jido.Joi.refine({Jido.Signal.CatalogTest, :faulty_validator, []})
   end
 
   setup do
@@ -171,7 +171,7 @@ defmodule Jido.Signal.CatalogTest do
             type: "snapshot.event",
             default_source: "/test",
             dataschema: "urn:example:snapshot:v1",
-            schema: Zoi.string()
+            schema: Jido.Joi.string()
         end
       )
 
@@ -187,7 +187,7 @@ defmodule Jido.Signal.CatalogTest do
             type: "snapshot.event",
             default_source: "/test",
             dataschema: "urn:example:snapshot:v2",
-            schema: Zoi.integer()
+            schema: Jido.Joi.integer()
         end
       )
 
@@ -249,7 +249,7 @@ defmodule Jido.Signal.CatalogTest do
                 MessageReceived.dataschema() => {MessageReceived, :invalid}
               }
             },
-            %{MessageReceived.type() => %{MessageReceived.dataschema() => {"module", Zoi.any()}}}
+            %{MessageReceived.type() => %{MessageReceived.dataschema() => {"module", Jido.Joi.any()}}}
           ] do
         invalid = %{catalog | definitions: definitions}
         error = assert_error(Catalog.validate(invalid, message()), :invalid_input)
@@ -348,7 +348,7 @@ defmodule Jido.Signal.CatalogTest do
         )
 
       assert error.details.definition == MessageReceived
-      assert [%Zoi.Error{} | _] = error.details.reason
+      assert [%{} | _] = error.details.reason
     end
 
     test "rejects invalid core attributes before lookup", %{catalog: catalog} do

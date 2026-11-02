@@ -1,8 +1,6 @@
-defmodule Jido.Schema do
+defmodule Jido.Joi.Runtime do
   @moduledoc false
 
-  # Hex Zoi parses input. Jido additionally needs checked defaults at creation
-  # and validation that cannot insert defaults or change committed values.
   alias Zoi.Types.Meta
 
   defmodule Node do
@@ -11,34 +9,46 @@ defmodule Jido.Schema do
   end
 
   defimpl Zoi.Type, for: Node do
-    def parse(node, input, _opts), do: Jido.Schema.parse(node.schema, input, node.mode)
+    def parse(node, input, opts) do
+      Jido.Joi.Runtime.parse(node.schema, input, node.mode, Keyword.delete(opts, :ctx))
+    end
   end
 
-  def validate(schema, input) do
-    case parse(schema, input, :stored) do
+  def initialize(schema, input, opts) do
+    case parse(schema, input, :initialize, opts) do
+      {:ok, initialized} ->
+        if preserves?(input, initialized), do: {:ok, initialized}, else: changed_value()
+
+      {:error, _errors} = error ->
+        error
+    end
+  end
+
+  def validate(schema, input, opts) do
+    case parse(schema, input, :stored, opts) do
       {:ok, ^input} -> :ok
-      {:ok, _changed} -> invalid("Validation cannot change stored values")
+      {:ok, _changed} -> changed_value()
       {:error, _} = error -> error
     end
   end
 
-  def parse(schema, input, mode) do
+  def parse(schema, input, mode, opts \\ []) do
     input =
       if mode == :initialize and is_nil(input) and Meta.default?(schema.meta),
         do: Meta.default(schema.meta),
         else: input
 
-    with {:ok, value} <- parse_type(schema, input, mode),
+    with {:ok, value} <- parse_type(schema, input, mode, opts),
          do: refine(schema, value)
   end
 
-  defp parse_type(%Zoi.Types.Intersection{schemas: [first | rest]}, input, mode) do
-    with {:ok, first} <- parse(first, input, mode) do
-      intersect(rest, first, input, mode)
+  defp parse_type(%Zoi.Types.Intersection{schemas: [first | rest]}, input, mode, opts) do
+    with {:ok, first} <- parse(first, input, mode, opts) do
+      intersect(rest, first, input, mode, opts)
     end
   end
 
-  defp parse_type(schema, input, mode) do
+  defp parse_type(schema, input, mode, opts) do
     prepared =
       schema
       |> Map.from_struct()
@@ -58,12 +68,12 @@ defmodule Jido.Schema do
       end)
       |> then(&struct!(schema.__struct__, &1))
 
-    Zoi.parse(prepared, defaults(schema, input, mode))
+    Zoi.parse(prepared, defaults(schema, input, mode), opts)
   end
 
-  defp intersect(schemas, first, input, mode) do
+  defp intersect(schemas, first, input, mode, opts) do
     Enum.reduce_while(schemas, {:ok, first}, fn schema, {:ok, previous} ->
-      with {:ok, value} <- parse(schema, input, mode),
+      with {:ok, value} <- parse(schema, input, mode, opts),
            {:ok, merged} <- merge(previous, value) do
         {:cont, {:ok, merged}}
       else
@@ -72,8 +82,6 @@ defmodule Jido.Schema do
     end)
   end
 
-  # Wrap child schemas so Hex Zoi retains container parsing and error paths,
-  # while each child passes through the same Jido rules exactly once.
   defp children(%{meta: %Meta{}} = schema, mode) do
     required =
       if Meta.default?(schema.meta) and schema.meta.required != false,
@@ -129,7 +137,7 @@ defmodule Jido.Schema do
 
       case Meta.run_effects(context) do
         {:ok, %{parsed: ^value}} -> {:cont, {:ok, value}}
-        {:ok, _changed} -> {:halt, invalid("State refinements cannot change values")}
+        {:ok, _changed} -> {:halt, changed_value()}
         {:error, context} -> {:halt, {:error, context.errors}}
       end
     end)
@@ -158,5 +166,27 @@ defmodule Jido.Schema do
 
   defp merge(_left, _right), do: invalid("Intersection branches produced conflicting values")
 
+  defp preserves?(input, output) when is_map(input) and is_map(output) do
+    Enum.all?(Map.to_list(input), fn {key, value} ->
+      Map.has_key?(output, key) and preserves?(value, Map.fetch!(output, key))
+    end)
+  end
+
+  defp preserves?([left | rest], [right | tail]),
+    do: preserves?(left, right) and preserves?(rest, tail)
+
+  defp preserves?(nil, _output), do: true
+  defp preserves?(input, output), do: input === output
+
   defp invalid(message), do: {:error, [Zoi.Error.custom_error(issue: {message, []})]}
+
+  defp changed_value do
+    {:error,
+     [
+       Zoi.Error.new(
+         code: :joi_changed_value,
+         message: "Validation cannot change stored values"
+       )
+     ]}
+  end
 end

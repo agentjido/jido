@@ -12,6 +12,6 @@
 
 - id: generic-plugin-mutation-profile
   date: 2026-10-19
-  decision: Mutate Jido.Plugin, Manifest, Normalizer, Codec, Input, and Error. Keep Spec and Zoi-backed context structs outside the mutation profile as data declarations.
+  decision: Mutate Jido.Plugin, Manifest, Normalizer, Codec, Input, and Error. Keep Spec and Joi-backed context structs outside the mutation profile as data declarations.
   driver: The selected modules contain generic behavior. The excluded modules are data shapes that focused contract tests validate directly.
   approved_by: Generic Plugin extraction

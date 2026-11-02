@@ -3,7 +3,7 @@ defmodule JidoTest.Persistence.CheckpointIdentityProbe do
   use Jido.Agent, name: "test_checkpoint_identity"
 
   state do
-    schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+    schema Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)})
   end
 
   def store_mismatched_checkpoint(store, requested_id, checkpoint_id) do
@@ -23,7 +23,7 @@ defmodule JidoTest.Persistence.CheckpointPortabilityProbe do
   use Jido.Agent, name: "test_checkpoint_portability"
 
   state do
-    schema Zoi.object(%{payload: Zoi.map() |> Zoi.default(%{})})
+    schema Jido.Joi.object(%{payload: Jido.Joi.map() |> Jido.Joi.default(%{})})
   end
 
   def store_payload(store, id, payload) do
@@ -44,7 +44,7 @@ defmodule JidoTest.Persistence.IndeterminateWriteProbe do
   use Jido.Agent, name: "test_indeterminate_write"
 
   state do
-    schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+    schema Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)})
   end
 
   routes do
@@ -52,7 +52,7 @@ defmodule JidoTest.Persistence.IndeterminateWriteProbe do
 
     route "test.persistence.indeterminate_write.increment", as: :increment do
       action input,
-        schema: Zoi.object(%{request_id: Zoi.string() |> Zoi.min(1), amount: Zoi.integer()}),
+        schema: Jido.Joi.object(%{request_id: Jido.Joi.string() |> Jido.Joi.min(1), amount: Jido.Joi.integer()}),
         context: context do
         next = %{context.agent_state | count: context.agent_state.count + input.amount}
 

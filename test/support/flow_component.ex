@@ -58,7 +58,7 @@ defmodule JidoActionTest.FlowComponent do
   def fallback!(attrs), do: unwrap!(fallback(attrs))
 
   def state(attrs) do
-    attrs = attrs |> attributes!() |> Map.put_new(:schema, Zoi.map())
+    attrs = attrs |> attributes!() |> Map.put_new(:schema, Jido.Joi.map())
 
     with {:ok, {_name, %{state: state}}} <-
            Definition.component(%{

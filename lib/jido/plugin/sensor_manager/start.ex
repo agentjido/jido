@@ -1,31 +1,32 @@
 defmodule Jido.Plugin.SensorManager.Start do
+  alias Jido.Joi
   @moduledoc "Declares one desired sensor process."
 
   alias Jido.Plugin.SensorManager
 
-  @schema Zoi.struct(
+  @schema Joi.struct(
             __MODULE__,
             %{
-              tag: Zoi.any(description: "Stable sensor tag"),
-              sensor: Zoi.module(description: "Sensor OTP module"),
-              config: Zoi.map(description: "Portable sensor configuration") |> Zoi.default(%{})
+              tag: Joi.any(description: "Stable sensor tag"),
+              sensor: Joi.module(description: "Sensor OTP module"),
+              config: Joi.map(description: "Portable sensor configuration") |> Joi.default(%{})
             },
             coerce: true
           )
 
   @typedoc "A Directive that adds or replaces one managed sensor."
-  @type t :: unquote(Zoi.type_spec(@schema))
-  @enforce_keys Zoi.Struct.enforce_keys(@schema)
-  defstruct Zoi.Struct.struct_fields(@schema)
+  @type t :: unquote(Joi.type_spec(@schema))
+  @enforce_keys Joi.Struct.enforce_keys(@schema)
+  defstruct Joi.Struct.struct_fields(@schema)
 
   @doc false
-  @spec schema() :: Zoi.schema()
+  @spec schema() :: Joi.schema()
   def schema, do: @schema
 
   @doc "Validates one portable desired sensor declaration."
   @spec validate(t()) :: {:ok, t()} | {:error, term()}
   def validate(%__MODULE__{} = directive) do
-    with {:ok, directive} <- Zoi.parse(@schema, Map.from_struct(directive)),
+    with {:ok, directive} <- Joi.parse(@schema, Map.from_struct(directive)),
          :ok <- SensorManager.validate_tag(directive.tag),
          :ok <- SensorManager.validate_sensor(directive.sensor) do
       case Jido.PortableTerm.validate(directive.config, :config) do

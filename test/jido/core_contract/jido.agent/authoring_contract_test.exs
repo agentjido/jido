@@ -7,7 +7,7 @@ defmodule JidoTest.Contract.AgentAuthoringTest do
     use Jido.Agent, name: "contract_leaf"
 
     state do
-      schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+      schema Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)})
     end
 
     routes do
@@ -21,7 +21,7 @@ defmodule JidoTest.Contract.AgentAuthoringTest do
     use Jido.Agent, name: "contract_typed_leaf"
 
     state do
-      schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+      schema Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)})
     end
 
     routes do
@@ -63,7 +63,7 @@ defmodule JidoTest.Contract.AgentAuthoringTest do
       plugins: [{JidoTest.AgentContract.First, %{initial: 3}}]
 
     state do
-      schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+      schema Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)})
       initial_state %{count: 2}
     end
 
@@ -88,7 +88,7 @@ defmodule JidoTest.Contract.AgentAuthoringTest do
     use Jido.Agent, name: "contract_route_forms"
 
     state do
-      schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+      schema Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)})
     end
 
     routes do
@@ -113,7 +113,7 @@ defmodule JidoTest.Contract.AgentAuthoringTest do
       end
 
       route "route.inline_flow" do
-        flow schema: Zoi.object(%{amount: Zoi.integer()}) do
+        flow schema: Jido.Joi.object(%{amount: Jido.Joi.integer()}) do
           step "add",
             action: JidoTest.AgentContract.Add,
             params: %{amount: input(:amount)}
@@ -149,7 +149,7 @@ defmodule JidoTest.Contract.AgentAuthoringTest do
       Agent.define!(%{
         name: "contract_leaf",
         module: Leaf,
-        schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}),
+        schema: Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)}),
         signal_source: "/contract",
         routes: [
           %{
@@ -161,15 +161,15 @@ defmodule JidoTest.Contract.AgentAuthoringTest do
       })
 
     assert from_map === Leaf.definition()
-    assert {:ok, ^from_map} = Zoi.parse(Agent.__schema__(), from_map)
+    assert {:ok, ^from_map} = Jido.Joi.parse(Agent.__schema__(), from_map)
 
     assert {:error, _issues} =
-             Zoi.parse(Agent.__schema__(), %{from_map | name: "", vsn: 0})
+             Jido.Joi.parse(Agent.__schema__(), %{from_map | name: "", vsn: 0})
 
     defaults = Agent.__defaults__()
     assert defaults.name == nil
     assert defaults.vsn == 1
-    assert defaults.schema == Zoi.object(%{})
+    assert defaults.schema == Jido.Joi.object(%{})
     assert defaults.topology == %{}
 
     complete =
@@ -178,7 +178,7 @@ defmodule JidoTest.Contract.AgentAuthoringTest do
         name: "contract_complete_dsl",
         description: "Complete core DSL shape",
         vsn: 2,
-        schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}),
+        schema: Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)}),
         initial_state: %{count: 2},
         metadata: %{domain: "contracts"},
         signal_source: "/contract/complete",
@@ -260,10 +260,10 @@ defmodule JidoTest.Contract.AgentAuthoringTest do
       Agent.define!(%{
         name: "map_initial_state",
         schema:
-          Zoi.object(%{
-            count: Zoi.integer() |> Zoi.default(1),
-            label: Zoi.string() |> Zoi.default("schema"),
-            settings: Zoi.map() |> Zoi.default(%{source: :schema})
+          Jido.Joi.object(%{
+            count: Jido.Joi.integer() |> Jido.Joi.default(1),
+            label: Jido.Joi.string() |> Jido.Joi.default("schema"),
+            settings: Jido.Joi.map() |> Jido.Joi.default(%{source: :schema})
           }),
         initial_state: %{count: 2, settings: %{source: :definition}}
       })
@@ -299,7 +299,7 @@ defmodule JidoTest.Contract.AgentAuthoringTest do
           "plugins do end\nplugins do end",
           "routes do end\nroutes do end",
           "topology do end\ntopology do end",
-          "state do schema Zoi.object(%{}); schema Zoi.object(%{}) end",
+          "state do schema Jido.Joi.object(%{}); schema Jido.Joi.object(%{}) end",
           "state do initial_state %{}; initial_state %{} end"
         ] do
       assert_raise CompileError, fn -> F.with_agent(body, fn _module -> :ok end) end
@@ -322,16 +322,16 @@ defmodule JidoTest.Contract.AgentAuthoringTest do
   end
 
   @tag obligation: "jido.agent.I8"
-  test "initialization uses Zoi defaults and preserves supplied values" do
+  test "initialization uses Joi defaults and preserves supplied values" do
     definition =
       Agent.define!(%{
         name: "defaults",
         schema:
-          Zoi.object(%{
-            count: Zoi.integer() |> Zoi.default(1),
-            enabled: Zoi.boolean() |> Zoi.default(true),
-            note: Zoi.string() |> Zoi.nullable() |> Zoi.default("default"),
-            settings: Zoi.map() |> Zoi.default(%{a: 1})
+          Jido.Joi.object(%{
+            count: Jido.Joi.integer() |> Jido.Joi.default(1),
+            enabled: Jido.Joi.boolean() |> Jido.Joi.default(true),
+            note: Jido.Joi.string() |> Jido.Joi.nullable() |> Jido.Joi.default("default"),
+            settings: Jido.Joi.map() |> Jido.Joi.default(%{a: 1})
           })
       })
 
@@ -350,7 +350,7 @@ defmodule JidoTest.Contract.AgentAuthoringTest do
     definition = F.definition(plugins: [F.contribution(F.First)])
     agent = Agent.instantiate!(definition, id: "plugin")
     assert agent.state.first == 0
-    assert {:ok, state} = Zoi.parse(Agent.schema(agent), agent.state)
+    assert {:ok, state} = Jido.Joi.parse(Agent.schema(agent), agent.state)
     assert state === agent.state
     assert {:error, _} = Agent.set(agent, first: 2)
     assert {:ok, next} = Agent.set(agent, settings: %{})
@@ -360,7 +360,7 @@ defmodule JidoTest.Contract.AgentAuthoringTest do
     assert {:error, _} =
              Agent.define(%{
                name: "collision",
-               schema: Zoi.object(%{first: Zoi.integer()}),
+               schema: Jido.Joi.object(%{first: Jido.Joi.integer()}),
                plugins: [F.contribution(F.First)]
              })
 

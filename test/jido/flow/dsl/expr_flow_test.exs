@@ -45,7 +45,7 @@ defmodule JidoActionTest.Flow.DSL.ExprFlowTest do
       )
 
       iterate("loop") do
-        state(Zoi.map(), initial: %{count: input(:start) - 1, done: false})
+        state(Jido.Joi.map(), initial: %{count: input(:start) - 1, done: false})
         action(EchoParamsAction)
         params(%{count: state(:count) + 1, index: iteration_index() + 1})
         update(%{count: body_result(:count), done: body_result(:count) >= 3})

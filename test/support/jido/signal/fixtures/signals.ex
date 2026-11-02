@@ -12,7 +12,7 @@ defmodule JidoSignalTest.Fixtures.Signals do
 
     use Jido.Signal,
       type: "doc.example",
-      schema: Zoi.object(%{user_id: Zoi.string(), message: Zoi.string()})
+      schema: Jido.Joi.object(%{user_id: Jido.Joi.string(), message: Jido.Joi.string()})
   end
 
   defmodule UserCreated do

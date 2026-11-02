@@ -36,7 +36,7 @@
 
 - at: lib/jido/agent/plugin.ex:52:28
   operator: string_empty
-  mutation: "`\"Agent domain schema must be a field-based Zoi object\"` → `\"\"`"
+  mutation: "`\"Agent domain schema must be a field-based Joi object\"` → `\"\"`"
   sort: log-only
   reason: Human-readable error prose is not part of the evaluation contract.
 

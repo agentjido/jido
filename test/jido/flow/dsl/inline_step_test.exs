@@ -506,8 +506,8 @@ defmodule Jido.Flow.DSL.InlineStepTest do
       assert Map.keys(node) |> Enum.sort() == [:call, :kind, :meta, :needs]
       assert is_atom(action)
       assert action.name() == name
-      assert %Zoi.Types.Map{} = action.schema()
-      assert %Zoi.Types.Map{} = action.output_schema()
+      assert Jido.Joi.Schema.kind(action.schema()) == :map
+      assert Jido.Joi.Schema.kind(action.output_schema()) == :map
     end
 
     assert canonical_data?(map)

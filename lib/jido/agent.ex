@@ -1,4 +1,6 @@
 defmodule Jido.Agent do
+  alias Jido.Joi
+
   @moduledoc """
   Author Agent definitions as Maps or with the Spark DSL.
 
@@ -32,34 +34,34 @@ defmodule Jido.Agent do
 
   @optional_callbacks checkpoint: 2, restore: 2, initialize: 2
 
-  @schema Zoi.struct(__MODULE__, %{
-            id: Zoi.string() |> Zoi.nullable() |> Zoi.default(nil),
-            state: Zoi.map() |> Zoi.nullable() |> Zoi.default(nil),
-            module: Zoi.atom() |> Zoi.nullable() |> Zoi.default(nil),
-            name: Zoi.string() |> Zoi.min(1),
-            description: Zoi.string() |> Zoi.nullable() |> Zoi.default(nil),
-            vsn: Zoi.integer() |> Zoi.min(1) |> Zoi.default(1),
-            schema: Zoi.any() |> Zoi.default(Zoi.object(%{})),
-            initial_state: Zoi.map() |> Zoi.default(%{}),
-            metadata: Zoi.map() |> Zoi.default(%{}),
-            signal_source: Zoi.string() |> Zoi.min(1) |> Zoi.nullable() |> Zoi.default(nil),
-            routes: Zoi.list(Zoi.any()) |> Zoi.default([]),
-            topology: Zoi.map() |> Zoi.default(%{}),
-            plugins: Zoi.list(Zoi.any()) |> Zoi.default([])
+  @schema Joi.struct(__MODULE__, %{
+            id: Joi.string() |> Joi.nullable() |> Joi.default(nil),
+            state: Joi.map() |> Joi.nullable() |> Joi.default(nil),
+            module: Joi.atom() |> Joi.nullable() |> Joi.default(nil),
+            name: Joi.string() |> Joi.min(1),
+            description: Joi.string() |> Joi.nullable() |> Joi.default(nil),
+            vsn: Joi.integer() |> Joi.min(1) |> Joi.default(1),
+            schema: Joi.any() |> Joi.default(Joi.object(%{})),
+            initial_state: Joi.map() |> Joi.default(%{}),
+            metadata: Joi.map() |> Joi.default(%{}),
+            signal_source: Joi.string() |> Joi.min(1) |> Joi.nullable() |> Joi.default(nil),
+            routes: Joi.list(Joi.any()) |> Joi.default([]),
+            topology: Joi.map() |> Joi.default(%{}),
+            plugins: Joi.list(Joi.any()) |> Joi.default([])
           })
-  @defaults Map.new(Zoi.Struct.struct_fields(@schema), fn
+  @defaults Map.new(Joi.Struct.struct_fields(@schema), fn
               {key, value} -> {key, value}
               key -> {key, nil}
             end)
-  @enforce_keys Zoi.Struct.enforce_keys(@schema)
-  defstruct Zoi.Struct.struct_fields(@schema)
+  @enforce_keys Joi.Struct.enforce_keys(@schema)
+  defstruct Joi.Struct.struct_fields(@schema)
   @doc false
   def __schema__, do: @schema
   @doc false
   def __defaults__, do: @defaults
 
   @doc "Returns the state schema, including Plugin-owned fields."
-  @spec schema(t()) :: Zoi.schema()
+  @spec schema(t()) :: Joi.schema()
   def schema(%__MODULE__{} = agent),
     do: Validation.state_schema(agent) |> Jido.Agent.Error.unwrap!()
 
@@ -83,6 +85,8 @@ defmodule Jido.Agent do
 
   Each optional core section can occur once:
 
+      alias Jido.Joi
+
       use Jido.Agent,
         name: "counter",
         id: "my_app/counter",
@@ -91,7 +95,7 @@ defmodule Jido.Agent do
         plugins: [{MyApp.Plugin, %{mode: :strict}}]
 
       state do
-        schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+        schema Joi.object(%{count: Joi.integer() |> Joi.default(0)})
         initial_state %{count: 0}
       end
 
@@ -286,7 +290,7 @@ defmodule Jido.Agent do
   end
 
   @doc false
-  @spec transition_validated(instance(), term(), Zoi.schema()) ::
+  @spec transition_validated(instance(), term(), Joi.schema()) ::
           {:ok, instance()} | {:error, Exception.t()}
   def transition_validated(%__MODULE__{} = agent, next_state, schema) do
     with :ok <- Jido.Agent.Error.at(Data.complete(schema, next_state), :state) do
@@ -363,8 +367,8 @@ defmodule Jido.Agent do
   end
 
   defp validate_domain_attrs(agent, attrs) do
-    case agent.schema do
-      %Zoi.Types.Map{fields: fields} ->
+    case {Joi.Schema.kind(agent.schema), Joi.Schema.fields(agent.schema)} do
+      {:map, {:ok, fields}} when is_list(fields) ->
         invalid_keys = Map.keys(attrs) -- Keyword.keys(fields)
 
         if invalid_keys == [] do
@@ -376,8 +380,8 @@ defmodule Jido.Agent do
            )}
         end
 
-      _schema ->
-        {:error, Error.validation_error("Agent domain schema must be a Zoi object")}
+      _ ->
+        {:error, Error.validation_error("Agent domain schema must be a Joi object")}
     end
   end
 

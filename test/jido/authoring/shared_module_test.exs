@@ -8,8 +8,8 @@ defmodule Jido.Authoring.SharedModuleTest do
     use Jido.Action,
       name: "shared_echo",
       description: "Returns its input",
-      schema: Zoi.object(%{value: Zoi.integer()}, unrecognized_keys: :preserve),
-      output_schema: Zoi.object(%{value: Zoi.integer()}, unrecognized_keys: :preserve)
+      schema: Jido.Joi.object(%{value: Jido.Joi.integer()}, unrecognized_keys: :preserve),
+      output_schema: Jido.Joi.object(%{value: Jido.Joi.integer()}, unrecognized_keys: :preserve)
 
     @impl true
     def run(params, _context), do: {:ok, params}
@@ -19,8 +19,8 @@ defmodule Jido.Authoring.SharedModuleTest do
     use Jido.Flow,
       name: "shared_echo_flow",
       description: "Returns its input through a Flow",
-      schema: Zoi.object(%{value: Zoi.integer()}, unrecognized_keys: :preserve),
-      output_schema: Zoi.object(%{value: Zoi.integer()}, unrecognized_keys: :preserve)
+      schema: Jido.Joi.object(%{value: Jido.Joi.integer()}, unrecognized_keys: :preserve),
+      output_schema: Jido.Joi.object(%{value: Jido.Joi.integer()}, unrecognized_keys: :preserve)
 
     flow do
       step "echo", action: Echo, params: input()
@@ -31,10 +31,10 @@ defmodule Jido.Authoring.SharedModuleTest do
   defmodule PreparedFlow do
     use Jido.Flow,
       name: "shared_prepared_flow",
-      schema: Zoi.object(%{value: Zoi.integer()}, unrecognized_keys: :preserve),
+      schema: Jido.Joi.object(%{value: Jido.Joi.integer()}, unrecognized_keys: :preserve),
       output_schema:
-        Zoi.object(%{value: Zoi.integer()}, unrecognized_keys: :preserve)
-        |> Zoi.transform({Jido.Authoring.SharedModuleTest, :observe_output, []})
+        Jido.Joi.object(%{value: Jido.Joi.integer()}, unrecognized_keys: :preserve)
+        |> Jido.Joi.transform({Jido.Authoring.SharedModuleTest, :observe_output, []})
 
     @impl Jido.Action
     def on_before_validate_params(params) do
@@ -171,7 +171,7 @@ defmodule Jido.Authoring.SharedModuleTest do
   def counted_options do
     send(self(), :built_options)
     send(self(), :built_schema)
-    [name: "counted_shared", schema: Zoi.object(%{value: Zoi.integer()})]
+    [name: "counted_shared", schema: Jido.Joi.object(%{value: Jido.Joi.integer()})]
   end
 
   def observe_output(output, _opts) do

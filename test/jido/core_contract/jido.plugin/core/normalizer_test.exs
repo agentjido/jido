@@ -32,7 +32,7 @@ defmodule JidoTest.PluginContract.NormalizerTest do
     @impl true
     def state_spec(opts) do
       send(self(), {:callback, :state_spec, opts})
-      Keyword.get(opts, :state_spec, {:owned, Zoi.integer() |> Zoi.default(0)})
+      Keyword.get(opts, :state_spec, {:owned, Jido.Joi.integer() |> Jido.Joi.default(0)})
     end
 
     @impl true
@@ -62,19 +62,19 @@ defmodule JidoTest.PluginContract.NormalizerTest do
 
   defmodule OtherOwner do
     use Jido.Plugin
-    def state_spec(_opts), do: {:other, Zoi.integer() |> Zoi.default(0)}
+    def state_spec(_opts), do: {:other, Jido.Joi.integer() |> Jido.Joi.default(0)}
     def directives(_opts), do: [Effect]
     def reduce(reduction, _opts), do: {:ok, reduction.plugin_state}
   end
 
   defmodule SameStateOwner do
     use Jido.Plugin
-    def state_spec(_opts), do: {:owned, Zoi.integer() |> Zoi.default(0)}
+    def state_spec(_opts), do: {:owned, Jido.Joi.integer() |> Jido.Joi.default(0)}
   end
 
   defmodule DistinctStateOwner do
     use Jido.Plugin
-    def state_spec(_opts), do: {:distinct, Zoi.integer() |> Zoi.default(0)}
+    def state_spec(_opts), do: {:distinct, Jido.Joi.integer() |> Jido.Joi.default(0)}
   end
 
   defmodule Full do
@@ -87,7 +87,7 @@ defmodule JidoTest.PluginContract.NormalizerTest do
       ]
 
     def prepare(_preparation, opts), do: {:ok, opts}
-    def state_spec(_opts), do: {:full_owned, Zoi.integer() |> Zoi.default(0)}
+    def state_spec(_opts), do: {:full_owned, Jido.Joi.integer() |> Jido.Joi.default(0)}
     def directives(_opts), do: [Effect]
     def reduce(reduction, _opts), do: {:ok, reduction.plugin_state}
     def validate_options(_opts), do: :ok
@@ -105,13 +105,13 @@ defmodule JidoTest.PluginContract.NormalizerTest do
 
   defmodule DumpOnly do
     use Jido.Plugin
-    def state_spec(_opts), do: {:dumped, Zoi.integer()}
+    def state_spec(_opts), do: {:dumped, Jido.Joi.integer()}
     def dump(value, _context, _opts), do: {:ok, value}
   end
 
   defmodule LoadOnly do
     use Jido.Plugin
-    def state_spec(_opts), do: {:loaded, Zoi.integer()}
+    def state_spec(_opts), do: {:loaded, Jido.Joi.integer()}
     def load(value, _context, _opts), do: {:ok, value}
   end
 
@@ -137,7 +137,7 @@ defmodule JidoTest.PluginContract.NormalizerTest do
 
   defmodule LegacyDirectiveValidation do
     use Jido.Plugin
-    def state_spec(_opts), do: {:legacy_directive, Zoi.integer()}
+    def state_spec(_opts), do: {:legacy_directive, Jido.Joi.integer()}
     def directives(_opts), do: [Effect]
     def reduce(reduction, _opts), do: {:ok, reduction.plugin_state}
     def validate_directive(directive, _opts), do: {:ok, directive}
@@ -145,14 +145,14 @@ defmodule JidoTest.PluginContract.NormalizerTest do
 
   defmodule LegacyStateUpdate do
     use Jido.Plugin
-    def state_spec(_opts), do: {:legacy_state, Zoi.integer()}
+    def state_spec(_opts), do: {:legacy_state, Jido.Joi.integer()}
     def reduce(reduction, _opts), do: {:ok, reduction.plugin_state}
     def update_state(state, _directive, _opts), do: {:ok, state}
   end
 
   defmodule DynamicSchema do
     use Jido.Plugin
-    def state_spec(_opts), do: {:dynamic, Zoi.any() |> Zoi.default(self())}
+    def state_spec(_opts), do: {:dynamic, Jido.Joi.any() |> Jido.Joi.default(self())}
   end
 
   defmodule StateResult do
@@ -195,7 +195,7 @@ defmodule JidoTest.PluginContract.NormalizerTest do
 
   @tag obligation: "jido.plugin.I4"
   test "declarations normalize once and retain order and exact options" do
-    options = [state_spec: {:owned, Zoi.integer()}, directives: [], validation: :ok]
+    options = [state_spec: {:owned, Jido.Joi.integer()}, directives: [], validation: :ok]
     declaration = {Configurable, options}
 
     assert {:ok, [spec]} = Normalizer.normalize_all([declaration])
@@ -385,7 +385,7 @@ defmodule JidoTest.PluginContract.NormalizerTest do
     assert spec.agent.module == Full
     assert spec.agent.options == [agent_option: :agent]
     assert spec.agent.state_key == :full_owned
-    assert %Zoi.Types.Integer{} = spec.agent.state_schema
+    assert Jido.Joi.Schema.kind(spec.agent.state_schema) == :integer
     assert spec.agent.directive_modules == [Effect]
 
     assert spec.agent_server.package == Full
@@ -433,9 +433,9 @@ defmodule JidoTest.PluginContract.NormalizerTest do
   @tag obligation: "jido.plugin.I5"
   test "Agent callback declarations require safe state and Directive ownership" do
     for {state_spec, detail} <- [
-          {{nil, Zoi.integer()}, {:state_key, nil}},
-          {{:__struct__, Zoi.integer()}, {:state_key, :__struct__}},
-          {{"owned", Zoi.integer()}, {:value, {"owned", Zoi.integer()}}},
+          {{nil, Jido.Joi.integer()}, {:state_key, nil}},
+          {{:__struct__, Jido.Joi.integer()}, {:state_key, :__struct__}},
+          {{"owned", Jido.Joi.integer()}, {:value, {"owned", Jido.Joi.integer()}}},
           {{:owned, %URI{}}, {:schema, %URI{}}},
           {:invalid, {:value, :invalid}}
         ] do
@@ -524,7 +524,7 @@ defmodule JidoTest.PluginContract.NormalizerTest do
              Normalizer.normalize_all([{StateResult, result: {:error, expected}}])
 
     assert {:ok, [error_key]} =
-             Normalizer.normalize_all([{StateResult, result: {:error, Zoi.integer()}}])
+             Normalizer.normalize_all([{StateResult, result: {:error, Jido.Joi.integer()}}])
 
     assert error_key.agent.state_key == :error
 

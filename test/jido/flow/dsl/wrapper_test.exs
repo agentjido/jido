@@ -5,7 +5,7 @@ defmodule Jido.Flow.DSL.WrapperTest do
     flows =
       for form <- [:keyword, :block] do
         name = ~s|(send(self(), :map_name); "mapped")|
-        schema = "(send(self(), :state_schema); Zoi.map())"
+        schema = "(send(self(), :state_schema); Jido.Joi.map())"
 
         {map, state} =
           case form do
@@ -49,10 +49,11 @@ defmodule Jido.Flow.DSL.WrapperTest do
           {~s|map "bad", [:invalid]|, "Flow declaration options must be a keyword list", 5},
           {~s|map "bad", params: %{}, params: %{}|, "duplicate Flow declaration field: :params", 5},
           {~s|map("bad", params: %{}, do: (params %{}))|, "do not mix keyword and block fields in one declaration", 5},
-          {"iterate \"loop\" do\n state Zoi.map(), [:invalid]\nend", "Iterate state options must be a keyword list", 6},
-          {"iterate \"loop\" do\n state Zoi.map(), initial: %{}, initial: %{}\nend",
+          {"iterate \"loop\" do\n state Jido.Joi.map(), [:invalid]\nend",
+           "Iterate state options must be a keyword list", 6},
+          {"iterate \"loop\" do\n state Jido.Joi.map(), initial: %{}, initial: %{}\nend",
            "duplicate Iterate state field: :initial", 6},
-          {"iterate \"loop\" do\n state(Zoi.map(), initial: %{}, do: (initial %{}))\nend",
+          {"iterate \"loop\" do\n state(Jido.Joi.map(), initial: %{}, do: (initial %{}))\nend",
            "do not mix keyword and block fields in Iterate state", 6}
         ] do
       error = assert_raise CompileError, fn -> compile(declaration) end

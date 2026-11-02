@@ -1,7 +1,7 @@
 defmodule Jido.Authoring.Config do
+  alias Jido.Joi
   @moduledoc false
 
-  alias Jido.Action.Validation
   alias Jido.Authoring.Registry
   alias Jido.Flow.Error
 
@@ -38,10 +38,10 @@ defmodule Jido.Authoring.Config do
   def validate_config_schema(value, _opts \\ [])
 
   def validate_config_schema(value, _opts) do
-    if Validation.zoi_schema?(value) do
+    if Joi.Schema.schema?(value) do
       :ok
     else
-      {:error, "must be a Zoi schema"}
+      {:error, "must be a Joi schema"}
     end
   end
 
@@ -49,7 +49,7 @@ defmodule Jido.Authoring.Config do
   @spec validate_map_schema(term(), keyword()) :: :ok | {:error, String.t()}
   def validate_map_schema(value, opts \\ []) do
     with :ok <- validate_config_schema(value, opts) do
-      if Validation.map_schema?(value) do
+      if Joi.Schema.map_shaped?(value) do
         :ok
       else
         {:error, "must accept map-shaped data"}
@@ -172,7 +172,7 @@ defmodule Jido.Authoring.Config do
 
   defp validate_field(_kind, field, nil)
        when field in [:schema, "schema", :output_schema, "output_schema"],
-       do: {:ok, Zoi.map()}
+       do: {:ok, Joi.map()}
 
   defp validate_field(_kind, _field, nil), do: {:ok, []}
 
@@ -224,7 +224,7 @@ defmodule Jido.Authoring.Config do
     end
   end
 
-  defp action_error({nil, {:unknown, key}}), do: Zoi.Error.unrecognized_key(key).message
+  defp action_error({nil, {:unknown, key}}), do: Joi.Error.unrecognized_key(key).message
   defp action_error({nil, :map}), do: "invalid type: expected map"
   defp action_error({field, :required}), do: "is required, at #{field}"
   defp action_error({field, :string}), do: "invalid type: expected string, at #{field}"

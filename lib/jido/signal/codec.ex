@@ -1,4 +1,5 @@
 defmodule Jido.Signal.Codec do
+  alias Jido.Joi
   @moduledoc false
 
   alias Jido.Signal
@@ -117,9 +118,9 @@ defmodule Jido.Signal.Codec do
         type: Map.get(attrs, "type")
       )
 
-    case Zoi.parse(Signal.schema(), signal) do
+    case Joi.parse(Signal.schema(), signal) do
       {:ok, validated} -> {:ok, validated}
-      {:error, errors} -> {:error, "parse error: #{Zoi.prettify_errors(errors)}"}
+      {:error, errors} -> {:error, "parse error: #{Joi.prettify_errors(errors)}"}
     end
   end
 

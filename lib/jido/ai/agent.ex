@@ -70,7 +70,7 @@ defmodule Jido.AI.Agent do
       use Jido.Agent, unquote(Macro.escape(options))
 
       state do
-        schema Zoi.object(%{session: Jido.AI.Thread.Projection.schema()})
+        schema Jido.Joi.object(%{session: Jido.AI.Thread.Projection.schema()})
       end
 
       routes do

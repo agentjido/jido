@@ -50,7 +50,7 @@ defmodule Jido.Exec.ErrorPathsTest do
   end
 
   defmodule InputFlow do
-    use Jido.Flow, name: "error_paths_input", schema: Zoi.object(%{value: Zoi.integer()})
+    use Jido.Flow, name: "error_paths_input", schema: Jido.Joi.object(%{value: Jido.Joi.integer()})
 
     flow do
       step "add", action: Add, params: %{value: input(:value), amount: 1}
@@ -170,7 +170,7 @@ defmodule Jido.Exec.ErrorPathsTest do
       assert {:error, %{message: "iterator initial state must resolve to a plain map"}} =
                Exec.run(flow([iterate(Count, Ref.input(:state), never, 2)]), %{state: 1})
 
-      schema = Zoi.map(%{count: Zoi.integer()})
+      schema = Jido.Joi.map(%{count: Jido.Joi.integer()})
 
       assert {:error, %{message: "iterator state schema validation failed"}} =
                Exec.run(flow([iterate(Count, Ref.input(:state), never, 2, schema)]), %{
@@ -233,7 +233,7 @@ defmodule Jido.Exec.ErrorPathsTest do
     Flow.new!(%{name: "error_paths", components: components, output: output})
   end
 
-  defp iterate(action, initial, completion, max, schema \\ Zoi.map()) do
+  defp iterate(action, initial, completion, max, schema \\ Jido.Joi.map()) do
     %{
       kind: :iterate,
       name: "loop",

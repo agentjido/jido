@@ -61,7 +61,7 @@ defmodule Jido.Flow.DSL.FormatterTest do
     end
 
     iterate "loop" do
-      state Zoi.map(), initial: %{count: 0}
+      state Jido.Joi.map(), initial: %{count: 0}
       action Increment
       params %{count: state(:count)}
       update %{count: body_result(:count)}
@@ -70,7 +70,7 @@ defmodule Jido.Flow.DSL.FormatterTest do
     end
 
     iterate "fixed" do
-      state Zoi.map() do
+      state Jido.Joi.map() do
         initial %{count: 0}
       end
 
@@ -140,8 +140,8 @@ defmodule Jido.Flow.DSL.FormatterTest do
     step "configured", [value <- input(:value), offset <- context(:offset)],
       inline: [
         name: "configured",
-        schema: Zoi.object(%{value: Zoi.integer(), offset: Zoi.integer()}),
-        output_schema: Zoi.object(%{value: Zoi.integer()}),
+        schema: Jido.Joi.object(%{value: Jido.Joi.integer(), offset: Jido.Joi.integer()}),
+        output_schema: Jido.Joi.object(%{value: Jido.Joi.integer()}),
         context: ctx
       ] do
       {:ok, %{value: value + offset + ctx.extra}}

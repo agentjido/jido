@@ -1,4 +1,4 @@
-defmodule Jido.Agent.HexZoiTest do
+defmodule Jido.Agent.JoiRuntimeTest do
   use Covenant.Case, component: "jido.agent", async: true
 
   alias Jido.Agent
@@ -6,12 +6,12 @@ defmodule Jido.Agent.HexZoiTest do
   @tag obligation: ["jido.agent.I8", "jido.agent.I9"]
   test "container defaults are checked during creation and never filled in stored state" do
     for container <- [
-          Zoi.list(Zoi.object(%{count: Zoi.integer() |> Zoi.default(1)})),
-          Zoi.map(Zoi.string(), Zoi.object(%{count: Zoi.integer() |> Zoi.default(1)}))
+          Jido.Joi.list(Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(1)})),
+          Jido.Joi.map(Jido.Joi.string(), Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(1)}))
         ] do
-      input = if match?(%Zoi.Types.Array{}, container), do: [%{}], else: %{"item" => %{}}
+      input = if Jido.Joi.Schema.kind(container) == :array, do: [%{}], else: %{"item" => %{}}
       expected = if is_list(input), do: [%{count: 1}], else: %{"item" => %{count: 1}}
-      definition = Agent.define!(%{name: "containers", schema: Zoi.object(%{items: container})})
+      definition = Agent.define!(%{name: "containers", schema: Jido.Joi.object(%{items: container})})
 
       assert {:ok, agent} = Agent.instantiate(definition, id: "one", state: %{items: input})
       assert agent.state == %{items: expected}
@@ -24,12 +24,12 @@ defmodule Jido.Agent.HexZoiTest do
   test "discriminated union defaults cannot bypass validation" do
     for default <- [1, "invalid"] do
       union =
-        Zoi.discriminated_union(:kind, [
-          Zoi.object(%{kind: Zoi.literal(:count), count: Zoi.integer() |> Zoi.default(default)}),
-          Zoi.object(%{kind: Zoi.literal(:text), text: Zoi.string()})
+        Jido.Joi.discriminated_union(:kind, [
+          Jido.Joi.object(%{kind: Jido.Joi.literal(:count), count: Jido.Joi.integer() |> Jido.Joi.default(default)}),
+          Jido.Joi.object(%{kind: Jido.Joi.literal(:text), text: Jido.Joi.string()})
         ])
 
-      definition = Agent.define!(%{name: "union", schema: Zoi.object(%{item: union})})
+      definition = Agent.define!(%{name: "union", schema: Jido.Joi.object(%{item: union})})
       result = Agent.instantiate(definition, id: "one", state: %{item: %{kind: :count}})
 
       if is_integer(default) do
@@ -43,14 +43,14 @@ defmodule Jido.Agent.HexZoiTest do
   end
 
   @tag obligation: ["jido.agent.I8", "jido.agent.I9"]
-  test "keyword defaults are checked with Hex Zoi" do
+  test "keyword defaults are checked with Hex Joi" do
     for default <- [1, "invalid"] do
       definition =
         Agent.define!(%{
           name: "keyword",
           schema:
-            Zoi.object(%{
-              options: Zoi.keyword(count: Zoi.integer() |> Zoi.default(default)) |> Zoi.default([])
+            Jido.Joi.object(%{
+              options: Jido.Joi.keyword(count: Jido.Joi.integer() |> Jido.Joi.default(default)) |> Jido.Joi.default([])
             })
         })
 

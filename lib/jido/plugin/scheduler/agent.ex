@@ -1,4 +1,5 @@
 defmodule Jido.Plugin.Scheduler.Agent do
+  alias Jido.Joi
   @moduledoc false
   @behaviour Jido.Plugin
 
@@ -6,21 +7,21 @@ defmodule Jido.Plugin.Scheduler.Agent do
   alias Jido.Plugin.Scheduler.{Cancel, Cron, Schedule}
   alias Jido.Signal
 
-  @cron_spec_schema Zoi.object(
+  @cron_spec_schema Joi.object(
                       %{
-                        cron_expression: Zoi.string(),
-                        message: Zoi.struct(Signal),
-                        timezone: Zoi.string(),
-                        generation: Zoi.integer() |> Zoi.min(0) |> Zoi.max(2_147_483_647) |> Zoi.optional()
+                        cron_expression: Joi.string(),
+                        message: Joi.struct(Signal),
+                        timezone: Joi.string(),
+                        generation: Joi.integer() |> Joi.min(0) |> Joi.max(2_147_483_647) |> Joi.optional()
                       },
                       unrecognized_keys: :error
                     )
-  @state_schema Zoi.object(%{
+  @state_schema Joi.object(%{
                   cron:
-                    Zoi.map(Zoi.any(), @cron_spec_schema, description: "Recurring schedule definitions")
-                    |> Zoi.refine({Scheduler, :validate_cron_state, []})
+                    Joi.map(Joi.any(), @cron_spec_schema, description: "Recurring schedule definitions")
+                    |> Joi.refine({Scheduler, :validate_cron_state, []})
                 })
-                |> Zoi.default(%{cron: %{}})
+                |> Joi.default(%{cron: %{}})
 
   @impl true
   def state_spec(_opts), do: {:scheduler, @state_schema}

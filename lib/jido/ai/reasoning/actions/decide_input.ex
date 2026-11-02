@@ -1,4 +1,5 @@
 defmodule Jido.AI.Reasoning.Actions.DecideInput do
+  alias Jido.Joi
   @moduledoc "Starts a guarded reasoning graph or returns a blocked terminal outcome."
 
   alias Jido.AI.Reasoning.Result
@@ -8,8 +9,8 @@ defmodule Jido.AI.Reasoning.Actions.DecideInput do
     vsn: 1,
     name: "jido_ai_decide_input",
     description: "Route a guarded request into its reasoning graph",
-    schema: Zoi.map(),
-    output_schema: Zoi.map()
+    schema: Joi.map(),
+    output_schema: Joi.map()
 
   @impl Jido.Action
   def run(%{turn: turn, guard: %{allowed: true}}, _context),

@@ -318,7 +318,7 @@ defmodule Jido.Exec.WaitHostTest do
     flow =
       Flow.new!(%{
         name: "predecessor_schema",
-        output_schema: Zoi.object(%{required: Zoi.string()}),
+        output_schema: Jido.Joi.object(%{required: Jido.Joi.string()}),
         components: [
           %{kind: :invoke, name: "invoke", decision: Echo, expander: ContinueEcho}
         ],

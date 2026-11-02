@@ -1,4 +1,6 @@
 defmodule Jido.AI.Context do
+  alias Jido.Joi
+
   @moduledoc """
   The lifecycle boundary for one ReqLLM call.
 
@@ -9,29 +11,29 @@ defmodule Jido.AI.Context do
 
   alias Jido.AI.Context.Snapshot
 
-  @request_schema Zoi.map(
+  @request_schema Joi.map(
                     %{
-                      model: Zoi.any() |> Zoi.nullable() |> Zoi.default(nil),
-                      context: Zoi.any(),
-                      options: Zoi.list(Zoi.any()) |> Zoi.default([])
+                      model: Joi.any() |> Joi.nullable() |> Joi.default(nil),
+                      context: Joi.any(),
+                      options: Joi.list(Joi.any()) |> Joi.default([])
                     },
                     unrecognized_keys: :error
                   )
 
-  @schema Zoi.struct(
+  @schema Joi.struct(
             __MODULE__,
             %{
-              version: Zoi.integer() |> Zoi.default(1),
-              id: Zoi.string() |> Zoi.min(1),
-              stage: Zoi.enum([:open, :prepared, :completed]) |> Zoi.default(:open),
+              version: Joi.integer() |> Joi.default(1),
+              id: Joi.string() |> Joi.min(1),
+              stage: Joi.enum([:open, :prepared, :completed]) |> Joi.default(:open),
               request: @request_schema,
-              result: Zoi.any() |> Zoi.default(nil),
-              metadata: Zoi.map() |> Zoi.default(%{}),
-              operations: Zoi.map() |> Zoi.default(%{}),
-              digest: Zoi.string() |> Zoi.nullable() |> Zoi.default(nil),
-              created_at_ms: Zoi.integer(),
-              prepared_at_ms: Zoi.integer() |> Zoi.nullable() |> Zoi.default(nil),
-              completed_at_ms: Zoi.integer() |> Zoi.nullable() |> Zoi.default(nil)
+              result: Joi.any() |> Joi.default(nil),
+              metadata: Joi.map() |> Joi.default(%{}),
+              operations: Joi.map() |> Joi.default(%{}),
+              digest: Joi.string() |> Joi.nullable() |> Joi.default(nil),
+              created_at_ms: Joi.integer(),
+              prepared_at_ms: Joi.integer() |> Joi.nullable() |> Joi.default(nil),
+              completed_at_ms: Joi.integer() |> Joi.nullable() |> Joi.default(nil)
             },
             coerce: true,
             unrecognized_keys: :error
@@ -44,13 +46,13 @@ defmodule Jido.AI.Context do
         }
 
   @type result :: nil | {:ok, ReqLLM.Response.t()} | {:error, term()}
-  @type t :: unquote(Zoi.type_spec(@schema))
+  @type t :: unquote(Joi.type_spec(@schema))
 
-  @enforce_keys Zoi.Struct.enforce_keys(@schema)
-  defstruct Zoi.Struct.struct_fields(@schema)
+  @enforce_keys Joi.Struct.enforce_keys(@schema)
+  defstruct Joi.Struct.struct_fields(@schema)
 
-  @doc "Returns the Zoi schema for a model-call context."
-  @spec schema() :: Zoi.schema()
+  @doc "Returns the Joi schema for a model-call context."
+  @spec schema() :: Joi.schema()
   def schema, do: @schema
 
   @doc "Builds an open lifecycle around an existing ReqLLM context."
@@ -82,7 +84,7 @@ defmodule Jido.AI.Context do
   @doc "Validates the lifecycle and its ReqLLM context."
   @spec validate(t()) :: {:ok, t()} | {:error, term()}
   def validate(%__MODULE__{} = context) do
-    with {:ok, parsed} <- Zoi.parse(@schema, context),
+    with {:ok, parsed} <- Joi.parse(@schema, context),
          true <- Keyword.keyword?(parsed.request.options),
          {:ok, _req_llm_context} <- validate_req_llm_context(parsed.request.context) do
       {:ok, parsed}
@@ -270,7 +272,7 @@ defmodule Jido.AI.Context do
 
   defp validate_messages(messages) do
     Enum.reduce_while(messages, :ok, fn message, :ok ->
-      with {:ok, _message} <- Zoi.parse(ReqLLM.Message.schema(), message),
+      with {:ok, _message} <- Joi.parse(ReqLLM.Message.schema(), message),
            :ok <- validate_content_parts(message.content) do
         {:cont, :ok}
       else
@@ -281,7 +283,7 @@ defmodule Jido.AI.Context do
 
   defp validate_content_parts(parts) do
     Enum.reduce_while(parts, :ok, fn part, :ok ->
-      case Zoi.parse(ReqLLM.Message.ContentPart.schema(), part) do
+      case Joi.parse(ReqLLM.Message.ContentPart.schema(), part) do
         {:ok, _part} -> {:cont, :ok}
         {:error, reason} -> {:halt, {:error, reason}}
       end

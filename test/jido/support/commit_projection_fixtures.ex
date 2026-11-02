@@ -8,7 +8,7 @@ defmodule JidoTest.CommitProjection.AgentFacet do
   @moduledoc false
   @behaviour Jido.Plugin
 
-  def state_spec(opts), do: {Keyword.fetch!(opts, :key), Zoi.integer() |> Zoi.default(0)}
+  def state_spec(opts), do: {Keyword.fetch!(opts, :key), Jido.Joi.integer() |> Jido.Joi.default(0)}
 
   def directives(opts),
     do: if(opts[:key] == :first, do: [JidoTest.CommitProjection.Effect], else: [])
@@ -173,7 +173,8 @@ defmodule JidoTest.CommitProjection.Update do
   @moduledoc false
   use Jido.Action,
     name: "commit_projection_update",
-    schema: Zoi.object(%{amount: Zoi.integer(), directives: Zoi.list(Zoi.any()) |> Zoi.default([])})
+    schema:
+      Jido.Joi.object(%{amount: Jido.Joi.integer(), directives: Jido.Joi.list(Jido.Joi.any()) |> Jido.Joi.default([])})
 
   def run(params, context) do
     {:ok, %{context.agent_state | count: context.agent_state.count + params.amount}, params.directives}
@@ -184,7 +185,7 @@ defmodule JidoTest.CommitProjection.Reject do
   @moduledoc false
   use Jido.Action,
     name: "commit_projection_reject",
-    schema: Zoi.object(%{})
+    schema: Jido.Joi.object(%{})
 
   def run(_params, _context), do: {:error, :rejected}
 end
@@ -198,7 +199,7 @@ defmodule JidoTest.CommitProjection.Agent do
     ]
 
   state do
-    schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+    schema Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)})
   end
 
   routes do
@@ -219,7 +220,7 @@ defmodule JidoTest.CommitProjection.ProjectionAgent do
     ]
 
   state do
-    schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+    schema Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)})
   end
 
   routes do
@@ -242,7 +243,7 @@ defmodule JidoTest.CommitProjection.TimeoutAgent do
     ]
 
   state do
-    schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+    schema Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)})
   end
 
   routes do

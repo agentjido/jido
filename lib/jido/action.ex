@@ -1,4 +1,6 @@
 defmodule Jido.Action do
+  alias Jido.Joi
+
   @moduledoc """
   Defines one named, validated unit of work.
 
@@ -6,11 +8,13 @@ defmodule Jido.Action do
   implement `c:run/2`:
 
       defmodule MyAction do
+        alias Jido.Joi
+
         use Jido.Action,
           name: "my_action",
           description: "Performs my action",
-          schema: Zoi.object(%{input: Zoi.string()}),
-          output_schema: Zoi.object(%{result: Zoi.string()})
+          schema: Joi.object(%{input: Joi.string()}),
+          output_schema: Joi.object(%{result: Joi.string()})
 
         @impl true
         def run(params, _context) do
@@ -23,7 +27,7 @@ defmodule Jido.Action do
   The generated `validate_params/1` and `validate_output/1` functions apply the
   declared schemas. An Action can implement `c:on_before_validate_params/1` to
   prepare raw input before its schema runs. Direct, nested, and wrapped schemas
-  keep their declared Zoi unknown-key policy. Parsed struct results become
+  keep their declared Joi unknown-key policy. Parsed struct results become
   plain maps at the Action boundary. See
   [Schemas And Validation](schemas-validation.md).
 
@@ -55,7 +59,7 @@ defmodule Jido.Action do
   alias Jido.Exec.Validation
 
   @typedoc "A static Action input or output schema."
-  @type schema :: Zoi.schema()
+  @type schema :: Joi.schema()
 
   @typedoc "An ordered list of opaque effect requests. Exec does not dispatch them."
   @type effects :: [term()]
@@ -103,24 +107,26 @@ defmodule Jido.Action do
   - `id` (optional) - The stable identifier used by runtime authoring discovery.
   - `vsn` (optional, default: `1`) - The positive authoring version.
   - `description` (optional) - A description of what the Action does.
-  - `schema` (optional, default: `Zoi.map()`) - A Zoi schema for Action input.
-  - `output_schema` (optional, default: `Zoi.map()`) - A Zoi schema for Action output.
+  - `schema` (optional, default: `Joi.map()`) - A Joi schema for Action input.
+  - `output_schema` (optional, default: `Joi.map()`) - A Joi schema for Action output.
 
-  Schemas must be static module data. Use named MFA tuples for Zoi refinements,
+  Schemas must be static module data. Use named MFA tuples for Joi refinements,
   transforms, and other effects. Anonymous functions and lazy schemas are not
   supported because they can change the schema after compile-time validation.
 
   ## Examples
 
       defmodule MyAction do
+        alias Jido.Joi
+
         use Jido.Action,
           name: "my_action",
           description: "Performs a specific task",
           schema:
-            Zoi.object(%{
+            Joi.object(%{
               input:
-                Zoi.string()
-                |> Zoi.refine({__MODULE__, :not_blank, []})
+                Joi.string()
+                |> Joi.refine({__MODULE__, :not_blank, []})
             })
 
         def not_blank(value, _opts) do
@@ -203,7 +209,7 @@ defmodule Jido.Action do
   Prepares raw input parameters before schema validation.
 
   Use this callback only for deterministic input preparation that must happen
-  before Zoi can parse the value. Prefer Zoi coercion, defaults, enums, and
+  before Joi can parse the value. Prefer Joi coercion, defaults, enums, and
   refinements when they can express the required rule.
   """
   @callback on_before_validate_params(params :: term()) ::

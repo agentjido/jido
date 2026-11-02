@@ -22,7 +22,7 @@ defmodule Jido.Plugin.HeartbeatIntegrationTest do
       ]
 
     state do
-      schema Zoi.object(%{heartbeats: Zoi.list(Zoi.any()) |> Zoi.default([])})
+      schema Jido.Joi.object(%{heartbeats: Jido.Joi.list(Jido.Joi.any()) |> Jido.Joi.default([])})
     end
 
     routes do

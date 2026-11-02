@@ -15,7 +15,7 @@ defmodule Jido.Agent.MutationTest do
   defmodule MappedOutput do
     use Jido.Action,
       name: "mutation_mapped_output",
-      output_schema: Zoi.object(%{state: Zoi.map(), reply: Zoi.map()})
+      output_schema: Jido.Joi.object(%{state: Jido.Joi.map(), reply: Jido.Joi.map()})
 
     def run(_, context), do: {:ok, %{state: context.agent_state, reply: %{ok: true}}}
   end
@@ -23,7 +23,7 @@ defmodule Jido.Agent.MutationTest do
   defmodule StateOnlyOutput do
     use Jido.Action,
       name: "mutation_state_only_output",
-      output_schema: Zoi.object(%{state: Zoi.map()})
+      output_schema: Jido.Joi.object(%{state: Jido.Joi.map()})
 
     def run(_, context), do: {:ok, %{state: context.agent_state}}
   end
@@ -267,7 +267,7 @@ defmodule Jido.Agent.MutationTest do
       Agent.define!(%{
         name: "mapped_mutations",
         signal_source: "/mutations",
-        schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}),
+        schema: Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)}),
         routes: [
           %{
             path: "run",
@@ -478,7 +478,7 @@ defmodule Jido.Agent.MutationTest do
     conflict =
       Agent.define!(%{
         name: "plugin_conflict",
-        schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(1)})
+        schema: Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(1)})
       })
       |> Agent.instantiate!(id: "plugin-conflict")
 

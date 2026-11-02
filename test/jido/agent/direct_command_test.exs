@@ -38,9 +38,9 @@ defmodule Jido.Agent.DirectCommandTest do
     use Jido.Agent, name: "direct"
 
     state do
-      schema Zoi.object(%{
-               count: Zoi.integer() |> Zoi.default(0),
-               label: Zoi.string() |> Zoi.default("same")
+      schema Jido.Joi.object(%{
+               count: Jido.Joi.integer() |> Jido.Joi.default(0),
+               label: Jido.Joi.string() |> Jido.Joi.default("same")
              })
     end
 
@@ -61,7 +61,7 @@ defmodule Jido.Agent.DirectCommandTest do
   defmodule Flow do
     use Jido.Flow,
       name: "direct_agent_flow",
-      schema: Zoi.object(%{amount: Zoi.integer()})
+      schema: Jido.Joi.object(%{amount: Jido.Joi.integer()})
 
     flow do
       step "update",
@@ -83,7 +83,7 @@ defmodule Jido.Agent.DirectCommandTest do
 
   defmodule Owned do
     use Jido.Plugin, id: "test.direct.owned"
-    def state_spec(_), do: {:owned, Zoi.integer() |> Zoi.default(0)}
+    def state_spec(_), do: {:owned, Jido.Joi.integer() |> Jido.Joi.default(0)}
 
     def reduce(reduction, _opts) do
       send(self(), :reduced)
@@ -115,9 +115,9 @@ defmodule Jido.Agent.DirectCommandTest do
       name: "direct",
       signal_source: "/direct",
       schema:
-        Zoi.object(%{
-          count: Zoi.integer() |> Zoi.default(0),
-          label: Zoi.string() |> Zoi.default("same")
+        Jido.Joi.object(%{
+          count: Jido.Joi.integer() |> Jido.Joi.default(0),
+          label: Jido.Joi.string() |> Jido.Joi.default("same")
         }),
       routes: routes,
       plugins: extensions
@@ -135,9 +135,9 @@ defmodule Jido.Agent.DirectCommandTest do
       module: Leaf,
       signal_source: "/direct",
       schema:
-        Zoi.object(%{
-          count: Zoi.integer() |> Zoi.default(0),
-          label: Zoi.string() |> Zoi.default("same")
+        Jido.Joi.object(%{
+          count: Jido.Joi.integer() |> Jido.Joi.default(0),
+          label: Jido.Joi.string() |> Jido.Joi.default("same")
         }),
       routes: [action("work")],
       topology: %{agents: [], connections: []}

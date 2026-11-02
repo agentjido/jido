@@ -1,4 +1,5 @@
 defmodule Jido.AI.Reasoning.AlgorithmOfThoughts.ModelRound do
+  alias Jido.Joi
   @moduledoc "Runs one structured Algorithm of Thoughts model response."
   alias Jido.AI.Reasoning.Actions.{CallModel, GuardOutput, ProjectConversation, RecordModelAttempt}
   alias Jido.AI.Reasoning.AlgorithmOfThoughts.Actions.Complete
@@ -7,8 +8,8 @@ defmodule Jido.AI.Reasoning.AlgorithmOfThoughts.ModelRound do
     id: "jido.ai/reasoning/algorithm-of-thoughts/model-round",
     vsn: 1,
     name: "jido_ai_algorithm_of_thoughts_model_round",
-    schema: Zoi.object(%{turn: Zoi.any()}),
-    output_schema: Zoi.map()
+    schema: Joi.object(%{turn: Joi.any()}),
+    output_schema: Joi.map()
 
   flow do
     step "project", action: ProjectConversation, params: %{turn: input(:turn)}

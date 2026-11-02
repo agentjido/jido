@@ -18,7 +18,7 @@ defmodule JidoTest.Agent.AuthoringTest do
   defmodule Add do
     use Jido.Action,
       name: "authoring_add",
-      schema: Zoi.object(%{amount: Zoi.integer(), flag: Zoi.boolean() |> Zoi.default(false)})
+      schema: Jido.Joi.object(%{amount: Jido.Joi.integer(), flag: Jido.Joi.boolean() |> Jido.Joi.default(false)})
 
     def run(%{amount: amount}, %{agent_state: state}),
       do: {:ok, %{state | count: state.count + amount}}
@@ -27,7 +27,7 @@ defmodule JidoTest.Agent.AuthoringTest do
   defmodule ProjectedOutput do
     use Jido.Action,
       name: "authoring_projected_output",
-      output_schema: Zoi.object(%{state: Zoi.map(), reply: Zoi.string()})
+      output_schema: Jido.Joi.object(%{state: Jido.Joi.map(), reply: Jido.Joi.string()})
 
     def run(_params, _context), do: {:ok, %{state: %{}, reply: "done"}}
   end
@@ -35,7 +35,7 @@ defmodule JidoTest.Agent.AuthoringTest do
   defmodule Flow do
     use Jido.Flow,
       name: "authoring_flow",
-      schema: Zoi.object(%{amount: Zoi.integer()})
+      schema: Jido.Joi.object(%{amount: Jido.Joi.integer()})
 
     flow do
       step "add", action: Add, params: %{amount: input(:amount)}
@@ -57,7 +57,7 @@ defmodule JidoTest.Agent.AuthoringTest do
     @behaviour Jido.Plugin
 
     def state_spec(opts),
-      do: {:turns, Zoi.integer() |> Zoi.default(Keyword.get(opts, :initial, 0))}
+      do: {:turns, Jido.Joi.integer() |> Jido.Joi.default(Keyword.get(opts, :initial, 0))}
 
     def reduce(reduction, _opts), do: {:ok, reduction.plugin_state + 1}
   end
@@ -82,7 +82,7 @@ defmodule JidoTest.Agent.AuthoringTest do
     use Jido.Agent, name: "prepared_counter"
 
     state do
-      schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+      schema Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)})
     end
 
     routes do
@@ -101,7 +101,7 @@ defmodule JidoTest.Agent.AuthoringTest do
     use Jido.Agent, name: "raw_counter", metadata: %{day: ~D[2026-09-03]}
 
     state do
-      schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+      schema Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)})
     end
 
     routes do
@@ -115,12 +115,12 @@ defmodule JidoTest.Agent.AuthoringTest do
     use Jido.Action,
       name: "list_inputs",
       schema:
-        Zoi.object(%{
-          items: Zoi.array(Zoi.integer()) |> Zoi.optional(),
-          nullable_items: Zoi.array(Zoi.integer()) |> Zoi.nullable() |> Zoi.optional(),
-          options: Zoi.keyword(value: Zoi.integer()) |> Zoi.optional(),
-          empty: Zoi.literal([]) |> Zoi.optional(),
-          anything: Zoi.any() |> Zoi.optional()
+        Jido.Joi.object(%{
+          items: Jido.Joi.array(Jido.Joi.integer()) |> Jido.Joi.optional(),
+          nullable_items: Jido.Joi.array(Jido.Joi.integer()) |> Jido.Joi.nullable() |> Jido.Joi.optional(),
+          options: Jido.Joi.keyword(value: Jido.Joi.integer()) |> Jido.Joi.optional(),
+          empty: Jido.Joi.literal([]) |> Jido.Joi.optional(),
+          anything: Jido.Joi.any() |> Jido.Joi.optional()
         })
 
     def run(_params, %{agent_state: state}), do: {:ok, state}
@@ -130,14 +130,14 @@ defmodule JidoTest.Agent.AuthoringTest do
     use Jido.Action,
       name: "named_inputs",
       schema:
-        Zoi.object(%{
-          server: Zoi.integer(),
-          opts: Zoi.integer(),
-          _: Zoi.integer(),
-          _private: Zoi.integer(),
-          "user-id": Zoi.integer(),
-          amount: Zoi.integer() |> Zoi.optional(),
-          amount_or_opts: Zoi.integer() |> Zoi.optional()
+        Jido.Joi.object(%{
+          server: Jido.Joi.integer(),
+          opts: Jido.Joi.integer(),
+          _: Jido.Joi.integer(),
+          _private: Jido.Joi.integer(),
+          "user-id": Jido.Joi.integer(),
+          amount: Jido.Joi.integer() |> Jido.Joi.optional(),
+          amount_or_opts: Jido.Joi.integer() |> Jido.Joi.optional()
         })
 
     def run(input, _context), do: {:ok, input}
@@ -162,7 +162,7 @@ defmodule JidoTest.Agent.AuthoringTest do
       plugins: [{CountTurns, %{initial: 0}}, {PassThrough, %{label: :second}}]
 
     state do
-      schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+      schema Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)})
     end
 
     routes do
@@ -183,7 +183,7 @@ defmodule JidoTest.Agent.AuthoringTest do
       plugins: [{CountTurns, %{initial: 0}}, {PassThrough, %{label: :second}}]
 
     state do
-      schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+      schema Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)})
     end
 
     routes do
@@ -197,7 +197,7 @@ defmodule JidoTest.Agent.AuthoringTest do
     use Jido.Agent, name: "inline_authoring_counter"
 
     state do
-      schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+      schema Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)})
     end
 
     routes do
@@ -207,9 +207,9 @@ defmodule JidoTest.Agent.AuthoringTest do
         action %{amount: amount, multiplier: multiplier},
           name: "inline_authoring_add",
           schema:
-            Zoi.object(%{
-              amount: Zoi.integer(),
-              multiplier: Zoi.integer() |> Zoi.default(1)
+            Jido.Joi.object(%{
+              amount: Jido.Joi.integer(),
+              multiplier: Jido.Joi.integer() |> Jido.Joi.default(1)
             }),
           context: context do
           {:ok, %{context.agent_state | count: add(context.agent_state.count, amount, multiplier)}}
@@ -274,7 +274,7 @@ defmodule JidoTest.Agent.AuthoringTest do
       compile_agent("", "", "state do\n schema nil\n end")
     end
 
-    for option <- ["schema: Zoi.object(%{})", "routes: []"] do
+    for option <- ["schema: Jido.Joi.object(%{})", "routes: []"] do
       assert_raise Spark.Options.ValidationError, ~r/unknown options/, fn ->
         compile_agent("", ", #{option}")
       end
@@ -369,7 +369,7 @@ defmodule JidoTest.Agent.AuthoringTest do
       compile_agent(
         """
         route "test.classify" do
-          action schema: Zoi.object(%{amount: Zoi.integer()}), context: context do
+          action schema: Jido.Joi.object(%{amount: Jido.Joi.integer()}), context: context do
             %{amount: amount} when amount > 0 ->
               {:ok, %{context.agent_state | result: :positive}}
 
@@ -382,7 +382,7 @@ defmodule JidoTest.Agent.AuthoringTest do
         "",
         """
         state do
-          schema Zoi.object(%{result: Zoi.atom() |> Zoi.default(:unset)})
+          schema Jido.Joi.object(%{result: Jido.Joi.atom() |> Jido.Joi.default(:unset)})
         end
         """
       )
@@ -610,7 +610,7 @@ defmodule JidoTest.Agent.AuthoringTest do
           use Jido.Agent, name: "reloaded"
 
           state do
-            schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+            schema Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)})
           end
 
           routes do
@@ -622,7 +622,7 @@ defmodule JidoTest.Agent.AuthoringTest do
         defmodule #{inspect(module)}.Add do
           use Jido.Action,
             name: "reloaded_add",
-            schema: Zoi.object(%{#{field}: Zoi.integer()})
+            schema: Jido.Joi.object(%{#{field}: Jido.Joi.integer()})
 
           def run(params, _context), do: {:ok, %{count: params.#{field}}}
         end

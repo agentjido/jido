@@ -1,4 +1,5 @@
 defmodule Jido.AI.Reasoning.ChainOfDraft.ModelRound do
+  alias Jido.Joi
   @moduledoc "Runs one structured Chain of Draft model response."
 
   alias Jido.AI.Reasoning.Actions.{CallModel, GuardOutput, ProjectConversation, RecordModelAttempt}
@@ -8,8 +9,8 @@ defmodule Jido.AI.Reasoning.ChainOfDraft.ModelRound do
     id: "jido.ai/reasoning/chain-of-draft/model-round",
     vsn: 1,
     name: "jido_ai_chain_of_draft_model_round",
-    schema: Zoi.object(%{turn: Zoi.any()}),
-    output_schema: Zoi.map()
+    schema: Joi.object(%{turn: Joi.any()}),
+    output_schema: Joi.map()
 
   flow do
     step "project", action: ProjectConversation, params: %{turn: input(:turn)}

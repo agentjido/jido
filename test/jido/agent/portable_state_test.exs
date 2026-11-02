@@ -36,7 +36,7 @@ defmodule Jido.Agent.PortableStateTest do
     ]
 
     definition =
-      Agent.define!(%{name: "portable_state", schema: Zoi.object(%{payload: Zoi.any()})})
+      Agent.define!(%{name: "portable_state", schema: Jido.Joi.object(%{payload: Jido.Joi.any()})})
 
     for value <- values do
       assert {:ok, agent} =
@@ -72,7 +72,7 @@ defmodule Jido.Agent.PortableStateTest do
 
   test "bounds every diagnostic path segment" do
     definition =
-      Agent.define!(%{name: "portable_path", schema: Zoi.object(%{payload: Zoi.any()})})
+      Agent.define!(%{name: "portable_path", schema: Jido.Joi.object(%{payload: Jido.Joi.any()})})
 
     long_binary = String.duplicate("b", 100)
     long_integer = String.to_integer(String.duplicate("9", 100))
@@ -105,7 +105,7 @@ defmodule Jido.Agent.PortableStateTest do
     definition =
       Agent.define!(%{
         name: "local_transition",
-        schema: Zoi.object(%{payload: Zoi.any()}),
+        schema: Jido.Joi.object(%{payload: Jido.Joi.any()}),
         routes: [
           %{
             path: "local.run",
@@ -133,7 +133,7 @@ defmodule Jido.Agent.PortableStateTest do
   end
 
   test "live local values must still match the declared schema and identity" do
-    definition = Agent.define!(%{name: "typed_local", schema: Zoi.object(%{payload: Zoi.pid()})})
+    definition = Agent.define!(%{name: "typed_local", schema: Jido.Joi.object(%{payload: Jido.Joi.pid()})})
 
     agent =
       Agent.instantiate!(definition, id: Jido.Signal.ID.generate!(), state: %{payload: self()})

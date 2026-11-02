@@ -11,12 +11,12 @@ defmodule Jido.Plugin.PreparationTest do
     @impl true
     def state_spec(_opts) do
       {:observation,
-       Zoi.object(%{
-         candidate_value: Zoi.integer() |> Zoi.default(0),
-         prepared_state_value: Zoi.integer() |> Zoi.default(0),
-         previous_value: Zoi.integer() |> Zoi.default(0)
+       Jido.Joi.object(%{
+         candidate_value: Jido.Joi.integer() |> Jido.Joi.default(0),
+         prepared_state_value: Jido.Joi.integer() |> Jido.Joi.default(0),
+         previous_value: Jido.Joi.integer() |> Jido.Joi.default(0)
        })
-       |> Zoi.default(%{
+       |> Jido.Joi.default(%{
          candidate_value: 0,
          prepared_state_value: 0,
          previous_value: 0
@@ -79,7 +79,7 @@ defmodule Jido.Plugin.PreparationTest do
   defmodule Capture do
     use Jido.Action,
       name: "plugin_preparation_capture",
-      schema: Zoi.object(%{value: Zoi.integer()})
+      schema: Jido.Joi.object(%{value: Jido.Joi.integer()})
 
     alias Jido.Plugin.PreparationTest.Package
 
@@ -180,13 +180,13 @@ defmodule Jido.Plugin.PreparationTest do
     Jido.Agent.define!(%{
       name: "plugin_preparation_agent",
       schema:
-        Zoi.object(%{
-          action_signal_id: Zoi.string() |> Zoi.default(""),
-          prepared_agent_id: Zoi.string() |> Zoi.default(""),
-          prepared_state_value: Zoi.integer() |> Zoi.default(-1),
-          prepared_signal_id: Zoi.string() |> Zoi.default(""),
-          prepared_signal_type: Zoi.string() |> Zoi.default(""),
-          value: Zoi.integer() |> Zoi.default(0)
+        Jido.Joi.object(%{
+          action_signal_id: Jido.Joi.string() |> Jido.Joi.default(""),
+          prepared_agent_id: Jido.Joi.string() |> Jido.Joi.default(""),
+          prepared_state_value: Jido.Joi.integer() |> Jido.Joi.default(-1),
+          prepared_signal_id: Jido.Joi.string() |> Jido.Joi.default(""),
+          prepared_signal_type: Jido.Joi.string() |> Jido.Joi.default(""),
+          value: Jido.Joi.integer() |> Jido.Joi.default(0)
         }),
       routes: [
         %{

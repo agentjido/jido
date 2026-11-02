@@ -1,4 +1,5 @@
 defmodule Jido.Agent.Route do
+  alias Jido.Joi
   @moduledoc "Pure route normalization and selection. Selection does not run a handler."
   alias Jido.Agent.{Data, Error}
 
@@ -200,7 +201,7 @@ defmodule Jido.Agent.Route do
   end
 
   defp output_schema_value(schema) do
-    if is_struct(schema) and Zoi.Type.impl_for(schema) != nil,
+    if Joi.Schema.schema?(schema),
       do: {:ok, schema},
       else: Error.fail(:invalid_output_schema, [], "Executable output schema is invalid")
   end
@@ -226,41 +227,42 @@ defmodule Jido.Agent.Route do
     end
   end
 
-  defp output_field(%{__struct__: type, fields: fields}, key, index)
-       when type in [Zoi.Types.Map, Zoi.Types.Struct] and is_list(fields) do
-    matches =
-      for {declared_key, schema} <- fields,
-          is_atom(declared_key) or is_binary(declared_key),
-          to_string(declared_key) == to_string(key),
-          do: {declared_key, schema}
+  defp output_field(schema, key, index) do
+    with kind when kind in [:map, :struct] <- Joi.Schema.kind(schema),
+         {:ok, fields} when is_list(fields) <- Joi.Schema.fields(schema) do
+      matches =
+        for {declared_key, child_schema} <- fields,
+            is_atom(declared_key) or is_binary(declared_key),
+            to_string(declared_key) == to_string(key),
+            do: {declared_key, child_schema}
 
-    case matches do
-      [{declared_key, schema}] ->
-        {:ok, declared_key, schema}
+      case matches do
+        [{declared_key, child_schema}] ->
+          {:ok, declared_key, child_schema}
 
-      [] ->
-        Error.fail(:unknown_output_field, [:path, index], "Output path field is not declared", %{
-          key: key
-        })
+        [] ->
+          Error.fail(:unknown_output_field, [:path, index], "Output path field is not declared", %{
+            key: key
+          })
 
-      _many ->
+        _many ->
+          Error.fail(
+            :ambiguous_output_field,
+            [:path, index],
+            "Output path field name is ambiguous",
+            %{key: key}
+          )
+      end
+    else
+      _ ->
         Error.fail(
-          :ambiguous_output_field,
+          :unsupported_output_path,
           [:path, index],
-          "Output path field name is ambiguous",
+          "Output paths can traverse only object or struct fields",
           %{key: key}
         )
     end
   end
-
-  defp output_field(_schema, key, index),
-    do:
-      Error.fail(
-        :unsupported_output_path,
-        [:path, index],
-        "Output paths can traverse only object or struct fields",
-        %{key: key}
-      )
 
   defp forward_target(%{kind: :agent} = target) do
     with {:ok, target} <- Data.fields(target, [:kind, :name]),

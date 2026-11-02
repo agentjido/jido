@@ -30,7 +30,7 @@ defmodule Jido.Exec.SourceMapTest do
   defmodule InvalidOutputFlow do
     use Jido.Flow,
       name: "exec_v2_invalid_output",
-      output_schema: Zoi.object(%{value: Zoi.integer()})
+      output_schema: Jido.Joi.object(%{value: Jido.Joi.integer()})
 
     flow do
       step "bad", action: BadOutputAction, params: %{}

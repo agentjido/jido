@@ -29,7 +29,7 @@ defmodule Jido.Flow.DSL.NestedSourceTest do
         option_scope: "flow expression contains a scoped ref outside its valid scope",
         fallback_scope: "flow expression contains a scoped ref outside its valid scope",
         option_name: "Action name cannot be blank.",
-        state_schema: "iterate state schema must be a Zoi schema",
+        state_schema: "iterate state schema must be a Joi schema",
         fallback_parse: "unsupported Flow expression: [Date.utc_today()]; use a Flow reference, literal, map, or list",
         state_parse: "unsupported Flow expression: [Date.utc_today()]; use a Flow reference, literal, map, or list"
       ] do
@@ -114,7 +114,7 @@ defmodule Jido.Flow.DSL.NestedSourceTest do
     {error, _source} =
       compile_error("""
       iterate "loop" do
-        state Zoi.map(), initial: %{}
+        state Jido.Joi.map(), initial: %{}
         action Echo
         params %{}
         update item()
@@ -131,7 +131,7 @@ defmodule Jido.Flow.DSL.NestedSourceTest do
     {error, _source} =
       compile_error("""
       iterate "loop" do
-        state Zoi.map(), initial: item()
+        state Jido.Joi.map(), initial: item()
         action Echo
         params %{}
         update item()
@@ -172,7 +172,7 @@ defmodule Jido.Flow.DSL.NestedSourceTest do
            """, "option", "unsupported Flow condition: 1"},
           {"""
            iterate "loop" do
-             state Zoi.map(), initial: %{}
+             state Jido.Joi.map(), initial: %{}
              action Echo
              while 1
              update System.system_time()
@@ -183,7 +183,7 @@ defmodule Jido.Flow.DSL.NestedSourceTest do
            """, "params Date", "unsupported Flow expression: Date.utc_today()"},
           {"""
            iterate "loop" do
-             state Zoi.map(), initial: %{}
+             state Jido.Joi.map(), initial: %{}
              action Echo
              while 1
              update Date.utc_today()
@@ -257,13 +257,13 @@ defmodule Jido.Flow.DSL.NestedSourceTest do
       :state_parse ->
         {"""
          iterate "loop" do
-           #{state} Zoi.map(), initial: [Date.utc_today()]
+           #{state} Jido.Joi.map(), initial: [Date.utc_today()]
            action Echo
            params %{}
            repeat 1
          end
          output result("loop")
-         """, "#{state} Zoi.map()"}
+         """, "#{state} Jido.Joi.map()"}
 
       :state_schema ->
         {"""

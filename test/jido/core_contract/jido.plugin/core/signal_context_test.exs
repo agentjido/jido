@@ -21,10 +21,10 @@ defmodule Jido.Plugin.SignalContextTest do
       partition: "west"
     }
 
-    assert {:ok, %SignalContext{} = context} = Zoi.parse(SignalContext.schema(), attrs)
+    assert {:ok, %SignalContext{} = context} = Jido.Joi.parse(SignalContext.schema(), attrs)
     assert Map.from_struct(context) == attrs
 
-    assert {:error, _reason} = Zoi.parse(SignalContext.schema(), Map.put(attrs, :extra, true))
+    assert {:error, _reason} = Jido.Joi.parse(SignalContext.schema(), Map.put(attrs, :extra, true))
   end
 
   @tag obligation: "jido.plugin.I9"
@@ -42,7 +42,7 @@ defmodule Jido.Plugin.SignalContextTest do
     }
 
     assert {:ok, %SignalContext{turn_context: %{}}} =
-             Zoi.parse(SignalContext.schema(), required)
+             Jido.Joi.parse(SignalContext.schema(), required)
 
     for changes <- [
           %{turn_id: 1},
@@ -51,7 +51,7 @@ defmodule Jido.Plugin.SignalContextTest do
           %{effective_signal: :invalid},
           %{state_version: -1}
         ] do
-      assert {:error, _reason} = Zoi.parse(SignalContext.schema(), Map.merge(required, changes))
+      assert {:error, _reason} = Jido.Joi.parse(SignalContext.schema(), Map.merge(required, changes))
     end
   end
 
@@ -75,19 +75,19 @@ defmodule Jido.Plugin.SignalContextTest do
       options: [label: "test"]
     }
 
-    assert {:ok, %Init{} = init} = Zoi.parse(Init.schema(), attrs)
+    assert {:ok, %Init{} = init} = Jido.Joi.parse(Init.schema(), attrs)
     assert Map.from_struct(init) == attrs
 
     assert {:ok, %Init{state_version: 0, options: []}} =
-             Zoi.parse(Init.schema(), Map.take(attrs, [:agent_server, :agent_id, :module]))
+             Jido.Joi.parse(Init.schema(), Map.take(attrs, [:agent_server, :agent_id, :module]))
 
     for key <- [:agent_server, :agent_id, :module] do
-      assert {:error, _reason} = Zoi.parse(Init.schema(), Map.delete(attrs, key))
+      assert {:error, _reason} = Jido.Joi.parse(Init.schema(), Map.delete(attrs, key))
     end
 
-    assert {:error, _reason} = Zoi.parse(Init.schema(), %{attrs | state_version: -1})
-    assert {:error, _reason} = Zoi.parse(Init.schema(), Map.put(attrs, :extra, true))
-    assert {:error, _reason} = Zoi.parse(Init.schema(), %{attrs | options: [:invalid]})
+    assert {:error, _reason} = Jido.Joi.parse(Init.schema(), %{attrs | state_version: -1})
+    assert {:error, _reason} = Jido.Joi.parse(Init.schema(), Map.put(attrs, :extra, true))
+    assert {:error, _reason} = Jido.Joi.parse(Init.schema(), %{attrs | options: [:invalid]})
   end
 
   @tag obligation: "jido.plugin.I9"
@@ -107,12 +107,12 @@ defmodule Jido.Plugin.SignalContextTest do
     }
 
     assert {:ok, %DirectiveContext{} = context} =
-             Zoi.parse(DirectiveContext.schema(), attrs)
+             Jido.Joi.parse(DirectiveContext.schema(), attrs)
 
     assert Map.from_struct(context) == attrs
 
     assert {:ok, %DirectiveContext{turn_context: %{}}} =
-             Zoi.parse(
+             Jido.Joi.parse(
                DirectiveContext.schema(),
                Map.drop(attrs, [:turn_context, :jido, :partition])
              )
@@ -125,12 +125,12 @@ defmodule Jido.Plugin.SignalContextTest do
           :state_version,
           :plugin_state
         ] do
-      assert {:error, _reason} = Zoi.parse(DirectiveContext.schema(), Map.delete(attrs, key))
+      assert {:error, _reason} = Jido.Joi.parse(DirectiveContext.schema(), Map.delete(attrs, key))
     end
 
-    assert {:error, _reason} = Zoi.parse(DirectiveContext.schema(), %{attrs | state_version: -1})
+    assert {:error, _reason} = Jido.Joi.parse(DirectiveContext.schema(), %{attrs | state_version: -1})
 
     assert {:error, _reason} =
-             Zoi.parse(DirectiveContext.schema(), Map.put(attrs, :extra, true))
+             Jido.Joi.parse(DirectiveContext.schema(), Map.put(attrs, :extra, true))
   end
 end

@@ -76,8 +76,8 @@ defmodule Jido.Exec.Runner.DurabilityTest do
   defmodule DurableStep do
     use Jido.Action,
       name: "durable_step",
-      schema: Zoi.object(%{step: Zoi.integer(), value: Zoi.integer()}),
-      output_schema: Zoi.object(%{value: Zoi.integer()})
+      schema: Jido.Joi.object(%{step: Jido.Joi.integer(), value: Jido.Joi.integer()}),
+      output_schema: Jido.Joi.object(%{value: Jido.Joi.integer()})
 
     @impl true
     def run(%{step: 6, value: value}, _context) do
@@ -220,7 +220,7 @@ defmodule Jido.Exec.Runner.DurabilityTest do
   defmodule HandoffTarget do
     use Jido.Action,
       name: "durable_handoff_target",
-      schema: Zoi.object(%{value: Zoi.integer()})
+      schema: Jido.Joi.object(%{value: Jido.Joi.integer()})
 
     @impl true
     def run(_params, _context), do: raise("successor must run in a new execution")
@@ -351,7 +351,7 @@ defmodule Jido.Exec.Runner.DurabilityTest do
             action: DurableIteration,
             params: %{count: Ref.state(:count), index: Ref.iteration_index()},
             state: %{
-              schema: Zoi.object(%{count: Zoi.integer()}),
+              schema: Jido.Joi.object(%{count: Jido.Joi.integer()}),
               initial: %{count: 0},
               update: %{count: Ref.body_result(:count)}
             },

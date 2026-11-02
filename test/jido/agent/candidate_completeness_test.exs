@@ -22,10 +22,10 @@ defmodule JidoTest.Agent.CandidateCompletenessTest do
     use Jido.Agent, name: "candidate_completeness_counter"
 
     state do
-      schema Zoi.object(%{
-               count: Zoi.integer() |> Zoi.default(0),
-               history: Zoi.list(Zoi.string()) |> Zoi.default([]),
-               note: Zoi.string() |> Zoi.optional()
+      schema Jido.Joi.object(%{
+               count: Jido.Joi.integer() |> Jido.Joi.default(0),
+               history: Jido.Joi.list(Jido.Joi.string()) |> Jido.Joi.default([]),
+               note: Jido.Joi.string() |> Jido.Joi.optional()
              })
     end
 
@@ -43,7 +43,7 @@ defmodule JidoTest.Agent.CandidateCompletenessTest do
     assert {:error,
             %Jido.Agent.Error{
               code: :incomplete_state,
-              details: %{issues: [%Zoi.Error{path: [:history]}]}
+              details: %{issues: [%{path: [:history]}]}
             }} =
              Counter.cmd(initial, signal)
 
@@ -53,7 +53,7 @@ defmodule JidoTest.Agent.CandidateCompletenessTest do
     assert {:error,
             %Jido.Agent.Error{
               code: :incomplete_state,
-              details: %{issues: [%Zoi.Error{path: [:history]}]}
+              details: %{issues: [%{path: [:history]}]}
             }} =
              Server.call(server, signal)
 

@@ -119,7 +119,7 @@ defmodule Jido.Agent.SchedulerCodecTest do
 
     Agent.define!(%{
       name: "json_scheduler",
-      schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}),
+      schema: Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)}),
       plugins: [
         %{
           id: Scheduler.id(),

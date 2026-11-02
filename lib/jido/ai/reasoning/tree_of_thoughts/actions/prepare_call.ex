@@ -1,4 +1,5 @@
 defmodule Jido.AI.Reasoning.TreeOfThoughts.Actions.PrepareCall do
+  alias Jido.Joi
   @moduledoc "Prepares one generation, evaluation, or synthesis model call."
 
   @thoughts_schema %{
@@ -51,8 +52,8 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.Actions.PrepareCall do
     id: "jido.ai/reasoning/tree-of-thoughts/actions/prepare-call",
     vsn: 1,
     name: "jido_ai_tree_of_thoughts_prepare_call",
-    schema: Zoi.map(),
-    output_schema: Zoi.map()
+    schema: Joi.map(),
+    output_schema: Joi.map()
 
   @impl Jido.Action
   def run(%{state: %{turn: turn} = state}, _context) do

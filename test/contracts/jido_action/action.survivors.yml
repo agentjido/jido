@@ -3,13 +3,13 @@
 
 - at: "lib/jido_authoring/compiler.ex:4:24"
   operator: "string_empty"
-  mutation: "`\"Validates the input parameters for the Action.\\n\\nRuns `on_before_validate_params/1` when the Action implements it, then applies\\nthe input schema. Returns `{:ok, validated_params}` or `{:error, reason}`.\\nDirect, nested, and wrapped schemas use their declared Zoi unknown-key policy.\\n\"` → `\"\"`"
+  mutation: "`\"Validates the input parameters for the Action.\\n\\nRuns `on_before_validate_params/1` when the Action implements it, then applies\\nthe input schema. Returns `{:ok, validated_params}` or `{:error, reason}`.\\nDirect, nested, and wrapped schemas use their declared Joi unknown-key policy.\\n\"` → `\"\"`"
   sort: "unpromised"
   reason: "This changes generated documentation text or its Action/Flow label. The declared functional obligations check metadata values, kind markers, validation and callback requirements. They do not check documentation wording; this is not an equivalent documentation claim."
 
 - at: "lib/jido_authoring/compiler.ex:12:24"
   operator: "string_empty"
-  mutation: "`\"Validates the output result for the Action.\\n\\nReturns `{:ok, validated_output}` or\\n`{:error, %Jido.Action.Error.InvalidInputError{}}`. Direct, nested, and wrapped\\nschemas use their declared Zoi unknown-key policy. An explicit\\n`Jido.Action.Output` envelope is validated as an envelope.\\n\"` → `\"\"`"
+  mutation: "`\"Validates the output result for the Action.\\n\\nReturns `{:ok, validated_output}` or\\n`{:error, %Jido.Action.Error.InvalidInputError{}}`. Direct, nested, and wrapped\\nschemas use their declared Joi unknown-key policy. An explicit\\n`Jido.Action.Output` envelope is validated as an envelope.\\n\"` → `\"\"`"
   sort: "unpromised"
   reason: "This changes generated documentation text or its Action/Flow label. The declared functional obligations check metadata values, kind markers, validation and callback requirements. They do not check documentation wording; this is not an equivalent documentation claim."
 

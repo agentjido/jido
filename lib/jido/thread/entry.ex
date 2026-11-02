@@ -1,27 +1,28 @@
 defmodule Jido.Thread.Entry do
+  alias Jido.Joi
   @moduledoc "One portable entry in a `Jido.Thread`."
 
-  @schema Zoi.struct(
+  @schema Joi.struct(
             __MODULE__,
             %{
-              id: Zoi.string() |> Zoi.min(1),
-              seq: Zoi.integer() |> Zoi.min(0),
-              at: Zoi.integer(),
-              kind: Zoi.any(),
-              payload: Zoi.map() |> Zoi.default(%{}),
-              refs: Zoi.map() |> Zoi.default(%{})
+              id: Joi.string() |> Joi.min(1),
+              seq: Joi.integer() |> Joi.min(0),
+              at: Joi.integer(),
+              kind: Joi.any(),
+              payload: Joi.map() |> Joi.default(%{}),
+              refs: Joi.map() |> Joi.default(%{})
             },
             coerce: true,
             unrecognized_keys: :error
           )
 
   @type kind :: atom() | String.t()
-  @type t :: unquote(Zoi.type_spec(@schema))
-  @enforce_keys Zoi.Struct.enforce_keys(@schema)
-  defstruct Zoi.Struct.struct_fields(@schema)
+  @type t :: unquote(Joi.type_spec(@schema))
+  @enforce_keys Joi.Struct.enforce_keys(@schema)
+  defstruct Joi.Struct.struct_fields(@schema)
 
   @doc "Returns the Entry schema."
-  @spec schema() :: Zoi.schema()
+  @spec schema() :: Joi.schema()
   def schema, do: @schema
 
   @doc "Creates an Entry. Its Thread assigns the final sequence number."
@@ -78,7 +79,7 @@ defmodule Jido.Thread.Entry do
   @doc false
   @spec validate(t()) :: {:ok, t()} | {:error, :invalid_entry}
   def validate(%__MODULE__{} = entry) do
-    with {:ok, _value} <- Zoi.parse(@schema, entry),
+    with :ok <- Joi.validate(@schema, entry),
          true <- (is_atom(entry.kind) and not is_nil(entry.kind)) or nonempty?(entry.kind),
          :ok <- Jido.PortableTerm.validate(entry.payload, :thread_entry_payload),
          :ok <- Jido.PortableTerm.validate(entry.refs, :thread_entry_refs) do

@@ -213,7 +213,7 @@ defmodule Jido.Agent.Plugin.Pipeline do
   end
 
   defp validate_reduction({:ok, value}, spec, state) do
-    case Jido.Schema.validate(spec.state_schema, value) do
+    case Jido.Joi.validate(spec.state_schema, value) do
       :ok ->
         {:ok, Map.put(state, spec.state_key, value)}
 

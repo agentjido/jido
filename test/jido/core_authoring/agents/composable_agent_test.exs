@@ -34,7 +34,7 @@ defmodule Jido.AgentAuthoringTest do
           name: "test",
           description: nil,
           vsn: 1,
-          schema: Zoi.object(%{}),
+          schema: Jido.Joi.object(%{}),
           metadata: %{},
           signal_source: nil,
           routes: [],
@@ -55,9 +55,9 @@ defmodule Jido.AgentAuthoringTest do
     Agent.define(%{
       name: "parent",
       schema:
-        Zoi.object(%{
-          value: Zoi.string() |> Zoi.default("start"),
-          workers: Zoi.integer() |> Zoi.default(2)
+        Jido.Joi.object(%{
+          value: Jido.Joi.string() |> Jido.Joi.default("start"),
+          workers: Jido.Joi.integer() |> Jido.Joi.default(2)
         }),
       routes: [
         route("work.request"),
@@ -80,7 +80,7 @@ defmodule Jido.AgentAuthoringTest do
     assert Minimal.definition() |> Map.from_struct() ===
              Agent.define!(%{name: "minimal", module: Minimal}) |> Map.from_struct()
 
-    assert Zoi.parse(Agent.__schema__(), expected) == {:ok, expected}
+    assert Jido.Joi.parse(Agent.__schema__(), expected) == {:ok, expected}
     assert Agent.define!(expected) === expected
   end
 
@@ -91,7 +91,7 @@ defmodule Jido.AgentAuthoringTest do
         name: "named",
         description: "Named executables",
         vsn: 3,
-        schema: Zoi.object(%{value: Zoi.string() |> Zoi.default("initial")}),
+        schema: Jido.Joi.object(%{value: Jido.Joi.string() |> Jido.Joi.default("initial")}),
         metadata: %{label: "named"},
         signal_source: "/named",
         routes: [
@@ -158,9 +158,9 @@ defmodule Jido.AgentAuthoringTest do
         description: "Test team",
         vsn: 2,
         schema:
-          Zoi.object(%{
-            value: Zoi.string() |> Zoi.default("input"),
-            workers: Zoi.integer() |> Zoi.default(2)
+          Jido.Joi.object(%{
+            value: Jido.Joi.string() |> Jido.Joi.default("input"),
+            workers: Jido.Joi.integer() |> Jido.Joi.default(2)
           }),
         metadata: %{label: "team"},
         signal_source: "/team",
@@ -254,9 +254,9 @@ defmodule Jido.AgentAuthoringTest do
 
   test "state schema must be static and cannot coerce or transform values" do
     for schema <- [
-          Zoi.string(),
-          Zoi.object(%{value: Zoi.integer(coerce: true)}),
-          Zoi.object(%{value: Zoi.string() |> Zoi.transform(&String.trim/1)})
+          Jido.Joi.string(),
+          Jido.Joi.object(%{value: Jido.Joi.integer(coerce: true)}),
+          Jido.Joi.object(%{value: Jido.Joi.string() |> Jido.Joi.transform(&String.trim/1)})
         ] do
       assert {:error, %Error{path: [:schema | _]}} =
                Agent.define(%{name: "test", schema: schema})
@@ -565,7 +565,7 @@ defmodule Jido.AgentAuthoringTest do
     child =
       Agent.define!(%{
         name: "nested",
-        schema: Zoi.object(%{settings: Zoi.object(%{value: Zoi.string(), limit: Zoi.integer()})})
+        schema: Jido.Joi.object(%{settings: Jido.Joi.object(%{value: Jido.Joi.string(), limit: Jido.Joi.integer()})})
       })
 
     initial = %{settings: %{value: Topology.state(:value), limit: "invalid"}}
@@ -592,7 +592,7 @@ defmodule Jido.AgentAuthoringTest do
 
   test "state initialization adds defaults without converting supplied values" do
     definition =
-      Agent.define!(%{name: "static", schema: Zoi.object(%{values: Zoi.list(Zoi.integer())})})
+      Agent.define!(%{name: "static", schema: Jido.Joi.object(%{values: Jido.Joi.list(Jido.Joi.integer())})})
 
     assert {:ok, %{state: %{values: [1, 2]}}} =
              Agent.instantiate(definition, id: "valid", state: %{values: [1, 2]})
@@ -608,7 +608,7 @@ defmodule Jido.AgentAuthoringTest do
         name: "map-copy",
         metadata: %{owner: "map"},
         routes: [],
-        schema: Zoi.object(%{})
+        schema: Jido.Joi.object(%{})
       })
 
     assert Agent.define!(input) === input
@@ -654,7 +654,7 @@ defmodule Jido.AgentAuthoringTest do
           "routes do route \"work.request\", priority: 2 end",
           "routes do route \"work.request\", JidoTest.ComposableAgent.Action do transform signal do {:ok,signal} end end end",
           "routes do route \"work.request\" do action value do {:ok,value} end; transform signal do {:ok,signal} end end end",
-          "state do schema Zoi.object(%{}); schema Zoi.object(%{}) end",
+          "state do schema Jido.Joi.object(%{}); schema Jido.Joi.object(%{}) end",
           "state do end; state do end"
         ] do
       assert_raise CompileError, fn -> Compiler.compile(body) end

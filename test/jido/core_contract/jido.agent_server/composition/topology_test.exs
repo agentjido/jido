@@ -109,7 +109,7 @@ defmodule JidoTest.AgentServer.Composition.TopologyTest do
   defp worker(handler \\ F.Work) do
     Agent.define!(%{
       name: "worker",
-      schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}),
+      schema: Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)}),
       routes: [
         %{
           path: "work",
@@ -161,7 +161,7 @@ defmodule JidoTest.AgentServer.Composition.TopologyTest do
     initial =
       Agent.define!(%{
         name: "bound",
-        schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(1)}),
+        schema: Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(1)}),
         routes: [
           %{
             path: "work",

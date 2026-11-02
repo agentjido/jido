@@ -7,7 +7,7 @@ defmodule Jido.Agent.FlowExpressionTest do
   defmodule Amount do
     use Jido.Action,
       name: "expression_amount",
-      schema: Zoi.object(%{amount: Zoi.integer()})
+      schema: Jido.Joi.object(%{amount: Jido.Joi.integer()})
 
     def run(input, _context), do: {:ok, input}
   end
@@ -15,7 +15,7 @@ defmodule Jido.Agent.FlowExpressionTest do
   defmodule Add do
     use Jido.Flow,
       name: "expression_add",
-      schema: Zoi.object(%{amount: Zoi.integer()})
+      schema: Jido.Joi.object(%{amount: Jido.Joi.integer()})
 
     flow do
       step "amount", action: Amount, params: %{amount: min(input(:amount), 5)}
@@ -27,7 +27,7 @@ defmodule Jido.Agent.FlowExpressionTest do
     use Jido.Agent, name: "expression_counter"
 
     state do
-      schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+      schema Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)})
     end
 
     routes do

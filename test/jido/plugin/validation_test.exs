@@ -40,7 +40,7 @@ defmodule Jido.Plugin.ValidationTest do
 
   defmodule Configurable.Agent do
     @behaviour Jido.Plugin
-    def state_spec(opts), do: Keyword.get(opts, :state, {:owned, Zoi.integer()})
+    def state_spec(opts), do: Keyword.get(opts, :state, {:owned, Jido.Joi.integer()})
     def directives(opts), do: Keyword.get(opts, :directives, [Effect])
     def reduce(_reduction, opts), do: Keyword.fetch!(opts, :result)
   end
@@ -180,7 +180,7 @@ defmodule Jido.Plugin.ValidationTest do
       assert {:error, error} =
                Jido.Agent.define(%{
                  name: "bad_plugin_state_schema",
-                 schema: Zoi.object(%{}),
+                 schema: Jido.Joi.object(%{}),
                  plugins: [
                    %{
                      id: FailingStateSpec.id(),
@@ -200,7 +200,7 @@ defmodule Jido.Plugin.ValidationTest do
     assert {:error, error} =
              Jido.Agent.define(%{
                name: "returned_plugin_state_error",
-               schema: Zoi.object(%{}),
+               schema: Jido.Joi.object(%{}),
                plugins: [
                  %{
                    id: FailingStateSpec.id(),
@@ -218,13 +218,13 @@ defmodule Jido.Plugin.ValidationTest do
     assert {:ok, definition} =
              Jido.Agent.define(%{
                name: "error_field_plugin",
-               schema: Zoi.object(%{}),
+               schema: Jido.Joi.object(%{}),
                plugins: [
                  %{
                    id: Configurable.id(),
                    provider: Configurable,
                    vsn: Configurable.vsn(),
-                   data: %{state: {:error, Zoi.integer() |> Zoi.default(7)}}
+                   data: %{state: {:error, Jido.Joi.integer() |> Jido.Joi.default(7)}}
                  }
                ]
              })
@@ -240,7 +240,8 @@ defmodule Jido.Plugin.ValidationTest do
           {42, "Invalid Agent Plugin declaration"},
           {JidoTest.MissingPlugin, "could not be loaded"},
           {{Configurable, state: :invalid}, "state_spec/1 returned an invalid value"},
-          {{Configurable, state: {:owned, Zoi.any() |> Zoi.refine(fn _ -> :ok end)}}, "options must be static data"},
+          {{Configurable, state: {:owned, Jido.Joi.any() |> Jido.Joi.refine(fn _ -> :ok end)}},
+           "options must be static data"},
           {{Configurable, directives: :invalid}, "directives/1 must return a list"},
           {{Configurable, directives: [42]}, "Directive modules must be atoms"},
           {{Configurable, directives: [Effect, Effect]}, "Directive modules must be unique"},
@@ -251,15 +252,15 @@ defmodule Jido.Plugin.ValidationTest do
       assert error.message =~ fragment
     end
 
-    assert {:error, error} = Jido.Agent.Plugin.compose_schema(Zoi.integer(), [])
-    assert error.message =~ "domain schema must be a field-based Zoi object"
+    assert {:error, error} = Jido.Agent.Plugin.compose_schema(Jido.Joi.integer(), [])
+    assert error.message =~ "domain schema must be a field-based Joi object"
   end
 
-  test "state_spec requires a usable Zoi schema and a safe state key" do
+  test "state_spec requires a usable Joi schema and a safe state key" do
     for {state_spec, message} <- [
-          {{nil, Zoi.integer()}, "Plugin-owned Agent state key must not be nil"},
-          {{:__struct__, Zoi.integer()}, "Plugin-owned Agent state key is reserved"},
-          {{:owned, %URI{scheme: "https"}}, "Plugin-owned Agent state schema must be a Zoi schema"}
+          {{nil, Jido.Joi.integer()}, "Plugin-owned Agent state key must not be nil"},
+          {{:__struct__, Jido.Joi.integer()}, "Plugin-owned Agent state key is reserved"},
+          {{:owned, %URI{scheme: "https"}}, "Plugin-owned Agent state schema must be a Joi schema"}
         ] do
       assert {:error, %{__exception__: true} = error} =
                Jido.Plugin.Normalizer.normalize_all([{Configurable, state: state_spec}])
@@ -271,7 +272,7 @@ defmodule Jido.Plugin.ValidationTest do
     assert {:error, %{__exception__: true} = error} =
              Jido.Agent.define(%{
                name: "invalid_plugin_schema",
-               schema: Zoi.object(%{}),
+               schema: Jido.Joi.object(%{}),
                plugins: [
                  %{
                    id: Configurable.id(),
@@ -282,7 +283,7 @@ defmodule Jido.Plugin.ValidationTest do
                ]
              })
 
-    assert error.message == "Plugin-owned Agent state schema must be a Zoi schema"
+    assert error.message == "Plugin-owned Agent state schema must be a Joi schema"
   end
 
   test "normalizes options and declaration callbacks once for reusable specs" do
@@ -302,7 +303,7 @@ defmodule Jido.Plugin.ValidationTest do
 
     init = %Init{agent_server: self(), agent_id: "agent", module: OptionValidator}
 
-    assert {:ok, _schema} = Jido.Agent.Plugin.compose_schema(Zoi.object(%{}), [spec])
+    assert {:ok, _schema} = Jido.Agent.Plugin.compose_schema(Jido.Joi.object(%{}), [spec])
 
     assert {:ok, [{OptionValidator, ^original_opts}]} =
              Jido.Plugin.Normalizer.canonical_declarations([spec])
@@ -571,7 +572,7 @@ defmodule Jido.Plugin.ValidationTest do
     agent =
       Jido.Agent.define!(%{
         name: "plugin_pipeline_validation",
-        schema: Zoi.object(%{owned: Zoi.integer()})
+        schema: Jido.Joi.object(%{owned: Jido.Joi.integer()})
       })
       |> Jido.Agent.instantiate!(id: Jido.Signal.ID.generate!(), state: %{owned: 1})
 

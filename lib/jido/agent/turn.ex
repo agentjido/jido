@@ -1,4 +1,6 @@
 defmodule Jido.Agent.Turn do
+  alias Jido.Joi
+
   @moduledoc """
   A prepared executable turn for one Agent Signal.
 
@@ -23,25 +25,25 @@ defmodule Jido.Agent.Turn do
 
   alias Jido.Error
 
-  @schema Zoi.struct(
+  @schema Joi.struct(
             __MODULE__,
             %{
-              executable: Zoi.any(description: "Action or Flow executable target"),
-              route: Zoi.any(description: "Selected authored route") |> Zoi.default(nil),
-              input: Zoi.any(description: "Executable input") |> Zoi.default(%{}),
+              executable: Joi.any(description: "Action or Flow executable target"),
+              route: Joi.any(description: "Selected authored route") |> Joi.default(nil),
+              input: Joi.any(description: "Executable input") |> Joi.default(%{}),
               source_signal:
-                Zoi.struct(Jido.Signal, description: "Unchanged source Signal")
-                |> Zoi.nullable()
-                |> Zoi.optional()
+                Joi.struct(Jido.Signal, description: "Unchanged source Signal")
+                |> Joi.nullable()
+                |> Joi.optional()
             }
           )
 
-  @type t :: unquote(Zoi.type_spec(@schema))
-  @enforce_keys Zoi.Struct.enforce_keys(@schema)
-  defstruct Zoi.Struct.struct_fields(@schema)
+  @type t :: unquote(Joi.type_spec(@schema))
+  @enforce_keys Joi.Struct.enforce_keys(@schema)
+  defstruct Joi.Struct.struct_fields(@schema)
 
   @doc "Returns the data schema for a prepared Agent Turn."
-  @spec schema() :: Zoi.schema()
+  @spec schema() :: Joi.schema()
   def schema, do: @schema
 
   @doc "Creates and validates one Turn."
@@ -162,7 +164,7 @@ defmodule Jido.Agent.Turn do
   defp validate_source_signal(nil), do: :ok
 
   defp validate_source_signal(%Jido.Signal{} = signal) do
-    case Zoi.parse(Jido.Signal.schema(), signal) do
+    case Joi.parse(Jido.Signal.schema(), signal) do
       {:ok, %Jido.Signal{}} ->
         :ok
 

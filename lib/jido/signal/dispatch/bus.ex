@@ -1,4 +1,6 @@
 defmodule Jido.Signal.Dispatch.Bus do
+  alias Jido.Joi
+
   @moduledoc """
   An adapter for dispatching signals through the Jido signal bus system.
 
@@ -43,13 +45,13 @@ defmodule Jido.Signal.Dispatch.Bus do
   alias Jido.Signal.Bus
   alias Jido.Signal.Sanitizer
 
-  @options_schema Zoi.keyword(
+  @options_schema Joi.keyword(
                     [
                       target:
-                        Zoi.atom()
-                        |> Zoi.refine({__MODULE__, :not_nil?, []})
-                        |> Zoi.required(),
-                      jido: Zoi.atom() |> Zoi.nullable() |> Zoi.optional()
+                        Joi.atom()
+                        |> Joi.refine({__MODULE__, :not_nil?, []})
+                        |> Joi.required(),
+                      jido: Joi.atom() |> Joi.nullable() |> Joi.optional()
                     ],
                     unrecognized_keys: :error
                   )

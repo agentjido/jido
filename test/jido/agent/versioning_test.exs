@@ -11,7 +11,7 @@ defmodule Jido.Agent.VersioningTest do
     use Jido.Agent, name: "versioned_agent", vsn: 3
 
     state do
-      schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+      schema Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)})
     end
   end
 
@@ -19,7 +19,7 @@ defmodule Jido.Agent.VersioningTest do
     use Jido.Agent, name: "custom_checkpoint_version_agent", vsn: 4
 
     state do
-      schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+      schema Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)})
     end
 
     @impl Jido.Agent
@@ -33,7 +33,7 @@ defmodule Jido.Agent.VersioningTest do
     use Jido.Agent, name: "numeric_definition_agent", metadata: %{ratio: 1}
 
     state do
-      schema Zoi.object(%{count: Zoi.number() |> Zoi.default(1)})
+      schema Jido.Joi.object(%{count: Jido.Joi.number() |> Jido.Joi.default(1)})
     end
   end
 
@@ -98,7 +98,7 @@ defmodule Jido.Agent.VersioningTest do
     for changed <- [
           agent,
           %{agent | metadata: %{ratio: 1.0}},
-          %{agent | schema: Zoi.object(%{count: Zoi.number() |> Zoi.default(1.0)})}
+          %{agent | schema: Jido.Joi.object(%{count: Jido.Joi.number() |> Jido.Joi.default(1.0)})}
         ] do
       assert {:ok, snapshot} = Jido.Persistence.snapshot(changed)
       assert snapshot.agent === changed

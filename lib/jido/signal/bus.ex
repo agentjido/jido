@@ -1,4 +1,6 @@
 defmodule Jido.Signal.Bus do
+  alias Jido.Joi
+
   @moduledoc """
   Provides ordered local publish and subscribe delivery for Signals.
 
@@ -40,23 +42,23 @@ defmodule Jido.Signal.Bus do
   @typedoc "Exact source and/or subject equality tests for an ordinary subscription."
   @type selector :: [source: String.t(), subject: String.t()]
 
-  @start_options_schema Zoi.keyword(
+  @start_options_schema Joi.keyword(
                           [
                             name:
-                              Zoi.union([Zoi.atom(), Zoi.string()])
-                              |> Zoi.refine({__MODULE__, :validate_name, []})
-                              |> Zoi.required(),
-                            jido: Zoi.atom() |> Zoi.nullable() |> Zoi.optional(),
+                              Joi.union([Joi.atom(), Joi.string()])
+                              |> Joi.refine({__MODULE__, :validate_name, []})
+                              |> Joi.required(),
+                            jido: Joi.atom() |> Joi.nullable() |> Joi.optional(),
                             registry:
-                              Zoi.atom()
-                              |> Zoi.refine({__MODULE__, :not_nil, []})
-                              |> Zoi.optional(),
+                              Joi.atom()
+                              |> Joi.refine({__MODULE__, :not_nil, []})
+                              |> Joi.optional(),
                             store:
-                              Zoi.atom()
-                              |> Zoi.refine({__MODULE__, :not_nil, []})
-                              |> Zoi.optional(),
-                            store_opts: Zoi.keyword(Zoi.any()) |> Zoi.default([]),
-                            max_log_size: Zoi.integer() |> Zoi.min(1) |> Zoi.optional()
+                              Joi.atom()
+                              |> Joi.refine({__MODULE__, :not_nil, []})
+                              |> Joi.optional(),
+                            store_opts: Joi.keyword(Joi.any()) |> Joi.default([]),
+                            max_log_size: Joi.integer() |> Joi.min(1) |> Joi.optional()
                           ],
                           unrecognized_keys: :error
                         )
@@ -254,9 +256,9 @@ defmodule Jido.Signal.Bus do
     with true <- Keyword.keyword?(opts),
          store_opts <- opts |> Keyword.get_values(:store_opts) |> List.last([]),
          true <- is_nil(store_opts) or Keyword.keyword?(store_opts) do
-      case Zoi.parse(@start_options_schema, opts) do
+      case Joi.parse(@start_options_schema, opts) do
         {:ok, validated_opts} -> {:ok, validated_opts}
-        {:error, errors} -> {:error, {:invalid_options, Zoi.prettify_errors(errors)}}
+        {:error, errors} -> {:error, {:invalid_options, Joi.prettify_errors(errors)}}
       end
     else
       false -> {:error, {:invalid_options, "options and store_opts must be keyword lists"}}

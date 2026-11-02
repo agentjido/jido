@@ -1,4 +1,5 @@
 defmodule Jido.AI.Reasoning.TreeOfThoughts do
+  alias Jido.Joi
   @moduledoc "Generates, evaluates, selects, and synthesizes a small thought tree."
 
   alias Jido.AI.Reasoning.Actions.{DecideInput, FinalizeTurn, GuardInput, StartRequest}
@@ -15,42 +16,42 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts do
     name: "jido_ai_reasoning_tree_of_thoughts",
     description: "Generate, evaluate, select, and synthesize candidate thoughts",
     schema:
-      Zoi.object(
+      Joi.object(
         %{
-          input: Zoi.union([Zoi.string(), Zoi.list(Zoi.map())]),
-          instructions: Zoi.string() |> Zoi.default(@default_instructions),
-          model: Zoi.string() |> Zoi.default("openai:gpt-4o-mini"),
-          options: Zoi.map() |> Zoi.default(%{max_tokens: 1536, temperature: 0.4}),
+          input: Joi.union([Joi.string(), Joi.list(Joi.map())]),
+          instructions: Joi.string() |> Joi.default(@default_instructions),
+          model: Joi.string() |> Joi.default("openai:gpt-4o-mini"),
+          options: Joi.map() |> Joi.default(%{max_tokens: 1536, temperature: 0.4}),
           prompt_cache:
-            Zoi.object(
+            Joi.object(
               %{
-                enabled: Zoi.boolean() |> Zoi.default(false),
-                ttl: Zoi.union([Zoi.string(), Zoi.integer(gte: 0)]) |> Zoi.optional()
+                enabled: Joi.boolean() |> Joi.default(false),
+                ttl: Joi.union([Joi.string(), Joi.integer(gte: 0)]) |> Joi.optional()
               },
               unrecognized_keys: :error
             )
-            |> Zoi.default(%{enabled: false}),
+            |> Joi.default(%{enabled: false}),
           context:
-            Zoi.object(
+            Joi.object(
               %{
-                max_messages: Zoi.integer(gte: 1, lte: 512) |> Zoi.default(64),
-                max_bytes: Zoi.integer(gte: 1_024, lte: 2_000_000) |> Zoi.default(200_000)
+                max_messages: Joi.integer(gte: 1, lte: 512) |> Joi.default(64),
+                max_bytes: Joi.integer(gte: 1_024, lte: 2_000_000) |> Joi.default(200_000)
               },
               unrecognized_keys: :error
             )
-            |> Zoi.default(%{max_messages: 64, max_bytes: 200_000}),
+            |> Joi.default(%{max_messages: 64, max_bytes: 200_000}),
           limits:
-            Zoi.object(
+            Joi.object(
               %{
-                elapsed_ms: Zoi.integer(gte: 1, lte: 3_600_000) |> Zoi.default(120_000),
-                input_tokens: Zoi.integer(gte: 1) |> Zoi.nullable() |> Zoi.default(nil),
-                output_tokens: Zoi.integer(gte: 1) |> Zoi.nullable() |> Zoi.default(nil),
-                total_tokens: Zoi.integer(gte: 1) |> Zoi.nullable() |> Zoi.default(nil),
-                total_cost: Zoi.number(gte: 0) |> Zoi.nullable() |> Zoi.default(nil)
+                elapsed_ms: Joi.integer(gte: 1, lte: 3_600_000) |> Joi.default(120_000),
+                input_tokens: Joi.integer(gte: 1) |> Joi.nullable() |> Joi.default(nil),
+                output_tokens: Joi.integer(gte: 1) |> Joi.nullable() |> Joi.default(nil),
+                total_tokens: Joi.integer(gte: 1) |> Joi.nullable() |> Joi.default(nil),
+                total_cost: Joi.number(gte: 0) |> Joi.nullable() |> Joi.default(nil)
               },
               unrecognized_keys: :error
             )
-            |> Zoi.default(%{
+            |> Joi.default(%{
               elapsed_ms: 120_000,
               input_tokens: nil,
               output_tokens: nil,
@@ -60,7 +61,7 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts do
         },
         unrecognized_keys: :error
       ),
-    output_schema: Zoi.object(%{state: Zoi.map(), response: Zoi.map()})
+    output_schema: Joi.object(%{state: Joi.map(), response: Joi.map()})
 
   @doc "Returns the default Tree of Thoughts instructions."
   @spec default_instructions() :: String.t()

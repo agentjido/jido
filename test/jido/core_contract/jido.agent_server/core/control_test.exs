@@ -137,7 +137,7 @@ defmodule JidoTest.AgentServer.ControlTest do
     agent =
       Jido.Agent.define!(%{
         name: "control_probe",
-        schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}),
+        schema: Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)}),
         routes: [
           %{
             path: "work",

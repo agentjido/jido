@@ -1,4 +1,5 @@
 defmodule Jido.AI.Reasoning.Actions.CallModel do
+  alias Jido.Joi
   @moduledoc "Calls one model and returns success or failure as graph data."
 
   alias Jido.AI.Context, as: AIContext
@@ -9,8 +10,8 @@ defmodule Jido.AI.Reasoning.Actions.CallModel do
     vsn: 1,
     name: "jido_ai_call_model",
     description: "Call or stream one text model",
-    schema: Zoi.map(),
-    output_schema: Zoi.map()
+    schema: Joi.map(),
+    output_schema: Joi.map()
 
   @impl Jido.Action
   def run(%{turn: turn, context: model_context} = params, context) do

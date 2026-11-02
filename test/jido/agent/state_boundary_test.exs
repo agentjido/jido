@@ -14,8 +14,8 @@ defmodule Jido.Agent.StateBoundaryTest do
 
   test "invalid complete state cannot commit or run its effects", %{jido: jido} do
     schema =
-      Zoi.object(%{
-        nested: Zoi.object(%{count: Zoi.integer() |> Zoi.default(1)}) |> Zoi.default(%{})
+      Jido.Joi.object(%{
+        nested: Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(1)}) |> Jido.Joi.default(%{})
       })
 
     definition =
@@ -63,8 +63,8 @@ defmodule Jido.Agent.StateBoundaryTest do
     def state_spec(_opts),
       do:
         {:owned,
-         Zoi.object(%{count: Zoi.integer() |> Zoi.nullable() |> Zoi.default(3)})
-         |> Zoi.default(%{})}
+         Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.nullable() |> Jido.Joi.default(3)})
+         |> Jido.Joi.default(%{})}
 
     @impl true
     def reduce(reduction, _opts), do: {:ok, reduction.signal.data.owned}

@@ -38,11 +38,13 @@ end
 
 ```elixir
 defmodule FlowIterate.RepeatThree do
+  alias Jido.Joi
+
   use Jido.Flow, name: "flow_iterate_repeat_three"
 
   flow do
     iterate "counter" do
-      state Zoi.object(%{count: Zoi.integer()}), initial: %{count: 0}
+      state Joi.object(%{count: Joi.integer()}), initial: %{count: 0}
       action FlowIterate.Increment
 
       params %{
@@ -83,11 +85,13 @@ bound, the Iterate fails with a Flow execution error.
 
 ```elixir
 defmodule FlowIterate.WhileBelowThree do
+  alias Jido.Joi
+
   use Jido.Flow, name: "flow_iterate_while_below_three"
 
   flow do
     iterate "counter" do
-      state Zoi.object(%{count: Zoi.integer()}), initial: %{count: input(:start)}
+      state Joi.object(%{count: Joi.integer()}), initial: %{count: input(:start)}
       action FlowIterate.Increment
       params %{count: state(:count), index: iteration_index()}
       update %{count: body_result(:count)}
@@ -119,7 +123,7 @@ replaces the State; Jido does not merge it. If you omit `update`, the next
 State is the complete body result.
 
 The State schema, the first argument to `state`, validates the initial State
-and every replacement. Omit it to use `Zoi.map()`. State must be a map. The
+and every replacement. Omit it to use `Jido.Joi.map()`. State must be a map. The
 body Action's own schema validates its params.
 
 These references are valid in Iterate `params`, `update`, and `while`:

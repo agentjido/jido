@@ -1,19 +1,12 @@
-# Validation survivors; reasons apply to the supported Zoi 0.18.11 contract.
+# Validation survivors; reasons apply to the supported Joi facade contract.
 
 - at: "lib/jido_action/validation.ex:11:36"
   operator: "guard_removal"
   mutation: "`when is_map(details)` → `(no guard)`"
   sort: "equivalent"
   reason: "All admitted calls supply a map for details, as required by the function specification and every Action/Flow caller. Removing this guard preserves those calls."
-
 - at: "lib/jido_action/validation.ex:19:53"
   operator: "guard_removal"
   mutation: "`when is_map(details)` → `(no guard)`"
   sort: "equivalent"
   reason: "All admitted calls supply a map for details, as required by the function specification and every Action/Flow caller. Removing this guard preserves those calls."
-
-- at: "lib/jido_action/validation.ex:79:72"
-  operator: "return_nil"
-  mutation: "`map_schema?(inner)` → `nil`"
-  sort: "dead-code"
-  reason: "Zoi 0.18.11 has no Zoi.Types.Default implementation. Defaults are schema metadata. Action/Flow admission rejects this old wrapper before this classification branch; no current Zoi schema produces it."

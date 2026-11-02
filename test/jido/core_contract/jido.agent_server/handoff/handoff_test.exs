@@ -120,7 +120,7 @@ defmodule JidoTest.AgentServer.HandoffTest do
   defmodule Successor do
     use Jido.Action,
       name: "agent_server_handoff_successor",
-      schema: Zoi.object(%{count: Zoi.integer()})
+      schema: Jido.Joi.object(%{count: Jido.Joi.integer()})
 
     def run(input, context) do
       if observer = context[:observer], do: send(observer, :successor_started)
@@ -131,7 +131,7 @@ defmodule JidoTest.AgentServer.HandoffTest do
   defmodule BlockingSuccessor do
     use Jido.Action,
       name: "agent_server_blocking_handoff_successor",
-      schema: Zoi.object(%{count: Zoi.integer()})
+      schema: Jido.Joi.object(%{count: Jido.Joi.integer()})
 
     def run(input, _context) do
       :ok = Probe.gate({:handoff_successor, __MODULE__})
@@ -143,7 +143,7 @@ defmodule JidoTest.AgentServer.HandoffTest do
   defmodule ErrorSuccessor do
     use Jido.Action,
       name: "agent_server_error_handoff_successor",
-      schema: Zoi.object(%{count: Zoi.integer()})
+      schema: Jido.Joi.object(%{count: Jido.Joi.integer()})
 
     def run(_input, _context), do: {:error, :successor_failed}
   end
@@ -151,8 +151,8 @@ defmodule JidoTest.AgentServer.HandoffTest do
   defmodule InvalidSuccessor do
     use Jido.Action,
       name: "agent_server_invalid_handoff_successor",
-      schema: Zoi.object(%{count: Zoi.integer()}),
-      output_schema: Zoi.object(%{count: Zoi.integer()})
+      schema: Jido.Joi.object(%{count: Jido.Joi.integer()}),
+      output_schema: Jido.Joi.object(%{count: Jido.Joi.integer()})
 
     def run(_input, _context), do: {:ok, %{count: "invalid"}}
   end
@@ -160,7 +160,7 @@ defmodule JidoTest.AgentServer.HandoffTest do
   defmodule FlowErrorStep do
     use Jido.Action,
       name: "agent_server_error_handoff_flow_step",
-      schema: Zoi.object(%{count: Zoi.integer()})
+      schema: Jido.Joi.object(%{count: Jido.Joi.integer()})
 
     def run(_input, _context), do: {:error, :successor_flow_failed}
   end
@@ -419,7 +419,7 @@ defmodule JidoTest.AgentServer.HandoffTest do
     use Jido.Agent, name: "agent_server_handoff_agent", plugins: [EffectPlugin]
 
     state do
-      schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+      schema Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)})
     end
 
     routes do
@@ -443,7 +443,7 @@ defmodule JidoTest.AgentServer.HandoffTest do
     use Jido.Agent, name: "agent_server_plain_handoff_agent", plugins: [EffectOnlyPlugin]
 
     state do
-      schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+      schema Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)})
     end
 
     routes do

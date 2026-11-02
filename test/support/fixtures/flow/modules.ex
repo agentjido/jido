@@ -19,11 +19,11 @@ defmodule JidoActionTest.Fixtures.CountedValidationFlow do
   use Jido.Flow,
     name: "counted_validation_flow",
     schema:
-      Zoi.map()
-      |> Zoi.transform({JidoActionTest.Fixtures.Transforms, :count, [:input]}),
+      Jido.Joi.map()
+      |> Jido.Joi.transform({JidoActionTest.Fixtures.Transforms, :count, [:input]}),
     output_schema:
-      Zoi.map()
-      |> Zoi.transform({JidoActionTest.Fixtures.Transforms, :count, [:output]})
+      Jido.Joi.map()
+      |> Jido.Joi.transform({JidoActionTest.Fixtures.Transforms, :count, [:output]})
 
   flow do
     step("echo",
@@ -40,8 +40,8 @@ defmodule JidoActionTest.Fixtures.ScalarTransformedOutputFlow do
   use Jido.Flow,
     name: "scalar_transformed_output_flow",
     output_schema:
-      Zoi.map()
-      |> Zoi.transform({JidoActionTest.Fixtures.Transforms, :count, [:invalid_output]})
+      Jido.Joi.map()
+      |> Jido.Joi.transform({JidoActionTest.Fixtures.Transforms, :count, [:invalid_output]})
 
   flow do
     step("echo",
@@ -58,8 +58,8 @@ defmodule JidoActionTest.Fixtures.ScalarTransformedInputFlow do
   use Jido.Flow,
     name: "scalar_transformed_input_flow",
     schema:
-      Zoi.map()
-      |> Zoi.transform({JidoActionTest.Fixtures.Transforms, :count, [:invalid_input]})
+      Jido.Joi.map()
+      |> Jido.Joi.transform({JidoActionTest.Fixtures.Transforms, :count, [:invalid_input]})
 
   flow do
     step("echo",
@@ -76,8 +76,8 @@ defmodule JidoActionTest.Fixtures.EnvelopeFlow do
   use Jido.Flow,
     name: "envelope_flow",
     output_schema:
-      Zoi.map()
-      |> Zoi.transform({JidoActionTest.Fixtures.Transforms, :count, [:envelope_output]})
+      Jido.Joi.map()
+      |> Jido.Joi.transform({JidoActionTest.Fixtures.Transforms, :count, [:envelope_output]})
 
   flow do
     step("envelope",
@@ -225,7 +225,7 @@ defmodule JidoActionTest.Fixtures.ChildIterator do
 
   flow do
     iterate "child" do
-      state(Zoi.map(), initial: %{count: 0})
+      state(Jido.Joi.map(), initial: %{count: 0})
       action(JidoActionTest.Fixtures.Increment)
       params(%{count: state(:count), index: iteration_index()})
       update(%{count: body_result(:count)})

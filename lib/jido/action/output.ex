@@ -1,4 +1,6 @@
 defmodule Jido.Action.Output do
+  alias Jido.Joi
+
   @moduledoc """
   Explicit envelope for successful Action outputs that are not normal maps.
 
@@ -24,21 +26,21 @@ defmodule Jido.Action.Output do
 
   @kinds [:raw, :stream, :batch, :opaque, :preserve]
 
-  @schema Zoi.struct(
+  @schema Joi.struct(
             __MODULE__,
             %{
-              kind: Zoi.enum(@kinds, description: "Explicit output kind"),
-              value: Zoi.any(description: "Explicit output value"),
-              meta: Zoi.map(description: "Output metadata") |> Zoi.default(%{})
+              kind: Joi.enum(@kinds, description: "Explicit output kind"),
+              value: Joi.any(description: "Explicit output value"),
+              meta: Joi.map(description: "Output metadata") |> Joi.default(%{})
             },
             coerce: true
           )
 
   @type kind :: :raw | :stream | :batch | :opaque | :preserve
-  @type t :: unquote(Zoi.type_spec(@schema))
+  @type t :: unquote(Joi.type_spec(@schema))
 
-  @enforce_keys Zoi.Struct.enforce_keys(@schema)
-  defstruct Zoi.Struct.struct_fields(@schema)
+  @enforce_keys Joi.Struct.enforce_keys(@schema)
+  defstruct Joi.Struct.struct_fields(@schema)
 
   @doc """
   Builds an explicit raw output envelope.
@@ -110,7 +112,7 @@ defmodule Jido.Action.Output do
   defp meta_opts!(_opts), do: raise(ArgumentError, "invalid action output envelope")
 
   defp parse(attrs) do
-    Zoi.parse(@schema, attrs)
+    Joi.parse(@schema, attrs)
   end
 
   defp validate_kind_value({:ok, %__MODULE__{kind: :stream, value: value} = output}, original) do

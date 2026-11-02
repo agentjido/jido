@@ -175,7 +175,7 @@ defmodule JidoTest.AgentServer.Fixtures do
   defmodule Gate do
     @moduledoc false
     use Jido.Plugin
-    def state_spec(_), do: {:probe, Zoi.integer() |> Zoi.default(0)}
+    def state_spec(_), do: {:probe, Jido.Joi.integer() |> Jido.Joi.default(0)}
     def directives(_), do: [Effect]
 
     def prepare(preparation, _) do
@@ -202,7 +202,7 @@ defmodule JidoTest.AgentServer.Fixtures do
   def agent do
     Jido.Agent.define!(%{
       name: "server_contract",
-      schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}),
+      schema: Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)}),
       plugins: [%{id: Gate.id(), provider: Gate, vsn: Gate.vsn(), data: %{}}],
       routes: [
         %{

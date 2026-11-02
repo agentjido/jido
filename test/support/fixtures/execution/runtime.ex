@@ -328,7 +328,7 @@ defmodule JidoActionTest.Fixtures.Iterator do
 
   def iterator_flow(opts) do
     action = Keyword.get(opts, :action, Increment)
-    schema = Keyword.get(opts, :schema, Zoi.map())
+    schema = Keyword.get(opts, :schema, Jido.Joi.map())
 
     input =
       Keyword.get(opts, :input, %{count: Ref.state(:count), index: Ref.iteration_index()})

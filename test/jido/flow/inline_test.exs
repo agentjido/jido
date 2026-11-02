@@ -226,8 +226,8 @@ defmodule Jido.Flow.InlineTest do
       require Jido.Flow.InlineTest.Host
 
       @flow_name "owner_scoped_flow"
-      @schema Zoi.object(%{value: Zoi.integer()})
-      @output_schema Zoi.object(%{value: Zoi.integer()})
+      @schema Jido.Joi.object(%{value: Jido.Joi.integer()})
+      @output_schema Jido.Joi.object(%{value: Jido.Joi.integer()})
 
       @target (Jido.Flow.InlineTest.Host.define(
         (Process.put(#{inspect(key)}, Process.get(#{inspect(key)}, 0) + 1); #{inspect(path)}),
@@ -250,8 +250,8 @@ defmodule Jido.Flow.InlineTest do
 
     assert Process.get(key) == 2
     assert owner.target().name() == "owner_scoped_flow"
-    assert owner.target().schema().fields == Zoi.object(%{value: Zoi.integer()}).fields
-    assert owner.target().output_schema().fields == Zoi.object(%{value: Zoi.integer()}).fields
+    assert owner.target().schema().fields == Jido.Joi.object(%{value: Jido.Joi.integer()}).fields
+    assert owner.target().output_schema().fields == Jido.Joi.object(%{value: Jido.Joi.integer()}).fields
     assert {:ok, %{value: 5}} = Jido.Exec.run(owner.target(), %{value: 4})
 
     assert {:error, %Jido.Action.Error.InvalidInputError{}} =

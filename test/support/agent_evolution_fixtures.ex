@@ -8,7 +8,7 @@ defmodule JidoTest.AgentEvolutionFixtures do
     use Jido.Agent, name: "evolution_worker"
 
     state do
-      schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+      schema Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)})
     end
 
     routes do
@@ -32,7 +32,7 @@ defmodule JidoTest.AgentEvolutionFixtures do
 
   defmodule Counter do
     use Jido.Plugin, id: "evolution.counter"
-    def state_spec(opts), do: {Keyword.get(opts, :key, :counter), Zoi.integer() |> Zoi.default(3)}
+    def state_spec(opts), do: {Keyword.get(opts, :key, :counter), Jido.Joi.integer() |> Jido.Joi.default(3)}
     def directives(_), do: [JidoTest.AgentEvolutionFixtures.Owned]
     def reduce(reduction, _), do: {:ok, reduction.plugin_state}
     def dump(value, _, _), do: {:ok, %{saved: value}}
@@ -66,7 +66,7 @@ defmodule JidoTest.AgentEvolutionFixtures do
     use Jido.Agent, name: "evolution_custom"
 
     state do
-      schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+      schema Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)})
     end
 
     def checkpoint(agent, _), do: {:ok, %{id: agent.id, saved: agent.state.count}}
@@ -99,7 +99,7 @@ defmodule JidoTest.AgentEvolutionFixtures do
     Jido.Agent.define!(%{
       name: "evolution",
       signal_source: "/evolution",
-      schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}),
+      schema: Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)}),
       routes: [
         %{
           path: "run",

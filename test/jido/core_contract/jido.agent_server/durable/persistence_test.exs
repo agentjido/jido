@@ -76,7 +76,7 @@ defmodule JidoTest.AgentServer.Durable.PersistenceTest do
 
   defmodule Plugin do
     use Jido.Plugin
-    def state_spec(_), do: {:resource, Zoi.integer() |> Zoi.default(7)}
+    def state_spec(_), do: {:resource, Jido.Joi.integer() |> Jido.Joi.default(7)}
     def child_spec(init), do: %{start: {Resource, :start_link, [init]}}
     def reduce(reduction, _), do: {:ok, reduction.plugin_state + 1}
 
@@ -100,7 +100,7 @@ defmodule JidoTest.AgentServer.Durable.PersistenceTest do
     use Jido.Agent, name: "server_durable_local_agent"
 
     state do
-      schema Zoi.object(%{handle: Zoi.any() |> Zoi.default(nil)})
+      schema Jido.Joi.object(%{handle: Jido.Joi.any() |> Jido.Joi.default(nil)})
     end
 
     routes do
@@ -112,7 +112,7 @@ defmodule JidoTest.AgentServer.Durable.PersistenceTest do
     use Jido.Agent, name: "server_durable_custom_agent"
 
     state do
-      schema Zoi.object(%{handle: Zoi.any() |> Zoi.default(nil)})
+      schema Jido.Joi.object(%{handle: Jido.Joi.any() |> Jido.Joi.default(nil)})
     end
 
     routes do
@@ -548,7 +548,7 @@ defmodule JidoTest.AgentServer.Durable.PersistenceTest do
         plugins: [
           %{id: Plugin.id(), provider: Plugin, vsn: Plugin.vsn(), data: %{observer: c.observer}}
         ],
-        schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}),
+        schema: Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)}),
         routes: [
           %{
             path: "work",

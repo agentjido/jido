@@ -1,4 +1,6 @@
 defmodule Jido.Plugin.Audit do
+  alias Jido.Joi
+
   @moduledoc """
   Stores bounded domain audit records in portable Agent state.
 
@@ -43,8 +45,8 @@ defmodule Jido.Plugin.Audit do
   end
 
   @default_max_entries 1_000
-  @state_schema Zoi.object(%{records: Zoi.list(Zoi.struct(Record)) |> Zoi.default([])})
-                |> Zoi.default(%{records: []})
+  @state_schema Joi.object(%{records: Joi.list(Joi.struct(Record)) |> Joi.default([])})
+                |> Joi.default(%{records: []})
 
   @impl true
   def state_spec(opts) do

@@ -178,7 +178,7 @@ defmodule Jido.Signal.BusTest do
              ])
   end
 
-  test "keeps the Zoi default and last-value rule for startup Store options" do
+  test "keeps the Joi default and last-value rule for startup Store options" do
     for options <- [[store_opts: nil], [store_opts: :ignored, store_opts: []]] do
       bus = start_bus(options)
       assert {:ok, [_]} = Bus.publish(bus, [signal("default.options")])
@@ -521,7 +521,7 @@ defmodule Jido.Signal.BusTest do
              )
   end
 
-  test "rejects unknown start options through the Zoi schema" do
+  test "rejects unknown start options through the Joi schema" do
     assert {:error, {:invalid_options, message}} =
              Bus.start_link(name: unique_name("invalid_options"), unexpected: true)
 

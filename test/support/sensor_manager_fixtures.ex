@@ -97,7 +97,7 @@ defmodule JidoTest.Plugin.SensorManagerFixtures do
     alias JidoTest.Plugin.SensorManagerFixtures.{ManageAction, ReadingAction}
 
     state do
-      schema Zoi.object(%{readings: Zoi.list(Zoi.integer()) |> Zoi.default([])})
+      schema Jido.Joi.object(%{readings: Jido.Joi.list(Jido.Joi.integer()) |> Jido.Joi.default([])})
     end
 
     routes do

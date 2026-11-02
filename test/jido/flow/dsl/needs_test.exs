@@ -42,7 +42,7 @@ defmodule Jido.Flow.DSL.NeedsTest do
 
     compile(
       owner,
-      "step \"child\", action: JidoActionTest.Fixtures.NestedFlow, params: %{}, needs: \"first\"\nmap \"mapped\", action: Add, collection: [], params: %{}, needs: \"first\"\nreduce \"reduced\", action: Add, collection: [], initial: %{}, params: %{}, needs: \"first\"\nchoice \"route\" do\n  needs \"first\"\n  option \"yes\", condition: true, action: Add, params: %{}\n  otherwise action: Add, params: %{}\nend\niterate \"loop\" do\n  needs \"first\"\n  state Zoi.map(), initial: %{}\n  action Add\n  params %{}\n  repeat 1\nend\ninvoke \"next\", decision: Add, expander: Add, params: %{},\n  needs: [\"first\", \"second\", \"child\", \"mapped\", \"reduced\", \"route\", \"loop\"]\n",
+      "step \"child\", action: JidoActionTest.Fixtures.NestedFlow, params: %{}, needs: \"first\"\nmap \"mapped\", action: Add, collection: [], params: %{}, needs: \"first\"\nreduce \"reduced\", action: Add, collection: [], initial: %{}, params: %{}, needs: \"first\"\nchoice \"route\" do\n  needs \"first\"\n  option \"yes\", condition: true, action: Add, params: %{}\n  otherwise action: Add, params: %{}\nend\niterate \"loop\" do\n  needs \"first\"\n  state Jido.Joi.map(), initial: %{}\n  action Add\n  params %{}\n  repeat 1\nend\ninvoke \"next\", decision: Add, expander: Add, params: %{},\n  needs: [\"first\", \"second\", \"child\", \"mapped\", \"reduced\", \"route\", \"loop\"]\n",
       "result(\"next\")"
     )
 

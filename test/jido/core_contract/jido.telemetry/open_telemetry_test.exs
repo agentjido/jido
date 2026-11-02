@@ -25,7 +25,7 @@ defmodule JidoTest.Telemetry.OpenTelemetryTest do
   defmodule Add do
     use Jido.Action,
       name: "traced_notification_add",
-      schema: Zoi.object(%{amount: Zoi.integer()})
+      schema: Jido.Joi.object(%{amount: Jido.Joi.integer()})
 
     def run(%{amount: amount}, context),
       do: {:ok, %{context.agent_state | count: context.agent_state.count + amount}}
@@ -35,7 +35,7 @@ defmodule JidoTest.Telemetry.OpenTelemetryTest do
     use Jido.Agent, name: "traced_notification_agent", plugins: [NotifyPlugin]
 
     state do
-      schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+      schema Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)})
     end
 
     routes do

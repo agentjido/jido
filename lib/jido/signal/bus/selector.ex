@@ -1,20 +1,21 @@
 defmodule Jido.Signal.Bus.Selector do
+  alias Jido.Joi
   @moduledoc false
 
   alias Jido.Signal
 
   @max_value_bytes 4_096
-  @value_schema Zoi.string() |> Zoi.refine({__MODULE__, :validate_value_size, []})
-  @schema Zoi.keyword(
+  @value_schema Joi.string() |> Joi.refine({__MODULE__, :validate_value_size, []})
+  @schema Joi.keyword(
             [
               source:
                 @value_schema
-                |> Zoi.refine({Signal, :validate_uri_reference, []})
-                |> Zoi.optional(),
+                |> Joi.refine({Signal, :validate_uri_reference, []})
+                |> Joi.optional(),
               subject:
                 @value_schema
-                |> Zoi.refine({Signal, :validate_utf8_string, []})
-                |> Zoi.optional()
+                |> Joi.refine({Signal, :validate_utf8_string, []})
+                |> Joi.optional()
             ],
             unrecognized_keys: :error
           )
@@ -25,9 +26,9 @@ defmodule Jido.Signal.Bus.Selector do
   @spec compile(term()) :: {:ok, match()} | {:error, {:invalid_selector, String.t()}}
   def compile(selector) do
     if valid_shape?(selector) do
-      case Zoi.parse(@schema, selector) do
+      case Joi.parse(@schema, selector) do
         {:ok, fields} -> {:ok, compile_match(fields)}
-        {:error, errors} -> {:error, {:invalid_selector, Zoi.prettify_errors(errors)}}
+        {:error, errors} -> {:error, {:invalid_selector, Joi.prettify_errors(errors)}}
       end
     else
       {:error, {:invalid_selector, "must contain :source and/or :subject once each"}}

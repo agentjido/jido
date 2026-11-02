@@ -1,4 +1,5 @@
 defmodule Jido.AI.Reasoning.GraphOfThoughts.Actions.Advance do
+  alias Jido.Joi
   @moduledoc "Accepts one structured graph phase and routes the next phase."
 
   alias Jido.AI.Reasoning.Result
@@ -7,8 +8,8 @@ defmodule Jido.AI.Reasoning.GraphOfThoughts.Actions.Advance do
     id: "jido.ai/reasoning/graph-of-thoughts/actions/advance",
     vsn: 1,
     name: "jido_ai_graph_of_thoughts_advance",
-    schema: Zoi.map(),
-    output_schema: Zoi.map()
+    schema: Joi.map(),
+    output_schema: Joi.map()
 
   @impl Jido.Action
   def run(%{state: state, turn: %{model_outcome: %{status: :error}} = turn}, _context),

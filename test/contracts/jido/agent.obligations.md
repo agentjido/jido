@@ -95,7 +95,7 @@ not restore or claim the retired standalone `jido.topology` component.
 ### jido.agent.I8 — Initialization defaults
 
 - **scope:** `Jido.Agent.instantiate/2`
-- **must:** For a new instance, initialization merges explicit state over declared initial state and passes that candidate to the Agent module's optional `initialize/2` callback with Jido-owned identity and topology context. The callback returns the complete candidate as `{:ok, state}` or stops creation with `{:error, reason}`. Zoi then adds defaults and validates the result. Invalid results and callback failures stop creation. Validation and restore do not run the callback. Initialization preserves valid false, zero, and empty values.
+- **must:** For a new instance, initialization merges explicit state over declared initial state and passes that candidate to the Agent module's optional `initialize/2` callback with Jido-owned identity and topology context. The callback returns the complete candidate as `{:ok, state}` or stops creation with `{:error, reason}`. Joi then adds defaults and validates the result. Invalid results and callback failures stop creation. Validation and restore do not run the callback. Initialization preserves valid false, zero, and empty values.
 - **kind:** functional
 - **status:** active
 

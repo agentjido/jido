@@ -1,4 +1,5 @@
 defmodule Jido.Flow.Defaults do
+  alias Jido.Joi
   @moduledoc false
 
   alias Jido.Flow.Error
@@ -54,13 +55,13 @@ defmodule Jido.Flow.Defaults do
   defp flow_schema(_target),
     do: failure(:invalid_target, [], "Flow defaults require a Flow module")
 
-  defp schema_fields(%Zoi.Types.Map{fields: fields}) when is_list(fields) and fields != [],
-    do: {:ok, fields}
-
-  defp schema_fields(%Zoi.Types.Map{fields: fields}) when fields in [nil, []], do: {:ok, :open}
-
-  defp schema_fields(_schema),
-    do: failure(:invalid_schema, [], "Flow defaults require an object input schema")
+  defp schema_fields(schema) do
+    case {Joi.Schema.kind(schema), Joi.Schema.fields(schema)} do
+      {:map, {:ok, fields}} when is_list(fields) and fields != [] -> {:ok, fields}
+      {:map, {:ok, fields}} when fields in [nil, []] -> {:ok, :open}
+      _ -> failure(:invalid_schema, [], "Flow defaults require an object input schema")
+    end
+  end
 
   defp normalize_fields(defaults, :open), do: {:ok, defaults}
 
@@ -113,48 +114,74 @@ defmodule Jido.Flow.Defaults do
      end)}
   end
 
-  defp restore_schema_atoms(
-         %Zoi.Types.Enum{enum_type: :atom, values: values},
-         value
-       )
-       when is_binary(value) do
-    Enum.find_value(values, value, fn {_name, atom} ->
-      if Atom.to_string(atom) == value, do: atom
-    end)
+  defp restore_schema_atoms(schema, value) do
+    case Joi.Schema.kind(schema) do
+      :enum -> restore_enum_atom(schema, value)
+      :atom -> restore_atom(value)
+      :map -> restore_map_atoms(schema, value)
+      :array -> restore_array_atoms(schema, value)
+      :union -> restore_union_atoms(schema, value)
+      _ -> value
+    end
   end
 
-  defp restore_schema_atoms(%Zoi.Types.Atom{}, value) when is_binary(value) do
+  defp restore_enum_atom(schema, value) when is_binary(value) do
+    with {:ok, :atom, values} <- Joi.Schema.enum(schema) do
+      Enum.find_value(values, value, fn {_name, atom} ->
+        if Atom.to_string(atom) == value, do: atom
+      end)
+    else
+      _ -> value
+    end
+  end
+
+  defp restore_enum_atom(_schema, value), do: value
+
+  defp restore_atom(value) when is_binary(value) do
     String.to_existing_atom(value)
   rescue
     ArgumentError -> value
   end
 
-  defp restore_schema_atoms(%Zoi.Types.Map{fields: fields}, value)
-       when is_list(fields) and is_map(value) and not is_struct(value) do
-    schemas = Map.new(fields, fn {key, schema} -> {to_string(key), schema} end)
+  defp restore_atom(value), do: value
 
-    Map.new(value, fn {key, item} ->
-      schema = if is_atom(key) or is_binary(key), do: Map.get(schemas, to_string(key))
-      {key, restore_schema_atoms(schema, item)}
-    end)
+  defp restore_map_atoms(schema, value) when is_map(value) and not is_struct(value) do
+    {:ok, fields} = Joi.Schema.fields(schema)
+
+    if is_list(fields) do
+      schemas = Map.new(fields, fn {key, schema} -> {to_string(key), schema} end)
+
+      Map.new(value, fn {key, item} ->
+        schema = if is_atom(key) or is_binary(key), do: Map.get(schemas, to_string(key))
+        {key, restore_schema_atoms(schema, item)}
+      end)
+    else
+      value
+    end
   end
 
-  defp restore_schema_atoms(%Zoi.Types.Array{inner: inner}, value) when is_list(value),
-    do: Enum.map(value, &restore_schema_atoms(inner, &1))
+  defp restore_map_atoms(_schema, value), do: value
 
-  defp restore_schema_atoms(%Zoi.Types.Union{schemas: schemas}, value) do
+  defp restore_array_atoms(schema, value) when is_list(value) do
+    {:ok, inner} = Joi.Schema.inner(schema)
+    Enum.map(value, &restore_schema_atoms(inner, &1))
+  end
+
+  defp restore_array_atoms(_schema, value), do: value
+
+  defp restore_union_atoms(schema, value) do
+    {:ok, schemas} = Joi.Schema.branches(schema)
+
     Enum.find_value(schemas, value, fn schema ->
       restored = restore_schema_atoms(schema, value)
 
-      if restored !== value and match?({:ok, _value}, Zoi.parse(schema, restored, coerce: true)),
+      if restored !== value and match?({:ok, _value}, Joi.parse(schema, restored, coerce: true)),
         do: restored
     end)
   end
 
-  defp restore_schema_atoms(_schema, value), do: value
-
   defp parse(schema, value, path) do
-    case Zoi.parse(schema, value, coerce: true) do
+    case Joi.parse(schema, value, coerce: true) do
       {:ok, normalized} ->
         {:ok, normalized}
 

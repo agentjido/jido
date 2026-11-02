@@ -1,4 +1,5 @@
 defmodule Jido.AI.Reasoning.TreeOfThoughts.ModelRound do
+  alias Jido.Joi
   @moduledoc "Runs one phase of the bounded Tree of Thoughts graph."
 
   alias Jido.AI.Reasoning.Actions.{CallModel, GuardOutput, ProjectConversation, RecordModelAttempt}
@@ -14,8 +15,8 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.ModelRound do
     id: "jido.ai/reasoning/tree-of-thoughts/model-round",
     vsn: 1,
     name: "jido_ai_tree_of_thoughts_model_round",
-    schema: Zoi.map(),
-    output_schema: Zoi.map()
+    schema: Joi.map(),
+    output_schema: Joi.map()
 
   flow do
     step "prepare", action: PrepareCall, params: %{state: input()}

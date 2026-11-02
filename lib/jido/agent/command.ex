@@ -82,7 +82,7 @@ defmodule Jido.Agent.Command do
   @doc false
   @spec normalize_signal(term()) :: {:ok, Signal.t()} | {:error, Exception.t()}
   def normalize_signal(%Signal{type: type} = signal) when is_binary(type) do
-    with {:ok, signal} <- Zoi.parse(Signal.schema(), signal),
+    with {:ok, signal} <- Jido.Joi.parse(Signal.schema(), signal),
          {:ok, extensions} <- SignalContext.normalize(signal.extensions) do
       {:ok, %{signal | extensions: extensions}}
     else

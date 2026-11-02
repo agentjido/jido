@@ -12,9 +12,9 @@ defmodule JidoTest.Agent.RouteTest do
     use Jido.Action,
       name: "route_nested_output",
       output_schema:
-        Zoi.object(%{
-          state: Zoi.object(%{count: Zoi.integer()}),
-          reply: Zoi.object(%{details: Zoi.object(%{id: Zoi.integer()})})
+        Jido.Joi.object(%{
+          state: Jido.Joi.object(%{count: Jido.Joi.integer()}),
+          reply: Jido.Joi.object(%{details: Jido.Joi.object(%{id: Jido.Joi.integer()})})
         })
 
     def run(_params, _context), do: {:ok, %{}}
@@ -24,9 +24,9 @@ defmodule JidoTest.Agent.RouteTest do
     use Jido.Action,
       name: "route_struct_output",
       output_schema:
-        Zoi.struct(OutputStruct, %{
-          id: Zoi.integer(),
-          details: Zoi.object(%{"label" => Zoi.string()})
+        Jido.Joi.struct(OutputStruct, %{
+          id: Jido.Joi.integer(),
+          details: Jido.Joi.object(%{"label" => Jido.Joi.string()})
         })
 
     def run(_params, _context), do: {:ok, %OutputStruct{}}
@@ -40,7 +40,7 @@ defmodule JidoTest.Agent.RouteTest do
   defmodule AmbiguousOutput do
     use Jido.Action,
       name: "route_ambiguous_output",
-      output_schema: Zoi.object([{:id, Zoi.integer()}, {"id", Zoi.string()}])
+      output_schema: Jido.Joi.object([{:id, Jido.Joi.integer()}, {"id", Jido.Joi.string()}])
 
     def run(_params, _context), do: {:ok, %{}}
   end
@@ -151,7 +151,7 @@ defmodule JidoTest.Agent.RouteTest do
                Map.put(base, :reply, %{
                  type: "work.done",
                  from: %{source: :output, path: []},
-                 schema: Zoi.any()
+                 schema: Jido.Joi.any()
                }),
                false
              )

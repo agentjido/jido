@@ -9,9 +9,9 @@ defmodule Jido.Agent.TopologyContractTest do
     use Jido.Agent, name: "topology_contract_child"
 
     state do
-      schema Zoi.object(%{
-               value: Zoi.string() |> Zoi.default("default"),
-               items: Zoi.list(Zoi.string()) |> Zoi.default([])
+      schema Jido.Joi.object(%{
+               value: Jido.Joi.string() |> Jido.Joi.default("default"),
+               items: Jido.Joi.list(Jido.Joi.string()) |> Jido.Joi.default([])
              })
     end
 
@@ -38,10 +38,10 @@ defmodule Jido.Agent.TopologyContractTest do
     use Jido.Agent, name: "topology_contract_structured_child"
 
     state do
-      schema Zoi.object(%{
-               settings: Zoi.object(%{label: Zoi.string(), enabled: Zoi.boolean()}),
-               metadata: Zoi.map(),
-               labels: Zoi.list(Zoi.string())
+      schema Jido.Joi.object(%{
+               settings: Jido.Joi.object(%{label: Jido.Joi.string(), enabled: Jido.Joi.boolean()}),
+               metadata: Jido.Joi.map(),
+               labels: Jido.Joi.list(Jido.Joi.string())
              })
     end
   end
@@ -388,9 +388,9 @@ defmodule Jido.Agent.TopologyContractTest do
       Agent.define!(%{
         name: "topology_binding",
         schema:
-          Zoi.object(%{
-            copies: Zoi.integer() |> Zoi.default(2),
-            value: Zoi.string() |> Zoi.default("seed")
+          Jido.Joi.object(%{
+            copies: Jido.Joi.integer() |> Jido.Joi.default(2),
+            value: Jido.Joi.string() |> Jido.Joi.default("seed")
           }),
         topology: %{
           agents: [
@@ -433,9 +433,9 @@ defmodule Jido.Agent.TopologyContractTest do
       Agent.define!(%{
         name: "topology_contract_initialized_child",
         schema:
-          Zoi.object(%{
-            count: Zoi.integer() |> Zoi.default(0),
-            label: Zoi.string() |> Zoi.default("schema")
+          Jido.Joi.object(%{
+            count: Jido.Joi.integer() |> Jido.Joi.default(0),
+            label: Jido.Joi.string() |> Jido.Joi.default("schema")
           }),
         initial_state: %{count: 4, label: "definition"}
       })
@@ -493,7 +493,7 @@ defmodule Jido.Agent.TopologyContractTest do
     definition =
       Agent.define!(%{
         name: "nested_parent_references",
-        schema: Zoi.object(%{label: Zoi.string()}),
+        schema: Jido.Joi.object(%{label: Jido.Joi.string()}),
         topology: %{
           agents: [
             %{

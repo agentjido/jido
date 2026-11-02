@@ -25,7 +25,7 @@ defmodule Jido.Signal.Dispatch.PidAdapterTest do
     end
   end
 
-  test "parses PID and named targets through one Zoi schema" do
+  test "parses PID and named targets through one Joi schema" do
     assert {:ok, {:pid, pid_opts}} = Dispatch.validate_opts({:pid, target: self()})
     assert pid_opts == [target: self(), delivery_mode: :async, timeout: 5_000]
 

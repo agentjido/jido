@@ -1,4 +1,5 @@
 defmodule Jido.AI.Reasoning.ReAct.Actions.DetectToolCycle do
+  alias Jido.Joi
   @moduledoc "Detects consecutive identical tool-call batches after tool execution."
 
   @cycle_warning "The previous tool calls repeated with the same arguments. Do not repeat them again. Use the available results for a final answer, or use a different approach."
@@ -8,8 +9,8 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.DetectToolCycle do
     vsn: 1,
     name: "jido_ai_react_detect_tool_cycle",
     description: "Detect one repeated ReAct tool-call batch",
-    schema: Zoi.object(%{turn: Zoi.any()}),
-    output_schema: Zoi.object(%{turn: Zoi.any()})
+    schema: Joi.object(%{turn: Joi.any()}),
+    output_schema: Joi.object(%{turn: Joi.any()})
 
   @impl Jido.Action
   def run(

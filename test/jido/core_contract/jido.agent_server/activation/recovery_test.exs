@@ -12,7 +12,7 @@ defmodule JidoTest.AgentServer.ActivationRecoveryTest do
     use Jido.Agent, name: "server_local_checkpoint"
 
     state do
-      schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0), handle: Zoi.any()})
+      schema Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0), handle: Jido.Joi.any()})
     end
 
     routes do
@@ -47,7 +47,7 @@ defmodule JidoTest.AgentServer.ActivationRecoveryTest do
 
   defmodule Plugin do
     use Jido.Plugin
-    def state_spec(_), do: {:resource, Zoi.integer() |> Zoi.default(7)}
+    def state_spec(_), do: {:resource, Jido.Joi.integer() |> Jido.Joi.default(7)}
     def child_spec(init), do: %{start: {Resource, :start_link, [init]}}
     def reduce(reduction, _), do: {:ok, reduction.plugin_state + 1}
 

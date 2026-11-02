@@ -18,7 +18,7 @@ defmodule JidoTest.InstanceRefTest do
   defmodule Add do
     use Jido.Action,
       name: "instance_ref_add",
-      schema: Zoi.object(%{by: Zoi.integer()})
+      schema: Jido.Joi.object(%{by: Jido.Joi.integer()})
 
     @impl true
     def run(%{by: by}, context) do
@@ -36,7 +36,7 @@ defmodule JidoTest.InstanceRefTest do
 
   defmodule StatePlugin do
     use Jido.Plugin
-    def state_spec(_opts), do: {:owned, Zoi.integer() |> Zoi.default(9)}
+    def state_spec(_opts), do: {:owned, Jido.Joi.integer() |> Jido.Joi.default(9)}
   end
 
   defmodule ReadyResource do
@@ -60,7 +60,7 @@ defmodule JidoTest.InstanceRefTest do
     use Jido.Agent, name: "instance_ref_counter"
 
     state do
-      schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+      schema Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)})
     end
 
     routes do
@@ -72,7 +72,7 @@ defmodule JidoTest.InstanceRefTest do
     use Jido.Agent, name: "instance_ref_renamed_counter"
 
     state do
-      schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+      schema Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)})
     end
 
     routes do

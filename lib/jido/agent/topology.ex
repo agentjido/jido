@@ -1,4 +1,5 @@
 defmodule Jido.Agent.Topology do
+  alias Jido.Joi
   @moduledoc "Logical members and output connections. These declarations do not start processes."
   alias Jido.Agent.{Data, Error, Extension, Route, Validation}
 
@@ -197,8 +198,23 @@ defmodule Jido.Agent.Topology do
   # parts and check the complete value again when an instance binds the input.
   defp partial_value(_schema, %{kind: :state}), do: :ok
 
-  defp partial_value(%Zoi.Types.Map{fields: fields}, state)
-       when is_list(fields) and is_map(state) and not is_struct(state) do
+  defp partial_value(schema, state) do
+    cond do
+      Joi.Schema.kind(schema) == :map and
+        match?({:ok, fields} when is_list(fields), Joi.Schema.fields(schema)) and
+        is_map(state) and not is_struct(state) ->
+        partial_map(schema, state)
+
+      Joi.Schema.kind(schema) == :array and is_list(state) ->
+        partial_array(schema, state)
+
+      true ->
+        with {:ok, _} <- Data.parse_value(schema, state), do: :ok
+    end
+  end
+
+  defp partial_map(schema, state) do
+    {:ok, fields} = Joi.Schema.fields(schema)
     known = Map.new(fields)
 
     with {:ok, _} <- Data.fields(state, Map.keys(known)),
@@ -210,15 +226,14 @@ defmodule Jido.Agent.Topology do
          do: :ok
   end
 
-  defp partial_value(%Zoi.Types.Array{inner: inner} = schema, value) when is_list(value) do
-    with {:ok, _} <- Data.parse_value(%{schema | inner: Zoi.any()}, value),
+  defp partial_array(schema, value) do
+    {:ok, inner} = Joi.Schema.inner(schema)
+    open_schema = Joi.Schema.put_inner(schema, Joi.any())
+
+    with {:ok, _} <- Data.parse_value(open_schema, value),
          {:ok, _} <-
            Data.list(value, fn item -> with :ok <- partial_value(inner, item), do: {:ok, item} end),
          do: :ok
-  end
-
-  defp partial_value(schema, value) do
-    with {:ok, _} <- Data.parse_value(schema, value), do: :ok
   end
 
   defp connection(value, agents, plugins) do

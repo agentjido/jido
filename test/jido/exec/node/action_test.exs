@@ -86,8 +86,8 @@ defmodule Jido.Exec.Node.ActionTest do
   defmodule PreservedOutput do
     use Jido.Action,
       name: "preserved_output",
-      schema: Zoi.object(%{value: Zoi.any()}),
-      output_schema: Zoi.struct(PreservedValue, %{value: Zoi.any()}, coerce: true)
+      schema: Jido.Joi.object(%{value: Jido.Joi.any()}),
+      output_schema: Jido.Joi.struct(PreservedValue, %{value: Jido.Joi.any()}, coerce: true)
 
     @impl true
     def run(%{value: value}, _context) do
@@ -98,7 +98,7 @@ defmodule Jido.Exec.Node.ActionTest do
   defmodule PreservedOutputFlow do
     use Jido.Flow,
       name: "preserved_output_flow",
-      output_schema: Zoi.struct(PreservedValue, %{value: Zoi.integer()}, coerce: true)
+      output_schema: Jido.Joi.struct(PreservedValue, %{value: Jido.Joi.integer()}, coerce: true)
 
     flow do
       step "preserve", action: PreservedOutput, params: input([])

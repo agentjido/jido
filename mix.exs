@@ -59,7 +59,7 @@ defmodule Jido.MixProject do
       {:telemetry, "~> 1.3"},
       {:telemetry_metrics, "~> 1.2"},
       {:yaml_elixir, "~> 2.12"},
-      {:zoi, "~> 0.18.11"},
+      {:zoi, "~> 0.19.0", override: true},
       {:covenant, "~> 0.2.0", only: [:dev, :test], runtime: false},
       {:ecto_sqlite3, "~> 0.24.1", only: :test},
       {:mimic, "~> 2.0", only: :test},

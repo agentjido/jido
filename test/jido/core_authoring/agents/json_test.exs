@@ -27,7 +27,7 @@ defmodule Jido.Agent.JSONTest do
     definition =
       Agent.define!(%{
         name: "leaf",
-        schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+        schema: Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)})
       })
 
     registry =
@@ -40,7 +40,7 @@ defmodule Jido.Agent.JSONTest do
     assert {:ok, json} = JidoTest.AgentRegistry.encode_json(instance, registry)
     assert json =~ "\"id\":\"state\""
     assert json =~ "\"vsn\":1"
-    refute json =~ "Zoi.Types"
+    refute json =~ "Joi.Types"
     assert {:ok, ^definition} = JidoTest.AgentRegistry.decode_json(json, registry)
     assert {:error, _} = JidoTest.AgentRegistry.decode_json(json, %{})
     assert {:error, _} = JidoTest.AgentRegistry.encode_json(instance, %{})

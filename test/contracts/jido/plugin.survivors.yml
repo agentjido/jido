@@ -336,7 +336,7 @@
 
 - at: "lib/jido/plugin/normalizer.ex:539:30"
   operator: "string_empty"
-  mutation: "`\"Plugin-owned Agent state schema must be a Zoi schema\"` → `\"\"`"
+  mutation: "`\"Plugin-owned Agent state schema must be a Joi schema\"` → `\"\"`"
   sort: log-only
   reason: "The contract fixes the error type and structured details. It does not fix human-readable error prose."
 

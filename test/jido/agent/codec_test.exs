@@ -6,12 +6,12 @@ defmodule Jido.Agent.CodecTest do
   alias JidoTest.AgentFixtures.Add
 
   defmodule Work do
-    use Jido.Action, name: "codec_work", schema: Zoi.object(%{})
+    use Jido.Action, name: "codec_work", schema: Jido.Joi.object(%{})
     def run(_, context), do: {:ok, context.agent_state}
   end
 
   defmodule WorkFlow do
-    use Jido.Flow, name: "codec_flow", schema: Zoi.object(%{})
+    use Jido.Flow, name: "codec_flow", schema: Jido.Joi.object(%{})
 
     flow do
       step "work", action: Work, params: %{}
@@ -23,7 +23,7 @@ defmodule Jido.Agent.CodecTest do
     use Jido.Agent, name: "codec_child"
 
     state do
-      schema Zoi.object(%{value: Zoi.string() |> Zoi.default("default")})
+      schema Jido.Joi.object(%{value: Jido.Joi.string() |> Jido.Joi.default("default")})
     end
 
     routes do
@@ -42,7 +42,7 @@ defmodule Jido.Agent.CodecTest do
     def validate_params(value), do: {:ok, value}
     @impl true
     def validate_output(value), do: {:ok, value}
-    def output_schema, do: Zoi.map()
+    def output_schema, do: Jido.Joi.map()
     @impl true
     def run(_, _), do: raise("encoding must not run Actions")
   end
@@ -50,7 +50,7 @@ defmodule Jido.Agent.CodecTest do
   defmodule AmbiguousOutput do
     use Jido.Action,
       name: "codec_ambiguous_output",
-      output_schema: Zoi.object(%{:id => Zoi.integer(), "id" => Zoi.integer()})
+      output_schema: Jido.Joi.object(%{:id => Jido.Joi.integer(), "id" => Jido.Joi.integer()})
 
     def run(_, _), do: {:ok, %{"id" => 2, id: 1}}
   end
@@ -258,7 +258,7 @@ defmodule Jido.Agent.CodecTest do
         name: "complete_codec",
         description: "all portable fields",
         vsn: 3,
-        schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}),
+        schema: Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)}),
         initial_state: %{count: 4},
         metadata: %{owner: :codec},
         signal_source: "/codec",
@@ -450,7 +450,7 @@ defmodule Jido.Agent.CodecTest do
     child =
       Agent.define!(%{
         name: "nested_shape",
-        schema: Zoi.object(%{value: Zoi.string() |> Zoi.default("default")}),
+        schema: Jido.Joi.object(%{value: Jido.Joi.string() |> Jido.Joi.default("default")}),
         routes: [
           %{
             path: "child.single",

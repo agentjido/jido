@@ -1,4 +1,5 @@
 defmodule Jido.AI.Reasoning.ReAct.Actions.RecordToolResults do
+  alias Jido.Joi
   @moduledoc "Appends ordered Parallel tool results to the Session."
 
   alias Jido.AI.{Thread.Projection, ToolResult}
@@ -8,8 +9,8 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.RecordToolResults do
     vsn: 1,
     name: "jido_ai_react_record_tool_results",
     description: "Record tool results and continue the Agent graph",
-    schema: Zoi.map(),
-    output_schema: Zoi.map()
+    schema: Joi.map(),
+    output_schema: Joi.map()
 
   @impl Jido.Action
   def run(%{turn: turn, results: results}, _context) do

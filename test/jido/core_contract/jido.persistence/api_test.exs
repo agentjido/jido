@@ -61,7 +61,7 @@ defmodule JidoTest.Persistence.ApiTest do
       reason: self()
     }
 
-    assert {:ok, ^context} = Zoi.parse(Context.schema(), context)
+    assert {:ok, ^context} = Jido.Joi.parse(Context.schema(), context)
     assert {:ok, ^context} = Context.validate(context)
 
     assert {:error,

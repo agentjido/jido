@@ -1,4 +1,5 @@
 defmodule Jido.Agent.Data do
+  alias Jido.Joi
   @moduledoc false
   alias Jido.Agent.Error
 
@@ -52,21 +53,17 @@ defmodule Jido.Agent.Data do
     end
   end
 
-  def schema(%Zoi.Types.Map{fields: fields} = schema) when is_list(fields),
-    do: static_schema(schema)
+  def schema(schema) do
+    case {Joi.Schema.kind(schema), Joi.Schema.fields(schema)} do
+      {:map, {:ok, fields}} when is_list(fields) -> static_schema(schema)
+      _ -> Error.fail(:invalid_schema, [], "Expected a static Joi object schema")
+    end
+  end
 
-  def schema(_), do: Error.fail(:invalid_schema, [], "Expected a static Zoi object schema")
-
-  defp static_schema(%{__struct__: type} = value) do
-    effects =
-      case Map.get(value, :meta) do
-        %{effects: effects} -> effects
-        _ -> []
-      end
-
-    if Map.get(value, :coerce) == true or
-         type in [Zoi.Types.Codec, Zoi.Types.Lazy, Zoi.Types.StringBoolean] or
-         Enum.any?(effects, &match?({:transform, _}, &1)) do
+  defp static_schema(%{__struct__: _type} = value) do
+    if Joi.Schema.coerce?(value) or
+         Joi.Schema.forbidden_state_type?(value) or
+         Enum.any?(Joi.Schema.effects(value), &Joi.Schema.transform_effect?/1) do
       Error.fail(:invalid_schema, [], "State schemas cannot convert values")
     else
       static_schema(Map.from_struct(value))
@@ -87,54 +84,47 @@ defmodule Jido.Agent.Data do
   end
 
   def initialize(schema, state) do
-    with :ok <- plain_map(state), do: parse_value(%{schema | unrecognized_keys: :error}, state)
+    with :ok <- plain_map(state),
+         do: parse_value(Joi.Schema.put_unrecognized_keys(schema, :error), state)
   end
 
   def parse_value(schema, input) do
-    case Jido.Schema.parse(schema, input, :initialize) do
+    case Joi.initialize(schema, input) do
       {:ok, initialized} ->
-        if preserves?(input, initialized),
-          do: {:ok, initialized},
-          else:
-            Error.fail(
-              :state_conversion,
-              [],
-              "State initialization can add defaults but cannot convert supplied values"
-            )
+        {:ok, initialized}
 
       {:error, issues} ->
-        Error.fail(:invalid_state, [], "State does not match its schema", %{issues: issues})
+        if Enum.any?(issues, &Joi.Error.changed_value?/1) do
+          Error.fail(
+            :state_conversion,
+            [],
+            "State initialization can add defaults but cannot convert supplied values"
+          )
+        else
+          Error.fail(:invalid_state, [], "State does not match its schema", %{issues: issues})
+        end
     end
   end
 
-  defp preserves?(input, output) when is_map(input) and is_map(output) do
-    Enum.all?(Map.to_list(input), fn {key, value} ->
-      Map.has_key?(output, key) and preserves?(value, Map.fetch!(output, key))
-    end)
-  end
-
-  defp preserves?([left | rest], [right | tail]),
-    do: preserves?(left, right) and preserves?(rest, tail)
-
-  defp preserves?(nil, _output), do: true
-  defp preserves?(input, output), do: input === output
-
   def complete(schema, state) do
     with :ok <- plain_map(state) do
-      case Jido.Schema.parse(%{schema | unrecognized_keys: :error}, state, :stored) do
-        {:ok, ^state} ->
+      case Joi.validate(Joi.Schema.put_unrecognized_keys(schema, :error), state) do
+        :ok ->
           :ok
 
-        {:ok, _} ->
-          Error.fail(:state_conversion, [], "Validation cannot change stored state")
-
         {:error, issues} ->
-          code =
-            if Enum.any?(issues, &(&1.code == :required)),
-              do: :incomplete_state,
-              else: :invalid_state
+          cond do
+            Enum.any?(issues, &Joi.Error.changed_value?/1) ->
+              Error.fail(:state_conversion, [], "Validation cannot change stored state")
 
-          Error.fail(code, [], "State does not match its schema", %{issues: issues})
+            Enum.any?(issues, &(Joi.Error.code(&1) == :required)) ->
+              Error.fail(:incomplete_state, [], "State does not match its schema", %{
+                issues: issues
+              })
+
+            true ->
+              Error.fail(:invalid_state, [], "State does not match its schema", %{issues: issues})
+          end
       end
     end
   end

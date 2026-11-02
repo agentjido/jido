@@ -6,7 +6,7 @@ defmodule Jido.Authoring.Compiler do
 
   Runs `on_before_validate_params/1` when the Action implements it, then applies
   the input schema. Returns `{:ok, validated_params}` or `{:error, reason}`.
-  Direct, nested, and wrapped schemas use their declared Zoi unknown-key policy.
+  Direct, nested, and wrapped schemas use their declared Joi unknown-key policy.
   """
 
   @validate_output_doc """
@@ -14,7 +14,7 @@ defmodule Jido.Authoring.Compiler do
 
   Returns `{:ok, validated_output}` or
   `{:error, %Jido.Action.Error.InvalidInputError{}}`. Direct, nested, and wrapped
-  schemas use their declared Zoi unknown-key policy. An explicit
+  schemas use their declared Joi unknown-key policy. An explicit
   `Jido.Action.Output` envelope is validated as an envelope.
   """
 
@@ -57,7 +57,7 @@ defmodule Jido.Authoring.Compiler do
       @doc unquote("""
            Returns the compile-time #{label} authoring contract as JSON-safe data.
 
-           Raises `ArgumentError` when a declared Zoi schema has no JSON Schema
+           Raises `ArgumentError` when a declared Joi schema has no JSON Schema
            representation. Validation and execution remain available in that case.
            """)
       @spec authoring_contract() :: map()
@@ -124,7 +124,7 @@ defmodule Jido.Authoring.Compiler do
   def contract!({:error, message}), do: raise(ArgumentError, message)
 
   defp compile_json_schema(schema, option) do
-    Zoi.to_json_schema(schema)
+    Jido.Joi.to_json_schema(schema)
   rescue
     exception ->
       raise ArgumentError,

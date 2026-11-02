@@ -56,8 +56,8 @@ defmodule JidoTest.Contract.PluginSensorManagerTest do
            }
 
     assert stop == %Stop{tag: {:source, 1}}
-    assert %Zoi.Types.Struct{module: Start} = Start.schema()
-    assert %Zoi.Types.Struct{module: Stop} = Stop.schema()
+    assert {:ok, Start} = Jido.Joi.Schema.struct_module(Start.schema())
+    assert {:ok, Stop} = Jido.Joi.Schema.struct_module(Stop.schema())
     assert {:ok, ^start} = Directive.validate(start)
     assert {:ok, ^stop} = Directive.validate(stop)
   end
@@ -95,7 +95,7 @@ defmodule JidoTest.Contract.PluginSensorManagerTest do
   @tag obligation: "jido.plugin.sensor_manager.I2"
   test "the Plugin reduces Start and Stop Directives in their given order" do
     assert {:sensors, schema} = SensorState.state_spec([])
-    assert {:ok, %{desired: %{}}} = Jido.Schema.parse(schema, %{}, :initialize)
+    assert {:ok, %{desired: %{}}} = Jido.Joi.initialize(schema, %{})
     assert SensorState.directives([]) == [Start, Stop]
 
     first = SensorManager.start(:source, F.ControlledSensor, %{value: 1})
@@ -196,8 +196,8 @@ defmodule JidoTest.Contract.PluginSensorManagerTest do
       partition: {:tenant, 1}
     }
 
-    assert %Zoi.Types.Struct{module: SensorInit} = SensorInit.schema()
-    assert {:ok, ^sensor_init} = Zoi.parse(SensorInit.schema(), Map.from_struct(sensor_init))
+    assert {:ok, SensorInit} = Jido.Joi.Schema.struct_module(SensorInit.schema())
+    assert {:ok, ^sensor_init} = Jido.Joi.parse(SensorInit.schema(), Map.from_struct(sensor_init))
   end
 
   @tag obligation: "jido.plugin.sensor_manager.I4"

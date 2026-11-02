@@ -1,4 +1,5 @@
 defmodule Jido.AI.Reasoning.Actions.FinalizeTurn do
+  alias Jido.Joi
   @moduledoc "Finalizes one graph request and returns the Agent commit envelope."
 
   alias Jido.AI.{Budget, Telemetry, Thread.Projection}
@@ -8,8 +9,8 @@ defmodule Jido.AI.Reasoning.Actions.FinalizeTurn do
     vsn: 1,
     name: "jido_ai_finalize_turn",
     description: "Commit the terminal request Session",
-    schema: Zoi.object(%{outcome: Zoi.object(%{turn: Zoi.any(), result: Zoi.map()})}),
-    output_schema: Zoi.object(%{state: Zoi.map(), response: Zoi.map()})
+    schema: Joi.object(%{outcome: Joi.object(%{turn: Joi.any(), result: Joi.map()})}),
+    output_schema: Joi.object(%{state: Joi.map(), response: Joi.map()})
 
   @impl Jido.Action
   def run(%{outcome: %{turn: turn, result: result}}, context) do

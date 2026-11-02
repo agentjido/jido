@@ -127,8 +127,8 @@ defmodule Jido.Agent.MutationFoundationTest do
       Agent.define!(%{
         name: "nested",
         schema:
-          Zoi.object(%{
-            nested: Zoi.object(%{value: Zoi.integer() |> Zoi.default(1)}) |> Zoi.default(%{})
+          Jido.Joi.object(%{
+            nested: Jido.Joi.object(%{value: Jido.Joi.integer() |> Jido.Joi.default(1)}) |> Jido.Joi.default(%{})
           })
       })
 
@@ -190,7 +190,7 @@ defmodule Jido.Agent.MutationFoundationTest do
   @tag obligation: "jido.agent.I27"
   test "Diff reports top-level definition changes made by a full upgrade" do
     before = F.agent()
-    schema = Zoi.object(%{count: Zoi.integer() |> Zoi.min(0) |> Zoi.default(0)})
+    schema = Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.min(0) |> Jido.Joi.default(0)})
     upgraded = %{before | schema: schema, vsn: 2, metadata: %{source: "upgrade"}}
     assert {:ok, ^upgraded} = Agent.validate(upgraded)
     diff = Diff.between(before, upgraded)

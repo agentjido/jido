@@ -83,7 +83,7 @@ defmodule Jido.Action.InlineTest do
 
     def schema do
       send(self(), :schema_evaluated)
-      Zoi.object(%{value: Zoi.integer()})
+      Jido.Joi.object(%{value: Jido.Joi.integer()})
     end
   end
 
@@ -114,8 +114,8 @@ defmodule Jido.Action.InlineTest do
     """)
 
     target = Inline.target!(owner, path("increment"))
-    assert %Zoi.Types.Map{} = target.schema()
-    assert %Zoi.Types.Map{} = target.output_schema()
+    assert Jido.Joi.Schema.kind(target.schema()) == :map
+    assert Jido.Joi.Schema.kind(target.output_schema()) == :map
     assert target.name() == "test_action"
 
     assert {:ok, %Jido.Instruction{kind: :action, target: ^target}} =
@@ -264,7 +264,7 @@ defmodule Jido.Action.InlineTest do
     owner = unique_owner("Schema")
 
     compile_source(owner, """
-    alias Zoi, as: Shape
+    alias Jido.Joi, as: Shape
     @input_schema Shape.object(%{value: Shape.integer() |> Shape.default(4)})
     @description "typed callback"
     action [host: :test, declaration: "typed", role: :action], :callback, %{value: value},
@@ -322,9 +322,9 @@ defmodule Jido.Action.InlineTest do
           "name: :bad",
           "description: 42",
           "schema: :invalid",
-          "schema: Zoi.integer()",
-          "output_schema: Zoi.integer()",
-          "schema: Zoi.object(%{value: Zoi.integer() |> Zoi.refine(fn _ -> :ok end)})"
+          "schema: Jido.Joi.integer()",
+          "output_schema: Jido.Joi.integer()",
+          "schema: Jido.Joi.object(%{value: Jido.Joi.integer() |> Jido.Joi.refine(fn _ -> :ok end)})"
         ] do
       owner = unique_owner("InvalidConfig")
 
@@ -723,7 +723,7 @@ defmodule Jido.Action.InlineTest do
 
     compile_source(owner, """
     action [host: :test, declaration: "divide", role: :action], :callback, nil,
-      [schema: Zoi.object(%{operand: Zoi.number()}), context: ctx] do
+      [schema: Jido.Joi.object(%{operand: Jido.Joi.number()}), context: ctx] do
       %{operand: operand} when operand == 0 ->
         send(ctx.observer, :zero)
         {:error, :zero}

@@ -1,4 +1,5 @@
 defmodule Jido.Flow.Ref do
+  alias Jido.Joi
   @moduledoc "A portable reference in a canonical Flow expression."
 
   alias Jido.Authoring.Config
@@ -46,24 +47,24 @@ defmodule Jido.Flow.Ref do
   @spec sources() :: [source()]
   def sources, do: @sources
 
-  @schema Zoi.struct(
+  @schema Joi.struct(
             __MODULE__,
             %{
               source:
-                Zoi.enum(
+                Joi.enum(
                   @sources,
                   description: "Reference source"
                 ),
-              component: Zoi.string(description: "Result component name") |> Zoi.optional(),
-              path: Zoi.list(Zoi.any(), description: "Nested value path") |> Zoi.default([])
+              component: Joi.string(description: "Result component name") |> Joi.optional(),
+              path: Joi.list(Joi.any(), description: "Nested value path") |> Joi.default([])
             },
             coerce: true
           )
 
-  @type t :: unquote(Zoi.type_spec(@schema))
+  @type t :: unquote(Joi.type_spec(@schema))
 
-  @enforce_keys Zoi.Struct.enforce_keys(@schema)
-  defstruct Zoi.Struct.struct_fields(@schema)
+  @enforce_keys Joi.Struct.enforce_keys(@schema)
+  defstruct Joi.Struct.struct_fields(@schema)
 
   @doc "Builds a Flow input reference with a required path."
   @spec input(term()) :: t()

@@ -59,11 +59,11 @@ defmodule Jido.Exec.ValidationContractTest do
     use Jido.Action,
       name: "prepared_validation_contract",
       schema:
-        Zoi.object(%{value: Zoi.integer()}, unrecognized_keys: :preserve)
-        |> Zoi.transform({Jido.Exec.ValidationContractTest, :transform, [:input]}),
+        Jido.Joi.object(%{value: Jido.Joi.integer()}, unrecognized_keys: :preserve)
+        |> Jido.Joi.transform({Jido.Exec.ValidationContractTest, :transform, [:input]}),
       output_schema:
-        Zoi.object(%{value: Zoi.integer()}, unrecognized_keys: :preserve)
-        |> Zoi.transform({Jido.Exec.ValidationContractTest, :transform, [:output]})
+        Jido.Joi.object(%{value: Jido.Joi.integer()}, unrecognized_keys: :preserve)
+        |> Jido.Joi.transform({Jido.Exec.ValidationContractTest, :transform, [:output]})
 
     def on_before_validate_params(%{test_pid: pid} = value) do
       send(pid, :prepared)
@@ -314,7 +314,7 @@ defmodule Jido.Exec.ValidationContractTest do
     refute_received {:transformed, _phase}
   end
 
-  defp scalar_schema, do: Zoi.any() |> Zoi.transform({__MODULE__, :scalar, []})
+  defp scalar_schema, do: Jido.Joi.any() |> Jido.Joi.transform({__MODULE__, :scalar, []})
 
   def data_flow(attrs) do
     Map.merge(
@@ -329,8 +329,8 @@ defmodule Jido.Exec.ValidationContractTest do
 
   defp transform_schema(phase),
     do:
-      Zoi.object(%{value: Zoi.integer()}, unrecognized_keys: :preserve)
-      |> Zoi.transform({__MODULE__, :transform, [phase]})
+      Jido.Joi.object(%{value: Jido.Joi.integer()}, unrecognized_keys: :preserve)
+      |> Jido.Joi.transform({__MODULE__, :transform, [phase]})
 
   defp boundaries(ActionValidator, phase) do
     [{ActionValidator, phase, nil}, {ParentAction, phase, ["child"]}]

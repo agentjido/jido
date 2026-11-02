@@ -1,4 +1,5 @@
 defmodule Jido.AI.Reasoning.ReAct.Actions.ResolveToolReview do
+  alias Jido.Joi
   @moduledoc "Turns a durable wait result into an explicit graph decision."
 
   alias Jido.AI.{Reasoning.Result, Thread.Projection}
@@ -8,8 +9,8 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.ResolveToolReview do
     vsn: 1,
     name: "jido_ai_react_resolve_tool_review",
     description: "Resolve an approved, denied, or expired tool review",
-    schema: Zoi.map(),
-    output_schema: Zoi.map()
+    schema: Joi.map(),
+    output_schema: Joi.map()
 
   @impl Jido.Action
   def run(%{turn: turn, decision: decision}, _context) do

@@ -109,10 +109,10 @@ defmodule Jido.Signal.Router.RouteTest do
   end
 
   describe "validate/1" do
-    test "uses the Route Zoi schema" do
+    test "uses the Route Joi schema" do
       route = %Route{path: "test.path", target: :target, priority: 10}
 
-      assert {:ok, ^route} = Zoi.parse(Route.schema(), route)
+      assert {:ok, ^route} = Jido.Joi.parse(Route.schema(), route)
       assert {:ok, ^route} = Router.validate(route)
       assert {:ok, [^route]} = Router.validate([route])
     end

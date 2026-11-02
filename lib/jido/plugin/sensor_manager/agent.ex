@@ -1,12 +1,13 @@
 defmodule Jido.Plugin.SensorManager.Agent do
+  alias Jido.Joi
   @moduledoc false
   @behaviour Jido.Plugin
 
   alias Jido.Plugin.SensorManager.{Start, Stop}
 
-  @sensor_schema Zoi.object(%{module: Zoi.module(), config: Zoi.map() |> Zoi.default(%{})})
-  @state_schema Zoi.object(%{desired: Zoi.map(Zoi.any(), @sensor_schema) |> Zoi.default(%{})})
-                |> Zoi.default(%{})
+  @sensor_schema Joi.object(%{module: Joi.module(), config: Joi.map() |> Joi.default(%{})})
+  @state_schema Joi.object(%{desired: Joi.map(Joi.any(), @sensor_schema) |> Joi.default(%{})})
+                |> Joi.default(%{})
 
   @impl true
   def state_spec(_opts), do: {:sensors, @state_schema}

@@ -33,7 +33,7 @@ defmodule Jido.Agent.SelectionTest do
   defmodule ValidatedRecord do
     use Jido.Action,
       name: "selection_validated_record",
-      schema: Zoi.object(%{value: Zoi.integer()})
+      schema: Jido.Joi.object(%{value: Jido.Joi.integer()})
 
     @impl true
     def run(input, context), do: Record.run(input, context)
@@ -43,9 +43,9 @@ defmodule Jido.Agent.SelectionTest do
     use Jido.Agent, name: "selection_routed"
 
     state do
-      schema Zoi.object(%{
-               input: Zoi.map() |> Zoi.default(%{}),
-               calls: Zoi.integer() |> Zoi.default(0)
+      schema Jido.Joi.object(%{
+               input: Jido.Joi.map() |> Jido.Joi.default(%{}),
+               calls: Jido.Joi.integer() |> Jido.Joi.default(0)
              })
     end
 

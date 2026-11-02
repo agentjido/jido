@@ -32,7 +32,7 @@ defmodule JidoTest.AgentServer.LifecycleTest do
   defmodule HandoffTarget do
     use Jido.Action,
       name: "lifecycle_handoff_target",
-      schema: Zoi.object(%{count: Zoi.integer()})
+      schema: Jido.Joi.object(%{count: Jido.Joi.integer()})
 
     def run(%{count: count}, _context), do: {:ok, %{count: count + 1}}
   end
@@ -56,7 +56,7 @@ defmodule JidoTest.AgentServer.LifecycleTest do
     use Jido.Agent, name: "lifecycle_handoff_agent", plugins: [HandoffPlugin]
 
     state do
-      schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+      schema Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)})
     end
 
     routes do

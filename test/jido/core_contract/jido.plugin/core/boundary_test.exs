@@ -16,7 +16,7 @@ defmodule Jido.Plugin.BoundaryTest do
   defmodule OwnedState.Agent do
     @behaviour Jido.Plugin
 
-    def state_spec(_opts), do: {:owned, Zoi.integer() |> Zoi.default(3)}
+    def state_spec(_opts), do: {:owned, Jido.Joi.integer() |> Jido.Joi.default(3)}
     def reduce(reduction, _opts), do: {:ok, reduction.plugin_state}
   end
 

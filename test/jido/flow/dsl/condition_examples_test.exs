@@ -6,7 +6,7 @@ defmodule JidoActionTest.Flow.DSL.ConditionExamplesTest do
   defmodule BooleanRoute do
     use Jido.Flow,
       name: "required_boolean_route",
-      schema: Zoi.object(%{enabled: Zoi.boolean()})
+      schema: Jido.Joi.object(%{enabled: Jido.Joi.boolean()})
 
     alias JidoActionTest.Fixtures.Actions.EchoParamsAction
 

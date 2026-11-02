@@ -1,4 +1,6 @@
 defmodule Jido.Agent.Directive do
+  alias Jido.Joi
+
   @moduledoc """
   Changes and runtime work returned by an Agent executable turn.
 
@@ -55,7 +57,7 @@ defmodule Jido.Agent.Directive do
       # `use` can precede `defstruct`; do not expand the struct here.
       def validate(%{__struct__: __MODULE__} = directive) do
         if function_exported?(__MODULE__, :schema, 0) do
-          Zoi.parse(apply(__MODULE__, :schema, []), Map.from_struct(directive))
+          Joi.parse(apply(__MODULE__, :schema, []), Map.from_struct(directive))
         else
           {:ok, directive}
         end
@@ -107,13 +109,13 @@ defmodule Jido.Agent.Directive do
   @spec validate(struct()) :: {:ok, struct()} | {:error, term()}
   def validate(%{__struct__: module, signal: %Signal{} = signal} = directive)
       when module in [Emit, Reply, ParentSend, AgentSend] do
-    with {:ok, signal} <- Zoi.parse(Signal.schema(), signal),
+    with {:ok, signal} <- Joi.parse(Signal.schema(), signal),
          {:ok, extensions} <- SignalContext.normalize(signal.extensions),
          {:ok, directive} <-
            directive
            |> Map.from_struct()
            |> Map.put(:signal, %{signal | extensions: extensions})
-           |> then(&Zoi.parse(module.schema(), &1)),
+           |> then(&Joi.parse(module.schema(), &1)),
          :ok <- validate_reply_causation(directive) do
       {:ok, directive}
     end
@@ -128,7 +130,7 @@ defmodule Jido.Agent.Directive do
   end
 
   def validate(%AgentStart{} = directive) do
-    with {:ok, directive} <- Zoi.parse(AgentStart.schema(), Map.from_struct(directive)),
+    with {:ok, directive} <- Joi.parse(AgentStart.schema(), Map.from_struct(directive)),
          :ok <- Runtime.validate_agent_target(directive.agent) do
       {:ok, directive}
     end
@@ -138,7 +140,7 @@ defmodule Jido.Agent.Directive do
     do: Jido.Agent.Mutation.validate(directive)
 
   def validate(%{__struct__: module} = directive) when module in @built_ins do
-    Zoi.parse(module.schema(), Map.from_struct(directive))
+    Joi.parse(module.schema(), Map.from_struct(directive))
   end
 
   def validate(%{__struct__: module} = directive) do

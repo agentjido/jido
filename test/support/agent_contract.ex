@@ -18,7 +18,7 @@ defmodule JidoTest.AgentContract do
   defmodule Add do
     use Jido.Action,
       name: "contract_add",
-      schema: Zoi.object(%{amount: Zoi.integer()})
+      schema: Jido.Joi.object(%{amount: Jido.Joi.integer()})
 
     def run(%{amount: amount}, %{agent_state: state}),
       do: {:ok, %{state | count: state.count + amount}}
@@ -28,9 +28,9 @@ defmodule JidoTest.AgentContract do
     use Jido.Action,
       name: "contract_project",
       output_schema:
-        Zoi.object(%{
-          state: Zoi.map(),
-          reply: Zoi.object(%{value: Zoi.integer()})
+        Jido.Joi.object(%{
+          state: Jido.Joi.map(),
+          reply: Jido.Joi.object(%{value: Jido.Joi.integer()})
         })
 
     def run(_input, context),
@@ -40,7 +40,7 @@ defmodule JidoTest.AgentContract do
   defmodule Flow do
     use Jido.Flow,
       name: "contract_flow",
-      schema: Zoi.object(%{amount: Zoi.integer()})
+      schema: Jido.Joi.object(%{amount: Jido.Joi.integer()})
 
     flow do
       step "add", action: Add, params: %{amount: input(:amount)}
@@ -75,7 +75,7 @@ defmodule JidoTest.AgentContract do
   def state_spec(opts, key) do
     if opts[:stateless],
       do: :none,
-      else: {Keyword.get(opts, :key, key), Zoi.integer() |> Zoi.default(Keyword.get(opts, :initial, 0))}
+      else: {Keyword.get(opts, :key, key), Jido.Joi.integer() |> Jido.Joi.default(Keyword.get(opts, :initial, 0))}
   end
 
   def prepare(preparation, opts) do
@@ -108,11 +108,11 @@ defmodule JidoTest.AgentContract do
   end
 
   def schema do
-    Zoi.object(%{
-      count: Zoi.integer() |> Zoi.default(0),
-      enabled: Zoi.boolean() |> Zoi.default(true),
-      note: Zoi.string() |> Zoi.nullable() |> Zoi.default("default"),
-      settings: Zoi.map() |> Zoi.default(%{a: 1, b: 2})
+    Jido.Joi.object(%{
+      count: Jido.Joi.integer() |> Jido.Joi.default(0),
+      enabled: Jido.Joi.boolean() |> Jido.Joi.default(true),
+      note: Jido.Joi.string() |> Jido.Joi.nullable() |> Jido.Joi.default("default"),
+      settings: Jido.Joi.map() |> Jido.Joi.default(%{a: 1, b: 2})
     })
   end
 
@@ -174,7 +174,7 @@ defmodule JidoTest.AgentContract do
 
   defmodule Effects do
     use Jido.Plugin
-    def state_spec(_), do: {:effects, Zoi.integer() |> Zoi.default(0)}
+    def state_spec(_), do: {:effects, Jido.Joi.integer() |> Jido.Joi.default(0)}
     def directives(_), do: [JidoTest.AgentContract.Effect]
 
     def reduce(reduction, _) do

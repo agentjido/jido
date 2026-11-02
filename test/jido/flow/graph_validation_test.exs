@@ -19,7 +19,7 @@ defmodule Jido.Flow.GraphValidationTest do
   defp registry do
     Registry.new!(%{
       {"action", 1} => {:action, ProbeAction},
-      {"schema", 1} => {:schema, Zoi.map()},
+      {"schema", 1} => {:schema, Jido.Joi.map()},
       {"flow", 1} => {:flow, NestedFlow}
     })
   end
@@ -248,7 +248,7 @@ end
         action: ProbeAction,
         params: [Ref.state(), ref.("dep_iterate_params")],
         state: [
-          schema: Zoi.map(),
+          schema: Jido.Joi.map(),
           initial: ref.("dep_initial"),
           update: [Ref.body_result(), ref.("dep_update")]
         ],
@@ -547,7 +547,7 @@ end
     registry =
       Registry.new!(%{
         {"unloaded", 1} => {:action, NotLoadedAction},
-        {"schema", 1} => {:schema, Zoi.map()}
+        {"schema", 1} => {:schema, Jido.Joi.map()}
       })
 
     assert {:ok, document} = Codec.encode(flow, registry)

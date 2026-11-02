@@ -1,4 +1,5 @@
 defmodule Jido.AI.Reasoning.Actions.GuardInput do
+  alias Jido.Joi
   @moduledoc "Checks one request before its reasoning graph starts."
 
   @blocked_fragments ["ignore previous instructions", "reveal your system prompt"]
@@ -8,8 +9,8 @@ defmodule Jido.AI.Reasoning.Actions.GuardInput do
     vsn: 1,
     name: "jido_ai_guard_input",
     description: "Check one request before model work starts",
-    schema: Zoi.map(),
-    output_schema: Zoi.map()
+    schema: Joi.map(),
+    output_schema: Joi.map()
 
   @impl Jido.Action
   def run(%{turn: turn}, context) do

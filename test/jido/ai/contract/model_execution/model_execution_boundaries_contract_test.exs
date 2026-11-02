@@ -64,7 +64,7 @@ defmodule Jido.AI.Contract.ModelExecutionBoundariesTest do
     assert {:error, :invalid_context} = Context.validate(:invalid)
 
     invalid_options = %{context | request: %{context.request | options: %{temperature: 0}}}
-    assert {:error, [%Zoi.Error{path: [:request, :options]}]} = Context.validate(invalid_options)
+    assert {:error, [%{path: [:request, :options]}]} = Context.validate(invalid_options)
 
     invalid_request = %{context | request: %{context.request | context: :invalid}}
     assert {:error, :invalid_req_llm_context} = Context.validate(invalid_request)

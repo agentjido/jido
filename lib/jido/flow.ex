@@ -1,4 +1,6 @@
 defmodule Jido.Flow do
+  alias Jido.Joi
+
   field_docs =
     for entity <- hd(Jido.Flow.DSL.Schema.sections()).entities do
       children = for {_, children} <- entity.entities, child <- children, do: {child, "####"}
@@ -152,20 +154,20 @@ defmodule Jido.Flow do
   alias Jido.Flow.Definition
   alias Jido.Flow.Identity
 
-  @schema Zoi.struct(
+  @schema Joi.struct(
             __MODULE__,
             %{
-              name: Zoi.string(description: "Flow name"),
-              description: Zoi.string(description: "Flow description") |> Zoi.optional(),
-              schema: Zoi.any(description: "Flow input schema") |> Zoi.default(Zoi.map()),
-              output_schema: Zoi.any(description: "Flow output schema") |> Zoi.default(Zoi.map()),
-              components: Zoi.map(description: "Canonical named Flow component graph") |> Zoi.default(%{}),
-              output: Zoi.any(description: "Declared output expression")
+              name: Joi.string(description: "Flow name"),
+              description: Joi.string(description: "Flow description") |> Joi.optional(),
+              schema: Joi.any(description: "Flow input schema") |> Joi.default(Joi.map()),
+              output_schema: Joi.any(description: "Flow output schema") |> Joi.default(Joi.map()),
+              components: Joi.map(description: "Canonical named Flow component graph") |> Joi.default(%{}),
+              output: Joi.any(description: "Declared output expression")
             },
             coerce: true
           )
 
-  @type t :: unquote(Zoi.type_spec(@schema))
+  @type t :: unquote(Joi.type_spec(@schema))
   @type dependency_info :: %{
           needs: [String.t()],
           references: [String.t()],
@@ -174,8 +176,8 @@ defmodule Jido.Flow do
   @type source_location :: %{optional(:file) => String.t(), optional(:line) => pos_integer()}
   @type source_map :: %{optional([term()]) => source_location()}
 
-  @enforce_keys Zoi.Struct.enforce_keys(@schema)
-  defstruct Zoi.Struct.struct_fields(@schema)
+  @enforce_keys Joi.Struct.enforce_keys(@schema)
+  defstruct Joi.Struct.struct_fields(@schema)
 
   @doc "Returns the stable canonical Flow value owned by a Flow module."
   @callback flow() :: t()

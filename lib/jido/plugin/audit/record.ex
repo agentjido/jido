@@ -1,31 +1,32 @@
 defmodule Jido.Plugin.Audit.Record do
+  alias Jido.Joi
   @moduledoc "One portable domain audit record."
 
-  @schema Zoi.struct(
+  @schema Joi.struct(
             __MODULE__,
             %{
-              id: Zoi.string(description: "Stable audit record identifier"),
-              at: Zoi.integer(description: "Record time in Unix milliseconds") |> Zoi.min(0),
-              event: Zoi.any(description: "Domain event"),
-              outcome: Zoi.atom(description: "Domain outcome"),
-              metadata: Zoi.map(description: "Portable record metadata") |> Zoi.default(%{})
+              id: Joi.string(description: "Stable audit record identifier"),
+              at: Joi.integer(description: "Record time in Unix milliseconds") |> Joi.min(0),
+              event: Joi.any(description: "Domain event"),
+              outcome: Joi.atom(description: "Domain outcome"),
+              metadata: Joi.map(description: "Portable record metadata") |> Joi.default(%{})
             },
             coerce: true
           )
 
   @typedoc "A validated portable domain audit record."
-  @type t :: unquote(Zoi.type_spec(@schema))
-  @enforce_keys Zoi.Struct.enforce_keys(@schema)
-  defstruct Zoi.Struct.struct_fields(@schema)
+  @type t :: unquote(Joi.type_spec(@schema))
+  @enforce_keys Joi.Struct.enforce_keys(@schema)
+  defstruct Joi.Struct.struct_fields(@schema)
 
   @doc false
-  @spec schema() :: Zoi.schema()
+  @spec schema() :: Joi.schema()
   def schema, do: @schema
 
   @doc "Validates one portable audit record."
   @spec validate(term()) :: {:ok, t()} | {:error, term()}
   def validate(%__MODULE__{} = record) do
-    with {:ok, record} <- Zoi.parse(@schema, Map.from_struct(record)),
+    with {:ok, record} <- Joi.parse(@schema, Map.from_struct(record)),
          true <- Jido.Signal.ID.valid?(record.id) do
       case Jido.PortableTerm.validate(record, :record) do
         :ok -> {:ok, record}

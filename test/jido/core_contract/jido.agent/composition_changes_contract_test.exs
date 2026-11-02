@@ -16,7 +16,7 @@ defmodule JidoTest.Contract.AgentCompositionChangesTest do
     use Jido.Plugin, vsn: 2
 
     def state_spec(opts),
-      do: {Keyword.get(opts, :key, :counter), Zoi.integer() |> Zoi.default(Keyword.get(opts, :start, 3))}
+      do: {Keyword.get(opts, :key, :counter), Jido.Joi.integer() |> Jido.Joi.default(Keyword.get(opts, :start, 3))}
 
     def dump(value, _, _), do: {:ok, %{value: value}}
     def load(%{value: value}, _, _), do: {:ok, value}

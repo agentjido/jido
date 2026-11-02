@@ -1,4 +1,5 @@
 defmodule Jido.AI.Reasoning.TRM.Actions.PrepareCall do
+  alias Jido.Joi
   @moduledoc "Prepares one draft, critique, or revision model call."
 
   @draft_schema %{
@@ -26,8 +27,8 @@ defmodule Jido.AI.Reasoning.TRM.Actions.PrepareCall do
     id: "jido.ai/reasoning/trm/actions/prepare-call",
     vsn: 1,
     name: "jido_ai_trm_prepare_call",
-    schema: Zoi.map(),
-    output_schema: Zoi.map()
+    schema: Joi.map(),
+    output_schema: Joi.map()
 
   @impl Jido.Action
   def run(%{state: %{turn: turn} = state}, _context) do

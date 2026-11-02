@@ -18,7 +18,7 @@ defmodule Jido.Agent.ForwardTest do
     use Jido.Agent, name: "forward_worker"
 
     state do
-      schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+      schema Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)})
     end
 
     routes do
@@ -34,7 +34,7 @@ defmodule Jido.Agent.ForwardTest do
     use Jido.Agent, name: "forward_parent"
 
     state do
-      schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+      schema Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)})
     end
 
     routes do

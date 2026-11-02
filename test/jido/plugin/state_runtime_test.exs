@@ -5,12 +5,12 @@ defmodule Jido.Plugin.StateRuntimeTest do
   alias Jido.Signal
 
   defmodule Spend do
-    @schema Zoi.struct(__MODULE__, %{amount: Zoi.integer() |> Zoi.min(1)})
-    @enforce_keys Zoi.Struct.enforce_keys(@schema)
-    defstruct Zoi.Struct.struct_fields(@schema)
+    @schema Jido.Joi.struct(__MODULE__, %{amount: Jido.Joi.integer() |> Jido.Joi.min(1)})
+    @enforce_keys Jido.Joi.Struct.enforce_keys(@schema)
+    defstruct Jido.Joi.Struct.struct_fields(@schema)
 
     def schema, do: @schema
-    def validate(%__MODULE__{} = directive), do: Zoi.parse(@schema, directive)
+    def validate(%__MODULE__{} = directive), do: Jido.Joi.parse(@schema, directive)
   end
 
   defmodule Credits do
@@ -30,7 +30,7 @@ defmodule Jido.Plugin.StateRuntimeTest do
     @behaviour Jido.Plugin
 
     @impl true
-    def state_spec(_opts), do: {:credits, Zoi.integer() |> Zoi.min(0) |> Zoi.default(3)}
+    def state_spec(_opts), do: {:credits, Jido.Joi.integer() |> Jido.Joi.min(0) |> Jido.Joi.default(3)}
 
     @impl true
     def directives(_opts), do: [Spend]

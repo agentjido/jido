@@ -1,12 +1,13 @@
 defmodule Jido.AI.Reasoning.TreeOfThoughts.Actions.SelectThoughts do
+  alias Jido.Joi
   @moduledoc "Selects the two highest-scoring thoughts and routes the next phase."
 
   use Jido.Action,
     id: "jido.ai/reasoning/tree-of-thoughts/actions/select-thoughts",
     vsn: 1,
     name: "jido_ai_tree_of_thoughts_select_thoughts",
-    schema: Zoi.map(),
-    output_schema: Zoi.map()
+    schema: Joi.map(),
+    output_schema: Joi.map()
 
   @impl Jido.Action
   def run(%{terminal: output}, _context), do: {:ok, %{kind: :complete, output: output}}

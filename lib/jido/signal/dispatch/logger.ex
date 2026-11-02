@@ -1,4 +1,6 @@
 defmodule Jido.Signal.Dispatch.LoggerAdapter do
+  alias Jido.Joi
+
   @moduledoc """
   Sends a Signal to Elixir Logger.
 
@@ -21,12 +23,12 @@ defmodule Jido.Signal.Dispatch.LoggerAdapter do
   require Logger
 
   @valid_levels [:debug, :info, :warning, :error]
-  @options_schema Zoi.keyword(
+  @options_schema Joi.keyword(
                     [
-                      level: Zoi.enum(@valid_levels) |> Zoi.optional(),
-                      log_level: Zoi.enum(@valid_levels) |> Zoi.optional(),
-                      structured: Zoi.boolean() |> Zoi.optional(),
-                      include_data: Zoi.boolean() |> Zoi.optional()
+                      level: Joi.enum(@valid_levels) |> Joi.optional(),
+                      log_level: Joi.enum(@valid_levels) |> Joi.optional(),
+                      structured: Joi.boolean() |> Joi.optional(),
+                      include_data: Joi.boolean() |> Joi.optional()
                     ],
                     unrecognized_keys: :error
                   )

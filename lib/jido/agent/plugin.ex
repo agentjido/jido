@@ -1,4 +1,6 @@
 defmodule Jido.Agent.Plugin do
+  alias Jido.Joi
+
   @moduledoc """
   Executes the Agent callbacks of `Jido.Plugin`.
 
@@ -20,39 +22,49 @@ defmodule Jido.Agent.Plugin do
   alias Jido.Plugin.Normalizer
   alias Jido.Signal
 
-  @type state_spec :: :none | {atom(), Zoi.schema()}
+  @type state_spec :: :none | {atom(), Joi.schema()}
 
   @doc false
-  @spec compose_schema(Zoi.schema(), [Jido.Plugin.declaration()] | [Jido.Plugin.Spec.t()]) ::
-          {:ok, Zoi.schema()} | {:error, term()}
-  def compose_schema(%Zoi.Types.Map{} = domain_schema, declarations) do
-    with {:ok, specs} <- Normalizer.normalize_all(declarations),
-         do: compose_schema_from_specs(domain_schema, specs)
-  end
-
-  def compose_schema(schema, _declarations), do: compose_schema_from_specs(schema, [])
-
-  # Callers pass the specifications from the current validation result.
-  @doc false
-  def compose_schema_from_specs(%Zoi.Types.Map{fields: fields} = domain_schema, plugin_specs) do
-    agent_specs = specs(plugin_specs)
-
-    with :ok <- state_key_conflicts(fields, agent_specs) do
-      plugin_fields =
-        for %Spec{state_key: key, state_schema: schema} <- agent_specs,
-            not is_nil(key),
-            into: %{},
-            do: {key, schema}
-
-      extended = Zoi.extend(domain_schema, plugin_fields)
-      {:ok, %{domain_schema | fields: extended.fields}}
+  @spec compose_schema(Joi.schema(), [Jido.Plugin.declaration()] | [Jido.Plugin.Spec.t()]) ::
+          {:ok, Joi.schema()} | {:error, term()}
+  def compose_schema(domain_schema, declarations) do
+    if field_object?(domain_schema) do
+      with {:ok, specs} <- Normalizer.normalize_all(declarations),
+           do: compose_schema_from_specs(domain_schema, specs)
+    else
+      compose_schema_from_specs(domain_schema, [])
     end
   end
 
-  def compose_schema_from_specs(schema, _specs) do
-    PluginError.validation("Agent domain schema must be a field-based Zoi object", %{
-      schema: schema
-    })
+  # Callers pass the specifications from the current validation result.
+  @doc false
+  def compose_schema_from_specs(domain_schema, plugin_specs) do
+    with true <- field_object?(domain_schema),
+         {:ok, fields} <- Joi.Schema.fields(domain_schema) do
+      agent_specs = specs(plugin_specs)
+
+      with :ok <- state_key_conflicts(fields, agent_specs) do
+        plugin_fields =
+          for %Spec{state_key: key, state_schema: schema} <- agent_specs,
+              not is_nil(key),
+              into: %{},
+              do: {key, schema}
+
+        extended = Joi.extend(domain_schema, plugin_fields)
+        {:ok, extended_fields} = Joi.Schema.fields(extended)
+        {:ok, Joi.Schema.put_fields(domain_schema, extended_fields)}
+      end
+    else
+      _ ->
+        PluginError.validation("Agent domain schema must be a field-based Joi object", %{
+          schema: domain_schema
+        })
+    end
+  end
+
+  defp field_object?(schema) do
+    Joi.Schema.kind(schema) == :map and
+      match?({:ok, fields} when is_list(fields), Joi.Schema.fields(schema))
   end
 
   @doc false

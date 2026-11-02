@@ -20,7 +20,7 @@ defmodule Jido.Persistence.SnapshotTest do
   defmodule RuntimePlugin do
     use Jido.Plugin
 
-    def state_spec(_opts), do: {:runtime_owned, Zoi.integer() |> Zoi.default(0)}
+    def state_spec(_opts), do: {:runtime_owned, Jido.Joi.integer() |> Jido.Joi.default(0)}
   end
 
   defmodule StaticExtension do
@@ -39,12 +39,12 @@ defmodule Jido.Persistence.SnapshotTest do
     use Jido.Action,
       name: "persistence_schema_action",
       schema:
-        Zoi.object(%{
-          input: Zoi.any() |> Zoi.refine({Jido.Persistence.SnapshotTest.InputCheck, :valid, []})
+        Jido.Joi.object(%{
+          input: Jido.Joi.any() |> Jido.Joi.refine({Jido.Persistence.SnapshotTest.InputCheck, :valid, []})
         }),
       output_schema:
-        Zoi.object(%{
-          output: Zoi.any() |> Zoi.refine({Jido.Persistence.SnapshotTest.OutputCheck, :valid, []})
+        Jido.Joi.object(%{
+          output: Jido.Joi.any() |> Jido.Joi.refine({Jido.Persistence.SnapshotTest.OutputCheck, :valid, []})
         })
 
     def run(input, _context), do: {:ok, %{output: input.input}}
@@ -62,7 +62,7 @@ defmodule Jido.Persistence.SnapshotTest do
     use Jido.Agent, name: "snapshot_inline_agent"
 
     state do
-      schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+      schema Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)})
     end
 
     routes do
@@ -501,8 +501,8 @@ defmodule Jido.Persistence.SnapshotTest do
   @tag obligation: "jido.persistence.I7"
   test "schema refinements are code references and tuple defaults remain data" do
     schema =
-      Zoi.object(%{
-        value: Zoi.any() |> Zoi.refine({F.Checks, :valid, []}) |> Zoi.default({NotAModule, :tuple, []})
+      Jido.Joi.object(%{
+        value: Jido.Joi.any() |> Jido.Joi.refine({F.Checks, :valid, []}) |> Jido.Joi.default({NotAModule, :tuple, []})
       })
 
     agent = Agent.define!(%{name: "schema", schema: schema}) |> Agent.instantiate!(id: "schema")
@@ -543,7 +543,7 @@ defmodule Jido.Persistence.SnapshotTest do
             Jido.Agent.define!(%{
               name: "after",
               module: __MODULE__,
-              schema: Zoi.object(%{required: Zoi.integer()})
+              schema: Jido.Joi.object(%{required: Jido.Joi.integer()})
             })
 
         def checkpoint(_, _), do: raise("new checkpoint must not run")

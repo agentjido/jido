@@ -6,20 +6,21 @@ defmodule JidoTest.Authoring.Agents.AuthoringTest do
   alias Jido.Agent
   alias JidoTest.ComposableAgent.Compiler
 
-  test "Map and DSL definitions initialize the same complete state with static Zoi schemas" do
+  test "Map and DSL definitions initialize the same complete state with static Joi schemas" do
     cases = [
-      {"Zoi.object(%{name: Zoi.string()})", Zoi.object(%{name: Zoi.string()}), %{name: "Ada"}, %{name: "Ada"}},
-      {"Zoi.object(%{enabled: Zoi.boolean() |> Zoi.default(false), amount: Zoi.integer() |> Zoi.default(0), note: Zoi.string() |> Zoi.nullable() |> Zoi.default(nil)})",
-       Zoi.object(%{
-         enabled: Zoi.boolean() |> Zoi.default(false),
-         amount: Zoi.integer() |> Zoi.default(0),
-         note: Zoi.string() |> Zoi.nullable() |> Zoi.default(nil)
+      {"Jido.Joi.object(%{name: Jido.Joi.string()})", Jido.Joi.object(%{name: Jido.Joi.string()}), %{name: "Ada"},
+       %{name: "Ada"}},
+      {"Jido.Joi.object(%{enabled: Jido.Joi.boolean() |> Jido.Joi.default(false), amount: Jido.Joi.integer() |> Jido.Joi.default(0), note: Jido.Joi.string() |> Jido.Joi.nullable() |> Jido.Joi.default(nil)})",
+       Jido.Joi.object(%{
+         enabled: Jido.Joi.boolean() |> Jido.Joi.default(false),
+         amount: Jido.Joi.integer() |> Jido.Joi.default(0),
+         note: Jido.Joi.string() |> Jido.Joi.nullable() |> Jido.Joi.default(nil)
        }), %{}, %{enabled: false, amount: 0, note: nil}},
-      {"Zoi.object(%{profile: Zoi.object(%{name: Zoi.string()})})",
-       Zoi.object(%{profile: Zoi.object(%{name: Zoi.string()})}), %{profile: %{name: "Ada"}},
+      {"Jido.Joi.object(%{profile: Jido.Joi.object(%{name: Jido.Joi.string()})})",
+       Jido.Joi.object(%{profile: Jido.Joi.object(%{name: Jido.Joi.string()})}), %{profile: %{name: "Ada"}},
        %{profile: %{name: "Ada"}}},
-      {"Zoi.object(%{items: Zoi.list(Zoi.string()) |> Zoi.default([])})",
-       Zoi.object(%{items: Zoi.list(Zoi.string()) |> Zoi.default([])}), %{}, %{items: []}}
+      {"Jido.Joi.object(%{items: Jido.Joi.list(Jido.Joi.string()) |> Jido.Joi.default([])})",
+       Jido.Joi.object(%{items: Jido.Joi.list(Jido.Joi.string()) |> Jido.Joi.default([])}), %{}, %{items: []}}
     ]
 
     for {source, schema, supplied, expected} <- cases do
@@ -67,7 +68,7 @@ defmodule JidoTest.Authoring.Agents.AuthoringTest do
     definition =
       Agent.define!(%{
         name: "strict",
-        schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+        schema: Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)})
       })
 
     assert {:error, _} = Agent.validate(%{definition | id: "one", state: %{}})

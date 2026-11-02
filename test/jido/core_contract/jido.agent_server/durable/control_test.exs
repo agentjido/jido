@@ -195,7 +195,7 @@ defmodule JidoTest.AgentServer.Durable.ControlTest do
     agent =
       Jido.Agent.define!(%{
         name: "shutdown_control",
-        schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}),
+        schema: Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)}),
         plugins: [
           %{
             id: F.ShutdownPlugin.id(),

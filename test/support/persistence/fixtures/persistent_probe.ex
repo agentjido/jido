@@ -4,7 +4,7 @@ defmodule JidoTest.Persistence.PersistentProbe do
   use Jido.Agent, name: "persistence_contract_probe"
 
   state do
-    schema Zoi.object(%{value: Zoi.integer() |> Zoi.default(0)})
+    schema Jido.Joi.object(%{value: Jido.Joi.integer() |> Jido.Joi.default(0)})
   end
 
   routes do
@@ -12,7 +12,7 @@ defmodule JidoTest.Persistence.PersistentProbe do
 
     route "test.persistence.probe.set", as: :set do
       action %{value: value},
-        schema: Zoi.object(%{value: Zoi.integer()}),
+        schema: Jido.Joi.object(%{value: Jido.Joi.integer()}),
         context: _context do
         {:ok, %{value: value}}
       end
@@ -26,7 +26,7 @@ defmodule JidoTest.Persistence.PersistentProbe do
 
     route "test.persistence.probe.set_and_emit", as: :set_and_emit do
       action %{value: value},
-        schema: Zoi.object(%{value: Zoi.integer()}),
+        schema: Jido.Joi.object(%{value: Jido.Joi.integer()}),
         context: context do
         signal =
           Jido.Signal.new!(

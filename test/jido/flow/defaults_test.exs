@@ -5,17 +5,17 @@ defmodule Jido.Flow.DefaultsTest do
     use Jido.Flow,
       name: "configured_flow",
       schema:
-        Zoi.object(
+        Jido.Joi.object(
           %{
-            input: Zoi.string(),
-            mode: Zoi.enum([:fast, :safe]),
-            modes: Zoi.list(Zoi.enum([:fast, :safe])),
-            retries: Zoi.integer(gte: 0, lte: 3),
+            input: Jido.Joi.string(),
+            mode: Jido.Joi.enum([:fast, :safe]),
+            modes: Jido.Joi.list(Jido.Joi.enum([:fast, :safe])),
+            retries: Jido.Joi.integer(gte: 0, lte: 3),
             nested:
-              Zoi.object(
+              Jido.Joi.object(
                 %{
-                  enabled: Zoi.boolean(),
-                  mode: Zoi.enum([:fast, :safe]) |> Zoi.optional()
+                  enabled: Jido.Joi.boolean(),
+                  mode: Jido.Joi.enum([:fast, :safe]) |> Jido.Joi.optional()
                 },
                 unrecognized_keys: :error
               )
@@ -33,7 +33,7 @@ defmodule Jido.Flow.DefaultsTest do
   end
 
   defmodule OpenFlow do
-    use Jido.Flow, name: "open_flow", schema: Zoi.map()
+    use Jido.Flow, name: "open_flow", schema: Jido.Joi.map()
 
     flow do
       step "done", params <- input() do

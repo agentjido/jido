@@ -74,7 +74,7 @@ defmodule JidoTest.AgentServer.Composition.ChildrenTest do
   defp agent(id, plugins \\ []) do
     Jido.Agent.define!(%{
       name: "activation_contract",
-      schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}),
+      schema: Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)}),
       plugins:
         Enum.map(
           plugins,

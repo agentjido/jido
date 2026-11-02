@@ -1,4 +1,5 @@
 defmodule Jido.AI.Agent.DSL do
+  alias Jido.Joi
   @moduledoc false
 
   @entity Module.concat([
@@ -88,7 +89,7 @@ defmodule Jido.AI.Agent.DSL do
         quote do
           [
             name: "reasoning",
-            output_schema: Zoi.object(%{state: Zoi.map(), response: Zoi.map()})
+            output_schema: Joi.object(%{state: Joi.map(), response: Joi.map()})
           ]
         end,
         body,

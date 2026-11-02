@@ -20,19 +20,19 @@ defmodule Jido.AITest.SchemaDrivenReasoning do
     vsn: 1,
     name: "schema_driven_reasoning",
     schema:
-      Zoi.object(
+      Jido.Joi.object(
         %{
-          input: Zoi.string(),
-          confidence_threshold: Zoi.number(gte: 0, lte: 1),
+          input: Jido.Joi.string(),
+          confidence_threshold: Jido.Joi.number(gte: 0, lte: 1),
           verification:
-            Zoi.object(
-              %{rounds: Zoi.integer(gte: 1, lte: 5)},
+            Jido.Joi.object(
+              %{rounds: Jido.Joi.integer(gte: 1, lte: 5)},
               unrecognized_keys: :error
             )
         },
         unrecognized_keys: :error
       ),
-    output_schema: Zoi.object(%{state: Zoi.map(), response: Zoi.map()})
+    output_schema: Jido.Joi.object(%{state: Jido.Joi.map(), response: Jido.Joi.map()})
 
   flow do
     step "answer",
@@ -747,7 +747,7 @@ defmodule Jido.AITest do
     refute Map.has_key?(decision, :target)
 
     extended = Map.put(decision, :repair, %{attempt: 1, reason: :invalid_model_output})
-    assert {:ok, ^extended} = Zoi.parse(Actions.ExpandNext.schema(), extended)
+    assert {:ok, ^extended} = Jido.Joi.parse(Actions.ExpandNext.schema(), extended)
     assert decision.input.turn.input == "Use the tools."
   end
 

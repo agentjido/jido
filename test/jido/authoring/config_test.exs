@@ -11,7 +11,7 @@ defmodule Jido.Authoring.ConfigTest do
 
   def schema(boundary) do
     send(self(), {:schema_built, boundary})
-    Zoi.object(%{value: Zoi.integer() |> Zoi.default(1)})
+    Jido.Joi.object(%{value: Jido.Joi.integer() |> Jido.Joi.default(1)})
   end
 
   @tag obligation: "jido_action.action.I1"
@@ -24,20 +24,19 @@ defmodule Jido.Authoring.ConfigTest do
       module = compile_module(kind, options)
       assert module.name() == "defaults"
       assert module.description() == nil
-      assert %Zoi.Types.Map{} = module.schema()
-      assert %Zoi.Types.Map{} = module.output_schema()
+      assert Jido.Joi.Schema.kind(module.schema()) == :map
+      assert Jido.Joi.Schema.kind(module.output_schema()) == :map
       assert %{"type" => "object"} = module.authoring_contract()["input_schema"]
       assert %{"type" => "object"} = module.authoring_contract()["output_schema"]
     end
 
-    assert {:ok,
-            %{
-              name: "defaults",
-              description: nil,
-              schema: %Zoi.Types.Map{},
-              output_schema: %Zoi.Types.Map{}
-            }} =
+    assert {:ok, config} =
              Config.validate_flow(%{name: "defaults", schema: nil, output_schema: nil})
+
+    assert config.name == "defaults"
+    assert config.description == nil
+    assert Jido.Joi.Schema.kind(config.schema) == :map
+    assert Jido.Joi.Schema.kind(config.output_schema) == :map
   end
 
   @tag obligation: "jido_action.action.I1"
@@ -78,7 +77,7 @@ defmodule Jido.Authoring.ConfigTest do
       {"name: \"valid\", description: nil", "invalid type: expected string, at description"},
       {"name: 2, description: 2, schema: 2, output_schema: 2, extra: true",
        "invalid type: expected string, at name\ninvalid type: expected string, at description\n" <>
-         "must be a Zoi schema, at schema\nmust be a Zoi schema, at output_schema\n" <>
+         "must be a Joi schema, at schema\nmust be a Joi schema, at output_schema\n" <>
          "unrecognized key: extra"}
     ]
 
@@ -111,10 +110,10 @@ defmodule Jido.Authoring.ConfigTest do
   test "schema failures keep boundary formatting and static errors take Action priority" do
     for field <- [:schema, :output_schema] do
       for {source, reason} <- [
-            {"[]", "must be a Zoi schema"},
-            {":invalid", "must be a Zoi schema"},
-            {"Zoi.integer()", "must accept map-shaped data"},
-            {"Zoi.object(%{value: Zoi.integer() |> Zoi.refine(fn _ -> :ok end)})",
+            {"[]", "must be a Joi schema"},
+            {":invalid", "must be a Joi schema"},
+            {"Jido.Joi.integer()", "must accept map-shaped data"},
+            {"Jido.Joi.object(%{value: Jido.Joi.integer() |> Jido.Joi.refine(fn _ -> :ok end)})",
              "must be static module data; anonymous functions are not supported at [:fields, 0, 1, :meta, :effects, 0, 1]"}
           ] do
         action_error =
@@ -155,7 +154,7 @@ defmodule Jido.Authoring.ConfigTest do
   test "Flow data retains field details and nil descriptions" do
     assert {:ok, %{description: nil}} = Config.validate_flow(%{name: "valid", description: nil})
 
-    assert {:error, %InvalidDefinitionError{message: "schema must be a Zoi schema", details: details}} =
+    assert {:error, %InvalidDefinitionError{message: "schema must be a Joi schema", details: details}} =
              Config.validate_flow(%{name: "valid", schema: :invalid})
 
     assert details == %{field: "schema"}

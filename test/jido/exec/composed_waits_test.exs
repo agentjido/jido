@@ -464,7 +464,7 @@ defmodule Jido.Exec.ComposedWaitsTest do
 
     registry =
       Jido.Authoring.Registry.new!(%{
-        {"map", 1} => {:schema, Zoi.map()},
+        {"map", 1} => {:schema, Jido.Joi.map()},
         {"decide", 1} => {:action, Decide},
         {"expand", 1} => {:action, Expand},
         {"id", 1} => {:atom, :id}
@@ -496,7 +496,7 @@ defmodule Jido.Exec.ComposedWaitsTest do
            iterate "collection" do
              action #{inspect(Child)}
              params %{id: iteration_index()}
-             state Zoi.map(), initial: %{}
+             state Jido.Joi.map(), initial: %{}
              repeat 2
            end
            """}
@@ -530,7 +530,7 @@ defmodule Jido.Exec.ComposedWaitsTest do
 
     registry =
       Jido.Authoring.Registry.new!(%{
-        {"map", 1} => {:schema, Zoi.map()},
+        {"map", 1} => {:schema, Jido.Joi.map()},
         {"child", 1} => {:action, Child},
         {"record", 1} => {:action, Record},
         {"id", 1} => {:atom, :id}

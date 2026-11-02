@@ -18,7 +18,7 @@ defmodule Jido.Agent.FormatConsistencyTest do
           name: "formats",
           description: nil,
           vsn: 1,
-          schema: Zoi.object(%{}),
+          schema: Jido.Joi.object(%{}),
           metadata: %{},
           signal_source: nil,
           routes: [],
@@ -51,12 +51,12 @@ defmodule Jido.Agent.FormatConsistencyTest do
     cases = [
       {"", %{}},
       {"", %{description: "example", vsn: 3, metadata: %{label: "formats"}}},
-      {~s"state do schema Zoi.object(%{flag: Zoi.boolean() |> Zoi.default(false), count: Zoi.integer() |> Zoi.default(0)}) end",
+      {~s"state do schema Jido.Joi.object(%{flag: Jido.Joi.boolean() |> Jido.Joi.default(false), count: Jido.Joi.integer() |> Jido.Joi.default(0)}) end",
        %{
          schema:
-           Zoi.object(%{
-             flag: Zoi.boolean() |> Zoi.default(false),
-             count: Zoi.integer() |> Zoi.default(0)
+           Jido.Joi.object(%{
+             flag: Jido.Joi.boolean() |> Jido.Joi.default(false),
+             count: Jido.Joi.integer() |> Jido.Joi.default(0)
            })
        }},
       {~s|routes do signal_source "/formats"; route "work.request", #{inspect(Action)}, as: :work; route "work.*", #{inspect(Action)} end|,
@@ -125,11 +125,11 @@ defmodule Jido.Agent.FormatConsistencyTest do
       Compiler.compile(
         """
         state do
-          schema Zoi.object(%{
-            flag: Zoi.boolean() |> Zoi.default(false),
-            count: Zoi.integer() |> Zoi.default(0),
-            label: Zoi.string() |> Zoi.nullable() |> Zoi.default(nil),
-            nested: Zoi.object(%{value: Zoi.string() |> Zoi.default("default")}) |> Zoi.default(%{})
+          schema Jido.Joi.object(%{
+            flag: Jido.Joi.boolean() |> Jido.Joi.default(false),
+            count: Jido.Joi.integer() |> Jido.Joi.default(0),
+            label: Jido.Joi.string() |> Jido.Joi.nullable() |> Jido.Joi.default(nil),
+            nested: Jido.Joi.object(%{value: Jido.Joi.string() |> Jido.Joi.default("default")}) |> Jido.Joi.default(%{})
           })
         end
         """,
@@ -140,11 +140,11 @@ defmodule Jido.Agent.FormatConsistencyTest do
       name: "formats",
       module: module,
       schema:
-        Zoi.object(%{
-          flag: Zoi.boolean() |> Zoi.default(false),
-          count: Zoi.integer() |> Zoi.default(0),
-          label: Zoi.string() |> Zoi.nullable() |> Zoi.default(nil),
-          nested: Zoi.object(%{value: Zoi.string() |> Zoi.default("default")}) |> Zoi.default(%{})
+        Jido.Joi.object(%{
+          flag: Jido.Joi.boolean() |> Jido.Joi.default(false),
+          count: Jido.Joi.integer() |> Jido.Joi.default(0),
+          label: Jido.Joi.string() |> Jido.Joi.nullable() |> Jido.Joi.default(nil),
+          nested: Jido.Joi.object(%{value: Jido.Joi.string() |> Jido.Joi.default("default")}) |> Jido.Joi.default(%{})
         })
     }
 

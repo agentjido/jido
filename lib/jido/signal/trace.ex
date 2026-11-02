@@ -1,4 +1,6 @@
 defmodule Jido.Signal.Trace do
+  alias Jido.Joi
+
   @moduledoc """
   Carries W3C trace context on Signals.
 
@@ -24,32 +26,32 @@ defmodule Jido.Signal.Trace do
   @zero_span_id String.duplicate("0", 16)
   @tracestate_whitespace ~r/\A[ \t]+|[ \t]+\z/
 
-  @schema Zoi.struct(
+  @schema Joi.struct(
             __MODULE__,
             %{
               trace_id:
-                Zoi.string()
-                |> Zoi.refine({__MODULE__, :validate_trace_id, []}),
+                Joi.string()
+                |> Joi.refine({__MODULE__, :validate_trace_id, []}),
               span_id:
-                Zoi.string()
-                |> Zoi.refine({__MODULE__, :validate_span_id, []}),
+                Joi.string()
+                |> Joi.refine({__MODULE__, :validate_span_id, []}),
               trace_flags:
-                Zoi.string()
-                |> Zoi.refine({__MODULE__, :validate_trace_flags, []}),
+                Joi.string()
+                |> Joi.refine({__MODULE__, :validate_trace_flags, []}),
               tracestate:
-                Zoi.string()
-                |> Zoi.refine({__MODULE__, :validate_tracestate, []})
-                |> Zoi.nullable()
-                |> Zoi.optional()
+                Joi.string()
+                |> Joi.refine({__MODULE__, :validate_tracestate, []})
+                |> Joi.nullable()
+                |> Joi.optional()
             }
           )
 
-  @type t :: unquote(Zoi.type_spec(@schema))
-  @enforce_keys Zoi.Struct.enforce_keys(@schema)
-  defstruct Zoi.Struct.struct_fields(@schema)
+  @type t :: unquote(Joi.type_spec(@schema))
+  @enforce_keys Joi.Struct.enforce_keys(@schema)
+  defstruct Joi.Struct.struct_fields(@schema)
 
-  @doc "Returns the Zoi schema for a Trace value."
-  @spec schema() :: Zoi.schema()
+  @doc "Returns the Joi schema for a Trace value."
+  @spec schema() :: Joi.schema()
   def schema, do: @schema
 
   @doc "Creates a new root Trace."
@@ -145,7 +147,7 @@ defmodule Jido.Signal.Trace do
         {:ok, %{signal | extensions: Map.merge(signal.extensions, attributes)}}
 
       {:error, errors} ->
-        {:error, "invalid Trace: #{Zoi.prettify_errors(errors)}"}
+        {:error, "invalid Trace: #{Joi.prettify_errors(errors)}"}
     end
   end
 
@@ -216,7 +218,7 @@ defmodule Jido.Signal.Trace do
     end
   end
 
-  defp parse(trace), do: Zoi.parse(@schema, trace)
+  defp parse(trace), do: Joi.parse(@schema, trace)
 
   defp format_traceparent(trace),
     do: "00-#{trace.trace_id}-#{trace.span_id}-#{trace.trace_flags}"
@@ -224,7 +226,7 @@ defmodule Jido.Signal.Trace do
   defp build!(trace) do
     case parse(trace) do
       {:ok, trace} -> trace
-      {:error, errors} -> raise ArgumentError, Zoi.prettify_errors(errors)
+      {:error, errors} -> raise ArgumentError, Joi.prettify_errors(errors)
     end
   end
 

@@ -32,8 +32,8 @@ defmodule Jido.Exec.ApiTest do
   defmodule CallerProcessAction do
     use Jido.Action,
       name: "caller_process_action",
-      schema: Zoi.object(%{value: Zoi.integer()}),
-      output_schema: Zoi.map()
+      schema: Jido.Joi.object(%{value: Jido.Joi.integer()}),
+      output_schema: Jido.Joi.map()
 
     @impl true
     def run(%{value: value}, _context), do: {:ok, %{pid: self(), value: value}, [:effect]}
@@ -104,22 +104,23 @@ defmodule Jido.Exec.ApiTest do
   defmodule StructSchemaAction do
     use Jido.Action,
       name: "exec_struct_schema",
-      schema: Zoi.struct(StructInput, %{id: Zoi.integer()}, coerce: true)
+      schema: Jido.Joi.struct(StructInput, %{id: Jido.Joi.integer()}, coerce: true)
 
     @impl true
     def run(%{id: id}, _context), do: {:ok, %{id: id}}
   end
 
   defmodule AtomSchemaAction do
-    use Jido.Action, name: "exec_atom_schema", schema: Zoi.object(%{mode: Zoi.atom()})
+    use Jido.Action, name: "exec_atom_schema", schema: Jido.Joi.object(%{mode: Jido.Joi.atom()})
 
     @impl true
     def run(%{mode: mode}, _context), do: {:ok, %{mode: mode}}
   end
 
   @tag obligation: "jido_action.boundary.I5"
-  test "run/4 executes Actions whose schemas have no JSON Schema form" do
-    assert_raise ArgumentError, fn -> StructSchemaAction.authoring_contract() end
+  test "run/4 executes Actions after Joi projects their schemas" do
+    assert %{"input_schema" => %{"type" => "object"}} =
+             StructSchemaAction.authoring_contract()
 
     assert Exec.run(StructSchemaAction, %{id: 1}) == {:ok, %{id: 1}}
     assert Exec.run(AtomSchemaAction, %{mode: :fast}) == {:ok, %{mode: :fast}}

@@ -15,7 +15,7 @@ defmodule JidoTest.Agent.ReplacementTest do
     use Jido.Agent, name: "agent_replacement_configured"
 
     state do
-      schema Zoi.object(%{config: Zoi.map() |> Zoi.default(%{})})
+      schema Jido.Joi.object(%{config: Jido.Joi.map() |> Jido.Joi.default(%{})})
     end
 
     routes do

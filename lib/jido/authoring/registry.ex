@@ -12,7 +12,7 @@ defmodule Jido.Authoring.Registry do
     id: "jido/schemas/map",
     kind: :schema,
     vsn: 1,
-    target: Zoi.map(),
+    target: Jido.Joi.map(),
     provider: __MODULE__,
     name: "Map schema",
     description: "The default Jido map schema"

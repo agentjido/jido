@@ -1,4 +1,5 @@
 defmodule Jido.AI.Reasoning.Adaptive.Actions.Expand do
+  alias Jido.Joi
   @moduledoc "Expands an Adaptive selection into the selected reasoning Flow."
 
   alias Jido.AI.Reasoning.{
@@ -25,8 +26,8 @@ defmodule Jido.AI.Reasoning.Adaptive.Actions.Expand do
     id: "jido.ai/reasoning/adaptive/actions/expand",
     vsn: 1,
     name: "jido_ai_adaptive_expand",
-    schema: Zoi.map(),
-    output_schema: Zoi.map()
+    schema: Joi.map(),
+    output_schema: Joi.map()
 
   @impl Jido.Action
   def run(%{strategy: strategy, input: input}, _context) do

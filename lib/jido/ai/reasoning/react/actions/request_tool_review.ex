@@ -1,4 +1,5 @@
 defmodule Jido.AI.Reasoning.ReAct.Actions.RequestToolReview do
+  alias Jido.Joi
   @moduledoc "Publishes one review request before the durable Flow wait."
 
   alias Jido.AI.Thread.Projection
@@ -8,8 +9,8 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.RequestToolReview do
     vsn: 1,
     name: "jido_ai_react_request_tool_review",
     description: "Request approval for one tool group",
-    schema: Zoi.map(),
-    output_schema: Zoi.map()
+    schema: Joi.map(),
+    output_schema: Joi.map()
 
   @impl Jido.Action
   def run(%{turn: turn}, context) do

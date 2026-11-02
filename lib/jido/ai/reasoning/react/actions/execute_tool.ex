@@ -1,4 +1,5 @@
 defmodule Jido.AI.Reasoning.ReAct.Actions.ExecuteTool do
+  alias Jido.Joi
   @moduledoc "Executes one resolved tool and returns a timed observation envelope."
 
   alias Jido.AI.{ToolResult, ToolSource}
@@ -8,8 +9,8 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.ExecuteTool do
     vsn: 1,
     name: "jido_ai_react_execute_tool",
     description: "Execute one static or dynamic tool through the Agent graph",
-    schema: Zoi.object(%{call: Zoi.map()}),
-    output_schema: Zoi.map()
+    schema: Joi.object(%{call: Joi.map()}),
+    output_schema: Joi.map()
 
   @impl Jido.Action
   def run(%{call: call}, context) do

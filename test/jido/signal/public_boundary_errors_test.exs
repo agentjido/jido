@@ -130,7 +130,7 @@ defmodule Jido.Signal.PublicBoundaryErrorsTest do
 
   describe "Trace error boundaries" do
     test "exposes its schema and rejects invalid values" do
-      assert %Zoi.Types.Struct{} = Trace.schema()
+      assert Jido.Joi.Schema.kind(Trace.schema()) == :struct
       refute Trace.valid?(:invalid)
       assert Trace.get(:invalid) == nil
       assert {:error, :invalid_traceparent} = Trace.from_traceparent(:invalid)

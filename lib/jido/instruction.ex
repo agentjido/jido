@@ -1,4 +1,6 @@
 defmodule Jido.Instruction do
+  alias Jido.Joi
+
   @moduledoc """
   Defines the invocation value for one Action or Flow target.
 
@@ -54,16 +56,16 @@ defmodule Jido.Instruction do
 
   @removed_fields [:id, :action, :flow, :opts]
 
-  @schema Zoi.struct(
+  @schema Joi.struct(
             __MODULE__,
             %{
               kind:
-                Zoi.enum([:action, :flow], description: "Resolved target kind")
-                |> Zoi.optional(),
-              target: Zoi.any(description: "Action or Flow target") |> Zoi.optional(),
-              params: Zoi.any(description: "Resolved target parameters") |> Zoi.default(%{}),
-              context: Zoi.map(description: "Execution context") |> Zoi.default(%{}),
-              metadata: Zoi.map(description: "Instruction metadata") |> Zoi.default(%{})
+                Joi.enum([:action, :flow], description: "Resolved target kind")
+                |> Joi.optional(),
+              target: Joi.any(description: "Action or Flow target") |> Joi.optional(),
+              params: Joi.any(description: "Resolved target parameters") |> Joi.default(%{}),
+              context: Joi.map(description: "Execution context") |> Joi.default(%{}),
+              metadata: Joi.map(description: "Instruction metadata") |> Joi.default(%{})
             },
             coerce: true
           )
@@ -73,7 +75,7 @@ defmodule Jido.Instruction do
   @typedoc "An Action module, Flow module, or runtime Flow value."
   @type target :: module() | Flow.t()
   @typedoc "A resolved call value for one Action or Flow target."
-  @type t :: unquote(Zoi.type_spec(@schema))
+  @type t :: unquote(Joi.type_spec(@schema))
   @typedoc "An inert module target with a declared kind and no bound call data."
   @type template_t :: %__MODULE__{
           kind: kind(),
@@ -89,8 +91,8 @@ defmodule Jido.Instruction do
   @typedoc "Caller metadata with no execution meaning."
   @type metadata :: map()
 
-  @enforce_keys Zoi.Struct.enforce_keys(@schema)
-  defstruct Zoi.Struct.struct_fields(@schema)
+  @enforce_keys Joi.Struct.enforce_keys(@schema)
+  defstruct Joi.Struct.struct_fields(@schema)
 
   @doc """
   Creates an inert Instruction template for a module target.

@@ -3,8 +3,8 @@ defmodule Jido.AITest.Tools.Add do
     id: "jido.ai/examples/tools/add",
     name: "add",
     description: "Add two numbers.",
-    schema: Zoi.object(%{left: Zoi.number(), right: Zoi.number()}),
-    output_schema: Zoi.object(%{value: Zoi.number()})
+    schema: Jido.Joi.object(%{left: Jido.Joi.number(), right: Jido.Joi.number()}),
+    output_schema: Jido.Joi.object(%{value: Jido.Joi.number()})
 
   @impl Jido.Action
   def run(%{left: left, right: right}, _context), do: {:ok, %{value: left + right}}
@@ -16,8 +16,8 @@ defmodule Jido.AITest.Tools.AddFlow do
     vsn: 1,
     name: "add_flow",
     description: "Add two numbers through a Flow.",
-    schema: Zoi.object(%{left: Zoi.number(), right: Zoi.number()}),
-    output_schema: Zoi.object(%{value: Zoi.number()})
+    schema: Jido.Joi.object(%{left: Jido.Joi.number(), right: Jido.Joi.number()}),
+    output_schema: Jido.Joi.object(%{value: Jido.Joi.number()})
 
   flow do
     step "add", action: Jido.AITest.Tools.Add, params: input([])
@@ -30,8 +30,8 @@ defmodule Jido.AITest.Tools.Multiply do
     id: "jido.ai/examples/tools/multiply",
     name: "multiply",
     description: "Multiply two numbers.",
-    schema: Zoi.object(%{left: Zoi.number(), right: Zoi.number()}),
-    output_schema: Zoi.object(%{value: Zoi.number()})
+    schema: Jido.Joi.object(%{left: Jido.Joi.number(), right: Jido.Joi.number()}),
+    output_schema: Jido.Joi.object(%{value: Jido.Joi.number()})
 
   @impl Jido.Action
   def run(%{left: left, right: right}, _context), do: {:ok, %{value: left * right}}
@@ -42,8 +42,8 @@ defmodule Jido.AITest.Tools.LargeOutput do
     id: "jido.ai/examples/tools/large-output",
     name: "large_output",
     description: "Return a large local value.",
-    schema: Zoi.object(%{}),
-    output_schema: Zoi.map()
+    schema: Jido.Joi.object(%{}),
+    output_schema: Jido.Joi.map()
 
   @impl Jido.Action
   def run(_params, _context), do: {:ok, %{content: String.duplicate("local-only-", 1_000)}}
@@ -54,7 +54,7 @@ defmodule Jido.AITest.Tools.ImageResult do
     id: "jido.ai/examples/tools/image-result",
     name: "image_result",
     description: "Return an image as model content.",
-    schema: Zoi.object(%{}),
+    schema: Jido.Joi.object(%{}),
     output_schema: ReqLLM.ToolResult.schema()
 
   @impl Jido.Action

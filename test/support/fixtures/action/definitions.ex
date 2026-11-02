@@ -3,7 +3,7 @@ defmodule JidoActionTest.Fixtures.Actions.BasicAction do
   use Jido.Action,
     name: "basic_action",
     description: "A basic action for testing",
-    schema: Zoi.object(%{value: Zoi.integer()})
+    schema: Jido.Joi.object(%{value: Jido.Joi.integer()})
 
   def run(%{value: value}, _context), do: {:ok, %{value: value}}
 end
@@ -23,8 +23,8 @@ defmodule JidoActionTest.Fixtures.Actions.OutputSchemaAction do
   use Jido.Action,
     name: "output_schema_action",
     description: "Action that validates output with schema",
-    schema: Zoi.object(%{input: Zoi.string()}),
-    output_schema: Zoi.object(%{result: Zoi.string(), length: Zoi.integer()})
+    schema: Jido.Joi.object(%{input: Jido.Joi.string()}),
+    output_schema: Jido.Joi.object(%{result: Jido.Joi.string(), length: Jido.Joi.integer()})
 
   def run(%{input: input}, _context) do
     {:ok, %{result: String.upcase(input), length: String.length(input), extra: "not validated"}}
@@ -45,7 +45,7 @@ defmodule JidoActionTest.Fixtures.Actions.FullAction do
   use Jido.Action,
     name: "full_action",
     description: "A full action for testing",
-    schema: Zoi.object(%{a: Zoi.integer(), b: Zoi.integer()})
+    schema: Jido.Joi.object(%{a: Jido.Joi.integer(), b: Jido.Joi.integer()})
 
   @impl true
   def run(params, _context) do
@@ -59,8 +59,8 @@ defmodule JidoActionTest.Fixtures.Actions.Add do
   use Jido.Action,
     name: "add_one",
     description: "Adds 1 to the input value",
-    schema: Zoi.object(%{value: Zoi.integer(), amount: Zoi.integer() |> Zoi.default(1)}),
-    output_schema: Zoi.object(%{value: Zoi.integer()})
+    schema: Jido.Joi.object(%{value: Jido.Joi.integer(), amount: Jido.Joi.integer() |> Jido.Joi.default(1)}),
+    output_schema: Jido.Joi.object(%{value: Jido.Joi.integer()})
 
   def run(%{value: value, amount: amount}, _context), do: {:ok, %{value: value + amount}}
 end
@@ -70,7 +70,7 @@ defmodule JidoActionTest.Fixtures.Actions.Multiply do
   use Jido.Action,
     name: "multiply",
     description: "Multiplies the input value by 2",
-    schema: Zoi.object(%{value: Zoi.integer(), amount: Zoi.integer() |> Zoi.default(2)})
+    schema: Jido.Joi.object(%{value: Jido.Joi.integer(), amount: Jido.Joi.integer() |> Jido.Joi.default(2)})
 
   def run(%{value: value, amount: amount}, _context), do: {:ok, %{value: value * amount}}
 end
@@ -80,7 +80,7 @@ defmodule JidoActionTest.Fixtures.Actions.Divide do
   use Jido.Action,
     name: "divide",
     description: "Divides first value by second value",
-    schema: Zoi.object(%{value: Zoi.float(), amount: Zoi.float() |> Zoi.default(2.0)})
+    schema: Jido.Joi.object(%{value: Jido.Joi.float(), amount: Jido.Joi.float() |> Jido.Joi.default(2.0)})
 
   def run(%{value: value, amount: amount}, _context) when amount != 0 do
     {:ok, %{value: value / amount}}
@@ -94,8 +94,8 @@ defmodule JidoActionTest.Fixtures.Actions.ContextEcho do
   use Jido.Action,
     name: "context_echo",
     description: "Echoes runtime context",
-    schema: Zoi.object(%{value: Zoi.integer()}),
-    output_schema: Zoi.object(%{value: Zoi.integer(), trace_id: Zoi.string()})
+    schema: Jido.Joi.object(%{value: Jido.Joi.integer()}),
+    output_schema: Jido.Joi.object(%{value: Jido.Joi.integer(), trace_id: Jido.Joi.string()})
 
   def run(%{value: value}, %{trace_id: trace_id}) do
     {:ok, %{value: value, trace_id: trace_id}}
@@ -114,8 +114,8 @@ defmodule JidoActionTest.Fixtures.Actions.ExtrasAction do
   use Jido.Action,
     name: "extras_action",
     description: "Returns a normal action output with extras",
-    schema: Zoi.object(%{value: Zoi.integer()}),
-    output_schema: Zoi.object(%{value: Zoi.integer()})
+    schema: Jido.Joi.object(%{value: Jido.Joi.integer()}),
+    output_schema: Jido.Joi.object(%{value: Jido.Joi.integer()})
 
   def run(%{value: value}, context) do
     {:ok, %{value: value}, [%{trace_id: Map.get(context, :trace_id)}]}
@@ -134,7 +134,7 @@ defmodule JidoActionTest.Fixtures.Actions.OutputEnvelopeAction do
   use Jido.Action,
     name: "output_envelope_action",
     description: "Returns an explicit action output envelope",
-    schema: Zoi.object(%{value: Zoi.integer()})
+    schema: Jido.Joi.object(%{value: Jido.Joi.integer()})
 
   def run(%{value: value}, _context) do
     {:ok, Jido.Action.Output.raw(%{value: value}, meta: %{source: :test})}
@@ -291,8 +291,8 @@ defmodule JidoActionTest.Fixtures.Increment do
   @moduledoc false
   use Jido.Action,
     name: "iterator_increment",
-    schema: Zoi.object(%{count: Zoi.integer(), index: Zoi.integer()}),
-    output_schema: Zoi.object(%{count: Zoi.integer()})
+    schema: Jido.Joi.object(%{count: Jido.Joi.integer(), index: Jido.Joi.integer()}),
+    output_schema: Jido.Joi.object(%{count: Jido.Joi.integer()})
 
   @impl true
   def run(%{count: count, index: index}, context) do
@@ -305,7 +305,7 @@ defmodule JidoActionTest.Fixtures.Envelope do
   @moduledoc false
   use Jido.Action,
     name: "iterator_envelope",
-    schema: Zoi.object(%{count: Zoi.integer(), index: Zoi.integer()})
+    schema: Jido.Joi.object(%{count: Jido.Joi.integer(), index: Jido.Joi.integer()})
 
   @impl true
   def run(%{count: count}, _context) do

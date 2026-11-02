@@ -1,4 +1,5 @@
 defmodule Jido.AI.Reasoning.ChainOfDraft.Actions.Complete do
+  alias Jido.Joi
   @moduledoc "Builds the terminal result from one validated Chain of Draft object."
 
   alias Jido.AI.Reasoning.Result
@@ -7,8 +8,8 @@ defmodule Jido.AI.Reasoning.ChainOfDraft.Actions.Complete do
     id: "jido.ai/reasoning/chain-of-draft/actions/complete",
     vsn: 1,
     name: "jido_ai_chain_of_draft_complete",
-    schema: Zoi.map(),
-    output_schema: Zoi.map()
+    schema: Joi.map(),
+    output_schema: Joi.map()
 
   @impl Jido.Action
   def run(%{turn: %{model_outcome: %{status: :error}} = turn}, _context),

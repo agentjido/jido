@@ -50,8 +50,8 @@ defmodule Jido.Action.InlineHostTest do
     owner =
       compile_owner(:bound, """
         action "double", value <- field(:value) * 2,
-          schema: Zoi.object(%{value: Zoi.integer()}),
-          output_schema: Zoi.object(%{value: Zoi.integer()}) do
+          schema: Jido.Joi.object(%{value: Jido.Joi.integer()}),
+          output_schema: Jido.Joi.object(%{value: Jido.Joi.integer()}) do
           {:ok, %{value: value}}
         end
       """)
@@ -77,7 +77,7 @@ defmodule Jido.Action.InlineHostTest do
         ] do
       owner =
         compile_owner(mode, """
-        alias Zoi, as: Shape
+        alias Jido.Joi, as: Shape
         alias String, as: Text
         @description "Build a typed greeting"
         @schema Shape.object(%{name: Shape.string(), suffix: Shape.string() |> Shape.default("!")})
@@ -99,9 +99,9 @@ defmodule Jido.Action.InlineHostTest do
       assert owner.current_prefix() == "changed:"
 
       assert target.schema().fields ==
-               Zoi.object(%{name: Zoi.string(), suffix: Zoi.string() |> Zoi.default("!")}).fields
+               Jido.Joi.object(%{name: Jido.Joi.string(), suffix: Jido.Joi.string() |> Jido.Joi.default("!")}).fields
 
-      assert target.output_schema().fields == Zoi.object(%{message: Zoi.string()}).fields
+      assert target.output_schema().fields == Jido.Joi.object(%{message: Jido.Joi.string()}).fields
       refute Keyword.has_key?(target.schema().fields, :ctx)
       assert {:ok, %{name: "Ada", suffix: "!"}} = target.validate_params(%{name: "Ada"})
       refute_received {:body, ^owner, _, _}
@@ -122,8 +122,8 @@ defmodule Jido.Action.InlineHostTest do
       owner =
         compile_owner(mode, """
         action "typed", #{header}, context: ctx,
-          schema: Zoi.object(%{value: Zoi.integer() |> Zoi.default(4)}),
-          output_schema: Zoi.object(%{value: Zoi.integer()}) do
+          schema: Jido.Joi.object(%{value: Jido.Joi.integer() |> Jido.Joi.default(4)}),
+          output_schema: Jido.Joi.object(%{value: Jido.Joi.integer()}) do
           send(ctx.observer, {:typed_body, __MODULE__})
           {:ok, %{value: if(ctx.bad_output, do: "invalid", else: value)}}
         end
@@ -174,8 +174,8 @@ defmodule Jido.Action.InlineHostTest do
     assert Jido.Exec.run(target, %{value: 9}, %{prefix: "reuse"}) ==
              {:ok, %{value: 9, prefix: "reuse"}}
 
-    assert %Zoi.Types.Map{} = target.schema()
-    assert %Zoi.Types.Map{} = target.output_schema()
+    assert Jido.Joi.Schema.kind(target.schema()) == :map
+    assert Jido.Joi.Schema.kind(target.output_schema()) == :map
   end
 
   @tag obligation: "jido_action.inline.I2"

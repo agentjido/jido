@@ -1,4 +1,6 @@
 defmodule Jido.Signal.Bus.RecordedSignal do
+  alias Jido.Joi
+
   @moduledoc """
   A Signal record returned by Bus publish, replay, and durable delivery.
 
@@ -12,24 +14,24 @@ defmodule Jido.Signal.Bus.RecordedSignal do
   alias Jido.Signal
   alias Jido.Signal.ID
 
-  @schema Zoi.struct(
+  @schema Joi.struct(
             __MODULE__,
             %{
-              id: Zoi.string(),
-              cursor: Zoi.integer() |> Zoi.min(1),
-              type: Zoi.string(),
-              created_at: Zoi.any(),
-              signal: Zoi.any()
+              id: Joi.string(),
+              cursor: Joi.integer() |> Joi.min(1),
+              type: Joi.string(),
+              created_at: Joi.any(),
+              signal: Joi.any()
             }
           )
 
   @typedoc "A stored Signal with its Bus cursor"
-  @type t :: unquote(Zoi.type_spec(@schema))
-  @enforce_keys Zoi.Struct.enforce_keys(@schema)
-  defstruct Zoi.Struct.struct_fields(@schema)
+  @type t :: unquote(Joi.type_spec(@schema))
+  @enforce_keys Joi.Struct.enforce_keys(@schema)
+  defstruct Joi.Struct.struct_fields(@schema)
 
-  @doc "Returns the Zoi schema for a recorded Signal."
-  @spec schema() :: Zoi.schema()
+  @doc "Returns the Joi schema for a recorded Signal."
+  @spec schema() :: Joi.schema()
   def schema, do: @schema
 
   @doc false
@@ -134,9 +136,9 @@ defmodule Jido.Signal.Bus.RecordedSignal do
   defp build_entry(_signal, _cursor), do: {:error, "expected a Signal struct"}
 
   defp validate_signal(signal) do
-    case Zoi.parse(Signal.schema(), signal) do
+    case Joi.parse(Signal.schema(), signal) do
       {:ok, signal} -> {:ok, signal}
-      {:error, errors} -> {:error, Zoi.prettify_errors(errors)}
+      {:error, errors} -> {:error, Joi.prettify_errors(errors)}
     end
   end
 

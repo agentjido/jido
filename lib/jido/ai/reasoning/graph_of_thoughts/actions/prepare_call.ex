@@ -1,4 +1,5 @@
 defmodule Jido.AI.Reasoning.GraphOfThoughts.Actions.PrepareCall do
+  alias Jido.Joi
   @moduledoc "Prepares graph construction or graph synthesis."
 
   @graph_schema %{
@@ -47,8 +48,8 @@ defmodule Jido.AI.Reasoning.GraphOfThoughts.Actions.PrepareCall do
     id: "jido.ai/reasoning/graph-of-thoughts/actions/prepare-call",
     vsn: 1,
     name: "jido_ai_graph_of_thoughts_prepare_call",
-    schema: Zoi.map(),
-    output_schema: Zoi.map()
+    schema: Joi.map(),
+    output_schema: Joi.map()
 
   @impl Jido.Action
   def run(%{state: %{turn: turn} = state}, _context) do

@@ -49,7 +49,7 @@ defmodule Jido.Flow.DSL.InlineActionTest do
         {:ok, %{value: if(ctx[:invalid_output], do: "bad", else: add_one(value))}}
       end
       """,
-      "alias Zoi, as: Z\n@action_name \"configured_action\"",
+      "alias Jido.Joi, as: Z\n@action_name \"configured_action\"",
       "defp add_one(value), do: value + 1"
     )
 
@@ -90,8 +90,8 @@ defmodule Jido.Flow.DSL.InlineActionTest do
       compile_source(owner, """
       step "increment", value <- input(:value),
         inline: [name: "original", description: "Adds one",
-          schema: Zoi.object(%{value: Zoi.integer()}),
-          output_schema: Zoi.object(%{value: Zoi.integer()})] do
+          schema: Jido.Joi.object(%{value: Jido.Joi.integer()}),
+          output_schema: Jido.Joi.object(%{value: Jido.Joi.integer()})] do
         {:ok, %{value: value + 1}}
       end
       """)
@@ -105,8 +105,8 @@ defmodule Jido.Flow.DSL.InlineActionTest do
       changed = """
       step "increment", value <- input(:value), #{field}: :invalid,
         inline: [name: "changed", description: "Keeps a string",
-          schema: Zoi.object(%{value: Zoi.string()}),
-          output_schema: Zoi.object(%{value: Zoi.string()})] do
+          schema: Jido.Joi.object(%{value: Jido.Joi.string()}),
+          output_schema: Jido.Joi.object(%{value: Jido.Joi.string()})] do
         {:ok, %{value: value}}
       end
       """
@@ -143,7 +143,7 @@ defmodule Jido.Flow.DSL.InlineActionTest do
 
     compile_source(owner, """
     step "increment", operand <- input(:operand),
-      inline: [schema: Zoi.object(%{operand: Zoi.number()})] do
+      inline: [schema: Jido.Joi.object(%{operand: Jido.Joi.number()})] do
       case operand do
         0 -> {:error, :zero}
         operand -> {:ok, %{value: 10 / operand}}
@@ -208,7 +208,7 @@ defmodule Jido.Flow.DSL.InlineActionTest do
           {"context: _", ~r/context must be a named variable/},
           {"name: \"one\", name: \"two\"", ~r/duplicate inline Step setting/},
           {"unknown: true", ~r/unsupported inline Step setting/},
-          {"schema: Zoi.integer()", ~r/schema|configuration/}
+          {"schema: Jido.Joi.integer()", ~r/schema|configuration/}
         ] do
       owner = unique_owner()
 
@@ -280,7 +280,7 @@ defmodule Jido.Flow.DSL.InlineActionTest do
       """,
       """
       iterate "increment" do
-        state Zoi.map(), initial: %{value: 0}
+        state Jido.Joi.map(), initial: %{value: 0}
         action value <- state(:value), do: {:ok, %{value: value + 1}}
         repeat 1
       end
@@ -371,7 +371,7 @@ defmodule Jido.Flow.DSL.InlineActionTest do
         end
 
         iterate "loop" do
-          state Zoi.map(), initial: result("increment")
+          state Jido.Joi.map(), initial: result("increment")
           action Target
           params %{value: state(:value)}
           repeat 1

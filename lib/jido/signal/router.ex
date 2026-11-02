@@ -255,11 +255,11 @@ defmodule Jido.Signal.Router do
   @spec empty?(t()) :: boolean()
   def empty?(%Router{} = router), do: count(router) == 0
 
-  @doc "Validates one or more Route values with the Route Zoi schema."
+  @doc "Validates one or more Route values with the Route Joi schema."
   @spec validate(Route.t() | [Route.t()]) ::
           {:ok, Route.t() | [Route.t()]} | {:error, term()}
   def validate(%Route{} = route) do
-    case Zoi.parse(Route.schema(), route) do
+    case Jido.Joi.parse(Route.schema(), route) do
       {:ok, validated} -> {:ok, validated}
       {:error, errors} -> {:error, route_validation_error(errors, route)}
     end

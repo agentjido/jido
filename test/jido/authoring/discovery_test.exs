@@ -73,7 +73,7 @@ defmodule Jido.Authoring.DiscoveryTest do
           id: "tests/schemas/name",
           kind: :schema,
           vsn: 1,
-          target: Zoi.object(%{name: Zoi.string()}),
+          target: Jido.Joi.object(%{name: Jido.Joi.string()}),
           name: "name input"
         }
       ]
@@ -165,7 +165,7 @@ defmodule Jido.Authoring.DiscoveryTest do
              {:ok, AlphaFlow}
 
     assert Registry.resolve(registry, {"jido/schemas/map", 1}, :schema) ==
-             {:ok, Zoi.map()}
+             {:ok, Jido.Joi.map()}
 
     assert [%{target: AlphaActionV1}, %{target: AlphaAction}, %{target: BetaAction}] =
              Discovery.list(:action)
@@ -204,13 +204,13 @@ defmodule Jido.Authoring.DiscoveryTest do
   test "catalog revision changes when a registered target changes" do
     assert {:ok, first} =
              Registry.new_discovered(
-               [manifest("tests/schemas/revision", :schema, Zoi.object(%{a: Zoi.string()}))],
+               [manifest("tests/schemas/revision", :schema, Jido.Joi.object(%{a: Jido.Joi.string()}))],
                []
              )
 
     assert {:ok, second} =
              Registry.new_discovered(
-               [manifest("tests/schemas/revision", :schema, Zoi.object(%{b: Zoi.integer()}))],
+               [manifest("tests/schemas/revision", :schema, Jido.Joi.object(%{b: Jido.Joi.integer()}))],
                []
              )
 
@@ -218,7 +218,7 @@ defmodule Jido.Authoring.DiscoveryTest do
   end
 
   test "catalog revision includes public display metadata" do
-    first = manifest("tests/schemas/revision", :schema, Zoi.object(%{value: Zoi.string()}))
+    first = manifest("tests/schemas/revision", :schema, Jido.Joi.object(%{value: Jido.Joi.string()}))
     second = %{first | name: "Changed name"}
 
     assert {:ok, first_catalog} = Registry.new_discovered([first], [])

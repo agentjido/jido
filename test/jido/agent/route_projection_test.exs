@@ -15,9 +15,9 @@ defmodule Jido.Agent.RouteProjectionTest do
     use Jido.Action,
       name: "route_projection_project",
       output_schema:
-        Zoi.object(%{
-          state: Zoi.any() |> Zoi.optional(),
-          reply: Zoi.any() |> Zoi.optional()
+        Jido.Joi.object(%{
+          state: Jido.Joi.any() |> Jido.Joi.optional(),
+          reply: Jido.Joi.any() |> Jido.Joi.optional()
         })
 
     @impl Jido.Action
@@ -57,7 +57,7 @@ defmodule Jido.Agent.RouteProjectionTest do
   defmodule RootReply do
     use Jido.Action,
       name: "route_projection_root_reply",
-      output_schema: Zoi.object(%{value: Zoi.integer()})
+      output_schema: Jido.Joi.object(%{value: Jido.Joi.integer()})
 
     @impl Jido.Action
     def run(_params, _context), do: {:ok, %{value: 1}}
@@ -75,9 +75,9 @@ defmodule Jido.Agent.RouteProjectionTest do
     use Jido.Action,
       name: "route_projection_blocking_project",
       output_schema:
-        Zoi.object(%{
-          state: Zoi.map(),
-          reply: Zoi.any()
+        Jido.Joi.object(%{
+          state: Jido.Joi.map(),
+          reply: Jido.Joi.any()
         })
 
     @impl Jido.Action
@@ -95,7 +95,7 @@ defmodule Jido.Agent.RouteProjectionTest do
     use Jido.Plugin, id: "test.route_projection.reply_reducer"
 
     @impl Jido.Plugin
-    def state_spec(_opts), do: {:reply_reductions, Zoi.integer() |> Zoi.default(0)}
+    def state_spec(_opts), do: {:reply_reductions, Jido.Joi.integer() |> Jido.Joi.default(0)}
 
     @impl Jido.Plugin
     def reduce(reduction, _opts) do
@@ -128,7 +128,7 @@ defmodule Jido.Agent.RouteProjectionTest do
     Agent.define!(%{
       name: "route_projection",
       signal_source: "/agent/route-projection",
-      schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}),
+      schema: Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)}),
       routes: routes,
       plugins: extensions
     })

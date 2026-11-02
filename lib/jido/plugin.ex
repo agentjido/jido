@@ -1,12 +1,16 @@
 defmodule Jido.Plugin do
+  alias Jido.Joi
+
   @moduledoc """
   Defines one reusable Plugin through optional callbacks.
 
       defmodule MyApp.Counter do
+        alias Jido.Joi
+
         use Jido.Plugin
 
         @impl true
-        def state_spec(_opts), do: {:turns, Zoi.integer() |> Zoi.default(0)}
+        def state_spec(_opts), do: {:turns, Joi.integer() |> Joi.default(0)}
 
         @impl true
         def reduce(reduction, _opts), do: {:ok, reduction.plugin_state + 1}
@@ -53,7 +57,7 @@ defmodule Jido.Plugin do
   alias Jido.Plugin.Init
 
   @type declaration :: module() | {module(), map()}
-  @type state_spec :: :none | {atom(), Zoi.schema()}
+  @type state_spec :: :none | {atom(), Joi.schema()}
 
   @callback prepare(Jido.Agent.Plugin.Preparation.t(), keyword()) ::
               {:ok, term()} | {:error, term()}

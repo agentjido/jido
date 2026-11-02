@@ -1,4 +1,6 @@
 defmodule Jido.Thread do
+  alias Jido.Joi
+
   @moduledoc """
   A portable append-only interaction log.
 
@@ -9,28 +11,28 @@ defmodule Jido.Thread do
   alias __MODULE__.Entry
 
   @version 1
-  @schema Zoi.struct(
+  @schema Joi.struct(
             __MODULE__,
             %{
-              version: Zoi.integer() |> Zoi.default(@version),
-              id: Zoi.string() |> Zoi.min(1),
-              rev: Zoi.integer() |> Zoi.min(0) |> Zoi.default(0),
-              entries: Zoi.list(Entry.schema()) |> Zoi.default([]),
-              created_at: Zoi.integer(),
-              updated_at: Zoi.integer(),
-              metadata: Zoi.map() |> Zoi.default(%{}),
-              stats: Zoi.map() |> Zoi.default(%{entry_count: 0})
+              version: Joi.integer() |> Joi.default(@version),
+              id: Joi.string() |> Joi.min(1),
+              rev: Joi.integer() |> Joi.min(0) |> Joi.default(0),
+              entries: Joi.list(Entry.schema()) |> Joi.default([]),
+              created_at: Joi.integer(),
+              updated_at: Joi.integer(),
+              metadata: Joi.map() |> Joi.default(%{}),
+              stats: Joi.map() |> Joi.default(%{entry_count: 0})
             },
             coerce: true,
             unrecognized_keys: :error
           )
 
-  @type t :: unquote(Zoi.type_spec(@schema))
-  @enforce_keys Zoi.Struct.enforce_keys(@schema)
-  defstruct Zoi.Struct.struct_fields(@schema)
+  @type t :: unquote(Joi.type_spec(@schema))
+  @enforce_keys Joi.Struct.enforce_keys(@schema)
+  defstruct Joi.Struct.struct_fields(@schema)
 
   @doc "Returns the Thread schema."
-  @spec schema() :: Zoi.schema()
+  @spec schema() :: Joi.schema()
   def schema, do: @schema
 
   @doc "Creates an empty Thread."
@@ -165,7 +167,7 @@ defmodule Jido.Thread do
           match?({:ok, _value}, Entry.validate(entry)) and entry.seq == index
         end)
 
-    with {:ok, _value} <- Zoi.parse(@schema, thread),
+    with :ok <- Joi.validate(@schema, thread),
          true <- thread.version == @version,
          true <- thread.rev == length(thread.entries),
          true <- thread.stats == %{entry_count: length(thread.entries)},

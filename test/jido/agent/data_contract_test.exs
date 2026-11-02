@@ -39,26 +39,26 @@ defmodule Jido.Agent.DataContractTest do
   test "static authoring checks include Map keys" do
     assert_error(Data.static(%{self() => :ok}), :live_value)
 
-    field = Zoi.integer()
+    field = Jido.Joi.integer()
     metadata = %{field.meta | metadata: %{self() => :ok}}
-    schema = Zoi.object(%{value: %{field | meta: metadata}})
+    schema = Jido.Joi.object(%{value: %{field | meta: metadata}})
 
     assert_error(Data.schema(schema), :live_value)
   end
 
   @tag obligation: ["jido.agent.I9", "jido.agent.I22"]
   test "state schemas reject malformed fields and every conversion type" do
-    malformed = struct(Zoi.Types.Map, fields: %{})
+    malformed = Map.put(Jido.Joi.map(), :fields, %{})
     assert_error(Data.schema(malformed), :invalid_schema)
 
     codec =
-      Zoi.codec(Zoi.string(), Zoi.integer(),
+      Jido.Joi.codec(Jido.Joi.string(), Jido.Joi.integer(),
         decode: fn value -> {:ok, String.to_integer(value)} end,
         encode: fn value -> {:ok, Integer.to_string(value)} end
       )
 
     assert {:error, %Error{code: :invalid_schema, message: message}} =
-             Data.schema(Zoi.object(%{value: codec}))
+             Data.schema(Jido.Joi.object(%{value: codec}))
 
     assert message != ""
   end
@@ -66,34 +66,34 @@ defmodule Jido.Agent.DataContractTest do
   @tag obligation: ["jido.agent.I8", "jido.agent.I22"]
   test "initialization cannot strip Map keys or convert list values" do
     assert_error(
-      Data.parse_value(Zoi.object(%{}), %{unknown: 1}),
+      Data.parse_value(Jido.Joi.object(%{}), %{unknown: 1}),
       :state_conversion
     )
 
     assert_error(
-      Data.parse_value(Zoi.list(Zoi.integer(coerce: true)), ["1", 2]),
+      Data.parse_value(Jido.Joi.list(Jido.Joi.integer(coerce: true)), ["1", 2]),
       :state_conversion
     )
 
     assert_error(
       Data.parse_value(
-        Zoi.object(%{nested: Zoi.object(%{value: Zoi.integer(coerce: true)})}),
+        Jido.Joi.object(%{nested: Jido.Joi.object(%{value: Jido.Joi.integer(coerce: true)})}),
         %{nested: %{value: "1"}}
       ),
       :state_conversion
     )
 
     assert {:error, %Error{code: :invalid_state, message: message, details: %{issues: issues}}} =
-             Data.parse_value(Zoi.integer(), "bad")
+             Data.parse_value(Jido.Joi.integer(), "bad")
 
     assert message != ""
-    assert [%Zoi.Error{} | _] = issues
+    assert [%{} | _] = issues
   end
 
   @tag obligation: ["jido.agent.I9", "jido.agent.I22"]
   test "stored-state failures distinguish conversion from missing data" do
     assert_error(
-      Data.complete(Zoi.object(%{value: Zoi.integer(coerce: true)}), %{value: "1"}),
+      Data.complete(Jido.Joi.object(%{value: Jido.Joi.integer(coerce: true)}), %{value: "1"}),
       :state_conversion
     )
 
@@ -102,10 +102,10 @@ defmodule Jido.Agent.DataContractTest do
               code: :incomplete_state,
               message: message,
               details: %{issues: issues}
-            }} = Data.complete(Zoi.object(%{value: Zoi.integer()}), %{})
+            }} = Data.complete(Jido.Joi.object(%{value: Jido.Joi.integer()}), %{})
 
     assert message != ""
-    assert [%Zoi.Error{code: :required, path: [:value]} | _] = issues
+    assert [%{code: :required, path: [:value]} | _] = issues
   end
 
   @tag obligation: ["jido.agent.I21", "jido.agent.I22"]

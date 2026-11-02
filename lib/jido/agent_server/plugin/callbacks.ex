@@ -195,7 +195,7 @@ defmodule Jido.AgentServer.Plugin.Callbacks do
   end
 
   defp validate_signal(signal, spec) do
-    case Zoi.parse(Jido.Signal.schema(), signal) do
+    case Jido.Joi.parse(Jido.Signal.schema(), signal) do
       {:ok, validated} ->
         {:ok, validated}
 

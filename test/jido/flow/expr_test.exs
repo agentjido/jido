@@ -126,7 +126,7 @@ defmodule JidoActionTest.Flow.ExprTest do
       JidoActionTest.FlowComponent.iterate!(
         name: "loop",
         action: EchoParamsAction,
-        state: [schema: Zoi.map(), initial: %{}, update: %{}],
+        state: [schema: Jido.Joi.map(), initial: %{}, update: %{}],
         completion: condition,
         max_iterations: 2
       )
@@ -287,7 +287,7 @@ defmodule JidoActionTest.Flow.ExprTest do
       JidoActionTest.FlowComponent.iterate!(
         name: "loop",
         action: EchoParamsAction,
-        state: [schema: Zoi.map(), initial: %{}, update: %{}],
+        state: [schema: Jido.Joi.map(), initial: %{}, update: %{}],
         completion: Expr.new!(:>, [Expr.new!(:+, [Ref.input(:missing), 1]), 0]),
         max_iterations: 2
       )

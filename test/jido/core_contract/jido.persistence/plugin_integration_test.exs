@@ -9,7 +9,7 @@ defmodule JidoTest.Persistence.PluginIntegrationTest do
   defmodule AgentFacet do
     @behaviour Jido.Plugin
 
-    def state_spec(_opts), do: {:owned, Zoi.integer() |> Zoi.default(0)}
+    def state_spec(_opts), do: {:owned, Jido.Joi.integer() |> Jido.Joi.default(0)}
   end
 
   defmodule PersistenceFacet do
@@ -76,7 +76,7 @@ defmodule JidoTest.Persistence.PluginIntegrationTest do
       plugins: [{Package, %{prefix: "sealed:"}}]
 
     state do
-      schema Zoi.object(%{value: Zoi.integer() |> Zoi.default(0)})
+      schema Jido.Joi.object(%{value: Jido.Joi.integer() |> Jido.Joi.default(0)})
     end
 
     @impl Jido.Agent
@@ -92,14 +92,14 @@ defmodule JidoTest.Persistence.PluginIntegrationTest do
     @impl true
     def state_spec(_opts) do
       {:owned,
-       Zoi.object(
+       Jido.Joi.object(
          %{
-           count: Zoi.integer() |> Zoi.nullable() |> Zoi.default(3),
-           optional: Zoi.integer() |> Zoi.default(7) |> Zoi.optional()
+           count: Jido.Joi.integer() |> Jido.Joi.nullable() |> Jido.Joi.default(3),
+           optional: Jido.Joi.integer() |> Jido.Joi.default(7) |> Jido.Joi.optional()
          },
          empty_values: [nil]
        )
-       |> Zoi.default(%{})}
+       |> Jido.Joi.default(%{})}
     end
 
     @impl true
@@ -122,7 +122,7 @@ defmodule JidoTest.Persistence.PluginIntegrationTest do
     agent =
       Agent.define!(%{
         name: "persistence_plugin_integration",
-        schema: Zoi.object(%{visible: Zoi.integer() |> Zoi.default(1)}),
+        schema: Jido.Joi.object(%{visible: Jido.Joi.integer() |> Jido.Joi.default(1)}),
         plugins: [
           %{id: Package.id(), provider: Package, vsn: Package.vsn(), data: Map.new(options)}
         ]
@@ -386,7 +386,7 @@ defmodule JidoTest.Persistence.PluginIntegrationTest do
   defp owned_agent(id) do
     Agent.define!(%{
       name: "persistence_plugin_faults",
-      schema: Zoi.object(%{visible: Zoi.integer() |> Zoi.default(1)}),
+      schema: Jido.Joi.object(%{visible: Jido.Joi.integer() |> Jido.Joi.default(1)}),
       plugins: [
         %{id: Package.id(), provider: Package, vsn: Package.vsn(), data: %{prefix: "sealed:"}}
       ]

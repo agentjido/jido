@@ -25,7 +25,7 @@ defmodule Jido.Signal.Dispatch.PubSubTest do
       do: {:error, :cluster_unavailable}
   end
 
-  test "parses the PubSub target with Zoi" do
+  test "parses the PubSub target with Joi" do
     assert {:ok, {:pubsub, opts}} =
              Dispatch.validate_opts({:pubsub, target: __MODULE__, topic: "events.created"})
 

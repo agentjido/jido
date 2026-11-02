@@ -1,4 +1,6 @@
 defmodule Jido.Agent.Ref do
+  alias Jido.Joi
+
   @moduledoc """
   Stable identity for one logical Agent.
 
@@ -13,38 +15,38 @@ defmodule Jido.Agent.Ref do
 
   @version 1
 
-  @nonempty_binary_schema Zoi.string(description: "Nonempty Agent identity value")
-                          |> Zoi.refine({__MODULE__, :validate_nonempty_binary, []})
+  @nonempty_binary_schema Joi.string(description: "Nonempty Agent identity value")
+                          |> Joi.refine({__MODULE__, :validate_nonempty_binary, []})
 
   @fields %{
     namespace: @nonempty_binary_schema,
     partition:
       @nonempty_binary_schema
-      |> Zoi.nullable()
-      |> Zoi.default(nil),
+      |> Joi.nullable()
+      |> Joi.default(nil),
     id: @nonempty_binary_schema
   }
 
-  @schema Zoi.struct(__MODULE__, @fields, unrecognized_keys: :error)
-  @attrs_schema Zoi.map(@fields, unrecognized_keys: :error)
+  @schema Joi.struct(__MODULE__, @fields, unrecognized_keys: :error)
+  @attrs_schema Joi.map(@fields, unrecognized_keys: :error)
 
-  @map_schema Zoi.map(
+  @map_schema Joi.map(
                 %{
-                  "version" => Zoi.literal(@version),
+                  "version" => Joi.literal(@version),
                   "namespace" => @nonempty_binary_schema,
-                  "partition" => @nonempty_binary_schema |> Zoi.nullable(),
+                  "partition" => @nonempty_binary_schema |> Joi.nullable(),
                   "id" => @nonempty_binary_schema
                 },
                 unrecognized_keys: :error
               )
 
-  @type t :: unquote(Zoi.type_spec(@schema))
+  @type t :: unquote(Joi.type_spec(@schema))
 
-  @enforce_keys Zoi.Struct.enforce_keys(@schema)
-  defstruct Zoi.Struct.struct_fields(@schema)
+  @enforce_keys Joi.Struct.enforce_keys(@schema)
+  defstruct Joi.Struct.struct_fields(@schema)
 
   @doc "Returns the static schema for an Agent Ref."
-  @spec schema() :: Zoi.schema()
+  @spec schema() :: Joi.schema()
   def schema, do: @schema
 
   @doc "Creates and validates one Agent Ref."
@@ -62,7 +64,7 @@ defmodule Jido.Agent.Ref do
   end
 
   def new(attrs) when is_map(attrs) and not is_struct(attrs) do
-    case Zoi.parse(@attrs_schema, attrs) do
+    case Joi.parse(@attrs_schema, attrs) do
       {:ok, parsed} -> {:ok, struct!(__MODULE__, parsed)}
       {:error, issues} -> invalid("Agent Ref attributes are invalid", %{issues: issues})
     end
@@ -83,7 +85,7 @@ defmodule Jido.Agent.Ref do
   @doc "Validates one Agent Ref without changing its identity fields."
   @spec validate(term()) :: {:ok, t()} | {:error, Error.ValidationError.t()}
   def validate(%__MODULE__{} = ref) do
-    case Zoi.parse(@schema, ref) do
+    case Joi.parse(@schema, ref) do
       {:ok, validated} -> {:ok, validated}
       {:error, issues} -> invalid("Agent Ref is invalid", %{issues: issues})
     end
@@ -123,7 +125,7 @@ defmodule Jido.Agent.Ref do
   @doc "Decodes and validates one exact version-1 Agent Ref map."
   @spec from_map(term()) :: {:ok, t()} | {:error, Error.ValidationError.t()}
   def from_map(value) do
-    case Zoi.parse(@map_schema, value) do
+    case Joi.parse(@map_schema, value) do
       {:ok, decoded} ->
         {:ok,
          %__MODULE__{

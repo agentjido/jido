@@ -61,7 +61,7 @@ Plugin does.
 ### jido.plugin.I5 — Agent callback declaration shapes
 
 - **scope:** Agent callbacks declared by `Jido.Plugin`, `Jido.Plugin.Normalizer`
-- **must:** Accept no owned state or one safe atom key with a static Zoi schema. Accept a unique list of loaded Directive struct modules with Directive-owned validation. Require `reduce/2` to have owned state. Require every declared Directive type to have either reduction or runtime dispatch. Reject built-in Directive ownership and duplicate state keys or Directive owners across Plugins.
+- **must:** Accept no owned state or one safe atom key with a static Joi schema. Accept a unique list of loaded Directive struct modules with Directive-owned validation. Require `reduce/2` to have owned state. Require every declared Directive type to have either reduction or runtime dispatch. Reject built-in Directive ownership and duplicate state keys or Directive owners across Plugins.
 - **why:** The generic interface must define valid ownership before Agent evaluation starts.
 - **kind:** functional
 - **status:** active

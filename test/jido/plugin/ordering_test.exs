@@ -24,7 +24,7 @@ defmodule Jido.Plugin.OrderingTest do
     @impl true
     def state_spec(opts) do
       key = Keyword.get(opts, :key, :first)
-      {key, Zoi.integer() |> Zoi.default(0)}
+      {key, Jido.Joi.integer() |> Jido.Joi.default(0)}
     end
 
     @impl true
@@ -52,7 +52,7 @@ defmodule Jido.Plugin.OrderingTest do
     @impl true
     def state_spec(opts) do
       key = Keyword.get(opts, :key, :second)
-      {key, Zoi.integer() |> Zoi.default(0)}
+      {key, Jido.Joi.integer() |> Jido.Joi.default(0)}
     end
 
     @impl true
@@ -183,7 +183,7 @@ defmodule Jido.Plugin.OrderingTest do
   defmodule FirstReducerFacet do
     @behaviour Jido.Plugin
 
-    def state_spec(_opts), do: {:first_reduced, Zoi.integer() |> Zoi.default(0)}
+    def state_spec(_opts), do: {:first_reduced, Jido.Joi.integer() |> Jido.Joi.default(0)}
 
     def reduce(%Jido.Agent.Plugin.Reduction{} = reduction, _opts),
       do: {:ok, reduction.plugin_state + 1}
@@ -202,7 +202,7 @@ defmodule Jido.Plugin.OrderingTest do
   defmodule SecondReducerFacet do
     @behaviour Jido.Plugin
 
-    def state_spec(_opts), do: {:second_observed, Zoi.integer() |> Zoi.default(0)}
+    def state_spec(_opts), do: {:second_observed, Jido.Joi.integer() |> Jido.Joi.default(0)}
 
     def reduce(%Jido.Agent.Plugin.Reduction{} = reduction, _opts) do
       send(self(), {:reduction, reduction})
@@ -235,7 +235,7 @@ defmodule Jido.Plugin.OrderingTest do
     @behaviour Jido.Plugin
 
     @impl true
-    def state_spec(_opts), do: {:first, Zoi.atom() |> Zoi.default(:first_state)}
+    def state_spec(_opts), do: {:first, Jido.Joi.atom() |> Jido.Joi.default(:first_state)}
   end
 
   defmodule FirstOutboundPlugin.Server do
@@ -267,7 +267,7 @@ defmodule Jido.Plugin.OrderingTest do
     @behaviour Jido.Plugin
 
     @impl true
-    def state_spec(_opts), do: {:second, Zoi.atom() |> Zoi.default(:second_state)}
+    def state_spec(_opts), do: {:second, Jido.Joi.atom() |> Jido.Joi.default(:second_state)}
   end
 
   defmodule SecondOutboundPlugin.Server do

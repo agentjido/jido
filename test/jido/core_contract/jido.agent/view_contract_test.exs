@@ -12,7 +12,7 @@ defmodule JidoTest.Contract.AgentViewTest do
       {"agents/counter", 1} => {:agent, CounterAgent},
       {"agents/core", 1} => {:agent, Agent},
       {"schemas/counter", 1} => {:schema, CounterAgent.definition().schema},
-      {"schemas/empty", 1} => {:schema, Zoi.object(%{})},
+      {"schemas/empty", 1} => {:schema, Jido.Joi.object(%{})},
       {"actions/add", 1} => {:action, Add},
       {"flows/contract", 1} => {:flow, F.Flow},
       {"transforms/view", 1} => {:transform, {__MODULE__, :transform, 1}},

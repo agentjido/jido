@@ -29,9 +29,9 @@ defmodule JidoTest.Error.TransportTest do
     use Jido.Action,
       name: "error_transport_validation",
       schema:
-        Zoi.object(%{
-          name: Zoi.string(),
-          users: Zoi.list(Zoi.object(%{name: Zoi.string()}))
+        Jido.Joi.object(%{
+          name: Jido.Joi.string(),
+          users: Jido.Joi.list(Jido.Joi.object(%{name: Jido.Joi.string()}))
         })
 
     def run(params, _context), do: {:ok, params}
@@ -291,7 +291,7 @@ defmodule JidoTest.Error.TransportTest do
       end
     end
 
-    test "preserves real Zoi validation paths through execution and JSON transport" do
+    test "preserves real Joi validation paths through execution and JSON transport" do
       for {params, path} <- [
             {%{users: []}, [:name]},
             {%{name: "example", users: [%{name: 123}]}, [:users, 0, :name]}

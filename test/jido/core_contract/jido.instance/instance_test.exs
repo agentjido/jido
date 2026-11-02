@@ -22,7 +22,7 @@ defmodule JidoTest.InstanceTest do
     use Jido.Agent, name: "redis_test_agent"
 
     state do
-      schema Zoi.object(%{counter: Zoi.integer() |> Zoi.default(0)})
+      schema Jido.Joi.object(%{counter: Jido.Joi.integer() |> Jido.Joi.default(0)})
     end
   end
 

@@ -1,4 +1,5 @@
 defmodule Jido.Persistence.Snapshot do
+  alias Jido.Joi
   @moduledoc false
   alias Jido.Agent
   alias Jido.Agent.{Data, Error}
@@ -219,11 +220,13 @@ defmodule Jido.Persistence.Snapshot do
     calls ++ schema_modules(flow)
   end
 
-  defp schema_modules(%Zoi.Types.Meta{effects: effects}),
-    do: for({:refine, {module, _, _}} <- effects, do: module)
-
-  defp schema_modules(value) when is_map(value),
-    do: value |> Map.to_list() |> Enum.flat_map(fn {_, item} -> schema_modules(item) end)
+  defp schema_modules(value) when is_map(value) do
+    if Joi.Schema.kind(value) == :meta do
+      for {:refine, {module, _, _}} <- Joi.Schema.effects(value), do: module
+    else
+      value |> Map.to_list() |> Enum.flat_map(fn {_, item} -> schema_modules(item) end)
+    end
+  end
 
   defp schema_modules(value) when is_list(value), do: Enum.flat_map(value, &schema_modules/1)
 

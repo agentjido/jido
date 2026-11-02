@@ -287,7 +287,7 @@ defmodule JidoActionTest.Flow.ConditionNormalizationTest do
       JidoActionTest.FlowComponent.iterate!(
         name: "loop",
         action: EchoParamsAction,
-        state: [schema: Zoi.map(), initial: %{done: false}, update: %{done: true}],
+        state: [schema: Jido.Joi.map(), initial: %{done: false}, update: %{done: true}],
         completion: completion,
         max_iterations: 1
       )

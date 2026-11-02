@@ -1,4 +1,5 @@
 defmodule Jido.AI.Reasoning.Actions.GuardOutput do
+  alias Jido.Joi
   @moduledoc "Applies final-answer guards to one model outcome."
 
   alias Jido.AI.Toolset
@@ -8,8 +9,8 @@ defmodule Jido.AI.Reasoning.Actions.GuardOutput do
     vsn: 1,
     name: "jido_ai_guard_output",
     description: "Apply the Agent output guard",
-    schema: Zoi.map(),
-    output_schema: Zoi.map()
+    schema: Joi.map(),
+    output_schema: Joi.map()
 
   @impl Jido.Action
   def run(%{outcome: %{status: :error}}, _context),

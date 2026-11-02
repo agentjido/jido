@@ -91,7 +91,7 @@ A condition cannot call application functions. Put complex or effectful
 decisions in an Action before the Choice, then test that Action's result.
 
 A condition that evaluates to `nil`, a number, or a string fails at runtime.
-Declare the field as a required `Zoi.boolean()` in the Flow input schema or the
+Declare the field as a required `Jido.Joi.boolean()` in the Flow input schema or the
 producing Action's output schema. See
 [Conditions And Missing Values](flow-expressions.md#conditions-and-missing-values)
 and the [complete operator list](flow-expressions.md#complete-operation-list).

@@ -1,4 +1,6 @@
 defmodule Jido.Agent.Plugin.FSM do
+  alias Jido.Joi
+
   @moduledoc """
   Adds deterministic finite-state route control to one Agent.
 
@@ -170,11 +172,11 @@ defmodule Jido.Agent.Plugin.FSM do
     states = states(config)
 
     schema =
-      Zoi.object(%{
-        definition_vsn: Zoi.enum([config.definition_vsn]) |> Zoi.default(config.definition_vsn),
-        current: Zoi.enum(states) |> Zoi.default(config.initial)
+      Joi.object(%{
+        definition_vsn: Joi.enum([config.definition_vsn]) |> Joi.default(config.definition_vsn),
+        current: Joi.enum(states) |> Joi.default(config.initial)
       })
-      |> Zoi.default(%{definition_vsn: config.definition_vsn, current: config.initial})
+      |> Joi.default(%{definition_vsn: config.definition_vsn, current: config.initial})
 
     {:fsm, schema}
   end

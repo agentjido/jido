@@ -1,4 +1,5 @@
 defmodule Jido.AI.Reasoning.ChainOfThought.ModelRound do
+  alias Jido.Joi
   @moduledoc "Runs one structured Chain of Thought model response."
 
   alias Jido.AI.Reasoning.Actions.{
@@ -14,8 +15,8 @@ defmodule Jido.AI.Reasoning.ChainOfThought.ModelRound do
     id: "jido.ai/reasoning/chain-of-thought/model-round",
     vsn: 1,
     name: "jido_ai_chain_of_thought_model_round",
-    schema: Zoi.object(%{turn: Zoi.any()}),
-    output_schema: Zoi.map()
+    schema: Joi.object(%{turn: Joi.any()}),
+    output_schema: Joi.map()
 
   flow do
     step "project",

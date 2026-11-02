@@ -12,7 +12,7 @@ defmodule JidoTest.Contract.AgentEvaluationTest do
   defmodule HandoffTarget do
     use Jido.Action,
       name: "evaluation_handoff_target",
-      schema: Zoi.object(%{count: Zoi.integer()})
+      schema: Jido.Joi.object(%{count: Jido.Joi.integer()})
 
     def run(_input, _context), do: raise("Agent.cmd/3 must not run a Handoff successor")
   end
@@ -690,7 +690,7 @@ defmodule JidoTest.Contract.AgentEvaluationTest do
 
     source = """
     defmodule #{inspect(action)} do
-      use Jido.Action, name: "reload_action", schema: Zoi.object(%{value: Zoi.integer()})
+      use Jido.Action, name: "reload_action", schema: Jido.Joi.object(%{value: Jido.Joi.integer()})
       def run(_, context), do: {:ok, context.agent_state}
     end
     defmodule #{inspect(host)} do
@@ -711,7 +711,7 @@ defmodule JidoTest.Contract.AgentEvaluationTest do
 
         Code.compile_string("""
         defmodule #{inspect(action)} do
-          use Jido.Action, name: "reload_action", schema: Zoi.object(%{value: Zoi.string()})
+          use Jido.Action, name: "reload_action", schema: Jido.Joi.object(%{value: Jido.Joi.string()})
           def run(_, context), do: {:ok, context.agent_state}
         end
         """)

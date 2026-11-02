@@ -1,4 +1,5 @@
 defmodule Jido.AI.Reasoning.Actions.StartRequest do
+  alias Jido.Joi
   @moduledoc "Initializes one request and appends its user message to the Session."
 
   alias Jido.AI.{Thread.Projection, Toolset, ToolSource, Usage}
@@ -8,8 +9,8 @@ defmodule Jido.AI.Reasoning.Actions.StartRequest do
     vsn: 1,
     name: "jido_ai_start_request",
     description: "Load conversation state and start one graph request",
-    schema: Zoi.map(),
-    output_schema: Zoi.map()
+    schema: Joi.map(),
+    output_schema: Joi.map()
 
   @impl Jido.Action
   def run(params, context) do

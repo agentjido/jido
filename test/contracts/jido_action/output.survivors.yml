@@ -4,19 +4,19 @@
   operator: "string_empty"
   mutation: "`\"Explicit output kind\"` → `\"\"`"
   sort: "unpromised"
-  reason: "This private Zoi field description has no promised text. Output kind validation and the public envelope data remain unchanged."
+  reason: "This private Joi field description has no promised text. Output kind validation and the public envelope data remain unchanged."
 
 - at: "lib/jido_action/output.ex:31:43"
   operator: "string_empty"
   mutation: "`\"Explicit output value\"` → `\"\"`"
   sort: "unpromised"
-  reason: "This private Zoi field description has no promised text. The public envelope value remains unchanged."
+  reason: "This private Joi field description has no promised text. The public envelope value remains unchanged."
 
 - at: "lib/jido_action/output.ex:32:42"
   operator: "string_empty"
   mutation: "`\"Output metadata\"` → `\"\"`"
   sort: "unpromised"
-  reason: "This private Zoi field description has no promised text. Public output metadata remains unchanged."
+  reason: "This private Joi field description has no promised text. Public output metadata remains unchanged."
 
 - at: "lib/jido_action/output.ex:90:25"
   operator: "guard_removal"

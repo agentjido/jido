@@ -624,8 +624,8 @@ defmodule Jido.Plugin.Normalizer do
 
   defp validate_state_spec({key, schema}, package, _facet)
        when is_atom(key) and not is_nil(key) and key != :__struct__ and is_struct(schema) do
-    if is_nil(Zoi.Type.impl_for(schema)) do
-      PluginError.validation("Plugin-owned Agent state schema must be a Zoi schema", %{
+    if not Jido.Joi.Schema.schema?(schema) do
+      PluginError.validation("Plugin-owned Agent state schema must be a Joi schema", %{
         plugin: package,
         schema: schema
       })

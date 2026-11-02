@@ -1,4 +1,6 @@
 defmodule Jido.AI.Reasoning.ReAct do
+  alias Jido.Joi
+
   @moduledoc """
   The canonical graph-first ReAct reasoning recipe.
 
@@ -18,43 +20,43 @@ defmodule Jido.AI.Reasoning.ReAct do
     name: "jido_ai_reasoning_react",
     description: "A persisted conversation, model, and parallel tool graph",
     schema:
-      Zoi.object(
+      Joi.object(
         %{
-          input: Zoi.union([Zoi.string(), Zoi.list(Zoi.map())]),
-          instructions: Zoi.string() |> Zoi.default(@default_instructions),
-          model: Zoi.string() |> Zoi.default("openai:gpt-4o-mini"),
-          fallback_models: Zoi.list(Zoi.string()) |> Zoi.default([]),
+          input: Joi.union([Joi.string(), Joi.list(Joi.map())]),
+          instructions: Joi.string() |> Joi.default(@default_instructions),
+          model: Joi.string() |> Joi.default("openai:gpt-4o-mini"),
+          fallback_models: Joi.list(Joi.string()) |> Joi.default([]),
           options:
-            Zoi.map()
-            |> Zoi.default(%{max_tokens: 128, receive_timeout: 30_000, temperature: 0.0}),
+            Joi.map()
+            |> Joi.default(%{max_tokens: 128, receive_timeout: 30_000, temperature: 0.0}),
           prompt_cache:
-            Zoi.object(
+            Joi.object(
               %{
-                enabled: Zoi.boolean() |> Zoi.default(false),
+                enabled: Joi.boolean() |> Joi.default(false),
                 ttl:
-                  Zoi.union([Zoi.string(), Zoi.integer(gte: 0)])
-                  |> Zoi.optional()
+                  Joi.union([Joi.string(), Joi.integer(gte: 0)])
+                  |> Joi.optional()
               },
               unrecognized_keys: :error
             )
-            |> Zoi.default(%{enabled: false}),
-          stream: Zoi.boolean() |> Zoi.default(false),
-          output_schema: Zoi.map() |> Zoi.nullable() |> Zoi.default(nil),
-          review_tools: Zoi.boolean() |> Zoi.default(false),
+            |> Joi.default(%{enabled: false}),
+          stream: Joi.boolean() |> Joi.default(false),
+          output_schema: Joi.map() |> Joi.nullable() |> Joi.default(nil),
+          review_tools: Joi.boolean() |> Joi.default(false),
           tool_policy:
-            Zoi.object(
+            Joi.object(
               %{
-                visible: Zoi.list(Zoi.string()) |> Zoi.default([]),
-                hidden: Zoi.list(Zoi.string()) |> Zoi.default([]),
-                review: Zoi.list(Zoi.string()) |> Zoi.default([]),
+                visible: Joi.list(Joi.string()) |> Joi.default([]),
+                hidden: Joi.list(Joi.string()) |> Joi.default([]),
+                review: Joi.list(Joi.string()) |> Joi.default([]),
                 requirement:
-                  Zoi.enum([:optional, :required, :per_turn, :disabled])
-                  |> Zoi.default(:optional),
-                reason: Zoi.string() |> Zoi.nullable() |> Zoi.default(nil)
+                  Joi.enum([:optional, :required, :per_turn, :disabled])
+                  |> Joi.default(:optional),
+                reason: Joi.string() |> Joi.nullable() |> Joi.default(nil)
               },
               unrecognized_keys: :error
             )
-            |> Zoi.default(%{
+            |> Joi.default(%{
               visible: [],
               hidden: [],
               review: [],
@@ -62,31 +64,31 @@ defmodule Jido.AI.Reasoning.ReAct do
               reason: nil
             }),
           context:
-            Zoi.object(
+            Joi.object(
               %{
-                max_messages: Zoi.integer(gte: 1, lte: 512) |> Zoi.default(64),
-                max_bytes: Zoi.integer(gte: 1_024, lte: 2_000_000) |> Zoi.default(200_000)
+                max_messages: Joi.integer(gte: 1, lte: 512) |> Joi.default(64),
+                max_bytes: Joi.integer(gte: 1_024, lte: 2_000_000) |> Joi.default(200_000)
               },
               unrecognized_keys: :error
             )
-            |> Zoi.default(%{max_messages: 64, max_bytes: 200_000}),
+            |> Joi.default(%{max_messages: 64, max_bytes: 200_000}),
           limits:
-            Zoi.object(
+            Joi.object(
               %{
-                model_calls: Zoi.integer(gte: 1, lte: 16) |> Zoi.default(8),
-                tool_rounds: Zoi.integer(gte: 0, lte: 8) |> Zoi.default(4),
-                tool_calls: Zoi.integer(gte: 1, lte: 16) |> Zoi.default(8),
-                retries: Zoi.integer(gte: 0, lte: 4) |> Zoi.default(1),
-                elapsed_ms: Zoi.integer(gte: 1, lte: 3_600_000) |> Zoi.default(120_000),
-                input_tokens: Zoi.integer(gte: 1) |> Zoi.nullable() |> Zoi.default(nil),
-                output_tokens: Zoi.integer(gte: 1) |> Zoi.nullable() |> Zoi.default(nil),
-                total_tokens: Zoi.integer(gte: 1) |> Zoi.nullable() |> Zoi.default(nil),
-                total_cost: Zoi.number(gte: 0) |> Zoi.nullable() |> Zoi.default(nil),
-                tool_output_bytes: Zoi.integer(gte: 256, lte: 1_000_000) |> Zoi.default(16_384)
+                model_calls: Joi.integer(gte: 1, lte: 16) |> Joi.default(8),
+                tool_rounds: Joi.integer(gte: 0, lte: 8) |> Joi.default(4),
+                tool_calls: Joi.integer(gte: 1, lte: 16) |> Joi.default(8),
+                retries: Joi.integer(gte: 0, lte: 4) |> Joi.default(1),
+                elapsed_ms: Joi.integer(gte: 1, lte: 3_600_000) |> Joi.default(120_000),
+                input_tokens: Joi.integer(gte: 1) |> Joi.nullable() |> Joi.default(nil),
+                output_tokens: Joi.integer(gte: 1) |> Joi.nullable() |> Joi.default(nil),
+                total_tokens: Joi.integer(gte: 1) |> Joi.nullable() |> Joi.default(nil),
+                total_cost: Joi.number(gte: 0) |> Joi.nullable() |> Joi.default(nil),
+                tool_output_bytes: Joi.integer(gte: 256, lte: 1_000_000) |> Joi.default(16_384)
               },
               unrecognized_keys: :error
             )
-            |> Zoi.default(%{
+            |> Joi.default(%{
               model_calls: 8,
               tool_rounds: 4,
               tool_calls: 8,
@@ -101,7 +103,7 @@ defmodule Jido.AI.Reasoning.ReAct do
         },
         unrecognized_keys: :error
       ),
-    output_schema: Zoi.object(%{state: Zoi.map(), response: Zoi.map()})
+    output_schema: Joi.object(%{state: Joi.map(), response: Joi.map()})
 
   flow do
     step "start_request",

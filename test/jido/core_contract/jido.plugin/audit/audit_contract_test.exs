@@ -64,7 +64,7 @@ defmodule JidoTest.Contract.PluginAuditTest do
   @tag obligation: "jido.plugin.audit.I2"
   test "Record validation requires its declared value shapes" do
     record = Audit.record({:saved, 1}, :accepted, at: 0, metadata: %{source: :contract})
-    assert %Zoi.Types.Struct{module: Record} = Record.schema()
+    assert {:ok, Record} = Jido.Joi.Schema.struct_module(Record.schema())
     assert {:ok, ^record} = Record.validate(record)
     assert {:ok, ^record} = Directive.validate(record)
 
@@ -107,7 +107,7 @@ defmodule JidoTest.Contract.PluginAuditTest do
     assert %{option_keys: %{agent: [:max_entries]}} = Audit.__jido_plugin__()
     assert {:audit, schema} = Audit.state_spec([])
     assert schema.meta.default == {:value, %{records: []}}
-    assert {:ok, %{records: []}} = Jido.Schema.parse(schema, %{}, :initialize)
+    assert {:ok, %{records: []}} = Jido.Joi.initialize(schema, %{})
     assert Audit.directives([]) == [Record]
     assert {:audit, ^schema} = Audit.state_spec(max_entries: 1)
 

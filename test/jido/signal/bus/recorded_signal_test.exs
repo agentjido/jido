@@ -83,6 +83,6 @@ defmodule Jido.Signal.Bus.RecordedSignalTest do
     {:ok, _stored, [{_record, ^signal, public}], _next_cursor} =
       RecordedSignal.build([signal], 1)
 
-    assert {:ok, ^public} = Zoi.parse(RecordedSignal.schema(), public)
+    assert {:ok, ^public} = Jido.Joi.parse(RecordedSignal.schema(), public)
   end
 end

@@ -1,4 +1,6 @@
 defmodule Jido.Signal.Dispatch do
+  alias Jido.Joi
+
   @moduledoc """
   Validates dispatch targets and delivers Signals.
 
@@ -63,7 +65,7 @@ defmodule Jido.Signal.Dispatch do
     http: Jido.Signal.Dispatch.Http
   }
 
-  @noop_options_schema Zoi.keyword([], unrecognized_keys: :error)
+  @noop_options_schema Joi.keyword([], unrecognized_keys: :error)
 
   @doc """
   Validates one target tuple or a list of target tuples.
@@ -328,7 +330,7 @@ defmodule Jido.Signal.Dispatch do
   defp parse_adapter_options(adapter_module, opts) do
     schema = adapter_module.options_schema()
 
-    if is_struct(schema) and Zoi.Type.impl_for(schema) != nil do
+    if Joi.Schema.schema?(schema) do
       parse_options(schema, opts)
     else
       {:error, {:invalid_options_schema, adapter_module}}
@@ -338,9 +340,9 @@ defmodule Jido.Signal.Dispatch do
   end
 
   defp parse_options(schema, opts) do
-    case Zoi.parse(schema, opts) do
+    case Joi.parse(schema, opts) do
       {:ok, validated_opts} -> {:ok, validated_opts}
-      {:error, errors} -> {:error, Zoi.prettify_errors(errors)}
+      {:error, errors} -> {:error, Joi.prettify_errors(errors)}
     end
   end
 

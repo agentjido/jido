@@ -247,7 +247,7 @@ defmodule JidoActionTest.Fixtures.Execution.SystemLoad do
 
     state =
       JidoActionTest.FlowComponent.state!(
-        schema: Zoi.object(%{count: Zoi.integer()}),
+        schema: Jido.Joi.object(%{count: Jido.Joi.integer()}),
         initial: %{count: Ref.result("reduce", :value)},
         update: %{count: Ref.body_result(:value)}
       )

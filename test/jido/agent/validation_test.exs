@@ -41,14 +41,14 @@ defmodule Jido.Agent.ValidationTest do
     @behaviour Jido.Plugin
 
     @impl true
-    def state_spec(_opts), do: {:owned, Zoi.integer()}
+    def state_spec(_opts), do: {:owned, Jido.Joi.integer()}
   end
 
   defmodule InvalidSchemaPlugin do
     use Jido.Plugin
 
     @impl true
-    def state_spec(_opts), do: {:owned, Zoi.integer(coerce: true)}
+    def state_spec(_opts), do: {:owned, Jido.Joi.integer(coerce: true)}
   end
 
   @tag obligation: "jido.agent.I10"
@@ -56,7 +56,7 @@ defmodule Jido.Agent.ValidationTest do
     assert {:error, %Jido.Error.ValidationError{} = reason} =
              Agent.define(%{
                name: "conflict",
-               schema: Zoi.object(%{owned: Zoi.integer()}),
+               schema: Jido.Joi.object(%{owned: Jido.Joi.integer()}),
                plugins: [entry(StatePlugin)]
              })
 
@@ -74,7 +74,7 @@ defmodule Jido.Agent.ValidationTest do
              module: nil,
              description: nil,
              vsn: 1,
-             schema: Zoi.object(%{}),
+             schema: Jido.Joi.object(%{}),
              initial_state: %{},
              plugins: [],
              routes: [],

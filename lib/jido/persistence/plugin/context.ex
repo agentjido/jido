@@ -1,32 +1,33 @@
 defmodule Jido.Persistence.Plugin.Context do
+  alias Jido.Joi
   @moduledoc "Bounded format context for one Plugin-owned state conversion."
 
   alias Jido.Error
 
-  @schema Zoi.struct(
+  @schema Joi.struct(
             __MODULE__,
             %{
-              plugin: Zoi.module(description: "Plugin package module"),
-              plugin_vsn: Zoi.integer(description: "Plugin package version") |> Zoi.min(1),
-              record_format: Zoi.integer(description: "Persistence record format version") |> Zoi.min(1),
-              direction: Zoi.enum([:dump, :load]),
-              reason: Zoi.any(description: "Persistence operation reason")
+              plugin: Joi.module(description: "Plugin package module"),
+              plugin_vsn: Joi.integer(description: "Plugin package version") |> Joi.min(1),
+              record_format: Joi.integer(description: "Persistence record format version") |> Joi.min(1),
+              direction: Joi.enum([:dump, :load]),
+              reason: Joi.any(description: "Persistence operation reason")
             },
             unrecognized_keys: :error
           )
 
-  @type t :: unquote(Zoi.type_spec(@schema))
-  @enforce_keys Zoi.Struct.enforce_keys(@schema)
-  defstruct Zoi.Struct.struct_fields(@schema)
+  @type t :: unquote(Joi.type_spec(@schema))
+  @enforce_keys Joi.Struct.enforce_keys(@schema)
+  defstruct Joi.Struct.struct_fields(@schema)
 
   @doc "Returns the static schema for a Persistence Plugin context."
-  @spec schema() :: Zoi.schema()
+  @spec schema() :: Joi.schema()
   def schema, do: @schema
 
   @doc "Validates one Persistence Plugin context."
   @spec validate(term()) :: {:ok, t()} | {:error, Error.ValidationError.t()}
   def validate(%__MODULE__{} = context) do
-    case Zoi.parse(@schema, context) do
+    case Joi.parse(@schema, context) do
       {:ok, validated} -> {:ok, validated}
       {:error, issues} -> invalid("Persistence Plugin context is invalid", %{issues: issues})
     end

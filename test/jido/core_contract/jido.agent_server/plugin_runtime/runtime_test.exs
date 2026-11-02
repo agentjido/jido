@@ -219,7 +219,7 @@ defmodule JidoTest.AgentServer.PluginRuntime.RuntimeTest do
 
   defmodule First do
     use Jido.Plugin
-    def state_spec(_), do: {:first, Zoi.integer() |> Zoi.default(7)}
+    def state_spec(_), do: {:first, Jido.Joi.integer() |> Jido.Joi.default(7)}
     def prepare(_, _), do: {:ok, %{prepared: :first}}
     def child_spec(init), do: %{id: __MODULE__, start: {Root, :start_link, [init]}}
     def await_ready(pid, opts), do: readiness(pid, opts)
@@ -279,7 +279,7 @@ defmodule JidoTest.AgentServer.PluginRuntime.RuntimeTest do
 
   defmodule Second do
     use Jido.Plugin
-    def state_spec(_), do: {:second, Zoi.integer() |> Zoi.default(9)}
+    def state_spec(_), do: {:second, Jido.Joi.integer() |> Jido.Joi.default(9)}
     def prepare(_, _), do: {:ok, %{prepared: :second}}
     def child_spec(init), do: %{id: __MODULE__, start: {Root, :start_link, [init]}}
     defdelegate await_ready(pid, opts), to: First, as: :readiness
@@ -308,7 +308,7 @@ defmodule JidoTest.AgentServer.PluginRuntime.RuntimeTest do
 
     Jido.Agent.define!(%{
       name: "server_live_plugins",
-      schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}),
+      schema: Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)}),
       plugins: [
         %{id: F.Gate.id(), provider: F.Gate, vsn: F.Gate.vsn(), data: %{}},
         %{id: First.id(), provider: First, vsn: First.vsn(), data: Map.new(opts)},
@@ -336,7 +336,7 @@ defmodule JidoTest.AgentServer.PluginRuntime.RuntimeTest do
 
     Jido.Agent.define!(%{
       name: "server_trapping_plugins",
-      schema: Zoi.object(%{}),
+      schema: Jido.Joi.object(%{}),
       plugins: [
         %{
           id: TrappingFirst.id(),
@@ -360,7 +360,7 @@ defmodule JidoTest.AgentServer.PluginRuntime.RuntimeTest do
 
     Jido.Agent.define!(%{
       name: "server_supervisor_plugins",
-      schema: Zoi.object(%{}),
+      schema: Jido.Joi.object(%{}),
       plugins: [
         %{
           id: SupervisorPlugin.id(),
@@ -414,7 +414,7 @@ defmodule JidoTest.AgentServer.PluginRuntime.RuntimeTest do
     agent =
       Jido.Agent.define!(%{
         name: "required_plugin",
-        schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}),
+        schema: Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)}),
         plugins: [JidoTest.AgentContract.contribution(plugin)],
         routes: [
           %{
@@ -978,7 +978,7 @@ defmodule JidoTest.AgentServer.PluginRuntime.RuntimeTest do
     agent =
       Jido.Agent.define!(%{
         name: "stateless_live_plugin",
-        schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}),
+        schema: Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)}),
         plugins: [
           %{
             id: AdmissionOnly.id(),

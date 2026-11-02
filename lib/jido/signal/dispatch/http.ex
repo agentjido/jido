@@ -1,4 +1,6 @@
 defmodule Jido.Signal.Dispatch.Http do
+  alias Jido.Joi
+
   @moduledoc """
   Delivers one Signal as a structured CloudEvents JSON request.
 
@@ -58,24 +60,24 @@ defmodule Jido.Signal.Dispatch.Http do
                       "upgrade"
                     ])
 
-  @header_schema Zoi.tuple({Zoi.string(), Zoi.string()})
-                 |> Zoi.refine({__MODULE__, :validate_header, []})
+  @header_schema Joi.tuple({Joi.string(), Joi.string()})
+                 |> Joi.refine({__MODULE__, :validate_header, []})
 
-  @headers_schema Zoi.list(@header_schema)
-                  |> Zoi.refine({__MODULE__, :validate_headers, []})
+  @headers_schema Joi.list(@header_schema)
+                  |> Joi.refine({__MODULE__, :validate_headers, []})
 
-  @options_schema Zoi.keyword(
+  @options_schema Joi.keyword(
                     [
                       url:
-                        Zoi.string()
-                        |> Zoi.refine({__MODULE__, :validate_url, []})
-                        |> Zoi.required(),
-                      headers: @headers_schema |> Zoi.default([]),
+                        Joi.string()
+                        |> Joi.refine({__MODULE__, :validate_url, []})
+                        |> Joi.required(),
+                      headers: @headers_schema |> Joi.default([]),
                       timeout:
-                        Zoi.integer()
-                        |> Zoi.min(1)
-                        |> Zoi.max(@max_timeout)
-                        |> Zoi.default(@default_timeout)
+                        Joi.integer()
+                        |> Joi.min(1)
+                        |> Joi.max(@max_timeout)
+                        |> Joi.default(@default_timeout)
                     ],
                     unrecognized_keys: :error
                   )

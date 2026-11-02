@@ -9,11 +9,11 @@ defmodule Jido.Signal.DispatchTest do
 
     @impl true
     def options_schema do
-      Zoi.keyword(
+      Jido.Joi.keyword(
         [
-          target: Zoi.pid() |> Zoi.required(),
-          sequence: Zoi.integer() |> Zoi.required(),
-          validated: Zoi.boolean() |> Zoi.default(true)
+          target: Jido.Joi.pid() |> Jido.Joi.required(),
+          sequence: Jido.Joi.integer() |> Jido.Joi.required(),
+          validated: Jido.Joi.boolean() |> Jido.Joi.default(true)
         ],
         unrecognized_keys: :error
       )
@@ -31,12 +31,12 @@ defmodule Jido.Signal.DispatchTest do
 
     @impl true
     def options_schema do
-      Zoi.keyword(
+      Jido.Joi.keyword(
         [
           counter_pid:
-            Zoi.pid()
-            |> Zoi.refine({__MODULE__, :count_validation, []})
-            |> Zoi.required()
+            Jido.Joi.pid()
+            |> Jido.Joi.refine({__MODULE__, :count_validation, []})
+            |> Jido.Joi.required()
         ],
         unrecognized_keys: :error
       )

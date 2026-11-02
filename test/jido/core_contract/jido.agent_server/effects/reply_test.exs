@@ -32,7 +32,7 @@ defmodule JidoTest.AgentServer.Effects.ReplyTest do
     agent =
       Agent.define!(%{
         name: "server_reply_contract",
-        schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}),
+        schema: Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)}),
         plugins: Agent.definition(context.agent).plugins,
         routes: [
           %{

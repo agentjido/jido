@@ -17,7 +17,7 @@ and `ACT-003` and retain tests for the internal validation rule.
 
 ### jido_action.validation.I2 — Every boundary honors the declared unknown-key policy
 - **scope:** `Jido.Action.validate_params/1`, `Jido.Action.validate_output/1`, `Jido.Flow.validate_params/1`, `Jido.Flow.validate_output/1`
-- **must:** Honor Zoi's declared strip, preserve, strict and typed-preservation policies at direct, nested and wrapped boundaries, including collections, combinations and map sets. Do not merge stripped input fields back into parsed results. Project a parsed root struct to one plain map with all fields from that parsed struct and no added input fields.
+- **must:** Honor Joi's declared strip, preserve, strict and typed-preservation policies at direct, nested and wrapped boundaries, including collections, combinations and map sets. Do not merge stripped input fields back into parsed results. Project a parsed root struct to one plain map with all fields from that parsed struct and no added input fields.
 - **kind:** functional
 - **status:** active
 

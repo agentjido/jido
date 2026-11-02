@@ -108,8 +108,8 @@ defmodule Jido.Agent.FlowEffectsTest do
     use Jido.Agent, name: "flow_effect_booking_agent", plugins: [Plugin]
 
     state do
-      schema Zoi.object(%{
-               status: Zoi.enum([:awaiting_approval, :submitting]) |> Zoi.default(:awaiting_approval)
+      schema Jido.Joi.object(%{
+               status: Jido.Joi.enum([:awaiting_approval, :submitting]) |> Jido.Joi.default(:awaiting_approval)
              })
     end
 

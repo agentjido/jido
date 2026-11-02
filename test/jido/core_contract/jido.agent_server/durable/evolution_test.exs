@@ -35,7 +35,7 @@ defmodule JidoTest.AgentServer.Durable.EvolutionTest do
     use Jido.Action,
       name: "server_schema_upgrade"
 
-    @schema Zoi.object(%{total: Zoi.integer()})
+    @schema Jido.Joi.object(%{total: Jido.Joi.integer()})
 
     def run(%{snapshot: snapshot}, _) do
       target =
@@ -108,7 +108,7 @@ defmodule JidoTest.AgentServer.Durable.EvolutionTest do
     agent =
       Agent.define!(%{
         name: "upgrade",
-        schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}),
+        schema: Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)}),
         routes: [
           %{
             path: "work",

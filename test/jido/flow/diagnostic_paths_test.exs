@@ -134,7 +134,7 @@ defmodule Jido.Flow.DiagnosticPathsTest do
   defp registry do
     Registry.new!(%{
       {"actions/echo", 1} => {:action, EchoParamsAction},
-      {"schemas/map", 1} => {:schema, Zoi.map()}
+      {"schemas/map", 1} => {:schema, Jido.Joi.map()}
     })
   end
 

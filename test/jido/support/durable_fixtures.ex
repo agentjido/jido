@@ -63,7 +63,7 @@ defmodule JidoTest.DurableFixtures do
   defmodule Step do
     use Jido.Action,
       name: "durable_probe_step",
-      schema: Zoi.object(%{step: Zoi.integer(), value: Zoi.integer()})
+      schema: Jido.Joi.object(%{step: Jido.Joi.integer(), value: Jido.Joi.integer()})
 
     def run(input, _) do
       :ok = Probe.enter(input.step)
@@ -75,11 +75,11 @@ defmodule JidoTest.DurableFixtures do
     use Jido.Flow,
       name: "durable_probe_flow",
       schema:
-        Zoi.object(%{
-          value: Zoi.integer(),
-          blob: Zoi.string() |> Zoi.optional()
+        Jido.Joi.object(%{
+          value: Jido.Joi.integer(),
+          blob: Jido.Joi.string() |> Jido.Joi.optional()
         }),
-      output_schema: Zoi.object(%{count: Zoi.integer()})
+      output_schema: Jido.Joi.object(%{count: Jido.Joi.integer()})
 
     flow do
       step "one", action: Step, params: %{step: 1, value: input(:value)}
@@ -104,7 +104,7 @@ defmodule JidoTest.DurableFixtures do
   defmodule BadOutput do
     use Jido.Flow,
       name: "durable_bad_output",
-      schema: Zoi.object(%{})
+      schema: Jido.Joi.object(%{})
 
     flow do
       step "pid", _input <- input() do
@@ -118,7 +118,7 @@ defmodule JidoTest.DurableFixtures do
   defmodule EffectsFlow do
     use Jido.Flow,
       name: "durable_effects_flow",
-      schema: Zoi.object(%{})
+      schema: Jido.Joi.object(%{})
 
     flow do
       step "effect", _input <- input() do
@@ -132,7 +132,7 @@ defmodule JidoTest.DurableFixtures do
   defmodule TopologyFlow do
     use Jido.Flow,
       name: "durable_topology_mutation",
-      schema: Zoi.object(%{})
+      schema: Jido.Joi.object(%{})
 
     flow do
       step "add_agent", _input <- input() do
@@ -208,7 +208,7 @@ defmodule JidoTest.DurableFixtures do
     use Jido.Agent, name: "durable_probe_agent"
 
     state do
-      schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+      schema Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)})
     end
 
     routes do

@@ -47,7 +47,7 @@ defmodule JidoTest.Plugin.BusFixtures do
       plugins: [{Jido.Plugin.Bus.Client, %{bus: :plugin_bus, path: "bus.**"}}]
 
     state do
-      schema Zoi.object(%{values: Zoi.list(Zoi.integer()) |> Zoi.default([])})
+      schema Jido.Joi.object(%{values: Jido.Joi.list(Jido.Joi.integer()) |> Jido.Joi.default([])})
     end
 
     routes do
@@ -71,7 +71,7 @@ defmodule JidoTest.Plugin.BusFixtures do
       ]
 
     state do
-      schema Zoi.object(%{values: Zoi.list(Zoi.integer()) |> Zoi.default([])})
+      schema Jido.Joi.object(%{values: Jido.Joi.list(Jido.Joi.integer()) |> Jido.Joi.default([])})
     end
 
     routes do
@@ -96,7 +96,7 @@ defmodule JidoTest.Plugin.BusFixtures do
       ]
 
     state do
-      schema Zoi.object(%{values: Zoi.list(Zoi.integer()) |> Zoi.default([])})
+      schema Jido.Joi.object(%{values: Jido.Joi.list(Jido.Joi.integer()) |> Jido.Joi.default([])})
     end
 
     routes do
@@ -119,7 +119,7 @@ defmodule JidoTest.Plugin.BusFixtures do
       ]
 
     state do
-      schema Zoi.object(%{values: Zoi.list(Zoi.integer()) |> Zoi.default([])})
+      schema Jido.Joi.object(%{values: Jido.Joi.list(Jido.Joi.integer()) |> Jido.Joi.default([])})
     end
 
     routes do

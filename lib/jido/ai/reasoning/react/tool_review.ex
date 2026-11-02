@@ -1,4 +1,5 @@
 defmodule Jido.AI.Reasoning.ReAct.ToolReview do
+  alias Jido.Joi
   @moduledoc "Waits for a durable tool approval, denial, or timeout."
 
   alias Jido.AI.Reasoning.ReAct.Actions.{
@@ -11,8 +12,8 @@ defmodule Jido.AI.Reasoning.ReAct.ToolReview do
     id: "jido.ai/reasoning/react/tool-review",
     vsn: 1,
     name: "jido_ai_react_tool_review",
-    schema: Zoi.object(%{turn: Zoi.any()}),
-    output_schema: Zoi.map()
+    schema: Joi.object(%{turn: Joi.any()}),
+    output_schema: Joi.map()
 
   flow do
     step "request",

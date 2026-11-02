@@ -205,7 +205,7 @@ defmodule Jido.AI.Toolset do
   end
 
   defp decode_arguments(target, arguments) when is_atom(target) do
-    case Zoi.parse(target.schema(), arguments, coerce: true) do
+    case Jido.Joi.parse(target.schema(), arguments, coerce: true) do
       {:ok, params} -> target.validate_params(params)
       {:error, _reason} -> {:error, {:invalid_tool_arguments, target.name()}}
     end

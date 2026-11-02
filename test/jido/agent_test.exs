@@ -42,9 +42,9 @@ defmodule Jido.AgentTest do
       metadata: %{category: "test", tags: ["agent", "immutable"], vsn: "1.0.0"}
 
     state do
-      schema Zoi.object(%{
-               count: Zoi.integer() |> Zoi.default(0),
-               history: Zoi.list(Zoi.string()) |> Zoi.default([])
+      schema Jido.Joi.object(%{
+               count: Jido.Joi.integer() |> Jido.Joi.default(0),
+               history: Jido.Joi.list(Jido.Joi.string()) |> Jido.Joi.default([])
              })
     end
 
@@ -59,9 +59,9 @@ defmodule Jido.AgentTest do
     use Jido.Agent, name: "custom_routing_agent"
 
     state do
-      schema Zoi.object(%{
-               count: Zoi.integer() |> Zoi.default(0),
-               history: Zoi.list(Zoi.string()) |> Zoi.default([])
+      schema Jido.Joi.object(%{
+               count: Jido.Joi.integer() |> Jido.Joi.default(0),
+               history: Jido.Joi.list(Jido.Joi.string()) |> Jido.Joi.default([])
              })
     end
 
@@ -111,9 +111,9 @@ defmodule Jido.AgentTest do
     use Jido.Agent, name: "callback_persistence_agent"
 
     state do
-      schema Zoi.object(%{
-               count: Zoi.integer() |> Zoi.default(0),
-               history: Zoi.list(Zoi.string()) |> Zoi.default([])
+      schema Jido.Joi.object(%{
+               count: Jido.Joi.integer() |> Jido.Joi.default(0),
+               history: Jido.Joi.list(Jido.Joi.string()) |> Jido.Joi.default([])
              })
     end
 
@@ -166,9 +166,9 @@ defmodule Jido.AgentTest do
     do: Agent.instantiate!(source, Keyword.put_new(opts, :id, Jido.Signal.ID.generate!()))
 
   defp schema do
-    Zoi.object(%{
-      count: Zoi.integer() |> Zoi.default(0),
-      history: Zoi.list(Zoi.string()) |> Zoi.default([])
+    Jido.Joi.object(%{
+      count: Jido.Joi.integer() |> Jido.Joi.default(0),
+      history: Jido.Joi.list(Jido.Joi.string()) |> Jido.Joi.default([])
     })
   end
 
@@ -284,12 +284,12 @@ defmodule Jido.AgentTest do
              Agent.validate(%{definition | state: %{count: 0, history: []}})
   end
 
-  test "exposes the shared Zoi Agent schema and the Turn schema" do
+  test "exposes the shared Joi Agent schema and the Turn schema" do
     assert function_exported?(Agent, :schema, 1)
     refute function_exported?(Agent, :to_map, 1)
     refute function_exported?(Agent, :new, 2)
     refute function_exported?(Agent, :new!, 2)
-    assert %Zoi.Types.Struct{module: Turn} = Turn.schema()
+    assert {:ok, Turn} = Jido.Joi.Schema.struct_module(Turn.schema())
   end
 
   test "builds instances from a module that uses Jido.Agent" do
@@ -341,7 +341,7 @@ defmodule Jido.AgentTest do
              build(name: "counter", module: InvalidBehavior)
 
     assert {:error, %{__exception__: true}} =
-             build(name: "counter", schema: Zoi.string())
+             build(name: "counter", schema: Jido.Joi.string())
 
     assert {:error, %{__exception__: true}} =
              build(name: "counter", routes: [{"counter.add", String}])
@@ -479,9 +479,9 @@ defmodule Jido.AgentTest do
 
     test "rejects dynamic Agent state schemas" do
       anonymous_schema =
-        Zoi.object(%{value: Zoi.string() |> Zoi.refine(fn _value -> :ok end)})
+        Jido.Joi.object(%{value: Jido.Joi.string() |> Jido.Joi.refine(fn _value -> :ok end)})
 
-      lazy_schema = Zoi.object(%{value: Zoi.lazy(fn -> Zoi.string() end)})
+      lazy_schema = Jido.Joi.object(%{value: Jido.Joi.lazy(fn -> Jido.Joi.string() end)})
 
       assert {:error, %Agent.Error{}} =
                build(name: "anonymous_schema_agent", schema: anonymous_schema)
@@ -519,7 +519,7 @@ defmodule Jido.AgentTest do
 
     test "raising constructors raise the returned validation error" do
       assert_raise Jido.Agent.Error, fn ->
-        build!(name: "invalid_agent", schema: Zoi.string())
+        build!(name: "invalid_agent", schema: Jido.Joi.string())
       end
 
       definition = build!(name: "valid_agent")
@@ -606,9 +606,9 @@ defmodule Jido.AgentTest do
 
     test "set replaces supplied fields and keeps other state and the source Agent" do
       nested_schema =
-        Zoi.object(%{
-          config: Zoi.map() |> Zoi.default(%{a: 1, b: 2}),
-          count: Zoi.integer() |> Zoi.default(7)
+        Jido.Joi.object(%{
+          config: Jido.Joi.map() |> Jido.Joi.default(%{a: 1, b: 2}),
+          count: Jido.Joi.integer() |> Jido.Joi.default(7)
         })
 
       agent =

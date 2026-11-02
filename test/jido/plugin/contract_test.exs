@@ -76,8 +76,8 @@ defmodule Jido.Plugin.ContractTest do
     @impl true
     def state_spec(_opts) do
       schema =
-        Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
-        |> Zoi.default(%{count: 0})
+        Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)})
+        |> Jido.Joi.default(%{count: 0})
 
       {:owned, schema}
     end
@@ -95,7 +95,7 @@ defmodule Jido.Plugin.ContractTest do
 
     @impl true
     def state_spec(_opts) do
-      {:nil_owned, Zoi.any() |> Zoi.nullable() |> Zoi.default(nil)}
+      {:nil_owned, Jido.Joi.any() |> Jido.Joi.nullable() |> Jido.Joi.default(nil)}
     end
   end
 
@@ -205,7 +205,7 @@ defmodule Jido.Plugin.ContractTest do
 
     @impl true
     def state_spec(_opts) do
-      {:reducer, Zoi.object(%{seen: Zoi.list(Zoi.atom())}) |> Zoi.default(%{seen: []})}
+      {:reducer, Jido.Joi.object(%{seen: Jido.Joi.list(Jido.Joi.atom())}) |> Jido.Joi.default(%{seen: []})}
     end
 
     @impl true
@@ -287,7 +287,8 @@ defmodule Jido.Plugin.ContractTest do
 
     @impl true
     def state_spec(_opts) do
-      {:normalized, Zoi.object(%{value: Zoi.string() |> Zoi.default("")}) |> Zoi.default(%{value: ""})}
+      {:normalized,
+       Jido.Joi.object(%{value: Jido.Joi.string() |> Jido.Joi.default("")}) |> Jido.Joi.default(%{value: ""})}
     end
 
     @impl true
@@ -330,7 +331,7 @@ defmodule Jido.Plugin.ContractTest do
 
     @impl true
     def state_spec(_opts),
-      do: {:missing_validation, Zoi.integer() |> Zoi.default(0)}
+      do: {:missing_validation, Jido.Joi.integer() |> Jido.Joi.default(0)}
 
     @impl true
     def reduce(reduction, _opts), do: {:ok, reduction.plugin_state}
@@ -395,7 +396,7 @@ defmodule Jido.Plugin.ContractTest do
     @behaviour Jido.Plugin
 
     @impl true
-    def state_spec(_opts), do: {:invalid_owner, Zoi.integer() |> Zoi.default(0)}
+    def state_spec(_opts), do: {:invalid_owner, Jido.Joi.integer() |> Jido.Joi.default(0)}
 
     @impl true
     def reduce(reduction, _opts), do: {:ok, reduction.plugin_state}
@@ -408,7 +409,7 @@ defmodule Jido.Plugin.ContractTest do
     use Jido.Agent, name: "invalid_state_agent"
 
     state do
-      schema Zoi.object(%{trace: Zoi.list(Zoi.string()) |> Zoi.default([])})
+      schema Jido.Joi.object(%{trace: Jido.Joi.list(Jido.Joi.string()) |> Jido.Joi.default([])})
     end
 
     routes do
@@ -436,7 +437,7 @@ defmodule Jido.Plugin.ContractTest do
     use Jido.Agent, name: "owned_state_agent", plugins: [OwnedStatePlugin]
 
     state do
-      schema Zoi.object(%{trace: Zoi.list(Zoi.string()) |> Zoi.default([])})
+      schema Jido.Joi.object(%{trace: Jido.Joi.list(Jido.Joi.string()) |> Jido.Joi.default([])})
     end
 
     routes do
@@ -541,7 +542,7 @@ defmodule Jido.Plugin.ContractTest do
     agent =
       Jido.Agent.define!(%{
         name: "plugin_admission_contract",
-        schema: Zoi.object(%{trace: Zoi.list(Zoi.string()) |> Zoi.default([])})
+        schema: Jido.Joi.object(%{trace: Jido.Joi.list(Jido.Joi.string()) |> Jido.Joi.default([])})
       })
       |> Jido.Agent.instantiate!(id: Jido.Signal.ID.generate!())
 
@@ -710,7 +711,7 @@ defmodule Jido.Plugin.ContractTest do
     assert {:error, %{__exception__: true}} =
              Jido.Agent.define(%{
                name: "conflicting_state_agent",
-               schema: Zoi.object(%{owned: Zoi.map()}),
+               schema: Jido.Joi.object(%{owned: Jido.Joi.map()}),
                plugins: [
                  %{
                    id: OwnedStatePlugin.id(),

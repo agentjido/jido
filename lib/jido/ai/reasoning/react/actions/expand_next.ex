@@ -1,4 +1,5 @@
 defmodule Jido.AI.Reasoning.ReAct.Actions.ExpandNext do
+  alias Jido.Joi
   @moduledoc "Expands each trusted AI routing decision into its next executable."
 
   alias Jido.AI.{Telemetry, Toolset}
@@ -11,8 +12,8 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.ExpandNext do
     vsn: 1,
     name: "jido_ai_react_expand_next",
     description: "Expand a trusted AI graph routing decision",
-    schema: Zoi.map(),
-    output_schema: Zoi.map()
+    schema: Joi.map(),
+    output_schema: Joi.map()
 
   @impl Jido.Action
   def run(%{kind: :complete, output: output}, _context), do: {:ok, output}
@@ -53,8 +54,8 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.ExpandNext do
     Jido.Flow.new(%{
       name: "jido_ai_tool_calls",
       description: "Execute validated tool calls as parallel Actions",
-      schema: Zoi.object(%{turn: Zoi.any()}),
-      output_schema: Zoi.map(),
+      schema: Joi.object(%{turn: Joi.any()}),
+      output_schema: Joi.map(),
       components: [parallel(calls), record(calls), model()],
       output: Ref.result("model")
     })

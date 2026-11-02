@@ -294,7 +294,7 @@ defmodule Jido.Flow.Component do
   defp default(_field, :canonical), do: {:__missing_flow_field__}
   defp default(field, :lowered) when field in [:params, :meta], do: %{}
   defp default(:needs, :lowered), do: []
-  defp default(:schema, :lowered), do: Zoi.map()
+  defp default(:schema, :lowered), do: Jido.Joi.map()
   defp default(:on_error, :lowered), do: :fail_fast
   defp default(_field, :lowered), do: {:__missing_flow_field__}
 

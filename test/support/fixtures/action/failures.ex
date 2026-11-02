@@ -86,8 +86,8 @@ defmodule JidoActionTest.Fixtures.Actions.InvalidOutput do
   use Jido.Action,
     name: "invalid_output",
     description: "Returns invalid output for validation tests",
-    schema: Zoi.object(%{value: Zoi.integer()}),
-    output_schema: Zoi.object(%{value: Zoi.integer()})
+    schema: Jido.Joi.object(%{value: Jido.Joi.integer()}),
+    output_schema: Jido.Joi.object(%{value: Jido.Joi.integer()})
 
   def run(%{value: value}, _context), do: {:ok, %{value: Integer.to_string(value)}}
 end
@@ -228,8 +228,8 @@ defmodule JidoActionTest.Fixtures.FailsSecond do
   @moduledoc false
   use Jido.Action,
     name: "iterator_fails_second",
-    schema: Zoi.object(%{count: Zoi.integer(), index: Zoi.integer()}),
-    output_schema: Zoi.object(%{count: Zoi.integer()})
+    schema: Jido.Joi.object(%{count: Jido.Joi.integer(), index: Jido.Joi.integer()}),
+    output_schema: Jido.Joi.object(%{count: Jido.Joi.integer()})
 
   @impl true
   def run(%{index: index} = params, context) do
@@ -247,7 +247,7 @@ defmodule JidoActionTest.Fixtures.RetryableFailure do
   @moduledoc false
   use Jido.Action,
     name: "iterator_retryable_failure",
-    schema: Zoi.object(%{count: Zoi.integer(), index: Zoi.integer()})
+    schema: Jido.Joi.object(%{count: Jido.Joi.integer(), index: Jido.Joi.integer()})
 
   @impl true
   def run(_params, _context) do
@@ -263,7 +263,7 @@ defmodule JidoActionTest.Fixtures.ReturnedException do
   @moduledoc false
   use Jido.Action,
     name: "iterator_returned_exception",
-    schema: Zoi.object(%{count: Zoi.integer(), index: Zoi.integer()})
+    schema: Jido.Joi.object(%{count: Jido.Joi.integer(), index: Jido.Joi.integer()})
 
   @impl true
   def run(_params, _context), do: {:error, RuntimeError.exception("returned body exception")}
@@ -273,8 +273,8 @@ defmodule JidoActionTest.Fixtures.InvalidOutput do
   @moduledoc false
   use Jido.Action,
     name: "iterator_invalid_output",
-    schema: Zoi.object(%{count: Zoi.integer(), index: Zoi.integer()}),
-    output_schema: Zoi.object(%{count: Zoi.integer()})
+    schema: Jido.Joi.object(%{count: Jido.Joi.integer(), index: Jido.Joi.integer()}),
+    output_schema: Jido.Joi.object(%{count: Jido.Joi.integer()})
 
   @impl true
   def run(_params, _context), do: {:ok, %{count: "bad"}}

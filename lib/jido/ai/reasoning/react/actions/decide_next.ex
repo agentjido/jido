@@ -1,4 +1,5 @@
 defmodule Jido.AI.Reasoning.ReAct.Actions.DecideNext do
+  alias Jido.Joi
   @moduledoc "Routes a model outcome to completion, repair, fallback, or tools."
 
   alias Jido.AI.{Budget, Reasoning.Result}
@@ -8,8 +9,8 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.DecideNext do
     vsn: 1,
     name: "jido_ai_react_decide_next",
     description: "Choose the next graph after a model call",
-    schema: Zoi.map(),
-    output_schema: Zoi.map()
+    schema: Joi.map(),
+    output_schema: Joi.map()
 
   @impl Jido.Action
   def run(%{turn: %{model_outcome: %{status: :budget, reason: reason}} = turn}, _context) do

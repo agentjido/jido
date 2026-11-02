@@ -1,4 +1,6 @@
 defmodule Jido.Signal do
+  alias Jido.Joi
+
   @moduledoc """
   Defines the Jido event envelope.
 
@@ -32,22 +34,24 @@ defmodule Jido.Signal do
   ## Custom Signal modules
 
       defmodule MyApp.UserCreated do
+        alias Jido.Joi
+
         use Jido.Signal,
           type: "user.created",
           default_source: "/accounts",
           schema:
-            Zoi.object(%{
-              user_id: Zoi.string()
+            Joi.object(%{
+              user_id: Joi.string()
             })
       end
 
-  Custom schemas must be static module data. Zoi refinements, transforms, and
+  Custom schemas must be static module data. Joi refinements, transforms, and
   other callbacks must use named `{Module, :function, args}` MFA values.
   Anonymous functions and lazy schemas are not accepted.
 
   A custom schema can accept any Signal data value. Its `validate_data/1` and
-  `new/2` functions return Zoi validation errors directly. Its `new!/2`
-  function raises the Zoi parse exception when data validation fails.
+  `new/2` functions return Joi validation errors directly. Its `new!/2`
+  function raises the Joi parse exception when data validation fails.
 
   `Jido.Signal.defined?/1` recognizes these modules. `Jido.Signal.Router`
   accepts them as route paths and uses `type/0` as the exact path.
@@ -63,7 +67,7 @@ defmodule Jido.Signal do
   alias Jido.Signal.Codec
   alias Jido.Signal.Serialization
 
-  @default_data_schema Zoi.any()
+  @default_data_schema Joi.any()
 
   @media_type_pattern ~r{\A[!#$%&'*+.^_`|~0-9A-Za-z-]+/[!#$%&'*+.^_`|~0-9A-Za-z-]+(?:[ \t]*;[ \t]*[!#$%&'*+.^_`|~0-9A-Za-z-]+[ \t]*=[ \t]*(?:[!#$%&'*+.^_`|~0-9A-Za-z-]+|"(?:[\x20-\x21\x23-\x5B\x5D-\x7E]|\\[\x20-\x7E])*"))*\z}
   @uri_reference_pattern ~r"\A(?:[A-Za-z0-9\-._~:/?#\[\]@!$&'()*+,;=]|%[0-9A-Fa-f]{2})*\z"
@@ -76,84 +80,84 @@ defmodule Jido.Signal do
     schema: @default_data_schema
   }
 
-  @definition_schema Zoi.keyword(
+  @definition_schema Joi.keyword(
                        [
                          type:
-                           Zoi.string()
-                           |> Zoi.min(1)
-                           |> Zoi.refine({__MODULE__, :validate_utf8_string, []})
-                           |> Zoi.required(),
+                           Joi.string()
+                           |> Joi.min(1)
+                           |> Joi.refine({__MODULE__, :validate_utf8_string, []})
+                           |> Joi.required(),
                          default_source:
-                           Zoi.string()
-                           |> Zoi.min(1)
-                           |> Zoi.refine({__MODULE__, :validate_uri_reference, []}),
+                           Joi.string()
+                           |> Joi.min(1)
+                           |> Joi.refine({__MODULE__, :validate_uri_reference, []}),
                          datacontenttype:
-                           Zoi.string()
-                           |> Zoi.min(1)
-                           |> Zoi.refine({__MODULE__, :validate_media_type, []}),
+                           Joi.string()
+                           |> Joi.min(1)
+                           |> Joi.refine({__MODULE__, :validate_media_type, []}),
                          dataschema:
-                           Zoi.string()
-                           |> Zoi.min(1)
-                           |> Zoi.refine({__MODULE__, :validate_absolute_uri, []}),
+                           Joi.string()
+                           |> Joi.min(1)
+                           |> Joi.refine({__MODULE__, :validate_absolute_uri, []}),
                          schema:
-                           Zoi.any()
-                           |> Zoi.refine({__MODULE__, :validate_definition_schema, []})
-                           |> Zoi.default(@default_data_schema)
+                           Joi.any()
+                           |> Joi.refine({__MODULE__, :validate_definition_schema, []})
+                           |> Joi.default(@default_data_schema)
                        ],
                        unrecognized_keys: :error
                      )
 
-  @signal_schema Zoi.struct(
+  @signal_schema Joi.struct(
                    __MODULE__,
                    %{
                      id:
-                       Zoi.string()
-                       |> Zoi.min(1)
-                       |> Zoi.refine({__MODULE__, :validate_utf8_string, []}),
+                       Joi.string()
+                       |> Joi.min(1)
+                       |> Joi.refine({__MODULE__, :validate_utf8_string, []}),
                      source:
-                       Zoi.string()
-                       |> Zoi.min(1)
-                       |> Zoi.refine({__MODULE__, :validate_uri_reference, []}),
+                       Joi.string()
+                       |> Joi.min(1)
+                       |> Joi.refine({__MODULE__, :validate_uri_reference, []}),
                      type:
-                       Zoi.string()
-                       |> Zoi.min(1)
-                       |> Zoi.refine({__MODULE__, :validate_utf8_string, []}),
-                     specversion: Zoi.default(Zoi.literal("1.0"), "1.0") |> Zoi.optional(),
+                       Joi.string()
+                       |> Joi.min(1)
+                       |> Joi.refine({__MODULE__, :validate_utf8_string, []}),
+                     specversion: Joi.default(Joi.literal("1.0"), "1.0") |> Joi.optional(),
                      subject:
-                       Zoi.string()
-                       |> Zoi.min(1)
-                       |> Zoi.refine({__MODULE__, :validate_utf8_string, []})
-                       |> Zoi.nullable()
-                       |> Zoi.optional(),
+                       Joi.string()
+                       |> Joi.min(1)
+                       |> Joi.refine({__MODULE__, :validate_utf8_string, []})
+                       |> Joi.nullable()
+                       |> Joi.optional(),
                      time:
-                       Zoi.string()
-                       |> Zoi.refine({__MODULE__, :validate_rfc3339, []})
-                       |> Zoi.nullable()
-                       |> Zoi.optional(),
+                       Joi.string()
+                       |> Joi.refine({__MODULE__, :validate_rfc3339, []})
+                       |> Joi.nullable()
+                       |> Joi.optional(),
                      datacontenttype:
-                       Zoi.string()
-                       |> Zoi.min(1)
-                       |> Zoi.refine({__MODULE__, :validate_media_type, []})
-                       |> Zoi.nullable()
-                       |> Zoi.optional(),
+                       Joi.string()
+                       |> Joi.min(1)
+                       |> Joi.refine({__MODULE__, :validate_media_type, []})
+                       |> Joi.nullable()
+                       |> Joi.optional(),
                      dataschema:
-                       Zoi.string()
-                       |> Zoi.refine({__MODULE__, :validate_absolute_uri, []})
-                       |> Zoi.nullable()
-                       |> Zoi.optional(),
-                     data: Zoi.any() |> Zoi.optional(),
-                     data_present?: Zoi.boolean() |> Zoi.default(false) |> Zoi.optional(),
-                     data_base64?: Zoi.boolean() |> Zoi.default(false) |> Zoi.optional(),
-                     extensions: Zoi.default(Zoi.map(), %{}) |> Zoi.optional()
+                       Joi.string()
+                       |> Joi.refine({__MODULE__, :validate_absolute_uri, []})
+                       |> Joi.nullable()
+                       |> Joi.optional(),
+                     data: Joi.any() |> Joi.optional(),
+                     data_present?: Joi.boolean() |> Joi.default(false) |> Joi.optional(),
+                     data_base64?: Joi.boolean() |> Joi.default(false) |> Joi.optional(),
+                     extensions: Joi.default(Joi.map(), %{}) |> Joi.optional()
                    }
                  )
 
-  @type t :: unquote(Zoi.type_spec(@signal_schema))
-  @enforce_keys Zoi.Struct.enforce_keys(@signal_schema)
-  defstruct Zoi.Struct.struct_fields(@signal_schema)
+  @type t :: unquote(Joi.type_spec(@signal_schema))
+  @enforce_keys Joi.Struct.enforce_keys(@signal_schema)
+  defstruct Joi.Struct.struct_fields(@signal_schema)
 
-  @doc "Returns the Zoi schema for the core Signal envelope."
-  @spec schema() :: Zoi.schema()
+  @doc "Returns the Joi schema for the core Signal envelope."
+  @spec schema() :: Joi.schema()
   def schema, do: @signal_schema
 
   @doc """
@@ -171,7 +175,7 @@ defmodule Jido.Signal do
 
   def defined?(_module), do: false
 
-  @doc "Defines a custom Signal module with a static Zoi data schema."
+  @doc "Defines a custom Signal module with a static Joi data schema."
   defmacro __using__(opts_ast) do
     quote location: :keep do
       @signal_definition Jido.Signal.__compile_definition__(unquote(opts_ast), __ENV__)
@@ -196,13 +200,13 @@ defmodule Jido.Signal do
       @spec dataschema() :: String.t() | nil
       def dataschema, do: @signal_definition[:dataschema]
 
-      @doc "Returns the static Zoi data schema."
-      @spec schema() :: Zoi.schema()
+      @doc "Returns the static Joi data schema."
+      @spec schema() :: Joi.schema()
       def schema, do: @signal_definition[:schema]
 
-      @doc "Validates data with the static Zoi schema."
-      @spec validate_data(term()) :: Zoi.result()
-      def validate_data(data), do: Zoi.parse(schema(), data)
+      @doc "Validates data with the static Joi schema."
+      @spec validate_data(term()) :: Joi.result()
+      def validate_data(data), do: Joi.parse(schema(), data)
 
       @doc """
       Creates a Signal with the definition's type, dataschema, and validated data.
@@ -211,7 +215,7 @@ defmodule Jido.Signal do
       keeps it absent. Other envelope attributes can be supplied in options.
       """
       @spec new(term(), keyword() | map()) ::
-              {:ok, Jido.Signal.t()} | {:error, [Zoi.Error.t()] | String.t()}
+              {:ok, Jido.Signal.t()} | {:error, [Joi.Error.t()] | String.t()}
       def new(data \\ %{}, opts \\ []) do
         defaults =
           %{
@@ -238,7 +242,7 @@ defmodule Jido.Signal do
             signal
 
           {:error, errors} when is_list(errors) ->
-            raise Zoi.ParseError, errors: errors
+            raise Joi.ParseError, errors: errors
 
           {:error, reason} ->
             raise ArgumentError, "invalid signal: #{reason}"
@@ -250,7 +254,7 @@ defmodule Jido.Signal do
   @doc false
   @spec __compile_definition__(keyword(), Macro.Env.t()) :: map() | no_return()
   def __compile_definition__(raw_opts, env) do
-    case Zoi.parse(@definition_schema, raw_opts) do
+    case Joi.parse(@definition_schema, raw_opts) do
       {:ok, validated_opts} ->
         definition = Map.merge(@definition_defaults, Map.new(validated_opts))
         ensure_static_schema!(definition.schema, env)
@@ -260,7 +264,7 @@ defmodule Jido.Signal do
         raise CompileError,
           description:
             "Invalid configuration given to use Jido.Signal (#{env.module}): " <>
-              Zoi.prettify_errors(errors),
+              Joi.prettify_errors(errors),
           file: env.file,
           line: env.line
     end
@@ -289,10 +293,10 @@ defmodule Jido.Signal do
   @doc false
   @spec validate_definition_schema(term(), keyword()) :: :ok | {:error, String.t()}
   def validate_definition_schema(value, _opts) do
-    if is_struct(value) and Zoi.Type.impl_for(value) != nil do
+    if Joi.Schema.schema?(value) do
       :ok
     else
-      {:error, "must be a Zoi schema"}
+      {:error, "must be a Joi schema"}
     end
   end
 
@@ -488,7 +492,7 @@ defmodule Jido.Signal do
   end
 
   defp ensure_static_schema!(schema, env) do
-    case static_schema_data(schema, []) do
+    case Jido.Authoring.Static.validate(schema) do
       :ok ->
         :ok
 
@@ -514,105 +518,4 @@ defmodule Jido.Signal do
           line: env.line
     end
   end
-
-  defp static_schema_data(%Zoi.Types.Lazy{}, path),
-    do: static_data_error("lazy schemas are not supported", path)
-
-  defp static_schema_data(%Zoi.Types.Meta{} = meta, path) do
-    with :ok <- static_schema_effects(meta.effects, path ++ [:effects]) do
-      meta
-      |> Map.from_struct()
-      |> Map.delete(:effects)
-      |> static_schema_data(path)
-    end
-  end
-
-  defp static_schema_data(term, path) when is_function(term),
-    do: static_data_error("anonymous functions are not supported", path)
-
-  defp static_schema_data(term, path)
-       when is_pid(term) or is_port(term) or is_reference(term),
-       do: static_data_error("runtime process values are not supported", path)
-
-  defp static_schema_data(term, path) when is_map(term) do
-    term
-    |> Map.to_list()
-    |> Enum.sort_by(fn {key, _value} -> :erlang.term_to_binary(key) end)
-    |> Enum.reduce_while(:ok, fn {key, value}, :ok ->
-      with :ok <- static_schema_data(key, path ++ [:key]),
-           :ok <- static_schema_data(value, path ++ [key]) do
-        {:cont, :ok}
-      else
-        {:error, reason} -> {:halt, {:error, reason}}
-      end
-    end)
-  end
-
-  defp static_schema_data(term, path) when is_list(term) do
-    static_schema_list_data(term, path, 0)
-  end
-
-  defp static_schema_data(term, path) when is_tuple(term) do
-    term
-    |> Tuple.to_list()
-    |> Enum.with_index()
-    |> Enum.reduce_while(:ok, fn {value, index}, :ok ->
-      case static_schema_data(value, path ++ [index]) do
-        :ok -> {:cont, :ok}
-        {:error, reason} -> {:halt, {:error, reason}}
-      end
-    end)
-  end
-
-  defp static_schema_data(_term, _path), do: :ok
-
-  defp static_schema_effects(effects, path) when is_list(effects) do
-    effects
-    |> Enum.with_index()
-    |> Enum.reduce_while(:ok, fn {effect, index}, :ok ->
-      case static_schema_effect(effect, path ++ [index]) do
-        :ok -> {:cont, :ok}
-        {:error, reason} -> {:halt, {:error, reason}}
-      end
-    end)
-  end
-
-  defp static_schema_effects(_effects, path),
-    do: static_data_error("schema effects must be a list", path)
-
-  defp static_schema_effect({kind, {module, function, args}}, path)
-       when kind in [:refine, :transform] and is_atom(module) and is_atom(function) and
-              is_list(args) do
-    static_schema_data(args, path ++ [kind, :args])
-  end
-
-  defp static_schema_effect({kind, effect}, path)
-       when kind in [:refine, :transform] and is_function(effect) do
-    static_data_error("anonymous functions are not supported", path)
-  end
-
-  defp static_schema_effect(_effect, path) do
-    static_data_error(
-      "custom schema effects must use {Module, :function, args} MFA values",
-      path
-    )
-  end
-
-  defp static_schema_list_data([], _path, _index), do: :ok
-
-  defp static_schema_list_data([value | rest], path, index) when is_list(rest) do
-    case static_schema_data(value, path ++ [index]) do
-      :ok -> static_schema_list_data(rest, path, index + 1)
-      {:error, reason} -> {:error, reason}
-    end
-  end
-
-  defp static_schema_list_data([value | _tail], path, index) do
-    with :ok <- static_schema_data(value, path ++ [index]) do
-      static_data_error("improper list tails are not supported", path ++ [index + 1])
-    end
-  end
-
-  defp static_data_error(reason, []), do: {:error, reason}
-  defp static_data_error(reason, path), do: {:error, "#{reason} at #{inspect(path)}"}
 end

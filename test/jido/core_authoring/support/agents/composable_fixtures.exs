@@ -1,7 +1,7 @@
 defmodule JidoTest.ComposableAgent.Action do
   use Jido.Action,
     name: "agent_authoring_action",
-    schema: Zoi.object(%{value: Zoi.string()})
+    schema: Jido.Joi.object(%{value: Jido.Joi.string()})
 
   def run(_, _), do: raise("Authoring must not run Actions")
 end
@@ -9,7 +9,7 @@ end
 defmodule JidoTest.ComposableAgent.Flow do
   use Jido.Flow,
     name: "agent_authoring_flow",
-    schema: Zoi.object(%{value: Zoi.string()})
+    schema: Jido.Joi.object(%{value: Jido.Joi.string()})
 
   flow do
     step "work", action: JidoTest.ComposableAgent.Action, params: %{value: input(:value)}
@@ -25,7 +25,7 @@ defmodule JidoTest.ComposableAgent.Worker do
   use Jido.Agent, name: "worker"
 
   state do
-    schema Zoi.object(%{value: Zoi.string() |> Zoi.default("")})
+    schema Jido.Joi.object(%{value: Jido.Joi.string() |> Jido.Joi.default("")})
   end
 
   routes do
@@ -49,9 +49,9 @@ defmodule JidoTest.ComposableAgent.Team do
     ]
 
   state do
-    schema Zoi.object(%{
-             value: Zoi.string() |> Zoi.default("input"),
-             workers: Zoi.integer() |> Zoi.default(2)
+    schema Jido.Joi.object(%{
+             value: Jido.Joi.string() |> Jido.Joi.default("input"),
+             workers: Jido.Joi.integer() |> Jido.Joi.default(2)
            })
   end
 
@@ -87,7 +87,7 @@ defmodule JidoTest.ComposableAgent.Team do
 
     route "inline.request" do
       action %{value: _value},
-        schema: Zoi.object(%{value: Zoi.string()}),
+        schema: Jido.Joi.object(%{value: Jido.Joi.string()}),
         context: context do
         {:ok, context.agent_state}
       end
@@ -195,7 +195,7 @@ defmodule JidoTest.ComposableAgent.Named do
     metadata: %{label: "named"}
 
   state do
-    schema Zoi.object(%{value: Zoi.string() |> Zoi.default("initial")})
+    schema Jido.Joi.object(%{value: Jido.Joi.string() |> Jido.Joi.default("initial")})
   end
 
   routes do
@@ -271,7 +271,7 @@ defmodule JidoTest.ComposableAgent.OwnedPlugin do
   use Jido.Plugin, id: "test.owned", vsn: 2
 
   @impl Jido.Plugin
-  def state_spec(opts), do: {:owned, Zoi.integer() |> Zoi.default(Keyword.get(opts, :initial, 1))}
+  def state_spec(opts), do: {:owned, Jido.Joi.integer() |> Jido.Joi.default(Keyword.get(opts, :initial, 1))}
 
   @impl Jido.Plugin
   def prepare(_, _), do: raise("authoring must not prepare a runtime input")
@@ -280,7 +280,7 @@ end
 defmodule JidoTest.ComposableAgent.ConflictingPlugin do
   use Jido.Plugin, id: "test.conflict"
   @impl Jido.Plugin
-  def state_spec(_), do: {:owned, Zoi.integer() |> Zoi.default(0)}
+  def state_spec(_), do: {:owned, Jido.Joi.integer() |> Jido.Joi.default(0)}
 end
 
 defmodule JidoTest.ComposableAgent.PluginState do
@@ -289,6 +289,6 @@ defmodule JidoTest.ComposableAgent.PluginState do
     plugins: [{JidoTest.ComposableAgent.OwnedPlugin, %{initial: 3}}]
 
   state do
-    schema Zoi.object(%{value: Zoi.string() |> Zoi.default("domain")})
+    schema Jido.Joi.object(%{value: Jido.Joi.string() |> Jido.Joi.default("domain")})
   end
 end

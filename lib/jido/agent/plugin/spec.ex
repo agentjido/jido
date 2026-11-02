@@ -15,7 +15,7 @@ defmodule Jido.Agent.Plugin.Spec do
           module: module(),
           options: keyword(),
           state_key: atom() | nil,
-          state_schema: Zoi.schema() | nil,
+          state_schema: Jido.Joi.schema() | nil,
           directive_modules: [module()],
           route_selector?: boolean()
         }

@@ -295,7 +295,7 @@ defmodule Jido.Agent.Mutation do
         {:value, value} -> %{key => value}
       end
 
-    with {:ok, value} <- Data.initialize(Zoi.object(%{key => schema}), initial) do
+    with {:ok, value} <- Data.initialize(Jido.Joi.object(%{key => schema}), initial) do
       if Map.has_key?(state, key),
         do: error(:plugin_state_conflict, %{key: key}),
         else: {:ok, Map.merge(state, value)}

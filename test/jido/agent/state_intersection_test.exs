@@ -11,16 +11,16 @@ defmodule Jido.Agent.StateIntersectionTest do
 
   def schema(reverse? \\ false) do
     branches = [
-      Zoi.object(%{
-        a: Zoi.integer() |> Zoi.refine({__MODULE__, :observe, [:a]}) |> Zoi.default(1)
+      Jido.Joi.object(%{
+        a: Jido.Joi.integer() |> Jido.Joi.refine({__MODULE__, :observe, [:a]}) |> Jido.Joi.default(1)
       }),
-      Zoi.object(%{
-        b: Zoi.integer() |> Zoi.refine({__MODULE__, :observe, [:b]}) |> Zoi.default(2)
+      Jido.Joi.object(%{
+        b: Jido.Joi.integer() |> Jido.Joi.refine({__MODULE__, :observe, [:b]}) |> Jido.Joi.default(2)
       })
     ]
 
     branches = if reverse?, do: Enum.reverse(branches), else: branches
-    Zoi.object(%{nested: Zoi.intersection(branches)})
+    Jido.Joi.object(%{nested: Jido.Joi.intersection(branches)})
   end
 
   test "creation retains both intersection fields and checks each branch once" do
@@ -88,14 +88,14 @@ defmodule Jido.Agent.StateIntersectionTest do
     @impl true
     def state_spec(_opts) do
       {:owned,
-       Zoi.object(%{
+       Jido.Joi.object(%{
          nested:
-           Zoi.intersection([
-             Zoi.object(%{a: Zoi.integer() |> Zoi.nullable() |> Zoi.default(1)}),
-             Zoi.object(%{b: Zoi.integer() |> Zoi.default(2)})
+           Jido.Joi.intersection([
+             Jido.Joi.object(%{a: Jido.Joi.integer() |> Jido.Joi.nullable() |> Jido.Joi.default(1)}),
+             Jido.Joi.object(%{b: Jido.Joi.integer() |> Jido.Joi.default(2)})
            ])
        })
-       |> Zoi.default(%{nested: %{a: 1, b: 2}})}
+       |> Jido.Joi.default(%{nested: %{a: 1, b: 2}})}
     end
 
     @impl true

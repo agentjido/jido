@@ -1,9 +1,11 @@
 defmodule Jido.Signal.Catalog do
+  alias Jido.Joi
+
   @moduledoc """
   Selects and validates explicitly registered Signal definitions.
 
   A catalog is an immutable value. `new/1` captures the type, `dataschema`,
-  and Zoi data schema from each supplied `use Jido.Signal` module. It matches
+  and Joi data schema from each supplied `use Jido.Signal` module. It matches
   exact `{type, dataschema}` pairs. A definition without `dataschema` matches
   only Signals without `dataschema`. Duplicate pairs are errors, even when
   the same module appears twice. Different schema versions can share a type.
@@ -16,11 +18,11 @@ defmodule Jido.Signal.Catalog do
   `validate/2` checks an existing Signal envelope, its flat context, and its
   selected data schema. Neither function calls a constructor or generates an
   ID. The supplied ID, time, source, subject, and valid context are preserved.
-  Zoi can apply data defaults and transforms declared by the definition.
+  Joi can apply data defaults and transforms declared by the definition.
   When data changes, the existing codec keeps its presence and Base64 flags
   consistent with the returned value.
 
-  Data keys follow the definition's Zoi schema. The catalog does not enable
+  Data keys follow the definition's Joi schema. The catalog does not enable
   coercion, convert arbitrary keys to atoms, or select modules from input.
   Use string-key schemas for JSON data. See the [catalog guide](catalog.md).
 
@@ -43,10 +45,10 @@ defmodule Jido.Signal.Catalog do
   * `:invalid_envelope` — an existing Signal or its context is invalid.
   * `:unknown_type` — the type has no registered definition.
   * `:unknown_dataschema` — the type is known but the schema identity is not.
-  * `:invalid_data` — the selected Zoi schema rejected the data.
-  * `:validation_failed` — a trusted Zoi callback raised, threw, or exited.
+  * `:invalid_data` — the selected Joi schema rejected the data.
+  * `:validation_failed` — a trusted Joi callback raised, threw, or exited.
 
-  `details.reason` retains codec/serialization errors or Zoi errors where
+  `details.reason` retains codec/serialization errors or Joi errors where
   applicable. Lookup and data errors include `type` and `dataschema`.
   Data errors also include the selected `definition` module. Duplicate errors
   include both modules in registration order under `definitions`.
@@ -63,27 +65,27 @@ defmodule Jido.Signal.Catalog do
   alias Jido.Signal.Error.InvalidInputError
   alias Jido.Signal.Serialization
 
-  @definitions_schema Zoi.list(Zoi.atom() |> Zoi.refine({__MODULE__, :validate_definition, []}))
+  @definitions_schema Joi.list(Joi.atom() |> Joi.refine({__MODULE__, :validate_definition, []}))
   @type_schema Keyword.fetch!(Signal.schema().fields, :type)
   @dataschema_schema Keyword.fetch!(Signal.schema().fields, :dataschema)
-  @data_schema Zoi.any() |> Zoi.refine({Signal, :validate_definition_schema, []})
-  @definition_schema Zoi.object(%{
+  @data_schema Joi.any() |> Joi.refine({Signal, :validate_definition_schema, []})
+  @definition_schema Joi.object(%{
                        type: @type_schema,
                        dataschema: @dataschema_schema,
                        schema: @data_schema
                      })
-  @catalog_schema Zoi.struct(__MODULE__, %{
+  @catalog_schema Joi.struct(__MODULE__, %{
                     definitions:
-                      Zoi.map(
+                      Joi.map(
                         @type_schema,
-                        Zoi.map(@dataschema_schema, Zoi.tuple({Zoi.atom(), @data_schema}))
+                        Joi.map(@dataschema_schema, Joi.tuple({Joi.atom(), @data_schema}))
                       )
                   })
 
   @typedoc "An immutable index of exact Signal type and schema identities."
-  @opaque t :: unquote(Zoi.type_spec(@catalog_schema))
-  @enforce_keys Zoi.Struct.enforce_keys(@catalog_schema)
-  defstruct Zoi.Struct.struct_fields(@catalog_schema)
+  @opaque t :: unquote(Joi.type_spec(@catalog_schema))
+  @enforce_keys Joi.Struct.enforce_keys(@catalog_schema)
+  defstruct Joi.Struct.struct_fields(@catalog_schema)
 
   @error_messages %{
     invalid_definitions: "Expected a list of Signal definition modules",
@@ -106,14 +108,14 @@ defmodule Jido.Signal.Catalog do
   """
   @spec new([module()]) :: {:ok, t()} | {:error, %InvalidInputError{}}
   def new(modules) when is_list(modules) and is_integer(length(modules)) do
-    case Zoi.parse(@definitions_schema, modules) do
+    case Joi.parse(@definitions_schema, modules) do
       {:ok, modules} -> build(modules)
       {:error, errors} -> error(:invalid_definitions, %{reason: errors})
     end
   end
 
   def new(_modules),
-    do: error(:invalid_definitions, %{reason: [Zoi.Error.invalid_type(:list)]})
+    do: error(:invalid_definitions, %{reason: [Joi.Error.invalid_type(:list)]})
 
   @doc "Builds a catalog, or raises `Jido.Signal.Error.InvalidInputError`."
   @spec new!([module()]) :: t() | no_return()
@@ -150,7 +152,7 @@ defmodule Jido.Signal.Catalog do
   Revalidates an existing Signal without replacing its identity or metadata.
 
   The envelope and flat context are checked before exact definition lookup.
-  The selected Zoi schema validates data using the same rules as construction.
+  The selected Joi schema validates data using the same rules as construction.
   Data defaults and transforms can change the returned data value.
   """
   @spec validate(t(), Signal.t()) :: {:ok, Signal.t()} | {:error, %InvalidInputError{}}
@@ -188,7 +190,7 @@ defmodule Jido.Signal.Catalog do
   end
 
   defp read_definition(module) do
-    case Zoi.parse(@definition_schema, module.__signal_definition__()) do
+    case Joi.parse(@definition_schema, module.__signal_definition__()) do
       {:ok, definition} -> {:ok, definition}
       {:error, reason} -> registration_error(module, reason)
     end
@@ -254,7 +256,7 @@ defmodule Jido.Signal.Catalog do
   defp normalize_data(%Signal{data: data} = signal, data), do: {:ok, signal}
 
   defp normalize_data(signal, data) do
-    # The codec owns data presence and Base64 flags. Reuse it after a Zoi
+    # The codec owns data presence and Base64 flags. Reuse it after a Joi
     # default or transform changes data, without generating a new fact ID.
     case signal |> Map.put(:data, data) |> Signal.to_map() |> Signal.from_map() do
       {:ok, signal} -> {:ok, signal}
@@ -264,7 +266,7 @@ defmodule Jido.Signal.Catalog do
 
   defp validate_envelope(signal) do
     with {:ok, context} <- Context.normalize(signal.extensions),
-         {:ok, signal} <- Zoi.parse(Signal.schema(), %{signal | extensions: context}) do
+         {:ok, signal} <- Joi.parse(Signal.schema(), %{signal | extensions: context}) do
       {:ok, signal}
     else
       {:error, reason} -> error(:invalid_envelope, %{reason: reason})
@@ -295,7 +297,7 @@ defmodule Jido.Signal.Catalog do
   end
 
   defp validate_data(schema, signal, module) do
-    case Zoi.parse(schema, signal.data) do
+    case Joi.parse(schema, signal.data) do
       {:ok, data} -> {:ok, data}
       {:error, reason} -> data_error(:invalid_data, signal, module, reason)
     end

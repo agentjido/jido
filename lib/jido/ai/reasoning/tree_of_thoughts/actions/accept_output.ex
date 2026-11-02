@@ -1,4 +1,5 @@
 defmodule Jido.AI.Reasoning.TreeOfThoughts.Actions.AcceptOutput do
+  alias Jido.Joi
   @moduledoc "Moves one validated model object into Tree of Thoughts state."
 
   alias Jido.AI.Reasoning.Result
@@ -7,8 +8,8 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.Actions.AcceptOutput do
     id: "jido.ai/reasoning/tree-of-thoughts/actions/accept-output",
     vsn: 1,
     name: "jido_ai_tree_of_thoughts_accept_output",
-    schema: Zoi.map(),
-    output_schema: Zoi.map()
+    schema: Joi.map(),
+    output_schema: Joi.map()
 
   @impl Jido.Action
   def run(%{state: state, turn: %{model_outcome: %{status: :error}} = turn}, _context),

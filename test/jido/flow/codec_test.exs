@@ -80,7 +80,7 @@ defmodule Jido.Flow.CodecTest do
 
   test "stored Registry references include and check vsn" do
     registry = InlineAuthoring.registry()
-    schema = Zoi.object(%{})
+    schema = Jido.Joi.object(%{})
     flow = %{InlineParityFlow.flow() | schema: schema, output_schema: schema}
     assert {:ok, document} = Codec.encode(flow, registry)
 
@@ -959,7 +959,7 @@ defmodule Jido.Flow.CodecTest do
     wrong_registry =
       Registry.new!(%{
         {"targets/child", 1} => {:action, NestedFlow},
-        {"schemas/map", 1} => {:schema, Zoi.map()}
+        {"schemas/map", 1} => {:schema, Jido.Joi.map()}
       })
 
     assert {:error, %InvalidDefinitionError{}} = Codec.encode(flow, wrong_registry)
@@ -1064,7 +1064,7 @@ defmodule Jido.Flow.CodecTest do
 
   test "reference records reject extra fields and report the exact path" do
     registry = CodecRegistry.mixed()
-    flow = %{FlowAuthoring.mixed_flow!() | schema: Zoi.object(%{})}
+    flow = %{FlowAuthoring.mixed_flow!() | schema: Jido.Joi.object(%{})}
     assert {:ok, document} = Codec.encode(flow, registry)
 
     schema = Map.put(document["schema"], "extra", true)
@@ -1089,7 +1089,7 @@ defmodule Jido.Flow.CodecTest do
 
   test "invalid reference versions report the vsn field" do
     registry = CodecRegistry.mixed()
-    flow = %{FlowAuthoring.mixed_flow!() | schema: Zoi.object(%{})}
+    flow = %{FlowAuthoring.mixed_flow!() | schema: Jido.Joi.object(%{})}
     assert {:ok, document} = Codec.encode(flow, registry)
 
     for invalid_vsn <- [0, "1", nil] do
@@ -1255,7 +1255,7 @@ defmodule Jido.Flow.CodecTest do
     registry =
       Registry.new!(%{
         {"actions/add", 1} => {:action, Add},
-        {"schemas/map", 1} => {:schema, Zoi.map()}
+        {"schemas/map", 1} => {:schema, Jido.Joi.map()}
       })
 
     assert {:error, %InvalidDefinitionError{}} = Codec.encode(flow, registry)
@@ -1342,7 +1342,7 @@ defmodule Jido.Flow.CodecTest do
       {"actions/mark/v1", 1} => {:action, InlineProbeFlow.step_action("mark")},
       {"flows/not-an-action", 1} => {:flow, NestedFlow},
       {"atoms/marker", 1} => {:atom, :marker},
-      {"schemas/map/v1", 1} => {:schema, Zoi.map()}
+      {"schemas/map/v1", 1} => {:schema, Jido.Joi.map()}
     })
   end
 

@@ -1,4 +1,5 @@
 defmodule Jido.AI.Reasoning.AlgorithmOfThoughts.Actions.Complete do
+  alias Jido.Joi
   @moduledoc "Builds the terminal result from one validated Algorithm of Thoughts object."
 
   alias Jido.AI.Reasoning.Result
@@ -7,8 +8,8 @@ defmodule Jido.AI.Reasoning.AlgorithmOfThoughts.Actions.Complete do
     id: "jido.ai/reasoning/algorithm-of-thoughts/actions/complete",
     vsn: 1,
     name: "jido_ai_algorithm_of_thoughts_complete",
-    schema: Zoi.map(),
-    output_schema: Zoi.map()
+    schema: Joi.map(),
+    output_schema: Joi.map()
 
   @impl Jido.Action
   def run(%{turn: %{model_outcome: %{status: :error}} = turn}, _context),

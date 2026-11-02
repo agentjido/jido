@@ -27,8 +27,10 @@ defmodule Jido.Flow.GeneratedRegistryTest do
     assert {:ok, NestedFlow} =
              Registry.resolve(registry, {"flows/generated-1", 1}, :flow)
 
-    assert {:ok, %Zoi.Types.Map{}} =
+    assert {:ok, generated_schema} =
              Registry.resolve(registry, {"schemas/generated-1", 1}, :schema)
+
+    assert Jido.Joi.Schema.kind(generated_schema) == :map
 
     for {atom, index} <-
           Enum.with_index([:add, :amount, :count, :items, :kind, :owner, :value], 1) do

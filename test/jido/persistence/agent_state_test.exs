@@ -5,10 +5,10 @@ defmodule Jido.Persistence.AgentStateTest do
 
   test "checkpoint restore rejects missing defaults and preserves nullable nil" do
     schema =
-      Zoi.object(%{
+      Jido.Joi.object(%{
         nested:
-          Zoi.object(%{count: Zoi.integer() |> Zoi.nullable() |> Zoi.default(3)})
-          |> Zoi.default(%{})
+          Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.nullable() |> Jido.Joi.default(3)})
+          |> Jido.Joi.default(%{})
       })
 
     agent =
@@ -27,7 +27,7 @@ defmodule Jido.Persistence.AgentStateTest do
 
   test "input empty values do not remove stored nullable nil" do
     schema =
-      Zoi.object(%{count: Zoi.integer() |> Zoi.nullable() |> Zoi.default(nil)},
+      Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.nullable() |> Jido.Joi.default(nil)},
         empty_values: [nil]
       )
 

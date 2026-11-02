@@ -6,8 +6,8 @@ defmodule InlineConsumer.Bound do
   action "bound",
          :bound,
          value <- var!(value) * 2,
-         schema: Zoi.object(%{value: Zoi.integer()}),
-         output_schema: Zoi.object(%{message: Zoi.string()}),
+         schema: Jido.Joi.object(%{value: Jido.Joi.integer()}),
+         output_schema: Jido.Joi.object(%{message: Jido.Joi.string()}),
          context: ctx do
     {:ok, %{message: ctx.prefix <> private_helper(value + @offset)}}
   end
@@ -34,8 +34,8 @@ defmodule InlineConsumer.Callback do
   @before_compile InlineConsumer.DeclarationHooks
 
   action "callback", :callback, %{value: value},
-    schema: Zoi.object(%{value: Zoi.integer() |> Zoi.default(4)}),
-    output_schema: Zoi.object(%{message: Zoi.string()}),
+    schema: Jido.Joi.object(%{value: Jido.Joi.integer() |> Jido.Joi.default(4)}),
+    output_schema: Jido.Joi.object(%{message: Jido.Joi.string()}),
     context: ctx do
     {:ok, %{message: ctx.prefix <> private_helper(value)}}
   end

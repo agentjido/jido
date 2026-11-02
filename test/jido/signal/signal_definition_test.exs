@@ -10,26 +10,26 @@ defmodule Jido.Signal.DefinitionTest do
       datacontenttype: "application/json",
       dataschema: "https://example.com/schemas/user-created",
       schema:
-        Zoi.object(%{
-          user_id: Zoi.string(),
+        Jido.Joi.object(%{
+          user_id: Jido.Joi.string(),
           email:
-            Zoi.string()
-            |> Zoi.refine({Jido.Signal.DefinitionTest, :valid_email, []}),
-          count: Zoi.integer() |> Zoi.default(1)
+            Jido.Joi.string()
+            |> Jido.Joi.refine({Jido.Signal.DefinitionTest, :valid_email, []}),
+          count: Jido.Joi.integer() |> Jido.Joi.default(1)
         })
   end
 
   defmodule ExplicitSource do
     use Jido.Signal,
       type: "explicit.source",
-      schema: Zoi.object(%{value: Zoi.string()})
+      schema: Jido.Joi.object(%{value: Jido.Joi.string()})
   end
 
   defmodule TextMessage do
     use Jido.Signal,
       type: "text.message",
       default_source: "/messages",
-      schema: Zoi.string()
+      schema: Jido.Joi.string()
   end
 
   defmodule OpaqueMessage do
@@ -75,19 +75,19 @@ defmodule Jido.Signal.DefinitionTest do
       assert signal.source == "/test"
     end
 
-    test "returns Zoi validation errors without a package wrapper" do
-      assert {:error, [%Zoi.Error{} = error]} =
+    test "returns Joi validation errors without a package wrapper" do
+      assert {:error, [%{} = error]} =
                UserCreated.new(%{user_id: "123", email: "not-an-email"})
 
       assert error.path == [:email]
       assert error.message == "must contain @"
 
-      assert_raise Zoi.ParseError, fn ->
+      assert_raise Jido.Joi.ParseError, fn ->
         UserCreated.new!(%{user_id: "123", email: "not-an-email"})
       end
     end
 
-    test "accepts non-map data defined by Zoi" do
+    test "accepts non-map data defined by Joi" do
       assert {:ok, text_signal} = TextMessage.new("hello")
       assert text_signal.data == "hello"
 
@@ -113,7 +113,7 @@ defmodule Jido.Signal.DefinitionTest do
       assert UserCreated.default_source() == "/accounts"
       assert UserCreated.datacontenttype() == "application/json"
       assert UserCreated.dataschema() == "https://example.com/schemas/user-created"
-      assert %Zoi.Types.Map{} = UserCreated.schema()
+      assert Jido.Joi.Schema.kind(UserCreated.schema()) == :map
       assert Jido.Signal.defined?(UserCreated)
       refute Jido.Signal.defined?(Jido.Signal)
       refute Jido.Signal.defined?(String)
@@ -142,7 +142,7 @@ defmodule Jido.Signal.DefinitionTest do
     end
   end
 
-  describe "static Zoi schema checks" do
+  describe "static Joi schema checks" do
     test "accepts named MFA effects" do
       assert {:ok, data} =
                UserCreated.validate_data(%{user_id: "123", email: "user@example.com"})
@@ -161,8 +161,8 @@ defmodule Jido.Signal.DefinitionTest do
               type: "anonymous.schema",
               default_source: "/test",
               schema:
-                Zoi.object(%{
-                  value: Zoi.string() |> Zoi.refine(fn _value, _opts -> :ok end)
+                Jido.Joi.object(%{
+                  value: Jido.Joi.string() |> Jido.Joi.refine(fn _value, _opts -> :ok end)
                 })
           end
         )
@@ -182,8 +182,8 @@ defmodule Jido.Signal.DefinitionTest do
               type: "anonymous.mfa.argument",
               default_source: "/test",
               schema:
-                Zoi.string()
-                |> Zoi.refine({Jido.Signal.DefinitionTest, :valid_email, [runtime_function]})
+                Jido.Joi.string()
+                |> Jido.Joi.refine({Jido.Signal.DefinitionTest, :valid_email, [runtime_function]})
           end
         )
       end
@@ -202,8 +202,8 @@ defmodule Jido.Signal.DefinitionTest do
               type: "runtime.schema.value",
               default_source: "/test",
               schema:
-                Zoi.string()
-                |> Zoi.refine({Jido.Signal.DefinitionTest, :valid_email, [runtime_reference]})
+                Jido.Joi.string()
+                |> Jido.Joi.refine({Jido.Signal.DefinitionTest, :valid_email, [runtime_reference]})
           end
         )
       end
@@ -219,7 +219,7 @@ defmodule Jido.Signal.DefinitionTest do
             use Jido.Signal,
               type: "improper.schema.list",
               default_source: "/test",
-              schema: Zoi.string(example: ["head" | :tail])
+              schema: Jido.Joi.string(example: ["head" | :tail])
           end
         )
       end
@@ -235,13 +235,13 @@ defmodule Jido.Signal.DefinitionTest do
             use Jido.Signal,
               type: "lazy.schema",
               default_source: "/test",
-              schema: Zoi.lazy(fn -> Zoi.object(%{value: Zoi.string()}) end)
+              schema: Jido.Joi.lazy(fn -> Jido.Joi.object(%{value: Jido.Joi.string()}) end)
           end
         )
       end
     end
 
-    test "rejects malformed Zoi effects at compile time" do
+    test "rejects malformed Joi effects at compile time" do
       module = unique_module("MalformedEffect")
 
       assert_raise CompileError, ~r/custom schema effects must use.*MFA/, fn ->
@@ -252,8 +252,8 @@ defmodule Jido.Signal.DefinitionTest do
               type: "malformed.effect",
               default_source: "/test",
               schema:
-                Zoi.object(%{
-                  value: Zoi.string() |> Zoi.refine(:not_an_mfa)
+                Jido.Joi.object(%{
+                  value: Jido.Joi.string() |> Jido.Joi.refine(:not_an_mfa)
                 })
           end
         )
@@ -291,10 +291,10 @@ defmodule Jido.Signal.DefinitionTest do
       assert error =~ "options"
     end
 
-    test "rejects non-Zoi schemas at compile time" do
+    test "rejects non-Joi schemas at compile time" do
       module = unique_module("InvalidSchema")
 
-      assert_raise CompileError, ~r/must be a Zoi schema/, fn ->
+      assert_raise CompileError, ~r/must be a Joi schema/, fn ->
         create_module(
           module,
           quote do
@@ -313,7 +313,7 @@ defmodule Jido.Signal.DefinitionTest do
       create_module(
         module,
         quote do
-          data_schema = Zoi.list(Zoi.integer())
+          data_schema = Jido.Joi.list(Jido.Joi.integer())
 
           use Jido.Signal,
             type: "schema.variable",

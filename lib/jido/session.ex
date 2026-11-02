@@ -1,4 +1,6 @@
 defmodule Jido.Session do
+  alias Jido.Joi
+
   @moduledoc """
   A portable conversation session that owns one `Jido.Thread`.
 
@@ -9,39 +11,36 @@ defmodule Jido.Session do
   alias Jido.Thread
 
   @version 1
-  @schema Zoi.struct(
+  @schema Joi.struct(
             __MODULE__,
             %{
-              version: Zoi.integer() |> Zoi.default(@version),
-              id: Zoi.string() |> Zoi.min(1),
-              rev: Zoi.integer() |> Zoi.min(0) |> Zoi.default(0),
+              version: Joi.integer() |> Joi.default(@version),
+              id: Joi.string() |> Joi.min(1),
+              rev: Joi.integer() |> Joi.min(0) |> Joi.default(0),
               thread: Thread.schema(),
-              status: Zoi.enum([:open, :closed]) |> Zoi.default(:open),
-              created_at: Zoi.integer(),
-              updated_at: Zoi.integer(),
-              metadata: Zoi.map() |> Zoi.default(%{})
+              status: Joi.enum([:open, :closed]) |> Joi.default(:open),
+              created_at: Joi.integer(),
+              updated_at: Joi.integer(),
+              metadata: Joi.map() |> Joi.default(%{})
             },
             coerce: true,
             unrecognized_keys: :error
           )
 
-  @type t :: unquote(Zoi.type_spec(@schema))
-  @enforce_keys Zoi.Struct.enforce_keys(@schema)
-  defstruct Zoi.Struct.struct_fields(@schema)
+  @type t :: unquote(Joi.type_spec(@schema))
+  @enforce_keys Joi.Struct.enforce_keys(@schema)
+  defstruct Joi.Struct.struct_fields(@schema)
 
   @state_schema @schema
-                |> Zoi.Schema.traverse(fn
-                  %{coerce: _} = schema -> %{schema | coerce: false}
-                  schema -> schema
-                end)
-                |> Map.put(:coerce, false)
+                |> Joi.Schema.traverse(&Joi.Schema.without_coercion/1)
+                |> Joi.Schema.without_coercion()
 
   @doc "Returns the portable Session schema."
-  @spec schema() :: Zoi.schema()
+  @spec schema() :: Joi.schema()
   def schema, do: @schema
 
   @doc "Returns the strict schema used when a Session is in Agent state."
-  @spec state_schema() :: Zoi.schema()
+  @spec state_schema() :: Joi.schema()
   def state_schema, do: @state_schema
 
   @doc "Creates an open Session with one empty Thread."
@@ -184,7 +183,7 @@ defmodule Jido.Session do
   @doc false
   @spec validate(t()) :: {:ok, t()} | {:error, :invalid_session}
   def validate(%__MODULE__{} = session) do
-    with {:ok, _value} <- Zoi.parse(@schema, session),
+    with :ok <- Joi.validate(@schema, session),
          true <- session.version == @version,
          true <- session.rev >= session.thread.rev,
          true <- session.updated_at >= session.created_at,

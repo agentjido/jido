@@ -1,4 +1,5 @@
 defmodule Jido.AI.Reasoning.ReAct.ModelRound do
+  alias Jido.Joi
   @moduledoc "Projects context and runs one guarded provider attempt."
 
   alias Jido.AI.Reasoning.Actions.{
@@ -14,8 +15,8 @@ defmodule Jido.AI.Reasoning.ReAct.ModelRound do
     id: "jido.ai/reasoning/react/model-round",
     vsn: 1,
     name: "jido_ai_react_model_round",
-    schema: Zoi.object(%{turn: Zoi.any()}),
-    output_schema: Zoi.map()
+    schema: Joi.object(%{turn: Joi.any()}),
+    output_schema: Joi.map()
 
   flow do
     step "project",

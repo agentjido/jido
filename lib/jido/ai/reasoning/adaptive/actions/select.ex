@@ -1,11 +1,12 @@
 defmodule Jido.AI.Reasoning.Adaptive.Actions.Select do
+  alias Jido.Joi
   @moduledoc "Selects one reasoning Flow from request text or an explicit override."
   use Jido.Action,
     id: "jido.ai/reasoning/adaptive/actions/select",
     vsn: 1,
     name: "jido_ai_adaptive_select",
-    schema: Zoi.map(),
-    output_schema: Zoi.map()
+    schema: Joi.map(),
+    output_schema: Joi.map()
 
   @tool ~w(search find lookup fetch calculate compute execute run tool)
   @synthesis ~w(synthesize combine merge integrate relationships perspectives)

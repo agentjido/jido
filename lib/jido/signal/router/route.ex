@@ -1,4 +1,6 @@
 defmodule Jido.Signal.Router.Route do
+  alias Jido.Joi
+
   @moduledoc """
   A validated Signal routing rule.
 
@@ -11,23 +13,23 @@ defmodule Jido.Signal.Router.Route do
 
   alias Jido.Signal
 
-  @schema Zoi.struct(
+  @schema Joi.struct(
             __MODULE__,
             %{
               path:
-                Zoi.any()
-                |> Zoi.refine({__MODULE__, :validate_path, []}),
-              target: Zoi.any(),
+                Joi.any()
+                |> Joi.refine({__MODULE__, :validate_path, []}),
+              target: Joi.any(),
               priority:
-                Zoi.any()
-                |> Zoi.refine({__MODULE__, :validate_priority, []})
-                |> Zoi.default(0)
-                |> Zoi.optional(),
+                Joi.any()
+                |> Joi.refine({__MODULE__, :validate_priority, []})
+                |> Joi.default(0)
+                |> Joi.optional(),
               match:
-                Zoi.any()
-                |> Zoi.refine({__MODULE__, :validate_match, []})
-                |> Zoi.nullable()
-                |> Zoi.optional()
+                Joi.any()
+                |> Joi.refine({__MODULE__, :validate_match, []})
+                |> Joi.nullable()
+                |> Joi.optional()
             }
           )
 
@@ -40,11 +42,11 @@ defmodule Jido.Signal.Router.Route do
           match: nil | match()
         }
 
-  @enforce_keys Zoi.Struct.enforce_keys(@schema)
-  defstruct Zoi.Struct.struct_fields(@schema)
+  @enforce_keys Joi.Struct.enforce_keys(@schema)
+  defstruct Joi.Struct.struct_fields(@schema)
 
-  @doc "Returns the Zoi schema for a Route."
-  @spec schema() :: Zoi.schema()
+  @doc "Returns the Joi schema for a Route."
+  @spec schema() :: Joi.schema()
   def schema, do: @schema
 
   @doc false

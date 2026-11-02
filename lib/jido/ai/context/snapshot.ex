@@ -1,36 +1,37 @@
 defmodule Jido.AI.Context.Snapshot do
+  alias Jido.Joi
   @moduledoc "A portable inspection record for one Context lifecycle stage."
 
   alias Jido.AI.Context
   alias ReqLLM.Message
 
-  @schema Zoi.struct(
+  @schema Joi.struct(
             __MODULE__,
             %{
-              type: Zoi.literal("jido.ai.context.snapshot") |> Zoi.default("jido.ai.context.snapshot"),
-              version: Zoi.integer() |> Zoi.default(1),
-              context_id: Zoi.string(),
-              stage: Zoi.enum([:open, :prepared, :completed]),
-              digest: Zoi.string() |> Zoi.nullable() |> Zoi.default(nil),
-              request: Zoi.map() |> Zoi.default(%{}),
-              response: Zoi.any() |> Zoi.default(nil),
-              metadata: Zoi.map() |> Zoi.default(%{}),
-              operations: Zoi.map() |> Zoi.default(%{}),
-              shape: Zoi.map() |> Zoi.default(%{}),
-              content: Zoi.enum([:none, :redacted, :full]) |> Zoi.default(:redacted),
-              captured_at_ms: Zoi.integer()
+              type: Joi.literal("jido.ai.context.snapshot") |> Joi.default("jido.ai.context.snapshot"),
+              version: Joi.integer() |> Joi.default(1),
+              context_id: Joi.string(),
+              stage: Joi.enum([:open, :prepared, :completed]),
+              digest: Joi.string() |> Joi.nullable() |> Joi.default(nil),
+              request: Joi.map() |> Joi.default(%{}),
+              response: Joi.any() |> Joi.default(nil),
+              metadata: Joi.map() |> Joi.default(%{}),
+              operations: Joi.map() |> Joi.default(%{}),
+              shape: Joi.map() |> Joi.default(%{}),
+              content: Joi.enum([:none, :redacted, :full]) |> Joi.default(:redacted),
+              captured_at_ms: Joi.integer()
             },
             coerce: true,
             unrecognized_keys: :error
           )
 
-  @type t :: unquote(Zoi.type_spec(@schema))
+  @type t :: unquote(Joi.type_spec(@schema))
 
-  @enforce_keys Zoi.Struct.enforce_keys(@schema)
-  defstruct Zoi.Struct.struct_fields(@schema)
+  @enforce_keys Joi.Struct.enforce_keys(@schema)
+  defstruct Joi.Struct.struct_fields(@schema)
 
-  @doc "Returns the Zoi schema for a context snapshot."
-  @spec schema() :: Zoi.schema()
+  @doc "Returns the Joi schema for a context snapshot."
+  @spec schema() :: Joi.schema()
   def schema, do: @schema
 
   @doc false

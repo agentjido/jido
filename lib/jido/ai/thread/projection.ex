@@ -1,4 +1,6 @@
 defmodule Jido.AI.Thread.Projection do
+  alias Jido.Joi
+
   @moduledoc """
   Projects the canonical `Jido.Session` Thread into portable model messages.
 
@@ -14,8 +16,8 @@ defmodule Jido.AI.Thread.Projection do
   @roles [:system, :user, :assistant, :tool]
 
   @doc "Returns the canonical Agent-state schema for a nullable Session."
-  @spec schema() :: Zoi.schema()
-  def schema, do: Session.state_schema() |> Zoi.nullable() |> Zoi.default(nil)
+  @spec schema() :: Joi.schema()
+  def schema, do: Session.state_schema() |> Joi.nullable() |> Joi.default(nil)
 
   @doc "Appends one portable model message to a Session."
   @spec append(Session.t(), ReqLLM.Message.t() | map(), map(), integer()) ::

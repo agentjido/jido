@@ -55,7 +55,7 @@ defmodule Jido.Flow.Codec.Writer do
   end
 
   defp encode_schema(schema, registry) do
-    if schema == Zoi.map(),
+    if schema == Jido.Joi.map(),
       do: {:ok, nil},
       else: Registry.encode_reference(registry, :schema, schema)
   end

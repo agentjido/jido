@@ -341,7 +341,7 @@ defmodule JidoActionTest.Flow.ExprBoundaryTest do
       JidoActionTest.FlowComponent.iterate!(
         name: "loop",
         action: EchoParamsAction,
-        state: [schema: Zoi.map(), initial: %{}, update: %{}],
+        state: [schema: Jido.Joi.map(), initial: %{}, update: %{}],
         completion: condition,
         max_iterations: 1
       )

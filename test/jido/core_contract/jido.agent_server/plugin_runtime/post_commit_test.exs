@@ -15,7 +15,7 @@ defmodule JidoTest.AgentServer.PluginRuntime.PostCommitTest do
 
   defmodule First do
     use Jido.Plugin
-    def state_spec(_), do: {:first, Zoi.integer() |> Zoi.default(7)}
+    def state_spec(_), do: {:first, Jido.Joi.integer() |> Jido.Joi.default(7)}
     def directives(_), do: [Effect]
     def reduce(reduction, _), do: {:ok, reduction.plugin_state + 1}
     def after_commit(nil, commit, opts), do: notify(commit, opts)
@@ -62,7 +62,7 @@ defmodule JidoTest.AgentServer.PluginRuntime.PostCommitTest do
 
   defmodule Live do
     use Jido.Plugin
-    def state_spec(_), do: {:first, Zoi.integer() |> Zoi.default(7)}
+    def state_spec(_), do: {:first, Jido.Joi.integer() |> Jido.Joi.default(7)}
     def directives(_), do: [Effect]
     def child_spec(init), do: %{id: __MODULE__, start: {Agent, :start_link, [fn -> init end]}}
 
@@ -79,7 +79,7 @@ defmodule JidoTest.AgentServer.PluginRuntime.PostCommitTest do
 
   defmodule Second do
     use Jido.Plugin
-    def state_spec(_), do: {:second, Zoi.integer() |> Zoi.default(9)}
+    def state_spec(_), do: {:second, Jido.Joi.integer() |> Jido.Joi.default(9)}
     def after_commit(nil, commit, opts), do: First.notify(commit, opts)
   end
 
@@ -100,7 +100,7 @@ defmodule JidoTest.AgentServer.PluginRuntime.PostCommitTest do
     agent =
       Jido.Agent.define!(%{
         name: "commit_plugins",
-        schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}),
+        schema: Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)}),
         plugins: [
           JidoTest.AgentContract.contribution(plugin, %{observer: __MODULE__, mode: mode}),
           JidoTest.AgentContract.contribution(Second, %{observer: __MODULE__, mode: second_mode})

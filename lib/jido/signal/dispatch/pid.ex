@@ -1,4 +1,6 @@
 defmodule Jido.Signal.Dispatch.PidAdapter do
+  alias Jido.Joi
+
   @moduledoc """
   Delivers a Signal to a local process.
 
@@ -9,22 +11,22 @@ defmodule Jido.Signal.Dispatch.PidAdapter do
 
   @behaviour Jido.Signal.Dispatch.Adapter
 
-  @target_schema Zoi.union([
-                   Zoi.pid(),
-                   Zoi.tuple({Zoi.literal(:name), Zoi.atom()})
+  @target_schema Joi.union([
+                   Joi.pid(),
+                   Joi.tuple({Joi.literal(:name), Joi.atom()})
                  ])
-                 |> Zoi.refine({__MODULE__, :validate_target, []})
+                 |> Joi.refine({__MODULE__, :validate_target, []})
 
-  @options_schema Zoi.keyword(
+  @options_schema Joi.keyword(
                     [
-                      target: @target_schema |> Zoi.required(),
-                      delivery_mode: Zoi.enum([:sync, :async]) |> Zoi.default(:async),
+                      target: @target_schema |> Joi.required(),
+                      delivery_mode: Joi.enum([:sync, :async]) |> Joi.default(:async),
                       timeout:
-                        Zoi.integer()
-                        |> Zoi.min(1)
-                        |> Zoi.max(4_294_967_295)
-                        |> Zoi.default(5_000),
-                      message_format: Zoi.function(arity: 1) |> Zoi.optional()
+                        Joi.integer()
+                        |> Joi.min(1)
+                        |> Joi.max(4_294_967_295)
+                        |> Joi.default(5_000),
+                      message_format: Joi.function(arity: 1) |> Joi.optional()
                     ],
                     unrecognized_keys: :error
                   )

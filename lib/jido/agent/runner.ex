@@ -26,7 +26,7 @@ defmodule Jido.Agent.Runner do
 
     @type t :: %__MODULE__{
             agent: Jido.Agent.instance(),
-            schema: Zoi.schema(),
+            schema: Jido.Joi.schema(),
             signal: Jido.Signal.t(),
             turn: Jido.Agent.Turn.t(),
             context: map(),

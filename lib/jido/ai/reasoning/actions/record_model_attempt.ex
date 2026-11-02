@@ -1,4 +1,5 @@
 defmodule Jido.AI.Reasoning.Actions.RecordModelAttempt do
+  alias Jido.Joi
   @moduledoc "Records one model attempt and any accepted assistant message."
 
   alias Jido.AI.{Context, Thread.Projection}
@@ -8,8 +9,8 @@ defmodule Jido.AI.Reasoning.Actions.RecordModelAttempt do
     vsn: 1,
     name: "jido_ai_record_model_attempt",
     description: "Record a model attempt in the canonical Session",
-    schema: Zoi.map(),
-    output_schema: Zoi.map()
+    schema: Joi.map(),
+    output_schema: Joi.map()
 
   @impl Jido.Action
   def run(%{turn: turn, outcome: %{status: :budget} = outcome} = params, _context) do

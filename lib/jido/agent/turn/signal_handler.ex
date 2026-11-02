@@ -1,8 +1,9 @@
 defmodule Jido.Agent.Turn.SignalHandler do
+  alias Jido.Joi
   @moduledoc false
   use Jido.Action,
     name: "agent_signal_handler",
-    schema: Zoi.object(%{handler: Zoi.any()})
+    schema: Joi.object(%{handler: Joi.any()})
 
   @impl Jido.Action
   def run(%{handler: %{kind: :forward, target: target}}, context) do

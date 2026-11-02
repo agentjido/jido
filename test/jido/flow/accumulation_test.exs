@@ -9,7 +9,7 @@ defmodule Jido.Flow.AccumulationTest do
     registry =
       Registry.new!(%{
         {"action", 1} => {:action, UnloadedAction},
-        {"schema", 1} => {:schema, Zoi.map()}
+        {"schema", 1} => {:schema, Jido.Joi.map()}
       })
 
     flow =

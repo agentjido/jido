@@ -90,7 +90,7 @@ defmodule JidoActionTest.Fixtures.FlowAuthoring do
           action: Add,
           params: %{value: Jido.Flow.Ref.state(:count), amount: 1},
           state: %{
-            schema: Zoi.map(),
+            schema: Jido.Joi.map(),
             initial: %{count: 0},
             update: %{count: Jido.Flow.Ref.body_result(:value)}
           },

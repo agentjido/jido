@@ -44,14 +44,14 @@ defmodule Jido.Plugin.AuthoringTest do
 
   defmodule FirstOwner do
     use Jido.Plugin
-    def state_spec(_opts), do: {:first, Zoi.integer() |> Zoi.default(0)}
+    def state_spec(_opts), do: {:first, Jido.Joi.integer() |> Jido.Joi.default(0)}
     def directives(_opts), do: [Effect]
     def reduce(reduction, _opts), do: {:ok, reduction.plugin_state}
   end
 
   defmodule OtherOwner do
     use Jido.Plugin
-    def state_spec(_opts), do: {:other, Zoi.object(%{}) |> Zoi.default(%{})}
+    def state_spec(_opts), do: {:other, Jido.Joi.object(%{}) |> Jido.Joi.default(%{})}
     def directives(_opts), do: [Effect]
     def reduce(reduction, _opts), do: {:ok, reduction.plugin_state}
   end

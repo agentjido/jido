@@ -9,7 +9,7 @@ defmodule Jido.Agent.Plugin.FSMDurableTest do
   defmodule Approval do
     use Jido.Flow,
       name: "fsm_durable_approval",
-      schema: Zoi.object(%{request_id: Zoi.string()})
+      schema: Jido.Joi.object(%{request_id: Jido.Joi.string()})
 
     flow do
       selection "decision" do
@@ -33,8 +33,8 @@ defmodule Jido.Agent.Plugin.FSMDurableTest do
 
     state do
       schema(
-        Zoi.object(%{
-          status: Zoi.enum([:idle, :approved, :expired]) |> Zoi.default(:idle)
+        Jido.Joi.object(%{
+          status: Jido.Joi.enum([:idle, :approved, :expired]) |> Jido.Joi.default(:idle)
         })
       )
     end

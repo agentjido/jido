@@ -14,9 +14,9 @@ defmodule Jido.Agent.TurnEvaluationTest do
     use Jido.Agent, name: "turn_evaluation_custom_route"
 
     state do
-      schema Zoi.object(%{
-               count: Zoi.integer() |> Zoi.default(0),
-               history: Zoi.list(Zoi.string()) |> Zoi.default([])
+      schema Jido.Joi.object(%{
+               count: Jido.Joi.integer() |> Jido.Joi.default(0),
+               history: Jido.Joi.list(Jido.Joi.string()) |> Jido.Joi.default([])
              })
     end
 

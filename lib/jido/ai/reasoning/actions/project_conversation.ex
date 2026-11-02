@@ -1,4 +1,5 @@
 defmodule Jido.AI.Reasoning.Actions.ProjectConversation do
+  alias Jido.Joi
   @moduledoc "Projects the canonical Thread into one model request."
 
   alias Jido.AI.{Context, Thread.Projection}
@@ -8,8 +9,8 @@ defmodule Jido.AI.Reasoning.Actions.ProjectConversation do
     vsn: 1,
     name: "jido_ai_project_conversation",
     description: "Project Session history into model messages",
-    schema: Zoi.map(),
-    output_schema: Zoi.map()
+    schema: Joi.map(),
+    output_schema: Joi.map()
 
   @impl Jido.Action
   def run(%{turn: turn}, _context) do

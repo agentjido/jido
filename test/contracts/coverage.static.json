@@ -39,10 +39,10 @@
             "test output validation action with invalid output fails validation",
             "test output validation action with valid output schema validates successfully",
             "test output validation action without output schema skips validation",
-            "test parameter validation honors an explicit Zoi unknown-key policy",
+            "test parameter validation honors an explicit Joi unknown-key policy",
             "test parameter validation prepares raw parameters before schema validation",
             "test parameter validation returns an input preparation error without schema validation",
-            "test parameter validation returns validation error for non-object Zoi schemas",
+            "test parameter validation returns validation error for non-object Joi schemas",
             "test parameter validation returns validation error for unsupported schema types",
             "test parameter validation supports struct schemas when validating params",
             "test parameter validation uses the declared unknown-key policy",
@@ -71,9 +71,9 @@
             "test action creation and metadata rejects the removed schema bindings options",
             "test action creation and metadata supports static schemas with named MFA effects",
             "test action creation and metadata unknown action options raise at compile time",
-            "test configuration schema validation accepts Zoi schemas and rejects empty lists",
+            "test configuration schema validation accepts Joi schemas and rejects empty lists",
             "test configuration schema validation rejects invalid action names",
-            "test configuration schema validation rejects non-Zoi schemas",
+            "test configuration schema validation rejects non-Joi schemas",
             "test configuration schema validation rejects scalar results from flexible action schemas",
             "test configuration schema validation rejects schemas that cannot accept map-shaped data",
             "test configuration schema validation validates action names with external or display-oriented punctuation",
@@ -1366,14 +1366,14 @@
             "test classification rejects foreign schemas, failed lazy builders and mixed codecs",
             "test classifies Action-compatible schema containers",
             "test defaults do not make scalar schemas map-compatible",
-            "test matches Zoi results across direct, nested, and wrapped object policies",
-            "test parse modes retain distinct struct shapes and the same Zoi field policy",
-            "test parse/3 keeps Zoi parsing behavior for map and struct schemas",
+            "test matches Joi results across direct, nested, and wrapped object policies",
+            "test parse modes retain distinct struct shapes and the same Joi field policy",
+            "test parse/3 keeps Joi parsing behavior for map and struct schemas",
             "test parse/3 keeps struct refinements and returns the complete parsed struct map",
-            "test parse/3 validates whole values for non-object Zoi schemas",
+            "test parse/3 validates whole values for non-object Joi schemas",
             "test parse_preserving_shape/3 keeps structs and plain values in their validated shape",
             "test schema transforms retain their chosen result and omit removed input fields",
-            "test struct roots follow Zoi policies and project parsed structs to maps",
+            "test struct roots follow Joi policies and project parsed structs to maps",
             "test validates fieldless struct schemas without schema traversal"
           ]
         },
@@ -1384,13 +1384,13 @@
           "status": "active",
           "testable": true,
           "tests": [
-            "test matches Zoi results across direct, nested, and wrapped object policies",
-            "test parse/3 honors declared Zoi unknown-key policies at the root",
-            "test parse/3 uses explicit Zoi preservation policies in nested and wrapped schemas",
+            "test matches Joi results across direct, nested, and wrapped object policies",
+            "test parse/3 honors declared Joi unknown-key policies at the root",
+            "test parse/3 uses explicit Joi preservation policies in nested and wrapped schemas",
             "test schema transforms retain their chosen result and omit removed input fields",
-            "test struct roots follow Zoi policies and project parsed structs to maps",
-            "test uses a declared Zoi policy inside map sets",
-            "test uses declared Zoi policies inside collection and combination schemas"
+            "test struct roots follow Joi policies and project parsed structs to maps",
+            "test uses a declared Joi policy inside map sets",
+            "test uses declared Joi policies inside collection and combination schemas"
           ]
         },
         "jido_action.validation.I3": {
@@ -1404,7 +1404,7 @@
             "test converts raised and thrown schema failures to structured errors",
             "test parse modes return the same complete public parse errors",
             "test parse_preserving_shape/3 returns validation and unsupported-schema errors",
-            "test struct roots follow Zoi policies and project parsed structs to maps"
+            "test struct roots follow Joi policies and project parsed structs to maps"
           ]
         }
       }

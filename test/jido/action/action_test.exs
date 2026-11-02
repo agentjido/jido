@@ -15,15 +15,16 @@ defmodule JidoActionTest.ActionTest do
     test "creates a valid action with retained metadata" do
       assert FullAction.name() == "full_action"
       assert FullAction.description() == "A full action for testing"
-      assert %Zoi.Types.Map{fields: fields} = FullAction.schema()
+      assert {:ok, fields} = Jido.Joi.Schema.fields(FullAction.schema())
+      assert Jido.Joi.Schema.kind(FullAction.schema()) == :map
       assert fields |> field_keys() |> Enum.sort() == [:a, :b]
     end
 
     test "creates a valid action with default schemas" do
       assert NoSchema.name() == "add_two"
       assert NoSchema.description() == "Adds 2 to the input value"
-      assert %Zoi.Types.Map{} = NoSchema.schema()
-      assert %Zoi.Types.Map{} = NoSchema.output_schema()
+      assert Jido.Joi.Schema.kind(NoSchema.schema()) == :map
+      assert Jido.Joi.Schema.kind(NoSchema.output_schema()) == :map
     end
 
     test "exposes a JSON-safe Action description" do
@@ -62,7 +63,7 @@ defmodule JidoActionTest.ActionTest do
         quote do
           use Jido.Action,
             name: "pid_schema_action",
-            schema: Zoi.object(%{process: Zoi.pid()})
+            schema: Jido.Joi.object(%{process: Jido.Joi.pid()})
 
           @impl true
           def run(params, _context), do: {:ok, params}
@@ -117,8 +118,8 @@ defmodule JidoActionTest.ActionTest do
 
     test "runtime compiled action supports non-literal options" do
       module = unique_module("RuntimeDynamicOptionsAction")
-      schema = Zoi.object(%{value: Zoi.integer()})
-      output_schema = Zoi.object(%{doubled: Zoi.integer()})
+      schema = Jido.Joi.object(%{value: Jido.Joi.integer()})
+      output_schema = Jido.Joi.object(%{doubled: Jido.Joi.integer()})
 
       create_module(
         module,
@@ -151,13 +152,13 @@ defmodule JidoActionTest.ActionTest do
       create_module(
         module,
         quote do
-          input_type = Zoi.integer()
-          output_type = Zoi.string()
+          input_type = Jido.Joi.integer()
+          output_type = Jido.Joi.string()
 
           use Jido.Action,
             name: "runtime_schema_variable_action",
-            schema: Zoi.object(%{value: input_type}),
-            output_schema: Zoi.object(%{result: output_type})
+            schema: Jido.Joi.object(%{value: input_type}),
+            output_schema: Jido.Joi.object(%{result: output_type})
 
           @impl true
           def run(params, _context), do: {:ok, params}
@@ -178,16 +179,16 @@ defmodule JidoActionTest.ActionTest do
           use Jido.Action,
             name: "static_mfa_schema_action",
             schema:
-              Zoi.object(%{
+              Jido.Joi.object(%{
                 value:
-                  Zoi.integer()
-                  |> Zoi.refine({JidoActionTest.ActionTest, :at_least, [2]})
+                  Jido.Joi.integer()
+                  |> Jido.Joi.refine({JidoActionTest.ActionTest, :at_least, [2]})
               }),
             output_schema:
-              Zoi.object(%{
+              Jido.Joi.object(%{
                 result:
-                  Zoi.integer()
-                  |> Zoi.refine({JidoActionTest.ActionTest, :at_least, [4]})
+                  Jido.Joi.integer()
+                  |> Jido.Joi.refine({JidoActionTest.ActionTest, :at_least, [4]})
               })
 
           @impl true
@@ -210,8 +211,8 @@ defmodule JidoActionTest.ActionTest do
     test "rejects anonymous functions in Action schemas" do
       schema_ast =
         quote do
-          Zoi.object(%{
-            value: Zoi.integer() |> Zoi.refine(fn _value -> :ok end)
+          Jido.Joi.object(%{
+            value: Jido.Joi.integer() |> Jido.Joi.refine(fn _value -> :ok end)
           })
         end
 
@@ -242,7 +243,7 @@ defmodule JidoActionTest.ActionTest do
           quote do
             use Jido.Action,
               name: "lazy_schema_action",
-              schema: Zoi.lazy({JidoActionTest.ActionTest, :static_lazy_schema, []})
+              schema: Jido.Joi.lazy({JidoActionTest.ActionTest, :static_lazy_schema, []})
           end
         )
       end
@@ -259,7 +260,7 @@ defmodule JidoActionTest.ActionTest do
             use Jido.Action,
               name: "removed_schema_bindings_action",
               schema_bindings: [],
-              schema: Zoi.object(%{value: Zoi.integer()})
+              schema: Jido.Joi.object(%{value: Jido.Joi.integer()})
           end
         )
       end
@@ -331,7 +332,7 @@ defmodule JidoActionTest.ActionTest do
         defmodule #{inspect(module)} do
           use Jido.Action,
             name: "unknown_action_option",
-            output_shema: Zoi.object(%{value: Zoi.integer()})
+            output_shema: Jido.Joi.object(%{value: Jido.Joi.integer()})
         end
         """)
       end
@@ -372,24 +373,24 @@ defmodule JidoActionTest.ActionTest do
       assert {:error, "Action name must be a string."} = Config.validate_name([])
     end
 
-    test "accepts Zoi schemas and rejects empty lists" do
-      assert :ok = Config.validate_config_schema(Zoi.object(%{value: Zoi.integer()}))
-      assert {:error, "must be a Zoi schema"} = Config.validate_config_schema([])
+    test "accepts Joi schemas and rejects empty lists" do
+      assert :ok = Config.validate_config_schema(Jido.Joi.object(%{value: Jido.Joi.integer()}))
+      assert {:error, "must be a Joi schema"} = Config.validate_config_schema([])
     end
 
-    test "rejects non-Zoi schemas" do
-      assert {:error, "must be a Zoi schema"} = Config.validate_config_schema(%{})
+    test "rejects non-Joi schemas" do
+      assert {:error, "must be a Joi schema"} = Config.validate_config_schema(%{})
     end
 
     test "rejects schemas that cannot accept map-shaped data" do
       assert {:error, "must accept map-shaped data"} =
-               Config.validate_map_schema(Zoi.integer())
+               Config.validate_map_schema(Jido.Joi.integer())
 
       assert {:error, "must accept map-shaped data"} =
-               Config.validate_map_schema(Zoi.lazy(fn -> Zoi.integer() end))
+               Config.validate_map_schema(Jido.Joi.lazy(fn -> Jido.Joi.integer() end))
 
       assert :ok =
-               Config.validate_map_schema(Zoi.lazy(fn -> Zoi.object(%{value: Zoi.integer()}) end))
+               Config.validate_map_schema(Jido.Joi.lazy(fn -> Jido.Joi.object(%{value: Jido.Joi.integer()}) end))
 
       module = unique_module("ScalarOutputSchemaAction")
 
@@ -399,7 +400,7 @@ defmodule JidoActionTest.ActionTest do
           quote do
             use Jido.Action,
               name: "scalar_output_schema_action",
-              output_schema: Zoi.integer()
+              output_schema: Jido.Joi.integer()
           end
         )
       end
@@ -414,11 +415,11 @@ defmodule JidoActionTest.ActionTest do
           use Jido.Action,
             name: "scalar_transform_action",
             schema:
-              Zoi.object(%{})
-              |> Zoi.transform({JidoActionTest.ActionTest, :invalid_transform, []}),
+              Jido.Joi.object(%{})
+              |> Jido.Joi.transform({JidoActionTest.ActionTest, :invalid_transform, []}),
             output_schema:
-              Zoi.object(%{})
-              |> Zoi.transform({JidoActionTest.ActionTest, :invalid_transform, []})
+              Jido.Joi.object(%{})
+              |> Jido.Joi.transform({JidoActionTest.ActionTest, :invalid_transform, []})
 
           @impl true
           def run(params, _context), do: {:ok, params}
@@ -494,7 +495,7 @@ defmodule JidoActionTest.ActionTest do
           quote do
             use Jido.Action,
               name: "runtime_value_schema_action",
-              schema: Zoi.object(%{value: Zoi.any() |> Zoi.default(self())})
+              schema: Jido.Joi.object(%{value: Jido.Joi.any() |> Jido.Joi.default(self())})
           end
         )
       end
@@ -510,7 +511,7 @@ defmodule JidoActionTest.ActionTest do
           quote do
             use Jido.Action,
               name: "observed_lazy_schema_action",
-              schema: Zoi.lazy({JidoActionTest.ActionTest, :observed_lazy_schema, [unquote(parent)]})
+              schema: Jido.Joi.lazy({JidoActionTest.ActionTest, :observed_lazy_schema, [unquote(parent)]})
           end
         )
       end
@@ -543,8 +544,8 @@ defmodule JidoActionTest.ActionTest do
         quote do
           use Jido.Action,
             name: "prepare_params_action",
-            schema: Zoi.object(%{enabled: Zoi.boolean()}),
-            output_schema: Zoi.object(%{enabled: Zoi.boolean()})
+            schema: Jido.Joi.object(%{enabled: Jido.Joi.boolean()}),
+            output_schema: Jido.Joi.object(%{enabled: Jido.Joi.boolean()})
 
           @impl true
           def on_before_validate_params(%{"enabled" => value} = params)
@@ -574,7 +575,7 @@ defmodule JidoActionTest.ActionTest do
         quote do
           use Jido.Action,
             name: "reject_prepared_params_action",
-            schema: Zoi.object(%{value: Zoi.integer()})
+            schema: Jido.Joi.object(%{value: Jido.Joi.integer()})
 
           @impl true
           def on_before_validate_params(_params), do: {:error, :unsafe_input}
@@ -607,7 +608,7 @@ defmodule JidoActionTest.ActionTest do
       assert params == %{a: 1, b: 2}
     end
 
-    test "honors an explicit Zoi unknown-key policy" do
+    test "honors an explicit Joi unknown-key policy" do
       module = unique_module("StrictParamsAction")
 
       create_module(
@@ -615,7 +616,7 @@ defmodule JidoActionTest.ActionTest do
         quote do
           use Jido.Action,
             name: "strict_params_action",
-            schema: Zoi.object(%{value: Zoi.integer()}, unrecognized_keys: :error)
+            schema: Jido.Joi.object(%{value: Jido.Joi.integer()}, unrecognized_keys: :error)
 
           @impl true
           def run(params, _context), do: {:ok, params}
@@ -639,7 +640,7 @@ defmodule JidoActionTest.ActionTest do
         end
       )
 
-      schema = Zoi.struct(params_module, [value: Zoi.integer()], coerce: true)
+      schema = Jido.Joi.struct(params_module, [value: Jido.Joi.integer()], coerce: true)
 
       create_module(
         action_module,
@@ -663,7 +664,7 @@ defmodule JidoActionTest.ActionTest do
       create_module(
         module,
         quote do
-          def schema, do: :not_a_zoi_schema
+          def schema, do: :not_a_schema
         end
       )
 
@@ -675,13 +676,13 @@ defmodule JidoActionTest.ActionTest do
       assert details.module == module
     end
 
-    test "returns validation error for non-object Zoi schemas" do
+    test "returns validation error for non-object Joi schemas" do
       module = unique_module("ScalarSchemaAction")
 
       create_module(
         module,
         quote do
-          def schema, do: Zoi.integer()
+          def schema, do: Jido.Joi.integer()
         end
       )
 
@@ -745,7 +746,7 @@ defmodule JidoActionTest.ActionTest do
 
   def counted_static_schema(counter) do
     Agent.update(counter, &(&1 + 1))
-    Zoi.object(%{value: Zoi.integer()})
+    Jido.Joi.object(%{value: Jido.Joi.integer()})
   end
 
   def at_least(value, minimum, _opts) do
@@ -754,10 +755,10 @@ defmodule JidoActionTest.ActionTest do
 
   def invalid_transform(_value, _opts), do: :invalid
 
-  def static_lazy_schema, do: Zoi.object(%{value: Zoi.integer()})
+  def static_lazy_schema, do: Jido.Joi.object(%{value: Jido.Joi.integer()})
 
   def observed_lazy_schema(parent) do
     send(parent, :lazy_schema_was_resolved)
-    Zoi.object(%{value: Zoi.integer()})
+    Jido.Joi.object(%{value: Jido.Joi.integer()})
   end
 end

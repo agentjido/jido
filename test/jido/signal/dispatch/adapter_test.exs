@@ -10,11 +10,11 @@ defmodule Jido.Signal.Dispatch.AdapterTest do
 
     @impl true
     def options_schema do
-      Zoi.keyword(
+      Jido.Joi.keyword(
         [
-          target: Zoi.pid() |> Zoi.required(),
-          label: Zoi.string() |> Zoi.default("default"),
-          fail: Zoi.boolean() |> Zoi.default(false)
+          target: Jido.Joi.pid() |> Jido.Joi.required(),
+          label: Jido.Joi.string() |> Jido.Joi.default("default"),
+          fail: Jido.Joi.boolean() |> Jido.Joi.default(false)
         ],
         unrecognized_keys: :error
       )
@@ -35,7 +35,7 @@ defmodule Jido.Signal.Dispatch.AdapterTest do
     @behaviour Adapter
 
     @impl true
-    def options_schema, do: :not_a_zoi_schema
+    def options_schema, do: :not_a_schema
 
     @impl true
     def deliver(_signal, _opts), do: :ok
@@ -99,7 +99,7 @@ defmodule Jido.Signal.Dispatch.AdapterTest do
     refute {:validate_opts, 1} in callbacks
   end
 
-  test "parses custom adapter options with Zoi" do
+  test "parses custom adapter options with Joi" do
     assert {:ok, {CustomAdapter, opts}} =
              Dispatch.validate_opts({CustomAdapter, target: self()})
 
