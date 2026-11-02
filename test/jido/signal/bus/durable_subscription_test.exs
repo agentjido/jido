@@ -348,6 +348,24 @@ defmodule Jido.Signal.Bus.DurableSubscriptionTest do
     assert_receive {:signal, "attach-reader", %RecordedSignal{signal: ^event}}
   end
 
+  test "an idempotent durable attach retries a failed Store read" do
+    {bus, store} = start_controlled_bus()
+    event = signal("attach.retry")
+    assert {:ok, [_record]} = Bus.publish(bus, [event])
+
+    ControlledStore.fail_next(store, :read, :temporarily_unavailable)
+
+    assert {:ok, "attach-retry"} =
+             Bus.subscribe(bus, "attach.*", durable: "attach-retry", start_from: :origin)
+
+    refute_received {:signal, "attach-retry", _record}
+
+    assert {:ok, "attach-retry"} =
+             Bus.subscribe(bus, "attach.*", durable: "attach-retry", start_from: :origin)
+
+    assert_receive {:signal, "attach-retry", %RecordedSignal{signal: ^event}}
+  end
+
   test "reports a Store read failure during publish and retries on later work" do
     {bus, store} = start_controlled_bus()
     attach_delivery_error_handler()

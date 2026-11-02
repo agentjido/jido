@@ -620,8 +620,10 @@ defmodule Jido.Signal.BusTest do
     monitor = Process.monitor(server)
     on_exit(fn -> if Process.alive?(server), do: Process.exit(server, :kill) end)
 
-    assert {:timeout, {GenServer, :call, [^server, {:replay, "**", []}, :infinity]}} =
+    assert {:timeout, {GenServer, :call, [^server, {:replay, "**", []}, timeout]}} =
              catch_exit(Bus.replay(server))
+
+    assert timeout == 30_000
 
     assert_receive {:DOWN, ^monitor, :process, ^server, :timeout}
   end

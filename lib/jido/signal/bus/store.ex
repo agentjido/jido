@@ -12,6 +12,8 @@ defmodule Jido.Signal.Bus.Store do
 
   Only `Jido.Signal.Bus.Store.Memory` is included. A custom adapter can keep an
   external resource in its state when records must survive a Bus restart.
+  A custom adapter must set a finite timeout on each external operation. Store
+  callbacks run in the Bus process and must not wait without a bound.
   """
 
   @type state :: term()

@@ -3,7 +3,7 @@ defmodule Jido.Signal.Bus.Subscriptions do
 
   alias Jido.Signal.Bus.DurableSubscription
   alias Jido.Signal.Bus.Selector
-  alias Jido.Signal.Bus.Subscriptions.Subscriber
+  alias Jido.Signal.Bus.Subscriptions.{Runtime, Subscriber}
   alias Jido.Signal.ID
   alias Jido.Signal.Router
   alias Jido.Signal.Router.Index
@@ -34,7 +34,7 @@ defmodule Jido.Signal.Bus.Subscriptions do
     case Map.get(state.subscriptions, subscription_id) do
       nil -> {:error, :subscription_not_found}
       %Subscriber{durable?: true} = subscriber -> DurableSubscription.detach(state, subscriber)
-      %Subscriber{} = subscriber -> {:ok, Subscriber.remove_subscriber(state, subscriber)}
+      %Subscriber{} = subscriber -> {:ok, Runtime.remove_subscriber(state, subscriber)}
     end
   end
 
@@ -46,7 +46,7 @@ defmodule Jido.Signal.Bus.Subscriptions do
     case Map.get(state.subscriptions, subscription_id) do
       nil -> {:error, :subscription_not_found}
       %Subscriber{durable?: true} = subscriber -> DurableSubscription.delete(state, subscriber)
-      %Subscriber{} = subscriber -> {:ok, Subscriber.remove_subscriber(state, subscriber)}
+      %Subscriber{} = subscriber -> {:ok, Runtime.remove_subscriber(state, subscriber)}
     end
   end
 
@@ -75,7 +75,7 @@ defmodule Jido.Signal.Bus.Subscriptions do
             DurableSubscription.target_down(state, subscriber)
 
           %Subscriber{} = subscriber ->
-            Subscriber.remove_subscriber(state, subscriber, false)
+            Runtime.remove_subscriber(state, subscriber, false)
         end
     end
   end
@@ -172,7 +172,7 @@ defmodule Jido.Signal.Bus.Subscriptions do
     if Map.has_key?(state.subscriptions, id) do
       {:error, :subscription_already_exists, state}
     else
-      {monitor_ref, state} = Subscriber.monitor_target(state, id, target)
+      {monitor_ref, state} = Runtime.monitor_target(state, id, target)
 
       subscriber = %Subscriber{
         id: id,
@@ -186,7 +186,7 @@ defmodule Jido.Signal.Bus.Subscriptions do
       }
 
       state = Subscriber.insert_subscriber(state, subscriber, selector)
-      Subscriber.emit_subscription(:attached, state, subscriber)
+      Runtime.emit_subscription(:attached, state, subscriber)
       {:ok, id, state}
     end
   end
@@ -196,9 +196,8 @@ defmodule Jido.Signal.Bus.Subscriptions do
       %Subscriber{durable?: true} = subscriber ->
         DurableSubscription.deliver(state, subscriber, signal)
 
-      %Subscriber{target: target} = subscriber ->
-        send(target, {:signal, signal})
-        Subscriber.emit_delivery(state, subscriber, signal)
+      %Subscriber{} = subscriber ->
+        Runtime.deliver(state, subscriber, {:signal, signal}, signal)
         state
     end
   end

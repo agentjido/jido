@@ -1,18 +1,5 @@
 defmodule Jido do
   @moduledoc """
-  Documentation for `Jido`.
+  Provides the consolidated Jido runtime, Signal, Action, Flow, and authoring APIs.
   """
-
-  @doc """
-  Hello world.
-
-  ## Examples
-
-      iex> Jido.hello()
-      :world
-
-  """
-  def hello do
-    :world
-  end
 end

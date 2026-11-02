@@ -8,7 +8,8 @@ defmodule Jido.MixProject do
       elixir: "~> 1.20",
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
-      deps: deps()
+      deps: deps(),
+      test_coverage: test_coverage()
     ]
   end
 
@@ -23,10 +24,26 @@ defmodule Jido.MixProject do
   defp elixirc_paths(:test), do: ["lib", "test/support"]
   defp elixirc_paths(_env), do: ["lib"]
 
+  defp test_coverage do
+    [
+      ignore_modules: [
+        ~r/^Inspect\.Jido/,
+        ~r/^JidoActionTest\./,
+        ~r/^JidoSignalTest\./,
+        ~r/^Jido\.Flow\.DSL\.Forms\.Flow\./,
+        ~r/^Jido\.Flow\.DSL\.(?:Entity|Step|Output)$/,
+        ~r/^Jido\.Flow\.DSL\.Forms\.(?:Map|Reduce|Choice(?:\.Option|\.Otherwise)?|Parallel(?:\.Action)?|Iterate(?:\.State)?|Invoke|Wait\.(?:Await|Timer|Selection(?:\.Await|\.Timer)?))$/,
+        ~r/^Jido\.Action\.Generated\.Inline\./
+      ],
+      summary: [threshold: 90]
+    ]
+  end
+
   defp deps do
     [
       {:jason, "~> 1.4"},
       {:phoenix_pubsub, "~> 2.1", optional: true},
+      {:spark, "~> 2.7.3"},
       {:splode, "~> 0.3.0"},
       {:telemetry, "~> 1.3"},
       {:zoi, "~> 0.18.11"}

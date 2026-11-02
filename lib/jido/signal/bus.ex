@@ -19,12 +19,17 @@ defmodule Jido.Signal.Bus do
   `Jido.Signal.Bus.Store.Memory` is the only included store. Its state does not
   survive a Bus or VM restart. An application can provide a store that
   implements `Jido.Signal.Bus.Store` when records must survive a restart.
+
+  Bus calls use a 30-second timeout. Configure `:call_timeout` under
+  `Jido.Signal.Bus` in the `:jido` application to use another positive value.
   """
 
   alias Jido.Signal
   alias Jido.Signal.Bus.RecordedSignal
   alias Jido.Signal.Bus.Server
   alias Jido.Signal.Router
+
+  @default_call_timeout 30_000
 
   @type server ::
           pid() | atom() | binary() | {name :: atom() | binary(), registry :: module()}
@@ -295,15 +300,53 @@ defmodule Jido.Signal.Bus do
   end
 
   defp bus_call(bus, message) do
-    GenServer.call(bus_call_target(bus), message, :infinity)
-  catch
-    :exit, {:noproc, _} -> {:error, :not_found}
-    :exit, {:shutdown, _} -> {:error, :not_found}
-    :exit, {:normal, _} -> {:error, :not_found}
-    :exit, {{:shutdown, _reason}, _call} -> {:error, :not_found}
-    :exit, :noproc -> {:error, :not_found}
-    :exit, :shutdown -> {:error, :not_found}
-    :exit, :normal -> {:error, :not_found}
+    target = bus_call_target(bus)
+
+    try do
+      GenServer.call(target, message, call_timeout())
+    catch
+      :exit, {:timeout, _call} = reason ->
+        if call_target_alive?(target), do: {:error, :timeout}, else: exit(reason)
+
+      :exit, {:noproc, _} ->
+        {:error, :not_found}
+
+      :exit, {:shutdown, _} ->
+        {:error, :not_found}
+
+      :exit, {:normal, _} ->
+        {:error, :not_found}
+
+      :exit, {{:shutdown, _reason}, _call} ->
+        {:error, :not_found}
+
+      :exit, :noproc ->
+        {:error, :not_found}
+
+      :exit, :shutdown ->
+        {:error, :not_found}
+
+      :exit, :normal ->
+        {:error, :not_found}
+    end
+  end
+
+  defp call_timeout do
+    timeout =
+      :jido
+      |> Application.get_env(__MODULE__, [])
+      |> Keyword.get(:call_timeout, @default_call_timeout)
+
+    if is_integer(timeout) and timeout > 0, do: timeout, else: @default_call_timeout
+  end
+
+  defp call_target_alive?(target) do
+    case GenServer.whereis(target) do
+      pid when is_pid(pid) -> Process.alive?(pid)
+      nil -> false
+    end
+  rescue
+    _error -> false
   end
 
   defp bus_call_target(pid) when is_pid(pid), do: pid

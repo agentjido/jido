@@ -3,7 +3,7 @@ defmodule Jido.Signal.Bus.DurableSubscription do
 
   alias Jido.Signal.Bus.RecordedSignal
   alias Jido.Signal.Bus.Store
-  alias Jido.Signal.Bus.Subscriptions.Subscriber
+  alias Jido.Signal.Bus.Subscriptions.{Runtime, Subscriber}
   alias Jido.Signal.Router
   alias Jido.Signal.Telemetry
 
@@ -22,10 +22,10 @@ defmodule Jido.Signal.Bus.DurableSubscription do
   def detach(state, %Subscriber{target: nil}), do: {:ok, state}
 
   def detach(state, subscriber) do
-    state = Subscriber.demonitor_target(state, subscriber)
+    state = Runtime.demonitor_target(state, subscriber)
     subscriber = %{subscriber | target: nil, monitor_ref: nil, in_flight: nil}
     state = Subscriber.put_subscriber(state, subscriber)
-    Subscriber.emit_subscription(:detached, state, subscriber)
+    Runtime.emit_subscription(:detached, state, subscriber)
     {:ok, state}
   end
 
@@ -33,7 +33,7 @@ defmodule Jido.Signal.Bus.DurableSubscription do
   @spec delete(map(), Subscriber.t()) :: {:ok, map()} | {:error, term()}
   def delete(state, subscriber) do
     with {:ok, state} <- Store.write(state, :delete_subscription, [subscriber.id]) do
-      {:ok, Subscriber.remove_subscriber(state, subscriber)}
+      {:ok, Runtime.remove_subscriber(state, subscriber)}
     end
   end
 
@@ -112,7 +112,7 @@ defmodule Jido.Signal.Bus.DurableSubscription do
          created_at <- DateTime.utc_now() |> DateTime.to_iso8601(),
          definition <- definition(id, path, cursor, created_at),
          {:ok, state} <- Store.write(state, :put_subscription, [definition]) do
-      {monitor_ref, state} = Subscriber.monitor_target(state, id, target)
+      {monitor_ref, state} = Runtime.monitor_target(state, id, target)
 
       subscriber = %Subscriber{
         id: id,
@@ -126,7 +126,7 @@ defmodule Jido.Signal.Bus.DurableSubscription do
       }
 
       state = Subscriber.insert_subscriber(state, subscriber)
-      Subscriber.emit_subscription(:attached, state, subscriber)
+      Runtime.emit_subscription(:attached, state, subscriber)
       finish_attach(state, subscriber)
     else
       {:error, reason} -> {:error, reason, state}
@@ -145,16 +145,16 @@ defmodule Jido.Signal.Bus.DurableSubscription do
 
       cond do
         subscriber.target == target ->
-          {:ok, subscriber.id, state}
+          finish_attach(state, subscriber)
 
         is_pid(subscriber.target) ->
           {:error, :subscription_in_use, state}
 
         true ->
-          {monitor_ref, state} = Subscriber.monitor_target(state, subscriber.id, target)
+          {monitor_ref, state} = Runtime.monitor_target(state, subscriber.id, target)
           subscriber = %{subscriber | target: target, monitor_ref: monitor_ref, in_flight: nil}
           state = Subscriber.put_subscriber(state, subscriber)
-          Subscriber.emit_subscription(:attached, state, subscriber)
+          Runtime.emit_subscription(:attached, state, subscriber)
           finish_attach(state, subscriber)
       end
     end
@@ -203,10 +203,17 @@ defmodule Jido.Signal.Bus.DurableSubscription do
            ]),
          {:ok, record} when not is_nil(record) <- first_record(records),
          {:ok, public} <- RecordedSignal.from_record(record) do
-      send(subscriber.target, {:signal, subscriber.id, public})
       subscriber = %{subscriber | in_flight: public.cursor}
       state = Subscriber.put_subscriber(state, subscriber)
-      Subscriber.emit_delivery(state, subscriber, public.signal, public.cursor)
+
+      Runtime.deliver(
+        state,
+        subscriber,
+        {:signal, subscriber.id, public},
+        public.signal,
+        public.cursor
+      )
+
       {:ok, state}
     else
       {:ok, nil} -> {:ok, state}
