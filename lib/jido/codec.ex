@@ -8,20 +8,20 @@ defmodule Jido.Codec do
 
   * route documents by their required string `type` and positive integer `vsn`;
   * select the current writer through `Jido.Codec.Encoder`, with a trusted
-    Registry fallback for external codecs;
+    private codec-index fallback for external codecs;
   * contain codec callback failures and return stable ordered issues;
   * enforce complete-document, JSON byte, duplicate-key, and nesting limits;
-  * resolve the Discovery Registry only when the caller does not pass
-    `:registry` and document routing needs it.
+  * read the atomically published codec index only when document routing needs
+    it and the caller does not pass `:registry`.
 
   Domain codecs implement `Jido.Codec.Contract` and own their document fields
-  and semantic validation. Discovery owns module scanning and Registry
-  lifecycle. Codec does not own persistence, execution, or automatic document
-  upgrades.
+  and semantic validation. Catalog Discovery owns module scanning and atomic
+  publication. Codec does not own persistence, execution, or automatic
+  document upgrades.
 
   The `Jido.Codec` namespace also owns the internal compile-time support that
-  makes definitions discoverable: static-data validation, Codec manifests,
-  and the common Action and Flow declaration contract. These helpers do not
+  makes definitions discoverable: static-data validation and the common Action
+  and Flow declaration contract. These helpers do not
   add more runtime operations to this facade.
 
   An explicit `:registry` option bypasses Discovery.
@@ -30,6 +30,7 @@ defmodule Jido.Codec do
   alias Jido.Codec.{Contract, Document, Error, Issue, Registry, Static}
 
   @default_maximum_json_bytes 8_388_608
+  @catalog_snapshot_key {:jido, :catalog_snapshot}
   @option_keys [:registry, :codec, :maximum_json_bytes]
 
   @typedoc "A JSON object produced or consumed by a document codec."
@@ -360,10 +361,27 @@ defmodule Jido.Codec do
 
   defp registry!(opts) do
     case Keyword.get(opts, :registry) do
-      nil -> Jido.Discovery.registry()
+      nil -> published_codec_index!()
       %Registry{} = registry -> registry
       entries when is_map(entries) and not is_struct(entries) -> Registry.new!(entries)
       value -> raise ArgumentError, "Codec Registry is invalid: #{inspect(value)}"
+    end
+  end
+
+  defp published_codec_index! do
+    case :persistent_term.get(@catalog_snapshot_key, :not_initialized) do
+      %{registry: %Registry{} = registry} ->
+        registry
+
+      {:error, reason} ->
+        raise Error.internal(
+                :catalog_initialization_failed,
+                "Catalog initialization failed: #{inspect(reason)}",
+                %{reason: reason}
+              )
+
+      :not_initialized ->
+        raise Error.internal(:catalog_not_initialized, "Catalog is not initialized")
     end
   end
 

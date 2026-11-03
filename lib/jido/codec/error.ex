@@ -45,7 +45,7 @@ defmodule Jido.Codec.Error do
   end
 
   defmodule InternalError do
-    @moduledoc "A codec or Registry lifecycle failure."
+    @moduledoc "A codec or published Catalog lifecycle failure."
     use Splode.Error,
       class: :internal,
       fields: [message: "Codec failed", code: nil, details: %{}]

@@ -19,6 +19,9 @@ defmodule Jido.Catalog.Manifest do
 
   @doc "Builds one static package Manifest."
   @spec new(module(), atom(), term()) :: {:ok, t()} | {:error, term()}
+  def new(provider, application, %{} = entry) when not is_struct(entry),
+    do: new(provider, application, [entry])
+
   def new(provider, application, entries)
       when is_atom(provider) and provider not in [nil, true, false] and is_atom(application) and
              application not in [nil, true, false] and is_list(entries) do

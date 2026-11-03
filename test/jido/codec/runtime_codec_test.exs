@@ -80,40 +80,41 @@ defmodule Jido.Codec.RuntimeCodecTest do
   end
 
   setup do
-    previous = :persistent_term.get({Jido.Discovery, :registry}, :not_initialized)
+    previous = :persistent_term.get({:jido, :catalog_snapshot}, :not_initialized)
 
     on_exit(fn ->
       if previous == :not_initialized,
-        do: :persistent_term.erase({Jido.Discovery, :registry}),
-        else: :persistent_term.put({Jido.Discovery, :registry}, previous)
+        do: :persistent_term.erase({:jido, :catalog_snapshot}),
+        else: :persistent_term.put({:jido, :catalog_snapshot}, previous)
     end)
 
     :ok =
-      Jido.Discovery.refresh(
+      Jido.Catalog.Discovery.refresh(
         applications: [],
         modules: [
-          CaptureCodec,
-          CrashingCodec,
-          ExternalCodec,
-          InvalidSuccessCodec,
-          IssueCodec,
-          Echo,
-          Jido.Flow.Codec
+          {CaptureCodec, :jido},
+          {CrashingCodec, :jido},
+          {ExternalCodec, :jido},
+          {InvalidSuccessCodec, :jido},
+          {IssueCodec, :jido},
+          {Echo, :jido},
+          {Jido.Flow.Codec, :jido}
         ]
       )
 
-    %{registry: Jido.Discovery.registry()}
+    %{registry: Jido.Catalog.Discovery.codec_index()}
   end
 
   test "uses Discovery only when routing needs the default Registry", %{registry: registry} do
-    :persistent_term.erase({Jido.Discovery, :registry})
+    snapshot = :persistent_term.get({:jido, :catalog_snapshot})
+    :persistent_term.erase({:jido, :catalog_snapshot})
     assert {:ok, _document} = Jido.Codec.encode(flow(), registry: registry)
     assert {:error, [%Issue{code: :invalid_json}]} = Jido.Codec.decode_json("{")
     assert {:error, [%Issue{code: :invalid_document}]} = Jido.Codec.decode([])
 
     assert_raise Jido.Codec.Error.InternalError, fn -> Jido.Codec.encode(flow()) end
 
-    :persistent_term.put({Jido.Discovery, :registry}, registry)
+    :persistent_term.put({:jido, :catalog_snapshot}, %{snapshot | registry: registry})
     assert {:ok, document} = Jido.Codec.encode(flow())
     assert {:ok, %Flow{}} = Jido.Codec.decode(document)
   end

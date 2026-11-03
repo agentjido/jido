@@ -10,7 +10,7 @@ defmodule Jido.Application do
     children = [
       {Registry, keys: :unique, name: Jido.Signal.Registry},
       {Task.Supervisor, name: Jido.Exec.TaskSupervisor, max_children: :infinity},
-      Jido.Discovery,
+      Jido.Catalog.Discovery,
       Jido.Telemetry.AI.CorrelationStore,
       Jido.Instance.NamespaceRegistry,
       Jido.Persistence.ETS.Owner,

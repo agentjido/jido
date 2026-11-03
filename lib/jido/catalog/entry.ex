@@ -10,6 +10,7 @@ defmodule Jido.Catalog.Entry do
   @fields [:id, :vsn, :kind, :target, :provider, :application, :name, :description]
   @required_fields [:id, :vsn, :kind, :target, :provider, :application]
 
+  alias Jido.Joi
   alias Jido.Joi.Static
 
   @enforce_keys @required_fields
@@ -116,8 +117,32 @@ defmodule Jido.Catalog.Entry do
     end
   end
 
-  defp validate_target(entry) do
-    case Static.validate(entry.target) do
+  defp validate_target(%__MODULE__{kind: kind, target: target} = entry)
+       when kind in [:action, :flow] do
+    if valid_atom?(target),
+      do: {:ok, entry},
+      else: {:error, {:invalid_catalog_entry, :target, "Action and Flow targets must be modules"}}
+  end
+
+  defp validate_target(%__MODULE__{kind: :atom, target: target} = entry) do
+    if valid_atom?(target),
+      do: {:ok, entry},
+      else: {:error, {:invalid_catalog_entry, :target, "atom targets must be non-Boolean atoms"}}
+  end
+
+  defp validate_target(%__MODULE__{kind: :schema, target: target} = entry) do
+    with :ok <- Static.validate(target),
+         true <- Joi.Schema.schema?(target),
+         true <- Joi.Schema.map_shaped?(target) do
+      {:ok, entry}
+    else
+      {:error, reason} -> {:error, {:invalid_catalog_entry, :target, reason}}
+      false -> {:error, {:invalid_catalog_entry, :target, "schema targets must accept map-shaped data"}}
+    end
+  end
+
+  defp validate_target(%__MODULE__{target: target} = entry) do
+    case Static.validate(target) do
       :ok -> {:ok, entry}
       {:error, reason} -> {:error, {:invalid_catalog_entry, :target, reason}}
     end

@@ -66,23 +66,29 @@ defmodule Jido.CodecIntegrationTest do
   end
 
   setup do
-    registry = :persistent_term.get({Jido.Discovery, :registry}, :not_initialized)
+    registry = :persistent_term.get({:jido, :catalog_snapshot}, :not_initialized)
 
     on_exit(fn ->
       if registry == :not_initialized,
-        do: :persistent_term.erase({Jido.Discovery, :registry}),
-        else: :persistent_term.put({Jido.Discovery, :registry}, registry)
+        do: :persistent_term.erase({:jido, :catalog_snapshot}),
+        else: :persistent_term.put({:jido, :catalog_snapshot}, registry)
     end)
   end
 
   test "Agent Plugins use the shared Authoring Registry" do
     assert :ok =
-             Jido.Discovery.refresh(
+             Jido.Catalog.Discovery.refresh(
                applications: [],
-               modules: [Agent, Extension, Plugin, Vocabulary, Jido.Agent.Codec]
+               modules: [
+                 {Agent, :jido},
+                 {Extension, :jido},
+                 {Plugin, :jido},
+                 {Vocabulary, :jido},
+                 {Jido.Agent.Codec, :jido}
+               ]
              )
 
-    registry = Jido.Discovery.registry()
+    registry = Jido.Catalog.Discovery.codec_index()
 
     assert %{kind: :agent, target: Agent} =
              Registry.get(registry, "tests/agents/sample", 1)
@@ -103,9 +109,9 @@ defmodule Jido.CodecIntegrationTest do
   end
 
   test "the default scan includes core Jido when it is loaded" do
-    assert :ok = Jido.Discovery.refresh()
+    assert :ok = Jido.Catalog.Discovery.refresh()
 
-    assert Registry.codec(Jido.Discovery.registry(), "jido.agent.definition", 1) ==
+    assert Registry.codec(Jido.Catalog.Discovery.codec_index(), "jido.agent.definition", 1) ==
              {:ok, Jido.Agent.Codec}
   end
 

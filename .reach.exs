@@ -19,10 +19,11 @@
       "Jido.Action",
       "Jido.Action.*",
       "Jido.Catalog",
-      "Jido.Catalog.*",
+      "Jido.Catalog.Entry",
+      "Jido.Catalog.Manifest",
+      "Jido.Catalog.View",
       "Jido.Codec",
       "Jido.Codec.*",
-      "Jido.Discovery",
       "Jido.Flow",
       "Jido.Flow.*",
       "Jido.Instruction",
@@ -79,7 +80,7 @@
       "Jido.Telemetry.AI.*",
       "Runic.Identity.Projectable.Jido.AI.*"
     ],
-    composition: ["Jido.Application"]
+    composition: ["Jido.Application", "Jido.Catalog.Discovery"]
   ],
   deps: [
     mode: :allowlist,
@@ -96,6 +97,8 @@
   source: [
     forbidden_modules: [
       "Jido.Config",
+      "Jido.Codec.Manifest",
+      "Jido.Discovery",
       "Jido.PortableTerm",
       "Jido.AI.Telemetry*",
       "Jido.Exec.Telemetry",
@@ -106,6 +109,8 @@
     ],
     forbidden_files: [
       "lib/jido/config.ex",
+      "lib/jido/codec/manifest.ex",
+      "lib/jido/discovery.ex",
       "lib/jido/portable_term.ex",
       "lib/jido/ai/telemetry.ex",
       "lib/jido/ai/telemetry/**",
