@@ -2,7 +2,8 @@ defmodule JidoTest.AgentServer.PluginRuntime.ApiTest do
   use Covenant.Case, component: "jido.agent_server.plugin_runtime", async: true
 
   alias Jido.AgentServer.Plugin, as: Runtime
-  alias Jido.AgentServer.Plugin.{Admission, Callbacks, Commit, Spec}
+  alias Jido.AgentServer.Plugin.{Admission, Callbacks, Commit}
+  alias Jido.Plugin.Spec.Runtime, as: RuntimeSpec
   @tag obligation: "jido.agent_server.plugin_runtime.I13"
   test "the live Plugin API exposes its state owner and callback records" do
     assert {:function, :state, 2} in documented_api(Runtime)
@@ -14,7 +15,7 @@ defmodule JidoTest.AgentServer.PluginRuntime.ApiTest do
       assert documented_types(module) == [{:type, :t, 0}]
     end
 
-    for module <- [Callbacks, Spec] do
+    for module <- [Callbacks, RuntimeSpec] do
       refute public_module?(module)
     end
   end

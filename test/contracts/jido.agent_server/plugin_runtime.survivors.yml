@@ -94,24 +94,6 @@
   sort: equivalent
   reason: Under the activation's exclusive Supervisor ownership, terminate followed by delete cannot reach this error path; not-found termination is handled separately.
 
-- at: lib/jido/agent_server/plugin/spec.ex:4:18
-  operator: element_removal
-  mutation: "`:package` → `(removed)`"
-  sort: unpromised
-  reason: Spec is internal and is built only by Plugin normalization, which always supplies package, module, and options. Direct incomplete construction is not supported.
-
-- at: lib/jido/agent_server/plugin/spec.ex:4:28
-  operator: element_removal
-  mutation: "`:module` → `(removed)`"
-  sort: unpromised
-  reason: Spec is internal and is built only by Plugin normalization, which always supplies package, module, and options. Direct incomplete construction is not supported.
-
-- at: lib/jido/agent_server/plugin/spec.ex:4:37
-  operator: element_removal
-  mutation: "`:options` → `(removed)`"
-  sort: unpromised
-  reason: Spec is internal and is built only by Plugin normalization, which always supplies package, module, and options. Direct incomplete construction is not supported.
-
 - at: lib/jido/agent_server/plugin/callbacks.ex:25:7
   operator: string_empty
   mutation: "`\"Agent Server Plugin commit notification failed\"` → `\"\"`"

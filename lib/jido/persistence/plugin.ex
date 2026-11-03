@@ -7,8 +7,9 @@ defmodule Jido.Persistence.Plugin do
   result. `Jido.Persistence` owns when the conversion runs.
   """
 
-  alias Jido.Persistence.Plugin.{Context, Spec}
+  alias Jido.Persistence.Plugin.Context
   alias Jido.Plugin, as: PluginBoundary
+  alias Jido.Plugin.Spec.Persistence, as: Spec
 
   @doc false
   @spec dump(Jido.Plugin.Spec.t(), term(), Context.t()) :: {:ok, term()} | {:error, term()}

@@ -191,7 +191,7 @@ defmodule Jido.Plugin do
   @spec directive_owner([Jido.Plugin.Spec.t()], struct()) :: Jido.Plugin.Spec.t() | nil
   def directive_owner(specs, %{__struct__: directive_module}) when is_list(specs) do
     Enum.find(specs, fn
-      %{agent: %Jido.Agent.Plugin.Spec{directive_modules: modules}} ->
+      %{agent: %Jido.Plugin.Spec.Agent{directive_modules: modules}} ->
         directive_module in modules
 
       _spec ->

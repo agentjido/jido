@@ -1,20 +1,20 @@
-- at: "lib/jido/plugin.ex:194:66"
-  operator: "return_nil"
-  mutation: "`Jido.AgentServer.Plugin.state(init, timeout)` → `nil`"
+- at: "lib/jido/plugin/spec.ex:30:18"
+  operator: "element_removal"
+  mutation: "`:package` → `(removed)`"
   sort: unpromised
-  reason: "The generic Plugin contract exposes this facade but does not own live AgentServer execution. The jido.agent_server.plugin_runtime component tests this behavior."
+  reason: "The runtime facet value is internal and Plugin normalization always supplies package, module, and options. Direct incomplete construction is not supported."
 
-- at: "lib/jido/plugin.ex:194:30"
-  operator: "integer_shift"
-  mutation: "`5000` → `5001`"
+- at: "lib/jido/plugin/spec.ex:30:28"
+  operator: "element_removal"
+  mutation: "`:module` → `(removed)`"
   sort: unpromised
-  reason: "The generic Plugin contract exposes this facade but does not own live AgentServer execution. The jido.agent_server.plugin_runtime component tests this behavior."
+  reason: "The runtime facet value is internal and Plugin normalization always supplies package, module, and options. Direct incomplete construction is not supported."
 
-- at: "lib/jido/plugin.ex:194:30"
-  operator: "integer_shift"
-  mutation: "`5000` → `4999`"
+- at: "lib/jido/plugin/spec.ex:30:37"
+  operator: "element_removal"
+  mutation: "`:options` → `(removed)`"
   sort: unpromised
-  reason: "The generic Plugin contract exposes this facade but does not own live AgentServer execution. The jido.agent_server.plugin_runtime component tests this behavior."
+  reason: "The runtime facet value is internal and Plugin normalization always supplies package, module, and options. Direct incomplete construction is not supported."
 
 - at: "lib/jido/plugin.ex:198:28"
   operator: "string_empty"

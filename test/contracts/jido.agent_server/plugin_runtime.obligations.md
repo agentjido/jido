@@ -4,7 +4,6 @@ modules:
   - Jido.AgentServer.Plugin.Admission
   - Jido.AgentServer.Plugin.Callbacks
   - Jido.AgentServer.Plugin.Commit
-  - Jido.AgentServer.Plugin.Spec
 ---
 
 ## Purpose
@@ -16,8 +15,9 @@ general effect execution.
 
 The public boundary is `Jido.AgentServer.Plugin.state/2` plus the read-only
 `Admission` and `Commit` callback records. Other Plugin hosting operations,
-callback adapters, and normalized runtime specifications are internal. This
-component has no DSL.
+callback adapters are internal. The normalized runtime specification is
+`Jido.Plugin.Spec.Runtime`, owned by the generic Plugin definition boundary.
+This component has no DSL.
 
 ## Obligations
 

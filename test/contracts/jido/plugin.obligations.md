@@ -1,12 +1,16 @@
 ---
 modules:
   - Jido.Plugin
+  - Jido.Plugin.Config
   - Jido.Plugin.Context
   - Jido.Plugin.Init
   - Jido.Plugin.Input
   - Jido.Plugin.Manifest
   - Jido.Plugin.Normalizer
   - Jido.Plugin.Spec
+  - Jido.Plugin.Spec.Agent
+  - Jido.Plugin.Spec.Persistence
+  - Jido.Plugin.Spec.Runtime
 ---
 
 ## Purpose
@@ -14,8 +18,9 @@ modules:
 Protect the generic Plugin declaration and callback contract. This component
 defines valid Plugin metadata, callback shapes, and narrow handoff values. Its
 public modules are `Jido.Plugin`, `Jido.Plugin.Input`, `Jido.Plugin.Init`,
-`Jido.Plugin.Context`. Manifest,
-normalization, aggregate Spec, and callback error policy are internal.
+`Jido.Plugin.Context`. Config owns deferred environment references. Manifest,
+normalization, the aggregate Spec and its consumer facet values, and callback
+error policy are internal.
 
 `Jido.AgentServer.Plugin.state/2` is the public live Plugin state API. The
 `jido.agent_server.plugin_runtime` component owns it. This component does not

@@ -4,10 +4,11 @@ defmodule Jido.Agent.Plugin.Pipeline do
   alias Jido.Agent.Directive.Reply
   alias Jido.Agent.Directive.Kind, as: DirectiveKind
   alias Jido.Agent.Plugin
-  alias Jido.Agent.Plugin.{Reduction, Spec}
+  alias Jido.Agent.Plugin.Reduction
   alias Jido.Error
   alias Jido.Plugin, as: PluginBoundary
   alias Jido.Plugin.Input
+  alias Jido.Plugin.Spec.Agent, as: Spec
   alias Jido.Signal
 
   @type result :: {:ok, map(), [struct()]} | {:error, term()}

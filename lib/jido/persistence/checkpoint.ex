@@ -4,9 +4,9 @@ defmodule Jido.Persistence.Checkpoint do
   alias Jido.Agent
   alias Jido.Persistence.Record
   alias Jido.Persistence.Snapshot
-  alias Jido.Agent.Plugin.Spec, as: AgentSpec
   alias Jido.Persistence.Plugin, as: PersistencePlugin
-  alias Jido.Persistence.Plugin.Spec, as: PersistenceSpec
+  alias Jido.Plugin.Spec.Agent, as: AgentSpec
+  alias Jido.Plugin.Spec.Persistence, as: PersistenceSpec
 
   @doc false
   @spec dump(Agent.instance(), map(), pos_integer(), term()) :: {:ok, map()} | {:error, term()}

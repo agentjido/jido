@@ -36,7 +36,7 @@ defmodule Jido.Agent.Runner do
             turn: Jido.Agent.Turn.t(),
             context: map(),
             exec_opts: keyword(),
-            plugin_specs: [Jido.Agent.Plugin.Spec.t()]
+            plugin_specs: [Jido.Plugin.Spec.Agent.t()]
           }
   end
 

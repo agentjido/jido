@@ -16,10 +16,11 @@ defmodule Jido.Agent.Plugin do
 
   alias Jido.Agent.{Route, Schema}
   alias Jido.Error
-  alias Jido.Agent.Plugin.{Preparation, RouteSelection, Spec}
+  alias Jido.Agent.Plugin.{Preparation, RouteSelection}
   alias Jido.Plugin, as: PluginBoundary
   alias Jido.Plugin.Input
   alias Jido.Plugin.Normalizer
+  alias Jido.Plugin.Spec.Agent, as: Spec
   alias Jido.Signal
 
   @doc false

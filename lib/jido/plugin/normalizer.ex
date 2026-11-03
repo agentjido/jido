@@ -2,12 +2,12 @@ defmodule Jido.Plugin.Normalizer do
   @moduledoc false
 
   alias Jido.Agent.Directive.Kind, as: DirectiveKind
-  alias Jido.Agent.Plugin.Spec, as: AgentSpec
-  alias Jido.AgentServer.Plugin.Spec, as: ServerSpec
   alias Jido.Joi
-  alias Jido.Persistence.Plugin.Spec, as: PersistenceSpec
   alias Jido.Plugin.{Manifest, Spec}
   alias Jido.Plugin, as: PluginBoundary
+  alias Jido.Plugin.Spec.Agent, as: AgentSpec
+  alias Jido.Plugin.Spec.Persistence, as: PersistenceSpec
+  alias Jido.Plugin.Spec.Runtime, as: ServerSpec
 
   @server_capabilities Jido.Plugin.owner_callbacks()[:agent_server]
                        |> Keyword.delete(:validate_options)
