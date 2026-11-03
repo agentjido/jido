@@ -10,11 +10,9 @@ defmodule Jido.Codec.Document do
   values.
   """
 
-  require Jido.Codec.Limits
-
-  @maximum_depth Jido.Codec.Limits.maximum_depth()
-  @maximum_collection_size Jido.Codec.Limits.maximum_collection_size()
-  @maximum_document_nodes Jido.Codec.Limits.maximum_document_nodes()
+  @maximum_depth 100
+  @maximum_collection_size 10_000
+  @maximum_document_nodes 100_000
   defmodule Error do
     @moduledoc "A codec document that exceeds a resource or shape limit."
     use Splode.Error,
@@ -37,6 +35,15 @@ defmodule Jido.Codec.Document do
             details: map()
           }
   end
+
+  @doc false
+  def maximum_depth, do: @maximum_depth
+
+  @doc false
+  def maximum_collection_size, do: @maximum_collection_size
+
+  @doc false
+  def maximum_document_nodes, do: @maximum_document_nodes
 
   @doc "Parses one bounded JSON document without losing duplicate-key information."
   @spec decode_json(term(), pos_integer()) :: {:ok, term()} | {:error, Error.t()}

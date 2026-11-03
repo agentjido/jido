@@ -4,10 +4,8 @@ defmodule Jido.Codec.Flow.Limits do
   alias Jido.Codec.Document.Error, as: DocumentError
   alias Jido.Error
 
-  require Jido.Codec.Limits
-
-  @maximum_depth Jido.Codec.Limits.maximum_depth()
-  @maximum_collection_size Jido.Codec.Limits.maximum_collection_size()
+  @maximum_depth Document.maximum_depth()
+  @maximum_collection_size Document.maximum_collection_size()
   @limit_errors %{
     depth: "stored Flow exceeds its nesting limit",
     collection: "stored Flow collection exceeds its size limit",

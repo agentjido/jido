@@ -14,10 +14,10 @@ defmodule Jido.Codec.Value do
 
   alias Jido.Catalog
   alias Jido.Catalog.Error, as: CatalogError
-  require Jido.Codec.Limits
+  alias Jido.Codec.Document
 
-  @maximum_depth Jido.Codec.Limits.maximum_depth()
-  @maximum_collection_size Jido.Codec.Limits.maximum_collection_size()
+  @maximum_depth Document.maximum_depth()
+  @maximum_collection_size Document.maximum_collection_size()
 
   defmodule Error do
     @moduledoc "An invalid portable codec value."

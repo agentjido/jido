@@ -50,7 +50,6 @@
       "Jido.Codec.Flow.*",
       "Jido.Codec.Index",
       "Jido.Codec.Issue",
-      "Jido.Codec.Limits",
       "Jido.Codec.Reference",
       "Jido.Codec.Value",
       "Jido.Codec.Value.*",
@@ -128,6 +127,7 @@
     forbidden_modules: [
       "Jido.Config",
       "Jido.Codec.Static",
+      "Jido.Codec.Limits",
       "Jido.Joi.Static",
       "Jido.Joi.Error",
       "Jido.Codec.Manifest",
@@ -179,6 +179,7 @@
     forbidden_files: [
       "lib/jido/config.ex",
       "lib/jido/codec/static.ex",
+      "lib/jido/codec/limits.ex",
       "lib/jido/joi/static.ex",
       "lib/jido/joi/error.ex",
       "lib/jido/codec/manifest.ex",
