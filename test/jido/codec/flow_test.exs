@@ -220,6 +220,7 @@ defmodule Jido.Codec.FlowTest do
     refute_received {:inline_codec_body, _, _}
   end
 
+  @tag obligation: "jido_action.codec.I5"
   test "JSON bytes round trip to the equal canonical Flow" do
     flow = FlowAuthoring.mixed_flow!()
     registry = CodecRegistry.mixed()
