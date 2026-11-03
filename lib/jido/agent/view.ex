@@ -16,8 +16,9 @@ defmodule Jido.Agent.View do
   """
 
   alias Jido.Agent
-  alias Jido.Agent.{Authoring, Codec}
+  alias Jido.Agent.Authoring
   alias Jido.Catalog
+  alias Jido.Codec.Agent, as: AgentCodec
   alias Jido.Codec.{Document, Reference}
 
   @default_operation_limit 100
@@ -79,7 +80,7 @@ defmodule Jido.Agent.View do
     with {:ok, operation} <-
            route
            |> Map.put(:defaults, %{})
-           |> Codec.encode_route(registry, &encode_reference/3),
+           |> AgentCodec.encode_route(registry, &encode_reference/3),
          do: {:ok, Map.delete(operation, "defaults")}
   end
 

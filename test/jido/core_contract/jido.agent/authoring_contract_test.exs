@@ -373,9 +373,9 @@ defmodule JidoTest.Contract.AgentAuthoringTest do
 
   @tag obligation: "jido.agent.I20"
   test "the trusted JSON codec returns the portable definition" do
-    assert Jido.Agent.Codec.type() == "jido.agent.definition"
-    assert Jido.Agent.Codec.version() == 1
-    assert Jido.Agent.Codec.target() == Jido.Agent
+    assert Jido.Codec.Agent.type() == "jido.agent.definition"
+    assert Jido.Codec.Agent.version() == 1
+    assert Jido.Codec.Agent.target() == Jido.Agent
 
     for value <- [Leaf.definition(), Leaf.instantiate!(id: "json")] do
       registry = JidoTest.AgentRegistry.for(value)

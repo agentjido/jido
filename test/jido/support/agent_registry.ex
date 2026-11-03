@@ -5,7 +5,7 @@ defmodule JidoTest.AgentRegistry do
   alias Jido.Catalog
   alias Jido.Codec
 
-  @codec Jido.Agent.Codec
+  @codec Jido.Codec.Agent
 
   def encode(source, registry),
     do: Codec.encode(source, catalog: registry, codec: @codec)

@@ -1,4 +1,4 @@
-defmodule Jido.Agent.Codec do
+defmodule Jido.Codec.Agent do
   @moduledoc false
 
   @behaviour Jido.Codec.Contract

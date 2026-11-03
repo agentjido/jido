@@ -401,7 +401,7 @@ defmodule Jido.AITest do
     assert {:ok, json} =
              Jido.Codec.encode_json(name.definition(),
                catalog: registry,
-               codec: Jido.Agent.Codec
+               codec: Jido.Codec.Agent
              )
 
     document = Jason.decode!(json)
@@ -417,7 +417,7 @@ defmodule Jido.AITest do
     assert {:ok, definition} =
              Jido.Codec.decode_json(json,
                catalog: registry,
-               codec: Jido.Agent.Codec
+               codec: Jido.Codec.Agent
              )
 
     assert definition == name.definition()
@@ -585,7 +585,7 @@ defmodule Jido.AITest do
     assert {:ok, json} =
              Jido.Codec.encode_json(SimpleAgent.definition(),
                catalog: registry,
-               codec: Jido.Agent.Codec
+               codec: Jido.Codec.Agent
              )
 
     fixture =
@@ -620,7 +620,7 @@ defmodule Jido.AITest do
     assert {:ok, definition} =
              Jido.Codec.decode_json(fixture,
                catalog: registry,
-               codec: Jido.Agent.Codec
+               codec: Jido.Codec.Agent
              )
 
     assert definition == SimpleAgent.definition()
@@ -665,7 +665,7 @@ defmodule Jido.AITest do
     assert {:ok, json} =
              Jido.Codec.encode_json(ConfiguredAgent.definition(),
                catalog: registry,
-               codec: Jido.Agent.Codec
+               codec: Jido.Codec.Agent
              )
 
     [plugin] = Jason.decode!(json)["definition"]["plugins"]
@@ -683,7 +683,7 @@ defmodule Jido.AITest do
     assert {:ok, definition} =
              Jido.Codec.decode_json(json,
                catalog: registry,
-               codec: Jido.Agent.Codec
+               codec: Jido.Codec.Agent
              )
 
     assert definition == ConfiguredAgent.definition()
@@ -706,7 +706,7 @@ defmodule Jido.AITest do
     assert {:error, [issue]} =
              Jido.Codec.decode_json(fixture,
                catalog: simple_agent_registry(),
-               codec: Jido.Agent.Codec
+               codec: Jido.Codec.Agent
              )
 
     assert issue.code == :reference
@@ -730,7 +730,7 @@ defmodule Jido.AITest do
     assert {:error, [issue]} =
              Jido.Codec.decode_json(fixture,
                catalog: simple_agent_registry(),
-               codec: Jido.Agent.Codec
+               codec: Jido.Codec.Agent
              )
 
     assert issue.code == :reference
