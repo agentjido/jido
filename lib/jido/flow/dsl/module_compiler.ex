@@ -202,7 +202,7 @@ defmodule Jido.Flow.DSL.ModuleCompiler do
   defp compile_flow!(env, config) do
     case Lowerer.lower(env.module, config, env.file) do
       {:ok, flow, source_map} ->
-        case Jido.Exec.Compiler.validate_targets(flow) do
+        case Jido.Flow.TargetValidator.validate_targets(flow) do
           {:ok, flow} ->
             {flow, source_map}
 

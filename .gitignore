@@ -10,6 +10,9 @@
 # Where third-party dependencies like ExDoc output generated docs.
 /doc/
 
+# Generated Reach architecture reports.
+/reach_report/
+
 # Temporary files, for example, from tests.
 /tmp/
 

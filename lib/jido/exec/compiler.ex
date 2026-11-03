@@ -8,7 +8,7 @@ defmodule Jido.Exec.Compiler do
   alias Jido.Exec.Node.Map, as: MapComponent
 
   alias Jido.Flow
-  alias Jido.Flow.{Definition, Graph, Identity}
+  alias Jido.Flow.{Identity, TargetValidator}
   alias Jido.Instruction
   alias Runic.Workflow
 
@@ -38,8 +38,8 @@ defmodule Jido.Exec.Compiler do
   @doc false
   @spec compile_nested!(Instruction.t(), keyword()) :: Workflow.t() | no_return()
   def compile_nested!(%Instruction{kind: :flow} = instruction, opts) do
-    with {:ok, flow} <- instruction_flow(instruction),
-         {:ok, flow, analysis, children} <- prepare_flow(flow, [], %{}),
+    with {:ok, flow} <- TargetValidator.instruction_flow(instruction),
+         {:ok, flow, analysis, children} <- TargetValidator.prepare(flow, [], %{}),
          {:ok, workflow} <-
            compile_flow(
              flow,
@@ -62,19 +62,15 @@ defmodule Jido.Exec.Compiler do
   @doc false
   @spec validate(Flow.t()) :: {:ok, Flow.t()} | {:error, Exception.t()}
   def validate(%Flow{} = flow) do
-    with {:ok, flow, _analysis, _children} <- prepare_flow(flow, [], %{}), do: {:ok, flow}
+    with {:ok, flow, _analysis, _children} <- TargetValidator.prepare(flow, [], %{}),
+         do: {:ok, flow}
   end
 
   def validate(value), do: Flow.validate(value)
 
   @doc false
   @spec validate_targets(Flow.t()) :: {:ok, Flow.t()} | {:error, Exception.t()}
-  def validate_targets(%Flow{} = flow) do
-    with {:ok, _children} <-
-           validate_component_targets(Graph.canonical_components(flow.components), [], %{}) do
-      {:ok, flow}
-    end
-  end
+  defdelegate validate_targets(flow), to: TargetValidator
 
   defp compile_instruction(%Instruction{kind: :action} = instruction, opts) do
     name = Keyword.get(opts, :name)
@@ -93,8 +89,8 @@ defmodule Jido.Exec.Compiler do
   end
 
   defp compile_instruction(%Instruction{kind: :flow} = instruction, opts) do
-    with {:ok, flow} <- instruction_flow(instruction),
-         {:ok, flow, analysis, children} <- prepare_flow(flow, [], %{}) do
+    with {:ok, flow} <- TargetValidator.instruction_flow(instruction),
+         {:ok, flow, analysis, children} <- TargetValidator.prepare(flow, [], %{}) do
       compile_flow(
         flow,
         opts
@@ -157,148 +153,6 @@ defmodule Jido.Exec.Compiler do
 
       _name ->
         :ok
-    end
-  end
-
-  defp validate_component_targets(components, module_stack, children) do
-    components
-    |> Enum.reduce_while({:ok, children}, fn {name, component}, {:ok, children} ->
-      case validate_component_target(name, component, module_stack, children) do
-        {:ok, children} -> {:cont, {:ok, children}}
-        {:error, error} -> {:halt, {:error, error}}
-      end
-    end)
-  end
-
-  defp validate_component_target(
-         name,
-         %{kind: :call, call: %{kind: :flow} = call},
-         module_stack,
-         children
-       ) do
-    with {:ok, instruction} <- resolve_target(call, :flow, name),
-         :ok <- reject_recursive_flow(instruction.target, module_stack),
-         {:ok, children} <- validate_child_flow(instruction.target, module_stack, children) do
-      {:ok, children}
-    else
-      {:error, error} -> {:error, target_error(error, name, :flow)}
-    end
-  end
-
-  defp validate_component_target(name, component, _module_stack, children) do
-    component
-    |> Definition.calls()
-    |> Enum.reduce_while({:ok, children}, fn {role, call, _params}, {:ok, children} ->
-      field = validation_field(component, role)
-
-      case resolve_target(call, :action, name) do
-        {:ok, _instruction} -> {:cont, {:ok, children}}
-        {:error, error} -> {:halt, {:error, target_error(error, name, field)}}
-      end
-    end)
-  end
-
-  defp resolve_target(call, expected, component) do
-    case Instruction.new(kind: call.kind, target: call.target) do
-      {:ok, %Instruction{kind: ^expected} = instruction} ->
-        case Instruction.validate_resolved(instruction) do
-          :ok -> {:ok, instruction}
-          {:error, error} -> {:error, error}
-        end
-
-      {:error, %{details: %{actual: actual}}}
-      when actual in [:action, :flow] ->
-        {:error,
-         Jido.Flow.Error.validation_error("Flow component has the wrong target kind", %{
-           component: component,
-           expected: expected,
-           actual: actual
-         })}
-
-      {:error, error} ->
-        {:error, error}
-    end
-  end
-
-  defp validate_child_flow(%Flow{} = child, module_stack, children) do
-    with {:ok, _flow, _analysis, children} <-
-           prepare_flow(child, [child | module_stack], children),
-         do: {:ok, children}
-  end
-
-  defp validate_child_flow(module, module_stack, children) when is_atom(module) do
-    case Map.fetch(children, module) do
-      {:ok, _child} ->
-        {:ok, children}
-
-      :error ->
-        with {:ok, child} <- instruction_flow(%Instruction{target: module, kind: :flow}),
-             {:ok, child, analysis, children} <-
-               prepare_flow(child, [module | module_stack], children) do
-          {:ok, Map.put(children, module, {child, analysis})}
-        end
-    end
-  end
-
-  defp prepare_flow(flow, module_stack, children) do
-    with {:ok, attrs, analysis} <- Definition.prepare_canonical(Map.from_struct(flow)),
-         {:ok, children} <- validate_component_targets(analysis.ordered, module_stack, children) do
-      {:ok, struct!(Flow, attrs), analysis, children}
-    end
-  end
-
-  defp reject_recursive_flow(identity, module_stack) do
-    if identity in module_stack do
-      {:error,
-       Jido.Flow.Error.validation_error("recursive nested Flow cycle", %{
-         flow: identity,
-         module_stack: Enum.reverse([identity | module_stack])
-       })}
-    else
-      :ok
-    end
-  end
-
-  defp target_error(error, component, field) do
-    details =
-      error
-      |> Map.get(:details, %{})
-      |> Map.merge(%{component: component, field: field, cause: error.__struct__})
-
-    tagged = Jido.Flow.Error.validation_error(Exception.message(error), details)
-
-    case Map.get(error, :stacktrace) do
-      nil -> tagged
-      stacktrace -> %{tagged | stacktrace: stacktrace}
-    end
-  end
-
-  defp validation_field(%{kind: kind}, _role) when kind in [:call, :map, :reduce, :iterate],
-    do: :action
-
-  defp validation_field(_component, role), do: role
-
-  defp instruction_flow(%Instruction{target: %Flow{} = flow}), do: {:ok, flow}
-
-  defp instruction_flow(%Instruction{target: module}) when is_atom(module) do
-    try do
-      case module.flow() do
-        %Flow{} = flow ->
-          {:ok, flow}
-
-        value ->
-          {:error, Error.config_error("Flow module returned invalid data", %{value: value})}
-      end
-    rescue
-      error -> {:error, error}
-    catch
-      kind, reason ->
-        {:error,
-         Error.config_error("Flow module failed while returning its definition", %{
-           module: module,
-           kind: kind,
-           reason: reason
-         })}
     end
   end
 

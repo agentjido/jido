@@ -55,8 +55,7 @@ defmodule Jido.Action do
   the caller sets `max_attempts` and the error is retryable.
   """
 
-  alias Jido.Action.{Error, Output}
-  alias Jido.Exec.Validation
+  alias Jido.Action.{Error, Output, Validation}
 
   @typedoc "A static Action input or output schema."
   @type schema :: Joi.schema()

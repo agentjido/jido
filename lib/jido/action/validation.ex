@@ -2,7 +2,50 @@ defmodule Jido.Action.Validation do
   alias Jido.Joi
   @moduledoc false
 
-  alias Jido.Action.Error
+  alias Jido.Action.{Error, Output}
+
+  @doc false
+  @spec schema(term(), term(), map(), String.t() | nil) ::
+          {:ok, map()} | {:error, Error.InvalidInputError.t()}
+  def schema(schema, value, details, message \\ nil) do
+    with {:ok, validated} <- parse(schema, value, details) do
+      if is_map(validated) do
+        {:ok, validated}
+      else
+        {:error,
+         Error.validation_error(
+           message || "#{details.context} validation must return a map",
+           Map.put(details, :value, validated)
+         )}
+      end
+    end
+  end
+
+  @doc false
+  @spec output_schema(term(), term(), map()) ::
+          {:ok, map() | Output.t()} | {:error, Error.InvalidInputError.t()}
+  def output_schema(schema, %Output{kind: :preserve} = output, details) do
+    with {:ok, output} <- Output.validate(output),
+         {:ok, value} when is_map(value) <-
+           parse_preserving_shape(schema, output.value, details) do
+      {:ok, %{output | value: value}}
+    else
+      {:ok, value} ->
+        {:error,
+         Error.validation_error(
+           "Action output validation must return a map",
+           Map.put(details, :value, value)
+         )}
+
+      error ->
+        error
+    end
+  end
+
+  def output_schema(_schema, %Output{} = value, _details), do: Output.validate(value)
+
+  def output_schema(schema, value, details),
+    do: schema(schema, value, details, "Action output validation must return a map")
 
   @doc false
   @spec parse(term(), term(), map()) ::

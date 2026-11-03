@@ -19,14 +19,20 @@
       "Jido.Flow",
       "Jido.Flow.*",
       "Jido.Instruction",
+      "Jido.Session",
+      "Jido.Thread",
+      "Jido.Thread.*",
       "Runic.Identity.Projectable.Jido.Flow",
-      "Runic.Transmutable.Jido.Instruction"
+      "Runic.Identity.Projectable.Jido.Session",
+      "Runic.Identity.Projectable.Jido.Thread",
+      "Runic.Identity.Projectable.Jido.Thread.*"
     ],
     execution: [
       "Jido.Exec",
       "Jido.Exec.*",
       "Runic.Component.Jido.Exec.*",
       "Runic.Identity.Projectable.Jido.Exec.*",
+      "Runic.Transmutable.Jido.Instruction",
       "Runic.Transmutable.Jido.Exec.*",
       "Runic.Workflow.Invokable.Jido.Exec.*"
     ],
@@ -57,13 +63,7 @@
     ai: [
       "Jido.AI",
       "Jido.AI.*",
-      "Jido.Session",
-      "Jido.Thread",
-      "Jido.Thread.*",
-      "Runic.Identity.Projectable.Jido.AI.*",
-      "Runic.Identity.Projectable.Jido.Session",
-      "Runic.Identity.Projectable.Jido.Thread",
-      "Runic.Identity.Projectable.Jido.Thread.*"
+      "Runic.Identity.Projectable.Jido.AI.*"
     ],
     composition: ["Jido.Application"]
   ],
