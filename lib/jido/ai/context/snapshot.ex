@@ -63,13 +63,13 @@ defmodule Jido.AI.Context.Snapshot do
 
   @doc "Encodes a snapshot as a portable JSON document."
   @spec encode(t()) :: String.t()
-  def encode(%__MODULE__{} = snapshot), do: snapshot |> to_map() |> Jason.encode!()
+  def encode(%__MODULE__{} = snapshot), do: snapshot |> to_map() |> JSON.encode!()
 
   @doc "Decodes a portable snapshot JSON document."
   @spec decode(String.t()) :: {:ok, map()} | {:error, term()}
   def decode(document) when is_binary(document) do
     with {:ok, %{"type" => "jido.ai.context.snapshot", "version" => 1} = snapshot} <-
-           Jason.decode(document) do
+           JSON.decode(document) do
       {:ok, snapshot}
     else
       {:ok, _document} -> {:error, :invalid_context_snapshot}
@@ -331,7 +331,7 @@ defmodule Jido.AI.Context.Snapshot do
   defp content_bytes(message) do
     message.content
     |> portable()
-    |> Jason.encode!()
+    |> JSON.encode!()
     |> byte_size()
   rescue
     _error -> byte_size(:erlang.term_to_binary(message.content))

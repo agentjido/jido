@@ -19,7 +19,7 @@ defmodule Jido.Agent.Options do
       end
   """
 
-  alias Jido.Authoring.Registry
+  alias Jido.Codec.Registry
 
   @type t :: keyword()
 

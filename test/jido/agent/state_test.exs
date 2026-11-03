@@ -81,7 +81,7 @@ defmodule Jido.Agent.StateTest do
 
     assert {:ok, agent} =
              Agent.instantiate(definition,
-               id: Jido.Signal.ID.generate!(),
+               id: Jido.Id.uuid7(),
                state: %{count: 3}
              )
 
@@ -103,7 +103,7 @@ defmodule Jido.Agent.StateTest do
       definition = Agent.define!(%{name: "invalid_default", schema: schema})
 
       assert {:error, %{__exception__: true}} =
-               Agent.instantiate(definition, id: Jido.Signal.ID.generate!(), state: state)
+               Agent.instantiate(definition, id: Jido.Id.uuid7(), state: state)
     end
   end
 
@@ -120,7 +120,7 @@ defmodule Jido.Agent.StateTest do
 
     assert {:ok, agent} =
              Agent.instantiate(definition,
-               id: Jido.Signal.ID.generate!(),
+               id: Jido.Id.uuid7(),
                state: %{config: %{second: 4}, count: nil}
              )
 
@@ -152,7 +152,7 @@ defmodule Jido.Agent.StateTest do
 
       expected = Enum.reduce(1..depth//1, 1, fn _, child -> %{child: child} end)
       definition = Agent.define!(%{name: "deep_defaults", schema: Jido.Joi.object(%{root: nested})})
-      assert {:ok, agent} = Agent.instantiate(definition, id: Jido.Signal.ID.generate!())
+      assert {:ok, agent} = Agent.instantiate(definition, id: Jido.Id.uuid7())
       assert agent.state === %{root: expected}
       assert_received {:validated, 1}
       refute_received {:validated, _}
@@ -176,7 +176,7 @@ defmodule Jido.Agent.StateTest do
         Agent.define!(%{name: "deep_invalid_defaults", schema: Jido.Joi.object(%{root: nested})})
 
       assert {:error, %Jido.Agent.Error{details: %{issues: [%{path: path}]}}} =
-               Agent.instantiate(definition, id: Jido.Signal.ID.generate!())
+               Agent.instantiate(definition, id: Jido.Id.uuid7())
 
       assert path == [:root | List.duplicate(:child, depth)]
     end
@@ -224,7 +224,7 @@ defmodule Jido.Agent.StateTest do
     definition = Agent.define!(%{name: "mutating_refinement", schema: schema})
 
     assert {:error, %{__exception__: true}} =
-             Agent.instantiate(definition, id: Jido.Signal.ID.generate!())
+             Agent.instantiate(definition, id: Jido.Id.uuid7())
 
     assert_received {:mutated, 1}
     refute_received {:mutated, _}
@@ -238,7 +238,7 @@ defmodule Jido.Agent.StateTest do
       })
 
     definition = Agent.define!(%{name: "stored_defaults", schema: schema})
-    agent = Agent.instantiate!(definition, id: Jido.Signal.ID.generate!())
+    agent = Agent.instantiate!(definition, id: Jido.Id.uuid7())
     assert agent.state === %{nested: %{count: 1}}
 
     for state <- [%{}, %{nested: %{}}, %{nested: nil}, %{nested: %{count: nil}}] do
@@ -254,13 +254,13 @@ defmodule Jido.Agent.StateTest do
   test "optional defaulted fields stay absent in input and stored state" do
     schema = Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(1) |> Jido.Joi.optional()})
     definition = Agent.define!(%{name: "optional_default", schema: schema})
-    agent = Agent.instantiate!(definition, id: Jido.Signal.ID.generate!())
+    agent = Agent.instantiate!(definition, id: Jido.Id.uuid7())
     assert agent.state === %{}
     assert {:ok, ^agent} = Agent.validate(agent)
     assert {:ok, ^agent} = Agent.transition(agent, %{})
 
     assert {:ok, %{state: %{count: 1}}} =
-             Agent.instantiate(definition, id: Jido.Signal.ID.generate!(), state: %{count: nil})
+             Agent.instantiate(definition, id: Jido.Id.uuid7(), state: %{count: nil})
 
     assert {:error, _} = Agent.transition(agent, %{count: nil})
   end
@@ -278,12 +278,12 @@ defmodule Jido.Agent.StateTest do
 
       if nullable? do
         assert {:ok, %{state: %{count: nil}} = agent} =
-                 Agent.instantiate(definition, id: Jido.Signal.ID.generate!())
+                 Agent.instantiate(definition, id: Jido.Id.uuid7())
 
         assert {:ok, ^agent} = Agent.validate(agent)
       else
         assert {:error, %{__exception__: true}} =
-                 Agent.instantiate(definition, id: Jido.Signal.ID.generate!())
+                 Agent.instantiate(definition, id: Jido.Id.uuid7())
       end
     end
   end
@@ -295,7 +295,7 @@ defmodule Jido.Agent.StateTest do
 
     agent =
       Agent.instantiate!(definition,
-        id: Jido.Signal.ID.generate!(),
+        id: Jido.Id.uuid7(),
         state: %{nested: %{count: 1}}
       )
 

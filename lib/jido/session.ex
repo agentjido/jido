@@ -47,7 +47,7 @@ defmodule Jido.Session do
   @spec new(keyword()) :: t()
   def new(opts \\ []) when is_list(opts) do
     now = Keyword.get(opts, :now, System.system_time(:millisecond))
-    id = Keyword.get(opts, :id, "session_#{Jido.generate_id()}")
+    id = Keyword.get(opts, :id, "session_#{Jido.Id.uuid7()}")
     thread = Keyword.get_lazy(opts, :thread, fn -> Thread.new(id: "#{id}:thread", now: now) end)
 
     %__MODULE__{

@@ -123,7 +123,7 @@ defmodule Jido.AI.Contract.ModelExecutionBoundariesTest do
     assert is_map(Snapshot.schema())
     assert {:error, :invalid_context_snapshot} = Snapshot.decode(:invalid)
     assert {:error, :invalid_context_snapshot} = Snapshot.decode(Jason.encode!(%{"version" => 1}))
-    assert {:error, %Jason.DecodeError{}} = Snapshot.decode("not-json")
+    assert {:error, {:invalid_byte, _offset, _byte}} = Snapshot.decode("not-json")
 
     assert_raise ArgumentError, ~r/invalid context snapshot/, fn ->
       Snapshot.decode!(Jason.encode!(%{"version" => 2}))

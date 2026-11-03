@@ -22,7 +22,7 @@ canonical Agent definitions and instances, state schemas, the Agent DSL,
 logical topology, Plugin contributions, definition mutation and Diff data,
 the Agent document codec adapter, and safe Agent views.
 
-The component follows behavior ownership. It does not claim shared Authoring,
+The component follows behavior ownership. It does not claim shared Codec,
 Registry, Document, Value, or Discovery behavior from `jido_action`. It also
 does not claim pure Agent evaluation, AgentServer commands and lifecycle,
 Agent references and process addressing, Directive dispatch, persistence, or
@@ -124,8 +124,8 @@ not restore or claim the retired standalone `jido.topology` component.
 
 ### jido.agent.I20 — Agent document adapter
 
-- **scope:** `Jido.Authoring.encode/2`, `Jido.Authoring.decode/2`, `Jido.Authoring.encode_json/2`, `Jido.Authoring.decode_json/2`, `Jido.Agent.Codec`
-- **must:** Register the Agent document type with shared Authoring. Write a portable Agent definition, including declared initial state, through a trusted Registry. Omit instance ID, instance state, and the module-owned `initialize/2` callback. Read through `Jido.Agent.define/1`, and reject a malformed or unsupported Agent document. Read a version 1 document that omits initial state as an empty initial-state Map. Shared document, Registry, JSON, and portable-value rules remain owned by `jido_action`.
+- **scope:** `Jido.Codec.encode/2`, `Jido.Codec.decode/2`, `Jido.Codec.encode_json/2`, `Jido.Codec.decode_json/2`, `Jido.Agent.Codec`
+- **must:** Register the Agent document type with `Jido.Codec`. Write a portable Agent definition, including declared initial state, through a trusted Registry. Omit instance ID, instance state, and the module-owned `initialize/2` callback. Read through `Jido.Agent.define/1`, and reject a malformed or unsupported Agent document. Read a version 1 document that omits initial state as an empty initial-state Map. Shared document, Registry, JSON, and portable-value rules remain owned by `jido_action`.
 - **kind:** persisted-format
 - **status:** active
 

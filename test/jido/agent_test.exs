@@ -163,7 +163,7 @@ defmodule Jido.AgentTest do
   defp build!(attrs), do: attrs |> build() |> Agent.Error.unwrap!()
 
   defp instance!(source, opts \\ []),
-    do: Agent.instantiate!(source, Keyword.put_new(opts, :id, Jido.Signal.ID.generate!()))
+    do: Agent.instantiate!(source, Keyword.put_new(opts, :id, Jido.Id.uuid7()))
 
   defp schema do
     Jido.Joi.object(%{
@@ -265,7 +265,7 @@ defmodule Jido.AgentTest do
     instance = instance!(definition)
 
     assert {:error, %{__exception__: true}} =
-             Agent.instantiate(instance, id: Jido.Signal.ID.generate!())
+             Agent.instantiate(instance, id: Jido.Id.uuid7())
   end
 
   test "rejects instance data at the definition boundary and half-instances" do
@@ -333,7 +333,7 @@ defmodule Jido.AgentTest do
     refute function_exported?(CounterAgent, :restore, 2)
 
     assert {:error, %{__exception__: true}} =
-             CounterAgent.instantiate(id: Jido.Signal.ID.generate!(), name: "changed")
+             CounterAgent.instantiate(id: Jido.Id.uuid7(), name: "changed")
   end
 
   test "rejects an invalid behavior, schema, route, and initial state" do
@@ -566,7 +566,7 @@ defmodule Jido.AgentTest do
       definition = build!(name: "counter", schema: schema())
 
       assert {:error, %Agent.Error{code: :unknown_fields}} =
-               Agent.instantiate(definition, id: Jido.Signal.ID.generate!(), name: "replacement")
+               Agent.instantiate(definition, id: Jido.Id.uuid7(), name: "replacement")
 
       assert {:error, %{__exception__: true}} =
                Agent.instantiate(definition, [:not_a_keyword_list])

@@ -1,7 +1,7 @@
 defmodule Jido.Signal.DefinitionTest do
   use JidoSignalTest.Case, async: true
 
-  alias Jido.Signal.ID
+  alias Jido.Id
 
   defmodule UserCreated do
     use Jido.Signal,
@@ -54,7 +54,7 @@ defmodule Jido.Signal.DefinitionTest do
       assert signal.datacontenttype == "application/json"
       assert signal.dataschema == "https://example.com/schemas/user-created"
       assert signal.data.count == 1
-      assert ID.valid?(signal.id)
+      assert Id.uuid7?(signal.id)
     end
 
     test "supports an explicit source override" do

@@ -17,7 +17,7 @@ defmodule Jido.AI.Agent.Plugin do
   """
 
   alias Jido.Agent.{Data, Error}
-  alias Jido.Authoring.{Issue, Registry}
+  alias Jido.Codec.{Issue, Registry}
   alias Spark.Dsl.Extension, as: SparkExtension
 
   @request_type "jido.ai.request"

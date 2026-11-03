@@ -28,10 +28,10 @@ end
 
 for owner <- owners, do: false = :code.is_loaded(owner)
 step = Enum.find(targets, &(&1.name() in ["first", "renamed"]))
-registry = Jido.Authoring.Registry.new!(%{{"actions/step/v1", 1} => {:action, step}})
+registry = Jido.Codec.Registry.new!(%{{"actions/step/v1", 1} => {:action, step}})
 
 {:ok, ^step} =
-  Jido.Authoring.Registry.resolve(
+  Jido.Codec.Registry.resolve(
     registry,
     {"actions/step/v1", 1},
     :action

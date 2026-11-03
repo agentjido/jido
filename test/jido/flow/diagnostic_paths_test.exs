@@ -2,7 +2,7 @@ defmodule Jido.Flow.DiagnosticPathsTest do
   use ExUnit.Case, async: true
 
   alias Jido.Flow
-  alias Jido.Authoring.Registry
+  alias Jido.Codec.Registry
   alias Jido.Flow.Codec
   alias JidoActionTest.FlowCodec, as: Codec
   alias JidoActionTest.Fixtures.Actions.EchoParamsAction

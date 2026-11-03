@@ -1,5 +1,5 @@
-defmodule Jido.Authoring.Error do
-  @moduledoc "Defines classified errors from the runtime authoring boundary."
+defmodule Jido.Codec.Error do
+  @moduledoc "Defines classified errors from the runtime Codec boundary."
 
   use Splode,
     error_classes: [
@@ -23,7 +23,7 @@ defmodule Jido.Authoring.Error do
       @moduledoc false
       use Splode.Error,
         class: :internal,
-        fields: [message: "Unknown authoring error", error: nil, details: %{}]
+        fields: [message: "Unknown Codec error", error: nil, details: %{}]
 
       @spec message(map()) :: String.t()
       def message(%{error: error}) when not is_nil(error), do: normalize_message(error)
@@ -36,24 +36,24 @@ defmodule Jido.Authoring.Error do
   end
 
   defmodule InvalidError do
-    @moduledoc "An invalid authoring value, document, or option."
+    @moduledoc "An invalid codec value, document, or option."
     use Splode.Error,
       class: :invalid,
-      fields: [message: "Invalid authoring data", code: nil, details: %{}]
+      fields: [message: "Invalid codec data", code: nil, details: %{}]
 
     @type t :: %__MODULE__{message: String.t(), code: atom(), details: map()}
   end
 
   defmodule InternalError do
-    @moduledoc "An authoring codec or Registry lifecycle failure."
+    @moduledoc "A codec or Registry lifecycle failure."
     use Splode.Error,
       class: :internal,
-      fields: [message: "Authoring failed", code: nil, details: %{}]
+      fields: [message: "Codec failed", code: nil, details: %{}]
 
     @type t :: %__MODULE__{message: String.t(), code: atom(), details: map()}
   end
 
-  @doc "Creates an invalid authoring error."
+  @doc "Creates an invalid Codec error."
   @spec invalid(code(), String.t(), map()) :: InvalidError.t()
   def invalid(code, message, details \\ %{}),
     do:
@@ -63,7 +63,7 @@ defmodule Jido.Authoring.Error do
         details: normalize_details(details)
       )
 
-  @doc "Creates an internal authoring error."
+  @doc "Creates an internal Codec error."
   @spec internal(code(), String.t(), map()) :: InternalError.t()
   def internal(code, message, details \\ %{}),
     do:

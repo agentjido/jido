@@ -47,8 +47,8 @@ defmodule JidoActionTest.Instruction.TargetTest do
   test "generated modules share the Action behaviour and retain their target kind" do
     assert behaviours(Add) == [Jido.Action]
     assert behaviours(MathFlow) == [Jido.Action]
-    assert Add.__jido_authoring_kind__() == :action
-    assert MathFlow.__jido_authoring_kind__() == :flow
+    assert Add.__jido_codec_kind__() == :action
+    assert MathFlow.__jido_codec_kind__() == :flow
   end
 
   test "resolution keeps the exact target and current kind" do

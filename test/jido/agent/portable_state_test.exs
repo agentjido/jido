@@ -41,7 +41,7 @@ defmodule Jido.Agent.PortableStateTest do
     for value <- values do
       assert {:ok, agent} =
                Agent.instantiate(definition,
-                 id: Jido.Signal.ID.generate!(),
+                 id: Jido.Id.uuid7(),
                  state: %{payload: value}
                )
 
@@ -116,7 +116,7 @@ defmodule Jido.Agent.PortableStateTest do
       })
 
     agent =
-      Agent.instantiate!(definition, id: Jido.Signal.ID.generate!(), state: %{payload: :initial})
+      Agent.instantiate!(definition, id: Jido.Id.uuid7(), state: %{payload: :initial})
 
     port = Port.open({:spawn_executable, System.find_executable("true")}, [])
     on_exit(fn -> if Port.info(port), do: Port.close(port) end)
@@ -136,11 +136,11 @@ defmodule Jido.Agent.PortableStateTest do
     definition = Agent.define!(%{name: "typed_local", schema: Jido.Joi.object(%{payload: Jido.Joi.pid()})})
 
     agent =
-      Agent.instantiate!(definition, id: Jido.Signal.ID.generate!(), state: %{payload: self()})
+      Agent.instantiate!(definition, id: Jido.Id.uuid7(), state: %{payload: self()})
 
     assert {:error, %{__exception__: true}} =
              Agent.instantiate(definition,
-               id: Jido.Signal.ID.generate!(),
+               id: Jido.Id.uuid7(),
                state: %{payload: <<5::size(3)>>}
              )
 
@@ -165,7 +165,7 @@ defmodule Jido.Agent.PortableStateTest do
 
   defp checkpoint_value(definition, value) do
     definition
-    |> Agent.instantiate!(id: Jido.Signal.ID.generate!(), state: %{payload: value})
+    |> Agent.instantiate!(id: Jido.Id.uuid7(), state: %{payload: value})
     |> Jido.Persistence.snapshot()
   end
 end

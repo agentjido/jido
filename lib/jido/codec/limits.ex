@@ -1,4 +1,4 @@
-defmodule Jido.Authoring.Limits do
+defmodule Jido.Codec.Limits do
   @moduledoc false
 
   @doc false

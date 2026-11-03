@@ -64,7 +64,7 @@ defmodule Jido.AI.Context do
 
     context = %__MODULE__{
       version: 1,
-      id: field(opts, :id) || "context_#{Jido.generate_id()}",
+      id: field(opts, :id) || "context_#{Jido.Id.uuid7()}",
       stage: :open,
       request: %{model: nil, context: req_llm_context, options: []},
       result: nil,

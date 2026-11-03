@@ -2114,7 +2114,7 @@ defmodule Jido.AgentServer do
       case mode do
         {:restore, receipt} -> receipt.id
         {:handoff, receipt} -> receipt.id
-        _ -> Jido.Signal.ID.generate!()
+        _ -> Jido.Id.uuid7()
       end
 
     timeout =
@@ -2995,7 +2995,7 @@ defmodule Jido.AgentServer do
          {:handoff, _candidate, instruction, _directives} = result
        )
        when not is_map_key(active, :handoff_receipt) do
-    active = Map.merge(active, %{result: result, handoff_id: Jido.Signal.ID.generate!()})
+    active = Map.merge(active, %{result: result, handoff_id: Jido.Id.uuid7()})
 
     operation(:prepare_handoff, %{data | active: active}, fn ->
       accept_handoff(instruction, %{data | active: active})

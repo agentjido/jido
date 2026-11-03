@@ -1,9 +1,9 @@
-defmodule Jido.Authoring.DiscoveryTest do
+defmodule Jido.Codec.DiscoveryTest do
   use ExUnit.Case, async: false
 
   import ExUnit.CaptureLog
 
-  alias Jido.Authoring.{Manifest, Registry}
+  alias Jido.Codec.{Manifest, Registry}
   alias Jido.Discovery
 
   defmodule AlphaAction do
@@ -44,7 +44,7 @@ defmodule Jido.Authoring.DiscoveryTest do
       name: "alpha_flow"
 
     flow do
-      step "beta", action: Jido.Authoring.DiscoveryTest.BetaAction, params: %{}
+      step "beta", action: Jido.Codec.DiscoveryTest.BetaAction, params: %{}
       output(result("beta"))
     end
   end
@@ -60,7 +60,7 @@ defmodule Jido.Authoring.DiscoveryTest do
   end
 
   defmodule Vocabulary do
-    def __jido_authoring__ do
+    def __jido_codec_manifest__ do
       [
         %{
           id: "tests/atoms/name",
@@ -81,7 +81,7 @@ defmodule Jido.Authoring.DiscoveryTest do
   end
 
   defmodule BareVocabulary do
-    def __jido_authoring__ do
+    def __jido_codec_manifest__ do
       %{
         id: "tests/atoms/bare",
         kind: :atom,
@@ -92,7 +92,7 @@ defmodule Jido.Authoring.DiscoveryTest do
   end
 
   defmodule InvalidManifest do
-    def __jido_authoring__, do: %{kind: :atom}
+    def __jido_codec_manifest__, do: %{kind: :atom}
   end
 
   setup do
@@ -113,7 +113,7 @@ defmodule Jido.Authoring.DiscoveryTest do
   end
 
   test "Action and Flow modules expose static authoring manifests" do
-    assert AlphaAction.__jido_authoring__() == %{
+    assert AlphaAction.__jido_codec_manifest__() == %{
              id: "tests/actions/alpha",
              kind: :action,
              vsn: 2,
@@ -122,7 +122,7 @@ defmodule Jido.Authoring.DiscoveryTest do
              description: "Alpha catalog fixture"
            }
 
-    assert AlphaFlow.__jido_authoring__() == %{
+    assert AlphaFlow.__jido_codec_manifest__() == %{
              id: "tests/flows/alpha",
              kind: :flow,
              vsn: 3,
@@ -227,19 +227,19 @@ defmodule Jido.Authoring.DiscoveryTest do
   end
 
   test "rejects invalid core manifest targets" do
-    assert {:error, {:invalid_authoring_manifest, __MODULE__, :kind}} =
+    assert {:error, {:invalid_codec_manifest, __MODULE__, :kind}} =
              Manifest.validate(
                __MODULE__,
                %{id: "tests/invalid-kind", kind: true, vsn: 1, target: :name}
              )
 
-    assert {:error, {:invalid_authoring_manifest, __MODULE__, {:target, _}}} =
+    assert {:error, {:invalid_codec_manifest, __MODULE__, {:target, _}}} =
              Manifest.validate(
                __MODULE__,
                %{id: "tests/atoms/invalid", kind: :atom, vsn: 1, target: "name"}
              )
 
-    assert {:error, {:invalid_authoring_manifest, __MODULE__, {:target, _}}} =
+    assert {:error, {:invalid_codec_manifest, __MODULE__, {:target, _}}} =
              Manifest.validate(
                __MODULE__,
                %{id: "tests/schemas/invalid", kind: :schema, vsn: 1, target: self()}
@@ -250,7 +250,7 @@ defmodule Jido.Authoring.DiscoveryTest do
     assert :ok = Discovery.refresh(applications: [], modules: [AlphaAction])
     catalog = Discovery.registry()
 
-    assert {:error, {:duplicate_authoring_reference, {"tests/actions/alpha", 2}}} =
+    assert {:error, {:duplicate_codec_reference, {"tests/actions/alpha", 2}}} =
              Discovery.refresh(
                applications: [],
                modules: [AlphaAction, DuplicateAction]
@@ -263,7 +263,7 @@ defmodule Jido.Authoring.DiscoveryTest do
     assert :ok = Discovery.refresh(applications: [], modules: [AlphaAction])
     catalog = Discovery.registry()
 
-    assert {:error, {:invalid_authoring_manifest, InvalidManifest, _reason}} =
+    assert {:error, {:invalid_codec_manifest, InvalidManifest, _reason}} =
              Discovery.refresh(applications: [], modules: [BetaAction, InvalidManifest])
 
     assert Discovery.registry() == catalog
@@ -303,7 +303,7 @@ defmodule Jido.Authoring.DiscoveryTest do
     assert capture_log(initializer) =~ "Jido Discovery did not refresh"
     refute Discovery.ready?()
 
-    error = assert_raise Jido.Authoring.Error.InternalError, &Discovery.registry/0
+    error = assert_raise Jido.Codec.Error.InternalError, &Discovery.registry/0
     assert error.code == :registry_initialization_failed
     assert error.details == %{reason: {:invalid_applications, :bad}}
 
@@ -312,7 +312,7 @@ defmodule Jido.Authoring.DiscoveryTest do
 
     assert capture_log(retry) =~ "Jido Discovery did not refresh"
 
-    error = assert_raise Jido.Authoring.Error.InternalError, &Discovery.registry/0
+    error = assert_raise Jido.Codec.Error.InternalError, &Discovery.registry/0
     assert error.details == %{reason: {:invalid_modules, :bad}}
   end
 
@@ -337,8 +337,8 @@ defmodule Jido.Authoring.DiscoveryTest do
           fn -> Discovery.get("missing", 1) end,
           fn -> Discovery.get_by_target(:atom, :missing) end
         ] do
-      assert_raise Jido.Authoring.Error.InternalError,
-                   "authoring Registry is not initialized",
+      assert_raise Jido.Codec.Error.InternalError,
+                   "Codec Registry is not initialized",
                    operation
     end
 

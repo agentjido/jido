@@ -229,7 +229,7 @@ defmodule Jido.Plugin.ValidationTest do
                ]
              })
 
-    assert {:ok, agent} = Jido.Agent.instantiate(definition, id: Jido.Signal.ID.generate!())
+    assert {:ok, agent} = Jido.Agent.instantiate(definition, id: Jido.Id.uuid7())
     assert agent.state.error == 7
   end
 
@@ -357,7 +357,7 @@ defmodule Jido.Plugin.ValidationTest do
   test "direct preparation validates Plugin declarations once" do
     agent =
       Jido.Agent.define!(%{name: "prepared"})
-      |> Jido.Agent.instantiate!(id: Jido.Signal.ID.generate!())
+      |> Jido.Agent.instantiate!(id: Jido.Id.uuid7())
 
     opts = [validation_result: :ok]
 
@@ -396,7 +396,7 @@ defmodule Jido.Plugin.ValidationTest do
           }
         ]
       })
-      |> Jido.Agent.instantiate!(id: Jido.Signal.ID.generate!())
+      |> Jido.Agent.instantiate!(id: Jido.Id.uuid7())
 
     opts = [validation_result: :ok]
 
@@ -574,7 +574,7 @@ defmodule Jido.Plugin.ValidationTest do
         name: "plugin_pipeline_validation",
         schema: Jido.Joi.object(%{owned: Jido.Joi.integer()})
       })
-      |> Jido.Agent.instantiate!(id: Jido.Signal.ID.generate!(), state: %{owned: 1})
+      |> Jido.Agent.instantiate!(id: Jido.Id.uuid7(), state: %{owned: 1})
 
     source = signal("plugin.pipeline")
 

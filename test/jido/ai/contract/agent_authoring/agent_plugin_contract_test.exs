@@ -4,7 +4,7 @@ defmodule Jido.AI.Contract.AgentPluginTest do
   alias Jido.AI.Agent.Plugin
   alias Jido.AI.Reasoning.ReAct
   alias Jido.AITest.Tools.Add
-  alias Jido.Authoring.Registry
+  alias Jido.Codec.Registry
 
   @tag obligation: ["jido_ai.agent_authoring.I1", "jido_ai.agent_authoring.I3"]
   test "the Plugin normalizes one route and rejects invalid provider data" do

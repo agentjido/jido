@@ -1,4 +1,4 @@
-defmodule Jido.Authoring.SharedModuleTest do
+defmodule Jido.Codec.SharedModuleTest do
   use Covenant.Case, component: "jido_action.action", async: true
 
   alias Jido.{Exec, Flow, Instruction}
@@ -34,7 +34,7 @@ defmodule Jido.Authoring.SharedModuleTest do
       schema: Jido.Joi.object(%{value: Jido.Joi.integer()}, unrecognized_keys: :preserve),
       output_schema:
         Jido.Joi.object(%{value: Jido.Joi.integer()}, unrecognized_keys: :preserve)
-        |> Jido.Joi.transform({Jido.Authoring.SharedModuleTest, :observe_output, []})
+        |> Jido.Joi.transform({Jido.Codec.SharedModuleTest, :observe_output, []})
 
     @impl Jido.Action
     def on_before_validate_params(params) do
@@ -52,7 +52,7 @@ defmodule Jido.Authoring.SharedModuleTest do
   test "Action and Flow modules share the Action contract and retain distinct kinds" do
     for {module, kind} <- [{Echo, :action}, {EchoFlow, :flow}] do
       assert module.__info__(:attributes)[:behaviour] == [Jido.Action]
-      assert module.__jido_authoring_kind__() == kind
+      assert module.__jido_codec_kind__() == kind
       assert {:ok, %Instruction{kind: ^kind, target: ^module}} = Instruction.resolve(module)
       assert :ok = Instruction.validate(module)
     end
@@ -142,7 +142,7 @@ defmodule Jido.Authoring.SharedModuleTest do
         else
           quote do
             flow do
-              step "echo", action: Jido.Authoring.SharedModuleTest.Echo, params: input()
+              step "echo", action: Jido.Codec.SharedModuleTest.Echo, params: input()
               output result("echo")
             end
           end
@@ -151,7 +151,7 @@ defmodule Jido.Authoring.SharedModuleTest do
       Module.create(
         module,
         quote do
-          use unquote(using), Jido.Authoring.SharedModuleTest.counted_options()
+          use unquote(using), Jido.Codec.SharedModuleTest.counted_options()
           unquote(body)
         end,
         Macro.Env.location(__ENV__)

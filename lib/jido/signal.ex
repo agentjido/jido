@@ -28,7 +28,7 @@ defmodule Jido.Signal do
       signal.specversion
       #=> "1.0"
 
-      Jido.Signal.ID.valid?(signal.id)
+      Jido.Id.uuid7?(signal.id)
       #=> true
 
   ## Custom Signal modules
@@ -492,7 +492,7 @@ defmodule Jido.Signal do
   end
 
   defp ensure_static_schema!(schema, env) do
-    case Jido.Authoring.Static.validate(schema) do
+    case Jido.Codec.Static.validate(schema) do
       :ok ->
         :ok
 

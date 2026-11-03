@@ -36,7 +36,7 @@ defmodule JidoTest.AgentServerAssertions do
 
   def start_agent(instance, agent, opts \\ []) do
     opts =
-      if is_atom(agent), do: Keyword.put_new(opts, :id, Jido.Signal.ID.generate!()), else: opts
+      if is_atom(agent), do: Keyword.put_new(opts, :id, Jido.Id.uuid7()), else: opts
 
     with {:ok, server} <- Jido.start_agent(instance, agent, opts),
          :ok <- AgentServer.await_ready(server) do

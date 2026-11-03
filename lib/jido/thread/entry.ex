@@ -147,7 +147,7 @@ defmodule Jido.Thread.Entry do
   defp decode_kind(%{"type" => "string", "value" => kind}) when is_binary(kind), do: kind
   defp decode_kind(kind) when is_binary(kind), do: kind
   defp decode_kind(kind), do: kind
-  defp entry_id, do: "entry_#{Jido.generate_id()}"
+  defp entry_id, do: "entry_#{Jido.Id.uuid7()}"
 end
 
 defimpl Runic.Identity.Projectable, for: Jido.Thread.Entry do

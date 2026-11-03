@@ -97,13 +97,13 @@ defmodule Jido.Agent.SchemaTest do
     definition = %{PlainAgent.definition() | plugins: [contribution(RequiredState)]}
 
     assert {:error, %Jido.Agent.Error{details: %{issues: errors}}} =
-             Jido.Agent.instantiate(definition, id: Jido.Signal.ID.generate!())
+             Jido.Agent.instantiate(definition, id: Jido.Id.uuid7())
 
     assert Enum.any?(errors, &(&1.code == :required and &1.path == [:owned]))
 
     assert {:ok, agent} =
              Jido.Agent.instantiate(definition,
-               id: Jido.Signal.ID.generate!(),
+               id: Jido.Id.uuid7(),
                state: %{owned: 7}
              )
 
@@ -111,7 +111,7 @@ defmodule Jido.Agent.SchemaTest do
 
     assert {:error, %{__exception__: true}} =
              Jido.Agent.instantiate(definition,
-               id: Jido.Signal.ID.generate!(),
+               id: Jido.Id.uuid7(),
                state: %{owned: 7, count: 2}
              )
   end
@@ -124,7 +124,7 @@ defmodule Jido.Agent.SchemaTest do
 
     assert {:ok, agent} =
              Jido.Agent.instantiate(definition,
-               id: Jido.Signal.ID.generate!(),
+               id: Jido.Id.uuid7(),
                state: %{owned: 0}
              )
 

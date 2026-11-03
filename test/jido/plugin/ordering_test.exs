@@ -459,7 +459,7 @@ defmodule Jido.Plugin.OrderingTest do
                {SecondStatePlugin, result: :second_failed}
              ])
 
-    agent = %{Agent.instantiate!(id: Jido.Signal.ID.generate!()) | state: %{first: 0, second: 0}}
+    agent = %{Agent.instantiate!(id: Jido.Id.uuid7()) | state: %{first: 0, second: 0}}
 
     assert Jido.Agent.Plugin.Pipeline.run(
              {:ok, agent.state, []},
@@ -489,7 +489,7 @@ defmodule Jido.Plugin.OrderingTest do
             %{id: provider.id(), provider: provider, vsn: provider.vsn(), data: Map.new(options)}
           end)
       })
-      |> Jido.Agent.instantiate!(id: Jido.Signal.ID.generate!())
+      |> Jido.Agent.instantiate!(id: Jido.Id.uuid7())
 
     assert {:ok, state, []} =
              Jido.Agent.Plugin.Pipeline.run(
@@ -512,7 +512,7 @@ defmodule Jido.Plugin.OrderingTest do
 
   defp command do
     {:ok, command} =
-      Command.new(Agent.instantiate!(id: Jido.Signal.ID.generate!()), signal("plugin.command"))
+      Command.new(Agent.instantiate!(id: Jido.Id.uuid7()), signal("plugin.command"))
 
     command
   end

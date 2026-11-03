@@ -18,7 +18,7 @@ defmodule Jido.AI.Reasoning.Actions.StartRequest do
     static_tools = Toolset.from_context(context)
     agent_state = Map.get(context, :agent_state, %{session: nil})
     request_id = request_id(context)
-    run_id = "run_#{Jido.generate_id()}"
+    run_id = "run_#{Jido.Id.uuid7()}"
     refs = %{request_id: request_id, run_id: run_id}
 
     with {:ok, session, session_owner} <- session(agent_state, context, now),
@@ -101,7 +101,7 @@ defmodule Jido.AI.Reasoning.Actions.StartRequest do
     do: {:ok, session, :agent}
 
   defp session(_state, context, now) do
-    agent_id = Map.get(context, :agent_id, Jido.generate_id())
+    agent_id = Map.get(context, :agent_id, Jido.Id.uuid7())
     {:ok, Jido.Session.new(id: "session:#{agent_id}", now: now), :agent}
   end
 
@@ -109,5 +109,5 @@ defmodule Jido.AI.Reasoning.Actions.StartRequest do
   defp turn_agent_state(agent_state, :caller), do: agent_state
 
   defp request_id(%{signal: %{id: id}}) when is_binary(id), do: id
-  defp request_id(_context), do: "request_#{Jido.generate_id()}"
+  defp request_id(_context), do: "request_#{Jido.Id.uuid7()}"
 end

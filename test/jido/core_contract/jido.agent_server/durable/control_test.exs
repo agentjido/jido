@@ -212,7 +212,7 @@ defmodule JidoTest.AgentServer.Durable.ControlTest do
           }
         ]
       })
-      |> Jido.Agent.instantiate!(id: Jido.Signal.ID.generate!())
+      |> Jido.Agent.instantiate!(id: Jido.Id.uuid7())
 
     {server, _} = F.persistent(c, agent: agent)
     root = Server.activation(server)

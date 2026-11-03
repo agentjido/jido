@@ -8,7 +8,7 @@ defmodule Jido.Agent.View do
   Agent state, metadata, schema values, Plugin options, route defaults, or
   route match functions.
 
-  The caller must supply a `Jido.Authoring.Registry`. The view uses stable
+  The caller must supply a `Jido.Codec.Registry`. The view uses stable
   Registry identifiers for the Agent type and included route targets. It does
   not expose modules or create identifiers from module names.
 
@@ -17,7 +17,7 @@ defmodule Jido.Agent.View do
 
   alias Jido.Agent
   alias Jido.Agent.{Authoring, Codec}
-  alias Jido.Authoring.{Document, Registry}
+  alias Jido.Codec.{Document, Registry}
 
   @default_operation_limit 100
   @maximum_operation_limit 500

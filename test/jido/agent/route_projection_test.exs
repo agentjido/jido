@@ -132,7 +132,7 @@ defmodule Jido.Agent.RouteProjectionTest do
       routes: routes,
       plugins: extensions
     })
-    |> Agent.instantiate!(id: Jido.Signal.ID.generate!())
+    |> Agent.instantiate!(id: Jido.Id.uuid7())
   end
 
   defp request(data \\ %{}) do

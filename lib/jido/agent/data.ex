@@ -44,7 +44,7 @@ defmodule Jido.Agent.Data do
   end
 
   def static(value) do
-    case Jido.Authoring.validate_static(value) do
+    case Jido.Codec.validate_static(value) do
       :ok ->
         :ok
 

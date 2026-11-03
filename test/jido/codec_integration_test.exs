@@ -1,7 +1,7 @@
-defmodule Jido.AuthoringIntegrationTest do
+defmodule Jido.CodecIntegrationTest do
   use ExUnit.Case, async: false
 
-  alias Jido.Authoring.Registry
+  alias Jido.Codec.Registry
 
   defmodule Extension do
     use Jido.Plugin, id: "tests/plugins/authoring", vsn: 2
@@ -55,7 +55,7 @@ defmodule Jido.AuthoringIntegrationTest do
   end
 
   defmodule Vocabulary do
-    def __jido_authoring__ do
+    def __jido_codec_manifest__ do
       %{
         id: "tests/schemas/sample-agent",
         kind: :schema,
@@ -97,9 +97,9 @@ defmodule Jido.AuthoringIntegrationTest do
              {:ok, Jido.Agent.Codec}
 
     definition = Agent.definition()
-    assert {:ok, document} = Jido.Authoring.encode(definition, registry: registry)
+    assert {:ok, document} = Jido.Codec.encode(definition, registry: registry)
     assert document["vsn"] == 1
-    assert {:ok, ^definition} = Jido.Authoring.decode(document, registry: registry)
+    assert {:ok, ^definition} = Jido.Codec.decode(document, registry: registry)
   end
 
   test "the default scan includes core Jido when it is loaded" do
@@ -138,7 +138,7 @@ defmodule Jido.AuthoringIntegrationTest do
       })
 
     assert {:ok, document} =
-             Jido.Authoring.encode(definition, registry: registry, codec: Jido.Agent.Codec)
+             Jido.Codec.encode(definition, registry: registry, codec: Jido.Agent.Codec)
 
     assert get_in(document, ["definition", "plugins", Access.at(0), "data"]) == %{
              "target" => %{"id" => "tests/actions/referenced", "vsn" => 1}
@@ -150,7 +150,7 @@ defmodule Jido.AuthoringIntegrationTest do
              definition.routes
 
     assert {:ok, ^definition} =
-             Jido.Authoring.decode(document, registry: registry, codec: Jido.Agent.Codec)
+             Jido.Codec.decode(document, registry: registry, codec: Jido.Agent.Codec)
 
     restricted =
       registry.entries
@@ -158,14 +158,14 @@ defmodule Jido.AuthoringIntegrationTest do
       |> Registry.new!()
 
     assert {:error, _issues} =
-             Jido.Authoring.decode(document, registry: restricted, codec: Jido.Agent.Codec)
+             Jido.Codec.decode(document, registry: restricted, codec: Jido.Agent.Codec)
   end
 
-  test "legacy Agent and Plugin authoring facades are not exported" do
+  test "Agent and Plugin legacy JSON facades stay removed" do
     refute function_exported?(Jido.Agent, :to_json, 2)
     refute function_exported?(Jido.Agent, :from_json, 2)
-    refute function_exported?(Jido.Agent.Codec, :encode, 2)
-    refute function_exported?(Jido.Agent.Codec, :decode, 2)
+    assert function_exported?(Jido.Agent.Codec, :encode, 2)
+    assert function_exported?(Jido.Agent.Codec, :decode, 2)
     refute function_exported?(Jido.Agent.Codec, :from_json, 2)
     refute function_exported?(Jido.Plugin, :manifest, 1)
   end

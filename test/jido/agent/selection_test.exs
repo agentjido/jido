@@ -78,7 +78,7 @@ defmodule Jido.Agent.SelectionTest do
     for definition <- definitions(),
         {type, target} <- [{"selection.action", Record}, {"selection.flow", RecordFlow}],
         {data, input} <- cases do
-      agent = Agent.instantiate!(definition, id: Jido.Signal.ID.generate!())
+      agent = Agent.instantiate!(definition, id: Jido.Id.uuid7())
       source = signal(type, data)
 
       assert {:ok, prepared} = Runner.prepare(agent, source, [])
@@ -118,7 +118,7 @@ defmodule Jido.Agent.SelectionTest do
           ]
         })
 
-      agent = Agent.instantiate!(definition, id: Jido.Signal.ID.generate!())
+      agent = Agent.instantiate!(definition, id: Jido.Id.uuid7())
       source = signal("selection.empty", data)
       assert {:ok, server} = JidoTest.AgentServerAssertions.start_agent(jido, agent)
       assert {:ok, direct, []} = Agent.cmd(agent, source)
@@ -130,7 +130,7 @@ defmodule Jido.Agent.SelectionTest do
 
   test "invalid route data returns its Signal context before executable work", %{jido: jido} do
     for definition <- definitions() do
-      agent = Agent.instantiate!(definition, id: Jido.Signal.ID.generate!())
+      agent = Agent.instantiate!(definition, id: Jido.Id.uuid7())
       assert {:ok, server} = JidoTest.AgentServerAssertions.start_agent(jido, agent)
 
       for data <- ["hello", 3, [1, 2], [{"value", 3}], [{:value, 3} | :invalid]] do
@@ -172,7 +172,7 @@ defmodule Jido.Agent.SelectionTest do
           }
         ]
       })
-      |> Agent.instantiate!(id: Jido.Signal.ID.generate!())
+      |> Agent.instantiate!(id: Jido.Id.uuid7())
 
     source = signal("selection.validated", value: "invalid")
     assert {:ok, server} = JidoTest.AgentServerAssertions.start_agent(jido, agent)

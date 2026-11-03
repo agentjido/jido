@@ -12,7 +12,7 @@ defmodule Jido.Signal.Bus.RecordedSignal do
   """
 
   alias Jido.Signal
-  alias Jido.Signal.ID
+  alias Jido.Id
 
   @schema Joi.struct(
             __MODULE__,
@@ -114,7 +114,7 @@ defmodule Jido.Signal.Bus.RecordedSignal do
 
       stored = %{
         "format_version" => 1,
-        "id" => ID.generate!(),
+        "id" => Id.uuid7(),
         "cursor" => cursor,
         "type" => signal.type,
         "created_at" => DateTime.to_iso8601(created_at),

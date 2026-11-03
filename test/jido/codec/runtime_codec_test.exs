@@ -1,7 +1,7 @@
-defmodule Jido.Authoring.RuntimeCodecTest do
+defmodule Jido.Codec.RuntimeCodecTest do
   use ExUnit.Case, async: false
 
-  alias Jido.Authoring.Issue
+  alias Jido.Codec.Issue
   alias Jido.Flow
   alias Jido.Flow.Ref
 
@@ -12,19 +12,28 @@ defmodule Jido.Authoring.RuntimeCodecTest do
   end
 
   defmodule CrashingCodec do
-    def __jido_authoring_codec__, do: %{type: "tests.crashing", vsn: 1}
-    def decode_document(_document, _registry), do: throw(:codec_bug)
+    @behaviour Jido.Codec.Contract
+    def type, do: "tests.crashing"
+    def version, do: 1
+    def target, do: nil
+    def decode(_document, _registry), do: throw(:codec_bug)
   end
 
   defmodule InvalidSuccessCodec do
-    def __jido_authoring_codec__, do: %{type: "tests.invalid-success", vsn: 1}
-    def decode_document(_document, _registry), do: {:ok, %{not: :a_struct}}
+    @behaviour Jido.Codec.Contract
+    def type, do: "tests.invalid-success"
+    def version, do: 1
+    def target, do: nil
+    def decode(_document, _registry), do: {:ok, %{not: :a_struct}}
   end
 
   defmodule IssueCodec do
-    def __jido_authoring_codec__, do: %{type: "tests.issue", vsn: 1}
+    @behaviour Jido.Codec.Contract
+    def type, do: "tests.issue"
+    def version, do: 1
+    def target, do: nil
 
-    def decode_document(_document, _registry),
+    def decode(_document, _registry),
       do: {:error, [Issue.new(:codec_issue, ["field"], "codec issue")]}
   end
 
@@ -32,17 +41,42 @@ defmodule Jido.Authoring.RuntimeCodecTest do
     defstruct [:value]
   end
 
-  defmodule CaptureCodec do
-    def __jido_authoring_codec__, do: %{type: "tests.capture", vsn: 1}
+  defmodule ExternalValue do
+    defstruct [:value]
+  end
 
-    def decode_document(%{"value" => value}, _registry),
+  defmodule ExternalCodec do
+    @behaviour Jido.Codec.Contract
+    alias Jido.Codec.RuntimeCodecTest.ExternalValue
+
+    def type, do: "tests.external"
+    def version, do: 1
+    def target, do: ExternalValue
+
+    def encode(%ExternalValue{value: value}, _registry),
+      do: {:ok, %{"type" => type(), "vsn" => version(), "value" => value}}
+
+    def decode(%{"type" => "tests.external", "vsn" => 1, "value" => value}, _registry),
+      do: {:ok, %ExternalValue{value: value}}
+  end
+
+  defmodule CaptureCodec do
+    @behaviour Jido.Codec.Contract
+    def type, do: "tests.capture"
+    def version, do: 1
+    def target, do: nil
+
+    def decode(%{"value" => value}, _registry),
       do: {:ok, %Captured{value: value}}
   end
 
   defmodule MetadataCrashCodec do
-    def __jido_authoring_codec__, do: raise("metadata bug")
-    def decode_document(_document, _registry), do: {:ok, %URI{}}
-    def encode_document(_value, _registry), do: {:ok, %{}}
+    @behaviour Jido.Codec.Contract
+    def type, do: raise("metadata bug")
+    def version, do: 1
+    def target, do: Jido.Flow
+    def decode(_document, _registry), do: {:ok, %URI{}}
+    def encode(_value, _registry), do: {:ok, %{}}
   end
 
   setup do
@@ -60,6 +94,7 @@ defmodule Jido.Authoring.RuntimeCodecTest do
         modules: [
           CaptureCodec,
           CrashingCodec,
+          ExternalCodec,
           InvalidSuccessCodec,
           IssueCodec,
           Echo,
@@ -70,42 +105,66 @@ defmodule Jido.Authoring.RuntimeCodecTest do
     %{registry: Jido.Discovery.registry()}
   end
 
+  test "uses Discovery only when routing needs the default Registry", %{registry: registry} do
+    :persistent_term.erase({Jido.Discovery, :registry})
+    assert {:ok, _document} = Jido.Codec.encode(flow(), registry: registry)
+    assert {:error, [%Issue{code: :invalid_json}]} = Jido.Codec.decode_json("{")
+    assert {:error, [%Issue{code: :invalid_document}]} = Jido.Codec.decode([])
+
+    assert_raise Jido.Codec.Error.InternalError, fn -> Jido.Codec.encode(flow()) end
+
+    :persistent_term.put({Jido.Discovery, :registry}, registry)
+    assert {:ok, document} = Jido.Codec.encode(flow())
+    assert {:ok, %Flow{}} = Jido.Codec.decode(document)
+  end
+
   test "encodes and decodes a Flow", %{registry: registry} do
     flow = flow()
-    assert {:ok, document} = Jido.Authoring.encode(flow, registry: registry)
-    assert {:ok, json} = Jido.Authoring.encode_json(flow, registry: registry)
+    assert {:ok, document} = Jido.Codec.encode(flow, registry: registry)
+    assert {:ok, json} = Jido.Codec.encode_json(flow, registry: registry)
     assert Jason.decode!(json) == document
 
-    assert {:ok, ^flow} = Jido.Authoring.decode_json(json, registry: registry)
+    assert {:ok, ^flow} = Jido.Codec.decode_json(json, registry: registry)
+  end
+
+  test "uses the Registry fallback for an external codec without a protocol implementation", %{
+    registry: registry
+  } do
+    value = %ExternalValue{value: "runtime"}
+
+    assert Jido.Codec.Encoder.codec(value) == :error
+    assert {:ok, document} = Jido.Codec.encode(value, registry: registry)
+    assert document == %{"type" => "tests.external", "vsn" => 1, "value" => "runtime"}
+    assert {:ok, ^value} = Jido.Codec.decode(document, registry: registry)
   end
 
   test "rejects unsupported encode values", %{registry: registry} do
-    assert {:error, %Jido.Authoring.Error.InvalidError{code: :unsupported_value}} =
-             Jido.Authoring.encode(:unsupported, registry: registry)
+    assert {:error, %Jido.Codec.Error.InvalidError{code: :unsupported_value}} =
+             Jido.Codec.encode(:unsupported, registry: registry)
   end
 
   test "applies the JSON byte limit", %{registry: registry} do
-    {:ok, document} = Jido.Authoring.encode(flow(), registry: registry)
+    {:ok, document} = Jido.Codec.encode(flow(), registry: registry)
     size = document |> Jason.encode!() |> byte_size()
 
     assert {:ok, ^document} =
-             Jido.Authoring.encode(flow(), registry: registry, maximum_json_bytes: size)
+             Jido.Codec.encode(flow(), registry: registry, maximum_json_bytes: size)
 
-    assert {:error, %Jido.Authoring.Error.InvalidError{code: :document_too_large}} =
-             Jido.Authoring.encode(flow(),
+    assert {:error, %Jido.Codec.Error.InvalidError{code: :document_too_large}} =
+             Jido.Codec.encode(flow(),
                registry: registry,
                maximum_json_bytes: size - 1
              )
 
     assert {:error, [%Issue{code: :bytes}]} =
-             Jido.Authoring.decode(document,
+             Jido.Codec.decode(document,
                registry: registry,
                maximum_json_bytes: size - 1
              )
   end
 
   test "reports a missing version without a repair system", %{registry: registry} do
-    {:ok, document} = Jido.Authoring.encode(flow(), registry: registry)
+    {:ok, document} = Jido.Codec.encode(flow(), registry: registry)
 
     assert {:error,
             [
@@ -114,7 +173,7 @@ defmodule Jido.Authoring.RuntimeCodecTest do
                 path: ["vsn"],
                 details: %{supported_vsns: [2]}
               }
-            ]} = Jido.Authoring.decode(Map.delete(document, "vsn"), registry: registry)
+            ]} = Jido.Codec.decode(Map.delete(document, "vsn"), registry: registry)
   end
 
   test "contains codec failures and invalid returns", %{registry: registry} do
@@ -125,13 +184,13 @@ defmodule Jido.Authoring.RuntimeCodecTest do
                 details: %{failure_kind: :throw, reason: ":codec_bug"}
               }
             ]} =
-             Jido.Authoring.decode(
+             Jido.Codec.decode(
                %{"type" => "tests.crashing", "vsn" => 1},
                registry: registry
              )
 
     assert {:error, [%Issue{code: :invalid_codec_return}]} =
-             Jido.Authoring.decode(
+             Jido.Codec.decode(
                %{"type" => "tests.invalid-success", "vsn" => 1},
                registry: registry
              )
@@ -145,19 +204,19 @@ defmodule Jido.Authoring.RuntimeCodecTest do
                 details: %{failure_kind: :error, reason: "metadata bug"}
               }
             ]} =
-             Jido.Authoring.decode(
+             Jido.Codec.decode(
                %{"type" => "tests.crashing-metadata", "vsn" => 1},
                registry: registry,
                codec: MetadataCrashCodec
              )
 
-    assert {:error, %Jido.Authoring.Error.InternalError{code: :codec_failure}} =
-             Jido.Authoring.encode(flow(), registry: registry, codec: MetadataCrashCodec)
+    assert {:error, %Jido.Codec.Error.InternalError{code: :codec_failure}} =
+             Jido.Codec.encode(flow(), registry: registry, codec: MetadataCrashCodec)
   end
 
   test "preserves ordered issues returned by a codec", %{registry: registry} do
     assert {:error, [%Issue{code: :codec_issue, path: ["field"]}]} =
-             Jido.Authoring.decode(
+             Jido.Codec.decode(
                %{"type" => "tests.issue", "vsn" => 1},
                registry: registry
              )
@@ -175,7 +234,7 @@ defmodule Jido.Authoring.RuntimeCodecTest do
       })
 
     assert {:ok, %Captured{value: decoded}} =
-             Jido.Authoring.decode_json(json, registry: registry)
+             Jido.Codec.decode_json(json, registry: registry)
 
     assert decoded == value
     assert :binary.referenced_byte_size(decoded) == byte_size(decoded)
@@ -191,7 +250,7 @@ defmodule Jido.Authoring.RuntimeCodecTest do
                 path: ["value"],
                 details: %{key: "value"}
               }
-            ]} = Jido.Authoring.decode_json(json, registry: registry)
+            ]} = Jido.Codec.decode_json(json, registry: registry)
   end
 
   test "bounds ordered JSON conversion before codec dispatch", %{registry: registry} do
@@ -219,31 +278,31 @@ defmodule Jido.Authoring.RuntimeCodecTest do
           {many_nodes_json, :nodes}
         ] do
       assert {:error, [%Issue{code: ^code}]} =
-               Jido.Authoring.decode_json(json, registry: registry)
+               Jido.Codec.decode_json(json, registry: registry)
     end
   end
 
   test "returns classified Splode errors" do
-    invalid = Jido.Authoring.Error.invalid(:invalid_document, "invalid")
-    internal = Jido.Authoring.Error.internal(:codec_failure, "failed")
+    invalid = Jido.Codec.Error.invalid(:invalid_document, "invalid")
+    internal = Jido.Codec.Error.internal(:codec_failure, "failed")
 
-    assert %Jido.Authoring.Error.InvalidError{class: :invalid} = invalid
-    assert %Jido.Authoring.Error.InternalError{class: :internal} = internal
-    assert Jido.Authoring.Error.splode_error?(invalid)
-    assert Jido.Authoring.Error.splode_error?(internal)
+    assert %Jido.Codec.Error.InvalidError{class: :invalid} = invalid
+    assert %Jido.Codec.Error.InternalError{class: :internal} = internal
+    assert Jido.Codec.Error.splode_error?(invalid)
+    assert Jido.Codec.Error.splode_error?(internal)
 
-    assert %Jido.Authoring.Error.Invalid{
-             errors: [%Jido.Authoring.Error.InvalidError{code: :invalid_document}]
-           } = Jido.Authoring.Error.to_class([invalid])
+    assert %Jido.Codec.Error.Invalid{
+             errors: [%Jido.Codec.Error.InvalidError{code: :invalid_document}]
+           } = Jido.Codec.Error.to_class([invalid])
   end
 
   test "rejects malformed envelopes", %{registry: registry} do
     cases = [
-      {fn -> Jido.Authoring.decode_json("{", registry: registry) end, :invalid_json},
-      {fn -> Jido.Authoring.decode(%{"vsn" => 1}, registry: registry) end, :missing_document_type},
-      {fn -> Jido.Authoring.decode([], registry: registry) end, :invalid_document},
+      {fn -> Jido.Codec.decode_json("{", registry: registry) end, :invalid_json},
+      {fn -> Jido.Codec.decode(%{"vsn" => 1}, registry: registry) end, :missing_document_type},
+      {fn -> Jido.Codec.decode([], registry: registry) end, :invalid_document},
       {fn ->
-         Jido.Authoring.decode(%{"type" => "jido.flow", "vsn" => 0}, registry: registry)
+         Jido.Codec.decode(%{"type" => "jido.flow", "vsn" => 0}, registry: registry)
        end, :invalid_document_vsn}
     ]
 

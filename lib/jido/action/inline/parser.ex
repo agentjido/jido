@@ -2,7 +2,7 @@ defmodule Jido.Action.Inline.Parser do
   @moduledoc false
 
   alias Jido.Action.Inline
-  alias Jido.Authoring.Options
+  alias Jido.Codec.Config
 
   @doc false
   @spec bound!(Macro.t(), keyword(), Macro.Env.t()) :: Inline.t()
@@ -75,7 +75,7 @@ defmodule Jido.Action.Inline.Parser do
   @doc false
   @spec options!(term(), [atom()], Macro.Env.t(), String.t()) :: :ok
   def options!(options, supported, caller, kind \\ "option") do
-    Options.validate!(
+    Config.validate_options!(
       options,
       source_env(options, caller),
       "inline Action #{kind}s must be a keyword list",
@@ -305,7 +305,7 @@ defmodule Jido.Action.Inline.Parser do
   @doc false
   @spec error!(term(), Macro.Env.t(), String.t()) :: no_return()
   def error!(value, caller, description),
-    do: Options.error!(source_env(value, caller), description)
+    do: Config.compile_error!(source_env(value, caller), description)
 
   defp source_env({_form, metadata, _args}, caller) when is_list(metadata),
     do: with_line(caller, metadata)

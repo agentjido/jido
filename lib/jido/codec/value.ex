@@ -1,28 +1,28 @@
-defmodule Jido.Authoring.Value do
+defmodule Jido.Codec.Value do
   @moduledoc """
-  Encodes and decodes portable values used inside authoring documents.
+  Encodes and decodes portable values used inside codec documents.
 
   The format supports JSON scalar values, proper lists, plain maps, and atoms
-  that a trusted `Jido.Authoring.Registry` identifies. Map keys can be valid
+  that a trusted `Jido.Codec.Registry` identifies. Map keys can be valid
   UTF-8 strings, non-negative integers, Booleans, or registered atoms.
 
   The format rejects structs, tuples, processes, invalid UTF-8 strings,
   improper lists, and collections or nesting above the documented limits.
-  A document owner must also call `Jido.Authoring.Document.check/1` on the
+  A document owner must also call `Jido.Codec.Document.check/1` on the
   complete document to enforce its total node limit.
   """
 
-  alias Jido.Authoring.Registry
-  require Jido.Authoring.Limits
+  alias Jido.Codec.Registry
+  require Jido.Codec.Limits
 
-  @maximum_depth Jido.Authoring.Limits.maximum_depth()
-  @maximum_collection_size Jido.Authoring.Limits.maximum_collection_size()
+  @maximum_depth Jido.Codec.Limits.maximum_depth()
+  @maximum_collection_size Jido.Codec.Limits.maximum_collection_size()
 
   defmodule Error do
-    @moduledoc "An invalid portable authoring value."
+    @moduledoc "An invalid portable codec value."
     use Splode.Error,
       class: :invalid,
-      fields: [message: "Invalid portable authoring value", reason: nil, details: %{}]
+      fields: [message: "Invalid portable codec value", reason: nil, details: %{}]
 
     @type reason ::
             :atom
@@ -91,7 +91,7 @@ defmodule Jido.Authoring.Value do
   end
 
   defp encode(_value, _registry, _depth, path),
-    do: error(:value, "authoring data contains an unsupported value", path)
+    do: error(:value, "codec data contains an unsupported value", path)
 
   defp decode(_value, _registry, depth, path) when depth > @maximum_depth,
     do: depth_error(path, depth)
@@ -110,7 +110,7 @@ defmodule Jido.Authoring.Value do
        when map_size(value) == 3 do
     case Registry.resolve(registry, {id, vsn}, :atom) do
       {:ok, atom} when is_atom(atom) -> {:ok, atom}
-      {:ok, _value} -> error(:atom, "authoring atom reference must resolve to an atom", path)
+      {:ok, _value} -> error(:atom, "codec atom reference must resolve to an atom", path)
       {:error, %Registry.Error{} = exception} -> prefix_registry_error({:error, exception}, path)
     end
   end
@@ -119,7 +119,7 @@ defmodule Jido.Authoring.Value do
        when map_size(value) == 2 and is_list(entries) do
     cond do
       List.improper?(entries) ->
-        error(:list, "authoring value must contain proper lists", path ++ ["entries"])
+        error(:list, "codec value must contain proper lists", path ++ ["entries"])
 
       length(entries) > @maximum_collection_size ->
         collection_error(path, length(entries))
@@ -144,7 +144,7 @@ defmodule Jido.Authoring.Value do
             {:halt,
              error(
                :map_entry,
-               "authoring map entry must contain a key and value",
+               "codec map entry must contain a key and value",
                path ++ ["entries", index]
              )}
         end)
@@ -154,10 +154,10 @@ defmodule Jido.Authoring.Value do
 
             cond do
               length(pairs) != map_size(decoded) ->
-                error(:duplicate_key, "authoring map contains a duplicate key", path)
+                error(:duplicate_key, "codec map contains a duplicate key", path)
 
               is_struct(decoded) ->
-                error(:value, "authoring data contains an unsupported value", path)
+                error(:value, "codec data contains an unsupported value", path)
 
               true ->
                 {:ok, decoded}
@@ -170,7 +170,7 @@ defmodule Jido.Authoring.Value do
   end
 
   defp decode(_value, _registry, _depth, path),
-    do: error(:tag, "authoring data contains an invalid tagged value", path)
+    do: error(:tag, "codec data contains an invalid tagged value", path)
 
   @doc false
   @spec encoded_key_sort_key(term()) :: {non_neg_integer(), term()}
@@ -212,7 +212,7 @@ defmodule Jido.Authoring.Value do
   defp map_list(values, registry, depth, path, mapper) do
     cond do
       List.improper?(values) ->
-        error(:list, "authoring value must contain proper lists", path)
+        error(:list, "codec value must contain proper lists", path)
 
       length(values) > @maximum_collection_size ->
         collection_error(path, length(values))
@@ -236,14 +236,14 @@ defmodule Jido.Authoring.Value do
 
   defp depth_error(path, actual),
     do:
-      error(:depth, "authoring value exceeds its nesting limit", path, %{
+      error(:depth, "codec value exceeds its nesting limit", path, %{
         actual: actual,
         maximum_depth: @maximum_depth
       })
 
   defp collection_error(path, actual),
     do:
-      error(:collection, "authoring value collection exceeds its size limit", path, %{
+      error(:collection, "codec value collection exceeds its size limit", path, %{
         actual: actual,
         maximum_size: @maximum_collection_size
       })
@@ -251,7 +251,7 @@ defmodule Jido.Authoring.Value do
   defp portable_string(value, path) do
     if String.valid?(value),
       do: {:ok, value},
-      else: error(:string, "authoring value strings must be valid UTF-8", path)
+      else: error(:string, "codec value strings must be valid UTF-8", path)
   end
 
   defp validate_key(key, _path)
@@ -260,12 +260,12 @@ defmodule Jido.Authoring.Value do
        do: :ok
 
   defp validate_key(_key, path),
-    do: error(:map_key, "authoring data contains an unsupported map key", path)
+    do: error(:map_key, "codec data contains an unsupported map key", path)
 
   defp validate_keys(value, path) do
     if Enum.all?(Map.keys(value), &valid_key?/1),
       do: :ok,
-      else: error(:map_key, "authoring data contains an unsupported map key", path)
+      else: error(:map_key, "codec data contains an unsupported map key", path)
   end
 
   defp valid_key?(key),

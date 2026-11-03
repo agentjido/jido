@@ -24,7 +24,7 @@ defmodule Jido.Flow.ValuePreparationContractTest do
 
   test "normalization failures precede scope validation across each call value" do
     params = [Ref.body_result(), %Ref{source: :result, component: "", path: []}]
-    {:error, message} = Jido.Authoring.Config.validate_name("")
+    {:error, message} = Jido.Codec.Config.validate_name("")
 
     for {attrs, _role, _scope} <- call_cases(params) do
       assert {:error, %InvalidDefinitionError{} = error} = Definition.component(attrs)

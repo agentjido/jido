@@ -381,8 +381,8 @@ defmodule Jido.Instruction do
   end
 
   defp authored_kind(module) do
-    if function_exported?(module, :__jido_authoring_kind__, 0) and
-         module.__jido_authoring_kind__() == :flow do
+    if function_exported?(module, :__jido_codec_kind__, 0) and
+         module.__jido_codec_kind__() == :flow do
       :flow
     else
       :action

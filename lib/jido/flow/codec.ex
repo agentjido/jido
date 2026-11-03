@@ -1,36 +1,43 @@
 defmodule Jido.Flow.Codec do
   @moduledoc false
 
-  alias Jido.Authoring.Issue
+  @behaviour Jido.Codec.Contract
+
+  alias Jido.Codec.Issue
   alias Jido.Flow
   alias Jido.Flow.{Definition, Error}
   alias Jido.Flow.Codec.{Paths, Reader, Writer}
 
   @type document :: %{required(String.t()) => term()}
 
-  @doc false
-  @spec __jido_authoring_codec__() :: %{type: String.t(), vsn: pos_integer(), encoder: module()}
-  def __jido_authoring_codec__, do: %{type: "jido.flow", vsn: 2, encoder: Jido.Flow}
+  @impl true
+  def type, do: "jido.flow"
 
-  @doc false
-  @spec encode_document(term(), term()) :: {:ok, document()} | {:error, Exception.t()}
-  def encode_document(%Flow{} = flow, %Jido.Authoring.Registry{} = registry) do
+  @impl true
+  def version, do: 2
+
+  @impl true
+  def target, do: Jido.Flow
+
+  @impl true
+  @spec encode(term(), term()) :: {:ok, document()} | {:error, Exception.t()}
+  def encode(%Flow{} = flow, %Jido.Codec.Registry{} = registry) do
     with {:ok, flow} <- Flow.validate(flow), do: Writer.encode(flow, registry)
   end
 
-  def encode_document(value, %Jido.Authoring.Registry{}),
+  def encode(value, %Jido.Codec.Registry{}),
     do: {:error, Error.validation_error("expected a Jido.Flow artifact", %{value: value})}
 
-  def encode_document(_flow, registry),
+  def encode(_flow, registry),
     do:
       {:error,
-       Error.validation_error("flow codec registry must be a Jido.Authoring.Registry", %{
+       Error.validation_error("flow codec registry must be a Jido.Codec.Registry", %{
          value: registry
        })}
 
-  @doc false
-  @spec decode_document(term(), term()) :: {:ok, Flow.t()} | {:error, [Issue.t()]}
-  def decode_document(document, registry) do
+  @impl true
+  @spec decode(term(), term()) :: {:ok, Flow.t()} | {:error, [Issue.t()]}
+  def decode(document, registry) do
     case diagnose(document, registry) do
       {:ok, flow} -> {:ok, flow}
       {:error, %Error.Invalid{errors: errors}} -> {:error, Enum.map(errors, &authoring_issue/1)}
@@ -38,9 +45,9 @@ defmodule Jido.Flow.Codec do
   end
 
   @doc false
-  @spec diagnose(document(), Jido.Authoring.Registry.t()) ::
+  @spec diagnose(document(), Jido.Codec.Registry.t()) ::
           {:ok, Flow.t()} | {:error, Error.Invalid.t()}
-  def diagnose(document, %Jido.Authoring.Registry{} = registry) do
+  def diagnose(document, %Jido.Codec.Registry{} = registry) do
     case Reader.decode(document, registry) do
       {:ok, attrs, paths} ->
         case Definition.diagnose_lowered(attrs) do
@@ -69,12 +76,12 @@ defmodule Jido.Flow.Codec do
   def diagnose(_document, registry),
     do:
       failure([
-        Error.validation_error("flow codec registry must be a Jido.Authoring.Registry", %{
+        Error.validation_error("flow codec registry must be a Jido.Codec.Registry", %{
           value: registry
         })
       ])
 
-  defp authoring_issue(%Jido.Authoring.Registry.Error{} = error),
+  defp authoring_issue(%Jido.Codec.Registry.Error{} = error),
     do: authoring_issue(error, :reference)
 
   defp authoring_issue(%Error.InvalidDefinitionError{} = error),
@@ -96,4 +103,8 @@ defmodule Jido.Flow.Codec do
   end
 
   defp failure(errors), do: {:error, %Error.Invalid{errors: errors}}
+end
+
+defimpl Jido.Codec.Encoder, for: Jido.Flow do
+  def codec(_flow), do: {:ok, Jido.Flow.Codec}
 end

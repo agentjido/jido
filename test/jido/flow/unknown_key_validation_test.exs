@@ -6,7 +6,7 @@ defmodule Jido.Flow.UnknownKeyValidationTest do
   alias JidoActionTest.FlowCodec, as: Codec
   alias Jido.Flow.Definition
   alias Jido.Flow.Error.InvalidDefinitionError
-  alias Jido.Authoring.Registry
+  alias Jido.Codec.Registry
   alias JidoActionTest.Fixtures.Actions.Add
 
   test "Flow.new preserves valid input and rejects unknown root keys" do

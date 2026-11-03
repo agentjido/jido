@@ -27,7 +27,7 @@ defmodule Jido.Plugin.Audit.Record do
   @spec validate(term()) :: {:ok, t()} | {:error, term()}
   def validate(%__MODULE__{} = record) do
     with {:ok, record} <- Joi.parse(@schema, Map.from_struct(record)),
-         true <- Jido.Signal.ID.valid?(record.id) do
+         true <- Jido.Id.uuid7?(record.id) do
       case Jido.PortableTerm.validate(record, :record) do
         :ok -> {:ok, record}
         {:error, path} -> invalid("Audit record must contain portable data", %{path: path})

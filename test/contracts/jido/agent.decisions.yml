@@ -18,7 +18,7 @@
 
 - id: agent-boundary-review
   date: 2026-10-22
-  decision: Remove transferred evaluation obligations from the Agent Covenant, keep stable obligation IDs, add Jido.Agent.View, describe Jido.Agent.Codec as the Agent adapter for shared Authoring, and keep persistence evidence outside this component.
+  decision: Remove transferred evaluation obligations from the Agent Covenant, keep stable obligation IDs, add Jido.Agent.View, describe Jido.Agent.Codec as the Agent adapter for Jido.Codec, and keep persistence evidence outside this component.
   driver: The component must state current Agent-specific ownership without repeating transfer history or claiming shared jido_action and persistence behavior.
   approved_by: User-approved component review
 

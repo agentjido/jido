@@ -1,6 +1,6 @@
-defmodule Jido.Authoring.Registry do
+defmodule Jido.Codec.Registry do
   @moduledoc """
-  Stores trusted authoring entries and document codecs.
+  Stores trusted entries and document codecs.
 
   References use `{stable_id, vsn}` tuples inside Elixir. Document codecs
   convert them to and from JSON objects at the storage boundary.
@@ -37,7 +37,7 @@ defmodule Jido.Authoring.Registry do
           required(:type) => String.t(),
           required(:vsn) => vsn(),
           required(:module) => module(),
-          optional(:encoder) => module() | nil
+          optional(:target) => module() | nil
         }
   @type t :: %__MODULE__{
           entries: %{key() => entry()},
@@ -52,10 +52,10 @@ defmodule Jido.Authoring.Registry do
   defstruct @enforce_keys
 
   defmodule Error do
-    @moduledoc "An invalid trusted authoring Registry or Registry operation."
+    @moduledoc "An invalid trusted Codec Registry or Registry operation."
     use Splode.Error,
       class: :invalid,
-      fields: [message: "Invalid authoring Registry", details: %{}]
+      fields: [message: "Invalid Codec Registry", details: %{}]
 
     @type t :: %__MODULE__{message: String.t(), details: map()}
   end
@@ -81,13 +81,13 @@ defmodule Jido.Authoring.Registry do
   end
 
   def new(entries) when is_map(entries) and not is_struct(entries) do
-    error("authoring Registry exceeds its entry limit", %{
+    error("Codec Registry exceeds its entry limit", %{
       entries: map_size(entries),
       maximum_entries: @maximum_entries
     })
   end
 
-  def new(_entries), do: error("authoring Registry must be a map")
+  def new(_entries), do: error("Codec Registry must be a map")
 
   @doc false
   @spec new_discovered([manifest()], [codec()]) :: {:ok, t()} | {:error, term()}
@@ -99,10 +99,10 @@ defmodule Jido.Authoring.Registry do
     codecs = Enum.sort_by(codecs, &{&1.type, &1.vsn, Atom.to_string(&1.module)})
     entries = Map.new(manifests, &{{&1.id, &1.vsn}, {&1.kind, &1.target}})
 
-    with :ok <- unique(manifests, &{&1.id, &1.vsn}, :duplicate_authoring_reference),
-         :ok <- unique(manifests, &{&1.kind, &1.target}, :duplicate_authoring_target),
-         :ok <- unique(codecs, &{&1.type, &1.vsn}, :duplicate_authoring_codec),
-         :ok <- unique_encoders(codecs),
+    with :ok <- unique(manifests, &{&1.id, &1.vsn}, :duplicate_codec_reference),
+         :ok <- unique(manifests, &{&1.kind, &1.target}, :duplicate_codec_target),
+         :ok <- unique(codecs, &{&1.type, &1.vsn}, :duplicate_codec_codec),
+         :ok <- unique_targets(codecs),
          {:ok, registry} <- new(entries) do
       {:ok,
        %{
@@ -111,8 +111,8 @@ defmodule Jido.Authoring.Registry do
            codecs: Map.new(codecs, &{{&1.type, &1.vsn}, &1.module}),
            encoders:
              codecs
-             |> Enum.reject(&is_nil(Map.get(&1, :encoder)))
-             |> Map.new(&{&1.encoder, &1.module}),
+             |> Enum.reject(&is_nil(Map.get(&1, :target)))
+             |> Map.new(&{&1.target, &1.module}),
            revision: revision(manifests, codecs)
        }}
     end
@@ -140,7 +140,7 @@ defmodule Jido.Authoring.Registry do
   end
 
   def resolve(%__MODULE__{}, reference, kind),
-    do: error("invalid authoring Registry reference", %{reference: type(reference), kind: kind})
+    do: error("invalid Codec Registry reference", %{reference: type(reference), kind: kind})
 
   @doc "Finds the canonical reference for one typed value."
   @spec reference(t(), kind() | [kind()], term()) :: {:ok, key()} | {:error, Error.t()}
@@ -156,7 +156,7 @@ defmodule Jido.Authoring.Registry do
   end
 
   def reference(%__MODULE__{}, kind, _value),
-    do: error("invalid authoring Registry kind", %{kind: kind})
+    do: error("invalid Codec Registry kind", %{kind: kind})
 
   @doc "Encodes the canonical reference for one typed value as JSON-safe data."
   @spec encode_reference(t(), kind() | [kind()], term()) ::
@@ -241,20 +241,20 @@ defmodule Jido.Authoring.Registry do
   end
 
   def validate_reference(reference),
-    do: error("invalid authoring Registry reference", %{reference: type(reference)})
+    do: error("invalid Codec Registry reference", %{reference: type(reference)})
 
   @doc false
   @spec validate_identifier(term()) :: :ok | {:error, Error.t()}
   def validate_identifier(id) do
     if is_binary(id) and byte_size(id) in 1..255 and Regex.match?(@identifier_pattern, id),
       do: :ok,
-      else: error("invalid authoring Registry identifier", %{identifier: type(id), field: "id"})
+      else: error("invalid Codec Registry identifier", %{identifier: type(id), field: "id"})
   end
 
   @doc false
   @spec validate_vsn(term()) :: :ok | {:error, Error.t()}
   def validate_vsn(vsn) when is_integer(vsn) and vsn > 0, do: :ok
-  def validate_vsn(vsn), do: error("invalid authoring Registry vsn", %{vsn: vsn, field: "vsn"})
+  def validate_vsn(vsn), do: error("invalid Codec Registry vsn", %{vsn: vsn, field: "vsn"})
 
   defp parse_reference(%{"id" => id, "vsn" => vsn} = reference)
        when map_size(reference) == 2,
@@ -269,18 +269,18 @@ defmodule Jido.Authoring.Registry do
         [] -> if("id" in fields, do: "vsn", else: "id")
       end
 
-    error("authoring Registry reference must contain only id and vsn", %{field: field})
+    error("Codec Registry reference must contain only id and vsn", %{field: field})
   end
 
   defp parse_reference(_reference),
-    do: error("authoring Registry reference must contain only id and vsn")
+    do: error("Codec Registry reference must contain only id and vsn")
 
-  defp validate_kinds([]), do: error("invalid authoring Registry kinds", %{kinds: []})
+  defp validate_kinds([]), do: error("invalid Codec Registry kinds", %{kinds: []})
 
   defp validate_kinds(kinds) do
     if Enum.all?(kinds, &(is_atom(&1) and &1 not in [nil, true, false, :alias])),
       do: :ok,
-      else: error("invalid authoring Registry kinds", %{kinds: kinds})
+      else: error("invalid Codec Registry kinds", %{kinds: kinds})
   end
 
   defp resolve_one(entries, reference, kinds, expected, missing_kind) do
@@ -290,7 +290,7 @@ defmodule Jido.Authoring.Registry do
           if kind in kinds do
             {:ok, value}
           else
-            error("authoring Registry reference has the wrong entry kind", %{
+            error("Codec Registry reference has the wrong entry kind", %{
               identifier: id,
               vsn: vsn,
               expected: expected,
@@ -307,7 +307,7 @@ defmodule Jido.Authoring.Registry do
 
   defp reference_one(references, kinds, value, details) do
     case Enum.find_value(kinds, &Map.get(references, {&1, value})) do
-      nil -> error("authoring Registry has no reference for the required value", details)
+      nil -> error("Codec Registry has no reference for the required value", details)
       reference -> {:ok, reference}
     end
   end
@@ -327,14 +327,14 @@ defmodule Jido.Authoring.Registry do
        when is_atom(kind) and kind not in [nil, true, false, :alias],
        do: {:ok, {kind, value}}
 
-  defp validate_entry(entry), do: error("invalid authoring Registry entry", %{entry: type(entry)})
+  defp validate_entry(entry), do: error("invalid Codec Registry entry", %{entry: type(entry)})
 
   defp build_references(entries) do
     Enum.reduce_while(entries, {:ok, %{}}, fn {reference, {kind, value}}, {:ok, refs} ->
       case Map.fetch(refs, {kind, value}) do
         {:ok, existing} ->
           {:halt,
-           error("authoring Registry has multiple references for the same value", %{
+           error("Codec Registry has multiple references for the same value", %{
              kind: kind,
              references: [existing, reference]
            })}
@@ -355,14 +355,14 @@ defmodule Jido.Authoring.Registry do
       |> Enum.sort()
 
     if supported == [] do
-      error("unknown authoring Registry reference", %{
+      error("unknown Codec Registry reference", %{
         identifier: id,
         vsn: vsn,
         kind: kind,
         field: "id"
       })
     else
-      error("authoring Registry reference has unsupported vsn", %{
+      error("Codec Registry reference has unsupported vsn", %{
         identifier: id,
         vsn: vsn,
         kind: kind,
@@ -381,10 +381,10 @@ defmodule Jido.Authoring.Registry do
     if duplicate, do: {:error, {tag, duplicate}}, else: :ok
   end
 
-  defp unique_encoders(codecs) do
+  defp unique_targets(codecs) do
     codecs
-    |> Enum.reject(&is_nil(Map.get(&1, :encoder)))
-    |> unique(& &1.encoder, :duplicate_authoring_encoder)
+    |> Enum.reject(&is_nil(Map.get(&1, :target)))
+    |> unique(& &1.target, :duplicate_codec_target)
   end
 
   defp revision(manifests, codecs) do

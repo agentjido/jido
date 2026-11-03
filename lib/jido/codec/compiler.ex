@@ -1,4 +1,4 @@
-defmodule Jido.Authoring.Compiler do
+defmodule Jido.Codec.Compiler do
   @moduledoc false
 
   @validate_params_doc """
@@ -32,27 +32,27 @@ defmodule Jido.Authoring.Compiler do
     quote location: :keep do
       @behaviour Jido.Action
 
-      @__jido_authoring_config__ unquote(opts_ast)
-      @__jido_authoring_contract__ Jido.Authoring.Compiler.compile_contract(
-                                     unquote(kind),
-                                     @__jido_authoring_config__
-                                   )
+      @__jido_codec_config__ unquote(opts_ast)
+      @__jido_codec_contract__ Jido.Codec.Compiler.compile_contract(
+                                 unquote(kind),
+                                 @__jido_codec_config__
+                               )
 
       @doc unquote("Returns the name of the #{label}.")
       @spec name() :: String.t()
-      def name, do: @__jido_authoring_config__[:name]
+      def name, do: @__jido_codec_config__[:name]
 
       @doc unquote("Returns the description of the #{label}.")
       @spec description() :: String.t() | nil
-      def description, do: @__jido_authoring_config__[:description]
+      def description, do: @__jido_codec_config__[:description]
 
       @doc unquote("Returns the input schema of the #{label}.")
       @spec schema() :: Jido.Action.schema()
-      def schema, do: @__jido_authoring_config__[:schema]
+      def schema, do: @__jido_codec_config__[:schema]
 
       @doc unquote("Returns the output schema of the #{label}.")
       @spec output_schema() :: Jido.Action.schema()
-      def output_schema, do: @__jido_authoring_config__[:output_schema]
+      def output_schema, do: @__jido_codec_config__[:output_schema]
 
       @doc unquote("""
            Returns the compile-time #{label} authoring contract as JSON-safe data.
@@ -62,7 +62,7 @@ defmodule Jido.Authoring.Compiler do
            """)
       @spec authoring_contract() :: map()
       def authoring_contract,
-        do: Jido.Authoring.Compiler.contract!(@__jido_authoring_contract__)
+        do: Jido.Codec.Compiler.contract!(@__jido_codec_contract__)
 
       @doc unquote(validate_params_doc)
       @impl Jido.Action
@@ -78,16 +78,16 @@ defmodule Jido.Authoring.Compiler do
       def validate_output(output), do: Jido.Action.validate_output_for(output, __MODULE__)
 
       @doc false
-      @spec __jido_authoring_kind__() :: Jido.Instruction.kind()
-      def __jido_authoring_kind__, do: unquote(kind)
+      @spec __jido_codec_kind__() :: Jido.Instruction.kind()
+      def __jido_codec_kind__, do: unquote(kind)
 
       @doc false
-      @spec __jido_authoring__() :: Jido.Authoring.Manifest.t()
-      def __jido_authoring__ do
+      @spec __jido_codec_manifest__() :: Jido.Codec.Manifest.t()
+      def __jido_codec_manifest__ do
         %{
-          id: @__jido_authoring_config__[:id],
-          kind: __jido_authoring_kind__(),
-          vsn: @__jido_authoring_config__[:vsn],
+          id: @__jido_codec_config__[:id],
+          kind: __jido_codec_kind__(),
+          vsn: @__jido_codec_config__[:vsn],
           target: __MODULE__,
           name: name(),
           description: description()
@@ -110,8 +110,8 @@ defmodule Jido.Authoring.Compiler do
         "input_schema" => compile_json_schema(opts.schema, :schema),
         "output_schema" => compile_json_schema(opts.output_schema, :output_schema)
       }
-      |> Jason.encode!(maps: :strict)
-      |> Jason.decode!()
+      |> strict_json_encode!()
+      |> JSON.decode!()
 
     {:ok, contract}
   rescue
@@ -131,4 +131,24 @@ defmodule Jido.Authoring.Compiler do
             "#{inspect(option)} does not have a JSON-safe JSON Schema representation: " <>
               Exception.message(exception)
   end
+
+  defp strict_json_encode!(value) do
+    ensure_unique_json_keys!(value)
+    JSON.encode!(value)
+  end
+
+  defp ensure_unique_json_keys!(value) when is_list(value) do
+    Enum.each(value, &ensure_unique_json_keys!/1)
+  end
+
+  defp ensure_unique_json_keys!(value) when is_map(value) and not is_struct(value) do
+    names = Enum.map(Map.keys(value), &to_string/1)
+
+    if length(names) != MapSet.size(MapSet.new(names)),
+      do: raise(ArgumentError, "JSON object contains colliding keys")
+
+    Enum.each(Map.values(value), &ensure_unique_json_keys!/1)
+  end
+
+  defp ensure_unique_json_keys!(_value), do: :ok
 end

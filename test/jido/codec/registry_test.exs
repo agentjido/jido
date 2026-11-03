@@ -1,9 +1,9 @@
-defmodule Jido.Authoring.RegistryTest do
+defmodule Jido.Codec.RegistryTest do
   use Covenant.Case, component: "jido_action.authoring", async: true
   @moduletag obligation: "jido_action.authoring.I1"
 
-  alias Jido.Authoring.Registry
-  alias Jido.Authoring.Registry.Error
+  alias Jido.Codec.Registry
+  alias Jido.Codec.Registry.Error
 
   test "stores typed entries and resolves exact versioned references" do
     registry =
@@ -18,17 +18,44 @@ defmodule Jido.Authoring.RegistryTest do
     assert {:error, %Error{} = error} =
              Registry.resolve(registry, {"actions/add", 1}, :flow)
 
-    assert Jido.Authoring.Error.splode_error?(error)
+    assert Jido.Codec.Error.splode_error?(error)
   end
 
   test "accepting an existing Registry preserves its discovered metadata" do
     assert {:ok, discovered} =
              Registry.new_discovered([], [
-               %{type: "tests.codec", vsn: 1, encoder: nil, module: __MODULE__}
+               %{type: "tests.codec", vsn: 1, target: nil, module: __MODULE__}
              ])
 
     assert {:ok, ^discovered} = Registry.new(discovered)
     assert Registry.codec(discovered, "tests.codec", 1) == {:ok, __MODULE__}
+  end
+
+  test "keeps historical readers and selects one current writer" do
+    old_one = %{type: "tests.versioned", vsn: 1, target: nil, module: String}
+    old_two = %{type: "tests.versioned", vsn: 2, target: nil, module: List}
+    current = %{type: "tests.versioned", vsn: 3, target: URI, module: URI}
+
+    assert {:ok, registry} = Registry.new_discovered([], [current, old_two, old_one])
+    assert Registry.codec_vsns(registry, "tests.versioned") == [1, 2, 3]
+    assert Registry.codec(registry, "tests.versioned", 1) == {:ok, String}
+    assert Registry.codec(registry, "tests.versioned", 2) == {:ok, List}
+    assert Registry.codec(registry, "tests.versioned", 3) == {:ok, URI}
+    assert Registry.encoder(registry, %URI{}) == {:ok, URI}
+  end
+
+  test "rejects duplicate document routes and duplicate current writers" do
+    assert {:error, {:duplicate_codec_codec, {"tests.duplicate", 1}}} =
+             Registry.new_discovered([], [
+               %{type: "tests.duplicate", vsn: 1, target: nil, module: String},
+               %{type: "tests.duplicate", vsn: 1, target: nil, module: List}
+             ])
+
+    assert {:error, {:duplicate_codec_target, URI}} =
+             Registry.new_discovered([], [
+               %{type: "tests.one", vsn: 1, target: URI, module: String},
+               %{type: "tests.two", vsn: 1, target: URI, module: List}
+             ])
   end
 
   test "uses vsn as part of every portable reference" do

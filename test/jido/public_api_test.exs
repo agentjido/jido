@@ -10,8 +10,8 @@ defmodule Jido.PublicAPITest do
     id1 = Jido.generate_id()
     id2 = Jido.generate_id()
 
-    assert Jido.Signal.ID.valid?(id1)
-    assert Jido.Signal.ID.valid?(id2)
+    assert Jido.Id.uuid7?(id1)
+    assert Jido.Id.uuid7?(id2)
     refute id1 == id2
   end
 

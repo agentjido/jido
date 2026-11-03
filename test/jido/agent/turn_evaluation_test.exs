@@ -26,7 +26,7 @@ defmodule Jido.Agent.TurnEvaluationTest do
   end
 
   test "route selection rejects malformed Signal types before callback", %{jido: jido} do
-    agent = CustomRouteAgent.instantiate!(id: Jido.Signal.ID.generate!())
+    agent = CustomRouteAgent.instantiate!(id: Jido.Id.uuid7())
     {:ok, server} = JidoTest.AgentServerAssertions.start_agent(jido, agent)
     before = JidoTest.AgentServerAssertions.committed(server)
     source = Signal.new!("source.custom", %{observer: self()}, source: "/test")
@@ -124,7 +124,7 @@ defmodule Jido.Agent.TurnEvaluationTest do
 
     agent =
       Agent.define!(%{name: "missing_route"})
-      |> Agent.instantiate!(id: Jido.Signal.ID.generate!())
+      |> Agent.instantiate!(id: Jido.Id.uuid7())
 
     {:ok, specs} = Jido.Plugin.Normalizer.normalize_all(Agent.runtime_plugins(agent))
     {:ok, command} = Command.new(agent, source)

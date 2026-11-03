@@ -3,7 +3,7 @@ defmodule Jido.Agent.SchedulerCodecTest do
 
   alias Jido.Agent
   alias Jido.AgentServer, as: Server
-  alias Jido.Authoring.Registry
+  alias Jido.Codec.Registry
   alias Jido.Plugin.Scheduler
 
   defmodule QueueTick do
@@ -74,7 +74,7 @@ defmodule Jido.Agent.SchedulerCodecTest do
 
     assert {:error,
             [
-              %Jido.Authoring.Issue{
+              %Jido.Codec.Issue{
                 details: %{identifier: "plugins/scheduler", kind: :plugin}
               }
             ]} =
@@ -107,7 +107,7 @@ defmodule Jido.Agent.SchedulerCodecTest do
 
     assert {:error,
             [
-              %Jido.Authoring.Issue{
+              %Jido.Codec.Issue{
                 code: :invalid_document,
                 message: "Scheduler retry_delay_ms is invalid"
               }

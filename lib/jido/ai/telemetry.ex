@@ -187,7 +187,7 @@ defmodule Jido.AI.Telemetry do
   @spec with_reasoning(map(), map(), (-> result)) :: result when result: term()
   def with_reasoning(context, reasoning, fun)
       when is_map(context) and is_map(reasoning) and is_function(fun, 0) do
-    operation_id = "reasoning_#{Jido.generate_id()}"
+    operation_id = "reasoning_#{Jido.Id.uuid7()}"
     metadata = reasoning_metadata(context, reasoning, operation_id)
     conversation_id = metadata[:thread_id]
     started_at = System.monotonic_time()
@@ -639,7 +639,7 @@ defmodule Jido.AI.Telemetry do
 
   defp agent_definition(module) when is_atom(module) and not is_nil(module) do
     authoring =
-      if function_exported?(module, :__jido_authoring__, 0), do: module.__jido_authoring__(), else: %{}
+      if function_exported?(module, :__jido_codec_manifest__, 0), do: module.__jido_codec_manifest__(), else: %{}
 
     case module.definition() do
       %{id: id, description: description, vsn: vsn} ->

@@ -2,16 +2,16 @@ defmodule Jido.Flow.Codec.Writer do
   @moduledoc false
 
   alias Jido.Flow.{Component, Error, Graph}
-  alias Jido.Authoring.Registry
+  alias Jido.Codec.Registry
   alias Jido.Flow.Codec.{Limits, Value}
 
   @doc false
-  @spec encode(Jido.Flow.t(), Jido.Authoring.Registry.t()) ::
+  @spec encode(Jido.Flow.t(), Jido.Codec.Registry.t()) ::
           {:ok, map()} | {:error, Exception.t()}
   def encode(flow, registry) do
     case do_encode(flow, registry) do
       {:error, %Registry.Error{} = error} ->
-        message = String.replace(error.message, "authoring Registry", "flow registry")
+        message = String.replace(error.message, "Codec Registry", "flow registry")
         {:error, Error.validation_error(message, error.details)}
 
       result ->

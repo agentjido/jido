@@ -6,7 +6,7 @@ defmodule Jido.Exec.HandoffTest do
   alias Jido.Exec
   alias Jido.Exec.Handoff
   alias Jido.Flow
-  alias Jido.Authoring.Registry
+  alias Jido.Codec.Registry
   alias Jido.Flow.Ref
   alias JidoActionTest.FlowCodec, as: Codec
   alias Jido.Instruction

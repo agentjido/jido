@@ -64,7 +64,7 @@ defmodule Jido.Plugin.StateRuntimeTest do
   end
 
   test "state-only Plugins compose optional state into the Agent" do
-    agent = DataAgent.instantiate!(id: Jido.Signal.ID.generate!())
+    agent = DataAgent.instantiate!(id: Jido.Id.uuid7())
 
     assert agent.state == %{credits: 3}
     assert agent.schema.fields == []

@@ -8,5 +8,8 @@ if config_env() in [:dev, :test] do
 end
 
 if config_env() == :test do
-  import_config "test.exs"
+  config :jido, runtime_store_timeout: 100
+
+  # Keep normal test output quiet. CaptureLog installs its own handler when needed.
+  config :logger, :default_handler, false
 end

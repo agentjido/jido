@@ -77,12 +77,12 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.Actions.PrepareCall do
   end
 
   defp request(%{phase: :evaluate, thoughts: thoughts}) do
-    instruction = "Evaluate each candidate from this JSON list: " <> Jason.encode!(thoughts)
+    instruction = "Evaluate each candidate from this JSON list: " <> JSON.encode!(thoughts)
     {instruction, @scores_schema}
   end
 
   defp request(%{phase: :synthesize, selected: selected}) do
-    instruction = "Synthesize the best final answer from this JSON list: " <> Jason.encode!(selected)
+    instruction = "Synthesize the best final answer from this JSON list: " <> JSON.encode!(selected)
     {instruction, @answer_schema}
   end
 end

@@ -2,13 +2,13 @@ defmodule Jido.SignalTest do
   use ExUnit.Case, async: true
 
   alias Jido.Signal
-  alias Jido.Signal.ID
+  alias Jido.Id
 
   describe "new/1" do
     test "generates a UUID7 and CloudEvents 1.0 specversion" do
       assert {:ok, signal} = Signal.new(type: "example.event", source: "/example")
 
-      assert ID.valid?(signal.id)
+      assert Id.uuid7?(signal.id)
       assert signal.specversion == "1.0"
       assert signal.source == "/example"
     end

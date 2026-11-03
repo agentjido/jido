@@ -2,7 +2,7 @@ defmodule Jido.Flow.CodecTest do
   use Covenant.Case, component: "jido_action.codec", async: false
   @moduletag obligation: "jido_action.codec.I7"
 
-  alias Jido.Authoring.Registry
+  alias Jido.Codec.Registry
   alias Jido.Flow.Error.InvalidDefinitionError
   alias Jido.Flow
   alias Jido.Flow.Codec
@@ -43,12 +43,10 @@ defmodule Jido.Flow.CodecTest do
     :ok
   end
 
-  test "the Flow authoring codec manifest uses document version two" do
-    assert Jido.Flow.Codec.__jido_authoring_codec__() == %{
-             type: "jido.flow",
-             vsn: 2,
-             encoder: Jido.Flow
-           }
+  test "the Flow codec contract uses document version two" do
+    assert Jido.Flow.Codec.type() == "jido.flow"
+    assert Jido.Flow.Codec.version() == 2
+    assert Jido.Flow.Codec.target() == Jido.Flow
   end
 
   test "inline Steps use the exact version 2 stored call fields" do
@@ -258,13 +256,13 @@ defmodule Jido.Flow.CodecTest do
 
     assert {:error,
             [
-              %Jido.Authoring.Issue{
+              %Jido.Codec.Issue{
                 code: :unsupported_document,
                 path: ["vsn"],
                 details: %{type: "jido.flow", vsn: 1, supported_vsns: [2]}
               }
             ]} =
-             Jido.Authoring.decode(version_one, registry: authoring_registry)
+             Jido.Codec.decode(version_one, registry: authoring_registry)
   end
 
   test "current version preserves diagnostics for nested structs" do

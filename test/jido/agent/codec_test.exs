@@ -1,7 +1,7 @@
 defmodule Jido.Agent.CodecTest do
   use Covenant.Case, component: "jido.agent", async: true
   alias Jido.Agent
-  alias Jido.Authoring.Registry
+  alias Jido.Codec.Registry
   alias JidoTest.AgentContract, as: F
   alias JidoTest.AgentFixtures.Add
 
@@ -37,7 +37,7 @@ defmodule Jido.Agent.CodecTest do
 
   defmodule ChangingTarget do
     @behaviour Jido.Action
-    def __jido_authoring_kind__, do: Process.get({__MODULE__, :kind}, :action)
+    def __jido_codec_kind__, do: Process.get({__MODULE__, :kind}, :action)
     @impl true
     def validate_params(value), do: {:ok, value}
     @impl true
@@ -89,7 +89,7 @@ defmodule Jido.Agent.CodecTest do
 
       for invalid <- [false, 1, "invalid", [], {1, 2}, %URI{}] do
         assert {:error,
-                %Jido.Authoring.Error.InvalidError{
+                %Jido.Codec.Error.InvalidError{
                   details: %{path: [:routes, 0, :defaults]}
                 }} =
                  JidoTest.AgentRegistry.encode(
@@ -119,7 +119,7 @@ defmodule Jido.Agent.CodecTest do
 
     for result <- [JidoTest.AgentRegistry.encode(definition, registry)] do
       assert {:error,
-              %Jido.Authoring.Error.InvalidError{
+              %Jido.Codec.Error.InvalidError{
                 code: :invalid_executable,
                 details: %{path: [:routes, 0, :handler]}
               }} = result
@@ -175,22 +175,22 @@ defmodule Jido.Agent.CodecTest do
         [Map.drop(route, ["state", "reply"])]
       end)
 
-    assert {:error, [%Jido.Authoring.Issue{code: :invalid_document}]} =
+    assert {:error, [%Jido.Codec.Issue{code: :invalid_document}]} =
              JidoTest.AgentRegistry.decode(old_shape, registry)
 
     unsupported = %{document | "vsn" => 2}
 
-    assert {:error, [%Jido.Authoring.Issue{code: :unsupported_document}]} =
+    assert {:error, [%Jido.Codec.Issue{code: :unsupported_document}]} =
              JidoTest.AgentRegistry.decode(unsupported, registry)
 
     assert {:error,
             [
-              %Jido.Authoring.Issue{
+              %Jido.Codec.Issue{
                 code: :unsupported_document,
                 path: ["vsn"],
                 details: %{vsn: 2}
               }
-            ]} = Jido.Agent.Codec.decode_document(unsupported, registry)
+            ]} = Jido.Agent.Codec.decode(unsupported, registry)
   end
 
   @tag obligation: "jido.agent.I20"
@@ -216,7 +216,7 @@ defmodule Jido.Agent.CodecTest do
         %{route | "state" => %{"source" => "output", "path" => ["id"]}}
       ])
 
-    assert {:error, [%Jido.Authoring.Issue{code: :ambiguous_output_field}]} =
+    assert {:error, [%Jido.Codec.Issue{code: :ambiguous_output_field}]} =
              JidoTest.AgentRegistry.decode(ambiguous, registry)
 
     key = "codec_missing_#{System.unique_integer([:positive])}"
@@ -235,7 +235,7 @@ defmodule Jido.Agent.CodecTest do
         %{route | "state" => %{"source" => "output", "path" => [1]}}
       ])
 
-    assert {:error, [%Jido.Authoring.Issue{code: :invalid_document}]} =
+    assert {:error, [%Jido.Codec.Issue{code: :invalid_document}]} =
              JidoTest.AgentRegistry.decode(unsafe, registry)
   end
 
@@ -373,7 +373,7 @@ defmodule Jido.Agent.CodecTest do
 
     assert {:error,
             [
-              %Jido.Authoring.Issue{
+              %Jido.Codec.Issue{
                 code: :invalid_string,
                 path: ["definition", "name"]
               }
@@ -384,7 +384,7 @@ defmodule Jido.Agent.CodecTest do
 
     assert {:error,
             [
-              %Jido.Authoring.Issue{
+              %Jido.Codec.Issue{
                 code: :reference,
                 path: ["definition", "schema", "id"]
               }
@@ -399,7 +399,7 @@ defmodule Jido.Agent.CodecTest do
 
     assert {:error,
             [
-              %Jido.Authoring.Issue{
+              %Jido.Codec.Issue{
                 code: :reference,
                 path: ["definition", "routes", 0, "handler", "target", "id"]
               }
@@ -413,7 +413,7 @@ defmodule Jido.Agent.CodecTest do
 
     assert {:error,
             [
-              %Jido.Authoring.Issue{
+              %Jido.Codec.Issue{
                 code: :tag,
                 path: ["definition", "metadata", "entries", 0, "value"]
               }
@@ -430,7 +430,7 @@ defmodule Jido.Agent.CodecTest do
 
     assert {:error,
             [
-              %Jido.Authoring.Issue{
+              %Jido.Codec.Issue{
                 code: :reference,
                 path: ["definition", "metadata", "id"]
               }
@@ -552,12 +552,12 @@ defmodule Jido.Agent.CodecTest do
     assert byte_size(at_limit) == 8_388_608
     assert byte_size(over_limit) == 8_388_609
 
-    assert {:error, [%Jido.Authoring.Issue{code: :invalid_document}]} =
+    assert {:error, [%Jido.Codec.Issue{code: :invalid_document}]} =
              JidoTest.AgentRegistry.decode_json(at_limit, registry)
 
     assert {:error,
             [
-              %Jido.Authoring.Issue{
+              %Jido.Codec.Issue{
                 code: :invalid_json,
                 details: %{maximum_bytes: 8_388_608}
               }

@@ -1,7 +1,7 @@
 defmodule Jido.Agent.SerializationContractTest do
   use JidoTest.Case, async: true
 
-  alias Jido.Authoring.Registry
+  alias Jido.Codec.Registry
   alias Jido.Persistence
   alias JidoTest.Persistence.CheckpointIdentityProbe, as: Probe
   alias JidoTest.Persistence.ProbeStore, as: Store

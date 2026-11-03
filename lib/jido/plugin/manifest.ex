@@ -145,7 +145,7 @@ defmodule Jido.Plugin.Manifest do
     do: invalid("Plugin option mapping must be a map", %{option_keys: option_keys})
 
   defp validate_static_options(options) do
-    case Jido.Authoring.validate_static(options) do
+    case Jido.Codec.validate_static(options) do
       :ok ->
         :ok
 

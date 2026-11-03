@@ -1,6 +1,6 @@
-defmodule Jido.Authoring.Issue do
+defmodule Jido.Codec.Issue do
   @moduledoc """
-  Describes one authoring problem at a source JSON path.
+  Describes one Codec problem at a source JSON path.
 
   Codecs return Issues directly. Codes and paths are stable machine data.
   Messages explain the problem to a person.
@@ -27,7 +27,7 @@ defmodule Jido.Authoring.Issue do
       details: safe_details(Keyword.get(opts, :details, %{}))
     }
 
-    if valid?(issue), do: issue, else: raise(ArgumentError, "invalid authoring issue")
+    if valid?(issue), do: issue, else: raise(ArgumentError, "invalid Codec issue")
   end
 
   @doc false
@@ -72,10 +72,31 @@ defmodule Jido.Authoring.Issue do
   defp valid_path?(_path), do: false
 
   defp json?(value) do
-    match?({:ok, _json}, Jason.encode(value, maps: :strict))
+    _json = JSON.encode!(value)
+    unique_json_keys?(value)
   rescue
     _error -> false
   catch
     _kind, _reason -> false
+  end
+
+  defp unique_json_keys?(value) when is_list(value),
+    do: not List.improper?(value) and Enum.all?(value, &unique_json_keys?/1)
+
+  defp unique_json_keys?(value) when is_map(value) and not is_struct(value) do
+    with {:ok, names} <- json_key_names(Map.keys(value)) do
+      length(names) == MapSet.size(MapSet.new(names)) and
+        Enum.all?(Map.values(value), &unique_json_keys?/1)
+    else
+      :error -> false
+    end
+  end
+
+  defp unique_json_keys?(_value), do: true
+
+  defp json_key_names(keys) do
+    {:ok, Enum.map(keys, &to_string/1)}
+  rescue
+    _error -> :error
   end
 end

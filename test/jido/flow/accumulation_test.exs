@@ -1,7 +1,7 @@
 defmodule Jido.Flow.AccumulationTest do
   use ExUnit.Case, async: true
 
-  alias Jido.Authoring.Registry
+  alias Jido.Codec.Registry
   alias Jido.Flow.{Codec, Definition, Error}
   alias JidoActionTest.FlowCodec, as: Codec
 

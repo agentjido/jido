@@ -33,7 +33,7 @@ defmodule JidoTest.AgentServer.OutboundTest do
           {:error, :outbound_rejected}
 
         context.target == :reply and opts[:corrupt_reply] == :id ->
-          {:ok, %{signal | id: Signal.ID.generate!()}}
+          {:ok, %{signal | id: Jido.Id.uuid7()}}
 
         context.target == :reply and opts[:corrupt_reply] == :causation ->
           Signal.put_context(signal, "jidocausationid", "changed-causation")

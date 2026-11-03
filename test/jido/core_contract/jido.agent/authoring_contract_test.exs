@@ -205,7 +205,7 @@ defmodule JidoTest.Contract.AgentAuthoringTest do
       })
 
     assert complete === CompleteDsl.definition()
-    assert CompleteDsl.__jido_authoring__().id == "tests/agents/complete-dsl"
+    assert CompleteDsl.__jido_codec_manifest__().id == "tests/agents/complete-dsl"
   end
 
   @tag obligation: ["jido.agent.I2", "jido.agent.I3", "jido.agent.I7", "jido.agent.I9"]
@@ -289,7 +289,7 @@ defmodule JidoTest.Contract.AgentAuthoringTest do
 
   @tag obligation: ["jido.agent.I3", "jido.agent.I4"]
   test "the DSL rejects invalid identity, repeated core declarations, and unsafe helpers" do
-    assert_raise Jido.Authoring.Registry.Error, ~r/Registry identifier/, fn ->
+    assert_raise Jido.Codec.Registry.Error, ~r/Registry identifier/, fn ->
       F.with_agent("", fn _module -> :ok end, ~s(, id: "bad id"))
     end
 
@@ -373,11 +373,9 @@ defmodule JidoTest.Contract.AgentAuthoringTest do
 
   @tag obligation: "jido.agent.I20"
   test "the trusted JSON codec returns the portable definition" do
-    assert Jido.Agent.Codec.__jido_authoring_codec__() == %{
-             type: "jido.agent.definition",
-             vsn: 1,
-             encoder: Jido.Agent
-           }
+    assert Jido.Agent.Codec.type() == "jido.agent.definition"
+    assert Jido.Agent.Codec.version() == 1
+    assert Jido.Agent.Codec.target() == Jido.Agent
 
     for value <- [Leaf.definition(), Leaf.instantiate!(id: "json")] do
       registry = JidoTest.AgentRegistry.for(value)

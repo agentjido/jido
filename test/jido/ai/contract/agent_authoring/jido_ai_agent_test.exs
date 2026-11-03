@@ -391,7 +391,7 @@ defmodule Jido.AITest do
     assert reply.data == %{input: "check", threshold: 0.85, rounds: 2}
 
     registry =
-      Jido.Authoring.Registry.new!(%{
+      Jido.Codec.Registry.new!(%{
         {id, 1} => {:agent, name},
         {"jido.ai/agent", 1} => {:plugin, Jido.AI.Agent.Plugin},
         {"jido.ai/tests/schema-driven-reasoning", 1} => {:flow, Jido.AITest.SchemaDrivenReasoning},
@@ -399,7 +399,7 @@ defmodule Jido.AITest do
       })
 
     assert {:ok, json} =
-             Jido.Authoring.encode_json(name.definition(),
+             Jido.Codec.encode_json(name.definition(),
                registry: registry,
                codec: Jido.Agent.Codec
              )
@@ -415,7 +415,7 @@ defmodule Jido.AITest do
              )
 
     assert {:ok, definition} =
-             Jido.Authoring.decode_json(json,
+             Jido.Codec.decode_json(json,
                registry: registry,
                codec: Jido.Agent.Codec
              )
@@ -583,7 +583,7 @@ defmodule Jido.AITest do
     registry = simple_agent_registry()
 
     assert {:ok, json} =
-             Jido.Authoring.encode_json(SimpleAgent.definition(),
+             Jido.Codec.encode_json(SimpleAgent.definition(),
                registry: registry,
                codec: Jido.Agent.Codec
              )
@@ -618,7 +618,7 @@ defmodule Jido.AITest do
            } = Jason.decode!(json)
 
     assert {:ok, definition} =
-             Jido.Authoring.decode_json(fixture,
+             Jido.Codec.decode_json(fixture,
                registry: registry,
                codec: Jido.Agent.Codec
              )
@@ -643,7 +643,7 @@ defmodule Jido.AITest do
 
   test "Flow tools round-trip through Agent authoring data" do
     registry =
-      Jido.Authoring.Registry.new!(%{
+      Jido.Codec.Registry.new!(%{
         {"jido.ai/reasoning/react", 1} => {:flow, ReAct},
         {"jido.ai/examples/tools/add-flow", 1} => {:flow, Tools.AddFlow}
       })
@@ -663,7 +663,7 @@ defmodule Jido.AITest do
     registry = configured_agent_registry()
 
     assert {:ok, json} =
-             Jido.Authoring.encode_json(ConfiguredAgent.definition(),
+             Jido.Codec.encode_json(ConfiguredAgent.definition(),
                registry: registry,
                codec: Jido.Agent.Codec
              )
@@ -681,7 +681,7 @@ defmodule Jido.AITest do
             }} = Jido.Flow.decode_defaults(plugin["data"]["config"], ReAct)
 
     assert {:ok, definition} =
-             Jido.Authoring.decode_json(json,
+             Jido.Codec.decode_json(json,
                registry: registry,
                codec: Jido.Agent.Codec
              )
@@ -704,7 +704,7 @@ defmodule Jido.AITest do
       |> Jason.encode!()
 
     assert {:error, [issue]} =
-             Jido.Authoring.decode_json(fixture,
+             Jido.Codec.decode_json(fixture,
                registry: simple_agent_registry(),
                codec: Jido.Agent.Codec
              )
@@ -728,7 +728,7 @@ defmodule Jido.AITest do
       |> Jason.encode!()
 
     assert {:error, [issue]} =
-             Jido.Authoring.decode_json(fixture,
+             Jido.Codec.decode_json(fixture,
                registry: simple_agent_registry(),
                codec: Jido.Agent.Codec
              )
@@ -971,7 +971,7 @@ defmodule Jido.AITest do
   end
 
   defp run_agent(params) do
-    agent = SimpleAgent.instantiate!(id: Jido.Signal.ID.generate!())
+    agent = SimpleAgent.instantiate!(id: Jido.Id.uuid7())
     signal = SimpleAgent.request_signal!(params)
 
     case SimpleAgent.cmd(agent, signal) do
@@ -984,7 +984,7 @@ defmodule Jido.AITest do
   end
 
   defp simple_agent_registry do
-    Jido.Authoring.Registry.new!(%{
+    Jido.Codec.Registry.new!(%{
       {"jido.ai/agents/simple", 3} => {:agent, SimpleAgent},
       {"jido.ai/agent", 1} => {:plugin, Jido.AI.Agent.Plugin},
       {"jido.ai/reasoning/react", 1} => {:flow, ReAct},
@@ -995,7 +995,7 @@ defmodule Jido.AITest do
   end
 
   defp configured_agent_registry do
-    Jido.Authoring.Registry.new!(%{
+    Jido.Codec.Registry.new!(%{
       {"jido.ai/agents/configured", 1} => {:agent, ConfiguredAgent},
       {"jido.ai/agent", 1} => {:plugin, Jido.AI.Agent.Plugin},
       {"jido.ai/reasoning/react", 1} => {:flow, ReAct},

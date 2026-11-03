@@ -4,7 +4,7 @@ defmodule Jido.Signal.Bus.Subscriptions do
   alias Jido.Signal.Bus.DurableSubscription
   alias Jido.Signal.Bus.Selector
   alias Jido.Signal.Bus.Subscriptions.{Runtime, Subscriber}
-  alias Jido.Signal.ID
+  alias Jido.Id
   alias Jido.Signal.Router
   alias Jido.Signal.Router.Index
 
@@ -161,7 +161,7 @@ defmodule Jido.Signal.Bus.Subscriptions do
         {:error, {:invalid_option, :durable}}
 
       :error ->
-        case Keyword.get_lazy(opts, :subscription_id, &ID.generate!/0) do
+        case Keyword.get_lazy(opts, :subscription_id, &Id.uuid7/0) do
           id when is_binary(id) and byte_size(id) > 0 -> {:ok, :ephemeral, id}
           _invalid -> {:error, {:invalid_option, :subscription_id}}
         end

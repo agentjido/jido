@@ -2,7 +2,7 @@ defmodule Jido.Flow.DSL.InlineStep do
   @moduledoc false
 
   alias Jido.Action.Inline
-  alias Jido.Authoring.Options
+  alias Jido.Codec.Config
   alias Jido.Flow.DSL.{ValueParser, MacroSupport}
 
   @action_fields [:name, :description, :schema, :output_schema, :context]
@@ -166,7 +166,7 @@ defmodule Jido.Flow.DSL.InlineStep do
         do: "; use only inline: and do:",
         else: "; use only needs:, meta:, inline:, and do:"
 
-    Options.allowed!(
+    Config.allow_options!(
       options,
       allowed,
       caller,
@@ -188,7 +188,7 @@ defmodule Jido.Flow.DSL.InlineStep do
           "#{label} setting"
         )
 
-        Options.allowed!(inline_options, @action_fields, caller, "#{label} setting")
+        Config.allow_options!(inline_options, @action_fields, caller, "#{label} setting")
 
         inline_options
     end

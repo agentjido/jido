@@ -1,4 +1,4 @@
-defmodule Jido.Authoring.Static do
+defmodule Jido.Codec.Static do
   alias Jido.Joi
   @moduledoc false
 

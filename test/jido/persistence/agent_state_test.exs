@@ -13,7 +13,7 @@ defmodule Jido.Persistence.AgentStateTest do
 
     agent =
       Agent.define!(%{name: "restore_defaults", schema: schema})
-      |> Agent.instantiate!(id: Jido.Signal.ID.generate!())
+      |> Agent.instantiate!(id: Jido.Id.uuid7())
 
     assert {:ok, stored_nil} = Agent.transition(agent, %{nested: %{count: nil}})
     assert {:ok, checkpoint} = Jido.Persistence.snapshot(stored_nil)
@@ -33,7 +33,7 @@ defmodule Jido.Persistence.AgentStateTest do
 
     agent =
       Agent.define!(%{name: "empty_nil", schema: schema})
-      |> Agent.instantiate!(id: Jido.Signal.ID.generate!())
+      |> Agent.instantiate!(id: Jido.Id.uuid7())
 
     assert agent.state === %{count: nil}
     assert Agent.validate(agent) === {:ok, agent}

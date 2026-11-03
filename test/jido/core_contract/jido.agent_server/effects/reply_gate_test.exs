@@ -10,11 +10,11 @@ defmodule JidoTest.AgentServer.Effects.ReplyGateTest do
   test "the Reply effect adds correlation and does not use the fallback handler" do
     signal = Signal.new!("reply.gate", %{value: 1}, source: "/test/reply-gate")
     directive = Directive.reply(signal)
-    request_id = Signal.ID.generate!()
+    request_id = Jido.Id.uuid7()
 
     context = %{
       agent: %{id: "reply-gate-agent", state: %{}},
-      turn_id: Signal.ID.generate!(),
+      turn_id: Jido.Id.uuid7(),
       signal_id: request_id,
       state_version: 1,
       plugin_specs: [],

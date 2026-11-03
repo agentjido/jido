@@ -1,8 +1,8 @@
 defmodule JidoActionTest.GeneratedFlowCodec do
   @moduledoc false
 
-  alias Jido.Authoring
-  alias Jido.Authoring.Registry
+  alias Jido.Codec
+  alias Jido.Codec.Registry
   alias Jido.Expr
   alias Jido.Flow
   alias Jido.Flow.Definition
@@ -29,7 +29,7 @@ defmodule JidoActionTest.GeneratedFlowCodec do
     do: {:error, Jido.Flow.Error.validation_error("expected a Jido.Flow artifact", %{value: value})}
 
   def encode(value, registry),
-    do: Jido.Flow.Codec.encode_document(value, registry)
+    do: Jido.Flow.Codec.encode(value, registry)
 
   def decode(document, registry) do
     case Jido.Flow.Codec.diagnose(document, registry) do
@@ -39,10 +39,10 @@ defmodule JidoActionTest.GeneratedFlowCodec do
   end
 
   def encode_json(value, registry),
-    do: Authoring.encode_json(value, registry: registry, codec: Jido.Flow.Codec)
+    do: Codec.encode_json(value, registry: registry, codec: Jido.Flow.Codec)
 
   def decode_json(json, registry),
-    do: Authoring.decode_json(json, registry: registry, codec: Jido.Flow.Codec)
+    do: Codec.decode_json(json, registry: registry, codec: Jido.Flow.Codec)
 
   defp entries(flow) do
     values =

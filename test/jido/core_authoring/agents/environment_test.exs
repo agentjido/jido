@@ -60,7 +60,7 @@ defmodule JidoTest.Authoring.Agents.EnvironmentTest do
 
     agent = Agent.instantiate!(definition, id: "environment-agent")
 
-    assert {:error, %Jido.Authoring.Error.InvalidError{code: :value}} =
+    assert {:error, %Jido.Codec.Error.InvalidError{code: :value}} =
              JidoTest.AgentRegistry.encode(agent, JidoTest.AgentRegistry.for(agent))
 
     assert {:ok, snapshot} = Jido.Persistence.snapshot(agent)

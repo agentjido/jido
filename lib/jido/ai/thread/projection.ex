@@ -319,7 +319,7 @@ defmodule Jido.AI.Thread.Projection do
   defp over?(value, limit), do: value > limit
   defp positive_limit(value) when is_integer(value) and value > 0, do: value
   defp positive_limit(_value), do: nil
-  defp turn_bytes(turn), do: turn |> Enum.map(&elem(&1, 1)) |> Jason.encode!() |> byte_size()
+  defp turn_bytes(turn), do: turn |> Enum.map(&elem(&1, 1)) |> JSON.encode!() |> byte_size()
   defp sequence(nil), do: nil
   defp sequence({entry, _message}), do: entry.seq
 
@@ -522,7 +522,7 @@ defmodule Jido.AI.Thread.Projection do
     name = field(call, :name)
     arguments = field(call, :arguments)
     metadata = field(call, :metadata) || %{}
-    encoded = if is_binary(arguments), do: arguments, else: Jason.encode!(arguments)
+    encoded = if is_binary(arguments), do: arguments, else: JSON.encode!(arguments)
 
     tool_call =
       if field(metadata, :builtin?) == true,
@@ -556,5 +556,27 @@ defmodule Jido.AI.Thread.Projection do
   defp portable_content(content), do: content
 
   defp field(map, key), do: Map.get(map, key, Map.get(map, Atom.to_string(key)))
-  defp json(value), do: value |> Jason.encode!() |> Jason.decode!()
+  defp json(value), do: value |> native_json_value() |> JSON.encode!() |> JSON.decode!()
+
+  defp native_json_value(%ReqLLM.Message.ContentPart{data: data} = part)
+       when is_binary(data) do
+    part
+    |> Map.from_struct()
+    |> Map.put(:data, Base.encode64(data))
+    |> native_json_value()
+  end
+
+  defp native_json_value(%ReqLLM.Message.ContentPart{} = part),
+    do: part |> Map.from_struct() |> native_json_value()
+
+  defp native_json_value(%ReqLLM.Message.ReasoningDetails{} = details),
+    do: details |> Map.from_struct() |> native_json_value()
+
+  defp native_json_value(values) when is_list(values),
+    do: Enum.map(values, &native_json_value/1)
+
+  defp native_json_value(value) when is_map(value) and not is_struct(value),
+    do: Map.new(value, fn {key, item} -> {key, native_json_value(item)} end)
+
+  defp native_json_value(value), do: value
 end

@@ -36,7 +36,7 @@ defmodule Jido.Action.Inline.Compiler do
     Owner.setup!(caller)
     path = Owner.validate_path!(path, caller)
     Owner.check_identity!(path, caller)
-    config = Jido.Authoring.Config.prepare!(:action, config, caller)
+    config = Jido.Codec.Config.prepare!(:action, config, caller)
 
     {target, function} = identity(caller.module, path)
 
@@ -95,7 +95,7 @@ defmodule Jido.Action.Inline.Compiler do
       quote generated: true do
         @moduledoc false
         @compile {:no_warn_undefined, unquote(owner)}
-        use Jido.Authoring.Compiler,
+        use Jido.Codec.Compiler,
           kind: :action,
           config: unquote(Macro.escape(config))
 

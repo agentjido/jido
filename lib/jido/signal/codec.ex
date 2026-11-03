@@ -4,7 +4,7 @@ defmodule Jido.Signal.Codec do
 
   alias Jido.Signal
   alias Jido.Signal.Context
-  alias Jido.Signal.ID
+  alias Jido.Id
 
   @core_names ~w[
     specversion id source type subject time
@@ -19,7 +19,7 @@ defmodule Jido.Signal.Codec do
   def new(map) when is_map(map) do
     with {:ok, attrs} <- normalize_keys(map) do
       attrs
-      |> Map.put_new_lazy("id", &ID.generate!/0)
+      |> Map.put_new_lazy("id", &Id.uuid7/0)
       |> Map.put_new("specversion", "1.0")
       |> from_normalized_map(:constructor)
     end

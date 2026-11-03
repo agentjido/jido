@@ -358,7 +358,7 @@ defmodule JidoTest.Agent.AuthoringTest do
       InlineCounter.add_inline_signal(%{amount: 3, multiplier: 2})
 
     assert {:ok, candidate, []} =
-             InlineCounter.cmd(InlineCounter.instantiate!(id: Jido.Signal.ID.generate!()), signal)
+             InlineCounter.cmd(InlineCounter.instantiate!(id: Jido.Id.uuid7()), signal)
 
     assert candidate.state.count == 6
   end
@@ -396,10 +396,10 @@ defmodule JidoTest.Agent.AuthoringTest do
     other = Jido.Signal.new!("test.classify", %{amount: 0}, source: "/test")
 
     assert {:ok, %{state: %{result: :positive}}, []} =
-             module.cmd(module.instantiate!(id: Jido.Signal.ID.generate!()), positive)
+             module.cmd(module.instantiate!(id: Jido.Id.uuid7()), positive)
 
     assert {:ok, %{state: %{result: :other}}, []} =
-             module.cmd(module.instantiate!(id: Jido.Signal.ID.generate!()), other)
+             module.cmd(module.instantiate!(id: Jido.Id.uuid7()), other)
   end
 
   @tag obligation: ["jido.agent.I1", "jido.agent.I22"]
@@ -448,7 +448,7 @@ defmodule JidoTest.Agent.AuthoringTest do
              Counter.add_signal(%{amount: 2}, source: "/custom", id: "stable")
 
     assert {:ok, next, []} =
-             Counter.cmd(Counter.instantiate!(id: Jido.Signal.ID.generate!()), first)
+             Counter.cmd(Counter.instantiate!(id: Jido.Id.uuid7()), first)
 
     assert next.state.count == 1
 
@@ -456,7 +456,7 @@ defmodule JidoTest.Agent.AuthoringTest do
     assert signal.data == %{amount: nil}
 
     assert {:error, %Jido.Action.Error.InvalidInputError{}} =
-             Counter.cmd(Counter.instantiate!(id: Jido.Signal.ID.generate!()), signal)
+             Counter.cmd(Counter.instantiate!(id: Jido.Id.uuid7()), signal)
   end
 
   @tag obligation: "jido.agent.I21"
@@ -496,7 +496,7 @@ defmodule JidoTest.Agent.AuthoringTest do
   test "wildcard routes work and static structs are not portable authoring values" do
     definition = RawCounter.definition()
 
-    assert {:error, %Jido.Authoring.Error.InvalidError{code: :value}} =
+    assert {:error, %Jido.Codec.Error.InvalidError{code: :value}} =
              JidoTest.AgentRegistry.encode(definition, JidoTest.AgentRegistry.for(definition))
 
     refute function_exported?(RawCounter, :raw_signal, 1)
@@ -513,7 +513,7 @@ defmodule JidoTest.Agent.AuthoringTest do
     assert {:ok, %{state: %{count: -1}}, []} = Agent.cmd(agent, signal)
 
     assert {:error, _} =
-             Jido.Authoring.Registry.new(%{"runtime" => {:value, ~D[2026-09-03]}})
+             Jido.Codec.Registry.new(%{"runtime" => {:value, ~D[2026-09-03]}})
   end
 
   @tag obligation: "jido.agent.I20"
@@ -596,7 +596,7 @@ defmodule JidoTest.Agent.AuthoringTest do
     signal = Jido.Signal.new!("test.add", %{}, source: "/caller")
 
     assert {:ok, %{state: %{}}, []} =
-             module.cmd(module.instantiate!(id: Jido.Signal.ID.generate!()), signal)
+             module.cmd(module.instantiate!(id: Jido.Id.uuid7()), signal)
   end
 
   @tag obligation: ["jido.agent.I1", "jido.agent.I22"]
@@ -631,7 +631,7 @@ defmodule JidoTest.Agent.AuthoringTest do
         assert {:ok, signal} = module.add_signal(%{field => 3})
 
         assert {:ok, candidate, []} =
-                 module.cmd(module.instantiate!(id: Jido.Signal.ID.generate!()), signal)
+                 module.cmd(module.instantiate!(id: Jido.Id.uuid7()), signal)
 
         assert candidate.state.count == 3
       end
@@ -714,7 +714,7 @@ defmodule JidoTest.Agent.AuthoringRuntimeTest do
   alias JidoTest.Agent.AuthoringTest.{Counter, InlineCounter, PreparedCounter}
 
   test "generated Action and Flow helpers commit the direct candidate", %{jido: jido} do
-    agent = Counter.instantiate!(id: Jido.Signal.ID.generate!())
+    agent = Counter.instantiate!(id: Jido.Id.uuid7())
     {:ok, server} = JidoTest.AgentServerAssertions.start_agent(jido, agent)
 
     {:ok, command_signal_1} = Counter.add_signal(%{amount: 3})
@@ -780,7 +780,7 @@ defmodule JidoTest.Agent.AuthoringRuntimeTest do
   end
 
   test "helpers leave executable validation to execution", %{jido: jido} do
-    agent = PreparedCounter.instantiate!(id: Jido.Signal.ID.generate!())
+    agent = PreparedCounter.instantiate!(id: Jido.Id.uuid7())
     assert {:ok, signal} = PreparedCounter.add_signal(%{amount: 2})
     assert signal.data == %{amount: 2}
     assert {:ok, candidate, []} = PreparedCounter.cmd(agent, signal)

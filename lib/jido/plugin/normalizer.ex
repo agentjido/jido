@@ -511,7 +511,7 @@ defmodule Jido.Plugin.Normalizer do
     with true <- Jido.Agent.Extension in behaviours(module),
          {:ok, id} <- read_authoring_value(module, :id),
          {:ok, vsn} <- read_authoring_value(module, :vsn),
-         {:ok, authoring} <- read_authoring_value(module, :__jido_authoring__) do
+         {:ok, authoring} <- read_authoring_value(module, :__jido_codec_manifest__) do
       expected = %{id: id, kind: :plugin, target: module, vsn: vsn}
 
       if is_binary(id) and byte_size(id) > 0 and vsn === manifest_vsn and
@@ -630,7 +630,7 @@ defmodule Jido.Plugin.Normalizer do
         schema: schema
       })
     else
-      case Jido.Authoring.validate_static(schema) do
+      case Jido.Codec.validate_static(schema) do
         :ok ->
           {:ok, {key, schema}}
 

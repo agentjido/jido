@@ -1,4 +1,4 @@
-defmodule Jido.Authoring.PortableDocumentTest do
+defmodule Jido.Codec.PortableDocumentTest do
   use Covenant.Case, component: "jido_action.authoring", async: true
 
   @moduletag obligation: [
@@ -7,12 +7,12 @@ defmodule Jido.Authoring.PortableDocumentTest do
                "jido_action.authoring.I3"
              ]
 
-  alias Jido.Authoring.{Document, Registry, Value}
+  alias Jido.Codec.{Document, Registry, Value}
 
   defmodule ExampleCodec do
     @moduledoc false
 
-    alias Jido.Authoring.{Document, Registry, Value}
+    alias Jido.Codec.{Document, Registry, Value}
 
     def encode(name, registry) do
       with {:ok, name} <- Value.encode(name, registry),

@@ -13,6 +13,9 @@
 # Temporary files, for example, from tests.
 /tmp/
 
+# Local environment variables.
+.env
+
 # If the VM crashes, it generates a dump, let's ignore it too.
 erl_crash.dump
 

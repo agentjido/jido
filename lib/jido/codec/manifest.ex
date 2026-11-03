@@ -1,7 +1,8 @@
-defmodule Jido.Authoring.Manifest do
+defmodule Jido.Codec.Manifest do
   @moduledoc false
 
-  alias Jido.Authoring.Registry
+  alias Jido.Codec.{Registry, Static}
+  alias Jido.Joi
 
   @fields [:id, :kind, :vsn, :target, :name, :description]
 
@@ -16,11 +17,11 @@ defmodule Jido.Authoring.Manifest do
           optional(:application) => atom() | nil
         }
 
-  @doc "Validates the static authoring manifest exported by one module."
+  @doc "Validates the static Codec manifest exported by one module."
   @spec validate(module(), term()) :: {:ok, [t()]} | {:error, term()}
   def validate(provider, manifests) when is_list(manifests) do
     if List.improper?(manifests) do
-      {:error, {:invalid_authoring_manifest, provider, :improper_list}}
+      {:error, {:invalid_codec_manifest, provider, :improper_list}}
     else
       traverse(manifests, &validate_one(provider, &1))
     end
@@ -34,22 +35,22 @@ defmodule Jido.Authoring.Manifest do
 
     cond do
       unknown != [] ->
-        {:error, {:invalid_authoring_manifest, provider, {:unknown_fields, Enum.sort(unknown)}}}
+        {:error, {:invalid_codec_manifest, provider, {:unknown_fields, Enum.sort(unknown)}}}
 
       missing != [] ->
-        {:error, {:invalid_authoring_manifest, provider, {:missing_fields, missing}}}
+        {:error, {:invalid_codec_manifest, provider, {:missing_fields, missing}}}
 
       not valid_vsn?(manifest.vsn) ->
-        {:error, {:invalid_authoring_manifest, provider, :vsn}}
+        {:error, {:invalid_codec_manifest, provider, :vsn}}
 
       not valid_kind?(manifest.kind) ->
-        {:error, {:invalid_authoring_manifest, provider, :kind}}
+        {:error, {:invalid_codec_manifest, provider, :kind}}
 
       not valid_text?(Map.get(manifest, :name)) ->
-        {:error, {:invalid_authoring_manifest, provider, :name}}
+        {:error, {:invalid_codec_manifest, provider, :name}}
 
       not valid_text?(Map.get(manifest, :description)) ->
-        {:error, {:invalid_authoring_manifest, provider, :description}}
+        {:error, {:invalid_codec_manifest, provider, :description}}
 
       true ->
         with {:ok, _reference} <- Registry.validate_reference({manifest.id, manifest.vsn}),
@@ -57,16 +58,16 @@ defmodule Jido.Authoring.Manifest do
           {:ok, Map.put(manifest, :provider, provider)}
         else
           {:error, %Registry.Error{} = error} ->
-            {:error, {:invalid_authoring_manifest, provider, error}}
+            {:error, {:invalid_codec_manifest, provider, error}}
 
           {:error, reason} ->
-            {:error, {:invalid_authoring_manifest, provider, {:target, reason}}}
+            {:error, {:invalid_codec_manifest, provider, {:target, reason}}}
         end
     end
   end
 
   defp validate_one(provider, _manifest),
-    do: {:error, {:invalid_authoring_manifest, provider, :map}}
+    do: {:error, {:invalid_codec_manifest, provider, :map}}
 
   defp valid_vsn?(vsn), do: Registry.validate_vsn(vsn) == :ok
   defp valid_kind?(kind), do: is_atom(kind) and kind not in [nil, true, false, :alias]
@@ -87,11 +88,16 @@ defmodule Jido.Authoring.Manifest do
   end
 
   defp validate_target(:schema, target) do
-    with :ok <- Jido.Authoring.validate_static(target),
-         do: Jido.Authoring.Config.validate_map_schema(target)
+    with :ok <- Static.validate(target) do
+      cond do
+        not Joi.Schema.schema?(target) -> {:error, "must be a Joi schema"}
+        not Joi.Schema.map_shaped?(target) -> {:error, "must accept map-shaped data"}
+        true -> :ok
+      end
+    end
   end
 
-  defp validate_target(_kind, target), do: Jido.Authoring.validate_static(target)
+  defp validate_target(_kind, target), do: Static.validate(target)
 
   defp traverse(values, mapper) do
     values

@@ -1,7 +1,7 @@
-defmodule Jido.Authoring.ConfigTest do
+defmodule Jido.Codec.ConfigTest do
   use Covenant.Case, component: "jido_action.action", async: false
 
-  alias Jido.Authoring.Config
+  alias Jido.Codec.Config
   alias Jido.Flow.Error.InvalidDefinitionError
 
   def options do
@@ -204,7 +204,7 @@ defmodule Jido.Authoring.ConfigTest do
     assert_received {:schema_built, :input}
     assert_received {:schema_built, :output}
     assert target.validate_params(%{}) == {:ok, %{value: 1}}
-    assert target.__jido_authoring_kind__() == :action
+    assert target.__jido_codec_kind__() == :action
     refute_received {:schema_built, _}
   end
 

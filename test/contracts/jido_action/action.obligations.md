@@ -1,5 +1,5 @@
 ---
-modules: [Jido.Action, Jido.Authoring.Compiler, Jido.Authoring.Config]
+modules: [Jido.Action, Jido.Codec.Compiler, Jido.Codec.Config]
 ---
 
 # Action macro obligations
@@ -21,7 +21,7 @@ contract coverage.
 - **status:** active
 
 ### jido_action.action.I2 — Configuration is static and validated during compilation
-- **scope:** `Jido.Action.__using__/1`, `Jido.Authoring.Compiler.__using__/1`, `Jido.Authoring.Config.prepare!/3`
+- **scope:** `Jido.Action.__using__/1`, `Jido.Codec.Compiler.__using__/1`, `Jido.Codec.Config.prepare!/3`
 - **must:** Require a non-blank UTF-8 name within the documented byte limit. Reject unknown options and schemas that cannot accept maps. Support literal and computed options and named MFA schema effects. Reject anonymous functions and lazy schemas in stored schema data. Evaluate options and schema builders once during compilation, without repeating that work when metadata or validation functions are called. Require run/2 and stop compilation when it is missing.
 - **kind:** functional
 - **status:** active

@@ -3,7 +3,7 @@ defmodule JidoTest.Contract.AgentViewTest do
 
   alias Jido.Agent
   alias Jido.Agent.View
-  alias Jido.Authoring.{Document, Registry}
+  alias Jido.Codec.{Document, Registry}
   alias JidoTest.AgentFixtures.{Add, CounterAgent}
   alias JidoTest.AgentContract, as: F
 

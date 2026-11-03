@@ -43,7 +43,6 @@ defmodule Jido.MixProject do
 
   defp deps do
     [
-      {:jason, "~> 1.4"},
       {:bedrock, "~> 0.7.2", optional: true},
       {:bedrock_raft, "~> 0.10.0", optional: true},
       {:ecto_sql, "~> 3.14", optional: true},

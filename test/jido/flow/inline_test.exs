@@ -123,14 +123,14 @@ defmodule Jido.Flow.InlineTest do
 
     assert target == Inline.target!(Owner, Owner.path())
     assert target.__jido_inline_flow__() == {Owner, Owner.path()}
-    assert target.__jido_authoring_kind__() == :flow
+    assert target.__jido_codec_kind__() == :flow
     assert target.name() == "inline_math"
     assert target.description() == "An embedded math Flow"
     assert target.flow().name == "inline_math"
     assert {:ok, %{value: 8}} = Jido.Exec.run(target, %{value: 3})
 
     assert action = target.step_action("double")
-    assert action.__jido_authoring_kind__() == :action
+    assert action.__jido_codec_kind__() == :action
   end
 
   @tag obligation: "jido_action.inline_flow.I3"

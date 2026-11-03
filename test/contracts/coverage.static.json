@@ -450,7 +450,7 @@
           "testable": true,
           "tests": [
             "property unknown identifiers wrong Registry kinds and executable stored fields reject inertly",
-            "test encode builds one deterministic temporary Authoring Registry",
+            "test encode builds one deterministic temporary Codec Registry",
             "test generated Registry leaves target contracts to Exec",
             "test temporary IDs depend on the exact Flow"
           ]

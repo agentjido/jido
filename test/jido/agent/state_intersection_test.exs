@@ -29,7 +29,7 @@ defmodule Jido.Agent.StateIntersectionTest do
 
       assert {:ok, agent} =
                Agent.instantiate(definition,
-                 id: Jido.Signal.ID.generate!(),
+                 id: Jido.Id.uuid7(),
                  state: %{nested: nested}
                )
 
@@ -52,7 +52,7 @@ defmodule Jido.Agent.StateIntersectionTest do
 
     agent =
       Agent.instantiate!(definition,
-        id: Jido.Signal.ID.generate!(),
+        id: Jido.Id.uuid7(),
         state: %{nested: %{a: 3, b: 4}}
       )
 

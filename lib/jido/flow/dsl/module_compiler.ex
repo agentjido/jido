@@ -15,9 +15,9 @@ defmodule Jido.Flow.DSL.ModuleCompiler do
       Jido.Action.Inline.setup!(__ENV__)
       unquote(module_compiler).reserve_function!(__ENV__, {:step_action, 1})
 
-      use Jido.Authoring.Compiler,
+      use Jido.Codec.Compiler,
         kind: :flow,
-        config: Jido.Authoring.Config.prepare!(:flow, unquote(flow_opts_ast), __ENV__)
+        config: Jido.Codec.Config.prepare!(:flow, unquote(flow_opts_ast), __ENV__)
 
       @doc "Returns the canonical Flow data for this module."
       @spec flow() :: Jido.Flow.t()
@@ -64,7 +64,7 @@ defmodule Jido.Flow.DSL.ModuleCompiler do
   @spec validate_options!(term(), Macro.Env.t()) :: :ok
   def validate_options!(options, caller) do
     {flow_options, _extensions} = split_options!(options, caller)
-    Jido.Authoring.Config.prepare!(:flow, flow_options, caller)
+    Jido.Codec.Config.prepare!(:flow, flow_options, caller)
     :ok
   end
 
@@ -162,7 +162,7 @@ defmodule Jido.Flow.DSL.ModuleCompiler do
   @doc false
   @spec before_compile(Macro.Env.t()) :: Macro.t()
   def before_compile(env) do
-    config = Module.get_attribute(env.module, :__jido_authoring_config__)
+    config = Module.get_attribute(env.module, :__jido_codec_config__)
 
     {flow, source_map} = compile_flow!(env, config)
     escaped_flow = Macro.escape(flow)

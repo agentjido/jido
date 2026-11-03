@@ -1,11 +1,11 @@
 defmodule Jido.Discovery do
   @moduledoc """
-  Builds the runtime Registry used by JSON authoring and code discovery.
+  Builds the runtime Registry used by JSON codecs and code discovery.
 
   Discovery scans configured application module lists and explicit modules.
-  Modules publish static entries through `__jido_authoring__/0`. Document
-  codecs publish metadata through `__jido_authoring_codec__/0`. Reads use an
-  immutable Registry in `:persistent_term`.
+  Modules publish static entries through `__jido_codec_manifest__/0`. Document
+  codecs implement the `Jido.Codec.Contract` behaviour. Reads use an immutable
+  Registry in `:persistent_term`.
 
       config :jido, Jido.Discovery,
         applications: [:my_app, :jido],
@@ -26,7 +26,7 @@ defmodule Jido.Discovery do
 
   require Logger
 
-  alias Jido.Authoring.{Codec, Manifest, Registry}
+  alias Jido.Codec.{Contract, Manifest, Registry}
 
   @registry_key {__MODULE__, :registry}
   @default_applications :loaded
@@ -47,20 +47,20 @@ defmodule Jido.Discovery do
   @spec ready?() :: boolean()
   def ready?, do: match?(%Registry{}, :persistent_term.get(@registry_key, :not_initialized))
 
-  @doc "Returns the current immutable runtime authoring Registry."
+  @doc "Returns the current immutable runtime Codec Registry."
   @spec registry() :: Registry.t()
   def registry do
     case :persistent_term.get(@registry_key, :not_initialized) do
       :not_initialized ->
-        raise Jido.Authoring.Error.internal(
+        raise Jido.Codec.Error.internal(
                 :registry_not_initialized,
-                "authoring Registry is not initialized"
+                "Codec Registry is not initialized"
               )
 
       {:error, reason} ->
-        raise Jido.Authoring.Error.internal(
+        raise Jido.Codec.Error.internal(
                 :registry_initialization_failed,
-                "authoring Registry initialization failed: #{inspect(reason)}",
+                "Codec Registry initialization failed: #{inspect(reason)}",
                 %{reason: reason}
               )
 
@@ -85,7 +85,7 @@ defmodule Jido.Discovery do
   @spec get_by_target(Registry.kind(), term()) :: Registry.manifest() | nil
   def get_by_target(kind, target), do: Registry.get_by_target(registry(), kind, target)
 
-  @doc "Rebuilds and atomically replaces the complete authoring Registry."
+  @doc "Rebuilds and atomically replaces the complete Codec Registry."
   @spec refresh(keyword()) :: :ok | {:error, term()}
   def refresh(opts \\ []) do
     with {:ok, modules} <- discovery_modules(opts),
@@ -241,37 +241,44 @@ defmodule Jido.Discovery do
   end
 
   defp discover_entries(module) do
-    if function_exported?(module, :__jido_authoring__, 0) do
-      with {:ok, entries} <- Manifest.validate(module, module.__jido_authoring__()) do
+    if function_exported?(module, :__jido_codec_manifest__, 0) do
+      with {:ok, entries} <- Manifest.validate(module, module.__jido_codec_manifest__()) do
         {:ok, Enum.map(entries, &decorate_entry/1)}
       end
     else
       {:ok, []}
     end
   rescue
-    error -> {:error, {:authoring_manifest_failed, module, error}}
+    error -> {:error, {:codec_manifest_failed, module, error}}
   catch
-    kind, reason -> {:error, {:authoring_manifest_failed, module, {kind, reason}}}
+    kind, reason -> {:error, {:codec_manifest_failed, module, {kind, reason}}}
   end
 
   defp codec_metadata(module) do
-    if function_exported?(module, :__jido_authoring_codec__, 0) do
-      case Codec.metadata(module) do
+    if codec_module?(module) do
+      case Contract.metadata(module) do
         {:ok, metadata} ->
           {:ok, [Map.put(metadata, :module, module)]}
 
         {:error, {:metadata_failure, kind, reason}} ->
-          {:error, {:authoring_codec_failed, module, {kind, reason}}}
+          {:error, {:codec_failed, module, {kind, reason}}}
 
         {:error, {:invalid_metadata, metadata}} ->
-          {:error, {:invalid_authoring_codec, module, metadata}}
+          {:error, {:invalid_codec, module, metadata}}
 
         {:error, :invalid_contract} ->
-          {:error, {:invalid_authoring_codec, module, :invalid_contract}}
+          {:error, {:invalid_codec, module, :invalid_contract}}
       end
     else
       {:ok, []}
     end
+  end
+
+  defp codec_module?(module) do
+    module.module_info(:attributes)
+    |> Keyword.get_values(:behaviour)
+    |> List.flatten()
+    |> Enum.member?(Jido.Codec.Contract)
   end
 
   defp decorate_entry(entry) do

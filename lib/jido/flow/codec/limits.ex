@@ -1,13 +1,13 @@
 defmodule Jido.Flow.Codec.Limits do
   @moduledoc false
-  alias Jido.Authoring.Document
-  alias Jido.Authoring.Document.Error, as: DocumentError
+  alias Jido.Codec.Document
+  alias Jido.Codec.Document.Error, as: DocumentError
   alias Jido.Flow.Error
 
-  require Jido.Authoring.Limits
+  require Jido.Codec.Limits
 
-  @maximum_depth Jido.Authoring.Limits.maximum_depth()
-  @maximum_collection_size Jido.Authoring.Limits.maximum_collection_size()
+  @maximum_depth Jido.Codec.Limits.maximum_depth()
+  @maximum_collection_size Jido.Codec.Limits.maximum_collection_size()
   @limit_errors %{
     depth: "stored Flow exceeds its nesting limit",
     collection: "stored Flow collection exceeds its size limit",

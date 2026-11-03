@@ -1,4 +1,4 @@
-defmodule Jido.Authoring.OptionsTest do
+defmodule Jido.Codec.ConfigOptionsTest do
   use Covenant.Case, component: "jido_action.inline", async: true
 
   alias Jido.Action.Inline

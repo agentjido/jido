@@ -1,9 +1,9 @@
-defmodule Jido.Authoring.ValueTest do
+defmodule Jido.Codec.ValueTest do
   use Covenant.Case, component: "jido_action.authoring", async: true
   @moduletag obligation: "jido_action.authoring.I2"
 
-  alias Jido.Authoring.{Registry, Value}
-  alias Jido.Authoring.Value.Error
+  alias Jido.Codec.{Registry, Value}
+  alias Jido.Codec.Value.Error
 
   test "round trips portable values and registered atoms" do
     registry =
@@ -23,7 +23,7 @@ defmodule Jido.Authoring.ValueTest do
 
     assert {:error, %Registry.Error{}} = Value.encode(:missing, registry)
     assert {:error, %Error{} = error} = Value.encode(self(), registry)
-    assert Jido.Authoring.Error.splode_error?(error)
+    assert Jido.Codec.Error.splode_error?(error)
     assert {:error, %Error{}} = Value.encode({:tuple}, registry)
   end
 

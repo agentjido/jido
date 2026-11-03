@@ -52,11 +52,11 @@ defmodule Jido.AI.Reasoning.TRM.Actions.PrepareCall do
   end
 
   defp request(%{phase: :critique, draft: draft}) do
-    {"Find the important errors or omissions in this draft: " <> Jason.encode!(draft), @critique_schema}
+    {"Find the important errors or omissions in this draft: " <> JSON.encode!(draft), @critique_schema}
   end
 
   defp request(%{phase: :revise, draft: draft, critique: critique}) do
-    input = Jason.encode!(%{draft: draft, critique: critique})
+    input = JSON.encode!(%{draft: draft, critique: critique})
     {"Revise the draft with this critique and return the final answer: " <> input, @answer_schema}
   end
 end

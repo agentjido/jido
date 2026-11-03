@@ -17,7 +17,7 @@ defmodule Jido.Plugin.Audit do
   use Jido.Plugin, option_keys: [agent: [:max_entries]]
 
   alias Jido.Plugin.Audit.Record
-  alias Jido.Signal.ID
+  alias Jido.Id
 
   @typedoc "One Audit Plugin option."
   @type plugin_option :: {:max_entries, pos_integer()}
@@ -36,7 +36,7 @@ defmodule Jido.Plugin.Audit do
     opts = record_options!(opts)
 
     %Record{
-      id: Keyword.get_lazy(opts, :id, &ID.generate!/0),
+      id: Keyword.get_lazy(opts, :id, &Id.uuid7/0),
       at: Keyword.get_lazy(opts, :at, fn -> System.system_time(:millisecond) end),
       event: event,
       outcome: outcome,

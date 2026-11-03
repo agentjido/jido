@@ -1,14 +1,14 @@
 defmodule Jido.Flow.Codec.Value do
   @moduledoc false
-  alias Jido.Authoring.Registry.Error, as: AuthoringRegistryError
-  alias Jido.Authoring.Value, as: AuthoringValue
-  alias Jido.Authoring.Value.Error, as: AuthoringValueError
+  alias Jido.Codec.Registry.Error, as: AuthoringRegistryError
+  alias Jido.Codec.Value, as: AuthoringValue
+  alias Jido.Codec.Value.Error, as: AuthoringValueError
   alias Jido.Expr
   alias Jido.Flow.{Error, Ref, Value}
   alias Jido.Flow.Codec.{Limits, Paths}
 
   @doc false
-  @spec encode_expression(term(), Jido.Authoring.Registry.t(), non_neg_integer()) ::
+  @spec encode_expression(term(), Jido.Codec.Registry.t(), non_neg_integer()) ::
           {:ok, term()} | {:error, Exception.t()}
   def encode_expression(%Expr{} = expression, registry, depth) do
     with :ok <- Limits.depth(depth),
@@ -43,9 +43,9 @@ defmodule Jido.Flow.Codec.Value do
   def encode_expression(value, registry, depth), do: encode_data(value, registry, depth)
 
   @doc false
-  @spec encode_data(term(), Jido.Authoring.Registry.t(), non_neg_integer()) ::
+  @spec encode_data(term(), Jido.Codec.Registry.t(), non_neg_integer()) ::
           {:ok, term()} | {:error, Exception.t()}
-  def encode_data(value, %Jido.Authoring.Registry{} = registry, depth) do
+  def encode_data(value, %Jido.Codec.Registry{} = registry, depth) do
     with :ok <- Limits.depth(depth) do
       value
       |> AuthoringValue.encode(registry)
@@ -97,7 +97,7 @@ defmodule Jido.Flow.Codec.Value do
   end
 
   @doc false
-  @spec decode(term(), Jido.Authoring.Registry.t(), list(), list(), :expression | :data) ::
+  @spec decode(term(), Jido.Codec.Registry.t(), list(), list(), :expression | :data) ::
           {:ok, term(), Paths.t()} | {:error, [Exception.t()]}
   def decode(value, registry, stored, canonical, mode \\ :expression),
     do: decode(value, registry, stored, canonical, mode, 0)
@@ -389,7 +389,7 @@ defmodule Jido.Flow.Codec.Value do
   defp reference_error_field(_error), do: "id"
 
   defp authoring_result({:error, %AuthoringRegistryError{} = exception}) do
-    message = String.replace(exception.message, "authoring Registry", "flow registry")
+    message = String.replace(exception.message, "Codec Registry", "flow registry")
     {:error, Error.validation_error(message, exception.details)}
   end
 

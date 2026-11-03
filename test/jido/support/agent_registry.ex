@@ -2,22 +2,22 @@ defmodule JidoTest.AgentRegistry do
   @moduledoc false
 
   alias Jido.Agent
-  alias Jido.Authoring
-  alias Jido.Authoring.Registry
+  alias Jido.Codec
+  alias Jido.Codec.Registry
 
   @codec Jido.Agent.Codec
 
   def encode(source, registry),
-    do: Authoring.encode(source, registry: registry, codec: @codec)
+    do: Codec.encode(source, registry: registry, codec: @codec)
 
   def decode(document, registry),
-    do: Authoring.decode(document, registry: registry, codec: @codec)
+    do: Codec.decode(document, registry: registry, codec: @codec)
 
   def encode_json(source, registry),
-    do: Authoring.encode_json(source, registry: registry, codec: @codec)
+    do: Codec.encode_json(source, registry: registry, codec: @codec)
 
   def decode_json(json, registry),
-    do: Authoring.decode_json(json, registry: registry, codec: @codec)
+    do: Codec.decode_json(json, registry: registry, codec: @codec)
 
   def for(source) do
     definition = Agent.definition(source)

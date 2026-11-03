@@ -3,7 +3,7 @@ defmodule Jido.Flow.GraphValidationTest do
   @moduletag obligation: "jido_action.flow.I8"
   alias Jido.Expr
   alias Jido.Flow
-  alias Jido.Authoring.Registry
+  alias Jido.Codec.Registry
   alias Jido.Flow.{Codec, Error, Ref}
   alias JidoActionTest.FlowCodec, as: Codec
   alias JidoActionTest.Fixtures.NestedFlow

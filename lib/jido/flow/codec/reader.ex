@@ -2,7 +2,7 @@ defmodule Jido.Flow.Codec.Reader do
   @moduledoc false
 
   alias Jido.Flow.{Component, Error, FieldError}
-  alias Jido.Authoring.Registry
+  alias Jido.Codec.Registry
   alias Jido.Flow.Codec.{Limits, Paths, Value}
 
   @root [
@@ -17,7 +17,7 @@ defmodule Jido.Flow.Codec.Reader do
   @on_error %{"fail_fast" => :fail_fast, "collect_errors" => :collect_errors}
 
   @doc false
-  @spec decode(term(), Jido.Authoring.Registry.t()) ::
+  @spec decode(term(), Jido.Codec.Registry.t()) ::
           {:ok, map(), Paths.t()} | {:error, [Exception.t()]}
   def decode(%{} = document, registry) when not is_struct(document) do
     with :ok <- Limits.check(document),
@@ -214,7 +214,7 @@ defmodule Jido.Flow.Codec.Reader do
   defp registry_error_path(_value, _error, stored), do: stored
 
   defp flow_registry_error(%Registry.Error{} = error) do
-    message = String.replace(error.message, "authoring Registry", "flow registry")
+    message = String.replace(error.message, "Codec Registry", "flow registry")
     Error.validation_error(message, error.details)
   end
 

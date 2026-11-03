@@ -9,7 +9,7 @@ defmodule Jido.Flow.Value do
   Each expression also uses the smaller standard limits from `Jido.Expr`.
   """
 
-  alias Jido.Authoring.Config
+  alias Jido.Codec.Config
   alias Jido.Expr
   alias Jido.Flow.Error
   alias Jido.Flow.Ref

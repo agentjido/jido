@@ -35,7 +35,7 @@ defmodule Jido.AgentServer.TopologyRuntime do
               identity =
                 if is_nil(before) or (same? && slot <= old.count),
                   do: Map.get(retained, slot, "initial"),
-                  else: Base.url_encode64(:crypto.strong_rand_bytes(16), padding: false)
+                  else: Jido.Id.uuid7()
 
               {slot, identity}
             end)

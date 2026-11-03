@@ -75,7 +75,7 @@ defmodule Jido.Agent do
 
   - `:name` is the required Agent name.
   - `:description` is optional display text.
-  - `:id` is the stable authoring Registry ID. It defaults to the module name.
+  - `:id` is the stable Codec Registry ID. It defaults to the module name.
   - `:vsn` is the positive definition version. It defaults to `1`.
   - `:metadata` is optional static definition data. It defaults to an empty Map.
   - `:plugins` lists ordered Plugin modules or `{Plugin, config}` tuples. A

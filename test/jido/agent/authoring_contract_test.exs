@@ -110,11 +110,11 @@ defmodule Jido.Agent.AuthoringContractTest do
         routes: [route(Add, %{by: 1})]
       })
 
-    assert {:error, %Jido.Authoring.Error.InvalidError{code: :value}} =
+    assert {:error, %Jido.Codec.Error.InvalidError{code: :value}} =
              JidoTest.AgentRegistry.encode(definition, JidoTest.AgentRegistry.for(definition))
 
     for entry <- [{:value, %URI{}}, {:route_match, &is_map/1}] do
-      assert {:error, _error} = Jido.Authoring.Registry.new(%{"obsolete" => entry})
+      assert {:error, _error} = Jido.Codec.Registry.new(%{"obsolete" => entry})
     end
   end
 

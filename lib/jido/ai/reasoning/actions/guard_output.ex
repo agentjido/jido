@@ -88,7 +88,7 @@ defmodule Jido.AI.Reasoning.Actions.GuardOutput do
   defp finish_reason(_reason), do: "model returned an unknown finish reason"
 
   defp output_content(text, nil), do: text
-  defp output_content(_text, output), do: Jason.encode!(output)
+  defp output_content(_text, output), do: JSON.encode!(output)
 
   defp decision(nil), do: %{allowed: true, reason: ""}
   defp decision(reason), do: %{allowed: false, reason: reason}

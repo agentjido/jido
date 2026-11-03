@@ -58,7 +58,7 @@ defmodule Jido.Agent.DSL do
       def schema, do: Jido.Agent.schema(definition())
 
       @doc false
-      def __jido_authoring__ do
+      def __jido_codec_manifest__ do
         %{
           id: unquote(opts[:id]),
           kind: :agent,

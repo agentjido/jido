@@ -146,7 +146,7 @@ defmodule JidoTest.AgentServer.ControlTest do
           }
         ]
       })
-      |> Jido.Agent.instantiate!(id: Jido.Signal.ID.generate!())
+      |> Jido.Agent.instantiate!(id: Jido.Id.uuid7())
 
     server = F.start(c, agent: agent)
 

@@ -634,12 +634,12 @@ defmodule Jido do
   # ---------------------------------------------------------------------------
 
   @doc """
-  Generate a UUID7 identifier.
+  Generates a UUIDv7 identifier.
 
-  Delegates to `Jido.Signal.ID.generate!/0`.
+  Delegates to `Jido.Id.uuid7/0`.
   """
-  @spec generate_id() :: Jido.Signal.ID.uuid7()
-  defdelegate generate_id(), to: Jido.Signal.ID, as: :generate!
+  @spec generate_id() :: Jido.Id.uuid7()
+  defdelegate generate_id(), to: Jido.Id, as: :uuid7
 
   @doc false
   def exec_runner_name(nil), do: Jido.ExecRunner

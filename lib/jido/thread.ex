@@ -42,7 +42,7 @@ defmodule Jido.Thread do
 
     %__MODULE__{
       version: @version,
-      id: Keyword.get(opts, :id, "thread_#{Jido.generate_id()}"),
+      id: Keyword.get(opts, :id, "thread_#{Jido.Id.uuid7()}"),
       rev: 0,
       entries: [],
       created_at: now,

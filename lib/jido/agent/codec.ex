@@ -1,26 +1,33 @@
 defmodule Jido.Agent.Codec do
   @moduledoc false
 
+  @behaviour Jido.Codec.Contract
+
   alias Jido.Agent
   alias Jido.Agent.{Authoring, Error, Extension}
-  alias Jido.Authoring.{Issue, Registry, Value}
+  alias Jido.Codec.{Issue, Registry, Value}
 
   @type document :: %{required(String.t()) => term()}
 
-  @doc false
-  def __jido_authoring_codec__,
-    do: %{type: "jido.agent.definition", vsn: 1, encoder: Jido.Agent}
+  @impl true
+  def type, do: "jido.agent.definition"
 
-  @doc false
-  def encode_document(source, registry) do
+  @impl true
+  def version, do: 1
+
+  @impl true
+  def target, do: Jido.Agent
+
+  @impl true
+  def encode(source, registry) do
     with {:ok, definition} <- definition(source),
          {:ok, fields} <- encode_fields(definition, registry) do
       {:ok, %{"type" => "jido.agent.definition", "vsn" => 1, "definition" => fields}}
     end
   end
 
-  @doc false
-  def decode_document(document, registry) do
+  @impl true
+  def decode(document, registry) do
     with :ok <- object(document, ~w(type vsn definition)),
          :ok <- document_version(document),
          {:ok, fields} <- at(decode_fields(document["definition"], registry), ["definition"]),
@@ -466,4 +473,8 @@ defmodule Jido.Agent.Codec do
 
   defp json_path_segment(segment) when is_atom(segment), do: Atom.to_string(segment)
   defp json_path_segment(segment), do: segment
+end
+
+defimpl Jido.Codec.Encoder, for: Jido.Agent do
+  def codec(_agent), do: {:ok, Jido.Agent.Codec}
 end

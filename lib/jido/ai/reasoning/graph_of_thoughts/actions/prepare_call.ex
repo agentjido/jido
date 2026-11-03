@@ -73,7 +73,7 @@ defmodule Jido.AI.Reasoning.GraphOfThoughts.Actions.PrepareCall do
   end
 
   defp request(%{phase: :synthesize, nodes: nodes, edges: edges}) do
-    graph = Jason.encode!(%{nodes: nodes, edges: edges})
+    graph = JSON.encode!(%{nodes: nodes, edges: edges})
     {"Synthesize one final answer from this thought graph: " <> graph, @answer_schema}
   end
 end

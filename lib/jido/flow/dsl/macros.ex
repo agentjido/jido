@@ -1,13 +1,12 @@
 defmodule Jido.Flow.DSL.MacroSupport do
   @moduledoc false
 
-  alias Jido.Authoring.Options
+  alias Jido.Codec.Config
 
   @doc false
   @spec validate_options!(term(), Macro.Env.t(), String.t(), String.t()) :: :ok | no_return()
   defdelegate validate_options!(options, caller, options_message, duplicate_label),
-    to: Options,
-    as: :validate!
+    to: Config
 
   @doc false
   @spec entity(
@@ -59,7 +58,7 @@ defmodule Jido.Flow.DSL.MacroSupport do
 
   @doc false
   @spec compile_error!(Macro.Env.t(), String.t()) :: no_return()
-  defdelegate compile_error!(caller, description), to: Options, as: :error!
+  defdelegate compile_error!(caller, description), to: Config
 end
 
 defmodule Jido.Flow.DSL.Macros do

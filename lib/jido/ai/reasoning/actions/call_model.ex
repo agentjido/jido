@@ -24,7 +24,7 @@ defmodule Jido.AI.Reasoning.Actions.CallModel do
   defp call_model(turn, model_context, params, context) do
     model = Enum.at(turn.models, turn.model_index)
     started_at = System.system_time(:millisecond)
-    stream_id = "stream_#{Jido.generate_id()}"
+    stream_id = "stream_#{Jido.Id.uuid7()}"
     :ok = Telemetry.record_agent_context(context, agent_context(turn))
 
     with {:ok, tools} <- model_tools(turn, Map.get(params, :tools, true)),

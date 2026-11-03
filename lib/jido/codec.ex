@@ -1,22 +1,41 @@
-defmodule Jido.Authoring do
+defmodule Jido.Codec do
   @moduledoc """
-  Decodes runtime JSON definitions and encodes canonical authoring values.
+  Encodes runtime values and decodes trusted versioned documents.
 
-  This module owns JSON parsing, complete-document limits, codec selection,
-  callback containment, and ordered issues.
+  ## Supported features
+
+  `Jido.Codec` owns the public encode and decode workflow:
+
+  * route documents by their required string `type` and positive integer `vsn`;
+  * select the current writer through `Jido.Codec.Encoder`, with a trusted
+    Registry fallback for external codecs;
+  * contain codec callback failures and return stable ordered issues;
+  * enforce complete-document, JSON byte, duplicate-key, and nesting limits;
+  * resolve the Discovery Registry only when the caller does not pass
+    `:registry` and document routing needs it.
+
+  Domain codecs implement `Jido.Codec.Contract` and own their document fields
+  and semantic validation. Discovery owns module scanning and Registry
+  lifecycle. Codec does not own persistence, execution, or automatic document
+  upgrades.
+
+  The `Jido.Codec` namespace also owns the internal compile-time support that
+  makes definitions discoverable: static-data validation, Codec manifests,
+  and the common Action and Flow declaration contract. These helpers do not
+  add more runtime operations to this facade.
+
+  An explicit `:registry` option bypasses Discovery.
   """
 
-  alias Jido.Authoring.{Codec, Document, Error, Issue, Registry, Static}
-
-  require Jido.Authoring.Limits
+  alias Jido.Codec.{Contract, Document, Error, Issue, Registry, Static}
 
   @default_maximum_json_bytes 8_388_608
-  @maximum_depth Jido.Authoring.Limits.maximum_depth()
-  @maximum_collection_size Jido.Authoring.Limits.maximum_collection_size()
-  @maximum_document_nodes Jido.Authoring.Limits.maximum_document_nodes()
   @option_keys [:registry, :codec, :maximum_json_bytes]
 
-  @doc "Encodes one canonical authoring value."
+  @typedoc "A JSON object produced or consumed by a document codec."
+  @type document :: Contract.document()
+
+  @doc "Encodes one supported runtime value."
   @spec encode(term(), keyword()) :: {:ok, map()} | {:error, Error.t()}
   def encode(value, opts \\ []) do
     opts = options!(opts)
@@ -30,40 +49,34 @@ defmodule Jido.Authoring do
     end
   end
 
-  @doc "Encodes one canonical authoring value as JSON."
+  @doc "Encodes one supported runtime value as JSON."
   @spec encode_json(term(), keyword()) :: {:ok, String.t()} | {:error, Error.t()}
   def encode_json(value, opts \\ []) do
-    with {:ok, document} <- encode(value, opts), do: Jason.encode(document)
+    with {:ok, document} <- encode(value, opts), do: {:ok, JSON.encode!(document)}
   end
 
-  @doc "Decodes one runtime authoring JSON document."
+  @doc "Decodes one trusted runtime JSON document."
   @spec decode_json(String.t(), keyword()) :: {:ok, struct()} | {:error, [Issue.t()]}
   def decode_json(json, opts \\ []) do
     opts = options!(opts)
-    registry = registry!(opts)
     maximum_bytes = maximum_json_bytes!(opts)
 
-    case parse_json(json, maximum_bytes) do
-      {:ok, document} -> decode_document(document, registry, opts[:codec], &Document.check/1)
-      {:error, issues} -> {:error, issues}
+    case Document.decode_json(json, maximum_bytes) do
+      {:ok, document} -> route(document, opts)
+      {:error, %Document.Error{} = error} -> document_error(error)
     end
   end
 
-  @doc "Decodes one runtime authoring document."
+  @doc "Decodes one trusted runtime document."
   @spec decode(term(), keyword()) :: {:ok, struct()} | {:error, [Issue.t()]}
   def decode(document, opts \\ []) do
     opts = options!(opts)
     maximum_bytes = maximum_json_bytes!(opts)
 
-    decode_document(
-      document,
-      registry!(opts),
-      opts[:codec],
-      &Document.check_json(&1, maximum_bytes)
-    )
+    decode_checked(document, opts, &Document.check_json(&1, maximum_bytes))
   end
 
-  @doc "Checks that authoring data contains no runtime-only values."
+  @doc "Checks that codec data contains no runtime-only values."
   @spec validate_static(term()) :: :ok | {:error, Error.InvalidError.t()}
   def validate_static(value) do
     case Static.validate(value) do
@@ -72,46 +85,46 @@ defmodule Jido.Authoring do
     end
   end
 
-  defp decode_document(document, registry, codec, check) do
+  defp decode_checked(document, opts, check) do
     with :ok <- check.(document),
-         {:ok, value} <- route(document, registry, codec) do
+         {:ok, value} <- route(document, opts) do
       {:ok, value}
     else
       {:error, %Document.Error{} = error} ->
-        {:error, [Issue.new(error.reason, [], error.message, details: error.details)]}
+        document_error(error)
 
       {:error, issues} when is_list(issues) ->
         {:error, issues}
     end
   end
 
-  defp route(%{"type" => type, "vsn" => vsn} = document, registry, codec)
+  defp route(%{"type" => type, "vsn" => vsn} = document, opts)
        when is_binary(type) and byte_size(type) in 1..255 and is_integer(vsn) and vsn > 0 do
-    run_codec(document, type, vsn, registry, codec)
+    run_codec(document, type, vsn, registry!(opts), opts[:codec])
   end
 
-  defp route(%{"type" => type, "vsn" => _vsn}, _registry, _codec) when is_binary(type),
+  defp route(%{"type" => type, "vsn" => _vsn}, _opts) when is_binary(type),
     do:
       issue(
         :invalid_document_vsn,
         ["vsn"],
-        "authoring document vsn must be a positive integer"
+        "codec document vsn must be a positive integer"
       )
 
-  defp route(%{"type" => type}, registry, _codec) when is_binary(type) do
-    issue(:missing_document_vsn, ["vsn"], "authoring document vsn is required", %{
-      supported_vsns: Registry.codec_vsns(registry, type)
+  defp route(%{"type" => type}, opts) when is_binary(type) do
+    issue(:missing_document_vsn, ["vsn"], "codec document vsn is required", %{
+      supported_vsns: Registry.codec_vsns(registry!(opts), type)
     })
   end
 
-  defp route(%{"type" => type}, _registry, _codec) when not is_binary(type),
-    do: issue(:invalid_document_type, ["type"], "authoring document type must be a string")
+  defp route(%{"type" => type}, _opts) when not is_binary(type),
+    do: issue(:invalid_document_type, ["type"], "codec document type must be a string")
 
-  defp route(%{} = document, _registry, _codec) when not is_struct(document),
-    do: issue(:missing_document_type, ["type"], "authoring document type is required")
+  defp route(%{} = document, _opts) when not is_struct(document),
+    do: issue(:missing_document_type, ["type"], "codec document type is required")
 
-  defp route(_document, _registry, _codec),
-    do: issue(:invalid_document, [], "authoring document must be a JSON object")
+  defp route(_document, _opts),
+    do: issue(:invalid_document, [], "codec document must be a JSON object")
 
   defp run_codec(document, type, vsn, registry, nil) do
     case Registry.codec(registry, type, vsn) do
@@ -122,7 +135,7 @@ defmodule Jido.Authoring do
         supported = Registry.codec_vsns(registry, type)
         path = if supported == [], do: ["type"], else: ["vsn"]
 
-        issue(:unsupported_document, path, "authoring document type or vsn is not supported", %{
+        issue(:unsupported_document, path, "codec document type or vsn is not supported", %{
           type: type,
           vsn: vsn,
           supported_vsns: supported
@@ -139,7 +152,7 @@ defmodule Jido.Authoring do
   end
 
   defp safe_decode(codec, document, registry) do
-    case codec.decode_document(document, registry) do
+    case codec.decode(document, registry) do
       {:ok, %_{} = value} ->
         {:ok, value}
 
@@ -158,7 +171,7 @@ defmodule Jido.Authoring do
   end
 
   defp safe_encode(codec, value, registry) do
-    case codec.encode_document(value, registry) do
+    case codec.encode(value, registry) do
       {:ok, %{} = document} when not is_struct(document) ->
         {:ok, document}
 
@@ -169,7 +182,7 @@ defmodule Jido.Authoring do
         {:error,
          Error.internal(
            :invalid_codec_return,
-           "authoring document codec returned an invalid value",
+           "document codec returned an invalid value",
            %{codec: codec}
          )}
     end
@@ -178,7 +191,7 @@ defmodule Jido.Authoring do
       {:error,
        Error.internal(
          :codec_failure,
-         "authoring document codec failed",
+         "document codec failed",
          %{codec: codec, failure_kind: :error, reason: Exception.message(error)}
        )}
   catch
@@ -186,7 +199,7 @@ defmodule Jido.Authoring do
       {:error,
        Error.internal(
          :codec_failure,
-         "authoring document codec failed",
+         "document codec failed",
          %{codec: codec, failure_kind: kind, reason: inspect(reason)}
        )}
   end
@@ -219,13 +232,13 @@ defmodule Jido.Authoring do
 
   defp invalid_codec_return(codec),
     do:
-      issue(:invalid_codec_return, [], "authoring document codec returned an invalid value", %{
+      issue(:invalid_codec_return, [], "document codec returned an invalid value", %{
         codec: codec
       })
 
   defp codec_failure(codec, kind, reason),
     do:
-      issue(:codec_failure, [], "authoring document codec failed", %{
+      issue(:codec_failure, [], "document codec failed", %{
         codec: codec,
         failure_kind: kind,
         reason: reason
@@ -240,7 +253,7 @@ defmodule Jido.Authoring do
         {:error,
          Error.invalid(
            :document_too_large,
-           "encoded authoring document exceeds its JSON byte limit",
+           "encoded codec document exceeds its JSON byte limit",
            details
          )}
 
@@ -251,7 +264,7 @@ defmodule Jido.Authoring do
         {:error,
          Error.invalid(
            :unsupported_document,
-           "authoring document codec returned the wrong type or vsn"
+           "document codec returned the wrong type or vsn"
          )}
 
       {:error, %Issue{} = issue} ->
@@ -260,14 +273,20 @@ defmodule Jido.Authoring do
   end
 
   defp encoded_document(_document, _codec, _maximum_bytes),
-    do: {:error, Error.invalid(:invalid_document, "authoring codec returned an invalid document")}
+    do: {:error, Error.invalid(:invalid_document, "codec returned an invalid document")}
 
   defp encoder(value, registry, opts) do
     case opts[:codec] do
       nil ->
-        case Registry.encoder(registry, value) do
-          {:ok, codec} -> {:ok, codec}
-          {:error, :unknown_encoder} -> unsupported_value()
+        case Jido.Codec.Encoder.codec(value) do
+          {:ok, codec} ->
+            {:ok, codec}
+
+          :error ->
+            case Registry.encoder(registry, value) do
+              {:ok, codec} -> {:ok, codec}
+              {:error, :unknown_encoder} -> unsupported_value()
+            end
         end
 
       codec when is_atom(codec) ->
@@ -285,7 +304,7 @@ defmodule Jido.Authoring do
   end
 
   defp codec_metadata(codec, operation) do
-    case Codec.metadata(codec, operation) do
+    case Contract.metadata(codec, operation) do
       {:ok, metadata} ->
         {:ok, metadata}
 
@@ -296,125 +315,34 @@ defmodule Jido.Authoring do
             else: inspect(reason, limit: 20, printable_limit: 1_000)
 
         {:error,
-         Issue.new(:codec_failure, [], "authoring codec metadata failed",
+         Issue.new(:codec_failure, [], "codec metadata failed",
            details: %{codec: codec, failure_kind: kind, reason: reason}
          )}
 
       {:error, {:invalid_metadata, _metadata}} ->
-        {:error, Issue.new(:invalid_codec, [], "authoring codec metadata is invalid")}
+        {:error, Issue.new(:invalid_codec, [], "codec metadata is invalid")}
 
       {:error, :invalid_contract} ->
-        {:error, Issue.new(:invalid_codec, [], "authoring codec contract is invalid")}
+        {:error, Issue.new(:invalid_codec, [], "codec contract is invalid")}
     end
   end
 
   defp unsupported_value do
-    {:error, Error.invalid(:unsupported_value, "authoring has no codec for this value")}
+    {:error, Error.invalid(:unsupported_value, "no codec supports this value")}
   end
 
   defp unsupported_document(type, vsn, supported) do
-    issue(:unsupported_document, ["type"], "authoring document type or vsn is not supported", %{
+    issue(:unsupported_document, ["type"], "codec document type or vsn is not supported", %{
       type: type,
       vsn: vsn,
       supported_vsns: supported
     })
   end
 
-  defp parse_json(json, maximum_bytes)
-       when is_binary(json) and byte_size(json) <= maximum_bytes do
-    case Jason.decode(json, strings: :copy, objects: :ordered_objects) do
-      {:ok, document} ->
-        case plain_json(document, [], 0, @maximum_document_nodes) do
-          {:ok, document, _remaining} -> {:ok, document}
-          {:error, _issues} = error -> error
-        end
-
-      {:error, error} ->
-        issue(:invalid_json, [], Exception.message(error))
-    end
-  end
-
-  defp parse_json(_json, maximum_bytes),
-    do:
-      issue(:invalid_json, [], "expected a JSON string of at most #{maximum_bytes} bytes", %{
-        maximum_bytes: maximum_bytes
-      })
-
-  defp plain_json(_value, _path, _depth, remaining) when remaining <= 0,
-    do:
-      issue(:nodes, [], "authoring document exceeds its total node limit", %{
-        maximum_nodes: @maximum_document_nodes
-      })
-
-  defp plain_json(_value, _path, depth, _remaining) when depth > @maximum_depth,
-    do:
-      issue(:depth, [], "authoring document exceeds its nesting limit", %{
-        maximum_depth: @maximum_depth
-      })
-
-  defp plain_json(%Jason.OrderedObject{values: pairs}, path, depth, remaining) do
-    cond do
-      length(pairs) > @maximum_collection_size ->
-        collection_issue()
-
-      key = duplicate_key(pairs) ->
-        issue(:duplicate_key, path ++ [key], "JSON object contains a duplicate key", %{key: key})
-
-      true ->
-        Enum.reduce_while(pairs, {:ok, %{}, remaining - 1}, fn {key, value}, {:ok, result, left} ->
-          with {:ok, _key, left} <- plain_json(key, path, depth + 1, left),
-               {:ok, value, left} <- plain_json(value, path ++ [key], depth + 1, left) do
-            {:cont, {:ok, Map.put(result, key, value), left}}
-          else
-            {:error, _issues} = error -> {:halt, error}
-          end
-        end)
-    end
-  end
-
-  defp plain_json(values, path, depth, remaining) when is_list(values) do
-    if length(values) > @maximum_collection_size do
-      collection_issue()
-    else
-      values
-      |> Enum.with_index()
-      |> Enum.reduce_while({:ok, [], remaining - 1}, fn {value, index}, {:ok, result, left} ->
-        case plain_json(value, path ++ [index], depth + 1, left) do
-          {:ok, value, left} -> {:cont, {:ok, [value | result], left}}
-          {:error, _issues} = error -> {:halt, error}
-        end
-      end)
-      |> case do
-        {:ok, result, left} -> {:ok, Enum.reverse(result), left}
-        {:error, _issues} = error -> error
-      end
-    end
-  end
-
-  defp plain_json(value, _path, _depth, remaining), do: {:ok, value, remaining - 1}
-
-  defp collection_issue do
-    issue(:collection, [], "authoring document collection exceeds its size limit", %{
-      maximum_size: @maximum_collection_size
-    })
-  end
-
-  defp duplicate_key(pairs) do
-    Enum.reduce_while(pairs, MapSet.new(), fn {key, _value}, seen ->
-      if MapSet.member?(seen, key),
-        do: {:halt, key},
-        else: {:cont, MapSet.put(seen, key)}
-    end)
-    |> case do
-      %MapSet{} -> nil
-      key -> key
-    end
-  end
-
   defp options!(opts) when is_list(opts), do: Keyword.validate!(opts, @option_keys)
 
   defp options!(opts),
-    do: raise(ArgumentError, "authoring options must be a keyword list, got: #{inspect(opts)}")
+    do: raise(ArgumentError, "codec options must be a keyword list, got: #{inspect(opts)}")
 
   defp maximum_json_bytes!(opts) do
     value = Keyword.get_lazy(opts, :maximum_json_bytes, &configured_maximum_json_bytes/0)
@@ -435,9 +363,12 @@ defmodule Jido.Authoring do
       nil -> Jido.Discovery.registry()
       %Registry{} = registry -> registry
       entries when is_map(entries) and not is_struct(entries) -> Registry.new!(entries)
-      value -> raise ArgumentError, "authoring registry is invalid: #{inspect(value)}"
+      value -> raise ArgumentError, "Codec Registry is invalid: #{inspect(value)}"
     end
   end
+
+  defp document_error(%Document.Error{} = error),
+    do: {:error, [Issue.new(error.reason, error.path, error.message, details: error.details)]}
 
   defp issue(code, path, message, details \\ %{}),
     do: {:error, [Issue.new(code, path, message, details: details)]}

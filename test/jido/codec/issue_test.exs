@@ -1,7 +1,7 @@
-defmodule Jido.Authoring.IssueTest do
+defmodule Jido.Codec.IssueTest do
   use ExUnit.Case, async: true
 
-  alias Jido.Authoring.Issue
+  alias Jido.Codec.Issue
 
   test "normalizes unsafe details and accepts JSON path indexes" do
     issue = Issue.new(:invalid_value, ["items", 0], "invalid value", details: %{pid: self()})

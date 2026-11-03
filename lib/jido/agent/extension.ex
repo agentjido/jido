@@ -1,7 +1,7 @@
 defmodule Jido.Agent.Extension do
   @moduledoc false
   alias Jido.Agent.{Data, Error, Route}
-  alias Jido.Authoring.{Registry, Value}
+  alias Jido.Codec.{Registry, Value}
 
   @doc "Returns the stable authoring ID for this provider."
   @callback id() :: String.t()
@@ -52,7 +52,7 @@ defmodule Jido.Agent.Extension do
       def vsn, do: unquote(Keyword.get(opts, :vsn, 1))
 
       @doc false
-      def __jido_authoring__ do
+      def __jido_codec_manifest__ do
         %{id: id(), kind: :plugin, vsn: vsn(), target: __MODULE__}
       end
 
@@ -71,10 +71,10 @@ defmodule Jido.Agent.Extension do
       def verify_connection(_data, _connection), do: :ok
 
       def encode_authoring_data(data, registry),
-        do: Jido.Authoring.Value.encode(data, registry)
+        do: Jido.Codec.Value.encode(data, registry)
 
       def decode_authoring_data(data, registry),
-        do: Jido.Authoring.Value.decode(data, registry)
+        do: Jido.Codec.Value.decode(data, registry)
 
       defoverridable lower: 2,
                      normalize: 1,
@@ -117,7 +117,7 @@ defmodule Jido.Agent.Extension do
     required_callbacks =
       __MODULE__.behaviour_info(:callbacks) -- __MODULE__.behaviour_info(:optional_callbacks)
 
-    callbacks = [{:sections, 0}, {:__jido_authoring__, 0} | required_callbacks]
+    callbacks = [{:sections, 0}, {:__jido_codec_manifest__, 0} | required_callbacks]
 
     if match?({:module, _}, Code.ensure_compiled(module)) and
          Enum.all?(callbacks, fn {f, a} -> function_exported?(module, f, a) end) do
@@ -139,7 +139,7 @@ defmodule Jido.Agent.Extension do
     do: Error.fail(:invalid_provider, [], "Expected a provider module", %{provider: value})
 
   defp plugin(module) do
-    authoring = module.__jido_authoring__()
+    authoring = module.__jido_codec_manifest__()
     expected = %{id: module.id(), kind: :plugin, target: module, vsn: module.vsn()}
 
     if Jido.Plugin in behaviours(module) and authoring === expected do

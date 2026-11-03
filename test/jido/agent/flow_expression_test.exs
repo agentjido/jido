@@ -65,7 +65,7 @@ defmodule Jido.Agent.FlowExpressionTest do
     assert {:ok, %Runic.Workflow{}} = Jido.Exec.compile(flow)
 
     flow_registry =
-      Jido.Authoring.Registry.new!(%{
+      Jido.Codec.Registry.new!(%{
         {"actions/amount", 1} => {:action, Amount},
         {"schemas/input", 1} => {:schema, flow.schema},
         {"schemas/output", 1} => {:schema, flow.output_schema},
@@ -75,10 +75,10 @@ defmodule Jido.Agent.FlowExpressionTest do
       })
 
     flow_opts = [registry: flow_registry, codec: Jido.Flow.Codec]
-    assert {:ok, flow_document} = Jido.Authoring.encode(flow, flow_opts)
+    assert {:ok, flow_document} = Jido.Codec.encode(flow, flow_opts)
 
     assert {:ok, ^flow} =
-             Jido.Authoring.decode(JSON.decode!(JSON.encode!(flow_document)), flow_opts)
+             Jido.Codec.decode(JSON.decode!(JSON.encode!(flow_document)), flow_opts)
 
     for target <- [Add] do
       definition =
@@ -102,7 +102,7 @@ defmodule Jido.Agent.FlowExpressionTest do
                JidoTest.AgentRegistry.decode(JSON.decode!(JSON.encode!(document)), registry)
 
       assert decoded == definition
-      instance = Agent.instantiate!(decoded, id: Jido.Signal.ID.generate!(), state: %{count: 10})
+      instance = Agent.instantiate!(decoded, id: Jido.Id.uuid7(), state: %{count: 10})
 
       {:ok, command_signal_1} = Counter.add_signal(%{})
 
@@ -139,7 +139,7 @@ defmodule Jido.Agent.FlowExpressionTest do
         })
 
       instance =
-        Agent.instantiate!(definition, id: Jido.Signal.ID.generate!(), state: %{count: 10})
+        Agent.instantiate!(definition, id: Jido.Id.uuid7(), state: %{count: 10})
 
       {:ok, server} = JidoTest.AgentServerAssertions.start_agent(jido, instance)
 

@@ -1,7 +1,7 @@
 defmodule Jido.Flow.Definition do
   @moduledoc false
 
-  alias Jido.Authoring.Config
+  alias Jido.Codec.Config
   alias Jido.Flow.{Component, Error, Graph, GraphValidation, Ref, Value, FieldError}
 
   @keys [:name, :description, :schema, :output_schema, :components, :output]

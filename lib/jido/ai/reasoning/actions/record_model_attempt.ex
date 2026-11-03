@@ -155,6 +155,6 @@ defmodule Jido.AI.Reasoning.Actions.RecordModelAttempt do
   end
 
   defp assistant_content(%{text: text}) when is_binary(text) and text != "", do: text
-  defp assistant_content(%{output: output}) when not is_nil(output), do: Jason.encode!(output)
+  defp assistant_content(%{output: output}) when not is_nil(output), do: JSON.encode!(output)
   defp assistant_content(_outcome), do: ""
 end

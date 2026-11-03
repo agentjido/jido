@@ -4,7 +4,7 @@ defmodule JidoActionTest.ActionTest do
   @moduletag obligation: "jido_action.action.I1"
 
   alias Jido.Action
-  alias Jido.Authoring.Config
+  alias Jido.Codec.Config
   alias Jido.Action.Output
   alias JidoActionTest.Fixtures.Actions.FullAction
   alias JidoActionTest.Fixtures.Actions.NoOutputSchemaAction
@@ -90,7 +90,7 @@ defmodule JidoActionTest.ActionTest do
         end
       )
 
-      assert_raise ArgumentError, ~r/invalid byte 0xFF/, fn -> module.authoring_contract() end
+      assert_raise ArgumentError, ~r/invalid_byte, 255/, fn -> module.authoring_contract() end
     end
 
     @tag obligation: "jido_action.action.I2"
@@ -457,7 +457,7 @@ defmodule JidoActionTest.ActionTest do
       try do
         for value <- [self(), make_ref(), port] do
           assert {:error,
-                  %Jido.Authoring.Error.InvalidError{
+                  %Jido.Codec.Error.InvalidError{
                     code: :non_static_data,
                     message: "runtime process values are not supported at [:values, 1]"
                   }} = Config.validate_static_data(%{values: [:static, value]})
@@ -479,7 +479,7 @@ defmodule JidoActionTest.ActionTest do
 
       for {value, message} <- cases do
         assert {:error,
-                %Jido.Authoring.Error.InvalidError{
+                %Jido.Codec.Error.InvalidError{
                   code: :non_static_data,
                   message: ^message
                 }} = Config.validate_static_data(value)
@@ -521,13 +521,13 @@ defmodule JidoActionTest.ActionTest do
 
     test "rejects improper list tails at their paths" do
       assert {:error,
-              %Jido.Authoring.Error.InvalidError{
+              %Jido.Codec.Error.InvalidError{
                 code: :non_static_data,
                 message: "improper list tails are not supported at [1]"
               }} = Config.validate_static_data([:schema | :tail])
 
       assert {:error,
-              %Jido.Authoring.Error.InvalidError{
+              %Jido.Codec.Error.InvalidError{
                 code: :non_static_data,
                 message: "improper list tails are not supported at [:schema, :steps, 1]"
               }} = Config.validate_static_data(%{schema: %{steps: [:step | :tail]}})

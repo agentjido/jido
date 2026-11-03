@@ -1,13 +1,44 @@
-defmodule Jido.Authoring.Config do
+defmodule Jido.Codec.Config do
   alias Jido.Joi
   @moduledoc false
 
-  alias Jido.Authoring.Registry
+  alias Jido.Codec.Registry
   alias Jido.Flow.Error
 
   @keys [:name, :description, :schema, :output_schema]
   @module_keys [:id, :vsn | @keys]
   @max_action_name_bytes 256
+
+  @doc false
+  @spec validate_options!(term(), Macro.Env.t(), String.t(), String.t(), [atom()] | nil) ::
+          :ok | no_return()
+  def validate_options!(options, caller, message, label, allowed \\ nil) do
+    unless Keyword.keyword?(options), do: compile_error!(caller, message)
+
+    _seen =
+      Enum.reduce(options, MapSet.new(), fn {key, _value}, seen ->
+        allowed_option!(key, allowed, caller, label, "")
+
+        if MapSet.member?(seen, key),
+          do: compile_error!(caller, "duplicate #{label}: #{inspect(key)}")
+
+        MapSet.put(seen, key)
+      end)
+
+    :ok
+  end
+
+  @doc false
+  @spec allow_options!(keyword(), [atom()], Macro.Env.t(), String.t(), String.t()) ::
+          :ok | no_return()
+  def allow_options!(options, allowed, caller, label, suffix \\ "") do
+    Enum.each(options, &allowed_option!(elem(&1, 0), allowed, caller, label, suffix))
+  end
+
+  @doc false
+  @spec compile_error!(Macro.Env.t(), String.t()) :: no_return()
+  def compile_error!(caller, description),
+    do: raise(CompileError, file: caller.file, line: caller.line, description: description)
 
   @doc false
   @spec validate_name(term(), keyword()) :: :ok | {:error, String.t()}
@@ -59,8 +90,8 @@ defmodule Jido.Authoring.Config do
 
   @doc false
   @spec validate_static_data(term()) ::
-          :ok | {:error, Jido.Authoring.Error.InvalidError.t()}
-  def validate_static_data(term), do: Jido.Authoring.validate_static(term)
+          :ok | {:error, Jido.Codec.Error.InvalidError.t()}
+  def validate_static_data(term), do: Jido.Codec.validate_static(term)
 
   defp ensure_escapable_schema!(schema, option, env) do
     Macro.escape(schema)
@@ -258,4 +289,11 @@ defmodule Jido.Authoring.Config do
   end
 
   defp module_defaults(opts, _module), do: opts
+
+  defp allowed_option!(_key, nil, _caller, _label, _suffix), do: :ok
+
+  defp allowed_option!(key, allowed, caller, label, suffix) do
+    unless key in allowed,
+      do: compile_error!(caller, "unsupported #{label}: #{inspect(key)}#{suffix}")
+  end
 end

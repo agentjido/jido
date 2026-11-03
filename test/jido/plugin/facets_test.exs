@@ -609,7 +609,7 @@ defmodule Jido.Plugin.FacetsTest do
           }
         ]
       })
-      |> Agent.instantiate!(id: Jido.Signal.ID.generate!())
+      |> Agent.instantiate!(id: Jido.Id.uuid7())
 
     signal = Signal.new!("facet.foreign", %{}, source: "/test")
 
@@ -636,7 +636,7 @@ defmodule Jido.Plugin.FacetsTest do
         }
       ]
     })
-    |> Agent.instantiate!(id: Jido.Signal.ID.generate!())
+    |> Agent.instantiate!(id: Jido.Id.uuid7())
   end
 
   defp options do

@@ -2,7 +2,7 @@ defmodule Jido.Flow.GeneratedRegistryTest do
   use Covenant.Case, component: "jido_action.codec", async: true
   @moduletag obligation: "jido_action.codec.I6"
 
-  alias Jido.Authoring.Registry
+  alias Jido.Codec.Registry
   alias Jido.Flow.Codec
   alias JidoActionTest.FlowCodec, as: Codec
   alias Jido.Flow.Error.InvalidDefinitionError
@@ -12,7 +12,7 @@ defmodule Jido.Flow.GeneratedRegistryTest do
   alias JidoActionTest.Fixtures.NestedFlow
   alias JidoActionTest.Fixtures.Actions.{Add, Multiply}
 
-  test "encode builds one deterministic temporary Authoring Registry" do
+  test "encode builds one deterministic temporary Codec Registry" do
     flow = FlowAuthoring.mixed_flow!()
 
     assert {:ok, document, %Registry{} = registry} = Codec.encode(flow)

@@ -1,7 +1,7 @@
 defmodule JidoActionTest.Fixtures.CodecRegistry do
   @moduledoc false
 
-  alias Jido.Authoring.Registry
+  alias Jido.Codec.Registry
   alias JidoActionTest.Fixtures.NestedFlow
   alias JidoActionTest.Fixtures.Actions.{Add, Multiply}
 

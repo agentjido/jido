@@ -1,8 +1,6 @@
 defmodule Jido.Flow.Identity do
   @moduledoc false
 
-  import Bitwise
-
   alias Jido.Flow
   alias Jido.Flow.Definition
   alias Jido.Flow.Graph
@@ -71,7 +69,7 @@ defmodule Jido.Flow.Identity do
       version: @identity_version,
       algorithm: :sha256,
       digest: Base.encode16(raw_digest, case: :lower),
-      uuid: uuid_v8(raw_digest)
+      uuid: Jido.Id.uuid8(raw_digest)
     }
   end
 
@@ -87,22 +85,5 @@ defmodule Jido.Flow.Identity do
         |> Enum.reduce(:crypto.hash_init(:sha256), &:crypto.hash_update(&2, &1))
         |> :crypto.hash_final()
     end
-  end
-
-  defp uuid_v8(<<time_low::32, time_mid::16, version_bits::16, variant_bits::16, node::48, _::binary>>) do
-    version_bits = bor(band(version_bits, 0x0FFF), 0x8000)
-    variant_bits = bor(band(variant_bits, 0x3FFF), 0x8000)
-
-    encoded =
-      Base.encode16(
-        <<time_low::32, time_mid::16, version_bits::16, variant_bits::16, node::48>>,
-        case: :lower
-      )
-
-    <<first::binary-size(8), second::binary-size(4), third::binary-size(4), fourth::binary-size(4),
-      fifth::binary-size(12)>> = encoded
-
-    <<first::binary, "-", second::binary, "-", third::binary, "-", fourth::binary, "-", fifth::binary>>
-    |> :binary.copy()
   end
 end

@@ -118,21 +118,20 @@ defmodule Jido.Signal.Serialization do
 
   defp encode(data, :json) do
     if json_value?(data) do
-      case Jason.encode(data) do
-        {:ok, binary} -> {:ok, binary}
-        {:error, error} -> {:error, {:json_encode_failed, Exception.message(error)}}
-      end
+      {:ok, JSON.encode!(data)}
     else
       {:error, {:json_encode_failed, "Signal data must contain JSON values or binary data"}}
     end
+  rescue
+    error -> {:error, {:json_encode_failed, Exception.message(error)}}
   end
 
   defp encode(data, :erlang_term), do: {:ok, :erlang.term_to_binary(data)}
 
   defp decode(binary, :json) do
-    case Jason.decode(binary) do
+    case JSON.decode(binary) do
       {:ok, data} -> {:ok, data}
-      {:error, error} -> {:error, {:json_decode_failed, Exception.message(error)}}
+      {:error, reason} -> {:error, {:json_decode_failed, inspect(reason)}}
     end
   end
 

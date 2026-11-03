@@ -225,7 +225,7 @@ defmodule JidoTest.Persistence.LiveStateTest do
   test "live execution commits local domain and Plugin values without persistence", c do
     initial =
       PluginAgent.instantiate!(
-        id: Jido.Signal.ID.generate!(),
+        id: Jido.Id.uuid7(),
         state: %{payload: self(), owned: %{bits: <<5::3>>}}
       )
 

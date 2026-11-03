@@ -113,9 +113,9 @@ defmodule Jido.AI.ToolResult do
   def project(value, max_bytes \\ @default_max_bytes)
 
   def project(value, max_bytes) when is_integer(max_bytes) and max_bytes > 0 do
-    case Jason.encode(value) do
+    case json_encode(value) do
       {:ok, encoded} when byte_size(encoded) <= max_bytes ->
-        {Jason.decode!(encoded), %{bytes: byte_size(encoded), max_bytes: max_bytes, truncated: false}}
+        {JSON.decode!(encoded), %{bytes: byte_size(encoded), max_bytes: max_bytes, truncated: false}}
 
       {:ok, encoded} ->
         content = %{
@@ -183,7 +183,7 @@ defmodule Jido.AI.ToolResult do
 
     with :ok <- validate_content_parts(content),
          {:ok, encoded} <-
-           Jason.encode(%{
+           json_encode(%{
              content: content,
              output: output,
              metadata: result_metadata
@@ -191,7 +191,7 @@ defmodule Jido.AI.ToolResult do
       bytes = byte_size(encoded)
 
       if bytes <= max_bytes do
-        decoded = Jason.decode!(encoded)
+        decoded = JSON.decode!(encoded)
 
         {:ok, decoded["content"] || [], decoded["output"], decoded["metadata"] || %{},
          %{
@@ -263,13 +263,13 @@ defmodule Jido.AI.ToolResult do
   end
 
   defp portable_content_result(result) do
-    case Jason.encode(%{
+    case json_encode(%{
            content: field(result, :content) || [],
            output: field(result, :output),
            metadata: field(result, :metadata) || %{}
          }) do
       {:ok, encoded} ->
-        decoded = Jason.decode!(encoded)
+        decoded = JSON.decode!(encoded)
 
         %{
           __jido_ai_tool_result__: 1,
@@ -290,4 +290,31 @@ defmodule Jido.AI.ToolResult do
 
   defp field(map, key) when is_map(map), do: Map.get(map, key, Map.get(map, Atom.to_string(key)))
   defp field(_value, _key), do: nil
+
+  defp json_encode(value) do
+    {:ok, value |> native_json_value() |> JSON.encode!()}
+  rescue
+    error -> {:error, error}
+  catch
+    kind, reason -> {:error, {kind, reason}}
+  end
+
+  defp native_json_value(%ReqLLM.Message.ContentPart{data: data} = part)
+       when is_binary(data) do
+    part
+    |> Map.from_struct()
+    |> Map.put(:data, Base.encode64(data))
+    |> native_json_value()
+  end
+
+  defp native_json_value(%ReqLLM.Message.ContentPart{} = part),
+    do: part |> Map.from_struct() |> native_json_value()
+
+  defp native_json_value(values) when is_list(values),
+    do: Enum.map(values, &native_json_value/1)
+
+  defp native_json_value(value) when is_map(value) and not is_struct(value),
+    do: Map.new(value, fn {key, item} -> {key, native_json_value(item)} end)
+
+  defp native_json_value(value), do: value
 end

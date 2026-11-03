@@ -23,7 +23,7 @@ defmodule JidoTest.Contract.PluginAuditTest do
 
   @tag obligation: "jido.plugin.audit.I1"
   test "record construction preserves present options and generates absent values" do
-    id = Jido.Signal.ID.generate!()
+    id = Jido.Id.uuid7()
 
     assert Audit.record(:saved, :accepted,
              id: id,
@@ -44,7 +44,7 @@ defmodule JidoTest.Contract.PluginAuditTest do
     generated = Audit.record({:saved, 1}, :accepted)
     after_time = System.system_time(:millisecond)
 
-    assert Jido.Signal.ID.valid?(generated.id)
+    assert Jido.Id.uuid7?(generated.id)
     assert generated.at in before..after_time
     assert generated.event == {:saved, 1}
     assert generated.outcome == :accepted
