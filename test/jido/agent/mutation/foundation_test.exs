@@ -1,7 +1,7 @@
 defmodule Jido.Agent.MutationFoundationTest do
   use Covenant.Case, component: "jido.agent", async: true
   alias Jido.Agent
-  alias Jido.Agent.{Composition, Diff}
+  alias Jido.Agent.{Diff, Mutation}
   alias Jido.Agent.Directive, as: D
   alias JidoTest.AgentEvolutionFixtures, as: F
 
@@ -89,9 +89,9 @@ defmodule Jido.Agent.MutationFoundationTest do
     source = F.agent()
     state = %{source.state | count: source.state.count + 1}
 
-    assert {:ok, next} = Composition.apply(source, state, [])
+    assert {:ok, next} = Mutation.apply(source, state, [])
     assert next === %{source | state: state}
-    assert {:ok, ^next} = Composition.bind(next)
+    assert {:ok, ^next} = Mutation.bind(next)
   end
 
   @tag obligation: "jido.agent.I29"

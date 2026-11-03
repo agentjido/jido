@@ -1,7 +1,7 @@
 defmodule Jido.Agent.Plugin.Declaration do
   @moduledoc false
 
-  alias Jido.Agent.{Data, Extension}
+  alias Jido.Agent.{Validation, Extension}
   alias Jido.Error
 
   @type t :: %{provider: module(), config: map()}
@@ -9,9 +9,9 @@ defmodule Jido.Agent.Plugin.Declaration do
   @doc false
   @spec normalize(term()) :: {:ok, [t()]} | {:error, Error.t()}
   def normalize(value) do
-    with {:ok, declarations} <- Data.list(value, &declaration/1),
-         :ok <- Data.unique(declarations, & &1.provider),
-         :ok <- Data.unique(declarations, & &1.provider.id()) do
+    with {:ok, declarations} <- Validation.list(value, &declaration/1),
+         :ok <- Validation.unique(declarations, & &1.provider),
+         :ok <- Validation.unique(declarations, & &1.provider.id()) do
       {:ok, declarations}
     end
   end
@@ -20,9 +20,9 @@ defmodule Jido.Agent.Plugin.Declaration do
 
   defp declaration({provider, config}) do
     with {:ok, provider} <- Extension.provider(provider),
-         :ok <- Data.plain_map(config),
+         :ok <- Validation.plain_map(config),
          :ok <- atom_keys(config),
-         :ok <- Data.static(config) do
+         :ok <- Validation.static(config) do
       {:ok, %{provider: provider, config: config}}
     end
   end

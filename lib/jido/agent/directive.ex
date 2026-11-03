@@ -31,6 +31,8 @@ defmodule Jido.Agent.Directive do
 
   alias __MODULE__.{AgentSend, Emit, ParentSend, Reply, ServerStop}
 
+  alias Jido.Agent.Validation
+  alias Jido.Error
   alias Jido.Signal
   alias __MODULE__.{PluginAdd, PluginConfigure, PluginRemove}
   alias Jido.Signal.Context, as: SignalContext
@@ -185,8 +187,8 @@ defmodule Jido.Agent.Directive do
   def emit(signal_or_type, dispatch_or_data \\ nil)
 
   def emit(type, data) when is_binary(type) do
-    with :ok <- Jido.Agent.Data.exact(type),
-         :ok <- Jido.Agent.Data.plain_map(data),
+    with :ok <- Jido.Agent.Validation.exact(type),
+         :ok <- Jido.Agent.Validation.plain_map(data),
          do: %{kind: :emit, type: type, data: data}
   end
 
@@ -207,6 +209,20 @@ defmodule Jido.Agent.Directive do
   @doc "Creates a terminal request to stop the AgentServer after commit."
   @spec server_stop(term()) :: ServerStop.t()
   def server_stop(reason \\ :normal), do: %ServerStop{reason: reason}
+
+  @doc false
+  def directives(definition, directives) do
+    Validation.list(directives, fn
+      %{kind: :emit} = request ->
+        with {:ok, request} <- emission(request, definition),
+             {:ok, signal} <- envelope(request, definition) do
+          {:ok, emit(signal)}
+        end
+
+      directive ->
+        {:ok, directive}
+    end)
+  end
 
   @doc "Replaces the complete topology data."
   @spec topology_set(map()) :: __MODULE__.TopologySet.t()
@@ -331,6 +347,39 @@ defmodule Jido.Agent.Directive do
   @spec plugin_remove(module(), keyword()) :: PluginRemove.t()
   def plugin_remove(module, opts \\ []),
     do: %PluginRemove{module: module, state: mutation_options(opts, [:state])[:state]}
+
+  defp envelope(%{signal: signal}, _definition), do: {:ok, signal}
+
+  defp envelope(%{type: type, data: data}, definition),
+    do: Signal.new(type, data, source: definition.signal_source)
+
+  defp emission(%{kind: :emit, signal: %Signal{} = signal} = request, _definition) do
+    with {:ok, _} <- Validation.fields(request, [:kind, :signal]),
+         :ok <- emission_signal(signal),
+         do: {:ok, request}
+  end
+
+  defp emission(%{kind: :emit, type: type, data: data} = request, definition) do
+    with {:ok, _} <- Validation.fields(request, [:kind, :type, :data]),
+         :ok <- Validation.exact(type),
+         :ok <- Validation.plain_map(data),
+         :ok <- Validation.static(data),
+         :ok <- Error.prefix_result_path(Validation.nonempty(definition.signal_source), :signal_source),
+         do: {:ok, request}
+  end
+
+  defp emission(_request, _definition),
+    do: Error.validation_result(:invalid_directive, [], "Expected a registered emission directive")
+
+  defp emission_signal(signal) do
+    case Jido.Joi.validate(Signal.schema(), signal) do
+      :ok ->
+        Validation.static(signal)
+
+      {:error, issues} ->
+        Error.validation_result(:invalid_signal, [], "Invalid Signal envelope", %{issues: issues})
+    end
+  end
 
   defp mutation_options(opts, allowed) do
     unless Keyword.keyword?(opts) and Enum.uniq(Keyword.keys(opts)) == Keyword.keys(opts),

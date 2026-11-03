@@ -16,7 +16,7 @@ defmodule Jido.AI.Agent.Plugin do
   core Agent only when you need the core `Jido.Agent` authoring surface.
   """
 
-  alias Jido.Agent.Data
+  alias Jido.Agent.Validation
   alias Jido.Error
   alias Jido.Codec.{Issue, Reference}
   alias Spark.Dsl.Extension, as: SparkExtension
@@ -79,7 +79,7 @@ defmodule Jido.AI.Agent.Plugin do
   @impl true
   def normalize(data) do
     with {:ok, data} <-
-           Data.fields(data, [:reasoning, :defaults, :tools], %{defaults: %{}, tools: []}),
+           Validation.fields(data, [:reasoning, :defaults, :tools], %{defaults: %{}, tools: []}),
          :ok <- reasoning(data[:reasoning]),
          :ok <- reserved_defaults(data.defaults),
          {:ok, defaults} <- normalize_defaults(data.defaults, data.reasoning),

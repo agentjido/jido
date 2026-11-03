@@ -2,6 +2,7 @@ defmodule Jido.Agent.DSL do
   alias Jido.Joi
   @moduledoc false
   alias Jido.Agent.{Extension, Validation}
+  alias Jido.Catalog
   alias Jido.Error
   alias Spark.Dsl.Extension, as: E
 
@@ -25,7 +26,7 @@ defmodule Jido.Agent.DSL do
     helpers =
       quote unquote: false do
         for route <- @agent_definition.routes,
-            route.as != nil and not Jido.Agent.Data.wildcard?(route.path) do
+            route.as != nil and not Jido.Agent.Validation.wildcard?(route.path) do
           helper = String.to_atom(Atom.to_string(route.as) <> "_signal")
           bang_helper = String.to_atom(Atom.to_string(route.as) <> "_signal!")
 
@@ -120,6 +121,35 @@ defmodule Jido.Agent.DSL do
     end
   end
 
+  @doc false
+  @spec prepare_options!(Macro.t(), Macro.Env.t()) :: keyword()
+  def prepare_options!(quoted_options, %Macro.Env{} = caller) do
+    {options, _binding} = Code.eval_quoted(quoted_options, [], caller)
+
+    options =
+      options
+      |> validate_keyword!()
+      |> Keyword.put_new(:id, Atom.to_string(caller.module))
+
+    case Catalog.validate_identifier(options[:id]) do
+      :ok -> options
+      {:error, error} -> raise error
+    end
+  end
+
+  @doc false
+  @spec prepend_plugin(keyword(), Jido.Plugin.declaration()) :: keyword()
+  def prepend_plugin(options, plugin) do
+    options = validate_keyword!(options)
+    plugins = Keyword.get(options, :plugins, [])
+
+    unless is_list(plugins), do: raise(ArgumentError, "Agent plugins must be a list")
+
+    plugins = if plugin in plugins, do: plugins, else: [plugin | plugins]
+
+    Keyword.delete(options, :plugins) ++ [plugins: plugins]
+  end
+
   def definition!(draft) do
     routes =
       Enum.map(draft.routes, fn
@@ -167,5 +197,12 @@ defmodule Jido.Agent.DSL do
           path: error.path,
           message: Exception.message(error)
     end
+  end
+
+  defp validate_keyword!(options) do
+    unless Keyword.keyword?(options) and Enum.uniq(Keyword.keys(options)) == Keyword.keys(options),
+      do: raise(ArgumentError, "Agent requires unique keyword options")
+
+    options
   end
 end

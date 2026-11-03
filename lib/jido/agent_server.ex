@@ -887,7 +887,7 @@ defmodule Jido.AgentServer do
   end
 
   defp initialize_plugins(data) do
-    case Jido.Agent.Composition.bind(data.agent) do
+    case Jido.Agent.Mutation.bind(data.agent) do
       {:ok, agent} ->
         {:ok, specs} =
           Jido.Plugin.Normalizer.normalize_runtime(
@@ -993,7 +993,7 @@ defmodule Jido.AgentServer do
   def upgrade(server, action, opts \\ []) do
     with {:ok, options} <- Jido.Agent.Validation.options(opts, [:context, :timeout]),
          context = Map.get(options, :context, %{}),
-         :ok <- Jido.Agent.Data.plain_map(context),
+         :ok <- Jido.Agent.Validation.plain_map(context),
          timeout = Map.get(options, :timeout, 5_000),
          :ok <- Core.validate_wait(timeout) do
       :gen_statem.call(server, {:upgrade, make_ref(), action, context}, timeout)
@@ -2234,7 +2234,7 @@ defmodule Jido.AgentServer do
       {:upgrade, action} ->
         operation(:upgrade, %{data | active: active}, fn ->
           with {:ok, candidate} <- Durable.upgrade(agent, action, context),
-               {:ok, candidate} <- Jido.Agent.Composition.bind(candidate),
+               {:ok, candidate} <- Jido.Agent.Mutation.bind(candidate),
                {:ok, candidate} <- identify_topology(data, candidate),
                :ok <- CompositionRuntime.check(data, candidate, []) do
             {:ok, candidate, []}
@@ -2863,7 +2863,7 @@ defmodule Jido.AgentServer do
         {:error, if(match?({:error, _}, result), do: :running, else: :settling), reason}
 
       {:ok, candidate, directives} ->
-        with {:ok, candidate} <- Jido.Agent.Composition.bind(candidate),
+        with {:ok, candidate} <- Jido.Agent.Mutation.bind(candidate),
              {:ok, candidate} <- identify_topology(config, candidate),
              :ok <- CompositionRuntime.check(config, candidate, directives),
              :ok <- Effects.validate_batch(directives, %{config | agent: candidate}) do
@@ -2873,7 +2873,7 @@ defmodule Jido.AgentServer do
         end
 
       {:handoff, candidate, instruction, directives} ->
-        with {:ok, candidate} <- Jido.Agent.Composition.bind(candidate),
+        with {:ok, candidate} <- Jido.Agent.Mutation.bind(candidate),
              {:ok, candidate} <- identify_topology(config, candidate),
              :ok <- CompositionRuntime.check(config, candidate, directives),
              :ok <- Effects.validate_batch(directives, %{config | agent: candidate}) do

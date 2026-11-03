@@ -29,7 +29,7 @@ defmodule Jido.Agent.Plugin.FSM do
   definitions. The runtime has no second state-machine representation.
   """
 
-  alias Jido.Agent.Data
+  alias Jido.Agent.Validation
   alias Jido.Error
   alias Jido.Agent.Plugin.FSM.Transition
   alias Jido.Agent.Plugin.{Preparation, Reduction, RouteSelection}
@@ -112,18 +112,18 @@ defmodule Jido.Agent.Plugin.FSM do
   @impl Jido.Agent.Extension
   def normalize(value) do
     with {:ok, value} <-
-           Data.fields(
+           Validation.fields(
              value,
              [:definition_vsn, :initial, :terminal, :transitions],
              %{definition_vsn: @default_definition_vsn, terminal: [], transitions: []}
            ),
-         :ok <- Error.prefix_result_path(Data.positive(value[:definition_vsn]), :definition_vsn),
-         :ok <- Error.prefix_result_path(Data.name(value[:initial]), :initial),
+         :ok <- Error.prefix_result_path(Validation.positive(value[:definition_vsn]), :definition_vsn),
+         :ok <- Error.prefix_result_path(Validation.name(value[:initial]), :initial),
          {:ok, terminal} <-
-           Error.prefix_result_path(Data.list(value.terminal, &state/1), :terminal),
-         :ok <- Error.prefix_result_path(Data.unique(terminal, & &1), :terminal),
+           Error.prefix_result_path(Validation.list(value.terminal, &state/1), :terminal),
+         :ok <- Error.prefix_result_path(Validation.unique(terminal, & &1), :terminal),
          {:ok, transitions} <-
-           Error.prefix_result_path(Data.list(value.transitions, &normalize_transition/1), :transitions),
+           Error.prefix_result_path(Validation.list(value.transitions, &normalize_transition/1), :transitions),
          :ok <- unique_transitions(transitions),
          :ok <- terminal_rules(terminal, transitions),
          :ok <- reachable(value.initial, terminal, transitions) do
@@ -254,21 +254,21 @@ defmodule Jido.Agent.Plugin.FSM do
   end
 
   defp normalize_transition(value) do
-    with {:ok, transition} <- Data.fields(value, [:name, :from, :route, :to]),
-         :ok <- Error.prefix_result_path(Data.name(transition[:name]), :name),
-         :ok <- Error.prefix_result_path(Data.name(transition[:from]), :from),
-         :ok <- Error.prefix_result_path(Data.name(transition[:route]), :route),
-         :ok <- Error.prefix_result_path(Data.name(transition[:to]), :to),
+    with {:ok, transition} <- Validation.fields(value, [:name, :from, :route, :to]),
+         :ok <- Error.prefix_result_path(Validation.name(transition[:name]), :name),
+         :ok <- Error.prefix_result_path(Validation.name(transition[:from]), :from),
+         :ok <- Error.prefix_result_path(Validation.name(transition[:route]), :route),
+         :ok <- Error.prefix_result_path(Validation.name(transition[:to]), :to),
          do: {:ok, transition}
   end
 
   defp state(value) do
-    with :ok <- Data.name(value), do: {:ok, value}
+    with :ok <- Validation.name(value), do: {:ok, value}
   end
 
   defp unique_transitions(transitions) do
-    with :ok <- Error.prefix_result_path(Data.unique(transitions, & &1.name), :name),
-         do: Error.prefix_result_path(Data.unique(transitions, &{&1.from, &1.route}), :source_route)
+    with :ok <- Error.prefix_result_path(Validation.unique(transitions, & &1.name), :name),
+         do: Error.prefix_result_path(Validation.unique(transitions, &{&1.from, &1.route}), :source_route)
   end
 
   defp terminal_rules(terminal, transitions) do

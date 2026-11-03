@@ -156,7 +156,7 @@ defmodule Jido.AgentServer.Directive do
   end
 
   defp option_map(opts, key) do
-    case Jido.Agent.Authoring.to_attrs(Keyword.get(opts, key, %{}), :reject) do
+    case Jido.Agent.Validation.to_attrs(Keyword.get(opts, key, %{}), :reject) do
       {:ok, value} -> value
       :error -> raise ArgumentError, "#{key} must be a plain Map or unique keyword list"
     end

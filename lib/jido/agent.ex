@@ -13,7 +13,7 @@ defmodule Jido.Agent do
   Routes select one handler in declaration order. Connections select recipients
   for outputs. Plugins add explicit, validated data to `plugins`.
   """
-  alias Jido.Agent.{Data, Options, Validation}
+  alias Jido.Agent.Validation
   alias Jido.Agent.Plugin.Declaration
   alias Jido.Agent.Runner
   alias Jido.Dispatch.Preparation
@@ -156,7 +156,7 @@ defmodule Jido.Agent do
 
   @doc false
   def options!(quoted_options, caller) do
-    options = Options.prepare!(quoted_options, caller)
+    options = Jido.Agent.DSL.prepare_options!(quoted_options, caller)
 
     case Declaration.normalize(Keyword.get(options, :plugins, [])) do
       {:ok, declarations} ->
@@ -242,8 +242,8 @@ defmodule Jido.Agent do
     with {:ok, opts} <-
            Validation.options(opts, [:source, :id, :time, :subject, :datacontenttype]),
          source = Map.get(opts, :source, definition.signal_source),
-         :ok <- Jido.Error.prefix_result_path(Jido.Agent.Data.nonempty(source), :source),
-         :ok <- Jido.Agent.Data.plain_map(data) do
+         :ok <- Jido.Error.prefix_result_path(Jido.Agent.Validation.nonempty(source), :source),
+         :ok <- Jido.Agent.Validation.plain_map(data) do
       Jido.Signal.new(type, data, Map.put(opts, :source, source))
     end
   end
@@ -293,7 +293,7 @@ defmodule Jido.Agent do
   @spec transition_validated(instance(), term(), Joi.schema()) ::
           {:ok, instance()} | {:error, Exception.t()}
   def transition_validated(%__MODULE__{} = agent, next_state, schema) do
-    with :ok <- Jido.Error.prefix_result_path(Data.complete(schema, next_state), :state) do
+    with :ok <- Jido.Error.prefix_result_path(Validation.complete(schema, next_state), :state) do
       {:ok, %{agent | state: next_state}}
     end
   end
@@ -360,7 +360,7 @@ defmodule Jido.Agent do
     do: invalid("Agent.cmd/3 options must be a keyword list", %{opts: opts})
 
   defp normalize_domain_attrs(attrs) do
-    case Jido.Agent.Authoring.to_attrs(attrs) do
+    case Jido.Agent.Validation.to_attrs(attrs) do
       {:ok, attrs} -> {:ok, attrs}
       :error -> invalid("Agent.set/2 attributes must be a map or keyword list", %{attrs: attrs})
     end

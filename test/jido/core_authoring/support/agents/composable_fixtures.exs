@@ -145,7 +145,7 @@ defmodule JidoTest.ComposableAgent.Team do
 end
 
 defmodule JidoTest.ComposableAgent.Audit do
-  alias Jido.Agent.Data
+  alias Jido.Agent.Validation
   alias Spark.Dsl.Extension, as: SparkExtension
 
   @section %Spark.Dsl.Section{name: :audit, schema: [label: [type: :string, required: true]]}
@@ -157,8 +157,8 @@ defmodule JidoTest.ComposableAgent.Audit do
   end
 
   def normalize(data) do
-    with {:ok, data} <- Data.fields(data, [:label, :enabled], %{enabled: true}),
-         :ok <- Data.nonempty(data[:label]),
+    with {:ok, data} <- Validation.fields(data, [:label, :enabled], %{enabled: true}),
+         :ok <- Validation.nonempty(data[:label]),
          do: {:ok, data}
   end
 end

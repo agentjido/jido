@@ -75,7 +75,7 @@ defmodule Jido.Persistence do
   @spec snapshot(Agent.t(), keyword()) :: {:ok, snapshot()} | {:error, term()}
   def snapshot(agent, opts \\ []) do
     with {:ok, opts} <- Jido.Agent.Validation.options(opts, [:context]),
-         :ok <- Jido.Agent.Data.plain_map(Map.get(opts, :context, %{})),
+         :ok <- Jido.Agent.Validation.plain_map(Map.get(opts, :context, %{})),
          do:
            Checkpoint.dump(
              agent,
@@ -89,7 +89,7 @@ defmodule Jido.Persistence do
   @spec restore(snapshot(), keyword()) :: {:ok, Agent.t()} | {:error, term()}
   def restore(snapshot, opts \\ []) do
     with {:ok, opts} <- Jido.Agent.Validation.options(opts, [:context]),
-         :ok <- Jido.Agent.Data.plain_map(Map.get(opts, :context, %{})),
+         :ok <- Jido.Agent.Validation.plain_map(Map.get(opts, :context, %{})),
          do: Checkpoint.restore_snapshot(snapshot, Map.get(opts, :context, %{}))
   end
 
@@ -98,7 +98,7 @@ defmodule Jido.Persistence do
   def upgrade(snapshot, action, opts \\ []) do
     with {:ok, opts} <- Jido.Agent.Validation.options(opts, [:context]),
          context = Map.get(opts, :context, %{}),
-         :ok <- Jido.Agent.Data.plain_map(context),
+         :ok <- Jido.Agent.Validation.plain_map(context),
          do:
            Jido.Persistence.Snapshot.upgrade(
              snapshot,

@@ -1,7 +1,7 @@
 defmodule Jido.Agent.Topology do
   alias Jido.Joi
   @moduledoc "Logical members and output connections. These declarations do not start processes."
-  alias Jido.Agent.{Data, Extension, Route, Validation}
+  alias Jido.Agent.{Extension, Route, Validation}
   alias Jido.Error
 
   @type state_reference :: %{kind: :state, key: atom()}
@@ -32,21 +32,21 @@ defmodule Jido.Agent.Topology do
   @doc false
   def validate(value) do
     with {:ok, value} <-
-           Data.fields(value, [:agents, :connections], %{agents: [], connections: []}),
-         {:ok, agents} <- Error.prefix_result_path(Data.list(value.agents, &entry(:agent, &1)), :agents),
+           Validation.fields(value, [:agents, :connections], %{agents: [], connections: []}),
+         {:ok, agents} <- Error.prefix_result_path(Validation.list(value.agents, &entry(:agent, &1)), :agents),
          {:ok, connections} <-
-           Error.prefix_result_path(Data.list(value.connections, &entry(:connect, &1)), :connections),
+           Error.prefix_result_path(Validation.list(value.connections, &entry(:connect, &1)), :connections),
          do: {:ok, %{agents: agents, connections: connections}}
   end
 
   @doc false
   def entry(:agent, value) do
     with {:ok, value} <-
-           Data.fields(value, [:name, :definition, :count, :initial_state, :identities], %{
+           Validation.fields(value, [:name, :definition, :count, :initial_state, :identities], %{
              count: 1,
              initial_state: %{}
            }),
-         :ok <- Error.prefix_result_path(Data.name(value[:name]), :name),
+         :ok <- Error.prefix_result_path(Validation.name(value[:name]), :name),
          :ok <- identities(Map.get(value, :identities, %{})),
          true <- Map.has_key?(value, :definition) do
       {:ok, value}
@@ -57,10 +57,10 @@ defmodule Jido.Agent.Topology do
   end
 
   def entry(:connect, value) do
-    with {:ok, value} <- Data.fields(value, [:path, :from, :to, :delivery], %{delivery: :single}),
-         :ok <- Error.prefix_result_path(Data.path(value[:path]), :path),
-         :ok <- Error.prefix_result_path(Data.plain_map(value[:from]), :from),
-         :ok <- Error.prefix_result_path(Data.plain_map(value[:to]), :to),
+    with {:ok, value} <- Validation.fields(value, [:path, :from, :to, :delivery], %{delivery: :single}),
+         :ok <- Error.prefix_result_path(Validation.path(value[:path]), :path),
+         :ok <- Error.prefix_result_path(Validation.plain_map(value[:from]), :from),
+         :ok <- Error.prefix_result_path(Validation.plain_map(value[:to]), :to),
          do: {:ok, value}
   end
 
@@ -78,15 +78,15 @@ defmodule Jido.Agent.Topology do
   @doc false
   def normalize(value, parent, opts) do
     with {:ok, topology} <-
-           Data.fields(value, [:agents, :connections], %{agents: [], connections: []}),
-         {:ok, agents} <- Error.prefix_result_path(Data.list(topology.agents, &member(&1, parent, opts)), :agents),
-         :ok <- Error.prefix_result_path(Data.unique(agents, & &1.name), :agents),
+           Validation.fields(value, [:agents, :connections], %{agents: [], connections: []}),
+         {:ok, agents} <- Error.prefix_result_path(Validation.list(topology.agents, &member(&1, parent, opts)), :agents),
+         :ok <- Error.prefix_result_path(Validation.unique(agents, & &1.name), :agents),
          {:ok, connections} <-
            Error.prefix_result_path(
-             Data.list(topology.connections, &connection(&1, agents, parent.plugins)),
+             Validation.list(topology.connections, &connection(&1, agents, parent.plugins)),
              :connections
            ),
-         :ok <- Error.prefix_result_path(Data.unique(connections, &{&1.from, &1.to, &1.path}), :connections),
+         :ok <- Error.prefix_result_path(Validation.unique(connections, &{&1.from, &1.to, &1.path}), :connections),
          topology = %{agents: agents, connections: connections},
          :ok <- compatibility(%{parent | topology: topology}, opts) do
       {:ok, topology}
@@ -97,7 +97,7 @@ defmodule Jido.Agent.Topology do
     with {:ok, member} <- entry(:agent, value),
          :ok <- reserved(member.name),
          :ok <- Error.prefix_result_path(count(member.count, parent.schema), :count),
-         :ok <- Error.prefix_result_path(Data.plain_map(member.initial_state), :initial_state),
+         :ok <- Error.prefix_result_path(Validation.plain_map(member.initial_state), :initial_state),
          :ok <- Error.prefix_result_path(references(member.initial_state, parent.schema), :initial_state),
          {:ok, definition} <- nested(member[:definition], opts),
          member = Map.put(member, :definition, definition),
@@ -111,10 +111,10 @@ defmodule Jido.Agent.Topology do
 
   defp reserved(_), do: :ok
   defp count(%{kind: :state} = ref, schema), do: reference(ref, schema)
-  defp count(value, _), do: Data.positive(value)
+  defp count(value, _), do: Validation.positive(value)
 
   defp reference(value, schema) do
-    with {:ok, ref} <- Data.fields(value, [:kind, :key]), :ok <- Data.name(ref[:key]) do
+    with {:ok, ref} <- Validation.fields(value, [:kind, :key]), :ok <- Validation.name(ref[:key]) do
       if Keyword.has_key?(schema.fields, ref.key),
         do: :ok,
         else:
@@ -128,18 +128,18 @@ defmodule Jido.Agent.Topology do
 
   defp references(value, schema) when is_map(value) and not is_struct(value) do
     with {:ok, _} <-
-           Data.list(Map.to_list(value), fn {key, v} ->
+           Validation.list(Map.to_list(value), fn {key, v} ->
              with :ok <- Error.prefix_result_path(references(v, schema), key), do: {:ok, v}
            end),
          do: :ok
   end
 
   defp references(value, schema) when is_list(value) do
-    with {:ok, _} <- Data.list(value, fn v -> with :ok <- references(v, schema), do: {:ok, v} end),
+    with {:ok, _} <- Validation.list(value, fn v -> with :ok <- references(v, schema), do: {:ok, v} end),
          do: :ok
   end
 
-  defp references(value, _), do: Data.static(value)
+  defp references(value, _), do: Validation.static(value)
 
   defp nested(value, opts) when is_map(value) do
     Validation.define(value, opts)
@@ -210,7 +210,7 @@ defmodule Jido.Agent.Topology do
         partial_array(schema, state)
 
       true ->
-        with {:ok, _} <- Data.parse_value(schema, state), do: :ok
+        with {:ok, _} <- Validation.parse_value(schema, state), do: :ok
     end
   end
 
@@ -218,9 +218,9 @@ defmodule Jido.Agent.Topology do
     {:ok, fields} = Joi.Schema.fields(schema)
     known = Map.new(fields)
 
-    with {:ok, _} <- Data.fields(state, Map.keys(known)),
+    with {:ok, _} <- Validation.fields(state, Map.keys(known)),
          {:ok, _} <-
-           Data.list(Map.to_list(state), fn {key, value} ->
+           Validation.list(Map.to_list(state), fn {key, value} ->
              with :ok <- Error.prefix_result_path(partial_value(Map.fetch!(known, key), value), key),
                   do: {:ok, {key, value}}
            end),
@@ -231,9 +231,9 @@ defmodule Jido.Agent.Topology do
     {:ok, inner} = Joi.Schema.inner(schema)
     open_schema = Joi.Schema.put_inner(schema, Joi.any())
 
-    with {:ok, _} <- Data.parse_value(open_schema, value),
+    with {:ok, _} <- Validation.parse_value(open_schema, value),
          {:ok, _} <-
-           Data.list(value, fn item -> with :ok <- partial_value(inner, item), do: {:ok, item} end),
+           Validation.list(value, fn item -> with :ok <- partial_value(inner, item), do: {:ok, item} end),
          do: :ok
   end
 
@@ -248,7 +248,7 @@ defmodule Jido.Agent.Topology do
   end
 
   defp endpoint(%{kind: :agent} = value, agents, _extensions) do
-    with {:ok, value} <- Data.fields(value, [:kind, :name]), :ok <- Data.name(value[:name]) do
+    with {:ok, value} <- Validation.fields(value, [:kind, :name]), :ok <- Validation.name(value[:name]) do
       if value.name == :root or Enum.any?(agents, &(&1.name == value.name)),
         do: {:ok, value},
         else: Error.validation_result(:unknown_endpoint, [], "Unknown agent endpoint", value)
@@ -298,7 +298,7 @@ defmodule Jido.Agent.Topology do
   @doc "Reports connection proofs. Unknown contracts remain :unchecked."
   @spec checks(Jido.Agent.t(), keyword()) :: {:ok, [check()]} | {:error, term()}
   def checks(definition, opts \\ []) do
-    Data.list(definition.topology.connections, fn connection ->
+    Validation.list(definition.topology.connections, fn connection ->
       check(connection, definition, opts)
     end)
   end
@@ -306,7 +306,7 @@ defmodule Jido.Agent.Topology do
   defp check(connection, definition, opts) do
     with {:ok, source} <- endpoint_definition(connection.from, definition, opts),
          {:ok, destination} <- endpoint_definition(connection.to, definition, opts) do
-      if Data.wildcard?(connection.path) do
+      if Validation.wildcard?(connection.path) do
         {:ok, %{connection: connection, status: :unchecked, reason: :wildcard_coverage}}
       else
         with :ok <- accepted(destination, connection.path),
@@ -352,10 +352,10 @@ defmodule Jido.Agent.Topology do
   @spec connections_for(Jido.Agent.t(), endpoint(), String.t()) ::
           {:ok, [connection()]} | {:error, term()}
   def connections_for(definition, from, type) do
-    with :ok <- Data.exact(type) do
+    with :ok <- Validation.exact(type) do
       {:ok,
        Enum.filter(definition.topology.connections, fn edge ->
-         edge.from == from and Data.matches?(type, edge.path)
+         edge.from == from and Validation.matches?(type, edge.path)
        end)}
     end
   end
@@ -363,10 +363,10 @@ defmodule Jido.Agent.Topology do
   @doc "Binds member inputs from one parent state snapshot. It starts no processes."
   @spec bind(Jido.Agent.t(), map()) :: {:ok, [bound_member()]} | {:error, term()}
   def bind(definition, state) do
-    Data.list(definition.topology.agents, fn member ->
+    Validation.list(definition.topology.agents, fn member ->
       with {:ok, child} <- related(member.definition, []),
            {:ok, count} <- resolve_ref(member.count, state),
-           :ok <- Error.prefix_result_path(Data.positive(count), :count),
+           :ok <- Error.prefix_result_path(Validation.positive(count), :count),
            {:ok, initial} <- resolve_ref(member.initial_state, state),
            {:ok, schema} <- Jido.Agent.Validation.state_schema(child),
            :ok <- partial_initial(schema, initial) do
@@ -385,14 +385,14 @@ defmodule Jido.Agent.Topology do
 
   defp resolve_ref(value, state) when is_map(value) and not is_struct(value) do
     with {:ok, pairs} <-
-           Data.list(Map.to_list(value), fn {key, v} ->
+           Validation.list(Map.to_list(value), fn {key, v} ->
              with {:ok, v} <- resolve_ref(v, state), do: {:ok, {key, v}}
            end),
          do: {:ok, Map.new(pairs)}
   end
 
   defp resolve_ref(value, state) when is_list(value),
-    do: Data.list(value, &resolve_ref(&1, state))
+    do: Validation.list(value, &resolve_ref(&1, state))
 
   defp resolve_ref(value, _), do: {:ok, value}
 end

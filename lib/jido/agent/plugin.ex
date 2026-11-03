@@ -15,7 +15,7 @@ defmodule Jido.Agent.Plugin do
   """
 
   alias Jido.Agent
-  alias Jido.Agent.{Data, Route}
+  alias Jido.Agent.{Validation, Route}
   alias Jido.Error
   alias Jido.Agent.Plugin.{Preparation, RouteSelection, Spec}
   alias Jido.Plugin, as: PluginBoundary
@@ -335,8 +335,8 @@ defmodule Jido.Agent.Plugin do
   end
 
   defp validate_routes_without_selector(routes) do
-    with :ok <- Data.unique(routes, & &1.path) do
-      case Enum.find(routes, &(not is_nil(&1.as) and Data.wildcard?(&1.path))) do
+    with :ok <- Validation.unique(routes, & &1.path) do
+      case Enum.find(routes, &(not is_nil(&1.as) and Validation.wildcard?(&1.path))) do
         nil ->
           :ok
 

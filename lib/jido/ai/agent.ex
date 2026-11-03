@@ -61,8 +61,8 @@ defmodule Jido.AI.Agent do
   defmacro __using__(quoted_options) do
     options =
       quoted_options
-      |> Jido.Agent.Options.prepare!(__CALLER__)
-      |> Jido.Agent.Options.prepend_plugin(Plugin)
+      |> Jido.Agent.DSL.prepare_options!(__CALLER__)
+      |> Jido.Agent.DSL.prepend_plugin(Plugin)
 
     signal_source = "/" <> Keyword.fetch!(options, :id)
 

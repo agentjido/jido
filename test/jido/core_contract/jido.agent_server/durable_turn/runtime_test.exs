@@ -442,7 +442,7 @@ defmodule JidoTest.AgentServer.DurableTurn.RuntimeTest do
     agent = F.Worker.instantiate!(id: unique_id("hooked"))
 
     {:ok, agent} =
-      Jido.Agent.Composition.apply(agent, agent.state, [Jido.Agent.Directive.plugin_add(F.Hook)])
+      Jido.Agent.Mutation.apply(agent, agent.state, [Jido.Agent.Directive.plugin_add(F.Hook)])
 
     {:ok, server} =
       Jido.start_agent(c.jido, agent, persistence: {Jido.Persistence.File, path: c.tmp_dir})

@@ -2,7 +2,7 @@ defmodule Jido.Agent.Runner do
   @moduledoc false
 
   alias Jido.Agent
-  alias Jido.Agent.{Composition, Mutation, Plugin, Turn, Validation}
+  alias Jido.Agent.{Mutation, Plugin, Turn, Validation}
   alias Jido.Agent.Directive.ServerStop
   alias Jido.Agent.Plugin.Pipeline, as: PluginPipeline
   alias Jido.Error
@@ -15,6 +15,15 @@ defmodule Jido.Agent.Runner do
           required(:context) => map(),
           required(:plugin_inputs) => map()
         }
+
+  @doc false
+  def invoke(module, callback, args) do
+    apply(module, callback, args)
+  rescue
+    error -> callback_failed(module, callback, :error, error)
+  catch
+    kind, reason -> callback_failed(module, callback, kind, reason)
+  end
 
   defmodule Prepared do
     @moduledoc false
@@ -235,7 +244,7 @@ defmodule Jido.Agent.Runner do
          {:handoff, %Jido.Instruction{} = instruction, directives}
        ) do
     with {:ok, directives} <-
-           at(:compose, Jido.Agent.Contract.directives(prepared.agent, directives)),
+           at(:compose, Jido.Agent.Directive.directives(prepared.agent, directives)),
          {:ok, state, directives} <-
            at(
              :compose,
@@ -249,7 +258,7 @@ defmodule Jido.Agent.Runner do
            ),
          result =
            if(Enum.any?(directives, &Mutation.mutation?/1),
-             do: Composition.apply(prepared.agent, state, directives),
+             do: Mutation.apply(prepared.agent, state, directives),
              else: Agent.transition_validated(prepared.agent, state, prepared.schema)
            ),
          {:ok, agent} <- at(:validate, result) do
@@ -260,7 +269,7 @@ defmodule Jido.Agent.Runner do
   defp do_finish(%Prepared{} = prepared, result) do
     with {:ok, output, directives} <- at(:compose, normalize_exec_result(result)),
          {:ok, directives} <-
-           at(:compose, Jido.Agent.Contract.directives(prepared.agent, directives)),
+           at(:compose, Jido.Agent.Directive.directives(prepared.agent, directives)),
          {:ok, state, directives} <-
            at(:compose, project_route_result(prepared, output, directives)),
          {:ok, state, directives} <-
@@ -276,7 +285,7 @@ defmodule Jido.Agent.Runner do
            ),
          result =
            if(Enum.any?(directives, &Mutation.mutation?/1),
-             do: Composition.apply(prepared.agent, state, directives),
+             do: Mutation.apply(prepared.agent, state, directives),
              else: Agent.transition_validated(prepared.agent, state, prepared.schema)
            ),
          {:ok, agent} <- at(:validate, result) do
@@ -322,7 +331,7 @@ defmodule Jido.Agent.Runner do
        when is_map(output) and not is_struct(output),
        do:
          with(
-           {:ok, values} <- Jido.Agent.Data.list(directives, &{:ok, &1}),
+           {:ok, values} <- Jido.Agent.Validation.list(directives, &{:ok, &1}),
            do: {:ok, output, values}
          )
 
@@ -346,7 +355,7 @@ defmodule Jido.Agent.Runner do
     route = prepared.turn.route
 
     with {:ok, state} <- project_state(route.state, output, prepared.agent.state),
-         :ok <- Jido.Error.prefix_result_path(Jido.Agent.Data.plain_map(state), :state),
+         :ok <- Jido.Error.prefix_result_path(Jido.Agent.Validation.plain_map(state), :state),
          {:ok, directives} <- project_reply(route.reply, output, directives, prepared) do
       {:ok, state, directives}
     end
@@ -431,4 +440,17 @@ defmodule Jido.Agent.Runner do
 
   defp unstage({:error, _stage, reason}), do: {:error, reason}
   defp unstage(result), do: result
+
+  defp callback_failed(module, callback, kind, reason) do
+    {:error,
+     Error.execution_error("Agent callback failed",
+       details: %{
+         code: :agent_callback_failed,
+         module: module,
+         callback: callback,
+         kind: kind,
+         reason: reason
+       }
+     )}
+  end
 end

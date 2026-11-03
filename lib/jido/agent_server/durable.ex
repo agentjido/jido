@@ -83,7 +83,7 @@ defmodule Jido.AgentServer.Durable do
   end
 
   defp load(config, agent, :create, opts) do
-    with {:ok, agent} <- Jido.Agent.Composition.bind(agent),
+    with {:ok, agent} <- Jido.Agent.Mutation.bind(agent),
          {:ok, agent} <- TopologyRuntime.identify(nil, agent),
          :ok <- Jido.Persistence.create_agent(config, agent, opts),
          do: {:ok, agent, 0, nil}

@@ -1,10 +1,7 @@
 ---
 modules:
   - Jido.Agent
-  - Jido.Agent.Authoring
   - Jido.Codec.Agent
-  - Jido.Agent.Composition
-  - Jido.Agent.Data
   - Jido.Agent.Diff
   - Jido.Agent.Directive
   - Jido.Agent.Directive.Emit

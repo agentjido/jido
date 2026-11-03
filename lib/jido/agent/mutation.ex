@@ -1,7 +1,7 @@
 defmodule Jido.Agent.Mutation do
   @moduledoc false
   alias Jido.Agent
-  alias Jido.Agent.{Data, Directive}
+  alias Jido.Agent.{Validation, Directive}
   alias Jido.Error
   alias Jido.Plugin.Normalizer
 
@@ -29,9 +29,27 @@ defmodule Jido.Agent.Mutation do
   def mutation?(%{__struct__: module}), do: module in @modules
   def mutation?(_), do: false
 
+  def apply(agent, state, directives) do
+    apply_changes(agent, state, directives, Enum.filter(directives, &mutation?/1))
+  end
+
+  # Runner checks complete state before this internal composition step.
+  defp apply_changes(agent, state, _directives, []), do: {:ok, %{agent | state: state}}
+
+  defp apply_changes(agent, state, directives, changes) do
+    with {:ok, candidate, _diff} <- Agent.mutate(%{agent | state: state}, changes),
+         :ok <- validate_effects(agent, candidate, directives),
+         do: {:ok, candidate}
+  end
+
+  @doc "Checks bindings without changing the authored definition."
+  def bind(%Agent{} = agent) do
+    with {:ok, _} <- Agent.Topology.bind(agent, agent.state), do: {:ok, agent}
+  end
+
   def apply(agent, directives) do
     with {:ok, _} <- Agent.validate(agent),
-         {:ok, changes} <- Error.prefix_result_path(Data.list(directives, &validate/1), :directives),
+         {:ok, changes} <- Error.prefix_result_path(Validation.list(directives, &validate/1), :directives),
          {:ok, candidate} <- edit_all(agent, changes),
          {:ok, candidate} <- normalize_routes(candidate),
          {:ok, candidate} <- Agent.validate(candidate) do
@@ -48,18 +66,18 @@ defmodule Jido.Agent.Mutation do
              do: {:ok, directive}
 
       {:set, :routes, values} ->
-        with {:ok, _} <- Data.list(values, &Agent.Route.normalize(&1, false)),
+        with {:ok, _} <- Validation.list(values, &Agent.Route.normalize(&1, false)),
              do: {:ok, directive}
 
       {:reorder, paths} ->
         with {:ok, _} <-
-               Data.list(paths, fn path -> with :ok <- Data.path(path), do: {:ok, path} end),
-             :ok <- Data.unique(paths, & &1),
+               Validation.list(paths, fn path -> with :ok <- Validation.path(path), do: {:ok, path} end),
+             :ok <- Validation.unique(paths, & &1),
              do: {:ok, directive}
 
       {:topology, topology} ->
         with {:ok, _} <- Agent.Topology.validate(topology),
-             :ok <- Data.static(topology),
+             :ok <- Validation.static(topology),
              do: {:ok, directive}
 
       {:plugin, change} ->
@@ -177,11 +195,11 @@ defmodule Jido.Agent.Mutation do
     {:edit, :connections, op, {value.from, value.to, d.path}, value}
   end
 
-  defp valid_key(:agents, key), do: Data.name(key)
-  defp valid_key(:routes, key), do: Data.path(key)
+  defp valid_key(:agents, key), do: Validation.name(key)
+  defp valid_key(:routes, key), do: Validation.path(key)
 
   defp valid_key(:connections, {from, to, path}) do
-    with :ok <- Data.plain_map(from), :ok <- Data.plain_map(to), do: Data.path(path)
+    with :ok <- Validation.plain_map(from), :ok <- Validation.plain_map(to), do: Validation.path(path)
   end
 
   defp valid_value(_, :remove, _), do: :ok
@@ -194,7 +212,7 @@ defmodule Jido.Agent.Mutation do
         :connections -> [:delivery]
       end
 
-    with {:ok, _} <- Data.fields(value, allowed), :ok <- Data.static(value), do: :ok
+    with {:ok, _} <- Validation.fields(value, allowed), :ok <- Validation.static(value), do: :ok
   end
 
   defp valid_value(collection, _, value) do
@@ -205,11 +223,11 @@ defmodule Jido.Agent.Mutation do
         :connections -> Agent.Topology.entry(:connect, value)
       end
 
-    with {:ok, _} <- result, :ok <- Data.static(value), do: :ok
+    with {:ok, _} <- result, :ok <- Validation.static(value), do: :ok
   end
 
   defp validate_plugin(change, directive) do
-    with :ok <- Data.name(change.module),
+    with :ok <- Validation.name(change.module),
          true <- Keyword.keyword?(change.options),
          true <- Enum.uniq(Keyword.keys(change.options)) == Keyword.keys(change.options),
          true <- change.state in [nil, :discard],
@@ -217,7 +235,7 @@ defmodule Jido.Agent.Mutation do
          true <-
            change.migrate == nil or
              match?({m, f, args} when is_atom(m) and is_atom(f) and is_list(args), change.migrate),
-         :ok <- Data.static(change) do
+         :ok <- Validation.static(change) do
       {:ok, directive}
     else
       false -> error(:invalid_plugin_change)
@@ -296,7 +314,7 @@ defmodule Jido.Agent.Mutation do
         {:value, value} -> %{key => value}
       end
 
-    with {:ok, value} <- Data.initialize(Jido.Joi.object(%{key => schema}), initial) do
+    with {:ok, value} <- Validation.initialize(Jido.Joi.object(%{key => schema}), initial) do
       if Map.has_key?(state, key),
         do: error(:plugin_state_conflict, %{key: key}),
         else: {:ok, Map.merge(state, value)}
@@ -365,7 +383,7 @@ defmodule Jido.Agent.Mutation do
     old_modules = Agent.runtime_plugins(agent) |> Keyword.keys()
 
     with {:ok, added} <-
-           Jido.Agent.Data.list(declarations, fn {module, options} ->
+           Jido.Agent.Validation.list(declarations, fn {module, options} ->
              with {:ok, provider} <- Jido.Agent.Extension.provider(module),
                   do:
                     {:ok,
@@ -390,7 +408,7 @@ defmodule Jido.Agent.Mutation do
 
   defp normalize_routes(agent) do
     with {:ok, routes} <-
-           Data.list(agent.routes, fn
+           Validation.list(agent.routes, fn
              %{handler: target} = route when is_atom(target) ->
                with {:ok, handler} <- Agent.Route.executable(target),
                     do: {:ok, %{route | handler: handler}}

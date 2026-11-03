@@ -1,7 +1,7 @@
-defmodule Jido.Agent.AuthoringContractTest do
+defmodule Jido.Agent.ValidationAuthoringContractTest do
   use Covenant.Case, component: "jido.agent", async: true
   alias Jido.Agent
-  alias Jido.Agent.Authoring
+  alias Jido.Agent.Validation
   alias JidoTest.AgentFixtures.Add
 
   defmodule Factory do
@@ -40,40 +40,40 @@ defmodule Jido.Agent.AuthoringContractTest do
 
   @tag obligation: ["jido.agent.I3", "jido.agent.I4", "jido.agent.I22"]
   test "authoring containers normalize keys and reject ambiguous input" do
-    assert {:ok, %{name: "agent"}} = Authoring.attrs(%{name: "agent"})
-    assert {:ok, %{name: "agent"}} = Authoring.attrs(name: "agent")
-    assert {:ok, %{name: "last"}} = Authoring.to_attrs(name: "first", name: "last")
-    assert :error = Authoring.to_attrs([name: "first", name: "last"], :reject)
+    assert {:ok, %{name: "agent"}} = Validation.attrs(%{name: "agent"})
+    assert {:ok, %{name: "agent"}} = Validation.attrs(name: "agent")
+    assert {:ok, %{name: "last"}} = Validation.to_attrs(name: "first", name: "last")
+    assert :error = Validation.to_attrs([name: "first", name: "last"], :reject)
 
     for value <- [[name: "first", name: "last"], [:invalid], [1 | :tail]] do
-      assert {:error, error} = Authoring.attrs(value)
+      assert {:error, error} = Validation.attrs(value)
       assert error.message != ""
       assert error.details.value === value
     end
 
-    assert {:error, error} = Authoring.attrs(:invalid)
+    assert {:error, error} = Validation.attrs(:invalid)
     assert error.message != ""
     assert error.details.value === :invalid
   end
 
   @tag obligation: ["jido.agent.I3", "jido.agent.I22"]
   test "authoring traversal preserves order and stops at one structured error" do
-    assert :ok = Authoring.keys(%{name: "agent"}, [:name])
+    assert :ok = Validation.keys(%{name: "agent"}, [:name])
 
-    assert {:error, error} = Authoring.keys(%{name: "agent", extra: true}, [:name])
+    assert {:error, error} = Validation.keys(%{name: "agent", extra: true}, [:name])
     assert error.message != ""
     assert error.details.keys === [:extra]
 
-    assert {:ok, [2, 4, 6]} = Authoring.traverse([1, 2, 3], &{:ok, &1 * 2})
-    expected = Authoring.error("Stopped", %{at: 2})
+    assert {:ok, [2, 4, 6]} = Validation.traverse([1, 2, 3], &{:ok, &1 * 2})
+    expected = Validation.authoring_error("Stopped", %{at: 2})
 
     assert ^expected =
-             Authoring.traverse([1, 2, 3], fn
+             Validation.traverse([1, 2, 3], fn
                2 -> expected
                value -> {:ok, value}
              end)
 
-    assert {:error, improper} = Authoring.traverse([1 | :tail], &{:ok, &1})
+    assert {:error, improper} = Validation.traverse([1 | :tail], &{:ok, &1})
     assert improper.message != ""
   end
 

@@ -304,7 +304,7 @@ defmodule Jido.Agent.DSL.RouteMacros do
 
   @doc false
   def transform_names!(path) do
-    case Jido.Agent.Data.path(path) do
+    case Jido.Agent.Validation.path(path) do
       :ok -> :ok
       {:error, error} -> raise error
     end

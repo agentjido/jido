@@ -60,7 +60,7 @@ defmodule JidoTest.Contract.AgentCompositionChangesTest do
     source = F.instance()
 
     assert {:ok, next} =
-             Jido.Agent.Composition.apply(source, source.state, [
+             Jido.Agent.Mutation.apply(source, source.state, [
                Directive.route_add("other", F.Return)
              ])
 

@@ -1,6 +1,5 @@
 ---
 modules:
-  - Jido.Agent.Callback
   - Jido.Persistence
   - Jido.Persistence.Adapter
   - Jido.Persistence.AdapterOps

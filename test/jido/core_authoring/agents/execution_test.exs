@@ -18,8 +18,8 @@ defmodule JidoTest.Authoring.Agents.ExecutionTest do
     assert instance.plugins === definition.plugins
   end
 
-  test "composition exposes data operations without the old runtime graph API" do
-    assert {:module, Agent.Composition} = Code.ensure_loaded(Agent.Composition)
+  test "Mutation owns state composition without the old runtime graph API" do
+    assert {:module, Agent.Mutation} = Code.ensure_loaded(Agent.Mutation)
 
     for {function, arity} <- [
           project: 1,
@@ -30,14 +30,12 @@ defmodule JidoTest.Authoring.Agents.ExecutionTest do
           error: 1,
           error: 2,
           static_definition: 1,
-          changed_plugins: 2,
-          changed_plugins: 3,
           change?: 1
         ] do
-      refute function_exported?(Agent.Composition, function, arity)
+      refute function_exported?(Agent.Mutation, function, arity)
     end
 
     instance = Team.instantiate!(id: "team", state: %{value: "copied", workers: 3})
-    assert {:ok, ^instance} = Agent.Composition.bind(instance)
+    assert {:ok, ^instance} = Agent.Mutation.bind(instance)
   end
 end

@@ -6,7 +6,7 @@ end
 
 defmodule Jido.Plugin.Bus.DSL do
   @moduledoc "Declares one local Signal bus and validates its connection endpoints."
-  alias Jido.Agent.Data
+  alias Jido.Agent.Validation
   alias Jido.Error
   alias Spark.Dsl.Extension, as: E
   @section %Spark.Dsl.Section{name: :signal_bus, schema: [name: [type: :atom, required: true]]}
@@ -36,8 +36,8 @@ defmodule Jido.Plugin.Bus.DSL do
 
   @impl Jido.Agent.Extension
   def normalize(value) do
-    with {:ok, value} <- Data.fields(value, [:buses]),
-         {:ok, buses} <- Data.list(value[:buses], &normalize_bus/1) do
+    with {:ok, value} <- Validation.fields(value, [:buses]),
+         {:ok, buses} <- Validation.list(value[:buses], &normalize_bus/1) do
       case buses do
         [_bus] -> {:ok, %{buses: buses}}
         _buses -> Error.validation_result(:bus_count, [], "This provider declares exactly one local bus")
@@ -46,8 +46,8 @@ defmodule Jido.Plugin.Bus.DSL do
   end
 
   defp normalize_bus(bus) do
-    with {:ok, bus} <- Data.fields(bus, [:name]),
-         :ok <- Data.name(bus[:name]),
+    with {:ok, bus} <- Validation.fields(bus, [:name]),
+         :ok <- Validation.name(bus[:name]),
          do: {:ok, bus}
   end
 

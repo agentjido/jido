@@ -1,6 +1,5 @@
 ---
 modules:
-  - Jido.Agent.Contract
   - Jido.Agent.Plugin
   - Jido.Agent.Plugin.Pipeline
   - Jido.Agent.Route

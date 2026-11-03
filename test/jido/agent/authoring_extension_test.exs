@@ -16,7 +16,7 @@ defmodule JidoTest.Agent.AuthoringExtensionTest do
       {:ok, Map.put(config, :label, SparkExtension.get_opt(dsl, [:labels], :value))}
     end
 
-    def normalize(data), do: Jido.Agent.Data.fields(data, [:label])
+    def normalize(data), do: Jido.Agent.Validation.fields(data, [:label])
     def verify(%{label: "blocked"}, _), do: {:error, :blocked_label}
     def verify(_, _), do: :ok
   end

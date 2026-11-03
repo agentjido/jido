@@ -141,8 +141,8 @@ defmodule Jido.Plugin do
         imports: unquote(Keyword.get(opts, :imports, []))
 
       def normalize(data) do
-        with :ok <- Jido.Agent.Data.plain_map(data),
-             :ok <- Jido.Agent.Data.static(data),
+        with :ok <- Jido.Agent.Validation.plain_map(data),
+             :ok <- Jido.Agent.Validation.static(data),
              do: {:ok, data}
       end
 

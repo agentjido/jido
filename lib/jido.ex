@@ -1153,7 +1153,7 @@ defmodule Jido do
     if runtime_opts[:persistence_mode] == :restore do
       with {:ok, definition} <- Jido.Agent.Validation.resolve(source),
            {:ok, opts} <- Jido.Agent.Validation.options(opts, [:id]),
-           :ok <- Jido.Agent.Data.nonempty(opts[:id]),
+           :ok <- Jido.Agent.Validation.nonempty(opts[:id]),
            do: {:ok, %{definition | id: opts.id}}
     else
       Jido.Agent.instantiate(source, opts)
