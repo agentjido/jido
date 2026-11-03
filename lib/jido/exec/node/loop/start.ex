@@ -39,7 +39,7 @@ defmodule Jido.Exec.Node.Loop.Start do
 
       {:error, error} ->
         Result.failure(
-          Jido.Exec.Source.attach(error, node.loop.location, %{
+          Jido.Exec.Validation.attach_source(error, node.loop.location, %{
             node: node.loop.component,
             node_path: node.loop.node_path
           })

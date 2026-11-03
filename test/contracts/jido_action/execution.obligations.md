@@ -19,7 +19,6 @@ modules:
   - Jido.Exec.Node.Output
   - Jido.Exec.Portable
   - Jido.Exec.Runtime
-  - Jido.Exec.Source
   - Jido.Telemetry.Exec
   - Jido.Exec.ValueResolver
 ---

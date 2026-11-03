@@ -3,7 +3,6 @@ defmodule Jido.Exec.Validation do
 
   alias Jido.Action.{Output, Validation}
   alias Jido.Error
-  alias Jido.Exec.Source
 
   @doc false
   @spec input(module() | Jido.Flow.t() | nil, term(), map()) ::
@@ -27,10 +26,24 @@ defmodule Jido.Exec.Validation do
       end
 
     case result do
-      {:error, error} -> {:error, Source.attach(error, nil, details)}
+      {:error, error} -> {:error, attach_source(error, nil, details)}
       result -> result
     end
   end
+
+  @doc false
+  @spec attach_source(term(), map() | nil, map()) :: term()
+  def attach_source(error, location, extra \\ %{})
+
+  def attach_source(%{details: details} = error, location, extra) when is_map(details) do
+    source_details =
+      extra
+      |> maybe_put(:source, location)
+
+    %{error | details: Map.merge(details, source_details)}
+  end
+
+  def attach_source(error, _location, _extra), do: error
 
   @doc false
   @spec output(module() | Jido.Flow.t() | nil, term()) ::
@@ -136,4 +149,7 @@ defmodule Jido.Exec.Validation do
   end
 
   defp flow_details(flow, context), do: %{module: Jido.Flow, flow: flow.name, context: context}
+
+  defp maybe_put(map, _key, nil), do: map
+  defp maybe_put(map, key, value), do: Map.put(map, key, value)
 end

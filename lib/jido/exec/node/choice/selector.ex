@@ -60,7 +60,7 @@ defmodule Jido.Exec.Node.Choice.Selector do
 
       {:error, error} ->
         Result.failure(
-          Jido.Exec.Source.attach(error, node.location, %{
+          Jido.Exec.Validation.attach_source(error, node.location, %{
             node: node.component,
             node_path: node.node_path
           })

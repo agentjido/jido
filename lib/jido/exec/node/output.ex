@@ -50,7 +50,7 @@ defmodule Jido.Exec.Node.Output do
 
       {:error, error} ->
         phase = if is_nil(node.parent_component), do: :flow_output, else: :subflow_output
-        Result.failure(Jido.Exec.Source.attach(error, node.location, %{phase: phase}))
+        Result.failure(Jido.Exec.Validation.attach_source(error, node.location, %{phase: phase}))
     end
   end
 
@@ -169,7 +169,11 @@ defimpl Runic.Workflow.Invokable, for: Jido.Exec.Node.Output do
 
       {:error, reason} ->
         phase = if is_nil(node.parent_component), do: :flow_output, else: :subflow_output
-        Runnable.fail(runnable, Jido.Exec.Source.attach(reason, node.location, %{phase: phase}))
+
+        Runnable.fail(
+          runnable,
+          Jido.Exec.Validation.attach_source(reason, node.location, %{phase: phase})
+        )
     end
   end
 end
