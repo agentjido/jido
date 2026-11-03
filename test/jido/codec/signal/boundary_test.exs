@@ -1,8 +1,8 @@
-defmodule Jido.Signal.SanitizerTest do
+defmodule Jido.Codec.Signal.BoundaryTest do
   use ExUnit.Case, async: true
 
+  alias Jido.Codec.Signal.Boundary, as: Sanitizer
   alias Jido.Signal
-  alias Jido.Signal.Sanitizer
 
   defmodule DetailError do
     defexception [:message, :code]
@@ -18,6 +18,15 @@ defmodule Jido.Signal.SanitizerTest do
 
   defmodule SensitiveStruct do
     defstruct [:token]
+  end
+
+  test "boundary owners expose their profile-specific entry points" do
+    value = %{token: "secret", status: :ready}
+
+    assert Jido.Telemetry.Signal.sanitize(value) == Sanitizer.sanitize(value, :telemetry)
+    assert Jido.Telemetry.Signal.preview(value) == Sanitizer.preview(value, :telemetry)
+    assert Jido.Codec.Signal.boundary_value(value) == Sanitizer.sanitize(value, :transport)
+    assert Jido.Codec.Signal.boundary_preview(value) == Sanitizer.preview(value, :transport)
   end
 
   describe "sanitize/2" do

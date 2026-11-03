@@ -1,4 +1,4 @@
-defmodule Jido.Signal.Sanitizer do
+defmodule Jido.Codec.Signal.Boundary do
   @moduledoc false
 
   alias Jido.Signal

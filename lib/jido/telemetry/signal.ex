@@ -11,9 +11,18 @@ defmodule Jido.Telemetry.Signal do
 
   alias Jido.Signal
   alias Jido.Signal.Context
+  alias Jido.Codec.Signal.Boundary
   alias Jido.Trace
 
   @type event_name :: [atom()]
+
+  @doc false
+  @spec sanitize(term()) :: term()
+  def sanitize(value), do: Boundary.sanitize(value, :telemetry)
+
+  @doc false
+  @spec preview(term(), keyword()) :: String.t()
+  def preview(value, opts \\ []), do: Boundary.preview(value, :telemetry, opts)
 
   @doc """
   Emits a telemetry event.

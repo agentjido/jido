@@ -43,7 +43,7 @@ defmodule Jido.Signal.Dispatch.Bus do
   @behaviour Jido.Signal.Dispatch.Adapter
 
   alias Jido.Signal.Bus
-  alias Jido.Signal.Sanitizer
+  alias Jido.Telemetry.Signal, as: Telemetry
 
   @options_schema Joi.keyword(
                     [
@@ -115,7 +115,7 @@ defmodule Jido.Signal.Dispatch.Bus do
     rescue
       ArgumentError ->
         Logger.error(fn ->
-          "Dispatch bus target lookup failed bus_name=#{Sanitizer.preview(bus_name, :telemetry)}"
+          "Dispatch bus target lookup failed bus_name=#{Telemetry.preview(bus_name)}"
         end)
 
         {:error, :bus_not_found}

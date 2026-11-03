@@ -13,6 +13,7 @@ defmodule Jido.Codec.Signal do
   """
 
   alias Jido.Codec.Signal.CloudEvents
+  alias Jido.Codec.Signal.Boundary
   alias Jido.Signal
 
   @default_max_payload_bytes 10_000_000
@@ -25,6 +26,14 @@ defmodule Jido.Codec.Signal do
     do: valid_utf8?(rest)
 
   def valid_utf8?(rest), do: String.valid?(rest)
+
+  @doc false
+  @spec boundary_value(term()) :: term()
+  def boundary_value(value), do: Boundary.sanitize(value, :transport)
+
+  @doc false
+  @spec boundary_preview(term(), keyword()) :: String.t()
+  def boundary_preview(value, opts \\ []), do: Boundary.preview(value, :transport, opts)
 
   @doc "Parses a complete CloudEvents structured-mode map."
   @spec from_map(map()) :: {:ok, Signal.t()} | {:error, String.t()}

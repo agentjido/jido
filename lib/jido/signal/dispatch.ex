@@ -33,7 +33,6 @@ defmodule Jido.Signal.Dispatch do
 
   alias __MODULE__.Target
   alias Jido.Error
-  alias Jido.Signal.Sanitizer
   alias Jido.Telemetry.Signal, as: Telemetry
 
   @type adapter ::
@@ -256,22 +255,22 @@ defmodule Jido.Signal.Dispatch do
     }
   end
 
-  defp signal_type(%{type: type}) when is_binary(type), do: Sanitizer.sanitize(type, :telemetry)
+  defp signal_type(%{type: type}) when is_binary(type), do: Telemetry.sanitize(type)
   defp signal_type(_signal), do: :unknown
 
   defp get_target_from_opts(:pubsub, opts) do
     opts
     |> Keyword.get(:topic, :unknown)
-    |> Sanitizer.sanitize(:telemetry)
+    |> Telemetry.sanitize()
   end
 
   defp get_target_from_opts(_adapter, opts) do
     cond do
       url = Keyword.get(opts, :url) -> url_target_for_telemetry(url)
-      target = Keyword.get(opts, :target) -> Sanitizer.sanitize(target, :telemetry)
-      pid = Keyword.get(opts, :pid) -> Sanitizer.sanitize(pid, :telemetry)
-      name = Keyword.get(opts, :name) -> Sanitizer.sanitize(name, :telemetry)
-      topic = Keyword.get(opts, :topic) -> Sanitizer.sanitize(topic, :telemetry)
+      target = Keyword.get(opts, :target) -> Telemetry.sanitize(target)
+      pid = Keyword.get(opts, :pid) -> Telemetry.sanitize(pid)
+      name = Keyword.get(opts, :name) -> Telemetry.sanitize(name)
+      topic = Keyword.get(opts, :topic) -> Telemetry.sanitize(topic)
       true -> :unknown
     end
   end
@@ -282,7 +281,7 @@ defmodule Jido.Signal.Dispatch do
       when scheme in ["http", "https"] and is_binary(host) and host != "" ->
         %URI{scheme: uri.scheme, host: uri.host, port: uri.port}
         |> URI.to_string()
-        |> Sanitizer.sanitize(:telemetry)
+        |> Telemetry.sanitize()
 
       _ ->
         :invalid_url

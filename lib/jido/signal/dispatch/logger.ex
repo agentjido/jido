@@ -18,7 +18,7 @@ defmodule Jido.Signal.Dispatch.LoggerAdapter do
 
   @behaviour Jido.Signal.Dispatch.Adapter
 
-  alias Jido.Signal.Sanitizer
+  alias Jido.Telemetry.Signal, as: Telemetry
 
   require Logger
 
@@ -70,7 +70,7 @@ defmodule Jido.Signal.Dispatch.LoggerAdapter do
     }
 
     if include_data do
-      Map.put(payload, :data, Sanitizer.sanitize(signal.data, :telemetry))
+      Map.put(payload, :data, Telemetry.sanitize(signal.data))
     else
       payload
     end
@@ -82,7 +82,7 @@ defmodule Jido.Signal.Dispatch.LoggerAdapter do
 
   defp build_log_message(signal, true) do
     "SIGNAL: #{signal.type} from #{signal.source} " <>
-      "with data=#{Sanitizer.preview(signal.data, :telemetry)}"
+      "with data=#{Telemetry.preview(signal.data)}"
   end
 
   defp resolve_log_level(opts) do
