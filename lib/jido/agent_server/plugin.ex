@@ -2,7 +2,7 @@ defmodule Jido.AgentServer.Plugin do
   @moduledoc false
 
   alias Jido.Agent.Command
-  alias Jido.Agent.Error
+  alias Jido.Error
   alias Jido.AgentServer.Plugin.{Callbacks, Commit}
   alias Jido.Plugin.{DirectiveContext, Init}
 
@@ -28,7 +28,7 @@ defmodule Jido.AgentServer.Plugin do
       if spec.module in changed and match?(%{runtime?: true}, spec.agent_server) and
            not function_exported?(spec.module, :quiesce, 2) do
         {:halt,
-         Error.fail(
+         Error.validation_result(
            :plugin_quiescence_required,
            [:plugins],
            "Plugin changes require quiesce and resume callbacks",

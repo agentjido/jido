@@ -629,7 +629,7 @@ defmodule Jido.Persistence.BoundaryTest do
     assert {:ok, ^agent} = Checkpoint.restore(ContextAgent, direct, public_context)
     assert_receive {:restore_context, ^public_context}
 
-    assert {:error, %Jido.Agent.Error{code: :snapshot_identity, path: [:agent, :module]}} =
+    assert {:error, %Jido.Error.ValidationError{code: :snapshot_identity, path: [:agent, :module]}} =
              Checkpoint.restore(Basic, direct, public_context)
 
     assert_receive {:restore_context, ^public_context}
@@ -637,13 +637,13 @@ defmodule Jido.Persistence.BoundaryTest do
     assert {:ok, default} = Checkpoint.default_checkpoint(agent, %{})
     assert default.state_format == :default
     assert {:ok, ^agent} = Checkpoint.default_restore(ContextAgent, default, %{})
-    assert {:error, %Jido.Agent.Error{code: :invalid_snapshot}} = Checkpoint.checkpoint(agent, [])
+    assert {:error, %Jido.Error.ValidationError{code: :invalid_snapshot}} = Checkpoint.checkpoint(agent, [])
 
     assert {:error, :checkpoint_rejected} =
              Checkpoint.checkpoint(agent, %{mode: :error})
 
     assert {:error,
-            %Jido.Agent.Error{
+            %Jido.Error.ValidationError{
               code: :invalid_snapshot_state,
               path: [:agent, :state],
               details: %{result: :invalid}
@@ -653,7 +653,7 @@ defmodule Jido.Persistence.BoundaryTest do
     assert {:error, :restore_rejected} =
              Checkpoint.restore(ContextAgent, direct, %{mode: :error})
 
-    assert {:error, %Jido.Agent.Error{code: :invalid_snapshot_state, path: [:agent, :state]}} =
+    assert {:error, %Jido.Error.ValidationError{code: :invalid_snapshot_state, path: [:agent, :state]}} =
              Checkpoint.restore(ContextAgent, direct, %{mode: :invalid})
 
     assert {:ok, snapshot} = Persistence.snapshot(agent, context: public_context)
@@ -747,7 +747,7 @@ defmodule Jido.Persistence.BoundaryTest do
     custom = Custom.instantiate!(id: "custom")
     {:ok, snapshot} = Persistence.snapshot(custom)
 
-    assert {:error, %Jido.Agent.Error{code: :invalid_snapshot_state, path: [:agent, :state]}} =
+    assert {:error, %Jido.Error.ValidationError{code: :invalid_snapshot_state, path: [:agent, :state]}} =
              Persistence.restore(%{snapshot | agent: %{snapshot.agent | state: %{id: "other"}}})
 
     for changed <- [

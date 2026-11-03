@@ -139,7 +139,7 @@ defmodule Jido.Agent.TurnEvaluationTest do
     {:ok, specs} = Jido.Plugin.Normalizer.normalize_all(Agent.runtime_plugins(agent))
     {:ok, command} = Command.new(agent, source)
 
-    assert {:error, :route, %Jido.Agent.Error{code: :unmatched_input}} =
+    assert {:error, :route, %Jido.Error.ValidationError{code: :unmatched_input}} =
              Runner.prepare_for_server(command, source, [], specs)
 
     command = %{command | context: %{agent_id: "reserved"}}

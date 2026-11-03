@@ -1,7 +1,8 @@
 defmodule Jido.Agent.Topology do
   alias Jido.Joi
   @moduledoc "Logical members and output connections. These declarations do not start processes."
-  alias Jido.Agent.{Data, Error, Extension, Route, Validation}
+  alias Jido.Agent.{Data, Extension, Route, Validation}
+  alias Jido.Error
 
   @type state_reference :: %{kind: :state, key: atom()}
   @type endpoint :: map()
@@ -32,9 +33,9 @@ defmodule Jido.Agent.Topology do
   def validate(value) do
     with {:ok, value} <-
            Data.fields(value, [:agents, :connections], %{agents: [], connections: []}),
-         {:ok, agents} <- Error.at(Data.list(value.agents, &entry(:agent, &1)), :agents),
+         {:ok, agents} <- Error.prefix_result_path(Data.list(value.agents, &entry(:agent, &1)), :agents),
          {:ok, connections} <-
-           Error.at(Data.list(value.connections, &entry(:connect, &1)), :connections),
+           Error.prefix_result_path(Data.list(value.connections, &entry(:connect, &1)), :connections),
          do: {:ok, %{agents: agents, connections: connections}}
   end
 
@@ -45,21 +46,21 @@ defmodule Jido.Agent.Topology do
              count: 1,
              initial_state: %{}
            }),
-         :ok <- Error.at(Data.name(value[:name]), :name),
+         :ok <- Error.prefix_result_path(Data.name(value[:name]), :name),
          :ok <- identities(Map.get(value, :identities, %{})),
          true <- Map.has_key?(value, :definition) do
       {:ok, value}
     else
-      false -> Error.fail(:invalid_member, :definition, "Expected an Agent definition or module")
+      false -> Error.validation_result(:invalid_member, :definition, "Expected an Agent definition or module")
       error -> error
     end
   end
 
   def entry(:connect, value) do
     with {:ok, value} <- Data.fields(value, [:path, :from, :to, :delivery], %{delivery: :single}),
-         :ok <- Error.at(Data.path(value[:path]), :path),
-         :ok <- Error.at(Data.plain_map(value[:from]), :from),
-         :ok <- Error.at(Data.plain_map(value[:to]), :to),
+         :ok <- Error.prefix_result_path(Data.path(value[:path]), :path),
+         :ok <- Error.prefix_result_path(Data.plain_map(value[:from]), :from),
+         :ok <- Error.prefix_result_path(Data.plain_map(value[:to]), :to),
          do: {:ok, value}
   end
 
@@ -68,24 +69,24 @@ defmodule Jido.Agent.Topology do
          is_integer(slot) and slot > 0 and is_binary(id) and byte_size(id) > 0
        end),
        do: :ok,
-       else: Error.fail(:invalid_member_identity, :identities, "Expected positive slots and IDs")
+       else: Error.validation_result(:invalid_member_identity, :identities, "Expected positive slots and IDs")
   end
 
   defp identities(_),
-    do: Error.fail(:invalid_member_identity, :identities, "Expected a member identity Map")
+    do: Error.validation_result(:invalid_member_identity, :identities, "Expected a member identity Map")
 
   @doc false
   def normalize(value, parent, opts) do
     with {:ok, topology} <-
            Data.fields(value, [:agents, :connections], %{agents: [], connections: []}),
-         {:ok, agents} <- Error.at(Data.list(topology.agents, &member(&1, parent, opts)), :agents),
-         :ok <- Error.at(Data.unique(agents, & &1.name), :agents),
+         {:ok, agents} <- Error.prefix_result_path(Data.list(topology.agents, &member(&1, parent, opts)), :agents),
+         :ok <- Error.prefix_result_path(Data.unique(agents, & &1.name), :agents),
          {:ok, connections} <-
-           Error.at(
+           Error.prefix_result_path(
              Data.list(topology.connections, &connection(&1, agents, parent.plugins)),
              :connections
            ),
-         :ok <- Error.at(Data.unique(connections, &{&1.from, &1.to, &1.path}), :connections),
+         :ok <- Error.prefix_result_path(Data.unique(connections, &{&1.from, &1.to, &1.path}), :connections),
          topology = %{agents: agents, connections: connections},
          :ok <- compatibility(%{parent | topology: topology}, opts) do
       {:ok, topology}
@@ -95,9 +96,9 @@ defmodule Jido.Agent.Topology do
   defp member(value, parent, opts) do
     with {:ok, member} <- entry(:agent, value),
          :ok <- reserved(member.name),
-         :ok <- Error.at(count(member.count, parent.schema), :count),
-         :ok <- Error.at(Data.plain_map(member.initial_state), :initial_state),
-         :ok <- Error.at(references(member.initial_state, parent.schema), :initial_state),
+         :ok <- Error.prefix_result_path(count(member.count, parent.schema), :count),
+         :ok <- Error.prefix_result_path(Data.plain_map(member.initial_state), :initial_state),
+         :ok <- Error.prefix_result_path(references(member.initial_state, parent.schema), :initial_state),
          {:ok, definition} <- nested(member[:definition], opts),
          member = Map.put(member, :definition, definition),
          :ok <- initial(member, opts) do
@@ -106,7 +107,7 @@ defmodule Jido.Agent.Topology do
   end
 
   defp reserved(:root),
-    do: Error.fail(:reserved_name, :name, "The :root name belongs to the enclosing agent")
+    do: Error.validation_result(:reserved_name, :name, "The :root name belongs to the enclosing agent")
 
   defp reserved(_), do: :ok
   defp count(%{kind: :state} = ref, schema), do: reference(ref, schema)
@@ -117,7 +118,7 @@ defmodule Jido.Agent.Topology do
       if Keyword.has_key?(schema.fields, ref.key),
         do: :ok,
         else:
-          Error.fail(:unknown_state_field, [], "Parent state field does not exist", %{
+          Error.validation_result(:unknown_state_field, [], "Parent state field does not exist", %{
             key: ref.key
           })
     end
@@ -128,7 +129,7 @@ defmodule Jido.Agent.Topology do
   defp references(value, schema) when is_map(value) and not is_struct(value) do
     with {:ok, _} <-
            Data.list(Map.to_list(value), fn {key, v} ->
-             with :ok <- Error.at(references(v, schema), key), do: {:ok, v}
+             with :ok <- Error.prefix_result_path(references(v, schema), key), do: {:ok, v}
            end),
          do: :ok
   end
@@ -156,7 +157,7 @@ defmodule Jido.Agent.Topology do
   end
 
   defp nested(_, _),
-    do: Error.fail(:invalid_member, :definition, "Expected an Agent definition or module")
+    do: Error.validation_result(:invalid_member, :definition, "Expected an Agent definition or module")
 
   defp related(%Jido.Agent{id: nil, state: nil} = value, _opts), do: {:ok, value}
 
@@ -165,7 +166,7 @@ defmodule Jido.Agent.Topology do
 
     cond do
       module in seen ->
-        Error.fail(:recursive_membership, :definition, "Member containment cannot be cyclic", %{
+        Error.validation_result(:recursive_membership, :definition, "Member containment cannot be cyclic", %{
           module: module
         })
 
@@ -173,7 +174,7 @@ defmodule Jido.Agent.Topology do
         Validation.define(module.definition(), Keyword.put(opts, :seen, [module | seen]))
 
       true ->
-        Error.fail(:unresolved_definition, :definition, "Member definition is not available", %{
+        Error.validation_result(:unresolved_definition, :definition, "Member definition is not available", %{
           module: module
         })
     end
@@ -191,7 +192,7 @@ defmodule Jido.Agent.Topology do
   end
 
   defp partial_initial(schema, state) do
-    partial_value(schema, state) |> Error.at(:initial_state)
+    partial_value(schema, state) |> Error.prefix_result_path(:initial_state)
   end
 
   # A symbolic value has no current value during authoring. Validate the known
@@ -220,7 +221,7 @@ defmodule Jido.Agent.Topology do
     with {:ok, _} <- Data.fields(state, Map.keys(known)),
          {:ok, _} <-
            Data.list(Map.to_list(state), fn {key, value} ->
-             with :ok <- Error.at(partial_value(Map.fetch!(known, key), value), key),
+             with :ok <- Error.prefix_result_path(partial_value(Map.fetch!(known, key), value), key),
                   do: {:ok, {key, value}}
            end),
          do: :ok
@@ -238,8 +239,8 @@ defmodule Jido.Agent.Topology do
 
   defp connection(value, agents, plugins) do
     with {:ok, connection} <- entry(:connect, value),
-         {:ok, from} <- Error.at(endpoint(connection[:from], agents, plugins), :from),
-         {:ok, to} <- Error.at(endpoint(connection[:to], agents, plugins), :to),
+         {:ok, from} <- Error.prefix_result_path(endpoint(connection[:from], agents, plugins), :from),
+         {:ok, to} <- Error.prefix_result_path(endpoint(connection[:to], agents, plugins), :to),
          connection = %{connection | from: from, to: to},
          :ok <- delivery(connection, agents),
          :ok <- Extension.verify_connection(plugins, connection),
@@ -250,7 +251,7 @@ defmodule Jido.Agent.Topology do
     with {:ok, value} <- Data.fields(value, [:kind, :name]), :ok <- Data.name(value[:name]) do
       if value.name == :root or Enum.any?(agents, &(&1.name == value.name)),
         do: {:ok, value},
-        else: Error.fail(:unknown_endpoint, [], "Unknown agent endpoint", value)
+        else: Error.validation_result(:unknown_endpoint, [], "Unknown agent endpoint", value)
     end
   end
 
@@ -258,7 +259,7 @@ defmodule Jido.Agent.Topology do
     if value in Extension.endpoints(plugins),
       do: {:ok, value},
       else:
-        Error.fail(
+        Error.validation_result(
           :unknown_endpoint,
           [],
           "Endpoint is not declared by a selected provider",
@@ -266,7 +267,7 @@ defmodule Jido.Agent.Topology do
         )
   end
 
-  defp endpoint(_, _, _), do: Error.fail(:invalid_endpoint, [], "Expected a typed endpoint Map")
+  defp endpoint(_, _, _), do: Error.validation_result(:invalid_endpoint, [], "Expected a typed endpoint Map")
 
   defp delivery(%{delivery: delivery} = connection, agents)
        when delivery in [:single, :broadcast] do
@@ -275,7 +276,7 @@ defmodule Jido.Agent.Topology do
 
     if (delivery == :single and member) && member.count != 1,
       do:
-        Error.fail(
+        Error.validation_result(
           :counted_delivery,
           :delivery,
           "A counted destination requires explicit :broadcast"
@@ -284,11 +285,11 @@ defmodule Jido.Agent.Topology do
   end
 
   defp delivery(_, _),
-    do: Error.fail(:invalid_delivery, :delivery, "Expected :single or :broadcast")
+    do: Error.validation_result(:invalid_delivery, :delivery, "Expected :single or :broadcast")
 
   defp compatibility(definition, opts) do
     if Keyword.get(opts, :related?, true) do
-      with {:ok, _} <- Error.at(checks(definition, opts), :connections), do: :ok
+      with {:ok, _} <- Error.prefix_result_path(checks(definition, opts), :connections), do: :ok
     else
       :ok
     end
@@ -337,7 +338,7 @@ defmodule Jido.Agent.Topology do
         :ok
 
       {:error, _} ->
-        Error.fail(:unaccepted_type, :to, "Destination does not accept the connection type", %{
+        Error.validation_result(:unaccepted_type, :to, "Destination does not accept the connection type", %{
           type: type,
           definition: destination.name
         })
@@ -365,20 +366,20 @@ defmodule Jido.Agent.Topology do
     Data.list(definition.topology.agents, fn member ->
       with {:ok, child} <- related(member.definition, []),
            {:ok, count} <- resolve_ref(member.count, state),
-           :ok <- Error.at(Data.positive(count), :count),
+           :ok <- Error.prefix_result_path(Data.positive(count), :count),
            {:ok, initial} <- resolve_ref(member.initial_state, state),
            {:ok, schema} <- Jido.Agent.Validation.state_schema(child),
            :ok <- partial_initial(schema, initial) do
         {:ok, %{name: member.name, definition: child, count: count, state: initial}}
       end
     end)
-    |> Error.at([:topology, :agents])
+    |> Error.prefix_result_path([:topology, :agents])
   end
 
   defp resolve_ref(%{kind: :state, key: key}, state) do
     case Map.fetch(state, key) do
       {:ok, value} -> {:ok, value}
-      :error -> Error.fail(:missing_state_field, [], "State reference has no value", %{key: key})
+      :error -> Error.validation_result(:missing_state_field, [], "State reference has no value", %{key: key})
     end
   end
 

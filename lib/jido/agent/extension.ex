@@ -1,6 +1,7 @@
 defmodule Jido.Agent.Extension do
   @moduledoc false
-  alias Jido.Agent.{Data, Error, Route}
+  alias Jido.Agent.{Data, Route}
+  alias Jido.Error
   alias Jido.Catalog
   alias Jido.Codec.Value
 
@@ -127,7 +128,7 @@ defmodule Jido.Agent.Extension do
            :ok <- plugin(module),
            do: {:ok, module}
     else
-      Error.fail(
+      Error.validation_result(
         :invalid_provider,
         [],
         "Provider #{inspect(module)} does not implement the Agent contribution contract",
@@ -137,7 +138,7 @@ defmodule Jido.Agent.Extension do
   end
 
   def provider(value),
-    do: Error.fail(:invalid_provider, [], "Expected a provider module", %{provider: value})
+    do: Error.validation_result(:invalid_provider, [], "Expected a provider module", %{provider: value})
 
   defp plugin(module) do
     authoring = module.__jido_catalog_manifest__()
@@ -146,7 +147,7 @@ defmodule Jido.Agent.Extension do
     if Jido.Plugin in behaviours(module) and authoring === expected do
       :ok
     else
-      Error.fail(
+      Error.validation_result(
         :invalid_plugin,
         [],
         "Agent plugins must use Jido.Plugin",
@@ -183,7 +184,7 @@ defmodule Jido.Agent.Extension do
   defp identity(value, provider) do
     if value[:id] === provider.id() and value[:vsn] === provider.vsn(),
       do: :ok,
-      else: Error.fail(:provider_identity, [], "Provider ID or version does not match its contract")
+      else: Error.validation_result(:provider_identity, [], "Provider ID or version does not match its contract")
   end
 
   @doc false
@@ -225,10 +226,10 @@ defmodule Jido.Agent.Extension do
                  else: []
 
              with {:ok, routes} <-
-                    Error.at(
+                    Error.prefix_result_path(
                       Data.list(routes, fn route ->
                         with :ok <- Data.plain_map(route),
-                             :ok <- Error.at(Data.exact(Map.get(route, :path)), :path),
+                             :ok <- Error.prefix_result_path(Data.exact(Map.get(route, :path)), :path),
                              do: {:ok, route}
                       end),
                       :routes
@@ -260,7 +261,7 @@ defmodule Jido.Agent.Extension do
 
   defp normalize_derived_routes(contributions) do
     Data.list(contributions, fn contribution ->
-      with {:ok, route} <- Error.at(Route.normalize(contribution.route), route_path(contribution)),
+      with {:ok, route} <- Error.prefix_result_path(Route.normalize(contribution.route), route_path(contribution)),
            do: {:ok, %{contribution | route: route}}
     end)
   end
@@ -270,7 +271,7 @@ defmodule Jido.Agent.Extension do
       case Enum.find_index(routes, &(&1 === contribution.route)) do
         nil ->
           {:halt,
-           Error.fail(
+           Error.validation_result(
              :missing_derived_route,
              route_path(contribution),
              "Agent definition is missing a route derived by a Plugin",
@@ -311,10 +312,10 @@ defmodule Jido.Agent.Extension do
         sections,
         &(&1 in ~w(agent state routes topology __state__ __routes__ __topology__)a)
       ) ->
-        Error.fail(:namespace_conflict, [], "Provider cannot replace a core section")
+        Error.validation_result(:namespace_conflict, [], "Provider cannot replace a core section")
 
       :agent in kinds ->
-        Error.fail(:namespace_conflict, [], "Provider cannot replace agent endpoints")
+        Error.validation_result(:namespace_conflict, [], "Provider cannot replace agent endpoints")
 
       true ->
         with :ok <- Data.unique(sections, & &1), do: Data.unique(kinds, & &1)
@@ -335,7 +336,7 @@ defmodule Jido.Agent.Extension do
         error
 
       other ->
-        Error.fail(
+        Error.validation_result(
           :provider_authoring_data,
           [],
           "Provider authoring callback returned an invalid value",
@@ -344,7 +345,7 @@ defmodule Jido.Agent.Extension do
     end
   rescue
     exception ->
-      Error.fail(
+      Error.validation_result(
         :provider_authoring_data,
         [],
         "Provider authoring callback failed",
@@ -352,7 +353,7 @@ defmodule Jido.Agent.Extension do
       )
   catch
     kind, reason ->
-      Error.fail(
+      Error.validation_result(
         :provider_authoring_data,
         [],
         "Provider authoring callback failed",
@@ -360,11 +361,11 @@ defmodule Jido.Agent.Extension do
       )
   end
 
-  defp result({:error, %Error{}} = error), do: error
+  defp result({:error, %Error.ValidationError{}} = error), do: error
 
   defp result({:error, reason}),
     do:
-      Error.fail(:provider_error, [], "Provider rejected its data: #{inspect(reason)}", %{
+      Error.validation_result(:provider_error, [], "Provider rejected its data: #{inspect(reason)}", %{
         reason: reason
       })
 

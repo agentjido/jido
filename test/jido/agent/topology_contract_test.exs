@@ -128,7 +128,7 @@ defmodule Jido.Agent.TopologyContractTest do
           %{1 => nil},
           %{"1" => "string-slot"}
         ] do
-      assert {:error, %Agent.Error{code: :invalid_member_identity, path: [:identities]}} =
+      assert {:error, %Jido.Error.ValidationError{code: :invalid_member_identity, path: [:identities]}} =
                Topology.entry(:agent, Map.put(valid, :identities, identities))
     end
 
@@ -148,20 +148,20 @@ defmodule Jido.Agent.TopologyContractTest do
     assert {:ok, %{agents: [%{definition: ^missing}]}} =
              Topology.normalize(topology, parent, related?: false)
 
-    assert {:error, %Agent.Error{code: :unresolved_definition}} =
+    assert {:error, %Jido.Error.ValidationError{code: :unresolved_definition}} =
              Topology.normalize(topology, parent, [])
 
     loaded = %{topology | agents: [%{name: :offline, definition: String}]}
 
-    assert {:error, %Agent.Error{code: :unresolved_definition, details: %{module: String}}} =
+    assert {:error, %Jido.Error.ValidationError{code: :unresolved_definition, details: %{module: String}}} =
              Topology.normalize(loaded, parent, [])
 
     cyclic = %{topology | agents: [%{name: :cycle, definition: CycleA}]}
 
-    assert {:error, %Agent.Error{code: :recursive_membership, details: %{module: CycleA}}} =
+    assert {:error, %Jido.Error.ValidationError{code: :recursive_membership, details: %{module: CycleA}}} =
              Topology.normalize(cyclic, parent, [])
 
-    assert {:error, %Agent.Error{}} =
+    assert {:error, %Jido.Error.ValidationError{}} =
              Topology.normalize(
                %{
                  agents: [
@@ -178,7 +178,7 @@ defmodule Jido.Agent.TopologyContractTest do
              )
 
     for definition <- [nil, true, false, 1, "agent", []] do
-      assert {:error, %Agent.Error{code: :invalid_member}} =
+      assert {:error, %Jido.Error.ValidationError{code: :invalid_member}} =
                Topology.normalize(
                  %{agents: [%{name: :bad, definition: definition}], connections: []},
                  parent,
@@ -249,7 +249,7 @@ defmodule Jido.Agent.TopologyContractTest do
       %{base | topology: %{base.topology | connections: [edge("missing", :child)]}}
 
     assert {:error,
-            %Agent.Error{
+            %Jido.Error.ValidationError{
               code: :unaccepted_type,
               details: %{type: "missing", definition: "topology_contract_child"}
             }} = Topology.checks(bad_destination)
@@ -298,7 +298,7 @@ defmodule Jido.Agent.TopologyContractTest do
     assert {:ok, [%{status: :unchecked}, %{status: :unchecked}, %{status: :unchecked}]} =
              Topology.checks(definition)
 
-    assert {:error, %Agent.Error{code: :unknown_endpoint}} =
+    assert {:error, %Jido.Error.ValidationError{code: :unknown_endpoint}} =
              Agent.define(%{
                definition
                | topology: %{
@@ -337,7 +337,7 @@ defmodule Jido.Agent.TopologyContractTest do
     ]
 
     for connection <- invalid do
-      assert {:error, %Agent.Error{}} =
+      assert {:error, %Jido.Error.ValidationError{}} =
                Agent.define(put_in(base, [:topology, :connections], [connection]))
     end
   end
@@ -420,7 +420,7 @@ defmodule Jido.Agent.TopologyContractTest do
     assert child === Child.definition()
 
     assert {:error,
-            %Agent.Error{
+            %Jido.Error.ValidationError{
               code: :missing_state_field,
               path: [:topology, :agents, 0],
               details: %{key: :copies}
@@ -462,7 +462,7 @@ defmodule Jido.Agent.TopologyContractTest do
 
   @tag obligation: ["jido.agent.I28", "jido.agent.I30"]
   test "authoring validates nested initial values and exact parent references" do
-    assert {:error, %Agent.Error{}} =
+    assert {:error, %Jido.Error.ValidationError{}} =
              Agent.define(%{
                name: "invalid_nested_initial",
                topology: %{
@@ -480,7 +480,7 @@ defmodule Jido.Agent.TopologyContractTest do
                }
              })
 
-    assert {:error, %Agent.Error{code: :unknown_state_field, details: %{key: :missing}}} =
+    assert {:error, %Jido.Error.ValidationError{code: :unknown_state_field, details: %{key: :missing}}} =
              Agent.define(%{
                name: "unknown_parent_reference",
                topology: %{

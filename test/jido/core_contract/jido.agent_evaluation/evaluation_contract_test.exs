@@ -191,13 +191,13 @@ defmodule JidoTest.Contract.AgentEvaluationTest do
     source = F.instance()
 
     for output <- [Map.delete(source.state, :count), %{source.state | count: "1"}] do
-      assert {:error, %Agent.Error{code: code}} =
+      assert {:error, %Jido.Error.ValidationError{code: code}} =
                Agent.cmd(source, F.signal(%{output: output}))
 
       assert code in [:incomplete_state, :invalid_state]
     end
 
-    assert {:error, %Agent.Error{code: :invalid_state}} =
+    assert {:error, %Jido.Error.ValidationError{code: :invalid_state}} =
              Agent.cmd(source, F.signal(%{output: Map.put(source.state, :extra, 1)}))
 
     for output <- [[], nil, %URI{}] do
@@ -367,7 +367,7 @@ defmodule JidoTest.Contract.AgentEvaluationTest do
           {%{kind: :emit, type: "effect.*", data: %{}}, :wildcard_type},
           {%{kind: :emit, signal: %{type: "effect.allowed"}}, :invalid_directive}
         ] do
-      assert {:error, %Agent.Error{code: ^code, path: [0]}} =
+      assert {:error, %Jido.Error.ValidationError{code: ^code, path: [0]}} =
                Agent.cmd(source, F.signal(%{directives: [request]}))
     end
 
@@ -384,7 +384,7 @@ defmodule JidoTest.Contract.AgentEvaluationTest do
 
     invalid_signal = %{signal | type: nil}
 
-    assert {:error, %Agent.Error{code: :invalid_signal, path: [0], details: %{issues: issues}}} =
+    assert {:error, %Jido.Error.ValidationError{code: :invalid_signal, path: [0], details: %{issues: issues}}} =
              Agent.cmd(
                source,
                F.signal(%{directives: [%{kind: :emit, signal: invalid_signal}]})
@@ -431,7 +431,7 @@ defmodule JidoTest.Contract.AgentEvaluationTest do
                  } = error
 
         :invalid_transform ->
-          assert %Agent.Error{code: :invalid_result} = error
+          assert %Jido.Error.ValidationError{code: :invalid_result} = error
 
         :raise_transform ->
           assert %Jido.Error.ExecutionError{
@@ -544,7 +544,7 @@ defmodule JidoTest.Contract.AgentEvaluationTest do
     unrouted = F.signal(%{}, "missing")
     {:ok, command} = Command.new(agent, unrouted)
 
-    assert {:error, :route, %Agent.Error{code: :unmatched_input}} =
+    assert {:error, :route, %Jido.Error.ValidationError{code: :unmatched_input}} =
              Runner.prepare_for_server(command, unrouted, [], specs)
   end
 
@@ -690,7 +690,7 @@ defmodule JidoTest.Contract.AgentEvaluationTest do
     assert {:error, _} = Agent.cmd(source, F.signal(%{output: %{}}), context: %{observer: self()})
     assert_receive {:executed, _, _}
 
-    assert {:error, %Agent.Error{code: :unmatched_input}} =
+    assert {:error, %Jido.Error.ValidationError{code: :unmatched_input}} =
              Agent.cmd(source, F.signal(%{}, "missing"))
 
     assert {:error, %{__exception__: true}} = Agent.cmd(source, %{F.signal() | type: nil})

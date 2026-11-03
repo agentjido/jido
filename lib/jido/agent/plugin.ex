@@ -15,7 +15,8 @@ defmodule Jido.Agent.Plugin do
   """
 
   alias Jido.Agent
-  alias Jido.Agent.{Data, Error, Route}
+  alias Jido.Agent.{Data, Route}
+  alias Jido.Error
   alias Jido.Agent.Plugin.{Preparation, RouteSelection, Spec}
   alias Jido.Plugin, as: PluginBoundary
   alias Jido.Plugin.Input
@@ -233,7 +234,7 @@ defmodule Jido.Agent.Plugin do
 
   defp require_candidates([], type),
     do:
-      Jido.Agent.Error.fail(
+      Jido.Error.validation_result(
         :unmatched_input,
         [:routes],
         "No route accepts this Signal type",
@@ -340,7 +341,7 @@ defmodule Jido.Agent.Plugin do
           :ok
 
         route ->
-          Error.fail(
+          Error.validation_result(
             :wildcard_helper,
             [:as],
             "A helper requires an exact input type",

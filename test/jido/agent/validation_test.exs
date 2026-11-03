@@ -94,7 +94,7 @@ defmodule Jido.Agent.ValidationTest do
   @tag obligation: ["jido.agent.I3", "jido.agent.I6"]
   test "initial state must be a plain static Map" do
     for initial_state <- [nil, [], %URI{}, %{process: self()}] do
-      assert {:error, %Agent.Error{path: [:initial_state]}} =
+      assert {:error, %Jido.Error.ValidationError{path: [:initial_state]}} =
                Agent.define(%{name: "invalid_initial_state", initial_state: initial_state})
     end
   end
@@ -182,27 +182,27 @@ defmodule Jido.Agent.ValidationTest do
   test "validation distinguishes definitions, instances, and unsupported values" do
     definition = Agent.define!(%{name: "validation_shapes"})
 
-    assert {:error, %Agent.Error{code: :invalid_map, path: [:state], message: message}} =
+    assert {:error, %Jido.Error.ValidationError{code: :invalid_map, path: [:state], message: message}} =
              Agent.validate(%{definition | id: "instance"})
 
     assert message != ""
 
-    assert {:error, %Agent.Error{code: :invalid_string, path: [:id], message: message}} =
+    assert {:error, %Jido.Error.ValidationError{code: :invalid_string, path: [:id], message: message}} =
              Agent.validate(%{definition | state: %{}})
 
     assert message != ""
 
-    assert {:error, %Agent.Error{code: :invalid_agent, message: message}} =
+    assert {:error, %Jido.Error.ValidationError{code: :invalid_agent, message: message}} =
              Agent.validate(:invalid)
 
     assert message != ""
 
-    assert {:error, %Agent.Error{code: :definition_required, message: message}} =
+    assert {:error, %Jido.Error.ValidationError{code: :definition_required, message: message}} =
              Validation.validate_definition(%{definition | id: "instance"})
 
     assert message != ""
 
-    assert {:error, %Agent.Error{code: :instance_required, message: message}} =
+    assert {:error, %Jido.Error.ValidationError{code: :instance_required, message: message}} =
              Validation.validate_instance_with_plugins(:invalid)
 
     assert message != ""
@@ -212,7 +212,7 @@ defmodule Jido.Agent.ValidationTest do
   test "noncanonical definitions return one nonempty normalization error" do
     definition = Agent.define!(%{name: "noncanonical"})
 
-    assert {:error, %Agent.Error{code: :not_canonical, message: message}} =
+    assert {:error, %Jido.Error.ValidationError{code: :not_canonical, message: message}} =
              Validation.validate_definition(%{definition | topology: %{}})
 
     assert message != ""

@@ -1,7 +1,8 @@
 defmodule Jido.Agent.Mutation do
   @moduledoc false
   alias Jido.Agent
-  alias Jido.Agent.{Data, Directive, Error}
+  alias Jido.Agent.{Data, Directive}
+  alias Jido.Error
   alias Jido.Plugin.Normalizer
 
   @modules [
@@ -30,7 +31,7 @@ defmodule Jido.Agent.Mutation do
 
   def apply(agent, directives) do
     with {:ok, _} <- Agent.validate(agent),
-         {:ok, changes} <- Error.at(Data.list(directives, &validate/1), :directives),
+         {:ok, changes} <- Error.prefix_result_path(Data.list(directives, &validate/1), :directives),
          {:ok, candidate} <- edit_all(agent, changes),
          {:ok, candidate} <- normalize_routes(candidate),
          {:ok, candidate} <- Agent.validate(candidate) do
@@ -66,13 +67,13 @@ defmodule Jido.Agent.Mutation do
     end
   end
 
-  def validate(_), do: Error.fail(:invalid_mutation, [], "Expected an Agent mutation Directive")
+  def validate(_), do: Error.validation_result(:invalid_mutation, [], "Expected an Agent mutation Directive")
 
   defp edit_all(agent, changes) do
     Enum.reduce_while(Enum.with_index(changes), {:ok, agent}, fn {directive, index}, {:ok, current} ->
       case edit(current, operation(directive)) do
         {:ok, next} -> {:cont, {:ok, next}}
-        error -> {:halt, Error.at(error, [:directives, index])}
+        error -> {:halt, Error.prefix_result_path(error, [:directives, index])}
       end
     end)
   end
@@ -406,5 +407,5 @@ defmodule Jido.Agent.Mutation do
     end
   end
 
-  defp error(code, details \\ %{}), do: Error.fail(code, [], "Agent mutation failed", details)
+  defp error(code, details \\ %{}), do: Error.validation_result(code, [], "Agent mutation failed", details)
 end

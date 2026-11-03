@@ -312,7 +312,7 @@ defmodule JidoTest.Persistence.PluginIntegrationTest do
     key = Persistence.agent_key(Jido.Agent.Ref.new!(namespace: "persistence-test", id: agent.id))
     {ETS, opts} = c.persistence
 
-    assert {:error, %Jido.Agent.Error{code: :incomplete_state, path: [:state]}} =
+    assert {:error, %Jido.Error.ValidationError{code: :incomplete_state, path: [:state]}} =
              Persistence.save_agent(c.persistence, incomplete, namespace: "persistence-test")
 
     assert {:error, :not_found} = ETS.get(key, opts)

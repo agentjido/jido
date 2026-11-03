@@ -1,7 +1,8 @@
 defmodule Jido.Agent.Plugin.Declaration do
   @moduledoc false
 
-  alias Jido.Agent.{Data, Error, Extension}
+  alias Jido.Agent.{Data, Extension}
+  alias Jido.Error
 
   @type t :: %{provider: module(), config: map()}
 
@@ -27,7 +28,7 @@ defmodule Jido.Agent.Plugin.Declaration do
   end
 
   defp declaration(value) do
-    Error.fail(
+    Error.validation_result(
       :invalid_plugin_declaration,
       [],
       "Expected a Plugin module or {Plugin module, config Map}",
@@ -41,7 +42,7 @@ defmodule Jido.Agent.Plugin.Declaration do
         :ok
 
       key ->
-        Error.fail(
+        Error.validation_result(
           :invalid_plugin_config,
           [],
           "Plugin configuration requires atom keys",

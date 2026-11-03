@@ -4,7 +4,8 @@ defmodule Jido.Codec.Agent do
   @behaviour Jido.Codec.Contract
 
   alias Jido.Agent
-  alias Jido.Agent.{Authoring, Error, Extension}
+  alias Jido.Agent.{Authoring, Extension}
+  alias Jido.Error
   alias Jido.Catalog.Error, as: CatalogError
   alias Jido.Codec.{Issue, Reference, Value}
 
@@ -52,7 +53,7 @@ defmodule Jido.Codec.Agent do
   defp definition(module) when is_atom(module), do: Jido.Agent.Validation.resolve(module)
 
   defp definition(_source),
-    do: Error.fail(:invalid_definition, [], "Expected an Agent definition, instance, or module")
+    do: Error.validation_result(:invalid_definition, [], "Expected an Agent definition, instance, or module")
 
   defp encode_fields(agent, registry) do
     with {:ok, routes} <- Extension.stored_routes(agent.plugins, agent.routes) do
@@ -140,7 +141,7 @@ defmodule Jido.Codec.Agent do
          {:ok, from} <- at(decode_selector(reply["from"]), ["from"]) do
       {:ok, %{type: reply["type"], from: from}}
     else
-      false -> Error.fail(:invalid_document, ["type"], "Invalid Agent route reply type")
+      false -> Error.validation_result(:invalid_document, ["type"], "Invalid Agent route reply type")
       error -> error
     end
   end
@@ -154,7 +155,7 @@ defmodule Jido.Codec.Agent do
          {:ok, path} <- decode_selector_path(selector["path"]) do
       {:ok, %{source: :output, path: path}}
     else
-      false -> Error.fail(:invalid_document, ["source"], "Invalid output selector source")
+      false -> Error.validation_result(:invalid_document, ["source"], "Invalid output selector source")
       error -> error
     end
   end
@@ -162,11 +163,11 @@ defmodule Jido.Codec.Agent do
   defp decode_selector_path(path) when is_list(path) do
     if Enum.all?(path, &is_binary/1),
       do: {:ok, path},
-      else: Error.fail(:invalid_document, ["path"], "Output selector path keys must be strings")
+      else: Error.validation_result(:invalid_document, ["path"], "Output selector path keys must be strings")
   end
 
   defp decode_selector_path(_path),
-    do: Error.fail(:invalid_document, ["path"], "Output selector path must be a list")
+    do: Error.validation_result(:invalid_document, ["path"], "Output selector path must be a list")
 
   defp encode_handler(%{kind: kind, target: target}, registry, reference)
        when kind in [:action, :flow, :transform] do
@@ -187,7 +188,7 @@ defmodule Jido.Codec.Agent do
   end
 
   defp encode_handler(_handler, _registry, _reference),
-    do: Error.fail(:invalid_handler, [], "Agent definition contains an invalid route handler")
+    do: Error.validation_result(:invalid_handler, [], "Agent definition contains an invalid route handler")
 
   defp decode_handler(%{"kind" => kind, "target" => target} = handler, registry)
        when map_size(handler) == 2 and kind in ["action", "flow", "transform"] do
@@ -215,7 +216,7 @@ defmodule Jido.Codec.Agent do
   end
 
   defp decode_handler(_handler, _registry),
-    do: Error.fail(:invalid_document, [], "Invalid Agent definition route handler")
+    do: Error.validation_result(:invalid_document, [], "Invalid Agent definition route handler")
 
   defp encode_topology(%{agents: agents, connections: connections}, registry) do
     with {:ok, agents} <- encode_list(agents, &encode_member(&1, registry)),
@@ -225,7 +226,7 @@ defmodule Jido.Codec.Agent do
   end
 
   defp encode_topology(_topology, _registry),
-    do: Error.fail(:invalid_topology, [], "Agent definition contains an invalid topology")
+    do: Error.validation_result(:invalid_topology, [], "Agent definition contains an invalid topology")
 
   defp decode_topology(topology, registry) do
     decode_map(topology,
@@ -275,7 +276,7 @@ defmodule Jido.Codec.Agent do
     do: encode_reference(module, registry, :agent)
 
   defp encode_nested_definition(_definition, _registry),
-    do: Error.fail(:invalid_definition, [], "Invalid nested Agent definition")
+    do: Error.validation_result(:invalid_definition, [], "Invalid nested Agent definition")
 
   defp decode_nested_definition(
          %{"$type" => "agent_definition", "value" => fields} = value,
@@ -309,7 +310,7 @@ defmodule Jido.Codec.Agent do
 
   defp delivery("single"), do: {:ok, :single}
   defp delivery("broadcast"), do: {:ok, :broadcast}
-  defp delivery(_value), do: Error.fail(:invalid_document, [], "Invalid Agent delivery value")
+  defp delivery(_value), do: Error.validation_result(:invalid_document, [], "Invalid Agent delivery value")
 
   defp encode_plugin(plugin, registry) do
     encode_map(plugin,
@@ -377,7 +378,7 @@ defmodule Jido.Codec.Agent do
         {:ok, reference}
 
       {:error, %CatalogError{}} ->
-        Error.fail(:unknown_reference, [], "Agent Catalog has no reference for a value", %{
+        Error.validation_result(:unknown_reference, [], "Agent Catalog has no reference for a value", %{
           kinds: List.wrap(kinds)
         })
     end
@@ -387,7 +388,7 @@ defmodule Jido.Codec.Agent do
     do: Authoring.traverse(values, encoder)
 
   defp encode_list(_values, _encoder),
-    do: Error.fail(:invalid_list, [], "Expected a proper Agent definition list")
+    do: Error.validation_result(:invalid_list, [], "Expected a proper Agent definition list")
 
   defp decode_list(values, decoder) when is_list(values) do
     values
@@ -396,7 +397,7 @@ defmodule Jido.Codec.Agent do
   end
 
   defp decode_list(_values, _decoder),
-    do: Error.fail(:invalid_document, [], "Expected an Agent definition list")
+    do: Error.validation_result(:invalid_document, [], "Expected an Agent definition list")
 
   defp object(value, required, optional \\ [])
 
@@ -405,16 +406,16 @@ defmodule Jido.Codec.Agent do
 
     if required -- keys == [] and keys -- (required ++ optional) == [],
       do: :ok,
-      else: Error.fail(:invalid_document, [], "Unknown or missing Agent document fields")
+      else: Error.validation_result(:invalid_document, [], "Unknown or missing Agent document fields")
   end
 
   defp object(_value, _required, _optional),
-    do: Error.fail(:invalid_document, [], "Agent document object must be a map")
+    do: Error.validation_result(:invalid_document, [], "Agent document object must be a map")
 
   defp document_version(%{"type" => "jido.agent.definition", "vsn" => 1}), do: :ok
 
   defp document_version(%{"vsn" => version}) do
-    Error.fail(
+    Error.validation_result(
       :unsupported_document,
       ["vsn"],
       "Agent definition document version is not supported",

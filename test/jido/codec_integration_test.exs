@@ -37,7 +37,7 @@ defmodule Jido.CodecIntegrationTest do
     end
 
     def decode_authoring_data(_data, _registry),
-      do: Jido.Agent.Error.fail(:invalid_data, [], "Invalid referenced extension data")
+      do: Jido.Error.validation_result(:invalid_data, [], "Invalid referenced extension data")
 
     @impl Jido.Agent.Extension
     def derive_routes(%{target: target}) do

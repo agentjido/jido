@@ -213,12 +213,14 @@ defmodule Jido.Error do
     """
     use Splode.Error,
       class: :invalid,
-      fields: [:message, :kind, :subject, :details]
+      fields: [:message, :kind, :subject, :code, :details]
 
     @type t :: %__MODULE__{
             message: String.t(),
             kind: :input | :action | :config | nil,
             subject: any(),
+            code: atom() | nil,
+            path: list() | nil,
             details: map()
           }
 
@@ -420,6 +422,26 @@ defmodule Jido.Error do
   end
 
   def prefix_path(error, _path), do: error
+
+  @doc "Creates a validation error result with a stable code and field path."
+  @spec validation_result(atom(), term(), String.t(), map()) :: {:error, ValidationError.t()}
+  def validation_result(code, path, message, details \\ %{}) when is_atom(code) do
+    {:error,
+     struct!(ValidationError,
+       message: message,
+       code: code,
+       path: List.wrap(path),
+       details: normalize_details(details)
+     )}
+  end
+
+  @doc "Prefixes the field path in a validation error result."
+  @spec prefix_result_path(term(), term()) :: term()
+  def prefix_result_path({:error, %ValidationError{} = error}, path) do
+    {:error, %{error | path: List.wrap(path) ++ List.wrap(error.path)}}
+  end
+
+  def prefix_result_path(result, _path), do: result
 
   @doc """
   Creates a validation error.
@@ -719,7 +741,9 @@ defmodule Jido.Error do
     |> sanitize_details()
     |> merge_public_fields(%{
       kind: error.kind,
-      subject: error.subject
+      subject: error.subject,
+      code: error.code,
+      path: if(error.path in [nil, []], do: nil, else: error.path)
     })
   end
 
@@ -984,6 +1008,7 @@ defmodule Jido.Error do
   defp default_retryable_for_type?(_type), do: true
 
   # Maps error structs to unified type atoms
+  defp unified_type(%ValidationError{code: :unmatched_input}), do: :routing_error
   defp unified_type(%ValidationError{kind: :action}), do: :invalid_action
   defp unified_type(%ValidationError{kind: :config}), do: :config_error
   defp unified_type(%ValidationError{}), do: :validation_error

@@ -210,7 +210,7 @@
 
 - at: lib/jido/agent/route.ex:37:15
   operator: return_nil
-  mutation: "`Error.fail(:invalid_executable, [], \"Expected an executable…` → `nil`"
+  mutation: "`Error.validation_result(:invalid_executable, [], \"Expected an executable…` → `nil`"
   sort: unpromised
   reason: This branch validates Route authoring data. jido.agent_evaluation starts with validated routes and does not own Route normalization behavior.
 
@@ -330,7 +330,7 @@
 
 - at: lib/jido/agent/route.ex:92:13
   operator: return_nil
-  mutation: "`Error.fail( :invalid_handler, [], \"Expected one Action, Flo…` → `nil`"
+  mutation: "`Error.validation_result( :invalid_handler, [], \"Expected one Action, Flo…` → `nil`"
   sort: unpromised
   reason: This branch validates Route authoring data. jido.agent_evaluation starts with validated routes and does not own Route normalization behavior.
 
@@ -348,7 +348,7 @@
 
 - at: lib/jido/agent/route.ex:101:5
   operator: return_nil
-  mutation: "`with :ok <- Error.at(Data.name(route.as), :as), :ok <- Erro…` → `nil`"
+  mutation: "`with :ok <- Error.prefix_result_path(Data.name(route.as), :as), :ok <- Erro…` → `nil`"
   sort: unpromised
   reason: This branch validates Route authoring data. jido.agent_evaluation starts with validated routes and does not own Route normalization behavior.
 
@@ -384,7 +384,7 @@
 
 - at: lib/jido/agent/route.ex:122:18
   operator: return_nil
-  mutation: "`Error.fail(:invalid_defaults, :defaults, \"Only Action and F…` → `nil`"
+  mutation: "`Error.validation_result(:invalid_defaults, :defaults, \"Only Action and F…` → `nil`"
   sort: unpromised
   reason: This branch validates Route authoring data. jido.agent_evaluation starts with validated routes and does not own Route normalization behavior.
 
@@ -426,7 +426,7 @@
 
 - at: lib/jido/agent/route.ex:138:15
   operator: return_nil
-  mutation: "`Error.fail(:invalid_forward_target, [], \"Forward requires a…` → `nil`"
+  mutation: "`Error.validation_result(:invalid_forward_target, [], \"Forward requires a…` → `nil`"
   sort: unpromised
   reason: This branch rejects an invalid forward target during Route authoring. Evaluation starts with a validated forward target.
 
@@ -468,7 +468,7 @@
 
 - at: lib/jido/agent/route.ex:161:15
   operator: return_nil
-  mutation: "`Error.fail(:invalid_handler, [:handler], \"Only Action and F…` → `nil`"
+  mutation: "`Error.validation_result(:invalid_handler, [:handler], \"Only Action and F…` → `nil`"
   sort: dead-code
   reason: No supported evaluation path calls params/2 for a non-Action and non-Flow handler.
 

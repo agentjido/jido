@@ -2,7 +2,7 @@ defmodule JidoTest.Contract.PluginBusTest do
   use JidoTest.Case, async: false
   use Covenant.Case, component: "jido.plugin.bus", async: false
 
-  alias Jido.Agent.Error
+  alias Jido.Error.ValidationError, as: Error
   alias Jido.AgentServer, as: Server
   alias Jido.Plugin.Bus.Client
   alias Jido.Plugin.Bus.Client.Runtime

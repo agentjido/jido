@@ -375,7 +375,7 @@ defmodule Jido.Plugin.ValidationTest do
 
     signal = Jido.Signal.new!("unrouted", %{}, source: "/test")
 
-    assert {:error, %Jido.Agent.Error{code: :unmatched_input}} =
+    assert {:error, %Jido.Error.ValidationError{code: :unmatched_input}} =
              Jido.Agent.Runner.prepare(agent, signal, [])
 
     assert_received {:callback, :validate_options, ^opts}

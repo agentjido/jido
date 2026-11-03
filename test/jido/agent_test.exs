@@ -160,7 +160,7 @@ defmodule Jido.AgentTest do
   end
 
   defp build(value), do: Agent.define(value)
-  defp build!(attrs), do: attrs |> build() |> Agent.Error.unwrap!()
+  defp build!(attrs), do: attrs |> build() |> Jido.Error.unwrap!()
 
   defp instance!(source, opts \\ []),
     do: Agent.instantiate!(source, Keyword.put_new(opts, :id, Jido.Id.uuid7()))
@@ -496,10 +496,10 @@ defmodule Jido.AgentTest do
 
       lazy_schema = Jido.Joi.object(%{value: Jido.Joi.lazy(fn -> Jido.Joi.string() end)})
 
-      assert {:error, %Agent.Error{}} =
+      assert {:error, %Jido.Error.ValidationError{}} =
                build(name: "anonymous_schema_agent", schema: anonymous_schema)
 
-      assert {:error, %Agent.Error{}} =
+      assert {:error, %Jido.Error.ValidationError{}} =
                build(name: "lazy_schema_agent", schema: lazy_schema)
     end
   end
@@ -517,7 +517,7 @@ defmodule Jido.AgentTest do
     end
 
     test "rejects unknown definition keys and invalid definition data" do
-      assert {:error, %Agent.Error{code: :unknown_fields}} =
+      assert {:error, %Jido.Error.ValidationError{code: :unknown_fields}} =
                build(name: "bad_agent", unknown: true)
 
       assert {:error, %{__exception__: true}} =
@@ -531,13 +531,13 @@ defmodule Jido.AgentTest do
     end
 
     test "raising constructors raise the returned validation error" do
-      assert_raise Jido.Agent.Error, fn ->
+      assert_raise Jido.Error.ValidationError, fn ->
         build!(name: "invalid_agent", schema: Jido.Joi.string())
       end
 
       definition = build!(name: "valid_agent")
 
-      assert_raise Jido.Agent.Error, fn ->
+      assert_raise Jido.Error.ValidationError, fn ->
         instance!(definition, id: "")
       end
     end
@@ -561,8 +561,8 @@ defmodule Jido.AgentTest do
   describe "instance lifecycle" do
     test "requires explicit identity at the authoring boundary" do
       definition = build!(name: "identity_agent")
-      assert {:error, %Agent.Error{path: [:id]}} = Agent.instantiate(definition)
-      assert {:error, %Agent.Error{path: [:id]}} = Agent.instantiate(definition, id: nil)
+      assert {:error, %Jido.Error.ValidationError{path: [:id]}} = Agent.instantiate(definition)
+      assert {:error, %Jido.Error.ValidationError{path: [:id]}} = Agent.instantiate(definition, id: nil)
       assert instance!(definition, id: "agent-123").id == "agent-123"
     end
 
@@ -578,7 +578,7 @@ defmodule Jido.AgentTest do
     test "accepts only identity and state instance overrides" do
       definition = build!(name: "counter", schema: schema())
 
-      assert {:error, %Agent.Error{code: :unknown_fields}} =
+      assert {:error, %Jido.Error.ValidationError{code: :unknown_fields}} =
                Agent.instantiate(definition, id: Jido.Id.uuid7(), name: "replacement")
 
       assert {:error, %{__exception__: true}} =
@@ -698,7 +698,7 @@ defmodule Jido.AgentTest do
       for module <- [CustomRoutingAgent, InvalidCallbackAgent] do
         agent = module.instantiate!(id: "runtime-fixture")
         signal = Signal.new!("custom.add", %{by: 3}, source: "/test")
-        assert {:error, %Jido.Agent.Error{code: :unmatched_input}} = Agent.cmd(agent, signal)
+        assert {:error, %Jido.Error.ValidationError{code: :unmatched_input}} = Agent.cmd(agent, signal)
       end
     end
 

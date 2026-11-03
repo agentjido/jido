@@ -287,7 +287,7 @@ defmodule Jido.Agent.DSL.RouteMacros do
           rescue
             error in FunctionClauseError ->
               if error.module == __MODULE__ and error.function == unquote(private) do
-                Jido.Agent.Error.fail(
+                Jido.Error.validation_result(
                   :transform_input,
                   [:routes, unquote(bound_path)],
                   "Signal does not match a transform clause"

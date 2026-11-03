@@ -30,7 +30,7 @@ defmodule JidoTest.Persistence.CheckpointPortabilityTest do
     agent = Probe.instantiate!(id: c.id, state: %{payload: %{job: %{worker: self()}}})
 
     assert {:error,
-            %Jido.Agent.Error{
+            %Jido.Error.ValidationError{
               code: :non_portable_term,
               path: [:snapshot, :agent, :state, :payload, :job, :worker]
             }} = Persistence.save_agent(c.store, agent, namespace: "persistence-probe")
@@ -44,7 +44,7 @@ defmodule JidoTest.Persistence.CheckpointPortabilityTest do
     agent = Probe.instantiate!(id: c.id, state: %{payload: %{job: %{values: [1 | self()]}}})
 
     assert {:error,
-            %Jido.Agent.Error{
+            %Jido.Error.ValidationError{
               code: :non_portable_term,
               path: [:snapshot, :agent, :state, :payload, :job, :values, 1]
             }} = Persistence.save_agent(c.store, agent, namespace: "persistence-probe")

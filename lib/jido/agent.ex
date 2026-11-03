@@ -63,7 +63,7 @@ defmodule Jido.Agent do
   @doc "Returns the state schema, including Plugin-owned fields."
   @spec schema(t()) :: Joi.schema()
   def schema(%__MODULE__{} = agent),
-    do: Validation.state_schema(agent) |> Jido.Agent.Error.unwrap!()
+    do: Validation.state_schema(agent) |> Jido.Error.unwrap!()
 
   @type definition :: %__MODULE__{id: nil, state: nil, initial_state: map()}
   @type instance :: %__MODULE__{id: String.t(), state: map(), initial_state: map()}
@@ -180,7 +180,7 @@ defmodule Jido.Agent do
 
   @doc "Builds one neutral Agent definition or raises its validation error."
   @spec define!(map()) :: definition() | no_return()
-  def define!(map), do: map |> define() |> Jido.Agent.Error.unwrap!()
+  def define!(map), do: map |> define() |> Jido.Error.unwrap!()
 
   @doc "Validates a definition or instance, including schema, routes, and provider data."
   @spec validate(term()) :: {:ok, t()} | {:error, term()}
@@ -204,7 +204,7 @@ defmodule Jido.Agent do
   def definition(%__MODULE__{} = value), do: %{value | id: nil, state: nil}
 
   def definition(module) when is_atom(module),
-    do: module |> Validation.resolve() |> Jido.Agent.Error.unwrap!()
+    do: module |> Validation.resolve() |> Jido.Error.unwrap!()
 
   @doc """
   Builds and validates one Agent instance from a definition or compiled Agent module.
@@ -221,7 +221,7 @@ defmodule Jido.Agent do
   @doc "Builds one Agent instance or raises its validation error."
   @spec instantiate!(definition() | module(), keyword() | map()) :: instance() | no_return()
   def instantiate!(source, opts \\ []),
-    do: source |> instantiate(opts) |> Jido.Agent.Error.unwrap!()
+    do: source |> instantiate(opts) |> Jido.Error.unwrap!()
 
   @doc "Applies ordered data mutations and returns the candidate and its final Diff."
   @spec mutate(t(), [Jido.Agent.Directive.t()]) ::
@@ -242,7 +242,7 @@ defmodule Jido.Agent do
     with {:ok, opts} <-
            Validation.options(opts, [:source, :id, :time, :subject, :datacontenttype]),
          source = Map.get(opts, :source, definition.signal_source),
-         :ok <- Jido.Agent.Error.at(Jido.Agent.Data.nonempty(source), :source),
+         :ok <- Jido.Error.prefix_result_path(Jido.Agent.Data.nonempty(source), :source),
          :ok <- Jido.Agent.Data.plain_map(data) do
       Jido.Signal.new(type, data, Map.put(opts, :source, source))
     end
@@ -293,7 +293,7 @@ defmodule Jido.Agent do
   @spec transition_validated(instance(), term(), Joi.schema()) ::
           {:ok, instance()} | {:error, Exception.t()}
   def transition_validated(%__MODULE__{} = agent, next_state, schema) do
-    with :ok <- Jido.Agent.Error.at(Data.complete(schema, next_state), :state) do
+    with :ok <- Jido.Error.prefix_result_path(Data.complete(schema, next_state), :state) do
       {:ok, %{agent | state: next_state}}
     end
   end

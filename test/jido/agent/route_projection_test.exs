@@ -182,7 +182,7 @@ defmodule Jido.Agent.RouteProjectionTest do
     {missing, _trace} = request(%{mode: :missing})
 
     assert {:error,
-            %Agent.Error{
+            %Jido.Error.ValidationError{
               code: :missing_output_field,
               path: [:reply, :from, :path, 0]
             }} = Agent.cmd(before, missing)
@@ -199,7 +199,7 @@ defmodule Jido.Agent.RouteProjectionTest do
     before = agent([project_route()])
     {source, _trace} = request(%{mode: :missing_state, reply: %{value: 1}})
 
-    expected_error = %Agent.Error{
+    expected_error = %Jido.Error.ValidationError{
       code: :missing_output_field,
       path: [:state, :path, 0],
       message: "Selected output field is missing",
@@ -252,7 +252,7 @@ defmodule Jido.Agent.RouteProjectionTest do
 
     for mode <- [:partial, :struct] do
       {source, _trace} = request(%{mode: mode, reply: %{value: 1}})
-      assert {:error, %Agent.Error{}} = Agent.cmd(before, source)
+      assert {:error, %Jido.Error.ValidationError{}} = Agent.cmd(before, source)
     end
 
     assert before.state == %{count: 0}
@@ -286,7 +286,7 @@ defmodule Jido.Agent.RouteProjectionTest do
     assert {:ok, after_agent, [^remove, %Reply{}]} = Agent.cmd(before, source)
     assert after_agent.state == %{count: 1}
     assert after_agent.routes == []
-    assert {:error, %Agent.Error{code: :unmatched_input}} = Agent.cmd(after_agent, source)
+    assert {:error, %Jido.Error.ValidationError{code: :unmatched_input}} = Agent.cmd(after_agent, source)
   end
 
   test "direct and live execution use the same projection path", %{jido: jido} do

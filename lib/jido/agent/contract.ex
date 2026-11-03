@@ -5,7 +5,8 @@ defmodule Jido.Agent.Contract do
   `directives/2` builds Signal envelopes for runtime emission requests.
   No function in this module dispatches a Signal or invokes a handler.
   """
-  alias Jido.Agent.{Data, Error}
+  alias Jido.Agent.Data
+  alias Jido.Error
 
   @doc false
   def directives(definition, directives) do
@@ -37,12 +38,12 @@ defmodule Jido.Agent.Contract do
          :ok <- Data.exact(type),
          :ok <- Data.plain_map(data),
          :ok <- Data.static(data),
-         :ok <- Error.at(Data.nonempty(definition.signal_source), :signal_source),
+         :ok <- Error.prefix_result_path(Data.nonempty(definition.signal_source), :signal_source),
          do: {:ok, request}
   end
 
   defp emission(_, _),
-    do: Error.fail(:invalid_directive, [], "Expected a registered emission directive")
+    do: Error.validation_result(:invalid_directive, [], "Expected a registered emission directive")
 
   defp signal(signal) do
     case Jido.Joi.validate(Jido.Signal.schema(), signal) do
@@ -50,7 +51,7 @@ defmodule Jido.Agent.Contract do
         Data.static(signal)
 
       {:error, issues} ->
-        Error.fail(:invalid_signal, [], "Invalid Signal envelope", %{issues: issues})
+        Error.validation_result(:invalid_signal, [], "Invalid Signal envelope", %{issues: issues})
     end
   end
 end

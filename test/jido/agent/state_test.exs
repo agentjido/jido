@@ -43,7 +43,7 @@ defmodule Jido.Agent.StateTest do
     assert overridden.state == %{value: 4, initialized_for: "overridden", defaulted: false}
     assert {:ok, ^overridden} = Agent.validate(overridden)
 
-    assert {:error, %Agent.Error{code: :initialize_failed, details: %{reason: :rejected}}} =
+    assert {:error, %Jido.Error.ValidationError{code: :initialize_failed, details: %{reason: :rejected}}} =
              InitializingAgent.instantiate(id: "error", state: %{reject: true})
   end
 
@@ -90,7 +90,7 @@ defmodule Jido.Agent.StateTest do
     refute_received {:validated, _}
 
     invalid = %{definition | initial_state: %{enabled: "false"}}
-    assert {:error, %Jido.Agent.Error{path: [:state]}} = Agent.instantiate(invalid, id: "bad")
+    assert {:error, %Jido.Error.ValidationError{path: [:state]}} = Agent.instantiate(invalid, id: "bad")
   end
 
   @tag obligation: "jido.agent.I8"
@@ -126,7 +126,7 @@ defmodule Jido.Agent.StateTest do
 
     assert agent.state == %{config: %{second: 4}, count: 3, optional: nil}
 
-    assert {:error, %Jido.Agent.Error{code: :incomplete_state}} =
+    assert {:error, %Jido.Error.ValidationError{code: :incomplete_state}} =
              Agent.transition(agent, %{optional: nil})
   end
 
@@ -175,7 +175,7 @@ defmodule Jido.Agent.StateTest do
       definition =
         Agent.define!(%{name: "deep_invalid_defaults", schema: Jido.Joi.object(%{root: nested})})
 
-      assert {:error, %Jido.Agent.Error{details: %{issues: [%{path: path}]}}} =
+      assert {:error, %Jido.Error.ValidationError{details: %{issues: [%{path: path}]}}} =
                Agent.instantiate(definition, id: Jido.Id.uuid7())
 
       assert path == [:root | List.duplicate(:child, depth)]
@@ -192,7 +192,7 @@ defmodule Jido.Agent.StateTest do
         ] do
       schema = Jido.Joi.object(%{nested: Jido.Joi.object(%{value: field})})
 
-      assert {:error, %Jido.Agent.Error{path: [:schema | _]}} =
+      assert {:error, %Jido.Error.ValidationError{path: [:schema | _]}} =
                Agent.define(%{name: "invalid_schema", schema: schema})
 
       refute_received {:transformed, _}
@@ -202,7 +202,7 @@ defmodule Jido.Agent.StateTest do
   @tag obligation: "jido.agent.I9"
   test "input conversion types and dynamic schemas cannot bypass the state contract" do
     for field <- [Jido.Joi.string_boolean(), Jido.Joi.lazy({__MODULE__, :lazy_transform, []})] do
-      assert {:error, %Jido.Agent.Error{path: [:schema | _]}} =
+      assert {:error, %Jido.Error.ValidationError{path: [:schema | _]}} =
                Agent.define(%{name: "conversion_schema", schema: Jido.Joi.object(%{value: field})})
 
       refute_received :lazy_schema_called
@@ -314,7 +314,7 @@ defmodule Jido.Agent.StateTest do
 
   @tag obligation: "jido.agent.I10"
   test "composed Plugin state follows the same schema policy" do
-    assert {:error, %Jido.Agent.Error{path: [:schema | _]}} =
+    assert {:error, %Jido.Error.ValidationError{path: [:schema | _]}} =
              Agent.define(%{
                name: "plugin_transform",
                plugins: [

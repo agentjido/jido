@@ -68,7 +68,7 @@ defmodule Jido.AgentServer.TopologyRuntime do
       if supported?,
         do: :ok,
         else:
-          Agent.Error.fail(
+          Jido.Error.validation_result(
             :unsupported_runtime_endpoint,
             [:topology, :connections],
             "Runtime supports Agent and declared local Bus endpoints"

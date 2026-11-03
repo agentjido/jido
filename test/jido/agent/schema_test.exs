@@ -96,7 +96,7 @@ defmodule Jido.Agent.SchemaTest do
   test "composition preserves required Plugin fields and the root rule" do
     definition = %{PlainAgent.definition() | plugins: [contribution(RequiredState)]}
 
-    assert {:error, %Jido.Agent.Error{details: %{issues: errors}}} =
+    assert {:error, %Jido.Error.ValidationError{details: %{issues: errors}}} =
              Jido.Agent.instantiate(definition, id: Jido.Id.uuid7())
 
     assert Enum.any?(errors, &(&1.code == :required and &1.path == [:owned]))

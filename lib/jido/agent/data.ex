@@ -1,46 +1,46 @@
 defmodule Jido.Agent.Data do
   alias Jido.Joi
   @moduledoc false
-  alias Jido.Agent.Error
+  alias Jido.Error
 
   def fields(value, allowed, defaults \\ %{}) do
     with :ok <- plain_map(value),
          [] <- Map.keys(value) -- allowed do
       {:ok, Map.merge(defaults, value)}
     else
-      keys when is_list(keys) -> Error.fail(:unknown_fields, [], "Unknown fields", %{keys: keys})
+      keys when is_list(keys) -> Error.validation_result(:unknown_fields, [], "Unknown fields", %{keys: keys})
       error -> error
     end
   end
 
   def plain_map(value) when is_map(value) and not is_struct(value), do: :ok
-  def plain_map(_), do: Error.fail(:invalid_map, [], "Expected a plain Map")
+  def plain_map(_), do: Error.validation_result(:invalid_map, [], "Expected a plain Map")
 
   def nonempty(value) when is_binary(value) and byte_size(value) > 0, do: :ok
-  def nonempty(_), do: Error.fail(:invalid_string, [], "Expected a nonempty string")
+  def nonempty(_), do: Error.validation_result(:invalid_string, [], "Expected a nonempty string")
 
   def name(value) when is_atom(value) and value not in [nil, true, false], do: :ok
-  def name(_), do: Error.fail(:invalid_name, [], "Expected a name atom")
+  def name(_), do: Error.validation_result(:invalid_name, [], "Expected a name atom")
 
   def positive(value) when is_integer(value) and value > 0, do: :ok
-  def positive(_), do: Error.fail(:invalid_positive, [], "Expected a positive integer")
+  def positive(_), do: Error.validation_result(:invalid_positive, [], "Expected a positive integer")
 
   def list(values, fun), do: walk(values, fun, 0, [])
   defp walk([], _fun, _index, acc), do: {:ok, Enum.reverse(acc)}
 
   defp walk([value | tail], fun, index, acc) do
-    with {:ok, value} <- Error.at(fun.(value), [index]),
+    with {:ok, value} <- Error.prefix_result_path(fun.(value), [index]),
          do: walk(tail, fun, index + 1, [value | acc])
   end
 
-  defp walk(_, _, _, _), do: Error.fail(:invalid_list, [], "Expected a proper list")
+  defp walk(_, _, _, _), do: Error.validation_result(:invalid_list, [], "Expected a proper list")
 
   def unique(values, key) do
     keys = Enum.map(values, key)
 
     if Enum.uniq(keys) == keys,
       do: :ok,
-      else: Error.fail(:duplicate, [], "Duplicate declaration", %{values: keys})
+      else: Error.validation_result(:duplicate, [], "Duplicate declaration", %{values: keys})
   end
 
   def static(value) do
@@ -49,14 +49,14 @@ defmodule Jido.Agent.Data do
         :ok
 
       {:error, _reason} ->
-        Error.fail(:live_value, [], "Authoring data cannot contain live values")
+        Error.validation_result(:live_value, [], "Authoring data cannot contain live values")
     end
   end
 
   def schema(schema) do
     case {Joi.Schema.kind(schema), Joi.Schema.fields(schema)} do
       {:map, {:ok, fields}} when is_list(fields) -> static_schema(schema)
-      _ -> Error.fail(:invalid_schema, [], "Expected a static Joi object schema")
+      _ -> Error.validation_result(:invalid_schema, [], "Expected a static Joi object schema")
     end
   end
 
@@ -64,7 +64,7 @@ defmodule Jido.Agent.Data do
     if Joi.Schema.coerce?(value) or
          Joi.Schema.forbidden_state_type?(value) or
          Enum.any?(Joi.Schema.effects(value), &Joi.Schema.transform_effect?/1) do
-      Error.fail(:invalid_schema, [], "State schemas cannot convert values")
+      Error.validation_result(:invalid_schema, [], "State schemas cannot convert values")
     else
       static_schema(Map.from_struct(value))
     end
@@ -95,13 +95,13 @@ defmodule Jido.Agent.Data do
 
       {:error, issues} ->
         if Enum.any?(issues, &Joi.Error.changed_value?/1) do
-          Error.fail(
+          Error.validation_result(
             :state_conversion,
             [],
             "State initialization can add defaults but cannot convert supplied values"
           )
         else
-          Error.fail(:invalid_state, [], "State does not match its schema", %{issues: issues})
+          Error.validation_result(:invalid_state, [], "State does not match its schema", %{issues: issues})
         end
     end
   end
@@ -115,15 +115,15 @@ defmodule Jido.Agent.Data do
         {:error, issues} ->
           cond do
             Enum.any?(issues, &Joi.Error.changed_value?/1) ->
-              Error.fail(:state_conversion, [], "Validation cannot change stored state")
+              Error.validation_result(:state_conversion, [], "Validation cannot change stored state")
 
             Enum.any?(issues, &(Joi.Error.code(&1) == :required)) ->
-              Error.fail(:incomplete_state, [], "State does not match its schema", %{
+              Error.validation_result(:incomplete_state, [], "State does not match its schema", %{
                 issues: issues
               })
 
             true ->
-              Error.fail(:invalid_state, [], "State does not match its schema", %{issues: issues})
+              Error.validation_result(:invalid_state, [], "State does not match its schema", %{issues: issues})
           end
       end
     end
@@ -132,16 +132,16 @@ defmodule Jido.Agent.Data do
   def path(value) when is_binary(value) do
     case Jido.Signal.Router.Route.validate_path(value, []) do
       :ok -> :ok
-      {:error, _} -> Error.fail(:invalid_path, [], "Invalid Signal path", %{path: value})
+      {:error, _} -> Error.validation_result(:invalid_path, [], "Invalid Signal path", %{path: value})
     end
   end
 
-  def path(_), do: Error.fail(:invalid_path, [], "Expected a Signal path string")
+  def path(_), do: Error.validation_result(:invalid_path, [], "Expected a Signal path string")
 
   def exact(value) do
     with :ok <- path(value) do
       if wildcard?(value),
-        do: Error.fail(:wildcard_type, [], "Expected an exact Signal type"),
+        do: Error.validation_result(:wildcard_type, [], "Expected an exact Signal type"),
         else: :ok
     end
   end

@@ -325,7 +325,7 @@ defmodule Jido.Agent.Runner do
     route = prepared.turn.route
 
     with {:ok, state} <- project_state(route.state, output, prepared.agent.state),
-         :ok <- Jido.Agent.Error.at(Jido.Agent.Data.plain_map(state), :state),
+         :ok <- Jido.Error.prefix_result_path(Jido.Agent.Data.plain_map(state), :state),
          {:ok, directives} <- project_reply(route.reply, output, directives, prepared) do
       {:ok, state, directives}
     end
@@ -360,7 +360,7 @@ defmodule Jido.Agent.Runner do
 
         _ ->
           {:halt,
-           Jido.Agent.Error.fail(
+           Jido.Error.validation_result(
              :missing_output_field,
              mapping_path ++ [:path, index],
              "Selected output field is missing",

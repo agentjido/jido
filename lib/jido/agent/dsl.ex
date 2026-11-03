@@ -1,7 +1,8 @@
 defmodule Jido.Agent.DSL do
   alias Jido.Joi
   @moduledoc false
-  alias Jido.Agent.{Error, Extension, Validation}
+  alias Jido.Agent.{Extension, Validation}
+  alias Jido.Error
   alias Spark.Dsl.Extension, as: E
 
   use Spark.Dsl,
@@ -74,7 +75,7 @@ defmodule Jido.Agent.DSL do
       def route_executable!(path) do
         case Enum.find(@agent_definition.routes, &(&1.path == path)) do
           %{handler: %{kind: :executable, target: target}} ->
-            %{target: target} = Jido.Agent.Route.executable(target) |> Jido.Agent.Error.unwrap!()
+            %{target: target} = Jido.Agent.Route.executable(target) |> Jido.Error.unwrap!()
 
             target
 

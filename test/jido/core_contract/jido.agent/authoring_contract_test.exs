@@ -233,7 +233,7 @@ defmodule JidoTest.Contract.AgentAuthoringTest do
     route = hd(definition.routes)
     assert {:error, _} = Agent.define(%{definition | routes: [route, route]})
 
-    assert {:error, %Agent.Error{code: :duplicate, path: [:routes]}} =
+    assert {:error, %Jido.Error.ValidationError{code: :duplicate, path: [:routes]}} =
              Agent.define(%{
                definition
                | routes: [route, %{route | path: "work.other", as: route.as}]
@@ -241,7 +241,7 @@ defmodule JidoTest.Contract.AgentAuthoringTest do
 
     for name <- [:Bad, :_private, :"bad name", :"bad-name", :bad!] do
       assert {:error,
-              %Agent.Error{
+              %Jido.Error.ValidationError{
                 code: :invalid_helper_name,
                 path: [:routes, 0, :as]
               }} = Agent.define(%{definition | routes: [%{route | as: name}]})
@@ -401,18 +401,18 @@ defmodule JidoTest.Contract.AgentAuthoringTest do
     assert {:error, _} = Leaf.work_signal([])
     assert {:error, _} = Leaf.work_signal(%{}, type: "forged")
     assert {:error, _} = Leaf.work_signal(%{}, data: %{forged: true})
-    assert_raise Agent.Error, fn -> Leaf.work_signal!([]) end
-    assert_raise Agent.Error, fn -> Leaf.work_signal!(%{}, type: "forged") end
+    assert_raise Jido.Error.ValidationError, fn -> Leaf.work_signal!([]) end
+    assert_raise Jido.Error.ValidationError, fn -> Leaf.work_signal!(%{}, type: "forged") end
   end
 
   @tag obligation: ["jido.agent.I22", "jido.agent.I23"]
   test "invalid definitions return structured paths and bang forms raise the same error" do
     attrs = %{name: "invalid", routes: [%{path: "x", handler: %{kind: :missing}}]}
-    assert {:error, %Agent.Error{path: [:routes, 0, :handler]} = error} = Agent.define(attrs)
+    assert {:error, %Jido.Error.ValidationError{path: [:routes, 0, :handler]} = error} = Agent.define(attrs)
     assert is_binary(error.message) and error.message != ""
-    assert_raise Agent.Error, error.message, fn -> Agent.define!(attrs) end
-    assert {:error, %Agent.Error{} = error} = Leaf.instantiate(id: "")
-    assert_raise Agent.Error, error.message, fn -> Leaf.instantiate!(id: "") end
+    assert_raise Jido.Error.ValidationError, error.message, fn -> Agent.define!(attrs) end
+    assert {:error, %Jido.Error.ValidationError{} = error} = Leaf.instantiate(id: "")
+    assert_raise Jido.Error.ValidationError, error.message, fn -> Leaf.instantiate!(id: "") end
   end
 
   @tag obligation: "jido.agent.I24"

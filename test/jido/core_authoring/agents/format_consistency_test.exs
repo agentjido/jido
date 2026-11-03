@@ -181,7 +181,7 @@ defmodule Jido.Agent.FormatConsistencyTest do
           Compiler.compile(body, ~s(name: "formats"))
           flunk("DSL accepted an invalid declaration")
         rescue
-          error in [Agent.Error, Spark.Error.DslError] -> error
+          error in [Jido.Error.ValidationError, Spark.Error.DslError] -> error
         end
 
       assert Exception.message(error) =~ map_error.message

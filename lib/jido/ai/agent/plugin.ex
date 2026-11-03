@@ -16,7 +16,8 @@ defmodule Jido.AI.Agent.Plugin do
   core Agent only when you need the core `Jido.Agent` authoring surface.
   """
 
-  alias Jido.Agent.{Data, Error}
+  alias Jido.Agent.Data
+  alias Jido.Error
   alias Jido.Codec.{Issue, Reference}
   alias Spark.Dsl.Extension, as: SparkExtension
 
@@ -56,13 +57,13 @@ defmodule Jido.AI.Agent.Plugin do
 
     cond do
       config != %{} and (reasonings != [] or tools != []) ->
-        Error.fail(:ambiguous_ai, [], "Use the AI DSL or provider data, not both")
+        Error.validation_result(:ambiguous_ai, [], "Use the AI DSL or provider data, not both")
 
       config != %{} ->
         normalize(config)
 
       length(reasonings) != 1 ->
-        Error.fail(:reasoning_count, [:ai], "AI Agent requires exactly one reasoning Flow")
+        Error.validation_result(:reasoning_count, [:ai], "AI Agent requires exactly one reasoning Flow")
 
       true ->
         [reasoning] = reasonings
@@ -130,25 +131,25 @@ defmodule Jido.AI.Agent.Plugin do
   defp reasoning(target) do
     case Jido.Instruction.resolve(target) do
       {:ok, %{kind: :flow}} -> :ok
-      _other -> Error.fail(:invalid_reasoning, [:reasoning], "Reasoning must reference a Jido Flow")
+      _other -> Error.validation_result(:invalid_reasoning, [:reasoning], "Reasoning must reference a Jido Flow")
     end
   rescue
-    _error -> Error.fail(:invalid_reasoning, [:reasoning], "Reasoning must reference a Jido Flow")
+    _error -> Error.validation_result(:invalid_reasoning, [:reasoning], "Reasoning must reference a Jido Flow")
   catch
     _kind, _reason ->
-      Error.fail(:invalid_reasoning, [:reasoning], "Reasoning must reference a Jido Flow")
+      Error.validation_result(:invalid_reasoning, [:reasoning], "Reasoning must reference a Jido Flow")
   end
 
   defp reserved_defaults(defaults) when is_map(defaults) and not is_struct(defaults) do
     if Map.has_key?(defaults, :input) or Map.has_key?(defaults, "input") do
-      Error.fail(:reserved_default, [:defaults, :input], "AI input cannot be a reasoning default")
+      Error.validation_result(:reserved_default, [:defaults, :input], "AI input cannot be a reasoning default")
     else
       :ok
     end
   end
 
   defp reserved_defaults(_defaults),
-    do: Error.fail(:invalid_defaults, [:defaults], "Reasoning defaults must be a map")
+    do: Error.validation_result(:invalid_defaults, [:defaults], "Reasoning defaults must be a map")
 
   defp normalize_defaults(defaults, reasoning) do
     case Jido.Flow.normalize_defaults(defaults, reasoning) do
@@ -156,7 +157,7 @@ defmodule Jido.AI.Agent.Plugin do
         {:ok, defaults}
 
       {:error, error} ->
-        Error.fail(
+        Error.validation_result(
           Map.get(error.details, :code, :invalid_defaults),
           [:defaults | Map.get(error.details, :path, [])],
           Exception.message(error),
@@ -171,7 +172,7 @@ defmodule Jido.AI.Agent.Plugin do
         :ok
 
       {:error, reason} ->
-        Error.fail(:invalid_tools, [:tools], "Invalid Agent tools", %{reason: reason})
+        Error.validation_result(:invalid_tools, [:tools], "Invalid Agent tools", %{reason: reason})
     end
   end
 
@@ -246,7 +247,7 @@ defmodule Jido.AI.Agent.Plugin do
     end
   end
 
-  defp normalize_issue(%Error{} = error) do
+  defp normalize_issue(%Error.ValidationError{} = error) do
     path =
       Enum.map(error.path, fn
         :defaults -> "config"

@@ -1,7 +1,8 @@
 defmodule Jido.Agent.DataContractTest do
   use Covenant.Case, component: "jido.agent", async: true
 
-  alias Jido.Agent.{Data, Error}
+  alias Jido.Agent.Data
+  alias Jido.Error.ValidationError, as: Error
 
   defp assert_error(result, code, details \\ %{}) do
     assert {:error, %Error{code: ^code, message: message, details: ^details}} = result
@@ -27,7 +28,7 @@ defmodule Jido.Agent.DataContractTest do
 
     result =
       Data.list([:ok, :ok, :bad], fn
-        :bad -> Error.fail(:bad_item, [], "Bad item")
+        :bad -> Jido.Error.validation_result(:bad_item, [], "Bad item")
         value -> {:ok, value}
       end)
 

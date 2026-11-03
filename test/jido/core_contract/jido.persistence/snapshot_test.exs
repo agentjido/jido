@@ -142,7 +142,7 @@ defmodule Jido.Persistence.SnapshotTest do
     changed = put_in(snapshot.references[F.Work], <<0::128>>)
 
     assert {:error,
-            %Jido.Agent.Error{
+            %Jido.Error.ValidationError{
               code: :changed_reference,
               path: [0, :references],
               details: %{module: F.Work}
@@ -154,7 +154,7 @@ defmodule Jido.Persistence.SnapshotTest do
     }
 
     assert {:error,
-            %Jido.Agent.Error{
+            %Jido.Error.ValidationError{
               code: :unavailable_reference,
               path: path,
               details: %{module: MissingSnapshotCode}
@@ -183,7 +183,7 @@ defmodule Jido.Persistence.SnapshotTest do
 
     invalid_references = %{snapshot | references: %{"not-an-atom" => <<0::128>>}}
 
-    assert {:error, %Jido.Agent.Error{code: :invalid_snapshot}} =
+    assert {:error, %Jido.Error.ValidationError{code: :invalid_snapshot}} =
              Jido.Persistence.Snapshot.envelope(invalid_references)
   end
 
@@ -192,7 +192,7 @@ defmodule Jido.Persistence.SnapshotTest do
     assert {:ok, snapshot} = Persistence.snapshot(F.agent())
 
     assert {:error,
-            %Jido.Agent.Error{
+            %Jido.Error.ValidationError{
               code: :unsupported_snapshot_format,
               path: [:format],
               details: %{format: 2, supported_formats: [1]}
@@ -206,7 +206,7 @@ defmodule Jido.Persistence.SnapshotTest do
     [route | routes] = snapshot.agent.routes
     old_agent = %{snapshot.agent | routes: [Map.drop(route, [:state, :reply]) | routes]}
 
-    assert {:error, %Jido.Agent.Error{code: :not_canonical}} =
+    assert {:error, %Jido.Error.ValidationError{code: :not_canonical}} =
              Persistence.restore(%{snapshot | agent: old_agent})
   end
 
@@ -316,16 +316,16 @@ defmodule Jido.Persistence.SnapshotTest do
     end
 
     for mode <- [:identity, :origin] do
-      assert {:error, %Jido.Agent.Error{code: :upgrade_identity, path: [:agent]}} =
+      assert {:error, %Jido.Error.ValidationError{code: :upgrade_identity, path: [:agent]}} =
                Persistence.upgrade(snapshot, F.BadUpgrade, context: %{mode: mode})
     end
 
     for mode <- [:directive, :result, :extra] do
-      assert {:error, %Jido.Agent.Error{code: :invalid_upgrade_result}} =
+      assert {:error, %Jido.Error.ValidationError{code: :invalid_upgrade_result}} =
                Persistence.upgrade(snapshot, F.BadUpgrade, context: %{mode: mode})
     end
 
-    assert {:error, %Jido.Agent.Error{code: :invalid_upgrade}} =
+    assert {:error, %Jido.Error.ValidationError{code: :invalid_upgrade}} =
              Persistence.upgrade(snapshot, F.Flow)
 
     assert {:ok, restored} = Persistence.restore(snapshot)
@@ -388,7 +388,7 @@ defmodule Jido.Persistence.SnapshotTest do
 
     extra = put_in(snapshot.references[String], String.module_info(:md5))
 
-    assert {:error, %Jido.Agent.Error{code: :snapshot_references, path: [:references]}} =
+    assert {:error, %Jido.Error.ValidationError{code: :snapshot_references, path: [:references]}} =
              Persistence.restore(extra)
 
     assert {:error, _} = Persistence.snapshot(Agent.definition(F.agent()))
@@ -442,7 +442,7 @@ defmodule Jido.Persistence.SnapshotTest do
       assert {:ok, snapshot} = Persistence.snapshot(agent)
       snapshot = %{snapshot | references: Map.delete(snapshot.references, missing)}
 
-      assert {:error, %Jido.Agent.Error{code: :snapshot_references, path: [:references]}} =
+      assert {:error, %Jido.Error.ValidationError{code: :snapshot_references, path: [:references]}} =
                Persistence.restore(snapshot, context: %{observer: self()})
 
       refute_received :restored

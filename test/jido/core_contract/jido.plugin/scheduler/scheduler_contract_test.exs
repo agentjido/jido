@@ -2,7 +2,7 @@ defmodule JidoTest.Contract.PluginSchedulerTest do
   use Covenant.Case, component: "jido.plugin.scheduler", async: true
 
   alias Jido.Agent
-  alias Jido.Agent.Error
+  alias Jido.Error.ValidationError, as: Error
   alias Jido.Plugin.Scheduler
   alias Jido.Plugin.Scheduler.{DSL, Occurrence, WallClock}
   alias Jido.Plugin.Normalizer

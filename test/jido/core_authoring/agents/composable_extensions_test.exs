@@ -7,7 +7,8 @@ defmodule Jido.AgentExtensionsAuthoringTest do
   use ExUnit.Case, async: true
   @moduletag :authoring
   alias Jido.Agent
-  alias Jido.Agent.{Error, Topology}
+  alias Jido.Agent.Topology
+  alias Jido.Error.ValidationError, as: Error
   alias Jido.Plugin.Scheduler.DSL, as: Scheduling
   alias Jido.Plugin.Bus.DSL, as: SignalBus
 

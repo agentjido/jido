@@ -1,7 +1,8 @@
 defmodule Jido.Agent.MutationTest do
   use Covenant.Case, component: "jido.agent", async: true
   alias Jido.Agent
-  alias Jido.Agent.{Diff, Directive, Error, Mutation, Route}
+  alias Jido.Agent.{Diff, Directive, Mutation, Route}
+  alias Jido.Error.ValidationError, as: Error
   alias JidoTest.AgentEvolutionFixtures, as: F
 
   defmodule InvalidMigrations do

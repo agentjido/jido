@@ -41,7 +41,7 @@ defmodule JidoTest.Agent.CandidateCompletenessTest do
     signal = Signal.new!("candidate.partial", %{}, source: "/test")
 
     assert {:error,
-            %Jido.Agent.Error{
+            %Jido.Error.ValidationError{
               code: :incomplete_state,
               details: %{issues: [%{path: [:history]}]}
             }} =
@@ -51,7 +51,7 @@ defmodule JidoTest.Agent.CandidateCompletenessTest do
     before = JidoTest.AgentServerAssertions.committed(server)
 
     assert {:error,
-            %Jido.Agent.Error{
+            %Jido.Error.ValidationError{
               code: :incomplete_state,
               details: %{issues: [%{path: [:history]}]}
             }} =

@@ -261,7 +261,7 @@ defmodule JidoTest.Agent.AuthoringTest do
     assert %{data: %{amount: "not validated during construction"}} =
              module.increment_signal!(%{amount: "not validated during construction"})
 
-    assert_raise Agent.Error, "Expected a plain Map", fn -> module.increment_signal!([]) end
+    assert_raise Jido.Error.ValidationError, "Expected a plain Map", fn -> module.increment_signal!([]) end
 
     assert_raise ArgumentError, ~r/invalid input Signal/, fn ->
       module.increment_signal!(%{}, source: "not a URI reference")

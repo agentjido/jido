@@ -90,7 +90,7 @@ defmodule Jido.Agent.ForwardTest do
   end
 
   test "forward rejects missing definition and runtime targets", %{jido: jido} do
-    assert {:error, %Agent.Error{code: :unknown_forward_target}} =
+    assert {:error, %Jido.Error.ValidationError{code: :unknown_forward_target}} =
              Agent.define(%{
                name: "missing_forward_target",
                routes: [

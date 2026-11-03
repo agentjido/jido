@@ -2,7 +2,8 @@ defmodule Jido.Persistence.Snapshot do
   alias Jido.Joi
   @moduledoc false
   alias Jido.Agent
-  alias Jido.Agent.{Data, Error}
+  alias Jido.Agent.Data
+  alias Jido.Error
   alias Jido.Codec.Term
 
   @format 1
@@ -39,7 +40,7 @@ defmodule Jido.Persistence.Snapshot do
       {:ok, agent}
     else
       false ->
-        Error.fail(
+        Error.validation_result(
           :snapshot_references,
           [:references],
           "Snapshot reference manifest is incomplete"
@@ -49,12 +50,12 @@ defmodule Jido.Persistence.Snapshot do
         error
     end
   rescue
-    error -> Error.fail(:invalid_snapshot, [], "Snapshot references are invalid", %{cause: error})
+    error -> Error.validation_result(:invalid_snapshot, [], "Snapshot references are invalid", %{cause: error})
   end
 
   @doc false
   def envelope(%{format: format}) when format != @format do
-    Error.fail(
+    Error.validation_result(
       :unsupported_snapshot_format,
       [:format],
       "Agent snapshot format is not supported",
@@ -78,7 +79,7 @@ defmodule Jido.Persistence.Snapshot do
       :ok
     else
       {:error, _} = error -> error
-      _ -> Error.fail(:invalid_snapshot, [], "Invalid Agent snapshot")
+      _ -> Error.validation_result(:invalid_snapshot, [], "Invalid Agent snapshot")
     end
   end
 
@@ -103,7 +104,7 @@ defmodule Jido.Persistence.Snapshot do
           error
 
         result ->
-          Error.fail(
+          Error.validation_result(
             :invalid_snapshot_state,
             [:agent, :state],
             "Checkpoint callback must return {:ok, Map} or {:error, reason}",
@@ -129,7 +130,7 @@ defmodule Jido.Persistence.Snapshot do
         error
 
       _ ->
-        Error.fail(
+        Error.validation_result(
           :invalid_snapshot_state,
           [:agent, :state],
           "Custom restore must retain the saved identity"
@@ -167,7 +168,7 @@ defmodule Jido.Persistence.Snapshot do
     if MapSet.subset?(required, MapSet.new(Map.keys(snapshot.references))),
       do: :ok,
       else:
-        Error.fail(
+        Error.validation_result(
           :snapshot_references,
           [:references],
           "Snapshot reference manifest is incomplete"
@@ -247,7 +248,7 @@ defmodule Jido.Persistence.Snapshot do
     if Code.ensure_loaded?(module),
       do: {:ok, module.module_info(:md5)},
       else:
-        Error.fail(:unavailable_reference, [:references], "Snapshot code is unavailable", %{
+        Error.validation_result(:unavailable_reference, [:references], "Snapshot code is unavailable", %{
           module: module
         })
   end
@@ -259,7 +260,7 @@ defmodule Jido.Persistence.Snapshot do
                if actual == expected,
                  do: {:ok, module},
                  else:
-                   Error.fail(
+                   Error.validation_result(
                      :changed_reference,
                      [:references],
                      "Snapshot code changed; use an explicit upgrade Action",
@@ -276,7 +277,7 @@ defmodule Jido.Persistence.Snapshot do
         :ok
 
       {:error, path} ->
-        Error.fail(:non_portable_term, path, "Snapshot contains a non-portable value")
+        Error.validation_result(:non_portable_term, path, "Snapshot contains a non-portable value")
     end
   end
 
@@ -293,7 +294,7 @@ defmodule Jido.Persistence.Snapshot do
       {:ok, candidate}
     else
       false ->
-        Error.fail(
+        Error.validation_result(
           :upgrade_identity,
           [:agent],
           "Upgrade must preserve Agent id and origin module"
@@ -303,7 +304,7 @@ defmodule Jido.Persistence.Snapshot do
         error
 
       _ ->
-        Error.fail(
+        Error.validation_result(
           :invalid_upgrade,
           [],
           "Upgrade requires an Action and a complete snapshot result"
@@ -318,7 +319,7 @@ defmodule Jido.Persistence.Snapshot do
 
   defp upgrade_result(_),
     do:
-      Error.fail(
+      Error.validation_result(
         :invalid_upgrade_result,
         [],
         "Upgrade must return one snapshot and no Directives"

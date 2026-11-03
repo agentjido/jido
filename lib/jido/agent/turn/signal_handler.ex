@@ -27,7 +27,7 @@ defmodule Jido.Agent.Turn.SignalHandler do
         error
 
       _ ->
-        Jido.Agent.Error.fail(
+        Jido.Error.validation_result(
           :invalid_result,
           [],
           "Transform must return {:ok, Signal} or {:error, reason}"

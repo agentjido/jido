@@ -48,7 +48,7 @@ defmodule Jido.Agent.PortableStateTest do
       assert agent.state.payload === value
       assert {:ok, ^agent} = Agent.validate(agent)
 
-      assert {:error, %Jido.Agent.Error{code: :non_portable_term, path: path}} =
+      assert {:error, %Jido.Error.ValidationError{code: :non_portable_term, path: path}} =
                Jido.Persistence.snapshot(agent)
 
       assert Enum.take(path, 4) == [:snapshot, :agent, :state, :payload]
@@ -64,7 +64,7 @@ defmodule Jido.Agent.PortableStateTest do
 
     deep_value = Enum.reduce(1..30, self(), fn index, value -> %{index => value} end)
 
-    assert {:error, %Jido.Agent.Error{code: :non_portable_term, path: deep_path}} =
+    assert {:error, %Jido.Error.ValidationError{code: :non_portable_term, path: deep_path}} =
              checkpoint_value(definition, deep_value)
 
     assert length(deep_path) == 20
@@ -80,7 +80,7 @@ defmodule Jido.Agent.PortableStateTest do
 
     for key <- [long_binary, long_atom] do
       assert {:error,
-              %Jido.Agent.Error{
+              %Jido.Error.ValidationError{
                 code: :non_portable_term,
                 path: [:snapshot, :agent, :state, :payload, segment]
               }} = checkpoint_value(definition, %{key => self()})
@@ -90,7 +90,7 @@ defmodule Jido.Agent.PortableStateTest do
     end
 
     assert {:error,
-            %Jido.Agent.Error{
+            %Jido.Error.ValidationError{
               code: :non_portable_term,
               path: [:snapshot, :agent, :state, :payload, {:map_value, 0}]
             }} = checkpoint_value(definition, %{long_integer => self()})
@@ -152,7 +152,7 @@ defmodule Jido.Agent.PortableStateTest do
     agent = NonportableCheckpointAgent.instantiate!(id: "checkpoint")
 
     assert {:error,
-            %Jido.Agent.Error{
+            %Jido.Error.ValidationError{
               code: :non_portable_term,
               path: [:snapshot, :agent, :state, :runtime]
             }} = Jido.Persistence.snapshot(agent)

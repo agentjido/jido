@@ -112,8 +112,8 @@ defmodule JidoTest.Error.NormalizationTest do
 
   @tag obligation: "jido.error.I3"
   test "projects Agent authoring errors by their shared meaning" do
-    unmatched = %Jido.Agent.Error{code: :unmatched_input, message: "No route"}
-    invalid = %Jido.Agent.Error{code: :invalid_state, message: "Invalid state"}
+    unmatched = %Jido.Error.ValidationError{code: :unmatched_input, message: "No route"}
+    invalid = %Jido.Error.ValidationError{code: :invalid_state, message: "Invalid state"}
 
     assert Error.to_map(unmatched).type == :routing_error
     assert Error.to_map(invalid).type == :validation_error

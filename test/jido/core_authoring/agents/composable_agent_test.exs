@@ -5,7 +5,8 @@ defmodule Jido.AgentAuthoringTest do
   use ExUnit.Case, async: true
   @moduletag :authoring
   alias Jido.Agent
-  alias Jido.Agent.{Error, Route, Topology}
+  alias Jido.Agent.{Route, Topology}
+  alias Jido.Error.ValidationError, as: Error
   alias JidoTest.ComposableAgent.{Action, Flow, Minimal, Named, Team, Worker}
   alias JidoTest.ComposableAgent.Compiler
 

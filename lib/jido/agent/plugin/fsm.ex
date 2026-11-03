@@ -29,7 +29,8 @@ defmodule Jido.Agent.Plugin.FSM do
   definitions. The runtime has no second state-machine representation.
   """
 
-  alias Jido.Agent.{Data, Error}
+  alias Jido.Agent.Data
+  alias Jido.Error
   alias Jido.Agent.Plugin.FSM.Transition
   alias Jido.Agent.Plugin.{Preparation, Reduction, RouteSelection}
   alias Spark.Dsl.Extension, as: SparkExtension
@@ -99,7 +100,7 @@ defmodule Jido.Agent.Plugin.FSM do
     if duplicate_fields == [] do
       {:ok, Map.merge(config, dsl_data)}
     else
-      Error.fail(
+      Error.validation_result(
         :ambiguous_config,
         [],
         "Plugin configuration and state_machine DSL define the same fields",
@@ -116,13 +117,13 @@ defmodule Jido.Agent.Plugin.FSM do
              [:definition_vsn, :initial, :terminal, :transitions],
              %{definition_vsn: @default_definition_vsn, terminal: [], transitions: []}
            ),
-         :ok <- Error.at(Data.positive(value[:definition_vsn]), :definition_vsn),
-         :ok <- Error.at(Data.name(value[:initial]), :initial),
+         :ok <- Error.prefix_result_path(Data.positive(value[:definition_vsn]), :definition_vsn),
+         :ok <- Error.prefix_result_path(Data.name(value[:initial]), :initial),
          {:ok, terminal} <-
-           Error.at(Data.list(value.terminal, &state/1), :terminal),
-         :ok <- Error.at(Data.unique(terminal, & &1), :terminal),
+           Error.prefix_result_path(Data.list(value.terminal, &state/1), :terminal),
+         :ok <- Error.prefix_result_path(Data.unique(terminal, & &1), :terminal),
          {:ok, transitions} <-
-           Error.at(Data.list(value.transitions, &normalize_transition/1), :transitions),
+           Error.prefix_result_path(Data.list(value.transitions, &normalize_transition/1), :transitions),
          :ok <- unique_transitions(transitions),
          :ok <- terminal_rules(terminal, transitions),
          :ok <- reachable(value.initial, terminal, transitions) do
@@ -144,7 +145,7 @@ defmodule Jido.Agent.Plugin.FSM do
       case Enum.find(definition.routes, &(&1.as == transition.route)) do
         nil ->
           {:halt,
-           Error.fail(
+           Error.validation_result(
              :unknown_fsm_route,
              [:transitions, index, :route],
              "FSM transition references an unknown route alias",
@@ -156,7 +157,7 @@ defmodule Jido.Agent.Plugin.FSM do
 
         route ->
           {:halt,
-           Error.fail(
+           Error.validation_result(
              :invalid_fsm_route,
              [:transitions, index, :route],
              "FSM transitions require an Action or Flow route",
@@ -254,10 +255,10 @@ defmodule Jido.Agent.Plugin.FSM do
 
   defp normalize_transition(value) do
     with {:ok, transition} <- Data.fields(value, [:name, :from, :route, :to]),
-         :ok <- Error.at(Data.name(transition[:name]), :name),
-         :ok <- Error.at(Data.name(transition[:from]), :from),
-         :ok <- Error.at(Data.name(transition[:route]), :route),
-         :ok <- Error.at(Data.name(transition[:to]), :to),
+         :ok <- Error.prefix_result_path(Data.name(transition[:name]), :name),
+         :ok <- Error.prefix_result_path(Data.name(transition[:from]), :from),
+         :ok <- Error.prefix_result_path(Data.name(transition[:route]), :route),
+         :ok <- Error.prefix_result_path(Data.name(transition[:to]), :to),
          do: {:ok, transition}
   end
 
@@ -266,8 +267,8 @@ defmodule Jido.Agent.Plugin.FSM do
   end
 
   defp unique_transitions(transitions) do
-    with :ok <- Error.at(Data.unique(transitions, & &1.name), :name),
-         do: Error.at(Data.unique(transitions, &{&1.from, &1.route}), :source_route)
+    with :ok <- Error.prefix_result_path(Data.unique(transitions, & &1.name), :name),
+         do: Error.prefix_result_path(Data.unique(transitions, &{&1.from, &1.route}), :source_route)
   end
 
   defp terminal_rules(terminal, transitions) do
@@ -276,7 +277,7 @@ defmodule Jido.Agent.Plugin.FSM do
         :ok
 
       transition ->
-        Error.fail(
+        Error.validation_result(
           :terminal_fsm_transition,
           [],
           "FSM terminal states cannot have outgoing transitions",
@@ -298,7 +299,7 @@ defmodule Jido.Agent.Plugin.FSM do
     if unreachable == [] do
       :ok
     else
-      Error.fail(
+      Error.validation_result(
         :unreachable_fsm_state,
         [],
         "FSM contains states that cannot be reached from its initial state",

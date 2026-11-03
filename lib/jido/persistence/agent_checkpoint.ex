@@ -11,7 +11,7 @@ defmodule Jido.Persistence.AgentCheckpoint do
     do: Snapshot.dump(agent, context, convert_state)
 
   def checkpoint(_, _, _),
-    do: Agent.Error.fail(:invalid_snapshot, [], "Expected an Agent instance and context Map")
+    do: Jido.Error.validation_result(:invalid_snapshot, [], "Expected an Agent instance and context Map")
 
   def restore(module, snapshot, context \\ %{}),
     do: restore(module, snapshot, context, &keep_state/2)
@@ -21,7 +21,7 @@ defmodule Jido.Persistence.AgentCheckpoint do
       if agent.module == module,
         do: {:ok, agent},
         else:
-          Agent.Error.fail(
+          Jido.Error.validation_result(
             :snapshot_identity,
             [:agent, :module],
             "Saved Agent origin differs from the requested origin"
