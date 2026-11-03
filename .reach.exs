@@ -18,6 +18,8 @@
     definitions: [
       "Jido.Action",
       "Jido.Action.*",
+      "Jido.Catalog",
+      "Jido.Catalog.*",
       "Jido.Codec",
       "Jido.Codec.*",
       "Jido.Discovery",
