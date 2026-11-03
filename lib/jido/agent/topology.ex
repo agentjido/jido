@@ -27,6 +27,49 @@ defmodule Jido.Agent.Topology do
   def empty?(%{agents: [], connections: []}), do: true
   def empty?(_), do: false
 
+  # Persist slot identities with the logical topology. A removed slot loses
+  # its identity, so a later slot with the same number starts a new lifetime.
+  @doc false
+  def identify(before, candidate) do
+    with {:ok, desired} <- bind(candidate, candidate.state),
+         {:ok, previous} <- previous_members(before) do
+      members =
+        Enum.map(candidate.topology.agents, fn declaration ->
+          member = Enum.find(desired, &(&1.name == declaration.name))
+          old = Enum.find(previous, &(&1.name == member.name))
+          same? = old && old.definition == member.definition && old.state == member.state
+
+          retained =
+            cond do
+              same? ->
+                before.topology.agents
+                |> Enum.find(&(&1.name == member.name))
+                |> Map.get(:identities, %{})
+
+              is_nil(before) ->
+                Map.get(declaration, :identities, %{})
+
+              true ->
+                %{}
+            end
+
+          identities =
+            Map.new(1..member.count, fn slot ->
+              identity =
+                if is_nil(before) or (same? && slot <= old.count),
+                  do: Map.get(retained, slot, "initial"),
+                  else: Jido.Id.uuid7()
+
+              {slot, identity}
+            end)
+
+          Map.put(declaration, :identities, identities)
+        end)
+
+      {:ok, put_in(candidate.topology.agents, members)}
+    end
+  end
+
   # These checks have no enclosing Agent. Full reference and contract checks
   # run when the complete candidate Agent is validated.
   @doc false
@@ -395,4 +438,7 @@ defmodule Jido.Agent.Topology do
     do: Validation.list(value, &resolve_ref(&1, state))
 
   defp resolve_ref(value, _), do: {:ok, value}
+
+  defp previous_members(nil), do: {:ok, []}
+  defp previous_members(agent), do: bind(agent, agent.state)
 end

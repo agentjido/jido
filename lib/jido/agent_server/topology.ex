@@ -48,51 +48,6 @@ defmodule Jido.AgentServer.Topology do
     end
   end
 
-  # Save slot identities with the topology. A removed slot loses its identity,
-  # so re-adding that slot cannot restore an earlier member lifetime.
-  def identify(before, candidate) do
-    with {:ok, desired} <- AgentTopology.bind(candidate, candidate.state),
-         {:ok, previous} <- previous_members(before) do
-      members =
-        Enum.map(candidate.topology.agents, fn declaration ->
-          member = Enum.find(desired, &(&1.name == declaration.name))
-          old = Enum.find(previous, &(&1.name == member.name))
-          same? = old && old.definition == member.definition && old.state == member.state
-
-          retained =
-            cond do
-              same? ->
-                before.topology.agents
-                |> Enum.find(&(&1.name == member.name))
-                |> Map.get(:identities, %{})
-
-              is_nil(before) ->
-                Map.get(declaration, :identities, %{})
-
-              true ->
-                %{}
-            end
-
-          identities =
-            Map.new(1..member.count, fn slot ->
-              identity =
-                if is_nil(before) or (same? && slot <= old.count),
-                  do: Map.get(retained, slot, "initial"),
-                  else: Jido.Id.uuid7()
-
-              {slot, identity}
-            end)
-
-          Map.put(declaration, :identities, identities)
-        end)
-
-      {:ok, put_in(candidate.topology.agents, members)}
-    end
-  end
-
-  defp previous_members(nil), do: {:ok, []}
-  defp previous_members(agent), do: AgentTopology.bind(agent, agent.state)
-
   def validate(%Agent{} = agent) do
     with :ok <-
            reduce(agent.topology.agents, fn member ->

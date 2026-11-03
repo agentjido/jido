@@ -1,14 +1,14 @@
 - id: durable-boundary
   date: 2026-10-20
-  decision: Use jido.agent_server.durable for persistence-backed AgentServer create, restore, commit, hibernate, snapshot, and upgrade coordination.
-  driver: Durable Agent state has different authority and failure rules from the core transient Turn state machine and from durable Flow progress.
-  approved_by: User-approved Jido V3 component map
+  decision: Use Jido.AgentServer.Lifecycle for persistence-backed AgentServer create, restore, commit, hibernate, snapshot, and upgrade policy. Use Jido.Persistence for storage conversion and record operations.
+  driver: Durable Agent state has distinct authority and failure rules, but it is part of the same Turn lifecycle and does not need a forwarding module.
+  approved_by: V3 aspirational module dependency map
 
 - id: durable-code-seam
   date: 2026-10-20
-  decision: Keep public APIs and gen_statem transitions in Jido.AgentServer. Move durable validation, startup, save, result, snapshot, upgrade, and topology identity decisions into Jido.AgentServer.Durable.
-  driver: One internal owner can hold durable decisions without a second state machine or a new public server type.
-  approved_by: Component hardening pass
+  decision: Keep public APIs and gen_statem transitions in Jido.AgentServer. Put durable lifecycle validation, startup, save ordering, result, snapshot, and upgrade policy in Jido.AgentServer.Lifecycle. Put stored Agent conversion in Jido.Persistence and stable member identity assignment in Jido.Agent.Topology.
+  driver: Each operation must have one canonical owner without a durable forwarding module or a second state machine.
+  approved_by: V3 aspirational module dependency map
 
 - id: durable-obligation-migration
   date: 2026-10-20
@@ -18,9 +18,9 @@
 
 - id: durable-mutation-profile
   date: 2026-10-20
-  decision: Mutate only Jido.AgentServer.Durable in the focused profile. Keep Jido.AgentServer, Jido.Persistence, the activation Supervisor, and DurableTurn out of this profile.
-  driver: The focused profile must test extracted durable decisions without overlapping core, persistence, activation, or durable Flow owners.
-  approved_by: Component hardening pass
+  decision: Mutate Jido.AgentServer.Lifecycle and Jido.Persistence in the focused profile. Keep Jido.AgentServer, the activation Supervisor, and DurableTurn out of this profile.
+  driver: The focused profile must cover the canonical durable policy and conversion owners without restoring a thin durable seam.
+  approved_by: V3 aspirational module dependency map
 
 - id: durable-public-api
   date: 2026-10-22

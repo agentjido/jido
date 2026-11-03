@@ -2,7 +2,7 @@ defmodule JidoTest.AgentServer.Durable.ApiTest do
   use Covenant.Case, component: "jido.agent_server.durable", async: true
 
   alias Jido.AgentServer, as: Server
-  alias Jido.AgentServer.Durable
+  alias Jido.AgentServer.Lifecycle
 
   @tag obligation: "jido.agent_server.durable.I13"
   test "durable operations stay on the typed AgentServer facade" do
@@ -27,7 +27,7 @@ defmodule JidoTest.AgentServer.Durable.ApiTest do
              public_types
            )
 
-    refute public_module?(Durable)
+    refute public_module?(Lifecycle)
   end
 
   defp documented_api(module) do

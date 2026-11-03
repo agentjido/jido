@@ -8,6 +8,7 @@ defmodule JidoTest.AgentServer.Composition.RuntimeRulesTest do
   alias Jido.Agent.Diff
   alias Jido.Agent.Directive, as: D
   alias Jido.AgentServer, as: Server
+  alias Jido.Agent.Topology, as: AgentTopology
   alias Jido.AgentServer.Topology
   alias JidoTest.AgentEvolutionFixtures, as: E
   alias JidoTest.AgentServer.Fixtures, as: F
@@ -29,22 +30,22 @@ defmodule JidoTest.AgentServer.Composition.RuntimeRulesTest do
     declaration = Map.put(hd(added.topology.agents), :identities, %{1 => "one", 2 => "two"})
     added = put_in(added.topology.agents, [declaration])
 
-    assert {:ok, initial} = Topology.identify(nil, added)
+    assert {:ok, initial} = AgentTopology.identify(nil, added)
     assert hd(initial.topology.agents).identities == %{1 => "one", 2 => "two"}
 
     assert {:ok, grown, _} = Agent.mutate(initial, [D.agent_update(:workers, %{count: 3})])
-    assert {:ok, grown} = Topology.identify(initial, grown)
+    assert {:ok, grown} = AgentTopology.identify(initial, grown)
     grown_ids = hd(grown.topology.agents).identities
     assert grown_ids[1] == "one"
     assert grown_ids[2] == "two"
     assert is_binary(grown_ids[3]) and grown_ids[3] not in ["one", "two"]
 
     assert {:ok, smaller, _} = Agent.mutate(grown, [D.agent_update(:workers, %{count: 1})])
-    assert {:ok, smaller} = Topology.identify(grown, smaller)
+    assert {:ok, smaller} = AgentTopology.identify(grown, smaller)
     assert hd(smaller.topology.agents).identities == %{1 => "one"}
 
     assert {:ok, regrown, _} = Agent.mutate(smaller, [D.agent_update(:workers, %{count: 2})])
-    assert {:ok, regrown} = Topology.identify(smaller, regrown)
+    assert {:ok, regrown} = AgentTopology.identify(smaller, regrown)
     regrown_ids = hd(regrown.topology.agents).identities
     assert regrown_ids[1] == "one"
     assert is_binary(regrown_ids[2]) and regrown_ids[2] not in ["one", "two", grown_ids[2]]
@@ -52,7 +53,7 @@ defmodule JidoTest.AgentServer.Composition.RuntimeRulesTest do
     assert {:ok, changed, _} =
              Agent.mutate(regrown, [D.agent_update(:workers, %{initial_state: %{count: 7}})])
 
-    assert {:ok, changed} = Topology.identify(regrown, changed)
+    assert {:ok, changed} = AgentTopology.identify(regrown, changed)
     changed_ids = hd(changed.topology.agents).identities
     assert changed_ids[1] != regrown_ids[1]
     assert changed_ids[2] != regrown_ids[2]

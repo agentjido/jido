@@ -1,6 +1,7 @@
 ---
 modules:
-  - Jido.AgentServer.Durable
+  - Jido.AgentServer.Lifecycle
+  - Jido.Persistence
 ---
 
 ## Purpose
@@ -11,8 +12,10 @@ It does not own persistence record formats, local activation checkpoints,
 Plugin callback rules, or durable Flow progress.
 
 The public boundary is `Jido.AgentServer.hibernate/2`, `snapshot/2`, and
-`upgrade/3`. `Jido.AgentServer.Durable` is internal. Persistence configuration
-uses AgentServer options; this component has no DSL.
+`upgrade/3`. Durable lifecycle policy is internal to
+`Jido.AgentServer.Lifecycle`. Durable storage conversion belongs to
+`Jido.Persistence`. Persistence configuration uses AgentServer options; this
+component has no DSL.
 
 ## Obligations
 

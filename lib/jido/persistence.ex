@@ -364,6 +364,17 @@ defmodule Jido.Persistence do
     end)
   end
 
+  @doc false
+  def open_agent(source, %Agent{} = agent, :create, opts) do
+    with {:ok, agent} <- Jido.Agent.Mutation.bind(agent),
+         {:ok, agent} <- Jido.Agent.Topology.identify(nil, agent),
+         :ok <- create_agent(source, agent, opts),
+         do: {:ok, agent, 0, nil}
+  end
+
+  def open_agent(source, %Agent{} = agent, :restore, opts),
+    do: load_agent_with_server_turn(source, agent.module, agent.id, opts)
+
   defp expected_revision(opts) do
     case Keyword.fetch(opts, :expected_revision) do
       :error -> {:ok, :any}

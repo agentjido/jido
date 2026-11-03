@@ -63,7 +63,6 @@ defmodule Jido.AgentServer do
 
   alias Jido.AgentServer.{
     Lifecycle,
-    Durable,
     Effects,
     Plugin,
     RegistrationGuard,
@@ -383,7 +382,6 @@ defmodule Jido.AgentServer do
          :ok <- Lifecycle.validate_timeout(opts, :directive_timeout),
          :ok <- Lifecycle.validate_timeout(opts, :readiness_timeout),
          :ok <- Lifecycle.validate_timeout(opts, :commit_timeout),
-         :ok <- Durable.validate_runtime(opts),
          :ok <- Lifecycle.validate_timeout(opts, :idle_timeout, false),
          :ok <- Lifecycle.validate_setting(opts[:idle_policy] in [:stop, :hibernate], :idle_policy),
          :ok <- Lifecycle.validate_limit(opts, :max_directives_per_turn),
@@ -556,7 +554,7 @@ defmodule Jido.AgentServer do
         Process.demonitor(ref, [:flush])
       end
     else
-      nil -> Durable.error(:activation_required, true)
+      nil -> Lifecycle.error(:activation_required, true)
       error -> error
     end
   end
@@ -872,8 +870,8 @@ defmodule Jido.AgentServer do
       })
 
     if data.persistence not in [nil, false] do
-      mode = Durable.persistence_mode(data.activation_state, data.persistence_mode)
-      bootstrap(data, :persistence, data.persistence_timeout, fn -> Durable.start(data, mode) end)
+      mode = Lifecycle.persistence_mode(data.activation_state, data.persistence_mode)
+      bootstrap(data, :persistence, data.persistence_timeout, fn -> Lifecycle.start(data, mode) end)
     else
       initialize_plugins(data)
     end
@@ -889,7 +887,7 @@ defmodule Jido.AgentServer do
           )
 
         if data.activation_state,
-          do: Durable.restore(data.activation_state, agent, data.state_version)
+          do: Lifecycle.restore(data.activation_state, agent, data.state_version)
 
         initialize_bound_plugins(%{data | agent: agent, plugin_specs: specs})
 
@@ -1184,7 +1182,7 @@ defmodule Jido.AgentServer do
         {:keep_state_and_data, reply(from, {:error, :unsafe_resume})}
 
       kind == :hibernate and data.persistence in [nil, false] ->
-        {:keep_state_and_data, reply(from, Durable.error(:persistence_not_configured, true))}
+        {:keep_state_and_data, reply(from, Lifecycle.error(:persistence_not_configured, true))}
 
       true ->
         begin_control(phase, data, kind, from, policy, timeout)
@@ -1241,7 +1239,7 @@ defmodule Jido.AgentServer do
   def handle_event(:info, {ref, result}, _phase, %{control: %{task: %{ref: ref}}} = data) do
     complete_task(data.control.task)
 
-    case Durable.write_result(result, data.control.deadline) do
+    case Lifecycle.write_result(result, data.control.deadline) do
       :ok ->
         Process.cancel_timer(data.control.timer)
         # The caller installs its monitor before requesting save. Reply only
@@ -1250,7 +1248,7 @@ defmodule Jido.AgentServer do
         {:stop_and_reply, {:shutdown, :hibernate}, replies, %{data | control: nil}}
 
       {:error, reason} ->
-        control_failed(data, reason, Durable.resumable?(reason))
+        control_failed(data, reason, Lifecycle.resumable?(reason))
     end
   end
 
@@ -1316,7 +1314,7 @@ defmodule Jido.AgentServer do
       do: {:keep_state_and_data, reply(from, {:error, :not_ready})}
 
   def handle_event({:call, from}, :snapshot, _phase, data),
-    do: {:keep_state_and_data, reply(from, Durable.snapshot(data.agent, data.state_version))}
+    do: {:keep_state_and_data, reply(from, Lifecycle.snapshot(data.agent, data.state_version))}
 
   def handle_event({:call, from}, {:upgrade, token, action, context}, :idle, data) do
     data = %{
@@ -2019,7 +2017,7 @@ defmodule Jido.AgentServer do
          {:ok, agent, revision, config, turn},
          %{bootstrap: %{kind: :persistence}} = data
        ) do
-    Durable.restore(data.activation_state, agent, revision)
+    Lifecycle.restore(data.activation_state, agent, revision)
 
     {:ok, specs} =
       Jido.Plugin.Normalizer.normalize_runtime(
@@ -2226,7 +2224,7 @@ defmodule Jido.AgentServer do
 
       {:upgrade, action} ->
         operation(:upgrade, %{data | active: active}, fn ->
-          with {:ok, candidate} <- Durable.upgrade(agent, action, context),
+          with {:ok, candidate} <- Lifecycle.upgrade(agent, action, context),
                {:ok, candidate} <- Jido.Agent.Mutation.bind(candidate),
                {:ok, candidate} <- identify_topology(data, candidate),
                :ok <- validate_composition(data, candidate, []) do
@@ -2284,7 +2282,7 @@ defmodule Jido.AgentServer do
 
   defp durable_write(kind, data, agent, receipt) do
     durable_operation(kind, data, fn ->
-      Durable.save(data, agent, data.state_version + 1, data.state_version, receipt)
+      Lifecycle.save(data, agent, data.state_version + 1, data.state_version, receipt)
     end)
   end
 
@@ -2607,7 +2605,7 @@ defmodule Jido.AgentServer do
     {timer, deadline} = data.active.storage
     Process.cancel_timer(timer)
 
-    case Durable.write_result(result, deadline) do
+    case Lifecycle.write_result(result, deadline) do
       :ok -> publish_commit(data, data.active.result)
       {:error, reason} -> stop_durable(data, reason)
     end
@@ -2950,7 +2948,7 @@ defmodule Jido.AgentServer do
 
   defp identify_topology(%{persistence: persistence, agent: before}, candidate)
        when persistence not in [nil, false],
-       do: Topology.identify(before, candidate)
+       do: Jido.Agent.Topology.identify(before, candidate)
 
   defp identify_topology(_data, candidate), do: {:ok, candidate}
 
@@ -3038,7 +3036,7 @@ defmodule Jido.AgentServer do
     data = %{data | server_turn: receipt}
 
     operation(:save, %{data | active: active}, fn ->
-      Durable.save(data, candidate, data.state_version + 1, data.state_version, receipt)
+      Lifecycle.save(data, candidate, data.state_version + 1, data.state_version, receipt)
     end)
   end
 
@@ -3064,7 +3062,7 @@ defmodule Jido.AgentServer do
     data = %{data | server_turn: receipt}
 
     operation(:save, %{data | active: active}, fn ->
-      Durable.save(data, candidate, data.state_version + 1, data.state_version, receipt)
+      Lifecycle.save(data, candidate, data.state_version + 1, data.state_version, receipt)
     end)
   end
 
@@ -3655,7 +3653,7 @@ defmodule Jido.AgentServer do
 
             task =
               Task.async(fn ->
-                Durable.save(
+                Lifecycle.save(
                   data,
                   data.agent,
                   data.state_version,
@@ -3689,7 +3687,7 @@ defmodule Jido.AgentServer do
     else
       result =
         if data.control.kind == :hibernate,
-          do: Durable.error(:quiesce_timeout, true),
+          do: Lifecycle.error(:quiesce_timeout, true),
           else: {:error, :quiesce_timeout}
 
       replies = reply(data.control.from, result)
@@ -3709,9 +3707,9 @@ defmodule Jido.AgentServer do
     if data.active && data.active.waits != [] do
       if safe? and expired?(data.active), do: send(self(), {:turn_timeout, data.active.turn_id})
 
-      {:next_state, :waiting, arm_wait_timer(data), reply(control.from, Durable.error(reason, safe?))}
+      {:next_state, :waiting, arm_wait_timer(data), reply(control.from, Lifecycle.error(reason, safe?))}
     else
-      {:keep_state, data, reply(control.from, Durable.error(reason, safe?))}
+      {:keep_state, data, reply(control.from, Lifecycle.error(reason, safe?))}
     end
   end
 

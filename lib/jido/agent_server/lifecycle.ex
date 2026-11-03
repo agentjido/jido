@@ -47,6 +47,9 @@ defmodule Jido.AgentServer.Lifecycle do
   require Logger
 
   alias Jido.Agent.Validation
+  alias Jido.AgentServer.DurableTurn
+  alias Jido.AgentServer.Supervisor, as: ServerSupervisor
+  alias Jido.Exec.Continuation
   alias Jido.Trace.Context, as: TraceContext
 
   def max_timeout, do: @max_timeout
@@ -100,10 +103,17 @@ defmodule Jido.AgentServer.Lifecycle do
          :ok <- validate_setting(is_boolean(opts[:debug]), :debug),
          :ok <-
            Jido.Plugin.Normalizer.validate_runtime_options(opts[:plugin_runtime_options]),
-         do:
+         :ok <-
            validate_setting(
              is_integer(opts[:debug_max_events]) and opts[:debug_max_events] in 1..10_000,
              :debug_max_events
+           ),
+         :ok <- validate_timeout(opts, :persistence_timeout),
+         :ok <- validate_setting(opts[:persistence_mode] in [:create, :restore], :persistence_mode),
+         do:
+           validate_setting(
+             opts[:idle_policy] != :hibernate or persistence_enabled?(opts[:persistence]),
+             :idle_policy
            )
   end
 
@@ -340,8 +350,86 @@ defmodule Jido.AgentServer.Lifecycle do
     |> Map.put(:worker_pid, active.worker)
   end
 
+  def start(data, mode) do
+    with :ok <- ServerSupervisor.close_execution(data.activation_state),
+         {:ok, config} <- Jido.Persistence.resolve_config(data.persistence, data.jido),
+         {:ok, agent, revision, turn} <-
+           Jido.Persistence.open_agent(config, data.agent, mode, persistence_options(data)),
+         {:ok, agent} <- Validation.validate_instance(agent),
+         {:ok, revision, turn} <- settle_unreleased_handoff(data, config, agent, revision, turn),
+         :ok <- DurableTurn.validate_restore(agent, turn) do
+      {:ok, agent, revision, config, turn}
+    end
+  end
+
+  def save(data, agent, revision, expected_revision, server_turn) do
+    Jido.Persistence.save_agent(
+      data.persistence,
+      agent,
+      persistence_options(data) ++
+        [
+          revision: revision,
+          expected_revision: expected_revision,
+          server_turn: server_turn
+        ]
+    )
+  end
+
+  def write_result(result, deadline) do
+    if System.monotonic_time(:millisecond) >= deadline,
+      do: {:error, :indeterminate},
+      else: result
+  end
+
+  def resumable?(reason),
+    do: reason not in [:conflict, :indeterminate] and not match?({:indeterminate, _}, reason)
+
+  def error(reason, resumable?), do: {:error, %{reason: reason, resumable?: resumable?}}
+
+  def snapshot(agent, revision), do: %{agent: agent, state_version: revision}
+
+  def upgrade(agent, action, context) do
+    with {:ok, snapshot} <- Jido.Persistence.snapshot(agent, context: context),
+         do: Jido.Persistence.upgrade(snapshot, action, context: context)
+  end
+
+  @doc false
+  def persistence_mode(state, requested) do
+    lifetime = :ets.lookup_element(state, :durable_lifetime, 2)
+
+    if :atomics.get(lifetime, 1) == 1 or not :ets.insert_new(state, {:durable_started, true}),
+      do: :restore,
+      else: requested
+  end
+
+  @doc false
+  def restore(state, agent, revision) do
+    # The parent child specification retains this reference across root loss.
+    # A separate start has a new reference and still enforces strict :create.
+    lifetime = :ets.lookup_element(state, :durable_lifetime, 2)
+    :atomics.put(lifetime, 1, 1)
+    :ets.insert(state, {:checkpoint, agent, revision})
+  end
+
   def invalid_options(message),
     do: {:error, Jido.Error.validation_error(message, kind: :config)}
+
+  # An accepted Handoff proves that the predecessor commit is durable. It does
+  # not prove that predecessor effects finished. Recovery must not replay those
+  # effects or start the successor across that uncertain boundary.
+  defp settle_unreleased_handoff(data, config, agent, revision, %{status: :accepted} = turn) do
+    failed = Continuation.put_status!(turn, :failed)
+    runtime = %{data | persistence: config}
+
+    with :ok <- save(runtime, agent, revision + 1, revision, failed),
+         do: {:ok, revision + 1, failed}
+  end
+
+  defp settle_unreleased_handoff(_data, _config, _agent, revision, turn),
+    do: {:ok, revision, turn}
+
+  defp persistence_options(data), do: [instance: data.jido, partition: data.partition]
+  defp persistence_enabled?(source), do: source not in [nil, false]
 
   defp validate_exec(opts) do
     if unique_keyword?(opts) and Keyword.keys(opts) -- @exec_keys == [] and

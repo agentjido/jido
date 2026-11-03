@@ -515,14 +515,14 @@ defmodule JidoTest.AgentServer.Durable.PersistenceTest do
     state = :ets.new(:durable_state, [:public])
     :ets.insert(state, {:durable_lifetime, lifetime})
 
-    assert :create = Jido.AgentServer.Durable.persistence_mode(state, :create)
-    assert :restore = Jido.AgentServer.Durable.persistence_mode(state, :create)
-    assert true = Jido.AgentServer.Durable.restore(state, c.agent, 0)
+    assert :create = Jido.AgentServer.Lifecycle.persistence_mode(state, :create)
+    assert :restore = Jido.AgentServer.Lifecycle.persistence_mode(state, :create)
+    assert true = Jido.AgentServer.Lifecycle.restore(state, c.agent, 0)
     assert [{:checkpoint, c.agent, 0}] == :ets.lookup(state, :checkpoint)
 
     replacement = :ets.new(:durable_replacement, [:public])
     :ets.insert(replacement, {:durable_lifetime, lifetime})
-    assert :restore = Jido.AgentServer.Durable.persistence_mode(replacement, :create)
+    assert :restore = Jido.AgentServer.Lifecycle.persistence_mode(replacement, :create)
   end
 
   @tag obligation: ["jido.agent_server.durable.I5", "jido.agent_server.durable.I6"]
