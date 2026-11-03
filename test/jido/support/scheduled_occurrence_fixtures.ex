@@ -40,6 +40,7 @@ defmodule JidoTest.ScheduledOccurrenceFixtures.TimedAgent do
   @moduledoc false
 
   alias Jido.Plugin.Scheduler
+  alias Jido.Plugin.Scheduler.Occurrence
   alias Jido.Signal
   alias JidoTest.ScheduledOccurrenceFixtures.Clock
 
@@ -77,7 +78,7 @@ defmodule JidoTest.ScheduledOccurrenceFixtures.TimedAgent do
 
     route "test.schedule.tick" do
       action input, context: context do
-        with {:ok, occurrence} <- Scheduler.occurrence(context.signal) do
+        with {:ok, occurrence} <- Occurrence.from_signal(context.signal) do
           tick = %{signal_id: context.signal.id, data: input, occurrence: occurrence}
           {:ok, %{context.agent_state | ticks: context.agent_state.ticks ++ [tick]}}
         end

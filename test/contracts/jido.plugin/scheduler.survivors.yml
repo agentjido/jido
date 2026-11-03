@@ -52,7 +52,7 @@
   sort: equivalent
   reason: A value that reaches the loaded-module and callback checks cannot make this swap accept an invalid time scale.
 
-- at: lib/jido/plugin/scheduler/agent.ex:22:36
+- at: lib/jido/plugin/scheduler.ex:102:72
   operator: string_empty
   mutation: '`"Recurring schedule definitions"` → `""`'
   sort: unpromised
@@ -364,25 +364,25 @@
   sort: unpromised
   reason: The hidden schema accessor is not a public Scheduler operation; Directive validation remains the promised surface.
 
-- at: lib/jido/plugin/scheduler/server.ex:11:91
+- at: lib/jido/plugin/scheduler.ex:122:91
   operator: integer_shift
   mutation: '`5000` → `5001`'
   sort: unpromised
   reason: The contract fixes explicit timeout forwarding and structured runtime failure, not the internal default call budget.
 
-- at: lib/jido/plugin/scheduler/server.ex:11:91
+- at: lib/jido/plugin/scheduler.ex:122:91
   operator: integer_shift
   mutation: '`5000` → `4999`'
   sort: unpromised
   reason: The contract fixes explicit timeout forwarding and structured runtime failure, not the internal default call budget.
 
-- at: lib/jido/plugin/scheduler/server.ex:18:71
+- at: lib/jido/plugin/scheduler.ex:129:71
   operator: integer_shift
   mutation: '`5000` → `5001`'
   sort: unpromised
   reason: The contract fixes explicit timeout forwarding and structured runtime failure, not the internal default readiness budget.
 
-- at: lib/jido/plugin/scheduler/server.ex:18:71
+- at: lib/jido/plugin/scheduler.ex:129:71
   operator: integer_shift
   mutation: '`5000` → `4999`'
   sort: unpromised

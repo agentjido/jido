@@ -5,6 +5,7 @@ defmodule Jido.Plugin.Scheduler.Runtime do
 
   alias Jido.AgentServer, as: Server
   alias Jido.Plugin.{Context, Init}
+  alias Jido.Plugin.Scheduler
   alias Jido.Plugin.Scheduler.{Cancel, Cron, CronRules, Schedule, WallClock}
   alias Jido.Signal
   alias Jido.Signal.Context, as: SignalContext
@@ -374,7 +375,7 @@ defmodule Jido.Plugin.Scheduler.Runtime do
   defp cron_tick(_spec, signal, _scope, _job, nil, _time), do: fresh_signal(signal)
 
   defp cron_tick(_spec, signal, scope, job, generation, time) do
-    {:ok, tick} = CronRules.occurrence_signal(signal, scope, job, generation, time)
+    {:ok, tick} = Scheduler.occurrence_signal(signal, scope, job, generation, time)
     tick
   end
 

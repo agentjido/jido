@@ -6,6 +6,7 @@ defmodule JidoTest.Contract.PluginSchedulerRuntimeTest do
   alias Jido.Plugin.Context, as: PluginContext
   alias Jido.Plugin.Init
   alias Jido.Plugin.Scheduler
+  alias Jido.Plugin.Scheduler.Occurrence
   alias Jido.Plugin.Scheduler.Runtime
   alias Jido.Signal
   alias Jido.Signal.Context, as: SignalContext
@@ -80,6 +81,9 @@ defmodule JidoTest.Contract.PluginSchedulerRuntimeTest do
   end
 
   defp tick(type \\ "test.tick"), do: Signal.new!(type, %{value: 7}, source: "/test")
+
+  defp reduce_state(state, directives),
+    do: Scheduler.reduce(%{plugin_state: state, directives: directives}, [])
 
   defp runtime(options \\ []) do
     options = Keyword.merge([retry_delay_ms: 60_000], options)
@@ -314,7 +318,7 @@ defmodule JidoTest.Contract.PluginSchedulerRuntimeTest do
     first = spec("0 0 1 1 *", 1)
 
     assert {:ok, %{cron: %{}}} =
-             Scheduler.Agent.apply_directives(%{cron: %{job: first}}, [Scheduler.cancel(:job)])
+             reduce_state(%{cron: %{job: first}}, [Scheduler.cancel(:job)])
 
     assert {:reply, :ok, current} = reconcile(runtime, %{job: first}, 2)
     tracked = current.cron_jobs.job
@@ -341,7 +345,7 @@ defmodule JidoTest.Contract.PluginSchedulerRuntimeTest do
     assert_receive {:"$gen_cast", {:turn, _ref, signal, %{}, :infinity, nil}}
     assert signal.type == "test.tick"
     refute signal.id == first.message.id
-    assert {:ok, occurrence} = Scheduler.occurrence(signal)
+    assert {:ok, occurrence} = Occurrence.from_signal(signal)
     assert occurrence.generation == 1
 
     replacement = %{spec("0 0 1 1 *", 2) | message: tick("test.replaced")}
@@ -376,8 +380,8 @@ defmodule JidoTest.Contract.PluginSchedulerRuntimeTest do
 
       assert_receive {:"$gen_cast", {:turn, _ref, second, %{}, :infinity, nil}}
       refute first.id == second.id
-      assert {:error, :not_found} = Scheduler.occurrence(first)
-      assert {:error, :not_found} = Scheduler.occurrence(second)
+      assert {:error, :not_found} = Occurrence.from_signal(first)
+      assert {:error, :not_found} = Occurrence.from_signal(second)
     after
       Runtime.terminate(:normal, current)
     end
@@ -435,7 +439,7 @@ defmodule JidoTest.Contract.PluginSchedulerRuntimeTest do
       )
 
     assert_receive {:scheduler_plugin_ready, ^scheduler}
-    assert :ok = Scheduler.Server.await_ready(scheduler, timeout: 100)
+    assert :ok = Scheduler.await_ready(scheduler, timeout: 100)
     restored = :sys.get_state(scheduler)
     refute Map.has_key?(restored.cron_jobs, :exhausted)
     assert restored.dormant_cron == %{exhausted: exhausted}
@@ -632,10 +636,10 @@ defmodule JidoTest.Contract.PluginSchedulerRuntimeTest do
     assert_receive {:DOWN, ^ref, :process, ^dead, _reason}
 
     assert {:error, {:scheduler_runtime_unavailable, _reason}} =
-             Scheduler.Server.await_ready(dead, timeout: 10)
+             Scheduler.await_ready(dead, timeout: 10)
 
     assert {:error, {:scheduler_runtime_unavailable, _reason}} =
-             Scheduler.Server.dispatch(
+             Scheduler.dispatch(
                dead,
                Scheduler.cancel(:job),
                context(runtime(), %{cron: %{}}, 1),

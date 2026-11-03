@@ -9,8 +9,8 @@ defmodule Jido.Plugin.Scheduler.Occurrence do
   time, and Signal ID. Repeating those coordinates produces the same ID.
 
   Signals carry flat CloudEvents context attributes. Read them with
-  `Jido.Plugin.Scheduler.occurrence/1`. Identity does not provide saved pending
-  work, acknowledgement, or automatic redelivery.
+  `from_signal/1`. Identity does not provide saved pending work,
+  acknowledgement, or automatic redelivery.
   """
   alias Jido.Signal
 

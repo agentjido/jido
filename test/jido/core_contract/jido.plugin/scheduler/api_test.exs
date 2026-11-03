@@ -16,7 +16,6 @@ defmodule JidoTest.Contract.PluginSchedulerApiTest do
         {:function, :cancel, 1},
         {:function, :cron, 4},
         {:function, :next_occurrence, 3},
-        {:function, :occurrence, 1},
         {:function, :occurrence_signal, 5},
         {:function, :schedule, 2}
       ],
@@ -44,15 +43,17 @@ defmodule JidoTest.Contract.PluginSchedulerApiTest do
     )
 
     for module <- [
-          Scheduler.Agent,
           Scheduler.CronRules,
           Scheduler.DSL.Schedule,
           Scheduler.Runtime,
-          Scheduler.Server,
           Scheduler.WallClock
         ] do
       refute public_module?(module)
     end
+
+    refute Code.ensure_loaded?(Scheduler.Agent)
+    refute Code.ensure_loaded?(Scheduler.Server)
+    refute function_exported?(Scheduler, :occurrence, 1)
   end
 
   defp assert_public(module, expected) do

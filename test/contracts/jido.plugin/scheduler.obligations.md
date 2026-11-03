@@ -1,7 +1,6 @@
 ---
 modules:
   - Jido.Plugin.Scheduler
-  - Jido.Plugin.Scheduler.Agent
   - Jido.Plugin.Scheduler.Cancel
   - Jido.Plugin.Scheduler.Cron
   - Jido.Plugin.Scheduler.CronRules
@@ -11,7 +10,6 @@ modules:
   - Jido.Plugin.Scheduler.Occurrence
   - Jido.Plugin.Scheduler.Runtime
   - Jido.Plugin.Scheduler.Schedule
-  - Jido.Plugin.Scheduler.Server
   - Jido.Plugin.Scheduler.WallClock
 ---
 
@@ -27,22 +25,23 @@ storage, durable business delivery, delivery replay, or acknowledgement.
 
 The public boundary is `Jido.Plugin.Scheduler`, its `Schedule`, `Cron`, and
 `Cancel` Directives, `Occurrence` data, and the separate static-authoring
-`DSL`, and `DeliveryAdapter`. Agent state, runtime, server, wall-clock, and DSL
-entity modules are internal. The runtime Plugin uses the standard Plugin
-configuration and adds no custom DSL section.
+`DSL`, and `DeliveryAdapter`. The root owns Agent state and Plugin runtime
+callbacks. Runtime, wall-clock, and DSL entity modules are internal. The
+runtime Plugin uses the standard Plugin configuration and adds no custom DSL
+section.
 
 ## Obligations
 
 ### jido.plugin.scheduler.I1 — Owned schedule state
 
-- **scope:** `Jido.Plugin.Scheduler`, `Jido.Plugin.Scheduler.Agent`, `Jido.Plugin.Scheduler.Schedule`, `Jido.Plugin.Scheduler.Cron`, `Jido.Plugin.Scheduler.Cancel`
+- **scope:** `Jido.Plugin.Scheduler`, `Jido.Plugin.Scheduler.Schedule`, `Jido.Plugin.Scheduler.Cron`, `Jido.Plugin.Scheduler.Cancel`
 - **must:** Expose constructors and validated types for Schedule, Cron, and Cancel Directives. Keep only recurring definitions in the owned Agent state, apply valid Cron and Cancel Directives in list order, and keep one-shot timers out of Agent state.
 - **kind:** functional
 - **status:** active
 
-### jido.plugin.scheduler.I2 — Input and compatibility boundary
+### jido.plugin.scheduler.I2 — Input boundary
 
-- **scope:** `Jido.Plugin.Scheduler`, `Jido.Plugin.Scheduler.Agent`, `Jido.Plugin.Scheduler.Schedule`, `Jido.Plugin.Scheduler.Cron`, `Jido.Plugin.Scheduler.Cancel`, `Jido.Plugin.Scheduler.DeliveryAdapter`
+- **scope:** `Jido.Plugin.Scheduler`, `Jido.Plugin.Scheduler.Schedule`, `Jido.Plugin.Scheduler.Cron`, `Jido.Plugin.Scheduler.Cancel`, `Jido.Plugin.Scheduler.DeliveryAdapter`
 - **must:** Accept only `timezone` and `generation` as unique `cron/4` options. Reject invalid delays, cron rules, timezones, generations, nonportable definitions, unknown or duplicate constructor options, invalid delivery adapters, and saved definitions with retired delivery fields. Keep durable storage, admission, delivery, and acknowledgement outside the Scheduler API.
 - **kind:** functional
 - **status:** active
@@ -77,21 +76,21 @@ configuration and adds no custom DSL section.
 
 ### jido.plugin.scheduler.I7 — Timer recovery and dormant schedules
 
-- **scope:** `Jido.Plugin.Scheduler.Runtime`, `Jido.Plugin.Scheduler.Server`
+- **scope:** `Jido.Plugin.Scheduler.Runtime`, `Jido.Plugin.Scheduler`
 - **must:** Restore future recurring timers from committed Agent state after Scheduler, Agent, or job replacement. Keep a valid finite schedule with no future slot dormant without blocking other schedules.
 - **kind:** functional
 - **status:** active
 
 ### jido.plugin.scheduler.I8 — Failure and retry containment
 
-- **scope:** `Jido.Plugin.Scheduler.Runtime`, `Jido.Plugin.Scheduler.Server`
+- **scope:** `Jido.Plugin.Scheduler.Runtime`, `Jido.Plugin.Scheduler`
 - **must:** Fail startup before readiness when state or clock validation fails, return structured runtime errors, contain adapter exceptions and invalid results, retry the latest committed recurring definition set with one owned timer and its state version, keep stale retry work inert, and recover when the cause is removed.
 - **kind:** functional
 - **status:** active
 
 ### jido.plugin.scheduler.I9 — Clock and readiness rules
 
-- **scope:** `Jido.Plugin.Scheduler.Agent`, `Jido.Plugin.Scheduler.Runtime`, `Jido.Plugin.Scheduler.Server`, `Jido.Plugin.Scheduler.WallClock`
+- **scope:** `Jido.Plugin.Scheduler`, `Jido.Plugin.Scheduler.Runtime`, `Jido.Plugin.Scheduler.WallClock`
 - **must:** Own exactly the AgentServer options `delivery_adapter`, `retry_delay_ms`, and `time_scale`; reject unknown or duplicate Plugin options; and accept only a valid delivery adapter, valid time-scale module, and bounded positive retry delay. Wait for each positive wall-clock remainder with upward millisecond rounding, permit shutdown cancellation, and report readiness only after initial reconciliation.
 - **kind:** functional
 - **status:** active

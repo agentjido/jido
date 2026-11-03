@@ -26,6 +26,9 @@ defmodule JidoTest.Contract.PluginSchedulerTest do
 
   defp tick, do: Signal.new!("test.tick", %{value: 7}, source: "/test")
 
+  defp reduce_state(state, directives),
+    do: Scheduler.reduce(%{plugin_state: state, directives: directives}, [])
+
   defp contribution(data) do
     %{id: DSL.id(), provider: DSL, vsn: DSL.vsn(), data: data}
   end
@@ -51,7 +54,7 @@ defmodule JidoTest.Contract.PluginSchedulerTest do
     cancel = Scheduler.cancel(:heartbeat)
 
     assert [Scheduler.Schedule, Scheduler.Cron, Scheduler.Cancel] =
-             Scheduler.Agent.directives([])
+             Scheduler.directives([])
 
     assert {:ok, ^schedule} = Agent.Directive.validate(schedule)
     assert {:ok, cron} = Agent.Directive.validate(cron)
@@ -64,12 +67,12 @@ defmodule JidoTest.Contract.PluginSchedulerTest do
     end
 
     assert {:ok, unchanged} =
-             Scheduler.Agent.apply_directives(%{cron: %{}}, [schedule])
+             reduce_state(%{cron: %{}}, [schedule])
 
     assert unchanged == %{cron: %{}}
 
     assert {:ok, %{cron: %{heartbeat: spec}}} =
-             Scheduler.Agent.apply_directives(%{cron: %{}}, [cancel, cron])
+             reduce_state(%{cron: %{}}, [cancel, cron])
 
     assert spec == %{
              cron_expression: "* * * * *",
@@ -79,7 +82,7 @@ defmodule JidoTest.Contract.PluginSchedulerTest do
            }
 
     assert {:ok, %{cron: %{}}} =
-             Scheduler.Agent.apply_directives(%{cron: %{}}, [cron, cancel])
+             reduce_state(%{cron: %{}}, [cron, cancel])
   end
 
   @tag obligation: "jido.plugin.scheduler.I2"
@@ -159,7 +162,7 @@ defmodule JidoTest.Contract.PluginSchedulerTest do
 
   @tag obligation: "jido.plugin.scheduler.I2"
   test "saved definitions with retired delivery fields fail validation" do
-    {:scheduler, schema} = Scheduler.Agent.state_spec([])
+    {:scheduler, schema} = Scheduler.state_spec([])
 
     base = CronRules.build_spec("* * * * *", tick(), nil, 1)
 
@@ -365,14 +368,14 @@ defmodule JidoTest.Contract.PluginSchedulerTest do
 
     assert {:ok, first} = Occurrence.attach(first, @scope, "job-1", 1, @instant)
     assert {:ok, second} = Occurrence.attach(second, @scope, "job-1", 1, @instant)
-    assert {:ok, %Occurrence{} = occurrence} = Scheduler.occurrence(first)
+    assert {:ok, %Occurrence{} = occurrence} = Occurrence.from_signal(first)
     assert {:ok, ^occurrence} = Jido.Joi.parse(Occurrence.schema(), Map.from_struct(occurrence))
-    assert {:ok, ^occurrence} = Scheduler.occurrence(second)
+    assert {:ok, ^occurrence} = Occurrence.from_signal(second)
     assert occurrence.id == "occ_JEa_q126OmcNwQorAlhQjtFbE93wjJ-qFlReVurgnHg"
     assert first.data == %{value: 7}
     assert Signal.get_context(first, "customer") == "acme"
     assert {:ok, restored} = first |> Jido.Codec.Signal.to_map() |> Signal.new()
-    assert {:ok, ^occurrence} = Scheduler.occurrence(restored)
+    assert {:ok, ^occurrence} = Occurrence.from_signal(restored)
   end
 
   @tag obligation: "jido.plugin.scheduler.I6"
@@ -390,7 +393,7 @@ defmodule JidoTest.Contract.PluginSchedulerTest do
     ids =
       Enum.map(coordinates, fn {scope, job, generation, instant} ->
         {:ok, signal} = Occurrence.attach(tick(), scope, job, generation, instant)
-        {:ok, occurrence} = Scheduler.occurrence(signal)
+        {:ok, occurrence} = Occurrence.from_signal(signal)
         occurrence.id
       end)
 
@@ -399,20 +402,20 @@ defmodule JidoTest.Contract.PluginSchedulerTest do
 
   @tag obligation: "jido.plugin.scheduler.I6"
   test "missing, partial, and malformed occurrence metadata return errors" do
-    assert {:error, :not_found} = Scheduler.occurrence(tick())
+    assert {:error, :not_found} = Occurrence.from_signal(tick())
     {:ok, partial} = Signal.put_context(tick(), "jidooccurrenceid", "occ_partial")
-    assert {:error, _} = Scheduler.occurrence(partial)
+    assert {:error, _} = Occurrence.from_signal(partial)
     {:ok, tagged} = Occurrence.attach(tick(), @scope, "job-1", 1, @instant)
 
     {:ok, short_id} = Signal.put_context(tagged, "jidooccurrenceid", "x")
-    assert {:ok, %Occurrence{id: "x"}} = Scheduler.occurrence(short_id)
+    assert {:ok, %Occurrence{id: "x"}} = Occurrence.from_signal(short_id)
 
     {:ok, empty_id} = Signal.put_context(tagged, "jidooccurrenceid", "")
-    assert {:error, _reason} = Scheduler.occurrence(empty_id)
+    assert {:error, _reason} = Occurrence.from_signal(empty_id)
 
     for generation <- [0, 2_147_483_647] do
       {:ok, boundary} = Signal.put_context(tagged, "jidoschedulegen", generation)
-      assert {:ok, %Occurrence{generation: ^generation}} = Scheduler.occurrence(boundary)
+      assert {:ok, %Occurrence{generation: ^generation}} = Occurrence.from_signal(boundary)
     end
 
     excessive = %{
@@ -420,7 +423,7 @@ defmodule JidoTest.Contract.PluginSchedulerTest do
       | extensions: Map.put(tagged.extensions, "jidoschedulegen", 2_147_483_648)
     }
 
-    assert {:error, _reason} = Scheduler.occurrence(excessive)
+    assert {:error, _reason} = Occurrence.from_signal(excessive)
 
     for {key, value} <- [
           {"jidoschedulegen", -1},
@@ -429,13 +432,13 @@ defmodule JidoTest.Contract.PluginSchedulerTest do
           {"jidoscheduledat", "2030-01-01T01:00:01+01:00"}
         ] do
       {:ok, invalid} = Signal.put_context(tagged, key, value)
-      assert {:error, _} = Scheduler.occurrence(invalid)
+      assert {:error, _} = Occurrence.from_signal(invalid)
     end
   end
 
   @tag obligation: "jido.plugin.scheduler.I9"
   test "configuration accepts only bounded retry delays and valid time scales" do
-    assert {:scheduler, _schema} = Scheduler.Agent.state_spec([])
+    assert {:scheduler, _schema} = Scheduler.state_spec([])
 
     assert %{
              option_keys: %{
@@ -537,8 +540,8 @@ defmodule JidoTest.Contract.PluginSchedulerTest do
                ~U[2030-01-01 00:00:01Z]
              )
 
-    assert {:ok, first_occurrence} = Scheduler.occurrence(first)
-    assert {:ok, second_occurrence} = Scheduler.occurrence(second)
+    assert {:ok, first_occurrence} = Occurrence.from_signal(first)
+    assert {:ok, second_occurrence} = Occurrence.from_signal(second)
     assert first_occurrence.id == second_occurrence.id
     refute first.id == second.id
 
@@ -551,7 +554,7 @@ defmodule JidoTest.Contract.PluginSchedulerTest do
                ~U[2030-01-01 00:00:01Z]
              )
 
-    assert {:ok, %Occurrence{generation: 0}} = Scheduler.occurrence(default_generation)
+    assert {:ok, %Occurrence{generation: 0}} = Occurrence.from_signal(default_generation)
 
     for invalid_generation <- [-1, 2_147_483_648, "3"] do
       assert {:error, :invalid_schedule_occurrence} =
