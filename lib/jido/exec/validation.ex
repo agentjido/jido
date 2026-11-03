@@ -1,7 +1,8 @@
 defmodule Jido.Exec.Validation do
   @moduledoc false
 
-  alias Jido.Action.{Error, Output, Validation}
+  alias Jido.Action.{Output, Validation}
+  alias Jido.Error
   alias Jido.Exec.Source
 
   @doc false
@@ -43,13 +44,13 @@ defmodule Jido.Exec.Validation do
 
   @doc false
   @spec schema(term(), term(), map(), String.t() | nil) ::
-          {:ok, map()} | {:error, Error.InvalidInputError.t()}
+          {:ok, map()} | {:error, Error.ValidationError.t()}
   def schema(schema, value, details, message \\ nil),
     do: Validation.schema(schema, value, details, message)
 
   @doc false
   @spec output_schema(term(), term(), map()) ::
-          {:ok, map() | Output.t()} | {:error, Error.InvalidInputError.t()}
+          {:ok, map() | Output.t()} | {:error, Error.ValidationError.t()}
   defdelegate output_schema(schema, value, details), to: Validation
 
   @doc false

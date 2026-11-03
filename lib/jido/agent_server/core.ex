@@ -199,7 +199,7 @@ defmodule Jido.AgentServer.Core do
       base_delay_ms: Keyword.get(opts, :base_delay_ms, 500),
       max_delay_ms: Keyword.get(opts, :max_delay_ms, 30_000),
       on_failure: :halt,
-      retry_if: {Jido.Action.Error, :retryable?, []}
+      retry_if: {Jido.Error, :retryable?, []}
     }
   end
 

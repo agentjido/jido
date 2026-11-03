@@ -254,7 +254,7 @@ defmodule Jido.Flow.InlineTest do
     assert owner.target().output_schema().fields == Jido.Joi.object(%{value: Jido.Joi.integer()}).fields
     assert {:ok, %{value: 5}} = Jido.Exec.run(owner.target(), %{value: 4})
 
-    assert {:error, %Jido.Action.Error.InvalidInputError{}} =
+    assert {:error, %Jido.Error.ValidationError{}} =
              Jido.Exec.run(owner.target(), %{value: "bad"})
 
     Process.delete(key)

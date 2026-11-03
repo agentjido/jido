@@ -1,12 +1,7 @@
 defmodule Jido.Exec.ErrorPathsTest do
   use Covenant.Case, component: "jido_action.boundary", async: true
 
-  alias Jido.Action.Error.{
-    ConfigurationError,
-    ExecutionFailureError,
-    InternalError,
-    InvalidInputError
-  }
+  alias Jido.Error.{ExecutionError, InternalError, ValidationError}
 
   alias Jido.Exec
   alias Jido.Flow
@@ -61,26 +56,26 @@ defmodule Jido.Exec.ErrorPathsTest do
   describe "run/4 options and targets" do
     @tag obligation: "jido_action.boundary.I6"
     test "invalid option shapes return configuration errors" do
-      assert {:error, %ConfigurationError{}} = Exec.run(Add, %{}, %{}, :bad)
-      assert {:error, %ConfigurationError{}} = Exec.run(Add, %{}, %{}, bogus: true)
+      assert {:error, %ValidationError{}} = Exec.run(Add, %{}, %{}, :bad)
+      assert {:error, %ValidationError{}} = Exec.run(Add, %{}, %{}, bogus: true)
 
-      assert {:error, %ConfigurationError{details: %{reason: :duplicate_option}}} =
+      assert {:error, %ValidationError{details: %{reason: :duplicate_option}}} =
                Exec.run(Add, %{}, %{},
                  task_supervisor: Jido.Exec.TaskSupervisor,
                  task_supervisor: Jido.Exec.TaskSupervisor
                )
 
-      assert {:error, %ConfigurationError{}} = Exec.run(Add, %{}, %{}, task_supervisor: 123)
+      assert {:error, %ValidationError{}} = Exec.run(Add, %{}, %{}, task_supervisor: 123)
 
-      assert {:error, %ConfigurationError{message: "Task Supervisor lookup failed"}} =
+      assert {:error, %ValidationError{message: "Task Supervisor lookup failed"}} =
                Exec.run(Add, %{}, %{}, task_supervisor: {:via, :no_such_registry, :name})
     end
 
     @tag obligation: "jido_action.boundary.I6"
     test "an unknown target and invalid Flow input return structured errors" do
-      assert {:error, %ConfigurationError{}} = Exec.run("not a target")
+      assert {:error, %ValidationError{}} = Exec.run("not a target")
 
-      assert {:error, %InvalidInputError{details: %{phase: :flow_input}}} =
+      assert {:error, %ValidationError{details: %{phase: :flow_input}}} =
                Exec.run(InputFlow, %{value: "bad"})
     end
   end
@@ -88,19 +83,19 @@ defmodule Jido.Exec.ErrorPathsTest do
   describe "Action validator and callback failures" do
     @tag obligation: "jido_action.boundary.I2"
     test "validator and callback returns become public errors" do
-      assert {:error, %InvalidInputError{message: "Action input validation failed"}} =
+      assert {:error, %ValidationError{message: "Action input validation failed"}} =
                Exec.run(AtomValidationAction, %{})
 
-      assert {:error, %InvalidInputError{message: "Action output validation failed"}} =
+      assert {:error, %ValidationError{message: "Action output validation failed"}} =
                Exec.run(RejectingOutput, %{})
 
       assert {:error, %InternalError{details: %{reason: :invalid_validator_return}}} =
                Exec.run(InvalidValidationResultAction, %{})
 
-      assert {:error, %ExecutionFailureError{details: %{kind: :throw}}} =
+      assert {:error, %ExecutionError{details: %{kind: :throw}}} =
                Exec.run(ThrowingValidator, %{})
 
-      assert {:error, %ExecutionFailureError{message: "{:bad, :tuple}"}} =
+      assert {:error, %ExecutionError{message: "{:bad, :tuple}"}} =
                Exec.run(TupleErrorAction, %{})
     end
   end
@@ -185,9 +180,9 @@ defmodule Jido.Exec.ErrorPathsTest do
       runner = :"error_paths_runner_#{System.unique_integer([:positive])}"
       start_supervised!({Runic.Runner, name: runner})
 
-      assert {:error, %ConfigurationError{}} = Exec.start(runner, :id, Add, %{}, %{}, :bad)
+      assert {:error, %ValidationError{}} = Exec.start(runner, :id, Add, %{}, %{}, :bad)
 
-      assert {:error, %ConfigurationError{details: %{options: [:bogus]}}} =
+      assert {:error, %ValidationError{details: %{options: [:bogus]}}} =
                Exec.start(runner, :id, Add, %{}, %{}, bogus: 1)
 
       # A caller executor replaces the default, and other worker options pass through.
@@ -199,16 +194,16 @@ defmodule Jido.Exec.ErrorPathsTest do
                )
 
       assert {:error, :not_found} = Exec.step(runner, :unknown)
-      assert {:error, %InvalidInputError{}} = Exec.resume(runner, :id, :bad_context)
-      assert {:error, %ExecutionFailureError{}} = Exec.resume(runner, :unknown, nil)
-      assert {:error, %ExecutionFailureError{}} = Exec.resume(runner, :unknown, value: 1)
+      assert {:error, %ValidationError{}} = Exec.resume(runner, :id, :bad_context)
+      assert {:error, %ExecutionError{}} = Exec.resume(runner, :unknown, nil)
+      assert {:error, %ExecutionError{}} = Exec.resume(runner, :unknown, value: 1)
 
-      assert {:error, %ExecutionFailureError{message: "Exec produced no result"}} =
+      assert {:error, %ExecutionError{message: "Exec produced no result"}} =
                Exec.result(Runic.Workflow.new())
 
       failed = %Runic.Workflow.RunnableFailed{error: :odd_failure}
 
-      assert {:error, %ExecutionFailureError{details: %{reason: :odd_failure}}} =
+      assert {:error, %ExecutionError{details: %{reason: :odd_failure}}} =
                Exec.result(%{Runic.Workflow.new() | runnable_events: [failed]})
     end
   end
@@ -216,11 +211,11 @@ defmodule Jido.Exec.ErrorPathsTest do
   describe "compile/2" do
     @tag obligation: "jido_action.boundary.I6"
     test "invalid targets and options return configuration errors" do
-      assert {:error, %ConfigurationError{}} = Exec.compile("not a target")
-      assert {:error, %ConfigurationError{}} = Exec.compile(Add, :bad)
-      assert {:error, %ConfigurationError{}} = Exec.compile(Add, bogus: true)
+      assert {:error, %ValidationError{}} = Exec.compile("not a target")
+      assert {:error, %ValidationError{}} = Exec.compile(Add, :bad)
+      assert {:error, %ValidationError{}} = Exec.compile(Add, bogus: true)
       assert %Runic.Workflow{} = Exec.compile!(Add, id: :root)
-      assert_raise ConfigurationError, fn -> Exec.compile!("not a target") end
+      assert_raise ValidationError, fn -> Exec.compile!("not a target") end
 
       assert_raise ArgumentError, fn ->
         Jido.Exec.Node.Action.new(Jido.Instruction.new!(target: InputFlow))

@@ -218,5 +218,5 @@ defmodule Jido.Exec.Waits do
   defp valid_candidate?(_), do: false
 
   defp error(reason),
-    do: {:error, Jido.Action.Error.config_error("wait operation rejected", %{reason: reason})}
+    do: {:error, Jido.Error.config_error("wait operation rejected", %{reason: reason})}
 end

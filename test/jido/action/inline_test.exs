@@ -281,14 +281,14 @@ defmodule Jido.Action.InlineTest do
     assert {:ok, %{value: 4}} = target.validate_params(%{extra: true})
     refute_received :typed_body
 
-    assert {:error, %Jido.Action.Error.InvalidInputError{}} =
+    assert {:error, %Jido.Error.ValidationError{}} =
              Jido.Exec.run(target, %{value: "bad"}, %{owner: self(), add: 1})
 
     refute_received :typed_body
     assert Jido.Exec.run(target, %{}, %{owner: self(), add: 1}) == {:ok, %{value: 5}}
     assert_received :typed_body
 
-    assert {:error, %Jido.Action.Error.InvalidInputError{}} =
+    assert {:error, %Jido.Error.ValidationError{}} =
              target.validate_output(%{value: "bad"})
   end
 
@@ -751,7 +751,7 @@ defmodule Jido.Action.InlineTest do
     assert {:ok, %{value: 5.0}} = Jido.Exec.run(target, %{operand: 2}, context)
     assert_received :ok
 
-    assert {:error, %Jido.Action.Error.InvalidInputError{}} =
+    assert {:error, %Jido.Error.ValidationError{}} =
              Jido.Exec.run(target, %{operand: "2"}, context)
 
     refute_received :ok

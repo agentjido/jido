@@ -107,7 +107,7 @@ defmodule Jido.Exec.Node.Output do
   defp validate_output(_node, %Jido.Exec.Handoff{}, true),
     do:
       {:error,
-       Jido.Action.Error.config_error("handoff must finish the root Flow", %{
+       Jido.Error.config_error("handoff must finish the root Flow", %{
          reason: :nested_handoff
        })}
 

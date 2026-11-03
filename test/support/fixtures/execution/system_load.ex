@@ -26,7 +26,7 @@ defmodule JidoActionTest.Fixtures.Execution.SystemLoad do
 
         {^ref, :fail} ->
           Agent.update(ledger, fn state -> %{state | active: state.active - 1} end)
-          {:error, Jido.Action.Error.execution_error("injected held-work failure", %{id: id})}
+          {:error, Jido.Error.execution_error("injected held-work failure", %{id: id})}
       end
     end
   end

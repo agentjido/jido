@@ -944,7 +944,7 @@ defmodule Jido.Flow.DSL.InlineStepTest do
     target = owner.step_action("divide")
     assert {:ok, %{value: 5.0}} = Jido.Exec.run(target, %{operand: 2})
 
-    assert {:error, %Jido.Action.Error.ExecutionFailureError{message: "zero"}} =
+    assert {:error, %Jido.Error.ExecutionError{message: "zero"}} =
              Jido.Exec.run(target, %{operand: 0})
   end
 

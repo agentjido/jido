@@ -1,7 +1,7 @@
 defmodule Jido.Exec.Portable do
   @moduledoc false
 
-  alias Jido.Action.Error
+  alias Jido.Error
 
   @typep local_type :: :pid | :port | :reference | :function
 

@@ -2,7 +2,7 @@ defmodule Jido.Exec.Runner.ManagedTest do
   use Covenant.Case, component: "jido_action.execution", async: false
   @moduletag obligation: "jido_action.execution.I21"
 
-  alias Jido.Action.Error.{ExecutionFailureError, TimeoutError}
+  alias Jido.Error.{ExecutionError, TimeoutError}
   alias Jido.Exec
   alias Jido.Flow
   alias Jido.Flow.Ref
@@ -200,7 +200,7 @@ defmodule Jido.Exec.Runner.ManagedTest do
 
     for mode <- [:hybrid, :lazy] do
       assert {:error,
-              %ExecutionFailureError{
+              %ExecutionError{
                 details: %{reason: {:unsupported_batch_rehydration, ^mode}}
               }} = Exec.resume(runner, id, %{}, rehydration: mode)
     end
@@ -237,7 +237,7 @@ defmodule Jido.Exec.Runner.ManagedTest do
     runner = start_runner!(__MODULE__.MetadataRunner)
     instruction = Instruction.new!(target: Echo, metadata: %{owner: self()})
 
-    assert {:error, %ExecutionFailureError{details: details}} =
+    assert {:error, %ExecutionError{details: details}} =
              Exec.start(runner, {:metadata, 1}, instruction)
 
     assert %{reason: :non_portable_durable_value, path: [:metadata, :owner]} = details
@@ -255,7 +255,7 @@ defmodule Jido.Exec.Runner.ManagedTest do
           hooks: :bad,
           executor: NoSuchExecutor
         ] do
-      assert {:error, %Jido.Action.Error.ConfigurationError{details: details}} =
+      assert {:error, %Jido.Error.ValidationError{details: details}} =
                Exec.start(runner, {:options, key}, Echo, %{}, %{}, [{key, value}])
 
       assert details == %{option: key, value: value}
@@ -267,7 +267,7 @@ defmodule Jido.Exec.Runner.ManagedTest do
   test "resume/4 rejects an invalid rehydration mode" do
     runner = start_runner!(__MODULE__.InvalidRehydrationRunner)
 
-    assert {:error, %Jido.Action.Error.ConfigurationError{details: details}} =
+    assert {:error, %Jido.Error.ValidationError{details: details}} =
              Exec.resume(runner, :missing, %{}, rehydration: :unknown)
 
     assert details == %{option: :rehydration, value: :unknown}
@@ -292,7 +292,7 @@ defmodule Jido.Exec.Runner.ManagedTest do
     assert :ok = Runic.Runner.stop(runner, id, persist: true)
 
     for mode <- [:hybrid, :lazy] do
-      assert {:error, %Jido.Action.Error.ConfigurationError{details: details}} =
+      assert {:error, %Jido.Error.ValidationError{details: details}} =
                Exec.resume(runner, id, %{}, rehydration: mode)
 
       assert details == %{option: :rehydration, value: mode}
@@ -344,7 +344,7 @@ defmodule Jido.Exec.Runner.ManagedTest do
 
     for {target, opts, error} <- [
           {Blocks, [timeout: 20], TimeoutError},
-          {Kills, [], ExecutionFailureError}
+          {Kills, [], ExecutionError}
         ] do
       id = {:failure, System.unique_integer([:positive])}
 

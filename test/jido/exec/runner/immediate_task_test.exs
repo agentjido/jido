@@ -78,10 +78,9 @@ defmodule Jido.Exec.Runner.ImmediateTaskTest do
   end
 
   test "an untrappable Action exit does not exit the caller" do
-    assert {:error, %Jido.Action.Error.ExecutionFailureError{details: details}} =
+    assert {:error, %Jido.Error.ExecutionError{phase: :execution_task, details: details}} =
              Exec.run(KillingAction)
 
-    assert details.phase == :execution_task
     assert details.reason == :killed
     assert Process.alive?(self())
   end
@@ -140,8 +139,7 @@ defmodule Jido.Exec.Runner.ImmediateTaskTest do
 
     send(task_pid, :release)
 
-    assert_receive {:caller_result, ^caller,
-                    {:error, %Jido.Action.Error.ExecutionFailureError{message: "Exec task exited"}}},
+    assert_receive {:caller_result, ^caller, {:error, %Jido.Error.ExecutionError{message: "Exec task exited"}}},
                    1_000
 
     for monitor <- monitors do
@@ -154,7 +152,7 @@ defmodule Jido.Exec.Runner.ImmediateTaskTest do
       {caller, monitor} = run_blocking(parallel_normal_exit_flow(), opts)
       error = release_until_result(caller)
 
-      assert %Jido.Action.Error.ExecutionFailureError{details: %{reason: :normal}} = error
+      assert %Jido.Error.ExecutionError{details: %{reason: :normal}} = error
       assert_receive {:DOWN, ^monitor, :process, ^caller, :normal}, 1_000
       refute_received {:action_started, _pid, _group_leader}
     end

@@ -81,7 +81,7 @@ defmodule Jido.Exec.Runtime do
   end
 
   defp execution_task_error(reason) do
-    Jido.Action.Error.execution_error("Exec task exited", %{
+    Jido.Error.execution_error("Exec task exited", %{
       phase: :execution_task,
       reason: reason
     })

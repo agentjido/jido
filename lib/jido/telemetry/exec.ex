@@ -10,7 +10,7 @@ defmodule Jido.Telemetry.Exec do
   event is reserved for a raise, throw, or exit that escapes the span.
   """
 
-  alias Jido.Action.Error, as: ActionError
+  alias Jido.Error
   alias Jido.Exec.Node.Action
   alias Jido.Flow
   alias Jido.Flow.Error, as: FlowError
@@ -91,7 +91,7 @@ defmodule Jido.Telemetry.Exec do
 
   def result_metadata(_kind, _result), do: %{outcome: :unknown}
 
-  defp error_metadata(:action, error), do: ActionError.to_map(error)
+  defp error_metadata(:action, error), do: Error.to_map(error)
   defp error_metadata(:flow, error), do: FlowError.to_map(error)
 
   defp flow_component_metadata(nil), do: %{}

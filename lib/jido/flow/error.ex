@@ -4,7 +4,7 @@ defmodule Jido.Flow.Error do
 
   Flow errors cover authoring data, compilation, native Runic coordination,
   and Flow execution state. An Action failure inside a Flow keeps its original
-  `Jido.Action.Error` type.
+  `Jido.Error` type.
   """
 
   use Splode,
@@ -14,12 +14,12 @@ defmodule Jido.Flow.Error do
       internal: __MODULE__.Internal
     ],
     unknown_error: __MODULE__.Internal.UnknownError,
-    merge_with: [Jido.Action.Error]
+    merge_with: [Jido.Error]
 
-  alias Jido.Action.Error, as: ActionError
+  alias Jido.Error, as: SharedError
 
   @type details_input :: map() | keyword()
-  @type error_map :: ActionError.error_map()
+  @type error_map :: SharedError.projection()
 
   defmodule Invalid do
     @moduledoc "An ordered group of invalid Flow definition errors."
@@ -239,7 +239,7 @@ defmodule Jido.Flow.Error do
     )
   end
 
-  def to_map(error), do: ActionError.to_map(error)
+  def to_map(error), do: SharedError.to_map(error)
 
   @doc "Returns whether a Flow or Action error is retryable."
   @spec retryable?(term()) :: boolean()
@@ -260,7 +260,7 @@ defmodule Jido.Flow.Error do
   def retryable?(%Invalid{}), do: false
   def retryable?(%Execution{}), do: false
   def retryable?(%Internal{}), do: false
-  def retryable?(error), do: ActionError.retryable?(error)
+  def retryable?(error), do: SharedError.retryable?(error)
 
   defp error_map(type, message, details, retryable?) do
     %{type: type, message: message, details: details, retryable?: retryable?}

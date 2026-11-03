@@ -13,7 +13,7 @@ defmodule Jido.Codec.Compiler do
   Validates the output result for the Action.
 
   Returns `{:ok, validated_output}` or
-  `{:error, %Jido.Action.Error.InvalidInputError{}}`. Direct, nested, and wrapped
+  `{:error, %Jido.Error.ValidationError{}}`. Direct, nested, and wrapped
   schemas use their declared Joi unknown-key policy. An explicit
   `Jido.Action.Output` envelope is validated as an envelope.
   """
@@ -74,7 +74,7 @@ defmodule Jido.Codec.Compiler do
       @impl Jido.Action
       @spec validate_output(map() | Jido.Action.Output.t()) ::
               {:ok, map() | Jido.Action.Output.t()}
-              | {:error, Jido.Action.Error.InvalidInputError.t()}
+              | {:error, Jido.Error.ValidationError.t()}
       def validate_output(output), do: Jido.Action.validate_output_for(output, __MODULE__)
 
       @doc false

@@ -58,10 +58,10 @@ defmodule Jido.Flow.DSL.InlineActionTest do
     assert target.description() == "Adds one"
     assert {:ok, %{value: 3}} = Jido.Exec.run(owner, %{value: 2})
 
-    assert {:error, %Jido.Action.Error.InvalidInputError{}} =
+    assert {:error, %Jido.Error.ValidationError{}} =
              Jido.Exec.run(target, %{value: "bad"})
 
-    assert {:error, %Jido.Action.Error.InvalidInputError{}} =
+    assert {:error, %Jido.Error.ValidationError{}} =
              Jido.Exec.run(target, %{value: 2}, %{invalid_output: true})
   end
 
@@ -153,7 +153,7 @@ defmodule Jido.Flow.DSL.InlineActionTest do
 
     assert {:ok, %{value: 5.0}} = Jido.Exec.run(owner, %{operand: 2})
 
-    assert {:error, %Jido.Action.Error.ExecutionFailureError{message: "zero"}} =
+    assert {:error, %Jido.Error.ExecutionError{message: "zero"}} =
              Jido.Exec.run(owner, %{operand: 0})
   end
 

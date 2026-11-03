@@ -68,7 +68,7 @@ defmodule Jido.Exec.Runner.ObservationTest do
     assert {:ok, %Execution{quiescent?: false}} =
              Runic.Runner.execution(ctx.runner, id, scope_id)
 
-    assert {:error, %Jido.Action.Error.ExecutionFailureError{details: details}} =
+    assert {:error, %Jido.Error.ExecutionError{details: details}} =
              Exec.result(ctx.runner, id)
 
     assert details.reason == :execution_active
@@ -135,14 +135,14 @@ defmodule Jido.Exec.Runner.ObservationTest do
     send(b, :release)
     assert_receive {:failed, "b"}
 
-    assert {:error, %Jido.Action.Error.ExecutionFailureError{details: details}} =
+    assert {:error, %Jido.Error.ExecutionError{details: details}} =
              Exec.result(ctx.runner, id)
 
     assert details.reason == :execution_active
     send(a, :release)
     assert_receive :idle
 
-    assert {:error, %Jido.Action.Error.ExecutionFailureError{message: "a"}} =
+    assert {:error, %Jido.Error.ExecutionError{message: "a"}} =
              Exec.result(ctx.runner, id)
   end
 
@@ -165,7 +165,7 @@ defmodule Jido.Exec.Runner.ObservationTest do
     assert_receive :idle
     refute_received {:started, :b, _task}
 
-    assert {:error, %Jido.Action.Error.ExecutionFailureError{message: "a"}} =
+    assert {:error, %Jido.Error.ExecutionError{message: "a"}} =
              Exec.result(ctx.runner, id)
   end
 
@@ -392,14 +392,14 @@ defmodule Jido.Exec.Runner.ObservationTest do
 
     assert Runic.Runner.execution(ctx.runner, id, scope_id) == {:error, :not_found}
 
-    assert {:error, %Jido.Action.Error.ExecutionFailureError{details: details}} =
+    assert {:error, %Jido.Error.ExecutionError{details: details}} =
              Exec.result(ctx.runner, id)
 
     assert details.reason == :execution_active
     assert {:ok, _workflow} = Exec.step(ctx.runner, id)
     assert_receive {:started, :restored, task}
 
-    assert {:error, %Jido.Action.Error.ExecutionFailureError{details: %{reason: :execution_active}}} =
+    assert {:error, %Jido.Error.ExecutionError{details: %{reason: :execution_active}}} =
              Exec.result(ctx.runner, id)
 
     send(task, :release)

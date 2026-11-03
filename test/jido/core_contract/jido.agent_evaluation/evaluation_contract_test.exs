@@ -181,7 +181,7 @@ defmodule JidoTest.Contract.AgentEvaluationTest do
     assert context.plugin_inputs == %{}
 
     for options <- [[timeout: -1], [max_attempts: 0], [backoff: :invalid]] do
-      assert {:error, %Jido.Action.Error.ConfigurationError{}} =
+      assert {:error, %Jido.Error.ValidationError{}} =
                Agent.cmd(source, signal, options)
     end
   end
@@ -426,7 +426,7 @@ defmodule JidoTest.Contract.AgentEvaluationTest do
 
       case callback do
         :reject_transform ->
-          assert %Jido.Action.Error.ExecutionFailureError{
+          assert %Jido.Error.ExecutionError{
                    details: %{reason: :transform_rejected}
                  } = error
 
@@ -434,8 +434,9 @@ defmodule JidoTest.Contract.AgentEvaluationTest do
           assert %Agent.Error{code: :invalid_result} = error
 
         :raise_transform ->
-          assert %Jido.Action.Error.ExecutionFailureError{
-                   details: %{exception: RuntimeError, phase: :run}
+          assert %Jido.Error.ExecutionError{
+                   phase: :run,
+                   details: %{exception: RuntimeError}
                  } = error
       end
     end

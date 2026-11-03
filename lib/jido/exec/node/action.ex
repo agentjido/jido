@@ -3,7 +3,7 @@ defmodule Jido.Exec.Node.Action do
 
   use Runic.Workflow.SingleOutput, batch_parent: false
 
-  alias Jido.Action.Error
+  alias Jido.Error
   alias Jido.Exec.{Frame, Portable, Runtime, Validation, ValueResolver}
   alias Jido.Exec.Node.Loop
   alias Jido.Telemetry.Exec, as: Telemetry

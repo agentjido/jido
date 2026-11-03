@@ -51,7 +51,7 @@ defmodule Jido.Instruction do
   runtime Flow values do not have one general JSON form.
   """
 
-  alias Jido.Action.Error
+  alias Jido.Error
   alias Jido.Flow
 
   @removed_fields [:id, :action, :flow, :opts]

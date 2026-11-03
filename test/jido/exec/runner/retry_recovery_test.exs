@@ -38,7 +38,7 @@ defmodule Jido.Exec.Runner.RetryRecoveryTest do
 
     def run(_, %{counter: counter}) do
       Agent.update(counter, &Map.update!(&1, :attempt, fn count -> count + 1 end))
-      {:error, Jido.Action.Error.execution_error("terminal", %{retry: false})}
+      {:error, Jido.Error.execution_error("terminal", %{retry: false})}
     end
   end
 
@@ -60,7 +60,7 @@ defmodule Jido.Exec.Runner.RetryRecoveryTest do
         end
       end
 
-      {:error, Jido.Action.Error.execution_error("retry probe", %{retry: true})}
+      {:error, Jido.Error.execution_error("retry probe", %{retry: true})}
     end
   end
 

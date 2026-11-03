@@ -36,7 +36,7 @@ defmodule Jido.Exec.DefaultConcurrencyTest do
   test "run/4 rejects an invalid package concurrency configuration" do
     Application.put_env(:jido, :max_concurrency, 0)
 
-    assert {:error, %Jido.Action.Error.ConfigurationError{details: details}} =
+    assert {:error, %Jido.Error.ValidationError{details: details}} =
              Exec.run(Add, %{value: 1, amount: 1})
 
     assert details == %{option: :max_concurrency, value: 0}

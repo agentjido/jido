@@ -132,7 +132,7 @@ defmodule Jido.Action.InlineHostTest do
       context = %{observer: self(), bad_output: false}
       input = if mode == :bound, do: %{value: %{value: "bad"}}, else: %{value: "bad"}
 
-      assert {:error, %Jido.Action.Error.InvalidInputError{}} =
+      assert {:error, %Jido.Error.ValidationError{}} =
                InlineHost.run(owner, "typed", input, context)
 
       # Synchronous Exec completion is the barrier for the absent body marker.
@@ -149,7 +149,7 @@ defmodule Jido.Action.InlineHostTest do
       assert Jido.Exec.run(target, %{}, context) == {:ok, %{value: 4}}
       assert_received {:typed_body, ^owner}
 
-      assert {:error, %Jido.Action.Error.InvalidInputError{}} =
+      assert {:error, %Jido.Error.ValidationError{}} =
                Jido.Exec.run(target, valid, %{context | bad_output: true})
 
       assert_received {:typed_body, ^owner}

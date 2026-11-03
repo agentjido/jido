@@ -198,12 +198,12 @@ defmodule JidoActionTest.ActionTest do
 
       assert {:ok, %{value: 2}} = module.validate_params(%{value: 2})
 
-      assert {:error, %Jido.Action.Error.InvalidInputError{}} =
+      assert {:error, %Jido.Error.ValidationError{}} =
                module.validate_params(%{value: 1})
 
       assert {:ok, %{result: 4}} = module.validate_output(%{result: 4})
 
-      assert {:error, %Jido.Action.Error.InvalidInputError{}} =
+      assert {:error, %Jido.Error.ValidationError{}} =
                module.validate_output(%{result: 3})
     end
 
@@ -427,7 +427,7 @@ defmodule JidoActionTest.ActionTest do
       )
 
       assert {:error,
-              %Jido.Action.Error.InvalidInputError{
+              %Jido.Error.ValidationError{
                 message: params_message,
                 details: params_details
               }} =
@@ -437,7 +437,7 @@ defmodule JidoActionTest.ActionTest do
       assert params_details == %{context: "Action", module: module, value: :invalid}
 
       assert {:error,
-              %Jido.Action.Error.InvalidInputError{
+              %Jido.Error.ValidationError{
                 message: output_message,
                 details: output_details
               }} =
@@ -589,7 +589,7 @@ defmodule JidoActionTest.ActionTest do
     end
 
     test "validates required parameters" do
-      assert {:error, %Jido.Action.Error.InvalidInputError{message: message}} =
+      assert {:error, %Jido.Error.ValidationError{message: message}} =
                FullAction.validate_params(%{})
 
       assert message =~ "required"
@@ -597,7 +597,7 @@ defmodule JidoActionTest.ActionTest do
     end
 
     test "validates parameter types" do
-      assert {:error, %Jido.Action.Error.InvalidInputError{message: message}} =
+      assert {:error, %Jido.Error.ValidationError{message: message}} =
                FullAction.validate_params(%{a: "not an integer", b: 2})
 
       assert message =~ "expected integer"
@@ -623,7 +623,7 @@ defmodule JidoActionTest.ActionTest do
         end
       )
 
-      assert {:error, %Jido.Action.Error.InvalidInputError{message: message}} =
+      assert {:error, %Jido.Error.ValidationError{message: message}} =
                module.validate_params(%{extra: true, value: 1})
 
       assert message =~ "unrecognized key: extra"
@@ -668,7 +668,7 @@ defmodule JidoActionTest.ActionTest do
         end
       )
 
-      assert {:error, %Jido.Action.Error.InvalidInputError{message: message, details: details}} =
+      assert {:error, %Jido.Error.ValidationError{message: message, details: details}} =
                Action.validate_params_for(%{value: 1}, module)
 
       assert message == "Unsupported schema type"
@@ -686,7 +686,7 @@ defmodule JidoActionTest.ActionTest do
         end
       )
 
-      assert {:error, %Jido.Action.Error.InvalidInputError{message: message, details: details}} =
+      assert {:error, %Jido.Error.ValidationError{message: message, details: details}} =
                Action.validate_params_for(%{value: 1}, module)
 
       assert message =~ "expected integer"
@@ -715,7 +715,7 @@ defmodule JidoActionTest.ActionTest do
     end
 
     test "action with invalid output fails validation" do
-      assert {:error, %Jido.Action.Error.InvalidInputError{message: message, details: details}} =
+      assert {:error, %Jido.Error.ValidationError{message: message, details: details}} =
                OutputSchemaAction.validate_output(%{result: "test"})
 
       assert message =~ "required"
@@ -732,7 +732,7 @@ defmodule JidoActionTest.ActionTest do
     test "action output validation rejects malformed output envelopes" do
       output = %Output{kind: :batch, value: :not_a_list, meta: %{}}
 
-      assert {:error, %Jido.Action.Error.InvalidInputError{}} =
+      assert {:error, %Jido.Error.ValidationError{}} =
                NoOutputSchemaAction.validate_output(output)
     end
   end

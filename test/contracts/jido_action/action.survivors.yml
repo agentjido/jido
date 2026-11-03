@@ -9,7 +9,7 @@
 
 - at: "lib/jido_authoring/compiler.ex:12:24"
   operator: "string_empty"
-  mutation: "`\"Validates the output result for the Action.\\n\\nReturns `{:ok, validated_output}` or\\n`{:error, %Jido.Action.Error.InvalidInputError{}}`. Direct, nested, and wrapped\\nschemas use their declared Joi unknown-key policy. An explicit\\n`Jido.Action.Output` envelope is validated as an envelope.\\n\"` → `\"\"`"
+  mutation: "`\"Validates the output result for the Action.\\n\\nReturns `{:ok, validated_output}` or\\n`{:error, %Jido.Error.ValidationError{}}`. Direct, nested, and wrapped\\nschemas use their declared Joi unknown-key policy. An explicit\\n`Jido.Action.Output` envelope is validated as an envelope.\\n\"` → `\"\"`"
   sort: "unpromised"
   reason: "This changes generated documentation text or its Action/Flow label. The declared functional obligations check metadata values, kind markers, validation and callback requirements. They do not check documentation wording; this is not an equivalent documentation claim."
 

@@ -1,7 +1,7 @@
 defmodule JidoActionTest.Flow.ErrorTest do
   use ExUnit.Case, async: true
 
-  alias Jido.Action.Error, as: ActionError
+  alias Jido.Error, as: SharedError
   alias Jido.Flow.Error
 
   describe "constructors" do
@@ -37,19 +37,19 @@ defmodule JidoActionTest.Flow.ErrorTest do
     end
   end
 
-  describe "Action error alignment" do
-    test "merges Action failures without changing the leaf error" do
-      action_error = ActionError.execution_error("action failed", retry: false)
+  describe "shared error alignment" do
+    test "merges shared failures without changing the leaf error" do
+      action_error = SharedError.execution_error("action failed", retry: false)
 
       assert %Error.Execution{errors: [merged]} = Error.to_class([action_error, action_error])
       assert merged.__struct__ == action_error.__struct__
       assert merged.message == action_error.message
     end
 
-    test "serializes Action errors through the Action error contract" do
-      action_error = ActionError.validation_error("bad action input", field: :value)
+    test "serializes shared errors through the shared error contract" do
+      action_error = SharedError.validation_error("bad action input", field: :value)
 
-      assert Error.to_map(action_error) == ActionError.to_map(action_error)
+      assert Error.to_map(action_error) == SharedError.to_map(action_error)
       refute Error.retryable?(action_error)
     end
   end
@@ -154,7 +154,7 @@ defmodule JidoActionTest.Flow.ErrorTest do
       refute Error.retryable?({:error, error})
       refute Error.retryable?({:error, error, %{effect: :none}})
 
-      assert Error.to_map(:foreign_failure) == ActionError.to_map(:foreign_failure)
+      assert Error.to_map(:foreign_failure) == SharedError.to_map(:foreign_failure)
     end
   end
 end

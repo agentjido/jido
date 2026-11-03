@@ -38,7 +38,7 @@ defmodule Jido.Exec.Node.ActionTest do
       key = if phase == :input, do: :input_validation, else: :output_validation
       params = %{key => {:ok, 42}}
 
-      assert {:error, %Jido.Action.Error.InternalError{} = error} =
+      assert {:error, %Jido.Error.InternalError{} = error} =
                Jido.Exec.run(target, params, %{observer: self(), token: token})
 
       assert error.message == "Action validator returned an invalid value"
@@ -63,7 +63,7 @@ defmodule Jido.Exec.Node.ActionTest do
       token = make_ref()
       params = %{output_validation: {:ok, invalid}}
 
-      assert {:error, %Jido.Action.Error.InvalidInputError{} = error} =
+      assert {:error, %Jido.Error.ValidationError{} = error} =
                Jido.Exec.run(target, params, %{observer: self(), token: token})
 
       assert error.message == "invalid action output envelope"
@@ -121,7 +121,7 @@ defmodule Jido.Exec.Node.ActionTest do
              Jido.Exec.run(PreservedOutput, %{value: "invalid"})
 
     for target <- [PreservedOutputFlow, data_flow] do
-      assert {:error, %Jido.Action.Error.InvalidInputError{}} =
+      assert {:error, %Jido.Error.ValidationError{}} =
                Jido.Exec.run(target, %{value: "invalid"})
     end
   end
@@ -131,7 +131,7 @@ defmodule Jido.Exec.Node.ActionTest do
     invalid = %Jido.Action.Output{kind: :batch, value: [1 | :tail], meta: %{}}
 
     for target <- [ConvertingOutput, boundary_flow(ConvertingOutput)] do
-      assert {:error, %Jido.Action.Error.InvalidInputError{} = scalar_error} =
+      assert {:error, %Jido.Error.ValidationError{} = scalar_error} =
                Jido.Exec.run(target, %{output: 42})
 
       assert scalar_error.message == "Action output validation must return a map"
@@ -139,7 +139,7 @@ defmodule Jido.Exec.Node.ActionTest do
       assert scalar_error.details.module == ConvertingOutput
       assert scalar_error.details.context == "Action output"
 
-      assert {:error, %Jido.Action.Error.InvalidInputError{} = envelope_error} =
+      assert {:error, %Jido.Error.ValidationError{} = envelope_error} =
                Jido.Exec.run(target, %{output: invalid})
 
       assert envelope_error.message == "invalid action output envelope"
@@ -170,7 +170,7 @@ defmodule Jido.Exec.Node.ActionTest do
   end
 
   @tag obligation: ["jido_action.boundary.I1", "jido_action.boundary.I3"]
-  test "validator failures retain the phase Action reason and invalid return" do
+  test "validator failures use the shared error fields" do
     for phase <- [:input, :output],
         reply <- [{:error, :bad}, :ok],
         target <- [ValidatorProbe, boundary_flow(ValidatorProbe)] do
@@ -181,17 +181,17 @@ defmodule Jido.Exec.Node.ActionTest do
       assert {:error, error} =
                Jido.Exec.run(target, params, %{observer: self(), token: token})
 
-      assert error.details.action == ValidatorProbe
-      assert error.details.phase == phase
-
       if reply == :ok do
-        assert %Jido.Action.Error.InternalError{} = error
+        assert %Jido.Error.InternalError{} = error
         assert error.message == "Action validator returned an invalid value"
+        assert error.details.action == ValidatorProbe
+        assert error.details.phase == phase
         assert error.details.return == :ok
         assert error.details.reason == :invalid_validator_return
       else
-        assert %Jido.Action.Error.InvalidInputError{} = error
+        assert %Jido.Error.ValidationError{kind: :action, subject: ValidatorProbe} = error
         assert error.message == "Action #{phase} validation failed"
+        assert error.details.phase == phase
         assert error.details.reason == :bad
       end
 
@@ -203,7 +203,7 @@ defmodule Jido.Exec.Node.ActionTest do
 
   @tag obligation: ["jido_action.boundary.I1", "jido_action.boundary.I3"]
   test "validator exception errors retain the original exception" do
-    original = Jido.Action.Error.validation_error("original", %{marker: :preserved})
+    original = Jido.Error.validation_error("original", %{marker: :preserved})
 
     for phase <- [:input, :output] do
       token = make_ref()
@@ -222,7 +222,7 @@ defmodule Jido.Exec.Node.ActionTest do
     for target <- [ReturnProbe, boundary_flow(ReturnProbe)] do
       for reason <- ["rejected", :rejected, {:rejected, 42}],
           reply <- [{:error, reason}, {:error, reason, [:discard]}] do
-        assert {:error, %Jido.Action.Error.ExecutionFailureError{} = error} =
+        assert {:error, %Jido.Error.ExecutionError{} = error} =
                  Jido.Exec.run(target, %{reply: reply})
 
         expected =
@@ -232,7 +232,7 @@ defmodule Jido.Exec.Node.ActionTest do
 
         assert error.message == expected
         assert error.details.action == ReturnProbe
-        assert error.details.phase == :run
+        assert error.phase == :run
         assert error.details.reason == reason
       end
 
@@ -240,12 +240,12 @@ defmodule Jido.Exec.Node.ActionTest do
             {continuation, "Action continuations are not supported by Runic execution", :unsupported_continuation},
             {:bad_return, "Action returned an invalid value", :invalid_return}
           ] do
-        assert {:error, %Jido.Action.Error.ExecutionFailureError{} = error} =
+        assert {:error, %Jido.Error.ExecutionError{} = error} =
                  Jido.Exec.run(target, %{reply: reply})
 
         assert error.message == message
         assert error.details.action == ReturnProbe
-        assert error.details.phase == :run
+        assert error.phase == :run
         assert error.details.return == reply
         assert error.details.reason == reason
       end
@@ -256,12 +256,12 @@ defmodule Jido.Exec.Node.ActionTest do
   test "invalid effect lists retain their rejected value and Action detail" do
     for target <- [ReturnProbe, boundary_flow(ReturnProbe)],
         effects <- [nil, %{}, [:request | :tail]] do
-      assert {:error, %Jido.Action.Error.ExecutionFailureError{} = error} =
+      assert {:error, %Jido.Error.ExecutionError{} = error} =
                Jido.Exec.run(target, %{reply: {:ok, %{}, effects}})
 
       assert error.message == "Action returned an invalid effects list"
       assert error.details.action == ReturnProbe
-      assert error.details.phase == :run
+      assert error.phase == :run
       assert error.details.reason == :invalid_effects
       assert error.details.effects == effects
     end
@@ -282,11 +282,11 @@ defmodule Jido.Exec.Node.ActionTest do
           {StacktraceValidationAction, :input, :input, :raise_from_input_validator},
           {StacktraceValidationAction, :output, :output, :raise_from_output_validator}
         ] do
-      assert {:error, %Jido.Action.Error.ExecutionFailureError{} = error} =
+      assert {:error, %Jido.Error.ExecutionError{} = error} =
                Jido.Exec.run(action, %{mode: mode})
 
       assert error.details.action == action
-      assert error.details.phase == phase
+      assert error.phase == phase
       assert %Splode.Stacktrace{stacktrace: frames} = error.stacktrace
       assert frames == error.details.stacktrace
       assert Enum.any?(frames, &match?({^action, ^frame, 0, _}, &1))
@@ -422,7 +422,7 @@ defmodule Jido.Exec.Node.ActionTest do
   test "native construction rejects a wrong Instruction kind and unresolved target" do
     instruction = Instruction.new!(target: Add)
 
-    assert_raise Jido.Action.Error.InvalidInputError, fn ->
+    assert_raise Jido.Error.ValidationError, fn ->
       Action.new(%{instruction | target: Enum})
     end
 
@@ -604,7 +604,7 @@ defmodule Jido.Exec.Node.ActionTest do
     executed = Invokable.execute(node, runnable)
 
     assert executed.status == :failed
-    assert %Jido.Action.Error.InvalidInputError{} = executed.error
+    assert %Jido.Error.ValidationError{} = executed.error
   end
 
   @tag obligation: "jido_action.boundary.I2"
@@ -617,7 +617,7 @@ defmodule Jido.Exec.Node.ActionTest do
     executed = Invokable.execute(node, runnable)
 
     assert executed.status == :failed
-    assert %Jido.Action.Error.ExecutionFailureError{details: %{phase: :run}} = executed.error
+    assert %Jido.Error.ExecutionError{phase: :run} = executed.error
   end
 
   @tag obligation: "jido_action.boundary.I2"
@@ -631,7 +631,7 @@ defmodule Jido.Exec.Node.ActionTest do
 
     assert executed.status == :failed
 
-    assert %Jido.Action.Error.ExecutionFailureError{details: %{reason: :invalid_return}} =
+    assert %Jido.Error.ExecutionError{details: %{reason: :invalid_return}} =
              executed.error
   end
 

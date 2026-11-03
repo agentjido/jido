@@ -22,7 +22,7 @@ defmodule Jido.Action.Output do
   the stream or dispatch the requests. Output metadata is data, not effects.
   """
 
-  alias Jido.Action.Error
+  alias Jido.Error
 
   @kinds [:raw, :stream, :batch, :opaque, :preserve]
 
@@ -73,7 +73,7 @@ defmodule Jido.Action.Output do
   def preserve(value, opts \\ []), do: build!(:preserve, value, opts)
 
   @doc false
-  @spec validate(term()) :: {:ok, t()} | {:error, Error.InvalidInputError.t()}
+  @spec validate(term()) :: {:ok, t()} | {:error, Error.ValidationError.t()}
   def validate(%__MODULE__{} = output) do
     output
     |> Map.from_struct()

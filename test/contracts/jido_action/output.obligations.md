@@ -16,6 +16,6 @@ Check intentional non-map Action success values. These obligations refine
 
 ### jido_action.output.I2 — Validation rejects malformed envelopes with the original value
 - **scope:** `Jido.Action.validate_output/1`, `Jido.Exec.run/4`
-- **must:** Preserve valid envelopes. Reject unsupported kinds, invalid metadata, improper batches, non-enumerable streams and non-envelope values with InvalidInputError. Keep the affected envelope or value in the error details.
+- **must:** Preserve valid envelopes. Reject unsupported kinds, invalid metadata, improper batches, non-enumerable streams and non-envelope values with `Jido.Error.ValidationError`. Keep the affected envelope or value in the error details.
 - **kind:** functional
 - **status:** active

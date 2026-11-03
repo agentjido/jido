@@ -97,7 +97,7 @@ defmodule JidoTest.AgentServer.PoliciesTest do
              base_delay_ms: 500,
              max_delay_ms: 30_000,
              on_failure: :halt,
-             retry_if: {Jido.Action.Error, :retryable?, []}
+             retry_if: {Jido.Error, :retryable?, []}
            }
 
     assert Core.execution_policy(
@@ -113,7 +113,7 @@ defmodule JidoTest.AgentServer.PoliciesTest do
              base_delay_ms: 20,
              max_delay_ms: 40,
              on_failure: :halt,
-             retry_if: {Jido.Action.Error, :retryable?, []}
+             retry_if: {Jido.Error, :retryable?, []}
            }
 
     observer = self()

@@ -596,7 +596,7 @@ defmodule Jido.Exec.Runner.DurabilityTest do
 
     assert_receive {:changed_target_idle, ^execution_id}, 2_000
 
-    assert {:error, %Jido.Action.Error.ConfigurationError{details: details}} =
+    assert {:error, %Jido.Error.ValidationError{details: details}} =
              Exec.result(runner, execution_id)
 
     assert details.reason == :incompatible_target

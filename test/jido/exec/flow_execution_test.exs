@@ -122,7 +122,7 @@ defmodule Jido.Exec.FlowExecutionTest do
     data = flow!("list_output", [add], [Ref.result("add")])
 
     for target <- [data, ListOutputFlow] do
-      assert {:error, %Jido.Action.Error.InvalidInputError{} = error} =
+      assert {:error, %Jido.Error.ValidationError{} = error} =
                Exec.run(target, %{value: 1})
 
       assert error.details.phase == :flow_output
@@ -189,7 +189,7 @@ defmodule Jido.Exec.FlowExecutionTest do
         Ref.result("blocked")
       )
 
-    assert {:error, %Jido.Action.Error.ExecutionFailureError{message: "Validation error"}} =
+    assert {:error, %Jido.Error.ExecutionError{message: "Validation error"}} =
              Exec.run(flow)
   end
 

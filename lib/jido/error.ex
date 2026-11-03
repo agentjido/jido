@@ -443,8 +443,14 @@ defmodule Jido.Error do
       message: message,
       kind: kind,
       subject: subject,
-      details: merge_extra_details(opts, [:kind, :subject, :field, :action])
+      details: merge_extra_details(opts, [:kind, :subject, :action])
     )
+  end
+
+  @doc "Creates a configuration validation error."
+  @spec config_error(String.t(), keyword() | map()) :: ValidationError.t()
+  def config_error(message, details \\ %{}) do
+    validation_error(message, kind: :config, details: normalize_constructor_details(details))
   end
 
   @doc """
@@ -556,6 +562,14 @@ defmodule Jido.Error do
 
     Map.merge(extra_details, explicit_details)
   end
+
+  defp normalize_constructor_details(details) when is_map(details), do: details
+
+  defp normalize_constructor_details(details) when is_list(details) do
+    if Keyword.keyword?(details), do: Map.new(details), else: %{}
+  end
+
+  defp normalize_constructor_details(_details), do: %{}
 
   # ============================================================================
   # Utilities

@@ -36,7 +36,7 @@ defmodule Jido.Flow.ActionBoundaryTest do
             } = flow} = Flow.from_action(Increment)
 
     assert {:ok, %{value: 2}, [:incremented]} = Jido.Exec.run(flow, %{value: 1})
-    assert {:error, %Jido.Action.Error.InvalidInputError{}} = Jido.Exec.run(flow, %{value: "one"})
+    assert {:error, %Jido.Error.ValidationError{}} = Jido.Exec.run(flow, %{value: "one"})
   end
 
   test "the conversion rejects a Flow and non-module values" do

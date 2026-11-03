@@ -2,7 +2,7 @@ defmodule Jido.Telemetry.ExecTest do
   use Covenant.Case, component: "jido_action.execution", async: false
   @moduletag obligation: "jido_action.execution.I23"
 
-  alias Jido.Action.Error
+  alias Jido.Error
   alias Jido.Exec
   alias Jido.Flow
   alias Jido.Flow.Ref
@@ -117,7 +117,7 @@ defmodule Jido.Telemetry.ExecTest do
   test "a returned Action error stops its span with an error outcome" do
     token = attach([@action_start, @action_stop, @action_exception])
 
-    assert {:error, %Error.ExecutionFailureError{}} =
+    assert {:error, %Error.ExecutionError{}} =
              Exec.run(ErrorAction, %{error_type: :runtime})
 
     assert_receive {^token, @action_start, _, start_metadata}
@@ -127,7 +127,7 @@ defmodule Jido.Telemetry.ExecTest do
     assert Map.drop(stop_metadata, [:outcome, :error_type, :retryable?]) == start_metadata
     assert stop_metadata.outcome == :error
     assert stop_metadata.error_type == :execution_error
-    assert stop_metadata.retryable? == false
+    assert stop_metadata.retryable?
     refute Map.has_key?(stop_metadata, :error)
     refute Map.has_key?(stop_metadata, :stacktrace)
   end
@@ -197,7 +197,7 @@ defmodule Jido.Telemetry.ExecTest do
       ])
 
     flow = one_step_flow("telemetry_failure", ErrorAction, %{error_type: :runtime})
-    assert {:error, %Error.ExecutionFailureError{}} = Exec.run(flow)
+    assert {:error, %Error.ExecutionError{}} = Exec.run(flow)
 
     events = receive_events(token, 4)
     assert metadata_for(events, @action_stop) |> List.first() |> Map.fetch!(:outcome) == :error
@@ -217,7 +217,7 @@ defmodule Jido.Telemetry.ExecTest do
     token = attach([@flow_start, @flow_stop, @flow_exception])
 
     flow = one_step_flow("telemetry_kill", KillAction, %{})
-    assert {:error, %Error.ExecutionFailureError{}} = Exec.run(flow)
+    assert {:error, %Error.ExecutionError{}} = Exec.run(flow)
 
     events = receive_events(token, 2)
     assert [%{outcome: :error}] = metadata_for(events, @flow_stop)

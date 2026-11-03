@@ -23,6 +23,6 @@ and `ACT-003` and retain tests for the internal validation rule.
 
 ### jido_action.validation.I3 — Schema failures retain structured public errors
 - **scope:** `Jido.Action.validate_params/1`, `Jido.Action.validate_output/1`, `Jido.Flow.validate_params/1`, `Jido.Flow.validate_output/1`
-- **must:** Return InvalidInputError for unsupported schemas and parse failures, with parse errors and boundary context details. At Exec, contain schema and custom-validator failures with documented types, phases, reasons, and paths without executing later work. Direct validator calls do not provide all Exec error containment.
+- **must:** Return `Jido.Error.ValidationError` for unsupported schemas and parse failures, with parse errors and boundary context details. At Exec, contain schema and custom-validator failures with documented types, phases, reasons, and paths without executing later work. Direct validator calls do not provide all Exec error containment.
 - **kind:** functional
 - **status:** active

@@ -455,7 +455,7 @@ defmodule JidoTest.Agent.AuthoringTest do
     assert {:ok, signal} = Counter.add_signal(%{amount: nil})
     assert signal.data == %{amount: nil}
 
-    assert {:error, %Jido.Action.Error.InvalidInputError{}} =
+    assert {:error, %Jido.Error.ValidationError{}} =
              Counter.cmd(Counter.instantiate!(id: Jido.Id.uuid7()), signal)
   end
 

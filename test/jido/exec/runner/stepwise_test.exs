@@ -107,7 +107,7 @@ defmodule Jido.Exec.Runner.StepwiseTest do
 
     assert {_steps, %Workflow{}} = step_to_completion(runner, execution_id, tag)
 
-    assert {:error, %Jido.Action.Error.ExecutionFailureError{message: "step_failed"}} =
+    assert {:error, %Jido.Error.ExecutionError{message: "step_failed"}} =
              Exec.result(runner, execution_id)
 
     assert Recorder.entries() == [:failed]
@@ -148,7 +148,7 @@ defmodule Jido.Exec.Runner.StepwiseTest do
     assert_receive :idle, 1_000
     assert {:complete, %Workflow{}} = Exec.step(runner, id)
 
-    assert {:error, %Jido.Action.Error.ExecutionFailureError{message: "controlled_failure"}} =
+    assert {:error, %Jido.Error.ExecutionError{message: "controlled_failure"}} =
              Exec.result(runner, id)
   end
 

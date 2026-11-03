@@ -77,14 +77,14 @@ defmodule Jido.Exec.Runner.TaskOwnershipTest do
     refute_received {:managed_failed, _reason}
     assert {:ok, workflow} = Runic.Runner.get_workflow(runner, execution_id)
 
-    assert {:error, %Jido.Action.Error.ExecutionFailureError{details: details}} =
+    assert {:error, %Jido.Error.ExecutionError{details: details}} =
              Exec.result(workflow)
 
     assert details.outcome == :uncertain
     assert details.reason == :killed
     assert details.retry == false
 
-    assert {:error, %Jido.Action.Error.ExecutionFailureError{details: ^details}} =
+    assert {:error, %Jido.Error.ExecutionError{details: ^details}} =
              Exec.result(runner, execution_id)
 
     assert Runic.Workflow.is_runnable?(workflow)

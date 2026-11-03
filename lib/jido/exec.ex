@@ -83,7 +83,7 @@ defmodule Jido.Exec do
       if effects == [], do: {:ok, value}, else: {:ok, value, effects}
     else
       {:ok, %Instruction{kind: kind}} ->
-        {:error, Jido.Action.Error.config_error("call_action requires an Action target", %{kind: kind})}
+        {:error, Jido.Error.config_error("call_action requires an Action target", %{kind: kind})}
 
       {:error, error} ->
         {:error, normalize_runtime_error(error)}
@@ -283,7 +283,7 @@ defmodule Jido.Exec do
 
   defp incomplete_error(execution_id, reason),
     do:
-      Jido.Action.Error.execution_error("Exec execution is not complete", %{
+      Jido.Error.execution_error("Exec execution is not complete", %{
         execution_id: execution_id,
         reason: reason,
         retry: false
@@ -422,7 +422,7 @@ defmodule Jido.Exec do
   end
 
   defp project(_missing),
-    do: {:error, Jido.Action.Error.execution_error("Exec produced no result")}
+    do: {:error, Jido.Error.execution_error("Exec produced no result")}
 
   # Snapshot compatibility for restored workflows without live observations.
   defp result_error(%Workflow{runnable_events: events} = workflow) do
@@ -493,7 +493,7 @@ defmodule Jido.Exec do
   end
 
   defp uncertain_error(reason) do
-    Jido.Action.Error.execution_error("Runic execution outcome is uncertain", %{
+    Jido.Error.execution_error("Runic execution outcome is uncertain", %{
       phase: :execution_task,
       outcome: :uncertain,
       reason: reason,
@@ -525,10 +525,10 @@ defmodule Jido.Exec do
           end
 
         unknown ->
-          {:error, Jido.Action.Error.config_error("unknown execution options", %{options: unknown})}
+          {:error, Jido.Error.config_error("unknown execution options", %{options: unknown})}
       end
     else
-      {:error, Jido.Action.Error.config_error("execution options must be a keyword list")}
+      {:error, Jido.Error.config_error("execution options must be a keyword list")}
     end
   end
 
@@ -547,18 +547,18 @@ defmodule Jido.Exec do
 
         _duplicates ->
           {:error,
-           Jido.Action.Error.config_error("pass only one task_supervisor reference", %{
+           Jido.Error.config_error("pass only one task_supervisor reference", %{
              option: :task_supervisor,
              reason: :duplicate_option
            })}
       end
     else
-      {:error, Jido.Action.Error.config_error("execution options must be a keyword list")}
+      {:error, Jido.Error.config_error("execution options must be a keyword list")}
     end
   end
 
   defp run_options(_opts),
-    do: {:error, Jido.Action.Error.config_error("execution options must be a keyword list")}
+    do: {:error, Jido.Error.config_error("execution options must be a keyword list")}
 
   defp validate_task_supervisor(task_supervisor)
        when is_pid(task_supervisor) or
@@ -575,7 +575,7 @@ defmodule Jido.Exec do
   rescue
     exception ->
       {:error,
-       Jido.Action.Error.config_error("Task Supervisor lookup failed", %{
+       Jido.Error.config_error("Task Supervisor lookup failed", %{
          option: :task_supervisor,
          task_supervisor: task_supervisor,
          reason: exception
@@ -583,7 +583,7 @@ defmodule Jido.Exec do
   catch
     kind, reason ->
       {:error,
-       Jido.Action.Error.config_error("Task Supervisor lookup failed", %{
+       Jido.Error.config_error("Task Supervisor lookup failed", %{
          option: :task_supervisor,
          task_supervisor: task_supervisor,
          reason: {kind, reason}
@@ -592,7 +592,7 @@ defmodule Jido.Exec do
 
   defp validate_task_supervisor(task_supervisor) do
     {:error,
-     Jido.Action.Error.config_error(
+     Jido.Error.config_error(
        "task_supervisor must be a local PID, registered name, or {:via, module, name} reference",
        %{option: :task_supervisor, value: task_supervisor}
      )}
@@ -600,7 +600,7 @@ defmodule Jido.Exec do
 
   defp not_running(task_supervisor) do
     {:error,
-     Jido.Action.Error.config_error("Task Supervisor is not running", %{
+     Jido.Error.config_error("Task Supervisor is not running", %{
        option: :task_supervisor,
        task_supervisor: task_supervisor
      })}
@@ -638,17 +638,17 @@ defmodule Jido.Exec do
 
         unknown ->
           {:error,
-           Jido.Action.Error.config_error("unknown managed execution options", %{
+           Jido.Error.config_error("unknown managed execution options", %{
              options: unknown
            })}
       end
     else
-      {:error, Jido.Action.Error.config_error("execution options must be a keyword list")}
+      {:error, Jido.Error.config_error("execution options must be a keyword list")}
     end
   end
 
   defp managed_options(_runner, _execution_id, _opts),
-    do: {:error, Jido.Action.Error.config_error("execution options must be a keyword list")}
+    do: {:error, Jido.Error.config_error("execution options must be a keyword list")}
 
   defp resume_options(runner, opts) when is_list(opts) do
     if Keyword.keyword?(opts) do
@@ -660,14 +660,14 @@ defmodule Jido.Exec do
       cond do
         rehydration not in [:full, :hybrid, :lazy] ->
           {:error,
-           Jido.Action.Error.config_error("invalid managed execution option", %{
+           Jido.Error.config_error("invalid managed execution option", %{
              option: :rehydration,
              value: rehydration
            })}
 
         explicit? and rehydration in [:hybrid, :lazy] and not fact_store? ->
           {:error,
-           Jido.Action.Error.config_error("rehydration mode requires Runic fact storage", %{
+           Jido.Error.config_error("rehydration mode requires Runic fact storage", %{
              option: :rehydration,
              value: rehydration
            })}
@@ -676,12 +676,12 @@ defmodule Jido.Exec do
           {:ok, rehydration, not explicit? and rehydration == :hybrid, opts}
       end
     else
-      {:error, Jido.Action.Error.config_error("execution options must be a keyword list")}
+      {:error, Jido.Error.config_error("execution options must be a keyword list")}
     end
   end
 
   defp resume_options(_runner, _opts),
-    do: {:error, Jido.Action.Error.config_error("execution options must be a keyword list")}
+    do: {:error, Jido.Error.config_error("execution options must be a keyword list")}
 
   defp fact_store?(runner) do
     {store, _state} = Runic.Runner.get_store(runner)
@@ -708,7 +708,7 @@ defmodule Jido.Exec do
 
       value ->
         {:error,
-         Jido.Action.Error.config_error("max_concurrency must be a positive integer", %{
+         Jido.Error.config_error("max_concurrency must be a positive integer", %{
            option: :max_concurrency,
            value: value
          })}
@@ -731,7 +731,7 @@ defmodule Jido.Exec do
       else
         {:halt,
          {:error,
-          Jido.Action.Error.config_error("invalid managed execution option", %{
+          Jido.Error.config_error("invalid managed execution option", %{
             option: key,
             value: value
           })}}
@@ -781,19 +781,19 @@ defmodule Jido.Exec do
 
     cond do
       timeout != :infinity and not (is_integer(timeout) and timeout >= 0) ->
-        {:error, Jido.Action.Error.config_error("timeout must be non-negative or :infinity")}
+        {:error, Jido.Error.config_error("timeout must be non-negative or :infinity")}
 
       not (is_integer(max_attempts) and max_attempts >= 1) ->
-        {:error, Jido.Action.Error.config_error("max_attempts must be a positive integer")}
+        {:error, Jido.Error.config_error("max_attempts must be a positive integer")}
 
       backoff not in [:none, :linear, :exponential, :jitter] ->
-        {:error, Jido.Action.Error.config_error("invalid backoff policy")}
+        {:error, Jido.Error.config_error("invalid backoff policy")}
 
       not (is_integer(base_delay_ms) and base_delay_ms >= 0) ->
-        {:error, Jido.Action.Error.config_error("base_delay_ms must be non-negative")}
+        {:error, Jido.Error.config_error("base_delay_ms must be non-negative")}
 
       not (is_integer(max_delay_ms) and max_delay_ms >= 0) ->
-        {:error, Jido.Action.Error.config_error("max_delay_ms must be non-negative")}
+        {:error, Jido.Error.config_error("max_delay_ms must be non-negative")}
 
       true ->
         {:ok,
@@ -804,7 +804,7 @@ defmodule Jido.Exec do
            base_delay_ms: base_delay_ms,
            max_delay_ms: max_delay_ms,
            on_failure: :halt,
-           retry_if: {Jido.Action.Error, :retryable?, []}
+           retry_if: {Jido.Error, :retryable?, []}
          }}
     end
   end
@@ -812,18 +812,18 @@ defmodule Jido.Exec do
   defp normalize_runtime_error(error) when is_exception(error), do: error
 
   defp normalize_runtime_error({:timeout, timeout}) do
-    Jido.Action.Error.timeout_error("Action timed out", %{timeout: timeout})
+    Jido.Error.timeout_error("Action timed out", %{timeout: timeout})
   end
 
   defp normalize_runtime_error({:task_crashed, reason}) do
-    Jido.Action.Error.execution_error("Action process exited", %{
+    Jido.Error.execution_error("Action process exited", %{
       phase: :execution_task,
       reason: reason
     })
   end
 
   defp normalize_runtime_error(reason) do
-    Jido.Action.Error.execution_error("Runic execution failed", %{reason: reason})
+    Jido.Error.execution_error("Runic execution failed", %{reason: reason})
   end
 
   defp execution_input(%Instruction{kind: :action}), do: %{}
@@ -846,7 +846,7 @@ defmodule Jido.Exec do
 
   defp invalid_context(context) do
     {:error,
-     Jido.Action.Error.validation_error("context must be a map or keyword list", %{
+     Jido.Error.validation_error("context must be a map or keyword list", %{
        field: :context,
        value: context
      })}

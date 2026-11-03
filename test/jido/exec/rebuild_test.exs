@@ -4,7 +4,7 @@ defmodule Jido.Exec.RebuildTest do
   alias Jido.Exec
   alias Jido.Exec.Frame
   alias Jido.Flow.Ref
-  alias Jido.Action.Error.ConfigurationError
+  alias Jido.Error.ValidationError
   alias JidoActionTest.Fixtures.Actions.{Add, EchoParamsAction}
   alias Runic.Workflow
 
@@ -190,7 +190,7 @@ defmodule Jido.Exec.RebuildTest do
       |> Workflow.put_run_context(%{_global: %{}})
       |> Workflow.execute(Jido.Exec.Fact.local_value(Frame.new(%{})))
 
-    assert {:error, %ConfigurationError{details: details} = error} =
+    assert {:error, %ValidationError{details: details} = error} =
              Exec.result(completed, observation)
 
     assert error.message == "Action target code changed after the graph was built"

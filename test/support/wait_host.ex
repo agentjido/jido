@@ -354,5 +354,5 @@ defmodule Jido.Exec.Test.WaitHost do
   end
 
   defp error(reason),
-    do: {:error, Jido.Action.Error.config_error("wait host rejected operation", %{reason: reason})}
+    do: {:error, Jido.Error.config_error("wait host rejected operation", %{reason: reason})}
 end

@@ -71,7 +71,7 @@ defmodule JidoTest.AgentServer.Fixtures do
 
   defmodule Work do
     @moduledoc false
-    alias Jido.Action.Error, as: ActionError
+    alias Jido.Error
     alias JidoTest.AgentServer.Fixtures
 
     use Jido.Action,
@@ -121,7 +121,7 @@ defmodule JidoTest.AgentServer.Fixtures do
       send(context.observer, {:attempt, attempt, System.monotonic_time(:millisecond)})
 
       if attempt <= input.failures,
-        do: {:error, ActionError.execution_error("controlled failure", %{retry: input.retry})},
+        do: {:error, Error.execution_error("controlled failure", %{retry: input.retry})},
         else: increment(input, context)
     end
 

@@ -236,7 +236,7 @@ defmodule JidoTest.ErrorTest do
 
       assert result.type == :validation_error
       assert result.message == "Invalid"
-      assert result.details == %{kind: :input, subject: :email}
+      assert result.details == %{field: :email, kind: :input, subject: :email}
       assert result.retryable? == false
       refute Map.has_key?(result, :stacktrace)
     end

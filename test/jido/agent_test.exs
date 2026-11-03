@@ -756,7 +756,7 @@ defmodule Jido.AgentTest do
       signal = Signal.new!("counter.fail", %{}, source: "/test")
 
       assert {:error,
-              %Jido.Action.Error.ExecutionFailureError{
+              %Jido.Error.ExecutionError{
                 details: %{reason: :expected_failure}
               }} = Agent.cmd(agent, signal)
 

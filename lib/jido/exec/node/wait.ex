@@ -92,7 +92,7 @@ defmodule Jido.Exec.Node.Wait do
            deadline: if(is_integer(option.after_ms), do: now + option.after_ms)
          }}
       else
-        false -> {:error, Jido.Action.Error.validation_error("wait match must resolve to a map")}
+        false -> {:error, Jido.Error.validation_error("wait match must resolve to a map")}
         error -> error
       end
     end)
@@ -102,7 +102,7 @@ defmodule Jido.Exec.Node.Wait do
   defp read_clock(now) when is_integer(now) and now >= 0, do: {:ok, now}
 
   defp read_clock(_),
-    do: {:error, Jido.Action.Error.config_error("invalid wait clock", %{reason: :invalid_clock})}
+    do: {:error, Jido.Error.config_error("invalid wait clock", %{reason: :invalid_clock})}
 
   @doc false
   @spec validate_host(Runic.Workflow.t(), map()) :: :ok | {:error, Exception.t()}
@@ -117,7 +117,7 @@ defmodule Jido.Exec.Node.Wait do
   @spec unsupported() :: Exception.t()
   def unsupported,
     do:
-      Jido.Action.Error.config_error("execution host does not support waits", %{
+      Jido.Error.config_error("execution host does not support waits", %{
         reason: :unsupported_host,
         capability: :waits
       })

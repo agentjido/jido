@@ -55,7 +55,8 @@ defmodule Jido.Action do
   the caller sets `max_attempts` and the error is retryable.
   """
 
-  alias Jido.Action.{Error, Output, Validation}
+  alias Jido.Action.{Output, Validation}
+  alias Jido.Error
 
   @typedoc "A static Action input or output schema."
   @type schema :: Joi.schema()
@@ -86,7 +87,7 @@ defmodule Jido.Action do
 
   @doc false
   @spec validate_output_for(map() | Output.t(), module()) ::
-          {:ok, map() | Output.t()} | {:error, Error.InvalidInputError.t()}
+          {:ok, map() | Output.t()} | {:error, Error.ValidationError.t()}
   def validate_output_for(output, module) do
     Validation.output_schema(module.output_schema(), output, %{
       context: "Action output",

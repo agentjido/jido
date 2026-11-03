@@ -1,7 +1,7 @@
 defmodule Jido.Exec.Compiler do
   @moduledoc false
 
-  alias Jido.Action.Error
+  alias Jido.Error
 
   alias Jido.Exec.Node.{Action, Choice, Handoff, Input, Invoke, Loop, Output, Parallel}
   alias Jido.Exec.Node.Invoke.Completion

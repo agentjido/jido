@@ -500,7 +500,7 @@ defmodule Jido.AI.RuntimeTest do
 
   test "a tool Action failure becomes a tool result that the model can repair" do
     expect(Tools.Add, :run, fn _params, _context ->
-      {:error, Jido.Action.Error.execution_error("calculator unavailable", retry: true)}
+      {:error, Jido.Error.execution_error("calculator unavailable", retry: true)}
     end)
 
     {:ok, calls} = Agent.start_link(fn -> 0 end)

@@ -39,7 +39,7 @@ defmodule Jido.Exec.ObservationTest do
     {workflow, observation} = Workflow.execute(Exec.compile!(Add), %{value: 1, amount: 2})
     observation = %{observation | quiescent?: false}
 
-    assert {:error, %Jido.Action.Error.ExecutionFailureError{details: details}} =
+    assert {:error, %Jido.Error.ExecutionError{details: details}} =
              Exec.result(workflow, observation)
 
     assert details.reason == :execution_active
@@ -57,7 +57,7 @@ defmodule Jido.Exec.ObservationTest do
     {workflow, _first} = Workflow.execute(Exec.compile!(Add), %{value: 1, amount: 2})
     {_other, observation} = Workflow.execute(Exec.compile!(Add), %{value: 5, amount: 2})
 
-    assert {:error, %Jido.Action.Error.ExecutionFailureError{details: details}} =
+    assert {:error, %Jido.Error.ExecutionError{details: details}} =
              Exec.result(workflow, observation)
 
     assert details.reason == :foreign_execution
@@ -67,7 +67,7 @@ defmodule Jido.Exec.ObservationTest do
     {workflow, observation} = Workflow.execute(Exec.compile!(Add), %{value: 1, amount: 2})
     observation = %{observation | admission: :stopped}
 
-    assert {:error, %Jido.Action.Error.ExecutionFailureError{details: details}} =
+    assert {:error, %Jido.Error.ExecutionError{details: details}} =
              Exec.result(workflow, observation)
 
     assert details.reason == :admission_stopped

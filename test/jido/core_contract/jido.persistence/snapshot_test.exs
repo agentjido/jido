@@ -342,7 +342,7 @@ defmodule Jido.Persistence.SnapshotTest do
     assert restored === F.agent()
     assert_receive :upgrade_context
 
-    assert {:error, %Jido.Action.Error.ExecutionFailureError{details: %{reason: :upgrade_rejected}}} =
+    assert {:error, %Jido.Error.ExecutionError{details: %{reason: :upgrade_rejected}}} =
              Persistence.upgrade(snapshot, ContextUpgrade, context: %{mode: :error})
 
     assert {:error, _reason} = Persistence.upgrade(snapshot, String)

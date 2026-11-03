@@ -2,7 +2,7 @@ defmodule Jido.Exec.Runner.PolicyTest do
   use Covenant.Case, component: "jido_action.execution", async: false
   @moduletag obligation: "jido_action.execution.I18"
 
-  alias Jido.Action.Error
+  alias Jido.Error
   alias Jido.Exec
 
   defmodule TimeoutAction do
@@ -77,7 +77,7 @@ defmodule Jido.Exec.Runner.PolicyTest do
   test "max_attempts retries only errors marked retryable" do
     {:ok, counter} = Agent.start_link(fn -> 0 end)
 
-    assert {:error, %Error.ExecutionFailureError{message: "unsafe"}} =
+    assert {:error, %Error.ExecutionError{message: "unsafe"}} =
              Exec.run(UnsafeAction, %{}, %{counter: counter}, max_attempts: 3)
 
     assert Agent.get(counter, & &1) == 1

@@ -244,7 +244,7 @@ defmodule Jido.Exec.WaitHostTest do
     {:ok, wf} = Waits.start("accepted-death", flow, %{}, %{}, now: 0)
     {:waiting, [request]} = Waits.status(wf)
 
-    assert {:error, %{details: %{phase: :execution_task}}} =
+    assert {:error, %Jido.Error.ExecutionError{phase: :execution_task}} =
              Waits.accept(wf, event(request, "kill"), %{}, now: 1)
   end
 

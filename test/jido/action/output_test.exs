@@ -89,13 +89,13 @@ defmodule JidoActionTest.Action.OutputTest do
 
     @tag obligation: "jido_action.output.I2"
     test "reports malformed output envelopes" do
-      assert {:error, %Jido.Action.Error.InvalidInputError{} = error} =
+      assert {:error, %Jido.Error.ValidationError{} = error} =
                Output.validate(:not_an_output)
 
       assert Exception.message(error) == "invalid action output envelope"
       assert error.details.value == :not_an_output
 
-      assert {:error, %Jido.Action.Error.InvalidInputError{} = error} =
+      assert {:error, %Jido.Error.ValidationError{} = error} =
                Output.validate(%Output{kind: :batch, value: :not_a_list, meta: %{}})
 
       assert Exception.message(error) == "invalid action output envelope"
@@ -107,7 +107,7 @@ defmodule JidoActionTest.Action.OutputTest do
             %Output{kind: :batch, value: [1 | 2], meta: %{}},
             %Output{kind: :stream, value: :not_enumerable, meta: %{}}
           ] do
-        assert {:error, %Jido.Action.Error.InvalidInputError{} = error} = Output.validate(output)
+        assert {:error, %Jido.Error.ValidationError{} = error} = Output.validate(output)
         assert error.message == "invalid action output envelope"
         assert error.details == %{value: output}
       end

@@ -95,7 +95,7 @@ defmodule JidoActionTest.Action.ValidationTest do
     test "keeps Joi parsing behavior for map and struct schemas" do
       generic_map = Jido.Joi.map(Jido.Joi.string(), Jido.Joi.integer())
 
-      assert {:error, %Jido.Action.Error.InvalidInputError{}} =
+      assert {:error, %Jido.Error.ValidationError{}} =
                Validation.parse(generic_map, %{"value" => "bad"}, %{})
 
       coerced_object = Jido.Joi.object(%{value: Jido.Joi.integer()}, coerce: true)
@@ -189,7 +189,7 @@ defmodule JidoActionTest.Action.ValidationTest do
 
       strict = Jido.Joi.object(%{name: Jido.Joi.string()}, unrecognized_keys: :error)
 
-      assert {:error, %Jido.Action.Error.InvalidInputError{}} =
+      assert {:error, %Jido.Error.ValidationError{}} =
                Validation.parse(strict, %{extra: true, name: "Ada"}, %{})
 
       strict_struct =
@@ -198,7 +198,7 @@ defmodule JidoActionTest.Action.ValidationTest do
           unrecognized_keys: :error
         )
 
-      assert {:error, %Jido.Action.Error.InvalidInputError{}} =
+      assert {:error, %Jido.Error.ValidationError{}} =
                Validation.parse(strict_struct, %{extra: true, value: 1}, %{})
 
       typed_unknowns =
@@ -209,7 +209,7 @@ defmodule JidoActionTest.Action.ValidationTest do
       assert {:ok, %{extra: 1, name: "Ada"}} =
                Validation.parse(typed_unknowns, %{extra: 1, name: "Ada"}, %{})
 
-      assert {:error, %Jido.Action.Error.InvalidInputError{}} =
+      assert {:error, %Jido.Error.ValidationError{}} =
                Validation.parse(
                  typed_unknowns,
                  %{extra: "not an integer", name: "Ada"},

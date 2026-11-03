@@ -118,5 +118,5 @@ defmodule Jido.AgentServer.DurableTurn.WaitHost do
   defp valid_input(_input, _now), do: error(:invalid_input)
 
   defp error(reason),
-    do: {:error, Jido.Action.Error.config_error("wait host rejected operation", %{reason: reason})}
+    do: {:error, Jido.Error.config_error("wait host rejected operation", %{reason: reason})}
 end

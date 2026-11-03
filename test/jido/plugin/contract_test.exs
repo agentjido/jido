@@ -597,7 +597,7 @@ defmodule Jido.Plugin.ContractTest do
     agent = FailingAgent.instantiate!(id: Jido.Id.uuid7())
     signal = Signal.new!("failure.run", %{}, source: "/test")
 
-    assert {:error, %Jido.Action.Error.ExecutionFailureError{message: "action_failed"}} =
+    assert {:error, %Jido.Error.ExecutionError{message: "action_failed"}} =
              FailingAgent.cmd(agent, signal)
   end
 

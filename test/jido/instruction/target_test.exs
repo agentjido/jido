@@ -72,7 +72,7 @@ defmodule JidoActionTest.Instruction.TargetTest do
     assert {:ok, %Instruction{kind: :action, target: Add}} =
              Instruction.new(kind: :action, target: Add)
 
-    assert {:error, %Jido.Action.Error.ConfigurationError{details: details} = error} =
+    assert {:error, %Jido.Error.ValidationError{details: details} = error} =
              Instruction.new(kind: :flow, target: Add)
 
     assert details == %{declared: :flow, actual: :action, reason: :target_kind_changed}
@@ -117,23 +117,23 @@ defmodule JidoActionTest.Instruction.TargetTest do
   end
 
   test "callbacks without a target behaviour do not classify a module" do
-    assert {:error, %Jido.Action.Error.ConfigurationError{details: details}} =
+    assert {:error, %Jido.Error.ValidationError{details: details}} =
              Instruction.resolve(CallbackOnly)
 
     assert details == %{target: CallbackOnly, reason: :missing_behaviour}
 
-    assert {:error, %Jido.Action.Error.ConfigurationError{details: ^details}} =
+    assert {:error, %Jido.Error.ValidationError{details: ^details}} =
              Instruction.target_kind(CallbackOnly)
   end
 
   test "a module cannot implement both target behaviours" do
-    assert {:error, %Jido.Action.Error.ConfigurationError{details: details} = error} =
+    assert {:error, %Jido.Error.ValidationError{details: details} = error} =
              Instruction.resolve(Ambiguous)
 
     assert details == %{target: Ambiguous, reason: :ambiguous_behaviour}
     assert byte_size(error.message) > 0
 
-    assert {:error, %Jido.Action.Error.ConfigurationError{details: ^details}} =
+    assert {:error, %Jido.Error.ValidationError{details: ^details}} =
              Instruction.target_kind(Ambiguous)
   end
 
@@ -145,7 +145,7 @@ defmodule JidoActionTest.Instruction.TargetTest do
           {MissingValidateParams, "validate_params/1"},
           {MissingValidateOutput, "validate_output/1"}
         ] do
-      assert {:error, %Jido.Action.Error.InvalidInputError{} = error} =
+      assert {:error, %Jido.Error.ValidationError{} = error} =
                Instruction.validate(target)
 
       assert error.message == "module is not a valid Instruction target"
@@ -164,7 +164,7 @@ defmodule JidoActionTest.Instruction.TargetTest do
           Instruction.bind(template, %{}, %{}),
           Instruction.validate(target)
         ] do
-      assert {:error, %Jido.Action.Error.ConfigurationError{} = error} = result
+      assert {:error, %Jido.Error.ValidationError{} = error} = result
       assert error.details == %{target: target, reason: :nofile}
       assert String.contains?(error.message, inspect(target))
     end
@@ -179,7 +179,7 @@ defmodule JidoActionTest.Instruction.TargetTest do
           %Instruction{kind: :action, target: "not a module"},
           %Instruction{kind: :action, target: MathFlow.flow()}
         ] do
-      assert {:error, %Jido.Action.Error.InvalidInputError{} = error} =
+      assert {:error, %Jido.Error.ValidationError{} = error} =
                Instruction.validate_resolved(instruction)
 
       assert error.details == %{instruction: instruction, reason: :invalid_target}
@@ -269,7 +269,7 @@ defmodule JidoActionTest.Instruction.TargetTest do
     assert {:ok, %Instruction{kind: :flow, target: ^target}} = Instruction.resolve(retained)
     assert :ok = Instruction.validate(retained)
 
-    assert {:error, %Jido.Action.Error.ConfigurationError{} = error} =
+    assert {:error, %Jido.Error.ValidationError{} = error} =
              Instruction.bind(action_template, %{}, %{})
 
     assert error.details == %{declared: :action, actual: :flow, reason: :target_kind_changed}

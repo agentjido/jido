@@ -136,10 +136,10 @@ defmodule Jido.Exec.BoundaryRulesTest do
 
   describe "Instruction targets" do
     test "reject unknown modules and non-template bindings" do
-      assert {:error, %Jido.Action.Error.ConfigurationError{details: %{reason: :nofile}}} =
+      assert {:error, %Jido.Error.ValidationError{details: %{reason: :nofile}}} =
                Jido.Instruction.resolve(Jido.NoSuchActionModule)
 
-      assert {:error, %Jido.Action.Error.InvalidInputError{details: %{reason: :invalid_template}}} =
+      assert {:error, %Jido.Error.ValidationError{details: %{reason: :invalid_template}}} =
                Jido.Instruction.bind(:not_a_template, %{}, %{})
     end
   end

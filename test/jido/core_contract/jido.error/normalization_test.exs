@@ -72,19 +72,24 @@ defmodule JidoTest.Error.NormalizationTest do
   end
 
   @tag obligation: "jido.error.I3"
-  test "projects adjacent Action errors without changing their ownership" do
+  test "projects the shared errors used by Action boundaries" do
     errors = [
-      {%Jido.Action.Error.InvalidInputError{message: "Bad input", details: %{}}, :validation_error},
-      {%Jido.Action.Error.ExecutionFailureError{message: "Failed", details: %{}}, :execution_error},
-      {%Jido.Action.Error.TimeoutError{message: "Timed out", details: %{}}, :timeout},
-      {%Jido.Action.Error.ConfigurationError{message: "Bad config", details: %{}}, :config_error},
-      {%Jido.Action.Error.InternalError{message: "Internal", details: %{}}, :internal}
+      {%Jido.Error.ValidationError{message: "Bad input", details: %{}}, :validation_error},
+      {%Jido.Error.ExecutionError{message: "Failed", details: %{}}, :execution_error},
+      {%Jido.Error.TimeoutError{message: "Timed out", details: %{}}, :timeout},
+      {Error.config_error("Bad config"), :config_error},
+      {%Jido.Error.InternalError{message: "Internal", details: %{}}, :internal}
     ]
 
     for {error, type} <- errors do
       assert Error.to_map(error).type == type
-      assert error.__struct__ != Error.ValidationError
-      assert error.__struct__ != Error.ExecutionError
+
+      assert error.__struct__ in [
+               Error.ValidationError,
+               Error.ExecutionError,
+               Error.TimeoutError,
+               Error.InternalError
+             ]
     end
   end
 

@@ -8,7 +8,7 @@ defmodule Jido.Exec.SourceMapTest do
     use Jido.Action, name: "exec_v2_source_failure"
 
     @impl true
-    def run(_params, _context), do: {:error, Jido.Action.Error.execution_error("source failure")}
+    def run(_params, _context), do: {:error, Jido.Error.execution_error("source failure")}
   end
 
   defmodule BadOutputAction do
@@ -77,7 +77,7 @@ defmodule Jido.Exec.SourceMapTest do
     expected = InvalidOutputFlow.__jido_flow_source_map__()[[:output]]
 
     assert {:error, error} = Exec.run(InvalidOutputFlow)
-    assert %Jido.Action.Error.InvalidInputError{} = error
+    assert %Jido.Error.ValidationError{} = error
     assert error.details.source == expected
     assert error.details.phase == :flow_output
   end

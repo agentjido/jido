@@ -1,11 +1,7 @@
 defmodule Jido.Exec.Node.InvokeTest do
   use Covenant.Case, component: "jido_action.boundary", async: true
 
-  alias Jido.Action.Error.{
-    ConfigurationError,
-    ExecutionFailureError,
-    InvalidInputError
-  }
+  alias Jido.Error.{ExecutionError, ValidationError}
 
   alias Jido.Exec
   alias Jido.Exec.Frame
@@ -692,7 +688,7 @@ defmodule Jido.Exec.Node.InvokeTest do
         output: Ref.result("next")
       })
 
-    assert {:error, %InvalidInputError{details: details}} =
+    assert {:error, %ValidationError{details: details}} =
              Exec.run(flow, %{target: instruction})
 
     assert details.node == "next"
@@ -723,7 +719,7 @@ defmodule Jido.Exec.Node.InvokeTest do
           {"invalid_input", "bad", "Action"},
           {"invalid_output", 4, "Action output"}
         ] do
-      assert {:error, %InvalidInputError{details: details}} =
+      assert {:error, %ValidationError{details: details}} =
                Exec.run(flow(), %{mode: mode, value: value})
 
       assert details.node == "next"
@@ -734,13 +730,13 @@ defmodule Jido.Exec.Node.InvokeTest do
 
   @tag obligation: ["jido_action.boundary.I2", "jido_action.boundary.I8"]
   test "selected Action failures return no executable effects" do
-    assert {:error, %ExecutionFailureError{details: %{node: "next", reason: :bad_with_extras}}} =
+    assert {:error, %ExecutionError{details: %{node: "next", reason: :bad_with_extras}}} =
              Exec.run(flow(), %{mode: "target_error", value: 4})
   end
 
   @tag obligation: "jido_action.boundary.I8"
   test "an invalid continuation target fails the expander Runnable" do
-    assert {:error, %ConfigurationError{details: details}} =
+    assert {:error, %ValidationError{details: details}} =
              Exec.run(flow(), %{mode: "bad_target", value: 1})
 
     assert details.target == Enum
@@ -751,7 +747,7 @@ defmodule Jido.Exec.Node.InvokeTest do
   @tag obligation: "jido_action.boundary.I8"
   test "a selected wait target needs a wait-capable execution host" do
     assert {:error,
-            %ConfigurationError{
+            %ValidationError{
               message: "execution host does not support waits",
               details: %{reason: :unsupported_host, capability: :waits}
             }} = Exec.run(flow(), %{mode: "runtime_wait", value: 1})
@@ -759,13 +755,13 @@ defmodule Jido.Exec.Node.InvokeTest do
 
   @tag obligation: "jido_action.boundary.I8"
   test "expander errors with discarded effects keep the Action reason" do
-    assert {:error, %ExecutionFailureError{message: "expander refused"}} =
+    assert {:error, %ExecutionError{message: "expander refused"}} =
              Exec.run(flow(), %{mode: "refuse", value: 0})
   end
 
   @tag obligation: "jido_action.boundary.I8"
   test "expander effects must be a proper list" do
-    assert {:error, %ExecutionFailureError{details: %{reason: :invalid_effects}}} =
+    assert {:error, %ExecutionError{details: %{reason: :invalid_effects}}} =
              Exec.run(flow(), %{mode: "improper", value: 0})
   end
 

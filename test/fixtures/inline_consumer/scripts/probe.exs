@@ -53,7 +53,7 @@ end
 {:ok, %{message: "bound:[7]"}} = Host.run(Bound, "bound", 3, %{prefix: "bound:"})
 {:ok, %{message: "default:[4]"}} = Host.run(Callback, "callback", %{}, %{prefix: "default:"})
 
-{:error, %Jido.Action.Error.InvalidInputError{}} =
+{:error, %Jido.Error.ValidationError{}} =
   Host.run(Callback, "callback", %{value: "bad"}, %{})
 
 for {name, expected} <- [{"late_first", "late:[6]"}, {"late_second", "late:[7]"}] do

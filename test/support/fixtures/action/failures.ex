@@ -153,7 +153,7 @@ defmodule JidoActionTest.Fixtures.Actions.ExceptionErrorAction do
   use Jido.Action, name: "exception_error_action"
 
   def run(_params, _context) do
-    {:error, Jido.Action.Error.execution_error("already wrapped", %{source: :test})}
+    {:error, Jido.Error.execution_error("already wrapped", %{source: :test})}
   end
 end
 
@@ -252,7 +252,7 @@ defmodule JidoActionTest.Fixtures.RetryableFailure do
   @impl true
   def run(_params, _context) do
     {:error,
-     Jido.Action.Error.execution_error("retryable body failed", %{
+     Jido.Error.execution_error("retryable body failed", %{
        retry: true,
        rejected_payload: %{secret: "must not leave the target boundary"}
      })}

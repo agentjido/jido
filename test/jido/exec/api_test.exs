@@ -46,10 +46,10 @@ defmodule Jido.Exec.ApiTest do
 
     assert pid == self()
 
-    assert {:error, %Jido.Action.Error.InvalidInputError{}} =
+    assert {:error, %Jido.Error.ValidationError{}} =
              Exec.call_action(CallerProcessAction, %{value: "bad"})
 
-    assert {:error, %Jido.Action.Error.ExecutionFailureError{details: %{phase: :run}}} =
+    assert {:error, %Jido.Error.ExecutionError{phase: :run}} =
              Exec.call_action(ErrorAction, %{error_type: :runtime})
   end
 
@@ -67,7 +67,7 @@ defmodule Jido.Exec.ApiTest do
 
   @tag obligation: "jido_action.boundary.I6"
   test "invalid compile and Task Supervisor options return configuration errors" do
-    assert {:error, %Jido.Action.Error.ConfigurationError{details: %{option: :name}}} =
+    assert {:error, %Jido.Error.ValidationError{details: %{option: :name}}} =
              Exec.compile(Add, name: %{})
 
     flow =
@@ -78,7 +78,7 @@ defmodule Jido.Exec.ApiTest do
       })
 
     for option <- [name: "root", id: :root] do
-      assert {:error, %Jido.Action.Error.ConfigurationError{}} = Exec.compile(flow, [option])
+      assert {:error, %Jido.Error.ValidationError{}} = Exec.compile(flow, [option])
     end
 
     {:ok, supervisor} = Task.Supervisor.start_link()
@@ -87,13 +87,13 @@ defmodule Jido.Exec.ApiTest do
     Process.exit(supervisor, :kill)
     assert_receive {:DOWN, ^monitor, :process, ^supervisor, :killed}
 
-    assert {:error, %Jido.Action.Error.ConfigurationError{message: "Task Supervisor is not running"}} =
+    assert {:error, %Jido.Error.ValidationError{message: "Task Supervisor is not running"}} =
              Exec.run(Add, %{value: 1, amount: 1}, %{}, task_supervisor: supervisor)
   end
 
   @tag obligation: "jido_action.boundary.I1"
   test "run/4 projects validation failures" do
-    assert {:error, %Jido.Action.Error.InvalidInputError{}} =
+    assert {:error, %Jido.Error.ValidationError{}} =
              Exec.run(BasicAction, %{value: "bad"})
   end
 
@@ -137,7 +137,7 @@ defmodule Jido.Exec.ApiTest do
   @tag obligation: "jido_action.boundary.I6"
   test "run/4 rejects invalid max_concurrency values" do
     for value <- [0, -1, :bogus, 2.5, nil, "2"] do
-      assert {:error, %Jido.Action.Error.ConfigurationError{details: details}} =
+      assert {:error, %Jido.Error.ValidationError{details: details}} =
                Exec.run(Add, %{value: 1, amount: 1}, %{}, max_concurrency: value)
 
       assert details == %{option: :max_concurrency, value: value}
@@ -167,7 +167,7 @@ defmodule Jido.Exec.ApiTest do
 
   @tag obligation: "jido_action.boundary.I2"
   test "run/4 projects Action exceptions" do
-    assert {:error, %Jido.Action.Error.ExecutionFailureError{details: %{phase: :run}}} =
+    assert {:error, %Jido.Error.ExecutionError{phase: :run}} =
              Exec.run(ErrorAction, %{error_type: :runtime})
   end
 end

@@ -27,7 +27,7 @@ defmodule Jido.Exec.Handoff do
   defp unbound_runtime(_instruction),
     do:
       {:error,
-       Jido.Action.Error.config_error(
+       Jido.Error.config_error(
          "handoff target must not bind runtime context or metadata",
          %{reason: :bound_handoff_runtime}
        )}

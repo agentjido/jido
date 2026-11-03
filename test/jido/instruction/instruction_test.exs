@@ -96,7 +96,7 @@ defmodule JidoActionTest.InstructionTest do
       template = Instruction.template(:flow, BasicAction)
 
       assert {:error,
-              %Jido.Action.Error.ConfigurationError{
+              %Jido.Error.ValidationError{
                 details: %{
                   declared: :flow,
                   actual: :action,
@@ -113,7 +113,7 @@ defmodule JidoActionTest.InstructionTest do
           ] do
         template = Instruction.template(:action, target)
 
-        assert {:error, %Jido.Action.Error.InvalidInputError{} = error} =
+        assert {:error, %Jido.Error.ValidationError{} = error} =
                  Instruction.bind(template, %{}, %{})
 
         assert error.details == %{target: target, reason: "missing #{callback}"}
@@ -137,7 +137,7 @@ defmodule JidoActionTest.InstructionTest do
             {%{}, [source: :runtime], :metadata}
           ] do
         assert {:error,
-                %Jido.Action.Error.InvalidInputError{
+                %Jido.Error.ValidationError{
                   message: message,
                   details: %{field: ^field, value: value, reason: :invalid_binding_data}
                 }} = Instruction.bind(template, %{}, context, metadata)
@@ -159,7 +159,7 @@ defmodule JidoActionTest.InstructionTest do
             {%Instruction{kind: :action, target: BasicAction, metadata: nil}, :invalid_metadata},
             {%Instruction{kind: :action, target: BasicAction, metadata: []}, :invalid_metadata}
           ] do
-        assert {:error, %Jido.Action.Error.InvalidInputError{} = error} =
+        assert {:error, %Jido.Error.ValidationError{} = error} =
                  Instruction.bind(template, %{}, %{})
 
         assert error.details == %{template: template, reason: reason}
@@ -192,14 +192,14 @@ defmodule JidoActionTest.InstructionTest do
           ],
           base <- [%{}, %{target: BasicAction}],
           attrs <- [Map.put(base, field, value), Map.to_list(Map.put(base, field, value))] do
-        assert {:error, %Jido.Action.Error.InvalidInputError{details: details} = error} =
+        assert {:error, %Jido.Error.ValidationError{details: details} = error} =
                  Instruction.new(attrs)
 
         assert details == %{fields: [field], reason: :removed_instruction_fields}
         assert byte_size(error.message) > 0
-        refute Jido.Action.Error.retryable?(error)
+        refute Jido.Error.retryable?(error)
 
-        assert_raise Jido.Action.Error.InvalidInputError, error.message, fn ->
+        assert_raise Jido.Error.ValidationError, error.message, fn ->
           Instruction.new!(attrs)
         end
       end
@@ -208,7 +208,7 @@ defmodule JidoActionTest.InstructionTest do
     test "reports all removed fields in stable order" do
       attrs = %{target: BasicAction, opts: [], flow: nil, action: nil, id: "old"}
 
-      assert {:error, %Jido.Action.Error.InvalidInputError{details: details}} =
+      assert {:error, %Jido.Error.ValidationError{details: details}} =
                Instruction.new(attrs)
 
       assert details == %{
@@ -291,14 +291,14 @@ defmodule JidoActionTest.InstructionTest do
     end
 
     test "returns structured errors for missing and invalid targets" do
-      assert {:error, %Jido.Action.Error.InvalidInputError{} = error} =
+      assert {:error, %Jido.Error.ValidationError{} = error} =
                Instruction.new(%{params: %{value: 1}})
 
       assert error.details == %{field: :target, reason: :missing}
       assert byte_size(error.message) > 0
 
       for target <- ["not_a_module", nil] do
-        assert {:error, %Jido.Action.Error.ConfigurationError{details: details}} =
+        assert {:error, %Jido.Error.ValidationError{details: details}} =
                  Instruction.new(%{target: target})
 
         assert details.target == target
@@ -306,41 +306,41 @@ defmodule JidoActionTest.InstructionTest do
     end
 
     test "rejects invalid invocation maps" do
-      assert {:error, %Jido.Action.Error.InvalidInputError{} = params_error} =
+      assert {:error, %Jido.Error.ValidationError{} = params_error} =
                Instruction.new(target: BasicAction, params: ["not", "keyword"])
 
-      refute Jido.Action.Error.retryable?(params_error)
+      refute Jido.Error.retryable?(params_error)
       assert params_error.details.params == ["not", "keyword"]
       assert byte_size(params_error.details.expected_format) > 0
 
-      assert {:error, %Jido.Action.Error.InvalidInputError{}} =
+      assert {:error, %Jido.Error.ValidationError{}} =
                Instruction.new(target: BasicAction, context: ["not", "keyword"])
 
-      assert {:error, %Jido.Action.Error.InvalidInputError{message: params_message}} =
+      assert {:error, %Jido.Error.ValidationError{message: params_message}} =
                Instruction.new(target: BasicAction, params: 123)
 
       assert params_message =~ "Invalid params format"
 
-      assert {:error, %Jido.Action.Error.InvalidInputError{message: context_message}} =
+      assert {:error, %Jido.Error.ValidationError{message: context_message}} =
                Instruction.new(target: BasicAction, context: 123)
 
       assert context_message =~ "Invalid context format"
 
-      assert {:error, %Jido.Action.Error.InvalidInputError{message: metadata_message}} =
+      assert {:error, %Jido.Error.ValidationError{message: metadata_message}} =
                Instruction.new(target: BasicAction, metadata: 123)
 
       assert metadata_message =~ "Invalid metadata format"
     end
 
     test "does not accept tuple instruction shims" do
-      assert {:error, %Jido.Action.Error.InvalidInputError{details: details}} =
+      assert {:error, %Jido.Error.ValidationError{details: details}} =
                Instruction.new({BasicAction, %{value: 1}})
 
       assert details.reason == :invalid_attributes
     end
 
     test "returns a validation error for malformed list attributes" do
-      assert {:error, %Jido.Action.Error.InvalidInputError{message: message}} =
+      assert {:error, %Jido.Error.ValidationError{message: message}} =
                Instruction.new([:not_keyword])
 
       assert message == "Invalid instruction configuration"
@@ -354,16 +354,16 @@ defmodule JidoActionTest.InstructionTest do
       @field field
       test "rejects false #{@field} in a raw Instruction" do
         attrs = %{@field => false, target: Add}
-        assert {:error, %Jido.Action.Error.InvalidInputError{} = error} = Instruction.new(attrs)
+        assert {:error, %Jido.Error.ValidationError{} = error} = Instruction.new(attrs)
         assert error.details[@field] == false
 
-        assert_raise Jido.Action.Error.InvalidInputError, error.message, fn ->
+        assert_raise Jido.Error.ValidationError, error.message, fn ->
           Instruction.new!(attrs)
         end
 
         instruction = struct!(Instruction, attrs)
 
-        assert_raise Jido.Action.Error.InvalidInputError,
+        assert_raise Jido.Error.ValidationError,
                      ~r/Invalid #{to_string(@field)}/i,
                      fn -> Instruction.normalize!(instruction, %{override: 1}, %{override: 2}) end
       end
@@ -463,13 +463,13 @@ defmodule JidoActionTest.InstructionTest do
     end
 
     test "rejects invalid normalization inputs" do
-      assert_raise Jido.Action.Error.ConfigurationError, ~r/unknown Instruction target/, fn ->
+      assert_raise Jido.Error.ValidationError, ~r/unknown Instruction target/, fn ->
         Instruction.normalize!(nil)
       end
 
       invalid = %Instruction{target: "not executable"}
 
-      assert_raise Jido.Action.Error.ConfigurationError,
+      assert_raise Jido.Error.ValidationError,
                    ~r/unknown Instruction target/,
                    fn -> Instruction.normalize!(invalid) end
 
@@ -498,13 +498,13 @@ defmodule JidoActionTest.InstructionTest do
     end
 
     test "raises on invalid input" do
-      assert_raise Jido.Action.Error.InvalidInputError, fn ->
+      assert_raise Jido.Error.ValidationError, fn ->
         Instruction.new!(params: %{value: 1})
       end
     end
 
     test "raises underlying exception errors" do
-      assert_raise Jido.Action.Error.InvalidInputError, ~r/Invalid params format/, fn ->
+      assert_raise Jido.Error.ValidationError, ~r/Invalid params format/, fn ->
         Instruction.new!(target: BasicAction, params: 123)
       end
     end

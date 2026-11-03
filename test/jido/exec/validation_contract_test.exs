@@ -1,7 +1,8 @@
 defmodule Jido.Exec.ValidationContractTest do
   use Covenant.Case, component: "jido_action.boundary", async: true
 
-  alias Jido.Action.{Error, Output}
+  alias Jido.Action.Output
+  alias Jido.Error
   alias Jido.Exec
   alias Jido.Exec.Validation
   alias Jido.Flow
@@ -128,15 +129,15 @@ defmodule Jido.Exec.ValidationContractTest do
             assert error.details.return == :invalid
 
           :reason ->
-            assert %Error.InvalidInputError{} = error
+            assert %Error.ValidationError{} = error
             assert error.details.reason == :rejected
 
           :exception ->
-            assert %Error.InvalidInputError{} = error
+            assert %Error.ValidationError{} = error
             assert error.details.original
 
           failure ->
-            assert %Error.ExecutionFailureError{} = error
+            assert %Error.ExecutionError{} = error
             assert %Splode.Stacktrace{} = error.stacktrace
             assert error.stacktrace.stacktrace == error.details.stacktrace
 
@@ -179,7 +180,7 @@ defmodule Jido.Exec.ValidationContractTest do
 
     for target <- [ActionValidator, FlowValidator],
         {executable, _expected_phase, _node_path} <- boundaries(target, :output) do
-      assert {:error, %Error.InvalidInputError{} = error} =
+      assert {:error, %Error.ValidationError{} = error} =
                Exec.run(executable, %{phase: :output, failure: :invalid_envelope})
 
       assert error.message == "invalid action output envelope"
@@ -199,7 +200,7 @@ defmodule Jido.Exec.ValidationContractTest do
   test "schema validation retains context when a transformation returns a scalar" do
     details = %{module: Jido.Flow, flow: "scalar", context: "Flow output"}
 
-    assert {:error, %Error.InvalidInputError{} = error} =
+    assert {:error, %Error.ValidationError{} = error} =
              Validation.schema(scalar_schema(), %{}, details)
 
     assert error.message == "Flow output validation must return a map"
@@ -211,7 +212,7 @@ defmodule Jido.Exec.ValidationContractTest do
     flow = data_flow(%{name: "scalar_input", schema: scalar_schema(), output: %{}})
 
     for run <- data_boundaries(flow) do
-      assert {:error, %Error.InvalidInputError{} = error} = run.(%{})
+      assert {:error, %Error.ValidationError{} = error} = run.(%{})
       assert error.message == "Flow input must be a map"
       assert error.details.flow == "scalar_input"
       assert error.details.module == Jido.Flow
@@ -240,7 +241,7 @@ defmodule Jido.Exec.ValidationContractTest do
     flow = data_flow(%{name: "scalar_output", output_schema: scalar_schema(), output: %{}})
 
     for run <- data_boundaries(flow) do
-      assert {:error, %Error.InvalidInputError{} = error} = run.(%{})
+      assert {:error, %Error.ValidationError{} = error} = run.(%{})
       assert error.message == "Action output validation must return a map"
       assert error.details.flow == "scalar_output"
       assert error.details.module == Jido.Flow
@@ -307,7 +308,7 @@ defmodule Jido.Exec.ValidationContractTest do
 
       invalid = %{output | kind: :invalid}
 
-      assert {:error, %Error.InvalidInputError{message: "invalid action output envelope"}} =
+      assert {:error, %Error.ValidationError{message: "invalid action output envelope"}} =
                run.(%{output: invalid})
     end
 

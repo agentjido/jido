@@ -1,7 +1,7 @@
 defmodule Jido.Flow.TargetValidator do
   @moduledoc false
 
-  alias Jido.Action.Error
+  alias Jido.Error
   alias Jido.Flow
   alias Jido.Flow.{Definition, Graph}
   alias Jido.Instruction

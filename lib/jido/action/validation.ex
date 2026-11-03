@@ -2,11 +2,12 @@ defmodule Jido.Action.Validation do
   alias Jido.Joi
   @moduledoc false
 
-  alias Jido.Action.{Error, Output}
+  alias Jido.Action.Output
+  alias Jido.Error
 
   @doc false
   @spec schema(term(), term(), map(), String.t() | nil) ::
-          {:ok, map()} | {:error, Error.InvalidInputError.t()}
+          {:ok, map()} | {:error, Error.ValidationError.t()}
   def schema(schema, value, details, message \\ nil) do
     with {:ok, validated} <- parse(schema, value, details) do
       if is_map(validated) do
@@ -23,7 +24,7 @@ defmodule Jido.Action.Validation do
 
   @doc false
   @spec output_schema(term(), term(), map()) ::
-          {:ok, map() | Output.t()} | {:error, Error.InvalidInputError.t()}
+          {:ok, map() | Output.t()} | {:error, Error.ValidationError.t()}
   def output_schema(schema, %Output{kind: :preserve} = output, details) do
     with {:ok, output} <- Output.validate(output),
          {:ok, value} when is_map(value) <-
@@ -49,13 +50,13 @@ defmodule Jido.Action.Validation do
 
   @doc false
   @spec parse(term(), term(), map()) ::
-          {:ok, term()} | {:error, Error.InvalidInputError.t()}
+          {:ok, term()} | {:error, Error.ValidationError.t()}
   def parse(schema, data, details) when is_map(details),
     do: parse(schema, data, details, &normalize_result/1)
 
   @doc false
   @spec parse_preserving_shape(term(), term(), map()) ::
-          {:ok, term()} | {:error, Error.InvalidInputError.t()}
+          {:ok, term()} | {:error, Error.ValidationError.t()}
   def parse_preserving_shape(schema, data, details) when is_map(details),
     do: parse(schema, data, details, &{:ok, &1})
 

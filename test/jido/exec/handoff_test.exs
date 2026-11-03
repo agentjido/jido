@@ -202,7 +202,7 @@ defmodule Jido.Exec.HandoffTest do
     assert {:error, error} = Exec.run(flow)
     assert error.message == "only a Handoff selector can hand off"
     assert error.details.action == Expand
-    assert error.details.phase == :run
+    assert error.phase == :run
     assert error.details.reason == :unsupported_handoff
   end
 
@@ -217,7 +217,7 @@ defmodule Jido.Exec.HandoffTest do
     assert {:error, error} = Exec.run(flow)
     assert error.message == "Handoff selector must return a handoff control result"
     assert error.details.action == InvalidSelector
-    assert error.details.phase == :run
+    assert error.phase == :run
     assert error.details.return == {:ok, %{not: :handoff}, []}
     assert error.details.reason == :invalid_handoff_return
   end
@@ -233,7 +233,7 @@ defmodule Jido.Exec.HandoffTest do
     assert {:error, error} = Exec.run(Expand, %{value: 7}, %{})
     assert error.message == "only a Handoff selector can hand off"
     assert error.details.action == Expand
-    assert error.details.phase == :run
+    assert error.phase == :run
     assert error.details.reason == :unsupported_handoff
   end
 

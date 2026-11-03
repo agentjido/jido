@@ -26,7 +26,7 @@ defmodule Jido.Exec.Node.MapTest do
         end)
 
       if index == 1 and attempt == 1,
-        do: {:error, Jido.Action.Error.execution_error("retry item", %{retry: true})},
+        do: {:error, Jido.Error.execution_error("retry item", %{retry: true})},
         else: {:ok, params, [index]}
     end
   end
@@ -254,7 +254,7 @@ defmodule Jido.Exec.Node.MapTest do
              error: %{
                type: :execution_error,
                message: "bad_item",
-               retryable?: false,
+               retryable?: true,
                details: details
              }
            } = failed

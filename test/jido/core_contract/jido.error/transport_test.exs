@@ -284,7 +284,7 @@ defmodule JidoTest.Error.TransportTest do
 
         for error <- [
               Error.validation_error("Invalid", details: details),
-              Jido.Action.Error.validation_error("Invalid", details)
+              Jido.Error.validation_error("Invalid", details)
             ] do
           assert Error.to_map(error).details.errors == details.errors
         end
@@ -296,12 +296,12 @@ defmodule JidoTest.Error.TransportTest do
             {%{users: []}, [:name]},
             {%{name: "example", users: [%{name: 123}]}, [:users, 0, :name]}
           ] do
-        assert {:error, %Jido.Action.Error.InvalidInputError{} = error} =
+        assert {:error, %Jido.Error.ValidationError{} = error} =
                  Jido.Exec.run(ValidationAction, params)
 
         assert [%{path: ^path}] = error.details.errors
         result = Error.to_map(error)
-        assert result.details.errors == Jido.Action.Error.to_map(error).details.errors
+        assert result.details.errors == Jido.Error.to_map(error).details.errors
 
         encoded_path =
           Enum.map(path, fn part -> if is_atom(part), do: to_string(part), else: part end)
