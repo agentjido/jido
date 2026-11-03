@@ -1,6 +1,4 @@
 defmodule Jido.Plugin do
-  alias Jido.Joi
-
   @moduledoc """
   Defines one reusable Plugin through optional callbacks.
 
@@ -54,6 +52,7 @@ defmodule Jido.Plugin do
   for the configuration commit; unchanged Plugins keep their normal hooks.
   """
 
+  alias Jido.{Error, Joi}
   alias Jido.Plugin.Init
 
   @type declaration :: module() | {module(), map()}
@@ -205,6 +204,59 @@ defmodule Jido.Plugin do
   @doc "Gets the current state owned by one Plugin runtime."
   @spec state(Init.t(), timeout()) :: {:ok, term()} | {:error, term()}
   def state(init, timeout \\ 5_000), do: Jido.AgentServer.Plugin.state(init, timeout)
+
+  @doc false
+  @spec invoke(module(), module(), atom(), [term()], String.t()) ::
+          term() | {:error, Exception.t()}
+  def invoke(package, facet, function, args, message) do
+    apply(facet, function, args)
+  rescue
+    error -> {:error, callback_error(message, package, function, :error, error)}
+  catch
+    kind, reason -> {:error, callback_error(message, package, function, kind, reason)}
+  end
+
+  @doc false
+  @spec invalid_callback(String.t(), module(), module(), map()) :: {:error, Exception.t()}
+  def invalid_callback(message, package, _facet, details \\ %{}) do
+    {:error,
+     execution_error(
+       message,
+       package,
+       Map.put_new(details, :code, :plugin_invalid_callback_result)
+     )}
+  end
+
+  @doc false
+  @spec validation_error(String.t(), map()) :: {:error, Exception.t()}
+  def validation_error(message, details) do
+    {:error, Error.validation_error(message, kind: :config, details: details)}
+  end
+
+  @doc false
+  @spec execution_error(String.t(), module(), map()) :: Exception.t()
+  def execution_error(message, package, details) do
+    Error.execution_error(message,
+      details: Map.put(details, :plugin, package)
+    )
+  end
+
+  defp callback_error(message, package, callback, :error, error) do
+    execution_error(message, package, %{
+      code: :plugin_callback_failed,
+      callback: callback,
+      error: error
+    })
+  end
+
+  defp callback_error(message, package, callback, kind, reason) do
+    execution_error(message, package, %{
+      code: :plugin_callback_failed,
+      callback: callback,
+      kind: kind,
+      reason: reason
+    })
+  end
 
   defp validate_use_options!(opts) do
     unless Keyword.keyword?(opts) do

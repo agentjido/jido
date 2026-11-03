@@ -4,7 +4,7 @@ defmodule Jido.AgentServer.Plugin.Callbacks do
   alias Jido.Agent.Command
   alias Jido.AgentServer.Plugin.{Admission, Commit, Spec}
   alias Jido.Plugin.{DirectiveContext, Init, Input, SignalContext}
-  alias Jido.Plugin.Error, as: PluginError
+  alias Jido.Plugin, as: PluginBoundary
 
   @doc false
   @spec commit_specs([Jido.Plugin.Spec.t()]) :: [Jido.Plugin.Spec.t()]
@@ -17,7 +17,7 @@ defmodule Jido.AgentServer.Plugin.Callbacks do
         runtime_ref,
         %Commit{} = commit
       ) do
-    PluginError.safe_apply(
+    PluginBoundary.invoke(
       spec.package,
       spec.module,
       :after_commit,
@@ -92,7 +92,7 @@ defmodule Jido.AgentServer.Plugin.Callbacks do
         directive,
         %DirectiveContext{} = context
       ) do
-    PluginError.safe_apply(
+    PluginBoundary.invoke(
       spec.package,
       spec.module,
       :dispatch,
@@ -109,7 +109,7 @@ defmodule Jido.AgentServer.Plugin.Callbacks do
 
   def await_ready(%{agent_server: %Spec{} = spec}, runtime_ref) do
     if function_exported?(spec.module, :await_ready, 2) do
-      PluginError.safe_apply(
+      PluginBoundary.invoke(
         spec.package,
         spec.module,
         :await_ready,
@@ -144,7 +144,7 @@ defmodule Jido.AgentServer.Plugin.Callbacks do
       state_version: state_version
     }
 
-    PluginError.safe_apply(
+    PluginBoundary.invoke(
       spec.package,
       spec.module,
       :admit,
@@ -155,7 +155,7 @@ defmodule Jido.AgentServer.Plugin.Callbacks do
   end
 
   defp prepare_outbound_one(signal, %{agent_server: %Spec{} = spec}, runtime_ref, context) do
-    PluginError.safe_apply(
+    PluginBoundary.invoke(
       spec.package,
       spec.module,
       :prepare_outbound,
@@ -170,7 +170,7 @@ defmodule Jido.AgentServer.Plugin.Callbacks do
         error
 
       result ->
-        PluginError.invalid_callback(
+        PluginBoundary.invalid_callback(
           "Agent Server Plugin prepare_outbound/4 returned an invalid result",
           spec.package,
           spec.module,
@@ -186,7 +186,7 @@ defmodule Jido.AgentServer.Plugin.Callbacks do
   defp validate_runtime_input({:error, _reason} = error, _command, _spec), do: error
 
   defp validate_runtime_input(result, _command, spec) do
-    PluginError.invalid_callback(
+    PluginBoundary.invalid_callback(
       "Agent Server Plugin admit/3 returned an invalid result",
       spec.package,
       spec.module,
@@ -200,7 +200,7 @@ defmodule Jido.AgentServer.Plugin.Callbacks do
         {:ok, validated}
 
       {:error, errors} ->
-        PluginError.invalid_callback(
+        PluginBoundary.invalid_callback(
           "Agent Server Plugin prepare_outbound/4 returned an invalid Signal",
           spec.package,
           spec.module,
@@ -220,7 +220,7 @@ defmodule Jido.AgentServer.Plugin.Callbacks do
     |> validate_child_spec(spec)
   rescue
     error ->
-      PluginError.validation(
+      PluginBoundary.validation_error(
         "Agent Server Plugin child_spec/1 raised",
         %{
           plugin: spec.package,
@@ -230,7 +230,7 @@ defmodule Jido.AgentServer.Plugin.Callbacks do
       )
   catch
     kind, reason ->
-      PluginError.validation(
+      PluginBoundary.validation_error(
         "Agent Server Plugin child_spec/1 failed",
         %{
           plugin: spec.package,
@@ -249,7 +249,7 @@ defmodule Jido.AgentServer.Plugin.Callbacks do
           {:ok, child_spec}
 
         restart ->
-          PluginError.validation(
+          PluginBoundary.validation_error(
             "Agent Server Plugin runtime root must use :permanent restart",
             %{
               plugin: spec.package,
@@ -286,7 +286,7 @@ defmodule Jido.AgentServer.Plugin.Callbacks do
   end
 
   defp invalid_child_spec(child_spec, spec, reason) do
-    PluginError.validation(
+    PluginBoundary.validation_error(
       "Agent Server Plugin child_spec/1 returned an invalid child specification",
       %{plugin: spec.package, facet: spec.module, child_spec: child_spec, reason: reason}
     )
@@ -296,7 +296,7 @@ defmodule Jido.AgentServer.Plugin.Callbacks do
   defp validate_status_result({:error, _reason} = error, _spec, _message), do: error
 
   defp validate_status_result(result, spec, message) do
-    PluginError.invalid_callback(message, spec.package, spec.module, %{result: result})
+    PluginBoundary.invalid_callback(message, spec.package, spec.module, %{result: result})
   end
 
   defp callback_specs(specs, function, arity) do

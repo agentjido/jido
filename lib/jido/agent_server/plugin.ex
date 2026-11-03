@@ -99,7 +99,7 @@ defmodule Jido.AgentServer.Plugin do
     Enum.reduce_while(specs, :ok, fn spec, :ok ->
       result =
         bounded(fn ->
-          Jido.Plugin.Error.safe_apply(
+          Jido.Plugin.invoke(
             spec.module,
             spec.module,
             callback,

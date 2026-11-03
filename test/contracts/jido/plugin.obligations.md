@@ -2,7 +2,6 @@
 modules:
   - Jido.Plugin
   - Jido.Plugin.DirectiveContext
-  - Jido.Plugin.Error
   - Jido.Plugin.Init
   - Jido.Plugin.Input
   - Jido.Plugin.Manifest
@@ -17,7 +16,7 @@ Protect the generic Plugin declaration and callback contract. This component
 defines valid Plugin metadata, callback shapes, and narrow handoff values. Its
 public modules are `Jido.Plugin`, `Jido.Plugin.Input`, `Jido.Plugin.Init`,
 `Jido.Plugin.SignalContext`, and `Jido.Plugin.DirectiveContext`. Manifest,
-normalization, aggregate Spec, and error helpers are internal.
+normalization, aggregate Spec, and callback error policy are internal.
 
 `Jido.Plugin.state/2` is the public convenience facade for a running Plugin.
 The `jido.agent_server.plugin_runtime` component owns its live behavior. This

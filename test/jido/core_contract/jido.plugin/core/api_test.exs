@@ -5,7 +5,6 @@ defmodule JidoTest.PluginContract.ApiTest do
 
   alias Jido.Plugin.{
     DirectiveContext,
-    Error,
     Init,
     Input,
     Manifest,
@@ -26,7 +25,7 @@ defmodule JidoTest.PluginContract.ApiTest do
       assert public_module?(module)
     end
 
-    for module <- [Error, Manifest, Normalizer, Spec] do
+    for module <- [Manifest, Normalizer, Spec] do
       refute public_module?(module)
     end
   end

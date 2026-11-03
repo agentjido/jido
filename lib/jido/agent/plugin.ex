@@ -17,7 +17,7 @@ defmodule Jido.Agent.Plugin do
   alias Jido.Agent
   alias Jido.Agent.{Data, Error, Route}
   alias Jido.Agent.Plugin.{Preparation, RouteSelection, Spec}
-  alias Jido.Plugin.Error, as: PluginError
+  alias Jido.Plugin, as: PluginBoundary
   alias Jido.Plugin.Input
   alias Jido.Plugin.Normalizer
   alias Jido.Signal
@@ -56,7 +56,7 @@ defmodule Jido.Agent.Plugin do
       end
     else
       _ ->
-        PluginError.validation("Agent domain schema must be a field-based Joi object", %{
+        PluginBoundary.validation_error("Agent domain schema must be a field-based Joi object", %{
           schema: domain_schema
         })
     end
@@ -118,7 +118,7 @@ defmodule Jido.Agent.Plugin do
         select_with_plugin(agent, signal, inputs, selector)
 
       selectors ->
-        PluginError.validation("Only one Agent Plugin can select routes", %{
+        PluginBoundary.validation_error("Only one Agent Plugin can select routes", %{
           plugins: Enum.map(selectors, & &1.package)
         })
     end
@@ -135,7 +135,7 @@ defmodule Jido.Agent.Plugin do
         validate_duplicate_route_aliases(routes)
 
       selectors ->
-        PluginError.validation("Only one Agent Plugin can select routes", %{
+        PluginBoundary.validation_error("Only one Agent Plugin can select routes", %{
           plugins: selectors
         })
     end
@@ -161,7 +161,7 @@ defmodule Jido.Agent.Plugin do
         route_candidates: candidates
       }
 
-      PluginError.safe_apply(
+      PluginBoundary.invoke(
         spec.package,
         spec.module,
         :prepare,
@@ -180,7 +180,7 @@ defmodule Jido.Agent.Plugin do
         {:ok, input}
 
       {:error, path} ->
-        PluginError.invalid_callback(
+        PluginBoundary.invalid_callback(
           "Agent Plugin prepare/2 returned a non-portable input",
           spec.package,
           spec.module,
@@ -192,7 +192,7 @@ defmodule Jido.Agent.Plugin do
   defp validate_preparation_result({:error, _reason} = error, _spec), do: error
 
   defp validate_preparation_result(result, spec) do
-    PluginError.invalid_callback(
+    PluginBoundary.invalid_callback(
       "Agent Plugin prepare/2 returned an invalid result",
       spec.package,
       spec.module,
@@ -221,7 +221,7 @@ defmodule Jido.Agent.Plugin do
       }
 
       spec.package
-      |> PluginError.safe_apply(
+      |> PluginBoundary.invoke(
         spec.module,
         :select_route,
         [selection, spec.options],
@@ -252,10 +252,9 @@ defmodule Jido.Agent.Plugin do
       :ok
     else
       {:error,
-       PluginError.execution(
+       PluginBoundary.execution_error(
          "Ambiguous matching routes require unique aliases",
          :core,
-         __MODULE__,
          %{code: :ambiguous_route_aliases, aliases: aliases}
        )}
     end
@@ -265,10 +264,9 @@ defmodule Jido.Agent.Plugin do
 
   defp validate_route_selection(:default, spec, candidates) do
     {:error,
-     PluginError.execution(
+     PluginBoundary.execution_error(
        "Agent Plugin left an ambiguous route selection unresolved",
        spec.package,
-       spec.module,
        %{
          code: :ambiguous_route_selection,
          aliases: Enum.map(candidates, & &1.as)
@@ -281,10 +279,9 @@ defmodule Jido.Agent.Plugin do
     case Enum.find(candidates, &(&1.as == route_as)) do
       nil ->
         {:error,
-         PluginError.execution(
+         PluginBoundary.execution_error(
            "Agent Plugin selected a route that does not match the Signal",
            spec.package,
-           spec.module,
            %{
              code: :invalid_route_selection,
              route: route_as,
@@ -300,7 +297,7 @@ defmodule Jido.Agent.Plugin do
   defp validate_route_selection({:error, _reason} = error, _spec, _candidates), do: error
 
   defp validate_route_selection(result, spec, _candidates) do
-    PluginError.invalid_callback(
+    PluginBoundary.invalid_callback(
       "Agent Plugin select_route/2 returned an invalid result",
       spec.package,
       spec.module,
@@ -328,7 +325,7 @@ defmodule Jido.Agent.Plugin do
           {:cont, :ok}
         else
           {:halt,
-           PluginError.validation("Duplicate routes require aliases for Plugin selection", %{
+           PluginBoundary.validation_error("Duplicate routes require aliases for Plugin selection", %{
              path: path,
              aliases: aliases
            })}
@@ -361,7 +358,7 @@ defmodule Jido.Agent.Plugin do
         :ok
 
       spec ->
-        PluginError.validation("Plugin-owned Agent state key conflicts with the domain schema", %{
+        PluginBoundary.validation_error("Plugin-owned Agent state key conflicts with the domain schema", %{
           plugin: spec.package,
           state_key: spec.state_key
         })

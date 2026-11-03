@@ -8,9 +8,9 @@ modules:
 Protect the shared Jido error taxonomy, constructors, stable common codes,
 retry classification, and bounded public projection.
 
-This component does not own `Jido.Agent.Error`, `Jido.Plugin.Error`, failure
-conversion in a domain component, adjacent-package error types, or runtime
-retry and recovery policy.
+This component does not own `Jido.Agent.Error`, callback invocation in a domain
+component, or runtime retry and recovery policy. Plugin callback failures use
+this shared taxonomy.
 
 ## Obligations
 
