@@ -8,7 +8,7 @@ defmodule JidoTest.AgentServer.Composition.RuntimeRulesTest do
   alias Jido.Agent.Diff
   alias Jido.Agent.Directive, as: D
   alias Jido.AgentServer, as: Server
-  alias Jido.AgentServer.{CompositionRuntime, TopologyBus, TopologyRuntime}
+  alias Jido.AgentServer.{CompositionRuntime, Topology}
   alias JidoTest.AgentEvolutionFixtures, as: E
   alias JidoTest.AgentServer.Fixtures, as: F
   import JidoTest.Eventually
@@ -29,22 +29,22 @@ defmodule JidoTest.AgentServer.Composition.RuntimeRulesTest do
     declaration = Map.put(hd(added.topology.agents), :identities, %{1 => "one", 2 => "two"})
     added = put_in(added.topology.agents, [declaration])
 
-    assert {:ok, initial} = TopologyRuntime.identify(nil, added)
+    assert {:ok, initial} = Topology.identify(nil, added)
     assert hd(initial.topology.agents).identities == %{1 => "one", 2 => "two"}
 
     assert {:ok, grown, _} = Agent.mutate(initial, [D.agent_update(:workers, %{count: 3})])
-    assert {:ok, grown} = TopologyRuntime.identify(initial, grown)
+    assert {:ok, grown} = Topology.identify(initial, grown)
     grown_ids = hd(grown.topology.agents).identities
     assert grown_ids[1] == "one"
     assert grown_ids[2] == "two"
     assert is_binary(grown_ids[3]) and grown_ids[3] not in ["one", "two"]
 
     assert {:ok, smaller, _} = Agent.mutate(grown, [D.agent_update(:workers, %{count: 1})])
-    assert {:ok, smaller} = TopologyRuntime.identify(grown, smaller)
+    assert {:ok, smaller} = Topology.identify(grown, smaller)
     assert hd(smaller.topology.agents).identities == %{1 => "one"}
 
     assert {:ok, regrown, _} = Agent.mutate(smaller, [D.agent_update(:workers, %{count: 2})])
-    assert {:ok, regrown} = TopologyRuntime.identify(smaller, regrown)
+    assert {:ok, regrown} = Topology.identify(smaller, regrown)
     regrown_ids = hd(regrown.topology.agents).identities
     assert regrown_ids[1] == "one"
     assert is_binary(regrown_ids[2]) and regrown_ids[2] not in ["one", "two", grown_ids[2]]
@@ -52,7 +52,7 @@ defmodule JidoTest.AgentServer.Composition.RuntimeRulesTest do
     assert {:ok, changed, _} =
              Agent.mutate(regrown, [D.agent_update(:workers, %{initial_state: %{count: 7}})])
 
-    assert {:ok, changed} = TopologyRuntime.identify(regrown, changed)
+    assert {:ok, changed} = Topology.identify(regrown, changed)
     changed_ids = hd(changed.topology.agents).identities
     assert changed_ids[1] != regrown_ids[1]
     assert changed_ids[2] != regrown_ids[2]
@@ -80,10 +80,10 @@ defmodule JidoTest.AgentServer.Composition.RuntimeRulesTest do
         |> Agent.instantiate!(id: "unsupported-runtime-endpoint")
 
       assert {:error, %{code: :unsupported_runtime_endpoint, path: [:topology, :connections]}} =
-               TopologyRuntime.validate(agent)
+               Topology.validate(agent)
     end
 
-    assert TopologyRuntime.buses(%{E.agent() | plugins: [queue]}) == []
+    assert Topology.buses(%{E.agent() | plugins: [queue]}) == []
   end
 
   @tag obligation: "jido.agent_server.composition.I5"
@@ -110,11 +110,11 @@ defmodule JidoTest.AgentServer.Composition.RuntimeRulesTest do
       })
       |> Agent.instantiate!(id: "runtime-endpoint-kind")
 
-    assert {:error, %{code: :unsupported_runtime_endpoint}} = TopologyRuntime.validate(agent)
+    assert {:error, %{code: :unsupported_runtime_endpoint}} = Topology.validate(agent)
 
     plain = E.agent()
     with_bus = %{plain | plugins: [bus]}
-    assert TopologyRuntime.changed?(Diff.between(plain, with_bus), plain, with_bus)
+    assert Topology.changed?(Diff.between(plain, with_bus), plain, with_bus)
 
     assert {:error, :activation_required} =
              CompositionRuntime.check(
@@ -139,13 +139,13 @@ defmodule JidoTest.AgentServer.Composition.RuntimeRulesTest do
       jido: c.jido
     }
 
-    assert :ok = TopologyRuntime.emit(root_context, F.signal())
+    assert :ok = Topology.emit(root_context, F.signal())
     assert_eventually(Server.agent(server).state.count == 1)
 
     output = F.signal()
 
     assert :ok =
-             TopologyRuntime.emit(
+             Topology.emit(
                %{root_context | default_dispatch: {:pid, target: self()}},
                output
              )
@@ -155,21 +155,21 @@ defmodule JidoTest.AgentServer.Composition.RuntimeRulesTest do
     child = %{F.agent() | id: unique_id("manual-child")}
     assert {:ok, child} = Server.spawn_child(server, child, :manual)
     assert :ok = Server.await_ready(child)
-    assert :ok = TopologyRuntime.send_agent(state, :manual, F.signal())
+    assert :ok = Topology.send_agent(state, :manual, F.signal())
     assert_eventually(Server.agent(child).state.count == 1)
 
     parent = Server.status(child).parent
-    assert :ok = TopologyRuntime.parent_send(parent, F.signal())
+    assert :ok = Topology.parent_send(parent, F.signal())
     assert_eventually(Server.agent(server).state.count == 2)
 
-    assert {:error, :agent_not_found} = TopologyRuntime.send_agent(state, :missing, F.signal())
-    assert {:error, :parent_not_found} = TopologyRuntime.parent_send(nil, F.signal())
-    assert :ok = TopologyRuntime.member_output(%{activation_state: state}, :missing, F.signal())
-    assert {:error, :bus_not_ready} = TopologyBus.publish(state, :missing, F.signal())
+    assert {:error, :agent_not_found} = Topology.send_agent(state, :missing, F.signal())
+    assert {:error, :parent_not_found} = Topology.parent_send(nil, F.signal())
+    assert :ok = Topology.member_output(%{activation_state: state}, :missing, F.signal())
+    assert {:error, :bus_not_ready} = Topology.publish(state, :missing, F.signal())
 
     root = parent.activation
     assert :ok = Server.stop(server)
     F.down(root)
-    assert {:error, :parent_not_found} = TopologyRuntime.parent_send(parent, F.signal())
+    assert {:error, :parent_not_found} = Topology.parent_send(parent, F.signal())
   end
 end

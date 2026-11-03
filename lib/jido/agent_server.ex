@@ -72,7 +72,7 @@ defmodule Jido.AgentServer do
     Plugin,
     RegistrationGuard,
     ReplyGate,
-    TopologyRuntime
+    Topology
   }
 
   alias Jido.AgentServer.Supervisor, as: ServerSupervisor
@@ -223,7 +223,7 @@ defmodule Jido.AgentServer do
              opts[:plugin_runtime_options]
            ) do
       if not Jido.Agent.Topology.empty?(opts[:agent].topology) or
-           TopologyRuntime.buses(opts[:agent]) != [] or
+           Topology.buses(opts[:agent]) != [] or
            opts[:persistence] not in [nil, false] or
            Enum.any?(specs, &match?(%{agent_server: %{runtime?: true}}, &1)) do
         invalid_options("runtime Plugins require a supervisor; use child_spec/1 or start/1")
@@ -907,7 +907,7 @@ defmodule Jido.AgentServer do
 
   defp initialize_bound_plugins(data) do
     if not Jido.Agent.Topology.empty?(data.agent.topology) or
-         TopologyRuntime.buses(data.agent) != [] or
+         Topology.buses(data.agent) != [] or
          ServerSupervisor.execution(data.activation_state) != nil or
          Enum.any?(data.plugin_specs, &match?(%{agent_server: %{runtime?: true}}, &1)) do
       owner = self()
@@ -1104,7 +1104,7 @@ defmodule Jido.AgentServer do
   end
 
   def handle_event({:call, from}, {:topology_members, name}, _phase, data) do
-    {:keep_state_and_data, reply(from, TopologyRuntime.members(data.activation_state, name))}
+    {:keep_state_and_data, reply(from, Topology.members(data.activation_state, name))}
   end
 
   def handle_event({:call, from}, {:reserve_child, tag, token}, _phase, data) do
@@ -1355,14 +1355,14 @@ defmodule Jido.AgentServer do
       do: {:keep_state_and_data, [:postpone]}
 
   def handle_event(:cast, {:topology_output, tag, signal}, _phase, data) do
-    case TopologyRuntime.member_output(Map.put(data, :server, self()), tag, signal) do
+    case Topology.member_output(Map.put(data, :server, self()), tag, signal) do
       :ok -> :keep_state_and_data
       {:error, reason} -> {:stop, {:shutdown, {:topology_delivery_failed, reason}}, data}
     end
   end
 
   def handle_event(:cast, {:topology_bus, name, signal}, _phase, data) do
-    case TopologyRuntime.output(Map.put(data, :server, self()), %{kind: :bus, name: name}, signal) do
+    case Topology.output(Map.put(data, :server, self()), %{kind: :bus, name: name}, signal) do
       :ok -> :keep_state_and_data
       {:error, reason} -> {:stop, {:shutdown, {:topology_delivery_failed, reason}}, data}
     end
@@ -2957,7 +2957,7 @@ defmodule Jido.AgentServer do
 
   defp identify_topology(%{persistence: persistence, agent: before}, candidate)
        when persistence not in [nil, false],
-       do: TopologyRuntime.identify(before, candidate)
+       do: Topology.identify(before, candidate)
 
   defp identify_topology(_data, candidate), do: {:ok, candidate}
 
@@ -3130,7 +3130,7 @@ defmodule Jido.AgentServer do
 
           active =
             Map.merge(data.active, %{
-              composition_changed: TopologyRuntime.changed?(data.active.diff, data.agent, candidate),
+              composition_changed: Topology.changed?(data.active.diff, data.agent, candidate),
               commit_plugins: Enum.reject(specs, &(&1.module in data.active.changed_plugins))
             })
 

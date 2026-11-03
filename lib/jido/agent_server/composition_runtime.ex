@@ -1,9 +1,10 @@
 defmodule Jido.AgentServer.CompositionRuntime do
   @moduledoc false
 
-  alias Jido.Agent.{Mutation, Topology}
+  alias Jido.Agent.Mutation
+  alias Jido.Agent.Topology, as: AgentTopology
   alias Jido.AgentServer, as: Server
-  alias Jido.AgentServer.{Core, Effects, Plugin, Supervisor, TopologyRuntime}
+  alias Jido.AgentServer.{Core, Effects, Plugin, Supervisor, Topology}
 
   @child_options ~w(placement on_parent_exit orphan_dispatch restart server_options meta)a
   @adoption_options ~w(placement on_parent_exit orphan_dispatch restart meta)a
@@ -19,8 +20,8 @@ defmodule Jido.AgentServer.CompositionRuntime do
     end
   end
 
-  def validate_runtime(data), do: TopologyRuntime.validate(data.agent)
-  def reconcile(data), do: TopologyRuntime.reconcile(data)
+  def validate_runtime(data), do: Topology.validate(data.agent)
+  def reconcile(data), do: Topology.reconcile(data)
 
   def spawn_child(server, agent, tag, opts) do
     token = make_ref()
@@ -119,8 +120,8 @@ defmodule Jido.AgentServer.CompositionRuntime do
   end
 
   defp requires_activation?(candidate, changed) do
-    not Topology.empty?(candidate.topology) or
-      TopologyRuntime.buses(candidate) != [] or changed != []
+    not AgentTopology.empty?(candidate.topology) or
+      Topology.buses(candidate) != [] or changed != []
   end
 
   defp child_supervisor(context, :owned) do

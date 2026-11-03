@@ -1,7 +1,7 @@
 defmodule Jido.AgentServer.Durable do
   @moduledoc false
 
-  alias Jido.AgentServer.{DurableTurn, Supervisor, TopologyRuntime}
+  alias Jido.AgentServer.{DurableTurn, Supervisor, Topology}
 
   @max_timeout 4_294_967_295
 
@@ -84,7 +84,7 @@ defmodule Jido.AgentServer.Durable do
 
   defp load(config, agent, :create, opts) do
     with {:ok, agent} <- Jido.Agent.Mutation.bind(agent),
-         {:ok, agent} <- TopologyRuntime.identify(nil, agent),
+         {:ok, agent} <- Topology.identify(nil, agent),
          :ok <- Jido.Persistence.create_agent(config, agent, opts),
          do: {:ok, agent, 0, nil}
   end

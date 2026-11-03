@@ -226,7 +226,7 @@ defmodule JidoTest.AgentServer.Composition.TopologyTest do
 
     bus_pid = :sys.get_state(bridge).bus
     state = :gen_statem.call(server, :child_context).state
-    assert :ok = Jido.AgentServer.TopologyBus.publish(state, :root, F.signal())
+    assert :ok = Jido.AgentServer.Topology.publish(state, :root, F.signal())
     assert_eventually(Server.agent(child).state.count == 1)
     assert {:ok, _, _} = turn(server, [D.emit(F.signal())])
     assert_eventually(Server.agent(child).state.count == 2)

@@ -1,14 +1,53 @@
-defmodule Jido.AgentServer.TopologyRuntime do
+defmodule Jido.AgentServer.Topology do
   @moduledoc false
+  use GenServer
   alias Jido.Agent
-  alias Jido.Agent.Topology
+  alias Jido.Agent.Topology, as: AgentTopology
   alias Jido.AgentServer, as: Server
   alias Jido.AgentServer.Supervisor, as: ServerSupervisor
+  alias Jido.Signal.Bus
+
+  def start_link(args), do: GenServer.start_link(__MODULE__, args)
+
+  @impl true
+  def init({context, name}) do
+    bus_name =
+      "$agent/" <>
+        Base.url_encode64(:erlang.term_to_binary({context.partition, context.agent_id, name}),
+          padding: false
+        )
+
+    with {:ok, bus} <- Bus.start_link(name: bus_name, jido: context.jido),
+         {:ok, _subscription} <- Bus.subscribe(bus, "**") do
+      owner = :ets.lookup_element(context.state, :worker, 2)
+      :ets.insert(context.state, {{:topology_bus, name}, bus})
+      {:ok, %{owner: owner, name: name, bus: bus}}
+    end
+  end
+
+  @impl true
+  def handle_info({:signal, signal}, state) do
+    :gen_statem.cast(state.owner, {:topology_bus, state.name, signal})
+    {:noreply, state}
+  end
+
+  def publish(state, name, signal) do
+    case :ets.lookup(state, {:topology_bus, name}) do
+      [{_, bus}] ->
+        case Bus.publish(bus, [signal]) do
+          {:ok, _} -> :ok
+          error -> error
+        end
+
+      [] ->
+        {:error, :bus_not_ready}
+    end
+  end
 
   # Save slot identities with the topology. A removed slot loses its identity,
   # so re-adding that slot cannot restore an earlier member lifetime.
   def identify(before, candidate) do
-    with {:ok, desired} <- Topology.bind(candidate, candidate.state),
+    with {:ok, desired} <- AgentTopology.bind(candidate, candidate.state),
          {:ok, previous} <- previous_members(before) do
       members =
         Enum.map(candidate.topology.agents, fn declaration ->
@@ -48,7 +87,7 @@ defmodule Jido.AgentServer.TopologyRuntime do
   end
 
   defp previous_members(nil), do: {:ok, []}
-  defp previous_members(agent), do: Topology.bind(agent, agent.state)
+  defp previous_members(agent), do: AgentTopology.bind(agent, agent.state)
 
   def validate(%Agent{} = agent) do
     with :ok <-
@@ -80,11 +119,12 @@ defmodule Jido.AgentServer.TopologyRuntime do
     Agent.Diff.changed?(diff, :agents) or Agent.Diff.changed?(diff, :connections) or
       buses(before) != buses(after_agent) or
       (Agent.Diff.changed?(diff, :state) and
-         Topology.bind(before, before.state) != Topology.bind(after_agent, after_agent.state))
+         AgentTopology.bind(before, before.state) !=
+           AgentTopology.bind(after_agent, after_agent.state))
   end
 
   def reconcile(%{agent: agent} = data) do
-    with {:ok, members} <- Topology.bind(agent, agent.state) do
+    with {:ok, members} <- AgentTopology.bind(agent, agent.state) do
       desired =
         Map.new(
           for member <- members, index <- 1..member.count do
@@ -109,7 +149,7 @@ defmodule Jido.AgentServer.TopologyRuntime do
 
       with :ok <- stop_changed(data.owner, previous, desired, live),
            :ok <- start_missing(data, desired, previous, live),
-           :ok <- Jido.AgentServer.TopologyBus.reconcile(data) do
+           :ok <- reconcile_buses(data) do
         put_plans(data.activation_state, desired)
         {:ok, desired}
       end
@@ -221,7 +261,11 @@ defmodule Jido.AgentServer.TopologyRuntime do
 
   def emit(context, signal) do
     with {:ok, edges} <-
-           Topology.connections_for(context.agent, %{kind: :agent, name: :root}, signal.type) do
+           AgentTopology.connections_for(
+             context.agent,
+             %{kind: :agent, name: :root},
+             signal.type
+           ) do
       cond do
         edges != [] ->
           deliver(context, edges, signal)
@@ -250,7 +294,7 @@ defmodule Jido.AgentServer.TopologyRuntime do
   end
 
   def output(data, source, signal) do
-    with {:ok, edges} <- Topology.connections_for(data.agent, source, signal.type),
+    with {:ok, edges} <- AgentTopology.connections_for(data.agent, source, signal.type),
          do: deliver(data, edges, signal)
   end
 
@@ -270,7 +314,7 @@ defmodule Jido.AgentServer.TopologyRuntime do
         send_agent(data.activation_state, name, signal)
 
       %{to: %{kind: :bus, name: name}} ->
-        Jido.AgentServer.TopologyBus.publish(data.activation_state, name, signal)
+        publish(data.activation_state, name, signal)
     end)
   end
 
@@ -278,6 +322,45 @@ defmodule Jido.AgentServer.TopologyRuntime do
     for %{provider: Jido.Plugin.Bus.DSL, data: %{buses: buses}} <- agent.plugins,
         bus <- buses,
         do: bus.name
+  end
+
+  defp reconcile_buses(data) do
+    names = buses(data.agent)
+    existing = if data.activation, do: Supervisor.which_children(data.activation), else: []
+
+    Enum.each(existing, fn
+      {{:topology_bus, name} = id, _, _, _} ->
+        if name not in names do
+          :ok = Supervisor.terminate_child(data.activation, id)
+          :ok = Supervisor.delete_child(data.activation, id)
+          :ets.delete(data.activation_state, {:topology_bus, name})
+        end
+
+      _ ->
+        :ok
+    end)
+
+    Enum.reduce_while(names, :ok, fn name, :ok ->
+      id = {:topology_bus, name}
+
+      if List.keymember?(existing, id, 0) do
+        {:cont, :ok}
+      else
+        context = %{
+          state: data.activation_state,
+          jido: data.jido,
+          partition: data.partition,
+          agent_id: data.agent.id
+        }
+
+        spec = %{id: id, start: {__MODULE__, :start_link, [{context, name}]}}
+
+        case Supervisor.start_child(data.activation, spec) do
+          {:ok, _} -> {:cont, :ok}
+          error -> {:halt, error}
+        end
+      end
+    end)
   end
 
   defp topology_parent?(nil), do: false

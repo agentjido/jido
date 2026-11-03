@@ -6,7 +6,7 @@ defmodule Jido.AgentServer.Effects do
   alias Jido.Agent.Mutation
   alias Jido.AgentServer, as: Server
   alias Jido.AgentServer.Directive.{AgentStart, AgentStop, ErrorReport, ProcessStart}
-  alias Jido.AgentServer.TopologyRuntime
+  alias Jido.AgentServer.Topology
   alias Jido.Dispatch.Preparation, as: DispatchPreparation
   alias Jido.Signal
   alias Jido.Trace.Context, as: TraceContext
@@ -76,7 +76,7 @@ defmodule Jido.AgentServer.Effects do
 
   defp do_run(%AgentSend{name: name, signal: signal}, _handler, context) do
     with {:ok, signal} <- prepare_outbound(signal, {:agent, name}, context),
-         do: TopologyRuntime.send_agent(context.activation_state, name, signal)
+         do: Topology.send_agent(context.activation_state, name, signal)
   end
 
   defp do_run(%Reply{signal: signal}, _handler, context) do
@@ -86,7 +86,7 @@ defmodule Jido.AgentServer.Effects do
 
   defp do_run(%ParentSend{signal: signal}, _handler, context) do
     with {:ok, signal} <- prepare_outbound(signal, :parent, context),
-         do: TopologyRuntime.parent_send(context.parent, signal)
+         do: Topology.parent_send(context.parent, signal)
   end
 
   defp do_run(%ServerStop{reason: reason}, _handler, _context), do: {:stop, reason}
@@ -312,7 +312,7 @@ defmodule Jido.AgentServer.Effects do
 
   defp validate_outbound_correlation(_target, _correlated, _prepared), do: :ok
 
-  defp dispatch_outbound(signal, nil, context), do: TopologyRuntime.emit(context, signal)
+  defp dispatch_outbound(signal, nil, context), do: Topology.emit(context, signal)
 
   defp dispatch_outbound(signal, target, context) do
     Signal.Dispatch.dispatch(signal, DispatchPreparation.inherit_bus_scope(target, context.jido))
