@@ -2,7 +2,7 @@ defmodule Jido.Plugin.Scheduler.Cron do
   alias Jido.Joi
   @moduledoc "Creates or replaces one recurring Signal schedule."
 
-  alias Jido.Plugin.Scheduler
+  alias Jido.Plugin.Scheduler.CronRules
 
   @schema Joi.struct(
             __MODULE__,
@@ -36,14 +36,14 @@ defmodule Jido.Plugin.Scheduler.Cron do
   @spec validate(t()) :: {:ok, t()} | {:error, term()}
   def validate(%__MODULE__{} = directive) do
     with {:ok, directive} <- Joi.parse(@schema, Map.from_struct(directive)),
-         :ok <- Scheduler.validate_job_id(directive.job_id),
+         :ok <- CronRules.validate_job_id(directive.job_id),
          {:ok, timezone} <-
-           Scheduler.validate_cron_spec(
+           CronRules.validate_spec(
              directive.cron,
              directive.signal,
              directive.timezone
            ),
-         :ok <- Scheduler.validate_occurrence(directive.signal, directive.generation) do
+         :ok <- CronRules.validate_occurrence(directive.signal, directive.generation) do
       {:ok, %{directive | timezone: timezone}}
     end
   end

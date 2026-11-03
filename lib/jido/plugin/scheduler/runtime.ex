@@ -5,8 +5,7 @@ defmodule Jido.Plugin.Scheduler.Runtime do
 
   alias Jido.AgentServer, as: Server
   alias Jido.Plugin.{Context, Init}
-  alias Jido.Plugin.Scheduler
-  alias Jido.Plugin.Scheduler.{Cancel, Cron, Schedule, WallClock}
+  alias Jido.Plugin.Scheduler.{Cancel, Cron, CronRules, Schedule, WallClock}
   alias Jido.Signal
   alias Jido.Signal.Context, as: SignalContext
   alias Jido.Trace
@@ -23,6 +22,7 @@ defmodule Jido.Plugin.Scheduler.Runtime do
       partition: init.partition,
       jido: init.jido,
       options: init.options,
+      plugin: init.module,
       state_version: init.state_version,
       cron_jobs: %{},
       dormant_cron: %{},
@@ -172,7 +172,7 @@ defmodule Jido.Plugin.Scheduler.Runtime do
   end
 
   defp current_plugin_state(runtime) do
-    case Server.plugin_state(runtime.agent_server, Scheduler, 5_000) do
+    case Server.plugin_state(runtime.agent_server, runtime.plugin, 5_000) do
       {:ok, state} -> {:ok, state || %{cron: %{}}}
       {:error, reason} -> {:error, reason}
     end
@@ -374,12 +374,12 @@ defmodule Jido.Plugin.Scheduler.Runtime do
   defp cron_tick(_spec, signal, _scope, _job, nil, _time), do: fresh_signal(signal)
 
   defp cron_tick(_spec, signal, scope, job, generation, time) do
-    {:ok, tick} = Scheduler.occurrence_signal(signal, scope, job, generation, time)
+    {:ok, tick} = CronRules.occurrence_signal(signal, scope, job, generation, time)
     tick
   end
 
   defp validate_scope(nil, _scope), do: :ok
-  defp validate_scope(_generation, scope), do: Scheduler.validate_occurrence_scope(scope)
+  defp validate_scope(_generation, scope), do: CronRules.validate_occurrence_scope(scope)
 
   defp validate_time_scale_runtime(time_scale, timezone) do
     with {:ok, speedup} <- time_scale_call(:speedup, &time_scale.speedup/0),

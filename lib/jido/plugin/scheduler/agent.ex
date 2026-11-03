@@ -3,8 +3,7 @@ defmodule Jido.Plugin.Scheduler.Agent do
   @moduledoc false
   @behaviour Jido.Plugin
 
-  alias Jido.Plugin.Scheduler
-  alias Jido.Plugin.Scheduler.{Cancel, Cron, Schedule}
+  alias Jido.Plugin.Scheduler.{Cancel, Cron, CronRules, Schedule}
   alias Jido.Signal
 
   @cron_spec_schema Joi.object(
@@ -19,7 +18,7 @@ defmodule Jido.Plugin.Scheduler.Agent do
   @state_schema Joi.object(%{
                   cron:
                     Joi.map(Joi.any(), @cron_spec_schema, description: "Recurring schedule definitions")
-                    |> Joi.refine({Scheduler, :validate_cron_state, []})
+                    |> Joi.refine({CronRules, :validate_state, []})
                 })
                 |> Joi.default(%{cron: %{}})
 
@@ -39,7 +38,7 @@ defmodule Jido.Plugin.Scheduler.Agent do
 
   defp apply_directive(%Cron{} = directive, {:ok, state}) do
     spec =
-      Scheduler.build_cron_spec(
+      CronRules.build_spec(
         directive.cron,
         directive.signal,
         directive.timezone,

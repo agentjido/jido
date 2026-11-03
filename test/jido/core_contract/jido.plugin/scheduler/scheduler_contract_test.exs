@@ -4,6 +4,7 @@ defmodule JidoTest.Contract.PluginSchedulerTest do
   alias Jido.Agent
   alias Jido.Error.ValidationError, as: Error
   alias Jido.Plugin.Scheduler
+  alias Jido.Plugin.Scheduler.CronRules
   alias Jido.Plugin.Scheduler.{DSL, Occurrence, WallClock}
   alias Jido.Plugin.Normalizer
   alias Jido.Signal
@@ -85,20 +86,20 @@ defmodule JidoTest.Contract.PluginSchedulerTest do
   test "invalid and retired Scheduler inputs fail before state can change" do
     signal = tick()
 
-    assert {:ok, "Etc/UTC"} = Scheduler.validate_cron_spec("* * * * *", signal, "")
-    assert {:ok, "Etc/UTC"} = Scheduler.validate_cron_spec("* * * * * *", signal, nil)
+    assert {:ok, "Etc/UTC"} = CronRules.validate_spec("* * * * *", signal, "")
+    assert {:ok, "Etc/UTC"} = CronRules.validate_spec("* * * * * *", signal, nil)
 
     assert {:error, {:invalid_cron, :invalid_type}} =
-             Scheduler.validate_cron_spec(nil, signal, nil)
+             CronRules.validate_spec(nil, signal, nil)
 
     assert {:error, {:invalid_cron, _reason}} =
-             Scheduler.validate_cron_spec("not cron", signal, nil)
+             CronRules.validate_spec("not cron", signal, nil)
 
     assert {:error, {:invalid_timezone, :invalid_type}} =
-             Scheduler.validate_cron_spec("* * * * *", signal, 1)
+             CronRules.validate_spec("* * * * *", signal, 1)
 
     assert {:error, {:invalid_timezone, _reason}} =
-             Scheduler.validate_cron_spec("* * * * *", signal, "No/SuchZone")
+             CronRules.validate_spec("* * * * *", signal, "No/SuchZone")
 
     for directive <- [
           Scheduler.schedule(-1, signal),
@@ -160,15 +161,15 @@ defmodule JidoTest.Contract.PluginSchedulerTest do
   test "saved definitions with retired delivery fields fail validation" do
     {:scheduler, schema} = Scheduler.Agent.state_spec([])
 
-    base = Scheduler.build_cron_spec("* * * * *", tick(), nil, 1)
+    base = CronRules.build_spec("* * * * *", tick(), nil, 1)
 
     for generation <- [0, 2_147_483_647] do
-      valid = Scheduler.build_cron_spec("* * * * *", tick(), nil, generation)
+      valid = CronRules.build_spec("* * * * *", tick(), nil, generation)
       assert {:ok, _state} = Jido.Joi.parse(schema, %{cron: %{boundary: valid}})
     end
 
     for generation <- [-1, 2_147_483_648] do
-      invalid = Scheduler.build_cron_spec("* * * * *", tick(), nil, generation)
+      invalid = CronRules.build_spec("* * * * *", tick(), nil, generation)
       assert {:error, _errors} = Jido.Joi.parse(schema, %{cron: %{boundary: invalid}})
     end
 
@@ -198,7 +199,7 @@ defmodule JidoTest.Contract.PluginSchedulerTest do
                  Agent.Directive.validate(Scheduler.cron(:job, "* * * * *", invalid))
 
         assert {:error, :nonportable_occurrence_scope} =
-                 Scheduler.validate_occurrence_scope({ExampleJido, "agent-1", [value]})
+                 CronRules.validate_occurrence_scope({ExampleJido, "agent-1", [value]})
       end
     after
       Port.close(port)

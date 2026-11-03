@@ -98,7 +98,7 @@ defmodule JidoTest.Contract.PluginSchedulerRuntimeTest do
   end
 
   defp spec(expression \\ "0 0 1 1 *", generation \\ nil) do
-    Scheduler.build_cron_spec(expression, tick(), nil, generation)
+    Jido.Plugin.Scheduler.CronRules.build_spec(expression, tick(), nil, generation)
   end
 
   defp context(runtime, plugin_state, version, signal \\ tick()) do

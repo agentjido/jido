@@ -2,7 +2,7 @@ defmodule Jido.Plugin.Scheduler.Cancel do
   alias Jido.Joi
   @moduledoc "Cancels one recurring Signal schedule."
 
-  alias Jido.Plugin.Scheduler
+  alias Jido.Plugin.Scheduler.CronRules
 
   @schema Joi.struct(
             __MODULE__,
@@ -22,7 +22,7 @@ defmodule Jido.Plugin.Scheduler.Cancel do
   @spec validate(t()) :: {:ok, t()} | {:error, term()}
   def validate(%__MODULE__{} = directive) do
     with {:ok, directive} <- Joi.parse(@schema, Map.from_struct(directive)),
-         :ok <- Scheduler.validate_job_id(directive.job_id) do
+         :ok <- CronRules.validate_job_id(directive.job_id) do
       {:ok, directive}
     end
   end

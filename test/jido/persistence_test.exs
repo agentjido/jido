@@ -326,7 +326,7 @@ defmodule JidoTest.PersistenceTest do
     start_supervised!(Clock)
     persistence = adapter(:plugin_state)
     tick = Signal.new!("cron.tick", %{}, source: "/test")
-    spec = Jido.Plugin.Scheduler.build_cron_spec("* * * * * * *", tick)
+    spec = Jido.Plugin.Scheduler.CronRules.build_spec("* * * * * * *", tick)
 
     agent =
       FastRuntimeAgent.instantiate!(

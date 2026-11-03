@@ -3,7 +3,6 @@ defmodule Jido.Plugin.Scheduler.Server do
   @behaviour Jido.Plugin
 
   alias Jido.Plugin.{Context, Init}
-  alias Jido.Plugin.Scheduler
   alias Jido.Plugin.Scheduler.Runtime
 
   @impl true
@@ -22,6 +21,6 @@ defmodule Jido.Plugin.Scheduler.Server do
 
   @impl true
   def child_spec(%Init{} = init) do
-    Supervisor.child_spec({Runtime, init}, id: Scheduler)
+    Supervisor.child_spec({Runtime, init}, id: init.module)
   end
 end
