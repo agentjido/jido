@@ -316,13 +316,15 @@ defmodule Jido.Action.InlineHostTest do
 
     assert_raise ArgumentError, fn -> owner.action_target("warmup_missing") end
     missing = Enum.map(1..50, &"missing_#{&1}_#{System.unique_integer([:positive])}")
-    before_atoms = :erlang.system_info(:atom_count)
 
     Enum.each(missing, fn name ->
       assert_raise ArgumentError, fn -> owner.action_target(name) end
     end)
 
-    assert :erlang.system_info(:atom_count) == before_atoms
+    Enum.each(missing, fn name ->
+      assert_raise ArgumentError, fn -> String.to_existing_atom(name) end
+    end)
+
     refute_received :body_ran
   end
 
