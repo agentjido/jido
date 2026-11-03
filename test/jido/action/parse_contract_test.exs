@@ -9,9 +9,9 @@ defmodule JidoActionTest.Action.ParseContractTest do
   end
 
   @tag obligation: "jido_action.validation.I1"
-  test "parse modes retain distinct struct shapes and the same Joi field policy" do
+  test "parse modes retain distinct struct shapes and open map fields" do
     schema = Jido.Joi.struct(Value, %{count: Jido.Joi.integer()}, coerce: true)
-    input = %{count: 2, extra: :kept}
+    input = %{count: 2}
 
     assert {:ok, %{count: 2, tag: nil}} = Validation.parse(schema, input, %{})
 
@@ -22,8 +22,10 @@ defmodule JidoActionTest.Action.ParseContractTest do
              Validation.parse(Jido.Joi.nullable(schema), input, %{})
 
     for validate <- validators() do
-      assert {:ok, %{count: 2}} =
-               validate.(Jido.Joi.object(%{count: Jido.Joi.integer()}), input, %{})
+      open_input = %{count: 2, extra: :kept}
+
+      assert validate.(Jido.Joi.object(%{count: Jido.Joi.integer()}), open_input, %{}) ==
+               {:ok, open_input}
 
       assert {:error, %{message: "Unsupported schema type"}} = validate.([], :unchanged, %{})
       assert {:ok, 2} = validate.(Jido.Joi.integer(), 2, %{})

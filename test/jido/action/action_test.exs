@@ -139,9 +139,11 @@ defmodule JidoActionTest.ActionTest do
 
       assert module.name() == "runtime_dynamic_options_action"
 
-      assert {:ok, %{value: 3}} = module.validate_params(%{value: 3, extra: "removed"})
+      assert module.validate_params(%{value: 3, extra: "kept"}) ==
+               {:ok, %{value: 3, extra: "kept"}}
 
-      assert {:ok, %{doubled: 6}} = module.validate_output(%{doubled: 6, extra: "removed"})
+      assert module.validate_output(%{doubled: 6, extra: "kept"}) ==
+               {:ok, %{doubled: 6, extra: "kept"}}
 
       assert {:ok, %{doubled: 6}} = module.run(%{value: 3}, %{})
     end
@@ -603,9 +605,9 @@ defmodule JidoActionTest.ActionTest do
       assert message =~ "expected integer"
     end
 
-    test "uses the declared unknown-key policy" do
+    test "uses the default open unknown-key policy" do
       assert {:ok, params} = FullAction.validate_params(%{a: 1, b: 2, trace_id: "trace-1"})
-      assert params == %{a: 1, b: 2}
+      assert params == %{a: 1, b: 2, trace_id: "trace-1"}
     end
 
     test "honors an explicit Joi unknown-key policy" do
@@ -654,8 +656,12 @@ defmodule JidoActionTest.ActionTest do
         end
       )
 
-      assert {:ok, %{value: 42}} =
-               action_module.validate_params(%{value: 42, extra: "kept"})
+      assert {:ok, %{value: 42}} = action_module.validate_params(%{value: 42})
+
+      assert {:error, %Jido.Error.ValidationError{message: message}} =
+               action_module.validate_params(%{value: 42, extra: "rejected"})
+
+      assert message =~ "unrecognized key: extra"
     end
 
     test "returns validation error for unsupported schema types" do
@@ -711,7 +717,7 @@ defmodule JidoActionTest.ActionTest do
 
       assert result.result == "test"
       assert result.length == 4
-      refute Map.has_key?(result, :extra)
+      assert result.extra == "data"
     end
 
     test "action with invalid output fails validation" do

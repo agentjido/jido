@@ -41,8 +41,6 @@ defmodule Jido.Joi.Schema do
   def kind(%Zoi.Types.Union{}), do: :union
   def kind(value), do: if(schema?(value), do: :other, else: :not_schema)
 
-  def kind?(schema, expected), do: kind(schema) == expected
-
   def map_shaped?(%Zoi.Types.Map{}), do: true
   def map_shaped?(%Zoi.Types.Struct{}), do: true
   def map_shaped?(%Zoi.Types.Any{}), do: true
@@ -79,15 +77,6 @@ defmodule Jido.Joi.Schema do
   def put_fields(%Zoi.Types.Struct{} = schema, fields), do: %{schema | fields: fields}
   def put_fields(%Zoi.Types.Keyword{} = schema, fields), do: %{schema | fields: fields}
 
-  def put_unrecognized_keys(%Zoi.Types.Map{} = schema, value),
-    do: %{schema | unrecognized_keys: value}
-
-  def put_unrecognized_keys(%Zoi.Types.Struct{} = schema, value),
-    do: %{schema | unrecognized_keys: value}
-
-  def put_unrecognized_keys(%Zoi.Types.Keyword{} = schema, value),
-    do: %{schema | unrecognized_keys: value}
-
   def inner(%Zoi.Types.Array{inner: inner}), do: {:ok, inner}
   def inner(%Zoi.Types.Codec{to: inner}), do: {:ok, inner}
   def inner(_), do: :error
@@ -102,44 +91,160 @@ defmodule Jido.Joi.Schema do
   def enum(%Zoi.Types.Enum{enum_type: type, values: values}), do: {:ok, type, values}
   def enum(_), do: :error
 
-  def literal(%Zoi.Types.Literal{value: value}), do: {:ok, value}
-  def literal(_), do: :error
-
   def struct_module(%Zoi.Types.Struct{module: module}), do: {:ok, module}
   def struct_module(_), do: :error
 
   def coerce?(schema), do: Map.get(schema, :coerce, false)
-  def without_coercion(%{coerce: _coerce} = schema), do: %{schema | coerce: false}
-  def without_coercion(schema), do: schema
-  def empty_values(schema), do: Map.get(schema, :empty_values, [])
-  def unrecognized_keys(schema), do: Map.get(schema, :unrecognized_keys)
 
   def effects(%Zoi.Types.Meta{effects: effects}), do: effects
   def effects(%{meta: %Zoi.Types.Meta{effects: effects}}), do: effects
   def effects(_), do: []
 
-  def effect_modules(schema) do
-    schema
-    |> effects()
-    |> Enum.flat_map(fn
-      {_kind, {module, _function, _args}} when is_atom(module) -> [module]
-      _ -> []
-    end)
-  end
-
-  def resolve_lazy(%Zoi.Types.Lazy{fun: {module, function, args}}),
-    do: apply(module, function, args)
-
-  def resolve_lazy(%Zoi.Types.Lazy{fun: fun}), do: fun.()
-  def resolve_lazy(schema), do: schema
-
-  def traverse(schema, fun), do: Zoi.Schema.traverse(schema, fun)
-
-  def type_module(schema) when is_struct(schema), do: schema.__struct__
-  def type_module(_), do: nil
-
   def forbidden_state_type?(schema), do: kind(schema) in [:codec, :lazy, :string_boolean]
 
   def transform_effect?({:transform, _}), do: true
   def transform_effect?(_), do: false
+
+  def validate_stored(schema) do
+    if schema?(schema),
+      do: validate_stored_value(schema, []),
+      else: stored_error("expected a Joi schema", [])
+  end
+
+  def close(schema), do: rewrite_unknown_keys(schema, :error)
+
+  @doc false
+  def validate_closed_fields(value, allowed, _opts) when is_map(value) do
+    case Map.keys(value) -- allowed do
+      [] -> :ok
+      [key | _rest] -> {:error, Zoi.Error.unrecognized_key(key)}
+    end
+  end
+
+  defp validate_stored_value(%_{} = value, path) do
+    if schema?(value) do
+      cond do
+        coerce?(value) ->
+          stored_error("stored schemas cannot coerce values", path)
+
+        forbidden_state_type?(value) ->
+          stored_error("stored schemas cannot use conversion or dynamic types", path)
+
+        Enum.any?(effects(value), &transform_effect?/1) ->
+          stored_error("stored schemas cannot transform values", path)
+
+        Map.get(value, :unrecognized_keys) == :strip ->
+          stored_error("stored schemas cannot strip undeclared fields", path)
+
+        Map.get(value, :prefix_items, []) != [] ->
+          stored_error("stored schemas do not support array prefix items", path)
+
+        Map.get(value, :pattern_properties, []) != [] ->
+          stored_error("stored schemas do not support map pattern properties", path)
+
+        true ->
+          value |> Map.from_struct() |> validate_stored_value(path)
+      end
+    else
+      value |> Map.from_struct() |> validate_stored_value(path)
+    end
+  end
+
+  defp validate_stored_value(value, path) when is_map(value) do
+    Enum.reduce_while(value, :ok, fn {key, child}, :ok ->
+      case validate_stored_value(child, path ++ [key]) do
+        :ok -> {:cont, :ok}
+        {:error, _reason} = error -> {:halt, error}
+      end
+    end)
+  end
+
+  defp validate_stored_value(value, path) when is_list(value),
+    do: validate_stored_list(value, path, 0)
+
+  defp validate_stored_value(value, path) when is_tuple(value),
+    do: value |> Tuple.to_list() |> validate_stored_list(path, 0)
+
+  defp validate_stored_value(_value, _path), do: :ok
+
+  defp validate_stored_list([], _path, _index), do: :ok
+
+  defp validate_stored_list([value | rest], path, index) when is_list(rest) do
+    with :ok <- validate_stored_value(value, path ++ [index]),
+         do: validate_stored_list(rest, path, index + 1)
+  end
+
+  defp validate_stored_list(_improper, path, index),
+    do: stored_error("stored schemas cannot contain improper lists", path ++ [index])
+
+  defp rewrite_unknown_keys(%Zoi.Types.Intersection{schemas: schemas} = intersection, :error) do
+    if Enum.all?(schemas, &field_map?/1) do
+      allowed = schemas |> Enum.flat_map(&field_keys/1) |> Enum.uniq()
+
+      schemas =
+        Enum.map(schemas, fn schema ->
+          schema = rewrite_unknown_keys(schema, :error)
+          %{schema | unrecognized_keys: :preserve}
+        end)
+
+      effect = {:refine, {__MODULE__, :validate_closed_fields, [allowed]}}
+      meta = %{intersection.meta | effects: intersection.meta.effects ++ [effect]}
+      %{intersection | schemas: schemas, meta: meta}
+    else
+      rewrite_struct_unknown_keys(intersection, :error)
+    end
+  end
+
+  defp rewrite_unknown_keys(%_{} = value, mode),
+    do: rewrite_struct_unknown_keys(value, mode)
+
+  defp rewrite_unknown_keys(value, mode) when is_map(value),
+    do: Map.new(value, fn {key, child} -> {key, rewrite_unknown_keys(child, mode)} end)
+
+  defp rewrite_unknown_keys(value, mode) when is_list(value),
+    do: Enum.map(value, &rewrite_unknown_keys(&1, mode))
+
+  defp rewrite_unknown_keys(value, mode) when is_tuple(value) do
+    value
+    |> Tuple.to_list()
+    |> Enum.map(&rewrite_unknown_keys(&1, mode))
+    |> List.to_tuple()
+  end
+
+  defp rewrite_unknown_keys(value, _mode), do: value
+
+  defp rewrite_struct_unknown_keys(value, mode) do
+    fields =
+      value
+      |> Map.from_struct()
+      |> Map.new(fn {key, child} -> {key, rewrite_unknown_keys(child, mode)} end)
+
+    value
+    |> then(&struct!(&1.__struct__, fields))
+    |> put_unknown_keys_if_supported(mode)
+  end
+
+  defp put_unknown_keys_if_supported(%Zoi.Types.Map{} = schema, mode),
+    do: %{schema | unrecognized_keys: mode}
+
+  defp put_unknown_keys_if_supported(%Zoi.Types.Struct{} = schema, mode),
+    do: %{schema | unrecognized_keys: mode}
+
+  defp put_unknown_keys_if_supported(%Zoi.Types.Keyword{} = schema, mode),
+    do: %{schema | unrecognized_keys: mode}
+
+  defp put_unknown_keys_if_supported(schema, _mode), do: schema
+
+  defp field_map?(%Zoi.Types.Map{fields: fields}), do: is_list(fields)
+  defp field_map?(_schema), do: false
+
+  defp field_keys(%Zoi.Types.Map{fields: fields}), do: Enum.map(fields, &elem(&1, 0))
+
+  defp resolve_lazy(%Zoi.Types.Lazy{fun: {module, function, args}}),
+    do: apply(module, function, args)
+
+  defp resolve_lazy(%Zoi.Types.Lazy{fun: fun}), do: fun.()
+
+  defp stored_error(reason, []), do: {:error, reason}
+  defp stored_error(reason, path), do: {:error, "#{reason} at #{inspect(path)}"}
 end

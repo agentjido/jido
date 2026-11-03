@@ -3,8 +3,9 @@ defmodule Jido.JoiTest do
 
   alias Jido.Joi
 
-  test "facade covers the complete pinned dependency API" do
-    assert Joi.facade_complete?()
+  test "facade excludes Zoi functions outside the Jido contract" do
+    refute function_exported?(Joi, :email, 0)
+    refute function_exported?(Joi, :from_json_schema, 1)
   end
 
   test "schemas stay interoperable across facade operations" do
@@ -19,21 +20,35 @@ defmodule Jido.JoiTest do
     assert {:error, [%{code: :required}]} = Joi.validate(schema, %{label: "one"})
   end
 
-  test "stored validation reports values that parsing would change" do
+  test "open map validation preserves undeclared fields without validating them" do
+    schema = Joi.object(%{count: Joi.integer()})
+    input = %{count: 1, opaque: self()}
+
+    assert {:ok, ^input} = Joi.parse(schema, input)
+  end
+
+  test "stored schemas reject key stripping" do
     schema = Joi.object(%{count: Joi.integer()}, unrecognized_keys: :strip)
 
     assert {:error, [error]} = Joi.validate(schema, %{count: 1, extra: true})
+    assert Joi.error_code(error) == :joi_invalid_stored_schema
+  end
+
+  test "stored schemas reject transformations" do
+    schema = Joi.object(%{count: Joi.integer() |> Joi.transform(&(&1 + 1))})
+
+    assert {:error, [error]} = Joi.initialize(schema, %{count: 1})
+    assert Joi.error_code(error) == :joi_invalid_stored_schema
+  end
+
+  test "stored validation reports refinements that change values" do
+    schema = Joi.object(%{count: Joi.integer() |> Joi.refine({__MODULE__, :mutate, []})})
+
+    assert {:error, [error]} = Joi.validate(schema, %{count: 1})
     assert Joi.changed_value?(error)
     assert Joi.error_code(error) == :joi_changed_value
     assert is_list(Joi.error_path(error))
     assert is_binary(Joi.error_message(error))
-  end
-
-  test "initialization can add defaults but cannot convert supplied values" do
-    schema = Joi.object(%{count: Joi.integer() |> Joi.transform(&(&1 + 1))})
-
-    assert {:error, [error]} = Joi.initialize(schema, %{count: 1})
-    assert Joi.changed_value?(error)
   end
 
   test "parse bang raises the facade exception" do
@@ -58,4 +73,7 @@ defmodule Jido.JoiTest do
   end
 
   def accept(_value, _context), do: :ok
+
+  def mutate(value, opts),
+    do: %{opts[:ctx] | valid?: true, parsed: value + 1}
 end

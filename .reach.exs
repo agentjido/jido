@@ -1,6 +1,6 @@
 [
   layers: [
-    foundation: [
+    primitives: [
       "Jido.Id",
       "Jido.Joi",
       "Jido.Joi.*",
@@ -9,52 +9,48 @@
       "Jido.Error",
       "Jido.Error.*",
       "Jido.Trace",
-      "Zoi.Type.Node"
+      "Jido.Codec.Term",
+      "Jido.Codec.Document",
+      "Jido.Codec.Document.*",
+      "Jido.Codec.Encoder",
+      "Jido.Codec.Encoder.Any",
+      "Jido.Codec.Error",
+      "Jido.Codec.Error.*",
+      "Jido.Codec.Index",
+      "Jido.Codec.Issue",
+      "Zoi.Type.Jido.Joi.Runtime.PolicyNode"
     ],
-    signal: [
-      "Inspect.Jido.Signal.*",
+    value_model: [
       "Jido.Codec.Signal",
       "Jido.Codec.Signal.*",
       "Jido.Signal",
-      "Jido.Signal.Catalog",
       "Jido.Signal.Context",
-      "Jido.Signal.Router",
-      "Jido.Signal.Router.*"
-    ],
-    stable_values: [
-      "Jido.Codec.Term",
       "Jido.Session",
       "Jido.Thread",
       "Jido.Thread.*",
-      "Runic.Identity.Projectable.Jido.Session",
-      "Runic.Identity.Projectable.Jido.Thread",
-      "Runic.Identity.Projectable.Jido.Thread.*"
-    ],
-    definitions: [
-      "Jido.Action",
-      "Jido.Action.*",
       "Jido.Catalog",
       "Jido.Catalog.Entry",
       "Jido.Catalog.Error",
       "Jido.Catalog.Manifest",
       "Jido.Catalog.View",
       "Jido.Codec",
-      "Jido.Codec.Compiler",
-      "Jido.Codec.Config",
       "Jido.Codec.Contract",
-      "Jido.Codec.Document",
-      "Jido.Codec.Document.*",
-      "Jido.Codec.Encoder",
-      "Jido.Codec.Encoder.*",
-      "Jido.Codec.Error",
-      "Jido.Codec.Error.*",
-      "Jido.Codec.Flow",
-      "Jido.Codec.Flow.*",
-      "Jido.Codec.Index",
-      "Jido.Codec.Issue",
       "Jido.Codec.Reference",
       "Jido.Codec.Value",
       "Jido.Codec.Value.*",
+      "Runic.Identity.Projectable.Jido.Session",
+      "Runic.Identity.Projectable.Jido.Thread",
+      "Runic.Identity.Projectable.Jido.Thread.*"
+    ],
+    definitions: [
+      "Inspect.Jido.Signal.*",
+      "Jido.Action",
+      "Jido.Action.*",
+      "Jido.Codec.Compiler",
+      "Jido.Codec.Config",
+      "Jido.Codec.Encoder.Jido.Flow",
+      "Jido.Codec.Flow",
+      "Jido.Codec.Flow.*",
       "Jido.Flow",
       "Jido.Flow.*",
       "Jido.Instruction",
@@ -62,6 +58,9 @@
       "Jido.Plugin.Manifest",
       "Jido.Plugin.Spec",
       "Jido.Plugin.Spec.*",
+      "Jido.Signal.Catalog",
+      "Jido.Signal.Router",
+      "Jido.Signal.Router.*",
       "Runic.Identity.Projectable.Jido.Flow"
     ],
     execution: [
@@ -75,10 +74,11 @@
       "Runic.Transmutable.Jido.Exec.*",
       "Runic.Workflow.Invokable.Jido.Exec.*"
     ],
-    agent: [
+    agent_domain: [
       "Jido.Agent",
       "Jido.Agent.*",
       "Jido.Codec.Agent",
+      "Jido.Codec.Encoder.Jido.Agent",
       "Jido.Plugin",
       "Jido.Plugin.Context",
       "Jido.Plugin.Context.*",
@@ -86,7 +86,7 @@
       "Jido.Plugin.Input",
       "Jido.Plugin.Normalizer"
     ],
-    runtime: [
+    live_runtime: [
       "Jido",
       "Jido.AgentServer",
       "Jido.AgentServer.*",
@@ -94,11 +94,6 @@
       "Jido.Instance.*",
       "Jido.Persistence",
       "Jido.Persistence.*",
-      "Jido.Plugin.Audit*",
-      "Jido.Plugin.Bus.*",
-      "Jido.Plugin.Heartbeat*",
-      "Jido.Plugin.Scheduler*",
-      "Jido.Plugin.SensorManager*",
       "Jido.Signal.Bus",
       "Jido.Signal.Bus.*",
       "Jido.Signal.Dispatch",
@@ -114,9 +109,14 @@
       "Runic.Workflow.EventApplicator.Jido.AgentServer.*",
       "Runic.Workflow.EventApplicator.Jido.Persistence.*"
     ],
-    ai: [
+    capabilities: [
       "Jido.AI",
       "Jido.AI.*",
+      "Jido.Plugin.Audit*",
+      "Jido.Plugin.Bus.*",
+      "Jido.Plugin.Heartbeat*",
+      "Jido.Plugin.Scheduler*",
+      "Jido.Plugin.SensorManager*",
       "Jido.Telemetry.AI",
       "Jido.Telemetry.AI.*",
       "Runic.Identity.Projectable.Jido.AI.*"
@@ -126,23 +126,28 @@
   deps: [
     mode: :allowlist,
     allowed: [
-      foundation: [],
-      signal: [:foundation],
-      stable_values: [:foundation],
-      definitions: [:foundation, :signal, :stable_values],
-      execution: [:foundation, :signal, :stable_values, :definitions],
-      agent: [:foundation, :signal, :stable_values, :definitions, :execution],
-      runtime: [:foundation, :signal, :stable_values, :definitions, :execution, :agent],
-      ai: [:foundation, :signal, :stable_values, :definitions, :execution, :agent, :runtime],
-      composition: [
-        :foundation,
-        :signal,
-        :stable_values,
+      primitives: [],
+      value_model: [:primitives],
+      definitions: [:primitives, :value_model],
+      execution: [:primitives, :value_model, :definitions],
+      agent_domain: [:primitives, :value_model, :definitions, :execution],
+      live_runtime: [:primitives, :value_model, :definitions, :execution, :agent_domain],
+      capabilities: [
+        :primitives,
+        :value_model,
         :definitions,
         :execution,
-        :agent,
-        :runtime,
-        :ai
+        :agent_domain,
+        :live_runtime
+      ],
+      composition: [
+        :primitives,
+        :value_model,
+        :definitions,
+        :execution,
+        :agent_domain,
+        :live_runtime,
+        :capabilities
       ]
     ]
   ],

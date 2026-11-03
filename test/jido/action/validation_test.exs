@@ -13,9 +13,9 @@ defmodule JidoActionTest.Action.ValidationTest do
   end
 
   @tag obligation: ["jido_action.validation.I1", "jido_action.validation.I2"]
-  test "schema transforms retain their chosen result and omit removed input fields" do
+  test "schema transforms retain their chosen result" do
     struct_schema = Jido.Joi.struct(ExtendedParams, %{value: Jido.Joi.integer()}, coerce: true)
-    input = %{value: 2, extra: :kept}
+    input = %{value: 2}
 
     transformed = Jido.Joi.transform(struct_schema, &%{&1 | tag: :added})
 
@@ -37,21 +37,26 @@ defmodule JidoActionTest.Action.ValidationTest do
          "jido_action.validation.I2",
          "jido_action.validation.I3"
        ]
-  test "struct roots follow Joi policies and project parsed structs to maps" do
-    schema = Jido.Joi.struct(ExtendedParams, %{value: Jido.Joi.integer()}, coerce: false)
+  test "struct roots are closed and project parsed structs to maps" do
+    schema =
+      Jido.Joi.struct(
+        ExtendedParams,
+        %{value: Jido.Joi.integer(), tag: Jido.Joi.atom()},
+        coerce: false
+      )
 
     assert Validation.parse(schema, %ExtendedParams{value: 2, tag: :kept}, %{}) ==
-             {:ok, %{value: 2, tag: nil}}
+             {:ok, %{value: 2, tag: :kept}}
 
     coercing = Jido.Joi.struct(Params, %{value: Jido.Joi.integer()}, coerce: true)
 
-    assert Validation.parse(coercing, %{"value" => 2, "extra" => :kept}, %{}) ==
+    assert Validation.parse(coercing, %{"value" => 2}, %{}) ==
              {:ok, %{value: 2}}
 
-    strict = Jido.Joi.struct(Params, %{value: Jido.Joi.integer()}, coerce: true, unrecognized_keys: :error)
-    assert Validation.parse(strict, %{value: 2}, %{}) == {:ok, %{value: 2}}
-
-    for {schema, data} <- [{schema, %{value: 2}}, {strict, %{value: 2, extra: :rejected}}] do
+    for {schema, data} <- [
+          {schema, %{value: 2, tag: :kept}},
+          {coercing, %{"value" => 2, "extra" => :rejected}}
+        ] do
       assert {:error, expected} = Jido.Joi.parse(schema, data)
       assert {:error, error} = Validation.parse(schema, data, %{phase: :input})
       assert error.message == Jido.Joi.prettify_errors(expected)
@@ -123,9 +128,9 @@ defmodule JidoActionTest.Action.ValidationTest do
         end)
 
       assert {:ok, result} =
-               Validation.parse(schema, %{scheme: "https", extra: "kept"}, %{})
+               Validation.parse(schema, %{scheme: "https"}, %{})
 
-      assert {:ok, parsed} = Jido.Joi.parse(schema, %{scheme: "https", extra: "kept"})
+      assert {:ok, parsed} = Jido.Joi.parse(schema, %{scheme: "https"})
       assert result == Map.from_struct(parsed)
       assert result.scheme == "https"
       refute Map.has_key?(result, :extra)
@@ -171,10 +176,10 @@ defmodule JidoActionTest.Action.ValidationTest do
 
     @tag obligation: "jido_action.validation.I2"
     test "honors declared Joi unknown-key policies at the root" do
-      default_strip = Jido.Joi.object(%{name: Jido.Joi.string()})
+      default_open = Jido.Joi.object(%{name: Jido.Joi.string()})
 
-      assert {:ok, %{name: "Ada"}} =
-               Validation.parse(default_strip, %{extra: true, name: "Ada"}, %{})
+      assert {:ok, %{extra: true, name: "Ada"}} =
+               Validation.parse(default_open, %{extra: true, name: "Ada"}, %{})
 
       nested_default = Jido.Joi.object(%{user: Jido.Joi.object(%{name: Jido.Joi.string()})})
 
@@ -185,7 +190,7 @@ defmodule JidoActionTest.Action.ValidationTest do
                  %{}
                )
 
-      assert validated_nested == %{user: %{name: "Ada"}}
+      assert validated_nested == %{user: %{id: 7, name: "Ada"}}
 
       strict = Jido.Joi.object(%{name: Jido.Joi.string()}, unrecognized_keys: :error)
 
@@ -220,7 +225,7 @@ defmodule JidoActionTest.Action.ValidationTest do
 
   @tag obligation: ["jido_action.validation.I1", "jido_action.validation.I2"]
   test "matches Joi results across direct, nested, and wrapped object policies" do
-    strip = Jido.Joi.object(%{name: Jido.Joi.string()})
+    open = Jido.Joi.object(%{name: Jido.Joi.string()})
     preserve = Jido.Joi.object(%{name: Jido.Joi.string()}, unrecognized_keys: :preserve)
     strict = Jido.Joi.object(%{name: Jido.Joi.string()}, unrecognized_keys: :error)
 
@@ -229,22 +234,22 @@ defmodule JidoActionTest.Action.ValidationTest do
         unrecognized_keys: {:preserve, {Jido.Joi.atom(), Jido.Joi.integer()}}
       )
 
-    nested = Jido.Joi.object(%{user: strip}, unrecognized_keys: :preserve)
-    wrapped = Jido.Joi.nullable(strip)
+    nested = Jido.Joi.object(%{user: open}, unrecognized_keys: :preserve)
+    wrapped = Jido.Joi.nullable(open)
 
     coercing =
       Jido.Joi.object(%{count: Jido.Joi.integer(coerce: true)}, coerce: true)
 
     cases = [
-      {strip, %{extra: true, name: "Ada"}},
+      {open, %{extra: true, name: "Ada"}},
       {preserve, %{extra: true, name: "Ada"}},
       {strict, %{extra: true, name: "Ada"}},
       {typed, %{extra: 1, name: "Ada"}},
       {typed, %{extra: "bad", name: "Ada"}},
       {nested, %{trace: "kept", user: %{extra: true, name: "Ada"}}},
       {wrapped, %{extra: true, name: "Ada"}},
-      {Jido.Joi.default(strip, %{name: "default"}), nil},
-      {Jido.Joi.union([strip, Jido.Joi.string()]), %{extra: true, name: "Ada"}},
+      {Jido.Joi.default(open, %{name: "default"}), nil},
+      {Jido.Joi.union([open, Jido.Joi.string()]), %{extra: true, name: "Ada"}},
       {coercing, %{"count" => "2", "extra" => true}}
     ]
 
@@ -274,12 +279,11 @@ defmodule JidoActionTest.Action.ValidationTest do
 
       assert {:ok, 1} = Validation.parse_preserving_shape(Jido.Joi.integer(), 1, %{})
 
-      assert {:ok, %{value: 1}} =
-               Validation.parse_preserving_shape(
-                 Jido.Joi.object(%{value: Jido.Joi.integer()}),
-                 %{value: 1, extra: true},
-                 %{}
-               )
+      assert Validation.parse_preserving_shape(
+               Jido.Joi.object(%{value: Jido.Joi.integer()}),
+               %{value: 1, extra: true},
+               %{}
+             ) == {:ok, %{value: 1, extra: true}}
 
       assert {:ok, %{value: 1, extra: true}} =
                Validation.parse_preserving_shape(

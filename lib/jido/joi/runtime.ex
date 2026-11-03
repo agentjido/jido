@@ -3,19 +3,19 @@ defmodule Jido.Joi.Runtime do
 
   alias Zoi.Types.Meta
 
-  defmodule Node do
+  defmodule PolicyNode do
     @moduledoc false
     defstruct [:schema, :mode, :meta]
   end
 
-  defimpl Zoi.Type, for: Node do
-    def parse(node, input, opts) do
-      Jido.Joi.Runtime.parse(node.schema, input, node.mode, Keyword.delete(opts, :ctx))
+  defimpl Zoi.Type, for: Jido.Joi.Runtime.PolicyNode do
+    def parse(node, input, _opts) do
+      Jido.Joi.Runtime.parse(node.schema, input, node.mode)
     end
   end
 
-  def initialize(schema, input, opts) do
-    case parse(schema, input, :initialize, opts) do
+  def initialize(schema, input) do
+    case parse(schema, input, :initialize) do
       {:ok, initialized} ->
         if preserves?(input, initialized), do: {:ok, initialized}, else: changed_value()
 
@@ -24,31 +24,31 @@ defmodule Jido.Joi.Runtime do
     end
   end
 
-  def validate(schema, input, opts) do
-    case parse(schema, input, :stored, opts) do
+  def validate(schema, input) do
+    case parse(schema, input, :stored) do
       {:ok, ^input} -> :ok
       {:ok, _changed} -> changed_value()
       {:error, _} = error -> error
     end
   end
 
-  def parse(schema, input, mode, opts \\ []) do
+  def parse(schema, input, mode) do
     input =
       if mode == :initialize and is_nil(input) and Meta.default?(schema.meta),
         do: Meta.default(schema.meta),
         else: input
 
-    with {:ok, value} <- parse_type(schema, input, mode, opts),
+    with {:ok, value} <- parse_type(schema, input, mode),
          do: refine(schema, value)
   end
 
-  defp parse_type(%Zoi.Types.Intersection{schemas: [first | rest]}, input, mode, opts) do
-    with {:ok, first} <- parse(first, input, mode, opts) do
-      intersect(rest, first, input, mode, opts)
+  defp parse_type(%Zoi.Types.Intersection{schemas: [first | rest]}, input, mode) do
+    with {:ok, first} <- parse(first, input, mode) do
+      intersect(rest, first, input, mode)
     end
   end
 
-  defp parse_type(schema, input, mode, opts) do
+  defp parse_type(schema, input, mode) do
     prepared =
       schema
       |> Map.from_struct()
@@ -68,12 +68,12 @@ defmodule Jido.Joi.Runtime do
       end)
       |> then(&struct!(schema.__struct__, &1))
 
-    Zoi.parse(prepared, defaults(schema, input, mode), opts)
+    Zoi.parse(prepared, defaults(schema, input, mode))
   end
 
-  defp intersect(schemas, first, input, mode, opts) do
+  defp intersect(schemas, first, input, mode) do
     Enum.reduce_while(schemas, {:ok, first}, fn schema, {:ok, previous} ->
-      with {:ok, value} <- parse(schema, input, mode, opts),
+      with {:ok, value} <- parse(schema, input, mode),
            {:ok, merged} <- merge(previous, value) do
         {:cont, {:ok, merged}}
       else
@@ -88,7 +88,7 @@ defmodule Jido.Joi.Runtime do
         do: true,
         else: schema.meta.required
 
-    %Node{schema: schema, mode: mode, meta: %Meta{required: required}}
+    %PolicyNode{schema: schema, mode: mode, meta: %Meta{required: required}}
   end
 
   defp children(list, mode) when is_list(list), do: Enum.map(list, &children(&1, mode))

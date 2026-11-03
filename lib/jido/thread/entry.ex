@@ -12,7 +12,6 @@ defmodule Jido.Thread.Entry do
               payload: Joi.map() |> Joi.default(%{}),
               refs: Joi.map() |> Joi.default(%{})
             },
-            coerce: true,
             unrecognized_keys: :error
           )
 

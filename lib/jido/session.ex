@@ -24,7 +24,6 @@ defmodule Jido.Session do
               updated_at: Joi.integer(),
               metadata: Joi.map() |> Joi.default(%{})
             },
-            coerce: true,
             unrecognized_keys: :error
           )
 
@@ -33,8 +32,6 @@ defmodule Jido.Session do
   defstruct Joi.struct_fields(@schema)
 
   @state_schema @schema
-                |> Joi.Schema.traverse(&Joi.Schema.without_coercion/1)
-                |> Joi.Schema.without_coercion()
 
   @doc "Returns the portable Session schema."
   @spec schema() :: Joi.schema()

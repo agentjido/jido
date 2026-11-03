@@ -23,7 +23,6 @@ defmodule Jido.Thread do
               metadata: Joi.map() |> Joi.default(%{}),
               stats: Joi.map() |> Joi.default(%{entry_count: 0})
             },
-            coerce: true,
             unrecognized_keys: :error
           )
 

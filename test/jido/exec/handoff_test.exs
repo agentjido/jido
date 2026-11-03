@@ -356,10 +356,10 @@ defmodule Jido.Exec.HandoffTest do
            } = selector_node
   end
 
-  test "handoff normalization rejects invalid targets and declared non-portable input" do
+  test "handoff normalization rejects invalid targets and non-portable open input" do
     assert {:error, _} = Runtime.handoff(Enum, %{})
 
-    assert {:ok, %Instruction{params: %{value: 1}}} =
+    assert {:error, %{details: %{reason: :non_portable_durable_value}}} =
              Runtime.handoff(Target, %{value: 1, resource: self()})
 
     assert {:error, _} = Runtime.handoff(PortableTarget, %{value: 1, resource: self()})

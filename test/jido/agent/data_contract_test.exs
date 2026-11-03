@@ -65,11 +65,9 @@ defmodule Jido.Agent.ValidationDataContractTest do
   end
 
   @tag obligation: ["jido.agent.I8", "jido.agent.I22"]
-  test "initialization cannot strip Map keys or convert list values" do
-    assert_error(
-      Schema.parse_value(Jido.Joi.object(%{}), %{unknown: 1}),
-      :state_conversion
-    )
+  test "initialization preserves open Map keys but cannot convert list values" do
+    assert {:ok, %{unknown: 1}} =
+             Schema.parse_value(Jido.Joi.object(%{}), %{unknown: 1})
 
     assert_error(
       Schema.parse_value(Jido.Joi.list(Jido.Joi.integer(coerce: true)), ["1", 2]),

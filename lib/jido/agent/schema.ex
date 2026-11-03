@@ -133,37 +133,20 @@ defmodule Jido.Agent.Schema do
 
   def schema(schema) do
     case {Joi.Schema.kind(schema), Joi.Schema.fields(schema)} do
-      {:map, {:ok, fields}} when is_list(fields) -> static_schema(schema)
-      _ -> Error.validation_result(:invalid_schema, [], "Expected a static Joi object schema")
+      {:map, {:ok, fields}} when is_list(fields) ->
+        case Joi.Schema.validate_stored(schema) do
+          :ok -> static(schema)
+          {:error, _reason} -> Error.validation_result(:invalid_schema, [], "Invalid stored-state schema")
+        end
+
+      _ ->
+        Error.validation_result(:invalid_schema, [], "Expected a static Joi object schema")
     end
-  end
-
-  defp static_schema(%{__struct__: _type} = value) do
-    if Joi.Schema.coerce?(value) or
-         Joi.Schema.forbidden_state_type?(value) or
-         Enum.any?(Joi.Schema.effects(value), &Joi.Schema.transform_effect?/1) do
-      Error.validation_result(:invalid_schema, [], "State schemas cannot convert values")
-    else
-      static_schema(Map.from_struct(value))
-    end
-  end
-
-  defp static_schema(value) when is_map(value),
-    do: schema_items(Enum.flat_map(value, fn {key, item} -> [key, item] end))
-
-  defp static_schema(value) when is_list(value), do: schema_items(value)
-  defp static_schema(value) when is_tuple(value), do: schema_items(Tuple.to_list(value))
-  defp static_schema(value), do: static(value)
-
-  defp schema_items(values) do
-    with {:ok, _} <-
-           list(values, fn value -> with :ok <- static_schema(value), do: {:ok, value} end),
-         do: :ok
   end
 
   def initialize(schema, state) do
     with :ok <- plain_map(state),
-         do: parse_value(Joi.Schema.put_unrecognized_keys(schema, :error), state)
+         do: parse_value(Joi.Schema.close(schema), state)
   end
 
   def parse_value(schema, input) do
@@ -172,7 +155,7 @@ defmodule Jido.Agent.Schema do
         {:ok, initialized}
 
       {:error, issues} ->
-        if Enum.any?(issues, &Joi.changed_value?/1) do
+        if Enum.any?(issues, &(Joi.changed_value?(&1) or invalid_stored_schema?(&1))) do
           Error.validation_result(
             :state_conversion,
             [],
@@ -186,13 +169,13 @@ defmodule Jido.Agent.Schema do
 
   def complete(schema, state) do
     with :ok <- plain_map(state) do
-      case Joi.validate(Joi.Schema.put_unrecognized_keys(schema, :error), state) do
+      case Joi.validate(Joi.Schema.close(schema), state) do
         :ok ->
           :ok
 
         {:error, issues} ->
           cond do
-            Enum.any?(issues, &Joi.changed_value?/1) ->
+            Enum.any?(issues, &(Joi.changed_value?(&1) or invalid_stored_schema?(&1))) ->
               Error.validation_result(:state_conversion, [], "Validation cannot change stored state")
 
             Enum.any?(issues, &(Joi.error_code(&1) == :required)) ->
@@ -206,6 +189,9 @@ defmodule Jido.Agent.Schema do
       end
     end
   end
+
+  defp invalid_stored_schema?(issue),
+    do: Joi.error_code(issue) == :joi_invalid_stored_schema
 
   def path(value) when is_binary(value) do
     case Jido.Signal.Router.Route.validate_path(value, []) do

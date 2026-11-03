@@ -210,6 +210,6 @@ defmodule Jido.Flow.GraphIdentityTest do
       })
 
     assert Jido.Flow.Identity.semantic_digest(flow) ==
-             "d3cd0623e408affb95cd8242d8d14468a9abbafcac454ee249caa9d1a151f233"
+             "83f90a1df8f3b5e88efe8159e33dd6d590a6751290fd25c7b672861cd6d2cdd7"
   end
 end
