@@ -258,7 +258,7 @@ defmodule Jido.AgentTest do
     assert {:error, %{__exception__: true}} = Agent.set(definition, %{})
 
     assert {:error, %{__exception__: true}} =
-             Jido.Persistence.AgentCheckpoint.checkpoint(definition)
+             Jido.Persistence.Checkpoint.dump_agent(definition)
 
     assert {:error, %{__exception__: true}} = Agent.cmd(definition, signal)
 
@@ -465,12 +465,12 @@ defmodule Jido.AgentTest do
   test "checkpoints and restores complete Agent state" do
     agent = CounterAgent.instantiate!(id: "saved", state: %{count: 7, history: ["saved"]})
 
-    assert {:ok, checkpoint} = Jido.Persistence.AgentCheckpoint.checkpoint(agent)
+    assert {:ok, checkpoint} = Jido.Persistence.Checkpoint.dump_agent(agent)
     assert checkpoint.format == 1
     assert checkpoint.state_format == :default
     assert checkpoint.agent === agent
 
-    assert {:ok, restored} = Jido.Persistence.AgentCheckpoint.restore(CounterAgent, checkpoint)
+    assert {:ok, restored} = Jido.Persistence.Checkpoint.load_agent(CounterAgent, checkpoint)
     assert restored == agent
   end
 
@@ -886,8 +886,8 @@ defmodule Jido.AgentTest do
       assert updated.state == %{count: 2, history: ["offline"]}
       assert agent.state == %{count: 0, history: []}
 
-      assert {:ok, checkpoint} = Jido.Persistence.AgentCheckpoint.checkpoint(updated)
-      assert {:ok, restored} = Jido.Persistence.AgentCheckpoint.restore(AuthoredAgent, checkpoint)
+      assert {:ok, checkpoint} = Jido.Persistence.Checkpoint.dump_agent(updated)
+      assert {:ok, restored} = Jido.Persistence.Checkpoint.load_agent(AuthoredAgent, checkpoint)
       assert restored == updated
       assert Agent.definition(restored) == definition
     end
@@ -896,8 +896,8 @@ defmodule Jido.AgentTest do
       definition = build!(name: "direct_agent", schema: schema())
       agent = instance!(definition, id: "direct-1", state: %{count: 5})
 
-      assert {:ok, checkpoint} = Jido.Persistence.AgentCheckpoint.checkpoint(agent)
-      assert {:ok, ^agent} = Jido.Persistence.AgentCheckpoint.restore(Agent, checkpoint)
+      assert {:ok, checkpoint} = Jido.Persistence.Checkpoint.dump_agent(agent)
+      assert {:ok, ^agent} = Jido.Persistence.Checkpoint.load_agent(Agent, checkpoint)
     end
 
     test "restores a validated behavior-only Agent module from its checkpoint definition" do
@@ -910,10 +910,10 @@ defmodule Jido.AgentTest do
 
       agent = instance!(definition, id: "behavior-only-1", state: %{count: 5})
 
-      assert {:ok, checkpoint} = Jido.Persistence.AgentCheckpoint.checkpoint(agent)
+      assert {:ok, checkpoint} = Jido.Persistence.Checkpoint.dump_agent(agent)
 
       assert {:ok, ^agent} =
-               Jido.Persistence.AgentCheckpoint.restore(BehaviorOnlyAgent, checkpoint)
+               Jido.Persistence.Checkpoint.load_agent(BehaviorOnlyAgent, checkpoint)
     end
 
     test "passes context through custom checkpoint and restore callbacks" do
@@ -924,7 +924,7 @@ defmodule Jido.AgentTest do
         )
 
       assert {:ok, checkpoint} =
-               Jido.Persistence.AgentCheckpoint.checkpoint(agent, %{saved_by: "checkpoint"})
+               Jido.Persistence.Checkpoint.dump_agent(agent, %{saved_by: "checkpoint"})
 
       assert checkpoint.format == 1
       assert checkpoint.state_format == :custom
@@ -937,7 +937,7 @@ defmodule Jido.AgentTest do
              }
 
       assert {:ok, restored} =
-               Jido.Persistence.AgentCheckpoint.restore(CallbackPersistenceAgent, checkpoint, %{
+               Jido.Persistence.Checkpoint.load_agent(CallbackPersistenceAgent, checkpoint, %{
                  restored_by: "restore"
                })
 

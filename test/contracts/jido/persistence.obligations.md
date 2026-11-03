@@ -1,7 +1,6 @@
 ---
 modules:
   - Jido.Persistence
-  - Jido.Persistence.AgentCheckpoint
   - Jido.Persistence.Checkpoint
   - Jido.Persistence.Identity
   - Jido.Persistence.Plugin

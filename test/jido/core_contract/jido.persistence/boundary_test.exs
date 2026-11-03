@@ -2,7 +2,7 @@ defmodule Jido.Persistence.BoundaryTest do
   use Covenant.Case, component: "jido.persistence", async: true
 
   alias Jido.Agent
-  alias Jido.Persistence.AgentCheckpoint, as: Checkpoint
+  alias Jido.Persistence.Checkpoint
   alias Jido.Persistence
   alias Jido.Persistence.{ETS, Record}
   alias JidoTest.AgentFixtures.CounterAgent, as: Basic
@@ -610,8 +610,8 @@ defmodule Jido.Persistence.BoundaryTest do
       assert {:error, _} = Persistence.snapshot(c.agent, context: invalid)
       assert {:error, _} = Persistence.restore(snapshot, context: invalid)
       assert {:error, _} = Persistence.restore(invalid)
-      assert {:error, _} = Checkpoint.default_restore(Basic, invalid, %{})
-      assert {:error, _} = Checkpoint.default_checkpoint(invalid, %{})
+      assert {:error, _} = Checkpoint.load_agent(Basic, invalid, %{})
+      assert {:error, _} = Checkpoint.dump_default_agent(invalid, %{})
     end
 
     assert {:error, _} = Persistence.restore(Map.put(snapshot, :unknown, true))
@@ -624,23 +624,25 @@ defmodule Jido.Persistence.BoundaryTest do
     agent = ContextAgent.instantiate!(id: "context-agent")
     public_context = %{observer: self(), marker: :public}
 
-    assert {:ok, direct} = Checkpoint.checkpoint(agent, public_context)
+    assert {:ok, direct} = Checkpoint.dump_agent(agent, public_context)
     assert_receive {:checkpoint_context, ^public_context}
-    assert {:ok, ^agent} = Checkpoint.restore(ContextAgent, direct, public_context)
+    assert {:ok, ^agent} = Checkpoint.load_agent(ContextAgent, direct, public_context)
     assert_receive {:restore_context, ^public_context}
 
     assert {:error, %Jido.Error.ValidationError{code: :snapshot_identity, path: [:agent, :module]}} =
-             Checkpoint.restore(Basic, direct, public_context)
+             Checkpoint.load_agent(Basic, direct, public_context)
 
     assert_receive {:restore_context, ^public_context}
 
-    assert {:ok, default} = Checkpoint.default_checkpoint(agent, %{})
+    assert {:ok, default} = Checkpoint.dump_default_agent(agent, %{})
     assert default.state_format == :default
-    assert {:ok, ^agent} = Checkpoint.default_restore(ContextAgent, default, %{})
-    assert {:error, %Jido.Error.ValidationError{code: :invalid_snapshot}} = Checkpoint.checkpoint(agent, [])
+    assert {:ok, ^agent} = Checkpoint.load_agent(ContextAgent, default, %{})
+
+    assert {:error, %Jido.Error.ValidationError{code: :invalid_snapshot}} =
+             Checkpoint.dump_agent(agent, [])
 
     assert {:error, :checkpoint_rejected} =
-             Checkpoint.checkpoint(agent, %{mode: :error})
+             Checkpoint.dump_agent(agent, %{mode: :error})
 
     assert {:error,
             %Jido.Error.ValidationError{
@@ -648,13 +650,13 @@ defmodule Jido.Persistence.BoundaryTest do
               path: [:agent, :state],
               details: %{result: :invalid}
             }} =
-             Checkpoint.checkpoint(agent, %{mode: :invalid})
+             Checkpoint.dump_agent(agent, %{mode: :invalid})
 
     assert {:error, :restore_rejected} =
-             Checkpoint.restore(ContextAgent, direct, %{mode: :error})
+             Checkpoint.load_agent(ContextAgent, direct, %{mode: :error})
 
     assert {:error, %Jido.Error.ValidationError{code: :invalid_snapshot_state, path: [:agent, :state]}} =
-             Checkpoint.restore(ContextAgent, direct, %{mode: :invalid})
+             Checkpoint.load_agent(ContextAgent, direct, %{mode: :invalid})
 
     assert {:ok, snapshot} = Persistence.snapshot(agent, context: public_context)
     assert_receive {:checkpoint_context, ^public_context}
@@ -701,7 +703,7 @@ defmodule Jido.Persistence.BoundaryTest do
   @tag obligation: "jido.persistence.I11"
   test "snapshot callbacks contain failures with stable diagnostic details" do
     agent = ContextAgent.instantiate!(id: "callback-failure")
-    assert {:ok, checkpoint} = Checkpoint.checkpoint(agent)
+    assert {:ok, checkpoint} = Checkpoint.dump_agent(agent)
 
     failures = [
       {:raise, :error, %RuntimeError{message: "checkpoint failed"}},
@@ -711,7 +713,7 @@ defmodule Jido.Persistence.BoundaryTest do
 
     for {mode, kind, reason} <- failures do
       assert {:error, %Jido.Error.ExecutionError{details: details}} =
-               Checkpoint.checkpoint(agent, %{mode: mode})
+               Checkpoint.dump_agent(agent, %{mode: mode})
 
       assert details == %{
                code: :agent_callback_failed,
@@ -730,7 +732,7 @@ defmodule Jido.Persistence.BoundaryTest do
 
     for {mode, kind, reason} <- failures do
       assert {:error, %Jido.Error.ExecutionError{details: details}} =
-               Checkpoint.restore(ContextAgent, checkpoint, %{mode: mode})
+               Checkpoint.load_agent(ContextAgent, checkpoint, %{mode: mode})
 
       assert details == %{
                code: :agent_callback_failed,

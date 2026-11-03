@@ -2,8 +2,8 @@ defmodule Jido.Persistence.Checkpoint do
   @moduledoc false
 
   alias Jido.Agent
-  alias Jido.Persistence.AgentCheckpoint
   alias Jido.Persistence.Record
+  alias Jido.Persistence.Snapshot
   alias Jido.Agent.Plugin.Spec, as: AgentSpec
   alias Jido.Persistence.Plugin, as: PersistencePlugin
   alias Jido.Persistence.Plugin.Spec, as: PersistenceSpec
@@ -11,7 +11,49 @@ defmodule Jido.Persistence.Checkpoint do
   @doc false
   @spec dump(Agent.instance(), map(), pos_integer(), term()) :: {:ok, map()} | {:error, term()}
   def dump(agent, context, record_format, reason) do
-    AgentCheckpoint.checkpoint(agent, context, converter(:dump, record_format, reason))
+    dump_agent(agent, context, converter(:dump, record_format, reason))
+  end
+
+  @doc false
+  @spec dump_agent(Agent.instance(), map()) :: {:ok, map()} | {:error, term()}
+  def dump_agent(agent, context \\ %{}), do: dump_agent(agent, context, &keep_state/2)
+
+  @doc false
+  @spec dump_agent(Agent.instance(), map(), (Agent.instance(), map() -> {:ok, map()} | {:error, term()})) ::
+          {:ok, map()} | {:error, term()}
+  def dump_agent(%Agent{} = agent, context, convert_state) when is_map(context),
+    do: Snapshot.dump(agent, context, convert_state)
+
+  def dump_agent(_agent, _context, _convert_state),
+    do: invalid_agent_snapshot()
+
+  @doc false
+  @spec dump_default_agent(Agent.instance(), map()) :: {:ok, map()} | {:error, term()}
+  def dump_default_agent(%Agent{} = agent, context) when is_map(context),
+    do: Snapshot.dump(agent, context, &keep_state/2, :default)
+
+  def dump_default_agent(_agent, _context),
+    do: invalid_agent_snapshot()
+
+  @doc false
+  @spec load_agent(module(), map(), map()) :: {:ok, Agent.instance()} | {:error, term()}
+  def load_agent(module, snapshot, context \\ %{}),
+    do: load_agent(module, snapshot, context, &keep_state/2)
+
+  @doc false
+  @spec load_agent(module(), map(), map(), (Agent.instance(), map() -> {:ok, map()} | {:error, term()})) ::
+          {:ok, Agent.instance()} | {:error, term()}
+  def load_agent(module, snapshot, context, convert_state) do
+    with {:ok, agent} <- Snapshot.load(snapshot, context, convert_state) do
+      if agent.module == module,
+        do: {:ok, agent},
+        else:
+          Jido.Error.validation_result(
+            :snapshot_identity,
+            [:agent, :module],
+            "Saved Agent origin differs from the requested origin"
+          )
+    end
   end
 
   defp converter(direction, record_format, reason) do
@@ -49,7 +91,7 @@ defmodule Jido.Persistence.Checkpoint do
   @doc false
   def restore_agent(record, agent_module, agent_id, instance) do
     with {:ok, agent} <-
-           AgentCheckpoint.restore(
+           load_agent(
              agent_module,
              Record.checkpoint(record),
              restore_context(record, instance),
@@ -86,4 +128,9 @@ defmodule Jido.Persistence.Checkpoint do
       reason: :restore
     }
   end
+
+  defp keep_state(_agent, state), do: {:ok, state}
+
+  defp invalid_agent_snapshot,
+    do: Jido.Error.validation_result(:invalid_snapshot, [], "Expected an Agent instance and context Map")
 end

@@ -22,13 +22,13 @@
   sort: log-only
   reason: The contract fixes the error category and structured data. It does not fix human-readable error prose.
 
-- at: lib/jido/persistence/agent_checkpoint.ex:14:49
+- at: lib/jido/persistence/checkpoint.ex:135:62
   operator: string_empty
   mutation: "`\"Expected an Agent instance and context Map\"` → `\"\"`"
   sort: log-only
   reason: The contract fixes the error category and structured data. It does not fix human-readable error prose.
 
-- at: lib/jido/persistence/agent_checkpoint.ex:27:13
+- at: lib/jido/persistence/checkpoint.ex:54:14
   operator: string_empty
   mutation: "`\"Saved Agent origin differs from the requested origin\"` → `\"\"`"
   sort: log-only
