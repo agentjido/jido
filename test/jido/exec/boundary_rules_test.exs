@@ -17,7 +17,11 @@ defmodule Jido.Exec.BoundaryRulesTest do
                  Portable.validate(value, :value)
       end
 
-      assert :ok = Portable.validate(%{list: [1 | 2], nested: {:ok, [%{a: 1}]}}, :value)
+      assert :ok =
+               Portable.validate(
+                 %{list: [1 | 2], bits: <<5::size(3)>>, nested: {:ok, [%{a: 1}]}},
+                 :value
+               )
     end
   end
 

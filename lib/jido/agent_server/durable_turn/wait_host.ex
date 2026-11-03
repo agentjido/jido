@@ -18,7 +18,7 @@ defmodule Jido.AgentServer.DurableTurn.WaitHost do
 
   def accept(workflow, input, now) do
     with :ok <- valid_input(input, now),
-         :ok <- Jido.PortableTerm.validate(input, :wait_event) do
+         :ok <- Jido.Codec.Term.validate(input, :wait_event) do
       receipts = inputs(workflow)
 
       case Enum.find(receipts, &(&1.input.id == input.id)) do

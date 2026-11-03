@@ -54,7 +54,7 @@ defmodule Jido.Persistence do
   alias Jido.Error
   alias Jido.Persistence.{AdapterOps, Checkpoint, Identity, Record, Source, Store}
   alias Jido.Telemetry.Persistence, as: PersistenceTelemetry
-  alias Jido.PortableTerm
+  alias Jido.Codec.Term
 
   @identity_options [:instance, :namespace, :partition]
   @create_options @identity_options ++ [:reason, :revision, :server_turn]
@@ -445,5 +445,5 @@ defmodule Jido.Persistence do
 
   @doc false
   @spec portable_term?(term()) :: boolean()
-  def portable_term?(term), do: PortableTerm.valid?(term)
+  def portable_term?(term), do: Term.valid?(term)
 end

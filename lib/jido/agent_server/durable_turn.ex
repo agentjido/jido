@@ -33,7 +33,7 @@ defmodule Jido.AgentServer.DurableTurn do
            status: :running,
            expires_at: expires_at(data.active)
          },
-         :ok <- Jido.PortableTerm.validate(receipt, :server_turn) do
+         :ok <- Jido.Codec.Term.validate(receipt, :server_turn) do
       {:ok, receipt}
     end
   end
@@ -280,7 +280,7 @@ defmodule Jido.AgentServer.DurableTurn do
 
   defp portable_facts(workflow) do
     if Enum.all?(Runic.Workflow.facts(workflow), fn fact ->
-         Jido.PortableTerm.valid?(Jido.Exec.Fact.value(fact))
+         Jido.Codec.Term.valid?(Jido.Exec.Fact.value(fact))
        end), do: :ok, else: {:error, :non_portable_flow_output}
   end
 
@@ -310,7 +310,7 @@ defmodule Jido.AgentServer.DurableTurn do
        do: {:ok, receipt}
 
   defp validate_receipt(_data, receipt) do
-    with :ok <- Jido.PortableTerm.validate(receipt, :server_turn), do: {:ok, receipt}
+    with :ok <- Jido.Codec.Term.validate(receipt, :server_turn), do: {:ok, receipt}
   end
 
   defp instruction_fingerprint(%Jido.Instruction{kind: :flow, target: target}),

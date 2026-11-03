@@ -173,7 +173,7 @@ defmodule Jido.Thread do
          true <- thread.stats == %{entry_count: length(thread.entries)},
          true <- thread.updated_at >= thread.created_at,
          true <- valid_entries?,
-         :ok <- Jido.PortableTerm.validate(thread.metadata, :thread_metadata) do
+         :ok <- Jido.Codec.Term.validate(thread.metadata, :thread_metadata) do
       {:ok, thread}
     else
       _other -> {:error, :invalid_thread}

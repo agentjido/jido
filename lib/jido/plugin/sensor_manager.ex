@@ -56,7 +56,7 @@ defmodule Jido.Plugin.SensorManager do
   def validate_tag(nil), do: invalid("Sensor tag must not be nil", %{tag: nil})
 
   def validate_tag(tag) do
-    case Jido.PortableTerm.validate(tag, :tag) do
+    case Jido.Codec.Term.validate(tag, :tag) do
       :ok -> :ok
       {:error, path} -> invalid("Sensor tag must contain portable data", %{path: path})
     end

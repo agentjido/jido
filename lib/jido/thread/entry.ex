@@ -81,8 +81,8 @@ defmodule Jido.Thread.Entry do
   def validate(%__MODULE__{} = entry) do
     with :ok <- Joi.validate(@schema, entry),
          true <- (is_atom(entry.kind) and not is_nil(entry.kind)) or nonempty?(entry.kind),
-         :ok <- Jido.PortableTerm.validate(entry.payload, :thread_entry_payload),
-         :ok <- Jido.PortableTerm.validate(entry.refs, :thread_entry_refs) do
+         :ok <- Jido.Codec.Term.validate(entry.payload, :thread_entry_payload),
+         :ok <- Jido.Codec.Term.validate(entry.refs, :thread_entry_refs) do
       {:ok, entry}
     else
       _other -> {:error, :invalid_entry}

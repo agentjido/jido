@@ -101,7 +101,7 @@ defmodule Jido.Session do
   @doc "Replaces the portable Session metadata."
   @spec put_metadata(t(), map()) :: t()
   def put_metadata(%__MODULE__{} = session, metadata) when is_map(metadata) do
-    case Jido.PortableTerm.validate(metadata, :session_metadata) do
+    case Jido.Codec.Term.validate(metadata, :session_metadata) do
       :ok ->
         %{session | rev: session.rev + 1, metadata: metadata, updated_at: now_after(session.updated_at)}
         |> validate!()
@@ -188,7 +188,7 @@ defmodule Jido.Session do
          true <- session.rev >= session.thread.rev,
          true <- session.updated_at >= session.created_at,
          {:ok, _thread} <- Thread.validate(session.thread),
-         :ok <- Jido.PortableTerm.validate(session.metadata, :session_metadata) do
+         :ok <- Jido.Codec.Term.validate(session.metadata, :session_metadata) do
       {:ok, session}
     else
       _other -> {:error, :invalid_session}

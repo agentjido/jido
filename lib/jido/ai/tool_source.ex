@@ -247,7 +247,7 @@ defmodule Jido.AI.ToolSource do
   end
 
   defp portable_term(source) do
-    case Jido.PortableTerm.validate(source, :tool_source) do
+    case Jido.Codec.Term.validate(source, :tool_source) do
       :ok -> :ok
       {:error, path} -> {:error, {:nonportable_tool_source, path}}
     end

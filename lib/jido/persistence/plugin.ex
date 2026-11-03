@@ -79,7 +79,7 @@ defmodule Jido.Persistence.Plugin do
   end
 
   defp portable(value, spec, callback) do
-    case Jido.PortableTerm.validate(value, [:plugin_state, spec.package]) do
+    case Jido.Codec.Term.validate(value, [:plugin_state, spec.package]) do
       :ok ->
         :ok
 

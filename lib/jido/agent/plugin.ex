@@ -175,7 +175,7 @@ defmodule Jido.Agent.Plugin do
   end
 
   defp validate_preparation_result({:ok, input}, spec) do
-    case Jido.PortableTerm.validate(input, [:plugin_inputs, spec.package, :prepared]) do
+    case Jido.Codec.Term.validate(input, [:plugin_inputs, spec.package, :prepared]) do
       :ok ->
         {:ok, input}
 

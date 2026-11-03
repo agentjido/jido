@@ -88,7 +88,7 @@ defmodule Jido.Plugin.Scheduler do
   defdelegate child_spec(init), to: Jido.Plugin.Scheduler.Server
 
   alias Crontab.CronExpression.Parser
-  alias Jido.PortableTerm
+  alias Jido.Codec.Term
 
   alias Jido.Plugin.Scheduler.{
     Cancel,
@@ -220,7 +220,7 @@ defmodule Jido.Plugin.Scheduler do
 
   @doc false
   def validate_occurrence_scope(scope) do
-    if PortableTerm.valid?(scope), do: :ok, else: {:error, :nonportable_occurrence_scope}
+    if Term.valid?(scope), do: :ok, else: {:error, :nonportable_occurrence_scope}
   end
 
   @doc false
@@ -269,14 +269,14 @@ defmodule Jido.Plugin.Scheduler do
   defp normalize_timezone_value(timezone) when is_binary(timezone), do: timezone
 
   defp validate_message(message) do
-    if PortableTerm.valid?(message),
+    if Term.valid?(message),
       do: :ok,
       else: {:error, {:invalid_message, :nonportable_term}}
   end
 
   @doc false
   def validate_job_id(id) do
-    if PortableTerm.valid?(id),
+    if Term.valid?(id),
       do: :ok,
       else: {:error, {:invalid_job_id, :nonportable_term}}
   end

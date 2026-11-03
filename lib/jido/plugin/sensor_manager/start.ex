@@ -29,7 +29,7 @@ defmodule Jido.Plugin.SensorManager.Start do
     with {:ok, directive} <- Joi.parse(@schema, Map.from_struct(directive)),
          :ok <- SensorManager.validate_tag(directive.tag),
          :ok <- SensorManager.validate_sensor(directive.sensor) do
-      case Jido.PortableTerm.validate(directive.config, :config) do
+      case Jido.Codec.Term.validate(directive.config, :config) do
         :ok ->
           {:ok, directive}
 

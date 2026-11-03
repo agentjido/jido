@@ -96,7 +96,7 @@ defmodule Jido.Agent.PortableStateTest do
             }} = checkpoint_value(definition, %{long_integer => self()})
 
     assert {:error, [root_segment]} =
-             Jido.PortableTerm.validate(self(), [String.duplicate("r", 100)])
+             Jido.Codec.Term.validate(self(), [String.duplicate("r", 100)])
 
     assert root_segment == String.duplicate("r", 64)
   end

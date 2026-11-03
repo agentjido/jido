@@ -3,7 +3,7 @@ defmodule Jido.Persistence.Snapshot do
   @moduledoc false
   alias Jido.Agent
   alias Jido.Agent.{Data, Error}
-  alias Jido.PortableTerm
+  alias Jido.Codec.Term
 
   @format 1
   @keys [:format, :agent, :references, :state_format]
@@ -271,7 +271,7 @@ defmodule Jido.Persistence.Snapshot do
   end
 
   defp portable(value) do
-    case PortableTerm.validate(value, [:snapshot]) do
+    case Term.validate(value, [:snapshot]) do
       :ok ->
         :ok
 

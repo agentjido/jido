@@ -4,7 +4,7 @@ defmodule Jido.Persistence.Record do
   alias Jido.Agent
   alias Jido.Agent.Ref
   alias Jido.Error
-  alias Jido.PortableTerm
+  alias Jido.Codec.Term
 
   @format_version 1
   @common_keys [:fmt, :kind, :namespace, :agent_module, :agent_id, :partition, :rev]
@@ -260,7 +260,7 @@ defmodule Jido.Persistence.Record do
   end
 
   defp validate_portable(record) do
-    case PortableTerm.validate(record, :record) do
+    case Term.validate(record, :record) do
       :ok ->
         :ok
 

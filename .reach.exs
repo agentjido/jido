@@ -6,7 +6,6 @@
       "Jido.Joi.*",
       "Jido.Expr",
       "Jido.Expr.*",
-      "Jido.PortableTerm",
       "Zoi.Type.Node"
     ],
     signal: ["Inspect.Jido.Signal.*", "Jido.Signal", "Jido.Signal.*"],
@@ -82,8 +81,12 @@
     ]
   ],
   source: [
-    forbidden_modules: ["Jido.Config", "Jido.Signal.ID"],
-    forbidden_files: ["lib/jido/config.ex", "lib/jido/signal/id.ex"]
+    forbidden_modules: ["Jido.Config", "Jido.PortableTerm", "Jido.Signal.ID"],
+    forbidden_files: [
+      "lib/jido/config.ex",
+      "lib/jido/portable_term.ex",
+      "lib/jido/signal/id.ex"
+    ]
   ],
   checks: [
     source_paths: ["lib"],
