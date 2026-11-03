@@ -97,7 +97,7 @@ defmodule Jido.Flow do
   [Inline Actions](inline-actions.md).
 
   After the owner compiles, `MyApp.Greeting.step_action("greet")` returns its
-  Action target for map-based definitions or trusted Registry reuse.
+  Action target for map-based definitions or trusted Catalog reuse.
   It does not copy parameters, dependencies, or metadata. Map-based definitions and stored
   JSON do not accept body code, anonymous functions, or MFA targets.
 
@@ -114,7 +114,7 @@ defmodule Jido.Flow do
   compiler keeps source locations outside the canonical Flow value.
 
   Use `Jido.Codec.encode/2` and `Jido.Codec.decode/2` with a trusted
-  `Jido.Codec.Registry` for database or transport storage.
+  `Jido.Catalog` for database or transport storage.
 
   Flow modules also accept `id:` and `vsn:` options for runtime authoring
   discovery. Use an explicit stable ID for any Flow referenced by stored JSON.
@@ -213,7 +213,7 @@ defmodule Jido.Flow do
   Encodes partial Flow defaults as JSON data after schema validation.
 
   Atom map keys and atom values become strings. The result contains no module
-  references and does not need an Codec Registry.
+  references and does not need a Catalog.
   """
   @spec encode_defaults(term(), module()) ::
           {:ok, map()} | {:error, Error.InvalidDefinitionError.t()}

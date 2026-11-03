@@ -5,7 +5,7 @@ defmodule Jido.Catalog.DiscoveryTest do
 
   alias Jido.Catalog
   alias Jido.Catalog.{Discovery, Entry, Manifest}
-  alias Jido.Codec.Registry
+  alias Jido.Codec.Index
 
   defmodule AlphaAction do
     use Jido.Action,
@@ -142,7 +142,7 @@ defmodule Jido.Catalog.DiscoveryTest do
            }
   end
 
-  test "builds one immutable catalog and Registry without running discovered work" do
+  test "builds one immutable Catalog and Codec Index without running discovered work" do
     assert :ok =
              Discovery.refresh(
                applications: [],
@@ -156,7 +156,7 @@ defmodule Jido.Catalog.DiscoveryTest do
              )
 
     assert %Catalog{} = catalog = Discovery.catalog()
-    assert %Registry{} = codecs = Discovery.codec_index()
+    assert %Index{} = codecs = Discovery.codec_index()
     assert Discovery.ready?()
     assert Catalog.revision(catalog) =~ ~r/^[A-Za-z0-9_-]{43}$/
 
@@ -169,7 +169,7 @@ defmodule Jido.Catalog.DiscoveryTest do
     assert %Entry{target: AlphaFlow, vsn: 3} =
              Catalog.get(catalog, :flow, "tests/flows/alpha", 3)
 
-    assert Registry.codec(codecs, "jido.flow", 2) == {:ok, Jido.Flow.Codec}
+    assert Index.codec(codecs, "jido.flow", 2) == {:ok, Jido.Flow.Codec}
 
     assert Catalog.resolve(catalog, {"tests/actions/alpha", 2}, :action) ==
              {:ok, AlphaAction}
@@ -366,7 +366,7 @@ defmodule Jido.Catalog.DiscoveryTest do
     assert error.details == %{reason: {:invalid_modules, :bad}}
   end
 
-  test "an asynchronous scan failure does not replace a valid Registry" do
+  test "an asynchronous scan failure does not replace a valid Catalog" do
     assert :ok = Discovery.refresh(applications: [], modules: [{AlphaAction, :jido}])
     catalog = Discovery.catalog()
 
@@ -418,7 +418,7 @@ defmodule Jido.Catalog.DiscoveryTest do
 
     assert :ok = Discovery.initialize()
     codecs = Discovery.codec_index()
-    assert Registry.codec(codecs, "jido.flow", 2) == {:ok, Jido.Flow.Codec}
+    assert Index.codec(codecs, "jido.flow", 2) == {:ok, Jido.Flow.Codec}
   end
 
   defp manifest(id, kind, target) do

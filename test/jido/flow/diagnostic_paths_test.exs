@@ -2,7 +2,7 @@ defmodule Jido.Flow.DiagnosticPathsTest do
   use ExUnit.Case, async: true
 
   alias Jido.Flow
-  alias Jido.Codec.Registry
+  alias Jido.Catalog
   alias Jido.Flow.Codec
   alias JidoActionTest.FlowCodec, as: Codec
   alias JidoActionTest.Fixtures.Actions.EchoParamsAction
@@ -132,7 +132,7 @@ defmodule Jido.Flow.DiagnosticPathsTest do
   end
 
   defp registry do
-    Registry.new!(%{
+    Catalog.from_targets!(__MODULE__, :jido, %{
       {"actions/echo", 1} => {:action, EchoParamsAction},
       {"schemas/map", 1} => {:schema, Jido.Joi.map()}
     })

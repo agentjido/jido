@@ -223,7 +223,7 @@ defmodule Jido.Exec.WaitsTest do
     assert data == SelectionFlow.flow()
 
     registry =
-      Jido.Codec.Registry.new!(%{
+      Jido.Catalog.from_targets!(__MODULE__, :jido, %{
         {"map", 1} => {:schema, Jido.Joi.map()},
         {"id", 1} => {:atom, :id}
       })

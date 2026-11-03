@@ -125,7 +125,7 @@ not restore or claim the retired standalone `jido.topology` component.
 ### jido.agent.I20 — Agent document adapter
 
 - **scope:** `Jido.Codec.encode/2`, `Jido.Codec.decode/2`, `Jido.Codec.encode_json/2`, `Jido.Codec.decode_json/2`, `Jido.Agent.Codec`
-- **must:** Register the Agent document type with `Jido.Codec`. Write a portable Agent definition, including declared initial state, through a trusted Registry. Omit instance ID, instance state, and the module-owned `initialize/2` callback. Read through `Jido.Agent.define/1`, and reject a malformed or unsupported Agent document. Read a version 1 document that omits initial state as an empty initial-state Map. Shared document, Registry, JSON, and portable-value rules remain owned by `jido_action`.
+- **must:** Register the Agent document type with `Jido.Codec`. Write a portable Agent definition, including declared initial state, through a trusted Catalog. Omit instance ID, instance state, and the module-owned `initialize/2` callback. Read through `Jido.Agent.define/1`, and reject a malformed or unsupported Agent document. Read a version 1 document that omits initial state as an empty initial-state Map. Shared document, Catalog, JSON, and portable-value rules remain owned by `jido_action`.
 - **kind:** persisted-format
 - **status:** active
 
@@ -160,7 +160,7 @@ not restore or claim the retired standalone `jido.topology` component.
 ### jido.agent.I31 — Safe Agent views
 
 - **scope:** `Jido.Agent.View.project/3`
-- **must:** Project a module, definition, or instance as one bounded JSON-safe summary. Expose code and schema values only through trusted Registry references. Do not expose Agent state, metadata, Plugin options, route defaults, or raw modules. Do not start or contact an Agent process.
+- **must:** Project a module, definition, or instance as one bounded JSON-safe summary. Expose code and schema values only through trusted Catalog references. Do not expose Agent state, metadata, Plugin options, route defaults, or raw modules. Do not start or contact an Agent process.
 - **kind:** security
 - **status:** active
 

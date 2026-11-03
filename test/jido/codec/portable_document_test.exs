@@ -7,12 +7,13 @@ defmodule Jido.Codec.PortableDocumentTest do
                "jido_action.authoring.I3"
              ]
 
-  alias Jido.Codec.{Document, Registry, Value}
+  alias Jido.Catalog
+  alias Jido.Codec.{Document, Value}
 
   defmodule ExampleCodec do
     @moduledoc false
 
-    alias Jido.Codec.{Document, Registry, Value}
+    alias Jido.Codec.{Document, Value}
 
     def encode(name, registry) do
       with {:ok, name} <- Value.encode(name, registry),
@@ -34,9 +35,9 @@ defmodule Jido.Codec.PortableDocumentTest do
     end
   end
 
-  test "a second document owner composes the public Registry Document and Value APIs" do
+  test "a second document owner composes the public Catalog, Document, and Value APIs" do
     registry =
-      Registry.new!(%{
+      Catalog.from_targets!(__MODULE__, :jido, %{
         {"atoms/example", 1} => {:atom, :example},
         {"atoms/kind", 1} => {:atom, :kind},
         {"flows/foreign", 1} => {:flow, __MODULE__}
@@ -46,7 +47,7 @@ defmodule Jido.Codec.PortableDocumentTest do
     assert {:ok, %{kind: :example}} = ExampleCodec.decode(document, registry)
 
     assert {:ok, __MODULE__} =
-             Registry.resolve(registry, {"flows/foreign", 1}, :flow)
+             Catalog.resolve(registry, {"flows/foreign", 1}, :flow)
 
     oversized = %{
       "type" => "wrong.owner",

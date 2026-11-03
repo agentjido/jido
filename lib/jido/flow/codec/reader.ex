@@ -2,7 +2,9 @@ defmodule Jido.Flow.Codec.Reader do
   @moduledoc false
 
   alias Jido.Flow.{Component, Error, FieldError}
-  alias Jido.Codec.Registry
+  alias Jido.Catalog
+  alias Jido.Catalog.Error, as: CatalogError
+  alias Jido.Codec.Reference
   alias Jido.Flow.Codec.{Limits, Paths, Value}
 
   @root [
@@ -17,7 +19,7 @@ defmodule Jido.Flow.Codec.Reader do
   @on_error %{"fail_fast" => :fail_fast, "collect_errors" => :collect_errors}
 
   @doc false
-  @spec decode(term(), Jido.Codec.Registry.t()) ::
+  @spec decode(term(), Catalog.t()) ::
           {:ok, map(), Paths.t()} | {:error, [Exception.t()]}
   def decode(%{} = document, registry) when not is_struct(document) do
     with :ok <- Limits.check(document),
@@ -198,11 +200,11 @@ defmodule Jido.Flow.Codec.Reader do
     do: failure("stored Flow target must be a map", stored)
 
   defp resolve(value, kind, registry, stored, canonical) do
-    with {:ok, resolved} <- Registry.decode_reference(registry, value, kind) do
+    with {:ok, resolved} <- Reference.decode(registry, value, kind) do
       {:ok, resolved, %{canonical => stored}}
     else
-      {:error, %Registry.Error{} = error} ->
-        error = flow_registry_error(error)
+      {:error, %CatalogError{} = error} ->
+        error = flow_catalog_error(error)
         {:error, [Error.prefix_path(error, registry_error_path(value, error, stored))]}
     end
   end
@@ -213,8 +215,8 @@ defmodule Jido.Flow.Codec.Reader do
 
   defp registry_error_path(_value, _error, stored), do: stored
 
-  defp flow_registry_error(%Registry.Error{} = error) do
-    message = String.replace(error.message, "Codec Registry", "flow registry")
+  defp flow_catalog_error(%CatalogError{} = error) do
+    message = String.replace(error.message, "Catalog", "flow catalog")
     Error.validation_error(message, error.details)
   end
 

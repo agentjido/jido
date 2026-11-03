@@ -8,7 +8,7 @@ defmodule Jido.Agent do
   `state`. A Map definition can contain a static `initial_state`. An instance
   has a nonempty `id` and complete `state`, including Plugin-owned fields.
   Authoring and instance construction do not start processes or execute
-  handlers. JSON uses trusted Registry references.
+  handlers. JSON uses trusted Catalog references.
 
   Routes select one handler in declaration order. Connections select recipients
   for outputs. Plugins add explicit, validated data to `plugins`.
@@ -75,7 +75,7 @@ defmodule Jido.Agent do
 
   - `:name` is the required Agent name.
   - `:description` is optional display text.
-  - `:id` is the stable Codec Registry ID. It defaults to the module name.
+  - `:id` is the stable Catalog ID. It defaults to the module name.
   - `:vsn` is the positive definition version. It defaults to `1`.
   - `:metadata` is optional static definition data. It defaults to an empty Map.
   - `:plugins` lists ordered Plugin modules or `{Plugin, config}` tuples. A

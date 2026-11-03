@@ -28,11 +28,15 @@ end
 
 for owner <- owners, do: false = :code.is_loaded(owner)
 step = Enum.find(targets, &(&1.name() in ["first", "renamed"]))
-registry = Jido.Codec.Registry.new!(%{{"actions/step/v1", 1} => {:action, step}})
+
+catalog =
+  Jido.Catalog.from_targets!(Steps, :inline_consumer, %{
+    {"actions/step/v1", 1} => {:action, step}
+  })
 
 {:ok, ^step} =
-  Jido.Codec.Registry.resolve(
-    registry,
+  Jido.Catalog.resolve(
+    catalog,
     {"actions/step/v1", 1},
     :action
   )

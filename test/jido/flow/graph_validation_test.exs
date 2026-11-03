@@ -3,7 +3,7 @@ defmodule Jido.Flow.GraphValidationTest do
   @moduletag obligation: "jido_action.flow.I8"
   alias Jido.Expr
   alias Jido.Flow
-  alias Jido.Codec.Registry
+  alias Jido.Catalog
   alias Jido.Flow.{Codec, Error, Ref}
   alias JidoActionTest.FlowCodec, as: Codec
   alias JidoActionTest.Fixtures.NestedFlow
@@ -17,7 +17,7 @@ defmodule Jido.Flow.GraphValidationTest do
   end
 
   defp registry do
-    Registry.new!(%{
+    Catalog.from_targets!(__MODULE__, :jido, %{
       {"action", 1} => {:action, ProbeAction},
       {"schema", 1} => {:schema, Jido.Joi.map()},
       {"flow", 1} => {:flow, NestedFlow}
@@ -545,7 +545,7 @@ end
     assert {:ok, ^flow} = Flow.validate(flow)
 
     registry =
-      Registry.new!(%{
+      Catalog.from_targets!(__MODULE__, :jido, %{
         {"unloaded", 1} => {:action, NotLoadedAction},
         {"schema", 1} => {:schema, Jido.Joi.map()}
       })

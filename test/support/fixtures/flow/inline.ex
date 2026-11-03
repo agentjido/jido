@@ -53,7 +53,7 @@ end
 
 defmodule JidoActionTest.Fixtures.InlineAuthoring do
   @moduledoc false
-  alias Jido.Codec.Registry
+  alias Jido.Catalog
   alias JidoActionTest.Fixtures.InlineParityFlow
 
   def direct_flow! do
@@ -102,7 +102,7 @@ defmodule JidoActionTest.Fixtures.InlineAuthoring do
   end
 
   def registry do
-    Registry.new!(%{
+    Catalog.from_targets!(__MODULE__, :jido, %{
       {"actions/demo/empty/v1", 1} => {:action, InlineParityFlow.step_action("empty")},
       {"actions/demo/named/v1", 1} => {:action, InlineParityFlow.step_action("named")},
       {"actions/demo/multiple/v1", 1} => {:action, InlineParityFlow.step_action("multiple")},

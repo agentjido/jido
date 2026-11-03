@@ -102,70 +102,70 @@ defmodule Jido.Codec.RuntimeCodecTest do
         ]
       )
 
-    %{registry: Jido.Catalog.Discovery.codec_index()}
+    %{catalog: Jido.Catalog.Discovery.catalog()}
   end
 
-  test "uses Discovery only when routing needs the default Registry", %{registry: registry} do
+  test "uses Discovery only when routing needs the published Catalog", %{catalog: catalog} do
     snapshot = :persistent_term.get({:jido, :catalog_snapshot})
     :persistent_term.erase({:jido, :catalog_snapshot})
-    assert {:ok, _document} = Jido.Codec.encode(flow(), registry: registry)
+    assert {:ok, _document} = Jido.Codec.encode(flow(), catalog: catalog)
     assert {:error, [%Issue{code: :invalid_json}]} = Jido.Codec.decode_json("{")
     assert {:error, [%Issue{code: :invalid_document}]} = Jido.Codec.decode([])
 
     assert_raise Jido.Codec.Error.InternalError, fn -> Jido.Codec.encode(flow()) end
 
-    :persistent_term.put({:jido, :catalog_snapshot}, %{snapshot | registry: registry})
+    :persistent_term.put({:jido, :catalog_snapshot}, snapshot)
     assert {:ok, document} = Jido.Codec.encode(flow())
     assert {:ok, %Flow{}} = Jido.Codec.decode(document)
   end
 
-  test "encodes and decodes a Flow", %{registry: registry} do
+  test "encodes and decodes a Flow", %{catalog: catalog} do
     flow = flow()
-    assert {:ok, document} = Jido.Codec.encode(flow, registry: registry)
-    assert {:ok, json} = Jido.Codec.encode_json(flow, registry: registry)
+    assert {:ok, document} = Jido.Codec.encode(flow, catalog: catalog)
+    assert {:ok, json} = Jido.Codec.encode_json(flow, catalog: catalog)
     assert Jason.decode!(json) == document
 
-    assert {:ok, ^flow} = Jido.Codec.decode_json(json, registry: registry)
+    assert {:ok, ^flow} = Jido.Codec.decode_json(json, catalog: catalog)
   end
 
-  test "uses the Registry fallback for an external codec without a protocol implementation", %{
-    registry: registry
+  test "uses the Codec Index fallback for an external codec without a protocol implementation", %{
+    catalog: catalog
   } do
     value = %ExternalValue{value: "runtime"}
 
     assert Jido.Codec.Encoder.codec(value) == :error
-    assert {:ok, document} = Jido.Codec.encode(value, registry: registry)
+    assert {:ok, document} = Jido.Codec.encode(value, catalog: catalog)
     assert document == %{"type" => "tests.external", "vsn" => 1, "value" => "runtime"}
-    assert {:ok, ^value} = Jido.Codec.decode(document, registry: registry)
+    assert {:ok, ^value} = Jido.Codec.decode(document, catalog: catalog)
   end
 
-  test "rejects unsupported encode values", %{registry: registry} do
+  test "rejects unsupported encode values", %{catalog: catalog} do
     assert {:error, %Jido.Codec.Error.InvalidError{code: :unsupported_value}} =
-             Jido.Codec.encode(:unsupported, registry: registry)
+             Jido.Codec.encode(:unsupported, catalog: catalog)
   end
 
-  test "applies the JSON byte limit", %{registry: registry} do
-    {:ok, document} = Jido.Codec.encode(flow(), registry: registry)
+  test "applies the JSON byte limit", %{catalog: catalog} do
+    {:ok, document} = Jido.Codec.encode(flow(), catalog: catalog)
     size = document |> Jason.encode!() |> byte_size()
 
     assert {:ok, ^document} =
-             Jido.Codec.encode(flow(), registry: registry, maximum_json_bytes: size)
+             Jido.Codec.encode(flow(), catalog: catalog, maximum_json_bytes: size)
 
     assert {:error, %Jido.Codec.Error.InvalidError{code: :document_too_large}} =
              Jido.Codec.encode(flow(),
-               registry: registry,
+               catalog: catalog,
                maximum_json_bytes: size - 1
              )
 
     assert {:error, [%Issue{code: :bytes}]} =
              Jido.Codec.decode(document,
-               registry: registry,
+               catalog: catalog,
                maximum_json_bytes: size - 1
              )
   end
 
-  test "reports a missing version without a repair system", %{registry: registry} do
-    {:ok, document} = Jido.Codec.encode(flow(), registry: registry)
+  test "reports a missing version without a repair system", %{catalog: catalog} do
+    {:ok, document} = Jido.Codec.encode(flow(), catalog: catalog)
 
     assert {:error,
             [
@@ -174,10 +174,10 @@ defmodule Jido.Codec.RuntimeCodecTest do
                 path: ["vsn"],
                 details: %{supported_vsns: [2]}
               }
-            ]} = Jido.Codec.decode(Map.delete(document, "vsn"), registry: registry)
+            ]} = Jido.Codec.decode(Map.delete(document, "vsn"), catalog: catalog)
   end
 
-  test "contains codec failures and invalid returns", %{registry: registry} do
+  test "contains codec failures and invalid returns", %{catalog: catalog} do
     assert {:error,
             [
               %Issue{
@@ -187,17 +187,17 @@ defmodule Jido.Codec.RuntimeCodecTest do
             ]} =
              Jido.Codec.decode(
                %{"type" => "tests.crashing", "vsn" => 1},
-               registry: registry
+               catalog: catalog
              )
 
     assert {:error, [%Issue{code: :invalid_codec_return}]} =
              Jido.Codec.decode(
                %{"type" => "tests.invalid-success", "vsn" => 1},
-               registry: registry
+               catalog: catalog
              )
   end
 
-  test "contains explicit codec metadata failures", %{registry: registry} do
+  test "contains explicit codec metadata failures", %{catalog: catalog} do
     assert {:error,
             [
               %Issue{
@@ -207,23 +207,23 @@ defmodule Jido.Codec.RuntimeCodecTest do
             ]} =
              Jido.Codec.decode(
                %{"type" => "tests.crashing-metadata", "vsn" => 1},
-               registry: registry,
+               catalog: catalog,
                codec: MetadataCrashCodec
              )
 
     assert {:error, %Jido.Codec.Error.InternalError{code: :codec_failure}} =
-             Jido.Codec.encode(flow(), registry: registry, codec: MetadataCrashCodec)
+             Jido.Codec.encode(flow(), catalog: catalog, codec: MetadataCrashCodec)
   end
 
-  test "preserves ordered issues returned by a codec", %{registry: registry} do
+  test "preserves ordered issues returned by a codec", %{catalog: catalog} do
     assert {:error, [%Issue{code: :codec_issue, path: ["field"]}]} =
              Jido.Codec.decode(
                %{"type" => "tests.issue", "vsn" => 1},
-               registry: registry
+               catalog: catalog
              )
   end
 
-  test "copies retained JSON strings", %{registry: registry} do
+  test "copies retained JSON strings", %{catalog: catalog} do
     value = String.duplicate("v", 128)
 
     json =
@@ -235,13 +235,13 @@ defmodule Jido.Codec.RuntimeCodecTest do
       })
 
     assert {:ok, %Captured{value: decoded}} =
-             Jido.Codec.decode_json(json, registry: registry)
+             Jido.Codec.decode_json(json, catalog: catalog)
 
     assert decoded == value
     assert :binary.referenced_byte_size(decoded) == byte_size(decoded)
   end
 
-  test "rejects duplicate JSON object keys", %{registry: registry} do
+  test "rejects duplicate JSON object keys", %{catalog: catalog} do
     json = ~s({"type":"tests.capture","vsn":1,"value":"first","value":"second"})
 
     assert {:error,
@@ -251,10 +251,10 @@ defmodule Jido.Codec.RuntimeCodecTest do
                 path: ["value"],
                 details: %{key: "value"}
               }
-            ]} = Jido.Codec.decode_json(json, registry: registry)
+            ]} = Jido.Codec.decode_json(json, catalog: catalog)
   end
 
-  test "bounds ordered JSON conversion before codec dispatch", %{registry: registry} do
+  test "bounds ordered JSON conversion before codec dispatch", %{catalog: catalog} do
     deep_json =
       ~s({"type":"tests.capture","vsn":1,"value":) <>
         String.duplicate("[", 101) <> "null" <> String.duplicate("]", 101) <> "}"
@@ -279,7 +279,7 @@ defmodule Jido.Codec.RuntimeCodecTest do
           {many_nodes_json, :nodes}
         ] do
       assert {:error, [%Issue{code: ^code}]} =
-               Jido.Codec.decode_json(json, registry: registry)
+               Jido.Codec.decode_json(json, catalog: catalog)
     end
   end
 
@@ -297,13 +297,13 @@ defmodule Jido.Codec.RuntimeCodecTest do
            } = Jido.Codec.Error.to_class([invalid])
   end
 
-  test "rejects malformed envelopes", %{registry: registry} do
+  test "rejects malformed envelopes", %{catalog: catalog} do
     cases = [
-      {fn -> Jido.Codec.decode_json("{", registry: registry) end, :invalid_json},
-      {fn -> Jido.Codec.decode(%{"vsn" => 1}, registry: registry) end, :missing_document_type},
-      {fn -> Jido.Codec.decode([], registry: registry) end, :invalid_document},
+      {fn -> Jido.Codec.decode_json("{", catalog: catalog) end, :invalid_json},
+      {fn -> Jido.Codec.decode(%{"vsn" => 1}, catalog: catalog) end, :missing_document_type},
+      {fn -> Jido.Codec.decode([], catalog: catalog) end, :invalid_document},
       {fn ->
-         Jido.Codec.decode(%{"type" => "jido.flow", "vsn" => 0}, registry: registry)
+         Jido.Codec.decode(%{"type" => "jido.flow", "vsn" => 0}, catalog: catalog)
        end, :invalid_document_vsn}
     ]
 

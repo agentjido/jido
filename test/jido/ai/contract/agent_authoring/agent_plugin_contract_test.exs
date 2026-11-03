@@ -4,7 +4,8 @@ defmodule Jido.AI.Contract.AgentPluginTest do
   alias Jido.AI.Agent.Plugin
   alias Jido.AI.Reasoning.ReAct
   alias Jido.AITest.Tools.Add
-  alias Jido.Codec.Registry
+  alias Jido.Catalog
+  alias Jido.Catalog.Error, as: CatalogError
 
   @tag obligation: ["jido_ai.agent_authoring.I1", "jido_ai.agent_authoring.I3"]
   test "the Plugin normalizes one route and rejects invalid provider data" do
@@ -60,7 +61,12 @@ defmodule Jido.AI.Contract.AgentPluginTest do
 
   @tag obligation: "jido_ai.agent_authoring.I4"
   test "Plugin authoring data round-trips and returns located codec errors" do
-    registry = Registry.new!(%{{"contract/reasoning", 1} => {:flow, ReAct}, {"contract/add", 1} => {:action, Add}})
+    registry =
+      Catalog.from_targets!(__MODULE__, :jido, %{
+        {"contract/reasoning", 1} => {:flow, ReAct},
+        {"contract/add", 1} => {:action, Add}
+      })
+
     data = %{reasoning: ReAct, defaults: %{model: "contract:model"}, tools: [Add]}
 
     assert {:ok,
@@ -87,14 +93,18 @@ defmodule Jido.AI.Contract.AgentPluginTest do
 
     assert {:error, _error} = Plugin.encode_authoring_data(%{data | reasoning: String}, registry)
 
-    registry_without_tool = Registry.new!(%{{"contract/reasoning", 1} => {:flow, ReAct}})
-    assert {:error, %Registry.Error{}} = Plugin.encode_authoring_data(data, registry_without_tool)
+    registry_without_tool =
+      Catalog.from_targets!(__MODULE__, :jido, %{
+        {"contract/reasoning", 1} => {:flow, ReAct}
+      })
+
+    assert {:error, %CatalogError{}} = Plugin.encode_authoring_data(data, registry_without_tool)
 
     assert {:error, %{code: :invalid_value, path: ["config", "model"]}} =
              Plugin.decode_authoring_data(%{document | "config" => %{"model" => %{}}}, registry)
 
     invalid_tool_registry =
-      Registry.new!(%{
+      Catalog.from_targets!(__MODULE__, :jido, %{
         {"contract/reasoning", 1} => {:flow, ReAct},
         {"contract/invalid-tool", 1} => {:action, String}
       })

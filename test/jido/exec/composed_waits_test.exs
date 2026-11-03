@@ -463,7 +463,7 @@ defmodule Jido.Exec.ComposedWaitsTest do
     assert definition == InvokeFlow.flow()
 
     registry =
-      Jido.Codec.Registry.new!(%{
+      Jido.Catalog.from_targets!(__MODULE__, :jido, %{
         {"map", 1} => {:schema, Jido.Joi.map()},
         {"decide", 1} => {:action, Decide},
         {"expand", 1} => {:action, Expand},
@@ -529,7 +529,7 @@ defmodule Jido.Exec.ComposedWaitsTest do
       })
 
     registry =
-      Jido.Codec.Registry.new!(%{
+      Jido.Catalog.from_targets!(__MODULE__, :jido, %{
         {"map", 1} => {:schema, Jido.Joi.map()},
         {"child", 1} => {:action, Child},
         {"record", 1} => {:action, Record},

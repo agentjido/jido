@@ -1,7 +1,8 @@
 defmodule Jido.Agent.Extension do
   @moduledoc false
   alias Jido.Agent.{Data, Error, Route}
-  alias Jido.Codec.{Registry, Value}
+  alias Jido.Catalog
+  alias Jido.Codec.Value
 
   @doc "Returns the stable authoring ID for this provider."
   @callback id() :: String.t()
@@ -31,11 +32,11 @@ defmodule Jido.Agent.Extension do
   @callback verify_connection(map(), map()) :: :ok | {:error, term()}
 
   @doc "Encodes normalized provider data for an Agent authoring document."
-  @callback encode_authoring_data(map(), Registry.t()) ::
+  @callback encode_authoring_data(map(), Catalog.t()) ::
               {:ok, term()} | {:error, term()}
 
   @doc "Decodes provider data from an Agent authoring document."
-  @callback decode_authoring_data(term(), Registry.t()) ::
+  @callback decode_authoring_data(term(), Catalog.t()) ::
               {:ok, term()} | {:error, term()}
 
   @optional_callbacks encode_authoring_data: 2, decode_authoring_data: 2, derive_routes: 1
@@ -89,17 +90,17 @@ defmodule Jido.Agent.Extension do
   end
 
   @doc false
-  @spec encode_authoring_data(module(), map(), Registry.t()) ::
+  @spec encode_authoring_data(module(), map(), Catalog.t()) ::
           {:ok, term()} | {:error, term()}
-  def encode_authoring_data(provider, data, %Registry{} = registry) do
-    authoring_data(provider, :encode_authoring_data, data, registry, &Value.encode/2)
+  def encode_authoring_data(provider, data, %Catalog{} = catalog) do
+    authoring_data(provider, :encode_authoring_data, data, catalog, &Value.encode/2)
   end
 
   @doc false
-  @spec decode_authoring_data(module(), term(), Registry.t()) ::
+  @spec decode_authoring_data(module(), term(), Catalog.t()) ::
           {:ok, term()} | {:error, term()}
-  def decode_authoring_data(provider, data, %Registry{} = registry) do
-    authoring_data(provider, :decode_authoring_data, data, registry, &Value.decode/2)
+  def decode_authoring_data(provider, data, %Catalog{} = catalog) do
+    authoring_data(provider, :decode_authoring_data, data, catalog, &Value.decode/2)
   end
 
   @doc false

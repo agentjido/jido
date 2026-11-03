@@ -2,7 +2,7 @@ defmodule Jido.Codec.Config do
   alias Jido.Joi
   @moduledoc false
 
-  alias Jido.Codec.Registry
+  alias Jido.Catalog
   alias Jido.Flow.Error
 
   @keys [:name, :description, :schema, :output_schema]
@@ -167,7 +167,7 @@ defmodule Jido.Codec.Config do
   defp validate_config(_kind, _attrs, _keys), do: {:error, [{nil, :map}]}
 
   defp validate_field(_kind, :id, value) when is_binary(value) do
-    case Registry.validate_identifier(value) do
+    case Catalog.validate_identifier(value) do
       :ok -> {:ok, value}
       {:error, _error} -> {:error, "must be a valid authoring identifier"}
     end
@@ -177,7 +177,7 @@ defmodule Jido.Codec.Config do
     do: {:error, "must be a valid authoring identifier"}
 
   defp validate_field(_kind, :vsn, value) do
-    case Registry.validate_vsn(value) do
+    case Catalog.validate_vsn(value) do
       :ok -> {:ok, value}
       {:error, _error} -> {:error, "must be a positive integer"}
     end

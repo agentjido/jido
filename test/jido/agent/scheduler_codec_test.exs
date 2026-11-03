@@ -3,7 +3,7 @@ defmodule Jido.Agent.SchedulerCodecTest do
 
   alias Jido.Agent
   alias Jido.AgentServer, as: Server
-  alias Jido.Codec.Registry
+  alias Jido.Catalog
   alias Jido.Plugin.Scheduler
 
   defmodule QueueTick do
@@ -70,7 +70,12 @@ defmodule Jido.Agent.SchedulerCodecTest do
     definition = definition(:action)
     registry = registry(definition)
     assert {:ok, json} = JidoTest.AgentRegistry.encode_json(definition, registry)
-    missing_plugin = Map.delete(registry.entries, {"plugins/scheduler", 1})
+
+    missing_plugin =
+      registry
+      |> Catalog.list()
+      |> Enum.reject(&(&1.id == "plugins/scheduler" and &1.vsn == 1))
+      |> Catalog.new!()
 
     assert {:error,
             [
@@ -144,7 +149,7 @@ defmodule Jido.Agent.SchedulerCodecTest do
   end
 
   defp registry(definition) do
-    Registry.new!(%{
+    Catalog.from_targets!(__MODULE__, :jido, %{
       {"schemas/counter", 1} => {:schema, definition.schema},
       {"actions/queue", 1} => {:action, QueueTick},
       {"flows/queue", 1} => {:flow, QueueFlow},

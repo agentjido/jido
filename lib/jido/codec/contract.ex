@@ -20,11 +20,11 @@ defmodule Jido.Codec.Contract do
   @callback target() :: module() | nil
 
   @doc "Encodes one runtime value as a versioned document."
-  @callback encode(term(), Jido.Codec.Registry.t()) ::
+  @callback encode(term(), Jido.Catalog.t()) ::
               {:ok, document()} | {:error, Exception.t()}
 
-  @doc "Decodes one versioned document through a trusted Registry."
-  @callback decode(term(), Jido.Codec.Registry.t()) ::
+  @doc "Decodes one versioned document through a trusted Catalog."
+  @callback decode(term(), Jido.Catalog.t()) ::
               {:ok, struct()} | {:error, [Jido.Codec.Issue.t()]}
 
   @optional_callbacks encode: 2

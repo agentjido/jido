@@ -1,7 +1,7 @@
 defmodule Jido.Agent.CodecTest do
   use Covenant.Case, component: "jido.agent", async: true
   alias Jido.Agent
-  alias Jido.Codec.Registry
+  alias Jido.Catalog
   alias JidoTest.AgentContract, as: F
   alias JidoTest.AgentFixtures.Add
 
@@ -337,11 +337,14 @@ defmodule Jido.Agent.CodecTest do
 
     assert child_document["definition"]["module"] != nil
 
-    plugin_registry = Registry.new!(registry.entries)
+    plugin_registry = registry
 
     assert {:ok, plugin_document} = JidoTest.AgentRegistry.encode(definition, plugin_registry)
     assert {:ok, ^definition} = JidoTest.AgentRegistry.decode(plugin_document, plugin_registry)
-    assert {:error, %{code: :unknown_reference}} = JidoTest.AgentRegistry.encode(definition, %{})
+    empty_catalog = Catalog.from_targets!(__MODULE__, :jido, %{})
+
+    assert {:error, %{code: :unknown_reference}} =
+             JidoTest.AgentRegistry.encode(definition, empty_catalog)
   end
 
   @tag obligation: "jido.agent.I20"
@@ -577,6 +580,6 @@ defmodule Jido.Agent.CodecTest do
     entries =
       if target, do: Map.put(entries, {"actions/target", 1}, {:action, target}), else: entries
 
-    Registry.new!(entries)
+    Catalog.from_targets!(__MODULE__, :jido, entries)
   end
 end

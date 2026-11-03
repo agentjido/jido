@@ -5,7 +5,8 @@ defmodule Jido.Agent.Codec do
 
   alias Jido.Agent
   alias Jido.Agent.{Authoring, Error, Extension}
-  alias Jido.Codec.{Issue, Registry, Value}
+  alias Jido.Catalog.Error, as: CatalogError
+  alias Jido.Codec.{Issue, Reference, Value}
 
   @type document :: %{required(String.t()) => term()}
 
@@ -78,7 +79,7 @@ defmodule Jido.Agent.Codec do
       fields,
       [
         module: &optional_resolve(&1, registry, :agent),
-        schema: &Registry.decode_reference(registry, &1, :schema),
+        schema: &Reference.decode(registry, &1, :schema),
         initial_state: fn value ->
           if Map.has_key?(fields, "initial_state"),
             do: Value.decode(value, registry),
@@ -192,7 +193,7 @@ defmodule Jido.Agent.Codec do
        when map_size(handler) == 2 and kind in ["action", "flow", "transform"] do
     kind = String.to_existing_atom(kind)
 
-    with {:ok, target} <- at(Registry.decode_reference(registry, target, kind), ["target"]),
+    with {:ok, target} <- at(Reference.decode(registry, target, kind), ["target"]),
          do: {:ok, %{kind: kind, target: target}}
   end
 
@@ -286,7 +287,7 @@ defmodule Jido.Agent.Codec do
   end
 
   defp decode_nested_definition(value, registry),
-    do: Registry.decode_reference(registry, value, :agent)
+    do: Reference.decode(registry, value, :agent)
 
   defp encode_connection(connection, registry) do
     encode_map(connection,
@@ -346,7 +347,7 @@ defmodule Jido.Agent.Codec do
   defp decode_plugin(plugin, registry) do
     with {:ok, plugin} <-
            decode_map(plugin,
-             provider: &Registry.decode_reference(registry, &1, :plugin),
+             provider: &Reference.decode(registry, &1, :plugin),
              data: nil,
              id: nil,
              vsn: nil
@@ -368,15 +369,15 @@ defmodule Jido.Agent.Codec do
   defp optional_resolve(nil, _registry, _kind), do: {:ok, nil}
 
   defp optional_resolve(value, registry, kind),
-    do: Registry.decode_reference(registry, value, kind)
+    do: Reference.decode(registry, value, kind)
 
   defp encode_reference(value, registry, kinds) do
-    case Registry.encode_reference(registry, kinds, value) do
+    case Reference.encode(registry, kinds, value) do
       {:ok, reference} ->
         {:ok, reference}
 
-      {:error, %Registry.Error{}} ->
-        Error.fail(:unknown_reference, [], "Agent Registry has no reference for a value", %{
+      {:error, %CatalogError{}} ->
+        Error.fail(:unknown_reference, [], "Agent Catalog has no reference for a value", %{
           kinds: List.wrap(kinds)
         })
     end
@@ -423,7 +424,7 @@ defmodule Jido.Agent.Codec do
 
   defp authoring_issue(%Issue{} = issue), do: issue
 
-  defp authoring_issue(%Registry.Error{} = error) do
+  defp authoring_issue(%CatalogError{} = error) do
     path =
       error.details
       |> Map.get(:path, [])
@@ -473,8 +474,4 @@ defmodule Jido.Agent.Codec do
 
   defp json_path_segment(segment) when is_atom(segment), do: Atom.to_string(segment)
   defp json_path_segment(segment), do: segment
-end
-
-defimpl Jido.Codec.Encoder, for: Jido.Agent do
-  def codec(_agent), do: {:ok, Jido.Agent.Codec}
 end

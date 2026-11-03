@@ -17,7 +17,7 @@ defmodule Jido.AI.Agent.Plugin do
   """
 
   alias Jido.Agent.{Data, Error}
-  alias Jido.Codec.{Issue, Registry}
+  alias Jido.Codec.{Issue, Reference}
   alias Spark.Dsl.Extension, as: SparkExtension
 
   @request_type "jido.ai.request"
@@ -110,7 +110,7 @@ defmodule Jido.AI.Agent.Plugin do
   @impl true
   def encode_authoring_data(data, registry) do
     with {:ok, data} <- normalize(data),
-         {:ok, reasoning} <- Registry.encode_reference(registry, :flow, data.reasoning),
+         {:ok, reasoning} <- Reference.encode(registry, :flow, data.reasoning),
          {:ok, defaults} <- encode_defaults(data.defaults, data.reasoning),
          {:ok, tools} <- encode_tools(data.tools, registry) do
       {:ok, %{"reasoning" => reasoning, "config" => defaults, "tools" => tools}}
@@ -178,7 +178,7 @@ defmodule Jido.AI.Agent.Plugin do
   defp encode_tools(tools, registry) do
     tools
     |> Enum.reduce_while({:ok, []}, fn tool, {:ok, encoded} ->
-      case Registry.encode_reference(registry, [:action, :flow], tool) do
+      case Reference.encode(registry, [:action, :flow], tool) do
         {:ok, reference} -> {:cont, {:ok, [reference | encoded]}}
         {:error, _error} = error -> {:halt, error}
       end
@@ -201,7 +201,7 @@ defmodule Jido.AI.Agent.Plugin do
     do: issue(:invalid_document, [], "AI Plugin data must be an object")
 
   defp resolve_reference(value, kind, registry, path) do
-    case Registry.decode_reference(registry, value, kind) do
+    case Reference.decode(registry, value, kind) do
       {:ok, target} -> {:ok, target}
       {:error, error} -> {:error, reference_issue(error, path)}
     end

@@ -114,7 +114,8 @@ defmodule Jido.Agent.AuthoringContractTest do
              JidoTest.AgentRegistry.encode(definition, JidoTest.AgentRegistry.for(definition))
 
     for entry <- [{:value, %URI{}}, {:route_match, &is_map/1}] do
-      assert {:error, _error} = Jido.Codec.Registry.new(%{"obsolete" => entry})
+      assert {:error, _error} =
+               Jido.Catalog.from_targets(__MODULE__, :jido, %{"obsolete" => entry})
     end
   end
 

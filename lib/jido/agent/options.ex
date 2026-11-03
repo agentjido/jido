@@ -19,7 +19,7 @@ defmodule Jido.Agent.Options do
       end
   """
 
-  alias Jido.Codec.Registry
+  alias Jido.Catalog
 
   @type t :: keyword()
 
@@ -39,7 +39,7 @@ defmodule Jido.Agent.Options do
       |> validate_keyword!()
       |> Keyword.put_new(:id, Atom.to_string(caller.module))
 
-    case Registry.validate_identifier(options[:id]) do
+    case Catalog.validate_identifier(options[:id]) do
       :ok -> options
       {:error, error} -> raise error
     end

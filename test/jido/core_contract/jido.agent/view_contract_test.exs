@@ -3,12 +3,13 @@ defmodule JidoTest.Contract.AgentViewTest do
 
   alias Jido.Agent
   alias Jido.Agent.View
-  alias Jido.Codec.{Document, Registry}
+  alias Jido.Catalog
+  alias Jido.Codec.Document
   alias JidoTest.AgentFixtures.{Add, CounterAgent}
   alias JidoTest.AgentContract, as: F
 
   defp registry do
-    Registry.new!(%{
+    Catalog.from_targets!(__MODULE__, :jido, %{
       {"agents/counter", 1} => {:agent, CounterAgent},
       {"agents/core", 1} => {:agent, Agent},
       {"schemas/counter", 1} => {:schema, CounterAgent.definition().schema},
@@ -226,7 +227,7 @@ defmodule JidoTest.Contract.AgentViewTest do
     definition = CounterAgent.definition()
 
     stable_without_action =
-      Registry.new!(%{
+      Catalog.from_targets!(__MODULE__, :jido, %{
         {"agents/counter", 1} => {:agent, CounterAgent},
         {"schemas/counter", 1} => {:schema, CounterAgent.definition().schema}
       })

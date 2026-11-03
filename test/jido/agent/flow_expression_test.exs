@@ -65,7 +65,7 @@ defmodule Jido.Agent.FlowExpressionTest do
     assert {:ok, %Runic.Workflow{}} = Jido.Exec.compile(flow)
 
     flow_registry =
-      Jido.Codec.Registry.new!(%{
+      Jido.Catalog.from_targets!(__MODULE__, :jido, %{
         {"actions/amount", 1} => {:action, Amount},
         {"schemas/input", 1} => {:schema, flow.schema},
         {"schemas/output", 1} => {:schema, flow.output_schema},
@@ -74,7 +74,7 @@ defmodule Jido.Agent.FlowExpressionTest do
         {"atoms/count", 1} => {:atom, :count}
       })
 
-    flow_opts = [registry: flow_registry, codec: Jido.Flow.Codec]
+    flow_opts = [catalog: flow_registry, codec: Jido.Flow.Codec]
     assert {:ok, flow_document} = Jido.Codec.encode(flow, flow_opts)
 
     assert {:ok, ^flow} =

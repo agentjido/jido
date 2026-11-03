@@ -1,12 +1,12 @@
 defmodule JidoActionTest.Fixtures.CodecRegistry do
   @moduledoc false
 
-  alias Jido.Codec.Registry
+  alias Jido.Catalog
   alias JidoActionTest.Fixtures.NestedFlow
   alias JidoActionTest.Fixtures.Actions.{Add, Multiply}
 
   def mixed do
-    Registry.new!(%{
+    Catalog.from_targets!(__MODULE__, :jido, %{
       {"actions/add", 1} => {:action, Add},
       {"actions/multiply", 1} => {:action, Multiply},
       {"flows/nested", 1} => {:flow, NestedFlow},
@@ -25,7 +25,7 @@ defmodule JidoActionTest.Fixtures.CodecRegistry do
   end
 
   def storage do
-    Registry.new!(%{
+    Catalog.from_targets!(__MODULE__, :jido, %{
       {"action/add/v1", 1} => {:action, Add},
       {"action/multiply/v1", 1} => {:action, Multiply},
       {"schema/map/v1", 1} => {:schema, Jido.Joi.map()},

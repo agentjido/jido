@@ -6,7 +6,7 @@ defmodule Jido.Flow.UnknownKeyValidationTest do
   alias JidoActionTest.FlowCodec, as: Codec
   alias Jido.Flow.Definition
   alias Jido.Flow.Error.InvalidDefinitionError
-  alias Jido.Codec.Registry
+  alias Jido.Catalog
   alias JidoActionTest.Fixtures.Actions.Add
 
   test "Flow.new preserves valid input and rejects unknown root keys" do
@@ -137,7 +137,12 @@ defmodule Jido.Flow.UnknownKeyValidationTest do
         output: %{}
       })
 
-    registry = Registry.new!(%{{"add", 1} => {:action, Add}, {"map", 1} => {:schema, Jido.Joi.map()}})
+    registry =
+      Catalog.from_targets!(__MODULE__, :jido, %{
+        {"add", 1} => {:action, Add},
+        {"map", 1} => {:schema, Jido.Joi.map()}
+      })
+
     assert {:ok, document} = Codec.encode(flow, registry)
     refute Map.has_key?(document, "schema")
     refute Map.has_key?(document, "output_schema")

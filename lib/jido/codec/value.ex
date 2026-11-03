@@ -3,7 +3,7 @@ defmodule Jido.Codec.Value do
   Encodes and decodes portable values used inside codec documents.
 
   The format supports JSON scalar values, proper lists, plain maps, and atoms
-  that a trusted `Jido.Codec.Registry` identifies. Map keys can be valid
+  that a trusted `Jido.Catalog` identifies. Map keys can be valid
   UTF-8 strings, non-negative integers, Booleans, or registered atoms.
 
   The format rejects structs, tuples, processes, invalid UTF-8 strings,
@@ -12,7 +12,8 @@ defmodule Jido.Codec.Value do
   complete document to enforce its total node limit.
   """
 
-  alias Jido.Codec.Registry
+  alias Jido.Catalog
+  alias Jido.Catalog.Error, as: CatalogError
   require Jido.Codec.Limits
 
   @maximum_depth Jido.Codec.Limits.maximum_depth()
@@ -44,12 +45,12 @@ defmodule Jido.Codec.Value do
   end
 
   @doc "Encodes one portable value with registered atom identifiers."
-  @spec encode(term(), Registry.t()) :: {:ok, term()} | {:error, Exception.t()}
-  def encode(value, %Registry{} = registry), do: encode(value, registry, 0, [])
+  @spec encode(term(), Catalog.t()) :: {:ok, term()} | {:error, Exception.t()}
+  def encode(value, %Catalog{} = catalog), do: encode(value, catalog, 0, [])
 
-  @doc "Decodes one portable value through a trusted Registry."
-  @spec decode(term(), Registry.t()) :: {:ok, term()} | {:error, Exception.t()}
-  def decode(value, %Registry{} = registry), do: decode(value, registry, 0, [])
+  @doc "Decodes one portable value through a trusted Catalog."
+  @spec decode(term(), Catalog.t()) :: {:ok, term()} | {:error, Exception.t()}
+  def decode(value, %Catalog{} = catalog), do: decode(value, catalog, 0, [])
 
   defp encode(_value, _registry, depth, path) when depth > @maximum_depth,
     do: depth_error(path, depth)
@@ -62,12 +63,12 @@ defmodule Jido.Codec.Value do
     do: portable_string(value, path)
 
   defp encode(value, registry, _depth, path) when is_atom(value) do
-    case Registry.reference(registry, :atom, value) do
+    case Catalog.reference(registry, :atom, value) do
       {:ok, {id, vsn}} ->
         {:ok, %{"$type" => "atom", "id" => id, "vsn" => vsn}}
 
-      {:error, %Registry.Error{} = exception} ->
-        prefix_registry_error({:error, exception}, path)
+      {:error, %CatalogError{} = exception} ->
+        prefix_catalog_error({:error, exception}, path)
     end
   end
 
@@ -108,10 +109,10 @@ defmodule Jido.Codec.Value do
 
   defp decode(%{"$type" => "atom", "id" => id, "vsn" => vsn} = value, registry, _depth, path)
        when map_size(value) == 3 do
-    case Registry.resolve(registry, {id, vsn}, :atom) do
+    case Catalog.resolve(registry, {id, vsn}, :atom) do
       {:ok, atom} when is_atom(atom) -> {:ok, atom}
       {:ok, _value} -> error(:atom, "codec atom reference must resolve to an atom", path)
-      {:error, %Registry.Error{} = exception} -> prefix_registry_error({:error, exception}, path)
+      {:error, %CatalogError{} = exception} -> prefix_catalog_error({:error, exception}, path)
     end
   end
 
@@ -273,7 +274,7 @@ defmodule Jido.Codec.Value do
       is_binary(key) or (is_integer(key) and key >= 0) or
         (is_atom(key) and not is_nil(key))
 
-  defp prefix_registry_error({:error, %Registry.Error{} = exception}, path),
+  defp prefix_catalog_error({:error, %CatalogError{} = exception}, path),
     do: {:error, %{exception | details: Map.put(exception.details, :path, path)}}
 
   defp reverse_ok({:ok, values}), do: {:ok, Enum.reverse(values)}

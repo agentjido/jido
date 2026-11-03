@@ -4,7 +4,7 @@ defmodule Jido.Agent.JSONTest do
   use ExUnit.Case, async: true
   @moduletag :authoring
   alias Jido.Agent
-  alias Jido.Codec.Registry
+  alias Jido.Catalog
   alias JidoTest.ComposableAgent.{Minimal, Named, Team, PluginState}
 
   test "Map, struct, DSL, and instance sources produce the same definition" do
@@ -23,7 +23,7 @@ defmodule Jido.Agent.JSONTest do
     end
   end
 
-  test "application Registry references are explicit and can differ from module names" do
+  test "application Catalog references are explicit and can differ from module names" do
     definition =
       Agent.define!(%{
         name: "leaf",
@@ -31,7 +31,7 @@ defmodule Jido.Agent.JSONTest do
       })
 
     registry =
-      Registry.new!(%{
+      Catalog.from_targets!(__MODULE__, :jido, %{
         {"state", 1} => {:schema, definition.schema},
         {"count", 1} => {:atom, :count}
       })
@@ -114,6 +114,8 @@ defmodule Jido.Agent.JSONTest do
              JidoTest.AgentRegistry.decode_json(String.duplicate(" ", 8_388_609), registry)
 
     assert {:error, _} =
-             Jido.Codec.Registry.new(%{"bad" => {:value, %URI{path: "/bad"}}})
+             Jido.Catalog.from_targets(__MODULE__, :jido, %{
+               "bad" => {:value, %URI{path: "/bad"}}
+             })
   end
 end

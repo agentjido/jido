@@ -1,13 +1,13 @@
 defmodule Jido.Flow.AccumulationTest do
   use ExUnit.Case, async: true
 
-  alias Jido.Codec.Registry
+  alias Jido.Catalog
   alias Jido.Flow.{Codec, Definition, Error}
   alias JidoActionTest.FlowCodec, as: Codec
 
   defp document do
     registry =
-      Registry.new!(%{
+      Catalog.from_targets!(__MODULE__, :jido, %{
         {"action", 1} => {:action, UnloadedAction},
         {"schema", 1} => {:schema, Jido.Joi.map()}
       })

@@ -289,7 +289,7 @@ defmodule JidoTest.Contract.AgentAuthoringTest do
 
   @tag obligation: ["jido.agent.I3", "jido.agent.I4"]
   test "the DSL rejects invalid identity, repeated core declarations, and unsafe helpers" do
-    assert_raise Jido.Codec.Registry.Error, ~r/Registry identifier/, fn ->
+    assert_raise Jido.Catalog.Error, ~r/Catalog identifier/, fn ->
       F.with_agent("", fn _module -> :ok end, ~s(, id: "bad id"))
     end
 

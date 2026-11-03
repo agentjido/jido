@@ -1,8 +1,8 @@
 defmodule JidoActionTest.GeneratedFlowCodec do
   @moduledoc false
 
+  alias Jido.Catalog
   alias Jido.Codec
-  alias Jido.Codec.Registry
   alias Jido.Expr
   alias Jido.Flow
   alias Jido.Flow.Definition
@@ -19,7 +19,7 @@ defmodule JidoActionTest.GeneratedFlowCodec do
 
   def encode(%Flow{} = flow) do
     with {:ok, flow} <- Flow.validate(flow),
-         {:ok, registry} <- flow |> entries() |> Registry.new(),
+         {:ok, registry} <- flow |> entries() |> then(&Catalog.from_targets(__MODULE__, :jido, &1)),
          {:ok, document} <- encode(flow, registry) do
       {:ok, document, registry}
     end
@@ -39,10 +39,10 @@ defmodule JidoActionTest.GeneratedFlowCodec do
   end
 
   def encode_json(value, registry),
-    do: Codec.encode_json(value, registry: registry, codec: Jido.Flow.Codec)
+    do: Codec.encode_json(value, catalog: registry, codec: Jido.Flow.Codec)
 
   def decode_json(json, registry),
-    do: Codec.decode_json(json, registry: registry, codec: Jido.Flow.Codec)
+    do: Codec.decode_json(json, catalog: registry, codec: Jido.Flow.Codec)
 
   defp entries(flow) do
     values =

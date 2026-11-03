@@ -5,7 +5,7 @@ defmodule Jido.Catalog.Discovery do
   Discovery scans configured application module lists and explicit modules.
   Modules publish static entries through `__jido_catalog_manifest__/0`. Document
   codecs implement the `Jido.Codec.Contract` behaviour. One atomic published
-  value contains the immutable Catalog and the private Codec Registry index.
+  value contains the immutable Catalog and the private Codec Index.
 
       config :jido, Jido.Catalog.Discovery,
         applications: [:my_app, :jido],
@@ -28,7 +28,7 @@ defmodule Jido.Catalog.Discovery do
 
   alias Jido.Catalog
   alias Jido.Catalog.{Entry, Manifest}
-  alias Jido.Codec.{Contract, Registry}
+  alias Jido.Codec.{Contract, Index}
 
   @snapshot_key {:jido, :catalog_snapshot}
   @default_applications :loaded
@@ -57,7 +57,7 @@ defmodule Jido.Catalog.Discovery do
 
   @doc "Returns true when the first Catalog build is complete."
   @spec ready?() :: boolean()
-  def ready?, do: match?(%{catalog: %Catalog{}, registry: %Registry{}}, published())
+  def ready?, do: match?(%{catalog: %Catalog{}, codecs: %Index{}}, published())
 
   @doc "Returns the current immutable application-wide Catalog."
   @spec catalog() :: Catalog.t()
@@ -70,12 +70,12 @@ defmodule Jido.Catalog.Discovery do
   end
 
   @doc false
-  @spec codec_index() :: Registry.t()
+  @spec codec_index() :: Index.t()
   def codec_index do
     case published() do
       :not_initialized -> raise_not_initialized()
       {:error, reason} -> raise_initialization_failed(reason)
-      %{registry: %Registry{} = registry} -> registry
+      %{codecs: %Index{} = codecs} -> codecs
     end
   end
 
@@ -103,8 +103,8 @@ defmodule Jido.Catalog.Discovery do
          {:ok, base_entry} <- Entry.new(@base_entry),
          entries = [base_entry | entries],
          {:ok, catalog} <- Catalog.new(entries),
-         {:ok, registry} <- build_codec_index(entries, codecs) do
-      :persistent_term.put(@snapshot_key, %{catalog: catalog, registry: registry})
+         {:ok, index} <- Index.new(codecs) do
+      :persistent_term.put(@snapshot_key, %{catalog: catalog, codecs: index})
       :ok
     end
   end
@@ -119,7 +119,7 @@ defmodule Jido.Catalog.Discovery do
         :ok
 
       {:error, reason} ->
-        unless match?(%{catalog: %Catalog{}, registry: %Registry{}}, published()),
+        unless match?(%{catalog: %Catalog{}, codecs: %Index{}}, published()),
           do: :persistent_term.put(@snapshot_key, {:error, reason})
 
         Logger.warning("Jido Catalog Discovery did not refresh: #{inspect(reason)}")
@@ -271,11 +271,6 @@ defmodule Jido.Catalog.Discovery do
           {:halt, {:error, error}}
       end
     end)
-  end
-
-  defp build_codec_index(entries, codecs) do
-    manifests = Enum.map(entries, &Map.from_struct/1)
-    Registry.new_discovered(manifests, codecs)
   end
 
   defp discover({module, application}) do

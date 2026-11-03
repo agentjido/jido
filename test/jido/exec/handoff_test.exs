@@ -6,7 +6,7 @@ defmodule Jido.Exec.HandoffTest do
   alias Jido.Exec
   alias Jido.Exec.Handoff
   alias Jido.Flow
-  alias Jido.Codec.Registry
+  alias Jido.Catalog
   alias Jido.Flow.Ref
   alias JidoActionTest.FlowCodec, as: Codec
   alias Jido.Instruction
@@ -259,7 +259,7 @@ defmodule Jido.Exec.HandoffTest do
       })
 
     registry =
-      Registry.new!(%{
+      Catalog.from_targets!(__MODULE__, :jido, %{
         {"map", 1} => {:schema, Jido.Joi.map()},
         {"decide", 1} => {:action, Decide},
         {"expand", 1} => {:action, Expand},

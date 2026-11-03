@@ -513,12 +513,15 @@ defmodule JidoTest.Agent.AuthoringTest do
     assert {:ok, %{state: %{count: -1}}, []} = Agent.cmd(agent, signal)
 
     assert {:error, _} =
-             Jido.Codec.Registry.new(%{"runtime" => {:value, ~D[2026-09-03]}})
+             Jido.Catalog.from_targets(__MODULE__, :jido, %{
+               "runtime" => {:value, ~D[2026-09-03]}
+             })
   end
 
   @tag obligation: "jido.agent.I20"
   test "Codec rejects incomplete instance shapes before it derives a definition" do
     definition = Counter.definition()
+    catalog = Jido.Catalog.from_targets!(__MODULE__, :jido, %{})
 
     for malformed <- [
           %{definition | id: "", state: %{}},
@@ -528,7 +531,7 @@ defmodule JidoTest.Agent.AuthoringTest do
           %{definition | id: "instance", state: %URI{}},
           %{definition | id: "instance", state: []}
         ] do
-      assert {:error, _error} = JidoTest.AgentRegistry.encode(malformed, %{})
+      assert {:error, _error} = JidoTest.AgentRegistry.encode(malformed, catalog)
     end
   end
 

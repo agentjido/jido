@@ -2,7 +2,7 @@ defmodule Jido.Flow.GeneratedRegistryTest do
   use Covenant.Case, component: "jido_action.codec", async: true
   @moduletag obligation: "jido_action.codec.I6"
 
-  alias Jido.Codec.Registry
+  alias Jido.Catalog
   alias Jido.Flow.Codec
   alias JidoActionTest.FlowCodec, as: Codec
   alias Jido.Flow.Error.InvalidDefinitionError
@@ -12,30 +12,30 @@ defmodule Jido.Flow.GeneratedRegistryTest do
   alias JidoActionTest.Fixtures.NestedFlow
   alias JidoActionTest.Fixtures.Actions.{Add, Multiply}
 
-  test "encode builds one deterministic temporary Codec Registry" do
+  test "encode builds one deterministic temporary Catalog" do
     flow = FlowAuthoring.mixed_flow!()
 
-    assert {:ok, document, %Registry{} = registry} = Codec.encode(flow)
+    assert {:ok, document, %Catalog{} = registry} = Codec.encode(flow)
     assert {:ok, ^document, ^registry} = Codec.encode(flow)
 
     assert {:ok, Add} =
-             Registry.resolve(registry, {"actions/generated-1", 1}, :action)
+             Catalog.resolve(registry, {"actions/generated-1", 1}, :action)
 
     assert {:ok, Multiply} =
-             Registry.resolve(registry, {"actions/generated-2", 1}, :action)
+             Catalog.resolve(registry, {"actions/generated-2", 1}, :action)
 
     assert {:ok, NestedFlow} =
-             Registry.resolve(registry, {"flows/generated-1", 1}, :flow)
+             Catalog.resolve(registry, {"flows/generated-1", 1}, :flow)
 
     assert {:ok, generated_schema} =
-             Registry.resolve(registry, {"schemas/generated-1", 1}, :schema)
+             Catalog.resolve(registry, {"schemas/generated-1", 1}, :schema)
 
     assert Jido.Joi.Schema.kind(generated_schema) == :map
 
     for {atom, index} <-
           Enum.with_index([:add, :amount, :count, :items, :kind, :owner, :value], 1) do
       assert {:ok, ^atom} =
-               Registry.resolve(
+               Catalog.resolve(
                  registry,
                  {"atoms/generated-#{index}", 1},
                  :atom
@@ -62,14 +62,14 @@ defmodule Jido.Flow.GeneratedRegistryTest do
       })
 
     assert {:ok, _subset_document, subset_registry} = Codec.encode(subset)
-    assert {:ok, original_reference} = Registry.reference(registry, :action, action)
-    assert {:ok, subset_reference} = Registry.reference(subset_registry, :action, action)
+    assert {:ok, original_reference} = Catalog.reference(registry, :action, action)
+    assert {:ok, subset_reference} = Catalog.reference(subset_registry, :action, action)
     refute original_reference == subset_reference
 
     assert {:error, %InvalidDefinitionError{}} = Codec.decode(document, subset_registry)
   end
 
-  test "generated Registry leaves target contracts to Exec" do
+  test "generated Catalog leaves target contracts to Exec" do
     flow =
       JidoActionTest.FlowBuilder.new!(%{
         name: "invalid_target",
@@ -77,7 +77,7 @@ defmodule Jido.Flow.GeneratedRegistryTest do
         output: Ref.result("invalid")
       })
 
-    assert {:ok, _document, %Registry{}} = Codec.encode(flow)
+    assert {:ok, _document, %Catalog{}} = Codec.encode(flow)
     assert {:error, %InvalidDefinitionError{}} = Jido.Exec.compile(flow)
     assert {:error, %InvalidDefinitionError{}} = Codec.encode(:invalid)
   end

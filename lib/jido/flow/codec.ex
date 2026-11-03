@@ -3,6 +3,8 @@ defmodule Jido.Flow.Codec do
 
   @behaviour Jido.Codec.Contract
 
+  alias Jido.Catalog
+  alias Jido.Catalog.Error, as: CatalogError
   alias Jido.Codec.Issue
   alias Jido.Flow
   alias Jido.Flow.{Definition, Error}
@@ -21,18 +23,18 @@ defmodule Jido.Flow.Codec do
 
   @impl true
   @spec encode(term(), term()) :: {:ok, document()} | {:error, Exception.t()}
-  def encode(%Flow{} = flow, %Jido.Codec.Registry{} = registry) do
-    with {:ok, flow} <- Flow.validate(flow), do: Writer.encode(flow, registry)
+  def encode(%Flow{} = flow, %Catalog{} = catalog) do
+    with {:ok, flow} <- Flow.validate(flow), do: Writer.encode(flow, catalog)
   end
 
-  def encode(value, %Jido.Codec.Registry{}),
+  def encode(value, %Catalog{}),
     do: {:error, Error.validation_error("expected a Jido.Flow artifact", %{value: value})}
 
-  def encode(_flow, registry),
+  def encode(_flow, catalog),
     do:
       {:error,
-       Error.validation_error("flow codec registry must be a Jido.Codec.Registry", %{
-         value: registry
+       Error.validation_error("flow codec catalog must be a Jido.Catalog", %{
+         value: catalog
        })}
 
   @impl true
@@ -45,10 +47,10 @@ defmodule Jido.Flow.Codec do
   end
 
   @doc false
-  @spec diagnose(document(), Jido.Codec.Registry.t()) ::
+  @spec diagnose(document(), Catalog.t()) ::
           {:ok, Flow.t()} | {:error, Error.Invalid.t()}
-  def diagnose(document, %Jido.Codec.Registry{} = registry) do
-    case Reader.decode(document, registry) do
+  def diagnose(document, %Catalog{} = catalog) do
+    case Reader.decode(document, catalog) do
       {:ok, attrs, paths} ->
         case Definition.diagnose_lowered(attrs) do
           {:ok, attrs} ->
@@ -73,15 +75,15 @@ defmodule Jido.Flow.Codec do
     end
   end
 
-  def diagnose(_document, registry),
+  def diagnose(_document, catalog),
     do:
       failure([
-        Error.validation_error("flow codec registry must be a Jido.Codec.Registry", %{
-          value: registry
+        Error.validation_error("flow codec catalog must be a Jido.Catalog", %{
+          value: catalog
         })
       ])
 
-  defp authoring_issue(%Jido.Codec.Registry.Error{} = error),
+  defp authoring_issue(%CatalogError{} = error),
     do: authoring_issue(error, :reference)
 
   defp authoring_issue(%Error.InvalidDefinitionError{} = error),

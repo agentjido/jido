@@ -1,7 +1,8 @@
 defmodule Jido.CodecIntegrationTest do
   use ExUnit.Case, async: false
 
-  alias Jido.Codec.Registry
+  alias Jido.Catalog
+  alias Jido.Codec.{Index, Reference}
 
   defmodule Extension do
     use Jido.Plugin, id: "tests/plugins/authoring", vsn: 2
@@ -24,14 +25,14 @@ defmodule Jido.CodecIntegrationTest do
 
     @impl Jido.Agent.Extension
     def encode_authoring_data(%{target: target}, registry) do
-      with {:ok, reference} <- Registry.encode_reference(registry, :action, target),
+      with {:ok, reference} <- Reference.encode(registry, :action, target),
            do: {:ok, %{"target" => reference}}
     end
 
     @impl Jido.Agent.Extension
     def decode_authoring_data(%{"target" => reference} = data, registry)
         when map_size(data) == 1 do
-      with {:ok, target} <- Registry.decode_reference(registry, reference, :action),
+      with {:ok, target} <- Reference.decode(registry, reference, :action),
            do: {:ok, %{target: target}}
     end
 
@@ -75,7 +76,7 @@ defmodule Jido.CodecIntegrationTest do
     end)
   end
 
-  test "Agent Plugins use the shared Authoring Registry" do
+  test "Agent Plugins use the shared Catalog" do
     assert :ok =
              Jido.Catalog.Discovery.refresh(
                applications: [],
@@ -88,34 +89,35 @@ defmodule Jido.CodecIntegrationTest do
                ]
              )
 
-    registry = Jido.Catalog.Discovery.codec_index()
+    catalog = Jido.Catalog.Discovery.catalog()
+    codecs = Jido.Catalog.Discovery.codec_index()
 
     assert %{kind: :agent, target: Agent} =
-             Registry.get(registry, "tests/agents/sample", 1)
+             Catalog.get(catalog, "tests/agents/sample", 1)
 
     assert %{kind: :plugin, target: Extension} =
-             Registry.get(registry, "tests/plugins/authoring", 2)
+             Catalog.get(catalog, "tests/plugins/authoring", 2)
 
     assert %{kind: :plugin, target: Plugin} =
-             Registry.get(registry, "tests/plugins/sample", 3)
+             Catalog.get(catalog, "tests/plugins/sample", 3)
 
-    assert Registry.codec(registry, "jido.agent.definition", 1) ==
+    assert Index.codec(codecs, "jido.agent.definition", 1) ==
              {:ok, Jido.Agent.Codec}
 
     definition = Agent.definition()
-    assert {:ok, document} = Jido.Codec.encode(definition, registry: registry)
+    assert {:ok, document} = Jido.Codec.encode(definition, catalog: catalog)
     assert document["vsn"] == 1
-    assert {:ok, ^definition} = Jido.Codec.decode(document, registry: registry)
+    assert {:ok, ^definition} = Jido.Codec.decode(document, catalog: catalog)
   end
 
   test "the default scan includes core Jido when it is loaded" do
     assert :ok = Jido.Catalog.Discovery.refresh()
 
-    assert Registry.codec(Jido.Catalog.Discovery.codec_index(), "jido.agent.definition", 1) ==
+    assert Index.codec(Jido.Catalog.Discovery.codec_index(), "jido.agent.definition", 1) ==
              {:ok, Jido.Agent.Codec}
   end
 
-  test "an extension can encode and decode typed Registry references" do
+  test "an extension can encode and decode typed Catalog references" do
     definition =
       Jido.Agent.define!(%{
         name: "referenced_extension_agent",
@@ -136,15 +138,15 @@ defmodule Jido.CodecIntegrationTest do
         ]
       })
 
-    registry =
-      Registry.new!(%{
+    catalog =
+      Catalog.from_targets!(__MODULE__, :jido, %{
         {"tests/schemas/referenced-extension-agent", 1} => {:schema, definition.schema},
         {"tests/plugins/referenced", 1} => {:plugin, ReferencedExtension},
         {"tests/actions/referenced", 1} => {:action, ReferencedAction}
       })
 
     assert {:ok, document} =
-             Jido.Codec.encode(definition, registry: registry, codec: Jido.Agent.Codec)
+             Jido.Codec.encode(definition, catalog: catalog, codec: Jido.Agent.Codec)
 
     assert get_in(document, ["definition", "plugins", Access.at(0), "data"]) == %{
              "target" => %{"id" => "tests/actions/referenced", "vsn" => 1}
@@ -156,18 +158,20 @@ defmodule Jido.CodecIntegrationTest do
              definition.routes
 
     assert {:ok, ^definition} =
-             Jido.Codec.decode(document, registry: registry, codec: Jido.Agent.Codec)
+             Jido.Codec.decode(document, catalog: catalog, codec: Jido.Agent.Codec)
 
     restricted =
-      registry.entries
-      |> Map.delete({"tests/actions/referenced", 1})
-      |> Registry.new!()
+      Catalog.from_targets!(__MODULE__, :jido, %{
+        {"tests/schemas/referenced-extension-agent", 1} => {:schema, definition.schema},
+        {"tests/plugins/referenced", 1} => {:plugin, ReferencedExtension}
+      })
 
     assert {:error, _issues} =
-             Jido.Codec.decode(document, registry: restricted, codec: Jido.Agent.Codec)
+             Jido.Codec.decode(document, catalog: restricted, codec: Jido.Agent.Codec)
   end
 
   test "Agent and Plugin legacy JSON facades stay removed" do
+    assert Code.ensure_loaded?(Jido.Agent.Codec)
     refute function_exported?(Jido.Agent, :to_json, 2)
     refute function_exported?(Jido.Agent, :from_json, 2)
     assert function_exported?(Jido.Agent.Codec, :encode, 2)

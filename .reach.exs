@@ -99,6 +99,7 @@
     forbidden_modules: [
       "Jido.Config",
       "Jido.Codec.Manifest",
+      "Jido.Codec.Registry",
       "Jido.Discovery",
       "Jido.PortableTerm",
       "Jido.AI.Telemetry*",
@@ -111,6 +112,7 @@
     forbidden_files: [
       "lib/jido/config.ex",
       "lib/jido/codec/manifest.ex",
+      "lib/jido/codec/registry.ex",
       "lib/jido/discovery.ex",
       "lib/jido/portable_term.ex",
       "lib/jido/ai/telemetry.ex",

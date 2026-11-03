@@ -2,12 +2,14 @@ defmodule Jido.Codec.ValueTest do
   use Covenant.Case, component: "jido_action.authoring", async: true
   @moduletag obligation: "jido_action.authoring.I2"
 
-  alias Jido.Codec.{Registry, Value}
+  alias Jido.Catalog
+  alias Jido.Catalog.Error, as: CatalogError
+  alias Jido.Codec.Value
   alias Jido.Codec.Value.Error
 
   test "round trips portable values and registered atoms" do
     registry =
-      Registry.new!(%{
+      Catalog.from_targets!(__MODULE__, :jido, %{
         {"atoms/count", 1} => {:atom, :count},
         {"atoms/ready", 1} => {:atom, :ready}
       })
@@ -19,24 +21,24 @@ defmodule Jido.Codec.ValueTest do
   end
 
   test "rejects unregistered atoms and nonportable values" do
-    registry = Registry.new!(%{})
+    registry = Catalog.from_targets!(__MODULE__, :jido, %{})
 
-    assert {:error, %Registry.Error{}} = Value.encode(:missing, registry)
+    assert {:error, %CatalogError{}} = Value.encode(:missing, registry)
     assert {:error, %Error{} = error} = Value.encode(self(), registry)
     assert Jido.Codec.Error.splode_error?(error)
     assert {:error, %Error{}} = Value.encode({:tuple}, registry)
   end
 
   test "keeps the full path for an unregistered nested atom" do
-    registry = Registry.new!(%{})
+    registry = Catalog.from_targets!(__MODULE__, :jido, %{})
 
-    assert {:error, %Registry.Error{details: %{path: ["outer", 0]}}} =
+    assert {:error, %CatalogError{details: %{path: ["outer", 0]}}} =
              Value.encode(%{"outer" => [:missing]}, registry)
   end
 
   test "sorts map entries by the encoded key" do
     registry =
-      Registry.new!(%{
+      Catalog.from_targets!(__MODULE__, :jido, %{
         {"atoms/z-write-a", 1} => {:atom, :a},
         {"atoms/a-write-z", 1} => {:atom, :z}
       })
@@ -50,7 +52,7 @@ defmodule Jido.Codec.ValueTest do
   end
 
   test "round trips Boolean map keys in deterministic order" do
-    registry = Registry.new!(%{})
+    registry = Catalog.from_targets!(__MODULE__, :jido, %{})
     value = %{true => "yes", false => "no"}
 
     assert {:ok, %{"entries" => entries} = encoded} = Value.encode(value, registry)
@@ -59,21 +61,21 @@ defmodule Jido.Codec.ValueTest do
   end
 
   test "rejects unsupported map keys before it sorts portable keys" do
-    registry = Registry.new!(%{})
+    registry = Catalog.from_targets!(__MODULE__, :jido, %{})
 
     assert {:error, %Error{reason: :map_key, path: []}} =
              Value.encode(%{{:unsupported, :key} => self()}, registry)
   end
 
-  test "rejects a Registry value that is not an atom for an atom tag" do
-    registry = Registry.new!(%{{"atoms/invalid", 1} => {:atom, "not-an-atom"}})
-    encoded = %{"$type" => "atom", "id" => "atoms/invalid", "vsn" => 1}
-
-    assert {:error, %Error{reason: :atom}} = Value.decode(encoded, registry)
+  test "Catalog rejects a non-atom target for an atom entry" do
+    assert {:error, {:invalid_catalog_manifest, __MODULE__, _reason}} =
+             Catalog.from_targets(__MODULE__, :jido, %{
+               {"atoms/invalid", 1} => {:atom, "not-an-atom"}
+             })
   end
 
   test "decode rejects invalid UTF-8 strings at every value position" do
-    registry = Registry.new!(%{})
+    registry = Catalog.from_targets!(__MODULE__, :jido, %{})
     invalid = <<255>>
 
     for encoded <- [
@@ -88,7 +90,7 @@ defmodule Jido.Codec.ValueTest do
 
   test "decode rejects a plain map that would become a struct" do
     registry =
-      Registry.new!(%{
+      Catalog.from_targets!(__MODULE__, :jido, %{
         {"atoms/struct", 1} => {:atom, :__struct__},
         {"atoms/uri", 1} => {:atom, URI}
       })
@@ -107,7 +109,7 @@ defmodule Jido.Codec.ValueTest do
   end
 
   test "decode returns structured errors for improper lists" do
-    registry = Registry.new!(%{})
+    registry = Catalog.from_targets!(__MODULE__, :jido, %{})
     encoded_map = %{"$type" => "map", "entries" => [%{"key" => "key", "value" => 1} | :tail]}
 
     assert {:error, %Error{reason: :list, path: []}} = Value.decode([1 | :tail], registry)
@@ -117,7 +119,7 @@ defmodule Jido.Codec.ValueTest do
   end
 
   test "enforces depth before recursive encode and decode" do
-    registry = Registry.new!(%{})
+    registry = Catalog.from_targets!(__MODULE__, :jido, %{})
     nested = Enum.reduce(1..101, 0, fn _index, value -> [value] end)
 
     assert {:error, %Error{reason: :depth, details: %{maximum_depth: 100}}} =
@@ -128,7 +130,7 @@ defmodule Jido.Codec.ValueTest do
   end
 
   test "enforces collection size before recursive encode and decode" do
-    registry = Registry.new!(%{})
+    registry = Catalog.from_targets!(__MODULE__, :jido, %{})
     values = List.duplicate(0, 10_001)
 
     assert {:error, %Error{reason: :collection, details: %{maximum_size: 10_000}}} =
@@ -139,7 +141,8 @@ defmodule Jido.Codec.ValueTest do
   end
 
   test "every decoded portable value can be encoded again" do
-    registry = Registry.new!(%{{"atoms/ready", 1} => {:atom, :ready}})
+    registry =
+      Catalog.from_targets!(__MODULE__, :jido, %{{"atoms/ready", 1} => {:atom, :ready}})
 
     for encoded <- [
           nil,

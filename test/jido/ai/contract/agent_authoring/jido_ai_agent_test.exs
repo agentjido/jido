@@ -391,7 +391,7 @@ defmodule Jido.AITest do
     assert reply.data == %{input: "check", threshold: 0.85, rounds: 2}
 
     registry =
-      Jido.Codec.Registry.new!(%{
+      Jido.Catalog.from_targets!(__MODULE__, :jido, %{
         {id, 1} => {:agent, name},
         {"jido.ai/agent", 1} => {:plugin, Jido.AI.Agent.Plugin},
         {"jido.ai/tests/schema-driven-reasoning", 1} => {:flow, Jido.AITest.SchemaDrivenReasoning},
@@ -400,7 +400,7 @@ defmodule Jido.AITest do
 
     assert {:ok, json} =
              Jido.Codec.encode_json(name.definition(),
-               registry: registry,
+               catalog: registry,
                codec: Jido.Agent.Codec
              )
 
@@ -416,7 +416,7 @@ defmodule Jido.AITest do
 
     assert {:ok, definition} =
              Jido.Codec.decode_json(json,
-               registry: registry,
+               catalog: registry,
                codec: Jido.Agent.Codec
              )
 
@@ -584,7 +584,7 @@ defmodule Jido.AITest do
 
     assert {:ok, json} =
              Jido.Codec.encode_json(SimpleAgent.definition(),
-               registry: registry,
+               catalog: registry,
                codec: Jido.Agent.Codec
              )
 
@@ -619,7 +619,7 @@ defmodule Jido.AITest do
 
     assert {:ok, definition} =
              Jido.Codec.decode_json(fixture,
-               registry: registry,
+               catalog: registry,
                codec: Jido.Agent.Codec
              )
 
@@ -643,7 +643,7 @@ defmodule Jido.AITest do
 
   test "Flow tools round-trip through Agent authoring data" do
     registry =
-      Jido.Codec.Registry.new!(%{
+      Jido.Catalog.from_targets!(__MODULE__, :jido, %{
         {"jido.ai/reasoning/react", 1} => {:flow, ReAct},
         {"jido.ai/examples/tools/add-flow", 1} => {:flow, Tools.AddFlow}
       })
@@ -664,7 +664,7 @@ defmodule Jido.AITest do
 
     assert {:ok, json} =
              Jido.Codec.encode_json(ConfiguredAgent.definition(),
-               registry: registry,
+               catalog: registry,
                codec: Jido.Agent.Codec
              )
 
@@ -682,7 +682,7 @@ defmodule Jido.AITest do
 
     assert {:ok, definition} =
              Jido.Codec.decode_json(json,
-               registry: registry,
+               catalog: registry,
                codec: Jido.Agent.Codec
              )
 
@@ -705,7 +705,7 @@ defmodule Jido.AITest do
 
     assert {:error, [issue]} =
              Jido.Codec.decode_json(fixture,
-               registry: simple_agent_registry(),
+               catalog: simple_agent_registry(),
                codec: Jido.Agent.Codec
              )
 
@@ -729,7 +729,7 @@ defmodule Jido.AITest do
 
     assert {:error, [issue]} =
              Jido.Codec.decode_json(fixture,
-               registry: simple_agent_registry(),
+               catalog: simple_agent_registry(),
                codec: Jido.Agent.Codec
              )
 
@@ -984,7 +984,7 @@ defmodule Jido.AITest do
   end
 
   defp simple_agent_registry do
-    Jido.Codec.Registry.new!(%{
+    Jido.Catalog.from_targets!(__MODULE__, :jido, %{
       {"jido.ai/agents/simple", 3} => {:agent, SimpleAgent},
       {"jido.ai/agent", 1} => {:plugin, Jido.AI.Agent.Plugin},
       {"jido.ai/reasoning/react", 1} => {:flow, ReAct},
@@ -995,7 +995,7 @@ defmodule Jido.AITest do
   end
 
   defp configured_agent_registry do
-    Jido.Codec.Registry.new!(%{
+    Jido.Catalog.from_targets!(__MODULE__, :jido, %{
       {"jido.ai/agents/configured", 1} => {:agent, ConfiguredAgent},
       {"jido.ai/agent", 1} => {:plugin, Jido.AI.Agent.Plugin},
       {"jido.ai/reasoning/react", 1} => {:flow, ReAct},

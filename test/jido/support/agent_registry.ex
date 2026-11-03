@@ -2,22 +2,22 @@ defmodule JidoTest.AgentRegistry do
   @moduledoc false
 
   alias Jido.Agent
+  alias Jido.Catalog
   alias Jido.Codec
-  alias Jido.Codec.Registry
 
   @codec Jido.Agent.Codec
 
   def encode(source, registry),
-    do: Codec.encode(source, registry: registry, codec: @codec)
+    do: Codec.encode(source, catalog: registry, codec: @codec)
 
   def decode(document, registry),
-    do: Codec.decode(document, registry: registry, codec: @codec)
+    do: Codec.decode(document, catalog: registry, codec: @codec)
 
   def encode_json(source, registry),
-    do: Codec.encode_json(source, registry: registry, codec: @codec)
+    do: Codec.encode_json(source, catalog: registry, codec: @codec)
 
   def decode_json(json, registry),
-    do: Codec.decode_json(json, registry: registry, codec: @codec)
+    do: Codec.decode_json(json, catalog: registry, codec: @codec)
 
   def for(source) do
     definition = Agent.definition(source)
@@ -30,7 +30,7 @@ defmodule JidoTest.AgentRegistry do
     |> Map.new(fn {{kind, value}, index} ->
       {{"#{kind}/test-#{index}", 1}, {kind, value}}
     end)
-    |> Registry.new!()
+    |> then(&Catalog.from_targets!(__MODULE__, :jido, &1))
   end
 
   defp references(%Agent{} = agent) do

@@ -12,7 +12,8 @@ defmodule Jido.Codec do
   * contain codec callback failures and return stable ordered issues;
   * enforce complete-document, JSON byte, duplicate-key, and nesting limits;
   * read the atomically published codec index only when document routing needs
-    it and the caller does not pass `:registry`.
+    it;
+  * resolve stable references through an explicit or published `Jido.Catalog`.
 
   Domain codecs implement `Jido.Codec.Contract` and own their document fields
   and semantic validation. Catalog Discovery owns module scanning and atomic
@@ -24,14 +25,15 @@ defmodule Jido.Codec do
   and Flow declaration contract. These helpers do not
   add more runtime operations to this facade.
 
-  An explicit `:registry` option bypasses Discovery.
+  An explicit `:catalog` option bypasses the published Catalog value.
   """
 
-  alias Jido.Codec.{Contract, Document, Error, Issue, Registry, Static}
+  alias Jido.Catalog
+  alias Jido.Codec.{Contract, Document, Error, Index, Issue, Static}
 
   @default_maximum_json_bytes 8_388_608
   @catalog_snapshot_key {:jido, :catalog_snapshot}
-  @option_keys [:registry, :codec, :maximum_json_bytes]
+  @option_keys [:catalog, :codec, :maximum_json_bytes]
 
   @typedoc "A JSON object produced or consumed by a document codec."
   @type document :: Contract.document()
@@ -40,11 +42,11 @@ defmodule Jido.Codec do
   @spec encode(term(), keyword()) :: {:ok, map()} | {:error, Error.t()}
   def encode(value, opts \\ []) do
     opts = options!(opts)
-    registry = registry!(opts)
+    catalog = catalog!(opts)
     maximum_bytes = maximum_json_bytes!(opts)
 
-    with {:ok, codec} <- encoder(value, registry, opts),
-         {:ok, document} <- safe_encode(codec, value, registry),
+    with {:ok, codec} <- encoder(value, opts),
+         {:ok, document} <- safe_encode(codec, value, catalog),
          :ok <- encoded_document(document, codec, maximum_bytes) do
       {:ok, document}
     end
@@ -101,7 +103,7 @@ defmodule Jido.Codec do
 
   defp route(%{"type" => type, "vsn" => vsn} = document, opts)
        when is_binary(type) and byte_size(type) in 1..255 and is_integer(vsn) and vsn > 0 do
-    run_codec(document, type, vsn, registry!(opts), opts[:codec])
+    run_codec(document, type, vsn, catalog!(opts), opts[:codec])
   end
 
   defp route(%{"type" => type, "vsn" => _vsn}, _opts) when is_binary(type),
@@ -114,7 +116,7 @@ defmodule Jido.Codec do
 
   defp route(%{"type" => type}, opts) when is_binary(type) do
     issue(:missing_document_vsn, ["vsn"], "codec document vsn is required", %{
-      supported_vsns: Registry.codec_vsns(registry!(opts), type)
+      supported_vsns: supported_versions(type, opts[:codec])
     })
   end
 
@@ -127,13 +129,15 @@ defmodule Jido.Codec do
   defp route(_document, _opts),
     do: issue(:invalid_document, [], "codec document must be a JSON object")
 
-  defp run_codec(document, type, vsn, registry, nil) do
-    case Registry.codec(registry, type, vsn) do
+  defp run_codec(document, type, vsn, catalog, nil) do
+    index = published_codec_index!()
+
+    case Index.codec(index, type, vsn) do
       {:ok, codec} ->
-        safe_decode(codec, document, registry)
+        safe_decode(codec, document, catalog)
 
       {:error, :unknown_codec} ->
-        supported = Registry.codec_vsns(registry, type)
+        supported = Index.versions(index, type)
         path = if supported == [], do: ["type"], else: ["vsn"]
 
         issue(:unsupported_document, path, "codec document type or vsn is not supported", %{
@@ -144,16 +148,26 @@ defmodule Jido.Codec do
     end
   end
 
-  defp run_codec(document, type, vsn, registry, codec) when is_atom(codec) do
+  defp run_codec(document, type, vsn, catalog, codec) when is_atom(codec) do
     case codec_metadata(codec, :decode) do
-      {:ok, %{type: ^type, vsn: ^vsn}} -> safe_decode(codec, document, registry)
+      {:ok, %{type: ^type, vsn: ^vsn}} -> safe_decode(codec, document, catalog)
+      {:ok, %{type: ^type, vsn: supported_vsn}} -> unsupported_document(type, vsn, [supported_vsn])
       {:ok, _metadata} -> unsupported_document(type, vsn, [])
       {:error, error} -> {:error, [error]}
     end
   end
 
-  defp safe_decode(codec, document, registry) do
-    case codec.decode(document, registry) do
+  defp supported_versions(type, nil), do: Index.versions(published_codec_index!(), type)
+
+  defp supported_versions(type, codec) when is_atom(codec) do
+    case codec_metadata(codec, :decode) do
+      {:ok, %{type: ^type, vsn: vsn}} -> [vsn]
+      _error_or_other_type -> []
+    end
+  end
+
+  defp safe_decode(codec, document, catalog) do
+    case codec.decode(document, catalog) do
       {:ok, %_{} = value} ->
         {:ok, value}
 
@@ -171,8 +185,8 @@ defmodule Jido.Codec do
     kind, reason -> codec_failure(codec, kind, inspect(reason, limit: 20, printable_limit: 1_000))
   end
 
-  defp safe_encode(codec, value, registry) do
-    case codec.encode(value, registry) do
+  defp safe_encode(codec, value, catalog) do
+    case codec.encode(value, catalog) do
       {:ok, %{} = document} when not is_struct(document) ->
         {:ok, document}
 
@@ -276,7 +290,7 @@ defmodule Jido.Codec do
   defp encoded_document(_document, _codec, _maximum_bytes),
     do: {:error, Error.invalid(:invalid_document, "codec returned an invalid document")}
 
-  defp encoder(value, registry, opts) do
+  defp encoder(value, opts) do
     case opts[:codec] do
       nil ->
         case Jido.Codec.Encoder.codec(value) do
@@ -284,7 +298,7 @@ defmodule Jido.Codec do
             {:ok, codec}
 
           :error ->
-            case Registry.encoder(registry, value) do
+            case Index.encoder(published_codec_index!(), value) do
               {:ok, codec} -> {:ok, codec}
               {:error, :unknown_encoder} -> unsupported_value()
             end
@@ -333,7 +347,9 @@ defmodule Jido.Codec do
   end
 
   defp unsupported_document(type, vsn, supported) do
-    issue(:unsupported_document, ["type"], "codec document type or vsn is not supported", %{
+    path = if supported == [], do: ["type"], else: ["vsn"]
+
+    issue(:unsupported_document, path, "codec document type or vsn is not supported", %{
       type: type,
       vsn: vsn,
       supported_vsns: supported
@@ -359,30 +375,40 @@ defmodule Jido.Codec do
     |> Keyword.get(:maximum_json_bytes, @default_maximum_json_bytes)
   end
 
-  defp registry!(opts) do
-    case Keyword.get(opts, :registry) do
-      nil -> published_codec_index!()
-      %Registry{} = registry -> registry
-      entries when is_map(entries) and not is_struct(entries) -> Registry.new!(entries)
-      value -> raise ArgumentError, "Codec Registry is invalid: #{inspect(value)}"
+  defp catalog!(opts) do
+    case Keyword.get(opts, :catalog) do
+      nil -> published_catalog!()
+      %Catalog{} = catalog -> catalog
+      value -> raise ArgumentError, "Catalog is invalid: #{inspect(value)}"
+    end
+  end
+
+  defp published_catalog! do
+    case :persistent_term.get(@catalog_snapshot_key, :not_initialized) do
+      %{catalog: %Catalog{} = catalog} -> catalog
+      {:error, reason} -> raise_catalog_initialization_failed(reason)
+      :not_initialized -> raise_catalog_not_initialized()
     end
   end
 
   defp published_codec_index! do
     case :persistent_term.get(@catalog_snapshot_key, :not_initialized) do
-      %{registry: %Registry{} = registry} ->
-        registry
-
-      {:error, reason} ->
-        raise Error.internal(
-                :catalog_initialization_failed,
-                "Catalog initialization failed: #{inspect(reason)}",
-                %{reason: reason}
-              )
-
-      :not_initialized ->
-        raise Error.internal(:catalog_not_initialized, "Catalog is not initialized")
+      %{codecs: %Index{} = index} -> index
+      {:error, reason} -> raise_catalog_initialization_failed(reason)
+      :not_initialized -> raise_catalog_not_initialized()
     end
+  end
+
+  defp raise_catalog_initialization_failed(reason) do
+    raise Error.internal(
+            :catalog_initialization_failed,
+            "Catalog initialization failed: #{inspect(reason)}",
+            %{reason: reason}
+          )
+  end
+
+  defp raise_catalog_not_initialized do
+    raise Error.internal(:catalog_not_initialized, "Catalog is not initialized")
   end
 
   defp document_error(%Document.Error{} = error),

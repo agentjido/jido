@@ -38,7 +38,7 @@ defmodule Jido.Agent.OptionsTest do
       end
     end
 
-    assert_raise Jido.Codec.Registry.Error, ~r/Registry identifier/, fn ->
+    assert_raise Jido.Catalog.Error, ~r/Catalog identifier/, fn ->
       Options.prepare!(quote(do: [name: "invalid", id: "bad id"]), __ENV__)
     end
   end
