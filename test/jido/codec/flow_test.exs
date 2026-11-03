@@ -3,10 +3,10 @@ defmodule Jido.Codec.FlowTest do
   @moduletag obligation: "jido_action.codec.I7"
 
   alias Jido.Catalog
-  alias Jido.Flow.Error.InvalidDefinitionError
+  alias Jido.Error.ValidationError
   alias Jido.Flow
   alias JidoActionTest.FlowCodec, as: Codec
-  alias Jido.Flow.Error
+  alias Jido.Error
   alias Jido.Flow.Ref
   alias JidoActionTest.Fixtures.CodecRegistry
   alias JidoActionTest.Fixtures.FlowAuthoring
@@ -89,7 +89,7 @@ defmodule Jido.Codec.FlowTest do
     invalid = put_in(step, ["call", "target", "vsn"], 2)
 
     assert {:error,
-            %InvalidDefinitionError{
+            %ValidationError{
               message: "flow catalog reference has unsupported vsn",
               details: %{
                 vsn: 2,
@@ -109,7 +109,7 @@ defmodule Jido.Codec.FlowTest do
       invalid = replace_component(document, 0, Map.put(step, field, "send(self(), :work)"))
 
       assert {:error,
-              %InvalidDefinitionError{
+              %ValidationError{
                 message: _message,
                 details: %{key: ^field, path: ["components", 0, ^field]}
               }} = invalid |> Jason.encode!() |> Jason.decode!() |> Codec.decode(registry)
@@ -146,7 +146,7 @@ defmodule Jido.Codec.FlowTest do
         )
 
       assert {:error,
-              %InvalidDefinitionError{
+              %ValidationError{
                 message: ^message,
                 details: %{identifier: ^identifier, path: ^path}
               }} = Codec.decode(invalid, registry)
@@ -158,11 +158,11 @@ defmodule Jido.Codec.FlowTest do
       |> Enum.reject(&(&1.id == "atoms/marker" and &1.vsn == 1))
       |> Catalog.new!()
 
-    assert {:error, %InvalidDefinitionError{details: %{kind: :atom}}} =
+    assert {:error, %ValidationError{details: %{kind: :atom}}} =
              Codec.encode(flow, missing_binding)
 
     assert {:error,
-            %InvalidDefinitionError{
+            %ValidationError{
               message: "unknown flow catalog reference",
               details: %{
                 identifier: "atoms/marker",
@@ -180,7 +180,7 @@ defmodule Jido.Codec.FlowTest do
     invalid = put_in(step, ["call", "params", "entries"], [untrusted_entry])
 
     assert {:error,
-            %InvalidDefinitionError{
+            %ValidationError{
               message: "unknown flow catalog reference",
               details: %{identifier: ^unknown_atom, kind: :atom}
             }} = Codec.decode(replace_component(document, 0, invalid), registry)
@@ -245,7 +245,7 @@ defmodule Jido.Codec.FlowTest do
     version_one = Map.put(document, "vsn", 1)
 
     assert {:error,
-            %InvalidDefinitionError{
+            %ValidationError{
               message:
                 "stored Flow document vsn 1 requires migration to vsn 2; Dispatch cannot be migrated automatically",
               details: %{path: ["vsn"]}
@@ -311,7 +311,7 @@ defmodule Jido.Codec.FlowTest do
              ]
 
       assert {:error,
-              %InvalidDefinitionError{
+              %ValidationError{
                 message: _message,
                 details: %{key: "after", path: ["components", ^index, "after"]}
               }} = Codec.decode(invalid, registry)
@@ -331,7 +331,7 @@ defmodule Jido.Codec.FlowTest do
     for invalid_step <- invalid_steps do
       invalid = replace_component(document, 0, invalid_step)
 
-      assert {:error, %InvalidDefinitionError{details: %{path: path}}} =
+      assert {:error, %ValidationError{details: %{path: path}}} =
                Codec.decode(invalid, registry)
 
       assert path in [["components", 0, "needs"], ["components", 0, "needs", 0]]
@@ -349,12 +349,12 @@ defmodule Jido.Codec.FlowTest do
       |> Map.replace!(:output_schema, nil)
 
     assert {:error,
-            %InvalidDefinitionError{
+            %ValidationError{
               message: "Flow artifact contains non-canonical data",
               details: %{path: [:schema], reason: :non_canonical}
             }} = Jido.Exec.Compiler.validate(raw_flow)
 
-    assert {:error, %InvalidDefinitionError{details: %{path: [:schema]}}} =
+    assert {:error, %ValidationError{details: %{path: [:schema]}}} =
              Codec.encode(raw_flow)
   end
 
@@ -591,7 +591,7 @@ defmodule Jido.Codec.FlowTest do
     assert {:error,
             %Error.Invalid{
               errors: [
-                %InvalidDefinitionError{
+                %ValidationError{
                   message: "stored Flow collection exceeds its size limit"
                 }
               ]
@@ -856,7 +856,7 @@ defmodule Jido.Codec.FlowTest do
     ]
 
     for invalid_flow <- invalid_flows do
-      assert {:error, %InvalidDefinitionError{}} = Codec.encode(invalid_flow, registry)
+      assert {:error, %ValidationError{}} = Codec.encode(invalid_flow, registry)
     end
 
     assert {:error, _reason} =
@@ -864,7 +864,7 @@ defmodule Jido.Codec.FlowTest do
 
     assert {:ok, document} = Codec.encode(flow, registry)
 
-    assert {:error, %InvalidDefinitionError{}} =
+    assert {:error, %ValidationError{}} =
              Codec.decode(%{document | "description" => invalid}, registry)
 
     assert {:ok, decoded} =
@@ -880,7 +880,7 @@ defmodule Jido.Codec.FlowTest do
     {:ok, document} = Codec.encode(FlowAuthoring.mixed_flow!(), CodecRegistry.mixed())
 
     assert {:error,
-            %InvalidDefinitionError{
+            %ValidationError{
               message: "stored Flow document vsn must be 2",
               details: %{path: ["vsn"]}
             }} =
@@ -893,7 +893,7 @@ defmodule Jido.Codec.FlowTest do
           document |> Map.delete("type") |> Map.put("", "jido.flow") |> Map.put("vsn", 99)
         ] do
       assert {:error,
-              %InvalidDefinitionError{
+              %ValidationError{
                 message: "stored Flow document type must be jido.flow",
                 details: %{path: ["type"]}
               }} = Codec.decode(malformed, CodecRegistry.mixed())
@@ -901,7 +901,7 @@ defmodule Jido.Codec.FlowTest do
 
     [first | rest] = document["components"]
     invalid = %{document | "components" => [Map.delete(first, "kind") | rest]}
-    assert {:error, %InvalidDefinitionError{}} = Codec.decode(invalid, CodecRegistry.mixed())
+    assert {:error, %ValidationError{}} = Codec.decode(invalid, CodecRegistry.mixed())
   end
 
   test "Codec rejects invalid public boundary values and root records" do
@@ -909,13 +909,13 @@ defmodule Jido.Codec.FlowTest do
     flow = FlowAuthoring.mixed_flow!()
     assert {:ok, document} = Codec.encode(flow, registry)
 
-    assert {:error, %InvalidDefinitionError{}} = Codec.encode(:invalid, registry)
-    assert {:error, %InvalidDefinitionError{}} = Codec.encode(flow, :invalid)
-    assert {:error, %InvalidDefinitionError{}} = Codec.decode(:invalid, registry)
-    assert {:error, %InvalidDefinitionError{}} = Codec.decode(document, :invalid)
+    assert {:error, %ValidationError{}} = Codec.encode(:invalid, registry)
+    assert {:error, %ValidationError{}} = Codec.encode(flow, :invalid)
+    assert {:error, %ValidationError{}} = Codec.decode(:invalid, registry)
+    assert {:error, %ValidationError{}} = Codec.decode(document, :invalid)
 
     for invalid <- [Map.delete(document, "name"), Map.put(document, "extra", true)] do
-      assert {:error, %InvalidDefinitionError{}} = Codec.decode(invalid, registry)
+      assert {:error, %ValidationError{}} = Codec.decode(invalid, registry)
     end
   end
 
@@ -933,7 +933,7 @@ defmodule Jido.Codec.FlowTest do
         {"schemas/map", 1} => {:schema, Jido.Joi.map()}
       })
 
-    assert {:error, %InvalidDefinitionError{}} = Codec.encode(flow, wrong_registry)
+    assert {:error, %ValidationError{}} = Codec.encode(flow, wrong_registry)
 
     document = %{
       "type" => "jido.flow",
@@ -960,7 +960,7 @@ defmodule Jido.Codec.FlowTest do
       }
     }
 
-    assert {:error, %InvalidDefinitionError{}} = Codec.decode(document, wrong_registry)
+    assert {:error, %ValidationError{}} = Codec.decode(document, wrong_registry)
   end
 
   test "unknown module text is never resolved without a Registry entry" do
@@ -980,7 +980,7 @@ defmodule Jido.Codec.FlowTest do
 
     refute existing_atom?(unknown_identifier)
 
-    assert {:error, %InvalidDefinitionError{}} =
+    assert {:error, %ValidationError{}} =
              Codec.decode(document, CodecRegistry.mixed())
 
     refute existing_atom?(unknown_identifier)
@@ -1082,13 +1082,13 @@ defmodule Jido.Codec.FlowTest do
     wide_output = List.duplicate(0, 10_001)
 
     assert {:error,
-            %InvalidDefinitionError{
+            %ValidationError{
               message: "stored Flow exceeds its nesting limit",
               details: %{maximum_depth: 100}
             }} = Codec.decode(%{document | "output" => deep_output}, registry)
 
     assert {:error,
-            %InvalidDefinitionError{
+            %ValidationError{
               message: "stored Flow collection exceeds its size limit",
               details: %{maximum_size: 10_000}
             }} = Codec.decode(%{document | "output" => wide_output}, registry)
@@ -1097,13 +1097,13 @@ defmodule Jido.Codec.FlowTest do
     wide_flow = %{flow | name: "wide_encode", output: wide_output}
 
     assert {:error,
-            %InvalidDefinitionError{
+            %ValidationError{
               message: "stored Flow exceeds its nesting limit",
               details: %{maximum_depth: 100}
             }} = Codec.encode(deep_flow, registry)
 
     assert {:error,
-            %InvalidDefinitionError{
+            %ValidationError{
               message: "stored Flow collection exceeds its size limit",
               details: %{maximum_size: 10_000}
             }} = Codec.encode(wide_flow, registry)
@@ -1119,7 +1119,7 @@ defmodule Jido.Codec.FlowTest do
         | components: Map.put(flow.components, component_name, %{component | meta: %{"payload" => value}})
       }
 
-      assert {:error, %InvalidDefinitionError{details: details}} =
+      assert {:error, %ValidationError{details: details}} =
                Codec.encode(metadata_flow, registry)
 
       assert Map.fetch!(details, elem(detail, 0)) == elem(detail, 1)
@@ -1133,7 +1133,7 @@ defmodule Jido.Codec.FlowTest do
         assert {:ok, _document} = Codec.encode(map_flow, registry)
       else
         assert {:error,
-                %InvalidDefinitionError{
+                %ValidationError{
                   message: "stored Flow collection exceeds its size limit",
                   details: %{maximum_size: 10_000}
                 }} =
@@ -1141,7 +1141,7 @@ defmodule Jido.Codec.FlowTest do
       end
     end
 
-    assert {:error, %InvalidDefinitionError{message: "stored Flow collection exceeds its size limit"}} =
+    assert {:error, %ValidationError{message: "stored Flow collection exceeds its size limit"}} =
              Codec.decode(
                %{document | "components" => List.duplicate(hd(document["components"]), 10_001)},
                registry
@@ -1150,7 +1150,7 @@ defmodule Jido.Codec.FlowTest do
     choice_index = component_index(document, "route")
     choice = component(document, "route")
 
-    assert {:error, %InvalidDefinitionError{message: "stored Flow collection exceeds its size limit"}} =
+    assert {:error, %ValidationError{message: "stored Flow collection exceeds its size limit"}} =
              Codec.decode(
                replace_component(document, choice_index, %{
                  choice
@@ -1167,7 +1167,7 @@ defmodule Jido.Codec.FlowTest do
     large_but_locally_valid = List.duplicate(List.duplicate(0, 10_000), 11)
 
     assert {:error,
-            %InvalidDefinitionError{
+            %ValidationError{
               message: "stored Flow exceeds its total node limit",
               details: %{maximum_nodes: 100_000}
             }} = Codec.decode(%{document | "output" => large_but_locally_valid}, registry)
@@ -1229,7 +1229,7 @@ defmodule Jido.Codec.FlowTest do
         {"schemas/map", 1} => {:schema, Jido.Joi.map()}
       })
 
-    assert {:error, %InvalidDefinitionError{}} = Codec.encode(flow, registry)
+    assert {:error, %ValidationError{}} = Codec.encode(flow, registry)
   end
 
   test "the decoder rejects malformed nested stored records" do
@@ -1301,7 +1301,7 @@ defmodule Jido.Codec.FlowTest do
     ]
 
     for invalid <- invalid_documents do
-      assert {:error, %InvalidDefinitionError{}} = Codec.decode(invalid, CodecRegistry.mixed())
+      assert {:error, %ValidationError{}} = Codec.decode(invalid, CodecRegistry.mixed())
 
       assert {:error, %Error.Invalid{errors: [_first | _rest]}} =
                Codec.diagnose(invalid, CodecRegistry.mixed())

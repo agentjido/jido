@@ -347,7 +347,7 @@ defmodule Jido.Flow.ParallelTest do
               ]
             }} = Exec.run(flow, %{})
 
-    assert error.type == :flow_execution_error
+    assert error.type == :execution_error
     assert error.details.action_index == 0
     assert error.details.action_name == "missing"
     assert error.details.target == Add
@@ -407,7 +407,7 @@ defmodule Jido.Flow.ParallelTest do
           [%{name: "same", action: Add} | :improper],
           [%{name: "same", action: Add}, %{name: "same", action: Multiply}]
         ] do
-      assert {:error, %Jido.Flow.Error.InvalidDefinitionError{}} =
+      assert {:error, %Jido.Error.ValidationError{}} =
                Flow.new(%{
                  name: "invalid_parallel",
                  components: [%{kind: :parallel, name: "tools", actions: actions}],

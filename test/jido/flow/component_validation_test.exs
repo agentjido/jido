@@ -2,7 +2,7 @@ defmodule Jido.Flow.ComponentValidationTest do
   use ExUnit.Case, async: true
 
   alias Jido.Flow.Definition
-  alias Jido.Flow.Error.InvalidDefinitionError
+  alias Jido.Error.ValidationError
   alias Jido.Flow.Ref
   alias Jido.Flow.Value
   alias JidoActionTest.Fixtures.Actions.Add
@@ -11,10 +11,10 @@ defmodule Jido.Flow.ComponentValidationTest do
   test "legacy Condition records are rejected in condition and expression fields" do
     legacy = %{__struct__: Jido.Flow.Condition, operator: :==, operands: [1, 1]}
 
-    assert {:error, %InvalidDefinitionError{}} =
+    assert {:error, %ValidationError{}} =
              Definition.component(choice(%{name: "old", condition: legacy, action: Add}))
 
-    assert {:error, %InvalidDefinitionError{}} =
+    assert {:error, %ValidationError{}} =
              Definition.component(%{
                kind: :iterate,
                name: "old",
@@ -24,7 +24,7 @@ defmodule Jido.Flow.ComponentValidationTest do
                max_iterations: 1
              })
 
-    assert {:error, %InvalidDefinitionError{details: %{path: [:call, :params, :value, :operands, 1]}}} =
+    assert {:error, %ValidationError{details: %{path: [:call, :params, :value, :operands, 1]}}} =
              Definition.component(%{
                kind: :step,
                name: "old",
@@ -55,8 +55,8 @@ defmodule Jido.Flow.ComponentValidationTest do
     assert {:ok, {"subflow", %{kind: :call, call: %{kind: :flow, params: %{}}}}} =
              Definition.component(%{kind: :subflow, name: "subflow", flow: NestedFlow})
 
-    assert {:error, %InvalidDefinitionError{}} = Definition.component(%{legacy: true})
-    assert {:error, %InvalidDefinitionError{}} = Definition.component(:invalid)
+    assert {:error, %ValidationError{}} = Definition.component(%{legacy: true})
+    assert {:error, %ValidationError{}} = Definition.component(:invalid)
   end
 
   test "params scopes accept only their native local references" do
@@ -69,7 +69,7 @@ defmodule Jido.Flow.ComponentValidationTest do
                params: %{item: Ref.item()}
              })
 
-    assert {:error, %InvalidDefinitionError{}} =
+    assert {:error, %ValidationError{}} =
              Definition.component(%{
                kind: :step,
                name: "step",
@@ -77,7 +77,7 @@ defmodule Jido.Flow.ComponentValidationTest do
                params: %{item: Ref.item()}
              })
 
-    assert {:error, %InvalidDefinitionError{}} =
+    assert {:error, %ValidationError{}} =
              Definition.component(%{
                kind: :reduce,
                name: "reduce",
@@ -91,7 +91,7 @@ defmodule Jido.Flow.ComponentValidationTest do
   test "metadata uses only portable data" do
     assert :ok = Value.validate_object(%{"owner" => "team", 1 => [:ready]})
 
-    assert {:error, %InvalidDefinitionError{}} =
+    assert {:error, %ValidationError{}} =
              Definition.component(%{
                kind: :step,
                name: "step",
@@ -99,7 +99,7 @@ defmodule Jido.Flow.ComponentValidationTest do
                meta: %{fun: fn -> :bad end}
              })
 
-    assert {:error, %InvalidDefinitionError{}} =
+    assert {:error, %ValidationError{}} =
              Definition.component(%{
                kind: :step,
                name: "step",
@@ -124,7 +124,7 @@ defmodule Jido.Flow.ComponentValidationTest do
       assert semantic_map.needs == ["second", "first"]
       refute Map.has_key?(semantic_map, :after)
 
-      assert {:error, %InvalidDefinitionError{message: message}} =
+      assert {:error, %ValidationError{message: message}} =
                attrs
                |> Map.put(:after, [])
                |> Definition.component()
@@ -138,7 +138,7 @@ defmodule Jido.Flow.ComponentValidationTest do
             {[nil], "component needs must contain component names"},
             {["first", "first"], "component needs contains a duplicate"}
           ] do
-        assert {:error, %InvalidDefinitionError{message: ^expected_message}} =
+        assert {:error, %ValidationError{message: ^expected_message}} =
                  attrs
                  |> Map.put(:needs, value)
                  |> Definition.component()
@@ -176,7 +176,7 @@ defmodule Jido.Flow.ComponentValidationTest do
       invalid_choice = Map.put(choice, :needs, [invalid_target])
 
       assert {:error,
-              %InvalidDefinitionError{
+              %ValidationError{
                 message: "Flow reference points to an unknown component",
                 details: %{owner: "route", component: ^invalid_target}
               }} =
@@ -192,7 +192,7 @@ defmodule Jido.Flow.ComponentValidationTest do
     unknown = %{kind: :step, name: "one", action: Add, needs: ["missing"]}
 
     assert {:error,
-            %InvalidDefinitionError{
+            %ValidationError{
               message: "Flow reference points to an unknown component",
               details: %{owner: "one", component: "missing"}
             }} =
@@ -202,7 +202,7 @@ defmodule Jido.Flow.ComponentValidationTest do
                output: Ref.result("one")
              })
 
-    assert {:error, %InvalidDefinitionError{message: "flow dependency graph contains a cycle"}} =
+    assert {:error, %ValidationError{message: "flow dependency graph contains a cycle"}} =
              Jido.Flow.new(%{
                name: "self_dependency",
                components: [%{kind: :step, name: "one", action: Add, needs: ["one"]}],
@@ -210,7 +210,7 @@ defmodule Jido.Flow.ComponentValidationTest do
              })
 
     assert {:error,
-            %InvalidDefinitionError{
+            %ValidationError{
               message: "flow dependency graph contains a cycle",
               details: %{components: components}
             }} =
@@ -235,7 +235,7 @@ defmodule Jido.Flow.ComponentValidationTest do
         params = %{nested: [%{value: %{ref | path: path}}]}
 
         assert {:error,
-                %InvalidDefinitionError{
+                %ValidationError{
                   message: "flow expression contains an invalid reference path",
                   details: %{path: error_path}
                 }} = Definition.component(put_params(attrs, params))
@@ -260,7 +260,7 @@ defmodule Jido.Flow.ComponentValidationTest do
     ]
 
     for {field, attrs} <- cases do
-      assert {:error, %InvalidDefinitionError{details: %{path: path}}} =
+      assert {:error, %ValidationError{details: %{path: path}}} =
                Definition.component(attrs)
 
       assert field in path
@@ -270,7 +270,7 @@ defmodule Jido.Flow.ComponentValidationTest do
   test "local values reject invalid paths in their valid scopes" do
     for path <- [[nil], [:value, nil], [:value | :tail], [-1]] do
       for ref <- [Ref.item(path), Ref.accumulator(path)] do
-        assert {:error, %InvalidDefinitionError{details: %{segment: _}}} =
+        assert {:error, %ValidationError{details: %{segment: _}}} =
                  Definition.component(%{
                    kind: :reduce,
                    name: "reduce",
@@ -281,7 +281,7 @@ defmodule Jido.Flow.ComponentValidationTest do
                  })
       end
 
-      assert {:error, %InvalidDefinitionError{details: %{segment: _}}} =
+      assert {:error, %ValidationError{details: %{segment: _}}} =
                Definition.component(%{
                  kind: :map,
                  name: "map",
@@ -291,7 +291,7 @@ defmodule Jido.Flow.ComponentValidationTest do
                })
 
       for ref <- [Ref.state(path), Ref.body_result(path)] do
-        assert {:error, %InvalidDefinitionError{details: %{segment: _}}} =
+        assert {:error, %ValidationError{details: %{segment: _}}} =
                  Definition.component(iterate(%{initial: %{}, update: %{nested: [ref]}}, true))
       end
     end
@@ -301,7 +301,7 @@ defmodule Jido.Flow.ComponentValidationTest do
     for path <- [[nil], [:value | :tail]] do
       ref = Ref.input(path)
 
-      assert {:error, %InvalidDefinitionError{details: %{segment: _}}} =
+      assert {:error, %ValidationError{details: %{segment: _}}} =
                Definition.component(%{
                  kind: :step,
                  name: "step",
@@ -309,10 +309,10 @@ defmodule Jido.Flow.ComponentValidationTest do
                  params: %{value: Jido.Expr.new!(:+, [ref, 1])}
                })
 
-      assert {:error, %InvalidDefinitionError{details: %{segment: _}}} =
+      assert {:error, %ValidationError{details: %{segment: _}}} =
                Jido.Flow.Value.condition(%Jido.Expr{operator: :==, operands: [ref, 1]}, :any)
 
-      assert {:error, %InvalidDefinitionError{details: %{segment: _}}} =
+      assert {:error, %ValidationError{details: %{segment: _}}} =
                Definition.component(
                  choice(%{
                    name: "option",

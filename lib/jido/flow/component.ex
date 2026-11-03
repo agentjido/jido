@@ -2,7 +2,8 @@ defmodule Jido.Flow.Component do
   @moduledoc false
 
   alias Jido.Codec.Config
-  alias Jido.Flow.{Error, FieldError, Value}
+  alias Jido.Error
+  alias Jido.Flow.{FieldError, Value}
 
   @common [name: :name, needs: :needs, meta: :meta]
   @fields %{

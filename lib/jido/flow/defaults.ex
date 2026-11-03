@@ -2,11 +2,11 @@ defmodule Jido.Flow.Defaults do
   alias Jido.Joi
   @moduledoc false
 
-  alias Jido.Flow.Error
+  alias Jido.Error
 
   @doc false
   @spec normalize(term(), module()) ::
-          {:ok, map()} | {:error, Error.InvalidDefinitionError.t()}
+          {:ok, map()} | {:error, Error.ValidationError.t()}
   def normalize(defaults, target) do
     with :ok <- map(defaults),
          {:ok, schema} <- flow_schema(target),
@@ -19,7 +19,7 @@ defmodule Jido.Flow.Defaults do
 
   @doc false
   @spec encode(term(), module()) ::
-          {:ok, map()} | {:error, Error.InvalidDefinitionError.t()}
+          {:ok, map()} | {:error, Error.ValidationError.t()}
   def encode(defaults, target) do
     with {:ok, defaults} <- normalize(defaults, target) do
       json(defaults, [])
@@ -28,7 +28,7 @@ defmodule Jido.Flow.Defaults do
 
   @doc false
   @spec decode(term(), module()) ::
-          {:ok, map()} | {:error, Error.InvalidDefinitionError.t()}
+          {:ok, map()} | {:error, Error.ValidationError.t()}
   def decode(defaults, target) do
     with :ok <- map(defaults),
          {:ok, schema} <- flow_schema(target),

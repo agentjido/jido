@@ -1,7 +1,8 @@
 defmodule Jido.Flow.GraphValidation do
   @moduledoc false
 
-  alias Jido.Flow.{Definition, Error, Graph, Ref, Value}
+  alias Jido.Error
+  alias Jido.Flow.{Definition, Graph, Ref, Value}
 
   @doc false
   @spec validate([Definition.named_component()], Value.t()) ::

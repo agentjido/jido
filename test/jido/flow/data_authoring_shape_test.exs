@@ -4,7 +4,7 @@ defmodule Jido.Flow.DataAuthoringShapeTest do
   alias Jido.Flow
   alias Jido.Flow.{Codec, Ref}
   alias JidoActionTest.FlowCodec, as: Codec
-  alias Jido.Flow.Error.InvalidDefinitionError
+  alias Jido.Error.ValidationError
   alias JidoActionTest.Fixtures.Actions.EchoParamsAction
   alias JidoActionTest.Fixtures.NestedFlow
 
@@ -23,9 +23,9 @@ defmodule Jido.Flow.DataAuthoringShapeTest do
       flow = Flow.new!(definition(component))
       internal = Map.put(flow.components[component.name], :name, component.name)
 
-      assert {:error, %InvalidDefinitionError{} = error} = Flow.new(definition(internal))
+      assert {:error, %ValidationError{} = error} = Flow.new(definition(internal))
       assert [:components, 0 | _] = error.details.path
-      assert_raise InvalidDefinitionError, fn -> Flow.new!(definition(internal)) end
+      assert_raise ValidationError, fn -> Flow.new!(definition(internal)) end
     end
   end
 
@@ -36,7 +36,7 @@ defmodule Jido.Flow.DataAuthoringShapeTest do
       flow = Flow.new!(definition(component))
       mixed = Map.put(component, :call, flow.components[component.name].call)
 
-      assert {:error, %InvalidDefinitionError{} = error} = Flow.new(definition(mixed))
+      assert {:error, %ValidationError{} = error} = Flow.new(definition(mixed))
       assert error.details.path == [:components, 0, :call]
     end
 
@@ -48,7 +48,7 @@ defmodule Jido.Flow.DataAuthoringShapeTest do
           {%{choice | options: [Map.put(option, :call, call)]}, [:options, 0, :call]},
           {%{choice | fallback: Map.merge(choice.fallback, call)}, [:fallback, :kind]}
         ] do
-      assert {:error, %InvalidDefinitionError{} = error} = Flow.new(definition(invalid))
+      assert {:error, %ValidationError{} = error} = Flow.new(definition(invalid))
       assert error.details.path == [:components, 0] ++ path
     end
   end

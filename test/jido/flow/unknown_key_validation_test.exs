@@ -4,7 +4,7 @@ defmodule Jido.Flow.UnknownKeyValidationTest do
   alias Jido.Flow
   alias JidoActionTest.FlowCodec, as: Codec
   alias Jido.Flow.Definition
-  alias Jido.Flow.Error.InvalidDefinitionError
+  alias Jido.Error.ValidationError
   alias Jido.Catalog
   alias JidoActionTest.Fixtures.Actions.Add
 
@@ -28,12 +28,12 @@ defmodule Jido.Flow.UnknownKeyValidationTest do
       message = "unknown Flow configuration key: #{inspect(key)}"
 
       assert {:error,
-              %InvalidDefinitionError{
+              %ValidationError{
                 message: ^message,
                 details: %{key: ^key}
               }} = Flow.new(invalid)
 
-      assert_raise InvalidDefinitionError, message, fn -> Flow.new!(invalid) end
+      assert_raise ValidationError, message, fn -> Flow.new!(invalid) end
     end
   end
 
@@ -75,7 +75,7 @@ defmodule Jido.Flow.UnknownKeyValidationTest do
           ] do
         key = if Map.has_key?(unknown, nil), do: nil, else: :unexpected
 
-        assert {:error, %InvalidDefinitionError{} = error} =
+        assert {:error, %ValidationError{} = error} =
                  attrs
                  |> Map.merge(unknown)
                  |> Definition.component()
@@ -119,7 +119,7 @@ defmodule Jido.Flow.UnknownKeyValidationTest do
                max_iterations: 1
              }, "unknown Flow field: nil", [:state]}
           ] do
-        assert {:error, %InvalidDefinitionError{} = error} =
+        assert {:error, %ValidationError{} = error} =
                  Flow.new(%{name: "nested", components: [component], output: %{}})
 
         assert error.message == message
@@ -153,7 +153,7 @@ defmodule Jido.Flow.UnknownKeyValidationTest do
             {update_in(document, ["components", Access.at(0)], &Map.merge(&1, unknown)), ["components", 0, "nil"]}
           ] do
         assert {:error,
-                %InvalidDefinitionError{
+                %ValidationError{
                   message: _message,
                   details: %{key: nil, path: ^path}
                 }} = Codec.decode(invalid, registry)

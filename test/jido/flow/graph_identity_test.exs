@@ -1,7 +1,7 @@
 defmodule Jido.Flow.GraphIdentityTest do
   use Covenant.Case, component: "jido_action.flow", async: true
   @moduletag obligation: "jido_action.flow.I10"
-  alias Jido.Flow.Error.InvalidDefinitionError
+  alias Jido.Error.ValidationError
   alias Jido.Flow
   alias Jido.Flow.Ref
   alias JidoActionTest.Fixtures.Actions.{Add, EchoParamsAction}
@@ -114,7 +114,7 @@ defmodule Jido.Flow.GraphIdentityTest do
   end
 
   test "unknown references and cycles fail without changing author data" do
-    assert {:error, %InvalidDefinitionError{}} =
+    assert {:error, %ValidationError{}} =
              JidoActionTest.FlowBuilder.new(
                name: "unknown",
                components: [
@@ -123,7 +123,7 @@ defmodule Jido.Flow.GraphIdentityTest do
                output: Ref.result("one")
              )
 
-    assert {:error, %InvalidDefinitionError{message: message}} =
+    assert {:error, %ValidationError{message: message}} =
              JidoActionTest.FlowBuilder.new(
                name: "cycle",
                components: [

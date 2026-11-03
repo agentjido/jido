@@ -26,7 +26,7 @@ defmodule JidoActionTest.GeneratedFlowCodec do
   end
 
   def encode(value),
-    do: {:error, Jido.Flow.Error.validation_error("expected a Jido.Flow artifact", %{value: value})}
+    do: {:error, Jido.Error.validation_error("expected a Jido.Flow artifact", %{value: value})}
 
   def encode(value, registry),
     do: Jido.Codec.Flow.encode(value, registry)
@@ -34,7 +34,7 @@ defmodule JidoActionTest.GeneratedFlowCodec do
   def decode(document, registry) do
     case Jido.Codec.Flow.diagnose(document, registry) do
       {:ok, flow} -> {:ok, flow}
-      {:error, %Jido.Flow.Error.Invalid{errors: [error | _]}} -> {:error, error}
+      {:error, %Jido.Error.Invalid{errors: [error | _]}} -> {:error, error}
     end
   end
 

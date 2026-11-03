@@ -2,7 +2,7 @@ defmodule Jido.Codec.ConfigTest do
   use Covenant.Case, component: "jido_action.action", async: false
 
   alias Jido.Codec.Config
-  alias Jido.Flow.Error.InvalidDefinitionError
+  alias Jido.Error.ValidationError
 
   def options do
     send(self(), :options_built)
@@ -154,17 +154,17 @@ defmodule Jido.Codec.ConfigTest do
   test "Flow data retains field details and nil descriptions" do
     assert {:ok, %{description: nil}} = Config.validate_flow(%{name: "valid", description: nil})
 
-    assert {:error, %InvalidDefinitionError{message: "schema must be a Joi schema", details: details}} =
+    assert {:error, %ValidationError{message: "schema must be a Joi schema", details: details}} =
              Config.validate_flow(%{name: "valid", schema: :invalid})
 
     assert details == %{field: "schema"}
 
-    assert {:error, %InvalidDefinitionError{details: %{key: :extra}}} =
+    assert {:error, %ValidationError{details: %{key: :extra}}} =
              Config.validate_flow(%{name: 2, extra: true})
 
     for {field, value} <- [name: nil, description: 2, schema: :invalid, output_schema: :invalid] do
       attrs = Map.put(%{name: "valid", components: [], output: %{}}, field, value)
-      assert {:error, %InvalidDefinitionError{}} = Jido.Flow.new(attrs)
+      assert {:error, %ValidationError{}} = Jido.Flow.new(attrs)
     end
   end
 

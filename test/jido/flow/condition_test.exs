@@ -2,7 +2,7 @@ defmodule JidoActionTest.Flow.ConditionTest do
   use ExUnit.Case, async: true
 
   alias Jido.Expr
-  alias Jido.Flow.Error.InvalidDefinitionError
+  alias Jido.Error.ValidationError
   alias Jido.Flow.Ref
   alias Jido.Flow.Value
 
@@ -31,7 +31,7 @@ defmodule JidoActionTest.Flow.ConditionTest do
 
     test "rejects unknown operators and invalid arity with paths" do
       assert {:error,
-              %InvalidDefinitionError{
+              %ValidationError{
                 message: "invalid Flow expression",
                 details: %{path: [], reason: :unknown_operator}
               }} = Value.condition(%Expr{operator: :unknown, operands: [1]}, :any)
@@ -44,7 +44,7 @@ defmodule JidoActionTest.Flow.ConditionTest do
             {:or, [true | :tail]},
             {:==, :bad}
           ] do
-        assert {:error, %InvalidDefinitionError{message: "invalid Flow expression", details: details}} =
+        assert {:error, %ValidationError{message: "invalid Flow expression", details: details}} =
                  Value.condition(%Expr{operator: operator, operands: operands}, :any)
 
         assert details.reason == :invalid_arity
@@ -54,7 +54,7 @@ defmodule JidoActionTest.Flow.ConditionTest do
     end
 
     test "rejects malformed refs, structs, and functions with expression paths" do
-      assert {:error, %InvalidDefinitionError{message: message, details: details}} =
+      assert {:error, %ValidationError{message: message, details: details}} =
                Value.condition(
                  %Expr{operator: :==, operands: [Ref.input([%{bad: :segment}]), 1]},
                  :any
@@ -63,14 +63,14 @@ defmodule JidoActionTest.Flow.ConditionTest do
       assert message == "flow expression contains an invalid reference path"
       assert details.path == [:operands, 0]
 
-      assert {:error, %InvalidDefinitionError{message: message, details: details}} =
+      assert {:error, %ValidationError{message: message, details: details}} =
                Value.condition(Expr.new!(:==, [~D[2026-01-01], 1]), :any)
 
       assert message == "flow expression contains an unsupported value"
       assert details.path == [:operands, 0]
       assert details.expression == Date
 
-      assert {:error, %InvalidDefinitionError{message: message, details: details}} =
+      assert {:error, %ValidationError{message: message, details: details}} =
                Value.condition(Expr.new!(:==, [fn -> :predicate end, 1]), :any)
 
       assert message == "invalid Flow expression"
@@ -79,8 +79,8 @@ defmodule JidoActionTest.Flow.ConditionTest do
     end
 
     test "rejects non-Boolean literal condition forms" do
-      assert {:error, %InvalidDefinitionError{}} = Value.condition(:bad, :any)
-      assert {:error, %InvalidDefinitionError{}} = Value.condition(%{}, :any)
+      assert {:error, %ValidationError{}} = Value.condition(:bad, :any)
+      assert {:error, %ValidationError{}} = Value.condition(%{}, :any)
     end
   end
 

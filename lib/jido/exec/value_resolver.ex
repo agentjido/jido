@@ -3,7 +3,7 @@ defmodule Jido.Exec.ValueResolver do
 
   alias Jido.Action.Output
   alias Jido.Expr
-  alias Jido.Flow.Error
+  alias Jido.Error
   alias Jido.Flow.Ref
 
   @doc false
@@ -25,6 +25,14 @@ defmodule Jido.Exec.ValueResolver do
            expression_path: [],
            retry: false
          })}
+
+      {:error, %Error.ExecutionError{details: details} = error} ->
+        {:error,
+         %{
+           error
+           | phase: :choice_condition,
+             details: Map.merge(details, %{node: node, option: option})
+         }}
 
       {:error, %{details: details} = error} ->
         {:error,

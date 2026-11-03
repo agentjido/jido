@@ -2,7 +2,7 @@ defmodule Jido.Flow.DSL.ValueParser do
   @moduledoc false
 
   alias Jido.Expr
-  alias Jido.Flow.Error
+  alias Jido.Error
   alias Jido.Flow.Ref
   alias Jido.Flow.DSL.SourceMap
 

@@ -2,7 +2,7 @@ defmodule JidoActionTest.Flow.CanonicalDataTest do
   use ExUnit.Case, async: true
 
   alias Jido.Flow
-  alias Jido.Flow.Error.InvalidDefinitionError
+  alias Jido.Error.ValidationError
   alias Jido.Flow.Ref
   alias JidoActionTest.Fixtures.Actions.Add
   alias JidoActionTest.Fixtures.NestedFlow
@@ -206,7 +206,7 @@ defmodule JidoActionTest.Flow.CanonicalDataTest do
     non_canonical_ref = %{flow.output | component: :step}
 
     assert {:error,
-            %InvalidDefinitionError{
+            %ValidationError{
               message: "flow expression contains an invalid reference",
               details: %{path: [:output], ref_type: :result}
             }} = Flow.validate(%{flow | output: non_canonical_ref})
@@ -240,7 +240,7 @@ defmodule JidoActionTest.Flow.CanonicalDataTest do
         ] do
       invalid = put_in(flow.components["loop"].state, invalid_state)
 
-      assert {:error, %InvalidDefinitionError{details: %{path: ^expected_path}}} =
+      assert {:error, %ValidationError{details: %{path: ^expected_path}}} =
                Flow.validate(invalid)
     end
   end
@@ -260,7 +260,7 @@ defmodule JidoActionTest.Flow.CanonicalDataTest do
 
   defp assert_invalid_canonical(flow) do
     for validate <- [&Flow.validate/1, &Jido.Exec.Compiler.validate/1] do
-      assert {:error, %InvalidDefinitionError{}} = validate.(flow)
+      assert {:error, %ValidationError{}} = validate.(flow)
     end
   end
 

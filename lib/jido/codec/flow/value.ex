@@ -5,7 +5,8 @@ defmodule Jido.Codec.Flow.Value do
   alias Jido.Codec.Value, as: AuthoringValue
   alias Jido.Codec.Value.Error, as: AuthoringValueError
   alias Jido.Expr
-  alias Jido.Flow.{Error, Ref, Value}
+  alias Jido.Error
+  alias Jido.Flow.{Ref, Value}
   alias Jido.Codec.Flow.{Limits, Paths}
 
   @doc false

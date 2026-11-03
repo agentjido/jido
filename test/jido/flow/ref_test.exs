@@ -1,7 +1,7 @@
 defmodule Jido.Flow.RefTest do
   use ExUnit.Case, async: true
 
-  alias Jido.Flow.Error.InvalidDefinitionError
+  alias Jido.Error.ValidationError
   alias Jido.Flow.Ref
 
   test "the reference grammar has one source, optional component, and path" do
@@ -19,10 +19,10 @@ defmodule Jido.Flow.RefTest do
   test "result is the only source that accepts a component" do
     assert :ok = Ref.validate(Ref.result("load"))
 
-    assert {:error, %InvalidDefinitionError{}} =
+    assert {:error, %ValidationError{}} =
              Ref.validate(%Ref{source: :input, component: "load", path: []})
 
-    assert {:error, %InvalidDefinitionError{}} =
+    assert {:error, %ValidationError{}} =
              Ref.validate(%Ref{source: :result, component: nil, path: []})
   end
 
@@ -30,21 +30,21 @@ defmodule Jido.Flow.RefTest do
     assert :ok = Ref.validate(Ref.item(), :map_params)
     assert :ok = Ref.validate(Ref.accumulator(), :reduce_params)
     assert :ok = Ref.validate(Ref.state(), :iterate_completion)
-    assert {:error, %InvalidDefinitionError{}} = Ref.validate(Ref.state(), :flow)
-    assert {:error, %InvalidDefinitionError{}} = Ref.validate(Ref.item(), :iterate_params)
+    assert {:error, %ValidationError{}} = Ref.validate(Ref.state(), :flow)
+    assert {:error, %ValidationError{}} = Ref.validate(Ref.item(), :iterate_params)
   end
 
   test "paths contain only portable path segments" do
     assert :ok = Ref.validate(Ref.input([:payload, "items", 0]))
-    assert {:error, %InvalidDefinitionError{}} = Ref.validate(Ref.input([-1]))
-    assert {:error, %InvalidDefinitionError{}} = Ref.validate(Ref.input([%{}]))
+    assert {:error, %ValidationError{}} = Ref.validate(Ref.input([-1]))
+    assert {:error, %ValidationError{}} = Ref.validate(Ref.input([%{}]))
   end
 
   test "nil is rejected at each path position for every source with a path" do
     for path <- [[nil], [nil, :value], [:payload, nil, :value], [:payload, nil]],
         ref <- path_refs(path) do
       assert {:error,
-              %InvalidDefinitionError{
+              %ValidationError{
                 details: %{reason: :path, segment: nil, ref: ^ref}
               }} = Ref.validate(ref, :any)
     end
@@ -55,7 +55,7 @@ defmodule Jido.Flow.RefTest do
         path <- [[segment], [segment, :value], [:payload, segment, 0], [:payload, segment]],
         ref <- path_refs(path) do
       assert {:error,
-              %InvalidDefinitionError{
+              %ValidationError{
                 message: "invalid flow ref",
                 details: %{reason: :path, segment: ^segment, ref: ^ref}
               }} = Ref.validate(ref, :any)
@@ -73,7 +73,7 @@ defmodule Jido.Flow.RefTest do
     for path <- [[:payload | :tail], [:payload, :value | nil]],
         ref <- path_refs(path) do
       assert {:error,
-              %InvalidDefinitionError{
+              %ValidationError{
                 details: %{reason: :path, segment: ^path, ref: ^ref}
               }} = Ref.validate(ref, :any)
     end
@@ -91,12 +91,12 @@ defmodule Jido.Flow.RefTest do
   test "unsupported segments and non-list canonical paths return structured errors" do
     for segment <- [-1, 1.5, %{}, [], {:value}, self(), make_ref(), fn -> :value end],
         ref <- path_refs([:payload, segment]) do
-      assert {:error, %InvalidDefinitionError{details: %{reason: :path, segment: ^segment}}} =
+      assert {:error, %ValidationError{details: %{reason: :path, segment: ^segment}}} =
                Ref.validate(ref, :any)
     end
 
     for path <- [nil, :value, "value", 0, %{}], ref <- path_refs([]) do
-      assert {:error, %InvalidDefinitionError{details: %{reason: :path, segment: ^path}}} =
+      assert {:error, %ValidationError{details: %{reason: :path, segment: ^path}}} =
                Ref.validate(%{ref | path: path}, :any)
     end
   end
@@ -106,7 +106,7 @@ defmodule Jido.Flow.RefTest do
       assert :ok = Ref.validate(ref, :any)
 
       for path <- [[nil], [:value], [:value | :tail], :value] do
-        assert {:error, %InvalidDefinitionError{details: %{reason: :shape}}} =
+        assert {:error, %ValidationError{details: %{reason: :shape}}} =
                  Ref.validate(%{ref | path: path}, :any)
       end
     end

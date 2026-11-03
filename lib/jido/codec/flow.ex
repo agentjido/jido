@@ -6,8 +6,9 @@ defmodule Jido.Codec.Flow do
   alias Jido.Catalog
   alias Jido.Catalog.Error, as: CatalogError
   alias Jido.Codec.Issue
+  alias Jido.Error
   alias Jido.Flow
-  alias Jido.Flow.{Definition, Error}
+  alias Jido.Flow.Definition
   alias Jido.Codec.Flow.{Paths, Reader, Writer}
 
   @type document :: %{required(String.t()) => term()}
@@ -86,7 +87,7 @@ defmodule Jido.Codec.Flow do
   defp authoring_issue(%CatalogError{} = error),
     do: authoring_issue(error, :reference)
 
-  defp authoring_issue(%Error.InvalidDefinitionError{} = error),
+  defp authoring_issue(%Error.ValidationError{} = error),
     do: authoring_issue(error, :invalid_definition)
 
   defp authoring_issue(error), do: authoring_issue(error, :invalid_document)

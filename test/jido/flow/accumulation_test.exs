@@ -2,7 +2,8 @@ defmodule Jido.Flow.AccumulationTest do
   use ExUnit.Case, async: true
 
   alias Jido.Catalog
-  alias Jido.Flow.{Codec, Definition, Error}
+  alias Jido.Error
+  alias Jido.Flow.{Codec, Definition}
   alias JidoActionTest.FlowCodec, as: Codec
 
   defp document do

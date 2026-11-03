@@ -170,6 +170,6 @@ defmodule Jido.Flow.DiagnosticPathsTest do
   defp result_ref(component),
     do: %{"$ref" => %{"source" => "result", "component" => component, "path" => []}}
 
-  defp messages(%Jido.Flow.Error.Invalid{errors: errors}), do: Enum.map(errors, & &1.message)
-  defp paths(%Jido.Flow.Error.Invalid{errors: errors}), do: Enum.map(errors, & &1.details[:path])
+  defp messages(%Jido.Error.Invalid{errors: errors}), do: Enum.map(errors, & &1.message)
+  defp paths(%Jido.Error.Invalid{errors: errors}), do: Enum.map(errors, & &1.details[:path])
 end

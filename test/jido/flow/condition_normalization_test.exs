@@ -6,7 +6,7 @@ defmodule JidoActionTest.Flow.ConditionNormalizationTest do
   alias Jido.Flow.{Codec, Ref}
   alias JidoActionTest.FlowCodec, as: Codec
   alias Jido.Flow.DSL.ValueParser
-  alias Jido.Flow.Error.InvalidDefinitionError
+  alias Jido.Error.ValidationError
   alias JidoActionTest.Fixtures.Actions.EchoParamsAction
 
   test "Boolean literals and references keep one shape across authoring forms" do
@@ -107,7 +107,7 @@ defmodule JidoActionTest.Flow.ConditionNormalizationTest do
           ] do
         assert {:error, error} = Jido.Exec.run(flow)
         assert error.details.reason == :invalid_boolean_operand
-        assert error.details.phase == phase
+        assert error.phase == phase
         assert error.details.expression_path == []
         assert error.details.retry == false
       end
@@ -120,10 +120,10 @@ defmodule JidoActionTest.Flow.ConditionNormalizationTest do
           Expr.new!(:or, [true, Ref.body_result()]),
           Expr.new!(:and, [false, fn -> true end])
         ] do
-      assert {:error, %InvalidDefinitionError{}} = Flow.Value.condition(expression, :flow)
+      assert {:error, %ValidationError{}} = Flow.Value.condition(expression, :flow)
     end
 
-    assert {:error, %InvalidDefinitionError{}} =
+    assert {:error, %ValidationError{}} =
              Flow.Value.condition(Expr.new!(:or, [true, Ref.item()]), :iterate_completion)
 
     assert {:error, error} =

@@ -63,7 +63,7 @@ defmodule Jido.Exec.Node.Map.Collection do
 
   defp resolve_params(params, state) do
     case ValueResolver.resolve(params, state) do
-      {:error, error} -> {:error, Jido.Flow.Error.to_map(error)}
+      {:error, error} -> {:error, Jido.Error.to_map(error)}
       result -> result
     end
   end

@@ -109,10 +109,10 @@ defmodule JidoActionTest.Instruction.TargetTest do
     action = Instruction.new!(target: Add, params: %{amount: 2})
     flow = Instruction.new!(target: MathFlow, params: %{value: 2})
 
-    assert {:error, %Jido.Flow.Error.InvalidDefinitionError{}} =
+    assert {:error, %Jido.Error.ValidationError{}} =
              JidoActionTest.FlowComponent.step(name: "action", action: action)
 
-    assert {:error, %Jido.Flow.Error.InvalidDefinitionError{}} =
+    assert {:error, %Jido.Error.ValidationError{}} =
              JidoActionTest.FlowComponent.subflow(name: "flow", flow: flow)
   end
 

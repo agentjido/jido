@@ -11,7 +11,7 @@ defmodule Jido.Flow.Value do
 
   alias Jido.Codec.Config
   alias Jido.Expr
-  alias Jido.Flow.Error
+  alias Jido.Error
   alias Jido.Flow.Ref
 
   @tree_options [
@@ -65,7 +65,7 @@ defmodule Jido.Flow.Value do
   end
 
   @doc "Validates portable Flow data without references or expressions."
-  @spec validate_data(term()) :: :ok | {:error, Error.InvalidDefinitionError.t()}
+  @spec validate_data(term()) :: :ok | {:error, Error.ValidationError.t()}
   def validate_data(value) do
     value
     |> Expr.reduce(nil, &validate_data_node/3, @tree_options)
@@ -73,7 +73,7 @@ defmodule Jido.Flow.Value do
   end
 
   @doc "Validates a portable Flow metadata object."
-  @spec validate_object(term()) :: :ok | {:error, Error.InvalidDefinitionError.t()}
+  @spec validate_object(term()) :: :ok | {:error, Error.ValidationError.t()}
   def validate_object(value) when is_map(value) and not is_struct(value),
     do: validate_data(value)
 
@@ -82,7 +82,7 @@ defmodule Jido.Flow.Value do
   end
 
   @doc false
-  @spec validate_key(term()) :: :ok | {:error, Error.InvalidDefinitionError.t()}
+  @spec validate_key(term()) :: :ok | {:error, Error.ValidationError.t()}
   def validate_key(key), do: validate_key(key, [])
 
   @doc false

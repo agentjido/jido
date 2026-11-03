@@ -152,7 +152,7 @@ defmodule Jido.Exec.Node.Parallel do
 
   defp invalid_outcomes(value) do
     {:error,
-     Jido.Flow.Error.execution_error("Parallel received invalid Action outcomes", %{
+     Jido.Error.execution_error("Parallel received invalid Action outcomes", %{
        reason: :invalid_parallel_outcomes,
        value: value
      })}

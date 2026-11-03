@@ -31,7 +31,7 @@ defmodule JidoActionTest.Flow.DSL.ConditionExamplesTest do
 
     for input <- [%{}, %{enabled: nil}, %{enabled: "false"}, %{enabled: 0}] do
       assert {:error, error} = Jido.Exec.run(BooleanRoute, input)
-      assert Jido.Flow.Error.to_map(error).type == :validation_error
+      assert Jido.Error.to_map(error).type == :validation_error
     end
   end
 

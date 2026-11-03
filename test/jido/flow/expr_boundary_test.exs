@@ -155,7 +155,7 @@ defmodule JidoActionTest.Flow.ExprBoundaryTest do
             %{duplicate: 1, duplicate: 2}
           end
         ] do
-      assert {:error, %Jido.Flow.Error.InvalidDefinitionError{}} = ValueParser.parse(value)
+      assert {:error, %Jido.Error.ValidationError{}} = ValueParser.parse(value)
     end
   end
 
@@ -180,7 +180,7 @@ defmodule JidoActionTest.Flow.ExprBoundaryTest do
   test "missing references in a calculated Choice retain the full error location" do
     expression = Expr.new!(:==, [Expr.new!(:+, [Ref.input(:missing), 1]), 2])
     assert {:error, error} = Jido.Exec.run(choice_flow(expression))
-    assert error.details.phase == :choice_condition
+    assert error.phase == :choice_condition
     assert error.details.node == "route"
     assert error.details.option == "yes"
     assert error.details.path == [:missing]
@@ -210,17 +210,17 @@ defmodule JidoActionTest.Flow.ExprBoundaryTest do
       expression = Expr.new!(:==, [data, data])
       assert :ok = Expr.validate(expression)
 
-      assert {:error, %Jido.Flow.Error.InvalidDefinitionError{}} =
+      assert {:error, %Jido.Error.ValidationError{}} =
                Jido.Flow.Value.validate(expression)
 
-      assert {:error, %Jido.Flow.Error.InvalidDefinitionError{}} =
+      assert {:error, %Jido.Error.ValidationError{}} =
                JidoActionTest.FlowComponent.step(
                  name: "seed",
                  action: EchoParamsAction,
                  params: %{nested: expression}
                )
 
-      assert {:error, %Jido.Flow.Error.InvalidDefinitionError{}} =
+      assert {:error, %Jido.Error.ValidationError{}} =
                Jido.Flow.Value.condition(%Expr{operator: :==, operands: [data, data]}, :any)
     end
   end
@@ -229,7 +229,7 @@ defmodule JidoActionTest.Flow.ExprBoundaryTest do
     for data <- [Ref.item(), <<255>>, %{nil: 1}, %{-1 => 1}] do
       expression = Expr.new!(:and, [false, Expr.new!(:==, [data, 1])])
 
-      assert {:error, %Jido.Flow.Error.InvalidDefinitionError{} = error} =
+      assert {:error, %Jido.Error.ValidationError{} = error} =
                Jido.Flow.Value.condition(expression, :flow)
 
       assert error.details.path == [:operands, 1, :operands, 0]

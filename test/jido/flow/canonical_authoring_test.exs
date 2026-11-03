@@ -696,9 +696,9 @@ defmodule Jido.Flow.CanonicalAuthoringTest do
         output: Ref.result("missing")
       )
 
-    assert_raise Jido.Flow.Error.InvalidDefinitionError, fn -> Jido.Exec.compile!(invalid) end
+    assert_raise Jido.Error.ValidationError, fn -> Jido.Exec.compile!(invalid) end
 
-    assert_raise Jido.Flow.Error.InvalidDefinitionError, fn ->
+    assert_raise Jido.Error.ValidationError, fn ->
       JidoActionTest.FlowBuilder.new!(name: "missing_output")
     end
   end

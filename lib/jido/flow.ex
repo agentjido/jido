@@ -149,7 +149,7 @@ defmodule Jido.Flow do
   #{IO.iodata_to_binary(field_docs)}
   """
 
-  alias Jido.Flow.Error
+  alias Jido.Error
   alias Jido.Flow.DSL.ModuleCompiler
   alias Jido.Flow.Definition
   alias Jido.Flow.Identity
@@ -206,7 +206,7 @@ defmodule Jido.Flow do
   names resolve to the canonical keys from a field-based object schema.
   """
   @spec normalize_defaults(term(), module()) ::
-          {:ok, map()} | {:error, Error.InvalidDefinitionError.t()}
+          {:ok, map()} | {:error, Error.ValidationError.t()}
   def normalize_defaults(defaults, target), do: Jido.Flow.Defaults.normalize(defaults, target)
 
   @doc """
@@ -216,7 +216,7 @@ defmodule Jido.Flow do
   references and does not need a Catalog.
   """
   @spec encode_defaults(term(), module()) ::
-          {:ok, map()} | {:error, Error.InvalidDefinitionError.t()}
+          {:ok, map()} | {:error, Error.ValidationError.t()}
   def encode_defaults(defaults, target), do: Jido.Flow.Defaults.encode(defaults, target)
 
   @doc """
@@ -226,7 +226,7 @@ defmodule Jido.Flow do
   restores supported atom values and other canonical values.
   """
   @spec decode_defaults(term(), module()) ::
-          {:ok, map()} | {:error, Error.InvalidDefinitionError.t()}
+          {:ok, map()} | {:error, Error.ValidationError.t()}
   def decode_defaults(defaults, target), do: Jido.Flow.Defaults.decode(defaults, target)
 
   @doc """
@@ -344,7 +344,7 @@ defmodule Jido.Flow do
   """
   @spec dependencies(t()) ::
           {:ok, %{String.t() => dependency_info()}}
-          | {:error, Error.InvalidDefinitionError.t()}
+          | {:error, Error.ValidationError.t()}
   def dependencies(%__MODULE__{} = flow) do
     with {:ok, flow} <- validate(flow) do
       {:ok, dependency_map(flow)}
@@ -356,7 +356,7 @@ defmodule Jido.Flow do
   @doc """
   Returns the versioned canonical inspection data for a Flow.
   """
-  @spec explain(t()) :: {:ok, map()} | {:error, Error.InvalidDefinitionError.t()}
+  @spec explain(t()) :: {:ok, map()} | {:error, Error.ValidationError.t()}
   def explain(%__MODULE__{} = flow) do
     with {:ok, flow} <- validate(flow) do
       {:ok,
@@ -381,7 +381,7 @@ defmodule Jido.Flow do
   Returns the deterministic SHA-256 and UUIDv8 identity for a Flow.
   """
   @spec semantic_identity(t()) ::
-          {:ok, map()} | {:error, Error.InvalidDefinitionError.t()}
+          {:ok, map()} | {:error, Error.ValidationError.t()}
   def semantic_identity(%__MODULE__{} = flow) do
     with {:ok, flow} <- validate(flow) do
       {:ok, Identity.for_flow(flow)}

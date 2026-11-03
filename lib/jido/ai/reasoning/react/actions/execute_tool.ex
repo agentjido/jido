@@ -75,7 +75,7 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.ExecuteTool do
 
   defp portable_error(error) do
     error
-    |> Jido.Flow.Error.to_map()
+    |> Jido.Error.to_map()
     |> Map.take([:type, :message, :retryable?])
   end
 end

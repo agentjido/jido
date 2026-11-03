@@ -76,30 +76,30 @@ defmodule Jido.Flow.DefaultsTest do
   end
 
   test "returns the exact invalid default path" do
-    assert {:error, %Jido.Flow.Error.InvalidDefinitionError{details: %{path: [:nested, :enabled]}}} =
+    assert {:error, %Jido.Error.ValidationError{details: %{path: [:nested, :enabled]}}} =
              Jido.Flow.normalize_defaults(%{nested: %{enabled: "not-boolean"}}, ConfiguredFlow)
 
-    assert {:error, %Jido.Flow.Error.InvalidDefinitionError{details: %{path: ["unknown"]}}} =
+    assert {:error, %Jido.Error.ValidationError{details: %{path: ["unknown"]}}} =
              Jido.Flow.normalize_defaults(%{"unknown" => true}, ConfiguredFlow)
   end
 
   test "rejects non-portable defaults after schema validation" do
-    assert {:error, %Jido.Flow.Error.InvalidDefinitionError{details: %{path: [:value]}}} =
+    assert {:error, %Jido.Error.ValidationError{details: %{path: [:value]}}} =
              Jido.Flow.normalize_defaults(%{value: self()}, OpenFlow)
   end
 
   test "rejects open defaults with duplicate JSON field names" do
     assert {:error,
-            %Jido.Flow.Error.InvalidDefinitionError{
+            %Jido.Error.ValidationError{
               details: %{code: :duplicate_field, path: ["mode"]}
             }} = Jido.Flow.encode_defaults(%{:mode => :safe, "mode" => "fast"}, OpenFlow)
   end
 
   test "rejects invalid subjects and non-object schemas" do
-    assert {:error, %Jido.Flow.Error.InvalidDefinitionError{}} =
+    assert {:error, %Jido.Error.ValidationError{}} =
              Jido.Flow.normalize_defaults([], ConfiguredFlow)
 
-    assert {:error, %Jido.Flow.Error.InvalidDefinitionError{}} =
+    assert {:error, %Jido.Error.ValidationError{}} =
              Jido.Flow.normalize_defaults(%{}, String)
   end
 end

@@ -1,7 +1,8 @@
 defmodule Jido.Codec.Flow.Writer do
   @moduledoc false
 
-  alias Jido.Flow.{Component, Error, Graph}
+  alias Jido.Error
+  alias Jido.Flow.{Component, Graph}
   alias Jido.Catalog
   alias Jido.Catalog.Error, as: CatalogError
   alias Jido.Codec.Reference

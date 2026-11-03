@@ -28,7 +28,7 @@ defmodule Jido.Flow.MapAuthoringTest do
           %{name: "node"},
           %{kind: "step", name: "node"}
         ] do
-      assert {:error, %Jido.Flow.Error.InvalidDefinitionError{}} =
+      assert {:error, %Jido.Error.ValidationError{}} =
                JidoActionTest.FlowBuilder.new(%{
                  name: "bad_map",
                  components: [component],

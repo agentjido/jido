@@ -215,11 +215,11 @@ defmodule Jido.Exec.Node.Action do
        do: drop_stacktrace(error)
 
   defp collected_error(error, {:error, _reference_error}, _action, _component, _index, _item_id),
-    do: error |> Jido.Flow.Error.to_map() |> drop_stacktrace()
+    do: error |> Jido.Error.to_map() |> drop_stacktrace()
 
   defp collected_error(error, _resolved, action, component, index, item_id) do
     error
-    |> Jido.Flow.Error.to_map()
+    |> Jido.Error.to_map()
     |> Map.update!(:details, fn details ->
       Map.merge(details, %{node: component, target: action, item_index: index, item_id: item_id})
     end)
@@ -262,7 +262,7 @@ defmodule Jido.Exec.Node.Action do
 
   defp collected_parallel_error(error, action, component, index, name) do
     error
-    |> Jido.Flow.Error.to_map()
+    |> Jido.Error.to_map()
     |> Map.update!(:details, fn details ->
       Map.merge(details, %{
         node: component,

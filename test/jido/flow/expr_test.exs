@@ -120,7 +120,7 @@ defmodule JidoActionTest.Flow.ExprTest do
 
     assert {:error, error} = Jido.Exec.run(choice_flow(condition))
     assert error.details.reason == :invalid_boolean_operand
-    assert error.details.phase == :choice_condition
+    assert error.phase == :choice_condition
 
     iterator =
       JidoActionTest.FlowComponent.iterate!(
@@ -140,7 +140,7 @@ defmodule JidoActionTest.Flow.ExprTest do
 
     assert {:error, error} = Jido.Exec.run(flow)
     assert error.details.reason == :invalid_boolean_operand
-    assert error.details.phase == :iterate_completion
+    assert error.phase == :iterate_completion
   end
 
   @tag obligation: ["jido_action.expression.I1", "jido_action.expression.I2"]
@@ -228,7 +228,7 @@ defmodule JidoActionTest.Flow.ExprTest do
     assert error.details.retry == false
     refute inspect(error, limit: :infinity) =~ private_key
     refute inspect(error, limit: :infinity) =~ "private-value"
-    refute inspect(Jido.Flow.Error.to_map(error), limit: :infinity) =~ private_key
+    refute inspect(Jido.Error.to_map(error), limit: :infinity) =~ private_key
   end
 
   @tag obligation: ["jido_action.expression.I1", "jido_action.expression.I3"]
@@ -300,7 +300,7 @@ defmodule JidoActionTest.Flow.ExprTest do
       )
 
     assert {:error, error} = Jido.Exec.run(flow)
-    assert error.details.phase == :iterate_completion
+    assert error.phase == :iterate_completion
     assert error.details.path == [:missing]
     assert error.details.expression_path == [:operands, 0, :operands, 0]
     assert error.details.retry == false

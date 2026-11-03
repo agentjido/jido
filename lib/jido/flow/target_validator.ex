@@ -100,7 +100,7 @@ defmodule Jido.Flow.TargetValidator do
       {:error, %{details: %{actual: actual}}}
       when actual in [:action, :flow] ->
         {:error,
-         Jido.Flow.Error.validation_error("Flow component has the wrong target kind", %{
+         Error.validation_error("Flow component has the wrong target kind", %{
            component: component,
            expected: expected,
            actual: actual
@@ -134,7 +134,7 @@ defmodule Jido.Flow.TargetValidator do
   defp reject_recursive_flow(identity, module_stack) do
     if identity in module_stack do
       {:error,
-       Jido.Flow.Error.validation_error("recursive nested Flow cycle", %{
+       Error.validation_error("recursive nested Flow cycle", %{
          flow: identity,
          module_stack: Enum.reverse([identity | module_stack])
        })}
@@ -149,7 +149,7 @@ defmodule Jido.Flow.TargetValidator do
       |> Map.get(:details, %{})
       |> Map.merge(%{component: component, field: field, cause: error.__struct__})
 
-    tagged = Jido.Flow.Error.validation_error(Exception.message(error), details)
+    tagged = Error.validation_error(Exception.message(error), details)
 
     case Map.get(error, :stacktrace) do
       nil -> tagged

@@ -192,6 +192,8 @@ defmodule Jido.Error do
     :jido_namespace_mismatch
   ]
 
+  @validation_kinds [:input, :action, :config]
+
   # ============================================================================
   # Error Structs
   # ============================================================================
@@ -411,6 +413,14 @@ defmodule Jido.Error do
   def normalize_details(details) when is_map(details), do: details
   def normalize_details(_details), do: %{}
 
+  @doc "Prefixes a structured error path."
+  @spec prefix_path(term(), list()) :: term()
+  def prefix_path(%{details: details} = error, path) when is_map(details) and is_list(path) do
+    %{error | details: Map.put(details, :path, path ++ Map.get(details, :path, []))}
+  end
+
+  def prefix_path(error, _path), do: error
+
   @doc """
   Creates a validation error.
 
@@ -430,20 +440,27 @@ defmodule Jido.Error do
   @spec validation_error(String.t(), keyword() | map()) :: ValidationError.t()
   def validation_error(message, opts \\ []) do
     opts = if is_map(opts), do: Map.to_list(opts), else: opts
+    explicit_kind = opts[:kind]
 
     # Infer kind and subject from convenience keys
     {kind, subject} =
       cond do
         opts[:action] -> {:action, opts[:action]}
         opts[:field] -> {:input, opts[:field]}
-        true -> {opts[:kind], opts[:subject]}
+        explicit_kind in @validation_kinds -> {explicit_kind, opts[:subject]}
+        true -> {nil, opts[:subject]}
       end
+
+    reserved_keys =
+      if explicit_kind in @validation_kinds,
+        do: [:kind, :subject, :action],
+        else: [:subject, :action]
 
     ValidationError.exception(
       message: message,
       kind: kind,
       subject: subject,
-      details: merge_extra_details(opts, [:kind, :subject, :action])
+      details: merge_extra_details(opts, reserved_keys)
     )
   end
 
@@ -732,6 +749,11 @@ defmodule Jido.Error do
       compensated: error.compensated,
       result: error.result
     })
+  end
+
+  defp public_details(%struct{errors: errors}, remaining_causes)
+       when struct in [Invalid, Execution, Routing, Timeout, Internal] and is_list(errors) do
+    %{errors: Enum.map(errors, &maybe_error_map(&1, remaining_causes))}
   end
 
   defp public_details(%{details: details}, _remaining_causes), do: sanitize_details(details)

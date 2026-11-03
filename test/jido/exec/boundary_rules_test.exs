@@ -105,7 +105,7 @@ defmodule Jido.Exec.BoundaryRulesTest do
             %{"c" => %{c | options: [:bad]}},
             :not_a_map
           ] do
-        assert {:error, %Jido.Flow.Error.InvalidDefinitionError{}} =
+        assert {:error, %Jido.Error.ValidationError{}} =
                  Jido.Flow.validate(%{flow | components: components})
       end
     end
@@ -128,7 +128,7 @@ defmodule Jido.Exec.BoundaryRulesTest do
             %{kind: :choice, name: "c", options: [:bad], fallback: %{action: step.action}},
             %{kind: :choice, name: "c", options: [], fallback: :bad}
           ] do
-        assert {:error, %Jido.Flow.Error.InvalidDefinitionError{}} =
+        assert {:error, %Jido.Error.ValidationError{}} =
                  Jido.Flow.new(%{name: "bad_choice", components: [choice], output: %{}})
       end
     end

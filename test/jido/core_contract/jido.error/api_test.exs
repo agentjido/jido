@@ -38,6 +38,14 @@ defmodule JidoTest.ErrorTest do
       assert error.kind == :action
       assert error.subject == SomeAction
     end
+
+    test "keeps domain kind values in details" do
+      error = Error.validation_error("Unknown catalog target", %{kind: :atom, path: [:target]})
+
+      assert error.kind == nil
+      assert error.subject == nil
+      assert error.details == %{kind: :atom, path: [:target]}
+    end
   end
 
   describe "execution_error/2" do
@@ -239,6 +247,18 @@ defmodule JidoTest.ErrorTest do
       assert result.details == %{field: :email, kind: :input, subject: :email}
       assert result.retryable? == false
       refute Map.has_key?(result, :stacktrace)
+    end
+
+    test "projects shared error groups with their ordered child errors" do
+      group =
+        Error.to_class([
+          Error.validation_error("First", details: %{path: [:first]}),
+          Error.validation_error("Second", details: %{path: [:second]})
+        ])
+
+      assert %{type: :validation_error, details: %{errors: errors}} = Error.to_map(group)
+      assert Enum.map(errors, & &1.message) == ["First", "Second"]
+      assert Enum.map(errors, & &1.details.path) == [[:first], [:second]]
     end
 
     test "converts compensation error to map" do

@@ -3,7 +3,7 @@ defmodule Jido.Codec.Config do
   @moduledoc false
 
   alias Jido.Catalog
-  alias Jido.Flow.Error
+  alias Jido.Error
 
   @keys [:name, :description, :schema, :output_schema]
   @module_keys [:id, :vsn | @keys]

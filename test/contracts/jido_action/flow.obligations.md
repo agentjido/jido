@@ -27,7 +27,6 @@ modules:
   - Jido.Flow.DSL.Step
   - Jido.Flow.DSL.ValueParser
   - Jido.Flow.Definition
-  - Jido.Flow.Error
   - Jido.Flow.Extension
   - Jido.Flow.FieldError
   - Jido.Flow.Graph

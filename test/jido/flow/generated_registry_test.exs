@@ -4,7 +4,7 @@ defmodule Jido.Flow.GeneratedRegistryTest do
 
   alias Jido.Catalog
   alias JidoActionTest.FlowCodec, as: Codec
-  alias Jido.Flow.Error.InvalidDefinitionError
+  alias Jido.Error.ValidationError
   alias Jido.Flow.Ref
   alias JidoActionTest.Fixtures.FlowAuthoring
   alias JidoActionTest.Fixtures.InlineParityFlow
@@ -65,7 +65,7 @@ defmodule Jido.Flow.GeneratedRegistryTest do
     assert {:ok, subset_reference} = Catalog.reference(subset_registry, :action, action)
     refute original_reference == subset_reference
 
-    assert {:error, %InvalidDefinitionError{}} = Codec.decode(document, subset_registry)
+    assert {:error, %ValidationError{}} = Codec.decode(document, subset_registry)
   end
 
   test "generated Catalog leaves target contracts to Exec" do
@@ -77,7 +77,7 @@ defmodule Jido.Flow.GeneratedRegistryTest do
       })
 
     assert {:ok, _document, %Catalog{}} = Codec.encode(flow)
-    assert {:error, %InvalidDefinitionError{}} = Jido.Exec.compile(flow)
-    assert {:error, %InvalidDefinitionError{}} = Codec.encode(:invalid)
+    assert {:error, %ValidationError{}} = Jido.Exec.compile(flow)
+    assert {:error, %ValidationError{}} = Codec.encode(:invalid)
   end
 end

@@ -5,7 +5,7 @@ defmodule Jido.Exec.Node.Loop do
   alias Jido.Exec.{Frame, ValueResolver}
   alias Jido.Exec.Node.Action
   alias Jido.Exec.Node.Loop.Start
-  alias Jido.Flow.Error
+  alias Jido.Error
   alias Jido.Instruction
   alias Runic.Identity
   alias Runic.Workflow
@@ -337,7 +337,7 @@ defmodule Jido.Exec.Node.Loop do
            )}
 
         {:error, _reason} ->
-          {:error, Error.invalid_execution_error("iterator state schema validation failed", details)}
+          {:error, Error.validation_error("iterator state schema validation failed", details)}
       end
     else
       message =
@@ -401,6 +401,20 @@ defmodule Jido.Exec.Node.Loop do
   end
 
   defp within_iteration_limit(_node, false, _completed, _state), do: :ok
+
+  defp put_loop_details(%Error.ExecutionError{details: details} = error, node, phase, completed)
+       when is_map(details) do
+    %{
+      error
+      | phase: phase,
+        details:
+          Map.merge(details, %{
+            node: node.component,
+            iterations: completed,
+            retry: false
+          })
+    }
+  end
 
   defp put_loop_details(%{details: details} = error, node, phase, completed)
        when is_map(details) do

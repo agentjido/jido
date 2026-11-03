@@ -127,7 +127,7 @@ defmodule Jido.Exec.Node.Output do
 
   defp complete_output(%__MODULE__{} = node, frame, _output, _effects) do
     {:error,
-     Jido.Flow.Error.execution_error("nested Flow output has no parent frame", %{
+     Jido.Error.execution_error("nested Flow output has no parent frame", %{
        node: node.parent_component,
        reason: :invalid_nested_flow_frame,
        frame: frame

@@ -2,9 +2,10 @@ defmodule Jido.Flow.GraphValidationTest do
   use Covenant.Case, component: "jido_action.flow", async: true
   @moduletag obligation: "jido_action.flow.I8"
   alias Jido.Expr
+  alias Jido.Error
   alias Jido.Flow
   alias Jido.Catalog
-  alias Jido.Flow.{Codec, Error, Ref}
+  alias Jido.Flow.Ref
   alias JidoActionTest.FlowCodec, as: Codec
   alias JidoActionTest.Fixtures.NestedFlow
 
@@ -125,9 +126,9 @@ end
           assert {:ok, ^flow} = Flow.validate(flow)
 
         :error ->
-          assert {:error, %Error.InvalidDefinitionError{}} = direct
-          assert {:error, %Error.InvalidDefinitionError{}} = built
-          assert {:error, %Error.InvalidDefinitionError{}} = decoded
+          assert {:error, %Error.ValidationError{}} = direct
+          assert {:error, %Error.ValidationError{}} = built
+          assert {:error, %Error.ValidationError{}} = decoded
           assert_raise CompileError, fn -> Code.compile_string(source) end
       end
     end

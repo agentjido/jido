@@ -1,7 +1,8 @@
 defmodule Jido.Codec.Flow.Reader do
   @moduledoc false
 
-  alias Jido.Flow.{Component, Error, FieldError}
+  alias Jido.Error
+  alias Jido.Flow.{Component, FieldError}
   alias Jido.Catalog
   alias Jido.Catalog.Error, as: CatalogError
   alias Jido.Codec.Reference

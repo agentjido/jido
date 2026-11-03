@@ -275,7 +275,7 @@ defmodule Jido.Exec.Node.MapTest do
     assert first == %{status: :ok, value: %{value: 1}}
     assert third == %{status: :ok, value: %{value: 3}}
 
-    assert %{status: :error, error: %{type: :flow_execution_error, details: details}} = failed
+    assert %{status: :error, error: %{type: :execution_error, details: details}} = failed
     assert %{reason: :missing_key, path: [:value], ref_type: :item} = details
     refute Map.has_key?(details, :item_id)
     refute Map.has_key?(details, :item_index)

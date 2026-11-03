@@ -4,7 +4,7 @@ defmodule Jido.Flow.DSL.Lowerer do
   alias Jido.Flow
   alias Jido.Flow.{Component, Definition}
   alias Jido.Expr
-  alias Jido.Flow.Error
+  alias Jido.Error
   alias Jido.Flow.Ref
 
   @maximum_iterations Jido.Flow.Component.maximum_iterations()

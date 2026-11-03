@@ -1,7 +1,7 @@
 defmodule Jido.Exec.Frame do
   @moduledoc false
 
-  alias Jido.Flow.Error
+  alias Jido.Error
 
   @tag :jido_flow_frame
   @nested_tag :jido_nested_flow_frame

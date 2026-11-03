@@ -223,7 +223,7 @@ defmodule Jido.Flow.DSL.InlineStep do
 
   defp reject_source_operations(%Jido.Expr{}) do
     {:error,
-     Jido.Flow.Error.validation_error("Flow operations are not allowed; move the calculation into the inline body")}
+     Jido.Error.validation_error("Flow operations are not allowed; move the calculation into the inline body")}
   end
 
   defp reject_source_operations(map) when is_map(map) and not is_struct(map) do

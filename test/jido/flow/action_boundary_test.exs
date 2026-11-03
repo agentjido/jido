@@ -40,8 +40,8 @@ defmodule Jido.Flow.ActionBoundaryTest do
   end
 
   test "the conversion rejects a Flow and non-module values" do
-    assert {:error, %Flow.Error.InvalidDefinitionError{}} = Flow.from_action(ExistingFlow)
-    assert {:error, %Flow.Error.InvalidDefinitionError{}} = Flow.from_action(:not_a_module)
-    assert {:error, %Flow.Error.InvalidDefinitionError{}} = Flow.from_action(%{})
+    assert {:error, %Jido.Error.ValidationError{}} = Flow.from_action(ExistingFlow)
+    assert {:error, %Jido.Error.ValidationError{}} = Flow.from_action(:not_a_module)
+    assert {:error, %Jido.Error.ValidationError{}} = Flow.from_action(%{})
   end
 end

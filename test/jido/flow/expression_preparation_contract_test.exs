@@ -2,7 +2,7 @@ defmodule Jido.Flow.ValuePreparationContractTest do
   use ExUnit.Case, async: true
 
   alias Jido.Flow.Definition
-  alias Jido.Flow.Error.InvalidDefinitionError
+  alias Jido.Error.ValidationError
   alias Jido.Flow.Ref
   alias JidoActionTest.Fixtures.Actions.Add
   alias JidoActionTest.Fixtures.NestedFlow
@@ -27,7 +27,7 @@ defmodule Jido.Flow.ValuePreparationContractTest do
     {:error, message} = Jido.Codec.Config.validate_name("")
 
     for {attrs, _role, _scope} <- call_cases(params) do
-      assert {:error, %InvalidDefinitionError{} = error} = Definition.component(attrs)
+      assert {:error, %ValidationError{} = error} = Definition.component(attrs)
       assert error.message == message
       assert List.last(error.details.path) == 1
       assert :params in error.details.path

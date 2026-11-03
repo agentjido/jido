@@ -13,7 +13,6 @@ defmodule Jido.Telemetry.Exec do
   alias Jido.Error
   alias Jido.Exec.Node.Action
   alias Jido.Flow
-  alias Jido.Flow.Error, as: FlowError
   alias Jido.Instruction
   alias Runic.Workflow.SingleOutput.Context
 
@@ -91,8 +90,7 @@ defmodule Jido.Telemetry.Exec do
 
   def result_metadata(_kind, _result), do: %{outcome: :unknown}
 
-  defp error_metadata(:action, error), do: Error.to_map(error)
-  defp error_metadata(:flow, error), do: FlowError.to_map(error)
+  defp error_metadata(kind, error) when kind in [:action, :flow], do: Error.to_map(error)
 
   defp flow_component_metadata(nil), do: %{}
 

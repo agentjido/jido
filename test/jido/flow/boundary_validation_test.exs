@@ -27,7 +27,7 @@ defmodule Jido.Flow.BoundaryValidationTest do
 
   alias Jido.Flow
   alias Jido.Flow.Definition
-  alias Jido.Flow.Error.InvalidDefinitionError
+  alias Jido.Error.ValidationError
   alias Jido.Flow.Ref
   alias Jido.Flow.Value
   alias JidoActionTest.Fixtures.Actions.{Add, MissingRun}
@@ -74,12 +74,12 @@ defmodule Jido.Flow.BoundaryValidationTest do
     assert {:error, _error} = Definition.name(1)
 
     for attrs <- components() do
-      assert {:error, %InvalidDefinitionError{}} =
+      assert {:error, %ValidationError{}} =
                attrs
                |> Map.put(:needs, ["one", "one"])
                |> Definition.component()
 
-      assert {:error, %InvalidDefinitionError{}} =
+      assert {:error, %ValidationError{}} =
                attrs
                |> Map.put(:meta, %{self() => :bad})
                |> Definition.component()
@@ -132,7 +132,7 @@ defmodule Jido.Flow.BoundaryValidationTest do
           %{schema: Jido.Joi.map(), update: %{}},
           %{schema: Jido.Joi.map(), initial: %{}}
         ] do
-      assert {:error, %InvalidDefinitionError{}} =
+      assert {:error, %ValidationError{}} =
                valid
                |> Map.put(:state, state)
                |> Definition.component()
@@ -168,7 +168,7 @@ defmodule Jido.Flow.BoundaryValidationTest do
 
     assert Map.keys(components) |> Enum.sort() == ["choice", "iterate", "map", "reduce"]
 
-    assert {:error, %InvalidDefinitionError{}} =
+    assert {:error, %ValidationError{}} =
              Flow.new(%{
                name: "invalid",
                components: [%{kind: :step, name: "bad", action: nil}],
@@ -245,7 +245,7 @@ defmodule Jido.Flow.BoundaryValidationTest do
           output: Ref.result("child")
         })
 
-      assert {:error, %InvalidDefinitionError{}} = Jido.Exec.Compiler.validate(flow)
+      assert {:error, %ValidationError{}} = Jido.Exec.Compiler.validate(flow)
     end
   end
 
