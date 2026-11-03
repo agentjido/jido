@@ -17,6 +17,15 @@
       "Jido.Signal.*",
       "Jido.Telemetry.Signal"
     ],
+    stable_values: [
+      "Jido.Codec.Term",
+      "Jido.Session",
+      "Jido.Thread",
+      "Jido.Thread.*",
+      "Runic.Identity.Projectable.Jido.Session",
+      "Runic.Identity.Projectable.Jido.Thread",
+      "Runic.Identity.Projectable.Jido.Thread.*"
+    ],
     definitions: [
       "Jido.Action",
       "Jido.Action.*",
@@ -42,19 +51,12 @@
       "Jido.Codec.Limits",
       "Jido.Codec.Reference",
       "Jido.Codec.Static",
-      "Jido.Codec.Term",
       "Jido.Codec.Value",
       "Jido.Codec.Value.*",
       "Jido.Flow",
       "Jido.Flow.*",
       "Jido.Instruction",
-      "Jido.Session",
-      "Jido.Thread",
-      "Jido.Thread.*",
-      "Runic.Identity.Projectable.Jido.Flow",
-      "Runic.Identity.Projectable.Jido.Session",
-      "Runic.Identity.Projectable.Jido.Thread",
-      "Runic.Identity.Projectable.Jido.Thread.*"
+      "Runic.Identity.Projectable.Jido.Flow"
     ],
     execution: [
       "Jido.Exec",
@@ -109,11 +111,20 @@
     allowed: [
       foundation: [],
       signal: [:foundation],
-      definitions: [:foundation, :signal],
-      execution: [:foundation, :signal, :definitions],
-      runtime: [:foundation, :signal, :definitions, :execution],
-      ai: [:foundation, :signal, :definitions, :execution, :runtime],
-      composition: [:foundation, :signal, :definitions, :execution, :runtime, :ai]
+      stable_values: [:foundation],
+      definitions: [:foundation, :signal, :stable_values],
+      execution: [:foundation, :signal, :stable_values, :definitions],
+      runtime: [:foundation, :signal, :stable_values, :definitions, :execution],
+      ai: [:foundation, :signal, :stable_values, :definitions, :execution, :runtime],
+      composition: [
+        :foundation,
+        :signal,
+        :stable_values,
+        :definitions,
+        :execution,
+        :runtime,
+        :ai
+      ]
     ]
   ],
   source: [

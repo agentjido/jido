@@ -2,10 +2,10 @@ defmodule Jido.Thread do
   alias Jido.Joi
 
   @moduledoc """
-  A portable append-only interaction log.
+  A portable append-only Agent Thread.
 
   A Thread is an immutable value. It does not own a process or a persistence
-  adapter.
+  adapter. Feature layers can project its entries for their own use.
   """
 
   alias __MODULE__.Entry
