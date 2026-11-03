@@ -1,44 +1,43 @@
 # Covenant contracts
 
-This directory is the one root for Covenant prose, decision records, survivor
-ledgers, executable tests, and generated obligation coverage.
-
-Earlier work put executable tests in `test/contract` and Covenant records in
-`test/contracts`. That split made one component use two roots. All Covenant
-files now use `test/contract`; do not recreate `test/contracts`.
+This directory is the one root for Covenant obligations, decision records,
+survivor ledgers, and generated obligation coverage. Executable tests can stay
+in their feature test directories. They bind to a component with
+`Covenant.Case`.
 
 ## Component register
 
-Status: Approved map; all components active; final hardening in progress.
+Status: The current components are active. Reach realignment is prepared and
+is not yet complete.
 
-This register defines the approved Covenant component boundaries for Jido V3.
-All component IDs start with `jido.`. Durable behavior stays under the
-`jido.agent_server` boundary.
+The target component IDs start with `jido.`. Some active IDs still start with
+`jido_action.` or `jido_ai.`. The realignment will replace those legacy package
+names. Durable behavior stays under the `jido.agent_server` boundary.
 
 A component is active only when it has an `obligations.md` file and passing
 tests with its obligation tags.
 
 | Component | Purpose | Contract area |
 | --- | --- | --- |
-| `jido.instance` | Jido instance supervision, namespace, options, and Ref routing | `test/contract/jido.instance/` |
-| `jido.agent` | Agent model, authoring, validation, logical topology, and edits | `test/contract/jido.agent/` |
-| `jido.agent_evaluation` | Pure Agent evaluation and candidate production | `test/contract/jido.agent_evaluation/` |
-| `jido.agent_server` | Transient serialized Turn lifecycle | `test/contract/jido.agent_server/core/` |
-| `jido.agent_server.activation` | Activation root, readiness, identity, and local recovery | `test/contract/jido.agent_server/activation/` |
-| `jido.agent_server.effects` | Ordered post-commit effects | `test/contract/jido.agent_server/effects/` |
-| `jido.agent_server.plugin_runtime` | Live generic Plugin hosting | `test/contract/jido.agent_server/plugin_runtime/` |
-| `jido.agent_server.composition` | Runtime child and connection resources | `test/contract/jido.agent_server/composition/` |
-| `jido.agent_server.durable` | Persistence-backed AgentServer state coordination | `test/contract/jido.agent_server/durable/` |
-| `jido.agent_server.durable_turn` | Durable Flow progress, waits, and receipts | `test/contract/jido.agent_server/durable_turn/` |
-| `jido.persistence` | Records, snapshots, adapters, storage operations, and revisions | `test/contract/jido.persistence/` |
-| `jido.plugin` | Generic Plugin SDK and callback contracts | `test/contract/jido.plugin/core/` |
-| `jido.telemetry` | Telemetry, metrics, tracing, logs, and Debug support | `test/contract/jido.telemetry/` |
-| `jido.error` | Shared error taxonomy and stable common codes | `test/contract/jido.error/` |
-| `jido.plugin.audit` | Bundled Audit Plugin behavior | `test/contract/jido.plugin/audit/` |
-| `jido.plugin.bus` | Bundled Bus Plugin behavior | `test/contract/jido.plugin/bus/` |
-| `jido.plugin.heartbeat` | Bundled Heartbeat Plugin behavior | `test/contract/jido.plugin/heartbeat/` |
-| `jido.plugin.scheduler` | Bundled Scheduler Plugin behavior | `test/contract/jido.plugin/scheduler/` |
-| `jido.plugin.sensor_manager` | Bundled SensorManager Plugin behavior | `test/contract/jido.plugin/sensor_manager/` |
+| `jido.instance` | Jido instance supervision, namespace, options, and Ref routing | `test/contracts/jido/instance.*` |
+| `jido.agent` | Agent model, authoring, validation, logical topology, and edits | `test/contracts/jido/agent.*` |
+| `jido.agent_evaluation` | Pure Agent evaluation and candidate production | `test/contracts/jido/agent_evaluation.*` |
+| `jido.agent_server` | Transient serialized Turn lifecycle | `test/contracts/jido/agent_server.*` |
+| `jido.agent_server.activation` | Activation root, readiness, identity, and local recovery | `test/contracts/jido.agent_server/activation.*` |
+| `jido.agent_server.effects` | Ordered post-commit effects | `test/contracts/jido.agent_server/effects.*` |
+| `jido.agent_server.plugin_runtime` | Live generic Plugin hosting | `test/contracts/jido.agent_server/plugin_runtime.*` |
+| `jido.agent_server.composition` | Runtime child and connection resources | `test/contracts/jido.agent_server/composition.*` |
+| `jido.agent_server.durable` | Persistence-backed AgentServer state coordination | `test/contracts/jido.agent_server/durable.*` |
+| `jido.agent_server.durable_turn` | Durable Flow progress, waits, and receipts | `test/contracts/jido.agent_server/durable_turn.*` |
+| `jido.persistence` | Records, snapshots, adapters, storage operations, and revisions | `test/contracts/jido/persistence.*` |
+| `jido.plugin` | Generic Plugin SDK and callback contracts | `test/contracts/jido/plugin.*` |
+| `jido.telemetry` | Telemetry, metrics, tracing, logs, and Debug support | `test/contracts/jido/telemetry.*` |
+| `jido.error` | Shared error taxonomy and stable common codes | `test/contracts/jido/error.*` |
+| `jido.plugin.audit` | Bundled Audit Plugin behavior | `test/contracts/jido.plugin/audit.*` |
+| `jido.plugin.bus` | Bundled Bus Plugin behavior | `test/contracts/jido.plugin/bus.*` |
+| `jido.plugin.heartbeat` | Bundled Heartbeat Plugin behavior | `test/contracts/jido.plugin/heartbeat.*` |
+| `jido.plugin.scheduler` | Bundled Scheduler Plugin behavior | `test/contracts/jido.plugin/scheduler.*` |
+| `jido.plugin.sensor_manager` | Bundled SensorManager Plugin behavior | `test/contracts/jido.plugin/sensor_manager.*` |
 
 ### Dependency rules
 
@@ -51,8 +50,10 @@ tests with its obligation tags.
 - `jido.agent_evaluation` uses `jido.agent` and `jido.plugin`.
 - `jido.telemetry` is best effort. An observation failure must not change
   consumer behavior.
-- `jido_action` and `jido_signal` own their execution, routing, and transport
-  internals. Jido Covenant components do not claim those rules.
+- Each Covenant component owns modules from one Reach layer.
+- A test can use lower Reach layers, but their modules do not enter the
+  component's `modules:` ownership list.
+- Each module has no more than one primary Covenant owner.
 
 ### Component change rules
 
@@ -63,67 +64,52 @@ tests with its obligation tags.
    change.
 5. Keep production code line count neutral or lower during extraction.
 
-See
-[`docs/covenant-component-refactor-plan.md`](../../docs/covenant-component-refactor-plan.md)
-for the completed refactor sequence and its evidence.
+See the
+[`Covenant and Reach realignment plan`](../../../docs/covenant-component-refactor-plan.md)
+for the current audit, target register, and execution order.
 
 ## Layout
 
-Each component uses one directory. The directory name is the component ID.
-Each directory contains `obligations.md`, `decisions.yml`, and, when needed,
-`survivors.yml`. Tests stay in the same directory. A component with child
-components keeps each child in a plain subdirectory. The parent component can
-keep its tests in `core/`.
+The configured record root is `test/contracts`. A component uses an
+`obligations.md` file, a `decisions.yml` file, and, when needed, a
+`survivors.yml` file. Tests can stay in any configured `test_paths` directory.
 
 ```text
-test/contract/
+test/contracts/
   README.md
   coverage.json
-  jido.agent/
-    obligations.md
-    decisions.yml
-    survivors.yml
-    *_test.exs
-  jido.agent_evaluation/
-    obligations.md
-    decisions.yml
-    survivors.yml
-    *_test.exs
-  jido.error/
-  jido.instance/
-  jido.persistence/
-  jido.telemetry/
+  jido/
+    agent.obligations.md
+    agent.decisions.yml
+    agent.survivors.yml
+    agent_evaluation.obligations.md
+    error.obligations.md
+    instance.obligations.md
+    persistence.obligations.md
+    plugin.obligations.md
+    telemetry.obligations.md
   jido.plugin/
-    obligations.md
-    decisions.yml
-    survivors.yml
-    core/
-    audit/
-      obligations.md
-      decisions.yml
-      survivors.yml
-    bus/
-    heartbeat/
-    scheduler/
-    sensor_manager/
+    audit.obligations.md
+    bus.obligations.md
+    heartbeat.obligations.md
+    scheduler.obligations.md
+    sensor_manager.obligations.md
   jido.agent_server/
-    README.md
-    support.ex
-    obligations.md
-    decisions.yml
-    core/
-    activation/
-      obligations.md
-      decisions.yml
-      survivors.yml
-    composition/
-    durable/
-    durable_turn/
-    effects/
-    plugin_runtime/
+    activation.obligations.md
+    composition.obligations.md
+    durable.obligations.md
+    durable_turn.obligations.md
+    effects.obligations.md
+    plugin_runtime.obligations.md
+  jido_action/
+    ...legacy component records pending realignment...
+  jido_ai/
+    ...legacy component records pending realignment...
 ```
 
-The same record names apply to all component directories.
+The first directory segment and the record name form the component ID. For
+example, `jido.agent_server/effects.obligations.md` defines
+`jido.agent_server.effects`.
 
 ## Active boundaries
 
@@ -206,10 +192,11 @@ runtime retry and recovery policy.
 Run the complete obligation gate from the `jido` repository:
 
 ```sh
-mix test.contract
+mix covenant.check
 ```
 
-This command runs `test/contract` and writes `test/contract/coverage.json`.
+This command runs the configured test paths and writes
+`test/contracts/coverage.json`.
 The reported percentage is obligation coverage, not code coverage.
 
 Run mutation analysis at an explicit component review checkpoint:

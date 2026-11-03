@@ -177,7 +177,7 @@
             "test constructors reject non-map input and invalid envelope options",
             "test definition and instance resolution preserve configuration exceptions",
             "test field validation follows one fixed order",
-            "test initialization cannot strip Map keys or convert list values",
+            "test initialization preserves open Map keys but cannot convert list values",
             "test invalid configuration retains its validation error",
             "test invalid definitions return structured paths and bang forms raise the same error",
             "test loaded Agent module detection requires the definition callback",
@@ -464,7 +464,7 @@
             "test defaults and explicit nil cannot insert invalid values",
             "test discriminated union defaults cannot bypass validation",
             "test initial state can be partial and the merged state uses one schema validation",
-            "test initialization cannot strip Map keys or convert list values",
+            "test initialization preserves open Map keys but cannot convert list values",
             "test initialization retains nested defaults, explicit nil, and supplied values",
             "test initialization uses Joi defaults and preserves supplied values",
             "test initialization validates unchanged state once",
@@ -3766,7 +3766,7 @@
             "test parameter validation returns validation error for non-object Joi schemas",
             "test parameter validation returns validation error for unsupported schema types",
             "test parameter validation supports struct schemas when validating params",
-            "test parameter validation uses the declared unknown-key policy",
+            "test parameter validation uses the default open unknown-key policy",
             "test parameter validation validates parameter types",
             "test parameter validation validates required parameters",
             "test shared Flow modules do not become Action targets in component fields",
@@ -4110,7 +4110,7 @@
             "test expander effects must be a proper list",
             "test expander errors with discarded effects keep the Action reason",
             "test handoff Flow telemetry reports its outcome and effects",
-            "test handoff normalization rejects invalid targets and declared non-portable input",
+            "test handoff normalization rejects invalid targets and non-portable open input",
             "test invalid call data for a bound continuation returns a structured error",
             "test invalid selector output keeps the Handoff failure contract",
             "test invalid successor input fails without an executable effect batch",
@@ -5090,13 +5090,13 @@
             "test classifies Action-compatible schema containers",
             "test defaults do not make scalar schemas map-compatible",
             "test matches Joi results across direct, nested, and wrapped object policies",
-            "test parse modes retain distinct struct shapes and the same Joi field policy",
+            "test parse modes retain distinct struct shapes and open map fields",
             "test parse/3 keeps Joi parsing behavior for map and struct schemas",
             "test parse/3 keeps struct refinements and returns the complete parsed struct map",
             "test parse/3 validates whole values for non-object Joi schemas",
             "test parse_preserving_shape/3 keeps structs and plain values in their validated shape",
-            "test schema transforms retain their chosen result and omit removed input fields",
-            "test struct roots follow Joi policies and project parsed structs to maps",
+            "test schema transforms retain their chosen result",
+            "test struct roots are closed and project parsed structs to maps",
             "test validates fieldless struct schemas without schema traversal"
           ]
         },
@@ -5110,8 +5110,8 @@
             "test matches Joi results across direct, nested, and wrapped object policies",
             "test parse/3 honors declared Joi unknown-key policies at the root",
             "test parse/3 uses explicit Joi preservation policies in nested and wrapped schemas",
-            "test schema transforms retain their chosen result and omit removed input fields",
-            "test struct roots follow Joi policies and project parsed structs to maps",
+            "test schema transforms retain their chosen result",
+            "test struct roots are closed and project parsed structs to maps",
             "test uses a declared Joi policy inside map sets",
             "test uses declared Joi policies inside collection and combination schemas"
           ]
@@ -5127,7 +5127,7 @@
             "test converts raised and thrown schema failures to structured errors",
             "test parse modes return the same complete public parse errors",
             "test parse_preserving_shape/3 returns validation and unsupported-schema errors",
-            "test struct roots follow Joi policies and project parsed structs to maps"
+            "test struct roots are closed and project parsed structs to maps"
           ]
         }
       }
