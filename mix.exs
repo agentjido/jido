@@ -26,7 +26,7 @@ defmodule Jido.MixProject do
   end
 
   def cli do
-    [preferred_envs: [ci: :test, quality: :test]]
+    [preferred_envs: [bench: :prod, ci: :test, quality: :test]]
   end
 
   defp elixirc_paths(:test), do: ["lib", "test/support", "test/jido/support"]
@@ -88,6 +88,7 @@ defmodule Jido.MixProject do
 
   defp aliases do
     [
+      bench: "run bench/react_memory.exs",
       ci: [
         "compile --warnings-as-errors",
         "format --check-formatted",
