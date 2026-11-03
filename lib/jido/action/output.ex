@@ -39,8 +39,8 @@ defmodule Jido.Action.Output do
   @type kind :: :raw | :stream | :batch | :opaque | :preserve
   @type t :: unquote(Joi.type_spec(@schema))
 
-  @enforce_keys Joi.Struct.enforce_keys(@schema)
-  defstruct Joi.Struct.struct_fields(@schema)
+  @enforce_keys Joi.enforce_keys(@schema)
+  defstruct Joi.struct_fields(@schema)
 
   @doc """
   Builds an explicit raw output envelope.

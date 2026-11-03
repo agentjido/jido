@@ -114,10 +114,6 @@ defmodule Jido.Flow.Definition do
   end
 
   @doc false
-  @spec validate_config(term()) :: {:ok, map()} | {:error, Exception.t()}
-  defdelegate validate_config(attrs), to: Config, as: :validate_flow
-
-  @doc false
   @spec component(term()) :: {:ok, named_component()} | {:error, Exception.t()}
   def component(attrs), do: component_result(Component.diagnose(attrs))
 

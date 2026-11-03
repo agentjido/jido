@@ -3503,19 +3503,21 @@
         "jido.telemetry.I1": {
           "failing": 0,
           "kind": "functional",
-          "passing": 3,
+          "passing": 5,
           "status": "active",
           "testable": true,
           "tests": [
             "test default metrics use semantic events and fixed vocabulary tags",
+            "test the AgentServer event owner defines the complete metric catalog",
             "test the default semantic handler attaches once and handles its catalog",
+            "test the owner emits one committed Turn and its later effects",
             "test the public API is metrics and OpenTelemetry status"
           ]
         },
         "jido.telemetry.I2": {
           "failing": 0,
           "kind": "security",
-          "passing": 17,
+          "passing": 19,
           "status": "active",
           "testable": true,
           "tests": [
@@ -3535,13 +3537,15 @@
             "test semantic log strings stay on one line and within the byte limit",
             "test semantic logger supports all four modes and removes private values",
             "test span time, disabled trace data, and nested log scope stay exact",
+            "test the AgentServer event owner defines the complete metric catalog",
+            "test the owner emits one committed Turn and its later effects",
             "test topology operation vocabulary includes update and exact placement"
           ]
         },
         "jido.telemetry.I3": {
           "failing": 0,
           "kind": "ordering",
-          "passing": 19,
+          "passing": 21,
           "status": "active",
           "testable": true,
           "tests": [
@@ -3563,6 +3567,8 @@
             "test returns failures and re-raises faults after one terminal event",
             "test semantic emission is independent of consumer configuration",
             "test span time, disabled trace data, and nested log scope stay exact",
+            "test the AgentServer event owner defines the complete metric catalog",
+            "test the owner emits one committed Turn and its later effects",
             "test topology operation vocabulary includes update and exact placement"
           ]
         },

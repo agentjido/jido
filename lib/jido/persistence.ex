@@ -118,10 +118,6 @@ defmodule Jido.Persistence do
            )
   end
 
-  @doc false
-  @spec normalize_adapter(adapter_config()) :: {module(), keyword()} | nil
-  defdelegate normalize_adapter(config), to: Store
-
   @doc """
   Resolves and validates a persistence adapter configuration.
 
@@ -491,7 +487,7 @@ defmodule Jido.Persistence do
   defp require_adapter(config), do: {:ok, config}
 
   defp normalize_adapter_result(config) do
-    {:ok, normalize_adapter(config)}
+    {:ok, Store.normalize_adapter(config)}
   rescue
     error -> {:error, {:invalid_persistence_config, error}}
   end

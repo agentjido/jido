@@ -176,8 +176,8 @@ defmodule Jido.Flow do
   @type source_location :: %{optional(:file) => String.t(), optional(:line) => pos_integer()}
   @type source_map :: %{optional([term()]) => source_location()}
 
-  @enforce_keys Joi.Struct.enforce_keys(@schema)
-  defstruct Joi.Struct.struct_fields(@schema)
+  @enforce_keys Joi.enforce_keys(@schema)
+  defstruct Joi.struct_fields(@schema)
 
   @doc "Returns the stable canonical Flow value owned by a Flow module."
   @callback flow() :: t()
@@ -408,7 +408,7 @@ defmodule Jido.Flow do
 
   @doc false
   @spec __validate_config__(map()) :: {:ok, map()} | {:error, Exception.t()}
-  def __validate_config__(attrs), do: Definition.validate_config(attrs)
+  def __validate_config__(attrs), do: Jido.Codec.Config.validate_flow(attrs)
 
   defp dependency_map(flow) do
     Map.new(flow.components, fn {name, node} ->

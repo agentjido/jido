@@ -84,8 +84,8 @@ defmodule Jido.Signal.Catalog do
 
   @typedoc "An immutable index of exact Signal type and schema identities."
   @opaque t :: unquote(Joi.type_spec(@catalog_schema))
-  @enforce_keys Joi.Struct.enforce_keys(@catalog_schema)
-  defstruct Joi.Struct.struct_fields(@catalog_schema)
+  @enforce_keys Joi.enforce_keys(@catalog_schema)
+  defstruct Joi.struct_fields(@catalog_schema)
 
   @error_messages %{
     invalid_definitions: "Expected a list of Signal definition modules",

@@ -1,6 +1,5 @@
 ---
 modules:
-  - Jido.Plugin.Bus
   - Jido.Plugin.Bus.Client
   - Jido.Plugin.Bus.Client.Runtime
   - Jido.Plugin.Bus.Client.Server

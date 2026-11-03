@@ -49,12 +49,12 @@ defmodule Jido.Agent do
             topology: Joi.map() |> Joi.default(%{}),
             plugins: Joi.list(Joi.any()) |> Joi.default([])
           })
-  @defaults Map.new(Joi.Struct.struct_fields(@schema), fn
+  @defaults Map.new(Joi.struct_fields(@schema), fn
               {key, value} -> {key, value}
               key -> {key, nil}
             end)
-  @enforce_keys Joi.Struct.enforce_keys(@schema)
-  defstruct Joi.Struct.struct_fields(@schema)
+  @enforce_keys Joi.enforce_keys(@schema)
+  defstruct Joi.struct_fields(@schema)
   @doc false
   def __schema__, do: @schema
   @doc false

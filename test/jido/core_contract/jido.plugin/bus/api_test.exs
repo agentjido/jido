@@ -1,7 +1,6 @@
 defmodule JidoTest.Contract.PluginBusApiTest do
   use Covenant.Case, component: "jido.plugin.bus", async: true
 
-  alias Jido.Plugin.Bus
   alias Jido.Plugin.Bus.Client
   alias Jido.Plugin.Bus.Client.Runtime
   alias Jido.Plugin.Bus.Client.Server, as: ClientServer
@@ -12,12 +11,11 @@ defmodule JidoTest.Contract.PluginBusApiTest do
 
   @tag obligation: ["jido.plugin.bus.I1", "jido.plugin.bus.I3", "jido.plugin.bus.I4"]
   test "Bus exposes only its Plugins, DSL, and Client option types" do
-    for module <- [Bus, DSL, Manager, Client] do
+    for module <- [DSL, Manager, Client] do
       assert public_module?(module)
       assert documented_api(module) == []
     end
 
-    assert documented_types(Bus) == []
     assert documented_types(DSL) == []
     assert documented_types(Manager) == []
 

@@ -62,11 +62,6 @@ defmodule Jido.Exec.Validation do
     do: Validation.schema(schema, value, details, message)
 
   @doc false
-  @spec output_schema(term(), term(), map()) ::
-          {:ok, map() | Output.t()} | {:error, Error.ValidationError.t()}
-  defdelegate output_schema(schema, value, details), to: Validation
-
-  @doc false
   @spec callback(module(), atom(), term(), :input | :output) ::
           {:ok, term()} | {:error, Exception.t()}
   def callback(module, callback, value, phase) do

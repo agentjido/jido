@@ -124,7 +124,7 @@ defmodule Jido do
 
       @doc false
       @spec __jido_persistence__() :: {module(), keyword()} | nil
-      def __jido_persistence__, do: Jido.Persistence.normalize_adapter(unquote(persistence))
+      def __jido_persistence__, do: Jido.Persistence.Store.normalize_adapter(unquote(persistence))
 
       @doc false
       @spec child_spec(term()) :: Supervisor.child_spec()

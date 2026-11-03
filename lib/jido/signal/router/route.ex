@@ -42,8 +42,8 @@ defmodule Jido.Signal.Router.Route do
           match: nil | match()
         }
 
-  @enforce_keys Joi.Struct.enforce_keys(@schema)
-  defstruct Joi.Struct.struct_fields(@schema)
+  @enforce_keys Joi.enforce_keys(@schema)
+  defstruct Joi.struct_fields(@schema)
 
   @doc "Returns the Joi schema for a Route."
   @spec schema() :: Joi.schema()

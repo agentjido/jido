@@ -3,6 +3,7 @@ defmodule JidoTest.Persistence.AdapterTest do
 
   alias Jido.Persistence
   alias Jido.Persistence.ETS
+  alias Jido.Persistence.Store
 
   defmodule LegacyAdapter do
     def get(_key, _opts), do: {:error, :not_found}
@@ -68,10 +69,10 @@ defmodule JidoTest.Persistence.AdapterTest do
 
   @tag obligation: "jido.persistence.I1"
   test "normalizes module, tuple, and disabled adapter declarations" do
-    assert {ETS, []} = Persistence.normalize_adapter(ETS)
-    assert {ETS, [table: :custom]} = Persistence.normalize_adapter({ETS, table: :custom})
-    assert Persistence.normalize_adapter(nil) == nil
-    assert Persistence.normalize_adapter(false) == nil
+    assert {ETS, []} = Store.normalize_adapter(ETS)
+    assert {ETS, [table: :custom]} = Store.normalize_adapter({ETS, table: :custom})
+    assert Store.normalize_adapter(nil) == nil
+    assert Store.normalize_adapter(false) == nil
   end
 
   @tag obligation: "jido.persistence.I1"

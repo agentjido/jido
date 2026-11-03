@@ -28,8 +28,8 @@ defmodule Jido.Plugin.FacetsTest do
     use Jido.Agent.Directive
 
     @schema Jido.Joi.struct(__MODULE__, %{count: Jido.Joi.integer()}, coerce: true)
-    @enforce_keys Jido.Joi.Struct.enforce_keys(@schema)
-    defstruct Jido.Joi.Struct.struct_fields(@schema)
+    @enforce_keys Jido.Joi.enforce_keys(@schema)
+    defstruct Jido.Joi.struct_fields(@schema)
 
     def schema, do: @schema
   end

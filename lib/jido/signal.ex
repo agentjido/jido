@@ -152,8 +152,8 @@ defmodule Jido.Signal do
                  )
 
   @type t :: unquote(Joi.type_spec(@signal_schema))
-  @enforce_keys Joi.Struct.enforce_keys(@signal_schema)
-  defstruct Joi.Struct.struct_fields(@signal_schema)
+  @enforce_keys Joi.enforce_keys(@signal_schema)
+  defstruct Joi.struct_fields(@signal_schema)
 
   @doc "Returns the Joi schema for the core Signal envelope."
   @spec schema() :: Joi.schema()

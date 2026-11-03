@@ -6,8 +6,8 @@ defmodule Jido.Plugin.StateRuntimeTest do
 
   defmodule Spend do
     @schema Jido.Joi.struct(__MODULE__, %{amount: Jido.Joi.integer() |> Jido.Joi.min(1)})
-    @enforce_keys Jido.Joi.Struct.enforce_keys(@schema)
-    defstruct Jido.Joi.Struct.struct_fields(@schema)
+    @enforce_keys Jido.Joi.enforce_keys(@schema)
+    defstruct Jido.Joi.struct_fields(@schema)
 
     def schema, do: @schema
     def validate(%__MODULE__{} = directive), do: Jido.Joi.parse(@schema, directive)

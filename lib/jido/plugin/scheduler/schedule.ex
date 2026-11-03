@@ -13,8 +13,8 @@ defmodule Jido.Plugin.Scheduler.Schedule do
 
   @typedoc "A delayed Signal Directive."
   @type t :: unquote(Joi.type_spec(@schema))
-  @enforce_keys Joi.Struct.enforce_keys(@schema)
-  defstruct Joi.Struct.struct_fields(@schema)
+  @enforce_keys Joi.enforce_keys(@schema)
+  defstruct Joi.struct_fields(@schema)
 
   @doc false
   def schema, do: @schema

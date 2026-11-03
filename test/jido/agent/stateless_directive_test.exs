@@ -6,8 +6,8 @@ defmodule Jido.Agent.StatelessDirectiveTest do
 
   defmodule Effect do
     @schema Jido.Joi.struct(__MODULE__, %{kind: Jido.Joi.enum([:reply, :block, :last])}, coerce: true)
-    @enforce_keys Jido.Joi.Struct.enforce_keys(@schema)
-    defstruct Jido.Joi.Struct.struct_fields(@schema)
+    @enforce_keys Jido.Joi.enforce_keys(@schema)
+    defstruct Jido.Joi.struct_fields(@schema)
     def schema, do: @schema
     def validate(%__MODULE__{} = effect), do: Jido.Joi.parse(@schema, Map.from_struct(effect))
   end

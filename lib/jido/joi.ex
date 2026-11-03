@@ -4,7 +4,8 @@ defmodule Jido.Joi do
 
   Joi exposes the Zoi 0.19 schema API that Jido uses. Joi schemas are ordinary
   Zoi schemas. The facade adds Jido policies for input parsing, checked state
-  initialization, exact stored-value validation, and JSON Schema projection.
+  initialization, exact stored-value validation, struct field projection, and
+  JSON Schema projection.
 
   Use `parse/3` for external input, `initialize/3` to create stored state, and
   `validate/3` to check an existing stored value.
@@ -218,6 +219,14 @@ defmodule Jido.Joi do
   def validate(schema, value, opts \\ []) do
     Jido.Joi.Runtime.validate(schema, value, opts)
   end
+
+  @doc "Returns the required struct fields for a Joi struct schema."
+  @spec enforce_keys(schema()) :: [atom()]
+  def enforce_keys(schema), do: Zoi.Struct.enforce_keys(schema)
+
+  @doc "Returns the public struct fields for a Joi struct schema."
+  @spec struct_fields(schema()) :: [atom() | {atom(), term()}]
+  def struct_fields(schema), do: Zoi.Struct.struct_fields(schema)
 
   @doc "Checks that authoring data contains no runtime-only values or dynamic schema effects."
   @spec validate_static(term()) :: :ok | {:error, String.t()}

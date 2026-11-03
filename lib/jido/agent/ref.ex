@@ -42,8 +42,8 @@ defmodule Jido.Agent.Ref do
 
   @type t :: unquote(Joi.type_spec(@schema))
 
-  @enforce_keys Joi.Struct.enforce_keys(@schema)
-  defstruct Joi.Struct.struct_fields(@schema)
+  @enforce_keys Joi.enforce_keys(@schema)
+  defstruct Joi.struct_fields(@schema)
 
   @doc "Returns the static schema for an Agent Ref."
   @spec schema() :: Joi.schema()

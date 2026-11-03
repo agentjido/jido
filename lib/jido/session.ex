@@ -29,8 +29,8 @@ defmodule Jido.Session do
           )
 
   @type t :: unquote(Joi.type_spec(@schema))
-  @enforce_keys Joi.Struct.enforce_keys(@schema)
-  defstruct Joi.Struct.struct_fields(@schema)
+  @enforce_keys Joi.enforce_keys(@schema)
+  defstruct Joi.struct_fields(@schema)
 
   @state_schema @schema
                 |> Joi.Schema.traverse(&Joi.Schema.without_coercion/1)

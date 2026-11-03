@@ -48,8 +48,8 @@ defmodule Jido.AI.Context do
   @type result :: nil | {:ok, ReqLLM.Response.t()} | {:error, term()}
   @type t :: unquote(Joi.type_spec(@schema))
 
-  @enforce_keys Joi.Struct.enforce_keys(@schema)
-  defstruct Joi.Struct.struct_fields(@schema)
+  @enforce_keys Joi.enforce_keys(@schema)
+  defstruct Joi.struct_fields(@schema)
 
   @doc "Returns the Joi schema for a model-call context."
   @spec schema() :: Joi.schema()
