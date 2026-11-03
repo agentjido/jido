@@ -3,6 +3,21 @@ defmodule Jido.AgentServer.RegistrationGuard do
   use GenServer
 
   @watch_interval 10
+  @registry_retry_interval 10
+  @registry_restart_wait 1_000
+
+  @doc false
+  def registry_child_spec(opts) do
+    opts
+    |> Registry.child_spec()
+    |> Map.put(:start, {__MODULE__, :start_registry_link, [opts]})
+  end
+
+  @doc false
+  def start_registry_link(opts) do
+    deadline = System.monotonic_time(:millisecond) + @registry_restart_wait
+    start_registry_until_ready(opts, deadline)
+  end
 
   def start_link(opts) do
     instance = Keyword.fetch!(opts, :jido)
@@ -130,4 +145,19 @@ defmodule Jido.AgentServer.RegistrationGuard do
   end
 
   def registry_key(id, partition), do: {:agent, Jido.partition_key(id, partition)}
+
+  defp start_registry_until_ready(opts, deadline) do
+    case Registry.start_link(opts) do
+      {:ok, _pid} = started ->
+        started
+
+      {:error, _reason} = error ->
+        if System.monotonic_time(:millisecond) < deadline do
+          Process.sleep(@registry_retry_interval)
+          start_registry_until_ready(opts, deadline)
+        else
+          error
+        end
+    end
+  end
 end

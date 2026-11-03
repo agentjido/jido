@@ -6,7 +6,7 @@ defmodule JidoTest.AgentServer.ActivationOwnershipTest do
 
   import JidoTest.Eventually
   alias Jido.AgentServer, as: Server
-  alias Jido.AgentServer.{RegistrationGuard, RegistryWorker}
+  alias Jido.AgentServer.RegistrationGuard
   alias Jido.Error.ValidationError
   alias JidoTest.AgentServer.Fixtures, as: F
 
@@ -289,13 +289,13 @@ defmodule JidoTest.AgentServer.ActivationOwnershipTest do
   end
 
   @tag obligation: "jido.agent_server.activation.I2"
-  test "the Registry worker retries a bounded name conflict" do
+  test "the registration owner retries a bounded Registry name conflict" do
     name = Module.concat(__MODULE__, "RetryRegistry#{System.unique_integer([:positive])}")
     {:ok, conflict} = Registry.start_link(keys: :unique, name: name)
 
     starter =
       Task.async(fn ->
-        case RegistryWorker.start_link(keys: :unique, name: name) do
+        case RegistrationGuard.start_registry_link(keys: :unique, name: name) do
           {:ok, registry} = result ->
             Process.unlink(registry)
             result
@@ -310,8 +310,8 @@ defmodule JidoTest.AgentServer.ActivationOwnershipTest do
     assert {:ok, registry} = Task.await(starter, 2_000)
     assert Process.alive?(registry)
 
-    assert %{start: {RegistryWorker, :start_link, [[keys: :unique, name: ^name]]}} =
-             RegistryWorker.child_spec(keys: :unique, name: name)
+    assert %{start: {RegistrationGuard, :start_registry_link, [[keys: :unique, name: ^name]]}} =
+             RegistrationGuard.registry_child_spec(keys: :unique, name: name)
 
     Supervisor.stop(registry)
   end

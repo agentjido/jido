@@ -618,7 +618,10 @@ defmodule Jido do
          name: exec_runner_name(name), store: Jido.Persistence.ContinuationStore, store_opts: [jido: name]},
         {Task.Supervisor, name: task_supervisor_name(name), max_children: Keyword.fetch!(opts, :max_tasks)},
         {Jido.AgentServer.RegistrationGuard, jido: name},
-        {Jido.AgentServer.RegistryWorker, keys: :unique, name: registry_name(name)},
+        Jido.AgentServer.RegistrationGuard.registry_child_spec(
+          keys: :unique,
+          name: registry_name(name)
+        ),
         {RuntimeStore, name: runtime_store},
         {DynamicSupervisor,
          name: agent_supervisor_name(name), strategy: :one_for_one, max_restarts: 1000, max_seconds: 5}

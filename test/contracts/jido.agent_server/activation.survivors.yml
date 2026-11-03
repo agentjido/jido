@@ -22,39 +22,39 @@
   sort: unpromised
   reason: The contract requires the old orphan to stop before identity reuse, not the exact private wait budget after a kill signal.
 
-- at: lib/jido/agent_server/registry_worker.ex:4:19
+- at: lib/jido/agent_server/registration_guard.ex:6:28
   operator: integer_shift
   mutation: "`10` → `11`"
   sort: unpromised
   reason: The contract requires bounded Registry restart retries, not the exact internal retry interval.
 
-- at: lib/jido/agent_server/registry_worker.ex:4:19
+- at: lib/jido/agent_server/registration_guard.ex:6:28
   operator: integer_shift
   mutation: "`10` → `9`"
   sort: unpromised
   reason: The contract requires bounded Registry restart retries, not the exact internal retry interval.
 
-- at: lib/jido/agent_server/registry_worker.ex:5:17
+- at: lib/jido/agent_server/registration_guard.ex:7:26
   operator: integer_shift
   mutation: "`1000` → `1001`"
   sort: unpromised
   reason: The contract requires one bounded Registry restart period, not its exact private duration.
 
-- at: lib/jido/agent_server/registry_worker.ex:5:17
+- at: lib/jido/agent_server/registration_guard.ex:7:26
   operator: integer_shift
   mutation: "`1000` → `999`"
   sort: unpromised
   reason: The contract requires one bounded Registry restart period, not its exact private duration.
 
-- at: lib/jido/agent_server/registry_worker.ex:24:48
+- at: lib/jido/agent_server/registration_guard.ex:155:48
   operator: comparison_swap
   mutation: "`<` → `<=`"
   sort: equivalent
   reason: The two comparisons differ only at one monotonic millisecond. Both make the same final retry and return the same Registry result.
 
-- at: lib/jido/agent_server/registry_worker.ex:25:19
+- at: lib/jido/agent_server/registration_guard.ex:156:11
   operator: statement_removal
-  mutation: "`Process.sleep(@retry_interval)` → `(removed)`"
+  mutation: "`Process.sleep(@registry_retry_interval)` → `(removed)`"
   sort: unpromised
   reason: The sleep paces a private retry loop. The contract fixes the bounded result, not its internal backoff policy.
 

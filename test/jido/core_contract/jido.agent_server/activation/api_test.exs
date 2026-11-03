@@ -5,7 +5,7 @@ defmodule JidoTest.AgentServer.ActivationApiTest do
   use Covenant.Case, component: "jido.agent_server.activation", async: false
 
   alias Jido.AgentServer, as: Server
-  alias Jido.AgentServer.{RegistrationGuard, RegistryWorker}
+  alias Jido.AgentServer.RegistrationGuard
   alias Jido.AgentServer.Supervisor, as: ServerSupervisor
   alias JidoTest.AgentServer.Fixtures, as: F
 
@@ -29,7 +29,7 @@ defmodule JidoTest.AgentServer.ActivationApiTest do
 
     assert MapSet.subset?(activation_api, MapSet.new(documented_api(Server)))
 
-    for module <- [ServerSupervisor, RegistrationGuard, RegistryWorker] do
+    for module <- [ServerSupervisor, RegistrationGuard] do
       refute public_module?(module)
     end
   end

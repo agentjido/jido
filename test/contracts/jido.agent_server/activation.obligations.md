@@ -2,7 +2,6 @@
 modules:
   - Jido.AgentServer.Supervisor
   - Jido.AgentServer.RegistrationGuard
-  - Jido.AgentServer.RegistryWorker
 ---
 
 ## Purpose
@@ -110,7 +109,7 @@ Activation has no separate DSL. Its public operations stay on
 ### jido.agent_server.activation.I12 — Public activation API
 
 - **scope:** activation operations on `Jido.AgentServer`
-- **must:** Keep child specifications, supervised and bare startup, lookup, liveness, readiness, worker-to-root lookup, and root-to-worker lookup on the one public AgentServer facade. Return nil when a root has no live worker. Keep `Supervisor`, `RegistrationGuard`, `RegistryWorker`, ETS records, and registration keys internal. Do not add an activation DSL.
+- **must:** Keep child specifications, supervised and bare startup, lookup, liveness, readiness, worker-to-root lookup, and root-to-worker lookup on the one public AgentServer facade. Return nil when a root has no live worker. Keep `Supervisor`, `RegistrationGuard`, ETS records, and registration keys internal. Do not add an activation DSL.
 - **why:** Users need one stable process boundary without depending on activation implementation modules.
 - **kind:** functional
 - **status:** active

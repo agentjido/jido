@@ -18,8 +18,8 @@
 
 - id: activation-mutation-profile
   date: 2026-10-19
-  decision: Mutate Jido.AgentServer.Supervisor, Jido.AgentServer.RegistrationGuard, and Jido.AgentServer.RegistryWorker. Keep the public Jido.AgentServer facade out of this focused profile while the core state machine remains one module.
-  driver: These three modules carry the present activation seams. Including the complete state machine would overlap every future AgentServer component.
+  decision: Mutate Jido.AgentServer.Supervisor and Jido.AgentServer.RegistrationGuard. Keep the public Jido.AgentServer facade out of this focused profile while the core state machine remains one module.
+  driver: These two modules carry the activation seams. RegistrationGuard also owns bounded Registry startup. RegistryWorker was a stateless forwarding module and was removed. Including the complete state machine would overlap every future AgentServer component.
   approved_by: Component hardening pass
 
 - id: activation-obligation-migration
@@ -35,6 +35,6 @@
 
 - id: activation-public-api
   date: 2026-10-22
-  decision: Keep activation operations on Jido.AgentServer. Add worker/1 as the safe inverse of activation/1, and keep Supervisor, RegistrationGuard, RegistryWorker, activation records, and registration keys internal.
+  decision: Keep activation operations on Jido.AgentServer. Add worker/1 as the safe inverse of activation/1, and keep Supervisor, RegistrationGuard, activation records, and registration keys internal.
   driver: Static OTP supervision returns the activation root, but users need the request endpoint without depending on the activation owner module.
   approved_by: Component hardening pass
