@@ -12,6 +12,17 @@ defmodule JidoTest.Property.Signal.Report do
     durable_store_faults envelope_wire memory_histories pid_lifecycles routing_model trace_ids wire_mutations
   )
 
+  def check!(path \\ report_path()) do
+    report = path |> File.read!() |> JSON.decode!()
+
+    unless report["status"] == "finished" and report["outcome"] == "passed",
+      do: raise("Signal property report did not pass: #{inspect(report["outcome"])}")
+
+    missing = report["required_case_ids_without_measurement"] || []
+    if missing != [], do: raise("missing Signal property cases: #{Enum.join(missing, ", ")}")
+    :ok
+  end
+
   # Call before test files compile. A load failure must not retain old evidence.
   def prepare!(path \\ report_path()) do
     report = %{

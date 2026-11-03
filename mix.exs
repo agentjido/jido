@@ -140,7 +140,10 @@ defmodule Jido.MixProject do
       ],
       "test.contracts": "covenant.check",
       "test.examples": test_alias("test/examples", :example),
-      "test.fuzz": test_alias("test/property", :fuzz),
+      "test.fuzz": fn args ->
+        run_tagged_tests("test/property", :fuzz, args)
+        check_property_reports!(args)
+      end,
       "test.live": test_alias("test/live", :live),
       "test.load": test_alias("test/load", :load),
       "test.peer": test_alias("test", :peer),
@@ -168,6 +171,21 @@ defmodule Jido.MixProject do
 
   defp test_path?(argument) do
     not String.starts_with?(argument, "-") and File.exists?(argument)
+  end
+
+  defp check_property_reports!(args) do
+    paths = Enum.filter(args, &test_path?/1)
+    all? = paths == [] or Enum.any?(paths, &(Path.expand(&1) == Path.expand("test/property")))
+
+    if all? or Enum.any?(paths, &String.contains?(Path.expand(&1), "/test/property/signal")) do
+      Code.require_file("test/property/signal/support/report.exs")
+      JidoTest.Property.Signal.Report.check!()
+    end
+
+    if all? or Enum.any?(paths, &String.contains?(Path.expand(&1), "/test/property/action_flow")) do
+      Code.require_file("test/property/action_flow/support/report.exs")
+      JidoTest.Property.ActionFlow.Report.check!()
+    end
   end
 
   defp test_ignore_filters do

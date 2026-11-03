@@ -32,6 +32,15 @@ if Enum.any?(quality_selection, fn
      _other -> false
    end) do
   Code.require_file("property/signal/support/report.exs", __DIR__)
+  Code.require_file("property/action_flow/support/report.exs", __DIR__)
   JidoTest.Property.Signal.Report.prepare!()
-  ExUnit.configure(formatters: [ExUnit.CLIFormatter, JidoTest.Property.Signal.Report])
+  JidoTest.Property.ActionFlow.Report.prepare!()
+
+  ExUnit.configure(
+    formatters: [
+      ExUnit.CLIFormatter,
+      JidoTest.Property.Signal.Report,
+      JidoTest.Property.ActionFlow.Report
+    ]
+  )
 end

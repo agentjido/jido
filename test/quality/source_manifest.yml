@@ -61,8 +61,32 @@ assets:
     target_path: test/property/action_flow
     quality_surface: property_and_fuzz
     owner: jido.flow
-    disposition: deferred
-    reason: Scheduled for jido-07x.5 as explicit post-baseline quality work.
+    disposition: ported
+    reason: Ported by jido-07x.5 with bounded expression generation, operator and parser checks, reduced failure handling, and a required full-report gate.
+  - source_repository: jido_action
+    source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
+    source_path: test/property/support/authoring.exs
+    target_path: test/quality/excluded/action_flow/property_authoring_support.exs
+    quality_surface: property_and_fuzz
+    owner: jido.flow
+    disposition: excluded
+    reason: The active source property suite does not load this authoring fixture; current authoring proof is owned by test/authoring.
+  - source_repository: jido_action
+    source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
+    source_path: test/property/support/managed.exs
+    target_path: test/quality/excluded/action_flow/property_managed_support.exs
+    quality_surface: property_and_fuzz
+    owner: jido.execution
+    disposition: excluded
+    reason: The active source expression property suite does not load this managed execution fixture; runtime cleanup proof belongs to jido-07x.6.
+  - source_repository: jido_action
+    source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
+    source_path: test/property/support/runtime.exs
+    target_path: test/quality/excluded/action_flow/property_runtime_support.exs
+    quality_surface: property_and_fuzz
+    owner: jido.execution
+    disposition: excluded
+    reason: The active source expression property suite does not load this runtime fixture; system and load proof belongs to jido-07x.6.
   - source_repository: jido_action
     source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
     source_path: test/system
