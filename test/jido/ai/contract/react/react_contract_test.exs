@@ -82,7 +82,11 @@ defmodule Jido.AI.Contract.ReActTest do
 
     assert %Jido.Flow{
              components: %{
-               "loop" => %{kind: :invoke, expander: %{target: ExpandNext}}
+               "loop" => %{
+                 kind: :iterate,
+                 call: %{target: Jido.AI.Reasoning.ReAct.Actions.Advance}
+               },
+               "continuation" => %{kind: :invoke, expander: %{target: ExpandNext}}
              }
            } = ReAct.flow()
   end
@@ -90,14 +94,22 @@ defmodule Jido.AI.Contract.ReActTest do
   @tag obligation: ["jido_ai.react.I1", "jido_ai.react.I2", "jido_ai.react.I3"]
   test "the standard ReAct graphs expose every ordered component" do
     assert %Jido.Flow{components: root_components} = ReAct.flow()
-    assert map_size(root_components) == 4
+    assert map_size(root_components) == 6
 
     assert %{
              "start_request" => %{kind: :call, call: %{target: SharedActions.StartRequest}},
              "input_guard" => %{kind: :call, call: %{target: SharedActions.GuardInput}},
+             "initialize" => %{
+               kind: :call,
+               call: %{target: Jido.AI.Reasoning.ReAct.Actions.Initialize}
+             },
              "loop" => %{
+               kind: :iterate,
+               call: %{target: Jido.AI.Reasoning.ReAct.Actions.Advance}
+             },
+             "continuation" => %{
                kind: :invoke,
-               decision: %{target: SharedActions.DecideInput},
+               decision: %{target: Jido.AI.Reasoning.ReAct.Actions.FinishLoop},
                expander: %{target: ExpandNext}
              },
              "finalize" => %{kind: :call, call: %{target: SharedActions.FinalizeTurn}}

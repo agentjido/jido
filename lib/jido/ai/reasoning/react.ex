@@ -4,13 +4,13 @@ defmodule Jido.AI.Reasoning.ReAct do
   @moduledoc """
   The canonical graph-first ReAct reasoning recipe.
 
-  The root Flow starts the request, applies the default input guard, invokes
-  the ReAct loop, and finalizes the terminal outcome. Model rounds, tool
+  The root Flow starts the request, applies the default input guard, runs one
+  fixed Iterate graph, and finalizes the terminal outcome. Model rounds, tool
   review, and all recipe Actions are public modules under this namespace.
   """
 
-  alias Jido.AI.Reasoning.Actions.{DecideInput, FinalizeTurn, GuardInput, StartRequest}
-  alias Jido.AI.Reasoning.ReAct.Actions.ExpandNext
+  alias Jido.AI.Reasoning.Actions.{FinalizeTurn, GuardInput, StartRequest}
+  alias Jido.AI.Reasoning.ReAct.Actions.{Advance, ExpandNext, FinishLoop, Initialize}
 
   @default_instructions "Answer concisely. Use the available tools when they help. You can request multiple tools in one response."
 
@@ -137,25 +137,29 @@ defmodule Jido.AI.Reasoning.ReAct do
       action: GuardInput,
       params: %{turn: result("start_request")}
 
-    invoke "loop",
-      decision: DecideInput,
+    step "initialize",
+      action: Initialize,
+      params: %{turn: result("start_request"), guard: result("input_guard")}
+
+    iterate "loop" do
+      state(Joi.map(), initial: result("initialize"))
+      action(Advance)
+      params(%{state: state()})
+      update(body_result())
+      while(state(:done) == false)
+      max_iterations(17)
+    end
+
+    invoke "continuation",
+      decision: FinishLoop,
       expander: ExpandNext,
       params: %{
-        turn: result("start_request"),
-        guard: result("input_guard"),
-        target: value(Jido.AI.Reasoning.ReAct.ModelRound),
-        continuation: %{
-          routes: %{
-            model: value(Jido.AI.Reasoning.ReAct.ModelRound),
-            review: value(Jido.AI.Reasoning.ReAct.ToolReview),
-            tools: value(Jido.AI.Reasoning.ReAct.ModelRound)
-          }
-        }
+        state: result("loop", :state)
       }
 
     step "finalize",
       action: FinalizeTurn,
-      params: %{outcome: result("loop")}
+      params: %{outcome: result("continuation")}
 
     output result("finalize")
   end

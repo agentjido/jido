@@ -179,7 +179,12 @@ defmodule Jido.Exec do
            Runic.Runner.start_workflow(runner, execution_id, workflow, worker_opts) do
       case Runic.Runner.start_execution(runner, execution_id, execution_input(instruction),
              execution_id: managed_identity(execution_id),
-             run_context: %{_global: durable_context(instruction.context)},
+             run_context: %{
+               _global:
+                 instruction.context
+                 |> durable_context()
+                 |> Map.put(:__jido_exec_max_concurrency__, worker_opts[:max_concurrency])
+             },
              scheduler_policies: [{:default, Map.from_struct(policy)}]
            ) do
         {:ok, _scope_id} ->
@@ -220,7 +225,12 @@ defmodule Jido.Exec do
         worker_opts ++
           [
             rehydration: rehydration,
-            run_context: %{_global: durable_context(context)},
+            run_context: %{
+              _global:
+                context
+                |> durable_context()
+                |> Map.put(:__jido_exec_max_concurrency__, worker_opts[:max_concurrency])
+            },
             scheduler_policies: [{:default, Map.from_struct(policy)}]
           ]
 
@@ -317,7 +327,10 @@ defmodule Jido.Exec do
 
   defp run_workflow(workflow, input, context, kind, opts) do
     with {:ok, policy, react_opts} <- execution_options(opts, kind) do
-      context = Jido.Exec.Runtime.context(context)
+      context =
+        context
+        |> Jido.Exec.Runtime.context()
+        |> Map.put(:__jido_exec_max_concurrency__, Keyword.get(react_opts, :max_concurrency, 1))
 
       {workflow, observation} =
         workflow

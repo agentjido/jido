@@ -42,8 +42,10 @@ not call a model provider. A deterministic local inference client emits known
 tool calls. A local Action returns an empty payload.
 
 The default profile is the shared base case for Jido and Runic work. It removes
-model, network, payload, concurrency, and AgentServer effects. The execution
-path is:
+model, network, payload, concurrency, and AgentServer effects. It compares two
+orchestration strategies.
+
+The benchmark-local `recursive` strategy preserves the former core path:
 
 ```text
 Jido Agent.cmd/3
@@ -52,10 +54,21 @@ Jido Agent.cmd/3
   -> dynamic ReAct invoke graphs
 ```
 
+The production `iterative` strategy is now `Jido.AI.Reasoning.ReAct` and uses
+this path:
+
+```text
+Jido Agent.cmd/3
+  -> one fixed Jido iterate graph
+  -> one ReAct transition Action per model round
+  -> the same loop nodes for the next round
+```
+
 The base profile has these fixed defaults:
 
 | Setting | Value |
 | --- | --- |
+| Strategies | `recursive` and `iterative` |
 | Execution | Direct, in-memory Runic workflow |
 | Tool calls | One serial call per ReAct round |
 | Tool result payload | 0 bytes |
@@ -63,12 +76,50 @@ The base profile has these fixed defaults:
 | Round counts | 1, 3, and 5 |
 | Isolation | One new BEAM VM for each round count |
 
-With Runic `0.1.0-alpha.13`, the one-round and three-round cases finish. The
-five-round case reaches the canonical identity item limit while it processes
-137,659 items at path `[:value, 1]`. This is the base failure. A Runic change
-can be tested against the same input without a model provider or a paid call.
-The script captures this execution error as benchmark data and exits normally.
-It does not mean that the benchmark runner failed.
+With Runic `0.1.0-alpha.13`, the recursive one-round and three-round cases
+finish. The recursive five-round case reaches the canonical identity item limit
+while it processes 137,659 items at path `[:value, 1]`. The iterative strategy
+finishes all three cases.
+
+One local comparison produced these peak process-memory changes:
+
+| Rounds | Recursive | Iterative | Iterative / recursive |
+| ---: | ---: | ---: | ---: |
+| 1 | 7.95 MiB | 3.26 MiB | 0.41x |
+| 3 | 36.29 MiB | 3.13 MiB | 0.09x |
+| 5 | 64.98 MiB, then error | 6.89 MiB | 0.11x |
+
+The production iterative strategy also completed eight tool rounds with 9.35
+MiB of peak process-memory growth.
+
+These values vary by host. The growth shape and execution outcome are the
+important results.
+
+The script captures the recursive execution error as benchmark data and exits
+normally. The benchmark runner does not fail.
+
+### What the experiment proves
+
+The former ReAct design recursively added a new ModelRound and tool Flow to the
+active Runic workflow. Every round also carried the prior Jido Frame. Replacing
+that recursive expansion with a fixed loop removes the identity-limit failure
+and most of the memory growth.
+
+The core implementation preserves the normal request and response contract,
+parallel tools, durable review waits, model and tool counts, Session entries,
+output guards, retry routing, and budget routing.
+
+One loop transition calls the existing ReAct Actions inside one outer Runic
+Action. Each tool batch runs as a short-lived Runic Flow with explicit parallel
+tool nodes. The inner Flow is discarded after the round, so it cannot expand
+the active outer graph. An approved review resumes through another fixed loop.
+
+The remaining boundary is checkpoint detail. Inner model work and a complete
+tool batch belong to the outer transition checkpoint. They do not have separate
+checkpoints in the active outer workflow.
+
+The benchmark keeps the former recursive Flow in the benchmark file only. It is
+not a second library implementation.
 
 ### Run and capture the base case
 
@@ -100,9 +151,9 @@ The report also shows the compiled Runic graph component count, build-log entry
 count, shared size, and flat size. It compares the peak process memory of the
 three-round and five-round cases with the one-round case.
 
-The base case has two success conditions:
+The iterative base case has two success conditions:
 
-1. All three round counts finish without a canonical identity limit.
+1. All three iterative round counts finish without a canonical identity limit.
 2. Peak memory grows in proportion to the added rounds. It must not make a
    large jump between adjacent cases.
 
@@ -116,10 +167,10 @@ tool payload:
 JIDO_MEMORY_BENCH_PROFILE=expanded mix bench
 ```
 
-This profile runs 18 isolated cases:
+This profile runs 18 recursive-strategy isolated cases:
 
 - direct and managed execution;
-- 1, 3, and 5 rounds; and
+- 1, 3, and 4 rounds; and
 - serial, constrained, and parallel workloads.
 
 The workloads are:
@@ -135,8 +186,9 @@ The workloads are:
 | Environment variable | Meaning |
 | --- | --- |
 | `JIDO_MEMORY_BENCH_PROFILE` | `base` or `expanded` |
+| `JIDO_MEMORY_BENCH_STRATEGIES` | Comma-separated `recursive` or `iterative` strategies |
 | `JIDO_MEMORY_BENCH_MODES` | Comma-separated `direct` or `managed` modes |
-| `JIDO_MEMORY_BENCH_ROUNDS` | Comma-separated round counts from 1 through 16 |
+| `JIDO_MEMORY_BENCH_ROUNDS` | Comma-separated round counts from 1 through 8 |
 | `JIDO_MEMORY_BENCH_WORKLOADS` | Comma-separated workload names |
 | `JIDO_MEMORY_BENCH_PAYLOAD_BYTES` | Bytes returned by each tool call, from 0 through 1,000,000 |
 | `JIDO_MEMORY_BENCH_REPEATS` | Number of isolated runs for each case |

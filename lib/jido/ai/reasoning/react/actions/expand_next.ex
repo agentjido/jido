@@ -2,10 +2,7 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.ExpandNext do
   alias Jido.Joi
   @moduledoc "Expands each trusted AI routing decision into its next executable."
 
-  alias Jido.AI.Toolset
-  alias Jido.Telemetry.AI, as: Telemetry
-  alias Jido.AI.Reasoning.ReAct.Actions.{ExecuteTool, RecordToolResults}
-  alias Jido.Flow.Ref
+  alias Jido.AI.Reasoning.ReAct.ToolRound
 
   use Jido.Action,
     id: "jido.ai/reasoning/react/actions/expand-next",
@@ -25,105 +22,10 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.ExpandNext do
     do: {:continue, input, target}
 
   def run(%{kind: :tools, input: %{turn: turn} = input, target: target}, context) do
-    with {:ok, calls} <- resolve_calls(turn.tools, turn.model_outcome.tool_calls),
-         {:ok, flow} <- build_flow(calls, target) do
-      :ok = Telemetry.record_tool_calls(context, tool_call_index(calls))
+    with {:ok, flow} <- ToolRound.build(turn, context, continuation: target) do
       {:continue, input, flow}
     end
   end
 
   def run(%{kind: :tools}, _context), do: {:error, :invalid_tool_calls}
-
-  defp resolve_calls(tools, calls) when is_list(calls) and calls != [] do
-    calls
-    |> Enum.reduce_while({:ok, []}, fn call, {:ok, resolved} ->
-      case Toolset.resolve_call(tools, call) do
-        {:ok, value} -> {:cont, {:ok, [value | resolved]}}
-        {:error, reason} -> {:halt, {:error, reason}}
-      end
-    end)
-    |> case do
-      {:ok, resolved} -> {:ok, Enum.reverse(resolved)}
-      error -> error
-    end
-  end
-
-  defp resolve_calls(_tools, calls), do: {:error, {:invalid_tool_calls, calls}}
-
-  defp build_flow(calls, model_target) do
-    Jido.Flow.new(%{
-      name: "jido_ai_tool_calls",
-      description: "Execute validated tool calls as parallel Actions",
-      schema: Joi.object(%{turn: Joi.any(), routes: Joi.map()}),
-      output_schema: Joi.map(),
-      components: [parallel(calls), record(calls), model(model_target)],
-      output: Ref.result("model")
-    })
-  end
-
-  defp parallel(calls) do
-    %{
-      kind: :parallel,
-      name: "tools",
-      on_error: :collect_errors,
-      actions:
-        calls
-        |> Enum.with_index()
-        |> Enum.map(fn {call, index} ->
-          %{
-            name: action_name(index),
-            action: ExecuteTool,
-            params: %{call: Map.take(call, [:id, :name, :arguments, :params, :executor, :tool])}
-          }
-        end)
-    }
-  end
-
-  defp record(calls) do
-    %{
-      kind: :step,
-      name: "record",
-      action: RecordToolResults,
-      params: %{
-        turn: Ref.input(:turn),
-        results: result_refs(calls)
-      }
-    }
-  end
-
-  defp model(model_target) do
-    %{
-      kind: :subflow,
-      name: "model",
-      flow: model_target,
-      params: %{turn: Ref.result("record", :turn), routes: Ref.input(:routes)}
-    }
-  end
-
-  defp result_refs(calls) do
-    calls
-    |> Enum.with_index()
-    |> Enum.map(fn {call, index} ->
-      %{id: call.id, name: call.name, outcome: Ref.result("tools", [index])}
-    end)
-  end
-
-  defp tool_call_index(calls) do
-    calls
-    |> Enum.with_index()
-    |> Map.new(fn {call, index} ->
-      telemetry =
-        call
-        |> Map.take([:id, :name, :description])
-        |> Map.put(:action, tool_action(call.executor))
-
-      {action_name(index), telemetry}
-    end)
-  end
-
-  defp tool_action(%{kind: :action, target: action}), do: action
-  defp tool_action(%{kind: :flow, target: flow}), do: flow
-  defp tool_action(%{kind: :source, module: module}), do: module
-
-  defp action_name(index), do: "tool_#{index}"
 end

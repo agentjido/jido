@@ -36,15 +36,83 @@ defmodule Jido.Bench.ReActMemory.Tool do
   end
 end
 
+defmodule Jido.Bench.ReActMemory.Recursive do
+  alias Jido.AI.Reasoning.Actions.{DecideInput, FinalizeTurn, GuardInput, StartRequest}
+  alias Jido.AI.Reasoning.ReAct.Actions.ExpandNext
+
+  use Jido.Flow,
+    id: "jido/bench/react-memory/recursive",
+    vsn: 1,
+    name: "recursive_react_memory_bench",
+    description: "The former recursive ReAct graph for memory comparison",
+    schema: Jido.AI.Reasoning.ReAct.schema(),
+    output_schema: Jido.AI.Reasoning.ReAct.output_schema()
+
+  flow do
+    step "start_request",
+      action: StartRequest,
+      params: %{
+        flow: %{id: "jido/bench/react-memory/recursive", vsn: 1},
+        input: input(:input),
+        instructions: input(:instructions),
+        model: input(:model),
+        fallback_models: input(:fallback_models),
+        options: input(:options),
+        prompt_cache: input(:prompt_cache),
+        output_schema: input(:output_schema),
+        stream: input(:stream),
+        review_tools: input(:review_tools),
+        tool_policy: input(:tool_policy),
+        context_window: input(:context),
+        max_tool_rounds: input([:limits, :tool_rounds]),
+        max_tool_calls: input([:limits, :tool_calls]),
+        max_model_calls: input([:limits, :model_calls]),
+        max_retries: input([:limits, :retries]),
+        max_elapsed_ms: input([:limits, :elapsed_ms]),
+        max_input_tokens: input([:limits, :input_tokens]),
+        max_output_tokens: input([:limits, :output_tokens]),
+        max_total_tokens: input([:limits, :total_tokens]),
+        max_total_cost: input([:limits, :total_cost]),
+        max_tool_output_bytes: input([:limits, :tool_output_bytes])
+      }
+
+    step "input_guard",
+      action: GuardInput,
+      params: %{turn: result("start_request")}
+
+    invoke "loop",
+      decision: DecideInput,
+      expander: ExpandNext,
+      params: %{
+        turn: result("start_request"),
+        guard: result("input_guard"),
+        target: value(Jido.AI.Reasoning.ReAct.ModelRound),
+        continuation: %{
+          routes: %{
+            model: value(Jido.AI.Reasoning.ReAct.ModelRound),
+            review: value(Jido.AI.Reasoning.ReAct.ToolReview),
+            tools: value(Jido.AI.Reasoning.ReAct.ModelRound)
+          }
+        }
+      }
+
+    step "finalize",
+      action: FinalizeTurn,
+      params: %{outcome: result("loop")}
+
+    output result("finalize")
+  end
+end
+
 defmodule Jido.Bench.ReActMemory.Agent do
   use Jido.AI.Agent,
     id: "jido/bench/react-memory/agent",
     vsn: 1,
     name: "react_memory_bench_agent",
-    description: "Run the canonical ReAct graph with a deterministic model"
+    description: "Run the former recursive ReAct graph with a deterministic model"
 
   ai do
-    reasoning Jido.AI.Reasoning.ReAct
+    reasoning Jido.Bench.ReActMemory.Recursive
 
     tools do
       action Jido.Bench.ReActMemory.Tool
@@ -133,11 +201,28 @@ defmodule Jido.Bench.ReActMemory.Client do
   end
 end
 
+defmodule Jido.Bench.ReActMemory.IterativeAgent do
+  use Jido.AI.Agent,
+    id: "jido/bench/react-memory/iterative-agent",
+    vsn: 1,
+    name: "iterative_react_memory_bench_agent",
+    description: "Run the fixed-shape core ReAct graph"
+
+  ai do
+    reasoning Jido.AI.Reasoning.ReAct
+
+    tools do
+      action Jido.Bench.ReActMemory.Tool
+    end
+  end
+end
+
 defmodule Jido.Bench.ReActMemory do
   alias Jido.Agent.Directive.Reply
   alias Jido.AgentServer
   alias Jido.Bench.ReActMemory.Agent, as: BenchAgent
   alias Jido.Bench.ReActMemory.Client
+  alias Jido.Bench.ReActMemory.IterativeAgent
 
   @memory_keys [:total, :processes_used, :binary, :ets]
   @workloads %{
@@ -148,12 +233,14 @@ defmodule Jido.Bench.ReActMemory do
   @base_defaults %{
     modes: [:direct],
     rounds: [1, 3, 5],
+    strategies: [:recursive, :iterative],
     workloads: ["serial"],
     payload_bytes: 0
   }
   @expanded_defaults %{
     modes: [:direct, :managed],
-    rounds: [1, 3, 5],
+    rounds: [1, 3, 4],
+    strategies: [:recursive],
     workloads: ["serial", "constrained", "parallel"],
     payload_bytes: 256
   }
@@ -163,6 +250,7 @@ defmodule Jido.Bench.ReActMemory do
 
   def main([
         "--case",
+        strategy,
         mode,
         workload,
         rounds,
@@ -174,6 +262,7 @@ defmodule Jido.Bench.ReActMemory do
       ]) do
     result =
       run_case(%{
+        strategy: strategy!(strategy),
         mode: mode!(mode),
         workload: workload,
         rounds: integer!(rounds),
@@ -192,7 +281,13 @@ defmodule Jido.Bench.ReActMemory do
     defaults = profile_defaults(profile)
 
     modes = csv_values("JIDO_MEMORY_BENCH_MODES", defaults.modes, &mode!/1)
-    rounds = csv_integers("JIDO_MEMORY_BENCH_ROUNDS", defaults.rounds)
+
+    rounds =
+      "JIDO_MEMORY_BENCH_ROUNDS"
+      |> csv_integers(defaults.rounds)
+      |> Enum.map(&integer_in!(&1, 1..8, "rounds"))
+
+    strategies = csv_values("JIDO_MEMORY_BENCH_STRATEGIES", defaults.strategies, &strategy!/1)
     workloads = csv_values("JIDO_MEMORY_BENCH_WORKLOADS", defaults.workloads, &workload!/1)
 
     payload_bytes =
@@ -211,13 +306,15 @@ defmodule Jido.Bench.ReActMemory do
       |> integer_in!(1..60_000, "sample interval")
 
     results =
-      for mode <- modes,
+      for strategy <- strategies,
+          mode <- modes,
           round_count <- rounds,
           workload_name <- workloads,
           iteration <- 1..repeats do
         workload = Map.fetch!(@workloads, workload_name)
 
         run_isolated_case(%{
+          strategy: strategy,
           mode: mode,
           workload: workload_name,
           rounds: round_count,
@@ -238,6 +335,7 @@ defmodule Jido.Bench.ReActMemory do
 
   defp run_case(
          %{
+           strategy: strategy,
            mode: mode,
            rounds: rounds,
            tools_per_round: tools_per_round,
@@ -247,8 +345,9 @@ defmodule Jido.Bench.ReActMemory do
            iteration: iteration
          } = scenario
        )
-       when mode in [:direct, :managed] and rounds in 1..16 and tools_per_round in 1..32 and
-              max_concurrency > 0 and payload_bytes in 0..1_000_000 and sample_ms > 0 and
+       when strategy in [:recursive, :iterative] and mode in [:direct, :managed] and
+              rounds in 1..8 and tools_per_round in 1..32 and max_concurrency > 0 and
+              rounds * tools_per_round <= 16 and payload_bytes in 0..1_000_000 and sample_ms > 0 and
               iteration > 0 do
     :erlang.system_flag(:backtrace_depth, 32)
     Application.put_env(:jido, :ai_inference_client, Client)
@@ -256,15 +355,17 @@ defmodule Jido.Bench.ReActMemory do
     Application.put_env(:jido, :react_memory_bench_tools_per_round, tools_per_round)
     Application.put_env(:jido, :react_memory_bench_payload_bytes, payload_bytes)
 
-    runic = runic_metrics()
+    runic = runic_metrics(strategy)
 
     collect_garbage()
     baseline = memory_snapshot()
     sampler = start_sampler(baseline, sample_ms)
     started_at = System.monotonic_time()
 
+    agent_module = agent_module(strategy)
+
     request =
-      BenchAgent.request_signal!(%{
+      agent_module.request_signal!(%{
         input: "Run #{rounds} tool rounds with #{tools_per_round} tool calls per round, then finish.",
         model: "bench:deterministic",
         limits: %{
@@ -355,16 +456,18 @@ defmodule Jido.Bench.ReActMemory do
   defp run_case(scenario), do: raise("invalid benchmark case: #{inspect(scenario)}")
 
   defp execute(:direct, scenario, request) do
-    agent = BenchAgent.instantiate!(id: scenario_id(scenario))
-    BenchAgent.cmd(agent, request, max_concurrency: scenario.max_concurrency)
+    agent_module = agent_module(scenario.strategy)
+    agent = agent_module.instantiate!(id: scenario_id(scenario))
+    agent_module.cmd(agent, request, max_concurrency: scenario.max_concurrency)
   end
 
   defp execute(:managed, scenario, request) do
     namespace = "jido/bench/react-memory/#{scenario_id(scenario)}"
+    agent_module = agent_module(scenario.strategy)
     {:ok, _jido} = Jido.start(namespace: namespace)
 
     {:ok, server} =
-      Jido.start_agent(Jido.Default, BenchAgent,
+      Jido.start_agent(Jido.Default, agent_module,
         id: scenario_id(scenario),
         turn_timeout: :infinity,
         exec_opts: [max_concurrency: scenario.max_concurrency]
@@ -382,6 +485,7 @@ defmodule Jido.Bench.ReActMemory do
     Enum.join(
       [
         "react-memory",
+        scenario.strategy,
         scenario.mode,
         scenario.workload,
         scenario.rounds,
@@ -391,9 +495,9 @@ defmodule Jido.Bench.ReActMemory do
     )
   end
 
-  defp runic_metrics do
+  defp runic_metrics(strategy) do
     started_at = System.monotonic_time()
-    workflow = Jido.Exec.compile!(Jido.AI.Reasoning.ReAct)
+    workflow = Jido.Exec.compile!(reasoning_module(strategy))
     compile_us = elapsed_us(started_at)
     sizes = term_sizes(workflow)
 
@@ -405,6 +509,12 @@ defmodule Jido.Bench.ReActMemory do
       runic_workflow_flat_bytes: sizes.flat
     }
   end
+
+  defp agent_module(:recursive), do: BenchAgent
+  defp agent_module(:iterative), do: IterativeAgent
+
+  defp reasoning_module(:recursive), do: Jido.Bench.ReActMemory.Recursive
+  defp reasoning_module(:iterative), do: Jido.AI.Reasoning.ReAct
 
   defp session_metrics(%Jido.Session{} = session) do
     sizes = term_sizes(session)
@@ -437,6 +547,7 @@ defmodule Jido.Bench.ReActMemory do
           "--no-deps-check",
           script,
           "--case",
+          Atom.to_string(scenario.strategy),
           Atom.to_string(scenario.mode),
           scenario.workload,
           Integer.to_string(scenario.rounds),
@@ -551,7 +662,7 @@ defmodule Jido.Bench.ReActMemory do
   end
 
   defp print_report(results, metadata) do
-    first = List.first(results) || raise "benchmark suite returned no results"
+    if results == [], do: raise("benchmark suite returned no results")
 
     IO.puts("Runic ReAct memory benchmark")
 
@@ -564,47 +675,60 @@ defmodule Jido.Bench.ReActMemory do
     IO.puts("Profile: #{metadata.profile}")
     IO.puts("Each case runs in a new BEAM VM with a local deterministic model and tool.\n")
 
-    IO.puts("Compiled canonical ReAct workflow:")
+    IO.puts("Compiled ReAct workflows:")
+    IO.puts("| strategy | components | build log | shared | flat |")
+    IO.puts("| :--- | ---: | ---: | ---: | ---: |")
 
-    IO.puts(
-      "  #{first.runic_components} components; #{first.runic_build_log_entries} build-log entries; " <>
-        "#{kib(first.runic_workflow_shared_bytes)} shared; " <>
-        "#{kib(first.runic_workflow_flat_bytes)} flat"
-    )
+    results
+    |> Enum.uniq_by(& &1.strategy)
+    |> Enum.each(fn result ->
+      IO.puts(
+        "| #{result.strategy} | #{result.runic_components} | #{result.runic_build_log_entries} | " <>
+          "#{kib(result.runic_workflow_shared_bytes)} | #{kib(result.runic_workflow_flat_bytes)} |"
+      )
+    end)
 
     IO.puts("\nRuntime cases:")
 
     IO.puts(
-      "| mode | workload | run | rounds | tools/round | max conc. | payload | outcome | elapsed | peak process | peak total | retained agent | retained session | entries |"
+      "| strategy | mode | workload | run | rounds | tools/round | max conc. | payload | outcome | elapsed | peak process | peak total | retained agent | retained session | entries |"
     )
 
-    IO.puts("| :--- | :--- | ---: | ---: | ---: | ---: | ---: | :--- | ---: | ---: | ---: | ---: | ---: | ---: |")
+    IO.puts(
+      "| :--- | :--- | :--- | ---: | ---: | ---: | ---: | ---: | :--- | ---: | ---: | ---: | ---: | ---: | ---: |"
+    )
 
     Enum.each(results, fn result ->
       IO.puts(
-        "| #{result.mode} | #{result.workload} | #{result.iteration} | #{result.rounds} | " <>
-          "#{result.tools_per_round} | #{result.max_concurrency} | #{kib(result.payload_bytes)} | " <>
-          "#{result.outcome} | #{result.elapsed_ms} ms | #{mib(result.peak_process_delta_bytes)} | " <>
-          "#{mib(result.peak_total_delta_bytes)} | #{maybe_mib(result.retained_agent_shared_bytes)} | " <>
+        "| #{result.strategy} | #{result.mode} | #{result.workload} | #{result.iteration} | " <>
+          "#{result.rounds} | #{result.tools_per_round} | #{result.max_concurrency} | " <>
+          "#{kib(result.payload_bytes)} | #{result.outcome} | #{result.elapsed_ms} ms | " <>
+          "#{mib(result.peak_process_delta_bytes)} | #{mib(result.peak_total_delta_bytes)} | " <>
+          "#{maybe_mib(result.retained_agent_shared_bytes)} | " <>
           "#{maybe_mib(result.retained_session_shared_bytes)} | #{result.thread_entries || "n/a"} |"
       )
     end)
 
     IO.puts("\nAllocator details:")
-    IO.puts("| mode | workload | run | rounds | peak binary | peak ETS | final process | samples | compile |")
-    IO.puts("| :--- | :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |")
+
+    IO.puts(
+      "| strategy | mode | workload | run | rounds | peak binary | peak ETS | final process | samples | compile |"
+    )
+
+    IO.puts("| :--- | :--- | :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |")
 
     Enum.each(results, fn result ->
       IO.puts(
-        "| #{result.mode} | #{result.workload} | #{result.iteration} | #{result.rounds} | " <>
-          "#{mib(result.peak_binary_delta_bytes)} | #{mib(result.peak_ets_delta_bytes)} | " <>
-          "#{signed_mib(result.final_process_delta_bytes)} | #{result.samples} | " <>
-          "#{result.runic_compile_us} us |"
+        "| #{result.strategy} | #{result.mode} | #{result.workload} | #{result.iteration} | " <>
+          "#{result.rounds} | #{mib(result.peak_binary_delta_bytes)} | " <>
+          "#{mib(result.peak_ets_delta_bytes)} | #{signed_mib(result.final_process_delta_bytes)} | " <>
+          "#{result.samples} | #{result.runic_compile_us} us |"
       )
     end)
 
     print_failures(results)
     print_round_growth(results)
+    print_strategy_ratios(results)
     print_ratios(results)
   end
 
@@ -616,7 +740,8 @@ defmodule Jido.Bench.ReActMemory do
 
       Enum.each(failures, fn result ->
         IO.puts(
-          "  #{result.mode}/#{result.workload}, run #{result.iteration}, #{result.rounds} rounds: " <>
+          "  #{result.strategy}/#{result.mode}/#{result.workload}, run #{result.iteration}, " <>
+            "#{result.rounds} rounds: " <>
             failure_line(result.failure)
         )
 
@@ -628,9 +753,9 @@ defmodule Jido.Bench.ReActMemory do
   defp print_round_growth(results) do
     lines =
       results
-      |> Enum.group_by(&{&1.mode, &1.workload, &1.iteration})
+      |> Enum.group_by(&{&1.strategy, &1.mode, &1.workload, &1.iteration})
       |> Enum.sort()
-      |> Enum.flat_map(fn {{mode, workload, iteration}, cases} ->
+      |> Enum.flat_map(fn {{strategy, mode, workload, iteration}, cases} ->
         case Enum.find(cases, &(&1.rounds == 1)) do
           nil ->
             []
@@ -640,7 +765,8 @@ defmodule Jido.Bench.ReActMemory do
             |> Enum.reject(&(&1.rounds == 1))
             |> Enum.sort_by(& &1.rounds)
             |> Enum.map(fn result ->
-              "  #{mode}/#{workload}, run #{iteration}, #{result.rounds} rounds / 1 round: " <>
+              "  #{strategy}/#{mode}/#{workload}, run #{iteration}, " <>
+                "#{result.rounds} rounds / 1 round: " <>
                 ratio(result.peak_process_delta_bytes, baseline.peak_process_delta_bytes)
             end)
         end
@@ -652,12 +778,38 @@ defmodule Jido.Bench.ReActMemory do
     end
   end
 
+  defp print_strategy_ratios(results) do
+    lines =
+      results
+      |> Enum.group_by(&{&1.mode, &1.workload, &1.rounds, &1.iteration})
+      |> Enum.sort()
+      |> Enum.flat_map(fn {{mode, workload, rounds, iteration}, cases} ->
+        recursive = Enum.find(cases, &(&1.strategy == "recursive"))
+        iterative = Enum.find(cases, &(&1.strategy == "iterative"))
+
+        if recursive && iterative do
+          [
+            "  #{mode}/#{workload}, #{rounds} rounds, run #{iteration}, " <>
+              "iterative / recursive: " <>
+              ratio(iterative.peak_process_delta_bytes, recursive.peak_process_delta_bytes)
+          ]
+        else
+          []
+        end
+      end)
+
+    if lines != [] do
+      IO.puts("\nPeak process strategy ratios:")
+      Enum.each(lines, &IO.puts/1)
+    end
+  end
+
   defp print_ratios(results) do
     lines =
       results
-      |> Enum.group_by(&{&1.mode, &1.rounds, &1.iteration})
+      |> Enum.group_by(&{&1.strategy, &1.mode, &1.rounds, &1.iteration})
       |> Enum.sort()
-      |> Enum.flat_map(fn {{mode, rounds, iteration}, cases} ->
+      |> Enum.flat_map(fn {{strategy, mode, rounds, iteration}, cases} ->
         serial = Enum.find(cases, &(&1.workload == "serial"))
         constrained = Enum.find(cases, &(&1.workload == "constrained"))
         parallel = Enum.find(cases, &(&1.workload == "parallel"))
@@ -667,7 +819,8 @@ defmodule Jido.Bench.ReActMemory do
           not is_nil(serial) and not is_nil(constrained) and serial.outcome == "completed" and
             constrained.outcome == "completed",
           fn ->
-            "  #{mode}, #{rounds} rounds, run #{iteration}, four calls / one call: " <>
+            "  #{strategy}/#{mode}, #{rounds} rounds, run #{iteration}, " <>
+              "four calls / one call: " <>
               ratio(constrained.peak_process_delta_bytes, serial.peak_process_delta_bytes)
           end
         )
@@ -675,7 +828,8 @@ defmodule Jido.Bench.ReActMemory do
           not is_nil(constrained) and not is_nil(parallel) and
             constrained.outcome == "completed" and parallel.outcome == "completed",
           fn ->
-            "  #{mode}, #{rounds} rounds, run #{iteration}, parallel / constrained: " <>
+            "  #{strategy}/#{mode}, #{rounds} rounds, run #{iteration}, " <>
+              "parallel / constrained: " <>
               ratio(parallel.peak_process_delta_bytes, constrained.peak_process_delta_bytes)
           end
         )
@@ -740,6 +894,12 @@ defmodule Jido.Bench.ReActMemory do
   defp mode!("managed"), do: :managed
   defp mode!(mode), do: raise("expected direct or managed mode, got: #{inspect(mode)}")
 
+  defp strategy!("recursive"), do: :recursive
+  defp strategy!("iterative"), do: :iterative
+
+  defp strategy!(strategy),
+    do: raise("expected recursive or iterative strategy, got: #{inspect(strategy)}")
+
   defp workload!(name) do
     if Map.has_key?(@workloads, name),
       do: name,
@@ -768,8 +928,7 @@ defmodule Jido.Bench.ReActMemory do
   defp failure_summary(%Jido.Error.ExecutionError{
          details: %{
            reason:
-             {%Runic.Identity.CanonicalError{reason: {:limit, :item_count, item_count}, path: path} = error,
-              stacktrace}
+             {%Runic.Identity.CanonicalError{reason: {:limit, :item_count, item_count}, path: path} = error, stacktrace}
          }
        }) do
     %{

@@ -13,10 +13,13 @@ defmodule Jido.Exec.Runtime do
 
   @reserved [
     :__jido_exec_durable__,
+    :__jido_exec_max_concurrency__,
     :__jido_wait_host__,
     :__jido_wait_result__,
     :jido_exec_capabilities
   ]
+
+  @max_concurrency_key {__MODULE__, :max_concurrency}
 
   @doc false
   @spec user_context(map()) :: map()
@@ -40,6 +43,30 @@ defmodule Jido.Exec.Runtime do
   @doc false
   @spec caller_context(map()) :: map()
   def caller_context(context), do: Map.drop(context, @reserved)
+
+  @doc false
+  @spec with_execution_context(map(), (-> term())) :: term()
+  def with_execution_context(context, work) when is_map(context) and is_function(work, 0) do
+    previous = Process.get(@max_concurrency_key)
+    Process.put(@max_concurrency_key, Map.get(context, :__jido_exec_max_concurrency__, 1))
+
+    try do
+      work.()
+    after
+      if is_nil(previous),
+        do: Process.delete(@max_concurrency_key),
+        else: Process.put(@max_concurrency_key, previous)
+    end
+  end
+
+  @doc false
+  @spec max_concurrency() :: pos_integer()
+  def max_concurrency do
+    case Process.get(@max_concurrency_key, 1) do
+      value when is_integer(value) and value > 0 -> value
+      _value -> 1
+    end
+  end
 
   @doc false
   @spec run(Jido.Exec.task_supervisor(), pid(), (-> term())) :: term()

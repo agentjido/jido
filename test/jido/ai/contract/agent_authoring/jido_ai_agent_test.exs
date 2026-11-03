@@ -132,9 +132,17 @@ defmodule Jido.AITest do
                  kind: :call,
                  call: %{target: SharedActions.GuardInput}
                },
+               "initialize" => %{
+                 kind: :call,
+                 call: %{target: Actions.Initialize}
+               },
                "loop" => %{
+                 kind: :iterate,
+                 call: %{target: Actions.Advance}
+               },
+               "continuation" => %{
                  kind: :invoke,
-                 decision: %{target: SharedActions.DecideInput},
+                 decision: %{target: Actions.FinishLoop},
                  expander: %{target: Actions.ExpandNext}
                },
                "finalize" => %{
@@ -144,7 +152,7 @@ defmodule Jido.AITest do
              }
            } = program.flow()
 
-    assert map_size(program.flow().components) == 4
+    assert map_size(program.flow().components) == 6
 
     assert %Jido.Flow{components: model_components} = ReAct.ModelRound.flow()
     assert map_size(model_components) == 6

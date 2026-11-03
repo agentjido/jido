@@ -117,51 +117,53 @@ defmodule Jido.Exec.Node.Action do
     {durable?, run_context} = Map.pop(run_context, :__jido_exec_durable__, false)
 
     result =
-      with :ok <- compatible_target(node) do
-        case flow_metadata do
-          %{mode: {:loop, %{kind: kind} = loop}} when kind in [:reduce, :iterate] ->
-            LoopStateMachine.run_action(
-              loop,
-              instruction,
-              input,
-              Map.get(meta, :jido_loop, %{}),
-              run_context,
-              &execute_action/3
-            )
+      Runtime.with_execution_context(run_context, fn ->
+        with :ok <- compatible_target(node) do
+          case flow_metadata do
+            %{mode: {:loop, %{kind: kind} = loop}} when kind in [:reduce, :iterate] ->
+              LoopStateMachine.run_action(
+                loop,
+                instruction,
+                input,
+                Map.get(meta, :jido_loop, %{}),
+                run_context,
+                &execute_action/3
+              )
 
-          %{mode: {:invoke, phase}, component: component, params: params} ->
-            execute_invoke(instruction, phase, component, params, input, run_context)
+            %{mode: {:invoke, phase}, component: component, params: params} ->
+              execute_invoke(instruction, phase, component, params, input, run_context)
 
-          %{mode: :handoff, component: component, params: params} ->
-            execute_handoff(instruction, component, params, input, run_context)
+            %{mode: :handoff, component: component, params: params} ->
+              execute_handoff(instruction, component, params, input, run_context)
 
-          %{component: component, mode: {:map, on_error}, params: params} ->
-            execute_map_component(instruction, component, params, on_error, input, run_context)
+            %{component: component, mode: {:map, on_error}, params: params} ->
+              execute_map_component(instruction, component, params, on_error, input, run_context)
 
-          %{
-            component: component,
-            mode: {:parallel, on_error, index, name},
-            params: params
-          } ->
-            execute_parallel_component(
-              instruction,
-              component,
-              params,
-              on_error,
-              index,
-              name,
-              input,
-              run_context
-            )
+            %{
+              component: component,
+              mode: {:parallel, on_error, index, name},
+              params: params
+            } ->
+              execute_parallel_component(
+                instruction,
+                component,
+                params,
+                on_error,
+                index,
+                name,
+                input,
+                run_context
+              )
 
-          %{component: component, params: params} ->
-            execute_flow_component(instruction, component, params, input, run_context)
+            %{component: component, params: params} ->
+              execute_flow_component(instruction, component, params, input, run_context)
 
-          nil ->
-            params = merge_params(instruction.params, input)
-            execute_action(instruction, params, run_context)
+            nil ->
+              params = merge_params(instruction.params, input)
+              execute_action(instruction, params, run_context)
+          end
         end
-      end
+      end)
 
     result
     |> validate_durable_result(durable?)
