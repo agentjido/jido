@@ -5,7 +5,7 @@ defmodule Jido.Exec.Node.Action do
 
   alias Jido.Error
   alias Jido.Exec.{Frame, Runtime, Validation, ValueResolver}
-  alias Jido.Exec.Node.Loop
+  alias Jido.Exec.Node.Loop.StateMachine, as: LoopStateMachine
   alias Jido.Telemetry.Exec, as: Telemetry
   alias Jido.Instruction
   alias Runic.Identity
@@ -119,8 +119,8 @@ defmodule Jido.Exec.Node.Action do
     result =
       with :ok <- compatible_target(node) do
         case flow_metadata do
-          %{mode: {:loop, %Loop{} = loop}} ->
-            Loop.run_action(
+          %{mode: {:loop, %{kind: kind} = loop}} when kind in [:reduce, :iterate] ->
+            LoopStateMachine.run_action(
               loop,
               instruction,
               input,

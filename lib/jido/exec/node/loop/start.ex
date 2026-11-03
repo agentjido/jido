@@ -3,6 +3,7 @@ defmodule Jido.Exec.Node.Loop.Start do
 
   use Runic.Workflow.SingleOutput, batch_parent: false
 
+  alias Jido.Exec.Node.Loop.StateMachine
   alias Runic.Identity
   alias Runic.Workflow.SingleOutput.{Context, Result}
 
@@ -12,13 +13,13 @@ defmodule Jido.Exec.Node.Loop.Start do
   @type t :: %__MODULE__{}
 
   @doc false
-  @spec new(Jido.Exec.Node.Loop.t()) :: t()
-  def new(%Jido.Exec.Node.Loop{} = loop) do
-    id = {loop.id, :start}
+  @spec new(map()) :: t()
+  def new(%{id: loop_id, kind: loop_kind, name: loop_name} = loop) do
+    id = {loop_id, :start}
 
     %__MODULE__{
       id: id,
-      name: "__jido_#{loop.kind}__/#{loop.name}/start",
+      name: "__jido_#{loop_kind}__/#{loop_name}/start",
       hash:
         Identity.digest(:component_definition, %{
           kind: "jido_loop_start",
@@ -33,7 +34,7 @@ defmodule Jido.Exec.Node.Loop.Start do
   @doc false
   @spec run(t(), term(), Context.t()) :: Result.t()
   def run(%__MODULE__{} = node, input, %Context{} = context) do
-    case Jido.Exec.Node.Loop.start(node.loop, Jido.Exec.Fact.unwrap(input), context.runtime) do
+    case StateMachine.start(node.loop, Jido.Exec.Fact.unwrap(input), context.runtime) do
       {:ok, value, loop} ->
         Jido.Exec.Fact.result(input, context, value, %{jido_loop: loop})
 

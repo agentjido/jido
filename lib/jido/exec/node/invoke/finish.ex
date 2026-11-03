@@ -4,6 +4,7 @@ defmodule Jido.Exec.Node.Invoke.Finish do
   use Runic.Workflow.SingleOutput, batch_parent: false
 
   alias Runic.Identity
+  alias Runic.Workflow.ChildInvocation
   alias Runic.Workflow.SingleOutput.{Context, Result}
 
   @enforce_keys [:id, :name, :hash, :invoke_id, :invoke_name, :component, :target_component]
@@ -12,24 +13,68 @@ defmodule Jido.Exec.Node.Invoke.Finish do
   @type t :: %__MODULE__{}
 
   @doc false
-  @spec new(Jido.Exec.Node.Invoke.t(), term()) :: t()
-  def new(%Jido.Exec.Node.Invoke{} = invoke, target_id) do
-    id = {invoke.id, :finish, target_id}
+  @spec new(map(), term()) :: t()
+  def new(%{id: invoke_id, name: invoke_name, component: component} = invoke, target_id) do
+    id = {invoke_id, :finish, target_id}
 
     %__MODULE__{
       id: id,
-      name: "__jido_invoke__/#{invoke.name}/finish/#{target_id}",
+      name: "__jido_invoke__/#{invoke_name}/finish/#{target_id}",
       hash:
         Identity.digest(:component_definition, %{
           kind: "jido_invoke_finish",
           version: 1,
           id: inspect(id)
         }),
-      invoke_id: invoke.id,
-      invoke_name: invoke.name,
-      component: invoke.component,
-      target_component: Jido.Exec.Node.Invoke.target_component_key(invoke, target_id)
+      invoke_id: invoke_id,
+      invoke_name: invoke_name,
+      component: component,
+      target_component: target_component_key(invoke, target_id)
     }
+  end
+
+  @doc false
+  @spec target_component_key(map(), term()) :: String.t()
+  def target_component_key(%{component: component}, target_id),
+    do: "__jido_invoke_target__/#{component}/#{target_id}"
+
+  @doc false
+  @spec condition(term(), term(), String.t()) :: Runic.Workflow.Condition.t()
+  def condition(id, name, component) do
+    source =
+      quote do
+        Jido.Exec.Node.Invoke.Finish.condition(
+          unquote(Macro.escape(id)),
+          unquote(name),
+          unquote(component)
+        )
+      end
+
+    %Runic.Workflow.Condition{
+      name: "__jido_invoke__/#{name}/finished",
+      hash:
+        Identity.digest(:component_definition, %{
+          kind: "jido_invoke_finished",
+          version: 1,
+          id: inspect(id)
+        }),
+      work: fn value -> complete?(value, component) end,
+      arity: 1,
+      closure: Runic.Closure.new(source, %{}, nil),
+      meta_refs: []
+    }
+  end
+
+  @doc false
+  @spec complete?(term(), String.t()) :: boolean()
+  def complete?(%ChildInvocation{}, _component), do: false
+
+  def complete?(value, component) do
+    case Jido.Exec.Frame.fetch_result(value, component) do
+      {:ok, nil} -> false
+      {:ok, _output} -> true
+      :error -> false
+    end
   end
 
   @doc false
@@ -71,7 +116,7 @@ defimpl Runic.Component, for: Jido.Exec.Node.Invoke.Finish do
     |> Runic.Workflow.add_step(to, node)
     |> Runic.Workflow.add_step(
       node,
-      Jido.Exec.Node.Invoke.finished_condition(
+      Jido.Exec.Node.Invoke.Finish.condition(
         node.invoke_id,
         node.invoke_name,
         node.component

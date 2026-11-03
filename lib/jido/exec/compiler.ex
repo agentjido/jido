@@ -1,6 +1,8 @@
 defmodule Jido.Exec.Compiler do
   @moduledoc false
 
+  @behaviour Jido.Exec.NestedCompiler
+
   alias Jido.Error
 
   alias Jido.Exec.Node.{Action, Choice, Handoff, Input, Invoke, Loop, Output, Parallel}
@@ -37,6 +39,7 @@ defmodule Jido.Exec.Compiler do
   end
 
   @doc false
+  @impl Jido.Exec.NestedCompiler
   @spec compile_nested!(Instruction.t(), keyword()) :: Workflow.t() | no_return()
   def compile_nested!(%Instruction{kind: :flow} = instruction, opts) do
     with {:ok, flow} <- Preparation.from_instruction(instruction),
@@ -294,7 +297,8 @@ defmodule Jido.Exec.Compiler do
        opts ++
          [
            decision: decision,
-           expander: expander
+           expander: expander,
+           nested_compiler: __MODULE__
          ]
      )}
   end

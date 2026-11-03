@@ -11,10 +11,10 @@ defmodule Jido.Telemetry.Exec do
   """
 
   alias Jido.Error
-  alias Jido.Exec.Node.Action
-  alias Jido.Flow
   alias Jido.Instruction
   alias Runic.Workflow.SingleOutput.Context
+
+  @flow_module Module.concat(["Jido", "Flow"])
 
   @type kind :: :action | :flow
 
@@ -42,15 +42,15 @@ defmodule Jido.Telemetry.Exec do
   end
 
   @doc false
-  @spec action_metadata(Action.t(), Context.t()) :: map()
+  @spec action_metadata(map(), Context.t()) :: map()
   def action_metadata(
-        %Action{instruction: %Instruction{target: action}, flow: flow} = node,
+        %{instruction: %Instruction{target: action}, flow: flow, name: node_name},
         %Context{} = context
       ) do
     %{
       action: action,
       action_name: action_name(action),
-      node_name: node.name,
+      node_name: node_name,
       runnable_id: context.runnable_id,
       activation_id: context.activation_id,
       attempt_id: context.attempt_id,
@@ -142,7 +142,7 @@ defmodule Jido.Telemetry.Exec do
     _exception -> Atom.to_string(action)
   end
 
-  defp flow_name(%Flow{name: name}), do: name
+  defp flow_name(%{__struct__: module, name: name}) when module == @flow_module, do: name
 
   defp flow_name(module) when is_atom(module) do
     if function_exported?(module, :name, 0), do: module.name(), else: Atom.to_string(module)

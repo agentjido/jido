@@ -3,6 +3,7 @@ defmodule Jido.Exec.Runtime do
 
   alias Jido.Error
   alias Jido.Exec.{Frame, Validation, Wait}
+  alias Jido.Flow.Preparation
   alias Jido.Instruction
   alias Runic.Workflow
   alias Runic.Workflow.{Fact, Invokable, Runnable}
@@ -118,7 +119,7 @@ defmodule Jido.Exec.Runtime do
   def handoff(target, params) do
     with {:ok, instruction} <- Instruction.resolve(target, params),
          :ok <- unbound_handoff(instruction),
-         {:ok, _workflow} <- Jido.Exec.compile(instruction),
+         :ok <- validate_handoff_target(instruction),
          {:ok, params} <- Validation.input(instruction.target, instruction.params),
          :ok <- validate_local(params, :handoff_input) do
       {:ok, %{instruction | params: params}}
@@ -202,6 +203,16 @@ defmodule Jido.Exec.Runtime do
      Error.config_error("handoff target must not bind runtime context or metadata", %{
        reason: :bound_handoff_runtime
      })}
+  end
+
+  defp validate_handoff_target(%Instruction{kind: :action} = instruction),
+    do: Instruction.validate_resolved(instruction)
+
+  defp validate_handoff_target(%Instruction{kind: :flow} = instruction) do
+    with :ok <- Instruction.validate_resolved(instruction),
+         {:ok, flow} <- Preparation.from_instruction(instruction),
+         {:ok, _attrs, _analysis, _children} <- Preparation.prepare(flow, [], %{}),
+         do: :ok
   end
 
   @doc false

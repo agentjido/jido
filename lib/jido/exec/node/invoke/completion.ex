@@ -3,7 +3,6 @@ defmodule Jido.Exec.Node.Invoke.Completion do
 
   use Runic.Workflow.SingleOutput, batch_parent: false
 
-  alias Jido.Exec.Node.Invoke
   alias Runic.Identity
   alias Runic.Workflow.SingleOutput.{Context, Result}
 
@@ -17,13 +16,13 @@ defmodule Jido.Exec.Node.Invoke.Completion do
         }
 
   @doc false
-  @spec new(Invoke.t()) :: t()
-  def new(%Invoke{} = invoke) do
-    id = {invoke.id, :completion}
+  @spec new(map()) :: t()
+  def new(%{id: invoke_id, name: invoke_name}) do
+    id = {invoke_id, :completion}
 
     %__MODULE__{
       id: id,
-      name: "__jido_invoke__/#{invoke.name}/completed",
+      name: "__jido_invoke__/#{invoke_name}/completed",
       hash:
         Identity.digest(:component_definition, %{
           kind: "jido_invoke_completion",

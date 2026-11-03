@@ -237,13 +237,13 @@ defmodule Jido.Exec.Node.InvokeTest do
     child_request =
       %Runic.Workflow.ChildInvocation{target: :target, input: frame, output: :out}
 
-    assert Jido.Exec.Node.Invoke.finished?(child_request, "next") == false
+    assert Jido.Exec.Node.Invoke.Finish.complete?(child_request, "next") == false
 
-    assert Jido.Exec.Node.Invoke.finished?(frame, nil) == false
-    assert Jido.Exec.Node.Invoke.finished?(frame, "next") == false
+    assert Jido.Exec.Node.Invoke.Finish.complete?(frame, nil) == false
+    assert Jido.Exec.Node.Invoke.Finish.complete?(frame, "next") == false
 
     nil_result = Frame.put_result(frame, "next", nil, [])
-    assert Jido.Exec.Node.Invoke.finished?(nil_result, "next") == false
+    assert Jido.Exec.Node.Invoke.Finish.complete?(nil_result, "next") == false
 
     assert Jido.Exec.Node.Invoke.target?(frame, "target") == false
 
@@ -314,8 +314,8 @@ defmodule Jido.Exec.Node.InvokeTest do
     assert first_target_id != second_target_id
     assert first_flow_id != second_flow_id
 
-    assert Jido.Exec.Node.Invoke.target_component_key(first_node, first_target_id) !=
-             Jido.Exec.Node.Invoke.target_component_key(second_node, second_target_id)
+    assert Jido.Exec.Node.Invoke.Finish.target_component_key(first_node, first_target_id) !=
+             Jido.Exec.Node.Invoke.Finish.target_component_key(second_node, second_target_id)
   end
 
   @tag obligation: ["jido_action.boundary.I5", "jido_action.boundary.I8"]
@@ -814,7 +814,8 @@ defmodule Jido.Exec.Node.InvokeTest do
         name: "next_#{id}",
         component: "next",
         decision: Instruction.new!(target: Decide),
-        expander: Instruction.new!(target: Expand)
+        expander: Instruction.new!(target: Expand),
+        nested_compiler: Jido.Exec.Compiler
       ] ++ opts
     )
   end

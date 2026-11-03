@@ -2,6 +2,7 @@
 modules:
   - Jido.Exec
   - Jido.Exec.Compiler
+  - Jido.Exec.NestedCompiler
   - Jido.Exec.Fact
   - Jido.Exec.Fact.LocalValue
   - Jido.Exec.Frame
@@ -14,6 +15,7 @@ modules:
   - Jido.Exec.Node.Input
   - Jido.Exec.Node.Loop
   - Jido.Exec.Node.Loop.Start
+  - Jido.Exec.Node.Loop.StateMachine
   - Jido.Exec.Node.Map
   - Jido.Exec.Node.Map.Collection
   - Jido.Exec.Node.Output

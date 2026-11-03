@@ -12,8 +12,18 @@ defmodule Jido.Exec.Node.Invoke do
   alias Runic.Workflow
   alias Runic.Workflow.{Call, ChildInvocation}
 
-  @enforce_keys [:id, :name, :hash, :component, :decision, :expander]
-  defstruct [:id, :name, :hash, :component, :decision, :expander, :location, :node_path]
+  @enforce_keys [:id, :name, :hash, :component, :decision, :expander, :nested_compiler]
+  defstruct [
+    :id,
+    :name,
+    :hash,
+    :component,
+    :decision,
+    :expander,
+    :nested_compiler,
+    :location,
+    :node_path
+  ]
 
   @type t :: %__MODULE__{}
 
@@ -27,6 +37,7 @@ defmodule Jido.Exec.Node.Invoke do
         :component,
         :decision,
         :expander,
+        :nested_compiler,
         :location,
         :node_path
       ])
@@ -45,6 +56,10 @@ defmodule Jido.Exec.Node.Invoke do
       component: Keyword.fetch!(opts, :component),
       decision: Keyword.fetch!(opts, :decision),
       expander: Keyword.fetch!(opts, :expander),
+      nested_compiler:
+        opts
+        |> Keyword.fetch!(:nested_compiler)
+        |> Jido.Exec.NestedCompiler.validate!(),
       location: Keyword.get(opts, :location),
       node_path: Keyword.get(opts, :node_path, [Keyword.fetch!(opts, :component)])
     }
@@ -55,7 +70,7 @@ defmodule Jido.Exec.Node.Invoke do
   def connect(%__MODULE__{} = node, parents, %Workflow{} = workflow) do
     decision = action(node, :decision, node.decision, node.decision.params)
     expander = action(node, :expander, node.expander, nil)
-    condition = finished_condition(node)
+    condition = Finish.condition(node.id, node.name, node.component)
     completion = Completion.new(node)
 
     workflow
@@ -68,50 +83,6 @@ defmodule Jido.Exec.Node.Invoke do
     |> Workflow.register_component(completion)
     |> Workflow.draw_connection(node, node, :component_of, properties: %{kind: :invoke})
     |> Workflow.register_component(node)
-  end
-
-  @doc false
-  @spec finished_condition(t()) :: Runic.Workflow.Condition.t()
-  def finished_condition(%__MODULE__{} = node),
-    do: finished_condition(node.id, node.name, node.component)
-
-  @doc false
-  @spec finished_condition(term(), term(), String.t()) :: Runic.Workflow.Condition.t()
-  def finished_condition(id, name, component) do
-    source =
-      quote do
-        Jido.Exec.Node.Invoke.finished_condition(
-          unquote(Macro.escape(id)),
-          unquote(name),
-          unquote(component)
-        )
-      end
-
-    %Runic.Workflow.Condition{
-      name: internal_name(%{name: name}, "finished"),
-      hash:
-        Identity.digest(:component_definition, %{
-          kind: "jido_invoke_finished",
-          version: 1,
-          id: inspect(id)
-        }),
-      work: fn value -> finished?(value, component) end,
-      arity: 1,
-      closure: Runic.Closure.new(source, %{}, nil),
-      meta_refs: []
-    }
-  end
-
-  @doc false
-  @spec finished?(term(), String.t()) :: boolean()
-  def finished?(%ChildInvocation{}, _component), do: false
-
-  def finished?(value, component) do
-    case Frame.fetch_result(value, component) do
-      {:ok, nil} -> false
-      {:ok, _output} -> true
-      :error -> false
-    end
   end
 
   @doc false
@@ -151,11 +122,6 @@ defmodule Jido.Exec.Node.Invoke do
 
   def finish({:jido_invoke_continue, _frame, _component, _input, _target, _effects} = value),
     do: {:continue, value}
-
-  @doc false
-  @spec target_component_key(t(), term()) :: String.t()
-  def target_component_key(%__MODULE__{} = node, target_id),
-    do: "__jido_invoke_target__/#{node.component}/#{target_id}"
 
   @doc false
   @spec target?(term(), term()) :: boolean()
@@ -225,12 +191,12 @@ defmodule Jido.Exec.Node.Invoke do
   end
 
   defp flow_target(node, instruction, runtime, target_id) do
-    target_key = target_component_key(node, target_id)
+    target_key = Finish.target_component_key(node, target_id)
     base_name = internal_name(node, "target/#{target_id}")
     route = target_condition(node.id, node.name, target_id)
 
     compiled_target =
-      Jido.Exec.Compiler.compile_nested!(instruction,
+      node.nested_compiler.compile_nested!(instruction,
         namespace: base_name,
         boundary_name: base_name,
         parent_component: target_key,
@@ -392,6 +358,7 @@ defimpl Runic.Component, for: Jido.Exec.Node.Invoke do
         component: unquote(node.component),
         decision: unquote(Macro.escape(node.decision)),
         expander: unquote(Macro.escape(node.expander)),
+        nested_compiler: unquote(node.nested_compiler),
         location: unquote(Macro.escape(node.location)),
         node_path: unquote(Macro.escape(node.node_path))
       )
