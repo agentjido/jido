@@ -2,7 +2,6 @@
 modules:
   - Jido.Persistence
   - Jido.Persistence.Checkpoint
-  - Jido.Persistence.Identity
   - Jido.Persistence.Plugin
   - Jido.Persistence.Plugin.Context
   - Jido.Persistence.Record

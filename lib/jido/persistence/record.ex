@@ -7,10 +7,24 @@ defmodule Jido.Persistence.Record do
   alias Jido.Codec.Term
 
   @format_version 1
+  @key_prefix "jido:agent:v1:"
   @common_keys [:fmt, :kind, :namespace, :agent_module, :agent_id, :partition, :rev]
   @active_keys @common_keys ++ [:vsn, :checkpoint]
 
   def format_version, do: @format_version
+
+  @doc false
+  @spec agent_key(Ref.t()) :: binary()
+  def agent_key(%Ref{} = ref) do
+    ref = Ref.new!(ref)
+
+    encoded =
+      {ref.namespace, ref.partition, ref.id}
+      |> :erlang.term_to_binary()
+      |> Base.url_encode64(padding: false)
+
+    @key_prefix <> encoded
+  end
 
   @doc false
   @spec build_active(Agent.t(), Ref.t(), non_neg_integer(), map()) ::

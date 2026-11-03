@@ -1,4 +1,4 @@
-defmodule Jido.Persistence.IdentityTest do
+defmodule Jido.Persistence.RecordIdentityTest do
   use ExUnit.Case, async: false
 
   alias Jido.Agent.Ref
