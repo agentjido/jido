@@ -162,9 +162,6 @@ defmodule Jido.AI.Contract.ToolBoundariesTest do
     assert {:error, {:invalid_tool, :invalid}} = Toolset.validate([:invalid])
     assert Toolset.execution_boundary(%{}) == {:error, :tool_must_run_in_agent_graph}
 
-    input = %Jido.Plugin.Input{prepared: [Tools.Add], runtime: nil}
-    assert Toolset.from_context(%{plugin_inputs: %{Jido.AI.Agent.Plugin => input}}) == [Tools.Add]
-    assert Toolset.from_context(%{}) == []
     assert Toolset.names([Tools.Add, Tools.Multiply]) == ["add", "multiply"]
 
     assert {:ok, [%ReqLLM.Tool{name: "add"}, %ReqLLM.Tool{name: "multiply"}]} =

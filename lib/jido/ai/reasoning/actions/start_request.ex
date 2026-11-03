@@ -2,6 +2,7 @@ defmodule Jido.AI.Reasoning.Actions.StartRequest do
   alias Jido.Joi
   @moduledoc "Initializes one request and appends its user message to the Session."
 
+  alias Jido.AI.Agent.Plugin
   alias Jido.AI.{Thread.Projection, Toolset, ToolSource, Usage}
 
   use Jido.Action,
@@ -15,7 +16,7 @@ defmodule Jido.AI.Reasoning.Actions.StartRequest do
   @impl Jido.Action
   def run(params, context) do
     now = System.system_time(:millisecond)
-    static_tools = Toolset.from_context(context)
+    static_tools = Plugin.prepared_tools(context)
     agent_state = Map.get(context, :agent_state, %{session: nil})
     request_id = request_id(context)
     run_id = "run_#{Jido.Id.uuid7()}"

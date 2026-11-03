@@ -69,6 +69,9 @@ defmodule Jido.AI.Agent do
     quote do
       use Jido.Agent, unquote(Macro.escape(options))
 
+      import unquote(Plugin),
+        only: [ai: 1, reasoning: 1, reasoning: 2, tools: 1]
+
       state do
         schema Jido.Joi.object(%{session: Jido.AI.Thread.Projection.schema()})
       end

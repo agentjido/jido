@@ -1,7 +1,6 @@
 ---
 modules:
   - Jido.AI.Agent
-  - Jido.AI.Agent.DSL
   - Jido.AI.Agent.Plugin
   - Jido.AI.Agent.Plugin.Reasoning
   - Jido.AI.Agent.Plugin.Tool
@@ -26,7 +25,7 @@ helpers. It does not own model execution, tool execution, or AgentServer work.
 
 ### jido_ai.agent_authoring.I2 — Invalid authoring input is rejected
 
-- **scope:** `Jido.AI.Agent.DSL`, `Jido.AI.Agent.Plugin`
+- **scope:** `Jido.AI.Agent.Plugin`
 - **must:** Reject missing or repeated reasoning declarations, repeated tools blocks, tools that are not Actions or Flows, unknown reasoning fields, and configuration that fails the selected Flow schema.
 - **kind:** functional
 - **status:** active

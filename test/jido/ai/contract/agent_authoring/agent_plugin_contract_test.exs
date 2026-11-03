@@ -17,6 +17,10 @@ defmodule Jido.AI.Contract.AgentPluginTest do
 
     assert {:ok, [Add]} = Plugin.prepare(%{}, reasoning: ReAct, defaults: %{}, tools: [Add])
 
+    input = %Jido.Plugin.Input{prepared: [Add], runtime: nil}
+    assert Plugin.prepared_tools(%{plugin_inputs: %{Plugin => input}}) == [Add]
+    assert Plugin.prepared_tools(%{}) == []
+
     assert {:ok, normalized} =
              Plugin.normalize(%{reasoning: ReAct, defaults: %{model: "contract:model"}, tools: [Add]})
 

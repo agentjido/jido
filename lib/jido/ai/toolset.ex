@@ -11,15 +11,6 @@ defmodule Jido.AI.Toolset do
 
   @type runtime_tool :: module() | ToolSource.tool()
 
-  @doc "Returns the static tools from the protected Agent plugin input."
-  @spec from_context(map()) :: [module()]
-  def from_context(context) when is_map(context) do
-    case get_in(context, [:plugin_inputs, Jido.AI.Agent.Plugin]) do
-      %Jido.Plugin.Input{prepared: actions} when is_list(actions) -> actions
-      _other -> []
-    end
-  end
-
   @doc "Validates an ordered Agent Toolset."
   @spec validate(term()) :: :ok | {:error, term()}
   def validate(tools) when is_list(tools) do
