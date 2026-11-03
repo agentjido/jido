@@ -168,7 +168,7 @@ defmodule JidoActionTest.Flow.ExprTest do
         output: Ref.result("first")
       )
 
-    assert Jido.Flow.Definition.reference_dependencies(flow.components["first"]) == ["later"]
+    assert Jido.Flow.Graph.reference_dependencies(flow.components["first"]) == ["later"]
     assert Jido.Exec.run(flow) == {:ok, %{selected: true}}
 
     assert {:error, error} =

@@ -1,7 +1,6 @@
 defmodule Jido.Flow.DSL.Lowerer do
   @moduledoc false
 
-  alias Jido.Flow
   alias Jido.Flow.{Component, Definition}
   alias Jido.Expr
   alias Jido.Error
@@ -26,9 +25,9 @@ defmodule Jido.Flow.DSL.Lowerer do
     Step
   }
 
-  @doc "Lowers Spark entities into a canonical Flow and its source locations."
+  @doc "Lowers Spark entities into canonical Flow attributes and source locations."
   @spec lower(module(), map(), String.t()) ::
-          {:ok, Flow.t(), Flow.source_map()} | {:error, Exception.t()}
+          {:ok, map(), map()} | {:error, Exception.t()}
   def lower(module, config, file) do
     entities = Spark.Dsl.Extension.get_entities(module, [:flow])
 
@@ -41,7 +40,7 @@ defmodule Jido.Flow.DSL.Lowerer do
 
       case Definition.diagnose_body(definition_config, components, output) do
         {:ok, attrs} ->
-          {:ok, struct!(Flow, attrs), sources}
+          {:ok, attrs, sources}
 
         {:error, [issue | _rest]} ->
           {:error, SourceMap.attach_issue(issue, sources, components)}

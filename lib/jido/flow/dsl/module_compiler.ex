@@ -1,19 +1,20 @@
 defmodule Jido.Flow.DSL.ModuleCompiler do
   @moduledoc false
 
-  alias Jido.Flow.DSL.{Lowerer, MacroSupport}
-  alias Jido.Flow.Definition
+  alias Jido.Flow.DSL.Lowerer
+  alias Jido.Flow.Preparation
+
+  @flow_module Module.concat(["Jido", "Flow"])
 
   @doc false
   defmacro __using__(opts_ast) do
-    module_compiler = __MODULE__
     {flow_opts_ast, extensions} = split_options!(opts_ast, __CALLER__)
 
     quote location: :keep do
       use Jido.Flow.DSL, extensions: unquote(Macro.escape(extensions))
       @before_compile Jido.Flow.DSL.ModuleCompiler
       Jido.Action.Inline.setup!(__ENV__)
-      unquote(module_compiler).reserve_function!(__ENV__, {:step_action, 1})
+      Jido.Action.Inline.Owner.reserve_function!(__ENV__, {:step_action, 1}, "Flow")
 
       use Jido.Codec.Compiler,
         kind: :flow,
@@ -126,37 +127,6 @@ defmodule Jido.Flow.DSL.ModuleCompiler do
   end
 
   @doc false
-  @spec register_step!(term(), Macro.Env.t()) :: String.t()
-  def register_step!(value, env) do
-    name = declaration_name!(value, env)
-
-    names = Module.get_attribute(env.module, :__jido_flow_step_names__) || MapSet.new()
-
-    if MapSet.member?(names, name) do
-      MacroSupport.compile_error!(env, "duplicate Step name: #{inspect(name)}")
-    end
-
-    Module.put_attribute(env.module, :__jido_flow_step_names__, MapSet.put(names, name))
-    name
-  end
-
-  @doc false
-  # Declarations normalize names as data definitions do.
-  @spec declaration_name!(term(), Macro.Env.t()) :: String.t()
-  def declaration_name!(value, env) do
-    case Definition.name(value) do
-      {:ok, name} -> name
-      {:error, error} -> MacroSupport.compile_error!(env, Exception.message(error))
-    end
-  end
-
-  @doc false
-  @spec reserve_function!(Macro.Env.t(), {atom(), non_neg_integer()}) :: :ok
-  def reserve_function!(env, function) do
-    Jido.Action.Inline.Owner.reserve_function!(env, function, "Flow")
-  end
-
-  @doc false
   defmacro __before_compile__(env), do: before_compile(env)
 
   @doc false
@@ -201,10 +171,10 @@ defmodule Jido.Flow.DSL.ModuleCompiler do
 
   defp compile_flow!(env, config) do
     case Lowerer.lower(env.module, config, env.file) do
-      {:ok, flow, source_map} ->
-        case Jido.Flow.Validation.validate_targets(flow) do
-          {:ok, flow} ->
-            {flow, source_map}
+      {:ok, attrs, source_map} ->
+        case Preparation.prepare(attrs, [], %{}) do
+          {:ok, attrs, _analysis, _children} ->
+            {struct!(@flow_module, attrs), source_map}
 
           {:error, error} ->
             raise_compile_error!(env, error, source_map)

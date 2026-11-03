@@ -39,6 +39,7 @@ defmodule Jido.Flow.Component do
 
   @type call :: %{kind: Jido.Instruction.kind(), target: module(), params: Value.t()}
   @type target :: %{kind: Jido.Instruction.kind(), target: module()}
+  @type component_node :: map()
   @type mode :: :authoring | :lowered | :canonical
 
   @doc false
@@ -85,6 +86,51 @@ defmodule Jido.Flow.Component do
   @doc false
   @spec state_fields() :: keyword()
   def state_fields, do: @state
+
+  @doc false
+  @spec calls(component_node()) :: [{atom() | String.t(), target(), Value.t() | nil}]
+  def calls(%{kind: :wait}), do: []
+
+  def calls(%{kind: :call, call: call}), do: [{:call, call, call.params}]
+
+  def calls(%{kind: :choice, options: options, fallback: fallback}) do
+    Enum.map(options, &{&1.name, &1.call, &1.call.params}) ++
+      [{:fallback, fallback, fallback.params}]
+  end
+
+  def calls(%{kind: kind, call: call}) when kind in [:map, :reduce, :iterate],
+    do: [{kind, call, call.params}]
+
+  def calls(%{kind: :parallel, actions: actions}),
+    do: Enum.map(actions, &{&1.name, &1.call, &1.call.params})
+
+  def calls(%{kind: :invoke, decision: decision, expander: expander}),
+    do: [{:decision, decision, decision.params}, {:expander, expander, nil}]
+
+  def calls(%{kind: :handoff, selector: selector}),
+    do: [{:selector, selector, selector.params}]
+
+  @doc false
+  @spec values(component_node()) :: [Value.t()]
+  def values(%{kind: :wait, options: options}), do: Enum.map(options, & &1.match)
+
+  def values(%{kind: :call, call: call}), do: [call.params]
+
+  def values(%{kind: :choice, options: options, fallback: fallback}),
+    do: Enum.flat_map(options, &[&1.condition, &1.call.params]) ++ [fallback.params]
+
+  def values(%{kind: :map, collection: collection, call: call}), do: [collection, call.params]
+
+  def values(%{kind: :parallel, actions: actions}), do: Enum.map(actions, & &1.call.params)
+
+  def values(%{kind: :reduce, collection: collection, initial: initial, call: call}),
+    do: [collection, initial, call.params]
+
+  def values(%{kind: :iterate, call: call, state: state, completion: completion}),
+    do: [call.params, state.initial, state.update, completion]
+
+  def values(%{kind: :invoke, decision: decision}), do: [decision.params]
+  def values(%{kind: :handoff, selector: selector}), do: [selector.params]
 
   @doc false
   @spec diagnose(term(), mode()) :: {:ok, {String.t(), map()}} | {:error, [Exception.t()]}

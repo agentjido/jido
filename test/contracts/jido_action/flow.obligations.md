@@ -3,6 +3,7 @@ modules:
   - Jido.Flow
   - Jido.Flow.Component
   - Jido.Flow.DSL
+  - Jido.Flow.DSL.Authoring
   - Jido.Flow.DSL.Choice
   - Jido.Flow.DSL.ChoiceMacros
   - Jido.Flow.DSL.ChoiceOption
@@ -15,7 +16,6 @@ modules:
   - Jido.Flow.DSL.IterateMacros
   - Jido.Flow.DSL.IterateState
   - Jido.Flow.DSL.Lowerer
-  - Jido.Flow.DSL.MacroSupport
   - Jido.Flow.DSL.Macros
   - Jido.Flow.DSL.MapNode
   - Jido.Flow.DSL.ModuleCompiler

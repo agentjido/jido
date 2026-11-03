@@ -8,7 +8,8 @@ defmodule Jido.Exec.Compiler do
   alias Jido.Exec.Node.Map, as: MapComponent
 
   alias Jido.Flow
-  alias Jido.Flow.{Identity, Validation}
+  alias Jido.Flow.Identity
+  alias Jido.Flow.Preparation
   alias Jido.Instruction
   alias Runic.Workflow
 
@@ -38,8 +39,8 @@ defmodule Jido.Exec.Compiler do
   @doc false
   @spec compile_nested!(Instruction.t(), keyword()) :: Workflow.t() | no_return()
   def compile_nested!(%Instruction{kind: :flow} = instruction, opts) do
-    with {:ok, flow} <- Validation.instruction_flow(instruction),
-         {:ok, flow, analysis, children} <- Validation.prepare(flow, [], %{}),
+    with {:ok, flow} <- Preparation.from_instruction(instruction),
+         {:ok, flow, analysis, children} <- prepare_flow(flow),
          {:ok, workflow} <-
            compile_flow(
              flow,
@@ -62,7 +63,7 @@ defmodule Jido.Exec.Compiler do
   @doc false
   @spec validate(Flow.t()) :: {:ok, Flow.t()} | {:error, Exception.t()}
   def validate(%Flow{} = flow) do
-    with {:ok, flow, _analysis, _children} <- Validation.prepare(flow, [], %{}),
+    with {:ok, flow, _analysis, _children} <- prepare_flow(flow),
          do: {:ok, flow}
   end
 
@@ -85,8 +86,8 @@ defmodule Jido.Exec.Compiler do
   end
 
   defp compile_instruction(%Instruction{kind: :flow} = instruction, opts) do
-    with {:ok, flow} <- Validation.instruction_flow(instruction),
-         {:ok, flow, analysis, children} <- Validation.prepare(flow, [], %{}) do
+    with {:ok, flow} <- Preparation.from_instruction(instruction),
+         {:ok, flow, analysis, children} <- prepare_flow(flow) do
       compile_flow(
         flow,
         opts
@@ -106,6 +107,12 @@ defmodule Jido.Exec.Compiler do
 
   defp normalize(target) do
     {:error, Error.config_error("unknown executable target", %{target: target, reason: :invalid_target})}
+  end
+
+  defp prepare_flow(flow) do
+    with {:ok, attrs, analysis, children} <- Preparation.prepare(flow, [], %{}) do
+      {:ok, struct!(Flow, attrs), analysis, children}
+    end
   end
 
   defp validate_options(opts) when is_list(opts) do

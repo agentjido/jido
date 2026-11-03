@@ -27,6 +27,7 @@ defmodule Jido.Flow.BoundaryValidationTest do
 
   alias Jido.Flow
   alias Jido.Flow.Definition
+  alias Jido.Flow.Graph
   alias Jido.Error.ValidationError
   alias Jido.Flow.Ref
   alias Jido.Flow.Value
@@ -66,7 +67,7 @@ defmodule Jido.Flow.BoundaryValidationTest do
     for attrs <- components() do
       assert {:ok, {name, node}} = Definition.component(attrs)
       assert name == attrs.name
-      assert Definition.needs(node) == []
+      assert Graph.needs(node) == []
       assert is_map(node.meta)
     end
 

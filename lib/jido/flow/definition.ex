@@ -134,65 +134,6 @@ defmodule Jido.Flow.Definition do
     do: {:error, Error.validation_error("expected a Jido.Flow artifact", %{value: value})}
 
   @doc false
-  @spec needs(component_node()) :: [String.t()]
-  def needs(%{needs: needs}), do: needs
-
-  @doc false
-  @spec calls(component_node()) :: [{atom(), Component.target(), Value.t()}]
-  def calls(%{kind: :wait}), do: []
-
-  def calls(%{kind: :call, call: call}), do: [{:call, call, call.params}]
-
-  def calls(%{kind: :choice, options: options, fallback: fallback}) do
-    Enum.map(options, &{&1.name, &1.call, &1.call.params}) ++
-      [{:fallback, fallback, fallback.params}]
-  end
-
-  def calls(%{kind: kind, call: call}) when kind in [:map, :reduce, :iterate],
-    do: [{kind, call, call.params}]
-
-  def calls(%{kind: :parallel, actions: actions}),
-    do: Enum.map(actions, &{&1.name, &1.call, &1.call.params})
-
-  def calls(%{kind: :invoke, decision: decision, expander: expander}),
-    do: [{:decision, decision, decision.params}, {:expander, expander, nil}]
-
-  def calls(%{kind: :handoff, selector: selector}),
-    do: [{:selector, selector, selector.params}]
-
-  @doc false
-  @spec values(component_node()) :: [Value.t()]
-  def values(%{kind: :wait, options: options}), do: Enum.map(options, & &1.match)
-
-  def values(%{kind: :call, call: call}), do: [call.params]
-
-  def values(%{kind: :choice, options: options, fallback: fallback}),
-    do: Enum.flat_map(options, &[&1.condition, &1.call.params]) ++ [fallback.params]
-
-  def values(%{kind: :map, collection: collection, call: call}), do: [collection, call.params]
-
-  def values(%{kind: :parallel, actions: actions}), do: Enum.map(actions, & &1.call.params)
-
-  def values(%{kind: :reduce, collection: collection, initial: initial, call: call}),
-    do: [collection, initial, call.params]
-
-  def values(%{kind: :iterate, call: call, state: state, completion: completion}),
-    do: [call.params, state.initial, state.update, completion]
-
-  def values(%{kind: :invoke, decision: decision}), do: [decision.params]
-  def values(%{kind: :handoff, selector: selector}), do: [selector.params]
-
-  @doc false
-  @spec reference_dependencies(component_node()) :: [String.t()]
-  def reference_dependencies(node),
-    do: node |> values() |> Enum.flat_map(&Value.result_refs/1) |> Enum.uniq() |> Enum.sort()
-
-  @doc false
-  @spec effective_dependencies(component_node()) :: [String.t()]
-  def effective_dependencies(node),
-    do: (needs(node) ++ reference_dependencies(node)) |> Enum.uniq() |> Enum.sort()
-
-  @doc false
   @spec to_definition(components()) :: [map()]
   def to_definition(components),
     do: components |> Graph.canonical_components() |> Enum.map(&component_to_definition/1)

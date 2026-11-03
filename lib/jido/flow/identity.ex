@@ -1,21 +1,19 @@
 defmodule Jido.Flow.Identity do
   @moduledoc false
 
-  alias Jido.Flow
-  alias Jido.Flow.Definition
   alias Jido.Flow.Graph
 
   @identity_version 1
 
   @doc false
-  @spec semantic_digest(Flow.t()) :: String.t()
-  def semantic_digest(%Flow{} = flow) do
-    semantic_digest(flow, Graph.canonical_components(flow.components))
+  @spec semantic_digest(map()) :: String.t()
+  def semantic_digest(%{components: components} = flow) do
+    semantic_digest(flow, Graph.canonical_components(components))
   end
 
   @doc false
-  @spec semantic_digest(Flow.t(), [Definition.named_component()]) :: String.t()
-  def semantic_digest(%Flow{} = flow, ordered_components) do
+  @spec semantic_digest(map(), [Graph.named_component()]) :: String.t()
+  def semantic_digest(flow, ordered_components) when is_map(flow) do
     flow
     |> identity_data(ordered_components)
     |> identity_hash()
@@ -23,10 +21,10 @@ defmodule Jido.Flow.Identity do
   end
 
   @doc false
-  @spec for_flow(Flow.t()) :: map()
-  def for_flow(%Flow{} = flow) do
+  @spec for_flow(map()) :: map()
+  def for_flow(%{components: components} = flow) do
     flow
-    |> identity_data(Graph.canonical_components(flow.components))
+    |> identity_data(Graph.canonical_components(components))
     |> identity()
   end
 
@@ -45,7 +43,7 @@ defmodule Jido.Flow.Identity do
   # dependencies, so their order does not change semantic identity.
   defp component_identity(named_component) do
     named_component
-    |> Definition.component_to_definition()
+    |> then(fn {name, node} -> Map.put(node, :name, name) end)
     |> Map.delete(:meta)
     |> sort_needs()
   end

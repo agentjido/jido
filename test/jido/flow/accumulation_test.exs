@@ -157,7 +157,7 @@ defmodule Jido.Flow.AccumulationTest do
            action: UnloadedAction,
            needs: needs
          }) do
-      {:ok, {_name, node}} -> {:ok, Definition.needs(node)}
+      {:ok, {_name, node}} -> {:ok, Jido.Flow.Graph.needs(node)}
       {:error, error} -> {:error, error}
     end
   end

@@ -5,7 +5,7 @@ defmodule JidoActionTest.GeneratedFlowCodec do
   alias Jido.Codec
   alias Jido.Expr
   alias Jido.Flow
-  alias Jido.Flow.Definition
+  alias Jido.Flow.Component
   alias Jido.Flow.Ref
 
   @kinds [:action, :flow, :schema, :atom]
@@ -74,11 +74,11 @@ defmodule JidoActionTest.GeneratedFlowCodec do
   defp collect_components(values, components) do
     Enum.reduce(components, values, fn {_name, node}, acc ->
       acc =
-        Enum.reduce(Definition.calls(node), acc, fn {_role, instruction, _params}, inner ->
+        Enum.reduce(Component.calls(node), acc, fn {_role, instruction, _params}, inner ->
           add(inner, instruction.kind, instruction.target)
         end)
 
-      acc = Enum.reduce(Definition.values(node), acc, &collect_expression(&2, &1))
+      acc = Enum.reduce(Component.values(node), acc, &collect_expression(&2, &1))
       acc = collect_expression(acc, node.meta)
 
       case node do

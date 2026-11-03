@@ -352,9 +352,9 @@ defmodule Jido.Flow.CanonicalAuthoringTest do
     assert [
              {:decision, %{kind: :action, target: ^add, params: ^invoke_params}, ^invoke_params},
              {:expander, %{kind: :action, target: ^add}, nil}
-           ] = Jido.Flow.Definition.calls(invoke)
+           ] = Jido.Flow.Component.calls(invoke)
 
-    assert Jido.Flow.Definition.values(invoke) == [invoke_params]
+    assert Jido.Flow.Component.values(invoke) == [invoke_params]
 
     handoff_params = %{value: Ref.input(:value)}
 
@@ -368,9 +368,9 @@ defmodule Jido.Flow.CanonicalAuthoringTest do
 
     assert [
              {:selector, %{kind: :action, target: ^add, params: ^handoff_params}, ^handoff_params}
-           ] = Jido.Flow.Definition.calls(handoff)
+           ] = Jido.Flow.Component.calls(handoff)
 
-    assert Jido.Flow.Definition.values(handoff) == [handoff_params]
+    assert Jido.Flow.Component.values(handoff) == [handoff_params]
   end
 
   test "runtime DSL lowering preserves Invoke and Handoff declarations" do

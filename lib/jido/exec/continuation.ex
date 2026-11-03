@@ -7,7 +7,7 @@ defmodule Jido.Exec.Continuation do
   data. It has no process, timer, storage adapter, or AgentServer state.
   """
 
-  alias Jido.Flow.Definition
+  alias Jido.Flow.Component
 
   @typedoc "A stable Turn identity."
   @type id :: String.t()
@@ -253,7 +253,7 @@ defmodule Jido.Exec.Continuation do
 
   defp versions({:flow, %Jido.Flow{} = flow}, acc) do
     for {_name, node} <- flow.components,
-        {_role, instruction, _params} <- Definition.calls(node),
+        {_role, instruction, _params} <- Component.calls(node),
         reduce: acc do
       acc -> versions({instruction.kind, instruction.target}, acc)
     end

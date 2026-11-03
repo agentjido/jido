@@ -1,12 +1,10 @@
 defmodule Jido.Flow.DSL.SourceMap do
   @moduledoc false
 
-  alias Jido.Flow.DSL.{Choice, Iterate, Output, Parallel}
-
   @doc false
   @spec put_entity(Jido.Flow.source_map(), struct(), non_neg_integer() | :output, String.t()) ::
           Jido.Flow.source_map()
-  def put_entity(source_map, %Output{} = output, :output, file),
+  def put_entity(source_map, output, :output, file),
     do: put_source(source_map, [:output], output, file)
 
   def put_entity(source_map, entity, index, file) do
@@ -85,9 +83,15 @@ defmodule Jido.Flow.DSL.SourceMap do
 
   defp attach_location(error, _location), do: error
 
-  defp put_nested_sources(source_map, path, %Choice{} = choice, file) do
+  defp put_nested_sources(
+         source_map,
+         path,
+         %{options: options, fallback: fallback},
+         file
+       )
+       when is_list(options) do
     sources =
-      choice.options
+      options
       |> Enum.with_index()
       |> Enum.reduce(source_map, fn {option, index}, sources ->
         Enum.reduce([index, option.name], sources, fn key, sources ->
@@ -95,17 +99,17 @@ defmodule Jido.Flow.DSL.SourceMap do
         end)
       end)
 
-    put_source(sources, path ++ [:fallback], choice.fallback, file)
+    put_source(sources, path ++ [:fallback], fallback, file)
   end
 
-  defp put_nested_sources(source_map, path, %Iterate{} = iterate, file) do
+  defp put_nested_sources(source_map, path, %{state: state} = iterate, file) do
     source_map
-    |> put_source(path ++ [:state], iterate.state, file)
+    |> put_source(path ++ [:state], state, file)
     |> put_source(path ++ [:state, :update], iterate, file)
   end
 
-  defp put_nested_sources(source_map, path, %Parallel{} = parallel, file) do
-    parallel.actions
+  defp put_nested_sources(source_map, path, %{actions: actions}, file) when is_list(actions) do
+    actions
     |> Enum.with_index()
     |> Enum.reduce(source_map, fn {action, index}, sources ->
       Enum.reduce([index, action.name], sources, fn key, sources ->

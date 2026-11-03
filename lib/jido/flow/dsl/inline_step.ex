@@ -3,7 +3,7 @@ defmodule Jido.Flow.DSL.InlineStep do
 
   alias Jido.Action.Inline
   alias Jido.Codec.Config
-  alias Jido.Flow.DSL.{ValueParser, MacroSupport}
+  alias Jido.Flow.DSL.ValueParser
 
   @action_fields [:name, :description, :schema, :output_schema, :context]
   @component_fields [:needs, :meta]
@@ -28,7 +28,7 @@ defmodule Jido.Flow.DSL.InlineStep do
 
     case Keyword.get(options, :do) do
       [{:->, metadata, _} | _] ->
-        MacroSupport.compile_error!(
+        Config.compile_error!(
           %{caller | line: Keyword.get(metadata, :line, caller.line)},
           "use case inside the #{label} body; top-level clause bodies are not supported"
         )
@@ -96,15 +96,19 @@ defmodule Jido.Flow.DSL.InlineStep do
   @doc false
   @spec declaration_imports(Macro.Env.t()) :: Inline.remove_imports()
   def declaration_imports(caller) do
+    dsl = Module.concat(["Jido", "Flow", "DSL"])
+    extension = Module.concat(["Jido", "Flow", "DSL", "Extension"])
+
     modules =
       [
-        Jido.Flow.DSL,
-        Spark.Dsl,
-        Jido.Flow.DSL.Extension,
-        Jido.Flow.DSL.Macros,
-        Jido.Flow.DSL.ParallelMacros,
-        Jido.Flow.DSL.ChoiceMacros,
-        Jido.Flow.DSL.IterateMacros
+        dsl,
+        Module.concat(["Spark", "Dsl"]),
+        extension,
+        Module.concat(["Jido", "Flow", "DSL", "Macros"]),
+        Module.concat(["Jido", "Flow", "DSL", "ParallelMacros"]),
+        Module.concat(["Jido", "Flow", "DSL", "ChoiceMacros"]),
+        Module.concat(["Jido", "Flow", "DSL", "IterateMacros"]),
+        Module.concat(["Jido", "Flow", "DSL", "SelectionMacros"])
       ] ++
         for segments <- [
               [],
@@ -123,7 +127,7 @@ defmodule Jido.Flow.DSL.InlineStep do
               ["Output"]
             ],
             suffix <- [[], ["Options"]] do
-          Module.concat([Jido.Flow.DSL.Extension, "Flow"] ++ segments ++ suffix)
+          Module.concat([extension, "Flow"] ++ segments ++ suffix)
         end
 
     for module <- modules,
@@ -134,14 +138,14 @@ defmodule Jido.Flow.DSL.InlineStep do
   end
 
   defp merge_options!(options, body_options, caller, label) do
-    MacroSupport.validate_options!(
+    Config.validate_options!(
       options,
       caller,
       "#{label} options must be a keyword list",
       "#{label} field"
     )
 
-    MacroSupport.validate_options!(
+    Config.validate_options!(
       body_options,
       caller,
       "#{label} options must be a keyword list",
@@ -152,7 +156,7 @@ defmodule Jido.Flow.DSL.InlineStep do
   end
 
   defp validate_options!(options, caller, label, component_fields) do
-    MacroSupport.validate_options!(
+    Config.validate_options!(
       options,
       caller,
       "#{label} options must be a keyword list",
@@ -181,7 +185,7 @@ defmodule Jido.Flow.DSL.InlineStep do
         []
 
       {:ok, inline_options} ->
-        MacroSupport.validate_options!(
+        Config.validate_options!(
           inline_options,
           caller,
           "#{label} settings must be a keyword list",
@@ -214,7 +218,7 @@ defmodule Jido.Flow.DSL.InlineStep do
             _ -> caller.line
           end
 
-        MacroSupport.compile_error!(
+        Config.compile_error!(
           %{caller | line: line},
           "#{label} binding source: #{error.message}"
         )

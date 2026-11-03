@@ -3,7 +3,8 @@ defmodule Jido.Codec.ConfigOptionsTest do
 
   alias Jido.Action.Inline
   alias Jido.Action.Inline.Parser
-  alias Jido.Flow.DSL.{InlineStep, MacroSupport}
+  alias Jido.Codec.Config
+  alias Jido.Flow.DSL.InlineStep
 
   @tag obligation: ["jido_action.inline.I1", "jido_action.inline.I2"]
   test "each caller keeps its error label and source location" do
@@ -65,15 +66,14 @@ defmodule Jido.Codec.ConfigOptionsTest do
     assert %{action: %Inline{}, component_options: [needs: []]} =
              InlineStep.parse!([], [needs: [], inline: [name: "valid"], do: :ok], caller())
 
-    assert :ok =
-             MacroSupport.validate_options!([action: String], caller(), "invalid", "Flow field")
+    assert :ok = Config.validate_options!([action: String], caller(), "invalid", "Flow field")
   end
 
   defp callers do
     [
       {&Parser.options!(&1, [:do], caller()), "inline Action option", "inline Action options must be a keyword list",
        :do},
-      {&MacroSupport.validate_options!(
+      {&Config.validate_options!(
          &1,
          caller(),
          "Flow declaration fields must be a keyword list",

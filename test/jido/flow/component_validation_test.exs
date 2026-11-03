@@ -1,7 +1,7 @@
 defmodule Jido.Flow.ComponentValidationTest do
   use ExUnit.Case, async: true
 
-  alias Jido.Flow.Definition
+  alias Jido.Flow.{Component, Definition, Graph}
   alias Jido.Error.ValidationError
   alias Jido.Flow.Ref
   alias Jido.Flow.Value
@@ -40,7 +40,7 @@ defmodule Jido.Flow.ComponentValidationTest do
       assert kind in [:call, :choice, :map, :reduce, :iterate, :invoke]
       assert is_map(node)
 
-      for {_role, call, _params} <- Definition.calls(node) do
+      for {_role, call, _params} <- Component.calls(node) do
         assert %{kind: target_kind, target: target} = call
         assert target_kind in [:action, :flow]
         assert is_atom(target)
@@ -156,9 +156,9 @@ defmodule Jido.Flow.ComponentValidationTest do
                needs: ["gate", "source"]
              })
 
-    assert Definition.needs(step) == ["gate", "source"]
-    assert Definition.reference_dependencies(step) == ["source"]
-    assert Definition.effective_dependencies(step) == ["gate", "source"]
+    assert Graph.needs(step) == ["gate", "source"]
+    assert Graph.reference_dependencies(step) == ["source"]
+    assert Graph.effective_dependencies(step) == ["gate", "source"]
   end
 
   test "Choice option and fallback names are not dependency targets" do

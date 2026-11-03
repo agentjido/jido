@@ -1,28 +1,31 @@
 defmodule Jido.Flow.Graph do
   @moduledoc false
 
-  alias Jido.Flow.Definition
+  alias Jido.Flow.{Component, Value}
+
+  @type named_component :: {String.t(), Component.component_node()}
+  @type components :: %{optional(String.t()) => Component.component_node()}
 
   @type analysis :: %{
           levels: %{optional(String.t()) => non_neg_integer()},
           remaining: [String.t()],
-          ordered: [Definition.named_component()] | nil,
+          ordered: [named_component()] | nil,
           dependencies: %{optional(String.t()) => [String.t()]},
           terminals: [String.t()]
         }
 
   @doc false
-  @spec canonical_components(Definition.components()) :: [Definition.named_component()]
+  @spec canonical_components(components()) :: [named_component()]
   def canonical_components(components) when is_map(components) do
     %{ordered: ordered, remaining: []} = analyze(components)
     ordered
   end
 
   @doc false
-  @spec analyze(Definition.components()) :: analysis()
+  @spec analyze(components()) :: analysis()
   def analyze(components) when is_map(components) do
     dependencies =
-      Map.new(components, fn {name, node} -> {name, Definition.effective_dependencies(node)} end)
+      Map.new(components, fn {name, node} -> {name, effective_dependencies(node)} end)
 
     graph = dependency_graph(dependencies)
     blocked = blocked_vertices(graph, components)
@@ -63,6 +66,25 @@ defmodule Jido.Flow.Graph do
       terminals: terminals
     }
   end
+
+  @doc false
+  @spec needs(Component.component_node()) :: [String.t()]
+  def needs(%{needs: needs}), do: needs
+
+  @doc false
+  @spec reference_dependencies(Component.component_node()) :: [String.t()]
+  def reference_dependencies(node) do
+    node
+    |> Component.values()
+    |> Enum.flat_map(&Value.result_refs/1)
+    |> Enum.uniq()
+    |> Enum.sort()
+  end
+
+  @doc false
+  @spec effective_dependencies(Component.component_node()) :: [String.t()]
+  def effective_dependencies(node),
+    do: (needs(node) ++ reference_dependencies(node)) |> Enum.uniq() |> Enum.sort()
 
   defp dependency_graph(dependencies) do
     graph =

@@ -2,13 +2,14 @@ defmodule Jido.Flow.Validation do
   @moduledoc false
 
   alias Jido.Error
-  alias Jido.Flow
-  alias Jido.Flow.{Definition, Graph, Ref, Value}
+  alias Jido.Flow.{Component, Graph, Ref, Value}
   alias Jido.Instruction
 
+  @type issue :: %{kind: atom(), error: Exception.t(), location: list()}
+
   @doc false
-  @spec validate_graph([Definition.named_component()], Value.t()) ::
-          {:ok, Graph.analysis()} | {:error, [Definition.issue()]}
+  @spec validate_graph([Graph.named_component()], Value.t()) ::
+          {:ok, Graph.analysis()} | {:error, [issue()]}
   def validate_graph(named_components, output) do
     {known, duplicates} = duplicate_name_issues(named_components)
     references = unknown_dependency_issues(named_components, output, known)
@@ -45,54 +46,22 @@ defmodule Jido.Flow.Validation do
   end
 
   @doc false
-  @spec validate_targets(Flow.t()) :: {:ok, Flow.t()} | {:error, Exception.t()}
-  def validate_targets(%Flow{} = flow) do
-    with {:ok, _children} <-
-           validate_component_targets(Graph.canonical_components(flow.components), [], %{}) do
-      {:ok, flow}
-    end
-  end
-
-  @doc false
-  @spec prepare(Flow.t(), list(), map()) ::
-          {:ok, Flow.t(), map(), map()} | {:error, Exception.t()}
-  def prepare(%Flow{} = flow, module_stack, children) do
-    with {:ok, attrs, analysis} <- Definition.prepare_canonical(Map.from_struct(flow)),
-         {:ok, children} <- validate_component_targets(analysis.ordered, module_stack, children) do
-      {:ok, struct!(Flow, attrs), analysis, children}
-    end
-  end
-
-  @doc false
-  @spec instruction_flow(Instruction.t()) :: {:ok, Flow.t()} | {:error, Exception.t()}
-  def instruction_flow(%Instruction{target: %Flow{} = flow}), do: {:ok, flow}
-
-  def instruction_flow(%Instruction{target: module}) when is_atom(module) do
-    try do
-      case module.flow() do
-        %Flow{} = flow ->
-          {:ok, flow}
-
-        value ->
-          {:error, Error.config_error("Flow module returned invalid data", %{value: value})}
-      end
-    rescue
-      error -> {:error, error}
-    catch
-      kind, reason ->
-        {:error,
-         Error.config_error("Flow module failed while returning its definition", %{
-           module: module,
-           kind: kind,
-           reason: reason
-         })}
-    end
-  end
-
-  defp validate_component_targets(components, module_stack, children) do
+  @spec validate_component_targets(
+          [Graph.named_component()],
+          list(),
+          map(),
+          (term(), list(), map() -> {:ok, map()} | {:error, Exception.t()})
+        ) :: {:ok, map()} | {:error, Exception.t()}
+  def validate_component_targets(components, module_stack, children, prepare_child) do
     components
     |> Enum.reduce_while({:ok, children}, fn {name, component}, {:ok, children} ->
-      case validate_component_target(name, component, module_stack, children) do
+      case validate_component_target(
+             name,
+             component,
+             module_stack,
+             children,
+             prepare_child
+           ) do
         {:ok, children} -> {:cont, {:ok, children}}
         {:error, error} -> {:halt, {:error, error}}
       end
@@ -103,20 +72,27 @@ defmodule Jido.Flow.Validation do
          name,
          %{kind: :call, call: %{kind: :flow} = call},
          module_stack,
-         children
+         children,
+         prepare_child
        ) do
     with {:ok, instruction} <- resolve_target(call, :flow, name),
          :ok <- reject_recursive_flow(instruction.target, module_stack),
-         {:ok, children} <- validate_child_flow(instruction.target, module_stack, children) do
+         {:ok, children} <- prepare_child.(instruction.target, module_stack, children) do
       {:ok, children}
     else
       {:error, error} -> {:error, target_error(error, name, :flow)}
     end
   end
 
-  defp validate_component_target(name, component, _module_stack, children) do
+  defp validate_component_target(
+         name,
+         component,
+         _module_stack,
+         children,
+         _prepare_child
+       ) do
     component
-    |> Definition.calls()
+    |> Component.calls()
     |> Enum.reduce_while({:ok, children}, fn {role, call, _params}, {:ok, children} ->
       field = validation_field(component, role)
 
@@ -146,26 +122,6 @@ defmodule Jido.Flow.Validation do
 
       {:error, error} ->
         {:error, error}
-    end
-  end
-
-  defp validate_child_flow(%Flow{} = child, module_stack, children) do
-    with {:ok, _flow, _analysis, children} <-
-           prepare(child, [child | module_stack], children),
-         do: {:ok, children}
-  end
-
-  defp validate_child_flow(module, module_stack, children) when is_atom(module) do
-    case Map.fetch(children, module) do
-      {:ok, _child} ->
-        {:ok, children}
-
-      :error ->
-        with {:ok, child} <- instruction_flow(%Instruction{target: module, kind: :flow}),
-             {:ok, child, analysis, children} <-
-               prepare(child, [module | module_stack], children) do
-          {:ok, Map.put(children, module, {child, analysis})}
-        end
     end
   end
 
@@ -236,7 +192,7 @@ defmodule Jido.Flow.Validation do
       |> Enum.with_index()
       |> Enum.flat_map(fn {{name, node}, index} ->
         unknown_refs(
-          Definition.needs(node) ++ Definition.reference_dependencies(node),
+          Graph.needs(node) ++ Graph.reference_dependencies(node),
           known,
           name,
           [

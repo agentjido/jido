@@ -153,7 +153,7 @@ defmodule Jido.Flow.ValuePreparationContractTest do
 
   defp call_params(node, role) do
     {_role, _instruction, params} =
-      Enum.find(Definition.calls(node), fn {call_role, _instruction, _params} ->
+      Enum.find(Jido.Flow.Component.calls(node), fn {call_role, _instruction, _params} ->
         call_role == role
       end)
 

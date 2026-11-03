@@ -145,6 +145,7 @@
       "Jido.Flow.FieldError",
       "Jido.Flow.GraphValidation",
       "Jido.Flow.TargetValidator",
+      "Jido.Flow.DSL.MacroSupport",
       "Jido.Exec.Source",
       "Jido.Exec.Portable",
       "Jido.Exec.Handoff",

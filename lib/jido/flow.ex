@@ -152,6 +152,7 @@ defmodule Jido.Flow do
   alias Jido.Error
   alias Jido.Flow.DSL.ModuleCompiler
   alias Jido.Flow.Definition
+  alias Jido.Flow.Graph
   alias Jido.Flow.Identity
 
   @schema Joi.struct(
@@ -412,8 +413,8 @@ defmodule Jido.Flow do
 
   defp dependency_map(flow) do
     Map.new(flow.components, fn {name, node} ->
-      needs = Definition.needs(node)
-      references = Definition.reference_dependencies(node)
+      needs = Graph.needs(node)
+      references = Graph.reference_dependencies(node)
 
       {name,
        %{

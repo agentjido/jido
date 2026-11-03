@@ -213,7 +213,7 @@ defmodule Jido.Persistence.Snapshot do
   defp flow_modules(flow, seen) do
     calls =
       Enum.flat_map(flow.components, fn {_, component} ->
-        Enum.flat_map(Jido.Flow.Definition.calls(component), fn {_, call, _} ->
+        Enum.flat_map(Jido.Flow.Component.calls(component), fn {_, call, _} ->
           executable_modules(call.target, call.kind, seen)
         end)
       end)
