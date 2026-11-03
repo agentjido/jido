@@ -94,7 +94,7 @@ defmodule Jido.Catalog.Entry do
       not (is_integer(entry.vsn) and entry.vsn > 0) ->
         {:error, {:invalid_catalog_entry, :vsn, entry.vsn}}
 
-      not valid_atom?(entry.kind) ->
+      not valid_kind?(entry.kind) ->
         {:error, {:invalid_catalog_entry, :kind, entry.kind}}
 
       is_nil(entry.target) ->
@@ -149,6 +149,7 @@ defmodule Jido.Catalog.Entry do
   end
 
   defp valid_atom?(value), do: is_atom(value) and value not in [nil, true, false]
+  defp valid_kind?(value), do: valid_atom?(value) and value != :alias
   defp valid_text?(nil), do: true
   defp valid_text?(value), do: is_binary(value) and String.valid?(value)
 end

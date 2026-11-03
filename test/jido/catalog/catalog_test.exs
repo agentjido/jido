@@ -2,7 +2,7 @@ defmodule Jido.CatalogTest do
   use ExUnit.Case, async: true
 
   alias Jido.Catalog
-  alias Jido.Catalog.Entry
+  alias Jido.Catalog.{Entry, Error}
 
   defmodule ActionA do
   end
@@ -25,9 +25,39 @@ defmodule Jido.CatalogTest do
     assert Catalog.get(catalog, :flow, "example/action", 1) == nil
     assert Catalog.get_by_target(catalog, :flow, Flow) == flow
     assert Catalog.resolve(catalog, {"example/action", 1}, :action) == {:ok, ActionA}
-    assert Catalog.resolve(catalog, {"example/action", 1}, :flow) == {:error, :wrong_kind}
-    assert Catalog.resolve(catalog, {"missing", 1}, :action) == {:error, :not_found}
+
+    assert {:error, %Error{details: %{actual: :action, expected: :flow}}} =
+             Catalog.resolve(catalog, {"example/action", 1}, :flow)
+
+    assert {:error, %Error{details: %{identifier: "missing", field: "id"}}} =
+             Catalog.resolve(catalog, {"missing", 1}, :action)
+
     assert Catalog.reference(catalog, :flow, Flow) == {:ok, {"example/flow", 2}}
+  end
+
+  test "builds an owned Catalog from a compact typed-target map" do
+    catalog =
+      Catalog.from_targets!(__MODULE__, :example, %{
+        {"example/action", 1} => {:action, ActionA},
+        {"example/flow", 2} => {:flow, Flow}
+      })
+
+    assert {:ok, ActionA} = Catalog.resolve(catalog, {"example/action", 1}, :action)
+    assert {:ok, {"example/flow", 2}} = Catalog.reference(catalog, :flow, Flow)
+    assert Enum.all?(Catalog.list(catalog), &(&1.provider == __MODULE__))
+    assert Enum.all?(Catalog.list(catalog), &(&1.application == :example))
+  end
+
+  test "reports detailed invalid and missing references" do
+    catalog = Catalog.new!([entry("example/action", 2, :action, ActionA)])
+
+    assert {:error, %Error{details: %{field: "id", identifier: :atom}}} =
+             Catalog.resolve(catalog, {:bad, 1}, :action)
+
+    assert {:error, %Error{details: %{field: "vsn", supported_vsns: [2]}}} =
+             Catalog.resolve(catalog, {"example/action", 1}, :action)
+
+    assert {:error, %Error{details: %{kinds: []}}} = Catalog.reference(catalog, [], ActionA)
   end
 
   test "revision is deterministic and covers descriptive data" do

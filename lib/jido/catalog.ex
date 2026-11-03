@@ -6,7 +6,7 @@ defmodule Jido.Catalog do
   Callers must still apply application policy before execution.
   """
 
-  alias Jido.Catalog.{Entry, Manifest}
+  alias Jido.Catalog.{Entry, Error, Manifest}
 
   @maximum_entries 10_000
 
@@ -45,6 +45,37 @@ defmodule Jido.Catalog do
     end
   end
 
+  @doc "Builds a Catalog from a compact map of owned typed targets."
+  @spec from_targets(module(), atom(), %{optional(key()) => {Entry.kind(), term()}}) ::
+          {:ok, t()} | {:error, term()}
+  def from_targets(provider, application, targets)
+      when is_map(targets) and not is_struct(targets) do
+    entries =
+      Enum.map(targets, fn
+        {{id, vsn}, {kind, target}} ->
+          %{id: id, vsn: vsn, kind: kind, target: target}
+
+        {reference, value} ->
+          %{invalid_reference: reference, invalid_value: value}
+      end)
+
+    with {:ok, manifest} <- Manifest.new(provider, application, entries),
+         do: new([manifest])
+  end
+
+  def from_targets(_provider, _application, _targets),
+    do: error("Catalog targets must be a map")
+
+  @doc "Builds a Catalog from a compact target map or raises its error."
+  @spec from_targets!(module(), atom(), %{optional(key()) => {Entry.kind(), term()}}) :: t()
+  def from_targets!(provider, application, targets) do
+    case from_targets(provider, application, targets) do
+      {:ok, catalog} -> catalog
+      {:error, %{__exception__: true} = exception} -> raise exception
+      {:error, reason} -> raise ArgumentError, "invalid Catalog targets: #{inspect(reason)}"
+    end
+  end
+
   @doc "Returns the exact Entry for a stable ID and version."
   @spec get(t(), String.t(), pos_integer()) :: Entry.t() | nil
   def get(%__MODULE__{entries: entries}, id, vsn), do: Map.get(entries, {id, vsn})
@@ -65,24 +96,133 @@ defmodule Jido.Catalog do
 
   @doc "Resolves one exact reference of the required kind."
   @spec resolve(t(), key(), Entry.kind() | [Entry.kind()]) ::
-          {:ok, term()} | {:error, :not_found | :wrong_kind}
-  def resolve(%__MODULE__{} = catalog, {id, vsn}, kinds) do
-    case get(catalog, id, vsn) do
-      nil -> {:error, :not_found}
-      %Entry{kind: kind, target: target} -> if kind in List.wrap(kinds), do: {:ok, target}, else: {:error, :wrong_kind}
-    end
+          {:ok, term()} | {:error, Error.t()}
+  def resolve(%__MODULE__{} = catalog, reference, kinds) when is_list(kinds) do
+    with :ok <- validate_kinds(kinds),
+         do: resolve_one(catalog, reference, kinds, kinds, List.last(kinds))
   end
 
-  def resolve(%__MODULE__{}, _reference, _kinds), do: {:error, :not_found}
+  def resolve(%__MODULE__{} = catalog, reference, kind) do
+    if valid_kind?(kind),
+      do: resolve_one(catalog, reference, [kind], kind, kind),
+      else: error("invalid Catalog reference", %{reference: value_type(reference), kind: kind})
+  end
 
-  @doc "Returns the stable reference for one exact kind and target."
-  @spec reference(t(), Entry.kind(), term()) :: {:ok, key()} | {:error, :not_found}
+  @doc "Returns the stable reference for one target of an accepted kind."
+  @spec reference(t(), Entry.kind() | [Entry.kind()], term()) ::
+          {:ok, key()} | {:error, Error.t()}
+  def reference(%__MODULE__{references: references}, kinds, target) when is_list(kinds) do
+    with :ok <- validate_kinds(kinds),
+         do: reference_one(references, kinds, target, %{kinds: kinds})
+  end
+
   def reference(%__MODULE__{references: references}, kind, target) do
-    case Map.fetch(references, {kind, target}) do
-      {:ok, reference} -> {:ok, reference}
-      :error -> {:error, :not_found}
+    if valid_kind?(kind),
+      do: reference_one(references, [kind], target, %{kind: kind}),
+      else: error("invalid Catalog kind", %{kind: kind})
+  end
+
+  @doc false
+  @spec validate_reference(term()) :: {:ok, key()} | {:error, Error.t()}
+  def validate_reference({id, vsn}) do
+    with :ok <- validate_identifier(id),
+         :ok <- validate_vsn(vsn),
+         do: {:ok, {id, vsn}}
+  end
+
+  def validate_reference(reference),
+    do: error("invalid Catalog reference", %{reference: value_type(reference)})
+
+  @doc false
+  @spec validate_identifier(term()) :: :ok | {:error, Error.t()}
+  def validate_identifier(id) do
+    if Entry.valid_identifier?(id),
+      do: :ok,
+      else: error("invalid Catalog identifier", %{identifier: value_type(id), field: "id"})
+  end
+
+  @doc false
+  @spec validate_vsn(term()) :: :ok | {:error, Error.t()}
+  def validate_vsn(vsn) when is_integer(vsn) and vsn > 0, do: :ok
+  def validate_vsn(vsn), do: error("invalid Catalog vsn", %{vsn: vsn, field: "vsn"})
+
+  defp resolve_one(%__MODULE__{entries: entries}, reference, kinds, expected, missing_kind) do
+    with {:ok, {id, vsn} = key} <- validate_reference(reference) do
+      case Map.fetch(entries, key) do
+        {:ok, %Entry{kind: kind, target: target}} ->
+          if kind in kinds do
+            {:ok, target}
+          else
+            error("Catalog reference has the wrong entry kind", %{
+              identifier: id,
+              vsn: vsn,
+              expected: expected,
+              actual: kind,
+              field: "id"
+            })
+          end
+
+        :error ->
+          missing_reference(entries, id, vsn, missing_kind)
+      end
     end
   end
+
+  defp reference_one(references, kinds, target, details) do
+    case Enum.find_value(kinds, &Map.get(references, {&1, target})) do
+      nil -> error("Catalog has no reference for the required target", details)
+      reference -> {:ok, reference}
+    end
+  end
+
+  defp missing_reference(entries, id, vsn, kind) do
+    supported =
+      entries
+      |> Map.keys()
+      |> Enum.flat_map(fn {entry_id, entry_vsn} ->
+        if entry_id == id, do: [entry_vsn], else: []
+      end)
+      |> Enum.sort()
+
+    if supported == [] do
+      error("unknown Catalog reference", %{
+        identifier: id,
+        vsn: vsn,
+        kind: kind,
+        field: "id"
+      })
+    else
+      error("Catalog reference has unsupported vsn", %{
+        identifier: id,
+        vsn: vsn,
+        kind: kind,
+        supported_vsns: supported,
+        field: "vsn"
+      })
+    end
+  end
+
+  defp validate_kinds([]), do: error("invalid Catalog kinds", %{kinds: []})
+
+  defp validate_kinds(kinds) do
+    if Enum.all?(kinds, &valid_kind?/1),
+      do: :ok,
+      else: error("invalid Catalog kinds", %{kinds: kinds})
+  end
+
+  defp valid_kind?(kind),
+    do: is_atom(kind) and kind not in [nil, true, false, :alias]
+
+  defp value_type(value) when is_atom(value), do: :atom
+  defp value_type(value) when is_binary(value), do: :binary
+  defp value_type(value) when is_integer(value), do: :integer
+  defp value_type(value) when is_list(value), do: :list
+  defp value_type(value) when is_map(value), do: :map
+  defp value_type(value) when is_tuple(value), do: :tuple
+  defp value_type(_value), do: :other
+
+  defp error(message, details \\ %{}),
+    do: {:error, Error.exception(message: message, details: details)}
 
   @doc "Lists all Entries in deterministic order."
   @spec list(t()) :: [Entry.t()]

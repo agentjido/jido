@@ -20,6 +20,7 @@
       "Jido.Action.*",
       "Jido.Catalog",
       "Jido.Catalog.Entry",
+      "Jido.Catalog.Error",
       "Jido.Catalog.Manifest",
       "Jido.Catalog.View",
       "Jido.Codec",
