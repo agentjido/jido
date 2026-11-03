@@ -1,4 +1,6 @@
 defmodule Jido.Codec.Signal do
+  import Bitwise, only: [band: 2]
+
   @moduledoc """
   Encodes and decodes Signals through the canonical CloudEvents map.
 
@@ -16,6 +18,13 @@ defmodule Jido.Codec.Signal do
   @default_max_payload_bytes 10_000_000
 
   @type format :: :json | :erlang_term
+
+  @doc false
+  @spec valid_utf8?(binary()) :: boolean()
+  def valid_utf8?(<<chunk::56, rest::binary>>) when band(chunk, 0x80808080808080) == 0,
+    do: valid_utf8?(rest)
+
+  def valid_utf8?(rest), do: String.valid?(rest)
 
   @doc "Parses a complete CloudEvents structured-mode map."
   @spec from_map(map()) :: {:ok, Signal.t()} | {:error, String.t()}
@@ -225,7 +234,7 @@ defmodule Jido.Codec.Signal do
 
   defp json_value?(nil), do: true
   defp json_value?(value) when is_boolean(value) or is_number(value), do: true
-  defp json_value?(value) when is_binary(value), do: Jido.Codec.Signal.UTF8.valid?(value)
+  defp json_value?(value) when is_binary(value), do: valid_utf8?(value)
   defp json_value?([]), do: true
   defp json_value?([head | tail]) when is_list(tail), do: json_value?(head) and json_value?(tail)
 
