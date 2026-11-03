@@ -3,7 +3,8 @@ defmodule Jido.Flow.Definition do
 
   alias Jido.Codec.Config
   alias Jido.Error
-  alias Jido.Flow.{Component, Graph, GraphValidation, Ref, Value, FieldError}
+  alias Jido.Error.ValidationError
+  alias Jido.Flow.{Component, Graph, GraphValidation, Ref, Value}
 
   @keys [:name, :description, :schema, :output_schema, :components, :output]
   @type call :: Component.call()
@@ -75,7 +76,7 @@ defmodule Jido.Flow.Definition do
       Enum.reduce(fields, {initial, unknown}, fn {field, validator}, {values, errors} ->
         result =
           case Map.get(attrs, field) do
-            %FieldError{errors: errors} -> {:error, errors}
+            %ValidationError{details: %{flow_field_errors: errors}} -> {:error, errors}
             value -> validator.(value)
           end
 

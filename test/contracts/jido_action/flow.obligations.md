@@ -28,7 +28,6 @@ modules:
   - Jido.Flow.DSL.ValueParser
   - Jido.Flow.Definition
   - Jido.Flow.Extension
-  - Jido.Flow.FieldError
   - Jido.Flow.Graph
   - Jido.Flow.GraphValidation
   - Jido.Flow.Identity

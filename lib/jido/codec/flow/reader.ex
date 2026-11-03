@@ -2,7 +2,7 @@ defmodule Jido.Codec.Flow.Reader do
   @moduledoc false
 
   alias Jido.Error
-  alias Jido.Flow.{Component, FieldError}
+  alias Jido.Flow.Component
   alias Jido.Catalog
   alias Jido.Catalog.Error, as: CatalogError
   alias Jido.Codec.Reference
@@ -66,7 +66,7 @@ defmodule Jido.Codec.Flow.Reader do
                   {Map.put(result, field, value), Map.merge(paths, nested_paths)}
 
                 {:error, nested} ->
-                  {Map.put(result, field, FieldError.new(nested)), paths}
+                  {Map.put(result, field, Component.stored_field_error(nested)), paths}
               end
           end
         end)
@@ -78,7 +78,7 @@ defmodule Jido.Codec.Flow.Reader do
   defp record(_values, _fields, _registry, stored, canonical),
     do:
       {:ok,
-       FieldError.new([
+       Component.stored_field_error([
          Error.validation_error("stored Flow field must be a map", %{path: stored})
        ]), %{canonical => stored}}
 
@@ -139,7 +139,7 @@ defmodule Jido.Codec.Flow.Reader do
     do: resolve(value, kind, registry, stored, canonical)
 
   defp field(:unresolved_target, _value, _registry, stored, canonical),
-    do: {:ok, FieldError.new([]), %{canonical => stored}}
+    do: {:ok, Component.stored_field_error([]), %{canonical => stored}}
 
   defp field(_type, value, _registry, stored, canonical), do: {:ok, value, %{canonical => stored}}
 
@@ -193,7 +193,7 @@ defmodule Jido.Codec.Flow.Reader do
 
     with {:ok, value, paths} <-
            record(Map.delete(value, "kind"), fields, registry, stored, canonical) do
-      {:ok, Map.put(value, :kind, if(kind, do: kind, else: FieldError.new(kind_errors))), paths}
+      {:ok, Map.put(value, :kind, if(kind, do: kind, else: Component.stored_field_error(kind_errors))), paths}
     end
   end
 
@@ -242,7 +242,7 @@ defmodule Jido.Codec.Flow.Reader do
 
         case result do
           {:ok, value, nested_paths} -> {[value | values], Map.merge(paths, nested_paths)}
-          {:error, nested} -> {[FieldError.new(nested) | values], paths}
+          {:error, nested} -> {[Component.stored_field_error(nested) | values], paths}
         end
       end)
 

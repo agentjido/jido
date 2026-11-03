@@ -3,7 +3,8 @@ defmodule Jido.Flow.Component do
 
   alias Jido.Codec.Config
   alias Jido.Error
-  alias Jido.Flow.{FieldError, Value}
+  alias Jido.Error.ValidationError
+  alias Jido.Flow.Value
 
   @common [name: :name, needs: :needs, meta: :meta]
   @fields %{
@@ -45,6 +46,23 @@ defmodule Jido.Flow.Component do
   def maximum_iterations, do: @maximum_iterations
 
   @doc false
+  @spec field_error([Exception.t()]) :: ValidationError.t()
+  def field_error(errors),
+    do: Error.validation_error("Flow field validation failed", flow_field_errors: errors)
+
+  @doc false
+  @spec stored_field_error([Exception.t()]) :: ValidationError.t()
+  def stored_field_error(errors) do
+    errors =
+      Enum.map(errors, fn error ->
+        path = Map.get(error.details, :path, [])
+        %{error | details: error.details |> Map.put(:source_path, path) |> Map.put(:path, [])}
+      end)
+
+    field_error(errors)
+  end
+
+  @doc false
   @spec fields(atom()) :: keyword() | nil
   def fields(kind), do: Map.get(@fields, kind)
 
@@ -72,7 +90,8 @@ defmodule Jido.Flow.Component do
   @spec diagnose(term(), mode()) :: {:ok, {String.t(), map()}} | {:error, [Exception.t()]}
   def diagnose(attrs, mode \\ :authoring)
 
-  def diagnose(%FieldError{errors: errors}, _mode), do: {:error, errors}
+  def diagnose(%ValidationError{details: %{flow_field_errors: errors}}, _mode),
+    do: {:error, errors}
 
   def diagnose(%{} = attrs, :authoring) when not is_struct(attrs),
     do: diagnose(authoring(attrs), :lowered)
@@ -101,10 +120,10 @@ defmodule Jido.Flow.Component do
   defp state(attrs, mode), do: record(attrs, @state, mode)
 
   @doc false
-  @spec authoring(map()) :: map() | FieldError.t()
+  @spec authoring(map()) :: map() | ValidationError.t()
   def authoring(%{kind: kind} = attrs) when kind in [:timer, :await] do
     case wait_option(Map.take(attrs, [:kind, :name, :event, :match, :after_ms])) do
-      %FieldError{} = error ->
+      %ValidationError{details: %{flow_field_errors: _errors}} = error ->
         error
 
       option ->
@@ -125,13 +144,11 @@ defmodule Jido.Flow.Component do
   end
 
   def authoring(%{kind: :call}) do
-    %FieldError{
-      errors: [
-        Error.validation_error("data authoring uses :step or :subflow for a call", %{
-          path: [:kind]
-        })
-      ]
-    }
+    field_error([
+      Error.validation_error("data authoring uses :step or :subflow for a call", %{
+        path: [:kind]
+      })
+    ])
   end
 
   def authoring(%{call: _}), do: unknown_call_field()
@@ -213,11 +230,10 @@ defmodule Jido.Flow.Component do
         |> Map.put_new(:event, nil)
         |> Map.put_new(:match, %{})
         |> Map.put_new(:after_ms, nil),
-      else: %FieldError{
-        errors: [
+      else:
+        field_error([
           Error.validation_error("wait fields do not match the declared kind", %{kind: kind})
-        ]
-      }
+        ])
   end
 
   defp wait_option(other), do: other
@@ -245,18 +261,24 @@ defmodule Jido.Flow.Component do
         |> Map.put(:target, Map.get(attrs, :action))
 
       errors ->
-        %FieldError{errors: errors}
+        field_error(errors)
     end
   end
 
   defp authoring_target_call(attrs), do: attrs
 
   defp unknown_call_field,
-    do: %FieldError{errors: unknown_fields(%{call: nil}, [])}
+    do: field_error(unknown_fields(%{call: nil}, []))
 
   defp record(attrs, fields, mode, extra \\ [])
 
-  defp record(%FieldError{errors: errors}, _fields, _mode, _extra), do: {:error, errors}
+  defp record(
+         %ValidationError{details: %{flow_field_errors: errors}},
+         _fields,
+         _mode,
+         _extra
+       ),
+       do: {:error, errors}
 
   defp record(%{} = attrs, fields, mode, extra) when not is_struct(attrs) do
     allowed = Keyword.keys(fields) ++ extra
@@ -299,7 +321,12 @@ defmodule Jido.Flow.Component do
   defp default(:on_error, :lowered), do: :fail_fast
   defp default(_field, :lowered), do: {:__missing_flow_field__}
 
-  defp validate(_type, %FieldError{errors: errors}, _mode), do: {:error, errors}
+  defp validate(
+         _type,
+         %ValidationError{details: %{flow_field_errors: errors}},
+         _mode
+       ),
+       do: {:error, errors}
 
   defp validate(_type, {:__missing_flow_field__}, _mode), do: failure("Flow field is required")
 
