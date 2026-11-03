@@ -44,7 +44,7 @@ defmodule Jido.Persistence.ContinuationStore do
       {:ok, {owner, config}} when owner == self() ->
         with :ok <- Jido.Instance.RuntimeStore.delete_owned(jido, __MODULE__, id, owner),
              {:ok, _pid} <-
-               Task.Supervisor.start_child(Jido.task_supervisor_name(jido), fn ->
+               Task.Supervisor.start_child(Jido.Instance.Names.task_supervisor(jido), fn ->
                  delete_execution(config, id)
                end),
              do: :ok

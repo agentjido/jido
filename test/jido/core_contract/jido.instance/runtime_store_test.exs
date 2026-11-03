@@ -7,7 +7,7 @@ defmodule JidoTest.RuntimeStoreTest do
   @moduletag obligation: "jido.instance.I2"
 
   test "a stopped worker returns the fallback for each operation", %{jido: jido} do
-    assert :ok = Supervisor.terminate_child(jido, Jido.runtime_store_name(jido))
+    assert :ok = Supervisor.terminate_child(jido, Jido.Instance.Names.runtime_store(jido))
 
     for {call, fallback} <- calls(jido) do
       assert call.() == fallback
@@ -15,7 +15,7 @@ defmodule JidoTest.RuntimeStoreTest do
   end
 
   test "a normal exit during a call returns each operation's fallback", %{jido: jido} do
-    assert :ok = Supervisor.terminate_child(jido, Jido.runtime_store_name(jido))
+    assert :ok = Supervisor.terminate_child(jido, Jido.Instance.Names.runtime_store(jido))
 
     for {call, fallback} <- calls(jido) do
       worker = start_call_worker(jido)
@@ -29,7 +29,7 @@ defmodule JidoTest.RuntimeStoreTest do
   end
 
   test "an abnormal worker exit reaches the caller", %{jido: jido} do
-    assert :ok = Supervisor.terminate_child(jido, Jido.runtime_store_name(jido))
+    assert :ok = Supervisor.terminate_child(jido, Jido.Instance.Names.runtime_store(jido))
     worker = start_call_worker(jido)
     task = Task.async(fn -> catch_exit(RuntimeStore.fetch(jido, :hive, :key)) end)
     assert_receive {:request, ^worker, _request}, 1_000
@@ -40,20 +40,20 @@ defmodule JidoTest.RuntimeStoreTest do
   test "a write timeout returns a structured error even when the worker later completes it", %{
     jido: jido
   } do
-    assert :ok = Supervisor.terminate_child(jido, Jido.runtime_store_name(jido))
+    assert :ok = Supervisor.terminate_child(jido, Jido.Instance.Names.runtime_store(jido))
     worker = start_call_worker(jido)
     task = Task.async(fn -> RuntimeStore.put(jido, :hive, :key, :value) end)
     assert_receive {:request, ^worker, {:put, :hive, :key, :value}}, 1_000
     assert {:error, :timeout} = Task.await(task, 1_000)
     send(worker, :complete)
     assert_receive {:completed, ^worker}, 1_000
-    assert [{{:hive, :key}, :value}] = :ets.lookup(Jido.runtime_store_name(jido), {:hive, :key})
+    assert [{{:hive, :key}, :value}] = :ets.lookup(Jido.Instance.Names.runtime_store(jido), {:hive, :key})
   end
 
   test "a delete timeout returns a structured error even when the worker later completes it", %{
     jido: jido
   } do
-    table = Jido.runtime_store_name(jido)
+    table = Jido.Instance.Names.runtime_store(jido)
     true = :ets.insert(table, {{:hive, :key}, :value})
     assert :ok = Supervisor.terminate_child(jido, table)
     worker = start_call_worker(jido)
@@ -67,7 +67,7 @@ defmodule JidoTest.RuntimeStoreTest do
   end
 
   test "all operation timeouts use their documented fallback or structured error", %{jido: jido} do
-    assert :ok = Supervisor.terminate_child(jido, Jido.runtime_store_name(jido))
+    assert :ok = Supervisor.terminate_child(jido, Jido.Instance.Names.runtime_store(jido))
 
     timeout_calls = [
       {fn -> RuntimeStore.fetch(jido, :hive, :key) end, {:error, :timeout}},
@@ -125,16 +125,16 @@ defmodule JidoTest.RuntimeStoreTest do
       end)
 
     on_exit(fn -> Process.exit(worker, :kill) end)
-    Process.register(worker, Jido.runtime_store_name(jido))
+    Process.register(worker, Jido.Instance.Names.runtime_store(jido))
     worker
   end
 
   defp complete_request(jido, {:put, hive, key, value}) do
-    :ets.insert(Jido.runtime_store_name(jido), {{hive, key}, value})
+    :ets.insert(Jido.Instance.Names.runtime_store(jido), {{hive, key}, value})
   end
 
   defp complete_request(jido, {:delete, hive, key}) do
-    :ets.delete(Jido.runtime_store_name(jido), {hive, key})
+    :ets.delete(Jido.Instance.Names.runtime_store(jido), {hive, key})
   end
 
   describe "RuntimeStore" do
@@ -180,7 +180,7 @@ defmodule JidoTest.RuntimeStoreTest do
     end
 
     test "retains entries when the RuntimeStore process restarts", %{jido: jido} do
-      runtime_store = Jido.runtime_store_name(jido)
+      runtime_store = Jido.Instance.Names.runtime_store(jido)
       runtime_store_pid = Process.whereis(runtime_store)
       runtime_store_ref = Process.monitor(runtime_store_pid)
 

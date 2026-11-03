@@ -318,7 +318,7 @@ defmodule JidoTest.AgentServer.ActivationRootTest do
 
   @tag obligation: "jido.agent_server.activation.I11"
   test "worker recovery keeps independent child records", c do
-    parent = F.start(c, jido: c.jido, runner: Jido.exec_runner_name(c.jido))
+    parent = F.start(c, jido: c.jido, runner: Jido.Instance.Names.exec_runner(c.jido))
     root = Server.activation(parent)
 
     {:ok, child} =

@@ -136,7 +136,7 @@ defmodule JidoTest.AgentServer.Durable.PersistenceTest do
 
   defp start(c, opts) do
     F.start(
-      %{agent: c.agent, runner: Jido.exec_runner_name(c.jido)},
+      %{agent: c.agent, runner: Jido.Instance.Names.exec_runner(c.jido)},
       Keyword.merge([jido: c.jido, persistence: c.adapter], opts)
     )
   end
@@ -197,7 +197,7 @@ defmodule JidoTest.AgentServer.Durable.PersistenceTest do
     assert {:ok, %{state: %{count: 2}}, []} = Server.await(queued)
     assert {:ok, %{state: %{count: 2}}, 2} = load(c)
     assert Server.status(server).state_version == 2
-    F.clean(Jido.exec_runner_name(c.jido))
+    F.clean(Jido.Instance.Names.exec_runner(c.jido))
   end
 
   @tag obligation: ["jido.agent_server.durable.I3", "jido.agent_server.durable.I4"]
@@ -294,7 +294,7 @@ defmodule JidoTest.AgentServer.Durable.PersistenceTest do
     assert Server.agent(replacement).state.count == 1
     assert Server.status(replacement).state_version == 1
     assert record(c).rev == 1
-    F.clean(Jido.exec_runner_name(c.jido))
+    F.clean(Jido.Instance.Names.exec_runner(c.jido))
   end
 
   for {name, result, revision} <- [
@@ -312,7 +312,7 @@ defmodule JidoTest.AgentServer.Durable.PersistenceTest do
       assert {:error, %Jido.Error.ExecutionError{}} = Server.call(server, F.signal())
       F.down(root)
       assert record(c).rev == unquote(revision)
-      F.clean(Jido.exec_runner_name(c.jido))
+      F.clean(Jido.Instance.Names.exec_runner(c.jido))
     end
   end
 
@@ -343,7 +343,7 @@ defmodule JidoTest.AgentServer.Durable.PersistenceTest do
     :ok = Server.stop(server)
 
     root =
-      F.start_activation(%{agent: c.agent, runner: Jido.exec_runner_name(c.jido)},
+      F.start_activation(%{agent: c.agent, runner: Jido.Instance.Names.exec_runner(c.jido)},
         jido: c.jido,
         persistence: c.adapter
       )
@@ -387,7 +387,7 @@ defmodule JidoTest.AgentServer.Durable.PersistenceTest do
     Storage.configure(c.storage, :read, {:error, :unavailable})
 
     root =
-      F.start_activation(%{agent: c.agent, runner: Jido.exec_runner_name(c.jido)},
+      F.start_activation(%{agent: c.agent, runner: Jido.Instance.Names.exec_runner(c.jido)},
         jido: c.jido,
         persistence: c.adapter,
         persistence_mode: :restore
@@ -465,7 +465,7 @@ defmodule JidoTest.AgentServer.Durable.PersistenceTest do
     base = [
       agent: c.agent,
       jido: c.jido,
-      runner: Jido.exec_runner_name(c.jido),
+      runner: Jido.Instance.Names.exec_runner(c.jido),
       persistence: c.adapter
     ]
 
@@ -485,7 +485,7 @@ defmodule JidoTest.AgentServer.Durable.PersistenceTest do
     assert {:error, %Jido.Error.ValidationError{}} =
              Server.activation_options(
                agent: c.agent,
-               runner: Jido.exec_runner_name(c.jido),
+               runner: Jido.Instance.Names.exec_runner(c.jido),
                persistence: c.adapter
              )
 
@@ -598,7 +598,7 @@ defmodule JidoTest.AgentServer.Durable.PersistenceTest do
     c = %{c | agent: LocalAgent.instantiate!(id: c.agent.id, state: %{handle: self()})}
 
     root =
-      F.start_activation(%{agent: c.agent, runner: Jido.exec_runner_name(c.jido)},
+      F.start_activation(%{agent: c.agent, runner: Jido.Instance.Names.exec_runner(c.jido)},
         jido: c.jido,
         persistence: c.adapter
       )
@@ -647,6 +647,6 @@ defmodule JidoTest.AgentServer.Durable.PersistenceTest do
     F.down(root)
     assert {:error, %Jido.Error.ExecutionError{}} = Server.await(queued)
     assert record(c).rev == 0
-    F.clean(Jido.exec_runner_name(c.jido))
+    F.clean(Jido.Instance.Names.exec_runner(c.jido))
   end
 end

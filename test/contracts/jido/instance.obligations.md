@@ -34,7 +34,7 @@ downstream operation results stay with their owning components.
 
 ### jido.instance.I3 — Namespace ownership
 
-- **scope:** `Jido.start_link/1`, `Jido.namespace/1`
+- **scope:** `Jido.start_link/1`, `Jido.Instance.NamespaceRegistry.namespace/1`
 - **must:** Bind an optional nonempty namespace to at most one live local instance. Keep the exact binding while that instance is live, release an unbound claim after failed startup, remove the binding after owner loss, and restore live bindings after the namespace registry worker restarts.
 - **why:** A stable Ref namespace must identify one current local instance without becoming stuck after failure.
 - **kind:** functional
@@ -42,7 +42,7 @@ downstream operation results stay with their owning components.
 
 ### jido.instance.I4 — Fixed instance runtime defaults
 
-- **scope:** generated instance `config/1`, `Jido.instance_persistence/1`, `Jido.instance_agent_server_options/1`
+- **scope:** generated instance `config/1`, `Jido.Instance.RuntimeStore.instance_persistence/1`, `Jido.Instance.RuntimeStore.instance_agent_server_options/1`
 - **must:** Apply runtime options after application and declared defaults. Store the validated persistence source and AgentServer defaults for the live instance. Keep those selected values fixed for that lifetime and available across RuntimeStore worker replacement.
 - **why:** Consumers need one stable set of instance defaults.
 - **kind:** functional

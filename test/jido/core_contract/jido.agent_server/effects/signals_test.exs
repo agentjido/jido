@@ -158,7 +158,7 @@ defmodule JidoTest.AgentServer.Effects.SignalsTest do
     second = start_supervised!({Bus, name: :scoped, jido: other})
     {:ok, _} = Bus.subscribe(first, "out")
     {:ok, _} = Bus.subscribe(second, "out")
-    server = F.start(c, jido: c.jido, runner: Jido.exec_runner_name(c.jido))
+    server = F.start(c, jido: c.jido, runner: Jido.Instance.Names.exec_runner(c.jido))
 
     directives =
       for target <- [{:bus, target: :scoped}, {:bus, target: :scoped, jido: other}],
@@ -176,7 +176,7 @@ defmodule JidoTest.AgentServer.Effects.SignalsTest do
     policy_server =
       F.start(c,
         jido: c.jido,
-        runner: Jido.exec_runner_name(c.jido),
+        runner: Jido.Instance.Names.exec_runner(c.jido),
         error_policy: {:emit_signal, {:bus, target: :scoped}}
       )
 
@@ -205,7 +205,7 @@ defmodule JidoTest.AgentServer.Effects.SignalsTest do
       F.start(%{c | agent: agent},
         jido: c.jido,
         partition: "effects",
-        runner: Jido.exec_runner_name(c.jido)
+        runner: Jido.Instance.Names.exec_runner(c.jido)
       )
 
     outbound = F.signal(%{}, "out")

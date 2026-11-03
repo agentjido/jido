@@ -134,7 +134,7 @@ defmodule JidoTest.InstanceRefTest do
     second = unique_instance("second")
 
     first_pid = start_supervised!({Jido, name: first, namespace: namespace}, id: first)
-    assert Jido.namespace(first) == namespace
+    assert Jido.Instance.NamespaceRegistry.namespace(first) == namespace
     assert Jido.Instance.NamespaceRegistry.lookup(namespace) == {first, first_pid}
 
     assert {:error, %Error.ValidationError{} = error} =
@@ -151,7 +151,7 @@ defmodule JidoTest.InstanceRefTest do
 
     assert {:ok, pid} = Jido.start(name: instance, namespace: namespace)
     assert {:ok, ^pid} = Jido.start(name: instance, namespace: namespace)
-    assert Jido.namespace(instance) == namespace
+    assert Jido.Instance.NamespaceRegistry.namespace(instance) == namespace
     assert :ok = Jido.stop(instance)
   end
 
@@ -266,7 +266,10 @@ defmodule JidoTest.InstanceRefTest do
   @tag obligation: "jido.instance.I8"
   test "a generated instance exposes the same Ref-first API" do
     start_supervised!(NamespacedInstance)
-    assert NamespacedInstance.namespace() == "jido/test/generated-instance"
+
+    assert Jido.Instance.NamespaceRegistry.namespace(NamespacedInstance) ==
+             "jido/test/generated-instance"
+
     assert {:ok, ref} = NamespacedInstance.agent_ref("counter")
     assert {:ok, server} = NamespacedInstance.start_agent_ref(ref, Counter)
     assert NamespacedInstance.resolve_agent(ref) == {:ok, server}
@@ -311,7 +314,7 @@ defmodule JidoTest.InstanceRefTest do
 
     foreign = %{ref | id: "foreign"}
     key = Jido.AgentServer.RegistrationGuard.registry_key(foreign.id, foreign.partition)
-    assert {:ok, _} = Registry.register(Jido.registry_name(instance), key, :ready)
+    assert {:ok, _} = Registry.register(Jido.Instance.Names.registry(instance), key, :ready)
     assert {:error, :not_found} = Jido.resolve_agent(instance, foreign)
 
     assert :ok = Jido.stop_agent_ref(instance, ref)
@@ -349,7 +352,7 @@ defmodule JidoTest.InstanceRefTest do
     assert Jido.resolve_agent(instance, ref) == {:ok, server}
 
     :sys.suspend(instance_pid)
-    registry = Process.whereis(Jido.registry_name(instance))
+    registry = Process.whereis(Jido.Instance.Names.registry(instance))
     monitor = Process.monitor(registry)
 
     try do

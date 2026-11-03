@@ -116,7 +116,7 @@ defmodule Jido.AgentServer do
     if Keyword.keyword?(opts) and not is_nil(opts[:jido]) do
       with {:ok, opts} <- activation_options(opts) do
         case ServerSupervisor.start_activation(
-               Jido.agent_supervisor_name(opts[:jido]),
+               Jido.Instance.Names.agent_supervisor(opts[:jido]),
                child_spec(opts)
              ) do
           {:error, {:shutdown, {:failed_to_start_child, __MODULE__, {:already_started, pid}}}} ->
@@ -143,7 +143,7 @@ defmodule Jido.AgentServer do
          true <- valid_partition?(opts[:partition]),
          [{pid, :ready}] <-
            Registry.lookup(
-             Jido.registry_name(jido),
+             Jido.Instance.Names.registry(jido),
              RegistrationGuard.registry_key(id, opts[:partition])
            ),
          true <- alive?(pid) do
@@ -269,11 +269,11 @@ defmodule Jido.AgentServer do
         with pid when is_pid(pid) <- Process.whereis(jido),
              {:supervisor, Jido, 1} <- :proc_lib.translate_initial_call(pid),
              true <- instance_children_live?(pid, jido),
-             runner = Jido.exec_runner_name(jido),
+             runner = Jido.Instance.Names.exec_runner(jido),
              true <- Keyword.get(opts, :runner, runner) == runner,
              true <- valid_partition?(opts[:partition]) do
           {:ok,
-           Jido.instance_agent_server_options(jido)
+           Jido.Instance.RuntimeStore.instance_agent_server_options(jido)
            |> Keyword.merge(opts)
            |> Keyword.put(:runner, runner)}
         else
@@ -290,9 +290,9 @@ defmodule Jido.AgentServer do
 
     Enum.all?(
       [
-        Jido.registry_name(jido),
-        Jido.agent_supervisor_name(jido),
-        Jido.registration_guard_name(jido)
+        Jido.Instance.Names.registry(jido),
+        Jido.Instance.Names.agent_supervisor(jido),
+        Jido.Instance.Names.registration_guard(jido)
       ],
       fn name ->
         child = Process.whereis(name)
@@ -768,14 +768,14 @@ defmodule Jido.AgentServer do
         {:ok, %{}}
 
       jido ->
-        registry = Jido.registry_name(jido)
+        registry = Jido.Instance.Names.registry(jido)
         key = RegistrationGuard.registry_key(id, opts[:partition])
 
         with :ok <- RegistrationGuard.claim(jido, key, self(), opts[:activation]),
              :ok <- register_ready(registry, key) do
           {:ok,
            Map.new(
-             [jido, registry, Jido.registration_guard_name(jido)],
+             [jido, registry, Jido.Instance.Names.registration_guard(jido)],
              fn name -> {Process.monitor(Process.whereis(name)), name} end
            )}
         end
@@ -908,7 +908,7 @@ defmodule Jido.AgentServer do
 
   defp mark_ready(data) do
     Registry.update_value(
-      Jido.registry_name(data.jido),
+      Jido.Instance.Names.registry(data.jido),
       RegistrationGuard.registry_key(data.agent.id, data.partition),
       fn _ -> :ready end
     )

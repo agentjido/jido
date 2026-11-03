@@ -38,7 +38,7 @@ defmodule JidoTest.AgentServer.Effects.ProcessTest do
              Server.call(server, batch([%ProcessStart{child_spec: {Agent, fn -> 1 end}}]))
 
     F.unchanged(server, c.agent)
-    instance = F.start(c, jido: c.jido, runner: Jido.exec_runner_name(c.jido))
+    instance = F.start(c, jido: c.jido, runner: Jido.Instance.Names.exec_runner(c.jido))
 
     assert {:error, :invalid_child_spec} =
              Server.call(instance, batch([%ProcessStart{child_spec: :invalid}]))
@@ -75,7 +75,7 @@ defmodule JidoTest.AgentServer.Effects.ProcessTest do
     )
 
     assert Enum.any?(
-             DynamicSupervisor.which_children(Jido.agent_supervisor_name(c.jido)),
+             DynamicSupervisor.which_children(Jido.Instance.Names.agent_supervisor(c.jido)),
              &(elem(&1, 1) == pid)
            )
 
@@ -85,7 +85,7 @@ defmodule JidoTest.AgentServer.Effects.ProcessTest do
 
   @tag obligation: "jido.agent_server.effects.I11"
   test "ProcessStart accepts OTP info and ignore results and reports start failure", c do
-    server = F.start(c, jido: c.jido, runner: Jido.exec_runner_name(c.jido))
+    server = F.start(c, jido: c.jido, runner: Jido.Instance.Names.exec_runner(c.jido))
     failed = %{id: make_ref(), start: {FailedChild, :start_link, []}}
 
     assert Effects.run(%ProcessStart{child_spec: failed}, nil, %{jido: c.jido}) ==

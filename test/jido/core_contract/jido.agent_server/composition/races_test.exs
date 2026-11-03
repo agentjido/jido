@@ -52,7 +52,7 @@ defmodule JidoTest.AgentServer.Composition.RacesTest do
       supervisor =
         if placement == :owned,
           do: owned,
-          else: Process.whereis(Jido.agent_supervisor_name(c.jido))
+          else: Process.whereis(Jido.Instance.Names.agent_supervisor(c.jido))
 
       # Hold the caller before it receives the root. Tracing worker/1 itself is
       # too late: its which_children reply can already be in the caller mailbox.
@@ -96,7 +96,7 @@ defmodule JidoTest.AgentServer.Composition.RacesTest do
     end
 
     assert Server.stop(parent) == :ok
-    assert DynamicSupervisor.which_children(Jido.agent_supervisor_name(c.jido)) == []
+    assert DynamicSupervisor.which_children(Jido.Instance.Names.agent_supervisor(c.jido)) == []
   end
 
   defp hold_worker_lookup(observer, caller) do

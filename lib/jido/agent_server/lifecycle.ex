@@ -500,7 +500,9 @@ defmodule Jido.AgentServer.Lifecycle do
   def validate_continuation(_agent, _receipt), do: :ok
 
   def execution_identity(data),
-    do: {:jido_execution, Jido.namespace(data.jido), data.partition, data.agent.id, data.active.turn_id}
+    do:
+      {:jido_execution, Jido.Instance.NamespaceRegistry.namespace(data.jido), data.partition, data.agent.id,
+       data.active.turn_id}
 
   def start_execution(data, owner, hooks, policy) do
     id = execution_identity(data)

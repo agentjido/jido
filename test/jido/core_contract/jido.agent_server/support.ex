@@ -261,7 +261,7 @@ defmodule JidoTest.AgentServer.Fixtures do
         Keyword.merge(
           [
             jido: context.jido,
-            runner: Jido.exec_runner_name(context.jido),
+            runner: Jido.Instance.Names.exec_runner(context.jido),
             persistence: source
           ],
           opts

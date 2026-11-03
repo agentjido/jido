@@ -159,7 +159,7 @@ defmodule JidoTest.AgentServer.Effects.RuntimeDirectivesTest do
       parent: self(),
       partition: nil,
       plugin_specs: [],
-      runner: Jido.exec_runner_name(c.jido)
+      runner: Jido.Instance.Names.exec_runner(c.jido)
     }
   end
 end

@@ -343,7 +343,9 @@ defmodule Jido.Persistence do
   def agent_key(%Ref{} = ref), do: Record.agent_key(ref)
 
   defp resolve_ref(instance, agent_id, opts) do
-    case Keyword.get_lazy(opts, :namespace, fn -> Jido.namespace(instance) end) do
+    case Keyword.get_lazy(opts, :namespace, fn ->
+           Jido.Instance.NamespaceRegistry.namespace(instance)
+         end) do
       nil ->
         {:error, :stable_namespace_required}
 
@@ -460,7 +462,7 @@ defmodule Jido.Persistence do
     config =
       cond do
         live_instance?(jido) ->
-          Jido.instance_persistence(jido)
+          Jido.Instance.RuntimeStore.instance_persistence(jido)
 
         is_atom(jido) and function_exported?(jido, :__jido_persistence__, 0) ->
           jido.__jido_persistence__()
@@ -478,7 +480,7 @@ defmodule Jido.Persistence do
 
   defp live_instance?(source) when is_atom(source) and not is_nil(source) do
     is_pid(Process.whereis(source)) and
-      is_pid(Process.whereis(Jido.runtime_store_name(source)))
+      is_pid(Process.whereis(Jido.Instance.Names.runtime_store(source)))
   end
 
   defp live_instance?(_source), do: false

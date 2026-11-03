@@ -56,8 +56,8 @@ defmodule Jido.InstanceHelpersTest do
     assert {:ok, ^pid} =
              Jido.start(name: name, namespace: later_namespace, persistence: later_persistence)
 
-    assert Jido.namespace(name) == first_namespace
-    assert Jido.instance_persistence(name) == first_persistence
+    assert Jido.Instance.NamespaceRegistry.namespace(name) == first_namespace
+    assert Jido.Instance.RuntimeStore.instance_persistence(name) == first_persistence
     assert Jido.Instance.NamespaceRegistry.lookup(later_namespace) == nil
   end
 
@@ -109,10 +109,11 @@ defmodule Jido.InstanceHelpersTest do
 
   @tag obligation: "jido.instance.I2"
   test "default instance helpers cover runtime names" do
-    assert Jido.registry_name() == Jido.registry_name(Jido.default_instance())
-    assert Jido.agent_supervisor_name() == Jido.agent_supervisor_name(Jido.default_instance())
-    assert Jido.task_supervisor_name() == Jido.task_supervisor_name(Jido.default_instance())
-    assert Jido.runtime_store_name() == Jido.runtime_store_name(Jido.default_instance())
+    instance = Jido.default_instance()
+    assert Jido.Instance.Names.registry(instance) == Jido.Default.Registry
+    assert Jido.Instance.Names.agent_supervisor(instance) == Jido.Default.AgentSupervisor
+    assert Jido.Instance.Names.task_supervisor(instance) == Jido.Default.TaskSupervisor
+    assert Jido.Instance.Names.runtime_store(instance) == Jido.Default.RuntimeStore
 
     assert {:ok, _jido} = Jido.start()
   end

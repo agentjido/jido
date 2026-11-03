@@ -96,8 +96,8 @@ defmodule JidoTest.AgentServer.DurableTurn.RuntimeTest do
 
           :worker ->
             Runic.Runner.lookup(
-              Jido.exec_runner_name(c.jido),
-              {:jido_execution, Jido.namespace(c.jido), nil, id, turn_id}
+              Jido.Instance.Names.exec_runner(c.jido),
+              {:jido_execution, Jido.Instance.NamespaceRegistry.namespace(c.jido), nil, id, turn_id}
             )
         end
 
@@ -162,9 +162,10 @@ defmodule JidoTest.AgentServer.DurableTurn.RuntimeTest do
     status = Server.status(server)
 
     execution_id =
-      {:jido_execution, Jido.namespace(c.jido), status.partition, status.agent_id, status.active.turn_id}
+      {:jido_execution, Jido.Instance.NamespaceRegistry.namespace(c.jido), status.partition, status.agent_id,
+       status.active.turn_id}
 
-    worker = Runic.Runner.lookup(Jido.exec_runner_name(c.jido), execution_id)
+    worker = Runic.Runner.lookup(Jido.Instance.Names.exec_runner(c.jido), execution_id)
     worker_state = :sys.get_state(worker)
     assert worker_state.checkpoint_strategy == :manual
     assert :sys.get_state(worker_state.task_scope).external_owner == server
@@ -199,10 +200,10 @@ defmodule JidoTest.AgentServer.DurableTurn.RuntimeTest do
 
     assert_receive {:durable_barrier, :step_6, action}, 5_000
     turn_id = Server.status(server).active.turn_id
-    execution_id = {:jido_execution, Jido.namespace(c.jido), nil, id, turn_id}
+    execution_id = {:jido_execution, Jido.Instance.NamespaceRegistry.namespace(c.jido), nil, id, turn_id}
 
     assert {:ok, workflow} =
-             Runic.Runner.get_workflow(Jido.exec_runner_name(c.jido), execution_id)
+             Runic.Runner.get_workflow(Jido.Instance.Names.exec_runner(c.jido), execution_id)
 
     full_fact_bytes =
       workflow
@@ -225,7 +226,7 @@ defmodule JidoTest.AgentServer.DurableTurn.RuntimeTest do
     assert_receive {:durable_barrier, :step_6, _}, 5_000
 
     assert {:ok, restored_workflow} =
-             Runic.Runner.get_workflow(Jido.exec_runner_name(c.jido), execution_id)
+             Runic.Runner.get_workflow(Jido.Instance.Names.exec_runner(c.jido), execution_id)
 
     restored_vertices = Map.values(restored_workflow.graph.vertices)
     assert Enum.any?(restored_vertices, &is_struct(&1, Runic.Workflow.FactRef))
@@ -345,7 +346,9 @@ defmodule JidoTest.AgentServer.DurableTurn.RuntimeTest do
 
   defp update_receipt(c, id, fun) do
     key =
-      Jido.Persistence.agent_key(Jido.Agent.Ref.new!(namespace: Jido.namespace(c.jido), id: id))
+      Jido.Persistence.agent_key(
+        Jido.Agent.Ref.new!(namespace: Jido.Instance.NamespaceRegistry.namespace(c.jido), id: id)
+      )
 
     opts = [path: c.tmp_dir]
     assert {:ok, bytes} = Jido.Persistence.File.get(key, opts)
@@ -427,15 +430,15 @@ defmodule JidoTest.AgentServer.DurableTurn.RuntimeTest do
     assert_receive {:durable_barrier, :input_write, _}, 5_000
     turn_id = Server.status(server).active.turn_id
 
-    identity = {:jido_execution, Jido.namespace(c.jido), nil, id, turn_id}
+    identity = {:jido_execution, Jido.Instance.NamespaceRegistry.namespace(c.jido), nil, id, turn_id}
 
-    worker = Runic.Runner.lookup(Jido.exec_runner_name(c.jido), identity)
+    worker = Runic.Runner.lookup(Jido.Instance.Names.exec_runner(c.jido), identity)
     assert is_pid(worker)
     monitor = Process.monitor(worker)
     assert :ok = Server.cancel(server)
     assert_receive {:DOWN, ^monitor, :process, ^worker, _}, 5_000
     assert {:error, _} = Server.await(pending)
-    assert Runic.Runner.lookup(Jido.exec_runner_name(c.jido), identity) == nil
+    assert Runic.Runner.lookup(Jido.Instance.Names.exec_runner(c.jido), identity) == nil
     assert F.Probe.records() == []
     assert Server.status(server).durable_turn.status == :cancelled
     assert {:ok, agent, []} = Server.call(server, signal("increment"))

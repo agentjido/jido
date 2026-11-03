@@ -244,7 +244,7 @@ defmodule JidoTest.InstanceTest do
     )
 
     {:ok, _pid} = TestInstance.start_link(persistence: runtime_persistence)
-    assert Jido.instance_persistence(TestInstance) == runtime_persistence
+    assert Jido.Instance.RuntimeStore.instance_persistence(TestInstance) == runtime_persistence
 
     assert {:ok, ^runtime_persistence} =
              Jido.Persistence.resolve_config(:inherit, TestInstance)
@@ -262,7 +262,7 @@ defmodule JidoTest.InstanceTest do
 
     stop_test_instance()
     {:ok, _pid} = TestInstance.start_link()
-    assert Jido.instance_persistence(TestInstance) == application_persistence
+    assert Jido.Instance.RuntimeStore.instance_persistence(TestInstance) == application_persistence
 
     assert {:ok, ^application_persistence} =
              Jido.Persistence.resolve_config(:inherit, TestInstance)
@@ -331,10 +331,10 @@ defmodule JidoTest.InstanceTest do
     {:ok, pid} = TestInstance.start_link()
 
     assert Process.whereis(TestInstance) == pid
-    assert Process.whereis(TestInstance.task_supervisor_name())
-    assert Process.whereis(TestInstance.registry_name())
-    assert Process.whereis(TestInstance.runtime_store_name())
-    assert Process.whereis(TestInstance.agent_supervisor_name())
+    assert Process.whereis(Jido.Instance.Names.task_supervisor(TestInstance))
+    assert Process.whereis(Jido.Instance.Names.registry(TestInstance))
+    assert Process.whereis(Jido.Instance.Names.runtime_store(TestInstance))
+    assert Process.whereis(Jido.Instance.Names.agent_supervisor(TestInstance))
   end
 
   @tag obligation: "jido.instance.I5"
@@ -410,7 +410,7 @@ defmodule JidoTest.InstanceTest do
     other = String.to_atom("jido_registry_duplicate_#{System.unique_integer([:positive])}")
 
     instance_pid = start_supervised!({Jido, name: instance, namespace: namespace}, id: instance)
-    assert Jido.namespace(instance) == namespace
+    assert Jido.Instance.NamespaceRegistry.namespace(instance) == namespace
 
     assert :ok =
              Supervisor.terminate_child(Jido.Supervisor, Jido.Instance.NamespaceRegistry)
@@ -418,7 +418,7 @@ defmodule JidoTest.InstanceTest do
     assert {:ok, _registry_pid} =
              Supervisor.restart_child(Jido.Supervisor, Jido.Instance.NamespaceRegistry)
 
-    assert Jido.namespace(instance) == namespace
+    assert Jido.Instance.NamespaceRegistry.namespace(instance) == namespace
     assert Jido.Instance.NamespaceRegistry.lookup(namespace) == {instance, instance_pid}
 
     assert {:error, %{__exception__: true} = error} =
@@ -436,12 +436,12 @@ defmodule JidoTest.InstanceTest do
     instance_pid =
       start_supervised!({Jido, name: instance, persistence: persistence}, id: instance)
 
-    runtime_store = Jido.runtime_store_name(instance)
+    runtime_store = Jido.Instance.Names.runtime_store(instance)
 
-    assert Jido.instance_persistence(instance) == persistence
+    assert Jido.Instance.RuntimeStore.instance_persistence(instance) == persistence
     assert :ok = Supervisor.terminate_child(instance_pid, runtime_store)
-    assert Jido.instance_persistence(instance) == persistence
+    assert Jido.Instance.RuntimeStore.instance_persistence(instance) == persistence
     assert {:ok, _runtime_store_pid} = Supervisor.restart_child(instance_pid, runtime_store)
-    assert Jido.instance_persistence(instance) == persistence
+    assert Jido.Instance.RuntimeStore.instance_persistence(instance) == persistence
   end
 end

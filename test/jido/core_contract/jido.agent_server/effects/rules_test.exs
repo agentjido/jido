@@ -137,7 +137,7 @@ defmodule JidoTest.AgentServer.Effects.RulesTest do
       parent: nil,
       partition: nil,
       plugin_specs: specs,
-      runner: Jido.exec_runner_name(c.jido)
+      runner: Jido.Instance.Names.exec_runner(c.jido)
     }
   end
 end

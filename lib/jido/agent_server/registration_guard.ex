@@ -21,11 +21,14 @@ defmodule Jido.AgentServer.RegistrationGuard do
 
   def start_link(opts) do
     instance = Keyword.fetch!(opts, :jido)
-    GenServer.start_link(__MODULE__, instance, name: Jido.registration_guard_name(instance))
+    GenServer.start_link(__MODULE__, instance, name: Jido.Instance.Names.registration_guard(instance))
   end
 
   def claim(instance, key, pid, activation) do
-    GenServer.call(Jido.registration_guard_name(instance), {:claim, key, pid, activation})
+    GenServer.call(
+      Jido.Instance.Names.registration_guard(instance),
+      {:claim, key, pid, activation}
+    )
   catch
     :exit, _reason -> {:error, :registration_guard_unavailable}
   end
@@ -36,7 +39,7 @@ defmodule Jido.AgentServer.RegistrationGuard do
 
     {:ok,
      %{
-       registry: Jido.registry_name(instance),
+       registry: Jido.Instance.Names.registry(instance),
        registry_pid: nil,
        registry_ref: nil,
        claims: %{},
@@ -144,7 +147,8 @@ defmodule Jido.AgentServer.RegistrationGuard do
     %{state | claims: claims, refs: Map.delete(state.refs, ref)}
   end
 
-  def registry_key(id, partition), do: {:agent, Jido.partition_key(id, partition)}
+  def registry_key(id, partition),
+    do: {:agent, Jido.Instance.Names.partition_key(id, partition)}
 
   defp start_registry_until_ready(opts, deadline) do
     case Registry.start_link(opts) do

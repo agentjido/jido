@@ -2,13 +2,13 @@ defmodule Jido.PublicAPITest do
   use JidoTest.Case, async: true
 
   test "builds instance supervisor names" do
-    assert Jido.agent_supervisor_name(MyApp.Jido) == MyApp.Jido.AgentSupervisor
-    assert Jido.agent_supervisor_name(MyApp.Sub.Jido) == MyApp.Sub.Jido.AgentSupervisor
+    assert Jido.Instance.Names.agent_supervisor(MyApp.Jido) == MyApp.Jido.AgentSupervisor
+    assert Jido.Instance.Names.agent_supervisor(MyApp.Sub.Jido) == MyApp.Sub.Jido.AgentSupervisor
   end
 
   test "generates unique UUID7 identifiers" do
-    id1 = Jido.generate_id()
-    id2 = Jido.generate_id()
+    id1 = Jido.Id.uuid7()
+    id2 = Jido.Id.uuid7()
 
     assert Jido.Id.uuid7?(id1)
     assert Jido.Id.uuid7?(id2)

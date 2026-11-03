@@ -4,6 +4,7 @@ defmodule Jido.Instance.RuntimeStore do
   use GenServer
 
   @call_timeout Application.compile_env(:jido, :runtime_store_timeout, 5_000)
+  @instance_config_hive :jido_instance_config
 
   @type hive :: term()
   @type key :: term()
@@ -46,6 +47,44 @@ defmodule Jido.Instance.RuntimeStore do
     end
   rescue
     ArgumentError -> :ok
+  end
+
+  @doc false
+  @spec put_instance_config(atom(), term(), keyword()) :: :ok
+  def put_instance_config(table, persistence, agent_server) when is_atom(table) do
+    true =
+      :ets.insert(table, [
+        {{@instance_config_hive, :persistence}, persistence},
+        {{@instance_config_hive, :agent_server}, agent_server}
+      ])
+
+    :ok
+  end
+
+  @doc false
+  @spec instance_persistence(atom()) :: term()
+  def instance_persistence(instance) when is_atom(instance) do
+    table = Jido.Instance.Names.runtime_store(instance)
+
+    case :ets.lookup(table, {@instance_config_hive, :persistence}) do
+      [{{@instance_config_hive, :persistence}, persistence}] -> persistence
+      [] -> nil
+    end
+  rescue
+    ArgumentError -> nil
+  end
+
+  @doc false
+  @spec instance_agent_server_options(atom()) :: keyword()
+  def instance_agent_server_options(instance) when is_atom(instance) do
+    table = Jido.Instance.Names.runtime_store(instance)
+
+    case :ets.lookup(table, {@instance_config_hive, :agent_server}) do
+      [{_, opts}] -> opts
+      [] -> []
+    end
+  rescue
+    ArgumentError -> []
   end
 
   @doc false
@@ -145,7 +184,7 @@ defmodule Jido.Instance.RuntimeStore do
   end
 
   defp call(instance, request, fallback, timeout_fallback) do
-    server = Jido.runtime_store_name(instance)
+    server = Jido.Instance.Names.runtime_store(instance)
 
     try do
       GenServer.call(server, request, @call_timeout)

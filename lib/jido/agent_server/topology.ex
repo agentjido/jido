@@ -431,7 +431,8 @@ defmodule Jido.AgentServer.Topology do
     supervisor
   end
 
-  defp child_supervisor(context, :independent), do: Jido.agent_supervisor_name(context.jido)
+  defp child_supervisor(context, :independent),
+    do: Jido.Instance.Names.agent_supervisor(context.jido)
 
   defp attach_child(server, child, tag, token, context, parent) do
     with :ok <- validate_adoption(context, child),

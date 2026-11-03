@@ -55,7 +55,7 @@ defmodule JidoTest.AgentServer.ActivationOwnershipTest do
     assert Server.whereis(c.jido, c.agent.id) == nil
 
     assert Enum.any?(
-             DynamicSupervisor.which_children(Jido.agent_supervisor_name(c.jido)),
+             DynamicSupervisor.which_children(Jido.Instance.Names.agent_supervisor(c.jido)),
              &(elem(&1, 1) == Server.activation(first))
            )
 
@@ -106,24 +106,24 @@ defmodule JidoTest.AgentServer.ActivationOwnershipTest do
   @tag obligation: ["jido.agent_server.activation.I2", "jido.agent_server.activation.I4"]
   test "loss of the instance Registry or registration guard stops the owner", c do
     for dependency <- [:registry, :guard] do
-      server = F.start(c, jido: c.jido, runner: Jido.exec_runner_name(c.jido))
-      turn = F.blocked(server, Jido.exec_runner_name(c.jido))
+      server = F.start(c, jido: c.jido, runner: Jido.Instance.Names.exec_runner(c.jido))
+      turn = F.blocked(server, Jido.Instance.Names.exec_runner(c.jido))
       ref = Process.monitor(server)
 
       target =
         case dependency do
-          :registry -> Process.whereis(Jido.registry_name(c.jido))
-          :guard -> Process.whereis(Jido.registration_guard_name(c.jido))
+          :registry -> Process.whereis(Jido.Instance.Names.registry(c.jido))
+          :guard -> Process.whereis(Jido.Instance.Names.registration_guard(c.jido))
         end
 
       Process.exit(target, :kill)
       assert_receive {:DOWN, ^ref, :process, ^server, _}, 1_000
       assert {:error, _} = Server.await(turn.pending, 500)
       F.down(turn.action)
-      F.clean(Jido.exec_runner_name(c.jido))
+      F.clean(Jido.Instance.Names.exec_runner(c.jido))
 
-      assert_eventually(Process.whereis(Jido.registry_name(c.jido)) != nil)
-      assert_eventually(Process.whereis(Jido.registration_guard_name(c.jido)) != nil)
+      assert_eventually(Process.whereis(Jido.Instance.Names.registry(c.jido)) != nil)
+      assert_eventually(Process.whereis(Jido.Instance.Names.registration_guard(c.jido)) != nil)
     end
   end
 
@@ -170,7 +170,7 @@ defmodule JidoTest.AgentServer.ActivationOwnershipTest do
   @tag obligation: "jido.agent_server.activation.I2"
   test "a replaced guard seeds live Registry claims", c do
     key = RegistrationGuard.registry_key("seed-#{unique_id()}", nil)
-    registry = Jido.registry_name(c.jido)
+    registry = Jido.Instance.Names.registry(c.jido)
     observer = self()
 
     owner =
@@ -182,14 +182,14 @@ defmodule JidoTest.AgentServer.ActivationOwnershipTest do
 
     on_exit(fn -> if Process.alive?(owner), do: Process.exit(owner, :kill) end)
     assert_receive {:registered, ^owner}, 1_000
-    old_guard = Process.whereis(Jido.registration_guard_name(c.jido))
+    old_guard = Process.whereis(Jido.Instance.Names.registration_guard(c.jido))
     Process.exit(old_guard, :kill)
     F.down(old_guard)
 
     assert_eventually(
       match?(
         pid when is_pid(pid) and pid != old_guard,
-        Process.whereis(Jido.registration_guard_name(c.jido))
+        Process.whereis(Jido.Instance.Names.registration_guard(c.jido))
       )
     )
 
@@ -205,7 +205,7 @@ defmodule JidoTest.AgentServer.ActivationOwnershipTest do
   @tag obligation: "jido.agent_server.activation.I2"
   test "an isolated guard follows Registry loss and keeps existing claims" do
     instance = Module.concat(__MODULE__, "GuardInstance#{System.unique_integer([:positive])}")
-    registry_name = Jido.registry_name(instance)
+    registry_name = Jido.Instance.Names.registry(instance)
     {:ok, guard} = RegistrationGuard.start_link(jido: instance)
     Process.unlink(guard)
 
@@ -270,7 +270,7 @@ defmodule JidoTest.AgentServer.ActivationOwnershipTest do
 
   @tag obligation: "jido.agent_server.activation.I2"
   test "the registration guard reports unavailability", c do
-    guard = Process.whereis(Jido.registration_guard_name(c.jido))
+    guard = Process.whereis(Jido.Instance.Names.registration_guard(c.jido))
     :sys.suspend(c.jido_pid)
 
     try do
@@ -358,20 +358,20 @@ defmodule JidoTest.AgentServer.ActivationOwnershipTest do
     {:ok, server} = Server.start(agent: c.agent, jido: instance)
     assert {:ok, _, []} = Server.call(server, F.signal())
     assert length(Server.history(server)) == 1
-    turn = F.blocked(server, Jido.exec_runner_name(instance))
+    turn = F.blocked(server, Jido.Instance.Names.exec_runner(instance))
     assert {:error, :turn_timeout} = Server.await(turn.pending, 1_000)
     Application.put_env(:jido, Server, turn_timeout: :infinity)
-    turn = F.blocked(server, Jido.exec_runner_name(instance))
+    turn = F.blocked(server, Jido.Instance.Names.exec_runner(instance))
     assert {:error, :turn_timeout} = Server.await(turn.pending, 1_000)
     Server.stop(server)
 
     {:ok, explicit} =
       Server.start(agent: c.agent, jido: instance, turn_timeout: :infinity, debug: false)
 
-    turn = F.blocked(explicit, Jido.exec_runner_name(instance))
+    turn = F.blocked(explicit, Jido.Instance.Names.exec_runner(instance))
     F.release(turn)
     assert {:ok, _, []} = Server.await(turn.pending)
     assert Server.history(explicit) == []
-    F.clean(Jido.exec_runner_name(instance))
+    F.clean(Jido.Instance.Names.exec_runner(instance))
   end
 end

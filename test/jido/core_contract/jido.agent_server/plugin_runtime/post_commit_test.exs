@@ -125,7 +125,7 @@ defmodule JidoTest.AgentServer.PluginRuntime.PostCommitTest do
     server =
       start(c, :gate,
         jido: c.jido,
-        runner: Jido.exec_runner_name(c.jido),
+        runner: Jido.Instance.Names.exec_runner(c.jido),
         partition: "plugin-runtime"
       )
 
@@ -189,7 +189,7 @@ defmodule JidoTest.AgentServer.PluginRuntime.PostCommitTest do
     server =
       start(c, :ok,
         jido: c.jido,
-        runner: Jido.exec_runner_name(c.jido),
+        runner: Jido.Instance.Names.exec_runner(c.jido),
         partition: "plugin-runtime",
         directive_handler: fn _, _ -> flunk("fallback used") end
       )

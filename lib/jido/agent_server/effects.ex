@@ -94,7 +94,7 @@ defmodule Jido.AgentServer.Effects do
     do: {:reported_error, {:reported_error, context, error}}
 
   defp do_run(%ProcessStart{child_spec: spec}, _handler, context) do
-    case DynamicSupervisor.start_child(Jido.agent_supervisor_name(context.jido), spec) do
+    case DynamicSupervisor.start_child(Jido.Instance.Names.agent_supervisor(context.jido), spec) do
       {:ok, _} -> :ok
       {:ok, _, _} -> :ok
       :ignore -> :ok

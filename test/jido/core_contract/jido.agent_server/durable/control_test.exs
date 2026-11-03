@@ -47,7 +47,7 @@ defmodule JidoTest.AgentServer.Durable.ControlTest do
     restored =
       F.start(c,
         jido: c.jido,
-        runner: Jido.exec_runner_name(c.jido),
+        runner: Jido.Instance.Names.exec_runner(c.jido),
         persistence: source,
         persistence_mode: :restore
       )

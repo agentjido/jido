@@ -45,14 +45,16 @@ defmodule JidoTest.Persistence.RecordLifecycleTest do
     {ETS, opts} = persistence
 
     key =
-      Persistence.agent_key(Jido.Agent.Ref.new!(namespace: Jido.namespace(jido), id: active.id))
+      Persistence.agent_key(
+        Jido.Agent.Ref.new!(namespace: Jido.Instance.NamespaceRegistry.namespace(jido), id: active.id)
+      )
 
     assert {:ok, bytes} = ETS.get(key, opts)
 
     assert :erlang.binary_to_term(bytes, [:safe]) == %{
              fmt: 1,
              kind: :tombstone,
-             namespace: Jido.namespace(jido),
+             namespace: Jido.Instance.NamespaceRegistry.namespace(jido),
              agent_module: RuntimeAgent,
              agent_id: active.id,
              partition: nil,
@@ -70,7 +72,9 @@ defmodule JidoTest.Persistence.RecordLifecycleTest do
     assert :ok = Persistence.delete_agent(persistence, RuntimeAgent, missing_id, instance: jido)
 
     missing_key =
-      Persistence.agent_key(Jido.Agent.Ref.new!(namespace: Jido.namespace(jido), id: missing_id))
+      Persistence.agent_key(
+        Jido.Agent.Ref.new!(namespace: Jido.Instance.NamespaceRegistry.namespace(jido), id: missing_id)
+      )
 
     assert {:ok, missing_bytes} = ETS.get(missing_key, opts)
 

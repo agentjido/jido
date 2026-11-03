@@ -480,7 +480,7 @@ defmodule JidoTest.AgentServer.PluginRuntime.RuntimeTest do
     {server, agent} =
       start_live(c, [ready_mode: :gate],
         jido: c.jido,
-        runner: Jido.exec_runner_name(c.jido),
+        runner: Jido.Instance.Names.exec_runner(c.jido),
         partition: "plugin-runtime"
       )
 
@@ -681,7 +681,7 @@ defmodule JidoTest.AgentServer.PluginRuntime.RuntimeTest do
     {server, agent} =
       start_live(c, [ready_mode: :gate],
         jido: c.jido,
-        runner: Jido.exec_runner_name(c.jido),
+        runner: Jido.Instance.Names.exec_runner(c.jido),
         partition: "live"
       )
 

@@ -541,7 +541,7 @@ defmodule JidoTest.AgentServer.DurableTurn.CheckpointStoreTest do
   end
 
   defp identity(init, id),
-    do: {:jido_execution, Jido.namespace(init.jido), init.partition, init.agent_id, id}
+    do: {:jido_execution, Jido.Instance.NamespaceRegistry.namespace(init.jido), init.partition, init.agent_id, id}
 
   defp event_hash(%Runic.Workflow.Events.FactProduced{hash: hash}), do: hash
   defp event_hash(_event), do: nil

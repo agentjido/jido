@@ -16,7 +16,7 @@ defmodule JidoTest.InstanceSupervisionTest do
     name = :"runner_shutdown_#{System.unique_integer([:positive])}"
     {:ok, original} = Jido.start_link(name: name)
     Process.unlink(original)
-    runner = Process.whereis(Jido.exec_runner_name(name))
+    runner = Process.whereis(Jido.Instance.Names.exec_runner(name))
     original_ref = Process.monitor(original)
     true = :erlang.suspend_process(runner)
 
@@ -46,7 +46,7 @@ defmodule JidoTest.InstanceSupervisionTest do
 
       try do
         assert Process.whereis(name) == replacement
-        assert Process.whereis(Jido.exec_runner_name(name)) != runner
+        assert Process.whereis(Jido.Instance.Names.exec_runner(name)) != runner
         assert Process.alive?(replacement)
       after
         Supervisor.stop(replacement)

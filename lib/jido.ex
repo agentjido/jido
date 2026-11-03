@@ -3,10 +3,9 @@ defmodule Jido do
 
   alias Jido.Agent.Ref
   alias Jido.AgentServer
-  alias Jido.Instance.{NamespaceRegistry, Options, RuntimeStore}
+  alias Jido.Instance.{Names, NamespaceRegistry, Options, RuntimeStore}
 
   @shutdown_timeout_ms 10_000
-  @instance_config_hive :jido_instance_config
 
   @moduledoc """
   自動 (Jido) - A declarative actor and agent framework for Elixir, built for
@@ -146,7 +145,7 @@ defmodule Jido do
       """
       @spec config(term()) :: term()
       def config(overrides \\ []) do
-        Jido.merge_instance_config(
+        Jido.Instance.Options.merge_definition(
           Application.get_env(@otp_app, __MODULE__, []),
           overrides
         )
@@ -155,7 +154,7 @@ defmodule Jido do
       defoverridable config: 1
 
       defp __jido_instance_options__(init_arg) do
-        Jido.instance_options(
+        Jido.Instance.Options.materialize(
           config(init_arg),
           __MODULE__,
           @otp_app,
@@ -338,26 +337,6 @@ defmodule Jido do
 
       # Instance service names
 
-      @doc "Returns the Registry name for this Jido instance."
-      @spec registry_name() :: atom()
-      def registry_name, do: Jido.registry_name(__MODULE__)
-
-      @doc "Returns the stable namespace bound to this live Jido instance."
-      @spec namespace() :: String.t() | nil
-      def namespace, do: Jido.namespace(__MODULE__)
-
-      @doc "Returns the AgentSupervisor name for this Jido instance."
-      @spec agent_supervisor_name() :: atom()
-      def agent_supervisor_name, do: Jido.agent_supervisor_name(__MODULE__)
-
-      @doc "Returns the TaskSupervisor name for this Jido instance."
-      @spec task_supervisor_name() :: atom()
-      def task_supervisor_name, do: Jido.task_supervisor_name(__MODULE__)
-
-      @doc "Returns the RuntimeStore name for this Jido instance."
-      @spec runtime_store_name() :: atom()
-      def runtime_store_name, do: Jido.runtime_store_name(__MODULE__)
-
       # Instance debug API
 
       @doc """
@@ -391,33 +370,6 @@ defmodule Jido do
   # ---------------------------------------------------------------------------
   # Generated instance configuration
   # ---------------------------------------------------------------------------
-
-  @doc false
-  def merge_instance_config(config, overrides) do
-    cond do
-      not (is_list(config) and Keyword.keyword?(config)) -> config
-      not (is_list(overrides) and Keyword.keyword?(overrides)) -> overrides
-      true -> Keyword.merge(config, overrides)
-    end
-  end
-
-  @doc false
-  def instance_options(config, name, otp_app, namespace, persistence)
-
-  def instance_options(config, name, otp_app, namespace, persistence) when is_list(config) do
-    if Keyword.keyword?(config) do
-      # Generated helpers address the instance by its module name.
-      config
-      |> Keyword.put(:name, name)
-      |> Keyword.put_new(:otp_app, otp_app)
-      |> Keyword.put_new(:namespace, namespace)
-      |> Keyword.put_new(:persistence, persistence)
-    else
-      config
-    end
-  end
-
-  def instance_options(config, _name, _otp_app, _namespace, _persistence), do: config
 
   # ---------------------------------------------------------------------------
   # Default instance
@@ -546,12 +498,12 @@ defmodule Jido do
       :ok
     else
       names = [
-        exec_runner_name(name),
-        task_supervisor_name(name),
-        registration_guard_name(name),
-        registry_name(name),
-        runtime_store_name(name),
-        agent_supervisor_name(name)
+        Names.exec_runner(name),
+        Names.task_supervisor(name),
+        Names.registration_guard(name),
+        Names.registry(name),
+        Names.runtime_store(name),
+        Names.agent_supervisor(name)
       ]
 
       monitors =
@@ -596,7 +548,7 @@ defmodule Jido do
   @impl true
   def init({opts, claim}) do
     name = Keyword.fetch!(opts, :name)
-    runtime_store = runtime_store_name(name)
+    runtime_store = Names.runtime_store(name)
 
     with :ok <-
            NamespaceRegistry.bind(claim, Keyword.get(opts, :namespace), name, self()) do
@@ -604,27 +556,25 @@ defmodule Jido do
 
       :ok = RuntimeStore.ensure_table(runtime_store)
 
-      true =
-        :ets.insert(
+      :ok =
+        RuntimeStore.put_instance_config(
           runtime_store,
-          [
-            {{@instance_config_hive, :persistence}, Keyword.get(opts, :persistence)},
-            {{@instance_config_hive, :agent_server}, Keyword.get(opts, :agent_server, [])}
-          ]
+          Keyword.get(opts, :persistence),
+          Keyword.get(opts, :agent_server, [])
         )
 
       base_children = [
         {Runic.Runner,
-         name: exec_runner_name(name), store: Jido.Persistence.ContinuationStore, store_opts: [jido: name]},
-        {Task.Supervisor, name: task_supervisor_name(name), max_children: Keyword.fetch!(opts, :max_tasks)},
+         name: Names.exec_runner(name), store: Jido.Persistence.ContinuationStore, store_opts: [jido: name]},
+        {Task.Supervisor, name: Names.task_supervisor(name), max_children: Keyword.fetch!(opts, :max_tasks)},
         {Jido.AgentServer.RegistrationGuard, jido: name},
         Jido.AgentServer.RegistrationGuard.registry_child_spec(
           keys: :unique,
-          name: registry_name(name)
+          name: Names.registry(name)
         ),
         {RuntimeStore, name: runtime_store},
         {DynamicSupervisor,
-         name: agent_supervisor_name(name), strategy: :one_for_one, max_restarts: 1000, max_seconds: 5}
+         name: Names.agent_supervisor(name), strategy: :one_for_one, max_restarts: 1000, max_seconds: 5}
       ]
 
       Supervisor.init(base_children, strategy: :one_for_one)
@@ -632,101 +582,6 @@ defmodule Jido do
       {:error, reason} -> exit(reason)
     end
   end
-
-  # ---------------------------------------------------------------------------
-  # Instance runtime names and metadata
-  # ---------------------------------------------------------------------------
-
-  @doc """
-  Generates a UUIDv7 identifier.
-
-  Delegates to `Jido.Id.uuid7/0`.
-  """
-  @spec generate_id() :: Jido.Id.uuid7()
-  defdelegate generate_id(), to: Jido.Id, as: :uuid7
-
-  @doc false
-  def exec_runner_name(nil), do: Jido.ExecRunner
-  def exec_runner_name(name), do: Module.concat(name, ExecRunner)
-
-  @doc "Returns the Registry name for the default Jido instance."
-  @spec registry_name() :: atom()
-  def registry_name, do: registry_name(@default_instance)
-
-  @doc "Returns the Registry name for the selected Jido instance."
-  @spec registry_name(atom()) :: atom()
-  def registry_name(name), do: Module.concat(name, Registry)
-
-  @doc false
-  @spec registration_guard_name(atom()) :: atom()
-  def registration_guard_name(name), do: Module.concat(name, RegistrationGuard)
-
-  @doc "Returns the stable namespace bound to one live Jido instance."
-  @spec namespace(atom() | nil) :: String.t() | nil
-  def namespace(nil), do: nil
-  def namespace(name), do: NamespaceRegistry.namespace(name)
-
-  @doc false
-  @spec instance_persistence(atom()) :: term()
-  def instance_persistence(name) when is_atom(name) do
-    table = runtime_store_name(name)
-
-    case :ets.lookup(table, {@instance_config_hive, :persistence}) do
-      [{{@instance_config_hive, :persistence}, persistence}] -> persistence
-      [] -> nil
-    end
-  rescue
-    ArgumentError -> nil
-  end
-
-  @doc false
-  def instance_agent_server_options(name) do
-    case :ets.lookup(runtime_store_name(name), {@instance_config_hive, :agent_server}) do
-      [{_, opts}] -> opts
-      [] -> []
-    end
-  rescue
-    ArgumentError -> []
-  end
-
-  @doc "Returns the AgentSupervisor name for the default Jido instance."
-  @spec agent_supervisor_name() :: atom()
-  def agent_supervisor_name, do: agent_supervisor_name(@default_instance)
-
-  @doc "Returns the AgentSupervisor name for the selected Jido instance."
-  @spec agent_supervisor_name(atom()) :: atom()
-  def agent_supervisor_name(name), do: Module.concat(name, AgentSupervisor)
-
-  @doc "Returns the TaskSupervisor name for the default Jido instance."
-  @spec task_supervisor_name() :: atom()
-  def task_supervisor_name, do: task_supervisor_name(@default_instance)
-
-  @doc "Returns the TaskSupervisor name for the selected Jido instance."
-  @spec task_supervisor_name(atom() | nil) :: atom()
-  def task_supervisor_name(nil), do: Jido.Exec.TaskSupervisor
-  def task_supervisor_name(name) when is_atom(name), do: Module.concat(name, TaskSupervisor)
-
-  def task_supervisor_name(name) do
-    raise ArgumentError, "Jido instance must be an atom or nil, got: #{inspect(name)}"
-  end
-
-  @doc "Returns the RuntimeStore name for the default Jido instance."
-  @spec runtime_store_name() :: atom()
-  def runtime_store_name, do: runtime_store_name(@default_instance)
-
-  @doc "Returns the RuntimeStore name for the selected Jido instance."
-  @spec runtime_store_name(atom()) :: atom()
-  def runtime_store_name(name), do: Module.concat(name, RuntimeStore)
-
-  @doc false
-  @spec partition_key(term(), partition() | nil) :: term()
-  def partition_key(value, nil), do: value
-  def partition_key(value, partition), do: {:partition, partition, value}
-
-  @doc false
-  @spec unwrap_partition_key(term()) :: {partition() | nil, term()}
-  def unwrap_partition_key({:partition, partition, value}), do: {partition, value}
-  def unwrap_partition_key(value), do: {nil, value}
 
   # ---------------------------------------------------------------------------
   # Stable Agent Ref API
@@ -913,7 +768,7 @@ defmodule Jido do
     with {:ok, _ref} <- validate_instance_ref(instance, ref) do
       key = AgentServer.RegistrationGuard.registry_key(ref.id, ref.partition)
 
-      case Registry.lookup(registry_name(instance), key) do
+      case Registry.lookup(Names.registry(instance), key) do
         [{pid, status}] -> resolve_registered_agent(pid, status)
         _other -> {:error, :not_found}
       end
@@ -937,7 +792,7 @@ defmodule Jido do
   end
 
   defp require_instance_namespace(instance) do
-    case namespace(instance) do
+    case NamespaceRegistry.namespace(instance) do
       namespace when is_binary(namespace) ->
         {:ok, namespace}
 
@@ -1141,11 +996,11 @@ defmodule Jido do
       partition = Keyword.get(opts, :partition)
 
       instance
-      |> registry_name()
+      |> Names.registry()
       |> Registry.select([{{:"$1", :"$2", :"$3"}, [], [{{:"$1", :"$2", :"$3"}}]}])
       |> Enum.flat_map(fn
         {{:agent, key}, pid, :ready} ->
-          case unwrap_partition_key(key) do
+          case Names.unwrap_partition_key(key) do
             {^partition, id} when is_binary(id) -> [{id, pid}]
             _other -> []
           end

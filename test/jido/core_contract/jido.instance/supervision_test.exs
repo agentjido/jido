@@ -31,7 +31,7 @@ defmodule JidoTest.SupervisorTest do
 
     @tag obligation: "jido.instance.I2"
     test "starts TaskSupervisor as child", %{jido: jido} do
-      task_sup = Jido.task_supervisor_name(jido)
+      task_sup = Jido.Instance.Names.task_supervisor(jido)
       assert Process.whereis(task_sup) != nil
 
       {:ok, task} = Task.Supervisor.start_child(task_sup, fn -> :ok end)
@@ -40,7 +40,7 @@ defmodule JidoTest.SupervisorTest do
 
     @tag obligation: "jido.instance.I2"
     test "starts Registry as child", %{jido: jido} do
-      reg = Jido.registry_name(jido)
+      reg = Jido.Instance.Names.registry(jido)
       assert Process.whereis(reg) != nil
 
       {:ok, _} = Registry.register(reg, "test_key", :test_value)
@@ -52,7 +52,7 @@ defmodule JidoTest.SupervisorTest do
 
     @tag obligation: "jido.instance.I2"
     test "starts AgentSupervisor (DynamicSupervisor) as child", %{jido: jido} do
-      agent_sup = Jido.agent_supervisor_name(jido)
+      agent_sup = Jido.Instance.Names.agent_supervisor(jido)
       assert Process.whereis(agent_sup) != nil
 
       assert DynamicSupervisor.count_children(agent_sup) == %{

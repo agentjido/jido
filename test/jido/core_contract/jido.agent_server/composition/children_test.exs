@@ -181,7 +181,7 @@ defmodule JidoTest.AgentServer.Composition.ChildrenTest do
     leaf = child(plugin, :leaf)
 
     assert Enum.any?(
-             DynamicSupervisor.which_children(Jido.agent_supervisor_name(c.jido)),
+             DynamicSupervisor.which_children(Jido.Instance.Names.agent_supervisor(c.jido)),
              &(elem(&1, 1) == independent_root)
            )
 
@@ -421,7 +421,7 @@ defmodule JidoTest.AgentServer.Composition.ChildrenTest do
   @tag obligation: "jido.agent_server.composition.I4"
   test "a dead startup caller cannot attach an old child after its tag is reused", c do
     {:ok, parent} = Server.start(agent: agent("parent"), jido: c.jido)
-    guard = Process.whereis(Jido.registration_guard_name(c.jido))
+    guard = Process.whereis(Jido.Instance.Names.registration_guard(c.jido))
     :sys.suspend(guard)
     on_exit(fn -> if Process.alive?(guard), do: :sys.resume(guard) end)
     abandoned = Task.async(fn -> Server.spawn_child(parent, agent("abandoned"), :retry) end)

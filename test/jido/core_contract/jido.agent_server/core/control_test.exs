@@ -215,7 +215,7 @@ defmodule JidoTest.AgentServer.ControlTest do
   test "initializing workers reject controls before readiness", c do
     F.storage_mode(c, :gate)
     source = {F.ControlStorage, store: c.store, control: c.control, observer: self()}
-    server = F.start(c, jido: c.jido, runner: Jido.exec_runner_name(c.jido), persistence: source)
+    server = F.start(c, jido: c.jido, runner: Jido.Instance.Names.exec_runner(c.jido), persistence: source)
     assert_receive {:saving, task}, 1_000
     assert {:error, :not_ready} = Server.quiesce(server)
     assert {:error, :not_ready} = Server.resume(server)

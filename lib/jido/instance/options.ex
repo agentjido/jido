@@ -16,6 +16,32 @@ defmodule Jido.Instance.Options do
   @default_max_tasks 1_000
 
   @doc false
+  @spec merge_definition(term(), term()) :: term()
+  def merge_definition(config, overrides) do
+    cond do
+      not (is_list(config) and Keyword.keyword?(config)) -> config
+      not (is_list(overrides) and Keyword.keyword?(overrides)) -> overrides
+      true -> Keyword.merge(config, overrides)
+    end
+  end
+
+  @doc false
+  @spec materialize(term(), atom(), atom(), String.t() | nil, term()) :: term()
+  def materialize(config, name, otp_app, namespace, persistence) when is_list(config) do
+    if Keyword.keyword?(config) do
+      config
+      |> Keyword.put(:name, name)
+      |> Keyword.put_new(:otp_app, otp_app)
+      |> Keyword.put_new(:namespace, namespace)
+      |> Keyword.put_new(:persistence, persistence)
+    else
+      config
+    end
+  end
+
+  def materialize(config, _name, _otp_app, _namespace, _persistence), do: config
+
+  @doc false
   @spec validate_definition!(term()) :: keyword() | no_return()
   def validate_definition!(opts) do
     with true <- Keyword.keyword?(opts),
