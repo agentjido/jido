@@ -122,7 +122,7 @@ assets:
   - source_repository: jido_v3_split
     source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
     source_path: test/authoring
-    target_path: test/jido/core_authoring
+    target_path: test/authoring
     quality_surface: authoring
     owner: jido.agent
     disposition: ported

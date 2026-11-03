@@ -34,6 +34,7 @@ defmodule Jido.MixProject do
         "test.authoring": :test,
         "test.bench": :test,
         "test.ci": :test,
+        "test.contracts": :test,
         "test.examples": :test,
         "test.fuzz": :test,
         "test.live": :test,
@@ -127,6 +128,8 @@ defmodule Jido.MixProject do
       "test.bench": test_alias("test/bench", :bench),
       "test.ci": [
         "test",
+        "test.authoring",
+        "test.contracts",
         "test.examples",
         "test.property",
         "test.fuzz",
@@ -135,6 +138,7 @@ defmodule Jido.MixProject do
         "test.peer",
         "test.bench"
       ],
+      "test.contracts": "covenant.check",
       "test.examples": test_alias("test/examples", :example),
       "test.fuzz": test_alias("test/property", :fuzz),
       "test.live": test_alias("test/live", :live),
@@ -170,7 +174,7 @@ defmodule Jido.MixProject do
     [
       ~r/^test\/fixtures\//,
       ~r/^test\/contracts\//,
-      ~r/^test\/jido\/core_authoring\/support\//,
+      ~r/^test\/authoring\/support\//,
       ~r/^test\/jido\/core_contract\/.*(?:support|configuration_support)\.ex$/
     ]
   end

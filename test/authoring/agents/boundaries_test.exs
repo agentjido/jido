@@ -47,6 +47,9 @@ defmodule JidoTest.Authoring.Agents.BoundariesTest do
     registry = JidoTest.AgentRegistry.for(definition)
     assert {:ok, document} = JidoTest.AgentRegistry.encode(definition, registry)
     assert {:ok, ^definition} = JidoTest.AgentRegistry.decode(document, registry)
-    assert {:error, _} = JidoTest.AgentRegistry.decode(document, %{})
+
+    assert_raise ArgumentError, "Catalog is invalid: %{}", fn ->
+      JidoTest.AgentRegistry.decode(document, %{})
+    end
   end
 end

@@ -42,8 +42,14 @@ defmodule Jido.Agent.JSONTest do
     assert json =~ "\"vsn\":1"
     refute json =~ "Joi.Types"
     assert {:ok, ^definition} = JidoTest.AgentRegistry.decode_json(json, registry)
-    assert {:error, _} = JidoTest.AgentRegistry.decode_json(json, %{})
-    assert {:error, _} = JidoTest.AgentRegistry.encode_json(instance, %{})
+
+    assert_raise ArgumentError, "Catalog is invalid: %{}", fn ->
+      JidoTest.AgentRegistry.decode_json(json, %{})
+    end
+
+    assert_raise ArgumentError, "Catalog is invalid: %{}", fn ->
+      JidoTest.AgentRegistry.encode_json(instance, %{})
+    end
   end
 
   test "import rejects unknown references, fields, versions, and invalid definitions" do
