@@ -1,9 +1,7 @@
 ---
 modules:
   - Jido.AgentServer.Plugin
-  - Jido.AgentServer.Plugin.Admission
   - Jido.AgentServer.Plugin.Callbacks
-  - Jido.AgentServer.Plugin.Commit
 ---
 
 ## Purpose
@@ -13,11 +11,11 @@ component owns runtime roots and Plugin callbacks. It does not own Plugin
 authoring, bundled Plugin behavior, Agent evaluation, state-machine phases, or
 general effect execution.
 
-The public boundary is `Jido.AgentServer.Plugin.state/2` plus the read-only
-`Admission` and `Commit` callback records. Other Plugin hosting operations,
-callback adapters are internal. The normalized runtime specification is
+The public boundary is `Jido.AgentServer.Plugin.state/2`. Other Plugin hosting
+operations and callback adapters are internal. Callback records belong to
+`Jido.Plugin.Context`. The normalized runtime specification is
 `Jido.Plugin.Spec.Runtime`, owned by the generic Plugin definition boundary.
-This component has no DSL.
+This component has no DSL or forwarding facade.
 
 ## Obligations
 
@@ -119,8 +117,8 @@ This component has no DSL.
 
 ### jido.agent_server.plugin_runtime.I13 — Public live Plugin API
 
-- **scope:** `Jido.AgentServer.Plugin.state/2`, `Jido.AgentServer.Plugin.Admission`, `Jido.AgentServer.Plugin.Commit`
-- **must:** Keep Plugin-owned state reads on the live `Jido.AgentServer.Plugin` owner. Document and type the exact read-only admission and commit callback records. Keep callback adapters and normalized runtime specifications internal. Do not add a Plugin-runtime DSL or a forwarding state facade.
+- **scope:** `Jido.AgentServer.Plugin.state/2`, `Jido.Plugin.Context.Admission`, `Jido.Plugin.Context.Commit`
+- **must:** Keep Plugin-owned state reads on the live `Jido.AgentServer.Plugin` owner. Consume the generic, read-only admission and commit callback records. Keep callback adapters and normalized runtime specifications internal. Do not add a Plugin-runtime DSL or a forwarding state facade.
 - **why:** Plugin authors need stable callback data and one direct state-read owner.
 - **kind:** functional
 - **status:** active

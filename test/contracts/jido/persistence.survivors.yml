@@ -70,42 +70,6 @@
   sort: log-only
   reason: The contract fixes the error category and structured data. It does not fix human-readable error prose.
 
-- at: lib/jido/persistence/plugin/context.ex:9:47
-  operator: string_empty
-  mutation: "`\"Plugin package module\"` → `\"\"`"
-  sort: unpromised
-  reason: Field descriptions are documentation metadata. The contract fixes the field, type, and validation rule, not this prose.
-
-- at: lib/jido/persistence/plugin/context.ex:10:52
-  operator: string_empty
-  mutation: "`\"Plugin package version\"` → `\"\"`"
-  sort: unpromised
-  reason: Field descriptions are documentation metadata. The contract fixes the field, type, and validation rule, not this prose.
-
-- at: lib/jido/persistence/plugin/context.ex:12:42
-  operator: string_empty
-  mutation: "`\"Persistence record format version\"` → `\"\"`"
-  sort: unpromised
-  reason: Field descriptions are documentation metadata. The contract fixes the field, type, and validation rule, not this prose.
-
-- at: lib/jido/persistence/plugin/context.ex:14:44
-  operator: string_empty
-  mutation: "`\"Persistence operation reason\"` → `\"\"`"
-  sort: unpromised
-  reason: Field descriptions are documentation metadata. The contract fixes the field, type, and validation rule, not this prose.
-
-- at: lib/jido/persistence/plugin/context.ex:32:35
-  operator: string_empty
-  mutation: "`\"Persistence Plugin context is invalid\"` → `\"\"`"
-  sort: log-only
-  reason: The contract fixes the error category and structured issues. It does not fix human-readable error prose.
-
-- at: lib/jido/persistence/plugin/context.ex:37:17
-  operator: string_empty
-  mutation: "`\"Expected a Jido.Persistence.Plugin.Context value\"` → `\"\"`"
-  sort: log-only
-  reason: The contract fixes the error category and rejected value. It does not fix human-readable error prose.
-
 - at: lib/jido/persistence/record.ex:235:33
   operator: string_empty
   mutation: "`\"Persistence record contains a non-portable term\"` → `\"\"`"

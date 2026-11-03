@@ -19,7 +19,6 @@ defmodule Jido.Agent do
   alias Jido.Catalog
   alias Jido.Error
   alias Jido.Signal
-  alias Jido.Trace.Context, as: TraceContext
 
   @type t :: %__MODULE__{}
 
@@ -263,13 +262,7 @@ defmodule Jido.Agent do
       ) do
     with {:ok, signal} <- Signal.new(type, data, source: signal_source),
          {:ok, _source_signal, trace} <- Signal.Context.ensure_trace(source_signal),
-         {:ok, signal} <-
-           Signal.Context.put_trace(signal, Jido.Trace.with_causation(trace, source_signal.id)) do
-      case TraceContext.propagate_to(signal, source_signal.id) do
-        {:ok, traced} -> {:ok, traced}
-        {:error, _reason} -> {:ok, signal}
-      end
-    end
+         do: Signal.Context.put_trace(signal, Jido.Trace.with_causation(trace, source_signal.id))
   end
 
   def build_signal(_context, _type, _data) do

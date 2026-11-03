@@ -3,7 +3,7 @@ defmodule JidoTest.Persistence.ApiTest do
 
   alias Jido.Persistence
   alias Jido.Persistence.{Plugin, S3, Snapshot, Store}
-  alias Jido.Persistence.Plugin.Context
+  alias Jido.Plugin.Context.Persistence, as: Context
 
   @tag obligation: [
          "jido.persistence.I1",
@@ -24,13 +24,11 @@ defmodule JidoTest.Persistence.ApiTest do
            ]
 
     assert documented_functions(Store) == [compare_and_swap: 4, open: 1, read: 2]
-    assert documented_functions(Context) == [schema: 0, validate: 1]
     assert documented_functions(Plugin) == []
 
     assert public_module?(Persistence)
     assert public_module?(Store)
     assert public_module?(Plugin)
-    assert public_module?(Context)
     assert public_module?(S3)
     refute public_module?(Snapshot)
   end

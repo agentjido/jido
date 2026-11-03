@@ -58,7 +58,7 @@ defmodule Jido.Plugin.FacetsTest do
     @moduledoc false
     @behaviour Jido.Plugin
 
-    alias Jido.AgentServer.Plugin.Admission
+    alias Jido.Plugin.Context.Admission
 
     def admit(_runtime, %Admission{} = admission, _opts) do
       {:ok,

@@ -1,6 +1,6 @@
-defmodule Jido.AgentServer.Plugin.Commit do
+defmodule Jido.Plugin.Context.Commit do
   @moduledoc """
-  Read-only committed view for one Agent Server Plugin notification.
+  Read-only committed view for one Plugin notification.
 
   `plugin_state` and `state_version` describe the same completed Turn commit.
   The view contains only the selected Plugin-owned field and identity context.

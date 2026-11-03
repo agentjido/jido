@@ -7,8 +7,8 @@ defmodule Jido.Persistence.Plugin do
   result. `Jido.Persistence` owns when the conversion runs.
   """
 
-  alias Jido.Persistence.Plugin.Context
   alias Jido.Plugin, as: PluginBoundary
+  alias Jido.Plugin.Context.Persistence, as: Context
   alias Jido.Plugin.Spec.Persistence, as: Spec
 
   @doc false

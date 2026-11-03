@@ -167,7 +167,7 @@ defmodule JidoTest.Persistence.PluginIntegrationTest do
 
     dump_context = PersistencePlugin.context(spec, :dump, 1, :contract)
 
-    assert %Jido.Persistence.Plugin.Context{
+    assert %Jido.Plugin.Context.Persistence{
              plugin: Package,
              plugin_vsn: 4,
              record_format: 1,
@@ -177,7 +177,7 @@ defmodule JidoTest.Persistence.PluginIntegrationTest do
 
     assert {:ok, "sealed:3"} = PersistencePlugin.dump(spec, 3, dump_context)
 
-    assert %Jido.Persistence.Plugin.Context{record_format: 1} =
+    assert %Jido.Plugin.Context.Persistence{record_format: 1} =
              PersistencePlugin.context(spec, :dump, 1, :contract)
 
     for changed <- [

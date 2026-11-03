@@ -1,8 +1,8 @@
-defmodule Jido.Persistence.Plugin.Context do
-  alias Jido.Joi
+defmodule Jido.Plugin.Context.Persistence do
   @moduledoc "Bounded format context for one Plugin-owned state conversion."
 
   alias Jido.Error
+  alias Jido.Joi
 
   @schema Joi.struct(
             __MODULE__,
@@ -34,7 +34,7 @@ defmodule Jido.Persistence.Plugin.Context do
   end
 
   def validate(value),
-    do: invalid("Expected a Jido.Persistence.Plugin.Context value", %{value: value})
+    do: invalid("Expected a Jido.Plugin.Context.Persistence value", %{value: value})
 
   defp invalid(message, details) do
     {:error,

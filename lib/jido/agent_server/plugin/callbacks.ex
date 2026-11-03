@@ -2,8 +2,8 @@ defmodule Jido.AgentServer.Plugin.Callbacks do
   @moduledoc false
 
   alias Jido.AgentServer.Command
-  alias Jido.AgentServer.Plugin.{Admission, Commit}
   alias Jido.Plugin.{Context, Init, Input}
+  alias Jido.Plugin.Context.{Admission, Commit}
   alias Jido.Plugin, as: PluginBoundary
   alias Jido.Plugin.Spec.Runtime, as: Spec
 

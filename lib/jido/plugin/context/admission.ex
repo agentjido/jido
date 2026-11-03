@@ -1,6 +1,6 @@
-defmodule Jido.AgentServer.Plugin.Admission do
+defmodule Jido.Plugin.Context.Admission do
   @moduledoc """
-  Read-only input for one live Agent Server Plugin admission callback.
+  Read-only input for one live Plugin admission callback.
 
   Admission can inspect live command data and its own pure prepared input. It
   can reject the Turn or return one transient runtime input. It has no return

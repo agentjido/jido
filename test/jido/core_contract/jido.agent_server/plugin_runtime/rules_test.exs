@@ -3,7 +3,8 @@ defmodule JidoTest.AgentServer.PluginRuntime.RulesTest do
   use Covenant.Case, component: "jido.agent_server.plugin_runtime", async: true
 
   alias Jido.AgentServer.Plugin
-  alias Jido.AgentServer.Plugin.{Callbacks, Commit}
+  alias Jido.AgentServer.Plugin.Callbacks
+  alias Jido.Plugin.Context.Commit
   alias Jido.Plugin.{Context, Init}
 
   defmodule Effect do

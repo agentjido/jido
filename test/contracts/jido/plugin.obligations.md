@@ -3,6 +3,9 @@ modules:
   - Jido.Plugin
   - Jido.Plugin.Config
   - Jido.Plugin.Context
+  - Jido.Plugin.Context.Admission
+  - Jido.Plugin.Context.Commit
+  - Jido.Plugin.Context.Persistence
   - Jido.Plugin.Init
   - Jido.Plugin.Input
   - Jido.Plugin.Manifest
@@ -18,9 +21,9 @@ modules:
 Protect the generic Plugin declaration and callback contract. This component
 defines valid Plugin metadata, callback shapes, and narrow handoff values. Its
 public modules are `Jido.Plugin`, `Jido.Plugin.Input`, `Jido.Plugin.Init`,
-`Jido.Plugin.Context`. Config owns deferred environment references. Manifest,
-normalization, the aggregate Spec and its consumer facet values, and callback
-error policy are internal.
+`Jido.Plugin.Context` and its Admission, Commit, and Persistence records. Config
+owns deferred environment references. Manifest, normalization, the aggregate
+Spec and its consumer facet values, and callback error policy are internal.
 
 `Jido.AgentServer.Plugin.state/2` is the public live Plugin state API. The
 `jido.agent_server.plugin_runtime` component owns it. This component does not
@@ -88,15 +91,15 @@ or what a bundled Plugin does.
 ### jido.plugin.I8 — Public API boundary
 
 - **scope:** documented modules and functions in the generic Plugin contract
-- **must:** Keep `use Jido.Plugin`, the Input struct, and the three context schemas public. Keep Manifest, Normalizer, aggregate Spec, and error helpers internal. Keep the callback list closed and optional. Do not add a facade for live AgentServer Plugin behavior.
+- **must:** Keep `use Jido.Plugin`, the Input and Init structs, the phase-tagged Context, and the exact Admission, Commit, and Persistence callback records public. Keep Manifest, Normalizer, aggregate Spec, and error helpers internal. Keep the callback list closed and optional. Do not add a facade for live AgentServer Plugin behavior.
 - **why:** Users need one small stable authoring surface while consumers keep ownership of execution.
 - **kind:** functional
 - **status:** active
 
 ### jido.plugin.I9 — Generic Plugin context values
 
-- **scope:** `Jido.Plugin.Input`, `Jido.Plugin.Init`, `Jido.Plugin.Context`
-- **must:** Keep prepared and runtime input separate. Validate exact runtime initialization and narrow Signal and Directive contexts with their required identity, Signal, version, owned-state, option, instance, and partition fields. Supply only documented empty defaults. Permit the owning AgentServer PID only in Init and transient handles only in runtime input and Turn context. Do not place complete Agent values in these generic structs.
+- **scope:** `Jido.Plugin.Input`, `Jido.Plugin.Init`, `Jido.Plugin.Context`, `Jido.Plugin.Context.Admission`, `Jido.Plugin.Context.Commit`, `Jido.Plugin.Context.Persistence`
+- **must:** Keep prepared and runtime input separate. Validate exact runtime initialization and narrow Signal, Directive, admission, commit, and persistence contexts with their required identity, Signal, version, owned-state, option, instance, partition, and format fields. Supply only documented empty defaults. Permit the owning AgentServer PID only in Init and transient handles only in runtime input and Turn context. Do not place complete Agent values in these generic structs.
 - **why:** Consumers need narrow handoff values that do not create a second Agent state or leak full runtime ownership.
 - **kind:** functional
 - **status:** active

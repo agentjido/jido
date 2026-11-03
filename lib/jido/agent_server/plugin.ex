@@ -3,8 +3,9 @@ defmodule Jido.AgentServer.Plugin do
 
   alias Jido.Error
   alias Jido.AgentServer.Command
-  alias Jido.AgentServer.Plugin.{Callbacks, Commit}
+  alias Jido.AgentServer.Plugin.Callbacks
   alias Jido.Plugin.Init
+  alias Jido.Plugin.Context.Commit
 
   @doc "Reads the current state owned by one live Plugin runtime."
   @spec state(Init.t(), timeout()) :: {:ok, term()} | {:error, term()}

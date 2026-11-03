@@ -3,7 +3,6 @@ modules:
   - Jido.Persistence
   - Jido.Persistence.Checkpoint
   - Jido.Persistence.Plugin
-  - Jido.Persistence.Plugin.Context
   - Jido.Persistence.Record
   - Jido.Persistence.Snapshot
   - Jido.Persistence.Store
@@ -16,10 +15,10 @@ owns adapter configuration, durable identity, record data, snapshots, Plugin
 state conversion, revisions, and logical deletion. It uses the strict
 `Jido.Codec.Term` contract.
 
-The supported public boundary is `Jido.Persistence`,
-`Jido.Persistence.Store`,
-`Jido.Persistence.Plugin.Context`, and the bundled adapter modules. Snapshot,
-record, identity, callback, and adapter-operation modules are internal.
+The supported public boundary is `Jido.Persistence`, `Jido.Persistence.Store`,
+and the bundled adapter modules. Persistence Plugin callbacks use the generic
+`Jido.Plugin.Context.Persistence` record. Snapshot, record, identity, callback,
+and adapter-operation modules are internal.
 
 It does not own live AgentServer recovery, commit publication, durable Flow
 progress, or the private behavior of one storage backend.

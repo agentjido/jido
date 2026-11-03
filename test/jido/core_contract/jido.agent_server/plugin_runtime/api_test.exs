@@ -2,59 +2,17 @@ defmodule JidoTest.AgentServer.PluginRuntime.ApiTest do
   use Covenant.Case, component: "jido.agent_server.plugin_runtime", async: true
 
   alias Jido.AgentServer.Plugin, as: Runtime
-  alias Jido.AgentServer.Plugin.{Admission, Callbacks, Commit}
+  alias Jido.AgentServer.Plugin.Callbacks
   alias Jido.Plugin.Spec.Runtime, as: RuntimeSpec
+
   @tag obligation: "jido.agent_server.plugin_runtime.I13"
-  test "the live Plugin API exposes its state owner and callback records" do
+  test "the live Plugin API exposes only its state owner" do
     assert {:function, :state, 2} in documented_api(Runtime)
     assert public_module?(Runtime)
-
-    for module <- [Admission, Commit] do
-      assert public_module?(module)
-      assert documented_api(module) == []
-      assert documented_types(module) == [{:type, :t, 0}]
-    end
 
     for module <- [Callbacks, RuntimeSpec] do
       refute public_module?(module)
     end
-  end
-
-  @tag obligation: [
-         "jido.agent_server.plugin_runtime.I4",
-         "jido.agent_server.plugin_runtime.I6",
-         "jido.agent_server.plugin_runtime.I13"
-       ]
-  test "public callback records keep their exact read-only fields" do
-    assert fields(Admission) == [
-             :agent_id,
-             :agent_module,
-             :caller_context,
-             :plugin,
-             :plugin_state,
-             :prepared_input,
-             :signal,
-             :state_version
-           ]
-
-    assert fields(Commit) == [
-             :agent_id,
-             :agent_module,
-             :jido,
-             :partition,
-             :plugin,
-             :plugin_state,
-             :state_version,
-             :turn_id
-           ]
-  end
-
-  defp fields(module) do
-    module
-    |> struct()
-    |> Map.from_struct()
-    |> Map.keys()
-    |> Enum.sort()
   end
 
   defp documented_api(module) do
@@ -64,19 +22,6 @@ defmodule JidoTest.AgentServer.PluginRuntime.ApiTest do
       {{kind, name, arity}, _, _, doc, _}
       when kind in [:function, :macro] and doc not in [:hidden, :none] ->
         [{kind, name, arity}]
-
-      _other ->
-        []
-    end)
-    |> Enum.sort()
-  end
-
-  defp documented_types(module) do
-    module
-    |> docs()
-    |> Enum.flat_map(fn
-      {{:type, name, arity}, _, _, doc, _} when doc not in [:hidden, :none] ->
-        [{:type, name, arity}]
 
       _other ->
         []

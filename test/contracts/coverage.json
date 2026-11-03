@@ -2137,12 +2137,11 @@
         "jido.agent_server.plugin_runtime.I13": {
           "failing": 0,
           "kind": "functional",
-          "passing": 2,
+          "passing": 1,
           "status": "active",
           "testable": true,
           "tests": [
-            "test public callback records keep their exact read-only fields",
-            "test the live Plugin API exposes its state owner and callback records"
+            "test the live Plugin API exposes only its state owner"
           ]
         },
         "jido.agent_server.plugin_runtime.I2": {
@@ -2180,7 +2179,7 @@
         "jido.agent_server.plugin_runtime.I4": {
           "failing": 0,
           "kind": "functional",
-          "passing": 6,
+          "passing": 5,
           "status": "active",
           "testable": true,
           "tests": [
@@ -2188,7 +2187,6 @@
             "test a root start result with info reaches readiness and supplies the live runtime ref",
             "test callback adapters preserve explicit errors and report invalid or raised results",
             "test live admission follows declaration order and keeps pure and runtime inputs separate",
-            "test public callback records keep their exact read-only fields",
             "test rejected, invalid, or raised admission never executes or commits"
           ]
         },
@@ -2207,7 +2205,7 @@
         "jido.agent_server.plugin_runtime.I6": {
           "failing": 0,
           "kind": "ordering",
-          "passing": 10,
+          "passing": 9,
           "status": "active",
           "testable": true,
           "tests": [
@@ -2219,8 +2217,7 @@
             "test callback adapters preserve explicit errors and report invalid or raised results",
             "test callbacks receive the live runtime root",
             "test commit options stay within the selected owner facet",
-            "test hooks run after commit in declaration order, even without directives",
-            "test public callback records keep their exact read-only fields"
+            "test hooks run after commit in declaration order, even without directives"
           ]
         },
         "jido.agent_server.plugin_runtime.I7": {
@@ -3024,10 +3021,11 @@
         "jido.plugin.I8": {
           "failing": 0,
           "kind": "functional",
-          "passing": 2,
+          "passing": 3,
           "status": "active",
           "testable": true,
           "tests": [
+            "test callback records keep their exact read-only fields",
             "test the Plugin behavior has one closed optional callback surface",
             "test the documented Plugin API contains only the public authoring and context surface"
           ]
@@ -3035,10 +3033,11 @@
         "jido.plugin.I9": {
           "failing": 0,
           "kind": "functional",
-          "passing": 6,
+          "passing": 7,
           "status": "active",
           "testable": true,
           "tests": [
+            "test callback records keep their exact read-only fields",
             "test directive schema preserves its complete narrow value",
             "test initialization schema preserves its complete narrow value",
             "test input keeps prepared and runtime values separate",

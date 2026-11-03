@@ -66,7 +66,7 @@ defmodule Jido.Plugin do
   @callback directives(keyword()) :: [module()] | {:error, term()}
   @callback reduce(Jido.Agent.Plugin.Reduction.t(), keyword()) :: {:ok, term()} | {:error, term()}
   @callback validate_options(keyword()) :: :ok | {:error, term()}
-  @callback admit(term() | nil, Jido.AgentServer.Plugin.Admission.t(), keyword()) ::
+  @callback admit(term() | nil, Jido.Plugin.Context.Admission.t(), keyword()) ::
               {:ok, term()} | {:error, term()}
   @callback prepare_outbound(
               term() | nil,
@@ -100,11 +100,11 @@ defmodule Jido.Plugin do
   Hooks are not replayed. Rebuild live state from `Jido.Plugin.Init` on startup
   and runtime replacement. Use Telemetry for optional observation.
   """
-  @callback after_commit(term() | nil, Jido.AgentServer.Plugin.Commit.t(), keyword()) ::
+  @callback after_commit(term() | nil, Jido.Plugin.Context.Commit.t(), keyword()) ::
               :ok | {:error, term()}
-  @callback dump(term(), Jido.Persistence.Plugin.Context.t(), keyword()) ::
+  @callback dump(term(), Jido.Plugin.Context.Persistence.t(), keyword()) ::
               {:ok, term()} | {:error, term()}
-  @callback load(term(), Jido.Persistence.Plugin.Context.t(), keyword()) ::
+  @callback load(term(), Jido.Plugin.Context.Persistence.t(), keyword()) ::
               {:ok, term()} | {:error, term()}
 
   @owner_callbacks [

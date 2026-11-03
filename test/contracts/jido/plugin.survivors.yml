@@ -78,7 +78,7 @@
 
 - at: "lib/jido/plugin/context.ex:16:61"
   operator: "string_empty"
-  mutation: "`\"Signal after live admission\"` → `\"\"`"
+  mutation: "`\"Signal used for the Agent Turn\"` → `\"\"`"
   sort: log-only
   reason: "The contract fixes the field and validation behavior. It does not fix schema description prose."
 
@@ -453,3 +453,39 @@
   mutation: "`\"Outbound Signal target\"` → `\"\"`"
   sort: log-only
   reason: "The contract fixes the field and validation behavior. It does not fix schema description prose."
+
+- at: "lib/jido/plugin/context/persistence.ex:14:44"
+  operator: "string_empty"
+  mutation: "`\"Persistence operation reason\"` → `\"\"`"
+  sort: unpromised
+  reason: "Field descriptions are documentation metadata. The contract fixes the field, type, and validation rule, not this prose."
+
+- at: "lib/jido/plugin/context/persistence.ex:10:47"
+  operator: "string_empty"
+  mutation: "`\"Plugin package module\"` → `\"\"`"
+  sort: unpromised
+  reason: "Field descriptions are documentation metadata. The contract fixes the field, type, and validation rule, not this prose."
+
+- at: "lib/jido/plugin/context/persistence.ex:11:52"
+  operator: "string_empty"
+  mutation: "`\"Plugin package version\"` → `\"\"`"
+  sort: unpromised
+  reason: "Field descriptions are documentation metadata. The contract fixes the field, type, and validation rule, not this prose."
+
+- at: "lib/jido/plugin/context/persistence.ex:12:42"
+  operator: "string_empty"
+  mutation: "`\"Persistence record format version\"` → `\"\"`"
+  sort: unpromised
+  reason: "Field descriptions are documentation metadata. The contract fixes the field, type, and validation rule, not this prose."
+
+- at: "lib/jido/plugin/context/persistence.ex:32:35"
+  operator: "string_empty"
+  mutation: "`\"Persistence Plugin context is invalid\"` → `\"\"`"
+  sort: log-only
+  reason: "The contract fixes the error category and structured issues. It does not fix human-readable error prose."
+
+- at: "lib/jido/plugin/context/persistence.ex:37:17"
+  operator: "string_empty"
+  mutation: "`\"Expected a Jido.Plugin.Context.Persistence value\"` → `\"\"`"
+  sort: log-only
+  reason: "The contract fixes the error category and rejected value. It does not fix human-readable error prose."
