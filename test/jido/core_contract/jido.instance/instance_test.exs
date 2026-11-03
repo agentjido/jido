@@ -201,11 +201,11 @@ defmodule JidoTest.InstanceTest do
   test "runtime debug options override application configuration" do
     Application.put_env(:jido_test_instance, TestInstance, max_tasks: 500, debug: true)
     assert {:ok, _pid} = TestInstance.start_link(debug: false)
-    assert TestInstance.debug() == :off
+    assert Jido.Telemetry.debug_level(TestInstance) == :off
 
     stop_test_instance()
     assert {:ok, _pid} = TestInstance.start_link(debug: :verbose)
-    assert TestInstance.debug() == :verbose
+    assert Jido.Telemetry.debug_level(TestInstance) == :verbose
   end
 
   @tag obligation: "jido.instance.I1"
@@ -252,10 +252,10 @@ defmodule JidoTest.InstanceTest do
     agent = RedisTestAgent.instantiate!(id: "configured-persistence")
 
     assert {:ok, server} =
-             TestInstance.start_agent(agent, persistence: :inherit, persistence_mode: :create)
+             Jido.start_agent(TestInstance, agent, persistence: :inherit, persistence_mode: :create)
 
     assert :ok = Server.await_ready(server)
-    assert :ok = TestInstance.hibernate(server)
+    assert :ok = Jido.hibernate(TestInstance, server)
 
     assert {:ok, ^agent} =
              Jido.Persistence.load_agent(runtime_persistence, RedisTestAgent, agent.id, instance: TestInstance)
@@ -269,7 +269,7 @@ defmodule JidoTest.InstanceTest do
   end
 
   @tag obligation: ["jido.instance.I4", "jido.instance.I5"]
-  test "hibernate and thaw work through an instance module" do
+  test "hibernate and thaw use the selected instance" do
     module = compile_inline_redis_instance("inline-persist")
     on_exit(fn -> unload_module(module) end)
     start_supervised!(module)
@@ -279,11 +279,11 @@ defmodule JidoTest.InstanceTest do
       |> then(fn agent -> %{agent | state: %{agent.state | counter: 42}} end)
 
     assert {:ok, pid} =
-             module.start_agent(agent, persistence: :inherit, persistence_mode: :create)
+             Jido.start_agent(module, agent, persistence: :inherit, persistence_mode: :create)
 
     assert :ok = Server.await_ready(pid)
-    assert :ok = module.hibernate(pid)
-    assert {:ok, thawed_pid} = module.thaw(RedisTestAgent, agent.id)
+    assert :ok = Jido.hibernate(module, pid)
+    assert {:ok, thawed_pid} = Jido.thaw(module, RedisTestAgent, agent.id)
     assert :ok = Server.await_ready(thawed_pid)
     assert Server.agent(thawed_pid).state.counter == 42
   end
@@ -301,24 +301,24 @@ defmodule JidoTest.InstanceTest do
     partitioned = %{agent | state: %{agent.state | counter: 20}}
 
     assert {:ok, pid} =
-             module.start_agent(agent, persistence: :inherit, persistence_mode: :create)
+             Jido.start_agent(module, agent, persistence: :inherit, persistence_mode: :create)
 
     assert {:ok, partitioned_pid} =
-             module.start_agent(partitioned,
+             Jido.start_agent(module, partitioned,
                partition: "blue",
                persistence: :inherit,
                persistence_mode: :create
              )
 
     assert :ok = Server.await_ready(pid)
-    assert :ok = module.hibernate(pid)
+    assert :ok = Jido.hibernate(module, pid)
     assert :ok = Server.await_ready(partitioned_pid)
-    assert :ok = module.hibernate(partitioned_pid)
+    assert :ok = Jido.hibernate(module, partitioned_pid)
 
-    assert {:ok, restored_pid} = module.thaw(RedisTestAgent, agent.id)
+    assert {:ok, restored_pid} = Jido.thaw(module, RedisTestAgent, agent.id)
 
     assert {:ok, restored_partitioned_pid} =
-             module.thaw(RedisTestAgent, agent.id, partition: "blue")
+             Jido.thaw(module, RedisTestAgent, agent.id, partition: "blue")
 
     assert :ok = Server.await_ready(restored_pid)
     assert :ok = Server.await_ready(restored_partitioned_pid)
@@ -338,59 +338,59 @@ defmodule JidoTest.InstanceTest do
   end
 
   @tag obligation: "jido.instance.I5"
-  test "instance Agent APIs start, find, list, count, and stop Agents" do
+  test "Jido starts, finds, lists, counts, and stops Agents in one instance" do
     {:ok, _pid} = TestInstance.start_link()
 
-    {:ok, first} = TestInstance.start_agent(RedisTestAgent, id: "agent-1")
-    {:ok, second} = TestInstance.start_agent(RedisTestAgent, id: "agent-2")
+    {:ok, first} = Jido.start_agent(TestInstance, RedisTestAgent, id: "agent-1")
+    {:ok, second} = Jido.start_agent(TestInstance, RedisTestAgent, id: "agent-2")
 
-    assert TestInstance.whereis_agent("agent-1") == first
-    assert TestInstance.whereis_agent("missing") == nil
+    assert Jido.whereis_agent(TestInstance, "agent-1") == first
+    assert Jido.whereis_agent(TestInstance, "missing") == nil
 
-    assert Enum.sort(TestInstance.list_agents()) ==
+    assert Enum.sort(Jido.list_agents(TestInstance)) ==
              Enum.sort([{"agent-1", first}, {"agent-2", second}])
 
-    assert TestInstance.agent_count() == 2
+    assert Jido.agent_count(TestInstance) == 2
 
     monitor = Process.monitor(first)
-    assert :ok = TestInstance.stop_agent("agent-1")
+    assert :ok = Jido.stop_agent(TestInstance, "agent-1")
     assert_receive {:DOWN, ^monitor, :process, ^first, _reason}, 1_000
-    eventually(fn -> TestInstance.whereis_agent("agent-1") == nil end)
+    eventually(fn -> Jido.whereis_agent(TestInstance, "agent-1") == nil end)
 
-    assert :ok = TestInstance.stop_agent(second)
-    assert TestInstance.agent_count() == 0
+    assert :ok = Jido.stop_agent(TestInstance, second)
+    assert Jido.agent_count(TestInstance) == 0
   end
 
   @tag obligation: "jido.instance.I5"
   test "partitions isolate equal Agent ids" do
     {:ok, _pid} = TestInstance.start_link()
 
-    {:ok, plain} = TestInstance.start_agent(RedisTestAgent, id: "shared")
-    {:ok, blue} = TestInstance.start_agent(RedisTestAgent, id: "shared", partition: "blue")
+    {:ok, plain} = Jido.start_agent(TestInstance, RedisTestAgent, id: "shared")
+    {:ok, blue} = Jido.start_agent(TestInstance, RedisTestAgent, id: "shared", partition: "blue")
 
-    assert TestInstance.whereis_agent("shared") == plain
-    assert TestInstance.whereis_agent("shared", partition: "blue") == blue
-    assert TestInstance.list_agents() == [{"shared", plain}]
-    assert TestInstance.list_agents(partition: "blue") == [{"shared", blue}]
+    assert Jido.whereis_agent(TestInstance, "shared") == plain
+    assert Jido.whereis_agent(TestInstance, "shared", partition: "blue") == blue
+    assert Jido.list_agents(TestInstance) == [{"shared", plain}]
+    assert Jido.list_agents(TestInstance, partition: "blue") == [{"shared", blue}]
   end
 
   @tag obligation: "jido.instance.I5"
   test "PID stop and hibernate require the exact explicit partition" do
     start_supervised!(TestInstance)
-    {:ok, server} = TestInstance.start_agent(RedisTestAgent, id: "numeric", partition: "1")
+    {:ok, server} = Jido.start_agent(TestInstance, RedisTestAgent, id: "numeric", partition: "1")
     before = JidoTest.AgentServerAssertions.committed(server)
 
-    assert TestInstance.whereis_agent("numeric", partition: "1") == server
-    assert TestInstance.whereis_agent("numeric", partition: "1.0") == nil
-    assert {:error, :not_found} = TestInstance.stop_agent(server, partition: "1.0")
-    assert {:error, :not_found} = TestInstance.hibernate(server, partition: "1.0")
+    assert Jido.whereis_agent(TestInstance, "numeric", partition: "1") == server
+    assert Jido.whereis_agent(TestInstance, "numeric", partition: "1.0") == nil
+    assert {:error, :not_found} = Jido.stop_agent(TestInstance, server, partition: "1.0")
+    assert {:error, :not_found} = Jido.hibernate(TestInstance, server, partition: "1.0")
     assert JidoTest.AgentServerAssertions.committed(server) === before
-    assert TestInstance.whereis_agent("numeric", partition: "1") == server
+    assert Jido.whereis_agent(TestInstance, "numeric", partition: "1") == server
 
     monitor = Process.monitor(server)
-    assert :ok = TestInstance.stop_agent(server, partition: "1")
+    assert :ok = Jido.stop_agent(TestInstance, server, partition: "1")
     assert_receive {:DOWN, ^monitor, :process, ^server, _reason}, 1_000
-    assert TestInstance.whereis_agent("numeric", partition: "1") == nil
+    assert Jido.whereis_agent(TestInstance, "numeric", partition: "1") == nil
   end
 
   @tag obligation: "jido.instance.I2"

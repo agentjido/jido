@@ -2481,12 +2481,13 @@
         "jido.instance.I1": {
           "failing": 0,
           "kind": "functional",
-          "passing": 15,
+          "passing": 16,
           "status": "active",
           "testable": true,
           "tests": [
             "test Jido supervisor can be used as a child spec",
             "test Jido supervisor requires :name option",
+            "test a generated instance does not expose forwarding APIs",
             "test definition validation rejects malformed, missing, unknown, and duplicate options",
             "test generated modules expose only the required configuration hook",
             "test instance module exposes configuration and a child specification",
@@ -2567,7 +2568,7 @@
             "test application and start options replace the declared persistence default",
             "test default debug helpers set and clear the default instance overrides",
             "test generated modules expose only the required configuration hook",
-            "test hibernate and thaw work through an instance module",
+            "test hibernate and thaw use the selected instance",
             "test runtime debug options override application configuration",
             "test validation keeps exact defaults and accepts all boundary values"
           ]
@@ -2579,10 +2580,10 @@
           "status": "active",
           "testable": true,
           "tests": [
+            "test Jido starts, finds, lists, counts, and stops Agents in one instance",
             "test PID stop and hibernate require the exact explicit partition",
             "test hibernate and thaw use the default instance when no instance is given",
-            "test hibernate and thaw work through an instance module",
-            "test instance Agent APIs start, find, list, count, and stop Agents",
+            "test hibernate and thaw use the selected instance",
             "test partitioned Agent checkpoints use separate keys",
             "test partitions isolate equal Agent ids",
             "test start_agent accepts a module and options for the default instance",
@@ -2618,7 +2619,7 @@
         "jido.instance.I8": {
           "failing": 0,
           "kind": "functional",
-          "passing": 8,
+          "passing": 7,
           "status": "active",
           "testable": true,
           "tests": [
@@ -2627,8 +2628,7 @@
             "test Ref runtime controls preserve their Server results and reject a missing activation",
             "test Ref stop forwards the reason and caller timeout",
             "test a durable Ref survives rebinding its namespace to another local instance",
-            "test a generated instance exposes the complete Ref-first API",
-            "test a generated instance exposes the same Ref-first API",
+            "test the Ref API accepts a generated instance identity",
             "test the Ref API resolves each operation and preserves direct Server results"
           ]
         }

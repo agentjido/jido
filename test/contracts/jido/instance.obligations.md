@@ -9,9 +9,9 @@ modules:
 ## Purpose
 
 Protect Jido instance configuration, supervision identity, namespaces, Agent
-lifecycle selection, and stable Agent Ref routing. The public `Jido` and
-generated instance functions are its public facade. `use Jido` is its only
-declaration DSL. AgentServer Turn behavior, persistence record meaning, and
+lifecycle selection, and stable Agent Ref routing. The public `Jido` module
+owns runtime operations. `use Jido` only declares instance configuration and a
+supervision child. AgentServer Turn behavior, persistence record meaning, and
 downstream operation results stay with their owning components.
 
 ## Obligations
@@ -51,7 +51,7 @@ downstream operation results stay with their owning components.
 ### jido.instance.I5 — Agent lifecycle selection
 
 - **scope:** `Jido.start_agent/3`, `Jido.stop_agent/3`, `Jido.whereis_agent/3`, `Jido.list_agents/2`, `Jido.agent_count/2`
-- **must:** Route lifecycle functions through the selected instance and exact partition. Isolate equal Agent IDs across instances and partitions. List and count only the selected partition. Reject a PID operation whose explicit partition does not match its registration. Generated and default-instance wrappers must select the same functions.
+- **must:** Route lifecycle functions through the selected instance and exact partition. Isolate equal Agent IDs across instances and partitions. List and count only the selected partition. Reject a PID operation whose explicit partition does not match its registration. A generated instance module must not copy these runtime functions.
 - **why:** Instance and partition selection must not target another activation.
 - **kind:** functional
 - **status:** active
@@ -74,8 +74,8 @@ downstream operation results stay with their owning components.
 
 ### jido.instance.I8 — Ref operation routing
 
-- **scope:** `Jido.call/4`, `Jido.cast/3`, `Jido.submit/4`, committed reads, controls, and generated instance Ref functions
-- **must:** Route each supported Ref function to the currently resolved AgentServer and preserve its public result and caller-wait contract. Support submit, await, and abandon wrappers. Return an explicit error for a missing target. Keep caller timeout separate from execution cancellation.
+- **scope:** `Jido.call/4`, `Jido.cast/3`, `Jido.submit/4`, committed reads, and controls
+- **must:** Route each supported Ref function to the currently resolved AgentServer and preserve its public result and caller-wait contract. Support submit, await, and abandon operations. Return an explicit error for a missing target. Keep caller timeout separate from execution cancellation.
 - **why:** The Ref API must not change downstream runtime semantics.
 - **kind:** functional
 - **status:** active

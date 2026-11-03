@@ -90,40 +90,46 @@ defmodule JidoTest.InstanceRefTest do
     use Jido, otp_app: :jido, namespace: "jido/test/generated-instance"
   end
 
-  @ref_api_contract [
-    {:agent_ref, [1, 2], :agent_ref, [2, 3]},
-    {:resolve_agent, [1], :resolve_agent, [2]},
-    {:start_agent_ref, [2, 3], :start_agent_ref, [3, 4]},
-    {:activate_agent, [2, 3], :activate_agent, [3, 4]},
-    {:call, [2, 3], :call, [3, 4]},
-    {:cast, [2], :cast, [3]},
-    {:submit, [2, 3], :submit, [3, 4]},
-    {:await, [1, 2], :await, [1, 2]},
-    {:abandon, [1], :abandon, [1]},
-    {:stop_agent_ref, [1, 2, 3], :stop_agent_ref, [2, 3, 4]},
-    {:hibernate_ref, [1, 2], :hibernate_ref, [2, 3]},
-    {:delete_agent, [2, 3], :delete_agent, [3, 4]},
-    {:cancel, [1, 2], :cancel, [2, 3]},
-    {:cancel_turn, [2, 3], :cancel_turn, [3, 4]},
-    {:attach_ref, [1, 2, 3], :attach, [2, 3, 4]},
-    {:detach_ref, [1, 2, 3], :detach, [2, 3, 4]},
-    {:touch_ref, [1], :touch, [2]},
-    {:agent, [1, 2], :agent, [2, 3]},
-    {:plugin_state, [2, 3], :plugin_state, [3, 4]},
-    {:status, [1, 2], :status, [2, 3]},
-    {:children, [1, 2], :children, [2, 3]},
-    {:await_ready, [1, 2], :await_ready, [2, 3]}
+  @removed_instance_facade [
+    start_agent: [1, 2],
+    stop_agent: [1, 2],
+    whereis_agent: [1, 2],
+    list_agents: [0, 1],
+    agent_count: [0, 1],
+    agent_ref: [1, 2],
+    resolve_agent: [1],
+    start_agent_ref: [2, 3],
+    activate_agent: [2, 3],
+    call: [2, 3],
+    cast: [2],
+    submit: [2, 3],
+    await: [1, 2],
+    abandon: [1],
+    stop_agent_ref: [1, 2, 3],
+    hibernate_ref: [1, 2],
+    delete_agent: [2, 3],
+    cancel: [1, 2],
+    cancel_turn: [2, 3],
+    attach_ref: [1, 2, 3],
+    detach_ref: [1, 2, 3],
+    touch_ref: [1],
+    agent: [1, 2],
+    plugin_state: [2, 3],
+    status: [1, 2],
+    children: [1, 2],
+    await_ready: [1, 2],
+    hibernate: [1, 2],
+    thaw: [2, 3],
+    debug: [0, 1],
+    debug_status: [0]
   ]
 
-  @tag obligation: "jido.instance.I8"
-  test "a generated instance exposes the complete Ref-first API" do
-    Enum.each(@ref_api_contract, fn {generated_name, generated_arities, root_name, root_arities} ->
-      assert Enum.all?(
-               generated_arities,
-               &function_exported?(NamespacedInstance, generated_name, &1)
-             )
-
-      assert Enum.all?(root_arities, &function_exported?(Jido, root_name, &1))
+  @tag obligation: "jido.instance.I1"
+  test "a generated instance does not expose forwarding APIs" do
+    Enum.each(@removed_instance_facade, fn {name, arities} ->
+      Enum.each(arities, fn arity ->
+        refute function_exported?(NamespacedInstance, name, arity)
+      end)
     end)
   end
 
@@ -264,16 +270,16 @@ defmodule JidoTest.InstanceRefTest do
   end
 
   @tag obligation: "jido.instance.I8"
-  test "a generated instance exposes the same Ref-first API" do
+  test "the Ref API accepts a generated instance identity" do
     start_supervised!(NamespacedInstance)
 
     assert Jido.Instance.NamespaceRegistry.namespace(NamespacedInstance) ==
              "jido/test/generated-instance"
 
-    assert {:ok, ref} = NamespacedInstance.agent_ref("counter")
-    assert {:ok, server} = NamespacedInstance.start_agent_ref(ref, Counter)
-    assert NamespacedInstance.resolve_agent(ref) == {:ok, server}
-    assert {:ok, agent, _} = NamespacedInstance.call(ref, signal(2))
+    assert {:ok, ref} = Jido.agent_ref(NamespacedInstance, "counter")
+    assert {:ok, server} = Jido.start_agent_ref(NamespacedInstance, ref, Counter)
+    assert Jido.resolve_agent(NamespacedInstance, ref) == {:ok, server}
+    assert {:ok, agent, _} = Jido.call(NamespacedInstance, ref, signal(2))
     assert agent.state.count == 2
   end
 

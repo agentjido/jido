@@ -27,10 +27,10 @@ defmodule Jido do
 
   Start and manage Agents:
 
-      {:ok, pid} = MyApp.Jido.start_agent(MyAgent, id: "agent-1")
-      pid = MyApp.Jido.whereis_agent("agent-1")
-      agents = MyApp.Jido.list_agents()
-      :ok = MyApp.Jido.stop_agent("agent-1")
+      {:ok, pid} = Jido.start_agent(MyApp.Jido, MyAgent, id: "agent-1")
+      pid = Jido.whereis_agent(MyApp.Jido, "agent-1")
+      agents = Jido.list_agents(MyApp.Jido)
+      :ok = Jido.stop_agent(MyApp.Jido, "agent-1")
 
   ## Core Concepts
 
@@ -59,8 +59,8 @@ defmodule Jido do
 
   `Jido.Telemetry` is the system-wide observation contract. Its semantic event
   catalog supplies Telemetry events, standard metrics, bounded logs, and
-  optional OpenTelemetry spans. Instance `debug/1` functions change semantic
-  log detail.
+  optional OpenTelemetry spans. `Jido.Telemetry.set_debug/2` changes semantic
+  log detail for one instance.
 
   See [Runtime State and Debugging](runtime-state-and-debugging.html) and
   [Telemetry, Tracing, and Logs](telemetry-tracing-and-logs.html).
@@ -162,201 +162,6 @@ defmodule Jido do
           __jido_persistence__()
         )
       end
-
-      # Compatible Agent lifecycle API
-
-      @doc "Starts an Agent under this Jido instance."
-      @spec start_agent(module() | Jido.Agent.t(), keyword()) ::
-              DynamicSupervisor.on_start_child()
-      def start_agent(agent, opts \\ []) do
-        Jido.start_agent(__MODULE__, agent, opts)
-      end
-
-      @doc "Stops an Agent by PID or id under this Jido instance."
-      @spec stop_agent(pid() | String.t(), keyword()) :: :ok | {:error, :not_found}
-      def stop_agent(pid_or_id, opts \\ []) do
-        Jido.stop_agent(__MODULE__, pid_or_id, opts)
-      end
-
-      @doc "Looks up an Agent by id under this Jido instance."
-      @spec whereis_agent(String.t(), keyword()) :: pid() | nil
-      def whereis_agent(id, opts \\ []) do
-        Jido.whereis_agent(__MODULE__, id, opts)
-      end
-
-      @doc "Lists all Agents under this Jido instance."
-      @spec list_agents(keyword()) :: [{String.t(), pid()}]
-      def list_agents(opts \\ []), do: Jido.list_agents(__MODULE__, opts)
-
-      @doc "Returns the count of live Agents under this Jido instance."
-      @spec agent_count(keyword()) :: non_neg_integer()
-      def agent_count(opts \\ []), do: Jido.agent_count(__MODULE__, opts)
-
-      # Stable Agent Ref API
-
-      @doc "Builds one stable Agent Ref in this instance namespace."
-      @spec agent_ref(String.t(), keyword()) ::
-              {:ok, Jido.Agent.Ref.t()} | {:error, Jido.Error.ValidationError.t()}
-      def agent_ref(id, opts \\ []), do: Jido.agent_ref(__MODULE__, id, opts)
-
-      @doc "Resolves the current local PID for one stable Agent Ref."
-      @spec resolve_agent(Jido.Agent.Ref.t()) :: {:ok, pid()} | {:error, term()}
-      def resolve_agent(%Jido.Agent.Ref{} = ref), do: Jido.resolve_agent(__MODULE__, ref)
-
-      @doc "Starts one Agent with an explicit stable Agent Ref."
-      @spec start_agent_ref(Jido.Agent.Ref.t(), module() | Jido.Agent.t(), keyword()) ::
-              DynamicSupervisor.on_start_child()
-      def start_agent_ref(%Jido.Agent.Ref{} = ref, agent, opts \\ []) do
-        Jido.start_agent_ref(__MODULE__, ref, agent, opts)
-      end
-
-      @doc "Activates one durable Agent with an explicit stable Agent Ref."
-      @spec activate_agent(Jido.Agent.Ref.t(), module(), keyword()) ::
-              DynamicSupervisor.on_start_child()
-      def activate_agent(%Jido.Agent.Ref{} = ref, agent_module, opts \\ []) do
-        Jido.activate_agent(__MODULE__, ref, agent_module, opts)
-      end
-
-      @doc "Sends one synchronous Signal through a stable Agent Ref."
-      @spec call(Jido.Agent.Ref.t(), Jido.Signal.t(), timeout() | keyword()) ::
-              Jido.AgentServer.signal_result()
-      def call(%Jido.Agent.Ref{} = ref, signal, timeout_or_opts \\ 5_000) do
-        Jido.call(__MODULE__, ref, signal, timeout_or_opts)
-      end
-
-      @doc "Sends one asynchronous Signal through a stable Agent Ref."
-      @spec cast(Jido.Agent.Ref.t(), Jido.Signal.t()) :: :ok | {:error, term()}
-      def cast(%Jido.Agent.Ref{} = ref, signal), do: Jido.cast(__MODULE__, ref, signal)
-
-      @doc "Submits one AgentServer turn through a stable Agent Ref."
-      @spec submit(Jido.Agent.Ref.t(), Jido.Signal.t(), keyword()) ::
-              Jido.AgentServer.pending() | {:error, term()}
-      def submit(%Jido.Agent.Ref{} = ref, signal, opts \\ []),
-        do: Jido.submit(__MODULE__, ref, signal, opts)
-
-      @doc "Collects an AgentServer pending reply in its submitting process."
-      @spec await(Jido.AgentServer.pending(), timeout()) :: Jido.AgentServer.signal_result()
-      def await(pending, timeout \\ 5_000), do: Jido.await(pending, timeout)
-
-      @doc "Discards an AgentServer pending reply without cancelling its turn."
-      @spec abandon(Jido.AgentServer.pending()) :: :ok | {:error, term()}
-      def abandon(pending), do: Jido.abandon(pending)
-
-      @doc "Stops the local Agent resolved by a stable Agent Ref."
-      @spec stop_agent_ref(Jido.Agent.Ref.t(), term(), timeout()) ::
-              :ok | {:error, term()}
-      def stop_agent_ref(%Jido.Agent.Ref{} = ref, reason \\ :shutdown, timeout \\ 5_000) do
-        Jido.stop_agent_ref(__MODULE__, ref, reason, timeout)
-      end
-
-      @doc "Persists and stops the local Agent resolved by a stable Agent Ref."
-      @spec hibernate_ref(Jido.Agent.Ref.t(), keyword()) :: :ok | {:error, term()}
-      def hibernate_ref(%Jido.Agent.Ref{} = ref, opts \\ []) do
-        Jido.hibernate_ref(__MODULE__, ref, opts)
-      end
-
-      @doc "Writes a durable tombstone for one inactive stable Agent Ref."
-      @spec delete_agent(Jido.Agent.Ref.t(), module(), keyword()) :: :ok | {:error, term()}
-      def delete_agent(%Jido.Agent.Ref{} = ref, agent_module, opts \\ []) do
-        Jido.delete_agent(__MODULE__, ref, agent_module, opts)
-      end
-
-      @doc "Cancels current pre-commit work for one stable Agent Ref."
-      @spec cancel(Jido.Agent.Ref.t(), timeout()) :: :ok | {:error, term()}
-      def cancel(%Jido.Agent.Ref{} = ref, timeout \\ 5_000) do
-        Jido.cancel(__MODULE__, ref, timeout)
-      end
-
-      @doc "Cancels one matching Turn for a stable Agent Ref."
-      @spec cancel_turn(Jido.Agent.Ref.t(), String.t(), timeout()) ::
-              :ok | {:error, term()}
-      def cancel_turn(%Jido.Agent.Ref{} = ref, turn_id, timeout \\ 5_000) do
-        Jido.cancel_turn(__MODULE__, ref, turn_id, timeout)
-      end
-
-      @doc "Attaches an owner process through a stable Agent Ref."
-      @spec attach_ref(Jido.Agent.Ref.t(), pid(), timeout()) :: :ok | {:error, term()}
-      def attach_ref(%Jido.Agent.Ref{} = ref, owner_pid \\ self(), timeout \\ 5_000) do
-        Jido.attach(__MODULE__, ref, owner_pid, timeout)
-      end
-
-      @doc "Detaches an owner process through a stable Agent Ref."
-      @spec detach_ref(Jido.Agent.Ref.t(), pid(), timeout()) :: :ok | {:error, term()}
-      def detach_ref(%Jido.Agent.Ref{} = ref, owner_pid \\ self(), timeout \\ 5_000) do
-        Jido.detach(__MODULE__, ref, owner_pid, timeout)
-      end
-
-      @doc "Resets the idle timer through a stable Agent Ref."
-      @spec touch_ref(Jido.Agent.Ref.t()) :: :ok | {:error, term()}
-      def touch_ref(%Jido.Agent.Ref{} = ref), do: Jido.touch(__MODULE__, ref)
-
-      @doc "Returns the committed Agent for one stable Agent Ref."
-      @spec agent(Jido.Agent.Ref.t(), timeout()) :: Jido.Agent.t() | {:error, term()}
-      def agent(%Jido.Agent.Ref{} = ref, timeout \\ 5_000) do
-        Jido.agent(__MODULE__, ref, timeout)
-      end
-
-      @doc "Returns one Plugin-owned field from the complete Agent state through a stable Ref."
-      @spec plugin_state(Jido.Agent.Ref.t(), module(), timeout()) ::
-              {:ok, term()} | {:error, term()}
-      def plugin_state(%Jido.Agent.Ref{} = ref, plugin, timeout \\ 5_000) do
-        Jido.plugin_state(__MODULE__, ref, plugin, timeout)
-      end
-
-      @doc "Returns Turn status through a stable Agent Ref."
-      @spec status(Jido.Agent.Ref.t(), timeout()) :: map() | {:error, term()}
-      def status(%Jido.Agent.Ref{} = ref, timeout \\ 5_000) do
-        Jido.status(__MODULE__, ref, timeout)
-      end
-
-      @doc "Returns child runtime status through a stable Agent Ref."
-      @spec children(Jido.Agent.Ref.t(), timeout()) :: map() | {:error, term()}
-      def children(%Jido.Agent.Ref{} = ref, timeout \\ 5_000) do
-        Jido.children(__MODULE__, ref, timeout)
-      end
-
-      @doc "Waits for runtime readiness through a stable Agent Ref."
-      @spec await_ready(Jido.Agent.Ref.t(), timeout()) :: :ok | {:error, term()}
-      def await_ready(%Jido.Agent.Ref{} = ref, timeout \\ 5_000) do
-        Jido.await_ready(__MODULE__, ref, timeout)
-      end
-
-      # Compatible relationship and persistence API
-
-      @doc "Persists and stops one live Agent Server."
-      @spec hibernate(Jido.AgentServer.server(), keyword()) :: :ok | {:error, term()}
-      def hibernate(server, opts \\ []) do
-        Jido.hibernate(__MODULE__, server, opts)
-      end
-
-      @doc "Restores and starts one persisted Agent."
-      @spec thaw(module(), String.t(), keyword()) :: DynamicSupervisor.on_start_child()
-      def thaw(agent_module, agent_id, opts \\ []) do
-        Jido.thaw(__MODULE__, agent_module, agent_id, opts)
-      end
-
-      # Instance service names
-
-      # Instance debug API
-
-      @doc """
-      Controls semantic log detail for this Jido instance.
-
-      - `debug()` — returns current debug level
-      - `debug(:on)` — log errors and slow semantic operations
-      - `debug(:verbose)` — log all terminal semantic events
-      - `debug(:off)` — use the global semantic log configuration
-
-      """
-      @spec debug() :: Jido.debug_level()
-      def debug, do: Jido.Telemetry.debug_level(__MODULE__)
-
-      @spec debug(Jido.debug_level()) :: :ok
-      def debug(level) when is_atom(level), do: Jido.Telemetry.set_debug(__MODULE__, level)
-
-      @doc "Returns the semantic log override for this Jido instance."
-      @spec debug_status() :: map()
-      def debug_status, do: Jido.Telemetry.debug_status(__MODULE__)
     end
   end
 
