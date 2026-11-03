@@ -3,7 +3,10 @@ defmodule Jido.AI.Context.Snapshot do
   @moduledoc "A portable inspection record for one Context lifecycle stage."
 
   alias Jido.AI.Context
+  alias Jido.AI.Context.Identity
   alias ReqLLM.Message
+
+  import Jido.AI.Context.Identity, only: [portable: 1]
 
   @schema Joi.struct(
             __MODULE__,
@@ -108,22 +111,12 @@ defmodule Jido.AI.Context.Snapshot do
   end
 
   @doc false
-  @spec request_identity(Context.request()) :: map()
-  def request_identity(request) do
-    %{
-      model: portable(request.model),
-      context: req_llm_identity(request.context),
-      options: options_summary(request.options, :full)
-    }
-  end
-
-  @doc false
-  @spec req_llm_identity(ReqLLM.Context.t()) :: map()
-  def req_llm_identity(%ReqLLM.Context{} = context) do
-    %{
-      messages: Enum.map(context.messages, &message_identity/1),
-      tools: Enum.map(context.tools, &tool_summary(&1, :full))
-    }
+  @spec identity_document(Context.t()) :: map()
+  def identity_document(%Context{} = context) do
+    context
+    |> new(content: :none)
+    |> to_map()
+    |> Map.delete(:captured_at_ms)
   end
 
   defp request_summary(request, content) do
@@ -153,7 +146,7 @@ defmodule Jido.AI.Context.Snapshot do
       type: output.type,
       name: output.name,
       description: output.description,
-      contract_digest: Context.term_digest(contract)
+      contract_digest: Identity.term_digest(contract)
     }
   end
 
@@ -172,7 +165,7 @@ defmodule Jido.AI.Context.Snapshot do
       name: message.name,
       tool_call_id: message.tool_call_id,
       metadata: portable(message.metadata),
-      content_digest: Context.term_digest(portable(message.content)),
+      content_digest: Identity.term_digest(portable(message.content)),
       content_shape: content_shape(message.content),
       tool_calls: Enum.map(message.tool_calls || [], &tool_call_summary(&1, content)),
       reasoning_details_count: length(message.reasoning_details || [])
@@ -192,25 +185,13 @@ defmodule Jido.AI.Context.Snapshot do
     end
   end
 
-  defp message_identity(%Message{} = message) do
-    %{
-      role: message.role,
-      content: portable(message.content),
-      name: message.name,
-      tool_call_id: message.tool_call_id,
-      tool_calls: portable(message.tool_calls),
-      metadata: portable(message.metadata),
-      reasoning_details: portable(message.reasoning_details)
-    }
-  end
-
   defp tool_call_summary(call, :full), do: portable(call)
 
   defp tool_call_summary(call, _content) do
     %{
       id: field(call, :id),
       name: tool_call_name(call),
-      arguments_digest: Context.term_digest(tool_call_arguments(call)),
+      arguments_digest: Identity.term_digest(tool_call_arguments(call)),
       metadata: portable(ReqLLM.ToolCall.metadata(call))
     }
   end
@@ -229,7 +210,7 @@ defmodule Jido.AI.Context.Snapshot do
       description: tool.description,
       strict: tool.strict,
       provider_options: portable(tool.provider_options),
-      schema_digest: Context.term_digest(schema)
+      schema_digest: Identity.term_digest(schema)
     }
 
     if content == :full, do: Map.put(summary, :schema, portable(schema)), else: summary
@@ -244,7 +225,7 @@ defmodule Jido.AI.Context.Snapshot do
       name: field(tool, :name),
       description: field(tool, :description),
       strict: field(tool, :strict) == true,
-      schema_digest: Context.term_digest(field(tool, :parameter_schema))
+      schema_digest: Identity.term_digest(field(tool, :parameter_schema))
     }
   end
 
@@ -353,48 +334,6 @@ defmodule Jido.AI.Context.Snapshot do
 
   defp captured_at(context, :completed),
     do: context.completed_at_ms || context.prepared_at_ms || context.created_at_ms
-
-  defp portable(nil), do: nil
-  defp portable(value) when is_binary(value) or is_number(value) or is_boolean(value), do: value
-  defp portable(value) when is_atom(value), do: value
-  defp portable(value) when is_function(value), do: "[FUNCTION]"
-  defp portable(value) when is_pid(value), do: "[PID]"
-  defp portable(value) when is_reference(value), do: "[REFERENCE]"
-  defp portable(value) when is_port(value), do: "[PORT]"
-  defp portable(value) when is_tuple(value), do: value |> Tuple.to_list() |> Enum.map(&portable/1)
-  defp portable(value) when is_list(value), do: Enum.map(value, &portable/1)
-  defp portable(%_module{} = value), do: value |> Map.from_struct() |> portable()
-
-  defp portable(value) when is_map(value) do
-    Map.new(value, fn {key, item} ->
-      portable_key = if is_atom(key) or is_binary(key), do: key, else: inspect(key)
-
-      if sensitive_key?(portable_key) do
-        {portable_key, "[REDACTED]"}
-      else
-        {portable_key, portable(item)}
-      end
-    end)
-  end
-
-  defp portable(value), do: inspect(value)
-
-  defp sensitive_key?(key) do
-    key = key |> to_string() |> String.downcase()
-
-    key in [
-      "api_key",
-      "access_token",
-      "auth_token",
-      "bearer_token",
-      "refresh_token",
-      "secret",
-      "password",
-      "authorization",
-      "credential",
-      "cookie"
-    ] or String.ends_with?(key, ["_api_key", "_secret", "_password", "_credential"])
-  end
 
   defp field(nil, _key), do: nil
   defp field(map, key) when is_map(map), do: Map.get(map, key, Map.get(map, Atom.to_string(key)))

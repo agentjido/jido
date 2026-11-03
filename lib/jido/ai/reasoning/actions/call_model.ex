@@ -3,7 +3,8 @@ defmodule Jido.AI.Reasoning.Actions.CallModel do
   @moduledoc "Calls one model and returns success or failure as graph data."
 
   alias Jido.AI.Context, as: AIContext
-  alias Jido.AI.{Budget, InferenceClient, Toolset, Usage}
+  alias Jido.AI.InferenceClient.Selection
+  alias Jido.AI.{Budget, Toolset, Usage}
   alias Jido.Telemetry.AI, as: Telemetry
 
   use Jido.Action,
@@ -120,7 +121,7 @@ defmodule Jido.AI.Reasoning.Actions.CallModel do
 
   defp generate(request, context) do
     context
-    |> InferenceClient.client!()
+    |> Selection.client!()
     |> then(& &1.generate_text(request.model, request.context, request.options))
   end
 
@@ -191,7 +192,7 @@ defmodule Jido.AI.Reasoning.Actions.CallModel do
     result =
       with {:ok, response} <-
              context
-             |> InferenceClient.client!()
+             |> Selection.client!()
              |> then(
                & &1.stream_text(
                  request_data.model,

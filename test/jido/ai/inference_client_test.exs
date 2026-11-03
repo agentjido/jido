@@ -2,6 +2,7 @@ defmodule Jido.AI.InferenceClientTest do
   use ExUnit.Case, async: false
 
   alias Jido.AI.InferenceClient
+  alias Jido.AI.InferenceClient.Selection
 
   defmodule CompleteClient do
     @behaviour InferenceClient
@@ -89,21 +90,21 @@ defmodule Jido.AI.InferenceClientTest do
 
   test "uses the default ReqLLM client" do
     Application.delete_env(:jido, :ai_inference_client)
-    assert InferenceClient.client!() == Jido.AI.InferenceClient.ReqLLM
+    assert Selection.client!() == Jido.AI.InferenceClient.ReqLLM
   end
 
   test "uses configured and per-action clients" do
     Application.put_env(:jido, :ai_inference_client, CompleteClient)
 
-    assert InferenceClient.client!() == CompleteClient
+    assert Selection.client!() == CompleteClient
 
-    assert InferenceClient.client!(%{jido_ai_inference_client: Jido.AI.InferenceClient.ReqLLM}) ==
+    assert Selection.client!(%{jido_ai_inference_client: Jido.AI.InferenceClient.ReqLLM}) ==
              Jido.AI.InferenceClient.ReqLLM
   end
 
   test "rejects an incomplete client" do
     assert_raise ArgumentError, ~r/invalid Jido AI inference client/, fn ->
-      InferenceClient.client!(%{jido_ai_inference_client: IncompleteClient})
+      Selection.client!(%{jido_ai_inference_client: IncompleteClient})
     end
   end
 

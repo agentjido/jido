@@ -135,7 +135,15 @@ defmodule Jido.AI.ReasoningStrategiesTest do
     turn = %{model_outcome: %{status: :budget, reason: "maximum total cost reached"}}
 
     cases = [
-      {ReAct.Actions.DecideNext, %{turn: turn}},
+      {ReAct.Actions.DecideNext,
+       %{
+         turn: turn,
+         routes: %{
+           model: ReAct.ModelRound,
+           review: ReAct.ToolReview,
+           tools: ReAct.ModelRound
+         }
+       }},
       {ChainOfThought.Actions.Complete, %{turn: turn}},
       {ChainOfDraft.Actions.Complete, %{turn: turn}},
       {AlgorithmOfThoughts.Actions.Complete, %{turn: turn}},

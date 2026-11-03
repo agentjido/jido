@@ -4,6 +4,7 @@ defmodule Jido.AI.ContextTest do
   @moduletag obligation: ["jido_ai.model_execution.I4", "jido_ai.model_execution.I5"]
 
   alias Jido.AI.Context
+  alias Jido.AI.Context.Snapshot
   alias Jido.AI.Thread.Projection
 
   test "wraps an existing ReqLLM context without thread or reasoning dependencies" do
@@ -48,7 +49,7 @@ defmodule Jido.AI.ContextTest do
                raise "must not run twice"
              end)
 
-    before = Context.snapshot(transformed, content: :none)
+    before = Snapshot.new(transformed, content: :none)
 
     assert {:ok, prepared} =
              Context.prepare(transformed,
@@ -68,7 +69,7 @@ defmodule Jido.AI.ContextTest do
              "Use what you know."
            ]
 
-    change = Context.diff(before, Context.snapshot(prepared, content: :none))
+    change = Snapshot.diff(before, Snapshot.new(prepared, content: :none))
     assert change.before.stage == :open
     assert change.after.stage == :prepared
     assert change.request_changed
@@ -104,7 +105,7 @@ defmodule Jido.AI.ContextTest do
 
     assert {:ok, completed} = Context.complete(context, {:ok, response})
 
-    manifest = completed |> Context.snapshot(content: :none) |> Context.Snapshot.to_map()
+    manifest = completed |> Snapshot.new(content: :none) |> Snapshot.to_map()
     assert manifest.stage == :completed
     assert manifest.shape.message_count == 2
     assert manifest.shape.tool_count == 0
@@ -114,14 +115,14 @@ defmodule Jido.AI.ContextTest do
     assert length(manifest.response.context.messages) == 3
     refute Map.has_key?(hd(manifest.request.context.messages), :content)
 
-    full = completed |> Context.snapshot(content: :full) |> Context.Snapshot.to_map()
+    full = completed |> Snapshot.new(content: :full) |> Snapshot.to_map()
 
     assert Enum.any?(full.request.context.messages, fn message ->
              Enum.any?(message.content, &(Map.get(&1, :text) == "Secret input"))
            end)
 
-    encoded = completed |> Context.snapshot(content: :none) |> Context.Snapshot.encode()
-    assert Context.Snapshot.decode!(encoded)["stage"] == "completed"
+    encoded = completed |> Snapshot.new(content: :none) |> Snapshot.encode()
+    assert Snapshot.decode!(encoded)["stage"] == "completed"
   end
 
   test "snapshots hash tool schemas and expose full schemas on request" do
@@ -144,13 +145,13 @@ defmodule Jido.AI.ContextTest do
     assert {:ok, context} =
              Context.prepare(context, model: "openai:gpt-4o-mini", options: [])
 
-    manifest = context |> Context.snapshot(content: :none) |> Context.Snapshot.to_map()
+    manifest = context |> Snapshot.new(content: :none) |> Snapshot.to_map()
     [manifest_tool] = manifest.request.context.tools
     assert manifest_tool.name == "lookup"
     assert is_binary(manifest_tool.schema_digest)
     refute Map.has_key?(manifest_tool, :schema)
 
-    full = context |> Context.snapshot(content: :full) |> Context.Snapshot.to_map()
+    full = context |> Snapshot.new(content: :full) |> Snapshot.to_map()
     [full_tool] = full.request.context.tools
     assert full_tool.schema["function"]["parameters"]["required"] == ["id"]
   end

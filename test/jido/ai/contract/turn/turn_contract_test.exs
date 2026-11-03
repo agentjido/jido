@@ -108,7 +108,14 @@ defmodule Jido.AI.Contract.TurnTest do
     turn = %{input: "question", request_id: "request-1"}
 
     assert {:ok, %{kind: :model, input: %{turn: ^turn}}} =
-             DecideInput.run(%{turn: turn, guard: %{allowed: true}}, %{})
+             DecideInput.run(
+               %{
+                 turn: turn,
+                 guard: %{allowed: true},
+                 target: Jido.AI.Reasoning.ReAct.ModelRound
+               },
+               %{}
+             )
 
     assert {:ok,
             %{

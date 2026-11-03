@@ -14,9 +14,16 @@ defmodule Jido.AI.Contract.ReActTest do
 
   alias Jido.AITest.Tools
 
+  @routes %{
+    model: ReAct.ModelRound,
+    review: ReAct.ToolReview,
+    tools: ReAct.ModelRound
+  }
+
   @tag obligation: ["jido_ai.react.I1", "jido_ai.react.I2"]
   test "validated tool calls expand in model order" do
     input = %{
+      routes: @routes,
       turn: %{
         tools: [Tools.Add, Tools.Multiply],
         model_outcome: %{
@@ -29,7 +36,7 @@ defmodule Jido.AI.Contract.ReActTest do
     }
 
     assert {:continue, ^input, %Jido.Flow{} = flow} =
-             ExpandNext.run(%{kind: :tools, input: input}, %{})
+             ExpandNext.run(%{kind: :tools, input: input, target: ReAct.ModelRound}, %{})
 
     assert [first, second] = flow.components["tools"].actions
     assert first.name == "tool_0"
@@ -41,7 +48,9 @@ defmodule Jido.AI.Contract.ReActTest do
              ExpandNext.run(
                %{
                  kind: :tools,
+                 target: ReAct.ModelRound,
                  input: %{
+                   routes: @routes,
                    turn: %{
                      tools: [Tools.Add],
                      model_outcome: %{
@@ -194,7 +203,7 @@ defmodule Jido.AI.Contract.ReActTest do
     }
 
     assert {:ok, %{kind: :complete, output: %{result: result}}} =
-             DecideNext.run(%{turn: turn}, %{})
+             DecideNext.run(%{turn: turn, routes: @routes}, %{})
 
     assert result.status == :blocked
     assert result.reason_code == :limits

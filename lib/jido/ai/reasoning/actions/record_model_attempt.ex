@@ -3,6 +3,7 @@ defmodule Jido.AI.Reasoning.Actions.RecordModelAttempt do
   @moduledoc "Records one model attempt and any accepted assistant message."
 
   alias Jido.AI.{Context, Thread.Projection}
+  alias Jido.AI.Context.Snapshot
 
   use Jido.Action,
     id: "jido.ai/reasoning/actions/record-model-attempt",
@@ -32,13 +33,13 @@ defmodule Jido.AI.Reasoning.Actions.RecordModelAttempt do
 
     before_snapshot =
       params.context
-      |> Context.snapshot(stage: :prepared, content: :none)
-      |> Context.Snapshot.encode()
+      |> Snapshot.new(stage: :prepared, content: :none)
+      |> Snapshot.encode()
 
     after_snapshot =
       params.context
-      |> Context.snapshot(content: :none)
-      |> Context.Snapshot.encode()
+      |> Snapshot.new(content: :none)
+      |> Snapshot.encode()
 
     attempt = %{
       version: 1,

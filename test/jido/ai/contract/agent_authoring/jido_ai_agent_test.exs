@@ -183,6 +183,11 @@ defmodule Jido.AITest do
     assert map_size(ReAct.ToolReview.flow().components) == 3
 
     input = %{
+      routes: %{
+        model: ReAct.ModelRound,
+        review: ReAct.ToolReview,
+        tools: ReAct.ModelRound
+      },
       turn: %{
         tools: [Tools.Add, Tools.Multiply],
         model_outcome: %{
@@ -199,7 +204,10 @@ defmodule Jido.AITest do
     }
 
     assert {:continue, ^input, tool_flow} =
-             Actions.ExpandNext.run(%{kind: :tools, input: input}, %{})
+             Actions.ExpandNext.run(
+               %{kind: :tools, input: input, target: ReAct.ModelRound},
+               %{}
+             )
 
     assert %Jido.Flow{
              components: %{
@@ -259,13 +267,22 @@ defmodule Jido.AITest do
     assert tool_targets == [Actions.ExecuteTool, Actions.ExecuteTool]
 
     assert {:error, :invalid_tool_calls} =
-             Actions.ExpandNext.run(%{kind: :tools, input: %{}}, %{})
+             Actions.ExpandNext.run(
+               %{kind: :tools, input: %{}, target: ReAct.ModelRound},
+               %{}
+             )
 
     assert {:continue, %{turn: :next}, ReAct.ModelRound} =
-             Actions.ExpandNext.run(%{kind: :model, input: %{turn: :next}}, %{})
+             Actions.ExpandNext.run(
+               %{kind: :model, input: %{turn: :next}, target: ReAct.ModelRound},
+               %{}
+             )
 
     assert {:continue, %{turn: :review}, ReAct.ToolReview} =
-             Actions.ExpandNext.run(%{kind: :review, input: %{turn: :review}}, %{})
+             Actions.ExpandNext.run(
+               %{kind: :review, input: %{turn: :review}, target: ReAct.ToolReview},
+               %{}
+             )
 
     outcome = %{turn: :done, result: %{status: :completed}}
 
@@ -741,10 +758,14 @@ defmodule Jido.AITest do
     turn = %{input: "Use the tools."}
     guard = %{allowed: true, reason_code: :none, reason: nil}
 
-    assert {:ok, %{kind: :model, input: %{turn: ^turn}} = decision} =
-             Jido.Exec.run(SharedActions.DecideInput, %{turn: turn, guard: guard})
+    assert {:ok, %{kind: :model, input: %{turn: ^turn}, target: ReAct.ModelRound} = decision} =
+             Jido.Exec.run(SharedActions.DecideInput, %{
+               turn: turn,
+               guard: guard,
+               target: ReAct.ModelRound
+             })
 
-    refute Map.has_key?(decision, :target)
+    assert decision.target == ReAct.ModelRound
 
     extended = Map.put(decision, :repair, %{attempt: 1, reason: :invalid_model_output})
     assert {:ok, ^extended} = Jido.Joi.parse(Actions.ExpandNext.schema(), extended)
@@ -762,7 +783,17 @@ defmodule Jido.AITest do
     }
 
     assert {:ok, %{kind: :complete, output: %{result: result}}} =
-             Actions.DecideNext.run(%{turn: turn}, %{})
+             Actions.DecideNext.run(
+               %{
+                 turn: turn,
+                 routes: %{
+                   model: ReAct.ModelRound,
+                   review: ReAct.ToolReview,
+                   tools: ReAct.ModelRound
+                 }
+               },
+               %{}
+             )
 
     assert result.status == :blocked
     assert result.reason_code == :limits

@@ -2,8 +2,7 @@ defmodule Jido.AI.Reasoning.AlgorithmOfThoughts do
   alias Jido.Joi
   @moduledoc "A graph-first Algorithm of Thoughts reasoning recipe."
 
-  alias Jido.AI.Reasoning.Actions.{DecideInput, FinalizeTurn, GuardInput, StartRequest}
-  alias Jido.AI.Reasoning.AlgorithmOfThoughts.Actions.ExpandNext
+  alias Jido.AI.Reasoning.Actions.{DecideInput, ExpandDecision, FinalizeTurn, GuardInput, StartRequest}
 
   @default_instructions """
   Solve the task with an explicit algorithmic search. Try promising operations,
@@ -105,8 +104,12 @@ defmodule Jido.AI.Reasoning.AlgorithmOfThoughts do
 
     invoke "reason",
       decision: DecideInput,
-      expander: ExpandNext,
-      params: %{turn: result("start_request"), guard: result("input_guard")}
+      expander: ExpandDecision,
+      params: %{
+        turn: result("start_request"),
+        guard: result("input_guard"),
+        target: value(Jido.AI.Reasoning.AlgorithmOfThoughts.ModelRound)
+      }
 
     step "finalize", action: FinalizeTurn, params: %{outcome: result("reason")}
     output result("finalize")

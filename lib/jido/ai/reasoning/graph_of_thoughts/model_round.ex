@@ -2,8 +2,8 @@ defmodule Jido.AI.Reasoning.GraphOfThoughts.ModelRound do
   alias Jido.Joi
   @moduledoc "Runs one phase of the bounded Graph of Thoughts graph."
 
-  alias Jido.AI.Reasoning.Actions.{CallModel, GuardOutput, ProjectConversation, RecordModelAttempt}
-  alias Jido.AI.Reasoning.GraphOfThoughts.Actions.{Advance, ExpandNext, PrepareCall}
+  alias Jido.AI.Reasoning.Actions.{CallModel, ExpandDecision, GuardOutput, ProjectConversation, RecordModelAttempt}
+  alias Jido.AI.Reasoning.GraphOfThoughts.Actions.{Advance, PrepareCall}
 
   use Jido.Flow,
     id: "jido.ai/reasoning/graph-of-thoughts/model-round",
@@ -52,10 +52,11 @@ defmodule Jido.AI.Reasoning.GraphOfThoughts.ModelRound do
 
     invoke "advance",
       decision: Advance,
-      expander: ExpandNext,
+      expander: ExpandDecision,
       params: %{
         state: result("prepare", :state),
-        turn: result("record_attempt", :turn)
+        turn: result("record_attempt", :turn),
+        target: value(Jido.AI.Reasoning.GraphOfThoughts.ModelRound)
       }
 
     output result("advance")

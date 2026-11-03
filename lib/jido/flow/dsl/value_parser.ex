@@ -170,6 +170,9 @@ defmodule Jido.Flow.DSL.ValueParser do
 
   defp literal!({:-, _, [value]}, true) when is_number(value), do: -value
 
+  defp literal!({:__aliases__, _, parts}, _negative_numbers?) when is_list(parts),
+    do: Module.concat(parts)
+
   defp literal!(values, negative_numbers?) when is_list(values),
     do: Enum.map(values, &literal!(&1, negative_numbers?))
 

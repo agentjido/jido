@@ -21,21 +21,21 @@ defmodule Jido.AI.Reasoning.TRM.Actions.Advance do
   def run(%{state: state, turn: %{output_allowed: false} = turn}, _context),
     do: {:ok, complete(state, turn, :blocked, :output, turn.output_reason)}
 
-  def run(%{state: %{phase: :draft} = state, turn: turn}, _context) do
+  def run(%{state: %{phase: :draft} = state, turn: turn, target: target}, _context) do
     next =
       state |> Map.put(:turn, turn) |> Map.put(:draft, turn.model_outcome.output["draft"]) |> Map.put(:phase, :critique)
 
-    {:ok, %{kind: :model, input: next}}
+    {:ok, %{kind: :model, input: next, target: target}}
   end
 
-  def run(%{state: %{phase: :critique} = state, turn: turn}, _context) do
+  def run(%{state: %{phase: :critique} = state, turn: turn, target: target}, _context) do
     next =
       state
       |> Map.put(:turn, turn)
       |> Map.put(:critique, turn.model_outcome.output["critique"])
       |> Map.put(:phase, :revise)
 
-    {:ok, %{kind: :model, input: next}}
+    {:ok, %{kind: :model, input: next, target: target}}
   end
 
   def run(%{state: %{phase: :revise} = state, turn: turn}, _context) do

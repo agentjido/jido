@@ -13,7 +13,7 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.ResolveToolReview do
     output_schema: Joi.map()
 
   @impl Jido.Action
-  def run(%{turn: turn, decision: decision}, _context) do
+  def run(%{turn: turn, decision: decision, routes: routes}, _context) do
     status = review_status(decision.selected)
     at = System.system_time(:millisecond)
 
@@ -35,9 +35,19 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.ResolveToolReview do
     turn = %{turn | review_id: nil, session: Jido.Session.encode(session)}
 
     case status do
-      :approved -> {:ok, %{kind: :tools, input: %{turn: turn}}}
-      :denied -> {:ok, complete(turn, "tool use was denied")}
-      :expired -> {:ok, complete(turn, "tool review expired")}
+      :approved ->
+        {:ok,
+         %{
+           kind: :tools,
+           input: %{turn: turn, routes: routes},
+           target: Map.fetch!(routes, :tools)
+         }}
+
+      :denied ->
+        {:ok, complete(turn, "tool use was denied")}
+
+      :expired ->
+        {:ok, complete(turn, "tool review expired")}
     end
   end
 

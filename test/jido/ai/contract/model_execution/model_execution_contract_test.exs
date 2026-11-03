@@ -3,6 +3,7 @@ defmodule Jido.AI.Contract.ModelExecutionTest do
 
   alias Jido.AI.{Budget, Context, Usage}
   alias Jido.AI.Actions.Embed
+  alias Jido.AI.Context.Snapshot
   alias Jido.AI.Reasoning.Actions.CallModel
 
   @tag obligation: ["jido_ai.model_execution.I1", "jido_ai.model_execution.I2"]
@@ -60,8 +61,8 @@ defmodule Jido.AI.Contract.ModelExecutionTest do
                options: [stream: true, api_key: "not-portable"]
              )
 
-    encoded = context |> Context.snapshot(content: :none) |> Context.Snapshot.encode()
-    decoded = Context.Snapshot.decode!(encoded)
+    encoded = context |> Snapshot.new(content: :none) |> Snapshot.encode()
+    decoded = Snapshot.decode!(encoded)
 
     assert decoded["stage"] == "prepared"
     assert get_in(decoded, ["request", "model"]) == "openai:gpt-4o-mini"

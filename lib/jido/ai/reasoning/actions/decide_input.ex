@@ -13,8 +13,11 @@ defmodule Jido.AI.Reasoning.Actions.DecideInput do
     output_schema: Joi.map()
 
   @impl Jido.Action
-  def run(%{turn: turn, guard: %{allowed: true}}, _context),
-    do: {:ok, %{kind: :model, input: %{turn: turn}}}
+  def run(%{turn: turn, guard: %{allowed: true}, target: target} = params, _context)
+      when is_atom(target) and target not in [nil, true, false] do
+    input = Map.merge(%{turn: turn}, Map.get(params, :continuation, %{}))
+    {:ok, %{kind: :model, input: input, target: target}}
+  end
 
   def run(
         %{turn: turn, guard: %{allowed: false, reason_code: reason_code, reason: reason}},

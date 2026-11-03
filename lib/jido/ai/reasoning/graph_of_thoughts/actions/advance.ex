@@ -21,7 +21,7 @@ defmodule Jido.AI.Reasoning.GraphOfThoughts.Actions.Advance do
   def run(%{state: state, turn: %{output_allowed: false} = turn}, _context),
     do: {:ok, complete(state, turn, :blocked, :output, turn.output_reason)}
 
-  def run(%{state: %{phase: :construct} = state, turn: turn}, _context) do
+  def run(%{state: %{phase: :construct} = state, turn: turn, target: target}, _context) do
     output = turn.model_outcome.output
 
     nodes = Enum.map(output["nodes"], &%{id: &1["id"], content: &1["content"]})
@@ -39,7 +39,7 @@ defmodule Jido.AI.Reasoning.GraphOfThoughts.Actions.Advance do
         |> Map.put(:edges, edges)
         |> Map.put(:phase, :synthesize)
 
-      {:ok, %{kind: :model, input: next}}
+      {:ok, %{kind: :model, input: next, target: target}}
     else
       {:ok,
        complete(

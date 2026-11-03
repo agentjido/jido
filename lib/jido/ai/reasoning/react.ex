@@ -142,7 +142,15 @@ defmodule Jido.AI.Reasoning.ReAct do
       expander: ExpandNext,
       params: %{
         turn: result("start_request"),
-        guard: result("input_guard")
+        guard: result("input_guard"),
+        target: value(Jido.AI.Reasoning.ReAct.ModelRound),
+        continuation: %{
+          routes: %{
+            model: value(Jido.AI.Reasoning.ReAct.ModelRound),
+            review: value(Jido.AI.Reasoning.ReAct.ToolReview),
+            tools: value(Jido.AI.Reasoning.ReAct.ModelRound)
+          }
+        }
       }
 
     step "finalize",

@@ -351,7 +351,7 @@ defmodule Jido.AI.Contract.ObservabilityBoundariesTest do
 
     Application.put_env(:jido, :ai_opentelemetry, %{enabled: false})
     refute OpenTelemetry.enabled?()
-    assert :ok = OpenTelemetry.attach()
+    assert :ok = Telemetry.attach_open_telemetry()
   end
 
   @tag obligation: "jido_ai.observability.I5"

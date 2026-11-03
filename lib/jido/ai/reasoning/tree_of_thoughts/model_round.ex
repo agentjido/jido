@@ -2,11 +2,10 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.ModelRound do
   alias Jido.Joi
   @moduledoc "Runs one phase of the bounded Tree of Thoughts graph."
 
-  alias Jido.AI.Reasoning.Actions.{CallModel, GuardOutput, ProjectConversation, RecordModelAttempt}
+  alias Jido.AI.Reasoning.Actions.{CallModel, ExpandDecision, GuardOutput, ProjectConversation, RecordModelAttempt}
 
   alias Jido.AI.Reasoning.TreeOfThoughts.Actions.{
     AcceptOutput,
-    ExpandNext,
     PrepareCall,
     SelectThoughts
   }
@@ -65,8 +64,11 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.ModelRound do
 
     invoke "next",
       decision: SelectThoughts,
-      expander: ExpandNext,
-      params: result("accept")
+      expander: ExpandDecision,
+      params: %{
+        decision: result("accept"),
+        target: value(Jido.AI.Reasoning.TreeOfThoughts.ModelRound)
+      }
 
     output result("next")
   end

@@ -10,13 +10,15 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.Actions.SelectThoughts do
     output_schema: Joi.map()
 
   @impl Jido.Action
-  def run(%{terminal: output}, _context), do: {:ok, %{kind: :complete, output: output}}
+  def run(%{decision: %{terminal: output}}, _context),
+    do: {:ok, %{kind: :complete, output: output}}
 
-  def run(%{state: %{phase: :select} = state}, _context) do
+  def run(%{decision: %{state: %{phase: :select} = state}, target: target}, _context) do
     selected = state.thoughts |> Enum.sort_by(& &1.score, :desc) |> Enum.take(2)
     next = state |> Map.put(:selected, selected) |> Map.put(:phase, :synthesize)
-    {:ok, %{kind: :model, input: next}}
+    {:ok, %{kind: :model, input: next, target: target}}
   end
 
-  def run(%{state: state}, _context), do: {:ok, %{kind: :model, input: state}}
+  def run(%{decision: %{state: state}, target: target}, _context),
+    do: {:ok, %{kind: :model, input: state, target: target}}
 end

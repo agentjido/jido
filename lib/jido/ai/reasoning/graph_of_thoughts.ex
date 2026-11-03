@@ -2,8 +2,7 @@ defmodule Jido.AI.Reasoning.GraphOfThoughts do
   alias Jido.Joi
   @moduledoc "Builds thought nodes and relationships, then synthesizes from the graph."
 
-  alias Jido.AI.Reasoning.Actions.{DecideInput, FinalizeTurn, GuardInput, StartRequest}
-  alias Jido.AI.Reasoning.GraphOfThoughts.Actions.ExpandNext
+  alias Jido.AI.Reasoning.Actions.{DecideInput, ExpandDecision, FinalizeTurn, GuardInput, StartRequest}
 
   @default_instructions """
   Build a small graph of useful thoughts and their relationships. Then use the
@@ -92,8 +91,12 @@ defmodule Jido.AI.Reasoning.GraphOfThoughts do
 
     invoke "reason",
       decision: DecideInput,
-      expander: ExpandNext,
-      params: %{turn: result("start_request"), guard: result("input_guard")}
+      expander: ExpandDecision,
+      params: %{
+        turn: result("start_request"),
+        guard: result("input_guard"),
+        target: value(Jido.AI.Reasoning.GraphOfThoughts.ModelRound)
+      }
 
     step "finalize", action: FinalizeTurn, params: %{outcome: result("reason")}
     output result("finalize")

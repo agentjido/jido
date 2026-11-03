@@ -27,6 +27,7 @@ defmodule JidoActionTest.Flow.DSL.ExpressionTest do
           body_result: body_result(),
           body_result_path: body_result(:status),
           literal: value(:ok),
+          module: value(Jido.Flow),
           nested: [1, true, nil, "value"]
         }
       end
@@ -51,6 +52,7 @@ defmodule JidoActionTest.Flow.DSL.ExpressionTest do
     assert parsed.body_result == Ref.body_result()
     assert parsed.body_result_path == Ref.body_result(:status)
     assert parsed.literal == :ok
+    assert parsed.module == Jido.Flow
     assert parsed.nested == [1, true, nil, "value"]
   end
 

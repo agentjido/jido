@@ -13,10 +13,10 @@ defmodule Jido.Telemetry.AI.OpenTelemetry do
     _, _ -> false
   end
 
-  @spec attach(keyword()) :: :ok
-  def attach(opts \\ []) do
+  @spec attach([[atom(), ...]], keyword()) :: :ok
+  def attach(events, opts \\ []) when is_list(events) do
     if enabled?() do
-      attach_owned_events()
+      attach_owned_events(events)
       attach_req_llm(opts)
     end
 
@@ -93,10 +93,10 @@ defmodule Jido.Telemetry.AI.OpenTelemetry do
     _, _ -> :ok
   end
 
-  defp attach_owned_events do
+  defp attach_owned_events(events) do
     case :telemetry.attach_many(
            @handler_id,
-           Jido.Telemetry.AI.owned_events(),
+           events,
            &__MODULE__.handle_event/4,
            nil
          ) do

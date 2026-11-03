@@ -2,8 +2,8 @@ defmodule Jido.AI.Reasoning.TRM.ModelRound do
   alias Jido.Joi
   @moduledoc "Runs one phase of the bounded TRM revision cycle."
 
-  alias Jido.AI.Reasoning.Actions.{CallModel, GuardOutput, ProjectConversation, RecordModelAttempt}
-  alias Jido.AI.Reasoning.TRM.Actions.{Advance, ExpandNext, PrepareCall}
+  alias Jido.AI.Reasoning.Actions.{CallModel, ExpandDecision, GuardOutput, ProjectConversation, RecordModelAttempt}
+  alias Jido.AI.Reasoning.TRM.Actions.{Advance, PrepareCall}
 
   use Jido.Flow,
     id: "jido.ai/reasoning/trm/model-round",
@@ -46,10 +46,11 @@ defmodule Jido.AI.Reasoning.TRM.ModelRound do
 
     invoke "advance",
       decision: Advance,
-      expander: ExpandNext,
+      expander: ExpandDecision,
       params: %{
         state: result("prepare", :state),
-        turn: result("record_attempt", :turn)
+        turn: result("record_attempt", :turn),
+        target: value(Jido.AI.Reasoning.TRM.ModelRound)
       }
 
     output result("advance")

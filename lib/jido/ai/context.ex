@@ -9,7 +9,7 @@ defmodule Jido.AI.Context do
   does not know about threads, memory, skills, tools, or reasoning graphs.
   """
 
-  alias Jido.AI.Context.Snapshot
+  alias Jido.AI.Context.Identity
 
   @request_schema Joi.map(
                     %{
@@ -132,7 +132,7 @@ defmodule Jido.AI.Context do
   def prepare(%__MODULE__{stage: :open} = context, opts) do
     with {:ok, request} <- prepared_request(context, opts) do
       prepared_at = System.system_time(:millisecond)
-      digest = request |> Snapshot.request_identity() |> term_digest()
+      digest = request |> Identity.request() |> Identity.term_digest()
 
       validate(%{
         context
@@ -169,38 +169,12 @@ defmodule Jido.AI.Context do
   def complete(%__MODULE__{stage: :open}, _result, _opts), do: {:error, :context_not_prepared}
   def complete(%__MODULE__{}, _result, _opts), do: {:error, :invalid_req_llm_result}
 
-  @doc "Captures a portable view before or after a model call."
-  @spec snapshot(t(), keyword()) :: Snapshot.t()
-  def snapshot(%__MODULE__{} = context, opts \\ []), do: Snapshot.new(context, opts)
-
-  @doc "Compares two context snapshots."
-  @spec diff(Snapshot.t(), Snapshot.t()) :: map()
-  def diff(%Snapshot{} = before, %Snapshot{} = later), do: Snapshot.diff(before, later)
-
-  @doc false
-  @spec identity_document(t()) :: map()
-  def identity_document(%__MODULE__{} = context) do
-    context
-    |> snapshot(content: :none)
-    |> Snapshot.to_map()
-    |> Map.delete(:captured_at_ms)
-  end
-
-  @doc false
-  @spec term_digest(term()) :: String.t()
-  def term_digest(value) do
-    value
-    |> :erlang.term_to_binary([:deterministic])
-    |> then(&:crypto.hash(:sha256, &1))
-    |> Base.encode16(case: :lower)
-  end
-
   defp apply_transform(context, operation_id, fun) do
-    before_digest = context.request.context |> Snapshot.req_llm_identity() |> term_digest()
+    before_digest = context.request.context |> Identity.req_llm() |> Identity.term_digest()
 
     with {:ok, transformed} <- transformed_context(fun, context.request.context),
          {:ok, transformed} <- ReqLLM.Context.validate(transformed) do
-      after_digest = transformed |> Snapshot.req_llm_identity() |> term_digest()
+      after_digest = transformed |> Identity.req_llm() |> Identity.term_digest()
 
       operation = %{
         before_digest: before_digest,
@@ -295,8 +269,4 @@ defmodule Jido.AI.Context do
   defp options_map(_opts), do: %{}
 
   defp field(map, key) when is_map(map), do: Map.get(map, key, Map.get(map, Atom.to_string(key)))
-end
-
-defimpl Runic.Identity.Projectable, for: Jido.AI.Context do
-  def identity_document(context), do: Jido.AI.Context.identity_document(context)
 end

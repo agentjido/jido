@@ -2,8 +2,7 @@ defmodule Jido.AI.Reasoning.ChainOfDraft do
   alias Jido.Joi
   @moduledoc "A compact, graph-first Chain of Draft reasoning recipe."
 
-  alias Jido.AI.Reasoning.Actions.{DecideInput, FinalizeTurn, GuardInput, StartRequest}
-  alias Jido.AI.Reasoning.ChainOfDraft.Actions.ExpandNext
+  alias Jido.AI.Reasoning.Actions.{DecideInput, ExpandDecision, FinalizeTurn, GuardInput, StartRequest}
 
   @default_instructions """
   Think step by step, but keep each draft step to at most five words.
@@ -105,8 +104,12 @@ defmodule Jido.AI.Reasoning.ChainOfDraft do
 
     invoke "reason",
       decision: DecideInput,
-      expander: ExpandNext,
-      params: %{turn: result("start_request"), guard: result("input_guard")}
+      expander: ExpandDecision,
+      params: %{
+        turn: result("start_request"),
+        guard: result("input_guard"),
+        target: value(Jido.AI.Reasoning.ChainOfDraft.ModelRound)
+      }
 
     step "finalize", action: FinalizeTurn, params: %{outcome: result("reason")}
     output result("finalize")

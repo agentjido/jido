@@ -12,7 +12,7 @@ defmodule Jido.AI.Reasoning.ReAct.ToolReview do
     id: "jido.ai/reasoning/react/tool-review",
     vsn: 1,
     name: "jido_ai_react_tool_review",
-    schema: Joi.object(%{turn: Joi.any()}),
+    schema: Joi.object(%{turn: Joi.any(), routes: Joi.map()}),
     output_schema: Joi.map()
 
   flow do
@@ -49,7 +49,8 @@ defmodule Jido.AI.Reasoning.ReAct.ToolReview do
       expander: ExpandNext,
       params: %{
         turn: result("request", :turn),
-        decision: result("decision")
+        decision: result("decision"),
+        routes: input(:routes)
       }
 
     output result("next")

@@ -2,8 +2,7 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts do
   alias Jido.Joi
   @moduledoc "Generates, evaluates, selects, and synthesizes a small thought tree."
 
-  alias Jido.AI.Reasoning.Actions.{DecideInput, FinalizeTurn, GuardInput, StartRequest}
-  alias Jido.AI.Reasoning.TreeOfThoughts.Actions.ExpandNext
+  alias Jido.AI.Reasoning.Actions.{DecideInput, ExpandDecision, FinalizeTurn, GuardInput, StartRequest}
 
   @default_instructions """
   Explore several different candidate paths. Evaluate weak and strong paths,
@@ -92,8 +91,12 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts do
 
     invoke "reason",
       decision: DecideInput,
-      expander: ExpandNext,
-      params: %{turn: result("start_request"), guard: result("input_guard")}
+      expander: ExpandDecision,
+      params: %{
+        turn: result("start_request"),
+        guard: result("input_guard"),
+        target: value(Jido.AI.Reasoning.TreeOfThoughts.ModelRound)
+      }
 
     step "finalize", action: FinalizeTurn, params: %{outcome: result("reason")}
     output result("finalize")

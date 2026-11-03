@@ -12,8 +12,7 @@ defmodule Jido.AI.Reasoning.ChainOfThought do
   model must select and run Agent tools.
   """
 
-  alias Jido.AI.Reasoning.Actions.{DecideInput, FinalizeTurn, GuardInput, StartRequest}
-  alias Jido.AI.Reasoning.ChainOfThought.Actions.ExpandNext
+  alias Jido.AI.Reasoning.Actions.{DecideInput, ExpandDecision, FinalizeTurn, GuardInput, StartRequest}
 
   @default_instructions """
   You are a helpful AI assistant that thinks through problems step by step.
@@ -129,10 +128,11 @@ defmodule Jido.AI.Reasoning.ChainOfThought do
 
     invoke "reason",
       decision: DecideInput,
-      expander: ExpandNext,
+      expander: ExpandDecision,
       params: %{
         turn: result("start_request"),
-        guard: result("input_guard")
+        guard: result("input_guard"),
+        target: value(Jido.AI.Reasoning.ChainOfThought.ModelRound)
       }
 
     step "finalize",

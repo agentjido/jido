@@ -2,6 +2,7 @@ defmodule Jido.AI.Contract.ModelExecutionBoundariesTest do
   use Covenant.Case, component: "jido_ai.model_execution", async: true
 
   alias Jido.AI.{Budget, Context, Usage}
+  alias Jido.AI.Context.Identity
   alias Jido.AI.Context.Snapshot
 
   @tag obligation: "jido_ai.model_execution.I2"
@@ -112,7 +113,7 @@ defmodule Jido.AI.Contract.ModelExecutionBoundariesTest do
     assert {:error, :context_already_completed} = Context.complete(completed, {:error, :other})
     assert {:error, :context_already_completed} = Context.prepare(completed, model: "contract:model")
 
-    identity = Context.identity_document(completed)
+    identity = Snapshot.identity_document(completed)
     assert identity.stage == :completed
     refute Map.has_key?(identity, :captured_at_ms)
     assert Runic.Identity.Projectable.identity_document(completed) == identity
@@ -157,9 +158,9 @@ defmodule Jido.AI.Contract.ModelExecutionBoundariesTest do
     assert {:ok, context} = Context.new(request, metadata: metadata)
     assert {:ok, prepared} = Context.prepare(context, model: "contract:model", options: [api_key: "secret"])
 
-    none = Context.snapshot(prepared, content: :none)
-    redacted = Context.snapshot(prepared, content: :redacted)
-    full = Context.snapshot(prepared, content: :full)
+    none = Snapshot.new(prepared, content: :none)
+    redacted = Snapshot.new(prepared, content: :redacted)
+    full = Snapshot.new(prepared, content: :full)
 
     assert none.request.options.api_key == "[REDACTED]"
     refute Map.has_key?(hd(none.request.context.messages), :content)
@@ -170,14 +171,14 @@ defmodule Jido.AI.Contract.ModelExecutionBoundariesTest do
     assert full.metadata.reference == "[REFERENCE]"
     assert full.metadata.api_key == "[REDACTED]"
 
-    diff = Context.diff(none, full)
+    diff = Snapshot.diff(none, full)
     assert diff.request_changed
     assert diff.messages_changed
     assert diff.before.stage == :prepared
     assert diff.after.stage == :prepared
 
     assert_raise ArgumentError, "context has no :open snapshot", fn ->
-      Context.snapshot(prepared, stage: :open)
+      Snapshot.new(prepared, stage: :open)
     end
 
     assert {:ok, failed} =
@@ -185,8 +186,8 @@ defmodule Jido.AI.Contract.ModelExecutionBoundariesTest do
                req_llm_request_id: "request-2"
              })
 
-    error_full = failed |> Context.snapshot(content: :full) |> Snapshot.to_map()
-    error_redacted = failed |> Context.snapshot(content: :redacted) |> Snapshot.to_map()
+    error_full = failed |> Snapshot.new(content: :full) |> Snapshot.to_map()
+    error_redacted = failed |> Snapshot.new(content: :redacted) |> Snapshot.to_map()
     assert error_full.response.error.message == "provider failed"
     assert error_full.response.error.__exception__
     assert error_redacted.response.error.type =~ "RuntimeError"
@@ -197,7 +198,7 @@ defmodule Jido.AI.Contract.ModelExecutionBoundariesTest do
   test "snapshots keep fallback request and response shapes portable" do
     request = ReqLLM.Context.new([ReqLLM.Context.user("edge")])
     assert {:ok, context} = Context.new(request, metadata: %{bits: <<1::1>>})
-    assert Context.snapshot(context, stage: :open).stage == :open
+    assert Snapshot.new(context, stage: :open).stage == :open
 
     assert {:ok, prepared} =
              Context.prepare(context,
@@ -229,8 +230,8 @@ defmodule Jido.AI.Contract.ModelExecutionBoundariesTest do
     }
 
     edge = %{prepared | request: %{prepared.request | context: request_context}}
-    edge_redacted = Context.snapshot(edge, content: :redacted)
-    edge_full = Context.snapshot(edge, content: :full)
+    edge_redacted = Snapshot.new(edge, content: :redacted)
+    edge_full = Snapshot.new(edge, content: :full)
 
     assert edge_redacted.request.options.output == %{kind: :custom}
 
@@ -238,7 +239,7 @@ defmodule Jido.AI.Contract.ModelExecutionBoundariesTest do
              %{
                id: "call-map",
                name: "map_tool",
-               arguments_digest: Context.term_digest(%{value: 1}),
+               arguments_digest: Identity.term_digest(%{value: 1}),
                metadata: %{}
              }
            ]
@@ -266,8 +267,8 @@ defmodule Jido.AI.Contract.ModelExecutionBoundariesTest do
     assert {:ok, completed} =
              Context.complete(prepared, {:ok, response}, req_llm_request_id: "")
 
-    response_full = Context.snapshot(completed, content: :full)
-    response_redacted = Context.snapshot(completed, content: :redacted)
+    response_full = Snapshot.new(completed, content: :full)
+    response_redacted = Snapshot.new(completed, content: :redacted)
     assert response_full.response.output == %{answer: 42}
     assert response_full.response.context == nil
     assert response_redacted.response.output == "[REDACTED]"

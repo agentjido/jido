@@ -191,7 +191,13 @@
       "Jido.Signal.ID",
       "Jido.Signal.Telemetry",
       "Jido.Signal.Trace",
-      "Jido.Tracing.*"
+      "Jido.Tracing.*",
+      "Jido.AI.Reasoning.AlgorithmOfThoughts.Actions.ExpandNext",
+      "Jido.AI.Reasoning.ChainOfDraft.Actions.ExpandNext",
+      "Jido.AI.Reasoning.ChainOfThought.Actions.ExpandNext",
+      "Jido.AI.Reasoning.GraphOfThoughts.Actions.ExpandNext",
+      "Jido.AI.Reasoning.TreeOfThoughts.Actions.ExpandNext",
+      "Jido.AI.Reasoning.TRM.Actions.ExpandNext"
     ],
     forbidden_files: [
       "lib/jido/config.ex",
@@ -259,7 +265,13 @@
       "lib/jido/signal/id.ex",
       "lib/jido/signal/telemetry.ex",
       "lib/jido/signal/trace.ex",
-      "lib/jido/tracing/**"
+      "lib/jido/tracing/**",
+      "lib/jido/ai/reasoning/algorithm_of_thoughts/actions/expand_next.ex",
+      "lib/jido/ai/reasoning/chain_of_draft/actions/expand_next.ex",
+      "lib/jido/ai/reasoning/chain_of_thought/actions/expand_next.ex",
+      "lib/jido/ai/reasoning/graph_of_thoughts/actions/expand_next.ex",
+      "lib/jido/ai/reasoning/tree_of_thoughts/actions/expand_next.ex",
+      "lib/jido/ai/reasoning/trm/actions/expand_next.ex"
     ]
   ],
   calls: [

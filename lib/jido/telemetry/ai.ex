@@ -159,7 +159,7 @@ defmodule Jido.Telemetry.AI do
 
   @doc "Attaches the vendor-neutral Agent, reasoning, tool, and ReqLLM OpenTelemetry bridges."
   @spec attach_open_telemetry(keyword()) :: :ok
-  def attach_open_telemetry(opts \\ []), do: OpenTelemetry.attach(opts)
+  def attach_open_telemetry(opts \\ []), do: OpenTelemetry.attach(@owned_events, opts)
 
   @doc false
   @spec attach_default_handlers() :: :ok

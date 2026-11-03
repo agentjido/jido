@@ -2,8 +2,7 @@ defmodule Jido.AI.Reasoning.TRM do
   alias Jido.Joi
   @moduledoc "Runs one bounded draft, critique, and revision cycle."
 
-  alias Jido.AI.Reasoning.Actions.{DecideInput, FinalizeTurn, GuardInput, StartRequest}
-  alias Jido.AI.Reasoning.TRM.Actions.ExpandNext
+  alias Jido.AI.Reasoning.Actions.{DecideInput, ExpandDecision, FinalizeTurn, GuardInput, StartRequest}
 
   @default_instructions """
   Produce a draft, inspect it for errors, and revise it into one final answer.
@@ -91,8 +90,12 @@ defmodule Jido.AI.Reasoning.TRM do
 
     invoke "reason",
       decision: DecideInput,
-      expander: ExpandNext,
-      params: %{turn: result("start_request"), guard: result("input_guard")}
+      expander: ExpandDecision,
+      params: %{
+        turn: result("start_request"),
+        guard: result("input_guard"),
+        target: value(Jido.AI.Reasoning.TRM.ModelRound)
+      }
 
     step "finalize", action: FinalizeTurn, params: %{outcome: result("reason")}
     output result("finalize")

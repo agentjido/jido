@@ -4,7 +4,6 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.ExpandNext do
 
   alias Jido.AI.Toolset
   alias Jido.Telemetry.AI, as: Telemetry
-  alias Jido.AI.Reasoning.ReAct
   alias Jido.AI.Reasoning.ReAct.Actions.{ExecuteTool, RecordToolResults}
   alias Jido.Flow.Ref
 
@@ -19,15 +18,15 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.ExpandNext do
   @impl Jido.Action
   def run(%{kind: :complete, output: output}, _context), do: {:ok, output}
 
-  def run(%{kind: :model, input: input}, _context),
-    do: {:continue, input, ReAct.ModelRound}
+  def run(%{kind: :model, input: input, target: target}, _context),
+    do: {:continue, input, target}
 
-  def run(%{kind: :review, input: input}, _context),
-    do: {:continue, input, ReAct.ToolReview}
+  def run(%{kind: :review, input: input, target: target}, _context),
+    do: {:continue, input, target}
 
-  def run(%{kind: :tools, input: %{turn: turn} = input}, context) do
+  def run(%{kind: :tools, input: %{turn: turn} = input, target: target}, context) do
     with {:ok, calls} <- resolve_calls(turn.tools, turn.model_outcome.tool_calls),
-         {:ok, flow} <- build_flow(calls) do
+         {:ok, flow} <- build_flow(calls, target) do
       :ok = Telemetry.record_tool_calls(context, tool_call_index(calls))
       {:continue, input, flow}
     end
@@ -51,13 +50,13 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.ExpandNext do
 
   defp resolve_calls(_tools, calls), do: {:error, {:invalid_tool_calls, calls}}
 
-  defp build_flow(calls) do
+  defp build_flow(calls, model_target) do
     Jido.Flow.new(%{
       name: "jido_ai_tool_calls",
       description: "Execute validated tool calls as parallel Actions",
-      schema: Joi.object(%{turn: Joi.any()}),
+      schema: Joi.object(%{turn: Joi.any(), routes: Joi.map()}),
       output_schema: Joi.map(),
-      components: [parallel(calls), record(calls), model()],
+      components: [parallel(calls), record(calls), model(model_target)],
       output: Ref.result("model")
     })
   end
@@ -92,12 +91,12 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.ExpandNext do
     }
   end
 
-  defp model do
+  defp model(model_target) do
     %{
       kind: :subflow,
       name: "model",
-      flow: ReAct.ModelRound,
-      params: %{turn: Ref.result("record", :turn)}
+      flow: model_target,
+      params: %{turn: Ref.result("record", :turn), routes: Ref.input(:routes)}
     }
   end
 

@@ -15,7 +15,7 @@ defmodule Jido.AI.Reasoning.ReAct.ModelRound do
     id: "jido.ai/reasoning/react/model-round",
     vsn: 1,
     name: "jido_ai_react_model_round",
-    schema: Joi.object(%{turn: Joi.any()}),
+    schema: Joi.object(%{turn: Joi.any(), routes: Joi.map()}),
     output_schema: Joi.map()
 
   flow do
@@ -54,7 +54,7 @@ defmodule Jido.AI.Reasoning.ReAct.ModelRound do
     invoke "next",
       decision: DecideNext,
       expander: ExpandNext,
-      params: %{turn: result("detect_cycle", :turn)}
+      params: %{turn: result("detect_cycle", :turn), routes: input(:routes)}
 
     output result("next")
   end
