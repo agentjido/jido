@@ -156,7 +156,7 @@ defmodule Jido.Agent.Validation do
         {:ok, initialized}
 
       {:error, issues} ->
-        if Enum.any?(issues, &Joi.Error.changed_value?/1) do
+        if Enum.any?(issues, &Joi.changed_value?/1) do
           Error.validation_result(
             :state_conversion,
             [],
@@ -176,10 +176,10 @@ defmodule Jido.Agent.Validation do
 
         {:error, issues} ->
           cond do
-            Enum.any?(issues, &Joi.Error.changed_value?/1) ->
+            Enum.any?(issues, &Joi.changed_value?/1) ->
               Error.validation_result(:state_conversion, [], "Validation cannot change stored state")
 
-            Enum.any?(issues, &(Joi.Error.code(&1) == :required)) ->
+            Enum.any?(issues, &(Joi.error_code(&1) == :required)) ->
               Error.validation_result(:incomplete_state, [], "State does not match its schema", %{
                 issues: issues
               })

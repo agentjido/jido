@@ -223,6 +223,29 @@ defmodule Jido.Joi do
   @spec validate_static(term()) :: :ok | {:error, String.t()}
   def validate_static(term), do: validate_static_value(term, [])
 
+  @doc "Returns the stable code from one Joi parse issue."
+  @spec error_code(error()) :: atom()
+  def error_code(%{code: code}), do: code
+
+  @doc "Returns the data path from one Joi parse issue."
+  @spec error_path(error()) :: [term()]
+  def error_path(%{path: path}), do: path
+
+  @doc "Returns the message from one Joi parse issue."
+  @spec error_message(error()) :: String.t()
+  def error_message(%{message: message}), do: message
+
+  @doc "Reports whether parsing would change an existing stored value."
+  @spec changed_value?(error()) :: boolean()
+  def changed_value?(%{code: :joi_changed_value}), do: true
+  def changed_value?(_error), do: false
+
+  @doc false
+  def invalid_type_issue(type), do: Zoi.Error.invalid_type(type)
+
+  @doc false
+  def unrecognized_key_issue(key), do: Zoi.Error.unrecognized_key(key)
+
   @doc "Project a Joi schema to the common Jido JSON Schema form."
   @spec to_json_schema(schema()) :: map()
   def to_json_schema(schema), do: Zoi.to_json_schema(schema)

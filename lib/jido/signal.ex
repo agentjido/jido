@@ -214,7 +214,7 @@ defmodule Jido.Signal do
       keeps it absent. Other envelope attributes can be supplied in options.
       """
       @spec new(term(), keyword() | map()) ::
-              {:ok, Jido.Signal.t()} | {:error, [Joi.Error.t()] | String.t()}
+              {:ok, Jido.Signal.t()} | {:error, [Joi.error()] | String.t()}
       def new(data \\ %{}, opts \\ []) do
         defaults =
           %{

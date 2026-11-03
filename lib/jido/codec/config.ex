@@ -261,7 +261,9 @@ defmodule Jido.Codec.Config do
     end
   end
 
-  defp action_error({nil, {:unknown, key}}), do: Joi.Error.unrecognized_key(key).message
+  defp action_error({nil, {:unknown, key}}),
+    do: key |> Joi.unrecognized_key_issue() |> Joi.error_message()
+
   defp action_error({nil, :map}), do: "invalid type: expected map"
   defp action_error({field, :required}), do: "is required, at #{field}"
   defp action_error({field, :string}), do: "invalid type: expected string, at #{field}"

@@ -23,14 +23,17 @@ defmodule Jido.JoiTest do
     schema = Joi.object(%{count: Joi.integer()}, unrecognized_keys: :strip)
 
     assert {:error, [error]} = Joi.validate(schema, %{count: 1, extra: true})
-    assert Joi.Error.changed_value?(error)
+    assert Joi.changed_value?(error)
+    assert Joi.error_code(error) == :joi_changed_value
+    assert is_list(Joi.error_path(error))
+    assert is_binary(Joi.error_message(error))
   end
 
   test "initialization can add defaults but cannot convert supplied values" do
     schema = Joi.object(%{count: Joi.integer() |> Joi.transform(&(&1 + 1))})
 
     assert {:error, [error]} = Joi.initialize(schema, %{count: 1})
-    assert Joi.Error.changed_value?(error)
+    assert Joi.changed_value?(error)
   end
 
   test "parse bang raises the facade exception" do

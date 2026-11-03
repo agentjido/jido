@@ -115,7 +115,7 @@ defmodule Jido.Signal.Catalog do
   end
 
   def new(_modules),
-    do: error(:invalid_definitions, %{reason: [Joi.Error.invalid_type(:list)]})
+    do: error(:invalid_definitions, %{reason: [Joi.invalid_type_issue(:list)]})
 
   @doc "Builds a catalog, or raises `Jido.Error.ValidationError`."
   @spec new!([module()]) :: t() | no_return()
