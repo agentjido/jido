@@ -1,11 +1,14 @@
 defmodule Jido.Exec.Runtime do
   @moduledoc false
 
-  alias Jido.Exec.{Frame, Portable, Validation, Wait}
+  alias Jido.Error
+  alias Jido.Exec.{Frame, Validation, Wait}
   alias Jido.Instruction
   alias Runic.Workflow
   alias Runic.Workflow.{Fact, Invokable, Runnable}
   alias Runic.Workflow.Events.{ActivationConsumed, FactProduced}
+
+  @typep local_type :: :pid | :port | :reference | :function
 
   @reserved [
     :__jido_exec_durable__,
@@ -104,11 +107,79 @@ defmodule Jido.Exec.Runtime do
   @doc false
   @spec portable(Jido.Instruction.t()) :: :ok | {:error, Exception.t()}
   def portable(%Instruction{} = instruction) do
-    with :ok <- Portable.validate(instruction.params, :params),
-         :ok <- Portable.validate(instruction.metadata, :metadata) do
-      Portable.validate(instruction.context, :context)
+    with :ok <- validate_local(instruction.params, :params),
+         :ok <- validate_local(instruction.metadata, :metadata) do
+      validate_local(instruction.context, :context)
     end
   end
+
+  @doc false
+  @spec validate_local(term(), atom()) :: :ok | {:error, Exception.t()}
+  def validate_local(value, field) do
+    case walk_local(value, [field]) do
+      :ok ->
+        :ok
+
+      {:error, type, path} ->
+        {:error,
+         Error.execution_error("durable execution data contains a process-local value", %{
+           phase: :durability,
+           reason: :non_portable_durable_value,
+           type: type,
+           path: path,
+           retry: false
+         })}
+    end
+  end
+
+  @spec walk_local(term(), [term()]) :: :ok | {:error, local_type(), [term()]}
+  defp walk_local(term, path)
+       when is_pid(term) or is_reference(term) or is_port(term) or is_function(term),
+       do: {:error, local_type(term), path}
+
+  defp walk_local(term, path) when is_map(term) do
+    term
+    |> Map.to_list()
+    |> Enum.reduce_while(:ok, fn {key, value}, :ok ->
+      with :ok <- walk_local(key, path ++ [:key]),
+           :ok <- walk_local(value, path ++ [key]) do
+        {:cont, :ok}
+      else
+        {:error, _type, _path} = error -> {:halt, error}
+      end
+    end)
+  end
+
+  defp walk_local(term, path) when is_tuple(term) do
+    term
+    |> Tuple.to_list()
+    |> Enum.with_index()
+    |> Enum.reduce_while(:ok, fn {value, index}, :ok ->
+      case walk_local(value, path ++ [index]) do
+        :ok -> {:cont, :ok}
+        {:error, _type, _path} = error -> {:halt, error}
+      end
+    end)
+  end
+
+  defp walk_local([], _path), do: :ok
+  defp walk_local([_head | _tail] = term, path), do: walk_local_list(term, path, 0)
+  defp walk_local(_term, _path), do: :ok
+
+  defp walk_local_list([], _path, _index), do: :ok
+
+  defp walk_local_list([value | rest], path, index) do
+    case walk_local(value, path ++ [index]) do
+      :ok when is_list(rest) -> walk_local_list(rest, path, index + 1)
+      :ok -> walk_local(rest, path ++ [:tail])
+      {:error, _type, _path} = error -> error
+    end
+  end
+
+  defp local_type(term) when is_pid(term), do: :pid
+  defp local_type(term) when is_port(term), do: :port
+  defp local_type(term) when is_reference(term), do: :reference
+  defp local_type(term) when is_function(term), do: :function
 
   @doc false
   @spec wait_context(map(), term(), Wait.clock()) :: map()

@@ -1,4 +1,4 @@
-defmodule Jido.Exec.PortableTest do
+defmodule Jido.Exec.RuntimePortabilityTest do
   use Covenant.Case, component: "jido_action.boundary", async: false
 
   alias Jido.Exec

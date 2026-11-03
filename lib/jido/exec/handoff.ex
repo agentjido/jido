@@ -1,7 +1,7 @@
 defmodule Jido.Exec.Handoff do
   @moduledoc false
 
-  alias Jido.Exec.{Portable, Validation}
+  alias Jido.Exec.{Runtime, Validation}
   alias Jido.Instruction
 
   @type t :: %__MODULE__{target: module() | Jido.Flow.t(), kind: :action | :flow, params: map()}
@@ -15,7 +15,7 @@ defmodule Jido.Exec.Handoff do
          :ok <- unbound_runtime(instruction),
          {:ok, _workflow} <- Jido.Exec.compile(instruction),
          {:ok, params} <- Validation.input(instruction.target, instruction.params),
-         :ok <- Portable.validate(params, :handoff_input) do
+         :ok <- Runtime.validate_local(params, :handoff_input) do
       {:ok, %__MODULE__{target: instruction.target, kind: instruction.kind, params: params}}
     end
   end

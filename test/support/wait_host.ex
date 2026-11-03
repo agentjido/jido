@@ -1,7 +1,7 @@
 defmodule Jido.Exec.Test.WaitHost do
   @moduledoc false
 
-  alias Jido.Exec.{Frame, Portable, Runtime}
+  alias Jido.Exec.{Frame, Runtime}
   alias Jido.Exec.Wait, as: WaitValue
   alias Jido.Exec.Node.Wait
   alias Runic.Workflow
@@ -36,7 +36,7 @@ defmodule Jido.Exec.Test.WaitHost do
          true <- is_map(context),
          limit = Keyword.get(opts, :max_buffered_inputs, 128),
          true <- is_integer(limit) and limit > 0,
-         :ok <- Portable.validate(execution_id, :execution_id),
+         :ok <- Runtime.validate_local(execution_id, :execution_id),
          {:ok, instruction} <- Jido.Instruction.resolve(target, params, context),
          {:ok, instruction} <- Runtime.flow_input(instruction),
          :ok <- Runtime.portable(instruction),
@@ -103,7 +103,7 @@ defmodule Jido.Exec.Test.WaitHost do
   defp do_accept(workflow, input, context, opts) do
     with {:ok, state} <- prepare(workflow, context, opts),
          :ok <- validate_input(input),
-         :ok <- Portable.validate(input, :wait_event) do
+         :ok <- Runtime.validate_local(input, :wait_event) do
       case Enum.find(records(workflow, :jido_wait_input), &(&1.input.id == input.id)) do
         %{input: ^input} -> {:ok, workflow}
         %{} -> error(:conflicting_input_id)
@@ -181,7 +181,7 @@ defmodule Jido.Exec.Test.WaitHost do
   defp prepare(workflow, context, opts) do
     with {:ok, now} <- clock(opts),
          :ok <- options(opts, [:now]),
-         :ok <- Portable.validate(context, :context),
+         :ok <- Runtime.validate_local(context, :context),
          true <- is_map(context) do
       state = state(workflow)
 

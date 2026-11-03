@@ -1,7 +1,7 @@
 defmodule Jido.Exec.BoundaryRulesTest do
   use ExUnit.Case, async: true
 
-  alias Jido.Exec.{Frame, Portable, ValueResolver}
+  alias Jido.Exec.{Frame, Runtime, ValueResolver}
   alias Jido.Flow.Ref
 
   describe "durable values" do
@@ -14,11 +14,11 @@ defmodule Jido.Exec.BoundaryRulesTest do
             {[1 | self()], :pid, [:value, :tail]}
           ] do
         assert {:error, %{details: %{type: ^type, path: ^path}}} =
-                 Portable.validate(value, :value)
+                 Runtime.validate_local(value, :value)
       end
 
       assert :ok =
-               Portable.validate(
+               Runtime.validate_local(
                  %{list: [1 | 2], bits: <<5::size(3)>>, nested: {:ok, [%{a: 1}]}},
                  :value
                )

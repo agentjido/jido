@@ -7,8 +7,8 @@ defmodule Jido.Codec.Term do
   tuples, and lists. On failure, it returns a bounded path to the first value
   that it rejects.
 
-  This strict storage policy is different from the managed execution policy
-  in `Jido.Exec.Portable`. Managed execution permits improper lists and
+  This strict storage policy is different from the local-value policy in
+  `Jido.Exec.Runtime`. Managed execution permits improper lists and
   non-byte-aligned bitstrings, but it rejects process-local values.
   """
 

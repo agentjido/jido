@@ -17,7 +17,7 @@ defmodule Jido.Exec do
   See [Managed Execution](managed-execution.md).
   """
 
-  alias Jido.Exec.{Compiler, Frame, Portable}
+  alias Jido.Exec.{Compiler, Frame, Runtime}
   alias Jido.Telemetry.Exec, as: Telemetry
   alias Jido.Exec.Node.Action, as: ActionNode
   alias Jido.Instruction
@@ -214,7 +214,7 @@ defmodule Jido.Exec do
   def resume(runner, execution_id, context \\ %{}, opts \\ []) do
     with {:ok, rehydration, fallback?, opts} <- resume_options(runner, opts),
          {:ok, context} <- runtime_context(context),
-         :ok <- Portable.validate(context, :context),
+         :ok <- Runtime.validate_local(context, :context),
          {:ok, policy, worker_opts} <- managed_options(runner, execution_id, opts) do
       resume_opts =
         worker_opts ++

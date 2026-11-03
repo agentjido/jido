@@ -4,7 +4,7 @@ defmodule Jido.Exec.Node.Action do
   use Runic.Workflow.SingleOutput, batch_parent: false
 
   alias Jido.Error
-  alias Jido.Exec.{Frame, Portable, Runtime, Validation, ValueResolver}
+  alias Jido.Exec.{Frame, Runtime, Validation, ValueResolver}
   alias Jido.Exec.Node.Loop
   alias Jido.Telemetry.Exec, as: Telemetry
   alias Jido.Instruction
@@ -169,8 +169,8 @@ defmodule Jido.Exec.Node.Action do
   end
 
   defp validate_durable_result({:ok, value, effects} = result, true) do
-    with :ok <- Portable.validate(value, :output),
-         :ok <- Portable.validate(effects, :effects) do
+    with :ok <- Runtime.validate_local(value, :output),
+         :ok <- Runtime.validate_local(effects, :effects) do
       result
     end
   end
