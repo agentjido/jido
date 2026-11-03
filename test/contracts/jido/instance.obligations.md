@@ -51,7 +51,7 @@ downstream operation results stay with their owning components.
 ### jido.instance.I5 — Agent lifecycle selection
 
 - **scope:** `Jido.start_agent/3`, `Jido.stop_agent/3`, `Jido.whereis_agent/3`, `Jido.list_agents/2`, `Jido.agent_count/2`
-- **must:** Route lifecycle functions through the selected instance and exact partition. Isolate equal Agent IDs across instances and partitions. List and count only the selected partition. Reject a PID operation whose explicit partition does not match its registration. A generated instance module must not copy these runtime functions.
+- **must:** Require an explicit selected instance for every Agent lifecycle function and route through its exact partition. Isolate equal Agent IDs across instances and partitions. List and count only the selected partition. Reject a PID operation whose explicit partition does not match its registration. A generated instance module must not copy these runtime functions.
 - **why:** Instance and partition selection must not target another activation.
 - **kind:** functional
 - **status:** active
@@ -75,7 +75,7 @@ downstream operation results stay with their owning components.
 ### jido.instance.I8 — Ref operation routing
 
 - **scope:** `Jido.call/4`, `Jido.cast/3`, `Jido.submit/4`, committed reads, and controls
-- **must:** Route each supported Ref function to the currently resolved AgentServer and preserve its public result and caller-wait contract. Support submit, await, and abandon operations. Return an explicit error for a missing target. Keep caller timeout separate from execution cancellation.
+- **must:** Route each supported Ref function to the currently resolved AgentServer and preserve its public result and caller-wait contract. Return an AgentServer pending value from submit. Keep await and abandon with `Jido.AgentServer`. Return an explicit error for a missing target. Keep caller timeout separate from execution cancellation.
 - **why:** The Ref API must not change downstream runtime semantics.
 - **kind:** functional
 - **status:** active

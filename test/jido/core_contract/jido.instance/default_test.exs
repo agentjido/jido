@@ -15,15 +15,38 @@ defmodule Jido.InstanceHelpersTest do
     use Jido.Agent, name: "default_instance_agent"
   end
 
+  @removed_root_shortcuts [
+    default_instance: [0],
+    debug: [0, 1],
+    await: [1, 2],
+    abandon: [1],
+    start_agent: [1],
+    stop_agent: [1],
+    whereis_agent: [1],
+    list_agents: [0],
+    agent_count: [0],
+    hibernate: [1],
+    thaw: [2]
+  ]
+
   setup do
     on_exit(&stop_default_instance/0)
     :ok
   end
 
   defp stop_default_instance do
-    Jido.stop()
+    Jido.stop(Jido.Default)
   catch
     :exit, _reason -> :ok
+  end
+
+  @tag obligation: ["jido.instance.I1", "jido.instance.I5", "jido.instance.I8"]
+  test "Jido does not expose default-instance or AgentServer forwarding shortcuts" do
+    Enum.each(@removed_root_shortcuts, fn {name, arities} ->
+      Enum.each(arities, fn arity ->
+        refute function_exported?(Jido, name, arity)
+      end)
+    end)
   end
 
   @tag obligation: "jido.instance.I2"
@@ -62,8 +85,8 @@ defmodule Jido.InstanceHelpersTest do
   end
 
   @tag obligation: "jido.instance.I4"
-  test "default debug helpers set and clear the default instance overrides" do
-    instance = Jido.default_instance()
+  test "Telemetry sets and clears debug overrides for the default instance" do
+    instance = Jido.Default
     key = {:jido_debug, instance}
     absent = make_ref()
     previous = :persistent_term.get(key, absent)
@@ -75,41 +98,41 @@ defmodule Jido.InstanceHelpersTest do
     end)
 
     assert instance == Jido.Default
-    assert :ok = Jido.debug(:on)
-    assert Jido.debug() == :on
-    assert :ok = Jido.debug(:verbose)
+    assert :ok = Jido.Telemetry.set_debug(instance, :on)
+    assert Jido.Telemetry.debug_level(instance) == :on
+    assert :ok = Jido.Telemetry.set_debug(instance, :verbose)
     assert Jido.Telemetry.debug_status(instance).overrides.semantic_log_mode == :all
-    assert :ok = Jido.debug(:off)
-    assert Jido.debug() == :off
+    assert :ok = Jido.Telemetry.set_debug(instance, :off)
+    assert Jido.Telemetry.debug_level(instance) == :off
   end
 
   @tag obligation: "jido.instance.I5"
-  test "start_agent uses the default instance when no instance is given" do
+  test "runtime operations use an explicit default instance identity" do
     assert {:ok, _jido} = Jido.start()
 
     agent = DefaultAgent.instantiate!(id: unique_id("default-agent"))
     agent_id = agent.id
-    assert {:ok, server} = Jido.start_agent(agent)
+    assert {:ok, server} = Jido.start_agent(Jido.Default, agent)
     assert %Jido.Agent{id: ^agent_id} = AgentServer.agent(server)
-    assert Jido.whereis_agent(agent_id) == server
-    assert Jido.list_agents() == [{agent_id, server}]
-    assert Jido.agent_count() == 1
-    assert :ok = Jido.stop_agent(agent_id)
-    assert Jido.whereis_agent(agent_id) == nil
+    assert Jido.whereis_agent(Jido.Default, agent_id) == server
+    assert Jido.list_agents(Jido.Default) == [{agent_id, server}]
+    assert Jido.agent_count(Jido.Default) == 1
+    assert :ok = Jido.stop_agent(Jido.Default, agent_id)
+    assert Jido.whereis_agent(Jido.Default, agent_id) == nil
   end
 
   @tag obligation: "jido.instance.I5"
-  test "start_agent accepts a module and options for the default instance" do
+  test "start_agent accepts a module and options with the default instance" do
     assert {:ok, _jido} = Jido.start()
 
     id = unique_id("default-agent-options")
-    assert {:ok, server} = Jido.start_agent(DefaultAgent, id: id)
+    assert {:ok, server} = Jido.start_agent(Jido.Default, DefaultAgent, id: id)
     assert %Jido.Agent{id: ^id} = AgentServer.agent(server)
   end
 
   @tag obligation: "jido.instance.I2"
-  test "default instance helpers cover runtime names" do
-    instance = Jido.default_instance()
+  test "the default instance identity owns its runtime names" do
+    instance = Jido.Default
     assert Jido.Instance.Names.registry(instance) == Jido.Default.Registry
     assert Jido.Instance.Names.agent_supervisor(instance) == Jido.Default.AgentSupervisor
     assert Jido.Instance.Names.task_supervisor(instance) == Jido.Default.TaskSupervisor
@@ -119,7 +142,7 @@ defmodule Jido.InstanceHelpersTest do
   end
 
   @tag obligation: "jido.instance.I5"
-  test "hibernate and thaw use the default instance when no instance is given" do
+  test "hibernate and thaw use the explicit default instance identity" do
     assert {:ok, _jido} = Jido.start(namespace: "default-persistence-test")
 
     table = :"default_lifecycle_#{System.unique_integer([:positive])}"
@@ -132,12 +155,12 @@ defmodule Jido.InstanceHelpersTest do
     id = unique_id("default-persisted-agent")
     agent = DefaultAgent.instantiate!(id: id)
 
-    assert {:ok, server} = Jido.start_agent(agent, persistence: persistence)
+    assert {:ok, server} = Jido.start_agent(Jido.Default, agent, persistence: persistence)
     assert :ok = AgentServer.await_ready(server)
-    assert :ok = Jido.hibernate(server)
-    assert Jido.whereis_agent(id) == nil
+    assert :ok = Jido.hibernate(Jido.Default, server)
+    assert Jido.whereis_agent(Jido.Default, id) == nil
 
-    assert {:ok, restored_server} = Jido.thaw(DefaultAgent, id, persistence: persistence)
+    assert {:ok, restored_server} = Jido.thaw(Jido.Default, DefaultAgent, id, persistence: persistence)
     assert :ok = AgentServer.await_ready(restored_server)
     assert %Jido.Agent{id: ^id} = AgentServer.agent(restored_server)
   end

@@ -305,7 +305,7 @@ defmodule JidoTest.InstanceRefTest do
     eventually(fn -> Jido.agent(instance, ref).state.count == 5 end)
 
     pending = Jido.submit(instance, ref, signal(4))
-    assert {:ok, requested, _} = Jido.await(pending)
+    assert {:ok, requested, _} = Jido.AgentServer.await(pending)
     assert requested.state.count == 9
 
     missing = %{ref | id: "missing"}
@@ -404,7 +404,7 @@ defmodule JidoTest.InstanceRefTest do
     end
 
     send(action, :release)
-    assert {:ok, committed, []} = Jido.await(pending)
+    assert {:ok, committed, []} = Jido.AgentServer.await(pending)
     assert committed.state.count == 1
     assert Jido.AgentServer.agent(server) == committed
   end

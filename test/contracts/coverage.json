@@ -2481,10 +2481,11 @@
         "jido.instance.I1": {
           "failing": 0,
           "kind": "functional",
-          "passing": 16,
+          "passing": 17,
           "status": "active",
           "testable": true,
           "tests": [
+            "test Jido does not expose default-instance or AgentServer forwarding shortcuts",
             "test Jido supervisor can be used as a child spec",
             "test Jido supervisor requires :name option",
             "test a generated instance does not expose forwarding APIs",
@@ -2526,12 +2527,12 @@
             "test a write timeout returns a structured error even when the worker later completes it",
             "test all operation timeouts use their documented fallback or structured error",
             "test an abnormal worker exit reaches the caller",
-            "test default instance helpers cover runtime names",
             "test idempotent convenience startup keeps an existing namespace binding",
             "test instance module exposes configuration and a child specification",
             "test replacement waits for the old Flow runner before starting its children",
             "test script startup and shutdown are idempotent",
             "test starts the Agent runtime supervision tree",
+            "test the default instance identity owns its runtime names",
             "test works as a child in another Supervisor"
           ]
         },
@@ -2562,11 +2563,11 @@
           "status": "active",
           "testable": true,
           "tests": [
+            "test Telemetry sets and clears debug overrides for the default instance",
             "test a later start keeps the first namespace and persistence options",
             "test a plain instance persistence default survives a runtime store worker restart",
             "test an inline instance keeps its Redis persistence function",
             "test application and start options replace the declared persistence default",
-            "test default debug helpers set and clear the default instance overrides",
             "test generated modules expose only the required configuration hook",
             "test hibernate and thaw use the selected instance",
             "test runtime debug options override application configuration",
@@ -2576,18 +2577,19 @@
         "jido.instance.I5": {
           "failing": 0,
           "kind": "functional",
-          "passing": 8,
+          "passing": 9,
           "status": "active",
           "testable": true,
           "tests": [
+            "test Jido does not expose default-instance or AgentServer forwarding shortcuts",
             "test Jido starts, finds, lists, counts, and stops Agents in one instance",
             "test PID stop and hibernate require the exact explicit partition",
-            "test hibernate and thaw use the default instance when no instance is given",
+            "test hibernate and thaw use the explicit default instance identity",
             "test hibernate and thaw use the selected instance",
             "test partitioned Agent checkpoints use separate keys",
             "test partitions isolate equal Agent ids",
-            "test start_agent accepts a module and options for the default instance",
-            "test start_agent uses the default instance when no instance is given"
+            "test runtime operations use an explicit default instance identity",
+            "test start_agent accepts a module and options with the default instance"
           ]
         },
         "jido.instance.I6": {
@@ -2619,10 +2621,11 @@
         "jido.instance.I8": {
           "failing": 0,
           "kind": "functional",
-          "passing": 7,
+          "passing": 8,
           "status": "active",
           "testable": true,
           "tests": [
+            "test Jido does not expose default-instance or AgentServer forwarding shortcuts",
             "test Ref Plugin reads keep the selected Plugin",
             "test Ref routing forwards context and explicit caller waits",
             "test Ref runtime controls preserve their Server results and reject a missing activation",

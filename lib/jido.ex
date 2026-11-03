@@ -166,8 +166,6 @@ defmodule Jido do
   end
 
   @type partition :: term()
-  @typedoc "Semantic log detail for one Jido instance."
-  @type debug_level :: :off | :on | :verbose
 
   # Default instance name for scripts/Livebook
   @default_instance Jido.Default
@@ -179,31 +177,6 @@ defmodule Jido do
   # ---------------------------------------------------------------------------
   # Default instance
   # ---------------------------------------------------------------------------
-
-  @doc """
-  Returns the default Jido instance name.
-
-  Used by `Jido.start/1` for scripts and Livebook quick-start.
-  """
-  @spec default_instance() :: atom()
-  def default_instance, do: @default_instance
-
-  @doc """
-  Controls semantic log detail for the default Jido instance (`Jido.Default`).
-
-  - `debug()` — returns current debug level
-  - `debug(:on)` — log errors and slow semantic operations
-  - `debug(:verbose)` — log all terminal semantic events
-  - `debug(:off)` — use the global semantic log configuration
-
-  Set `debug: true` at Agent startup to enable its bounded history buffer.
-  Read that buffer with `Jido.AgentServer.history/1`.
-  """
-  @spec debug() :: debug_level()
-  def debug, do: Jido.Telemetry.debug_level(@default_instance)
-
-  @spec debug(debug_level()) :: :ok
-  def debug(level) when is_atom(level), do: Jido.Telemetry.set_debug(@default_instance, level)
 
   @doc """
   Start the default Jido instance for scripts and Livebook.
@@ -219,7 +192,7 @@ defmodule Jido do
 
       # In a script or Livebook
       {:ok, _} = Jido.start()
-      {:ok, pid} = Jido.start_agent(MyAgent)
+      {:ok, pid} = Jido.start_agent(Jido.Default, MyAgent)
 
       # With custom options
       {:ok, _} = Jido.start(max_tasks: 2000)
@@ -453,14 +426,6 @@ defmodule Jido do
     with_ref_server(instance, ref, &AgentServer.submit(&1, signal, opts))
   end
 
-  @doc "Collects an AgentServer pending reply in its submitting process."
-  @spec await(Jido.AgentServer.pending(), timeout()) :: Jido.AgentServer.signal_result()
-  defdelegate await(pending, timeout \\ 5_000), to: Jido.AgentServer
-
-  @doc "Discards an AgentServer pending reply without cancelling its turn."
-  @spec abandon(Jido.AgentServer.pending()) :: :ok | {:error, term()}
-  defdelegate abandon(pending), to: Jido.AgentServer
-
   @doc "Stops the local Agent resolved by a stable Agent Ref."
   @spec stop_agent_ref(atom(), Ref.t(), term(), timeout()) :: :ok | {:error, term()}
   def stop_agent_ref(instance, %Ref{} = ref, reason \\ :shutdown, timeout \\ 5_000) do
@@ -632,16 +597,15 @@ defmodule Jido do
   # ---------------------------------------------------------------------------
 
   @doc """
-  Starts one Agent under the default or selected Jido instance supervisor.
+  Starts one Agent under the selected Jido instance supervisor.
 
-  The one-argument form uses the default instance started by `Jido.start/1`:
+  Pass `Jido.Default` after `Jido.start/1` in a script or Livebook:
 
       {:ok, _jido} = Jido.start()
       agent = MyAgent.instantiate!(id: "agent-1")
-      {:ok, server} = Jido.start_agent(agent)
+      {:ok, server} = Jido.start_agent(Jido.Default, agent)
 
-  Pass an instance as the first argument when the application runs more than
-  one Jido supervisor:
+  Pass an application instance module in a supervised application:
 
       {:ok, server} = Jido.start_agent(MyApp.Jido, agent)
 
@@ -660,25 +624,9 @@ defmodule Jido do
   This is the standard example startup API. Domain command functions can stay
   in the Agent module; they do not need a matching startup wrapper.
   """
-  @spec start_agent(module() | Jido.Agent.t()) :: DynamicSupervisor.on_start_child()
-  def start_agent(agent), do: start_agent(@default_instance, agent, [])
-
-  @doc """
-  Starts an Agent with options in the default instance, or starts an Agent in
-  the selected instance with default options.
-  """
-  @spec start_agent(module() | Jido.Agent.t(), keyword() | module() | Jido.Agent.t()) ::
-          DynamicSupervisor.on_start_child()
-  def start_agent(agent, opts) when is_list(opts),
-    do: start_agent(@default_instance, agent, opts)
-
-  def start_agent(instance, agent) when is_atom(instance),
-    do: start_agent(instance, agent, [])
-
-  @doc "Starts an Agent with options in the selected Jido instance."
   @spec start_agent(atom(), module() | Jido.Agent.t(), keyword()) ::
           DynamicSupervisor.on_start_child()
-  def start_agent(instance, agent, opts) when is_atom(instance) do
+  def start_agent(instance, agent, opts \\ []) when is_atom(instance) do
     if is_list(opts) and Keyword.keyword?(opts) do
       {instance_opts, runtime_opts} = Keyword.split(opts, [:id, :state])
 
@@ -692,30 +640,10 @@ defmodule Jido do
     end
   end
 
-  @doc "Stops one Agent under the default Jido instance."
-  @spec stop_agent(Jido.AgentServer.server() | String.t()) ::
-          :ok | {:error, :not_found | Jido.Error.ValidationError.t()}
-  def stop_agent(pid_or_id), do: stop_agent(@default_instance, pid_or_id, [])
-
-  @doc """
-  Stops an Agent with options in the default instance, or stops an Agent in
-  the selected instance with default options.
-  """
-  @spec stop_agent(
-          atom() | Jido.AgentServer.server() | String.t(),
-          keyword() | Jido.AgentServer.server() | String.t()
-        ) ::
-          :ok | {:error, :not_found | Jido.Error.ValidationError.t()}
-  def stop_agent(pid_or_id, opts) when is_list(opts),
-    do: stop_agent(@default_instance, pid_or_id, opts)
-
-  def stop_agent(instance, pid_or_id) when is_atom(instance),
-    do: stop_agent(instance, pid_or_id, [])
-
   @doc "Stops an Agent with options in the selected Jido instance."
   @spec stop_agent(atom(), Jido.AgentServer.server() | String.t(), keyword()) ::
           :ok | {:error, :not_found | Jido.Error.ValidationError.t()}
-  def stop_agent(instance, pid_or_id, opts)
+  def stop_agent(instance, pid_or_id, opts \\ [])
 
   def stop_agent(instance, id, opts)
       when is_atom(instance) and is_binary(id) and is_list(opts) do
@@ -725,14 +653,14 @@ defmodule Jido do
         pid -> stop_agent(instance, pid, opts)
       end
     else
-      invalid_compat_input(:stop_agent, %{id: id, opts: opts})
+      invalid_runtime_input(:stop_agent, %{id: id, opts: opts})
     end
   end
 
   def stop_agent(instance, server, opts)
       when is_atom(instance) and is_list(opts) do
-    with :ok <- validate_compat_server(server),
-         :ok <- validate_compat_options(:stop_agent, opts),
+    with :ok <- validate_server(server),
+         :ok <- validate_runtime_options(:stop_agent, opts),
          {:ok, pid} <- owned_agent_server(instance, server, opts) do
       Jido.AgentServer.stop(pid)
     end
@@ -743,29 +671,13 @@ defmodule Jido do
   end
 
   def stop_agent(_instance, id, opts),
-    do: invalid_compat_input(:stop_agent, %{id: id, opts: opts})
-
-  @doc "Looks up one Agent by id under the default Jido instance."
-  @spec whereis_agent(String.t()) :: pid() | nil | {:error, Jido.Error.ValidationError.t()}
-  def whereis_agent(id), do: whereis_agent(@default_instance, id, [])
-
-  @doc """
-  Looks up an Agent with options in the default instance, or looks up an Agent
-  in the selected instance with default options.
-  """
-  @spec whereis_agent(atom() | String.t(), keyword() | String.t()) ::
-          pid() | nil | {:error, Jido.Error.ValidationError.t()}
-  def whereis_agent(id, opts) when is_binary(id) and is_list(opts),
-    do: whereis_agent(@default_instance, id, opts)
-
-  def whereis_agent(instance, id) when is_atom(instance),
-    do: whereis_agent(instance, id, [])
-
-  def whereis_agent(id, opts), do: invalid_compat_input(:whereis_agent, %{id: id, opts: opts})
+    do: invalid_runtime_input(:stop_agent, %{id: id, opts: opts})
 
   @doc "Looks up an Agent with options in the selected Jido instance."
   @spec whereis_agent(atom(), String.t(), keyword()) ::
           pid() | nil | {:error, Jido.Error.ValidationError.t()}
+  def whereis_agent(instance, id, opts \\ [])
+
   def whereis_agent(instance, id, opts)
       when is_atom(instance) and is_binary(id) and is_list(opts) do
     if Keyword.keyword?(opts) do
@@ -775,26 +687,18 @@ defmodule Jido do
         partition: Keyword.get(opts, :partition)
       )
     else
-      invalid_compat_input(:whereis_agent, %{id: id, opts: opts})
+      invalid_runtime_input(:whereis_agent, %{id: id, opts: opts})
     end
   end
 
   def whereis_agent(_instance, id, opts),
-    do: invalid_compat_input(:whereis_agent, %{id: id, opts: opts})
-
-  @doc "Lists all Agents in the default Jido instance."
-  @spec list_agents() :: [{String.t(), pid()}] | {:error, Jido.Error.ValidationError.t()}
-  def list_agents, do: list_agents(@default_instance, [])
-
-  @doc "Lists Agents with default-instance options, or lists a selected instance."
-  @spec list_agents(keyword() | atom()) ::
-          [{String.t(), pid()}] | {:error, Jido.Error.ValidationError.t()}
-  def list_agents(opts) when is_list(opts), do: list_agents(@default_instance, opts)
-  def list_agents(instance) when is_atom(instance), do: list_agents(instance, [])
+    do: invalid_runtime_input(:whereis_agent, %{id: id, opts: opts})
 
   @doc "Lists Agents with options in the selected Jido instance."
   @spec list_agents(atom(), keyword()) ::
           [{String.t(), pid()}] | {:error, Jido.Error.ValidationError.t()}
+  def list_agents(instance, opts \\ [])
+
   def list_agents(instance, opts)
       when is_atom(instance) and is_list(opts) do
     if Keyword.keyword?(opts) do
@@ -815,103 +719,58 @@ defmodule Jido do
       end)
       |> Enum.filter(fn {_id, pid} -> Process.alive?(pid) end)
     else
-      invalid_compat_input(:list_agents, %{opts: opts})
+      invalid_runtime_input(:list_agents, %{opts: opts})
     end
   end
 
-  def list_agents(_instance, opts), do: invalid_compat_input(:list_agents, %{opts: opts})
-
-  @doc "Returns the count of live Agents in the default Jido instance."
-  @spec agent_count() :: non_neg_integer() | {:error, Jido.Error.ValidationError.t()}
-  def agent_count, do: agent_count(@default_instance, [])
-
-  @doc "Counts Agents with default-instance options, or counts a selected instance."
-  @spec agent_count(keyword() | atom()) ::
-          non_neg_integer() | {:error, Jido.Error.ValidationError.t()}
-  def agent_count(opts) when is_list(opts), do: agent_count(@default_instance, opts)
-  def agent_count(instance) when is_atom(instance), do: agent_count(instance, [])
+  def list_agents(_instance, opts), do: invalid_runtime_input(:list_agents, %{opts: opts})
 
   @doc "Counts live Agents with options in the selected Jido instance."
   @spec agent_count(atom(), keyword()) ::
           non_neg_integer() | {:error, Jido.Error.ValidationError.t()}
-  def agent_count(instance, opts) do
+  def agent_count(instance, opts \\ []) do
     case list_agents(instance, opts) do
       agents when is_list(agents) -> length(agents)
       {:error, _reason} = error -> error
     end
   end
 
-  defp validate_compat_options(operation, opts) do
+  defp validate_runtime_options(operation, opts) do
     if Keyword.keyword?(opts),
       do: :ok,
-      else: invalid_compat_input(operation, %{opts: opts})
+      else: invalid_runtime_input(operation, %{opts: opts})
   end
 
-  defp validate_compat_server(server)
+  defp validate_server(server)
        when is_pid(server) or is_atom(server) or is_tuple(server),
        do: :ok
 
-  defp validate_compat_server(server),
-    do: invalid_compat_input(:stop_agent, %{server: server})
+  defp validate_server(server),
+    do: invalid_runtime_input(:stop_agent, %{server: server})
 
-  defp invalid_compat_input(operation, details) do
+  defp invalid_runtime_input(operation, details) do
     {:error,
-     Jido.Error.validation_error("Jido compatibility input is invalid",
+     Jido.Error.validation_error("Jido runtime input is invalid",
        kind: :input,
        subject: __MODULE__,
        details: Map.put(details, :operation, operation)
      )}
   end
 
-  @doc "Persists and stops one live Agent Server in the default instance."
-  @spec hibernate(Jido.AgentServer.server()) :: :ok | {:error, term()}
-  def hibernate(server), do: hibernate(@default_instance, server, [])
-
-  @doc """
-  Hibernates an Agent with default-instance options, or hibernates it in a
-  selected instance with default options.
-  """
-  @spec hibernate(Jido.AgentServer.server(), keyword() | Jido.AgentServer.server()) ::
-          :ok | {:error, term()}
-  def hibernate(server, opts) when is_list(opts),
-    do: hibernate(@default_instance, server, opts)
-
-  def hibernate(instance, server) when is_atom(instance),
-    do: hibernate(instance, server, [])
-
   @doc "Hibernates an Agent with options in the selected Jido instance."
   @spec hibernate(atom(), Jido.AgentServer.server(), keyword()) ::
           :ok | {:error, term()}
-  def hibernate(instance, server, opts)
+  def hibernate(instance, server, opts \\ [])
       when is_atom(instance) and is_list(opts) do
     with {:ok, pid} <- owned_agent_server(instance, server, opts) do
       Jido.AgentServer.hibernate(pid, opts)
     end
   end
 
-  @doc "Restores and starts one persisted Agent in the default instance."
-  @spec thaw(module(), String.t()) :: DynamicSupervisor.on_start_child()
-  def thaw(agent_module, agent_id),
-    do: thaw(@default_instance, agent_module, agent_id, [])
-
-  @doc """
-  Thaws an Agent with default-instance options, or thaws it in a selected
-  instance with default options.
-  """
-  @spec thaw(module(), module() | String.t(), keyword() | String.t()) ::
-          DynamicSupervisor.on_start_child()
-  def thaw(agent_module, agent_id, opts)
-      when is_atom(agent_module) and is_binary(agent_id) and is_list(opts),
-      do: thaw(@default_instance, agent_module, agent_id, opts)
-
-  def thaw(instance, agent_module, agent_id)
-      when is_atom(instance) and is_atom(agent_module) and is_binary(agent_id),
-      do: thaw(instance, agent_module, agent_id, [])
-
   @doc "Thaws an Agent with options in the selected Jido instance."
   @spec thaw(atom(), module(), String.t(), keyword()) ::
           DynamicSupervisor.on_start_child()
-  def thaw(instance, agent_module, agent_id, opts)
+  def thaw(instance, agent_module, agent_id, opts \\ [])
       when is_atom(instance) and is_atom(agent_module) and is_binary(agent_id) and
              is_list(opts) do
     opts =
@@ -926,7 +785,7 @@ defmodule Jido do
   defp startup_agent(%Jido.Agent{id: id} = agent, opts, _runtime_opts) when is_binary(id) do
     if Keyword.delete(opts, :id) == [] and Keyword.get(opts, :id, id) == id,
       do: {:ok, agent},
-      else: invalid_compat_input(:start_agent, %{opts: opts})
+      else: invalid_runtime_input(:start_agent, %{opts: opts})
   end
 
   defp startup_agent(source, opts, runtime_opts) do
