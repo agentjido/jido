@@ -3,7 +3,6 @@ defmodule Jido.Flow.DiagnosticPathsTest do
 
   alias Jido.Flow
   alias Jido.Catalog
-  alias Jido.Flow.Codec
   alias JidoActionTest.FlowCodec, as: Codec
   alias JidoActionTest.Fixtures.Actions.EchoParamsAction
 

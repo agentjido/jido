@@ -1,11 +1,11 @@
-defmodule Jido.Flow.Codec.Reader do
+defmodule Jido.Codec.Flow.Reader do
   @moduledoc false
 
   alias Jido.Flow.{Component, Error, FieldError}
   alias Jido.Catalog
   alias Jido.Catalog.Error, as: CatalogError
   alias Jido.Codec.Reference
-  alias Jido.Flow.Codec.{Limits, Paths, Value}
+  alias Jido.Codec.Flow.{Limits, Paths, Value}
 
   @root [
     name: :name,

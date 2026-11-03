@@ -74,7 +74,7 @@ defmodule Jido.Agent.FlowExpressionTest do
         {"atoms/count", 1} => {:atom, :count}
       })
 
-    flow_opts = [catalog: flow_registry, codec: Jido.Flow.Codec]
+    flow_opts = [catalog: flow_registry, codec: Jido.Codec.Flow]
     assert {:ok, flow_document} = Jido.Codec.encode(flow, flow_opts)
 
     assert {:ok, ^flow} =

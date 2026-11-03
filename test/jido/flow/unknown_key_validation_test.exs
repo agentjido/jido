@@ -2,7 +2,6 @@ defmodule Jido.Flow.UnknownKeyValidationTest do
   use ExUnit.Case, async: true
 
   alias Jido.Flow
-  alias Jido.Flow.Codec
   alias JidoActionTest.FlowCodec, as: Codec
   alias Jido.Flow.Definition
   alias Jido.Flow.Error.InvalidDefinitionError

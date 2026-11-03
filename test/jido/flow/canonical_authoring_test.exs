@@ -102,7 +102,6 @@ defmodule Jido.Flow.CanonicalAuthoringTest do
   use Covenant.Case, component: "jido_action.flow", async: true
   @moduletag obligation: "jido_action.flow.I7"
   alias Jido.Flow
-  alias Jido.Flow.Codec
   alias JidoActionTest.FlowCodec, as: Codec
   alias Jido.Flow.Ref
   alias JidoActionTest.Fixtures.CodecRegistry

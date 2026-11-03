@@ -3,7 +3,6 @@ defmodule Jido.Flow.GeneratedRegistryTest do
   @moduletag obligation: "jido_action.codec.I6"
 
   alias Jido.Catalog
-  alias Jido.Flow.Codec
   alias JidoActionTest.FlowCodec, as: Codec
   alias Jido.Flow.Error.InvalidDefinitionError
   alias Jido.Flow.Ref

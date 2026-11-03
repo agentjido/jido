@@ -1,4 +1,4 @@
-defmodule Jido.Flow.Codec.Limits do
+defmodule Jido.Codec.Flow.Limits do
   @moduledoc false
   alias Jido.Codec.Document
   alias Jido.Codec.Document.Error, as: DocumentError
