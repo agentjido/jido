@@ -284,13 +284,15 @@ defmodule Jido.AgentServer.DurableTurn do
        end), do: :ok, else: {:error, :non_portable_flow_output}
   end
 
-  defp flow_instruction(prepared) do
+  defp flow_instruction(%{turn: %{execution_mode: :durable}} = prepared) do
     case instruction(prepared) do
       {:ok, %{kind: :flow} = instruction} -> {:ok, instruction}
       {:ok, _instruction} -> {:error, :not_durable_flow}
       error -> error
     end
   end
+
+  defp flow_instruction(_prepared), do: {:error, :not_durable_flow}
 
   defp validate_input(instruction),
     do:

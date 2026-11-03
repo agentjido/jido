@@ -2377,8 +2377,8 @@ defmodule Jido.AgentServer do
        when kind in [:prepare, :restore_turn, :restore_handoff] do
     data = put_in(data.active.prepared, prepared)
 
-    case DurableTurn.instruction(prepared) do
-      {:ok, %{kind: :flow}} when data.persistence not in [nil, false] ->
+    case {prepared.turn.execution_mode, DurableTurn.instruction(prepared)} do
+      {:durable, {:ok, %{kind: :flow}}} when data.persistence not in [nil, false] ->
         if kind in [:restore_turn, :restore_handoff] do
           start_durable_worker(put_in(data.active.durable, true))
         else
@@ -2397,7 +2397,7 @@ defmodule Jido.AgentServer do
           end
         end
 
-      _ ->
+      {_execution_mode, _instruction} ->
         owner = self()
         runner = data.runner
         id = data.active.turn_id

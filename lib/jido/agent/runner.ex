@@ -115,6 +115,7 @@ defmodule Jido.Agent.Runner do
       ) do
     turn = %Turn{
       executable: instruction,
+      execution_mode: execution_mode(instruction.kind),
       route: %{state: %{source: :output, path: []}, reply: nil},
       source_signal: source_signal
     }
@@ -268,12 +269,20 @@ defmodule Jido.Agent.Runner do
            (case route.handler do
               %{kind: kind, target: target} when kind in [:action, :flow] ->
                 with {:ok, input} <- merge_route_input(route, signal),
-                     do: {:ok, %Turn{executable: target, input: input, route: route}}
+                     do:
+                       {:ok,
+                        %Turn{
+                          executable: target,
+                          execution_mode: execution_mode(kind),
+                          input: input,
+                          route: route
+                        }}
 
               handler ->
                 {:ok,
                  %Turn{
                    executable: Jido.Agent.Turn.SignalHandler,
+                   execution_mode: :managed,
                    input: %{handler: handler},
                    route: route
                  }}
@@ -282,6 +291,9 @@ defmodule Jido.Agent.Runner do
       Turn.validate_selected(turn)
     end
   end
+
+  defp execution_mode(:flow), do: :durable
+  defp execution_mode(:action), do: :managed
 
   defp normalize_exec_result({:ok, output}), do: normalize_exec_result({:ok, output, []})
 

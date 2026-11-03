@@ -84,7 +84,20 @@ defmodule Jido.Agent.SelectionTest do
 
       assert {:ok, prepared} = Runner.prepare(agent, source, [])
       turn = prepared.turn
-      assert turn.executable == target
+
+      if type == "selection.action" do
+        assert %Jido.Flow{
+                 components: %{
+                   "action" => %{call: %{kind: :action, target: ^target}}
+                 }
+               } = turn.executable
+
+        assert turn.execution_mode == :managed
+      else
+        assert turn.executable == target
+        assert turn.execution_mode == :durable
+      end
+
       assert turn.input == input
       assert turn.source_signal == source
 

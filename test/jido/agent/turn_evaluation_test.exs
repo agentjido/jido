@@ -44,6 +44,11 @@ defmodule Jido.Agent.TurnEvaluationTest do
   test "source binding accepts nil and matching Signals and rejects malformed sources" do
     source = Signal.new!("source.route", %{}, source: "/test")
     unbound = Turn.new!(Add)
+
+    assert %Jido.Flow{
+             components: %{"action" => %{call: %{kind: :action, target: Add}}}
+           } = unbound.executable
+
     assert {:ok, bound} = Turn.bind_source(unbound, source)
     assert bound.source_signal == source
     assert {:ok, ^bound} = Turn.bind_source(bound, source)
@@ -63,7 +68,12 @@ defmodule Jido.Agent.TurnEvaluationTest do
 
     assert {:ok, prepared} = Runner.prepare(agent, source, [])
     assert prepared.turn.source_signal == source
-    assert prepared.turn.executable == Add
+
+    assert %Jido.Flow{
+             components: %{"action" => %{call: %{kind: :action, target: Add}}}
+           } = prepared.turn.executable
+
+    assert prepared.turn.execution_mode == :managed
     assert prepared.turn.input == %{by: 1, label: "route", observer: self()}
     assert prepared.signal.type == "source.route"
     assert prepared.context.signal == prepared.signal

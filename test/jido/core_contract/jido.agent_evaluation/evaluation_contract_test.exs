@@ -68,7 +68,12 @@ defmodule JidoTest.Contract.AgentEvaluationTest do
     assert {:ok,
             %Runner.Prepared{
               turn: %Turn{
-                executable: F.Return,
+                executable: %Jido.Flow{
+                  components: %{
+                    "action" => %{call: %{kind: :action, target: F.Return}}
+                  }
+                },
+                execution_mode: :managed,
                 input: %{amount: 7, nested: %{a: 9}},
                 source_signal: ^signal
               }
@@ -555,7 +560,16 @@ defmodule JidoTest.Contract.AgentEvaluationTest do
               agent: ^agent,
               signal: ^signal,
               turn: %Turn{
-                executable: ^instruction,
+                executable: %Jido.Instruction{
+                  kind: :flow,
+                  target: %Jido.Flow{
+                    components: %{
+                      "action" => %{call: %{kind: :action, target: HandoffTarget}}
+                    }
+                  },
+                  params: %{count: 2}
+                },
+                execution_mode: :managed,
                 input: %{},
                 route: %{state: %{source: :output, path: []}, reply: nil},
                 source_signal: ^signal

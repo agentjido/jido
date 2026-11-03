@@ -348,7 +348,7 @@ defmodule Jido.Agent.RouteProjectionTest do
     {:ok, server} = JidoTest.AgentServerAssertions.start_agent(jido, before)
     caller = Task.async(fn -> AgentServer.call(server, source) end)
 
-    assert_receive {:route_projection_started, worker}
+    assert_receive {:route_projection_started, worker}, 1_000
     assert :ok = AgentServer.cancel(server)
     assert {:error, :cancelled} = Task.await(caller)
     refute Process.alive?(worker)

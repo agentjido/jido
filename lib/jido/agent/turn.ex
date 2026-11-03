@@ -4,9 +4,16 @@ defmodule Jido.Agent.Turn do
   @moduledoc """
   A prepared executable turn for one Agent Signal.
 
-  The executable can be an Action, a Flow module, or a `Jido.Flow` value.
-  `Jido.AgentServer` owns the execution options and adds the current Signal
-  and Agent state to the execution context.
+  A validated Turn always has a Flow executable. An Action supplied as route
+  convenience syntax becomes a canonical one-step `Jido.Flow` value. A bound
+  Action Instruction becomes a bound Flow Instruction. `Jido.AgentServer`
+  owns the execution options and adds the current Signal and Agent state to
+  the execution context.
+
+  `execution_mode` separates behavior from host lifecycle. `:managed` runs in
+  the live AgentServer execution context. `:durable` uses the durable Flow
+  lifecycle when the AgentServer has persistence. The runner keeps Action
+  authoring sugar managed and marks an authored Flow as durable.
 
   `source_signal` is the unchanged Signal that selected the Turn. It can be
   `nil` while a Turn is constructed. The runner binds and validates the source
@@ -28,7 +35,10 @@ defmodule Jido.Agent.Turn do
   @schema Joi.struct(
             __MODULE__,
             %{
-              executable: Joi.any(description: "Action or Flow executable target"),
+              executable: Joi.any(description: "Flow executable target"),
+              execution_mode:
+                Joi.enum([:managed, :durable], description: "AgentServer execution lifecycle")
+                |> Joi.default(:managed),
               route: Joi.any(description: "Selected authored route") |> Joi.default(nil),
               input: Joi.any(description: "Executable input") |> Joi.default(%{}),
               source_signal:
@@ -108,7 +118,8 @@ defmodule Jido.Agent.Turn do
   @doc "Validates one Agent Turn."
   @spec validate(term()) :: {:ok, t()} | {:error, Exception.t()}
   def validate(%__MODULE__{} = turn) do
-    with {:ok, _input} <- validate_plan(turn),
+    with {:ok, turn} <- validate_plan(turn, false),
+         :ok <- validate_execution_mode(turn.execution_mode),
          :ok <- validate_source_signal(turn.source_signal) do
       {:ok, turn}
     end
@@ -126,7 +137,10 @@ defmodule Jido.Agent.Turn do
   @doc false
   @spec validate_selected(t()) :: {:ok, t()} | {:error, Exception.t()}
   def validate_selected(%__MODULE__{source_signal: %Jido.Signal{}} = turn) do
-    with {:ok, input} <- validate_plan(turn), do: {:ok, %{turn | input: input}}
+    with {:ok, turn} <- validate_plan(turn, true),
+         :ok <- validate_execution_mode(turn.execution_mode) do
+      {:ok, turn}
+    end
   end
 
   def validate_selected(value) do
@@ -149,8 +163,39 @@ defmodule Jido.Agent.Turn do
 
   def normalize_input(value), do: invalid_input(value)
 
-  defp validate_plan(%__MODULE__{} = turn) do
-    with :ok <- Jido.Instruction.validate(turn.executable), do: normalize_input(turn.input)
+  defp validate_plan(%__MODULE__{} = turn, normalize_input?) do
+    with {:ok, executable} <- normalize_executable(turn.executable),
+         {:ok, input} <- normalize_input(turn.input) do
+      input = if normalize_input?, do: input, else: turn.input
+      {:ok, %{turn | executable: executable, input: input}}
+    end
+  end
+
+  defp normalize_executable(executable) do
+    with {:ok, instruction} <- Jido.Instruction.resolve(executable),
+         :ok <- Jido.Instruction.validate_resolved(instruction) do
+      lower_action(executable, instruction)
+    end
+  end
+
+  defp lower_action(executable, %Jido.Instruction{kind: :flow}), do: {:ok, executable}
+
+  defp lower_action(executable, %Jido.Instruction{kind: :action} = instruction) do
+    with {:ok, flow} <- Jido.Flow.from_action(instruction.target) do
+      if match?(%Jido.Instruction{}, executable),
+        do: {:ok, %{instruction | kind: :flow, target: flow}},
+        else: {:ok, flow}
+    end
+  end
+
+  defp validate_execution_mode(mode) when mode in [:managed, :durable], do: :ok
+
+  defp validate_execution_mode(mode) do
+    {:error,
+     Error.validation_error("Agent Turn execution_mode must be :managed or :durable",
+       field: :execution_mode,
+       details: %{value: mode}
+     )}
   end
 
   defp invalid_input(value) do

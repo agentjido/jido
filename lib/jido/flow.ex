@@ -260,6 +260,64 @@ defmodule Jido.Flow do
   end
 
   @doc """
+  Builds the canonical one-step Flow for an Action module.
+
+  Agent routes use this conversion when an author supplies an Action as
+  convenience syntax. The returned Flow passes its complete input to the
+  Action and returns that Action's result.
+  """
+  @spec from_action(module()) :: {:ok, t()} | {:error, Exception.t()}
+  def from_action(action) when is_atom(action) and action not in [nil, true, false] do
+    with {:ok, %Jido.Instruction{kind: :action}} <- Jido.Instruction.resolve(action),
+         :ok <- Jido.Instruction.validate(action) do
+      new(%{
+        name: "one_step_#{action.name()}",
+        components: [
+          %{
+            kind: :step,
+            name: "action",
+            action: action,
+            params: Jido.Flow.Ref.input([])
+          }
+        ],
+        output: Jido.Flow.Ref.result("action")
+      })
+    else
+      {:ok, %Jido.Instruction{kind: kind}} ->
+        {:error,
+         Error.validation_error("one-step Flow requires an Action module", %{
+           kind: kind,
+           target: action
+         })}
+
+      {:error, error} ->
+        {:error,
+         Error.validation_error("one-step Flow requires an Action module", %{
+           target: action,
+           reason: error
+         })}
+    end
+  rescue
+    error -> {:error, error}
+  end
+
+  def from_action(action) do
+    {:error,
+     Error.validation_error("one-step Flow requires an Action module", %{
+       target: action
+     })}
+  end
+
+  @doc "Builds the canonical one-step Flow for an Action module, or raises."
+  @spec from_action!(module()) :: t() | no_return()
+  def from_action!(action) do
+    case from_action(action) do
+      {:ok, flow} -> flow
+      {:error, error} when is_exception(error) -> raise error
+    end
+  end
+
+  @doc """
   Converts a Flow artifact to its deterministic semantic map.
 
   Components use deterministic dependency order, then component name. Use

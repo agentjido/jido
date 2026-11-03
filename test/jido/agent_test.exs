@@ -365,7 +365,12 @@ defmodule Jido.AgentTest do
     assert {:ok,
             %Jido.Agent.Runner.Prepared{
               turn: %Turn{
-                executable: Add,
+                executable: %Jido.Flow{
+                  components: %{
+                    "action" => %{call: %{kind: :action, target: Add}}
+                  }
+                },
+                execution_mode: :managed,
                 input: %{by: 2, label: "one"}
               }
             }} = Jido.Agent.Runner.prepare(agent, signal, [])
@@ -384,7 +389,15 @@ defmodule Jido.AgentTest do
 
     assert {:ok,
             %Jido.Agent.Runner.Prepared{
-              turn: %Turn{executable: Add, source_signal: ^signal}
+              turn: %Turn{
+                executable: %Jido.Flow{
+                  components: %{
+                    "action" => %{call: %{kind: :action, target: Add}}
+                  }
+                },
+                execution_mode: :managed,
+                source_signal: ^signal
+              }
             }} = Jido.Agent.Runner.prepare(agent, signal, [])
   end
 
@@ -642,7 +655,15 @@ defmodule Jido.AgentTest do
 
         assert {:ok,
                 %Jido.Agent.Runner.Prepared{
-                  turn: %Turn{executable: Add, input: input}
+                  turn: %Turn{
+                    executable: %Jido.Flow{
+                      components: %{
+                        "action" => %{call: %{kind: :action, target: Add}}
+                      }
+                    },
+                    execution_mode: :managed,
+                    input: input
+                  }
                 }} = Jido.Agent.Runner.prepare(routed, signal, [])
 
         assert input === signal.data
@@ -826,7 +847,17 @@ defmodule Jido.AgentTest do
       flow = JidoTest.AgentFixtures.two_step_flow()
       signal = Signal.new!("counter.add", %{by: 1}, source: "/test")
 
-      assert {:ok, %Turn{executable: Add, input: %{by: 1}}} = Turn.new(Add, %{by: 1})
+      assert {:ok,
+              %Turn{
+                executable: %Jido.Flow{
+                  components: %{
+                    "action" => %{call: %{kind: :action, target: Add}}
+                  }
+                },
+                execution_mode: :managed,
+                input: %{by: 1}
+              }} = Turn.new(Add, %{by: 1})
+
       assert %Turn{executable: ^flow, input: []} = Turn.new!(flow, [])
 
       assert {:ok, %Turn{source_signal: ^signal}} = Turn.new(Add, %{by: 1}, signal)
@@ -837,6 +868,9 @@ defmodule Jido.AgentTest do
 
       assert {:error, %{__exception__: true}} =
                Turn.validate(%Turn{executable: Add, input: %{}, source_signal: :invalid})
+
+      assert {:error, %Jido.Error.ValidationError{subject: :execution_mode}} =
+               Turn.validate(%Turn{executable: Add, execution_mode: :invalid})
 
       assert_raise Jido.Error.ValidationError, fn -> Turn.new!(Add, "invalid input") end
     end
