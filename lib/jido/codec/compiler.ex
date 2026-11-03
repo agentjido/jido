@@ -82,8 +82,8 @@ defmodule Jido.Codec.Compiler do
       def __jido_codec_kind__, do: unquote(kind)
 
       @doc false
-      @spec __jido_codec_manifest__() :: Jido.Codec.Manifest.t()
-      def __jido_codec_manifest__ do
+      @spec __jido_catalog_manifest__() :: map()
+      def __jido_catalog_manifest__ do
         %{
           id: @__jido_codec_config__[:id],
           kind: __jido_codec_kind__(),

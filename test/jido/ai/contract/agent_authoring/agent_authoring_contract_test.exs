@@ -30,7 +30,7 @@ defmodule Jido.AI.Contract.AgentAuthoringTest do
   test "the core Agent default ID also defines the AI signal source" do
     id = Atom.to_string(DefaultIdentityAgent)
 
-    assert DefaultIdentityAgent.__jido_codec_manifest__().id == id
+    assert DefaultIdentityAgent.__jido_catalog_manifest__().id == id
     assert DefaultIdentityAgent.definition().signal_source == "/" <> id
   end
 

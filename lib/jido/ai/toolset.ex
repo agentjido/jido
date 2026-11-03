@@ -253,7 +253,7 @@ defmodule Jido.AI.Toolset do
 
   defp identity(target) when is_atom(target) do
     kind = tool_kind!(target)
-    manifest = target.__jido_codec_manifest__()
+    manifest = target.__jido_catalog_manifest__()
 
     %{
       kind: kind,

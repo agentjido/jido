@@ -3,7 +3,7 @@ defmodule Jido.Discovery do
   Builds the runtime Registry used by JSON codecs and code discovery.
 
   Discovery scans configured application module lists and explicit modules.
-  Modules publish static entries through `__jido_codec_manifest__/0`. Document
+  Modules publish static entries through `__jido_catalog_manifest__/0`. Document
   codecs implement the `Jido.Codec.Contract` behaviour. Reads use an immutable
   Registry in `:persistent_term`.
 
@@ -241,8 +241,8 @@ defmodule Jido.Discovery do
   end
 
   defp discover_entries(module) do
-    if function_exported?(module, :__jido_codec_manifest__, 0) do
-      with {:ok, entries} <- Manifest.validate(module, module.__jido_codec_manifest__()) do
+    if function_exported?(module, :__jido_catalog_manifest__, 0) do
+      with {:ok, entries} <- Manifest.validate(module, module.__jido_catalog_manifest__()) do
         {:ok, Enum.map(entries, &decorate_entry/1)}
       end
     else

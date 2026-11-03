@@ -27,7 +27,7 @@ defmodule Jido.Agent.Plugin.DeclarationTest do
     def vsn, do: 1
     def sections, do: []
 
-    def __jido_codec_manifest__,
+    def __jido_catalog_manifest__,
       do: %{id: id(), kind: :plugin, target: __MODULE__, vsn: vsn()}
 
     def lower(_dsl, config), do: {:ok, config}

@@ -639,7 +639,9 @@ defmodule Jido.Telemetry.AI do
 
   defp agent_definition(module) when is_atom(module) and not is_nil(module) do
     authoring =
-      if function_exported?(module, :__jido_codec_manifest__, 0), do: module.__jido_codec_manifest__(), else: %{}
+      if function_exported?(module, :__jido_catalog_manifest__, 0),
+        do: module.__jido_catalog_manifest__(),
+        else: %{}
 
     case module.definition() do
       %{id: id, description: description, vsn: vsn} ->

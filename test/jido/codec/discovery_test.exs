@@ -60,7 +60,7 @@ defmodule Jido.Codec.DiscoveryTest do
   end
 
   defmodule Vocabulary do
-    def __jido_codec_manifest__ do
+    def __jido_catalog_manifest__ do
       [
         %{
           id: "tests/atoms/name",
@@ -81,7 +81,7 @@ defmodule Jido.Codec.DiscoveryTest do
   end
 
   defmodule BareVocabulary do
-    def __jido_codec_manifest__ do
+    def __jido_catalog_manifest__ do
       %{
         id: "tests/atoms/bare",
         kind: :atom,
@@ -92,7 +92,7 @@ defmodule Jido.Codec.DiscoveryTest do
   end
 
   defmodule InvalidManifest do
-    def __jido_codec_manifest__, do: %{kind: :atom}
+    def __jido_catalog_manifest__, do: %{kind: :atom}
   end
 
   setup do
@@ -113,7 +113,7 @@ defmodule Jido.Codec.DiscoveryTest do
   end
 
   test "Action and Flow modules expose static authoring manifests" do
-    assert AlphaAction.__jido_codec_manifest__() == %{
+    assert AlphaAction.__jido_catalog_manifest__() == %{
              id: "tests/actions/alpha",
              kind: :action,
              vsn: 2,
@@ -122,7 +122,7 @@ defmodule Jido.Codec.DiscoveryTest do
              description: "Alpha catalog fixture"
            }
 
-    assert AlphaFlow.__jido_codec_manifest__() == %{
+    assert AlphaFlow.__jido_catalog_manifest__() == %{
              id: "tests/flows/alpha",
              kind: :flow,
              vsn: 3,

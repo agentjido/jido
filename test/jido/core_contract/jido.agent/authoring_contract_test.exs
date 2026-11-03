@@ -205,7 +205,7 @@ defmodule JidoTest.Contract.AgentAuthoringTest do
       })
 
     assert complete === CompleteDsl.definition()
-    assert CompleteDsl.__jido_codec_manifest__().id == "tests/agents/complete-dsl"
+    assert CompleteDsl.__jido_catalog_manifest__().id == "tests/agents/complete-dsl"
   end
 
   @tag obligation: ["jido.agent.I2", "jido.agent.I3", "jido.agent.I7", "jido.agent.I9"]

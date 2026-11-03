@@ -55,7 +55,7 @@ defmodule Jido.CodecIntegrationTest do
   end
 
   defmodule Vocabulary do
-    def __jido_codec_manifest__ do
+    def __jido_catalog_manifest__ do
       %{
         id: "tests/schemas/sample-agent",
         kind: :schema,
