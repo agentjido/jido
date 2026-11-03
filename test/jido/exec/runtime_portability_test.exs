@@ -4,7 +4,6 @@ defmodule Jido.Exec.RuntimePortabilityTest do
   alias Jido.Exec
   alias Jido.Flow
   alias Jido.Flow.Ref
-  alias JidoActionTest.Fixtures.Actions.Add
 
   defmodule UnprojectedData do
     defstruct value: 1
@@ -26,6 +25,13 @@ defmodule Jido.Exec.RuntimePortabilityTest do
 
     @impl true
     def run(_params, _context), do: {:ok, %{pid: self()}}
+  end
+
+  defmodule EchoInput do
+    use Jido.Action, name: "exec_v2_echo_local_input"
+
+    @impl true
+    def run(params, _context), do: {:ok, params}
   end
 
   @tag obligation: "jido_action.boundary.I10"
@@ -60,30 +66,19 @@ defmodule Jido.Exec.RuntimePortabilityTest do
   end
 
   @tag obligation: "jido_action.boundary.I10"
-  test "rejected Runic input closes the new Worker and permits a corrected retry" do
+  test "managed input accepts a safe local struct without canonical expansion" do
     runner = start_runner!()
     id = unique_id()
     flow = input_flow()
-
-    assert {:error, %Runic.Identity.CanonicalError{}} =
-             Exec.start(runner, id, flow, %{value: %UnprojectedData{}})
-
-    assert Runic.Runner.lookup(runner, id) == nil
-    assert DynamicSupervisor.which_children(Module.concat(runner, WorkerSupervisor)) == []
-
-    scopes =
-      Registry.select(Module.concat(runner, Registry), [
-        {{{Runic.TaskScope, :_}, :"$1", :_}, [], [:"$1"]}
-      ])
-
-    refute Enum.any?(scopes, &Process.alive?/1)
     owner = self()
 
     assert {:ok, _worker} =
-             Exec.start(runner, id, flow, %{value: 1}, %{}, hooks: [on_idle: fn _state -> send(owner, :retry_idle) end])
+             Exec.start(runner, id, flow, %{value: %UnprojectedData{}}, %{},
+               hooks: [on_idle: fn _state -> send(owner, :local_input_idle) end]
+             )
 
-    assert_receive :retry_idle
-    assert Exec.result(runner, id) == {:ok, %{value: 1}}
+    assert_receive :local_input_idle
+    assert Exec.result(runner, id) == {:ok, %{value: %UnprojectedData{}}}
   end
 
   @tag obligation: "jido_action.boundary.I10"
@@ -104,9 +99,9 @@ defmodule Jido.Exec.RuntimePortabilityTest do
     Flow.new!(%{
       name: "portable_input",
       components: [
-        %{kind: :step, name: "add", action: Add, params: %{value: Ref.input(:value), amount: 0}}
+        %{kind: :step, name: "echo", action: EchoInput, params: %{value: Ref.input(:value)}}
       ],
-      output: Ref.result("add")
+      output: Ref.result("echo")
     })
   end
 

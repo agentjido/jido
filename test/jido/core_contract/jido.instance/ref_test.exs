@@ -488,6 +488,42 @@ defmodule JidoTest.InstanceRefTest do
     end
   end
 
+  @tag obligation: ["jido.instance.I6", "jido.instance.I9"]
+  test "durable Ref activation creates, restores, and resolves concurrent starts" do
+    namespace = unique_namespace("activation")
+    instance = unique_instance("activation")
+    store = persistence("activation")
+    ref = Ref.new!(namespace: namespace, partition: "team-a", id: "counter")
+
+    start_supervised!(
+      {Jido, name: instance, namespace: namespace, persistence: store},
+      id: instance
+    )
+
+    results =
+      1..4
+      |> Task.async_stream(
+        fn _index -> Jido.activate_agent(instance, ref, Counter) end,
+        ordered: false,
+        timeout: 5_000
+      )
+      |> Enum.map(fn {:ok, result} -> result end)
+
+    servers = Enum.map(results, fn {:ok, server} -> server end)
+    assert length(Enum.uniq(servers)) == 1
+    server = hd(servers)
+    assert :ok = Jido.AgentServer.await_ready(server)
+    assert Jido.agent(instance, ref).state.count == 0
+
+    assert {:ok, agent, _} = Jido.call(instance, ref, signal(7))
+    assert agent.state.count == 7
+    assert :ok = Jido.hibernate_ref(instance, ref)
+
+    assert {:ok, restored} = Jido.activate_agent(instance, ref, Counter)
+    assert :ok = Jido.AgentServer.await_ready(restored)
+    assert Jido.agent(instance, ref).state.count == 7
+  end
+
   @tag obligation: "jido.instance.I6"
   test "Ref startup rejects conflicting identity options before starting an Agent" do
     instance = unique_instance("ref-options")

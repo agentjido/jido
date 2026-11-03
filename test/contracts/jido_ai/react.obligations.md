@@ -69,3 +69,10 @@ model-execution, conversation, and tools components.
 - **must:** Enforce configured tool-round and total tool-call limits before a new tool batch starts and return a stable blocked result when a limit is reached.
 - **kind:** functional
 - **status:** active
+
+### jido_ai.react.I8 — Provider options have no hidden generation limits
+
+- **scope:** `Jido.AI.Reasoning.ReAct`
+- **must:** Keep omitted provider options empty. Preserve a supplied partial options Map without adding a hidden token, timeout, or temperature value. Runtime budgets remain separate from provider generation options.
+- **kind:** functional
+- **status:** active

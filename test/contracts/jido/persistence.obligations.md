@@ -144,3 +144,11 @@ progress, or the private behavior of one storage backend.
 - **why:** All bundled adapters must implement the same storage boundary.
 - **kind:** functional
 - **status:** active
+
+### jido.persistence.I16 — Atomic stored Agent upgrade
+
+- **scope:** `Jido.Persistence.upgrade_agent/5`
+- **must:** Read one active record and run one explicit upgrade Action before old code reference resolution. Refuse a nonterminal durable Turn. Write the complete upgraded Agent at the next revision with the condition from that read. Keep stored bytes unchanged after validation, Action, encoding, or compare-and-swap failure.
+- **why:** An inactive durable Agent needs a safe code and data evolution path.
+- **kind:** ordering
+- **status:** active

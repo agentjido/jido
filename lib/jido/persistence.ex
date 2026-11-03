@@ -60,6 +60,7 @@ defmodule Jido.Persistence do
   @identity_options [:instance, :namespace, :partition]
   @create_options @identity_options ++ [:reason, :revision, :server_turn]
   @save_options @create_options ++ [:expected_revision]
+  @upgrade_options @identity_options ++ [:context]
   @operation_options [
     :expected_revision,
     :instance,
@@ -304,6 +305,84 @@ defmodule Jido.Persistence do
       })
 
   @doc """
+  Atomically upgrades one inactive saved Agent.
+
+  The upgrade Action receives the saved snapshot before old code references
+  are resolved. A successful upgrade writes the next revision with
+  compare-and-swap. An active durable Turn returns `{:error, :turn_in_flight}`.
+
+  Use `:instance`, `:namespace`, and `:partition` to select durable identity.
+  Use `:context` to pass Action context. Jido adds the durable identity,
+  current revision, and `:stored_upgrade` reason to that context.
+  """
+  @spec upgrade_agent(adapter_config() | atom(), module(), String.t(), term(), keyword()) ::
+          {:ok, Agent.t(), non_neg_integer()} | {:error, term()}
+  def upgrade_agent(source, agent_module, agent_id, action, opts \\ [])
+
+  def upgrade_agent(source, agent_module, agent_id, action, opts)
+      when is_atom(agent_module) and is_binary(agent_id) do
+    telemetry_opts =
+      if Keyword.keyword?(opts), do: Keyword.put(opts, :reason, :stored_upgrade), else: opts
+
+    PersistenceTelemetry.observe(
+      :compare_and_swap,
+      source,
+      agent_module,
+      agent_id,
+      telemetry_opts,
+      fn ->
+        Store.protect(:compare_and_swap, fn ->
+          with :ok <- validate_operation_options(opts, @upgrade_options),
+               context = Keyword.get(opts, :context, %{}),
+               :ok <- Jido.Agent.Schema.plain_map(context),
+               {:ok, {adapter, adapter_opts}, instance} <- resolve_source(source, opts),
+               {:ok, ref} <- resolve_ref(instance, agent_id, opts),
+               key = Record.agent_key(ref),
+               {:ok, value, condition} <- Store.read({adapter, adapter_opts}, key),
+               {:ok, record} <- decode_record(value, agent_module),
+               :ok <- Record.validate(record, ref, agent_module),
+               :ok <- Record.require_active(record),
+               :ok <- require_inactive_turn(record),
+               revision = Record.revision(record),
+               action_context = stored_upgrade_context(context, instance, ref, revision),
+               {:ok, upgraded} <-
+                 upgrade(Record.checkpoint(record), action, context: action_context),
+               next_revision = revision + 1,
+               {:ok, next_record} <-
+                 build_record(
+                   upgraded,
+                   instance,
+                   [
+                     partition: ref.partition,
+                     revision: next_revision,
+                     reason: :stored_upgrade,
+                     server_turn: Map.get(record, :server_turn)
+                   ],
+                   ref
+                 ),
+               {:ok, next_value} <- Record.encode(next_record),
+               :ok <-
+                 Store.compare_and_swap(
+                   {adapter, adapter_opts},
+                   key,
+                   condition,
+                   next_value
+                 ) do
+            {:ok, upgraded, next_revision}
+          end
+        end)
+      end
+    )
+  end
+
+  def upgrade_agent(_source, agent_module, agent_id, _action, _opts),
+    do:
+      invalid_public_input(:upgrade_agent, %{
+        agent_module: agent_module,
+        agent_id: agent_id
+      })
+
+  @doc """
   Logically deletes one Agent record with a compare-and-swap tombstone.
 
   Use `:instance`, `:namespace`, and `:partition` to select its durable identity.
@@ -384,6 +463,50 @@ defmodule Jido.Persistence do
 
   def open_agent(source, %Agent{} = agent, :restore, opts),
     do: load_agent_with_server_turn(source, agent.module, agent.id, opts)
+
+  def open_agent(source, %Agent{} = agent, :restore_or_create, opts) do
+    case load_agent_with_server_turn(source, agent.module, agent.id, opts) do
+      {:ok, _agent, _revision, _turn} = restored ->
+        restored
+
+      {:error, :not_found} ->
+        create_or_restore_agent(source, agent, opts)
+
+      {:error, _reason} = error ->
+        error
+    end
+  end
+
+  defp create_or_restore_agent(source, agent, opts) do
+    case open_agent(source, agent, :create, opts) do
+      {:ok, _agent, _revision, _turn} = created ->
+        created
+
+      {:error, :conflict} ->
+        load_agent_with_server_turn(source, agent.module, agent.id, opts)
+
+      {:error, _reason} = error ->
+        error
+    end
+  end
+
+  defp require_inactive_turn(record) do
+    case Map.get(record, :server_turn) do
+      nil -> :ok
+      %{status: status} when status in [:completed, :failed, :cancelled] -> :ok
+      _turn -> {:error, :turn_in_flight}
+    end
+  end
+
+  defp stored_upgrade_context(context, instance, ref, revision) do
+    Map.merge(context, %{
+      instance: instance,
+      namespace: ref.namespace,
+      partition: ref.partition,
+      revision: revision,
+      reason: :stored_upgrade
+    })
+  end
 
   defp expected_revision(opts) do
     case Keyword.fetch(opts, :expected_revision) do

@@ -56,6 +56,13 @@ defmodule Jido.Exec.Runner.ManagedTest do
     def run(params, context), do: {:ok, Map.put(params, :seen, Map.has_key?(context, :api_key))}
   end
 
+  defmodule DateTimeValue do
+    use Jido.Action, name: "managed_datetime_value"
+
+    @impl true
+    def run(_params, _context), do: {:ok, %{at: ~U[2026-11-03 12:00:00Z]}}
+  end
+
   defmodule Blocks do
     use Jido.Action, name: "managed_blocks"
 
@@ -231,6 +238,17 @@ defmodule Jido.Exec.Runner.ManagedTest do
     {store, store_state} = Runic.Runner.get_store(runner)
     assert {:ok, events} = store.stream(id, store_state)
     refute inspect(Enum.to_list(events), limit: :infinity) =~ "SECRET-KEY-123"
+  end
+
+  test "managed execution keeps a DateTime Action result as a local value" do
+    runner = start_runner!(__MODULE__.DateTimeRunner)
+    id = {:datetime, System.unique_integer([:positive])}
+
+    assert {:ok, _worker} =
+             Exec.start(runner, id, DateTimeValue, %{}, %{}, hooks: idle_hook(id))
+
+    assert_receive {:idle, ^id}, 2_000
+    assert Exec.result(runner, id) == {:ok, %{at: ~U[2026-11-03 12:00:00Z]}}
   end
 
   test "managed execution rejects non-portable Instruction metadata" do

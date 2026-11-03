@@ -40,6 +40,11 @@ Some active Covenant IDs still start with `jido_action.` or `jido_ai.`. These ar
 ## Work rules
 
 - Run Mix commands from this directory.
+- Always run `bw prime` before you start work. Beadwork stores plans, progress,
+  and decisions in Git so they remain available after context loss.
+- For multi-step work, create a Beadwork epic and child tasks before
+  implementation starts. Use one task and one worktree for each architecture
+  slice.
 - Keep one `:jido` OTP application. Keep `Jido.Application` as its only composition root.
 - Change one namespace or Covenant component at a time. Change its tests and contract records in the same work.
 - Update `../docs/aspirational-module-dependency-map.md` when ownership or dependency direction changes.

@@ -396,13 +396,22 @@ defmodule Jido do
     end
   end
 
-  @doc "Activates one durable Agent with an explicit stable Agent Ref."
+  @doc "Restores or creates one durable Agent with an explicit stable Agent Ref."
   @spec activate_agent(atom(), Ref.t(), module(), keyword()) ::
           DynamicSupervisor.on_start_child()
   def activate_agent(instance, %Ref{} = ref, agent_module, opts \\ []) do
     with {:ok, ref} <- validate_instance_ref(instance, ref),
          {:ok, opts} <- Ref.startup_options(ref, opts) do
-      thaw(instance, agent_module, ref.id, opts)
+      opts =
+        opts
+        |> Keyword.put(:id, ref.id)
+        |> Keyword.put_new(:persistence, :inherit)
+        |> Keyword.put(:persistence_mode, :restore_or_create)
+
+      case start_agent(instance, agent_module, opts) do
+        {:error, {:already_started, pid}} when is_pid(pid) -> {:ok, pid}
+        result -> result
+      end
     end
   end
 

@@ -1,9 +1,9 @@
 {
   "apps": {
     "jido": {
-      "active": 118,
+      "active": 120,
       "coverage": 1.0,
-      "covered": 118
+      "covered": 120
     },
     "jido.agent_server": {
       "active": 74,
@@ -21,9 +21,9 @@
       "covered": 52
     },
     "jido_ai": {
-      "active": 42,
+      "active": 43,
       "coverage": 1.0,
-      "covered": 42
+      "covered": 43
     }
   },
   "components": {
@@ -2472,10 +2472,10 @@
       }
     },
     "jido.instance": {
-      "active": 8,
+      "active": 9,
       "app": "jido",
       "coverage": 1.0,
-      "covered": 8,
+      "covered": 9,
       "form": "light",
       "obligations": {
         "jido.instance.I1": {
@@ -2595,7 +2595,7 @@
         "jido.instance.I6": {
           "failing": 0,
           "kind": "functional",
-          "passing": 6,
+          "passing": 7,
           "status": "active",
           "testable": true,
           "tests": [
@@ -2604,6 +2604,7 @@
             "test a Ref-first operation requires a stable instance namespace",
             "test a durable Ref survives rebinding its namespace to another local instance",
             "test a process label identifies each live server for one Agent Ref",
+            "test durable Ref activation creates, restores, and resolves concurrent starts",
             "test the Ref API resolves each operation and preserves direct Server results"
           ]
         },
@@ -2634,14 +2635,24 @@
             "test the Ref API accepts a generated instance identity",
             "test the Ref API resolves each operation and preserves direct Server results"
           ]
+        },
+        "jido.instance.I9": {
+          "failing": 0,
+          "kind": "ordering",
+          "passing": 1,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test durable Ref activation creates, restores, and resolves concurrent starts"
+          ]
         }
       }
     },
     "jido.persistence": {
-      "active": 15,
+      "active": 16,
       "app": "jido",
       "coverage": 1.0,
-      "covered": 15,
+      "covered": 16,
       "form": "light",
       "obligations": {
         "jido.persistence.I1": {
@@ -2765,6 +2776,17 @@
             "test built-in adapters obey the required binary get and CAS contract"
           ]
         },
+        "jido.persistence.I16": {
+          "failing": 0,
+          "kind": "ordering",
+          "passing": 2,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test stored upgrade rejects a nonterminal durable Turn without changing bytes",
+            "test stored upgrade resolves old code only after the Action and commits the next revision"
+          ]
+        },
         "jido.persistence.I2": {
           "failing": 0,
           "kind": "persisted_format",
@@ -2875,10 +2897,11 @@
         "jido.persistence.I8": {
           "failing": 0,
           "kind": "functional",
-          "passing": 3,
+          "passing": 4,
           "status": "active",
           "testable": true,
           "tests": [
+            "test stored upgrade resolves old code only after the Action and commits the next revision",
             "test upgrade passes context and accepts the exact empty-Directive result",
             "test upgrade rejects identity changes, invalid state, directives, and invalid results",
             "test upgrade runs before old code resolution and validates only target references"
@@ -3913,7 +3936,7 @@
             "test managed Flow input failures preserve the validator error",
             "test managed execution fails a process-local Action result before persistence",
             "test managed execution rejects process-local input before it starts",
-            "test rejected Runic input closes the new Worker and permits a corrected retry"
+            "test managed input accepts a safe local struct without canonical expansion"
           ]
         },
         "jido_action.boundary.I2": {
@@ -4295,7 +4318,7 @@
         "jido_action.execution.I21": {
           "failing": 0,
           "kind": "functional",
-          "passing": 25,
+          "passing": 26,
           "status": "active",
           "testable": true,
           "tests": [
@@ -4306,6 +4329,7 @@
             "test failure selection survives resume after completion order [:b, :a]",
             "test later inputs keep distinct identities and do not replace the managed result",
             "test managed Action targets keep context out of the Runic store",
+            "test managed execution keeps a DateTime Action result as a local value",
             "test managed execution rejects non-portable Instruction metadata",
             "test managed execution uses the package concurrency configuration",
             "test managed failure selection follows component order after active work drains",
@@ -5619,16 +5643,16 @@
       }
     },
     "jido_ai.react": {
-      "active": 7,
+      "active": 8,
       "app": "jido_ai",
       "coverage": 1.0,
-      "covered": 7,
+      "covered": 8,
       "form": "light",
       "obligations": {
         "jido_ai.react.I1": {
           "failing": 0,
           "kind": "functional",
-          "passing": 30,
+          "passing": 32,
           "status": "active",
           "testable": true,
           "tests": [
@@ -5636,6 +5660,7 @@
             "test AgentServer records a tool review denial outside the model context",
             "test AgentServer records an input rejection outside the model context",
             "test ReAct loads SKILL.md instructions through the dynamic tool source",
+            "test a DateTime tool value completes the next ReAct model round",
             "test a Flow executes through the model tool contract",
             "test a retryable provider failure can fall back without becoming a conversation message",
             "test a second request projects the complete committed conversation",
@@ -5647,6 +5672,7 @@
             "test conversation projection keeps complete recent turns within its configured window",
             "test conversation projection removes an incomplete tool exchange but keeps later messages",
             "test disabled tool policy sends no definitions and forbids provider tool use",
+            "test eight sequential tool rounds keep bounded Runic identity state",
             "test elapsed budget becomes the provider whole-call timeout",
             "test large local Action values become bounded model content",
             "test provider prompt-cache usage remains in the model attempt and aggregate usage",
@@ -5667,7 +5693,7 @@
         "jido_ai.react.I2": {
           "failing": 0,
           "kind": "ordering",
-          "passing": 30,
+          "passing": 32,
           "status": "active",
           "testable": true,
           "tests": [
@@ -5675,6 +5701,7 @@
             "test AgentServer records a tool review denial outside the model context",
             "test AgentServer records an input rejection outside the model context",
             "test ReAct loads SKILL.md instructions through the dynamic tool source",
+            "test a DateTime tool value completes the next ReAct model round",
             "test a Flow executes through the model tool contract",
             "test a retryable provider failure can fall back without becoming a conversation message",
             "test a second request projects the complete committed conversation",
@@ -5686,6 +5713,7 @@
             "test conversation projection keeps complete recent turns within its configured window",
             "test conversation projection removes an incomplete tool exchange but keeps later messages",
             "test disabled tool policy sends no definitions and forbids provider tool use",
+            "test eight sequential tool rounds keep bounded Runic identity state",
             "test elapsed budget becomes the provider whole-call timeout",
             "test large local Action values become bounded model content",
             "test provider prompt-cache usage remains in the model attempt and aggregate usage",
@@ -5706,7 +5734,7 @@
         "jido_ai.react.I3": {
           "failing": 0,
           "kind": "ordering",
-          "passing": 30,
+          "passing": 32,
           "status": "active",
           "testable": true,
           "tests": [
@@ -5714,6 +5742,7 @@
             "test AgentServer records a tool review denial outside the model context",
             "test AgentServer records an input rejection outside the model context",
             "test ReAct loads SKILL.md instructions through the dynamic tool source",
+            "test a DateTime tool value completes the next ReAct model round",
             "test a Flow executes through the model tool contract",
             "test a retryable provider failure can fall back without becoming a conversation message",
             "test a second request projects the complete committed conversation",
@@ -5725,6 +5754,7 @@
             "test conversation projection keeps complete recent turns within its configured window",
             "test conversation projection removes an incomplete tool exchange but keeps later messages",
             "test disabled tool policy sends no definitions and forbids provider tool use",
+            "test eight sequential tool rounds keep bounded Runic identity state",
             "test elapsed budget becomes the provider whole-call timeout",
             "test large local Action values become bounded model content",
             "test provider prompt-cache usage remains in the model attempt and aggregate usage",
@@ -5745,7 +5775,7 @@
         "jido_ai.react.I4": {
           "failing": 0,
           "kind": "persisted_format",
-          "passing": 29,
+          "passing": 31,
           "status": "active",
           "testable": true,
           "tests": [
@@ -5753,6 +5783,7 @@
             "test AgentServer records a tool review denial outside the model context",
             "test AgentServer records an input rejection outside the model context",
             "test ReAct loads SKILL.md instructions through the dynamic tool source",
+            "test a DateTime tool value completes the next ReAct model round",
             "test a Flow executes through the model tool contract",
             "test a retryable provider failure can fall back without becoming a conversation message",
             "test a second request projects the complete committed conversation",
@@ -5764,6 +5795,7 @@
             "test conversation projection keeps complete recent turns within its configured window",
             "test conversation projection removes an incomplete tool exchange but keeps later messages",
             "test disabled tool policy sends no definitions and forbids provider tool use",
+            "test eight sequential tool rounds keep bounded Runic identity state",
             "test elapsed budget becomes the provider whole-call timeout",
             "test large local Action values become bounded model content",
             "test provider prompt-cache usage remains in the model attempt and aggregate usage",
@@ -5783,7 +5815,7 @@
         "jido_ai.react.I5": {
           "failing": 0,
           "kind": "functional",
-          "passing": 29,
+          "passing": 31,
           "status": "active",
           "testable": true,
           "tests": [
@@ -5791,6 +5823,7 @@
             "test AgentServer records a tool review denial outside the model context",
             "test AgentServer records an input rejection outside the model context",
             "test ReAct loads SKILL.md instructions through the dynamic tool source",
+            "test a DateTime tool value completes the next ReAct model round",
             "test a Flow executes through the model tool contract",
             "test a retryable provider failure can fall back without becoming a conversation message",
             "test a second request projects the complete committed conversation",
@@ -5803,6 +5836,7 @@
             "test conversation projection removes an incomplete tool exchange but keeps later messages",
             "test cycle signatures ignore provider call IDs",
             "test disabled tool policy sends no definitions and forbids provider tool use",
+            "test eight sequential tool rounds keep bounded Runic identity state",
             "test elapsed budget becomes the provider whole-call timeout",
             "test large local Action values become bounded model content",
             "test provider prompt-cache usage remains in the model attempt and aggregate usage",
@@ -5821,7 +5855,7 @@
         "jido_ai.react.I6": {
           "failing": 0,
           "kind": "persisted_format",
-          "passing": 29,
+          "passing": 31,
           "status": "active",
           "testable": true,
           "tests": [
@@ -5829,6 +5863,7 @@
             "test AgentServer records a tool review denial outside the model context",
             "test AgentServer records an input rejection outside the model context",
             "test ReAct loads SKILL.md instructions through the dynamic tool source",
+            "test a DateTime tool value completes the next ReAct model round",
             "test a Flow executes through the model tool contract",
             "test a retryable provider failure can fall back without becoming a conversation message",
             "test a second request projects the complete committed conversation",
@@ -5841,6 +5876,7 @@
             "test conversation projection removes an incomplete tool exchange but keeps later messages",
             "test disabled tool policy sends no definitions and forbids provider tool use",
             "test each completed tool call creates one durable attempt observation",
+            "test eight sequential tool rounds keep bounded Runic identity state",
             "test elapsed budget becomes the provider whole-call timeout",
             "test large local Action values become bounded model content",
             "test provider prompt-cache usage remains in the model attempt and aggregate usage",
@@ -5859,7 +5895,7 @@
         "jido_ai.react.I7": {
           "failing": 0,
           "kind": "functional",
-          "passing": 29,
+          "passing": 31,
           "status": "active",
           "testable": true,
           "tests": [
@@ -5867,6 +5903,7 @@
             "test AgentServer records a tool review denial outside the model context",
             "test AgentServer records an input rejection outside the model context",
             "test ReAct loads SKILL.md instructions through the dynamic tool source",
+            "test a DateTime tool value completes the next ReAct model round",
             "test a Flow executes through the model tool contract",
             "test a retryable provider failure can fall back without becoming a conversation message",
             "test a second request projects the complete committed conversation",
@@ -5878,6 +5915,7 @@
             "test conversation projection keeps complete recent turns within its configured window",
             "test conversation projection removes an incomplete tool exchange but keeps later messages",
             "test disabled tool policy sends no definitions and forbids provider tool use",
+            "test eight sequential tool rounds keep bounded Runic identity state",
             "test elapsed budget becomes the provider whole-call timeout",
             "test large local Action values become bounded model content",
             "test provider prompt-cache usage remains in the model attempt and aggregate usage",
@@ -5890,6 +5928,46 @@
             "test the total tool-call budget blocks a later tool batch before it executes",
             "test token budget stops tool work after the model call that consumes it",
             "test tool limits stop a new batch before expansion",
+            "test tool results preserve model-visible content parts",
+            "test two sequential tool rounds keep a valid model conversation"
+          ]
+        },
+        "jido_ai.react.I8": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 31,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test AgentServer persists conversation state and restores it for the next request",
+            "test AgentServer records a tool review denial outside the model context",
+            "test AgentServer records an input rejection outside the model context",
+            "test ReAct loads SKILL.md instructions through the dynamic tool source",
+            "test a DateTime tool value completes the next ReAct model round",
+            "test a Flow executes through the model tool contract",
+            "test a retryable provider failure can fall back without becoming a conversation message",
+            "test a second request projects the complete committed conversation",
+            "test a successful tool round starts a new retry budget for the next model round",
+            "test a tool Action failure becomes a tool result that the model can repair",
+            "test a tool review wait survives restart and resumes the same graph",
+            "test a truncated model response starts repair and is not committed as an assistant message",
+            "test a trusted runtime tool source extends the canonical ReAct Toolset",
+            "test conversation projection keeps complete recent turns within its configured window",
+            "test conversation projection removes an incomplete tool exchange but keeps later messages",
+            "test disabled tool policy sends no definitions and forbids provider tool use",
+            "test eight sequential tool rounds keep bounded Runic identity state",
+            "test elapsed budget becomes the provider whole-call timeout",
+            "test large local Action values become bounded model content",
+            "test omitted and partial provider options do not add hidden generation limits",
+            "test provider prompt-cache usage remains in the model attempt and aggregate usage",
+            "test request tool selection stays below the Agent allowlist",
+            "test semantic required tool policy relaxes after one tool batch",
+            "test streaming identifies each model call across a tool round",
+            "test streaming publishes ordered Jido Signals and commits one assistant message",
+            "test the ReAct cycle step warns after consecutive identical tool calls",
+            "test the hard model-call budget stops a continued tool loop before another provider call",
+            "test the total tool-call budget blocks a later tool batch before it executes",
+            "test token budget stops tool work after the model call that consumes it",
             "test tool results preserve model-visible content parts",
             "test two sequential tool rounds keep a valid model conversation"
           ]
@@ -6190,8 +6268,8 @@
   },
   "covenant": "0.2.0",
   "totals": {
-    "active": 320,
+    "active": 323,
     "coverage": 1.0,
-    "covered": 320
+    "covered": 323
   }
 }

@@ -177,7 +177,10 @@ defmodule Jido.Exec do
          {:ok, policy, worker_opts} <- managed_options(runner, execution_id, opts),
          {:ok, pid} <-
            Runic.Runner.start_workflow(runner, execution_id, workflow, worker_opts) do
-      case Runic.Runner.start_execution(runner, execution_id, execution_input(instruction),
+      case Runic.Runner.start_execution(
+             runner,
+             execution_id,
+             Jido.Exec.Fact.local_value(execution_input(instruction)),
              execution_id: managed_identity(execution_id),
              run_context: %{
                _global:

@@ -20,7 +20,8 @@ defmodule JidoTest.Persistence.ApiTest do
              restore: 2,
              save_agent: 3,
              snapshot: 2,
-             upgrade: 3
+             upgrade: 3,
+             upgrade_agent: 5
            ]
 
     assert documented_functions(Store) == [compare_and_swap: 4, open: 1, read: 2]

@@ -55,7 +55,7 @@ Check focused facets of the [reviewed public promises](../../../guides/public-ap
 
 ### jido_action.execution.I21 — Managed results respect input scope and progress
 - **scope:** `Jido.Exec.start/6, Jido.Exec.step/2, Jido.Exec.result/1, Jido.Exec.result/2`
-- **must:** Read the input admitted by start, rejecting active, stopped, failed, foreign, or uncertain work as documented. Later input occurrences cannot replace its result. A manual step dispatches one scheduler unit and can report busy or complete; complete does not mean successful. Computed success is separate from Store acknowledgement. Native Runner control and lookup errors can retain atom reasons.
+- **must:** Read the input admitted by start, rejecting active, stopped, failed, foreign, or uncertain work as documented. Later input occurrences cannot replace its result. Keep local Elixir values, including structs, equivalent to direct execution without expanding their identity document. A manual step dispatches one scheduler unit and can report busy or complete; complete does not mean successful. Computed success is separate from Store acknowledgement. Native Runner control and lookup errors can retain atom reasons.
 - **kind:** functional
 - **status:** active
 

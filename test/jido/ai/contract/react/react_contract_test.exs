@@ -221,4 +221,18 @@ defmodule Jido.AI.Contract.ReActTest do
     assert result.reason_code == :limits
     assert result.reason == "maximum tool rounds reached"
   end
+
+  @tag obligation: "jido_ai.react.I8"
+  test "omitted and partial provider options do not add hidden generation limits" do
+    assert {:ok, without_options} = Jido.Joi.parse(ReAct.schema(), %{input: "Answer"})
+    assert without_options.options == %{}
+
+    assert {:ok, partial_options} =
+             Jido.Joi.parse(ReAct.schema(), %{
+               input: "Answer",
+               options: %{api_key: "offline"}
+             })
+
+    assert partial_options.options == %{api_key: "offline"}
+  end
 end

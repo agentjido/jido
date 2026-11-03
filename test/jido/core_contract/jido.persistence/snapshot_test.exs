@@ -3,6 +3,7 @@ defmodule Jido.Persistence.SnapshotTest do
   alias Jido.Agent
   alias Jido.Agent.Directive, as: D
   alias Jido.Persistence
+  alias Jido.Persistence.{Record, Store}
   alias JidoTest.AgentEvolutionFixtures, as: F
 
   defmodule ContextUpgrade do
@@ -346,6 +347,82 @@ defmodule Jido.Persistence.SnapshotTest do
              Persistence.upgrade(snapshot, ContextUpgrade, context: %{mode: :error})
 
     assert {:error, _reason} = Persistence.upgrade(snapshot, String)
+  end
+
+  @tag obligation: ["jido.persistence.I8", "jido.persistence.I16"]
+  test "stored upgrade resolves old code only after the Action and commits the next revision" do
+    store = {Persistence.ETS, table: __MODULE__}
+    namespace = "stored-upgrade"
+    opts = [namespace: namespace]
+    agent = %{F.agent() | id: "stored-upgrade-#{System.unique_integer([:positive])}"}
+    assert :ok = Persistence.create_agent(store, agent, opts)
+
+    ref = Agent.Ref.new!(namespace: namespace, id: agent.id)
+    key = Persistence.agent_key(ref)
+    assert {:ok, bytes, condition} = Store.read(store, key)
+    assert {:ok, record} = Record.decode(bytes)
+    snapshot = Record.checkpoint(record)
+
+    old_snapshot = %{
+      snapshot
+      | references: %{MissingStoredHandler => <<0::128>>},
+        agent: %{
+          snapshot.agent
+          | routes: [
+              %{hd(snapshot.agent.routes) | handler: %{kind: :action, target: MissingStoredHandler}}
+            ]
+        }
+    }
+
+    assert {:ok, old_bytes} = Record.encode(%{record | checkpoint: old_snapshot})
+    assert :ok = Store.compare_and_swap(store, key, condition, old_bytes)
+
+    assert {:error, %{code: :unavailable_reference}} =
+             Persistence.load_agent(store, agent.module, agent.id, opts)
+
+    assert {:ok, upgraded, 1} =
+             Persistence.upgrade_agent(store, agent.module, agent.id, F.Upgrade, opts)
+
+    assert upgraded.id == agent.id
+    assert upgraded.routes == []
+    assert upgraded.state == %{count: 7}
+
+    assert {:ok, ^upgraded, 1} =
+             Persistence.load_agent_with_revision(store, agent.module, agent.id, opts)
+  end
+
+  @tag obligation: "jido.persistence.I16"
+  test "stored upgrade rejects a nonterminal durable Turn without changing bytes" do
+    store = {Persistence.ETS, table: __MODULE__}
+    namespace = "stored-upgrade-turn"
+    opts = [namespace: namespace]
+    agent = %{F.agent() | id: "stored-turn-#{System.unique_integer([:positive])}"}
+    assert :ok = Persistence.create_agent(store, agent, opts)
+
+    signal = F.signal([])
+
+    assert {:ok, turn} =
+             Jido.Exec.Continuation.running(%{
+               id: "turn-1",
+               signal: signal,
+               admitted_signal: signal,
+               context: %{},
+               plugin_inputs: %{},
+               target: F.Flow,
+               expires_at: :infinity
+             })
+
+    ref = Agent.Ref.new!(namespace: namespace, id: agent.id)
+    key = Persistence.agent_key(ref)
+    assert {:ok, bytes, condition} = Store.read(store, key)
+    assert {:ok, record} = Record.decode(bytes)
+    assert {:ok, turn_bytes} = Record.encode(Map.put(record, :server_turn, turn))
+    assert :ok = Store.compare_and_swap(store, key, condition, turn_bytes)
+
+    assert {:error, :turn_in_flight} =
+             Persistence.upgrade_agent(store, agent.module, agent.id, F.Upgrade, opts)
+
+    assert {:ok, ^turn_bytes, _condition} = Store.read(store, key)
   end
 
   @tag obligation: "jido.persistence.I12"

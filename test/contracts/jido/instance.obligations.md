@@ -79,3 +79,11 @@ downstream operation results stay with their owning components.
 - **why:** The Ref API must not change downstream runtime semantics.
 - **kind:** functional
 - **status:** active
+
+### jido.instance.I9 — Durable Ref activation
+
+- **scope:** `Jido.activate_agent/4`
+- **must:** Return the current live local activation when one exists. Otherwise restore one active durable record, or create revision zero only when no record exists. After a create conflict, restore the winning record. Do not replace a tombstone or an invalid record.
+- **why:** One activation API must safely implement the common restore-or-create lifecycle.
+- **kind:** ordering
+- **status:** active

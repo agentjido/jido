@@ -8,7 +8,8 @@ defmodule Jido.AI.RuntimeTest do
                "jido_ai.react.I4",
                "jido_ai.react.I5",
                "jido_ai.react.I6",
-               "jido_ai.react.I7"
+               "jido_ai.react.I7",
+               "jido_ai.react.I8"
              ]
 
   import Mimic
@@ -20,6 +21,29 @@ defmodule Jido.AI.RuntimeTest do
   alias Jido.AITest.SimpleAgent
   alias Jido.AITest.Tools
   alias Jido.AgentServer, as: Server
+
+  defmodule DateTimeTool do
+    use Jido.Action,
+      name: "react_datetime_tool",
+      description: "Return one UTC instant"
+
+    @impl true
+    def run(_params, _context), do: {:ok, %{at: ~U[2026-11-03 12:00:00Z]}}
+  end
+
+  defmodule DateTimeAgent do
+    use Jido.AI.Agent,
+      name: "react_datetime_agent",
+      description: "Use a tool that returns a DateTime"
+
+    ai do
+      reasoning Jido.AI.Reasoning.ReAct
+
+      tools do
+        action DateTimeTool
+      end
+    end
+  end
 
   setup :set_mimic_global
   setup :verify_on_exit!
@@ -300,6 +324,67 @@ defmodule Jido.AI.RuntimeTest do
       |> Enum.map(& &1.payload["role"])
 
     assert messages == ["user", "assistant", "tool", "assistant", "tool", "assistant"]
+  end
+
+  test "eight sequential tool rounds keep bounded Runic identity state" do
+    {:ok, calls} = Agent.start_link(fn -> 0 end)
+
+    expect(ReqLLM, :generate_text, 9, fn model, context, _options ->
+      call = Agent.get_and_update(calls, fn count -> {count + 1, count + 1} end)
+
+      if call <= 8 do
+        tool_calls = [
+          ReqLLM.ToolCall.new(
+            "round-#{call}",
+            "add",
+            Jason.encode!(%{left: call, right: call + 1})
+          )
+        ]
+
+        {:ok, tool_response(model, context, tool_calls, "round-#{call}")}
+      else
+        assert length(ReqLLM.Context.to_list(context)) == 18
+        {:ok, response(model, context, "Eight rounds completed.", "round-final")}
+      end
+    end)
+
+    agent = SimpleAgent.instantiate!(id: "eight-round-agent")
+
+    assert {:ok, result, _agent} =
+             run(agent, %{
+               input: "Use eight distinct tool rounds",
+               limits: %{model_calls: 16, tool_rounds: 8, tool_calls: 8}
+             })
+
+    assert result.status == :completed
+    assert result.model_calls == 9
+    assert result.tool_rounds == 8
+    assert result.tool_calls == 8
+  end
+
+  test "a DateTime tool value completes the next ReAct model round" do
+    {:ok, calls} = Agent.start_link(fn -> 0 end)
+
+    expect(ReqLLM, :generate_text, 2, fn model, context, _options ->
+      case Agent.get_and_update(calls, fn count -> {count + 1, count + 1} end) do
+        1 ->
+          tool_calls = [ReqLLM.ToolCall.new("datetime-1", "react_datetime_tool", ~s({}))]
+          {:ok, tool_response(model, context, tool_calls, "datetime-tool")}
+
+        2 ->
+          assert roles(context) == [:system, :user, :assistant, :tool]
+          {:ok, response(model, context, "The instant is available.", "datetime-final")}
+      end
+    end)
+
+    agent = DateTimeAgent.instantiate!(id: "datetime-agent")
+
+    assert {:ok, result, _agent} =
+             run_as(DateTimeAgent, agent, %{input: "Get the instant"})
+
+    assert result.status == :completed
+    assert result.model_calls == 2
+    assert result.tool_rounds == 1
   end
 
   test "the hard model-call budget stops a continued tool loop before another provider call" do

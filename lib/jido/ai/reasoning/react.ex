@@ -28,7 +28,7 @@ defmodule Jido.AI.Reasoning.ReAct do
           fallback_models: Joi.list(Joi.string()) |> Joi.default([]),
           options:
             Joi.map()
-            |> Joi.default(%{max_tokens: 128, receive_timeout: 30_000, temperature: 0.0}),
+            |> Joi.default(%{}),
           prompt_cache:
             Joi.object(
               %{

@@ -114,7 +114,11 @@ defmodule Jido.AgentServer.Lifecycle do
              :debug_max_events
            ),
          :ok <- validate_timeout(opts, :persistence_timeout),
-         :ok <- validate_setting(opts[:persistence_mode] in [:create, :restore], :persistence_mode),
+         :ok <-
+           validate_setting(
+             opts[:persistence_mode] in [:create, :restore, :restore_or_create],
+             :persistence_mode
+           ),
          do:
            validate_setting(
              opts[:idle_policy] != :hibernate or persistence_enabled?(opts[:persistence]),

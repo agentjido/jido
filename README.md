@@ -1,8 +1,31 @@
 # NewJido
 
-This repository is an exploration of one consolidated Jido project. It brings
-`jido`, `jido_action`, `jido_signal`, and `jido_ai` into one Mix project and one
-OTP application. It is a working architecture branch, not a published package.
+> [!WARNING]
+> This repository is an experiment. It is not the current Jido release, a
+> supported package, or a complete source of Jido documentation. APIs, module
+> ownership, and project structure can change while the consolidation work is
+> in progress.
+
+This experiment consolidates the four core Jido repositories, `jido`,
+`jido_action`, `jido_signal`, and `jido_ai`, into one Mix project and one OTP
+application. The first source port is complete. The project is now testing and
+refining the module boundaries that became visible after the packages moved
+together.
+
+Many release-quality parts are missing, incomplete, or out of date. These
+include:
+
+- complete user and module documentation;
+- tutorials and a reviewed example set;
+- migration guidance from the four separate packages;
+- final package, version, and release configuration;
+- a complete public API and compatibility review; and
+- the full benchmark, load, property, system, and authoring test suites from
+  the source repositories.
+
+Do not use this repository as the official guide for a released Jido version.
+The current focus is architecture and quality backpressure. Documentation and
+release preparation will follow after those boundaries are stable.
 
 The main work is:
 

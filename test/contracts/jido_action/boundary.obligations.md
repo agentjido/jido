@@ -65,8 +65,8 @@ callers. This does not establish complete Flow contract coverage.
 - **kind:** functional
 - **status:** active
 
-### jido_action.boundary.I10 — Managed boundaries reject values that cannot be stored
+### jido_action.boundary.I10 — Managed boundaries contain process-local values
 - **scope:** `Jido.Exec.Node.Action`, `Jido.Exec.start/6`
-- **must:** Reject process-local input before managed work starts and process-local Action output or effects before persistence. A rejected start closes only the newly created worker and permits a corrected retry. A duplicate start must keep the existing worker intact.
+- **must:** Reject process handles in input before managed work starts and in Action output or effects before persistence. Accept safe local structs through bounded local identity. A duplicate start must keep the existing worker intact.
 - **kind:** functional
 - **status:** active
