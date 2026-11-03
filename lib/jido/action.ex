@@ -144,9 +144,9 @@ defmodule Jido.Action do
     quote location: :keep do
       alias Jido.Action
 
-      use Jido.Codec.Compiler,
+      use Jido.Instruction.Compiler,
         kind: :action,
-        config: Jido.Codec.Config.prepare!(:action, unquote(opts_ast), __ENV__)
+        config: Jido.Instruction.Config.prepare!(:action, unquote(opts_ast), __ENV__)
 
       @doc "Executes the Action with the given parameters and context."
       @impl Jido.Action

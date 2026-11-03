@@ -73,6 +73,17 @@ defmodule Jido.Joi.Schema do
   def fields(%Zoi.Types.Keyword{fields: fields}), do: {:ok, fields}
   def fields(_), do: :error
 
+  def map_types(%Zoi.Types.Map{key_type: key_type, value_type: value_type}),
+    do: {:ok, key_type, value_type}
+
+  def map_types(_), do: :error
+
+  def unknown_keys(%{unrecognized_keys: mode}), do: mode
+  def unknown_keys(_), do: :error
+
+  def literal(%Zoi.Types.Literal{value: value}), do: {:ok, value}
+  def literal(_), do: :error
+
   def put_fields(%Zoi.Types.Map{} = schema, fields), do: %{schema | fields: fields}
   def put_fields(%Zoi.Types.Struct{} = schema, fields), do: %{schema | fields: fields}
   def put_fields(%Zoi.Types.Keyword{} = schema, fields), do: %{schema | fields: fields}

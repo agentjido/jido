@@ -1,7 +1,7 @@
 defmodule Jido.Action.Inline.Parser do
   @moduledoc false
 
-  alias Jido.Codec.Config
+  alias Jido.Instruction.Config
 
   @doc false
   @spec bound!(Macro.t(), keyword(), Macro.Env.t()) :: map()

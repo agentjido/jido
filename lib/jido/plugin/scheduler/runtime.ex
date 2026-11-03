@@ -422,7 +422,7 @@ defmodule Jido.Plugin.Scheduler.Runtime do
 
   defp fresh_signal(%Signal{} = signal) do
     signal
-    |> Jido.Codec.Signal.to_map()
+    |> Jido.Signal.Codec.to_map()
     |> Map.delete("id")
     |> Signal.new!()
   end

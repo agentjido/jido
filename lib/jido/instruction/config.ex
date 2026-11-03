@@ -1,4 +1,4 @@
-defmodule Jido.Codec.Config do
+defmodule Jido.Instruction.Config do
   alias Jido.Joi
   @moduledoc false
 

@@ -2,7 +2,7 @@ defmodule Jido.Flow.DSL.ParallelMacros do
   @moduledoc false
 
   alias Jido.Action.Inline
-  alias Jido.Codec.Config
+  alias Jido.Instruction.Config
   alias Jido.Flow.DSL.{Authoring, InlineStep}
 
   defmacro action(name, target_or_bindings, options) do

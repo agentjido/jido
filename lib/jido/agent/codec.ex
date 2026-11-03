@@ -1,4 +1,4 @@
-defmodule Jido.Codec.Agent do
+defmodule Jido.Agent.Codec do
   @moduledoc false
 
   @behaviour Jido.Codec.Contract
@@ -475,4 +475,8 @@ defmodule Jido.Codec.Agent do
 
   defp json_path_segment(segment) when is_atom(segment), do: Atom.to_string(segment)
   defp json_path_segment(segment), do: segment
+end
+
+defimpl Jido.Codec.Encoder, for: Jido.Agent do
+  def codec(_agent), do: {:ok, Jido.Agent.Codec}
 end

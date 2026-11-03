@@ -11,7 +11,7 @@ defmodule Jido.Telemetry.Signal do
 
   alias Jido.Signal
   alias Jido.Signal.Context
-  alias Jido.Codec.Signal.Boundary
+  alias Jido.Signal.Boundary
   alias Jido.Trace
 
   @type event_name :: [atom()]

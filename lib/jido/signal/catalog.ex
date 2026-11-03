@@ -63,7 +63,7 @@ defmodule Jido.Signal.Catalog do
   alias Jido.Signal.Context
   alias Jido.Error
   alias Jido.Error.ValidationError
-  alias Jido.Codec.Signal, as: SignalCodec
+  alias Jido.Signal.Codec, as: SignalCodec
 
   @definitions_schema Joi.list(Joi.atom() |> Joi.refine({__MODULE__, :validate_definition, []}))
   @type_schema Keyword.fetch!(Signal.schema().fields, :type)
@@ -129,7 +129,7 @@ defmodule Jido.Signal.Catalog do
   @doc """
   Decodes one canonical wire map or binary and validates its definition.
 
-  Binary options are forwarded to `Jido.Codec.Signal.deserialize/2`.
+  Binary options are forwarded to `Jido.Signal.Codec.deserialize/2`.
   JSON is the default. The configured payload limit applies to binary input.
   Maps must be complete wire envelopes; constructor defaults are not added.
   Maps accept no options. Lists, JSON batches, and Signal structs are rejected.

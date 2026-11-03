@@ -409,7 +409,7 @@ defmodule Jido.Flow do
 
   @doc false
   @spec __validate_config__(map()) :: {:ok, map()} | {:error, Exception.t()}
-  def __validate_config__(attrs), do: Jido.Codec.Config.validate_flow(attrs)
+  def __validate_config__(attrs), do: Jido.Instruction.Config.validate_flow(attrs)
 
   defp dependency_map(flow) do
     Map.new(flow.components, fn {name, node} ->

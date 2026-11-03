@@ -1,7 +1,7 @@
-defmodule Jido.Codec.Signal.BoundaryTest do
+defmodule Jido.Signal.BoundaryTest do
   use ExUnit.Case, async: true
 
-  alias Jido.Codec.Signal.Boundary, as: Sanitizer
+  alias Jido.Signal.Boundary, as: Sanitizer
   alias Jido.Signal
 
   defmodule DetailError do
@@ -25,8 +25,8 @@ defmodule Jido.Codec.Signal.BoundaryTest do
 
     assert Jido.Telemetry.Signal.sanitize(value) == Sanitizer.sanitize(value, :telemetry)
     assert Jido.Telemetry.Signal.preview(value) == Sanitizer.preview(value, :telemetry)
-    assert Jido.Codec.Signal.boundary_value(value) == Sanitizer.sanitize(value, :transport)
-    assert Jido.Codec.Signal.boundary_preview(value) == Sanitizer.preview(value, :transport)
+    assert Jido.Signal.Codec.boundary_value(value) == Sanitizer.sanitize(value, :transport)
+    assert Jido.Signal.Codec.boundary_preview(value) == Sanitizer.preview(value, :transport)
   end
 
   describe "sanitize/2" do

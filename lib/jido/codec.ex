@@ -1,6 +1,20 @@
 defmodule Jido.Codec do
   @moduledoc """
-  Encodes runtime values and decodes trusted versioned documents.
+  Compiles Joi-backed JSON codecs and routes trusted versioned documents.
+
+  Use `Jido.Codec` in a struct or named-map module after its Joi schema is
+  defined. The compiler generates `from_map/1`, `from_map!/1`, `decode/1`,
+  `decode!/1`, `dump/1`, and `json_schema/0`. Struct codecs also implement the
+  Elixir `JSON.Encoder` protocol.
+
+      @schema Jido.Joi.struct(__MODULE__, %{name: Jido.Joi.string()})
+      use Jido.Codec, schema: @schema
+
+      @enforce_keys Jido.Joi.enforce_keys(@schema)
+      defstruct Jido.Joi.struct_fields(@schema)
+
+  Joi is the only type and validation source. Use `codec/2` only for JSON field
+  names, encode or decode callbacks, and nil omission.
 
   ## Supported features
 
@@ -20,14 +34,20 @@ defmodule Jido.Codec do
   publication. Codec does not own persistence, execution, or automatic
   document upgrades.
 
-  The `Jido.Codec` namespace also owns the common Action and Flow declaration
-  contract. `Jido.Joi.validate_static/1` owns authoring-data validation.
+  `Jido.Instruction.Compiler` and `Jido.Instruction.Config` own Action and Flow
+  declaration compilation. `Jido.Joi.validate_static/1` owns authoring-data
+  validation.
 
   An explicit `:catalog` option bypasses the published Catalog value.
   """
 
   alias Jido.Catalog
   alias Jido.Codec.{Contract, Document, Error, Index, Issue}
+
+  @doc "Installs a compile-time JSON codec backed by one Joi schema."
+  defmacro __using__(opts) do
+    Jido.Codec.Compiler.using(opts, __CALLER__)
+  end
 
   @default_maximum_json_bytes 8_388_608
   @catalog_snapshot_key {:jido, :catalog_snapshot}

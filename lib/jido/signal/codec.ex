@@ -1,4 +1,4 @@
-defmodule Jido.Codec.Signal do
+defmodule Jido.Signal.Codec do
   import Bitwise, only: [band: 2]
 
   @moduledoc """
@@ -12,7 +12,7 @@ defmodule Jido.Codec.Signal do
   `:jido` application.
   """
 
-  alias Jido.Codec.Signal.Boundary
+  alias Jido.Signal.Boundary
   alias Jido.Joi
   alias Jido.Signal
 

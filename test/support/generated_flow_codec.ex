@@ -29,20 +29,20 @@ defmodule JidoActionTest.GeneratedFlowCodec do
     do: {:error, Jido.Error.validation_error("expected a Jido.Flow artifact", %{value: value})}
 
   def encode(value, registry),
-    do: Jido.Codec.Flow.encode(value, registry)
+    do: Jido.Flow.Codec.encode(value, registry)
 
   def decode(document, registry) do
-    case Jido.Codec.Flow.diagnose(document, registry) do
+    case Jido.Flow.Codec.diagnose(document, registry) do
       {:ok, flow} -> {:ok, flow}
       {:error, %Jido.Error.Invalid{errors: [error | _]}} -> {:error, error}
     end
   end
 
   def encode_json(value, registry),
-    do: Codec.encode_json(value, catalog: registry, codec: Jido.Codec.Flow)
+    do: Codec.encode_json(value, catalog: registry, codec: Jido.Flow.Codec)
 
   def decode_json(json, registry),
-    do: Codec.decode_json(json, catalog: registry, codec: Jido.Codec.Flow)
+    do: Codec.decode_json(json, catalog: registry, codec: Jido.Flow.Codec)
 
   defp entries(flow) do
     values =
@@ -122,5 +122,5 @@ defmodule JidoActionTest.FlowCodec do
   defdelegate decode(document, registry), to: JidoActionTest.GeneratedFlowCodec
   defdelegate encode_json(flow, registry), to: JidoActionTest.GeneratedFlowCodec
   defdelegate decode_json(json, registry), to: JidoActionTest.GeneratedFlowCodec
-  defdelegate diagnose(document, registry), to: Jido.Codec.Flow
+  defdelegate diagnose(document, registry), to: Jido.Flow.Codec
 end

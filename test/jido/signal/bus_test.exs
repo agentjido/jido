@@ -151,7 +151,7 @@ defmodule Jido.Signal.BusTest do
       "cursor" => record.cursor,
       "type" => record.type,
       "created_at" => DateTime.to_iso8601(record.created_at),
-      "signal" => Jido.Codec.Signal.to_map(record.signal)
+      "signal" => Jido.Signal.Codec.to_map(record.signal)
     }
 
     custom = start_bus(store: StartupStore, store_opts: [records: {:ok, [stored | :tail]}])
@@ -310,7 +310,7 @@ defmodule Jido.Signal.BusTest do
     assert_received {:stored_records, [stored]}
     assert stored["format_version"] == 1
     assert stored["cursor"] == 1
-    assert stored["signal"] == Jido.Codec.Signal.to_map(event)
+    assert stored["signal"] == Jido.Signal.Codec.to_map(event)
     assert stored["signal"]["specversion"] == "1.0"
     assert_received {:signal, ^event}
   end

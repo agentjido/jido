@@ -1,7 +1,7 @@
 defmodule Jido.Flow.Definition do
   @moduledoc false
 
-  alias Jido.Codec.Config
+  alias Jido.Instruction.Config
   alias Jido.Error
   alias Jido.Error.ValidationError
   alias Jido.Flow.{Component, Graph, Ref, Validation, Value}

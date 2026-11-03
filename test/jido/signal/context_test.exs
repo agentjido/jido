@@ -16,7 +16,7 @@ defmodule Jido.Signal.ContextTest do
     assert Signal.get_context(signal, "tenantid") == "tenant-123"
     assert Enum.sort(Signal.list_context(signal)) == ["attempt", "sampled", "tenantid"]
 
-    wire = Jido.Codec.Signal.to_map(signal)
+    wire = Jido.Signal.Codec.to_map(signal)
     assert wire["tenantid"] == "tenant-123"
     assert wire["attempt"] == 2
     refute Map.has_key?(wire, "extensions")
@@ -24,9 +24,9 @@ defmodule Jido.Signal.ContextTest do
   end
 
   test "reads unknown top-level attributes as context", %{signal: signal} do
-    wire = Jido.Codec.Signal.to_map(signal) |> Map.put("tenantid", "tenant-123")
+    wire = Jido.Signal.Codec.to_map(signal) |> Map.put("tenantid", "tenant-123")
 
-    assert {:ok, decoded} = Jido.Codec.Signal.from_map(wire)
+    assert {:ok, decoded} = Jido.Signal.Codec.from_map(wire)
     assert decoded.extensions == %{"tenantid" => "tenant-123"}
   end
 
@@ -34,9 +34,9 @@ defmodule Jido.Signal.ContextTest do
     assert {:ok, signal} = Signal.put_context(signal, "extensions", "enabled")
     assert Signal.get_context(signal, "extensions") == "enabled"
 
-    wire = Jido.Codec.Signal.to_map(signal)
+    wire = Jido.Signal.Codec.to_map(signal)
     assert wire["extensions"] == "enabled"
-    assert {:ok, decoded} = Jido.Codec.Signal.from_map(wire)
+    assert {:ok, decoded} = Jido.Signal.Codec.from_map(wire)
     assert decoded.extensions == %{"extensions" => "enabled"}
   end
 

@@ -18,7 +18,7 @@ defmodule Jido.Agent.View do
   alias Jido.Agent
   alias Jido.Agent.Schema
   alias Jido.Catalog
-  alias Jido.Codec.Agent, as: AgentCodec
+  alias Jido.Agent.Codec, as: AgentCodec
   alias Jido.Codec.{Document, Reference}
 
   @default_operation_limit 100

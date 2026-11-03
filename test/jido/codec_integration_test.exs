@@ -85,7 +85,7 @@ defmodule Jido.CodecIntegrationTest do
                  {Extension, :jido},
                  {Plugin, :jido},
                  {Vocabulary, :jido},
-                 {Jido.Codec.Agent, :jido}
+                 {Jido.Agent.Codec, :jido}
                ]
              )
 
@@ -102,7 +102,7 @@ defmodule Jido.CodecIntegrationTest do
              Catalog.get(catalog, "tests/plugins/sample", 3)
 
     assert Index.codec(codecs, "jido.agent.definition", 1) ==
-             {:ok, Jido.Codec.Agent}
+             {:ok, Jido.Agent.Codec}
 
     definition = Agent.definition()
     assert {:ok, document} = Jido.Codec.encode(definition, catalog: catalog)
@@ -114,7 +114,7 @@ defmodule Jido.CodecIntegrationTest do
     assert :ok = Jido.Catalog.Discovery.refresh()
 
     assert Index.codec(Jido.Catalog.Discovery.codec_index(), "jido.agent.definition", 1) ==
-             {:ok, Jido.Codec.Agent}
+             {:ok, Jido.Agent.Codec}
   end
 
   test "an extension can encode and decode typed Catalog references" do
@@ -146,7 +146,7 @@ defmodule Jido.CodecIntegrationTest do
       })
 
     assert {:ok, document} =
-             Jido.Codec.encode(definition, catalog: catalog, codec: Jido.Codec.Agent)
+             Jido.Codec.encode(definition, catalog: catalog, codec: Jido.Agent.Codec)
 
     assert get_in(document, ["definition", "plugins", Access.at(0), "data"]) == %{
              "target" => %{"id" => "tests/actions/referenced", "vsn" => 1}
@@ -158,7 +158,7 @@ defmodule Jido.CodecIntegrationTest do
              definition.routes
 
     assert {:ok, ^definition} =
-             Jido.Codec.decode(document, catalog: catalog, codec: Jido.Codec.Agent)
+             Jido.Codec.decode(document, catalog: catalog, codec: Jido.Agent.Codec)
 
     restricted =
       Catalog.from_targets!(__MODULE__, :jido, %{
@@ -167,16 +167,16 @@ defmodule Jido.CodecIntegrationTest do
       })
 
     assert {:error, _issues} =
-             Jido.Codec.decode(document, catalog: restricted, codec: Jido.Codec.Agent)
+             Jido.Codec.decode(document, catalog: restricted, codec: Jido.Agent.Codec)
   end
 
   test "Agent and Plugin legacy JSON facades stay removed" do
-    assert Code.ensure_loaded?(Jido.Codec.Agent)
+    assert Code.ensure_loaded?(Jido.Agent.Codec)
     refute function_exported?(Jido.Agent, :to_json, 2)
     refute function_exported?(Jido.Agent, :from_json, 2)
-    assert function_exported?(Jido.Codec.Agent, :encode, 2)
-    assert function_exported?(Jido.Codec.Agent, :decode, 2)
-    refute function_exported?(Jido.Codec.Agent, :from_json, 2)
+    assert function_exported?(Jido.Agent.Codec, :encode, 2)
+    assert function_exported?(Jido.Agent.Codec, :decode, 2)
+    refute function_exported?(Jido.Agent.Codec, :from_json, 2)
     refute function_exported?(Jido.Plugin, :manifest, 1)
   end
 end

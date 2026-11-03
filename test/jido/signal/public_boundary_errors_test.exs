@@ -13,11 +13,11 @@ defmodule Jido.Signal.PublicBoundaryErrorsTest do
         for result <- [
               Signal.new(attrs),
               Signal.new("event", %{}, attrs),
-              Jido.Codec.Signal.from_map(attrs),
+              Jido.Signal.Codec.from_map(attrs),
               Signal.new(type: "event", source: "/test", extensions: attrs),
               Context.normalize(attrs),
               JidoSignalTest.Fixtures.Signals.UserCreated.new(%{}, attrs),
-              Jido.Codec.Signal.deserialize(:erlang.term_to_binary(attrs), format: :erlang_term)
+              Jido.Signal.Codec.deserialize(:erlang.term_to_binary(attrs), format: :erlang_term)
             ] do
           assert {:error, _reason} = result
         end
@@ -51,7 +51,7 @@ defmodule Jido.Signal.PublicBoundaryErrorsTest do
 
     test "raises at the serialization convenience boundary" do
       assert_raise RuntimeError, ~r/serialization failed/, fn ->
-        Jido.Codec.Signal.serialize!(:invalid)
+        Jido.Signal.Codec.serialize!(:invalid)
       end
     end
   end

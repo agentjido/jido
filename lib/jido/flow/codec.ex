@@ -1,4 +1,4 @@
-defmodule Jido.Codec.Flow do
+defmodule Jido.Flow.Codec do
   @moduledoc false
 
   @behaviour Jido.Codec.Contract
@@ -9,7 +9,7 @@ defmodule Jido.Codec.Flow do
   alias Jido.Error
   alias Jido.Flow
   alias Jido.Flow.Definition
-  alias Jido.Codec.Flow.{Paths, Reader, Writer}
+  alias Jido.Flow.Codec.{Paths, Reader, Writer}
 
   @type document :: %{required(String.t()) => term()}
 
@@ -109,5 +109,5 @@ defmodule Jido.Codec.Flow do
 end
 
 defimpl Jido.Codec.Encoder, for: Jido.Flow do
-  def codec(_flow), do: {:ok, Jido.Codec.Flow}
+  def codec(_flow), do: {:ok, Jido.Flow.Codec}
 end

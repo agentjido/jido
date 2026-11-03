@@ -1,7 +1,7 @@
 defmodule Jido.Flow.DSL.Authoring do
   @moduledoc false
 
-  alias Jido.Codec.Config
+  alias Jido.Instruction.Config
   alias Jido.Flow.Definition
 
   @step_names :__jido_flow_step_names__

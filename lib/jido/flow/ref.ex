@@ -2,7 +2,7 @@ defmodule Jido.Flow.Ref do
   alias Jido.Joi
   @moduledoc "A portable reference in a canonical Flow expression."
 
-  alias Jido.Codec.Config
+  alias Jido.Instruction.Config
   alias Jido.Error
 
   @type source ::

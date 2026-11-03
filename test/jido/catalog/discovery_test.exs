@@ -148,7 +148,7 @@ defmodule Jido.Catalog.DiscoveryTest do
                applications: [],
                modules: [
                  {AlphaFlow, :jido},
-                 {Jido.Codec.Flow, :jido},
+                 {Jido.Flow.Codec, :jido},
                  {BetaAction, :jido},
                  {AlphaAction, :jido},
                  {AlphaActionV1, :jido}
@@ -169,7 +169,7 @@ defmodule Jido.Catalog.DiscoveryTest do
     assert %Entry{target: AlphaFlow, vsn: 3} =
              Catalog.get(catalog, :flow, "tests/flows/alpha", 3)
 
-    assert Index.codec(codecs, "jido.flow", 2) == {:ok, Jido.Codec.Flow}
+    assert Index.codec(codecs, "jido.flow", 2) == {:ok, Jido.Flow.Codec}
 
     assert Catalog.resolve(catalog, {"tests/actions/alpha", 2}, :action) ==
              {:ok, AlphaAction}
@@ -436,7 +436,7 @@ defmodule Jido.Catalog.DiscoveryTest do
 
     assert :ok = Discovery.initialize()
     codecs = Discovery.codec_index()
-    assert Index.codec(codecs, "jido.flow", 2) == {:ok, Jido.Codec.Flow}
+    assert Index.codec(codecs, "jido.flow", 2) == {:ok, Jido.Flow.Codec}
   end
 
   defp manifest(id, kind, target) do

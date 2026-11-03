@@ -61,7 +61,7 @@ defmodule Jido.AI.ChainOfThoughtTest do
     assert {:ok, json} =
              Jido.Codec.encode_json(ChainOfThoughtAgent.definition(),
                catalog: registry,
-               codec: Jido.Codec.Agent
+               codec: Jido.Agent.Codec
              )
 
     document = Jason.decode!(json)
@@ -82,7 +82,7 @@ defmodule Jido.AI.ChainOfThoughtTest do
     assert {:ok, definition} =
              Jido.Codec.decode_json(json,
                catalog: registry,
-               codec: Jido.Codec.Agent
+               codec: Jido.Agent.Codec
              )
 
     assert definition == ChainOfThoughtAgent.definition()

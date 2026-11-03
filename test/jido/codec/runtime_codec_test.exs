@@ -98,7 +98,7 @@ defmodule Jido.Codec.RuntimeCodecTest do
           {InvalidSuccessCodec, :jido},
           {IssueCodec, :jido},
           {Echo, :jido},
-          {Jido.Codec.Flow, :jido}
+          {Jido.Flow.Codec, :jido}
         ]
       )
 

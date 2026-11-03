@@ -59,7 +59,7 @@ defmodule Jido.SignalTest do
       assert signal.specversion == "1.0"
       assert signal.extensions == %{"tenant" => "one"}
       assert signal.data == <<1, 2, 3>>
-      assert Jido.Codec.Signal.to_map(signal)["data_base64"] == "AQID"
+      assert Jido.Signal.Codec.to_map(signal)["data_base64"] == "AQID"
     end
 
     test "keeps nested constructor extensions and rejects duplicate flat values" do
@@ -106,14 +106,14 @@ defmodule Jido.SignalTest do
           field <- ["id", "type", "subject"] do
         invalid = Map.put(wire, field, "x" <> <<codepoint::utf8>>)
         assert {:error, _} = Signal.new(invalid)
-        assert {:error, _} = Jido.Codec.Signal.from_map(invalid)
-        assert {:error, _} = Jido.Codec.Signal.deserialize(Jason.encode!(invalid))
+        assert {:error, _} = Jido.Signal.Codec.from_map(invalid)
+        assert {:error, _} = Jido.Signal.Codec.deserialize(Jason.encode!(invalid))
       end
 
       valid = Map.merge(wire, %{"subject" => "café 😀", "data" => "domain\ntext"})
       assert {:ok, signal} = Signal.new(valid)
-      assert {:ok, json} = Jido.Codec.Signal.serialize(signal)
-      assert {:ok, ^signal} = Jido.Codec.Signal.deserialize(json)
+      assert {:ok, json} = Jido.Signal.Codec.serialize(signal)
+      assert {:ok, ^signal} = Jido.Signal.Codec.deserialize(json)
     end
 
     test "validates RFC 3339 text and preserves supported timestamp spelling" do
@@ -129,9 +129,9 @@ defmodule Jido.SignalTest do
           ] do
         attrs = Map.put(wire, "time", time)
         assert {:ok, signal} = Signal.new(attrs)
-        assert {:ok, ^signal} = Jido.Codec.Signal.from_map(attrs)
-        assert Jido.Codec.Signal.to_map(signal)["time"] == time
-        assert {:ok, ^signal} = Jido.Codec.Signal.deserialize(Jason.encode!(attrs))
+        assert {:ok, ^signal} = Jido.Signal.Codec.from_map(attrs)
+        assert Jido.Signal.Codec.to_map(signal)["time"] == time
+        assert {:ok, ^signal} = Jido.Signal.Codec.deserialize(Jason.encode!(attrs))
       end
 
       for time <- [
@@ -145,7 +145,7 @@ defmodule Jido.SignalTest do
           ] do
         attrs = Map.put(wire, "time", time)
         assert {:error, _} = Signal.new(attrs)
-        assert {:error, _} = Jido.Codec.Signal.from_map(attrs)
+        assert {:error, _} = Jido.Signal.Codec.from_map(attrs)
       end
     end
 

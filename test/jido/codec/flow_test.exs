@@ -1,4 +1,4 @@
-defmodule Jido.Codec.FlowTest do
+defmodule Jido.Flow.CodecTest do
   use Covenant.Case, component: "jido_action.codec", async: false
   @moduletag obligation: "jido_action.codec.I7"
 
@@ -22,7 +22,7 @@ defmodule Jido.Codec.FlowTest do
 
     flow do
       step "mark", marker <- value("stored") do
-        send(Jido.Codec.FlowTest.InlineProbeObserver, {:inline_codec_body, marker, self()})
+        send(Jido.Flow.CodecTest.InlineProbeObserver, {:inline_codec_body, marker, self()})
         {:ok, %{marker: marker}}
       end
 
@@ -43,9 +43,9 @@ defmodule Jido.Codec.FlowTest do
   end
 
   test "the Flow codec contract uses document version two" do
-    assert Jido.Codec.Flow.type() == "jido.flow"
-    assert Jido.Codec.Flow.version() == 2
-    assert Jido.Codec.Flow.target() == Jido.Flow
+    assert Jido.Flow.Codec.type() == "jido.flow"
+    assert Jido.Flow.Codec.version() == 2
+    assert Jido.Flow.Codec.target() == Jido.Flow
   end
 
   test "inline Steps use the exact version 2 stored call fields" do
@@ -260,7 +260,7 @@ defmodule Jido.Codec.FlowTest do
                 details: %{type: "jido.flow", vsn: 1, supported_vsns: [2]}
               }
             ]} =
-             Jido.Codec.decode(version_one, catalog: registry, codec: Jido.Codec.Flow)
+             Jido.Codec.decode(version_one, catalog: registry, codec: Jido.Flow.Codec)
   end
 
   test "current version preserves diagnostics for nested structs" do

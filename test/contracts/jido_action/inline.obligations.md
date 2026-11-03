@@ -1,5 +1,5 @@
 ---
-modules: [Jido.Action.Inline, Jido.Action.Inline.Parser, Jido.Action.Inline.Compiler, Jido.Action.Inline.Owner, Jido.Codec.Config]
+modules: [Jido.Action.Inline, Jido.Action.Inline.Parser, Jido.Action.Inline.Compiler, Jido.Action.Inline.Owner, Jido.Instruction.Config]
 ---
 # Inline Action obligations
 

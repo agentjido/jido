@@ -2,7 +2,7 @@ defmodule Jido.Flow.DSL.InlineStep do
   @moduledoc false
 
   alias Jido.Action.Inline
-  alias Jido.Codec.Config
+  alias Jido.Instruction.Config
   alias Jido.Flow.DSL.ValueParser
 
   @action_fields [:name, :description, :schema, :output_schema, :context]

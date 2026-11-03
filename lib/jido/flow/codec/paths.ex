@@ -1,4 +1,4 @@
-defmodule Jido.Codec.Flow.Paths do
+defmodule Jido.Flow.Codec.Paths do
   @moduledoc false
 
   @type t :: %{optional(list()) => list()}

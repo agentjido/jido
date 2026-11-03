@@ -33,7 +33,7 @@ defmodule Jido.Signal.Dispatch.Http do
 
   @behaviour Jido.Signal.Dispatch.Adapter
 
-  alias Jido.Codec.Signal, as: SignalCodec
+  alias Jido.Signal.Codec, as: SignalCodec
 
   @content_type ~c"application/cloudevents+json"
   @default_timeout 5_000

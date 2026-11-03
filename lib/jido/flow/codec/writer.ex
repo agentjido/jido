@@ -1,4 +1,4 @@
-defmodule Jido.Codec.Flow.Writer do
+defmodule Jido.Flow.Codec.Writer do
   @moduledoc false
 
   alias Jido.Error
@@ -6,7 +6,7 @@ defmodule Jido.Codec.Flow.Writer do
   alias Jido.Catalog
   alias Jido.Catalog.Error, as: CatalogError
   alias Jido.Codec.Reference
-  alias Jido.Codec.Flow.{Limits, Value}
+  alias Jido.Flow.Codec.{Limits, Value}
 
   @doc false
   @spec encode(Jido.Flow.t(), Catalog.t()) ::

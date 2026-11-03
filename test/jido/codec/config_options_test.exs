@@ -1,9 +1,9 @@
-defmodule Jido.Codec.ConfigOptionsTest do
+defmodule Jido.Instruction.ConfigOptionsTest do
   use Covenant.Case, component: "jido_action.inline", async: true
 
   alias Jido.Action.Inline
   alias Jido.Action.Inline.Parser
-  alias Jido.Codec.Config
+  alias Jido.Instruction.Config
   alias Jido.Flow.DSL.InlineStep
 
   @tag obligation: ["jido_action.inline.I1", "jido_action.inline.I2"]

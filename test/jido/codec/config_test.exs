@@ -1,7 +1,7 @@
-defmodule Jido.Codec.ConfigTest do
+defmodule Jido.Instruction.ConfigTest do
   use Covenant.Case, component: "jido_action.action", async: false
 
-  alias Jido.Codec.Config
+  alias Jido.Instruction.Config
   alias Jido.Error.ValidationError
 
   def options do

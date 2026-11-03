@@ -2,7 +2,7 @@
 modules:
   - Jido.Agent
   - Jido.Agent.Callback
-  - Jido.Codec.Agent
+  - Jido.Agent.Codec
   - Jido.Agent.Diff
   - Jido.Agent.Directive
   - Jido.Agent.Directive.Kind
@@ -125,7 +125,7 @@ not restore or claim the retired standalone `jido.topology` component.
 
 ### jido.agent.I20 — Agent document adapter
 
-- **scope:** `Jido.Codec.encode/2`, `Jido.Codec.decode/2`, `Jido.Codec.encode_json/2`, `Jido.Codec.decode_json/2`, `Jido.Codec.Agent`
+- **scope:** `Jido.Codec.encode/2`, `Jido.Codec.decode/2`, `Jido.Codec.encode_json/2`, `Jido.Codec.decode_json/2`, `Jido.Agent.Codec`
 - **must:** Register the Agent document type with `Jido.Codec`. Write a portable Agent definition, including declared initial state, through a trusted Catalog. Omit instance ID, instance state, and the module-owned `initialize/2` callback. Read through `Jido.Agent.define/1`, and reject a malformed or unsupported Agent document. Read a version 1 document that omits initial state as an empty initial-state Map. Shared document, Catalog, JSON, and portable-value rules remain owned by `jido_action`.
 - **kind:** persisted-format
 - **status:** active

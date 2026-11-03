@@ -41,7 +41,7 @@ modules:
 Check focused facets of the [reviewed public promises](../../../guides/public-api-contract-review.md). The module reference defines the supported API. Passing tags are evidence for these facets, not complete branch or acceptance-matrix coverage.
 
 ### jido_action.flow.I7 — Authoring forms preserve one Flow meaning
-- **scope:** `Jido.Flow.new/1, Jido.Flow.__using__/1, Jido.Codec.Flow`
+- **scope:** `Jido.Flow.new/1, Jido.Flow.__using__/1, Jido.Flow.Codec`
 - **must:** DSL, public data definitions, and stored documents produce equivalent validated Flow meaning for supported components, references, schemas, and outputs. Generated names and source locations need not be equal.
 - **kind:** functional
 - **status:** active
@@ -59,7 +59,7 @@ Check focused facets of the [reviewed public promises](../../../guides/public-ap
 - **status:** active
 
 ### jido_action.flow.I10 — Semantic identity describes canonical graph data
-- **scope:** `Jido.Flow.semantic_identity/1, Jido.Flow.explain/1, Jido.Codec.Flow`
+- **scope:** `Jido.Flow.semantic_identity/1, Jido.Flow.explain/1, Jido.Flow.Codec`
 - **must:** Equivalent canonical graphs have deterministic versioned identity independent of source order, descriptions, and component metadata. References and expressions remain distinct from literal maps. Codec round trips preserve identity. Identity does not identify deployed Action code.
 - **kind:** functional
 - **status:** active

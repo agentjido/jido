@@ -1,4 +1,4 @@
-defmodule Jido.Codec.Signal.Boundary do
+defmodule Jido.Signal.Boundary do
   @moduledoc false
 
   alias Jido.Signal

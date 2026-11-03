@@ -1,4 +1,4 @@
-defmodule Jido.Codec.Flow.Value do
+defmodule Jido.Flow.Codec.Value do
   @moduledoc false
   alias Jido.Catalog
   alias Jido.Catalog.Error, as: CatalogError
@@ -7,7 +7,7 @@ defmodule Jido.Codec.Flow.Value do
   alias Jido.Expr
   alias Jido.Error
   alias Jido.Flow.{Ref, Value}
-  alias Jido.Codec.Flow.{Limits, Paths}
+  alias Jido.Flow.Codec.{Limits, Paths}
 
   @doc false
   @spec encode_expression(term(), Catalog.t(), non_neg_integer()) ::

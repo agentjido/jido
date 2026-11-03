@@ -4,7 +4,7 @@ defmodule JidoActionTest.ActionTest do
   @moduletag obligation: "jido_action.action.I1"
 
   alias Jido.Action
-  alias Jido.Codec.Config
+  alias Jido.Instruction.Config
   alias Jido.Action.Output
   alias JidoActionTest.Fixtures.Actions.FullAction
   alias JidoActionTest.Fixtures.Actions.NoOutputSchemaAction

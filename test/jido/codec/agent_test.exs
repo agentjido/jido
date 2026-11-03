@@ -1,4 +1,4 @@
-defmodule Jido.Codec.AgentTest do
+defmodule Jido.Agent.CodecTest do
   use Covenant.Case, component: "jido.agent", async: true
   alias Jido.Agent
   alias Jido.Catalog
@@ -27,9 +27,9 @@ defmodule Jido.Codec.AgentTest do
     end
 
     routes do
-      route "child.single", Jido.Codec.AgentTest.Work
+      route "child.single", Jido.Agent.CodecTest.Work
 
-      route "child.broadcast", Jido.Codec.AgentTest.Work
+      route "child.broadcast", Jido.Agent.CodecTest.Work
     end
   end
 
@@ -190,7 +190,7 @@ defmodule Jido.Codec.AgentTest do
                 path: ["vsn"],
                 details: %{vsn: 2}
               }
-            ]} = Jido.Codec.Agent.decode(unsupported, registry)
+            ]} = Jido.Agent.Codec.decode(unsupported, registry)
   end
 
   @tag obligation: "jido.agent.I20"
