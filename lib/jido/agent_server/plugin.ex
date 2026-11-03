@@ -122,9 +122,6 @@ defmodule Jido.AgentServer.Plugin do
   end
 
   @doc false
-  def commit_specs(specs), do: Callbacks.commit_specs(specs)
-
-  @doc false
   def after_commit(data, active, plugin) do
     commit = %Commit{
       plugin: plugin.module,

@@ -238,6 +238,24 @@ defmodule Jido.Catalog.DiscoveryTest do
     assert Catalog.revision(Discovery.catalog()) == Catalog.revision(first)
   end
 
+  test "publishes the exact included Plugin list through the Catalog" do
+    assert Discovery.included_plugins() == [
+             Jido.AI.Agent.Plugin,
+             Jido.Plugin.Scheduler,
+             Jido.Plugin.SensorManager,
+             Jido.Plugin.Bus.Manager,
+             Jido.Plugin.Bus.Client,
+             Jido.Plugin.Heartbeat,
+             Jido.Plugin.Audit
+           ]
+
+    assert :ok = Discovery.refresh(applications: [:jido])
+
+    assert Enum.all?(Discovery.included_plugins(), fn plugin ->
+             match?(%Entry{target: ^plugin}, Discovery.get_by_target(:plugin, plugin))
+           end)
+  end
+
   test "lists manifests without display text" do
     assert :ok = Discovery.refresh(applications: [], modules: [{BareVocabulary, :jido}])
 

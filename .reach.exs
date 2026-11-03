@@ -16,8 +16,10 @@
       "Jido.Codec.Signal",
       "Jido.Codec.Signal.*",
       "Jido.Signal",
-      "Jido.Signal.*",
-      "Jido.Telemetry.Signal"
+      "Jido.Signal.Catalog",
+      "Jido.Signal.Context",
+      "Jido.Signal.Router",
+      "Jido.Signal.Router.*"
     ],
     stable_values: [
       "Jido.Codec.Term",
@@ -97,8 +99,13 @@
       "Jido.Plugin.Heartbeat*",
       "Jido.Plugin.Scheduler*",
       "Jido.Plugin.SensorManager*",
+      "Jido.Signal.Bus",
+      "Jido.Signal.Bus.*",
+      "Jido.Signal.Dispatch",
+      "Jido.Signal.Dispatch.*",
       "Jido.Telemetry",
       "Jido.Telemetry.AgentServer",
+      "Jido.Telemetry.Signal",
       "Jido.Telemetry.OpenTelemetry*",
       "Jido.Telemetry.Persistence*",
       "Jido.Telemetry.Semantic*",

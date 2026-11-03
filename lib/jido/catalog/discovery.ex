@@ -33,6 +33,15 @@ defmodule Jido.Catalog.Discovery do
   @snapshot_key {:jido, :catalog_snapshot}
   @default_applications :loaded
   @option_keys [:applications, :modules]
+  @included_plugins [
+    Jido.AI.Agent.Plugin,
+    Jido.Plugin.Scheduler,
+    Jido.Plugin.SensorManager,
+    Jido.Plugin.Bus.Manager,
+    Jido.Plugin.Bus.Client,
+    Jido.Plugin.Heartbeat,
+    Jido.Plugin.Audit
+  ]
   @base_entry %{
     id: "jido/schemas/map",
     kind: :schema,
@@ -58,6 +67,10 @@ defmodule Jido.Catalog.Discovery do
   @doc "Returns true when the first Catalog build is complete."
   @spec ready?() :: boolean()
   def ready?, do: match?(%{catalog: %Catalog{}, codecs: %Index{}}, published())
+
+  @doc "Lists the first-party Plugin modules included in this Jido release."
+  @spec included_plugins() :: [module()]
+  def included_plugins, do: @included_plugins
 
   @doc "Returns the current immutable application-wide Catalog."
   @spec catalog() :: Catalog.t()

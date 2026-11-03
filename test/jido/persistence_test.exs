@@ -369,12 +369,10 @@ defmodule JidoTest.PersistenceTest do
 
     assert Jido.Error.code(error) == :persistence_callback_failed
 
-    assert {{:shutdown, {:indeterminate, %Jido.Error.ExecutionError{}}}, _} =
-             catch_exit(
-               JidoTest.AgentServerAssertions.start_agent(jido, agent,
-                 persistence: {RaisingAdapter, allow_read: true},
-                 persistence_mode: :create
-               )
+    assert {:error, {:indeterminate, %Jido.Error.ExecutionError{}}} =
+             JidoTest.AgentServerAssertions.start_result(jido, agent,
+               persistence: {RaisingAdapter, allow_read: true},
+               persistence_mode: :create
              )
 
     eventually(fn -> Jido.whereis_agent(jido, agent.id) == nil end)

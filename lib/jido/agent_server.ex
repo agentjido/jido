@@ -73,6 +73,7 @@ defmodule Jido.AgentServer do
 
   alias Jido.AgentServer.Supervisor, as: ServerSupervisor
   alias Jido.AgentServer.Command
+  alias Jido.AgentServer.Plugin.Callbacks, as: PluginCallbacks
   alias Jido.Agent.Runner, as: AgentRunner
   alias Jido.Agent.Validation
   alias Jido.Exec.Continuation
@@ -3112,7 +3113,7 @@ defmodule Jido.AgentServer do
         if next.active.composition_changed or next.active.changed_plugins != [] do
           begin_reconciliation(next, effects)
         else
-          if effects != [] or Plugin.commit_specs(next.plugin_specs) != [],
+          if effects != [] or PluginCallbacks.commit_specs(next.plugin_specs) != [],
             do: begin_effects(next, effects),
             else: complete_terminal(next, :continue)
         end
@@ -3167,7 +3168,7 @@ defmodule Jido.AgentServer do
     active = data.active
     replies = commit_replies(active)
 
-    hooks = Plugin.commit_specs(Map.get(active, :commit_plugins, data.plugin_specs))
+    hooks = PluginCallbacks.commit_specs(Map.get(active, :commit_plugins, data.plugin_specs))
     timeout = if hooks == [], do: data.directive_timeout, else: data.commit_timeout
     timer_kind = if hooks == [], do: :effect_timeout, else: :commit_timeout
 
