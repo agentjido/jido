@@ -2,7 +2,8 @@
 modules:
   - Jido.Instance.Options
   - Jido.Instance.NamespaceRegistry
-  - Jido.Instance.RefFacade
+  - Jido.Instance.RuntimeStore
+  - Jido.Agent.Ref
 ---
 
 ## Purpose
@@ -75,6 +76,6 @@ downstream operation results stay with their owning components.
 
 - **scope:** `Jido.call/4`, `Jido.cast/3`, `Jido.submit/4`, committed reads, controls, and generated instance Ref functions
 - **must:** Route each supported Ref function to the currently resolved AgentServer and preserve its public result and caller-wait contract. Support submit, await, and abandon wrappers. Return an explicit error for a missing target. Keep caller timeout separate from execution cancellation.
-- **why:** A Ref facade must not change downstream runtime semantics.
+- **why:** The Ref API must not change downstream runtime semantics.
 - **kind:** functional
 - **status:** active

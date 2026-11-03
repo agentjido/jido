@@ -1,7 +1,10 @@
 defmodule JidoTest.RuntimeStoreTest do
   use JidoTest.Case, async: true
+  use Covenant.Case, component: "jido.instance", async: true
 
-  alias Jido.RuntimeStore
+  alias Jido.Instance.RuntimeStore
+
+  @moduletag obligation: "jido.instance.I2"
 
   test "a stopped worker returns the fallback for each operation", %{jido: jido} do
     assert :ok = Supervisor.terminate_child(jido, Jido.runtime_store_name(jido))

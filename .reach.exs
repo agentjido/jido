@@ -88,7 +88,6 @@
       # legacy Agent, Action, and Signal error taxonomies. It then moves with
       # Jido.Error to the declarative definitions layer.
       "Jido.Plugin.*",
-      "Jido.RuntimeStore",
       "Jido.Telemetry",
       "Jido.Telemetry.OpenTelemetry*",
       "Jido.Telemetry.Persistence*",
@@ -154,6 +153,8 @@
       "Jido.AgentServer.Durable",
       "Jido.AgentServer.DurableTurn*",
       "Jido.AgentServer.Store",
+      "Jido.Instance.RefFacade",
+      "Jido.RuntimeStore",
       "Jido.AgentServer.TopologyBus",
       "Jido.AgentServer.TopologyRuntime",
       "Jido.Exec.Waits",
@@ -199,6 +200,8 @@
       "lib/jido/agent_server/durable.ex",
       "lib/jido/agent_server/durable_turn.ex",
       "lib/jido/agent_server/durable_turn/**",
+      "lib/jido/instance/ref_facade.ex",
+      "lib/jido/runtime_store.ex",
       "lib/jido/agent_server/topology_bus.ex",
       "lib/jido/agent_server/topology_runtime.ex",
       "lib/jido/exec/waits.ex",

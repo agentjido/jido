@@ -1,4 +1,4 @@
-defmodule Jido.RuntimeStore do
+defmodule Jido.Instance.RuntimeStore do
   @moduledoc false
 
   use GenServer

@@ -35,14 +35,14 @@ defmodule Jido.Persistence.ContinuationStore do
   def load_fact(hash, {id, jido}), do: load_fact(id, hash, jido)
 
   def register(jido, id, config, owner \\ self()),
-    do: Jido.RuntimeStore.put(jido, __MODULE__, id, {owner, config})
+    do: Jido.Instance.RuntimeStore.put(jido, __MODULE__, id, {owner, config})
 
   # Terminal checkpoint collection is best effort. A failed physical delete
   # must not change a Turn result which is already durable in the Agent record.
   def collect(jido, id) do
-    case Jido.RuntimeStore.fetch(jido, __MODULE__, id) do
+    case Jido.Instance.RuntimeStore.fetch(jido, __MODULE__, id) do
       {:ok, {owner, config}} when owner == self() ->
-        with :ok <- Jido.RuntimeStore.delete_owned(jido, __MODULE__, id, owner),
+        with :ok <- Jido.Instance.RuntimeStore.delete_owned(jido, __MODULE__, id, owner),
              {:ok, _pid} <-
                Task.Supervisor.start_child(Jido.task_supervisor_name(jido), fn ->
                  delete_execution(config, id)
@@ -226,7 +226,7 @@ defmodule Jido.Persistence.ContinuationStore do
   end
 
   defp config(jido, id) do
-    case Jido.RuntimeStore.fetch(jido, __MODULE__, id) do
+    case Jido.Instance.RuntimeStore.fetch(jido, __MODULE__, id) do
       {:ok, {owner, config}} ->
         if Process.alive?(owner), do: {:ok, config}, else: {:error, :execution_owner_lost}
 

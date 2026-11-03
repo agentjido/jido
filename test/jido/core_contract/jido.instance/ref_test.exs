@@ -264,7 +264,7 @@ defmodule JidoTest.InstanceRefTest do
   end
 
   @tag obligation: "jido.instance.I8"
-  test "a generated instance exposes the same Ref-first facade" do
+  test "a generated instance exposes the same Ref-first API" do
     start_supervised!(NamespacedInstance)
     assert NamespacedInstance.namespace() == "jido/test/generated-instance"
     assert {:ok, ref} = NamespacedInstance.agent_ref("counter")
@@ -275,9 +275,9 @@ defmodule JidoTest.InstanceRefTest do
   end
 
   @tag obligation: ["jido.instance.I6", "jido.instance.I7", "jido.instance.I8"]
-  test "the Ref facade resolves each operation and preserves direct Server results" do
-    namespace = unique_namespace("facade")
-    instance = unique_instance("facade")
+  test "the Ref API resolves each operation and preserves direct Server results" do
+    namespace = unique_namespace("routing")
+    instance = unique_instance("routing")
     start_supervised!({Jido, name: instance, namespace: namespace}, id: instance)
 
     assert {:ok, %Ref{} = ref} = Jido.agent_ref(instance, "counter", partition: "west")
@@ -506,13 +506,13 @@ defmodule JidoTest.InstanceRefTest do
     end
 
     for opts <- [:invalid, [:invalid], %{id: "counter"}] do
-      assert {:error, %{message: "Ref facade options must be a keyword list"}} =
+      assert {:error, %{message: "Agent Ref options must be a keyword list"}} =
                Jido.agent_ref(instance, "counter", opts)
 
-      assert {:error, %{message: "Ref facade options must be a keyword list"}} =
+      assert {:error, %{message: "Agent Ref startup options must be a keyword list"}} =
                Jido.start_agent_ref(instance, ref, Counter, opts)
 
-      assert {:error, %{message: "Ref facade options must be a keyword list"}} =
+      assert {:error, %{message: "Agent Ref delete options must be a unique keyword list"}} =
                Jido.delete_agent(instance, ref, Counter, opts)
     end
 

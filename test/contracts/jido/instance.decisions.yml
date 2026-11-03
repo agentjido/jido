@@ -6,8 +6,8 @@
 
 - id: instance-mutation-profile
   date: 2026-10-19
-  decision: Mutate Jido.Instance.Options, Jido.Instance.NamespaceRegistry, and Jido.Instance.RefFacade. Do not mutate the shared Jido facade in this component.
-  driver: Jido contains public entry points for several future components. Selecting the complete module would make the instance mutation profile broader than its obligations. Public facade behavior remains covered by contract tests.
+  decision: Mutate Jido.Instance.Options, Jido.Instance.NamespaceRegistry, and Jido.Agent.Ref. Test the Ref-specific public functions in Jido through this component contract. Jido.Instance.RefFacade is removed.
+  driver: Stable Ref validation belongs to the Ref value. Instance lookup and direct AgentServer routing belong to the existing public Jido entry point. Selecting all of Jido for mutation would include unrelated components. A forwarding module has no separate responsibility.
   approved_by: Component hardening pass
 
 - id: instance-agent-server-migration
@@ -24,6 +24,6 @@
 
 - id: instance-generated-api
   date: 2026-10-22
-  decision: Remove the unused generated `__otp_app__/0` and `__jido_namespace__/0` functions. Keep `__jido_persistence__/0` as a hidden interoperability hook. Use `config/1`, `namespace/0`, and the typed lifecycle and Ref facades as the public generated API.
+  decision: Remove the unused generated `__otp_app__/0` and `__jido_namespace__/0` functions. Keep `__jido_persistence__/0` as a hidden interoperability hook. Use `config/1`, `namespace/0`, and the typed lifecycle and Ref functions as the public generated API.
   driver: The removed functions had no internal or sibling-package consumers and exposed declaration details that the supported runtime API already represents.
   approved_by: Component hardening pass

@@ -87,39 +87,3 @@
   mutation: "`\"Jido instance persistence is invalid\"` → `\"\"`"
   sort: log-only
   reason: The contract fixes the structured instance configuration error and persistence failure reason. It does not fix human-readable error prose.
-
-- at: lib/jido/instance/ref_facade.ex:23:17
-  operator: string_empty
-  mutation: "`\"Agent Ref ID must be a binary\"` → `\"\"`"
-  sort: log-only
-  reason: The contract fixes the structured Ref configuration error and rejected ID. It does not fix human-readable error prose.
-
-- at: lib/jido/instance/ref_facade.ex:211:17
-  operator: string_empty
-  mutation: "`\"Agent Ref conflicts with startup options\"` → `\"\"`"
-  sort: log-only
-  reason: The contract fixes the conflicting key and value in structured error data. It does not fix human-readable error prose.
-
-- at: lib/jido/instance/ref_facade.ex:220:17
-  operator: string_empty
-  mutation: "`\"Agent Ref namespace does not match the Jido instance\"` → `\"\"`"
-  sort: log-only
-  reason: The contract fixes the namespace mismatch code and the expected and actual namespaces. It does not fix human-readable error prose.
-
-- at: lib/jido/instance/ref_facade.ex:235:17
-  operator: string_empty
-  mutation: "`\"Jido instance does not have a stable namespace\"` → `\"\"`"
-  sort: log-only
-  reason: The contract fixes the namespace-required code and selected instance. It does not fix human-readable error prose.
-
-- at: lib/jido/instance/ref_facade.ex:251:19
-  operator: string_empty
-  mutation: "`\"Ref facade options must contain unique keys\"` → `\"\"`"
-  sort: log-only
-  reason: The contract fixes the structured Ref configuration error and duplicate keys. It does not fix human-readable error prose.
-
-- at: lib/jido/instance/ref_facade.ex:263:23
-  operator: string_empty
-  mutation: "`\"Agent Ref options have unknown keys\"` → `\"\"`"
-  sort: log-only
-  reason: The contract fixes the structured Ref configuration error and rejected keys. It does not fix human-readable error prose.
