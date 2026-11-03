@@ -3488,7 +3488,7 @@
           "status": "active",
           "testable": true,
           "tests": [
-            "test Server callbacks contain an unavailable runtime exit",
+            "test Plugin runtime callbacks contain an unavailable runtime exit",
             "test failed starts and restarts retry without a new Directive",
             "test invalid child specifications fail without damaging the runtime"
           ]

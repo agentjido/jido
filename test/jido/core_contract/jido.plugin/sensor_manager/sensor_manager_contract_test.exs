@@ -9,11 +9,9 @@ defmodule JidoTest.Contract.PluginSensorManagerTest do
   alias Jido.Plugin.Init, as: PluginInit
   alias Jido.Plugin.Normalizer
   alias Jido.Plugin.SensorManager
-  alias Jido.Plugin.SensorManager.Agent, as: SensorState
   alias Jido.Plugin.SensorManager.Init, as: SensorInit
   alias Jido.Plugin.SensorManager.Runtime
   alias Jido.Plugin.SensorManager.Runtime.Controller
-  alias Jido.Plugin.SensorManager.Server
   alias Jido.Plugin.SensorManager.Start
   alias Jido.Plugin.SensorManager.Stop
   alias JidoTest.Plugin.SensorManagerFixtures, as: F
@@ -94,9 +92,9 @@ defmodule JidoTest.Contract.PluginSensorManagerTest do
 
   @tag obligation: "jido.plugin.sensor_manager.I2"
   test "the Plugin reduces Start and Stop Directives in their given order" do
-    assert {:sensors, schema} = SensorState.state_spec([])
+    assert {:sensors, schema} = SensorManager.state_spec([])
     assert {:ok, %{desired: %{}}} = Jido.Joi.initialize(schema, %{})
-    assert SensorState.directives([]) == [Start, Stop]
+    assert SensorManager.directives([]) == [Start, Stop]
 
     first = SensorManager.start(:source, F.ControlledSensor, %{value: 1})
     replacement = SensorManager.start(:source, F.ControlledSensor, %{value: 2})
@@ -118,14 +116,14 @@ defmodule JidoTest.Contract.PluginSensorManagerTest do
               desired: %{
                 other: %{module: F.ControlledSensor, config: %{value: 3}}
               }
-            }} = SensorState.reduce(input, [])
+            }} = SensorManager.reduce(input, [])
 
     existing = %{desired: %{source: %{module: F.ControlledSensor, config: %{value: 1}}}}
 
     assert {:ok, %{desired: %{}}} =
              existing
              |> reduction([SensorManager.stop(:source)])
-             |> SensorState.reduce([])
+             |> SensorManager.reduce([])
   end
 
   @tag obligation: "jido.plugin.sensor_manager.I3"
@@ -173,7 +171,7 @@ defmodule JidoTest.Contract.PluginSensorManagerTest do
       options: []
     }
 
-    spec = Server.child_spec(init)
+    spec = SensorManager.child_spec(init)
     assert spec.id == SensorManager
     assert Map.get(spec, :restart, :permanent) == :permanent
     assert spec.start == {Runtime, :start_link, [init]}
@@ -375,18 +373,18 @@ defmodule JidoTest.Contract.PluginSensorManagerTest do
   end
 
   @tag obligation: "jido.plugin.sensor_manager.I8"
-  test "Server callbacks contain an unavailable runtime exit" do
+  test "Plugin runtime callbacks contain an unavailable runtime exit" do
     runtime = spawn(fn -> :ok end)
     ref = Process.monitor(runtime)
     assert_receive {:DOWN, ^ref, :process, ^runtime, _reason}
 
     assert {:error, {:sensor_manager_runtime_unavailable, _reason}} =
-             Server.await_ready(runtime, [])
+             SensorManager.await_ready(runtime, [])
 
     context =
       struct(Context, phase: :directive, plugin_state: %{desired: %{}}, state_version: 1)
 
     assert {:error, {:sensor_manager_runtime_unavailable, _reason}} =
-             Server.dispatch(runtime, SensorManager.stop(:source), context, [])
+             SensorManager.dispatch(runtime, SensorManager.stop(:source), context, [])
   end
 end

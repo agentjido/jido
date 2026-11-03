@@ -40,13 +40,13 @@
   sort: unpromised
   reason: The contract fixes the optional partition value and its propagation. It does not fix schema description prose.
 
-- at: lib/jido/plugin/sensor_manager/server.ex:9:20
+- at: lib/jido/plugin/sensor_manager.ex:25:20
   operator: integer_shift
   mutation: "`5000` → `5001`"
   sort: unpromised
   reason: The contract fixes runtime fault containment. It does not fix the internal wait budget.
 
-- at: lib/jido/plugin/sensor_manager/server.ex:9:20
+- at: lib/jido/plugin/sensor_manager.ex:25:20
   operator: integer_shift
   mutation: "`5000` → `4999`"
   sort: unpromised

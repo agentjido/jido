@@ -1,11 +1,9 @@
 ---
 modules:
   - Jido.Plugin.SensorManager
-  - Jido.Plugin.SensorManager.Agent
   - Jido.Plugin.SensorManager.Init
   - Jido.Plugin.SensorManager.Runtime
   - Jido.Plugin.SensorManager.Runtime.Controller
-  - Jido.Plugin.SensorManager.Server
   - Jido.Plugin.SensorManager.Start
   - Jido.Plugin.SensorManager.Stop
 ---
@@ -22,9 +20,10 @@ timing, AgentServer commit atomicity, or Signal processing by the receiving
 Agent.
 
 The public boundary is `Jido.Plugin.SensorManager`, its `Start` and `Stop`
-Directives, and the sensor-facing `Init` value. Agent state, runtime,
-controller, and server modules are internal. Sensor Manager uses the standard
-Plugin configuration and adds no custom DSL section.
+Directives, and the sensor-facing `Init` value. The root owns its Agent-state
+and Plugin runtime callbacks. Runtime and controller modules are internal.
+Sensor Manager uses the standard Plugin configuration and adds no custom DSL
+section.
 
 ## Obligations
 
@@ -37,14 +36,14 @@ Plugin configuration and adds no custom DSL section.
 
 ### jido.plugin.sensor_manager.I2 — Ordered desired state
 
-- **scope:** `Jido.Plugin.SensorManager.Agent.state_spec/1`, `Jido.Plugin.SensorManager.Agent.directives/1`, `Jido.Plugin.SensorManager.Agent.reduce/2`
+- **scope:** `Jido.Plugin.SensorManager.state_spec/1`, `Jido.Plugin.SensorManager.directives/1`, `Jido.Plugin.SensorManager.reduce/2`
 - **must:** Own one `:sensors` field with an empty desired map, declare only Start and Stop, apply those Directives in order, and ignore other Directive types.
 - **kind:** ordering
 - **status:** active
 
 ### jido.plugin.sensor_manager.I3 — Runtime configuration and sensor input
 
-- **scope:** `Jido.Plugin.SensorManager`, `Jido.Plugin.SensorManager.Server`, `Jido.Plugin.SensorManager.Init`
+- **scope:** `Jido.Plugin.SensorManager`, `Jido.Plugin.SensorManager.Init`
 - **must:** Own exactly the AgentServer option `retry_delay_ms`, add no custom DSL section, reject unknown or duplicate Plugin options, and accept only a delay from 1 through 4,294,967,295 milliseconds. Declare one permanent Sensor Manager runtime child and expose the typed Init value given to each sensor.
 - **kind:** functional
 - **status:** active
@@ -79,7 +78,7 @@ Plugin configuration and adds no custom DSL section.
 
 ### jido.plugin.sensor_manager.I8 — Runtime fault containment
 
-- **scope:** `Jido.Plugin.SensorManager.Runtime.Controller`, `Jido.Plugin.SensorManager.Server.dispatch/4`, `Jido.Plugin.SensorManager.Server.await_ready/2`
+- **scope:** `Jido.Plugin.SensorManager.Runtime.Controller`, `Jido.Plugin.SensorManager.dispatch/4`, `Jido.Plugin.SensorManager.await_ready/2`
 - **must:** Return structured failures for invalid child specifications, failed child starts, ignored children, and an unavailable runtime without changing the desired state contract.
 - **kind:** functional
 - **status:** active

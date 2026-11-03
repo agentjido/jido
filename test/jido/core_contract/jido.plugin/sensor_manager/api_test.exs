@@ -20,14 +20,12 @@ defmodule JidoTest.Contract.PluginSensorManagerApiTest do
       types: [{:type, :t, 0}]
     )
 
-    for module <- [
-          SensorManager.Agent,
-          SensorManager.Runtime,
-          SensorManager.Runtime.Controller,
-          SensorManager.Server
-        ] do
+    for module <- [SensorManager.Runtime, SensorManager.Runtime.Controller] do
       refute public_module?(module)
     end
+
+    refute Code.ensure_loaded?(SensorManager.Agent)
+    refute Code.ensure_loaded?(SensorManager.Server)
   end
 
   defp assert_public(module, expected) do

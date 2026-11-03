@@ -218,7 +218,9 @@
       "Jido.AI.Reasoning.GraphOfThoughts.Actions.ExpandNext",
       "Jido.AI.Reasoning.TreeOfThoughts.Actions.ExpandNext",
       "Jido.AI.Reasoning.TRM.Actions.ExpandNext",
-      "Jido.AI.Agent.DSL"
+      "Jido.AI.Agent.DSL",
+      "Jido.Plugin.SensorManager.Agent",
+      "Jido.Plugin.SensorManager.Server"
     ],
     forbidden_files: [
       "lib/jido/config.ex",
@@ -298,7 +300,9 @@
       "lib/jido/ai/reasoning/graph_of_thoughts/actions/expand_next.ex",
       "lib/jido/ai/reasoning/tree_of_thoughts/actions/expand_next.ex",
       "lib/jido/ai/reasoning/trm/actions/expand_next.ex",
-      "lib/jido/ai/agent/dsl.ex"
+      "lib/jido/ai/agent/dsl.ex",
+      "lib/jido/plugin/sensor_manager/agent.ex",
+      "lib/jido/plugin/sensor_manager/server.ex"
     ]
   ],
   calls: [
