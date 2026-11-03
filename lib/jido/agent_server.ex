@@ -62,7 +62,7 @@ defmodule Jido.AgentServer do
   alias Jido.Agent
 
   alias Jido.AgentServer.{
-    Core,
+    Lifecycle,
     Durable,
     Effects,
     Plugin,
@@ -169,7 +169,7 @@ defmodule Jido.AgentServer do
   @spec whereis(atom(), String.t(), keyword()) :: pid() | nil
   def whereis(jido, id, opts \\ []) do
     with true <- is_atom(jido) and not is_nil(jido) and is_binary(id),
-         true <- Core.unique_keyword?(opts) and Keyword.keys(opts) -- [:partition] == [],
+         true <- Lifecycle.unique_keyword?(opts) and Keyword.keys(opts) -- [:partition] == [],
          true <- valid_partition?(opts[:partition]),
          [{pid, :ready}] <-
            Registry.lookup(
@@ -278,10 +278,10 @@ defmodule Jido.AgentServer do
   defp normalize_stop_reason(reason), do: {:shutdown, reason}
 
   defp runtime_options(opts) do
-    with true <- Core.unique_keyword?(opts),
+    with true <- Lifecycle.unique_keyword?(opts),
          {:ok, opts} <- instance_options(opts),
-         {:ok, opts} <- Core.with_turn_timeout(opts) do
-      {:ok, Keyword.merge(Core.runtime_defaults(), opts)}
+         {:ok, opts} <- Lifecycle.with_turn_timeout(opts) do
+      {:ok, Keyword.merge(Lifecycle.runtime_defaults(), opts)}
     else
       false -> invalid_options("startup option keys must be unique")
       error -> error
@@ -345,8 +345,8 @@ defmodule Jido.AgentServer do
 
   @doc false
   def validate_defaults(opts) do
-    if Core.unique_keyword?(opts) and Keyword.keys(opts) -- Core.runtime_keys() == [] do
-      validate_runtime(Keyword.merge(Core.runtime_defaults(), opts))
+    if Lifecycle.unique_keyword?(opts) and Keyword.keys(opts) -- Lifecycle.runtime_keys() == [] do
+      validate_runtime(Keyword.merge(Lifecycle.runtime_defaults(), opts))
     else
       invalid_options("invalid instance AgentServer defaults")
     end
@@ -356,7 +356,7 @@ defmodule Jido.AgentServer do
     name = Keyword.get(opts, :name)
 
     cond do
-      Keyword.keys(opts) -- Core.startup_keys() != [] ->
+      Keyword.keys(opts) -- Lifecycle.startup_keys() != [] ->
         invalid_options("unknown startup options")
 
       not Keyword.has_key?(opts, :agent) ->
@@ -379,21 +379,21 @@ defmodule Jido.AgentServer do
   end
 
   defp validate_runtime(opts) do
-    with :ok <- Core.validate_runtime(opts),
-         :ok <- Core.validate_timeout(opts, :directive_timeout),
-         :ok <- Core.validate_timeout(opts, :readiness_timeout),
-         :ok <- Core.validate_timeout(opts, :commit_timeout),
+    with :ok <- Lifecycle.validate_runtime(opts),
+         :ok <- Lifecycle.validate_timeout(opts, :directive_timeout),
+         :ok <- Lifecycle.validate_timeout(opts, :readiness_timeout),
+         :ok <- Lifecycle.validate_timeout(opts, :commit_timeout),
          :ok <- Durable.validate_runtime(opts),
-         :ok <- Core.validate_timeout(opts, :idle_timeout, false),
-         :ok <- Core.validate_setting(opts[:idle_policy] in [:stop, :hibernate], :idle_policy),
-         :ok <- Core.validate_limit(opts, :max_directives_per_turn),
+         :ok <- Lifecycle.validate_timeout(opts, :idle_timeout, false),
+         :ok <- Lifecycle.validate_setting(opts[:idle_policy] in [:stop, :hibernate], :idle_policy),
+         :ok <- Lifecycle.validate_limit(opts, :max_directives_per_turn),
          :ok <-
-           Core.validate_setting(
+           Lifecycle.validate_setting(
              is_nil(opts[:directive_handler]) or is_function(opts[:directive_handler], 2),
              :directive_handler
            ),
          :ok <-
-           Core.validate_setting(
+           Lifecycle.validate_setting(
              Effects.validate_dispatch(opts[:default_dispatch]) == :ok,
              :default_dispatch
            ),
@@ -439,7 +439,7 @@ defmodule Jido.AgentServer do
     end)
   end
 
-  defp invalid_options(message), do: Core.invalid_options(message)
+  defp invalid_options(message), do: Lifecycle.invalid_options(message)
 
   @doc "Stops the server and its active turn through OTP termination."
   @spec stop(server(), term(), timeout()) :: :ok | {:error, term()}
@@ -506,7 +506,7 @@ defmodule Jido.AgentServer do
     do: cancel_request(server, turn_id, timeout)
 
   defp cancel_request(server, id, timeout) do
-    with :ok <- Core.validate_wait(timeout), do: :gen_statem.call(server, {:cancel, id}, timeout)
+    with :ok <- Lifecycle.validate_wait(timeout), do: :gen_statem.call(server, {:cancel, id}, timeout)
   end
 
   @doc """
@@ -525,7 +525,7 @@ defmodule Jido.AgentServer do
   @doc "Opens admission after quiescence. An uncertain hibernation save forbids resume."
   @spec resume(server(), timeout()) :: :ok | {:error, term()}
   def resume(server, timeout \\ 5_000) do
-    with :ok <- Core.validate_wait(timeout), do: :gen_statem.call(server, :resume, timeout)
+    with :ok <- Lifecycle.validate_wait(timeout), do: :gen_statem.call(server, :resume, timeout)
   end
 
   @doc """
@@ -539,7 +539,7 @@ defmodule Jido.AgentServer do
   """
   @spec hibernate(server(), keyword()) :: :ok | {:error, term()}
   def hibernate(server, opts \\ []) do
-    with {:ok, _active, _timeout} <- Core.control_options(opts),
+    with {:ok, _active, _timeout} <- Lifecycle.control_options(opts),
          target when is_pid(target) <- :gen_statem.call(server, :stop_target) do
       ref = Process.monitor(target)
 
@@ -562,10 +562,10 @@ defmodule Jido.AgentServer do
   end
 
   defp control_request(server, kind, opts) do
-    with {:ok, active, timeout} <- Core.control_options(opts) do
+    with {:ok, active, timeout} <- Lifecycle.control_options(opts) do
       # Allow the server to report its control deadline. The caller still has
       # a finite OTP wait if delivery or the server itself cannot progress.
-      wait = Core.control_wait(timeout)
+      wait = Lifecycle.control_wait(timeout)
 
       :gen_statem.call(
         server,
@@ -586,8 +586,8 @@ defmodule Jido.AgentServer do
     do: owner_request(server, :detach, owner, timeout)
 
   defp owner_request(server, kind, owner, timeout) do
-    with :ok <- Core.validate_setting(is_pid(owner), :owner),
-         :ok <- Core.validate_wait(timeout),
+    with :ok <- Lifecycle.validate_setting(is_pid(owner), :owner),
+         :ok <- Lifecycle.validate_wait(timeout),
          do: :gen_statem.call(server, {kind, owner}, timeout)
   end
 
@@ -598,13 +598,13 @@ defmodule Jido.AgentServer do
   @doc "Returns the saved Agent instance."
   @spec agent(server(), timeout()) :: Agent.instance() | {:error, term()}
   def agent(server, timeout \\ 5_000) do
-    with :ok <- Core.validate_wait(timeout), do: :gen_statem.call(server, :agent, timeout)
+    with :ok <- Lifecycle.validate_wait(timeout), do: :gen_statem.call(server, :agent, timeout)
   end
 
   @doc "Returns one committed Plugin-owned state field."
   @spec plugin_state(server(), module(), timeout()) :: {:ok, term()} | {:error, term()}
   def plugin_state(server, plugin, timeout \\ 5_000) do
-    with :ok <- Core.validate_wait(timeout),
+    with :ok <- Lifecycle.validate_wait(timeout),
          do: :gen_statem.call(server, {:plugin_state, plugin}, timeout)
   end
 
@@ -623,10 +623,10 @@ defmodule Jido.AgentServer do
     opts = if is_list(timeout_or_opts), do: timeout_or_opts, else: [timeout: timeout_or_opts]
 
     with {:ok, signal} <- Validation.normalize_signal(signal),
-         {:ok, context} <- Core.turn_context(opts, [:timeout, :admission_timeout, :context]),
+         {:ok, context} <- Lifecycle.turn_context(opts, [:timeout, :admission_timeout, :context]),
          timeout = Keyword.get(opts, :timeout, 5_000),
-         :ok <- Core.validate_wait(timeout),
-         {:ok, deadline} <- Core.admission_deadline(opts) do
+         :ok <- Lifecycle.validate_wait(timeout),
+         {:ok, deadline} <- Lifecycle.admission_deadline(opts) do
       reply_gate = ReplyGate.start(self(), server)
 
       try do
@@ -656,8 +656,8 @@ defmodule Jido.AgentServer do
   @spec submit(server(), Signal.t(), keyword()) :: pending() | {:error, term()}
   def submit(server, signal, opts \\ []) do
     with {:ok, signal} <- Validation.normalize_signal(signal),
-         {:ok, context} <- Core.turn_context(opts, [:context, :admission_timeout]),
-         {:ok, deadline} <- Core.admission_deadline(opts) do
+         {:ok, context} <- Lifecycle.turn_context(opts, [:context, :admission_timeout]),
+         {:ok, deadline} <- Lifecycle.admission_deadline(opts) do
       reply_gate = ReplyGate.start(self(), server)
 
       %Pending{
@@ -677,7 +677,7 @@ defmodule Jido.AgentServer do
   @spec cast(server(), Signal.t(), keyword()) :: :ok | {:error, term()}
   def cast(server, signal, opts \\ []) do
     with {:ok, signal} <- Validation.normalize_signal(signal),
-         {:ok, context} <- Core.turn_context(opts, [:context]) do
+         {:ok, context} <- Lifecycle.turn_context(opts, [:context]) do
       :gen_statem.cast(server, turn_event(signal, context, :infinity, nil))
     end
   end
@@ -699,7 +699,7 @@ defmodule Jido.AgentServer do
 
   def await(%Pending{owner: owner, request_id: request_id, reply_gate: reply_gate}, timeout)
       when owner == self() do
-    with :ok <- Core.validate_wait(timeout) do
+    with :ok <- Lifecycle.validate_wait(timeout) do
       case :gen_statem.wait_response(request_id, timeout) do
         {:reply, result} ->
           ReplyGate.open(reply_gate)
@@ -741,7 +741,7 @@ defmodule Jido.AgentServer do
   @doc "Returns phase, identity, revision, queue counts, and a bounded active turn view."
   @spec status(server(), timeout()) :: map() | {:error, term()}
   def status(server, timeout \\ 5_000) do
-    with :ok <- Core.validate_wait(timeout), do: :gen_statem.call(server, :status, timeout)
+    with :ok <- Lifecycle.validate_wait(timeout), do: :gen_statem.call(server, :status, timeout)
   end
 
   @doc """
@@ -759,7 +759,7 @@ defmodule Jido.AgentServer do
 
   def deliver_wait(server, wait_id, %Signal{} = signal, timeout) do
     with {:ok, input} <- Jido.Exec.Wait.input(wait_id, signal),
-         :ok <- Core.validate_wait(timeout) do
+         :ok <- Lifecycle.validate_wait(timeout) do
       :gen_statem.call(server, {:wait_input, input}, timeout)
     end
   end
@@ -770,7 +770,7 @@ defmodule Jido.AgentServer do
   @doc "Waits for Plugin startup and readiness. Caller timeout does not stop startup."
   @spec await_ready(server(), timeout()) :: :ok | {:error, term()}
   def await_ready(server, timeout \\ 5_000) do
-    with :ok <- Core.validate_wait(timeout), do: :gen_statem.call(server, :await_ready, timeout)
+    with :ok <- Lifecycle.validate_wait(timeout), do: :gen_statem.call(server, :await_ready, timeout)
   end
 
   @doc "Returns terminal summaries in chronological order when debug is enabled."
@@ -838,7 +838,7 @@ defmodule Jido.AgentServer do
       )
 
     data =
-      Map.merge(Map.new(Core.runtime_keys(), &{&1, Keyword.fetch!(opts, &1)}), %{
+      Map.merge(Map.new(Lifecycle.runtime_keys(), &{&1, Keyword.fetch!(opts, &1)}), %{
         agent: agent,
         runner: runner,
         jido: opts[:jido],
@@ -971,7 +971,7 @@ defmodule Jido.AgentServer do
   @doc "Returns one committed Agent and revision from the same server event."
   @spec snapshot(server(), timeout()) :: snapshot() | {:error, term()}
   def snapshot(server, timeout \\ 5_000) do
-    with :ok <- Core.validate_wait(timeout), do: :gen_statem.call(server, :snapshot, timeout)
+    with :ok <- Lifecycle.validate_wait(timeout), do: :gen_statem.call(server, :snapshot, timeout)
   end
 
   @doc """
@@ -988,7 +988,7 @@ defmodule Jido.AgentServer do
          context = Map.get(options, :context, %{}),
          :ok <- Jido.Agent.Validation.plain_map(context),
          timeout = Map.get(options, :timeout, 5_000),
-         :ok <- Core.validate_wait(timeout) do
+         :ok <- Lifecycle.validate_wait(timeout) do
       :gen_statem.call(server, {:upgrade, make_ref(), action, context}, timeout)
     end
   end
@@ -997,7 +997,7 @@ defmodule Jido.AgentServer do
   @spec children(server(), timeout()) ::
           %{optional(child_tag()) => child_info()} | {:error, term()}
   def children(server, timeout \\ 5_000) do
-    with :ok <- Core.validate_wait(timeout) do
+    with :ok <- Lifecycle.validate_wait(timeout) do
       context = :gen_statem.call(server, :child_context, timeout)
       Topology.children(context)
     end
@@ -1006,7 +1006,7 @@ defmodule Jido.AgentServer do
   @doc "Returns live topology members in slot order. Await readiness before use."
   @spec members(server(), atom(), timeout()) :: [pid()] | {:error, term()}
   def members(server, name, timeout \\ 5_000) do
-    with :ok <- Core.validate_wait(timeout),
+    with :ok <- Lifecycle.validate_wait(timeout),
          do: :gen_statem.call(server, {:topology_members, name}, timeout)
   end
 
@@ -1089,7 +1089,7 @@ defmodule Jido.AgentServer do
       jido: data.jido,
       partition: data.partition,
       opts:
-        Enum.map(Core.runtime_keys(), &{&1, Map.fetch!(data, &1)}) ++
+        Enum.map(Lifecycle.runtime_keys(), &{&1, Map.fetch!(data, &1)}) ++
           [runner: data.runner, jido: data.jido, partition: data.partition]
     }
 
@@ -1334,7 +1334,7 @@ defmodule Jido.AgentServer do
   end
 
   def handle_event({:call, from}, {:upgrade, token, _action, _context}, _phase, data) do
-    if Core.reentrant?({:call, from}, data) or Core.bootstrap_caller?(from, data),
+    if Lifecycle.reentrant?({:call, from}, data) or Lifecycle.bootstrap_caller?(from, data),
       do: reject_turn({:call, from}, :reentrant_turn, data),
       else: postpone_turn({:call, from}, token, data)
   end
@@ -1368,7 +1368,7 @@ defmodule Jido.AgentServer do
       when phase in [:restoring, :initializing] do
     {caller, _} = from
 
-    if Core.owned_process?(caller, data.bootstrap.task.pid, [], 0) do
+    if Lifecycle.owned_process?(caller, data.bootstrap.task.pid, [], 0) do
       {:keep_state_and_data, reply(from, {:error, :reentrant_turn})}
     else
       {:keep_state, %{data | ready_waiters: [from | data.ready_waiters]}}
@@ -1376,7 +1376,7 @@ defmodule Jido.AgentServer do
   end
 
   def handle_event({:call, from}, :await_ready, :effects, %{active: %{reconciling: true}} = data) do
-    if Core.reentrant?({:call, from}, data),
+    if Lifecycle.reentrant?({:call, from}, data),
       do: {:keep_state_and_data, reply(from, {:error, :reentrant_turn})},
       else: {:keep_state, %{data | ready_waiters: [from | data.ready_waiters]}}
   end
@@ -1474,7 +1474,7 @@ defmodule Jido.AgentServer do
         limit: data.max_postponed_signals,
         message_queue_len: mailbox
       },
-      active: Core.active_status(data.active, phase),
+      active: Lifecycle.active_status(data.active, phase),
       waits: if(data.active, do: data.active.waits, else: [])
     }
 
@@ -1527,7 +1527,7 @@ defmodule Jido.AgentServer do
       id != :active and id != data.active.turn_id and id != data.active.handoff_receipt.id ->
         {:keep_state_and_data, reply(from, {:error, :stale_turn})}
 
-      Core.reentrant?(type, data) ->
+      Lifecycle.reentrant?(type, data) ->
         {:keep_state_and_data, reply(from, {:error, :reentrant_turn})}
 
       true ->
@@ -1549,7 +1549,7 @@ defmodule Jido.AgentServer do
       id != :active and id != data.active.turn_id and id != data.active.handoff_receipt.id ->
         {:keep_state_and_data, reply(from, {:error, :stale_turn})}
 
-      Core.reentrant?(type, data) ->
+      Lifecycle.reentrant?(type, data) ->
         {:keep_state_and_data, reply(from, {:error, :reentrant_turn})}
 
       true ->
@@ -1617,7 +1617,7 @@ defmodule Jido.AgentServer do
           id != handoff_predecessor_id(data.active) ->
         {:keep_state_and_data, reply(from, {:error, :stale_turn})}
 
-      Core.reentrant?(type, data) ->
+      Lifecycle.reentrant?(type, data) ->
         {:keep_state_and_data, reply(from, {:error, :reentrant_turn})}
 
       true ->
@@ -1639,7 +1639,7 @@ defmodule Jido.AgentServer do
         remaining = remaining_wait(data.active.deadline)
 
         timer =
-          Process.send_after(self(), {:turn_timeout, id}, min(remaining, Core.max_timeout()))
+          Process.send_after(self(), {:turn_timeout, id}, min(remaining, Lifecycle.max_timeout()))
 
         {:keep_state, put_in(data.active.timer, timer)}
     end
@@ -1679,7 +1679,7 @@ defmodule Jido.AgentServer do
         queued_from: Map.delete(data.queued_from, token)
     }
 
-    case Core.admission_status(deadline) do
+    case Lifecycle.admission_status(deadline) do
       :ok -> start_turn(type, signal, context, data, :turn, reply_gate)
       {:error, reason} -> reject_turn(type, reason, data, reply_gate)
     end
@@ -1701,9 +1701,9 @@ defmodule Jido.AgentServer do
            ] and
              (type == :cast or (is_tuple(type) and elem(type, 0) == :call)) do
     admission =
-      if Core.reentrant?(type, data),
+      if Lifecycle.reentrant?(type, data),
         do: {:error, :reentrant_turn},
-        else: Core.admission_status(deadline)
+        else: Lifecycle.admission_status(deadline)
 
     case admission do
       {:error, reason} ->
@@ -2204,7 +2204,7 @@ defmodule Jido.AgentServer do
       timer:
         if(timeout == :infinity,
           do: nil,
-          else: Process.send_after(self(), {:turn_timeout, turn_id}, min(timeout, Core.max_timeout()))
+          else: Process.send_after(self(), {:turn_timeout, turn_id}, min(timeout, Lifecycle.max_timeout()))
         )
     }
 
@@ -2320,8 +2320,8 @@ defmodule Jido.AgentServer do
   defp start_durable_worker(data) do
     data = put_in(data.active.worker_id, DurableTurn.identity(data))
     owner = self()
-    hooks = Core.execution_hooks(Keyword.get(data.exec_opts, :hooks, []), TraceContext.get())
-    policy = Core.execution_policy(data.exec_opts)
+    hooks = Lifecycle.execution_hooks(Keyword.get(data.exec_opts, :hooks, []), TraceContext.get())
+    policy = Lifecycle.execution_policy(data.exec_opts)
 
     durable_operation(:durable_start, data, fn ->
       DurableTurn.start(data, owner, hooks, policy)
@@ -2563,7 +2563,7 @@ defmodule Jido.AgentServer do
     active = %{data.active | worker: worker, worker_ref: Process.monitor(worker)}
     runner = data.runner
     id = active.worker_id
-    policy = Core.execution_policy(data.exec_opts)
+    policy = Lifecycle.execution_policy(data.exec_opts)
 
     case ServerSupervisor.remember_execution(data.activation_state, runner, id, worker) do
       :ok ->
@@ -2812,7 +2812,7 @@ defmodule Jido.AgentServer do
              max_concurrency: Keyword.get(exec_opts, :max_concurrency, 1),
              checkpoint_strategy: :manual,
              runnable_order: &execution_order/1,
-             hooks: Core.execution_hooks(Keyword.get(exec_opts, :hooks, []), TraceContext.get()),
+             hooks: Lifecycle.execution_hooks(Keyword.get(exec_opts, :hooks, []), TraceContext.get()),
              on_complete: fn ^id, _workflow -> send(owner, {:worker_complete, id}) end
            ) do
       {:ok, worker, input, instruction.context}
@@ -2913,7 +2913,7 @@ defmodule Jido.AgentServer do
   end
 
   defp postpone_turn(type, token, data, reply_gate \\ nil) do
-    case Core.queue_decision(data.postponed, token, data.max_postponed_signals) do
+    case Lifecycle.queue_decision(data.postponed, token, data.max_postponed_signals) do
       :duplicate ->
         {:keep_state_and_data, [:postpone]}
 
@@ -3159,8 +3159,8 @@ defmodule Jido.AgentServer do
                 turn_id: data.active.turn_id
               )
 
-          status = Core.outcome_status(reason)
-          errors = Core.next_error_count(status, data.error_count)
+          status = Lifecycle.outcome_status(reason)
+          errors = Lifecycle.next_error_count(status, data.error_count)
           {%{data | error_count: errors}, status, data.active.failure_stage || :cleaning, 0}
       end
 
@@ -3350,7 +3350,7 @@ defmodule Jido.AgentServer do
 
   defp record_outcome(data, status, stage, committed, count) do
     active = data.active
-    outcome = Core.outcome(active, data.state_version, status, stage, committed, count)
+    outcome = Lifecycle.outcome(active, data.state_version, status, stage, committed, count)
 
     metadata = %{
       status: telemetry_status(status),
@@ -3384,7 +3384,7 @@ defmodule Jido.AgentServer do
       measurements
     )
 
-    history = Core.retain_history(data.history, outcome, data.debug, data.debug_max_events)
+    history = Lifecycle.retain_history(data.history, outcome, data.debug, data.debug_max_events)
 
     data
     |> Map.merge(%{last_outcome: outcome, history: history})
@@ -3396,7 +3396,7 @@ defmodule Jido.AgentServer do
   defp telemetry_status(status), do: status
 
   defp apply_failure_policy(data) do
-    case Core.failure_decision(data.error_policy, data.error_count, data.active.signal_type) do
+    case Lifecycle.failure_decision(data.error_policy, data.error_count, data.active.signal_type) do
       {:complete, decision} -> complete_terminal(data, decision)
       :run -> run_failure_policy(data)
     end
@@ -3505,7 +3505,7 @@ defmodule Jido.AgentServer do
               Process.send_after(
                 self(),
                 {:turn_timeout, data.active.turn_id},
-                min(timeout, Core.max_timeout())
+                min(timeout, Lifecycle.max_timeout())
               )
           )
     }
@@ -3570,10 +3570,10 @@ defmodule Jido.AgentServer do
   defp control_caller?(from, data) do
     {caller, _} = from
 
-    Core.reentrant?({:call, from}, data) or Core.bootstrap_caller?(from, data) or
+    Lifecycle.reentrant?({:call, from}, data) or Lifecycle.bootstrap_caller?(from, data) or
       Enum.any?([data.parent_effect, data.control], fn operation ->
         operation != nil and operation.task != nil and
-          Core.owned_process?(caller, operation.task.pid, [], 0)
+          Lifecycle.owned_process?(caller, operation.task.pid, [], 0)
       end)
   end
 
@@ -3780,7 +3780,7 @@ defmodule Jido.AgentServer do
   defp arm_wait_timer(%{active: %{wait_deadline: deadline}} = data) when is_integer(deadline) do
     data = cancel_wait_timer(data)
     token = make_ref()
-    delay = min(Core.max_timeout(), max(0, deadline - System.system_time(:millisecond)))
+    delay = min(Lifecycle.max_timeout(), max(0, deadline - System.system_time(:millisecond)))
     timer = Process.send_after(self(), {:wait_wake, data.active.turn_id, token}, delay)
     data |> put_in([:active, :wait_timer], timer) |> put_in([:active, :wait_token], token)
   end

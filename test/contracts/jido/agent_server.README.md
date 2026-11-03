@@ -28,6 +28,6 @@ ownership. Durable Agent state and durable Flow progress have separate owners.
 The obligation register is [`obligations.md`](obligations.md). Current scope
 decisions are in [`decisions.yml`](decisions.yml).
 
-The root mutation profile targets `Jido.AgentServer.Core`. The Handoff profile
+The root mutation profile targets `Jido.AgentServer.Lifecycle`. The Handoff profile
 targets the shared `Jido.AgentServer` state-machine coordinator. Each other
 AgentServer subcomponent has its own focused mutation profile.

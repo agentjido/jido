@@ -5,7 +5,7 @@ defmodule JidoTest.AgentServer.PoliciesTest do
   use Covenant.Case, component: "jido.agent_server", async: false
 
   alias Jido.AgentServer, as: Server
-  alias Jido.AgentServer.Core
+  alias Jido.AgentServer.Lifecycle
   alias Jido.Error.ValidationError
   alias Jido.Trace
   alias Jido.Trace.Context
@@ -90,7 +90,7 @@ defmodule JidoTest.AgentServer.PoliciesTest do
 
   @tag obligation: ["jido.agent_server.I27", "jido.agent_server.I28"]
   test "execution policy defaults and hook adapters preserve their exact values", _c do
-    assert Core.execution_policy([]) == %{
+    assert Lifecycle.execution_policy([]) == %{
              timeout_ms: :infinity,
              max_retries: 0,
              backoff: :none,
@@ -100,7 +100,7 @@ defmodule JidoTest.AgentServer.PoliciesTest do
              retry_if: {Jido.Error, :retryable?, []}
            }
 
-    assert Core.execution_policy(
+    assert Lifecycle.execution_policy(
              timeout: 10,
              max_attempts: 3,
              backoff: :linear,
@@ -120,7 +120,7 @@ defmodule JidoTest.AgentServer.PoliciesTest do
     trace = Trace.new()
 
     hooks =
-      Core.execution_hooks(
+      Lifecycle.execution_hooks(
         [
           on_dispatch: fn runnable, state ->
             send(observer, {:dispatch, runnable, state})
@@ -148,7 +148,7 @@ defmodule JidoTest.AgentServer.PoliciesTest do
     assert_received {:transform, [:original], :transform_state}
     Context.clear()
 
-    failing = Core.execution_hooks([on_idle: fn _ -> raise "PRIVATE_HOOK" end], nil)
+    failing = Lifecycle.execution_hooks([on_idle: fn _ -> raise "PRIVATE_HOOK" end], nil)
 
     logs =
       ExUnit.CaptureLog.capture_log(fn ->
@@ -161,27 +161,27 @@ defmodule JidoTest.AgentServer.PoliciesTest do
 
   @tag obligation: "jido.agent_server.I30"
   test "failure policy selection distinguishes failures, cancellation, and error reports", _c do
-    assert Core.next_error_count(:failed, 2) == 3
-    assert Core.next_error_count(:cancelled, 2) == 2
-    assert Core.next_error_count(:timed_out, 2) == 2
+    assert Lifecycle.next_error_count(:failed, 2) == 3
+    assert Lifecycle.next_error_count(:cancelled, 2) == 2
+    assert Lifecycle.next_error_count(:timed_out, 2) == 2
 
-    assert Core.failure_decision(:log_only, 1, "work") == {:complete, :continue}
+    assert Lifecycle.failure_decision(:log_only, 1, "work") == {:complete, :continue}
 
-    assert Core.failure_decision(:stop_on_error, 1, "work") ==
+    assert Lifecycle.failure_decision(:stop_on_error, 1, "work") ==
              {:complete, {:stop, :agent_error}}
 
-    assert Core.failure_decision({:max_errors, 2}, 1, "work") == {:complete, :continue}
+    assert Lifecycle.failure_decision({:max_errors, 2}, 1, "work") == {:complete, :continue}
 
-    assert Core.failure_decision({:max_errors, 2}, 2, "work") ==
+    assert Lifecycle.failure_decision({:max_errors, 2}, 2, "work") ==
              {:complete, {:stop, :max_agent_errors}}
 
-    assert Core.failure_decision(
+    assert Lifecycle.failure_decision(
              {:emit_signal, {:pid, target: self()}},
              1,
              "jido.agent_server.error"
            ) == {:complete, :continue}
 
-    assert Core.failure_decision(fn _, _ -> :continue end, 1, "work") == :run
+    assert Lifecycle.failure_decision(fn _, _ -> :continue end, 1, "work") == :run
   end
 
   @tag obligation: "jido.agent_server.I27"

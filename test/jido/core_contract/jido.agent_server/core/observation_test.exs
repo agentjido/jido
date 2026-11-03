@@ -5,7 +5,7 @@ defmodule JidoTest.AgentServer.ObservationTest do
   use Covenant.Case, component: "jido.agent_server", async: false
 
   alias Jido.AgentServer, as: Server
-  alias Jido.AgentServer.Core
+  alias Jido.AgentServer.Lifecycle
   alias Jido.Signal.Context, as: SignalContext
   alias Jido.Trace
   alias JidoTest.AgentServer.Fixtures, as: F
@@ -20,7 +20,7 @@ defmodule JidoTest.AgentServer.ObservationTest do
       abs(System.monotonic_time()) + System.convert_time_unit(1, :second, :native)
 
     outcome =
-      Core.outcome(
+      Lifecycle.outcome(
         %{turn_id: "turn", signal_id: "signal", start_version: 0, span: %{at: future}},
         0,
         :failed,

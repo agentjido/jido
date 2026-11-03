@@ -5,7 +5,7 @@ defmodule JidoTest.AgentServer.OwnershipTest do
   use Covenant.Case, component: "jido.agent_server", async: false
 
   alias Jido.AgentServer, as: Server
-  alias Jido.AgentServer.Core
+  alias Jido.AgentServer.Lifecycle
   alias JidoTest.AgentServer.Fixtures, as: F
 
   setup do
@@ -25,24 +25,24 @@ defmodule JidoTest.AgentServer.OwnershipTest do
     data = %{active: %{worker: root, operation: nil}}
     bootstrap = %{bootstrap: %{task: %{pid: root}}}
 
-    assert Core.reentrant?({:call, {eighth, make_ref()}}, data)
-    refute Core.reentrant?({:call, {ninth, make_ref()}}, data)
-    assert Core.bootstrap_caller?({eighth, make_ref()}, bootstrap)
-    refute Core.bootstrap_caller?({ninth, make_ref()}, bootstrap)
+    assert Lifecycle.reentrant?({:call, {eighth, make_ref()}}, data)
+    refute Lifecycle.reentrant?({:call, {ninth, make_ref()}}, data)
+    assert Lifecycle.bootstrap_caller?({eighth, make_ref()}, bootstrap)
+    refute Lifecycle.bootstrap_caller?({ninth, make_ref()}, bootstrap)
 
     first = Enum.at(chain, -2)
-    assert Core.owned_process?(first, root, [], 7)
-    assert Core.owned_process?(first, root, [], 8) === false
-    assert Core.owned_process?(self(), root, [], 0) === false
-    assert Core.owned_process?(first, root, [first], 0) === false
-    assert Core.reentrant?(:cast, data) === false
-    assert Core.reentrant?({:call, {self(), make_ref()}}, %{active: nil}) === false
-    assert Core.bootstrap_caller?({self(), make_ref()}, %{bootstrap: nil}) === false
+    assert Lifecycle.owned_process?(first, root, [], 7)
+    assert Lifecycle.owned_process?(first, root, [], 8) === false
+    assert Lifecycle.owned_process?(self(), root, [], 0) === false
+    assert Lifecycle.owned_process?(first, root, [first], 0) === false
+    assert Lifecycle.reentrant?(:cast, data) === false
+    assert Lifecycle.reentrant?({:call, {self(), make_ref()}}, %{active: nil}) === false
+    assert Lifecycle.bootstrap_caller?({self(), make_ref()}, %{bootstrap: nil}) === false
 
     dead = caller_process([root])
     Process.exit(dead, :kill)
     F.down(dead)
-    assert Core.owned_process?(dead, root, [], 0) === false
+    assert Lifecycle.owned_process?(dead, root, [], 0) === false
 
     Enum.each(chain, &Process.exit(&1, :kill))
   end

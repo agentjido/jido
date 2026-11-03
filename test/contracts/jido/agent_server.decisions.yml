@@ -30,13 +30,13 @@
 
 - id: agent-server-core-mutation-owner
   date: 2026-10-20
-  decision: Target Jido.AgentServer.Core in the final jido.agent_server mutation profile. Keep Jido.AgentServer as the public API and shared gen_statem coordinator, covered through public contract tests and the focused profiles of each behavior owner.
-  driver: Mutating the shared coordinator repeats activation, effects, Plugin runtime, composition, durable state, and durable Flow behavior. Core now owns the request, admission, execution-policy, ownership, queue, terminal-summary, and failure-policy decisions that belong only to this component.
+  decision: Target Jido.AgentServer.Lifecycle in the final jido.agent_server mutation profile. Keep Jido.AgentServer as the public API and shared gen_statem coordinator, covered through public contract tests and the focused profiles of each behavior owner.
+  driver: Mutating the shared coordinator repeats activation, effects, Plugin runtime, composition, durable state, and durable Flow behavior. Lifecycle now owns the request, admission, execution-policy, ownership, queue, terminal-summary, and failure-policy decisions that belong only to this component.
   approved_by: Component hardening pass
 
 - id: agent-server-handoff-mutation-exception
   date: 2026-10-26
-  decision: Keep Jido.AgentServer.Core as the root mutation target, and target Jido.AgentServer itself in the focused jido.agent_server.handoff component.
+  decision: Keep Jido.AgentServer.Lifecycle as the root mutation target, and target Jido.AgentServer itself in the focused jido.agent_server.handoff component.
   driver: Handoff queue, reply, timeout, cancellation, and persistence ordering live in the shared coordinator and cannot be evaluated through the durable_turn module alone.
   approved_by: Handoff hardening audit
 
@@ -46,8 +46,8 @@
   driver: The root contract now contains only core request, Turn, cancellation, failure-policy, control, and observation promises. Its full mutation profile has no surviving valid mutant.
   approved_by: Component hardening pass
 
-- id: agent-server-public-facade
+- id: agent-server-public-boundary
   date: 2026-10-22
-  decision: Keep Jido.AgentServer as the one documented runtime facade. Keep Core, Pending, Store, callbacks, and focused owner implementations internal. Treat direct function options and Jido instance defaults as the authoring surface; AgentServer has no separate DSL.
+  decision: Keep Jido.AgentServer as the documented runtime owner and API. Keep Lifecycle, Pending, Store, callbacks, and focused owner implementations internal. Treat direct function options and Jido instance defaults as the authoring surface; AgentServer has no separate DSL.
   driver: The runtime needs one stable API without making the shared coordinator or its behavior owners public contracts.
   approved_by: Component hardening pass

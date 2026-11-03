@@ -5,7 +5,7 @@ defmodule JidoTest.AgentServer.StartupTest do
   use Covenant.Case, component: "jido.agent_server", async: false
 
   alias Jido.AgentServer, as: Server
-  alias Jido.AgentServer.Core
+  alias Jido.AgentServer.Lifecycle
   alias JidoTest.AgentServer.Fixtures, as: F
   alias JidoTest.ScheduledOccurrenceFixtures.FastRuntimeAgent
 
@@ -253,7 +253,7 @@ defmodule JidoTest.AgentServer.StartupTest do
     assert {:error,
             %{
               message: "timeout must be in 0..4294967295 milliseconds or :infinity"
-            }} = Core.validate_wait(-1)
+            }} = Lifecycle.validate_wait(-1)
 
     assert {:error, %{message: ":turn_id and :trace_context are reserved"}} =
              Server.call(server, F.signal(), context: %{trace_context: %{}})

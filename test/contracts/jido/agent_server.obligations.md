@@ -1,6 +1,6 @@
 ---
 modules:
-  - Jido.AgentServer.Core
+  - Jido.AgentServer.Lifecycle
 ---
 
 ## Purpose
@@ -85,7 +85,7 @@ instance options and direct function options are its authoring surface.
 ### jido.agent_server.I9 — Public API boundary
 
 - **scope:** documented `Jido.AgentServer` functions and types
-- **must:** Keep one exact documented facade for lifecycle, requests, control, observation, Plugin state, composition, and durability. Keep the owner-bound pending handle opaque. Keep `Core`, `Pending`, `Store`, state-machine callbacks, and owner implementation modules internal. Do not add a second AgentServer DSL or expose coordinator internals.
+- **must:** Keep one exact documented API for lifecycle, requests, control, observation, Plugin state, composition, and durability. Keep the owner-bound pending handle opaque. Keep `Lifecycle`, `Pending`, `Store`, state-machine callbacks, and owner implementation modules internal. Do not add a second AgentServer DSL or expose coordinator internals.
 - **why:** Users need one stable runtime entry point while focused components retain behavior ownership.
 - **kind:** functional
 - **status:** active

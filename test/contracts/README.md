@@ -23,7 +23,7 @@ tests with its obligation tags.
 | `jido.instance` | Jido instance supervision, namespace, options, and Ref routing | `test/contract/jido.instance/` |
 | `jido.agent` | Agent model, authoring, validation, logical topology, and edits | `test/contract/jido.agent/` |
 | `jido.agent_evaluation` | Pure Agent evaluation and candidate production | `test/contract/jido.agent_evaluation/` |
-| `jido.agent_server` | Core transient serialized Turn worker | `test/contract/jido.agent_server/core/` |
+| `jido.agent_server` | Transient serialized Turn lifecycle | `test/contract/jido.agent_server/core/` |
 | `jido.agent_server.activation` | Activation root, readiness, identity, and local recovery | `test/contract/jido.agent_server/activation/` |
 | `jido.agent_server.effects` | Ordered post-commit effects | `test/contract/jido.agent_server/effects/` |
 | `jido.agent_server.plugin_runtime` | Live generic Plugin hosting | `test/contract/jido.agent_server/plugin_runtime/` |
@@ -148,7 +148,7 @@ Directives. It does not own live AgentServer state or effect dispatch.
 
 `jido.agent_server` owns core request, admission, Turn, cancellation,
 failure-policy, and bounded observation behavior. Its mutation profile targets
-`Jido.AgentServer.Core`. The public `Jido.AgentServer` state-machine
+`Jido.AgentServer.Lifecycle`. The public `Jido.AgentServer` state-machine
 coordinator is covered through public contract tests and the focused profiles
 of each AgentServer behavior owner.
 

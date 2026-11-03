@@ -5,7 +5,7 @@ defmodule JidoTest.AgentServer.RequestsTest do
   use Covenant.Case, component: "jido.agent_server", async: false
 
   alias Jido.AgentServer, as: Server
-  alias Jido.AgentServer.Core
+  alias Jido.AgentServer.Lifecycle
   alias Jido.Error.ValidationError
   alias JidoTest.AgentServer.Fixtures, as: F
 
@@ -239,10 +239,10 @@ defmodule JidoTest.AgentServer.RequestsTest do
 
   @tag obligation: "jido.agent_server.I15"
   test "admission deadlines reject clocks from another node", _c do
-    assert Core.admission_timeout([]) == {:ok, 5_000}
-    assert Core.admission_timeout(admission_timeout: :infinity) == {:ok, :infinity}
+    assert Lifecycle.admission_timeout([]) == {:ok, 5_000}
+    assert Lifecycle.admission_timeout(admission_timeout: :infinity) == {:ok, :infinity}
 
-    assert Core.admission_status({:foreign_node, 0}) ==
+    assert Lifecycle.admission_status({:foreign_node, 0}) ==
              {:error, :admission_clock_unavailable}
   end
 

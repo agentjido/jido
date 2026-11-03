@@ -4,7 +4,7 @@ defmodule Jido.AgentServer.Topology do
   alias Jido.Agent
   alias Jido.Agent.Topology, as: AgentTopology
   alias Jido.AgentServer, as: Server
-  alias Jido.AgentServer.{Core, Effects}
+  alias Jido.AgentServer.{Lifecycle, Effects}
   alias Jido.AgentServer.Supervisor, as: ServerSupervisor
   alias Jido.Signal.Bus
 
@@ -601,7 +601,7 @@ defmodule Jido.AgentServer.Topology do
   end
 
   defp valid_server_options?(opts) do
-    Core.unique_keyword?(opts) and Keyword.keys(opts) -- Core.runtime_keys() == []
+    Lifecycle.unique_keyword?(opts) and Keyword.keys(opts) -- Lifecycle.runtime_keys() == []
   end
 
   defp plans(state) do

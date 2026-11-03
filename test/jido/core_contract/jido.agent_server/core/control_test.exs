@@ -6,7 +6,7 @@ defmodule JidoTest.AgentServer.ControlTest do
 
   import JidoTest.Eventually
   alias Jido.AgentServer, as: Server
-  alias Jido.AgentServer.Core
+  alias Jido.AgentServer.Lifecycle
   alias JidoTest.AgentServer.Fixtures, as: F
   alias JidoTest.Persistence.ProbeStore
 
@@ -176,15 +176,15 @@ defmodule JidoTest.AgentServer.ControlTest do
     end
 
     assert {:error, %{message: "invalid control options"}} =
-             Core.control_options([{:active, :finish} | :invalid])
+             Lifecycle.control_options([{:active, :finish} | :invalid])
 
     assert {:error, %{message: "invalid control options"}} =
-             Core.control_options(active: :finish, active: :finish)
+             Lifecycle.control_options(active: :finish, active: :finish)
 
-    assert Core.control_options([]) == {:ok, :finish, 5_000}
-    assert Core.control_options(active: :cancel, timeout: 7) == {:ok, :cancel, 7}
-    assert Core.control_wait(5_000) == 6_000
-    assert Core.control_wait(4_294_967_295) == 4_294_967_295
+    assert Lifecycle.control_options([]) == {:ok, :finish, 5_000}
+    assert Lifecycle.control_options(active: :cancel, timeout: 7) == {:ok, :cancel, 7}
+    assert Lifecycle.control_wait(5_000) == 6_000
+    assert Lifecycle.control_wait(4_294_967_295) == 4_294_967_295
   end
 
   @tag obligation: "jido.agent_server.I87"

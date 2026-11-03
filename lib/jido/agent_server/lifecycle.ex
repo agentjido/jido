@@ -1,4 +1,4 @@
-defmodule Jido.AgentServer.Core do
+defmodule Jido.AgentServer.Lifecycle do
   @moduledoc false
 
   @max_timeout 4_294_967_295
