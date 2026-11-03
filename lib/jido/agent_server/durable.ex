@@ -2,6 +2,7 @@ defmodule Jido.AgentServer.Durable do
   @moduledoc false
 
   alias Jido.AgentServer.{DurableTurn, Supervisor, Topology}
+  alias Jido.Exec.Continuation
 
   @max_timeout 4_294_967_295
 
@@ -96,7 +97,7 @@ defmodule Jido.AgentServer.Durable do
   # not prove that predecessor effects finished. Recovery must not replay those
   # effects or start the successor across that uncertain boundary.
   defp settle_unreleased_handoff(data, config, agent, revision, %{status: :accepted} = turn) do
-    failed = %{turn | status: :failed}
+    failed = Continuation.put_status!(turn, :failed)
     runtime = %{data | persistence: config}
 
     with :ok <- save(runtime, agent, revision + 1, revision, failed),

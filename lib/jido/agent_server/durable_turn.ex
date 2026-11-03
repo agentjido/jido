@@ -3,8 +3,7 @@ defmodule Jido.AgentServer.DurableTurn do
 
   alias __MODULE__.{CheckpointStore, WaitHost}
   alias Runic.Runner
-  alias Jido.Exec.Runtime
-  alias Jido.Flow.Definition
+  alias Jido.Exec.{Continuation, Runtime}
 
   def instruction(prepared),
     do: Jido.Instruction.resolve(prepared.turn.executable, prepared.turn.input, prepared.context)
@@ -12,30 +11,27 @@ defmodule Jido.AgentServer.DurableTurn do
   def accept(data, prepared) do
     with {:ok, instruction} <- flow_instruction(prepared),
          {:ok, _} <- validate_input(instruction),
-         receipt = %{
-           id: data.active.turn_id,
-           signal: data.active.source_signal,
-           admitted_signal: prepared.signal,
-           context:
-             Map.drop(prepared.context, [
-               :agent_id,
-               :agent_module,
-               :agent_signal_source,
-               :agent_state,
-               :agent_topology,
-               :plugin_inputs,
-               :signal,
-               :turn_id,
-               :trace_context
-             ]),
-           plugin_inputs: prepared.context.plugin_inputs,
-           fingerprint: fingerprint(instruction.target),
-           status: :running,
-           expires_at: expires_at(data.active)
-         },
-         :ok <- Jido.Codec.Term.validate(receipt, :server_turn) do
-      {:ok, receipt}
-    end
+         do:
+           Continuation.running(%{
+             id: data.active.turn_id,
+             signal: data.active.source_signal,
+             admitted_signal: prepared.signal,
+             context:
+               Map.drop(prepared.context, [
+                 :agent_id,
+                 :agent_module,
+                 :agent_signal_source,
+                 :agent_state,
+                 :agent_topology,
+                 :plugin_inputs,
+                 :signal,
+                 :turn_id,
+                 :trace_context
+               ]),
+             plugin_inputs: prepared.context.plugin_inputs,
+             target: instruction.target,
+             expires_at: expires_at(data.active)
+           })
   end
 
   def restore(agent, receipt, context, specs) do
@@ -49,35 +45,33 @@ defmodule Jido.AgentServer.DurableTurn do
              [],
              specs
            ),
-         :ok <- compatible(prepared, receipt),
+         {:ok, instruction} <- flow_instruction(prepared),
+         :ok <- Continuation.compatible(receipt, instruction),
          do: {:ok, prepared}
   end
 
   def accept_handoff(data, %Jido.Instruction{} = instruction) do
-    receipt = %{
-      id: data.active.handoff_id,
-      signal: data.active.source_signal,
-      context: data.active.turn_context,
-      fingerprint: instruction_fingerprint(instruction),
-      status: :accepted,
-      instruction: instruction,
-      chain_id: data.active.chain_id,
-      chain_order: data.active.chain_order + 1,
-      predecessor_id: data.active.turn_id
-    }
-
-    validate_receipt(data, receipt)
+    with {:ok, receipt} <-
+           Continuation.accept_handoff(%{
+             id: data.active.handoff_id,
+             signal: data.active.source_signal,
+             context: data.active.turn_context,
+             instruction: instruction,
+             chain_id: data.active.chain_id,
+             chain_order: data.active.chain_order + 1,
+             predecessor_id: data.active.turn_id
+           }),
+         do: validate_receipt(data, receipt)
   end
 
   def release_handoff(data, receipt, prepared) do
-    released =
-      receipt
-      |> Map.put(:status, :released)
-      |> Map.put(:expires_at, expires_at(data.active))
-      |> Map.put(:admitted_signal, prepared.signal)
-      |> Map.put(:plugin_inputs, prepared.context.plugin_inputs)
-
-    validate_receipt(data, released)
+    with {:ok, released} <-
+           Continuation.release_handoff(receipt, %{
+             expires_at: expires_at(data.active),
+             admitted_signal: prepared.signal,
+             plugin_inputs: prepared.context.plugin_inputs
+           }),
+         do: validate_receipt(data, released)
   end
 
   def restore_handoff(agent, receipt, context, specs) do
@@ -92,11 +86,8 @@ defmodule Jido.AgentServer.DurableTurn do
              [],
              specs
            ),
-         true <- instruction_fingerprint(receipt.instruction) == receipt.fingerprint do
+         :ok <- Continuation.compatible(receipt, receipt.instruction) do
       {:ok, prepared}
-    else
-      false -> {:error, :execution_definition_changed}
-      error -> error
     end
   end
 
@@ -111,15 +102,6 @@ defmodule Jido.AgentServer.DurableTurn do
   end
 
   def validate_restore(_agent, _receipt), do: :ok
-
-  def compatible(prepared, receipt) do
-    with {:ok, instruction} <- flow_instruction(prepared),
-         true <- fingerprint(instruction.target) == receipt.fingerprint do
-      :ok
-    else
-      _ -> {:error, :execution_definition_changed}
-    end
-  end
 
   def identity(data),
     do: {:jido_execution, Jido.namespace(data.jido), data.partition, data.agent.id, data.active.turn_id}
@@ -318,40 +300,5 @@ defmodule Jido.AgentServer.DurableTurn do
 
   defp validate_receipt(_data, receipt) do
     with :ok <- Jido.Codec.Term.validate(receipt, :server_turn), do: {:ok, receipt}
-  end
-
-  defp instruction_fingerprint(%Jido.Instruction{kind: :flow, target: target}),
-    do: fingerprint(target)
-
-  defp instruction_fingerprint(%Jido.Instruction{kind: :action, target: target}) do
-    :sha256
-    |> :crypto.hash(:erlang.term_to_binary({:action, target, target.module_info(:md5)}, [:deterministic]))
-    |> Base.encode16(case: :lower)
-  end
-
-  def fingerprint(target) do
-    flow = if is_atom(target), do: target.flow(), else: target
-    versions = versions({:flow, target}, %{}) |> Enum.sort()
-
-    :sha256
-    |> :crypto.hash(:erlang.term_to_binary({flow, versions}, [:deterministic]))
-    |> Base.encode16(case: :lower)
-  end
-
-  defp versions({kind, module}, acc) when kind in [:action, :flow] and is_atom(module) do
-    if Map.has_key?(acc, module) do
-      acc
-    else
-      acc = Map.put(acc, module, module.module_info(:md5))
-      if kind == :flow, do: versions({:flow, module.flow()}, acc), else: acc
-    end
-  end
-
-  defp versions({:flow, %Jido.Flow{} = flow}, acc) do
-    for {_name, node} <- flow.components,
-        {_role, instruction, _params} <- Definition.calls(node),
-        reduce: acc do
-      acc -> versions({instruction.kind, instruction.target}, acc)
-    end
   end
 end

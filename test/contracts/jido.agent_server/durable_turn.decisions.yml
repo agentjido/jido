@@ -1,7 +1,7 @@
 - id: durable-turn-boundary
   date: 2026-10-20
-  decision: Use jido.agent_server.durable_turn for accepted Flow receipts, Runic workflow checkpoints, wait input receipts, wait resolution, and recovery of persistent Flow execution.
-  driver: Agent durability owns complete Agent records, while durable Turn coordination owns progress inside one accepted Flow Turn.
+  decision: Use Jido.Exec.Continuation for portable accepted Flow and Handoff receipts. Use jido.agent_server.durable_turn for Runic workflow checkpoints, wait input receipts, wait resolution, and recovery of persistent Flow execution.
+  driver: Exec owns portable suspension data. AgentServer owns live execution and Persistence owns its durable record.
   approved_by: User-approved Jido V3 component map
 
 - id: durable-turn-code-seam

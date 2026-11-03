@@ -3,6 +3,7 @@ defmodule JidoTest.AgentServer.DurableTurn.PolicyTest do
   use Covenant.Case, component: "jido.agent_server.durable_turn", async: false
 
   alias Jido.AgentServer.DurableTurn
+  alias Jido.Exec.Continuation
   alias JidoTest.DurableFixtures, as: F
 
   defp prepared(agent, type, data) do
@@ -82,7 +83,7 @@ defmodule JidoTest.AgentServer.DurableTurn.PolicyTest do
     assert receipt.admitted_signal == signal
     assert receipt.context == %{custom: %{portable: true}}
     assert receipt.plugin_inputs == %{}
-    assert receipt.fingerprint == DurableTurn.fingerprint(F.Flow)
+    assert receipt.fingerprint == Continuation.fingerprint(F.Flow)
     assert receipt.status == :running
     assert receipt.expires_at in (before + 900)..(after_accept + 1_100)
   end
@@ -97,7 +98,6 @@ defmodule JidoTest.AgentServer.DurableTurn.PolicyTest do
 
     {signal, action} = prepared(agent, "increment", %{})
     assert {:error, :not_durable_flow} = DurableTurn.accept(data(signal), action)
-    assert {:error, :execution_definition_changed} = DurableTurn.compatible(action, %{})
   end
 
   @tag obligation: "jido.agent_server.durable_turn.I1"
@@ -115,7 +115,7 @@ defmodule JidoTest.AgentServer.DurableTurn.PolicyTest do
 
   @tag obligation: "jido.agent_server.durable_turn.I3"
   test "a data Flow has a fingerprint without a module callback" do
-    fingerprint = DurableTurn.fingerprint(F.Flow.flow())
+    fingerprint = Continuation.fingerprint(F.Flow.flow())
     assert is_binary(fingerprint)
     assert byte_size(fingerprint) == 64
   end
@@ -129,16 +129,16 @@ defmodule JidoTest.AgentServer.DurableTurn.PolicyTest do
 
     compile_action(action, 1)
     compile_flow(flow, action, 1)
-    initial = DurableTurn.fingerprint(flow)
+    initial = Continuation.fingerprint(flow)
 
     unload(action)
     compile_action(action, 2)
-    action_changed = DurableTurn.fingerprint(flow)
+    action_changed = Continuation.fingerprint(flow)
     refute action_changed == initial
 
     unload(flow)
     compile_flow(flow, action, 2)
-    refute DurableTurn.fingerprint(flow) == action_changed
+    refute Continuation.fingerprint(flow) == action_changed
   end
 
   @tag obligation: "jido.agent_server.durable_turn.I3"

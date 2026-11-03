@@ -76,6 +76,7 @@ defmodule Jido.AgentServer do
   alias Jido.AgentServer.Command
   alias Jido.Agent.Runner, as: AgentRunner
   alias Jido.Agent.Validation
+  alias Jido.Exec.Continuation
   alias Jido.Signal
   alias Jido.Telemetry.Semantic
   alias Jido.Trace.Context, as: TraceContext
@@ -2746,7 +2747,7 @@ defmodule Jido.AgentServer do
     if data.active.wait_from, do: :gen_statem.reply(data.active.wait_from, {:error, reason})
     data = put_in(data.active.wait_from, nil)
     status = if reason == :cancelled, do: :cancelled, else: :failed
-    receipt = %{data.server_turn | status: status}
+    receipt = Continuation.put_status!(data.server_turn, status)
 
     data =
       data
@@ -2972,7 +2973,7 @@ defmodule Jido.AgentServer do
          %{active: %{persisted: true, durable_finalized: false}} = data,
          {:error, _} = result
        ) do
-    receipt = %{data.server_turn | status: :failed}
+    receipt = Continuation.put_status!(data.server_turn, :failed)
 
     data =
       data
@@ -3057,7 +3058,7 @@ defmodule Jido.AgentServer do
 
     receipt =
       if data.active.persisted,
-        do: %{data.server_turn | status: :completed},
+        do: Continuation.put_status!(data.server_turn, :completed),
         else: data.server_turn
 
     data = %{data | server_turn: receipt}

@@ -8,9 +8,10 @@ modules:
 ## Purpose
 
 Protect persistent Flow progress inside one AgentServer Turn. This component
-owns the saved Turn receipt, Runic workflow checkpoints, wait input receipts,
-and recovery of that execution. It does not own Agent record formats, general
-Agent commits, transient Turn execution, or post-commit effects.
+owns Runic workflow checkpoints, wait input receipts, and recovery of that
+execution. `Jido.Exec.Continuation` owns the portable saved Turn value. This
+component does not own Agent record formats, general Agent commits, transient
+Turn execution, or post-commit effects.
 
 The public boundary is `Jido.AgentServer.deliver_wait/4` together with the
 existing AgentServer Turn, status, and cancellation APIs. The three

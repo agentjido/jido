@@ -178,71 +178,12 @@ defmodule Jido.Persistence.Record do
 
   defp validate_server_turn(nil), do: :ok
 
-  defp validate_server_turn(
-         %{
-           id: id,
-           status: status,
-           signal: %Jido.Signal{},
-           context: context,
-           fingerprint: fingerprint,
-           instruction: %Jido.Instruction{},
-           chain_id: chain_id,
-           chain_order: chain_order,
-           predecessor_id: predecessor_id
-         } = turn
-       )
-       when is_binary(id) and byte_size(id) > 0 and
-              status in [:accepted, :failed, :cancelled] and is_map(context) and
-              is_binary(fingerprint) and is_binary(chain_id) and byte_size(chain_id) > 0 and
-              is_integer(chain_order) and chain_order > 0 and is_binary(predecessor_id) and
-              byte_size(predecessor_id) > 0 and map_size(turn) == 9,
-       do: :ok
-
-  defp validate_server_turn(
-         %{
-           id: id,
-           status: status,
-           signal: %Jido.Signal{},
-           admitted_signal: %Jido.Signal{},
-           context: context,
-           plugin_inputs: inputs,
-           fingerprint: fingerprint,
-           expires_at: expires_at
-         } = turn
-       )
-       when is_binary(id) and byte_size(id) > 0 and
-              status in [:running, :completed, :failed, :cancelled] and
-              is_map(context) and is_map(inputs) and is_binary(fingerprint) and
-              (expires_at == :infinity or is_integer(expires_at)) and map_size(turn) == 8,
-       do: :ok
-
-  defp validate_server_turn(
-         %{
-           id: id,
-           status: status,
-           signal: %Jido.Signal{},
-           admitted_signal: %Jido.Signal{},
-           context: context,
-           plugin_inputs: inputs,
-           fingerprint: fingerprint,
-           expires_at: expires_at,
-           instruction: %Jido.Instruction{},
-           chain_id: chain_id,
-           chain_order: chain_order,
-           predecessor_id: predecessor_id
-         } = turn
-       )
-       when is_binary(id) and byte_size(id) > 0 and
-              status in [:released, :completed, :failed, :cancelled] and
-              is_map(context) and
-              is_map(inputs) and
-              is_binary(fingerprint) and (expires_at == :infinity or is_integer(expires_at)) and
-              is_binary(chain_id) and byte_size(chain_id) > 0 and is_integer(chain_order) and
-              chain_order > 0 and is_binary(predecessor_id) and byte_size(predecessor_id) > 0 and
-              map_size(turn) == 12,
-       do: :ok
-
-  defp validate_server_turn(_), do: invalid(:server_turn)
+  defp validate_server_turn(turn) do
+    case Jido.Exec.Continuation.validate(turn) do
+      :ok -> :ok
+      {:error, _reason} -> invalid(:server_turn)
+    end
+  end
 
   defp validate_checkpoint(record) do
     checkpoint = Map.get(record, :checkpoint)
