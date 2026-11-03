@@ -3,7 +3,7 @@ defmodule JidoTest.AgentServer.DurableTurn.WaitHostTest do
   use Covenant.Case, component: "jido.agent_server.durable_turn", async: true
 
   alias Jido.AgentServer.DurableTurn.WaitHost
-  alias Jido.Exec.{Frame, Waits}
+  alias Jido.Exec.{Frame, Runtime}
   alias Runic.Workflow
   alias Runic.Workflow.{CausalContext, Fact, Runnable}
   alias Runic.Workflow.Events.FactProduced
@@ -37,12 +37,12 @@ defmodule JidoTest.AgentServer.DurableTurn.WaitHostTest do
     {:ok, workflow} = Jido.Exec.compile(flow)
 
     workflow
-    |> Workflow.put_run_context(%{_global: Waits.context(%{}, "execution", 100)})
+    |> Workflow.put_run_context(%{_global: Runtime.wait_context(%{}, "execution", 100)})
     |> Workflow.react_until_satisfied(Frame.new(%{id: 7}))
   end
 
   defp input(workflow, id \\ "one") do
-    [request] = Waits.pending(workflow)
+    [request] = Runtime.pending_waits(workflow)
     %{id: id, event: "approved", payload: %{id: 7}, wait_id: request.id}
   end
 
@@ -68,7 +68,7 @@ defmodule JidoTest.AgentServer.DurableTurn.WaitHostTest do
     workflow = waiting()
     event = input(workflow)
     assert {:ok, accepted} = WaitHost.accept(workflow, event, 101)
-    assert Waits.pending(accepted) == Waits.pending(workflow)
+    assert Runtime.pending_waits(accepted) == Runtime.pending_waits(workflow)
 
     assert [
              %{
@@ -93,7 +93,7 @@ defmodule JidoTest.AgentServer.DurableTurn.WaitHostTest do
              WaitHost.accept(accepted, %{event | payload: %{id: 8}}, 102)
 
     assert {:ok, resolved} = WaitHost.resolve(accepted, 102)
-    assert Waits.pending(resolved) == []
+    assert Runtime.pending_waits(resolved) == []
     assert Workflow.is_runnable?(resolved)
     assert {:ok, ^resolved} = WaitHost.resolve(resolved, 103)
 
@@ -199,7 +199,7 @@ defmodule JidoTest.AgentServer.DurableTurn.WaitHostTest do
   @tag obligation: "jido.agent_server.durable_turn.I8"
   test "an invalid receipt stops resolution before a later wait" do
     workflow = waiting(ParallelWaits)
-    [first, _second] = Waits.pending(workflow)
+    [first, _second] = Runtime.pending_waits(workflow)
 
     invalid = %{
       type: :jido_wait_input,

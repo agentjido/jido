@@ -1,6 +1,7 @@
 defmodule Jido.Exec.Node.Wait do
   @moduledoc false
   alias Jido.Exec.{Frame, ValueResolver}
+  alias Jido.Exec.Wait, as: WaitValue
   alias Runic.Workflow.{Fact, Runnable}
   alias Runic.Workflow.Events.{ActivationConsumed, FactProduced}
 
@@ -38,17 +39,16 @@ defmodule Jido.Exec.Node.Wait do
              {:ok, frame} <- Frame.merge(Jido.Exec.Fact.value(runnable.input_fact)),
              {:ok, options} <-
                resolve_options(node.options, Frame.resolver_state(frame, runtime), now) do
-          request = %{
-            type: :jido_wait_request,
-            version: 1,
-            id: to_string(Runic.Identity.derive(:activation, [execution_id, runnable.activation_id])),
-            execution_id: execution_id,
-            node_hash: node.hash,
-            input_id: runnable.input_fact.hash,
-            path: node.node_path,
-            options: options,
-            opened_at: now
-          }
+          {:ok, request} =
+            WaitValue.record(%{
+              id: to_string(Runic.Identity.derive(:activation, [execution_id, runnable.activation_id])),
+              execution_id: execution_id,
+              node_hash: node.hash,
+              input_id: runnable.input_fact.hash,
+              path: node.node_path,
+              options: options,
+              opened_at: now
+            })
 
           fact =
             Fact.new(

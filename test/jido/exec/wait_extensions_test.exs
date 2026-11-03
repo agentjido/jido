@@ -1,7 +1,7 @@
 defmodule Jido.Exec.WaitExtensionsTest do
   use ExUnit.Case, async: true
 
-  alias Jido.Exec.{Frame, Waits}
+  alias Jido.Exec.{Frame, Runtime, Wait}
   alias Jido.Flow.Ref
   alias Runic.Workflow
 
@@ -23,7 +23,7 @@ defmodule Jido.Exec.WaitExtensionsTest do
     {:ok, workflow} = Jido.Exec.compile(target)
 
     workflow
-    |> Workflow.put_run_context(%{_global: Waits.context(%{}, execution_id, clock)})
+    |> Workflow.put_run_context(%{_global: Runtime.wait_context(%{}, execution_id, clock)})
     |> Workflow.react_until_satisfied(Frame.new(%{id: 7}))
   end
 
@@ -37,17 +37,19 @@ defmodule Jido.Exec.WaitExtensionsTest do
 
   test "host candidates resolve a wait through native replay without running successors" do
     workflow = waiting()
-    [request] = Waits.pending(workflow)
+    [request] = Runtime.pending_waits(workflow)
+    assert %Wait{} = request
+    assert :ok = Jido.Codec.Term.validate(request, :wait)
     refute Map.has_key?(request, :node_hash)
     refute Map.has_key?(request, :input_id)
-    assert Waits.next_deadline(workflow) == 1_100
-    assert Waits.matches?(request, "approved", %{id: 7})
-    refute Waits.matches?(request, "approved", %{id: 8})
-    assert {:ok, resolved} = Waits.resolve(workflow, request.id, [candidate("one", 101)], 102)
-    assert Waits.pending(resolved) == []
+    assert Runtime.next_wait_deadline(workflow) == 1_100
+    assert Wait.matches?(request, "approved", %{id: 7})
+    refute Wait.matches?(request, "approved", %{id: 8})
+    assert {:ok, resolved} = Runtime.resolve_wait(workflow, request.id, [candidate("one", 101)], 102)
+    assert Runtime.pending_waits(resolved) == []
     assert Workflow.is_runnable?(resolved)
     restored = resolved |> Workflow.event_log() |> Workflow.from_events()
-    assert {:ok, ^restored} = Waits.resolve(restored, request.id, [candidate("one", 101)], 103)
+    assert {:ok, ^restored} = Runtime.resolve_wait(restored, request.id, [candidate("one", 101)], 103)
 
     assert {:ok, %{selected: "approved", value: %{id: 7}, input_id: "one"}} =
              restored |> Workflow.react_until_satisfied() |> Jido.Exec.result()
@@ -55,7 +57,7 @@ defmodule Jido.Exec.WaitExtensionsTest do
 
   test "selection uses time, timer priority, receipt order, and option order" do
     workflow = waiting()
-    [request] = Waits.pending(workflow)
+    [request] = Runtime.pending_waits(workflow)
 
     candidates = [
       candidate("later", 102, 0),
@@ -63,12 +65,13 @@ defmodule Jido.Exec.WaitExtensionsTest do
       candidate("first", 101, 1)
     ]
 
-    assert {:ok, resolved} = Waits.resolve(workflow, request.id, candidates, 103)
+    assert {:ok, resolved} = Runtime.resolve_wait(workflow, request.id, candidates, 103)
 
     assert {:ok, %{input_id: "first"}} =
              resolved |> Workflow.react_until_satisfied() |> Jido.Exec.result()
 
-    assert {:ok, resolved} = Waits.resolve(workflow, request.id, [candidate("tie", 1_100)], 1_100)
+    assert {:ok, resolved} =
+             Runtime.resolve_wait(workflow, request.id, [candidate("tie", 1_100)], 1_100)
 
     assert {:ok, %{selected: "expired", value: %{fired_at: 1_100}, input_id: nil}} =
              resolved |> Workflow.react_until_satisfied() |> Jido.Exec.result()
@@ -76,38 +79,41 @@ defmodule Jido.Exec.WaitExtensionsTest do
 
   test "future or unmatched candidates leave the wait open and malformed candidates fail" do
     workflow = waiting()
-    [request] = Waits.pending(workflow)
-    assert {:ok, ^workflow} = Waits.resolve(workflow, request.id, [candidate("future", 103)], 102)
+    [request] = Runtime.pending_waits(workflow)
+
+    assert {:ok, ^workflow} =
+             Runtime.resolve_wait(workflow, request.id, [candidate("future", 103)], 102)
+
     wrong = put_in(candidate("wrong", 101), [:input, :payload], %{id: 8})
-    assert {:ok, ^workflow} = Waits.resolve(workflow, request.id, [wrong], 102)
+    assert {:ok, ^workflow} = Runtime.resolve_wait(workflow, request.id, [wrong], 102)
 
     assert {:error, %{details: %{reason: :invalid_candidate}}} =
-             Waits.resolve(workflow, request.id, [%{}], 102)
+             Runtime.resolve_wait(workflow, request.id, [%{}], 102)
 
     assert {:error, %{details: %{reason: :stale_target}}} =
-             Waits.resolve(workflow, "unknown", [], 102)
+             Runtime.resolve_wait(workflow, "unknown", [], 102)
 
     assert {:error, %{details: %{reason: :invalid_clock}}} =
-             Waits.resolve(workflow, request.id, [], -1)
+             Runtime.resolve_wait(workflow, request.id, [], -1)
   end
 
   test "wait IDs include execution scope even with equal direct inputs" do
-    [first] = Approval |> waiting("first") |> Waits.pending()
+    [first] = Approval |> waiting("first") |> Runtime.pending_waits()
     workflow = waiting(Approval, "second")
-    [second] = Waits.pending(workflow)
+    [second] = Runtime.pending_waits(workflow)
     assert first.id != second.id
     assert first.execution_id == "first"
     assert second.execution_id == "second"
 
     assert {:error, %{details: %{reason: :stale_target}}} =
-             Waits.resolve(workflow, first.id, [candidate("old", 101)], 102)
+             Runtime.resolve_wait(workflow, first.id, [candidate("old", 101)], 102)
   end
 
   test "the host clock is read at opening and wait support does not force durable validation" do
     key = make_ref()
     Process.put(key, 123)
     clock = fn -> Process.get(key) end
-    context = Waits.context(%{custom: true}, "clock", clock)
+    context = Runtime.wait_context(%{custom: true}, "clock", clock)
     assert context.custom
     refute Map.get(context, :__jido_exec_durable__, false)
     Process.put(key, 321)
@@ -118,9 +124,9 @@ defmodule Jido.Exec.WaitExtensionsTest do
       |> Workflow.put_run_context(%{_global: context})
       |> Workflow.react_until_satisfied(Frame.new(%{id: 7}))
 
-    [request] = Waits.pending(workflow)
+    [request] = Runtime.pending_waits(workflow)
     assert request.opened_at == 321
-    assert Waits.next_deadline(workflow) == 1_321
+    assert Runtime.next_wait_deadline(workflow) == 1_321
     assert Workflow.from_events(Workflow.event_log(workflow)).run_context == %{}
     Process.delete(key)
   end
@@ -139,10 +145,13 @@ defmodule Jido.Exec.WaitExtensionsTest do
       |> Workflow.attach_before_hook("decision", hook)
       |> Workflow.attach_after_hook("decision", fn _, _, _ -> raise "must not run" end)
 
-    [request] = Waits.pending(workflow)
-    assert {:ok, resolved} = Waits.resolve(workflow, request.id, [candidate("one", 101)], 102)
+    [request] = Runtime.pending_waits(workflow)
+
+    assert {:ok, resolved} =
+             Runtime.resolve_wait(workflow, request.id, [candidate("one", 101)], 102)
+
     refute_received :unexpected_hook
-    assert Waits.pending(resolved) == []
+    assert Runtime.pending_waits(resolved) == []
 
     assert {:ok, %{selected: "approved"}} =
              resolved |> Workflow.react_until_satisfied() |> Jido.Exec.result()
@@ -160,10 +169,10 @@ defmodule Jido.Exec.WaitExtensionsTest do
 
     workflow =
       workflow
-      |> Workflow.put_run_context(%{_global: Waits.context(%{}, "local", 100)})
+      |> Workflow.put_run_context(%{_global: Runtime.wait_context(%{}, "local", 100)})
       |> Workflow.react_until_satisfied(Jido.Exec.Fact.local_root(Frame.new(%{})))
 
-    [request] = Waits.pending(workflow)
+    [request] = Runtime.pending_waits(workflow)
     pid = self()
 
     candidate = %{
@@ -172,7 +181,7 @@ defmodule Jido.Exec.WaitExtensionsTest do
       order: 0
     }
 
-    assert {:ok, workflow} = Waits.resolve(workflow, request.id, [candidate], 101)
+    assert {:ok, workflow} = Runtime.resolve_wait(workflow, request.id, [candidate], 101)
 
     assert {:ok, %{pid: ^pid}} =
              workflow |> Workflow.react_until_satisfied() |> Jido.Exec.result()
@@ -190,13 +199,13 @@ defmodule Jido.Exec.WaitExtensionsTest do
       })
 
     workflow = waiting(flow)
-    [left, right] = Waits.pending(workflow)
+    [left, right] = Runtime.pending_waits(workflow)
 
     event = fn name, value ->
       %{input: %{id: name, event: name, payload: %{value: value}}, accepted_at: 101, order: 0}
     end
 
-    assert {:ok, workflow} = Waits.resolve(workflow, left.id, [event.("left", 1)], 101)
+    assert {:ok, workflow} = Runtime.resolve_wait(workflow, left.id, [event.("left", 1)], 101)
 
     workflow =
       workflow
@@ -204,8 +213,10 @@ defmodule Jido.Exec.WaitExtensionsTest do
       |> Workflow.event_log()
       |> Workflow.from_events()
 
-    assert Waits.pending(workflow) == [right]
-    assert {:ok, workflow} = Waits.resolve(workflow, right.id, [event.("right", 2)], 102)
+    assert Runtime.pending_waits(workflow) == [right]
+
+    assert {:ok, workflow} =
+             Runtime.resolve_wait(workflow, right.id, [event.("right", 2)], 102)
 
     assert {:ok, %{left: %{value: 1}, right: %{value: 2}}} =
              workflow |> Workflow.react_until_satisfied() |> Jido.Exec.result()

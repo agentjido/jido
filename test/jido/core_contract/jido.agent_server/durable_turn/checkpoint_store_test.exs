@@ -123,6 +123,7 @@ defmodule JidoTest.AgentServer.DurableTurn.CheckpointStoreTest do
 
   @tag obligation: "jido.agent_server.durable_turn.I2"
   test "Runic appends each event batch once and streams committed events in order", c do
+    assert Code.ensure_loaded?(Jido.AgentServer.Store)
     assert Runic.Runner.Store.supports_stream?(Jido.AgentServer.Store)
     assert {:error, :not_found} = Store.stream(c.id, c.jido)
 

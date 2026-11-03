@@ -1,7 +1,8 @@
 defmodule Jido.Exec.Test.WaitHost do
   @moduledoc false
 
-  alias Jido.Exec.{Frame, Portable, Runtime, Waits}
+  alias Jido.Exec.{Frame, Portable, Runtime}
+  alias Jido.Exec.Wait, as: WaitValue
   alias Jido.Exec.Node.Wait
   alias Runic.Workflow
   alias Runic.Workflow.{CausalContext, Fact, Runnable}
@@ -203,7 +204,7 @@ defmodule Jido.Exec.Test.WaitHost do
     resolved =
       Enum.reduce(requests, workflow, fn request, current ->
         candidates = Enum.filter(inputs, &addressed?(&1.input, request))
-        {:ok, next} = Waits.resolve(current, request.id, candidates, state.now)
+        {:ok, next} = Runtime.resolve_wait(current, request.id, candidates, state.now)
         next
       end)
 
@@ -213,7 +214,7 @@ defmodule Jido.Exec.Test.WaitHost do
   end
 
   defp pending(workflow) do
-    if state(workflow).cancelled?, do: [], else: Waits.pending(workflow)
+    if state(workflow).cancelled?, do: [], else: Runtime.pending_waits(workflow)
   end
 
   defp buffered(workflow, now) do
@@ -291,7 +292,10 @@ defmodule Jido.Exec.Test.WaitHost do
   defp runtime(workflow, context, state),
     do:
       Workflow.put_run_context(workflow, %{
-        _global: context |> Runtime.context(true) |> Waits.context(state.execution_id, state.now)
+        _global:
+          context
+          |> Runtime.context(true)
+          |> Runtime.wait_context(state.execution_id, state.now)
       })
 
   defp useful_input?(_workflow, %{path: _path}), do: true
@@ -299,7 +303,7 @@ defmodule Jido.Exec.Test.WaitHost do
   defp useful_input?(workflow, input) do
     Enum.any?(pending(workflow), fn request ->
       addressed?(input, request) and
-        Waits.matches?(request, input.event, input.payload)
+        WaitValue.matches?(request, input.event, input.payload)
     end)
   end
 

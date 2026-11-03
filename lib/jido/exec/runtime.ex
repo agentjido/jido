@@ -1,8 +1,11 @@
 defmodule Jido.Exec.Runtime do
   @moduledoc false
 
-  alias Jido.Exec.{Portable, Validation}
+  alias Jido.Exec.{Frame, Portable, Validation, Wait}
   alias Jido.Instruction
+  alias Runic.Workflow
+  alias Runic.Workflow.{Fact, Invokable, Runnable}
+  alias Runic.Workflow.Events.{ActivationConsumed, FactProduced}
 
   @reserved [
     :__jido_exec_durable__,
@@ -106,4 +109,103 @@ defmodule Jido.Exec.Runtime do
       Portable.validate(instruction.context, :context)
     end
   end
+
+  @doc false
+  @spec wait_context(map(), term(), Wait.clock()) :: map()
+  def wait_context(context, execution_id, clock) when is_map(context) do
+    Map.put(context, :__jido_wait_host__, %{execution_id: execution_id, clock: clock})
+  end
+
+  @doc false
+  @spec pending_waits(Workflow.t()) :: [Wait.t()]
+  def pending_waits(workflow) do
+    closed = MapSet.new(wait_records(workflow, :jido_wait_resolution), & &1.wait_id)
+
+    workflow
+    |> wait_records(:jido_wait_request)
+    |> Enum.reject(&MapSet.member?(closed, &1.id))
+    |> Enum.sort_by(&{&1.path, &1.id})
+    |> Enum.map(&Wait.from_record!/1)
+  end
+
+  @doc false
+  @spec next_wait_deadline(Workflow.t()) :: non_neg_integer() | nil
+  def next_wait_deadline(workflow), do: workflow |> pending_waits() |> Wait.next_deadline()
+
+  @doc false
+  @spec resolve_wait(Workflow.t(), Wait.id(), [Wait.candidate()], non_neg_integer()) ::
+          {:ok, Workflow.t()} | {:error, Exception.t()}
+  def resolve_wait(workflow, wait_id, candidates, now) when is_integer(now) and now >= 0 do
+    with :ok <- Wait.validate_candidates(candidates) do
+      requests = wait_records(workflow, :jido_wait_request)
+      closed = wait_records(workflow, :jido_wait_resolution)
+
+      cond do
+        Enum.any?(closed, &(&1.wait_id == wait_id)) ->
+          {:ok, workflow}
+
+        request = Enum.find(requests, &(&1.id == wait_id)) ->
+          wait = Wait.from_record!(request)
+
+          case Wait.choose(wait, candidates, now) do
+            nil -> {:ok, workflow}
+            choice -> complete_wait(workflow, request, wait, choice)
+          end
+
+        true ->
+          wait_error(:stale_target)
+      end
+    end
+  end
+
+  def resolve_wait(_workflow, _wait_id, _candidates, _now), do: wait_error(:invalid_clock)
+
+  defp complete_wait(workflow, record, wait, choice) do
+    node = Map.fetch!(workflow.graph.vertices, record.node_hash)
+    fact = Map.fetch!(workflow.graph.vertices, record.input_id)
+
+    with {:ok, runnable} <- Invokable.prepare(node, workflow, fact),
+         {:ok, frame} <- Frame.merge(Jido.Exec.Fact.value(fact)) do
+      output =
+        Jido.Exec.Fact.child(fact,
+          value: Frame.put_result(frame, node.component, Wait.result(wait, choice), []),
+          ancestry: {node.hash, fact.hash}
+        )
+
+      resolution =
+        Fact.new(
+          value: %{
+            type: :jido_wait_resolution,
+            version: 1,
+            wait_id: wait.id,
+            path: wait.path,
+            selected: choice.option.name,
+            accepted_at: choice.at,
+            input_id: if(choice.input, do: choice.input.id)
+          },
+          meta: %{jido_wait_record: true},
+          ancestry: {node.hash, fact.hash}
+        )
+
+      events = [
+        FactProduced.new(output,
+          producer_label: :produced,
+          weight: runnable.context.ancestry_depth + 1
+        ),
+        %ActivationConsumed{fact_hash: fact.hash, node_hash: node.hash, from_label: :runnable},
+        FactProduced.new(resolution, producer_label: :state_produced)
+      ]
+
+      {:ok, Workflow.apply_runnable(workflow, Runnable.complete(runnable, output, events))}
+    end
+  end
+
+  defp wait_records(workflow, type) do
+    for %Fact{meta: %{jido_wait_record: true}, value: %{type: ^type} = value} <-
+          Workflow.facts(workflow),
+        do: value
+  end
+
+  defp wait_error(reason),
+    do: {:error, Jido.Error.config_error("wait operation rejected", %{reason: reason})}
 end

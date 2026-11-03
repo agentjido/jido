@@ -4,12 +4,14 @@ defmodule JidoTest.AgentServer.DurableTurn.ApiTest do
   alias Jido.AgentServer, as: Server
   alias Jido.AgentServer.DurableTurn
   alias Jido.AgentServer.DurableTurn.{CheckpointStore, WaitHost}
+  alias Jido.Exec.Wait
   alias Jido.Signal
 
   @tag obligation: "jido.agent_server.durable_turn.I11"
   test "wait delivery stays on the typed AgentServer facade" do
     assert {:function, :deliver_wait, 4} in documented_api(Server)
-    assert {:type, :wait_id, 0} in documented_types(Server)
+    assert {:type, :id, 0} in documented_types(Wait)
+    refute {:type, :wait_id, 0} in documented_types(Server)
 
     for module <- [DurableTurn, CheckpointStore, WaitHost] do
       refute public_module?(module)

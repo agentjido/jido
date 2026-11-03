@@ -1,7 +1,7 @@
 defmodule Jido.AgentServer.DurableTurn.WaitHost do
   @moduledoc false
 
-  alias Jido.Exec.Waits
+  alias Jido.Exec.{Runtime, Wait}
   alias Runic.Workflow
   alias Runic.Workflow.{CausalContext, Fact, Runnable}
   alias Runic.Workflow.Events.FactProduced
@@ -12,13 +12,12 @@ defmodule Jido.AgentServer.DurableTurn.WaitHost do
     floor = acceptance_time(workflow, System.system_time(:millisecond))
 
     context
-    |> Jido.Exec.Runtime.context(true)
-    |> Waits.context(execution_id, fn -> max(System.system_time(:millisecond), floor) end)
+    |> Runtime.context(true)
+    |> Runtime.wait_context(execution_id, fn -> max(System.system_time(:millisecond), floor) end)
   end
 
   def accept(workflow, input, now) do
-    with :ok <- valid_input(input, now),
-         :ok <- Jido.Codec.Term.validate(input, :wait_event) do
+    with :ok <- Wait.validate_input(input, now) do
       receipts = inputs(workflow)
 
       case Enum.find(receipts, &(&1.input.id == input.id)) do
@@ -33,10 +32,10 @@ defmodule Jido.AgentServer.DurableTurn.WaitHost do
     receipts = inputs(workflow)
     now = acceptance_time(workflow, now)
 
-    Enum.reduce_while(Waits.pending(workflow), {:ok, workflow}, fn request, {:ok, current} ->
+    Enum.reduce_while(Runtime.pending_waits(workflow), {:ok, workflow}, fn request, {:ok, current} ->
       candidates = Enum.filter(receipts, &(&1.input.wait_id == request.id))
 
-      case Waits.resolve(current, request.id, candidates, now) do
+      case Runtime.resolve_wait(current, request.id, candidates, now) do
         {:error, _reason} = error -> {:halt, error}
         result -> {:cont, result}
       end
@@ -46,13 +45,13 @@ defmodule Jido.AgentServer.DurableTurn.WaitHost do
   def resolve(_workflow, _now), do: error(:invalid_clock)
 
   defp accept_new(workflow, input, now, receipts) do
-    request = Enum.find(Waits.pending(workflow), &(&1.id == input.wait_id))
+    request = Enum.find(Runtime.pending_waits(workflow), &(&1.id == input.wait_id))
 
     cond do
       is_nil(request) ->
         error(:stale_target)
 
-      not Waits.matches?(request, input.event, input.payload) ->
+      not Wait.matches?(request, input.event, input.payload) ->
         error(:unmatched_input)
 
       length(receipts) >= @input_limit ->
@@ -75,7 +74,7 @@ defmodule Jido.AgentServer.DurableTurn.WaitHost do
 
   defp acceptance_time(workflow, now) do
     accepted = Enum.reduce(inputs(workflow), now, &max(&1.accepted_at, &2))
-    Enum.reduce(Waits.pending(workflow), accepted, &max(&1.opened_at, &2))
+    Enum.reduce(Runtime.pending_waits(workflow), accepted, &max(&1.opened_at, &2))
   end
 
   defp inputs(workflow) do
@@ -107,15 +106,6 @@ defmodule Jido.AgentServer.DurableTurn.WaitHost do
 
     Workflow.apply_runnable(workflow, runnable)
   end
-
-  defp valid_input(%{id: id, event: event, payload: payload, wait_id: wait_id} = input, now)
-       when is_binary(id) and byte_size(id) > 0 and is_binary(event) and byte_size(event) > 0 and
-              is_binary(wait_id) and byte_size(wait_id) > 0 and is_map(payload) and
-              not is_struct(payload) and is_integer(now) and now >= 0 do
-    if map_size(input) == 4, do: :ok, else: error(:invalid_input)
-  end
-
-  defp valid_input(_input, _now), do: error(:invalid_input)
 
   defp error(reason),
     do: {:error, Jido.Error.config_error("wait host rejected operation", %{reason: reason})}

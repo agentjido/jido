@@ -2,7 +2,7 @@ defmodule Jido.AgentServer.DurableTurn.CheckpointStore do
   @moduledoc false
   alias Jido.Persistence.Store
   alias Jido.Exec.Frame.Delta
-  alias Jido.Exec.Waits
+  alias Jido.Exec.Runtime
   alias Jido.AgentServer.DurableTurn.JoinCompletedRef
   alias Runic.Workflow.{Batch, Fact, FactRef, FactResolver, Rehydration}
 
@@ -160,7 +160,7 @@ defmodule Jido.AgentServer.DurableTurn.CheckpointStore do
   end
 
   defp wait_input_hashes(workflow) do
-    pending_ids = workflow |> Waits.pending() |> MapSet.new(& &1.id)
+    pending_ids = workflow |> Runtime.pending_waits() |> MapSet.new(& &1.id)
 
     for %Fact{
           meta: %{jido_wait_record: true},

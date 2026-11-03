@@ -6,8 +6,8 @@
 
 - id: durable-turn-code-seam
   date: 2026-10-20
-  decision: Keep deliver_wait and durable-turn gen_statem transitions in Jido.AgentServer. Type and validate the public wait ID there. Keep Flow coordination in Jido.AgentServer.DurableTurn and keep CheckpointStore and WaitHost under its namespace without compatibility delegates. Keep Flow and wait definition in jido_action; do not add a core DSL.
-  driver: The storage and wait modules have no external production callers and are implementation parts of durable Flow coordination. The AgentServer facade is the stable runtime boundary.
+  decision: Keep deliver_wait and durable-turn gen_statem transitions in Jido.AgentServer. Put the portable wait value, ID, input validation, matching, and deadline data in Jido.Exec.Wait. Put workflow host operations in Jido.Exec.Runtime. Keep durable acceptance and storage in DurableTurn, CheckpointStore, and WaitHost without compatibility delegates.
+  driver: Portable wait data belongs to Exec. AgentServer owns live admission and durable storage owns saved acceptance.
   approved_by: Component hardening pass
 
 - id: durable-turn-obligation-origin

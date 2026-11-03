@@ -3,7 +3,7 @@ defmodule Jido.AgentServer.DurableTurn do
 
   alias __MODULE__.{CheckpointStore, WaitHost}
   alias Runic.Runner
-  alias Jido.Exec.Waits
+  alias Jido.Exec.Runtime
   alias Jido.Flow.Definition
 
   def instruction(prepared),
@@ -164,7 +164,7 @@ defmodule Jido.AgentServer.DurableTurn do
            Keyword.put(options, :run_context, %{
              _global: WaitHost.context(data.active.prepared.context, id, saved)
            }) do
-      if saved && not Runic.Workflow.is_runnable?(saved) && Waits.pending(saved) != [] do
+      if saved && not Runic.Workflow.is_runnable?(saved) && Runtime.pending_waits(saved) != [] do
         waiting(saved)
       else
         with {:ok, worker} <-
@@ -247,7 +247,7 @@ defmodule Jido.AgentServer.DurableTurn do
           with {:ok, settled} <- Runner.get_workflow(runner, id),
                :ok <- portable_facts(settled),
                :ok <- Runner.checkpoint(runner, id) do
-            if Waits.pending(settled) == [], do: :complete, else: waiting(settled)
+            if Runtime.pending_waits(settled) == [], do: :complete, else: waiting(settled)
           end
 
         {:error, :admission_stopped} ->
@@ -279,7 +279,7 @@ defmodule Jido.AgentServer.DurableTurn do
   end
 
   defp waiting(workflow),
-    do: {:waiting, Waits.pending(workflow), Waits.next_deadline(workflow)}
+    do: {:waiting, Runtime.pending_waits(workflow), Runtime.next_wait_deadline(workflow)}
 
   defp now, do: System.system_time(:millisecond)
 
