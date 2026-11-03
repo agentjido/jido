@@ -311,7 +311,7 @@ defmodule Jido.Agent.RouteProjectionTest do
 
   test "a generated Reply runs before a terminal ServerStop", %{jido: jido} do
     before = agent([project_route()])
-    stop = Jido.AgentServer.Directive.server_stop()
+    stop = Jido.Agent.Directive.server_stop()
     {source, _trace} = request(%{reply: %{value: 1}, directives: [stop]})
     {:ok, server} = JidoTest.AgentServerAssertions.start_agent(jido, before)
     monitor = Process.monitor(server)

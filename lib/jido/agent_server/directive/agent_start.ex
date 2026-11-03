@@ -1,4 +1,5 @@
 defmodule Jido.AgentServer.Directive.AgentStart do
+  use Jido.Agent.Directive, built_in: true
   alias Jido.Joi
 
   @moduledoc """
@@ -37,4 +38,14 @@ defmodule Jido.AgentServer.Directive.AgentStart do
 
   @doc false
   def schema, do: @schema
+
+  @impl Jido.Agent.Directive
+  def validate(%__MODULE__{} = directive) do
+    with {:ok, directive} <- Joi.parse(@schema, Map.from_struct(directive)),
+         :ok <- Jido.AgentServer.Directive.validate_agent_target(directive.agent) do
+      {:ok, directive}
+    end
+  end
+
+  def validate(value), do: super(value)
 end

@@ -2,13 +2,19 @@ defmodule Jido.Agent.Runner do
   @moduledoc false
 
   alias Jido.Agent
-  alias Jido.Agent.{Command, Composition, Mutation, Plugin, Turn, Validation}
+  alias Jido.Agent.{Composition, Mutation, Plugin, Turn, Validation}
+  alias Jido.Agent.Directive.ServerStop
   alias Jido.Agent.Plugin.Pipeline, as: PluginPipeline
-  alias Jido.AgentServer.Directive.ServerStop
   alias Jido.Error
   alias Jido.Signal
 
   @type stage :: :route | :prepare | :input | :compose | :validate
+  @type admission :: %{
+          required(:agent) => Agent.instance(),
+          required(:signal) => Signal.t(),
+          required(:context) => map(),
+          required(:plugin_inputs) => map()
+        }
 
   defmodule Prepared do
     @moduledoc false
@@ -61,53 +67,68 @@ defmodule Jido.Agent.Runner do
   end
 
   @doc false
-  @spec prepare_for_server(Command.t(), Signal.t(), keyword(), [Jido.Plugin.Spec.t()]) ::
+  @spec prepare_admitted(
+          admission(),
+          Signal.t(),
+          keyword(),
+          [Jido.Plugin.Spec.t()]
+        ) ::
           {:ok, Prepared.t()} | {:error, stage(), term()}
-  def prepare_for_server(
-        %Command{} = command,
+  def prepare_admitted(
+        %{
+          agent: %Agent{} = agent,
+          signal: %Signal{} = signal,
+          context: context,
+          plugin_inputs: plugin_inputs
+        },
         %Signal{} = source_signal,
         exec_opts,
         plugin_specs
       ) do
     agent_specs = Plugin.specs(plugin_specs)
 
-    with :ok <- at(:input, Command.validate_caller_context(command.context)),
+    with :ok <- at(:input, Validation.validate_caller_context(context)),
          {:ok, turn} <-
            at(
              :route,
              select(
-               command.agent,
+               agent,
                source_signal,
-               command.plugin_inputs,
+               plugin_inputs,
                agent_specs
              )
            ),
          {:ok, schema} <-
-           at(:input, Plugin.compose_schema_from_specs(command.agent.schema, plugin_specs)) do
+           at(:input, Plugin.compose_schema_from_specs(agent.schema, plugin_specs)) do
       {:ok,
        prepared(
-         command.agent,
+         agent,
          schema,
-         command.signal,
+         signal,
          turn,
-         command.context,
+         context,
          exec_opts,
-         command.plugin_inputs,
+         plugin_inputs,
          agent_specs
        )}
     end
   end
 
   @doc false
-  @spec prepare_handoff_for_server(
-          Command.t(),
+  @spec prepare_admitted_handoff(
+          admission(),
           Signal.t(),
           Jido.Instruction.t(),
           keyword(),
           [Jido.Plugin.Spec.t()]
         ) :: {:ok, Prepared.t()} | {:error, stage(), term()}
-  def prepare_handoff_for_server(
-        %Command{} = command,
+  def prepare_admitted_handoff(
+        %{
+          agent: %Agent{} = agent,
+          signal: %Signal{} = signal,
+          context: context,
+          plugin_inputs: plugin_inputs
+        },
         %Signal{} = source_signal,
         %Jido.Instruction{} = instruction,
         exec_opts,
@@ -120,19 +141,19 @@ defmodule Jido.Agent.Runner do
       source_signal: source_signal
     }
 
-    with :ok <- at(:input, Command.validate_caller_context(command.context)),
+    with :ok <- at(:input, Validation.validate_caller_context(context)),
          {:ok, turn} <- at(:route, Turn.validate_selected(turn)),
          {:ok, schema} <-
-           at(:input, Plugin.compose_schema_from_specs(command.agent.schema, plugin_specs)) do
+           at(:input, Plugin.compose_schema_from_specs(agent.schema, plugin_specs)) do
       {:ok,
        prepared(
-         command.agent,
+         agent,
          schema,
-         command.signal,
+         signal,
          turn,
-         command.context,
+         context,
          exec_opts,
-         command.plugin_inputs,
+         plugin_inputs,
          Plugin.specs(plugin_specs)
        )}
     end
@@ -148,11 +169,11 @@ defmodule Jido.Agent.Runner do
   defp prepare_direct(agent, signal, opts) do
     {caller_context, exec_opts} = Keyword.pop(opts, :context, %{})
 
-    with {:ok, caller_context} <- at(:input, Command.normalize_context(caller_context)),
-         :ok <- at(:input, Command.validate_caller_context(caller_context)),
+    with {:ok, caller_context} <- at(:input, Validation.normalize_context(caller_context)),
+         :ok <- at(:input, Validation.validate_caller_context(caller_context)),
          validation = Validation.validate_instance_with_plugins(agent),
          {:ok, agent, specs, schema} <- at(:input, validation),
-         {:ok, signal} <- at(:input, Command.normalize_signal(signal)),
+         {:ok, signal} <- at(:input, Validation.normalize_signal(signal)),
          plugin_specs = Plugin.specs(specs),
          {:ok, plugin_inputs} <- at(:prepare, Plugin.prepare(agent, signal, plugin_specs)),
          {:ok, turn} <-

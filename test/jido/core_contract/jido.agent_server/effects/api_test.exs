@@ -2,18 +2,10 @@ defmodule JidoTest.AgentServer.EffectsApiTest do
   use Covenant.Case, component: "jido.agent_server.effects", async: true
 
   alias Jido.Agent.Directive, as: AgentDirective
-  alias Jido.Agent.Directive.Emit
+  alias Jido.Agent.Directive.{AgentSend, Emit, ParentSend, ServerStop}
   alias Jido.AgentServer.Directive
 
-  alias Jido.AgentServer.Directive.{
-    AgentSend,
-    AgentStart,
-    AgentStop,
-    ErrorReport,
-    ParentSend,
-    ProcessStart,
-    ServerStop
-  }
+  alias Jido.AgentServer.Directive.{AgentStart, AgentStop, ErrorReport, ProcessStart}
 
   alias Jido.AgentServer.Effects
   alias Jido.Dispatch.Preparation
@@ -25,13 +17,10 @@ defmodule JidoTest.AgentServer.EffectsApiTest do
   @tag obligation: "jido.agent_server.effects.I12"
   test "the documented runtime Directive API and public types are exact" do
     assert documented_api(Directive) == [
-             {:function, :agent_send, 2},
              {:function, :agent_start, 3},
              {:function, :agent_stop, 2},
              {:function, :error_report, 2},
-             {:function, :parent_send, 1},
              {:function, :process_start, 1},
-             {:function, :server_stop, 1},
              {:function, :signal_send, 3}
            ]
 
@@ -70,8 +59,8 @@ defmodule JidoTest.AgentServer.EffectsApiTest do
     assert dispatch[:delivery_mode] == :sync
     assert dispatch[:timeout] == 100
     assert dispatch[:message_format] == formatter
-    assert %AgentSend{name: :child, signal: ^signal} = Directive.agent_send(:child, signal)
-    assert %ParentSend{signal: ^signal} = Directive.parent_send(signal)
+    assert %AgentSend{name: :child, signal: ^signal} = AgentDirective.agent_send(:child, signal)
+    assert %ParentSend{signal: ^signal} = AgentDirective.parent_send(signal)
 
     assert %ErrorReport{error: :failed, context: :turn} =
              Directive.error_report(:failed, :turn)
@@ -94,7 +83,7 @@ defmodule JidoTest.AgentServer.EffectsApiTest do
     assert %AgentStop{name: :child, reason: :shutdown} =
              Directive.agent_stop(:child, :shutdown)
 
-    assert %ServerStop{reason: :shutdown} = Directive.server_stop(:shutdown)
+    assert %ServerStop{reason: :shutdown} = AgentDirective.server_stop(:shutdown)
 
     for invalid <- [
           [unknown: true],
@@ -118,7 +107,7 @@ defmodule JidoTest.AgentServer.EffectsApiTest do
       assert :ok = Directive.validate_restart_policy(policy)
     end
 
-    stop = Directive.server_stop()
+    stop = AgentDirective.server_stop()
     assert {:ok, ^stop} = AgentDirective.validate(stop)
 
     assert {:error, message} = Directive.validate_restart_policy(:invalid)

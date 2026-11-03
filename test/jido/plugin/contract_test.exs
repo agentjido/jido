@@ -51,7 +51,7 @@ defmodule Jido.Plugin.ContractTest do
 
     @impl Jido.Action
     def run(_params, context) do
-      {:ok, context.agent_state, [%Jido.AgentServer.Directive.ServerStop{}]}
+      {:ok, context.agent_state, [%Jido.Agent.Directive.ServerStop{}]}
     end
   end
 
@@ -121,7 +121,7 @@ defmodule Jido.Plugin.ContractTest do
 
   defmodule OwnedDirective do
     defstruct value: nil
-    def validate(%__MODULE__{}), do: {:ok, %Jido.AgentServer.Directive.ServerStop{}}
+    def validate(%__MODULE__{}), do: {:ok, %Jido.Agent.Directive.ServerStop{}}
   end
 
   defmodule ReturnOwnedDirective do
@@ -402,7 +402,7 @@ defmodule Jido.Plugin.ContractTest do
     def reduce(reduction, _opts), do: {:ok, reduction.plugin_state}
 
     @impl true
-    def directives(_opts), do: [Jido.AgentServer.Directive.ServerStop]
+    def directives(_opts), do: [Jido.Agent.Directive.ServerStop]
   end
 
   defmodule InvalidStateAgent do
@@ -547,7 +547,7 @@ defmodule Jido.Plugin.ContractTest do
       |> Jido.Agent.instantiate!(id: Jido.Id.uuid7())
 
     signal = Signal.new!("trace.run", %{trace: []}, source: "/test")
-    assert {:ok, command} = Jido.Agent.Command.new(agent, signal)
+    assert {:ok, command} = Jido.AgentServer.Command.new(agent, signal)
 
     assert {:ok, invalid_specs} =
              Jido.Plugin.Normalizer.normalize_all([{AdmissionPlugin, mode: :invalid}])
@@ -589,7 +589,7 @@ defmodule Jido.Plugin.ContractTest do
     agent = DirectiveAgent.instantiate!(id: Jido.Id.uuid7())
     signal = Signal.new!("directive.stop", %{}, source: "/test")
 
-    assert {:ok, _next_agent, [%Jido.AgentServer.Directive.ServerStop{reason: :normal}]} =
+    assert {:ok, _next_agent, [%Jido.Agent.Directive.ServerStop{reason: :normal}]} =
              DirectiveAgent.cmd(agent, signal)
   end
 

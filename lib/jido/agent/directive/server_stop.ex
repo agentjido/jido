@@ -1,6 +1,6 @@
-defmodule Jido.AgentServer.Directive.ServerStop do
+defmodule Jido.Agent.Directive.ServerStop do
   alias Jido.Joi
-  @moduledoc "Stops the Agent Server after the Agent state commit."
+  @moduledoc "Stops the AgentServer after the Agent state commit."
 
   @schema Joi.struct(
             __MODULE__,

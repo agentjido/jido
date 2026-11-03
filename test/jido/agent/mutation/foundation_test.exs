@@ -138,19 +138,19 @@ defmodule Jido.Agent.MutationFoundationTest do
   end
 
   @tag obligation: "jido.agent.I27"
-  test "runtime constructors have a separate noun_verb API" do
+  test "domain and runtime constructors have separate noun_verb APIs" do
     alias Jido.AgentServer.Directive, as: R
     signal = Jido.Signal.new!("event", %{}, source: "/test")
 
     for directive <- [
           R.agent_start(F.Worker, :worker),
           R.agent_stop(:worker),
-          R.server_stop(),
+          D.server_stop(),
           R.process_start({Elixir.Agent, fn -> 0 end}),
           R.error_report(:failed),
           R.signal_send(signal, self(), timeout: 100),
-          R.parent_send(signal),
-          R.agent_send(:worker, signal)
+          D.parent_send(signal),
+          D.agent_send(:worker, signal)
         ] do
       assert {:ok, ^directive} = D.validate(directive)
       refute Agent.Mutation.mutation?(directive)
@@ -171,7 +171,7 @@ defmodule Jido.Agent.MutationFoundationTest do
 
     assert %R.AgentStart{name: :worker} = R.agent_start(F.Worker, :worker)
     assert %R.AgentStop{name: :worker} = R.agent_stop(:worker)
-    assert %R.AgentSend{name: :worker} = R.agent_send(:worker, signal)
+    assert %D.AgentSend{name: :worker} = D.agent_send(:worker, signal)
   end
 
   @tag obligation: "jido.agent.I28"

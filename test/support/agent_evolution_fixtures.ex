@@ -86,7 +86,7 @@ defmodule JidoTest.AgentEvolutionFixtures do
         :identity -> {:ok, %{snapshot: put_in(snapshot.agent.id, "other")}}
         :origin -> {:ok, %{snapshot: put_in(snapshot.agent.module, OtherOrigin)}}
         :state -> {:ok, %{snapshot: put_in(snapshot.agent.state.count, "wrong")}}
-        :directive -> {:ok, %{snapshot: snapshot}, [Jido.AgentServer.Directive.server_stop()]}
+        :directive -> {:ok, %{snapshot: snapshot}, [Jido.Agent.Directive.server_stop()]}
         :result -> {:ok, %{wrong: true}}
         :extra -> {:ok, %{snapshot: snapshot, ignored: true}}
         :nonportable -> {:ok, %{snapshot: Map.put(snapshot, :pid, self())}}

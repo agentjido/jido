@@ -6,7 +6,7 @@ defmodule JidoTest.AgentServer.Effects.CoreTest do
 
   import JidoTest.Eventually
   alias Jido.Agent.Directive.Emit
-  alias Jido.AgentServer.Directive.ServerStop
+  alias Jido.Agent.Directive.ServerStop
   alias Jido.AgentServer, as: Server
   alias Jido.Error.ValidationError
   alias Jido.Signal.Context, as: SignalContext

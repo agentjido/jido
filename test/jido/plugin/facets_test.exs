@@ -495,7 +495,7 @@ defmodule Jido.Plugin.FacetsTest do
       agent = agent(@package)
       signal = Signal.new!("facet.run", %{}, source: "/test")
       assert {:ok, [spec]} = Jido.Plugin.Normalizer.normalize_all([{@package, options()}])
-      assert {:ok, command} = Jido.Agent.Command.new(agent, signal, %{request: "one"})
+      assert {:ok, command} = Jido.AgentServer.Command.new(agent, signal, %{request: "one"})
 
       prepared = %Jido.Plugin.Input{prepared: %{tenant: "alpha"}}
       command = %{command | plugin_inputs: %{@package => prepared}}

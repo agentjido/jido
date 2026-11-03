@@ -138,6 +138,10 @@
       "Jido.Action.Error",
       "Jido.Agent.Error",
       "Jido.Flow.Error",
+      "Jido.Agent.Command",
+      "Jido.AgentServer.Directive.AgentSend",
+      "Jido.AgentServer.Directive.ParentSend",
+      "Jido.AgentServer.Directive.ServerStop",
       "Jido.Plugin.Error",
       "Jido.Signal.Error",
       "Jido.Signal.Codec",
@@ -162,6 +166,10 @@
       "lib/jido/action/error.ex",
       "lib/jido/agent/error.ex",
       "lib/jido/flow/error.ex",
+      "lib/jido/agent/command.ex",
+      "lib/jido/agent_server/directive/agent_send.ex",
+      "lib/jido/agent_server/directive/parent_send.ex",
+      "lib/jido/agent_server/directive/server_stop.ex",
       "lib/jido/plugin/error.ex",
       "lib/jido/signal/error.ex",
       "lib/jido/signal/codec.ex",
@@ -175,6 +183,14 @@
       "lib/jido/signal/telemetry.ex",
       "lib/jido/signal/trace.ex",
       "lib/jido/tracing/**"
+    ]
+  ],
+  calls: [
+    forbidden: [
+      {[
+         "Jido.Agent",
+         "Jido.Agent.*"
+       ], ["Jido.AgentServer.*"]}
     ]
   ],
   checks: [

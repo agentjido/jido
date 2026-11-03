@@ -208,7 +208,7 @@ defmodule Jido.Agent.DirectCommandTest do
           %{mode: :invalid},
           %{mode: :partial},
           %{directives: :bad},
-          %{directives: [Jido.AgentServer.Directive.server_stop() | :bad]},
+          %{directives: [Jido.Agent.Directive.server_stop() | :bad]},
           %{directives: [%UnknownDirective{}]},
           %{directives: [%{unknown: true}]},
           %{directives: [%Directive.Emit{signal: :bad}]},

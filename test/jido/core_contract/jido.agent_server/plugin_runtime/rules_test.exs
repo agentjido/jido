@@ -246,7 +246,7 @@ defmodule JidoTest.AgentServer.PluginRuntime.RulesTest do
       |> Jido.Agent.instantiate!(id: "plugin-callback-rules")
 
     signal = Jido.Signal.new!("plugin.callback", %{}, source: "/test")
-    assert {:ok, command} = Jido.Agent.Command.new(agent, signal)
+    assert {:ok, command} = Jido.AgentServer.Command.new(agent, signal)
 
     commit = %Commit{
       plugin: CallbackPlugin,

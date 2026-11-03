@@ -1,9 +1,7 @@
-defmodule Jido.AgentServer.Directive.ParentSend do
+defmodule Jido.Agent.Directive.ParentSend do
   alias Jido.Joi
 
-  @moduledoc """
-  Sends one Signal to the current parent Agent after commit.
-  """
+  @moduledoc "Sends one Signal to the current parent Agent after commit."
 
   @schema Joi.struct(
             __MODULE__,

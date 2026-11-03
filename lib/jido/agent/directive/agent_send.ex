@@ -1,6 +1,6 @@
-defmodule Jido.AgentServer.Directive.AgentSend do
+defmodule Jido.Agent.Directive.AgentSend do
   alias Jido.Joi
-  @moduledoc "Sends one Signal to a tracked Agent activation."
+  @moduledoc "Sends one Signal to a tracked Agent activation after commit."
 
   @schema Joi.struct(
             __MODULE__,

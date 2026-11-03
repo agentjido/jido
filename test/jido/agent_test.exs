@@ -2,7 +2,7 @@ defmodule Jido.AgentTest do
   use ExUnit.Case, async: true
 
   alias Jido.Agent
-  alias Jido.Agent.Command
+  alias Jido.AgentServer.Command
   alias Jido.Agent.Turn
   alias Jido.Signal
 
@@ -101,7 +101,7 @@ defmodule Jido.AgentTest do
     @impl Jido.Action
     def run(%{label: label}, context) do
       state = %{context.agent_state | history: context.agent_state.history ++ [label]}
-      {:ok, state, [%Jido.AgentServer.Directive.ServerStop{reason: :normal}]}
+      {:ok, state, [%Jido.Agent.Directive.ServerStop{reason: :normal}]}
     end
   end
 
@@ -775,7 +775,7 @@ defmodule Jido.AgentTest do
       agent = agent_with_route("counter.stop", WithStopDirective)
       signal = Signal.new!("counter.stop", %{label: "stopped"}, source: "/test")
 
-      assert {:ok, updated, [%Jido.AgentServer.Directive.ServerStop{reason: :normal}]} =
+      assert {:ok, updated, [%Jido.Agent.Directive.ServerStop{reason: :normal}]} =
                Agent.cmd(agent, signal)
 
       assert updated.state == %{count: 0, history: ["stopped"]}

@@ -1,7 +1,7 @@
 defmodule Jido.Plugin.OrderingTest do
   use JidoTest.Case, async: true
 
-  alias Jido.Agent.Command
+  alias Jido.AgentServer.Command
   alias Jido.Plugin.SignalContext
 
   defmodule Agent do

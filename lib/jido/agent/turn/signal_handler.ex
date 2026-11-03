@@ -36,8 +36,8 @@ defmodule Jido.Agent.Turn.SignalHandler do
   end
 
   defp forward(%{kind: :agent, name: name}, signal),
-    do: {:ok, Jido.AgentServer.Directive.agent_send(name, signal)}
+    do: {:ok, Jido.Agent.Directive.agent_send(name, signal)}
 
   defp forward(%{kind: :parent}, signal),
-    do: {:ok, Jido.AgentServer.Directive.parent_send(signal)}
+    do: {:ok, Jido.Agent.Directive.parent_send(signal)}
 end

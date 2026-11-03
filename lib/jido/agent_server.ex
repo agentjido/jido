@@ -77,8 +77,9 @@ defmodule Jido.AgentServer do
 
   alias Jido.AgentServer.Supervisor, as: ServerSupervisor
   alias Jido.Dispatch.Preparation, as: DispatchPreparation
-  alias Jido.Agent.Command
+  alias Jido.AgentServer.Command
   alias Jido.Agent.Runner, as: AgentRunner
+  alias Jido.Agent.Validation
   alias Jido.Signal
   alias Jido.Telemetry.Semantic
   alias Jido.Trace.Context, as: TraceContext
@@ -624,7 +625,7 @@ defmodule Jido.AgentServer do
   def call(server, signal, timeout_or_opts \\ 5_000) do
     opts = if is_list(timeout_or_opts), do: timeout_or_opts, else: [timeout: timeout_or_opts]
 
-    with {:ok, signal} <- Command.normalize_signal(signal),
+    with {:ok, signal} <- Validation.normalize_signal(signal),
          {:ok, context} <- Core.turn_context(opts, [:timeout, :admission_timeout, :context]),
          timeout = Keyword.get(opts, :timeout, 5_000),
          :ok <- Core.validate_wait(timeout),
@@ -657,7 +658,7 @@ defmodule Jido.AgentServer do
   """
   @spec submit(server(), Signal.t(), keyword()) :: pending() | {:error, term()}
   def submit(server, signal, opts \\ []) do
-    with {:ok, signal} <- Command.normalize_signal(signal),
+    with {:ok, signal} <- Validation.normalize_signal(signal),
          {:ok, context} <- Core.turn_context(opts, [:context, :admission_timeout]),
          {:ok, deadline} <- Core.admission_deadline(opts) do
       reply_gate = ReplyGate.start(self(), server)
@@ -678,7 +679,7 @@ defmodule Jido.AgentServer do
   """
   @spec cast(server(), Signal.t(), keyword()) :: :ok | {:error, term()}
   def cast(server, signal, opts \\ []) do
-    with {:ok, signal} <- Command.normalize_signal(signal),
+    with {:ok, signal} <- Validation.normalize_signal(signal),
          {:ok, context} <- Core.turn_context(opts, [:context]) do
       :gen_statem.cast(server, turn_event(signal, context, :infinity, nil))
     end
@@ -2248,7 +2249,12 @@ defmodule Jido.AgentServer do
          command = %{command | plugin_inputs: inputs},
          {:ok, admitted} <- Plugin.admit(command, data),
          {:ok, prepared} <-
-           AgentRunner.prepare_for_server(admitted, signal, [], data.plugin_specs) do
+           AgentRunner.prepare_admitted(
+             admitted,
+             signal,
+             [],
+             data.plugin_specs
+           ) do
       {:ok, prepared}
     else
       {:error, _stage, reason} -> {:error, reason}
@@ -2268,7 +2274,7 @@ defmodule Jido.AgentServer do
          command = %{command | plugin_inputs: inputs},
          {:ok, admitted} <- Plugin.admit(command, data),
          {:ok, prepared} <-
-           AgentRunner.prepare_handoff_for_server(
+           AgentRunner.prepare_admitted_handoff(
              admitted,
              signal,
              receipt.instruction,

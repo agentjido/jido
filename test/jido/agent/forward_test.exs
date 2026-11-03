@@ -71,7 +71,7 @@ defmodule Jido.Agent.ForwardTest do
     [worker] = AgentServer.members(parent, :worker)
     signal = Signal.new!("work.request", %{}, source: "/test")
 
-    assert {:ok, _, [%Jido.AgentServer.Directive.AgentSend{name: :worker}]} =
+    assert {:ok, _, [%Jido.Agent.Directive.AgentSend{name: :worker}]} =
              AgentServer.call(parent, signal)
 
     eventually(fn -> AgentServer.agent(worker).state.count == 1 end)
@@ -83,7 +83,7 @@ defmodule Jido.Agent.ForwardTest do
     [worker] = AgentServer.members(parent, :worker)
     signal = Signal.new!("work.completed", %{}, source: "/test")
 
-    assert {:ok, _, [%Jido.AgentServer.Directive.ParentSend{}]} =
+    assert {:ok, _, [%Jido.Agent.Directive.ParentSend{}]} =
              AgentServer.call(worker, signal)
 
     eventually(fn -> AgentServer.agent(parent).state.count == 1 end)

@@ -1,7 +1,8 @@
 defmodule JidoTest.Contract.AgentEvaluationTest do
   use Covenant.Case, component: "jido.agent_evaluation", async: true
   alias Jido.Agent
-  alias Jido.Agent.{Command, Directive, Runner, Turn}
+  alias Jido.Agent.{Directive, Runner, Turn}
+  alias Jido.AgentServer.Command
   alias Jido.Signal
   alias JidoTest.AgentContract, as: F
 
@@ -334,8 +335,8 @@ defmodule JidoTest.Contract.AgentEvaluationTest do
       Directive.emit("effect.allowed", %{value: 1}),
       %{kind: :emit, signal: signal},
       Directive.emit(signal),
-      Jido.AgentServer.Directive.parent_send(signal),
-      Jido.AgentServer.Directive.agent_send(:child, signal)
+      Jido.Agent.Directive.parent_send(signal),
+      Jido.Agent.Directive.agent_send(:child, signal)
     ]
 
     for request <- requests do
@@ -456,7 +457,7 @@ defmodule JidoTest.Contract.AgentEvaluationTest do
         ]
       )
 
-    assert {:ok, ^parent, [%Jido.AgentServer.Directive.ParentSend{signal: ^signal}]} =
+    assert {:ok, ^parent, [%Jido.Agent.Directive.ParentSend{signal: ^signal}]} =
              Agent.cmd(parent, signal)
 
     child =
@@ -470,7 +471,7 @@ defmodule JidoTest.Contract.AgentEvaluationTest do
         topology: %{agents: [%{name: :worker, definition: ForwardChild}]}
       )
 
-    assert {:ok, ^child, [%Jido.AgentServer.Directive.AgentSend{name: :worker, signal: ^signal}]} =
+    assert {:ok, ^child, [%Jido.Agent.Directive.AgentSend{name: :worker, signal: ^signal}]} =
              Agent.cmd(child, signal)
   end
 
@@ -511,7 +512,7 @@ defmodule JidoTest.Contract.AgentEvaluationTest do
     agent = F.instance()
     {:ok, specs} = Jido.Plugin.Normalizer.normalize_all(Agent.runtime_plugins(agent))
     {:ok, command} = Command.new(agent, source)
-    assert {:ok, prepared} = Runner.prepare_for_server(command, source, [], specs)
+    assert {:ok, prepared} = Runner.prepare_admitted(command, source, [], specs)
     assert prepared.agent === agent
     assert prepared.turn.source_signal === source
     assert {:ok, ^agent, []} = Runner.finish_for_server(prepared, {:ok, agent.state})
@@ -539,13 +540,13 @@ defmodule JidoTest.Contract.AgentEvaluationTest do
     invalid = put_in(command.context, %{agent_id: "reserved"})
 
     assert {:error, :input, %{__exception__: true}} =
-             Runner.prepare_for_server(invalid, source, [], specs)
+             Runner.prepare_admitted(invalid, source, [], specs)
 
     unrouted = F.signal(%{}, "missing")
     {:ok, command} = Command.new(agent, unrouted)
 
     assert {:error, :route, %Jido.Error.ValidationError{code: :unmatched_input}} =
-             Runner.prepare_for_server(command, unrouted, [], specs)
+             Runner.prepare_admitted(command, unrouted, [], specs)
   end
 
   @tag obligation: ["jido.agent_evaluation.I9", "jido.agent_evaluation.I10"]
@@ -578,7 +579,7 @@ defmodule JidoTest.Contract.AgentEvaluationTest do
               context: %{caller: :retained, signal: ^signal},
               exec_opts: [timeout: 10]
             } = prepared} =
-             Runner.prepare_handoff_for_server(
+             Runner.prepare_admitted_handoff(
                command,
                signal,
                instruction,

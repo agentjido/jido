@@ -1,8 +1,8 @@
 defmodule Jido.AgentServer.Plugin do
   @moduledoc false
 
-  alias Jido.Agent.Command
   alias Jido.Error
+  alias Jido.AgentServer.Command
   alias Jido.AgentServer.Plugin.{Callbacks, Commit}
   alias Jido.Plugin.{DirectiveContext, Init}
 

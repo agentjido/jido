@@ -2,11 +2,10 @@ defmodule Jido.AgentServer.Effects do
   @moduledoc false
 
   alias Jido.Agent
-  alias Jido.Agent.Directive.{Emit, Reply}
+  alias Jido.Agent.Directive.{AgentSend, Emit, ParentSend, Reply, ServerStop}
   alias Jido.Agent.Mutation
   alias Jido.AgentServer, as: Server
-  alias Jido.AgentServer.Directive.{AgentSend, AgentStart, AgentStop, ParentSend}
-  alias Jido.AgentServer.Directive.{ErrorReport, ProcessStart, ServerStop}
+  alias Jido.AgentServer.Directive.{AgentStart, AgentStop, ErrorReport, ProcessStart}
   alias Jido.AgentServer.TopologyRuntime
   alias Jido.Dispatch.Preparation, as: DispatchPreparation
   alias Jido.Signal

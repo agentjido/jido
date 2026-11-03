@@ -46,7 +46,7 @@ defmodule Jido.AgentServer.Core do
 
   require Logger
 
-  alias Jido.Agent.Command
+  alias Jido.Agent.Validation
   alias Jido.Trace.Context, as: TraceContext
 
   def max_timeout, do: @max_timeout
@@ -143,8 +143,8 @@ defmodule Jido.AgentServer.Core do
 
   def turn_context(opts, allowed) do
     if unique_keyword?(opts) and Keyword.keys(opts) -- allowed == [] do
-      with {:ok, context} <- Command.normalize_context(Keyword.get(opts, :context)),
-           :ok <- Command.validate_caller_context(context) do
+      with {:ok, context} <- Validation.normalize_context(Keyword.get(opts, :context)),
+           :ok <- Validation.validate_caller_context(context) do
         if Enum.any?([:turn_id, :trace_context], &Map.has_key?(context, &1)),
           do: invalid_options(":turn_id and :trace_context are reserved"),
           else: {:ok, context}

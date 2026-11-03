@@ -40,10 +40,15 @@ defmodule Jido.AgentServer.DurableTurn do
 
   def restore(agent, receipt, context, specs) do
     with {:ok, command} <-
-           Jido.Agent.Command.new_trusted_agent(agent, receipt.admitted_signal, context),
+           Jido.AgentServer.Command.new_trusted_agent(agent, receipt.admitted_signal, context),
          command = %{command | plugin_inputs: receipt.plugin_inputs},
          {:ok, prepared} <-
-           Jido.Agent.Runner.prepare_for_server(command, receipt.signal, [], specs),
+           Jido.Agent.Runner.prepare_admitted(
+             command,
+             receipt.signal,
+             [],
+             specs
+           ),
          :ok <- compatible(prepared, receipt),
          do: {:ok, prepared}
   end
@@ -77,10 +82,10 @@ defmodule Jido.AgentServer.DurableTurn do
 
   def restore_handoff(agent, receipt, context, specs) do
     with {:ok, command} <-
-           Jido.Agent.Command.new_trusted_agent(agent, receipt.admitted_signal, context),
+           Jido.AgentServer.Command.new_trusted_agent(agent, receipt.admitted_signal, context),
          command = %{command | plugin_inputs: receipt.plugin_inputs},
          {:ok, prepared} <-
-           Jido.Agent.Runner.prepare_handoff_for_server(
+           Jido.Agent.Runner.prepare_admitted_handoff(
              command,
              receipt.signal,
              receipt.instruction,

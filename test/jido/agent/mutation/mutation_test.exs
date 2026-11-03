@@ -525,7 +525,7 @@ defmodule Jido.Agent.MutationTest do
           nil,
           :bad,
           [Directive.agent_remove(:a) | :bad],
-          [Jido.AgentServer.Directive.server_stop()],
+          [Jido.Agent.Directive.server_stop()],
           [42]
         ] do
       assert {:error, _} = Agent.mutate(F.agent(), changes)

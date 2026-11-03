@@ -38,7 +38,7 @@ defmodule JidoTest.AgentServer.Effects.RuntimeDirectivesTest do
 
     assert {:ok, _, _} =
              turn(server, [
-               R.agent_send(
+               D.agent_send(
                  :worker,
                  E.signal([D.route_add("extra", E.Work)])
                )
@@ -49,7 +49,7 @@ defmodule JidoTest.AgentServer.Effects.RuntimeDirectivesTest do
 
     assert {:ok, _, _} =
              turn(worker, [
-               R.parent_send(E.signal([D.route_add("reply", E.Work)]))
+               D.parent_send(E.signal([D.route_add("reply", E.Work)]))
              ])
 
     settled(worker)
@@ -72,7 +72,7 @@ defmodule JidoTest.AgentServer.Effects.RuntimeDirectivesTest do
           R.agent_start(E.Worker, :worker, opts: %{agent: E.agent()}),
           R.agent_start(E.Worker, nil),
           R.agent_start(E.Worker, "$topology/worker"),
-          R.parent_send(E.signal([]))
+          D.parent_send(E.signal([]))
         ] do
       assert {:error, _} =
                turn(server, [
@@ -117,7 +117,7 @@ defmodule JidoTest.AgentServer.Effects.RuntimeDirectivesTest do
     config = config(c)
 
     assert {:error, :activation_required} =
-             Effects.validate_batch([R.agent_send(:worker, E.signal([]))], %{
+             Effects.validate_batch([D.agent_send(:worker, E.signal([]))], %{
                config
                | activation: nil
              })
@@ -126,7 +126,7 @@ defmodule JidoTest.AgentServer.Effects.RuntimeDirectivesTest do
              Effects.validate_batch([R.agent_stop("")], config)
 
     assert {:error, :reserved_agent_name} =
-             Effects.validate_batch([R.agent_send("$topology/worker", E.signal([]))], config)
+             Effects.validate_batch([D.agent_send("$topology/worker", E.signal([]))], config)
 
     config = put_in(config.agent.topology.agents, [%{name: :worker}])
 

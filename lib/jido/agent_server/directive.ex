@@ -5,13 +5,10 @@ defmodule Jido.AgentServer.Directive do
   Topology edits belong to `Jido.Agent.Directive`. These records request
   runtime work after commit. Activation ownership is fixed at startup.
   """
-  alias Jido.Agent.Directive.{Emit, Reply}
-  alias Jido.AgentServer.Directive.AgentSend
-  alias Jido.AgentServer.Directive.ParentSend
+  alias Jido.Agent.Directive.{AgentSend, Emit, ParentSend, Reply, ServerStop}
   alias Jido.AgentServer.Directive.ErrorReport
   alias Jido.AgentServer.Directive.AgentStart
   alias Jido.AgentServer.Directive.ProcessStart
-  alias Jido.AgentServer.Directive.ServerStop
   alias Jido.AgentServer.Directive.AgentStop
   alias Jido.Signal
 
@@ -74,14 +71,6 @@ defmodule Jido.AgentServer.Directive do
       dispatch: {:pid, Keyword.put(options(opts, [:delivery_mode, :timeout, :message_format]), :target, pid)}
     }
 
-  @doc "Builds a Directive that sends one Signal to the parent Agent."
-  @spec parent_send(Signal.t()) :: ParentSend.t()
-  def parent_send(signal), do: %ParentSend{signal: signal}
-
-  @doc "Builds a Directive that sends one Signal to a tracked child Agent."
-  @spec agent_send(atom() | String.t(), Signal.t()) :: AgentSend.t()
-  def agent_send(name, signal), do: %AgentSend{name: name, signal: signal}
-
   @doc "Builds a Directive that applies the AgentServer error policy after commit."
   @spec error_report(term(), atom() | nil) :: ErrorReport.t()
   def error_report(error, context \\ nil), do: %ErrorReport{error: error, context: context}
@@ -115,10 +104,6 @@ defmodule Jido.AgentServer.Directive do
   @doc "Builds a Directive that stops and untracks one child Agent."
   @spec agent_stop(atom() | String.t(), term()) :: AgentStop.t()
   def agent_stop(name, reason \\ :normal), do: %AgentStop{name: name, reason: reason}
-
-  @doc "Builds a terminal Directive that stops the AgentServer after commit."
-  @spec server_stop(term()) :: ServerStop.t()
-  def server_stop(reason \\ :normal), do: %ServerStop{reason: reason}
 
   @doc false
   def validate_restart_policy(restart, _opts \\ [])

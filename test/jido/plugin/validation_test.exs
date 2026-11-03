@@ -424,9 +424,9 @@ defmodule Jido.Plugin.ValidationTest do
     assert_received {:callback, :validate_options, ^opts}
     assert_received {:callback, :state_spec, ^opts}
     assert_received {:callback, :directives, ^opts}
-    command = %Jido.Agent.Command{agent: agent, signal: signal}
+    command = %Jido.AgentServer.Command{agent: agent, signal: signal}
 
-    assert {:ok, prepared} = Jido.Agent.Runner.prepare_for_server(command, signal, [], specs)
+    assert {:ok, prepared} = Jido.Agent.Runner.prepare_admitted(command, signal, [], specs)
     assert {:ok, ^agent, []} = Jido.Agent.Runner.finish_for_server(prepared, {:ok, agent.state})
     refute_received {:callback, _, _}
   end

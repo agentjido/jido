@@ -2,6 +2,8 @@ defmodule Jido.Agent.Validation do
   @moduledoc false
   alias Jido.Agent.{Callback, Data, Extension, Plugin, Route, Topology}
   alias Jido.Error
+  alias Jido.Signal
+  alias Jido.Signal.Context, as: SignalContext
 
   @fields [
     :id,
@@ -141,6 +143,63 @@ defmodule Jido.Agent.Validation do
   def validate(%Jido.Agent{} = value), do: validate_instance(value)
   def validate(_), do: Error.validation_result(:invalid_agent, [], "Expected a Jido.Agent struct")
 
+  def normalize_context(nil), do: {:ok, %{}}
+
+  def normalize_context(context) do
+    case Jido.Agent.Authoring.to_attrs(context) do
+      {:ok, context} -> {:ok, context}
+      :error -> invalid_command("Agent caller context must be a map or keyword list", %{context: context})
+    end
+  end
+
+  def normalize_signal(%Signal{type: type} = signal) when is_binary(type) do
+    with {:ok, signal} <- Jido.Joi.parse(Signal.schema(), signal),
+         {:ok, extensions} <- SignalContext.normalize(signal.extensions) do
+      {:ok, %{signal | extensions: extensions}}
+    else
+      {:error, issues} -> invalid_command("Agent command Signal is invalid", %{issues: issues})
+    end
+  end
+
+  def normalize_signal(%Signal{} = signal) do
+    {:error, cause} = Jido.Signal.Router.route(Jido.Signal.Router.new!([]), signal)
+
+    {:error,
+     Error.routing_error(cause.message,
+       target: signal.type,
+       details: Map.put(cause.details, :cause, cause)
+     )}
+  end
+
+  def normalize_signal(value),
+    do: invalid_command("Agent command must contain a Jido.Signal", %{signal: value})
+
+  def validate_caller_context(context) when is_map(context) and not is_struct(context) do
+    reserved =
+      Enum.filter(
+        [
+          :agent_id,
+          :agent_module,
+          :agent_signal_source,
+          :agent_state,
+          :agent_topology,
+          :signal,
+          :plugin_inputs,
+          :__jido_exec_durable__,
+          :__jido_wait_host__,
+          :__jido_wait_result__
+        ],
+        &Map.has_key?(context, &1)
+      )
+
+    if reserved == [],
+      do: :ok,
+      else: invalid_command("Agent command context contains reserved keys", %{keys: reserved})
+  end
+
+  def validate_caller_context(context),
+    do: invalid_command("Agent command context must be a map", %{context: context})
+
   def validate_definition(value, opts \\ [])
 
   def validate_definition(%Jido.Agent{} = value, opts) do
@@ -261,6 +320,9 @@ defmodule Jido.Agent.Validation do
   end
 
   def options(opts, allowed), do: Data.fields(opts, allowed)
+
+  defp invalid_command(message, details),
+    do: {:error, Error.validation_error(message, kind: :config, details: details)}
 
   defp fields(definition) do
     with :ok <- neutral(definition),

@@ -1,4 +1,5 @@
 defmodule Jido.AgentServer.Directive.ProcessStart do
+  use Jido.Agent.Directive, built_in: true
   alias Jido.Joi
   @moduledoc "Starts one untracked process under the Jido instance supervisor."
 

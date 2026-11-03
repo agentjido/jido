@@ -1,4 +1,5 @@
 defmodule Jido.AgentServer.Directive.AgentStop do
+  use Jido.Agent.Directive, built_in: true
   alias Jido.Joi
   @moduledoc "Stops and untracks one Agent activation."
 

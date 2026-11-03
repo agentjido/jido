@@ -9,7 +9,7 @@ defmodule Jido.Agent.StateBoundaryTest do
       name: "state_boundary_replace"
 
     def run(%{candidate: candidate}, _context),
-      do: {:ok, candidate, [Jido.AgentServer.Directive.server_stop(:invalid_state_committed)]}
+      do: {:ok, candidate, [Jido.Agent.Directive.server_stop(:invalid_state_committed)]}
   end
 
   test "invalid complete state cannot commit or run its effects", %{jido: jido} do

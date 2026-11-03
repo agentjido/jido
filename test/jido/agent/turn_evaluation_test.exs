@@ -3,7 +3,7 @@ defmodule Jido.Agent.TurnEvaluationTest do
 
   alias Jido.Agent.Runner
   alias Jido.Agent
-  alias Jido.Agent.Command
+  alias Jido.AgentServer.Command
   alias Jido.Agent.Turn
   alias Jido.Signal
   alias JidoTest.AgentFixtures.Add
@@ -140,12 +140,12 @@ defmodule Jido.Agent.TurnEvaluationTest do
     {:ok, command} = Command.new(agent, source)
 
     assert {:error, :route, %Jido.Error.ValidationError{code: :unmatched_input}} =
-             Runner.prepare_for_server(command, source, [], specs)
+             Runner.prepare_admitted(command, source, [], specs)
 
     command = %{command | context: %{agent_id: "reserved"}}
 
     assert {:error, :input, %{__exception__: true}} =
-             Runner.prepare_for_server(command, source, [], specs)
+             Runner.prepare_admitted(command, source, [], specs)
 
     selected = Signal.new!("source.route", %{observer: self()}, source: "/test")
     selected_agent = CustomRouteAgent.instantiate!(id: "stages")
@@ -156,7 +156,7 @@ defmodule Jido.Agent.TurnEvaluationTest do
     {:ok, selected_command} = Command.new(selected_agent, selected)
 
     assert {:ok, prepared} =
-             Runner.prepare_for_server(
+             Runner.prepare_admitted(
                selected_command,
                selected,
                [],

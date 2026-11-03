@@ -89,13 +89,13 @@ defmodule Jido.Agent.DirectiveContractTest do
     directives = [
       Directive.emit(signal),
       Directive.reply(reply),
-      Runtime.parent_send(signal),
-      Runtime.agent_send(:child, signal),
+      Directive.parent_send(signal),
+      Directive.agent_send(:child, signal),
       Runtime.agent_start(JidoTest.AgentFixtures.CounterAgent, :child),
       Runtime.agent_stop(:child),
       Runtime.error_report(:failed, :action),
       Runtime.process_start({Elixir.Agent, fn -> 0 end}),
-      Runtime.server_stop(),
+      Directive.server_stop(),
       Directive.agent_add(:child, JidoTest.AgentFixtures.CounterAgent),
       Directive.agent_remove(:child),
       Directive.route_add("event", JidoTest.AgentContract.Add, state: %{source: :output, path: []}),
@@ -136,16 +136,16 @@ defmodule Jido.Agent.DirectiveContractTest do
         ],
         directive <- [
           Directive.emit(malformed),
-          Runtime.parent_send(malformed),
-          Runtime.agent_send(:child, malformed)
+          Directive.parent_send(malformed),
+          Directive.agent_send(:child, malformed)
         ] do
       assert {:error, _reason} = Directive.validate(directive)
     end
 
     for directive <- [
           Directive.emit(signal),
-          Runtime.parent_send(signal),
-          Runtime.agent_send(:child, signal)
+          Directive.parent_send(signal),
+          Directive.agent_send(:child, signal)
         ] do
       assert {:ok, ^directive} = Directive.validate(directive)
     end
@@ -159,8 +159,8 @@ defmodule Jido.Agent.DirectiveContractTest do
     for directive <- [
           %Directive.Emit{signal: %{}},
           %Directive.Reply{signal: %{}},
-          %{Runtime.parent_send(signal) | signal: %{}},
-          %{Runtime.agent_send(:child, signal) | signal: %{}}
+          %{Directive.parent_send(signal) | signal: %{}},
+          %{Directive.agent_send(:child, signal) | signal: %{}}
         ] do
       assert {:error, %Jido.Error.ValidationError{details: %{directive: ^directive}}} =
                Directive.validate(directive)

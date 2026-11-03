@@ -2,7 +2,8 @@ defmodule Jido.Agent.SelectionTest do
   use JidoTest.Case, async: true
 
   alias Jido.Agent
-  alias Jido.Agent.{Command, Runner}
+  alias Jido.Agent.Runner
+  alias Jido.AgentServer.Command
   alias Jido.AgentServer, as: Server
   alias Jido.Signal.Context, as: SignalContext
   alias Jido.Trace
@@ -204,7 +205,7 @@ defmodule Jido.Agent.SelectionTest do
       refute execution_signal.extensions == source.extensions
       command = %{command | signal: execution_signal}
 
-      assert {:ok, prepared} = Runner.prepare_for_server(command, source, [], [])
+      assert {:ok, prepared} = Runner.prepare_admitted(command, source, [], [])
       assert prepared.turn.source_signal == source
       assert prepared.signal == execution_signal
       assert prepared.context.signal == execution_signal

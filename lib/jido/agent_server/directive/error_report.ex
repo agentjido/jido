@@ -1,4 +1,5 @@
 defmodule Jido.AgentServer.Directive.ErrorReport do
+  use Jido.Agent.Directive, built_in: true
   alias Jido.Joi
   @moduledoc "Reports a structured turn or runtime error to the Server policy."
 

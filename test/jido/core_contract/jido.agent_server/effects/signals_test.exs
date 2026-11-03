@@ -5,10 +5,10 @@ defmodule JidoTest.AgentServer.Effects.SignalsTest do
   use Covenant.Case, component: "jido.agent_server.effects", async: false
 
   import JidoTest.Eventually
-  alias Jido.Agent.Directive.Emit
+  alias Jido.Agent.Directive.{Emit, ServerStop}
   alias Jido.Agent.Directive
   alias Jido.AgentServer, as: Server
-  alias Jido.AgentServer.Directive.{ErrorReport, ServerStop}
+  alias Jido.AgentServer.Directive.ErrorReport
   alias Jido.AgentServer.Effects
   alias Jido.Signal.Bus
   alias Jido.Signal.Context, as: SignalContext

@@ -1,14 +1,14 @@
 ---
 modules:
   - Jido.Agent.Directive.Reply
+  - Jido.Agent.Directive.AgentSend
+  - Jido.Agent.Directive.ParentSend
+  - Jido.Agent.Directive.ServerStop
   - Jido.AgentServer.Directive
-  - Jido.AgentServer.Directive.AgentSend
   - Jido.AgentServer.Directive.AgentStart
   - Jido.AgentServer.Directive.AgentStop
   - Jido.AgentServer.Directive.ErrorReport
-  - Jido.AgentServer.Directive.ParentSend
   - Jido.AgentServer.Directive.ProcessStart
-  - Jido.AgentServer.Directive.ServerStop
   - Jido.AgentServer.Effects
   - Jido.AgentServer.ReplyGate
   - Jido.Dispatch.Preparation
@@ -23,9 +23,11 @@ the batch in order, and records a safe effect result.
 This component does not own pure Agent evaluation, the commit itself, Plugin
 root lifetime, child restart behavior, durable storage, or Signal transport.
 
-The documented `Jido.AgentServer.Directive` constructors and their result
-records are the public boundary. The effect engine and dispatch preparation
-are internal. This component has no DSL.
+The documented `Jido.Agent.Directive` and `Jido.AgentServer.Directive`
+constructors and their result records are the public boundary. Agent owns
+deferred behavior requests. AgentServer owns live-runtime-only requests. The
+effect engine and dispatch preparation are internal. This component has no
+DSL.
 
 ## Obligations
 
@@ -87,7 +89,7 @@ are internal. This component has no DSL.
 
 ### jido.agent_server.effects.I8 — Terminal ServerStop
 
-- **scope:** `Jido.AgentServer.Directive.ServerStop`
+- **scope:** `Jido.Agent.Directive.ServerStop`
 - **must:** Reject ServerStop before commit when it is not the last Directive. For a valid ServerStop, return commit success first and then stop with the requested clean reason.
 - **why:** A terminal Directive cannot leave later accepted work in its batch.
 - **kind:** ordering
@@ -103,7 +105,7 @@ are internal. This component has no DSL.
 
 ### jido.agent_server.effects.I10 — Runtime Agent Directive handoff
 
-- **scope:** `Jido.AgentServer.Directive.AgentStart`, `AgentStop`, `AgentSend`, `ParentSend`
+- **scope:** `Jido.AgentServer.Directive.AgentStart`, `Jido.AgentServer.Directive.AgentStop`, `Jido.Agent.Directive.AgentSend`, `Jido.Agent.Directive.ParentSend`
 - **must:** Validate local Agent targets, start options, placement, and parent presence before commit. Reject remote start before commit. After commit, start or stop the named runtime Agent, send a Signal to it, or send a Signal to its parent in Directive order.
 - **why:** Runtime Agent requests need one admitted post-commit dispatch boundary.
 - **kind:** functional

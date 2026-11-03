@@ -449,7 +449,7 @@ defmodule JidoTest.AgentServer.Composition.TopologyTest do
 
       settled(server)
       worker = Server.children(server)[restart].pid
-      assert {:ok, _, _} = turn(worker, [R.server_stop()])
+      assert {:ok, _, _} = turn(worker, [D.server_stop()])
 
       if restart == :permanent do
         assert_eventually(match?(%{permanent: %{pid: pid}} when pid != worker, Server.children(server)))
