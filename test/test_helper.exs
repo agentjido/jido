@@ -8,21 +8,18 @@ ExUnit.start(capture_log: true)
     Code.require_file("support/fixtures/action/missing_callbacks.exs", __DIR__)
   end)
 
-ExUnit.configure(
-  exclude: [
-    :integration,
-    :skip,
-    :flaky,
-    :authoring,
-    :system,
-    :load,
-    :throughput,
-    :property,
-    :fuzz,
-    :peer,
-    :bench,
-    :example,
-    :live,
-    :service
-  ]
-)
+special_quality_tags = [
+  :authoring,
+  :system,
+  :load,
+  :throughput,
+  :property,
+  :fuzz,
+  :peer,
+  :bench,
+  :example,
+  :live,
+  :service
+]
+
+ExUnit.configure(exclude: [:integration, :skip, :flaky] ++ special_quality_tags)

@@ -26,7 +26,24 @@ defmodule Jido.MixProject do
   end
 
   def cli do
-    [preferred_envs: [bench: :prod, ci: :test, quality: :test]]
+    [
+      preferred_envs: [
+        bench: :prod,
+        ci: :test,
+        quality: :test,
+        "test.authoring": :test,
+        "test.bench": :test,
+        "test.ci": :test,
+        "test.examples": :test,
+        "test.fuzz": :test,
+        "test.live": :test,
+        "test.load": :test,
+        "test.peer": :test,
+        "test.property": :test,
+        "test.services": :test,
+        "test.system": :test
+      ]
+    ]
   end
 
   defp elixirc_paths(:test), do: ["lib", "test/support", "test/jido/support"]
@@ -92,7 +109,7 @@ defmodule Jido.MixProject do
       ci: [
         "compile --warnings-as-errors",
         "format --check-formatted",
-        "test",
+        "test.ci",
         "credo --strict",
         "dialyzer",
         "ex_dna",
@@ -105,8 +122,48 @@ defmodule Jido.MixProject do
         "dialyzer",
         "ex_dna",
         "reach.check --arch --smells"
-      ]
+      ],
+      "test.authoring": test_alias("test/authoring", :authoring),
+      "test.bench": test_alias("test/bench", :bench),
+      "test.ci": [
+        "test",
+        "test.examples",
+        "test.property",
+        "test.fuzz",
+        "test.system",
+        "test.load",
+        "test.peer",
+        "test.bench"
+      ],
+      "test.examples": test_alias("test/examples", :example),
+      "test.fuzz": test_alias("test/property", :fuzz),
+      "test.live": test_alias("test/live", :live),
+      "test.load": test_alias("test/load", :load),
+      "test.peer": test_alias("test", :peer),
+      "test.property": test_alias("test/property", :property),
+      "test.services": test_alias("test/system/services", :service),
+      "test.system": test_alias("test/system", :system)
     ]
+  end
+
+  defp test_alias(default_path, tag) do
+    fn args -> run_tagged_tests(default_path, tag, args) end
+  end
+
+  defp run_tagged_tests(default_path, tag, args) do
+    explicit_path? = Enum.any?(args, &test_path?/1)
+    default_path? = File.exists?(default_path)
+
+    if default_path? or explicit_path? do
+      paths = if default_path? and not explicit_path?, do: [default_path], else: []
+      Mix.Task.run("test", ["--only", Atom.to_string(tag), "--seed", "0"] ++ paths ++ args)
+    else
+      Mix.shell().info("No #{tag} tests found under #{default_path}")
+    end
+  end
+
+  defp test_path?(argument) do
+    not String.starts_with?(argument, "-") and File.exists?(argument)
   end
 
   defp test_ignore_filters do

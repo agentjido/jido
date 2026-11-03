@@ -1,0 +1,297 @@
+version: 1
+schema:
+  required_fields:
+    - source_repository
+    - source_commit
+    - source_path
+    - target_path
+    - quality_surface
+    - owner
+    - disposition
+    - reason
+  dispositions:
+    - ported
+    - superseded
+    - deferred
+    - excluded
+assets:
+  - source_repository: jido_signal
+    source_commit: 7b825f1d050a0e0159bb2a72ba79c100b5d362d3
+    source_path: test/property
+    target_path: test/property/signal
+    quality_surface: property_and_fuzz
+    owner: jido.signal
+    disposition: deferred
+    reason: Scheduled for jido-07x.3.
+  - source_repository: jido_signal
+    source_commit: 7b825f1d050a0e0159bb2a72ba79c100b5d362d3
+    source_path: test/bench
+    target_path: test/bench/signal
+    quality_surface: benchmark_smoke
+    owner: jido.signal
+    disposition: deferred
+    reason: Scheduled for jido-07x.4.
+  - source_repository: jido_signal
+    source_commit: 7b825f1d050a0e0159bb2a72ba79c100b5d362d3
+    source_path: bench
+    target_path: bench/signal
+    quality_surface: benchmark
+    owner: jido.signal
+    disposition: deferred
+    reason: Scheduled for jido-07x.4. Historical bench/results files are excluded.
+  - source_repository: jido_action
+    source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
+    source_path: test/property
+    target_path: test/property/action_flow
+    quality_surface: property_and_fuzz
+    owner: jido.flow
+    disposition: deferred
+    reason: Scheduled for jido-07x.5 as explicit post-baseline quality work.
+  - source_repository: jido_action
+    source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
+    source_path: test/system
+    target_path: test/system/runtime/action_flow
+    quality_surface: system
+    owner: jido.execution
+    disposition: deferred
+    reason: Scheduled for jido-07x.6 as explicit post-baseline quality work.
+  - source_repository: jido_action
+    source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
+    source_path: test/load
+    target_path: test/load/action_flow
+    quality_surface: load
+    owner: jido.execution
+    disposition: deferred
+    reason: Scheduled for jido-07x.6 as explicit post-baseline quality work.
+  - source_repository: jido_action
+    source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
+    source_path: test/bench
+    target_path: test/bench/action_flow
+    quality_surface: benchmark_smoke
+    owner: jido.flow
+    disposition: deferred
+    reason: Scheduled for jido-07x.7 as explicit post-baseline quality work.
+  - source_repository: jido_action
+    source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
+    source_path: test/examples
+    target_path: test/examples/flow
+    quality_surface: examples
+    owner: jido.flow
+    disposition: deferred
+    reason: Scheduled across jido-07x.9 through jido-07x.11 as explicit post-baseline quality work.
+  - source_repository: jido_action
+    source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
+    source_path: examples/01_compilation
+    target_path: examples/flow/compilation
+    quality_surface: examples
+    owner: jido.flow
+    disposition: deferred
+    reason: Scheduled for jido-07x.9 as explicit post-baseline quality work.
+  - source_repository: jido_action
+    source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
+    source_path: examples/02_execution
+    target_path: examples/flow/execution
+    quality_surface: examples
+    owner: jido.execution
+    disposition: deferred
+    reason: Scheduled for jido-07x.10 as explicit post-baseline quality work.
+  - source_repository: jido_action
+    source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
+    source_path: examples/03_durability
+    target_path: examples/flow/advanced/durability
+    quality_surface: examples
+    owner: jido.execution
+    disposition: deferred
+    reason: Scheduled for jido-07x.11 as explicit post-baseline quality work.
+  - source_repository: jido_action
+    source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
+    source_path: examples/04_patterns
+    target_path: examples/flow/advanced/patterns
+    quality_surface: examples
+    owner: jido.execution
+    disposition: deferred
+    reason: Scheduled for jido-07x.11 as explicit post-baseline quality work.
+  - source_repository: jido_action
+    source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
+    source_path: examples/05_distribution
+    target_path: examples/flow/advanced/distribution
+    quality_surface: examples
+    owner: jido.execution
+    disposition: deferred
+    reason: Scheduled for jido-07x.11 as explicit post-baseline quality work.
+  - source_repository: jido_v3_split
+    source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
+    source_path: test/authoring
+    target_path: test/jido/core_authoring
+    quality_surface: authoring
+    owner: jido.agent
+    disposition: ported
+    reason: The adapted authoring corpus was present before this quality import.
+  - source_repository: jido_v3_split
+    source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
+    source_path: test/examples
+    target_path: test/examples/agent
+    quality_surface: examples
+    owner: jido.agent
+    disposition: deferred
+    reason: Scheduled across jido-07x.12 through jido-07x.14.
+  - source_repository: jido_v3_split
+    source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
+    source_path: test/property
+    target_path: test/property/runtime
+    quality_surface: property_and_fuzz
+    owner: jido.agent_server
+    disposition: deferred
+    reason: Scheduled for jido-07x.16.
+  - source_repository: jido_v3_split
+    source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
+    source_path: test/system
+    target_path: test/system/runtime/core
+    quality_surface: system_and_services
+    owner: jido.agent_server
+    disposition: deferred
+    reason: Local checks are scheduled for jido-07x.16 and service checks for jido-07x.17.
+  - source_repository: jido_v3_split
+    source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
+    source_path: test/bench
+    target_path: test/quality/excluded/core_bench
+    quality_surface: benchmark_smoke
+    owner: jido.agent_server
+    disposition: excluded
+    reason: The plan selects distinct Signal, Action, and AI benchmark obligations instead of this broad legacy suite.
+  - source_repository: jido_v3_split
+    source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
+    source_path: examples/01_basic
+    target_path: examples/agent/basic
+    quality_surface: examples
+    owner: jido.agent
+    disposition: deferred
+    reason: Scheduled for jido-07x.12.
+  - source_repository: jido_v3_split
+    source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
+    source_path: examples/02_workflow
+    target_path: examples/agent/workflow
+    quality_surface: examples
+    owner: jido.flow
+    disposition: deferred
+    reason: Scheduled for jido-07x.12.
+  - source_repository: jido_v3_split
+    source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
+    source_path: examples/03_llm
+    target_path: test/quality/superseded/core_llm_examples
+    quality_surface: examples
+    owner: jido.ai.agent_authoring
+    disposition: superseded
+    reason: The AI example catalog scheduled for jido-07x.15 owns this learning path.
+  - source_repository: jido_v3_split
+    source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
+    source_path: examples/04_runtime
+    target_path: examples/runtime
+    quality_surface: examples
+    owner: jido.agent_server
+    disposition: deferred
+    reason: Scheduled for jido-07x.13.
+  - source_repository: jido_v3_split
+    source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
+    source_path: examples/05_multi_agent
+    target_path: examples/runtime/multi_agent
+    quality_surface: examples
+    owner: jido.agent_server
+    disposition: deferred
+    reason: Scheduled for jido-07x.13.
+  - source_repository: jido_v3_split
+    source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
+    source_path: examples/07_topology
+    target_path: examples/topology
+    quality_surface: examples
+    owner: jido.agent_server
+    disposition: deferred
+    reason: Scheduled for jido-07x.13.
+  - source_repository: jido_v3_split
+    source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
+    source_path: examples/08_applications
+    target_path: examples/plugin/applications
+    quality_surface: examples
+    owner: jido.plugin
+    disposition: deferred
+    reason: Scheduled for jido-07x.14.
+  - source_repository: jido_v3_split
+    source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
+    source_path: examples/09_plugins
+    target_path: examples/plugin
+    quality_surface: examples
+    owner: jido.plugin
+    disposition: deferred
+    reason: Scheduled for jido-07x.14.
+  - source_repository: jido_v3_split
+    source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
+    source_path: examples/10_persistence
+    target_path: examples/persistence
+    quality_surface: examples
+    owner: jido.persistence
+    disposition: deferred
+    reason: Scheduled for jido-07x.14.
+  - source_repository: jido_v3_split
+    source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
+    source_path: examples/11_durable
+    target_path: examples/durable
+    quality_surface: examples
+    owner: jido.agent_server.durable
+    disposition: deferred
+    reason: Supported examples are scheduled for jido-07x.14. Proposal folders remain excluded.
+  - source_repository: jido_v3_split
+    source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
+    source_path: examples/99_research
+    target_path: test/quality/excluded/core_research_examples
+    quality_surface: examples
+    owner: jido.agent
+    disposition: excluded
+    reason: Research-only examples are outside the supported example catalog.
+  - source_repository: jido_ai
+    source_commit: 2d3cac6700fcb850b632c2ce5f552ccfd0e5459e
+    source_path: test/bench
+    target_path: test/bench/ai
+    quality_surface: benchmark_smoke
+    owner: jido.ai.react
+    disposition: deferred
+    reason: Scheduled for jido-07x.18.
+  - source_repository: jido_ai
+    source_commit: 2d3cac6700fcb850b632c2ce5f552ccfd0e5459e
+    source_path: test/live
+    target_path: test/live/ai_reasoning_live_test.exs
+    quality_surface: live
+    owner: jido.ai.model_execution
+    disposition: deferred
+    reason: Scheduled for jido-07x.19.
+  - source_repository: jido_ai
+    source_commit: 2d3cac6700fcb850b632c2ce5f552ccfd0e5459e
+    source_path: examples/00_graph_first
+    target_path: examples/ai/graph_first
+    quality_surface: examples
+    owner: jido.ai.agent_authoring
+    disposition: deferred
+    reason: Scheduled for jido-07x.15.
+  - source_repository: jido_ai
+    source_commit: 2d3cac6700fcb850b632c2ce5f552ccfd0e5459e
+    source_path: examples/01_basics
+    target_path: examples/ai/basics
+    quality_surface: examples
+    owner: jido.ai.agent_authoring
+    disposition: deferred
+    reason: Scheduled for jido-07x.15.
+  - source_repository: jido_ai
+    source_commit: 2d3cac6700fcb850b632c2ce5f552ccfd0e5459e
+    source_path: examples/02_conversations
+    target_path: examples/ai/conversations
+    quality_surface: examples
+    owner: jido.ai.conversation
+    disposition: deferred
+    reason: Scheduled for jido-07x.15.
+  - source_repository: jido_ai
+    source_commit: 2d3cac6700fcb850b632c2ce5f552ccfd0e5459e
+    source_path: examples/99_proposed
+    target_path: test/quality/excluded/ai_proposed_examples
+    quality_surface: examples
+    owner: jido.ai.agent_authoring
+    disposition: excluded
+    reason: Proposed examples are not supported product guidance.
