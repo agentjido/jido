@@ -12,11 +12,17 @@ defmodule Jido.Codec.Signal do
   `:jido` application.
   """
 
-  alias Jido.Codec.Signal.CloudEvents
   alias Jido.Codec.Signal.Boundary
+  alias Jido.Joi
   alias Jido.Signal
 
   @default_max_payload_bytes 10_000_000
+  @core_names ~w[
+    specversion id source type subject time
+    datacontenttype dataschema data data_base64
+  ]
+  @legacy_wire_version_key "jido_schema_version"
+  @legacy_wire_versions [1, 2]
 
   @type format :: :json | :erlang_term
 
@@ -37,11 +43,163 @@ defmodule Jido.Codec.Signal do
 
   @doc "Parses a complete CloudEvents structured-mode map."
   @spec from_map(map()) :: {:ok, Signal.t()} | {:error, String.t()}
-  defdelegate from_map(map), to: CloudEvents
+  def from_map(map) when is_map(map) do
+    with {:ok, attrs} <- normalize_attribute_keys(map),
+         :ok <- validate_specversion(attrs),
+         :ok <- validate_legacy_wire_version(attrs),
+         {:ok, data, data_present?, data_base64?} <- extract_data(attrs),
+         {:ok, extensions} <- extract_extensions(attrs) do
+      parse_signal(attrs, data, data_present?, data_base64?, extensions)
+    end
+  end
+
+  def from_map(_map), do: {:error, "parse error: expected a map"}
 
   @doc "Returns the canonical CloudEvents structured-mode map."
   @spec to_map(Signal.t()) :: map()
-  defdelegate to_map(signal), to: CloudEvents
+  def to_map(%Signal{} = signal) do
+    extensions =
+      case Signal.normalize_extensions(signal.extensions) do
+        {:ok, extensions} -> extensions
+        {:error, reason} -> raise ArgumentError, "invalid Signal extensions: #{reason}"
+      end
+
+    signal
+    |> core_map()
+    |> Map.merge(extensions)
+  end
+
+  defp core_map(signal) do
+    %{
+      "specversion" => signal.specversion,
+      "id" => signal.id,
+      "source" => signal.source,
+      "type" => signal.type,
+      "subject" => signal.subject,
+      "time" => normalize_time(signal.time),
+      "datacontenttype" => signal.datacontenttype,
+      "dataschema" => signal.dataschema
+    }
+    |> Map.reject(fn {_key, value} -> is_nil(value) end)
+    |> Map.merge(encode_data(signal.data, signal.data_present?, signal.data_base64?))
+  end
+
+  defp encode_data(nil, false, _base64?), do: %{}
+  defp encode_data(nil, true, _base64?), do: %{"data" => nil}
+
+  defp encode_data(data, _present?, base64?) when is_binary(data) do
+    if base64? or not String.valid?(data),
+      do: %{"data_base64" => Base.encode64(data)},
+      else: %{"data" => data}
+  end
+
+  defp encode_data(data, _present?, _base64?), do: %{"data" => data}
+
+  defp normalize_time(%DateTime{} = time), do: DateTime.to_iso8601(time)
+  defp normalize_time(time), do: time
+
+  defp normalize_attribute_keys(map) do
+    Enum.reduce_while(Map.to_list(map), {:ok, %{}}, fn {key, value}, {:ok, normalized} ->
+      with {:ok, key} <- normalize_attribute_key(key),
+           false <- Map.has_key?(normalized, key) do
+        {:cont, {:ok, Map.put(normalized, key, value)}}
+      else
+        true -> {:halt, {:error, "parse error: duplicate attribute #{inspect(key)}"}}
+        {:error, reason} -> {:halt, {:error, reason}}
+      end
+    end)
+  end
+
+  defp normalize_attribute_key(key) when is_atom(key), do: {:ok, Atom.to_string(key)}
+
+  defp normalize_attribute_key(key) when is_binary(key) do
+    if String.valid?(key),
+      do: {:ok, key},
+      else: {:error, "parse error: attribute names must be valid UTF-8 strings"}
+  end
+
+  defp normalize_attribute_key(key),
+    do: {:error, "parse error: attribute keys must be atoms or strings, got: #{inspect(key)}"}
+
+  defp extract_data(attrs) do
+    case {Map.fetch(attrs, "data"), Map.fetch(attrs, "data_base64")} do
+      {{:ok, _data}, {:ok, _encoded}} ->
+        {:error, "parse error: data and data_base64 are mutually exclusive"}
+
+      {{:ok, data}, :error} ->
+        {:ok, data, true, is_binary(data) and not String.valid?(data)}
+
+      {:error, {:ok, encoded}} ->
+        decode_data_base64(encoded)
+
+      {:error, :error} ->
+        {:ok, nil, false, false}
+    end
+  end
+
+  defp decode_data_base64(encoded) when is_binary(encoded) do
+    case Base.decode64(encoded) do
+      {:ok, binary} -> {:ok, binary, true, true}
+      :error -> {:error, "parse error: data_base64 must be valid Base64"}
+    end
+  end
+
+  defp decode_data_base64(_encoded),
+    do: {:error, "parse error: data_base64 must be a Base64 string"}
+
+  defp extract_extensions(attrs) do
+    attrs
+    |> Map.drop(@core_names ++ [@legacy_wire_version_key])
+    |> Map.reject(fn {_name, value} -> is_nil(value) end)
+    |> Signal.normalize_extensions()
+    |> case do
+      {:ok, extensions} -> {:ok, extensions}
+      {:error, reason} -> {:error, "parse error: #{reason}"}
+    end
+  end
+
+  defp parse_signal(attrs, data, data_present?, data_base64?, extensions) do
+    signal =
+      struct(Signal,
+        data: data,
+        data_present?: data_present?,
+        data_base64?: data_base64?,
+        datacontenttype: Map.get(attrs, "datacontenttype"),
+        dataschema: Map.get(attrs, "dataschema"),
+        extensions: extensions,
+        id: Map.get(attrs, "id"),
+        source: Map.get(attrs, "source"),
+        specversion: normalize_specversion(Map.get(attrs, "specversion")),
+        subject: Map.get(attrs, "subject"),
+        time: normalize_time(Map.get(attrs, "time")),
+        type: Map.get(attrs, "type")
+      )
+
+    case Joi.parse(Signal.schema(), signal) do
+      {:ok, validated} -> {:ok, validated}
+      {:error, errors} -> {:error, "parse error: #{Joi.prettify_errors(errors)}"}
+    end
+  end
+
+  defp normalize_specversion("1.0.2"), do: "1.0"
+  defp normalize_specversion(value), do: value
+
+  defp validate_specversion(%{"specversion" => value}) when not is_nil(value), do: :ok
+  defp validate_specversion(_attrs), do: {:error, "parse error: specversion is required"}
+
+  defp validate_legacy_wire_version(%{@legacy_wire_version_key => version})
+       when version in @legacy_wire_versions,
+       do: :ok
+
+  defp validate_legacy_wire_version(%{@legacy_wire_version_key => nil}), do: :ok
+
+  defp validate_legacy_wire_version(map)
+       when not is_map_key(map, @legacy_wire_version_key),
+       do: :ok
+
+  defp validate_legacy_wire_version(%{@legacy_wire_version_key => version}) do
+    {:error, "parse error: unsupported jido_schema_version #{inspect(version)}"}
+  end
 
   @doc "Encodes one Signal or a list of Signals."
   @spec serialize(Signal.t() | [Signal.t()], keyword()) ::

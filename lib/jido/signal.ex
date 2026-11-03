@@ -320,7 +320,7 @@ defmodule Jido.Signal do
       attrs
       |> Map.put_new_lazy("id", &Jido.Id.uuid7/0)
       |> Map.put_new("specversion", "1.0")
-      |> from_normalized_map(:constructor)
+      |> from_constructor_attrs()
     end
   end
 
@@ -403,14 +403,6 @@ defmodule Jido.Signal do
   @spec list_context(t()) :: [String.t()]
   def list_context(%__MODULE__{} = signal), do: Map.keys(signal.extensions)
   def list_context(_signal), do: []
-
-  @doc false
-  @spec __from_cloud_events__(map()) :: {:ok, t()} | {:error, String.t()}
-  def __from_cloud_events__(map) when is_map(map) do
-    with {:ok, attrs} <- normalize_attribute_keys(map), do: from_normalized_map(attrs, :wire)
-  end
-
-  def __from_cloud_events__(_map), do: {:error, "parse error: expected a map"}
 
   @doc false
   @spec normalize_extensions(map()) :: {:ok, %{optional(String.t()) => context_value()}} | {:error, String.t()}
@@ -514,16 +506,16 @@ defmodule Jido.Signal do
 
   def validate_utf8_string(_value, _opts), do: {:error, "must be valid UTF-8"}
 
-  defp from_normalized_map(attrs, boundary) do
+  defp from_constructor_attrs(attrs) do
     with :ok <- validate_specversion(attrs),
          :ok <- validate_legacy_wire_version(attrs),
          {:ok, data, data_present?, data_base64?} <- extract_data(attrs),
-         {:ok, extensions} <- extract_extensions(attrs, boundary) do
+         {:ok, extensions} <- extract_extensions(attrs) do
       parse_signal(attrs, data, data_present?, data_base64?, extensions)
     end
   end
 
-  defp extract_extensions(attrs, :constructor) do
+  defp extract_extensions(attrs) do
     explicit = Map.get(attrs, "extensions", %{})
     unknown = Map.drop(attrs, @constructor_names ++ [@legacy_wire_version_key])
 
@@ -532,17 +524,6 @@ defmodule Jido.Signal do
          :ok <- reject_duplicate_extensions(explicit, unknown) do
       {:ok, Map.merge(unknown, explicit)}
     else
-      {:error, reason} -> {:error, "parse error: #{reason}"}
-    end
-  end
-
-  defp extract_extensions(attrs, :wire) do
-    attrs
-    |> Map.drop(@core_names ++ [@legacy_wire_version_key])
-    |> Map.reject(fn {_name, value} -> is_nil(value) end)
-    |> normalize_extensions()
-    |> case do
-      {:ok, extensions} -> {:ok, extensions}
       {:error, reason} -> {:error, "parse error: #{reason}"}
     end
   end

@@ -1,7 +1,11 @@
-defmodule Jido.Codec.Signal.CloudEventsTest do
+defmodule Jido.Codec.Signal.MapTest do
   use ExUnit.Case, async: true
 
   alias Jido.Signal
+
+  test "does not keep a separate CloudEvents codec module" do
+    refute Code.ensure_loaded?(Jido.Codec.Signal.CloudEvents)
+  end
 
   test "parses and emits a complete CloudEvents envelope" do
     map = %{
