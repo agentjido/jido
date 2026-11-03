@@ -1,8 +1,20 @@
-defmodule Jido.Signal.SerializationTest do
+defmodule Jido.Codec.SignalTest do
   use ExUnit.Case, async: false
 
   alias Jido.Signal
-  alias Jido.Signal.Serialization
+  alias Jido.Codec.Signal, as: SignalCodec
+
+  test "owns the wire API without a Signal compatibility facade" do
+    assert function_exported?(SignalCodec, :from_map, 1)
+    assert function_exported?(SignalCodec, :to_map, 1)
+    assert function_exported?(SignalCodec, :serialize, 2)
+    assert function_exported?(SignalCodec, :deserialize, 2)
+
+    refute function_exported?(Signal, :from_map, 1)
+    refute function_exported?(Signal, :to_map, 1)
+    refute function_exported?(Signal, :serialize, 2)
+    refute function_exported?(Signal, :deserialize, 2)
+  end
 
   describe "JSON" do
     test "round-trips one Signal through the canonical map" do
@@ -13,9 +25,9 @@ defmodule Jido.Signal.SerializationTest do
           subject: "record/1"
         )
 
-      assert {:ok, json} = Signal.serialize(signal)
-      assert Jason.decode!(json) == Signal.to_map(signal)
-      assert {:ok, decoded} = Signal.deserialize(json)
+      assert {:ok, json} = Jido.Codec.Signal.serialize(signal)
+      assert Jason.decode!(json) == Jido.Codec.Signal.to_map(signal)
+      assert {:ok, decoded} = Jido.Codec.Signal.deserialize(json)
       assert decoded == signal
     end
 
@@ -25,13 +37,13 @@ defmodule Jido.Signal.SerializationTest do
         Signal.new!(type: "second.created", source: "/test", id: "second")
       ]
 
-      assert {:ok, json} = Signal.serialize(signals)
-      assert {:ok, decoded} = Signal.deserialize(json)
+      assert {:ok, json} = Jido.Codec.Signal.serialize(signals)
+      assert {:ok, decoded} = Jido.Codec.Signal.deserialize(json)
       assert decoded == signals
     end
 
     test "returns a tagged error for invalid JSON" do
-      assert {:error, {:json_decode_failed, message}} = Signal.deserialize("{invalid")
+      assert {:error, {:json_decode_failed, message}} = Jido.Codec.Signal.deserialize("{invalid")
       assert is_binary(message)
     end
   end
@@ -40,15 +52,15 @@ defmodule Jido.Signal.SerializationTest do
     test "round-trips through the same canonical map" do
       signal = Signal.new!("test.created", %{"count" => 2}, source: "/test")
 
-      assert {:ok, binary} = Signal.serialize(signal, format: :erlang_term)
-      assert :erlang.binary_to_term(binary, [:safe]) == Signal.to_map(signal)
-      assert {:ok, decoded} = Signal.deserialize(binary, format: :erlang_term)
+      assert {:ok, binary} = Jido.Codec.Signal.serialize(signal, format: :erlang_term)
+      assert :erlang.binary_to_term(binary, [:safe]) == Jido.Codec.Signal.to_map(signal)
+      assert {:ok, decoded} = Jido.Codec.Signal.deserialize(binary, format: :erlang_term)
       assert decoded == signal
     end
 
     test "returns a tagged error for invalid Erlang term data" do
       assert {:error, {:erlang_term_decode_failed, message}} =
-               Signal.deserialize(<<1, 2, 3>>, format: :erlang_term)
+               Jido.Codec.Signal.deserialize(<<1, 2, 3>>, format: :erlang_term)
 
       assert is_binary(message)
     end
@@ -57,25 +69,25 @@ defmodule Jido.Signal.SerializationTest do
       encoded_function = :erlang.term_to_binary(&System.cmd/3)
 
       assert {:error, {:invalid_wire_data, message}} =
-               Signal.deserialize(encoded_function, format: :erlang_term)
+               Jido.Codec.Signal.deserialize(encoded_function, format: :erlang_term)
 
       assert message =~ "expected a map"
 
-      valid_wire = Signal.to_map(Signal.new!(type: "test.valid", source: "/test"))
+      valid_wire = Jido.Codec.Signal.to_map(Signal.new!(type: "test.valid", source: "/test"))
       invalid_list = :erlang.term_to_binary([valid_wire, &System.cmd/3])
 
       assert {:error, {:invalid_wire_data, list_message}} =
-               Signal.deserialize(invalid_list, format: :erlang_term)
+               Jido.Codec.Signal.deserialize(invalid_list, format: :erlang_term)
 
       assert list_message =~ "expected a map"
     end
 
     test "validates a large batch without recursive stack growth" do
-      wire = Signal.to_map(Signal.new!(type: "test.large-batch", source: "/test"))
+      wire = Jido.Codec.Signal.to_map(Signal.new!(type: "test.large-batch", source: "/test"))
       encoded = :erlang.term_to_binary(List.duplicate(wire, 20_000))
 
       assert {:ok, signals} =
-               Signal.deserialize(encoded,
+               Jido.Codec.Signal.deserialize(encoded,
                  format: :erlang_term,
                  max_payload_bytes: byte_size(encoded)
                )
@@ -89,11 +101,11 @@ defmodule Jido.Signal.SerializationTest do
       data = <<0, 255>>
       signal = Signal.new!("test.binary", data, source: "/test")
 
-      wire = Signal.to_map(signal)
+      wire = Jido.Codec.Signal.to_map(signal)
       refute Map.has_key?(wire, "data")
       assert Base.decode64!(wire["data_base64"]) == data
 
-      assert {:ok, decoded} = Signal.from_map(wire)
+      assert {:ok, decoded} = Jido.Codec.Signal.from_map(wire)
       assert decoded.data == data
     end
 
@@ -106,18 +118,18 @@ defmodule Jido.Signal.SerializationTest do
         "data_base64" => "AQID"
       }
 
-      assert {:ok, signal} = Signal.from_map(wire)
+      assert {:ok, signal} = Jido.Codec.Signal.from_map(wire)
       assert signal.data == <<1, 2, 3>>
-      assert Signal.to_map(signal) == wire
+      assert Jido.Codec.Signal.to_map(signal) == wire
     end
 
     test "keeps Erlang-only values in the trusted term format only" do
       data = %{status: :ready, value: {1, 2}, bytes: <<0, 255>>}
       signal = Signal.new!("test.term", data, source: "/test")
 
-      assert {:error, {:json_encode_failed, _message}} = Signal.serialize(signal)
-      assert {:ok, encoded} = Signal.serialize(signal, format: :erlang_term)
-      assert {:ok, decoded} = Signal.deserialize(encoded, format: :erlang_term)
+      assert {:error, {:json_encode_failed, _message}} = Jido.Codec.Signal.serialize(signal)
+      assert {:ok, encoded} = Jido.Codec.Signal.serialize(signal, format: :erlang_term)
+      assert {:ok, decoded} = Jido.Codec.Signal.deserialize(encoded, format: :erlang_term)
       assert decoded.data == data
     end
 
@@ -125,16 +137,16 @@ defmodule Jido.Signal.SerializationTest do
       data = %{"message" => "hello", "items" => [1, true, nil]}
       signal = Signal.new!("test.json", data, source: "/test")
 
-      assert Signal.to_map(signal)["data"] == data
-      refute Map.has_key?(Signal.to_map(signal), "data_base64")
+      assert Jido.Codec.Signal.to_map(signal)["data"] == data
+      refute Map.has_key?(Jido.Codec.Signal.to_map(signal), "data_base64")
     end
 
     test "keeps explicit null data in JSON" do
       signal = Signal.new!("test.null", nil, source: "/test")
 
-      assert {:ok, json} = Signal.serialize(signal)
+      assert {:ok, json} = Jido.Codec.Signal.serialize(signal)
       assert Map.fetch(Jason.decode!(json), "data") == {:ok, nil}
-      assert {:ok, ^signal} = Signal.deserialize(json)
+      assert {:ok, ^signal} = Jido.Codec.Signal.deserialize(json)
     end
 
     test "rejects invalid or ambiguous data_base64" do
@@ -145,13 +157,13 @@ defmodule Jido.Signal.SerializationTest do
         "type" => "test.binary"
       }
 
-      assert {:error, error} = Signal.from_map(Map.put(wire, "data_base64", "not-base64"))
+      assert {:error, error} = Jido.Codec.Signal.from_map(Map.put(wire, "data_base64", "not-base64"))
       assert error =~ "valid Base64"
 
       encoded = Base.encode64("value")
 
       assert {:error, error} =
-               Signal.from_map(Map.merge(wire, %{"data" => "value", "data_base64" => encoded}))
+               Jido.Codec.Signal.from_map(Map.merge(wire, %{"data" => "value", "data_base64" => encoded}))
 
       assert error =~ "mutually exclusive"
     end
@@ -167,7 +179,7 @@ defmodule Jido.Signal.SerializationTest do
         "data_base64" => Base.encode64(encoded_function)
       }
 
-      assert {:ok, signal} = Signal.from_map(wire)
+      assert {:ok, signal} = Jido.Codec.Signal.from_map(wire)
       assert signal.data == encoded_function
       refute is_function(signal.data)
     end
@@ -177,68 +189,68 @@ defmodule Jido.Signal.SerializationTest do
     test "validates the decoded Signal envelope" do
       json = ~s({"specversion":"1.0","id":"1","source":"","type":"test.created"})
 
-      assert {:error, error} = Signal.deserialize(json)
+      assert {:error, error} = Jido.Codec.Signal.deserialize(json)
       assert error =~ "source"
     end
 
     test "rejects non-Signal input and unsupported formats" do
-      assert {:error, {:invalid_signal, _message}} = Serialization.serialize(%{"type" => "test"})
-      assert {:error, {:invalid_signal, _message}} = Serialization.serialize([:not_a_signal])
-      assert {:error, {:unsupported_format, :msgpack}} = Signal.serialize([], format: :msgpack)
+      assert {:error, {:invalid_signal, _message}} = SignalCodec.serialize(%{"type" => "test"})
+      assert {:error, {:invalid_signal, _message}} = SignalCodec.serialize([:not_a_signal])
+      assert {:error, {:unsupported_format, :msgpack}} = Jido.Codec.Signal.serialize([], format: :msgpack)
     end
 
     test "rejects invalid option and decoded payload shapes" do
       signal = Signal.new!(type: "test.created", source: "/test")
 
       assert {:error, {:invalid_options, "expected a keyword list"}} =
-               Serialization.serialize(signal, %{})
+               SignalCodec.serialize(signal, %{})
 
       assert {:error, {:invalid_payload, "expected a binary"}} =
-               Serialization.deserialize(:not_binary)
+               SignalCodec.deserialize(:not_binary)
 
       assert {:error, {:invalid_options, "expected a keyword list"}} =
-               Serialization.deserialize("{}", %{})
+               SignalCodec.deserialize("{}", %{})
 
       assert {:error, {:invalid_wire_data, message}} =
-               Serialization.deserialize("[1]")
+               SignalCodec.deserialize("[1]")
 
       assert message =~ "expected a map"
 
       assert {:error, {:invalid_options, "expected a keyword list"}} =
-               Serialization.serialize(signal, [:invalid])
+               SignalCodec.serialize(signal, [:invalid])
 
       assert {:error, {:invalid_options, "expected a keyword list"}} =
-               Serialization.deserialize("{}", [:invalid])
+               SignalCodec.deserialize("{}", [:invalid])
     end
 
     test "rejects an invalid payload limit" do
       signal = Signal.new!(type: "test.created", source: "/test")
 
       assert {:error, {:invalid_max_payload_bytes, -1}} =
-               Serialization.serialize(signal, max_payload_bytes: -1)
+               SignalCodec.serialize(signal, max_payload_bytes: -1)
 
       assert {:error, {:invalid_max_payload_bytes, :infinity}} =
-               Serialization.deserialize("{}", max_payload_bytes: :infinity)
+               SignalCodec.deserialize("{}", max_payload_bytes: :infinity)
     end
 
     test "normalizes an unexpected canonical map failure" do
       signal = Signal.new!(type: "test.created", source: "/test")
 
       assert {:error, {:serialization_failed, message}} =
-               Serialization.serialize(%{signal | extensions: :invalid})
+               SignalCodec.serialize(%{signal | extensions: :invalid})
 
       assert is_binary(message)
     end
 
     test "enforces the payload size for encode and decode" do
       signal = Signal.new!(type: "test.created", source: "/test")
-      assert {:ok, json} = Signal.serialize(signal)
+      assert {:ok, json} = Jido.Codec.Signal.serialize(signal)
 
       assert {:error, {:payload_too_large, encode_size, 10}} =
-               Signal.serialize(signal, max_payload_bytes: 10)
+               Jido.Codec.Signal.serialize(signal, max_payload_bytes: 10)
 
       assert {:error, {:payload_too_large, size, 10}} =
-               Signal.deserialize(json, max_payload_bytes: 10)
+               Jido.Codec.Signal.deserialize(json, max_payload_bytes: 10)
 
       assert encode_size == byte_size(json)
       assert size == byte_size(json)
@@ -246,7 +258,7 @@ defmodule Jido.Signal.SerializationTest do
 
     test "reads the application payload limit" do
       signal = Signal.new!(type: "test.created", source: "/test")
-      assert {:ok, json} = Signal.serialize(signal)
+      assert {:ok, json} = Jido.Codec.Signal.serialize(signal)
 
       previous = Application.get_env(:jido, :max_payload_bytes)
       Application.put_env(:jido, :max_payload_bytes, 10)
@@ -259,13 +271,13 @@ defmodule Jido.Signal.SerializationTest do
         end
       end)
 
-      assert {:error, {:payload_too_large, _size, 10}} = Signal.serialize(signal)
-      assert {:error, {:payload_too_large, _size, 10}} = Signal.deserialize(json)
+      assert {:error, {:payload_too_large, _size, 10}} = Jido.Codec.Signal.serialize(signal)
+      assert {:error, {:payload_too_large, _size, 10}} = Jido.Codec.Signal.deserialize(json)
     end
 
     test "serialize!/2 returns a binary" do
       signal = Signal.new!(type: "test.created", source: "/test")
-      assert is_binary(Signal.serialize!(signal))
+      assert is_binary(Jido.Codec.Signal.serialize!(signal))
     end
 
     test "rejects compressed Erlang terms before expansion" do
@@ -280,7 +292,7 @@ defmodule Jido.Signal.SerializationTest do
       compressed = :erlang.term_to_binary(wire, compressed: 9)
 
       assert {:error, {:erlang_term_decode_failed, message}} =
-               Signal.deserialize(compressed, format: :erlang_term)
+               Jido.Codec.Signal.deserialize(compressed, format: :erlang_term)
 
       assert message =~ "compressed"
     end
@@ -288,17 +300,17 @@ defmodule Jido.Signal.SerializationTest do
     test "rejects maps with atom keys at the JSON boundary" do
       signal = Signal.new!("test.atom-keys", %{value: 1}, source: "/test")
 
-      assert {:error, {:json_encode_failed, message}} = Signal.serialize(signal)
+      assert {:error, {:json_encode_failed, message}} = Jido.Codec.Signal.serialize(signal)
       assert message =~ "JSON values"
 
       tuple_signal = Signal.new!("test.tuple", {:one, :two}, source: "/test")
-      assert {:error, {:json_encode_failed, _message}} = Signal.serialize(tuple_signal)
+      assert {:error, {:json_encode_failed, _message}} = Jido.Codec.Signal.serialize(tuple_signal)
     end
   end
 
   test "uses the exact canonical Erlang size at the decoded size boundary" do
     signal = Signal.new!(type: "test.term", source: "/test", data: :éééé)
-    wire = Signal.to_map(signal)
+    wire = Jido.Codec.Signal.to_map(signal)
     legacy = :erlang.term_to_binary(wire, minor_version: 0)
     canonical = :erlang.term_to_binary(wire)
     input_size = byte_size(legacy)
@@ -306,21 +318,21 @@ defmodule Jido.Signal.SerializationTest do
     assert input_size < output_size
 
     assert {:error, {:payload_too_large, ^output_size, ^input_size}} =
-             Signal.deserialize(legacy, format: :erlang_term, max_payload_bytes: input_size)
+             Jido.Codec.Signal.deserialize(legacy, format: :erlang_term, max_payload_bytes: input_size)
 
     assert {:ok, ^signal} =
-             Signal.deserialize(legacy, format: :erlang_term, max_payload_bytes: output_size)
+             Jido.Codec.Signal.deserialize(legacy, format: :erlang_term, max_payload_bytes: output_size)
 
     for data <- [:binary.copy("x", 131_072), %{blob: <<255>>, nested: [{:ok, [1, 2, 3]}]}] do
       signal = Signal.new!(type: "test.term", source: "/test", data: data)
-      assert {:ok, encoded} = Signal.serialize(signal, format: :erlang_term)
+      assert {:ok, encoded} = Jido.Codec.Signal.serialize(signal, format: :erlang_term)
       size = byte_size(encoded)
 
       assert {:ok, ^signal} =
-               Signal.deserialize(encoded, format: :erlang_term, max_payload_bytes: size)
+               Jido.Codec.Signal.deserialize(encoded, format: :erlang_term, max_payload_bytes: size)
 
       assert {:error, {:payload_too_large, ^size, limit}} =
-               Signal.deserialize(encoded, format: :erlang_term, max_payload_bytes: size - 1)
+               Jido.Codec.Signal.deserialize(encoded, format: :erlang_term, max_payload_bytes: size - 1)
 
       assert limit == size - 1
     end
@@ -345,16 +357,16 @@ defmodule Jido.Signal.SerializationTest do
 
     for data <- values ++ boundaries do
       signal = Signal.new!(type: "test.text", source: "/test", data: data)
-      wire = Signal.to_map(signal)
+      wire = Jido.Codec.Signal.to_map(signal)
       assert Map.has_key?(wire, "data") == String.valid?(data)
       assert Map.has_key?(wire, "data_base64") == not String.valid?(data)
-      assert {:ok, ^signal} = Signal.from_map(wire)
-      assert {:ok, json} = Signal.serialize(signal)
-      assert {:ok, ^signal} = Signal.deserialize(json)
+      assert {:ok, ^signal} = Jido.Codec.Signal.from_map(wire)
+      assert {:ok, json} = Jido.Codec.Signal.serialize(signal)
+      assert {:ok, ^signal} = Jido.Codec.Signal.deserialize(json)
     end
 
     signal = Signal.new!(type: "test.text", source: "/test", data: %{"text" => <<255>>})
-    assert {:error, {:json_encode_failed, _}} = Signal.serialize(signal)
+    assert {:error, {:json_encode_failed, _}} = Jido.Codec.Signal.serialize(signal)
   end
 
   describe "legacy input" do
@@ -368,9 +380,9 @@ defmodule Jido.Signal.SerializationTest do
           "type" => "test.created"
         })
 
-      assert {:ok, signal} = Signal.deserialize(json)
+      assert {:ok, signal} = Jido.Codec.Signal.deserialize(json)
       assert signal.specversion == "1.0"
-      refute Map.has_key?(Signal.to_map(signal), "jido_schema_version")
+      refute Map.has_key?(Jido.Codec.Signal.to_map(signal), "jido_schema_version")
     end
 
     test "rejects unsupported v2 wire markers" do
@@ -383,7 +395,7 @@ defmodule Jido.Signal.SerializationTest do
           "type" => "test.created"
         })
 
-      assert {:error, error} = Signal.deserialize(json)
+      assert {:error, error} = Jido.Codec.Signal.deserialize(json)
       assert error =~ "unsupported jido_schema_version 999"
     end
   end

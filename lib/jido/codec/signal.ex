@@ -1,4 +1,4 @@
-defmodule Jido.Signal.Serialization do
+defmodule Jido.Codec.Signal do
   @moduledoc """
   Encodes and decodes Signals through the canonical CloudEvents map.
 
@@ -10,11 +10,20 @@ defmodule Jido.Signal.Serialization do
   `:jido` application.
   """
 
+  alias Jido.Codec.Signal.CloudEvents
   alias Jido.Signal
 
   @default_max_payload_bytes 10_000_000
 
   @type format :: :json | :erlang_term
+
+  @doc "Parses a complete CloudEvents structured-mode map."
+  @spec from_map(map()) :: {:ok, Signal.t()} | {:error, String.t()}
+  defdelegate from_map(map), to: CloudEvents
+
+  @doc "Returns the canonical CloudEvents structured-mode map."
+  @spec to_map(Signal.t()) :: map()
+  defdelegate to_map(signal), to: CloudEvents
 
   @doc "Encodes one Signal or a list of Signals."
   @spec serialize(Signal.t() | [Signal.t()], keyword()) ::
@@ -31,6 +40,15 @@ defmodule Jido.Signal.Serialization do
 
   def serialize(_signal_or_signals, _opts),
     do: {:error, {:invalid_options, "expected a keyword list"}}
+
+  @doc "Encodes one Signal or a list of Signals, or raises."
+  @spec serialize!(Signal.t() | [Signal.t()], keyword()) :: binary() | no_return()
+  def serialize!(signal_or_signals, opts \\ []) do
+    case serialize(signal_or_signals, opts) do
+      {:ok, binary} -> binary
+      {:error, reason} -> raise RuntimeError, "serialization failed: #{inspect(reason)}"
+    end
+  end
 
   defp do_serialize(signal_or_signals, opts) do
     with {:ok, format} <- format(opts),
@@ -68,13 +86,13 @@ defmodule Jido.Signal.Serialization do
 
   def deserialize(_binary, _opts), do: {:error, {:invalid_options, "expected a keyword list"}}
 
-  defp to_wire_data(%Signal{} = signal), do: {:ok, Signal.to_map(signal)}
+  defp to_wire_data(%Signal{} = signal), do: {:ok, to_map(signal)}
 
   defp to_wire_data(signals) when is_list(signals) do
     signals
     |> Enum.reduce_while({:ok, []}, fn
       %Signal{} = signal, {:ok, acc} ->
-        {:cont, {:ok, [Signal.to_map(signal) | acc]}}
+        {:cont, {:ok, [to_map(signal) | acc]}}
 
       value, _acc ->
         {:halt, {:error, {:invalid_signal, "expected a Signal, got: #{inspect(value)}"}}}
@@ -104,7 +122,7 @@ defmodule Jido.Signal.Serialization do
 
   defp from_wire_data(data), do: from_wire_item(data)
 
-  defp from_wire_item(data) when is_map(data), do: Signal.from_map(data)
+  defp from_wire_item(data) when is_map(data), do: from_map(data)
 
   defp from_wire_item(data),
     do: {:error, {:invalid_wire_data, "expected a map, got: #{inspect(data)}"}}
@@ -207,7 +225,7 @@ defmodule Jido.Signal.Serialization do
 
   defp json_value?(nil), do: true
   defp json_value?(value) when is_boolean(value) or is_number(value), do: true
-  defp json_value?(value) when is_binary(value), do: Jido.Signal.UTF8.valid?(value)
+  defp json_value?(value) when is_binary(value), do: Jido.Codec.Signal.UTF8.valid?(value)
   defp json_value?([]), do: true
   defp json_value?([head | tail]) when is_list(tail), do: json_value?(head) and json_value?(tail)
 

@@ -1,4 +1,4 @@
-defmodule Jido.Signal.UTF8 do
+defmodule Jido.Codec.Signal.UTF8 do
   @moduledoc false
   import Bitwise, only: [band: 2]
 

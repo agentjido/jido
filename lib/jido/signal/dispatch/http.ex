@@ -33,7 +33,7 @@ defmodule Jido.Signal.Dispatch.Http do
 
   @behaviour Jido.Signal.Dispatch.Adapter
 
-  alias Jido.Signal.Serialization
+  alias Jido.Codec.Signal, as: SignalCodec
 
   @content_type ~c"application/cloudevents+json"
   @default_timeout 5_000
@@ -209,7 +209,7 @@ defmodule Jido.Signal.Dispatch.Http do
   defp ascii?(value), do: Enum.all?(:binary.bin_to_list(value), &(&1 < 128))
 
   defp serialize(signal) do
-    case Serialization.serialize(signal, format: :json) do
+    case SignalCodec.serialize(signal, format: :json) do
       {:ok, body} -> {:ok, body}
       {:error, reason} -> {:error, {:serialization, reason}}
     end

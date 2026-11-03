@@ -206,8 +206,8 @@ defmodule Jido.TraceTest do
       trace = Trace.new(trace_flags: "01", tracestate: "vendor=value")
       assert {:ok, traced} = SignalContext.put_trace(signal, trace)
 
-      assert {:ok, json} = Signal.serialize(traced)
-      assert {:ok, restored} = Signal.deserialize(json)
+      assert {:ok, json} = Jido.Codec.Signal.serialize(traced)
+      assert {:ok, restored} = Jido.Codec.Signal.deserialize(json)
       assert SignalContext.get_trace(restored) == trace
     end
   end

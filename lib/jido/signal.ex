@@ -64,8 +64,7 @@ defmodule Jido.Signal do
   """
 
   alias Jido.Signal.Context
-  alias Jido.Signal.Codec
-  alias Jido.Signal.Serialization
+  alias Jido.Codec.Signal.CloudEvents
 
   @default_data_schema Joi.any()
 
@@ -282,7 +281,7 @@ defmodule Jido.Signal do
   end
 
   def __normalize_definition_attrs__(opts, defaults) when is_map(opts) do
-    with {:ok, attrs} <- Codec.normalize_keys(opts) do
+    with {:ok, attrs} <- CloudEvents.normalize_keys(opts) do
       {:ok, Map.merge(defaults, attrs)}
     end
   end
@@ -308,7 +307,7 @@ defmodule Jido.Signal do
       else: {:error, "parse error: expected a map or keyword list"}
   end
 
-  def new(attrs) when is_map(attrs), do: Codec.new(attrs)
+  def new(attrs) when is_map(attrs), do: CloudEvents.new(attrs)
 
   def new(_attrs), do: {:error, "parse error: expected a map or keyword list"}
 
@@ -323,7 +322,7 @@ defmodule Jido.Signal do
   end
 
   def new(type, data, attrs) when is_binary(type) and is_map(attrs) do
-    with {:ok, attrs} <- Codec.normalize_keys(attrs) do
+    with {:ok, attrs} <- CloudEvents.normalize_keys(attrs) do
       case Enum.find(["type", "data", "data_base64"], &Map.has_key?(attrs, &1)) do
         nil ->
           attrs |> Map.put("type", type) |> Map.put("data", data) |> new()
@@ -356,14 +355,6 @@ defmodule Jido.Signal do
     end
   end
 
-  @doc "Parses a complete CloudEvents structured-mode map."
-  @spec from_map(map()) :: {:ok, t()} | {:error, String.t()}
-  defdelegate from_map(map), to: Codec
-
-  @doc "Returns the canonical CloudEvents structured-mode map."
-  @spec to_map(t()) :: map()
-  defdelegate to_map(signal), to: Codec
-
   @doc "Adds a CloudEvents extension context attribute."
   @spec put_context(t(), atom() | String.t(), Context.value()) ::
           {:ok, t()} | {:error, String.t()}
@@ -380,23 +371,6 @@ defmodule Jido.Signal do
   @doc "Lists the CloudEvents extension context attribute names."
   @spec list_context(t()) :: [String.t()]
   defdelegate list_context(signal), to: Context, as: :names
-
-  @doc "Serializes one Signal or a list of Signals as JSON or Erlang Term Format."
-  @spec serialize(t() | [t()], keyword()) :: {:ok, binary()} | {:error, term()}
-  defdelegate serialize(signal_or_signals, opts \\ []), to: Serialization
-
-  @doc "Serializes one Signal or a list of Signals, or raises."
-  @spec serialize!(t() | [t()], keyword()) :: binary() | no_return()
-  def serialize!(signal_or_signals, opts \\ []) do
-    case serialize(signal_or_signals, opts) do
-      {:ok, binary} -> binary
-      {:error, reason} -> raise RuntimeError, "serialization failed: #{inspect(reason)}"
-    end
-  end
-
-  @doc "Deserializes one Signal or a list of Signals from JSON or Erlang Term Format."
-  @spec deserialize(binary(), keyword()) :: {:ok, t() | [t()]} | {:error, term()}
-  defdelegate deserialize(binary, opts \\ []), to: Serialization
 
   @doc false
   def validate_uri_reference(value, _opts) when is_binary(value) do

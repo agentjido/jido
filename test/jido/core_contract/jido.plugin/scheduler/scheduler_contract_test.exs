@@ -370,7 +370,7 @@ defmodule JidoTest.Contract.PluginSchedulerTest do
     assert occurrence.id == "occ_JEa_q126OmcNwQorAlhQjtFbE93wjJ-qFlReVurgnHg"
     assert first.data == %{value: 7}
     assert Signal.get_context(first, "customer") == "acme"
-    assert {:ok, restored} = first |> Signal.to_map() |> Signal.new()
+    assert {:ok, restored} = first |> Jido.Codec.Signal.to_map() |> Signal.new()
     assert {:ok, ^occurrence} = Scheduler.occurrence(restored)
   end
 

@@ -63,7 +63,7 @@ defmodule Jido.Signal.Catalog do
   alias Jido.Signal.Context
   alias Jido.Signal.Error
   alias Jido.Signal.Error.InvalidInputError
-  alias Jido.Signal.Serialization
+  alias Jido.Codec.Signal, as: SignalCodec
 
   @definitions_schema Joi.list(Joi.atom() |> Joi.refine({__MODULE__, :validate_definition, []}))
   @type_schema Keyword.fetch!(Signal.schema().fields, :type)
@@ -129,7 +129,7 @@ defmodule Jido.Signal.Catalog do
   @doc """
   Decodes one canonical wire map or binary and validates its definition.
 
-  Binary options are forwarded to `Jido.Signal.Serialization.deserialize/2`.
+  Binary options are forwarded to `Jido.Codec.Signal.deserialize/2`.
   JSON is the default. The configured payload limit applies to binary input.
   Maps must be complete wire envelopes; constructor defaults are not added.
   Maps accept no options. Lists, JSON batches, and Signal structs are rejected.
@@ -223,11 +223,11 @@ defmodule Jido.Signal.Catalog do
   end
 
   defp decode_wire(binary, opts) when is_binary(binary) do
-    binary |> Serialization.deserialize(opts) |> decode_result()
+    binary |> SignalCodec.deserialize(opts) |> decode_result()
   end
 
   defp decode_wire(map, []) when is_map(map) and not is_struct(map) do
-    map |> Signal.from_map() |> decode_result()
+    map |> SignalCodec.from_map() |> decode_result()
   rescue
     exception -> error(:decode_failed, %{reason: {:exception, exception}})
   catch
@@ -258,7 +258,7 @@ defmodule Jido.Signal.Catalog do
   defp normalize_data(signal, data) do
     # The codec owns data presence and Base64 flags. Reuse it after a Joi
     # default or transform changes data, without generating a new fact ID.
-    case signal |> Map.put(:data, data) |> Signal.to_map() |> Signal.from_map() do
+    case signal |> Map.put(:data, data) |> SignalCodec.to_map() |> SignalCodec.from_map() do
       {:ok, signal} -> {:ok, signal}
       {:error, reason} -> error(:invalid_envelope, %{reason: reason})
     end

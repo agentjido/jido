@@ -11,6 +11,8 @@
     ],
     signal: [
       "Inspect.Jido.Signal.*",
+      "Jido.Codec.Signal",
+      "Jido.Codec.Signal.*",
       "Jido.Signal",
       "Jido.Signal.*",
       "Jido.Telemetry.Signal"
@@ -122,6 +124,9 @@
       "Jido.Discovery",
       "Jido.Flow.Codec*",
       "Jido.Agent.Codec",
+      "Jido.Signal.Codec",
+      "Jido.Signal.Serialization",
+      "Jido.Signal.UTF8",
       "Jido.PortableTerm",
       "Jido.AI.Telemetry*",
       "Jido.Exec.Telemetry",
@@ -138,6 +143,9 @@
       "lib/jido/flow/codec.ex",
       "lib/jido/flow/codec/**",
       "lib/jido/agent/codec.ex",
+      "lib/jido/signal/codec.ex",
+      "lib/jido/signal/serialization.ex",
+      "lib/jido/signal/utf8.ex",
       "lib/jido/portable_term.ex",
       "lib/jido/ai/telemetry.ex",
       "lib/jido/ai/telemetry/**",

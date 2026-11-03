@@ -254,7 +254,7 @@ defmodule Jido.Signal.CatalogTest do
         invalid = %{catalog | definitions: definitions}
         error = assert_error(Catalog.validate(invalid, message()), :invalid_input)
         assert error.field == :catalog
-        assert_error(Catalog.decode(invalid, Signal.to_map(message())), :invalid_input)
+        assert_error(Catalog.decode(invalid, Jido.Codec.Signal.to_map(message())), :invalid_input)
       end
     end
 
@@ -386,7 +386,7 @@ defmodule Jido.Signal.CatalogTest do
     end
 
     test "rejects values that are not Signals", %{catalog: catalog} do
-      for value <- [nil, [], Signal.to_map(message()), %{type: "unknown"}] do
+      for value <- [nil, [], Jido.Codec.Signal.to_map(message()), %{type: "unknown"}] do
         assert_error(Catalog.validate(catalog, value), :invalid_input)
       end
 
@@ -434,7 +434,7 @@ defmodule Jido.Signal.CatalogTest do
       Catalog.new([RaisingMetadata]),
       Catalog.validate(catalog, %{message() | dataschema: "urn:unknown"}),
       Catalog.validate(catalog, %{message() | data: false}),
-      Catalog.decode(catalog, message() |> Signal.to_map() |> Map.put("time", malformed_time))
+      Catalog.decode(catalog, message() |> Jido.Codec.Signal.to_map() |> Map.put("time", malformed_time))
     ]
 
     for result <- results do
@@ -473,10 +473,10 @@ defmodule Jido.Signal.CatalogTest do
         assert signal.data === expected_data
         assert signal.data_present?
         refute signal.data_base64?
-        assert Signal.to_map(signal) == expected
-        assert {:ok, json} = Signal.serialize(signal)
+        assert Jido.Codec.Signal.to_map(signal) == expected
+        assert {:ok, json} = Jido.Codec.Signal.serialize(signal)
         assert Jason.decode!(json) == expected
-        assert {:ok, ^signal} = Signal.deserialize(json)
+        assert {:ok, ^signal} = Jido.Codec.Signal.deserialize(json)
         assert {:ok, ^signal} = Catalog.validate(catalog, signal)
       end
     end
@@ -495,14 +495,14 @@ defmodule Jido.Signal.CatalogTest do
         assert {:ok, signal} = Catalog.decode(catalog, Jason.encode!(wire))
         assert signal.data == nil
         assert signal.data_present? == present?
-        assert Signal.to_map(signal) == wire
+        assert Jido.Codec.Signal.to_map(signal) == wire
         assert {:ok, ^signal} = Catalog.validate(catalog, signal)
       end
     end
 
     test "treats an absent and a null schema as the same nil identity", %{catalog: catalog} do
       signal = TemperatureMeasured.new!(%{"celsius" => 10})
-      wire = Signal.to_map(signal)
+      wire = Jido.Codec.Signal.to_map(signal)
 
       for map <- [wire, Map.put(wire, "dataschema", nil)] do
         assert {:ok, ^signal} = Catalog.decode(catalog, map)
@@ -512,22 +512,22 @@ defmodule Jido.Signal.CatalogTest do
 
     test "contains codec faults from invalid map values", %{catalog: catalog} do
       malformed_time = %{DateTime.utc_now() | year: nil}
-      wire = message() |> Signal.to_map() |> Map.put("time", malformed_time)
+      wire = message() |> Jido.Codec.Signal.to_map() |> Map.put("time", malformed_time)
       assert_error(Catalog.decode(catalog, wire), :decode_failed)
     end
 
     test "round trips JSON and preserves all supplied metadata", %{catalog: catalog} do
       signal = message()
-      assert {:ok, json} = Signal.serialize(signal)
+      assert {:ok, json} = Jido.Codec.Signal.serialize(signal)
       assert {:ok, ^signal} = Catalog.decode(catalog, json)
-      assert {:ok, ^signal} = Catalog.decode(catalog, Signal.to_map(signal))
+      assert {:ok, ^signal} = Catalog.decode(catalog, Jido.Codec.Signal.to_map(signal))
       assert {:ok, decoded} = Catalog.decode(catalog, json)
-      assert {:ok, ^json} = Signal.serialize(decoded)
+      assert {:ok, ^json} = Jido.Codec.Signal.serialize(decoded)
     end
 
     test "revalidates JSON data after generic envelope decode", %{catalog: catalog} do
-      wire = message() |> Signal.to_map() |> Map.put("data", %{"text" => false, "room" => "one"})
-      assert {:ok, _signal} = Signal.from_map(wire)
+      wire = message() |> Jido.Codec.Signal.to_map() |> Map.put("data", %{"text" => false, "room" => "one"})
+      assert {:ok, _signal} = Jido.Codec.Signal.from_map(wire)
       assert_error(Catalog.decode(catalog, Jason.encode!(wire)), :invalid_data)
     end
 
@@ -542,7 +542,7 @@ defmodule Jido.Signal.CatalogTest do
         assert_raise ArgumentError, fn -> String.to_existing_atom(name) end
       end
 
-      wire = message() |> Signal.to_map() |> Map.put(key, true)
+      wire = message() |> Jido.Codec.Signal.to_map() |> Map.put(key, true)
       assert {:ok, signal} = Catalog.decode(catalog, Jason.encode!(wire))
       assert signal.extensions[key] == true
 
@@ -577,13 +577,13 @@ defmodule Jido.Signal.CatalogTest do
       assert {:ok, ^strict} = Catalog.validate(catalog, strict)
 
       assert_error(
-        Catalog.decode(catalog, %{Signal.to_map(strict) | "data" => %{"value" => 1}}),
+        Catalog.decode(catalog, %{Jido.Codec.Signal.to_map(strict) | "data" => %{"value" => 1}}),
         :invalid_data
       )
 
       wire =
         Signal.new!(CoercedKeys.type(), %{"nested" => %{"value" => 1}}, source: "/wire")
-        |> Signal.to_map()
+        |> Jido.Codec.Signal.to_map()
 
       assert {:ok, decoded} = Catalog.decode(catalog, Jason.encode!(wire))
       assert decoded.data == %{"nested" => %{value: 1}}
@@ -609,12 +609,12 @@ defmodule Jido.Signal.CatalogTest do
         assert {:ok, signal} = Catalog.decode(catalog, Jason.encode!(wire))
         assert signal.data == bytes
         assert signal.data_base64?
-        assert Signal.to_map(signal) == wire
+        assert Jido.Codec.Signal.to_map(signal) == wire
       end
     end
 
     test "rejects malformed envelopes and context without a fallback", %{catalog: catalog} do
-      wire = Signal.to_map(message())
+      wire = Jido.Codec.Signal.to_map(message())
 
       for invalid <- [
             Map.delete(wire, "id"),
@@ -634,28 +634,28 @@ defmodule Jido.Signal.CatalogTest do
         assert_error(Catalog.decode(catalog, input), :invalid_input)
       end
 
-      for json <- ["[", "null", "10", "[]", Jason.encode!([Signal.to_map(message())])] do
+      for json <- ["[", "null", "10", "[]", Jason.encode!([Jido.Codec.Signal.to_map(message())])] do
         assert_error(Catalog.decode(catalog, json), :decode_failed)
       end
 
-      assert_error(Catalog.decode(nil, Signal.to_map(message())), :invalid_input)
+      assert_error(Catalog.decode(nil, Jido.Codec.Signal.to_map(message())), :invalid_input)
     end
 
     test "forwards binary format and size options", %{catalog: catalog} do
       signal = message()
-      json = Signal.serialize!(signal)
+      json = Jido.Codec.Signal.serialize!(signal)
       assert {:ok, ^signal} = Catalog.decode(catalog, json, max_payload_bytes: byte_size(json))
       error = assert_error(Catalog.decode(catalog, json, max_payload_bytes: 1), :decode_failed)
       assert error.details.reason == {:payload_too_large, byte_size(json), 1}
 
-      binary = Signal.serialize!(signal, format: :erlang_term)
+      binary = Jido.Codec.Signal.serialize!(signal, format: :erlang_term)
       assert {:ok, ^signal} = Catalog.decode(catalog, binary, format: :erlang_term)
       assert_error(Catalog.decode(catalog, json, format: :unknown), :decode_failed)
       assert_error(Catalog.decode(catalog, json, [:invalid]), :decode_failed)
       assert_error(Catalog.decode(catalog, json, nil), :decode_failed)
 
       assert_error(
-        Catalog.decode(catalog, Signal.to_map(signal), max_payload_bytes: 1),
+        Catalog.decode(catalog, Jido.Codec.Signal.to_map(signal), max_payload_bytes: 1),
         :invalid_options
       )
     end

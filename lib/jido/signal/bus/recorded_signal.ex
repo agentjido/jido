@@ -7,7 +7,7 @@ defmodule Jido.Signal.Bus.RecordedSignal do
   `cursor` is the ordered Bus position. A durable consumer passes this cursor
   to `Jido.Signal.Bus.ack/3`.
 
-  Signal wire encoding belongs to `Jido.Signal.Serialization`. This module is
+  Signal wire encoding belongs to `Jido.Codec.Signal`. This module is
   a value type and does not define a second serialization path.
   """
 
@@ -90,7 +90,7 @@ defmodule Jido.Signal.Bus.RecordedSignal do
          true <- is_integer(cursor) and cursor > 0,
          true <- is_binary(type),
          {:ok, datetime, _offset} <- DateTime.from_iso8601(created_at),
-         {:ok, signal} <- Signal.from_map(signal_map),
+         {:ok, signal} <- Jido.Codec.Signal.from_map(signal_map),
          true <- signal.type == type do
       {:ok,
        %__MODULE__{
@@ -143,9 +143,9 @@ defmodule Jido.Signal.Bus.RecordedSignal do
   end
 
   defp canonicalize_signal(signal) do
-    signal_map = Signal.to_map(signal)
+    signal_map = Jido.Codec.Signal.to_map(signal)
 
-    case Signal.from_map(signal_map) do
+    case Jido.Codec.Signal.from_map(signal_map) do
       {:ok, canonical_signal} -> {:ok, canonical_signal, signal_map}
       {:error, reason} -> {:error, reason}
     end

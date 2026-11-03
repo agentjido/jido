@@ -365,7 +365,7 @@ defmodule Jido.Plugin.Scheduler do
 
   defp fresh_signal(%Signal{} = signal) do
     signal
-    |> Signal.to_map()
+    |> Jido.Codec.Signal.to_map()
     |> Map.delete("id")
     |> Signal.new!()
   end
