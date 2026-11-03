@@ -30,7 +30,7 @@ defmodule Jido.Telemetry do
 
   require Logger
 
-  alias Jido.Telemetry.{OpenTelemetry, Semantic}
+  alias Jido.Telemetry.{AgentServer, OpenTelemetry, Semantic}
 
   @semantic_handler_id "jido-semantic-logger"
   @log_scope_key {:jido, :semantic_log_scope}
@@ -40,18 +40,7 @@ defmodule Jido.Telemetry do
   @debug_verbose_overrides %{semantic_log_mode: :all}
 
   @span_metrics [
-    {[:jido, :agent_server, :turn], [:stop], [:status, :stage]},
     {[:jido, :persistence, :operation], [:stop, :exception], [:operation, :status, :persistence_reason]}
-  ]
-
-  @point_metrics [
-    {[:jido, :agent_server, :lifecycle, :start], []},
-    {[:jido, :agent_server, :lifecycle, :stop], []},
-    {[:jido, :agent_server, :commit], [:status]},
-    {[:jido, :agent_server, :directives, :returned], []},
-    {[:jido, :agent_server, :effects, :start], []},
-    {[:jido, :agent_server, :effects, :stop], [:status, :stage]},
-    {[:jido, :agent_server, :turn, :settled], [:status, :stage]}
   ]
 
   @typedoc "A Jido telemetry event name."
@@ -82,8 +71,8 @@ defmodule Jido.Telemetry do
   """
   @spec metrics() :: [Telemetry.Metrics.t()]
   def metrics do
-    Enum.flat_map(@span_metrics, &span_metrics/1) ++
-      Enum.map(@point_metrics, fn {event, tags} ->
+    Enum.flat_map(AgentServer.span_metrics() ++ @span_metrics, &span_metrics/1) ++
+      Enum.map(AgentServer.point_metrics(), fn {event, tags} ->
         Telemetry.Metrics.counter(Enum.join(event ++ [:count], "."),
           event_name: event,
           tags: tags

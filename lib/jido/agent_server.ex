@@ -78,7 +78,7 @@ defmodule Jido.AgentServer do
   alias Jido.Exec.Continuation
   alias Jido.Persistence.ContinuationStore
   alias Jido.Signal
-  alias Jido.Telemetry.Semantic
+  alias Jido.Telemetry.AgentServer, as: AgentServerTelemetry
   alias Jido.Trace.Context, as: TraceContext
   alias Runic.Runner
 
@@ -799,7 +799,7 @@ defmodule Jido.AgentServer do
   end
 
   defp init_registered(agent, runner, opts, monitors) do
-    Semantic.point([:jido, :agent_server, :lifecycle, :start], %{agent_id: agent.id})
+    AgentServerTelemetry.lifecycle(:start, agent.id)
 
     {:ok, specs} =
       Jido.Plugin.Normalizer.normalize_runtime(
@@ -2020,7 +2020,7 @@ defmodule Jido.AgentServer do
     end
 
     TraceContext.clear()
-    Semantic.point([:jido, :agent_server, :lifecycle, :stop], %{agent_id: data.agent.id})
+    AgentServerTelemetry.lifecycle(:stop, data.agent.id)
     :ok
   end
 
@@ -2053,8 +2053,7 @@ defmodule Jido.AgentServer do
     trace = TraceContext.begin_turn(signal)
 
     span =
-      Semantic.start(
-        [:jido, :agent_server, :turn],
+      AgentServerTelemetry.start_turn(
         Map.merge(Jido.Trace.metadata(trace), %{
           agent_id: agent.id,
           agent_module: agent.module,
@@ -3177,9 +3176,7 @@ defmodule Jido.AgentServer do
         effect_timer: Process.send_after(self(), {timer_kind, active.turn_id}, timeout)
     }
 
-    Semantic.point([:jido, :agent_server, :effects, :start], active.span.metadata, %{
-      directive_count: length(directives)
-    })
+    AgentServerTelemetry.start_effects(active.span.metadata, length(directives))
 
     {:next_state, :effects, %{data | active: active}, replies ++ [{:next_event, :internal, :effect_next}]}
   end
@@ -3246,14 +3243,12 @@ defmodule Jido.AgentServer do
     active = data.active
     outcome = Effects.outcome(active, data.state_version, status)
 
-    Semantic.point(
-      [:jido, :agent_server, :effects, :stop],
-      Map.merge(active.span.metadata, %{
-        committed?: true,
-        stage: outcome.stage,
-        status: telemetry_status(status)
-      }),
-      %{directive_completed: active.effect_index, directive_count: length(active.effects)}
+    AgentServerTelemetry.finish_effects(
+      active.span.metadata,
+      status,
+      outcome.stage,
+      active.effect_index,
+      length(active.effects)
     )
 
     data |> Map.put(:last_effect_outcome, outcome) |> put_in([:active, :effect_outcome], outcome)
@@ -3282,7 +3277,7 @@ defmodule Jido.AgentServer do
     outcome = Lifecycle.outcome(active, data.state_version, status, stage, committed, count)
 
     metadata = %{
-      status: telemetry_status(status),
+      status: AgentServerTelemetry.status(status),
       stage: if(committed, do: :commit, else: :evaluate),
       committed?: committed
     }
@@ -3293,25 +3288,7 @@ defmodule Jido.AgentServer do
       directive_count: count
     }
 
-    if committed do
-      Semantic.point(
-        [:jido, :agent_server, :commit],
-        Map.merge(active.span.metadata, metadata),
-        measurements
-      )
-
-      Semantic.point([:jido, :agent_server, :directives, :returned], active.span.metadata, %{
-        directive_count: count
-      })
-    end
-
-    Semantic.finish(active.span, metadata, measurements)
-
-    Semantic.point(
-      [:jido, :agent_server, :turn, :settled],
-      Map.merge(active.span.metadata, metadata),
-      measurements
-    )
+    AgentServerTelemetry.settle_turn(active.span, metadata, measurements, committed, count)
 
     history = Lifecycle.retain_history(data.history, outcome, data.debug, data.debug_max_events)
 
@@ -3319,10 +3296,6 @@ defmodule Jido.AgentServer do
     |> Map.merge(%{last_outcome: outcome, history: history})
     |> put_in([:active, :outcome], outcome)
   end
-
-  defp telemetry_status(:succeeded), do: :ok
-  defp telemetry_status(:failed), do: :error
-  defp telemetry_status(status), do: status
 
   defp apply_failure_policy(data) do
     case Lifecycle.failure_decision(data.error_policy, data.error_count, data.active.signal_type) do

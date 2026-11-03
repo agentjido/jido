@@ -86,6 +86,7 @@
       # Jido.Error to the declarative definitions layer.
       "Jido.Plugin.*",
       "Jido.Telemetry",
+      "Jido.Telemetry.AgentServer",
       "Jido.Telemetry.OpenTelemetry*",
       "Jido.Telemetry.Persistence*",
       "Jido.Telemetry.Semantic*",
