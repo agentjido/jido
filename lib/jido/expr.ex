@@ -69,38 +69,10 @@ defmodule Jido.Expr do
   Resolved values are checked as data and are never evaluated as expressions.
   """
 
-  alias Jido.Expr.{Error, Parser, Runtime}
-
-  @operations [
-    {:==, 2},
-    {:!=, 2},
-    {:<, 2},
-    {:<=, 2},
-    {:>, 2},
-    {:>=, 2},
-    {:in, 2},
-    {:and, 2},
-    {:or, 2},
-    {:not, 1},
-    {:+, 2},
-    {:-, 2},
-    {:-, 1},
-    {:*, 2},
-    {:/, 2},
-    {:div, 2},
-    {:rem, 2},
-    {:min, 2},
-    {:max, 2},
-    {:abs, 1},
-    {:<>, 2}
-  ]
-  @operator_names @operations |> Enum.map(&elem(&1, 0)) |> Enum.uniq()
-
-  @enforce_keys [:operator, :operands]
-  defstruct [:operator, :operands]
+  alias Jido.Expr.{Error, Operation, Parser, Runtime}
 
   @typedoc "One fixed operation with data or nested expression operands."
-  @type t :: %__MODULE__{operator: atom(), operands: [term()]}
+  @type t :: Operation.t()
 
   @typedoc "A path within an expression tree."
   @type path :: [atom() | integer() | String.t()]
@@ -149,22 +121,11 @@ defmodule Jido.Expr do
 
   @doc "Returns the closed list of supported Elixir operators and arities."
   @spec operations() :: [{atom(), pos_integer()}]
-  def operations, do: @operations
+  def operations, do: Parser.syntax()
 
   @doc "Constructs an expression after checking its operator and operand arity."
   @spec new(atom(), [term()]) :: {:ok, t()} | {:error, Error.t()}
-  def new(operator, operands) do
-    cond do
-      operator not in @operator_names ->
-        {:error, %Error{reason: :unknown_operator, operator: safe_operator(operator)}}
-
-      not valid_operands?(operator, operands) ->
-        {:error, %Error{reason: :invalid_arity, operator: operator}}
-
-      true ->
-        {:ok, %__MODULE__{operator: operator, operands: operands}}
-    end
-  end
+  def new(operator, operands), do: Parser.new(operator, operands)
 
   @doc "Constructs an expression, or raises `Jido.Expr.Error`."
   @spec new!(atom(), [term()]) :: t()
@@ -250,12 +211,6 @@ defmodule Jido.Expr do
   @spec evaluate(t(), evaluate_options()) :: {:ok, term()} | {:error, term()}
   def evaluate(value, options \\ []), do: Runtime.evaluate(value, options)
 
-  defp valid_operands?(operator, [_]), do: {operator, 1} in @operations
-  defp valid_operands?(operator, [_, _]), do: {operator, 2} in @operations
-  defp valid_operands?(_operator, _operands), do: false
-
-  defp safe_operator(operator) when is_atom(operator), do: operator
-  defp safe_operator(_), do: nil
   defp unwrap!({:ok, value}), do: value
   defp unwrap!({:error, error}), do: raise(error)
 end

@@ -384,7 +384,8 @@ defmodule Jido.Flow.Component do
   defp validate({:params, scope}, value, mode), do: validate({:value, scope}, value, mode)
 
   defp validate({:condition, scope}, value, mode)
-       when is_boolean(value) or is_struct(value, Jido.Flow.Ref) or is_struct(value, Jido.Expr),
+       when is_boolean(value) or is_struct(value, Jido.Flow.Ref) or
+              is_struct(value, Jido.Expr.Operation),
        do: validate({:value, scope}, value, mode)
 
   defp validate({:condition, _scope}, _value, _mode),

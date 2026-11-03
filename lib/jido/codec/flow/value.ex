@@ -12,7 +12,7 @@ defmodule Jido.Codec.Flow.Value do
   @doc false
   @spec encode_expression(term(), Catalog.t(), non_neg_integer()) ::
           {:ok, term()} | {:error, Exception.t()}
-  def encode_expression(%Expr{} = expression, registry, depth) do
+  def encode_expression(%Jido.Expr.Operation{} = expression, registry, depth) do
     with :ok <- Limits.depth(depth),
          {:ok, operands} <-
            encode_list(expression.operands, registry, depth + 1, &encode_expression/3) do
@@ -301,7 +301,7 @@ defmodule Jido.Codec.Flow.Value do
                stored ++ ["$expr", "operands"]
              ) do
           {:ok, operands, paths} when errors == [] ->
-            {:ok, %Expr{operator: elem(operator, 0), operands: operands},
+            {:ok, %Jido.Expr.Operation{operator: elem(operator, 0), operands: operands},
              Map.put(paths, canonical, stored ++ ["$expr"])}
 
           {:ok, _, _} ->

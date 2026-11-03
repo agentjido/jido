@@ -45,7 +45,7 @@ defmodule Jido.Exec.ValueResolver do
 
   @doc false
   @spec resolve(term(), map()) :: {:ok, term()} | {:error, Exception.t()}
-  def resolve(%Expr{} = expression, state) do
+  def resolve(%Jido.Expr.Operation{} = expression, state) do
     case Expr.evaluate(expression,
            resolve: fn ref, path ->
              case resolve(ref, state) do

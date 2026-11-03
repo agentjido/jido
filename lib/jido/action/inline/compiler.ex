@@ -4,8 +4,7 @@ defmodule Jido.Action.Inline.Compiler do
   alias Jido.Action.Inline.{Owner, Parser}
 
   @doc false
-  @spec compile!(Macro.t(), Jido.Action.Inline.t(), Macro.Env.t(), keyword()) ::
-          Jido.Action.Inline.compilation()
+  @spec compile!(Macro.t(), struct(), Macro.Env.t(), keyword()) :: map()
   def compile!(path_ast, parsed, caller, options) do
     Owner.ensure_compiling!(caller)
     target = Macro.unique_var(:inline_action, __MODULE__)
@@ -86,8 +85,7 @@ defmodule Jido.Action.Inline.Compiler do
   end
 
   @doc false
-  @spec create_action!(module(), atom(), Jido.Action.Inline.path(), map(), Macro.Env.t()) ::
-          tuple()
+  @spec create_action!(module(), atom(), list(), map(), Macro.Env.t()) :: tuple()
   def create_action!(target, function, path, config, caller) do
     owner = caller.module
 

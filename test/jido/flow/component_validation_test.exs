@@ -310,13 +310,16 @@ defmodule Jido.Flow.ComponentValidationTest do
                })
 
       assert {:error, %ValidationError{details: %{segment: _}}} =
-               Jido.Flow.Value.condition(%Jido.Expr{operator: :==, operands: [ref, 1]}, :any)
+               Jido.Flow.Value.condition(
+                 %Jido.Expr.Operation{operator: :==, operands: [ref, 1]},
+                 :any
+               )
 
       assert {:error, %ValidationError{details: %{segment: _}}} =
                Definition.component(
                  choice(%{
                    name: "option",
-                   condition: %Jido.Expr{operator: :==, operands: [ref, 1]},
+                   condition: %Jido.Expr.Operation{operator: :==, operands: [ref, 1]},
                    action: Add
                  })
                )

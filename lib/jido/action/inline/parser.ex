@@ -1,11 +1,10 @@
 defmodule Jido.Action.Inline.Parser do
   @moduledoc false
 
-  alias Jido.Action.Inline
   alias Jido.Codec.Config
 
   @doc false
-  @spec bound!(Macro.t(), keyword(), Macro.Env.t()) :: Inline.t()
+  @spec bound!(Macro.t(), keyword(), Macro.Env.t()) :: map()
   def bound!(bindings, options, caller) do
     bindings = if is_list(bindings), do: bindings, else: [bindings]
 
@@ -23,7 +22,7 @@ defmodule Jido.Action.Inline.Parser do
   end
 
   @doc false
-  @spec callback!(Macro.t() | nil, keyword(), Macro.Env.t()) :: Inline.t()
+  @spec callback!(Macro.t() | nil, keyword(), Macro.Env.t()) :: map()
   def callback!(pattern, options, caller) do
     build!(:callback, nil, pattern, options, caller)
   end
@@ -61,7 +60,7 @@ defmodule Jido.Action.Inline.Parser do
     patterns = if clauses, do: Enum.map(clauses, &elem(&1, 0)), else: List.wrap(pattern)
     context = context_from_options!(options, patterns, caller)
 
-    %Inline{
+    %{
       mode: mode,
       params_ast: params,
       pattern_ast: if(clauses && mode == :callback, do: nil, else: pattern),

@@ -1,8 +1,9 @@
 defmodule Jido.Expr.Parser do
   @moduledoc false
 
-  alias Jido.Expr
+  alias Jido.Expr.Error
   alias Jido.Expr.Limits
+  alias Jido.Expr.Operation
 
   @binary [
     :==,
@@ -26,11 +27,27 @@ defmodule Jido.Expr.Parser do
   ]
   @unary [:-, :not, :abs]
   @reserved Enum.uniq(@binary ++ @unary ++ [:expr])
+  @operator_names Enum.uniq(@binary ++ @unary)
 
   @doc false
   @spec syntax() :: [{atom(), pos_integer()}]
   def syntax do
     Enum.map(@binary, &{&1, 2}) ++ Enum.map(@unary, &{&1, 1})
+  end
+
+  @doc false
+  @spec new(atom(), [term()]) :: {:ok, struct()} | {:error, Error.t()}
+  def new(operator, operands) do
+    cond do
+      operator not in @operator_names ->
+        {:error, %Error{reason: :unknown_operator, operator: safe_operator(operator)}}
+
+      {operator, operand_arity(operands)} not in syntax() ->
+        {:error, %Error{reason: :invalid_arity, operator: operator}}
+
+      true ->
+        {:ok, %Operation{operator: operator, operands: operands}}
+    end
   end
 
   @doc false
@@ -49,7 +66,9 @@ defmodule Jido.Expr.Parser do
   defp run(ast, options, pins?) do
     with {:ok, state} <- Limits.new(options, [:leaf_parser]),
          {:ok, result, _state} <- walk(ast, Map.put(state, :pins?, pins?), [], 0) do
-      if is_struct(result, Expr), do: {:ok, result}, else: Limits.fail(:expected_expression, [])
+      if is_struct(result, Operation),
+        do: {:ok, result},
+        else: Limits.fail(:expected_expression, [])
     end
   end
 
@@ -59,7 +78,7 @@ defmodule Jido.Expr.Parser do
     end
   end
 
-  defp node(%Expr{operator: operator, operands: operands}, state, path, depth),
+  defp node(%Operation{operator: operator, operands: operands}, state, path, depth),
     do: operation(operator, operands, state, path, depth)
 
   defp node(%_{} = value, state, path, _depth), do: leaf(value, state, path)
@@ -102,7 +121,7 @@ defmodule Jido.Expr.Parser do
 
   defp operation(operator, operands, state, path, depth) do
     with {:ok, parsed, state} <- list(operands, state, path ++ [:operands], depth, 0, []),
-         {:ok, expression} <- Expr.new(operator, parsed) do
+         {:ok, expression} <- new(operator, parsed) do
       {:ok, expression, state}
     else
       {:error, %Jido.Expr.Error{path: []} = error} -> {:error, %{error | path: path}}
@@ -172,4 +191,11 @@ defmodule Jido.Expr.Parser do
         end
     end
   end
+
+  defp safe_operator(operator) when is_atom(operator), do: operator
+  defp safe_operator(_operator), do: nil
+
+  defp operand_arity([_operand]), do: 1
+  defp operand_arity([_left, _right]), do: 2
+  defp operand_arity(_operands), do: :invalid
 end

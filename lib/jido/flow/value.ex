@@ -98,7 +98,7 @@ defmodule Jido.Flow.Value do
   @spec condition(term(), Ref.scope()) ::
           {:ok, boolean() | Ref.t() | Expr.t()} | {:error, Exception.t()}
   def condition(value, scope)
-      when is_struct(value, Expr) or is_struct(value, Ref) or is_boolean(value),
+      when is_struct(value, Jido.Expr.Operation) or is_struct(value, Ref) or is_boolean(value),
       do: prepare(value, scope)
 
   def condition(_value, _scope),
@@ -113,7 +113,8 @@ defmodule Jido.Flow.Value do
   # Keep the struct tags distinct from literal maps with the same fields.
   def to_map(%Ref{} = ref), do: ref
 
-  def to_map(%Expr{} = expr), do: %{expr | operands: Enum.map(expr.operands, &to_map/1)}
+  def to_map(%Jido.Expr.Operation{} = expr),
+    do: %{expr | operands: Enum.map(expr.operands, &to_map/1)}
 
   def to_map(%{} = map) do
     Map.new(map, fn {key, value} -> {key, to_map(value)} end)
@@ -147,7 +148,7 @@ defmodule Jido.Flow.Value do
     |> validation_result()
   end
 
-  defp validate_node(%Expr{} = expression, path, state) do
+  defp validate_node(%Jido.Expr.Operation{} = expression, path, state) do
     if state.validate_expressions? and not inside_expression?(path, state.expression_root) do
       case validate_expression(expression, path) do
         :ok -> {:cont, %{state | expression_root: path}}
@@ -201,7 +202,7 @@ defmodule Jido.Flow.Value do
     |> validation_result()
   end
 
-  defp validate_expression_root(%Expr{} = expression, path, expression_root) do
+  defp validate_expression_root(%Jido.Expr.Operation{} = expression, path, expression_root) do
     if inside_expression?(path, expression_root) do
       {:cont, expression_root}
     else

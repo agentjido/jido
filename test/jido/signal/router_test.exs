@@ -166,7 +166,7 @@ defmodule Jido.Signal.RouterTest do
     test "creates an empty Router" do
       router = Router.new!()
 
-      assert %Router.Router{} = router
+      assert %Router.State{} = router
       assert Router.empty?(router)
       assert Router.count(router) == 0
       assert {:ok, []} = Router.list(router)

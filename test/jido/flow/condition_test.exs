@@ -34,7 +34,11 @@ defmodule JidoActionTest.Flow.ConditionTest do
               %ValidationError{
                 message: "invalid Flow expression",
                 details: %{path: [], reason: :unknown_operator}
-              }} = Value.condition(%Expr{operator: :unknown, operands: [1]}, :any)
+              }} =
+               Value.condition(
+                 %Jido.Expr.Operation{operator: :unknown, operands: [1]},
+                 :any
+               )
 
       for {operator, operands} <- [
             {:==, [1]},
@@ -45,7 +49,10 @@ defmodule JidoActionTest.Flow.ConditionTest do
             {:==, :bad}
           ] do
         assert {:error, %ValidationError{message: "invalid Flow expression", details: details}} =
-                 Value.condition(%Expr{operator: operator, operands: operands}, :any)
+                 Value.condition(
+                   %Jido.Expr.Operation{operator: operator, operands: operands},
+                   :any
+                 )
 
         assert details.reason == :invalid_arity
         assert details.operator == operator
@@ -56,7 +63,10 @@ defmodule JidoActionTest.Flow.ConditionTest do
     test "rejects malformed refs, structs, and functions with expression paths" do
       assert {:error, %ValidationError{message: message, details: details}} =
                Value.condition(
-                 %Expr{operator: :==, operands: [Ref.input([%{bad: :segment}]), 1]},
+                 %Jido.Expr.Operation{
+                   operator: :==,
+                   operands: [Ref.input([%{bad: :segment}]), 1]
+                 },
                  :any
                )
 

@@ -141,7 +141,7 @@ defmodule Jido.ExprTest do
     improper_operands = [1 | operands] ++ :invalid_tail
 
     for values <- [operands, improper_operands] do
-      expression = %Jido.Expr{operator: :+, operands: values}
+      expression = %Jido.Expr.Operation{operator: :+, operands: values}
 
       for check <- [
             fn -> Jido.Expr.new(:+, values) end,
@@ -170,8 +170,8 @@ defmodule Jido.ExprTest do
                Jido.Expr.new(operator, values)
     end
 
-    assert {:ok, %Jido.Expr{}} = Jido.Expr.new(:-, [1])
-    assert {:ok, %Jido.Expr{}} = Jido.Expr.new(:-, [1, 2])
+    assert {:ok, %Jido.Expr.Operation{}} = Jido.Expr.new(:-, [1])
+    assert {:ok, %Jido.Expr.Operation{}} = Jido.Expr.new(:-, [1, 2])
   end
 
   @tag obligation: "jido_action.expression.I1"
@@ -549,7 +549,7 @@ defmodule Jido.ExprTest do
              end)
 
     assert Enum.any?(visited, fn {value, path} ->
-             is_struct(value, Jido.Expr) and path == [:outer, 0]
+             is_struct(value, Jido.Expr.Operation) and path == [:outer, 0]
            end)
 
     assert {reference, [:outer, 0, :operands, 0]} in visited

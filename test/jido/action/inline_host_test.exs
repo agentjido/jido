@@ -62,7 +62,9 @@ defmodule Jido.Action.InlineHostTest do
     assert {:ok, %Jido.Instruction{kind: :action, target: ^target}} =
              Jido.Instruction.resolve(target)
 
-    assert %{value: %Jido.Expr{operator: :*, operands: [%Field{key: :value}, 2]}} =
+    assert %{
+             value: %Jido.Expr.Operation{operator: :*, operands: [%Field{key: :value}, 2]}
+           } =
              owner.action_source("double")
 
     assert owner.action_params("double", %{value: 3}) == {:ok, %{value: 6}}

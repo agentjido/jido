@@ -147,10 +147,10 @@ defmodule Jido.Exec.BoundaryRulesTest do
   describe "expression trees" do
     test "parse map, list, and struct data with exact errors" do
       # A parse result must be an operation; data appears as its operands.
-      assert {:ok, %Jido.Expr{operands: [%{a: 1, b: [1, 2]}, %{a: 1}]}} =
+      assert {:ok, %Jido.Expr.Operation{operands: [%{a: 1, b: [1, 2]}, %{a: 1}]}} =
                Jido.Expr.parse(quote(do: %{a: 1, b: [1, 2]} == %{a: 1}))
 
-      assert {:ok, %Jido.Expr{operands: [%{1 => 2}, 1]}} =
+      assert {:ok, %Jido.Expr.Operation{operands: [%{1 => 2}, 1]}} =
                Jido.Expr.parse({:==, [], [%{1 => 2}, 1]})
 
       assert {:error, %Jido.Expr.Error{reason: :expected_expression}} =

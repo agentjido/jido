@@ -1,18 +1,18 @@
 defmodule Jido.Signal.Router.Index do
   @moduledoc false
 
-  alias Jido.Signal.Router.{Route, Router}
+  alias Jido.Signal.Router.{Route, State}
 
   @doc false
-  @spec new([Route.t()]) :: Router.t()
+  @spec new([Route.t()]) :: State.t()
   def new(routes) do
     {entries, next_order} = compile_entries(routes, 0)
-    router = %Router{}
+    router = %State{}
 
     {exact_index, wildcard_index, next_node_id} =
       index_entries(entries, router.exact_index, router.wildcard_index, router.next_node_id)
 
-    %Router{
+    %State{
       entries: entries,
       exact_index: exact_index,
       wildcard_index: wildcard_index,
@@ -22,8 +22,8 @@ defmodule Jido.Signal.Router.Index do
   end
 
   @doc false
-  @spec add(Router.t(), [Route.t()]) :: Router.t()
-  def add(%Router{} = router, routes) do
+  @spec add(State.t(), [Route.t()]) :: State.t()
+  def add(%State{} = router, routes) do
     {new_entries, next_order} = compile_entries(routes, router.next_order)
 
     {exact_index, wildcard_index, next_node_id} =
@@ -45,8 +45,8 @@ defmodule Jido.Signal.Router.Index do
   end
 
   @doc false
-  @spec remove(Router.t(), [String.t()]) :: Router.t()
-  def remove(%Router{} = router, paths) do
+  @spec remove(State.t(), [String.t()]) :: State.t()
+  def remove(%State{} = router, paths) do
     paths = MapSet.new(paths)
     entries = Enum.reject(router.entries, &MapSet.member?(paths, &1.route.path))
 
@@ -63,8 +63,8 @@ defmodule Jido.Signal.Router.Index do
   end
 
   @doc false
-  @spec remove_target(Router.t(), String.t(), term()) :: Router.t()
-  def remove_target(%Router{} = router, path, target) do
+  @spec remove_target(State.t(), String.t(), term()) :: State.t()
+  def remove_target(%State{} = router, path, target) do
     reject = fn entries ->
       Enum.reject(entries, &(&1.route.path == path and &1.route.target == target))
     end
@@ -91,8 +91,8 @@ defmodule Jido.Signal.Router.Index do
   end
 
   @doc false
-  @spec lookup(Router.t(), String.t(), Jido.Signal.t()) :: [term()]
-  def lookup(%Router{} = router, type, signal) do
+  @spec lookup(State.t(), String.t(), Jido.Signal.t()) :: [term()]
+  def lookup(%State{} = router, type, signal) do
     (Map.get(router.exact_index, type, []) ++
        wildcard_matches(router.wildcard_index, type))
     |> Enum.filter(&predicate_matches?(&1.route.match, signal))
@@ -123,8 +123,8 @@ defmodule Jido.Signal.Router.Index do
   end
 
   @doc false
-  @spec has_route?(Router.t(), String.t()) :: boolean()
-  def has_route?(%Router{} = router, path) do
+  @spec has_route?(State.t(), String.t()) :: boolean()
+  def has_route?(%State{} = router, path) do
     if wildcard_path?(path) do
       trie_has_path?(router.wildcard_index, String.split(path, "."))
     else

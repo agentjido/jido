@@ -69,7 +69,7 @@ defmodule JidoActionTest.Fixtures.Action.InlineHost do
 
   def resolve(:bound, source, fields), do: resolve_value(source, fields)
 
-  defp resolve_value(%Jido.Expr{} = source, fields) do
+  defp resolve_value(%Jido.Expr.Operation{} = source, fields) do
     Jido.Expr.evaluate(source,
       resolve: fn %Field{key: key} ->
         case Map.fetch(fields, key) do
@@ -192,7 +192,7 @@ defmodule JidoActionTest.Fixtures.Action.InlineHost do
     end
   end
 
-  defp validate_value(%Jido.Expr{} = source, fields) do
+  defp validate_value(%Jido.Expr.Operation{} = source, fields) do
     Jido.Expr.validate(source,
       validate_leaf: fn %Field{key: key} ->
         if key in fields, do: :ok, else: {:error, {:unknown_field, key}}

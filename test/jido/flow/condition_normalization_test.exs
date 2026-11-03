@@ -141,10 +141,12 @@ defmodule JidoActionTest.Flow.ConditionNormalizationTest do
     wide = balanced_and(comparisons)
 
     cases = [
-      {Enum.reduce(1..65, true, fn _, child -> %Expr{operator: :not, operands: [child]} end), :max_depth},
+      {Enum.reduce(1..65, true, fn _, child ->
+         %Jido.Expr.Operation{operator: :not, operands: [child]}
+       end), :max_depth},
       {wide, :max_nodes},
-      {%Expr{operator: :==, operands: [String.duplicate("x", 1_048_577), ""]}, :max_binary_bytes},
-      {%Expr{operator: :==, operands: [Bitwise.bsl(1, 4096), 0]}, :max_integer_bits}
+      {%Jido.Expr.Operation{operator: :==, operands: [String.duplicate("x", 1_048_577), ""]}, :max_binary_bytes},
+      {%Jido.Expr.Operation{operator: :==, operands: [Bitwise.bsl(1, 4096), 0]}, :max_integer_bits}
     ]
 
     for {expression, reason} <- cases do
@@ -166,18 +168,21 @@ defmodule JidoActionTest.Flow.ConditionNormalizationTest do
   end
 
   test "reference names normalize through nested operation operands" do
-    expression = %Expr{
+    expression = %Jido.Expr.Operation{
       operator: :==,
       operands: [%Ref{source: :result, component: :seed, path: []}, %{value: 1}]
     }
 
-    assert {:ok, %Expr{operands: [%Ref{component: "seed"}, _]}} =
+    assert {:ok, %Jido.Expr.Operation{operands: [%Ref{component: "seed"}, _]}} =
              Flow.Value.condition(expression, :any)
 
     assert {:error, error} =
              Flow.Value.normalize(%{
                outer: [
-                 %Expr{operator: :not, operands: [%Expr{operator: :unknown, operands: [1, 1]}]}
+                 %Jido.Expr.Operation{
+                   operator: :not,
+                   operands: [%Jido.Expr.Operation{operator: :unknown, operands: [1, 1]}]
+                 }
                ]
              })
 
@@ -204,7 +209,7 @@ defmodule JidoActionTest.Flow.ConditionNormalizationTest do
     expressions
     |> Enum.chunk_every(2)
     |> Enum.map(fn
-      [left, right] -> %Expr{operator: :and, operands: [left, right]}
+      [left, right] -> %Jido.Expr.Operation{operator: :and, operands: [left, right]}
       [expression] -> expression
     end)
     |> balanced_and()

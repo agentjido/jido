@@ -86,7 +86,7 @@ defmodule Jido.Action.Inline.Owner do
   end
 
   @doc false
-  @spec validate_path!(term(), Macro.Env.t()) :: Jido.Action.Inline.path()
+  @spec validate_path!(term(), Macro.Env.t()) :: list()
   def validate_path!(path, caller) do
     unless valid_path?(path) do
       Parser.error!(
@@ -115,7 +115,7 @@ defmodule Jido.Action.Inline.Owner do
   defp valid_segments?(_), do: false
 
   @doc false
-  @spec check_identity!(Jido.Action.Inline.path(), Macro.Env.t()) :: :ok
+  @spec check_identity!(list(), Macro.Env.t()) :: :ok
   def check_identity!(path, caller) do
     index = Module.get_attribute(caller.module, :__jido_inline_index__) || %{}
 
@@ -126,7 +126,7 @@ defmodule Jido.Action.Inline.Owner do
   end
 
   @doc false
-  @spec register!(Jido.Action.Inline.path(), module(), Macro.Env.t()) :: :ok
+  @spec register!(list(), module(), Macro.Env.t()) :: :ok
   def register!(path, target, caller) do
     index = Module.get_attribute(caller.module, :__jido_inline_index__) || %{}
     index = Map.put(index, path, target)
@@ -157,7 +157,7 @@ defmodule Jido.Action.Inline.Owner do
   end
 
   @doc false
-  @spec target!(module(), Jido.Action.Inline.path()) :: module()
+  @spec target!(module(), list()) :: module()
   def target!(owner, path) do
     if is_atom(owner) and not is_nil(owner) and Module.open?(owner) do
       raise ArgumentError, "inline Action lookup is available only after the owner compiles"

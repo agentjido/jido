@@ -61,7 +61,7 @@ defmodule JidoActionTest.Flow.DSL.ExpressionTest do
           not (context(:blocked) == true or input(:total) < 0)
       end
 
-    assert {:ok, %Jido.Expr{operator: :and}} = ValueParser.parse_condition(native)
+    assert {:ok, %Jido.Expr.Operation{operator: :and}} = ValueParser.parse_condition(native)
 
     for expression <- [
           quote(do: eq(input(:kind), :priority)),
@@ -89,12 +89,12 @@ defmodule JidoActionTest.Flow.DSL.ExpressionTest do
   end
 
   test "lowers empty lists in comparison operands" do
-    assert {:ok, %Jido.Expr{operator: :==, operands: [ref, []]}} =
+    assert {:ok, %Jido.Expr.Operation{operator: :==, operands: [ref, []]}} =
              ValueParser.parse_condition(quote(do: input(:items) == []))
 
     assert ref == Ref.input(:items)
 
-    assert {:ok, %Jido.Expr{operator: :in, operands: [1, []]}} =
+    assert {:ok, %Jido.Expr.Operation{operator: :in, operands: [1, []]}} =
              ValueParser.parse_condition(quote(do: 1 in []))
   end
 
@@ -106,7 +106,7 @@ defmodule JidoActionTest.Flow.DSL.ExpressionTest do
 
     # A negative number is literal data, as in a data definition.
     assert {:ok, -1} = ValueParser.parse(quote(do: -1))
-    assert {:ok, %Jido.Expr{operator: :-}} = ValueParser.parse(quote(do: -input(:amount)))
+    assert {:ok, %Jido.Expr.Operation{operator: :-}} = ValueParser.parse(quote(do: -input(:amount)))
 
     for expression <- [
           quote(do: value(-input(:amount))),
@@ -167,7 +167,8 @@ defmodule JidoActionTest.Flow.DSL.ExpressionTest do
           {quote(do: input(:left) > input(:right)), :>},
           {quote(do: input(:left) >= input(:right)), :>=}
         ] do
-      assert {:ok, %Jido.Expr{operator: ^operator}} = ValueParser.parse_condition(expression)
+      assert {:ok, %Jido.Expr.Operation{operator: ^operator}} =
+               ValueParser.parse_condition(expression)
     end
   end
 

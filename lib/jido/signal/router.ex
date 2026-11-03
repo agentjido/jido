@@ -80,36 +80,9 @@ defmodule Jido.Signal.Router do
           | {path(), match(), target()}
           | {path(), match(), target(), priority()}
 
-  defmodule Router do
-    @moduledoc false
+  alias __MODULE__.{Route, State}
 
-    @empty_wildcard_index %{
-      id: 0,
-      exact: %{},
-      single: nil,
-      multi: nil,
-      terminals: [],
-      globstar?: false
-    }
-
-    @type t :: %__MODULE__{
-            entries: [map()],
-            exact_index: %{optional(String.t()) => [map()]},
-            wildcard_index: map(),
-            next_order: non_neg_integer(),
-            next_node_id: pos_integer()
-          }
-
-    defstruct entries: [],
-              exact_index: %{},
-              wildcard_index: @empty_wildcard_index,
-              next_order: 0,
-              next_node_id: 1
-  end
-
-  alias __MODULE__.{Route, Router}
-
-  @opaque t :: Router.t()
+  @opaque t :: State.t()
   @type new_opts :: keyword()
 
   @doc """
@@ -189,7 +162,7 @@ defmodule Jido.Signal.Router do
           {:ok, t()} | {:error, term()}
   def new(routes \\ nil, opts \\ [])
 
-  def new(nil, _opts), do: {:ok, %Router{}}
+  def new(nil, _opts), do: {:ok, %State{}}
 
   def new(routes, _opts) do
     with {:ok, routes} <- normalize(routes) do
@@ -215,7 +188,7 @@ defmodule Jido.Signal.Router do
   @doc "Adds one or more routes and preserves their registration order."
   @spec add(t(), route_spec() | Route.t() | [route_spec()] | [Route.t()]) ::
           {:ok, t()} | {:error, term()}
-  def add(%Router{} = router, routes) do
+  def add(%State{} = router, routes) do
     with {:ok, routes} <- normalize(routes) do
       {:ok, Index.add(router, routes)}
     end
@@ -223,37 +196,37 @@ defmodule Jido.Signal.Router do
 
   @doc "Removes all routes that have one of the specified paths."
   @spec remove(t(), path() | [path()]) :: {:ok, t()} | {:error, term()}
-  def remove(%Router{} = router, paths) when is_list(paths) and is_integer(length(paths)) do
+  def remove(%State{} = router, paths) when is_list(paths) and is_integer(length(paths)) do
     with {:ok, paths} <- resolve_paths(paths) do
       {:ok, Index.remove(router, paths)}
     end
   end
 
-  def remove(%Router{} = router, path) when is_binary(path) or is_atom(path),
+  def remove(%State{} = router, path) when is_binary(path) or is_atom(path),
     do: remove(router, [path])
 
-  def remove(%Router{}, invalid), do: invalid_path(invalid)
+  def remove(%State{}, invalid), do: invalid_path(invalid)
 
   @doc "Appends routes or another Router to a Router."
   @spec merge(t(), t() | [Route.t()]) :: {:ok, t()} | {:error, term()}
-  def merge(%Router{} = router, %Router{} = other) do
+  def merge(%State{} = router, %State{} = other) do
     with {:ok, routes} <- list(other), do: add(router, routes)
   end
 
-  def merge(%Router{} = router, routes) when is_list(routes), do: add(router, routes)
-  def merge(%Router{}, invalid), do: {:error, {:invalid_routes, invalid}}
+  def merge(%State{} = router, routes) when is_list(routes), do: add(router, routes)
+  def merge(%State{}, invalid), do: {:error, {:invalid_routes, invalid}}
 
   @doc "Lists Routes in registration order."
   @spec list(t()) :: {:ok, [Route.t()]}
-  def list(%Router{} = router), do: {:ok, Enum.map(router.entries, & &1.route)}
+  def list(%State{} = router), do: {:ok, Enum.map(router.entries, & &1.route)}
 
   @doc "Returns the number of registered Route values."
   @spec count(t()) :: non_neg_integer()
-  def count(%Router{entries: entries}), do: length(entries)
+  def count(%State{entries: entries}), do: length(entries)
 
   @doc "Checks if a Router has no routes."
   @spec empty?(t()) :: boolean()
-  def empty?(%Router{} = router), do: count(router) == 0
+  def empty?(%State{} = router), do: count(router) == 0
 
   @doc "Validates one or more Route values with the Route Joi schema."
   @spec validate(Route.t() | [Route.t()]) ::
@@ -303,7 +276,7 @@ defmodule Jido.Signal.Router do
   Returns the existing structured routing error when no target matches.
   """
   @spec route(t(), Signal.t()) :: {:ok, [term()]} | {:error, term()}
-  def route(%Router{}, %Signal{type: nil}) do
+  def route(%State{}, %Signal{type: nil}) do
     {:error,
      Error.routing_error(
        "Signal type cannot be nil",
@@ -311,7 +284,7 @@ defmodule Jido.Signal.Router do
      )}
   end
 
-  def route(%Router{} = router, %Signal{type: type} = signal) when is_binary(type) do
+  def route(%State{} = router, %Signal{type: type} = signal) when is_binary(type) do
     targets = Index.lookup(router, type, signal)
 
     case targets do
@@ -320,7 +293,7 @@ defmodule Jido.Signal.Router do
     end
   end
 
-  def route(%Router{}, %Signal{} = signal) do
+  def route(%State{}, %Signal{} = signal) do
     {:error,
      Error.routing_error(
        "Signal type must be a string",
@@ -361,7 +334,7 @@ defmodule Jido.Signal.Router do
 
   @doc "Checks if an exact route path is registered."
   @spec has_route?(t(), term()) :: boolean()
-  def has_route?(%Router{} = router, path) do
+  def has_route?(%State{} = router, path) do
     case query_path(path) do
       {:ok, path} ->
         Index.has_route?(router, path)

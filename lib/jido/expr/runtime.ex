@@ -1,8 +1,9 @@
 defmodule Jido.Expr.Runtime do
   @moduledoc false
 
-  alias Jido.Expr
   alias Jido.Expr.Limits
+  alias Jido.Expr.Operation
+  alias Jido.Expr.Parser
 
   @doc false
   @spec evaluate(term(), keyword()) :: {:ok, term()} | {:error, term()}
@@ -67,7 +68,7 @@ defmodule Jido.Expr.Runtime do
     _, _ -> Limits.fail(:reducer_failure, path)
   end
 
-  defp expression_root(%Expr{}), do: :ok
+  defp expression_root(%Operation{}), do: :ok
   defp expression_root(_value), do: Limits.fail(:expected_expression, [])
 
   defp visit(value, state, path, depth, :reduce) do
@@ -97,7 +98,8 @@ defmodule Jido.Expr.Runtime do
     end
   end
 
-  defp normalize_value(%Expr{} = value, _state, _path, _depth, _mode), do: {:ok, value}
+  defp normalize_value(%Operation{} = value, _state, _path, _depth, _mode),
+    do: {:ok, value}
 
   defp normalize_value(%_{} = value, %{normalize_leaf: callback} = state, path, depth, :normalize) do
     with {:ok, _state} <- Limits.enter(state, value, path, depth) do
@@ -122,7 +124,7 @@ defmodule Jido.Expr.Runtime do
 
   defp visit_value(value, state, _path, _depth, :data), do: {:ok, value, state}
 
-  defp visit_value(%Expr{} = expression, state, path, depth, mode) do
+  defp visit_value(%Operation{} = expression, state, path, depth, mode) do
     with :ok <- shape(expression, state, path) do
       expression(expression, state, path, depth, mode)
     end
@@ -228,14 +230,14 @@ defmodule Jido.Expr.Runtime do
   defp list(_tail, _state, path, _depth, _mode, index, _result),
     do: Limits.fail(:improper_list, path ++ [index])
 
-  defp shape(%Expr{operator: operator, operands: operands}, _state, path) do
-    case Expr.new(operator, operands) do
+  defp shape(%Operation{operator: operator, operands: operands}, _state, path) do
+    case Parser.new(operator, operands) do
       {:ok, _} -> :ok
       {:error, error} -> {:error, %{error | path: path}}
     end
   end
 
-  defp expression(%Expr{operands: operands} = value, state, path, depth, mode)
+  defp expression(%Operation{operands: operands} = value, state, path, depth, mode)
        when mode in [:reduce, :validate] do
     with {:ok, _operands, state} <-
            list(operands, state, path ++ [:operands], depth, mode, 0, operands) do
@@ -243,7 +245,7 @@ defmodule Jido.Expr.Runtime do
     end
   end
 
-  defp expression(%Expr{operands: operands} = value, state, path, depth, :normalize) do
+  defp expression(%Operation{operands: operands} = value, state, path, depth, :normalize) do
     with {:ok, operands, state} <-
            list(operands, state, path ++ [:operands], depth, :normalize, 0, []) do
       {:ok, %{value | operands: operands}, state}
@@ -251,7 +253,7 @@ defmodule Jido.Expr.Runtime do
   end
 
   defp expression(
-         %Expr{operator: operator, operands: [left, right]},
+         %Operation{operator: operator, operands: [left, right]},
          state,
          path,
          depth,
@@ -265,7 +267,13 @@ defmodule Jido.Expr.Runtime do
     end
   end
 
-  defp expression(%Expr{operator: operator, operands: operands}, state, path, depth, :evaluate) do
+  defp expression(
+         %Operation{operator: operator, operands: operands},
+         state,
+         path,
+         depth,
+         :evaluate
+       ) do
     with {:ok, values, state} <-
            list(operands, state, path ++ [:operands], depth, :evaluate, 0, []),
          {:ok, result, state} <- operation(operator, values, state, path, depth),

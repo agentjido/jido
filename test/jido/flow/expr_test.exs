@@ -276,7 +276,10 @@ defmodule JidoActionTest.Flow.ExprTest do
     expression = Expr.new!(:+, [reference, 1])
 
     assert {:error, error} =
-             Jido.Flow.Value.condition(%Expr{operator: :==, operands: [expression, 2]}, :any)
+             Jido.Flow.Value.condition(
+               %Jido.Expr.Operation{operator: :==, operands: [expression, 2]},
+               :any
+             )
 
     assert error.details.ref_type == :unknown
   end
@@ -368,8 +371,8 @@ defmodule JidoActionTest.Flow.ExprTest do
   @tag obligation: ["jido_action.expression.I3", "jido_action.expression.I4"]
   test "nested invalid expression definitions and evaluation limits stay structured" do
     for invalid <- [
-          %Expr{operator: :unknown, operands: []},
-          %Expr{operator: :+, operands: [1 | :tail]},
+          %Jido.Expr.Operation{operator: :unknown, operands: []},
+          %Jido.Expr.Operation{operator: :+, operands: [1 | :tail]},
           Expr.new!(:+, [fn -> 1 end, 2])
         ] do
       assert {:error, _} =

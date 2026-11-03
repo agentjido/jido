@@ -154,6 +154,7 @@
       "Jido.Persistence.AgentCheckpoint",
       "Jido.Persistence.Identity",
       "Jido.Signal.Sanitizer",
+      "Jido.Signal.Router.Router",
       "Jido.Agent.Command",
       "Jido.Agent.Authoring",
       "Jido.Agent.Callback",

@@ -61,7 +61,7 @@ defmodule Jido.Agent.FlowExpressionTest do
 
     assert {:ok, flow} = flow
     assert flow == Add.flow()
-    assert %Jido.Expr{} = flow.output.count
+    assert %Jido.Expr.Operation{} = flow.output.count
     assert {:ok, %Runic.Workflow{}} = Jido.Exec.compile(flow)
 
     flow_registry =

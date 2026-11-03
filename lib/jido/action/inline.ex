@@ -133,7 +133,9 @@ defmodule Jido.Action.Inline do
   Raises `CompileError` for an invalid header or option, at the source location.
   """
   @spec parse_bound!(Macro.t(), [action_option()], Macro.Env.t()) :: t()
-  def parse_bound!(bindings, options, caller), do: Parser.bound!(bindings, options, caller)
+  def parse_bound!(bindings, options, caller) do
+    struct!(__MODULE__, Parser.bound!(bindings, options, caller))
+  end
 
   @doc """
   Parses a named parameter variable or a map pattern for direct callback input.
@@ -146,7 +148,9 @@ defmodule Jido.Action.Inline do
   `CompileError` for invalid headers or options.
   """
   @spec parse_callback!(Macro.t() | nil, [action_option()], Macro.Env.t()) :: t()
-  def parse_callback!(pattern, options, caller), do: Parser.callback!(pattern, options, caller)
+  def parse_callback!(pattern, options, caller) do
+    struct!(__MODULE__, Parser.callback!(pattern, options, caller))
+  end
 
   @doc """
   Builds declaration and target AST inside a compiling owner module.

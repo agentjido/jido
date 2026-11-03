@@ -58,7 +58,7 @@ defmodule JidoActionTest.Flow.ExprBoundaryTest do
           Expr.new!(:not, [Expr.new!(:==, [calculation, Ref.input(:data)])]),
           Expr.new!(:and, [Expr.new!(:==, [1, 1]), comparison])
         ] do
-      assert {:ok, %Expr{}} = Jido.Flow.Value.condition(condition, :any)
+      assert {:ok, %Jido.Expr.Operation{}} = Jido.Flow.Value.condition(condition, :any)
 
       assert {:error, error} =
                Jido.Exec.run(choice_flow(condition), %{data: String.duplicate("x", 300_000)})
@@ -221,7 +221,10 @@ defmodule JidoActionTest.Flow.ExprBoundaryTest do
                )
 
       assert {:error, %Jido.Error.ValidationError{}} =
-               Jido.Flow.Value.condition(%Expr{operator: :==, operands: [data, data]}, :any)
+               Jido.Flow.Value.condition(
+                 %Jido.Expr.Operation{operator: :==, operands: [data, data]},
+                 :any
+               )
     end
   end
 

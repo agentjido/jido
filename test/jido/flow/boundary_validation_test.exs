@@ -156,7 +156,7 @@ defmodule Jido.Flow.BoundaryValidationTest do
                Jido.Expr.new!(:or, [false, Jido.Expr.new!(:==, [1, 1])]),
                Jido.Expr.new!(:not, [Jido.Expr.new!(:==, [1, 2])])
              ],
-             &match?(%Jido.Expr{}, &1)
+             &match?(%Jido.Expr.Operation{}, &1)
            )
 
     assert {:ok, %Flow{components: components}} =

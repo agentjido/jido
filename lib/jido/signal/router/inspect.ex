@@ -1,4 +1,4 @@
-defimpl Inspect, for: Jido.Signal.Router.Router do
+defimpl Inspect, for: Jido.Signal.Router.State do
   def inspect(router, opts) do
     if Keyword.get(opts.custom_options, :verbose, false) do
       Inspect.Any.inspect(router, opts)

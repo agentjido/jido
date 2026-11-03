@@ -9,12 +9,15 @@ defmodule Jido.Expr.SurvivorContractTest do
 
   @tag obligation: "jido_action.expression.I1"
   test "expression literals require both fields before entering the runtime" do
-    for ast <- [quote(do: %Jido.Expr{operator: :not}), quote(do: %Jido.Expr{operands: [true]})] do
+    for ast <- [
+          quote(do: %Jido.Expr.Operation{operator: :not}),
+          quote(do: %Jido.Expr.Operation{operands: [true]})
+        ] do
       assert_raise ArgumentError, fn -> Code.eval_quoted(ast) end
     end
 
     assert {expression, []} =
-             Code.eval_quoted(quote(do: %Jido.Expr{operator: :not, operands: [true]}))
+             Code.eval_quoted(quote(do: %Jido.Expr.Operation{operator: :not, operands: [true]}))
 
     assert expression == Expr.new!(:not, [true])
   end
@@ -130,7 +133,7 @@ defmodule Jido.Expr.SurvivorContractTest do
 
     reference = %Reference{}
 
-    assert {:ok, %Expr{operands: [^reference]}} =
+    assert {:ok, %Jido.Expr.Operation{operands: [^reference]}} =
              Expr.parse(Expr.new!(:not, [reference]),
                leaf_parser: fn ^reference -> {:ok, reference} end
              )
@@ -146,7 +149,7 @@ defmodule Jido.Expr.SurvivorContractTest do
           {{:==, [], [{:%{}, [], [invalid: 1, invalid: 2]}, nil]}, :duplicate_key, [:operands, 0, :invalid]},
           {{:==, [], [{:%{}, [], [nil]}, nil]}, :invalid_map_key, [:operands, 0]},
           {{:==, [], [%{1.5 => 1}, nil]}, :invalid_map_key, [:operands, 0]},
-          {{:==, [], [%Expr{operator: :unknown, operands: []}, nil]}, :unknown_operator, [:operands, 0]}
+          {{:==, [], [%Jido.Expr.Operation{operator: :unknown, operands: []}, nil]}, :unknown_operator, [:operands, 0]}
         ] do
       assert {:error, %Expr.Error{reason: ^reason, path: ^path}} = Expr.parse(ast)
     end
@@ -173,7 +176,9 @@ defmodule Jido.Expr.SurvivorContractTest do
           {quote(do: 1 == %{a: [2]}), [max_depth: 2], [:operands, 1, :a, 0]}
         ] do
       assert {:error, %Expr.Error{reason: :max_depth, path: ^path}} = Expr.parse(ast, options)
-      assert {:ok, %Expr{}} = Expr.parse(ast, max_depth: options[:max_depth] + 1)
+
+      assert {:ok, %Jido.Expr.Operation{}} =
+               Expr.parse(ast, max_depth: options[:max_depth] + 1)
     end
 
     for key <- ["private", 16, -16] do

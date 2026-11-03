@@ -355,6 +355,6 @@ defmodule JidoActionTest.Fixtures.Iterator do
     )
   end
 
-  def eq(left, right), do: %Jido.Expr{operator: :==, operands: [left, right]}
-  def gte(left, right), do: %Jido.Expr{operator: :>=, operands: [left, right]}
+  def eq(left, right), do: %Jido.Expr.Operation{operator: :==, operands: [left, right]}
+  def gte(left, right), do: %Jido.Expr.Operation{operator: :>=, operands: [left, right]}
 end
