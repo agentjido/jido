@@ -65,7 +65,6 @@ defmodule Jido.AgentServer do
   alias Jido.Agent
 
   alias Jido.AgentServer.{
-    CompositionRuntime,
     Core,
     Durable,
     Effects,
@@ -916,9 +915,9 @@ defmodule Jido.AgentServer do
         runtime = Map.put(data, :owner, owner)
 
         with :ok <- ServerSupervisor.close_execution(data.activation_state),
-             :ok <- CompositionRuntime.validate_runtime(runtime),
+             :ok <- Topology.validate(runtime.agent),
              {:ok, refs} <- Plugin.bootstrap(data, owner),
-             {:ok, _} <- CompositionRuntime.reconcile(runtime),
+             {:ok, _} <- Topology.reconcile(runtime),
              do: {:ok, refs}
       end)
     else
@@ -969,7 +968,7 @@ defmodule Jido.AgentServer do
   def spawn_child(server, agent, tag, opts \\ [])
 
   def spawn_child(server, %Agent{} = agent, tag, opts) do
-    CompositionRuntime.spawn_child(server, agent, tag, opts)
+    Topology.spawn_child(server, agent, tag, opts)
   end
 
   def spawn_child(_server, _agent, _tag, _opts),
@@ -1006,7 +1005,7 @@ defmodule Jido.AgentServer do
   def children(server, timeout \\ 5_000) do
     with :ok <- Core.validate_wait(timeout) do
       context = :gen_statem.call(server, :child_context, timeout)
-      CompositionRuntime.children(context)
+      Topology.children(context)
     end
   end
 
@@ -1023,7 +1022,7 @@ defmodule Jido.AgentServer do
   """
   @spec stop_child(server(), child_tag(), term()) :: :ok | {:error, term()}
   def stop_child(server, tag, reason \\ :shutdown) do
-    CompositionRuntime.stop_child(server, tag, reason)
+    Topology.stop_child(server, tag, reason)
   end
 
   @doc """
@@ -1035,7 +1034,7 @@ defmodule Jido.AgentServer do
   @spec adopt_child(server(), server(), child_tag(), [adoption_option()]) ::
           :ok | {:error, term()}
   def adopt_child(server, child, tag, opts \\ []) do
-    CompositionRuntime.adopt_child(server, child, tag, opts)
+    Topology.adopt_child(server, child, tag, opts)
   end
 
   @doc "Returns the activation supervisor PID, or nil for a bare worker."
@@ -2236,7 +2235,7 @@ defmodule Jido.AgentServer do
           with {:ok, candidate} <- Durable.upgrade(agent, action, context),
                {:ok, candidate} <- Jido.Agent.Mutation.bind(candidate),
                {:ok, candidate} <- identify_topology(data, candidate),
-               :ok <- CompositionRuntime.check(data, candidate, []) do
+               :ok <- validate_composition(data, candidate, []) do
             {:ok, candidate, []}
           end
         end)
@@ -2865,7 +2864,7 @@ defmodule Jido.AgentServer do
       {:ok, candidate, directives} ->
         with {:ok, candidate} <- Jido.Agent.Mutation.bind(candidate),
              {:ok, candidate} <- identify_topology(config, candidate),
-             :ok <- CompositionRuntime.check(config, candidate, directives),
+             :ok <- validate_composition(config, candidate, directives),
              :ok <- Effects.validate_batch(directives, %{config | agent: candidate}) do
           {:ok, candidate, directives}
         else
@@ -2875,7 +2874,7 @@ defmodule Jido.AgentServer do
       {:handoff, candidate, instruction, directives} ->
         with {:ok, candidate} <- Jido.Agent.Mutation.bind(candidate),
              {:ok, candidate} <- identify_topology(config, candidate),
-             :ok <- CompositionRuntime.check(config, candidate, directives),
+             :ok <- validate_composition(config, candidate, directives),
              :ok <- Effects.validate_batch(directives, %{config | agent: candidate}) do
           {:handoff, candidate, instruction, directives}
         else
@@ -2960,6 +2959,21 @@ defmodule Jido.AgentServer do
        do: Topology.identify(before, candidate)
 
   defp identify_topology(_data, candidate), do: {:ok, candidate}
+
+  defp validate_composition(data, candidate, directives) do
+    changed = Jido.Agent.Mutation.changed_plugins(data.agent, candidate, directives)
+
+    if is_nil(data.activation) and composition_requires_activation?(candidate, changed) do
+      {:error, :activation_required}
+    else
+      with :ok <- Topology.validate(candidate),
+           do: Plugin.validate_changes(data.plugin_specs, changed)
+    end
+  end
+
+  defp composition_requires_activation?(candidate, changed) do
+    Topology.requires_activation?(candidate) or changed != []
+  end
 
   defp finish(
          %{active: %{persisted: true, durable_finalized: false}} = data,
@@ -3215,7 +3229,7 @@ defmodule Jido.AgentServer do
     {:next_state, phase, next} =
       operation(:reconcile, data, fn ->
         with {:ok, refs} <- Plugin.rebuild(runtime, owner, data.active.changed_plugins),
-             {:ok, members} <- CompositionRuntime.reconcile(runtime),
+             {:ok, members} <- Topology.reconcile(runtime),
              do: {:ok, refs, members}
       end)
 

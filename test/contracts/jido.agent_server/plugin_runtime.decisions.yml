@@ -6,7 +6,7 @@
 
 - id: plugin-runtime-code-seam
   date: 2026-10-19
-  decision: Move Plugin startup, readiness, owned-state selection, admission, configuration pause and rebuild, commit construction, and Directive dispatch from Jido.AgentServer and its nested CompositionRuntime into Jido.AgentServer.Plugin. Keep phase transitions, deadlines, task startup, and replies in the gen_statem owner.
+  decision: Keep Plugin startup, readiness, owned-state selection, admission, configuration pause and rebuild, commit construction, and Directive dispatch in Jido.AgentServer.Plugin. Keep phase transitions, deadlines, task startup, composition checks, and replies in the gen_statem owner.
   driver: Plugin-specific decisions need one owner without creating a second state machine.
   approved_by: Component hardening pass
 

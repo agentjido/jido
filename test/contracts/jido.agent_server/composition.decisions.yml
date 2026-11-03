@@ -6,8 +6,8 @@
 
 - id: composition-code-seam
   date: 2026-10-19
-  decision: Move child API behavior and the composition pre-commit check from Jido.AgentServer into Jido.AgentServer.CompositionRuntime. Keep public entry points and gen_statem events in Jido.AgentServer. Keep generic activation start and worker lookup in Jido.AgentServer.Supervisor.
-  driver: Child ownership needs one behavior owner without creating a second state machine or changing the public API.
+  decision: Put child API behavior and live topology reconciliation in Jido.AgentServer.Topology. Keep the composition pre-commit orchestration, public entry points, and gen_statem events in Jido.AgentServer. Keep generic activation start and worker lookup in Jido.AgentServer.Supervisor.
+  driver: Child ownership needs one live topology owner. The commit owner must coordinate topology and Plugin validation without a pass-through module.
   approved_by: Component hardening pass
 
 - id: composition-obligation-migration
@@ -18,12 +18,12 @@
 
 - id: composition-mutation-profile
   date: 2026-10-19
-  decision: Mutate CompositionRuntime, TopologyRuntime, and TopologyBus. Do not mutate the shared AgentServer state machine or Supervisor in this focused profile.
+  decision: Mutate Jido.AgentServer.Topology. Do not mutate the shared AgentServer state machine or Supervisor in this focused profile.
   driver: The focused profile must test composition decisions without overlapping core Turn and activation owners.
   approved_by: Component hardening pass
 
 - id: composition-public-api
   date: 2026-10-22
-  decision: Keep child and topology-member operations on Jido.AgentServer. Type their child records and option boundaries. Keep CompositionRuntime, TopologyRuntime, and TopologyBus internal, and keep the logical topology DSL in Jido.Agent.
+  decision: Keep child and topology-member operations on Jido.AgentServer. Type their child records and option boundaries. Keep Jido.AgentServer.Topology internal, and keep the logical topology DSL in Jido.Agent.
   driver: Runtime composition needs one public facade without exposing OTP resource owners or creating a second DSL.
   approved_by: Component hardening pass

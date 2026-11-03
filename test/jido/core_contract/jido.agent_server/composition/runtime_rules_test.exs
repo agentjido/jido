@@ -8,7 +8,7 @@ defmodule JidoTest.AgentServer.Composition.RuntimeRulesTest do
   alias Jido.Agent.Diff
   alias Jido.Agent.Directive, as: D
   alias Jido.AgentServer, as: Server
-  alias Jido.AgentServer.{CompositionRuntime, Topology}
+  alias Jido.AgentServer.Topology
   alias JidoTest.AgentEvolutionFixtures, as: E
   alias JidoTest.AgentServer.Fixtures, as: F
   import JidoTest.Eventually
@@ -115,13 +115,7 @@ defmodule JidoTest.AgentServer.Composition.RuntimeRulesTest do
     plain = E.agent()
     with_bus = %{plain | plugins: [bus]}
     assert Topology.changed?(Diff.between(plain, with_bus), plain, with_bus)
-
-    assert {:error, :activation_required} =
-             CompositionRuntime.check(
-               %{agent: plain, activation: nil, plugin_specs: []},
-               with_bus,
-               []
-             )
+    assert Topology.requires_activation?(with_bus)
   end
 
   @tag obligation: "jido.agent_server.composition.I8"

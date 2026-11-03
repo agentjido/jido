@@ -64,10 +64,10 @@ defmodule JidoTest.AgentServer.Composition.CommitTest do
        ]
   test "topology mutations start accepted members", c do
     initial = agent()
-    assert :ok = Server.CompositionRuntime.validate_runtime(%{agent: initial})
+    assert :ok = Server.Topology.validate(initial)
     member = Directive.agent_add(:worker, Worker)
     assert {:ok, candidate, _} = Agent.mutate(initial, [member])
-    assert :ok = Server.CompositionRuntime.validate_runtime(%{agent: candidate})
+    assert :ok = Server.Topology.validate(candidate)
     server = F.start(%{c | agent: initial})
     assert {:ok, _, [^member]} = turn(server, [member])
     assert :ok = Server.await_ready(server)

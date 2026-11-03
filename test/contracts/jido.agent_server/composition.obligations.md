@@ -1,6 +1,5 @@
 ---
 modules:
-  - Jido.AgentServer.CompositionRuntime
   - Jido.AgentServer.Topology
 ---
 
@@ -11,7 +10,7 @@ This component does not own pure topology data validation, Turn evaluation,
 Plugin callback behavior, effect ordering, or durable storage.
 
 The public boundary is the child and member API on `Jido.AgentServer`.
-`CompositionRuntime` and `Topology` are internal. The
+`Topology` is the internal live resource owner. The
 logical topology and Bus declarations belong to the `Jido.Agent` DSL; this
 runtime component has no separate DSL.
 

@@ -2,7 +2,7 @@ defmodule JidoTest.AgentServer.Composition.ApiTest do
   use Covenant.Case, component: "jido.agent_server.composition", async: true
 
   alias Jido.AgentServer, as: Server
-  alias Jido.AgentServer.{CompositionRuntime, Topology}
+  alias Jido.AgentServer.Topology
 
   @tag obligation: "jido.agent_server.composition.I10"
   test "composition stays on the typed AgentServer facade" do
@@ -31,9 +31,7 @@ defmodule JidoTest.AgentServer.Composition.ApiTest do
              public_types
            )
 
-    for module <- [CompositionRuntime, Topology] do
-      refute public_module?(module)
-    end
+    refute public_module?(Topology)
   end
 
   defp documented_api(module) do
