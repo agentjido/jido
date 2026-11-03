@@ -9,6 +9,8 @@ defmodule Jido.MixProject do
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
       deps: deps(),
+      aliases: aliases(),
+      dialyzer: [plt_add_apps: [:ex_unit]],
       package: package(),
       test_ignore_filters: test_ignore_filters(),
       test_coverage: test_coverage()
@@ -21,6 +23,10 @@ defmodule Jido.MixProject do
       mod: {Jido.Application, []},
       extra_applications: [:crypto, :inets, :logger, :public_key, :ssl]
     ]
+  end
+
+  def cli do
+    [preferred_envs: [ci: :test, quality: :test]]
   end
 
   defp elixirc_paths(:test), do: ["lib", "test/support", "test/jido/support"]
@@ -43,29 +49,62 @@ defmodule Jido.MixProject do
 
   defp deps do
     [
-      {:bedrock, "~> 0.7.2", optional: true},
-      {:bedrock_raft, "~> 0.10.0", optional: true},
-      {:ecto_sql, "~> 3.14", optional: true},
+      # Runtime
       {:multigraph, "~> 0.16.1-mg.5"},
-      {:opentelemetry_api, "~> 1.0", optional: true},
-      {:phoenix_pubsub, "~> 2.1", optional: true},
       {:req_llm, "~> 1.29"},
-      {:runic,
-       git: "https://github.com/zblanco/runic.git", ref: "0c15a9c107137b8c13ebbc3340abd207d8f1f3ff", override: true},
+      {:runic, "~> 0.1.0-alpha.13"},
+      {:sched_ex, "~> 1.2.1"},
       {:spark, "~> 2.7.3"},
       {:splode, "~> 0.3.0"},
-      {:sched_ex, "~> 1.2.1"},
       {:telemetry, "~> 1.3"},
       {:telemetry_metrics, "~> 1.2"},
       {:yaml_elixir, "~> 2.12"},
       {:zoi, "~> 0.19.0", override: true},
+
+      # Optional integrations
+      {:bedrock, "~> 0.7.2", optional: true},
+      {:bedrock_raft, "~> 0.10.0", optional: true},
+      {:ecto_sql, "~> 3.14", optional: true},
+      {:opentelemetry_api, "~> 1.0", optional: true},
+      {:phoenix_pubsub, "~> 2.1", optional: true},
+
+      # Development and test tools
       {:covenant, "~> 0.2.0", only: [:dev, :test], runtime: false},
+      {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
+      {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
+      {:ex_dna, "~> 1.5", only: [:dev, :test], runtime: false},
+      {:ex_slop, "~> 0.4", only: [:dev, :test], runtime: false},
+      {:reach, "~> 2.8", only: [:dev, :test], runtime: false},
+
+      # Test support
       {:ecto_sqlite3, "~> 0.24.1", only: :test},
       {:mimic, "~> 2.0", only: :test},
       {:opentelemetry, "~> 1.0", only: :test, runtime: false},
       {:plug, "~> 1.0", only: :test},
       {:postgrex, "~> 0.19 or ~> 1.0", only: :test},
       {:stream_data, "~> 1.4", only: :test, runtime: false}
+    ]
+  end
+
+  defp aliases do
+    [
+      ci: [
+        "compile --warnings-as-errors",
+        "format --check-formatted",
+        "test",
+        "credo --strict",
+        "dialyzer",
+        "ex_dna",
+        "reach.check --arch --smells"
+      ],
+      quality: [
+        "compile --warnings-as-errors",
+        "format --check-formatted",
+        "credo --strict",
+        "dialyzer",
+        "ex_dna",
+        "reach.check --arch --smells"
+      ]
     ]
   end
 
