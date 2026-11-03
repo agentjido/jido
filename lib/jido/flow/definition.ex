@@ -4,7 +4,7 @@ defmodule Jido.Flow.Definition do
   alias Jido.Codec.Config
   alias Jido.Error
   alias Jido.Error.ValidationError
-  alias Jido.Flow.{Component, Graph, GraphValidation, Ref, Value}
+  alias Jido.Flow.{Component, Graph, Ref, Validation, Value}
 
   @keys [:name, :description, :schema, :output_schema, :components, :output]
   @type call :: Component.call()
@@ -108,7 +108,7 @@ defmodule Jido.Flow.Definition do
   end
 
   defp diagnose_normalized(attrs, components) do
-    with {:ok, analysis} <- GraphValidation.validate(components, attrs.output) do
+    with {:ok, analysis} <- Validation.validate_graph(components, attrs.output) do
       {:ok, Map.put(attrs, :components, Map.new(components)), analysis}
     end
   end

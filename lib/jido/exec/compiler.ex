@@ -8,7 +8,7 @@ defmodule Jido.Exec.Compiler do
   alias Jido.Exec.Node.Map, as: MapComponent
 
   alias Jido.Flow
-  alias Jido.Flow.{Identity, TargetValidator}
+  alias Jido.Flow.{Identity, Validation}
   alias Jido.Instruction
   alias Runic.Workflow
 
@@ -38,8 +38,8 @@ defmodule Jido.Exec.Compiler do
   @doc false
   @spec compile_nested!(Instruction.t(), keyword()) :: Workflow.t() | no_return()
   def compile_nested!(%Instruction{kind: :flow} = instruction, opts) do
-    with {:ok, flow} <- TargetValidator.instruction_flow(instruction),
-         {:ok, flow, analysis, children} <- TargetValidator.prepare(flow, [], %{}),
+    with {:ok, flow} <- Validation.instruction_flow(instruction),
+         {:ok, flow, analysis, children} <- Validation.prepare(flow, [], %{}),
          {:ok, workflow} <-
            compile_flow(
              flow,
@@ -62,15 +62,11 @@ defmodule Jido.Exec.Compiler do
   @doc false
   @spec validate(Flow.t()) :: {:ok, Flow.t()} | {:error, Exception.t()}
   def validate(%Flow{} = flow) do
-    with {:ok, flow, _analysis, _children} <- TargetValidator.prepare(flow, [], %{}),
+    with {:ok, flow, _analysis, _children} <- Validation.prepare(flow, [], %{}),
          do: {:ok, flow}
   end
 
   def validate(value), do: Flow.validate(value)
-
-  @doc false
-  @spec validate_targets(Flow.t()) :: {:ok, Flow.t()} | {:error, Exception.t()}
-  defdelegate validate_targets(flow), to: TargetValidator
 
   defp compile_instruction(%Instruction{kind: :action} = instruction, opts) do
     name = Keyword.get(opts, :name)
@@ -89,8 +85,8 @@ defmodule Jido.Exec.Compiler do
   end
 
   defp compile_instruction(%Instruction{kind: :flow} = instruction, opts) do
-    with {:ok, flow} <- TargetValidator.instruction_flow(instruction),
-         {:ok, flow, analysis, children} <- TargetValidator.prepare(flow, [], %{}) do
+    with {:ok, flow} <- Validation.instruction_flow(instruction),
+         {:ok, flow, analysis, children} <- Validation.prepare(flow, [], %{}) do
       compile_flow(
         flow,
         opts

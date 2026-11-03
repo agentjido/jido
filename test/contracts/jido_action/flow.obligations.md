@@ -29,7 +29,7 @@ modules:
   - Jido.Flow.Definition
   - Jido.Flow.Extension
   - Jido.Flow.Graph
-  - Jido.Flow.GraphValidation
+  - Jido.Flow.Validation
   - Jido.Flow.Identity
   - Jido.Flow.Ref
   - Jido.Flow.Value

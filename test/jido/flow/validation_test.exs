@@ -1,4 +1,4 @@
-defmodule Jido.Flow.GraphValidationTest do
+defmodule Jido.Flow.ValidationTest do
   use Covenant.Case, component: "jido_action.flow", async: true
   @moduletag obligation: "jido_action.flow.I8"
   alias Jido.Expr
@@ -398,7 +398,7 @@ end
                name: "graph"
              })
 
-    source = "defmodule Jido.Flow.GraphValidationTest.NonterminalHandoff do
+    source = "defmodule Jido.Flow.ValidationTest.NonterminalHandoff do
   use Jido.Flow, name: \"graph\"
   flow do
     handoff \"next\", selector: #{inspect(ProbeAction)}, params: %{}
@@ -471,7 +471,7 @@ end"
   end
 
   test "a duplicate across component kinds points to the second occurrence" do
-    source = "defmodule Jido.Flow.GraphValidationTest.CrossKindDuplicate do
+    source = "defmodule Jido.Flow.ValidationTest.CrossKindDuplicate do
   use Jido.Flow, name: \"cross_kind_duplicate\"
   flow do
     step \"same\", action: #{inspect(ProbeAction)}, params: %{}
@@ -513,7 +513,7 @@ end
 
     assert {:error, %Error.Invalid{errors: [stored_error]}} = Codec.diagnose(document, registry())
     assert stored_error.details == Map.put(canonical.details, :path, ["components"])
-    source = "defmodule Jido.Flow.GraphValidationTest.BlockedCycle do
+    source = "defmodule Jido.Flow.ValidationTest.BlockedCycle do
   use Jido.Flow, name: \"blocked_cycle\"
   flow do
     step \"blocked\", action: #{inspect(ProbeAction)}, params: %{}, needs: [\"one\"]
