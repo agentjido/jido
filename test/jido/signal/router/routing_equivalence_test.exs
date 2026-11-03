@@ -147,5 +147,5 @@ defmodule Jido.Signal.Router.RoutingEquivalenceTest do
   end
 
   defp match_result({:ok, [:matched]}), do: true
-  defp match_result({:error, %Jido.Signal.Error.RoutingError{}}), do: false
+  defp match_result({:error, %Jido.Error.RoutingError{}}), do: false
 end

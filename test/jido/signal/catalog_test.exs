@@ -3,7 +3,7 @@ defmodule Jido.Signal.CatalogTest do
 
   alias Jido.Signal
   alias Jido.Signal.Catalog
-  alias Jido.Signal.Error.InvalidInputError
+  alias Jido.Error.ValidationError
 
   defmodule MessageReceived do
     use Jido.Signal,
@@ -233,7 +233,7 @@ defmodule Jido.Signal.CatalogTest do
         assert error.details.definitions == [first, other]
       end
 
-      assert_raise InvalidInputError, fn -> Catalog.new!([MessageReceived, MessageReceived]) end
+      assert_raise ValidationError, fn -> Catalog.new!([MessageReceived, MessageReceived]) end
     end
   end
 
@@ -253,7 +253,7 @@ defmodule Jido.Signal.CatalogTest do
           ] do
         invalid = %{catalog | definitions: definitions}
         error = assert_error(Catalog.validate(invalid, message()), :invalid_input)
-        assert error.field == :catalog
+        assert error.subject == :catalog
         assert_error(Catalog.decode(invalid, Jido.Codec.Signal.to_map(message())), :invalid_input)
       end
     end
@@ -439,10 +439,10 @@ defmodule Jido.Signal.CatalogTest do
 
     for result <- results do
       assert {:error, error} = result
-      public = Jido.Signal.Error.to_map(error)
-      assert public.type == :invalid_input_error
+      public = Jido.Error.to_map(error)
+      assert public.type == :validation_error
       refute public.retryable?
-      assert public.details["code"] == Atom.to_string(error.details.code)
+      assert public.details.code == error.details.code
       assert {:ok, _json} = Jason.encode(public)
     end
   end
@@ -684,7 +684,7 @@ defmodule Jido.Signal.CatalogTest do
   end
 
   defp assert_error(result, code) do
-    assert {:error, %InvalidInputError{} = error} = result
+    assert {:error, %ValidationError{} = error} = result
     assert error.details.code == code
     error
   end

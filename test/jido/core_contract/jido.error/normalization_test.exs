@@ -89,19 +89,19 @@ defmodule JidoTest.Error.NormalizationTest do
   end
 
   @tag obligation: "jido.error.I3"
-  test "projects adjacent Signal errors without changing their ownership" do
+  test "projects the shared errors used by Signal boundaries" do
     errors = [
-      {%Jido.Signal.Error.InvalidInputError{message: "Bad input", details: %{}}, :validation_error},
-      {%Jido.Signal.Error.ExecutionFailureError{message: "Failed", details: %{}}, :execution_error},
-      {%Jido.Signal.Error.RoutingError{message: "No route", details: %{}}, :routing_error},
-      {%Jido.Signal.Error.TimeoutError{message: "Timed out", details: %{}}, :timeout},
-      {%Jido.Signal.Error.DispatchError{message: "Dispatch failed", details: %{}}, :routing_error},
-      {%Jido.Signal.Error.InternalError{message: "Internal", details: %{}}, :internal}
+      {%Jido.Error.ValidationError{message: "Bad input", details: %{}}, :validation_error},
+      {%Jido.Error.ExecutionError{message: "Failed", details: %{}}, :execution_error},
+      {%Jido.Error.RoutingError{message: "No route", details: %{}}, :routing_error},
+      {%Jido.Error.TimeoutError{message: "Timed out", details: %{}}, :timeout},
+      {%Jido.Error.RoutingError{message: "Dispatch failed", details: %{}}, :routing_error},
+      {%Jido.Error.InternalError{message: "Internal", details: %{}}, :internal}
     ]
 
     for {error, type} <- errors do
       assert Error.to_map(error).type == type
-      assert String.starts_with?(inspect(error.__struct__), "Jido.Signal.Error.")
+      assert String.starts_with?(inspect(error.__struct__), "Jido.Error.")
     end
   end
 

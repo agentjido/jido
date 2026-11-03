@@ -3,7 +3,7 @@ defmodule Jido.Signal.Dispatch.ErrorNormalizationTest do
 
   alias Jido.Signal
   alias Jido.Signal.Dispatch
-  alias Jido.Signal.Error
+  alias Jido.Error
   alias Jido.Signal.Context, as: SignalContext
   alias Jido.Trace
 
@@ -67,7 +67,7 @@ defmodule Jido.Signal.Dispatch.ErrorNormalizationTest do
 
   # Test with error normalization enabled per test
 
-  test "dispatch normalizes errors to Jido.Signal.Error when enabled" do
+  test "dispatch normalizes errors to Jido.Error when enabled" do
     Application.put_env(:jido, :normalize_dispatch_errors, true)
     {:ok, signal} = Signal.new(%{type: "test.event", source: "test", data: %{value: 42}})
 
@@ -79,7 +79,7 @@ defmodule Jido.Signal.Dispatch.ErrorNormalizationTest do
 
     result = Dispatch.dispatch(signal, config)
 
-    assert {:error, %Error.DispatchError{}} = result
+    assert {:error, %Error.RoutingError{}} = result
     {:error, error} = result
 
     assert Exception.message(error) =~ "Signal dispatch failed"
@@ -98,7 +98,7 @@ defmodule Jido.Signal.Dispatch.ErrorNormalizationTest do
 
     result = Dispatch.dispatch(signal, configs)
 
-    assert {:error, [%Error.DispatchError{}]} = result
+    assert {:error, [%Error.RoutingError{}]} = result
     {:error, [error]} = result
 
     assert Exception.message(error) =~ "Signal dispatch failed"
@@ -164,8 +164,8 @@ defmodule Jido.Signal.Dispatch.ErrorNormalizationTest do
     assert Map.has_key?(measurements, :latency_ms)
     assert metadata.success? == false
     assert metadata.outcome == :error
-    assert metadata.error_type == :dispatch_error
-    assert metadata.retryable? == false
+    assert metadata.error_type == :routing_error
+    assert metadata.retryable? == true
   end
 
   test "dispatch start telemetry redacts URL credentials and query strings" do
@@ -229,9 +229,9 @@ defmodule Jido.Signal.Dispatch.ErrorNormalizationTest do
        headers: [{"authorization", "Bearer header-secret"}],
        secret: "adapter-secret"}
 
-    assert {:error, %Error.DispatchError{} = error} = Dispatch.dispatch(signal, config)
+    assert {:error, %Error.RoutingError{} = error} = Dispatch.dispatch(signal, config)
 
-    error_text = inspect(error.details)
+    error_text = inspect({error.target, error.details})
     assert error_text =~ "https://example.com"
     refute error_text =~ "/path"
     refute error_text =~ "url-secret"
@@ -257,22 +257,22 @@ defmodule Jido.Signal.Dispatch.ErrorNormalizationTest do
     {:ok, signal} = Signal.new(%{type: "test.event", source: "test", data: %{value: 42}})
     target = "secret-" <> String.duplicate("x", 100_000)
 
-    assert {:error, %Error.DispatchError{} = error} =
+    assert {:error, %Error.RoutingError{} = error} =
              Dispatch.dispatch(signal, {TargetReportingAdapter, target: target})
 
     assert_received {:telemetry, [:jido, :dispatch, :start], %{}, metadata}
     assert byte_size(metadata.target) <= 163
-    assert byte_size(inspect(error.details.target)) < 1_000
-    refute inspect(error.details.target) =~ target
+    assert byte_size(inspect(error.target)) < 1_000
+    refute inspect(error.target) =~ target
   end
 
   test "invalid dispatch configuration errors contain only the input shape" do
     Application.put_env(:jido, :normalize_dispatch_errors, true)
 
-    assert {:error, %Error.InvalidInputError{} = error} =
+    assert {:error, %Error.ValidationError{} = error} =
              Dispatch.validate_opts(%{authorization: "Bearer config-secret"})
 
-    assert error.value == %{type: :map, size: 1}
+    assert error.details.value == %{type: :map, size: 1}
     refute inspect(error) =~ "config-secret"
   end
 
@@ -315,14 +315,14 @@ defmodule Jido.Signal.Dispatch.ErrorNormalizationTest do
     signal = Signal.new!(type: String.duplicate("t", 100_000), source: "/test")
     url = "https://" <> String.duplicate("h", 100_000) <> "/secret?token=hidden"
 
-    assert {:error, %Error.DispatchError{} = error} =
+    assert {:error, %Error.RoutingError{} = error} =
              Dispatch.dispatch(signal, {URLReportingAdapter, url: url})
 
     assert_received {:telemetry, [:jido, :dispatch, :start], %{}, metadata}
     assert byte_size(metadata.signal_type) <= 163
     assert byte_size(metadata.target) <= 163
     refute metadata.target =~ "hidden"
-    assert byte_size(error.details.target.target) <= 163
+    assert byte_size(error.target.target) <= 163
   end
 
   test "invalid dispatch configuration reports each input shape" do
@@ -338,7 +338,8 @@ defmodule Jido.Signal.Dispatch.ErrorNormalizationTest do
     ]
 
     for {input, shape} <- inputs_and_shapes do
-      assert {:error, %Error.InvalidInputError{value: ^shape}} = Dispatch.validate_opts(input)
+      assert {:error, %Error.ValidationError{details: %{value: ^shape}}} =
+               Dispatch.validate_opts(input)
     end
   end
 
@@ -354,13 +355,13 @@ defmodule Jido.Signal.Dispatch.ErrorNormalizationTest do
     signal = Signal.new!("dispatch.invalid", %{}, source: "/test")
     invalid = [:invalid | "tail-secret"]
 
-    assert {:error, %Error.InvalidInputError{value: %{type: :improper_list}} = error} =
+    assert {:error, %Error.ValidationError{details: %{value: %{type: :improper_list}}} = error} =
              Dispatch.validate_opts(invalid)
 
     refute inspect(error) =~ "tail-secret"
-    assert {:error, %Error.InvalidInputError{}} = Dispatch.dispatch(signal, invalid)
-    assert {:error, %Error.InvalidInputError{}} = Dispatch.validate_opts([invalid])
-    assert {:error, [%Error.InvalidInputError{}]} = Dispatch.dispatch(signal, [invalid])
+    assert {:error, %Error.ValidationError{}} = Dispatch.dispatch(signal, invalid)
+    assert {:error, %Error.ValidationError{}} = Dispatch.validate_opts([invalid])
+    assert {:error, [%Error.ValidationError{}]} = Dispatch.dispatch(signal, [invalid])
   end
 
   test "dispatch reads the consolidated normalization config" do
@@ -368,7 +369,7 @@ defmodule Jido.Signal.Dispatch.ErrorNormalizationTest do
     {:ok, signal} = Signal.new(%{type: "test.event", source: "test", data: %{value: 42}})
     config = {:named, [target: {:name, :nonexistent_process}, delivery_mode: :async]}
 
-    assert {:error, %Error.DispatchError{}} = Dispatch.dispatch(signal, config)
+    assert {:error, %Error.RoutingError{}} = Dispatch.dispatch(signal, config)
   end
 
   test "adapter crashes emit safe telemetry and still escape the dispatch boundary" do
@@ -396,8 +397,8 @@ defmodule Jido.Signal.Dispatch.ErrorNormalizationTest do
     assert is_integer(measurements.latency_ms)
     assert metadata.outcome == :raised
     assert metadata.success? == false
-    assert metadata.error_type == :dispatch_error
-    assert metadata.retryable? == false
+    assert metadata.error_type == :routing_error
+    assert metadata.retryable? == true
     assert metadata.exception_kind == :error
     assert metadata.exception_module == RuntimeError
     refute inspect(metadata) =~ "adapter crashed"

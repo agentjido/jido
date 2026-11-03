@@ -206,10 +206,10 @@ defmodule Jido.Signal.RouterTest do
 
       assert {:error, error} = Router.remove(router, String)
       assert error.message == "Expected a route path string or a Jido.Signal module"
-      assert error.value == String
+      assert error.details.value == String
 
       assert {:error, error} = Router.remove(router, ["keep", String])
-      assert error.value == String
+      assert error.details.value == String
       assert Router.count(router) == 1
     end
 
@@ -228,7 +228,7 @@ defmodule Jido.Signal.RouterTest do
 
       assert {:ok, router} = Router.remove(router, ["user.created", "user.**"])
       assert Router.empty?(router)
-      assert {:error, %Jido.Signal.Error.RoutingError{}} = Router.route(router, signal)
+      assert {:error, %Jido.Error.RoutingError{}} = Router.route(router, signal)
     end
 
     test "merges Routers by appending their Routes" do
@@ -268,7 +268,7 @@ defmodule Jido.Signal.RouterTest do
       }
 
       assert {:ok, [:large]} = Router.route(router, large)
-      assert {:error, %Jido.Signal.Error.RoutingError{}} = Router.route(router, small)
+      assert {:error, %Jido.Error.RoutingError{}} = Router.route(router, small)
     end
 
     test "accepts a Jido.Signal module as a route path" do

@@ -34,7 +34,7 @@ defmodule Jido.Signal.Catalog do
 
   ## Errors
 
-  All failures return `{:error, %Jido.Signal.Error.InvalidInputError{}}`.
+  All failures return `{:error, %Jido.Error.ValidationError{}}`.
   The `details.code` field is one of:
 
   * `:invalid_definitions` — registration input or metadata is invalid, or a metadata callback failed.
@@ -61,8 +61,8 @@ defmodule Jido.Signal.Catalog do
 
   alias Jido.Signal
   alias Jido.Signal.Context
-  alias Jido.Signal.Error
-  alias Jido.Signal.Error.InvalidInputError
+  alias Jido.Error
+  alias Jido.Error.ValidationError
   alias Jido.Codec.Signal, as: SignalCodec
 
   @definitions_schema Joi.list(Joi.atom() |> Joi.refine({__MODULE__, :validate_definition, []}))
@@ -106,7 +106,7 @@ defmodule Jido.Signal.Catalog do
   An empty list is valid. All duplicate `{type, dataschema}` pairs are rejected.
   The supplied modules are trusted application configuration.
   """
-  @spec new([module()]) :: {:ok, t()} | {:error, %InvalidInputError{}}
+  @spec new([module()]) :: {:ok, t()} | {:error, %ValidationError{}}
   def new(modules) when is_list(modules) and is_integer(length(modules)) do
     case Joi.parse(@definitions_schema, modules) do
       {:ok, modules} -> build(modules)
@@ -117,7 +117,7 @@ defmodule Jido.Signal.Catalog do
   def new(_modules),
     do: error(:invalid_definitions, %{reason: [Joi.Error.invalid_type(:list)]})
 
-  @doc "Builds a catalog, or raises `Jido.Signal.Error.InvalidInputError`."
+  @doc "Builds a catalog, or raises `Jido.Error.ValidationError`."
   @spec new!([module()]) :: t() | no_return()
   def new!(modules) do
     case new(modules) do
@@ -136,7 +136,7 @@ defmodule Jido.Signal.Catalog do
   Use `validate/2` for an existing Signal.
   """
   @spec decode(t(), map() | binary(), keyword()) ::
-          {:ok, Signal.t()} | {:error, %InvalidInputError{}}
+          {:ok, Signal.t()} | {:error, %ValidationError{}}
   def decode(catalog, wire_value, opts \\ [])
 
   def decode(%__MODULE__{definitions: definitions} = catalog, wire_value, opts)
@@ -155,7 +155,7 @@ defmodule Jido.Signal.Catalog do
   The selected Joi schema validates data using the same rules as construction.
   Data defaults and transforms can change the returned data value.
   """
-  @spec validate(t(), Signal.t()) :: {:ok, Signal.t()} | {:error, %InvalidInputError{}}
+  @spec validate(t(), Signal.t()) :: {:ok, Signal.t()} | {:error, %ValidationError{}}
   def validate(%__MODULE__{definitions: definitions} = catalog, %Signal{} = signal)
       when is_map(definitions) do
     with {:ok, signal} <- validate_envelope(signal) do

@@ -31,7 +31,7 @@ this shared taxonomy.
 ### jido.error.I3 — Exact version-1 projection
 
 - **scope:** `to_map/1`, error-type normalization
-- **must:** Return exactly type, message, details, and retryable? keys. Canonicalize Jido, Agent, Action, Signal, atom, and string error types to the supported public vocabulary. Keep stable codes inside details and do not add a new projection version or copy an adjacent error into a Jido error type.
+- **must:** Return exactly type, message, details, and retryable? keys. Canonicalize shared Jido, Agent, Action, atom, and string error types to the supported public vocabulary. Signal boundaries use the shared Jido types directly. Keep stable codes inside details and do not add a new projection version.
 - **kind:** functional
 - **status:** active
 

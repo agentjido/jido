@@ -78,8 +78,8 @@ defmodule Jido.Signal.Router.RouteTest do
     test "rejects a loaded module that is not a Jido.Signal definition" do
       assert {:error, error} = Router.normalize({String, :target})
       assert error.message == "Expected a route path string or a Jido.Signal module"
-      assert error.field == "path"
-      assert error.value == String
+      assert error.subject == "path"
+      assert error.details.value == String
     end
   end
 
@@ -100,7 +100,7 @@ defmodule Jido.Signal.Router.RouteTest do
     test "rejects a wildcard type from a Signal module" do
       assert {:error, error} = Router.path(WildcardType)
       assert error.message == "Signal module type must be an exact route path"
-      assert error.value == WildcardType
+      assert error.details.value == WildcardType
       assert error.details.type == "user.*"
 
       assert {:error, error} = Router.new({WildcardType, :target})

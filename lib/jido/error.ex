@@ -443,7 +443,7 @@ defmodule Jido.Error do
       message: message,
       kind: kind,
       subject: subject,
-      details: Keyword.get(opts, :details, %{})
+      details: merge_extra_details(opts, [:kind, :subject, :field, :action])
     )
   end
 
@@ -483,7 +483,7 @@ defmodule Jido.Error do
     RoutingError.exception(
       message: message,
       target: Keyword.get(opts, :target),
-      details: Keyword.get(opts, :details, %{})
+      details: merge_extra_details(opts, [:target])
     )
   end
 
@@ -502,7 +502,7 @@ defmodule Jido.Error do
     TimeoutError.exception(
       message: message,
       timeout: Keyword.get(opts, :timeout),
-      details: Keyword.get(opts, :details, %{})
+      details: merge_extra_details(opts, [:timeout])
     )
   end
 
@@ -542,7 +542,7 @@ defmodule Jido.Error do
 
     InternalError.exception(
       message: message,
-      details: Keyword.get(opts, :details, %{})
+      details: merge_extra_details(opts, [])
     )
   end
 
@@ -560,6 +560,41 @@ defmodule Jido.Error do
   # ============================================================================
   # Utilities
   # ============================================================================
+
+  @doc "Normalizes a foreign failure into the shared Jido taxonomy."
+  @spec normalize(term()) :: Exception.t()
+  def normalize({:error, reason}), do: normalize(reason)
+
+  def normalize(%struct{} = error)
+      when struct in [
+             ValidationError,
+             ExecutionError,
+             RoutingError,
+             TimeoutError,
+             CompensationError,
+             InternalError,
+             Internal.UnknownError
+           ],
+      do: error
+
+  def normalize(%ArgumentError{} = error) do
+    validation_error(Exception.message(error), reason: Exception.message(error))
+  end
+
+  def normalize(%RuntimeError{} = error) do
+    execution_error(Exception.message(error), reason: Exception.message(error))
+  end
+
+  def normalize(%_{} = error) when is_exception(error) do
+    internal_error(Exception.message(error), reason: error)
+  end
+
+  def normalize(error) when is_binary(error), do: internal_error(error, reason: error)
+  def normalize(error), do: internal_error("Jido operation failed", reason: error)
+
+  @doc "Returns the stable public type for an error."
+  @spec type(term()) :: public_type()
+  def type(error), do: unified_type(error)
 
   @doc "Returns the registered Jido program code carried by an error."
   @spec code(term()) :: code() | nil
@@ -597,6 +632,7 @@ defmodule Jido.Error do
     credentials
     password
     privatekey
+    query
     secret
     token
   ]
@@ -768,7 +804,14 @@ defmodule Jido.Error do
 
   defp sanitize_key(key) when is_atom(key), do: key
   defp sanitize_key(key) when is_binary(key), do: sanitize_utf8(key)
-  defp sanitize_key(key), do: safe_inspect(key)
+  defp sanitize_key(key) when is_number(key), do: to_string(key)
+
+  defp sanitize_key(key) do
+    case safe_inspect(key) do
+      "#Inspect.Error" -> "#Inspect.Error"
+      _inspected -> "[COMPLEX_KEY]"
+    end
+  end
 
   defp sanitize_key_value_pairs(entries, depth) do
     entries
@@ -915,22 +958,20 @@ defmodule Jido.Error do
   defp unified_type(%CompensationError{}), do: :compensation_error
   defp unified_type(%InternalError{}), do: :internal
   defp unified_type(%Internal.UnknownError{}), do: :internal
-  defp unified_type(%Jido.Agent.Error{code: :unmatched_input}), do: :routing_error
-  defp unified_type(%Jido.Agent.Error{}), do: :validation_error
 
-  # Cross-package error mapping (jido_action, jido_signal)
-  defp unified_type(%Jido.Action.Error.InvalidInputError{}), do: :validation_error
-  defp unified_type(%Jido.Action.Error.ExecutionFailureError{}), do: :execution_error
-  defp unified_type(%Jido.Action.Error.TimeoutError{}), do: :timeout
-  defp unified_type(%Jido.Action.Error.ConfigurationError{}), do: :config_error
-  defp unified_type(%Jido.Action.Error.InternalError{}), do: :internal
+  defp unified_type(%{code: :unmatched_input, path: path}) when is_list(path),
+    do: :routing_error
 
-  defp unified_type(%Jido.Signal.Error.InvalidInputError{}), do: :validation_error
-  defp unified_type(%Jido.Signal.Error.ExecutionFailureError{}), do: :execution_error
-  defp unified_type(%Jido.Signal.Error.RoutingError{}), do: :routing_error
-  defp unified_type(%Jido.Signal.Error.TimeoutError{}), do: :timeout
-  defp unified_type(%Jido.Signal.Error.DispatchError{}), do: :routing_error
-  defp unified_type(%Jido.Signal.Error.InternalError{}), do: :internal
+  defp unified_type(%{code: code, path: path}) when is_atom(code) and is_list(path),
+    do: :validation_error
+
+  defp unified_type(%{class: :execution, timeout: _timeout}), do: :timeout
+  defp unified_type(%{class: :invalid}), do: :validation_error
+  defp unified_type(%{class: :config}), do: :config_error
+  defp unified_type(%{class: :execution}), do: :execution_error
+  defp unified_type(%{class: :routing}), do: :routing_error
+  defp unified_type(%{class: :timeout}), do: :timeout
+  defp unified_type(%{class: :internal}), do: :internal
 
   defp unified_type(%{type: type}) when is_atom(type), do: unified_type_from_atom(type)
   defp unified_type(%{type: type}) when is_binary(type), do: unified_type_from_string(type)

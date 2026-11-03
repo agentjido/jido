@@ -7,7 +7,7 @@ defmodule Jido.Signal.Bus.Server do
   alias Jido.Signal.Bus.Store
   alias Jido.Signal.Bus.Store.Memory
   alias Jido.Signal.Bus.Subscriptions
-  alias Jido.Signal.Error
+  alias Jido.Error
   alias Jido.Telemetry.Signal, as: Telemetry
 
   @impl GenServer

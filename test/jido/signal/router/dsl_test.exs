@@ -78,7 +78,7 @@ defmodule Jido.Signal.Router.DSLTest do
       other = Signal.new!("attribute.route", %{status: :waiting}, source: "/test")
 
       assert {:ok, [:attribute]} = AttributeRouter.route(matching)
-      assert {:error, %Jido.Signal.Error.RoutingError{}} = AttributeRouter.route(other)
+      assert {:error, %Jido.Error.RoutingError{}} = AttributeRouter.route(other)
     end
 
     test "allows an empty Router module" do

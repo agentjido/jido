@@ -39,11 +39,11 @@ defmodule Jido.Signal.SanitizerTest do
         end
 
         public =
-          Jido.Signal.Error.validation_error("invalid", %{signal: signal})
-          |> Jido.Signal.Error.to_map()
+          Jido.Error.validation_error("invalid", %{signal: signal})
+          |> Jido.Error.to_map()
 
-        assert public.type == :invalid_input_error
-        assert public.details["signal"]["id"] == original.id
+        assert public.type == :validation_error
+        assert public.details.signal.id == original.id
         refute Jason.encode!(public) =~ secret
       end
     end
@@ -84,7 +84,7 @@ defmodule Jido.Signal.SanitizerTest do
         refute inspect(Sanitizer.sanitize(value, profile)) =~ secret
         refute Sanitizer.preview(value, profile, max_length: 10_000) =~ secret
 
-        refute inspect(Jido.Signal.Error.to_map(Jido.Signal.Error.validation_error("invalid", value))) =~ secret
+        refute inspect(Jido.Error.to_map(Jido.Error.validation_error("invalid", value))) =~ secret
       end
     end
 
@@ -115,8 +115,8 @@ defmodule Jido.Signal.SanitizerTest do
       sanitized = Sanitizer.sanitize(nested, :transport)
       refute inspect(sanitized, limit: :infinity) =~ "leaf"
       assert byte_size(:erlang.term_to_binary(sanitized)) < 3_000
-      error = Jido.Signal.Error.validation_error("invalid", %{signal: nested})
-      assert byte_size(Jason.encode!(Jido.Signal.Error.to_map(error))) < 3_000
+      error = Jido.Error.validation_error("invalid", %{signal: nested})
+      assert byte_size(Jason.encode!(Jido.Error.to_map(error))) < 3_000
     end
 
     test "redacts sensitive keys for telemetry" do

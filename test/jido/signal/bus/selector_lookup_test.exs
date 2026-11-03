@@ -1,8 +1,9 @@
 defmodule Jido.Signal.Bus.SelectorLookupTest do
   use JidoSignalTest.Case, async: false
 
+  alias Jido.Error
   alias Jido.Signal
-  alias Jido.Signal.{Bus, Error, Router}
+  alias Jido.Signal.{Bus, Router}
 
   test "normal observation misses do not construct routing errors" do
     bus = start_supervised!({Bus, name: unique_name("selector_lookup")})

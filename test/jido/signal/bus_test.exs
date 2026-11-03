@@ -325,7 +325,7 @@ defmodule Jido.Signal.BusTest do
       extensions: :invalid
     }
 
-    assert {:error, %Jido.Signal.Error.InvalidInputError{} = error} =
+    assert {:error, %Jido.Error.ValidationError{} = error} =
              Bus.publish(bus, [malformed])
 
     assert error.details.index == 0

@@ -96,7 +96,7 @@ defmodule Jido.Signal.PublicBoundaryErrorsTest do
 
     test "rejects invalid route definitions through each public constructor" do
       assert {:error, _error} = Router.normalize(:invalid)
-      assert_raise Jido.Signal.Error.InvalidInputError, fn -> Router.new!(:invalid) end
+      assert_raise Jido.Error.ValidationError, fn -> Router.new!(:invalid) end
 
       assert {:ok, router} = Router.new()
       assert {:error, {:invalid_routes, :invalid}} = Router.merge(router, :invalid)

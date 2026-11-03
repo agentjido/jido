@@ -66,7 +66,7 @@ defmodule Jido.Signal.Router do
   """
 
   alias Jido.Signal
-  alias Jido.Signal.Error
+  alias Jido.Error
   alias Jido.Signal.Router.Index
 
   @type path :: String.t() | module()

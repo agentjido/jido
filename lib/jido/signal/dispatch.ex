@@ -32,7 +32,7 @@ defmodule Jido.Signal.Dispatch do
   end
 
   alias __MODULE__.Target
-  alias Jido.Signal.Error
+  alias Jido.Error
   alias Jido.Signal.Sanitizer
   alias Jido.Telemetry.Signal, as: Telemetry
 
@@ -185,8 +185,8 @@ defmodule Jido.Signal.Dispatch do
             Map.merge(metadata, %{
               outcome: :raised,
               success?: false,
-              error_type: :dispatch_error,
-              retryable?: false,
+              error_type: :routing_error,
+              retryable?: true,
               exception_kind: kind,
               exception_module: exception_module(reason)
             }),
@@ -382,7 +382,7 @@ defmodule Jido.Signal.Dispatch do
   defp normalize_error(reason, adapter, config) do
     if should_normalize_errors?() do
       {:error,
-       Error.dispatch_error("Signal dispatch failed", %{
+       Error.routing_error("Signal dispatch failed", %{
          adapter: adapter,
          reason: reason,
          target: target_summary(adapter, config)
@@ -410,10 +410,10 @@ defmodule Jido.Signal.Dispatch do
     Application.get_env(:jido, :normalize_dispatch_errors, @normalize_errors_compile_time)
   end
 
-  defp dispatch_error_for_telemetry(%Error.DispatchError{} = error, _target), do: error
+  defp dispatch_error_for_telemetry(%Error.RoutingError{} = error, _target), do: error
 
   defp dispatch_error_for_telemetry(reason, target) do
-    Error.dispatch_error("Signal dispatch failed", %{
+    Error.routing_error("Signal dispatch failed", %{
       adapter: target.adapter,
       reason: reason,
       target: target_summary(target.adapter, Target.to_tuple(target))

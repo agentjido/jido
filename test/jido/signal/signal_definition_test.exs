@@ -137,7 +137,7 @@ defmodule Jido.Signal.DefinitionTest do
     test "does not identify an incomplete marker module as a Signal module" do
       refute Jido.Signal.defined?(MarkerOnly)
 
-      assert {:error, %Jido.Signal.Error.InvalidInputError{}} =
+      assert {:error, %Jido.Error.ValidationError{}} =
                Jido.Signal.Router.path(MarkerOnly)
     end
   end

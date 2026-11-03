@@ -248,7 +248,7 @@ defmodule JidoTest.Error.TransportTest do
       assert Error.to_map(error).details.nested == %{
                "�" => "visible",
                "�TOKEN" => "[REDACTED]",
-               "{:password, 1}" => "[REDACTED]",
+               "[COMPLEX_KEY]" => "hidden",
                "123" => "visible"
              }
 

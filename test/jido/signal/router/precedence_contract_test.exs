@@ -2,7 +2,7 @@ defmodule Jido.Signal.Router.PrecedenceContractTest do
   use ExUnit.Case, async: true
 
   alias Jido.Signal
-  alias Jido.Signal.Error
+  alias Jido.Error
   alias Jido.Signal.Router
 
   defp signal(type, data \\ %{}) do
