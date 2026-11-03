@@ -3,7 +3,6 @@ defmodule Jido.Plugin.SensorManager.Server do
   @behaviour Jido.Plugin
 
   alias Jido.Plugin.{Context, Init}
-  alias Jido.Plugin.SensorManager
   alias Jido.Plugin.SensorManager.Runtime
 
   @runtime_timeout 5_000
@@ -47,6 +46,6 @@ defmodule Jido.Plugin.SensorManager.Server do
 
   @impl true
   def child_spec(%Init{} = init) do
-    Supervisor.child_spec({Runtime, init}, id: SensorManager)
+    Supervisor.child_spec({Runtime, init}, id: init.module)
   end
 end

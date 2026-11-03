@@ -2,7 +2,7 @@ defmodule Jido.Plugin.SensorManager.Stop do
   alias Jido.Joi
   @moduledoc "Removes one desired sensor process."
 
-  alias Jido.Plugin.SensorManager
+  alias Jido.Plugin.SensorManager.Start
 
   @schema Joi.struct(
             __MODULE__,
@@ -23,7 +23,7 @@ defmodule Jido.Plugin.SensorManager.Stop do
   @spec validate(t()) :: {:ok, t()} | {:error, term()}
   def validate(%__MODULE__{} = directive) do
     with {:ok, directive} <- Joi.parse(@schema, Map.from_struct(directive)),
-         :ok <- SensorManager.validate_tag(directive.tag) do
+         :ok <- Start.validate_tag(directive.tag) do
       {:ok, directive}
     end
   end

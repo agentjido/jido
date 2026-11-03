@@ -50,7 +50,8 @@ defmodule Jido.Plugin.Heartbeat do
 
   @impl true
   def child_spec(%Init{} = init) do
-    Supervisor.child_spec({Runtime, init}, id: __MODULE__)
+    {:ok, config} = configuration(init.options)
+    Supervisor.child_spec({Runtime, {init, config}}, id: __MODULE__)
   end
 
   @doc false

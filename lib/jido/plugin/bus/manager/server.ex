@@ -2,7 +2,6 @@ defmodule Jido.Plugin.Bus.Manager.Server do
   @moduledoc false
   @behaviour Jido.Plugin
 
-  alias Jido.Plugin.Bus.Manager
   alias Jido.Plugin.Init
   alias Jido.Signal.Bus
 
@@ -11,6 +10,6 @@ defmodule Jido.Plugin.Bus.Manager.Server do
     |> Keyword.put_new(:name, init.agent_id)
     |> Keyword.put_new(:jido, init.jido)
     |> Bus.child_spec()
-    |> Map.put(:id, Manager)
+    |> Map.put(:id, init.module)
   end
 end

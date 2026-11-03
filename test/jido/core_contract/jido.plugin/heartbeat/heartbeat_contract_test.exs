@@ -16,6 +16,11 @@ defmodule JidoTest.Contract.PluginHeartbeatTest do
     }
   end
 
+  defp runtime_init(options) do
+    {:ok, config} = Heartbeat.configuration(options)
+    {init(options), config}
+  end
+
   defp receive_tick(timeout \\ 500) do
     assert_receive {:"$gen_cast", {:turn, _token, %Jido.Signal{} = signal, %{}, :infinity, nil}},
                    timeout
@@ -85,8 +90,6 @@ defmodule JidoTest.Contract.PluginHeartbeatTest do
                 message: "Heartbeat Plugin options are invalid",
                 details: %{reason: ^reason}
               }} = Heartbeat.validate_options(options)
-
-      assert {:error, ^reason} = Runtime.start_link(init(options))
     end
 
     for options <- [[unknown: true], [interval: 1, interval: 2]] do
@@ -99,11 +102,12 @@ defmodule JidoTest.Contract.PluginHeartbeatTest do
   test "the Plugin declares and starts one linked runtime child" do
     init = init(interval: 60_000)
     spec = Heartbeat.child_spec(init)
+    {:ok, config} = Heartbeat.configuration(init.options)
 
     assert spec.id == Heartbeat
-    assert spec.start == {Runtime, :start_link, [init]}
+    assert spec.start == {Runtime, :start_link, [{init, config}]}
 
-    assert {:ok, runtime} = Runtime.start_link(init)
+    assert {:ok, runtime} = Runtime.start_link({init, config})
     assert is_pid(runtime)
     assert runtime in elem(Process.info(self(), :links), 1)
     assert :ok = GenServer.stop(runtime)
@@ -113,7 +117,7 @@ defmodule JidoTest.Contract.PluginHeartbeatTest do
   test "automatic default ticks keep data and source and use fresh IDs" do
     data = %{source: :clock, count: 1}
 
-    start_supervised!({Runtime, init(interval: 10, signal_data: data, source: "/contract/heartbeat")})
+    start_supervised!({Runtime, runtime_init(interval: 10, signal_data: data, source: "/contract/heartbeat")})
 
     first = receive_tick()
     second = receive_tick()
@@ -137,7 +141,7 @@ defmodule JidoTest.Contract.PluginHeartbeatTest do
     runtime =
       start_supervised!(
         {Runtime,
-         init(
+         runtime_init(
            interval: 60_000,
            signal_type: "system.heartbeat",
            signal_data: data,

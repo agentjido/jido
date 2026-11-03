@@ -51,29 +51,4 @@ defmodule Jido.Plugin.SensorManager do
   @doc "Creates a Directive that removes one tagged sensor."
   @spec stop(term()) :: Stop.t()
   def stop(tag), do: %Stop{tag: tag}
-
-  @doc false
-  def validate_tag(nil), do: invalid("Sensor tag must not be nil", %{tag: nil})
-
-  def validate_tag(tag) do
-    case Jido.Codec.Term.validate(tag, :tag) do
-      :ok -> :ok
-      {:error, path} -> invalid("Sensor tag must contain portable data", %{path: path})
-    end
-  end
-
-  @doc false
-  def validate_sensor(module) do
-    with {:module, ^module} <- Code.ensure_loaded(module),
-         true <- function_exported?(module, :child_spec, 1) do
-      :ok
-    else
-      _invalid -> invalid("Sensor must define child_spec/1", %{sensor: module})
-    end
-  end
-
-  @doc false
-  def invalid(message, details) do
-    {:error, Jido.Error.validation_error(message, kind: :config, details: details)}
-  end
 end
