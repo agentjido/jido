@@ -72,7 +72,6 @@ defmodule Jido.AgentServer do
   }
 
   alias Jido.AgentServer.Supervisor, as: ServerSupervisor
-  alias Jido.Dispatch.Preparation, as: DispatchPreparation
   alias Jido.AgentServer.Command
   alias Jido.Agent.Runner, as: AgentRunner
   alias Jido.Agent.Validation
@@ -1788,7 +1787,7 @@ defmodule Jido.AgentServer do
             source: "/agent/" <> data.agent.id
           )
 
-        dispatch = DispatchPreparation.inherit_bus_scope(parent.dispatch, data.jido)
+        dispatch = Signal.Dispatch.inherit_bus_scope(parent.dispatch, data.jido)
         task = Task.async(fn -> Jido.Signal.Dispatch.dispatch(signal, dispatch) end)
         timer = Process.send_after(self(), {:orphan_timeout, task.ref}, data.directive_timeout)
 

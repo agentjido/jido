@@ -11,7 +11,6 @@ modules:
   - Jido.AgentServer.Directive.ProcessStart
   - Jido.AgentServer.Effects
   - Jido.AgentServer.ReplyGate
-  - Jido.Dispatch.Preparation
 ---
 
 ## Purpose
@@ -26,7 +25,7 @@ root lifetime, child restart behavior, durable storage, or Signal transport.
 The documented `Jido.Agent.Directive` and `Jido.AgentServer.Directive`
 constructors and their result records are the public boundary. Agent owns
 deferred behavior requests. AgentServer owns live-runtime-only requests. The
-effect engine and dispatch preparation are internal. This component has no
+effect engine is internal. This component has no
 DSL.
 
 ## Obligations
@@ -122,7 +121,7 @@ DSL.
 ### jido.agent_server.effects.I12 — Public runtime Directive API
 
 - **scope:** `Jido.AgentServer.Directive` and its built-in result records
-- **must:** Document and type only the supported constructors, option sets, restart policies, and result records. Reject unknown or duplicate constructor options. Keep validation hooks and record schemas hidden. Keep `Jido.AgentServer.Effects` and `Jido.Dispatch.Preparation` internal. Do not add an effects DSL.
+- **must:** Document and type only the supported constructors, option sets, restart policies, and result records. Reject unknown or duplicate constructor options. Keep validation hooks and record schemas hidden. Keep `Jido.AgentServer.Effects` internal. Do not add an effects DSL.
 - **why:** Agent code needs one stable way to request post-commit work without depending on the effect engine.
 - **kind:** functional
 - **status:** active

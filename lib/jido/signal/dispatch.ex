@@ -49,6 +49,17 @@ defmodule Jido.Signal.Dispatch do
   @type dispatch_config :: {adapter(), keyword()}
   @type dispatch_configs :: dispatch_config() | [dispatch_config()]
 
+  @doc false
+  @spec inherit_bus_scope(term(), atom() | nil) :: term()
+  def inherit_bus_scope({:bus, opts}, jido) when is_atom(jido) and not is_nil(jido) do
+    {:bus, Keyword.put_new(opts, :jido, jido)}
+  end
+
+  def inherit_bus_scope(targets, jido) when is_list(targets),
+    do: Enum.map(targets, &inherit_bus_scope(&1, jido))
+
+  def inherit_bus_scope(target, _jido), do: target
+
   @normalize_errors_compile_time Application.compile_env(
                                    :jido,
                                    :normalize_dispatch_errors,

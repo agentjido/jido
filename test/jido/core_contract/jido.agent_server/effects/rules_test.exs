@@ -6,7 +6,7 @@ defmodule JidoTest.AgentServer.Effects.RulesTest do
 
   alias Jido.AgentServer.Effects
   alias Jido.Agent.Directive.Emit
-  alias Jido.Dispatch.Preparation
+  alias Jido.Signal.Dispatch
   alias Jido.Signal.Context, as: SignalContext
   alias Jido.Trace
   alias Jido.Trace.Context
@@ -49,31 +49,31 @@ defmodule JidoTest.AgentServer.Effects.RulesTest do
   end
 
   @tag obligation: "jido.agent_server.effects.I6"
-  test "dispatch preparation propagates causation and keeps safe fallbacks" do
+  test "trace and dispatch owners propagate causation and bus scope" do
     source = F.signal()
     outbound = F.signal(%{}, "out")
     root = Trace.new()
     Context.put(root)
     on_exit(&Context.clear/0)
 
-    traced = Preparation.propagate(outbound, source)
+    assert {:ok, traced} = Context.propagate_to(outbound, source.id)
     assert SignalContext.get_trace(traced).trace_id == root.trace_id
     assert SignalContext.get_trace(traced).causation_id == source.id
 
     Context.clear()
-    assert Preparation.propagate(outbound, source) == outbound
+    assert Context.propagate_to(outbound, source.id) == {:error, :no_trace_context}
 
     targets = [{:bus, target: :one}, {:pid, target: self()}]
 
-    assert Preparation.inherit_bus_scope(targets, Jido) == [
+    assert Dispatch.inherit_bus_scope(targets, Jido) == [
              {:bus, [jido: Jido, target: :one]},
              {:pid, target: self()}
            ]
 
-    assert Preparation.inherit_bus_scope({:bus, target: :one}, nil) ==
+    assert Dispatch.inherit_bus_scope({:bus, target: :one}, nil) ==
              {:bus, target: :one}
 
-    assert Preparation.inherit_bus_scope({:bus, target: :one}, "not-an-instance") ==
+    assert Dispatch.inherit_bus_scope({:bus, target: :one}, "not-an-instance") ==
              {:bus, target: :one}
   end
 

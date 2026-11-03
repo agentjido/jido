@@ -345,7 +345,7 @@ defmodule Jido.AgentServer.Topology do
             dispatch ->
               Jido.Signal.Dispatch.dispatch(
                 signal,
-                Jido.Dispatch.Preparation.inherit_bus_scope(dispatch, context.jido)
+                Jido.Signal.Dispatch.inherit_bus_scope(dispatch, context.jido)
               )
           end
       end

@@ -12,8 +12,8 @@
 
 - id: effects-mutation-profile
   date: 2026-10-19
-  decision: Mutate Jido.AgentServer.Effects and Jido.Dispatch.Preparation. Keep Jido.AgentServer out of this focused profile while it remains the shared state-machine owner for core, effects, Plugin runtime, composition, and durable work.
-  driver: The focused profile must test the extracted effect decisions without overlapping every remaining AgentServer component.
+  decision: Mutate Jido.AgentServer.Effects. Keep Jido.AgentServer out of this focused profile while it remains the shared state-machine owner for core, effects, Plugin runtime, composition, and durable work.
+  driver: Trace propagation belongs to Jido.Trace.Context, and bus scope belongs to Jido.Signal.Dispatch. Jido.Dispatch.Preparation was a forwarding helper and was removed. The focused profile tests effect decisions without overlapping the owners of those shared policies.
   approved_by: Component hardening pass
 
 - id: effects-obligation-migration
@@ -30,7 +30,7 @@
 
 - id: effects-public-api
   date: 2026-10-22
-  decision: Make Jido.AgentServer.Directive and its built-in result records the documented public effects API. Keep Jido.AgentServer.Effects, dispatch preparation, schema access, and validation hooks internal. Supersede effects-mutation-profile by adding the public Directive modules to the component mutation profile.
+  decision: Make Jido.AgentServer.Directive and its built-in result records the documented public effects API. Keep Jido.AgentServer.Effects, schema access, and validation hooks internal. Supersede effects-mutation-profile by adding the public Directive modules to the component mutation profile.
   driver: Agent code must request post-commit work without depending on effect-engine internals, and the Covenant must enforce that boundary.
   approved_by: Component hardening pass
 

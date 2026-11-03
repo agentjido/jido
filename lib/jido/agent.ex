@@ -16,9 +16,9 @@ defmodule Jido.Agent do
   alias Jido.Agent.Validation
   alias Jido.Agent.Plugin.Declaration
   alias Jido.Agent.Runner
-  alias Jido.Dispatch.Preparation
   alias Jido.Error
   alias Jido.Signal
+  alias Jido.Trace.Context, as: TraceContext
 
   @type t :: %__MODULE__{}
 
@@ -270,7 +270,10 @@ defmodule Jido.Agent do
          {:ok, _source_signal, trace} <- Signal.Context.ensure_trace(source_signal),
          {:ok, signal} <-
            Signal.Context.put_trace(signal, Jido.Trace.with_causation(trace, source_signal.id)) do
-      {:ok, Preparation.propagate(signal, source_signal)}
+      case TraceContext.propagate_to(signal, source_signal.id) do
+        {:ok, traced} -> {:ok, traced}
+        {:error, _reason} -> {:ok, signal}
+      end
     end
   end
 

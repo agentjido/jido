@@ -8,7 +8,6 @@ defmodule JidoTest.AgentServer.EffectsApiTest do
   alias Jido.AgentServer.Directive.{AgentStart, AgentStop, ErrorReport, ProcessStart}
 
   alias Jido.AgentServer.Effects
-  alias Jido.Dispatch.Preparation
   alias Jido.Signal
   alias JidoTest.AgentEvolutionFixtures, as: E
 
@@ -40,7 +39,6 @@ defmodule JidoTest.AgentServer.EffectsApiTest do
     end
 
     refute public_module?(Effects)
-    refute public_module?(Preparation)
   end
 
   @tag obligation: "jido.agent_server.effects.I12"

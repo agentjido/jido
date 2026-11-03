@@ -7,7 +7,6 @@ defmodule Jido.AgentServer.Effects do
   alias Jido.AgentServer, as: Server
   alias Jido.AgentServer.Directive.{AgentStart, AgentStop, ErrorReport, ProcessStart}
   alias Jido.AgentServer.Topology
-  alias Jido.Dispatch.Preparation, as: DispatchPreparation
   alias Jido.Signal
   alias Jido.Trace.Context, as: TraceContext
 
@@ -129,7 +128,7 @@ defmodule Jido.AgentServer.Effects do
         _ -> signal
       end
 
-    case Signal.Dispatch.dispatch(signal, DispatchPreparation.inherit_bus_scope(target, jido)) do
+    case Signal.Dispatch.dispatch(signal, Signal.Dispatch.inherit_bus_scope(target, jido)) do
       :ok -> :continue
       _ -> {:stop, :error_signal_failed}
     end
@@ -315,6 +314,6 @@ defmodule Jido.AgentServer.Effects do
   defp dispatch_outbound(signal, nil, context), do: Topology.emit(context, signal)
 
   defp dispatch_outbound(signal, target, context) do
-    Signal.Dispatch.dispatch(signal, DispatchPreparation.inherit_bus_scope(target, context.jido))
+    Signal.Dispatch.dispatch(signal, Signal.Dispatch.inherit_bus_scope(target, context.jido))
   end
 end
