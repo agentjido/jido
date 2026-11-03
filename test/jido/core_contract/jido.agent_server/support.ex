@@ -228,7 +228,7 @@ defmodule JidoTest.AgentServer.Fixtures do
   def setup_runtime do
     # Use a separate Runner per test. No AgentServer is started by this fixture.
     name = Module.concat(__MODULE__, "Runner#{System.unique_integer([:positive])}")
-    start_supervised!({Runic.Runner, name: name, store: Server.Store})
+    start_supervised!({Runic.Runner, name: name, store: Jido.Persistence.ContinuationStore})
     %{runner: name, agent: agent()}
   end
 

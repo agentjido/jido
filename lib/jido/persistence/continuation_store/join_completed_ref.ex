@@ -1,4 +1,4 @@
-defmodule Jido.AgentServer.DurableTurn.JoinCompletedRef do
+defmodule Jido.Persistence.ContinuationStore.JoinCompletedRef do
   @moduledoc false
 
   alias Runic.Workflow.Events.JoinCompleted
@@ -27,7 +27,7 @@ defmodule Jido.AgentServer.DurableTurn.JoinCompletedRef do
 end
 
 defimpl Runic.Workflow.EventApplicator,
-  for: Jido.AgentServer.DurableTurn.JoinCompletedRef do
+  for: Jido.Persistence.ContinuationStore.JoinCompletedRef do
   alias Runic.Workflow
   alias Runic.Workflow.FactRef
   alias Runic.Identity

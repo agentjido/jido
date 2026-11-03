@@ -2,7 +2,7 @@ defmodule JidoTest.AgentServer.DurableTurn.PolicyTest do
   use JidoTest.Case, async: false
   use Covenant.Case, component: "jido.agent_server.durable_turn", async: false
 
-  alias Jido.AgentServer.DurableTurn
+  alias Jido.AgentServer.Lifecycle
   alias Jido.Exec.Continuation
   alias JidoTest.DurableFixtures, as: F
 
@@ -75,7 +75,7 @@ defmodule JidoTest.AgentServer.DurableTurn.PolicyTest do
     }
 
     before = System.system_time(:millisecond)
-    assert {:ok, receipt} = DurableTurn.accept(data(signal), prepared)
+    assert {:ok, receipt} = Lifecycle.accept_continuation(data(signal), prepared)
     after_accept = System.system_time(:millisecond)
 
     assert receipt.id == "turn-1"
@@ -94,10 +94,10 @@ defmodule JidoTest.AgentServer.DurableTurn.PolicyTest do
     {signal, invalid} = prepared(agent, "request", %{value: "bad"})
 
     assert {:error, %{details: %{phase: :flow_input}}} =
-             DurableTurn.accept(data(signal), invalid)
+             Lifecycle.accept_continuation(data(signal), invalid)
 
     {signal, action} = prepared(agent, "increment", %{})
-    assert {:error, :not_durable_flow} = DurableTurn.accept(data(signal), action)
+    assert {:error, :not_durable_flow} = Lifecycle.accept_continuation(data(signal), action)
   end
 
   @tag obligation: "jido.agent_server.durable_turn.I1"
@@ -110,7 +110,7 @@ defmodule JidoTest.AgentServer.DurableTurn.PolicyTest do
       signal: signal
     }
 
-    assert {:error, _error} = DurableTurn.accept(data(signal), prepared)
+    assert {:error, _error} = Lifecycle.accept_continuation(data(signal), prepared)
   end
 
   @tag obligation: "jido.agent_server.durable_turn.I3"
@@ -144,9 +144,9 @@ defmodule JidoTest.AgentServer.DurableTurn.PolicyTest do
   @tag obligation: "jido.agent_server.durable_turn.I3"
   test "only a running receipt requires Flow reconstruction" do
     agent = F.Worker.instantiate!(id: "terminal-agent")
-    assert :ok = DurableTurn.validate_restore(agent, nil)
-    assert :ok = DurableTurn.validate_restore(agent, %{status: :completed})
-    assert :ok = DurableTurn.validate_restore(agent, %{status: :failed})
-    assert :ok = DurableTurn.validate_restore(agent, %{status: :cancelled})
+    assert :ok = Lifecycle.validate_continuation(agent, nil)
+    assert :ok = Lifecycle.validate_continuation(agent, %{status: :completed})
+    assert :ok = Lifecycle.validate_continuation(agent, %{status: :failed})
+    assert :ok = Lifecycle.validate_continuation(agent, %{status: :cancelled})
   end
 end

@@ -6,7 +6,7 @@ defmodule JidoTest.AgentServer.HandoffTest do
   import JidoTest.Eventually
 
   alias Jido.AgentServer, as: Server
-  alias Jido.AgentServer.DurableTurn
+  alias Jido.AgentServer.Lifecycle
   alias JidoTest.DurableFixtures.Probe
 
   defmodule EventLog do
@@ -595,7 +595,7 @@ defmodule JidoTest.AgentServer.HandoffTest do
       persistence: false
     }
 
-    assert {:ok, accepted} = DurableTurn.accept_handoff(data, instruction)
+    assert {:ok, accepted} = Lifecycle.accept_handoff(data, instruction)
 
     released =
       Map.merge(accepted, %{
@@ -605,10 +605,10 @@ defmodule JidoTest.AgentServer.HandoffTest do
         expires_at: :infinity
       })
 
-    assert {:ok, _prepared} = DurableTurn.restore_handoff(agent, released, %{}, [])
+    assert {:ok, _prepared} = Lifecycle.restore_handoff(agent, released, %{}, [])
 
     assert {:error, :execution_definition_changed} =
-             DurableTurn.restore_handoff(
+             Lifecycle.restore_handoff(
                agent,
                %{released | fingerprint: "changed"},
                %{},
@@ -965,7 +965,7 @@ defmodule JidoTest.AgentServer.HandoffTest do
       persistence: adapter
     }
 
-    assert {:ok, accepted} = DurableTurn.accept_handoff(data, instruction)
+    assert {:ok, accepted} = Lifecycle.accept_handoff(data, instruction)
 
     released =
       Map.merge(accepted, %{

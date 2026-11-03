@@ -14,7 +14,7 @@ defmodule Jido.Application do
       Jido.Telemetry.AI.CorrelationStore,
       Jido.Instance.NamespaceRegistry,
       Jido.Persistence.ETS.Owner,
-      {Runic.Runner, name: Jido.exec_runner_name(nil), store: Jido.AgentServer.Store}
+      {Runic.Runner, name: Jido.exec_runner_name(nil), store: Jido.Persistence.ContinuationStore}
     ]
 
     case Supervisor.start_link(children, strategy: :one_for_one, name: Jido.Supervisor) do

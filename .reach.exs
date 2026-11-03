@@ -95,7 +95,8 @@
       "Jido.Telemetry.Semantic*",
       "Jido.Trace.Context",
       "Jido.Trace.Context.*",
-      "Runic.Workflow.EventApplicator.Jido.AgentServer.*"
+      "Runic.Workflow.EventApplicator.Jido.AgentServer.*",
+      "Runic.Workflow.EventApplicator.Jido.Persistence.*"
     ],
     ai: [
       "Jido.AI",
@@ -151,6 +152,8 @@
       "Jido.AgentServer.CompositionRuntime",
       "Jido.AgentServer.Core",
       "Jido.AgentServer.Durable",
+      "Jido.AgentServer.DurableTurn*",
+      "Jido.AgentServer.Store",
       "Jido.AgentServer.TopologyBus",
       "Jido.AgentServer.TopologyRuntime",
       "Jido.Exec.Waits",
@@ -194,6 +197,8 @@
       "lib/jido/agent_server/composition_runtime.ex",
       "lib/jido/agent_server/core.ex",
       "lib/jido/agent_server/durable.ex",
+      "lib/jido/agent_server/durable_turn.ex",
+      "lib/jido/agent_server/durable_turn/**",
       "lib/jido/agent_server/topology_bus.ex",
       "lib/jido/agent_server/topology_runtime.ex",
       "lib/jido/exec/waits.ex",

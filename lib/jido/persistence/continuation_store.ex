@@ -1,9 +1,11 @@
-defmodule Jido.AgentServer.DurableTurn.CheckpointStore do
+defmodule Jido.Persistence.ContinuationStore do
   @moduledoc false
+  @behaviour Runic.Runner.Store
+
   alias Jido.Persistence.Store
   alias Jido.Exec.Frame.Delta
   alias Jido.Exec.Runtime
-  alias Jido.AgentServer.DurableTurn.JoinCompletedRef
+  alias __MODULE__.JoinCompletedRef
   alias Runic.Workflow.{Batch, Fact, FactRef, FactResolver, Rehydration}
 
   @prefix "jido:execution:"
@@ -11,6 +13,26 @@ defmodule Jido.AgentServer.DurableTurn.CheckpointStore do
   @fact_version 1
   @max_fact_delta_depth 32
   @fact_index_write_attempts 8
+
+  # Durable Flow Turns use the Agent persistence adapter. Ordinary Turns save
+  # no graph.
+  @impl true
+  def init_store(opts), do: {:ok, Keyword.get(opts, :jido)}
+
+  @impl true
+  def for_workflow(id, jido), do: {id, jido}
+
+  @impl true
+  def save(_id, _log, _state), do: :ok
+
+  @impl true
+  def load(_id, _state), do: {:error, :not_found}
+
+  @impl true
+  def save_fact(hash, value, {id, jido}), do: save_fact(id, hash, value, jido)
+
+  @impl true
+  def load_fact(hash, {id, jido}), do: load_fact(id, hash, jido)
 
   def register(jido, id, config, owner \\ self()),
     do: Jido.RuntimeStore.put(jido, __MODULE__, id, {owner, config})
@@ -35,6 +57,9 @@ defmodule Jido.AgentServer.DurableTurn.CheckpointStore do
     end
   end
 
+  @impl true
+  def append(id, events, {id, jido}), do: append(id, events, jido)
+
   def append({:jido_execution, _, _, _, _} = id, events, jido) when is_list(events) do
     with {:ok, events} <- detach_join_values(events, id, jido),
          {:ok, config} <- config(jido, id),
@@ -45,6 +70,9 @@ defmodule Jido.AgentServer.DurableTurn.CheckpointStore do
 
   # Non-durable Turns share the Runner Store but do not persist execution events.
   def append(_id, _events, _jido), do: {:ok, 0}
+
+  @impl true
+  def stream(id, {id, jido}), do: stream(id, jido)
 
   def stream({:jido_execution, _, _, _, _} = id, jido) do
     with {:ok, config} <- config(jido, id),
@@ -146,7 +174,7 @@ defmodule Jido.AgentServer.DurableTurn.CheckpointStore do
         Rehydration.classify(workflow).hot
       end
 
-    resolver = FactResolver.new({Jido.AgentServer.Store, {id, jido}})
+    resolver = FactResolver.new({__MODULE__, {id, jido}})
     {workflow, resolver} = Rehydration.resolve_hot(workflow, required, resolver)
     wait_inputs = wait_input_hashes(workflow)
     required = MapSet.union(required, wait_inputs)

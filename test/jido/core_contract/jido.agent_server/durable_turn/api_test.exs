@@ -2,9 +2,10 @@ defmodule JidoTest.AgentServer.DurableTurn.ApiTest do
   use Covenant.Case, component: "jido.agent_server.durable_turn", async: true
 
   alias Jido.AgentServer, as: Server
-  alias Jido.AgentServer.DurableTurn
-  alias Jido.AgentServer.DurableTurn.{CheckpointStore, WaitHost}
+  alias Jido.AgentServer.Lifecycle
   alias Jido.Exec.{Continuation, Wait}
+  alias Jido.Persistence.ContinuationStore
+  alias Jido.Persistence.ContinuationStore.JoinCompletedRef
   alias Jido.Signal
 
   @tag obligation: "jido.agent_server.durable_turn.I11"
@@ -15,7 +16,7 @@ defmodule JidoTest.AgentServer.DurableTurn.ApiTest do
     refute {:type, :wait_id, 0} in documented_types(Server)
     assert public_module?(Continuation)
 
-    for module <- [DurableTurn, CheckpointStore, WaitHost] do
+    for module <- [Lifecycle, ContinuationStore, JoinCompletedRef] do
       refute public_module?(module)
     end
   end

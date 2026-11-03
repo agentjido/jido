@@ -2,8 +2,9 @@ defmodule JidoTest.AgentServer.DurableTurn.CheckpointStoreTest do
   use JidoTest.Case, async: true
   use Covenant.Case, component: "jido.agent_server.durable_turn", async: true
 
-  alias Jido.AgentServer.DurableTurn.CheckpointStore, as: Store
-  alias Jido.AgentServer.DurableTurn.JoinCompletedRef
+  alias Jido.AgentServer.Lifecycle
+  alias Jido.Persistence.ContinuationStore, as: Store
+  alias Jido.Persistence.ContinuationStore.JoinCompletedRef
   alias JidoTest.DurableFixtures, as: F
 
   defmodule Increment do
@@ -123,8 +124,8 @@ defmodule JidoTest.AgentServer.DurableTurn.CheckpointStoreTest do
 
   @tag obligation: "jido.agent_server.durable_turn.I2"
   test "Runic appends each event batch once and streams committed events in order", c do
-    assert Code.ensure_loaded?(Jido.AgentServer.Store)
-    assert Runic.Runner.Store.supports_stream?(Jido.AgentServer.Store)
+    assert Code.ensure_loaded?(Store)
+    assert Runic.Runner.Store.supports_stream?(Store)
     assert {:error, :not_found} = Store.stream(c.id, c.jido)
 
     first = [%{event: 1}, %{event: 2}]
@@ -487,7 +488,7 @@ defmodule JidoTest.AgentServer.DurableTurn.CheckpointStoreTest do
     data = %{jido: c.jido, active: %{worker_id: c.id}}
 
     assert {:error, :missing_wait_checkpoint} =
-             Jido.AgentServer.DurableTurn.deliver(data, %{
+             Lifecycle.deliver_wait_input(data, %{
                id: "input",
                event: "event",
                payload: %{},

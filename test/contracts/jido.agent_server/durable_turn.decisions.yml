@@ -1,14 +1,14 @@
 - id: durable-turn-boundary
   date: 2026-10-20
-  decision: Use Jido.Exec.Continuation for portable accepted Flow and Handoff receipts. Use jido.agent_server.durable_turn for Runic workflow checkpoints, wait input receipts, wait resolution, and recovery of persistent Flow execution.
+  decision: Use Jido.Exec.Continuation for portable accepted Flow and Handoff receipts. Use Jido.AgentServer.Lifecycle for live wait and recovery policy. Use Jido.Persistence.ContinuationStore for Runic workflow checkpoints and saved wait input receipts.
   driver: Exec owns portable suspension data. AgentServer owns live execution and Persistence owns its durable record.
   approved_by: User-approved Jido V3 component map
 
 - id: durable-turn-code-seam
   date: 2026-10-20
-  decision: Keep deliver_wait and durable-turn gen_statem transitions in Jido.AgentServer. Put the portable wait value, ID, input validation, matching, and deadline data in Jido.Exec.Wait. Put workflow host operations in Jido.Exec.Runtime. Keep durable acceptance and storage in DurableTurn, CheckpointStore, and WaitHost without compatibility delegates.
-  driver: Portable wait data belongs to Exec. AgentServer owns live admission and durable storage owns saved acceptance.
-  approved_by: Component hardening pass
+  decision: Keep deliver_wait and durable-turn gen_statem transitions in Jido.AgentServer. Put portable wait values and workflow operations in Exec, live continuation policy in Lifecycle, and saved workflow data in Persistence. Remove DurableTurn, CheckpointStore, WaitHost, and the forwarding AgentServer Store module without compatibility delegates.
+  driver: Portable wait data belongs to Exec, AgentServer owns live admission, and Persistence owns saved acceptance.
+  approved_by: V3 aspirational module dependency map
 
 - id: durable-turn-obligation-origin
   date: 2026-10-20
@@ -18,9 +18,9 @@
 
 - id: durable-turn-mutation-profile
   date: 2026-10-20
-  decision: Mutate DurableTurn, DurableTurn.CheckpointStore, and DurableTurn.WaitHost. Do not mutate the shared AgentServer state machine in this focused profile.
-  driver: The focused profile must test durable Flow decisions without overlapping the core Turn and durable Agent components.
-  approved_by: Component hardening pass
+  decision: Mutate Jido.AgentServer.Lifecycle and Jido.Persistence.ContinuationStore. Do not mutate the shared AgentServer state machine in this focused profile.
+  driver: The focused profile must test the canonical live and stored durable Flow owners without restoring old seams.
+  approved_by: V3 aspirational module dependency map
 
 - id: durable-turn-fact-deltas
   date: 2026-10-27

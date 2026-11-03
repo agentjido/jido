@@ -36,8 +36,11 @@ defmodule JidoTest.AgentServer.StartupTest do
   @tag obligation: "jido.agent_server.I1"
   test "rejects an unrelated process under a former Runner name", c do
     name = Module.concat(__MODULE__, "Stale#{System.unique_integer([:positive])}")
-    {:ok, pid} = Runic.Runner.start_link(name: name, store: Server.Store)
-    assert {Server.Store, _} = Runic.Runner.get_store(name)
+
+    {:ok, pid} =
+      Runic.Runner.start_link(name: name, store: Jido.Persistence.ContinuationStore)
+
+    assert {Jido.Persistence.ContinuationStore, _} = Runic.Runner.get_store(name)
     Supervisor.stop(pid)
     fake = start_supervised!(Supervisor.child_spec({Agent, fn -> :fake end}, id: name))
     true = Process.register(fake, name)

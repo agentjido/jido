@@ -2,7 +2,7 @@ defmodule JidoTest.AgentServer.DurableTurn.WaitHostTest do
   use ExUnit.Case, async: true
   use Covenant.Case, component: "jido.agent_server.durable_turn", async: true
 
-  alias Jido.AgentServer.DurableTurn.WaitHost
+  alias Jido.AgentServer.Lifecycle, as: WaitHost
   alias Jido.Exec.{Frame, Runtime}
   alias Runic.Workflow
   alias Runic.Workflow.{CausalContext, Fact, Runnable}
@@ -67,7 +67,7 @@ defmodule JidoTest.AgentServer.DurableTurn.WaitHostTest do
   test "accepted input survives replay, with equal retries inert and conflicting IDs rejected" do
     workflow = waiting()
     event = input(workflow)
-    assert {:ok, accepted} = WaitHost.accept(workflow, event, 101)
+    assert {:ok, accepted} = WaitHost.accept_wait_input(workflow, event, 101)
     assert Runtime.pending_waits(accepted) == Runtime.pending_waits(workflow)
 
     assert [
@@ -87,15 +87,15 @@ defmodule JidoTest.AgentServer.DurableTurn.WaitHostTest do
              )
 
     accepted = accepted |> Workflow.event_log() |> Workflow.from_events()
-    assert {:ok, ^accepted} = WaitHost.accept(accepted, event, 102)
+    assert {:ok, ^accepted} = WaitHost.accept_wait_input(accepted, event, 102)
 
     assert {:error, %{details: %{reason: :conflicting_input_id}}} =
-             WaitHost.accept(accepted, %{event | payload: %{id: 8}}, 102)
+             WaitHost.accept_wait_input(accepted, %{event | payload: %{id: 8}}, 102)
 
-    assert {:ok, resolved} = WaitHost.resolve(accepted, 102)
+    assert {:ok, resolved} = WaitHost.resolve_wait_inputs(accepted, 102)
     assert Runtime.pending_waits(resolved) == []
     assert Workflow.is_runnable?(resolved)
-    assert {:ok, ^resolved} = WaitHost.resolve(resolved, 103)
+    assert {:ok, ^resolved} = WaitHost.resolve_wait_inputs(resolved, 103)
 
     assert {:ok, %{input_id: "one"}} =
              resolved |> Workflow.react_until_satisfied() |> Jido.Exec.result()
@@ -115,15 +115,15 @@ defmodule JidoTest.AgentServer.DurableTurn.WaitHostTest do
     }
 
     workflow = put_fact(workflow, decoy, %{})
-    assert {:ok, _accepted} = WaitHost.accept(workflow, event, 101)
+    assert {:ok, _accepted} = WaitHost.accept_wait_input(workflow, event, 101)
   end
 
   @tag obligation: "jido.agent_server.durable_turn.I8"
   test "clock rollback cannot put a later accepted event before an earlier event" do
     workflow = waiting()
-    assert {:ok, workflow} = WaitHost.accept(workflow, input(workflow, "first"), 200)
-    assert {:ok, workflow} = WaitHost.accept(workflow, input(workflow, "second"), 150)
-    assert {:ok, workflow} = WaitHost.resolve(workflow, 151)
+    assert {:ok, workflow} = WaitHost.accept_wait_input(workflow, input(workflow, "first"), 200)
+    assert {:ok, workflow} = WaitHost.accept_wait_input(workflow, input(workflow, "second"), 150)
+    assert {:ok, workflow} = WaitHost.resolve_wait_inputs(workflow, 151)
 
     assert {:ok, %{input_id: "first", accepted_at: 200}} =
              workflow |> Workflow.react_until_satisfied() |> Jido.Exec.result()
@@ -135,17 +135,17 @@ defmodule JidoTest.AgentServer.DurableTurn.WaitHostTest do
     event = input(workflow)
 
     assert {:error, %{details: %{reason: :stale_target}}} =
-             WaitHost.accept(workflow, %{event | wait_id: "old"}, 101)
+             WaitHost.accept_wait_input(workflow, %{event | wait_id: "old"}, 101)
 
     assert {:error, %{details: %{reason: :unmatched_input}}} =
-             WaitHost.accept(workflow, %{event | payload: %{id: 8}}, 101)
+             WaitHost.accept_wait_input(workflow, %{event | payload: %{id: 8}}, 101)
 
     assert {:error, %{details: %{reason: :invalid_input}}} =
-             WaitHost.accept(workflow, Map.put(event, :extra, true), 101)
+             WaitHost.accept_wait_input(workflow, Map.put(event, :extra, true), 101)
 
-    assert {:error, _} = WaitHost.accept(workflow, %{event | payload: %{id: 7, pid: self()}}, 101)
-    assert {:error, _} = WaitHost.accept(workflow, event, -1)
-    assert {:error, %{details: %{reason: :invalid_clock}}} = WaitHost.resolve(workflow, -1)
+    assert {:error, _} = WaitHost.accept_wait_input(workflow, %{event | payload: %{id: 7, pid: self()}}, 101)
+    assert {:error, _} = WaitHost.accept_wait_input(workflow, event, -1)
+    assert {:error, %{details: %{reason: :invalid_clock}}} = WaitHost.resolve_wait_inputs(workflow, -1)
   end
 
   @tag obligation: "jido.agent_server.durable_turn.I7"
@@ -166,17 +166,17 @@ defmodule JidoTest.AgentServer.DurableTurn.WaitHostTest do
 
     for input <- invalid do
       assert {:error, %{details: %{reason: :invalid_input}}} =
-               WaitHost.accept(workflow, input, 0)
+               WaitHost.accept_wait_input(workflow, input, 0)
     end
 
     assert {:error, %{details: %{reason: :unmatched_input}}} =
-             WaitHost.accept(workflow, %{event | event: "a"}, 0)
+             WaitHost.accept_wait_input(workflow, %{event | event: "a"}, 0)
 
     assert {:error, %{details: %{reason: :stale_target}}} =
-             WaitHost.accept(workflow, %{event | wait_id: "w"}, 0)
+             WaitHost.accept_wait_input(workflow, %{event | wait_id: "w"}, 0)
 
-    assert {:ok, _accepted} = WaitHost.accept(workflow, event, 0)
-    assert {:ok, ^workflow} = WaitHost.resolve(workflow, 0)
+    assert {:ok, _accepted} = WaitHost.accept_wait_input(workflow, event, 0)
+    assert {:ok, ^workflow} = WaitHost.resolve_wait_inputs(workflow, 0)
   end
 
   @tag obligation: "jido.agent_server.durable_turn.I8"
@@ -193,7 +193,7 @@ defmodule JidoTest.AgentServer.DurableTurn.WaitHostTest do
     }
 
     workflow = put_fact(workflow, invalid, %{jido_wait_record: true})
-    assert {:error, _error} = WaitHost.resolve(workflow, 101)
+    assert {:error, _error} = WaitHost.resolve_wait_inputs(workflow, 101)
   end
 
   @tag obligation: "jido.agent_server.durable_turn.I8"
@@ -215,12 +215,12 @@ defmodule JidoTest.AgentServer.DurableTurn.WaitHostTest do
     }
 
     workflow = put_fact(workflow, invalid, %{jido_wait_record: true})
-    assert {:error, _error} = WaitHost.resolve(workflow, 101)
+    assert {:error, _error} = WaitHost.resolve_wait_inputs(workflow, 101)
   end
 
   @tag obligation: "jido.agent_server.durable_turn.I11"
   test "the production host supplies a current clock and durable validation" do
-    context = WaitHost.context(%{custom: true}, "host", nil)
+    context = WaitHost.wait_context(%{custom: true}, "host", nil)
     assert context.custom
     assert context.__jido_exec_durable__
     assert is_function(context.__jido_wait_host__.clock, 0)
@@ -235,13 +235,13 @@ defmodule JidoTest.AgentServer.DurableTurn.WaitHostTest do
 
     full =
       Enum.reduce(1..1_024, workflow, fn index, current ->
-        {:ok, next} = WaitHost.accept(current, %{event | id: Integer.to_string(index)}, 101)
+        {:ok, next} = WaitHost.accept_wait_input(current, %{event | id: Integer.to_string(index)}, 101)
         next
       end)
 
-    assert {:ok, ^full} = WaitHost.accept(full, %{event | id: "1"}, 102)
+    assert {:ok, ^full} = WaitHost.accept_wait_input(full, %{event | id: "1"}, 102)
 
     assert {:error, %{details: %{reason: :input_limit}}} =
-             WaitHost.accept(full, %{event | id: "overflow"}, 102)
+             WaitHost.accept_wait_input(full, %{event | id: "overflow"}, 102)
   end
 end

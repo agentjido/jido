@@ -76,46 +76,17 @@ defmodule Jido.AgentServer do
   alias Jido.Agent.Runner, as: AgentRunner
   alias Jido.Agent.Validation
   alias Jido.Exec.Continuation
+  alias Jido.Persistence.ContinuationStore
   alias Jido.Signal
   alias Jido.Telemetry.Semantic
   alias Jido.Trace.Context, as: TraceContext
   alias Runic.Runner
-  alias Jido.AgentServer.DurableTurn
 
   defmodule Pending do
     @moduledoc false
     @enforce_keys [:request_id, :owner, :reply_gate]
     @derive {Inspect, only: []}
     defstruct [:request_id, :owner, :reply_gate]
-  end
-
-  defmodule Store do
-    @moduledoc false
-    @behaviour Runic.Runner.Store
-    # Durable Flow Turns use the Agent adapter. Ordinary Turns save no graph.
-    @impl true
-    def init_store(opts), do: {:ok, Keyword.get(opts, :jido)}
-    @impl true
-    def for_workflow(id, jido), do: {id, jido}
-    @impl true
-    def save(_id, _log, _state), do: :ok
-    @impl true
-    def load(_id, _state), do: {:error, :not_found}
-    @impl true
-    def append(id, events, {id, jido}),
-      do: Jido.AgentServer.DurableTurn.CheckpointStore.append(id, events, jido)
-
-    @impl true
-    def stream(id, {id, jido}),
-      do: Jido.AgentServer.DurableTurn.CheckpointStore.stream(id, jido)
-
-    @impl true
-    def save_fact(hash, value, {id, jido}),
-      do: Jido.AgentServer.DurableTurn.CheckpointStore.save_fact(id, hash, value, jido)
-
-    @impl true
-    def load_fact(hash, {id, jido}),
-      do: Jido.AgentServer.DurableTurn.CheckpointStore.load_fact(id, hash, jido)
   end
 
   @typedoc "An owner-bound handle for one submitted Turn result."
@@ -410,10 +381,11 @@ defmodule Jido.AgentServer do
          true <- live_runner_children?(runner, pid),
          {store, _state} <- Runner.get_store(runner),
          true <-
-           store == Store do
+           store == Jido.Persistence.ContinuationStore do
       :ok
     else
-      _other -> invalid_options("Runner must be running with Jido.AgentServer.Store")
+      _other ->
+        invalid_options("Runner must use Jido.Persistence.ContinuationStore")
     end
   rescue
     ArgumentError -> invalid_options("Runner configuration is unavailable")
@@ -1488,7 +1460,7 @@ defmodule Jido.AgentServer do
       when data.admission_mode != :blocked and
              (is_nil(data.control) or data.control.kind == :quiesce) do
     data = data |> cancel_wait_timer() |> put_in([:active, :wait_from], from)
-    durable_operation(:durable_input, data, fn -> DurableTurn.deliver(data, input) end)
+    durable_operation(:durable_input, data, fn -> Lifecycle.deliver_wait_input(data, input) end)
   end
 
   def handle_event({:call, from}, {:wait_input, _input}, _phase, _data),
@@ -2209,12 +2181,12 @@ defmodule Jido.AgentServer do
     case mode do
       {:restore, receipt} ->
         operation(:restore_turn, %{data | active: active}, fn ->
-          DurableTurn.restore(agent, receipt, context, data.plugin_specs)
+          Lifecycle.restore_continuation(agent, receipt, context, data.plugin_specs)
         end)
 
       {:handoff, receipt} ->
         operation(:restore_handoff, %{data | active: active, pending_handoff: nil}, fn ->
-          DurableTurn.restore_handoff(agent, receipt, context, data.plugin_specs)
+          Lifecycle.restore_handoff(agent, receipt, context, data.plugin_specs)
         end)
 
       :turn ->
@@ -2253,7 +2225,7 @@ defmodule Jido.AgentServer do
     end
   end
 
-  defp accept_handoff(instruction, data), do: DurableTurn.accept_handoff(data, instruction)
+  defp accept_handoff(instruction, data), do: Lifecycle.accept_handoff(data, instruction)
 
   defp release_handoff(data) do
     receipt = data.active.handoff_receipt
@@ -2272,7 +2244,7 @@ defmodule Jido.AgentServer do
              [],
              data.plugin_specs
            ),
-         {:ok, released} <- DurableTurn.release_handoff(data, receipt, prepared) do
+         {:ok, released} <- Lifecycle.release_handoff(data, receipt, prepared) do
       {:ok, released}
     else
       {:error, _stage, reason} -> {:error, reason}
@@ -2316,20 +2288,20 @@ defmodule Jido.AgentServer do
   end
 
   defp start_durable_worker(data) do
-    data = put_in(data.active.worker_id, DurableTurn.identity(data))
+    data = put_in(data.active.worker_id, Lifecycle.execution_identity(data))
     owner = self()
     hooks = Lifecycle.execution_hooks(Keyword.get(data.exec_opts, :hooks, []), TraceContext.get())
     policy = Lifecycle.execution_policy(data.exec_opts)
 
     durable_operation(:durable_start, data, fn ->
-      DurableTurn.start(data, owner, hooks, policy)
+      Lifecycle.start_execution(data, owner, hooks, policy)
     end)
   end
 
   defp durable_advance(%{active: %{operation: nil}} = data),
     do:
       durable_operation(:durable_advance, data, fn ->
-        DurableTurn.advance(data.runner, data.active.worker_id)
+        Lifecycle.advance_execution(data.runner, data.active.worker_id)
       end)
 
   defp durable_advance(data), do: {:keep_state, put_in(data.active.advance_pending, true)}
@@ -2374,12 +2346,12 @@ defmodule Jido.AgentServer do
        when kind in [:prepare, :restore_turn, :restore_handoff] do
     data = put_in(data.active.prepared, prepared)
 
-    case {prepared.turn.execution_mode, DurableTurn.instruction(prepared)} do
+    case {prepared.turn.execution_mode, Lifecycle.durable_instruction(prepared)} do
       {:durable, {:ok, %{kind: :flow}}} when data.persistence not in [nil, false] ->
         if kind in [:restore_turn, :restore_handoff] do
           start_durable_worker(put_in(data.active.durable, true))
         else
-          case DurableTurn.accept(data, prepared) do
+          case Lifecycle.accept_continuation(data, prepared) do
             {:ok, receipt} ->
               data = %{
                 data
@@ -2490,7 +2462,7 @@ defmodule Jido.AgentServer do
       |> put_in([:active, :wait_deadline], deadline)
 
     durable_operation(:durable_suspend, data, fn ->
-      DurableTurn.suspend(data.runner, data.active.worker_id)
+      Lifecycle.suspend_execution(data.runner, data.active.worker_id)
     end)
   end
 
@@ -3121,7 +3093,7 @@ defmodule Jido.AgentServer do
   defp finish_result(data, result) do
     if data.active.durable and
          (data.active.durable_finalized or data.server_turn.status == :completed),
-       do: DurableTurn.CheckpointStore.collect(data.jido, data.active.worker_id)
+       do: ContinuationStore.collect(data.jido, data.active.worker_id)
 
     {next, status, stage, count} =
       case result do

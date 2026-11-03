@@ -1,8 +1,8 @@
 ---
 modules:
-  - Jido.AgentServer.DurableTurn
-  - Jido.AgentServer.DurableTurn.CheckpointStore
-  - Jido.AgentServer.DurableTurn.WaitHost
+  - Jido.AgentServer.Lifecycle
+  - Jido.Persistence.ContinuationStore
+  - Jido.Persistence.ContinuationStore.JoinCompletedRef
 ---
 
 ## Purpose
@@ -14,10 +14,11 @@ component does not own Agent record formats, general Agent commits, transient
 Turn execution, or post-commit effects.
 
 The public boundary is `Jido.AgentServer.deliver_wait/4` together with the
-existing AgentServer Turn, status, and cancellation APIs. The three
-`Jido.AgentServer.DurableTurn` modules are internal. Flow and wait definition
-belong to `Jido.Flow`. Portable wait data belongs to `Jido.Exec.Wait`; this
-component adds no DSL.
+existing AgentServer Turn, status, and cancellation APIs. Live durable Turn
+policy is internal to `Jido.AgentServer.Lifecycle`. Workflow bytes belong to
+`Jido.Persistence.ContinuationStore`. Flow and wait definition belong to
+`Jido.Flow`. Portable wait data belongs to `Jido.Exec.Wait`; this component
+adds no DSL.
 
 ## Obligations
 
