@@ -1,0 +1,9 @@
+{
+  "format": 1,
+  "property": "wire_mutations",
+  "input": {
+    "mutation": "type",
+    "text": "newline-boundary"
+  },
+  "description": "Fixed review regression. Construct process values at test time."
+}

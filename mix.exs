@@ -175,6 +175,7 @@ defmodule Jido.MixProject do
       ~r/^test\/fixtures\//,
       ~r/^test\/contracts\//,
       ~r/^test\/authoring\/support\//,
+      ~r|^test/property/[^/]+/support/|,
       ~r/^test\/jido\/core_contract\/.*(?:support|configuration_support)\.ex$/
     ]
   end

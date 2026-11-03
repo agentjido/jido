@@ -1,0 +1,35 @@
+{
+  "format": 1,
+  "property": "memory_histories",
+  "input": {
+    "bound": 1,
+    "commands": [
+      {
+        "op": "put",
+        "id": "a",
+        "path": "**.a",
+        "n": 0,
+        "types": []
+      },
+      {
+        "op": "append",
+        "id": "a",
+        "path": "**",
+        "n": 0,
+        "types": [
+          "**.x.a"
+        ]
+      },
+      {
+        "op": "append",
+        "id": "a",
+        "path": "**",
+        "n": 0,
+        "types": [
+          "a"
+        ]
+      }
+    ]
+  },
+  "description": "Fixed review regression. Construct process values at test time."
+}

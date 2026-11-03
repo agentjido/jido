@@ -23,3 +23,15 @@ special_quality_tags = [
 ]
 
 ExUnit.configure(exclude: [:integration, :skip, :flaky] ++ special_quality_tags)
+
+quality_selection = ExUnit.configuration()[:include]
+
+if Enum.any?(quality_selection, fn
+     tag when tag in [:property, :fuzz] -> true
+     {tag, value} when tag in [:property, :fuzz] -> value != false
+     _other -> false
+   end) do
+  Code.require_file("property/signal/support/report.exs", __DIR__)
+  JidoTest.Property.Signal.Report.prepare!()
+  ExUnit.configure(formatters: [ExUnit.CLIFormatter, JidoTest.Property.Signal.Report])
+end
