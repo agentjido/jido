@@ -1,7 +1,7 @@
-defmodule Jido.ConfigTest do
+defmodule Jido.Plugin.ConfigTest do
   use ExUnit.Case, async: false
 
-  alias Jido.Config
+  alias Jido.Plugin.Config
   alias Jido.Error.ValidationError
 
   setup do

@@ -39,7 +39,10 @@ defmodule JidoTest.Authoring.Agents.EnvironmentTest do
     end
     """)
 
-    data = %{credentials: %{token: Jido.Config.env(name)}, rooms: [Jido.Config.env(name)]}
+    data = %{
+      credentials: %{token: Jido.Plugin.Config.env(name)},
+      rooms: [Jido.Plugin.Config.env(name)]
+    }
 
     definition =
       Agent.define!(%{
@@ -54,7 +57,7 @@ defmodule JidoTest.Authoring.Agents.EnvironmentTest do
       System.put_env(name, expected)
       assert module.definition() === definition
 
-      assert Jido.Config.resolve(hd(definition.plugins).data) ==
+      assert Jido.Plugin.Config.resolve(hd(definition.plugins).data) ==
                {:ok, %{credentials: %{token: expected}, rooms: [expected]}}
     end
 

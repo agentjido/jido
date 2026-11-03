@@ -19,7 +19,7 @@
 - id: register-config-error-codes
   date: 2026-10-20
   decision: Add missing_env, invalid_env, and invalid_config to the common-code registry.
-  driver: Jido.Config already emits these Jido-owned details.code values, so the prior 21-code registry was not complete.
+  driver: Jido.Plugin.Config emits these Jido-owned details.code values, so the prior 21-code registry was not complete.
   approved_by: Component hardening pass
 
 - id: remove-unused-message-extractor

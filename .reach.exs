@@ -42,7 +42,6 @@
       "Jido.Agent.*",
       "Jido.AgentServer",
       "Jido.AgentServer.*",
-      "Jido.Config",
       "Jido.Dispatch",
       "Jido.Dispatch.*",
       "Jido.Error",
@@ -52,6 +51,9 @@
       "Jido.Persistence",
       "Jido.Persistence.*",
       "Jido.Plugin",
+      # Plugin.Config remains here until Jido.Error no longer depends on the
+      # legacy Agent, Action, and Signal error taxonomies. It then moves with
+      # Jido.Error to the declarative definitions layer.
       "Jido.Plugin.*",
       "Jido.RuntimeStore",
       "Jido.Telemetry",
@@ -78,6 +80,10 @@
       ai: [:foundation, :signal, :definitions, :execution, :runtime],
       composition: [:foundation, :signal, :definitions, :execution, :runtime, :ai]
     ]
+  ],
+  source: [
+    forbidden_modules: ["Jido.Config"],
+    forbidden_files: ["lib/jido/config.ex"]
   ],
   checks: [
     source_paths: ["lib"],

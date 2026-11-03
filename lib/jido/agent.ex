@@ -150,7 +150,7 @@ defmodule Jido.Agent do
       use Jido.Agent.DSL, unquote(Macro.escape(opts))
       import Jido.Agent.DSL.Macros
       import Jido.Agent.Directive, only: [emit: 1, emit: 2]
-      import Jido.Config, only: [env: 1]
+      import Jido.Plugin.Config, only: [env: 1]
     end
   end
 

@@ -1,4 +1,4 @@
-defmodule Jido.ConfigRuntimeTest do
+defmodule Jido.Plugin.ConfigRuntimeTest do
   use JidoTest.Case, async: false
 
   alias Jido.Agent
@@ -19,7 +19,7 @@ defmodule Jido.ConfigRuntimeTest do
 
     @impl true
     def init(init) do
-      case Jido.Config.resolve(init.options) do
+      case Jido.Plugin.Config.resolve(init.options) do
         {:ok, options} -> {:ok, options}
         {:error, error} -> {:stop, error}
       end
@@ -35,7 +35,7 @@ defmodule Jido.ConfigRuntimeTest do
     name = "JIDO_RUNTIME_ENV_#{System.unique_integer([:positive])}"
     on_exit(fn -> System.delete_env(name) end)
 
-    data = %{credentials: %{token: Jido.Config.env(name)}}
+    data = %{credentials: %{token: Jido.Plugin.Config.env(name)}}
 
     agent =
       Agent.define!(%{

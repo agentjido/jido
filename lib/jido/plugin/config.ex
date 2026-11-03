@@ -1,19 +1,19 @@
-defmodule Jido.Config do
+defmodule Jido.Plugin.Config do
   @moduledoc """
-  Deferred environment references for runtime configuration.
+  Deferred environment references for Plugin options.
 
   `env/1` stores a variable name as `{:env, name}`. It does not read the
   environment. `use Jido.Agent` imports this helper for DSL declarations.
-  Map authoring uses `Jido.Config.env/1` or the same tuple.
+  Map authoring can use `Jido.Plugin.Config.env/1` or the same tuple.
 
-  A runtime consumer calls `resolve/1` when it starts its resources. Keep the
-  resolved configuration in that runtime. Agent definitions, JSON documents,
-  and snapshots retain the references. A replacement runtime resolves them
-  again from the current environment.
+  A Plugin runtime owner calls `resolve/1` when it starts its resources. The
+  runtime keeps the resolved options. Agent definitions, JSON documents, and
+  snapshots retain the references. A replacement runtime resolves them again
+  from the current environment.
 
   The host application owns environment file loading. This module reads
-  variables with `System.fetch_env/1` and does not load files or convert values.
-  The consumer validates the resolved configuration with its own schema.
+  variables with `System.fetch_env/1`. It does not load files or convert values.
+  The Plugin validates the resolved options with its own schema.
   """
 
   alias Jido.Error
@@ -27,7 +27,7 @@ defmodule Jido.Config do
   Raises `ArgumentError` if the name is empty, is not a UTF-8 string, or
   contains `=` or a null byte.
 
-      iex> Jido.Config.env("API_KEY")
+      iex> Jido.Plugin.Config.env("API_KEY")
       {:env, "API_KEY"}
   """
   @spec env(String.t()) :: env_reference()
@@ -38,7 +38,7 @@ defmodule Jido.Config do
   end
 
   @doc """
-  Resolves environment references in configuration values.
+  Resolves environment references in Plugin option values.
 
   Walks plain map values, lists, keyword lists, and tuples. Preserves map keys,
   keyword order, duplicate keyword entries, and tuple shape. Structs and other
