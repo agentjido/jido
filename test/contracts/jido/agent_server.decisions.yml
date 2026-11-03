@@ -48,6 +48,6 @@
 
 - id: agent-server-public-boundary
   date: 2026-10-22
-  decision: Keep Jido.AgentServer as the documented runtime owner and API. Keep Lifecycle, Pending, callbacks, and focused owner implementations internal. Put Runic checkpoint storage in Jido.Persistence.ContinuationStore. Treat direct function options and Jido instance defaults as the authoring surface; AgentServer has no separate DSL.
+  decision: Keep Jido.AgentServer as the documented runtime owner and API. Publish Jido.AgentServer.Status as the typed process-neutral inspection value. Keep Lifecycle, Pending, callbacks, and focused owner implementations internal. Put Runic checkpoint storage in Jido.Persistence.ContinuationStore. Treat direct function options and Jido instance defaults as the authoring surface; AgentServer has no separate DSL.
   driver: The runtime needs one stable API without making the shared coordinator or its behavior owners public contracts.
   approved_by: Component hardening pass

@@ -159,7 +159,12 @@ defmodule JidoTest.AgentServer.DurableTurn.RuntimeTest do
     server = start(c)
     pending = Server.submit(server, signal("request", %{value: 0}))
     assert_receive {:durable_barrier, :step_6, _}, 5_000
-    worker = Server.status(server).active.worker_pid
+    status = Server.status(server)
+
+    execution_id =
+      {:jido_execution, Jido.namespace(c.jido), status.partition, status.agent_id, status.active.turn_id}
+
+    worker = Runic.Runner.lookup(Jido.exec_runner_name(c.jido), execution_id)
     worker_state = :sys.get_state(worker)
     assert worker_state.checkpoint_strategy == :manual
     assert :sys.get_state(worker_state.task_scope).external_owner == server

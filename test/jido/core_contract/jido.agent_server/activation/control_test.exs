@@ -32,7 +32,7 @@ defmodule JidoTest.AgentServer.ActivationControlTest do
     Process.exit(server, :kill)
     new = replacement(root, server)
     assert :ok = Server.await_ready(new)
-    assert Server.status(new).owners == [self()]
+    assert Server.status(new).owner_count == 1
     assert Server.status(new).admission.mode == :quiesced
     assert {:error, :quiesced} = Server.call(new, F.signal())
     assert :ok = Server.resume(new)
@@ -44,12 +44,12 @@ defmodule JidoTest.AgentServer.ActivationControlTest do
     server = F.start(c)
     assert :ok = Server.attach(server)
     assert :ok = Server.attach(server)
-    assert Server.status(server).owners == [self()]
+    assert Server.status(server).owner_count == 1
     {:monitors, monitors} = Process.info(server, :monitors)
     assert Enum.count(monitors, &(&1 == {:process, self()})) == 1
     assert :ok = Server.detach(server)
     assert :ok = Server.detach(server)
-    assert Server.status(server).owners == []
+    assert Server.status(server).owner_count == 0
     {:monitors, monitors} = Process.info(server, :monitors)
     refute {:process, self()} in monitors
   end

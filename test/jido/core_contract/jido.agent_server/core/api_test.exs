@@ -2,7 +2,7 @@ defmodule JidoTest.AgentServer.ApiTest do
   use Covenant.Case, component: "jido.agent_server", async: true
 
   alias Jido.AgentServer
-  alias Jido.AgentServer.{Lifecycle, Pending}
+  alias Jido.AgentServer.{Lifecycle, Pending, Status}
 
   @tag obligation: "jido.agent_server.I9"
   test "the documented AgentServer API and public types are exact" do
@@ -56,6 +56,7 @@ defmodule JidoTest.AgentServer.ApiTest do
            ]
 
     assert public_module?(AgentServer)
+    assert public_module?(Status)
 
     for module <- [Lifecycle, Pending] do
       refute public_module?(module)

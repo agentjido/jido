@@ -153,7 +153,7 @@ defmodule JidoTest.AgentServer.Composition.RuntimeRulesTest do
     assert :ok = Topology.send_agent(state, :manual, F.signal())
     assert_eventually(Server.agent(child).state.count == 1)
 
-    parent = Server.status(child).parent
+    parent = :gen_statem.call(child, :parent)
     assert :ok = Topology.parent_send(parent, F.signal())
     assert_eventually(Server.agent(server).state.count == 2)
 

@@ -231,7 +231,7 @@ defmodule JidoTest.AgentServer.DurableTurn.WaitIntegrationTest do
     {_id, server, pending, _} = start(c)
     status = waiting(server)
     [wait] = status.waits
-    assert status.active.worker_pid == nil
+    refute Map.has_key?(status.active, :worker_pid)
     assert Server.agent(server).state == %{count: 0}
     queued = Server.submit(server, signal("increment"))
     eventually(fn -> Server.status(server).admission.postponed == 1 end)

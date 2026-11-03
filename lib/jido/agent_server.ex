@@ -67,6 +67,7 @@ defmodule Jido.AgentServer do
     Plugin,
     RegistrationGuard,
     ReplyGate,
+    Status,
     Topology
   }
 
@@ -709,7 +710,7 @@ defmodule Jido.AgentServer do
     do: invalid_options("abandon must run in the process that submitted the turn")
 
   @doc "Returns phase, identity, revision, queue counts, and a bounded active turn view."
-  @spec status(server(), timeout()) :: map() | {:error, term()}
+  @spec status(server(), timeout()) :: Status.t() | {:error, term()}
   def status(server, timeout \\ 5_000) do
     with :ok <- Lifecycle.validate_wait(timeout), do: :gen_statem.call(server, :status, timeout)
   end
@@ -1009,8 +1010,8 @@ defmodule Jido.AgentServer do
   @spec worker(pid()) :: pid() | nil
   def worker(activation), do: ServerSupervisor.live_worker(activation)
 
-  defp public_parent(nil), do: nil
-  defp public_parent(parent), do: Map.drop(parent, [:monitor, :state, :token, :dispatch])
+  defp runtime_parent(nil), do: nil
+  defp runtime_parent(parent), do: Map.drop(parent, [:monitor, :state, :token, :dispatch])
 
   defp monitor_parent(nil), do: nil
 
@@ -1125,7 +1126,7 @@ defmodule Jido.AgentServer do
   end
 
   def handle_event({:call, from}, :parent, _phase, data),
-    do: {:keep_state_and_data, reply(from, public_parent(data.parent))}
+    do: {:keep_state_and_data, reply(from, runtime_parent(data.parent))}
 
   def handle_event({:call, from}, :activation, _phase, data),
     do: {:keep_state_and_data, reply(from, data.activation)}
@@ -1407,48 +1408,7 @@ defmodule Jido.AgentServer do
 
   def handle_event({:call, from}, :status, phase, data) do
     {:message_queue_len, mailbox} = Process.info(self(), :message_queue_len)
-
-    status = %{
-      phase:
-        case phase do
-          phase when phase in [:restoring, :initializing] -> :initializing
-          :idle -> :idle
-          :handoff_pending -> :handoff_pending
-          :waiting -> :waiting
-          _ -> :running
-        end,
-      ready?: phase not in [:restoring, :initializing] and not match?(%{reconciling: true}, data.active),
-      plugin_count: length(data.plugin_specs),
-      activation: data.activation,
-      generation: data.generation,
-      parent: public_parent(data.parent),
-      agent_id: data.agent.id,
-      jido: data.jido,
-      partition: data.partition,
-      effects: Effects.status(data.active),
-      last_effect_outcome: data.last_effect_outcome,
-      state_version: data.state_version,
-      durable_turn:
-        if(data.server_turn,
-          do: Map.take(data.server_turn, [:id, :status, :chain_id, :chain_order]),
-          else: nil
-        ),
-      error_count: data.error_count,
-      last_outcome: data.last_outcome,
-      owners: Map.keys(data.owners),
-      idle_timeout: data.idle_timeout,
-      idle_policy: data.idle_policy,
-      admission: %{
-        mode: data.admission_mode,
-        postponed: MapSet.size(data.postponed),
-        limit: data.max_postponed_signals,
-        message_queue_len: mailbox
-      },
-      active: Lifecycle.active_status(data.active, phase),
-      waits: if(data.active, do: data.active.waits, else: [])
-    }
-
-    {:keep_state_and_data, [{:reply, from, status}]}
+    {:keep_state_and_data, [{:reply, from, Status.new(phase, data, mailbox)}]}
   end
 
   def handle_event(

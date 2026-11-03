@@ -176,8 +176,6 @@ defmodule JidoTest.AgentServer.Composition.RacesTest do
         on_parent_exit: :continue
       )
 
-    first_root = Server.activation(first)
-    middle_root = Server.activation(middle)
     :ok = :sys.suspend(middle)
 
     try do
@@ -198,8 +196,8 @@ defmodule JidoTest.AgentServer.Composition.RacesTest do
 
       replacement = Server.whereis(c.jido, "middle")
       assert Server.status(first).parent == nil
-      assert Server.status(replacement).parent.activation == first_root
-      assert Server.status(last).parent.activation == middle_root
+      assert Server.status(replacement).parent.agent_id == "first"
+      assert Server.status(last).parent.agent_id == "middle"
       assert Server.adopt_child(last, first, :first) == {:error, :cyclic_parent}
     after
       if Process.alive?(middle), do: :sys.resume(middle)

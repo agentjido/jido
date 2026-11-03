@@ -229,19 +229,18 @@ defmodule JidoTest.AgentServer.Composition.ChildrenTest do
     refute_received {:signal, %{type: "jido.agent_server.orphaned"}}
     {:ok, adopter} = Server.start(agent: agent("adopter"), jido: c.jido)
     assert Server.adopt_child(adopter, orphan, :adopted) == :ok
-    adopter_root = root(adopter)
     orphan_root = root(orphan)
     Process.exit(adopter, :kill)
     F.down(adopter)
     assert_eventually(is_pid(Server.whereis(c.jido, "adopter")))
     adopter = Server.whereis(c.jido, "adopter")
     assert Server.children(adopter).adopted.pid == orphan
-    assert Server.status(orphan).parent.activation == adopter_root
+    assert Server.status(orphan).parent.agent_id == "adopter"
     Process.exit(orphan, :kill)
     F.down(orphan)
     assert_eventually(is_pid(Server.whereis(c.jido, "orphan")))
     orphan = Server.whereis(c.jido, "orphan")
-    assert Server.status(orphan).parent.activation == adopter_root
+    assert Server.status(orphan).parent.agent_id == "adopter"
     assert Server.stop(adopter) == :ok
     F.down(orphan_root)
   end

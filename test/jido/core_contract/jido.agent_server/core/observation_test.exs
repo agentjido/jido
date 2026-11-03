@@ -5,13 +5,31 @@ defmodule JidoTest.AgentServer.ObservationTest do
   use Covenant.Case, component: "jido.agent_server", async: false
 
   alias Jido.AgentServer, as: Server
-  alias Jido.AgentServer.Lifecycle
+  alias Jido.AgentServer.{Lifecycle, Status}
   alias Jido.Signal.Context, as: SignalContext
   alias Jido.Trace
   alias JidoTest.AgentServer.Fixtures, as: F
 
   setup do
     F.setup_runtime()
+  end
+
+  @tag obligation: "jido.agent_server.I5"
+  test "status is typed and contains no live process handles", c do
+    server = F.start(c)
+    turn = F.blocked(server, c.runner)
+    status = Server.status(server)
+    turn_id = turn.id
+
+    assert %Status{activation: :supervised, active: %{turn_id: ^turn_id}} = status
+    assert Status.process_neutral?(status)
+    refute Map.has_key?(Map.from_struct(status), :generation)
+    refute Map.has_key?(Map.from_struct(status), :owners)
+    refute Map.has_key?(status.active, :worker_pid)
+
+    F.release(turn)
+    assert {:ok, _, []} = Server.await(turn.pending)
+    F.clean(c.runner)
   end
 
   @tag obligation: "jido.agent_server.I29"

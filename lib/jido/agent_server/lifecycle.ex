@@ -339,22 +339,6 @@ defmodule Jido.AgentServer.Lifecycle do
 
   def failure_decision(_policy, _count, _signal_type), do: :run
 
-  def active_status(nil, _phase), do: nil
-
-  def active_status(active, phase) do
-    active
-    |> Map.take([:turn_id, :signal_id, :start_version])
-    |> Map.put(
-      :committed_version,
-      if(active.outcome && active.outcome.committed?,
-        do: active.outcome.state_version_after,
-        else: nil
-      )
-    )
-    |> Map.put(:stage, phase)
-    |> Map.put(:worker_pid, active.worker)
-  end
-
   def start(data, mode) do
     with :ok <- ServerSupervisor.close_execution(data.activation_state),
          {:ok, config} <- Jido.Persistence.resolve_config(data.persistence, data.jido),

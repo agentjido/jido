@@ -306,7 +306,12 @@ defmodule JidoTest.AgentServer.LifecycleTest do
       blocked = gate(if(loss == :worker, do: :running, else: :preparing))
       queued = Server.submit(server, F.signal(), context: %{observer: self()})
       assert %{admission: %{postponed: 1}} = Server.status(server)
-      target = if loss == :worker, do: Server.status(server).active.worker_pid, else: blocked
+
+      target =
+        if loss == :worker,
+          do: Runic.Runner.lookup(c.runner, Server.status(server).active.turn_id),
+          else: blocked
+
       Process.exit(target, :kill)
       assert {:error, _} = Server.await(pending, 1_000)
       F.down(server)

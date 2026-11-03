@@ -460,12 +460,11 @@ defmodule JidoTest.AgentServer.PluginRuntime.RuntimeTest do
     plugin = watch_root(SupervisorPlugin)
     {leaf, _} = first_leaf = watch_leaf()
     assert Server.await_ready(server) == :ok
-    generation = Server.status(server).generation
     Process.exit(leaf, :kill)
     assert_root_down(first_leaf)
     assert_receive {:plugin_leaf, replacement}, 1_000
     assert replacement != leaf
-    assert Server.status(server).generation == generation
+    assert Process.alive?(server)
     assert Process.alive?(elem(plugin, 0))
   end
 

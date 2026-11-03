@@ -539,10 +539,10 @@ defmodule JidoTest.InstanceRefTest do
              Jido.AgentServer.cancel_turn(server, "absent")
 
     assert :ok = Jido.attach(instance, ref)
-    assert Jido.AgentServer.status(server).owners == [self()]
+    assert Jido.AgentServer.status(server).owner_count == 1
     assert :ok = Jido.touch(instance, ref)
     assert :ok = Jido.detach(instance, ref)
-    assert Jido.AgentServer.status(server).owners == []
+    assert Jido.AgentServer.status(server).owner_count == 0
 
     assert Jido.plugin_state(instance, ref, __MODULE__) ==
              Jido.AgentServer.plugin_state(server, __MODULE__)

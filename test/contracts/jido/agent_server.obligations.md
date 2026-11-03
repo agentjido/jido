@@ -1,6 +1,7 @@
 ---
 modules:
   - Jido.AgentServer.Lifecycle
+  - Jido.AgentServer.Status
 ---
 
 ## Purpose
@@ -9,10 +10,12 @@ Protect the core `Jido.AgentServer` request, Turn, failure-policy, and runtime
 control behavior. Other AgentServer components own activation, effects, Plugin
 runtime, composition, durable state, and durable Flow progress.
 
-`Jido.AgentServer` is the single public runtime facade. This component owns the
-facade boundary and its core operations. Focused AgentServer components own the
-behavior of delegated facade operations. AgentServer has no separate DSL. Jido
-instance options and direct function options are its authoring surface.
+`Jido.AgentServer` is the single public runtime facade.
+`Jido.AgentServer.Status` is its typed, process-neutral inspection value. This
+component owns the facade boundary and its core operations. Focused AgentServer
+components own the behavior of delegated facade operations. AgentServer has no
+separate DSL. Jido instance options and direct function options are its
+authoring surface.
 
 ## Obligations
 
@@ -53,7 +56,7 @@ instance options and direct function options are its authoring surface.
 ### jido.agent_server.I5 — Responsive committed reads
 
 - **scope:** `Jido.AgentServer.agent/1`, `Jido.AgentServer.status/1`
-- **must:** Return committed state and a bounded status while a turn or cleanup is active. Report Agent identity, active turn and Signal IDs, starting revision, stage, and queue counts. Report handoff_pending while a released successor owns the next Turn. Separate reads are not atomic.
+- **must:** Return committed state and a typed `Jido.AgentServer.Status` while a turn or cleanup is active. Report Agent identity, active turn and Signal IDs, starting revision, stage, and queue counts. Report handoff_pending while a released successor owns the next Turn. Do not expose PIDs, ports, references, functions, monitors, tasks, timers, or ownership tokens. Separate reads are not atomic.
 - **why:** Inspection must remain available without exposing input or internal request handles.
 - **kind:** functional
 - **status:** active
@@ -85,7 +88,7 @@ instance options and direct function options are its authoring surface.
 ### jido.agent_server.I9 — Public API boundary
 
 - **scope:** documented `Jido.AgentServer` functions and types
-- **must:** Keep one exact documented API for lifecycle, requests, control, observation, Plugin state, composition, and durability. Keep the owner-bound pending handle opaque. Keep `Lifecycle`, `Pending`, `Store`, state-machine callbacks, and owner implementation modules internal. Do not add a second AgentServer DSL or expose coordinator internals.
+- **must:** Keep one exact documented API for lifecycle, requests, control, observation, Plugin state, composition, and durability. Keep the owner-bound pending handle opaque. Keep `Status` public and typed. Keep `Lifecycle`, `Pending`, state-machine callbacks, and owner implementation modules internal. Do not add a second AgentServer DSL or expose coordinator internals.
 - **why:** Users need one stable runtime entry point while focused components retain behavior ownership.
 - **kind:** functional
 - **status:** active

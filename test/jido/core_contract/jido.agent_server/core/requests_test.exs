@@ -40,8 +40,7 @@ defmodule JidoTest.AgentServer.RequestsTest do
                :signal_id,
                :start_version,
                :committed_version,
-               :stage,
-               :worker_pid
+               :stage
              ])
 
     send(action, :release)
