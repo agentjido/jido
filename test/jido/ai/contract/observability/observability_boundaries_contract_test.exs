@@ -3,8 +3,8 @@ defmodule Jido.AI.Contract.ObservabilityBoundariesTest do
 
   import ExUnit.CaptureLog
 
-  alias Jido.AI.Telemetry
-  alias Jido.AI.Telemetry.{CorrelationStore, OpenTelemetry}
+  alias Jido.Telemetry.AI, as: Telemetry
+  alias Jido.Telemetry.AI.{CorrelationStore, OpenTelemetry}
   alias Jido.AITest.OpenTelemetryTracer, as: TestTracer
   alias Jido.AITest.{SimpleAgent, Tools}
 

@@ -1,4 +1,4 @@
-defmodule Jido.AI.Telemetry.CorrelationStore do
+defmodule Jido.Telemetry.AI.CorrelationStore do
   @moduledoc false
 
   use GenServer

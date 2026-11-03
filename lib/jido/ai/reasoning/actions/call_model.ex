@@ -3,7 +3,8 @@ defmodule Jido.AI.Reasoning.Actions.CallModel do
   @moduledoc "Calls one model and returns success or failure as graph data."
 
   alias Jido.AI.Context, as: AIContext
-  alias Jido.AI.{Budget, InferenceClient, Telemetry, Toolset, Usage}
+  alias Jido.AI.{Budget, InferenceClient, Toolset, Usage}
+  alias Jido.Telemetry.AI, as: Telemetry
 
   use Jido.Action,
     id: "jido.ai/reasoning/actions/call-model",

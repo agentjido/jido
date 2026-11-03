@@ -1,8 +1,8 @@
 ---
 modules:
-  - Jido.AI.Telemetry
-  - Jido.AI.Telemetry.CorrelationStore
-  - Jido.AI.Telemetry.OpenTelemetry
+  - Jido.Telemetry.AI
+  - Jido.Telemetry.AI.CorrelationStore
+  - Jido.Telemetry.AI.OpenTelemetry
 ---
 
 ## Purpose
@@ -30,14 +30,14 @@ sampling, export, or the work that it observes.
 
 ### jido_ai.observability.I3 — Stable OpenTelemetry parentage
 
-- **scope:** `Jido.AI.Telemetry.OpenTelemetry`
+- **scope:** `Jido.Telemetry.AI.OpenTelemetry`
 - **must:** Map Agent, model, reasoning, and tool operations to stable GenAI span names and attributes. Keep model and tool spans under the Agent span and keep work inside a tool under its tool span.
 - **kind:** ordering
 - **status:** active
 
 ### jido_ai.observability.I4 — OpenTelemetry remains optional
 
-- **scope:** `Jido.AI.Telemetry.open_telemetry?/0`, `attach_open_telemetry/1`
+- **scope:** `Jido.Telemetry.AI.open_telemetry?/0`, `attach_open_telemetry/1`
 - **must:** Work without the optional API or an active host tracer, never start an SDK, and contain bridge setup or callback failure without changing Agent work.
 - **kind:** functional
 - **status:** active

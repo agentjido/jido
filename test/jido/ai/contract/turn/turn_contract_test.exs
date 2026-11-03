@@ -1,7 +1,8 @@
 defmodule Jido.AI.Contract.TurnTest do
   use Covenant.Case, component: "jido_ai.turn", async: true
 
-  alias Jido.AI.{Context, Telemetry.CorrelationStore, Usage}
+  alias Jido.AI.{Context, Usage}
+  alias Jido.Telemetry.AI.CorrelationStore
   alias Jido.AI.Reasoning.Result
 
   alias Jido.AI.Reasoning.Actions.{

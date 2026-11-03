@@ -3,7 +3,7 @@ defmodule Jido.Signal.Bus.Subscriptions.Runtime do
 
   alias Jido.Signal.Bus.Subscriptions.Subscriber
   alias Jido.Signal.Router.Index
-  alias Jido.Signal.Telemetry
+  alias Jido.Telemetry.Signal, as: Telemetry
 
   @doc false
   @spec monitor_target(map(), String.t(), pid()) :: {reference(), map()}

@@ -1,7 +1,7 @@
 defmodule Jido.AI.Contract.ObservabilityTest do
   use Covenant.Case, component: "jido_ai.observability", async: true
 
-  alias Jido.AI.Telemetry
+  alias Jido.Telemetry.AI, as: Telemetry
 
   @tag obligation: [
          "jido_ai.observability.I1",

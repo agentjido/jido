@@ -1,7 +1,7 @@
-defmodule Jido.AI.Telemetry.OpenTelemetry do
+defmodule Jido.Telemetry.AI.OpenTelemetry do
   @moduledoc false
 
-  alias Jido.AI.Telemetry.CorrelationStore
+  alias Jido.Telemetry.AI.CorrelationStore
 
   @handler_id "jido-ai-open-telemetry"
   @req_llm_handler_id "jido-ai-req-llm-open-telemetry"
@@ -96,7 +96,7 @@ defmodule Jido.AI.Telemetry.OpenTelemetry do
   defp attach_owned_events do
     case :telemetry.attach_many(
            @handler_id,
-           Jido.AI.Telemetry.owned_events(),
+           Jido.Telemetry.AI.owned_events(),
            &__MODULE__.handle_event/4,
            nil
          ) do

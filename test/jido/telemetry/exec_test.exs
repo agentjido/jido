@@ -1,4 +1,4 @@
-defmodule Jido.Exec.TelemetryTest do
+defmodule Jido.Telemetry.ExecTest do
   use Covenant.Case, component: "jido_action.execution", async: false
   @moduletag obligation: "jido_action.execution.I23"
 
@@ -34,7 +34,7 @@ defmodule Jido.Exec.TelemetryTest do
   end
 
   test "lists the public Jido Exec telemetry events" do
-    assert Jido.Exec.Telemetry.event_names() == [
+    assert Jido.Telemetry.Exec.event_names() == [
              @action_start,
              @action_stop,
              @action_exception,
@@ -65,17 +65,17 @@ defmodule Jido.Exec.TelemetryTest do
              node_name: "invoke_selector",
              component_kind: :invoke,
              invoke_phase: :expander
-           } = Jido.Exec.Telemetry.action_metadata(invoke, %Context{})
+           } = Jido.Telemetry.Exec.action_metadata(invoke, %Context{})
 
     assert %{
              node_name: "handoff_selector",
              component_kind: :handoff
-           } = handoff_metadata = Jido.Exec.Telemetry.action_metadata(handoff, %Context{})
+           } = handoff_metadata = Jido.Telemetry.Exec.action_metadata(handoff, %Context{})
 
     refute Map.has_key?(handoff_metadata, :invoke_phase)
     refute Map.has_key?(handoff_metadata, :dispatch_phase)
 
-    assert Jido.Exec.Telemetry.result_metadata(:flow, {:handoff, instruction, [:one, :two]}) ==
+    assert Jido.Telemetry.Exec.result_metadata(:flow, {:handoff, instruction, [:one, :two]}) ==
              %{outcome: :handoff, effect_count: 2}
   end
 

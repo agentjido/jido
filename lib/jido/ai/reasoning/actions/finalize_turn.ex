@@ -2,7 +2,8 @@ defmodule Jido.AI.Reasoning.Actions.FinalizeTurn do
   alias Jido.Joi
   @moduledoc "Finalizes one graph request and returns the Agent commit envelope."
 
-  alias Jido.AI.{Budget, Telemetry, Thread.Projection}
+  alias Jido.AI.{Budget, Thread.Projection}
+  alias Jido.Telemetry.AI, as: Telemetry
 
   use Jido.Action,
     id: "jido.ai/reasoning/actions/finalize-turn",

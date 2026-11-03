@@ -1,4 +1,4 @@
-defmodule Jido.AI.TelemetryTest do
+defmodule Jido.Telemetry.AITest do
   use Covenant.Case, component: "jido_ai.observability", async: false
 
   @moduletag obligation: [
@@ -11,7 +11,7 @@ defmodule Jido.AI.TelemetryTest do
   import ExUnit.CaptureLog
   import Mimic
 
-  alias Jido.AI.Telemetry
+  alias Jido.Telemetry.AI, as: Telemetry
   alias Jido.AITest.SimpleAgent
   alias Jido.AgentServer
 

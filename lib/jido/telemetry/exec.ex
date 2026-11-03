@@ -1,4 +1,4 @@
-defmodule Jido.Exec.Telemetry do
+defmodule Jido.Telemetry.Exec do
   @moduledoc """
   Emits semantic telemetry for Jido execution.
 

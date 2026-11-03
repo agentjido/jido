@@ -1,4 +1,4 @@
-defmodule Jido.AI.Telemetry do
+defmodule Jido.Telemetry.AI do
   @moduledoc """
   The public observability API for AI Agent execution.
 
@@ -29,7 +29,7 @@ defmodule Jido.AI.Telemetry do
 
   require Logger
 
-  alias Jido.AI.Telemetry.{CorrelationStore, OpenTelemetry}
+  alias Jido.Telemetry.AI.{CorrelationStore, OpenTelemetry}
 
   @request_type "jido.ai.request"
   @runtime_handler_id "jido-ai-runtime-telemetry"
@@ -87,7 +87,7 @@ defmodule Jido.AI.Telemetry do
     (@owned_events ++
        @correlation_events ++
        @runtime_events ++
-       Jido.Exec.Telemetry.event_names() ++
+       Jido.Telemetry.Exec.event_names() ++
        Runic.Runner.Telemetry.event_names() ++ ReqLLM.Telemetry.events())
     |> Enum.uniq()
   end

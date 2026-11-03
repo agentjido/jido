@@ -17,7 +17,8 @@ defmodule Jido.Exec do
   See [Managed Execution](managed-execution.md).
   """
 
-  alias Jido.Exec.{Compiler, Frame, Portable, Telemetry}
+  alias Jido.Exec.{Compiler, Frame, Portable}
+  alias Jido.Telemetry.Exec, as: Telemetry
   alias Jido.Exec.Node.Action, as: ActionNode
   alias Jido.Instruction
   alias Runic.Workflow

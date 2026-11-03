@@ -6,7 +6,7 @@ defmodule Jido.Exec.Node.Action do
   alias Jido.Action.Error
   alias Jido.Exec.{Frame, Portable, Runtime, Validation, ValueResolver}
   alias Jido.Exec.Node.Loop
-  alias Jido.Exec.Telemetry
+  alias Jido.Telemetry.Exec, as: Telemetry
   alias Jido.Instruction
   alias Runic.Identity
   alias Runic.Workflow.SingleOutput.{Context, Result}

@@ -8,7 +8,7 @@ defmodule Jido.Signal.Bus.Server do
   alias Jido.Signal.Bus.Store.Memory
   alias Jido.Signal.Bus.Subscriptions
   alias Jido.Signal.Error
-  alias Jido.Signal.Telemetry
+  alias Jido.Telemetry.Signal, as: Telemetry
 
   @impl GenServer
   def init({name, opts}) do

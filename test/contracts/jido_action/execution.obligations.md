@@ -20,7 +20,7 @@ modules:
   - Jido.Exec.Portable
   - Jido.Exec.Runtime
   - Jido.Exec.Source
-  - Jido.Exec.Telemetry
+  - Jido.Telemetry.Exec
   - Jido.Exec.ValueResolver
 ---
 # Execution public promise obligations
@@ -66,7 +66,7 @@ Check focused facets of the [reviewed public promises](../../../guides/public-ap
 - **status:** active
 
 ### jido_action.execution.I23 — Telemetry retains bounded documented event shapes
-- **scope:** `Jido.Exec.Telemetry, Jido.Exec.run/4, Jido.Exec.start/6`
+- **scope:** `Jido.Telemetry.Exec, Jido.Exec.run/4, Jido.Exec.start/6`
 - **must:** Emit documented Action-attempt and immediate-Flow events with measurements, outcome, and correlation fields. Start and stop metadata omit params, context, results, and full errors. Retries have separate attempt identities. Managed runtime events belong to Runic. Timeout or process death can prevent Action stop events; caller death can prevent Flow stop.
 - **kind:** functional
 - **status:** active

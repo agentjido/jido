@@ -1,9 +1,9 @@
-defmodule Jido.Signal.TelemetryTest do
+defmodule Jido.Telemetry.SignalTest do
   use ExUnit.Case, async: true
 
   alias Jido.Signal
   alias Jido.Signal.Context
-  alias Jido.Signal.Telemetry
+  alias Jido.Telemetry.Signal, as: Telemetry
   alias Jido.Trace
 
   def handle_event(event, measurements, metadata, test_pid) do

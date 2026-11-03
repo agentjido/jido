@@ -1,4 +1,4 @@
-defmodule Jido.AI.Telemetry.CorrelationStoreTest do
+defmodule Jido.Telemetry.AI.CorrelationStoreTest do
   use Covenant.Case, component: "jido_ai.observability", async: false
 
   @moduletag obligation: [
@@ -7,7 +7,7 @@ defmodule Jido.AI.Telemetry.CorrelationStoreTest do
                "jido_ai.observability.I5"
              ]
 
-  alias Jido.AI.Telemetry.CorrelationStore
+  alias Jido.Telemetry.AI.CorrelationStore
 
   defmodule CleanupProbe do
     def expire(key, {owner, value}) do

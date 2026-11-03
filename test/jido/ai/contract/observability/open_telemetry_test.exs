@@ -11,8 +11,8 @@ defmodule Jido.AI.OpenTelemetryTest do
 
   import Mimic
 
-  alias Jido.AI.Telemetry
-  alias Jido.AI.Telemetry.CorrelationStore
+  alias Jido.Telemetry.AI, as: Telemetry
+  alias Jido.Telemetry.AI.CorrelationStore
   alias Jido.AITest.OpenTelemetryTracer, as: TestTracer
 
   defmodule TracedTool do

@@ -5,7 +5,7 @@ defmodule Jido.Signal.Bus.DurableSubscription do
   alias Jido.Signal.Bus.Store
   alias Jido.Signal.Bus.Subscriptions.{Runtime, Subscriber}
   alias Jido.Signal.Router
-  alias Jido.Signal.Telemetry
+  alias Jido.Telemetry.Signal, as: Telemetry
 
   @doc false
   @spec attach(map(), String.t(), String.t(), pid(), keyword()) ::

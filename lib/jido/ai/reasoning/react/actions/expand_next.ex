@@ -2,7 +2,8 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.ExpandNext do
   alias Jido.Joi
   @moduledoc "Expands each trusted AI routing decision into its next executable."
 
-  alias Jido.AI.{Telemetry, Toolset}
+  alias Jido.AI.Toolset
+  alias Jido.Telemetry.AI, as: Telemetry
   alias Jido.AI.Reasoning.ReAct
   alias Jido.AI.Reasoning.ReAct.Actions.{ExecuteTool, RecordToolResults}
   alias Jido.Flow.Ref

@@ -9,7 +9,12 @@
       "Jido.Trace",
       "Zoi.Type.Node"
     ],
-    signal: ["Inspect.Jido.Signal.*", "Jido.Signal", "Jido.Signal.*"],
+    signal: [
+      "Inspect.Jido.Signal.*",
+      "Jido.Signal",
+      "Jido.Signal.*",
+      "Jido.Telemetry.Signal"
+    ],
     definitions: [
       "Jido.Action",
       "Jido.Action.*",
@@ -30,6 +35,7 @@
     execution: [
       "Jido.Exec",
       "Jido.Exec.*",
+      "Jido.Telemetry.Exec",
       "Runic.Component.Jido.Exec.*",
       "Runic.Identity.Projectable.Jido.Exec.*",
       "Runic.Transmutable.Jido.Instruction",
@@ -57,7 +63,9 @@
       "Jido.Plugin.*",
       "Jido.RuntimeStore",
       "Jido.Telemetry",
-      "Jido.Telemetry.*",
+      "Jido.Telemetry.OpenTelemetry*",
+      "Jido.Telemetry.Persistence*",
+      "Jido.Telemetry.Semantic*",
       "Jido.Trace.Context",
       "Jido.Trace.Context.*",
       "Runic.Workflow.EventApplicator.Jido.AgentServer.*"
@@ -65,6 +73,8 @@
     ai: [
       "Jido.AI",
       "Jido.AI.*",
+      "Jido.Telemetry.AI",
+      "Jido.Telemetry.AI.*",
       "Runic.Identity.Projectable.Jido.AI.*"
     ],
     composition: ["Jido.Application"]
@@ -85,14 +95,21 @@
     forbidden_modules: [
       "Jido.Config",
       "Jido.PortableTerm",
+      "Jido.AI.Telemetry*",
+      "Jido.Exec.Telemetry",
       "Jido.Signal.ID",
+      "Jido.Signal.Telemetry",
       "Jido.Signal.Trace",
       "Jido.Tracing.*"
     ],
     forbidden_files: [
       "lib/jido/config.ex",
       "lib/jido/portable_term.ex",
+      "lib/jido/ai/telemetry.ex",
+      "lib/jido/ai/telemetry/**",
+      "lib/jido/exec/telemetry.ex",
       "lib/jido/signal/id.ex",
+      "lib/jido/signal/telemetry.ex",
       "lib/jido/signal/trace.ex",
       "lib/jido/tracing/**"
     ]

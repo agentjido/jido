@@ -1,6 +1,6 @@
-defmodule Jido.Signal.Telemetry do
+defmodule Jido.Telemetry.Signal do
   @moduledoc """
-  Canonical telemetry helper for Jido Signal.
+  Canonical telemetry helper for Jido Signal events.
 
   Signal-aware events pass the Signal to `execute/4`. The helper reads its
   valid W3C trace context and adds the trace ID, span ID, and trace flags to

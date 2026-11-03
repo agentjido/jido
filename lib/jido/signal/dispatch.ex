@@ -34,7 +34,7 @@ defmodule Jido.Signal.Dispatch do
   alias __MODULE__.Target
   alias Jido.Signal.Error
   alias Jido.Signal.Sanitizer
-  alias Jido.Signal.Telemetry
+  alias Jido.Telemetry.Signal, as: Telemetry
 
   @type adapter ::
           :pid
