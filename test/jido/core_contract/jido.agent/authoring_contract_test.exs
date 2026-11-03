@@ -479,13 +479,15 @@ defmodule JidoTest.Contract.AgentAuthoringTest do
           {:function, :__schema__, 0},
           {:function, :__defaults__, 0},
           {:function, :options!, 2},
-          {:function, :runtime_plugins, 1},
           {:function, :input_signal, 4},
           {:function, :input_signal!, 4},
-          {:function, :transition, 2},
-          {:function, :transition_validated, 3}
+          {:function, :transition, 2}
         ] do
       assert Map.fetch!(api_docs, key) == :hidden
+    end
+
+    for {name, arity} <- [runtime_plugins: 1, transition_validated: 3] do
+      refute function_exported?(Agent, name, arity)
     end
 
     for {name, arity} <- [
@@ -656,7 +658,7 @@ defmodule JidoTest.Contract.AgentAuthoringTest do
              ])
 
     assert {:ok, [%{status: :unchecked, reason: :unknown_outputs}]} =
-             Agent.Topology.checks(team)
+             Agent.Topology.checks(team, [], &Agent.Validation.resolve/2)
 
     assert {:error, _} = Agent.mutate(team, [Agent.Directive.agent_add(:root, Leaf)])
 

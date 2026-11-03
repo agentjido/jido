@@ -42,7 +42,7 @@ defmodule JidoTest.AgentServer.PluginRuntime.ConfigurationTest do
     assert :ok = Server.await_ready(server)
     assert_receive {:DOWN, ^ref, :process, ^second, _}
     assert Server.agent(server).state == %{count: 3}
-    assert Agent.runtime_plugins(Server.agent(server)) == []
+    assert Agent.Plugin.declarations(Server.agent(server)) == []
   end
 
   @tag obligation: "jido.agent_server.plugin_runtime.I12"

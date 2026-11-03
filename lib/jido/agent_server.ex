@@ -186,7 +186,7 @@ defmodule Jido.AgentServer do
     with {:ok, opts} <- activation_options(opts),
          {:ok, specs} <-
            Jido.Plugin.Normalizer.normalize_runtime(
-             Jido.Agent.runtime_plugins(opts[:agent]),
+             Jido.Agent.Plugin.declarations(opts[:agent]),
              opts[:plugin_runtime_options]
            ) do
       if not Jido.Agent.Topology.empty?(opts[:agent].topology) or
@@ -210,7 +210,7 @@ defmodule Jido.AgentServer do
            {:ok, agent} <- validate_start_agent(opts),
            {:ok, _specs} <-
              Jido.Plugin.Normalizer.normalize_runtime(
-               Jido.Agent.runtime_plugins(agent),
+               Jido.Agent.Plugin.declarations(agent),
                opts[:plugin_runtime_options]
              ),
            do: {:ok, Keyword.put(opts, :agent, agent)}
@@ -803,7 +803,7 @@ defmodule Jido.AgentServer do
 
     {:ok, specs} =
       Jido.Plugin.Normalizer.normalize_runtime(
-        Jido.Agent.runtime_plugins(agent),
+        Jido.Agent.Plugin.declarations(agent),
         opts[:plugin_runtime_options]
       )
 
@@ -854,7 +854,7 @@ defmodule Jido.AgentServer do
       {:ok, agent} ->
         {:ok, specs} =
           Jido.Plugin.Normalizer.normalize_runtime(
-            Jido.Agent.runtime_plugins(agent),
+            Jido.Agent.Plugin.declarations(agent),
             data.plugin_runtime_options
           )
 
@@ -954,9 +954,9 @@ defmodule Jido.AgentServer do
   @spec upgrade(server(), term(), map() | [upgrade_option()]) ::
           {:ok, Agent.instance(), []} | {:error, term()}
   def upgrade(server, action, opts \\ []) do
-    with {:ok, options} <- Jido.Agent.Validation.options(opts, [:context, :timeout]),
+    with {:ok, options} <- Jido.Agent.Schema.options(opts, [:context, :timeout]),
          context = Map.get(options, :context, %{}),
-         :ok <- Jido.Agent.Validation.plain_map(context),
+         :ok <- Jido.Agent.Schema.plain_map(context),
          timeout = Map.get(options, :timeout, 5_000),
          :ok <- Lifecycle.validate_wait(timeout) do
       :gen_statem.call(server, {:upgrade, make_ref(), action, context}, timeout)
@@ -1952,7 +1952,7 @@ defmodule Jido.AgentServer do
 
     {:ok, specs} =
       Jido.Plugin.Normalizer.normalize_runtime(
-        Jido.Agent.runtime_plugins(agent),
+        Jido.Agent.Plugin.declarations(agent),
         data.plugin_runtime_options
       )
 
@@ -2878,7 +2878,12 @@ defmodule Jido.AgentServer do
 
   defp identify_topology(%{persistence: persistence, agent: before}, candidate)
        when persistence not in [nil, false],
-       do: Jido.Agent.Topology.identify(before, candidate)
+       do:
+         Jido.Agent.Topology.identify(
+           before,
+           candidate,
+           &Jido.Agent.Validation.resolve/2
+         )
 
   defp identify_topology(_data, candidate), do: {:ok, candidate}
 
@@ -3060,7 +3065,7 @@ defmodule Jido.AgentServer do
 
           {:ok, specs} =
             Jido.Plugin.Normalizer.normalize_runtime(
-              Jido.Agent.runtime_plugins(candidate),
+              Jido.Agent.Plugin.declarations(candidate),
               data.plugin_runtime_options
             )
 
@@ -3228,7 +3233,7 @@ defmodule Jido.AgentServer do
               Effects.run(directive, handler, context)
 
             :unowned ->
-              if Jido.Agent.Directive.built_in?(directive),
+              if Jido.Agent.Directive.Kind.built_in?(directive),
                 do: Effects.run(directive, nil, context),
                 else: :ok
 

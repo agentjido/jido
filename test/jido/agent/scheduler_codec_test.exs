@@ -43,7 +43,7 @@ defmodule Jido.Agent.SchedulerCodecTest do
       assert definition.id == nil
       assert definition.state == nil
 
-      assert [{Scheduler, [retry_delay_ms: 17]}] = Agent.runtime_plugins(definition)
+      assert [{Scheduler, [retry_delay_ms: 17]}] = Agent.Plugin.declarations(definition)
       instance = Agent.instantiate!(definition, id: unique_id("json-scheduler"))
       assert instance.state == %{count: 0, scheduler: %{cron: %{}}}
 

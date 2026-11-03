@@ -78,8 +78,8 @@ defmodule Jido.AgentServer.Topology do
     Agent.Diff.changed?(diff, :agents) or Agent.Diff.changed?(diff, :connections) or
       buses(before) != buses(after_agent) or
       (Agent.Diff.changed?(diff, :state) and
-         AgentTopology.bind(before, before.state) !=
-           AgentTopology.bind(after_agent, after_agent.state))
+         AgentTopology.bind(before, before.state, &Agent.Validation.resolve/2) !=
+           AgentTopology.bind(after_agent, after_agent.state, &Agent.Validation.resolve/2))
   end
 
   def requires_activation?(agent) do
@@ -183,7 +183,8 @@ defmodule Jido.AgentServer.Topology do
   end
 
   def reconcile(%{agent: agent} = data) do
-    with {:ok, members} <- AgentTopology.bind(agent, agent.state) do
+    with {:ok, members} <-
+           AgentTopology.bind(agent, agent.state, &Agent.Validation.resolve/2) do
       desired =
         Map.new(
           for member <- members, index <- 1..member.count do
@@ -501,7 +502,7 @@ defmodule Jido.AgentServer.Topology do
         is_nil(context.activation) ->
           {:error, :activation_required}
 
-        Server.Directive.validate_restart_policy(Keyword.get(opts, :restart, :transient)) != :ok ->
+        Server.Directive.AgentStart.validate_restart(Keyword.get(opts, :restart, :transient)) != :ok ->
           {:error, :invalid_restart_policy}
 
         not valid_server_options?(server_options) ->

@@ -3,7 +3,6 @@ defmodule Jido.Plugin.SensorManager.Runtime.Controller do
 
   use GenServer
 
-  alias Jido.Plugin
   alias Jido.Plugin.Init, as: PluginInit
   alias Jido.Plugin.SensorManager.Init, as: SensorInit
 
@@ -27,7 +26,7 @@ defmodule Jido.Plugin.SensorManager.Runtime.Controller do
 
   @impl true
   def handle_continue(:restore, state) do
-    with {:ok, plugin_state} <- Plugin.state(state.init),
+    with {:ok, plugin_state} <- Jido.AgentServer.Plugin.state(state.init),
          {:ok, state} <- reconcile(state, plugin_state.desired) do
       {:noreply, %{state | last_reconciled_version: state.init.state_version}}
     else

@@ -6,7 +6,7 @@ end
 defmodule Jido.Plugin.Scheduler.DSL do
   @moduledoc "Static schedule authoring. This provider does not start timers."
   alias Crontab.CronExpression.Parser
-  alias Jido.Agent.{Validation, Route}
+  alias Jido.Agent.{Route, Schema}
   alias Jido.Error
   alias Spark.Dsl.Extension, as: E
 
@@ -43,7 +43,7 @@ defmodule Jido.Plugin.Scheduler.DSL do
   end
 
   defp lower_schedules(schedules) do
-    with {:ok, entries} <- Validation.list(schedules, &lower_schedule/1),
+    with {:ok, entries} <- Schema.list(schedules, &lower_schedule/1),
          do: {:ok, %{schedules: entries}}
   end
 
@@ -83,31 +83,31 @@ defmodule Jido.Plugin.Scheduler.DSL do
 
   @impl Jido.Agent.Extension
   def normalize(value) do
-    with {:ok, value} <- Validation.fields(value, [:schedules], %{schedules: []}),
-         {:ok, schedules} <- Error.prefix_result_path(Validation.list(value.schedules, &schedule/1), :schedules),
-         :ok <- Validation.unique(schedules, & &1.name),
+    with {:ok, value} <- Schema.fields(value, [:schedules], %{schedules: []}),
+         {:ok, schedules} <- Error.prefix_result_path(Schema.list(value.schedules, &schedule/1), :schedules),
+         :ok <- Schema.unique(schedules, & &1.name),
          do: {:ok, %{schedules: schedules}}
   end
 
   defp schedule(value) do
-    with {:ok, value} <- Validation.fields(value, [:name, :timing, :signal]),
-         :ok <- Validation.name(value[:name]),
+    with {:ok, value} <- Schema.fields(value, [:name, :timing, :signal]),
+         :ok <- Schema.name(value[:name]),
          {:ok, timing} <- timing(value[:timing]),
          {:ok, signal} <- template(value[:signal]),
          do: {:ok, %{name: value.name, timing: timing, signal: signal}}
   end
 
   defp timing(%{kind: :every} = value) do
-    with {:ok, value} <- Validation.fields(value, [:kind, :milliseconds]),
-         :ok <- Validation.positive(value[:milliseconds]),
+    with {:ok, value} <- Schema.fields(value, [:kind, :milliseconds]),
+         :ok <- Schema.positive(value[:milliseconds]),
          do: {:ok, value}
   end
 
   defp timing(%{kind: :cron} = value) do
     with {:ok, value} <-
-           Validation.fields(value, [:kind, :expression, :timezone], %{timezone: "Etc/UTC"}),
-         :ok <- Validation.nonempty(value[:expression]),
-         :ok <- Validation.nonempty(value.timezone),
+           Schema.fields(value, [:kind, :expression, :timezone], %{timezone: "Etc/UTC"}),
+         :ok <- Schema.nonempty(value[:expression]),
+         :ok <- Schema.nonempty(value.timezone),
          {:ok, _} <- Parser.parse(value.expression, extended_cron?(value.expression)),
          :ok <- timezone(value.timezone) do
       {:ok, value}
@@ -135,16 +135,16 @@ defmodule Jido.Plugin.Scheduler.DSL do
   end
 
   defp template(value) do
-    with {:ok, value} <- Validation.fields(value, [:type, :data], %{data: %{}}),
-         :ok <- Validation.exact(value[:type]),
-         :ok <- Validation.plain_map(value.data),
-         :ok <- Validation.static(value.data),
+    with {:ok, value} <- Schema.fields(value, [:type, :data], %{data: %{}}),
+         :ok <- Schema.exact(value[:type]),
+         :ok <- Schema.plain_map(value.data),
+         :ok <- Schema.static(value.data),
          do: {:ok, value}
   end
 
   @impl Jido.Agent.Extension
   def verify(data, definition) do
-    with {:ok, _} <- Validation.list(data.schedules, &verify_schedule(&1, definition)),
+    with {:ok, _} <- Schema.list(data.schedules, &verify_schedule(&1, definition)),
          do: :ok
   end
 

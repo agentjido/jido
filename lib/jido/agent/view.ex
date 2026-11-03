@@ -16,7 +16,7 @@ defmodule Jido.Agent.View do
   """
 
   alias Jido.Agent
-  alias Jido.Agent.Validation
+  alias Jido.Agent.Schema
   alias Jido.Catalog
   alias Jido.Codec.Agent, as: AgentCodec
   alias Jido.Codec.{Document, Reference}
@@ -36,8 +36,8 @@ defmodule Jido.Agent.View do
   @spec project(Agent.t() | module(), Catalog.t(), keyword()) ::
           {:ok, projection()} | {:error, term()}
   def project(source, %Catalog{} = catalog, opts \\ []) do
-    with {:ok, opts} <- Validation.attrs(opts),
-         :ok <- Validation.keys(opts, [:operation_limit]),
+    with {:ok, opts} <- Schema.attrs(opts),
+         :ok <- Schema.keys(opts, [:operation_limit]),
          {:ok, limit} <-
            limit(Map.get(opts, :operation_limit, @default_operation_limit)),
          {:ok, agent} <- definition(source),
@@ -62,7 +62,7 @@ defmodule Jido.Agent.View do
   end
 
   defp definition(_source),
-    do: Validation.authoring_error("Expected an Agent definition, instance, or module")
+    do: Schema.authoring_error("Expected an Agent definition, instance, or module")
 
   defp operations(routes, registry, limit) do
     total = length(routes)
@@ -70,7 +70,7 @@ defmodule Jido.Agent.View do
     with {:ok, items} <-
            routes
            |> Enum.take(limit)
-           |> Validation.traverse(&encode_route(&1, registry)) do
+           |> Schema.traverse(&encode_route(&1, registry)) do
       {:ok, %{"items" => items, "total" => total, "truncated" => total > limit}}
     end
   end
@@ -107,7 +107,5 @@ defmodule Jido.Agent.View do
 
   defp limit(_value),
     do:
-      Validation.authoring_error(
-        "Agent view operation_limit must be an integer from 0 through #{@maximum_operation_limit}"
-      )
+      Schema.authoring_error("Agent view operation_limit must be an integer from 0 through #{@maximum_operation_limit}")
 end

@@ -2,7 +2,6 @@ defmodule Jido.Agent.DSL do
   alias Jido.Joi
   @moduledoc false
   alias Jido.Agent.{Extension, Validation}
-  alias Jido.Catalog
   alias Jido.Error
   alias Spark.Dsl.Extension, as: E
 
@@ -26,7 +25,7 @@ defmodule Jido.Agent.DSL do
     helpers =
       quote unquote: false do
         for route <- @agent_definition.routes,
-            route.as != nil and not Jido.Agent.Validation.wildcard?(route.path) do
+            route.as != nil and not Jido.Agent.Schema.wildcard?(route.path) do
           helper = String.to_atom(Atom.to_string(route.as) <> "_signal")
           bang_helper = String.to_atom(Atom.to_string(route.as) <> "_signal!")
 
@@ -117,22 +116,6 @@ defmodule Jido.Agent.DSL do
   def verify!(module) do
     case Jido.Agent.validate(module.definition()) do
       {:ok, _} -> :ok
-      {:error, error} -> raise error
-    end
-  end
-
-  @doc false
-  @spec prepare_options!(Macro.t(), Macro.Env.t()) :: keyword()
-  def prepare_options!(quoted_options, %Macro.Env{} = caller) do
-    {options, _binding} = Code.eval_quoted(quoted_options, [], caller)
-
-    options =
-      options
-      |> validate_keyword!()
-      |> Keyword.put_new(:id, Atom.to_string(caller.module))
-
-    case Catalog.validate_identifier(options[:id]) do
-      :ok -> options
       {:error, error} -> raise error
     end
   end

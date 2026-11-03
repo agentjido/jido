@@ -52,7 +52,7 @@ defmodule Jido.Agent.MutationTest do
       Directive.PluginRemove
     ]
 
-    assert Mutation.modules() === modules
+    assert Jido.Agent.Directive.Kind.mutation_modules() === modules
 
     for module <- modules do
       assert Mutation.mutation?(struct(module)) === true

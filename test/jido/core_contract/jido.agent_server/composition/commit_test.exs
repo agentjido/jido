@@ -85,7 +85,7 @@ defmodule JidoTest.AgentServer.Composition.CommitTest do
     server = F.start(%{c | agent: agent()})
     assert {:ok, accepted, _} = turn(server, [Directive.plugin_add(Cache, observer: c.observer)])
     assert Server.status(server).state_version == 1
-    assert Agent.runtime_plugins(accepted) != []
+    assert Agent.Plugin.declarations(accepted) != []
     assert_receive {:plugin_started, _, %{plugin_state: 5, state_version: 1}}
     assert :ok = Server.await_ready(server)
   end
@@ -99,7 +99,7 @@ defmodule JidoTest.AgentServer.Composition.CommitTest do
       })
 
     assert {:error, _} = turn(bare, [Directive.plugin_add(Observer, observer: c.observer)])
-    assert Agent.runtime_plugins(Server.agent(bare)) == []
+    assert Agent.Plugin.declarations(Server.agent(bare)) == []
     assert Server.status(bare).state_version == 0
     assert Server.alive?(bare)
   end

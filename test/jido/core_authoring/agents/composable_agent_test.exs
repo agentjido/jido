@@ -435,7 +435,8 @@ defmodule Jido.AgentAuthoringTest do
                state: %{value: "supplied", workers: 3}
              )
 
-    assert {:ok, [planner, workers]} = Topology.bind(definition, instance.state)
+    assert {:ok, [planner, workers]} =
+             Topology.bind(definition, instance.state, &Agent.Validation.resolve/2)
 
     assert planner.name == :planner and planner.count == 1 and
              planner.state == %{value: "supplied"}
@@ -480,7 +481,7 @@ defmodule Jido.AgentAuthoringTest do
               %{status: :unchecked, reason: :unknown_outputs},
               %{status: :unchecked, reason: :wildcard_coverage}
             ]} =
-             Topology.checks(definition)
+             Topology.checks(definition, [], &Agent.Validation.resolve/2)
 
     assert {:error, %Error{code: :duplicate}} =
              composed(%{agents: [member()], connections: edges ++ [hd(edges)]})
@@ -527,13 +528,14 @@ defmodule Jido.AgentAuthoringTest do
                connections: [edge("work.request", :worker, :worker)]
              })
 
-    assert {:ok, [%{status: :unchecked, reason: :unknown_outputs}]} = Topology.checks(definition)
+    assert {:ok, [%{status: :unchecked, reason: :unknown_outputs}]} =
+             Topology.checks(definition, [], &Agent.Validation.resolve/2)
 
     assert {:ok, definition} =
              composed(%{agents: [member()], connections: [edge("work.done", :worker, :root)]})
 
     assert {:ok, [%{status: :unchecked, reason: :unknown_outputs}]} =
-             Topology.checks(definition)
+             Topology.checks(definition, [], &Agent.Validation.resolve/2)
   end
 
   test "a team replaces a leaf through the same routes and explicit root outputs" do
@@ -554,7 +556,7 @@ defmodule Jido.AgentAuthoringTest do
              composed(%{agents: [member(%{definition: inner})], connections: wires})
 
     assert leaf_parent.topology.connections === team_parent.topology.connections
-    assert {:ok, proofs} = Topology.checks(team_parent)
+    assert {:ok, proofs} = Topology.checks(team_parent, [], &Agent.Validation.resolve/2)
     assert Enum.all?(proofs, &(&1.status == :unchecked))
     assert {:ok, _} = Agent.instantiate(team_parent, id: "outer")
 
@@ -582,7 +584,7 @@ defmodule Jido.AgentAuthoringTest do
     assert {:ok, instance} = Agent.instantiate(parent, id: "nested", state: %{value: "copied"})
 
     assert {:ok, [%{state: %{settings: %{value: "copied", limit: 3}}}]} =
-             Topology.bind(parent, instance.state)
+             Topology.bind(parent, instance.state, &Agent.Validation.resolve/2)
 
     assert {:error, %Error{}} =
              Agent.instantiate(child,

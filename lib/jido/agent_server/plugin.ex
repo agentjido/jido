@@ -1,12 +1,12 @@
 defmodule Jido.AgentServer.Plugin do
-  @moduledoc false
+  @moduledoc "Live Plugin state access and lifecycle policy for one AgentServer."
 
   alias Jido.Error
   alias Jido.AgentServer.Command
   alias Jido.AgentServer.Plugin.{Callbacks, Commit}
   alias Jido.Plugin.Init
 
-  @doc false
+  @doc "Reads the current state owned by one live Plugin runtime."
   @spec state(Init.t(), timeout()) :: {:ok, term()} | {:error, term()}
   def state(%Init{agent_server: agent_server, module: package}, timeout \\ 5_000) do
     Jido.AgentServer.plugin_state(agent_server, package, timeout)

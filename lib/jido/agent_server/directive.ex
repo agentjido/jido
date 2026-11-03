@@ -12,23 +12,6 @@ defmodule Jido.AgentServer.Directive do
   alias Jido.AgentServer.Directive.AgentStop
   alias Jido.Signal
 
-  @restart_policies [:permanent, :temporary, :transient]
-  @unsupported_agent_start_opts [
-    :agent,
-    :input,
-    :jido,
-    :partition,
-    :runner,
-    :node,
-    :lifecycle_mod,
-    :pool,
-    :pool_key,
-    :idle_timeout,
-    :persistence,
-    :restore,
-    :state_version
-  ]
-
   @typedoc "A built-in runtime Directive that AgentServer runs after commit."
   @type t ::
           Emit.t()
@@ -105,49 +88,6 @@ defmodule Jido.AgentServer.Directive do
   @spec agent_stop(atom() | String.t(), term()) :: AgentStop.t()
   def agent_stop(name, reason \\ :normal), do: %AgentStop{name: name, reason: reason}
 
-  @doc false
-  def validate_restart_policy(restart, _opts \\ [])
-  def validate_restart_policy(restart, _opts) when restart in @restart_policies, do: :ok
-
-  def validate_restart_policy(restart, _opts) do
-    {:error, "restart must be one of #{inspect(@restart_policies)}, got: #{inspect(restart)}"}
-  end
-
-  @doc false
-  def validate_agent_start_opts(opts, _refinement_opts \\ [])
-
-  def validate_agent_start_opts(opts, _refinement_opts) when is_map(opts) do
-    unsupported = Enum.filter(@unsupported_agent_start_opts, &Map.has_key?(opts, &1))
-
-    case unsupported do
-      [] -> :ok
-      [:input] -> {:error, "AgentStart does not support initialization input"}
-      [:node] -> {:error, "Use AgentStart.node for placement, not opts.node"}
-      keys -> {:error, "AgentStart does not support lifecycle options #{inspect(keys)}"}
-    end
-  end
-
-  def validate_agent_start_opts(value, _refinement_opts),
-    do: {:error, "AgentStart opts must be a map, got: #{inspect(value)}"}
-
-  @doc false
-  def validate_agent_target(%Jido.Agent{} = agent) do
-    case Jido.Agent.validate(agent) do
-      {:ok, _agent} -> :ok
-      {:error, error} -> {:error, error}
-    end
-  end
-
-  def validate_agent_target(module) when is_atom(module) do
-    with {:ok, _definition} <- Jido.Agent.Validation.resolve(module) do
-      :ok
-    else
-      _reason -> {:error, {:invalid_agent_module, module}}
-    end
-  end
-
-  def validate_agent_target(value), do: {:error, {:invalid_agent, value}}
-
   defp options(opts, allowed) do
     unless Keyword.keyword?(opts) and Enum.uniq(Keyword.keys(opts)) == Keyword.keys(opts),
       do: raise(ArgumentError, "Expected unique keyword options")
@@ -156,7 +96,7 @@ defmodule Jido.AgentServer.Directive do
   end
 
   defp option_map(opts, key) do
-    case Jido.Agent.Validation.to_attrs(Keyword.get(opts, key, %{}), :reject) do
+    case Jido.Agent.Schema.to_attrs(Keyword.get(opts, key, %{}), :reject) do
       {:ok, value} -> value
       :error -> raise ArgumentError, "#{key} must be a plain Map or unique keyword list"
     end

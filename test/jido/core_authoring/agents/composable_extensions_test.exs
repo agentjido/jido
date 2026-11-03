@@ -422,7 +422,7 @@ defmodule Jido.AgentExtensionsAuthoringTest do
     assert PluginState.definition() |> Map.from_struct() === expected |> Map.from_struct()
     assert expected.plugins == [contribution(OwnedPlugin, %{initial: 3})]
     refute Map.has_key?(expected, :schedules)
-    assert Agent.runtime_plugins(expected) === [{OwnedPlugin, [initial: 3]}]
+    assert Agent.Plugin.declarations(expected) === [{OwnedPlugin, [initial: 3]}]
     assert {:ok, instance} = Agent.instantiate(expected, id: "one")
     assert instance.state === %{value: "domain", owned: 3}
     assert instance.plugins === expected.plugins

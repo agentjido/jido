@@ -136,7 +136,7 @@ defmodule Jido.Agent.TurnEvaluationTest do
       Agent.define!(%{name: "missing_route"})
       |> Agent.instantiate!(id: Jido.Id.uuid7())
 
-    {:ok, specs} = Jido.Plugin.Normalizer.normalize_all(Agent.runtime_plugins(agent))
+    {:ok, specs} = Jido.Plugin.Normalizer.normalize_all(Agent.Plugin.declarations(agent))
     {:ok, command} = Command.new(agent, source)
 
     assert {:error, :route, %Jido.Error.ValidationError{code: :unmatched_input}} =
@@ -151,7 +151,7 @@ defmodule Jido.Agent.TurnEvaluationTest do
     selected_agent = CustomRouteAgent.instantiate!(id: "stages")
 
     {:ok, selected_specs} =
-      Jido.Plugin.Normalizer.normalize_all(Agent.runtime_plugins(selected_agent))
+      Jido.Plugin.Normalizer.normalize_all(Agent.Plugin.declarations(selected_agent))
 
     {:ok, selected_command} = Command.new(selected_agent, selected)
 

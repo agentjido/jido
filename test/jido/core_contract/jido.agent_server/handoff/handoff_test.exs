@@ -667,7 +667,7 @@ defmodule JidoTest.AgentServer.HandoffTest do
 
     assert {:error, :timeout} = Server.await(pending, 0)
 
-    assert Keyword.fetch!(Jido.Agent.runtime_plugins(Server.agent(server)), EffectPlugin) ==
+    assert Keyword.fetch!(Jido.Agent.Plugin.declarations(Server.agent(server)), EffectPlugin) ==
              [marker: :changed]
 
     {_phase, after_reconciliation} = :sys.get_state(server)

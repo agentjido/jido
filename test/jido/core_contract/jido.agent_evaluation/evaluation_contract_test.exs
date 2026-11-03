@@ -510,7 +510,7 @@ defmodule JidoTest.Contract.AgentEvaluationTest do
   test "the AgentServer evaluation boundary keeps stages closed" do
     source = F.signal()
     agent = F.instance()
-    {:ok, specs} = Jido.Plugin.Normalizer.normalize_all(Agent.runtime_plugins(agent))
+    {:ok, specs} = Jido.Plugin.Normalizer.normalize_all(Agent.Plugin.declarations(agent))
     {:ok, command} = Command.new(agent, source)
     assert {:ok, prepared} = Runner.prepare_admitted(command, source, [], specs)
     assert prepared.agent === agent
@@ -554,7 +554,7 @@ defmodule JidoTest.Contract.AgentEvaluationTest do
     agent = F.instance()
     signal = F.signal(%{count: 1})
     {:ok, command} = Command.new(agent, signal, %{caller: :retained})
-    {:ok, specs} = Jido.Plugin.Normalizer.normalize_all(Agent.runtime_plugins(agent))
+    {:ok, specs} = Jido.Plugin.Normalizer.normalize_all(Agent.Plugin.declarations(agent))
     instruction = Jido.Instruction.new!(target: HandoffTarget, params: %{count: 2})
 
     assert {:ok,

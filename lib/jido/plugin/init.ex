@@ -11,8 +11,8 @@ defmodule Jido.Plugin.Init do
   complete commit. Runtime handles and the complete Agent are not part of this
   value.
 
-  Use `Jido.Plugin.state/2` when a running resource must read state after a
-  later commit.
+  Use `Jido.AgentServer.Plugin.state/2` when a running resource must read state
+  after a later commit.
   """
 
   @schema Joi.struct(

@@ -4,7 +4,7 @@ defmodule Jido.Codec.Agent do
   @behaviour Jido.Codec.Contract
 
   alias Jido.Agent
-  alias Jido.Agent.{Validation, Extension}
+  alias Jido.Agent.{Extension, Schema}
   alias Jido.Error
   alias Jido.Catalog.Error, as: CatalogError
   alias Jido.Codec.{Issue, Reference, Value}
@@ -333,7 +333,7 @@ defmodule Jido.Codec.Agent do
 
   defp map_fields(value, fields, direction) do
     with {:ok, entries} <-
-           Validation.traverse(fields, fn {key, transform} ->
+           Schema.traverse(fields, fn {key, transform} ->
              name = Atom.to_string(key)
              input = Map.get(value, if(direction == :encode, do: key, else: name))
              result = if transform, do: transform.(input), else: {:ok, input}
@@ -385,7 +385,7 @@ defmodule Jido.Codec.Agent do
   end
 
   defp encode_list(values, encoder) when is_list(values),
-    do: Validation.traverse(values, encoder)
+    do: Schema.traverse(values, encoder)
 
   defp encode_list(_values, _encoder),
     do: Error.validation_result(:invalid_list, [], "Expected a proper Agent definition list")
@@ -393,7 +393,7 @@ defmodule Jido.Codec.Agent do
   defp decode_list(values, decoder) when is_list(values) do
     values
     |> Enum.with_index()
-    |> Validation.traverse(fn {value, index} -> at(decoder.(value), [index]) end)
+    |> Schema.traverse(fn {value, index} -> at(decoder.(value), [index]) end)
   end
 
   defp decode_list(_values, _decoder),

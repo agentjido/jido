@@ -1,6 +1,7 @@
 defmodule Jido.Agent.DirectiveContractTest do
   use Covenant.Case, component: "jido.agent", async: true
   alias Jido.Agent.Directive
+  alias Jido.Agent.Directive.Kind
   alias Jido.AgentServer.Directive, as: Runtime
   alias Jido.Signal
 
@@ -106,15 +107,15 @@ defmodule Jido.Agent.DirectiveContractTest do
     ]
 
     for directive <- directives do
-      assert Directive.built_in?(directive) === true
-      assert Directive.built_in_module?(directive.__struct__) === true
-      assert Directive.validator?(directive.__struct__) === true
+      assert Kind.built_in?(directive) === true
+      assert Kind.built_in_module?(directive.__struct__) === true
+      assert Kind.validator?(directive.__struct__) === true
       assert {:ok, ^directive} = Directive.validate(directive)
     end
 
-    assert Directive.built_in?(:unknown) === false
-    assert Directive.built_in?(%PlainDirective{}) === false
-    assert Directive.validator?(PlainDirective) === true
+    assert Kind.built_in?(:unknown) === false
+    assert Kind.built_in?(%PlainDirective{}) === false
+    assert Kind.validator?(PlainDirective) === true
 
     assert {:error, %Jido.Error.ValidationError{details: %{directive: :unknown}}} =
              Directive.validate(:unknown)
@@ -287,27 +288,27 @@ defmodule Jido.AgentServer.DirectiveTest do
   alias Jido.Agent.Directive
 
   test "child start validation rejects unsupported lifecycle options and malformed targets" do
-    assert :ok = Jido.AgentServer.Directive.validate_restart_policy(:temporary)
-    assert {:error, message} = Jido.AgentServer.Directive.validate_restart_policy(:invalid)
+    assert :ok = Jido.AgentServer.Directive.AgentStart.validate_restart(:temporary)
+    assert {:error, message} = Jido.AgentServer.Directive.AgentStart.validate_restart(:invalid)
     assert message =~ "restart must be one of"
-    assert :ok = Jido.AgentServer.Directive.validate_agent_start_opts(%{id: "child"})
+    assert :ok = Jido.AgentServer.Directive.AgentStart.validate_options(%{id: "child"})
 
     assert {:error, "AgentStart does not support initialization input"} =
-             Jido.AgentServer.Directive.validate_agent_start_opts(%{input: %{}})
+             Jido.AgentServer.Directive.AgentStart.validate_options(%{input: %{}})
 
     assert {:error, message} =
-             Jido.AgentServer.Directive.validate_agent_start_opts(%{
+             Jido.AgentServer.Directive.AgentStart.validate_options(%{
                restore: :required,
                persistence: :invalid
              })
 
     assert message =~ "does not support lifecycle options"
-    assert {:error, message} = Jido.AgentServer.Directive.validate_agent_start_opts([])
+    assert {:error, message} = Jido.AgentServer.Directive.AgentStart.validate_options([])
     assert message =~ "opts must be a map"
-    assert {:error, {:invalid_agent, 42}} = Jido.AgentServer.Directive.validate_agent_target(42)
+    assert {:error, {:invalid_agent, 42}} = Jido.AgentServer.Directive.AgentStart.validate_target(42)
     agent = JidoTest.AgentFixtures.CounterAgent.instantiate!(id: "invalid-target")
     invalid = %{agent | state: %{count: :invalid, history: []}}
-    assert {:error, _} = Jido.AgentServer.Directive.validate_agent_target(invalid)
+    assert {:error, _} = Jido.AgentServer.Directive.AgentStart.validate_target(invalid)
 
     assert {:error, _} =
              Directive.validate(Jido.AgentServer.Directive.agent_start(invalid, :child))

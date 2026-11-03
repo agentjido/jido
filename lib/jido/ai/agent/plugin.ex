@@ -16,7 +16,7 @@ defmodule Jido.AI.Agent.Plugin do
   core Agent only when you need the core `Jido.Agent` authoring surface.
   """
 
-  alias Jido.Agent.Validation
+  alias Jido.Agent.Schema
   alias Jido.Error
   alias Jido.Codec.{Issue, Reference}
   alias Jido.Joi
@@ -137,7 +137,7 @@ defmodule Jido.AI.Agent.Plugin do
   @impl true
   def normalize(data) do
     with {:ok, data} <-
-           Validation.fields(data, [:reasoning, :defaults, :tools], %{defaults: %{}, tools: []}),
+           Schema.fields(data, [:reasoning, :defaults, :tools], %{defaults: %{}, tools: []}),
          :ok <- validate_reasoning(data[:reasoning]),
          :ok <- reserved_defaults(data.defaults),
          {:ok, defaults} <- normalize_defaults(data.defaults, data.reasoning),

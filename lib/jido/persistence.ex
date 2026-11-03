@@ -84,8 +84,8 @@ defmodule Jido.Persistence do
   @doc "Captures the complete Agent as portable data without writing storage."
   @spec snapshot(Agent.t(), keyword()) :: {:ok, snapshot()} | {:error, term()}
   def snapshot(agent, opts \\ []) do
-    with {:ok, opts} <- Jido.Agent.Validation.options(opts, [:context]),
-         :ok <- Jido.Agent.Validation.plain_map(Map.get(opts, :context, %{})),
+    with {:ok, opts} <- Jido.Agent.Schema.options(opts, [:context]),
+         :ok <- Jido.Agent.Schema.plain_map(Map.get(opts, :context, %{})),
          do:
            Checkpoint.dump(
              agent,
@@ -98,17 +98,17 @@ defmodule Jido.Persistence do
   @doc "Restores saved definition and state without consulting the source definition."
   @spec restore(snapshot(), keyword()) :: {:ok, Agent.t()} | {:error, term()}
   def restore(snapshot, opts \\ []) do
-    with {:ok, opts} <- Jido.Agent.Validation.options(opts, [:context]),
-         :ok <- Jido.Agent.Validation.plain_map(Map.get(opts, :context, %{})),
+    with {:ok, opts} <- Jido.Agent.Schema.options(opts, [:context]),
+         :ok <- Jido.Agent.Schema.plain_map(Map.get(opts, :context, %{})),
          do: Checkpoint.restore_snapshot(snapshot, Map.get(opts, :context, %{}))
   end
 
   @doc "Runs an explicit data upgrade Action before resolving saved code references."
   @spec upgrade(snapshot(), term(), keyword()) :: {:ok, Agent.t()} | {:error, term()}
   def upgrade(snapshot, action, opts \\ []) do
-    with {:ok, opts} <- Jido.Agent.Validation.options(opts, [:context]),
+    with {:ok, opts} <- Jido.Agent.Schema.options(opts, [:context]),
          context = Map.get(opts, :context, %{}),
-         :ok <- Jido.Agent.Validation.plain_map(context),
+         :ok <- Jido.Agent.Schema.plain_map(context),
          do:
            Jido.Persistence.Snapshot.upgrade(
              snapshot,
@@ -376,7 +376,8 @@ defmodule Jido.Persistence do
   @doc false
   def open_agent(source, %Agent{} = agent, :create, opts) do
     with {:ok, agent} <- Jido.Agent.Mutation.bind(agent),
-         {:ok, agent} <- Jido.Agent.Topology.identify(nil, agent),
+         {:ok, agent} <-
+           Jido.Agent.Topology.identify(nil, agent, &Jido.Agent.Validation.resolve/2),
          :ok <- create_agent(source, agent, opts),
          do: {:ok, agent, 0, nil}
   end

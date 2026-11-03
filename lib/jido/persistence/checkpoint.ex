@@ -58,7 +58,7 @@ defmodule Jido.Persistence.Checkpoint do
 
   defp converter(direction, record_format, reason) do
     fn agent, state ->
-      with {:ok, specs} <- Jido.Plugin.Normalizer.normalize_all(Jido.Agent.runtime_plugins(agent)) do
+      with {:ok, specs} <- Jido.Plugin.Normalizer.normalize_all(Jido.Agent.Plugin.declarations(agent)) do
         convert_owned_state(state, specs, direction, record_format, reason)
       end
     end

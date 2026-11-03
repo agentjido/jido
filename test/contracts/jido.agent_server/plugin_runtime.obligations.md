@@ -14,9 +14,10 @@ component owns runtime roots and Plugin callbacks. It does not own Plugin
 authoring, bundled Plugin behavior, Agent evaluation, state-machine phases, or
 general effect execution.
 
-The public boundary is `Jido.Plugin.state/2` plus the read-only `Admission`
-and `Commit` callback records. Plugin hosting, callback adapters, and normalized
-runtime specifications are internal. This component has no DSL.
+The public boundary is `Jido.AgentServer.Plugin.state/2` plus the read-only
+`Admission` and `Commit` callback records. Other Plugin hosting operations,
+callback adapters, and normalized runtime specifications are internal. This
+component has no DSL.
 
 ## Obligations
 
@@ -118,8 +119,8 @@ runtime specifications are internal. This component has no DSL.
 
 ### jido.agent_server.plugin_runtime.I13 — Public live Plugin API
 
-- **scope:** `Jido.Plugin.state/2`, `Jido.AgentServer.Plugin.Admission`, `Jido.AgentServer.Plugin.Commit`
-- **must:** Keep Plugin-owned state reads on the `Jido.Plugin` facade. Document and type the exact read-only admission and commit callback records. Keep `Jido.AgentServer.Plugin`, callback adapters, and normalized runtime specifications internal. Do not add a Plugin-runtime DSL.
-- **why:** Plugin authors need stable callback data and one state-read facade without depending on hosting internals.
+- **scope:** `Jido.AgentServer.Plugin.state/2`, `Jido.AgentServer.Plugin.Admission`, `Jido.AgentServer.Plugin.Commit`
+- **must:** Keep Plugin-owned state reads on the live `Jido.AgentServer.Plugin` owner. Document and type the exact read-only admission and commit callback records. Keep callback adapters and normalized runtime specifications internal. Do not add a Plugin-runtime DSL or a forwarding state facade.
+- **why:** Plugin authors need stable callback data and one direct state-read owner.
 - **kind:** functional
 - **status:** active

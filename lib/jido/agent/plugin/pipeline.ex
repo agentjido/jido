@@ -1,8 +1,8 @@
 defmodule Jido.Agent.Plugin.Pipeline do
   @moduledoc false
 
-  alias Jido.Agent
   alias Jido.Agent.Directive.Reply
+  alias Jido.Agent.Directive.Kind, as: DirectiveKind
   alias Jido.Agent.Plugin
   alias Jido.Agent.Plugin.{Reduction, Spec}
   alias Jido.Error
@@ -15,7 +15,7 @@ defmodule Jido.Agent.Plugin.Pipeline do
   @doc false
   @spec run(
           {:ok, map(), [struct()]},
-          Agent.instance(),
+          map(),
           Signal.t(),
           %{optional(module()) => Input.t()},
           [Spec.t()]
@@ -23,7 +23,7 @@ defmodule Jido.Agent.Plugin.Pipeline do
           result()
   def run(
         {:ok, state, directives},
-        %Agent{} = agent,
+        agent,
         %Signal{} = signal,
         plugin_inputs,
         specs
@@ -125,7 +125,7 @@ defmodule Jido.Agent.Plugin.Pipeline do
   end
 
   defp validate_directive(directive, specs) do
-    if Jido.Agent.Directive.built_in?(directive) do
+    if DirectiveKind.built_in?(directive) do
       Jido.Agent.Directive.validate(directive)
     else
       case Plugin.directive_owner(specs, directive) do

@@ -3,11 +3,10 @@ defmodule JidoTest.AgentServer.PluginRuntime.ApiTest do
 
   alias Jido.AgentServer.Plugin, as: Runtime
   alias Jido.AgentServer.Plugin.{Admission, Callbacks, Commit, Spec}
-  alias Jido.Plugin
-
   @tag obligation: "jido.agent_server.plugin_runtime.I13"
-  test "the live Plugin API exposes only the state facade and callback records" do
-    assert {:function, :state, 2} in documented_api(Plugin)
+  test "the live Plugin API exposes its state owner and callback records" do
+    assert {:function, :state, 2} in documented_api(Runtime)
+    assert public_module?(Runtime)
 
     for module <- [Admission, Commit] do
       assert public_module?(module)
@@ -15,7 +14,7 @@ defmodule JidoTest.AgentServer.PluginRuntime.ApiTest do
       assert documented_types(module) == [{:type, :t, 0}]
     end
 
-    for module <- [Runtime, Callbacks, Spec] do
+    for module <- [Callbacks, Spec] do
       refute public_module?(module)
     end
   end

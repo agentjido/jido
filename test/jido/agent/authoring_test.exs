@@ -227,7 +227,7 @@ defmodule JidoTest.Agent.AuthoringTest do
     assert definition.vsn == 7
     assert Enum.map(definition.routes, & &1.path) == ["authoring.add", "authoring.flow"]
 
-    assert Agent.runtime_plugins(definition) == [
+    assert Agent.Plugin.declarations(definition) == [
              {CountTurns, [initial: 0]},
              {PassThrough, [label: :second]}
            ]

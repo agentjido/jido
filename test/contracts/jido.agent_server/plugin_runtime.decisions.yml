@@ -24,6 +24,6 @@
 
 - id: plugin-runtime-public-api
   date: 2026-10-22
-  decision: Keep Plugin-owned state reads on Jido.Plugin.state/2. Make Admission and Commit the typed public callback records. Keep Jido.AgentServer.Plugin, Callbacks, and Spec internal. Supersede plugin-runtime-mutation-profile by adding all Plugin-runtime-owned records to the component profile.
-  driver: Plugin authors need stable callback inputs without a second state facade or access to hosting internals.
+  decision: Keep Plugin-owned state reads on Jido.AgentServer.Plugin.state/2. Make Admission and Commit the typed public callback records. Keep Callbacks and Spec internal. Supersede plugin-runtime-mutation-profile by adding all Plugin-runtime-owned records to the component profile.
+  driver: Plugin authors need stable callback inputs and one direct live state owner without a forwarding facade.
   approved_by: Component hardening pass

@@ -617,7 +617,7 @@ defmodule JidoTest.AgentServer.PluginRuntime.RuntimeTest do
     assert saved.state == %{agent.state | count: 1}
 
     assert {:ok, 7} =
-             Jido.Plugin.state(%Jido.Plugin.Init{
+             Jido.AgentServer.Plugin.state(%Jido.Plugin.Init{
                agent_server: server,
                agent_id: agent.id,
                module: First

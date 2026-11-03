@@ -31,7 +31,8 @@ defmodule Jido.Agent.Directive do
 
   alias __MODULE__.{AgentSend, Emit, ParentSend, Reply, ServerStop}
 
-  alias Jido.Agent.Validation
+  alias Jido.Agent.Schema
+  alias Jido.Agent.Directive.Kind
   alias Jido.Error
   alias Jido.Signal
   alias __MODULE__.{PluginAdd, PluginConfigure, PluginRemove}
@@ -74,34 +75,7 @@ defmodule Jido.Agent.Directive do
 
   @type t :: struct()
 
-  @built_ins [
-    Emit,
-    Reply,
-    AgentSend,
-    ParentSend,
-    ServerStop
-  ]
-
-  @mutation_modules Jido.Agent.Mutation.modules()
-
-  @doc false
-  @spec built_in?(term()) :: boolean()
-  def built_in?(%{__struct__: module}), do: built_in_module?(module)
-  def built_in?(_value), do: false
-
-  @doc false
-  @spec built_in_module?(module()) :: boolean()
-  def built_in_module?(module) when is_atom(module),
-    do:
-      module in @built_ins or module in @mutation_modules or
-        (Code.ensure_loaded?(module) and
-           function_exported?(module, :__jido_builtin_directive__, 0) and
-           module.__jido_builtin_directive__() == true)
-
-  @doc false
-  @spec validator?(module()) :: boolean()
-  def validator?(module) when is_atom(module),
-    do: built_in_module?(module) or function_exported?(module, :validate, 1)
+  @core_modules Kind.core_modules()
 
   @doc "Validates one built-in or custom Agent Directive."
   @spec validate(struct()) :: {:ok, struct()} | {:error, term()}
@@ -127,14 +101,24 @@ defmodule Jido.Agent.Directive do
      )}
   end
 
-  def validate(%{__struct__: module} = directive) when module in @mutation_modules,
-    do: Jido.Agent.Mutation.validate(directive)
-
-  def validate(%{__struct__: module} = directive) when module in @built_ins do
+  def validate(%{__struct__: module} = directive) when module in @core_modules do
     Joi.parse(module.schema(), Map.from_struct(directive))
   end
 
   def validate(%{__struct__: module} = directive) do
+    if Kind.mutation_module?(module),
+      do: Jido.Agent.Mutation.validate(directive),
+      else: validate_custom(module, directive)
+  end
+
+  def validate(value) do
+    {:error,
+     Jido.Error.validation_error("Unknown Agent Directive",
+       details: %{directive: value}
+     )}
+  end
+
+  defp validate_custom(module, directive) do
     try do
       case module.validate(directive) do
         {:ok, %{__struct__: ^module} = validated} ->
@@ -170,13 +154,6 @@ defmodule Jido.Agent.Directive do
     end
   end
 
-  def validate(value) do
-    {:error,
-     Jido.Error.validation_error("Unknown Agent Directive",
-       details: %{directive: value}
-     )}
-  end
-
   @doc """
   Creates an emission request. It does not dispatch a Signal.
 
@@ -187,8 +164,8 @@ defmodule Jido.Agent.Directive do
   def emit(signal_or_type, dispatch_or_data \\ nil)
 
   def emit(type, data) when is_binary(type) do
-    with :ok <- Jido.Agent.Validation.exact(type),
-         :ok <- Jido.Agent.Validation.plain_map(data),
+    with :ok <- Jido.Agent.Schema.exact(type),
+         :ok <- Jido.Agent.Schema.plain_map(data),
          do: %{kind: :emit, type: type, data: data}
   end
 
@@ -212,7 +189,7 @@ defmodule Jido.Agent.Directive do
 
   @doc false
   def directives(definition, directives) do
-    Validation.list(directives, fn
+    Schema.list(directives, fn
       %{kind: :emit} = request ->
         with {:ok, request} <- emission(request, definition),
              {:ok, signal} <- envelope(request, definition) do
@@ -354,17 +331,17 @@ defmodule Jido.Agent.Directive do
     do: Signal.new(type, data, source: definition.signal_source)
 
   defp emission(%{kind: :emit, signal: %Signal{} = signal} = request, _definition) do
-    with {:ok, _} <- Validation.fields(request, [:kind, :signal]),
+    with {:ok, _} <- Schema.fields(request, [:kind, :signal]),
          :ok <- emission_signal(signal),
          do: {:ok, request}
   end
 
   defp emission(%{kind: :emit, type: type, data: data} = request, definition) do
-    with {:ok, _} <- Validation.fields(request, [:kind, :type, :data]),
-         :ok <- Validation.exact(type),
-         :ok <- Validation.plain_map(data),
-         :ok <- Validation.static(data),
-         :ok <- Error.prefix_result_path(Validation.nonempty(definition.signal_source), :signal_source),
+    with {:ok, _} <- Schema.fields(request, [:kind, :type, :data]),
+         :ok <- Schema.exact(type),
+         :ok <- Schema.plain_map(data),
+         :ok <- Schema.static(data),
+         :ok <- Error.prefix_result_path(Schema.nonempty(definition.signal_source), :signal_source),
          do: {:ok, request}
   end
 
@@ -374,7 +351,7 @@ defmodule Jido.Agent.Directive do
   defp emission_signal(signal) do
     case Jido.Joi.validate(Signal.schema(), signal) do
       :ok ->
-        Validation.static(signal)
+        Schema.static(signal)
 
       {:error, issues} ->
         Error.validation_result(:invalid_signal, [], "Invalid Signal envelope", %{issues: issues})

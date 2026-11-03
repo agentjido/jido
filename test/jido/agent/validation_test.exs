@@ -155,7 +155,7 @@ defmodule Jido.Agent.ValidationTest do
                plugins: [entry(CallbackPlugin, %{label: :first})]
              })
 
-    assert Agent.runtime_plugins(definition) == [{CallbackPlugin, [label: :first]}]
+    assert Agent.Plugin.declarations(definition) == [{CallbackPlugin, [label: :first]}]
     assert_received {:callback, :state_spec, [label: :first]}
     assert_received {:callback, :directives, [label: :first]}
 

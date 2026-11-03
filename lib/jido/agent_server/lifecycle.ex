@@ -488,7 +488,7 @@ defmodule Jido.AgentServer.Lifecycle do
 
   def validate_continuation(agent, %{status: status} = receipt)
       when status in [:running, :released] do
-    with {:ok, specs} <- Jido.Plugin.Normalizer.normalize_all(Jido.Agent.runtime_plugins(agent)),
+    with {:ok, specs} <- Jido.Plugin.Normalizer.normalize_all(Jido.Agent.Plugin.declarations(agent)),
          {:ok, _prepared} <-
            if(status == :running,
              do: restore_continuation(agent, receipt, receipt.context, specs),

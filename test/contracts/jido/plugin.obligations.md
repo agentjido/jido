@@ -17,10 +17,10 @@ public modules are `Jido.Plugin`, `Jido.Plugin.Input`, `Jido.Plugin.Init`,
 `Jido.Plugin.Context`. Manifest,
 normalization, aggregate Spec, and callback error policy are internal.
 
-`Jido.Plugin.state/2` is the public convenience facade for a running Plugin.
-The `jido.agent_server.plugin_runtime` component owns its live behavior. This
-component does not define when a consumer runs a callback or what a bundled
-Plugin does.
+`Jido.AgentServer.Plugin.state/2` is the public live Plugin state API. The
+`jido.agent_server.plugin_runtime` component owns it. This component does not
+provide a runtime facade. It does not define when a consumer runs a callback
+or what a bundled Plugin does.
 
 ## Obligations
 
@@ -83,7 +83,7 @@ Plugin does.
 ### jido.plugin.I8 — Public API boundary
 
 - **scope:** documented modules and functions in the generic Plugin contract
-- **must:** Keep `use Jido.Plugin`, `Jido.Plugin.state/2`, the Input struct, and the three context schemas public. Keep Manifest, Normalizer, aggregate Spec, and error helpers internal. Keep the callback list closed and optional. Do not move live runtime behavior into this component.
+- **must:** Keep `use Jido.Plugin`, the Input struct, and the three context schemas public. Keep Manifest, Normalizer, aggregate Spec, and error helpers internal. Keep the callback list closed and optional. Do not add a facade for live AgentServer Plugin behavior.
 - **why:** Users need one small stable authoring surface while consumers keep ownership of execution.
 - **kind:** functional
 - **status:** active

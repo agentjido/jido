@@ -172,7 +172,7 @@ defmodule JidoTest.Contract.AgentCompositionChangesTest do
              mutate(migrated, [Directive.plugin_remove(Counter, state: :discard)])
 
     assert removed.state === source.state
-    assert Agent.runtime_plugins(removed) == []
+    assert Agent.Plugin.declarations(removed) == []
   end
 
   @tag obligation: ["jido.agent.I28", "jido.agent.I30"]
@@ -185,10 +185,15 @@ defmodule JidoTest.Contract.AgentCompositionChangesTest do
       )
 
     source = Agent.instantiate!(definition, id: "bound", state: %{count: 2})
-    assert {:ok, [%{name: :workers, count: 2}]} = Topology.bind(source, source.state)
+
+    assert {:ok, [%{name: :workers, count: 2}]} =
+             Topology.bind(source, source.state, &Agent.Validation.resolve/2)
+
     assert source.topology === definition.topology
     assert {:ok, changed} = Agent.set(source, count: 4)
     assert changed.topology === source.topology
-    assert {:ok, [%{count: 4}]} = Topology.bind(changed, changed.state)
+
+    assert {:ok, [%{count: 4}]} =
+             Topology.bind(changed, changed.state, &Agent.Validation.resolve/2)
   end
 end

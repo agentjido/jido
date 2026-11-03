@@ -125,7 +125,7 @@ defmodule JidoTest.AgentServer.Effects.RulesTest do
 
   defp config(c) do
     agent = F.agent()
-    {:ok, specs} = Jido.Plugin.Normalizer.normalize_all(Jido.Agent.runtime_plugins(agent))
+    {:ok, specs} = Jido.Plugin.Normalizer.normalize_all(Jido.Agent.Plugin.declarations(agent))
 
     %{
       activation: self(),

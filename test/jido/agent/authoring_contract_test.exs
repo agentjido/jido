@@ -1,7 +1,7 @@
 defmodule Jido.Agent.ValidationAuthoringContractTest do
   use Covenant.Case, component: "jido.agent", async: true
   alias Jido.Agent
-  alias Jido.Agent.Validation
+  alias Jido.Agent.Schema
   alias JidoTest.AgentFixtures.Add
 
   defmodule Factory do
@@ -40,40 +40,40 @@ defmodule Jido.Agent.ValidationAuthoringContractTest do
 
   @tag obligation: ["jido.agent.I3", "jido.agent.I4", "jido.agent.I22"]
   test "authoring containers normalize keys and reject ambiguous input" do
-    assert {:ok, %{name: "agent"}} = Validation.attrs(%{name: "agent"})
-    assert {:ok, %{name: "agent"}} = Validation.attrs(name: "agent")
-    assert {:ok, %{name: "last"}} = Validation.to_attrs(name: "first", name: "last")
-    assert :error = Validation.to_attrs([name: "first", name: "last"], :reject)
+    assert {:ok, %{name: "agent"}} = Schema.attrs(%{name: "agent"})
+    assert {:ok, %{name: "agent"}} = Schema.attrs(name: "agent")
+    assert {:ok, %{name: "last"}} = Schema.to_attrs(name: "first", name: "last")
+    assert :error = Schema.to_attrs([name: "first", name: "last"], :reject)
 
     for value <- [[name: "first", name: "last"], [:invalid], [1 | :tail]] do
-      assert {:error, error} = Validation.attrs(value)
+      assert {:error, error} = Schema.attrs(value)
       assert error.message != ""
       assert error.details.value === value
     end
 
-    assert {:error, error} = Validation.attrs(:invalid)
+    assert {:error, error} = Schema.attrs(:invalid)
     assert error.message != ""
     assert error.details.value === :invalid
   end
 
   @tag obligation: ["jido.agent.I3", "jido.agent.I22"]
   test "authoring traversal preserves order and stops at one structured error" do
-    assert :ok = Validation.keys(%{name: "agent"}, [:name])
+    assert :ok = Schema.keys(%{name: "agent"}, [:name])
 
-    assert {:error, error} = Validation.keys(%{name: "agent", extra: true}, [:name])
+    assert {:error, error} = Schema.keys(%{name: "agent", extra: true}, [:name])
     assert error.message != ""
     assert error.details.keys === [:extra]
 
-    assert {:ok, [2, 4, 6]} = Validation.traverse([1, 2, 3], &{:ok, &1 * 2})
-    expected = Validation.authoring_error("Stopped", %{at: 2})
+    assert {:ok, [2, 4, 6]} = Schema.traverse([1, 2, 3], &{:ok, &1 * 2})
+    expected = Schema.authoring_error("Stopped", %{at: 2})
 
     assert ^expected =
-             Validation.traverse([1, 2, 3], fn
+             Schema.traverse([1, 2, 3], fn
                2 -> expected
                value -> {:ok, value}
              end)
 
-    assert {:error, improper} = Validation.traverse([1 | :tail], &{:ok, &1})
+    assert {:error, improper} = Schema.traverse([1 | :tail], &{:ok, &1})
     assert improper.message != ""
   end
 
@@ -164,7 +164,7 @@ defmodule Jido.Agent.ValidationAuthoringContractTest do
     }
 
     definition = Agent.define!(%{name: "passive", plugins: [passive]})
-    assert Agent.runtime_plugins(definition) === []
+    assert Agent.Plugin.declarations(definition) === []
 
     valid = %{
       id: ValidRuntime.id(),
@@ -175,7 +175,7 @@ defmodule Jido.Agent.ValidationAuthoringContractTest do
 
     supported = Agent.define!(%{name: "supported", plugins: [valid]})
 
-    assert Agent.runtime_plugins(supported) === [{ValidRuntime, []}]
+    assert Agent.Plugin.declarations(supported) === [{ValidRuntime, []}]
   end
 
   @tag obligation: "jido.agent.I21"

@@ -1,18 +1,18 @@
 defmodule Jido.Agent.Route do
   alias Jido.Joi
   @moduledoc "Pure route normalization and selection. Selection does not run a handler."
-  alias Jido.Agent.Validation
+  alias Jido.Agent.Schema
   alias Jido.Error
 
   @helper_name ~r/\A[a-z][a-z0-9_]*\z/
   @route_fields [:path, :as, :defaults, :handler, :state, :reply]
 
   def normalize(value, related? \\ true) do
-    with {:ok, route} <- Validation.fields(value, @route_fields, %{as: nil, defaults: %{}, reply: nil}),
-         :ok <- Error.prefix_result_path(Validation.path(route[:path]), :path),
+    with {:ok, route} <- Schema.fields(value, @route_fields, %{as: nil, defaults: %{}, reply: nil}),
+         :ok <- Error.prefix_result_path(Schema.path(route[:path]), :path),
          :ok <- helper(route),
-         :ok <- Error.prefix_result_path(Validation.plain_map(route.defaults), :defaults),
-         :ok <- Error.prefix_result_path(Validation.static(route.defaults), :defaults),
+         :ok <- Error.prefix_result_path(Schema.plain_map(route.defaults), :defaults),
+         :ok <- Error.prefix_result_path(Schema.static(route.defaults), :defaults),
          {:ok, handler} <- Error.prefix_result_path(handler(route[:handler], related?), :handler),
          :ok <- defaults(handler, route.defaults) do
       route
@@ -42,7 +42,7 @@ defmodule Jido.Agent.Route do
   defp handler(%{kind: kind} = value, related?)
        when kind in [:action, :flow, :forward, :transform] or
               (kind == :executable and related? == false) do
-    with {:ok, value} <- Validation.fields(value, [:kind, :target]),
+    with {:ok, value} <- Schema.fields(value, [:kind, :target]),
          {:ok, target} <- handler_target(kind, value[:target], related?) do
       {:ok, %{kind: kind, target: target}}
     end
@@ -54,7 +54,7 @@ defmodule Jido.Agent.Route do
   defp handler_target(:forward, target, _related?), do: forward_target(target)
 
   defp handler_target(kind, target, related?) when kind in [:action, :flow, :executable] do
-    with :ok <- Validation.name(target) do
+    with :ok <- Schema.name(target) do
       if related? do
         with {:ok, actual} <- executable(target) do
           if actual.kind == kind,
@@ -88,7 +88,7 @@ defmodule Jido.Agent.Route do
   defp helper(%{as: nil}), do: :ok
 
   defp helper(route) do
-    with :ok <- Error.prefix_result_path(Validation.name(route.as), :as),
+    with :ok <- Error.prefix_result_path(Schema.name(route.as), :as),
          do: Error.prefix_result_path(helper_name(route.as), :as)
   end
 
@@ -141,7 +141,7 @@ defmodule Jido.Agent.Route do
 
   defp reply(value) do
     with {:ok, reply} <- required_fields(value, [:type, :from], "Reply requires type and from"),
-         :ok <- Error.prefix_result_path(Validation.exact(reply.type), :type),
+         :ok <- Error.prefix_result_path(Schema.exact(reply.type), :type),
          {:ok, from} <- Error.prefix_result_path(selector(reply.from), :from) do
       {:ok, %{reply | from: from}}
     end
@@ -162,18 +162,18 @@ defmodule Jido.Agent.Route do
     do: Error.validation_result(:invalid_selector_source, [:source], "Selector source must be output")
 
   defp selector_path(path) do
-    Validation.list(path, fn
+    Schema.list(path, fn
       key when is_atom(key) or is_binary(key) -> {:ok, key}
       _key -> Error.validation_result(:invalid_selector_key, [], "Output path keys must be atoms or strings")
     end)
   end
 
   defp required_fields(value, fields, message) do
-    with :ok <- Validation.plain_map(value) do
+    with :ok <- Schema.plain_map(value) do
       missing = Enum.reject(fields, &Map.has_key?(value, &1))
 
       if missing == [],
-        do: Validation.fields(value, fields),
+        do: Schema.fields(value, fields),
         else: Error.validation_result(:missing_fields, [], message, %{keys: missing})
     end
   end
@@ -266,15 +266,15 @@ defmodule Jido.Agent.Route do
   end
 
   defp forward_target(%{kind: :agent} = target) do
-    with {:ok, target} <- Validation.fields(target, [:kind, :name]),
-         :ok <- Validation.name(target[:name]) do
+    with {:ok, target} <- Schema.fields(target, [:kind, :name]),
+         :ok <- Schema.name(target[:name]) do
       if target.name == :root,
         do: Error.validation_result(:self_forward, [], "Forward cannot target the current Agent"),
         else: {:ok, target}
     end
   end
 
-  defp forward_target(%{kind: :parent} = target), do: Validation.fields(target, [:kind])
+  defp forward_target(%{kind: :parent} = target), do: Schema.fields(target, [:kind])
 
   defp forward_target(_target),
     do: Error.validation_result(:invalid_forward_target, [], "Forward requires agent(name) or parent()")
@@ -299,13 +299,13 @@ defmodule Jido.Agent.Route do
   def matching(%{routes: routes}, type), do: matching(routes, type)
 
   def matching(routes, type) when is_list(routes) do
-    with :ok <- Validation.exact(type) do
-      {:ok, Enum.filter(routes, &Validation.matches?(type, &1.path))}
+    with :ok <- Schema.exact(type) do
+      {:ok, Enum.filter(routes, &Schema.matches?(type, &1.path))}
     end
   end
 
   def params(%{handler: %{kind: kind}, defaults: defaults}, data) when kind in [:action, :flow] do
-    with :ok <- Validation.plain_map(data), do: {:ok, Map.merge(defaults, data)}
+    with :ok <- Schema.plain_map(data), do: {:ok, Map.merge(defaults, data)}
   end
 
   def params(_, _),

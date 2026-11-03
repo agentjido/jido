@@ -14,7 +14,7 @@ defmodule JidoTest.PluginContract.ApiTest do
 
   @tag obligation: ["jido.plugin.I1", "jido.plugin.I8", "jido.plugin.I9"]
   test "the documented Plugin API contains only the public authoring and context surface" do
-    assert documented_api(Plugin) == [{:function, :state, 2}, {:macro, :__using__, 1}]
+    assert documented_api(Plugin) == [{:macro, :__using__, 1}]
     assert documented_api(Input) == []
     assert documented_api(Init) == [{:function, :schema, 0}]
     assert documented_api(Context) == [{:function, :schema, 1}]

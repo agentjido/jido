@@ -141,8 +141,8 @@ defmodule Jido.Plugin do
         imports: unquote(Keyword.get(opts, :imports, []))
 
       def normalize(data) do
-        with :ok <- Jido.Agent.Validation.plain_map(data),
-             :ok <- Jido.Agent.Validation.static(data),
+        with :ok <- Jido.Agent.Schema.plain_map(data),
+             :ok <- Jido.Agent.Schema.static(data),
              do: {:ok, data}
       end
 
@@ -200,10 +200,6 @@ defmodule Jido.Plugin do
   end
 
   def directive_owner(_specs, _directive), do: nil
-
-  @doc "Gets the current state owned by one Plugin runtime."
-  @spec state(Init.t(), timeout()) :: {:ok, term()} | {:error, term()}
-  def state(init, timeout \\ 5_000), do: Jido.AgentServer.Plugin.state(init, timeout)
 
   @doc false
   @spec invoke(module(), module(), atom(), [term()], String.t()) ::

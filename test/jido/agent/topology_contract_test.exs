@@ -5,6 +5,15 @@ defmodule Jido.Agent.TopologyContractTest do
   alias Jido.Agent.Topology
   alias JidoTest.AgentContract, as: F
 
+  defp normalize_topology(topology, parent, opts),
+    do: Topology.normalize(topology, parent, opts, &Agent.Validation.define/2)
+
+  defp check_topology(definition, opts \\ []),
+    do: Topology.checks(definition, opts, &Agent.Validation.resolve/2)
+
+  defp bind_topology(definition, state),
+    do: Topology.bind(definition, state, &Agent.Validation.resolve/2)
+
   defmodule Child do
     use Jido.Agent, name: "topology_contract_child"
 
@@ -146,23 +155,23 @@ defmodule Jido.Agent.TopologyContractTest do
     }
 
     assert {:ok, %{agents: [%{definition: ^missing}]}} =
-             Topology.normalize(topology, parent, related?: false)
+             normalize_topology(topology, parent, related?: false)
 
     assert {:error, %Jido.Error.ValidationError{code: :unresolved_definition}} =
-             Topology.normalize(topology, parent, [])
+             normalize_topology(topology, parent, [])
 
     loaded = %{topology | agents: [%{name: :offline, definition: String}]}
 
     assert {:error, %Jido.Error.ValidationError{code: :unresolved_definition, details: %{module: String}}} =
-             Topology.normalize(loaded, parent, [])
+             normalize_topology(loaded, parent, [])
 
     cyclic = %{topology | agents: [%{name: :cycle, definition: CycleA}]}
 
     assert {:error, %Jido.Error.ValidationError{code: :recursive_membership, details: %{module: CycleA}}} =
-             Topology.normalize(cyclic, parent, [])
+             normalize_topology(cyclic, parent, [])
 
     assert {:error, %Jido.Error.ValidationError{}} =
-             Topology.normalize(
+             normalize_topology(
                %{
                  agents: [
                    %{
@@ -179,7 +188,7 @@ defmodule Jido.Agent.TopologyContractTest do
 
     for definition <- [nil, true, false, 1, "agent", []] do
       assert {:error, %Jido.Error.ValidationError{code: :invalid_member}} =
-               Topology.normalize(
+               normalize_topology(
                  %{agents: [%{name: :bad, definition: definition}], connections: []},
                  parent,
                  []
@@ -211,7 +220,7 @@ defmodule Jido.Agent.TopologyContractTest do
                 status: :unchecked,
                 reason: :unknown_outputs
               }
-            ]} = Topology.checks(compatible)
+            ]} = check_topology(compatible)
 
     wildcard = %{base | topology: %{base.topology | connections: [edge("work.*", :child)]}}
 
@@ -222,7 +231,7 @@ defmodule Jido.Agent.TopologyContractTest do
                 status: :unchecked,
                 reason: :wildcard_coverage
               }
-            ]} = Topology.checks(wildcard)
+            ]} = check_topology(wildcard)
 
     unknown_source =
       Agent.define!(%{
@@ -243,7 +252,7 @@ defmodule Jido.Agent.TopologyContractTest do
     }
 
     assert {:ok, [%{status: :unchecked, reason: :unknown_outputs}]} =
-             Topology.checks(unchecked)
+             check_topology(unchecked)
 
     bad_destination =
       %{base | topology: %{base.topology | connections: [edge("missing", :child)]}}
@@ -252,7 +261,7 @@ defmodule Jido.Agent.TopologyContractTest do
             %Jido.Error.ValidationError{
               code: :unaccepted_type,
               details: %{type: "missing", definition: "topology_contract_child"}
-            }} = Topology.checks(bad_destination)
+            }} = check_topology(bad_destination)
   end
 
   @tag obligation: "jido.agent.I28"
@@ -296,7 +305,7 @@ defmodule Jido.Agent.TopologyContractTest do
       })
 
     assert {:ok, [%{status: :unchecked}, %{status: :unchecked}, %{status: :unchecked}]} =
-             Topology.checks(definition)
+             check_topology(definition)
 
     assert {:error, %Jido.Error.ValidationError{code: :unknown_endpoint}} =
              Agent.define(%{
@@ -415,7 +424,7 @@ defmodule Jido.Agent.TopologyContractTest do
                 count: 2,
                 state: %{value: "seed", items: ["seed"]}
               }
-            ]} = Topology.bind(definition, %{copies: 2, value: "seed"})
+            ]} = bind_topology(definition, %{copies: 2, value: "seed"})
 
     assert child === Child.definition()
 
@@ -424,7 +433,7 @@ defmodule Jido.Agent.TopologyContractTest do
               code: :missing_state_field,
               path: [:topology, :agents, 0],
               details: %{key: :copies}
-            }} = Topology.bind(definition, %{value: "seed"})
+            }} = bind_topology(definition, %{value: "seed"})
   end
 
   @tag obligation: "jido.agent.I30"
@@ -455,7 +464,7 @@ defmodule Jido.Agent.TopologyContractTest do
         }
       })
 
-    assert {:ok, [default, overridden]} = Topology.bind(definition, %{})
+    assert {:ok, [default, overridden]} = bind_topology(definition, %{})
     assert default.state == %{}
     assert overridden.state == %{label: "member"}
   end
@@ -518,6 +527,6 @@ defmodule Jido.Agent.TopologyContractTest do
                   labels: ["literal", "bound"]
                 }
               }
-            ]} = Topology.bind(definition, %{label: "bound"})
+            ]} = bind_topology(definition, %{label: "bound"})
   end
 end

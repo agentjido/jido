@@ -102,13 +102,13 @@ defmodule JidoTest.AgentServer.EffectsApiTest do
     for policy <- [:permanent, :temporary, :transient] do
       directive = Directive.agent_start(E.Worker, :child, restart: policy)
       assert {:ok, ^directive} = AgentDirective.validate(directive)
-      assert :ok = Directive.validate_restart_policy(policy)
+      assert :ok = Directive.AgentStart.validate_restart(policy)
     end
 
     stop = AgentDirective.server_stop()
     assert {:ok, ^stop} = AgentDirective.validate(stop)
 
-    assert {:error, message} = Directive.validate_restart_policy(:invalid)
+    assert {:error, message} = Directive.AgentStart.validate_restart(:invalid)
     assert message != ""
 
     for key <- [
@@ -125,16 +125,16 @@ defmodule JidoTest.AgentServer.EffectsApiTest do
           :restore,
           :state_version
         ] do
-      assert {:error, message} = Directive.validate_agent_start_opts(%{key => :invalid})
+      assert {:error, message} = Directive.AgentStart.validate_options(%{key => :invalid})
       assert message != ""
     end
 
-    assert {:error, message} = Directive.validate_agent_start_opts([])
+    assert {:error, message} = Directive.AgentStart.validate_options([])
     assert message != ""
 
     invalid = %{E.Worker.instantiate!(id: "invalid-effect-target") | state: %{count: :invalid}}
-    assert {:error, _} = Directive.validate_agent_target(invalid)
-    assert {:error, {:invalid_agent, 42}} = Directive.validate_agent_target(42)
+    assert {:error, _} = Directive.AgentStart.validate_target(invalid)
+    assert {:error, {:invalid_agent, 42}} = Directive.AgentStart.validate_target(42)
   end
 
   defp documented_api(module) do

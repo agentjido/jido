@@ -139,7 +139,7 @@ defmodule Jido.AgentTest do
     routes = Map.get(attrs, :routes, [])
 
     with {:ok, routes} <-
-           Agent.Validation.list(routes, fn {path, target} ->
+           Agent.Schema.list(routes, fn {path, target} ->
              {target, defaults} =
                case target do
                  {target, defaults} when is_map(defaults) -> {target, defaults}

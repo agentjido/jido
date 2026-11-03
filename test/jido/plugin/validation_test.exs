@@ -420,7 +420,7 @@ defmodule Jido.Plugin.ValidationTest do
     assert_received {:callback, :directives, ^opts}
     refute_received {:callback, _, _}
 
-    assert {:ok, specs} = Jido.Plugin.Normalizer.normalize_all(Jido.Agent.runtime_plugins(agent))
+    assert {:ok, specs} = Jido.Plugin.Normalizer.normalize_all(Jido.Agent.Plugin.declarations(agent))
     assert_received {:callback, :validate_options, ^opts}
     assert_received {:callback, :state_spec, ^opts}
     assert_received {:callback, :directives, ^opts}
@@ -678,7 +678,7 @@ defmodule Jido.Plugin.ValidationTest do
     ref = Process.monitor(pid)
     assert_receive {:DOWN, ^ref, :process, ^pid, _}
     init = %Init{agent_server: pid, agent_id: "agent", module: ThrowingChild}
-    assert {:error, {:agent_server_unavailable, _}} = Plugin.state(init)
+    assert {:error, {:agent_server_unavailable, _}} = Jido.AgentServer.Plugin.state(init)
     assert {:ok, [spec]} = Jido.Plugin.Normalizer.normalize_all([ThrowingChild])
     assert {:error, error} = Jido.AgentServer.Plugin.Callbacks.child_spec(init, spec)
     assert error.message == "Agent Server Plugin child_spec/1 failed"

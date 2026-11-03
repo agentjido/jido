@@ -2,7 +2,7 @@ defmodule Jido.Persistence.Snapshot do
   alias Jido.Joi
   @moduledoc false
   alias Jido.Agent
-  alias Jido.Agent.Validation
+  alias Jido.Agent.Schema
   alias Jido.Error
   alias Jido.Codec.Term
 
@@ -12,7 +12,7 @@ defmodule Jido.Persistence.Snapshot do
   @doc false
   def dump(agent, context, convert_state, state_mode \\ :auto) do
     with {:ok, agent} <- Agent.validate(agent),
-         :ok <- Validation.nonempty(agent.id),
+         :ok <- Schema.nonempty(agent.id),
          {:ok, frozen} <- freeze(agent),
          {:ok, state, format} <- dump_state(frozen, context, convert_state, state_mode),
          {:ok, references} <- fingerprints(code_modules(frozen, format)),
@@ -64,13 +64,13 @@ defmodule Jido.Persistence.Snapshot do
   end
 
   def envelope(snapshot) do
-    with {:ok, _} <- Validation.fields(snapshot, @keys),
+    with {:ok, _} <- Schema.fields(snapshot, @keys),
          true <- Map.keys(snapshot) |> Enum.sort() == Enum.sort(@keys),
          true <- snapshot.format == @format,
          %Agent{} <- snapshot.agent,
-         :ok <- Validation.nonempty(snapshot.agent.id),
+         :ok <- Schema.nonempty(snapshot.agent.id),
          true <- snapshot.state_format in [:default, :custom],
-         :ok <- Validation.plain_map(snapshot.references),
+         :ok <- Schema.plain_map(snapshot.references),
          true <-
            Enum.all?(snapshot.references, fn {module, digest} ->
              is_atom(module) and is_binary(digest) and byte_size(digest) == 16
@@ -86,7 +86,7 @@ defmodule Jido.Persistence.Snapshot do
   @doc false
   def freeze(%Agent{} = agent) do
     with {:ok, agents} <-
-           Validation.list(agent.topology.agents, fn member ->
+           Schema.list(agent.topology.agents, fn member ->
              with {:ok, definition} <- Agent.Validation.resolve(member.definition),
                   {:ok, definition} <- freeze(definition),
                   do: {:ok, %{member | definition: definition}}
@@ -96,9 +96,9 @@ defmodule Jido.Persistence.Snapshot do
 
   defp dump_state(agent, context, convert, state_mode) do
     if state_mode == :auto and callback?(agent.module, :checkpoint) do
-      case Agent.Runner.invoke(agent.module, :checkpoint, [agent, context]) do
+      case Agent.Callback.invoke(agent.module, :checkpoint, [agent, context]) do
         {:ok, payload} ->
-          with :ok <- Validation.plain_map(payload), do: {:ok, payload, :custom}
+          with :ok <- Schema.plain_map(payload), do: {:ok, payload, :custom}
 
         {:error, _} = error ->
           error
@@ -122,7 +122,7 @@ defmodule Jido.Persistence.Snapshot do
   defp load_state(%{agent: saved}, context, _convert) do
     with true <- callback?(saved.module, :restore),
          {:ok, %Agent{id: id, state: state}} <-
-           Agent.Runner.invoke(saved.module, :restore, [saved.state, context]),
+           Agent.Callback.invoke(saved.module, :restore, [saved.state, context]),
          true <- id == saved.id do
       {:ok, state}
     else
@@ -238,7 +238,7 @@ defmodule Jido.Persistence.Snapshot do
 
   defp fingerprints(modules) do
     with {:ok, values} <-
-           Validation.list(modules, fn module ->
+           Schema.list(modules, fn module ->
              with {:ok, digest} <- fingerprint(module), do: {:ok, {module, digest}}
            end),
          do: {:ok, Map.new(values)}
@@ -255,7 +255,7 @@ defmodule Jido.Persistence.Snapshot do
 
   defp verify_references(references) do
     with {:ok, _} <-
-           Validation.list(Map.to_list(references), fn {module, expected} ->
+           Schema.list(Map.to_list(references), fn {module, expected} ->
              with {:ok, actual} <- fingerprint(module) do
                if actual == expected,
                  do: {:ok, module},

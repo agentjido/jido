@@ -14,14 +14,20 @@ defmodule Jido.Agent.Plugin do
   owned field.
   """
 
-  alias Jido.Agent
-  alias Jido.Agent.{Validation, Route}
+  alias Jido.Agent.{Route, Schema}
   alias Jido.Error
   alias Jido.Agent.Plugin.{Preparation, RouteSelection, Spec}
   alias Jido.Plugin, as: PluginBoundary
   alias Jido.Plugin.Input
   alias Jido.Plugin.Normalizer
   alias Jido.Signal
+
+  @doc false
+  def declarations(%{plugins: entries}) when is_list(entries) do
+    for %{provider: module, data: data} <- entries,
+        Code.ensure_loaded?(module) and function_exported?(module, :__jido_plugin__, 0),
+        do: {module, Enum.sort(data)}
+  end
 
   @type state_spec :: :none | {atom(), Joi.schema()}
 
@@ -79,9 +85,9 @@ defmodule Jido.Agent.Plugin do
   end
 
   @doc false
-  @spec prepare(Agent.instance(), Signal.t(), [Jido.Plugin.Spec.t()] | [Spec.t()]) ::
+  @spec prepare(map(), Signal.t(), [Jido.Plugin.Spec.t()] | [Spec.t()]) ::
           {:ok, %{optional(module()) => Input.t()}} | {:error, term()}
-  def prepare(%Agent{} = agent, %Signal{} = signal, plugin_specs) do
+  def prepare(agent, %Signal{} = signal, plugin_specs) do
     with {:ok, candidates} <- Route.matching(agent, signal.type) do
       plugin_specs
       |> specs()
@@ -103,12 +109,12 @@ defmodule Jido.Agent.Plugin do
 
   @doc false
   @spec select_route(
-          Agent.instance(),
+          map(),
           Signal.t(),
           %{optional(module()) => Input.t()},
           [Jido.Plugin.Spec.t()] | [Spec.t()]
         ) :: {:ok, map()} | {:error, term()}
-  def select_route(%Agent{} = agent, %Signal{} = signal, inputs, plugin_specs) do
+  def select_route(agent, %Signal{} = signal, inputs, plugin_specs) do
     selectors = Enum.filter(specs(plugin_specs), & &1.route_selector?)
 
     case selectors do
@@ -335,8 +341,8 @@ defmodule Jido.Agent.Plugin do
   end
 
   defp validate_routes_without_selector(routes) do
-    with :ok <- Validation.unique(routes, & &1.path) do
-      case Enum.find(routes, &(not is_nil(&1.as) and Validation.wildcard?(&1.path))) do
+    with :ok <- Schema.unique(routes, & &1.path) do
+      case Enum.find(routes, &(not is_nil(&1.as) and Schema.wildcard?(&1.path))) do
         nil ->
           :ok
 

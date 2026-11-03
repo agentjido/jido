@@ -1,7 +1,6 @@
 defmodule Jido.Agent.Runner do
   @moduledoc false
 
-  alias Jido.Agent
   alias Jido.Agent.{Mutation, Plugin, Turn, Validation}
   alias Jido.Agent.Directive.ServerStop
   alias Jido.Agent.Plugin.Pipeline, as: PluginPipeline
@@ -10,20 +9,11 @@ defmodule Jido.Agent.Runner do
 
   @type stage :: :route | :prepare | :input | :compose | :validate
   @type admission :: %{
-          required(:agent) => Agent.instance(),
+          required(:agent) => map(),
           required(:signal) => Signal.t(),
           required(:context) => map(),
           required(:plugin_inputs) => map()
         }
-
-  @doc false
-  def invoke(module, callback, args) do
-    apply(module, callback, args)
-  rescue
-    error -> callback_failed(module, callback, :error, error)
-  catch
-    kind, reason -> callback_failed(module, callback, kind, reason)
-  end
 
   defmodule Prepared do
     @moduledoc false
@@ -40,7 +30,7 @@ defmodule Jido.Agent.Runner do
     defstruct @enforce_keys
 
     @type t :: %__MODULE__{
-            agent: Jido.Agent.instance(),
+            agent: map(),
             schema: Jido.Joi.schema(),
             signal: Jido.Signal.t(),
             turn: Jido.Agent.Turn.t(),
@@ -51,11 +41,11 @@ defmodule Jido.Agent.Runner do
   end
 
   @doc false
-  @spec run(Agent.instance(), Signal.t(), keyword()) ::
-          {:ok, Agent.instance(), [struct()]}
-          | {:handoff, Agent.instance(), Jido.Instruction.t(), [struct()]}
+  @spec run(map(), Signal.t(), keyword()) ::
+          {:ok, map(), [struct()]}
+          | {:handoff, map(), Jido.Instruction.t(), [struct()]}
           | {:error, term()}
-  def run(%Agent{} = agent, %Signal{} = signal, opts) do
+  def run(agent, %Signal{} = signal, opts) do
     with {:ok, prepared} <- prepare(agent, signal, opts),
          result <-
            Jido.Exec.run(
@@ -69,10 +59,20 @@ defmodule Jido.Agent.Runner do
   end
 
   @doc false
-  @spec prepare(Agent.instance(), Signal.t(), keyword()) ::
+  @spec prepare(map(), Signal.t(), keyword()) ::
           {:ok, Prepared.t()} | {:error, term()}
-  def prepare(%Agent{} = agent, %Signal{} = signal, opts) do
+  def prepare(agent, %Signal{} = signal, opts) do
     prepare_direct(agent, signal, opts) |> unstage()
+  end
+
+  @doc false
+  @spec transition_validated(map(), term(), Jido.Joi.schema()) ::
+          {:ok, map()} | {:error, Exception.t()}
+  def transition_validated(agent, next_state, schema) do
+    with :ok <-
+           Jido.Error.prefix_result_path(Jido.Agent.Schema.complete(schema, next_state), :state) do
+      {:ok, %{agent | state: next_state}}
+    end
   end
 
   @doc false
@@ -85,7 +85,7 @@ defmodule Jido.Agent.Runner do
           {:ok, Prepared.t()} | {:error, stage(), term()}
   def prepare_admitted(
         %{
-          agent: %Agent{} = agent,
+          agent: agent,
           signal: %Signal{} = signal,
           context: context,
           plugin_inputs: plugin_inputs
@@ -133,7 +133,7 @@ defmodule Jido.Agent.Runner do
         ) :: {:ok, Prepared.t()} | {:error, stage(), term()}
   def prepare_admitted_handoff(
         %{
-          agent: %Agent{} = agent,
+          agent: agent,
           signal: %Signal{} = signal,
           context: context,
           plugin_inputs: plugin_inputs
@@ -170,8 +170,8 @@ defmodule Jido.Agent.Runner do
 
   @doc false
   @spec finish_for_server(Prepared.t(), term()) ::
-          {:ok, Agent.instance(), [struct()]}
-          | {:handoff, Agent.instance(), Jido.Instruction.t(), [struct()]}
+          {:ok, map(), [struct()]}
+          | {:handoff, map(), Jido.Instruction.t(), [struct()]}
           | {:error, stage(), term()}
   def finish_for_server(%Prepared{} = prepared, result), do: do_finish(prepared, result)
 
@@ -259,7 +259,7 @@ defmodule Jido.Agent.Runner do
          result =
            if(Enum.any?(directives, &Mutation.mutation?/1),
              do: Mutation.apply(prepared.agent, state, directives),
-             else: Agent.transition_validated(prepared.agent, state, prepared.schema)
+             else: transition_validated(prepared.agent, state, prepared.schema)
            ),
          {:ok, agent} <- at(:validate, result) do
       {:handoff, agent, instruction, directives}
@@ -286,7 +286,7 @@ defmodule Jido.Agent.Runner do
          result =
            if(Enum.any?(directives, &Mutation.mutation?/1),
              do: Mutation.apply(prepared.agent, state, directives),
-             else: Agent.transition_validated(prepared.agent, state, prepared.schema)
+             else: transition_validated(prepared.agent, state, prepared.schema)
            ),
          {:ok, agent} <- at(:validate, result) do
       {:ok, agent, directives}
@@ -331,7 +331,7 @@ defmodule Jido.Agent.Runner do
        when is_map(output) and not is_struct(output),
        do:
          with(
-           {:ok, values} <- Jido.Agent.Validation.list(directives, &{:ok, &1}),
+           {:ok, values} <- Jido.Agent.Schema.list(directives, &{:ok, &1}),
            do: {:ok, output, values}
          )
 
@@ -355,7 +355,7 @@ defmodule Jido.Agent.Runner do
     route = prepared.turn.route
 
     with {:ok, state} <- project_state(route.state, output, prepared.agent.state),
-         :ok <- Jido.Error.prefix_result_path(Jido.Agent.Validation.plain_map(state), :state),
+         :ok <- Jido.Error.prefix_result_path(Jido.Agent.Schema.plain_map(state), :state),
          {:ok, directives} <- project_reply(route.reply, output, directives, prepared) do
       {:ok, state, directives}
     end
@@ -440,17 +440,4 @@ defmodule Jido.Agent.Runner do
 
   defp unstage({:error, _stage, reason}), do: {:error, reason}
   defp unstage(result), do: result
-
-  defp callback_failed(module, callback, kind, reason) do
-    {:error,
-     Error.execution_error("Agent callback failed",
-       details: %{
-         code: :agent_callback_failed,
-         module: module,
-         callback: callback,
-         kind: kind,
-         reason: reason
-       }
-     )}
-  end
 end

@@ -1,11 +1,15 @@
 ---
 modules:
   - Jido.Agent
+  - Jido.Agent.Callback
   - Jido.Codec.Agent
   - Jido.Agent.Diff
   - Jido.Agent.Directive
+  - Jido.Agent.Directive.Kind
+  - Jido.Agent.DSL.Entry
   - Jido.Agent.Directive.Emit
   - Jido.Agent.Mutation
+  - Jido.Agent.Schema
   - Jido.Agent.Topology
   - Jido.Agent.Validation
   - Jido.Agent.View

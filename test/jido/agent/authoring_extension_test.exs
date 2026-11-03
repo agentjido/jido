@@ -16,7 +16,7 @@ defmodule JidoTest.Agent.AuthoringExtensionTest do
       {:ok, Map.put(config, :label, SparkExtension.get_opt(dsl, [:labels], :value))}
     end
 
-    def normalize(data), do: Jido.Agent.Validation.fields(data, [:label])
+    def normalize(data), do: Jido.Agent.Schema.fields(data, [:label])
     def verify(%{label: "blocked"}, _), do: {:error, :blocked_label}
     def verify(_, _), do: :ok
   end
@@ -126,7 +126,7 @@ defmodule JidoTest.Agent.AuthoringExtensionTest do
              Agent.define(%{name: "labels", module: Host, plugins: [entry]})
 
     assert definition === Host.definition()
-    assert Agent.runtime_plugins(definition) == []
+    assert Agent.Plugin.declarations(definition) == []
     refute function_exported?(Labels, :__jido_plugin__, 0)
   end
 

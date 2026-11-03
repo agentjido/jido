@@ -1127,8 +1127,8 @@ defmodule Jido do
   defp startup_agent(source, opts, runtime_opts) do
     if runtime_opts[:persistence_mode] == :restore do
       with {:ok, definition} <- Jido.Agent.Validation.resolve(source),
-           {:ok, opts} <- Jido.Agent.Validation.options(opts, [:id]),
-           :ok <- Jido.Agent.Validation.nonempty(opts[:id]),
+           {:ok, opts} <- Jido.Agent.Schema.options(opts, [:id]),
+           :ok <- Jido.Agent.Schema.nonempty(opts[:id]),
            do: {:ok, %{definition | id: opts.id}}
     else
       Jido.Agent.instantiate(source, opts)

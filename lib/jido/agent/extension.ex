@@ -1,6 +1,6 @@
 defmodule Jido.Agent.Extension do
   @moduledoc false
-  alias Jido.Agent.{Validation, Route}
+  alias Jido.Agent.{Route, Schema}
   alias Jido.Error
   alias Jido.Catalog
   alias Jido.Codec.Value
@@ -61,8 +61,8 @@ defmodule Jido.Agent.Extension do
       def lower(_dsl, config), do: {:ok, config}
 
       def normalize(data) do
-        with :ok <- Jido.Agent.Validation.plain_map(data),
-             :ok <- Jido.Agent.Validation.static(data),
+        with :ok <- Jido.Agent.Schema.plain_map(data),
+             :ok <- Jido.Agent.Schema.static(data),
              do: {:ok, data}
       end
 
@@ -106,9 +106,9 @@ defmodule Jido.Agent.Extension do
 
   @doc false
   def providers(providers) do
-    with {:ok, providers} <- Validation.list(providers, &provider/1),
-         :ok <- Validation.unique(providers, & &1),
-         :ok <- Validation.unique(providers, & &1.id()),
+    with {:ok, providers} <- Schema.list(providers, &provider/1),
+         :ok <- Schema.unique(providers, & &1),
+         :ok <- Schema.unique(providers, & &1.id()),
          :ok <- namespaces(providers) do
       {:ok, providers}
     end
@@ -123,8 +123,8 @@ defmodule Jido.Agent.Extension do
 
     if match?({:module, _}, Code.ensure_compiled(module)) and
          Enum.all?(callbacks, fn {f, a} -> function_exported?(module, f, a) end) do
-      with :ok <- Validation.nonempty(module.id()),
-           :ok <- Validation.positive(module.vsn()),
+      with :ok <- Schema.nonempty(module.id()),
+           :ok <- Schema.positive(module.vsn()),
            :ok <- plugin(module),
            do: {:ok, module}
     else
@@ -164,19 +164,19 @@ defmodule Jido.Agent.Extension do
 
   @doc false
   def normalize(entries) do
-    with {:ok, entries} <- Validation.list(entries, &entry/1),
+    with {:ok, entries} <- Schema.list(entries, &entry/1),
          {:ok, _} <- providers(Enum.map(entries, & &1.provider)),
          do: {:ok, entries}
   end
 
   defp entry(value) do
-    with {:ok, value} <- Validation.fields(value, [:id, :provider, :vsn, :data]),
+    with {:ok, value} <- Schema.fields(value, [:id, :provider, :vsn, :data]),
          {:ok, provider} <- provider(value[:provider]),
          :ok <- identity(value, provider),
-         :ok <- Validation.plain_map(value[:data]),
+         :ok <- Schema.plain_map(value[:data]),
          {:ok, data} <- result(provider.normalize(value.data)),
-         :ok <- Validation.plain_map(data),
-         :ok <- Validation.static(data) do
+         :ok <- Schema.plain_map(data),
+         :ok <- Schema.static(data) do
       {:ok, %{id: provider.id(), provider: provider, vsn: provider.vsn(), data: data}}
     end
   end
@@ -189,17 +189,17 @@ defmodule Jido.Agent.Extension do
 
   @doc false
   def lower(declarations, dsl) do
-    with :ok <- Validation.plain_map(dsl),
+    with :ok <- Schema.plain_map(dsl),
          {:ok, declarations} <-
-           Validation.list(declarations, fn declaration ->
-             with {:ok, declaration} <- Validation.fields(declaration, [:provider, :config]),
+           Schema.list(declarations, fn declaration ->
+             with {:ok, declaration} <- Schema.fields(declaration, [:provider, :config]),
                   {:ok, provider} <- provider(declaration[:provider]),
-                  :ok <- Validation.plain_map(declaration[:config]) do
+                  :ok <- Schema.plain_map(declaration[:config]) do
                {:ok, %{provider: provider, config: declaration.config}}
              end
            end) do
-      Validation.list(declarations, fn %{provider: provider, config: config} ->
-        with :ok <- Validation.plain_map(config),
+      Schema.list(declarations, fn %{provider: provider, config: config} ->
+        with :ok <- Schema.plain_map(config),
              {:ok, data} <- result(provider.lower(dsl, config)) do
           {:ok, %{id: provider.id(), provider: provider, vsn: provider.vsn(), data: data}}
         end
@@ -210,7 +210,7 @@ defmodule Jido.Agent.Extension do
   @doc false
   def verify(entries, definition) do
     with {:ok, _} <-
-           Validation.list(entries, fn entry ->
+           Schema.list(entries, fn entry ->
              with :ok <- result(entry.provider.verify(entry.data, definition)), do: {:ok, entry}
            end),
          do: :ok
@@ -219,7 +219,7 @@ defmodule Jido.Agent.Extension do
   @doc false
   def route_contributions(entries) do
     with {:ok, groups} <-
-           Validation.list(entries, fn entry ->
+           Schema.list(entries, fn entry ->
              routes =
                if function_exported?(entry.provider, :derive_routes, 1),
                  do: entry.provider.derive_routes(entry.data),
@@ -227,9 +227,9 @@ defmodule Jido.Agent.Extension do
 
              with {:ok, routes} <-
                     Error.prefix_result_path(
-                      Validation.list(routes, fn route ->
-                        with :ok <- Validation.plain_map(route),
-                             :ok <- Error.prefix_result_path(Validation.exact(Map.get(route, :path)), :path),
+                      Schema.list(routes, fn route ->
+                        with :ok <- Schema.plain_map(route),
+                             :ok <- Error.prefix_result_path(Schema.exact(Map.get(route, :path)), :path),
                              do: {:ok, route}
                       end),
                       :routes
@@ -260,7 +260,7 @@ defmodule Jido.Agent.Extension do
   end
 
   defp normalize_derived_routes(contributions) do
-    Validation.list(contributions, fn contribution ->
+    Schema.list(contributions, fn contribution ->
       with {:ok, route} <- Error.prefix_result_path(Route.normalize(contribution.route), route_path(contribution)),
            do: {:ok, %{contribution | route: route}}
     end)
@@ -294,7 +294,7 @@ defmodule Jido.Agent.Extension do
   @doc false
   def verify_connection(entries, connection) do
     with {:ok, _} <-
-           Validation.list(entries, fn entry ->
+           Schema.list(entries, fn entry ->
              with :ok <- result(entry.provider.verify_connection(entry.data, connection)),
                   do: {:ok, entry}
            end),
@@ -318,7 +318,7 @@ defmodule Jido.Agent.Extension do
         Error.validation_result(:namespace_conflict, [], "Provider cannot replace agent endpoints")
 
       true ->
-        with :ok <- Validation.unique(sections, & &1), do: Validation.unique(kinds, & &1)
+        with :ok <- Schema.unique(sections, & &1), do: Schema.unique(kinds, & &1)
     end
   end
 

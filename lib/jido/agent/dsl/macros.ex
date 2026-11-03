@@ -44,7 +44,10 @@ defmodule Jido.Agent.DSL.RouteMacros do
   alias Jido.Flow.Inline, as: InlineFlow
 
   @entity Module.concat([
-            Jido.Agent.DSL.Extension,
+            "Jido",
+            "Agent",
+            "DSL",
+            "Extension",
             Macro.camelize("__routes__"),
             Macro.camelize("__route__")
           ])
@@ -304,7 +307,7 @@ defmodule Jido.Agent.DSL.RouteMacros do
 
   @doc false
   def transform_names!(path) do
-    case Jido.Agent.Validation.path(path) do
+    case Jido.Agent.Schema.path(path) do
       :ok -> :ok
       {:error, error} -> raise error
     end

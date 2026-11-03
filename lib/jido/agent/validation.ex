@@ -2,9 +2,9 @@ defmodule Jido.Agent.Validation do
   @moduledoc false
   alias Jido.Agent.{Extension, Plugin, Route, Topology}
   alias Jido.Error
-  alias Jido.Joi
   alias Jido.Signal
   alias Jido.Signal.Context, as: SignalContext
+  import Jido.Agent.Schema
 
   @fields [
     :id,
@@ -22,209 +22,23 @@ defmodule Jido.Agent.Validation do
     :plugins
   ]
 
-  def attrs(value) do
-    case to_attrs(value, :reject) do
-      {:ok, attrs} -> {:ok, attrs}
-      :error when is_list(value) -> authoring_error("Expected unique keyword options", %{value: value})
-      :error -> authoring_error("Expected a map or keyword list", %{value: value})
-    end
-  end
-
-  # Public boundaries keep their own duplicate policy and error context.
-  def to_attrs(value, duplicates \\ :last)
-  def to_attrs(value, _duplicates) when is_map(value) and not is_struct(value), do: {:ok, value}
-
-  def to_attrs(value, duplicates) when is_list(value) do
-    if Keyword.keyword?(value) and
-         (duplicates == :last or Enum.uniq(Keyword.keys(value)) == Keyword.keys(value)),
-       do: {:ok, Map.new(value)},
-       else: :error
-  end
-
-  def to_attrs(_value, _duplicates), do: :error
-
-  def keys(map, allowed) do
-    case Map.keys(map) -- allowed do
-      [] -> :ok
-      unknown -> authoring_error("Unknown authoring fields", %{keys: unknown})
-    end
-  end
-
-  def traverse(values, fun), do: traverse(values, fun, [])
-  defp traverse([], _fun, acc), do: {:ok, Enum.reverse(acc)}
-
-  defp traverse([value | tail], fun, acc) do
-    case fun.(value) do
-      {:ok, result} -> traverse(tail, fun, [result | acc])
-      {:error, _error} = error -> error
-    end
-  end
-
-  defp traverse(_tail, _fun, _acc), do: authoring_error("Expected a proper list")
-
-  def authoring_error(message, details \\ %{}),
-    do: {:error, Error.validation_error(message, kind: :config, details: details)}
-
-  def fields(value, allowed, defaults \\ %{}) do
-    with :ok <- plain_map(value),
-         [] <- Map.keys(value) -- allowed do
-      {:ok, Map.merge(defaults, value)}
+  def state_schema(agent) do
+    if agent?(agent) do
+      with {:ok, schema} <- Plugin.compose_schema(agent.schema, Plugin.declarations(agent)),
+           :ok <- Error.prefix_result_path(schema(schema), :schema),
+           do: {:ok, schema}
     else
-      keys when is_list(keys) -> Error.validation_result(:unknown_fields, [], "Unknown fields", %{keys: keys})
-      error -> error
+      Error.validation_result(:invalid_agent, [], "Expected a Jido.Agent struct")
     end
-  end
-
-  def plain_map(value) when is_map(value) and not is_struct(value), do: :ok
-  def plain_map(_), do: Error.validation_result(:invalid_map, [], "Expected a plain Map")
-
-  def nonempty(value) when is_binary(value) and byte_size(value) > 0, do: :ok
-  def nonempty(_), do: Error.validation_result(:invalid_string, [], "Expected a nonempty string")
-
-  def name(value) when is_atom(value) and value not in [nil, true, false], do: :ok
-  def name(_), do: Error.validation_result(:invalid_name, [], "Expected a name atom")
-
-  def positive(value) when is_integer(value) and value > 0, do: :ok
-  def positive(_), do: Error.validation_result(:invalid_positive, [], "Expected a positive integer")
-
-  def list(values, fun), do: walk(values, fun, 0, [])
-  defp walk([], _fun, _index, acc), do: {:ok, Enum.reverse(acc)}
-
-  defp walk([value | tail], fun, index, acc) do
-    with {:ok, value} <- Error.prefix_result_path(fun.(value), [index]),
-         do: walk(tail, fun, index + 1, [value | acc])
-  end
-
-  defp walk(_, _, _, _), do: Error.validation_result(:invalid_list, [], "Expected a proper list")
-
-  def unique(values, key) do
-    keys = Enum.map(values, key)
-
-    if Enum.uniq(keys) == keys,
-      do: :ok,
-      else: Error.validation_result(:duplicate, [], "Duplicate declaration", %{values: keys})
-  end
-
-  def static(value) do
-    case Joi.validate_static(value) do
-      :ok ->
-        :ok
-
-      {:error, _reason} ->
-        Error.validation_result(:live_value, [], "Authoring data cannot contain live values")
-    end
-  end
-
-  def schema(schema) do
-    case {Joi.Schema.kind(schema), Joi.Schema.fields(schema)} do
-      {:map, {:ok, fields}} when is_list(fields) -> static_schema(schema)
-      _ -> Error.validation_result(:invalid_schema, [], "Expected a static Joi object schema")
-    end
-  end
-
-  defp static_schema(%{__struct__: _type} = value) do
-    if Joi.Schema.coerce?(value) or
-         Joi.Schema.forbidden_state_type?(value) or
-         Enum.any?(Joi.Schema.effects(value), &Joi.Schema.transform_effect?/1) do
-      Error.validation_result(:invalid_schema, [], "State schemas cannot convert values")
-    else
-      static_schema(Map.from_struct(value))
-    end
-  end
-
-  defp static_schema(value) when is_map(value),
-    do: schema_items(Enum.flat_map(value, fn {k, v} -> [k, v] end))
-
-  defp static_schema(value) when is_list(value), do: schema_items(value)
-  defp static_schema(value) when is_tuple(value), do: schema_items(Tuple.to_list(value))
-  defp static_schema(value), do: static(value)
-
-  defp schema_items(values) do
-    with {:ok, _} <-
-           list(values, fn value -> with :ok <- static_schema(value), do: {:ok, value} end),
-         do: :ok
-  end
-
-  def initialize(schema, state) do
-    with :ok <- plain_map(state),
-         do: parse_value(Joi.Schema.put_unrecognized_keys(schema, :error), state)
-  end
-
-  def parse_value(schema, input) do
-    case Joi.initialize(schema, input) do
-      {:ok, initialized} ->
-        {:ok, initialized}
-
-      {:error, issues} ->
-        if Enum.any?(issues, &Joi.changed_value?/1) do
-          Error.validation_result(
-            :state_conversion,
-            [],
-            "State initialization can add defaults but cannot convert supplied values"
-          )
-        else
-          Error.validation_result(:invalid_state, [], "State does not match its schema", %{issues: issues})
-        end
-    end
-  end
-
-  def complete(schema, state) do
-    with :ok <- plain_map(state) do
-      case Joi.validate(Joi.Schema.put_unrecognized_keys(schema, :error), state) do
-        :ok ->
-          :ok
-
-        {:error, issues} ->
-          cond do
-            Enum.any?(issues, &Joi.changed_value?/1) ->
-              Error.validation_result(:state_conversion, [], "Validation cannot change stored state")
-
-            Enum.any?(issues, &(Joi.error_code(&1) == :required)) ->
-              Error.validation_result(:incomplete_state, [], "State does not match its schema", %{
-                issues: issues
-              })
-
-            true ->
-              Error.validation_result(:invalid_state, [], "State does not match its schema", %{issues: issues})
-          end
-      end
-    end
-  end
-
-  def path(value) when is_binary(value) do
-    case Jido.Signal.Router.Route.validate_path(value, []) do
-      :ok -> :ok
-      {:error, _} -> Error.validation_result(:invalid_path, [], "Invalid Signal path", %{path: value})
-    end
-  end
-
-  def path(_), do: Error.validation_result(:invalid_path, [], "Expected a Signal path string")
-
-  def exact(value) do
-    with :ok <- path(value) do
-      if wildcard?(value),
-        do: Error.validation_result(:wildcard_type, [], "Expected an exact Signal type"),
-        else: :ok
-    end
-  end
-
-  def wildcard?(value), do: String.contains?(value, "*")
-  def matches?(type, path), do: Jido.Signal.Router.matches?(type, path)
-
-  def state_schema(%Jido.Agent{} = agent) do
-    with {:ok, schema} <-
-           Jido.Agent.Plugin.compose_schema(agent.schema, Jido.Agent.runtime_plugins(agent)),
-         :ok <- Error.prefix_result_path(schema(schema), :schema),
-         do: {:ok, schema}
   end
 
   def define(input, opts \\ [])
-  def define(%Jido.Agent{} = input, opts), do: define(Map.from_struct(input), opts)
 
   def define(input, opts) do
+    input = if agent?(input), do: Map.from_struct(input), else: input
     related? = Keyword.get(opts, :related?, true)
 
-    with {:ok, definition} <- fields(input, @fields, Jido.Agent.__defaults__()),
+    with {:ok, definition} <- fields(input, @fields, defaults()),
          :ok <- fields(definition),
          {:ok, plugins} <- Error.prefix_result_path(Extension.normalize(definition.plugins), :plugins),
          {:ok, route_contributions} <-
@@ -237,12 +51,15 @@ defmodule Jido.Agent.Validation do
          :ok <- reply_source(routes, definition.signal_source, related?),
          definition = %{definition | routes: routes, plugins: plugins},
          {:ok, topology} <-
-           Error.prefix_result_path(Topology.normalize(definition.topology, definition, opts), :topology),
+           Error.prefix_result_path(
+             Topology.normalize(definition.topology, definition, opts, &__MODULE__.define/2),
+             :topology
+           ),
          definition = %{definition | topology: topology},
          :ok <- forward_targets(definition),
          :ok <- verify_plugins(plugins, definition, related?),
          :ok <- plugin_schema(definition, related? and Keyword.get(opts, :plugin_schema?, true)) do
-      {:ok, struct!(Jido.Agent, definition)}
+      {:ok, struct!(agent_module(), definition)}
     else
       {:error, %Error.ValidationError{} = error} ->
         {:error,
@@ -313,7 +130,7 @@ defmodule Jido.Agent.Validation do
   end
 
   defp plugin_schema(fields, true) do
-    with {:ok, _schema} <- state_schema(struct!(Jido.Agent, fields)), do: :ok
+    with {:ok, _schema} <- state_schema(struct!(agent_module(), fields)), do: :ok
   end
 
   defp plugin_schema(_, false), do: :ok
@@ -329,9 +146,17 @@ defmodule Jido.Agent.Validation do
       else: :ok
   end
 
-  def validate(%Jido.Agent{id: nil, state: nil} = value), do: validate_definition(value)
-  def validate(%Jido.Agent{} = value), do: validate_instance(value)
-  def validate(_), do: Error.validation_result(:invalid_agent, [], "Expected a Jido.Agent struct")
+  def validate(%{id: nil, state: nil} = value) do
+    if agent?(value),
+      do: validate_definition(value),
+      else: Error.validation_result(:invalid_agent, [], "Expected a Jido.Agent struct")
+  end
+
+  def validate(value) do
+    if agent?(value),
+      do: validate_instance(value),
+      else: Error.validation_result(:invalid_agent, [], "Expected a Jido.Agent struct")
+  end
 
   def normalize_context(nil), do: {:ok, %{}}
 
@@ -392,16 +217,17 @@ defmodule Jido.Agent.Validation do
 
   def validate_definition(value, opts \\ [])
 
-  def validate_definition(%Jido.Agent{} = value, opts) do
-    with {:ok, normalized} <- define(value, opts) do
-      if normalized === value,
-        do: {:ok, value},
-        else: Error.validation_result(:not_canonical, [], "Definition must contain its normalized fields")
+  def validate_definition(value, opts) do
+    if agent?(value) do
+      with {:ok, normalized} <- define(value, opts) do
+        if normalized === value,
+          do: {:ok, value},
+          else: Error.validation_result(:not_canonical, [], "Definition must contain its normalized fields")
+      end
+    else
+      Error.validation_result(:definition_required, [], "Expected a definition with nil id and state")
     end
   end
-
-  def validate_definition(_, _opts),
-    do: Error.validation_result(:definition_required, [], "Expected a definition with nil id and state")
 
   def validate_instance(value) do
     with {:ok, agent, _specs, _schema} <- validate_instance_with_plugins(value), do: {:ok, agent}
@@ -416,19 +242,19 @@ defmodule Jido.Agent.Validation do
          :ok <- Error.prefix_result_path(nonempty(opts[:id]), :id),
          state = Map.get(opts, :state, %{}),
          :ok <- Error.prefix_result_path(plain_map(state), :state),
-         {:ok, schema} <- Jido.Agent.Validation.state_schema(definition),
+         {:ok, schema} <- state_schema(definition),
          context = Map.put(parent_context, :id, opts.id),
          state = Map.merge(definition.initial_state, state),
          {:ok, state} <- initialize(definition, state, context),
          {:ok, state} <- Error.prefix_result_path(initialize(schema, state), :state),
-         {:ok, _} <- Topology.bind(definition, state),
+         {:ok, _} <- Topology.bind(definition, state, &__MODULE__.resolve/2),
          do: {:ok, %{definition | id: opts.id, state: state}}
   end
 
   defp initialize(%{module: module}, state, context) do
     if module not in [nil, true, false] and Code.ensure_loaded?(module) and
          function_exported?(module, :initialize, 2) do
-      case Jido.Agent.Runner.invoke(module, :initialize, [state, context]) do
+      case Jido.Agent.Callback.invoke(module, :initialize, [state, context]) do
         {:ok, state} ->
           with :ok <- Error.prefix_result_path(plain_map(state), :initialize), do: {:ok, state}
 
@@ -449,22 +275,28 @@ defmodule Jido.Agent.Validation do
   defp initialize_error(details),
     do: Error.validation_result(:initialize_failed, [:initialize], "Agent initialize/2 failed", details)
 
-  def resolve(%Jido.Agent{} = definition), do: validate_definition(definition)
+  def resolve(value), do: resolve(value, [])
 
-  def resolve(module) when is_atom(module) and module not in [nil, true, false] do
+  def resolve(%{__struct__: _module} = definition, opts) do
+    if agent?(definition),
+      do: validate_definition(definition, opts),
+      else: Error.validation_result(:definition_required, [], "Expected an Agent definition or module")
+  end
+
+  def resolve(module, opts) when is_atom(module) and module not in [nil, true, false] do
     if Code.ensure_loaded?(module) and function_exported?(module, :definition, 0),
-      do: resolve_module(module),
+      do: resolve_module(module, opts),
       else:
         Error.validation_result(:unresolved_definition, [], "Agent definition module is not available", %{
           module: module
         })
   end
 
-  def resolve(_),
+  def resolve(_, _opts),
     do: Error.validation_result(:definition_required, [], "Expected an Agent definition or module")
 
-  defp resolve_module(module) do
-    validate_definition(module.definition())
+  defp resolve_module(module, opts) do
+    validate_definition(module.definition(), opts)
   rescue
     reason -> definition_failed(module, :error, reason)
   catch
@@ -483,33 +315,26 @@ defmodule Jido.Agent.Validation do
     do: Code.ensure_loaded?(module) and function_exported?(module, :definition, 0)
 
   defp dependencies(agent) do
-    with {:ok, specs} <- Jido.Plugin.Normalizer.normalize_all(Jido.Agent.runtime_plugins(agent)),
-         {:ok, schema} <- Jido.Agent.Plugin.compose_schema_from_specs(agent.schema, specs),
+    with {:ok, specs} <- Jido.Plugin.Normalizer.normalize_all(Plugin.declarations(agent)),
+         {:ok, schema} <- Plugin.compose_schema_from_specs(agent.schema, specs),
          :ok <- Error.prefix_result_path(schema(schema), :schema),
          do: {:ok, specs, schema}
   end
 
-  def validate_instance_with_plugins(%Jido.Agent{} = value) do
-    with :ok <- Error.prefix_result_path(nonempty(value.id), :id),
-         {:ok, definition} <-
-           validate_definition(Jido.Agent.definition(value), plugin_schema?: false),
-         {:ok, specs, schema} <- dependencies(definition),
-         :ok <- Error.prefix_result_path(complete(schema, value.state), :state),
-         {:ok, _} <- Topology.bind(definition, value.state),
-         do: {:ok, value, specs, schema}
+  def validate_instance_with_plugins(value) do
+    if agent?(value) do
+      definition = %{value | id: nil, state: nil}
+
+      with :ok <- Error.prefix_result_path(nonempty(value.id), :id),
+           {:ok, definition} <- validate_definition(definition, plugin_schema?: false),
+           {:ok, specs, schema} <- dependencies(definition),
+           :ok <- Error.prefix_result_path(complete(schema, value.state), :state),
+           {:ok, _} <- Topology.bind(definition, value.state, &__MODULE__.resolve/2),
+           do: {:ok, value, specs, schema}
+    else
+      Error.validation_result(:instance_required, [], "Expected an Agent instance")
+    end
   end
-
-  def validate_instance_with_plugins(_),
-    do: Error.validation_result(:instance_required, [], "Expected an Agent instance")
-
-  def options(opts, allowed) when is_list(opts) do
-    if Keyword.keyword?(opts) and
-         length(Keyword.keys(opts)) == length(Enum.uniq(Keyword.keys(opts))),
-       do: fields(Map.new(opts), allowed),
-       else: Error.validation_result(:invalid_options, [], "Expected unique keyword options")
-  end
-
-  def options(opts, allowed), do: fields(opts, allowed)
 
   defp invalid_command(message, details),
     do: {:error, Error.validation_error(message, kind: :config, details: details)}

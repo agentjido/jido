@@ -13,9 +13,10 @@ defmodule Jido.Agent do
   Routes select one handler in declaration order. Connections select recipients
   for outputs. Plugins add explicit, validated data to `plugins`.
   """
-  alias Jido.Agent.Validation
+  alias Jido.Agent.{Schema, Validation}
   alias Jido.Agent.Plugin.Declaration
   alias Jido.Agent.Runner
+  alias Jido.Catalog
   alias Jido.Error
   alias Jido.Signal
   alias Jido.Trace.Context, as: TraceContext
@@ -34,25 +35,8 @@ defmodule Jido.Agent do
 
   @optional_callbacks checkpoint: 2, restore: 2, initialize: 2
 
-  @schema Joi.struct(__MODULE__, %{
-            id: Joi.string() |> Joi.nullable() |> Joi.default(nil),
-            state: Joi.map() |> Joi.nullable() |> Joi.default(nil),
-            module: Joi.atom() |> Joi.nullable() |> Joi.default(nil),
-            name: Joi.string() |> Joi.min(1),
-            description: Joi.string() |> Joi.nullable() |> Joi.default(nil),
-            vsn: Joi.integer() |> Joi.min(1) |> Joi.default(1),
-            schema: Joi.any() |> Joi.default(Joi.object(%{})),
-            initial_state: Joi.map() |> Joi.default(%{}),
-            metadata: Joi.map() |> Joi.default(%{}),
-            signal_source: Joi.string() |> Joi.min(1) |> Joi.nullable() |> Joi.default(nil),
-            routes: Joi.list(Joi.any()) |> Joi.default([]),
-            topology: Joi.map() |> Joi.default(%{}),
-            plugins: Joi.list(Joi.any()) |> Joi.default([])
-          })
-  @defaults Map.new(Joi.struct_fields(@schema), fn
-              {key, value} -> {key, value}
-              key -> {key, nil}
-            end)
+  @schema Schema.agent_schema()
+  @defaults Schema.defaults()
   @enforce_keys Joi.enforce_keys(@schema)
   defstruct Joi.struct_fields(@schema)
   @doc false
@@ -156,7 +140,7 @@ defmodule Jido.Agent do
 
   @doc false
   def options!(quoted_options, caller) do
-    options = Jido.Agent.DSL.prepare_options!(quoted_options, caller)
+    options = prepare_options!(quoted_options, caller)
 
     case Declaration.normalize(Keyword.get(options, :plugins, [])) do
       {:ok, declarations} ->
@@ -167,6 +151,24 @@ defmodule Jido.Agent do
 
       {:error, error} ->
         raise error
+    end
+  end
+
+  @doc false
+  @spec prepare_options!(Macro.t(), Macro.Env.t()) :: keyword()
+  def prepare_options!(quoted_options, %Macro.Env{} = caller) do
+    {options, _binding} = Code.eval_quoted(quoted_options, [], caller)
+
+    unless Keyword.keyword?(options) and
+             Enum.uniq(Keyword.keys(options)) == Keyword.keys(options) do
+      raise ArgumentError, "Agent requires unique keyword options"
+    end
+
+    options = Keyword.put_new(options, :id, Atom.to_string(caller.module))
+
+    case Catalog.validate_identifier(options[:id]) do
+      :ok -> options
+      {:error, error} -> raise error
     end
   end
 
@@ -229,21 +231,14 @@ defmodule Jido.Agent do
   def mutate(%__MODULE__{} = agent, directives), do: Jido.Agent.Mutation.apply(agent, directives)
 
   @doc false
-  def runtime_plugins(%__MODULE__{plugins: entries}) do
-    for %{provider: module, data: data} <- entries,
-        Code.ensure_loaded?(module) and function_exported?(module, :__jido_plugin__, 0),
-        do: {module, Enum.sort(data)}
-  end
-
-  @doc false
   @spec input_signal(definition(), String.t(), map(), keyword() | map()) ::
           {:ok, Signal.t()} | {:error, term()}
   def input_signal(definition, type, data, opts \\ []) do
     with {:ok, opts} <-
-           Validation.options(opts, [:source, :id, :time, :subject, :datacontenttype]),
+           Schema.options(opts, [:source, :id, :time, :subject, :datacontenttype]),
          source = Map.get(opts, :source, definition.signal_source),
-         :ok <- Jido.Error.prefix_result_path(Jido.Agent.Validation.nonempty(source), :source),
-         :ok <- Jido.Agent.Validation.plain_map(data) do
+         :ok <- Jido.Error.prefix_result_path(Jido.Agent.Schema.nonempty(source), :source),
+         :ok <- Jido.Agent.Schema.plain_map(data) do
       Jido.Signal.new(type, data, Map.put(opts, :source, source))
     end
   end
@@ -288,16 +283,7 @@ defmodule Jido.Agent do
   @spec transition(instance(), term()) :: {:ok, instance()} | {:error, Exception.t()}
   def transition(%__MODULE__{} = agent, next_state) do
     with {:ok, agent, _specs, schema} <- Validation.validate_instance_with_plugins(agent) do
-      transition_validated(agent, next_state, schema)
-    end
-  end
-
-  @doc false
-  @spec transition_validated(instance(), term(), Joi.schema()) ::
-          {:ok, instance()} | {:error, Exception.t()}
-  def transition_validated(%__MODULE__{} = agent, next_state, schema) do
-    with :ok <- Jido.Error.prefix_result_path(Validation.complete(schema, next_state), :state) do
-      {:ok, %{agent | state: next_state}}
+      Runner.transition_validated(agent, next_state, schema)
     end
   end
 
@@ -363,7 +349,7 @@ defmodule Jido.Agent do
     do: invalid("Agent.cmd/3 options must be a keyword list", %{opts: opts})
 
   defp normalize_domain_attrs(attrs) do
-    case Jido.Agent.Validation.to_attrs(attrs) do
+    case Jido.Agent.Schema.to_attrs(attrs) do
       {:ok, attrs} -> {:ok, attrs}
       :error -> invalid("Agent.set/2 attributes must be a map or keyword list", %{attrs: attrs})
     end

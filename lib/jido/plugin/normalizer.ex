@@ -1,7 +1,7 @@
 defmodule Jido.Plugin.Normalizer do
   @moduledoc false
 
-  alias Jido.Agent.Directive
+  alias Jido.Agent.Directive.Kind, as: DirectiveKind
   alias Jido.Agent.Plugin.Spec, as: AgentSpec
   alias Jido.AgentServer.Plugin.Spec, as: ServerSpec
   alias Jido.Joi
@@ -704,7 +704,7 @@ defmodule Jido.Plugin.Normalizer do
           directive: not_struct
         })
 
-      Enum.any?(directives, &Directive.built_in_module?/1) ->
+      Enum.any?(directives, &DirectiveKind.built_in_module?/1) ->
         PluginBoundary.validation_error("Agent Plugin cannot own a built-in Directive", %{
           plugin: package
         })
@@ -723,7 +723,7 @@ defmodule Jido.Plugin.Normalizer do
 
   defp validate_agent_contract(package, facet, state_key, directives) do
     reducer? = function_exported?(facet, :reduce, 2)
-    invalid_directive = Enum.find(directives, &(not Directive.validator?(&1)))
+    invalid_directive = Enum.find(directives, &(not DirectiveKind.validator?(&1)))
 
     cond do
       function_exported?(facet, :validate_directive, 2) ->

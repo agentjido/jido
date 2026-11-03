@@ -10,7 +10,10 @@ defmodule JidoTest.Authoring.Agents.ExecutionTest do
     definition = Team.definition()
     instance = Agent.instantiate!(definition, id: "team", state: %{value: "copied", workers: 3})
     assert Agent.definition(instance) === definition
-    assert {:ok, [planner, workers]} = Agent.Topology.bind(instance, instance.state)
+
+    assert {:ok, [planner, workers]} =
+             Agent.Topology.bind(instance, instance.state, &Agent.Validation.resolve/2)
+
     assert planner.state.value == "copied"
     assert workers.count == 3
     assert workers.definition === Worker.definition()

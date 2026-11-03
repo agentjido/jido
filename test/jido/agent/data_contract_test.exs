@@ -1,7 +1,7 @@
 defmodule Jido.Agent.ValidationDataContractTest do
   use Covenant.Case, component: "jido.agent", async: true
 
-  alias Jido.Agent.Validation
+  alias Jido.Agent.Schema
   alias Jido.Error.ValidationError, as: Error
 
   defp assert_error(result, code, details \\ %{}) do
@@ -11,46 +11,46 @@ defmodule Jido.Agent.ValidationDataContractTest do
 
   @tag obligation: ["jido.agent.I3", "jido.agent.I7", "jido.agent.I22"]
   test "scalar authoring validators keep their exact boundaries" do
-    assert :ok = Validation.nonempty("a")
+    assert :ok = Schema.nonempty("a")
 
     for value <- [nil, true, false] do
-      assert_error(Validation.name(value), :invalid_name)
+      assert_error(Schema.name(value), :invalid_name)
     end
 
-    assert_error(Validation.nonempty(""), :invalid_string)
-    assert_error(Validation.positive(0), :invalid_positive)
+    assert_error(Schema.nonempty(""), :invalid_string)
+    assert_error(Schema.positive(0), :invalid_positive)
   end
 
   @tag obligation: ["jido.agent.I3", "jido.agent.I22"]
   test "collection errors retain the failed field, declaration, and index" do
-    assert_error(Validation.fields(%{bad: 1}, []), :unknown_fields, %{keys: [:bad]})
-    assert_error(Validation.unique([:a, :a], & &1), :duplicate, %{values: [:a, :a]})
+    assert_error(Schema.fields(%{bad: 1}, []), :unknown_fields, %{keys: [:bad]})
+    assert_error(Schema.unique([:a, :a], & &1), :duplicate, %{values: [:a, :a]})
 
     result =
-      Validation.list([:ok, :ok, :bad], fn
+      Schema.list([:ok, :ok, :bad], fn
         :bad -> Jido.Error.validation_result(:bad_item, [], "Bad item")
         value -> {:ok, value}
       end)
 
     assert {:error, %Error{code: :bad_item, path: [2], message: "Bad item"}} = result
-    assert_error(Validation.list([:ok | :bad_tail], &{:ok, &1}), :invalid_list)
+    assert_error(Schema.list([:ok | :bad_tail], &{:ok, &1}), :invalid_list)
   end
 
   @tag obligation: ["jido.agent.I1", "jido.agent.I22"]
   test "static authoring checks include Map keys" do
-    assert_error(Validation.static(%{self() => :ok}), :live_value)
+    assert_error(Schema.static(%{self() => :ok}), :live_value)
 
     field = Jido.Joi.integer()
     metadata = %{field.meta | metadata: %{self() => :ok}}
     schema = Jido.Joi.object(%{value: %{field | meta: metadata}})
 
-    assert_error(Validation.schema(schema), :live_value)
+    assert_error(Schema.schema(schema), :live_value)
   end
 
   @tag obligation: ["jido.agent.I9", "jido.agent.I22"]
   test "state schemas reject malformed fields and every conversion type" do
     malformed = Map.put(Jido.Joi.map(), :fields, %{})
-    assert_error(Validation.schema(malformed), :invalid_schema)
+    assert_error(Schema.schema(malformed), :invalid_schema)
 
     codec =
       Jido.Joi.codec(Jido.Joi.string(), Jido.Joi.integer(),
@@ -59,7 +59,7 @@ defmodule Jido.Agent.ValidationDataContractTest do
       )
 
     assert {:error, %Error{code: :invalid_schema, message: message}} =
-             Validation.schema(Jido.Joi.object(%{value: codec}))
+             Schema.schema(Jido.Joi.object(%{value: codec}))
 
     assert message != ""
   end
@@ -67,17 +67,17 @@ defmodule Jido.Agent.ValidationDataContractTest do
   @tag obligation: ["jido.agent.I8", "jido.agent.I22"]
   test "initialization cannot strip Map keys or convert list values" do
     assert_error(
-      Validation.parse_value(Jido.Joi.object(%{}), %{unknown: 1}),
+      Schema.parse_value(Jido.Joi.object(%{}), %{unknown: 1}),
       :state_conversion
     )
 
     assert_error(
-      Validation.parse_value(Jido.Joi.list(Jido.Joi.integer(coerce: true)), ["1", 2]),
+      Schema.parse_value(Jido.Joi.list(Jido.Joi.integer(coerce: true)), ["1", 2]),
       :state_conversion
     )
 
     assert_error(
-      Validation.parse_value(
+      Schema.parse_value(
         Jido.Joi.object(%{nested: Jido.Joi.object(%{value: Jido.Joi.integer(coerce: true)})}),
         %{nested: %{value: "1"}}
       ),
@@ -85,7 +85,7 @@ defmodule Jido.Agent.ValidationDataContractTest do
     )
 
     assert {:error, %Error{code: :invalid_state, message: message, details: %{issues: issues}}} =
-             Validation.parse_value(Jido.Joi.integer(), "bad")
+             Schema.parse_value(Jido.Joi.integer(), "bad")
 
     assert message != ""
     assert [%{} | _] = issues
@@ -94,7 +94,7 @@ defmodule Jido.Agent.ValidationDataContractTest do
   @tag obligation: ["jido.agent.I9", "jido.agent.I22"]
   test "stored-state failures distinguish conversion from missing data" do
     assert_error(
-      Validation.complete(Jido.Joi.object(%{value: Jido.Joi.integer(coerce: true)}), %{value: "1"}),
+      Schema.complete(Jido.Joi.object(%{value: Jido.Joi.integer(coerce: true)}), %{value: "1"}),
       :state_conversion
     )
 
@@ -103,7 +103,7 @@ defmodule Jido.Agent.ValidationDataContractTest do
               code: :incomplete_state,
               message: message,
               details: %{issues: issues}
-            }} = Validation.complete(Jido.Joi.object(%{value: Jido.Joi.integer()}), %{})
+            }} = Schema.complete(Jido.Joi.object(%{value: Jido.Joi.integer()}), %{})
 
     assert message != ""
     assert [%{code: :required, path: [:value]} | _] = issues
@@ -111,8 +111,8 @@ defmodule Jido.Agent.ValidationDataContractTest do
 
   @tag obligation: ["jido.agent.I21", "jido.agent.I22"]
   test "Signal paths reject malformed values with their source" do
-    assert_error(Validation.path("bad..path"), :invalid_path, %{path: "bad..path"})
-    assert_error(Validation.path(42), :invalid_path)
-    assert_error(Validation.exact("event.*"), :wildcard_type)
+    assert_error(Schema.path("bad..path"), :invalid_path, %{path: "bad..path"})
+    assert_error(Schema.path(42), :invalid_path)
+    assert_error(Schema.exact("event.*"), :wildcard_type)
   end
 end

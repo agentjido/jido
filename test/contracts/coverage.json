@@ -2142,7 +2142,7 @@
           "testable": true,
           "tests": [
             "test public callback records keep their exact read-only fields",
-            "test the live Plugin API exposes only the state facade and callback records"
+            "test the live Plugin API exposes its state owner and callback records"
           ]
         },
         "jido.agent_server.plugin_runtime.I2": {
