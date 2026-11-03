@@ -352,7 +352,7 @@ defmodule JidoTest.AgentServer.HandoffTest do
   end
 
   defmodule TerminalStorage do
-    @behaviour Jido.Persistence.Adapter
+    @behaviour Jido.Persistence.Store
 
     def get(key, opts), do: Jido.Persistence.File.get(key, opts)
 

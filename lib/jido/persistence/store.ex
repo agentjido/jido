@@ -22,12 +22,35 @@ defmodule Jido.Persistence.Store do
   keys, values, tokens, or adapter options.
   """
 
-  alias Jido.Persistence.{Adapter, AdapterOps}
+  alias Jido.Error
   alias Jido.Telemetry.Semantic
 
+  @type key :: binary()
+  @type value :: binary()
+  @type token :: nonempty_binary()
+  @type options :: keyword()
+  @type condition :: :not_found | value() | {:token, token()}
   @type config :: {module(), keyword()}
   @type declaration :: module() | config() | nil | false
-  @type condition :: Adapter.condition()
+
+  @doc "Validates Store options before an operation starts."
+  @callback validate_options(options()) :: :ok | {:error, term()}
+
+  @doc "Gets one binary value and an optional opaque read token."
+  @callback get(key(), options()) ::
+              {:ok, value()} | {:ok, value(), token()} | {:error, term()}
+
+  @doc "Stores one value for explicit maintenance and replaces any prior value."
+  @callback put(key(), value(), options()) :: :ok | {:error, term()}
+
+  @doc "Atomically writes one value when the supplied read condition still holds."
+  @callback compare_and_swap(key(), condition(), value(), options()) ::
+              :ok | {:error, term()}
+
+  @doc "Physically deletes one value for explicit maintenance."
+  @callback delete(key(), options()) :: :ok | {:error, term()}
+
+  @optional_callbacks validate_options: 1, put: 3, delete: 2
 
   @doc "Validates a byte adapter and returns its normalized configuration."
   @spec open(declaration()) :: {:ok, config()} | {:error, term()}
@@ -47,7 +70,7 @@ defmodule Jido.Persistence.Store do
       when is_atom(adapter) and is_list(opts) and is_binary(key) do
     if Keyword.keyword?(opts) do
       observe(:load, adapter, fn ->
-        AdapterOps.protect(:get, fn -> AdapterOps.get(adapter, key, opts) end)
+        protect(:get, fn -> get(adapter, key, opts) end)
       end)
     else
       {:error, {:invalid_persistence_config, :options}}
@@ -64,7 +87,7 @@ defmodule Jido.Persistence.Store do
     with true <- Keyword.keyword?(opts),
          :ok <- validate_condition(expected) do
       observe(:compare_and_swap, adapter, fn ->
-        AdapterOps.compare_and_swap(adapter, key, expected, value, opts)
+        safe_compare_and_swap(adapter, key, expected, value, opts)
       end)
     else
       false -> {:error, {:rejected, {:invalid_store_input, :options}}}
@@ -74,6 +97,32 @@ defmodule Jido.Persistence.Store do
 
   def compare_and_swap(_config, _key, _expected, _value),
     do: {:error, {:rejected, {:invalid_store_input, :compare_and_swap}}}
+
+  @doc false
+  def delete({adapter, opts}, key)
+      when is_atom(adapter) and is_list(opts) and is_binary(key) do
+    cond do
+      not Keyword.keyword?(opts) ->
+        {:error, {:invalid_persistence_config, :options}}
+
+      function_exported?(adapter, :delete, 2) ->
+        observe(:delete, adapter, fn -> protect(:delete, fn -> adapter.delete(key, opts) end) end)
+
+      true ->
+        :ok
+    end
+  end
+
+  def delete(_config, _key), do: {:error, {:invalid_store_input, :delete}}
+
+  @doc false
+  def protect(operation, fun) do
+    fun.()
+  rescue
+    error -> persistence_failure(operation, :error, error)
+  catch
+    kind, reason -> persistence_failure(operation, kind, reason)
+  end
 
   @doc false
   @spec normalize_adapter(term()) :: config() | nil
@@ -129,6 +178,89 @@ defmodule Jido.Persistence.Store do
   end
 
   defp invalid_adapter(adapter), do: {:error, {:invalid_persistence_adapter, adapter}}
+
+  defp get(adapter, key, opts) do
+    case adapter.get(key, opts) do
+      {:ok, value} when is_binary(value) ->
+        {:ok, value, value}
+
+      {:ok, value, token} when is_binary(value) and is_binary(token) and byte_size(token) > 0 ->
+        {:ok, value, {:token, token}}
+
+      result when is_tuple(result) and tuple_size(result) > 2 and elem(result, 0) == :ok ->
+        invalid_adapter_result(:get, :invalid_token_read)
+
+      {:error, _reason} = error ->
+        error
+
+      result ->
+        invalid_adapter_result(:get, result)
+    end
+  end
+
+  defp safe_compare_and_swap(adapter, key, expected, value, opts) do
+    result =
+      try do
+        adapter.compare_and_swap(key, expected, value, opts)
+      rescue
+        error -> {:callback_fault, :error, error}
+      catch
+        kind, reason -> {:callback_fault, kind, reason}
+      end
+
+    case result do
+      :ok ->
+        :ok
+
+      {:error, :conflict} = error ->
+        error
+
+      {:error, {:rejected, _reason}} = error ->
+        error
+
+      {:error, :indeterminate} = error ->
+        error
+
+      {:error, {:indeterminate, _reason}} = error ->
+        error
+
+      {:error, reason} ->
+        {:error, {:indeterminate, reason}}
+
+      {:callback_fault, kind, reason} ->
+        {:error, {:indeterminate, persistence_failure_value(:compare_and_swap, kind, reason)}}
+
+      invalid ->
+        {:error, {:indeterminate, invalid_adapter_result_value(:compare_and_swap, invalid)}}
+    end
+  end
+
+  defp invalid_adapter_result(operation, result),
+    do: {:error, invalid_adapter_result_value(operation, result)}
+
+  defp persistence_failure(operation, kind, reason),
+    do: {:error, persistence_failure_value(operation, kind, reason)}
+
+  defp invalid_adapter_result_value(operation, result) do
+    Error.execution_error("Persistence adapter returned an invalid result",
+      details: %{
+        code: :persistence_invalid_callback_result,
+        operation: operation,
+        result: result
+      }
+    )
+  end
+
+  defp persistence_failure_value(operation, kind, reason) do
+    Error.execution_error("Persistence adapter operation failed",
+      details: %{
+        code: :persistence_callback_failed,
+        operation: operation,
+        kind: kind,
+        reason: reason
+      }
+    )
+  end
 
   defp validate_condition(:not_found), do: :ok
   defp validate_condition(value) when is_binary(value), do: :ok

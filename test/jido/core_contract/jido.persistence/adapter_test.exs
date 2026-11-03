@@ -18,7 +18,7 @@ defmodule JidoTest.Persistence.AdapterTest do
   end
 
   defmodule MinimalAdapter do
-    @behaviour Jido.Persistence.Adapter
+    @behaviour Jido.Persistence.Store
 
     @impl true
     def get(_key, _opts), do: {:error, :not_found}
@@ -28,7 +28,7 @@ defmodule JidoTest.Persistence.AdapterTest do
   end
 
   defmodule RejectingAdapter do
-    @behaviour Jido.Persistence.Adapter
+    @behaviour Jido.Persistence.Store
 
     @impl true
     def validate_options(_opts), do: {:error, :rejected}
@@ -44,7 +44,7 @@ defmodule JidoTest.Persistence.AdapterTest do
   end
 
   defmodule FaultyValidatorAdapter do
-    @behaviour Jido.Persistence.Adapter
+    @behaviour Jido.Persistence.Store
 
     @impl true
     def validate_options(opts) do

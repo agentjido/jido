@@ -2,7 +2,7 @@ defmodule JidoTest.Persistence.ApiTest do
   use Covenant.Case, component: "jido.persistence", async: true
 
   alias Jido.Persistence
-  alias Jido.Persistence.{Adapter, Plugin, S3, Snapshot, Store}
+  alias Jido.Persistence.{Plugin, S3, Snapshot, Store}
   alias Jido.Persistence.Plugin.Context
 
   @tag obligation: [
@@ -28,7 +28,6 @@ defmodule JidoTest.Persistence.ApiTest do
     assert documented_functions(Plugin) == []
 
     assert public_module?(Persistence)
-    assert public_module?(Adapter)
     assert public_module?(Store)
     assert public_module?(Plugin)
     assert public_module?(Context)
@@ -37,8 +36,8 @@ defmodule JidoTest.Persistence.ApiTest do
   end
 
   @tag obligation: ["jido.persistence.I1", "jido.persistence.I3", "jido.persistence.I4"]
-  test "the Adapter behavior has one required read and atomic write contract" do
-    assert Adapter.behaviour_info(:callbacks) |> Enum.sort() ==
+  test "the Store behavior has one required read and atomic write contract" do
+    assert Store.behaviour_info(:callbacks) |> Enum.sort() ==
              [
                compare_and_swap: 4,
                delete: 2,
@@ -47,7 +46,7 @@ defmodule JidoTest.Persistence.ApiTest do
                validate_options: 1
              ]
 
-    assert Adapter.behaviour_info(:optional_callbacks) |> Enum.sort() ==
+    assert Store.behaviour_info(:optional_callbacks) |> Enum.sort() ==
              [delete: 2, put: 3, validate_options: 1]
   end
 

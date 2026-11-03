@@ -10,7 +10,7 @@ defmodule Jido.Persistence.Redis do
   value atomically, including its TTL. The Redis connection must permit EVAL.
   """
 
-  @behaviour Jido.Persistence.Adapter
+  @behaviour Jido.Persistence.Store
 
   @default_prefix "jido"
 

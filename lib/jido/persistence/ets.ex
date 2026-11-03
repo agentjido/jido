@@ -10,7 +10,7 @@ defmodule Jido.Persistence.ETS do
   The `:table` option selects the base table name. The default is `:jido_persistence`.
   """
 
-  @behaviour Jido.Persistence.Adapter
+  @behaviour Jido.Persistence.Store
 
   @default_table :jido_persistence
 

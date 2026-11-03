@@ -55,7 +55,7 @@ defmodule JidoTest.AgentServer.DurableTurn.WaitIntegrationTest do
   end
 
   defmodule FaultStorage do
-    @behaviour Jido.Persistence.Adapter
+    @behaviour Jido.Persistence.Store
     def get(key, opts), do: Jido.Persistence.File.get(key, opts)
 
     def compare_and_swap(key, expected, bytes, opts) do

@@ -41,7 +41,7 @@ defmodule Jido.Persistence.S3 do
   can use the key.
   """
 
-  @behaviour Jido.Persistence.Adapter
+  @behaviour Jido.Persistence.Store
 
   @max_object_bytes 5_000_000
   @default_timeout_ms 5_000

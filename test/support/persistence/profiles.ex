@@ -93,7 +93,7 @@ defmodule JidoTest.Persistence.Profiles do
   defp persistence_adapter?(module) do
     case Code.ensure_loaded(module) do
       {:module, ^module} ->
-        Jido.Persistence.Adapter in List.wrap(module.module_info(:attributes)[:behaviour])
+        Jido.Persistence.Store in List.wrap(module.module_info(:attributes)[:behaviour])
 
       {:error, _reason} ->
         false

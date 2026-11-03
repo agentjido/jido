@@ -6,7 +6,7 @@ defmodule JidoTest.Persistence.TokenTest do
   alias JidoTest.AgentFixtures.CounterAgent
 
   defmodule TokenAdapter do
-    @behaviour Jido.Persistence.Adapter
+    @behaviour Jido.Persistence.Store
 
     @impl true
     def get(key, opts) do

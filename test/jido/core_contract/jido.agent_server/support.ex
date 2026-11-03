@@ -12,7 +12,7 @@ defmodule JidoTest.AgentServer.Fixtures do
 
   defmodule ControlStorage do
     @moduledoc false
-    @behaviour Jido.Persistence.Adapter
+    @behaviour Jido.Persistence.Store
 
     def get(key, opts), do: JidoTest.Persistence.ProbeStore.get(key, opts)
 

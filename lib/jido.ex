@@ -95,7 +95,7 @@ defmodule Jido do
     - `:namespace` - Nonempty binary for stable Agent Ref operations.
       Required for persistent Agents.
       One exact namespace can be bound to one live local instance per node.
-    - `:persistence` - Optional `Jido.Persistence.Adapter` module or
+    - `:persistence` - Optional `Jido.Persistence.Store` module or
       `{module, options}` tuple. The default is no durable persistence.
 
   ## Example

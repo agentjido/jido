@@ -8,7 +8,7 @@ defmodule JidoTest.Persistence.ProbeStore do
   can activate an Agent before it injects the write fault.
   """
   use Elixir.Agent
-  @behaviour Jido.Persistence.Adapter
+  @behaviour Jido.Persistence.Store
 
   def start_link(_opts), do: Elixir.Agent.start_link(fn -> %{} end)
 

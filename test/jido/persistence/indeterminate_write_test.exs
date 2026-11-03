@@ -8,7 +8,7 @@ defmodule JidoTest.Persistence.IndeterminateWriteTest do
   alias JidoTest.Persistence.ProbeStore, as: Store
 
   defmodule LostReply do
-    @behaviour Jido.Persistence.Adapter
+    @behaviour Jido.Persistence.Store
     defdelegate get(key, opts), to: Store
     defdelegate put(key, value, opts), to: Store
     defdelegate delete(key, opts), to: Store

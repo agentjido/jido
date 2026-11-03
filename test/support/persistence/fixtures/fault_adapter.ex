@@ -3,7 +3,7 @@ defmodule JidoTest.Persistence.FaultAdapter do
 
   use Agent
 
-  @behaviour Jido.Persistence.Adapter
+  @behaviour Jido.Persistence.Store
 
   alias Jido.Persistence.Store
 

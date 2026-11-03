@@ -148,7 +148,7 @@ defmodule JidoTest.PersistenceTest do
   end
 
   defmodule RaisingAdapter do
-    @behaviour Jido.Persistence.Adapter
+    @behaviour Jido.Persistence.Store
 
     @impl true
     def get(_key, opts) do
@@ -168,7 +168,7 @@ defmodule JidoTest.PersistenceTest do
   end
 
   defmodule ReplyAdapter do
-    @behaviour Jido.Persistence.Adapter
+    @behaviour Jido.Persistence.Store
 
     @impl true
     def get(_key, opts), do: Keyword.get(opts, :get_reply, Keyword.fetch!(opts, :reply))
@@ -184,7 +184,7 @@ defmodule JidoTest.PersistenceTest do
   end
 
   defmodule CASFaultAdapter do
-    @behaviour Jido.Persistence.Adapter
+    @behaviour Jido.Persistence.Store
 
     @impl true
     def get(_key, _opts), do: {:error, :not_found}
@@ -200,7 +200,7 @@ defmodule JidoTest.PersistenceTest do
   end
 
   defmodule BarrierAdapter do
-    @behaviour Jido.Persistence.Adapter
+    @behaviour Jido.Persistence.Store
 
     @impl true
     def get(key, opts) do

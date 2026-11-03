@@ -2,7 +2,8 @@ defmodule JidoTest.Persistence.SourceTest do
   use ExUnit.Case, async: false
   use Covenant.Case, component: "jido.persistence", async: false
 
-  alias Jido.Persistence.{ETS, Source}
+  alias Jido.Persistence
+  alias Jido.Persistence.ETS
 
   defmodule ConfiguredSource do
     def __jido_persistence__,
@@ -17,7 +18,7 @@ defmodule JidoTest.Persistence.SourceTest do
   test "module and live instance sources resolve one selected adapter" do
     default = {ETS, table: :persistence_source_default}
     assert {:ok, ^default} = Jido.Persistence.resolve_config(:inherit, ConfiguredSource)
-    assert {:ok, ^default, ConfiguredSource} = Source.resolve(ConfiguredSource, [])
+    assert {:ok, ^default, ConfiguredSource} = Persistence.resolve_source(ConfiguredSource, [])
 
     live = {ETS, table: :persistence_source_live}
     namespace = "persistence/source/#{System.unique_integer([:positive])}"
@@ -28,10 +29,10 @@ defmodule JidoTest.Persistence.SourceTest do
     )
 
     assert {:ok, ^live} = Jido.Persistence.resolve_config(:inherit, ConfiguredSource)
-    assert {:ok, ^live, ConfiguredSource} = Source.resolve(ConfiguredSource, [])
+    assert {:ok, ^live, ConfiguredSource} = Persistence.resolve_source(ConfiguredSource, [])
 
     assert {:ok, ^live, :explicit_instance} =
-             Source.resolve(ConfiguredSource, instance: :explicit_instance)
+             Persistence.resolve_source(ConfiguredSource, instance: :explicit_instance)
 
     runtime_name = :"persistence_source_runtime_#{System.unique_integer([:positive])}"
 
@@ -40,7 +41,7 @@ defmodule JidoTest.Persistence.SourceTest do
       id: {Jido, runtime_name}
     )
 
-    assert {:ok, ^live, ^runtime_name} = Source.resolve(runtime_name, [])
+    assert {:ok, ^live, ^runtime_name} = Persistence.resolve_source(runtime_name, [])
   end
 
   @tag obligation: "jido.persistence.I1"
@@ -51,29 +52,29 @@ defmodule JidoTest.Persistence.SourceTest do
     assert {:ok, nil} = Jido.Persistence.resolve_config(:inherit, String)
     assert {:ok, nil} = Jido.Persistence.resolve_config(:inherit, 123)
     assert {:ok, nil} = Jido.Persistence.resolve_config(:inherit, DisabledSource)
-    assert {:error, :persistence_not_configured} = Source.resolve(nil, [])
+    assert {:error, :persistence_not_configured} = Persistence.resolve_source(nil, [])
 
     process_name = :"persistence_source_process_#{System.unique_integer([:positive])}"
     process = start_supervised!({Agent, fn -> :ok end}, id: process_name)
     Process.register(process, process_name)
 
     assert {:error, {:invalid_persistence_adapter, ^process_name}} =
-             Source.resolve(process_name, [])
+             Persistence.resolve_source(process_name, [])
 
     assert {:error, {:invalid_persistence_options, [:not_keyword]}} =
-             Source.validate_operation_options([:not_keyword])
+             Persistence.validate_operation_options([:not_keyword])
 
     assert {:error, {:unsupported_persistence_option, :write_authority}} =
-             Source.validate_operation_options(write_authority: :removed)
+             Persistence.validate_operation_options(write_authority: :removed)
 
     assert {:error, {:unsupported_persistence_options, [:unknown]}} =
-             Source.validate_operation_options(unknown: true)
+             Persistence.validate_operation_options(unknown: true)
 
     assert {:error, {:invalid_persistence_options, {:duplicate_options, [:namespace]}}} =
-             Source.validate_operation_options(namespace: "one", namespace: "two")
+             Persistence.validate_operation_options(namespace: "one", namespace: "two")
 
     assert {:error, {:unsupported_persistence_options, [:revision]}} =
-             Source.validate_operation_options([revision: 1], [:namespace])
+             Persistence.validate_operation_options([revision: 1], [:namespace])
 
     for option <- [
           :expected_revision,
@@ -84,7 +85,7 @@ defmodule JidoTest.Persistence.SourceTest do
           :revision,
           :server_turn
         ] do
-      assert :ok = Source.validate_operation_options([{option, :value}])
+      assert :ok = Persistence.validate_operation_options([{option, :value}])
     end
   end
 end

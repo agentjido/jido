@@ -23,7 +23,7 @@ if Code.ensure_loaded?(Ecto.Query) and Code.ensure_loaded?(Ecto.Adapters.SQL) do
   defmodule Jido.Persistence.Ecto.Implementation do
     @moduledoc false
 
-    @behaviour Jido.Persistence.Adapter
+    @behaviour Jido.Persistence.Store
 
     @default_schema Jido.Persistence.Ecto.Record
     @supported_adapters [
@@ -277,7 +277,7 @@ defmodule Jido.Persistence.Ecto do
   @moduledoc """
   Ecto SQL persistence adapter for binary keys and values.
 
-  This adapter keeps the `Jido.Persistence.Adapter` byte contract. It does not
+  This adapter keeps the `Jido.Persistence.Store` byte contract. It does not
   decode domain records or change their semantics. The required `:repo`
   option selects a running Ecto repository. The optional `:schema` defaults to
   `Jido.Persistence.Ecto.Record`. The optional `:repo_options` keyword list is
@@ -329,7 +329,7 @@ defmodule Jido.Persistence.Ecto do
   fields and set it with `:schema`.
   """
 
-  @behaviour Jido.Persistence.Adapter
+  @behaviour Jido.Persistence.Store
 
   @implementation Jido.Persistence.Ecto.Implementation
   @unavailable "requires the optional :ecto_sql dependency at compile time"

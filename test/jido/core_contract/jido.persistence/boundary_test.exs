@@ -8,13 +8,13 @@ defmodule Jido.Persistence.BoundaryTest do
   alias JidoTest.AgentFixtures.CounterAgent, as: Basic
 
   defmodule ReadAdapter do
-    @behaviour Jido.Persistence.Adapter
+    @behaviour Jido.Persistence.Store
     def get(key, opts), do: Keyword.fetch!(opts, :read).(key)
     def compare_and_swap(_key, _expected, _value, _opts), do: flunk("unexpected storage write")
   end
 
   defmodule RecordingAdapter do
-    @behaviour Jido.Persistence.Adapter
+    @behaviour Jido.Persistence.Store
 
     def validate_options(opts) do
       send(Keyword.fetch!(opts, :observer), {:adapter_call, :validate_options})

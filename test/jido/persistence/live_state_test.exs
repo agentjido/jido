@@ -111,7 +111,7 @@ defmodule JidoTest.Persistence.LiveStateTest do
   end
 
   defmodule RejectedStorage do
-    @behaviour Jido.Persistence.Adapter
+    @behaviour Jido.Persistence.Store
     defdelegate validate_options(opts), to: ETS
     defdelegate get(key, opts), to: ETS
     defdelegate put(key, value, opts), to: ETS

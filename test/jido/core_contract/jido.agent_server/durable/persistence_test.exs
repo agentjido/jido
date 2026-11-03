@@ -10,7 +10,7 @@ defmodule JidoTest.AgentServer.Durable.PersistenceTest do
 
   defmodule Storage do
     use Elixir.Agent
-    @behaviour Jido.Persistence.Adapter
+    @behaviour Jido.Persistence.Store
     def start_link(_), do: Elixir.Agent.start_link(fn -> %{read: :ok, write: :ok} end)
 
     def configure(opts, kind, mode),

@@ -5,7 +5,7 @@ defmodule JidoTest.Persistence.StoreTest do
   alias Jido.Persistence.Store
 
   defmodule MemoryAdapter do
-    @behaviour Jido.Persistence.Adapter
+    @behaviour Jido.Persistence.Store
 
     @impl true
     def get(key, opts) do
@@ -41,7 +41,7 @@ defmodule JidoTest.Persistence.StoreTest do
   end
 
   defmodule ReplyAdapter do
-    @behaviour Jido.Persistence.Adapter
+    @behaviour Jido.Persistence.Store
 
     @impl true
     def get(key, opts), do: Keyword.fetch!(opts, :read).(key)

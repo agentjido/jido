@@ -1,6 +1,6 @@
 defmodule Jido.AgentServer.DurableTurn.CheckpointStore do
   @moduledoc false
-  alias Jido.Persistence.{AdapterOps, Store}
+  alias Jido.Persistence.Store
   alias Jido.Exec.Frame.Delta
   alias Jido.Exec.Waits
   alias Jido.AgentServer.DurableTurn.JoinCompletedRef
@@ -468,10 +468,7 @@ defmodule Jido.AgentServer.DurableTurn.CheckpointStore do
     end
   end
 
-  defp delete_record({adapter, opts}, key) do
-    if function_exported?(adapter, :delete, 2),
-      do: AdapterOps.protect(:delete, fn -> adapter.delete(key, opts) end)
-  end
+  defp delete_record(config, key), do: Store.delete(config, key)
 
   defp key(id), do: @prefix <> Base.url_encode64(:erlang.term_to_binary(id), padding: false)
 

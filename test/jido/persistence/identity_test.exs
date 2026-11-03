@@ -8,7 +8,7 @@ defmodule Jido.Persistence.IdentityTest do
   alias JidoTest.AgentRuntimeFixtures.RuntimeAgent
 
   defmodule BarrierAdapter do
-    @behaviour Jido.Persistence.Adapter
+    @behaviour Jido.Persistence.Store
     defdelegate get(key, opts), to: ETS
 
     def compare_and_swap(key, expected, value, opts) do

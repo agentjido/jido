@@ -7,7 +7,7 @@ defmodule JidoTest.Persistence.RecordLifecycleTest do
   alias JidoTest.AgentRuntimeFixtures.RuntimeAgent
 
   defmodule BarrierAdapter do
-    @behaviour Jido.Persistence.Adapter
+    @behaviour Jido.Persistence.Store
 
     @impl true
     def get(key, opts) do

@@ -1,8 +1,6 @@
 ---
 modules:
   - Jido.Persistence
-  - Jido.Persistence.Adapter
-  - Jido.Persistence.AdapterOps
   - Jido.Persistence.AgentCheckpoint
   - Jido.Persistence.Checkpoint
   - Jido.Persistence.Identity
@@ -10,7 +8,6 @@ modules:
   - Jido.Persistence.Plugin.Context
   - Jido.Persistence.Record
   - Jido.Persistence.Snapshot
-  - Jido.Persistence.Source
   - Jido.Persistence.Store
 ---
 
@@ -22,7 +19,7 @@ state conversion, revisions, and logical deletion. It uses the strict
 `Jido.Codec.Term` contract.
 
 The supported public boundary is `Jido.Persistence`,
-`Jido.Persistence.Adapter`, `Jido.Persistence.Store`,
+`Jido.Persistence.Store`,
 `Jido.Persistence.Plugin.Context`, and the bundled adapter modules. Snapshot,
 record, identity, callback, and adapter-operation modules are internal.
 

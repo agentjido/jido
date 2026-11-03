@@ -144,7 +144,7 @@ defmodule JidoTest.DurableFixtures do
   end
 
   defmodule Corrupt do
-    @behaviour Jido.Persistence.Adapter
+    @behaviour Jido.Persistence.Store
 
     def get(key, opts) do
       case Jido.Persistence.File.get(key, opts) do
@@ -165,7 +165,7 @@ defmodule JidoTest.DurableFixtures do
   end
 
   defmodule Storage do
-    @behaviour Jido.Persistence.Adapter
+    @behaviour Jido.Persistence.Store
     def get(key, opts), do: Jido.Persistence.File.get(key, opts)
 
     def compare_and_swap(key, expected, value, opts) do
@@ -193,7 +193,7 @@ defmodule JidoTest.DurableFixtures do
   end
 
   defmodule Reject do
-    @behaviour Jido.Persistence.Adapter
+    @behaviour Jido.Persistence.Store
     def get(key, opts), do: Jido.Persistence.File.get(key, opts)
 
     def compare_and_swap(key, expected, value, opts) do

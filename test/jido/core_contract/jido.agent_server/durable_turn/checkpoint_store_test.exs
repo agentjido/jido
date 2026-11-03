@@ -33,7 +33,7 @@ defmodule JidoTest.AgentServer.DurableTurn.CheckpointStoreTest do
   end
 
   defmodule Bytes do
-    @behaviour Jido.Persistence.Adapter
+    @behaviour Jido.Persistence.Store
 
     def get(key, opts) do
       Agent.get(opts[:store], fn records ->
@@ -81,7 +81,7 @@ defmodule JidoTest.AgentServer.DurableTurn.CheckpointStoreTest do
   end
 
   defmodule BarrierBytes do
-    @behaviour Jido.Persistence.Adapter
+    @behaviour Jido.Persistence.Store
     alias JidoTest.AgentServer.DurableTurn.CheckpointStoreTest.Bytes
 
     def get(key, opts), do: Bytes.get(key, opts)

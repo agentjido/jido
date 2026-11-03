@@ -52,13 +52,22 @@ defmodule Jido.Persistence do
   alias Jido.Agent
   alias Jido.Agent.Ref
   alias Jido.Error
-  alias Jido.Persistence.{AdapterOps, Checkpoint, Identity, Record, Source, Store}
+  alias Jido.Persistence.{Checkpoint, Identity, Record, Store}
   alias Jido.Telemetry.Persistence, as: PersistenceTelemetry
   alias Jido.Codec.Term
 
   @identity_options [:instance, :namespace, :partition]
   @create_options @identity_options ++ [:reason, :revision, :server_turn]
   @save_options @create_options ++ [:expected_revision]
+  @operation_options [
+    :expected_revision,
+    :instance,
+    :namespace,
+    :partition,
+    :reason,
+    :revision,
+    :server_turn
+  ]
 
   @typedoc "A direct persistence adapter declaration."
   @type adapter_config :: {module(), keyword()} | module() | nil | false
@@ -110,7 +119,7 @@ defmodule Jido.Persistence do
 
   @doc false
   @spec normalize_adapter(adapter_config()) :: {module(), keyword()} | nil
-  defdelegate normalize_adapter(config), to: Source
+  defdelegate normalize_adapter(config), to: Store
 
   @doc """
   Resolves and validates a persistence adapter configuration.
@@ -127,7 +136,50 @@ defmodule Jido.Persistence do
   """
   @spec resolve_config(:inherit | adapter_config(), atom() | nil) ::
           {:ok, {module(), keyword()} | nil} | {:error, term()}
-  defdelegate resolve_config(config, jido), to: Source
+  def resolve_config(:inherit, jido), do: resolve_instance_config(jido)
+  def resolve_config(nil, _jido), do: {:ok, nil}
+
+  def resolve_config(config, _jido) do
+    config
+    |> normalize_adapter_result()
+    |> validate_adapter_result()
+  end
+
+  @doc false
+  def resolve_source(source, opts) do
+    {config_result, default_instance} =
+      cond do
+        is_atom(source) and not is_nil(source) and
+            function_exported?(source, :__jido_persistence__, 0) ->
+          {resolve_instance_config(source), source}
+
+        live_instance?(source) ->
+          {resolve_instance_config(source), source}
+
+        true ->
+          {resolve_config(source, nil), nil}
+      end
+
+    with {:ok, config} <- config_result,
+         {:ok, config} <- require_adapter(config) do
+      {:ok, config, Keyword.get(opts, :instance, default_instance)}
+    end
+  end
+
+  @doc false
+  @spec validate_operation_options(term(), [atom()]) :: :ok | {:error, term()}
+  def validate_operation_options(opts, allowed \\ @operation_options) do
+    cond do
+      not Keyword.keyword?(opts) ->
+        {:error, {:invalid_persistence_options, opts}}
+
+      Keyword.has_key?(opts, :write_authority) ->
+        {:error, {:unsupported_persistence_option, :write_authority}}
+
+      true ->
+        validate_option_keys(Keyword.keys(opts), allowed)
+    end
+  end
 
   @doc """
   Saves one Agent checkpoint with an atomic revision check.
@@ -155,9 +207,9 @@ defmodule Jido.Persistence do
 
   def save_agent(source, %Agent{} = agent, opts) do
     PersistenceTelemetry.observe(:compare_and_swap, source, agent.module, agent.id, opts, fn ->
-      AdapterOps.protect(:compare_and_swap, fn ->
-        with :ok <- Source.validate_operation_options(opts, @save_options),
-             {:ok, {adapter, adapter_opts}, instance} <- Source.resolve(source, opts),
+      Store.protect(:compare_and_swap, fn ->
+        with :ok <- validate_operation_options(opts, @save_options),
+             {:ok, {adapter, adapter_opts}, instance} <- resolve_source(source, opts),
              {:ok, ref} <- Identity.resolve(instance, agent.id, opts),
              {:ok, record} <- build_record(agent, instance, opts, ref),
              {:ok, expected_revision} <- expected_revision(opts),
@@ -185,9 +237,9 @@ defmodule Jido.Persistence do
           :ok | {:error, term()}
   def create_agent(source, %Agent{} = agent, opts \\ []) do
     PersistenceTelemetry.observe(:compare_and_swap, source, agent.module, agent.id, opts, fn ->
-      AdapterOps.protect(:compare_and_swap, fn ->
-        with :ok <- Source.validate_operation_options(opts, @create_options),
-             {:ok, {adapter, adapter_opts}, instance} <- Source.resolve(source, opts),
+      Store.protect(:compare_and_swap, fn ->
+        with :ok <- validate_operation_options(opts, @create_options),
+             {:ok, {adapter, adapter_opts}, instance} <- resolve_source(source, opts),
              :ok <- validate_initial_revision(opts),
              {:ok, ref} <- Identity.resolve(instance, agent.id, opts),
              {:ok, record} <-
@@ -267,9 +319,9 @@ defmodule Jido.Persistence do
   def delete_agent(source, agent_module, agent_id, opts)
       when is_atom(agent_module) and is_binary(agent_id) do
     PersistenceTelemetry.observe(:delete, source, agent_module, agent_id, opts, fn ->
-      AdapterOps.protect(:delete, fn ->
-        with :ok <- Source.validate_operation_options(opts, @identity_options),
-             {:ok, {adapter, adapter_opts}, instance} <- Source.resolve(source, opts),
+      Store.protect(:delete, fn ->
+        with :ok <- validate_operation_options(opts, @identity_options),
+             {:ok, {adapter, adapter_opts}, instance} <- resolve_source(source, opts),
              {:ok, ref} <- Identity.resolve(instance, agent_id, opts) do
           delete_current(adapter, adapter_opts, ref, agent_module)
         end
@@ -296,9 +348,9 @@ defmodule Jido.Persistence do
   @doc false
   def load_agent_with_server_turn(source, agent_module, agent_id, opts) do
     PersistenceTelemetry.observe(:load, source, agent_module, agent_id, opts, fn ->
-      AdapterOps.protect(:get, fn ->
-        with :ok <- Source.validate_operation_options(opts, @identity_options),
-             {:ok, {adapter, adapter_opts}, instance} <- Source.resolve(source, opts),
+      Store.protect(:get, fn ->
+        with :ok <- validate_operation_options(opts, @identity_options),
+             {:ok, {adapter, adapter_opts}, instance} <- resolve_source(source, opts),
              {:ok, ref} <- Identity.resolve(instance, agent_id, opts),
              {:ok, value, _condition} <-
                Store.read({adapter, adapter_opts}, Identity.agent_key(ref)),
@@ -363,6 +415,68 @@ defmodule Jido.Persistence do
         {:error, :conflict}
     end
   end
+
+  defp validate_option_keys(keys, allowed) do
+    duplicate_keys = keys |> Enum.frequencies() |> duplicate_keys(keys)
+    unsupported_keys = keys |> Enum.reject(&(&1 in allowed)) |> Enum.uniq()
+
+    cond do
+      duplicate_keys != [] ->
+        {:error, {:invalid_persistence_options, {:duplicate_options, duplicate_keys}}}
+
+      unsupported_keys != [] ->
+        {:error, {:unsupported_persistence_options, unsupported_keys}}
+
+      true ->
+        :ok
+    end
+  end
+
+  defp duplicate_keys(frequencies, keys) do
+    keys
+    |> Enum.filter(&(Map.fetch!(frequencies, &1) > 1))
+    |> Enum.uniq()
+  end
+
+  defp resolve_instance_config(jido) do
+    config =
+      cond do
+        live_instance?(jido) ->
+          Jido.instance_persistence(jido)
+
+        is_atom(jido) and function_exported?(jido, :__jido_persistence__, 0) ->
+          jido.__jido_persistence__()
+
+        true ->
+          nil
+      end
+
+    config
+    |> normalize_adapter_result()
+    |> validate_adapter_result()
+  rescue
+    error -> {:error, {:invalid_persistence_config, error}}
+  end
+
+  defp live_instance?(source) when is_atom(source) and not is_nil(source) do
+    is_pid(Process.whereis(source)) and
+      is_pid(Process.whereis(Jido.runtime_store_name(source)))
+  end
+
+  defp live_instance?(_source), do: false
+
+  defp require_adapter(nil), do: {:error, :persistence_not_configured}
+  defp require_adapter(config), do: {:ok, config}
+
+  defp normalize_adapter_result(config) do
+    {:ok, normalize_adapter(config)}
+  rescue
+    error -> {:error, {:invalid_persistence_config, error}}
+  end
+
+  defp validate_adapter_result({:ok, nil}), do: {:ok, nil}
+  defp validate_adapter_result({:ok, config}), do: Store.open(config)
+  defp validate_adapter_result({:error, _reason} = error), do: error
 
   defp build_record(agent, instance, opts, ref) do
     partition = Keyword.get(opts, :partition)

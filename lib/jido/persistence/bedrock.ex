@@ -37,7 +37,7 @@ defmodule Jido.Persistence.Bedrock do
   Bedrock cluster durable.
   """
 
-  @behaviour Jido.Persistence.Adapter
+  @behaviour Jido.Persistence.Store
 
   @default_prefix "jido:persistence:"
   @default_timeout_in_ms 5_000
