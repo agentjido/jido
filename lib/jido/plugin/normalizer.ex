@@ -4,6 +4,7 @@ defmodule Jido.Plugin.Normalizer do
   alias Jido.Agent.Directive
   alias Jido.Agent.Plugin.Spec, as: AgentSpec
   alias Jido.AgentServer.Plugin.Spec, as: ServerSpec
+  alias Jido.Joi
   alias Jido.Persistence.Plugin.Spec, as: PersistenceSpec
   alias Jido.Plugin.{Manifest, Spec}
   alias Jido.Plugin, as: PluginBoundary
@@ -630,7 +631,7 @@ defmodule Jido.Plugin.Normalizer do
         schema: schema
       })
     else
-      case Jido.Codec.validate_static(schema) do
+      case Joi.validate_static(schema) do
         :ok ->
           {:ok, {key, schema}}
 
@@ -638,7 +639,7 @@ defmodule Jido.Plugin.Normalizer do
           PluginBoundary.validation_error("Plugin-owned Agent state schema must contain static data", %{
             plugin: package,
             state_key: key,
-            reason: Exception.message(reason)
+            reason: reason
           })
       end
     end

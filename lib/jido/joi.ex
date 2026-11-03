@@ -219,6 +219,10 @@ defmodule Jido.Joi do
     Jido.Joi.Runtime.validate(schema, value, opts)
   end
 
+  @doc "Checks that authoring data contains no runtime-only values or dynamic schema effects."
+  @spec validate_static(term()) :: :ok | {:error, String.t()}
+  def validate_static(term), do: validate_static_value(term, [])
+
   @doc "Project a Joi schema to the common Jido JSON Schema form."
   @spec to_json_schema(schema()) :: map()
   def to_json_schema(schema), do: Zoi.to_json_schema(schema)
@@ -230,6 +234,91 @@ defmodule Jido.Joi do
   def facade_complete? do
     Enum.sort(Zoi.__info__(:functions)) == facade_exports()
   end
+
+  defp validate_static_value(term, path) when is_function(term),
+    do: static_error("anonymous functions are not supported", path)
+
+  defp validate_static_value(term, path)
+       when is_pid(term) or is_port(term) or is_reference(term),
+       do: static_error("runtime process values are not supported", path)
+
+  defp validate_static_value(term, path) when is_map(term) do
+    case Jido.Joi.Schema.kind(term) do
+      :lazy ->
+        static_error("lazy schemas are not supported", path)
+
+      :meta ->
+        with :ok <- validate_static_effects(Jido.Joi.Schema.effects(term), path ++ [:effects]) do
+          term
+          |> Map.from_struct()
+          |> Map.delete(:effects)
+          |> validate_static_value(path)
+        end
+
+      _other ->
+        term
+        |> Map.to_list()
+        |> Enum.sort_by(fn {key, _value} -> :erlang.term_to_binary(key) end)
+        |> validate_static_pairs(path)
+    end
+  end
+
+  defp validate_static_value(term, path) when is_list(term),
+    do: validate_static_list(term, path, 0)
+
+  defp validate_static_value(term, path) when is_tuple(term),
+    do: validate_static_list(Tuple.to_list(term), path, 0)
+
+  defp validate_static_value(_term, _path), do: :ok
+
+  defp validate_static_pairs([], _path), do: :ok
+
+  defp validate_static_pairs([{key, value} | rest], path) do
+    with :ok <- validate_static_value(key, path ++ [:key]),
+         :ok <- validate_static_value(value, path ++ [key]),
+         do: validate_static_pairs(rest, path)
+  end
+
+  defp validate_static_list([], _path, _index), do: :ok
+
+  defp validate_static_list([value | rest], path, index) when is_list(rest) do
+    with :ok <- validate_static_value(value, path ++ [index]),
+         do: validate_static_list(rest, path, index + 1)
+  end
+
+  defp validate_static_list([value | _tail], path, index) do
+    with :ok <- validate_static_value(value, path ++ [index]),
+         do: static_error("improper list tails are not supported", path ++ [index + 1])
+  end
+
+  defp validate_static_effects(effects, path) when is_list(effects) do
+    effects
+    |> Enum.with_index()
+    |> Enum.reduce_while(:ok, fn {effect, index}, :ok ->
+      case validate_static_effect(effect, path ++ [index]) do
+        :ok -> {:cont, :ok}
+        {:error, reason} -> {:halt, {:error, reason}}
+      end
+    end)
+  end
+
+  defp validate_static_effects(_effects, path),
+    do: static_error("schema effects must be a list", path)
+
+  defp validate_static_effect({kind, {module, function, args}}, path)
+       when kind in [:refine, :transform] and is_atom(module) and is_atom(function) and
+              is_list(args),
+       do: validate_static_value(args, path ++ [1, 2])
+
+  defp validate_static_effect({kind, effect}, path)
+       when kind in [:refine, :transform] and is_function(effect),
+       do: static_error("anonymous functions are not supported", path ++ [1])
+
+  defp validate_static_effect(_effect, path),
+    do: static_error("custom schema effects must use {Module, :function, args} MFA values", path)
+
+  defp static_error(reason, []), do: {:error, reason}
+  defp static_error(reason, path), do: {:error, "#{reason} at #{inspect(path)}"}
 end
 
 defmodule Jido.Joi.ParseError do

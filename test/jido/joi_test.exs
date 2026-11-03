@@ -36,4 +36,23 @@ defmodule Jido.JoiTest do
   test "parse bang raises the facade exception" do
     assert_raise Joi.ParseError, fn -> Joi.parse!(Joi.integer(), "one") end
   end
+
+  test "static validation rejects live values with exact paths" do
+    assert Joi.validate_static(%{steps: [:one, self()]}) ==
+             {:error, "runtime process values are not supported at [:steps, 1]"}
+
+    assert Joi.validate_static([:one | :tail]) ==
+             {:error, "improper list tails are not supported at [1]"}
+  end
+
+  test "static validation accepts named schema effects and rejects anonymous effects" do
+    named = Joi.any() |> Joi.refine({__MODULE__, :accept, []})
+    anonymous = Joi.any() |> Joi.refine(fn _value -> :ok end)
+
+    assert :ok = Joi.validate_static(named)
+    assert {:error, message} = Joi.validate_static(anonymous)
+    assert message =~ "anonymous functions are not supported"
+  end
+
+  def accept(_value, _context), do: :ok
 end

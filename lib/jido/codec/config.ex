@@ -3,6 +3,7 @@ defmodule Jido.Codec.Config do
   @moduledoc false
 
   alias Jido.Catalog
+  alias Jido.Codec.Error, as: CodecError
   alias Jido.Error
 
   @keys [:name, :description, :schema, :output_schema]
@@ -90,8 +91,13 @@ defmodule Jido.Codec.Config do
 
   @doc false
   @spec validate_static_data(term()) ::
-          :ok | {:error, Jido.Codec.Error.InvalidError.t()}
-  def validate_static_data(term), do: Jido.Codec.validate_static(term)
+          :ok | {:error, CodecError.InvalidError.t()}
+  def validate_static_data(term) do
+    case Joi.validate_static(term) do
+      :ok -> :ok
+      {:error, message} -> {:error, CodecError.invalid(:non_static_data, message)}
+    end
+  end
 
   defp ensure_escapable_schema!(schema, option, env) do
     Macro.escape(schema)

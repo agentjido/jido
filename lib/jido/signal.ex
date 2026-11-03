@@ -466,7 +466,7 @@ defmodule Jido.Signal do
   end
 
   defp ensure_static_schema!(schema, env) do
-    case Jido.Joi.Static.validate(schema) do
+    case Jido.Joi.validate_static(schema) do
       :ok ->
         :ok
 

@@ -11,7 +11,6 @@ defmodule Jido.Catalog.Entry do
   @required_fields [:id, :vsn, :kind, :target, :provider, :application]
 
   alias Jido.Joi
-  alias Jido.Joi.Static
 
   @enforce_keys @required_fields
   defstruct @required_fields ++ [name: nil, description: nil]
@@ -131,7 +130,7 @@ defmodule Jido.Catalog.Entry do
   end
 
   defp validate_target(%__MODULE__{kind: :schema, target: target} = entry) do
-    with :ok <- Static.validate(target),
+    with :ok <- Joi.validate_static(target),
          true <- Joi.Schema.schema?(target),
          true <- Joi.Schema.map_shaped?(target) do
       {:ok, entry}
@@ -142,7 +141,7 @@ defmodule Jido.Catalog.Entry do
   end
 
   defp validate_target(%__MODULE__{target: target} = entry) do
-    case Static.validate(target) do
+    case Joi.validate_static(target) do
       :ok -> {:ok, entry}
       {:error, reason} -> {:error, {:invalid_catalog_entry, :target, reason}}
     end

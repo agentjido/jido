@@ -20,16 +20,14 @@ defmodule Jido.Codec do
   publication. Codec does not own persistence, execution, or automatic
   document upgrades.
 
-  The `Jido.Codec` namespace also owns the internal compile-time support that
-  makes definitions discoverable: static-data validation and the common Action
-  and Flow declaration contract. These helpers do not
-  add more runtime operations to this facade.
+  The `Jido.Codec` namespace also owns the common Action and Flow declaration
+  contract. `Jido.Joi.validate_static/1` owns authoring-data validation.
 
   An explicit `:catalog` option bypasses the published Catalog value.
   """
 
   alias Jido.Catalog
-  alias Jido.Codec.{Contract, Document, Error, Index, Issue, Static}
+  alias Jido.Codec.{Contract, Document, Error, Index, Issue}
 
   @default_maximum_json_bytes 8_388_608
   @catalog_snapshot_key {:jido, :catalog_snapshot}
@@ -77,15 +75,6 @@ defmodule Jido.Codec do
     maximum_bytes = maximum_json_bytes!(opts)
 
     decode_checked(document, opts, &Document.check_json(&1, maximum_bytes))
-  end
-
-  @doc "Checks that codec data contains no runtime-only values."
-  @spec validate_static(term()) :: :ok | {:error, Error.InvalidError.t()}
-  def validate_static(value) do
-    case Static.validate(value) do
-      :ok -> :ok
-      {:error, message} -> {:error, Error.invalid(:non_static_data, message)}
-    end
   end
 
   defp decode_checked(document, opts, check) do

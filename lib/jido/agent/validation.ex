@@ -106,7 +106,7 @@ defmodule Jido.Agent.Validation do
   end
 
   def static(value) do
-    case Jido.Codec.validate_static(value) do
+    case Joi.validate_static(value) do
       :ok ->
         :ok
 
