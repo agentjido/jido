@@ -383,7 +383,7 @@ defmodule Jido.Agent.ReplyDirectiveRuntimeTest do
     assert_receive %Signal{id: output_id, type: "work.reply", data: %{}} = delivered
     assert output_id == output.id
     assert Signal.get_context(delivered, "jidocausationid") == request.id
-    assert Signal.Trace.get(delivered) != nil
+    assert Signal.Context.get_trace(delivered) != nil
     assert AgentServer.status(server).state_version == 1
     assert AgentServer.agent(server) == committed
   end

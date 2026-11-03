@@ -10,7 +10,7 @@ defmodule Jido.AgentServer.Effects do
   alias Jido.AgentServer.TopologyRuntime
   alias Jido.Dispatch.Preparation, as: DispatchPreparation
   alias Jido.Signal
-  alias Jido.Tracing.Context, as: TraceContext
+  alias Jido.Trace.Context, as: TraceContext
 
   def validate_batch(directives, config) do
     limit = config.max_directives_per_turn
@@ -297,13 +297,13 @@ defmodule Jido.AgentServer.Effects do
     before = {
       correlated.id,
       Signal.get_context(correlated, "jidocausationid"),
-      Signal.Trace.get(correlated)
+      Signal.Context.get_trace(correlated)
     }
 
     after_preparation = {
       prepared.id,
       Signal.get_context(prepared, "jidocausationid"),
-      Signal.Trace.get(prepared)
+      Signal.Context.get_trace(prepared)
     }
 
     if before == after_preparation,

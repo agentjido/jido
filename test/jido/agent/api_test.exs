@@ -71,7 +71,7 @@ defmodule Jido.Agent.APITest do
 
   test "build_signal uses the Agent source and correlates the source Signal" do
     source = Signal.new!("request", %{}, source: "/caller")
-    {:ok, source, trace} = Signal.Trace.ensure(source)
+    {:ok, source, trace} = Signal.Context.ensure_trace(source)
 
     assert {:ok, output} =
              Agent.build_signal(
@@ -84,7 +84,8 @@ defmodule Jido.Agent.APITest do
     assert output.data == %{step: 1}
     assert output.source == "/counter"
     assert Signal.get_context(output, "jidocausationid") == source.id
-    assert Signal.Trace.get(output) == trace
+    output_trace = Signal.Context.get_trace(output)
+    assert %{output_trace | causation_id: nil} == trace
 
     assert {:error, %Jido.Error.ValidationError{}} =
              Agent.build_signal(%{}, "progress", %{step: 1})

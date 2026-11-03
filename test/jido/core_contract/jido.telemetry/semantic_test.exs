@@ -4,6 +4,7 @@ defmodule JidoTest.Telemetry.SemanticTest do
   @moduletag obligation: ["jido.telemetry.I2", "jido.telemetry.I3"]
 
   alias Jido.Telemetry.Semantic
+  alias Jido.Trace
 
   test "metadata normalization keeps only bounded semantic fields" do
     invalid_utf8 = <<255>>
@@ -313,7 +314,7 @@ defmodule JidoTest.Telemetry.SemanticTest do
     Application.put_env(:jido, :opentelemetry, enabled: false)
     on_exit(fn -> restore_env(:jido, :opentelemetry, previous) end)
 
-    trace = Jido.Signal.Trace.new(trace_flags: "01", tracestate: "vendor=value")
+    trace = Trace.new(trace_flags: "01", tracestate: "vendor=value")
 
     metadata = %{
       trace_id: "ignored",
@@ -321,7 +322,7 @@ defmodule JidoTest.Telemetry.SemanticTest do
       parent_span_id: String.duplicate("a", 16),
       causation_id: "signal-1",
       trace_flags: trace.trace_flags,
-      traceparent: Jido.Signal.Trace.to_traceparent(trace),
+      traceparent: Trace.to_traceparent(trace),
       tracestate: trace.tracestate,
       jido_instance: :inner
     }
@@ -381,7 +382,7 @@ defmodule JidoTest.Telemetry.SemanticTest do
     assert_receive {:exact_event, [:jido, :exact, :start], _, minimal_metadata}
     assert minimal.trace.trace_id == trace.trace_id
     assert minimal.trace.span_id == trace.span_id
-    assert minimal.trace.traceparent == metadata.traceparent
+    assert Trace.to_traceparent(minimal.trace) == metadata.traceparent
     assert minimal_metadata.trace_id == trace.trace_id
     assert minimal_metadata.span_id == trace.span_id
 

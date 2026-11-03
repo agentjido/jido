@@ -10,7 +10,8 @@ defmodule Jido.Signal.Telemetry do
   """
 
   alias Jido.Signal
-  alias Jido.Signal.Trace
+  alias Jido.Signal.Context
+  alias Jido.Trace
 
   @type event_name :: [atom()]
 
@@ -41,7 +42,7 @@ defmodule Jido.Signal.Telemetry do
   end
 
   defp add_signal_trace(metadata, signal) do
-    case Trace.get(signal) do
+    case Context.get_trace(signal) do
       %Trace{} = trace ->
         Map.merge(metadata, %{
           jido_trace_id: trace.trace_id,

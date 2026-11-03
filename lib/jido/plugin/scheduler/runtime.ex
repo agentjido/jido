@@ -8,7 +8,8 @@ defmodule Jido.Plugin.Scheduler.Runtime do
   alias Jido.Plugin.Scheduler
   alias Jido.Plugin.Scheduler.{Cancel, Cron, Schedule, WallClock}
   alias Jido.Signal
-  alias Jido.Tracing.Trace
+  alias Jido.Signal.Context, as: SignalContext
+  alias Jido.Trace
 
   def start_link(%Init{} = init), do: GenServer.start_link(__MODULE__, init)
 
@@ -406,9 +407,9 @@ defmodule Jido.Plugin.Scheduler.Runtime do
     do: propagate(signal, source)
 
   defp propagate(%Signal{} = signal, %Signal{} = source) do
-    case Trace.get(source) do
-      %{trace_id: _trace_id, span_id: _span_id} = trace ->
-        case Trace.put(signal, Trace.child_of(trace, source.id)) do
+    case SignalContext.get_trace(source) do
+      %Trace{} = trace ->
+        case SignalContext.put_trace(signal, Trace.child(trace, causation_id: source.id)) do
           {:ok, traced} -> traced
           {:error, _reason} -> signal
         end

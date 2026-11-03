@@ -137,7 +137,7 @@ defmodule Jido.Agent.RouteProjectionTest do
 
   defp request(data \\ %{}) do
     signal = Signal.new!("project", data, source: "/test")
-    {:ok, signal, trace} = Signal.Trace.ensure(signal)
+    {:ok, signal, trace} = Signal.Context.ensure_trace(signal)
     {signal, trace}
   end
 
@@ -163,7 +163,8 @@ defmodule Jido.Agent.RouteProjectionTest do
     assert reply.source == "/agent/route-projection"
     assert reply.data === reply_data
     assert reply.id != source.id
-    assert Signal.Trace.get(reply) == trace
+    reply_trace = Signal.Context.get_trace(reply)
+    assert %{reply_trace | causation_id: nil} == trace
     assert Signal.get_context(reply, "jidocausationid") == source.id
   end
 
@@ -262,8 +263,10 @@ defmodule Jido.Agent.RouteProjectionTest do
     {source, trace} = request(%{reply: %{value: 1}})
 
     manual_signal = Signal.new!("manual.done", %{}, source: "/manual")
-    {:ok, manual_signal} = Signal.Trace.put(manual_signal, trace)
-    {:ok, manual_signal} = Signal.put_context(manual_signal, "jidocausationid", source.id)
+
+    {:ok, manual_signal} =
+      Signal.Context.put_trace(manual_signal, Jido.Trace.with_causation(trace, source.id))
+
     manual = Directive.reply(manual_signal)
     source = %{source | data: Map.put(source.data, :directives, [manual])}
 

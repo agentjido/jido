@@ -9,8 +9,9 @@ defmodule JidoTest.AgentServer.Effects.CoreTest do
   alias Jido.AgentServer.Directive.ServerStop
   alias Jido.AgentServer, as: Server
   alias Jido.Error.ValidationError
-  alias Jido.Tracing.Context
-  alias Jido.Tracing.Trace
+  alias Jido.Signal.Context, as: SignalContext
+  alias Jido.Trace
+  alias Jido.Trace.Context
   alias JidoTest.AgentServer.Fixtures, as: F
 
   defmodule UnownedEffect do
@@ -146,14 +147,14 @@ defmodule JidoTest.AgentServer.Effects.CoreTest do
             dispatch: {:pid, target: self()}
           }
 
-    parent = Trace.new_root()
-    {:ok, signal} = Trace.put(batch_signal(effects), parent)
+    parent = Trace.new()
+    {:ok, signal} = SignalContext.put_trace(batch_signal(effects), parent)
     assert {:ok, _, ^effects} = Server.call(server, signal)
     assert_receive {:signal, first}, 1_000
     assert_receive {:signal, second}, 1_000
     assert [first.data.label, second.data.label] == [1, 2]
-    assert Trace.get(first).trace_id == parent.trace_id
-    assert Trace.get(first).causation_id == signal.id
+    assert SignalContext.get_trace(first).trace_id == parent.trace_id
+    assert SignalContext.get_trace(first).causation_id == signal.id
     assert_eventually(Server.status(server).phase == :idle)
     assert Server.status(server).last_effect_outcome.completed == 2
     F.clean(c.runner)

@@ -4,7 +4,9 @@ defmodule JidoTest.Telemetry.ContextTest do
   @moduletag obligation: ["jido.telemetry.I5", "jido.telemetry.I6"]
 
   alias Jido.Signal
-  alias Jido.Tracing.{Context, Trace}
+  alias Jido.Signal.Context, as: SignalContext
+  alias Jido.Trace
+  alias Jido.Trace.Context
 
   setup do
     Context.clear()
@@ -16,22 +18,22 @@ defmodule JidoTest.Telemetry.ContextTest do
     trace = Context.begin_turn(signal)
 
     assert Context.get() == trace
-    assert is_binary(trace.traceparent)
-    refute Map.has_key?(trace, :parent_span_id)
-    assert Trace.get(signal) == nil
+    assert is_binary(Trace.to_traceparent(trace))
+    assert trace.parent_span_id == nil
+    assert SignalContext.get_trace(signal) == nil
   end
 
   test "an incoming carrier becomes the parent of the local Turn" do
-    parent = Trace.new_root()
+    parent = Trace.new()
     signal = Signal.new!("test.trace.incoming", %{}, source: "/test")
-    assert {:ok, signal} = Trace.put(signal, parent)
+    assert {:ok, signal} = SignalContext.put_trace(signal, parent)
 
     child = Context.begin_turn(signal)
 
     assert child.trace_id == parent.trace_id
     assert child.span_id != parent.span_id
     assert child.parent_span_id == parent.span_id
-    refute Map.has_key?(child, :causation_id)
+    assert child.causation_id == nil
     assert Context.get() == child
   end
 
@@ -42,17 +44,17 @@ defmodule JidoTest.Telemetry.ContextTest do
 
     trace = Context.begin_turn(signal)
 
-    refute trace.traceparent == "malformed"
-    refute Map.has_key?(trace, :parent_span_id)
+    refute Trace.to_traceparent(trace) == "malformed"
+    assert trace.parent_span_id == nil
   end
 
   test "propagation carries the active Turn span and cause" do
-    active = Trace.new_root()
+    active = Trace.new()
     Context.put(active)
     target = Signal.new!("test.trace.target", %{}, source: "/test")
 
     assert {:ok, target} = Context.propagate_to(target, "source-1")
-    propagated = Trace.get(target)
+    propagated = SignalContext.get_trace(target)
 
     assert propagated.trace_id == active.trace_id
     assert propagated.span_id == active.span_id
@@ -64,12 +66,11 @@ defmodule JidoTest.Telemetry.ContextTest do
 
     assert Context.propagate_to(signal, "source-1") == {:error, :no_trace_context}
     assert Context.propagate_to(signal, :bad) == {:error, :invalid_args}
-    Context.put(%{trace_id: "bad"})
-    assert Context.propagate_to(signal, "source-1") == {:error, :invalid_trace_context}
+    assert_raise FunctionClauseError, fn -> apply(Context, :put, [%{trace_id: "bad"}]) end
   end
 
   test "captured task context is restored after success and failure" do
-    parent = Trace.new_root()
+    parent = Trace.new()
     Context.put(parent)
     captured = Context.capture()
     Context.clear()
@@ -81,10 +82,10 @@ defmodule JidoTest.Telemetry.ContextTest do
   end
 
   test "clear removes the current context" do
-    assert :ok = Context.put(Trace.new_root())
+    assert :ok = Context.put(Trace.new())
     assert :ok = Context.put(nil)
     assert Context.get() == nil
-    assert :ok = Context.put(Trace.new_root())
+    assert :ok = Context.put(Trace.new())
     assert :ok = Context.clear()
     assert Context.get() == nil
   end

@@ -4,8 +4,8 @@ modules:
   - Jido.Telemetry.Semantic
   - Jido.Telemetry.OpenTelemetry
   - Jido.Telemetry.Persistence
-  - Jido.Tracing.Context
-  - Jido.Tracing.Trace
+  - Jido.Trace
+  - Jido.Trace.Context
 ---
 
 ## Purpose
@@ -53,14 +53,14 @@ durable audit records.
 
 ### jido.telemetry.I5 — W3C Signal trace values
 
-- **scope:** `Jido.Tracing.Trace`
-- **must:** Create valid W3C roots and children, retain trace flags and tracestate, record explicit parent and causation identifiers, and use `Jido.Signal.Trace` as the Signal carrier. Remove old private trace fields when writing. Reject malformed or legacy-only values and expose only validated identifiers to telemetry.
+- **scope:** `Jido.Trace` and `Jido.Signal.Context`
+- **must:** Create valid W3C roots and children, retain trace flags and tracestate, record explicit parent and causation identifiers, and use `Jido.Signal.Context` as the Signal carrier owner. Remove old private trace fields when writing. Reject malformed or legacy-only values and expose only validated identifiers to telemetry.
 - **kind:** functional
 - **status:** active
 
 ### jido.telemetry.I6 — Process and task trace context
 
-- **scope:** `Jido.Tracing.Context`
+- **scope:** `Jido.Trace.Context`
 - **must:** Start one local Turn context from a valid incoming Signal parent or a new root. Capture and restore Jido and OpenTelemetry contexts across task boundaries. Restore the caller context after success or failure. Propagate the active context and explicit cause to an outbound Signal. Clear all locally installed context.
 - **kind:** ordering
 - **status:** active

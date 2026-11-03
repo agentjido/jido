@@ -267,9 +267,9 @@ defmodule Jido.Agent do
         data
       ) do
     with {:ok, signal} <- Signal.new(type, data, source: signal_source),
-         {:ok, _source_signal, trace} <- Signal.Trace.ensure(source_signal),
-         {:ok, signal} <- Signal.Trace.put(signal, trace),
-         {:ok, signal} <- Signal.put_context(signal, "jidocausationid", source_signal.id) do
+         {:ok, _source_signal, trace} <- Signal.Context.ensure_trace(source_signal),
+         {:ok, signal} <-
+           Signal.Context.put_trace(signal, Jido.Trace.with_causation(trace, source_signal.id)) do
       {:ok, Preparation.propagate(signal, source_signal)}
     end
   end

@@ -4,7 +4,8 @@ defmodule Jido.Agent.SelectionTest do
   alias Jido.Agent
   alias Jido.Agent.{Command, Runner}
   alias Jido.AgentServer, as: Server
-  alias Jido.Tracing.Trace
+  alias Jido.Signal.Context, as: SignalContext
+  alias Jido.Trace
 
   defmodule Record do
     use Jido.Action,
@@ -186,7 +187,7 @@ defmodule Jido.Agent.SelectionTest do
     for module <- [RoutedAgent] do
       source = signal("selection.action", %{})
       assert {:ok, command} = Command.new(module.instantiate!(id: "source"), source)
-      assert {:ok, execution_signal} = Trace.put(source, Trace.new_root())
+      assert {:ok, execution_signal} = SignalContext.put_trace(source, Trace.new())
       refute execution_signal.extensions == source.extensions
       command = %{command | signal: execution_signal}
 

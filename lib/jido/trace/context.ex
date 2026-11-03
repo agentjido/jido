@@ -1,9 +1,12 @@
-defmodule Jido.Tracing.Context do
-  @moduledoc false
+defmodule Jido.Trace.Context do
+  @moduledoc """
+  Owns the process-local and OpenTelemetry context for a Jido Trace.
+  """
 
   alias Jido.Signal
+  alias Jido.Signal.Context, as: SignalContext
   alias Jido.Telemetry.OpenTelemetry
-  alias Jido.Tracing.Trace
+  alias Jido.Trace
 
   @context_key {:jido, :trace_context}
   @otel_restore_key {:jido, :opentelemetry_restore_context}
@@ -14,22 +17,22 @@ defmodule Jido.Tracing.Context do
     @enforce_keys [:trace, :otel_context]
     defstruct [:trace, :otel_context]
 
-    @type t :: %__MODULE__{trace: map() | nil, otel_context: term() | nil}
+    @type t :: %__MODULE__{trace: Trace.t() | nil, otel_context: term() | nil}
   end
 
   @doc false
-  @spec begin_turn(Signal.t()) :: map()
+  @spec begin_turn(Signal.t()) :: Trace.t()
   def begin_turn(%Signal{} = signal) do
     restore_open_telemetry_context()
 
     trace =
-      case Trace.get(signal) do
+      case SignalContext.get_trace(signal) do
         nil ->
-          Trace.new_root()
+          Trace.new()
 
-        parent ->
+        %Trace{} = parent ->
           attach_open_telemetry_parent(parent)
-          Trace.child_of(parent, Map.get(parent, :causation_id))
+          Trace.child(parent, causation_id: parent.causation_id)
       end
 
     put(trace)
@@ -37,13 +40,13 @@ defmodule Jido.Tracing.Context do
   end
 
   @doc false
-  @spec put(map() | nil) :: :ok
+  @spec put(Trace.t() | nil) :: :ok
   def put(nil) do
     Process.delete(@context_key)
     :ok
   end
 
-  def put(trace) when is_map(trace) do
+  def put(%Trace{} = trace) do
     Process.put(@context_key, trace)
     :ok
   end
@@ -57,25 +60,21 @@ defmodule Jido.Tracing.Context do
   end
 
   @doc false
-  @spec get() :: map() | nil
+  @spec get() :: Trace.t() | nil
   def get, do: Process.get(@context_key)
 
   @doc false
   @spec capture() :: Captured.t()
-  def capture do
-    %Captured{trace: get(), otel_context: OpenTelemetry.current_context()}
-  end
+  def capture, do: %Captured{trace: get(), otel_context: OpenTelemetry.current_context()}
 
   @doc false
-  @spec with_context(map() | Captured.t() | nil, (-> result)) :: result when result: term()
-  def with_context(%Captured{} = captured, fun) when is_function(fun, 0) do
-    with_contexts(captured.trace, captured.otel_context, fun)
-  end
+  @spec with_context(Trace.t() | Captured.t() | nil, (-> result)) :: result when result: term()
+  def with_context(%Captured{} = captured, fun) when is_function(fun, 0),
+    do: with_contexts(captured.trace, captured.otel_context, fun)
 
   def with_context(context, fun)
-      when (is_map(context) or is_nil(context)) and is_function(fun, 0) do
-    with_contexts(context, OpenTelemetry.context_from_trace(context), fun)
-  end
+      when (is_struct(context, Trace) or is_nil(context)) and is_function(fun, 0),
+      do: with_contexts(context, OpenTelemetry.context_from_trace(context), fun)
 
   @doc false
   @spec propagate_to(Signal.t(), String.t()) ::
@@ -84,7 +83,7 @@ defmodule Jido.Tracing.Context do
   def propagate_to(%Signal{} = signal, causation_id) when is_binary(causation_id) do
     case get() do
       nil -> {:error, :no_trace_context}
-      trace -> Trace.put(signal, Map.put(trace, :causation_id, causation_id))
+      %Trace{} = trace -> SignalContext.put_trace(signal, Trace.with_causation(trace, causation_id))
     end
   end
 

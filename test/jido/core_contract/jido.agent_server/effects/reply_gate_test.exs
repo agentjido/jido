@@ -27,7 +27,7 @@ defmodule JidoTest.AgentServer.Effects.ReplyGateTest do
     }
 
     result =
-      Jido.Tracing.Context.with_context(Jido.Tracing.Trace.new_root(), fn ->
+      Jido.Trace.Context.with_context(Jido.Trace.new(), fn ->
         Effects.run(directive, fn _, _ -> flunk("Reply used the fallback handler") end, context)
       end)
 
@@ -37,7 +37,7 @@ defmodule JidoTest.AgentServer.Effects.ReplyGateTest do
              Map.drop(Map.from_struct(signal), [:extensions])
 
     assert Signal.get_context(delivered, "jidocausationid") == request_id
-    assert Signal.Trace.get(delivered) != nil
+    assert Signal.Context.get_trace(delivered) != nil
   end
 
   @tag obligation: "jido.agent_server.effects.I13"

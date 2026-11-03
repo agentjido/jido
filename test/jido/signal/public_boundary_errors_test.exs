@@ -5,7 +5,7 @@ defmodule Jido.Signal.PublicBoundaryErrorsTest do
   alias Jido.Signal.Context
   alias Jido.Signal.Router
   alias Jido.Signal.Router.Route
-  alias Jido.Signal.Trace
+  alias Jido.Trace
 
   describe "Signal error boundaries" do
     test "returns validation errors for struct attribute maps" do
@@ -132,9 +132,9 @@ defmodule Jido.Signal.PublicBoundaryErrorsTest do
     test "exposes its schema and rejects invalid values" do
       assert Jido.Joi.Schema.kind(Trace.schema()) == :struct
       refute Trace.valid?(:invalid)
-      assert Trace.get(:invalid) == nil
+      assert Context.get_trace(:invalid) == nil
       assert {:error, :invalid_traceparent} = Trace.from_traceparent(:invalid)
-      assert {:error, "expected a Signal and Trace"} = Trace.put(:invalid, :invalid)
+      assert {:error, :invalid_args} = Context.put_trace(:invalid, :invalid)
     end
 
     test "raises when formatting or deriving from an invalid Trace" do

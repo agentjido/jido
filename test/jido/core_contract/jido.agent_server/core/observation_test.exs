@@ -6,7 +6,8 @@ defmodule JidoTest.AgentServer.ObservationTest do
 
   alias Jido.AgentServer, as: Server
   alias Jido.AgentServer.Core
-  alias Jido.Tracing.Trace
+  alias Jido.Signal.Context, as: SignalContext
+  alias Jido.Trace
   alias JidoTest.AgentServer.Fixtures, as: F
 
   setup do
@@ -114,8 +115,11 @@ defmodule JidoTest.AgentServer.ObservationTest do
     assert_receive {:event, [:jido, :agent_server, :lifecycle, :start], _, %{agent_id: id}}
     assert id == c.agent.id
     assert :proc_lib.get_label(server) == {Server, c.agent.id}
-    parent = Trace.new_root()
-    {:ok, signal} = Trace.put(F.signal(%{mode: :trace, private_input: "PRIVATE_EVENT"}), parent)
+    parent = Trace.new()
+
+    {:ok, signal} =
+      SignalContext.put_trace(F.signal(%{mode: :trace, private_input: "PRIVATE_EVENT"}), parent)
+
     assert {:ok, _, []} = Server.call(server, signal, context: %{observer: self()})
     assert_receive {:trace, trace, logger}
     assert trace.trace_id == parent.trace_id

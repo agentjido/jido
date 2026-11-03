@@ -1,8 +1,9 @@
-defmodule Jido.Signal.TraceTest do
+defmodule Jido.TraceTest do
   use ExUnit.Case, async: true
 
   alias Jido.Signal
-  alias Jido.Signal.Trace
+  alias Jido.Signal.Context, as: SignalContext
+  alias Jido.Trace
 
   @traceparent "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"
 
@@ -147,40 +148,43 @@ defmodule Jido.Signal.TraceTest do
       signal = Signal.new!(type: "test.created", source: "/test")
       trace = Trace.new(trace_flags: "01", tracestate: "vendor=value")
 
-      assert {:ok, traced} = Trace.put(signal, trace)
+      assert {:ok, traced} = SignalContext.put_trace(signal, trace)
       assert traced.extensions["traceparent"] == Trace.to_traceparent(trace)
       assert traced.extensions["tracestate"] == "vendor=value"
-      assert Trace.get(traced) == trace
+      assert SignalContext.get_trace(traced) == trace
 
-      clean = Trace.delete(traced)
-      assert Trace.get(clean) == nil
+      clean = SignalContext.delete_trace(traced)
+      assert SignalContext.get_trace(clean) == nil
       refute Map.has_key?(clean.extensions, "traceparent")
       refute Map.has_key?(clean.extensions, "tracestate")
     end
 
     test "replaces stale tracestate" do
       signal = Signal.new!(type: "test.created", source: "/test")
-      assert {:ok, signal} = Trace.put(signal, Trace.new(tracestate: "vendor=old"))
-      assert {:ok, signal} = Trace.put(signal, Trace.new())
+
+      assert {:ok, signal} =
+               SignalContext.put_trace(signal, Trace.new(tracestate: "vendor=old"))
+
+      assert {:ok, signal} = SignalContext.put_trace(signal, Trace.new())
 
       refute Map.has_key?(signal.extensions, "tracestate")
     end
 
     test "returns nil for missing or invalid trace context" do
       signal = Signal.new!(type: "test.created", source: "/test")
-      assert Trace.get(signal) == nil
+      assert SignalContext.get_trace(signal) == nil
 
       invalid = %{signal | extensions: %{"traceparent" => "invalid"}}
-      assert Trace.get(invalid) == nil
+      assert SignalContext.get_trace(invalid) == nil
     end
 
     test "ensures a root Trace and preserves an existing Trace" do
       signal = Signal.new!(type: "test.created", source: "/test")
 
-      assert {:ok, traced, trace} = Trace.ensure(signal, trace_flags: "01")
-      assert Trace.get(traced) == trace
+      assert {:ok, traced, trace} = SignalContext.ensure_trace(signal, trace_flags: "01")
+      assert SignalContext.get_trace(traced) == trace
 
-      assert {:ok, same_signal, same_trace} = Trace.ensure(traced)
+      assert {:ok, same_signal, same_trace} = SignalContext.ensure_trace(traced)
       assert same_signal == traced
       assert same_trace == trace
     end
@@ -194,18 +198,17 @@ defmodule Jido.Signal.TraceTest do
         trace_flags: "00"
       }
 
-      assert {:error, error} = Trace.put(signal, invalid)
-      assert error =~ "invalid Trace"
+      assert {:error, :invalid_trace_context} = SignalContext.put_trace(signal, invalid)
     end
 
     test "survives Signal JSON serialization" do
       signal = Signal.new!(type: "test.created", source: "/test")
       trace = Trace.new(trace_flags: "01", tracestate: "vendor=value")
-      assert {:ok, traced} = Trace.put(signal, trace)
+      assert {:ok, traced} = SignalContext.put_trace(signal, trace)
 
       assert {:ok, json} = Signal.serialize(traced)
       assert {:ok, restored} = Signal.deserialize(json)
-      assert Trace.get(restored) == trace
+      assert SignalContext.get_trace(restored) == trace
     end
   end
 end

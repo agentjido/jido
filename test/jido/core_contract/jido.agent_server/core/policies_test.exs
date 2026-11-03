@@ -7,7 +7,8 @@ defmodule JidoTest.AgentServer.PoliciesTest do
   alias Jido.AgentServer, as: Server
   alias Jido.AgentServer.Core
   alias Jido.Error.ValidationError
-  alias Jido.Tracing.{Context, Trace}
+  alias Jido.Trace
+  alias Jido.Trace.Context
   alias JidoTest.AgentServer.Fixtures, as: F
 
   setup do
@@ -116,7 +117,7 @@ defmodule JidoTest.AgentServer.PoliciesTest do
            }
 
     observer = self()
-    trace = Trace.new_root()
+    trace = Trace.new()
 
     hooks =
       Core.execution_hooks(

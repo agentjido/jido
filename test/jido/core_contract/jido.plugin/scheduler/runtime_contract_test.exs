@@ -7,7 +7,9 @@ defmodule JidoTest.Contract.PluginSchedulerRuntimeTest do
   alias Jido.Plugin.Scheduler
   alias Jido.Plugin.Scheduler.Runtime
   alias Jido.Signal
-  alias Jido.Tracing.{Context, Trace}
+  alias Jido.Signal.Context, as: SignalContext
+  alias Jido.Trace
+  alias Jido.Trace.Context
   alias JidoTest.ScheduledOccurrenceFixtures.{Clock, FastRuntimeAgent, TimedAgent}
 
   @instant ~U[2030-01-01 00:00:01Z]
@@ -133,13 +135,13 @@ defmodule JidoTest.Contract.PluginSchedulerRuntimeTest do
   test "one-shot timers deliver one fresh traced Signal and ignore stale tokens" do
     Context.clear()
     on_exit(&Context.clear/0)
-    source_trace = Trace.new_root()
-    local_trace = Trace.new_root()
+    source_trace = Trace.new()
+    local_trace = Trace.new()
     source = Signal.new!("test.source", %{}, source: "/test")
-    {:ok, source} = Trace.put(source, source_trace)
+    {:ok, source} = SignalContext.put_trace(source, source_trace)
     local = Signal.new!("test.local", %{}, source: "/test")
-    {:ok, local} = Trace.put(local, local_trace)
-    :ok = Context.put(Trace.get(local))
+    {:ok, local} = SignalContext.put_trace(local, local_trace)
+    :ok = Context.put(SignalContext.get_trace(local))
     delayed = tick("test.delayed")
     runtime = runtime()
 
@@ -156,7 +158,7 @@ defmodule JidoTest.Contract.PluginSchedulerRuntimeTest do
     refute delivered.id == delayed.id
     assert delivered.type == delayed.type
     assert delivered.data == delayed.data
-    trace = Trace.get(delivered)
+    trace = SignalContext.get_trace(delivered)
     assert trace.trace_id == source_trace.trace_id
     assert trace.span_id not in [source_trace.span_id, local_trace.span_id]
     assert trace.causation_id == source.id

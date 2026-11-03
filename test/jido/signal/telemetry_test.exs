@@ -2,8 +2,9 @@ defmodule Jido.Signal.TelemetryTest do
   use ExUnit.Case, async: true
 
   alias Jido.Signal
+  alias Jido.Signal.Context
   alias Jido.Signal.Telemetry
-  alias Jido.Signal.Trace
+  alias Jido.Trace
 
   def handle_event(event, measurements, metadata, test_pid) do
     send(test_pid, {event, measurements, metadata})
@@ -12,7 +13,7 @@ defmodule Jido.Signal.TelemetryTest do
   test "execute/4 adds trace metadata from a Signal" do
     signal = Signal.new!(type: "test.created", source: "/test")
     trace = Trace.new(trace_flags: "01")
-    assert {:ok, signal} = Trace.put(signal, trace)
+    assert {:ok, signal} = Context.put_trace(signal, trace)
 
     event = [:jido, :signal, :test, :traced]
     handler_id = {__MODULE__, make_ref()}

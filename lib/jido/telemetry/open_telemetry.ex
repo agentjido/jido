@@ -1,7 +1,7 @@
 defmodule Jido.Telemetry.OpenTelemetry do
   @moduledoc false
 
-  alias Jido.Signal.Trace, as: SignalTrace
+  alias Jido.Trace
 
   @ignored_measurements [:duration, :monotonic_time, :system_time]
 
@@ -28,7 +28,7 @@ defmodule Jido.Telemetry.OpenTelemetry do
   end
 
   @doc false
-  @spec trace_context(Span.t() | nil) :: map() | nil
+  @spec trace_context(Span.t() | nil) :: Trace.t() | nil
   def trace_context(nil), do: nil
 
   def trace_context(%Span{span_ctx: span_ctx}) do
@@ -140,7 +140,7 @@ defmodule Jido.Telemetry.OpenTelemetry do
   end
 
   @doc false
-  @spec context_from_trace(map() | nil) :: term() | nil
+  @spec context_from_trace(Trace.t() | nil) :: term() | nil
   def context_from_trace(trace) do
     if enabled?() do
       case trace_carrier(trace) do
@@ -174,7 +174,7 @@ defmodule Jido.Telemetry.OpenTelemetry do
   end
 
   @doc false
-  @spec restore_trace_context(map() | nil) :: term() | nil
+  @spec restore_trace_context(Trace.t() | nil) :: term() | nil
   def restore_trace_context(trace) do
     case context_from_trace(trace) do
       nil -> nil
@@ -340,11 +340,13 @@ defmodule Jido.Telemetry.OpenTelemetry do
 
   defp deactivate_span(_span), do: :ok
 
-  defp trace_carrier(trace) do
+  defp trace_carrier(%Trace{} = trace) do
     []
-    |> maybe_add_carrier("traceparent", Map.get(trace, :traceparent))
-    |> maybe_add_carrier("tracestate", Map.get(trace, :tracestate))
+    |> maybe_add_carrier("traceparent", Trace.to_traceparent(trace))
+    |> maybe_add_carrier("tracestate", trace.tracestate)
   end
+
+  defp trace_carrier(_trace), do: []
 
   defp maybe_add_carrier(carrier, _key, nil), do: carrier
 
@@ -365,15 +367,9 @@ defmodule Jido.Telemetry.OpenTelemetry do
     fields =
       Map.new(carrier, fn {key, value} -> {String.downcase(key), value} end)
 
-    case SignalTrace.from_traceparent(fields["traceparent"], fields["tracestate"]) do
+    case Trace.from_traceparent(fields["traceparent"], fields["tracestate"]) do
       {:ok, trace} ->
-        %{
-          trace_id: trace.trace_id,
-          span_id: trace.span_id,
-          trace_flags: trace.trace_flags,
-          traceparent: SignalTrace.to_traceparent(trace)
-        }
-        |> maybe_put(:tracestate, trace.tracestate)
+        trace
 
       {:error, :invalid_traceparent} ->
         nil

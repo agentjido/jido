@@ -12,7 +12,7 @@
 
 - id: telemetry-mutation-profile
   date: 2026-10-20
-  decision: Mutate Jido.Debug, Jido.Telemetry, its three helper modules, and Jido.Tracing.Context and Trace in one non-overlapping profile.
+  decision: Mutate Jido.Debug, Jido.Telemetry, its three helper modules, Jido.Trace, and Jido.Trace.Context in one non-overlapping profile.
   driver: These seven modules contain the component's behavior and are not targets of another active Covenant profile.
   approved_by: Component hardening pass
 

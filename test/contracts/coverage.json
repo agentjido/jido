@@ -2493,12 +2493,12 @@ Total output lines: 3708
             "test clear removes the current context",
             "test context input functions reject unsupported values",
             "test invalid and legacy-only values are rejected",
-            "test map carriers default flags and retain tracestate without traceparent",
+            "test children require the canonical Trace value",
             "test new roots use one valid W3C representation",
             "test old or malformed context does not become a parent",
             "test propagation carries the active Turn span and cause",
             "test propagation validates its boundary",
-            "test put and get use Signal.Trace and remove old private trace fields",
+            "test Signal context uses the canonical Trace and removes old private fields",
             "test telemetry context contains only validated trace and causation identifiers"
           ]
         },

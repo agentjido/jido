@@ -3,14 +3,16 @@ defmodule Jido.Dispatch.PreparationTest do
 
   alias Jido.Dispatch.Preparation
   alias Jido.Signal
-  alias Jido.Tracing.{Context, Trace}
+  alias Jido.Signal.Context, as: SignalContext
+  alias Jido.Trace
+  alias Jido.Trace.Context
 
   test "trace propagation keeps exact Signals when context is absent or invalid" do
     source = Signal.new!("source", %{}, source: "/test")
     signal = Signal.new!("output", %{}, source: "/test")
-    {:ok, traced} = Trace.put(signal, Trace.new_root())
+    {:ok, traced} = SignalContext.put_trace(signal, Trace.new())
 
-    for context <- [nil, %{trace_id: "invalid"}], signal <- [signal, traced] do
+    for context <- [nil], signal <- [signal, traced] do
       Context.put(context)
       assert Preparation.propagate(signal, source) === signal
     end
@@ -19,7 +21,7 @@ defmodule Jido.Dispatch.PreparationTest do
   test "an invalid cause keeps the original outgoing trace" do
     source = Signal.new!("source", %{}, source: "/test")
     signal = Signal.new!("output", %{}, source: "/test")
-    {:ok, signal} = Trace.put(signal, Trace.new_root())
+    {:ok, signal} = SignalContext.put_trace(signal, Trace.new())
     Context.begin_turn(source)
 
     assert Preparation.propagate(signal, %{source | id: nil}) === signal
@@ -29,15 +31,15 @@ defmodule Jido.Dispatch.PreparationTest do
     source = Signal.new!("source", %{}, source: "/test")
     signal = Signal.new!("output", %{value: 1}, source: "/test", subject: "worker")
     {:ok, signal} = Signal.put_context(signal, "tenant", "blue")
-    {:ok, signal} = Trace.put(signal, Trace.new_root())
+    {:ok, signal} = SignalContext.put_trace(signal, Trace.new())
     trace = Context.begin_turn(source)
     propagated = Preparation.propagate(signal, source)
 
     assert Map.drop(propagated, [:extensions]) == Map.drop(signal, [:extensions])
     assert Signal.get_context(propagated, "tenant") == "blue"
-    assert Trace.get(propagated).trace_id == trace.trace_id
-    assert Trace.get(propagated).span_id == trace.span_id
-    assert Trace.get(propagated).causation_id == source.id
+    assert SignalContext.get_trace(propagated).trace_id == trace.trace_id
+    assert SignalContext.get_trace(propagated).span_id == trace.span_id
+    assert SignalContext.get_trace(propagated).causation_id == source.id
     assert Context.get() == trace
   end
 

@@ -81,7 +81,7 @@ defmodule Jido.AgentServer do
   alias Jido.Agent.Runner, as: AgentRunner
   alias Jido.Signal
   alias Jido.Telemetry.Semantic
-  alias Jido.Tracing.Context, as: TraceContext
+  alias Jido.Trace.Context, as: TraceContext
   alias Runic.Runner
   alias Jido.AgentServer.DurableTurn
 
@@ -2132,7 +2132,7 @@ defmodule Jido.AgentServer do
     span =
       Semantic.start(
         [:jido, :agent_server, :turn],
-        Map.merge(trace, %{
+        Map.merge(Jido.Trace.metadata(trace), %{
           agent_id: agent.id,
           agent_module: agent.module,
           agent_name: agent.name,

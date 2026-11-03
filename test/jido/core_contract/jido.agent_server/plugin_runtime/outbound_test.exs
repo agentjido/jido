@@ -6,7 +6,7 @@ defmodule JidoTest.AgentServer.OutboundTest do
   alias Jido.AgentServer, as: Server
   alias Jido.Agent.Directive.{Emit, Reply}
   alias Jido.Signal
-  alias Jido.Tracing.Trace
+  alias Jido.Signal.Context, as: SignalContext
   alias JidoTest.AgentServer.Fixtures, as: F
   import JidoTest.Eventually
   @moduletag obligation: "jido.agent_server.plugin_runtime.I8"
@@ -39,7 +39,7 @@ defmodule JidoTest.AgentServer.OutboundTest do
           Signal.put_context(signal, "jidocausationid", "changed-causation")
 
         context.target == :reply and opts[:corrupt_reply] == :trace ->
-          {:ok, Signal.Trace.delete(signal)}
+          {:ok, Signal.Context.delete_trace(signal)}
 
         true ->
           {:ok, %{signal | data: Map.put(signal.data, :prepared, true)}}
@@ -79,7 +79,7 @@ defmodule JidoTest.AgentServer.OutboundTest do
       source = batch([%Emit{signal: output, dispatch: {:pid, target: self()}}])
       assert {:ok, saved, [_]} = Server.call(server, source)
       assert_receive {:outbound, traced, context}, 1_000
-      assert Trace.get(traced).causation_id == source.id
+      assert SignalContext.get_trace(traced).causation_id == source.id
       assert context.source_signal.id == source.id
       assert context.agent_id == saved.id
       assert context.state_version == 1
@@ -110,7 +110,7 @@ defmodule JidoTest.AgentServer.OutboundTest do
     assert context.target == :reply
     assert context.source_signal.id == source.id
     assert context.agent_id == saved.id
-    assert Trace.get(traced).causation_id == source.id
+    assert SignalContext.get_trace(traced).causation_id == source.id
 
     assert_receive %Signal{
                      id: reply_id,
@@ -120,7 +120,7 @@ defmodule JidoTest.AgentServer.OutboundTest do
                    1_000
 
     assert reply_id == reply_signal.id
-    assert Trace.get(delivered) == Trace.get(traced)
+    assert SignalContext.get_trace(delivered) == SignalContext.get_trace(traced)
     assert_eventually(Server.status(server).last_effect_outcome.status == :succeeded)
   end
 

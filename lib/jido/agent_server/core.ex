@@ -47,7 +47,7 @@ defmodule Jido.AgentServer.Core do
   require Logger
 
   alias Jido.Agent.Command
-  alias Jido.Tracing.Context, as: TraceContext
+  alias Jido.Trace.Context, as: TraceContext
 
   def max_timeout, do: @max_timeout
   def runtime_defaults, do: @runtime_defaults
@@ -210,7 +210,7 @@ defmodule Jido.AgentServer.Core do
 
     hooks
     |> Keyword.put(:on_dispatch, fn runnable, state ->
-      Logger.metadata(Map.to_list(trace || %{}))
+      Logger.metadata(if trace, do: Map.to_list(Jido.Trace.telemetry_context(trace)), else: [])
       TraceContext.put(trace)
       if dispatch, do: dispatch.(runnable, state)
     end)

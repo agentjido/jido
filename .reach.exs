@@ -6,6 +6,7 @@
       "Jido.Joi.*",
       "Jido.Expr",
       "Jido.Expr.*",
+      "Jido.Trace",
       "Zoi.Type.Node"
     ],
     signal: ["Inspect.Jido.Signal.*", "Jido.Signal", "Jido.Signal.*"],
@@ -57,8 +58,8 @@
       "Jido.RuntimeStore",
       "Jido.Telemetry",
       "Jido.Telemetry.*",
-      "Jido.Tracing",
-      "Jido.Tracing.*",
+      "Jido.Trace.Context",
+      "Jido.Trace.Context.*",
       "Runic.Workflow.EventApplicator.Jido.AgentServer.*"
     ],
     ai: [
@@ -81,11 +82,19 @@
     ]
   ],
   source: [
-    forbidden_modules: ["Jido.Config", "Jido.PortableTerm", "Jido.Signal.ID"],
+    forbidden_modules: [
+      "Jido.Config",
+      "Jido.PortableTerm",
+      "Jido.Signal.ID",
+      "Jido.Signal.Trace",
+      "Jido.Tracing.*"
+    ],
     forbidden_files: [
       "lib/jido/config.ex",
       "lib/jido/portable_term.ex",
-      "lib/jido/signal/id.ex"
+      "lib/jido/signal/id.ex",
+      "lib/jido/signal/trace.ex",
+      "lib/jido/tracing/**"
     ]
   ],
   checks: [

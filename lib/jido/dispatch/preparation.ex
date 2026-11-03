@@ -2,7 +2,7 @@ defmodule Jido.Dispatch.Preparation do
   @moduledoc false
 
   alias Jido.Signal
-  alias Jido.Tracing.Context, as: TraceContext
+  alias Jido.Trace.Context, as: TraceContext
 
   @spec propagate(Signal.t(), Signal.t()) :: Signal.t()
   def propagate(%Signal{} = signal, %Signal{} = source) do

@@ -4,7 +4,8 @@ defmodule Jido.Signal.Dispatch.ErrorNormalizationTest do
   alias Jido.Signal
   alias Jido.Signal.Dispatch
   alias Jido.Signal.Error
-  alias Jido.Signal.Trace
+  alias Jido.Signal.Context, as: SignalContext
+  alias Jido.Trace
 
   # Named function for telemetry handler to avoid performance warnings
   def handle_telemetry_event(event, measurements, metadata, _config) do
@@ -128,7 +129,7 @@ defmodule Jido.Signal.Dispatch.ErrorNormalizationTest do
 
     {:ok, signal} = Signal.new(%{type: "test.event", source: "test", data: %{value: 42}})
     trace = Trace.new(trace_flags: "01")
-    {:ok, signal} = Trace.put(signal, trace)
+    {:ok, signal} = SignalContext.put_trace(signal, trace)
     config = {:noop, []}
 
     # Successful dispatch

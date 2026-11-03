@@ -9,7 +9,7 @@ defmodule JidoTest.AgentServer.Effects.ReplyTest do
   alias Jido.Agent.Directive
   alias Jido.AgentServer, as: Server
   alias Jido.Signal
-  alias Jido.Tracing.Trace
+  alias Jido.Signal.Context, as: SignalContext
   alias JidoTest.AgentServer.Fixtures, as: F
 
   defmodule Work do
@@ -209,7 +209,7 @@ defmodule JidoTest.AgentServer.Effects.ReplyTest do
 
     causation_id = Signal.get_context(expected, "jidocausationid")
     assert Signal.get_context(delivered, "jidocausationid") == causation_id
-    assert Trace.get(delivered).causation_id == causation_id
+    assert SignalContext.get_trace(delivered).causation_id == causation_id
   end
 
   defp refute_reply(expected) do

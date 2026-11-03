@@ -1,24 +1,19 @@
-defmodule Jido.Signal.Trace do
-  alias Jido.Joi
-
+defmodule Jido.Trace do
   @moduledoc """
-  Carries W3C trace context on Signals.
+  One validated W3C trace value for Jido.
 
-  A Trace contains the current trace ID, span ID, trace flags, and optional
-  `tracestate`. Signals store it in the flat `traceparent` and `tracestate`
-  CloudEvents context attributes.
+  The value stores the current trace and span identifiers, trace flags, and
+  optional tracestate. A child also records its parent span and the application
+  causation identifier that led to the child.
 
-  This module can create root and child trace values. A full tracing system,
-  such as OpenTelemetry, still owns span lifetime, sampling policy, export, and
-  process context.
+  `Jido.Signal.Context` owns Signal attachment. `Jido.Trace.Context` owns
+  process-local and OpenTelemetry context.
   """
 
-  alias Jido.Signal
+  alias Jido.Joi
 
   @trace_id_bytes 16
   @span_id_bytes 8
-  @traceparent "traceparent"
-  @tracestate "tracestate"
   @traceparent_pattern ~r/\A00-([0-9a-f]{32})-([0-9a-f]{16})-([0-9a-f]{2})\z/
   @trace_id_pattern ~r/\A[0-9a-f]{32}\z/
   @span_id_pattern ~r/\A[0-9a-f]{16}\z/
@@ -42,6 +37,15 @@ defmodule Jido.Signal.Trace do
                 Joi.string()
                 |> Joi.refine({__MODULE__, :validate_tracestate, []})
                 |> Joi.nullable()
+                |> Joi.optional(),
+              parent_span_id:
+                Joi.string()
+                |> Joi.refine({__MODULE__, :validate_span_id, []})
+                |> Joi.nullable()
+                |> Joi.optional(),
+              causation_id:
+                Joi.string()
+                |> Joi.nullable()
                 |> Joi.optional()
             }
           )
@@ -57,7 +61,7 @@ defmodule Jido.Signal.Trace do
   @doc "Creates a new root Trace."
   @spec new(keyword()) :: t()
   def new(opts \\ []) do
-    validate_options!(opts)
+    validate_options!(opts, [:trace_flags, :tracestate])
 
     build!(%__MODULE__{
       trace_id: generate_id(@trace_id_bytes),
@@ -68,19 +72,29 @@ defmodule Jido.Signal.Trace do
   end
 
   @doc "Creates a child Trace with a new span ID."
-  @spec child(t()) :: t()
-  def child(%__MODULE__{} = parent) do
+  @spec child(t(), keyword()) :: t()
+  def child(%__MODULE__{} = parent, opts \\ []) do
+    validate_options!(opts, [:causation_id])
+
     if valid?(parent) do
-      %__MODULE__{
+      build!(%__MODULE__{
         trace_id: parent.trace_id,
         span_id: generate_id(@span_id_bytes),
         trace_flags: parent.trace_flags,
-        tracestate: parent.tracestate
-      }
+        tracestate: parent.tracestate,
+        parent_span_id: parent.span_id,
+        causation_id: Keyword.get(opts, :causation_id)
+      })
     else
       raise ArgumentError, "invalid parent Trace"
     end
   end
+
+  @doc "Returns a Trace with one causation identifier."
+  @spec with_causation(t(), String.t() | nil) :: t()
+  def with_causation(%__MODULE__{} = trace, causation_id)
+      when is_binary(causation_id) or is_nil(causation_id),
+      do: build!(%{trace | causation_id: causation_id})
 
   @doc "Parses a W3C version 00 traceparent value."
   @spec from_traceparent(String.t(), String.t() | nil) ::
@@ -107,67 +121,26 @@ defmodule Jido.Signal.Trace do
   @doc "Formats a Trace as a W3C version 00 traceparent value."
   @spec to_traceparent(t()) :: String.t()
   def to_traceparent(%__MODULE__{} = trace) do
-    if valid?(trace) do
-      format_traceparent(trace)
-    else
-      raise ArgumentError, "invalid Trace"
-    end
+    if valid?(trace),
+      do: "00-#{trace.trace_id}-#{trace.span_id}-#{trace.trace_flags}",
+      else: raise(ArgumentError, "invalid Trace")
   end
 
-  @doc "Gets the valid Trace carried by a Signal."
-  @spec get(Signal.t()) :: t() | nil
-  def get(%Signal{} = signal) do
-    case Signal.get_context(signal, @traceparent) do
-      traceparent when is_binary(traceparent) ->
-        case from_traceparent(traceparent, Signal.get_context(signal, @tracestate)) do
-          {:ok, trace} -> trace
-          {:error, :invalid_traceparent} -> nil
-        end
-
-      _missing ->
-        nil
-    end
+  @doc "Returns the trace fields used as semantic telemetry metadata."
+  @spec telemetry_context(t()) :: map()
+  def telemetry_context(%__MODULE__{} = trace) do
+    trace
+    |> Map.take([:trace_id, :span_id, :parent_span_id, :causation_id])
+    |> Map.reject(fn {_key, value} -> is_nil(value) end)
   end
 
-  def get(_signal), do: nil
-
-  @doc "Puts a valid Trace on a Signal."
-  @spec put(Signal.t(), t()) :: {:ok, Signal.t()} | {:error, String.t()}
-  def put(%Signal{} = signal, %__MODULE__{} = trace) do
-    case parse(trace) do
-      {:ok, trace} ->
-        attributes =
-          %{
-            @traceparent => format_traceparent(trace),
-            @tracestate => trace.tracestate
-          }
-          |> Map.reject(fn {_name, value} -> is_nil(value) end)
-
-        signal = delete(signal)
-        {:ok, %{signal | extensions: Map.merge(signal.extensions, attributes)}}
-
-      {:error, errors} ->
-        {:error, "invalid Trace: #{Joi.prettify_errors(errors)}"}
-    end
-  end
-
-  def put(_signal, _trace), do: {:error, "expected a Signal and Trace"}
-
-  @doc "Deletes traceparent and tracestate from a Signal."
-  @spec delete(Signal.t()) :: Signal.t()
-  def delete(%Signal{} = signal) do
-    signal
-    |> Signal.delete_context(@traceparent)
-    |> Signal.delete_context(@tracestate)
-  end
-
-  @doc "Returns the Signal trace, or creates and stores a new root Trace."
-  @spec ensure(Signal.t(), keyword()) :: {:ok, Signal.t(), t()} | {:error, String.t()}
-  def ensure(%Signal{} = signal, opts \\ []) do
-    case get(signal) do
-      %__MODULE__{} = trace -> {:ok, signal, trace}
-      nil -> put_new_trace(signal, new(opts))
-    end
+  @doc "Returns the W3C carrier and semantic fields as one flat metadata map."
+  @spec metadata(t()) :: map()
+  def metadata(%__MODULE__{} = trace) do
+    trace
+    |> telemetry_context()
+    |> Map.put(:traceparent, to_traceparent(trace))
+    |> maybe_put(:tracestate, trace.tracestate)
   end
 
   @doc "Checks a Trace struct or traceparent string."
@@ -175,7 +148,7 @@ defmodule Jido.Signal.Trace do
   def valid?(%__MODULE__{} = trace), do: match?({:ok, _trace}, parse(trace))
 
   def valid?(traceparent) when is_binary(traceparent),
-    do: match?({:ok, _}, from_traceparent(traceparent))
+    do: match?({:ok, _trace}, from_traceparent(traceparent))
 
   def valid?(_value), do: false
 
@@ -189,17 +162,14 @@ defmodule Jido.Signal.Trace do
 
   @doc false
   def validate_trace_flags(value, _opts) do
-    if is_binary(value) and Regex.match?(~r/\A[0-9a-f]{2}\z/, value) do
-      :ok
-    else
-      {:error, "trace flags must be two lower-case hexadecimal characters"}
-    end
+    if is_binary(value) and Regex.match?(~r/\A[0-9a-f]{2}\z/, value),
+      do: :ok,
+      else: {:error, "trace flags must be two lower-case hexadecimal characters"}
   end
 
   @doc false
   def validate_tracestate(value, _opts) do
-    with true <-
-           is_binary(value) and String.valid?(value) and byte_size(value) <= 512,
+    with true <- is_binary(value) and String.valid?(value) and byte_size(value) <= 512,
          members <- String.split(value, ",", trim: false),
          {:ok, keys} <- validate_tracestate_members(members),
          true <- Enum.count_until(keys, 33) <= 32,
@@ -211,17 +181,7 @@ defmodule Jido.Signal.Trace do
     end
   end
 
-  defp put_new_trace(signal, trace) do
-    case put(signal, trace) do
-      {:ok, traced} -> {:ok, traced, trace}
-      {:error, reason} -> {:error, reason}
-    end
-  end
-
   defp parse(trace), do: Joi.parse(@schema, trace)
-
-  defp format_traceparent(trace),
-    do: "00-#{trace.trace_id}-#{trace.span_id}-#{trace.trace_flags}"
 
   defp build!(trace) do
     case parse(trace) do
@@ -230,12 +190,10 @@ defmodule Jido.Signal.Trace do
     end
   end
 
-  defp validate_options!(opts) do
-    if Keyword.keyword?(opts) and Keyword.keys(opts) -- [:trace_flags, :tracestate] == [] do
-      :ok
-    else
-      raise ArgumentError, "expected trace_flags and tracestate options"
-    end
+  defp validate_options!(opts, allowed) do
+    if Keyword.keyword?(opts) and Keyword.keys(opts) -- allowed == [],
+      do: :ok,
+      else: raise(ArgumentError, "unexpected Trace options")
   end
 
   defp normalize_tracestate(nil), do: nil
@@ -248,11 +206,9 @@ defmodule Jido.Signal.Trace do
   end
 
   defp validate_id(value, pattern, zero, name) do
-    if is_binary(value) and value != zero and Regex.match?(pattern, value) do
-      :ok
-    else
-      {:error, "#{name} must be #{byte_size(zero)} lower-case hexadecimal characters and not all zero"}
-    end
+    if is_binary(value) and value != zero and Regex.match?(pattern, value),
+      do: :ok,
+      else: {:error, "#{name} must be #{byte_size(zero)} lower-case hexadecimal characters and not all zero"}
   end
 
   defp validate_tracestate_members(members) do
@@ -264,11 +220,9 @@ defmodule Jido.Signal.Trace do
           {:cont, {:ok, keys}}
 
         [key, value] ->
-          if valid_tracestate_key?(key) and valid_tracestate_value?(value) do
-            {:cont, {:ok, [key | keys]}}
-          else
-            {:halt, :error}
-          end
+          if valid_tracestate_key?(key) and valid_tracestate_value?(value),
+            do: {:cont, {:ok, [key | keys]}},
+            else: {:halt, :error}
 
         _invalid ->
           {:halt, :error}
@@ -296,4 +250,7 @@ defmodule Jido.Signal.Trace do
     id = bytes |> :crypto.strong_rand_bytes() |> Base.encode16(case: :lower)
     if String.trim(id, "0") == "", do: generate_id(bytes), else: id
   end
+
+  defp maybe_put(map, _key, nil), do: map
+  defp maybe_put(map, key, value), do: Map.put(map, key, value)
 end

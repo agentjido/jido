@@ -11,7 +11,7 @@ defmodule JidoTest.AgentServer.Effects.SignalsTest do
   alias Jido.AgentServer.Directive.{ErrorReport, ServerStop}
   alias Jido.AgentServer.Effects
   alias Jido.Signal.Bus
-  alias Jido.Tracing.Trace
+  alias Jido.Signal.Context, as: SignalContext
   alias JidoTest.AgentServer.Fixtures, as: F
 
   defmodule SignalContextPlugin do
@@ -43,7 +43,7 @@ defmodule JidoTest.AgentServer.Effects.SignalsTest do
     source = batch([%Emit{signal: F.signal(%{}, "out")}])
     assert {:ok, _, _} = Server.call(server, source)
     assert_receive {:signal, signal}, 1_000
-    assert Trace.get(signal).causation_id == source.id
+    assert SignalContext.get_trace(signal).causation_id == source.id
     assert_eventually(Server.status(server).phase == :idle)
     assert Server.status(server).state_version == 1
     observer = self()
@@ -258,7 +258,7 @@ defmodule JidoTest.AgentServer.Effects.SignalsTest do
     assert signal.data == Server.status(server).last_outcome
     refute inspect(signal) =~ "PRIVATE_INPUT"
     refute inspect(signal) =~ "SERVER2_PRIVATE_ERROR"
-    assert Trace.get(signal).causation_id == signal.data.signal_id
+    assert SignalContext.get_trace(signal).causation_id == signal.data.signal_id
     assert {:error, _} = Server.call(server, signal)
     refute_receive {:signal, _}, 30
     assert Server.status(server).error_count == 2

@@ -4,9 +4,11 @@ defmodule JidoTest.Telemetry.OpenTelemetryTest do
   @moduletag obligation: ["jido.telemetry.I7", "jido.telemetry.I8"]
 
   alias Jido.Signal
+  alias Jido.Signal.Context, as: SignalContext
   alias Jido.Telemetry.OpenTelemetry
   alias Jido.Telemetry.Semantic
-  alias Jido.Tracing.Context
+  alias Jido.Trace
+  alias Jido.Trace.Context
   alias JidoTest.OpenTelemetryTracer, as: TestTracer
 
   defmodule NotifyFacet do
@@ -160,20 +162,15 @@ defmodule JidoTest.Telemetry.OpenTelemetryTest do
 
     assert OpenTelemetry.with_context(nil, fn -> :returned end) == :returned
     assert OpenTelemetry.detach_trace_context(nil) == :ok
-    incoming = Jido.Signal.Trace.new(trace_flags: "01")
+    incoming = Trace.new(trace_flags: "01")
 
-    context_without_state =
-      OpenTelemetry.context_from_trace(%{
-        traceparent: Jido.Signal.Trace.to_traceparent(incoming),
-        tracestate: [:invalid]
-      })
+    context_without_state = OpenTelemetry.context_from_trace(incoming)
 
     OpenTelemetry.with_context(context_without_state, fn ->
       assert :otel_span.hex_trace_id(:otel_tracer.current_span_ctx()) == incoming.trace_id
     end)
 
-    context =
-      OpenTelemetry.context_from_trace(%{traceparent: Jido.Signal.Trace.to_traceparent(incoming)})
+    context = OpenTelemetry.context_from_trace(incoming)
 
     assert_raise RuntimeError, "work failed", fn ->
       OpenTelemetry.with_context(context, fn ->
@@ -184,10 +181,7 @@ defmodule JidoTest.Telemetry.OpenTelemetryTest do
 
     assert OpenTelemetry.current_context() == before
 
-    restore =
-      OpenTelemetry.restore_trace_context(%{
-        traceparent: Jido.Signal.Trace.to_traceparent(incoming)
-      })
+    restore = OpenTelemetry.restore_trace_context(incoming)
 
     refute is_nil(restore)
     assert OpenTelemetry.detach_trace_context(restore) == :ok
@@ -426,12 +420,17 @@ defmodule JidoTest.Telemetry.OpenTelemetryTest do
   end
 
   test "W3C context crosses Signal and task boundaries" do
-    incoming = Jido.Signal.Trace.new(trace_flags: "01", tracestate: "vendor=value")
+    incoming = Trace.new(trace_flags: "01", tracestate: "vendor=value")
     source = Signal.new!("test.trace.source", %{}, source: "/test")
-    assert {:ok, source} = Jido.Signal.Trace.put(source, incoming)
+    assert {:ok, source} = SignalContext.put_trace(source, incoming)
     trace = Context.begin_turn(source)
 
-    outer = Semantic.start([:jido, :agent, :turn], Map.put(trace, :turn_id, "turn-1"))
+    outer =
+      Semantic.start(
+        [:jido, :agent, :turn],
+        trace |> Trace.metadata() |> Map.put(:turn_id, "turn-1")
+      )
+
     assert_receive {:otel_start, outer_span, remote_parent, "jido.agent.turn", _opts}
     outer_ids = TestTracer.ids(outer_span)
     assert :otel_span.hex_trace_id(remote_parent) == incoming.trace_id
@@ -460,7 +459,7 @@ defmodule JidoTest.Telemetry.OpenTelemetryTest do
 
     target = Signal.new!("test.trace.target", %{}, source: "/test")
     assert {:ok, traced_target} = Context.propagate_to(target, source.id)
-    propagated = Jido.Signal.Trace.get(traced_target)
+    propagated = SignalContext.get_trace(traced_target)
     assert propagated.trace_id == outer_ids.hex_trace_id
     assert propagated.span_id == outer_ids.hex_span_id
     assert propagated.trace_flags == "01"
@@ -472,13 +471,8 @@ defmodule JidoTest.Telemetry.OpenTelemetryTest do
   end
 
   test "OpenTelemetry carrier conversion retains validated tracestate" do
-    incoming = Jido.Signal.Trace.new(trace_flags: "01", tracestate: "vendor=value")
-
-    context =
-      OpenTelemetry.context_from_trace(%{
-        traceparent: Jido.Signal.Trace.to_traceparent(incoming),
-        tracestate: incoming.tracestate
-      })
+    incoming = Trace.new(trace_flags: "01", tracestate: "vendor=value")
+    context = OpenTelemetry.context_from_trace(incoming)
 
     trace =
       OpenTelemetry.with_context(context, fn ->
@@ -496,9 +490,9 @@ defmodule JidoTest.Telemetry.OpenTelemetryTest do
   end
 
   test "a new Turn removes the previous Turn parent context" do
-    incoming = Jido.Signal.Trace.new()
+    incoming = Trace.new()
     traced = Signal.new!("test.trace.first", %{}, source: "/test")
-    assert {:ok, traced} = Jido.Signal.Trace.put(traced, incoming)
+    assert {:ok, traced} = SignalContext.put_trace(traced, incoming)
 
     Context.begin_turn(traced)
     assert :otel_span.is_valid(:otel_tracer.current_span_ctx())
@@ -513,12 +507,8 @@ defmodule JidoTest.Telemetry.OpenTelemetryTest do
     assert_receive {:otel_start, foreign_span, _parent, "jido.foreign", _opts}
     foreign_ids = TestTracer.ids(foreign_span)
 
-    incoming = Jido.Signal.Trace.new()
-
-    task_context =
-      OpenTelemetry.context_from_trace(%{
-        traceparent: Jido.Signal.Trace.to_traceparent(incoming)
-      })
+    incoming = Trace.new()
+    task_context = OpenTelemetry.context_from_trace(incoming)
 
     task =
       Task.async(fn ->
@@ -538,7 +528,7 @@ defmodule JidoTest.Telemetry.OpenTelemetryTest do
   test "an untraced Signal lets the SDK make the root sampling decision" do
     source = Signal.new!("test.trace.source", %{}, source: "/test")
     trace = Context.begin_turn(source)
-    span = Semantic.start([:jido, :agent, :turn], trace)
+    span = Semantic.start([:jido, :agent, :turn], Trace.metadata(trace))
 
     assert_receive {:otel_start, otel_span, parent, "jido.agent.turn", _opts}
     refute :otel_span.is_valid(parent)

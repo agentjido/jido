@@ -7,7 +7,9 @@ defmodule JidoTest.AgentServer.Effects.RulesTest do
   alias Jido.AgentServer.Effects
   alias Jido.Agent.Directive.Emit
   alias Jido.Dispatch.Preparation
-  alias Jido.Tracing.{Context, Trace}
+  alias Jido.Signal.Context, as: SignalContext
+  alias Jido.Trace
+  alias Jido.Trace.Context
   alias JidoTest.AgentServer.Fixtures, as: F
 
   defmodule Unowned do
@@ -50,13 +52,13 @@ defmodule JidoTest.AgentServer.Effects.RulesTest do
   test "dispatch preparation propagates causation and keeps safe fallbacks" do
     source = F.signal()
     outbound = F.signal(%{}, "out")
-    root = Trace.new_root()
+    root = Trace.new()
     Context.put(root)
     on_exit(&Context.clear/0)
 
     traced = Preparation.propagate(outbound, source)
-    assert Trace.get(traced).trace_id == root.trace_id
-    assert Trace.get(traced).causation_id == source.id
+    assert SignalContext.get_trace(traced).trace_id == root.trace_id
+    assert SignalContext.get_trace(traced).causation_id == source.id
 
     Context.clear()
     assert Preparation.propagate(outbound, source) == outbound
@@ -80,7 +82,7 @@ defmodule JidoTest.AgentServer.Effects.RulesTest do
     source = F.signal()
     outbound = F.signal(%{}, "out")
     agent = F.agent()
-    Context.put(Trace.new_root())
+    Context.put(Trace.new())
     on_exit(&Context.clear/0)
 
     context = %{
@@ -118,7 +120,7 @@ defmodule JidoTest.AgentServer.Effects.RulesTest do
     assert_receive {:signal, signal}, 1_000
     assert signal.type == "jido.agent_server.error"
     assert signal.data == %{status: :failed}
-    assert Trace.get(signal) == nil
+    assert SignalContext.get_trace(signal) == nil
   end
 
   defp config(c) do

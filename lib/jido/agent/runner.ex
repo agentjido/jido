@@ -360,10 +360,12 @@ defmodule Jido.Agent.Runner do
 
   defp build_reply_signal(type, data, %Prepared{} = prepared) do
     with {:ok, signal} <- Signal.new(type, data, source: prepared.agent.signal_source),
-         {:ok, _request, trace} <- Signal.Trace.ensure(prepared.turn.source_signal),
-         {:ok, signal} <- Signal.Trace.put(signal, trace),
+         {:ok, _request, trace} <- Signal.Context.ensure_trace(prepared.turn.source_signal),
          {:ok, signal} <-
-           Signal.put_context(signal, "jidocausationid", prepared.turn.source_signal.id) do
+           Signal.Context.put_trace(
+             signal,
+             Jido.Trace.with_causation(trace, prepared.turn.source_signal.id)
+           ) do
       {:ok, signal}
     else
       {:error, reason} ->
