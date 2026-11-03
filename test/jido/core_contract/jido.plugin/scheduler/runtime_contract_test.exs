@@ -3,7 +3,8 @@ defmodule JidoTest.Contract.PluginSchedulerRuntimeTest do
   use Covenant.Case, component: "jido.plugin.scheduler", async: false
 
   alias Jido.AgentServer, as: Server
-  alias Jido.Plugin.{DirectiveContext, Init}
+  alias Jido.Plugin.Context, as: PluginContext
+  alias Jido.Plugin.Init
   alias Jido.Plugin.Scheduler
   alias Jido.Plugin.Scheduler.Runtime
   alias Jido.Signal
@@ -101,7 +102,8 @@ defmodule JidoTest.Contract.PluginSchedulerRuntimeTest do
   end
 
   defp context(runtime, plugin_state, version, signal \\ tick()) do
-    %DirectiveContext{
+    %PluginContext{
+      phase: :directive,
       turn_id: "turn",
       agent_id: runtime.agent_id,
       source_signal: signal,

@@ -3,7 +3,7 @@ defmodule Jido.Plugin.FacetsTest do
 
   alias Jido.Agent
   alias Jido.Persistence.Plugin, as: PersistencePlugin
-  alias Jido.Plugin.DirectiveContext
+  alias Jido.Plugin.Context
   alias Jido.Signal
 
   defmodule Effect do
@@ -534,7 +534,7 @@ defmodule Jido.Plugin.FacetsTest do
                  spec,
                  nil,
                  %Effect{label: "validated:facet"},
-                 struct(DirectiveContext)
+                 struct(Context, phase: :directive)
                )
 
       dump_context = PersistencePlugin.context(spec, :dump, 1, :test)

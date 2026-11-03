@@ -4,7 +4,7 @@ defmodule Jido.AgentServer.Plugin do
   alias Jido.Error
   alias Jido.AgentServer.Command
   alias Jido.AgentServer.Plugin.{Callbacks, Commit}
-  alias Jido.Plugin.{DirectiveContext, Init}
+  alias Jido.Plugin.Init
 
   @doc false
   @spec state(Init.t(), timeout()) :: {:ok, term()} | {:error, term()}
@@ -146,7 +146,8 @@ defmodule Jido.AgentServer.Plugin do
         :unowned
 
       owner ->
-        context = %DirectiveContext{
+        context = %Jido.Plugin.Context{
+          phase: :directive,
           turn_id: active.turn_id,
           agent_id: data.agent.id,
           source_signal: active.source_signal,

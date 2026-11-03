@@ -3,7 +3,7 @@ defmodule Jido.AgentServer.Plugin.Callbacks do
 
   alias Jido.AgentServer.Command
   alias Jido.AgentServer.Plugin.{Admission, Commit, Spec}
-  alias Jido.Plugin.{DirectiveContext, Init, Input, SignalContext}
+  alias Jido.Plugin.{Context, Init, Input}
   alias Jido.Plugin, as: PluginBoundary
 
   @doc false
@@ -58,7 +58,7 @@ defmodule Jido.AgentServer.Plugin.Callbacks do
           Jido.Signal.t(),
           [Jido.Plugin.Spec.t()],
           %{optional(module()) => term() | nil},
-          SignalContext.t(),
+          Context.signal_t(),
           map()
         ) :: {:ok, Jido.Signal.t()} | {:error, term()}
   def prepare_outbound(%Jido.Signal{} = signal, specs, runtime_refs, context, agent_state) do
@@ -84,13 +84,13 @@ defmodule Jido.AgentServer.Plugin.Callbacks do
   end
 
   @doc false
-  @spec dispatch(Jido.Plugin.Spec.t(), term(), struct(), DirectiveContext.t()) ::
+  @spec dispatch(Jido.Plugin.Spec.t(), term(), struct(), Context.directive_t()) ::
           :ok | {:error, term()}
   def dispatch(
         %Jido.Plugin.Spec{agent_server: %Spec{} = spec},
         runtime_ref,
         directive,
-        %DirectiveContext{} = context
+        %Context{phase: :directive} = context
       ) do
     PluginBoundary.invoke(
       spec.package,

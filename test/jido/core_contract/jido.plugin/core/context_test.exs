@@ -1,7 +1,7 @@
-defmodule Jido.Plugin.SignalContextTest do
+defmodule Jido.Plugin.ContextTest do
   use Covenant.Case, component: "jido.plugin", async: true
 
-  alias Jido.Plugin.{DirectiveContext, Init, Input, SignalContext}
+  alias Jido.Plugin.{Context, Init, Input}
   alias Jido.Signal
 
   @tag obligation: "jido.plugin.I9"
@@ -9,6 +9,7 @@ defmodule Jido.Plugin.SignalContextTest do
     source = Signal.new!("plugin.source", %{}, source: "/test")
 
     attrs = %{
+      phase: :signal,
       turn_id: "turn-1",
       agent_id: "agent-1",
       source_signal: source,
@@ -21,10 +22,13 @@ defmodule Jido.Plugin.SignalContextTest do
       partition: "west"
     }
 
-    assert {:ok, %SignalContext{} = context} = Jido.Joi.parse(SignalContext.schema(), attrs)
+    assert {:ok, %Context{phase: :signal} = context} =
+             Jido.Joi.parse(Context.schema(:signal), attrs)
+
     assert Map.from_struct(context) == attrs
 
-    assert {:error, _reason} = Jido.Joi.parse(SignalContext.schema(), Map.put(attrs, :extra, true))
+    assert {:error, _reason} =
+             Jido.Joi.parse(Context.schema(:signal), Map.put(attrs, :extra, true))
   end
 
   @tag obligation: "jido.plugin.I9"
@@ -32,6 +36,7 @@ defmodule Jido.Plugin.SignalContextTest do
     source = Signal.new!("plugin.source", %{}, source: "/test")
 
     required = %{
+      phase: :signal,
       turn_id: "turn-1",
       agent_id: "agent-1",
       source_signal: source,
@@ -41,17 +46,24 @@ defmodule Jido.Plugin.SignalContextTest do
       plugin_state: nil
     }
 
-    assert {:ok, %SignalContext{turn_context: %{}}} =
-             Jido.Joi.parse(SignalContext.schema(), required)
+    assert {:ok, %Context{phase: :signal, turn_context: %{}}} =
+             Jido.Joi.parse(Context.schema(:signal), required)
 
     for changes <- [
+          %{phase: :directive},
           %{turn_id: 1},
           %{agent_id: nil},
           %{source_signal: :invalid},
           %{effective_signal: :invalid},
           %{state_version: -1}
         ] do
-      assert {:error, _reason} = Jido.Joi.parse(SignalContext.schema(), Map.merge(required, changes))
+      assert {:error, _reason} =
+               Jido.Joi.parse(Context.schema(:signal), Map.merge(required, changes))
+    end
+
+    for key <- [:phase, :target] do
+      assert {:error, _reason} =
+               Jido.Joi.parse(Context.schema(:signal), Map.delete(required, key))
     end
   end
 
@@ -95,6 +107,7 @@ defmodule Jido.Plugin.SignalContextTest do
     source = Signal.new!("plugin.source", %{}, source: "/test")
 
     attrs = %{
+      phase: :directive,
       turn_id: "turn-1",
       agent_id: "agent-1",
       source_signal: source,
@@ -106,18 +119,19 @@ defmodule Jido.Plugin.SignalContextTest do
       partition: "west"
     }
 
-    assert {:ok, %DirectiveContext{} = context} =
-             Jido.Joi.parse(DirectiveContext.schema(), attrs)
+    assert {:ok, %Context{phase: :directive} = context} =
+             Jido.Joi.parse(Context.schema(:directive), attrs)
 
-    assert Map.from_struct(context) == attrs
+    assert Map.from_struct(context) == Map.put(attrs, :target, nil)
 
-    assert {:ok, %DirectiveContext{turn_context: %{}}} =
+    assert {:ok, %Context{phase: :directive, turn_context: %{}}} =
              Jido.Joi.parse(
-               DirectiveContext.schema(),
+               Context.schema(:directive),
                Map.drop(attrs, [:turn_context, :jido, :partition])
              )
 
     for key <- [
+          :phase,
           :turn_id,
           :agent_id,
           :source_signal,
@@ -125,12 +139,17 @@ defmodule Jido.Plugin.SignalContextTest do
           :state_version,
           :plugin_state
         ] do
-      assert {:error, _reason} = Jido.Joi.parse(DirectiveContext.schema(), Map.delete(attrs, key))
+      assert {:error, _reason} =
+               Jido.Joi.parse(Context.schema(:directive), Map.delete(attrs, key))
     end
 
-    assert {:error, _reason} = Jido.Joi.parse(DirectiveContext.schema(), %{attrs | state_version: -1})
+    assert {:error, _reason} =
+             Jido.Joi.parse(Context.schema(:directive), %{attrs | state_version: -1})
 
     assert {:error, _reason} =
-             Jido.Joi.parse(DirectiveContext.schema(), Map.put(attrs, :extra, true))
+             Jido.Joi.parse(Context.schema(:directive), Map.put(attrs, :extra, true))
+
+    assert {:error, _reason} =
+             Jido.Joi.parse(Context.schema(:directive), Map.put(attrs, :target, self()))
   end
 end

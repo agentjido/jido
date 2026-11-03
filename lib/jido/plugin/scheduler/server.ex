@@ -2,12 +2,12 @@ defmodule Jido.Plugin.Scheduler.Server do
   @moduledoc false
   @behaviour Jido.Plugin
 
-  alias Jido.Plugin.{DirectiveContext, Init}
+  alias Jido.Plugin.{Context, Init}
   alias Jido.Plugin.Scheduler
   alias Jido.Plugin.Scheduler.Runtime
 
   @impl true
-  def dispatch(runtime, directive, %DirectiveContext{} = context, opts) do
+  def dispatch(runtime, directive, %Context{phase: :directive} = context, opts) do
     GenServer.call(runtime, {:directive, directive, context}, Keyword.get(opts, :timeout, 5_000))
   catch
     :exit, reason -> {:error, {:scheduler_runtime_unavailable, reason}}

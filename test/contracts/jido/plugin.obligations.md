@@ -1,12 +1,11 @@
 ---
 modules:
   - Jido.Plugin
-  - Jido.Plugin.DirectiveContext
+  - Jido.Plugin.Context
   - Jido.Plugin.Init
   - Jido.Plugin.Input
   - Jido.Plugin.Manifest
   - Jido.Plugin.Normalizer
-  - Jido.Plugin.SignalContext
   - Jido.Plugin.Spec
 ---
 
@@ -15,7 +14,7 @@ modules:
 Protect the generic Plugin declaration and callback contract. This component
 defines valid Plugin metadata, callback shapes, and narrow handoff values. Its
 public modules are `Jido.Plugin`, `Jido.Plugin.Input`, `Jido.Plugin.Init`,
-`Jido.Plugin.SignalContext`, and `Jido.Plugin.DirectiveContext`. Manifest,
+`Jido.Plugin.Context`. Manifest,
 normalization, aggregate Spec, and callback error policy are internal.
 
 `Jido.Plugin.state/2` is the public convenience facade for a running Plugin.
@@ -91,7 +90,7 @@ Plugin does.
 
 ### jido.plugin.I9 — Generic Plugin context values
 
-- **scope:** `Jido.Plugin.Input`, `Jido.Plugin.Init`, `Jido.Plugin.SignalContext`, `Jido.Plugin.DirectiveContext`
+- **scope:** `Jido.Plugin.Input`, `Jido.Plugin.Init`, `Jido.Plugin.Context`
 - **must:** Keep prepared and runtime input separate. Validate exact runtime initialization and narrow Signal and Directive contexts with their required identity, Signal, version, owned-state, option, instance, and partition fields. Supply only documented empty defaults. Permit the owning AgentServer PID only in Init and transient handles only in runtime input and Turn context. Do not place complete Agent values in these generic structs.
 - **why:** Consumers need narrow handoff values that do not create a second Agent state or leak full runtime ownership.
 - **kind:** functional

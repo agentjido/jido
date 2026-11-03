@@ -4,7 +4,7 @@ defmodule JidoTest.AgentServer.PluginRuntime.RulesTest do
 
   alias Jido.AgentServer.Plugin
   alias Jido.AgentServer.Plugin.{Callbacks, Commit}
-  alias Jido.Plugin.{DirectiveContext, Init, SignalContext}
+  alias Jido.Plugin.{Context, Init}
 
   defmodule Effect do
     use Jido.Agent.Directive
@@ -134,7 +134,8 @@ defmodule JidoTest.AgentServer.PluginRuntime.RulesTest do
     signal = Jido.Signal.new!("plugin.output", %{trace: []}, source: "/test")
 
     context =
-      struct!(SignalContext,
+      struct!(Context,
+        phase: :signal,
         turn_id: "turn",
         agent_id: "agent",
         source_signal: signal,
@@ -168,7 +169,8 @@ defmodule JidoTest.AgentServer.PluginRuntime.RulesTest do
     signal = Jido.Signal.new!("plugin.output", %{}, source: "/test")
 
     context =
-      struct!(SignalContext,
+      struct!(Context,
+        phase: :signal,
         turn_id: "turn",
         agent_id: "agent",
         source_signal: signal,
@@ -258,7 +260,8 @@ defmodule JidoTest.AgentServer.PluginRuntime.RulesTest do
     }
 
     directive_context =
-      struct!(DirectiveContext,
+      struct!(Context,
+        phase: :directive,
         turn_id: "turn",
         agent_id: agent.id,
         source_signal: signal,

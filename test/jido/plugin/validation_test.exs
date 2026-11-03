@@ -2,7 +2,7 @@ defmodule Jido.Plugin.ValidationTest do
   use JidoTest.Case, async: true
 
   alias Jido.Plugin
-  alias Jido.Plugin.{Init, SignalContext}
+  alias Jido.Plugin.{Context, Init}
 
   defmodule Effect do
     defstruct [:value]
@@ -615,7 +615,8 @@ defmodule Jido.Plugin.ValidationTest do
   test "outbound preparation rejects invalid results and preserves explicit errors" do
     outbound = signal("plugin.output")
 
-    context = %SignalContext{
+    context = %Context{
+      phase: :signal,
       turn_id: "turn",
       agent_id: "agent",
       source_signal: outbound,
@@ -648,7 +649,8 @@ defmodule Jido.Plugin.ValidationTest do
     outbound = signal("plugin.output")
     invalid = %{outbound | source: "not a URI reference"}
 
-    context = %SignalContext{
+    context = %Context{
+      phase: :signal,
       turn_id: "turn",
       agent_id: "agent",
       source_signal: outbound,

@@ -71,11 +71,11 @@ defmodule Jido.Plugin do
   @callback prepare_outbound(
               term() | nil,
               Jido.Signal.t(),
-              Jido.Plugin.SignalContext.t(),
+              Jido.Plugin.Context.signal_t(),
               keyword()
             ) ::
               {:ok, Jido.Signal.t()} | {:error, term()}
-  @callback dispatch(term() | nil, struct(), Jido.Plugin.DirectiveContext.t(), keyword()) ::
+  @callback dispatch(term() | nil, struct(), Jido.Plugin.Context.directive_t(), keyword()) ::
               :ok | {:error, term()}
   @callback child_spec(Init.t()) :: Supervisor.child_spec()
   @callback await_ready(term(), keyword()) :: :ok | {:error, term()}

@@ -2,7 +2,7 @@ defmodule Jido.Plugin.OrderingTest do
   use JidoTest.Case, async: true
 
   alias Jido.AgentServer.Command
-  alias Jido.Plugin.SignalContext
+  alias Jido.Plugin.Context
 
   defmodule Agent do
     use Jido.Agent, name: "plugin_ordering_agent"
@@ -394,7 +394,8 @@ defmodule Jido.Plugin.OrderingTest do
     source = signal("plugin.order")
 
     context =
-      struct!(SignalContext,
+      struct!(Context,
+        phase: :signal,
         turn_id: "turn-1",
         agent_id: "agent-1",
         source_signal: source,
@@ -431,7 +432,8 @@ defmodule Jido.Plugin.OrderingTest do
     source = signal("plugin.order")
 
     context =
-      struct!(SignalContext,
+      struct!(Context,
+        phase: :signal,
         turn_id: "turn-1",
         agent_id: "agent-1",
         source_signal: source,

@@ -5,7 +5,7 @@ defmodule JidoTest.Contract.PluginSensorManagerTest do
   alias Jido.Agent.Directive
   alias Jido.Agent.Plugin.Reduction
   alias Jido.AgentServer
-  alias Jido.Plugin.DirectiveContext
+  alias Jido.Plugin.Context
   alias Jido.Plugin.Init, as: PluginInit
   alias Jido.Plugin.Normalizer
   alias Jido.Plugin.SensorManager
@@ -383,7 +383,8 @@ defmodule JidoTest.Contract.PluginSensorManagerTest do
     assert {:error, {:sensor_manager_runtime_unavailable, _reason}} =
              Server.await_ready(runtime, [])
 
-    context = struct(DirectiveContext, plugin_state: %{desired: %{}}, state_version: 1)
+    context =
+      struct(Context, phase: :directive, plugin_state: %{desired: %{}}, state_version: 1)
 
     assert {:error, {:sensor_manager_runtime_unavailable, _reason}} =
              Server.dispatch(runtime, SensorManager.stop(:source), context, [])

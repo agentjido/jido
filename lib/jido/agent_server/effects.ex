@@ -264,7 +264,8 @@ defmodule Jido.AgentServer.Effects do
   end
 
   defp prepare_outbound(signal, target, context) do
-    signal_context = %Jido.Plugin.SignalContext{
+    signal_context = %Jido.Plugin.Context{
+      phase: :signal,
       turn_id: context.turn_id,
       agent_id: context.agent.id,
       source_signal: context.source_signal,

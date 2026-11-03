@@ -4,12 +4,11 @@ defmodule JidoTest.PluginContract.ApiTest do
   alias Jido.Plugin
 
   alias Jido.Plugin.{
-    DirectiveContext,
+    Context,
     Init,
     Input,
     Manifest,
     Normalizer,
-    SignalContext,
     Spec
   }
 
@@ -18,10 +17,9 @@ defmodule JidoTest.PluginContract.ApiTest do
     assert documented_api(Plugin) == [{:function, :state, 2}, {:macro, :__using__, 1}]
     assert documented_api(Input) == []
     assert documented_api(Init) == [{:function, :schema, 0}]
-    assert documented_api(SignalContext) == [{:function, :schema, 0}]
-    assert documented_api(DirectiveContext) == [{:function, :schema, 0}]
+    assert documented_api(Context) == [{:function, :schema, 1}]
 
-    for module <- [Plugin, Input, Init, SignalContext, DirectiveContext] do
+    for module <- [Plugin, Context, Input, Init] do
       assert public_module?(module)
     end
 

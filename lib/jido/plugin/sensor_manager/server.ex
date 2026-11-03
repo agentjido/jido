@@ -2,7 +2,7 @@ defmodule Jido.Plugin.SensorManager.Server do
   @moduledoc false
   @behaviour Jido.Plugin
 
-  alias Jido.Plugin.{DirectiveContext, Init}
+  alias Jido.Plugin.{Context, Init}
   alias Jido.Plugin.SensorManager
   alias Jido.Plugin.SensorManager.Runtime
 
@@ -27,7 +27,7 @@ defmodule Jido.Plugin.SensorManager.Server do
   end
 
   @impl true
-  def dispatch(runtime, _directive, %DirectiveContext{} = context, _opts) do
+  def dispatch(runtime, _directive, %Context{phase: :directive} = context, _opts) do
     Runtime.reconcile(
       runtime,
       context.plugin_state.desired,

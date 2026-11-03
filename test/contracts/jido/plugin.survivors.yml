@@ -58,55 +58,55 @@
   sort: log-only
   reason: "The contract fixes the error type and structured details. It does not fix human-readable error prose."
 
-- at: "lib/jido/plugin/directive_context.ex:13:48"
+- at: "lib/jido/plugin/context.ex:13:38"
   operator: "string_empty"
   mutation: "`\"Source Turn identifier\"` → `\"\"`"
   sort: log-only
   reason: "The contract fixes the field and validation behavior. It does not fix schema description prose."
 
-- at: "lib/jido/plugin/directive_context.ex:14:49"
+- at: "lib/jido/plugin/context.ex:14:39"
   operator: "string_empty"
   mutation: "`\"Owning Agent identifier\"` → `\"\"`"
   sort: log-only
   reason: "The contract fixes the field and validation behavior. It does not fix schema description prose."
 
-- at: "lib/jido/plugin/directive_context.ex:16:54"
+- at: "lib/jido/plugin/context.ex:15:58"
   operator: "string_empty"
   mutation: "`\"Signal received by the Server\"` → `\"\"`"
   sort: log-only
   reason: "The contract fixes the field and validation behavior. It does not fix schema description prose."
 
-- at: "lib/jido/plugin/directive_context.ex:18:54"
+- at: "lib/jido/plugin/context.ex:16:61"
   operator: "string_empty"
   mutation: "`\"Signal after live admission\"` → `\"\"`"
   sort: log-only
   reason: "The contract fixes the field and validation behavior. It does not fix schema description prose."
 
-- at: "lib/jido/plugin/directive_context.ex:20:42"
+- at: "lib/jido/plugin/context.ex:17:45"
   operator: "string_empty"
   mutation: "`\"Committed Agent state version\"` → `\"\"`"
   sort: log-only
   reason: "The contract fixes the field and validation behavior. It does not fix schema description prose."
 
-- at: "lib/jido/plugin/directive_context.ex:22:38"
+- at: "lib/jido/plugin/context.ex:18:40"
   operator: "string_empty"
   mutation: "`\"Committed value from the Plugin-owned Agent field\"` → `\"\"`"
   sort: log-only
   reason: "The contract fixes the field and validation behavior. It does not fix schema description prose."
 
-- at: "lib/jido/plugin/directive_context.ex:24:38"
+- at: "lib/jido/plugin/context.ex:19:40"
   operator: "string_empty"
   mutation: "`\"Admitted transient Turn context\"` → `\"\"`"
   sort: log-only
   reason: "The contract fixes the field and validation behavior. It does not fix schema description prose."
 
-- at: "lib/jido/plugin/directive_context.ex:25:43"
+- at: "lib/jido/plugin/context.ex:20:43"
   operator: "string_empty"
   mutation: "`\"Optional Jido instance\"` → `\"\"`"
   sort: log-only
   reason: "The contract fixes the field and validation behavior. It does not fix schema description prose."
 
-- at: "lib/jido/plugin/directive_context.ex:26:47"
+- at: "lib/jido/plugin/context.ex:21:47"
   operator: "string_empty"
   mutation: "`\"Optional Agent partition\"` → `\"\"`"
   sort: log-only
@@ -448,62 +448,8 @@
   sort: log-only
   reason: "The contract fixes the error type and structured details. It does not fix human-readable error prose."
 
-- at: "lib/jido/plugin/signal_context.ex:13:48"
-  operator: "string_empty"
-  mutation: "`\"Source Turn identifier\"` → `\"\"`"
-  sort: log-only
-  reason: "The contract fixes the field and validation behavior. It does not fix schema description prose."
-
-- at: "lib/jido/plugin/signal_context.ex:14:49"
-  operator: "string_empty"
-  mutation: "`\"Owning Agent identifier\"` → `\"\"`"
-  sort: log-only
-  reason: "The contract fixes the field and validation behavior. It does not fix schema description prose."
-
-- at: "lib/jido/plugin/signal_context.ex:16:54"
-  operator: "string_empty"
-  mutation: "`\"Unchanged Signal received by the Server\"` → `\"\"`"
-  sort: log-only
-  reason: "The contract fixes the field and validation behavior. It does not fix schema description prose."
-
-- at: "lib/jido/plugin/signal_context.ex:18:54"
-  operator: "string_empty"
-  mutation: "`\"Signal used for the Agent Turn\"` → `\"\"`"
-  sort: log-only
-  reason: "The contract fixes the field and validation behavior. It does not fix schema description prose."
-
-- at: "lib/jido/plugin/signal_context.ex:20:38"
-  operator: "string_empty"
-  mutation: "`\"Prepared transient Turn context\"` → `\"\"`"
-  sort: log-only
-  reason: "The contract fixes the field and validation behavior. It does not fix schema description prose."
-
-- at: "lib/jido/plugin/signal_context.ex:21:44"
+- at: "lib/jido/plugin/context.ex:28:50"
   operator: "string_empty"
   mutation: "`\"Outbound Signal target\"` → `\"\"`"
-  sort: log-only
-  reason: "The contract fixes the field and validation behavior. It does not fix schema description prose."
-
-- at: "lib/jido/plugin/signal_context.ex:23:42"
-  operator: "string_empty"
-  mutation: "`\"Committed Agent state version\"` → `\"\"`"
-  sort: log-only
-  reason: "The contract fixes the field and validation behavior. It does not fix schema description prose."
-
-- at: "lib/jido/plugin/signal_context.ex:25:38"
-  operator: "string_empty"
-  mutation: "`\"Committed value from the Plugin-owned Agent field\"` → `\"\"`"
-  sort: log-only
-  reason: "The contract fixes the field and validation behavior. It does not fix schema description prose."
-
-- at: "lib/jido/plugin/signal_context.ex:26:43"
-  operator: "string_empty"
-  mutation: "`\"Optional Jido instance\"` → `\"\"`"
-  sort: log-only
-  reason: "The contract fixes the field and validation behavior. It does not fix schema description prose."
-
-- at: "lib/jido/plugin/signal_context.ex:27:47"
-  operator: "string_empty"
-  mutation: "`\"Optional Agent partition\"` → `\"\"`"
   sort: log-only
   reason: "The contract fixes the field and validation behavior. It does not fix schema description prose."

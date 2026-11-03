@@ -302,7 +302,7 @@
   operator: return_nil
   mutation: '`signal` → `nil`'
   sort: dead-code
-  reason: Plugin dispatch always supplies DirectiveContext, so the non-context fallback is not reached by the runtime contract.
+  reason: Plugin dispatch always supplies a directive-phase Plugin Context, so the non-context fallback is not reached by the runtime contract.
 
 - at: lib/jido/plugin/scheduler/runtime.ex:375:9
   operator: element_removal

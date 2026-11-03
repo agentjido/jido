@@ -4,7 +4,7 @@ defmodule Jido.Plugin.Scheduler.Runtime do
   use GenServer
 
   alias Jido.AgentServer, as: Server
-  alias Jido.Plugin.{DirectiveContext, Init}
+  alias Jido.Plugin.{Context, Init}
   alias Jido.Plugin.Scheduler
   alias Jido.Plugin.Scheduler.{Cancel, Cron, Schedule, WallClock}
   alias Jido.Signal
@@ -55,7 +55,7 @@ defmodule Jido.Plugin.Scheduler.Runtime do
   def handle_call(:await_ready, _from, runtime), do: {:reply, :ok, runtime}
 
   def handle_call(
-        {:directive, %Schedule{} = directive, %DirectiveContext{} = context},
+        {:directive, %Schedule{} = directive, %Context{phase: :directive} = context},
         _from,
         runtime
       ) do
@@ -75,7 +75,7 @@ defmodule Jido.Plugin.Scheduler.Runtime do
     end
   end
 
-  def handle_call({:directive, directive, %DirectiveContext{} = context}, _from, runtime)
+  def handle_call({:directive, directive, %Context{phase: :directive} = context}, _from, runtime)
       when is_struct(directive, Cron) or is_struct(directive, Cancel) do
     if stale_state_version?(runtime.last_reconciled_version, context.state_version) do
       {:reply, :ok, runtime}
@@ -403,7 +403,7 @@ defmodule Jido.Plugin.Scheduler.Runtime do
     kind, reason -> {:error, {:time_scale_unavailable, callback, {kind, reason}}}
   end
 
-  defp scheduled_signal(%Signal{} = signal, %DirectiveContext{effective_signal: source}),
+  defp scheduled_signal(%Signal{} = signal, %Context{effective_signal: source}),
     do: propagate(signal, source)
 
   defp propagate(%Signal{} = signal, %Signal{} = source) do
@@ -453,9 +453,9 @@ defmodule Jido.Plugin.Scheduler.Runtime do
     }
   end
 
-  defp context_state_version(%DirectiveContext{state_version: version}, _default), do: version
+  defp context_state_version(%Context{state_version: version}, _default), do: version
   defp context_state_version(_context, default), do: default
-  defp context_turn_id(%DirectiveContext{turn_id: turn_id}), do: turn_id
+  defp context_turn_id(%Context{turn_id: turn_id}), do: turn_id
   defp context_turn_id(_context), do: nil
 
   defp adapter_call(adapter, function, arguments) do
