@@ -413,8 +413,8 @@ defmodule Jido.Exec do
     effects = get_in(meta, [:jido, :effects]) || []
 
     case {get_in(meta, [:jido, :control]), value} do
-      {:handoff, %Jido.Exec.Handoff{} = request} ->
-        {:handoff, %Instruction{target: request.target, kind: request.kind, params: request.params}, effects}
+      {:handoff, %Instruction{} = instruction} ->
+        {:handoff, instruction, effects}
 
       _ ->
         if effects == [], do: {:ok, value}, else: {:ok, value, effects}

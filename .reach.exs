@@ -64,6 +64,7 @@
       "Jido.Telemetry.Exec",
       "Runic.Component.Jido.Exec.*",
       "Runic.Identity.Projectable.Jido.Exec.*",
+      "Runic.Identity.Projectable.Jido.Instruction",
       "Runic.Transmutable.Jido.Instruction",
       "Runic.Transmutable.Jido.Exec.*",
       "Runic.Workflow.Invokable.Jido.Exec.*"
@@ -143,6 +144,7 @@
       "Jido.Flow.TargetValidator",
       "Jido.Exec.Source",
       "Jido.Exec.Portable",
+      "Jido.Exec.Handoff",
       "Jido.Agent.Command",
       "Jido.Agent.Authoring",
       "Jido.Agent.Callback",
@@ -201,6 +203,7 @@
       "lib/jido/flow/target_validator.ex",
       "lib/jido/exec/source.ex",
       "lib/jido/exec/portable.ex",
+      "lib/jido/exec/handoff.ex",
       "lib/jido/agent/command.ex",
       "lib/jido/agent/authoring.ex",
       "lib/jido/agent/callback.ex",

@@ -4,7 +4,7 @@ defmodule Jido.Exec.HandoffTest do
   @moduletag capture_log: true
 
   alias Jido.Exec
-  alias Jido.Exec.Handoff
+  alias Jido.Exec.Runtime
   alias Jido.Flow
   alias Jido.Catalog
   alias Jido.Flow.Ref
@@ -21,7 +21,17 @@ defmodule Jido.Exec.HandoffTest do
     def name, do: "handoff_validator_data"
     def validate_params(params), do: {:ok, params}
     def run(_params, _context), do: {:ok, %{}}
-    def validate_output(_value), do: {:ok, %Handoff{target: Enum, kind: :action, params: %{}}}
+
+    def validate_output(_value) do
+      {:ok,
+       %Jido.Instruction{
+         target: Enum,
+         kind: :action,
+         params: %{},
+         context: %{},
+         metadata: %{}
+       }}
+    end
   end
 
   defmodule SelectRuntime do
@@ -101,7 +111,7 @@ defmodule Jido.Exec.HandoffTest do
   end
 
   test "ordinary data and validator output cannot grant control" do
-    forged = %Handoff{target: Enum, kind: :action, params: %{}}
+    forged = %Instruction{target: Enum, kind: :action, params: %{}, context: %{}, metadata: %{}}
 
     flow =
       Flow.new!(%{
@@ -346,19 +356,19 @@ defmodule Jido.Exec.HandoffTest do
            } = selector_node
   end
 
-  test "handoff envelopes reject invalid targets and declared non-portable input" do
-    assert {:error, _} = Handoff.new(Enum, %{})
+  test "handoff normalization rejects invalid targets and declared non-portable input" do
+    assert {:error, _} = Runtime.handoff(Enum, %{})
 
-    assert {:ok, %Handoff{params: %{value: 1}}} =
-             Handoff.new(Target, %{value: 1, resource: self()})
+    assert {:ok, %Instruction{params: %{value: 1}}} =
+             Runtime.handoff(Target, %{value: 1, resource: self()})
 
-    assert {:error, _} = Handoff.new(PortableTarget, %{value: 1, resource: self()})
+    assert {:error, _} = Runtime.handoff(PortableTarget, %{value: 1, resource: self()})
 
     for runtime <- [context: %{tenant: "tenant"}, metadata: %{request_id: "request"}] do
       bound = Instruction.new!([target: Target] ++ [runtime])
 
       assert {:error, %{details: %{reason: :bound_handoff_runtime}}} =
-               Handoff.new(bound, %{value: 1})
+               Runtime.handoff(bound, %{value: 1})
     end
   end
 

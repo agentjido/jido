@@ -358,7 +358,7 @@ defmodule Jido.Exec.Node.Action do
            ) do
       case result do
         {:handoff, successor_input, target} ->
-          with {:ok, handoff} <- Jido.Exec.Handoff.new(target, successor_input) do
+          with {:ok, handoff} <- Runtime.handoff(target, successor_input) do
             {:ok, {:jido_handoff, frame, component, handoff, []}, []}
           end
 

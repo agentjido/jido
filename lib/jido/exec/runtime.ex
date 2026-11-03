@@ -114,6 +114,18 @@ defmodule Jido.Exec.Runtime do
   end
 
   @doc false
+  @spec handoff(term(), term()) :: {:ok, Instruction.t()} | {:error, Exception.t()}
+  def handoff(target, params) do
+    with {:ok, instruction} <- Instruction.resolve(target, params),
+         :ok <- unbound_handoff(instruction),
+         {:ok, _workflow} <- Jido.Exec.compile(instruction),
+         {:ok, params} <- Validation.input(instruction.target, instruction.params),
+         :ok <- validate_local(params, :handoff_input) do
+      {:ok, %{instruction | params: params}}
+    end
+  end
+
+  @doc false
   @spec validate_local(term(), atom()) :: :ok | {:error, Exception.t()}
   def validate_local(value, field) do
     case walk_local(value, [field]) do
@@ -180,6 +192,17 @@ defmodule Jido.Exec.Runtime do
   defp local_type(term) when is_port(term), do: :port
   defp local_type(term) when is_reference(term), do: :reference
   defp local_type(term) when is_function(term), do: :function
+
+  defp unbound_handoff(%Instruction{context: context, metadata: metadata})
+       when map_size(context) == 0 and map_size(metadata) == 0,
+       do: :ok
+
+  defp unbound_handoff(_instruction) do
+    {:error,
+     Error.config_error("handoff target must not bind runtime context or metadata", %{
+       reason: :bound_handoff_runtime
+     })}
+  end
 
   @doc false
   @spec wait_context(map(), term(), Wait.clock()) :: map()

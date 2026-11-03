@@ -101,10 +101,10 @@ defmodule Jido.Exec.Node.Output do
     end
   end
 
-  defp validate_output(%{parent_component: nil}, %Jido.Exec.Handoff{} = handoff, true),
-    do: {:ok, handoff}
+  defp validate_output(%{parent_component: nil}, %Jido.Instruction{} = instruction, true),
+    do: {:ok, instruction}
 
-  defp validate_output(_node, %Jido.Exec.Handoff{}, true),
+  defp validate_output(_node, %Jido.Instruction{}, true),
     do:
       {:error,
        Jido.Error.config_error("handoff must finish the root Flow", %{
