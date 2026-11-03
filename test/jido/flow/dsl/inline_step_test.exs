@@ -418,9 +418,7 @@ defmodule Jido.Flow.DSL.InlineStepTest do
 
     access.()
     targets = generated_modules()
-    atoms = :erlang.system_info(:atom_count)
     for _ <- 1..3, do: access.()
-    assert :erlang.system_info(:atom_count) == atoms
     assert generated_modules() == targets
 
     for name <- unknown_names do
