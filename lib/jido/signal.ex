@@ -63,10 +63,18 @@ defmodule Jido.Signal do
   by exact type and schema identity when it decodes or validates a Signal.
   """
 
-  alias Jido.Signal.Context
-  alias Jido.Codec.Signal.CloudEvents
-
   @default_data_schema Joi.any()
+
+  @core_names ~w[
+    specversion id source type subject time
+    datacontenttype dataschema data data_base64
+  ]
+  @constructor_names ["extensions" | @core_names]
+  @legacy_wire_version_key "jido_schema_version"
+  @legacy_wire_versions [1, 2]
+  @extension_name_pattern ~r/\A[a-z][a-z0-9]{0,19}\z/
+  @extension_min_integer -2_147_483_648
+  @extension_max_integer 2_147_483_647
 
   @media_type_pattern ~r{\A[!#$%&'*+.^_`|~0-9A-Za-z-]+/[!#$%&'*+.^_`|~0-9A-Za-z-]+(?:[ \t]*;[ \t]*[!#$%&'*+.^_`|~0-9A-Za-z-]+[ \t]*=[ \t]*(?:[!#$%&'*+.^_`|~0-9A-Za-z-]+|"(?:[\x20-\x21\x23-\x5B\x5D-\x7E]|\\[\x20-\x7E])*"))*\z}
   @uri_reference_pattern ~r"\A(?:[A-Za-z0-9\-._~:/?#\[\]@!$&'()*+,;=]|%[0-9A-Fa-f]{2})*\z"
@@ -281,7 +289,7 @@ defmodule Jido.Signal do
   end
 
   def __normalize_definition_attrs__(opts, defaults) when is_map(opts) do
-    with {:ok, attrs} <- CloudEvents.normalize_keys(opts) do
+    with {:ok, attrs} <- normalize_attribute_keys(opts) do
       {:ok, Map.merge(defaults, attrs)}
     end
   end
@@ -307,7 +315,14 @@ defmodule Jido.Signal do
       else: {:error, "parse error: expected a map or keyword list"}
   end
 
-  def new(attrs) when is_map(attrs), do: CloudEvents.new(attrs)
+  def new(attrs) when is_map(attrs) do
+    with {:ok, attrs} <- normalize_attribute_keys(attrs) do
+      attrs
+      |> Map.put_new_lazy("id", &Jido.Id.uuid7/0)
+      |> Map.put_new("specversion", "1.0")
+      |> from_normalized_map(:constructor)
+    end
+  end
 
   def new(_attrs), do: {:error, "parse error: expected a map or keyword list"}
 
@@ -322,7 +337,7 @@ defmodule Jido.Signal do
   end
 
   def new(type, data, attrs) when is_binary(type) and is_map(attrs) do
-    with {:ok, attrs} <- CloudEvents.normalize_keys(attrs) do
+    with {:ok, attrs} <- normalize_attribute_keys(attrs) do
       case Enum.find(["type", "data", "data_base64"], &Map.has_key?(attrs, &1)) do
         nil ->
           attrs |> Map.put("type", type) |> Map.put("data", data) |> new()
@@ -355,22 +370,87 @@ defmodule Jido.Signal do
     end
   end
 
+  @typedoc "One CloudEvents extension value."
+  @type context_value :: boolean() | -2_147_483_648..2_147_483_647 | binary()
+
   @doc "Adds a CloudEvents extension context attribute."
-  @spec put_context(t(), atom() | String.t(), Context.value()) ::
+  @spec put_context(t(), atom() | String.t(), context_value()) ::
           {:ok, t()} | {:error, String.t()}
-  defdelegate put_context(signal, name, value), to: Context, as: :put
+  def put_context(%__MODULE__{} = signal, name, value) do
+    with {:ok, name} <- normalize_extension_name(name),
+         :ok <- validate_extension_value(value) do
+      {:ok, %{signal | extensions: Map.put(signal.extensions, name, value)}}
+    end
+  end
+
+  def put_context(_signal, _name, _value), do: {:error, "expected a Signal struct"}
 
   @doc "Gets a CloudEvents extension context attribute."
-  @spec get_context(t(), atom() | String.t()) :: Context.value() | nil
-  defdelegate get_context(signal, name), to: Context, as: :get
+  @spec get_context(t(), atom() | String.t()) :: context_value() | nil
+  def get_context(%__MODULE__{} = signal, name) when is_atom(name) or is_binary(name),
+    do: Map.get(signal.extensions, to_string(name))
+
+  def get_context(_signal, _name), do: nil
 
   @doc "Deletes a CloudEvents extension context attribute."
   @spec delete_context(t(), atom() | String.t()) :: t()
-  defdelegate delete_context(signal, name), to: Context, as: :delete
+  def delete_context(%__MODULE__{} = signal, name) when is_atom(name) or is_binary(name),
+    do: %{signal | extensions: Map.delete(signal.extensions, to_string(name))}
+
+  def delete_context(signal, _name), do: signal
 
   @doc "Lists the CloudEvents extension context attribute names."
   @spec list_context(t()) :: [String.t()]
-  defdelegate list_context(signal), to: Context, as: :names
+  def list_context(%__MODULE__{} = signal), do: Map.keys(signal.extensions)
+  def list_context(_signal), do: []
+
+  @doc false
+  @spec __from_cloud_events__(map()) :: {:ok, t()} | {:error, String.t()}
+  def __from_cloud_events__(map) when is_map(map) do
+    with {:ok, attrs} <- normalize_attribute_keys(map), do: from_normalized_map(attrs, :wire)
+  end
+
+  def __from_cloud_events__(_map), do: {:error, "parse error: expected a map"}
+
+  @doc false
+  @spec normalize_extensions(map()) :: {:ok, %{optional(String.t()) => context_value()}} | {:error, String.t()}
+  def normalize_extensions(attributes) when is_map(attributes) do
+    Enum.reduce_while(Map.to_list(attributes), {:ok, %{}}, fn {name, value}, {:ok, acc} ->
+      with {:ok, name} <- normalize_extension_name(name),
+           :ok <- validate_extension_value(value) do
+        if Map.has_key?(acc, name) do
+          {:halt, {:error, "duplicate extension attribute #{inspect(name)}"}}
+        else
+          {:cont, {:ok, Map.put(acc, name, value)}}
+        end
+      else
+        {:error, reason} -> {:halt, {:error, reason}}
+      end
+    end)
+  end
+
+  def normalize_extensions(_attributes), do: {:error, "extensions must be a map"}
+
+  @doc false
+  @spec normalize_extension_name(term()) :: {:ok, String.t()} | {:error, String.t()}
+  def normalize_extension_name(name) when is_atom(name),
+    do: normalize_extension_name(Atom.to_string(name))
+
+  def normalize_extension_name(name) when is_binary(name) do
+    cond do
+      name in @core_names ->
+        {:error, "extension name #{inspect(name)} conflicts with a CloudEvents attribute"}
+
+      Regex.match?(@extension_name_pattern, name) ->
+        {:ok, name}
+
+      true ->
+        {:error,
+         "extension name #{inspect(name)} must start with a lower-case letter, contain only lower-case letters and digits, and have at most 20 characters"}
+    end
+  end
+
+  def normalize_extension_name(name), do: {:error, "invalid extension name #{inspect(name)}"}
 
   @doc false
   def validate_uri_reference(value, _opts) when is_binary(value) do
@@ -433,6 +513,155 @@ defmodule Jido.Signal do
   end
 
   def validate_utf8_string(_value, _opts), do: {:error, "must be valid UTF-8"}
+
+  defp from_normalized_map(attrs, boundary) do
+    with :ok <- validate_specversion(attrs),
+         :ok <- validate_legacy_wire_version(attrs),
+         {:ok, data, data_present?, data_base64?} <- extract_data(attrs),
+         {:ok, extensions} <- extract_extensions(attrs, boundary) do
+      parse_signal(attrs, data, data_present?, data_base64?, extensions)
+    end
+  end
+
+  defp extract_extensions(attrs, :constructor) do
+    explicit = Map.get(attrs, "extensions", %{})
+    unknown = Map.drop(attrs, @constructor_names ++ [@legacy_wire_version_key])
+
+    with {:ok, explicit} <- normalize_extensions(explicit),
+         {:ok, unknown} <- normalize_extensions(unknown),
+         :ok <- reject_duplicate_extensions(explicit, unknown) do
+      {:ok, Map.merge(unknown, explicit)}
+    else
+      {:error, reason} -> {:error, "parse error: #{reason}"}
+    end
+  end
+
+  defp extract_extensions(attrs, :wire) do
+    attrs
+    |> Map.drop(@core_names ++ [@legacy_wire_version_key])
+    |> Map.reject(fn {_name, value} -> is_nil(value) end)
+    |> normalize_extensions()
+    |> case do
+      {:ok, extensions} -> {:ok, extensions}
+      {:error, reason} -> {:error, "parse error: #{reason}"}
+    end
+  end
+
+  defp reject_duplicate_extensions(explicit, unknown) do
+    case Enum.find(Map.keys(explicit), &Map.has_key?(unknown, &1)) do
+      nil -> :ok
+      name -> {:error, "duplicate extension attribute #{inspect(name)}"}
+    end
+  end
+
+  defp parse_signal(attrs, data, data_present?, data_base64?, extensions) do
+    signal =
+      struct(__MODULE__,
+        data: data,
+        data_present?: data_present?,
+        data_base64?: data_base64?,
+        datacontenttype: Map.get(attrs, "datacontenttype"),
+        dataschema: Map.get(attrs, "dataschema"),
+        extensions: extensions,
+        id: Map.get(attrs, "id"),
+        source: Map.get(attrs, "source"),
+        specversion: normalize_specversion(Map.get(attrs, "specversion")),
+        subject: Map.get(attrs, "subject"),
+        time: normalize_time(Map.get(attrs, "time")),
+        type: Map.get(attrs, "type")
+      )
+
+    case Joi.parse(schema(), signal) do
+      {:ok, validated} -> {:ok, validated}
+      {:error, errors} -> {:error, "parse error: #{Joi.prettify_errors(errors)}"}
+    end
+  end
+
+  defp extract_data(attrs) do
+    case {Map.fetch(attrs, "data"), Map.fetch(attrs, "data_base64")} do
+      {{:ok, _data}, {:ok, _encoded}} ->
+        {:error, "parse error: data and data_base64 are mutually exclusive"}
+
+      {{:ok, data}, :error} ->
+        {:ok, data, true, is_binary(data) and not String.valid?(data)}
+
+      {:error, {:ok, encoded}} ->
+        decode_data_base64(encoded)
+
+      {:error, :error} ->
+        {:ok, nil, false, false}
+    end
+  end
+
+  defp decode_data_base64(encoded) when is_binary(encoded) do
+    case Base.decode64(encoded) do
+      {:ok, binary} -> {:ok, binary, true, true}
+      :error -> {:error, "parse error: data_base64 must be valid Base64"}
+    end
+  end
+
+  defp decode_data_base64(_encoded),
+    do: {:error, "parse error: data_base64 must be a Base64 string"}
+
+  defp normalize_attribute_keys(map) when is_map(map) do
+    Enum.reduce_while(Map.to_list(map), {:ok, %{}}, fn {key, value}, {:ok, normalized} ->
+      with {:ok, key} <- normalize_attribute_key(key),
+           false <- Map.has_key?(normalized, key) do
+        {:cont, {:ok, Map.put(normalized, key, value)}}
+      else
+        true -> {:halt, {:error, "parse error: duplicate attribute #{inspect(key)}"}}
+        {:error, reason} -> {:halt, {:error, reason}}
+      end
+    end)
+  end
+
+  defp normalize_attribute_key(key) when is_atom(key), do: {:ok, Atom.to_string(key)}
+
+  defp normalize_attribute_key(key) when is_binary(key) do
+    if String.valid?(key),
+      do: {:ok, key},
+      else: {:error, "parse error: attribute names must be valid UTF-8 strings"}
+  end
+
+  defp normalize_attribute_key(key),
+    do: {:error, "parse error: attribute keys must be atoms or strings, got: #{inspect(key)}"}
+
+  defp normalize_specversion("1.0.2"), do: "1.0"
+  defp normalize_specversion(value), do: value
+
+  defp normalize_time(%DateTime{} = time), do: DateTime.to_iso8601(time)
+  defp normalize_time(time), do: time
+
+  defp validate_specversion(%{"specversion" => value}) when not is_nil(value), do: :ok
+  defp validate_specversion(_attrs), do: {:error, "parse error: specversion is required"}
+
+  defp validate_legacy_wire_version(%{@legacy_wire_version_key => version})
+       when version in @legacy_wire_versions,
+       do: :ok
+
+  defp validate_legacy_wire_version(%{@legacy_wire_version_key => nil}), do: :ok
+
+  defp validate_legacy_wire_version(map)
+       when not is_map_key(map, @legacy_wire_version_key),
+       do: :ok
+
+  defp validate_legacy_wire_version(%{@legacy_wire_version_key => version}) do
+    {:error, "parse error: unsupported jido_schema_version #{inspect(version)}"}
+  end
+
+  defp validate_extension_value(value) when is_boolean(value), do: :ok
+
+  defp validate_extension_value(value)
+       when is_integer(value) and value >= @extension_min_integer and
+              value <= @extension_max_integer,
+       do: :ok
+
+  defp validate_extension_value(value) when is_binary(value), do: :ok
+
+  defp validate_extension_value(value) do
+    {:error,
+     "extension values must be a Boolean, signed 32-bit Integer, String, Binary, URI, URI-reference, or Timestamp; got: #{inspect(value)}"}
+  end
 
   defp valid_context_characters?(<<>>), do: true
 
