@@ -1,4 +1,4 @@
-defmodule JidoActionTest.Flow.ConditionNormalizationTest do
+defmodule Jido.Flow.ConditionNormalizationTest do
   use ExUnit.Case, async: true
 
   alias Jido.Expr

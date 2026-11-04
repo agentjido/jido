@@ -1,4 +1,4 @@
-defmodule JidoActionTest.Exec.Frame.DeltaTest do
+defmodule Jido.Exec.Frame.DeltaTest do
   use ExUnit.Case, async: true
 
   alias Jido.Exec.Frame

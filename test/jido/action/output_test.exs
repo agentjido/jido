@@ -1,4 +1,4 @@
-defmodule JidoActionTest.Action.OutputTest do
+defmodule Jido.Action.OutputTest do
   use Covenant.Case, component: "jido_action.output", async: true
 
   alias Jido.Action.Output

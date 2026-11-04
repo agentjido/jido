@@ -1,4 +1,4 @@
-defmodule JidoTest.Persistence.RedisTest do
+defmodule Jido.Persistence.RedisTest do
   use ExUnit.Case, async: true
 
   alias Jido.Persistence.Redis

@@ -1,4 +1,4 @@
-defmodule JidoActionTest.Flow.CanonicalDataTest do
+defmodule Jido.Flow.CanonicalDataTest do
   use ExUnit.Case, async: true
 
   alias Jido.Flow

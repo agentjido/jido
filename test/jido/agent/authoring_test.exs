@@ -1,4 +1,4 @@
-defmodule JidoTest.Agent.AuthoringTest do
+defmodule Jido.Agent.AuthoringTest do
   use Covenant.Case, component: "jido.agent", async: false
 
   alias Jido.Agent
@@ -47,10 +47,10 @@ defmodule JidoTest.Agent.AuthoringTest do
     use Jido.Plugin
 
     @impl true
-    defdelegate state_spec(opts), to: JidoTest.Agent.AuthoringTest.CountTurns.Agent
+    defdelegate state_spec(opts), to: Jido.Agent.AuthoringTest.CountTurns.Agent
 
     @impl true
-    defdelegate reduce(reduction, opts), to: JidoTest.Agent.AuthoringTest.CountTurns.Agent
+    defdelegate reduce(reduction, opts), to: Jido.Agent.AuthoringTest.CountTurns.Agent
   end
 
   defmodule CountTurns.Agent do
@@ -66,10 +66,10 @@ defmodule JidoTest.Agent.AuthoringTest do
     use Jido.Plugin
 
     @impl true
-    defdelegate state_spec(opts), to: JidoTest.Agent.AuthoringTest.PassThrough.Agent
+    defdelegate state_spec(opts), to: Jido.Agent.AuthoringTest.PassThrough.Agent
 
     @impl true
-    defdelegate prepare(preparation, opts), to: JidoTest.Agent.AuthoringTest.PassThrough.Agent
+    defdelegate prepare(preparation, opts), to: Jido.Agent.AuthoringTest.PassThrough.Agent
   end
 
   defmodule PassThrough.Agent do
@@ -310,7 +310,7 @@ defmodule JidoTest.Agent.AuthoringTest do
 
     compiled =
       compile_isolated("""
-      defmodule JidoTest.BareAgent#{System.unique_integer([:positive])} do
+      defmodule Jido.Test.BareAgent#{System.unique_integer([:positive])} do
         use Jido.Agent, name: "bare"
         routes do
           route "test.pass" do
@@ -406,7 +406,7 @@ defmodule JidoTest.Agent.AuthoringTest do
   test "compiled Agents canonicalize string state selectors against atom output fields" do
     compiled =
       compile_agent("""
-      route "test.project", JidoTest.Agent.AuthoringTest.ProjectedOutput do
+      route "test.project", Jido.Agent.AuthoringTest.ProjectedOutput do
         state from: output("state")
       end
       """)
@@ -423,7 +423,7 @@ defmodule JidoTest.Agent.AuthoringTest do
   test "compiled Agents canonicalize string reply selectors against atom output fields" do
     compiled =
       compile_agent("""
-      route "test.project", JidoTest.Agent.AuthoringTest.ProjectedOutput do
+      route "test.project", Jido.Agent.AuthoringTest.ProjectedOutput do
         state :unchanged
         reply "test.project.done", from: output("reply")
       end
@@ -604,7 +604,7 @@ defmodule JidoTest.Agent.AuthoringTest do
 
   @tag obligation: ["jido.agent.I1", "jido.agent.I22"]
   test "recompilation verifies the new schema of an Action defined later in the same file" do
-    module = Module.concat(JidoTest, "ReloadedAgent#{System.unique_integer([:positive])}")
+    module = Module.concat(Jido.Test, "ReloadedAgent#{System.unique_integer([:positive])}")
 
     ExUnit.CaptureIO.capture_io(:stderr, fn ->
       for field <- [:amount, :value] do
@@ -643,7 +643,7 @@ defmodule JidoTest.Agent.AuthoringTest do
 
   @tag obligation: "jido.agent.I22"
   test "an unchanged Agent checks a reloaded Action contract" do
-    module = Module.concat(JidoTest, "ActionReload#{System.unique_integer([:positive])}")
+    module = Module.concat(Jido.Test, "ActionReload#{System.unique_integer([:positive])}")
     action = Module.concat(module, Action)
 
     compile_isolated("""
@@ -670,13 +670,13 @@ defmodule JidoTest.Agent.AuthoringTest do
   end
 
   defp compile_agent(routes, opts \\ "", extra \\ "", source? \\ true) do
-    name = "JidoTest.GeneratedAgent#{System.unique_integer([:positive])}"
+    name = "Jido.Test.GeneratedAgent#{System.unique_integer([:positive])}"
     source = if source?, do: "signal_source \"/test\"", else: ""
 
     compile_isolated("""
     defmodule #{name} do
-        alias JidoTest.Agent.AuthoringTest.Add, warn: false
-        alias JidoTest.Agent.AuthoringTest.ListInputs, warn: false
+        alias Jido.Agent.AuthoringTest.Add, warn: false
+        alias Jido.Agent.AuthoringTest.ListInputs, warn: false
       use Jido.Agent, name: "compiled"#{opts}
       #{extra}
       routes do
@@ -710,11 +710,11 @@ defmodule JidoTest.Agent.AuthoringTest do
   end
 end
 
-defmodule JidoTest.Agent.AuthoringRuntimeTest do
+defmodule Jido.Agent.AuthoringRuntimeTest do
   use Jido.Test.Case, async: false
 
   alias Jido.AgentServer, as: Server
-  alias JidoTest.Agent.AuthoringTest.{Counter, InlineCounter, PreparedCounter}
+  alias Jido.Agent.AuthoringTest.{Counter, InlineCounter, PreparedCounter}
 
   test "generated Action and Flow helpers commit the direct candidate", %{jido: jido} do
     agent = Counter.instantiate!(id: Jido.Id.uuid7())

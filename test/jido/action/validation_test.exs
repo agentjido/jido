@@ -1,4 +1,4 @@
-defmodule JidoActionTest.Action.ValidationTest do
+defmodule Jido.Action.ValidationTest do
   use Covenant.Case, component: "jido_action.validation", async: true
 
   alias Jido.Action.Validation

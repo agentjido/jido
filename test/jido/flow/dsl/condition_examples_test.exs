@@ -1,4 +1,4 @@
-defmodule JidoActionTest.Flow.DSL.ConditionExamplesTest do
+defmodule Jido.Flow.DSL.ConditionExamplesTest do
   use ExUnit.Case, async: true
 
   alias Jido.Flow.DSL.ValueParser

@@ -1,4 +1,4 @@
-defmodule JidoTest.Persistence.Conformance.RegistryTest do
+defmodule Jido.Persistence.Conformance.RegistryTest do
   use ExUnit.Case, async: true
 
   @moduletag :persistence
@@ -16,7 +16,7 @@ end
 
 for profile <- Jido.Test.Persistence.Profiles.active(:local) do
   defmodule Module.concat(
-              JidoTest.Persistence.Conformance.Local,
+              Jido.Persistence.Conformance.Local,
               Macro.camelize(to_string(profile))
             ) do
     use Jido.Test.Persistence.Case, profile: profile

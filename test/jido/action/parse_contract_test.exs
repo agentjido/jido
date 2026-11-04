@@ -1,4 +1,4 @@
-defmodule JidoActionTest.Action.ParseContractTest do
+defmodule Jido.Action.ParseContractTest do
   use Covenant.Case, component: "jido_action.validation", async: true
 
   alias Jido.Error

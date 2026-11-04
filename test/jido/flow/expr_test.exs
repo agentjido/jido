@@ -1,4 +1,4 @@
-defmodule JidoActionTest.Flow.ExprTest do
+defmodule Jido.Flow.ExprTest do
   use Covenant.Case, component: "jido_action.expression", async: true
   alias Jido.Expr
   alias Jido.Flow

@@ -1,4 +1,4 @@
-defmodule JidoTest.Agent.CandidateCompletenessTest do
+defmodule Jido.Agent.CandidateCompletenessTest do
   use Jido.Test.Case, async: true
 
   alias Jido.AgentServer, as: Server

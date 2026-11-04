@@ -1,4 +1,4 @@
-defmodule JidoTest.Persistence.IndeterminateWriteTest do
+defmodule Jido.Persistence.IndeterminateWriteTest do
   use Jido.Test.Case, async: true
   @moduletag :research
   @moduletag capability: "PERSIST-03"

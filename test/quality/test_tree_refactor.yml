@@ -61,6 +61,26 @@ u2_result:
   ex_dna:
     clone_groups: 39
     duplicated_lines: 817
+u3_result:
+  default_suite:
+    passed: 3342
+    excluded: 508
+  covenant:
+    obligations_passed: 323
+    obligations_total: 323
+  quality_contract:
+    passed: 8
+  component_proof:
+    claims: 40
+    validation_tests_passed: 15
+  ex_dna:
+    clone_groups: 39
+    duplicated_lines: 817
+  active_default_roots:
+    - test/jido
+  removed_default_roots:
+    - test/jido/core_contract
+    - test/jido/ai/contract
 deletions:
   - removed:
       - test/property/signal/support/fuzz.exs
@@ -112,3 +132,9 @@ deletions:
       - JidoActionTest, JidoSignalTest, JidoTest, Jido.AITest, and Jido.Exec.Test compiled support namespaces
     reason: legacy_structure_removed
     surviving_proof: test/support is the only compiled support root, helpers use Jido.Test, and test/consumers/inline_consumer remains isolated.
+  - removed:
+      - test/jido/core_contract
+      - test/jido/ai/contract
+      - JidoTest, JidoActionTest, Jido.AITest, and Jido.AI.Contract executable module roots below test/jido
+    reason: legacy_structure_removed
+    surviving_proof: Covenant-tagged executable tests now live under namespace owners in test/jido, and Covenant reports 323 of 323 active obligations at 100 percent.

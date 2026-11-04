@@ -1,4 +1,4 @@
-defmodule JidoTest.MalformedPublicInputsTest do
+defmodule Jido.MalformedPublicInputsTest do
   use Jido.Test.Case, async: true
 
   alias Jido.Agent

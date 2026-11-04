@@ -1,4 +1,4 @@
-defmodule JidoTest.Persistence.EctoTest do
+defmodule Jido.Persistence.EctoTest do
   use ExUnit.Case, async: false
 
   alias Jido.Persistence

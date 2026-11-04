@@ -16,6 +16,7 @@ defmodule Jido.Quality.ComponentProof do
       Keyword.get_lazy(options, :covenant_owners, fn -> covenant_owners(proof, root, active) end)
 
     components = list(proof["components"])
+    claims = list(proof["claims"])
     profiles = map(proof["proof_profiles"])
     performance_profiles = map(proof["performance_profiles"])
     groups = map(proof["evidence_groups"])
@@ -27,6 +28,8 @@ defmodule Jido.Quality.ComponentProof do
       |> validate_components(components, active, profiles, performance_profiles)
       |> validate_profiles(profiles, groups, schema, root)
       |> validate_profiles(performance_profiles, groups, performance_schema, root)
+      |> validate_claims(claims, active, groups, schema, root)
+      |> validate_evidence_group_ownership(groups, profiles, performance_profiles, claims)
       |> validate_inventory(proof["module_inventory"], inventory)
 
     {_owners, ownership_errors} =
@@ -144,6 +147,132 @@ defmodule Jido.Quality.ComponentProof do
             "component #{component["id"]} has unknown performance profile: #{inspect(component["performance_profile"])}"
 
     errors ++ duplicates ++ missing ++ unknown ++ bad_profiles ++ bad_performance_profiles
+  end
+
+  defp validate_claims(errors, claims, active, groups, schema, root) do
+    ids = Enum.map(claims, & &1["id"])
+    components = Enum.map(claims, & &1["component"])
+    modes = list(schema["claim_proof_modes"])
+
+    duplicates =
+      ids
+      |> Enum.frequencies()
+      |> Enum.filter(fn {_id, count} -> count > 1 end)
+      |> Enum.map(fn {id, _count} -> "claim has two canonical owners: #{inspect(id)}" end)
+
+    missing = Enum.map(active -- components, &"component has no canonical behavior claim: #{&1}")
+
+    unknown =
+      components
+      |> Enum.uniq()
+      |> Kernel.--(active)
+      |> Enum.map(&"claim has inactive component: #{&1}")
+
+    Enum.reduce(claims, errors ++ duplicates ++ missing ++ unknown, fn claim, current ->
+      validate_claim(current, claim, groups, modes, root)
+    end)
+  end
+
+  defp validate_claim(errors, claim, groups, modes, root) do
+    id = claim["id"]
+    component = claim["component"]
+    canonical = map(claim["canonical"])
+    prefix = "claim #{inspect(id)}"
+    owner = canonical["owner"]
+    group = canonical["evidence_group"]
+    mode = canonical["mode"]
+
+    errors =
+      errors
+      |> add_unless(present?(id), "claim has no stable id")
+      |> add_unless(present?(component), "#{prefix} has no component")
+      |> add_unless(mode in modes, "#{prefix} canonical proof has unknown mode")
+      |> add_unless(Map.has_key?(groups, group), "#{prefix} canonical proof has no evidence group")
+      |> add_unless(repository_path?(owner, root), "#{prefix} canonical owner leaves the repository")
+      |> add_unless(owner_has_tests?(owner, root), "#{prefix} canonical owner has no executable test")
+      |> add_unless(
+        owner_has_component?(owner, component, root),
+        "#{prefix} canonical owner has no #{component} Covenant case"
+      )
+      |> add_unless(
+        owner_in_group?(owner, list(groups[group]), root),
+        "#{prefix} canonical owner is outside evidence group #{inspect(group)}"
+      )
+      |> add_unless(specific?(canonical["proves"]), "#{prefix} canonical proof has no specific claim")
+      |> validate_claim_obligations(claim["covenant_obligations"], component, root, prefix)
+
+    supplements = list(claim["supplemental"])
+
+    duplicate_supplements =
+      supplements
+      |> Enum.map(&{&1["mode"], &1["evidence_group"]})
+      |> Enum.frequencies()
+      |> Enum.filter(fn {_key, count} -> count > 1 end)
+      |> Enum.map(fn {{supplement_mode, supplement_group}, _count} ->
+        "#{prefix} repeats supplemental #{supplement_mode} proof in #{supplement_group}"
+      end)
+
+    Enum.reduce(supplements, errors ++ duplicate_supplements, fn supplement, current ->
+      supplement_mode = supplement["mode"]
+      supplement_group = supplement["evidence_group"]
+
+      current
+      |> add_unless(supplement_mode in modes, "#{prefix} supplemental proof has unknown mode")
+      |> add_unless(
+        Map.has_key?(groups, supplement_group),
+        "#{prefix} supplemental proof has no evidence group"
+      )
+      |> add_unless(
+        {supplement_mode, supplement_group} != {mode, group},
+        "#{prefix} repeats its canonical proof as supplemental evidence"
+      )
+      |> add_unless(
+        specific?(supplement["proves"]),
+        "#{prefix} supplemental proof has no distinct claim"
+      )
+    end)
+  end
+
+  defp validate_claim_obligations(errors, "all", component, root, prefix) do
+    obligations = covenant_obligations(root, component)
+    add_unless(errors, obligations != [], "#{prefix} has no active Covenant obligations")
+  end
+
+  defp validate_claim_obligations(errors, obligations, component, root, prefix) when is_list(obligations) do
+    active = covenant_obligations(root, component)
+
+    Enum.reduce(obligations, errors, fn obligation, current ->
+      add_unless(current, obligation in active, "#{prefix} names unknown Covenant obligation #{inspect(obligation)}")
+    end)
+  end
+
+  defp validate_claim_obligations(errors, nil, _component, _root, _prefix), do: errors
+
+  defp validate_claim_obligations(errors, _obligations, _component, _root, prefix),
+    do: ["#{prefix} has invalid Covenant obligations" | errors]
+
+  defp validate_evidence_group_ownership(errors, groups, profiles, performance_profiles, claims) do
+    profile_groups =
+      [profiles, performance_profiles]
+      |> Enum.flat_map(&Map.values/1)
+      |> Enum.flat_map(&Map.values/1)
+      |> Enum.map(& &1["evidence_group"])
+
+    claim_groups =
+      Enum.flat_map(claims, fn claim ->
+        [get_in(claim, ["canonical", "evidence_group"])] ++
+          Enum.map(list(claim["supplemental"]), & &1["evidence_group"])
+      end)
+
+    used = MapSet.new(profile_groups ++ claim_groups)
+
+    unused =
+      groups
+      |> Map.keys()
+      |> Enum.reject(&MapSet.member?(used, &1))
+      |> Enum.map(&"evidence group has no proof owner: #{&1}")
+
+    errors ++ unused
   end
 
   defp validate_profiles(errors, profiles, groups, schema, root) do
@@ -348,6 +477,48 @@ defmodule Jido.Quality.ComponentProof do
     end
   end
 
+  defp covenant_obligations(root, component) do
+    root
+    |> Path.join("test/contracts/coverage.json")
+    |> File.read!()
+    |> JSON.decode!()
+    |> get_in(["components", component, "obligations"])
+    |> map()
+    |> Map.keys()
+  end
+
+  defp owner_has_tests?(path, root), do: owner_test_files(path, root) != []
+
+  defp owner_has_component?(path, component, root) when is_binary(component) do
+    marker = "component: \"#{component}\""
+    Enum.any?(owner_test_files(path, root), &String.contains?(File.read!(&1), marker))
+  end
+
+  defp owner_has_component?(_path, _component, _root), do: false
+
+  defp owner_test_files(path, root) when is_binary(path) do
+    full = Path.join(root, path)
+
+    cond do
+      File.dir?(full) -> Path.wildcard(Path.join(full, "**/*_test.exs"))
+      File.regular?(full) and String.ends_with?(full, "_test.exs") -> [full]
+      true -> []
+    end
+  end
+
+  defp owner_test_files(_path, _root), do: []
+
+  defp owner_in_group?(owner, paths, root) when is_binary(owner) do
+    owner = Path.expand(owner, root)
+
+    Enum.any?(paths, fn path ->
+      group = Path.expand(path, root)
+      owner == group or String.starts_with?(owner, group <> "/")
+    end)
+  end
+
+  defp owner_in_group?(_owner, _paths, _root), do: false
+
   defp production_module?(module, root) do
     with true <- Code.ensure_loaded?(module),
          source when is_list(source) <- module.module_info(:compile)[:source] do
@@ -380,6 +551,8 @@ defmodule Jido.Quality.ComponentProof do
 
   defp repository_path?(_path, _root), do: false
 
+  defp present?(value), do: is_binary(value) and String.trim(value) != ""
+  defp specific?(value), do: is_binary(value) and String.length(String.trim(value)) >= 30
   defp add_unless(errors, true, _error), do: errors
   defp add_unless(errors, false, error), do: [error | errors]
   defp list_at(map, key), do: map |> map() |> Map.get(key) |> list()

@@ -1,4 +1,4 @@
-defmodule JidoTest.Persistence.S3Test do
+defmodule Jido.Persistence.S3Test do
   use ExUnit.Case, async: true
 
   alias Jido.Persistence.S3

@@ -1,4 +1,4 @@
-defmodule JidoTest.Persistence.ETSTest do
+defmodule Jido.Persistence.ETSTest do
   use ExUnit.Case, async: true
 
   alias Jido.Persistence.ETS

@@ -1,4 +1,4 @@
-defmodule JidoTest.Persistence.LiveStateTest do
+defmodule Jido.Persistence.LiveStateTest do
   use Jido.Test.Case, async: true
 
   alias Jido.Agent

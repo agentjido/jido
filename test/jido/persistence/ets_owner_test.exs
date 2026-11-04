@@ -1,4 +1,4 @@
-defmodule JidoTest.Persistence.ETSOwnerTest do
+defmodule Jido.Persistence.ETSOwnerTest do
   use ExUnit.Case, async: false
 
   import ExUnit.CaptureLog

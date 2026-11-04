@@ -1,4 +1,4 @@
-defmodule JidoTest.Persistence.BedrockTest do
+defmodule Jido.Persistence.BedrockTest do
   use ExUnit.Case, async: false
 
   alias Jido.Persistence

@@ -1,4 +1,4 @@
-defmodule JidoTest.Persistence.CrossBeamAtomTest do
+defmodule Jido.Persistence.CrossBeamAtomTest do
   use Jido.Test.AgentServer.PeerCase, async: false
 
   alias Jido.Persistence

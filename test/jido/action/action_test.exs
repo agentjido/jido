@@ -1,4 +1,4 @@
-defmodule JidoActionTest.ActionTest do
+defmodule Jido.ActionTest do
   use Covenant.Case, component: "jido_action.action", async: true
   import Jido.Test.Action.Case
   @moduletag obligation: "jido_action.action.I1"
@@ -184,13 +184,13 @@ defmodule JidoActionTest.ActionTest do
               Jido.Joi.object(%{
                 value:
                   Jido.Joi.integer()
-                  |> Jido.Joi.refine({JidoActionTest.ActionTest, :at_least, [2]})
+                  |> Jido.Joi.refine({Jido.ActionTest, :at_least, [2]})
               }),
             output_schema:
               Jido.Joi.object(%{
                 result:
                   Jido.Joi.integer()
-                  |> Jido.Joi.refine({JidoActionTest.ActionTest, :at_least, [4]})
+                  |> Jido.Joi.refine({Jido.ActionTest, :at_least, [4]})
               })
 
           @impl true
@@ -245,7 +245,7 @@ defmodule JidoActionTest.ActionTest do
           quote do
             use Jido.Action,
               name: "lazy_schema_action",
-              schema: Jido.Joi.lazy({JidoActionTest.ActionTest, :static_lazy_schema, []})
+              schema: Jido.Joi.lazy({Jido.ActionTest, :static_lazy_schema, []})
           end
         )
       end
@@ -278,7 +278,7 @@ defmodule JidoActionTest.ActionTest do
         quote do
           use Jido.Action,
             name: "counted_static_schema_action",
-            schema: JidoActionTest.ActionTest.counted_static_schema(unquote(counter))
+            schema: Jido.ActionTest.counted_static_schema(unquote(counter))
 
           @impl true
           def run(params, _context), do: {:ok, params}
@@ -300,7 +300,7 @@ defmodule JidoActionTest.ActionTest do
       create_module(
         module,
         quote do
-          use Jido.Action, JidoActionTest.ActionTest.counted_options(unquote(counter))
+          use Jido.Action, Jido.ActionTest.counted_options(unquote(counter))
 
           @impl true
           def run(params, _context), do: {:ok, params}
@@ -418,10 +418,10 @@ defmodule JidoActionTest.ActionTest do
             name: "scalar_transform_action",
             schema:
               Jido.Joi.object(%{})
-              |> Jido.Joi.transform({JidoActionTest.ActionTest, :invalid_transform, []}),
+              |> Jido.Joi.transform({Jido.ActionTest, :invalid_transform, []}),
             output_schema:
               Jido.Joi.object(%{})
-              |> Jido.Joi.transform({JidoActionTest.ActionTest, :invalid_transform, []})
+              |> Jido.Joi.transform({Jido.ActionTest, :invalid_transform, []})
 
           @impl true
           def run(params, _context), do: {:ok, params}
@@ -513,7 +513,7 @@ defmodule JidoActionTest.ActionTest do
           quote do
             use Jido.Action,
               name: "observed_lazy_schema_action",
-              schema: Jido.Joi.lazy({JidoActionTest.ActionTest, :observed_lazy_schema, [unquote(parent)]})
+              schema: Jido.Joi.lazy({Jido.ActionTest, :observed_lazy_schema, [unquote(parent)]})
           end
         )
       end

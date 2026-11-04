@@ -90,6 +90,6 @@ mix test test/examples/14_durable_agents --include example --seed 0 --warnings-a
 
 Child BEAM tests need local sockets and `kill`. No credentials or external service
 are required. See the [durable activation decision](../../docs/adr/0002-restore-or-create-durable-agent-activation.md) and
-[Core tests](../../test/jido/core_contract/jido.agent_server/durable_turn/runtime_test.exs).
+[Core tests](../../test/jido/agent_server/durable_turn/runtime_test.exs).
 
 Previous: [Persistence](../13_persistence/README.md) | Next: [Saved Agent State](14_01_saved_agent/README.md)

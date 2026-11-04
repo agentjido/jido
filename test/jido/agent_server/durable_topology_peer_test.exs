@@ -1,4 +1,4 @@
-defmodule JidoTest.AgentServer.DurableTopologyPeerTest do
+defmodule Jido.AgentServer.DurableTopologyPeerTest do
   use Jido.Test.AgentServer.PeerCase
   @moduletag :tmp_dir
 

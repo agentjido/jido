@@ -1,4 +1,4 @@
-defmodule JidoTest.Persistence.MnesiaTest do
+defmodule Jido.Persistence.MnesiaTest do
   use ExUnit.Case, async: false
 
   alias Jido.Persistence

@@ -244,8 +244,7 @@ defmodule Jido.MixProject do
       ~r/^test\/quality\/support\//,
       ~r{^test/property/(?:support|[^/]+/support)/},
       ~r|^test/system/services/support/|,
-      ~r|^test/system/runtime/core/support/|,
-      ~r/^test\/jido\/core_contract\/.*(?:support|configuration_support)\.ex$/
+      ~r|^test/system/runtime/core/support/|
     ]
   end
 

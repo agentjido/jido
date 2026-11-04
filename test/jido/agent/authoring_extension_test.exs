@@ -1,4 +1,4 @@
-defmodule JidoTest.Agent.AuthoringExtensionTest do
+defmodule Jido.Agent.AuthoringExtensionTest do
   use Covenant.Case, component: "jido.agent", async: true
   alias Jido.Agent
   alias Jido.Agent.Extension

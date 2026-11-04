@@ -37,6 +37,11 @@ profile. Functional profiles declare unit, Covenant, authoring, example, propert
 profiles declare load and benchmark evidence. Every proof is required or not applicable. A not-applicable result needs
 a named owner, a controlled reason code, and a specific reason.
 
+The `claims` registry gives each active component a stable behavior claim. Each claim names one canonical executable
+owner under `test/jido`, its evidence mode, and its Covenant obligation scope. Supplemental evidence must use a
+different mode or group and state the separate value that it proves. Validation rejects duplicate canonical owners,
+missing component cases, repeated supplemental proof, and evidence groups without an owner.
+
 Module ownership starts with the `modules` frontmatter in active Covenant records. Three documented overlaps have an
 explicit primary owner. Fallback namespace rules cover modules that do not occur in Covenant frontmatter. The most
 specific fallback prefix wins. The committed production and documented-public module counts and SHA-256 values make

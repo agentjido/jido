@@ -1,4 +1,4 @@
-defmodule JidoTest.Agent.ReplacementTest do
+defmodule Jido.Agent.ReplacementTest do
   use Jido.Test.Case, async: true
 
   alias Jido.AgentServer, as: Server

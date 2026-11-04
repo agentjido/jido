@@ -1,4 +1,4 @@
-defmodule JidoTest.Agent.RouteTest do
+defmodule Jido.Agent.RouteTest do
   use ExUnit.Case, async: true
 
   alias Jido.Agent
@@ -49,7 +49,7 @@ defmodule JidoTest.Agent.RouteTest do
     use Jido.Agent, name: "route_default_state"
 
     routes do
-      route "work.run", JidoTest.Agent.RouteTest.RootOutput
+      route "work.run", Jido.Agent.RouteTest.RootOutput
     end
   end
 

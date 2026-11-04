@@ -1,4 +1,4 @@
-defmodule JidoTest.Persistence.FileTest do
+defmodule Jido.Persistence.FileTest do
   use ExUnit.Case, async: false
 
   alias Jido.Persistence.File, as: FilePersistence

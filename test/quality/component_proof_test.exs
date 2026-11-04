@@ -30,6 +30,60 @@ defmodule Jido.Quality.ComponentProofTest do
            )
   end
 
+  test "each active component has one registered canonical behavior owner" do
+    proof = ComponentProof.load!(@proof_path)
+    components = component_ids(proof)
+    behavior_claims = Enum.filter(proof["claims"], &String.ends_with?(&1["id"], ".behavior"))
+    claim_components = Enum.map(behavior_claims, & &1["component"])
+
+    assert Enum.sort(claim_components) == Enum.sort(components)
+    assert Enum.all?(behavior_claims, &is_binary(get_in(&1, ["canonical", "owner"])))
+  end
+
+  test "rejects two canonical owners for one claim" do
+    proof = ComponentProof.load!(@proof_path)
+    [first | _rest] = proof["claims"]
+    invalid = Map.update!(proof, "claims", &[first | &1])
+
+    assert "claim has two canonical owners: #{inspect(first["id"])}" in ComponentProof.validate(invalid, @root)
+  end
+
+  test "rejects a canonical owner without its component Covenant case" do
+    proof = ComponentProof.load!(@proof_path)
+    invalid = put_in(proof, ["claims", Access.at(0), "canonical", "owner"], "test/jido/public_api_test.exs")
+    [first | _rest] = proof["claims"]
+
+    assert "claim #{inspect(first["id"])} canonical owner has no #{first["component"]} Covenant case" in ComponentProof.validate(
+             invalid,
+             @root
+           )
+  end
+
+  test "rejects canonical evidence repeated as supplemental evidence" do
+    proof = ComponentProof.load!(@proof_path)
+    [first | _rest] = proof["claims"]
+
+    repeated = %{
+      "mode" => first["canonical"]["mode"],
+      "evidence_group" => first["canonical"]["evidence_group"],
+      "proves" => "This text is long enough but repeats the canonical proof without distinct value."
+    }
+
+    invalid = put_in(proof, ["claims", Access.at(0), "supplemental"], [repeated])
+
+    assert "claim #{inspect(first["id"])} repeats its canonical proof as supplemental evidence" in ComponentProof.validate(
+             invalid,
+             @root
+           )
+  end
+
+  test "rejects an evidence group without a proof owner" do
+    proof = ComponentProof.load!(@proof_path)
+    invalid = put_in(proof, ["evidence_groups", "orphan"], ["test/jido"])
+
+    assert "evidence group has no proof owner: orphan" in ComponentProof.validate(invalid, @root)
+  end
+
   test "rejects a public module without a primary owner" do
     proof = ComponentProof.load!(@proof_path) |> with_inventory(["Other.Public"], ["Other.Public"])
 

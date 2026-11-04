@@ -127,7 +127,7 @@ defmodule Jido.Agent.Plugin.DeclarationTest do
 
     assert_raise Spark.Options.ValidationError, fn ->
       Code.compile_string("""
-      defmodule JidoTest.RemovedExtensions#{suffix} do
+      defmodule Jido.Test.RemovedExtensions#{suffix} do
         use Jido.Agent, name: "removed_extensions", extensions: []
       end
       """)
@@ -136,7 +136,7 @@ defmodule Jido.Agent.Plugin.DeclarationTest do
     ExUnit.CaptureIO.capture_io(:stderr, fn ->
       assert_raise CompileError, fn ->
         Code.compile_string("""
-        defmodule JidoTest.RemovedPluginBlock#{suffix} do
+        defmodule Jido.Test.RemovedPluginBlock#{suffix} do
           use Jido.Agent, name: "removed_plugin_block"
 
           plugins do

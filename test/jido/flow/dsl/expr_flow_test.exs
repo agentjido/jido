@@ -1,4 +1,4 @@
-defmodule JidoActionTest.Flow.DSL.ExprFlowTest do
+defmodule Jido.Flow.DSL.ExprFlowTest do
   use ExUnit.Case, async: true
   alias Jido.Expr
   alias Jido.Flow.{Codec, Ref}

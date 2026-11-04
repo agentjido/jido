@@ -2,6 +2,7 @@ version: 1
 schema:
   proof_types: [unit, covenant, authoring, example, property, fuzz]
   performance_proof_types: [load, benchmark]
+  claim_proof_modes: [unit, covenant, authoring, example, property, fuzz, system, external, load, benchmark]
   proof_states: [required, not_applicable]
   not_applicable_reason_codes:
     - deterministic_contract_matrix
@@ -84,7 +85,7 @@ module_ownership:
     - {prefix: Runic.Workflow.Invokable.Jido.Exec, component: jido_action.execution}
     - {prefix: Zoi.Type.Jido.Joi, component: jido_action.validation}
 evidence_groups:
-  unit: [test]
+  unit: [test/jido]
   covenant: [test/contracts/coverage.json]
   authoring: [test/authoring]
   signal_property: [test/property/signal]
@@ -96,6 +97,247 @@ evidence_groups:
   signal_benchmark: [test/bench/signal]
   action_flow_benchmark: [test/bench/action_flow]
   react_benchmark: [test/bench/ai]
+claims:
+  - id: jido.agent.behavior
+    component: jido.agent
+    canonical: {mode: unit, evidence_group: unit, owner: test/jido/agent, proves: "Canonical API and behavior semantics for the Agent definition and instance model."}
+    covenant_obligations: all
+    supplemental:
+      - {mode: covenant, evidence_group: covenant, proves: "Stable Covenant IDs trace the named Agent obligations to the canonical behavior tests."}
+  - id: jido.agent_evaluation.behavior
+    component: jido.agent_evaluation
+    canonical: {mode: unit, evidence_group: unit, owner: test/jido/agent/evaluation, proves: "Canonical evaluation semantics for route selection, directives, and Agent turns."}
+    covenant_obligations: all
+    supplemental:
+      - {mode: covenant, evidence_group: covenant, proves: "Stable Covenant IDs trace named evaluation obligations to the canonical behavior tests."}
+  - id: jido.agent_server.behavior
+    component: jido.agent_server
+    canonical: {mode: unit, evidence_group: unit, owner: test/jido/agent_server/core, proves: "Canonical AgentServer lifecycle, request, ownership, and control semantics."}
+    covenant_obligations: all
+    supplemental:
+      - {mode: covenant, evidence_group: covenant, proves: "Stable Covenant IDs trace named AgentServer obligations to the canonical behavior tests."}
+  - id: jido.agent_server.activation.behavior
+    component: jido.agent_server.activation
+    canonical: {mode: unit, evidence_group: unit, owner: test/jido/agent_server/activation, proves: "Canonical activation, recovery, and root ownership semantics for AgentServer."}
+    covenant_obligations: all
+    supplemental:
+      - {mode: covenant, evidence_group: covenant, proves: "Stable Covenant IDs trace activation obligations to the canonical behavior tests."}
+  - id: jido.agent_server.composition.behavior
+    component: jido.agent_server.composition
+    canonical: {mode: unit, evidence_group: unit, owner: test/jido/agent_server/composition, proves: "Canonical child composition, topology, commit, and race semantics for AgentServer."}
+    covenant_obligations: all
+    supplemental:
+      - {mode: covenant, evidence_group: covenant, proves: "Stable Covenant IDs trace composition obligations to the canonical behavior tests."}
+  - id: jido.agent_server.durable.behavior
+    component: jido.agent_server.durable
+    canonical: {mode: unit, evidence_group: unit, owner: test/jido/agent_server/durable, proves: "Canonical durable AgentServer persistence, control, and evolution semantics."}
+    covenant_obligations: all
+    supplemental:
+      - {mode: covenant, evidence_group: covenant, proves: "Stable Covenant IDs trace durable runtime obligations to the canonical behavior tests."}
+  - id: jido.agent_server.durable_turn.behavior
+    component: jido.agent_server.durable_turn
+    canonical: {mode: unit, evidence_group: unit, owner: test/jido/agent_server/durable_turn, proves: "Canonical durable turn checkpoint, wait, policy, and runtime semantics."}
+    covenant_obligations: all
+    supplemental:
+      - {mode: covenant, evidence_group: covenant, proves: "Stable Covenant IDs trace durable turn obligations to the canonical behavior tests."}
+  - id: jido.agent_server.effects.behavior
+    component: jido.agent_server.effects
+    canonical: {mode: unit, evidence_group: unit, owner: test/jido/agent_server/effects, proves: "Canonical process, reply, signal, and runtime directive effect semantics."}
+    covenant_obligations: all
+    supplemental:
+      - {mode: covenant, evidence_group: covenant, proves: "Stable Covenant IDs trace AgentServer effect obligations to the canonical behavior tests."}
+  - id: jido.agent_server.handoff.behavior
+    component: jido.agent_server.handoff
+    canonical: {mode: unit, evidence_group: unit, owner: test/jido/agent_server/handoff, proves: "Canonical AgentServer handoff behavior and successor ownership semantics."}
+    covenant_obligations: all
+    supplemental:
+      - {mode: covenant, evidence_group: covenant, proves: "Stable Covenant IDs trace handoff obligations to the canonical behavior tests."}
+  - id: jido.agent_server.plugin_runtime.behavior
+    component: jido.agent_server.plugin_runtime
+    canonical: {mode: unit, evidence_group: unit, owner: test/jido/agent_server/plugin_runtime, proves: "Canonical plugin runtime configuration, commit, and outbound semantics."}
+    covenant_obligations: all
+    supplemental:
+      - {mode: covenant, evidence_group: covenant, proves: "Stable Covenant IDs trace plugin runtime obligations to the canonical behavior tests."}
+  - id: jido.error.behavior
+    component: jido.error
+    canonical: {mode: unit, evidence_group: unit, owner: test/jido/error, proves: "Canonical error API, normalization, and transport semantics."}
+    covenant_obligations: all
+    supplemental:
+      - {mode: covenant, evidence_group: covenant, proves: "Stable Covenant IDs trace error obligations to the canonical behavior tests."}
+  - id: jido.instance.behavior
+    component: jido.instance
+    canonical: {mode: unit, evidence_group: unit, owner: test/jido/instance, proves: "Canonical instance naming, registry, restart, and supervision semantics."}
+    covenant_obligations: all
+    supplemental:
+      - {mode: covenant, evidence_group: covenant, proves: "Stable Covenant IDs trace instance obligations to the canonical behavior tests."}
+  - id: jido.persistence.behavior
+    component: jido.persistence
+    canonical: {mode: unit, evidence_group: unit, owner: test/jido/persistence, proves: "Canonical persistence adapter, record, snapshot, and portability semantics."}
+    covenant_obligations: all
+    supplemental:
+      - {mode: covenant, evidence_group: covenant, proves: "Stable Covenant IDs trace persistence obligations to the canonical behavior tests."}
+  - id: jido.plugin.behavior
+    component: jido.plugin
+    canonical: {mode: unit, evidence_group: unit, owner: test/jido/plugin/api_test.exs, proves: "Canonical plugin API behavior and provider contract semantics."}
+    covenant_obligations: all
+    supplemental:
+      - {mode: covenant, evidence_group: covenant, proves: "Stable Covenant IDs trace plugin obligations to the canonical behavior tests."}
+  - id: jido.plugin.audit.behavior
+    component: jido.plugin.audit
+    canonical: {mode: unit, evidence_group: unit, owner: test/jido/plugin/audit, proves: "Canonical audit plugin API and recorded event semantics."}
+    covenant_obligations: all
+    supplemental:
+      - {mode: covenant, evidence_group: covenant, proves: "Stable Covenant IDs trace audit plugin obligations to the canonical behavior tests."}
+  - id: jido.plugin.bus.behavior
+    component: jido.plugin.bus
+    canonical: {mode: unit, evidence_group: unit, owner: test/jido/plugin/bus, proves: "Canonical bus plugin API, subscription, and delivery semantics."}
+    covenant_obligations: all
+    supplemental:
+      - {mode: covenant, evidence_group: covenant, proves: "Stable Covenant IDs trace bus plugin obligations to the canonical behavior tests."}
+  - id: jido.plugin.heartbeat.behavior
+    component: jido.plugin.heartbeat
+    canonical: {mode: unit, evidence_group: unit, owner: test/jido/plugin/heartbeat, proves: "Canonical heartbeat plugin API and scheduling semantics."}
+    covenant_obligations: all
+    supplemental:
+      - {mode: covenant, evidence_group: covenant, proves: "Stable Covenant IDs trace heartbeat obligations to the canonical behavior tests."}
+  - id: jido.plugin.scheduler.behavior
+    component: jido.plugin.scheduler
+    canonical: {mode: unit, evidence_group: unit, owner: test/jido/plugin/scheduler, proves: "Canonical scheduler plugin API, policy, and runtime semantics."}
+    covenant_obligations: all
+    supplemental:
+      - {mode: covenant, evidence_group: covenant, proves: "Stable Covenant IDs trace scheduler obligations to the canonical behavior tests."}
+  - id: jido.plugin.sensor_manager.behavior
+    component: jido.plugin.sensor_manager
+    canonical: {mode: unit, evidence_group: unit, owner: test/jido/plugin/sensor_manager, proves: "Canonical sensor manager plugin API and lifecycle semantics."}
+    covenant_obligations: all
+    supplemental:
+      - {mode: covenant, evidence_group: covenant, proves: "Stable Covenant IDs trace sensor manager obligations to the canonical behavior tests."}
+  - id: jido.telemetry.behavior
+    component: jido.telemetry
+    canonical: {mode: unit, evidence_group: unit, owner: test/jido/telemetry, proves: "Canonical telemetry context, trace, semantic, and OpenTelemetry behavior."}
+    covenant_obligations: all
+    supplemental:
+      - {mode: covenant, evidence_group: covenant, proves: "Stable Covenant IDs trace telemetry obligations to the canonical behavior tests."}
+  - id: jido_action.action.behavior
+    component: jido_action.action
+    canonical: {mode: unit, evidence_group: unit, owner: test/jido/action/action_test.exs, proves: "Canonical Action definition, schema, execution, and metadata semantics."}
+    covenant_obligations: all
+    supplemental:
+      - {mode: covenant, evidence_group: covenant, proves: "Stable Covenant IDs trace Action obligations to the canonical behavior tests."}
+  - id: jido_action.authoring.behavior
+    component: jido_action.authoring
+    canonical: {mode: unit, evidence_group: unit, owner: test/jido/codec/document_test.exs, proves: "Canonical portable authoring document and value representation semantics."}
+    covenant_obligations: all
+    supplemental:
+      - {mode: covenant, evidence_group: covenant, proves: "Stable Covenant IDs trace authoring obligations to the canonical behavior tests."}
+  - id: jido_action.boundary.behavior
+    component: jido_action.boundary
+    canonical: {mode: unit, evidence_group: unit, owner: test/jido/exec/api_test.exs, proves: "Canonical public execution boundary and error normalization semantics."}
+    covenant_obligations: all
+    supplemental:
+      - {mode: covenant, evidence_group: covenant, proves: "Stable Covenant IDs trace boundary obligations to the canonical behavior tests."}
+  - id: jido_action.codec.behavior
+    component: jido_action.codec
+    canonical: {mode: unit, evidence_group: unit, owner: test/jido/codec/flow_test.exs, proves: "Canonical Flow codec round-trip and registry semantics."}
+    covenant_obligations: all
+    supplemental:
+      - {mode: covenant, evidence_group: covenant, proves: "Stable Covenant IDs trace codec obligations to the canonical behavior tests."}
+  - id: jido_action.execution.behavior
+    component: jido_action.execution
+    canonical: {mode: unit, evidence_group: unit, owner: test/jido/exec/runner, proves: "Canonical execution runner, wait, durability, and task ownership semantics."}
+    covenant_obligations: all
+    supplemental:
+      - {mode: covenant, evidence_group: covenant, proves: "Stable Covenant IDs trace execution obligations to the canonical behavior tests."}
+  - id: jido_action.expression.behavior
+    component: jido_action.expression
+    canonical: {mode: unit, evidence_group: unit, owner: test/jido/expr, proves: "Canonical expression evaluation and survivor contract semantics."}
+    covenant_obligations: all
+    supplemental:
+      - {mode: covenant, evidence_group: covenant, proves: "Stable Covenant IDs trace expression obligations to the canonical behavior tests."}
+  - id: jido_action.flow.behavior
+    component: jido_action.flow
+    canonical: {mode: unit, evidence_group: unit, owner: test/jido/flow, proves: "Canonical Flow authoring, graph identity, validation, and parallel semantics."}
+    covenant_obligations: all
+    supplemental:
+      - {mode: covenant, evidence_group: covenant, proves: "Stable Covenant IDs trace Flow obligations to the canonical behavior tests."}
+  - id: jido_action.inline.behavior
+    component: jido_action.inline
+    canonical: {mode: unit, evidence_group: unit, owner: test/jido/action/inline_test.exs, proves: "Canonical inline Action lowering and execution semantics."}
+    covenant_obligations: all
+    supplemental:
+      - {mode: covenant, evidence_group: covenant, proves: "Stable Covenant IDs trace inline Action obligations to the canonical behavior tests."}
+  - id: jido_action.inline_flow.behavior
+    component: jido_action.inline_flow
+    canonical: {mode: unit, evidence_group: unit, owner: test/jido/flow/inline_test.exs, proves: "Canonical inline Flow lowering, ownership, and extension semantics."}
+    covenant_obligations: all
+    supplemental:
+      - {mode: covenant, evidence_group: covenant, proves: "Stable Covenant IDs trace inline Flow obligations to the canonical behavior tests."}
+  - id: jido_action.instruction.behavior
+    component: jido_action.instruction
+    canonical: {mode: unit, evidence_group: unit, owner: test/jido/instruction, proves: "Canonical instruction configuration, compilation, and target semantics."}
+    covenant_obligations: all
+    supplemental:
+      - {mode: covenant, evidence_group: covenant, proves: "Stable Covenant IDs trace instruction obligations to the canonical behavior tests."}
+  - id: jido_action.output.behavior
+    component: jido_action.output
+    canonical: {mode: unit, evidence_group: unit, owner: test/jido/action/output_test.exs, proves: "Canonical Action output schema and normalization semantics."}
+    covenant_obligations: all
+    supplemental:
+      - {mode: covenant, evidence_group: covenant, proves: "Stable Covenant IDs trace output obligations to the canonical behavior tests."}
+  - id: jido_action.validation.behavior
+    component: jido_action.validation
+    canonical: {mode: unit, evidence_group: unit, owner: test/jido/action/validation_test.exs, proves: "Canonical Action validation and malformed input semantics."}
+    covenant_obligations: all
+    supplemental:
+      - {mode: covenant, evidence_group: covenant, proves: "Stable Covenant IDs trace validation obligations to the canonical behavior tests."}
+  - id: jido_ai.agent_authoring.behavior
+    component: jido_ai.agent_authoring
+    canonical: {mode: unit, evidence_group: unit, owner: test/jido/ai/agent, proves: "Canonical AI Agent authoring, plugin, and validation semantics."}
+    covenant_obligations: all
+    supplemental:
+      - {mode: covenant, evidence_group: covenant, proves: "Stable Covenant IDs trace AI Agent obligations to the canonical behavior tests."}
+  - id: jido_ai.conversation.behavior
+    component: jido_ai.conversation
+    canonical: {mode: unit, evidence_group: unit, owner: test/jido/ai/conversation, proves: "Canonical AI conversation and conversation codec semantics."}
+    covenant_obligations: all
+    supplemental:
+      - {mode: covenant, evidence_group: covenant, proves: "Stable Covenant IDs trace conversation obligations to the canonical behavior tests."}
+  - id: jido_ai.model_execution.behavior
+    component: jido_ai.model_execution
+    canonical: {mode: unit, evidence_group: unit, owner: test/jido/ai/model_execution, proves: "Canonical model call, budget, context, and execution boundary semantics."}
+    covenant_obligations: all
+    supplemental:
+      - {mode: covenant, evidence_group: covenant, proves: "Stable Covenant IDs trace model execution obligations to the canonical behavior tests."}
+  - id: jido_ai.observability.behavior
+    component: jido_ai.observability
+    canonical: {mode: unit, evidence_group: unit, owner: test/jido/ai/observability, proves: "Canonical AI telemetry, correlation, and OpenTelemetry semantics."}
+    covenant_obligations: all
+    supplemental:
+      - {mode: covenant, evidence_group: covenant, proves: "Stable Covenant IDs trace observability obligations to the canonical behavior tests."}
+  - id: jido_ai.react.behavior
+    component: jido_ai.react
+    canonical: {mode: unit, evidence_group: unit, owner: test/jido/ai/reasoning/react, proves: "Canonical ReAct reasoning and runtime iteration semantics."}
+    covenant_obligations: all
+    supplemental:
+      - {mode: covenant, evidence_group: covenant, proves: "Stable Covenant IDs trace ReAct obligations to the canonical behavior tests."}
+  - id: jido_ai.strategies.behavior
+    component: jido_ai.strategies
+    canonical: {mode: unit, evidence_group: unit, owner: test/jido/ai/reasoning/strategies, proves: "Canonical reasoning strategy selection and explanation semantics."}
+    covenant_obligations: all
+    supplemental:
+      - {mode: covenant, evidence_group: covenant, proves: "Stable Covenant IDs trace strategy obligations to the canonical behavior tests."}
+  - id: jido_ai.tools.behavior
+    component: jido_ai.tools
+    canonical: {mode: unit, evidence_group: unit, owner: test/jido/ai/tools, proves: "Canonical AI tool, skill, boundary, and policy semantics."}
+    covenant_obligations: all
+    supplemental:
+      - {mode: covenant, evidence_group: covenant, proves: "Stable Covenant IDs trace tool obligations to the canonical behavior tests."}
+  - id: jido_ai.turn.behavior
+    component: jido_ai.turn
+    canonical: {mode: unit, evidence_group: unit, owner: test/jido/ai/turn, proves: "Canonical AI turn result, control, and transition semantics."}
+    covenant_obligations: all
+    supplemental:
+      - {mode: covenant, evidence_group: covenant, proves: "Stable Covenant IDs trace turn obligations to the canonical behavior tests."}
 proof_profiles:
   closed_contract:
     unit: {state: required, evidence_group: unit}

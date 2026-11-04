@@ -238,7 +238,7 @@ defmodule Jido.Plugin.ValidationTest do
           {Empty, "must use Jido.Plugin"},
           {{Configurable, [:invalid]}, "options must be a keyword list"},
           {42, "Invalid Agent Plugin declaration"},
-          {JidoTest.MissingPlugin, "could not be loaded"},
+          {Jido.Test.MissingPlugin, "could not be loaded"},
           {{Configurable, state: :invalid}, "state_spec/1 returned an invalid value"},
           {{Configurable, state: {:owned, Jido.Joi.any() |> Jido.Joi.refine(fn _ -> :ok end)}},
            "options must be static data"},
@@ -556,7 +556,7 @@ defmodule Jido.Plugin.ValidationTest do
 
   test "Directive owners must be loaded struct modules" do
     for {directive, message} <- [
-          {JidoTest.MissingDirective, "must be loaded"},
+          {Jido.Test.MissingDirective, "must be loaded"},
           {String, "must define a struct"}
         ] do
       assert {:error, error} =

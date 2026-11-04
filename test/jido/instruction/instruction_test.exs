@@ -1,4 +1,4 @@
-defmodule JidoActionTest.InstructionTest do
+defmodule Jido.InstructionTest do
   use Covenant.Case, component: "jido_action.instruction", async: true
 
   alias Jido.Instruction

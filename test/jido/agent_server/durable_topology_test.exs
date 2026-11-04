@@ -1,4 +1,4 @@
-defmodule JidoTest.AgentServer.DurableTopologyTest do
+defmodule Jido.AgentServer.DurableTopologyTest do
   use Jido.Test.Case, async: false
   @moduletag :tmp_dir
   @moduletag capture_log: true

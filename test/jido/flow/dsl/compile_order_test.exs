@@ -6,8 +6,8 @@ defmodule Jido.Flow.DSL.CompileOrderTest do
 
   test "a Flow waits for an advanced component target that compiles later", %{tmp_dir: dir} do
     suffix = System.unique_integer([:positive])
-    action = Module.concat([JidoActionTest, CompileOrder, "ItemAction#{suffix}"])
-    flow = Module.concat([JidoActionTest, CompileOrder, "MapFlow#{suffix}"])
+    action = Module.concat([Jido.Test, CompileOrder, "ItemAction#{suffix}"])
+    flow = Module.concat([Jido.Test, CompileOrder, "MapFlow#{suffix}"])
     test_pid = :erlang.pid_to_list(self())
 
     action_file = Path.join(dir, "action.ex")
