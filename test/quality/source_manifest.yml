@@ -72,6 +72,22 @@ assets:
     disposition: excluded
     reason: The imported runner reports measurements without timing or memory pass thresholds.
   - source_repository: jido_action
+    source_commit: 177e7a4ce4342a9a6b7bc668f540dafbd7169d54
+    source_path: test/authoring
+    target_path: test/authoring/flows
+    quality_surface: authoring
+    owner: jido.flow
+    disposition: ported
+    reason: Ported by jido-nnq as 11 adapted Flow authoring test files, nine support assets, and one README. The guide runner has a separate superseded record.
+  - source_repository: jido_action
+    source_commit: 177e7a4ce4342a9a6b7bc668f540dafbd7169d54
+    source_path: test/authoring/guides_test.exs
+    target_path: test/jido/flow/dsl/spark_surface_test.exs
+    quality_surface: authoring
+    owner: jido.flow
+    disposition: superseded
+    reason: Current Spark guide checks and the registered Flow authoring examples replace the removed source guide paths without duplicating guide execution in the authoring lane.
+  - source_repository: jido_action
     source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
     source_path: test/property
     target_path: test/property/action_flow
