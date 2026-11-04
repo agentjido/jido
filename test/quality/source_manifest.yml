@@ -209,6 +209,30 @@ assets:
     reason: Scheduled across jido-07x.12 through jido-07x.14.
   - source_repository: jido_v3_split
     source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
+    source_path: test/examples/catalog_test.exs
+    target_path: test/examples/catalog_test.exs
+    quality_surface: examples
+    owner: jido.examples
+    disposition: ported
+    reason: Adapted by jido-07x.8 into one category register that rejects missing, duplicate, and unlisted example assets.
+  - source_repository: jido_v3_split
+    source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
+    source_path: test/examples/README.md
+    target_path: test/examples/README.md
+    quality_surface: examples
+    owner: jido.examples
+    disposition: ported
+    reason: Adapted by jido-07x.8 with the unified offline example loading and test contract.
+  - source_repository: jido_v3_split
+    source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
+    source_path: examples/README.md
+    target_path: examples/README.md
+    quality_surface: examples
+    owner: jido.examples
+    disposition: ported
+    reason: Adapted by jido-07x.8 as the unified category and stable ID contract.
+  - source_repository: jido_v3_split
+    source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
     source_path: test/property
     target_path: test/property/runtime
     quality_surface: property_and_fuzz

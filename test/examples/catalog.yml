@@ -1,0 +1,32 @@
+version: 1
+id_pattern: '^[a-z][a-z0-9_]*(/[a-z][a-z0-9_]*)+$'
+categories:
+  - id: flow
+    source_root: examples/flow
+    test_root: test/examples/flow
+  - id: agent
+    source_root: examples/agent
+    test_root: test/examples/agent
+  - id: runtime
+    source_root: examples/runtime
+    test_root: test/examples/runtime
+  - id: topology
+    source_root: examples/topology
+    test_root: test/examples/topology
+  - id: plugin
+    source_root: examples/plugin
+    test_root: test/examples/plugin
+  - id: persistence
+    source_root: examples/persistence
+    test_root: test/examples/persistence
+  - id: durable
+    source_root: examples/durable
+    test_root: test/examples/durable
+  - id: ai
+    source_root: examples/ai
+    test_root: test/examples/ai
+index_readmes: []
+examples: []
+exclusions:
+  - path: examples/00_graph_first
+    reason: The current script needs a live provider. U15 will move and pair the supported offline AI examples, and U19 owns live-provider proof.
