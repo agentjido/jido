@@ -614,9 +614,9 @@ All units execute directly on `main` after their dependency tickets close, per K
 
 **Test scenarios and acceptance criteria:**
 
-- [ ] Service checks do not run under `mix test`, `mix test.ci`, or `mix test.all`.
-- [ ] Setup does not use ambient production services or credentials.
-- [ ] Every service family has a manifest disposition.
+- [x] Service checks do not run under `mix test`, `mix test.ci`, or `mix test.all`.
+- [x] Setup does not use ambient production services or credentials.
+- [x] Every service family has a manifest disposition.
 
 **Verification:** Each documented `mix test.services` command exits with status `0` in its declared test environment.
 

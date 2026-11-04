@@ -673,12 +673,36 @@ assets:
     reason: The opt-in durable example peer suite proves fresh-BEAM File restore and in-flight workflow recovery with current APIs.
   - source_repository: jido_v3_split
     source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
-    source_path: test/system/services
-    target_path: test/system/services
+    source_path: test/system/services/redis*.exs
+    target_path: test/system/services/redis_test.exs
+    quality_surface: services
+    owner: jido.persistence
+    disposition: ported
+    reason: Adapted as an owned Redis 7 container with binary, conditional-write, concurrency, and cleanup checks.
+  - source_repository: jido_v3_split
+    source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
+    source_path: test/system/services/postgres_test.exs
+    target_path: test/system/services/postgres_test.exs
+    quality_surface: services
+    owner: jido.persistence
+    disposition: ported
+    reason: Adapted as an owned PostgreSQL 17 container with the current Ecto migration and Store contract.
+  - source_repository: jido_v3_split
+    source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
+    source_path: test/system/services/minio/**
+    target_path: test/system/services/minio_test.exs
+    quality_surface: services
+    owner: jido.persistence
+    disposition: ported
+    reason: Adapted as a dedicated-credential MinIO Store contract with a unique owned bucket and complete object cleanup.
+  - source_repository: jido_v3_split
+    source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
+    source_path: test/system/services/bedrock*.exs
+    target_path: test/system/services/bedrock_deferred_test.exs
     quality_surface: services
     owner: jido.persistence
     disposition: deferred
-    reason: Scheduled for jido-07x.17.
+    reason: The strict Bedrock service pressure suite remains paused pending bedrock-kv/bedrock#319; local adapter and transaction tests remain active.
   - source_repository: jido_v3_split
     source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
     source_path: test/bench
