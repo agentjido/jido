@@ -131,6 +131,7 @@ Land only quality work in this effort. Do not change `lib/**`. If an imported ch
 - KTD15. **External boundaries:** Keep provider and service suites opt-in. Do not include them in combined offline coverage.
 - KTD16. **Direct delivery:** Apply this quality work directly to `main`. (session-settled: user-directed — chosen over a branch and local pull request: the user requested direct main delivery.)
 - KTD17. **Stability evidence:** Preserve every required-suite failure in the quality report until a versioned resolution or waiver closes it.
+- KTD18. **Numbered examples:** Keep the source teaching order as `NN_chapter/NN_NN_lesson` under each category. Mirror that path in `test/examples`, use `category/NN_NN_lesson` catalog IDs, preserve intentional gaps, and reject a lesson whose prefix does not match its parent chapter.
 
 ### High-Level Technical Design
 
@@ -186,9 +187,9 @@ All units execute directly on `main` after their dependency tickets close, per K
 | U6 | Port Action system and load | `test/system/runtime/action_flow/**`, `test/load/action_flow/**` | U5, U24 |
 | U7 | Port Action benchmarks | `test/bench/action_flow/**` | U4, U5, U24 |
 | U8 | Add example catalog | `test/examples/**`, `examples/**` | U2, U5, U24 |
-| U9 | Port compilation examples | `test/examples/flow/compilation/**` | U8 |
-| U10 | Port execution examples | `test/examples/flow/execution/**` | U5, U8 |
-| U11 | Port advanced examples | `test/examples/flow/advanced/**` | U6, U8 |
+| U9 | Port compilation examples | `test/examples/flow/01_compilation/**` | U8 |
+| U10 | Port execution examples | `test/examples/flow/02_execution/**` | U5, U8 |
+| U11 | Port advanced examples | `test/examples/flow/03_durability/**`, `04_patterns/**`, `05_distribution/**` | U6, U8 |
 | U12 | Port core learning examples | `test/examples/agent/**` | U2, U5, U8 |
 | U13 | Port runtime examples | `test/examples/runtime/**`, `test/examples/topology/**` | U3, U6, U8 |
 | U14 | Port Plugin and persistence examples | `test/examples/plugin/**`, `test/examples/persistence/**` | U8, U13 |
@@ -378,7 +379,7 @@ All units execute directly on `main` after their dependency tickets close, per K
 
 **Goal:** Create one enforced layout for all supported examples.
 
-**Covers:** R1, R2, R3, R4; KTD1, KTD3, KTD5, KTD6.
+**Covers:** R1, R2, R3, R4; KTD1, KTD3, KTD5, KTD6, KTD18.
 
 **Dependencies:** U2, U5, and U24.
 
@@ -386,14 +387,16 @@ All units execute directly on `main` after their dependency tickets close, per K
 
 **Directive:**
 
-1. Define one stable example ID format and category register.
+1. Define `category/NN_NN_lesson` IDs and a category register.
 2. Require one README, one primary source, and one paired test for every supported example.
 3. Make the catalog test reject missing files, duplicate IDs, and unlisted examples.
 4. Load example source only when example paths or the `:example` tag are selected.
+5. Require `NN_chapter/NN_NN_lesson` source and test paths, matching chapter prefixes, preserved gaps, and ID-sorted catalog entries.
 
 **Test scenarios and acceptance criteria:**
 
 - [ ] An orphan README, source, or test makes the catalog test fail.
+- [ ] A malformed chapter, malformed lesson, mismatched prefix, mirrored-path error, or unsorted ID makes the catalog test fail.
 - [ ] Default `mix test` does not compile the example tree.
 - [ ] `mix test.examples` is offline and uses seed `0`.
 
@@ -407,7 +410,7 @@ All units execute directly on `main` after their dependency tickets close, per K
 
 **Dependencies:** U8.
 
-**Files:** Read `../refs/jido_action/examples/01_compilation/**` and matching source tests at Action commit `40ec1f0af3a373bae5e6d869017cc229c85aef92`. Add `examples/flow/compilation/**` and `test/examples/flow/compilation/**`. Change the manifest.
+**Files:** Read `../refs/jido_action/examples/01_compilation/**` and matching source tests at Action commit `40ec1f0af3a373bae5e6d869017cc229c85aef92`. Add `examples/flow/01_compilation/**` and `test/examples/flow/01_compilation/**`. Change the manifest.
 
 **Directive:**
 
@@ -421,7 +424,7 @@ All units execute directly on `main` after their dependency tickets close, per K
 - [ ] Every ported example has a README, source, and passing paired test.
 - [ ] No separate-package application module appears.
 
-**Verification:** `mix test.examples test/examples/flow/compilation` exits with status `0`.
+**Verification:** `mix test.examples test/examples/flow/01_compilation` exits with status `0`.
 
 ### U10. Port Action execution examples
 
@@ -431,7 +434,7 @@ All units execute directly on `main` after their dependency tickets close, per K
 
 **Dependencies:** U8 and U5.
 
-**Files:** Read `../refs/jido_action/examples/02_execution/**` and matching tests at Action commit `40ec1f0af3a373bae5e6d869017cc229c85aef92`. Add `examples/flow/execution/**` and `test/examples/flow/execution/**`. Change the manifest.
+**Files:** Read `../refs/jido_action/examples/02_execution/**` and matching tests at Action commit `40ec1f0af3a373bae5e6d869017cc229c85aef92`. Add `examples/flow/02_execution/**` and `test/examples/flow/02_execution/**`. Change the manifest.
 
 **Directive:**
 
@@ -445,7 +448,7 @@ All units execute directly on `main` after their dependency tickets close, per K
 - [ ] Every ported example has one paired offline test.
 - [ ] Wait and parallel examples use deterministic coordination.
 
-**Verification:** `mix test.examples test/examples/flow/execution` exits with status `0`.
+**Verification:** `mix test.examples test/examples/flow/02_execution` exits with status `0`.
 
 ### U11. Port advanced Action examples
 
@@ -455,7 +458,7 @@ All units execute directly on `main` after their dependency tickets close, per K
 
 **Dependencies:** U6 and U8.
 
-**Files:** Read Action example groups `03_durability/**`, `04_patterns/**`, and `05_distribution/**` with their tests at commit `40ec1f0af3a373bae5e6d869017cc229c85aef92`. Add `examples/flow/advanced/**` and matching tests. Change the manifest.
+**Files:** Read Action example groups `03_durability/**`, `04_patterns/**`, and `05_distribution/**` with their tests at commit `40ec1f0af3a373bae5e6d869017cc229c85aef92`. Add matching numbered chapters under `examples/flow/**` and `test/examples/flow/**`. Change the manifest.
 
 **Directive:**
 
@@ -469,7 +472,7 @@ All units execute directly on `main` after their dependency tickets close, per K
 - [ ] Ported examples use barriers or monitors for ordering.
 - [ ] Deferred examples record the exact failing command and expected behavior.
 
-**Verification:** `mix test.examples test/examples/flow/advanced` exits with status `0`.
+**Verification:** `mix test.examples test/examples/flow/03_durability test/examples/flow/04_patterns test/examples/flow/05_distribution` exits with status `0`.
 
 ### U12. Port core basic and workflow examples
 

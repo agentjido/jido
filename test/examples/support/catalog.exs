@@ -3,6 +3,8 @@ defmodule JidoTest.Examples.Catalog do
 
   @required_entry_fields ~w(id category readme source test)
   @required_category_fields ~w(id source_root test_root)
+  @chapter_pattern ~r/^\d{2}_[a-z][a-z0-9_]*$/
+  @lesson_pattern ~r/^(\d{2})_\d{2}_[a-z][a-z0-9_]*$/
 
   def load!(path) do
     case YamlElixir.read_from_file(path) do
@@ -24,6 +26,7 @@ defmodule JidoTest.Examples.Catalog do
     |> validate_categories(categories)
     |> validate_exclusions(exclusions, root)
     |> validate_entries(entries, categories, catalog, root)
+    |> validate_order(entries)
     |> validate_unique(entries, "id")
     |> validate_unique(entries, "readme")
     |> validate_unique(entries, "source")
@@ -149,7 +152,83 @@ defmodule JidoTest.Examples.Catalog do
     |> expected_root(entry["readme"], category["source_root"], "readme")
     |> expected_root(entry["source"], category["source_root"], "source")
     |> expected_root(entry["test"], category["test_root"], "test")
+    |> validate_numbered_entry(entry, category)
     |> validate_auxiliary(entry, category, root)
+  end
+
+  defp validate_numbered_entry(errors, entry, category) do
+    assets =
+      [
+        {"readme", entry["readme"], category["source_root"]},
+        {"source", entry["source"], category["source_root"]},
+        {"test", entry["test"], category["test_root"]}
+      ] ++
+        Enum.map(Map.get(entry, "auxiliary_sources", []), fn path ->
+          {"auxiliary source", path, category["source_root"]}
+        end)
+
+    {errors, locations} =
+      Enum.reduce(assets, {errors, []}, fn {label, path, root}, {current, found} ->
+        case numbered_location(path, root) do
+          {:ok, chapter, lesson} ->
+            chapter_number = String.slice(chapter, 0, 2)
+
+            lesson_number =
+              case Regex.run(@lesson_pattern, lesson) do
+                [_, number] -> number
+                _ -> nil
+              end
+
+            next =
+              current
+              |> maybe_error(
+                not Regex.match?(@chapter_pattern, chapter),
+                "#{label} chapter must use NN_chapter: #{path}"
+              )
+              |> maybe_error(
+                is_nil(lesson_number),
+                "#{label} lesson must use NN_NN_lesson: #{path}"
+              )
+              |> maybe_error(
+                is_binary(lesson_number) and lesson_number != chapter_number,
+                "#{label} lesson chapter prefix does not match its parent: #{path}"
+              )
+
+            {next, [{chapter, lesson} | found]}
+
+          :error ->
+            {["#{label} path must use NN_chapter/NN_NN_lesson: #{path}" | current], found}
+        end
+      end)
+
+    unique_locations = Enum.uniq(locations)
+
+    expected_id =
+      case unique_locations do
+        [{_chapter, lesson}] -> "#{entry["category"]}/#{lesson}"
+        _ -> nil
+      end
+
+    errors
+    |> maybe_error(
+      length(unique_locations) > 1,
+      "paired assets do not mirror one numbered chapter and lesson: #{entry["id"]}"
+    )
+    |> maybe_error(
+      is_binary(expected_id) and entry["id"] != expected_id,
+      "example id does not match its numbered lesson: #{entry["id"]}"
+    )
+  end
+
+  defp numbered_location(path, root) do
+    if under?(path, root) do
+      case path |> Path.relative_to(root) |> Path.split() do
+        [chapter, lesson, _file] -> {:ok, chapter, lesson}
+        _ -> :error
+      end
+    else
+      :error
+    end
   end
 
   defp validate_auxiliary(errors, entry, category, root) do
@@ -192,6 +271,13 @@ defmodule JidoTest.Examples.Catalog do
   defp validate_unique(errors, entries, field) do
     duplicates(errors, entries, field, "duplicate example #{field}")
   end
+
+  defp validate_order(errors, entries) when is_list(entries) do
+    ids = Enum.map(entries, & &1["id"])
+    maybe_error(errors, ids != Enum.sort(ids), "example entries must be sorted by id")
+  end
+
+  defp validate_order(errors, _entries), do: errors
 
   defp validate_index_readmes(errors, indexes, categories, root) when is_list(indexes) do
     source_roots = Enum.map(categories, & &1["source_root"])

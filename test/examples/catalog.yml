@@ -1,5 +1,5 @@
 version: 1
-id_pattern: '^[a-z][a-z0-9_]*(/[a-z][a-z0-9_]*)+$'
+id_pattern: '^[a-z][a-z0-9_]*/[0-9]{2}_[0-9]{2}_[a-z][a-z0-9_]*$'
 categories:
   - id: flow
     source_root: examples/flow
@@ -26,48 +26,124 @@ categories:
     source_root: examples/ai
     test_root: test/examples/ai
 index_readmes:
-  - examples/flow/compilation/README.md
+  - examples/flow/01_compilation/README.md
+  - examples/flow/02_execution/README.md
 examples:
-  - id: flow/compilation/single_step
+  - id: flow/01_01_single_step
     category: flow
-    readme: examples/flow/compilation/single_step/README.md
-    source: examples/flow/compilation/single_step/single_step.ex
-    test: test/examples/flow/compilation/single_step_test.exs
-  - id: flow/compilation/dependency_graph
+    readme: examples/flow/01_compilation/01_01_single_step/README.md
+    source: examples/flow/01_compilation/01_01_single_step/single_step.ex
+    test: test/examples/flow/01_compilation/01_01_single_step/single_step_test.exs
+  - id: flow/01_02_dependency_graph
     category: flow
-    readme: examples/flow/compilation/dependency_graph/README.md
-    source: examples/flow/compilation/dependency_graph/dependency_graph.ex
-    test: test/examples/flow/compilation/dependency_graph_test.exs
-  - id: flow/compilation/dsl_flow
+    readme: examples/flow/01_compilation/01_02_dependency_graph/README.md
+    source: examples/flow/01_compilation/01_02_dependency_graph/dependency_graph.ex
+    test: test/examples/flow/01_compilation/01_02_dependency_graph/dependency_graph_test.exs
+  - id: flow/01_03_dsl_flow
     category: flow
-    readme: examples/flow/compilation/dsl_flow/README.md
-    source: examples/flow/compilation/dsl_flow/dsl_flow.ex
-    test: test/examples/flow/compilation/dsl_flow_test.exs
-  - id: flow/compilation/stored_json
+    readme: examples/flow/01_compilation/01_03_dsl_flow/README.md
+    source: examples/flow/01_compilation/01_03_dsl_flow/dsl_flow.ex
+    test: test/examples/flow/01_compilation/01_03_dsl_flow/dsl_flow_test.exs
+  - id: flow/01_04_stored_json
     category: flow
-    readme: examples/flow/compilation/stored_json/README.md
-    source: examples/flow/compilation/stored_json/stored_json.ex
-    test: test/examples/flow/compilation/stored_json_test.exs
-  - id: flow/compilation/authoring_equivalence
+    readme: examples/flow/01_compilation/01_04_stored_json/README.md
+    source: examples/flow/01_compilation/01_04_stored_json/stored_json.ex
+    test: test/examples/flow/01_compilation/01_04_stored_json/stored_json_test.exs
+  - id: flow/01_05_authoring_equivalence
     category: flow
-    readme: examples/flow/compilation/authoring_equivalence/README.md
-    source: examples/flow/compilation/authoring_equivalence/authoring_equivalence.ex
-    test: test/examples/flow/compilation/authoring_equivalence_test.exs
-  - id: flow/compilation/validation
+    readme: examples/flow/01_compilation/01_05_authoring_equivalence/README.md
+    source: examples/flow/01_compilation/01_05_authoring_equivalence/authoring_equivalence.ex
+    test: test/examples/flow/01_compilation/01_05_authoring_equivalence/authoring_equivalence_test.exs
+  - id: flow/01_06_validation
     category: flow
-    readme: examples/flow/compilation/validation/README.md
-    source: examples/flow/compilation/validation/validation.ex
-    test: test/examples/flow/compilation/validation_test.exs
-  - id: flow/compilation/inputs_and_output
+    readme: examples/flow/01_compilation/01_06_validation/README.md
+    source: examples/flow/01_compilation/01_06_validation/validation.ex
+    test: test/examples/flow/01_compilation/01_06_validation/validation_test.exs
+  - id: flow/01_07_inputs_and_output
     category: flow
-    readme: examples/flow/compilation/inputs_and_output/README.md
-    source: examples/flow/compilation/inputs_and_output/inputs_and_output.ex
-    test: test/examples/flow/compilation/inputs_and_output_test.exs
-  - id: flow/compilation/compiled_program
+    readme: examples/flow/01_compilation/01_07_inputs_and_output/README.md
+    source: examples/flow/01_compilation/01_07_inputs_and_output/inputs_and_output.ex
+    test: test/examples/flow/01_compilation/01_07_inputs_and_output/inputs_and_output_test.exs
+  - id: flow/01_09_compiled_program
     category: flow
-    readme: examples/flow/compilation/compiled_program/README.md
-    source: examples/flow/compilation/compiled_program/compiled_program.ex
-    test: test/examples/flow/compilation/compiled_program_test.exs
+    readme: examples/flow/01_compilation/01_09_compiled_program/README.md
+    source: examples/flow/01_compilation/01_09_compiled_program/compiled_program.ex
+    test: test/examples/flow/01_compilation/01_09_compiled_program/compiled_program_test.exs
+  - id: flow/02_01_single_action
+    category: flow
+    readme: examples/flow/02_execution/02_01_single_action/README.md
+    source: examples/flow/02_execution/02_01_single_action/single_action.ex
+    test: test/examples/flow/02_execution/02_01_single_action/single_action_test.exs
+  - id: flow/02_02_three_step_flow
+    category: flow
+    readme: examples/flow/02_execution/02_02_three_step_flow/README.md
+    source: examples/flow/02_execution/02_02_three_step_flow/three_step_flow.ex
+    test: test/examples/flow/02_execution/02_02_three_step_flow/three_step_flow_test.exs
+  - id: flow/02_03_serial_then_parallel
+    category: flow
+    readme: examples/flow/02_execution/02_03_serial_then_parallel/README.md
+    source: examples/flow/02_execution/02_03_serial_then_parallel/serial_then_parallel.ex
+    test: test/examples/flow/02_execution/02_03_serial_then_parallel/serial_then_parallel_test.exs
+  - id: flow/02_04_choice
+    category: flow
+    readme: examples/flow/02_execution/02_04_choice/README.md
+    source: examples/flow/02_execution/02_04_choice/choice.ex
+    test: test/examples/flow/02_execution/02_04_choice/choice_test.exs
+  - id: flow/02_05_map_reduce
+    category: flow
+    readme: examples/flow/02_execution/02_05_map_reduce/README.md
+    source: examples/flow/02_execution/02_05_map_reduce/map_reduce.ex
+    test: test/examples/flow/02_execution/02_05_map_reduce/map_reduce_test.exs
+  - id: flow/02_06_loop_invoke_wait
+    category: flow
+    readme: examples/flow/02_execution/02_06_loop_invoke_wait/README.md
+    source: examples/flow/02_execution/02_06_loop_invoke_wait/loop_invoke_wait.ex
+    test: test/examples/flow/02_execution/02_06_loop_invoke_wait/loop_invoke_wait_test.exs
+  - id: flow/02_07_parallel
+    category: flow
+    readme: examples/flow/02_execution/02_07_parallel/README.md
+    source: examples/flow/02_execution/02_07_parallel/parallel.ex
+    test: test/examples/flow/02_execution/02_07_parallel/parallel_test.exs
+  - id: flow/02_08_map
+    category: flow
+    readme: examples/flow/02_execution/02_08_map/README.md
+    source: examples/flow/02_execution/02_08_map/map.ex
+    test: test/examples/flow/02_execution/02_08_map/map_test.exs
+  - id: flow/02_09_reduce
+    category: flow
+    readme: examples/flow/02_execution/02_09_reduce/README.md
+    source: examples/flow/02_execution/02_09_reduce/reduce.ex
+    test: test/examples/flow/02_execution/02_09_reduce/reduce_test.exs
+  - id: flow/02_10_iterate
+    category: flow
+    readme: examples/flow/02_execution/02_10_iterate/README.md
+    source: examples/flow/02_execution/02_10_iterate/iterate.ex
+    test: test/examples/flow/02_execution/02_10_iterate/iterate_test.exs
+  - id: flow/02_11_child_flow
+    category: flow
+    readme: examples/flow/02_execution/02_11_child_flow/README.md
+    source: examples/flow/02_execution/02_11_child_flow/child_flow.ex
+    test: test/examples/flow/02_execution/02_11_child_flow/child_flow_test.exs
+  - id: flow/02_12_wait_and_signal
+    category: flow
+    readme: examples/flow/02_execution/02_12_wait_and_signal/README.md
+    source: examples/flow/02_execution/02_12_wait_and_signal/wait_and_signal.ex
+    test: test/examples/flow/02_execution/02_12_wait_and_signal/wait_and_signal_test.exs
+  - id: flow/02_13_controlled_execution
+    category: flow
+    readme: examples/flow/02_execution/02_13_controlled_execution/README.md
+    source: examples/flow/02_execution/02_13_controlled_execution/controlled_execution.ex
+    test: test/examples/flow/02_execution/02_13_controlled_execution/controlled_execution_test.exs
+  - id: flow/02_14_effects_and_failure
+    category: flow
+    readme: examples/flow/02_execution/02_14_effects_and_failure/README.md
+    source: examples/flow/02_execution/02_14_effects_and_failure/effects_and_failure.ex
+    test: test/examples/flow/02_execution/02_14_effects_and_failure/effects_and_failure_test.exs
+  - id: flow/02_15_dynamic_invoke
+    category: flow
+    readme: examples/flow/02_execution/02_15_dynamic_invoke/README.md
+    source: examples/flow/02_execution/02_15_dynamic_invoke/dynamic_invoke.ex
+    test: test/examples/flow/02_execution/02_15_dynamic_invoke/dynamic_invoke_test.exs
 exclusions:
   - path: examples/00_graph_first
-    reason: The current script needs a live provider. U15 will move and pair the supported offline AI examples, and U19 owns live-provider proof.
+    reason: The numbered live-provider lesson is opt-in. U15 owns offline AI examples, and U19 owns live-provider proof.

@@ -154,7 +154,7 @@ assets:
   - source_repository: jido_action
     source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
     source_path: examples/01_compilation
-    target_path: examples/flow/compilation
+    target_path: examples/flow/01_compilation
     quality_surface: examples
     owner: jido.flow
     disposition: ported
@@ -162,7 +162,7 @@ assets:
   - source_repository: jido_action
     source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
     source_path: examples/01_compilation/01_01_single_step
-    target_path: examples/flow/compilation/single_step
+    target_path: examples/flow/01_compilation/01_01_single_step
     quality_surface: examples
     owner: jido.flow
     disposition: ported
@@ -170,7 +170,7 @@ assets:
   - source_repository: jido_action
     source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
     source_path: examples/01_compilation/01_02_dependency_graph
-    target_path: examples/flow/compilation/dependency_graph
+    target_path: examples/flow/01_compilation/01_02_dependency_graph
     quality_surface: examples
     owner: jido.flow
     disposition: ported
@@ -178,7 +178,7 @@ assets:
   - source_repository: jido_action
     source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
     source_path: examples/01_compilation/01_03_dsl_flow
-    target_path: examples/flow/compilation/dsl_flow
+    target_path: examples/flow/01_compilation/01_03_dsl_flow
     quality_surface: examples
     owner: jido.flow
     disposition: ported
@@ -186,7 +186,7 @@ assets:
   - source_repository: jido_action
     source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
     source_path: examples/01_compilation/01_04_stored_json
-    target_path: examples/flow/compilation/stored_json
+    target_path: examples/flow/01_compilation/01_04_stored_json
     quality_surface: examples
     owner: jido.codec
     disposition: ported
@@ -194,7 +194,7 @@ assets:
   - source_repository: jido_action
     source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
     source_path: examples/01_compilation/01_05_authoring_equivalence
-    target_path: examples/flow/compilation/authoring_equivalence
+    target_path: examples/flow/01_compilation/01_05_authoring_equivalence
     quality_surface: examples
     owner: jido.flow
     disposition: ported
@@ -202,7 +202,7 @@ assets:
   - source_repository: jido_action
     source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
     source_path: examples/01_compilation/01_06_validation
-    target_path: examples/flow/compilation/validation
+    target_path: examples/flow/01_compilation/01_06_validation
     quality_surface: examples
     owner: jido.flow
     disposition: ported
@@ -210,7 +210,7 @@ assets:
   - source_repository: jido_action
     source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
     source_path: examples/01_compilation/01_07_inputs_and_output
-    target_path: examples/flow/compilation/inputs_and_output
+    target_path: examples/flow/01_compilation/01_07_inputs_and_output
     quality_surface: examples
     owner: jido.flow
     disposition: ported
@@ -218,7 +218,7 @@ assets:
   - source_repository: jido_action
     source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
     source_path: examples/01_compilation/01_09_compiled_program
-    target_path: examples/flow/compilation/compiled_program
+    target_path: examples/flow/01_compilation/01_09_compiled_program
     quality_surface: examples
     owner: jido.flow
     disposition: ported
@@ -226,15 +226,135 @@ assets:
   - source_repository: jido_action
     source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
     source_path: examples/02_execution
-    target_path: examples/flow/execution
+    target_path: examples/flow/02_execution
     quality_surface: examples
     owner: jido.execution
-    disposition: deferred
-    reason: Scheduled for jido-07x.10 as explicit post-baseline quality work.
+    disposition: ported
+    reason: Ported by jido-07x.10 with 15 registered paired offline examples for current Flow execution forms.
+  - source_repository: jido_action
+    source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
+    source_path: examples/02_execution/02_01_single_action
+    target_path: examples/flow/02_execution/02_01_single_action
+    quality_surface: examples
+    owner: jido.execution
+    disposition: ported
+    reason: Ported by jido-07x.10 with its paired catalog test.
+  - source_repository: jido_action
+    source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
+    source_path: examples/02_execution/02_02_three_step_flow
+    target_path: examples/flow/02_execution/02_02_three_step_flow
+    quality_surface: examples
+    owner: jido.execution
+    disposition: ported
+    reason: Ported by jido-07x.10 with its paired catalog test.
+  - source_repository: jido_action
+    source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
+    source_path: examples/02_execution/02_03_serial_then_parallel
+    target_path: examples/flow/02_execution/02_03_serial_then_parallel
+    quality_surface: examples
+    owner: jido.execution
+    disposition: ported
+    reason: Ported by jido-07x.10 with its paired catalog test.
+  - source_repository: jido_action
+    source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
+    source_path: examples/02_execution/02_04_choice
+    target_path: examples/flow/02_execution/02_04_choice
+    quality_surface: examples
+    owner: jido.execution
+    disposition: ported
+    reason: Ported by jido-07x.10 with its paired catalog test.
+  - source_repository: jido_action
+    source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
+    source_path: examples/02_execution/02_05_map_reduce
+    target_path: examples/flow/02_execution/02_05_map_reduce
+    quality_surface: examples
+    owner: jido.execution
+    disposition: ported
+    reason: Ported by jido-07x.10 with its paired catalog test.
+  - source_repository: jido_action
+    source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
+    source_path: examples/02_execution/02_06_loop_invoke_wait
+    target_path: examples/flow/02_execution/02_06_loop_invoke_wait
+    quality_surface: examples
+    owner: jido.execution
+    disposition: ported
+    reason: Ported by jido-07x.10 with deterministic wait coordination and its paired catalog test.
+  - source_repository: jido_action
+    source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
+    source_path: examples/02_execution/02_07_parallel
+    target_path: examples/flow/02_execution/02_07_parallel
+    quality_surface: examples
+    owner: jido.execution
+    disposition: ported
+    reason: Ported by jido-07x.10 with deterministic concurrency barriers and its paired catalog test.
+  - source_repository: jido_action
+    source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
+    source_path: examples/02_execution/02_08_map
+    target_path: examples/flow/02_execution/02_08_map
+    quality_surface: examples
+    owner: jido.execution
+    disposition: ported
+    reason: Ported by jido-07x.10 with its paired catalog test.
+  - source_repository: jido_action
+    source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
+    source_path: examples/02_execution/02_09_reduce
+    target_path: examples/flow/02_execution/02_09_reduce
+    quality_surface: examples
+    owner: jido.execution
+    disposition: ported
+    reason: Ported by jido-07x.10 with its paired catalog test.
+  - source_repository: jido_action
+    source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
+    source_path: examples/02_execution/02_10_iterate
+    target_path: examples/flow/02_execution/02_10_iterate
+    quality_surface: examples
+    owner: jido.execution
+    disposition: ported
+    reason: Ported by jido-07x.10 with bounded iteration assertions and its paired catalog test.
+  - source_repository: jido_action
+    source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
+    source_path: examples/02_execution/02_11_child_flow
+    target_path: examples/flow/02_execution/02_11_child_flow
+    quality_surface: examples
+    owner: jido.execution
+    disposition: ported
+    reason: Ported by jido-07x.10 with current compiled child Flow behavior and its paired catalog test.
+  - source_repository: jido_action
+    source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
+    source_path: examples/02_execution/02_12_wait_and_signal
+    target_path: examples/flow/02_execution/02_12_wait_and_signal
+    quality_surface: examples
+    owner: jido.execution
+    disposition: ported
+    reason: Ported by jido-07x.10 with deterministic wait-host coordination and its paired catalog test.
+  - source_repository: jido_action
+    source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
+    source_path: examples/02_execution/02_13_controlled_execution
+    target_path: examples/flow/02_execution/02_13_controlled_execution
+    quality_surface: examples
+    owner: jido.execution
+    disposition: ported
+    reason: Ported by jido-07x.10 with current manual managed execution and its paired catalog test.
+  - source_repository: jido_action
+    source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
+    source_path: examples/02_execution/02_14_effects_and_failure
+    target_path: examples/flow/02_execution/02_14_effects_and_failure
+    quality_surface: examples
+    owner: jido.execution
+    disposition: ported
+    reason: Ported by jido-07x.10 with exact effect and failure assertions and its paired catalog test.
+  - source_repository: jido_action
+    source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
+    source_path: examples/02_execution/02_15_dynamic_invoke
+    target_path: examples/flow/02_execution/02_15_dynamic_invoke
+    quality_surface: examples
+    owner: jido.execution
+    disposition: ported
+    reason: Ported by jido-07x.10 with the current Invoke expansion contract and its paired catalog test.
   - source_repository: jido_action
     source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
     source_path: examples/03_durability
-    target_path: examples/flow/advanced/durability
+    target_path: examples/flow/03_durability
     quality_surface: examples
     owner: jido.execution
     disposition: deferred
@@ -242,7 +362,7 @@ assets:
   - source_repository: jido_action
     source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
     source_path: examples/04_patterns
-    target_path: examples/flow/advanced/patterns
+    target_path: examples/flow/04_patterns
     quality_surface: examples
     owner: jido.execution
     disposition: deferred
@@ -250,7 +370,7 @@ assets:
   - source_repository: jido_action
     source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
     source_path: examples/05_distribution
-    target_path: examples/flow/advanced/distribution
+    target_path: examples/flow/05_distribution
     quality_surface: examples
     owner: jido.execution
     disposition: deferred
@@ -278,7 +398,7 @@ assets:
     quality_surface: examples
     owner: jido.examples
     disposition: ported
-    reason: Adapted by jido-07x.8 into one category register that rejects missing, duplicate, and unlisted example assets.
+    reason: Adapted by jido-07x.8 into one category register that enforces numbered chapters, numbered lessons, mirrored paths, sorted IDs, and complete assets.
   - source_repository: jido_v3_split
     source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
     source_path: test/examples/README.md
@@ -294,7 +414,7 @@ assets:
     quality_surface: examples
     owner: jido.examples
     disposition: ported
-    reason: Adapted by jido-07x.8 as the unified category and stable ID contract.
+    reason: Adapted by jido-07x.8 as the unified category and numbered teaching-order contract.
   - source_repository: jido_v3_split
     source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
     source_path: test/property

@@ -5,13 +5,21 @@ Supported examples use the register in
 the source of truth for example IDs, categories, source files, README files,
 and paired tests.
 
-An example ID uses slash-separated lower snake case:
+Supported examples keep the numbered chapter and lesson structure from the
+source Jido packages:
 
 ```text
-category/topic/example_name
+examples/category/NN_chapter/NN_NN_lesson
+test/examples/category/NN_chapter/NN_NN_lesson
+category/NN_NN_lesson
 ```
 
-The first segment must be one of these categories:
+The last line is the catalog ID. The category prefix prevents collisions
+between equal lesson numbers in different domains. The lesson chapter prefix
+must equal its parent chapter number. Numeric gaps are intentional and must
+not be renumbered.
+
+The category must be one of these values:
 
 | Category | Source root | Test root |
 | --- | --- | --- |
@@ -26,7 +34,9 @@ The first segment must be one of these categories:
 
 Each supported example has one catalog entry, one README, one primary source,
 and one paired test. Register auxiliary source files in the same entry. The
-catalog rejects files that are not registered.
+catalog rejects files that are not registered, paths that do not use the
+numbered structure, mismatched chapter prefixes, and entries that are not
+sorted by ID.
 
 Run all offline examples with:
 
