@@ -32,12 +32,12 @@ if Enum.any?(quality_selection, fn
      _other -> false
    end) do
   Code.require_file("property/support/report.exs", __DIR__)
-  JidoTest.Property.Report.prepare!()
+  Jido.Test.Property.Report.prepare!()
 
   ExUnit.configure(
     formatters: [
       ExUnit.CLIFormatter,
-      JidoTest.Property.Report
+      Jido.Test.Property.Report
     ]
   )
 end

@@ -230,7 +230,7 @@ defmodule Jido.MixProject do
     all? = paths == [] or Enum.any?(paths, &(Path.expand(&1) == Path.expand("test/property")))
 
     Code.require_file("test/property/support/report.exs")
-    JidoTest.Property.Report.check!(full: all?, suite: suite)
+    Jido.Test.Property.Report.check!(full: all?, suite: suite)
   end
 
   defp test_ignore_filters do

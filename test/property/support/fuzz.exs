@@ -1,9 +1,9 @@
 Code.require_file("config.exs", __DIR__)
 
-defmodule JidoTest.Property.Fuzz do
+defmodule Jido.Test.Property.Fuzz do
   @moduledoc false
 
-  alias JidoTest.Property.Config
+  alias Jido.Test.Property.Config
 
   # StreamData owns generation and shrinking. Inputs and observation names must
   # use JSON-compatible data so a reduced failure can be replayed.

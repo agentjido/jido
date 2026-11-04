@@ -81,6 +81,29 @@ u3_result:
   removed_default_roots:
     - test/jido/core_contract
     - test/jido/ai/contract
+u4_result:
+  authoring_suite:
+    passed: 134
+  property_suite:
+    passed: 37
+    excluded: 13
+  fuzz_suite:
+    passed: 13
+    excluded: 37
+  component_proof:
+    claims: 47
+    validation_tests_passed: 16
+  authoring_roots:
+    - test/authoring/jido_agent
+    - test/authoring/jido_flow
+  property_roots:
+    - test/property/jido_agent_server
+    - test/property/jido_expr
+    - test/property/jido_signal
+  ownership_policy:
+    - Product namespaces own executable authoring and property tests.
+    - Jido.Test namespaces own shared and family-specific helpers.
+    - AgentServer generated lifecycle proof is supplemental to deterministic runtime proof.
 deletions:
   - removed:
       - test/property/signal/support/fuzz.exs

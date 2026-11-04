@@ -88,10 +88,11 @@ evidence_groups:
   unit: [test/jido]
   covenant: [test/contracts/coverage.json]
   authoring: [test/authoring]
-  signal_property: [test/property/signal]
-  signal_fuzz: [test/property/signal]
-  expression_property: [test/property/action_flow/expression]
-  expression_fuzz: [test/property/action_flow/expression]
+  signal_property: [test/property/jido_signal]
+  signal_fuzz: [test/property/jido_signal]
+  expression_property: [test/property/jido_expr]
+  expression_fuzz: [test/property/jido_expr]
+  agent_server_property: [test/property/jido_agent_server]
   runtime_load: [test/load/runtime]
   action_flow_load: [test/load/action_flow]
   signal_benchmark: [test/bench/signal]
@@ -116,6 +117,7 @@ claims:
     covenant_obligations: all
     supplemental:
       - {mode: covenant, evidence_group: covenant, proves: "Stable Covenant IDs trace named AgentServer obligations to the canonical behavior tests."}
+      - {mode: property, evidence_group: agent_server_property, proves: "Generated command histories supplement deterministic lifecycle cases with cleanup, hibernation, rejection, and restoration sequences."}
   - id: jido.agent_server.activation.behavior
     component: jido.agent_server.activation
     canonical: {mode: unit, evidence_group: unit, owner: test/jido/agent_server/activation, proves: "Canonical activation, recovery, and root ownership semantics for AgentServer."}
@@ -338,6 +340,37 @@ claims:
     covenant_obligations: all
     supplemental:
       - {mode: covenant, evidence_group: covenant, proves: "Stable Covenant IDs trace turn obligations to the canonical behavior tests."}
+  - id: jido.agent.authoring
+    component: jido.agent
+    canonical: {mode: authoring, evidence_group: authoring, owner: test/authoring/jido_agent, proves: "Executable Agent DSL cases own compilation, metadata, extension, serialization, and generated-module authoring behavior."}
+  - id: jido_action.flow.authoring
+    component: jido_action.flow
+    canonical: {mode: authoring, evidence_group: authoring, owner: test/authoring/jido_flow, proves: "Executable Flow DSL cases own declaration, graph, extension, rejection, stored-form, and source-boundary authoring behavior."}
+  - id: jido_action.expression.generated_invariants
+    component: jido_action.expression
+    canonical: {mode: property, evidence_group: expression_property, owner: test/property/jido_expr/expression_contract_test.exs, proves: "Generated expression trees own operator, short-circuit, parser-limit, and evaluation invariants beyond the deterministic contract matrix."}
+    supplemental:
+      - {mode: fuzz, evidence_group: expression_fuzz, proves: "The larger fuzz budget extends generated expression depth and input volume while it keeps the same invariant set."}
+  - id: jido_action.authoring.signal_wire_invariants
+    component: jido_action.authoring
+    canonical: {mode: property, evidence_group: signal_property, owner: test/property/jido_signal/envelope_wire_test.exs, proves: "Generated Signal envelopes own canonical wire round-trip and portable value invariants."}
+    supplemental:
+      - {mode: fuzz, evidence_group: signal_fuzz, proves: "The larger fuzz budget extends generated envelope shapes and encoded value combinations."}
+  - id: jido_action.boundary.signal_boundary_invariants
+    component: jido_action.boundary
+    canonical: {mode: property, evidence_group: signal_property, owner: test/property/jido_signal/wire_mutations_test.exs, proves: "Generated wire mutations own boundary rejection and normalization invariants for hostile Signal payloads."}
+    supplemental:
+      - {mode: fuzz, evidence_group: signal_fuzz, proves: "The larger fuzz budget extends hostile wire mutations and malformed payload combinations."}
+  - id: jido.agent_server.effects.signal_dispatch_invariants
+    component: jido.agent_server.effects
+    canonical: {mode: property, evidence_group: signal_property, owner: test/property/jido_signal/dispatch_sequences_test.exs, proves: "Generated dispatch sequences own delivery, ordering, and process-effect invariants across Signal handlers."}
+    supplemental:
+      - {mode: fuzz, evidence_group: signal_fuzz, proves: "The larger fuzz budget extends dispatch ordering and handler-result combinations."}
+  - id: jido.plugin.bus.signal_history_invariants
+    component: jido.plugin.bus
+    canonical: {mode: property, evidence_group: signal_property, owner: test/property/jido_signal/bus_histories_test.exs, proves: "Generated bus histories own subscription, publication, observation, and cleanup invariants."}
+    supplemental:
+      - {mode: fuzz, evidence_group: signal_fuzz, proves: "The larger fuzz budget extends bus operation histories and lifecycle interleavings."}
 proof_profiles:
   closed_contract:
     unit: {state: required, evidence_group: unit}

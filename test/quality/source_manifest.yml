@@ -18,7 +18,7 @@ assets:
   - source_repository: jido_signal
     source_commit: 7b825f1d050a0e0159bb2a72ba79c100b5d362d3
     source_path: test/property
-    target_path: test/property/signal
+    target_path: test/property/jido_signal
     quality_surface: property_and_fuzz
     owner: jido.signal
     disposition: ported
@@ -34,7 +34,7 @@ assets:
   - source_repository: jido_signal
     source_commit: 7b825f1d050a0e0159bb2a72ba79c100b5d362d3
     source_path: test/property/corpus
-    target_path: test/property/corpus/signal
+    target_path: test/property/corpus/jido_signal
     quality_surface: regression_corpus
     owner: jido.signal
     disposition: ported
@@ -74,7 +74,7 @@ assets:
   - source_repository: jido_action
     source_commit: 177e7a4ce4342a9a6b7bc668f540dafbd7169d54
     source_path: test/authoring
-    target_path: test/authoring/flows
+    target_path: test/authoring/jido_flow
     quality_surface: authoring
     owner: jido.flow
     disposition: ported
@@ -90,7 +90,7 @@ assets:
   - source_repository: jido_action
     source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
     source_path: test/property
-    target_path: test/property/action_flow
+    target_path: test/property/jido_expr
     quality_surface: property_and_fuzz
     owner: jido.flow
     disposition: ported
@@ -618,7 +618,7 @@ assets:
   - source_repository: jido_v3_split
     source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
     source_path: test/property
-    target_path: test/property/runtime
+    target_path: test/property/jido_agent_server
     quality_surface: property_and_fuzz
     owner: jido.agent_server
     disposition: ported

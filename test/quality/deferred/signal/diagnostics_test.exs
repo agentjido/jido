@@ -1,12 +1,12 @@
 Code.require_file("../../../property/support/fuzz.exs", __DIR__)
 
-defmodule JidoTest.Property.Signal.DiagnosticsTest do
+defmodule Jido.Signal.Property.DiagnosticsTest do
   use ExUnit.Case, async: true
   import StreamData
   alias Jido.Error
   alias Jido.Signal
   alias Jido.Signal.Boundary
-  alias JidoTest.Property.Fuzz
+  alias Jido.Test.Property.Fuzz
 
   @classes [
     {:validation_error, :validation_error, false},

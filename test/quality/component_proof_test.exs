@@ -38,6 +38,7 @@ defmodule Jido.Quality.ComponentProofTest do
 
     assert Enum.sort(claim_components) == Enum.sort(components)
     assert Enum.all?(behavior_claims, &is_binary(get_in(&1, ["canonical", "owner"])))
+    assert Enum.all?(behavior_claims, &(&1["covenant_obligations"] == "all"))
   end
 
   test "rejects two canonical owners for one claim" do
@@ -57,6 +58,24 @@ defmodule Jido.Quality.ComponentProofTest do
              invalid,
              @root
            )
+  end
+
+  test "accepts a non-Covenant claim with an executable canonical owner" do
+    proof = ComponentProof.load!(@proof_path)
+
+    claim = %{
+      "id" => "jido.agent.synthetic_authoring_contract",
+      "component" => "jido.agent",
+      "canonical" => %{
+        "mode" => "authoring",
+        "evidence_group" => "authoring",
+        "owner" => "test/authoring/jido_agent",
+        "proves" => "Executable Agent authoring tests own this distinct synthetic DSL claim."
+      }
+    }
+
+    valid = Map.update!(proof, "claims", &[claim | &1])
+    assert ComponentProof.validate(valid, @root) == []
   end
 
   test "rejects canonical evidence repeated as supplemental evidence" do

@@ -1,11 +1,11 @@
 Code.require_file("support/report.exs", __DIR__)
 
-defmodule JidoTest.Property.ReportTest do
+defmodule Jido.Property.ReportTest do
   use ExUnit.Case, async: true
 
   @moduletag :property
 
-  alias JidoTest.Property.Report
+  alias Jido.Test.Property.Report
 
   defmodule FamilyTest do
   end
@@ -15,12 +15,12 @@ defmodule JidoTest.Property.ReportTest do
 
   @configs %{
     "family" => %{
-      module_prefixes: ["JidoTest.Property.ReportTest.FamilyTest"],
+      module_prefixes: ["Jido.Property.ReportTest.FamilyTest"],
       fuzz_ids: ["family_case"],
       required_observations: %{"family_case" => ["complete"]}
     },
     "other" => %{
-      module_prefixes: ["JidoTest.Property.ReportTest.OtherFamilyTest"],
+      module_prefixes: ["Jido.Property.ReportTest.OtherFamilyTest"],
       fuzz_ids: ["other_case"],
       required_observations: %{}
     }

@@ -191,7 +191,7 @@ defmodule Jido.Quality.ComponentProof do
       |> add_unless(repository_path?(owner, root), "#{prefix} canonical owner leaves the repository")
       |> add_unless(owner_has_tests?(owner, root), "#{prefix} canonical owner has no executable test")
       |> add_unless(
-        owner_has_component?(owner, component, root),
+        is_nil(claim["covenant_obligations"]) or owner_has_component?(owner, component, root),
         "#{prefix} canonical owner has no #{component} Covenant case"
       )
       |> add_unless(

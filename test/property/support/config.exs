@@ -1,21 +1,21 @@
-defmodule JidoTest.Property.Config do
+defmodule Jido.Test.Property.Config do
   @moduledoc false
 
   @families %{
     "jido_agent_server" => %{
-      module_prefixes: ["JidoTest.Property.Runtime."],
+      module_prefixes: ["Jido.AgentServer.Property."],
       fuzz_ids: ["agent_server_lifecycle"],
       required_observations: %{
         "agent_server_lifecycle" => ~w(cleanup failure hibernate invalid_directive invalid_state restore success)
       }
     },
     "jido_expr" => %{
-      module_prefixes: ["JidoTest.Property.ActionFlow.Expression."],
+      module_prefixes: ["Jido.Expr.Property."],
       fuzz_ids: ["expression_trees"],
       required_observations: %{}
     },
     "jido_signal" => %{
-      module_prefixes: ["JidoTest.Property.Signal."],
+      module_prefixes: ["Jido.Signal.Property."],
       fuzz_ids: ~w(
           bus_histories bus_observations catalog_boundaries dispatch_sequences
           durable_store_faults envelope_wire memory_histories pid_lifecycles
@@ -45,7 +45,7 @@ defmodule JidoTest.Property.Config do
 
   def corpus(family, id) do
     case family do
-      "jido_signal" -> Path.wildcard(Path.expand("../corpus/signal/#{id}/*.json", __DIR__))
+      "jido_signal" -> Path.wildcard(Path.expand("../corpus/jido_signal/#{id}/*.json", __DIR__))
       _other -> []
     end
   end

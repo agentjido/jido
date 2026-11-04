@@ -1,10 +1,10 @@
 Code.require_file("config.exs", __DIR__)
 
-defmodule JidoTest.Property.Report do
+defmodule Jido.Test.Property.Report do
   @moduledoc false
   use GenServer
 
-  alias JidoTest.Property.Config
+  alias Jido.Test.Property.Config
 
   @root Path.expand("../../..", __DIR__)
 
