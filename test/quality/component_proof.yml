@@ -103,9 +103,9 @@ evidence_groups:
   external_postgres: [test/external/postgres]
   external_redis: [test/external/redis]
   runtime_load: [test/perf/jido_agent_server]
-  action_flow_load: [test/perf/jido_exec]
+  execution_load: [test/perf/jido_exec]
   signal_benchmark: [test/perf/jido_signal]
-  action_flow_benchmark: [test/perf/jido_flow, test/perf/jido_exec]
+  flow_execution_benchmark: [test/perf/jido_flow, test/perf/jido_exec]
   react_benchmark: [test/perf/jido_ai]
 claims:
   - id: jido.agent.behavior
@@ -420,7 +420,7 @@ claims:
     canonical: {mode: load, evidence_group: runtime_load, owner: test/perf/jido_agent_server/load_test.exs, proves: "Bounded load cycles own AgentServer command capacity and complete process and registry cleanup under concurrent stop pressure."}
   - id: jido_action.execution.capacity
     component: jido_action.execution
-    canonical: {mode: load, evidence_group: action_flow_load, owner: test/perf/jido_exec/load_test.exs, proves: "Bounded load owns concurrent execution input isolation and complete caller and supervised task cleanup."}
+    canonical: {mode: load, evidence_group: execution_load, owner: test/perf/jido_exec/load_test.exs, proves: "Bounded load owns concurrent execution input isolation and complete caller and supervised task cleanup."}
   - id: jido_action.authoring.signal_capacity
     component: jido_action.authoring
     canonical: {mode: benchmark, evidence_group: signal_benchmark, owner: test/perf/jido_signal/signal_bench_test.exs, proves: "The Signal workload owns construction, codec, routing, dispatch, and retained-term measurement inventory without portable timing thresholds."}
@@ -435,16 +435,16 @@ claims:
     canonical: {mode: benchmark, evidence_group: signal_benchmark, owner: test/perf/jido_signal/candidate_bench_test.exs, proves: "Candidate Signal workloads own publish, replay, removal, retention, and Bus activity measurements."}
   - id: jido_action.action.compile_capacity
     component: jido_action.action
-    canonical: {mode: benchmark, evidence_group: action_flow_benchmark, owner: test/perf/jido_flow/runner_test.exs, proves: "Bounded Flow runners own Action normalization and generated DSL compile measurements with result validation."}
+    canonical: {mode: benchmark, evidence_group: flow_execution_benchmark, owner: test/perf/jido_flow/runner_test.exs, proves: "Bounded Flow runners own Action normalization and generated DSL compile measurements with result validation."}
   - id: jido_action.flow.compile_capacity
     component: jido_action.flow
-    canonical: {mode: benchmark, evidence_group: action_flow_benchmark, owner: test/perf/jido_flow/runner_test.exs, proves: "Bounded Flow runners own normalization, graph compilation, and generated module cleanup measurements."}
+    canonical: {mode: benchmark, evidence_group: flow_execution_benchmark, owner: test/perf/jido_flow/runner_test.exs, proves: "Bounded Flow runners own normalization, graph compilation, and generated module cleanup measurements."}
   - id: jido_action.instruction.compile_capacity
     component: jido_action.instruction
-    canonical: {mode: benchmark, evidence_group: action_flow_benchmark, owner: test/perf/jido_flow/runner_test.exs, proves: "Bounded Flow runners own instruction-bearing DSL compilation and executable result measurements."}
+    canonical: {mode: benchmark, evidence_group: flow_execution_benchmark, owner: test/perf/jido_flow/runner_test.exs, proves: "Bounded Flow runners own instruction-bearing DSL compilation and executable result measurements."}
   - id: jido_action.execution.run_capacity
     component: jido_action.execution
-    canonical: {mode: benchmark, evidence_group: action_flow_benchmark, owner: test/perf/jido_exec/runner_test.exs, proves: "The execution runner owns Action, Flow module, and Flow value measurements with supervised task cleanup."}
+    canonical: {mode: benchmark, evidence_group: flow_execution_benchmark, owner: test/perf/jido_exec/runner_test.exs, proves: "The execution runner owns Action, Flow module, and Flow value measurements with supervised task cleanup."}
   - id: jido_ai.react.capacity
     component: jido_ai.react
     canonical: {mode: benchmark, evidence_group: react_benchmark, owner: test/perf/jido_ai/react_bench_test.exs, proves: "Deterministic ReAct workloads own retained state, fresh workflow, isolated memory, and repeatable case inventory measurements."}
@@ -894,12 +894,12 @@ performance_profiles:
   signal_benchmark:
     load: {state: not_applicable, owner: self, reason_code: no_supported_load_surface, reason: Signal boundary work is bounded per operation; sustained AgentServer and execution load are owned by their runtime components.}
     benchmark: {state: required, evidence_group: signal_benchmark}
-  action_flow_benchmark:
+  flow_execution_benchmark:
     load: {state: not_applicable, owner: self, reason_code: no_supported_load_surface, reason: This authoring component performs bounded construction or compilation; execution owns sustained load behavior.}
-    benchmark: {state: required, evidence_group: action_flow_benchmark}
+    benchmark: {state: required, evidence_group: flow_execution_benchmark}
   execution_performance:
-    load: {state: required, evidence_group: action_flow_load}
-    benchmark: {state: required, evidence_group: action_flow_benchmark}
+    load: {state: required, evidence_group: execution_load}
+    benchmark: {state: required, evidence_group: flow_execution_benchmark}
   react_benchmark:
     load: {state: not_applicable, owner: self, reason_code: no_supported_load_surface, reason: Offline ReAct proof uses bounded deterministic requests; external provider throughput is not a portable package load gate.}
     benchmark: {state: required, evidence_group: react_benchmark}
@@ -924,16 +924,16 @@ components:
   - {id: jido.plugin.scheduler, proof_profile: stateful_contract, performance_profile: no_performance_surface}
   - {id: jido.plugin.sensor_manager, proof_profile: stateful_contract, performance_profile: no_performance_surface}
   - {id: jido.telemetry, proof_profile: stateful_contract, performance_profile: no_performance_surface}
-  - {id: jido_action.action, proof_profile: authoring_contract, performance_profile: action_flow_benchmark}
+  - {id: jido_action.action, proof_profile: authoring_contract, performance_profile: flow_execution_benchmark}
   - {id: jido_action.authoring, proof_profile: signal_authoring, performance_profile: signal_benchmark}
   - {id: jido_action.boundary, proof_profile: signal_authoring, performance_profile: signal_benchmark}
   - {id: jido_action.codec, proof_profile: authoring_contract, performance_profile: no_performance_surface}
   - {id: jido_action.execution, proof_profile: closed_example_contract, performance_profile: execution_performance}
   - {id: jido_action.expression, proof_profile: expression_authoring, performance_profile: no_performance_surface}
-  - {id: jido_action.flow, proof_profile: authoring_example_contract, performance_profile: action_flow_benchmark}
+  - {id: jido_action.flow, proof_profile: authoring_example_contract, performance_profile: flow_execution_benchmark}
   - {id: jido_action.inline, proof_profile: authoring_contract, performance_profile: no_performance_surface}
   - {id: jido_action.inline_flow, proof_profile: authoring_contract, performance_profile: no_performance_surface}
-  - {id: jido_action.instruction, proof_profile: authoring_contract, performance_profile: action_flow_benchmark}
+  - {id: jido_action.instruction, proof_profile: authoring_contract, performance_profile: flow_execution_benchmark}
   - {id: jido_action.output, proof_profile: closed_contract, performance_profile: no_performance_surface}
   - {id: jido_action.validation, proof_profile: authoring_contract, performance_profile: no_performance_surface}
   - {id: jido_ai.agent_authoring, proof_profile: authoring_example_contract, performance_profile: no_performance_surface}

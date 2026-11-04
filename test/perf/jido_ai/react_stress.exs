@@ -30,7 +30,7 @@ defmodule Jido.Test.Perf.AI.ReActStress do
       child_vm_exit_status: 0
     }
 
-    Runner.report!("jido.action_flow.react_stress", options, settings, [case_row], %{
+    Runner.report!("jido.ai.react_stress", options, settings, [case_row], %{
       benchmark_owner: "test/perf/jido_ai/react_memory.exs",
       isolation: "fresh BEAM VM"
     })

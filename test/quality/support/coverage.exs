@@ -40,10 +40,12 @@ defmodule Jido.Quality.Coverage do
 
     relevant =
       for source <- source_files,
+          file = repository_source(source["name"], root),
+          not is_nil(file),
           {count, index} <- Enum.with_index(source["coverage"], 1),
           not is_nil(count),
           into: %{} do
-        {"#{source["name"]}:#{index}", %{"covered" => count > 0, "file" => source["name"], "line" => index}}
+        {"#{file}:#{index}", %{"covered" => count > 0, "file" => file, "line" => index}}
       end
 
     {line_owners, file_owners, line_components, file_components} =
@@ -285,6 +287,16 @@ defmodule Jido.Quality.Coverage do
       %{args: args} -> base ++ args
     end
   end
+
+  defp repository_source(source, root) when is_binary(source) do
+    root = Path.expand(root)
+    expanded = Path.expand(source, root)
+    lib_root = Path.join(root, "lib")
+
+    if String.starts_with?(expanded, lib_root <> "/"), do: Path.relative_to(expanded, root)
+  end
+
+  defp repository_source(_source, _root), do: nil
 
   defp cover_owners(coverdata_path, owners, coverage_owners, root) do
     silence_output(fn ->

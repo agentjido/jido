@@ -266,10 +266,10 @@ defmodule Jido.Test.Perf.AI.ReActSupport do
 
   defp output_path!(path) do
     expanded = Path.expand(path)
-    root = Path.expand("tmp/bench/ai")
+    root = Path.expand("tmp/perf/jido_ai")
 
     unless expanded == root or String.starts_with?(expanded, root <> "/") do
-      raise "benchmark output must be under tmp/bench/ai"
+      raise "benchmark output must be under tmp/perf/jido_ai"
     end
 
     expanded

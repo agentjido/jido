@@ -9,7 +9,7 @@ defmodule Jido.Exec.Perf.RunnerTest do
   alias Jido.Test.Perf.{Result, ScriptRunner}
 
   test "the execution runner validates its work and writes a complete report" do
-    root = Path.expand("tmp/bench/action_flow/smoke")
+    root = Path.expand("tmp/perf/smoke")
     File.mkdir_p!(root)
 
     reports =

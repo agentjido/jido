@@ -1,5 +1,5 @@
 Code.require_file("../support/runner.exs", __DIR__)
-Code.require_file("../support/action_flow_fixtures.exs", __DIR__)
+Code.require_file("../support/flow_fixtures.exs", __DIR__)
 
 defmodule Jido.Test.Perf.Flow.Compile do
   @moduledoc false
@@ -41,7 +41,7 @@ defmodule Jido.Test.Perf.Flow.Compile do
         [Map.put(normalize, :width, width), Map.put(compile, :width, width)]
       end)
 
-    Runner.report!("jido.action_flow.compile", options, settings, cases)
+    Runner.report!("jido.flow.compile", options, settings, cases)
   end
 
   defp check_flow!(flow, width) do

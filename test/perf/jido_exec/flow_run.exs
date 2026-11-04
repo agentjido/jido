@@ -1,5 +1,5 @@
 Code.require_file("../support/runner.exs", __DIR__)
-Code.require_file("../support/action_flow_fixtures.exs", __DIR__)
+Code.require_file("../support/flow_fixtures.exs", __DIR__)
 
 defmodule Jido.Test.Perf.Exec.FlowRun do
   @moduledoc false
@@ -31,7 +31,7 @@ defmodule Jido.Test.Perf.Exec.FlowRun do
 
     after_run = Runner.task_children()
 
-    Runner.report!("jido.action_flow.run", options, settings, cases, %{
+    Runner.report!("jido.exec.run", options, settings, cases, %{
       cleanup: %{
         task_children_before: MapSet.size(baseline),
         task_children_after: MapSet.size(after_run)

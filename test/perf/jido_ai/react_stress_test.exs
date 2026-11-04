@@ -9,7 +9,7 @@ defmodule Jido.AI.Perf.ReActStressTest do
   alias Jido.Test.Perf.{Result, ScriptRunner}
 
   test "the isolated ReAct runner writes a complete report" do
-    output = Path.expand("tmp/bench/action_flow/smoke/react_stress.json")
+    output = Path.expand("tmp/perf/smoke/react_stress.json")
     File.mkdir_p!(Path.dirname(output))
     report = ScriptRunner.run!("test/perf/jido_ai/react_stress.exs", output)
 

@@ -1,4 +1,4 @@
-defmodule JidoTest.Quality.CIWorkflowTest do
+defmodule Jido.Quality.CIWorkflowTest do
   use ExUnit.Case, async: true
 
   @workflow_path Path.expand("../../.github/workflows/ci.yml", __DIR__)

@@ -16,7 +16,7 @@ reports, not pass thresholds.
 Run the bounded ReAct memory profile and write its common JSON result:
 
 ```console
-JIDO_MEMORY_BENCH_PROFILE=quick JIDO_MEMORY_BENCH_OUTPUT=json JIDO_MEMORY_BENCH_FILE=tmp/bench/ai/react-memory-quick.json mix bench
+JIDO_MEMORY_BENCH_PROFILE=quick JIDO_MEMORY_BENCH_OUTPUT=json JIDO_MEMORY_BENCH_FILE=tmp/perf/jido_ai/react-memory-quick.json mix bench
 ```
 
 Run the smoke checks with:
@@ -39,6 +39,6 @@ mix bench.ai.fresh_workflow --profile quick
 To save JSON, use a path under the ignored report directory:
 
 ```console
-mix bench.ai.state_growth --profile quick --output tmp/bench/ai/state-growth.json
-mix bench.ai.fresh_workflow --profile quick --output tmp/bench/ai/fresh-workflow.json
+mix bench.ai.state_growth --profile quick --output tmp/perf/jido_ai/state-growth.json
+mix bench.ai.fresh_workflow --profile quick --output tmp/perf/jido_ai/fresh-workflow.json
 ```

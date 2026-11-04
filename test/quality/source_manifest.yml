@@ -54,7 +54,7 @@ assets:
     quality_surface: benchmark
     owner: jido.signal
     disposition: ported
-    reason: Ported by jido-07x.4. Reports write only under tmp/bench/signal.
+    reason: Ported by jido-07x.4. Reports write only under tmp/perf/jido_signal.
   - source_repository: jido_signal
     source_commit: 7b825f1d050a0e0159bb2a72ba79c100b5d362d3
     source_path: bench/results
@@ -98,7 +98,7 @@ assets:
   - source_repository: jido_action
     source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
     source_path: test/property/support/authoring.exs
-    target_path: test/quality/excluded/action_flow/property_authoring_support.exs
+    target_path: test/quality/excluded/jido_flow/property_authoring_support.exs
     quality_surface: property_and_fuzz
     owner: jido.flow
     disposition: excluded
@@ -106,7 +106,7 @@ assets:
   - source_repository: jido_action
     source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
     source_path: test/property/support/managed.exs
-    target_path: test/quality/excluded/action_flow/property_managed_support.exs
+    target_path: test/quality/excluded/jido_exec/property_managed_support.exs
     quality_surface: property_and_fuzz
     owner: jido.execution
     disposition: excluded
@@ -114,7 +114,7 @@ assets:
   - source_repository: jido_action
     source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
     source_path: test/property/support/runtime.exs
-    target_path: test/quality/excluded/action_flow/property_runtime_support.exs
+    target_path: test/quality/excluded/jido_exec/property_runtime_support.exs
     quality_surface: property_and_fuzz
     owner: jido.execution
     disposition: excluded
@@ -142,7 +142,7 @@ assets:
     quality_surface: benchmark_smoke
     owner: jido.flow
     disposition: ported
-    reason: Ported by jido-07x.7 with quick, standard, and stress profiles for Flow compile, Flow run, DSL compile, and the current ReAct memory benchmark; generated reports stay under ignored tmp/bench/action_flow.
+    reason: Ported by jido-07x.7 with quick, standard, and stress profiles for Flow compile, Flow run, DSL compile, and the current ReAct memory benchmark; generated reports stay under ignored tmp/perf.
   - source_repository: jido_action
     source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
     source_path: test/bench/*.exs
@@ -154,11 +154,11 @@ assets:
   - source_repository: jido_action
     source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
     source_path: test/bench/results
-    target_path: test/quality/excluded/action_flow_benchmark_results
+    target_path: test/quality/excluded/jido_flow/benchmark_results
     quality_surface: benchmark_history
     owner: jido.flow
     disposition: excluded
-    reason: Historical benchmark result JSON is not imported; generated reports are ignored under tmp/bench/action_flow.
+    reason: Historical benchmark result JSON is not imported; generated reports are ignored under tmp/perf.
   - source_repository: jido_action
     source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
     source_path: test/examples

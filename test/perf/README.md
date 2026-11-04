@@ -18,14 +18,14 @@ state, Elixir and OTP versions, seed, workload, profile, and measurement units.
 | --- | --- |
 | AgentServer bounded load | `mix test.load test/perf/jido_agent_server` |
 | Exec bounded load | `mix test.load test/perf/jido_exec` |
-| Signal | `MIX_ENV=test mix run test/perf/jido_signal/run.exs --profile smoke --output tmp/bench/signal/smoke` |
+| Signal | `MIX_ENV=test mix run test/perf/jido_signal/run.exs --profile smoke --output tmp/perf/jido_signal/smoke` |
 | Flow normalization and compile | `MIX_ENV=test mix run test/perf/jido_flow/flow_compile.exs --profile quick` |
 | Action and Flow execution | `MIX_ENV=test mix run test/perf/jido_exec/flow_run.exs --profile quick` |
 | Action and Flow DSL compile | `MIX_ENV=test mix run test/perf/jido_flow/dsl_compile.exs --profile quick` |
 | ReAct isolated stress | `MIX_ENV=test mix run test/perf/jido_ai/react_stress.exs --profile quick` |
 | ReAct retained state | `MIX_ENV=test mix bench.ai.state_growth --profile quick` |
 | ReAct fresh workflow | `MIX_ENV=test mix bench.ai.fresh_workflow --profile quick` |
-| ReAct memory | `JIDO_MEMORY_BENCH_PROFILE=quick JIDO_MEMORY_BENCH_OUTPUT=json JIDO_MEMORY_BENCH_FILE=tmp/bench/ai/react-memory-quick.json mix bench` |
+| ReAct memory | `JIDO_MEMORY_BENCH_PROFILE=quick JIDO_MEMORY_BENCH_OUTPUT=json JIDO_MEMORY_BENCH_FILE=tmp/perf/jido_ai/react-memory-quick.json mix bench` |
 
 The Action and Flow commands use `quick`, `standard`, and `stress`. The two
 focused AI commands use the same profile names. The Signal runner uses `smoke`,

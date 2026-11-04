@@ -27,7 +27,7 @@ families:
     owner: jido.signal
     workload: Signal construction, codec, routing, dispatch, Bus, selector, replay, and cleanup
     limiter: Caller CPU, scheduler work, process memory, mailbox growth, and retained term size
-    command: MIX_ENV=test mix run test/perf/jido_signal/run.exs --profile smoke --output tmp/bench/signal/smoke
+    command: MIX_ENV=test mix run test/perf/jido_signal/run.exs --profile smoke --output tmp/perf/jido_signal/smoke
     evidence: test/perf/jido_signal/run.exs
     quick_profile: smoke
     supported_profiles: [smoke, short, candidates, scale]
@@ -38,7 +38,7 @@ families:
       short: {input_size: "8 fixture units", concurrency: "case-specific and bounded", warmup: 3, sample_count: 15}
       candidates: {input_size: "2 and 32 fixture units", concurrency: "case-specific and bounded", warmup: 3, sample_count: 15}
       scale: {input_size: "2, 8, and 32 fixture units", concurrency: "case-specific and bounded", warmup: 5, sample_count: 30}
-  - id: jido.action_flow.compile
+  - id: jido.flow.compile
     mode: benchmark
     component: jido_action.flow
     components: [jido_action.action, jido_action.flow, jido_action.instruction]
@@ -55,7 +55,7 @@ families:
       quick: {input_size: "Flow widths 4 and 16", concurrency: "1 caller", warmup: 1, sample_count: 2}
       standard: {input_size: "Flow widths 16 and 64", concurrency: "1 caller", warmup: 2, sample_count: 5}
       stress: {input_size: "Flow widths 64 and 256", concurrency: "1 caller", warmup: 3, sample_count: 10}
-  - id: jido.action_flow.run
+  - id: jido.exec.run
     mode: benchmark
     component: jido_action.execution
     components: [jido_action.execution]
@@ -72,7 +72,7 @@ families:
       quick: {input_size: "Flow width 4", concurrency: "bounded by the Flow runtime", warmup: 1, sample_count: 3}
       standard: {input_size: "Flow width 16", concurrency: "bounded by the Flow runtime", warmup: 3, sample_count: 15}
       stress: {input_size: "Flow width 64", concurrency: "bounded by the Flow runtime", warmup: 5, sample_count: 30}
-  - id: jido.action_flow.dsl_compile
+  - id: jido.flow.dsl_compile
     mode: benchmark
     component: jido_action.flow
     components: [jido_action.action, jido_action.flow, jido_action.instruction]
@@ -89,7 +89,7 @@ families:
       quick: {input_size: "2 generated Flow modules", concurrency: "1 compiler caller", warmup: 1, sample_count: 2}
       standard: {input_size: "10 generated Flow modules", concurrency: "1 compiler caller", warmup: 1, sample_count: 10}
       stress: {input_size: "25 generated Flow modules", concurrency: "1 compiler caller", warmup: 1, sample_count: 25}
-  - id: jido.action_flow.react_stress
+  - id: jido.ai.react_stress
     mode: benchmark
     component: jido_ai.react
     components: [jido_ai.react]
@@ -147,7 +147,7 @@ families:
     owner: jido.ai.react
     workload: Run isolated recursive and iterative ReAct scenarios and sample VM memory
     limiter: Runic graph work, process memory, allocator growth, and tool concurrency
-    command: JIDO_MEMORY_BENCH_PROFILE=quick JIDO_MEMORY_BENCH_OUTPUT=json JIDO_MEMORY_BENCH_FILE=tmp/bench/ai/react-memory-quick.json mix bench
+    command: JIDO_MEMORY_BENCH_PROFILE=quick JIDO_MEMORY_BENCH_OUTPUT=json JIDO_MEMORY_BENCH_FILE=tmp/perf/jido_ai/react-memory-quick.json mix bench
     evidence: test/perf/jido_ai/react_memory.exs
     quick_profile: quick
     supported_profiles: [quick, base, expanded]

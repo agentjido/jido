@@ -28,7 +28,7 @@ defmodule Jido.AI.Perf.ReActTest do
   end
 
   test "both manual runners write complete reports" do
-    root = Path.expand("tmp/bench/ai/smoke")
+    root = Path.expand("tmp/perf/jido_ai/smoke")
     File.rm_rf!(root)
     File.mkdir_p!(root)
 
@@ -71,7 +71,7 @@ defmodule Jido.AI.Perf.ReActTest do
   end
 
   test "the ReAct memory quick profile is repeatable and writes the common result" do
-    root = Path.expand("tmp/bench/ai/memory-smoke")
+    root = Path.expand("tmp/perf/jido_ai/memory-smoke")
     File.rm_rf!(root)
     File.mkdir_p!(root)
 

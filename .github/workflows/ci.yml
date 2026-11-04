@@ -159,7 +159,7 @@ jobs:
         with:
           name: extended-${{ strategy.job-index }}-${{ github.sha }}
           path: |
-            tmp/bench
+            tmp/perf
             tmp/quality
           if-no-files-found: ignore
 

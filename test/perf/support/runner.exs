@@ -6,7 +6,7 @@ defmodule Jido.Test.Perf.Runner do
   alias Jido.Test.Perf.Result
 
   @profiles ~w(quick standard stress)
-  @root Path.expand("tmp/bench/action_flow")
+  @root Path.expand("tmp/perf")
   @script_paths %{
     "dsl_compile" => "test/perf/jido_flow/dsl_compile.exs",
     "flow_compile" => "test/perf/jido_flow/flow_compile.exs",
@@ -27,7 +27,7 @@ defmodule Jido.Test.Perf.Runner do
     output = options |> Keyword.get(:output, default) |> Path.expand()
 
     unless String.starts_with?(output, @root <> "/") do
-      raise ArgumentError, "benchmark output must be under tmp/bench/action_flow"
+      raise ArgumentError, "benchmark output must be under tmp/perf"
     end
 
     %{profile: profile, output: output}
@@ -181,6 +181,6 @@ defmodule Jido.Test.Perf.Runner do
     raise ArgumentError,
           "usage: mix run #{Map.fetch!(@script_paths, suite)} " <>
             "--profile quick|standard|stress " <>
-            "[--output tmp/bench/action_flow/FILE.json]"
+            "[--output tmp/perf/FILE.json]"
   end
 end

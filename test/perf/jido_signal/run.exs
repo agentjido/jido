@@ -7,15 +7,15 @@ if args != [] or invalid != [],
   do:
     raise(
       ArgumentError,
-      "usage: mix run test/perf/jido_signal/run.exs --profile short|scale|smoke|candidates --output tmp/bench/signal/DIRECTORY"
+      "usage: mix run test/perf/jido_signal/run.exs --profile short|scale|smoke|candidates --output tmp/perf/jido_signal/DIRECTORY"
     )
 
 profile = Keyword.get(opts, :profile, "short")
-root = Path.expand("tmp/bench/signal")
+root = Path.expand("tmp/perf/jido_signal")
 output = opts |> Keyword.get(:output, Path.join(root, profile)) |> Path.expand()
 
 unless output == root or String.starts_with?(output, root <> "/") do
-  raise ArgumentError, "benchmark output must be under tmp/bench/signal"
+  raise ArgumentError, "benchmark output must be under tmp/perf/jido_signal"
 end
 
 report = Jido.Test.Perf.Signal.Suite.run(profile)

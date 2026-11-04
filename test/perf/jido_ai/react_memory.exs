@@ -696,11 +696,11 @@ defmodule Jido.Test.Perf.AI.ReActMemory do
         :ok
 
       path ->
-        root = Path.expand("tmp/bench/ai")
+        root = Path.expand("tmp/perf/jido_ai")
         output = Path.expand(path)
 
         unless output == root or String.starts_with?(output, root <> "/") do
-          raise "benchmark output must be under tmp/bench/ai"
+          raise "benchmark output must be under tmp/perf/jido_ai"
         end
 
         File.mkdir_p!(Path.dirname(output))

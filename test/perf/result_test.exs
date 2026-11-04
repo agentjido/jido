@@ -40,7 +40,7 @@ defmodule Jido.Perf.ResultTest do
   defp report do
     %{
       benchmark_result_schema_version: Result.schema_version(),
-      metadata: Result.metadata("jido.action_flow.compile", "quick"),
+      metadata: Result.metadata("jido.flow.compile", "quick"),
       cases: [%{id: "case/one"}, %{id: "case/two"}]
     }
   end

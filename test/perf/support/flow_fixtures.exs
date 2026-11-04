@@ -1,12 +1,12 @@
 defmodule Jido.Test.Perf.Flow.Identity do
-  use Jido.Action, name: "action_flow_benchmark_identity"
+  use Jido.Action, name: "perf_flow_identity"
 
   @impl true
   def run(params, _context), do: {:ok, %{value: params.value}}
 end
 
 defmodule Jido.Test.Perf.Flow.StaticFlow do
-  use Jido.Flow, name: "action_flow_benchmark_static"
+  use Jido.Flow, name: "perf_flow_static"
 
   alias Jido.Test.Perf.Flow.Identity
 
@@ -27,7 +27,7 @@ defmodule Jido.Test.Perf.Flow.Fixtures do
     ids = Enum.map(1..width, &"branch_#{&1}")
 
     %{
-      name: "action_flow_benchmark_wide_#{width}",
+      name: "perf_flow_wide_#{width}",
       components:
         Enum.map(ids, fn id ->
           %{

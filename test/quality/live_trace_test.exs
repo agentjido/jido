@@ -1,4 +1,4 @@
-defmodule JidoTest.Quality.LiveTraceTest do
+defmodule Jido.Quality.LiveTraceTest do
   use ExUnit.Case, async: true
 
   alias Jido.Test.AI.LiveTrace

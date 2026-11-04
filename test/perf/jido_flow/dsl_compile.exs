@@ -25,7 +25,7 @@ defmodule Jido.Test.Perf.Flow.DSLCompile do
     Enum.each(compiled_modules, &:code.purge/1)
     Enum.each(compiled_modules, &:code.delete/1)
 
-    Runner.report!("jido.action_flow.dsl_compile", options, settings, cases, %{
+    Runner.report!("jido.flow.dsl_compile", options, settings, cases, %{
       cleanup: %{purged_modules: length(compiled_modules)}
     })
   end
@@ -42,7 +42,7 @@ defmodule Jido.Test.Perf.Flow.DSLCompile do
     flow = Module.concat([Jido, Test, Perf, Flow, Generated, "Flow#{suffix}"])
     source = source(action, flow, suffix)
     started = System.monotonic_time()
-    compiled = Code.compile_string(source, "action_flow_dsl_#{suffix}.ex")
+    compiled = Code.compile_string(source, "jido_flow_dsl_#{suffix}.ex")
     elapsed = System.monotonic_time() - started
 
     unless Jido.Exec.run(flow, %{value: 11}) == {:ok, %{value: 11}} do

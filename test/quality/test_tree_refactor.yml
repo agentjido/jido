@@ -148,6 +148,50 @@ u6_result:
     - Jido.Examples namespaces own executable example tests.
     - Jido.Test.Examples namespaces own shared example loaders and fixtures.
     - Each lesson owns one documentation claim and supplements one canonical component behavior claim.
+u7_result:
+  default_suite:
+    passed: 3344
+    excluded: 510
+  authoring_suite:
+    passed: 134
+  covenant:
+    obligations_passed: 323
+    obligations_total: 323
+  example_suite:
+    passed: 261
+  property_suite:
+    passed: 37
+    skipped: 1
+    excluded: 14
+  fuzz_suite:
+    passed: 13
+    skipped: 1
+    excluded: 38
+  system_suite:
+    passed: 5
+    skipped: 14
+  load_suite:
+    passed: 5
+    excluded: 27
+  peer_suite:
+    passed: 7
+    excluded: 3847
+  bench_suite:
+    passed: 30
+    excluded: 2
+  quality_coverage:
+    status: pass
+    package_percent: 93.167
+  component_proof:
+    claims: 183
+    canonical_example_claims: 117
+  ex_dna:
+    clone_groups: 39
+    duplicated_lines: 817
+  final_state:
+    retired_active_paths: 0
+    retired_test_module_roots: 0
+    static_covenant_snapshots: 0
 deletions:
   - removed:
       - test/property/signal/support/fuzz.exs
@@ -221,3 +265,7 @@ deletions:
       - test/quality/deferred
     reason: legacy_structure_removed
     surviving_proof: Deferred execution probes are skipped under test/system/jido_exec/gaps, and the diagnostic probe is skipped under test/property/jido_signal; source manifest records keep each gap disposition.
+  - removed:
+      - test/contracts/coverage.static.json
+    reason: unconsumed_generated_evidence
+    surviving_proof: test/contracts/coverage.json remains the versioned Covenant evidence and reports 323 of 323 active obligations.

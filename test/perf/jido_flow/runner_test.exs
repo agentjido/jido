@@ -13,7 +13,7 @@ defmodule Jido.Flow.Perf.RunnerTest do
   alias Jido.Test.Perf.{Result, ScriptRunner}
 
   test "each Flow runner validates its work and writes one complete report" do
-    root = Path.expand("tmp/bench/action_flow/smoke")
+    root = Path.expand("tmp/perf/smoke")
     File.rm_rf!(root)
     File.mkdir_p!(root)
 
@@ -47,7 +47,7 @@ defmodule Jido.Flow.Perf.RunnerTest do
       )
 
     assert status != 0
-    assert log =~ "benchmark output must be under tmp/bench/action_flow"
+    assert log =~ "benchmark output must be under tmp/perf"
     refute File.exists?("flow-compile.json")
   end
 
