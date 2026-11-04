@@ -35,6 +35,7 @@ defmodule Jido.MixProject do
         quality: :test,
         "quality.contract": :test,
         "quality.coverage": :test,
+        "quality.report": :test,
         "test.authoring": :test,
         "test.bench": :test,
         "test.ci": :test,
@@ -166,6 +167,13 @@ defmodule Jido.MixProject do
         Code.require_file("test/quality/support/component_proof.exs")
         Code.require_file("test/quality/support/coverage.exs")
         Jido.Quality.Coverage.run!(File.cwd!(), args)
+      end,
+      "quality.report": fn args ->
+        Mix.Task.run("app.start")
+        Code.require_file("test/quality/support/contract.exs")
+        Code.require_file("test/quality/support/component_proof.exs")
+        Code.require_file("test/quality/support/report.exs")
+        Jido.Quality.Report.run!(File.cwd!(), args)
       end
     ]
   end

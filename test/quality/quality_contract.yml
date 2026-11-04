@@ -37,6 +37,7 @@ schema:
     - benchmark_smoke
   waiver_required_fields:
     - id
+    - finding_id
     - owner
     - reason
     - expires_on

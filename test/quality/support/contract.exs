@@ -32,7 +32,7 @@ defmodule Jido.Quality.Contract do
     |> validate_fuzz(map(contract["fuzz"]))
     |> validate_reports(map(contract["reports"]), root)
     |> validate_registries(map(contract["registries"]), root)
-    |> validate_waivers(waivers, list(schema["waiver_required_fields"]), today)
+    |> validate_waivers(waivers, list(schema["waiver_required_fields"]), today, findings)
     |> validate_stability_findings(
       findings,
       list(schema["stability_required_fields"]),
@@ -205,7 +205,9 @@ defmodule Jido.Quality.Contract do
     end)
   end
 
-  defp validate_waivers(errors, waivers, fields, today) do
+  defp validate_waivers(errors, waivers, fields, today, findings) do
+    findings_by_id = Map.new(findings, &{&1["id"], &1})
+
     waivers
     |> Enum.with_index(1)
     |> Enum.reduce(errors, fn {waiver, index}, current ->
@@ -214,6 +216,15 @@ defmodule Jido.Quality.Contract do
       current
       |> validate_record_fields(waiver, fields, name)
       |> validate_expiry(waiver["expires_on"], today, name)
+      |> add_unless(
+        Map.has_key?(findings_by_id, waiver["finding_id"]),
+        "#{name} has unknown finding_id"
+      )
+      |> add_unless(
+        is_nil(findings_by_id[waiver["finding_id"]]) or
+          findings_by_id[waiver["finding_id"]]["owner"] == waiver["owner"],
+        "#{name} owner does not match its finding"
+      )
     end)
   end
 

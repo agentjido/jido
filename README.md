@@ -43,8 +43,16 @@ decisions in `docs/aspirational-module-dependency-map.md`.
 ```sh
 mix deps.get
 mix test
+mix test.ci
+mix quality.coverage
+mix quality.report
 mix reach.check --arch --smells
 ```
+
+`mix quality.coverage` measures the package, all active Covenant components, and each required offline suite. Run it
+before `mix quality.report`. The report writes JSON and text evidence under `tmp/quality/` and fails when a required
+suite, obligation, component proof, coverage rule, or stability record is not satisfied. Live provider and external
+service checks are separate opt-in commands.
 
 The live graph-first example makes a paid model call. It starts a Jido instance,
 runs the canonical ReAct Flow in an AgentServer, calls two Actions in one tool

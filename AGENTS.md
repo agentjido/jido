@@ -51,4 +51,5 @@ Some active Covenant IDs still start with `jido_action.` or `jido_ai.`. These ar
 - Record a lasting architecture decision in `docs/adr/` and update its index.
 - Run focused tests and `mix format --check-formatted` before handoff. For architecture changes, also run `mix reach.check --arch --smells` and the Covenant checks for the changed component.
 - Run `mix test.authoring` for public authoring compatibility and `mix test.contracts` for all Covenant contracts. Both commands run in `mix test.ci`.
+- Run `mix quality.coverage` before `mix quality.report`. The report runs all required offline suites and fails on missing, stale, unowned, or unresolved evidence. Provider and external-service suites stay opt-in.
 - Do not edit generated files in `_build/`, `cover/`, or `deps/`.

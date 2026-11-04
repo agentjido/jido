@@ -77,3 +77,13 @@ mix test.services
 
 `mix test.ci` runs the default suite and every offline quality surface that is available. Live and service checks stay
 explicit and opt-in.
+
+## Combined quality report
+
+Run `mix quality.coverage` first, then run `mix quality.report`. The report command validates the contract before it
+runs the required offline suites. It collects suite artifacts, Covenant obligation coverage, component proof, line
+coverage, stability findings, and waivers.
+
+The command writes `tmp/quality/quality.json` and `tmp/quality/quality.txt`. Both files contain the same pass or fail
+outcome, the exact Git revision, the dirty state, runtime versions, suite owners, thresholds, coverage, findings, and
+waivers. Missing or stale evidence fails closed. A later passing suite does not remove an unresolved stability finding.

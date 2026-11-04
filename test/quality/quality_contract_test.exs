@@ -64,6 +64,7 @@ defmodule Jido.Quality.ContractTest do
   test "rejects a waiver without ownership or an expiry condition" do
     waiver = %{
       "id" => "temporary-gap",
+      "finding_id" => "unknown-finding",
       "owner" => "",
       "reason" => "A temporary compatibility gap",
       "expires_on" => "2026-11-03",
@@ -76,6 +77,7 @@ defmodule Jido.Quality.ContractTest do
     assert "waiver temporary-gap is missing owner" in errors
     assert "waiver temporary-gap is missing resolution_condition" in errors
     assert "waiver temporary-gap is expired" in errors
+    assert "waiver temporary-gap has unknown finding_id" in errors
   end
 
   test "rejects evidence and report paths that leave the repository" do
