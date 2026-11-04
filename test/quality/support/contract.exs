@@ -189,6 +189,10 @@ defmodule Jido.Quality.Contract do
 
     errors
     |> add_unless(present?(registries["component_proof"]), "registries must declare component_proof")
+    |> add_unless(
+      present?(registries["coverage_baseline"]),
+      "registries must declare coverage_baseline"
+    )
     |> validate_paths(paths, root, "registry path")
     |> then(fn current ->
       Enum.reduce(paths, current, fn path, path_errors ->

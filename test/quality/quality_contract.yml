@@ -171,6 +171,7 @@ reports:
   text: tmp/quality/quality.txt
 registries:
   component_proof: test/quality/component_proof.yml
+  coverage_baseline: test/quality/coverage_baseline.json
 waivers: []
 stability_findings:
   - id: covenant-persistence-token-cleanup-race

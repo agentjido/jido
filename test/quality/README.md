@@ -41,6 +41,23 @@ explicit primary owner. Fallback namespace rules cover modules that do not occur
 specific fallback prefix wins. The committed production and documented-public module counts and SHA-256 values make
 new modules fail closed until their ownership is reviewed.
 
+## Coverage measurement
+
+`coverage_baseline.json` records the clean component baseline from its full Git revision. `mix quality.coverage` runs
+every required offline suite with ExCoveralls, unions source path and line identities, and writes only ignored evidence
+under `tmp/quality/coverage/`. Package lines count once. A module can contribute to each Covenant component that names
+it, but it still has one primary owner in `component_proof.yml`.
+
+The gate requires at least 90 percent package coverage and 80 percent for each component. It also fails when a component
+drops below its recorded floor or regresses by more than 0.5 percentage points from the committed baseline. The JSON
+and text outputs include total and unique covered-line contributions for each suite.
+
+Run the complete coverage gate with:
+
+```text
+mix quality.coverage
+```
+
 ## Focused commands
 
 Each command uses seed `0`. A command exits successfully with a clear message when its default target path does not exist.

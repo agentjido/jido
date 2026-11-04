@@ -113,6 +113,45 @@ defmodule Jido.Quality.Coverage do
     }
   end
 
+  def validate_baseline(baseline, component_ids, thresholds) do
+    expected = Enum.sort(component_ids)
+    actual = baseline |> map_at("components") |> Map.keys() |> Enum.sort()
+    baseline_thresholds = map_at(baseline, "thresholds")
+    minimum = number(thresholds["component_minimum_percent"])
+
+    errors =
+      []
+      |> add_unless(baseline["version"] == 1, "coverage baseline version must equal 1")
+      |> add_unless(
+        is_binary(baseline["revision"]) and Regex.match?(~r/^[0-9a-f]{40}$/, baseline["revision"]),
+        "coverage baseline revision must be a full Git SHA"
+      )
+      |> add_unless(actual == expected, "coverage baseline component inventory does not match component proof")
+      |> add_unless(
+        baseline_thresholds == %{
+          "package_minimum_percent" => number(thresholds["package_minimum_percent"]),
+          "component_minimum_percent" => minimum,
+          "maximum_component_regression_points" => number(thresholds["maximum_component_regression_points"])
+        },
+        "coverage baseline thresholds do not match the quality contract"
+      )
+
+    baseline
+    |> map_at("components")
+    |> Enum.reduce(errors, fn {id, entry}, current ->
+      baseline_percent = entry["baseline_percent"]
+      floor_percent = entry["floor_percent"]
+
+      current
+      |> add_unless(valid_percent?(baseline_percent), "component #{id} has an invalid baseline percent")
+      |> add_unless(
+        valid_percent?(floor_percent) and number(floor_percent) >= minimum,
+        "component #{id} has an invalid coverage floor"
+      )
+    end)
+    |> Enum.sort()
+  end
+
   def run!(root, args \\ []) do
     contract_path = Path.join(root, "test/quality/quality_contract.yml")
     proof_path = Path.join(root, "test/quality/component_proof.yml")
@@ -147,6 +186,13 @@ defmodule Jido.Quality.Coverage do
           "components" => Map.new(component_ids, &{&1, %{"baseline_percent" => 0.0, "floor_percent" => 80.0}})
         }
       end
+
+    if File.regular?(baseline_path) do
+      case validate_baseline(baseline, component_ids, contract["thresholds"]["line_coverage"]) do
+        [] -> :ok
+        errors -> raise "invalid coverage baseline:\n- #{Enum.join(errors, "\n- ")}"
+      end
+    end
 
     thresholds = contract["thresholds"]["line_coverage"]
     report = aggregate(suites, baseline, thresholds, components: component_ids)
@@ -468,6 +514,9 @@ defmodule Jido.Quality.Coverage do
 
   defp map_at(map, key) when is_map(map), do: Map.get(map, key, %{})
   defp map_at(_value, _key), do: %{}
+  defp valid_percent?(value), do: is_number(value) and value >= 0 and value <= 100
+  defp add_unless(errors, true, _message), do: errors
+  defp add_unless(errors, false, message), do: [message | errors]
   defp number(value) when is_integer(value), do: value * 1.0
   defp number(value) when is_float(value), do: value
   defp number(_value), do: 0.0

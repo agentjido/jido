@@ -118,6 +118,31 @@ defmodule Jido.Quality.CoverageTest do
     assert "component a has no line coverage evidence" in report["errors"]
   end
 
+  test "the committed baseline must match the component inventory and thresholds" do
+    source = baseline(%{"a" => 90.0})
+
+    source =
+      source
+      |> Map.put("version", 1)
+      |> Map.put("revision", String.duplicate("a", 40))
+      |> Map.put("thresholds", %{
+        "package_minimum_percent" => 90.0,
+        "component_minimum_percent" => 80.0,
+        "maximum_component_regression_points" => 0.5
+      })
+
+    assert Coverage.validate_baseline(source, ["a"], @thresholds) == []
+
+    invalid = put_in(source, ["components", "a", "floor_percent"], 79.9)
+    assert "component a has an invalid coverage floor" in Coverage.validate_baseline(invalid, ["a"], @thresholds)
+
+    assert "coverage baseline component inventory does not match component proof" in Coverage.validate_baseline(
+             source,
+             ["a", "b"],
+             @thresholds
+           )
+  end
+
   defp suite(id, lines), do: %{"suite" => id, "lines" => lines}
   defp line(component, covered), do: %{"component" => component, "covered" => covered}
 
