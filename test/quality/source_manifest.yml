@@ -882,27 +882,27 @@ assets:
   - source_repository: jido_ai
     source_commit: 2d3cac6700fcb850b632c2ce5f552ccfd0e5459e
     source_path: examples/00_graph_first
-    target_path: examples/ai/graph_first
+    target_path: examples/ai/00_graph_first
     quality_surface: examples
     owner: jido.ai.agent_authoring
-    disposition: deferred
-    reason: Scheduled for jido-07x.15.
+    disposition: ported
+    reason: Ported as two offline graph-first lessons with deterministic model fixtures.
   - source_repository: jido_ai
     source_commit: 2d3cac6700fcb850b632c2ce5f552ccfd0e5459e
     source_path: examples/01_basics
-    target_path: examples/ai/basics
+    target_path: examples/ai/01_basics
     quality_surface: examples
     owner: jido.ai.agent_authoring
-    disposition: deferred
-    reason: Scheduled for jido-07x.15.
+    disposition: ported
+    reason: Ported as nine numbered offline AI basics lessons.
   - source_repository: jido_ai
     source_commit: 2d3cac6700fcb850b632c2ce5f552ccfd0e5459e
     source_path: examples/02_conversations
-    target_path: examples/ai/conversations
+    target_path: examples/ai/02_conversations
     quality_surface: examples
     owner: jido.ai.conversation
-    disposition: deferred
-    reason: Scheduled for jido-07x.15.
+    disposition: ported
+    reason: Ported as five numbered offline Session and Thread lessons.
   - source_repository: jido_ai
     source_commit: 2d3cac6700fcb850b632c2ce5f552ccfd0e5459e
     source_path: examples/99_proposed

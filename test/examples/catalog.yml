@@ -28,6 +28,9 @@ categories:
 index_readmes:
   - examples/agent/01_basic/README.md
   - examples/agent/02_workflow/README.md
+  - examples/ai/00_graph_first/README.md
+  - examples/ai/01_basics/README.md
+  - examples/ai/02_conversations/README.md
   - examples/durable/11_durable/README.md
   - examples/flow/01_compilation/README.md
   - examples/flow/02_execution/README.md
@@ -136,6 +139,90 @@ examples:
     auxiliary_sources:
       - examples/agent/02_workflow/02_09_flow_directives/effects.ex
     test: test/examples/agent/02_workflow/02_09_flow_directives/flow_directives_test.exs
+  - id: ai/00_01_simple_agent
+    category: ai
+    readme: examples/ai/00_graph_first/00_01_simple_agent/README.md
+    source: examples/ai/00_graph_first/00_01_simple_agent/simple_agent.ex
+    auxiliary_sources:
+      - examples/ai/00_graph_first/00_01_simple_agent/simple_agent.exs
+    test: test/examples/ai/00_graph_first/00_01_simple_agent/simple_agent_test.exs
+  - id: ai/00_02_schema_driven_overrides
+    category: ai
+    readme: examples/ai/00_graph_first/00_02_schema_driven_overrides/README.md
+    source: examples/ai/00_graph_first/00_02_schema_driven_overrides/schema_driven_overrides.ex
+    test: test/examples/ai/00_graph_first/00_02_schema_driven_overrides/schema_driven_overrides_test.exs
+  - id: ai/01_01_basic_agent
+    category: ai
+    readme: examples/ai/01_basics/01_01_basic_agent/README.md
+    source: examples/ai/01_basics/01_01_basic_agent/agent.ex
+    test: test/examples/ai/01_basics/01_01_basic_agent/basic_agent_test.exs
+  - id: ai/01_02_tool_flow
+    category: ai
+    readme: examples/ai/01_basics/01_02_tool_flow/README.md
+    source: examples/ai/01_basics/01_02_tool_flow/agent.ex
+    test: test/examples/ai/01_basics/01_02_tool_flow/tool_flow_test.exs
+  - id: ai/01_03_structured_output
+    category: ai
+    readme: examples/ai/01_basics/01_03_structured_output/README.md
+    source: examples/ai/01_basics/01_03_structured_output/agent.ex
+    test: test/examples/ai/01_basics/01_03_structured_output/structured_output_test.exs
+  - id: ai/01_04_controls
+    category: ai
+    readme: examples/ai/01_basics/01_04_controls/README.md
+    source: examples/ai/01_basics/01_04_controls/agent.ex
+    test: test/examples/ai/01_basics/01_04_controls/controls_test.exs
+  - id: ai/01_05_streaming
+    category: ai
+    readme: examples/ai/01_basics/01_05_streaming/README.md
+    source: examples/ai/01_basics/01_05_streaming/agent.ex
+    test: test/examples/ai/01_basics/01_05_streaming/streaming_test.exs
+  - id: ai/01_06_request_contract
+    category: ai
+    readme: examples/ai/01_basics/01_06_request_contract/README.md
+    source: examples/ai/01_basics/01_06_request_contract/agent.ex
+    test: test/examples/ai/01_basics/01_06_request_contract/request_contract_test.exs
+  - id: ai/01_07_core_composition
+    category: ai
+    readme: examples/ai/01_basics/01_07_core_composition/README.md
+    source: examples/ai/01_basics/01_07_core_composition/agent.ex
+    test: test/examples/ai/01_basics/01_07_core_composition/core_composition_test.exs
+  - id: ai/01_08_model_helpers
+    category: ai
+    readme: examples/ai/01_basics/01_08_model_helpers/README.md
+    source: examples/ai/01_basics/01_08_model_helpers/models.ex
+    test: test/examples/ai/01_basics/01_08_model_helpers/model_helpers_test.exs
+  - id: ai/01_09_json_agent
+    category: ai
+    readme: examples/ai/01_basics/01_09_json_agent/README.md
+    source: examples/ai/01_basics/01_09_json_agent/json_agent.ex
+    auxiliary_sources:
+      - examples/ai/01_basics/01_09_json_agent/run.exs
+    test: test/examples/ai/01_basics/01_09_json_agent/json_agent_test.exs
+  - id: ai/02_01_thread_agent
+    category: ai
+    readme: examples/ai/02_conversations/02_01_thread_agent/README.md
+    source: examples/ai/02_conversations/02_01_thread_agent/thread_agent.ex
+    test: test/examples/ai/02_conversations/02_01_thread_agent/thread_agent_test.exs
+  - id: ai/02_02_session_value
+    category: ai
+    readme: examples/ai/02_conversations/02_02_session_value/README.md
+    source: examples/ai/02_conversations/02_02_session_value/session_value.ex
+    test: test/examples/ai/02_conversations/02_02_session_value/session_value_test.exs
+  - id: ai/02_03_session_agent
+    category: ai
+    readme: examples/ai/02_conversations/02_03_session_agent/README.md
+    source: examples/ai/02_conversations/02_03_session_agent/session_agent.ex
+    test: test/examples/ai/02_conversations/02_03_session_agent/session_agent_test.exs
+  - id: ai/02_04_conversation_history
+    category: ai
+    readme: examples/ai/02_conversations/02_04_conversation_history/README.md
+    source: examples/ai/02_conversations/02_04_conversation_history/conversation_history.ex
+    test: test/examples/ai/02_conversations/02_04_conversation_history/conversation_history_test.exs
+  - id: ai/02_05_request_modes
+    category: ai
+    readme: examples/ai/02_conversations/02_05_request_modes/README.md
+    source: examples/ai/02_conversations/02_05_request_modes/request_modes.ex
+    test: test/examples/ai/02_conversations/02_05_request_modes/request_modes_test.exs
   - id: durable/11_01_saved_agent
     category: durable
     readme: examples/durable/11_durable/11_01_saved_agent/README.md
@@ -609,6 +696,8 @@ examples:
 exclusions:
   - path: examples/00_graph_first
     reason: The numbered live-provider lesson is opt-in. U15 owns offline AI examples, and U19 owns live-provider proof.
+  - path: examples/ai/support
+    reason: The arithmetic tools are shared by numbered offline AI lessons and are not a standalone lesson.
   - path: examples/durable/11_durable/11_03_vm_recovery/support
     reason: The DETS Store is support for the VM recovery lesson and is not a standalone lesson.
   - path: examples/durable/11_durable/11_07_external_uncertainty/support

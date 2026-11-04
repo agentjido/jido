@@ -554,7 +554,7 @@ All units execute directly on `main` after their dependency tickets close, per K
 
 **Dependencies:** U8 and U2.
 
-**Files:** Read AI baseline example groups `00_graph_first/**`, `01_basics/**`, and `02_conversations/**` at `2d3cac6700fcb850b632c2ce5f552ccfd0e5459e`. Exclude `99_proposed/**`. Add `examples/ai/**` and `test/examples/ai/**`. Change the manifest.
+**Files:** Read AI baseline example groups `00_graph_first/**`, `01_basics/**`, and `02_conversations/**` at `2d3cac6700fcb850b632c2ce5f552ccfd0e5459e`. Exclude `99_proposed/**`. Add `examples/ai/00_graph_first/**`, `examples/ai/01_basics/**`, `examples/ai/02_conversations/**`, and matching paths under `test/examples/ai/**`. Change the manifest.
 
 **Directive:**
 
@@ -564,9 +564,9 @@ All units execute directly on `main` after their dependency tickets close, per K
 
 **Test scenarios and acceptance criteria:**
 
-- [ ] Every baseline AI example has a manifest disposition.
-- [ ] `99_proposed/**` is excluded with a reason.
-- [ ] All ported AI examples pass without a provider key.
+- [x] Every baseline AI example has a manifest disposition.
+- [x] `99_proposed/**` is excluded with a reason.
+- [x] All ported AI examples pass without a provider key.
 
 **Verification:** `mix test.examples test/examples/ai` exits with status `0`.
 
