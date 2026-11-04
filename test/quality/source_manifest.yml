@@ -605,16 +605,80 @@ assets:
     target_path: test/property/runtime
     quality_surface: property_and_fuzz
     owner: jido.agent_server
-    disposition: deferred
-    reason: Scheduled for jido-07x.16.
+    disposition: ported
+    reason: Distinct runtime lifecycle and precommit histories were adapted into generated short and fuzz budgets with File recovery and cleanup checks.
   - source_repository: jido_v3_split
     source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
-    source_path: test/system
+    source_path: test/property/authoring_contract_test.exs
+    target_path: test/quality/superseded/core_property_authoring_contract
+    quality_surface: property_and_fuzz
+    owner: jido.agent
+    disposition: superseded
+    reason: The authoring corpus and Covenant Agent authoring obligations own this duplicate definition and fixture-cleanup proof.
+  - source_repository: jido_v3_split
+    source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
+    source_path: test/property/state_test.exs
+    target_path: test/quality/superseded/core_property_state_contract
+    quality_surface: property_and_fuzz
+    owner: jido.agent
+    disposition: superseded
+    reason: Current Covenant state obligations cover defaults, completeness, deep schemas, immutability, and checkpoint restore directly.
+  - source_repository: jido_v3_split
+    source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
+    source_path: test/property/intersection_test.exs
+    target_path: test/quality/superseded/core_property_intersection_contract
+    quality_surface: property_and_fuzz
+    owner: jido.agent
+    disposition: superseded
+    reason: test/jido/agent/state_intersection_test.exs owns the same intersection defaults, validation, transition, and restore proof.
+  - source_repository: jido_v3_split
+    source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
+    source_path: test/property/fuzz_support_test.exs
+    target_path: test/quality/superseded/core_property_fuzz_harness
+    quality_surface: property_and_fuzz
+    owner: jido.quality
+    disposition: superseded
+    reason: The Signal and Action fuzz harnesses own generation, shrinking, replay, and artifact-integrity proof.
+  - source_repository: jido_v3_split
+    source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
+    source_path: test/property/report_test.exs
+    target_path: test/quality/superseded/core_property_reporting
+    quality_surface: property_and_fuzz
+    owner: jido.quality
+    disposition: superseded
+    reason: The suite-specific fuzz reporters plus the unified quality contract own proof accounting.
+  - source_repository: jido_v3_split
+    source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
+    source_path: test/system/runtime
     target_path: test/system/runtime/core
     quality_surface: system_and_services
     owner: jido.agent_server
+    disposition: ported
+    reason: Distinct cleanup, File recovery, corrupt-record, stale-checkpoint, and telemetry behavior was adapted into local current-API system checks.
+  - source_repository: jido_v3_split
+    source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
+    source_path: test/system/runtime/agent_server_load_test.exs
+    target_path: test/load/runtime
+    quality_surface: load
+    owner: jido.agent_server
+    disposition: ported
+    reason: Adapted as three monitored 100-Agent cycles with exact process and registry cleanup barriers.
+  - source_repository: jido_v3_split
+    source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
+    source_path: test/system/runtime/peers_test.exs
+    target_path: test/quality/superseded/core_runtime_peers
+    quality_surface: peer
+    owner: jido.agent_server
+    disposition: superseded
+    reason: The opt-in durable example peer suite proves fresh-BEAM File restore and in-flight workflow recovery with current APIs.
+  - source_repository: jido_v3_split
+    source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
+    source_path: test/system/services
+    target_path: test/system/services
+    quality_surface: services
+    owner: jido.persistence
     disposition: deferred
-    reason: Local checks are scheduled for jido-07x.16 and service checks for jido-07x.17.
+    reason: Scheduled for jido-07x.17.
   - source_repository: jido_v3_split
     source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
     source_path: test/bench

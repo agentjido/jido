@@ -589,9 +589,9 @@ All units execute directly on `main` after their dependency tickets close, per K
 
 **Test scenarios and acceptance criteria:**
 
-- [ ] Duplicate property cases are marked superseded.
-- [ ] Local system checks cover cleanup, recovery, observation, and storage behavior supported by current APIs.
-- [ ] Peer checks remain opt-in.
+- [x] Duplicate property cases are marked superseded.
+- [x] Local system checks cover cleanup, recovery, observation, and storage behavior supported by current APIs.
+- [x] Peer checks remain opt-in.
 
 **Verification:** `mix test.property test/property/runtime`, `mix test.system test/system/runtime/core`, and `mix test.peer` exit with status `0`.
 
